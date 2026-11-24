@@ -91,5 +91,6 @@
   },
   "pickAddress": "Sélectionnez une adresse pour l’autoriser ou la bloquer pour cette app.",
   "recent": "connexion récente",
-  "recentDenied": "refusée récemment"
+  "recentDenied": "refusée récemment",
+  "machineInherits": "Les règles de Machines décident aussi pour cette machine. Ses propres règles s’y ajoutent : quand les deux correspondent à une connexion, la plus précise décide, et Bloquer l’emporte sur Autoriser."
 }

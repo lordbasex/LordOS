@@ -23,6 +23,7 @@ import { readMeta, writeMeta, readCpuUse, isProtectedMachine } from './meta.js';
 import { CloneSheet } from './clone.jsx';
 import { ExportSheet, ImportExportSheet } from './vmkey.jsx';
 import { withAsk } from './openwith.js';
+import { disposableOf, disposableAllowed, disposableToggle } from './storagemodel.js';
 import { libraryItems, groupMenu, groupShows } from './group.js';
 import { GroupMark, TorChip, groupLine, groupStateOf, groupColors, startGroup, stopGroup, FreshDialog, GroupSnapDialog, DeleteGroupDialog, RenameGroupDialog, RepairGroupDialog, groupJob, groupWorkText } from './groupui.jsx';
 
@@ -232,6 +233,7 @@ function Card({ m, u, sel, onSelect, onMenu, windowed, picH, gpuName, host }) {
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ fontSize: 18, fontWeight: 600, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{m.name}</Text>
           <Text style={{ marginTop: 4, fontSize: 13, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{specLine(m)}</Text>
+          {disposableOf(m) !== 'off' ? <Text style={{ marginTop: 4, fontSize: 12, color: p.accent, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{tr(`machines.disp.card.${disposableOf(m)}`)}</Text> : null}
           <VcpuHint m={m} host={host} />
         </View>
         <MoreBtn m={m} onMenu={onMenu} />
@@ -882,6 +884,9 @@ export function Library() {
       '-',
       { label: tr('machines.cmd.configure'), onClick: () => setCfg({ dir: m.dir }) },
       { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m) },
+      // the disposable session (6.2): on (in memory) or off, for its next start; Configure chooses in memory or on disk
+      disposableAllowed(m) ? { label: tr('machines.disp.switch'), checked: disposableOf(m) !== 'off', disabled: !a.remove,
+        onClick: () => { const id = lord.vm.set(m.dir, { disposable: disposableToggle(m) }); if (id) follow(id, m.name); else setError(tr('machines.cfg.refused')); } } : null,
       { label: m.meta?.template ? tr('machines.tpl.newFrom') : tr('machines.cmd.clone'), onClick: () => setCopying(m) },
       // Templates (5.1): a machine kept as it is to make others from; it doesn't start from here while it is one
       { label: m.meta?.template ? tr('machines.tpl.unmake') : tr('machines.tpl.make'), disabled: !m.meta?.template && !a.remove,

@@ -3,6 +3,7 @@
 import { bundleFor, createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText, clipboard, appsOff, openersAvailable, offerActivate,
   openProvidersFor, suggestedProviderFor, defaultProviderFor, openHintsFor } from '@lordos/sdk';
 import { kindOf, mimesOf, appOpens, isTextual, isImage, isProgram, isForeignProgram } from './kinds.js';
+import { quarantineBlocks } from './quarantine.js';
 import { pasteFrom, offerable } from './clipfiles.js';
 import { createJobQueue } from './jobqueue.js';
 import { toggledTags, withComment, movedKey } from './tags.js';
@@ -177,6 +178,13 @@ function openersOf(e, linuxApps, t) {
 
 export function openEntry(e, ctx) {
   if (e.app) { launchApp(e.id); return; }
+  // a file from a Machines guest, or one inside an archive from one (its marks are the archive's: quarantine.js)
+  const from = e.arc ? (Array.isArray(e.arc.file) ? e.arc.file[0] : e.arc.file) : e.path;
+  if (!e.dir && !e.trash && typeof from === 'string' && !fs.isRemote(from)) {
+    let st = null;
+    try { st = fs.stat(from); } catch (err) { st = null; }
+    if (quarantineBlocks(e, st)) { if (ctx.say) ctx.say(ctx.t('files.fromMachineNoRun', { name: e.name, machine: st.fromMachine || '?' })); return; }
+  }
   // archives (M9): browsed like a folder; what is inside is extracted to the cache when opened
   if (e.arc) { if (e.dir) ctx.navigate({ type: 'archive', path: e.arc.file, inner: e.arc.inner }); else ctx.openArc(e); return; }
   // a bundle (a machine's folder): its app opens it; Open in New Tab still goes in

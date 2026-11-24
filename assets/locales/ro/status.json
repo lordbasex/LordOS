@@ -177,6 +177,7 @@
   "pkg.why.multiarchPair": "Aceeași versiune ca {name}",
   "gpu.roleSet": "Utilizarea plăcii video a fost salvată ({card}): reporniți pentru a aplica",
   "vm.gvtReady": "Partea din placa video este gata ({name})",
+  "vm.usbReady": "Dispozitiv USB pregătit",
   "vm.gvtGone": "Partea din placa video a fost eliminată",
   "gpu.freqSet": "Frecvența minimă a plăcii video a fost setată",
   "gpu.memlockSet": "Memoria pe care mașinile o pot bloca a fost salvată",

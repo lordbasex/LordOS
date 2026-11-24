@@ -19,8 +19,9 @@ def lib_rect(s):
     time.sleep(0.3)
     w = s.window("machines", lambda w: w["id"] == "machines")
     if w["h"] < 640:
-        # its sheets (Configure, Clone) are taller than its first size (the Clone sheet's buttons are cut off at 760×500):
-        # as a person would, it is made bigger first; the new size reaches wm.windows() a moment later
+        # its sheets fit its first size (760×500: their bodies scroll, tests/machines_sheets_headless.sh), but Configure's
+        # rows the flows click are all on screen only in a bigger window: it is made bigger first, as a person would; the
+        # new size reaches wm.windows() a moment later
         s.js("wm.setFrame('machines', { x: 40, y: 36, w: 1200, h: 680 })")
         end = time.time() + 5
         while w["h"] < 640 and time.time() < end:
@@ -650,7 +651,11 @@ def flow_storage(s, r, c):
     freed = vfs.f_bavail * vfs.f_frsize - free0
     said = clone.get("frees") or 0
     c["storage"] = {"fs": fs, "clone_bytes": clone.get("total"), "said_frees": said, "freed": freed, "clone_base": clone.get("base") or "",
-                    "orig_bytes": orig and orig.get("total"), "how": c.get("clone_how", "")}
+                    "orig_bytes": orig and orig.get("total"), "how": c.get("clone_how", ""), "shared": clone.get("shared"),
+                    "approx": bool(clone.get("approx"))}
+    # compressed extents (btrfs with compression): the figures are "about", and the window says so (6.16)
+    if os.environ.get("MH_EXPECT_APPROX") == "1":
+        r.t("storage: compressed extents make the figures \"about\"", bool(clone.get("approx")) or bool(orig and orig.get("approx")), c["storage"])
     log("storage: %s; Machines said deleting the clone frees %.1f MB, the free space grew %.1f MB" % (fs, said / 1e6, freed / 1e6))
     tol = max(32 << 20, said * 0.05)
     r.t("storage: what Machines said the clone frees (%.1f MB) is what deleting it gave back (%.1f MB) on %s" % (said / 1e6, freed / 1e6, fs),

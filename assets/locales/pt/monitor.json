@@ -716,5 +716,12 @@
   "desc.done.pause": "Pausado.",
   "desc.done.block_network": "A rede dele está bloqueada.",
   "desc.done.blocklist": "Na lista de bloqueio: é encerrado sempre que inicia.",
-  "desc.blockConfirm": "Adicionar “{name}” à lista de bloqueio? A partir de agora ele é encerrado sempre que inicia. Você pode desfazer isso em Ajustes → IA → Sentinela."
+  "desc.blockConfirm": "Adicionar “{name}” à lista de bloqueio? A partir de agora ele é encerrado sempre que inicia. Você pode desfazer isso em Ajustes → IA → Sentinela.",
+  "comp.machine": "Máquina",
+  "comp.machineNamed": "{name} (máquina)",
+  "comp.machineHint": "Uma máquina virtual: o tráfego de rede do sistema convidado. As regras próprias dela somam-se às regras de Máquinas, que continuam decidindo por todas as máquinas.",
+  "comp.machinesRules": "Regra de Máquinas",
+  "comp.forwarded": "Porta encaminhada {proto} {port} → {guest}",
+  "comp.forwardedLan": "Aberta à rede",
+  "comp.forwardedLocal": "Só este computador"
 }

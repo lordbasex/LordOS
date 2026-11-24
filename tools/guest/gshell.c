@@ -4,6 +4,7 @@
 #define _GNU_SOURCE
 #endif
 #include "gshell.h"
+#include "gsend.h"
 #include "../../server/src/vm/vmagent.h"
 
 #include <errno.h>
@@ -23,11 +24,24 @@
 #include <time.h>
 #include <unistd.h>
 
+/* the whole frame, however the port takes it: a virtio-serial port writes at most 32 KiB per call (virtio_console), so
+ * a frame is written in a loop and never left half sent */
 static int send_frame(int fd, uint16_t kind, const uint8_t *p, uint32_t n) {
     uint8_t h[AG_HEAD];
     ag_frame_head(h, kind, 0, n);
-    struct iovec io[2] = { { h, AG_HEAD }, { (void *)p, n } };
-    return writev(fd, io, n ? 2 : 1) == (ssize_t)(AG_HEAD + n) ? 0 : -1;
+    size_t total = AG_HEAD + (size_t)n, done = 0;
+    while (done < total) {
+        struct iovec io[2];
+        int k = 0;
+        if (done < AG_HEAD) { io[k++] = (struct iovec){ h + done, AG_HEAD - done }; if (n) io[k++] = (struct iovec){ (void *)p, n }; }
+        else io[k++] = (struct iovec){ (void *)(p + (done - AG_HEAD)), total - done };
+        ssize_t w = writev(fd, io, k);
+        if (w < 0 && errno == EINTR) continue;
+        if (w < 0 && errno == EAGAIN) { struct pollfd q = { fd, POLLOUT, 0 }; if (poll(&q, 1, 2000) <= 0) return -1; continue; }
+        if (w <= 0) return -1;
+        done += (size_t)w;
+    }
+    return 0;
 }
 
 /* ---- the shell ---- */
@@ -207,7 +221,7 @@ void gshell_pump(int port, short ev) {
 
 static int ls_fd = -1;
 static char ls_path[256];
-static struct { int fd; long long until; size_t n; uint8_t b[AG_HEAD + AG_NOTE_BYTES + AG_LINK_MAX]; } cl[4];
+static struct { int fd; long long until; size_t n; uint8_t b[AG_HEAD + 4096 + AG_NOTE_BYTES + AG_LINK_MAX]; } cl[4];
 
 static long long mono(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (long long)t.tv_sec * 1000 + t.tv_nsec / 1000000; }
 
@@ -272,6 +286,18 @@ void gshell_client(int i, int port, unsigned host_caps) {
     int used = ag_frame_next(cl[i].b, cl[i].n, &f);
     if (used < 0 || (!used && cl[i].n == sizeof cl[i].b)) { cl_done(i, GSA_MALFORMED); return; }
     if (!used) return;
+    if (f.kind == AGK_SEND_OFFER) {
+        /* a file to send (tools 10): its absolute path, sent on only while the host takes files */
+        char path[4096 + 1];
+        if (!f.len || f.len > 4096 || memchr(f.data, 0, f.len)) { cl_done(i, GSA_MALFORMED); return; }
+        memcpy(path, f.data, f.len);
+        path[f.len] = 0;
+        if (port < 0) { cl_done(i, GSA_NOHOST); return; }
+        if (!(host_caps & AG_HELLO_SEND)) { cl_done(i, GSA_REFUSED); return; }
+        int r = gsend_queue(path);
+        cl_done(i, r == 0 ? GSA_SENT : r == 1 ? GSA_MALFORMED : GSA_FULL);
+        return;
+    }
     int link = f.kind == AGK_LINK;
     if ((!link && f.kind != AGK_NOTIFY) || (link ? !ag_link_ok(f.data, f.len) : ag_note_parse(f.data, f.len, NULL, NULL, NULL, NULL))) { cl_done(i, GSA_MALFORMED); return; }
     if (port < 0) { cl_done(i, GSA_NOHOST); return; }

@@ -716,5 +716,12 @@
   "desc.done.pause": "Keskeytetty.",
   "desc.done.block_network": "Sen verkko on estetty.",
   "desc.done.blocklist": "Estolistalla: se lopetetaan aina, kun se käynnistyy.",
-  "desc.blockConfirm": "Lisätäänkö ”{name}” estolistalle? Tästä lähtien se lopetetaan aina, kun se käynnistyy. Voit perua tämän kohdassa Asetukset → Tekoäly → Sentinela."
+  "desc.blockConfirm": "Lisätäänkö ”{name}” estolistalle? Tästä lähtien se lopetetaan aina, kun se käynnistyy. Voit perua tämän kohdassa Asetukset → Tekoäly → Sentinela.",
+  "comp.machine": "Kone",
+  "comp.machineNamed": "{name} (kone)",
+  "comp.machineHint": "Virtuaalikone: sen vierasjärjestelmän verkkoliikenne. Sen omat säännöt lisätään Koneiden sääntöihin, jotka päättävät edelleen jokaisesta koneesta.",
+  "comp.machinesRules": "Koneiden sääntö",
+  "comp.forwarded": "Edelleenohjattu portti {proto} {port} → {guest}",
+  "comp.forwardedLan": "Avoin verkkoon",
+  "comp.forwardedLocal": "Vain tämä tietokone"
 }

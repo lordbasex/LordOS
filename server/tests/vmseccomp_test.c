@@ -138,9 +138,9 @@ static void program_checks(void) {
     const pid_t self = 4242;
     int maxlen = 0;
     /* every combination of the machine's options, with and without a listener */
-    for (int bits = 0; bits < 128; bits++) {
+    for (int bits = 0; bits < 256; bits++) {
         VmScOpts o = { .kvm = bits & 1, .tcg = !!(bits & 2), .render = !!(bits & 4), .vgpu = !!(bits & 8),
-                       .tap = !!(bits & 16), .notify = !!(bits & 32), .bti = !!(bits & 64), .self = self, .exec_fd = 9, .learn = 0 };
+                       .tap = !!(bits & 16), .notify = !!(bits & 32), .bti = !!(bits & 64), .usb = !!(bits & 128), .self = self, .exec_fd = 9, .learn = 0 };
         int n = build(&o);
         CHECK(n > 0 && n <= BPF_MAXINSNS, "%s: options %d: the program has %d instructions", tab->name, bits, n);
         if (n <= 0 || n > BPF_MAXINSNS) continue;
@@ -164,6 +164,8 @@ static void program_checks(void) {
             case VSR_EACCES: CHECK(got == ERRNO(EACCES), "%s: %s isn't EACCES", tab->name, r->name); break;
             case VSR_EPERM: CHECK(got == ERRNO(EPERM), "%s: %s isn't EPERM", tab->name, r->name); break;
             case VSR_ENOSYS: CHECK(got == ERRNO(ENOSYS), "%s: %s isn't ENOSYS", tab->name, r->name); break;
+            /* libusb's rows (6.6): only for a machine that may get a host USB device */
+            case VSR_USB: CHECK(got == (o.usb ? ALLOW : deflt), "%s: %s with usb=%d", tab->name, r->name, o.usb); break;
             /* QEMU's filter: the render server's rows are its default */
             case VSR_VENUS: case VSR_VENUSKILL: case VSR_VENUSEPERM: CHECK(got == deflt, "%s: %s (the render server's) runs for QEMU (0x%x)", tab->name, r->name, got); break;
             default: break;     /* the argument rules, below */
@@ -181,6 +183,10 @@ static void program_checks(void) {
         CHECK(verdict(io, 3, 0xC00464B4u, 0, 0) == (o.render ? ALLOW : deflt), "%s: a DRM ioctl with render=%d", tab->name, o.render);
         CHECK(verdict(io, 3, 0x3B6E, 0, 0) == (o.vgpu ? ALLOW : deflt), "%s: a VFIO ioctl with vgpu=%d", tab->name, o.vgpu);
         CHECK(verdict(io, 3, 0x400454CA, 0, 0) == (o.tap ? ALLOW : deflt), "%s: TUNSETIFF with tap=%d", tab->name, o.tap);
+        /* usbfs (USBDEVFS_SUBMITURB 0x8038550a, USBDEVFS_CLAIMINTERFACE 0x8004550f) only with usb; never a terminal's */
+        CHECK(verdict(io, 3, 0x8038550au, 0, 0) == (o.usb ? ALLOW : deflt), "%s: USBDEVFS_SUBMITURB with usb=%d", tab->name, o.usb);
+        CHECK(verdict(io, 3, 0x8004550fu, 0, 0) == (o.usb ? ALLOW : deflt), "%s: USBDEVFS_CLAIMINTERFACE with usb=%d", tab->name, o.usb);
+        CHECK(verdict(io, 3, 0x5412, 0, 0) == deflt, "%s: TIOCSTI with usb=%d", tab->name, o.usb);
         CHECK(verdict(io, 3, 0x5412, 0, 0) == deflt, "%s: TIOCSTI with tap=%d", tab->name, o.tap);
         CHECK(verdict(io, 3, 0xC0186201u, 0, 0) == (o.render ? ALLOW : deflt), "%s: a dma-buf ioctl with render=%d", tab->name, o.render);
         CHECK(verdict(io, 3, 0xC0303E03u, 0, 0) == (o.render ? ALLOW : deflt), "%s: SYNC_IOC_MERGE with render=%d", tab->name, o.render);

@@ -53,6 +53,11 @@ typedef struct {
 int vm_snaps_load(const char *dir, VmSnap *s, int max);           /* how many (0 none or unreadable) */
 int vm_snaps_save(const char *dir, const VmSnap *s, int n);       /* atomically; 0 ok */
 int vm_snaps_find(const VmSnap *s, int n, const char *tag);       /* index or -1 */
+/* A snapshot's note (6.2): <machine>/snapshots/<tag>.note, the person's own words, written by lord-server; removed with
+ * the snapshot (lord-vm). UTF-8 without control characters but the line break, at most VM_SNAP_NOTE_MAX bytes; empty
+ * is no note */
+#define VM_SNAP_NOTE_MAX 1000
+int vm_snap_note_valid(const char *s);
 
 /* A Clone's own identity inside the guest (6.3): <machine>/identity.json, {"hostname":"debian-clone"}, written by
  * lord-vm --clone (unless the identity is kept) and removed once the guest agent gave the guest that hostname, a new

@@ -562,5 +562,7 @@
   "prefs.tr.would.capture": "disimpan di Keluaran Tertangkap",
   "prefs.tr.would.highlight": "menyorot “{text}”",
   "prefs.tr.param": "Parameter",
-  "prefs.tr.regexFirst": "Tulis ekspresi reguler terlebih dahulu."
+  "prefs.tr.regexFirst": "Tulis ekspresi reguler terlebih dahulu.",
+  "guest.badge": "TAMU",
+  "guest.title": "Shell di dalam {machine}"
 }

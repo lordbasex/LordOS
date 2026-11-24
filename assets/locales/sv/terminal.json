@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "sparas i Fångade utdata",
   "prefs.tr.would.highlight": "färgmarkerar ”{text}”",
   "prefs.tr.param": "Parameter",
-  "prefs.tr.regexFirst": "Skriv det reguljära uttrycket först."
+  "prefs.tr.regexFirst": "Skriv det reguljära uttrycket först.",
+  "guest.badge": "GÄST",
+  "guest.title": "Skal i {machine}"
 }

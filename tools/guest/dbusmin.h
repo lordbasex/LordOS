@@ -19,6 +19,7 @@ typedef struct {
     uint32_t serial, reply_serial;      /* reply_serial 0: none */
     char sig[64];                       /* the body's signature ("" none) */
     char err[128];                      /* an error's name */
+    char member[64], iface[96];         /* a call's or a signal's member and interface ("" none) */
     const uint8_t *body;
     uint32_t body_n;
 } DbMsg;
@@ -37,6 +38,20 @@ void dbw_str(DbW *w, const char *s);        /* s or o */
 void dbw_sig(DbW *w, const char *s);        /* g */
 void dbw_bytes(DbW *w, const uint8_t *p, size_t n);   /* ay */
 void dbw_variant_str(DbW *w, const char *s);          /* v holding an s */
+void dbw_u32(DbW *w, uint32_t v);                     /* u */
+void dbw_strv(DbW *w, const char *const *v, int n);   /* as */
+
+/* the whole size of the message whose header is at p (16 bytes are enough): > 0, 0 more bytes needed, -1 not a message.
+ * Unlike db_msg_parse it takes messages up to DB_SKIP_MAX, so a reader can skip one too big to keep */
+#define DB_SKIP_MAX (128u << 20)
+long db_msg_total(const uint8_t *p, size_t n);
+/* a monitored org.freedesktop.Notifications.Notify call (body "susssasa{sv}i"): its app name, summary and body, each cut to
+ * its cap - 1 bytes (on a character boundary). 0, -1 not one */
+int db_notify_body(const DbMsg *m, char *app, size_t an, char *summary, size_t sn, char *body, size_t bn);
+/* a notification's text as plain text for the host (lordos-guest 10, docs/VIRTUALIZATION.md 6.12): markup tags dropped,
+ * &amp; &lt; &gt; &quot; &apos; decoded, control and bidi characters as spaces, runs of spaces as one, trimmed, at most
+ * max bytes cut on a character boundary; what isn't UTF-8 becomes '?'. Its length (out holds max + 1) */
+size_t db_note_plain(const char *in, char *out, size_t max);
 
 /* a reply's value: its body is one variant (nested variants unwrapped) holding an s, or a b. 0, -1 otherwise */
 int db_reply_str(const DbMsg *m, char *out, size_t cap);

@@ -2,8 +2,9 @@
 // it holds, then Now; the selected one can be gone back to or deleted. lord-vm does the work (6.2): qcow2 internal
 // snapshots of the system disk and the UEFI variables together, with the memory when the machine runs, under
 // operation.json, the entry in snapshots.json written last. Going back to a snapshot with memory on a machine that's
-// off starts it from there.
-import { View, Text, Image, TextInput, ScrollView, Toggle, useAppWindow, useWindowHeight, wm, fs, formatDate, formatTime, t as tr } from '@lordos/sdk';
+// off starts it from there. Each snapshot also keeps the machine's settings as they were (lord-vm puts its hardware back
+// when going back to it) and a note of the person's own (snapshots/<tag>.note, lord.vm.snapNote).
+import { View, Text, Image, TextInput, TextArea, ScrollView, Toggle, useAppWindow, useWindowHeight, wm, fs, formatDate, formatTime, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, snapName, snapSize, thumbSrc } from './model.js';
 import { usePal, has, bytes, Btn, Sheet, markColors } from './ui.jsx';
@@ -54,6 +55,8 @@ export function Snapshots({ dir, name: name0 }) {
   const [busy, setBusy] = useState(null);           // { job, what, then }
   const [msg, setMsg] = useState(null);
   const [cloning, setCloning] = useState(null);
+  const [noting, setNoting] = useState(null);       // { tag, text }: a note being written
+  const [takeNote, setTakeNote] = useState('');     // the note typed with a new snapshot
   const thumb = useRef(0);
   const load = () => {
     if (!has()) return;
@@ -74,7 +77,10 @@ export function Snapshots({ dir, name: name0 }) {
       const b = busy;
       setBusy(null);
       load();
-      if (r.ok) { setMsg({ ok: true, text: tr(`machines.snap.done.${b.what}`) }); if (b.then) b.then(); return; }
+      if (r.ok) {
+        if (b.what === 'take' && b.note && b.tag && !lord.vm.snapNote(dir, b.tag, b.note)) { setMsg({ ok: false, text: tr('machines.snap.noteFailed') }); if (b.then) b.then(); return; }
+        setMsg({ ok: true, text: tr(`machines.snap.done.${b.what}`) }); if (b.then) b.then(); return;
+      }
       // a snapshot with memory, and the machine off: it starts from there instead
       if (b.what === 'revert' && r.exit === 4) { openMachine({ ...m, dir }, { loadvm: b.tag }); setMsg({ ok: true, text: tr('machines.snap.startingFrom') }); return; }
       setMsg({ ok: false, text: errOf(r.out) || tr('machines.cfg.refused') });
@@ -102,10 +108,14 @@ export function Snapshots({ dir, name: name0 }) {
   const total = list.reduce((a, s) => a + (s.vmstate || 0), 0);
   const cur = list.find((s) => s.tag === sel) || null;
   const run = (job, what, extra = {}) => { if (!job) { setMsg({ ok: false, text: tr('machines.cfg.refused') }); return false; } setMsg(null); setBusy({ job, what, ...extra }); return true; };
-  const take = (name, then) => {
+  const take = (name, then, note = '') => {
     const r = lord.vm.snapTake(dir, name);
     if (!r) { setMsg({ ok: false, text: tr('machines.cfg.refused') }); return; }
-    run(r.job, 'take', { then });
+    run(r.job, 'take', { then, tag: r.tag, note: note.trim() });
+  };
+  const saveNote = (n) => {
+    setNoting(null);
+    if (!lord.vm.snapNote(dir, n.tag, n.text.trim())) setMsg({ ok: false, text: tr('machines.snap.noteFailed') }); else { setMsg(null); load(); }
   };
   const revert = (s) => run(lord.vm.snapRevert(dir, s.tag), 'revert', { tag: s.tag });
   const full = list.length >= lim.max;
@@ -119,7 +129,7 @@ export function Snapshots({ dir, name: name0 }) {
           <Text style={{ fontSize: 12, color: list.length >= lim.warn ? '#ffc56e' : p.dim, textAlign: 'start' }}>{tr('machines.snap.count', { n: list.length, warn: lim.warn, size: bytes(total) })}</Text>
         </View>
         <Pill primary icon="plus" label={busy?.what === 'take' ? tr('machines.snap.taking') : tr('machines.snap.take')} disabled={!!busy || full || m.suspended}
-          onClick={() => setTaking(snapName(list, tr('machines.snap.defaultName')))} />
+          onClick={() => { setTakeNote(''); setTaking(snapName(list, tr('machines.snap.defaultName'))); }} />
       </View>
       {/* the timeline in rows of as many cards as the window's width takes, in the window's free height (no spacer beside
           it: it got half of that), scrolling when there are more rows than fit */}
@@ -150,7 +160,11 @@ export function Snapshots({ dir, name: name0 }) {
           <View style={{ flex: 1, minWidth: 200 }}>
             <Text style={{ fontSize: 14, fontWeight: 700, color: p.text, textAlign: 'start' }}>{cur.name}</Text>
             <Text style={{ marginTop: 2, fontSize: 13, color: p.dim, textAlign: 'start', lineHeight: 1.4 }}>{tr(cur.memory ? 'machines.snap.aboutMemory' : 'machines.snap.aboutDisk')}</Text>
+            {cur.settings ? <Text style={{ marginTop: 2, fontSize: 12, color: p.dim, textAlign: 'start', lineHeight: 1.4 }}>
+              {tr('machines.snap.settingsThen', { vcpus: cur.settings.vcpus, memory: bytes(cur.settings.memoryMb * 1048576) })}</Text> : null}
+            {cur.note ? <Text style={{ marginTop: 6, fontSize: 13, color: p.text, textAlign: 'start', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{cur.note}</Text> : null}
           </View>
+          <Pill label={tr(cur.note ? 'machines.snap.editNote' : 'machines.snap.addNote')} disabled={!!busy} onClick={() => setNoting({ tag: cur.tag, text: cur.note || '' })} />
           <Pill icon="copy" label={tr('machines.snap.cloneHere')} disabled={!!busy || v.active} onClick={() => setCloning(cur)} />
           <Pill danger icon="trash" label={tr('machines.snap.delete')} disabled={!!busy} onClick={() => setDel(cur)} />
           <Pill primary label={tr('machines.snap.goBack')} disabled={!!busy || (!cur.memory && v.active)} onClick={() => { setFirst(!full); setGoBack(cur); }} />
@@ -164,9 +178,11 @@ export function Snapshots({ dir, name: name0 }) {
       {taking !== null ? (
         <Sheet title={tr('machines.snap.take')} onCancel={() => setTaking(null)} actions={[
           <Btn key="c" label={tr('machines.cancel')} onClick={() => setTaking(null)} />,
-          <Btn key="t" primary label={tr('machines.snap.takeOk')} disabled={!taking.trim()} onClick={() => { const n = taking.trim(); setTaking(null); take(n); }} />,
+          <Btn key="t" primary label={tr('machines.snap.takeOk')} disabled={!taking.trim() || takeNote.length > 1000} onClick={() => { const n = taking.trim(); setTaking(null); take(n, null, takeNote); }} />,
         ]}>
           <TextInput value={taking} onChange={setTaking} autoFocus />
+          <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.snap.noteLabel')}</Text>
+          <TextArea value={takeNote} onChange={setTakeNote} placeholder={tr('machines.snap.notePlaceholder')} minRows={2} />
           <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', lineHeight: 1.4 }}>{tr(v.active ? 'machines.snap.takeRunning' : 'machines.snap.takeOff')}</Text>
         </Sheet>
       ) : null}
@@ -184,6 +200,14 @@ export function Snapshots({ dir, name: name0 }) {
             <Toggle on={first && !full} onChange={(x) => setFirst(x && !full)} />
             <Text style={{ fontSize: 13, color: p.text }}>{tr('machines.snap.takeFirst')}</Text>
           </View>
+        </Sheet>
+      ) : null}
+      {noting ? (
+        <Sheet title={tr('machines.snap.noteTitle')} onCancel={() => setNoting(null)} actions={[
+          <Btn key="c" label={tr('machines.cancel')} onClick={() => setNoting(null)} />,
+          <Btn key="s" primary label={tr('machines.snap.noteSave')} disabled={noting.text.length > 1000} onClick={() => saveNote(noting)} />,
+        ]}>
+          <TextArea value={noting.text} onChange={(x) => setNoting({ ...noting, text: x })} placeholder={tr('machines.snap.notePlaceholder')} minRows={4} />
         </Sheet>
       ) : null}
       {cloning ? <CloneSheet m={m} fromSnapshot={cloning} running={v.active} onClose={() => setCloning(null)}

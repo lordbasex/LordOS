@@ -157,6 +157,11 @@ static int wait_for(Qmp *q, int want, long long deadline, char *err, size_t errl
     }
 }
 
+int qmp_call(Qmp *q, const char *cmd, const char *args, int timeout_ms, char *err, size_t errlen) {
+    if (qmp_command(q, cmd, args, -1)) { snprintf(err, errlen, "can't write to QEMU's control socket"); return -1; }
+    return wait_for(q, QMP_MSG_RETURN, now_ms() + timeout_ms, err, errlen);
+}
+
 int qmp_handshake(Qmp *q, int timeout_ms, char *err, size_t errlen) {
     long long deadline = now_ms() + timeout_ms;
     if (wait_for(q, QMP_MSG_GREETING, deadline, err, errlen)) return -1;

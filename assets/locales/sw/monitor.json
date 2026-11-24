@@ -716,5 +716,12 @@
   "desc.done.pause": "Imesitishwa.",
   "desc.done.block_network": "Mtandao wake umezuiwa.",
   "desc.done.blocklist": "Iko kwenye orodha ya kuzuia: inamalizwa kila inapoanza.",
-  "desc.blockConfirm": "Ongeza “{name}” kwenye orodha ya kuzuia? Kuanzia sasa itamalizwa kila inapoanza. Unaweza kutendua hili kwenye Mipangilio → AI → Sentinela."
+  "desc.blockConfirm": "Ongeza “{name}” kwenye orodha ya kuzuia? Kuanzia sasa itamalizwa kila inapoanza. Unaweza kutendua hili kwenye Mipangilio → AI → Sentinela.",
+  "comp.machine": "Mashine",
+  "comp.machineNamed": "{name} (mashine)",
+  "comp.machineHint": "Mashine pepe: trafiki ya mtandao ya mfumo wake mgeni. Sheria zake huongezwa kwenye sheria za Mashine, ambazo bado huamua kwa kila mashine.",
+  "comp.machinesRules": "Sheria ya Mashine",
+  "comp.forwarded": "Mlango uliopitishwa {proto} {port} → {guest}",
+  "comp.forwardedLan": "Wazi kwa mtandao",
+  "comp.forwardedLocal": "Kompyuta hii tu"
 }

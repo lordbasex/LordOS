@@ -48,6 +48,30 @@ $B/machines cp --force "$N:vmexec-big.bin" "$HOME/.config/lordos/settings.json"
 ln -sf /etc/passwd link.txt; $B/machines cp link.txt "$N:~/"; [ $? != 0 ] && ok "a link out of the files refused" || bad "symlink read"
 $B/machines cp vmexec-big.bin back.bin; [ $? = 2 ] && ok "two local sides refused" || bad "two local"
 $B/machines exec "$N" -- rm -f vmexec-big.bin
+# folders, both ways: every file with its bytes, links left out (never followed), an existing folder refused without
+# --force, a guest listing with a name no path may have refused before anything is made here
+$B/machines exec "$N" -- rm -rf vmexec-tree vmexec-evil
+rm -rf vmexec-tree back; mkdir -p vmexec-tree/sub/deep; echo a > vmexec-tree/a.txt; head -c 300000 /dev/urandom > vmexec-tree/sub/b.bin; : > vmexec-tree/sub/deep/empty; ln -s /etc/passwd vmexec-tree/link
+sums() { (cd "$1" && find . -type f | LC_ALL=C sort | xargs -d '\n' sha256sum); }
+$B/machines cp vmexec-tree "$N:~/" && ok "cp of a folder into the machine" || bad "cp folder in"
+g=$($B/machines exec "$N" -- sh -c 'cd ~/vmexec-tree && find . -type f | LC_ALL=C sort | xargs -d "\n" sha256sum'); h=$(sums vmexec-tree)
+[ "$g" = "$h" ] && ok "the folder's files arrived, same bytes ($(echo "$h" | wc -l) files)" || bad "folder in: $g vs $h"
+$B/machines exec "$N" -- test ! -e vmexec-tree/link && ok "a link in the folder isn't copied (nor followed)" || bad "link copied"
+$B/machines cp vmexec-tree "$N:~/"; [ $? != 0 ] && ok "an existing folder in the machine refused without --force" || bad "folder overwrite"
+$B/machines cp --force vmexec-tree "$N:~/" && ok "--force merges into the existing folder" || bad "folder --force"
+$B/machines cp "$N:vmexec-tree" back && [ "$(sums back)" = "$(sums vmexec-tree)" ] && [ -d back/sub/deep ] && ok "cp of a folder out of the machine, same files" || bad "folder out"
+$B/machines cp "$N:vmexec-tree" back >/dev/null && [ -f back/vmexec-tree/a.txt ] && ok "into an existing folder: the machine's folder goes in it, as cp -r" || bad "into a folder"
+$B/machines cp "$N:vmexec-tree" back; [ $? != 0 ] && ok "an existing folder here refused without --force" || bad "host folder overwrite"
+$B/machines exec "$N" -- sh -c 'mkdir -p ~/vmexec-evil && : > "$HOME/vmexec-evil/a
+b" && : > ~/vmexec-evil/ok'
+$B/machines cp "$N:vmexec-evil" evil; [ $? != 0 ] && [ ! -e evil ] && ok "a guest name with a control character refuses the whole copy, nothing made here" || bad "evil listing"
+# a guest folder whose listing would make a protected folder here (autostart), even with --force: nothing made
+$B/machines exec "$N" -- sh -c 'mkdir -p ~/vmexec-cfg/.config/autostart && echo x > ~/vmexec-cfg/.config/autostart/evil.desktop'
+mkdir -p "$HOME/.config"
+$B/machines cp --force "$N:vmexec-cfg/.config" "$HOME"; r1=$?
+$B/machines cp --force "$N:vmexec-cfg/.config/autostart" "$HOME/.config"; r2=$?
+[ $r1 != 0 ] && [ $r2 != 0 ] && [ ! -e "$HOME/.config/autostart/evil.desktop" ] && [ ! -d "$HOME/.config/autostart" ] && ok "a guest folder that would make a protected folder here is refused whole, even with --force" || bad "protected folder from the guest ($r1 $r2)"
+$B/machines exec "$N" -- rm -rf vmexec-tree vmexec-evil vmexec-cfg
 $B/machines logs "$N" --machine --lines 5 | grep -q "automation: program" && ok "lord-vm's log names each program" || bad "log"
 grep -q "exec: id" "$DIR/log/automation.log" && ok "automation.log written" || bad "automation.log"
 ! grep -q "\$(id)" "$DIR/log/lord-vm.log" && ok "arguments never in the log" || bad "args in log"
@@ -83,19 +107,21 @@ o=$(printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"prot
   '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"list_machines","arguments":{}}}' \
   'not json' "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":$J,\"command\":[\"true\"],\"evil\":1}}}" \
   "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"get_logs\",\"arguments\":{\"name\":$J,\"which\":\"machine\",\"lines\":3}}}" \
-  "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":$JO,\"command\":[\"true\"]}}}" | $B/machines mcp 2>/dev/null)
+  "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":$JO,\"command\":[\"true\"]}}}" \
+  '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"requirements","arguments":{}}}' | $B/machines mcp 2>/dev/null)
 echo "$o" | python3 -I -c '
 import json,sys
 user, name = sys.argv[1], sys.argv[2]
 ls=[json.loads(l) for l in sys.stdin if l.strip()]
 by={m.get("id"):m for m in ls}
 assert by[1]["result"]["protocolVersion"]=="2025-06-18"
-assert len(by[2]["result"]["tools"])==8
+assert len(by[2]["result"]["tools"])==9
+q=json.loads(by[8]["result"]["content"][0]["text"]); assert q["arch"] in ("amd64","arm64") and q["memory_mb"]>0 and set(q["runs"])=={"amd64","arm64"} and q["machines_running"]>=1, q
 r=json.loads(by[3]["result"]["content"][0]["text"]); assert r["stdout"]=="hi\n"+user+"\n" and r["exit"]==0, r
 assert name in [m["name"] for m in json.loads(by[4]["result"]["content"][0]["text"])]
 assert any(m.get("error",{}).get("code")==-32700 for m in ls)
 assert by[5]["error"]["code"]==-32602
 assert not by[6]["result"]["isError"]
 assert by[7]["result"]["isError"]
-' "$U" "$N" && ok "MCP: initialize, tools/list, run_command, list, parse errors, unknown argument, logs, a machine without automation" || bad "mcp: $o"
+' "$U" "$N" && ok "MCP: initialize, tools/list, run_command, list, parse errors, unknown argument, logs, a machine without automation, requirements" || bad "mcp: $o"
 exit $R

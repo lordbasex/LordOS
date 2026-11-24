@@ -978,5 +978,6 @@
   "themeSwitch.failedTitle": "{name} could not be applied",
   "themeSwitch.refusedBody": "Its code does not match the signed copy of LordOS, so it was not loaded. Your desktop style stays as it was.",
   "themeSwitch.failedBody": "It did not start. Your desktop style stays as it was.",
-  "spotlight.section.machines": "Machines"
+  "spotlight.section.machines": "Machines",
+  "guestApps.inMachine": "In {machine}"
 }

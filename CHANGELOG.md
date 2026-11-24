@@ -12,7 +12,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 - **Machines: Vulkan for Linux guests (venus)** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.10,
-  3.3). Configure → Display → Vulkan, with Graphics 3D (machine.json schema 21, "vulkan"; lord-vm --set --vulkan). The guest's
+  3.3). Configure → Display → Vulkan, with Graphics 3D (machine.json schema 22, "vulkan"; lord-vm --set --vulkan). The guest's
   Vulkan apps draw with this computer's GPU through virglrenderer's render server, which lord-vm starts in a jail of its own (a
   pid namespace, Landlock, a seccomp allowlist with a listener, one exec, only the start's library mappings); QEMU gets the
   connection through a small preloaded library and never forks or execs. Given only where the host can map the GPU's memory
@@ -23,6 +23,110 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   reach lord-server as up to 8 rectangles a frame instead of one box over all of them, each damaged on its own; a 2D picture
   is a GPU texture when the desktop composes on the GPU (only the changed rectangles uploaded, the frame presented without a UI
   paint), and on the CPU path a scaled picture's copy is remade only where it changed.
+- **Machines: snapshots keep the settings, take notes, and come before a tools update** (in development; latest release
+  0.8.9.5-beta; docs/VIRTUALIZATION.md 6.2). Each snapshot keeps `machine.json` as it was (`snapshots/<tag>.json`; a
+  running machine's hardware as it started); going back puts that hardware back (processors, memory, devices, cards,
+  graphics, displays, TPM, agent channels, MAC) and keeps every other choice; a disk added since refuses going back
+  before anything changes. A note of the person's own per snapshot (Add Note…, or with the new snapshot; at most 1000
+  bytes, no control or bidi characters). When the LordOS tools bring themselves up to date, a snapshot with the
+  machine's memory comes first, once per run and version. No file system freeze, decided: a snapshot is taken off or with
+  its memory, so a freeze adds nothing. `tests/vm_snap_store_test.sh` (real QEMU/KVM, 21 checks).
+- **Machines: Reclaim space can compress the disk** (in development; 6.4). *Compress the disk too* in the sheet
+  (`lord-vm --compact DIR --compress`, `qemu-img convert -c`): 96 MB became 380 KB in the test, checked, read back and
+  booted; refused for an encrypted machine.
+- **Machines: the Storage window deletes old snapshots and removes unused downloads** (in development; 6.16). Delete Old
+  Snapshots (every one but the newest) and Remove Unused (every download no machine uses), each after a question with
+  the figure; figures read from compressed extents are marked "about"; raw and data disks are counted (they were left
+  out). `tools/vm/e2e/machines/storage-fs.sh` runs the storage flow on scratch btrfs, compressed btrfs and XFS (needs
+  sudo for the mounts).
+- **Machines: the disposable session's switch in the machine window and on the card** (in development; 6.2). Actions →
+  Disposable Session and the card's menu turn it on (in memory) or off with the machine off; the card says so.
+- **Machines: an imported machine's other network cards are connected** (in development; 6.22). Each extra card gets its
+  own passt in the first card's mode, on a network of its own (10.0.3.0/24, 10.0.4.0/24…), with no forwarded ports;
+  checked under KVM in Shared and Host only (`tests/vm_nic_boot.sh`, `tests/vm_nic_e2e.sh`).
+- **`machines cp` copies folders, and the MCP server says what this computer can run** (in development; 6.15). Folders
+  both ways as `cp -r`; links are never followed; a guest's listing is parsed as hostile and refused whole (before
+  anything is made) when it names a protected path, `..`, a control or bidi character, or goes too deep. The MCP tool
+  `requirements`. `tools/vm/e2e/machines/exec-guest.sh` runs `tests/vm_exec_e2e.sh` against a throwaway Debian 13
+  machine (38 of 38).
+- **Machines: real runs of sound, recording and card models** (in development; latest release 0.8.9.5-beta;
+  docs/VIRTUALIZATION.md 6.9, 6.20, 6.22). `tests/vm_sound_e2e.sh`: a headless lord-server in its own namespaces with only
+  this account's pulse socket mounted in, a guest playing a tone and recording its microphone: the speakers' PipeWire
+  stream named after the machine, the microphone closed without LordOS's permission and open with it (the guest heard the
+  maintainer's webcam microphone), a screenshot at the guest's size and an H.264 and AAC recording carrying the guest's tone
+  even with the speakers at volume 0. `tests/vm_nic_e2e.sh`: every card model booted; seven reach the internet, PCnet gets
+  its address and then only receive errors (QEMU 10.0's PCnet with Linux 6.12, documented); an import's extra cards are
+  there with their MACs, and now each on a network of its own (below).
+- **Machines: this computer's USB devices in a machine, and the camera** (in development; latest release 0.8.9.5-beta;
+  docs/VIRTUALIZATION.md 6.6 and 6.9; approved by the maintainer on 2026-11-24, AGENTS.md "Machines' USB devices").
+  - The machine window's **Devices** menu lists this computer's USB devices; one picked goes into the running machine
+    whole (QEMU's `usb-host` on the machine's xHCI controller) and back to this computer's drivers when it is picked again,
+    when it is unplugged, or when the machine stops. One machine holds a device at a time, a machine at most 8.
+  - A new closed admin action, `vm-usb-allow "<machine id> <bus> <address> <vvvv>:<pppp>"` (anyone at the seat; storage, network
+    cards and Bluetooth adapters only for administrators): it finds the device again in sysfs, refuses a hub or root hub, a device whose keyboard or mouse a
+    process holds (the session's own), a disk this computer has mounted, uses as swap or under another block device, opens
+    `/dev/bus/usb/BBB/DDD`, checks it by its device number and sysfs again, and answers with the **descriptor**
+    (`admin_ok_fd`: SCM_RIGHTS on the helper's socket; `admin_dispatch` now reads with `recvmsg`). The node's owner, mode and
+    access list never change; nothing is written. lord-server keeps a descriptor only for a request it sent itself
+    (`js_vm_admin_reply`), hands it to the machine's lord-vm (a new request, `VM_USB`) and closes its copy; lord-vm checks it
+    again (`vmusb_fd_ok`) and gives it to QEMU through `add-fd` and `hostdevice=/dev/fdset/N`, so QEMU opens no path.
+  - QEMU's sandbox: Landlock unchanged. `lord-vm-usb.so` (`/usr/lib/lordos/lib`, new) is preloaded into the QEMU of a machine
+    with USB on and only sets libusb's default to `LIBUSB_OPTION_NO_DEVICE_DISCOVERY`, so libusb never looks at the
+    computer's other devices; the usb-host module is loaded during QEMU's start (`device-list-properties`), while
+    executable mappings are still allowed. The allowlist gains, only for such a machine, usbfs's ioctls (`'U'`) and the
+    rows `timerfd_create`, `timerfd_settime`, `timerfd_gettime` (rule `USB`): nothing else was called through a webcam's
+    capture in learn mode.
+  - machine.json schema 21: `usb` (the machine's USB controller, `qemu-xhci` on slot 0x15; new and imported machines have it,
+    an older one gets it in Configure → Sound and input with the machine off) and `usb_auto` (up to 8 `vendor:product[:serial]`
+    rules, "Connect … automatically" in the Devices menu while it runs, `VM_USB a = 2/3`, Remove in Configure, `lord-vm
+    --set --usb on|off --usb-auto RULE…|none`). A matching device goes in by itself, once while it stays plugged in, never
+    asking for a permission and never a disk (picked by hand only); an exported machine's rules are dropped at its import. Never for a machine locked for anonymity: refused by machine.json's check, lord-server and
+    lord-vm.
+  - **The camera** goes in the same way, as a USB device: a device with a video interface needs LordOS's camera permission
+    for Machines and one with sound the microphone's (checked in C; the app asks with the system prompt the first time;
+    taken away, the device leaves the machine within a second); the capture indicator shows the camera for "Machines —
+    <name>". Measured with the maintainer's own Logitech C930e (he allowed it): a Debian 13 guest saw it as
+    "Logitech Webcam C930e" (`/dev/video0`) and captured 30 frames of 640×480 YUYV at about 13 frames a second; out again,
+    uvcvideo and snd-usb-audio took it back on this computer.
+  - `lord.vm.usbDevices()`, `usbAttach(id, bus, dev)`, `usbDetach`, `usbAuto`; the poll's `usb` (`devices`, `busy`,
+    `controller`, `locked`, `err`, `auto`); the list's `usb` and `usbAuto`. 24 new strings in all 35 languages.
+  - Tests: `build/vmusb-test` (a made-up sysfs: listing, every refusal, the request, rule and line parsers with 200 000
+    random inputs, the descriptor check; ASan, UBSan), `tests/vm_usb_model_test.mjs` (the menu's rows, rules, indicator,
+    permissions), `tests/vm_usb_e2e.sh` (root, a real device, a real guest: vm-usb-allow → lord-vm → QEMU → the guest, and a
+    lord-server started as root in a private mount namespace driving `lord.vm` through the real admin helper), and
+    `build/vm-usb-cli` (vm-usb-allow as the helper runs it, for manual checks). lordvm-dev gains `usb-in`, `usb-out`,
+    `usb-auto`, `usb-noauto`.
+- **Machines: files from the machine, a file copy panel, the guest's own notifications, its apps before it runs** (in
+  development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.18, 6.21).
+  - **Send to LordOS.** A file chosen in the machine (Linux: the file manager's Send to LordOS, or `lordos-guest
+    --send-to-host FILE…`; virtio-win guests: Send To → LordOS) is copied to this computer over the guest agent's own
+    channel, one at a time, with flow control (never more than 4 MiB in flight) and resume after a lost connection (the
+    machine goes on only from a start whose SHA-256 matches what arrived), and is kept only when the whole file's SHA-256
+    is the machine's.
+  - **The quarantine folder.** Every file from a machine lands in `~/Machines/Received/<machine>/`, never anywhere the
+    machine names: folders made without following a link and never shared with other accounts, names made safe (nothing
+    arrives hidden, nothing is replaced: "name (2).ext"), the file 0600 (never executable) and marked as from that machine.
+    Files shows where it came from in Get Info and never opens a program, installer, package or desktop entry from a
+    machine with a double click (Open With still does); the marks follow copies and everything extracted from an archive
+    that came from a machine. At least 1 GiB stays free; at most 8 unfinished files are kept for a resume, none older than
+    7 days. Configure → Sharing → **Files from the machine** turns it off (machine.json schema 20, `guest_files`); a
+    machine locked for anonymity never takes files.
+  - **The file copy panel** along the bottom of the machine's window: every file on its way in (drops) or out, with its
+    size, a bar, the speed, the time left and **Cancel** (a drop can now be cancelled too), Show in Files, Open Received
+    Folder, and a received file dragged onto a folder in Files is copied there. It replaces the one progress line.
+  - **The machine's own notifications** (Linux guests, with Notifications from the machine on): the guest desktop's
+    notifications come too, as plain text marked "From ‹machine›", read by the LordOS tools as the person from that
+    person's own session bus, one kind of message only.
+  - **The machine's apps in the launcher before it runs**: the apps of a machine that has used apps mode are in the
+    launcher, the Classic start menu and search with the machine's mark; choosing one starts the machine and opens the app
+    in apps mode, only when the machine itself still lists it. Configure → General → "Its apps in the launcher".
+  - **The agent's shell in a Terminal tab**: Open in Terminal moves the machine's shell into a Terminal tab, titled and
+    marked as the machine's.
+  - **The LordOS tools 10 (Linux) and w13**; Machines updates older tools by itself. The Linux tools now write every frame
+    whole (a virtio-serial port takes at most 32 KiB a call: a large clipboard picture could be cut before).
+  - Tests: `vm-test` (the new frames, fuzzed with 80 000 random frames, the quarantine folder against links, hard links,
+    collisions and sizes, schema 20), `guest_send_test.sh`, `guest-dbus-test` (the notification monitor's parser),
+    `fsops-test` (the marks), `vm_xfer_test.mjs`, `guest_apps_test.mjs`, and a real Debian 13 KVM guest.
 - **Machines: All Displays** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.4). View → All
   Displays shows a machine across this computer's displays: one output of its virtio-gpu per display (up to four), each full
   screen at that display's size, beside the others; the machine's own window keeps the first, and each further window's
@@ -31,6 +135,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display serves one connection), and an output whose window goes is turned off for the guest. Not for a machine with a
   graphics card, apps mode or a protected machine (the anonymity profile keeps one display: the guest never learns this
   computer's displays). Checked with a real KVM guest (tests/vm_multihead.sh) and a headless scene.
+- **Machines: each machine its own firewall row** (in development; docs/FIREWALL.md, docs/VIRTUALIZATION.md 6.5). A
+  running machine's traffic is the firewall app `lordos:vm-<id>`, named after the machine in Monitor, with its forwarded
+  ports listed as its incoming lines; Settings' rule and restriction lists offer each machine, and Configure → Network
+  opens its rules. Every machine still inherits the Machines rules, restrictions and trust (`lordos:machines`), decided as
+  one list with the usual precedence; lord-netperm compiles the same union. The Tor gateway keeps its own row and
+  inherits nothing.
 - **Machines: one parent for every machine** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.7).
   lord-sessiond places each machine's scope in its session's `lordos-machines.slice` (root-owned, made on the first
   machine) with a fixed `cpu.weight` 50 and `io.weight` 50: half of one app's, a twentieth of the compositor's. Under load,
@@ -715,6 +825,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Machines: a machine with an Intel graphics card (GVT-g vGPU) hung at every start** since QEMU's seccomp allowlist: the
   starting child asked Landlock's version after its jail, a call the allowlist sends to lord-vm, which wasn't listening yet.
   Found by the first run of a vGPU machine under the allowlist (a Debian 13 guest on a scratch vGPU, 2026-11-24).
+- **`machines cp` out of a machine works again for files over 128 KB** (in development): a check meant to refuse a guest
+  answer that doesn't fit took every full 128 KB piece for one, so such a copy failed with "a strange answer".
+- **Sentinela: a false "weaker sandbox" alert on every running machine** (in development). lord-vm is non-dumpable since
+  QEMU's namespaces, so lord-server could no longer read which program a machine's engine runs and never counted one as
+  checked. lord-server now keeps a pidfd of every lord-vm it starts (a machine started without a window sends its own) and
+  checks the machine's socket against it; after lord-server restarts, a running engine is checked again only when the
+  kernel places it in the machine's own scope. A mismatch still raises the alert. Checked live on a real KVM machine.
+- **Machines: an arm64 machine with the compatible devices now boots** (in development; latest release 0.8.9.5-beta;
+  docs/VIRTUALIZATION.md 6.22, 12). Its disks were SATA, and the arm64 UEFI firmware (AAVMF) has no SATA driver, so it
+  stopped at the firmware's shell; every import of another app's arm64 machine starts on these devices. On arm64 they are
+  now NVMe disks (one controller each, the disk's own serial kept) and a USB CD/DVD that can still be changed while it runs:
+  what the firmware starts from and what arm64 guests without virtio drivers carry. Configure and the import's plan say
+  "NVMe" there (two new texts, in every language). Booted on a Raspberry Pi 5 with KVM and emulated, and emulated on a PC.
+- **Machines: the Clone sheet's buttons were cut off** at the Control Center's first size (760×500), and the file pickers
+  of Export and Bring In were drawn inside their sheets, a few lines tall. A sheet is now never taller than its window (its
+  title and buttons stay, its body scrolls), and the pickers cover the window. Every sheet and dialog of the library checked
+  at that size (`server/tests/machines_sheets_headless.sh`).
 - **Machines: a machine started right after a large import timed out** (in development). `qemu-img convert` leaves the
   disk in the page cache, and QEMU's first open of it with `O_DIRECT` waited behind gigabytes of writeback past its 20 s
   to answer QMP. The import now writes the converted disk out (`fsync`) before putting it in place. Found while checking
@@ -940,6 +1067,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Machines: QEMU's render node by descriptor** (in development; docs/VIRTUALIZATION.md 3.3): lord-vm opens and checks the GPU's
   render node, QEMU reopens that descriptor (`rendernode=/proc/self/fd/N`) and its Landlock rule is made from it, so the
   device checked is the only one QEMU may open.
+- **Machines: an installer disc is read out of the desktop's process** (in development; docs/VIRTUALIZATION.md 5.2). The
+  disc a person chooses is untrusted; its boot files are now read by `lord-vm --iso-probe` in seccomp strict mode (it can
+  only read the mapped file and write one fixed 64-byte answer), and lord-server only checks that answer. Same results
+  on real discs.
 
 - **Machines: a guest's picture is taken less often when it doesn't change or no window shows it** (in development;
   the latest release is 0.8.9.5-beta). Seen on the maintainer's PC: a guest on an Intel GVT-g vGPU in apps mode with a
@@ -1174,6 +1305,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Tests
 
+- **Two tests made steady on a busy computer** (in development). `webreg-test`'s stand-in web runtime wrote the files the
+  test reads in place, so a loaded computer let the test read an empty one: it now writes them whole and renames them, and
+  each wait for one may last 10 s (it ends as soon as the file is there; its content is still checked). `wlperf`'s frame rate
+  check shared its lord-server with the paint check, which repaints every frame a second time: with a load of about 24 it
+  measured 41–44 frame callbacks a second (45 needed), 57 without it. The subsurface and damage checks now get a lord-server
+  of their own with the paint check; the bound is unchanged.
+- **Machines: the boot matrix's compatible-devices rows** `tcg-compat` and `other-tcg-compat-<arch>`, and two rows of the
+  QEMU arguments test (the compatible devices on arm64, and with a data disk).
 - **Machines: an end-to-end harness, a boot matrix and kill tests** (`tools/vm/e2e/machines/`, its README says how other
   tests use it; docs/VIRTUALIZATION.md 12; in development, the latest release is 0.8.9.5-beta).
   - **The harness** (`mh.py`): a real headless session, `build/lord-server-test` with the real default theme, started in

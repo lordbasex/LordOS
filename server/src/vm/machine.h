@@ -21,12 +21,14 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). 15: guest_links, guest_notify (6.12). 16: disposable, encrypted, backup, disk_format (storage: 6.2, 6.4, 8). 17: automation (6.15, `machines exec` and `cp`). 18: cpu_model (5.5). 19: heads (5.4, All Displays). 20: reserved (guest_files). 21: vulkan (6.10, venus). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). 15: guest_links, guest_notify (6.12). 16: disposable, encrypted, backup, disk_format (storage: 6.2, 6.4, 8). 17: automation (6.15, `machines exec` and `cp`). 18: cpu_model (5.5). 19: heads (5.4, All Displays). 20: guest_files (6.21). 21: usb, usb_auto (6.6). 22: vulkan (6.10, venus). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 21
+#define VM_SCHEMA 22
 /* the most displays (virtio-gpu outputs) a machine may have: "heads" (schema 19) */
 #define VM_HEADS_MAX 4
+#define VM_USB_AUTO     8               /* schema 21: auto-connect rules (usb_auto) */
+#define VM_USB_RULE_MAX 73              /* "vvvv:pppp:" and a serial of up to 63 */
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -217,6 +219,9 @@ typedef struct {
      * chosen: "cpu_model": "compatible", a fixed x86-64-v2 model (amd64 with KVM only: the guest moves between computers and
      * keeps working after this one's processor changes); missing: "host", this computer's own processor */
     int cpu_model;                      /* VM_CPU_HOST, VM_CPU_COMPAT */
+    /* schema 20: files sent from the guest (docs/VIRTUALIZATION.md 6.21, "Send to LordOS"): taken into the machine's
+     * quarantine folder unless "guest_files": false (written only then); a machine locked for anonymity never takes them */
+    int guest_files_off;
     /* schema 14: a member of a machine group (docs/VIRTUALIZATION.md 19.4), written only for members. group: the group's
      * id (group.json "id"); role: VM_ROLE_*; uplink_tor: the gateway's passt has no DNS forwarding and no forwarded ports
      * ("uplink": "tor", with network "shared"); link_mac: the gateway's second card, on the internal link; profile_lock:
@@ -243,7 +248,18 @@ typedef struct {
      * lets `machines exec`, `machines cp` and the MCP server's run_command run programs in the guest, as its signed-in
      * person, through lord-vm (VM_EXEC); written only then, missing: no. Never with VM_LOCK_ANONYMITY */
     int automation;
-    /* schema 21: Vulkan for a 3D machine's guest through venus (docs/VIRTUALIZATION.md 6.10, "venus"): "vulkan": true, only
+    /* schema 21: host USB devices that go into the machine by themselves while it runs (docs/VIRTUALIZATION.md 6.6):
+     * "usb_auto": ["046d:0843", "0781:5581:4C530001"], each vendor:product (four lowercase hex digits each) and maybe the
+     * device's serial (1 to 63 of [A-Za-z0-9._-]); at most VM_USB_AUTO, no two the same (vm_usb_rule_valid). Lord-server
+     * connects a device that matches while the machine runs (lord.vm.usbAttach's checks, the admin helper's vm-usb-allow);
+     * never with VM_LOCK_ANONYMITY */
+    char usb_auto[VM_USB_AUTO][VM_USB_RULE_MAX + 1];
+    int n_usb_auto;
+    /* schema 21: "usb": true, the machine has a USB controller for this computer's devices (6.6): a qemu-xhci of its own on
+     * slot 0x15 (the compatible and Windows devices in a window use their xHCI). A device of the guest, so it changes only
+     * with no saved state. Never with VM_LOCK_ANONYMITY */
+    int usb;
+    /* schema 22: Vulkan for a 3D machine's guest through venus (docs/VIRTUALIZATION.md 6.10, "venus"): "vulkan": true, only
      * with graphics "3d"; written only then, missing: no. Never with VM_LOCK_ANONYMITY (no 3D there at all) */
     int vulkan;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
@@ -433,6 +449,8 @@ int vm_key_valid(const char *k, size_t n);
 
 const char *vm_arch_name(int arch);     /* "arm64", "amd64" */
 int vm_uuid_valid(const char *s);
+/* an auto-connect rule of usb_auto (schema 18): "vvvv:pppp" or "vvvv:pppp:serial" */
+int vm_usb_rule_valid(const char *s);
 int vm_mac_valid(const char *s);      /* lowercase aa:bb:cc:dd:ee:ff, unicast, not all zero */
 int vm_smbios_valid(const char *s);   /* printable ASCII, at most VM_SMBIOS_MAX bytes */
 int vm_serial_valid(const char *s);   /* letters, digits, '-', '_', '.', at most VM_SERIAL_MAX */

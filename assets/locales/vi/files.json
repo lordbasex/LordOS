@@ -331,5 +331,8 @@
   "markupHint": "Mở trong trình chỉnh sửa đánh dấu",
   "readOnly.title": "Tệp không thể thay đổi “{name}”",
   "readOnly.outside": "Tệp chỉ có thể xem thư mục này: thư mục nằm ngoài thư mục chính và các ổ đĩa của bạn. Để thay đổi, hãy dùng Terminal hoặc ứng dụng khác.",
-  "readOnly.denied": "Thư mục này chỉ đọc: quyền của thư mục không cho phép bạn thay đổi. Để thay đổi, hãy dùng Terminal hoặc ứng dụng khác."
+  "readOnly.denied": "Thư mục này chỉ đọc: quyền của thư mục không cho phép bạn thay đổi. Để thay đổi, hãy dùng Terminal hoặc ứng dụng khác.",
+  "fromMachineNoRun": "«{name}» đến từ máy {machine}. Tệp không mở chương trình hay trình cài đặt từ một máy: dùng Mở bằng nếu bạn tin tưởng nó.",
+  "info.from": "Nguồn",
+  "info.fromMachine": "Máy {machine}"
 }

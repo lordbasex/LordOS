@@ -561,7 +561,7 @@ static void sync_user_scope(Session *s) {
 static int scope_app(const char *name, char *app) {
     if (!strcmp(name, "server")) { snprintf(app, FW_APP_MAX, "lordos"); return 0; }
     /* (0.8.5) LordOS's own components that use the network: lordos-net-<name>.scope → lordos:<name>;
-     * (0.8.8.6) a running machine's scope → lordos:machines, so several scopes can share one app */
+     * a running machine's scope → lordos:vm-<id>, compiled with the Machines component's rules too (npcompile.c) */
     return fw_scope_app(name, app, FW_APP_MAX);
 }
 
@@ -1404,8 +1404,7 @@ static void push_counts(void) {
         j[w++] = '{';
         for (int k = 0; k < s->nsc; k++) {
             Scope *sc = &s->sc[k];
-            /* one entry per app: the scopes that share one (each running machine and the Machines
-             * downloads, all lordos:machines) are added together under the first */
+            /* one entry per app: scopes that share one are added together under the first */
             int first = 1;
             for (int p = 0; p < k && first; p++) first = s->sc[p].idx != sc->idx;
             if (!first) continue;

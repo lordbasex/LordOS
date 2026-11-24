@@ -1006,6 +1006,32 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   r = M.toolsAutoStep({ ...M.TOOLS_AUTO_IDLE, want: 'w8', tries: 3, told: 'w8', since: T0 }, { agent: ag('w7'), on: true, busy: false, now: T0 + SET }, S);
   eq('auto: a newer version shipped: tried again', [r.act, r.s.want, r.s.tries], ['install', 'w9', 1]);
   eq('auto: failed backoff stops after the last', M.toolsAutoFailed({ tries: M.TOOLS_TRIES }, 5).next, Infinity);
+  // a snapshot before the first attempt for a version, once; then the install; never while busy
+  r = step({ since: T0 }, ag('w7'), T0 + SET, { snap: true });
+  eq('auto: snapshot first', [r.act, r.s.snapped, r.s.tries], ['snapshot', 'w9', 0]);
+  eq('auto: busy taking it: waits', step(r.s, ag('w7'), T0 + SET + 1, { snap: true, busy: true }).act, null);
+  r = step(r.s, ag('w7'), T0 + SET + 2, { snap: true });
+  eq('auto: then the install', [r.act, r.s.tries], ['install', 1]);
+  const f = M.toolsAutoFailed(r.s, T0 + SET + 3);
+  eq('auto: a retry takes no second snapshot', step(f, ag('w7'), f.next, { snap: true }).act, 'install');
+  eq('auto: no snapshot when it can\'t have one', step({ since: T0 }, ag('w7'), T0 + SET, { snap: false }).act, 'install');
+  r = M.toolsAutoStep({ ...M.TOOLS_AUTO_IDLE, want: 'w8', snapped: 'w8', tries: 3, told: 'w8', since: T0 }, { agent: ag('w7'), on: true, busy: false, now: T0 + SET, snap: true }, S);
+  eq('auto: a newer version: a new snapshot', [r.act, r.s.snapped], ['snapshot', 'w9']);
+  eq('auto: off: no snapshot either', step({ since: T0 }, ag('w7'), T0 + SET, { snap: true, on: false }).act, 'notify');
+  eq('snap ok: a qcow2 machine', M.toolsSnapOk({ count: 3 }), true);
+  eq('snap ok: raw, disposable, 3D, full', [M.toolsSnapOk({ raw: true }), M.toolsSnapOk({ disposable: true }), M.toolsSnapOk({ gl: true }), M.toolsSnapOk({ count: 64, max: 64 })], [false, false, false, false]);
+}
+
+// ---- the Storage window's old snapshots and unused downloads (6.16) ----
+{
+  const sn = (tag, created) => ({ tag, name: tag, created });
+  eq('old snapshots: none or one', [M.oldSnapshots([]), M.oldSnapshots([sn('s1', '2026-11-01T00:00:00Z')]), M.oldSnapshots(null)], [[], [], []]);
+  eq('old snapshots: all but the newest', M.oldSnapshots([sn('s1', '2026-11-01T00:00:00Z'), sn('s2', '2026-11-03T00:00:00Z'), sn('s3', '2026-11-02T00:00:00Z')]).map((s) => s.tag), ['s1', 's3']);
+  eq('old snapshots: no times: the last listed is the newest', M.oldSnapshots([sn('s1'), sn('s2')]).map((s) => s.tag), ['s1']);
+  eq('old snapshots: junk skipped', M.oldSnapshots([sn('s1', '2026-11-01T00:00:00Z'), null, { name: 'x' }, sn('s2', '2026-11-02T00:00:00Z')]).map((s) => s.tag), ['s1']);
+  const im = (sha, o = {}) => ({ sha, size: 10, partial: false, users: [], running: [], ...o });
+  eq('unused downloads', M.unusedImages([im('a'), im('b', { users: ['M'] }), im('c', { partial: true }), im('d', { running: ['M'] }), null]).map((x) => x.sha), ['a']);
+  eq('unused downloads: none', M.unusedImages(undefined), []);
 }
 
 

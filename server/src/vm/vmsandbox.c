@@ -289,7 +289,7 @@ int vm_jail_qemu(const VmQemuJail *j) {
     if (VM_AUDIT_ARCH) {
         static struct sock_filter filt[BPF_MAXINSNS];
         VmScOpts o = { .kvm = j->kvm, .tcg = j->tcg, .render = j->render && j->render[0], .vgpu = j->vgpu_dev && j->vgpu_dev[0],
-                       .tap = j->tap, .self = getpid(), .exec_fd = j->exec_fd, .notify = j->notify_out != NULL, .learn = j->learn, .bti = vm_sc_cpu_bti(),
+                       .tap = j->tap, .usb = j->usb, .self = getpid(), .exec_fd = j->exec_fd, .notify = j->notify_out != NULL, .learn = j->learn, .bti = vm_sc_cpu_bti(),
                        .drop = j->sc_drop };
         for (int pass = 0; pass < 2 && !(mask & VMS_SECCOMP_OURS); pass++) {
             if (pass && (!o.notify || o.learn)) break;

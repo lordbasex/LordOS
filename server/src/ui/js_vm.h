@@ -14,5 +14,8 @@ void js_vm_register(JSContext *c, JSValue lord);
 int  js_vm_pollfds(struct pollfd *p, int max);
 void js_vm_dispatch(const struct pollfd *p, int n);
 void js_vm_painted(void);
+/* the admin helper's answer to a vm-usb-allow js_vm sent (docs/VIRTUALIZATION.md 6.6): 1 when it was one, and JS never
+ * sees it (its descriptor goes to the machine's lord-vm) */
+int  js_vm_admin_reply(int id, const char *kind, const char *text);
 
 #endif

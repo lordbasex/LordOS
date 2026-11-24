@@ -10,13 +10,18 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending, discOffer, discCommands, discCanCopy, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered } from './model.js';
-import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
+import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending, discOffer, discCommands, discCanCopy, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered, usbRows, usbCamLive, usbMicLive, usbNeedsPerm, toolsSnapOk } from './model.js';
+import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS, launchGuest } from './appsmode.jsx';
+import { launchAsks, dropLaunchAsk } from './guestlaunch.js';
+import { launchAskStep } from '../../sdk/guestappsmodel.js';
 import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
 import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
+import { disposableOf, disposableAllowed, disposableToggle } from './storagemodel.js';
 import { defaultsOf } from './store.js';
 import { ClipAskBar } from './clipask.jsx';
 import { gatewayBar, gatewayOf } from './group.js';
+import { TransfersPanel } from './transfers.jsx';
+import { xferStep, xferShown, xferNextExpiry } from './xfer.js';
 import { KeysBtn, sendKeysItems } from './keys.jsx';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, startPrep, needsPrep, soundDevItems } from './ui.jsx';
 import { openLogs, openSnapshots, playAsks, openAsks } from './library.jsx';
@@ -540,7 +545,17 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const [shellSrc, setShellSrc] = useWindowState('vm.shellSrc', 'agent');
   const agentShell = !!(st?.agent?.state === 'connected' && st.agent.caps & AGENT_CAPS.shell);
   const shellUse = shellSrc === 'agent' && agentShell ? 'agent' : 'serial';
-  const shellTerm = shellUse === 'agent' ? st?.shell : st?.console;
+  // the agent's shell moved to a Terminal tab ("Open in Terminal", 6.18): { sid, win } while that window shows it; the
+  // pane then says so instead of a second view of the same session (two views would fight over its size)
+  const [inTerm, setInTerm] = useWindowState('vm.shellInTerm', null);
+  const termWins = useStore(windows, (ws) => (inTerm ? ws.some((w) => w.id === inTerm.win) : false));
+  const shellElsewhere = !!(inTerm && termWins && shellUse === 'agent' && st?.shell && st.shell === inTerm.sid);
+  const shellTerm = shellUse === 'agent' ? (shellElsewhere ? 0 : st?.shell) : st?.console;
+  const shellToTerminal = () => {
+    if (!st?.shell) return;
+    const win = wm.open('terminal', { new: true, args: { guestShell: { sid: st.shell, machine: name } } });
+    if (win != null) { setInTerm({ sid: st.shell, win }); setShellKeys(false); }
+  };
   // the clipboard's "ask before each paste" bar (model.js clipAsk*): while it shows, the keyboard is the bar's
   const [askSt, setAskSt] = useState(clipAskEmpty);
   const askKind = clipAskShown(askSt);
@@ -554,6 +569,10 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const [stuck, setStuck] = useState(false);
   // files dropped on the window, on their way into the guest (lord.vm.files): the ones still copying
   const [copies, setCopies] = useState([]);
+  // the file copy panel (6.21, transfers.jsx): drops on their way into the guest and files the guest sends, as rows
+  const [xfers, setXfers] = useState([]);
+  const recvSeen = useRef(-1);
+  const onReceived = useRef(null);
   const filesSeen = useRef(-1);
   const onFiles = useRef(null);
   const buttons = useRef(new Set());
@@ -719,6 +738,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       const stuckNow = q.display === 'up' && followRef.current && !appsRef.current && followStuck(z.asked, [q.w, q.h], z.askedAt, now());
       setStuck((x) => (x === stuckNow ? x : stuckNow));
       if (q.filesSeq !== filesSeen.current || (q.ended && filesSeen.current !== -2)) { filesSeen.current = q.ended ? -2 : q.filesSeq; onFiles.current?.(lord.vm.files(sid)); }
+      if (q.receivedSeq !== recvSeen.current || (q.ended && recvSeen.current !== -2)) { recvSeen.current = q.ended ? -2 : q.receivedSeq; onReceived.current?.(lord.vm.received(sid)); }
       // the card picture in the library, every few seconds while it runs
       // only while the guest's system is up (its agent answers, when it has one): never its firmware, boot or shutdown
       // screens, which a card would otherwise keep
@@ -988,9 +1008,24 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   // guest's picture is re-encoded on this side before any app sees it
   const cfgRef = useRef({});
   const [cfg, setCfg] = useState({});
-  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch, guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, network: m.network, group: m.group || '' }); } }, [sid, st?.state]);
-  // the devices' own backend (USB, the camera): shown only once it says they're supported here (deviceCaps)
-  const caps = has() && typeof lord.vm.deviceCaps === 'function' ? lord.vm.deviceCaps(dir) : null;
+  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch, guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, guestFiles: m.guestFiles !== false, network: m.network, group: m.group || '', disposable: m.disposable || 'off' }); } }, [sid, st?.state]);
+  // the disposable session's switch (6.2, Actions): lord-vm --set while the machine is off, then shown as saved
+  const [dispJob, setDispJob] = useState(null);         // { job, to }
+  useEffect(() => {
+    if (!dispJob) return undefined;
+    const timer = setInterval(() => {
+      const r = lord.vm.job(dispJob.job);
+      if (!r || !r.done) return;
+      if (r.ok) setCfg((c) => ({ ...c, disposable: dispJob.to }));
+      setDispJob(null);
+    }, 300);
+    return () => clearInterval(timer);
+  }, [dispJob]);
+  const dispSwitch = () => {
+    const to = disposableToggle(cfg);
+    const job = lord.vm.set(dir, { disposable: to });
+    if (job) setDispJob({ job, to });
+  };
   const cableOk = cableOffered(cfg, running);
   const cableOut = !!st?.cableOut;
   // shape keeping (5.3): windowed, the resolution fixed, nothing else deciding the frame
@@ -1143,6 +1178,42 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   // the capture indicator names the machine: "Machines — Windows 11 Pro"
   const micWho = name || '';
   useEffect(() => { markDeviceUse('machines', 'microphone', micOn, null, micWho); return micOn ? () => markDeviceUse('machines', 'microphone', false, null, micWho) : undefined; }, [micOn, micWho]);
+  // host USB devices (6.6): this computer's list (sysfs, read again every 2 s while the machine runs), what the machine
+  // holds (st.usb), the capture indicator for a camera or a device with sound given to it, and the last refusal shown
+  const [usbList, setUsbList] = useState([]);
+  const [usbErr, setUsbErr] = useState('');
+  const usbOn = !!sid && (st?.state === 'running' || st?.state === 'paused');
+  useEffect(() => {
+    if (!usbOn || !has() || typeof lord.vm.usbDevices !== 'function') return undefined;
+    const read = () => { try { setUsbList(lord.vm.usbDevices()); } catch (e) { /* */ } };
+    read();
+    const t = setInterval(read, 2000);
+    return () => clearInterval(t);
+  }, [usbOn]);
+  const usbView = usbRows(usbList, st?.usb, sid);
+  const usbCam = usbCamLive(st?.usb), usbMic = usbMicLive(st?.usb);
+  // the bar's USB and camera dots (deviceDots): this machine's devices now
+  const caps = { usb: !!st?.usb?.controller, usbAttached: (st?.usb?.devices || []).length, camera: true, cameraOn: usbCam };
+  useEffect(() => { markDeviceUse('machines', 'camera', usbCam, null, micWho); return usbCam ? () => markDeviceUse('machines', 'camera', false, null, micWho) : undefined; }, [usbCam, micWho]);
+  useEffect(() => { if (usbMic && !micOn) { markDeviceUse('machines', 'microphone', true, null, `${micWho} USB`); return () => markDeviceUse('machines', 'microphone', false, null, `${micWho} USB`); } return undefined; }, [usbMic, micOn, micWho]);
+  const usbErrs = st?.usb?.errs || 0;
+  const usbErrSeen = useRef(0);
+  useEffect(() => { if (usbErrs > usbErrSeen.current && st?.usb?.err) setUsbErr(st.usb.err); usbErrSeen.current = usbErrs; }, [usbErrs]);
+  // a device in or out; a camera or a device with sound first asks for LordOS's permission (the system prompt, once)
+  const usbToggle = async (r) => {
+    setUsbErr('');
+    if (r.on) { lord.vm.usbDetach(sid, r.bus, r.dev); return; }
+    let why = lord.vm.usbAttach(sid, r.bus, r.dev);
+    for (let k = 0; k < 2 && usbNeedsPerm(why); k++) {
+      if (!(await requestPermission('machines', usbNeedsPerm(why)))) break;
+      why = lord.vm.usbAttach(sid, r.bus, r.dev);
+    }
+  };
+  const usbItems = usbView.state === 'locked' ? [{ label: tr('errors.vm.usbLocked'), disabled: true }]
+    : usbView.state === 'nocontroller' ? [{ label: tr('machines.usb.noController'), onClick: () => setCfgSheet({ section: 'sound' }) }]
+    : usbView.state === 'empty' ? [{ label: tr('machines.usb.none'), disabled: true }]
+    : [...usbView.rows.map((r) => ({ label: r.name, checked: r.on, disabled: (!!r.why && !r.on) || !!st?.usb?.busy, hint: r.why && !r.on ? tr(`errors.${r.why}`) : '', onClick: () => usbToggle(r) })),
+      ...usbView.rows.filter((r) => r.on || r.auto).map((r) => ({ label: tr('machines.usb.auto', { name: r.name }), checked: r.auto, onClick: () => lord.vm.usbAuto(sid, r.autoRule, !r.auto) }))];
   // Files dragged from Files onto the picture (6.x): copied into the guest's Downloads by its agent, one at a time in
   // lord-vm; a line under the picture while they go, a notice when they're there. Only into the guest: nothing comes
   // out by dragging (a shared folder does that)
@@ -1191,6 +1262,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   onFiles.current = (list) => {
     if (!Array.isArray(list)) return;
     setCopies(list.filter((f) => f.state === 'copying'));
+    setXfers((x) => xferStep(x, { drops: list.filter((f) => !f.open && !f.place) }, Date.now()));
     // files opened from Files' "Open with": the program's window comes up as its own (apps mode), or this one in front
     const opened = list.filter((f) => f.open && f.state === 'done'), notOpened = list.filter((f) => f.open && f.state === 'failed');
     for (const f of [...opened, ...notOpened]) opening.current.delete(f.id);
@@ -1214,6 +1286,24 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     for (const f of failed) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.drop.failed', { machine: name, name: f.name }), body: f.message, sound: false });
   };
   const line = copyLine(copies);
+  // files the guest sends ("Send to LordOS", 6.21): kept in the machine's quarantine folder; a notification when one is
+  onReceived.current = (list) => {
+    if (!Array.isArray(list)) return;
+    setXfers((x) => xferStep(x, { recvs: list }, Date.now()));
+    for (const r of list.filter((f) => f.state === 'done')) {
+      notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.xfer.arrived', { name: r.name, machine: name }), body: tr('machines.xfer.arrivedBody'), sound: false,
+        actions: [{ id: 'show', label: tr('machines.xfer.show'), run: () => revealPath(r.path) }] });
+    }
+  };
+  const shownX = xferShown(xfers);
+  // a finished row goes after its time: looked at again then
+  useEffect(() => {
+    const ms = xferNextExpiry(xfers);
+    if (ms < 0) return undefined;
+    const tm = setTimeout(() => setXfers((x) => xferShown(x)), ms + 50);
+    return () => clearTimeout(tm);
+  }, [xfers]);
+  const cancelX = (r) => { if (!sid) return; if (r.dir === 'out') lord.vm.receiveCancel(sid, r.id); else lord.vm.fileCancel(sid, r.id); };
   // Files' "Open with" this machine (7.3; openwith.js): the files asked for wait here until the machine runs and its
   // guest tools can open them, then go in as drops with { open }; once one is open, apps mode (when the guest has it)
   const asks = useStore(openAsks, (x) => x[dir] || null);
@@ -1254,8 +1344,10 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   // button, only while nothing is on its way; off or given up, a notification with Update. Its state lives for the
   // machine's run (toolsRuns), so the window closed and opened again doesn't try again.
   const toolsBusy = useRef(false);
+  const toolsSnapJob = useRef(0);          // the snapshot before an update (model.js toolsAutoStep 'snapshot'), while it's taken
+  if (toolsSnapJob.current && lord.vm.job(toolsSnapJob.current)?.done !== false) toolsSnapJob.current = 0;
   const gl = guests.get()[dir];
-  toolsBusy.current = copies.length > 0 || opening.current.size > 0 || !!asks || xferBusy.current || xstate === 'settingUp' || st?.agent?.transfer === 1
+  toolsBusy.current = !!toolsSnapJob.current || copies.length > 0 || opening.current.size > 0 || !!asks || xferBusy.current || xstate === 'settingUp' || st?.agent?.transfer === 1
     || Object.values(gl?.launches || {}).some((e) => launchPending(e, gl.list, Date.now()));
   useEffect(() => {
     if (!sid) return undefined;
@@ -1270,8 +1362,14 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       const q = stRef.current;
       if (!q || q.ended || q.state !== 'running' || closingRef.current) return;
       const t0 = Date.now();
-      const r = toolsAutoStep(toolsRuns.get(dir), { agent: q.agent, on: toolsAutoOn(readMeta(dir), defaultsOf(settings.get().machinesDefaults)), busy: toolsBusy.current, now: t0 });
+      if (toolsSnapJob.current && lord.vm.job(toolsSnapJob.current)?.done !== false) toolsSnapJob.current = 0;
+      const sn = lord.vm.snaps(dir);
+      const c0 = cfgRef.current || {};
+      const snap = toolsSnapOk({ raw: c0.diskFormat === 'raw', disposable: !!c0.disposable && c0.disposable !== 'off', gl: c0.graphics === '3d' || !!c0.gpu, count: sn?.list?.length, max: sn?.max });
+      const r = toolsAutoStep(toolsRuns.get(dir), { agent: q.agent, on: toolsAutoOn(readMeta(dir), defaultsOf(settings.get().machinesDefaults)), busy: toolsBusy.current || !!toolsSnapJob.current, now: t0, snap });
       let s = r.s, why = r.act === 'notify' ? r.why : null;
+      // a snapshot first, with the machine's memory; the install waits until it's done (or refused: it goes on anyway)
+      if (r.act === 'snapshot') { const t = lord.vm.snapTake(dir, tr('machines.snap.beforeTools', { version: s.snapped }), sid); toolsSnapJob.current = t?.job || 0; }
       // lord-server didn't take it (the session is going away): a failed attempt
       if (r.act === 'install' && !lord.vm.agent(sid, 'update')) {
         s = toolsAutoFailed(s, t0);
@@ -1306,6 +1404,27 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   }, [appsActive, appsActive && shell]);
   const gApps = useStore(guests, (x) => x[dir] || null);
   const gRunning = runningKey(runningWindows(gApps?.list));
+  // a guest app chosen in the launcher while the machine was off (guestlaunch.js, 6.12): this window started the machine;
+  // apps mode goes on, and the app opens once the guest's own fresh list holds that very token (never anything else)
+  const lask = useStore(launchAsks, (x) => x[dir] || null);
+  useEffect(() => { if (lask && !appsOn) setApps(true); }, [lask]);
+  useEffect(() => () => dropLaunchAsk(dir), []);          // the window closed: the launch isn't waited for any more
+  useEffect(() => {
+    if (!lask) return undefined;
+    const check = () => {
+      // the guest's tools answered and can't list windows (no apps mode in this guest): no use waiting
+      const cant = st?.agent?.state === 'connected' && appsBlockedRef.current === 'needsTools';
+      const step = cant ? 'timeout' : launchAskStep(lask, appsActive ? gApps?.apps : [], Date.now());
+      if (step === 'wait') return;
+      dropLaunchAsk(dir);
+      if (step === 'launch') { launchGuest(dir, { token: lask.token, name: lask.name }); return; }
+      notify({ app: 'machines', label: tr('machines.title'), title: tr(step === 'missing' ? 'machines.launcher.missing' : 'machines.launcher.timeout', { app: lask.name, machine: name }),
+        body: tr(step === 'missing' ? 'machines.launcher.missingBody' : 'machines.launcher.timeoutBody'), sound: false });
+    };
+    check();
+    const t2 = setInterval(check, 5000);
+    return () => clearInterval(t2);
+  }, [lask, appsActive, gApps?.apps, st?.agent?.state, st?.agent?.caps]);
   // why it can't be on: the agent, or a guest whose helper can't list its windows (it needs LordOS or Windows inside)
   const appsWhy = appsBlocked === 'needsTools' ? tr('machines.win.appsNeedsTools') : appsBlocked ? tr('machines.apps.needsAgent') : '';
   const appsLabel = appsOn ? tr('machines.apps.leave') : appsWhy || tr('machines.apps.enter');
@@ -1371,9 +1490,10 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       '-',
       { label: (cfg.shares || []).length ? tr('machines.tb.foldersN', { n: cfg.shares.length }) : tr('machines.tb.folders'), disabled: true },
       { label: tr('machines.dev.folderSettings'), onClick: () => setCfgSheet({ section: 'sharing' }) },
-      // USB and the camera: their own backend's, only once it says they're supported (deviceCaps)
-      ...(caps?.usb ? ['-', { label: tr('machines.dev.usb'), onClick: () => setCfgSheet({ section: 'usb' }) }] : []),
-      ...(caps?.camera ? [{ label: tr('machines.dev.camera'), onClick: () => setCfgSheet({ section: 'camera' }) }] : []),
+      // this computer's USB devices and its camera (6.6, 6.9): each one in or out of the machine, and its rule
+      '-',
+      { label: tr('machines.usb.title'), disabled: true },
+      ...usbItems,
     ],
     dots: deviceDots({ iso, heard, mic: micOn, cableOut, network: cfg.network, shares: (cfg.shares || []).length, transfer: cfg.transfer, caps }),
   };
@@ -1391,6 +1511,8 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
         '-',
         { label: tr('machines.snap.takeNow'), disabled: !sid || busy || noSuspend(st, gpu) || !(st?.state === 'running' || st?.state === 'paused'), onClick: snapNow },
         { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m0) },
+        ...(disposableAllowed(cfg) ? [{ label: tr('machines.disp.switch'), checked: disposableOf(cfg) !== 'off', disabled: running || !!dispJob || !!(st && !st.ended && st.state && st.state !== 'off' && st.state !== 'crashed'),
+          hint: running ? tr('machines.disp.whenOff') : '', onClick: dispSwitch }] : []),
         '-',
         { label: tr('machines.tb.transferOpen'), disabled: !cfg.transfer, onClick: xferOpen },
         ...(xstate === 'setup' ? [{ label: tr('machines.tb.transferSetup'), onClick: xferSetup }] : []),
@@ -1489,10 +1611,15 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
             <Text style={{ flex: 1, fontSize: 12, color: '#c9c9d1', textAlign: 'start' }}>{tr(shellUse === 'agent' ? 'machines.shell.agentTitle' : 'machines.shell.title', { name })}</Text>
             {agentShell ? <Segmented small value={shellUse} onChange={(x) => setShellSrc(x)} options={[['agent', tr('machines.shell.agent')], ['serial', tr('machines.shell.serial')]]} /> : null}
             {shellUse === 'agent' && st?.shell ? <Btn label={tr('machines.shell.new')} onClick={() => lord.vm.shell(sid, 100, 14)} style={{ height: 20, paddingHorizontal: 8 }} /> : null}
+            {shellUse === 'agent' && st?.shell && !shellElsewhere ? <Btn label={tr('machines.shell.toTerminal')} onClick={shellToTerminal} style={{ height: 20, paddingHorizontal: 8 }} /> : null}
             <Text style={{ fontSize: 11, color: '#8a8a94' }}>{shellKeys ? tr('machines.shell.keysHere') : tr('machines.shell.clickHere')}</Text>
             <Btn label="×" onClick={() => { setShell(false); setShellKeys(false); }} style={{ height: 20, paddingHorizontal: 8 }} />
           </View>
-          {shellTerm ? <Terminal ref={shellRef} session={shellTerm} style={{ flex: 1 }} />
+          {shellElsewhere ? <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 12, color: '#8a8a94' }}>{tr('machines.shell.inTerminal')}</Text>
+              <Btn label={tr('machines.shell.showTerminal')} onClick={() => wm.focus(inTerm.win)} style={{ height: 22, paddingHorizontal: 10 }} />
+            </View>
+            : shellTerm ? <Terminal ref={shellRef} session={shellTerm} style={{ flex: 1 }} />
             : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, color: '#8a8a94' }}>{a.reset ? tr('machines.shell.connecting') : tr('machines.shell.off')}</Text></View>}
         </View>
       ) : null}
@@ -1528,17 +1655,17 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
           </View>
         </View>
       ) : null}
-      {!card && !failed && ((noticeOn && noticeText) || cdErr) ? (
+      {!card && !failed && ((noticeOn && noticeText) || cdErr || usbErr) ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 16, alignItems: 'center' }}>
           <View style={{ maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
-            <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{cdErr ? tr('machines.tb.cdFailed', { why: cdErr }) : noticeText}</Text>
-            {cdErr ? <Btn label={tr('machines.ok')} onClick={() => setCdErr('')} style={{ height: 28 }} />
+            <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{cdErr ? tr('machines.tb.cdFailed', { why: cdErr }) : usbErr ? tr('machines.usb.failed', { why: tr(`errors.${usbErr}`) }) : noticeText}</Text>
+            {cdErr || usbErr ? <Btn label={tr('machines.ok')} onClick={() => { setCdErr(''); setUsbErr(''); }} style={{ height: 28 }} />
               : ['network-back', 'identity'].includes(st.notice) ? <Btn label={tr('machines.ok')} onClick={() => setNoticeGone(st.noticeSeq)} style={{ height: 28 }} />
               : <Btn label={tr('machines.cmd.logs')} onClick={() => openLogs(m0)} style={{ height: 28 }} />}
           </View>
         </View>
       ) : null}
-      {asks && !line && !card && !failed ? (
+      {asks && !line && !shownX.length && !card && !failed ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 64, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ maxWidth: 560, minWidth: 260, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
             <Text style={{ fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>
@@ -1547,7 +1674,8 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
           </View>
         </View>
       ) : null}
-      {line && !card && !failed ? (
+      {shownX.length && !card && !failed ? <TransfersPanel rows={shownX} machine={name} onCancel={cancelX} bottom={52} /> : null}
+      {line && !shownX.length && !card && !failed ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 64, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ maxWidth: 560, minWidth: 260, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
             <Text style={{ fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>

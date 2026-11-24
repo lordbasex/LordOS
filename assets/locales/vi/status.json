@@ -159,6 +159,7 @@
   "pkg.why.multiarchPair": "Cùng phiên bản với {name}",
   "gpu.roleSet": "Đã lưu cách dùng card đồ họa ({card}): khởi động lại để áp dụng",
   "vm.gvtReady": "Phần card đồ họa đã sẵn sàng ({name})",
+  "vm.usbReady": "Thiết bị USB đã sẵn sàng",
   "vm.gvtGone": "Đã gỡ phần card đồ họa",
   "gpu.freqSet": "Đã đặt tần số tối thiểu của card đồ họa",
   "gpu.memlockSet": "Đã lưu bộ nhớ các máy được phép khóa",

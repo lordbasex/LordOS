@@ -562,5 +562,7 @@
   "prefs.tr.would.capture": "เก็บไว้ในเอาต์พุตที่จับไว้",
   "prefs.tr.would.highlight": "ไฮไลต์ “{text}”",
   "prefs.tr.param": "พารามิเตอร์",
-  "prefs.tr.regexFirst": "เขียน regular expression ก่อน"
+  "prefs.tr.regexFirst": "เขียน regular expression ก่อน",
+  "guest.badge": "เครื่องเสมือน",
+  "guest.title": "เชลล์ภายใน {machine}"
 }

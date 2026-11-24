@@ -17,6 +17,9 @@
 #include "vm/vmperfwin.h"
 #include "vm/vmhoststop.h"
 #include "vm/vmgroup.h"
+#include "vm/vmrecv.h"
+#include <sys/xattr.h>
+#include <time.h>
 
 #include <limits.h>
 #include <stdio.h>
@@ -620,6 +623,34 @@ static void test_schema(void) {
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 15);
         }
+        /* schema 20: guest_files (6.21), true or false, written only when false, never below 20 */
+        {
+            struct { const char *add; int schema, want, off; } s18[] = {
+                { "\"guest_files\":false", 20, VM_OK, 1 }, { "\"guest_files\":true", 20, VM_OK, 0 }, { "\"guest_files\":0", 20, VM_E_FIELD, 0 },
+                { "\"guest_files\":false", 19, VM_E_FIELD, 0 }, { "\"guest_files\":true", 19, VM_OK, 0 }, { "\"guest_files\":false", VM_SCHEMA + 1, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s18 / sizeof s18[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s18[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s18[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s18[i].want) fprintf(stderr, "  schema 20 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
+                CHECK(r == s18[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.guest_files_off == s18[i].off);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"guest_files\": false") == s18[i].off && !strstr(jj, "\"guest_files\": true"));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && !m.guest_files_off);
+            m.guest_files_off = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.guest_files_off = 2; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 20);
+        }
         /* schema 17: automation (6.15), true or false, written only when true, never below 17, never for anonymity */
         {
             struct { const char *add; int schema, want, on; } s16[] = {
@@ -663,7 +694,7 @@ static void test_schema(void) {
                 const char *at = strstr(GOOD, "\"schema\":1");
                 snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s18[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s18[i].add);
                 int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
-                if (r != s18[i].want) fprintf(stderr, "  schema 18 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
+                if (r != s18[i].want) fprintf(stderr, "  schema 20 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
                 CHECK(r == s18[i].want);
                 if (r == VM_OK) CHECK(m.cpu_model == s18[i].model);
             }
@@ -1489,6 +1520,18 @@ static void test_ops(void) {
     vm_snap_tag(tag);
     CHECK(vm_snap_tag_valid(tag));
     CHECK(!vm_snap_tag_valid("x2026") && !vm_snap_tag_valid("s;rm") && !vm_snap_tag_valid("S1") && !vm_snap_tag_valid("s") && !vm_snap_tag_valid(NULL));
+    /* a snapshot's note: UTF-8, line breaks, no other control characters, no bidi overrides, at most 1000 bytes */
+    CHECK(vm_snap_note_valid("") && vm_snap_note_valid("Before the upgrade\nkernel 6.12 / apt") && vm_snap_note_valid("Antes del cambio \xc3\xa9 \xe2\x9c\x93"));
+    CHECK(!vm_snap_note_valid(NULL) && !vm_snap_note_valid("tab\there") && !vm_snap_note_valid("cr\r") && !vm_snap_note_valid("esc\x1b[2J"));
+    CHECK(!vm_snap_note_valid("\xc3") && !vm_snap_note_valid("\xc0\xaf") && !vm_snap_note_valid("\xed\xa0\x80") && !vm_snap_note_valid("\xf4\x90\x80\x80"));
+    CHECK(!vm_snap_note_valid("rlo \xe2\x80\xae") && !vm_snap_note_valid("del\x7f") && !vm_snap_note_valid("c1 \xc2\x85"));
+    {
+        char big[VM_SNAP_NOTE_MAX + 2];
+        memset(big, 'a', sizeof big - 1); big[sizeof big - 1] = 0;
+        CHECK(!vm_snap_note_valid(big));
+        big[VM_SNAP_NOTE_MAX] = 0;
+        CHECK(vm_snap_note_valid(big));
+    }
     VmSnap a[3], b[VM_SNAPS_MAX];
     memset(a, 0, sizeof a);
     snprintf(a[0].tag, sizeof a[0].tag, "s1"); snprintf(a[0].name, sizeof a[0].name, "Fresh install"); snprintf(a[0].created, sizeof a[0].created, "2026-11-05T12:00:00Z");
@@ -2856,6 +2899,205 @@ static void test_guest_links(void) {
     }
 }
 
+/* files sent from the guest (6.21, AGK_SEND_*): every frame exact, names one plain file name, flow control, fuzzed */
+static void test_guest_send(void) {
+    AgSendOffer o, g;
+    memset(&o, 0, sizeof o);
+    o.id = 7; o.size = 123456789; o.flags = AGSF_EXEC;
+    for (int i = 0; i < 32; i++) o.key[i] = (uint8_t)(i * 7 + 1);
+    snprintf(o.name, sizeof o.name, "%s", "report \xc3\xa9t\xc3\xa9.pdf");
+    uint8_t b[AG_SEND_OFFER_BYTES + 8];
+    size_t n = ag_send_offer_write(&o, b, sizeof b);
+    CHECK(n == 47 + strlen(o.name) && !ag_send_offer_parse(b, n, &g) && g.id == 7 && g.size == 123456789 && g.flags == AGSF_EXEC &&
+          !memcmp(g.key, o.key, 32) && !strcmp(g.name, o.name));
+    CHECK(ag_send_offer_parse(b, n - 1, NULL) == -1 && ag_send_offer_parse(b, n + 1, NULL) == -1);
+    b[12] = 2; CHECK(ag_send_offer_parse(b, n, NULL) == -1); b[12] = AGSF_EXEC;
+    b[0] = b[1] = b[2] = b[3] = 0; CHECK(ag_send_offer_parse(b, n, NULL) == -1);
+    /* names the host never takes: a path, a parent, controls, bidi tricks, empty, not UTF-8 */
+    static const char *const bad[] = { "a/b", "..", ".", "a\\b", "x\ny", "evil\xe2\x80\xae" "fdp.exe", "", "\xff\xfe", "tab\t" };
+    for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+        AgSendOffer x = o;
+        snprintf(x.name, sizeof x.name, "%s", bad[i]);
+        CHECK(!ag_send_offer_write(&x, b, sizeof b));
+        CHECK(!ag_send_name_ok((const uint8_t *)bad[i], strlen(bad[i])));
+    }
+    { AgSendOffer x = o; memset(x.name, 'a', AG_NAME_MAX); x.name[AG_NAME_MAX] = 0; CHECK(ag_send_offer_write(&x, b, sizeof b) == 47 + AG_NAME_MAX); }
+    { AgSendOffer x = o; x.size = AG_SEND_SIZE_MAX + 1; CHECK(!ag_send_offer_write(&x, b, sizeof b)); }
+    CHECK(ag_send_name_ok((const uint8_t *)".bashrc", 7) && ag_send_name_ok((const uint8_t *)"a..b", 4));
+
+    /* ACCEPT: a resume carries its prefix hash; a refusal carries nothing */
+    uint8_t a[AG_SEND_ACCEPT_BYTES], sha[32], got[32];
+    memset(sha, 0xab, sizeof sha);
+    uint32_t id; uint8_t st; uint64_t off;
+    CHECK(!ag_send_accept_write(a, 7, AGSA_OK, 4096, sha) && !ag_send_accept_parse(a, sizeof a, &id, &st, &off, got) && id == 7 && st == AGSA_OK && off == 4096 && !memcmp(got, sha, 32));
+    CHECK(!ag_send_accept_write(a, 7, AGSA_OK, 0, NULL) && !ag_send_accept_parse(a, sizeof a, &id, &st, &off, got) && off == 0);
+    CHECK(!ag_send_accept_write(a, 7, AGSA_SPACE, 0, NULL) && !ag_send_accept_parse(a, sizeof a, NULL, &st, NULL, NULL) && st == AGSA_SPACE);
+    CHECK(ag_send_accept_write(a, 7, AGSA_BUSY, 10, sha) == -1 && ag_send_accept_write(a, 7, AGSA_LAST + 1, 0, NULL) == -1);
+    ag_send_accept_write(a, 7, AGSA_OK, 0, NULL); a[20] = 1; CHECK(ag_send_accept_parse(a, sizeof a, NULL, NULL, NULL, NULL) == -1);
+    ag_send_accept_write(a, 7, AGSA_REFUSED, 0, NULL); a[6] = 1; CHECK(ag_send_accept_parse(a, sizeof a, NULL, NULL, NULL, NULL) == -1);
+    CHECK(ag_send_accept_parse(a, sizeof a - 1, NULL, NULL, NULL, NULL) == -1);
+
+    /* FROM / ACK, DATA, END, DONE */
+    uint8_t q[12];
+    CHECK(!ag_send_pos_write(q, 9, 1ULL << 33) && !ag_send_pos_parse(q, 12, &id, &off) && id == 9 && off == 1ULL << 33);
+    CHECK(ag_send_pos_write(q, 0, 1) == -1 && ag_send_pos_write(q, 1, AG_SEND_SIZE_MAX + 1) == -1 && ag_send_pos_parse(q, 11, NULL, NULL) == -1);
+    static uint8_t d[12 + AG_SEND_CHUNK + 1];
+    ag_send_data_head(d, 3, 100);
+    const uint8_t *dp; uint32_t dn;
+    CHECK(!ag_send_data_parse(d, 12 + AG_SEND_CHUNK, &id, &off, &dp, &dn) && id == 3 && off == 100 && dn == AG_SEND_CHUNK && dp == d + 12);
+    CHECK(ag_send_data_parse(d, 12 + AG_SEND_CHUNK + 1, NULL, NULL, NULL, NULL) == -1 && ag_send_data_parse(d, 12, NULL, NULL, NULL, NULL) == -1);
+    ag_send_data_head(d, 3, AG_SEND_SIZE_MAX); CHECK(ag_send_data_parse(d, 13, NULL, NULL, NULL, NULL) == -1);      /* past the largest file */
+    ag_send_data_head(d, 3, AG_SEND_SIZE_MAX - 1); CHECK(!ag_send_data_parse(d, 13, NULL, NULL, NULL, NULL));
+    ag_send_data_head(d, 3, ~0ULL); CHECK(ag_send_data_parse(d, 13, NULL, NULL, NULL, NULL) == -1);                /* no wrap */
+    uint8_t e[36];
+    CHECK(!ag_send_end_write(e, 4, sha) && !ag_send_end_parse(e, 36, &id, got) && id == 4 && !memcmp(got, sha, 32) && ag_send_end_parse(e, 35, NULL, NULL) == -1);
+    uint8_t dd[5], code;
+    CHECK(!ag_send_done_write(dd, 4, AGSD_BADHASH) && !ag_send_done_parse(dd, 5, &id, &code) && code == AGSD_BADHASH);
+    CHECK(ag_send_done_write(dd, 4, AGSD_LAST + 1) == -1); dd[4] = AGSD_LAST + 1; CHECK(ag_send_done_parse(dd, 5, NULL, NULL) == -1);
+
+    /* the window: never more than AG_SEND_WINDOW past the last ACK */
+    CHECK(ag_send_room(0, 0, AG_SEND_CHUNK) && ag_send_room(AG_SEND_WINDOW - AG_SEND_CHUNK, 0, AG_SEND_CHUNK) && !ag_send_room(AG_SEND_WINDOW - AG_SEND_CHUNK + 1, 0, AG_SEND_CHUNK));
+    CHECK(!ag_send_room(5, 6, 1) && ag_send_room(AG_SEND_WINDOW + 10, 10, 0));
+
+    /* the quarantine folder's names: nothing hidden, nothing a Windows or Linux file system refuses */
+    char rn[AG_NAME_MAX + 2];
+    CHECK(!ag_recv_name(".bashrc", rn, sizeof rn) && !strcmp(rn, "_bashrc"));
+    CHECK(!ag_recv_name("CON.txt", rn, sizeof rn) && !strcmp(rn, "_CON.txt"));
+    CHECK(!ag_recv_name("a:b?.exe", rn, sizeof rn) && !strcmp(rn, "a_b_.exe"));
+    CHECK(ag_recv_name("..", rn, sizeof rn) == -1 && ag_recv_name("x\xe2\x80\xae.txt", rn, sizeof rn) == -1);
+
+    /* random bytes: what the parsers take is exactly what they promise */
+    static uint8_t r[AG_SEND_OFFER_BYTES + 64];
+    uint32_t seed = 4242;
+    for (int it = 0; it < 80000; it++) {
+        size_t len = (seed = seed * 1103515245 + 12345) % (it % 3 ? 64 : sizeof r);
+        for (size_t i = 0; i < len; i++) r[i] = (uint8_t)((seed = seed * 1103515245 + 12345) >> 16);
+        if (it % 2 && len > 47) {                     /* a plausible offer: small flags, a name length that fits, printable */
+            r[12] &= 1; r[45] = (uint8_t)(len - 47); r[46] = 0;
+            for (size_t i = 47; i < len; i++) r[i] = (uint8_t)(0x20 + r[i] % 95);
+            r[9] = r[10] = r[11] = 0;
+        }
+        AgSendOffer x;
+        if (!ag_send_offer_parse(r, len, &x)) {
+            CHECK(x.id && x.size <= AG_SEND_SIZE_MAX && !(x.flags & ~AGSF_ALL) && strlen(x.name) >= 1 && strlen(x.name) <= AG_NAME_MAX && !strchr(x.name, '/'));
+            uint8_t again[AG_SEND_OFFER_BYTES];
+            CHECK(ag_send_offer_write(&x, again, sizeof again) == len && !memcmp(again, r, len));
+            char nm[AG_NAME_MAX + 2];
+            if (!ag_recv_name(x.name, nm, sizeof nm)) CHECK(nm[0] && nm[0] != '.' && !strchr(nm, '/') && !strchr(nm, '\\') && strlen(nm) <= AG_NAME_MAX);
+        }
+        if (!ag_send_accept_parse(r, len, &id, &st, &off, got)) CHECK(len == AG_SEND_ACCEPT_BYTES && id && st <= AGSA_LAST && off <= AG_SEND_SIZE_MAX);
+        if (!ag_send_pos_parse(r, len, &id, &off)) CHECK(len == 12 && id && off <= AG_SEND_SIZE_MAX);
+        if (!ag_send_data_parse(r, len, &id, &off, &dp, &dn)) CHECK(id && dn >= 1 && dn <= AG_SEND_CHUNK && off + dn <= AG_SEND_SIZE_MAX && dp == r + 12);
+        if (!ag_send_end_parse(r, len, &id, got)) CHECK(len == 36 && id);
+        if (!ag_send_done_parse(r, len, &id, &code)) CHECK(len == 5 && id && code <= AGSD_LAST);
+    }
+    CHECK(ag_hello_caps((const uint8_t *)"9 shell send links", 18) & AG_HELLO_SEND);
+}
+
+
+/* the quarantine folder (vmrecv.c, 6.21): made without following links, part files only plain files of ours, names never
+ * replace a file, kept files 0600 and marked, old parts trimmed */
+static void test_vmrecv(void) {
+    char base[] = "/tmp/vmrecv-test.XXXXXX", p[PATH_MAX], q[PATH_MAX], shown[PATH_MAX], part[VMRECV_PART_NAME], fin[256];
+    if (!mkdtemp(base)) { CHECK(0); return; }
+    snprintf(p, sizeof p, "%s/lib", base); mkdir(p, 0700);
+    snprintf(p, sizeof p, "%s/lib/Test VM.lordvm", base); mkdir(p, 0700);
+    int d = vmrecv_dir_open(p, shown, sizeof shown);
+    snprintf(q, sizeof q, "%s/lib/Received/Test VM", base);
+    struct stat st;
+    CHECK(d >= 0 && !strcmp(shown, q) && !stat(q, &st) && (st.st_mode & 0777) == 0700);
+    CHECK(vmrecv_dir_open("relative.lordvm", NULL, 0) == -1);
+    snprintf(q, sizeof q, "%s/lib/Other", base);
+    CHECK(vmrecv_dir_open(q, NULL, 0) == -1);                          /* not a machine folder */
+    /* Received, or the machine's folder in it, a link the guest or anyone planted: refused */
+    snprintf(q, sizeof q, "%s/lib2", base); mkdir(q, 0700);
+    snprintf(q, sizeof q, "%s/elsewhere", base); mkdir(q, 0700);
+    snprintf(p, sizeof p, "%s/lib2/Received", base); CHECK(!symlink(q, p));
+    snprintf(p, sizeof p, "%s/lib2/X.lordvm", base); mkdir(p, 0700);
+    CHECK(vmrecv_dir_open(p, NULL, 0) == -1);
+    snprintf(q, sizeof q, "%s/lib/Received/Y", base); CHECK(!symlink("/tmp", q));
+    snprintf(p, sizeof p, "%s/lib/Y.lordvm", base); mkdir(p, 0700);
+    CHECK(vmrecv_dir_open(p, NULL, 0) == -1);
+    if (d < 0) return;
+    /* a part: what came before is kept for a resume, unless it's longer than the file */
+    uint8_t key[32];
+    for (int i = 0; i < 32; i++) key[i] = (uint8_t)i;
+    uint64_t have = 9;
+    int status = -1;
+    int f = vmrecv_part_open(d, key, 20, part, &have, &status);
+    CHECK(f >= 0 && have == 0 && status == AGSA_OK && !strncmp(part, ".lordos-part-000102", 19) && strlen(part) == 13 + 64);
+    if (f >= 0) { CHECK(write(f, "0123456789", 10) == 10); close(f); }
+    f = vmrecv_part_open(d, key, 20, part, &have, &status);
+    CHECK(f >= 0 && have == 10);
+    if (f >= 0) close(f);
+    f = vmrecv_part_open(d, key, 5, part, &have, &status);
+    CHECK(f >= 0 && have == 0);
+    if (f >= 0) close(f);
+    /* a part that is a link or has another name (a hard link) is never written through */
+    uint8_t k2[32];
+    memset(k2, 0xee, sizeof k2);
+    char p2[VMRECV_PART_NAME];
+    int n = snprintf(p2, sizeof p2, ".lordos-part-");
+    for (int i = 0; i < 32; i++) n += snprintf(p2 + n, sizeof p2 - (size_t)n, "ee");
+    CHECK(!symlinkat("/etc/passwd", d, p2));
+    CHECK(vmrecv_part_open(d, k2, 20, part, &have, &status) == -1 && status == AGSA_BUSY);
+    unlinkat(d, p2, 0);
+    int t = openat(d, "victim", O_CREAT | O_WRONLY, 0600); if (t >= 0) close(t);
+    CHECK(!linkat(d, "victim", d, p2, 0));
+    CHECK(vmrecv_part_open(d, k2, 20, part, &have, &status) == -1);
+    unlinkat(d, p2, 0); unlinkat(d, "victim", 0);
+    /* no room: more than the file system has */
+    CHECK(vmrecv_part_open(d, k2, AG_SEND_SIZE_MAX, part, &have, &status) == -1 && status == AGSA_SPACE && faccessat(d, p2, F_OK, AT_SYMLINK_NOFOLLOW));
+    /* kept: 0600, marked, never replacing a file */
+    f = vmrecv_part_open(d, key, 4, part, &have, &status);
+    CHECK(f >= 0 && write(f, "data", 4) == 4 && !fchmod(f, 0755));
+    t = openat(d, "run me.sh", O_CREAT | O_WRONLY, 0600); if (t >= 0) close(t);
+    int marked = -1;
+    CHECK(!vmrecv_finish(d, f, part, "run me.sh", "Test VM", "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b", 4, fin, sizeof fin, &marked) && !strcmp(fin, "run me (2).sh"));
+    CHECK(!fstatat(d, fin, &st, 0) && (st.st_mode & 0777) == 0600 && st.st_size == 4);
+    char x[64];
+    ssize_t xl = fgetxattr(f, "user.lordos.from", x, sizeof x);
+    CHECK(!marked || (xl == 7 && !memcmp(x, "Test VM", 7)));
+    if (f >= 0) close(f);
+    /* a size that isn't the one offered: removed, not named */
+    f = vmrecv_part_open(d, key, 4, part, &have, &status);
+    CHECK(f >= 0 && write(f, "abc", 3) == 3);
+    CHECK(vmrecv_finish(d, f, part, "short.txt", "Test VM", "x", 4, fin, sizeof fin, &marked) == -1 && faccessat(d, part, F_OK, 0) && faccessat(d, "short.txt", F_OK, 0));
+    if (f >= 0) close(f);
+    /* another process swaps the part's name for a file of its own before it is named: the checked file gets the name */
+    f = vmrecv_part_open(d, key, 4, part, &have, &status);
+    CHECK(f >= 0 && write(f, "good", 4) == 4);
+    CHECK(!renameat(d, part, d, "moved-away"));
+    t = openat(d, part, O_CREAT | O_WRONLY | O_EXCL, 0600);
+    CHECK(t >= 0 && write(t, "evil", 4) == 4);
+    if (t >= 0) close(t);
+    CHECK(!vmrecv_finish(d, f, part, "swap.txt", "Test VM", "x", 4, fin, sizeof fin, &marked) && !strcmp(fin, "swap.txt"));
+    char got4[8] = "";
+    t = openat(d, "swap.txt", O_RDONLY);
+    CHECK(t >= 0 && read(t, got4, 4) == 4 && !memcmp(got4, "good", 4));
+    if (t >= 0) close(t);
+    CHECK(!faccessat(d, part, F_OK, 0));                                  /* the impostor stays where it was, unnamed */
+    unlinkat(d, part, 0); unlinkat(d, "moved-away", 0);
+    if (f >= 0) close(f);
+    /* parts nobody came back for: at most VMRECV_PARTS_MAX, old ones gone */
+    for (int i = 0; i < 12; i++) {
+        char nm[VMRECV_PART_NAME];
+        snprintf(nm, sizeof nm, ".lordos-part-%064d", i);
+        t = openat(d, nm, O_CREAT | O_WRONLY, 0600);
+        if (t >= 0) { struct timespec ts[2] = { { 1000000 + i, 0 }, { time(NULL) - (i == 0 ? 30 * 86400 : 100 - i), 0 } }; futimens(t, ts); close(t); }
+    }
+    vmrecv_parts_trim(d, NULL);
+    int left = 0;
+    for (int i = 0; i < 12; i++) { char nm[VMRECV_PART_NAME]; snprintf(nm, sizeof nm, ".lordos-part-%064d", i); left += !faccessat(d, nm, F_OK, 0); }
+    char nm0[VMRECV_PART_NAME], nm11[VMRECV_PART_NAME];
+    snprintf(nm0, sizeof nm0, ".lordos-part-%064d", 0);
+    snprintf(nm11, sizeof nm11, ".lordos-part-%064d", 11);
+    CHECK(left == VMRECV_PARTS_MAX - 1 && faccessat(d, nm0, F_OK, 0) && !faccessat(d, nm11, F_OK, 0));
+    close(d);
+    char cmd[PATH_MAX + 16];
+    snprintf(cmd, sizeof cmd, "rm -rf '%s'", base);
+    CHECK(system(cmd) == 0);
+}
 /* a host stop's steps (vmhoststop.h, 6.1): everything, SIGKILL included, inside logind's delay with a margin */
 static void test_host_stop_plan(void) {
     VmHostStopPlan p = vm_host_stop_plan(45000);            /* LordOS's InhibitDelayMaxSec=45 */
@@ -2886,6 +3128,8 @@ static void test_host_stop_plan(void) {
 
 int main(void) {
     test_guest_links();
+    test_guest_send();
+    test_vmrecv();
     test_gvtwin();
     test_perfwin();
     test_open_with();

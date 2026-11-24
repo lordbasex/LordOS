@@ -120,7 +120,7 @@
   "execFailed": "{name} nie mogła tego uruchomić: {why}",
   "outputCut": "Wyjście było dłuższe niż to, co wraca: pokazano tylko początek.",
   "timedOut": "Programowi w {name} skończył się czas i został zatrzymany.",
-  "cpOnlyFiles": "Można kopiować tylko pliki: {path} nim nie jest.",
+  "cpOnlyFiles": "Kopiować można tylko pliki i foldery: {path} nie jest żadnym z nich.",
   "cpOneSide": "Podaj, która strona to maszyna: jedna z dwóch to NAZWA:ŚCIEŻKA, druga to plik na tym komputerze.",
   "cpOutside": "{path} nie należy do twoich plików albo jest chroniony.",
   "cpExists": "{path} już istnieje: --force go zastępuje.",

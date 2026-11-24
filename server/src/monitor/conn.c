@@ -291,7 +291,7 @@ static const char *const TCP_STATE[] = { "", "ESTABLISHED", "SYN_SENT", "SYN_REC
 /* Name and executable of a pid (small per-sample cache). */
 /* ---- cgroup id → app (the session's scopes, rescanned every 5 s) ---- */
 
-/* sub: the machine's id for a running machine's scope (lordos:machines) and its leaves (qemu, passt) */
+/* sub: the machine's id for a running machine's scope (lordos:vm-<id>) and its leaves (qemu, passt) */
 static struct { uint64_t id; char app[FW_APP_MAX]; char sub[40]; } scopes[256];
 static int nscopes;
 static double scopes_t;

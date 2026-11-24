@@ -43,6 +43,7 @@ typedef struct {
     /* the seccomp allowlist (vmseccomp.h) */
     int tcg;                    /* TCG: its code buffer is writable and executable */
     int tap;                    /* a bridged network: the tap's TUN ioctls */
+    int usb;                    /* host USB devices may come (6.6): usbfs's ioctls ('U') on the descriptors lord-vm hands over */
     int exec_fd;                /* the descriptor of QEMU's binary, the only thing execveat may run then (-1: none) */
     const char *exec_path;      /* that binary's path: Landlock's execute right goes to it and its loader only */
     int learn;                  /* 0; a test build's learn modes (1, 2) */

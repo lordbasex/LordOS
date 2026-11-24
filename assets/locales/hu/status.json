@@ -168,6 +168,7 @@
   "pkg.why.multiarchPair": "Ugyanaz a verzió, mint: {name}",
   "gpu.roleSet": "A videokártya használata mentve ({card}): az alkalmazáshoz indítsa újra",
   "vm.gvtReady": "A videokártya része kész ({name})",
+  "vm.usbReady": "USB-eszköz kész",
   "vm.gvtGone": "A videokártya része eltávolítva",
   "gpu.freqSet": "A videokártya minimális frekvenciája beállítva",
   "gpu.memlockSet": "A gépek által zárolható memória mentve",

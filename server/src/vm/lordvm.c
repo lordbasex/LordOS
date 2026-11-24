@@ -7,7 +7,7 @@
  *                        [--disk GB] [--firmware uefi|bios] [--display window|none]
  *                        [--network shared|isolated|bridged|hostonly]
  *                        [--import IMAGE] [--iso FILE]
- *   lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp]
+ *   lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--pidfd-to N] [--keep-running] [--dev-qmp]
  *                       [--credentials-file FILE]
  *     FILE: systemd credentials for the guest's first boot, one per line, NAME=VALUE or binary:NAME=BASE64.
  *     They may be secrets (a root password), so they never go on a command line or into the log: lord-vm reads
@@ -26,6 +26,7 @@
 #include "vmmem.h"
 #include "vmsandbox.h"
 #include "vmseccomp.h"
+#include "vmiso.h"
 #include "vmops.h"
 #include "vmagent.h"
 #include "vmimport.h"
@@ -41,6 +42,7 @@
 #include "vmexec.h"
 #include "vmlink.h"
 #include "vmexport.h"
+#include "vmusb.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -63,7 +65,9 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <linux/fs.h>
+#include <malloc.h>
 #include <sys/mman.h>
+#include <linux/seccomp.h>
 #include <sys/prctl.h>
 #include <sys/random.h>
 #include <sys/resource.h>
@@ -108,6 +112,13 @@ static char *test_path(const char *env, const char *def) {
 #define SWTPM    "/usr/bin/swtpm"
 #define QEMU_BIN_OF(a) QEMU_BIN[a]
 #endif
+/* lord-vm-usb.so (vmusbshim.c), preloaded into QEMU when the machine may get a host USB device (6.6) */
+#ifdef LORDVM_TEST_PATHS
+#define USB_SHIM test_path("LORDVM_TEST_USBSHIM", "/usr/lib/lordos/lib/lord-vm-usb.so")
+#else
+#define USB_SHIM "/usr/lib/lordos/lib/lord-vm-usb.so"
+#endif
+#define USB_FDSET 120                   /* + the slot: each host USB device's descriptor in QEMU */
 static const char *const QEMU_BIN[2] = { "/usr/bin/qemu-system-aarch64", "/usr/bin/qemu-system-x86_64" };
 
 /* UEFI code and variable templates, by architecture, first found wins */
@@ -672,10 +683,94 @@ static int qimg_repair_leaks(const char *dir, const char *disk) {
     return r;
 }
 
+/* a snapshot's own files beside snapshots.json: its picture (lord-server), its note (lord-server) and the machine's
+ * settings as they were (snap_settings_keep) */
 static void snap_picture_rm(const char *dir, const char *tag) {
+    static const char *const EXT[] = { "png", "note", "json" };
     char p[PATH_MAX + 64];
-    snprintf(p, sizeof p, "%s/snapshots/%s.png", dir, tag);
-    unlink(p);
+    for (int i = 0; i < 3; i++) { snprintf(p, sizeof p, "%s/snapshots/%s.%s", dir, tag, EXT[i]); unlink(p); }
+}
+
+/* ---- the machine's settings with each snapshot (6.2) ----
+ * A snapshot holds the disks, the UEFI variables, the TPM and (taken running) the memory; the settings are the fifth
+ * part: snapshots/<tag>.json is machine.json as it was, with the hardware the guest had (a running machine's: the one it
+ * started with, not changes waiting for its next start). Going back to the snapshot puts that hardware back
+ * (snap_hw_copy's fields): a snapshot's memory only loads into the same hardware, and a disk-only one boots the system
+ * that was installed for it. The name, icon, tags, folders, clipboard and every other choice stay as they are now. */
+static void snap_hw_copy(VmMachine *to, const VmMachine *from) {
+    to->vcpus = from->vcpus; to->memory_mb = from->memory_mb;
+    to->cpu_sockets = from->cpu_sockets; to->cpu_cores = from->cpu_cores; to->cpu_threads = from->cpu_threads;
+    to->cpu_model = from->cpu_model; to->devices = from->devices; to->nic_model = from->nic_model;
+    to->n_extra_macs = from->n_extra_macs;
+    memcpy(to->extra_macs, from->extra_macs, sizeof to->extra_macs);
+    memcpy(to->extra_models, from->extra_models, sizeof to->extra_models);
+    to->graphics = from->graphics; to->heads = from->heads; to->res_w = from->res_w; to->res_h = from->res_h;
+    to->secure_boot = from->secure_boot; to->tpm = from->tpm; to->hyperv = from->hyperv; to->rtc = from->rtc;
+    to->agent = from->agent; to->transfer = from->transfer;
+    memcpy(to->mac, from->mac, sizeof to->mac);
+}
+
+/* writes snapshots/<tag>.json: machine.json now, with `hw`'s hardware (NULL: as it is); 0 ok */
+static int snap_settings_keep(const char *dir, const char *tag, const VmMachine *hw) {
+    if (!vm_snap_tag_valid(tag)) return -1;
+    VmMachine m;
+    if (vm_machine_load(dir, &m, NULL, 0)) return -1;
+    if (hw) snap_hw_copy(&m, hw);
+    char *j = vm_machine_json(&m);
+    if (!j) return -1;
+    char sd[PATH_MAX + 32], tmp[PATH_MAX + 96], to[PATH_MAX + 96];
+    snprintf(sd, sizeof sd, "%s/snapshots", dir);
+    mkdir(sd, 0700);
+    snprintf(tmp, sizeof tmp, "%s/.%s.json.tmp", sd, tag);
+    snprintf(to, sizeof to, "%s/%s.json", sd, tag);
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    int ok = fd >= 0 && !write_all(fd, j, strlen(j)) && !fsync(fd);
+    if (fd >= 0) close(fd);
+    free(j);
+    if (!ok || rename(tmp, to)) { unlink(tmp); return -1; }
+    return 0;
+}
+
+/* the snapshot's settings, read back: 1 there (in *then), 0 none kept (a snapshot taken before they were), -1 unusable */
+static int snap_settings_read(const char *dir, const char *tag, VmMachine *then) {
+    char p[PATH_MAX + 96];
+    snprintf(p, sizeof p, "%s/snapshots/%s.json", dir, tag);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return errno == ENOENT ? 0 : -1;
+    static char buf[64 * 1024];
+    ssize_t n = read(fd, buf, sizeof buf);
+    close(fd);
+    if (n <= 0 || n >= (ssize_t)sizeof buf) return -1;
+    return vm_machine_parse(buf, (size_t)n, then, NULL, 0) ? -1 : 1;
+}
+
+/* before going back: a disk added after the snapshot has no part in it (its tag isn't there), so going back is refused
+ * before anything changes; 0 may go on */
+static int snap_settings_check(const char *dir, const VmMachine *now, const char *tag, char *err, size_t errlen) {
+    VmMachine then;
+    int r = snap_settings_read(dir, tag, &then);
+    if (r == 1 && strcmp(then.id, now->id)) r = -1;
+    if (r == 1 && now->n_data > then.n_data) {
+        snprintf(err, errlen, "a disk was added after this snapshot was taken (%d then, %d now): it has no part in it", then.n_data, now->n_data);
+        return -1;
+    }
+    return 0;
+}
+
+/* after going back (or before a start from the snapshot's memory): its hardware into machine.json */
+static void snap_settings_back(const char *dir, const char *tag) {
+    VmMachine then, now;
+    int r = snap_settings_read(dir, tag, &then);
+    if (r <= 0 || vm_machine_load(dir, &now, NULL, 0) || strcmp(then.id, now.id)) {
+        if (r < 0) vlog("snapshots: %s: its settings can't be read: the machine's are kept", tag);
+        return;
+    }
+    VmMachine m = now;
+    snap_hw_copy(&m, &then);
+    if (!memcmp(&m, &now, sizeof m)) return;
+    char err[160];
+    if (vm_machine_check(&m, err, sizeof err) || vm_machine_save(dir, &m)) { vlog("snapshots: %s: its settings couldn't be put back (%s): the machine's are kept", tag, err); return; }
+    vlog("snapshots: %s: the machine's hardware is as it was then (%d vCPUs, %d MB)", tag, m.vcpus, m.memory_mb);
 }
 
 /* a tag on the disks that snapshots.json doesn't list is what's left of a snapshot that didn't finish: removed at the
@@ -744,6 +839,7 @@ static int snap_take_off(const char *dir, const VmMachine *m, const char *tag, c
         snprintf(err, errlen, "can't keep the TPM's state");
         return -1;
     }
+    if (snap_settings_keep(dir, tag, NULL)) vlog("snapshots: %s: the settings couldn't be kept with it", tag);
     VmSnap sn;
     memset(&sn, 0, sizeof sn);
     snprintf(sn.tag, sizeof sn.tag, "%s", tag);
@@ -777,12 +873,14 @@ static int snap_revert_off(const char *dir, const VmMachine *m, const char *tag,
     VmSnap list[VM_SNAPS_MAX];
     int n = vm_snaps_load(dir, list, VM_SNAPS_MAX);
     if (vm_snaps_find(list, n, tag) < 0) { snprintf(err, errlen, "there's no snapshot %s", tag); return -1; }
+    if (snap_settings_check(dir, m, tag, err, errlen)) return -1;
     char disks[VM_NDISKS][PATH_MAX + 64];
     int nd = disk_files(dir, m, disks);
     if (vm_op_begin(dir, "snapshot-revert", tag, NULL, NULL)) { snprintf(err, errlen, "can't write operation.json"); return -1; }
     for (int i = 0; i < nd; i++) if (qimg_snap(dir, disks[i], "-a", tag, err, errlen)) return -1;     /* operation.json stays: the next open goes on */
     if (tpm_snap(dir, m, TPMS_REVERT, tag)) { snprintf(err, errlen, "can't put the TPM's state back"); return -1; }
     discard_state(dir);
+    snap_settings_back(dir, tag);
     vm_op_end(dir);
     return 0;
 }
@@ -851,6 +949,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     }
     VmMachine m;
     vm_machine_defaults(&m, &h, arch);
+    m.usb = 1;                          /* a USB controller for this computer's devices (6.6): a new machine has no saved state */
     if (want_id) memcpy(m.id, want_id, sizeof m.id);
     m.encrypted = enc;
     m.raw = raw;
@@ -948,9 +1047,10 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         snprintf(dd, sizeof dd, "%s/disks", real);
         if (un.kind == VMU_WINDOWS && !m.drivers[0]) { fprintf(stderr, "lord-vm: a Windows install needs --drivers (virtio-win)\n"); unlink(sys); return 2; }
         /* LordOS (vmunattend.h): its installer erases only the disk the answers name, with exactly this size: the system
-         * disk just made (virtio-blk in slot 1, the guest's first: vda; SATA with the compatible devices: sda) */
+         * disk just made (virtio-blk in slot 1, the guest's first: vda; with the compatible devices SATA, sda, or on arm64
+         * NVMe, nvme0n1) */
         if (un.kind == VMU_LORDOS) {
-            snprintf(un.disk, sizeof un.disk, "%s", m.devices == VM_DEV_COMPAT ? "sda" : "vda");
+            snprintf(un.disk, sizeof un.disk, "%s", m.devices != VM_DEV_COMPAT ? "vda" : m.arch == VM_ARCH_ARM64 ? "nvme0n1" : "sda");
             un.disk_bytes = (unsigned long long)m.disk_gb << 30;
         }
         if (un.kind == VMU_WINDOWS ? vmu_prepare_windows(dd, m.drivers, &un, why, sizeof why) : vmu_prepare(dd, m.iso, &un, m.id, why, sizeof why)) {
@@ -972,7 +1072,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 
 typedef struct { int fd, control; } Client;
 enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME,
-       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET, P_PINQ };
+       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET, P_PINQ, P_USB_ADD, P_USB_DEL, P_XNIC };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 
 /* a file dropped on the machine's window, for the guest (VM_FILE) */
@@ -1097,6 +1197,11 @@ static struct {
     int cred_fd[MAX_CREDS];
     char cred_name[MAX_CREDS][130];
     int ncreds;
+    /* host USB devices (6.6, VM_USB): each slot's device ("usb<slot>" in QEMU, its descriptor in fdset USB_FDSET + slot);
+     * state 0 free, 1 being added, 2 in the machine, 3 being taken out; the client and request that asked */
+    struct { int state, bus, dev, client; unsigned vendor, product; uint32_t seq; } usb[VMUSB_PER_VM];
+    char usb_bus[16];                   /* the controller's bus for them ("" none: machine.json's usb is off) */
+    int usb_q[2 * VMUSB_PER_VM], usb_qn;   /* the slots of the P_USB_* replies still to come, in order */
     /* the CD/DVD drive (scsi-cd "cd0"): the disc's block node ("" empty), its fdset (0: none, the start's ISO is a path) */
     char cd_node[16], cd_new_node[16];
     int cd_fdset, cd_new_fdset, cd_busy, cd_client;
@@ -1168,6 +1273,7 @@ static struct {
      * way to start a program), the passt it started last (followed by pidfd: not our child), QEMU's backend number
      * (pst<gen> on hub port hp<gen>), when the network went and when to try again, restarts in the last minute */
     int keeper_fd, passt_pidfd, net_gen, net_busy, net_restarts, net_gave_up;
+    int xnic_err[VM_EXTRA_NICS];        /* an extra card's passt's stderr (xnic_attach), held open, never read */
     /* a machine group's internal link (VM_LINK): the last backend's number (lk<gen>), and whether it's on the hub */
     int link_gen, link_up;
     pid_t keeper, passt_ext;
@@ -1197,6 +1303,7 @@ static struct {
     /* a drop through the transfer folder (6.7.1): fx_via 1; the host's copy into it (a child of lord-vm: its pid, the pipe
      * it reports on), the file's name there (.lordos-drop-<random>), whether the agent's way was tried after it failed */
     int fx_via, fx_cpipe, fx_retried, fx_stagefd, fx_dig_n;
+    int fx_cancel;                          /* the person cancelled the drop being copied: it stops at its next step */
     pid_t fx_cpid;
     char fx_stage[40], fx_token[33], fx_sha[65];
     uint8_t fx_dig[32];
@@ -1227,6 +1334,20 @@ static struct {
     uint32_t sh_id, sh_next, sh_to_guest;
     uint8_t *sh_buf;
     size_t sh_n;
+    /* files sent from the guest (6.21, AGK_SEND_*): the tools said "send"; the one transfer (RX_*), its ids (the guest's,
+     * lord-server's), size, what was written and acknowledged, what came before (a resume), the part file's descriptor
+     * (lord-server's), the running SHA-256, a child hashing what came before, the offers' rate */
+    int lag_send_ok, rx_state;
+    uint32_t rx_gid, rx_id, rx_next;
+    uint64_t rx_size, rx_off, rx_acked, rx_prefix;
+    int rx_fd, rx_hpipe;
+    pid_t rx_hpid;
+    Sha256 rx_hs;
+    uint8_t rx_psha[32], rx_hbuf[sizeof(Sha256) + 32];
+    size_t rx_hgot;
+    long long rx_deadline, rx_told, rx_t0;
+    AgRate rx_rate;
+    char rx_name[AG_NAME_MAX + 1];
     unsigned perf_said;                     /* the last AGK_PERFSTATE logged, as 1 << 24 | on << 16 | done << 8 | failed; 0 none */
     AgDisplay disp_list[AG_DISPLAYS_MAX];   /* the guest's displays (AGK_DISPLAYS) as last said, for the tablet's layout */
     int disp_n, disp_shown;
@@ -1262,6 +1383,8 @@ static struct {
 enum { XG_UNKNOWN = 0, XG_MOUNTED, XG_NEEDS_WINFSP, XG_NO_SERVICE, XG_FAILED };
 
 /* the start's shared folders: the person's (0 .. n_shares-1) and the transfer folder (VM_SHARES) */
+/* may a host USB device go into this machine (6.6)? Never into one locked for anonymity (19.5) */
+static int usb_may(void) { return S.m.profile_lock == VM_LOCK_NONE && S.m.usb; }
 static int sh_on(int i) { return (i >= 0 && i < S.m.n_shares) || (i == VM_SHARES && S.xfer_on); }
 static int sh_count(void) { return S.m.n_shares + (S.xfer_on ? 1 : 0); }
 static const char *sh_tag(int i) { return i == VM_SHARES ? VM_XFER_TAG : S.m.share_tag[i]; }
@@ -1890,12 +2013,28 @@ static void place_fds(const int *want, int n) {
  *  - Both: the forwarded ports (-t, -u with the address to listen on: 127.0.0.1, or 0.0.0.0 for "lan" in Shared).
  *    passt binds them in the machine's scope, so LordOS's firewall decides them as the incoming connections of
  *    Machines (FIREWALL.md, "Machines"). */
+/* An imported machine's other cards (6.22, extra_nics) in Shared and Host-only: each its own passt, started by the keeper
+ * once the machine runs (xnic_attach), in the same mode as the first card but on a network of its own, 10.0.<3+i>.0/24
+ * (the guest at .15, passt's gateway at .2), IPv4, with no forwarded port (they stay the first card's). -1: the first card */
+static int passt_extra = -1;
 static int vm_passt_argv(const VmMachine *m, char **argv, int max) {
-    static char tv[VM_PORTS][48], uv[VM_PORTS][48];
-    int n = 0, nt = vm_passt_ports(m, VM_PROTO_TCP, tv, VM_PORTS), nu = vm_passt_ports(m, VM_PROTO_UDP, uv, VM_PORTS);
+    static char tv[VM_PORTS][48], uv[VM_PORTS][48], xa[20], xg[20];
+    int xi = passt_extra >= 0 && passt_extra < VM_EXTRA_NICS ? passt_extra : -1;
+    int n = 0, nt = xi >= 0 ? 0 : vm_passt_ports(m, VM_PROTO_TCP, tv, VM_PORTS), nu = xi >= 0 ? 0 : vm_passt_ports(m, VM_PROTO_UDP, uv, VM_PORTS);
     if (max < 20 + 2 * (nt + nu)) return -1;
     argv[n++] = PASST; argv[n++] = "-f"; argv[n++] = "-q"; argv[n++] = "-1"; argv[n++] = "--fd"; argv[n++] = "3";
-    if (m->network == VM_NET_HOSTONLY) {
+    if (xi >= 0) {
+        snprintf(xa, sizeof xa, "10.0.%d.15", 3 + xi);
+        snprintf(xg, sizeof xg, "10.0.%d.2", 3 + xi);
+    }
+    if (xi >= 0 && m->network == VM_NET_HOSTONLY) {
+        argv[n++] = "-4"; argv[n++] = "-o"; argv[n++] = "127.0.0.1";
+        argv[n++] = "-a"; argv[n++] = xa; argv[n++] = "-n"; argv[n++] = "24"; argv[n++] = "-g"; argv[n++] = xg;
+        argv[n++] = "--no-dhcp-dns"; argv[n++] = "--no-dhcp-search";
+    } else if (xi >= 0) {
+        argv[n++] = "-4"; argv[n++] = "-a"; argv[n++] = xa; argv[n++] = "-n"; argv[n++] = "24"; argv[n++] = "-g"; argv[n++] = xg;
+        argv[n++] = "--no-map-gw"; argv[n++] = "--dns-forward"; argv[n++] = VM_DNS_ADDR;
+    } else if (m->network == VM_NET_HOSTONLY) {
         argv[n++] = "-4"; argv[n++] = "-o"; argv[n++] = "127.0.0.1";
         argv[n++] = "-a"; argv[n++] = VM_HOSTONLY_ADDR; argv[n++] = "-n"; argv[n++] = "24"; argv[n++] = "-g"; argv[n++] = VM_HOSTONLY_GW;
         argv[n++] = "--no-dhcp-dns"; argv[n++] = "--no-dhcp-search";
@@ -2180,6 +2319,9 @@ static void keeper_main(int sock) {
         ssize_t r = read(sock, &c, 1);
         if (r == 0 || (r < 0 && errno != EINTR)) _exit(0);
         if (r < 0) continue;
+        /* 'p' the first card's passt; '1'..'7' an imported machine's other card's (passt_extra); nothing else */
+        if (c != 'p' && !(c >= '1' && c < '1' + VM_EXTRA_NICS)) continue;
+        passt_extra = c == 'p' ? -1 : c - '1';
         int net[2] = { -1, -1 }, perr[2] = { -1, -1 }, fds[3] = { -1, -1, -1 };
         int32_t pid = -1;
         if (!socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, net) && !pipe2(perr, O_CLOEXEC)) {
@@ -2330,6 +2472,7 @@ static int mem_backing(const VmMachine *m) {
 /* the hub of a group's internal link: the workstation's only card is on hub 0, a gateway's second card on hub 1 (hub 0
  * is its passt card's) */
 #define LINK_HUB(m) ((m)->network == VM_NET_LINK ? 0 : 1)
+#define XNIC_HUB 10                     /* an imported machine's other cards' hubs: 10 .. 10 + VM_EXTRA_NICS - 1 */
 #define MAXARGS 192
 static char *qargv[MAXARGS];
 static int qargc;
@@ -2507,7 +2650,7 @@ static void decide_graphics(void) {
     S.venus = 0;
     S.render[0] = 0;
     if (S.render_fd >= 0) close(S.render_fd);
-    S.render_fd = S.render_qfd = S.vs_pidfd = S.vs_fd = S.vs_qemu_end = S.vs_qfd = S.vs_err = -1;
+    S.render_fd = S.render_qfd = -1;
     if (S.m.graphics != VM_GFX_3D) return;
     VmHost h;
     vm_host_probe(&h);
@@ -2765,6 +2908,8 @@ static void build_qemu_args(void) {
     /* the windows devices on arm64 (4.3): virt with a GICv3 (vm_machine_check_host refuses KVM on a GICv2 host), USB
      * CD/DVD drives, ramfb, a TPM on the system bus */
     int win_arm = arm && m->devices == VM_DEV_WINDOWS;
+    /* the compatible devices on arm64: NVMe disks and a USB CD/DVD (below), not SATA */
+    int compat_arm = arm && m->devices == VM_DEV_COMPAT;
     char esc[2 * VM_NAME_MAX + 8], p[PATH_MAX + 64];
     qargc = 0;
     arg(QEMU_BIN_OF(m->arch));
@@ -2915,11 +3060,30 @@ static void build_qemu_args(void) {
     if (bidx[VM_BOOT_DISK] >= 0) snprintf(bi_sys, sizeof bi_sys, ",bootindex=%d", bidx[VM_BOOT_DISK]);
     if (bidx[VM_BOOT_CD] >= 0) snprintf(bi_cd, sizeof bi_cd, ",bootindex=%d", bidx[VM_BOOT_CD]);
     if (bidx[VM_BOOT_NET] >= 0) snprintf(bi_net, sizeof bi_net, ",bootindex=%d", bidx[VM_BOOT_NET]);
-    if (m->devices == VM_DEV_COMPAT) {
-        /* devices every system has a driver for (6.22): SATA (AHCI) disks and CD/DVD; q35 has its AHCI built in (ide.0
-         * to ide.5), arm64's virt gets one in the system disk's slot */
-        const char *bus = arm ? "ahci" : "ide";
-        if (arm) { arg("-device"); arg("ich9-ahci,id=ahci,addr=0x1"); }
+    if (compat_arm) {
+        /* the compatible devices on arm64 (6.22, 12): AAVMF has no AHCI (SATA) driver, so a SATA disk never boots there
+         * (it stops at its UEFI shell, measured on the Pi 5). NVMe is what it boots from and what arm64 guests without
+         * virtio drivers have in their own kernel (Windows on Arm's stornvme, Linux, the BSDs): one controller per disk,
+         * in the slots virtio's disks take; QEMU's NVMe needs a serial, the disk's own or else a fixed one. The CD/DVD
+         * is the windows devices' on arm64: USB mass storage (usb-bot) with a SCSI CD/DVD, which AAVMF starts from and
+         * guests read with their own drivers, and whose disc can still be changed (VM_CDROM's "cd0") */
+        arg("-device"); argf("nvme,id=sysdisk,drive=sys,addr=0x1,serial=%s%s", m->disk_serial[0] ? m->disk_serial : "lordvm-sys", bi_sys);
+        for (int i = 0; i < m->n_data; i++) {
+            arg("-device");
+            if (m->data_serial[i][0]) argf("nvme,id=datadisk%d,drive=data%d,addr=0x%x,serial=%s", i + 1, i + 1, 0x10 + i, m->data_serial[i]);
+            else argf("nvme,id=datadisk%d,drive=data%d,addr=0x%x,serial=lordvm-data%d", i + 1, i + 1, 0x10 + i, i + 1);
+        }
+        arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5");
+        arg("-device"); arg("usb-bot,id=cdbot0,bus=xhci.0");
+        if (m->iso[0]) {
+            arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
+            arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
+            arg("-device"); argf("scsi-cd,id=cd0,bus=cdbot0.0,drive=cd%s", bi_cd);
+            snprintf(S.cd_node, sizeof S.cd_node, "cd");
+        } else { arg("-device"); argf("scsi-cd,id=cd0,bus=cdbot0.0%s", bi_cd); S.cd_node[0] = 0; }
+    } else if (m->devices == VM_DEV_COMPAT) {
+        /* devices every system has a driver for (6.22): SATA (AHCI) disks and CD/DVD, q35's own AHCI (ide.0 to ide.5) */
+        const char *bus = "ide";
         arg("-device"); argf("ide-hd,id=sysdisk,drive=sys,bus=%s.0%s%s", bus, bi_sys, ser);
         for (int i = 0; i < m->n_data; i++) {
             arg("-device"); argf("ide-hd,id=datadisk%d,drive=data%d,bus=%s.%d%s%s", i + 1, i + 1, bus, i + 1, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
@@ -3025,8 +3189,15 @@ static void build_qemu_args(void) {
         arg("-netdev"); argf("hubport,id=lnk0,hubid=%d", LINK_HUB(m));
         arg("-device"); argf("virtio-net-pci,id=link0,netdev=lnk0,mac=%s,addr=0x%x", m->link_mac, VM_LINK_SLOT_GATEWAY);
     }
-    /* an imported machine's other cards: there with their addresses, so the guest keeps its interfaces; not connected */
-    for (int i = 0; i < m->n_extra_macs; i++) { arg("-device"); argf("%s,id=nic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, m->extra_macs[i], 0x18 + i); }
+    /* an imported machine's other cards: there with their addresses, so the guest keeps its interfaces. In Shared and
+     * Host-only each sits on a hub of its own (XNIC_HUB + i), where its own passt goes once the machine runs
+     * (xnic_attach); in Bridged and Isolated it has no backend: its cable is out */
+    for (int i = 0; i < m->n_extra_macs; i++) {
+        if (m->network == VM_NET_SHARED || m->network == VM_NET_HOSTONLY) {
+            arg("-netdev"); argf("hubport,id=xnic%d,hubid=%d", i + 1, XNIC_HUB + i);
+            arg("-device"); argf("%s,id=nic%d,netdev=xnic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, i + 1, m->extra_macs[i], 0x18 + i);
+        } else { arg("-device"); argf("%s,id=nic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, m->extra_macs[i], 0x18 + i); }
+    }
     arg("-device"); arg("virtio-rng-pci,addr=0x3");
     /* amd64 with -nodefaults needs a display device or its kernel never starts (3.3); arm64's virt has no keyboard */
     /* 3D (decide_graphics): the same slot with virgl, and the D-Bus display shares its pictures as dmabufs (gl=on) made on
@@ -3067,7 +3238,7 @@ static void build_qemu_args(void) {
          * after the firmware leaves (virtio-gpu's picture stops there until viogpudo is in) */
         if (win_arm) { arg("-device"); arg("ramfb"); }
         else if (arm) { arg("-device"); arg(arm_gpu); }
-        if (m->devices != VM_DEV_WINDOWS) { arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5"); }
+        if (m->devices != VM_DEV_WINDOWS && !compat_arm) { arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5"); }
         if (arm) { arg("-device"); arg("usb-kbd,bus=xhci.0"); }
         arg("-device"); arg("usb-tablet,bus=xhci.0");
         /* "Capture mouse" (6.25): a relative mouse beside the tablet, used only while captured (mouse_set). Not the PS/2
@@ -3090,6 +3261,14 @@ static void build_qemu_args(void) {
         arg("-audiodev"); arg("dbus,id=snd0,out.frequency=48000,out.channels=2,out.format=s16,in.frequency=48000,in.channels=2,in.format=s16");
         arg("-display"); arg(dbus_disp);
     } else { arg("-audiodev"); arg("none,id=snd0"); arg("-display"); arg("none"); }
+    /* host USB devices (6.6, machine.json "usb"): the compatible and Windows devices' xHCI controller in a window has room;
+     * any other machine gets one of its own on slot 0x15, only when "usb" is on (a device of the guest: never while a
+     * state is saved, so a saved state always finds the hardware it was saved with) */
+    S.usb_bus[0] = 0;
+    if (m->usb) {
+        if (m->display == VM_DISPLAY_WINDOW && (m->devices == VM_DEV_COMPAT || m->devices == VM_DEV_WINDOWS)) snprintf(S.usb_bus, sizeof S.usb_bus, "xhci.0");
+        else { arg("-device"); arg("qemu-xhci,id=usbx,p2=8,p3=8,addr=0x15"); snprintf(S.usb_bus, sizeof S.usb_bus, "usbx.0"); }
+    }
     /* a sound card (HDA, which every Linux and Windows guest has a driver for), on its own slot after the CD/DVD
      * drive's: a machine made before it had none, and a state saved without it still loads (a device the saved
      * stream doesn't name keeps its reset state). Its codec has a speaker and a microphone (hda-micro) on every
@@ -3398,7 +3577,7 @@ static int start_machine(void) {
         VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL,
                          S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : S.vgpu ? S.vgpu_render : NULL,
                          S.vgpu ? S.vgpu_dev : NULL, S.vgpu ? S.vgpu_group : -1, S.vgpu ? GVT_ROM : NULL,
-                         S.m.accel != VM_ACCEL_KVM, S.m.network == VM_NET_BRIDGED, xfd, qargv[0], S.sc_learn, sc_drop_row(), &lfd,
+                         S.m.accel != VM_ACCEL_KVM, S.m.network == VM_NET_BRIDGED, usb_may(), xfd, qargv[0], S.sc_learn, sc_drop_row(), &lfd,
                          S.render_qfd, S.gl && S.venus && S.vs_qfd >= 0 ? VENUS_SHIM : NULL };
         int mask = xfd >= 0 ? vm_jail_qemu(&j) | (in_ns ? VMS_NAMESPACES : 0) | (nsb & VMNS_NOEXEC ? VMS_NOEXEC_DISKS : 0) : 0;
         int32_t msg[2] = { mask, 0 };
@@ -3425,12 +3604,19 @@ static int start_machine(void) {
             if (sent != (ssize_t)sizeof msg[0]) _exit(126);
         }
         /* 3D: Mesa in QEMU can't write a shader cache (its sandbox has no home folder): told not to try */
-        /* venus: QEMU preloads the library that gives virglrenderer lord-vm's connection to the render server (venusshim.c) */
-        static char vsenv[2][PATH_MAX + 32];
-        snprintf(vsenv[0], sizeof vsenv[0], "LD_PRELOAD=%s", VENUS_SHIM);
-        snprintf(vsenv[1], sizeof vsenv[1], "LORDOS_VENUS_FD=%d", S.vs_qfd);
-        int vs = S.gl && S.venus && S.vs_qfd >= 0;
-        char *env[] = { "LC_ALL=C.UTF-8", S.gl || S.vgpu ? "MESA_SHADER_CACHE_DISABLE=true" : "LC_CTYPE=C.UTF-8", vs ? vsenv[0] : NULL, vs ? vsenv[1] : NULL, NULL };
+        /* a machine that may get a host USB device (6.6): libusb in QEMU looks for no device of its own (vmusbshim.c);
+         * venus: the library that gives virglrenderer lord-vm's connection to the render server (venusshim.c), and its fd */
+        char *env[5], **ep = env;
+        *ep++ = "LC_ALL=C.UTF-8";
+        if (S.gl || S.vgpu) *ep++ = "MESA_SHADER_CACHE_DISABLE=true";
+        static char preload[2 * PATH_MAX + 32], vsfd[48];
+        int pu = usb_may() && !access(USB_SHIM, R_OK), pv = S.gl && S.venus && S.vs_qfd >= 0;
+        int pn = pu && pv ? snprintf(preload, sizeof preload, "LD_PRELOAD=%s:%s", USB_SHIM, VENUS_SHIM)
+               : pu ? snprintf(preload, sizeof preload, "LD_PRELOAD=%s", USB_SHIM)
+               : pv ? snprintf(preload, sizeof preload, "LD_PRELOAD=%s", VENUS_SHIM) : 0;
+        if (pn > 0 && pn < (int)sizeof preload) *ep++ = preload;
+        if (pv) { snprintf(vsfd, sizeof vsfd, "LORDOS_VENUS_FD=%d", S.vs_qfd); *ep++ = vsfd; }
+        *ep = NULL;
         syscall(SYS_execveat, xfd, "", qargv, env, AT_EMPTY_PATH);
         msg[1] = errno ? errno : ENOEXEC;
         write_all(stf, &msg[1], sizeof msg[1]);
@@ -3512,6 +3698,11 @@ static int start_machine(void) {
         return 0;
     }
     S.qmp_up = 1;
+    /* host USB devices (6.6): QEMU loads its usb-host module (hw-usb-host.so, with libusb already mapped by lord-vm-usb.so)
+     * now, while executable mappings are still the loader's; a module loaded later, at the first device_add, would stop
+     * QEMU. device-list-properties loads only that type's module and makes no device (no libusb_init) */
+    if (usb_may() && qmp_call(&S.qmp, "device-list-properties", "{\"typename\":\"usb-host\"}", 10000, err, sizeof err))
+        vlog("usb: QEMU's usb-host isn't there (%s): no host USB devices for this machine", err);
     S.sc_starting = 0;      /* QEMU's start is over: no executable mapping from now on (vmseccomp.h) */
     S.vs_starting = 0;      /* nor in venus's render server */
     S.oom0 = read_oom_kills();
@@ -3626,6 +3817,136 @@ static void host_shutdown(void) {
     if (left < 1000) { vlog("no time left for the guest to shut down: turning it off"); begin_poweroff(); return; }
     begin_shutdown((int)((left + 999) / 1000));
     S.shut_deadline = S.host_t0 + S.hplan.quit_at;
+}
+
+/* ---- host USB devices (6.6; AGENTS.md "Machines' USB devices") ----
+ * The admin helper's vm-usb-allow opened the device's node for the person; lord-server passed the descriptor on (VM_USB).
+ * It goes to QEMU as an fdset and a usb-host device on the machine's xhci controller reads it (hostdevice=/dev/fdset/N):
+ * QEMU opens no path and its Landlock rules don't change; its allowlist has usbfs's ioctls only when the machine may get
+ * a device (not one locked for anonymity). Out: device_del, then the fdset once QEMU says DEVICE_DELETED. Nothing of it is
+ * written anywhere: the next start has none (auto-connect is lord-server's, from machine.json's usb_auto) */
+static void usb_q_push(int slot) { if (S.usb_qn < 2 * VMUSB_PER_VM) S.usb_q[S.usb_qn++] = slot; }
+static int usb_q_pop(void) {
+    if (!S.usb_qn) return -1;
+    int s0 = S.usb_q[0];
+    memmove(S.usb_q, S.usb_q + 1, (size_t)(--S.usb_qn) * sizeof S.usb_q[0]);
+    return s0;
+}
+
+static void usb_broadcast(int ci, uint32_t seq) {
+    char t[VM_TEXT_MAX] = "";
+    size_t o = 0;
+    int n = 0;
+    for (int i = 0; i < VMUSB_PER_VM; i++) {
+        if (S.usb[i].state != 2) continue;
+        int w = snprintf(t + o, sizeof t - o, "%s%d %d %04x:%04x", n ? "\t" : "", S.usb[i].bus, S.usb[i].dev, S.usb[i].vendor, S.usb[i].product);
+        if (w < 0 || (size_t)w >= sizeof t - o) { t[o] = 0; break; }
+        o += (size_t)w;
+        n++;
+    }
+    VmMsg m = vm_msg(VM_USB_STATE, seq, n, 0, 0, 0, t);
+    if (ci >= 0) send_to(ci, &m, -1);
+    else for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, -1);
+}
+
+static void usb_attach(int ci, uint32_t seq, int fd, const char *text) {
+    int bus, dev, slot = -1;
+    unsigned v, p;
+    if (vmusb_line_parse(text, &bus, &dev, &v, &p) || vmusb_fd_ok(fd, bus, dev)) {
+        reply(ci, seq, VME_BAD_REQUEST, "not a USB device's node opened for reading and writing");
+        return;
+    }
+    if (S.m.profile_lock) { reply(ci, seq, VME_DENIED, "locked for anonymity: no USB devices"); return; }
+    for (int i = 0; i < VMUSB_PER_VM; i++) {
+        if (S.usb[i].state && S.usb[i].bus == bus && S.usb[i].dev == dev) { reply(ci, seq, VME_BUSY, "that device is already in this machine"); return; }
+        if (!S.usb[i].state && slot < 0) slot = i;
+    }
+    if (slot < 0) { reply(ci, seq, VME_BUSY, "the machine holds 8 USB devices already"); return; }
+    if (!S.usb_bus[0]) { reply(ci, seq, VME_DENIED, "the machine has no USB controller for this computer's devices: turn on USB devices in its Configure and start it again"); return; }
+    if (S.usb_qn >= 2 * VMUSB_PER_VM) { reply(ci, seq, VME_BUSY, "busy"); return; }
+    char a[200];
+    snprintf(a, sizeof a, "{\"fdset-id\":%d,\"opaque\":\"usb\"}", USB_FDSET + slot);
+    if (qmp_do("add-fd", a, P_GETFD, -1, 0, fd, -1)) { reply(ci, seq, VME_BUSY, "busy"); return; }
+    snprintf(a, sizeof a, "{\"driver\":\"usb-host\",\"id\":\"usb%d\",\"bus\":\"%s\",\"hostdevice\":\"/dev/fdset/%d\"}", slot, S.usb_bus, USB_FDSET + slot);
+    if (qmp_do("device_add", a, P_USB_ADD, ci, seq, -1, -1)) {
+        snprintf(a, sizeof a, "{\"fdset-id\":%d}", USB_FDSET + slot);
+        qmp_do("remove-fd", a, P_IGNORE, -1, 0, -1, -1);
+        reply(ci, seq, VME_BUSY, "busy");
+        return;
+    }
+    S.usb[slot].state = 1; S.usb[slot].bus = bus; S.usb[slot].dev = dev; S.usb[slot].vendor = v; S.usb[slot].product = p;
+    S.usb[slot].client = ci; S.usb[slot].seq = seq;
+    usb_q_push(slot);
+    vlog("usb: %04x:%04x (bus %d, address %d) going into the machine", v, p, bus, dev);
+}
+
+static void usb_gone(int slot) {
+    char a[64];
+    snprintf(a, sizeof a, "{\"fdset-id\":%d}", USB_FDSET + slot);
+    qmp_do("remove-fd", a, P_IGNORE, -1, 0, -1, -1);
+    vlog("usb: %04x:%04x (bus %d, address %d) out of the machine", S.usb[slot].vendor, S.usb[slot].product, S.usb[slot].bus, S.usb[slot].dev);
+    S.usb[slot].state = 0;
+    usb_broadcast(-1, 0);
+}
+
+static void usb_detach(int ci, uint32_t seq, const char *text) {
+    int bus, dev;
+    unsigned v, p;
+    if (vmusb_line_parse(text, &bus, &dev, &v, &p)) { reply(ci, seq, VME_BAD_REQUEST, "BUS DEV VVVV:PPPP"); return; }
+    for (int i = 0; i < VMUSB_PER_VM; i++) {
+        if (S.usb[i].state != 2 || S.usb[i].bus != bus || S.usb[i].dev != dev) continue;
+        if (S.usb_qn >= 2 * VMUSB_PER_VM) { reply(ci, seq, VME_BUSY, "busy"); return; }
+        char a[64];
+        snprintf(a, sizeof a, "{\"id\":\"usb%d\"}", i);
+        if (qmp_do("device_del", a, P_USB_DEL, ci, seq, -1, -1)) { reply(ci, seq, VME_BUSY, "busy"); return; }
+        S.usb[i].state = 3;
+        usb_q_push(i);
+        return;
+    }
+    reply(ci, seq, VME_OK, "not in the machine");
+}
+
+/* VM_USB a = 2 (add) or 3 (remove): an auto-connect rule of machine.json's usb_auto while the machine runs (lord-vm holds
+ * the lock, so it writes the file); nothing changes in QEMU */
+static void usb_rule(int ci, uint32_t seq, int add, const char *rule) {
+    if (!vm_usb_rule_valid(rule)) { reply(ci, seq, VME_BAD_REQUEST, "VVVV:PPPP[:SERIAL]"); return; }
+    if (add && S.m.profile_lock) { reply(ci, seq, VME_DENIED, "locked for anonymity: no USB devices"); return; }
+    VmMachine m = S.m;
+    int at = -1;
+    for (int i = 0; i < m.n_usb_auto; i++) if (!strcmp(m.usb_auto[i], rule)) at = i;
+    if (add && at < 0) {
+        if (m.n_usb_auto >= VM_USB_AUTO) { reply(ci, seq, VME_BUSY, "at most 8 devices connect by themselves"); return; }
+        memcpy(m.usb_auto[m.n_usb_auto++], rule, strlen(rule) + 1);     /* vm_usb_rule_valid: at most VM_USB_RULE_MAX */
+        m.schema = VM_SCHEMA;
+    } else if (!add && at >= 0) {
+        memmove(m.usb_auto[at], m.usb_auto[at + 1], (size_t)(m.n_usb_auto - at - 1) * sizeof m.usb_auto[0]);
+        m.n_usb_auto--;
+    } else { reply(ci, seq, VME_OK, "unchanged"); return; }
+    vm_now_iso(m.updated);
+    char err[160];
+    if (vm_machine_check(&m, err, sizeof err) || vm_machine_save(S.dir, &m)) { reply(ci, seq, VME_INTERNAL, "machine.json can't be written"); return; }
+    S.m = m;
+    vlog("usb: %s connects by itself %s", rule, add ? "from now on" : "no more");
+    reply(ci, seq, VME_OK, add ? "added" : "removed");
+}
+
+static void usb_reply(int kind, int client, uint32_t seq, int ok, const char *desc) {
+    int slot = usb_q_pop();
+    if (slot < 0 || slot >= VMUSB_PER_VM) return;
+    if (kind == P_USB_ADD) {
+        if (ok) { S.usb[slot].state = 2; reply(client, seq, VME_OK, "in"); usb_broadcast(-1, 0); vlog("usb: %04x:%04x is in the machine", S.usb[slot].vendor, S.usb[slot].product); return; }
+        vlog("usb: %04x:%04x: QEMU refused it: %.150s", S.usb[slot].vendor, S.usb[slot].product, desc);
+        char a[64];
+        snprintf(a, sizeof a, "{\"fdset-id\":%d}", USB_FDSET + slot);
+        qmp_do("remove-fd", a, P_IGNORE, -1, 0, -1, -1);
+        S.usb[slot].state = 0;
+        reply(client, seq, VME_QMP, desc);
+        return;
+    }
+    /* device_del: a device QEMU no longer has is out already; otherwise DEVICE_DELETED finishes it */
+    if (!ok && !strstr(desc, "not found")) { S.usb[slot].state = 2; reply(client, seq, VME_QMP, desc); return; }
+    if (!ok) usb_gone(slot);
+    reply(client, seq, VME_OK, "out");
 }
 
 enum { GT_NONE = 0, GT_INSERTING, GT_IN, GT_EJECTING };
@@ -3986,23 +4307,59 @@ static void net_lost(int sig, int code) {
     S.net_retry_at = now + (S.net_restarts == 0 ? 0 : 1000LL << (S.net_restarts - 1));
 }
 
-static void net_restart(void) {
-    S.net_retry_at = 0;
-    if (S.qemu_done || !S.qmp_up || S.keeper_fd < 0) return;
-    char c = 'p';
-    if (write(S.keeper_fd, &c, 1) != 1) { vlog("network: passt's keeper is gone"); close(S.keeper_fd); S.keeper_fd = -1; net_lost(0, 0); return; }
+/* one passt from the keeper: its pid and { socket, stderr, pidfd }; -1 none started, -2 the keeper is gone */
+static int32_t keeper_ask(char c, int fds[3]) {
+    if (write(S.keeper_fd, &c, 1) != 1) return -2;
     struct pollfd pf = { S.keeper_fd, POLLIN, 0 };
     int32_t pid = -1;
-    int fds[3] = { -1, -1, -1 };
     if (poll(&pf, 1, 3000) == 1) {
-        union { struct cmsghdr h; char b[CMSG_SPACE(sizeof fds)]; } cm;
+        union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int) * 3)]; } cm;
         struct iovec io = { &pid, sizeof pid };
         struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
         ssize_t n = recvmsg(S.keeper_fd, &mh, MSG_CMSG_CLOEXEC);
         struct cmsghdr *ch = n == sizeof pid ? CMSG_FIRSTHDR(&mh) : NULL;
-        if (ch && ch->cmsg_level == SOL_SOCKET && ch->cmsg_type == SCM_RIGHTS && ch->cmsg_len == CMSG_LEN(sizeof fds)) memcpy(fds, CMSG_DATA(ch), sizeof fds);
+        if (ch && ch->cmsg_level == SOL_SOCKET && ch->cmsg_type == SCM_RIGHTS && ch->cmsg_len == CMSG_LEN(sizeof(int) * 3)) memcpy(fds, CMSG_DATA(ch), sizeof(int) * 3);
         else pid = -1;
     }
+    return pid;
+}
+
+/* An imported machine's other cards (6.22) in Shared and Host-only: each gets its own passt from the keeper, on the hub
+ * its card is on (XNIC_HUB + i), once, as the machine starts. Not healed: a passt of an extra card that ends leaves that
+ * card without network until the machine starts again. */
+static void xnic_attach(void) {
+    if (S.keeper_fd < 0 || !S.qmp_up || S.qemu_done) return;
+    for (int i = 0; i < S.m.n_extra_macs && i < VM_EXTRA_NICS; i++) {
+        int fds[3] = { -1, -1, -1 };
+        int32_t pid = keeper_ask((char)('1' + i), fds);
+        if (pid == -2) { vlog("network: passt's keeper is gone: the other cards stay without network"); return; }
+        if (pid <= 0 || fds[0] < 0) {
+            for (int k = 0; k < 3; k++) if (fds[k] >= 0) close(fds[k]);
+            vlog("network: card %d (%s): no passt could be started: its cable is out", i + 2, S.m.extra_macs[i]);
+            continue;
+        }
+        if (S.xnic_err[i] >= 0) close(S.xnic_err[i]);
+        S.xnic_err[i] = fds[1];                 /* kept open (a closed pipe would end passt at its first word); -q */
+        if (fds[2] >= 0) close(fds[2]);         /* it dies with the keeper, which dies with lord-vm or the machine's end */
+        char a[160];
+        snprintf(a, sizeof a, "{\"fdname\":\"xpst%d\"}", i + 1);
+        int bad = qmp_do("getfd", a, P_XNIC, -1, 0, fds[0], -1);
+        close(fds[0]);
+        snprintf(a, sizeof a, "{\"type\":\"socket\",\"id\":\"xpst%d\",\"fd\":\"xpst%d\"}", i + 1, i + 1);
+        bad |= qmp_do("netdev_add", a, P_XNIC, -1, 0, -1, -1);
+        snprintf(a, sizeof a, "{\"type\":\"hubport\",\"id\":\"xhp%d\",\"hubid\":%d,\"netdev\":\"xpst%d\"}", i + 1, XNIC_HUB + i, i + 1);
+        bad |= qmp_do("netdev_add", a, P_XNIC, -1, 0, -1, -1);
+        if (bad) { kill(pid, SIGKILL); vlog("network: card %d (%s): QEMU couldn't be asked to connect it", i + 2, S.m.extra_macs[i]); continue; }
+        vlog("network: card %d (%s, %s) connected: passt %d, 10.0.%d.15/24", i + 2, S.m.extra_macs[i], VM_NIC_MODELS[S.m.extra_models[i]], (int)pid, 3 + i);
+    }
+}
+
+static void net_restart(void) {
+    S.net_retry_at = 0;
+    if (S.qemu_done || !S.qmp_up || S.keeper_fd < 0) return;
+    int fds[3] = { -1, -1, -1 };
+    int32_t pid = keeper_ask('p', fds);
+    if (pid == -2) { vlog("network: passt's keeper is gone"); close(S.keeper_fd); S.keeper_fd = -1; net_lost(0, 0); return; }
     S.net_restarts++;
     if (pid <= 0 || fds[0] < 0) {
         for (int i = 0; i < 3; i++) if (fds[i] >= 0) close(fds[i]);
@@ -4237,6 +4594,7 @@ static void snap_concluded(const JVal *root, int ok) {
             begin_poweroff();
             return;
         }
+        snap_settings_back(S.dir, S.snap_tag);
         vm_op_end(S.dir);
         snap_end(1, "");
     } else {
@@ -4270,6 +4628,7 @@ static void snap_taken(const JVal *root) {
     vm_now_iso(sn.created);
     sn.memory = 1;
     sn.vmstate = vmstate;
+    if (snap_settings_keep(S.dir, S.snap_tag, &S.m)) vlog("snapshots: %s: the settings couldn't be kept with it", S.snap_tag);
     list[n++] = sn;
     if (vm_snaps_save(S.dir, list, n)) { vm_op_end(S.dir); snap_end(0, "can't write snapshots.json"); return; }
     vm_op_end(S.dir);
@@ -4317,7 +4676,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
 /* what org.lordos.agent's helper brings (kept when qemu-guest-agent comes and goes) */
 #define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | VAC_OPEN | VAC_PLACE | (int)LAG_CAP_WINDOWS | VAC_EXTRA | VAC_EXTRA_OFF | \
-                 VAC_SHELL | VAC_LINKS | VAC_NOTIFY)
+                 VAC_SHELL | VAC_LINKS | VAC_NOTIFY | VAC_SEND)
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
        AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS,
@@ -4894,7 +5253,8 @@ static void on_qga_reply(const JVal *root, int ok) {
 /* the steps of VAG_INSTALL: lordos-guest written in 32 KB pieces through guest-file-write, then one fixed script (no
  * argument, nothing the host or the person names): the helper, its udev rule and user service, and systemd-shutdown's hook
  * that runs `lordos-guest --stopping <verb>` (lordos-guest-local, best effort: a read-only /usr skips it; "Graphics 3D"
- * in docs/VIRTUALIZATION.md); then, best effort and
+ * in docs/VIRTUALIZATION.md) and the file managers' "Send to LordOS" entries (best effort, 6.21: the same text as
+ * tools/guest/lordos-send-to-host*.desktop and the disc's install.sh); then, best effort and
  * never failing the install (offline, a locked or unknown package manager), the clipboard tool through the guest's own
  * package manager when xclip isn't there (xclip and wl-clipboard: apt-get, dnf, zypper or pacman); then the helper
  * started again in each signed-in desktop session (uid ≥ 1000 with graphical-session.target active), so the new one
@@ -4912,6 +5272,13 @@ static const char INSTALL_SH[] =
     "{ mkdir -p /usr/lib/systemd/system-shutdown && "
       "printf '%s\\n' '#!/bin/sh' 'exec /usr/local/bin/lordos-guest --stopping \"$1\"' > /usr/lib/systemd/system-shutdown/lordos-guest-local && "
       "chmod 755 /usr/lib/systemd/system-shutdown/lordos-guest-local; } 2>/dev/null || true; "
+    "{ mkdir -p /usr/local/share/applications /usr/local/share/kio/servicemenus && "
+      "printf '%s\\n' '[Desktop Entry]' 'Type=Application' 'Name=Send to LordOS' 'Comment=Copy these files to the LordOS computer this machine runs on' "
+      "'Exec=/usr/local/bin/lordos-guest --send-to-host %F' 'Icon=document-send' 'Terminal=false' 'NoDisplay=true' 'MimeType=application/octet-stream;' "
+      "'Categories=Utility;' > /usr/local/share/applications/lordos-send-to-host.desktop && chmod 644 /usr/local/share/applications/lordos-send-to-host.desktop && "
+      "printf '%s\\n' '[Desktop Entry]' 'Type=Service' 'MimeType=application/octet-stream;' 'Actions=sendToLordOS' 'X-KDE-Priority=TopLevel' '' "
+      "'[Desktop Action sendToLordOS]' 'Name=Send to LordOS' 'Icon=document-send' 'Exec=/usr/local/bin/lordos-guest --send-to-host %F' "
+      "> /usr/local/share/kio/servicemenus/lordos-send-to-host.desktop && chmod 755 /usr/local/share/kio/servicemenus/lordos-send-to-host.desktop; } 2>/dev/null || true; "
     "command -v xclip >/dev/null 2>&1 || { "
       "if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; "
         "apt-get install -y -q -o DPkg::Lock::Timeout=120 --no-install-recommends xclip wl-clipboard || "
@@ -5212,7 +5579,7 @@ static void fx_unstage(void) {
 
 static void fx_reset(void) {
     fx_unstage();
-    S.fx_via = S.fx_retried = 0;
+    S.fx_via = S.fx_retried = S.fx_cancel = 0;
     if (S.fx.fd >= 0) close(S.fx.fd);
     memset(&S.fx, 0, sizeof S.fx);
     S.fx.fd = -1;
@@ -5363,7 +5730,7 @@ static void fx_fail_all(const char *why) {
 static void fx_write_next(void) {
     static uint8_t buf[FX_CHUNK];
     static char b64[FX_CHUNK / 3 * 4 + 8], args[FX_CHUNK / 3 * 4 + 96];
-    while (!S.fx_eof && S.fx_inflight < FX_DEPTH) {
+    while (!S.fx_eof && !S.fx_cancel && S.fx_inflight < FX_DEPTH) {
         ssize_t n = pread(S.fx.fd, buf, sizeof buf, S.fx_sent);
         if (n < 0) { fx_fail(VME_INTERNAL, "the file couldn't be read"); return; }
         if (n == 0) { S.fx_eof = 1; break; }
@@ -5595,6 +5962,8 @@ static void fx_exec_done(const JVal *r) {
 
 static void fx_on_reply(int kind, const JVal *root, const JVal *r, int ok) {
     if (!S.fx_step) return;
+    /* cancelled: at this answer (pieces still on their way are let through first, so none is taken for the next file's) */
+    if (S.fx_cancel && (kind != AQ_FXWRITE || S.fx_inflight <= 1)) { S.fx_retried = 1; fx_fail(VME_DENIED, "cancelled"); return; }
     if (!ok) { char why[VM_TEXT_MAX]; snprintf(why, sizeof why, "qemu-guest-agent: %.160s", qmp_error_desc(root)); fx_fail(VME_QMP, why); return; }
     switch (kind) {
     case AQ_FXEXEC:
@@ -5922,8 +6291,8 @@ static void lag_send(uint16_t kind, const uint8_t *data, uint32_t n) {
  * machine that resumed asks the tools to say hello again */
 static void host_hello(int ask) {
     char me[128];
-    snprintf(me, sizeof me, "lord-vm 2 clipboard clipx clipreq elevated%s%s%s", S.m.guest_links ? " links" : "",
-             S.m.guest_notify ? " notify" : "", ask ? " ask" : "");
+    snprintf(me, sizeof me, "lord-vm 2 clipboard clipx clipreq elevated%s%s%s%s", S.m.guest_links ? " links" : "",
+             S.m.guest_notify ? " notify" : "", S.m.profile_lock || S.m.guest_files_off ? "" : " send", ask ? " ask" : "");
     lag_send(AGK_HELLO, (const uint8_t *)me, (uint32_t)strlen(me));
 }
 
@@ -6205,6 +6574,253 @@ static void shell_pump(short ev) {
     S.sh_to_guest += (uint32_t)r;
 }
 
+/* ---- files sent from the guest (6.21, AGK_SEND_*) ----
+ * The guest's tools offer one file at a time; lord-server decides where it goes (the machine's quarantine folder) and hands
+ * this side the part file's descriptor (VM_RECV), never a path; this side writes only through it. The guest is hostile:
+ * every frame parses exactly, the offset must be the next byte, never more than AG_SEND_WINDOW past the last ACK, never past
+ * the size offered, and the file is kept only when the SHA-256 of what was written is the guest's. A resume (the same key
+ * offered again after a lost connection): lord-server hands back the part with what came before, a child hashes it, the
+ * guest goes on only when its own file starts with those very bytes. */
+enum { RX_NONE = 0, RX_ASKED, RX_HASHING, RX_FROM, RX_DATA };
+#define RX_ACK_EVERY (256u << 10)
+
+static int rx_window_there(void) {
+    for (int i = 0; i < MAX_CLIENTS; i++) if (S.cl[i].fd >= 0) return 1;
+    return 0;
+}
+
+static void rx_tell(int vrs, int code) {
+    VmMsg m = vm_msg(VM_RECV_STATE, 0, (int)S.rx_id, vrs, (int)(S.rx_off >> 10), code, "");
+    for (int i = 0; i < MAX_CLIENTS; i++) if (S.cl[i].fd >= 0) send_to(i, &m, -1);
+    S.rx_told = now_ms();
+}
+
+static void rx_accept(uint8_t status, uint64_t offset, const uint8_t *sha) {
+    uint8_t a[AG_SEND_ACCEPT_BYTES];
+    if (!ag_send_accept_write(a, S.rx_gid, status, offset, sha)) lag_send(AGK_SEND_ACCEPT, a, sizeof a);
+}
+
+/* the transfer ends: the guest told (code, unless guest_code < 0), lord-server told (vrs, unless 0), all let go */
+static void rx_end(int vrs, int guest_code, int code, const char *why) {
+    if (!S.rx_state) return;
+    if (guest_code >= 0 && S.lag_fd >= 0 && S.rx_state != RX_ASKED) { uint8_t d[5]; if (!ag_send_done_write(d, S.rx_gid, (uint8_t)guest_code)) lag_send(AGK_SEND_DONE, d, 5); }
+    if (vrs && S.rx_state != RX_ASKED) rx_tell(vrs, code);
+    if (S.rx_hpid > 0) kill(S.rx_hpid, SIGKILL);              /* reaped by reap() */
+    if (S.rx_hpipe >= 0) close(S.rx_hpipe);
+    if (S.rx_fd >= 0) close(S.rx_fd);
+    if (why) vlog("files from the guest: %s: %s (%llu of %llu bytes)", S.rx_name, why, (unsigned long long)S.rx_off, (unsigned long long)S.rx_size);
+    S.rx_hpid = 0; S.rx_hpipe = -1; S.rx_fd = -1; S.rx_hgot = 0;
+    S.rx_state = RX_NONE; S.rx_gid = 0; S.rx_off = S.rx_acked = S.rx_prefix = 0;
+}
+
+/* AGK_SEND_OFFER: passed to lord-server (a sealed memfd, written again) when this machine takes files, a window is there to
+ * show it, nothing else is on its way and the guest offers within its rate; else answered at once */
+static void rx_offer(const AgFrame *f) {
+    AgSendOffer o;
+    if (ag_send_offer_parse(f->data, f->len, &o)) { vlog("files from the guest: a malformed offer: dropped"); return; }
+    uint8_t a[AG_SEND_ACCEPT_BYTES];
+    uint8_t no = S.m.profile_lock || S.m.guest_files_off ? AGSA_OFF : S.rx_state ? AGSA_BUSY : !rx_window_there() ? AGSA_BUSY
+               : !ag_rate_take(&S.rx_rate, now_ms(), AG_SEND_OFFER_BURST, AG_SEND_OFFER_EVERY_MS) ? AGSA_REFUSED : AGSA_OK;
+    char nm[AG_NAME_MAX + 1];
+    if (no == AGSA_OK && ag_recv_name(o.name, nm, sizeof nm)) no = AGSA_REFUSED;
+    if (no != AGSA_OK) {
+        static int said;
+        if (no != AGSA_BUSY && !(said & (1 << no))) { said |= 1 << no; vlog("files from the guest: an offer refused (%s)", no == AGSA_OFF ? "this machine doesn't take files from the guest" : "too many offers, or a name this computer won't take"); }
+        if (!ag_send_accept_write(a, o.id, no, 0, NULL)) lag_send(AGK_SEND_ACCEPT, a, sizeof a);
+        return;
+    }
+    uint8_t out[VM_RECV_OFFER_MAX];
+    size_t n = ag_send_offer_write(&o, out, sizeof out);
+    int fd = n ? memfd_create("lordos-vm-recv", MFD_CLOEXEC | MFD_ALLOW_SEALING) : -1;
+    if (fd < 0 || write_all(fd, out, n) || fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+        if (fd >= 0) close(fd);
+        if (!ag_send_accept_write(a, o.id, AGSA_BUSY, 0, NULL)) lag_send(AGK_SEND_ACCEPT, a, sizeof a);
+        return;
+    }
+    S.rx_id = ++S.rx_next ? S.rx_next : ++S.rx_next;
+    S.rx_gid = o.id;
+    S.rx_size = o.size;
+    snprintf(S.rx_name, sizeof S.rx_name, "%s", nm);
+    S.rx_state = RX_ASKED;
+    S.rx_deadline = now_ms() + 10000;
+    VmMsg m = vm_msg(VM_RECV_OFFER, 0, (int)n, (int)S.rx_id, 0, 0, "");
+    for (int i = 0; i < MAX_CLIENTS; i++) if (S.cl[i].fd >= 0) send_to(i, &m, fd);
+    close(fd);
+    vlog("files from the guest: %s offered (%llu bytes%s)", nm, (unsigned long long)o.size, o.flags & AGSF_EXEC ? ", runnable in the guest" : "");
+}
+
+/* the hash of what the part file already holds (a resume), in a child: lord-vm's loop never waits on a file. It writes
+ * back the SHA-256 state after the prefix, then the prefix's digest, in one write */
+static int rx_hash_start(void) {
+    int pp[2];
+    if (pipe2(pp, O_CLOEXEC)) return -1;
+    pid_t pid = fork();
+    if (pid < 0) { close(pp[0]); close(pp[1]); return -1; }
+    if (!pid) {
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+        close(pp[0]);
+        static uint8_t buf[1 << 20];
+        struct { Sha256 st; uint8_t d[32]; } out;
+        sha256_init(&out.st);
+        for (uint64_t off = 0; off < S.rx_prefix;) {
+            size_t want = S.rx_prefix - off < sizeof buf ? (size_t)(S.rx_prefix - off) : sizeof buf;
+            ssize_t r = pread(S.rx_fd, buf, want, (off_t)off);
+            if (r < 0 && errno == EINTR) continue;
+            if (r <= 0) _exit(1);
+            sha256_update(&out.st, buf, (size_t)r);
+            off += (uint64_t)r;
+        }
+        Sha256 c = out.st;
+        sha256_final(&c, out.d);
+        _exit(write_all(pp[1], &out, sizeof out) ? 1 : 0);
+    }
+    close(pp[1]);
+    fcntl(pp[0], F_SETFL, O_NONBLOCK);
+    S.rx_hpipe = pp[0];
+    S.rx_hpid = pid;
+    S.rx_hgot = 0;
+    S.rx_state = RX_HASHING;
+    return 0;
+}
+
+static void rx_hash_read(void) {
+    ssize_t r = read(S.rx_hpipe, S.rx_hbuf + S.rx_hgot, sizeof S.rx_hbuf - S.rx_hgot);
+    if (r < 0 && (errno == EAGAIN || errno == EINTR)) return;
+    if (r <= 0) { rx_end(VRS_FAILED, AGSD_FAILED, AGSD_FAILED, "what came before couldn't be read again"); return; }
+    S.rx_hgot += (size_t)r;
+    if (S.rx_hgot < sizeof S.rx_hbuf) return;
+    close(S.rx_hpipe); S.rx_hpipe = -1; S.rx_hpid = 0;        /* reaped by reap() */
+    memcpy(&S.rx_hs, S.rx_hbuf, sizeof S.rx_hs);
+    memcpy(S.rx_psha, S.rx_hbuf + sizeof S.rx_hs, 32);
+    S.rx_state = RX_FROM;
+    rx_accept(AGSA_OK, S.rx_prefix, S.rx_psha);
+    vlog("files from the guest: %s: %llu bytes came before, offered to go on from there", S.rx_name, (unsigned long long)S.rx_prefix);
+}
+
+/* VM_RECV: lord-server's answer: the part file, or why not */
+static void rx_answer(int ci, const VmMsg *m, int fd) {
+    (void)ci;
+    if (S.rx_state != RX_ASKED || (uint32_t)m->a != S.rx_id) { if (fd >= 0) close(fd); return; }     /* late, or another's */
+    struct stat st;
+    int fl = fd >= 0 ? fcntl(fd, F_GETFL) : -1;
+    if (m->b != AGSA_OK || fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_nlink != 1 || fl < 0 || (fl & O_ACCMODE) != O_RDWR) {
+        uint8_t why = m->b != AGSA_OK ? (uint8_t)m->b : AGSA_BUSY;
+        if (fd >= 0) close(fd);
+        rx_accept(why, 0, NULL);
+        vlog("files from the guest: %s not taken (%s)", S.rx_name, why == AGSA_SPACE ? "no room on this computer" : why == AGSA_OFF ? "turned off" : "not now");
+        S.rx_state = RX_NONE; S.rx_gid = 0;
+        return;
+    }
+    S.rx_fd = fd;
+    S.rx_off = S.rx_acked = 0;
+    S.rx_t0 = now_ms();
+    sha256_init(&S.rx_hs);
+    /* a part longer than this file can't be its start: begun again */
+    if ((uint64_t)st.st_size > S.rx_size && ftruncate(fd, 0)) { rx_end(VRS_FAILED, AGSD_FAILED, AGSD_FAILED, "the part file can't be emptied"); return; }
+    S.rx_prefix = (uint64_t)st.st_size > S.rx_size ? 0 : (uint64_t)st.st_size;
+    S.rx_state = RX_FROM;
+    rx_tell(VRS_RUNNING, 0);
+    if (!S.rx_prefix) { rx_accept(AGSA_OK, 0, NULL); return; }
+    if (rx_hash_start()) { S.rx_prefix = 0; if (ftruncate(fd, 0)) {} rx_accept(AGSA_OK, 0, NULL); }
+}
+
+static void rx_frame(const AgFrame *f) {
+    uint32_t id;
+    if (f->kind == AGK_SEND_OFFER) { rx_offer(f); return; }
+    if (f->kind == AGK_SEND_DONE) {
+        uint8_t code;
+        if (ag_send_done_parse(f->data, f->len, &id, &code) || !S.rx_state || id != S.rx_gid) return;
+        if (S.rx_state == RX_ASKED) { S.rx_state = RX_NONE; S.rx_gid = 0; return; }        /* lord-server's answer is dropped */
+        rx_end(VRS_FAILED, -1, code == AGSD_OK ? AGSD_FAILED : code, code == AGSD_CANCELLED ? "cancelled in the guest" : "the guest gave up");
+        return;
+    }
+    if (f->kind == AGK_SEND_FROM) {
+        uint64_t off;
+        if (ag_send_pos_parse(f->data, f->len, &id, &off) || S.rx_state != RX_FROM || id != S.rx_gid) return;
+        if (off != 0 && off != S.rx_prefix) { rx_end(VRS_FAILED, AGSD_FAILED, AGSD_FAILED, "the guest asked to go on from a place this computer didn't offer"); return; }
+        if (!off && S.rx_prefix) {
+            if (ftruncate(S.rx_fd, 0)) { rx_end(VRS_FAILED, AGSD_FAILED, AGSD_FAILED, "the part file can't be emptied"); return; }
+            sha256_init(&S.rx_hs);
+            vlog("files from the guest: %s changed in the guest since: begun again", S.rx_name);
+        }
+        S.rx_off = S.rx_acked = off;
+        S.rx_state = RX_DATA;
+        if (S.rx_off == S.rx_size) { uint8_t q[12]; ag_send_pos_write(q, S.rx_gid, S.rx_off); lag_send(AGK_SEND_ACK, q, 12); }
+        return;
+    }
+    if (f->kind == AGK_SEND_DATA) {
+        const uint8_t *d;
+        uint32_t dn;
+        uint64_t off;
+        if (ag_send_data_parse(f->data, f->len, &id, &off, &d, &dn)) { if (S.rx_state == RX_DATA) rx_end(VRS_FAILED, AGSD_FAILED, AGSD_FAILED, "a malformed piece from the guest"); return; }
+        if (S.rx_state != RX_DATA || id != S.rx_gid) return;                 /* an earlier transfer's last pieces */
+        if (off != S.rx_off) { rx_end(VRS_FAILED, AGSD_FAILED, AGSD_FAILED, "a piece out of order"); return; }
+        if (dn > S.rx_size - S.rx_off) { rx_end(VRS_FAILED, AGSD_FAILED, AGSD_FAILED, "the guest sent more than the size it offered"); return; }
+        if (S.rx_off + dn - S.rx_acked > AG_SEND_WINDOW) { rx_end(VRS_FAILED, AGSD_FAILED, AGSD_FAILED, "the guest sent past its window"); return; }
+        for (uint32_t w = 0; w < dn;) {
+            ssize_t r = pwrite(S.rx_fd, d + w, dn - w, (off_t)(S.rx_off + w));
+            if (r < 0 && errno == EINTR) continue;
+            if (r <= 0) {
+                int full = r < 0 && (errno == ENOSPC || errno == EDQUOT);
+                char why[96];
+                snprintf(why, sizeof why, "it couldn't be written: %s", r < 0 ? strerror(errno) : "nothing written");
+                rx_end(VRS_FAILED, full ? AGSD_SPACE : AGSD_FAILED, full ? AGSD_SPACE : AGSD_FAILED, why);
+                return;
+            }
+            w += (uint32_t)r;
+        }
+        sha256_update(&S.rx_hs, d, dn);
+        S.rx_off += dn;
+        if (S.rx_off - S.rx_acked >= RX_ACK_EVERY || S.rx_off == S.rx_size) {
+            uint8_t q[12];
+            ag_send_pos_write(q, S.rx_gid, S.rx_off);
+            lag_send(AGK_SEND_ACK, q, 12);
+            S.rx_acked = S.rx_off;
+        }
+        if (now_ms() - S.rx_told >= 250) rx_tell(VRS_RUNNING, 0);
+        return;
+    }
+    if (f->kind == AGK_SEND_END) {
+        uint8_t sha[32], mine[32];
+        if (ag_send_end_parse(f->data, f->len, &id, sha) || S.rx_state != RX_DATA || id != S.rx_gid) return;
+        if (S.rx_off != S.rx_size) { rx_end(VRS_FAILED, AGSD_FAILED, AGSD_FAILED, "the guest ended before its size"); return; }
+        sha256_final(&S.rx_hs, mine);
+        if (memcmp(sha, mine, 32)) {
+            if (ftruncate(S.rx_fd, 0)) {}
+            rx_end(VRS_FAILED, AGSD_BADHASH, AGSD_BADHASH, "its SHA-256 isn't the guest's: thrown away");
+            return;
+        }
+        if (fdatasync(S.rx_fd) && errno != EINVAL) { rx_end(VRS_FAILED, AGSD_FAILED, AGSD_FAILED, "it couldn't be written to disk"); return; }
+        long long ms = now_ms() - S.rx_t0;
+        char why[96];
+        snprintf(why, sizeof why, "received in %lld ms, SHA-256 checked", ms);
+        rx_end(VRS_DONE, AGSD_OK, 0, why);
+    }
+}
+
+/* the person cancelled it (VM_RECV_CANCEL) */
+static void rx_cancel(uint32_t id) {
+    if (!S.rx_state || id != S.rx_id) return;
+    if (S.rx_state == RX_ASKED) { rx_accept(AGSA_REFUSED, 0, NULL); S.rx_state = RX_NONE; S.rx_gid = 0; return; }
+    rx_end(VRS_FAILED, AGSD_CANCELLED, AGSD_CANCELLED, "cancelled on this computer");
+}
+
+/* the guest's tools went (the port closed, their hello lost): what came is kept for a resume */
+static void rx_lost(const char *why) {
+    if (S.rx_state == RX_ASKED) { S.rx_state = RX_NONE; S.rx_gid = 0; return; }
+    rx_end(VRS_PAUSED, -1, 0, why);
+}
+
+static void rx_tick(long long now) {
+    if (S.rx_state == RX_ASKED && now > S.rx_deadline) {
+        rx_accept(AGSA_BUSY, 0, NULL);
+        vlog("files from the guest: %s: no answer from the window: not now", S.rx_name);
+        S.rx_state = RX_NONE; S.rx_gid = 0;
+    }
+    /* the window went: stopped for now (the guest keeps the file and offers it again; what came is kept) */
+    if (S.rx_state > RX_ASKED && !rx_window_there()) rx_end(VRS_PAUSED, AGSD_LATER, 0, "the window went: stopped for now");
+}
+
 static void drain_lag(void) {
     if (!S.lag_buf) { S.lag_buf = malloc(AG_FRAME_MAX + AG_HEAD); S.lag_n = 0; if (!S.lag_buf) return; }
     ssize_t r = read(S.lag_fd, S.lag_buf + S.lag_n, AG_FRAME_MAX + AG_HEAD - S.lag_n);
@@ -6242,6 +6858,8 @@ static void drain_lag(void) {
                 S.lag_shell = (hw & AG_HELLO_SHELL) != 0;
                 S.lag_links = (hw & AG_HELLO_LINKS) != 0;
                 S.lag_notify = (hw & AG_HELLO_NOTIFY) != 0;
+                S.lag_send_ok = (hw & AG_HELLO_SEND) != 0;
+                if (!S.lag_send_ok) rx_lost("the guest's tools don't send files any more");
                 if (!S.lag_shell) shell_end("the guest's tools have no shell any more", 0);
                 /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
                  * again with "clipboard" once one is installed */
@@ -6262,7 +6880,7 @@ static void drain_lag(void) {
                             (S.lag_open && S.ag_windows ? VAC_OPEN : 0) | (S.lag_place && S.ag_windows ? VAC_PLACE : 0) |
                             (S.lag_extra && S.extra_avail ? VAC_EXTRA : 0) | (S.lag_extra && S.lag_extraoff ? VAC_EXTRA_OFF : 0) |
                             (S.lag_shell ? VAC_SHELL : 0) | (S.lag_links && S.m.guest_links ? VAC_LINKS : 0) |
-                            (S.lag_notify && S.m.guest_notify ? VAC_NOTIFY : 0);
+                            (S.lag_notify && S.m.guest_notify ? VAC_NOTIFY : 0) | (S.lag_send_ok && !S.m.guest_files_off && !S.m.profile_lock ? VAC_SEND : 0);
                 if (!S.lag_open && !S.lag_place) open_all_end();
                 host_hello(0);
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
@@ -6377,6 +6995,8 @@ static void drain_lag(void) {
             guest_note(&f);
         } else if ((f.kind == AGK_SHELL_DATA || f.kind == AGK_SHELL_ACK || f.kind == AGK_SHELL_CLOSE) && S.lag_hello && S.lag_shell) {
             shell_frame(&f);
+        } else if (f.kind >= AGK_SEND_OFFER && f.kind <= AGK_SEND_DONE && f.kind != AGK_SEND_ACCEPT && f.kind != AGK_SEND_ACK && S.lag_hello && S.lag_send_ok) {
+            rx_frame(&f);
         }
         /* other kinds: skipped, so either side can grow */
         memmove(S.lag_buf, S.lag_buf + k, S.lag_n - (size_t)k);
@@ -6614,7 +7234,7 @@ static void ex_reply(int kind, const JVal *root, const JVal *r, int ok) {
 
 static void handle_request(int ci, const VmMsg *m, int fd) {
     if (!vm_msg_valid(m, 1)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
-    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && m->type != VM_LINK && m->type != VM_EXEC && (m->type != VM_QMP || !S.dev_qmp) &&
+    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && m->type != VM_LINK && m->type != VM_EXEC && m->type != VM_RECV && !(m->type == VM_USB && m->a == 1) && (m->type != VM_QMP || !S.dev_qmp) &&
         !(m->type == VM_AGENT && m->a == VAG_TRANSFER)) { close(fd); fd = -1; }
     int alive = S.qemu > 0 && !S.qemu_done && S.qmp_up;
     switch (m->type) {
@@ -6625,6 +7245,7 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         send_to(ci, &s, -1);
         if (S.notice) { VmMsg n = vm_msg(VM_NOTICE, m->seq, S.notice, S.notice_code, 0, 0, S.notice_text); send_to(ci, &n, -1); }
         if (S.m.agent) { char t[VM_TEXT_MAX]; ag_state_text(t, sizeof t); VmMsg a = vm_msg(VM_AGENT_STATE, m->seq, S.ag_state, S.ag_caps, 0, 0, t); send_to(ci, &a, -1); }
+        usb_broadcast(ci, m->seq);
         return;
     }
     case VM_PAUSE:
@@ -6664,6 +7285,19 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (qmp_do("add_client", args, P_ADDCLIENT, ci, m->seq, -1, sv[0])) { close(sv[0]); reply(ci, m->seq, VME_BUSY, "busy"); }
         return;
     }
+    case VM_USB: {
+        if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
+        if (m->a == 2 || m->a == 3) { if (fd >= 0) close(fd); usb_rule(ci, m->seq, m->a == 2, m->text); return; }
+        if (m->a == 1) {
+            if (fd < 0) { reply(ci, m->seq, VME_BAD_REQUEST, "no descriptor"); return; }
+            usb_attach(ci, m->seq, fd, m->text);
+            close(fd);
+        } else {
+            if (fd >= 0) close(fd);
+            usb_detach(ci, m->seq, m->text);
+        }
+        return;
+    }
     case VM_CDROM: {
         if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
         if (S.cd_busy) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BUSY, "the drive is busy"); return; }
@@ -6673,6 +7307,35 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (S.gt_state) { S.gt_state = GT_NONE; S.gt_eject = 0; gt_caps(); }      /* the person changes the disc: not ours any more */
         cd_change(ci, m->seq, fd, m->text);
         if (fd >= 0) close(fd);
+        return;
+    }
+    case VM_RECV:
+        rx_answer(ci, m, fd);
+        return;
+    case VM_RECV_CANCEL:
+        if (fd >= 0) close(fd);
+        rx_cancel((uint32_t)m->a);
+        reply(ci, m->seq, VME_OK, "cancelled");
+        return;
+    case VM_FILE_CANCEL: {
+        if (fd >= 0) close(fd);
+        /* a drop that waits goes at once; the one being copied stops at its next step (fx_on_reply, fx_write_next) */
+        for (int i = 0; i < S.fxq_n; i++) if (S.fxq[i].seq == (uint32_t)m->a) {
+            reply(S.fxq[i].client, S.fxq[i].seq, VME_DENIED, "cancelled");
+            if (S.fxq[i].fd >= 0) close(S.fxq[i].fd);
+            memmove(S.fxq + i, S.fxq + i + 1, (size_t)(S.fxq_n - i - 1) * sizeof *S.fxq);
+            S.fxq_n--;
+            vlog("files: a waiting drop was cancelled");
+            reply(ci, m->seq, VME_OK, "cancelled");
+            return;
+        }
+        if (S.fx_step && S.fx.seq == (uint32_t)m->a) {
+            S.fx_cancel = 1;
+            if (S.fx_step == FX_XCOPY) { S.fx_retried = 1; fx_fail(VME_DENIED, "cancelled"); }
+            reply(ci, m->seq, VME_OK, "cancelling");
+            return;
+        }
+        reply(ci, m->seq, VME_WRONG_STATE, "no such drop");
         return;
     }
     case VM_NETCABLE: {
@@ -7116,13 +7779,18 @@ static void on_qmp_event(const JVal *root) {
         if (S.state == VS_RUNNING || S.state == VS_PAUSED) set_state(S.state, VR_GUEST_RESET, 0, "");
     } else if (!strcmp(ev, "GUEST_PANICKED")) { S.panic = 1; vlog("qemu: the guest panicked"); }
     else if (!strcmp(ev, "POWERDOWN")) vlog("qemu: power button pressed");
+    else if (!strcmp(ev, "DEVICE_DELETED")) {
+        const char *id = data ? json_str(data, "device") : NULL;
+        int slot = id && !strncmp(id, "usb", 3) && id[3] >= '0' && id[3] < '0' + VMUSB_PER_VM && !id[4] ? id[3] - '0' : -1;
+        if (slot >= 0 && S.usb[slot].state) usb_gone(slot);
+    }
     else if (!strcmp(ev, "VSERPORT_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL;
         int open = data ? json_bool(data, "open", 0) : 0;
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = S.lag_perf = 0; S.lag_shell = S.lag_links = S.lag_notify = 0; shell_end("the guest closed org.lordos.agent", 0); S.perf_said = 0; S.disp_n = 0; S.tablet = 0; S.tablet_far = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
+            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = S.lag_perf = 0; S.lag_shell = S.lag_links = S.lag_notify = 0; shell_end("the guest closed org.lordos.agent", 0); S.lag_send_ok = 0; rx_lost("the guest closed org.lordos.agent: what came is kept for when it offers the file again"); S.perf_said = 0; S.disp_n = 0; S.tablet = 0; S.tablet_far = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
@@ -7223,6 +7891,7 @@ static void on_qmp_reply(const JVal *root, int ok) {
         break;
     case P_JOBQ: if (S.snap_kind) snap_concluded(root, ok); break;
     case P_NET: break;                                  /* the old backend may already be gone */
+    case P_USB_ADD: case P_USB_DEL: usb_reply(p.kind, p.client, p.seq, ok, desc); break;
     case P_PINQ: pin_reply(ok ? json_get(root, "return") : NULL, ok, desc); break;
     case P_MICE: S.mice_q = 0; mice_answer(ok ? json_get(root, "return") : NULL, p.client, p.seq, desc); break;
     case P_MOUSE_SET:
@@ -7233,6 +7902,7 @@ static void on_qmp_reply(const JVal *root, int ok) {
         break;
     case P_NET_ADD: if (!ok && !S.net_err[0]) snprintf(S.net_err, sizeof S.net_err, "%s", desc); break;
     case P_NET_LAST: net_attached(ok, desc); break;
+    case P_XNIC: if (!ok) vlog("network: an extra card's passt wasn't taken: %s", desc); break;
     case P_SNAPSIZE: if (S.snap_kind == VSN_TAKE) snap_taken(root); break;
     case P_RESUME: if (!ok && !S.resume_err[0]) { snprintf(S.resume_err, sizeof S.resume_err, "%s", desc); kill(S.qemu, SIGKILL); S.killed = 1; } break;
     case P_MIGQ: {
@@ -7589,6 +8259,7 @@ static void loop(void) {
         if (S.lag_fd >= 0 && lag_out_off < lag_out_n) p[n - 1].events |= POLLOUT;
         WATCH(S.passt_pidfd, -10);
         WATCH(S.fx_cpipe, -12);
+        WATCH(S.rx_hpipe, -15);
         WATCH(S.sc_fd, -13);
         WATCH(S.vs_fd, -40);
         /* the agent's shell: read from lord-server only while the guest's window has room; written to while some waits */
@@ -7611,6 +8282,7 @@ static void loop(void) {
         if (S.ex_busy && S.ex_poll_at && (next < 0 || S.ex_poll_at < next)) next = S.ex_poll_at;
         if (S.ex_busy && S.ex_deadline && (next < 0 || S.ex_deadline < next)) next = S.ex_deadline;
         if (S.fx_poll_at && (next < 0 || S.fx_poll_at < next)) next = S.fx_poll_at;
+        if (S.rx_state == RX_ASKED && (next < 0 || S.rx_deadline < next)) next = S.rx_deadline;
         if (S.wi_poll_at && (next < 0 || S.wi_poll_at < next)) next = S.wi_poll_at;
         if (S.migq_next && (next < 0 || S.migq_next < next)) next = S.migq_next;
         if (S.qga_fd >= 0 && S.ag_next && (next < 0 || S.ag_next < next)) next = S.ag_next;
@@ -7651,6 +8323,7 @@ static void loop(void) {
         if (S.ex_busy && S.ex_deadline && now >= S.ex_deadline) ex_end(VME_INTERNAL, "the guest didn't say the program ended");
         if (S.inst_poll_at && now >= S.inst_poll_at) { char a[48]; S.inst_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.inst_pid); if (qga_do("guest-exec-status", a, AQ_INSTSTATUS)) S.inst_poll_at = now + 500; }
         fx_tick(now);
+        rx_tick(now);
         open_tick(now);
         wi_tick(now);
         host_stop_tick(now);
@@ -7705,6 +8378,7 @@ static void loop(void) {
             case -13: sc_serve(); break;
             case -40: vs_serve(); break;
             case -14: shell_pump(p[i].revents); break;
+            case -15: rx_hash_read(); break;
             default: {
                 int k = ci[i];
                 if (S.cl[k].fd < 0) break;
@@ -7738,6 +8412,7 @@ static void loop(void) {
     }
     if (S.keeper_fd >= 0) { close(S.keeper_fd); S.keeper_fd = -1; }
     if (S.keeper > 0) { waitpid(S.keeper, NULL, 0); S.keeper = 0; }
+    for (int i = 0; i < VM_EXTRA_NICS; i++) if (S.xnic_err[i] >= 0) { close(S.xnic_err[i]); S.xnic_err[i] = -1; }
     logind_close();
 }
 
@@ -7965,10 +8640,11 @@ static void discard_state(const char *dir) {
 
 static int connect_machine(const VmMachine *m);
 static int cmd_start(const char *dir, int argc, char **argv) {
-    int detach = 0, control = -1, discard = 0;
+    int detach = 0, control = -1, discard = 0, pidfd_to = -1;
     memset(&S, 0, sizeof S);
-    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = S.sh_fd = S.gt_fd = -1;
-    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = S.render_fd = S.render_qfd = -1;
+    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = S.sh_fd = S.gt_fd = S.rx_fd = S.rx_hpipe = -1;
+    for (int i = 0; i < VM_EXTRA_NICS; i++) S.xnic_err[i] = -1;
+    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = S.render_fd = S.render_qfd = S.vs_pidfd = S.vs_fd = S.vs_qemu_end = S.vs_qfd = S.vs_err = -1;
     for (int i = 0; i < 2 + VM_DATA_DISKS; i++) S.sess_fds[i] = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
@@ -7988,6 +8664,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         else if (!strcmp(argv[i], "--loadvm") && i + 1 < argc) { if (!vm_snap_tag_valid(argv[++i])) { fprintf(stderr, "lord-vm: --loadvm TAG\n"); return 2; } snprintf(S.loadvm, sizeof S.loadvm, "%s", argv[i]); }
         else if (!strcmp(argv[i], "--discard-state")) discard = 1;
         else if (!strcmp(argv[i], "--control-fd") && i + 1 < argc) control = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--pidfd-to") && i + 1 < argc) pidfd_to = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--credentials-file") && i + 1 < argc) { if (read_credentials(argv[++i])) return 2; }
         else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
     }
@@ -7997,6 +8674,15 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         if (control < 3 || getsockopt(control, SOL_SOCKET, SO_TYPE, &type, &l) || type != SOCK_SEQPACKET) { fprintf(stderr, "lord-vm: --control-fd must be a SOCK_SEQPACKET socket\n"); return 2; }
         fcntl(control, F_SETFD, FD_CLOEXEC);
         fcntl(control, F_SETFL, O_NONBLOCK);
+    }
+    if (pidfd_to >= 0) {
+        /* lord-server's socketpair for this start (a detached one): lord-vm sends a pidfd of itself over it once it is
+         * the process that serves the machine, so lord-server can vouch for it without /proc/<pid>/exe (Sentinela,
+         * vm/vmwatch.h); one message, then it's closed */
+        int type = 0;
+        socklen_t l = sizeof type;
+        if (pidfd_to < 3 || pidfd_to == control || getsockopt(pidfd_to, SOL_SOCKET, SO_TYPE, &type, &l) || type != SOCK_SEQPACKET) { fprintf(stderr, "lord-vm: --pidfd-to must be a SOCK_SEQPACKET socket\n"); return 2; }
+        fcntl(pidfd_to, F_SETFD, FD_CLOEXEC);
     }
     /* QEMU's user namespace: made now, while lord-vm is still dumpable (vmsandbox.h) */
     S.userns = vm_userns_open();
@@ -8048,6 +8734,23 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); dup2(null, 1); dup2(null, 2); if (null > 2) close(null); }
         log_stderr = 0;
+    }
+    if (pidfd_to >= 0) {
+        int me = (int)syscall(SYS_pidfd_open, getpid(), 0);
+        if (me >= 0) {
+            char one = 'p';
+            char cm[CMSG_SPACE(sizeof(int))];
+            memset(cm, 0, sizeof cm);
+            struct iovec io = { &one, 1 };
+            struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm, .msg_controllen = sizeof cm };
+            struct cmsghdr *h = CMSG_FIRSTHDR(&mh);
+            h->cmsg_level = SOL_SOCKET; h->cmsg_type = SCM_RIGHTS; h->cmsg_len = CMSG_LEN(sizeof(int));
+            memcpy(CMSG_DATA(h), &me, sizeof me);
+            if (sendmsg(pidfd_to, &mh, MSG_NOSIGNAL | MSG_DONTWAIT) != 1) vlog("start: lord-server didn't get this lord-vm's pidfd: %s", strerror(errno));
+            close(me);
+        }
+        close(pidfd_to);
+        pidfd_to = -1;
     }
     char p[PATH_MAX + 32];
     snprintf(p, sizeof p, "%s/log", S.dir);
@@ -8191,6 +8894,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         if (S.m.network == VM_NET_SHARED || S.m.network == VM_NET_HOSTONLY) {
             S.keeper = start_keeper(&S.keeper_fd);
             if (S.keeper < 0) { S.keeper = 0; vlog("network: no keeper: a passt that ends isn't replaced"); }
+            else if (S.m.n_extra_macs) xnic_attach();
         }
         logind_open();
         cpu_begin();
@@ -8458,8 +9162,8 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1, autom = -1, heads = 0, vk = -1;
-    int dispo = -1, bkp = -1, fwup = 0;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1, autom = -1, heads = 0, gfiles = -1, vk = -1;
+    int dispo = -1, bkp = -1, fwup = 0, usbc = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -8475,6 +9179,10 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     int boot[VM_BOOT_DEVS], nboot = -1, bmenu = -1;
     /* the sound's output and input (6.9): --sound-out, --sound-in NODE|default */
     const char *sout = NULL, *sin = NULL;
+    /* host USB devices that go in by themselves (6.6): --usb-auto VVVV:PPPP[:SERIAL], up to VM_USB_AUTO, replace the list;
+     * --usb-auto none empties it */
+    const char *uauto[VM_USB_AUTO];
+    int nuauto = 0, uauto_set = 0;
     /* Configure (5.5, schema 16): --cpu-model host|compatible; --mac new (a new random address of QEMU's 52:54:00 range for
      * the first card); --add-disk GB (one more empty data disk, disks/data-<n>.qcow2, up to VM_DATA_DISKS) */
     int cpum = -1, newmac = 0, adddisk = 0;
@@ -8507,6 +9215,13 @@ static int cmd_set(const char *dir, int argc, char **argv) {
             continue;
         }
         if (!strcmp(a, "--shares")) { if (strcmp(v, "none")) { fprintf(stderr, "lord-vm: --shares none\n"); return 2; } shares_set = 1; continue; }
+        if (!strcmp(a, "--usb-auto")) {
+            uauto_set = 1;
+            if (!strcmp(v, "none")) { nuauto = 0; continue; }
+            if (nuauto >= VM_USB_AUTO || !vm_usb_rule_valid(v)) { fprintf(stderr, "lord-vm: --usb-auto VVVV:PPPP[:SERIAL] (lowercase hex; at most %d) or none\n", VM_USB_AUTO); return 2; }
+            uauto[nuauto++] = v;
+            continue;
+        }
         /* sound (6.9): host-side choices, also while suspended (the guest's hardware doesn't change) */
         if (!strcmp(a, "--sound")) { sound = parse_enum(v, "off", "on"); if (sound < 0) { fprintf(stderr, "lord-vm: --sound on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--microphone")) { mic = parse_enum(v, "off", "on"); if (mic < 0) { fprintf(stderr, "lord-vm: --microphone on|off\n"); return 2; } continue; }
@@ -8531,11 +9246,13 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         if (!strcmp(a, "--backup")) { bkp = parse_enum(v, "off", "on"); if (bkp < 0) { fprintf(stderr, "lord-vm: --backup on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--firmware-update")) { fwup = parse_enum(v, "no", "yes"); if (fwup < 0) { fprintf(stderr, "lord-vm: --firmware-update yes\n"); return 2; } continue; }
         if (!strcmp(a, "--guest-links")) { glinks = parse_enum(v, "off", "on"); if (glinks < 0) { fprintf(stderr, "lord-vm: --guest-links on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--guest-files")) { gfiles = parse_enum(v, "off", "on"); if (gfiles < 0) { fprintf(stderr, "lord-vm: --guest-files on|off\n"); return 2; } continue; }
         /* All Displays (5.4): the virtio-gpu's outputs, 1 to VM_HEADS_MAX (hardware: refused while suspended) */
         if (!strcmp(a, "--heads")) { heads = (strlen(v) == 1 && v[0] >= '1' && v[0] <= '0' + VM_HEADS_MAX) ? v[0] - '0' : 0; if (!heads) { fprintf(stderr, "lord-vm: --heads 1 to %d\n", VM_HEADS_MAX); return 2; } continue; }
         if (!strcmp(a, "--guest-notify")) { gnote = parse_enum(v, "off", "on"); if (gnote < 0) { fprintf(stderr, "lord-vm: --guest-notify on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--usb")) { usbc = parse_enum(v, "off", "on"); if (usbc < 0) { fprintf(stderr, "lord-vm: --usb on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--volume")) {
             char *end = NULL;
             long x = strtol(v, &end, 10);
@@ -8585,7 +9302,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
         /* the graphics card changes with 2D or 3D: a saved state holds the other one's */
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || adddisk || newmac || (cpum >= 0 && cpum != m.cpu_model) || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (vk >= 0 && vk != m.vulkan) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu) || (heads && heads != (m.heads > 1 ? m.heads : 1)))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || adddisk || newmac || (cpum >= 0 && cpum != m.cpu_model) || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (vk >= 0 && vk != m.vulkan) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu) || (heads && heads != (m.heads > 1 ? m.heads : 1)) || (usbc >= 0 && usbc != m.usb))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     /* a new name (6.26): refused when another machine has it or, as the folder follows, when its folder's or transfer
      * folder's new name is taken; the same name again only brings the folder in line when it can */
@@ -8623,6 +9340,13 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (gnote >= 0) { m.guest_notify = gnote; if (gnote) m.schema = VM_SCHEMA; }
     if (heads) { m.heads = heads; if (heads > 1) m.schema = VM_SCHEMA; }
     if (autom >= 0) { m.automation = autom; if (autom) m.schema = VM_SCHEMA; }
+    if (gfiles >= 0) { m.guest_files_off = !gfiles; if (!gfiles) m.schema = VM_SCHEMA; }
+    if (usbc >= 0) { m.usb = usbc; if (usbc) m.schema = VM_SCHEMA; }
+    if (uauto_set) {
+        m.n_usb_auto = nuauto;
+        for (int k = 0; k < nuauto; k++) snprintf(m.usb_auto[k], sizeof m.usb_auto[k], "%s", uauto[k]);
+        if (nuauto) m.schema = VM_SCHEMA;
+    }
     if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
     if (cpum >= 0) { m.cpu_model = cpum; if (cpum) m.schema = VM_SCHEMA; }
     if (newmac) {
@@ -8838,7 +9562,14 @@ static int cmd_snapshot(const char *dir, int argc, char **argv) {
     else {
         VmSnap list[VM_SNAPS_MAX];
         int n = vm_snaps_load(real, list, VM_SNAPS_MAX), i = vm_snaps_find(list, n, tag);
-        if (i >= 0 && list[i].memory) { close(lock); fprintf(stderr, "lord-vm: %s holds the machine's memory: start it with --loadvm %s\n", tag, tag); return 4; }
+        if (i >= 0 && list[i].memory) {
+            /* its memory loads only into the hardware it ran on: that goes back first */
+            if (snap_settings_check(real, &m, tag, err, sizeof err)) { close(lock); fprintf(stderr, "lord-vm: %s\n", err); return 1; }
+            snap_settings_back(real, tag);
+            close(lock);
+            fprintf(stderr, "lord-vm: %s holds the machine's memory: start it with --loadvm %s\n", tag, tag);
+            return 4;
+        }
         rc = snap_revert_off(real, &m, tag, err, sizeof err);
     }
     close(lock);
@@ -8903,6 +9634,8 @@ static int copy_reflink(const char *from, const char *to) {
 
 /* qemu-img convert of a qcow2 (with its base when it has one), jailed: it reads the disk (and the base) and writes
  * only in out_dir. snap: a snapshot's tag to copy instead of the current state, or NULL */
+/* --compact --compress: the copy's clusters compressed (qemu-img convert -c, zlib), never with encryption (qcow2 can't) */
+static int qimg_compress;
 static int qimg_convert(const char *disk, const char *base, const char *snap, const char *out, const char *out_dir, char *err, size_t errlen) {
     JBuf b;
     jb_init(&b);
@@ -8918,6 +9651,8 @@ static int qimg_convert(const char *disk, const char *base, const char *snap, co
     int e = key_have();
     char *with[] = { QEMU_IMG, "convert", "-q", "-l", sn, "-O", "qcow2", e ? "-o" : b.p, e ? ENC_CREATE_OPTS : (char *)out, e ? b.p : NULL, (char *)out, NULL };
     char *without[] = { QEMU_IMG, "convert", "-q", "-O", "qcow2", e ? "-o" : b.p, e ? ENC_CREATE_OPTS : (char *)out, e ? b.p : NULL, (char *)out, NULL };
+    char *compressed[] = { QEMU_IMG, "convert", "-q", "-c", "-O", "qcow2", b.p, (char *)out, NULL };
+    if (qimg_compress && !snap && !e) { jail_read2 = NULL; int r = run_tool_in(compressed, err, errlen, disk, out_dir); jb_free(&b); return r; }
     jail_read2 = base && base[0] ? base : NULL;
     int r = run_tool_in(snap ? with : without, err, errlen, disk, out_dir);
     jail_read2 = NULL;
@@ -9180,11 +9915,18 @@ out:
     return rc;
 }
 
-/* lord-vm --compact DIR [--estimate]: the system disk rewritten without the space it no longer uses (6.4). The machine
- * must be off, without snapshots (they'd be lost), a saved session or a base. Under operation.json "compact": the new
- * file is made beside the old one, checked, and renamed over it. --estimate prints what it would take. */
+/* lord-vm --compact DIR [--estimate] [--compress]: the system disk rewritten without the space it no longer uses (6.4).
+ * The machine must be off, without snapshots (they'd be lost), a saved session or a base. Under operation.json
+ * "compact": the new file is made beside the old one, checked, and renamed over it. --estimate prints what it would
+ * take. --compress also compresses every cluster of the copy (qcow2's own zlib compression): smaller, and what the guest
+ * writes later is stored as usual; not for an encrypted machine (qcow2 can't have both). */
 static int cmd_compact(const char *dir, int argc, char **argv) {
-    int estimate = argc > 0 && !strcmp(argv[0], "--estimate");
+    int estimate = 0;
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(argv[i], "--estimate")) estimate = 1;
+        else if (!strcmp(argv[i], "--compress")) qimg_compress = 1;
+        else { fprintf(stderr, "lord-vm: --compact DIR [--estimate] [--compress]\n"); return 2; }
+    }
     char real[PATH_MAX], err[256];
     if (!realpath(dir, real)) { fprintf(stderr, "lord-vm: %s: %s\n", dir, strerror(errno)); return 1; }
     snprintf(S.dir, sizeof S.dir, "%s", real);
@@ -9192,6 +9934,7 @@ static int cmd_compact(const char *dir, int argc, char **argv) {
     if (vm_machine_load(real, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); return 1; }
     /* a raw disk gives space back by itself: the guest's discards punch holes in the file (6.4) */
     if (m.raw) { fprintf(stderr, "lord-vm: a raw disk needs no compaction: the guest's discards free its space\n"); return 1; }
+    if (m.encrypted && qimg_compress) { fprintf(stderr, "lord-vm: an encrypted machine's disk can't be compressed (qcow2 has no compressed encrypted clusters)\n"); return 1; }
     if (m.encrypted && !key_have()) { fprintf(stderr, "lord-vm: the machine is encrypted: its key is needed (--key-fd)\n"); return 1; }
     if (!m.encrypted && key_have()) key_wipe();
     char sys[PATH_MAX + 64], dd[PATH_MAX + 64], tmp[PATH_MAX + 64];
@@ -9244,7 +9987,7 @@ static int cmd_compact(const char *dir, int argc, char **argv) {
     vm_sync_dir(dd);
     vm_op_end(real);
     stat(sys, &sb);
-    printf("{\"compacted\":true,\"before\":%lld,\"after\":%lld}\n", before, (long long)sb.st_blocks * 512);
+    printf("{\"compacted\":true,\"compressed\":%s,\"before\":%lld,\"after\":%lld}\n", qimg_compress ? "true" : "false", before, (long long)sb.st_blocks * 512);
     rc = 0;
 out:
     close(lock);
@@ -9850,6 +10593,7 @@ static int imp_detect(const char *src, Imp *I, int want_arch, char *why, size_t 
 static int imp_machine(Imp *I, VmMachine *n, const VmHost *h, int devices, int network, int fw_over, int vcpus, int mem, char *why, size_t wn) {
     VmiMachine *m = &I->m;
     vm_machine_defaults(n, h, m->arch);
+    n->usb = 1;                         /* a USB controller for this computer's devices (6.6) */
     if (m->uuid[0]) snprintf(n->id, sizeof n->id, "%s", m->uuid);
     for (char *c = n->id; *c; c++) *c = (char)tolower((unsigned char)*c);
     if (!vm_uuid_valid(n->id)) vm_new_id(n->id);
@@ -11755,6 +12499,8 @@ static int cmd_import_lordvm(const char *src, int argc, char **argv) {
                 if (bad) { fprintf(stderr, "lord-vm: the key doesn't open this machine's disks\n"); rc = 5; goto out; }
             }
         }
+        /* another computer's devices aren't this one's: an exported machine's auto-connect rules stay behind (6.6) */
+        m.n_usb_auto = 0;
         vm_now_iso(m.updated);
         if (vm_machine_save(tmp, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
         if (rename(tmp, dreal)) { fprintf(stderr, "lord-vm: can't put the machine in place: %s\n", strerror(errno)); goto out; }
@@ -11790,16 +12536,19 @@ static int usage(void) {
             "                         [--heads 1-4]   (All Displays, 5.4: the guest's displays; while it is off)\n"
             "                         [--automation on|off]   (machines exec and cp may run programs in the guest: docs/VIRTUALIZATION.md 6.15)\n"
             "                         [--vulkan on|off]   (a 3D machine's guest gets Vulkan through venus: docs/VIRTUALIZATION.md 6.10)\n"
+            "                         [--guest-files on|off]   (files the guest sends land in this machine's quarantine folder; on by default)\n"
+            "                         [--usb on|off]   (a USB controller for this computer's devices, with the machine off: 6.6)\n"
+            "                         [--usb-auto VVVV:PPPP[:SERIAL] ...|none]   (host USB devices that go in by themselves while it runs: 6.6)\n"
             "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"
-            "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
+            "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--pidfd-to N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--render-node /dev/dri/renderDN|none]   (3D graphics: the GPU QEMU may use; none: 2D)\n"
             "                           [--resume-anyway] [--discard-state]\n"
             "       lord-vm --suspend DIR | --discard-state DIR | --agent DIR shutdown|timesync|install\n"
             "       lord-vm --snapshot DIR take NAME [TAG] | revert TAG | delete TAG | list   (and --start DIR --loadvm TAG)\n"
             "       lord-vm --clone DIR NEWDIR [--name N] [--duplicate] [--linked] [--from-snapshot TAG] [--hostname H | --keep-identity]\n"
-            "       lord-vm --compact DIR [--estimate]\n"
+            "       lord-vm --compact DIR [--estimate] [--compress]\n"
             "       lord-vm --import-plan SRC [--arch arm64|amd64]   (a machine of another virtualization app: what comes along)\n"
             "       lord-vm --import-machine SRC DIR [--name N] [--arch A] [--devices compat|virtio] [--network shared|isolated]\n"
             "                                        [--firmware uefi|bios] [--vcpus N] [--memory MB]\n"
@@ -11807,6 +12556,7 @@ static int usage(void) {
             "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"
             "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n"
             "       lord-vm --sha256 FILE   (an ISO's SHA-256, with progress lines)\n"
+            "       lord-vm --iso-probe MAX   (lord.vm.isoInfo: the ISO on fd 0, one fixed answer on fd 1, under seccomp strict mode)\n"
             "       lord-vm --group-create GROUPDIR --catalog-id ID --archive FILE --sha512 HEX [--release R] [--name N]   (a machine group from a verified archive)\n"
             "       lord-vm --group-fresh GROUPDIR [--gateway] [--archive FILE]   (Start Fresh: the workstation, and the gateway too, back to the verified base)\n"
             "       lord-vm --group-set GROUPDIR [--disposable on|off] [--fresh-gateway on|off]\n"
@@ -11845,6 +12595,52 @@ static int cmd_sha256(const char *path) {
     return 0;
 }
 
+/* lord-vm --iso-probe MAX [--strict-check]: what an ISO a person chose boots on (lord.vm.isoInfo, docs/VIRTUALIZATION.md
+ * 5.2), out of lord-server. fd 0: the ISO, opened by lord-server; fd 1: the answer, a pipe. The file is mapped, every
+ * other descriptor closed and the process enters seccomp strict mode (read, write, exit, sigreturn: no open, no mmap,
+ * no socket) before one byte of the ISO is parsed; the parser's few allocations come from a heap grown beforehand (glibc
+ * may not map memory under strict mode). It writes VMISO_ANSWER bytes and exits. A hostile ISO that breaks the parser
+ * gets a process that can only write those bytes to lord-server, which decodes them strictly (vmiso_answer_decode).
+ * --strict-check (tests): after strict mode, a forbidden call (getpid) that must kill it. */
+static int cmd_iso_probe(int argc, char **argv) {
+    char *e;
+    long max = argc >= 3 ? strtol(argv[2], &e, 10) : -1;
+    if (argc < 3 || *e || max < 0 || max > VMISO_READS) { fprintf(stderr, "lord-vm: --iso-probe MAX (0 to %d), the ISO on fd 0\n", VMISO_READS); return 2; }
+    int check = argc >= 4 && !strcmp(argv[3], "--strict-check");
+    struct stat st;
+    uint8_t ans[VMISO_ANSWER];
+    VmIso v;
+    memset(&v, 0, sizeof v);
+    const void *map = MAP_FAILED;
+    /* 1 TB at most: an ISO is far smaller; the mapping is virtual, read lazily */
+    if (!fstat(0, &st) && S_ISREG(st.st_mode) && st.st_size >= 17 * 2048 && st.st_size <= (1LL << 40))
+        map = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, 0, 0);
+    close(0);
+    int nul = open("/dev/null", O_RDWR | O_CLOEXEC);
+    if (nul >= 0 && nul != 2) { dup2(nul, 2); close(nul); }
+    syscall(SYS_close_range, 3, ~0u, 0);
+    prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+    prctl(PR_SET_DUMPABLE, 0);
+    /* the heap the parser needs, grown now: no mmap for large blocks, no trimming, room on top */
+    mallopt(M_MMAP_MAX, 0);
+    mallopt(M_TRIM_THRESHOLD, 256 << 20);
+    mallopt(M_TOP_PAD, 16 << 20);
+    void *warm = malloc((size_t)VMISO_DIR_MAX * 4);
+    if (warm) { memset(warm, 0, (size_t)VMISO_DIR_MAX * 4); free(warm); }
+    if (syscall(SYS_seccomp, SECCOMP_SET_MODE_STRICT, 0, NULL) && prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT)) { const char m[] = "lord-vm: no seccomp strict mode\n"; (void)!write(2, m, sizeof m - 1); syscall(SYS_exit, 3); }
+    if (check) syscall(SYS_getpid);     /* must not return: strict mode kills the process */
+    int rc = map != MAP_FAILED ? vmiso_probe_map(map, (uint64_t)st.st_size, &v, (unsigned)max) : -1;
+    vmiso_answer_encode(rc, &v, ans);
+    size_t o = 0;
+    while (o < sizeof ans) {
+        ssize_t w = write(1, ans + o, sizeof ans - o);
+        if (w <= 0) break;
+        o += (size_t)w;
+    }
+    syscall(SYS_exit, o == sizeof ans ? 0 : 1);
+    return 1;
+}
+
 int main(int argc, char **argv) {
     /* --key-fd N, anywhere after the command: an encrypted machine's key (above), taken out before the command's own
      * options are read */
@@ -11858,6 +12654,7 @@ int main(int argc, char **argv) {
         break;
     }
     if (argc < 3) return usage();
+    if (!strcmp(argv[1], "--iso-probe")) return cmd_iso_probe(argc, argv);
     if (!strcmp(argv[1], "--sha256")) return cmd_sha256(argv[2]);
     const char *cmd = argv[1], *dir = argv[2];
     int rest = argc - 3;

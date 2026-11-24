@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "huhifadhiwa kwenye Matokeo Yaliyonaswa",
   "prefs.tr.would.highlight": "huangazia “{text}”",
   "prefs.tr.param": "Kigezo",
-  "prefs.tr.regexFirst": "Andika usemi wa kawaida kwanza."
+  "prefs.tr.regexFirst": "Andika usemi wa kawaida kwanza.",
+  "guest.badge": "MGENI",
+  "guest.title": "Shell ndani ya {machine}"
 }

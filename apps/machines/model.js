@@ -915,7 +915,7 @@ export const machineProtectedOf = (entry, meta, homeProtected = false) =>
 // (xclip or wl-clipboard: lordos-guest's hello said "noclip")
 // shell: the tools start the agent's shell (6.18, tools 8 / w12); links, notify: they pass the guest's links and
 // notifications on, and this machine takes them (6.12); eventlog: a Windows guest's event logs come in (6.19)
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576, toolsDisc: 2097152 };
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576, toolsDisc: 2097152, send: 4194304 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -938,6 +938,8 @@ export function agentLines(agent, cfg) {
     // links and notifications from the guest (6.12): off unless Configure turned them on
     ['links', !cfg?.guestLinks ? 'off' : on && caps & AGENT_CAPS.links ? 'works' : on ? 'needsTools' : 'needsAgent'],
     ['notify', !cfg?.guestNotify ? 'off' : on && caps & AGENT_CAPS.notify ? 'works' : on ? 'needsTools' : 'needsAgent'],
+    // files from the guest (6.21, "Send to LordOS"): on unless Configure turned them off; the tools 10 / w13
+    ['sendFiles', cfg?.guestFiles === false ? 'off' : on && caps & AGENT_CAPS.send ? 'works' : on ? 'needsTools' : 'needsAgent'],
   ].filter(Boolean);
 }
 // the clipboard's line: 'off' (Configure), 'works', 'needsXclip' (the helper runs but the guest has no clipboard tool),
@@ -975,7 +977,7 @@ export const discCanCopy = (agent, cfg) => clipTo(cfg?.clipboard || 'off') && !!
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w12', linux: '9' };
+export const TOOLS_SHIPPED = { windows: 'w13', linux: '10' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older
@@ -1009,12 +1011,17 @@ export function toolsLine(agent, shipped = TOOLS_SHIPPED) {
 // Only when it's safe: the agent connected for TOOLS_SETTLE_MS and nothing on its way (files copying, the transfer
 // folder's setup, an app of apps mode opening, an install the person asked for). At most TOOLS_TRIES attempts per run of
 // the machine and version, TOOLS_BACKOFF_MS apart; an attempt without an answer in TOOLS_WAIT_MS failed. Off, or given
-// up: one notification per run and version, with Update.
+// up: one notification per run and version, with Update. Before the first attempt for a version, a snapshot of the
+// machine (6.2, "Auto-snapshot before a guest's tools upgrade"; with its memory, as it runs) when `snap` says the
+// machine can have one: act 'snapshot', once per run and version; the install follows once it's done or refused.
 export const TOOLS_SETTLE_MS = 20000;
 export const TOOLS_BACKOFF_MS = [2 * 60000, 10 * 60000];
 export const TOOLS_TRIES = 3;
 export const TOOLS_WAIT_MS = 10 * 60000;
-export const TOOLS_AUTO_IDLE = { want: '', since: 0, tries: 0, next: 0, pending: 0, done: 0, told: '' };
+export const TOOLS_AUTO_IDLE = { want: '', since: 0, tries: 0, next: 0, pending: 0, done: 0, told: '', snapped: '' };
+// may the update be preceded by a snapshot: snapshots exist for it (not raw disks, not a disposable session, not 3D or a
+// graphics card while it runs: lord-vm refuses those), and there's room for one more
+export const toolsSnapOk = ({ raw, disposable, gl, count, max = 64 } = {}) => !raw && !disposable && !gl && (count || 0) < max;
 // the machine's choice, else the default for all of them (on unless turned off)
 export const toolsAutoOn = (meta, defaults) => (typeof meta?.toolsAuto === 'boolean' ? meta.toolsAuto : defaults?.toolsAuto !== false);
 // an attempt that failed: the next one after its backoff, none after the last
@@ -1026,7 +1033,7 @@ export function toolsAutoFailed(s, now) {
 // busy (something on its way, see above), now. → { s, act: null | 'install' | 'notify', why: 'off' | 'failed' (with
 // notify), result: 'ok' | 'failed' (an attempt of ours ended) }. After 'install' the caller sends it and, when
 // lord-server refuses it at once, calls toolsAutoFailed.
-export function toolsAutoStep(s0, { agent, on, busy, now }, shipped = TOOLS_SHIPPED) {
+export function toolsAutoStep(s0, { agent, on, busy, now, snap = false }, shipped = TOOLS_SHIPPED) {
   let s = { ...TOOLS_AUTO_IDLE, ...(s0 || {}) };
   const inst = agent?.install || 0;
   // our attempt on its way: how it ended. lord.vm.agent sets the session's install to 1 as it sends, so a 2 or 3 after
@@ -1052,6 +1059,7 @@ export function toolsAutoStep(s0, { agent, on, busy, now }, shipped = TOOLS_SHIP
     return { s: { ...s, told: want }, act: 'notify', why: 'failed' };
   }
   if (s.tries >= TOOLS_TRIES || now < s.next || busy || inst === 1) return { s, act: null };
+  if (snap && !s.tries && s.snapped !== want) return { s: { ...s, snapped: want }, act: 'snapshot' };
   return { s: { ...s, tries: s.tries + 1, pending: now }, act: 'install' };
 }
 // the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
@@ -1362,6 +1370,20 @@ export function storageBar(st, images = []) {
   // an empty slice isn't shown (no "Disc images 0 MB")
   return [...parts, ['other', other]].filter(([, bytes]) => bytes > 0).map(([key, bytes]) => ({ key, bytes, frac: Math.min(1, bytes / total) }));
 }
+
+// "Delete Old Snapshots" (6.16): every snapshot but the newest (lord.vm.snaps' list is in the order they were taken; a
+// created time decides when two say otherwise). Nothing with one or none
+export function oldSnapshots(list) {
+  const xs = (Array.isArray(list) ? list : []).filter((s) => s && typeof s.tag === 'string');
+  if (xs.length < 2) return [];
+  const t = (s) => { const v = Date.parse(s.created || ''); return Number.isFinite(v) ? v : 0; };
+  const newest = xs.reduce((a, s, i) => (t(s) >= t(xs[a]) ? i : a), 0);
+  return xs.filter((s, i) => i !== newest);
+}
+
+// "Remove Unused" (6.16): the downloads no machine or group uses and that aren't a stopped download (catalog.js
+// downloadedImages' entries); one in a running machine's drive is used
+export const unusedImages = (imgs) => (Array.isArray(imgs) ? imgs : []).filter((x) => x && !x.partial && !(x.users || []).length && !(x.running || []).length);
 
 // ---- the resolution menu (5.3) ----
 
@@ -2017,3 +2039,35 @@ export function sectionsMatching(secs, q, textOf, fold = (s) => String(s || '').
   if (!words.length) return secs;
   return secs.filter((k) => { const t = fold(textOf(k)); return words.every((w) => t.includes(w)); });
 }
+
+// ---- host USB devices (docs/VIRTUALIZATION.md 6.6) ----
+// The Devices menu's rows from lord.vm.usbDevices() (this computer's devices) and the machine's poll (st.usb: what it holds,
+// its controller, its lock, its auto-connect rules). A hub is never shown; a device another machine holds, or that lord-server
+// won't offer (the session's own keyboard or mouse), is shown greyed with why. state: 'locked' (anonymity), 'nocontroller'
+// (machine.json's usb off: Configure turns it on with the machine off), 'empty' or 'list'.
+export const usbRule = (d) => `${d.vendor}:${d.product}${d.serial ? `:${d.serial}` : ''}`;
+export const usbName = (d) => String(d?.model || d?.maker || `${d?.vendor || '????'}:${d?.product || '????'}`).slice(0, 48);
+export function usbRows(devs, usb, sid) {
+  if (!usb || usb.locked) return { state: 'locked', rows: [] };
+  if (!usb.controller) return { state: 'nocontroller', rows: [] };
+  const held = new Set((usb.devices || []).map((d) => `${d.bus}-${d.dev}`));
+  const auto = usb.auto || [];
+  const rows = (devs || []).filter((d) => d && d.why !== 'vm.usbHub').map((d) => {
+    const on = held.has(`${d.bus}-${d.dev}`);
+    const other = !on && d.holder > 0 && d.holder !== sid;
+    const rule = usbRule(d), plain = `${d.vendor}:${d.product}`;
+    return { bus: d.bus, dev: d.dev, name: usbName(d), on, why: d.why || (other ? 'vm.usbOtherMachine' : ''), camera: !!d.camera, audio: !!d.audio,
+      storage: !!d.storage, rule, auto: auto.includes(rule) || auto.includes(plain), autoRule: auto.includes(rule) ? rule : auto.includes(plain) ? plain : rule };
+  });
+  return { state: rows.length ? 'list' : 'empty', rows };
+}
+// what the machine's USB devices capture now: the capture indicator's camera and microphone
+export const usbCamLive = (usb) => !!(usb?.devices || []).some((d) => d.camera);
+export const usbMicLive = (usb) => !!(usb?.devices || []).some((d) => d.audio);
+// an attach refused for want of LordOS's permission: the one to ask for ('' none)
+export const usbNeedsPerm = (code) => (code === 'vm.usbCameraPerm' ? 'camera' : code === 'vm.usbMicPerm' ? 'microphone' : '');
+// Configure's list of auto-connect rules, with the device's name when it is plugged in now
+export const usbAutoRows = (rules, devs) => (rules || []).map((r) => {
+  const d = (devs || []).find((x) => usbRule(x) === r || `${x.vendor}:${x.product}` === r);
+  return { rule: r, name: d ? usbName(d) : r };
+});

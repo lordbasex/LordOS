@@ -29,6 +29,9 @@
  *   PRLIMIT   pid 0 or QEMU's own (never another process's limits)
  *   TGKILL    QEMU's own pid (a signal to one of its threads: the vCPU kick)
  *   SECCOMP   never a filter with a listener (QEMU's own -sandbox adds one without)
+ *   USB       only for a machine that may get a host USB device (6.6, VmScOpts.usb: machine.json "usb", never one locked
+ *             for anonymity): what libusb in QEMU's usb-host was measured to call (2026-11-24, a UVC webcam through a
+ *             Debian 13 guest's capture); for any other machine the default (QEMU stops)
  *   EXECVEAT  the one exec: lord-vm lets the start's own through and stops QEMU at any later one (without a listener:
  *             lord-vm's descriptor number and AT_EMPTY_PATH, with Landlock's execute right on QEMU's binary and loader
  *             only); execve is not a row */
@@ -37,6 +40,8 @@
 
 /* both architectures */
 #define VM_SC_COMMON(X) \
+    /* libusb in QEMU's usb-host (6.6): its timeouts */ \
+    X(timerfd_create, USB) X(timerfd_settime, USB) X(timerfd_gettime, USB) \
     /* the hot paths: vCPU threads, the main loop, the block layer and its iothread, the D-Bus display */ \
     X(read, HOT) X(write, HOT) X(readv, HOT) X(writev, HOT) X(pread64, HOT) X(pwrite64, HOT) \
     X(preadv, HOT) X(pwritev, HOT) X(preadv2, HOT) X(pwritev2, HOT) X(ppoll, HOT) X(futex, HOT) \

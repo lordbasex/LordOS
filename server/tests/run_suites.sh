@@ -239,11 +239,14 @@ EOF
     if have node; then run "mem-figure-test (sdk/memfigure.js)" node tests/mem_figure_test.mjs; fi
     if have node; then run "openwith-model-test (sdk/openwithmodel.js, Files' Open with providers)" node tests/openwith_model_test.mjs; fi
     if have node; then run "vm-openwith-test (apps/machines/openwith.js, a machine in Open with)" node tests/vm_openwith_test.mjs; fi
+    if have node; then run "vm-xfer-test (apps/machines/xfer.js, apps/files/quarantine.js: the file copy panel, files from a machine)" node tests/vm_xfer_test.mjs; fi
+    if have node; then run "guest-apps-test (sdk/guestappsmodel.js, guest apps in the launcher)" node tests/guest_apps_test.mjs; fi
     if have node; then run "theme-gallery-test (sdk/themegallery.js, Settings → Appearance)" node tests/theme_gallery_test.mjs; fi
     if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
     if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
     if have node; then run "vm-group-model-test (apps/machines/model.js groupPlan: a machine group's start and stop order, its link)" node tests/vm_group_model_test.mjs; fi
     if have node; then run "vm-storage-model-test (apps/machines/storagemodel.js: key steps, recovery key, disposable, Export)" node tests/vm_storage_model_test.mjs; fi
+    if have node; then run "vm-usb-model-test (apps/machines/model.js: host USB devices' menu rows, rules, indicator, permissions)" node tests/vm_usb_model_test.mjs; fi
     if have node; then run "vm-group-ui-test (apps/machines/group.js and catalog.js: a group's one card, its menu, Start Fresh, its budget, the Whonix card)" node tests/vm_group_ui_test.mjs; fi
     if have node; then run "vm-profiles-test (apps/machines/profiles.js, systems.js: .lordprofile import, your systems, PNG logos, library chips)" node tests/vm_profiles_test.mjs; fi
     if have node; then run "photos-places-test (apps/photos/places.js)" node tests/photos_places_test.mjs; fi
@@ -453,6 +456,14 @@ EOF
         77) skip "vm-storage" "build/lord-vm, KVM, QEMU (qemu-img, qemu-io), swtpm, OVMF and python3" ;;
         *) bad "vm-storage (tests/vm_storage_test.sh, encryption, disposable sessions, Export, raw disks)"; tail -20 "$T/out" ;;
     esac
+    # snapshots' kept settings (put back, a disk added refused, a running machine's hardware) and Reclaim space's
+    # compression (tests/vm_snap_store_test.sh), real lord-vm, qemu-img and QEMU/KVM
+    bash tests/vm_snap_store_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-snap-store (tests/vm_snap_store_test.sh, snapshots' settings, compression)" ;;
+        77) skip "vm-snap-store" "build/lord-vm, KVM, QEMU (qemu-img, qemu-io), OVMF and python3" ;;
+        *) bad "vm-snap-store (tests/vm_snap_store_test.sh, snapshots' settings, compression)"; tail -20 "$T/out" ;;
+    esac
     # lordos-guest's clipboard tool (xclip, wl-clipboard, none: the hello says "noclip"), stub tools and a socket port
     sh tests/guest_clip_test.sh >"$T/out" 2>&1
     case $? in
@@ -474,6 +485,14 @@ EOF
         0) ok "guest-shell (tests/guest_shell_test.sh, lordos-guest's agent shell, links and notifications)" ;;
         77) skip "guest-shell" "build/lordos-guest and python3" ;;
         *) bad "guest-shell (tests/guest_shell_test.sh, lordos-guest's agent shell, links and notifications)" ;;
+    esac
+    # lordos-guest 9: "Send to LordOS" (6.21): the offer, flow control (it stops at the window), a resume after a lost
+    # connection, a prefix that differs, "not now" and "off"
+    sh tests/guest_send_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guest-send (tests/guest_send_test.sh, lordos-guest's Send to LordOS)" ;;
+        77) skip "guest-send" "build/lordos-guest and python3" ;;
+        *) bad "guest-send (tests/guest_send_test.sh, lordos-guest's Send to LordOS)" ;;
     esac
     # lordos-guest's performance profile on private buses: the real dconf-service, stand-ins for power-profiles-daemon
     # and the portal (tests/guest_perf_mock.py)

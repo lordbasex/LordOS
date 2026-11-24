@@ -12,7 +12,9 @@
  * AGK_NOTIFY frame, the helper parses it as lord-vm will and passes it on only when the host's hello said "links" or
  * "notify" (the machine allows them), answering one GSA_* byte. `lordos-guest --open-on-host URL` and
  * `lordos-guest --notify-host TITLE [BODY]` are that program (the link percent-encoded, ag_link_encode). The helper
- * sends nothing of its own: only what a program of this person asked for. */
+ * sends nothing of its own: only what a program of this person asked for (and, tools 10, the person's desktop notifications
+ * while the host takes them, gnotes.h). Tools 9: a frame of kind AGK_SEND_OFFER whose payload is a file's absolute path
+ * queues that file for the host (gsend.h, `lordos-guest --send-to-host FILE…`). */
 #ifndef LORDOS_GUEST_GSHELL_H
 #define LORDOS_GUEST_GSHELL_H
 
@@ -20,7 +22,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-enum { GSA_SENT = 0, GSA_REFUSED = 1, GSA_MALFORMED = 2, GSA_NOHOST = 3 };
+enum { GSA_SENT = 0, GSA_REFUSED = 1, GSA_MALFORMED = 2, GSA_NOHOST = 3, GSA_FULL = 4 };
 
 /* the shell for uid: 1 theirs (out), 0 /bin/sh (out). passwd, shells: other files for tests (NULL: /etc's) */
 int gshell_pick(uid_t uid, const char *passwd, const char *shells, char *out, size_t cap);

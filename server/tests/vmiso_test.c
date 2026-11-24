@@ -15,7 +15,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <sys/mman.h>
+#include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 static int pass, fail;
@@ -295,9 +298,34 @@ static int memfd_of(const uint8_t *b, size_t n) {
     if (fd < 0 || write(fd, b, n) != (ssize_t)n) { perror("memfd"); exit(2); }
     return fd;
 }
+/* the installed program's stand-in: build/lord-vm next to this test (run from server/) */
+static char lordvm[4096];
+static int oop = 0, oop_runs = 0, oop_same = 0;
+
+static int same(const VmIso *a, const VmIso *b) {
+    return a->iso9660 == b->iso9660 && a->udf == b->udf && !strcmp(a->label, b->label) && a->bios == b->bios && a->efi == b->efi &&
+           a->efi_named == b->efi_named && a->efi_pe == b->efi_pe && a->windows == b->windows;
+}
+
+/* every probe three ways: through the descriptor, over the mapped bytes (what lord-vm --iso-probe runs) and through the
+ * fixed answer's encoding; with oop also out of process, lord-vm under seccomp strict mode (vmiso_run): all must agree */
 static int probe(VmIso *v, size_t n) {
     int fd = memfd_of(img, n);
     int rc = vmiso_probe(fd, v, 0);
+    VmIso m, d;
+    int rm = vmiso_probe_map(img, n, &m, 0);
+    uint8_t ans[VMISO_ANSWER];
+    vmiso_answer_encode(rc, v, ans);
+    int rd = vmiso_answer_decode(ans, sizeof ans, &d);
+    if (rm != rc || (!rc && !same(v, &m))) { fail++; printf("FAIL  the mapped probe differs (rc %d/%d)\n", rc, rm); }
+    if (rd != (rc ? 1 : 0) || (!rc && !same(v, &d))) { fail++; printf("FAIL  the answer's round trip differs (rc %d, decode %d)\n", rc, rd); }
+    if (oop) {
+        VmIso o;
+        int ro = vmiso_run(lordvm, fd, 0, 5000, &o);
+        oop_runs++;
+        if (ro == (rc ? 1 : 0) && (rc || same(v, &o))) oop_same++;
+        else printf("FAIL  out of process: %d (in process %d) label \"%s\"/\"%s\"\n", ro, rc, o.label, v->label);
+    }
     close(fd);
     return rc;
 }
@@ -311,7 +339,10 @@ int main(int argc, char **argv) {
             int fd = open(argv[i], O_RDONLY | O_CLOEXEC);
             VmIso v;
             int rc = fd >= 0 ? vmiso_probe(fd, &v, 0) : -1;
+            VmIso o;
+            int ro = fd >= 0 && realpath("build/lord-vm", lordvm) ? vmiso_run(lordvm, fd, 0, 10000, &o) : -2;
             if (fd >= 0) close(fd);
+            printf("%s: out of process (lord-vm --iso-probe): %s\n", argv[i], ro == -2 ? "not run" : ro == (rc ? 1 : 0) && (rc || same(&v, &o)) ? "the same" : "DIFFERENT");
             if (rc) { printf("%s: not an ISO 9660 or UDF image\n", argv[i]); continue; }
             printf("%s: label \"%s\" iso9660 %d udf %d bios %d efi %d named %#x pe %#x windows %d arch \"%s\" reads %u\n", argv[i], v.label,
                    v.iso9660, v.udf, v.bios, v.efi, v.efi_named, v.efi_pe, v.windows, vmiso_arch(&v), v.reads);
@@ -320,6 +351,10 @@ int main(int argc, char **argv) {
     }
     int rounds = argc > 1 ? atoi(argv[1]) : 2000;
     VmIso v;
+    /* out of process (docs/VIRTUALIZATION.md 5.2): lord-server never parses an ISO itself; lord-vm --iso-probe does, under
+     * seccomp strict mode. With build/lord-vm here, every named image below is probed that way too */
+    if (realpath("build/lord-vm", lordvm) && !access(lordvm, X_OK)) oop = 1;
+    else printf("vmiso-test: no build/lord-vm: the out-of-process checks are skipped\n");
 
     build(IMG_ARM);
     T("arm64: an ISO", !probe(&v, sizeof img) && v.iso9660 && !v.udf);
@@ -419,6 +454,98 @@ int main(int argc, char **argv) {
     build(IMG_ARM);
     sec(24)[28] ^= 1;
     T("bad catalog checksum: ignored", !probe(&v, sizeof img) && !v.efi && v.efi_named == VMISO_AA64);
+
+    if (oop) {
+        T("out of process: every named image, the same answer as in process", oop_runs > 20 && oop_same == oop_runs);
+        oop = 0;
+        /* strict mode is really on: a forbidden call after it kills the probe (SIGKILL), before any byte is parsed */
+        build(IMG_ARM);
+        int fd = memfd_of(img, sizeof img);
+        pid_t ch = fork();
+        if (!ch) {
+            dup2(fd, 0);
+            int nul = open("/dev/null", O_WRONLY);
+            dup2(nul, 1);
+            char *a[] = { "lord-vm", "--iso-probe", "0", "--strict-check", NULL }, *e[] = { NULL };
+            execve(lordvm, a, e);
+            _exit(127);
+        }
+        int st = 0;
+        waitpid(ch, &st, 0);
+        T("strict mode: getpid after it kills the probe", WIFSIGNALED(st) && WTERMSIG(st) == SIGKILL);
+        /* a probe that never answers is killed at the time limit (a slow mount): a FIFO with no writer never gives a byte */
+        VmIso t;
+        T("the same image again: an answer", vmiso_run(lordvm, fd, 0, 5000, &t) == 0 && !strcmp(t.label, "MY_DISC"));
+        int pp[2];
+        if (!pipe(pp)) {
+            struct timespec t0, t1;
+            clock_gettime(CLOCK_MONOTONIC, &t0);
+            int rr = vmiso_run(lordvm, pp[0], 0, 400, &t);
+            clock_gettime(CLOCK_MONOTONIC, &t1);
+            long ms = (t1.tv_sec - t0.tv_sec) * 1000 + (t1.tv_nsec - t0.tv_nsec) / 1000000;
+            T("a pipe: no ISO, answered fast", rr == 1 && ms < 400);
+            close(pp[0]); close(pp[1]);
+        }
+        T("a relative program path: refused", vmiso_run("build/lord-vm", fd, 0, 1000, &t) == -1);
+        close(fd);
+        /* lord-server doesn't link the parser: only the answer's decoder (vmisoans.c) */
+        if (!access("build/lord-server", R_OK)) {
+            FILE *f = popen("nm build/lord-server 2>/dev/null | grep -cE ' (vmiso_probe|vmiso_probe_map|udf_probe|iso_tree|el_torito)$'", "r");
+            char line[32] = "";
+            if (f) { if (!fgets(line, sizeof line, f)) line[0] = 0; pclose(f); }
+            T("lord-server has no ISO parser in it", f && atoi(line) == 0);
+            f = popen("nm build/lord-server 2>/dev/null | grep -c ' vmiso_answer_decode$'", "r");
+            line[0] = 0;
+            if (f) { if (!fgets(line, sizeof line, f)) line[0] = 0; pclose(f); }
+            T("lord-server has the answer's decoder", f && atoi(line) == 1);
+        }
+    }
+
+    /* the answer's decoder, from bytes anyone could put in the pipe: anything off the format is refused whole */
+    {
+        build(IMG_WIN);
+        VmIso g, d;
+        int fd0 = memfd_of(img, sizeof img);
+        vmiso_probe(fd0, &g, 0);
+        close(fd0);
+        uint8_t a[VMISO_ANSWER], b[VMISO_ANSWER];
+        vmiso_answer_encode(0, &g, a);
+        T("decode: a good answer", vmiso_answer_decode(a, sizeof a, &d) == 0 && same(&g, &d));
+        T("decode: short", vmiso_answer_decode(a, sizeof a - 1, &d) == -1 && !d.label[0]);
+        T("decode: NULL", vmiso_answer_decode(NULL, sizeof a, &d) == -1);
+        memcpy(b, a, sizeof b); b[3] ^= 1;
+        T("decode: bad magic", vmiso_answer_decode(b, sizeof b, &d) == -1);
+        memcpy(b, a, sizeof b); b[8] |= 0x40;
+        T("decode: an unknown flag", vmiso_answer_decode(b, sizeof b, &d) == -1);
+        memcpy(b, a, sizeof b); b[12] |= 0x10;
+        T("decode: an unknown architecture", vmiso_answer_decode(b, sizeof b, &d) == -1);
+        memcpy(b, a, sizeof b); b[24] = 0x1b;
+        T("decode: a control character in the label", vmiso_answer_decode(b, sizeof b, &d) == -1);
+        memcpy(b, a, sizeof b); b[24 + 31] = 'X';
+        T("decode: bytes after the label's end", vmiso_answer_decode(b, sizeof b, &d) == -1);
+        memcpy(b, a, sizeof b); b[60] = 'X';
+        T("decode: the padding not zero", vmiso_answer_decode(b, sizeof b, &d) == -1);
+        vmiso_answer_encode(-1, &g, b);
+        T("decode: not an ISO", vmiso_answer_decode(b, sizeof b, &d) == 1 && !d.label[0] && !d.efi_pe);
+        b[24] = 'A';
+        T("decode: not an ISO with a label", vmiso_answer_decode(b, sizeof b, &d) == -1);
+        unsigned ok = 0;
+        for (int i = 0; i < 200000; i++) {
+            memcpy(b, a, sizeof b);
+            int ch = 1 + (int)(rnd() % 4);
+            for (int c = 0; c < ch; c++) b[rnd() % sizeof b] = (uint8_t)rnd();
+            if (rnd() % 16 == 0) for (size_t k = 0; k < sizeof b; k++) b[k] = (uint8_t)rnd();
+            int r = vmiso_answer_decode(b, sizeof b, &d);
+            if (r == 0) {
+                ok++;
+                int bad = 0;
+                for (int k = 0; d.label[k]; k++) if ((unsigned char)d.label[k] < 0x20 || (unsigned char)d.label[k] > 0x7e) bad = 1;
+                if (bad || strlen(d.label) > 32 || (d.efi_pe & ~(unsigned)VMISO_ARCH_ALL) || (d.efi_named & ~(unsigned)VMISO_ARCH_ALL)) { fail++; printf("FAIL  decode fuzz: a bad answer passed\n"); break; }
+            } else if (r == -1 && (d.label[0] || d.efi_pe || d.iso9660)) { fail++; printf("FAIL  decode fuzz: a refused answer left data\n"); break; }
+            (void)vmiso_arch(&d);
+        }
+        T("decode fuzz ran", ok > 0);
+    }
 
     /* fuzz: random bytes changed in each image (the first 700 KiB hold every structure), under ASan and UBSan */
     unsigned maxreads = 0;

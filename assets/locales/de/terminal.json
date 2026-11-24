@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "in „Erfasste Ausgabe“ aufbewahrt",
   "prefs.tr.would.highlight": "hebt „{text}“ hervor",
   "prefs.tr.param": "Parameter",
-  "prefs.tr.regexFirst": "Schreib zuerst den regulären Ausdruck."
+  "prefs.tr.regexFirst": "Schreib zuerst den regulären Ausdruck.",
+  "guest.badge": "GAST",
+  "guest.title": "Shell in {machine}"
 }

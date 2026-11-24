@@ -20,10 +20,10 @@ import { formatBytes } from './system.js';
 import { registerStatusItem, statusPanelAt } from './statusitems.js';
 import { Overlay } from './layers.js';
 import { Segmented } from './components.jsx';
-import { firewall, firewallState } from './monitor.js';
+import { firewall, firewallState, monitor } from './monitor.js';
 import { wm } from './windows.js';
 import { useLauncherApps } from './apps.js';
-import { COMPONENTS } from './netmodel.js';
+import { COMPONENTS, vmIdOf, componentLabel } from './netmodel.js';
 
 const SAMPLES = 300;                    // one per second: the last five minutes
 // What the bar shows ({ rx, tx } as short text): it changes only when the rounded rates do, so an
@@ -106,6 +106,7 @@ const Graph = memo(function Graph({ hist }) {
 
 function appLabel(id, launcher) {
   if (id === 'lordos') return t('monitor.lordos');
+  if (vmIdOf(id)) return componentLabel(t, id, monitor.machineNames([vmIdOf(id)]));
   if (COMPONENTS[id]) return t(COMPONENTS[id].label);
   const a = launcher.find((x) => x.id === id || `lpk:${x.id}` === id || `desktop:${x.id}` === id);
   return a?.name || String(id).replace(/^(desktop|lpk|flatpak):/, '');

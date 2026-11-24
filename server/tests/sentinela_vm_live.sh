@@ -5,14 +5,15 @@
 # disk, copied) started with `machines start --no-window`. A driver after the theme bundle logs what lord.vm.stats gives
 # Sentinela for it (verified by lord-server over lord-vm's socket: sandbox bits, the kernel's seccomp and no_new_privs,
 # the scope), waits for Sentinela's tick, and takes screenshots of the alerts (Settings → AI → Sentinela). Headless has no
-# session manager, so the machine's QEMU isn't in an app scope of a session: the "always" rule vmScope must fire, live,
-# for that machine, and vmSandbox must not (its sandbox is whole).
+# session manager, so the machine's QEMU isn't in an app scope of a session (cgMode none): vmSandbox names exactly the
+# missing cgroup, never "unverified", and vmScope (out of a scope it has) can't fire.
 #   tests/sentinela_vm_live.sh DEBIAN_NOCLOUD_QCOW2 OUT_DIR       (from server/, after make and npm run build; KVM host)
 # A test tool: not part of `make test`. Exit 77 without KVM, QEMU, unshare or the image.
-# First run, 2026-11-24 (amd64, KVM): it FAILS, and that is a real finding. lord-vm is non-dumpable since QEMU's namespaces
-# (2026-11-23), so lord-server can't read /proc/<lord-vm>/exe (a ptrace-mode check); vm_exe_is is false, the machine is
-# never "verified", and Sentinela raises vmSandbox ("proof that its engine is the machine's own") on every live machine.
-# The fix needs a decision on what attests lord-vm (docs/SENTINELA.md "Machines", open item).
+# First run, 2026-11-24 (amd64, KVM): it FAILED, a real finding. lord-vm is non-dumpable since QEMU's namespaces
+# (2026-11-23), so lord-server couldn't read /proc/<lord-vm>/exe; no machine was ever "verified" and Sentinela raised
+# vmSandbox ("unverified") on every live machine. Fixed the same day: lord-server holds a pidfd of every lord-vm it starts
+# (a detached start's lord-vm sends its own, --pidfd-to) and vouches for a socket's peer only by it (vm/vmwatch.h).
+# Headless has no session manager, so its machine has no scope: vmSandbox names "cgroup", and only that.
 cd "$(dirname "$0")/.." || exit 1
 IMG=${1:?usage: tests/sentinela_vm_live.sh DEBIAN_NOCLOUD_QCOW2 OUT_DIR}
 OUT=${2:?usage}
@@ -69,7 +70,13 @@ cat "$ROOT/themes/default/theme.bundle.js" - >"$T/theme.bundle.js" <<'EOF'
     log(`stats verified=${st.verified} sandbox=${st.sandbox} seccomp=${st.seccomp} noNewPrivs=${st.noNewPrivs} scope=${st.scope} cgMode=${st.cgMode} passt=${st.passt}`);
     let alerts = [];
     for (let i = 0; i < 60 && !alerts.some((a) => a.machine || /^vm/.test(a.rule || '')); i++) { await sleep(1000); alerts = sdk.sentinelaAlerts.get() || []; }
-    log(`alerts ${JSON.stringify(alerts.map((a) => ({ rule: a.rule, name: a.name })))}`);
+    // every read of the run stays verified (an unverified one twice in a row is itself a vmSandbox alert)
+    let ver = 0;
+    for (let i = 0; i < 6; i++) { await sleep(1000); if ((lord.vm.stats(m.dir) || {}).verified === true) ver++; }
+    log(`verified ${ver}/6`);
+    await sleep(6000);
+    alerts = sdk.sentinelaAlerts.get() || [];
+    log(`alerts ${JSON.stringify(alerts.map((a) => ({ rule: a.rule, name: a.name, missing: (a.ev && a.ev.missing) || null })))}`);
     await shot('notice');
     sdk.wm.open('settings', { args: { section: 'ai', page: 'sentinela', nonce: Date.now() } });
     await sleep(2500);
@@ -87,10 +94,16 @@ out=$(ns $E ./build/machines start Live --no-window 2>&1) && ok "machines start 
 for i in $(seq 1 300); do grep -aq 'SENT-LIVE done' "$D/home/.cache/lordos/shell.log" 2>/dev/null && break; sleep 0.5; done
 grep -ah 'SENT-LIVE' "$D/home/.cache/lordos/shell.log" | sed 's/.*SENT-LIVE/ /'
 L=$(grep -ah 'SENT-LIVE' "$D/home/.cache/lordos/shell.log")
-echo "$L" | grep -q "stats verified=true" && ok "lord-server verified the machine's engine (SO_PEERCRED, the installed lord-vm, its own QEMU)" || bad "stats not verified"
-echo "$L" | grep -q "seccomp=2 noNewPrivs=true" && ok "the kernel's seccomp and no_new_privs on QEMU" || bad "seccomp/no_new_privs as read: $(echo "$L" | grep stats)"
-echo "$L" | grep -q '"rule":"vmScope"' && ok "vmScope fired live (no session scope in a headless test)" || bad "no vmScope alert"
-echo "$L" | grep -q '"rule":"vmSandbox"' && bad "vmSandbox fired on a whole sandbox" || ok "no vmSandbox alert: the sandbox is whole"
+echo "$L" | grep -q "stats verified=true" && ok "lord-server verified the machine's engine (the pidfd it holds of the lord-vm it started, SO_PEERCRED, its own QEMU)" || bad "stats not verified"
+echo "$L" | grep -q "verified 6/6" && ok "every later read verified too" || bad "a later read wasn't verified: $(echo "$L" | grep 'verified [0-9]')"
+echo "$L" | grep -q "seccomp=2 noNewPrivs=1" && ok "the kernel's seccomp and no_new_privs on QEMU" || bad "seccomp/no_new_privs as read: $(echo "$L" | grep stats)"
+# headless has no session manager: no scope (cgMode none), so vmScope (QEMU out of a scope it has) can't fire, and
+# vmSandbox names exactly the missing cgroup; never "unverified" (the false alert before lord-server held pidfds)
+echo "$L" | grep -q 'cgMode=none' && ok "no scope headless (cgMode none)" || bad "cgMode: $(echo "$L" | grep stats)"
+echo "$L" | grep -q '"rule":"vmScope"' && bad "vmScope fired without a scope" || ok "no vmScope alert (no scope to be out of)"
+echo "$L" | grep -q 'unverified' && bad "an unverified alert: $(echo "$L" | grep alerts)" || ok "no unverified alert"
+echo "$L" | grep -q '"rule":"vmSandbox","name":"Live","missing":\["cgroup"\]' && ok "vmSandbox names only the cgroup headless lacks" || bad "vmSandbox: $(echo "$L" | grep alerts)"
+grep -aq 'no pidfd kept' "$D/server.log" "$D/home/.cache/lordos/shell.log" 2>/dev/null && bad "lord-server kept no pidfd" || ok "lord-server kept the lord-vm's pidfd"
 for k in 1 2; do [ -f "$D/home/shot-$k.png" ] && cp "$D/home/shot-$k.png" "$OUT/sentinela-vm-live-$k.png"; done
 ls "$OUT"/sentinela-vm-live-*.png 2>/dev/null
 grep -ai 'TypeError\|ReferenceError' "$D/home/.cache/lordos/shell.log" | tail -5

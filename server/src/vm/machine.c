@@ -3,6 +3,7 @@
 #include "../sec/json.h"
 #include "../doc/wire.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -30,6 +31,16 @@ static int fail(char *err, size_t n, int code, const char *fmt, ...) {
 }
 
 const char *vm_arch_name(int arch) { return arch == VM_ARCH_ARM64 ? "arm64" : arch == VM_ARCH_AMD64 ? "amd64" : "?"; }
+
+int vm_usb_rule_valid(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    if (n < 9 || n > VM_USB_RULE_MAX || s[4] != ':') return 0;
+    for (int i = 0; i < 9; i++) if (i != 4 && !((s[i] >= '0' && s[i] <= '9') || (s[i] >= 'a' && s[i] <= 'f'))) return 0;
+    if (n == 9) return 1;
+    if (s[9] != ':' || n == 10) return 0;
+    for (const char *p = s + 10; *p; p++) if (!isalnum((unsigned char)*p) && *p != '.' && *p != '_' && *p != '-') return 0;
+    return 1;
+}
 
 int vm_uuid_valid(const char *s) {
     if (!s || strlen(s) != 36) return 0;
@@ -560,6 +571,7 @@ static int check_member(const VmMachine *m, char *err, size_t n) {
         /* All Displays would tell the guest how many displays this computer has, and their sizes */
         if (m->heads > 1) return fail(err, n, VM_E_RANGE, "locked for anonymity: several displays");
         if (m->automation) return fail(err, n, VM_E_RANGE, "locked for anonymity: automation");
+        if (m->n_usb_auto || m->usb) return fail(err, n, VM_E_RANGE, "locked for anonymity: USB devices");
     }
     return VM_OK;
 }
@@ -676,8 +688,18 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 19 && m->heads > 1) return fail(err, n, VM_E_FIELD, "heads needs schema 19");
     /* one picture per output needs virtio-gpu's own: not an Intel vGPU's, and only on a machine with a window */
     if (m->heads > 1 && (m->vgpu || m->display != VM_DISPLAY_WINDOW)) return fail(err, n, VM_E_RANGE, "several displays need virtio graphics and a window");
+    if (m->guest_files_off & ~1) return fail(err, n, VM_E_RANGE, "guest_files is true or false");
+    if (m->schema < 20 && m->guest_files_off) return fail(err, n, VM_E_FIELD, "guest_files needs schema 20");
+    if (m->n_usb_auto < 0 || m->n_usb_auto > VM_USB_AUTO) return fail(err, n, VM_E_RANGE, "at most %d usb_auto rules", VM_USB_AUTO);
+    if (m->schema < 21 && m->n_usb_auto) return fail(err, n, VM_E_FIELD, "usb_auto needs schema 21");
+    if (m->usb & ~1) return fail(err, n, VM_E_RANGE, "usb is true or false");
+    if (m->schema < 21 && m->usb) return fail(err, n, VM_E_FIELD, "usb needs schema 21");
+    for (int i = 0; i < m->n_usb_auto; i++) {
+        if (!vm_usb_rule_valid(m->usb_auto[i])) return fail(err, n, VM_E_RANGE, "usb_auto: vendor:product[:serial], lowercase hex");
+        for (int k = 0; k < i; k++) if (!strcmp(m->usb_auto[i], m->usb_auto[k])) return fail(err, n, VM_E_RANGE, "usb_auto: the same rule twice");
+    }
     if (m->vulkan & ~1) return fail(err, n, VM_E_RANGE, "vulkan is true or false");
-    if (m->schema < 21 && m->vulkan) return fail(err, n, VM_E_FIELD, "vulkan needs schema 21");
+    if (m->schema < 22 && m->vulkan) return fail(err, n, VM_E_FIELD, "vulkan needs schema 22");
     if (m->vulkan && m->graphics != VM_GFX_3D) return fail(err, n, VM_E_RANGE, "vulkan needs graphics 3d");
     if (m->cpu_pin < VM_PIN_DEFAULT || m->cpu_pin > VM_PIN_AUTO) return fail(err, n, VM_E_RANGE, "cpu_pin is off or auto");
     if (m->schema < 13 && m->cpu_pin) return fail(err, n, VM_E_FIELD, "cpu_pin needs schema 13");
@@ -833,7 +855,8 @@ static const char *const KEYS[] = {
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
-    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation", "cpu_model", "heads", "vulkan", NULL,
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation", "cpu_model", "heads",
+    "guest_files", "usb_auto", "usb", "vulkan", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -1135,7 +1158,27 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         m->heads = 1;
         if ((r = get_opt_int(o, "heads", &m->heads, err, n))) goto out;
         if (json_get(o, "heads") && m->heads < 1) { r = fail(err, n, VM_E_RANGE, "heads is 1 to %d", VM_HEADS_MAX); goto out; }
-        /* schema 21: missing means no Vulkan (venus, 6.10) */
+        /* schema 20: missing means files from the guest are taken */
+        const JVal *gf = json_get(o, "guest_files");
+        if (gf && gf->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "guest_files must be true or false"); goto out; }
+        m->guest_files_off = gf ? !json_bool(o, "guest_files", 1) : 0;
+        /* schema 21: missing means no USB controller and no rule (6.6) */
+        const JVal *uc = json_get(o, "usb");
+        if (uc && uc->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "usb must be true or false"); goto out; }
+        m->usb = uc ? json_bool(o, "usb", 0) : 0;
+        const JVal *ua = json_get(o, "usb_auto");
+        if (ua) {
+            if (ua->type != J_ARR) { r = fail(err, n, VM_E_FIELD, "usb_auto must be a list"); goto out; }
+            if (ua->len > VM_USB_AUTO) { r = fail(err, n, VM_E_RANGE, "at most %d usb_auto rules", VM_USB_AUTO); goto out; }
+            for (const JVal *e = ua->kid; e; e = e->next) {
+                if (e->type != J_STR || e->len > VM_USB_RULE_MAX || strlen(e->str) != e->len || !vm_usb_rule_valid(e->str)) {
+                    r = fail(err, n, VM_E_RANGE, "usb_auto: vendor:product[:serial], lowercase hex");
+                    goto out;
+                }
+                snprintf(m->usb_auto[m->n_usb_auto++], sizeof m->usb_auto[0], "%s", e->str);
+            }
+        }
+        /* schema 22: missing means no Vulkan (venus, 6.10) */
         const JVal *vk = json_get(o, "vulkan");
         if (vk && vk->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "vulkan must be true or false"); goto out; }
         m->vulkan = vk ? json_bool(o, "vulkan", 0) : 0;
@@ -1277,7 +1320,14 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 17 && m->automation) jb_raw(&b, ",\n  \"automation\": true");
     if (m->schema >= 18 && m->cpu_model == VM_CPU_COMPAT) jb_raw(&b, ",\n  \"cpu_model\": \"compatible\"");
     if (m->schema >= 19 && m->heads > 1) jb_printf(&b, ",\n  \"heads\": %d", m->heads);
-    if (m->schema >= 21 && m->vulkan) jb_raw(&b, ",\n  \"vulkan\": true");
+    if (m->schema >= 20 && m->guest_files_off) jb_raw(&b, ",\n  \"guest_files\": false");
+    if (m->schema >= 21 && m->usb) jb_raw(&b, ",\n  \"usb\": true");
+    if (m->schema >= 21 && m->n_usb_auto) {
+        jb_raw(&b, ",\n  \"usb_auto\": [");
+        for (int i = 0; i < m->n_usb_auto; i++) { if (i) jb_raw(&b, ", "); jb_str(&b, m->usb_auto[i]); }
+        jb_raw(&b, "]");
+    }
+    if (m->schema >= 22 && m->vulkan) jb_raw(&b, ",\n  \"vulkan\": true");
     if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
     if (m->schema >= 14 && m->group[0]) {
         jb_raw(&b, ",\n  \"group\": "); jb_str(&b, m->group);

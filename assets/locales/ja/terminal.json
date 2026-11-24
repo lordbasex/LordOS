@@ -562,5 +562,7 @@
   "prefs.tr.would.capture": "キャプチャした出力に保存",
   "prefs.tr.would.highlight": "「{text}」を強調表示",
   "prefs.tr.param": "パラメータ",
-  "prefs.tr.regexFirst": "先に正規表現を入力してください。"
+  "prefs.tr.regexFirst": "先に正規表現を入力してください。",
+  "guest.badge": "ゲスト",
+  "guest.title": "{machine} 内のシェル"
 }
