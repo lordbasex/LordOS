@@ -254,6 +254,25 @@ build/guest-dbus-test: tests/guest_dbus_test.c ../tools/guest/dbusmin.c ../tools
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/guest_dbus_test.c ../tools/guest/dbusmin.c ../tools/guest/perf.c
 	./$@ || { rm -f $@; exit 1; }
+# the agent channel's parsers (vm/vmagent.c), both ends, under structured mutation: well-formed payloads from the
+# writers changed byte by byte, what each takes checked in bounds; a stream of frames cut anywhere (docs/VIRTUALIZATION.md 8)
+test: build/agent-fuzz-test
+build/agent-fuzz-test: tests/agent_fuzz_test.c src/vm/vmagent.c src/vm/vmagent.h src/pkg/crypto.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/agent_fuzz_test.c src/vm/vmagent.c src/pkg/crypto.c
+	./$@ || { rm -f $@; exit 1; }
+# lordos-guest against hostile peers: the host's frames, the guest's lord-server, an X display, the buses and local
+# programs at once, seeded and mutated, with the helper built with ASan and UBSan (as a user namespace's root, where no
+# shell opens); what it sends the host must parse. About 25 s
+GUEST_ASAN_SRC := ../tools/guest/lordos-guest.c ../tools/guest/gshell.c ../tools/guest/x11clip.c ../tools/guest/perf.c ../tools/guest/dbusmin.c ../tools/guest/gsend.c ../tools/guest/gnotes.c src/vm/vmagent.c src/pkg/crypto.c
+test: build/guest-fuzz
+build/lordos-guest-asan: $(GUEST_ASAN_SRC) ../tools/guest/gshell.h ../tools/guest/x11clip.h ../tools/guest/perf.h ../tools/guest/dbusmin.h ../tools/guest/gsend.h ../tools/guest/gnotes.h src/vm/vmagent.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ $(GUEST_ASAN_SRC)
+build/guest-fuzz: tests/guest_fuzz.c ../tools/guest/dbusmin.c src/vm/vmagent.c src/pkg/crypto.c build/lordos-guest-asan
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/guest_fuzz.c ../tools/guest/dbusmin.c src/vm/vmagent.c src/pkg/crypto.c
+	./$@ build/lordos-guest-asan 2>build/guest-fuzz.err || { cat build/guest-fuzz.err; rm -f $@; exit 1; }
 
 # lord-server's side: lord.vm (ui/js_vm.c), machine.json reading, and the admin actions vm-enable and vm-kvm
 VM_SRV_SRC := src/ui/js_vm.c src/vm/vmkeysrv.c src/vm/vmexport.c src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmrecv.c src/vm/vmpin.c src/vm/vmisoans.c

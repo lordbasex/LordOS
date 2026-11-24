@@ -110,9 +110,9 @@ static int cookie(const char *dpy, uint8_t out[16]) {
     return found;
 }
 
-/* waits for count bytes of the server's answer (setup, a reply), up to 2 s */
-static int wait_in(size_t count) {
-    long long end = mono() + 2000;
+/* waits for count bytes of the server's answer (setup, a reply) until end (CLOCK_MONOTONIC ms). The caller's deadline
+ * covers all its reads: a display that keeps sending events and never the reply can't hold the helper longer */
+static int wait_in(size_t count, long long end) {
     while (in_n < count) {
         if (count > sizeof in) return -1;
         struct pollfd q = { xfd, POLLIN, 0 };
@@ -128,7 +128,7 @@ static void consume(size_t k) { memmove(in, in + k, in_n - k); in_n -= k; }
 
 static int xconnect(const char *disp, char num[16]) {
     const char *p = disp;
-    if (!strncmp(p, "unix:", 5)) p += 4;
+    if (!strncmp(p, "unix:", 5)) p += p[5] == '/' ? 5 : 4;     /* unix:/path is that path; unix:N is :N */
     if (*p == '/') {                    /* a socket's path (some launchers pass that) */
         const char *x = strrchr(p, 'X');
         snprintf(num, 16, "%.15s", x ? x + 1 : "0");
@@ -163,12 +163,13 @@ static uint32_t intern(const char *name) {
     w16(h + 4, (uint32_t)n);
     uint16_t want = (uint16_t)(seq + 1);
     if (request(h, 8, name, n)) return 0;
-    /* replies and events in order: only this reply matters during setup */
+    /* replies and events in order: only this reply matters during setup, and it comes within 2 s */
+    long long end = mono() + 2000;
     for (;;) {
-        if (wait_in(32)) return 0;
+        if (wait_in(32, end)) return 0;
         uint8_t t = in[0];
         size_t len = 32 + (t == 1 ? (size_t)r32(in + 4) * 4 : 0);
-        if (wait_in(len)) return 0;
+        if (wait_in(len, end)) return 0;
         uint32_t v = r32(in + 8);
         int mine = (t == 1 || t == 0) && r16(in + 2) == want;
         consume(len);
@@ -205,9 +206,10 @@ int xc_open(void) {
     w16(h + 8, auth ? 16 : 0);
     in_n = 0;
     uint8_t name[20] = "MIT-MAGIC-COOKIE-1";
-    if (send_all(h, 12) || (auth && (send_all(name, 20) || send_all(ck, 16))) || wait_in(8)) { xc_close(); return -1; }
+    long long end = mono() + 2000;
+    if (send_all(h, 12) || (auth && (send_all(name, 20) || send_all(ck, 16))) || wait_in(8, end)) { xc_close(); return -1; }
     size_t more = (size_t)r16(in + 6) * 4;
-    if (in[0] != 1 || wait_in(8 + more) || more < 32) { fprintf(stderr, "lordos-guest: the X display refused the connection\n"); xc_close(); return -1; }
+    if (in[0] != 1 || wait_in(8 + more, end) || more < 32) { fprintf(stderr, "lordos-guest: the X display refused the connection\n"); xc_close(); return -1; }
     const uint8_t *s = in + 8;
     uint32_t base = r32(s + 4), mask = r32(s + 8);
     uint16_t vlen = r16(s + 16), mreq = r16(s + 18);
