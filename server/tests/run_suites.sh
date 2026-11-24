@@ -858,6 +858,11 @@ EOF
     if [ -x build/lord-web ] && have python3 && have bwrap && have xdg-dbus-proxy; then
         run "web-probe-test (lord-web --probe)" python3 -I tests/web_probe_test.py build/lord-web
     else skip "web-probe-test" "wpe-webkit-2.0 (build/lord-web), bubblewrap, xdg-dbus-proxy and python3"; fi
+    # (in development) lord-web's view backend alone (src/web/webback.h, legacy or WPEPlatform, the one mk/web.mk built):
+    # a local page's pixels, a click, keys and the wheel reaching its listeners, a resize, scale 2, hidden and shown
+    if [ -x build/web-backend-test ] && have bwrap && have xdg-dbus-proxy; then
+        run "web-backend-test ($(cat build/gen/web_backend 2>/dev/null) backend)" build/web-backend-test
+    else skip "web-backend-test" "wpe-webkit-2.0 (build/web-backend-test), bubblewrap and xdg-dbus-proxy"; fi
     # (0.8.8.6) Claude Code in the Terminal's footer: the status line bridge and the footer's model
     run "claude-bridge-test (lord-claude-status)" sh tests/claude_bridge_test.sh
     if have node; then run "terminal-claude-test (apps/terminal/claude.js)" node tests/terminal_claude_test.mjs
