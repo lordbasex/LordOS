@@ -40,21 +40,21 @@ recomputes both from the rows; the arithmetic:
 |---|---:|---:|---:|---:|---:|---:|
 | A. Engine, lifecycle, sandbox, display | 14 | 22 | 92.05 | 92 % | 14 × 92 % = 12.88 | 78 % |
 | B. Getting a system in (cards, unattended, import) | 12 | 13 | 87.85 | 88 % | 12 × 88 % = 10.56 | 76 % |
-| C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 91.00 | 91 % | 11 × 91 % = 10.01 | 75 % |
+| C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 95.17 | 95 % | 11 × 95 % = 10.45 | 75 % |
 | D. Snapshots, clones, storage | 9 | 6 | 85.00 | 85 % | 9 × 85 % = 7.65 | 60 % |
-| E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 80 % |
+| E. Network | 6 | 4 | 88.75 | 89 % | 6 × 89 % = 5.34 | 80 % |
 | F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 56.00 | 56 % | 6 × 56 % = 3.36 | 56 % |
 | G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 9 | 76.67 | 77 % | 12 × 77 % = 9.24 | 68 % |
 | H. Graphics (virgl, GVT-g, venus, passthrough) | 7 | 8 | 46.25 | 46 % | 7 × 46 % = 3.22 | 46 % |
 | I. Guest tools and agent (state, shell, logs) | 7 | 6 | 90.83 | 91 % | 7 × 91 % = 6.37 | 75 % |
 | J. Command line and automation | 3 | 2 | 92.50 | 93 % | 3 × 93 % = 2.79 | 48 % |
-| K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 88.75 | 89 % | 3 × 89 % = 2.67 | 61 % |
+| K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 91.25 | 91 % | 3 × 91 % = 2.73 | 61 % |
 | L. Privacy and security model | 4 | 7 | 85.71 | 86 % | 4 × 86 % = 3.44 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **110** | | | **81.22 → 81 %** | 69 % |
+| **Total** | **100** | **110** | | | **82.26 → 82 %** | 69 % |
 
-Σ = 12.88 + 10.56 + 10.01 + 7.65 + 4.80 + 3.36 + 9.24 + 3.22 + 6.37 + 2.79 + 2.67 + 3.44 + 2.58 + 1.65 = 81.22, rounded **81 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
+Σ = 12.88 + 10.56 + 10.45 + 7.65 + 5.34 + 3.36 + 9.24 + 3.22 + 6.37 + 2.79 + 2.73 + 3.44 + 2.58 + 1.65 = 82.26, rounded **82 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); the rest of guest → host links (G, +0.3); the file copy panel with drag out, USB, then camera and printers (G and F, +1.2
@@ -122,7 +122,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 |---|---|---:|---|---|
 | Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows on amd64 (4.1, 5.2) | ✅ | 100 | `assets/machines/systems.json`, `catalog.js`, `vmunattend.c` (`kali`); `vmcatalog-test`, `vm_catalog_test.mjs`, `vmunattend-test` | Kali runs end to end with its own unattended install (*in development*): amd64 to the Xfce desktop in 36 min 27 s, the Pi 5 console in 11 min 5 s, 2026-11-24 (3.9, "The cards run end to end") (was 95: Kali had no unattended install) |
 | Makers' OpenPGP signatures, SHA-256, resumed downloads, removal (3.9) | ✅ | 100 | `vmcatalog.c`, `vmimage_admin.c`, `pgp.h`; `http-resume-test`, `http-retry-test` | A redirect refused with 403 or 5xx starts again from the original URL (*in development*) |
-| Any ISO, recognized (5.2) | ✅ | 95 | `vm/vmiso.c`, `js_vm.c` `isoInfo`, `model.js` `isoArch`, `assistant.jsx` (the ISO tile's drop); `vmiso-test` (ASan, UBSan, fuzz), `vm_model_test.mjs` | *In development*: the architecture from the UEFI boot files' PE headers (ISO 9660, UDF, the El Torito ESP), install discs by `sources/install.*`, the name only when they say nothing (`archFrom`); an `.iso` dropped on Use an ISO picks it. Checked with real ISOs (Alpine aarch64 named `mysystem.iso`, Ubuntu Server 26.04.1, LordOS 0.8.9, an install-disc evaluation ISO). The drop has no end-to-end UI test (was 85: only the 32-byte label was read) |
+| Any ISO, recognized (5.2) | ✅ | 95 | `vm/vmiso.c` (run only in `lord-vm --iso-probe`, seccomp strict mode), `vm/vmisoans.c` (`vmiso_run`, `vmiso_answer_decode`), `js_vm.c` `isoInfo`, `model.js` `isoArch`, `assistant.jsx` (the ISO tile's drop); `vmiso-test` (ASan, UBSan, fuzz; out of process, strict mode, the answer's decoder fuzzed), `vm_model_test.mjs` | *In development*: the hostile ISO is parsed out of lord-server, in `lord-vm --iso-probe` under seccomp strict mode, and only a fixed 64-byte answer comes back (2026-11-24; the same answers out of process for LordOS 0.8.8 amd64 and arm64, virtio-win 0.1.271 and an install-disc ISO). The architecture from the UEFI boot files' PE headers (ISO 9660, UDF, the El Torito ESP), install discs by `sources/install.*`, the name only when they say nothing (`archFrom`); an `.iso` dropped on Use an ISO picks it. Checked with real ISOs (Alpine aarch64 named `mysystem.iso`, Ubuntu Server 26.04.1, LordOS 0.8.9, an install-disc evaluation ISO). The drop has no end-to-end UI test (was 85: only the 32-byte label was read) |
 | Unattended Linux: Debian and Ubuntu desktops to login (3.9) | ✅ | 100 | `vmunattend.c`; `vmunattend-test`; VM 116, 2026-11-07 |  |
 | Unattended Fedora to login, Ubuntu console, the arm64 cards on the Pi | ✅ | 95 | `vmunattend.c` (`VMU_KICKSTART`, `xconfig`, `custom-environment`), `systems.json` (arm64 `append`), `catalog.js` `unattendedOf`; `vmunattend-test`, `vm_catalog_test.mjs` | Fedora 45 Workstation to GDM and GNOME (21 min 47 s) and Ubuntu 26.04.1 console to login (10 min 40 s) on amd64; Debian 13.8, Fedora 45 and Kali consoles and LordOS on the Pi 5, 2026-11-24, each from its card's verified download. Fixed on the way: Fedora's desktop booted to a text login, Fedora's console install stopped (an environment renamed), arm64 installers showed only on the serial port. Not run for lack of space on the Pi: the arm64 desktops and Ubuntu arm64 (was 🟡 60) |
 | LordOS card, `lordos-auto.conf`; its signed list read from lordos.org first, GitHub second (3.9, 4.1) | ✅ | 95 | `vmunattend.c` (`VMU_LORDOS`), `vmcatalog.c` (`LIST_MIRROR`, `vmcat_list_source`), `vmimage_admin.c`; `vmcatalog-test` (the real list and signature) | Run from the card end to end on 2026-11-24: on amd64 the list from lordos.org (HTTP 200), the 0.8.9 image, the install in 1 min 19 s with 3D, the greeter and the desktop; on the Pi 5 in 2 min 2 s to the greeter and the desktop. The guest agent and apps mode on first boot wait for an ISO newer than 0.8.9 (was 🧪 85) |
@@ -134,7 +134,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Migrate from another PC (6.11) | 🟡 | 25 | `lordvm.c` `--import-machine` (a raw whole-disk image), `machines.c` `cmd_import` | *In development*: a backup image of a Linux PC's disk imports and boots (a 20 GB Ubuntu 26.04.1 image, 2026-11-24, with the import's `fsync` fix). Not built: the old PC's agent and the LAN copy, a connected disk, driver injection, encrypted disks (was ❌ 0) |
 | Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19) | 🟡 | 92 | `vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `--group-delete`, `--group-rename`, `--group-repair`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_ui_test.mjs`, `vm_group_link.sh`, `vm_group_manage.sh`, `machines_group_manage_headless.sh` | *In development*: G0–G4 plus Delete, Rename and Repair of a group, Start Gateway and Stop Gateway, and a missing or changed base made again from the archive (2026-11-24; headless, screenshots of the dialogs; the Start Gateway bar node-tested only, its window being protected). Creating a group from the app was refused before (the image store's file name); fixed. Left: the release gate on real hardware (G5) and disk encryption of the members (layer 5) (was 80) |
 
-### C. The app (91 %)
+### C. The app (95 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
@@ -162,7 +162,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Raw disks, disk encryption, export (`.lordvm`, OVA), backups (6.4, 3.6) | 🧪 | 85 | `lordvm.c` (`--disk-format raw`, `cmd_export`, `cmd_import_lordvm`), `vmexport.c`, `vmkeysrv.c`, `backup/engine.c`, `vmkey.jsx`; `vm_storage_test.sh`, `vmexport-test`, `vmkeysrv-test`, `backup-machines-test` | *In development*, 2026-11-24: raw disk files (never host block devices: decided), encryption (8), Export as `.lordvm` with a checked manifest and as OVA, the import of an export, consistent backups. The OVA never imported into another app; the app's sheets not driven end to end; no bare disk image export (was ❌ 0) |
 | Storage window: shared extents, frees-if-deleted, downloads (6.16) | 🟡 | 75 | `storage.jsx`, `js_vm.c` (FIEMAP) | Trash, Reclaim with an estimate, the unused shared base. Never seen on btrfs or XFS; no "about" figures; no "delete old snapshots" or "remove unused media" |
 
-### E. Network (80 %)
+### E. Network (89 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
@@ -226,14 +226,14 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | `machines` list, status, start, open, stop…, snapshot, clone, set, rename, ids, and for a machine group `fresh` and `--member` (19.9); 35 languages, `--json`, completion (6.15) | 🧪 | 100 | `server/src/cli/machines.c`, `mcli.c`; `mcli-test`, `machinescli_headless.sh`, `vm_rename.sh`, `vm_exec_e2e.sh` | *In development* since the last audit: `set` passes `--cpu-pin`, `--perf-profile` and `--capture-fullscreen`; `start --no-window --snapshot TAG`, `import`, `console` (each run on 2026-11-24 against a real Ubuntu 26.04.1 machine on the dev PC, in a private home). A start in a window is still checked headless only; a machine from a card is made in the app (`apply` makes one from an ISO) (was 95) |
 | `lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24) | 🧪 | 85 | `vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cmd_logs`, `cmd_mcp`, `cmd_apply`), `mcli.c`, `configure.jsx` (Automation), `machine.h` (schema 17); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh` | *In development* (2026-11-24): exec, cp, logs, console, apply and an MCP server of eight tools, per machine with automation on; 28 of 28 checks in a real Ubuntu 26.04.1 guest on the dev PC. `machines shell` (the agent's shell, checked against a stand-in lord-vm). Not built: exec in virtio-win guests, folders in cp, MCP's create_machine, requirements and screenshot, apply's packages and rebuild. Configure's Automation row not yet seen on screen (was ❌ 0) |
 
-### K. System ties (89 %)
+### K. System ties (91 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
 | Monitor: a machine as one row (6.14) | 🟡 | 80 | `apps/monitor/Processes.jsx` (Show Machine), `Network.jsx`, `Gpu.jsx`; `apps/machines/index.jsx` (`args.show`) | Network and GPU name machines too; a machine's row opens its processes and Show Machine opens its window (*in development*). No per-machine disk and network numbers in Monitor |
 | Idle block while a machine runs (6.14) | ✅ | 90 | `lord.vm.awake`, `vmlogind.c` |  |
 | Cleaner, Backups, Files bundle, Search, Pause All on battery, start with the session, auto-pause, Reclaim in Machines (6.14, 16) | ✅ | 100 | `clean/cleanfs.c` `clean_machine_path`, `apps/cleaner/vmspace.js` `machinesSpace`, `backup/engine.c` (`hold`), `backup.c`, `machine.c` `vm_backup_hold`, `vm_dir_active`, `sdk/openwith.js` `registerBundle`, `apps/files`, `apps/machines/ties.js`; `clean-test`, `backup-test`, `vm-test`, `vm_model_test.mjs`, `machines_app_headless.sh` | *In development*: Cleaner never offers a machine's files and its Storage view sends a machine's space to Machines' Storage window (Reclaim in Machines); Backups hold back a running machine's disks and saved session; Files shows a machine as one item; Search finds machines; Pause All on battery; Start with the session; Pause while I'm away. No balloon: decided 2026-11-24 (6.14) |
-| Sentinela watches running machines: sandbox and scope, a Workstation's ways out, crashes, CPU, memory, a Gateway's traffic (docs/SENTINELA.md, "Machines") | 🧪 | 85 | `sdk/sentinelavm.js`, `vmwatch.h`, `js_vm.c` (`stats`: lord-vm asked over its socket, `SO_PEERCRED`), `monitor/conn.c` (`conn_machines`); `sentinela_vm_test.mjs`, `vmwatch-test`, `sentinela_vm_live.sh` | *In development*; off by default; counts only. **Run live on 2026-11-24** (`sentinela_vm_live.sh`: a real KVM machine under a headless session, Sentinela on, screenshots): the alert reached the screen, but it was a false one: lord-vm is non-dumpable since QEMU's namespaces (2026-11-23), so lord-server can't read `/proc/<lord-vm>/exe`, never verifies a live machine and raises vmSandbox on every one. Needs a decision on what attests lord-vm (was 90) |
+| Sentinela watches running machines: sandbox and scope, a Workstation's ways out, crashes, CPU, memory, a Gateway's traffic (docs/SENTINELA.md, "Machines") | 🧪 | 95 | `sdk/sentinelavm.js`, `vmwatch.h` (`vmwatch_procs_*`, `vmwatch_cg_lordvm`, `SO_PEERPIDFD`), `js_vm.c` (`stats`: lord-vm asked over its socket, `SO_PEERCRED`, `vm_vouched`; a pidfd kept by `start` and, through `lord-vm --pidfd-to`, by `startDetached`), `monitor/conn.c` (`conn_machines`); `sentinela_vm_test.mjs`, `vmwatch-test`, `sentinela_vm_live.sh` | *In development*; off by default; counts only. **Run live on 2026-11-24** (`sentinela_vm_live.sh`: a real KVM machine under a headless session, Sentinela on, screenshots): it first found a false alert (lord-vm is non-dumpable, so `/proc/<lord-vm>/exe` can't be read and nothing was verified); fixed the same day with pidfds lord-server keeps of every lord-vm it starts (adopting one after its own restart only from `SO_PEERPIDFD` in the machine's own scope). Run again: verified on every read, no unverified alert, vmSandbox names only the cgroup a headless run lacks. Not run: a real LordOS session with scopes, the adoption after a lord-server restart (unit-tested only) |
 
 ### L. Privacy and security (86 %)
 
@@ -2380,8 +2380,14 @@ they say nothing, or name both amd64 and arm64, `model.js` `isoArch` takes it fr
 and the summary card says which ("arm64, read from its boot files"), or that the boot files are for an architecture
 Machines can't run (riscv64). The file is untrusted: every offset and length is checked against the file, paths are fixed
 (no tree walk, so a directory that points at itself can't loop), FAT chains and UDF descriptors are capped, and a probe
-stops at 4,096 reads or 24 MB (40 reads on a network or cloud mount). `tests/vmiso_test.c` builds each kind of image byte
-by byte, adds hostile ones and fuzzes them under ASan and UBSan. Checked on real ISOs: Alpine 3.24.4 aarch64 virt (arm64
+stops at 4,096 reads or 24 MB (40 reads on a network or cloud mount). The parser never runs in lord-server (in development,
+2026-11-24): lord-server opens the file and passes it as fd 0 to `lord-vm --iso-probe MAX`, which maps it, closes every
+other descriptor, grows its heap, enters seccomp **strict** mode (read, write, exit: no open, mmap, socket or exec) and
+only then parses, writing one fixed 64-byte answer on a pipe (`vmiso.h`); lord-server links only the answer's decoder
+(`vmisoans.c`), which refuses anything off the format whole, and kills the probe after 3 s either way. `tests/vmiso_test.c`
+builds each kind of image byte by byte, adds hostile ones and fuzzes them under ASan and UBSan; every named image is also
+probed out of process and must give the same answer, strict mode is proven (a forbidden call after it kills the probe),
+the decoder is fuzzed, and `nm` shows no parser in lord-server. Checked on real ISOs: Alpine 3.24.4 aarch64 virt (arm64
 from its PE headers, though its file name says nothing), an amd64 install disc's evaluation (UDF, install.wim, amd64 from
 the ESP), Ubuntu Server 26.04.1, LordOS 0.8.9 live, virtio-win 0.1.271 (no boot files: name).
 
