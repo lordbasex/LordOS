@@ -1,6 +1,6 @@
 // Backups' exclusions from the file dialog or typed (#200), from server/: node tests/backup_model_test.mjs
 import assert from 'node:assert/strict';
-import { exclusionFor, addExclusion } from '../../apps/backup/model.js';
+import { exclusionFor, addExclusion, restoreTarget, baseName, MAX_RESTORE } from '../../apps/backup/model.js';
 import { refuseCloud } from '../../sdk/filepickermodel.js';
 
 const H = '/home/u';
@@ -36,5 +36,21 @@ assert.deepEqual(refuseCloud({ pick: '/home/u/Cloud' }, H), { pick: '/home/u/Clo
 assert.deepEqual(refuseCloud({ pick: '/media/u/Disk' }, H), { pick: '/media/u/Disk' });
 assert.deepEqual(refuseCloud({ go: '/home/u/Cloud/Drive' }, H), { go: '/home/u/Cloud/Drive' });
 assert.equal(refuseCloud(null, H), null);
+
+// Restore with several rows picked (#231): one → its path (a string, as before), several → their paths, none → the folder
+assert.equal(restoreTarget('', ['a.txt']), 'a.txt');
+assert.equal(restoreTarget('Docs', ['a.txt']), 'Docs/a.txt');
+assert.deepEqual(restoreTarget('Docs', ['a.txt', 'Sub', 'a.txt']), ['Docs/a.txt', 'Docs/Sub']);
+assert.equal(restoreTarget('Docs', []), 'Docs');
+assert.equal(restoreTarget('', []), null);
+assert.equal(restoreTarget('', undefined), null);
+// names that can't be one element of a path are dropped (lord-server refuses them anyway)
+assert.deepEqual(restoreTarget('', ['..', '.', '', 'x/y', 'ok', 7, 'fine']), ['ok', 'fine']);
+assert.equal(restoreTarget('D', ['..', 'ok']), 'D/ok');
+assert.equal(restoreTarget('D', ['..']), 'D');
+// at most what lord.backup.restore takes in one call
+assert.equal(restoreTarget('', Array.from({ length: 100 }, (_, i) => `f${i}`)).length, MAX_RESTORE);
+assert.equal(baseName('Docs/Sub/a.txt'), 'a.txt');
+assert.equal(baseName(''), '');
 
 console.log('backup-model-test: ok');

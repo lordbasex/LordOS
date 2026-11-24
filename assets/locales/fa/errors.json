@@ -61,6 +61,8 @@
   "backup.saveFailed": "تنظیمات پشتیبان‌گیری ذخیره نشد",
   "backup.setupFailed": "رمزگذاری روشن نشد",
   "backup.snapshotFailed": "پشتیبان‌گیری کامل نشد: {errno}",
+  "backup.someFilesFailed": "برخی از فایل‌های آن بازیابی نشدند",
+  "backup.restoreStartFailed": "شروع بازیابی ممکن نشد",
   "backup.sourceUnreadable": "خواندن پوشهٔ مبدأ ممکن نیست",
   "backup.tooManyExclusions": "استثناها بیش از حد زیادند",
   "backup.verifyFailed": "یکی از فایل‌های پشتیبان در وارسی رد شد (دستکاری شده یا کلید اشتباه)",

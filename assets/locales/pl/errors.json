@@ -61,6 +61,8 @@
   "backup.saveFailed": "Nie udało się zapisać ustawień kopii zapasowej",
   "backup.setupFailed": "Nie udało się włączyć szyfrowania",
   "backup.snapshotFailed": "Nie udało się dokończyć kopii zapasowej: {errno}",
+  "backup.someFilesFailed": "Nie udało się przywrócić niektórych jego plików",
+  "backup.restoreStartFailed": "Nie udało się rozpocząć przywracania",
   "backup.sourceUnreadable": "Nie można odczytać folderu źródłowego",
   "backup.tooManyExclusions": "Zbyt wiele wykluczeń",
   "backup.verifyFailed": "Plik kopii zapasowej nie przeszedł weryfikacji (zmieniony lub zły klucz)",

@@ -61,6 +61,8 @@
   "backup.saveFailed": "ব্যাকআপ সেটিংস সংরক্ষণ করা যায়নি",
   "backup.setupFailed": "এনক্রিপশন চালু করা যায়নি",
   "backup.snapshotFailed": "ব্যাকআপ শেষ করা যায়নি: {errno}",
+  "backup.someFilesFailed": "এর কিছু ফাইল পুনরুদ্ধার করা যায়নি",
+  "backup.restoreStartFailed": "পুনরুদ্ধার শুরু করা যায়নি",
   "backup.sourceUnreadable": "উৎস ফোল্ডারটি পড়া যাচ্ছে না",
   "backup.tooManyExclusions": "অনেক বেশি বাদ দেওয়া আইটেম",
   "backup.verifyFailed": "একটি ব্যাকআপ ফাইল যাচাইয়ে ব্যর্থ হয়েছে (পরিবর্তিত বা ভুল কী)",

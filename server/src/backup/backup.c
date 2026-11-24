@@ -83,14 +83,21 @@ static struct {
     char vm_names[BK_VM_NAMES][BK_VM_NAME];    /* running machines whose disks were carried over */
 } last;
 /* pending restore / delete */
-static struct { int pending; char id[BK_ID_LEN], rel[PATH_MAX / 2], suffix[80], to[PATH_MAX]; int replace; } rjob;
+static struct { int pending; char id[BK_ID_LEN], *rels[BK_RESTORE_MAX], suffix[80], to[PATH_MAX]; int nrels, replace; } rjob;
 static struct { int pending; char id[BK_ID_LEN]; } djob;
 /* encryption: the key lives only in memory (mlock'd), for as long as the session lasts */
 static uint8_t key[BKC_KEY];
 static int have_key, dest_enc;
 static struct { int pending, create; char pass[256]; } ujob;
 static struct { int done, ok; char error[160]; } ures;
-static struct { int done; int ok; uint64_t files, kept, replaced, skipped, errors; char error[256]; char id[BK_ID_LEN]; } rres;
+_Static_assert(BACKUP_RESTORE_MAX == BK_RESTORE_MAX, "backup.h and engine.h agree on the list's length");
+#define RRES_FAILED 8                       /* the items that failed, named in the status (the rest only counted) */
+static struct {
+    int done, ok, count, index, nfailed;
+    uint64_t files, kept, replaced, skipped, errors;
+    char error[256], id[BK_ID_LEN], cur[PATH_MAX / 2];
+    struct { char rel[PATH_MAX / 2], error[256]; } failed[RRES_FAILED];
+} rres;
 
 /* snprintf for paths: if it does not fit, leaves the string empty and returns -1 */
 __attribute__((format(printf, 3, 4)))
@@ -396,26 +403,55 @@ static void do_snapshot(void) {
     emit();
 }
 
+static void restore_step(void *ud, int i) {
+    const char *const *rels = ud;
+    pthread_mutex_lock(&mu);
+    rres.index = i + 1;
+    snprintf(rres.cur, sizeof rres.cur, "%s", rels[i]);
+    emit();
+    pthread_mutex_unlock(&mu);
+}
+
 static void do_restore(void) {
     Config c = cfg;
     char machine[PATH_MAX];
     rjob.pending = 0;
-    char id[BK_ID_LEN], rel[PATH_MAX / 2], suffix[80], to[PATH_MAX];
+    char id[BK_ID_LEN], suffix[80], to[PATH_MAX];
+    char *rels[BK_RESTORE_MAX];
+    int n = rjob.nrels;
+    memcpy(rels, rjob.rels, sizeof rels);            /* this thread owns them now: freed below */
+    memset(rjob.rels, 0, sizeof rjob.rels);
+    rjob.nrels = 0;
     snprintf(id, sizeof id, "%s", rjob.id);
-    snprintf(rel, sizeof rel, "%s", rjob.rel);
     snprintf(suffix, sizeof suffix, "%s", rjob.suffix);
     snprintf(to, sizeof to, "%s", rjob.to[0] ? rjob.to : home);
     int replace = rjob.replace;
     memset(&rres, 0, sizeof rres);
     snprintf(rres.id, sizeof rres.id, "%s", id);
-    if (machine_dir(&c, machine, sizeof machine)) { rres.done = 1; snprintf(rres.error, sizeof rres.error, "backup.noDestination"); emit(); return; }
+    rres.count = n;
+    BkItem *items = calloc((size_t)(n > 0 ? n : 1), sizeof *items);
+    if (!items || machine_dir(&c, machine, sizeof machine)) {
+        rres.done = 1;
+        snprintf(rres.error, sizeof rres.error, "%s", items ? "backup.noDestination" : "backup.restoreStartFailed");
+        free(items);
+        for (int i = 0; i < n; i++) free(rels[i]);
+        emit();
+        return;
+    }
     state = S_RESTORING;
     cancel_flag = 0;
     emit();
     pthread_mutex_unlock(&mu);
-    if (dest_enc && !have_key) { state = S_IDLE; rres.done = 1; snprintf(rres.error, sizeof rres.error, "backup.locked"); emit(); return; }
+    if (dest_enc && !have_key) {
+        pthread_mutex_lock(&mu);
+        state = S_IDLE; rres.done = 1; snprintf(rres.error, sizeof rres.error, "backup.locked");
+        free(items);
+        for (int i = 0; i < n; i++) free(rels[i]);
+        emit();
+        return;
+    }
     BkRestore o = { .cancel = &cancel_flag, .key = dest_enc ? key : NULL };
-    int r = bk_restore(machine, id, rel, to, replace, suffix, &o);
+    int r = bk_restore_list(machine, id, (const char *const *)rels, n, to, replace, suffix, &o, items, restore_step, rels);
     pthread_mutex_lock(&mu);
     state = S_IDLE;
     rres.done = 1;
@@ -425,9 +461,22 @@ static void do_restore(void) {
     rres.replaced = o.replaced;
     rres.skipped = o.skipped;
     rres.errors = o.errors;
+    rres.cur[0] = 0;
+    for (int i = 0; i < n && r >= 0; i++) {
+        if (items[i].r != -1) continue;
+        if (rres.nfailed < RRES_FAILED) {
+            snprintf(rres.failed[rres.nfailed].rel, sizeof rres.failed[0].rel, "%s", rels[i]);
+            snprintf(rres.failed[rres.nfailed].error, sizeof rres.failed[0].error, "%s",
+                     items[i].error[0] ? items[i].error : "backup.someFilesFailed");
+        }
+        rres.nfailed++;
+    }
     snprintf(rres.error, sizeof rres.error, "%s", r > 0 ? "backup.interrupted" : o.error);
-    fprintf(stderr, "backup: restored %s/%s: %llu files, %llu kept alongside, %llu replaced, %llu errors\n", id, rel,
-            (unsigned long long)o.files, (unsigned long long)o.kept_both, (unsigned long long)o.replaced, (unsigned long long)o.errors);
+    fprintf(stderr, "backup: restored %d item(s) of %s: %llu files, %llu kept alongside, %llu replaced, %llu errors, %d item(s) failed\n",
+            n, id, (unsigned long long)o.files, (unsigned long long)o.kept_both, (unsigned long long)o.replaced,
+            (unsigned long long)o.errors, rres.nfailed);
+    free(items);
+    for (int i = 0; i < n; i++) free(rels[i]);
     emit();
 }
 
@@ -608,7 +657,24 @@ char *backup_status_json(void) {
     json_quote(qe, sizeof qe, last_error);
     json_quote(qd, sizeof qd, cfg.dest);
     json_quote(qr, sizeof qr, rres.error);
-    size_t cap = 2048 + strlen(qf) + strlen(qe) + strlen(qd) + strlen(qr) + strlen(qn);
+    /* restore.current (the item going) and restore.failed: [{ rel, error }] (file names: quoted) */
+    static char qc[PATH_MAX * 3], qfail[RRES_FAILED * (PATH_MAX * 3 + 600) + 4];
+    json_quote(qc, sizeof qc, rres.cur);
+    {
+        size_t o = 0;
+        qfail[o++] = '[';
+        for (int i = 0; i < rres.nfailed && i < RRES_FAILED; i++) {
+            if (i) qfail[o++] = ',';
+            o += (size_t)snprintf(qfail + o, sizeof qfail - o, "{\"rel\":");
+            o += json_quote(qfail + o, sizeof qfail - o, rres.failed[i].rel);
+            o += (size_t)snprintf(qfail + o, sizeof qfail - o, ",\"error\":");
+            o += json_quote(qfail + o, sizeof qfail - o, rres.failed[i].error);
+            qfail[o++] = '}';
+        }
+        qfail[o++] = ']';
+        qfail[o] = 0;
+    }
+    size_t cap = 2048 + strlen(qf) + strlen(qe) + strlen(qd) + strlen(qr) + strlen(qn) + strlen(qc) + strlen(qfail);
     char *s = malloc(cap);
     if (!s) { pthread_mutex_unlock(&mu); return NULL; }
     struct stat st;
@@ -622,7 +688,8 @@ char *backup_status_json(void) {
              "\"progress\":{\"files\":%llu,\"totalFiles\":%llu,\"bytes\":%llu,\"totalBytes\":%llu,\"copied\":%llu,\"linked\":%llu,\"file\":%s},"
              "\"last\":{\"when\":%lld,\"ok\":%d,\"id\":\"%s\",\"files\":%llu,\"copied\":%llu,\"linked\":%llu,\"bytes\":%llu,\"errors\":%llu,\"secs\":%.1f,\"error\":%s,"
              "\"machinesBusy\":%llu,\"machinesBusyNames\":%s,\"machinesLeftOut\":%llu},"
-             "\"restore\":{\"done\":%s,\"ok\":%s,\"id\":\"%s\",\"files\":%llu,\"keptBoth\":%llu,\"replaced\":%llu,\"skipped\":%llu,\"errors\":%llu,\"error\":%s},"
+             "\"restore\":{\"done\":%s,\"ok\":%s,\"id\":\"%s\",\"files\":%llu,\"keptBoth\":%llu,\"replaced\":%llu,\"skipped\":%llu,\"errors\":%llu,\"error\":%s,"
+             "\"count\":%d,\"index\":%d,\"current\":%s,\"failedCount\":%d,\"failed\":%s},"
              "\"encryption\":true,\"destEncrypted\":%s,\"encrypted\":%s,\"locked\":%s,\"unlock\":{\"done\":%s,\"ok\":%s,\"error\":\"%s\"}}",
              state_names[state], on_batt_pause ? "true" : "false", user_pause ? "true" : "false", qd, avail ? "true" : "false", freeb, totalb,
              (long long)next_due, (long long)last_ok,
@@ -633,6 +700,7 @@ char *backup_status_json(void) {
              (unsigned long long)last.vm_busy, qn, (unsigned long long)last.vm_left_out,
              rres.done ? "true" : "false", rres.ok ? "true" : "false", rres.id, (unsigned long long)rres.files, (unsigned long long)rres.kept,
              (unsigned long long)rres.replaced, (unsigned long long)rres.skipped, (unsigned long long)rres.errors, qr,
+             rres.count, rres.index, qc, rres.nfailed, qfail,
              dest_enc ? "true" : "false", dest_enc || cfg.encrypt ? "true" : "false", (dest_enc || cfg.encrypt) && !have_key ? "true" : "false",
              ures.done ? "true" : "false", ures.ok ? "true" : "false", ures.error);
     pthread_mutex_unlock(&mu);
@@ -787,21 +855,28 @@ char *backup_ls_json(const char *id, const char *rel, char *err, size_t en) {
     return s;
 }
 
-int backup_restore(const char *id, const char *rel, int replace, const char *suffix, const char *to, char *err, size_t n) {
+int backup_restore_list(const char *id, const char *const *rels, int nrels, int replace, const char *suffix, const char *to,
+                        char *err, size_t n) {
     if (!started) { lerr_set(err, n, "backup.notRunning", NULL); return -1; }
-    if (!bk_id_valid(id) || !bk_rel_valid(rel) || strlen(rel) >= sizeof rjob.rel) { lerr_set(err, n, "backup.badPath", NULL); return -1; }
+    /* the whole list is checked before anything is queued: every item as one restore is (bk_restore checks it again) */
+    if (!bk_id_valid(id) || !bk_restore_list_valid(rels, nrels)) { lerr_set(err, n, "backup.badPath", NULL); return -1; }
     size_t sl = strlen(suffix);
     if (!sl || sl >= sizeof rjob.suffix || strchr(suffix, '/')) { lerr_set(err, n, "backup.badSuffix", NULL); return -1; }
     char tr[PATH_MAX] = "";
     if (to && to[0]) {
         if (!realpath(to, tr) || !fsops_allowed(tr) || fsops_protected(tr)) { lerr_set(err, n, "backup.destNotAllowed", NULL); return -1; }
     }
+    char *copy[BK_RESTORE_MAX] = { 0 };
+    for (int i = 0; i < nrels; i++)
+        if (!(copy[i] = strdup(rels[i]))) { for (int k = 0; k < i; k++) free(copy[k]); lerr_set(err, n, "backup.restoreStartFailed", NULL); return -1; }
     pthread_mutex_lock(&mu);
     int r = 0;
     if (state == S_RUNNING || state == S_RESTORING || state == S_DELETING || rjob.pending) { lerr_set(err, n, "backup.busy", NULL); r = -1; }
     else {
+        for (int i = 0; i < rjob.nrels; i++) free(rjob.rels[i]);
         snprintf(rjob.id, sizeof rjob.id, "%s", id);
-        snprintf(rjob.rel, sizeof rjob.rel, "%s", rel);
+        memcpy(rjob.rels, copy, sizeof rjob.rels);
+        rjob.nrels = nrels;
         snprintf(rjob.suffix, sizeof rjob.suffix, "%s", suffix);
         snprintf(rjob.to, sizeof rjob.to, "%s", tr);
         rjob.replace = replace != 0;
@@ -810,7 +885,13 @@ int backup_restore(const char *id, const char *rel, int replace, const char *suf
         pthread_cond_broadcast(&cv);
     }
     pthread_mutex_unlock(&mu);
+    if (r) for (int i = 0; i < nrels; i++) free(copy[i]);
     return r;
+}
+
+int backup_restore(const char *id, const char *rel, int replace, const char *suffix, const char *to, char *err, size_t n) {
+    const char *one[1] = { rel };
+    return backup_restore_list(id, one, 1, replace, suffix, to, err, n);
 }
 
 int backup_delete(const char *id, char *err, size_t n) {

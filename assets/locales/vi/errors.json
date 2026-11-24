@@ -61,6 +61,8 @@
   "backup.saveFailed": "Không thể lưu cài đặt sao lưu",
   "backup.setupFailed": "Không thể bật mã hóa",
   "backup.snapshotFailed": "Không thể hoàn tất sao lưu: {errno}",
+  "backup.someFilesFailed": "Không thể khôi phục một số tệp của nó",
+  "backup.restoreStartFailed": "Không thể bắt đầu khôi phục",
   "backup.sourceUnreadable": "Không thể đọc thư mục nguồn",
   "backup.tooManyExclusions": "Quá nhiều mục loại trừ",
   "backup.verifyFailed": "Một tệp sao lưu không vượt qua kiểm tra (đã bị can thiệp hoặc sai khóa)",

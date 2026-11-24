@@ -28,3 +28,21 @@ export const addExclusion = (list, rel) => {
   const l = Array.isArray(list) ? list.filter((x) => typeof x === 'string' && x) : [];
   return !rel || l.includes(rel) ? l : [...l, rel];
 };
+
+// What Restore sends for the rows picked in a folder of a backup (#231): one row → its path (as before), several →
+// the list of their paths (lord.backup.restore takes up to MAX_RESTORE at once, each checked as one), none → the
+// folder shown (rel), or null at the top (Restore All has its own button and confirmation). Names that can't be a
+// path's element ("", ".", "..", with "/") are dropped: lord-server refuses them anyway.
+export const MAX_RESTORE = 64;
+const okName = (n) => typeof n === 'string' && n !== '' && n !== '.' && n !== '..' && !n.includes('/');
+export function restoreTarget(rel, picked) {
+  const base = String(rel || '');
+  const names = [...new Set((Array.isArray(picked) ? picked : []).filter(okName))];
+  const join = (n) => (base ? `${base}/${n}` : n);
+  if (names.length === 1) return join(names[0]);
+  if (names.length > 1) return names.slice(0, MAX_RESTORE).map(join);
+  return base || null;
+}
+
+// The last element of a path, for "Restoring 2 of 5: name" and a failed item's line.
+export const baseName = (rel) => String(rel || '').split('/').filter(Boolean).pop() || '';

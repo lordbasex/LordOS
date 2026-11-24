@@ -61,6 +61,8 @@
   "backup.saveFailed": "Setările de copiere de rezervă nu au putut fi salvate",
   "backup.setupFailed": "Criptarea nu a putut fi activată",
   "backup.snapshotFailed": "Copia de rezervă nu a putut fi finalizată: {errno}",
+  "backup.someFilesFailed": "Unele dintre fișierele sale nu au putut fi restaurate",
+  "backup.restoreStartFailed": "Restaurarea nu a putut începe",
   "backup.sourceUnreadable": "Dosarul sursă nu poate fi citit",
   "backup.tooManyExclusions": "Prea multe excluderi",
   "backup.verifyFailed": "Un fișier al copiei de rezervă nu a trecut verificarea (modificat sau cheie greșită)",

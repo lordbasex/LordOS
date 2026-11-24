@@ -98,4 +98,18 @@ int  bk_restore(const char *machine, const char *id, const char *rel, const char
 /* Safe rel: relative, no "..", ".", "//" or control characters. "" is valid. */
 int  bk_rel_valid(const char *rel);
 
+/* Several files and folders at once (GitHub #231): each item is restored by bk_restore, one after the other, with every
+ * check it does for one (the same validation, nothing outside the snapshot, nothing where lord.fs may not write). The
+ * list is checked whole before anything is restored: 1 to BK_RESTORE_MAX items, each a bk_rel_valid path; "" (the
+ * whole snapshot) only alone. An item inside another listed folder (or listed twice) comes back with that folder and is
+ * not restored twice (items[i].r = BK_ITEM_COVERED). out has the totals; items[i] (n entries) each item's own: r (0
+ * done, -1 refused or failed, 1 not reached: cancelled), its counts and its error code. step(ud, i) runs before item i.
+ * Returns -1 for a bad list (out->error says why, nothing restored), 1 when cancelled, else 0 (items may have failed). */
+#define BK_RESTORE_MAX 64
+#define BK_ITEM_COVERED 2
+typedef struct { int r; uint64_t files, kept_both, replaced, skipped, errors; char error[256]; } BkItem;
+int  bk_restore_list_valid(const char *const *rels, int n);
+int  bk_restore_list(const char *machine, const char *id, const char *const *rels, int n, const char *base, int replace,
+                     const char *suffix, BkRestore *out, BkItem *items, void (*step)(void *ud, int i), void *ud);
+
 #endif
