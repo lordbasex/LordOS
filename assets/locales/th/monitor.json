@@ -670,6 +670,7 @@
   "stats.memAvgRow": "หน่วยความจำเฉลี่ย (1 · 5 · 15 นาที)",
   "stats.memPeakRow": "หน่วยความจำสูงสุด (1 · 5 · 15 นาที)",
   "stats.spark": "นาทีล่าสุด",
+  "group.showMachine": "แสดงเครื่องเสมือน",
   "desc.label": "คำอธิบาย",
   "desc.unknown": "ไม่ทราบ",
   "desc.fromPkg": "จากแพ็กเกจ {pkg}: {text}",

@@ -90,7 +90,8 @@ export function Section({ title, children, style }) {
 }
 
 // a sidebar row: glyph, title and a one-line summary; the selected one filled with the accent
-export function SideRow({ icon, title, detail, selected, onClick }) {
+// dot: a change in this section not saved yet (Configure's sidebar)
+export function SideRow({ icon, title, detail, selected, onClick, dot }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   return (
@@ -102,6 +103,7 @@ export function SideRow({ icon, title, detail, selected, onClick }) {
         <Text style={{ fontSize: 13, fontWeight: 600, color: selected ? '#fff' : p.text, textAlign: 'start' }}>{title}</Text>
         {detail ? <Text style={{ fontSize: 11, color: selected ? 'rgba(255,255,255,0.82)' : p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{detail}</Text> : null}
       </View>
+      {dot ? <View title={dot} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: selected ? '#ffffff' : p.accent }} /> : null}
     </View>
   );
 }

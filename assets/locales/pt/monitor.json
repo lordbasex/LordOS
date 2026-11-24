@@ -685,6 +685,7 @@
   "stats.memAvgRow": "Memória média (1 · 5 · 15 min)",
   "stats.memPeakRow": "Memória pico (1 · 5 · 15 min)",
   "stats.spark": "Último minuto",
+  "group.showMachine": "Mostrar a máquina",
   "desc.label": "Descrição",
   "desc.unknown": "Desconhecido",
   "desc.fromPkg": "Do pacote {pkg}: {text}",

@@ -933,6 +933,7 @@
   "sentinela.blockFailed": "No s’ha pogut bloquejar la seva xarxa.",
   "sentinela.machineGone": "Aquesta màquina ja no és a Màquines.",
   "sentinela.machineFailed": "La màquina no ha respost.",
+  "vm.overBudget": "No hi ha prou memòria al costat de les màquines que ja funcionen. Suspèn o apaga'n una, o dona menys memòria a aquesta màquina.",
   "llm.timeout": "El model local ha trigat massa a respondre.",
   "llm.failed": "El model local no ha pogut respondre.",
   "llm.answer": "No s’ha pogut llegir la resposta del model local.",

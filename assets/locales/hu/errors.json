@@ -933,6 +933,7 @@
   "sentinela.blockFailed": "A hálózatát nem sikerült letiltani.",
   "sentinela.machineGone": "Ez a gép már nincs a Gépek alkalmazásban.",
   "sentinela.machineFailed": "A gép nem válaszolt.",
+  "vm.overBudget": "Nincs elég memória a már futó gépek mellett. Függessz fel vagy állíts le egyet közülük, vagy adj ennek a gépnek kevesebb memóriát.",
   "llm.timeout": "A helyi modell túl sokáig nem válaszolt.",
   "llm.failed": "A helyi modell nem tudott válaszolni.",
   "llm.answer": "A helyi modell válaszát nem sikerült beolvasni.",

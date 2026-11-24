@@ -685,6 +685,7 @@
   "stats.memAvgRow": "औसत मेमोरी (1 · 5 · 15 मिनट)",
   "stats.memPeakRow": "शिखर मेमोरी (1 · 5 · 15 मिनट)",
   "stats.spark": "पिछला मिनट",
+  "group.showMachine": "मशीन दिखाएँ",
   "desc.label": "विवरण",
   "desc.unknown": "अज्ञात",
   "desc.fromPkg": "पैकेज {pkg} से: {text}",

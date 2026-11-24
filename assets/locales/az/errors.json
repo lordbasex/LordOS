@@ -933,6 +933,7 @@
   "sentinela.blockFailed": "Onun şəbəkəsi bloklana bilmədi.",
   "sentinela.machineGone": "O maşın artıq “Virtual maşınlar”-da yoxdur.",
   "sentinela.machineFailed": "Maşın cavab vermədi.",
+  "vm.overBudget": "Artıq işləyən maşınların yanında kifayət qədər yaddaş yoxdur. Onlardan birini dayandırın və ya söndürün, ya da bu maşına daha az yaddaş verin.",
   "llm.timeout": "Yerli model cavab verməyə çox vaxt sərf etdi.",
   "llm.failed": "Yerli model cavab verə bilmədi.",
   "llm.answer": "Yerli modelin cavabı oxunmadı.",

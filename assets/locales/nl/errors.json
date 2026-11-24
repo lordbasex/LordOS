@@ -933,6 +933,7 @@
   "sentinela.blockFailed": "Het netwerk kon niet worden geblokkeerd.",
   "sentinela.machineGone": "Die machine staat niet meer in Machines.",
   "sentinela.machineFailed": "De machine antwoordde niet.",
+  "vm.overBudget": "Niet genoeg geheugen naast de machines die al draaien. Zet er een in sluimerstand of sluit er een af, of geef deze machine minder geheugen.",
   "llm.timeout": "Het lokale model deed er te lang over om te antwoorden.",
   "llm.failed": "Het lokale model kon niet antwoorden.",
   "llm.answer": "Het antwoord van het lokale model kon niet worden gelezen.",

@@ -700,6 +700,7 @@
   "stats.memAvgRow": "Пам’ять у середньому (1 · 5 · 15 хв)",
   "stats.memPeakRow": "Пік пам’яті (1 · 5 · 15 хв)",
   "stats.spark": "Остання хвилина",
+  "group.showMachine": "Показати машину",
   "desc.label": "Опис",
   "desc.unknown": "Невідомо",
   "desc.fromPkg": "З пакунка {pkg}: {text}",

@@ -174,6 +174,24 @@ const char *clean_type_name(int type) {
     return type >= 0 && type < CLEAN_TYPES ? names[type] : "other";
 }
 
+int clean_machine_path(const char *path, const char *home) {
+    if (!path || path[0] != '/') return 1;
+    if (home && home[0] == '/') {
+        char lib[4096];
+        if ((size_t)snprintf(lib, sizeof lib, "%s/Machines", home) < sizeof lib && clean_under(path, lib)) return 1;
+    }
+    /* a component "<name>.lordvm" or "<name>.lordgroup", wherever it is (a library moved, a copy kept elsewhere) */
+    for (const char *p = path; *p; ) {
+        while (*p == '/') p++;
+        const char *e = p;
+        while (*e && *e != '/') e++;
+        size_t l = (size_t)(e - p);
+        if ((l > 7 && !memcmp(e - 7, ".lordvm", 7)) || (l > 10 && !memcmp(e - 10, ".lordgroup", 10))) return 1;
+        p = e;
+    }
+    return 0;
+}
+
 int clean_under(const char *path, const char *ex) {
     size_t n = strlen(ex);
     return n > 1 && !strncmp(path, ex, n) && (!path[n] || path[n] == '/');

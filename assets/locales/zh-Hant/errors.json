@@ -932,6 +932,7 @@
   "sentinela.blockFailed": "無法封鎖其網路。",
   "sentinela.machineGone": "該虛擬機器已不在「虛擬機器」中。",
   "sentinela.machineFailed": "虛擬機器沒有回應。",
+  "vm.overBudget": "已有虛擬機在執行,記憶體不足。請暫停或關閉其中一台,或給這台虛擬機較少的記憶體。",
   "llm.timeout": "本機模型回答的時間太長。",
   "llm.failed": "本機模型無法回答。",
   "llm.answer": "無法讀取本機模型的回答。",

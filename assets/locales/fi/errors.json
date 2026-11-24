@@ -933,6 +933,7 @@
   "sentinela.blockFailed": "Sen verkkoa ei voitu estää.",
   "sentinela.machineGone": "Konetta ei ole enää Koneet-sovelluksessa.",
   "sentinela.machineFailed": "Kone ei vastannut.",
+  "vm.overBudget": "Muisti ei riitä jo käynnissä olevien koneiden rinnalla. Keskeytä tai sammuta yksi niistä, tai anna tälle koneelle vähemmän muistia.",
   "llm.timeout": "Paikallinen malli vastasi liian hitaasti.",
   "llm.failed": "Paikallinen malli ei pystynyt vastaamaan.",
   "llm.answer": "Paikallisen mallin vastausta ei voitu lukea.",

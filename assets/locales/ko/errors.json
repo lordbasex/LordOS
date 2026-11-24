@@ -932,6 +932,7 @@
   "sentinela.blockFailed": "네트워크를 차단하지 못했습니다.",
   "sentinela.machineGone": "그 머신은 더 이상 가상 머신 앱에 없습니다.",
   "sentinela.machineFailed": "머신이 응답하지 않았습니다.",
+  "vm.overBudget": "이미 실행 중인 머신과 함께 쓸 메모리가 부족합니다. 그중 하나를 일시 중단하거나 종료하거나, 이 머신의 메모리를 줄이세요.",
   "llm.timeout": "로컬 모델이 응답하는 데 너무 오래 걸렸습니다.",
   "llm.failed": "로컬 모델이 응답하지 못했습니다.",
   "llm.answer": "로컬 모델의 응답을 읽을 수 없습니다.",

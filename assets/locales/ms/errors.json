@@ -932,6 +932,7 @@
   "sentinela.blockFailed": "Rangkaiannya tidak dapat disekat.",
   "sentinela.machineGone": "Mesin itu tiada lagi dalam Mesin Maya.",
   "sentinela.machineFailed": "Mesin tidak menjawab.",
+  "vm.overBudget": "Memori tidak mencukupi di samping mesin yang sudah berjalan. Gantung atau matikan salah satu daripadanya, atau beri mesin ini kurang memori.",
   "llm.timeout": "Model setempat mengambil masa terlalu lama untuk menjawab.",
   "llm.failed": "Model setempat tidak dapat menjawab.",
   "llm.answer": "Jawapan model setempat tidak dapat dibaca.",

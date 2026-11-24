@@ -745,6 +745,7 @@
   "stats.memAvgRow": "متوسط الذاكرة (1 · 5 · 15 د)",
   "stats.memPeakRow": "ذروة الذاكرة (1 · 5 · 15 د)",
   "stats.spark": "آخر دقيقة",
+  "group.showMachine": "إظهار الآلة",
   "desc.label": "الوصف",
   "desc.unknown": "غير معروف",
   "desc.fromPkg": "من الحزمة {pkg}: {text}",

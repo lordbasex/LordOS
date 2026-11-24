@@ -933,6 +933,7 @@
   "sentinela.blockFailed": "Mtandao wake haukuweza kuzuiwa.",
   "sentinela.machineGone": "Mashine hiyo haimo tena katika Mashine.",
   "sentinela.machineFailed": "Mashine haikujibu.",
+  "vm.overBudget": "Hakuna kumbukumbu ya kutosha kando ya mashine zinazoendeshwa tayari. Simamisha au zima mojawapo, au ipe mashine hii kumbukumbu kidogo.",
   "llm.timeout": "Modeli ya ndani ilichukua muda mrefu mno kujibu.",
   "llm.failed": "Modeli ya ndani haikuweza kujibu.",
   "llm.answer": "Jibu la modeli ya ndani halikuweza kusomwa.",

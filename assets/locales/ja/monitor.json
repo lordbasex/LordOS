@@ -670,6 +670,7 @@
   "stats.memAvgRow": "メモリ平均（1 · 5 · 15 分）",
   "stats.memPeakRow": "メモリ最大（1 · 5 · 15 分）",
   "stats.spark": "直近 1 分",
+  "group.showMachine": "マシンを表示",
   "desc.label": "説明",
   "desc.unknown": "不明",
   "desc.fromPkg": "パッケージ {pkg} より：{text}",

@@ -933,6 +933,7 @@
   "sentinela.blockFailed": "Dess nätverk kunde inte blockeras.",
   "sentinela.machineGone": "Den maskinen finns inte längre i Maskiner.",
   "sentinela.machineFailed": "Maskinen svarade inte.",
+  "vm.overBudget": "Inte tillräckligt med minne bredvid maskinerna som redan körs. Försätt en av dem i viloläge eller stäng av den, eller ge den här maskinen mindre minne.",
   "llm.timeout": "Den lokala modellen tog för lång tid att svara.",
   "llm.failed": "Den lokala modellen kunde inte svara.",
   "llm.answer": "Den lokala modellens svar kunde inte läsas.",

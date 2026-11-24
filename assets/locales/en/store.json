@@ -369,5 +369,7 @@
   "settings.listsTitle": "Package lists",
   "settings.listsHint": "The lists of Debian's and LordOS's packages, where new apps and updates come from.",
   "settings.webManage": "Profiles, permissions and space of each web app",
-  "settings.flathubOff": "Turn off Flathub in the Store. The apps you installed from it stay."
+  "settings.flathubOff": "Turn off Flathub in the Store. The apps you installed from it stay.",
+  "updates.qemuTitle": "Suspended machines may not resume after this update ({count})",
+  "updates.qemuText": "This update changes QEMU, and a session saved by one QEMU build may not load in another. Shut those machines down first, or choose Resume anyway or Discard saved state when they start."
 }

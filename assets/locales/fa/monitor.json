@@ -685,6 +685,7 @@
   "stats.memAvgRow": "میانگین حافظه (۱ · ۵ · ۱۵ دقیقه)",
   "stats.memPeakRow": "اوج حافظه (۱ · ۵ · ۱۵ دقیقه)",
   "stats.spark": "دقیقه آخر",
+  "group.showMachine": "نمایش ماشین",
   "desc.label": "توضیحات",
   "desc.unknown": "ناشناخته",
   "desc.fromPkg": "از بستهٔ {pkg}: {text}",

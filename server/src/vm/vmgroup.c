@@ -357,3 +357,11 @@ int vm_group_primary(const VmGroup *g) {
     for (int i = 0; i < g->n; i++) if (g->m[i].primary) return i;
     return -1;
 }
+
+long vm_group_session_mb(const char *dir, const VmMachine *m) {
+    if (!dir || !m || m->role != VM_ROLE_WORKSTATION || !m->group[0] || m->profile_lock != VM_LOCK_ANONYMITY) return 0;
+    char gdir[VM_PATH_MAX];
+    VmGroup g;
+    if (!vm_group_parent(dir, gdir, sizeof gdir) || vm_group_load(gdir, &g, NULL, 0) || strcmp(g.id, m->group) || !g.disposable) return 0;
+    return m->memory_mb > VMG_SESSION_MIN_MB ? m->memory_mb : VMG_SESSION_MIN_MB;
+}

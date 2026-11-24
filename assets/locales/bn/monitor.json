@@ -685,6 +685,7 @@
   "stats.memAvgRow": "গড় মেমরি (1 · 5 · 15 মিনিট)",
   "stats.memPeakRow": "সর্বোচ্চ মেমরি (1 · 5 · 15 মিনিট)",
   "stats.spark": "শেষ মিনিট",
+  "group.showMachine": "মেশিন দেখান",
   "desc.label": "বিবরণ",
   "desc.unknown": "অজানা",
   "desc.fromPkg": "{pkg} প্যাকেজ থেকে: {text}",

@@ -10,7 +10,7 @@ import {
 } from '@lordos/sdk';
 import { Suggested } from './suggested.js';
 import { Card, CardGrid, Facts, Pill, Shelf } from './ui.js';
-import { sysPkgKey, snapshotDate, companionsOf } from './syspkg.js';
+import { sysPkgKey, snapshotDate, companionsOf, qemuUpdateRisk } from './syspkg.js';
 import { AdminRescue, isNotAdmin } from './rescue.js';
 import { search } from './search.js';
 import { MoreButton, usePaged } from './endless.js';
@@ -397,6 +397,11 @@ function Updates() {
   void gen;
   const ups = ready() ? lord.pkg.upgrades() : [];
   const others = ups.filter((u) => u.name !== 'lordos');
+  // machines suspended while QEMU itself is updated: their saved sessions may not load in the new build (Machines then
+  // offers Resume anyway or Discard saved state)
+  let vms = [];
+  try { vms = typeof lord.vm !== 'undefined' && typeof lord.vm.list === 'function' ? lord.vm.list() || [] : []; } catch (e) { vms = []; }
+  const qemuRisk = qemuUpdateRisk(ups, vms);
   // a full upgrade can list hundreds of packages: a page of rows at a time as the page is scrolled (endless.js)
   const { limit, more } = usePaged(others.length, 'updates');
   if (!ready()) return h(NoIndex);
@@ -411,6 +416,9 @@ function Updates() {
         onClick: () => !job && setPlan(lord.pkg.plan({ upgrade: true })) }) : null),
     h(Progress),
     need ? h(RestartCard, { need }) : null,
+    qemuRisk ? h(View, { style: boxStyle(th) },
+      h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('store.updates.qemuTitle', { count: qemuRisk })),
+      h(Text, { style: { fontSize: typeScale.caption, color: th.textDim, lineHeight: 1.4, textAlign: 'start' } }, t('store.updates.qemuText'))) : null,
     plan && h(View, { style: boxStyle(th) },
       h(PlanView, { plan }),
       h(View, { style: { flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 4 } },

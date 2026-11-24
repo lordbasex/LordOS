@@ -934,6 +934,7 @@
   "sentinela.blockFailed": "Nie udało się zablokować jego sieci.",
   "sentinela.machineGone": "Tej maszyny nie ma już w aplikacji Maszyny.",
   "sentinela.machineFailed": "Maszyna nie odpowiedziała.",
+  "vm.overBudget": "Za mało pamięci obok już działających maszyn. Wstrzymaj lub wyłącz jedną z nich albo daj tej maszynie mniej pamięci.",
   "llm.timeout": "Lokalny model zbyt długo nie odpowiadał.",
   "llm.failed": "Lokalny model nie mógł odpowiedzieć.",
   "llm.answer": "Nie udało się odczytać odpowiedzi lokalnego modelu.",

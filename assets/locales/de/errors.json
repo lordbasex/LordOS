@@ -933,6 +933,7 @@
   "sentinela.blockFailed": "Sein Netzwerk konnte nicht gesperrt werden.",
   "sentinela.machineGone": "Diese Maschine ist nicht mehr in „Maschinen“.",
   "sentinela.machineFailed": "Die Maschine hat nicht geantwortet.",
+  "vm.overBudget": "Neben den laufenden Maschinen ist nicht genug Speicher frei. Versetze eine davon in den Ruhezustand oder fahre sie herunter, oder gib dieser Maschine weniger Speicher.",
   "llm.timeout": "Das lokale Modell hat zu lange für die Antwort gebraucht.",
   "llm.failed": "Das lokale Modell konnte nicht antworten.",
   "llm.answer": "Die Antwort des lokalen Modells konnte nicht gelesen werden.",

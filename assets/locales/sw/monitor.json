@@ -685,6 +685,7 @@
   "stats.memAvgRow": "Wastani wa kumbukumbu (dak 1 · 5 · 15)",
   "stats.memPeakRow": "Kilele cha kumbukumbu (dak 1 · 5 · 15)",
   "stats.spark": "Dakika ya mwisho",
+  "group.showMachine": "Onyesha mashine",
   "desc.label": "Maelezo",
   "desc.unknown": "Haijulikani",
   "desc.fromPkg": "Kutoka kifurushi {pkg}: {text}",

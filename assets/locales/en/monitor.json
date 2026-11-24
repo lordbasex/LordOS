@@ -685,6 +685,7 @@
   "stats.memAvgRow": "Memory average (1 · 5 · 15 min)",
   "stats.memPeakRow": "Memory peak (1 · 5 · 15 min)",
   "stats.spark": "Last minute",
+  "group.showMachine": "Show Machine",
   "desc.label": "Description",
   "desc.unknown": "Unknown",
   "desc.fromPkg": "From the package {pkg}: {text}",

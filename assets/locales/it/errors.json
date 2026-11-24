@@ -933,6 +933,7 @@
   "sentinela.blockFailed": "Non è stato possibile bloccare la sua rete.",
   "sentinela.machineGone": "Quella macchina non è più in Macchine.",
   "sentinela.machineFailed": "La macchina non ha risposto.",
+  "vm.overBudget": "Memoria insufficiente accanto alle macchine già in esecuzione. Sospendine o spegnine una, oppure dai meno memoria a questa macchina.",
   "llm.timeout": "Il modello locale ha impiegato troppo tempo a rispondere.",
   "llm.failed": "Il modello locale non è riuscito a rispondere.",
   "llm.answer": "Non è stato possibile leggere la risposta del modello locale.",

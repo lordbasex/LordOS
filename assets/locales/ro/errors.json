@@ -934,6 +934,7 @@
   "sentinela.blockFailed": "Rețeaua lui nu a putut fi blocată.",
   "sentinela.machineGone": "Mașina aceea nu mai este în Mașini.",
   "sentinela.machineFailed": "Mașina nu a răspuns.",
+  "vm.overBudget": "Nu este destulă memorie pe lângă mașinile care rulează deja. Suspendă sau oprește una dintre ele ori dă-i acestei mașini mai puțină memorie.",
   "llm.timeout": "Modelul local a răspuns prea greu.",
   "llm.failed": "Modelul local nu a putut răspunde.",
   "llm.answer": "Răspunsul modelului local nu a putut fi citit.",

@@ -670,6 +670,7 @@
   "stats.memAvgRow": "記憶體平均（1 · 5 · 15 分鐘）",
   "stats.memPeakRow": "記憶體峰值（1 · 5 · 15 分鐘）",
   "stats.spark": "最近一分鐘",
+  "group.showMachine": "顯示虛擬機",
   "desc.label": "說明",
   "desc.unknown": "不明",
   "desc.fromPkg": "來自套件 {pkg}：{text}",

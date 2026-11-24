@@ -700,6 +700,7 @@
   "stats.memAvgRow": "Atminties vidurkis (1 · 5 · 15 min)",
   "stats.memPeakRow": "Atminties didžiausia (1 · 5 · 15 min)",
   "stats.spark": "Paskutinė minutė",
+  "group.showMachine": "Rodyti mašiną",
   "desc.label": "Aprašymas",
   "desc.unknown": "Nežinoma",
   "desc.fromPkg": "Iš paketo {pkg}: {text}",

@@ -1,7 +1,7 @@
 #!/bin/sh
 # apt-repo.sh — the signed LordOS APT repository on lordos.org (docs/UPDATES.md, docs/RELEASING.md).
 #
-#   tools/release/apt-repo.sh build   <target> [--notes VERSION=SECTION]… [--rpi] [--catalog] <file.deb>…
+#   tools/release/apt-repo.sh build   <target> [--notes VERSION=SECTION]… [--rpi] [--catalog] <file.deb|file.dsc>…
 #   tools/release/apt-repo.sh publish <target>
 #   tools/release/apt-repo.sh verify  <target>
 #   tools/release/apt-repo.sh rpi-fetch <target>     (only fetches and verifies the --rpi packages)
@@ -40,6 +40,17 @@
 # pool/catalog/<letter>/<name>/ and into the indexes of their architectures, like pool/main. Apps whose
 # vendor has its own signed APT repository ("delivery": "direct") are only checked, never mirrored: the
 # user's system installs them from the vendor (docs/UPDATES.md, "Mirrored apps (catalog)").
+#
+# Source packages (docs/WPEWEBKIT.md, "Licence and the source next to the binaries"): a .dsc among the files is a
+# Debian source package LordOS built (WPE WebKit's backport, version ~lordos<n>+<m>). Every file its Checksums-Sha256
+# names must be next to it with that SHA-256; they go, append-only, to pool/main/source/<prefix>/<source>/ and are
+# indexed as deb-src in dists/stable/main/source/Sources (signed through Release like the rest). A .deb whose version
+# ends in ~lordos<n>+<m> (a Debian package LordOS rebuilt) is refused while its source's .dsc isn't in the pool, so
+# such a binary is never published without its exact source. publish also writes lordos-src.sources (a deb-src
+# stanza, for `apt-get source`; LordOS systems don't get it, the lordos package keeps installing lordos.sources).
+#
+# Tests only: LORDOS_APT_OFFLINE=1 (no S3) with LORDOS_APT_TEST_KEYRING=<public keyring> and LORDOS_APT_GNUPGHOME
+# holding that throwaway key builds a scratch tree (LORDOS_APT_DIR) signed by it; publish and verify refuse it.
 #
 # lordos-hwdata (0.8.7, docs/BENCHMARK.md "Newer snapshots between releases"): the signed tested-hardware
 # snapshot, an Architecture: all package (tools/iso/mkdeb-hwdata.sh) that lordos depends on. It is added like any
@@ -82,6 +93,12 @@ DISTRIBUTION=$LORDOS_CF_DISTRIBUTION
 SUITE=stable
 ARCHES="amd64 arm64"
 KEYRING=$ROOT/packaging/keys/lordos-archive-keyring.gpg
+if [ -n "${LORDOS_APT_TEST_KEYRING:-}" ]; then
+    # a throwaway key for a local test tree only: never with S3, never for publish or verify
+    [ -n "${LORDOS_APT_OFFLINE:-}" ] && [ "${1:-}" = build ] ||
+        { echo "apt-repo.sh: LORDOS_APT_TEST_KEYRING is only for 'build' with LORDOS_APT_OFFLINE=1" >&2; exit 1; }
+    KEYRING=$LORDOS_APT_TEST_KEYRING
+fi
 GNUPGHOME=${LORDOS_APT_GNUPGHOME:-$HOME/.config/lordos-release/apt-gnupg}
 WORKDIR=${LORDOS_APT_DIR:-$HOME/.local/share/lordos-apt}
 IMAGE=lordos-apt-tools:trixie
@@ -367,6 +384,47 @@ check_hwdata() {
 # is this package one of the mirrored Raspberry Pi packages? (they go to pool/rpi, arm64 index only)
 is_rpi_pkg() { grep -v '^#' "$RPI_LIST" | awk -v n="$1" '$1 == n { f = 1 } END { exit !f }'; }
 
+# the pool folder letter(s) of a source package, as Debian's: lib<x> for lib*, else the first letter
+src_prefix() { case "$1" in lib?*) printf %s "$1" | cut -c1-4 ;; *) printf %s "$1" | cut -c1 ;; esac; }
+
+# one source package (.dsc) into pool/main/source/<prefix>/<source>/: the .dsc and every file its
+# Checksums-Sha256 names, each found next to it with exactly that size and SHA-256; append-only
+add_source() {
+    dsc=$1; d=$(dirname "$dsc"); b=$(basename "$dsc")
+    src=$(awk '/^Source:/ { print $2; exit }' "$dsc")
+    ver=$(awk '/^Version:/ { print $2; exit }' "$dsc")
+    printf %s "$src" | grep -Eq '^[a-z0-9][a-z0-9.+-]+$' || die "$b: bad Source: $src"
+    printf %s "$ver" | grep -Eq '^[0-9A-Za-z.+~:-]+$' || die "$b: bad Version: $ver"
+    [ "$b" = "${src}_${ver#*:}.dsc" ] || die "$b: the file name doesn't match Source $src and Version $ver"
+    dest=pool/main/source/$(src_prefix "$src")/$src
+    files=$(awk '/^Checksums-Sha256:/ { s = 1; next } /^[^ ]/ { s = 0 } s && NF == 3 { print $1, $2, $3 }' "$dsc")
+    [ -n "$files" ] || die "$b has no Checksums-Sha256"
+    echo "$files" | while read -r sum size f; do
+        case "$f" in */*|.*|'') die "$b names a bad file: $f" ;; esac
+        [ -f "$d/$f" ] || die "$b: $f is not next to it"
+        [ "$(wc -c < "$d/$f" | tr -d ' ')" = "$size" ] || die "$b: $f has the wrong size"
+        [ "$(shasum -a 256 "$d/$f" | cut -d' ' -f1)" = "$sum" ] || die "$b: $f does not match its SHA-256"
+    done || exit 1
+    mkdir -p "$TREE/$dest"
+    # every collision first, so a refused source package leaves nothing half copied
+    for f in "$b" $(echo "$files" | awk '{ print $3 }'); do
+        if [ -f "$TREE/$dest/$f" ] && ! cmp -s "$d/$f" "$TREE/$dest/$f"; then
+            die "$dest/$f is already published with different contents: a version is never replaced (bump it)"
+        fi
+    done
+    for f in "$b" $(echo "$files" | awk '{ print $3 }'); do
+        cp "$d/$f" "$TREE/$dest/$f"
+        echo "  $dest/$f"
+    done
+}
+
+# the deb-src stanza of this target (lordos-src.sources)
+src_sources() {
+    printf '%s\n' "# LordOS's source packages (docs/WPEWEBKIT.md): the exact source of the Debian packages LordOS rebuilds," \
+        "# for apt-get source. Optional: copy it to /etc/apt/sources.list.d/ to use it." \
+        "Types: deb-src" "URIs: $URL" "Suites: $SUITE" "Components: main" "Signed-By: /usr/share/keyrings/lordos-archive-keyring.gpg"
+}
+
 do_build() {
     NOTES_MAP=""; RPI=0; CATALOG=0; cats=
     while [ $# -gt 0 ]; do
@@ -402,6 +460,7 @@ do_build() {
     fi
     for deb in "$@"; do
         [ -f "$deb" ] || die "no such file: $deb"
+        case "$deb" in *.dsc) add_source "$deb"; continue ;; esac
         mkdir -p "$TREE/incoming"
         cp "$deb" "$TREE/incoming/"
         b=$(basename "$deb")
@@ -422,6 +481,16 @@ do_build() {
         echo "  $dest"
     done
     rm -rf "$TREE/incoming"
+    # a Debian package LordOS rebuilt (~lordos<n>+<m>) only with its exact source in the pool
+    for d in $(find "$TREE/pool/main" "$TREE/pool/catalog" -path "$TREE/pool/main/source" -prune -o -name '*~lordos*+*.deb' -print 2>/dev/null | sed "s#^$TREE/##"); do
+        src=$(debtool dpkg-deb -f "$d" Source)
+        sver=$(printf %s "$src" | sed -n 's/.*(\(.*\)).*/\1/p')
+        src=${src%% *}
+        [ -n "$src" ] || src=$(debtool dpkg-deb -f "$d" Package)
+        [ -n "$sver" ] || sver=$(debtool dpkg-deb -f "$d" Version)
+        dsc=pool/main/source/$(src_prefix "$src")/$src/${src}_${sver#*:}.dsc
+        [ -f "$TREE/$dsc" ] || die "$d is a LordOS rebuild of Debian's $src $sver and $dsc is not in the pool: add the .dsc"
+    done
     # every lordos that depends on lordos-hwdata needs one in the pool, or no system could install it
     if [ -z "$(find "$TREE/pool/main/l/lordos-hwdata" -name 'lordos-hwdata_*_all.deb' 2>/dev/null | head -n 1)" ]; then
         for d in $(find "$TREE/pool/main/l/lordos" -name 'lordos_*.deb' 2>/dev/null | sed "s#^$TREE/##"); do
@@ -477,6 +546,16 @@ do_build() {
         gzip -9 -n -k -f "$TREE/$D/main/binary-$a/Packages"
         printf 'Archive: %s\nOrigin: LordOS\nLabel: LordOS\nComponent: main\nArchitecture: %s\n' "$SUITE" "$a" > "$TREE/$D/main/binary-$a/Release"
     done
+
+    # the source packages (deb-src): main/source/Sources, signed through Release with the rest
+    if [ -d "$TREE/pool/main/source" ]; then
+        mkdir -p "$TREE/$D/main/source"
+        debtool apt-ftparchive sources pool/main/source > "$TREE/$D/main/source/Sources"
+        xz -9 -k -f "$TREE/$D/main/source/Sources"
+        gzip -9 -n -k -f "$TREE/$D/main/source/Sources"
+        printf 'Archive: %s\nOrigin: LordOS\nLabel: LordOS\nComponent: main\nArchitecture: source\n' "$SUITE" > "$TREE/$D/main/source/Release"
+        echo "  source packages: $(grep -c '^Package:' "$TREE/$D/main/source/Sources")"
+    fi
 
     # release notes of every lordos version in the pool (Store → Updates shows the candidate's)
     mkdir -p "$TREE/$D/main/notes"
@@ -545,7 +624,13 @@ do_publish() {
     check_signatures "$TREE/dists/$SUITE/InRelease" "$TREE/dists/$SUITE/Release" "$TREE/dists/$SUITE/Release.gpg"
     # 1. packages (never change once published), 2. indexes, 3. the signed files that point at them
     aws s3 sync "$TREE/pool" "s3://$BUCKET/$PREFIX/pool" --cache-control "public, max-age=31536000, immutable" \
-        --exclude "rpi/source/*" --content-type application/vnd.debian.binary-package --only-show-errors
+        --exclude "rpi/source/*" --exclude "main/source/*" --content-type application/vnd.debian.binary-package --only-show-errors
+    if [ -d "$TREE/pool/main/source" ]; then
+        aws s3 sync "$TREE/pool/main/source" "s3://$BUCKET/$PREFIX/pool/main/source" --cache-control "public, max-age=31536000, immutable" \
+            --exclude "*" --include "*.dsc" --content-type "text/plain; charset=utf-8" --only-show-errors
+        aws s3 sync "$TREE/pool/main/source" "s3://$BUCKET/$PREFIX/pool/main/source" --cache-control "public, max-age=31536000, immutable" \
+            --exclude "*.dsc" --content-type application/octet-stream --only-show-errors
+    fi
     if [ -d "$TREE/pool/rpi/source" ]; then
         aws s3 sync "$TREE/pool/rpi/source" "s3://$BUCKET/$PREFIX/pool/rpi/source" --cache-control "public, max-age=31536000, immutable" \
             --exclude "*" --include "*.dsc" --include "*/config-*" --include "*.diff" --include "*.sh" --include "*/SOURCE" \
@@ -564,12 +649,18 @@ do_publish() {
     sed "s#^URIs: https://lordos.org/apt\$#URIs: $URL#" "$ROOT/packaging/apt/lordos.sources" > "$TREE/lordos.sources"
     aws s3 cp "$TREE/lordos.sources" "s3://$BUCKET/$PREFIX/lordos.sources" --cache-control "no-cache" \
         --content-type "text/plain; charset=utf-8" --only-show-errors
+    # deb-src for whoever wants `apt-get source` (not installed on LordOS systems; the Store's engine reads deb only)
+    if [ -f "$TREE/dists/$SUITE/main/source/Sources" ]; then
+        src_sources > "$TREE/lordos-src.sources"
+        aws s3 cp "$TREE/lordos-src.sources" "s3://$BUCKET/$PREFIX/lordos-src.sources" --cache-control "no-cache" \
+            --content-type "text/plain; charset=utf-8" --only-show-errors
+    fi
     aws s3 cp "$KEYRING" "s3://$BUCKET/keys/lordos-archive-keyring.gpg" --cache-control "no-cache" \
         --content-type application/pgp-keys --only-show-errors
     aws s3 cp "${KEYRING%.gpg}.asc" "s3://$BUCKET/keys/lordos-archive-keyring.asc" --cache-control "no-cache" \
         --content-type "text/plain; charset=utf-8" --only-show-errors
     id=$(aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION" \
-        --paths "/$PREFIX/dists/*" "/$PREFIX/lordos.sources" "/keys/*" --query Invalidation.Id --output text)
+        --paths "/$PREFIX/dists/*" "/$PREFIX/lordos.sources" "/$PREFIX/lordos-src.sources" "/keys/*" --query Invalidation.Id --output text)
     echo "published $URL (invalidation $id); check it with: $0 verify $target"
 }
 

@@ -685,6 +685,7 @@
   "stats.memAvgRow": "Memòria mitjana (1 · 5 · 15 min)",
   "stats.memPeakRow": "Memòria pic (1 · 5 · 15 min)",
   "stats.spark": "Últim minut",
+  "group.showMachine": "Mostra la màquina",
   "desc.label": "Descripció",
   "desc.unknown": "Desconegut",
   "desc.fromPkg": "Del paquet {pkg}: {text}",

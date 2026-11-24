@@ -932,6 +932,7 @@
   "sentinela.blockFailed": "Không thể chặn mạng của nó.",
   "sentinela.machineGone": "Máy đó không còn trong Máy ảo nữa.",
   "sentinela.machineFailed": "Máy không phản hồi.",
+  "vm.overBudget": "Không đủ bộ nhớ bên cạnh các máy đang chạy. Hãy tạm ngưng hoặc tắt một máy trong số đó, hoặc cho máy này ít bộ nhớ hơn.",
   "llm.timeout": "Mô hình cục bộ trả lời quá lâu.",
   "llm.failed": "Mô hình cục bộ không thể trả lời.",
   "llm.answer": "Không đọc được câu trả lời của mô hình cục bộ.",

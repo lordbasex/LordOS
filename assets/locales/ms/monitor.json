@@ -670,6 +670,7 @@
   "stats.memAvgRow": "Purata memori (1 · 5 · 15 min)",
   "stats.memPeakRow": "Puncak memori (1 · 5 · 15 min)",
   "stats.spark": "Minit terakhir",
+  "group.showMachine": "Tunjukkan mesin",
   "desc.label": "Penerangan",
   "desc.unknown": "Tidak diketahui",
   "desc.fromPkg": "Daripada pakej {pkg}: {text}",

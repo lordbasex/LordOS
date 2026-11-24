@@ -933,6 +933,7 @@
   "sentinela.blockFailed": "Ağı engellenemedi.",
   "sentinela.machineGone": "O makine artık Sanal Makineler’de yok.",
   "sentinela.machineFailed": "Makine yanıt vermedi.",
+  "vm.overBudget": "Zaten çalışan makinelerin yanında yeterli bellek yok. Birini askıya alın ya da kapatın veya bu makineye daha az bellek verin.",
   "llm.timeout": "Yerel modelin yanıt vermesi çok uzun sürdü.",
   "llm.failed": "Yerel model yanıt veremedi.",
   "llm.answer": "Yerel modelin yanıtı okunamadı.",

@@ -670,6 +670,7 @@
   "stats.memAvgRow": "메모리 평균 (1 · 5 · 15분)",
   "stats.memPeakRow": "메모리 최대 (1 · 5 · 15분)",
   "stats.spark": "최근 1분",
+  "group.showMachine": "머신 보기",
   "desc.label": "설명",
   "desc.unknown": "알 수 없음",
   "desc.fromPkg": "{pkg} 패키지 설명: {text}",

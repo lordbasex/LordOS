@@ -932,6 +932,7 @@
   "sentinela.blockFailed": "Jaringannya tidak dapat diblokir.",
   "sentinela.machineGone": "Mesin itu sudah tidak ada di Mesin Virtual.",
   "sentinela.machineFailed": "Mesin tidak menjawab.",
+  "vm.overBudget": "Memori tidak cukup di samping mesin yang sudah berjalan. Tangguhkan atau matikan salah satunya, atau beri mesin ini memori lebih sedikit.",
   "llm.timeout": "Model lokal terlalu lama menjawab.",
   "llm.failed": "Model lokal tidak dapat menjawab.",
   "llm.answer": "Jawaban model lokal tidak dapat dibaca.",

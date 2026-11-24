@@ -685,6 +685,7 @@
   "stats.memAvgRow": "Memóriaátlag (1 · 5 · 15 perc)",
   "stats.memPeakRow": "Memóriacsúcs (1 · 5 · 15 perc)",
   "stats.spark": "Utolsó perc",
+  "group.showMachine": "Gép megjelenítése",
   "desc.label": "Leírás",
   "desc.unknown": "Ismeretlen",
   "desc.fromPkg": "A(z) {pkg} csomagból: {text}",

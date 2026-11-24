@@ -670,6 +670,7 @@
   "stats.memAvgRow": "Bộ nhớ trung bình (1 · 5 · 15 phút)",
   "stats.memPeakRow": "Bộ nhớ đỉnh (1 · 5 · 15 phút)",
   "stats.spark": "Phút vừa qua",
+  "group.showMachine": "Hiện máy",
   "desc.label": "Mô tả",
   "desc.unknown": "Không rõ",
   "desc.fromPkg": "Từ gói {pkg}: {text}",

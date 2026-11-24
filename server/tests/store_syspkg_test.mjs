@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { sysPkgKey, snapshotDate, companionsOf } = await import(path.join(here, '../../apps/store/syspkg.js'));
+const { sysPkgKey, snapshotDate, companionsOf, qemuUpdateRisk } = await import(path.join(here, '../../apps/store/syspkg.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -41,6 +41,14 @@ eq('only those the index has', JSON.stringify(companionsOf('obs-studio', (p) => 
 eq('other packages none', JSON.stringify(companionsOf('vlc')), '[]');
 eq('no name none', JSON.stringify(companionsOf(undefined)), '[]');
 eq('not an own property', JSON.stringify(companionsOf('toString')), '[]');
+
+// a QEMU update while machines are suspended (qemuUpdateRisk)
+const vms = [{ suspended: true }, { suspended: false }, { suspended: true }];
+eq('qemu update, two suspended', qemuUpdateRisk([{ name: 'firefox-esr' }, { name: 'qemu-system-x86' }], vms), 2);
+eq('qemu-utils counts', qemuUpdateRisk([{ name: 'qemu-utils' }], vms), 2);
+eq('no qemu, nothing', qemuUpdateRisk([{ name: 'firefox-esr' }, { name: 'xqemu-system' }], vms), 0);
+eq('none suspended', qemuUpdateRisk([{ name: 'qemu-system-arm' }], [{ suspended: false }]), 0);
+eq('no lists', qemuUpdateRisk(null, null), 0);
 
 console.log(`store-syspkg-test: ${n - bad}/${n} checks passed`);
 process.exit(bad ? 1 : 0);

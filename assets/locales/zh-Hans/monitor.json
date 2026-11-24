@@ -670,6 +670,7 @@
   "stats.memAvgRow": "内存平均（1 · 5 · 15 分钟）",
   "stats.memPeakRow": "内存峰值（1 · 5 · 15 分钟）",
   "stats.spark": "最近一分钟",
+  "group.showMachine": "显示虚拟机",
   "desc.label": "说明",
   "desc.unknown": "未知",
   "desc.fromPkg": "来自软件包 {pkg}：{text}",

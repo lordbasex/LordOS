@@ -685,6 +685,7 @@
   "stats.memAvgRow": "اوسط میموری (1 · 5 · 15 منٹ)",
   "stats.memPeakRow": "زیادہ سے زیادہ میموری (1 · 5 · 15 منٹ)",
   "stats.spark": "آخری منٹ",
+  "group.showMachine": "مشین دکھائیں",
   "desc.label": "تفصیل",
   "desc.unknown": "نامعلوم",
   "desc.fromPkg": "پیکیج {pkg} سے: {text}",

@@ -670,6 +670,7 @@
   "stats.memAvgRow": "Rata-rata memori (1 · 5 · 15 mnt)",
   "stats.memPeakRow": "Puncak memori (1 · 5 · 15 mnt)",
   "stats.spark": "Menit terakhir",
+  "group.showMachine": "Tampilkan mesin",
   "desc.label": "Deskripsi",
   "desc.unknown": "Tidak diketahui",
   "desc.fromPkg": "Dari paket {pkg}: {text}",

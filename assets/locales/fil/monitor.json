@@ -685,6 +685,7 @@
   "stats.memAvgRow": "Average na memory (1 · 5 · 15 min)",
   "stats.memPeakRow": "Peak na memory (1 · 5 · 15 min)",
   "stats.spark": "Huling minuto",
+  "group.showMachine": "Ipakita ang Machine",
   "desc.label": "Paglalarawan",
   "desc.unknown": "Hindi kilala",
   "desc.fromPkg": "Mula sa package na {pkg}: {text}",

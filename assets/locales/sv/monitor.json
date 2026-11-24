@@ -685,6 +685,7 @@
   "stats.memAvgRow": "Minne snitt (1 · 5 · 15 min)",
   "stats.memPeakRow": "Minne topp (1 · 5 · 15 min)",
   "stats.spark": "Senaste minuten",
+  "group.showMachine": "Visa maskinen",
   "desc.label": "Beskrivning",
   "desc.unknown": "Okänd",
   "desc.fromPkg": "Från paketet {pkg}: {text}",

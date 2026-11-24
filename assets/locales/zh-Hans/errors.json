@@ -932,6 +932,7 @@
   "sentinela.blockFailed": "无法阻止其联网。",
   "sentinela.machineGone": "该虚拟机已不在“虚拟机”中。",
   "sentinela.machineFailed": "虚拟机没有响应。",
+  "vm.overBudget": "已有虚拟机在运行,内存不足。请挂起或关闭其中一台,或给这台虚拟机更少的内存。",
   "llm.timeout": "本地模型回答时间太长。",
   "llm.failed": "本地模型无法回答。",
   "llm.answer": "无法读取本地模型的回答。",

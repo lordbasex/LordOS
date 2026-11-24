@@ -700,6 +700,7 @@
   "stats.memAvgRow": "Średnia pamięć (1 · 5 · 15 min)",
   "stats.memPeakRow": "Szczyt pamięci (1 · 5 · 15 min)",
   "stats.spark": "Ostatnia minuta",
+  "group.showMachine": "Pokaż maszynę",
   "desc.label": "Opis",
   "desc.unknown": "Nieznany",
   "desc.fromPkg": "Z pakietu {pkg}: {text}",

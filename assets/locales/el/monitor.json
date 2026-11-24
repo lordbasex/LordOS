@@ -685,6 +685,7 @@
   "stats.memAvgRow": "Μέση μνήμη (1 · 5 · 15 λεπ.)",
   "stats.memPeakRow": "Μέγιστη μνήμη (1 · 5 · 15 λεπ.)",
   "stats.spark": "Τελευταίο λεπτό",
+  "group.showMachine": "Εμφάνιση μηχανής",
   "desc.label": "Περιγραφή",
   "desc.unknown": "Άγνωστο",
   "desc.fromPkg": "Από το πακέτο {pkg}: {text}",

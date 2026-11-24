@@ -280,6 +280,12 @@ Session *term_create_fd(int fd, int scrollback) {
     s->t.respond = respond;
     s->t.tmux = tmux_cb;
     s->t.user = s;
+    /* a guest's stream (Machines' serial console and agent shell): what the guest writes never acts on this computer. It
+     * can't set the clipboard (OSC 52, iTerm's Copy), start tmux's control mode (its panes and protocol), make links
+     * (OSC 8), and term_events passes on only its output, size, bell and end: no title, notification, badge, profile,
+     * attention, command, run, host, secret prompt, fill or save event, so no host code acts on the guest's words */
+    s->t.no_clip_set = 1;
+    s->t.tmux = NULL;
     fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
     s->fd = fd;
     s->pid = 0;                 /* no process: never signalled, never waited for */
@@ -741,6 +747,7 @@ Session *term_tmux_pane(Session *g, int pane) {
     if (vt_init(&s->t, 80, 24, s->prof.scrollback, &s->prof)) { vt_free(&s->t); return NULL; }
     s->t.respond = respond;
     s->t.user = s;
+    s->t.no_clip_set = g->t.no_clip_set;    /* a guest gateway's panes are guest streams too (defence in depth) */
     s->fd = -1;
     s->ctrl = -1;
     s->gateway = g->id;
@@ -1074,6 +1081,7 @@ void term_events(TermEventFn fn) {
         if (!s->used || !s->t.events) continue;
         uint32_t e = s->t.events;
         s->t.events = 0;
+        if (s->t.no_clip_set) e &= EV_BELL | EV_RESIZE | EV_OUTPUT | EV_EXIT;     /* a guest's stream: term_create_fd */
         int id = s->id;
         char code[16];
         if (e & EV_TITLE) fn(id, "title", s->t.title);

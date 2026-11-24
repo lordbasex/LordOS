@@ -1005,5 +1005,6 @@
   "themeSwitch.changingTo": "جارٍ التغيير إلى {name}…",
   "themeSwitch.failedTitle": "تعذّر تطبيق {name}",
   "themeSwitch.refusedBody": "لا تطابق شيفرته النسخة الموقّعة من LordOS، لذا لم يُحمَّل. يبقى نمط سطح المكتب كما كان.",
-  "themeSwitch.failedBody": "لم يبدأ. يبقى نمط سطح المكتب كما كان."
+  "themeSwitch.failedBody": "لم يبدأ. يبقى نمط سطح المكتب كما كان.",
+  "spotlight.section.machines": "الأجهزة الافتراضية"
 }
