@@ -8998,6 +8998,15 @@ static int cmd_import_machine(const char *src, int argc, char **argv) {
         }
         char w2[256];
         if (disk_plain(out, w2, sizeof w2)) { fprintf(stderr, "lord-vm: the converted disk isn't plain: %s\n", w2); goto out; }
+        /* qemu-img convert leaves the disk in the page cache (its output cache is "unsafe"): written out here, or the
+         * machine's first start opens it with O_DIRECT behind gigabytes of writeback and QEMU misses its 20 s to
+         * answer QMP (seen 2026-11-24 with a 20 GB disk started right after its import) */
+        {
+            int sf = open(out, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+            int bad = sf < 0 || fsync(sf);
+            if (sf >= 0) close(sf);
+            if (bad) { fprintf(stderr, "lord-vm: the converted disk couldn't be written out: %s\n", strerror(errno)); goto out; }
+        }
         if (rename(out, fin)) { fprintf(stderr, "lord-vm: can't put a disk in place\n"); goto out; }
         chmod(fin, 0600);
     }
