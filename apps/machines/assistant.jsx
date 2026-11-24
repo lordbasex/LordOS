@@ -16,6 +16,7 @@ import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openU
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
 import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, noticeOf, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor, lordosLang } from './catalog.js';
+import { newKey } from './keyflow.js';
 import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard } from './model.js';
 import { allProfiles, profileById, builtinProfile, defaultProfileId, onHost, setPatch, shareAbs, DEFAULT_PROFILE } from './profiles.js';
 import { customUnattended, systemState } from './systems.js';
@@ -66,7 +67,8 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   const [customs] = useState(loadSystems);
   const [profile, setProfile] = useState(() => defaultProfileId(defaultsOf(settings.get().machinesDefaults).profile, own));
   const [custom, setCustom] = useState(null);     // a system the person added (systems.js), once its image is verified
-  const [shareOn, setShareOn] = useState(true);   // the profile's shared folder, confirmed in the review
+  const [shareOn, setShareOn] = useState(true);
+  const [encrypt, setEncrypt] = useState(false);   // an encrypted machine (docs/VIRTUALIZATION.md 8), asked in the review   // the profile's shared folder, confirmed in the review
   const [gpuReady] = useState(() => { try { return !!gvtGpu(typeof lord !== 'undefined' && lord.vm?.gpus ? lord.vm.gpus() : null); } catch (e) { return false; } });
   const [name, setName] = useState('');
   const [rootPassword, setRootPassword] = useState('');
@@ -318,6 +320,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
     const lang = win.mode === 'eval' ? evalFile.lang : win.iso.lang;
     const req = createRequest({ ...d, path: iso });
     req.windows = { drivers };
+    if (encrypt) { try { req.keyId = await newKey(d.name); } catch (e) { setFail(e.message); return; } }
     req.unattended = { kind: 'windows', guided: !un.on, user: un.user, password: un.password, fullname: '', hostname: un.hostname,
       edition: plan.name, key: plan.key, uilang: lang, inputloc: inputLocale(un.keymap, '', lang), userloc: userLocale(hd.locale), wtz: windowsZone(ZONES, un.timezone) };
     const id = lord.vm.create(req);
@@ -368,6 +371,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
       setGot(null);
     }
     const req = createRequest(iso ? { ...d, path: iso } : d);
+    if (encrypt) { try { req.keyId = await newKey(d.name); } catch (e) { setFail(e.message); setStep(4); return; } }
     if (iso && unOn) {
       req.unattended = { kind: uo.kind, user: un.user, password: un.password, fullname: '', hostname: un.hostname, timezone: un.timezone,
         keymap: un.keymap, variant: '', locale: hd.locale || 'en_US.UTF-8', release: uo.release, kernel: uo.kernel, initrd: uo.initrd, append: uo.append, desktop: true };
@@ -580,6 +584,13 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
             <Text style={{ fontSize: 13, fontWeight: 600, color: p.text, direction: 'ltr' }}>{val}</Text>
           </View>
         ))}
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
+        <Toggle on={encrypt} onChange={setEncrypt} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.as.encrypt')}</Text>
+          <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.as.encryptHint')}</Text>
+        </View>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
         <Toggle on={shareClip} onChange={setShareClip} />

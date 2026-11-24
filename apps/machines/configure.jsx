@@ -12,6 +12,8 @@ import { defaultsOf } from './store.js';
 import { SideRow, PaneHeader, Pill, Section, Sym } from './kit.jsx';
 import { BUILTIN, builtinProfile, onHost } from './profiles.js';
 import { LOCKED_ROWS, sessionCapMb } from './group.js';
+import { disposableOf, disposableAllowed, disposableCapMb, encryptionNote } from './storagemodel.js';
+import { ExportSheet } from './vmkey.jsx';
 
 const SECTIONS = ['general', 'startup', 'cpu', 'display', 'network', 'sound', 'disks', 'sharing', 'agent', 'boot', 'security'];
 // each section's glyph (assets/machines/symbols)
@@ -200,6 +202,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   const [msg, setMsg] = useState(() => { const c = carried && carried.dir === dir ? carried.msg : null; carried = null; return c; });
   const [picking, setPicking] = useState(false);
   const [pickShare, setPickShare] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [disk, setDisk] = useState(null);
   const [sndDraft, setSndDraft] = useState({});
   const sndSt = useSound();                          // the outputs and inputs, as Settings → Sound lists them
@@ -524,6 +527,28 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
           onClick={() => save(m.devices === 'compat' ? { devices: 'virtio', nicModel: 'virtio' } : { devices: 'compat', nicModel: 'e1000e' })} /></View></Off>
       </Row>
     </Group> : null}
+    {/* storage (docs/VIRTUALIZATION.md 6.2, 6.4, 3.6): the disks' format, a disposable session, Backups, Export */}
+    <Group>
+      <Row label={tr('machines.cfg.st.format')} value={m.diskFormat === 'raw' ? tr('machines.cfg.st.raw') : tr('machines.cfg.st.qcow2')}
+        note={tr(m.diskFormat === 'raw' ? 'machines.cfg.st.rawNote' : 'machines.cfg.st.qcow2Note')} />
+      {disposableAllowed(m) ? (
+        <Row label={tr('machines.cfg.st.disposable')} note={tr(`machines.cfg.st.disposableNote.${disposableOf(m)}`, { mem: gb(disposableCapMb(m)) }) + (offNote ? ` ${offNote}` : '')}>
+          <Off off={running}><Segmented options={[['off', tr('machines.cfg.st.dispOff')], ['memory', tr('machines.cfg.st.dispMemory')], ['disk', tr('machines.cfg.st.dispDisk')]]}
+            value={disposableOf(m)} onChange={(x) => { if (!running && !job && x !== disposableOf(m)) save({ disposable: x }); }} /></Off>
+        </Row>
+      ) : null}
+      <Row label={tr('machines.cfg.st.backup')} note={tr(m.backup === false ? 'machines.cfg.st.backupOffNote' : 'machines.cfg.st.backupNote')}>
+        <Off off={running}><Toggle on={m.backup !== false} onChange={(x) => { if (!job && !running) save({ backup: x }); }} /></Off>
+      </Row>
+      <Row label={tr('machines.cfg.st.export')} note={tr('machines.cfg.st.exportNote')} last>
+        <View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.st.exportBtn')} disabled={running || !!job || !!m.group} onClick={() => setExporting(true)} /></View>
+      </Row>
+    </Group>
+    {m.firmwareChanged ? <Group>
+      <Row label={tr('machines.cfg.st.firmware')} note={tr('machines.cfg.st.firmwareNote')} last>
+        <View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.st.firmwareUse')} disabled={running || !!job} onClick={() => save({ firmwareUpdate: true })} /></View>
+      </Row>
+    </Group> : null}
     <Group>
       <Row label={tr('machines.cfg.cd')} value={m.iso ? m.iso.split('/').pop() : tr('machines.cfg.cdEmpty')} last note={running ? tr('machines.cfg.cdRunning') : null}>
         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -629,13 +654,18 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       </Row>
     </Group>
   </>;
-  else if (sec === 'security') pane = <Group>
+  else if (sec === 'security') pane = <><Group>
+    {/* encrypted machines (8): whole (disks, UEFI variables, TPM, snapshots' memory), the key in Passwords; host swap */}
+    <Row label={tr('machines.cfg.sec.encryption')} value={tr(m.encrypted ? 'machines.cfg.sec.encYes' : 'machines.cfg.sec.encNo')}
+      note={tr(`machines.cfg.secNote.enc.${encryptionNote(m)}`, { name: m.name })} />
+    <Row label={tr('machines.cfg.sec.swap')} note={tr('machines.cfg.secNote.swap')} last />
+  </Group><Group>
     {['sandbox', 'files', 'network', 'limits', 'display', 'secrets'].map((k, i, a) => {
       // the network's line follows the mode: passt listening on the forwarded ports, or the bridged card's device
       const note = k !== 'network' ? k : m.network === 'bridged' ? 'networkBridged' : usesPorts(m.network) && m.ports?.length ? 'networkPorts' : k;
       return <Row key={k} label={tr(`machines.cfg.sec.${k}`)} last={i === a.length - 1} note={tr(`machines.cfg.secNote.${note}`, { limit: gb(memLimit(m)) })} />;
     })}
-  </Group>;
+  </Group></>;
 
   const savable = ['general', 'cpu', 'display', 'network', 'disks', 'sharing', 'agent', 'boot'].includes(sec);
   const list = (
@@ -689,6 +719,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
           if (!path || cur.shares.some((y) => y.path === path)) return;
           set({ shares: [...cur.shares, { tag: shareTag(path.split('/').pop(), [...cur.shares.map((y) => y.tag), 'LordOS']), path, writable: false }] });
         }} /> : null}
+      {exporting ? <ExportSheet m={m} running={running} onClose={() => setExporting(false)} /> : null}
       {picking ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPicking(false)}
         onPick={(x) => { setPicking(false); save({ iso: Array.isArray(x) ? x[0] : x }); }} /> : null}
       {side.narrow && side.shown ? <SidebarOverlay width={260} onClose={side.close}>{list}</SidebarOverlay> : null}

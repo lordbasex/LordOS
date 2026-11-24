@@ -19,6 +19,7 @@ import { startAppsStatus } from './appsstatus.jsx';
 import { startMachinesCli } from './cli.js';
 import { MachinesSettings } from './settingswin.jsx';
 import { useMachineDir } from './ui.jsx';
+import { RecoveryKeyWindow } from './vmkey.jsx';
 
 export function Icon({ size }) { return <AppMark size={size} />; }
 
@@ -69,6 +70,8 @@ export default function App() {
   // a machine renamed with its folder (6.26): its windows follow it there, by its id
   const dir0 = args?.machine || args?.snapshots || args?.configure || args?.logs || '';
   const dir = useMachineDir(dir0);
+  // an encrypted machine's recovery key (keyflow.js): a protected window of its own
+  if (args?.recoveryKey) return <RecoveryKeyWindow id={args.recoveryKey} name={args.name || ''} />;
   if (args?.guestWin) return <GuestWindow dir={args.guestWin.dir} gid={args.guestWin.gid} />;
   if (args?.machine) return <MachineWindow key={dir} dir={dir} name={args.name || ''} loadvm={args.loadvm || ''} followed={dir !== dir0} />;
   if (args?.storage) return <Storage />;

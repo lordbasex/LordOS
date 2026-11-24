@@ -80,6 +80,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "../vm/vmpin.h"
+#include "../vm/vmkeysrv.h"
+#include "../vault/vclient.h"
+#include "../vm/vmexport.h"
+#include "../pkg/crypto.h"
 
 extern char **environ;
 
@@ -458,6 +462,44 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         set_str(c, o, "pointer", m.pointer_guest ? "guest" : "lordos");   /* who draws a Windows guest's pointer (7.1.2) */
         JS_SetPropertyStr(c, o, "captureFullscreen", JS_NewBool(c, m.capture_fullscreen));   /* "Capture mouse" (6.25) */
         JS_SetPropertyStr(c, o, "perfProfile", JS_NewBool(c, m.perf_profile));   /* the guest's performance profile (7.1.4) */
+        /* storage (schema 15): 6.2, 6.4, 8; keyId: where its key lives in the keyring (its id, or its group's) */
+        set_str(c, o, "disposable", VM_DISP_NAMES[m.disposable][0] ? VM_DISP_NAMES[m.disposable] : "off");
+        JS_SetPropertyStr(c, o, "encrypted", JS_NewBool(c, m.encrypted));
+        if (m.encrypted) set_str(c, o, "keyId", m.group[0] ? m.group : m.id);
+        set_str(c, o, "diskFormat", m.raw ? "raw" : "qcow2");
+        JS_SetPropertyStr(c, o, "backup", JS_NewBool(c, !m.no_backup));
+        {
+            /* the UEFI code this machine was made with is no longer the system's (3.6): it starts with its kept copy */
+            char sum[65];
+            int changed = 0;
+            if (m.firmware == VM_FW_UEFI) {
+                int ffd = open(m.firmware_code, O_RDONLY | O_CLOEXEC);
+                struct stat fst;
+                /* hashing 4 MB on every list would cost: the kept copy's presence and the system file's size and time
+                 * are cached per machine id in a tiny table */
+                static struct { char id[37]; long long size, mtime; int changed; } fwc[16];
+                if (ffd >= 0 && !fstat(ffd, &fst)) {
+                    int hit = -1;
+                    for (int q = 0; q < 16; q++) if (!strcmp(fwc[q].id, m.id)) hit = q;
+                    if (hit >= 0 && fwc[hit].size == (long long)fst.st_size && fwc[hit].mtime == (long long)fst.st_mtime) changed = fwc[hit].changed;
+                    else {
+                        Sha256 h;
+                        uint8_t dg[32], buf[65536];
+                        ssize_t r;
+                        sha256_init(&h);
+                        while ((r = read(ffd, buf, sizeof buf)) > 0) sha256_update(&h, buf, (size_t)r);
+                        sha256_final(&h, dg);
+                        for (int q = 0; q < 32; q++) snprintf(sum + 2 * q, 3, "%02x", dg[q]);
+                        changed = strcmp(sum, m.firmware_sha256) != 0;
+                        int slot = hit >= 0 ? hit : (int)(m.id[0] % 16);
+                        snprintf(fwc[slot].id, sizeof fwc[slot].id, "%s", m.id);
+                        fwc[slot].size = (long long)fst.st_size; fwc[slot].mtime = (long long)fst.st_mtime; fwc[slot].changed = changed;
+                    }
+                }
+                if (ffd >= 0) close(ffd);
+            }
+            JS_SetPropertyStr(c, o, "firmwareChanged", JS_NewBool(c, changed));
+        }
         set_str(c, o, "cpuPin", pin_effective(&m));                                           /* "off" | "auto" (3.7.1) */
         JS_SetPropertyStr(c, o, "cpuPinChosen", JS_NewBool(c, m.cpu_pin != VM_PIN_DEFAULT));
         set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
@@ -892,6 +934,20 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     int vcpus = prop_int(c, argv[0], "vcpus"), mem = prop_int(c, argv[0], "memoryMb"), disk = prop_int(c, argv[0], "diskGb");
     char imp[PATH_MAX] = "", iso[PATH_MAX] = "";
     int isolated = 0, share = 0;
+    /* storage (schema 15): keyId (encrypted: the id lord.vm.keyNew made a key for), diskFormat "raw", disposable */
+    char cr_kid[37] = "", cr_disp[8] = "";
+    int cr_raw = 0;
+    {
+        JSValue vk = JS_GetPropertyStr(c, argv[0], "keyId"), vf = JS_GetPropertyStr(c, argv[0], "diskFormat"), vd = JS_GetPropertyStr(c, argv[0], "disposable");
+        const char *ks = JS_IsString(vk) ? JS_ToCString(c, vk) : NULL, *fs = JS_IsString(vf) ? JS_ToCString(c, vf) : NULL, *ds = JS_IsString(vd) ? JS_ToCString(c, vd) : NULL;
+        if (ks && vm_uuid_valid(ks)) snprintf(cr_kid, sizeof cr_kid, "%s", ks);
+        cr_raw = fs && !strcmp(fs, "raw");
+        if (ds && (!strcmp(ds, "memory") || !strcmp(ds, "disk"))) snprintf(cr_disp, sizeof cr_disp, "%s", ds);
+        if (ks) JS_FreeCString(c, ks);
+        if (fs) JS_FreeCString(c, fs);
+        if (ds) JS_FreeCString(c, ds);
+        JS_FreeValue(c, vk); JS_FreeValue(c, vf); JS_FreeValue(c, vd);
+    }
     {
         JSValue vsh = JS_GetPropertyStr(c, argv[0], "shareClipboard");
         share = JS_ToBool(c, vsh) > 0;
@@ -961,7 +1017,7 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         int native = (!strcmp(arch, "amd64") ? VM_ARCH_AMD64 : VM_ARCH_ARM64) == host_arch();
         char sv[16], sm[16], sd[16];
         snprintf(sv, sizeof sv, "%d", vcpus); snprintf(sm, sizeof sm, "%d", mem); snprintf(sd, sizeof sd, "%d", disk);
-        char *args[48] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
+        char *args[64] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
                          "--vcpus", sv, "--memory", sm, "--disk", sd, "--network", isolated ? "isolated" : "shared", has_imp ? "--import" : "--iso", has_imp ? imp : iso, NULL };
         int na = 0;
         while (args[na]) na++;
@@ -969,14 +1025,24 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         if (share) { args[na++] = "--agent"; args[na++] = "on"; args[na++] = "--clipboard"; args[na++] = "both"; }
         /* the Design profile's 3D graphics (6.10): Linux machines only; lord-vm refuses them for the windows devices */
         if (gfx3d && !windows) { args[na++] = "--graphics"; args[na++] = "3d"; }
+        /* storage (schema 15): encrypted under the key made for keyId first (lord.vm.keyNew), raw disks, disposable */
+        if (cr_kid[0]) { args[na++] = "--encrypt"; args[na++] = "on"; args[na++] = "--id"; args[na++] = cr_kid; }
+        if (cr_raw) { args[na++] = "--disk-format"; args[na++] = "raw"; }
+        if (cr_disp[0]) { args[na++] = "--disposable"; args[na++] = cr_disp; }
         if (windows) {
             static char *const W[] = { "--secure-boot", "on", "--tpm", "on", "--hyperv", "on", "--rtc", "local", "--devices", "windows", "--drivers" };
             for (size_t i = 0; i < sizeof W / sizeof W[0]; i++) args[na++] = W[i];
             args[na++] = drv;
         }
+        int cr_kp = -1;
+        if (cr_kid[0]) {
+            cr_kp = vmkey_pipe(cr_kid);
+            if (cr_kp < 0) ok = 0;                  /* the key must be made and kept first */
+            else { args[na++] = "--key-fd"; args[na++] = "3"; }
+        }
         args[na] = NULL;
         int p[2];
-        if (!access(dir, F_OK) || pipe2(p, O_CLOEXEC)) ok = 0;
+        if (!ok || !access(dir, F_OK) || pipe2(p, O_CLOEXEC)) { ok = 0; if (cr_kp >= 0) close(cr_kp); }
         else {
             pid_t pid = fork();
             if (!pid) {
@@ -984,7 +1050,8 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
                 if (null >= 0) dup2(null, 0);
                 dup2(p[1], 1);
                 dup2(p[1], 2);
-                syscall(SYS_close_range, 3, ~0u, 0);
+                if (cr_kp >= 0 && (cr_kp == 3 ? fcntl(3, F_SETFD, 0) : dup2(cr_kp, 3)) < 0) _exit(126);
+                syscall(SYS_close_range, cr_kp >= 0 ? 4 : 3, ~0u, 0);
                 sigset_t none;
                 sigemptyset(&none);
                 sigprocmask(SIG_SETMASK, &none, NULL);
@@ -992,6 +1059,7 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
                 _exit(127);
             }
             close(p[1]);
+            if (cr_kp >= 0) close(cr_kp);
             if (pid < 0) { close(p[0]); ok = 0; }
             else {
                 fcntl(p[0], F_SETFL, O_NONBLOCK);
@@ -1010,20 +1078,52 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
 }
 
 /* lord-vm with args in the background, as a job (f_job reads it); 0 when it couldn't start */
+/* the keyring id an encrypted machine's key lives under (docs/VIRTUALIZATION.md 8): its own id, or its group's for a
+ * group's member; a group's folder: its group's id when its members are encrypted. 1 and the id, or 0 not encrypted */
+static int key_id_of(const char *dir, char out[37]) {
+    VmMachine m;
+    size_t n = strlen(dir);
+    if (n > strlen(VMG_SUFFIX) && !strcmp(dir + n - strlen(VMG_SUFFIX), VMG_SUFFIX)) {
+        VmGroup g;
+        char md[PATH_MAX + 80];
+        if (vm_group_load(dir, &g, NULL, 0) || g.n < 1) return 0;
+        snprintf(md, sizeof md, "%s/%s", dir, g.m[0].dir);
+        if (vm_machine_load(md, &m, NULL, 0) || !m.encrypted) return 0;
+        memcpy(out, g.id, 37);
+        return 1;
+    }
+    if (vm_machine_load(dir, &m, NULL, 0) || !m.encrypted) return 0;
+    memcpy(out, m.group[0] ? m.group : m.id, 37);
+    return 1;
+}
+static int spawn_job_k(char *const args[], const char *dir, const char *keyid);
 static int spawn_job(char *const args[], const char *dir) {
+    char kid[37];
+    return spawn_job_k(args, dir, key_id_of(dir, kid) ? kid : NULL);
+}
+/* lord-vm with args as a job; with keyid, that key (held here: vmkey_fetch first) on fd 3 (--key-fd 3). Without the key
+ * ready the job still starts, and lord-vm says the machine's key is needed */
+static int spawn_job_k(char *const args0[], const char *dir, const char *keyid) {
+    char *args[96];
+    int na = 0;
+    while (args0[na] && na < 92) { args[na] = args0[na]; na++; }
+    int kp = keyid ? vmkey_pipe(keyid) : -1;
+    if (kp >= 0) { args[na++] = "--key-fd"; args[na++] = "3"; }
+    args[na] = NULL;
     int slot = -1;
     for (int i = 0; i < MAX_JOBS; i++) if (!jobs[i].used) { slot = i; break; }
     char bin[PATH_MAX];
-    if (slot < 0 || bin_path("lord-vm", bin, sizeof bin)) return 0;
+    if (slot < 0 || bin_path("lord-vm", bin, sizeof bin)) { if (kp >= 0) close(kp); return 0; }
     int p[2];
-    if (pipe2(p, O_CLOEXEC)) return 0;
+    if (pipe2(p, O_CLOEXEC)) { if (kp >= 0) close(kp); return 0; }
     pid_t pid = fork();
     if (!pid) {
         int null = open("/dev/null", O_RDONLY);
         if (null >= 0) dup2(null, 0);
         dup2(p[1], 1);
         dup2(p[1], 2);
-        syscall(SYS_close_range, 3, ~0u, 0);
+        if (kp >= 0 && (kp == 3 ? fcntl(3, F_SETFD, 0) : dup2(kp, 3)) < 0) _exit(126);
+        syscall(SYS_close_range, kp >= 0 ? 4 : 3, ~0u, 0);
         sigset_t none;
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
@@ -1031,6 +1131,7 @@ static int spawn_job(char *const args[], const char *dir) {
         _exit(127);
     }
     close(p[1]);
+    if (kp >= 0) close(kp);
     if (pid < 0) { close(p[0]); return 0; }
     fcntl(p[0], F_SETFL, O_NONBLOCK);
     jobs[slot] = (Job){ .used = 1, .fd = p[0], .pid = pid };
@@ -1078,8 +1179,17 @@ static JSValue f_group_create(JSContext *c, JSValueConst t, int argc, JSValueCon
     if (strcmp(arch, want)) return JS_NewInt32(c, 0);
     struct stat st;
     if (snprintf(gdir, sizeof gdir, "%s/%s%s", lib, name, VMG_SUFFIX) >= (int)sizeof gdir || !vm_group_dir_ok(gdir) || !lstat(gdir, &st)) return JS_NewInt32(c, 0);
-    char *args[] = { "lord-vm", "--group-create", gdir, "--catalog-id", cid, "--archive", arch, "--sha512", sha, "--name", name, NULL };
-    return JS_NewInt32(c, spawn_job(args, ""));
+    /* isolation layer 5 (19.1): the members' disks encrypted under a key lord.vm.keyNew made and kept for keyId */
+    char gk[37] = "";
+    JSValue vk = JS_GetPropertyStr(c, argv[0], "keyId");
+    const char *ks = JS_IsString(vk) ? JS_ToCString(c, vk) : NULL;
+    if (ks && vm_uuid_valid(ks)) snprintf(gk, sizeof gk, "%s", ks);
+    if (ks) JS_FreeCString(c, ks);
+    JS_FreeValue(c, vk);
+    if (gk[0] && vmkey_state(gk) != VMK_READY) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--group-create", gdir, "--catalog-id", cid, "--archive", arch, "--sha512", sha, "--name", name,
+                     gk[0] ? "--encrypt" : NULL, "on", "--id", gk, NULL };
+    return JS_NewInt32(c, spawn_job_k(args, "", gk[0] ? gk : NULL));
 }
 static JSValue f_group_fresh(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
@@ -1259,6 +1369,20 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "perfProfile");
     if (JS_IsBool(v)) { args[n++] = "--perf-profile"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    JS_FreeValue(c, v);
+    /* storage (schema 15): the disposable session (6.2), Backups, the move to this computer's UEFI code (3.6) */
+    v = JS_GetPropertyStr(c, argv[1], "disposable");
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && (!strcmp(s, "off") || !strcmp(s, "memory") || !strcmp(s, "disk"))) { args[n++] = "--disposable"; args[n++] = !strcmp(s, "off") ? "off" : !strcmp(s, "memory") ? "memory" : "disk"; } else ok = 0;
+        if (s) JS_FreeCString(c, s);
+    }
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "backup");
+    if (JS_IsBool(v)) { args[n++] = "--backup"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "firmwareUpdate");
+    if (JS_ToBool(c, v) > 0) { args[n++] = "--firmware-update"; args[n++] = "yes"; }
     else if (!JS_IsUndefined(v)) ok = 0;
     v = JS_GetPropertyStr(c, argv[1], "cpuPin");
     if (JS_IsString(v)) {
@@ -2203,19 +2327,23 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         gpu_info(&gi);
         if (gpu_active() && gi.dmabuf && gi.render_node && !strncmp(gi.render_node, "/dev/dri/renderD", 16)) snprintf(rnode, sizeof rnode, "%s", gi.render_node);
     }
+    /* an encrypted machine's key (8), held here after vmkey_fetch, on fd 4 */
+    char kid[37];
+    int kp = key_id_of(dir, kid) ? vmkey_pipe(kid) : -1;
     pid_t p = fork();
     if (!p) {
-        int ch = fcntl(sv[1], F_DUPFD, 10), e = fcntl(ep[1], F_DUPFD, 11);
+        int ch = fcntl(sv[1], F_DUPFD, 10), e = fcntl(ep[1], F_DUPFD, 11), kf = kp >= 0 ? fcntl(kp, F_DUPFD, 12) : -1;
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); dup2(null, 1); }
         dup2(e, 2);
         dup2(ch, 3);
-        syscall(SYS_close_range, 4, ~0u, 0);
+        if (kf >= 0 && dup2(kf, 4) != 4) _exit(126);
+        syscall(SYS_close_range, kf >= 0 ? 5 : 4, ~0u, 0);
         sigset_t none;
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
         /* no cgroup_enter here: lord-vm places itself in the machine's scope through lord-sessiond */
-        char *args[20];
+        char *args[24];
         int k = 0;
         args[k++] = "lord-vm"; args[k++] = "--start"; args[k++] = dir; args[k++] = "--control-fd"; args[k++] = "3"; args[k++] = "--paused";
         /* 3D graphics (6.10): QEMU draws on the GPU this desktop composes with, whose dmabufs it can read back; without
@@ -2225,10 +2353,12 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (discard) args[k++] = "--discard-state";
         if (loadvm[0]) { args[k++] = "--loadvm"; args[k++] = loadvm; }
         if (have_creds) { args[k++] = "--credentials-file"; args[k++] = creds; }
+        if (kp >= 0) { args[k++] = "--key-fd"; args[k++] = "4"; }
         args[k] = NULL;
         execve(bin, args, environ);
         _exit(127);
     }
+    if (kp >= 0) close(kp);
     close(sv[1]);
     close(ep[1]);
     if (p < 0) { close(sv[0]); close(ep[0]); if (have_creds) unlink(creds); return JS_NewInt32(c, 0); }
@@ -4510,7 +4640,7 @@ static JSValue f_clone(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         folder_name(nm, folder, sizeof folder);
         snprintf(dst, sizeof dst, "%s/%s.lordvm", lib, folder);
         for (int k = 2; !access(dst, F_OK) && k < 100; k++) snprintf(dst, sizeof dst, "%s/%s %d.lordvm", lib, folder, k);
-        char *args[14];
+        char *args[18];
         int k = 0;
         args[k++] = "lord-vm"; args[k++] = "--clone"; args[k++] = dir; args[k++] = dst; args[k++] = "--name"; args[k++] = nm;
         if (dup) args[k++] = "--duplicate";
@@ -4518,8 +4648,19 @@ static JSValue f_clone(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (!dup && keep) args[k++] = "--keep-identity";
         else if (!dup && host[0]) { args[k++] = "--hostname"; args[k++] = host; }
         if (tg[0]) { args[k++] = "--from-snapshot"; args[k++] = tg; }
+        /* an encrypted machine's Clone: its key is kept under the new id first (lord.vm.keyCopy gave newId) */
+        char kid[37], nid[37] = "";
+        int enc = key_id_of(dir, kid);
+        if (enc && !dup) {
+            JSValue vni = JS_GetPropertyStr(c, argv[1], "newId");
+            const char *ni = JS_IsString(vni) ? JS_ToCString(c, vni) : NULL;
+            if (ni && vm_uuid_valid(ni)) snprintf(nid, sizeof nid, "%s", ni);
+            if (ni) JS_FreeCString(c, ni);
+            JS_FreeValue(c, vni);
+            if (nid[0]) { args[k++] = "--new-id"; args[k++] = nid; }
+        }
         args[k] = NULL;
-        if (access(dst, F_OK)) id = spawn_job(args, dst);
+        if (access(dst, F_OK) && (!enc || dup || nid[0])) id = spawn_job_k(args, dst, enc ? kid : NULL);
     }
     if (name) JS_FreeCString(c, name);
     if (snap) JS_FreeCString(c, snap);
@@ -4862,7 +5003,168 @@ static JSValue f_import_info(JSContext *c, JSValueConst t, int argc, JSValueCons
     return JS_NewString(c, buf);
 }
 
+/* ---- encrypted machines' keys (docs/VIRTUALIZATION.md 8; vm/vmkeysrv.h): never a key to JS, only states ---- */
+
+/* the keyring id of what v names: a machine's or group's folder of the library (its own, or its group's id), or an id */
+static int key_target(JSContext *c, JSValueConst v, char out[37]) {
+    char dir[PATH_MAX];
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        int idok = s && vm_uuid_valid(s);
+        if (idok) memcpy(out, s, 37);
+        if (s) JS_FreeCString(c, s);
+        if (idok) return 0;
+    }
+    if (!machine_dir(c, v, dir, sizeof dir) || !group_dir(c, v, dir, sizeof dir)) return key_id_of(dir, out) ? 0 : 1;
+    return -1;
+}
+/* keyState(dirOrId[, fetch]) → "none" (not encrypted) | "pending" | "ready" | "locked" | "missing" | "error"; fetch asks
+ * the keyring when the key isn't held already */
+static JSValue f_key_state(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char id[37];
+    int r = argc >= 1 ? key_target(c, argv[0], id) : -1;
+    if (r) return JS_NewString(c, "none");
+    if (argc >= 2 && JS_ToBool(c, argv[1]) > 0) {
+        int st = vmkey_state(id);
+        if (st != VMK_READY && st != VMK_PENDING) vmkey_fetch(id);
+    }
+    return JS_NewString(c, VMK_NAMES[vmkey_state(id)]);
+}
+/* keyNew(name) → a new id whose key is being made and kept (keyState(id) says when it's ready), for create or a group */
+static JSValue f_key_new(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *nm = argc >= 1 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
+    char id[37];
+    int ok = nm && vm_name_valid(nm) && !vm_new_id(id) && !vmkey_new(id, nm);
+    if (nm) JS_FreeCString(c, nm);
+    return ok ? JS_NewString(c, id) : JS_NULL;
+}
+/* keyCopy(dir) → a new id that gets this encrypted machine's key too (its Clone's), or null */
+static JSValue f_key_copy(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char dir[PATH_MAX], kid[37], id[37];
+    VmMachine m;
+    if (machine_dir(c, argv[0], dir, sizeof dir) || !key_id_of(dir, kid) || vm_machine_load(dir, &m, NULL, 0) || vm_new_id(id) || vmkey_copy(kid, id, m.name)) return JS_NULL;
+    return JS_NewString(c, id);
+}
+/* keyEnter(id, recoveryKey, name) → bool: the recovery key the person typed (in a protected window) kept under id, for an
+ * exported machine brought in; its spaces and dashes are ignored. The text is wiped from this side at once */
+static JSValue f_key_enter(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 3) return JS_FALSE;
+    const char *id = JS_ToCString(c, argv[0]), *nm = JS_ToCString(c, argv[2]);
+    size_t kn = 0;
+    char *k = js_secret_dup(c, argv[1], &kn);
+    int ok = id && nm && k && vm_uuid_valid(id) && vm_name_valid(nm) && !vmkey_enter(id, k, nm);
+    js_secret_free(k, kn);
+    if (id) JS_FreeCString(c, id);
+    if (nm) JS_FreeCString(c, nm);
+    return JS_NewBool(c, ok);
+}
+
+/* ---- Export (6.4): lord-vm --export, and the import of an export ---- */
+
+/* a folder the person may read (and, with write, write) here, as lord.fs allows: its real path inside home or under
+ * /media, /run/media or /mnt, no control characters; never the machines' library or inside it */
+static int user_dir(JSContext *c, JSValueConst v, int write, char *out, size_t n) {
+    const char *s = JS_ToCString(c, v);
+    if (!s) return -1;
+    char r[PATH_MAX], lib[PATH_MAX];
+    struct stat st;
+    int ok = s[0] == '/' && realpath(s, r) && !stat(r, &st) && S_ISDIR(st.st_mode) && !access(r, write ? R_OK | W_OK | X_OK : R_OK | X_OK) && strlen(r) < n;
+    JS_FreeCString(c, s);
+    if (!ok) return -1;
+    for (const unsigned char *p = (const unsigned char *)r; *p; p++) if (*p < 0x20 || *p == 0x7f) return -1;
+    const char *home = getenv("HOME");
+    size_t hl = home ? strlen(home) : 0;
+    int inside = (hl > 1 && !strncmp(r, home, hl) && (r[hl] == '/' || !r[hl])) || !strncmp(r, "/media/", 7) || !strncmp(r, "/run/media/", 11) || !strncmp(r, "/mnt/", 5);
+    if (!inside) return -1;
+    if (!library(lib, sizeof lib, 0)) {
+        size_t ll = strlen(lib);
+        if (!strncmp(r, lib, ll) && (r[ll] == '/' || !r[ll]) && write) return -1;
+    }
+    memcpy(out, r, strlen(r) + 1);
+    return 0;
+}
+
+/* export(dir, { to, format: "lordvm"|"ova", noSnapshots }) → job id. `to` is the save dialog's choice: an absolute path
+ * the person picked, checked like any file lord.fs writes (user_file's rules on its folder) */
+static JSValue f_export(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX], to[PATH_MAX], parent[PATH_MAX];
+    if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
+    JSValue vt = JS_GetPropertyStr(c, argv[1], "to"), vf = JS_GetPropertyStr(c, argv[1], "format");
+    const char *ts = JS_IsString(vt) ? JS_ToCString(c, vt) : NULL, *fs = JS_IsString(vf) ? JS_ToCString(c, vf) : NULL;
+    int ova = fs && !strcmp(fs, "ova");
+    int ok = ts && ts[0] == '/' && strlen(ts) < sizeof to && (!fs || ova || !strcmp(fs, "lordvm"));
+    if (ok) snprintf(to, sizeof to, "%s", ts);
+    if (ts) JS_FreeCString(c, ts);
+    if (fs) JS_FreeCString(c, fs);
+    JS_FreeValue(c, vt); JS_FreeValue(c, vf);
+    if (!ok) return JS_NewInt32(c, 0);
+    /* its folder must be one the person may write to: an existing folder under home or their mounts, not hidden */
+    snprintf(parent, sizeof parent, "%s", to);
+    char *sl = strrchr(parent, '/');
+    if (!sl || !sl[1] || strchr(sl + 1, '\n')) return JS_NewInt32(c, 0);
+    *sl = 0;
+    JSValue pv = JS_NewString(c, parent[0] ? parent : "/");
+    char preal[PATH_MAX];
+    int bad = user_dir(c, pv, 1, preal, sizeof preal);
+    JS_FreeValue(c, pv);
+    if (bad || strlen(preal) + strlen(sl + 1) + 2 > sizeof to) return JS_NewInt32(c, 0);
+    if (snprintf(to, sizeof to, "%s/%s", preal, sl + 1) >= (int)sizeof to) return JS_NewInt32(c, 0);
+    int nosnap = opt_bool(c, argc, argv, "noSnapshots");
+    char *args[] = { "lord-vm", "--export", dir, "--to", to, "--format", ova ? "ova" : "lordvm", nosnap ? "--no-snapshots" : NULL, NULL };
+    return JS_NewInt32(c, spawn_job(args, dir));
+}
+/* exportInfo(path) → { id, name, encrypted, snapshots, files } of an export's manifest.json (parsed strictly by
+ * vmexport.c), or null */
+static JSValue f_export_info(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char src[PATH_MAX], mp[PATH_MAX + 32];
+    if (user_dir(c, argv[0], 0, src, sizeof src)) return JS_NULL;
+    snprintf(mp, sizeof mp, "%s/manifest.json", src);
+    size_t len = 0;
+    char *txt = store_file(mp, VMX_MANIFEST_MAX, &len);
+    VmxManifest man;
+    int bad = !txt || vmx_manifest_parse(txt, len, &man, NULL, 0);
+    free(txt);
+    if (bad) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    set_str(c, o, "id", man.id);
+    set_str(c, o, "name", man.name);
+    set_str(c, o, "created", man.created);
+    JS_SetPropertyStr(c, o, "encrypted", JS_NewBool(c, man.encrypted));
+    JS_SetPropertyStr(c, o, "snapshots", JS_NewBool(c, man.snapshots));
+    set_int(c, o, "files", man.n);
+    return o;
+}
+/* importExport(path) → job id: lord-vm --import-lordvm into a new folder of the library named after the export's
+ * machine. An encrypted one needs its key held first (keyEnter, or the keyring of the computer it came from) */
+static JSValue f_import_export(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char src[PATH_MAX], lib[PATH_MAX], mp[PATH_MAX + 32], folder[64], dst[PATH_MAX + 80];
+    if (user_dir(c, argv[0], 0, src, sizeof src) || library(lib, sizeof lib, 1)) return JS_NewInt32(c, 0);
+    snprintf(mp, sizeof mp, "%s/manifest.json", src);
+    size_t len = 0;
+    char *txt = store_file(mp, VMX_MANIFEST_MAX, &len);
+    VmxManifest man;
+    int bad = !txt || vmx_manifest_parse(txt, len, &man, NULL, 0);
+    free(txt);
+    if (bad) return JS_NewInt32(c, 0);
+    folder_name(man.name, folder, sizeof folder);
+    snprintf(dst, sizeof dst, "%s/%s.lordvm", lib, folder);
+    for (int k = 2; !access(dst, F_OK) && k < 100; k++) snprintf(dst, sizeof dst, "%s/%s %d.lordvm", lib, folder, k);
+    if (!access(dst, F_OK)) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--import-lordvm", src, dst, NULL };
+    return JS_NewInt32(c, spawn_job_k(args, dst, man.encrypted ? man.id : NULL));
+}
+
 static const JSCFunctionListEntry funcs[] = {
+    JS_CFUNC_DEF("keyState", 2, f_key_state), JS_CFUNC_DEF("keyNew", 1, f_key_new), JS_CFUNC_DEF("keyCopy", 1, f_key_copy),
+    JS_CFUNC_DEF("keyEnter", 3, f_key_enter), JS_CFUNC_DEF("export", 2, f_export), JS_CFUNC_DEF("exportInfo", 1, f_export_info),
+    JS_CFUNC_DEF("importExport", 1, f_import_export),
     JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("groups", 0, f_groups), JS_CFUNC_DEF("link", 2, f_link), JS_CFUNC_DEF("groupCreate", 1, f_group_create), JS_CFUNC_DEF("groupFresh", 2, f_group_fresh), JS_CFUNC_DEF("groupSet", 2, f_group_set), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
@@ -4886,5 +5188,7 @@ static const JSCFunctionListEntry funcs[] = {
 void js_vm_register(JSContext *c, JSValue lord) {
     JSValue o = JS_NewObject(c);
     JS_SetPropertyFunctionList(c, o, funcs, sizeof funcs / sizeof funcs[0]);
+    /* the screen locks, the user switches or logs out: the encrypted machines' keys held here go (vmkeysrv.h) */
+    vc_set_lock_hook(vmkey_wipe_all);
     JS_SetPropertyStr(c, lord, "vm", o);
 }

@@ -239,6 +239,7 @@ EOF
     if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
     if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
     if have node; then run "vm-group-model-test (apps/machines/model.js groupPlan: a machine group's start and stop order, its link)" node tests/vm_group_model_test.mjs; fi
+    if have node; then run "vm-storage-model-test (apps/machines/storagemodel.js: key steps, recovery key, disposable, Export)" node tests/vm_storage_model_test.mjs; fi
     if have node; then run "vm-group-ui-test (apps/machines/group.js and catalog.js: a group's one card, its menu, Start Fresh, its budget, the Whonix card)" node tests/vm_group_ui_test.mjs; fi
     if have node; then run "vm-profiles-test (apps/machines/profiles.js, systems.js: .lordprofile import, your systems, PNG logos, library chips)" node tests/vm_profiles_test.mjs; fi
     if have node; then run "photos-places-test (apps/photos/places.js)" node tests/photos_places_test.mjs; fi
@@ -400,6 +401,14 @@ EOF
         0) ok "vm-group-link (tests/vm_group_link.sh, headless lord-server, a Whonix group)" ;;
         77) skip "vm-group-link" "WHONIX_GW and WHONIX_WS (Whonix's disks with a serial shell), KVM, QEMU, unshare and the default theme" ;;
         *) bad "vm-group-link (tests/vm_group_link.sh, headless lord-server, a Whonix group)"; tail -20 "$T/out" ;;
+    esac
+    # Machines' storage under real QEMU/KVM (tests/vm_storage_test.sh): encrypted machines, both disposable sessions,
+    # snapshot, clone, Export (.lordvm and OVA), the import of an export (tampered and hostile), raw disks
+    bash tests/vm_storage_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-storage (tests/vm_storage_test.sh, encryption, disposable sessions, Export, raw disks)" ;;
+        77) skip "vm-storage" "build/lord-vm, KVM, QEMU (qemu-img, qemu-io), swtpm, OVMF and python3" ;;
+        *) bad "vm-storage (tests/vm_storage_test.sh, encryption, disposable sessions, Export, raw disks)"; tail -20 "$T/out" ;;
     esac
     # lordos-guest's clipboard tool (xclip, wl-clipboard, none: the hello says "noclip"), stub tools and a socket port
     sh tests/guest_clip_test.sh >"$T/out" 2>&1
