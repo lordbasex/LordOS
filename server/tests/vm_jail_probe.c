@@ -220,6 +220,38 @@ static int kill_case(const char *what, pid_t sib) {
             return 0;
         }
     }
+    /* venus's render server (vm_jail_venus): signals only to a pid above 0, no exec of any kind, its workers' forks */
+    else if (!strcmp(what, "kill-neg")) ret = kill(-1, 0);
+    else if (!strcmp(what, "kill-zero")) ret = kill(0, 0);
+    else if (!strcmp(what, "execve-loader")) {
+        /* the loader run as a program, to run another binary: what a compromised server would try */
+        const char *ld = getenv("PROBE_LOADER");
+        char *a[] = { (char *)(ld ? ld : "/lib64/ld-linux-x86-64.so.2"), "/usr/bin/true", NULL };
+        ret = execve(a[0], a, a + 2);
+    }
+    else if (!strcmp(what, "fork-ok") || !strcmp(what, "kill-child")) {
+        pid_t c = fork();
+        if (c == 0) { if (!strcmp(what, "kill-child")) pause(); _exit(0); }
+        int okk = c > 0 && (strcmp(what, "kill-child") || !kill(c, SIGKILL));
+        int ws2 = 0;
+        okk = okk && waitpid(c, &ws2, 0) == c;
+        printf("%s\n", okk ? "ALLOWED" : "REFUSED");
+        return 0;
+    }
+    else if (!strcmp(what, "kill-sib")) {
+        /* a process of the person's outside its jail: Landlock's signal scope refuses it (EPERM), whatever seccomp allows */
+        errno = 0;
+        ret = kill(sib, 0);
+        printf("%s %d\n", ret < 0 && errno == EPERM ? "REFUSED" : "ALLOWED", errno);
+        return 0;
+    }
+    else if (!strcmp(what, "etc-read") || !strcmp(what, "home-read")) {
+        const char *h = getenv("PROBE_HOME");
+        errno = 0;
+        int f = open(!strcmp(what, "etc-read") ? "/etc/hostname" : (h && h[0] ? h : "/root"), O_RDONLY);
+        printf("%s %d\n", f < 0 ? "REFUSED" : "ALLOWED", errno);
+        return 0;
+    }
     else if (!strcmp(what, "bpf")) ret = syscall(SYS_bpf, 0, NULL, 0);
     else if (!strcmp(what, "perf_event_open")) ret = syscall(SYS_perf_event_open, NULL, 0, -1, -1, 0);
     else if (!strcmp(what, "userfaultfd")) ret = syscall(SYS_userfaultfd, 0);
@@ -287,7 +319,8 @@ static int copy_file(const char *from, const char *to, mode_t mode) {
     return ok ? 0 : -1;
 }
 
-static int userns = -1, before;
+static int userns = -1, before, venus_mode;
+static char render_node[32];
 static char loader[PATH_MAX], probe[PATH_MAX + 64], disks[PATH_MAX + 16], bindir[PATH_MAX + 64];
 
 /* lord-vm's child: namespaces, the private loader, the jail (with a listener when `notify`), the listener sent on `st`
@@ -308,10 +341,17 @@ static pid_t jailed(char **args, int out, int hold, int st, int notify, int tcg)
      * unreadable copy, so this exec makes the probe non-dumpable exactly as QEMU's does */
     int xfd = open(loader, O_PATH | O_CLOEXEC);
     if (xfd >= 0 && xfd != EXEC_FD) { dup3(xfd, EXEC_FD, O_CLOEXEC); close(xfd); xfd = EXEC_FD; }
-    int lfd = -1;
-    /* the probe's copy is readable as a machine's ISO is (read only) */
-    VmQemuJail j = { .disks_dir = disks, .iso = probe, .exec_fd = xfd, .exec_path = loader, .tcg = tcg, .notify_out = notify ? &lfd : NULL };
-    int mask = xfd >= 0 ? vm_jail_qemu(&j) : 0;
+    int lfd = -1, mask = 0;
+    if (venus_mode) {
+        /* venus's render server's jail (lordvm.c spawn_venus), the probe readable in it */
+        int rfd = open(render_node, O_RDWR | O_CLOEXEC);
+        VmVenusJail vj = { render_node, rfd, xfd, loader, 0, notify ? &lfd : NULL, probe };
+        mask = xfd >= 0 && rfd > 2 ? vm_jail_venus(&vj) | VMS_SECCOMP_ALLOWLIST : 0;
+    } else {
+        /* the probe's copy is readable as a machine's ISO is (read only) */
+        VmQemuJail j = { .disks_dir = disks, .iso = probe, .exec_fd = xfd, .exec_path = loader, .tcg = tcg, .notify_out = notify ? &lfd : NULL };
+        mask = xfd >= 0 ? vm_jail_qemu(&j) : 0;
+    }
     if (!(mask & VMS_SECCOMP_OURS) || !(mask & VMS_SECCOMP_ALLOWLIST) || !(mask & VMS_NO_NEW_PRIVS) || !(mask & VMS_LANDLOCK_FS) ||
         (notify && !(mask & VMS_SECCOMP_NAMED))) { printf("FAIL  jail: mask %d\n", mask); _exit(1); }
     if (st >= 0) {
@@ -326,11 +366,12 @@ static pid_t jailed(char **args, int out, int hold, int st, int notify, int tcg)
         close(lfd);
         close(st);
     }
-    char henv[PATH_MAX + 16], denv[PATH_MAX + 32];
+    char henv[PATH_MAX + 16], denv[PATH_MAX + 32], lenv[PATH_MAX + 16];
     const char *h = getenv("HOME");
     snprintf(henv, sizeof henv, "PROBE_HOME=%s", h ? h : "");
     snprintf(denv, sizeof denv, "PROBE_DISKS=%s", disks);
-    char *env[] = { henv, denv, NULL };
+    snprintf(lenv, sizeof lenv, "PROBE_LOADER=%s", loader);
+    char *env[] = { henv, denv, lenv, NULL };
     syscall(SYS_execveat, xfd, "", args, env, AT_EMPTY_PATH);
     printf("FAIL  exec: %s\n", strerror(errno));
     _exit(127);
@@ -425,10 +466,13 @@ static void kill_one(const char *what, const char *want, pid_t sib, int notify) 
 }
 
 /* a call that must be answered, not stopped: the probe prints `want` */
+static pid_t answer_sib = 1;      /* the sibling the "kill-sib" case signals */
 static void answered(const char *what, const char *want, int tcg, const char *label) {
     int out[2], hold[2];
     if (pipe2(out, O_CLOEXEC) || pipe2(hold, O_CLOEXEC)) { check(0, label, errno); return; }
-    char *args[] = { loader, probe, "--kill", (char *)what, "1", NULL };
+    char sb[16];
+    snprintf(sb, sizeof sb, "%d", (int)answer_sib);
+    char *args[] = { loader, probe, "--kill", (char *)what, sb, NULL };
     pid_t q = jailed(args, out[1], hold[0], -1, 0, tcg);
     close(out[1]); close(hold[0]);
     char line[256] = "";
@@ -565,6 +609,34 @@ int main(int argc, char **argv) {
         answered("noexec-mmap", "REFUSED", 0, "without a listener, a program QEMU wrote into its disks folder can't be mapped executable (noexec: EPERM)");
         answered("noexec-exec", "REFUSED", 0, "without a listener, a program QEMU wrote into its disks folder can't run (EACCES)");
     }
+
+    /* venus's render server's own jail (vm_jail_venus; docs/VIRTUALIZATION.md 6.10): no exec of any kind after lord-vm's
+     * one, the loader run as a program included; a signal only to a pid above 0; nothing outside /usr and the render
+     * node; its workers' forks and their end work */
+    for (int n = 128; n < 192 && !render_node[0] && !before; n++) {
+        char rn[32];
+        snprintf(rn, sizeof rn, "/dev/dri/renderD%d", n);
+        if (!access(rn, R_OK | W_OK)) snprintf(render_node, sizeof render_node, "%s", rn);
+    }
+    if (render_node[0]) {
+        venus_mode = 1;
+        static const char *const VCASES[][2] = {
+            { "execve", "execve" }, { "execve-loader", "execve" }, { "execveat-again", "execveat" }, { "kill-neg", "kill" },
+            { "kill-zero", "kill" }, { "prlimit64", "prlimit64" }, { "ptrace", "ptrace" }, { "unshare", "unshare" },
+            { "mmap-x-anon", "mmap" }, { "mprotect-x", "mprotect" }, { "mmap-x-memfd", "mmap" }, { "mmap-wx", "mmap" },
+        };
+        for (size_t i = 0; i < sizeof VCASES / sizeof VCASES[0]; i++) {
+            kill_one(VCASES[i][0], VCASES[i][1], sib, 1);
+        }
+        answered("fork-ok", "ALLOWED", 0, "venus: the render server forks a worker and waits for it (control)");
+        answered("kill-child", "ALLOWED", 0, "venus: the render server ends its own worker (control)");
+        answer_sib = sib;
+        answered("kill-sib", "REFUSED", 0, "venus: the render server can't signal a process of the person's outside its jail (Landlock's scope)");
+        answer_sib = 1;
+        answered("etc-read", "REFUSED", 0, "venus: the render server can't read /etc");
+        answered("home-read", "REFUSED", 0, "venus: the render server can't read the home folder");
+        venus_mode = 0;
+    } else printf("skipped: venus's render server's jail (no render node)\n");
 
     kill(sib, SIGKILL);
     waitpid(sib, NULL, 0);

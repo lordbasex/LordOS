@@ -1085,6 +1085,7 @@ static struct {
      * one exec done, QEMU's end of the connection and its number in QEMU (LORDOS_VENUS_FD) */
     pid_t vs_pid;
     int vs_pidfd, vs_fd, vs_exec_done, vs_qemu_end, vs_qfd, vs_starting, vs_err;
+    pid_t vs_waiter;        /* the server's parent outside its pid namespace, which only waits for it */
     /* an Intel GVT-g vGPU this run (decide_vgpu, docs/MACHINES-GPU.md Mode A): its render node (the iGPU's, where QEMU
      * makes the picture's dmabufs), /dev/vfio/<group>, the picture's size, and whether the guest asked for a restart
      * (QEMU runs with -action reboot=shutdown: a reset is an exit, and Machines starts it again) */
@@ -1711,7 +1712,7 @@ static int spawn_venus(void) {
     int sp[2], st[2], ep[2];
     if (pipe2(ep, O_CLOEXEC)) return -1;
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sp)) { close(ep[0]); close(ep[1]); return -1; }
-    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, st)) { close(sp[0]); close(sp[1]); return -1; }
+    if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, st)) { close(sp[0]); close(sp[1]); return -1; }
     int xfd = open(VM_VENUS_SERVER, O_PATH | O_CLOEXEC);
     if (xfd < 0) { close(sp[0]); close(sp[1]); close(st[0]); close(st[1]); return -1; }
     pid_t pid = fork();
@@ -1720,6 +1721,28 @@ static int spawn_venus(void) {
         child_common(qemu_procs_fd);
         int in_ns = vm_ns_enter(S.userns);
         if (in_ns) vm_ns_setup(S.rundir, S.disks);
+        /* a pid namespace of its own (it has no D-Bus display, whose peer check stopped one for QEMU): the server is its
+         * pid 1 and sees no other process of the person's. This process stays outside it, only to wait for the server
+         * and end with it; lord-vm gets the server's pid as it sees it first, on the status socket */
+        int gp[2];
+        if (!in_ns || unshare(CLONE_NEWPID) || pipe2(gp, O_CLOEXEC)) _exit(125);
+        pid_t inner = fork();
+        if (inner < 0) _exit(125);
+        if (inner > 0) {
+            prctl(PR_SET_DUMPABLE, 0);
+            int32_t ip = (int32_t)inner;
+            if (send(st[1], &ip, sizeof ip, MSG_NOSIGNAL) != (ssize_t)sizeof ip) { kill(inner, SIGKILL); _exit(125); }
+            if (write(gp[1], "g", 1) != 1) { kill(inner, SIGKILL); _exit(125); }      /* the server's own message after this one */
+            syscall(SYS_close_range, 3, ~0u, 0);
+            int ws = 0;
+            while (waitpid(inner, &ws, 0) < 0 && errno == EINTR) {}
+            _exit(WIFEXITED(ws) ? WEXITSTATUS(ws) : 128 + WTERMSIG(ws));
+        }
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+        char go;
+        close(gp[1]);
+        if (read(gp[0], &go, 1) != 1) _exit(125);
+        close(gp[0]);
         int null = open("/dev/null", O_RDWR);
         dup2(null, 0);
         dup2(ep[1], 1);         /* what it says goes to the machine's log ("venus: ...") */
@@ -1731,9 +1754,10 @@ static int spawn_venus(void) {
         for (int f = 4; f <= 6; f++) fcntl(f, F_SETFD, FD_CLOEXEC);
         int x2 = 6;
         int lfd = -1, abi = vm_landlock_abi();      /* asked before the filter: it isn't a row */
-        VmVenusJail j = { S.render, 4, x2, VM_VENUS_SERVER, S.sc_learn, &lfd };
+        VmVenusJail j = { S.render, 4, x2, VM_VENUS_SERVER, S.sc_learn, &lfd, NULL };
         int32_t msg = vm_jail_venus(&j);
-        int bad = !(msg & VMS_SECCOMP_OURS) || !(msg & VMS_NO_NEW_PRIVS) || (abi >= 1 && !(msg & VMS_LANDLOCK_FS));
+        /* Landlock's signal scope is required (ABI 6): its signals stay inside its own jail */
+        int bad = !(msg & VMS_SECCOMP_OURS) || !(msg & VMS_NO_NEW_PRIVS) || abi < 6 || !(msg & VMS_LANDLOCK_FS) || !(msg & VMS_LANDLOCK_SCOPE);
         union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
         struct iovec io = { &msg, sizeof msg };
         struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1 };
@@ -1769,9 +1793,22 @@ static int spawn_venus(void) {
     if (S.vs_err >= 0) close(S.vs_err);
     S.vs_err = ep[0];
     fcntl(S.vs_err, F_SETFL, O_NONBLOCK);
-    S.vs_pid = pid;
+    S.vs_waiter = pid;
+    S.vs_pid = 0;
     S.vs_exec_done = 0;
-    S.vs_pidfd = (int)syscall(SYS_pidfd_open, pid, 0);
+    {
+        /* the server's pid outside its namespace, from its waiter */
+        int32_t ip = 0;
+        struct pollfd p1 = { st[0], POLLIN, 0 };
+        if (poll(&p1, 1, 5000) > 0 && recv(st[0], &ip, sizeof ip, 0) == (ssize_t)sizeof ip && ip > 1) S.vs_pid = (pid_t)ip;
+    }
+    if (S.vs_pid <= 0) {
+        vlog("venus: its render server's pid namespace couldn't be made: no Vulkan this start");
+        kill(pid, SIGKILL);
+        close(st[0]); close(sp[0]);
+        return -1;
+    }
+    S.vs_pidfd = (int)syscall(SYS_pidfd_open, S.vs_pid, 0);
     int32_t got = 0;
     union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
     struct iovec io = { &got, sizeof got };
@@ -7401,10 +7438,12 @@ static void reap(void) {
     pid_t p;
     while ((p = waitpid(-1, &status, WNOHANG)) > 0) {
         if (p == S.qemu) { vlog("qemu: exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status)); qemu_exited(status); }
-        else if (p > 0 && p == S.vs_pid) {
+        else if (p > 0 && p == S.vs_waiter) {
             for (int k = 0; k < 20 && S.vs_err >= 0; k++) pump_fd(&S.vs_err, "venus");
-            vlog("venus: the render server exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
-            S.vs_pid = 0;
+            int code = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+            if (code > 128) vlog("venus: the render server ended (signal %d)", code - 128);
+            else vlog("venus: the render server ended (status %d)", code);
+            S.vs_pid = S.vs_waiter = 0;
             if (S.vs_pidfd >= 0) { close(S.vs_pidfd); S.vs_pidfd = -1; }
         } else if (p == S.passt) {
             vlog("passt: exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));

@@ -330,6 +330,7 @@ int vm_jail_venus(const VmVenusJail *j) {
             int ok = j->exec_path && j->exec_path[0] == '/' && VM_LOADER[0] && realpath(VM_LOADER, ldreal) && j->render && j->render[0] &&
                      !rule(rs, "/usr", ro, h) && !rule(rs, j->exec_path, rx, h) && !rule(rs, ldreal, rx, h) && !rule(rs, "/proc/self", ro, h) &&
                      !render_rules(rs, j->render, j->render_fd, h);
+            if (j->probe_read && j->probe_read[0] && rule(rs, j->probe_read, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             rule(rs, "/etc/ld.so.cache", LANDLOCK_ACCESS_FS_READ_FILE, h);
             rule(rs, "/dev/null", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, h);
             if (ok && !syscall(SYS_landlock_restrict_self, rs, 0U)) {

@@ -62,7 +62,8 @@ typedef struct {
  * caller refuses to exec without VMS_SECCOMP_OURS and VMS_NO_NEW_PRIVS, and without VMS_LANDLOCK_FS where the kernel
  * has Landlock. Landlock: /usr read only, execute only the server and the loader, /etc/ld.so.cache, /dev/null, its own
  * /proc, the render node (from lord-vm's descriptor, as for QEMU), /dev/dri listed, the GPU's sysfs folder read; no
- * TCP, no abstract sockets, signals only inside its own jail. Seccomp: QEMU's allowlist with VmScOpts.venus (the render
+ * TCP, no abstract sockets, signals only inside its own jail (lord-vm refuses venus without Landlock ABI 6's scope), and
+ * lord-vm puts it in a pid namespace of its own. Seccomp: QEMU's allowlist with VmScOpts.venus (the render
  * node's ioctls, its workers' forks, no exec but this one), the default action to lord-vm's listener (*notify_out) */
 typedef struct {
     const char *render;         /* /dev/dri/renderD<N> */
@@ -71,6 +72,7 @@ typedef struct {
     const char *exec_path;      /* VM_VENUS_SERVER */
     int learn;                  /* 0; a test build's learn modes */
     int *notify_out;            /* the filter's listener comes back here (cloexec), -1 none */
+    const char *probe_read;     /* NULL; tests/vm_jail_probe.c's own copy, which it runs in this jail (read only) */
 } VmVenusJail;
 int vm_jail_venus(const VmVenusJail *j);
 
