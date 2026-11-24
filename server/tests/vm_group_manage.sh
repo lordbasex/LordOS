@@ -109,6 +109,18 @@ GID=$(jget "$G/Gateway.lordvm/machine.json" id)
 expect 0 "repair a changed base" $VM --group-repair "$G"
 [ "$(jget "$G/Gateway.lordvm/machine.json" id)" != "$GID" ] && ok "the gateway over the changed base started fresh" || no "the gateway kept its identity over a changed base"
 
+# a disposable session over no base (a hand-edited machine.json) is refused: QEMU would open the system disk writable
+W="$G/Workstation.lordvm"
+expect 0 "disposable on" $VM --group-set "$G" --disposable on
+cp "$W/machine.json" "$D/ws.json"; mv "$W/disks/system.qcow2" "$D/ws.qcow2"; qemu-img create -q -f qcow2 "$W/disks/system.qcow2" 1G
+python3 -I -c 'import json,sys; p=sys.argv[1]; m=json.load(open(p)); m.pop("base",None); open(p,"w").write(json.dumps(m,indent=2)+"\n")' "$W/machine.json"
+out=$($E $VM --start "$W" --detach 2>&1); sleep 2
+if $E $VM --status "$W" 2>/dev/null | grep -q running; then $E $VM --poweroff "$W" >/dev/null 2>&1; no "a disposable session started without its base"
+else grep -q "a disposable session needs the workstation's base" "$W/log/lord-vm.log" 2>/dev/null && ok "a disposable session without its base is refused" ||
+    { echo "$out" | grep -q "base" && ok "a disposable session without its base is refused (by the check)" || no "no base: $out"; }; fi
+cp "$D/ws.json" "$W/machine.json"; mv -f "$D/ws.qcow2" "$W/disks/system.qcow2"
+expect 0 "disposable off" $VM --group-set "$G" --disposable off
+
 # delete: refused while a member runs
 hold "$G/Workstation.lordvm/lock"
 sleep 0.3

@@ -344,12 +344,13 @@ static const char *jail_read2;          /* a second file the next jailed tool ma
 static const char *const *jail_list;    /* or a list of them (an import: a descriptor, its extents, its snapshot layers) */
 static int jail_n;
 static void (*tool_progress)(double pct); /* qemu-img convert -p's "(12.34/100%)", as it comes */
+static int tool_nokey;                  /* the next tools read plain disks only: never given the key (a group's archive) */
 static int run_tool_in(char *const argv0[], char *out, size_t outcap, const char *jail_read, const char *jail_rw) {
     /* an encrypted machine's qemu-img gets the key as a secret object on fd 3 (a pipe), right after its subcommand */
     char *const *argv = argv0;
     char *kargv[48];
     int kp = -1;
-    if (key_have() && !strcmp(argv0[0], QEMU_IMG) && argv0[1]) {
+    if (!tool_nokey && key_have() && !strcmp(argv0[0], QEMU_IMG) && argv0[1]) {
         int n = 0;
         while (argv0[n]) n++;
         if (n + 3 > (int)(sizeof kargv / sizeof kargv[0]) || (kp = key_pipe()) < 0) return -1;
@@ -2869,7 +2870,9 @@ static int session_prepare(void) {
     S.sess_mode = VM_DISP_OFF;
     int cap = session_cap_mb();
     if (cap) {
-        /* a group's workstation (19.7): its system disk only, over its base, in memory */
+        /* a group's workstation (19.7): its system disk only, over its base, in memory. Without a base QEMU would open the
+         * system disk itself, writable, and the session wouldn't be one: refused (a hand-edited machine.json) */
+        if (!S.m.base[0]) { fail_start("a disposable session needs the workstation's base (machine.json \"base\"): this machine has none"); return -1; }
         char sys[PATH_MAX + 48];
         snprintf(sys, sizeof sys, "%s/system.qcow2", S.disks);
         int fd = session_layer(sys, "qcow2", (long long)S.m.disk_gb << 30, VM_DISP_MEMORY, 0);
@@ -11430,7 +11433,11 @@ static int unpack_archive(int afd, const VmCatEntry *e, int gw, int ws, long lon
 static int member_ok(const char *path, unsigned long long max, long long *vsize, char *why, size_t wn) {
     char out[16384];
     char *argv[] = { QEMU_IMG, "info", "-f", "qcow2", "--output=json", (char *)path, NULL };
-    if (run_tool_in(argv, out, sizeof out, path, NULL)) { snprintf(why, wn, "qemu-img info: %.150s", out); return -1; }
+    /* the archive's member is plain qcow2 from the download: the qemu-img that parses it never gets the group's key */
+    tool_nokey = 1;
+    int rc = run_tool_in(argv, out, sizeof out, path, NULL);
+    tool_nokey = 0;
+    if (rc) { snprintf(why, wn, "qemu-img info: %.150s", out); return -1; }
     JDoc d;
     if (json_parse(out, strlen(out), &d, NULL, 0)) { snprintf(why, wn, "qemu-img info said something else"); return -1; }
     const JVal *r = d.root;
@@ -11451,8 +11458,15 @@ static int make_base(const char *member, const char *staging, const char *base, 
     char *cv[] = { QEMU_IMG, "convert", "-q", "-f", "qcow2", "-O", "qcow2", (char *)member, tmp, NULL };
     char *ck[] = { QEMU_IMG, "check", "-q", "-f", "qcow2", tmp, NULL };
     char err[512];
-    if (run_tool_in(cv, err, sizeof err, member, staging)) { snprintf(why, wn, "qemu-img convert: %.150s", err); unlink(tmp); return -1; }
-    if (run_tool_in(ck, err, sizeof err, tmp, NULL)) { snprintf(why, wn, "qemu-img check: %.150s", err); unlink(tmp); return -1; }
+    /* the shared base is plain (the members' own layers are what is encrypted): these never get the key */
+    tool_nokey = 1;
+    int rc = run_tool_in(cv, err, sizeof err, member, staging);
+    tool_nokey = 0;
+    if (rc) { snprintf(why, wn, "qemu-img convert: %.150s", err); unlink(tmp); return -1; }
+    tool_nokey = 1;
+    rc = run_tool_in(ck, err, sizeof err, tmp, NULL);
+    tool_nokey = 0;
+    if (rc) { snprintf(why, wn, "qemu-img check: %.150s", err); unlink(tmp); return -1; }
     if (chmod(tmp, 0444) || sha256_file(tmp, sha)) { snprintf(why, wn, "can't finish the base"); unlink(tmp); return -1; }
     if (rename(tmp, base)) { snprintf(why, wn, "can't place the base: %s", strerror(errno)); unlink(tmp); return -1; }
     return 0;
