@@ -975,6 +975,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     a throwaway machine started paused and its logged command line checked for what the setting adds and must not.
   - **`make -C server e2e-machines-gates`**: the three release gates with this build's lord-vm and the cached image,
     through `ns-run.sh`.
+  - **Run on the i9 PC on 2026-11-24**: the flows 57 of 57; the release gates on its bare metal for the first time
+    (isolation 72, integrity 45, recovery 40, leaks 10 passed); the boot matrix's 9 rows, 3D on both the RX 580 and the
+    UHD 630; the virtio-win install test 9 of 9 (installed unattended in 25.9 minutes, the guest tools' hello from the
+    installed system). On the Pi 5: arm64 under KVM and emulated boot; an arm64 machine with the compatible devices
+    doesn't (its firmware has no SATA driver: stops at the UEFI shell), recorded in docs/VIRTUALIZATION.md 12.
 
 - **Sentinela** (`docs/SENTINELA.md`): `build/llm-engine-test` runs a stand-in engine in lord-llm's real sandbox and
   checks that TCP, UDP, IPv6, netlink and packet sockets, Unix datagrams, `connect`, reading `/etc` or `/home`, writing

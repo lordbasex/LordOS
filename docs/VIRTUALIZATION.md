@@ -51,10 +51,10 @@ recomputes both from the rows; the arithmetic:
 | K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 83.75 | 84 % | 3 × 84 % = 2.52 | 61 % |
 | L. Privacy and security model | 4 | 7 | 73.57 | 74 % | 4 × 74 % = 2.96 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
-| N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **111** | | | **73.98 → 74 %** | 69 % |
+| N. Tests and validation on hardware | 3 | 5 | 92.00 | 92 % | 3 × 92 % = 2.76 | 55 % |
+| **Total** | **100** | **111** | | | **75.09 → 75 %** | 69 % |
 
-Σ = 12.04 + 9.12 + 9.35 + 5.40 + 4.80 + 3.36 + 9.24 + 3.22 + 6.30 + 1.44 + 2.52 + 2.96 + 2.58 + 1.65 = 73.98, rounded **74 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
+Σ = 12.04 + 9.12 + 9.35 + 5.40 + 4.80 + 3.36 + 9.24 + 3.22 + 6.30 + 1.44 + 2.52 + 2.96 + 2.58 + 2.76 = 75.09, rounded **75 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); raw disks, encryption, export and backups
@@ -254,14 +254,14 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | 5. Guest-side performance profile through the guest tools | 🧪 | 85 | `lordvm.c` (`AGK_PERF`), `vmperfwin.c`, `configure.jsx`, `lordos-guest-win.c` w11, `tools/guest/perf.c` (`lordos-guest` 7); `vm-test`, `guest-dbus-test`, `guest_perf_test.sh` | *In development*; Windows guests: power plan, effects, transparency (checked in the maintainer's guest) and Windows Search paused (lord-vm's fixed script as SYSTEM); Linux guests: power-profiles-daemon and GNOME's animations over D-Bus (KDE and others refused). Not yet checked in a running guest: the Search scripts and the Linux part (was 🟡 55) |
 | 6. vCPU pinning | ✅ | 95 | `vmpin.c`, `lordvm.c`, `configure.jsx` (Pin cores); `vmpin-test` | *In development*; measured on the i9 (8 vCPUs: host frame p99 15.2 → 9.9 ms) |
 
-### N. Tests and validation (55 %)
+### N. Tests and validation (92 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
 | Unit and headless suites in `make test` (12) | ✅ | 100 | `server/mk/vm.mk`, `vmpin.mk`, `tests/run_suites.sh`, `tests/vm_qemu_args_test.py` | 27 C programs (new: `vmseccomp`, `vm-jail-probe`, `vmgroup`, `vmlink`, `vmimage-group`, `vmunpack`, `np-torgw`, `vmwatch`, `guest-dbus`), 11 scripts (new: `vm_whonix_xml_test.sh`, `vm_group_link.sh`, `guest_perf_test.sh`, migration 011's, and *in development* `vm_qemu_args_test.py`: settings → QEMU arguments as a table, 12 rows, 12 of 12 on the i9; skipped without KVM), 12 node tests (new: `vm_group_model`, `vm_group_ui`, `sentinela_vm`, `protect_model`) (was 90) |
 | Release gates: isolation, integrity, recovery, leaks (12) | ✅ | 100 | `vm_*.sh`, `tools/vm/bare-metal-gates.sh`, `make -C server e2e-machines-gates`, `tools/vm/e2e/machines/ns-run.sh` | Manual (minutes each). *In development*: run on the i9 PC's bare metal on 2026-11-24, in private namespaces: isolation 72 passed (2 skipped: no delegated cgroup, no session bus in the run), integrity 45, recovery 40 (1 skipped), leaks 10; the script refused every physical PC (its virtual-machine check) and the leak gate's zombie check counted other programs' children, both fixed (was 85) |
 | End-to-end bench: a headless session driven over `remote.sock` (12) | ✅ | 95 | `tools/vm/e2e/machines/` (`mh.py`, `probe.js`, `flows.py`, README), `make -C server e2e-machines` | *In development*: a headless lord-server-test with the real theme in private user and mount namespaces, a scratch library, a real Debian guest; the assistant to first boot, Shut Down, Configure, start, the agent and its install, the clipboard both ways, a file drop, kill tests, snapshots, clone, storage, a group's card, checked on screen and on disk: run on the i9 on 2026-11-24. Input through the test hooks, the remote desktop's own injection (`remote.sock` takes only root). Not scripted: apps mode (needs a LordOS guest) and USB; not in `make test` (KVM, minutes) (was 50) |
-| Boot matrix in CI, virtio-win install test, storage figures, agent kill tests (12) | 🟡 | 90 | `tools/vm/e2e/machines/boot-matrix.py`, `images.py --windows`, `flows.py` (`windows`, `storage`, `kills`, `killcopy`) | *In development*: the boot matrix ran on the i9 (9 rows: KVM and TCG, OVMF and SeaBIOS, TPM, Secure Boot, compatible devices, 3D on both cards) and the Pi 5 (3 rows; it found that an arm64 machine with the compatible devices doesn't boot, AAVMF has no SATA driver); the virtio-win install test installed the catalog's 90-day evaluation with virtio-win 0.1.271 unattended on the i9; storage figures on ext4 only (said 1,075.5 MB, freed 1,073.1 MB; btrfs and XFS need a disk of theirs); kill tests of the agent, passt, virtiofsd and lord-vm, and of the agent mid-copy, pass. Not in a hosted CI: GitHub's runners have no KVM (was 0) |
+| Boot matrix in CI, virtio-win install test, storage figures, agent kill tests (12) | 🟡 | 90 | `tools/vm/e2e/machines/boot-matrix.py`, `images.py --windows`, `flows.py` (`windows`, `storage`, `kills`, `killcopy`) | *In development*: the boot matrix ran on the i9 (9 rows: KVM and TCG, OVMF and SeaBIOS, TPM, Secure Boot, compatible devices, 3D on both cards) and the Pi 5 (3 rows; it found that an arm64 machine with the compatible devices doesn't boot, AAVMF has no SATA driver); the virtio-win install test installed the catalog's 90-day evaluation with virtio-win 0.1.271 unattended on the i9; storage figures on ext4 only (said 1,322.4 MB, freed 1,322.2 MB; btrfs and XFS need a disk of theirs); kill tests of the agent, passt, virtiofsd and lord-vm, and of the agent mid-copy, pass. Not in a hosted CI: GitHub's runners have no KVM (was 0) |
 | Hardware matrix: Pi 5 and Xeon bare metal (gates), the i9 with RX 580 and UHD 630 (3D, GVT-g) | 🟡 | 75 | CHANGELOG; 12 (boot matrix, bare-metal gates) | Pi 5 (gates 2026-11-06, boot matrix 2026-11-24), Xeon (gates), the i9: gates on bare metal and 3D boots on both the RX 580 and the UHD 630 (2026-11-24, *in development*). No Pi 4, no Pi kernel with 4 KiB pages, no NVIDIA; a 3D machine's picture on the UHD 630 not checked (was 50) |
 
 ## Status and how to continue (read this first)
@@ -4121,9 +4121,10 @@ output`. A test-only probe in the bundle keeps lord-server's node tree on the JS
 where it is drawn, shown and painted on top, and clicks it there. The guest is Debian 13's nocloud image (SHA-512 from
 Debian's list), prepared once under KVM with qemu-guest-agent, a person's account and a root console. `make -C server
 e2e-machines` runs the flows; each step checks the texts a person reads, what reached the disk or lord-vm, and keeps a
-screenshot. **Run on the i9 PC on 2026-11-24: 50 of 50 checks** (Debian 13 guest, KVM, CPU path): the empty library;
+screenshot. **Run on the i9 PC on 2026-11-24: 57 of 57 checks** on this branch merged with `test/integration-1125`
+(Debian 13 guest, KVM, CPU path; 50 of 50 earlier the same day, before the clipboard and mid-copy flows): the empty library;
 the New Machine assistant from Import a machine through the file picker, Light, a typed name and the review to Create
-and Start (made in 2.2 s, `MH-READY` 13.9 s after the click, its console's text in the machine's window); Shut Down (the
+and Start (made in 2.2 to 6.5 s, `MH-READY` 13.9 to 21.7 s after the click, its console's text in the machine's window); Shut Down (the
 power button, then the guest's own shutdown); Configure (Network → Isolated, the guest agent on, back to Shared, each in
 `machine.json`); a start from the card; the agent's popover (what works) and Install Clipboard Helper (lordos-guest in the
 guest); the clipboard both ways (Configure's Both ways; lordos-guest and `xclip` on the guest's Xvfb display: a text copied
@@ -4139,11 +4140,12 @@ network is back", and the guest resolved names again 1.0 s after the kill); the 
 machine keeps running and its window says "The transfer folder stopped working…", `VMN_SHARE_LOST`, built for this: it
 was in lord-vm's log only); lord-vm itself killed (the library says its supervisor ended, a start recovers it and the log
 says what it recovered); the agent killed while a 300 MB file dropped on the window is being copied in (nothing partial in
-the guest's Downloads: the whole file or none, and lord-vm's log says which).
+the guest's Downloads: the whole file or none, and lord-vm's log says which; on the i9 it said "wasn't copied:
+qemu-guest-agent stopped answering in the guest" and the Downloads folder had no trace of it).
 
 **Storage figures** (the `storage` flow): what Machines says deleting a clone frees (`lord.vm.storage()`, the Storage
 window's "Frees if deleted") against the change in free space once it went to the Trash and the Trash was emptied. ext4
-on the i9 (a full copy): said 1,075.5 MB, freed 1,073.1 MB. btrfs (reflinks) and XFS aren't measured yet: the run's
+on the i9 (a full copy), two runs: said 1,075.5 MB, freed 1,073.1 MB; said 1,322.4 MB, freed 1,322.2 MB. btrfs (reflinks) and XFS aren't measured yet: the run's
 scratch folder (`MH_SCRATCH`) must be on one, and none of the test computers has such a disk (making one needs root).
 
 **Boot matrix** (`boot-matrix.py`, `make -C server e2e-machines-matrix`): the prepared guest booted by lord-vm under each
