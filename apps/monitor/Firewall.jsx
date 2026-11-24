@@ -10,7 +10,7 @@
 //     and the clipboard isn't offered yet; a help line per restriction says what it covers.
 // The rules are saved by lord-server (lord.fw); this screen writes no files. Drawn like the
 // Settings sections: 13/600 headers, inset GroupBoxes with hairlines, footers.
-import { View, Text, Button, Segmented, ScrollView, GroupBox, useTheme, useLocale, useStore, useLauncherApps, firewall, firewallState, spacing, typeScale, errorText, netModel } from '@lordos/sdk';
+import { View, Text, Button, Segmented, ScrollView, GroupBox, useTheme, useLocale, useStore, useLauncherApps, firewall, firewallState, spacing, typeScale, errorText, netModel, monitor } from '@lordos/sdk';
 import { useState } from 'react';
 
 // Firewall id of a launcher app: the built-in ones run inside LordOS.
@@ -29,7 +29,7 @@ const isLinux = (id) => id.startsWith('desktop:') || id.startsWith('flatpak:');
 const { COMPONENTS } = netModel;
 const COMPONENT_IDS = Object.keys(COMPONENTS).filter((id) => id.startsWith('lordos:') && !COMPONENTS[id].system);
 const NET_ONLY = ['no-internet', 'no-lan', 'no-network', 'no-incoming'];
-const offered = (id) => (COMPONENTS[id] ? NET_ONLY : id === 'lordos' ? firewall.RESTRICTIONS.filter((f) => !DESKTOP_ALWAYS.includes(f))
+const offered = (id) => (netModel.componentOf(id) ? NET_ONLY : id === 'lordos' ? firewall.RESTRICTIONS.filter((f) => !DESKTOP_ALWAYS.includes(f))
   : isLinux(id) ? firewall.RESTRICTIONS.filter((f) => !LINUX_NOT_YET.includes(f)) : firewall.RESTRICTIONS);
 
 function useAppIndex() {
@@ -50,7 +50,7 @@ function AppLabel({ id, apps, tr }) {
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }}>
       {Icon ? <Icon size={24} /> : <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: t.control }} />}
       <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-        <Text style={{ fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{id === 'lordos' ? tr('monitor.lordos') : COMPONENTS[id] ? tr(COMPONENTS[id].label) : a?.name || id.replace(/^(desktop|lpk|flatpak):/, '')}</Text>
+        <Text style={{ fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{id === 'lordos' ? tr('monitor.lordos') : netModel.componentOf(id) ? (netModel.componentLabel(tr, id, monitor.machineNames([netModel.vmIdOf(id)].filter(Boolean))) || '') : a?.name || id.replace(/^(desktop|lpk|flatpak):/, '')}</Text>
         <Text style={{ fontSize: 10, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', fontFamily: 'monospace', textAlign: 'start' }}>{id}</Text>
       </View>
     </View>
@@ -61,7 +61,7 @@ function AppLabel({ id, apps, tr }) {
 function AddApp({ apps, exclude, onPick, tr }) {
   const t = useTheme();
   const [open, setOpen] = useState(false);
-  const choices = ['lordos', ...COMPONENT_IDS, ...apps.keys()].filter((id) => !exclude.has(id));
+  const choices = ['lordos', ...COMPONENT_IDS, ...monitor.machineList().map((m) => netModel.vmAppOf(m.id)).filter(Boolean), ...apps.keys()].filter((id) => !exclude.has(id));
   return (
     <View style={{ gap: spacing.s, paddingVertical: spacing.s }}>
       <View style={{ flexDirection: 'row' }}>

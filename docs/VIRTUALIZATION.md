@@ -42,19 +42,19 @@ recomputes both from the rows; the arithmetic:
 | B. Getting a system in (cards, unattended, import) | 12 | 13 | 87.85 | 88 % | 12 × 88 % = 10.56 | 76 % |
 | C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 95.17 | 95 % | 11 × 95 % = 10.45 | 75 % |
 | D. Snapshots, clones, storage | 9 | 6 | 85.00 | 85 % | 9 × 85 % = 7.65 | 60 % |
-| E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 80 % |
+| E. Network | 6 | 4 | 88.75 | 89 % | 6 × 89 % = 5.34 | 80 % |
 | F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 56.00 | 56 % | 6 × 56 % = 3.36 | 56 % |
 | G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 9 | 91.11 | 91 % | 12 × 91 % = 10.92 | 68 % |
 | H. Graphics (virgl, GVT-g, venus, passthrough) | 7 | 8 | 46.25 | 46 % | 7 × 46 % = 3.22 | 46 % |
 | I. Guest tools and agent (state, shell, logs) | 7 | 6 | 91.67 | 92 % | 7 × 92 % = 6.44 | 75 % |
 | J. Command line and automation | 3 | 2 | 92.50 | 93 % | 3 × 93 % = 2.79 | 48 % |
-| K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 88.75 | 89 % | 3 × 89 % = 2.67 | 61 % |
+| K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 91.25 | 91 % | 3 × 91 % = 2.73 | 61 % |
 | L. Privacy and security model | 4 | 7 | 85.71 | 86 % | 4 × 86 % = 3.44 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 92.00 | 92 % | 3 × 92 % = 2.76 | 55 % |
-| **Total** | **100** | **110** | | | **84.52 → 85 %** | 69 % |
+| **Total** | **100** | **110** | | | **85.12 → 85 %** | 69 % |
 
-Σ = 12.88 + 10.56 + 10.45 + 7.65 + 4.80 + 3.36 + 10.92 + 3.22 + 6.44 + 2.79 + 2.67 + 3.44 + 2.58 + 2.76 = 84.52, rounded **85 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
+Σ = 12.88 + 10.56 + 10.45 + 7.65 + 5.34 + 3.36 + 10.92 + 3.22 + 6.44 + 2.79 + 2.73 + 3.44 + 2.58 + 2.76 = 85.12, rounded **85 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); USB, then camera and printers (F, +1.2
@@ -122,7 +122,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 |---|---|---:|---|---|
 | Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows on amd64 (4.1, 5.2) | ✅ | 100 | `assets/machines/systems.json`, `catalog.js`, `vmunattend.c` (`kali`); `vmcatalog-test`, `vm_catalog_test.mjs`, `vmunattend-test` | Kali runs end to end with its own unattended install (*in development*): amd64 to the Xfce desktop in 36 min 27 s, the Pi 5 console in 11 min 5 s, 2026-11-24 (3.9, "The cards run end to end") (was 95: Kali had no unattended install) |
 | Makers' OpenPGP signatures, SHA-256, resumed downloads, removal (3.9) | ✅ | 100 | `vmcatalog.c`, `vmimage_admin.c`, `pgp.h`; `http-resume-test`, `http-retry-test` | A redirect refused with 403 or 5xx starts again from the original URL (*in development*) |
-| Any ISO, recognized (5.2) | ✅ | 95 | `vm/vmiso.c`, `js_vm.c` `isoInfo`, `model.js` `isoArch`, `assistant.jsx` (the ISO tile's drop); `vmiso-test` (ASan, UBSan, fuzz), `vm_model_test.mjs` | *In development*: the architecture from the UEFI boot files' PE headers (ISO 9660, UDF, the El Torito ESP), install discs by `sources/install.*`, the name only when they say nothing (`archFrom`); an `.iso` dropped on Use an ISO picks it. Checked with real ISOs (Alpine aarch64 named `mysystem.iso`, Ubuntu Server 26.04.1, LordOS 0.8.9, an install-disc evaluation ISO). The drop has no end-to-end UI test (was 85: only the 32-byte label was read) |
+| Any ISO, recognized (5.2) | ✅ | 95 | `vm/vmiso.c` (run only in `lord-vm --iso-probe`, seccomp strict mode), `vm/vmisoans.c` (`vmiso_run`, `vmiso_answer_decode`), `js_vm.c` `isoInfo`, `model.js` `isoArch`, `assistant.jsx` (the ISO tile's drop); `vmiso-test` (ASan, UBSan, fuzz; out of process, strict mode, the answer's decoder fuzzed), `vm_model_test.mjs` | *In development*: the hostile ISO is parsed out of lord-server, in `lord-vm --iso-probe` under seccomp strict mode, and only a fixed 64-byte answer comes back (2026-11-24; the same answers out of process for LordOS 0.8.8 amd64 and arm64, virtio-win 0.1.271 and an install-disc ISO; the Detect step seen headless through it, `machines_app2_headless.sh`). The architecture from the UEFI boot files' PE headers (ISO 9660, UDF, the El Torito ESP), install discs by `sources/install.*`, the name only when they say nothing (`archFrom`); an `.iso` dropped on Use an ISO picks it. Checked with real ISOs (Alpine aarch64 named `mysystem.iso`, Ubuntu Server 26.04.1, LordOS 0.8.9, an install-disc evaluation ISO). The drop has no end-to-end UI test (was 85: only the 32-byte label was read) |
 | Unattended Linux: Debian and Ubuntu desktops to login (3.9) | ✅ | 100 | `vmunattend.c`; `vmunattend-test`; VM 116, 2026-11-07 |  |
 | Unattended Fedora to login, Ubuntu console, the arm64 cards on the Pi | ✅ | 95 | `vmunattend.c` (`VMU_KICKSTART`, `xconfig`, `custom-environment`), `systems.json` (arm64 `append`), `catalog.js` `unattendedOf`; `vmunattend-test`, `vm_catalog_test.mjs` | Fedora 45 Workstation to GDM and GNOME (21 min 47 s) and Ubuntu 26.04.1 console to login (10 min 40 s) on amd64; Debian 13.8, Fedora 45 and Kali consoles and LordOS on the Pi 5, 2026-11-24, each from its card's verified download. Fixed on the way: Fedora's desktop booted to a text login, Fedora's console install stopped (an environment renamed), arm64 installers showed only on the serial port. Not run for lack of space on the Pi: the arm64 desktops and Ubuntu arm64 (was 🟡 60) |
 | LordOS card, `lordos-auto.conf`; its signed list read from lordos.org first, GitHub second (3.9, 4.1) | ✅ | 95 | `vmunattend.c` (`VMU_LORDOS`), `vmcatalog.c` (`LIST_MIRROR`, `vmcat_list_source`), `vmimage_admin.c`; `vmcatalog-test` (the real list and signature) | Run from the card end to end on 2026-11-24: on amd64 the list from lordos.org (HTTP 200), the 0.8.9 image, the install in 1 min 19 s with 3D, the greeter and the desktop; on the Pi 5 in 2 min 2 s to the greeter and the desktop. The guest agent and apps mode on first boot wait for an ISO newer than 0.8.9 (was 🧪 85) |
@@ -162,13 +162,13 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Raw disks, disk encryption, export (`.lordvm`, OVA), backups (6.4, 3.6) | 🧪 | 85 | `lordvm.c` (`--disk-format raw`, `cmd_export`, `cmd_import_lordvm`), `vmexport.c`, `vmkeysrv.c`, `backup/engine.c`, `vmkey.jsx`; `vm_storage_test.sh`, `vmexport-test`, `vmkeysrv-test`, `backup-machines-test` | *In development*, 2026-11-24: raw disk files (never host block devices: decided), encryption (8), Export as `.lordvm` with a checked manifest and as OVA, the import of an export, consistent backups. The OVA never imported into another app; the app's sheets not driven end to end; no bare disk image export (was ❌ 0) |
 | Storage window: shared extents, frees-if-deleted, downloads (6.16) | 🟡 | 75 | `storage.jsx`, `js_vm.c` (FIEMAP) | Trash, Reclaim with an estimate, the unused shared base. Never seen on btrfs or XFS; no "about" figures; no "delete old snapshots" or "remove unused media" |
 
-### E. Network (80 %)
+### E. Network (89 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
 | Shared (passt over a socketpair), Isolated (6.5) | ✅ | 100 | `lordvm.c` (`vm_passt_argv`) |  |
 | Bridged (macvtap, `vm-net-bridge`), Host only (passt on 127.0.0.1), port rules (6.5) | 🧪 | 90 | `vmnet_admin.c`, `vmnet.c`, `lordvm.c` | Headless checks; `vhost=off`, no `vhost-net` |
-| Each machine named in the firewall (6.5) | 🟡 | 60 | `fw/rules.h` (`lordos:machines`), `apps/monitor/Network.jsx` | One component for every machine (Monitor names them); a forwarded port isn't shown as its own rule |
+| Each machine named in the firewall (6.5) | 🧪 | 95 | `fw/rules.c` (`fw_vm_app`, `fw_app_parent`, `fw_effective_restricted`, `fw_effective_trusted`, `fw_decide`), `netperm/npcompile.c` (`load_rules`), `sdk/netmodel.js` (`vmIdOf`, `componentOf`, `componentLabel`, `forwardedRules`), `apps/monitor/Network.jsx`, `FwRules.jsx`, `Firewall.jsx`, `apps/machines/configure.jsx` (Network → Firewall); `fw-rules-test` (`test_machine_inherits`), `npcompile-test` (random rounds with a machine and Machines against `fw_decide`), `netmodel_test.mjs` | *In development*: each machine is its own firewall app and row, `lordos:vm-<id>`, which inherits the rules, restrictions and trust of `lordos:machines` (nothing a Machines rule denies is allowed by the split); Monitor names the row after the machine and lists its forwarded ports as its own incoming lines; Settings' rule and restriction lists offer each machine; Configure → Network opens its rules. Not yet run through a live lord-netperm with a running machine (the kernel path is the same compile, tested against `fw_decide`) |
 | Network card model (`--nic-model`) and an import's extra cards (3.9, 6.22) | 🧪 | 70 | `machine.h` (`nic_model`, `VM_EXTRA_NICS`) | An import's extra cards are kept but never connected. Added by the audit of 2026-11-23 |
 
 ### F. Devices (56 %)
@@ -226,14 +226,14 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | `machines` list, status, start, open, stop…, snapshot, clone, set, rename, ids, and for a machine group `fresh` and `--member` (19.9); 35 languages, `--json`, completion (6.15) | 🧪 | 100 | `server/src/cli/machines.c`, `mcli.c`; `mcli-test`, `machinescli_headless.sh`, `vm_rename.sh`, `vm_exec_e2e.sh` | *In development* since the last audit: `set` passes `--cpu-pin`, `--perf-profile` and `--capture-fullscreen`; `start --no-window --snapshot TAG`, `import`, `console` (each run on 2026-11-24 against a real Ubuntu 26.04.1 machine on the dev PC, in a private home). A start in a window is still checked headless only; a machine from a card is made in the app (`apply` makes one from an ISO) (was 95) |
 | `lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24) | 🧪 | 85 | `vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cmd_logs`, `cmd_mcp`, `cmd_apply`), `mcli.c`, `configure.jsx` (Automation), `machine.h` (schema 17); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh` | *In development* (2026-11-24): exec, cp, logs, console, apply and an MCP server of eight tools, per machine with automation on; 28 of 28 checks in a real Ubuntu 26.04.1 guest on the dev PC. `machines shell` (the agent's shell, checked against a stand-in lord-vm). Not built: exec in virtio-win guests, folders in cp, MCP's create_machine, requirements and screenshot, apply's packages and rebuild. Configure's Automation row not yet seen on screen (was ❌ 0) |
 
-### K. System ties (89 %)
+### K. System ties (91 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
 | Monitor: a machine as one row (6.14) | 🟡 | 80 | `apps/monitor/Processes.jsx` (Show Machine), `Network.jsx`, `Gpu.jsx`; `apps/machines/index.jsx` (`args.show`) | Network and GPU name machines too; a machine's row opens its processes and Show Machine opens its window (*in development*). No per-machine disk and network numbers in Monitor |
 | Idle block while a machine runs (6.14) | ✅ | 90 | `lord.vm.awake`, `vmlogind.c` |  |
 | Cleaner, Backups, Files bundle, Search, Pause All on battery, start with the session, auto-pause, Reclaim in Machines (6.14, 16) | ✅ | 100 | `clean/cleanfs.c` `clean_machine_path`, `apps/cleaner/vmspace.js` `machinesSpace`, `backup/engine.c` (`hold`), `backup.c`, `machine.c` `vm_backup_hold`, `vm_dir_active`, `sdk/openwith.js` `registerBundle`, `apps/files`, `apps/machines/ties.js`; `clean-test`, `backup-test`, `vm-test`, `vm_model_test.mjs`, `machines_app_headless.sh` | *In development*: Cleaner never offers a machine's files and its Storage view sends a machine's space to Machines' Storage window (Reclaim in Machines); Backups hold back a running machine's disks and saved session; Files shows a machine as one item; Search finds machines; Pause All on battery; Start with the session; Pause while I'm away. No balloon: decided 2026-11-24 (6.14) |
-| Sentinela watches running machines: sandbox and scope, a Workstation's ways out, crashes, CPU, memory, a Gateway's traffic (docs/SENTINELA.md, "Machines") | 🧪 | 85 | `sdk/sentinelavm.js`, `vmwatch.h`, `js_vm.c` (`stats`: lord-vm asked over its socket, `SO_PEERCRED`), `monitor/conn.c` (`conn_machines`); `sentinela_vm_test.mjs`, `vmwatch-test`, `sentinela_vm_live.sh` | *In development*; off by default; counts only. **Run live on 2026-11-24** (`sentinela_vm_live.sh`: a real KVM machine under a headless session, Sentinela on, screenshots): the alert reached the screen, but it was a false one: lord-vm is non-dumpable since QEMU's namespaces (2026-11-23), so lord-server can't read `/proc/<lord-vm>/exe`, never verifies a live machine and raises vmSandbox on every one. Needs a decision on what attests lord-vm (was 90) |
+| Sentinela watches running machines: sandbox and scope, a Workstation's ways out, crashes, CPU, memory, a Gateway's traffic (docs/SENTINELA.md, "Machines") | 🧪 | 95 | `sdk/sentinelavm.js`, `vmwatch.h` (`vmwatch_procs_*`, `vmwatch_cg_lordvm`, `SO_PEERPIDFD`), `js_vm.c` (`stats`: lord-vm asked over its socket, `SO_PEERCRED`, `vm_vouched`; a pidfd kept by `start` and, through `lord-vm --pidfd-to`, by `startDetached`), `monitor/conn.c` (`conn_machines`); `sentinela_vm_test.mjs`, `vmwatch-test`, `sentinela_vm_live.sh` | *In development*; off by default; counts only. **Run live on 2026-11-24** (`sentinela_vm_live.sh`: a real KVM machine under a headless session, Sentinela on, screenshots): it first found a false alert (lord-vm is non-dumpable, so `/proc/<lord-vm>/exe` can't be read and nothing was verified); fixed the same day with pidfds lord-server keeps of every lord-vm it starts (adopting one after its own restart only from `SO_PEERPIDFD` in the machine's own scope). Run again: verified on every read, no unverified alert, vmSandbox names only the cgroup a headless run lacks. Not run: a real LordOS session with scopes, the adoption after a lord-server restart (unit-tested only) |
 
 ### L. Privacy and security (86 %)
 
@@ -2383,8 +2383,14 @@ they say nothing, or name both amd64 and arm64, `model.js` `isoArch` takes it fr
 and the summary card says which ("arm64, read from its boot files"), or that the boot files are for an architecture
 Machines can't run (riscv64). The file is untrusted: every offset and length is checked against the file, paths are fixed
 (no tree walk, so a directory that points at itself can't loop), FAT chains and UDF descriptors are capped, and a probe
-stops at 4,096 reads or 24 MB (40 reads on a network or cloud mount). `tests/vmiso_test.c` builds each kind of image byte
-by byte, adds hostile ones and fuzzes them under ASan and UBSan. Checked on real ISOs: Alpine 3.24.4 aarch64 virt (arm64
+stops at 4,096 reads or 24 MB (40 reads on a network or cloud mount). The parser never runs in lord-server (in development,
+2026-11-24): lord-server opens the file and passes it as fd 0 to `lord-vm --iso-probe MAX`, which maps it, closes every
+other descriptor, grows its heap, enters seccomp **strict** mode (read, write, exit: no open, mmap, socket or exec) and
+only then parses, writing one fixed 64-byte answer on a pipe (`vmiso.h`); lord-server links only the answer's decoder
+(`vmisoans.c`), which refuses anything off the format whole, and kills the probe after 3 s either way. `tests/vmiso_test.c`
+builds each kind of image byte by byte, adds hostile ones and fuzzes them under ASan and UBSan; every named image is also
+probed out of process and must give the same answer, strict mode is proven (a forbidden call after it kills the probe),
+the decoder is fuzzed, and `nm` shows no parser in lord-server. Checked on real ISOs: Alpine 3.24.4 aarch64 virt (arm64
 from its PE headers, though its file name says nothing), an amd64 install disc's evaluation (UDF, install.wim, amd64 from
 the ESP), Ubuntu Server 26.04.1, LordOS 0.8.9 live, virtio-win 0.1.271 (no boot files: name).
 
@@ -2423,7 +2429,7 @@ The resolution menu is always shown, with **Follow the window** as one of its it
 with ❖Esc or Ctrl+Alt (fixed, 6.25). Built since (*in development*): a **View** menu (Window, Full Screen, Apps, **Picture in Picture**, **Actual Size**: the window
 sized to the guest's display while the resolution is fixed, `actualFrame`), an **Info** menu (CPU, memory and disk from two
 `lord.vm.stats` reads 2 s apart, the sandbox, Open Configuration…, `infoLines`) and **Start in Full Screen** in the machine's ···
-menu (the window takes its display as it opens). Built since (*in development*, "Machines to 100 %"): **View → Scale** (50, 75,
+menu (the window takes its display as it opens); View → **All Displays** (5.4). Built since (*in development*, "Machines to 100 %"): **View → Scale** (50, 75,
 125, 150 and 200 % of the guest's display, the largest of that shape that fits the display, `scaleFrame`); the window
 **keeps the guest's shape** while the resolution is fixed: after the person resizes it, the frame takes the guest's
 proportions again, keeping its width (`shapeFrame`, once per size, so a window that can't go there isn't fought);
@@ -2960,7 +2966,23 @@ downloading 500 MB from a server on the host (**Measured**, 2026-11-04, medians 
 
 **Decision (confirmed, open question 7 closed):** `passt` stays the default for Shared. It's 3.2× faster on amd64, about equal on the
 Pi, and it is the process the firewall can name as the machine. On the Pi its speed varies far more from run to run, which Phase 1
-looks at. QEMU 10.0 has no `-netdev passt`, so it's connected through `-netdev stream` on a socketpair (3.3). Bridged runs with `vhost=off` (QEMU opens no device), not `vhost-net`. `passt` runs as the machine's own process, in its scope, because it's the one opening the connections: the firewall has to see **that** as the machine, as it does for `desktop:lordos-rdesk`. Centinela sees each VM as an app (`desktop:lordos-vm-<id>`, **To test**): its traffic in Shared mode appears in the firewall, the map and Monitor as "Machine: name". A rule can block it. Bridged traffic bypasses this: Security says so.
+looks at. QEMU 10.0 has no `-netdev passt`, so it's connected through `-netdev stream` on a socketpair (3.3). Bridged runs with `vhost=off` (QEMU opens no device), not `vhost-net`. `passt` runs as the machine's own process, in its scope, because it's the one opening the connections: the firewall has to see **that** as the machine.
+
+**Each machine in the firewall (*in development*, "Machines to 100 %").** A running machine's scope
+`app-lordos-lordos-vm-<id>.scope` is the firewall app **`lordos:vm-<id>`** (`fw_scope_app` → `fw_vm_app`; the id is the
+machine's lowercase UUID). It never stands alone: `fw_app_parent` makes `lordos:machines` (the Machines component, also its
+downloads) its parent, and what decides for the machine is both together. `fw_decide` picks from the machine's own rules and
+the Machines rules as one list with the usual precedence (the more specific destination wins; on a tie Block beats Allow), the
+restrictions are both apps' (`fw_effective_restricted`), and trust comes from either (`fw_effective_trusted`; trust only
+decides what no rule and no restriction decides). lord-netperm compiles the same union for the kernel (`npcompile.c`
+`load_rules`, flags and trust from the two functions), so a rule, a restriction or "no incoming connections" for Machines still
+holds for every machine, and nothing the Machines rules deny becomes allowed by the split: only a rule the person writes for
+that one machine can be more specific. A group's Tor gateway keeps `lordos:tor-gateway`, inherits nothing and keeps its
+built-in restriction (19.5.1). Monitor → Network shows a row per machine named after it ("Ubuntu 24.04 (machine)"), with the
+Machines rule that decides for it too and each forwarded port as its own incoming line ("Forwarded port TCP 2222 → 22", open
+to the network or only this computer; `forwardedRules`). Settings → Privacy's rule list and restricted-apps list offer each
+machine (not a gateway), and Configure → Network has a **Firewall** row that opens that machine's rules. Bridged traffic
+bypasses all this (the guest's frames aren't sockets): Configure and Security say so.
 
 Each forwarded port has a scope: **Only this computer** by default, or **Your network**, which is a firewall rule the person sees.
 
@@ -2973,8 +2995,8 @@ shows the four modes, the card and the port list; every change needs the machine
 - **Forwarded ports (Shared and Host-only).** passt's own options, one per rule: `-t 127.0.0.1/H:G` (only this computer) or
   `-t 0.0.0.0/H:G` (the network, Shared only; a host-only machine never listens beyond loopback, whatever the file says), the same
   with `-u`. No rule: `-t none -u none` as before. passt binds them in the machine's scope, so `lord-netperm`'s bind programs decide
-  them as incoming connections of `lordos:machines` (FIREWALL.md, "Machines' downloads"): with "no incoming connections" for
-  Machines the bind is refused. Before passt starts, lord-vm binds and lets go of each port itself (`ports_free`), so a port in use
+  them as incoming connections of that machine's app, `lordos:vm-<id>`, with the Machines rules (FIREWALL.md, "Each machine its own
+  app"): with "no incoming connections" for Machines or for that machine the bind is refused. Before passt starts, lord-vm binds and lets go of each port itself (`ports_free`), so a port in use
   or a refusal by the firewall fails the start with a clear line instead of passt dying and the network's healing trying again.
   passt has no Landlock of ours (3.3) and binds nothing else; QEMU still can't bind or connect (Landlock net + seccomp).
 - **Host-only.** Also passt, with no root and no device: `-4 -o 127.0.0.1 -a 10.0.2.15 -n 24 -g 10.0.2.2 --no-dhcp-dns
@@ -5163,7 +5185,7 @@ What people don't normally get from a desktop virtualization app, and the reason
 | **A sandbox per machine** | 1 | Yes | Landlock, seccomp, cgroup scope, descriptors only: a broken engine is still shut in |
 | **Permission-gated devices** | 2 | Yes | Camera, mic, USB, folders pass the system's permission flow, one screen shows all |
 | **"Guest can see"** | 2 | Yes | One plain list of everything a guest can reach |
-| **Machines in the firewall** | 2 | Yes | Built partly: every machine is the one firewall component `lordos:machines`; Monitor tells machines apart |
+| **Machines in the firewall** | 2 | Yes | Built (*in development*): each machine its own firewall app `lordos:vm-<id>`, inheriting the rules of `lordos:machines` |
 | **No engine window, no X11** | 1 | Yes | One compositor, theme, desktops and shortcuts for all |
 | **Forwarded windows are marked** | 4 | Work | A guest's window can't pass as a host's |
 | **Guest logs and files are treated as hostile** | 2 | Yes | Escapes stripped, quarantine marking, fuzzed agent protocol |
@@ -5919,8 +5941,8 @@ The questions as they were asked:
 - **Huge pages off**, at a cost of about 30 % in random memory access (recommended, Whonix's advice), or Machines'
   default.
 - **The edition:** LXQt only (recommended), or a CLI choice too.
-- **The firewall and logs:** whether the Gateway gets its own name in the firewall (today every machine is
-  `lordos:machines`, area E), and whether `lord-vm`'s logs of group members are kept shorter.
+- **The firewall and logs:** the Gateway has its own name in the firewall (`lordos:tor-gateway`, 19.5.1) and every other
+  machine its own (`lordos:vm-<id>`, 6.5); open: whether `lord-vm`'s logs of group members are kept shorter.
 - **A fixed guest resolution** (for example 1920 × 1080 whatever the window's size), or the window's size; Tor Browser
   letterboxes either way.
 - **Generic groups:** Whonix only (recommended), or "New Group" for any machines later.

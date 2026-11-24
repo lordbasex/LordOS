@@ -82,17 +82,27 @@ typedef struct {
     int n;
 } Rules;
 
+/* An app's rules; a machine's ("lordos:vm-<id>") are its own and the Machines component's together (fw_app_parent),
+ * decided as one list with the usual precedence, the same as fw_decide. */
 static int load_rules(FwStore *s, const char *app, Rules *R) {
     R->rules = NULL;
     R->n = 0;
-    int total = fw_rule_list(s, app, NULL, 0);
-    if (total < 0) return -1;
+    const char *parent = fw_app_parent(app);
+    int own = fw_rule_list(s, app, NULL, 0);
+    int inh = parent ? fw_rule_list(s, parent, NULL, 0) : 0;
+    if (own < 0 || inh < 0) return -1;
+    int total = own + inh;
     if (!total) return 0;
     FwRule *all = malloc((size_t)total * sizeof *all);
     if (!all) return -1;
-    int got = fw_rule_list(s, app, all, total);
+    int got = own ? fw_rule_list(s, app, all, own) : 0;
     if (got < 0) { free(all); return -1; }
-    if (got > total) got = total;
+    if (got > own) got = own;
+    if (inh) {
+        int g2 = fw_rule_list(s, parent, all + got, inh);
+        if (g2 < 0) { free(all); return -1; }
+        got += g2 > inh ? inh : g2;
+    }
     int k = 0;
     for (int i = 0; i < got; i++) if (all[i].life != FW_LIFE_ONCE) all[k++] = all[i];
     R->rules = all;
@@ -196,8 +206,8 @@ int np_compile_app(FwStore *s, const char *app, uint32_t idx, DnsMap *names, con
      * their permission and restriction checks (js_media.c, the broker), so the kernel doesn't
      * take its devices away. */
     uint32_t keep = NP_R_NET_MASK | (strcmp(app, "lordos") ? NP_R_DEV_MASK : 0);
-    a->flags = (fw_restricted(s, app) | fw_builtin_restricted(app)) & keep;
-    a->trusted = (np_u8)(fw_is_trusted(s, app) != 0);
+    a->flags = fw_effective_restricted(s, app) & keep;          /* a machine's: the Machines component's too */
+    a->trusted = (np_u8)(fw_effective_trusted(s, app) != 0);
     a->mode = fw_mode(s) == FW_MODE_OFF ? NP_M_OFF : fw_mode(s) == FW_MODE_DENY ? NP_M_DENY : NP_M_SILENT;
 
     int rc = -1;

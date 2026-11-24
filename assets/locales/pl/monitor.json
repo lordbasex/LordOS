@@ -731,5 +731,12 @@
   "desc.done.pause": "Wstrzymano.",
   "desc.done.block_network": "Jego sieć jest zablokowana.",
   "desc.done.blocklist": "Na liście blokowania: jest kończony za każdym razem, gdy się uruchomi.",
-  "desc.blockConfirm": "Dodać „{name}” do listy blokowania? Od teraz będzie kończony za każdym razem, gdy się uruchomi. Możesz to cofnąć w Ustawienia → AI → Sentinela."
+  "desc.blockConfirm": "Dodać „{name}” do listy blokowania? Od teraz będzie kończony za każdym razem, gdy się uruchomi. Możesz to cofnąć w Ustawienia → AI → Sentinela.",
+  "comp.machine": "Maszyna",
+  "comp.machineNamed": "{name} (maszyna)",
+  "comp.machineHint": "Maszyna wirtualna: ruch sieciowy jej systemu gościa. Jej własne reguły dochodzą do reguł Maszyn, które nadal decydują o każdej maszynie.",
+  "comp.machinesRules": "Reguła Maszyn",
+  "comp.forwarded": "Przekierowany port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Otwarty dla sieci",
+  "comp.forwardedLocal": "Tylko ten komputer"
 }

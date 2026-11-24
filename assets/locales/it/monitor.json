@@ -716,5 +716,12 @@
   "desc.done.pause": "In pausa.",
   "desc.done.block_network": "La sua rete è bloccata.",
   "desc.done.blocklist": "Nella lista di blocco: viene terminato ogni volta che si avvia.",
-  "desc.blockConfirm": "Aggiungere «{name}» alla lista di blocco? Da ora in poi verrà terminato ogni volta che si avvia. Puoi annullarlo in Impostazioni → IA → Sentinela."
+  "desc.blockConfirm": "Aggiungere «{name}» alla lista di blocco? Da ora in poi verrà terminato ogni volta che si avvia. Puoi annullarlo in Impostazioni → IA → Sentinela.",
+  "comp.machine": "Macchina",
+  "comp.machineNamed": "{name} (macchina)",
+  "comp.machineHint": "Una macchina virtuale: il traffico di rete del suo sistema ospite. Le sue regole si aggiungono a quelle di Macchine, che continuano a decidere per ogni macchina.",
+  "comp.machinesRules": "Regola di Macchine",
+  "comp.forwarded": "Porta inoltrata {proto} {port} → {guest}",
+  "comp.forwardedLan": "Aperta alla rete",
+  "comp.forwardedLocal": "Solo questo computer"
 }

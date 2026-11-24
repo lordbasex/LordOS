@@ -701,5 +701,12 @@
   "desc.done.pause": "已暂停。",
   "desc.done.block_network": "已阻止其联网。",
   "desc.done.blocklist": "已加入拦截列表：它每次启动都会被结束。",
-  "desc.blockConfirm": "要把“{name}”加入拦截列表吗？从现在起，它每次启动都会被结束。你可以在 设置 → AI → Sentinela 中撤销。"
+  "desc.blockConfirm": "要把“{name}”加入拦截列表吗？从现在起，它每次启动都会被结束。你可以在 设置 → AI → Sentinela 中撤销。",
+  "comp.machine": "机器",
+  "comp.machineNamed": "{name}（机器）",
+  "comp.machineHint": "一台虚拟机：其客户系统的网络流量。它自己的规则会加到“虚拟机”的规则上，后者仍为每台机器做决定。",
+  "comp.machinesRules": "“虚拟机”的规则",
+  "comp.forwarded": "转发端口 {proto} {port} → {guest}",
+  "comp.forwardedLan": "对网络开放",
+  "comp.forwardedLocal": "仅此电脑"
 }

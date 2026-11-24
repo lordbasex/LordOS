@@ -26,14 +26,16 @@ import { HistoryControls, HistoryChart, useHistory } from './History.jsx';
 import { REMOTE_KEY, RemoteDetail, ShareHolderLine, remoteGroup, useRemoteDesktop } from './RemoteDesktop.jsx';
 import { TokenSearch, ViewButton, useNetView, TreeChildren, Child } from './NetTree.jsx';
 
-const { COMPONENTS, isSystemId, filterFlows, groupFlows, sortTree, machinesLabel } = netModel;
+const { COMPONENTS, isSystemId, filterFlows, groupFlows, sortTree, machinesLabel, componentOf, componentLabel, vmIdOf, forwardedRules, VM_PARENT } = netModel;
 
 // (0.8.5) a socket made in an app's scope is that app's (conn.c "cgApp"), whoever holds it: the ones
 // Mail's connector made are Mail's, a program in the Terminal is the Terminal's
 export const appKeyOf = netModel.connAppKey;
 // The row's name: LordOS's own components by their label, LordOS itself, or the app's name.
 // (0.8.8.6) The Machines row also names the running machines whose guests are on the network.
-export const labelOf = (tr, g) => (COMPONENTS[g.key]
+// (Machines to 100 %) Each running machine has its own row, named after the machine.
+export const labelOf = (tr, g) => (vmIdOf(g.key) ? componentLabel(tr, g.key, g.machineNames || monitor.machineNames([vmIdOf(g.key)]))
+  : COMPONENTS[g.key]
   ? ((g.key === 'lordos:machines' || g.key === 'lordos:tor-gateway') && g.machines?.size ? machinesLabel(tr(COMPONENTS[g.key].label), g.machines, g.machineNames)
     : tr(COMPONENTS[g.key].label))
   : g.key === 'lordos' ? tr('monitor.lordos') : g.name);
@@ -105,7 +107,7 @@ function useGroups(conns) {
       const key = appKeyOf(c);
       let g = apps.get(key);
       if (!g) {
-        const comp = !!COMPONENTS[key] || key === 'lordos';
+        const comp = !!componentOf(key) || key === 'lordos';
         g = { key, item: comp ? { app: key } : c, name: comp || (c.self && !c.cgApp) ? null : c.appName || c.name || '?', exe: c.exe, pids: new Set(), conns: [], hosts: new Map(),
           sent: 0, recv: 0, rateTx: 0, rateRx: 0, listen: [], icmp: [], raw: [], packet: [], incoming: 0, verdict: 'allow', programs: new Set() };
         apps.set(key, g);
@@ -187,7 +189,7 @@ function withFirewall(groups, fw, launcher) {
   for (const [key, v] of Object.entries(counts)) {
     if (have.has(key) || key === 'lordos' || !Array.isArray(v) || !(v[0] || v[1] || (hasBytes(fw, v) && (v[2] || v[3])))) continue;
     const la = launcher.find((a) => a.id === key || `lpk:${a.id}` === key);
-    const comp = !!COMPONENTS[key];
+    const comp = !!componentOf(key);
     const name = comp ? null : la?.name || key.replace(/^(desktop|lpk|flatpak):/, '');
     const g = { key, item: comp ? { app: key } : { app: key, appName: name, name, appIcon: la?.icon || '' }, name, exe: '', pids: new Set(), conns: [], hosts: new Map(), sent: 0, recv: 0,
       rateTx: 0, rateRx: 0, listen: [], incoming: 0, verdict: v[1] && !v[0] ? 'deny' : 'allow', rule: firewall.appRule(key), allowed: v[0] || 0, denied: v[1] || 0,
@@ -605,7 +607,11 @@ function HostRow({ h, name, selected, onSelect, can, onRule, tr }) {
 function Detail({ g, tr, user, names, host, onHost, onRule, hist, range, end }) {
   const t = useTheme();
   const can = firewall.available() && firewall.enforceable(g.key);
-  const comp = COMPONENTS[g.key];
+  const comp = componentOf(g.key);
+  const vm = vmIdOf(g.key);
+  // a machine's row: the Machines rules that decide for it too, and its forwarded ports as its own incoming lines
+  const vmInfo = vm ? monitor.machineInfo(vm) : null;
+  const forwarded = vm ? forwardedRules(vmInfo?.ports) : [];
   let dns = [];
   if (g.key === 'system:dns') { try { dns = (lord.net?.dns?.()?.servers || []).slice(0, 4); } catch (e) { dns = []; } }
   const ports = new Set(), local = new Set();
@@ -638,6 +644,12 @@ function Detail({ g, tr, user, names, host, onHost, onRule, hist, range, end }) 
           color={g.rule === 'deny' ? '#ff453a' : '#30d158'} />
         {g.allowed || g.denied ? <KV k={tr('firewall.counts')} v={tr('firewall.countsValue', { allowed: g.allowed || 0, denied: g.denied || 0 })} /> : null}
         {g.blocked ? <KV k={tr('firewall.blocked')} v={formatBytes(g.blocked)} color="#ff453a" /> : null}
+        {vm ? <KV k={tr('monitor.comp.machinesRules')} v={tr(firewall.appRule(VM_PARENT) === 'deny' ? 'firewall.rule.deny' : firewall.appRule(VM_PARENT) === 'allow' ? 'firewall.rule.allow' : 'firewall.rule.none')}
+          color={firewall.appRule(VM_PARENT) === 'deny' ? '#ff453a' : undefined} /> : null}
+        {forwarded.map((f) => (
+          <KV key={`${f.proto}${f.port}`} k={tr('monitor.comp.forwarded', { proto: f.proto.toUpperCase(), port: f.port, guest: f.guest })}
+            v={tr(f.open === 'lan' ? 'monitor.comp.forwardedLan' : 'monitor.comp.forwardedLocal')} />
+        ))}
         {can ? (
           <View onClick={() => openAppRules(g.key)} style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
             <Text style={{ fontSize: 11, color: t.accent }}>{tr('fwrules.appRulesLink', { count: firewall.rules(g.key).length })}</Text>
@@ -875,8 +887,8 @@ export function NetworkTab({ last, prefs }) {
   const filtered = chips.length > 0 || !!text.trim() || view.dir !== 'all' || view.proto !== 'all' || view.status !== 'all';
   const histRoots = !live ? (sysHist?.h?.top || []).map(([id, rx, tx]) => {
     const la = launcher.find((a) => a.id === id || `lpk:${a.id}` === id || `desktop:${a.id}` === id);
-    const g = byKey.get(id) || { key: id, item: COMPONENTS[id] ? { app: id } : { app: id, appName: la?.name, name: la?.name || id, appIcon: la?.icon || '', self: id === 'lordos' },
-      name: COMPONENTS[id] || id === 'lordos' ? null : la?.name || id.replace(/^(desktop|lpk|flatpak):/, ''), conns: [], listen: [], hosts: new Map(), rule: firewall.appRule(id), denied: 0, programs: new Set() };
+    const g = byKey.get(id) || { key: id, item: componentOf(id) ? { app: id } : { app: id, appName: la?.name, name: la?.name || id, appIcon: la?.icon || '', self: id === 'lordos' },
+      name: componentOf(id) || id === 'lordos' ? null : la?.name || id.replace(/^(desktop|lpk|flatpak):/, ''), conns: [], listen: [], hosts: new Map(), rule: firewall.appRule(id), denied: 0, programs: new Set() };
     return { ...g, recv: rx, sent: tx, rateRx: 0, rateTx: 0, histOnly: true };
   }).filter((g) => {
     const f = { app: g.key, appName: labelOf(tr, g), name: null, addr: '', port: 0, proto: 'other', dir: 'out', cc: '' };

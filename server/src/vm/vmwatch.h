@@ -6,10 +6,13 @@
 
 #include "vmproto.h"
 
+#include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
 #include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
@@ -54,14 +57,121 @@ static inline int vmwatch_exe_same(const char *exe, const char *want) {
     return l == w + 10 && !strncmp(exe, want, w) && !strcmp(exe + w, " (deleted)");
 }
 
+/* lord-vm's own cgroup, from /proc/<pid>/cgroup: exactly the machine's scope, or its "supervisor" leaf when lord-vm
+ * divided the scope (3.7). Never a leaf below it (QEMU's, passt's: processes the guest may reach) and never another
+ * cgroup that merely starts the same way. */
+static inline int vmwatch_cg_lordvm(const char *proc_cgroup, const char *scope) {
+    if (!vmwatch_cg_under(proc_cgroup, scope)) return 0;
+    const char *rest = proc_cgroup + 3 + strlen(scope);
+    if (*rest == 0 || *rest == '\n') return 1;
+    return !strncmp(rest, "/supervisor", 11) && (rest[11] == 0 || rest[11] == '\n');
+}
+
+/* ---- the lord-vm processes this lord-server vouches for (docs/SENTINELA.md "Machines") ----
+ * lord-vm is non-dumpable (QEMU's user namespace is made while it still is), so /proc/<lord-vm>/exe can't be read by the
+ * person's other processes, lord-server included. What attests a machine's lord-vm instead: lord-server holds a pidfd of
+ * every lord-vm it starts (the child it forked and exec'd from the installed program, or, for a detached start, the pidfd
+ * the installed lord-vm sends of itself over a socketpair only it was given), with the machine's id and the process's
+ * start time. A peer of the machine's socket is that lord-vm only when its SO_PEERCRED pid is one held for that machine
+ * and the pidfd still names a live process. A lord-vm this lord-server didn't start (it restarted) is adopted only with
+ * the kernel's pidfd of the socket's peer (SO_PEERPIDFD) when that process is in the machine's own scope or its
+ * supervisor leaf, where lord-sessiond places only the installed LordOS programs of the session's server leaf; it stays
+ * unverified otherwise. */
+#ifndef SO_PEERPIDFD
+#define SO_PEERPIDFD 77
+#endif
+#define VMWATCH_PROCS 32
+typedef struct { long pid; int pidfd; unsigned long long start; char id[37]; int adopted; } VmProcRec;
+
+/* the pidfd still names a live process (pidfd_send_signal with signal 0) */
+static inline int vmwatch_pidfd_alive(int pidfd) {
+    return pidfd >= 0 && syscall(SYS_pidfd_send_signal, pidfd, 0, NULL, 0) == 0;
+}
+
+/* the pid a pidfd names, from the kernel (/proc/self/fdinfo's "Pid:"), -1 when fd isn't a pidfd of a live process */
+static inline long vmwatch_pidfd_pid(int pidfd) {
+    char p[64], buf[1024];
+    if (pidfd < 0) return -1;
+    snprintf(p, sizeof p, "/proc/self/fdinfo/%d", pidfd);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (n <= 0) return -1;
+    buf[n] = 0;
+    const char *s = strstr(buf, "\nPid:");
+    if (!s) return -1;
+    long v = strtol(s + 5, NULL, 10);
+    return v > 1 ? v : -1;
+}
+
+/* the process's start time (clock ticks after boot, /proc/<pid>/stat field 22), 0 unknown */
+static inline unsigned long long vmwatch_start_time(long pid) {
+    char p[64], buf[1024];
+    snprintf(p, sizeof p, "/proc/%ld/stat", pid);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (n <= 0) return 0;
+    buf[n] = 0;
+    const char *s = strrchr(buf, ')');          /* comm may hold spaces and ')': fields count from the last one */
+    if (!s) return 0;
+    int field = 2;
+    for (s++; *s && field < 22; s++) if (*s == ' ') field++;
+    return field == 22 ? strtoull(s, NULL, 10) : 0;
+}
+
+/* the dead ones' pidfds closed and their places freed */
+static inline void vmwatch_procs_prune(VmProcRec *t, int n) {
+    for (int i = 0; i < n; i++)
+        if (t[i].pid && !vmwatch_pidfd_alive(t[i].pidfd)) { if (t[i].pidfd >= 0) close(t[i].pidfd); memset(&t[i], 0, sizeof t[i]); t[i].pidfd = -1; }
+}
+
+/* id's lord-vm with pidfd (taken: the table closes it); its pid from the pidfd itself and its start time read while the
+ * pidfd shows it alive before and after. 0 kept, -1 not (bad id, not a live pidfd, no room: pidfd closed) */
+static inline int vmwatch_procs_add(VmProcRec *t, int n, const char *id, int pidfd, int adopted) {
+    size_t il = id ? strlen(id) : 0;
+    int ok = il > 0 && il <= 36;
+    for (size_t i = 0; ok && i < il; i++) if (!((id[i] >= '0' && id[i] <= '9') || (id[i] >= 'a' && id[i] <= 'f') || id[i] == '-')) ok = 0;
+    long pid = ok ? vmwatch_pidfd_pid(pidfd) : -1;
+    unsigned long long st = pid > 1 ? vmwatch_start_time(pid) : 0;
+    if (pid <= 1 || !st || !vmwatch_pidfd_alive(pidfd)) { if (pidfd >= 0) close(pidfd); return -1; }
+    vmwatch_procs_prune(t, n);
+    int slot = -1;
+    for (int i = 0; i < n; i++) {
+        if (t[i].pid == pid && !strcmp(t[i].id, id)) { close(pidfd); return 0; }   /* the same one again */
+        if (!t[i].pid && slot < 0) slot = i;
+    }
+    if (slot < 0) { close(pidfd); return -1; }
+    t[slot].pid = pid;
+    t[slot].pidfd = pidfd;
+    t[slot].start = st;
+    t[slot].adopted = adopted;
+    memcpy(t[slot].id, id, il + 1);
+    return 0;
+}
+
+/* the record of id's lord-vm whose pid is pid, still alive and still the same process (its start time unchanged); NULL
+ * otherwise: a mismatch is never verified */
+static inline const VmProcRec *vmwatch_procs_match(VmProcRec *t, int n, const char *id, long pid) {
+    if (!id || !id[0] || pid <= 1) return NULL;
+    for (int i = 0; i < n; i++) {
+        if (t[i].pid != pid || strcmp(t[i].id, id)) continue;
+        if (!vmwatch_pidfd_alive(t[i].pidfd) || vmwatch_start_time(pid) != t[i].start) return NULL;
+        return &t[i];
+    }
+    return NULL;
+}
+
 /* A running machine's own lord-vm, asked over its socket as `lord-vm --status` asks: the peer's pid and uid from the
- * kernel (SO_PEERCRED, never from a file), its state and QEMU's pid (VM_STATE), the VMS_* sandbox bits and VMC_* cgroup
- * mode (VM_INFO). ms at most; 0 with both answers, -1 otherwise. The caller still checks that the peer runs the
- * installed lord-vm and that the QEMU is its child. */
-typedef struct { long pid, qemu; unsigned uid; int state, sandbox, cg; } VmLive;
+ * kernel (SO_PEERCRED, never from a file), its pidfd (SO_PEERPIDFD, -1 on a kernel without it; the caller closes it),
+ * its state and QEMU's pid (VM_STATE), the VMS_* sandbox bits and VMC_* cgroup mode (VM_INFO). ms at most; 0 with both
+ * answers, -1 otherwise. The caller still checks that the peer is a lord-vm it vouches for (vmwatch_procs_match) and
+ * that the QEMU is its child. */
+typedef struct { long pid, qemu; unsigned uid; int state, sandbox, cg, pidfd; } VmLive;
 static inline int vmwatch_live(const char *sockpath, VmLive *lv, int ms) {
     memset(lv, 0, sizeof *lv);
     lv->state = -1;
+    lv->pidfd = -1;
     struct sockaddr_un a = { .sun_family = AF_UNIX };
     if (!sockpath || strlen(sockpath) >= sizeof a.sun_path) return -1;
     memcpy(a.sun_path, sockpath, strlen(sockpath) + 1);
@@ -72,6 +182,14 @@ static inline int vmwatch_live(const char *sockpath, VmLive *lv, int ms) {
     if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cr, &cl) || cr.pid <= 1) { close(fd); return -1; }
     lv->pid = cr.pid;
     lv->uid = cr.uid;
+    {
+        int pfd = -1;
+        socklen_t pl = sizeof pfd;
+        if (!getsockopt(fd, SOL_SOCKET, SO_PEERPIDFD, &pfd, &pl) && pfd >= 0) {
+            fcntl(pfd, F_SETFD, FD_CLOEXEC);
+            if (vmwatch_pidfd_pid(pfd) == cr.pid) lv->pidfd = pfd; else close(pfd);
+        }
+    }
     VmMsg q = vm_msg(VM_STATUS, 9, 0, 0, 0, 0, "");
     if (vm_send(fd, &q, -1)) { close(fd); return -1; }
     struct timespec t0, t1;
@@ -91,6 +209,7 @@ static inline int vmwatch_live(const char *sockpath, VmLive *lv, int ms) {
         if (info && state) break;
     }
     close(fd);
+    if (!(info && state) && lv->pidfd >= 0) { close(lv->pidfd); lv->pidfd = -1; }
     return info && state ? 0 : -1;
 }
 

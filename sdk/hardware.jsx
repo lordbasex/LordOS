@@ -28,7 +28,7 @@ import { settings } from './settings.js';
 import { useTheme } from './theme.js';
 import { t, formatDate, formatTime, weekdayName, appName } from './i18n.js';
 import { monitor } from './monitor.js';
-import { COMPONENTS } from './netmodel.js';
+import { componentLabel } from './netmodel.js';
 import { notify, dismissNotification } from './notify.js';
 import { linuxAppFor, flatpakAppFor, shortAppName, windowAppName } from './apps.js';
 import { admin } from './admin.js';
@@ -492,7 +492,7 @@ function castAsker(p) {
       const app = appName(getApp('machines')) || t('machines.title');
       return m ? t('shell.capture.appDetail', { app, detail: m }) : app;
     },
-    lordos: (id) => (id === 'lordos' ? t('monitor.lordos') : COMPONENTS[id] ? t(COMPONENTS[id].label) : ''),
+    lordos: (id) => (id === 'lordos' ? t('monitor.lordos') : componentLabel(t, id) || ''),
   });
 }
 // a Screenshot portal request's picture: a new file in the person's Screenshots folder, named as the Screenshots app

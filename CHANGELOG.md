@@ -50,6 +50,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display serves one connection), and an output whose window goes is turned off for the guest. Not for a machine with a
   graphics card, apps mode or a protected machine (the anonymity profile keeps one display: the guest never learns this
   computer's displays). Checked with a real KVM guest (tests/vm_multihead.sh) and a headless scene.
+- **Machines: each machine its own firewall row** (in development; docs/FIREWALL.md, docs/VIRTUALIZATION.md 6.5). A
+  running machine's traffic is the firewall app `lordos:vm-<id>`, named after the machine in Monitor, with its forwarded
+  ports listed as its incoming lines; Settings' rule and restriction lists offer each machine, and Configure → Network
+  opens its rules. Every machine still inherits the Machines rules, restrictions and trust (`lordos:machines`), decided as
+  one list with the usual precedence; lord-netperm compiles the same union. The Tor gateway keeps its own row and
+  inherits nothing.
 - **Machines: one parent for every machine** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.7).
   lord-sessiond places each machine's scope in its session's `lordos-machines.slice` (root-owned, made on the first
   machine) with a fixed `cpu.weight` 50 and `io.weight` 50: half of one app's, a twentieth of the compositor's. Under load,
@@ -731,6 +737,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Sentinela: a false "weaker sandbox" alert on every running machine** (in development). lord-vm is non-dumpable since
+  QEMU's namespaces, so lord-server could no longer read which program a machine's engine runs and never counted one as
+  checked. lord-server now keeps a pidfd of every lord-vm it starts (a machine started without a window sends its own) and
+  checks the machine's socket against it; after lord-server restarts, a running engine is checked again only when the
+  kernel places it in the machine's own scope. A mismatch still raises the alert. Checked live on a real KVM machine.
 - **Machines: a machine started right after a large import timed out** (in development). `qemu-img convert` leaves the
   disk in the page cache, and QEMU's first open of it with `O_DIRECT` waited behind gigabytes of writeback past its 20 s
   to answer QMP. The import now writes the converted disk out (`fsync`) before putting it in place. Found while checking
@@ -953,6 +964,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `qemu-3d-stop`; nothing said with tools → `qemu-3d-crash`; Shut Down asked → `host-shutdown`; …), with lord-vm's
     echo received each time and the disk check at each next start. Not yet checked with a real 6.12.117 guest with 3D.
 ### Changed
+- **Machines: an installer disc is read out of the desktop's process** (in development; docs/VIRTUALIZATION.md 5.2). The
+  disc a person chooses is untrusted; its boot files are now read by `lord-vm --iso-probe` in seccomp strict mode (it can
+  only read the mapped file and write one fixed 64-byte answer), and lord-server only checks that answer. Same results
+  on real discs.
 
 - **Machines: a guest's picture is taken less often when it doesn't change or no window shows it** (in development;
   the latest release is 0.8.9.5-beta). Seen on the maintainer's PC: a guest on an Intel GVT-g vGPU in apps mode with a

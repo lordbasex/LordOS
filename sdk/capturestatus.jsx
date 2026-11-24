@@ -29,7 +29,7 @@ import { castRuns, castShown, castStop, shotTaken, castAppName } from './screenc
 import { perms, brokerDevices, linuxCapture, studioUse } from './privacy.js';
 import { closeDevicesOf } from './media.js';
 import { firewall } from './monitor.js';
-import { COMPONENTS } from './netmodel.js';
+import { componentOf } from './netmodel.js';
 import { captureRows, captureGlyph, captureSummary, rowStops } from './capturemodel.js';
 import { StudioPanel, MicModePanel, studioAvailable, useMicModeName, openStudioApp } from './studio.jsx';
 import { studioWhat } from './studiomodel.js';
@@ -169,7 +169,7 @@ function whatText(r) {
 function iconFor(id) {
   if (!id) return null;
   if (isMachine(id)) return getApp('machines')?.Icon || null;
-  if (id === 'lordos' || id.startsWith('lordos:')) { const c = COMPONENTS[id]; return c && c.icon ? getApp(c.icon)?.Icon || null : null; }
+  if (id === 'lordos' || id.startsWith('lordos:')) { const c = componentOf(id); return c && c.icon ? getApp(c.icon)?.Icon || null : null; }
   if (id.startsWith('desktop:')) return linuxAppFor(id.slice(8))?.Icon || null;
   if (id.startsWith('flatpak:')) { const a = flatpakAppFor(id.slice(8)); return a && a.flatpakId === id.slice(8) ? a.Icon : null; }
   return getApp(bare(id))?.Icon || null;

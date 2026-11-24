@@ -716,5 +716,12 @@
   "desc.done.pause": "En pausa.",
   "desc.done.block_network": "La seva xarxa està bloquejada.",
   "desc.done.blocklist": "A la llista de bloqueig: es finalitza cada cop que s’inicia.",
-  "desc.blockConfirm": "Vols afegir «{name}» a la llista de bloqueig? A partir d’ara es finalitzarà cada cop que s’iniciï. Ho pots desfer a Configuració → IA → Sentinela."
+  "desc.blockConfirm": "Vols afegir «{name}» a la llista de bloqueig? A partir d’ara es finalitzarà cada cop que s’iniciï. Ho pots desfer a Configuració → IA → Sentinela.",
+  "comp.machine": "Màquina",
+  "comp.machineNamed": "{name} (màquina)",
+  "comp.machineHint": "Una màquina virtual: el trànsit de xarxa del sistema convidat. Les seves regles se sumen a les de Màquines, que continuen decidint per totes les màquines.",
+  "comp.machinesRules": "Regla de Màquines",
+  "comp.forwarded": "Port reenviat {proto} {port} → {guest}",
+  "comp.forwardedLan": "Obert a la xarxa",
+  "comp.forwardedLocal": "Només aquest ordinador"
 }

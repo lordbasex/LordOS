@@ -776,5 +776,12 @@
   "desc.done.pause": "تم الإيقاف مؤقتًا.",
   "desc.done.block_network": "شبكته محظورة.",
   "desc.done.blocklist": "في قائمة الحظر: سيُنهى كلما بدأ.",
-  "desc.blockConfirm": "هل تريد إضافة «{name}» إلى قائمة الحظر؟ من الآن فصاعدًا سيُنهى كلما بدأ. يمكنك التراجع عن ذلك في الإعدادات → الذكاء الاصطناعي → Sentinela."
+  "desc.blockConfirm": "هل تريد إضافة «{name}» إلى قائمة الحظر؟ من الآن فصاعدًا سيُنهى كلما بدأ. يمكنك التراجع عن ذلك في الإعدادات → الذكاء الاصطناعي → Sentinela.",
+  "comp.machine": "آلة",
+  "comp.machineNamed": "{name} (آلة)",
+  "comp.machineHint": "آلة افتراضية: حركة شبكة نظامها الضيف. قواعدها الخاصة تُضاف إلى قواعد الآلات، التي تبقى تقرر لكل آلة.",
+  "comp.machinesRules": "قاعدة الآلات",
+  "comp.forwarded": "منفذ مُعاد توجيهه {proto} {port} ← {guest}",
+  "comp.forwardedLan": "مفتوح للشبكة",
+  "comp.forwardedLocal": "هذا الحاسوب فقط"
 }

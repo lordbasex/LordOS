@@ -776,8 +776,46 @@ typedef struct {
     /* a lord-pgpv job (f_sig_check): the fingerprint asked for, the image's SHA-256 and the checksum file's bytes the
      * helper was given, to look for that SHA-256 in once it says valid */
     int sigcheck; char sig_fpr[41]; char sig_sha[65]; char *sums; size_t sums_n;
+    /* a detached start (f_start_detached): the socketpair end lord-vm sends its own pidfd over, and the machine's id */
+    int reg; char reg_id[37];
 } Job;
 static Job jobs[MAX_JOBS];
+
+/* the lord-vm processes this lord-server vouches for (vm/vmwatch.h): the ones it started, and ones it adopted */
+static VmProcRec vm_procs[VMWATCH_PROCS];
+
+/* the machine id of a machine folder, "" when it can't be read */
+static void vouch_id_of(const char *dir, char id[37]) {
+    static VmMachine im;
+    id[0] = 0;
+    if (!vm_machine_load(dir, &im, NULL, 0) && strlen(im.id) < 37) memcpy(id, im.id, strlen(im.id) + 1);
+}
+
+/* a detached start's lord-vm sends a pidfd of itself (lord-vm --pidfd-to) right after it leaves its parent: taken into
+ * vm_procs once, then the socket is closed. Only a pidfd counts (vmwatch_pidfd_pid), and only one per start */
+static void job_take_pidfd(Job *j) {
+    if (j->reg < 0) return;
+    char b[4];
+    char cm[CMSG_SPACE(sizeof(int))];
+    struct iovec io = { b, sizeof b };
+    struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm, .msg_controllen = sizeof cm };
+    ssize_t r = recvmsg(j->reg, &mh, MSG_DONTWAIT | MSG_CMSG_CLOEXEC);
+    if (r < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return;
+    int got = -1;
+    for (struct cmsghdr *h = r > 0 ? CMSG_FIRSTHDR(&mh) : NULL; h; h = CMSG_NXTHDR(&mh, h)) {
+        if (h->cmsg_level != SOL_SOCKET || h->cmsg_type != SCM_RIGHTS) continue;
+        int nf = (int)((h->cmsg_len - CMSG_LEN(0)) / sizeof(int));
+        for (int k = 0; k < nf; k++) {
+            int f;
+            memcpy(&f, CMSG_DATA(h) + k * sizeof(int), sizeof f);
+            if (got < 0) got = f; else close(f);
+        }
+    }
+    if (got >= 0 && (mh.msg_flags & MSG_CTRUNC)) { close(got); got = -1; }
+    if (got >= 0 && vmwatch_procs_add(vm_procs, VMWATCH_PROCS, j->reg_id, got, 0)) fprintf(stderr, "vm: a detached start's pidfd wasn't kept\n");
+    close(j->reg);
+    j->reg = -1;
+}
 
 /* the folder's name from the machine's: letters, digits, space, '-', '_', '.'; others become '-' */
 /* a new machine's folder: as machine.c names it (a rename gives the same) */
@@ -1105,7 +1143,7 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
             if (pid < 0) { close(p[0]); ok = 0; }
             else {
                 fcntl(p[0], F_SETFL, O_NONBLOCK);
-                jobs[slot] = (Job){ .used = 1, .fd = p[0], .pid = pid };
+                jobs[slot] = (Job){ .used = 1, .reg = -1, .fd = p[0], .pid = pid };
                 snprintf(jobs[slot].dir, sizeof jobs[slot].dir, "%s", dir);
                 snprintf(jobs[slot].hash, sizeof jobs[slot].hash, "%s", hash);
                 id = slot + 1;
@@ -1145,12 +1183,17 @@ static int spawn_job(char *const args[], const char *dir) {
 }
 /* lord-vm with args as a job; with keyid, that key (held here: vmkey_fetch first) on fd 3 (--key-fd 3). Without the key
  * ready the job still starts, and lord-vm says the machine's key is needed */
-static int spawn_job_k(char *const args0[], const char *dir, const char *keyid) {
+static int spawn_job_r(char *const args0[], const char *dir, const char *keyid, int reg);
+static int spawn_job_k(char *const args0[], const char *dir, const char *keyid) { return spawn_job_r(args0, dir, keyid, -1); }
+/* reg >= 0 (a detached start): the socketpair end lord-vm sends its own pidfd over (--pidfd-to), on fd 3 or, with a key,
+ * fd 4; the caller keeps the other end in the job */
+static int spawn_job_r(char *const args0[], const char *dir, const char *keyid, int reg) {
     char *args[96];
     int na = 0;
-    while (args0[na] && na < 92) { args[na] = args0[na]; na++; }
+    while (args0[na] && na < 90) { args[na] = args0[na]; na++; }
     int kp = keyid ? vmkey_pipe(keyid) : -1;
     if (kp >= 0) { args[na++] = "--key-fd"; args[na++] = "3"; }
+    if (reg >= 0) { args[na++] = "--pidfd-to"; args[na++] = kp >= 0 ? "4" : "3"; }
     args[na] = NULL;
     int slot = -1;
     for (int i = 0; i < MAX_JOBS; i++) if (!jobs[i].used) { slot = i; break; }
@@ -1160,12 +1203,17 @@ static int spawn_job_k(char *const args0[], const char *dir, const char *keyid) 
     if (pipe2(p, O_CLOEXEC)) { if (kp >= 0) close(kp); return 0; }
     pid_t pid = fork();
     if (!pid) {
+        /* both above the fds they go to first, so neither overwrites the other */
+        int kx = kp >= 0 ? fcntl(kp, F_DUPFD_CLOEXEC, 10) : -1, rx = reg >= 0 ? fcntl(reg, F_DUPFD_CLOEXEC, 10) : -1;
+        if ((kp >= 0 && kx < 0) || (reg >= 0 && rx < 0)) _exit(126);
         int null = open("/dev/null", O_RDONLY);
         if (null >= 0) dup2(null, 0);
         dup2(p[1], 1);
         dup2(p[1], 2);
-        if (kp >= 0 && (kp == 3 ? fcntl(3, F_SETFD, 0) : dup2(kp, 3)) < 0) _exit(126);
-        syscall(SYS_close_range, kp >= 0 ? 4 : 3, ~0u, 0);
+        int next = 3;
+        if (kx >= 0 && dup2(kx, next++) < 0) _exit(126);
+        if (rx >= 0 && dup2(rx, next++) < 0) _exit(126);
+        syscall(SYS_close_range, next, ~0u, 0);
         sigset_t none;
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
@@ -1176,7 +1224,7 @@ static int spawn_job_k(char *const args0[], const char *dir, const char *keyid) 
     if (kp >= 0) close(kp);
     if (pid < 0) { close(p[0]); return 0; }
     fcntl(p[0], F_SETFL, O_NONBLOCK);
-    jobs[slot] = (Job){ .used = 1, .fd = p[0], .pid = pid };
+    jobs[slot] = (Job){ .used = 1, .reg = -1, .fd = p[0], .pid = pid };
     snprintf(jobs[slot].dir, sizeof jobs[slot].dir, "%s", dir);
     return slot + 1;
 }
@@ -1754,19 +1802,6 @@ static long proc_uid(long pid) {
     return u ? atol(u + 5) : -1;
 }
 
-/* the process runs the installed program `name` (the one next to lord-server, bin_path): an upgraded one shows as
- * "(deleted)" and still counts */
-static int vm_exe_is(long pid, const char *name) {
-    char want[PATH_MAX], got[PATH_MAX], p[64];
-    if (pid <= 1 || bin_path(name, want, sizeof want)) return 0;
-    snprintf(p, sizeof p, "/proc/%ld/exe", pid);
-    ssize_t k = readlink(p, got, sizeof got - 1);
-    if (k <= 0) return 0;
-    got[k] = 0;
-    char rw[PATH_MAX];
-    return realpath(want, rw) && vmwatch_exe_same(got, rw);
-}
-
 /* where lord-sessiond puts a machine's scope: in the session's machines' slice (3.7), the exact cgroup path; "" outside a
  * LordOS session. old: where a machine started before the slice existed is, beside lord-server's own leaf */
 static void vm_scope_path(const char *id, int tor, char *out, size_t n, char *old, size_t on) {
@@ -1789,6 +1824,38 @@ static int vm_in_cgroup(long pid, const char *scope) {
 /* the process is under the machine's scope, in the slice or (started before it) in the old place */
 static int vm_in_scope(long pid, const char *scope, const char *old) {
     return (scope[0] && vm_in_cgroup(pid, scope)) || (old[0] && vm_in_cgroup(pid, old));
+}
+
+/* the process's cgroup is exactly what lord-vm itself may be in: the machine's scope or its supervisor leaf */
+static int vm_lordvm_cgroup(long pid, const char *scope) {
+    char p[64], buf[PATH_MAX + 8];
+    if (!scope[0]) return 0;
+    snprintf(p, sizeof p, "/proc/%ld/cgroup", pid);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    ssize_t k = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (k <= 3) return 0;
+    buf[k] = 0;
+    return vmwatch_cg_lordvm(buf, scope);
+}
+
+/* The peer of the machine's socket is a lord-vm this lord-server vouches for (vm/vmwatch.h): one it started, held by a
+ * pidfd under this machine's id; or, after this lord-server restarted, one it adopts now: the kernel's pidfd of the peer
+ * (lv->pidfd, SO_PEERPIDFD), the person's, in the machine's own scope or its supervisor leaf (where lord-sessiond places
+ * only LordOS's programs from the session's server leaf), alive after that was read. Never from /proc/<pid>/exe: lord-vm
+ * is non-dumpable. */
+static int vm_vouched(const char *id, const VmLive *lv, const char *scope, const char *old) {
+    for (int i = 0; i < MAX_JOBS; i++) if (jobs[i].used) job_take_pidfd(&jobs[i]);   /* a detached start nobody polled yet */
+    vmwatch_procs_prune(vm_procs, VMWATCH_PROCS);
+    if (lv->uid != getuid()) return 0;
+    if (vmwatch_procs_match(vm_procs, VMWATCH_PROCS, id, lv->pid)) return 1;
+    if (lv->pidfd < 0 || vmwatch_pidfd_pid(lv->pidfd) != lv->pid) return 0;
+    if (!vm_lordvm_cgroup(lv->pid, scope) && !vm_lordvm_cgroup(lv->pid, old)) return 0;
+    if (!vmwatch_pidfd_alive(lv->pidfd)) return 0;
+    int pfd = fcntl(lv->pidfd, F_DUPFD_CLOEXEC, 3);
+    if (pfd < 0 || vmwatch_procs_add(vm_procs, VMWATCH_PROCS, id, pfd, 1)) return 0;
+    fprintf(stderr, "vm: machine %s: its running lord-vm %ld adopted (in its own scope)\n", id, lv->pid);
+    return vmwatch_procs_match(vm_procs, VMWATCH_PROCS, id, lv->pid) != NULL;
 }
 
 /* the machine's own lord-vm, asked over its socket (vmwatch_live) */
@@ -1849,10 +1916,12 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         VmLive lv;
         int ok = !vm_live(sm.id, &lv);
         if (ok && (lv.state == VS_RUNNING || lv.state == VS_PAUSED)) {
-            /* the peer of the machine's socket is the installed lord-vm, the person's, and the QEMU it names is its child */
+            /* the peer of the machine's socket is a lord-vm this lord-server vouches for (vm_vouched), and the QEMU it names is its child */
             long pp = -1;
             int sec = -1, nnp = -1;
-            ok = lv.uid == getuid() && vm_exe_is(lv.pid, "lord-vm") && lv.qemu > 1 && !proc_status(lv.qemu, &pp, &sec, &nnp) && pp == lv.pid;
+            ok = vm_vouched(sm.id, &lv, scope, scope_old) && lv.qemu > 1 && !proc_status(lv.qemu, &pp, &sec, &nnp) && pp == lv.pid;
+            /* still the same lord-vm after QEMU's facts were read (its pid can't have been reused meanwhile) */
+            if (ok && !vmwatch_procs_match(vm_procs, VMWATCH_PROCS, sm.id, lv.pid)) ok = 0;
             JS_SetPropertyStr(c, o, "verified", JS_NewBool(c, ok));
             if (ok) {
                 qpid = lv.qemu;
@@ -1887,6 +1956,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
             if (n > 0) { buf[n] = 0; still = strstr(buf, "\"state\":\"running\"") || strstr(buf, "\"state\":\"paused\""); }
             if (still) JS_SetPropertyStr(c, o, "verified", JS_FALSE);
         }
+        if (lv.pidfd >= 0) close(lv.pidfd);
     }
     char cg[PATH_MAX] = "";
     if (qpid > 0) {
@@ -1932,8 +2002,11 @@ static JSValue f_isoinfo(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     unsigned max = fsops_remote_path(path) ? 40 : 0;
     int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     if (fd < 0) return JS_NULL;
+    /* the ISO is untrusted: parsed in lord-vm --iso-probe under seccomp strict mode, never here (vmiso.h); only its fixed
+     * 64-byte answer comes back. 3 s at most (a slow mount): then nothing is known and the name decides */
     VmIso v;
-    int rc = vmiso_probe(fd, &v, max);
+    char bin[PATH_MAX];
+    int rc = bin_path("lord-vm", bin, sizeof bin) ? -1 : vmiso_run(bin, fd, max, 3000, &v);
     close(fd);
     if (rc) memset(&v, 0, sizeof v);
     const char *arch = rc ? "" : vmiso_arch(&v);
@@ -2060,7 +2133,7 @@ static JSValue f_sig_check(JSContext *c, JSValueConst t, int argc, JSValueConst 
         free(sums);
         /* no signature files stored for that image (downloaded before, or a failed fetch): a finished job that says so */
         if (!have_files) {
-            jobs[slot] = (Job){ .used = 1, .fd = -1, .done = 1, .ok = 0, .exit = 1, .pid = 0 };
+            jobs[slot] = (Job){ .used = 1, .reg = -1, .fd = -1, .done = 1, .ok = 0, .exit = 1, .pid = 0 };
             jobs[slot].n = (size_t)snprintf(jobs[slot].out, sizeof jobs[slot].out, "{\"valid\":false,\"reason\":\"noFiles\"}");
             return JS_NewInt32(c, slot + 1);
         }
@@ -2071,7 +2144,7 @@ static JSValue f_sig_check(JSContext *c, JSValueConst t, int argc, JSValueConst 
     if (write(in[1], req, (size_t)rl) != rl) { /* the helper answers malformed */ }
     close(in[1]);
     fcntl(out[0], F_SETFL, O_NONBLOCK);
-    jobs[slot] = (Job){ .used = 1, .fd = out[0], .pid = pid, .sigcheck = 1, .sums = sums, .sums_n = sl };
+    jobs[slot] = (Job){ .used = 1, .reg = -1, .fd = out[0], .pid = pid, .sigcheck = 1, .sums = sums, .sums_n = sl };
     memcpy(jobs[slot].sig_fpr, f, 41);
     memcpy(jobs[slot].sig_sha, s, 65);
     return JS_NewInt32(c, slot + 1);
@@ -2098,6 +2171,7 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     int i = ival(c, argv[0]);
     if (i < 1 || i > MAX_JOBS || !jobs[i - 1].used) return JS_NULL;
     Job *j = &jobs[i - 1];
+    job_take_pidfd(j);
     if (!j->done) {
         char tmp[1024];
         ssize_t r;
@@ -2137,7 +2211,7 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     set_int(c, o, "exit", j->exit);
     set_str(c, o, "out", j->out);
     set_str(c, o, "dir", j->dir);
-    if (j->done) memset(j, 0, sizeof *j);
+    if (j->done) { job_take_pidfd(j); if (j->reg >= 0) close(j->reg); memset(j, 0, sizeof *j); j->reg = -1; }
     return o;
 }
 
@@ -2759,6 +2833,14 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     s->err = ep[0];
     s->vm_pid = p;
     s->started_paused = 1;
+    {
+        /* our own child, not yet reaped: its pid can't be anyone else's, so its pidfd is the lord-vm we exec'd */
+        char mid[37];
+        vouch_id_of(dir, mid);
+        int pfd = (int)syscall(SYS_pidfd_open, p, 0);
+        if (pfd >= 0) fcntl(pfd, F_SETFD, FD_CLOEXEC);
+        if (pfd < 0 || vmwatch_procs_add(vm_procs, VMWATCH_PROCS, mid, pfd, 0)) fprintf(stderr, "vm: no pidfd kept for lord-vm %d\n", (int)p);
+    }
     return JS_NewInt32(c, slot + 1);
 }
 
@@ -5152,8 +5234,15 @@ static JSValue f_start_detached(JSContext *c, JSValueConst t, int argc, JSValueC
     last_start = time(NULL);
     int have = !write_creds(creds, sizeof creds, dir);
     char *args[] = { "lord-vm", "--start", dir, "--detach", "--keep-running", have ? "--credentials-file" : NULL, creds, NULL };
-    int id = spawn_job(args, dir);
-    if (!id) { if (have) unlink(creds); return JS_NewInt32(c, 0); }
+    /* the started lord-vm sends a pidfd of itself back (vm/vmwatch.h): what Sentinela's facts are checked against */
+    int rp[2] = { -1, -1 };
+    if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, rp)) rp[0] = rp[1] = -1;
+    char kid[37];
+    int id = spawn_job_r(args, dir, key_id_of(dir, kid) ? kid : NULL, rp[1]);
+    if (rp[1] >= 0) close(rp[1]);
+    if (!id) { if (rp[0] >= 0) close(rp[0]); if (have) unlink(creds); return JS_NewInt32(c, 0); }
+    jobs[id - 1].reg = rp[0];
+    vouch_id_of(dir, jobs[id - 1].reg_id);
     if (have) snprintf(jobs[id - 1].creds, sizeof jobs[id - 1].creds, "%s", creds);
     return JS_NewInt32(c, id);
 }

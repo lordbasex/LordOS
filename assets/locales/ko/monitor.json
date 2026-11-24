@@ -701,5 +701,12 @@
   "desc.done.pause": "일시 정지했습니다.",
   "desc.done.block_network": "네트워크가 차단되었습니다.",
   "desc.done.blocklist": "차단 목록에 추가됨: 시작할 때마다 종료됩니다.",
-  "desc.blockConfirm": "“{name}”을(를) 차단 목록에 추가할까요? 이제부터 시작할 때마다 종료됩니다. 설정 → AI → Sentinela에서 되돌릴 수 있습니다."
+  "desc.blockConfirm": "“{name}”을(를) 차단 목록에 추가할까요? 이제부터 시작할 때마다 종료됩니다. 설정 → AI → Sentinela에서 되돌릴 수 있습니다.",
+  "comp.machine": "머신",
+  "comp.machineNamed": "{name} (머신)",
+  "comp.machineHint": "가상 머신: 게스트 시스템의 네트워크 트래픽입니다. 이 머신의 규칙은 가상 머신 규칙에 더해지며, 가상 머신 규칙은 계속 모든 머신에 대해 결정합니다.",
+  "comp.machinesRules": "가상 머신 규칙",
+  "comp.forwarded": "전달된 포트 {proto} {port} → {guest}",
+  "comp.forwardedLan": "네트워크에 공개",
+  "comp.forwardedLocal": "이 컴퓨터만"
 }

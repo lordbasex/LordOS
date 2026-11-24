@@ -7,7 +7,7 @@
  *                        [--disk GB] [--firmware uefi|bios] [--display window|none]
  *                        [--network shared|isolated|bridged|hostonly]
  *                        [--import IMAGE] [--iso FILE]
- *   lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp]
+ *   lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--pidfd-to N] [--keep-running] [--dev-qmp]
  *                       [--credentials-file FILE]
  *     FILE: systemd credentials for the guest's first boot, one per line, NAME=VALUE or binary:NAME=BASE64.
  *     They may be secrets (a root password), so they never go on a command line or into the log: lord-vm reads
@@ -26,6 +26,7 @@
 #include "vmmem.h"
 #include "vmsandbox.h"
 #include "vmseccomp.h"
+#include "vmiso.h"
 #include "vmops.h"
 #include "vmagent.h"
 #include "vmimport.h"
@@ -63,7 +64,9 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <linux/fs.h>
+#include <malloc.h>
 #include <sys/mman.h>
+#include <linux/seccomp.h>
 #include <sys/prctl.h>
 #include <sys/random.h>
 #include <sys/resource.h>
@@ -7847,7 +7850,7 @@ static void discard_state(const char *dir) {
 
 static int connect_machine(const VmMachine *m);
 static int cmd_start(const char *dir, int argc, char **argv) {
-    int detach = 0, control = -1, discard = 0;
+    int detach = 0, control = -1, discard = 0, pidfd_to = -1;
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = S.sh_fd = S.gt_fd = S.rx_fd = S.rx_hpipe = -1;
     S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = -1;
@@ -7870,6 +7873,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         else if (!strcmp(argv[i], "--loadvm") && i + 1 < argc) { if (!vm_snap_tag_valid(argv[++i])) { fprintf(stderr, "lord-vm: --loadvm TAG\n"); return 2; } snprintf(S.loadvm, sizeof S.loadvm, "%s", argv[i]); }
         else if (!strcmp(argv[i], "--discard-state")) discard = 1;
         else if (!strcmp(argv[i], "--control-fd") && i + 1 < argc) control = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--pidfd-to") && i + 1 < argc) pidfd_to = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--credentials-file") && i + 1 < argc) { if (read_credentials(argv[++i])) return 2; }
         else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
     }
@@ -7879,6 +7883,15 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         if (control < 3 || getsockopt(control, SOL_SOCKET, SO_TYPE, &type, &l) || type != SOCK_SEQPACKET) { fprintf(stderr, "lord-vm: --control-fd must be a SOCK_SEQPACKET socket\n"); return 2; }
         fcntl(control, F_SETFD, FD_CLOEXEC);
         fcntl(control, F_SETFL, O_NONBLOCK);
+    }
+    if (pidfd_to >= 0) {
+        /* lord-server's socketpair for this start (a detached one): lord-vm sends a pidfd of itself over it once it is
+         * the process that serves the machine, so lord-server can vouch for it without /proc/<pid>/exe (Sentinela,
+         * vm/vmwatch.h); one message, then it's closed */
+        int type = 0;
+        socklen_t l = sizeof type;
+        if (pidfd_to < 3 || pidfd_to == control || getsockopt(pidfd_to, SOL_SOCKET, SO_TYPE, &type, &l) || type != SOCK_SEQPACKET) { fprintf(stderr, "lord-vm: --pidfd-to must be a SOCK_SEQPACKET socket\n"); return 2; }
+        fcntl(pidfd_to, F_SETFD, FD_CLOEXEC);
     }
     /* QEMU's user namespace: made now, while lord-vm is still dumpable (vmsandbox.h) */
     S.userns = vm_userns_open();
@@ -7930,6 +7943,23 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); dup2(null, 1); dup2(null, 2); if (null > 2) close(null); }
         log_stderr = 0;
+    }
+    if (pidfd_to >= 0) {
+        int me = (int)syscall(SYS_pidfd_open, getpid(), 0);
+        if (me >= 0) {
+            char one = 'p';
+            char cm[CMSG_SPACE(sizeof(int))];
+            memset(cm, 0, sizeof cm);
+            struct iovec io = { &one, 1 };
+            struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm, .msg_controllen = sizeof cm };
+            struct cmsghdr *h = CMSG_FIRSTHDR(&mh);
+            h->cmsg_level = SOL_SOCKET; h->cmsg_type = SCM_RIGHTS; h->cmsg_len = CMSG_LEN(sizeof(int));
+            memcpy(CMSG_DATA(h), &me, sizeof me);
+            if (sendmsg(pidfd_to, &mh, MSG_NOSIGNAL | MSG_DONTWAIT) != 1) vlog("start: lord-server didn't get this lord-vm's pidfd: %s", strerror(errno));
+            close(me);
+        }
+        close(pidfd_to);
+        pidfd_to = -1;
     }
     char p[PATH_MAX + 32];
     snprintf(p, sizeof p, "%s/log", S.dir);
@@ -11672,7 +11702,7 @@ static int usage(void) {
             "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"
-            "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
+            "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--pidfd-to N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--render-node /dev/dri/renderDN|none]   (3D graphics: the GPU QEMU may use; none: 2D)\n"
             "                           [--resume-anyway] [--discard-state]\n"
             "       lord-vm --suspend DIR | --discard-state DIR | --agent DIR shutdown|timesync|install\n"
@@ -11686,6 +11716,7 @@ static int usage(void) {
             "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"
             "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n"
             "       lord-vm --sha256 FILE   (an ISO's SHA-256, with progress lines)\n"
+            "       lord-vm --iso-probe MAX   (lord.vm.isoInfo: the ISO on fd 0, one fixed answer on fd 1, under seccomp strict mode)\n"
             "       lord-vm --group-create GROUPDIR --catalog-id ID --archive FILE --sha512 HEX [--release R] [--name N]   (a machine group from a verified archive)\n"
             "       lord-vm --group-fresh GROUPDIR [--gateway] [--archive FILE]   (Start Fresh: the workstation, and the gateway too, back to the verified base)\n"
             "       lord-vm --group-set GROUPDIR [--disposable on|off] [--fresh-gateway on|off]\n"
@@ -11724,6 +11755,52 @@ static int cmd_sha256(const char *path) {
     return 0;
 }
 
+/* lord-vm --iso-probe MAX [--strict-check]: what an ISO a person chose boots on (lord.vm.isoInfo, docs/VIRTUALIZATION.md
+ * 5.2), out of lord-server. fd 0: the ISO, opened by lord-server; fd 1: the answer, a pipe. The file is mapped, every
+ * other descriptor closed and the process enters seccomp strict mode (read, write, exit, sigreturn: no open, no mmap,
+ * no socket) before one byte of the ISO is parsed; the parser's few allocations come from a heap grown beforehand (glibc
+ * may not map memory under strict mode). It writes VMISO_ANSWER bytes and exits. A hostile ISO that breaks the parser
+ * gets a process that can only write those bytes to lord-server, which decodes them strictly (vmiso_answer_decode).
+ * --strict-check (tests): after strict mode, a forbidden call (getpid) that must kill it. */
+static int cmd_iso_probe(int argc, char **argv) {
+    char *e;
+    long max = argc >= 3 ? strtol(argv[2], &e, 10) : -1;
+    if (argc < 3 || *e || max < 0 || max > VMISO_READS) { fprintf(stderr, "lord-vm: --iso-probe MAX (0 to %d), the ISO on fd 0\n", VMISO_READS); return 2; }
+    int check = argc >= 4 && !strcmp(argv[3], "--strict-check");
+    struct stat st;
+    uint8_t ans[VMISO_ANSWER];
+    VmIso v;
+    memset(&v, 0, sizeof v);
+    const void *map = MAP_FAILED;
+    /* 1 TB at most: an ISO is far smaller; the mapping is virtual, read lazily */
+    if (!fstat(0, &st) && S_ISREG(st.st_mode) && st.st_size >= 17 * 2048 && st.st_size <= (1LL << 40))
+        map = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, 0, 0);
+    close(0);
+    int nul = open("/dev/null", O_RDWR | O_CLOEXEC);
+    if (nul >= 0 && nul != 2) { dup2(nul, 2); close(nul); }
+    syscall(SYS_close_range, 3, ~0u, 0);
+    prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+    prctl(PR_SET_DUMPABLE, 0);
+    /* the heap the parser needs, grown now: no mmap for large blocks, no trimming, room on top */
+    mallopt(M_MMAP_MAX, 0);
+    mallopt(M_TRIM_THRESHOLD, 256 << 20);
+    mallopt(M_TOP_PAD, 16 << 20);
+    void *warm = malloc((size_t)VMISO_DIR_MAX * 4);
+    if (warm) { memset(warm, 0, (size_t)VMISO_DIR_MAX * 4); free(warm); }
+    if (syscall(SYS_seccomp, SECCOMP_SET_MODE_STRICT, 0, NULL) && prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT)) { const char m[] = "lord-vm: no seccomp strict mode\n"; (void)!write(2, m, sizeof m - 1); syscall(SYS_exit, 3); }
+    if (check) syscall(SYS_getpid);     /* must not return: strict mode kills the process */
+    int rc = map != MAP_FAILED ? vmiso_probe_map(map, (uint64_t)st.st_size, &v, (unsigned)max) : -1;
+    vmiso_answer_encode(rc, &v, ans);
+    size_t o = 0;
+    while (o < sizeof ans) {
+        ssize_t w = write(1, ans + o, sizeof ans - o);
+        if (w <= 0) break;
+        o += (size_t)w;
+    }
+    syscall(SYS_exit, o == sizeof ans ? 0 : 1);
+    return 1;
+}
+
 int main(int argc, char **argv) {
     /* --key-fd N, anywhere after the command: an encrypted machine's key (above), taken out before the command's own
      * options are read */
@@ -11737,6 +11814,7 @@ int main(int argc, char **argv) {
         break;
     }
     if (argc < 3) return usage();
+    if (!strcmp(argv[1], "--iso-probe")) return cmd_iso_probe(argc, argv);
     if (!strcmp(argv[1], "--sha256")) return cmd_sha256(argv[2]);
     const char *cmd = argv[1], *dir = argv[2];
     int rest = argc - 3;

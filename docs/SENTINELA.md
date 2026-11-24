@@ -168,8 +168,17 @@ and local only; the machine rules run in the same 10-second tick as the process 
   that never come from `run.json` (the person's own file, only a hint that the machine runs). lord-server asks the
   machine's lord-vm over its socket, as `lord-vm --status` does (`vmwatch_live`, 150 ms at most): the peer's pid and uid
   come from the kernel (`SO_PEERCRED`), its answer gives QEMU's pid, the `VMS_*` sandbox bits and the cgroup mode. It is
-  **verified** only when that peer is the person's, runs the installed lord-vm (`/proc/<pid>/exe` is the `lord-vm` next
-  to lord-server; an upgraded one, "(deleted)", still counts) and the QEMU it names is its child (`PPid`). Then:
+  **verified** only when that peer is the person's, is a lord-vm lord-server vouches for, and the QEMU it names is its
+  child (`PPid`). lord-server vouches by pidfds, never by `/proc/<pid>/exe` (lord-vm is non-dumpable, so that link can't
+  be read): it keeps a pidfd of every lord-vm it starts, with the machine's id and the process's start time (the child it
+  forked and exec'd from the installed program; for a detached start, `machines start` and Start Without Window, the
+  installed lord-vm sends a pidfd of itself over a socketpair only it was given, `--pidfd-to`). The socket's
+  `SO_PEERCRED` pid must be one held for that machine, its pidfd must still name a live process
+  (`pidfd_send_signal` 0) with the same start time, before and after QEMU's facts are read. A lord-vm this lord-server
+  didn't start (lord-server restarted) is adopted only from the kernel's pidfd of the socket's peer (`SO_PEERPIDFD`) when
+  that process is in the machine's own scope or its `supervisor` leaf, where lord-sessiond places only LordOS's programs
+  from the session's server leaf; outside a LordOS session (no scope) it stays unverified, and so does a lord-vm started
+  by hand from a terminal. A mismatch is never verified (`vm/vmwatch.h`, `vmwatch-test`). Then:
   `qemuPid`, `sandbox`, `cgMode`, `seccomp` and `noNewPrivs` (the kernel's `/proc/<qemu>/status`), `scope` (`in` only
   when QEMU's and lord-vm's cgroups are exactly the session's `app-lordos-lordos-vm-<id>.scope`, the sibling of
   lord-server's own leaf, or below it, never a path that merely contains that name; `vm/vmwatch.h`), and `passt` (a
@@ -183,13 +192,12 @@ and local only; the machine rules run in the same 10-second tick as the process 
 
 Never the guest's screen, files, clipboard, logs' text or any address.
 
-**Open (found 2026-11-24 by `server/tests/sentinela_vm_live.sh`, a live machine on screen):** lord-vm calls
-`PR_SET_DUMPABLE 0` since QEMU's namespaces (2026-11-23), and reading `/proc/<pid>/exe` is a ptrace-mode check that a
-non-dumpable process refuses to the person's own programs, lord-server included. So `vm_exe_is` is false for every live
-machine, nothing is ever verified, and after two ticks Sentinela shows vmSandbox ("proof that its engine is the machine's
-own") for each running machine. Failing closed is right, but the alert is false. What could attest lord-vm instead (a
-pidfd lord-server keeps for each lord-vm it starts, with machines it didn't start shown as "not checked"; or lord-sessiond,
-which is root, answering for a pid) is for the maintainer to decide; until then the live run fails on purpose.
+**Fixed (found 2026-11-24 by `server/tests/sentinela_vm_live.sh`, a live machine on screen; in development):** lord-vm
+calls `PR_SET_DUMPABLE 0` since QEMU's namespaces (2026-11-23), and reading `/proc/<pid>/exe` is a ptrace-mode check a
+non-dumpable process refuses to the person's own programs, lord-server included: nothing was ever verified and Sentinela
+showed vmSandbox ("proof that its engine is the machine's own") for every running machine. Decided the same day: the pidfds
+above. The live run now passes on a real KVM machine (amd64): verified on every read, no "unverified" alert; headless
+has no scope, so its vmSandbox names only the missing cgroup, which is true.
 
 **The rules:**
 

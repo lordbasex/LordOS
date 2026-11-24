@@ -91,5 +91,6 @@
   },
   "pickAddress": "Chagua anwani ili kuiruhusu au kuizuia kwa programu hii.",
   "recent": "muunganisho wa hivi karibuni",
-  "recentDenied": "imekataliwa hivi karibuni"
+  "recentDenied": "imekataliwa hivi karibuni",
+  "machineInherits": "Sheria za Mashine huamua pia kwa mashine hii. Sheria zake huongezwa: zote mbili zikilingana na muunganisho, iliyo mahususi zaidi huamua, na Zuia hushinda Ruhusu."
 }

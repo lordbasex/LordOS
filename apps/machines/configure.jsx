@@ -2,7 +2,7 @@
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once. The name is the exception (6.26): while
 // the machine runs it changes alone (`lord-vm --rename`), and its folders follow it once it's off.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, ConfirmDialog, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, ConfirmDialog, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber, firewall, netModel } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { changedSections, sectionsMatching, atLoginToggle, stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
   portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice, parseTags, TAGS_MAX } from './model.js';
@@ -124,8 +124,14 @@ function NetworkPane({ m, cur, set, running, offNote, host, issues, onNewMac }) 
         </Row>
       ) : null}
       {/* a new address (5.5): lord-vm makes a random one of QEMU's 52:54:00 range, while the machine is off */}
-      <Row label={tr('machines.cfg.mac')} value={m.mac || '—'} last note={tr('machines.cfg.macNote') + (offNote ? ` ${offNote}` : '')}>
+      <Row label={tr('machines.cfg.mac')} value={m.mac || '—'} note={tr('machines.cfg.macNote') + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.macNew')} disabled={running || !!m.suspended} onClick={onNewMac} /></View></Off>
+      </Row>
+      <Row label={tr('machines.cfg.firewall')} last note={tr(m.role === 'gateway' ? 'machines.cfg.firewallGateway'
+        : cur.network === 'bridged' ? 'machines.cfg.firewallBridged' : 'machines.cfg.firewallNote')}>
+        <View style={{ alignSelf: 'flex-start' }}>
+          <Btn label={tr('machines.cfg.firewallRules')} disabled={!firewallAppOf(m)} onClick={() => openFirewallRules(firewallAppOf(m))} />
+        </View>
       </Row>
     </Group>
     {usesPorts(cur.network) ? (
@@ -156,6 +162,15 @@ function NetworkPane({ m, cur, set, running, offNote, host, issues, onNewMac }) 
     ) : null}
     {lan ? <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, color: p.text, textAlign: 'start', lineHeight: 1.5 }}>{tr('machines.cfg.portsLanWarn')}</Text></View> : null}
   </>;
+}
+
+// (Machines to 100 %) the machine's own row in LordOS's firewall (fw/rules.h): "lordos:vm-<id>", the Machines rules
+// deciding for it too; a group's Tor gateway is "lordos:tor-gateway". Opens Settings → Privacy on its rules.
+const firewallAppOf = (m) => (m?.role === 'gateway' ? 'lordos:tor-gateway' : netModel.vmAppOf(m?.id));
+function openFirewallRules(app) {
+  if (!app) return;
+  firewall.focus.set(() => app);
+  wm.open('settings', { args: { section: 'privacy', nonce: Date.now() } });
 }
 
 // onClose: shown as a sheet over the library or the machine's window (kit.jsx), with Cancel and Done; without it, a
@@ -747,7 +762,9 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       // the sandbox's line says what this kernel can't give ("Weaker isolation on this kernel", 3.3)
       const note = k === 'sandbox' ? (isolationGaps(host, null).includes('landlock') ? 'sandboxWeak' : k)
         : k !== 'network' ? k : m.network === 'bridged' ? 'networkBridged' : usesPorts(m.network) && m.ports?.length ? 'networkPorts' : k;
-      return <Row key={k} label={tr(`machines.cfg.sec.${k}`)} last={i === a.length - 1} note={tr(`machines.cfg.secNote.${note}`, { limit: gb(memLimit(m)) })} />;
+      // a guest on passt is decided by LordOS's firewall as its own app, with the Machines rules too
+      const fw = k === 'network' && m.network !== 'bridged' && m.network !== 'isolated' ? ` ${tr('machines.cfg.secNote.firewall')}` : '';
+      return <Row key={k} label={tr(`machines.cfg.sec.${k}`)} last={i === a.length - 1} note={tr(`machines.cfg.secNote.${note}`, { limit: gb(memLimit(m)) }) + fw} />;
     })}
   </Group></>;
 

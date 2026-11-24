@@ -387,7 +387,12 @@ export function Cell({ col, children, color, bold }) {
 // as Mail or Passwords; the process is shown with the app's name and icon.
 export const isolatedAppOf = (item) => (typeof item?.app === 'string' && item.app.startsWith('lpk:') ? getApp(item.app.slice(4)) : null);
 // (0.8.9.6) one of LordOS's components (lordos:terminal, lordos:mail…: the process runs in its lordos-net-<name>.scope)
-export const componentName = (tr, app) => { const c = sdk.netModel?.COMPONENTS?.[app]; return c ? tr(c.label) : null; };
+export const componentName = (tr, app) => {
+  const vm = sdk.netModel?.vmIdOf?.(app);
+  if (vm) return sdk.netModel.componentLabel(tr, app, monitor.machineNames([vm]));
+  const c = sdk.netModel?.COMPONENTS?.[app];
+  return c ? tr(c.label) : null;
+};
 
 // (0.8.5) LordOS's own components: the built-in app's icon (Mail, Store, Terminal) or a glyph
 function ComponentGlyph({ comp, size }) {
@@ -404,7 +409,7 @@ function ComponentGlyph({ comp, size }) {
 const letterIcons = new Map();
 export function AppGlyph({ item, size = 16 }) {
   if (item.app === 'lordos') return <LordOSLogo size={size} />;
-  const comp = sdk.netModel?.COMPONENTS?.[item.app];
+  const comp = sdk.netModel?.componentOf?.(item.app);
   if (comp) return <ComponentGlyph comp={comp} size={size} />;
   if (item.app === 'remote-desktop') return <RemoteGlyph size={size} />;
   const iso = isolatedAppOf(item);
