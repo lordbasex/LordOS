@@ -87,6 +87,15 @@ build/vmlink-test: tests/vmlink_test.c src/vm/vmlink.c src/vm/vmgroup.c src/vm/m
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmlink_test.c src/vm/vmlink.c src/vm/vmgroup.c src/vm/machine.c src/sec/json.c src/doc/wire.c
 	./$@ || { rm -f $@; exit 1; }
+# vm-image-list and vm-image-get for a machine group's archive (vmimage_admin.c) with the network replaced, as root of a
+# user namespace (unshare -Ur): the release floor and its root-side high-water mark, a list's and an archive's release
+# bound to their folder's, the archive only under a temporary name until its SHA-512 matched; under ASan and UBSan
+VMIMG_GROUP_SRC := tests/vmimage_group_test.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/pkg/pubhost.c src/pkg/crypto.c src/pkg/pgp.c src/sec/json.c src/imager/imgverify.c tests/imager_key.c
+test: build/vmimage-group-test
+build/vmimage-group-test: $(VMIMG_GROUP_SRC) src/vm/vmcatalog.h src/vm/vm_admin.h ../assets/machines/systems.json tests/vmimage/whonix.sums tests/vmimage/whonix.asc
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -DVM_CATALOG='"build/vmimage-group-test/systems.json"' -DVM_STORE='"build/vmimage-group-test/machines"' -DVM_KEYS='"build/vmimage-group-test/keys"' -o $@ $(VMIMG_GROUP_SRC)
+	unshare -Ur ./$@; s=$$?; [ $$s = 0 ] || [ $$s = 77 ] || { rm -f $@; exit 1; }
 # lord-server's side of a group's link (vm/vmlink.c) as a command, for tests/vm_group_link.sh; not installed
 all: build/vm-link-tool
 build/vm-link-tool: tests/vm_link_tool.c src/vm/vmlink.c src/vm/vmgroup.c src/vm/machine.c src/sec/json.c src/doc/wire.c $(VM_HDR)

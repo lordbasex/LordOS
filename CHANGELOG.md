@@ -22,9 +22,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     detached signature named after its list (`.asc`), the newest release folder whose list verifies with a floor no
     download goes below (18.2.4.3), and an archive's members and size caps.
   - **The admin actions** `vm-image-list` and `vm-image-get` take such an entry: the release folders' listing, then the
-    release's SHA-512 list and its OpenPGP signature checked with the pinned key, then the archive into
-    `images/<sha512>.tar.xz`, kept only with the list's SHA-512 of the whole file. Root hashes it and never reads its
-    contents. `vm-image-cancel` and `vm-image-remove` take the longer names.
+    release's SHA-512 list and its OpenPGP signature checked with the pinned key, then the archive. A release below the
+    catalog's floor or below the newest one ever verified (kept root-side) is refused, and a list's or an archive's name
+    must give the very release of its folder. The archive downloads under a temporary name and becomes
+    `images/<sha512>.tar.xz` only after the whole file's SHA-512 matched the list's; a file at that name that isn't in
+    that verified state is thrown away. Root hashes it and never reads its contents. `vm-image-cancel` and
+    `vm-image-remove` take the longer names.
   - **`lord-vmunpack`**, a new sandboxed helper started by `lord-vm`: it reads the verified archive on a descriptor and
     writes exactly the two disks into two descriptors, with no files, network or exec (`sandbox_apply_helper`, 320 MB),
     linking only libc and LordOS's own xz decoder, which got a streaming mode (`xzs_*`: CRC32 and CRC64 checked block by
@@ -41,7 +44,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `"uplink": "tor"` (the gateway's passt with no DNS forwarding and no ports), `link_mac`, `profile_lock` and `timers`.
     The anonymity lock refuses the agent, clipboard, transfer and shared folders, ports, 3D, graphics cards, the
     microphone, SMBIOS strings, disk serials and the performance profile, with no override. A locked member gets private
-    4 KB memory (no huge pages, no KSM), no VMware port, no HPET, a generation id, Whonix's clock devices as libvirt
+    4 KB memory (no hugetlb, transparent huge pages off for its QEMU, no KSM), no VMware port, no HPET, a generation id, Whonix's clock devices as libvirt
     gives them (checked in libvirt 11.3's source), no sound card on the gateway and an output-only one on the
     workstation, no first-boot credentials, no suspend and no card picture on disk.
   - **The internal link**: a new control message, `VM_LINK`. lord-server makes one `socketpair` per pairing and hands one
@@ -57,8 +60,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Checked on the dev host, headless**: the gateway's eth0 at slot 0x2 (passt) and eth1 at 0x18 (the link), the
     workstation's only card at 0x2 with its only route through 10.152.152.10, Tor's own check answering `"IsTor":true`
     from the workstation, no network for it with the gateway off, the link swapped three times during a download without
-    breaking it, and the session relinking a restarted gateway. Shut Down through ACPI didn't power either member off
-    within 60 s (they were forced off): still to look at.
+    breaking it, and the session relinking a restarted gateway. Still open: neither Whonix member powers off on ACPI's
+    power button (checked with the unchanged images: forced off after 120 s), so a group's Shut Down ends as a forced
+    power-off for now.
 - **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
   Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
   threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores

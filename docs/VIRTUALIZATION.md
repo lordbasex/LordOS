@@ -4260,9 +4260,14 @@ day** with the decisions of 19.13 (19.12 lists what was approved, for AGENTS.md)
   listing of `https://download.whonix.org/libvirt/` (only names are taken from it); `"whonix amd64 <release>"` that
   release's folder; `"whonix amd64 <release> <list>"` the `.sha512sums` list and its `.asc`, verified with the pinned key
   by `pkg/pgp.c`, kept as `lists/whonix-amd64.list` with the release beside it (`.release`). A release below the floor
-  (`18.2.4.3`) or not a release's name is refused. `vm-image-get "whonix amd64 <file> <sha512>"` downloads from that
-  release's folder into `images/<sha512>.tar.xz` and keeps it only when the whole file's SHA-512 is the list's. Root hashes
-  the bytes; it never parses the archive. `vm-image-cancel` and `vm-image-remove` take the 128-digit names too. *Not run
+  (`18.2.4.3`), below the newest release ever verified (`lists/whonix-amd64.newest`, root's: the rollback floor no file of
+  the person's can lower) or not a release's name is refused, and the list's own name must give that very release
+  (`vmcat_release_in`: no older signed list beside a newer folder). `vm-image-get "whonix amd64 <file> <sha512>"` takes
+  only an archive whose name gives the recorded release, downloads it from that release's folder under a temporary name
+  (`<sha512>.tar.xz.dl`, 0600) and renames it to `images/<sha512>.tar.xz` (then 0644) only when the whole file's SHA-512
+  is the list's; the image lock is taken before anything, and a file at the final name that isn't root's, single-linked
+  and 0644 is thrown away, never trusted. Root hashes the bytes; it never parses the archive (`vmimage-group-test`, as
+  root of a user namespace with the network replaced). `vm-image-cancel` and `vm-image-remove` take the 128-digit names too. *Not run
   as root here* (it needs root and the network: `tests/vm_image_cli.c`); the verification itself is `vmcatalog-test`,
   with the real 18.2.4.3 list and signature as fixtures.
 - **`lord-vmunpack`** (`server/src/vm/vmunpack.c`, `mk/vmunpack.mk`) and a streaming decoder in `pkg/xz.c` (`xzs_*`, next to
@@ -4288,7 +4293,9 @@ day** with the decisions of 19.13 (19.12 lists what was approved, for AGENTS.md)
   the microphone, SMBIOS strings, disk serials or the performance profile on a locked member.
 - **The members' QEMU** (`lordvm.c`): the link card on its own hub (`lnk0`; hub 0 and slot 0x2 on the workstation, hub 1
   and slot 0x18 on the gateway), passt without DNS forwarding for `uplink: tor` (`--no-map-gw --no-dhcp-dns
-  --no-dhcp-search`), and for a locked member: a private `memory-backend-memfd` (never hugetlb), `mem-merge=off`,
+  --no-dhcp-search`), and for a locked member: a private `memory-backend-memfd` (never hugetlb), no transparent huge
+  pages either (`PR_SET_THP_DISABLE` on QEMU before exec: LordOS sets `shmem_enabled` to `advise` since 0.8.9.6 and QEMU
+  advises them on guest memory), `mem-merge=off`,
   `vmport=off`, `hpet=off`, `vmgenid`, no sound card on the gateway and `ich9-intel-hda` + `hda-output` on the workstation,
   no first-boot credentials, no suspend (VM_SUSPEND refused; at host shutdown it is shut down, never saved). The timers are
   libvirt's (below). No `thumb.png` is written for a locked member (`js_vm.c`).
@@ -4321,7 +4328,7 @@ release gate on real hardware. Until the library has the group card, the two mem
 | `pkg/pgp.c` on Whonix's real signature | Verifies the 2026-11-04 `.sha512sums.asc` (RSA signing subkey `6E97 9B28 A6F3 7C43 BE30 AFA1 CB8D 50BB 77BB 3C48`, SHA-512, a critical creation time, Sequoia's salt notation and a `file@name` notation); a changed digit, another pinned key and a time before its creation are refused. The list and signature are `vmcatalog-test` fixtures (`tests/vmimage/whonix.*`) |
 | xz speed and the unpacked sizes (LXQt 18.2.4.3) | The archive: 1,957,016,760 bytes, one xz stream of 275 blocks of 24 MiB (LZMA2, 8 MiB dictionary, CRC64) holding 6,917,150,720 bytes of tar: the license, the disclaimer, the two XMLs, then the two disks as old-GNU sparse members, each 107,384,668,160 bytes (100 GiB of qcow2 with preallocated metadata) holding 3,063,865,344 (gateway) and 3,853,221,888 (workstation) bytes of data. Our decoder: 98.7 s alone (about 70 MB/s out, 11 MB of memory); `xz -T1` 47 s; `xz -T0` 4.8 s (20 threads, 1.4 GB). `lord-vmunpack` on the whole archive: 104 s; its two files are byte for byte GNU tar's (`cmp`), slightly sparser. The whole `--group-create` from the verified archive: 236 s on the dev host. The bases: 2.85 GiB (gateway) and 3.59 GiB (workstation), 100 GiB virtual, `qemu-img check` clean. Space at the peak: the archive, the unpacked data and one base, about 11 GB |
 | The internet only through the Gateway (`tests/vm_group_link.sh`) | With both members running, `curl https://check.torproject.org/api/ip` in the workstation answers `"IsTor":true`. With the gateway off, the workstation has no network at all (`curl` times out, 10.152.152.10 unreachable: the cable is pulled, nothing else is reachable). The gateway started again is linked again by the session by itself and the workstation's Tor works again |
-| Shut Down on Whonix's members | **Not resolved**: on the dev host neither member powered off within the 60 s after ACPI's power button (`lord-vm --stop` then forced them off). The test disks had a serial root shell added; the unchanged images still need the same check in a window (LXQt may answer the power button with a dialog). Until then the group's stop is effectively a forced one after 60 s each; the Gateway's Tor state was kept anyway (an orderly Tor shutdown isn't needed for its guards) |
+| Shut Down on Whonix's members | **Open**: neither member powers off on ACPI's power button. Checked twice on the dev host: with the test disks (60 s) and with the unchanged bases made from the archive, booted to their desktop (`lord-vm --stop --timeout 120`: QEMU pressed the button, both were forced off after 120 s). With no guest agent there is no other polite way in today, so a group's Shut Down is a forced power-off after the wait. To look at before the card ships: what Whonix 18 does with the power button (LXQt's or logind's handling, the sysmaint/user split), a key sequence through the display, or asking the maintainer to accept a forced stop for these guests |
 
 **How the test disks are made** (for `tests/vm_group_link.sh`, never shipped): the two members' qcow2 files from the
 verified archive, converted to raw, `systemd.debug_shell=ttyS0` appended to every `linux` line of `/boot/grub/grub.cfg`
@@ -4517,7 +4524,7 @@ our own channels:
 | Camera, USB, printers | none (not built anyway) | passthrough is on Whonix's unsafe list |
 | Suspend, memory snapshots, saving at host shutdown | refused | guest memory would land on this computer's disk; Whonix's XML turns suspend off. At host shutdown the guests are shut down (the `vmhoststop.h` plan without the save) |
 | Thumbnail | `thumb.png` not written (`js_vm.c`); the live picture only while running | a picture of the browsing would stay in `~/Machines` |
-| Guest memory | `memory-backend-memfd,share=off` (4 KB pages with Debian's default `shmem_enabled=never`), `-machine mem-merge=off` (no KSM), no hugetlb | Whonix lists huge pages and KSM as unsafe (rowhammer, cross-VM deduplication). Cost: about 30 % slower random memory access (measured in 3.7.2) |
+| Guest memory | `memory-backend-memfd,share=off` with transparent huge pages off for the QEMU process (`PR_SET_THP_DISABLE`, whatever `shmem_enabled` says), `-machine mem-merge=off` (no KSM), no hugetlb | Whonix lists huge pages and KSM as unsafe (rowhammer, cross-VM deduplication). Cost: about 30 % slower random memory access (measured in 3.7.2) |
 | Core dumps | `dump-guest-core=off`, none, non-dumpable, as every machine (3.3) | |
 | Identity | `-uuid` random per group and per Start Fresh; no `-smbios` strings (QEMU's stock "Standard PC (Q35 + ICH9, 2009)"); no disk serial; no first-boot credentials (`type=11`) | unique strings would mark the group; stock values are what every KVM Whonix shows. Whonix's own hostname and machine id inside the guests are left as Whonix sets them |
 | vCPU pinning | Automatic (3.7.1), the members on different physical cores with no shared SMT sibling | Whonix's XML pins the Gateway and the Workstation on CPUs 0 and 1 |

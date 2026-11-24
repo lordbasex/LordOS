@@ -244,6 +244,15 @@ static void whonix(const char *cat, size_t n, const char *fx, const char *kd) {
       !strcmp(list, "https://download.whonix.org/libvirt/18.2.4.3/Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.sha512sums") &&
       !strcmp(sig, "https://download.whonix.org/libvirt/18.2.4.3/Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.sha512sums.asc") &&
       vmcat_list_source(&e, "x.sha512sums", 1, list, sig, sizeof list) != 0);
+    {
+        char rel[32];
+        T("whonix: the release a list names", !vmcat_release_in(&e, "Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.sha512sums", rel, sizeof rel) && !strcmp(rel, "18.2.4.3"));
+        T("whonix: the release an archive names", !vmcat_release_in(&e, WFILE, rel, sizeof rel) && !strcmp(rel, "18.2.4.3"));
+        T("whonix: a name with no release", vmcat_release_in(&e, "Whonix-LXQt.Intel_AMD64.qcow2.libvirt.xz", rel, sizeof rel) != 0);
+        T("whonix: a name with two releases", vmcat_release_in(&e, "Whonix-18.2.4.3-18.2.4.4.libvirt.xz", rel, sizeof rel) != 0);
+        T("whonix: a part of a longer number isn't a release", vmcat_release_in(&e, "Whonix-118.2.4.3.5.xz", rel, sizeof rel) != 0);
+        T("whonix: not a plain name", vmcat_release_in(&e, "../Whonix-LXQt-18.2.4.3.xz", rel, sizeof rel) != 0);
+    }
     T("whonix: SHA-512 hashes", vmcat_hash_ok(&e, WSHA) && !vmcat_hash_ok(&e, SHA) && !vmcat_hash_ok(&e, "e57c"));
     /* the real list and signature */
     size_t ln = 0, sn = 0, kn = 0;

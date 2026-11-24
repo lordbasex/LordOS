@@ -95,6 +95,27 @@ int vmcat_release_ok(const VmCatEntry *e, const char *rel) {
     return vmcat_release_cmp(rel, e->rel_floor) >= 0;
 }
 
+int vmcat_release_in(const VmCatEntry *e, const char *name, char *out, size_t n) {
+    if (!e || !e->rel_dir[0] || !vmcat_name_ok(name) || !out || n < 2) return -1;
+    char found[32] = "";
+    for (const char *p = name; *p; p++) {
+        if (!(*p >= '0' && *p <= '9') || (p > name && ((p[-1] >= '0' && p[-1] <= '9') || p[-1] == '.'))) continue;
+        size_t k = 0, dots = 0;
+        while ((p[k] >= '0' && p[k] <= '9') || (p[k] == '.' && p[k + 1] >= '0' && p[k + 1] <= '9')) dots += p[k++] == '.';
+        char run[32];
+        if (!dots || k >= sizeof run) { p += k ? k - 1 : 0; continue; }
+        memcpy(run, p, k);
+        run[k] = 0;
+        p += k - 1;
+        if (!vmcat_match(e->rel_re, run)) continue;
+        if (found[0] && strcmp(found, run)) return -1;          /* two different releases in one name */
+        memcpy(found, run, k + 1);
+    }
+    if (!found[0] || strlen(found) >= n) return -1;
+    memcpy(out, found, strlen(found) + 1);
+    return 0;
+}
+
 int vmcat_release_dir(VmCatEntry *e, const char *rel) {
     if (!vmcat_release_ok(e, rel)) return -1;
     if (snprintf(e->dir, sizeof e->dir, "%s%s/", e->rel_dir, rel) >= (int)sizeof e->dir) return -1;

@@ -2394,6 +2394,10 @@ static int start_machine(void) {
     if (pid < 0) { fail_start("fork: %s", strerror(errno)); return -1; }
     if (!pid) {
         child_common(qemu_procs_fd);
+        /* a group's member under the anonymity profile (19.5): no transparent huge pages at all, whatever the system's
+         * THP settings say (LordOS sets shmem_enabled to advise since 0.8.9.6, and QEMU advises them on guest memory);
+         * the flag is the process's and survives exec */
+        if (S.m.profile_lock == VM_LOCK_ANONYMITY && prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0)) _exit(126);
         /* QEMU quits on SIGTERM, and stopping the session's units sends it to every process of the machine's scope at
          * once: blocked here (QEMU never unblocks it), so lord-vm can still save the machine to disk (host_stop) and
          * then tell QEMU to quit */
@@ -8841,17 +8845,8 @@ static int cmd_group_create(const char *gdir_arg, int argc, char **argv) {
     const char *an = archive ? strrchr(archive, '/') : NULL;
     an = an ? an + 1 : archive;
     if (!dev && !vmcat_match(e.file_re, an)) { fprintf(stderr, "lord-vm: %s isn't the catalog's archive\n", an); return 1; }
-    for (const char *p = dev ? "" : an; *p; p++) {
-        /* the first run of numbers joined by dots that is a release of the catalog's (vmcat_release_ok) */
-        if (!(*p >= '0' && *p <= '9') || (p > an && p[-1] >= '0' && p[-1] <= '9')) continue;
-        size_t k = 0;
-        while ((p[k] >= '0' && p[k] <= '9') || (p[k] == '.' && p[k + 1] >= '0' && p[k + 1] <= '9')) k++;
-        if (k >= sizeof release) continue;
-        memcpy(release, p, k);
-        release[k] = 0;
-        if (!e.rel_dir[0] || vmcat_release_ok(&e, release)) break;
-        release[0] = 0;
-    }
+    /* the release the archive's name gives (vmcat_release_in, the same rule as the admin helper's), at least the floor */
+    if (!dev && (vmcat_release_in(&e, an, release, sizeof release) || !vmcat_release_ok(&e, release))) release[0] = 0;
     if (!release[0] && !dev) { fprintf(stderr, "lord-vm: the archive's name gives no release the catalog accepts (at least %s)\n", e.rel_floor); return 1; }
     if (!release[0]) snprintf(release, sizeof release, "%s", e.rel_floor[0] ? e.rel_floor : "0");
     if (e.rel_dir[0] && vmcat_release_cmp(release, e.rel_floor) < 0) { fprintf(stderr, "lord-vm: release %s is older than the catalog's floor %s\n", release, e.rel_floor); return 1; }

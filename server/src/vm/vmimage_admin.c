@@ -207,9 +207,9 @@ static void get_signed_list(const char *id, const char *arch, const VmCatEntry *
 
 /* lists/<id>-<arch>.release: the release folder the entry's last verified list came from (an entry with "releases",
  * vmcatalog.h), which vm-image-get downloads from; written only beside a list that verified */
-static void release_note(const char *id, const char *arch, const char *rel) {
+static void note_write(const char *id, const char *arch, const char *what, const char *rel) {
     char p[160], t[176];
-    snprintf(p, sizeof p, VM_LISTS "/%s-%s.release", id, arch);
+    snprintf(p, sizeof p, VM_LISTS "/%s-%s.%s", id, arch, what);
     if (!rel) { unlink(p); return; }
     snprintf(t, sizeof t, "%s.tmp", p);
     int fd = open(t, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
@@ -218,7 +218,29 @@ static void release_note(const char *id, const char *arch, const char *rel) {
     int ok = write(fd, rel, l) == (ssize_t)l;
     if (close(fd) || !ok || rename(t, p)) unlink(t);
 }
+static void release_note(const char *id, const char *arch, const char *rel) { note_write(id, arch, "release", rel); }
 
+/* a root-side note (lists/<id>-<arch>.<what>, root's, in root's folder): a release, or "" */
+static void note_read(const char *id, const char *arch, const char *what, char *out, size_t n) {
+    char p[160];
+    size_t l = 0;
+    snprintf(p, sizeof p, VM_LISTS "/%s-%s.%s", id, arch, what);
+    char *v = read_root_file(p, 31, &l);
+    out[0] = 0;
+    if (v && l < n) { memcpy(out, v, l); out[l] = 0; }
+    for (size_t i = 0; out[i]; i++) if (!((out[i] >= '0' && out[i] <= '9') || out[i] == '.')) { out[0] = 0; break; }
+    free(v);
+}
+
+/* the rollback floor of an entry with "releases" (vmcatalog.h): the catalog's floor, raised to the newest release whose
+ * list this helper ever verified (lists/<id>-<arch>.newest, root's: no file of the person's can lower it). A release
+ * below it is refused by vm-image-list and vm-image-get */
+static int release_allowed(const VmCatEntry *e, const char *id, const char *arch, const char *rel) {
+    char newest[32];
+    if (!vmcat_release_ok(e, rel)) return 0;
+    note_read(id, arch, "newest", newest, sizeof newest);
+    return !newest[0] || vmcat_release_cmp(rel, newest) >= 0;
+}
 void vm_act_image_list(const AdminReq *r, const char *arg, size_t len) {
     (void)r;
     char buf[256], *f[4];
@@ -231,15 +253,24 @@ void vm_act_image_list(const AdminReq *r, const char *arg, size_t len) {
          * listing (only names are taken from it, each checked again here); "<id> <arch> <release>" that release's folder
          * listing; "<id> <arch> <release> <list>" that list and its signature. A release below the catalog's floor, or
          * not a release's name, is refused */
-        if (n >= 3 && vmcat_release_dir(&e, f[2])) { admin_err("admin.invalidArgument", NULL); return; }
+        if (n >= 3 && (!release_allowed(&e, f[0], f[1], f[2]) || vmcat_release_dir(&e, f[2]))) { admin_err("admin.invalidArgument", NULL); return; }
         if (n == 4) {
-            if (!e.sums_re[0] || !vmcat_match(e.sums_re, f[3])) { admin_err("admin.invalidArgument", NULL); return; }
+            /* the list must name the very release of its folder: no older signed list beside a newer folder */
+            char lrel[32];
+            if (!e.sums_re[0] || !vmcat_match(e.sums_re, f[3]) || vmcat_release_in(&e, f[3], lrel, sizeof lrel) || strcmp(lrel, f[2])) {
+                admin_err("admin.invalidArgument", NULL);
+                return;
+            }
             release_note(f[0], f[1], NULL);
             get_signed_list(f[0], f[1], &e, f[3]);
-            char lp[160];
+            char lp[160], newest[32];
             struct stat st;
             snprintf(lp, sizeof lp, VM_LISTS "/%s-%s.list", f[0], f[1]);
-            if (!lstat(lp, &st) && S_ISREG(st.st_mode)) release_note(f[0], f[1], f[2]);
+            if (!lstat(lp, &st) && S_ISREG(st.st_mode) && st.st_uid == 0) {
+                release_note(f[0], f[1], f[2]);
+                note_read(f[0], f[1], "newest", newest, sizeof newest);
+                if (!newest[0] || vmcat_release_cmp(f[2], newest) > 0) note_write(f[0], f[1], "newest", f[2]);
+            }
             return;
         }
         char url[VMCAT_URL + 160], dest[160];
@@ -338,29 +369,39 @@ static int sha512_file(const char *path, char out[129]) {
     return 0;
 }
 
-static void archive_fetch(const AdminReq *r, const char *sha, const char *url, uint64_t max, const char *id, const char *arch, const char *file) {
-    char dest[240], lock[240];
-    snprintf(dest, sizeof dest, VM_IMAGES "/%s.tar.xz", sha);
+/* a verified archive in the store: images/<sha512>.tar.xz, root's, one link, 0644. Only archive_fetch makes that name,
+ * by rename after the SHA-512 matched; the download itself never has it (it is <sha512>.tar.xz.dl until checked) */
+static int archive_verified(const char *path) {
     struct stat st;
-    if (!lstat(dest, &st) && S_ISREG(st.st_mode) && st.st_uid == 0) { admin_say("OK", "%s", dest); return; }   /* i18n-ok: a path */
+    return !lstat(path, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 && st.st_nlink == 1 && (st.st_mode & 07777) == 0644;
+}
+
+static void archive_fetch(const AdminReq *r, const char *sha, const char *url, uint64_t max, const char *id, const char *arch, const char *file) {
+    char dest[240], tmp[248], lock[240];
+    snprintf(dest, sizeof dest, VM_IMAGES "/%s.tar.xz", sha);
+    snprintf(tmp, sizeof tmp, "%s.dl", dest);
     snprintf(lock, sizeof lock, VM_IMAGES "/%s.lock", sha);
+    /* the lock first: no answer about the name while another download of it may be renaming */
     int lfd = open(lock, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
     if (lfd < 0 || flock(lfd, LOCK_EX | LOCK_NB)) { if (lfd >= 0) close(lfd); admin_err("vm.imageBusy", NULL); return; }
+    if (archive_verified(dest)) { close(lfd); admin_say("OK", "%s", dest); return; }   /* i18n-ok: a path */
+    unlink(dest);                                            /* anything else at the final name isn't trusted */
     char jp[64];
     image_job(r, jp, sizeof jp);
     mkdir("/run/lordos", 0755);
     FILE *jf = fopen(jp, "we");
     if (jf) { fprintf(jf, "%d %u %s\n", (int)getpid(), (unsigned)r->uid, sha); fclose(jf); }
     write_image_info(sha, id, arch, file, NULL, 0);
-    char pp[248];
-    snprintf(pp, sizeof pp, "%s.part", dest);
+    char pp[256];
+    struct stat st;
+    snprintf(pp, sizeof pp, "%s.part", tmp);
     if (!lstat(pp, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 && st.st_size > 0)
         admin_log("vm.downloadResumed", "from", lerr_int((long long)st.st_size), NULL);   /* parsed by apps/machines */
     FetchItem it;
     memset(&it, 0, sizeof it);
     int bad = -1;
-    if (snprintf(it.url, sizeof it.url, "%s", url) < (int)sizeof it.url && strlen(dest) < sizeof it.dest) {
-        snprintf(it.dest, sizeof it.dest, "%s", dest);
+    if (snprintf(it.url, sizeof it.url, "%s", url) < (int)sizeof it.url && strlen(tmp) < sizeof it.dest) {
+        snprintf(it.dest, sizeof it.dest, "%s", tmp);       /* the fetcher writes <tmp>.part and renames it to <tmp> */
         it.max = max;
         it.resume = 1;
         fetch_batch_in(&it, 1, vm_progress, NULL, VM_SCOPE);
@@ -368,12 +409,16 @@ static void archive_fetch(const AdminReq *r, const char *sha, const char *url, u
     }
     unlink(jp);
     char hex[129] = "";
-    if (!bad && (sha512_file(dest, hex) || strcmp(hex, sha))) bad = 2;
-    if (bad) unlink(dest);
-    else { chmod(dest, 0644); write_image_info(sha, id, arch, file, NULL, it.size); }
+    /* hashed under its temporary name, 0600; the final name only by rename after a match, and 0644 only then */
+    if (!bad && (chmod(tmp, 0600) || sha512_file(tmp, hex) || strcmp(hex, sha))) bad = 2;
+    if (!bad && rename(tmp, dest)) bad = 3;
+    if (!bad && chmod(dest, 0644)) { unlink(dest); bad = 3; }
+    if (bad) unlink(tmp);
+    else write_image_info(sha, id, arch, file, NULL, it.size);
     unlink(lock);
     close(lfd);
     if (bad == 2) { admin_err("vm.hashMismatch", NULL); return; }
+    if (bad == 3) { admin_err("vm.downloadFailed", "reason", "pkg.http.writeFailed", NULL); return; }
     if (bad) { admin_err("vm.downloadFailed", "reason", it.err[0] ? it.err : "?", NULL); return; }
     admin_say("OK", "%s", dest);                             /* i18n-ok: a path, parsed by apps/machines */
 }
@@ -391,7 +436,11 @@ void vm_act_image_get(const AdminReq *r, const char *arg, size_t len) {
         size_t rl = 0, sl = 0;
         char *rv = e.rel_dir[0] ? read_root_file(rp, 39, &rl) : NULL;
         if (rv) { memcpy(rel, rv, rl); rel[rl] = 0; free(rv); }
-        if ((e.rel_dir[0] && vmcat_release_dir(&e, rel)) || !vmcat_match(e.file_re, f[2])) { admin_err("vm.notListed", NULL); return; }
+        /* the archive must name the release its verified list came from, and that release must still be allowed */
+        char frel[32];
+        if (!vmcat_match(e.file_re, f[2]) ||
+            (e.rel_dir[0] && (!release_allowed(&e, f[0], f[1], rel) || vmcat_release_dir(&e, rel) ||
+                              vmcat_release_in(&e, f[2], frel, sizeof frel) || strcmp(frel, rel)))) { admin_err("vm.notListed", NULL); return; }
         for (int i = 0; i < 128; i++) hex[i] = (char)tolower((unsigned char)f[3][i]);
         hex[128] = 0;
         char *sums = read_root_file(lp, VM_LIST_MAX, &sl);
@@ -564,6 +613,13 @@ void vm_act_image_remove(const AdminReq *r, const char *arg, size_t len) {
     char q[248];
     snprintf(q, sizeof q, "%s.part", p);
     if (unlink(q) && errno != ENOENT) rc = 1;
+    if (big) {
+        /* an archive's download under its temporary name (archive_fetch) */
+        snprintf(q, sizeof q, "%s.dl", p);
+        if (unlink(q) && errno != ENOENT) rc = 1;
+        snprintf(q, sizeof q, "%s.dl.part", p);
+        if (unlink(q) && errno != ENOENT) rc = 1;
+    }
     snprintf(q, sizeof q, VM_IMAGES "/%s.json", s);
     unlink(q);
     if (lfd >= 0) { unlink(lock); close(lfd); }

@@ -107,6 +107,11 @@ int vmcat_hash_ok(const VmCatEntry *e, const char *s);
 int vmcat_release_ok(const VmCatEntry *e, const char *rel);
 /* -1, 0, 1: a release "18.2.4.3" compared to another, numerically, part by part */
 int vmcat_release_cmp(const char *a, const char *b);
+/* the release a file name of such an entry names (Whonix-LXQt-<release>.Intel_AMD64…: the first run of numbers joined by
+ * dots, at least two of them, that matches rel_re), into out; 0, or -1 when it names none or more than one different.
+ * A list's or an archive's name must name the very release whose folder it comes from (no older signed file paired with
+ * a newer folder) */
+int vmcat_release_in(const VmCatEntry *e, const char *name, char *out, size_t n);
 /* e->dir and e->file_dir set to rel_dir + rel + "/" (after vmcat_release_ok); 0, or -1 */
 int vmcat_release_dir(VmCatEntry *e, const char *rel);
 
