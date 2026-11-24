@@ -1,8 +1,10 @@
 // build-e2e.mjs — test-only theme bundle for Machines' end-to-end bench (tools/vm/e2e/README.md), the approach of the
 // Cloud bench (branch cloud-e2e, tools/cloud/e2e): the default theme exactly as tools/build-theme.mjs builds it, plus
-// driver.js (same module instances of the SDK). Writes themes/default/theme.vm-e2e.bundle.js and
-// code-manifest.vm-e2e.json (git-ignored; never shipped).
-//   node tools/vm/e2e/build-e2e.mjs
+// driver.js (same module instances of the SDK), with machines/probe.js first (the node tree by text, for clicks by
+// name). Writes themes/default/theme.vm-e2e.bundle.js and code-manifest.vm-e2e.json (git-ignored; never shipped), or with
+// --out FILE only that bundle, anywhere (the Machines harness, machines/mh.py: a development build loads a theme outside
+// the LordOS folder unchecked, so nothing in the tree is replaced).
+//   node tools/vm/e2e/build-e2e.mjs [--out FILE]
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
@@ -39,14 +41,16 @@ const entry = {
   setup(b) {
     b.onResolve({ filter: /^e2e-entry$/ }, () => ({ path: 'e2e', namespace: 'e2e-entry' }));
     b.onLoad({ filter: /.*/, namespace: 'e2e-entry' }, () => ({
-      contents: `import ${JSON.stringify(path.join(root, 'themes/default/index.jsx'))};\nimport ${JSON.stringify(path.join(root, 'tools/vm/e2e/driver.js'))};\n`,
+      contents: `import ${JSON.stringify(path.join(root, 'tools/vm/e2e/machines/probe.js'))};\nimport ${JSON.stringify(path.join(root, 'themes/default/index.jsx'))};\nimport ${JSON.stringify(path.join(root, 'tools/vm/e2e/driver.js'))};\n`,
       resolveDir: root, loader: 'js',
     }));
   },
 };
 
 const t0 = Date.now();
-const out = path.join(root, 'themes/default/theme.vm-e2e.bundle.js');
+const oi = process.argv.indexOf('--out');
+const custom = oi > 0 && process.argv[oi + 1] ? path.resolve(process.argv[oi + 1]) : null;
+const out = custom || path.join(root, 'themes/default/theme.vm-e2e.bundle.js');
 await build({
   entryPoints: ['e2e-entry'], outfile: out, bundle: true, format: 'iife', target: 'es2020', minify: true, jsx: 'automatic',
   alias: { '@lordos/runtime': path.join(root, 'runtime', 'index.js'), '@lordos/sdk': path.join(root, 'sdk', 'index.js') },
@@ -55,6 +59,7 @@ await build({
 // lord-server loads only code listed in code-manifest.json (docs/SIGNING.md): session.sh install puts this bundle in
 // place of themes/default/theme.bundle.js in /opt/lordos-e2e and this manifest (the same, with that one entry changed)
 // in place of code-manifest.json. The bench's copy is unsigned, like any development checkout.
+if (custom) { console.log(`e2e theme: ${(fs.statSync(out).size / 1024).toFixed(0)} KB in ${Date.now() - t0} ms -> ${out}`); process.exit(0); }
 const data = fs.readFileSync(out);
 const man = fs.readFileSync(path.join(root, 'code-manifest.json'), 'utf8').replace(
   /\{ "path": "themes\/default\/theme\.bundle\.js", "size": \d+, "sha256": "[0-9a-f]+" \}/,
