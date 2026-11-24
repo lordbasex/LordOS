@@ -542,10 +542,10 @@
   {
    "area": "G",
    "item": "File copy panel, flow control, resume, drag out, Send to LordOS, quarantine (6.21)",
-   "status": "❌",
-   "pct": 10,
-   "file": "one progress line",
-   "note": ""
+   "status": "🟡",
+   "pct": 85,
+   "file": "`vmagent.c` (`ag_send_*`), `lordvm.c` (`rx_*`, `VM_FILE_CANCEL`), `vmrecv.c`, `js_vm.c` (`received`, `receiveCancel`, `fileCancel`), `transfers.jsx`, `xfer.js`, `tools/guest/gsend.c`, `lordos-guest-win.c` w13, `fsops.c` (marks), `apps/files/quarantine.js`; `vm-test`, `guest_send_test.sh`, `fsops-test`, `vm_xfer_test.mjs`, a KVM guest (6.21)",
+   "note": "*In development*: Send to LordOS from a real Debian 13 guest through the real lord-vm and `lordvm-dev` (48 MB whole, a resume after the guest's tools were killed mid-file, quarantine folder 0700, files 0600 and marked, names never hidden or replaced). Not built: dragging straight out of a guest's or apps-mode window (only out of the panel). Not checked: the panel on screen in a real lord-server session, w13 in a Windows guest (was ❌ 10)"
   },
   {
    "area": "G",
@@ -567,17 +567,17 @@
    "area": "G",
    "item": "Guest apps in the launcher before the machine runs (6.12)",
    "status": "🟡",
-   "pct": 40,
-   "file": "Dock `vm:<machine>:<app>` while apps mode runs",
-   "note": "No saved list, no launcher entries, no \"launch starts the machine\""
+   "pct": 85,
+   "file": "`sdk/guestappsmodel.js`, `sdk/apps.js` (`guestLauncherApps`), `apps/machines/guestlaunch.js`, `appsmode.jsx` (saves `guestApps`), `configure.jsx`; `guest_apps_test.mjs`",
+   "note": "*In development*: the saved list (`app.json` `guestApps`, cleaned), launcher, Classic start menu and search entries with the machine's mark, choosing one starts the machine and launches only a token the fresh list holds. Not checked on screen yet (was 🟡 40)"
   },
   {
    "area": "G",
    "item": "Guest → host links and notifications (6.12)",
    "status": "🟡",
-   "pct": 75,
-   "file": "`vmagent.c` (`ag_link_ok`, `ag_note_parse`, `ag_rate_take`), `lordvm.c` (`guest_note`), `js_vm.c` (`guestLinkAnswer`), `vmwindow.jsx`, `configure.jsx`, `tools/guest/gshell.c`, `lordos-guest-win.c` w12; `vm-test`, `guest_shell_test.sh`, a KVM guest (6.18)",
-   "note": "*In development*: off by default (machine.json schema 15), http and https only, a link opens only from the bar's Open (after 700 ms, while in use), notifications shown as from the machine, both rate-limited; checked in a real Debian 13 guest through `lordvm-dev`. Not built: the guest desktop's own notifications passed on by themselves, a Send to LordOS entry in the guest; not checked: the bar on screen, a Windows guest (was ❌ 0)"
+   "pct": 85,
+   "file": "`vmagent.c` (`ag_link_ok`, `ag_note_parse`, `ag_rate_take`), `lordvm.c` (`guest_note`), `js_vm.c` (`guestLinkAnswer`), `vmwindow.jsx`, `configure.jsx`, `tools/guest/gshell.c`, `gnotes.c`, `dbusmin.c` (`db_notify_body`, `db_note_plain`), `lordos-send-to-host.desktop`, `lordos-guest-win.c` w13 (Send To); `vm-test`, `guest_shell_test.sh`, `guest-dbus-test`, a KVM guest (6.18, 6.21)",
+   "note": "*In development*: off by default (machine.json schema 15), http and https only, a link opens only from the bar's Open, notifications shown as from the machine, both rate-limited; the Linux guest desktop's own notifications (a session-bus monitor for `Notify` only) checked in a real Debian 13 guest; Send to LordOS entries in the guest (Open With, Dolphin, Send To). Not buildable cleanly: a Windows guest's own notifications (needs package identity). Not checked: the bar on screen, a Windows guest (was 🟡 75)"
   },
   {
    "area": "H",
@@ -645,19 +645,19 @@
   },
   {
    "area": "I",
-   "item": "`lordos-guest` 8: clipboard, apps-mode relay, `--stopping`, `perf` over D-Bus, the agent's shell, links and notifications (6.12, 6.17, 6.18, 7, 7.1.4)",
+   "item": "`lordos-guest` 9: clipboard, apps-mode relay, `--stopping`, `perf` over D-Bus, the agent's shell, links and notifications, Send to LordOS, the desktop's notifications (6.12, 6.17, 6.18, 6.21, 7, 7.1.4)",
    "status": "✅",
    "pct": 95,
-   "file": "`tools/guest/lordos-guest.c` (`VERSION \"8\"`), `gshell.c`, `perf.c`, `dbusmin.c`; `guest-dbus-test`, `guest_perf_test.sh`, `guest_shell_test.sh`",
-   "note": "8 (*in development*) adds the shell (the person's own login shell in a pty, never root) and the links and notifications socket, both checked in a running Debian 13 guest on 2026-11-24; `perf` (7) still not checked in a running guest"
+   "file": "`tools/guest/lordos-guest.c` (`VERSION \"9\"`), `gshell.c`, `gsend.c`, `gnotes.c`, `perf.c`, `dbusmin.c`; `guest-dbus-test`, `guest_perf_test.sh`, `guest_shell_test.sh`, `guest_send_test.sh`",
+   "note": "9 (*in development*) adds Send to LordOS and the desktop's own notifications, and writes every frame whole (a virtio-serial port takes 32 KiB a call), checked in a running Debian 13 guest on 2026-11-24; 8 added the shell (the person's own login shell in a pty, never root) and the links and notifications socket, both checked in a running Debian 13 guest on 2026-11-24; `perf` (7) still not checked in a running guest"
   },
   {
    "area": "I",
-   "item": "`lordos-guest-win` w12: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf, shell, links, notify (6.12, 6.18, 7.1.2, 7.1.4)",
+   "item": "`lordos-guest-win` w13: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf, shell, links, notify, send (6.12, 6.18, 6.21, 7.1.2, 7.1.4)",
    "status": "✅",
    "pct": 95,
-   "file": "`tools/guest-win/lordos-guest-win.c` (`VERSION \"w12\"`); `vm-test` (`AGK_PERF`, the shell's and links' frames)",
-   "note": "w12 (*in development*) adds PowerShell in a pseudo console (never elevated) and `--open-on-host`/`--notify-host` by `WM_COPYDATA`; cross-built with mingw-w64, not yet run in a Windows guest (w11 was 100, `perf` checked in the maintainer's guest on 2026-11-23)"
+   "file": "`tools/guest-win/lordos-guest-win.c` (`VERSION \"w13\"`); `vm-test` (`AGK_PERF`, the shell's and links' frames)",
+   "note": "w12 (*in development*) adds PowerShell in a pseudo console (never elevated) and `--open-on-host`/`--notify-host` by `WM_COPYDATA`; w13 adds Send to LordOS (Send To, `--send-to-host`, flow control and resume); cross-built with mingw-w64, not yet run in a Windows guest (w11 was 100, `perf` checked in the maintainer's guest on 2026-11-23)"
   },
   {
    "area": "I",
@@ -679,9 +679,9 @@
    "area": "I",
    "item": "Shell over the agent as the signed-in user (6.18)",
    "status": "🟡",
-   "pct": 80,
-   "file": "`tools/guest/gshell.c`, `lordos-guest-win.c` (ConPTY), `lordvm.c` (`shell_*`), `js_vm.c` (`shell`), `vmwindow.jsx`; `guest_shell_test.sh`, `vm-test`, a KVM guest",
-   "note": "*In development*: the signed-in person's own shell (PowerShell in virtio-win guests), flow control both ways, checked in a real Debian 13 guest through `lordvm-dev` (2026-11-24). A pane of the machine's window, not a Terminal tab; no root or administrator switch, no `lordvm exec`; w12 not run in a Windows guest; the pane not seen on screen (was ❌ 15)"
+   "pct": 85,
+   "file": "`tools/guest/gshell.c`, `lordos-guest-win.c` (ConPTY), `lordvm.c` (`shell_*`), `js_vm.c` (`shell`), `vmwindow.jsx`, `apps/terminal/state.js` (`guestTab`), `js_term.c` (`guest`); `guest_shell_test.sh`, `vm-test`, a KVM guest",
+   "note": "*In development*: the signed-in person's own shell (PowerShell in virtio-win guests), flow control both ways, checked in a real Debian 13 guest through `lordvm-dev` (2026-11-24); Open in Terminal moves it into a Terminal tab marked as the machine's. No root or administrator switch; `lordvm exec` belongs to the command line's package (6.15); w12/w13 not run in a Windows guest; the pane and the tab not seen on screen (was 🟡 80)"
   },
   {
    "area": "I",
@@ -946,8 +946,8 @@
    "name": "Host integration",
    "weight": 12,
    "items": 9,
-   "mean": 76.67,
-   "score": 77
+   "mean": 91.11,
+   "score": 91
   },
   {
    "id": "H",
@@ -962,8 +962,8 @@
    "name": "Guest tools and agent",
    "weight": 7,
    "items": 6,
-   "mean": 90.0,
-   "score": 90
+   "mean": 90.83,
+   "score": 91
   },
   {
    "id": "J",
@@ -983,7 +983,7 @@
   },
   {
    "id": "L",
-   "name": "Privacy and security",
+   "name": "Privacy and security model",
    "weight": 4,
    "items": 7,
    "mean": 73.57,
@@ -999,13 +999,13 @@
   },
   {
    "id": "N",
-   "name": "Tests and validation",
+   "name": "Tests and validation on hardware",
    "weight": 3,
    "items": 5,
    "mean": 55.0,
    "score": 55
   }
  ],
- "total": 71,
- "total_exact": 71.07
+ "total": 73,
+ "total_exact": 72.82
 }

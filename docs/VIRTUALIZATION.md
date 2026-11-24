@@ -44,25 +44,25 @@ recomputes both from the rows; the arithmetic:
 | D. Snapshots, clones, storage | 9 | 6 | 60.00 | 60 % | 9 × 60 % = 5.40 | 60 % |
 | E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 80 % |
 | F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 56.00 | 56 % | 6 × 56 % = 3.36 | 56 % |
-| G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 9 | 76.67 | 77 % | 12 × 77 % = 9.24 | 68 % |
+| G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 9 | 91.11 | 91 % | 12 × 91 % = 10.92 | 68 % |
 | H. Graphics (virgl, GVT-g, venus, passthrough) | 7 | 8 | 46.25 | 46 % | 7 × 46 % = 3.22 | 46 % |
-| I. Guest tools and agent (state, shell, logs) | 7 | 6 | 90.00 | 90 % | 7 × 90 % = 6.30 | 75 % |
+| I. Guest tools and agent (state, shell, logs) | 7 | 6 | 90.83 | 91 % | 7 × 91 % = 6.37 | 75 % |
 | J. Command line and automation | 3 | 2 | 47.50 | 48 % | 3 × 48 % = 1.44 | 48 % |
 | K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 61.25 | 61 % | 3 × 61 % = 1.83 | 61 % |
 | L. Privacy and security model | 4 | 7 | 73.57 | 74 % | 4 × 74 % = 2.96 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **111** | | | **71.07 → 71 %** | 69 % |
+| **Total** | **100** | **111** | | | **72.82 → 73 %** | 69 % |
 
-Σ = 10.92 + 9.12 + 8.25 + 5.40 + 4.80 + 3.36 + 9.24 + 3.22 + 6.30 + 1.44 + 1.83 + 2.96 + 2.58 + 1.65 = 71.07, rounded **71 %** (69 % at the audit of `bb5baab62`; 68 % against `965a10f6e`). The 2026-11-24 integration work (branch `m100/integration`: the agent's shell, links and notifications from the guest, the red agent light, the logs) moved G 68 → 77 % and I 75 → 90 %. Before this audit the
+Σ = 10.92 + 9.12 + 8.25 + 5.40 + 4.80 + 3.36 + 10.92 + 3.22 + 6.37 + 1.44 + 1.83 + 2.96 + 2.58 + 1.65 = 72.82, rounded **73 %** (69 % at the audit of `bb5baab62`; 68 % against `965a10f6e`). The 2026-11-24 integration work (branch `m100/integration`: the agent's shell, links and notifications from the guest, the red agent light, the logs) moved G 68 → 77 % and I 75 → 90 %; the second (branch `m100/integration-2`: Send to LordOS with flow control and resume, the quarantine folder, the file copy panel, the guest desktop's own notifications, guest apps in the launcher before the machine runs, the agent's shell as a Terminal tab) moved G 77 → 91 % and I 90 → 91 %. Before this audit the
 document's table said 67.52 and the JSON 67.16 while the rows themselves gave 67.88: the Whonix row had been raised to 85 %
 twice without the table, the Σ line and the JSON being computed again, and B's score in the table (73 %) wasn't its rows'
 mean (76 %). All three now come from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); raw disks, encryption, export and backups
-(D, +1.5); the rest of guest → host links (G, +0.3); the file copy panel with drag out, USB, then camera and printers (G and F, +1.2
-each); disposable sessions for any machine (D, +1.1); the rest of the agent shell (I, +0.2); Picture in Picture with several displays
+(D, +1.5); USB, then camera and printers (F, +1.2
+each); on-screen checks of the panel, the launcher entries and the link bar, and a Windows guest for w13 (G, +0.6); disposable sessions for any machine (D, +1.1); the rest of the agent shell (I, +0.2); Picture in Picture with several displays
 (C, +0.9); venus, whole-GPU passthrough and several damage rectangles (H, +0.9 each); Migrate from another PC (B, +0.9);
 virtio-win guests on arm64 (B, +0.8).
 
@@ -179,7 +179,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | USB passthrough, auto-connect rules, `vm-usb-allow` (6.6) | ❌ | 0 | no usbredir anywhere |  |
 | Camera (6.9), printers (5.5) | ❌ | 0 |  |  |
 
-### G. Host integration (77 %)
+### G. Host integration (91 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
@@ -187,11 +187,11 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Transfer folder (6.7.1) | 🧪 | 90 | `machine.h` (`VM_XFER_*`), `lordvm.c`, `configure.jsx` | Through `lordvm-dev` |
 | Clipboard: text, rich text, pictures, by direction, ask mode, secrets kept out (6.8) | ✅ | 95 | `vmagent.c`, `js_vm.c`, `x11clip.c`; `guest_clip_test.sh` |  |
 | Files dropped on a machine or an apps-mode window (6.21, 7.2.1) | ✅ | 100 | `lordvm.c` (`.lordos-drop-*.part`), `AGK_PLACE` |  |
-| File copy panel, flow control, resume, drag out, Send to LordOS, quarantine (6.21) | ❌ | 10 | one progress line |  |
+| File copy panel, flow control, resume, drag out, Send to LordOS, quarantine (6.21) | 🟡 | 85 | `vmagent.c` (`ag_send_*`), `lordvm.c` (`rx_*`, `VM_FILE_CANCEL`), `vmrecv.c`, `js_vm.c` (`received`, `receiveCancel`, `fileCancel`), `transfers.jsx`, `xfer.js`, `tools/guest/gsend.c`, `lordos-guest-win.c` w13, `fsops.c` (marks), `apps/files/quarantine.js`; `vm-test`, `guest_send_test.sh`, `fsops-test`, `vm_xfer_test.mjs`, a KVM guest (6.21) | *In development*: Send to LordOS from a real Debian 13 guest through the real lord-vm and `lordvm-dev` (48 MB whole, a resume after the guest's tools were killed mid-file, quarantine folder 0700, files 0600 and marked, names never hidden or replaced). Not built: dragging straight out of a guest's or apps-mode window (only out of the panel). Not checked: the panel on screen in a real lord-server session, w13 in a Windows guest (was ❌ 10) |
 | Open with a machine (7.3) | ✅ | 100 | `openwith.js`; `vm_openwith_test.mjs` | Windows guests |
 | Apps mode: Windows and LordOS guests (7.2) | ✅ | 90 | `appsmode.jsx`, `appsstatus.jsx`, `js_guestwin.c`; `guestwin_headless.sh` | Not other Linux desktops; no window shapes |
-| Guest apps in the launcher before the machine runs (6.12) | 🟡 | 40 | Dock `vm:<machine>:<app>` while apps mode runs | No saved list, no launcher entries, no "launch starts the machine" |
-| Guest → host links and notifications (6.12) | 🟡 | 75 | `vmagent.c` (`ag_link_ok`, `ag_note_parse`, `ag_rate_take`), `lordvm.c` (`guest_note`), `js_vm.c` (`guestLinkAnswer`), `vmwindow.jsx`, `configure.jsx`, `tools/guest/gshell.c`, `lordos-guest-win.c` w12; `vm-test`, `guest_shell_test.sh`, a KVM guest (6.18) | *In development*: off by default (machine.json schema 15), http and https only, a link opens only from the bar's Open (after 700 ms, while in use), notifications shown as from the machine, both rate-limited; checked in a real Debian 13 guest through `lordvm-dev`. Not built: the guest desktop's own notifications passed on by themselves, a Send to LordOS entry in the guest; not checked: the bar on screen, a Windows guest (was ❌ 0) |
+| Guest apps in the launcher before the machine runs (6.12) | 🟡 | 85 | `sdk/guestappsmodel.js`, `sdk/apps.js` (`guestLauncherApps`), `apps/machines/guestlaunch.js`, `appsmode.jsx` (saves `guestApps`), `configure.jsx`; `guest_apps_test.mjs` | *In development*: the saved list (`app.json` `guestApps`, cleaned), launcher, Classic start menu and search entries with the machine's mark, choosing one starts the machine and launches only a token the fresh list holds. Not checked on screen yet (was 🟡 40) |
+| Guest → host links and notifications (6.12) | 🟡 | 85 | `vmagent.c` (`ag_link_ok`, `ag_note_parse`, `ag_rate_take`), `lordvm.c` (`guest_note`), `js_vm.c` (`guestLinkAnswer`), `vmwindow.jsx`, `configure.jsx`, `tools/guest/gshell.c`, `gnotes.c`, `dbusmin.c` (`db_notify_body`, `db_note_plain`), `lordos-send-to-host.desktop`, `lordos-guest-win.c` w13 (Send To); `vm-test`, `guest_shell_test.sh`, `guest-dbus-test`, a KVM guest (6.18, 6.21) | *In development*: off by default (machine.json schema 15), http and https only, a link opens only from the bar's Open, notifications shown as from the machine, both rate-limited; the Linux guest desktop's own notifications (a session-bus monitor for `Notify` only) checked in a real Debian 13 guest; Send to LordOS entries in the guest (Open With, Dolphin, Send To). Not buildable cleanly: a Windows guest's own notifications (needs package identity). Not checked: the bar on screen, a Windows guest (was 🟡 75) |
 
 ### H. Graphics (46 %)
 
@@ -206,15 +206,15 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | venus (Vulkan) (6.10) | ❌ | 0 |  |  |
 | Whole-GPU passthrough (Mode B) (6.10, MACHINES-GPU.md) | ❌ | 0 | `vmgpu_admin.c` refuses a dedicated card | "Whole" in Configure is the largest GVT-g type, not passthrough |
 
-### I. Guest tools and agent (90 %)
+### I. Guest tools and agent (91 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| `lordos-guest` 8: clipboard, apps-mode relay, `--stopping`, `perf` over D-Bus, the agent's shell, links and notifications (6.12, 6.17, 6.18, 7, 7.1.4) | ✅ | 95 | `tools/guest/lordos-guest.c` (`VERSION "8"`), `gshell.c`, `perf.c`, `dbusmin.c`; `guest-dbus-test`, `guest_perf_test.sh`, `guest_shell_test.sh` | 8 (*in development*) adds the shell (the person's own login shell in a pty, never root) and the links and notifications socket, both checked in a running Debian 13 guest on 2026-11-24; `perf` (7) still not checked in a running guest |
-| `lordos-guest-win` w12: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf, shell, links, notify (6.12, 6.18, 7.1.2, 7.1.4) | ✅ | 95 | `tools/guest-win/lordos-guest-win.c` (`VERSION "w12"`); `vm-test` (`AGK_PERF`, the shell's and links' frames) | w12 (*in development*) adds PowerShell in a pseudo console (never elevated) and `--open-on-host`/`--notify-host` by `WM_COPYDATA`; cross-built with mingw-w64, not yet run in a Windows guest (w11 was 100, `perf` checked in the maintainer's guest on 2026-11-23) |
+| `lordos-guest` 9: clipboard, apps-mode relay, `--stopping`, `perf` over D-Bus, the agent's shell, links and notifications, Send to LordOS, the desktop's notifications (6.12, 6.17, 6.18, 6.21, 7, 7.1.4) | ✅ | 95 | `tools/guest/lordos-guest.c` (`VERSION "9"`), `gshell.c`, `gsend.c`, `gnotes.c`, `perf.c`, `dbusmin.c`; `guest-dbus-test`, `guest_perf_test.sh`, `guest_shell_test.sh`, `guest_send_test.sh` | 9 (*in development*) adds Send to LordOS and the desktop's own notifications, and writes every frame whole (a virtio-serial port takes 32 KiB a call), checked in a running Debian 13 guest on 2026-11-24; 8 added the shell (the person's own login shell in a pty, never root) and the links and notifications socket, both checked in a running Debian 13 guest on 2026-11-24; `perf` (7) still not checked in a running guest |
+| `lordos-guest-win` w13: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf, shell, links, notify, send (6.12, 6.18, 6.21, 7.1.2, 7.1.4) | ✅ | 95 | `tools/guest-win/lordos-guest-win.c` (`VERSION "w13"`); `vm-test` (`AGK_PERF`, the shell's and links' frames) | w12 (*in development*) adds PowerShell in a pseudo console (never elevated) and `--open-on-host`/`--notify-host` by `WM_COPYDATA`; w13 adds Send to LordOS (Send To, `--send-to-host`, flow control and resume); cross-built with mingw-w64, not yet run in a Windows guest (w11 was 100, `perf` checked in the maintainer's guest on 2026-11-23) |
 | Install Agent through qemu-guest-agent; tools updated by themselves (6.17, 7.1.3) | ✅ | 90 | `lordvm.c` (`guest-file-write`), `model.js` (`TOOLS_SHIPPED`, `toolsAutoStep`) | No guest with older tools tried |
 | Agent state light and capability list (6.17) | ✅ | 95 | `model.js` (`agentTone`, `agentLines`), `js_vm.c` (`lost`); `vm_model_test.mjs` | Red (*in development*) when the agent stopped answering while the guest runs, or the tools' install failed; the list has the agent's shell, links and notifications and a Windows guest's event logs. Not seen on screen yet (was 🟡 85: no red state) |
-| Shell over the agent as the signed-in user (6.18) | 🟡 | 80 | `tools/guest/gshell.c`, `lordos-guest-win.c` (ConPTY), `lordvm.c` (`shell_*`), `js_vm.c` (`shell`), `vmwindow.jsx`; `guest_shell_test.sh`, `vm-test`, a KVM guest | *In development*: the signed-in person's own shell (PowerShell in virtio-win guests), flow control both ways, checked in a real Debian 13 guest through `lordvm-dev` (2026-11-24). A pane of the machine's window, not a Terminal tab; no root or administrator switch, no `lordvm exec`; w12 not run in a Windows guest; the pane not seen on screen (was ❌ 15) |
+| Shell over the agent as the signed-in user (6.18) | 🟡 | 85 | `tools/guest/gshell.c`, `lordos-guest-win.c` (ConPTY), `lordvm.c` (`shell_*`), `js_vm.c` (`shell`), `vmwindow.jsx`, `apps/terminal/state.js` (`guestTab`), `js_term.c` (`guest`); `guest_shell_test.sh`, `vm-test`, a KVM guest | *In development*: the signed-in person's own shell (PowerShell in virtio-win guests), flow control both ways, checked in a real Debian 13 guest through `lordvm-dev` (2026-11-24); Open in Terminal moves it into a Terminal tab marked as the machine's. No root or administrator switch; `lordvm exec` belongs to the command line's package (6.15); w12/w13 not run in a Windows guest; the pane and the tab not seen on screen (was 🟡 80) |
 | Logs: journal, serial, machine log, Overview (6.19) | 🟡 | 85 | `logs.jsx`, `diag.js` (`journalLine`, `guestZone`), `lordvm.c` (journal and `EVLOG_PS` through qemu-ga); `vm_model_test.mjs` | *In development*: a Windows guest's System and Application event logs, a unit or source filter, times in local time with the guest's zone; the event logs not yet run in a Windows guest; Clear view was built already (was 65: no event logs, unit filter or time zone) |
 
 ### J. Command line and automation (48 %)
@@ -361,7 +361,7 @@ Still open in Phase 2:
   Fusion): NVMe disk, vmxnet3, the SMBIOS UUID and MAC kept, no TPM, Secure Boot off; activation checked.
 - [ ] USB passthrough of a device to a machine.
 - [x] Bridged and Host-only networks (0.8.9: a macvtap for Bridged, with `vhost=off`; passt on 127.0.0.1 for Host only; 6.5).
-- [ ] File copy panel with flow control and resume, Send to LordOS, drag out (7, target 300 MB/s). Dropping files in is built (6.21).
+- [x] File copy panel with Cancel, Send to LordOS with flow control and resume, the quarantine folder (6.21, built 2026-11-24, in development; about 83 MB/s measured through the agent's channel, target 300 MB/s). Still open: dragging straight out of a guest's window. Dropping files in is built (6.21).
 - [x] UEFI secure boot and TPM on amd64 (swtpm, its state in snapshots; 4.3.1). arm64 secure boot is still To test.
 - [x] virtio-win guests on amd64 with automatic driver setup (Windows 11, 0.8.9.5, 4.3.1). arm64 is not built (stage C).
 - [x] 3D with virgl for Linux guests on amd64 (6.10, "3D graphics (built)" below). Still open: venus; the arm64 3D abort (13.8
@@ -2821,8 +2821,8 @@ person's own shares are.
   drop files through the agent: turn the transfer folder off in Configure. The window's hint says
   which way the files will go, the progress line says "through the transfer folder".
 - **Out of the guest:** what the guest saves in its LordOS folder or drive is in the transfer folder here at once (Open Transfer
-  Folder: the folder menu, the Actions menu, the library's menu). Dragging out of the guest's window still needs a helper inside
-  it: not built.
+  Folder: the folder menu, the Actions menu, the library's menu). Send to LordOS (6.21) copies a file into this computer's quarantine
+  folder for the machine. Dragging straight out of the guest's window: not built (6.21).
 - Nothing in LordOS opens, runs or indexes the transfer folder by itself: it's a folder of the person's like Downloads.
 
 **Measured on 2026-11-20** (amd64 host, NVMe, ext4: no reflink, so `copy_file_range`; KVM; 2 GB random file; through
@@ -2845,7 +2845,8 @@ that names the guest's copy) would bring a 2 GB drop to about 10 s on Linux: not
 
 ### 6.8 Clipboard and drag
 
-Clipboard through the agent's own channel, `org.lordos.agent` (text, rich text, pictures), direction chosen per VM, **Off for Testing**. Protected windows (`wm.setProtected`) never leak. File drag: into the guest copies through the transfer folder or the agent (6.21); out of the guest is not built. Linux: our `lordos-guest`. virtio-win guests: our `lordos-guest-win` (7.1.2).
+Clipboard through the agent's own channel, `org.lordos.agent` (text, rich text, pictures), direction chosen per VM, **Off for Testing**. Protected windows (`wm.setProtected`) never leak. File drag: into the guest copies through the transfer folder or the agent (6.21); out of the guest, Send to LordOS and the
+file copy panel (6.21); dragging straight out of a guest's window is not built. Linux: our `lordos-guest`. virtio-win guests: our `lordos-guest-win` (7.1.2).
 
 **Only while the machine is in use (0.8.9, the guest is untrusted: clipboard stealers, address swappers).** The machine
 counts as in use while its window is in front, or, in apps mode, one of its guest's windows, and for 3 seconds after it
@@ -2984,12 +2985,14 @@ A small agent runs on the old PC, or the disk is read from a backup image, or th
 
 ### 6.12 Guest app integration
 
-- Guest's apps in the launcher and Dock, with icons, marked with a small badge. Launching starts or resumes the VM.
+- Guest's apps in the launcher and Dock, with icons, marked with a small badge. Launching starts or resumes the VM. **Built
+  (2026-11-24, in development)**, below.
 - Open a LordOS file with a guest app: **built** (7.3, Windows guests): Files' Open With copies it through the transfer folder or the
   agent into the guest's Downloads and opens it there.
 - Reverse: open a link or file from the guest on the host: optional. **Links built (2026-11-24, in development)**, below; files
-  out of the guest are the transfer folder's (6.7.1).
-- Guest notifications to the host: optional, off by default. **Built (2026-11-24, in development)**, below.
+  out of the guest: the transfer folder (6.7.1) and **Send to LordOS** (6.21, built 2026-11-24).
+- Guest notifications to the host: optional, off by default. **Built (2026-11-24, in development)**, below, including the
+  guest desktop's own notifications on Linux guests (tools 9).
 
 **Links and notifications from the guest (built 2026-11-24, *in development*; tools 8 and w12, machine.json schema 15).** The
 guest is hostile, so neither is on by default and neither ever runs anything on this computer by itself.
@@ -3005,8 +3008,19 @@ guest is hostile, so neither is on by default and neither ever runs anything on 
   frame each). Windows (`lordos-guest-win` w12): the same two options on `lordos-guest-win.exe`, which hand the running
   tools of that session one frame by `WM_COPYDATA`. Either way the tools parse the frame as lord-vm will and answer with
   an exit status: 0 sent, 1 not connected, 2 malformed, 3 this machine doesn't take them. A link is percent-encoded first
-  (`ag_link_encode`: `https://x.org/a (b)` becomes `https://x.org/a%20%28b%29`). Not built: a "Send to LordOS" entry in a
-  guest's browser or file manager, and passing the guest desktop's own notifications on by themselves.
+  (`ag_link_encode`: `https://x.org/a (b)` becomes `https://x.org/a%20%28b%29`). Files go the other way with Send to LordOS
+  (6.21).
+- *The guest desktop's own notifications* (Linux, `lordos-guest` 9, `tools/guest/gnotes.c`; 2026-11-24). Only while the
+  host's hello says `notify` (the same switch), the helper, as the person and with its own D-Bus client (`dbusmin.c`: no
+  libdbus, no program started), becomes a monitor of that person's own session bus (`BecomeMonitor`, which the bus allows its
+  own user) for exactly one match: method calls to `org.freedesktop.Notifications.Notify`. Of each it keeps the summary
+  (the app's name when empty) and the body, made plain text (`db_note_plain`: markup dropped, `&amp;` and the like decoded,
+  control and bidi characters as spaces, cut on a character), and sends them as `AGK_NOTIFY`, at most 3 at once and then one
+  a second, on top of lord-vm's own rate. Nothing else on the bus is read; a message too large to keep (an image in its
+  hints) is skipped whole (`db_msg_total`). The monitor goes when the host stops saying `notify` and is tried again every
+  30 s while wanted. *Windows guests:* not built, and not buildable cleanly: reading another program's toast notifications
+  needs `UserNotificationListener`, which a program gets only with package identity (an MSIX package signed with a
+  certificate the guest trusts) and the person's consent; the tools are a plain program, so only `--notify-host` works there.
 - *The frames* (`vmagent.h`, strict parsers in `vmagent.c`, fuzzed in `vm-test`): `AGK_LINK` (kind 25), 1..2048 bytes,
   only `http://` or `https://`, a host of letters, digits, `.` and `-` (labels not empty, not starting or ending with `-`)
   or a bracketed IPv6 address, an optional port 1..65535, never a user name or password before the host (`@` in the
@@ -3029,8 +3043,18 @@ guest is hostile, so neither is on by default and neither ever runs anything on 
   helper's socket, the hello, a link percent-encoded, a notification refused while the host says no and cut to its
   limits when it says yes, a `file:` link refused), and in a real KVM guest (below, 6.18).
 
-**Status:** guest apps reach the Dock (`vm:<machine>:<app>`) only while apps mode runs (7.2); nothing is listed before
-the machine runs (not built).
+**Guest apps in the launcher before the machine runs (built 2026-11-24, *in development*).** Apps mode keeps the guest's last
+app list in `<machine>/app.json` (`guestApps`, cleaned on every read by `sdk/guestappsmodel.js`: at most 256 entries; names
+cut to 256 bytes, without control or bidi characters, shown as text only; tokens kept byte for byte up to 512 bytes, refused
+with control characters). While the machine is off, each app is in the launcher, the Classic start menu and search
+(`sdk/apps.js` `guestLauncherApps`, kind `machine`, id `vmapp:<machine id>:<hash>`), with the Machines mark and "In
+‹machine›". It is never in the Dock, and never shown for a running, unreadable, locked (anonymity) or group member machine,
+nor with Configure → General → "Its apps in the launcher" off. Choosing one opens the machine's window, whose usual start runs
+(memory budget, bridged network or vGPU preparation), turns apps mode on, and launches the app only when the guest's own
+fresh list holds that exact token (`launchAskStep`); lord-vm checks the token again against its own copy. Otherwise it says
+the app isn't there any more, or that apps mode didn't start (10 minutes, or tools that can't list windows), and launches
+nothing. Tests: `guest_apps_test.mjs`. Not checked on screen yet. While apps mode runs, the guest's open apps are in the Dock
+as before (`vm:<machine>:<app>`).
 
 ### 6.13 Nested virtualization
 
@@ -3150,7 +3174,7 @@ ones show a blue dot. Clicking it opens a popover:
 
 **Protocol.** A virtio-serial port named `org.lordos.agent`, chosen over vsock because it works in every guest without extra drivers. Length-prefixed frames with a channel number, a `hello` carrying version and capabilities, skipped unknown kinds so that either side can grow, and a hard frame limit. `lord-vm`, not `lord-server`, parses it, inside the sandbox. A newer host updates older tools itself, on by default with a switch to turn it off, through qemu-guest-agent (7.1.3).
 
-**Direction of trust.** The host runs things in the guest, never the reverse. A guest can't open a channel, start a host program, or read a host path. Only the person's own user can reach a VM's socket. The guest's links and notifications (6.12) are offers: a link opens only when the person clicks Open, a notification is text shown as from the machine. (Planned, not built: a profile turning the agent's shell off; the agent's shell is 6.18.)
+**Direction of trust.** The host runs things in the guest, never the reverse. A guest can't open a channel, start a host program, or read a host path. Only the person's own user can reach a VM's socket. The guest's links and notifications (6.12) are offers: a link opens only when the person clicks Open, a notification is text shown as from the machine. A file it sends (6.21) lands only in the machine's quarantine folder, 0600 and marked, and nothing opens it by itself. (Planned, not built: a profile turning the agent's shell off; the agent's shell is 6.18.)
 
 ### 6.18 Shell
 
@@ -3180,8 +3204,12 @@ so it can't be taken for one of this computer's.
   control mode (its panes and protocol), or make links (OSC 8), and of the terminal's events only its output, size, bell
   and end reach any code: no title, notification, badge, profile, command, host, secret prompt or Passwords fill or save
   (a fake password prompt can't get a saved password offered). `term-guest-test`, `vt-ring-test`.
-- *Not built:* an administrator or root shell (the switch in Security), opening it as a tab of the Terminal app (it is a
-  pane of the machine's window), `lordvm exec` and the MCP server's `run_command` (6.15).
+- **Open in Terminal** (the pane's bar, 2026-11-24) moves the agent's shell into a Terminal tab on the same session
+  (`lord.term.info().guest`, true only for `term_create_fd` streams; `apps/terminal/state.js` `guestTab`), titled "Shell
+  inside ‹machine›" with the guest badge. A session that isn't a guest's, or one already shown, never opens a host shell
+  instead. The pane says the shell is in Terminal while that window shows it. Not checked on screen yet.
+- *Not built:* an administrator or root shell (the switch in Security), `lordvm exec` (the `lordvm` command line belongs to
+  6.15's package) and the MCP server's `run_command` (6.15).
 - *Checked:* `guest_shell_test.sh` (the pty, its size, the exit status, 2 MB with late acknowledgements never past the
   window, the host's close ending the shell's programs), `vm-test` (the frames, fuzzed), and on 2026-11-24 in a real KVM
   guest (Debian 13, kernel 6.12.118) with the real lord-vm and `lordvm-dev` playing lord-server (below).
@@ -3219,25 +3247,89 @@ The camera icon saves the guest's display at its real resolution, directly from 
 
 ### 6.21 File copy with progress
 
-**Status (beta, 2026-11-05, superseded):** not built then. The agent's channel carries the clipboard (text, rich text, pictures: 3.9), not files: copy and
-paste of files and drag in or out need the flow control, resume and panel below, and are Phase 3 work.
 **Since 0.8.9.5:** files dropped on a machine's window go into the signed-in person's Downloads
 (`VM_FILE`, AGENTS.md "Machines' dropped files"), through the transfer folder at full speed when the guest has it (6.7.1), else
 through qemu-guest-agent. Files arrive as hidden `.lordos-drop-*.part` files renamed when complete, and a name in use gets
-" (n)". Shown is one progress line; the panel, flow control, resume, drag out, **Send to LordOS** and quarantine below are
-**not built**.
+" (n)".
 
-Drag files and folders onto a running machine's window to copy them to the desktop of the user signed in at its display, or onto a shared folder window to choose the place. It goes through the agent, so it needs neither network nor shared folders.
+**Built 2026-11-24 (*in development*; tools 9 and w13, machine.json schema 16): the panel, Cancel, files from the guest
+("Send to LordOS") with flow control and resume, the quarantine folder.**
 
-A panel along the bottom of the window shows file name, size, a bar, speed, time left and Cancel. Several transfers queue in it, and it hides when done.
-
-- Atomic: files arrive in a hidden folder beside the destination and are moved in when complete, so that nothing half-written appears.
-- Name conflicts are never overwritten silently: a numbered name is used, and the panel says so.
-- Flow control by acknowledgement keeps memory flat for any file size. **Target:** 300 MB/s on Linux guests with NVMe on a PC, measured in Phase 3.
-- Resume after a dropped connection, by offset and hash. Optional end-to-end check, on by default for files over 1 GB.
-- Names are sanitized for the guest's rules. Symbolic links aren't followed; permissions and dates carry over where the file system can.
-- **Out of the guest (not built):** in Apps mode, windows are ours, so dragging out could work. From a Linux guest's own desktop, no agent can see the drag, so the agent adds **Send to LordOS** to the guest's file manager, plus `lordvm cp`. The panel says this when someone tries. Virtio-win guests allow drag-out through the agent, **To test**.
-- Scanning: files coming out of a guest get the same quarantine marking as downloads.
+- *The panel* (`apps/machines/transfers.jsx`, model `xfer.js`, `vm_xfer_test.mjs`): along the bottom of the machine's
+  window, every file on its way into the guest (drops) and from it, each with its name, the direction and the machine,
+  "1.2 MB of 48 MB · 85 MB/s · 3 s left", a bar and **Cancel**; a finished row stays 8 s with its outcome (Received,
+  Copied, Cancelled, "It changed on the way: not kept", "Not enough room on this computer") and **Show in Files**; the
+  panel hides when all are done. It replaces the one progress line. A drop's Cancel (`lord.vm.fileCancel`,
+  `VM_FILE_CANCEL`) drops a waiting file at once and stops the one being copied at its next step (a piece already handed
+  to qemu-guest-agent is let through first, so no answer is taken for the next file's; the transfer folder's copy child
+  is killed); its staging folders go as on any failure.
+- *Send to LordOS* (a guest → this computer). Linux guests (`lordos-guest` 9, `tools/guest/gsend.c`): `lordos-guest
+  --send-to-host FILE…` hands the helper each file's absolute path over its socket (6.12; same uid only); the file
+  manager's **Send to LordOS** is `lordos-send-to-host.desktop` (Open With, every file type) and, for Dolphin,
+  `lordos-send-to-host-kde.desktop` (a service menu), both shipped with the tools. Windows guests (`lordos-guest-win`
+  w13): **Send To → LordOS** (`%APPDATA%\Microsoft\Windows\SendTo\LordOS.lnk`, made by the tools at each start, only
+  when missing or pointing elsewhere) runs `lordos-guest-win.exe --send-to-host FILE…`, which hands the paths to the
+  running tools by `WM_COPYDATA`. Folders are refused; only the person's own regular files, opened without following a
+  link (Windows: no reparse point, `FILE_SHARE_READ`). Exit status 0 queued, 1 not connected, 2 a file refused, 3 this
+  machine doesn't take files.
+- *The frames* (`vmagent.h` `AGK_SEND_*`, kinds 32–38, strict parsers in `vmagent.c`, fuzzed with 80 000 random frames in
+  `vm-test`): the guest offers one file at a time (`AGK_SEND_OFFER`: an id, the size ≤ 1 TiB, a flag when it could run in
+  the guest, a 32-byte resume key, one file name: 1..180 bytes of UTF-8 without control or bidi characters, no `/` or `\`,
+  not `.` or `..`); the host answers (`AGK_SEND_ACCEPT`: taken, from which offset, with the SHA-256 of what it already has;
+  or off, not now, no room, refused); the guest says where it starts (`AGK_SEND_FROM`: that offset when its own file
+  starts with those very bytes, else 0); data comes in order (`AGK_SEND_DATA`, 64 KiB pieces), never more than 4 MiB past
+  the host's last `AGK_SEND_ACK` (`ag_send_room`; lord-vm ends a transfer whose guest sends past it, out of order, or past
+  the size it offered); `AGK_SEND_END` carries the whole file's SHA-256; `AGK_SEND_DONE` says the outcome either way.
+  "Not now" (another file on its way, no Machines window open) and "later" (the window went: what came is kept) keep the
+  file in the guest's queue and offer it again every 5 s, for at most 10 minutes.
+- *lord-vm* (`rx_*`): takes offers only from tools that said `send`, only while machine.json takes files (`"guest_files"`,
+  on by default, Configure → Sharing → **Files from the machine**; a machine locked for anonymity never), one at a time,
+  at most 8 at once and then one per 2 s; passes the offer to lord-server as a sealed memfd (`VM_RECV_OFFER`) and writes
+  only through the part file's descriptor lord-server hands back (`VM_RECV`), never a path. A resume: a child hashes what
+  the part already holds (lord-vm's loop never waits on a file) and the guest goes on only from a matching prefix. The
+  file is kept only when the SHA-256 of what was written is the guest's (`fdatasync` first); else it is emptied.
+  The log says which file and its size, never its contents. The agent's state has `VAC_SEND` (the popover's
+  "Files sent from the machine").
+- *The quarantine folder* (`vm/vmrecv.c`, shared by lord-server and `lordvm-dev`; `vm-test`): every file from a guest lands
+  in `<library>/Received/<machine folder's name>` (so `~/Machines/Received/Ubuntu 26.04/`), never anywhere the guest names.
+  Each step is made 0700 and opened without following a link, and must be this account's own and not writable by others
+  (a `Received` or machine folder that is a link is refused). The part is `.lordos-part-<the key in hex>`, opened `O_RDWR`
+  without following a link and used only as a regular file of this account with one link; one longer than the file
+  offered is emptied. An offer needs the file's size (less what came before) plus 1 GiB free there. At most 8 parts stay
+  for resumes and none older than 7 days. Once kept, the file is made **0600** (never executable, whatever it was in the
+  guest), **marked** (`user.lordos.quarantine` "1", `user.lordos.from` the machine's name, `user.lordos.machine` its id,
+  `user.xdg.origin.url` `lordos-machine:<id>`) and named with `ag_recv_name` (ag_drop_name's rules; a leading `.` becomes `_`,
+  so nothing arrives hidden), never replacing a file (`renameat2` `RENAME_NOREPLACE`, then "name (2).ext"…).
+- *Files* shows the mark (Get Info: "From: The machine ‹name›", `lord.fs.stat`'s `quarantine` and `fromMachine`, the name
+  shown only when it is plain text) and never opens a marked program, installer, package or desktop entry by a double click
+  (`apps/files/quarantine.js`: `.deb`, `.rpm`, `.AppImage`, `.run`, `.flatpak(ref)`, `.snap`, `.desktop`, `.lpk`, `.exe`,
+  `.msi`, `.bat`, `.cmd`, `.ps1`, `.jar`… and any program): it says so; Open With still opens it when the person picks an
+  app. The marks follow a file Files copies (`fsops_copy_marks`) and everything extracted from a marked archive
+  (`lord.fs.inheritMarks` after `archive.extract`: extract, Quick Preview, opening an entry, dragging one out), so an
+  installer inside a zip from a machine is blocked the same way.
+- *Drag out:* a received file in the panel can be dragged onto a folder in Files (it is copied there with its marks, still
+  0600) or onto an app that takes files. **Not built:** dragging straight out of a guest's own window or an apps-mode
+  window: the guest's drag isn't visible to its tools on either system (Linux: a DnD source isn't readable from outside
+  the drag; Windows: no public way to watch another program's OLE drag). Send to LordOS is the way out.
+- *Checked:* `vm-test` (frames, names, the window, the quarantine folder against links, hard links, collisions, sizes and
+  trimming), `guest_send_test.sh` (the Linux tools against a scripted host: the offer, it stops at exactly the window
+  with no acknowledgement, 6 MB whole with late acknowledgements, a lost connection resumed from the host's 2 MiB, a
+  differing prefix started again, "not now" offered again, "off" dropped, folders refused), `fsops-test` (marks shown,
+  copied, inherited, links never followed), `vm_xfer_test.mjs`, and in a real KVM guest (below).
+- Names are made safe for this computer's file systems; symbolic links aren't followed; dates and permissions don't carry
+  over (a received file is always 0600).
+- *Checked in a guest* (2026-11-24, the dev PC, amd64, KVM; a scratch machine with a private HOME under `/var/tmp`, the
+  Debian 13 nocloud image, Isolated network; the real lord-vm, `lordvm-dev` playing lord-server with the same `vmrecv.c`;
+  `lordos-guest` 9 from a seed disk run as a person `lg`, uid 1000, with a session bus of that person's): `--send-to-host`
+  of a 48 MB random file, an executable script and `.bashrc` queued all three (exit 0); the 48 MB came whole in 603 ms
+  (about 83 MB/s through the agent's channel), SHA-256 checked, into `<library>/Received/Send Test/` (0700); the script
+  arrived 0600, `.bashrc` as `_bashrc`, each marked (`user.lordos.quarantine`, `user.xdg.origin.url`
+  `lordos-machine:<id>`); the same name again became `_bashrc (2)`; the tools killed mid-file left 18 677 760 bytes in the
+  part, and once they ran again the same file was offered with the same key, lord-vm hashed what came before, the guest
+  went on from there and `big (2).bin` was whole; a `Notify` call on the person's session bus (`New <b>mail</b>`,
+  `From Ana &amp; Bo`) reached lord-server's side as "New mail" / "From Ana & Bo". This run found that a virtio-serial port
+  takes at most 32 KiB a write: the tools now write every frame whole. *Not checked:* the panel and Files' marks on screen
+  in a real lord-server session; a Windows guest (w13).
 
 ### 6.22 Import
 
@@ -4009,13 +4101,14 @@ and since the last audit `vmseccomp` (the allowlist on both architectures), `vm-
 QEMU finds it), `vmgroup`, `vmlink`, `vmimage-group`, `vmunpack`, `np-torgw` (the Tor gateway's firewall identity),
 `vmwatch` and `guest-dbus`; the scripts `vm_import_test.sh`, `vm_rename.sh`, `guest_clip_test.sh`,
 `guest_stop_test.sh`, `guestwin_headless.sh`, `machinescli_headless.sh`, `vm_whonix_xml_test.sh`, `vm_group_link.sh` (with
-Whonix's disks given), `guest_perf_test.sh` and `migration_shmem_huge_test.sh` (each skips without what it needs), and the
-node tests `vm_model`, `vm_catalog`, `vm_windows`, `vm_capture`, `vm_openwith`, `vm_cli`, `vm_profiles`, `vm_keys_scene`,
+Whonix's disks given), `guest_perf_test.sh`, `guest_shell_test.sh`, `guest_send_test.sh` (Send to LordOS: the window, a resume after a
+lost connection) and `migration_shmem_huge_test.sh` (each skips without what it needs), and the
+node tests `vm_xfer`, `guest_apps`, `vm_model`, `vm_catalog`, `vm_windows`, `vm_capture`, `vm_openwith`, `vm_cli`, `vm_profiles`, `vm_keys_scene`,
 `vm_group_model`, `vm_group_ui`, `sentinela_vm` and `protect_model`. Manual: the four
 gates below, `vm_import_identity.sh`, `build/vm-image-cli`, `vm-net-cli`, `vm-gvt-cli` and `lordvm-dev` (`tests/vm_dev.c`). Not
 built from the list below: the settings → QEMU arguments table test (the arguments are built in `lordvm.c`, which `vm-test`
-doesn't link), a fuzz of lord-vmdisplay's D-Bus side, a boot matrix in CI, the virtio-win install test, agent kill-mid-transfer and
-channel-refusal tests, the storage-figure test.
+doesn't link), a fuzz of lord-vmdisplay's D-Bus side, a boot matrix in CI, the virtio-win install test, a channel-refusal test (an agent killed mid-transfer is
+`guest_send_test.sh`'s and the 6.21 KVM run's), the storage-figure test.
 
 - **Unit:** settings → QEMU arguments in a table test, for each architecture; `machine.json` schema and migration.
 - **Sandbox:** a test that a hostile `lord-vm` child can't open `~/.ssh`, another VM's folder, or `/dev/kvm` again. Built
@@ -4390,8 +4483,8 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 | Clipboard for all guests, by direction | 2 | Yes | Text first; images to test |
 | Shared folders for all guests, read-only by default | 3 | Yes | virtiofs; on arm64 virtio-win guests, a host-only SMB share if that fails |
 | Drag and drop into any guest, with progress, speed, time left | 3 | Work | Our agent |
-| Drag out of virtio-win guests | 3 | Work | To test |
-| Drag out of a Linux guest's own desktop | none | No | No agent can see the drag. Send to LordOS instead; Apps mode can |
+| Drag out of virtio-win guests | 3 | Work | Not built (6.21): Send To → LordOS instead |
+| Drag out of a Linux guest's own desktop | none | No | No agent can see the drag. Send to LordOS instead (built 2026-11-24, 6.21) |
 | USB attach, auto-connect rules | 3 | Yes | usbredir |
 | Sound | 2 | Yes | |
 | Microphone and camera on request | 3 | Yes | |

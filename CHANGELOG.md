@@ -11,6 +11,37 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: files from the machine, a file copy panel, the guest's own notifications, its apps before it runs** (in
+  development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.18, 6.21).
+  - **Send to LordOS.** A file chosen in the machine (Linux: the file manager's Send to LordOS, or `lordos-guest
+    --send-to-host FILE…`; virtio-win guests: Send To → LordOS) is copied to this computer over the guest agent's own
+    channel, one at a time, with flow control (never more than 4 MiB in flight) and resume after a lost connection (the
+    machine goes on only from a start whose SHA-256 matches what arrived), and is kept only when the whole file's SHA-256
+    is the machine's.
+  - **The quarantine folder.** Every file from a machine lands in `~/Machines/Received/<machine>/`, never anywhere the
+    machine names: folders made without following a link and never shared with other accounts, names made safe (nothing
+    arrives hidden, nothing is replaced: "name (2).ext"), the file 0600 (never executable) and marked as from that machine.
+    Files shows where it came from in Get Info and never opens a program, installer, package or desktop entry from a
+    machine with a double click (Open With still does); the marks follow copies and everything extracted from an archive
+    that came from a machine. At least 1 GiB stays free; at most 8 unfinished files are kept for a resume, none older than
+    7 days. Configure → Sharing → **Files from the machine** turns it off (machine.json schema 16, `guest_files`); a
+    machine locked for anonymity never takes files.
+  - **The file copy panel** along the bottom of the machine's window: every file on its way in (drops) or out, with its
+    size, a bar, the speed, the time left and **Cancel** (a drop can now be cancelled too), Show in Files, Open Received
+    Folder, and a received file dragged onto a folder in Files is copied there. It replaces the one progress line.
+  - **The machine's own notifications** (Linux guests, with Notifications from the machine on): the guest desktop's
+    notifications come too, as plain text marked "From ‹machine›", read by the LordOS tools as the person from that
+    person's own session bus, one kind of message only.
+  - **The machine's apps in the launcher before it runs**: the apps of a machine that has used apps mode are in the
+    launcher, the Classic start menu and search with the machine's mark; choosing one starts the machine and opens the app
+    in apps mode, only when the machine itself still lists it. Configure → General → "Its apps in the launcher".
+  - **The agent's shell in a Terminal tab**: Open in Terminal moves the machine's shell into a Terminal tab, titled and
+    marked as the machine's.
+  - **The LordOS tools 9 (Linux) and w13**; Machines updates older tools by itself. The Linux tools now write every frame
+    whole (a virtio-serial port takes at most 32 KiB a call: a large clipboard picture could be cut before).
+  - Tests: `vm-test` (the new frames, fuzzed with 80 000 random frames, the quarantine folder against links, hard links,
+    collisions and sizes, schema 16), `guest_send_test.sh`, `guest-dbus-test` (the notification monitor's parser),
+    `fsops-test` (the marks), `vm_xfer_test.mjs`, `guest_apps_test.mjs`, and a real Debian 13 KVM guest.
 - **Machines: a shell inside the machine, links and notifications from it, and more of the logs** (in development;
   latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.17, 6.18, 6.19).
   - **The agent's shell.** The Shell pane of a machine's window shows a shell inside the guest as the person signed in
