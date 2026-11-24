@@ -1071,7 +1071,8 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 
 /* ---- the supervisor ---- */
 
-typedef struct { int fd, control, gone_said; } Client;   /* gone_said: its peer went (EPIPE), said once in the log */
+typedef struct { int fd, control, gone_said; } Client;   /* gone_said: its peer can't receive any more (EPIPE, ECONNRESET): said
+                                                            * once in the log, dropped at the top of the next loop */
 enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME,
        P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET, P_PINQ, P_USB_ADD, P_USB_DEL, P_XNIC };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
@@ -1399,8 +1400,11 @@ static int sh_rw(int i) { return i == VM_SHARES ? 1 : S.m.share_rw[i]; }
 static void awake_update(void);
 static void send_to(int ci, const VmMsg *m, int fd) {
     if (ci < 0 || ci >= MAX_CLIENTS || S.cl[ci].fd < 0) return;
-    /* a peer that went away (a command killed or timed out) is dropped when the loop sees its hangup; until then each send
-     * fails: said once, not once a message (a machine's log filled with the same line several times a second) */
+    /* a peer that went away (a command killed or timed out) is dropped when the loop sees its hangup. One that only shut
+     * its reading side (shutdown SHUT_RD, its socket kept open) never hangs up: each send fails with EPIPE and nothing
+     * in poll says so, so it was kept for the machine's whole run and every broadcast was refused again (2026-11-24,
+     * reproduced). Such a client is marked here and dropped at the top of the main loop (drop_client from here could
+     * run inside another client's request or a QMP answer); said once in the log */
     if (vm_send(S.cl[ci].fd, m, fd) && !S.cl[ci].gone_said) {
         int e = errno;
         vlog("client %d: message %d not delivered (%s)", ci, m->type, strerror(e));
@@ -5047,12 +5051,15 @@ static void ag_lost(const char *why) {
 /* A Windows guest's event logs (6.19), in the journal's own short-iso shape so Logs reads them like a Linux guest's:
  * "<time> <computer> <provider>: [critical: |error: |warning: ]<the message's first line>", oldest first, the System and
  * Application logs, then "-- cursor: <ticks>" (UTC ticks of the newest event; the next run asks only for later ones).
+ * qemu-ga's own informational lines are left out: they are this very polling ("guest-exec called", "guest-exec-status
+ * called" every 10 s), two thirds of a Windows 11 guest's log in a 45-minute run (2026-11-24); its warnings and errors stay.
  * Compile-time text: %s is evlog_cursor's digits */
 static const char EVLOG_PS[] =
     "$ErrorActionPreference='SilentlyContinue';[Console]::OutputEncoding=[Text.Encoding]::UTF8;$c=[int64]%s;"
     "$f=@{LogName='System','Application'};if($c -gt 0){$f.StartTime=[DateTime]::new($c+1,[DateTimeKind]::Utc).ToLocalTime()};"
     "$e=Get-WinEvent -FilterHashtable $f -MaxEvents 300|Sort-Object TimeCreated;$last=$c;$h=$env:COMPUTERNAME;"
     "foreach($x in $e){$t=$x.TimeCreated.ToUniversalTime().Ticks;if($t -le $c){continue};if($t -gt $last){$last=$t};"
+    "if($x.ProviderName -eq 'qemu-ga' -and ($x.Level -eq 0 -or $x.Level -ge 4)){continue};"
     "$l=switch($x.Level){1{'critical: '}2{'error: '}3{'warning: '}default{''}};$m=(($x.Message -split \"`r?`n\")[0]);"
     "if(-not $m){$m='event '+$x.Id};$p=($x.ProviderName -replace '[^\\w@.\\-]','-');"
     "'{0} {1} {2}: {3}{4}' -f $x.TimeCreated.ToString('yyyy-MM-ddTHH:mm:sszzz'),$h,$p,$l,$m};'-- cursor: '+$last";
@@ -8305,6 +8312,7 @@ static void loop(void) {
             p[n] = (struct pollfd){ S.sh_fd, (short)((S.sh_to_guest < AG_SHELL_WINDOW ? POLLIN : 0) | (S.sh_n ? POLLOUT : 0)), 0 };
             ci[n++] = -14;
         }
+        for (int i = 0; i < MAX_CLIENTS; i++) if (S.cl[i].fd >= 0 && S.cl[i].gone_said) { vlog("client %d: dropped (it can't receive)", i); drop_client(i); }
         for (int i = 0; i < MAX_CLIENTS; i++) WATCH(S.cl[i].fd, i);
 #undef WATCH
         long long now = now_ms(), next = -1;

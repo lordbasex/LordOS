@@ -30,14 +30,14 @@ def t(name, ok, extra=""):
         print("FAIL  %s%s" % (name, (": " + str(extra)[:600]) if extra != "" else ""), flush=True)
 
 
-def _log_size():
+def _log_ino():
     try:
-        return os.path.getsize(os.path.join(D, "log", "lord-vm.log"))
+        return os.stat(os.path.join(D, "log", "lord-vm.log")).st_ino
     except OSError:
-        return 0
+        return None
 
 
-LOG0 = _log_size()          # lord-vm.log goes on across starts: only what this run wrote counts
+OLD_LOG = _log_ino()        # lord-vm starts a new lord-vm.log at each start (the last one becomes lord-vm.1.log)
 
 
 env = dict(os.environ, LORDVM_WINTOOLS=os.path.join(BUILD, "lordos-guest-win.exe"))
@@ -68,7 +68,8 @@ def say(cmd):
 def vmlog():
     try:
         with open(os.path.join(D, "log", "lord-vm.log"), "rb") as fh:
-            fh.seek(LOG0)
+            if OLD_LOG is not None and os.fstat(fh.fileno()).st_ino == OLD_LOG:
+                return ""                       # still the last run's
             return fh.read().decode("utf-8", "replace")
     except OSError:
         return ""
@@ -87,14 +88,18 @@ def until(fn, sec, every=1.0):
 shell_out = []
 
 
+ESC = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\x1b[()][0-9A-Za-z]")
+
+
 def shell_text():
-    return "".join(e.get("text", "") for e in events if e.get("ev") == "shell")
+    """what the shell wrote, without the pseudo console's escapes"""
+    return ESC.sub("", "".join(e.get("text", "") for e in events if e.get("ev") == "shell"))
 
 
 def ps(cmd, mark, sec=60):
     """a PowerShell line typed into the agent's shell; waits until mark is in its output"""
     n0 = len(shell_text())
-    say("shell-type " + cmd + "\\n")
+    say("shell-type " + cmd + "\r")              # Enter in a pseudo console is a carriage return
     ok = until(lambda: mark in shell_text()[n0:], sec, 0.5)
     return shell_text()[n0:] if ok else None
 
@@ -150,6 +155,30 @@ try:
             mark = None
         t("in the machine's quarantine folder, 0600 and marked", (st.st_mode & 0o777) == 0o600 and mark == b"1", [oct(st.st_mode), mark])
     say("shell-close")
+
+    # the transfer folder in Windows (6.7, 6.7.1): WinFsp from the image store (the pinned installer vm-image-get kept),
+    # checked and installed by lord-vm through the agent, the VirtIO-FS service, a drive labelled LordOS both ways
+    store = "/var/lib/lordos/machines/images"
+    wf = next((j[:-5] for j in sorted(os.listdir(store)) if j.endswith(".json") and '"winfsp"' in open(os.path.join(store, j)).read()), None) if os.path.isdir(store) else None
+    if wf and os.path.exists(os.path.join(store, wf + ".iso")):
+        say("transfer %s %s" % (wf, os.path.join(store, wf + ".iso")))
+        ok = until(lambda: "the guest's VirtIO-FS service serves the folder" in vmlog(), 300, 2)
+        t("WinFsp installed and the VirtIO-FS service serves the transfer folder", bool(ok), vmlog()[-800:])
+        xf = os.path.join(os.path.dirname(D), "Transfer", NAME)
+        word = "mh-host-%s" % os.urandom(3).hex()
+        if os.path.isdir(xf):
+            open(os.path.join(xf, "from-host.txt"), "w").write(word)
+        say("shell 120 30")
+        until(lambda: "PS " in shell_text()[-2000:], 30, 0.5)
+        out = ps("$d=(Get-Volume|?{$_.FileSystemLabel -eq 'LordOS'}|Select-Object -First 1).DriveLetter; 'drive='+$d; "
+                 "Get-Content \"${d}:\\from-host.txt\"; Set-Content \"${d}:\\from-guest.txt\" 'mh-guest'; 'MH-X'", "MH-X", 60)
+        print("      transfer in Windows: %s" % " ".join((out or "").split())[-200:])
+        t("the drive holds what this computer put there", out is not None and word in out, out)
+        g = open(os.path.join(xf, "from-guest.txt"), errors="replace").read().strip() if os.path.exists(os.path.join(xf, "from-guest.txt")) else None
+        t("what the guest wrote there is here at once", g == "mh-guest", g)
+        say("shell-close")
+    else:
+        print("      skipped: no WinFsp installer in the image store")
 
     # the event logs (6.19): lord-vm reads the System and Application logs through qemu-guest-agent every 10 s
     jl = os.path.join(D, "log", "journal.log")
