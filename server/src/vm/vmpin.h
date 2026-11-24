@@ -58,7 +58,8 @@ int vmpin_plan(const VmTopo *t, const cpu_set_t *allowed, const cpu_set_t *taken
 int vmpin_default_on(const VmTopo *t, const cpu_set_t *allowed, int nvcpu);
 
 /* the CPUs vCPU threads of the other QEMU processes of this user are pinned to: a thread whose affinity is a single CPU
- * (what vmpin_apply sets). Reads /proc; call before lord-vm's own Landlock */
+ * (what vmpin_apply sets). Reads /proc; call before lord-vm's own Landlock. A QEMU is this user's by the real uid in
+ * its status: a non-dumpable one's /proc folder is root's (vmsandbox.h) */
 void vmpin_taken(pid_t self_qemu, cpu_set_t *taken);
 
 /* sets the plan on QEMU's threads: tids[i] is vCPU i's thread (query-cpus-fast's thread-id); every other thread listed

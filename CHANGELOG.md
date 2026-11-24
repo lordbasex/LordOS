@@ -11,6 +11,49 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: QEMU in its own namespaces, and non-dumpable** (in development; latest release 0.8.9.5-beta; approved by
+  the maintainer 2026-11-23; docs/VIRTUALIZATION.md 3.3, which promised both). Every machine's QEMU now starts in its own
+  user, mount, ipc, uts and net namespaces, and the kernel makes it non-dumpable at exec, so the person's other programs,
+  which run as the same user, can no longer read the guest's memory, keys or typing.
+  - **Why it was needed**: Yama (`ptrace_scope` 1 on Debian 13) stops a same-user program from attaching to QEMU, but
+    not from reading `/proc/<qemu>/environ`, `maps`, `smaps` or opening `/proc/<qemu>/fd/N` (read access): a machine
+    with a shared folder keeps its RAM in a memfd that could be reopened that way.
+  - **Non-dumpable without a new root piece**: `execve` makes a process dumpable again unless its binary or its ELF
+    interpreter is unreadable (the kernel's `would_dump`). In QEMU's own mount namespace the dynamic loader is a copy with
+    mode `0100` mounted over the loader's path (`vmsandbox.c` `private_loader`: made in lord-vm's private runtime folder
+    and unlinked once mounted, a write lease proves nobody else holds it open, then its inode and bytes are checked), so
+    QEMU is non-dumpable from its first instruction. The kernel then ties QEMU's memory to the first user namespace where
+    the copy's owner and group are both mapped; QEMU's namespace maps the person's uid only, never a group, so that is
+    the computer's own, where only root may ptrace. A namespace the person owns would have let their programs back in:
+    the user namespace alone doesn't block same-user readers (measured: `environ` readable with it and without the
+    private loader). `/proc/<qemu>/` files become root's; `status`, `stat`, `comm`, `cmdline` and `cgroup` stay readable,
+    so the vCPU use, vCPU pinning, Monitor and root's `vm-memlock` checks keep working. lord-vm checks it after exec
+    (`vm_nondumpable`) and says it in the log and in `lord-vm --status --json` (`"nondumpable"`).
+  - **The namespaces**: the user namespace is made once at lord-vm's start, while lord-vm is still dumpable (a
+    non-dumpable process can't write its own `uid_map`), by a short-lived child that maps the person's uid, and kept as a
+    descriptor (`vm_userns_open`). QEMU's child joins it and makes the mount, ipc, uts and net namespaces
+    (`vm_ns_enter`) before its Landlock and seccomp. QEMU has no capability after exec, an unconfigured loopback for a
+    network (its sockets are the ones lord-vm passed), and stays lord-vm's plain child. Landlock's rule for QEMU's own
+    `/proc` folder now goes through `/proc/self`. Where the kernel refuses user namespaces, QEMU runs as before and the
+    machine's log says so (`"namespaces":0`).
+  - **No pid namespace**: QEMU's D-Bus display couldn't authenticate lord-vmdisplay from inside one (measured: "Unexpected
+    line 'NEGOTIATE_UNIX_FD' while in WaitingForAuth state", no picture, no keyboard): GLib 2.84 refuses peer
+    credentials whose pid is 0, which is how a process outside the namespace looks from inside. Reproduced with a plain
+    GDBus server under `unshare --user --map-user --pid`; uid-only mapping without a pid namespace authenticates. So a
+    compromised QEMU can still name the person's processes: signals stay refused (Landlock's signal scope), `setpriority`
+    and `sched_setaffinity` too (QEMU's own `resourcecontrol=deny`), but reading or setting another process's limits
+    with `prlimit` is left to the seccomp allowlist.
+  - **Monitor and pinning with a root-owned `/proc` folder**: other machines' QEMUs are recognised by the real uid in
+    their `status` (`vmpin_taken`), not by the owner of their `/proc` folder; Monitor's GPU view does the same for the
+    machines' GPU use (`gpustat.c`). Monitor's process list shows QEMU under root, as it already showed lord-vm.
+  - **Tests**: `vm-jail-probe` (in `make -C server test`) goes through lord-vm's own steps and then runs a program as
+    QEMU would run, through the dynamic loader under `/usr`: from inside it can't signal, ptrace or read the memory of a
+    sibling process, can't list `/proc` or read another's, can't read `~/.ssh`, the home folder, `/etc` or a file beside
+    its disks, can't write in `/tmp`, make a socket, a user namespace or a process; from outside (the probe's own
+    ancestor, which Yama alone lets in) its environment, memory, maps, descriptors and root aren't readable and `ptrace`
+    and `process_vm_readv` are refused. `vm-jail-probe --before` runs the old jail for comparison: 9 of those checks fail
+    there. `tests/vm_isolation.sh` checks the status fields, the refused reads, `PTRACE_SEIZE` and `process_vm_readv` on
+    a real machine; it no longer lists QEMU's descriptors, which the person's programs can't any more.
 - **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
   Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
   threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores

@@ -933,6 +933,7 @@ static struct {
     off_t serial_bytes;
     int lock_fd;
     int sandbox, cg_mode;
+    int userns, userns_err;                 /* QEMU's user namespace (vm_userns_open), or -1 and why */
     int memev_fd;
     long oom0;
     int host_shutdown, poweroff, forced, guest_shutdown, panic, killed;
@@ -2328,6 +2329,7 @@ static int start_machine(void) {
         vlog("qemu: %s", line);
         for (int i = 0; i < S.ncreds; i++) vlog("qemu: credential %s on fd %d (value not logged)", S.cred_name[i], (S.m.agent ? 9 : 7) + i);
     }
+    if (S.userns < 0) vlog("qemu: no user namespace (%s): QEMU runs in the session's namespaces, readable by the person's programs", strerror(S.userns_err));
     pid_t pid = fork();
     if (pid < 0) { fail_start("fork: %s", strerror(errno)); return -1; }
     if (!pid) {
@@ -2343,6 +2345,10 @@ static int start_machine(void) {
         dup2(null, 0);
         dup2(qerr[1], 1);
         dup2(qerr[1], 2);
+        /* its own namespaces and the private loader (QEMU is made non-dumpable at exec; vmsandbox.h); the loader's copy
+         * is made in lord-vm's runtime folder, a tmpfs that allows exec. What fails goes to QEMU's log */
+        int in_ns = vm_ns_enter(S.userns);
+        if (in_ns) vm_ns_setup(S.rundir);
         /* 3 kvm, 4 QMP, 5 serial, 6 network, 7.. credentials, then the status pipe (closed by exec) */
         int fds[6 + MAX_CREDS + VM_SHARES + 3], nf = 0;
         fds[nf++] = kvm; fds[nf++] = qmp[1]; fds[nf++] = ser[1]; fds[nf++] = net[0] >= 0 ? net[0] : null;
@@ -2357,7 +2363,7 @@ static int start_machine(void) {
         VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL,
                          S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : S.vgpu ? S.vgpu_render : NULL,
                          S.vgpu ? S.vgpu_dev : NULL, S.vgpu ? S.vgpu_group : -1, S.vgpu ? GVT_ROM : NULL };
-        int mask = vm_jail_qemu(&j);
+        int mask = vm_jail_qemu(&j) | (in_ns ? VMS_NAMESPACES : 0);
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
         /* a vGPU only inside Landlock where the kernel has it: its device rules must have applied (vgpu_rules) */
@@ -2395,9 +2401,13 @@ static int start_machine(void) {
     if (n < 4 || !(got[0] & VMS_SECCOMP_OURS) || !(got[0] & VMS_NO_NEW_PRIVS)) { fail_start("QEMU's sandbox couldn't be set up (seccomp %d, no_new_privs %d)", !!(got[0] & VMS_SECCOMP_OURS), !!(got[0] & VMS_NO_NEW_PRIVS)); return -1; }
     if (n == sizeof got) { fail_start("can't run QEMU: %s", strerror(got[1])); return -1; }
     S.sandbox |= VMS_SECCOMP_QEMU | VMS_PDEATHSIG;
-    vlog("qemu: pid %d; sandbox: landlock-fs=%d landlock-net=%d landlock-scope=%d seccomp(ours)=%d no-new-privs=%d kvm-by-fd=%d%s",
+    /* the status pipe closed at exec, after the kernel set QEMU's dumpability: what the person's programs see now */
+    if (vm_nondumpable(pid)) S.sandbox |= VMS_NONDUMPABLE;
+    vlog("qemu: pid %d; sandbox: landlock-fs=%d landlock-net=%d landlock-scope=%d seccomp(ours)=%d no-new-privs=%d kvm-by-fd=%d namespaces=%d non-dumpable=%d%s",
          (int)pid, !!(S.sandbox & VMS_LANDLOCK_FS), !!(S.sandbox & VMS_LANDLOCK_NET), !!(S.sandbox & VMS_LANDLOCK_SCOPE),
-         !!(S.sandbox & VMS_SECCOMP_OURS), !!(S.sandbox & VMS_NO_NEW_PRIVS), !!(S.sandbox & VMS_KVM_FD), S.gl ? " render-node=1" : S.vgpu ? " vgpu=1" : "");
+         !!(S.sandbox & VMS_SECCOMP_OURS), !!(S.sandbox & VMS_NO_NEW_PRIVS), !!(S.sandbox & VMS_KVM_FD),
+         !!(S.sandbox & VMS_NAMESPACES), !!(S.sandbox & VMS_NONDUMPABLE), S.gl ? " render-node=1" : S.vgpu ? " vgpu=1" : "");
+    if (!(S.sandbox & VMS_NONDUMPABLE)) vlog("note: QEMU is dumpable: the person's programs can read its memory (3.3)");
     if (!(S.sandbox & VMS_LANDLOCK_FS)) vlog("note: no Landlock on this kernel: weaker isolation (3.3)");
     if (qmp_open(&S.qmp, qmp[0])) { fail_start("out of memory"); return -1; }
     if (qmp_handshake(&S.qmp, 20000, err, sizeof err)) {
@@ -6334,6 +6344,9 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         fcntl(control, F_SETFD, FD_CLOEXEC);
         fcntl(control, F_SETFL, O_NONBLOCK);
     }
+    /* QEMU's user namespace: made now, while lord-vm is still dumpable (vmsandbox.h) */
+    S.userns = vm_userns_open();
+    S.userns_err = S.userns < 0 ? errno : 0;
     prctl(PR_SET_DUMPABLE, 0);
     signal(SIGPIPE, SIG_IGN);
     if (!realpath(dir, S.dir) || !dir_ok(S.dir)) { fprintf(stderr, "lord-vm: %s: not a machine folder (or its path has ',' or control characters)\n", dir); return 1; }
@@ -6548,17 +6561,18 @@ static void print_json_str(const char *s) {
 static void print_state(const VmMachine *m, int state, int reason, int code, const char *detail, int pid, int sandbox, int cg, int json, int live) {
     if (json) {
         printf("{\"id\":\"%s\",\"state\":\"%s\",\"reason\":\"%s\",\"code\":%d,\"qemu_pid\":%d,\"live\":%s", m->id, STATE_NAME[state], REASON_NAME[reason], code, pid, live ? "true" : "false");
-        if (live) printf(",\"sandbox\":%d,\"landlock_fs\":%d,\"landlock_net\":%d,\"seccomp_ours\":%d,\"kvm_fd\":%d,\"supervisor_landlock\":%d,\"cgroup\":\"%s\"",
+        if (live) printf(",\"sandbox\":%d,\"landlock_fs\":%d,\"landlock_net\":%d,\"seccomp_ours\":%d,\"kvm_fd\":%d,\"supervisor_landlock\":%d,\"namespaces\":%d,\"nondumpable\":%d,\"cgroup\":\"%s\"",
                          sandbox, !!(sandbox & VMS_LANDLOCK_FS), !!(sandbox & VMS_LANDLOCK_NET), !!(sandbox & VMS_SECCOMP_OURS), !!(sandbox & VMS_KVM_FD),
-                         !!(sandbox & VMS_SUPERVISOR_LANDLOCK), cg & VMC_NESTED ? "nested" : cg & VMC_SCOPE ? "scope" : "none");
+                         !!(sandbox & VMS_SUPERVISOR_LANDLOCK), !!(sandbox & VMS_NAMESPACES), !!(sandbox & VMS_NONDUMPABLE), cg & VMC_NESTED ? "nested" : cg & VMC_SCOPE ? "scope" : "none");
         printf(",\"detail\":");
         print_json_str(detail);
         printf("}\n");
     } else {
         printf("%s: %s (%s)%s%s\n", m->name, STATE_NAME[state], REASON_NAME[reason], detail[0] ? ": " : "", detail);
-        if (live) printf("  qemu pid %d, sandbox: landlock-fs %s, landlock-net %s, our seccomp %s, /dev/kvm by descriptor %s, cgroups %s\n", pid,
+        if (live) printf("  qemu pid %d, sandbox: landlock-fs %s, landlock-net %s, our seccomp %s, /dev/kvm by descriptor %s, namespaces %s, non-dumpable %s, cgroups %s\n", pid,
                          sandbox & VMS_LANDLOCK_FS ? "yes" : "no", sandbox & VMS_LANDLOCK_NET ? "yes" : "no", sandbox & VMS_SECCOMP_OURS ? "yes" : "no",
-                         sandbox & VMS_KVM_FD ? "yes" : "no", cg & VMC_NESTED ? "nested" : cg & VMC_SCOPE ? "scope" : "none");
+                         sandbox & VMS_KVM_FD ? "yes" : "no", sandbox & VMS_NAMESPACES ? "yes" : "no", sandbox & VMS_NONDUMPABLE ? "yes" : "no",
+                         cg & VMC_NESTED ? "nested" : cg & VMC_SCOPE ? "scope" : "none");
     }
 }
 
