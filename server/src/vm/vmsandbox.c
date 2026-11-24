@@ -22,6 +22,7 @@
 #include <sys/resource.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/syscall.h>
 #include <sys/sysmacros.h>
 #include <sys/wait.h>
@@ -496,15 +497,51 @@ static int private_loader(const char *tmpdir, char *why, size_t wn) {
     return r;
 }
 
-int vm_ns_setup(const char *tmpdir) {
+/* `dir` (and what is mounted under it) seen again at the same path, noexec, nosuid and nodev, in this mount namespace
+ * only: a bind of the folder over itself, then a remount of that bind. A file QEMU wrote there can then be neither run
+ * nor mapped executable (the kernel refuses PROT_EXEC on a noexec mount: EPERM), whatever seccomp lets through. What
+ * the mount already had stays: read-only stays read-only, its atime flags are kept (a remount without any keeps them),
+ * and in a user namespace the kernel refuses to clear a flag the outer mount locked. 0 when the folder is noexec now */
+static int noexec_bind(const char *dir, char *why, size_t wn) {
+    struct statvfs sv;
+    if (statvfs(dir, &sv)) { snprintf(why, wn, "%s", strerror(errno)); return -1; }
+    unsigned long keep = (sv.f_flag & ST_RDONLY) ? MS_RDONLY : 0;
+    if (mount(dir, dir, NULL, MS_BIND | MS_REC, NULL)) { snprintf(why, wn, "bind: %s", strerror(errno)); return -1; }
+    if (mount(NULL, dir, NULL, MS_REMOUNT | MS_BIND | MS_NOEXEC | MS_NOSUID | MS_NODEV | keep, NULL)) {
+        snprintf(why, wn, "remount: %s", strerror(errno));
+        umount2(dir, MNT_DETACH);
+        return -1;
+    }
+    if (statvfs(dir, &sv) || !(sv.f_flag & ST_NOEXEC)) { snprintf(why, wn, "still executable after the remount"); return -1; }
+    return 0;
+}
+
+int vm_ns_setup(const char *tmpdir, const char *disks) {
     int bits = 0;
     char why[PATH_MAX + 64];
     if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL)) {
         dprintf(2, "lord-vm: QEMU's mount namespace: %s\n", strerror(errno));
         return 0;
     }
-    if (!private_loader(tmpdir && tmpdir[0] ? tmpdir : "/dev/shm", why, sizeof why)) bits |= VMNS_LOADER;
+    const char *td = tmpdir && tmpdir[0] ? tmpdir : "/dev/shm";
+    if (!private_loader(td, why, sizeof why)) bits |= VMNS_LOADER;
     else dprintf(2, "lord-vm: QEMU's private loader: %s (its memory stays readable by the person's programs)\n", why);
+    /* after the loader: its bind is a mount of its own, made while the runtime folder still allowed exec, and stays so.
+     * The disks folder is the only one QEMU's Landlock lets it write; the temporary and runtime folders are for a
+     * kernel without Landlock. If a remount fails QEMU still runs: Landlock and seccomp still hold, and the log says so */
+    if (disks && disks[0]) {
+        if (!noexec_bind(disks, why, sizeof why)) bits |= VMNS_NOEXEC;
+        else dprintf(2, "lord-vm: QEMU's disks folder couldn't be made noexec in its mount namespace (%s): a file QEMU writes "
+                        "there could still be mapped executable where seccomp has no listener; Landlock and seccomp still hold\n", why);
+    }
+    const char *rt = getenv("XDG_RUNTIME_DIR");
+    const char *tmps[] = { "/dev/shm", "/tmp", "/var/tmp", rt && rt[0] == '/' ? rt : td };
+    for (size_t i = 0; i < sizeof tmps / sizeof tmps[0]; i++) {
+        struct stat st;
+        if (stat(tmps[i], &st) || !S_ISDIR(st.st_mode)) continue;
+        if (noexec_bind(tmps[i], why, sizeof why))
+            dprintf(2, "lord-vm: %s couldn't be made noexec in QEMU's mount namespace (%s); Landlock and seccomp still hold\n", tmps[i], why);
+    }
     return bits;
 }
 
