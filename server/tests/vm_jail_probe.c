@@ -2,16 +2,19 @@
  *
  * The probe goes through lord-vm's own steps for QEMU: vm_userns_open, fork, vm_ns_enter, vm_ns_setup, vm_jail_qemu (its
  * Landlock and the seccomp allowlist), then the exec by descriptor, so the kernel decides its dumpability as it does
- * QEMU's. What runs after exec is this program again (a copy in the jail's disks folder, started through the dynamic
- * loader under /usr): code that already runs inside QEMU, the case the jail is for. It tries what such code would, and
- * reports each try. The outside half is the person's other programs (this process is even the probe's ancestor, which
+ * QEMU's. What runs after exec is this program again (a copy beside the test's build, readable in the jail as a
+ * machine's ISO is, started through the dynamic loader under /usr): code that already runs inside QEMU, the case the
+ * jail is for. Not in the disks folder: that one is noexec in QEMU's mount namespace, so the loader couldn't map it. It
+ * tries what such code would, and reports each try. The outside half is the person's other programs (this process is even the probe's ancestor, which
  * Yama alone would let in): it may not read the probe's memory, environment, descriptors or maps, nor ptrace it.
  *
  * Then the seccomp allowlist (vmseccomp.h) as lord-vm runs it: the filter's listener comes back to this process over a
  * socket (the jailed side never keeps it), and each call that isn't QEMU's is tried by a fresh jailed probe. The call
  * must arrive here, named, before it runs; this process then kills the probe, which never goes on. Without a listener
  * the same call kills the probe with SIGSYS. What must keep working is tried too (threads, TCG's writable and executable
- * memory on a TCG machine).
+ * memory on a TCG machine). And the noexec remounts (vm_ns_setup): code written into a file of the disks folder can be
+ * neither mapped executable nor run, even in the fallback where seccomp has no listener and lets the loader's kind of
+ * mapping through at any time.
  *
  *   build/vm-jail-probe          PASS/FAIL lines, exit 1 on a FAIL; "skipped: needs ..." and exit 0 without user
  *                                namespaces or Landlock
@@ -41,6 +44,7 @@
 #include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
@@ -60,7 +64,7 @@ static void check(int ok, const char *what, int err) {
 /* ---- inside: code running as QEMU, after exec ---- */
 
 static void *thread_main(void *a) { return a; }
-static const char *self_path;   /* this program's copy in the disks folder (argv[0] under the loader) */
+static const char *self_path;   /* this program's copy beside the build (argv[0] under the loader) */
 #define EXEC_FD 100             /* where the jailed side keeps its descriptor of the loader (the one exec) */
 
 static int inside(char **argv) {
@@ -101,6 +105,19 @@ static int inside(char **argv) {
     e = errno;
     check(fd >= 0 && write(fd, "ok", 2) == 2, "inside: writes its own disk (control)", e);
     if (fd >= 0) close(fd);
+    /* its mount namespace: the disks folder and the temporary folders noexec, nosuid and nodev (vm_ns_setup) */
+    static const char *const nx[] = { "disks", "/dev/shm", "/tmp", "/var/tmp" };
+    for (size_t k = 0; k < sizeof nx / sizeof nx[0]; k++) {
+        struct statvfs sv;
+        char what[PATH_MAX + 96];
+        if (nx[k][0] == '/') snprintf(p, sizeof p, "%s", nx[k]); else snprintf(p, sizeof p, "%s/%s", w, nx[k]);
+        if (nx[k][0] == '/' && access(p, F_OK)) continue;
+        snprintf(what, sizeof what, "inside: %s is noexec, nosuid and nodev in its mount namespace", nx[k][0] == '/' ? nx[k] : "its disks folder");
+        errno = 0;
+        int sr = statvfs(p, &sv);
+        e = errno;
+        check(!sr && (sv.f_flag & (ST_NOEXEC | ST_NOSUID | ST_NODEV)) == (ST_NOEXEC | ST_NOSUID | ST_NODEV), what, e);
+    }
     REFUSED(open("/etc/hostname", O_RDONLY), 0, "inside: can't read /etc");
     REFUSED(socket(AF_UNIX, SOCK_STREAM, 0), EACCES, "inside: can't make a socket (EACCES)");
     REFUSED(syscall(SYS_io_uring_setup, 8, NULL), EPERM, "inside: no io_uring (EPERM)");
@@ -178,9 +195,8 @@ static int kill_case(const char *what, pid_t sib) {
         /* code written into a file of its disks folder (it can't make one there: one of its disks), then mapped to run:
          * the loader's kind of mapping, after the start */
         char fp[PATH_MAX + 16];
-        snprintf(fp, sizeof fp, "%s", self_path);
-        char *sl = strrchr(fp, '/');
-        if (sl) snprintf(sl, sizeof fp - (size_t)(sl - fp), "/disk.img");
+        const char *dk = getenv("PROBE_DISKS");
+        snprintf(fp, sizeof fp, "%s/disk.img", dk ? dk : ".");
         int f = open(fp, O_RDWR | O_CLOEXEC);
         ret = f < 0 || write(f, "\xc3", 1) != 1 || ftruncate(f, 4096) ? -2 :
               (mmap(NULL, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE, f, 0) == MAP_FAILED ? -1 : 0);
@@ -220,6 +236,33 @@ static int kill_case(const char *what, pid_t sib) {
         printf("%s %ld\n", ret < 0 && errno == EPERM ? "REFUSED" : "SURVIVED", ret);
         return 0;
     }
+    else if (!strcmp(what, "noexec-mmap") || !strcmp(what, "noexec-exec")) {
+        /* a real program written into a file of its disks folder (one of its disks: it can't make a file there), as a
+         * compromised QEMU would; then mapped executable the loader's way, or run under lord-vm's descriptor number.
+         * Without a listener seccomp lets both forms through: the noexec mount is what refuses them */
+        const char *dk = getenv("PROBE_DISKS");
+        char fp[PATH_MAX + 16], buf[65536];
+        snprintf(fp, sizeof fp, "%s/evil.so", dk ? dk : ".");
+        int s = open("/usr/bin/true", O_RDONLY | O_CLOEXEC), f = open(fp, O_RDWR | O_TRUNC | O_CLOEXEC);
+        ssize_t n, total = 0;
+        while (s >= 0 && f >= 0 && (n = read(s, buf, sizeof buf)) > 0) { if (write(f, buf, (size_t)n) != n) { total = -1; break; } total += n; }
+        if (s < 0 || f < 0 || total <= 0) { printf("SETUP %d %d %s\n", s, f, strerror(errno)); return 2; }
+        close(s);
+        if (!strcmp(what, "noexec-mmap")) {
+            errno = 0;
+            void *x = mmap(NULL, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE, f, 0);
+            printf("%s %d\n", x == MAP_FAILED && errno == EPERM ? "REFUSED" : x == MAP_FAILED ? "OTHER" : "ALLOWED", errno);
+            return 0;
+        }
+        close(f);
+        int g = open(fp, O_PATH | O_CLOEXEC);
+        if (g >= 0 && g != EXEC_FD) { int h = fcntl(g, F_DUPFD_CLOEXEC, EXEC_FD); close(g); if (h != EXEC_FD) { printf("SETUP %d\n", h); return 2; } }
+        char *a[] = { "true", NULL };
+        errno = 0;
+        ret = syscall(SYS_execveat, EXEC_FD, "", a, a + 1, AT_EMPTY_PATH);
+        printf("%s %ld %d\n", ret < 0 && errno == EACCES ? "REFUSED" : "SURVIVED", ret, errno);
+        return 0;
+    }
     else if (!strcmp(what, "mmap-wx-tcg")) {
         /* TCG's code buffer: allowed on a TCG machine (no kill) */
         void *p = mmap(NULL, 4096, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -245,7 +288,7 @@ static int copy_file(const char *from, const char *to, mode_t mode) {
 }
 
 static int userns = -1, before;
-static char loader[PATH_MAX], probe[PATH_MAX + 64], disks[PATH_MAX + 16];
+static char loader[PATH_MAX], probe[PATH_MAX + 64], disks[PATH_MAX + 16], bindir[PATH_MAX + 64];
 
 /* lord-vm's child: namespaces, the private loader, the jail (with a listener when `notify`), the listener sent on `st`
  * (lord-vm's way: SCM_RIGHTS, then closed), the exec of the loader by descriptor with `args` */
@@ -257,13 +300,17 @@ static pid_t jailed(char **args, int out, int hold, int st, int notify, int tcg)
     dup2(out, 2);
     dup2(hold, 0);
     const char *rt = getenv("XDG_RUNTIME_DIR");
-    if (!before && (!vm_ns_enter(userns) || vm_ns_setup(rt && rt[0] ? rt : "/dev/shm") != VMNS_LOADER)) { printf("FAIL  namespaces or the private loader\n"); _exit(1); }
+    if (!before && (!vm_ns_enter(userns) || vm_ns_setup(rt && rt[0] ? rt : "/dev/shm", disks) != (VMNS_LOADER | VMNS_NOEXEC))) {
+        printf("FAIL  namespaces, the private loader or the noexec disks folder\n");
+        _exit(1);
+    }
     /* the program is the loader under /usr (Landlock lets only /usr run); in this mount namespace it is the
      * unreadable copy, so this exec makes the probe non-dumpable exactly as QEMU's does */
     int xfd = open(loader, O_PATH | O_CLOEXEC);
     if (xfd >= 0 && xfd != EXEC_FD) { dup3(xfd, EXEC_FD, O_CLOEXEC); close(xfd); xfd = EXEC_FD; }
     int lfd = -1;
-    VmQemuJail j = { .disks_dir = disks, .exec_fd = xfd, .exec_path = loader, .tcg = tcg, .notify_out = notify ? &lfd : NULL };
+    /* the probe's copy is readable as a machine's ISO is (read only) */
+    VmQemuJail j = { .disks_dir = disks, .iso = probe, .exec_fd = xfd, .exec_path = loader, .tcg = tcg, .notify_out = notify ? &lfd : NULL };
     int mask = xfd >= 0 ? vm_jail_qemu(&j) : 0;
     if (!(mask & VMS_SECCOMP_OURS) || !(mask & VMS_SECCOMP_ALLOWLIST) || !(mask & VMS_NO_NEW_PRIVS) || !(mask & VMS_LANDLOCK_FS) ||
         (notify && !(mask & VMS_SECCOMP_NAMED))) { printf("FAIL  jail: mask %d\n", mask); _exit(1); }
@@ -279,10 +326,11 @@ static pid_t jailed(char **args, int out, int hold, int st, int notify, int tcg)
         close(lfd);
         close(st);
     }
-    char henv[PATH_MAX + 16];
+    char henv[PATH_MAX + 16], denv[PATH_MAX + 32];
     const char *h = getenv("HOME");
     snprintf(henv, sizeof henv, "PROBE_HOME=%s", h ? h : "");
-    char *env[] = { henv, NULL };
+    snprintf(denv, sizeof denv, "PROBE_DISKS=%s", disks);
+    char *env[] = { henv, denv, NULL };
     syscall(SYS_execveat, xfd, "", args, env, AT_EMPTY_PATH);
     printf("FAIL  exec: %s\n", strerror(errno));
     _exit(127);
@@ -413,7 +461,20 @@ int main(int argc, char **argv) {
     snprintf(p, sizeof p, "%s/disk.img", disks);
     f = fopen(p, "w");
     if (f) fclose(f);
-    snprintf(probe, sizeof probe, "%s/probe", disks);
+    snprintf(p, sizeof p, "%s/evil.so", disks);
+    f = fopen(p, "w");
+    if (f) fclose(f);
+    /* the probe's copy beside this program (build/): not in the disks folder nor a temporary folder, which are noexec
+     * in the jail's mount namespace */
+    char exe[PATH_MAX];
+    ssize_t xl = readlink("/proc/self/exe", exe, sizeof exe - 1);
+    if (xl <= 0) { perror("readlink"); return 1; }
+    exe[xl] = 0;
+    char *sl = strrchr(exe, '/');
+    if (sl) *sl = 0;
+    snprintf(bindir, sizeof bindir, "%s/.vm-jail-probe.XXXXXX", exe);
+    if (!mkdtemp(bindir)) { perror("mkdtemp"); return 1; }
+    snprintf(probe, sizeof probe, "%s/probe", bindir);
     if (copy_file("/proc/self/exe", probe, 0700)) { perror("copy"); return 1; }
 #if defined(__x86_64__)
     const char *ld = "/lib64/ld-linux-x86-64.so.2";
@@ -500,12 +561,18 @@ int main(int argc, char **argv) {
     answered("seccomp-listener", "REFUSED", 0, "allowlist: a filter with a listener is refused (EPERM), not run");
     answered("mmap-wx-tcg", "ALLOWED", 1, "allowlist: a TCG machine may map memory writable and executable (control)");
     answered("execveat-reuse", "REFUSED", 0, "without a listener, another binary under lord-vm's descriptor number: Landlock refuses to run it");
+    if (!before) {
+        answered("noexec-mmap", "REFUSED", 0, "without a listener, a program QEMU wrote into its disks folder can't be mapped executable (noexec: EPERM)");
+        answered("noexec-exec", "REFUSED", 0, "without a listener, a program QEMU wrote into its disks folder can't run (EACCES)");
+    }
 
     kill(sib, SIGKILL);
     waitpid(sib, NULL, 0);
     snprintf(p, sizeof p, "%s/secret", w); unlink(p);
     snprintf(p, sizeof p, "%s/disk.img", disks); unlink(p);
+    snprintf(p, sizeof p, "%s/evil.so", disks); unlink(p);
     unlink(probe);
+    rmdir(bindir);
     rmdir(disks);
     rmdir(w);
     printf("vm-jail-probe: %d passed, %d failed\n", passes, fails);

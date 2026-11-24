@@ -932,5 +932,6 @@
   "llm.noModel": "Hindi naka-install ang lokal na modelong iyon.",
   "sentinela.blockFailed": "Hindi ma-block ang network nito.",
   "sentinela.machineGone": "Wala na ang makinang iyon sa Mga Makina.",
-  "sentinela.machineFailed": "Hindi sumagot ang makina."
+  "sentinela.machineFailed": "Hindi sumagot ang makina.",
+  "vm.overBudget": "Kulang ang memory katabi ng mga machine na tumatakbo na. I-suspend o i-shut down ang isa sa mga ito, o bigyan ng mas kaunting memory ang machine na ito."
 }

@@ -932,5 +932,6 @@
   "llm.noModel": "Den lokala modellen är inte installerad.",
   "sentinela.blockFailed": "Dess nätverk kunde inte blockeras.",
   "sentinela.machineGone": "Den maskinen finns inte längre i Maskiner.",
-  "sentinela.machineFailed": "Maskinen svarade inte."
+  "sentinela.machineFailed": "Maskinen svarade inte.",
+  "vm.overBudget": "Inte tillräckligt med minne bredvid maskinerna som redan körs. Försätt en av dem i viloläge eller stäng av den, eller ge den här maskinen mindre minne."
 }

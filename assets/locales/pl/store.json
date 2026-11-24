@@ -385,5 +385,7 @@
   "settings.listsTitle": "Listy pakietów",
   "settings.listsHint": "Listy pakietów Debiana i LordOS, z których pochodzą nowe aplikacje i aktualizacje.",
   "settings.webManage": "Profile, uprawnienia i zajmowane miejsce każdej aplikacji webowej",
-  "settings.flathubOff": "Wyłącz Flathub w Sklepie. Zainstalowane z niego aplikacje zostają."
+  "settings.flathubOff": "Wyłącz Flathub w Sklepie. Zainstalowane z niego aplikacje zostają.",
+  "updates.qemuTitle": "Wstrzymane maszyny mogą nie wznowić się po tej aktualizacji ({count})",
+  "updates.qemuText": "Ta aktualizacja zmienia QEMU, a sesja zapisana przez jedną wersję QEMU może nie wczytać się w innej. Najpierw wyłącz te maszyny albo przy starcie wybierz Wznów mimo to lub Odrzuć zapisany stan."
 }

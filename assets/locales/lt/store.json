@@ -377,5 +377,7 @@
   "settings.listsTitle": "Paketų sąrašai",
   "settings.listsHint": "Debian ir LordOS paketų sąrašai, iš kurių ateina naujos programos ir atnaujinimai.",
   "settings.webManage": "Kiekvienos žiniatinklio programos profiliai, leidimai ir užimama vieta",
-  "settings.flathubOff": "Išjungti Flathub Parduotuvėje. Iš jo įdiegtos programos lieka."
+  "settings.flathubOff": "Išjungti Flathub Parduotuvėje. Iš jo įdiegtos programos lieka.",
+  "updates.qemuTitle": "Pristabdytos mašinos po šio atnaujinimo gali nebetęsti ({count})",
+  "updates.qemuText": "Šis atnaujinimas keičia QEMU, o vienos QEMU versijos įrašyta sesija gali neįsikelti kitoje. Pirma išjunkite tas mašinas arba paleisdami pasirinkite Vis tiek tęsti arba Atmesti įrašytą būseną."
 }

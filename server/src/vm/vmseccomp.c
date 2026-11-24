@@ -173,7 +173,8 @@ static int body(Emit *e, const VmScRow *r, const VmScOpts *o) {
          * PROT_EXEC|PROT_BTI mprotect) and only until QEMU's start is over (its QMP handshake: libraries, QEMU's modules
          * and Mesa's drivers are loaded by then); after it, executable memory of any kind stops QEMU, whatever the file
          * (a memfd or a file of its disks folder written to be run). Without a listener (the fallback) only the loader's
-         * kind passes, at any time */
+         * kind passes, at any time; the kernel still refuses it on a file of the disks folder, noexec in QEMU's mount
+         * namespace (vm_ns_setup) */
         if (o->tcg) { ALLOW(); return 0; }
         LD_ARG(2);
         if (o->notify) {

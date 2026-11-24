@@ -931,5 +931,6 @@
   "llm.noModel": "そのローカルモデルはインストールされていません。",
   "sentinela.blockFailed": "ネットワークをブロックできませんでした。",
   "sentinela.machineGone": "そのマシンはもう「仮想マシン」にありません。",
-  "sentinela.machineFailed": "マシンが応答しませんでした。"
+  "sentinela.machineFailed": "マシンが応答しませんでした。",
+  "vm.overBudget": "すでに実行中のマシンと並べて動かすにはメモリが足りません。どれかをサスペンドするかシャットダウンするか、このマシンのメモリを減らしてください。"
 }

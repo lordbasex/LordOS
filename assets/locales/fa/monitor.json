@@ -684,5 +684,6 @@
   "stats.p95Row": "صدک ۹۵ CPU (۱ دقیقه)",
   "stats.memAvgRow": "میانگین حافظه (۱ · ۵ · ۱۵ دقیقه)",
   "stats.memPeakRow": "اوج حافظه (۱ · ۵ · ۱۵ دقیقه)",
-  "stats.spark": "دقیقه آخر"
+  "stats.spark": "دقیقه آخر",
+  "group.showMachine": "نمایش ماشین"
 }

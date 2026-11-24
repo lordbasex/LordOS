@@ -932,5 +932,6 @@
   "llm.noModel": "Quel modello locale non è installato.",
   "sentinela.blockFailed": "Non è stato possibile bloccare la sua rete.",
   "sentinela.machineGone": "Quella macchina non è più in Macchine.",
-  "sentinela.machineFailed": "La macchina non ha risposto."
+  "sentinela.machineFailed": "La macchina non ha risposto.",
+  "vm.overBudget": "Memoria insufficiente accanto alle macchine già in esecuzione. Sospendine o spegnine una, oppure dai meno memoria a questa macchina."
 }

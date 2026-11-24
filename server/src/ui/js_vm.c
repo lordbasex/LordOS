@@ -49,6 +49,7 @@
 #include "../sound/snd.h"
 #include "ui.h"
 #include "../term/term.h"
+#include "../apps.h"
 #include "../fsops.h"
 #include "../pointerlock.h"
 
@@ -212,6 +213,16 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     }
     char lib[PATH_MAX];
     set_str(c, o, "library", library(lib, sizeof lib, 0) ? "" : lib);
+    /* Landlock's ABI on this kernel (0: none): without it lord-vm still starts machines (seccomp and no_new_privs are
+     * what it refuses to start without) but QEMU isn't kept to its folder by the kernel; the app says "Weaker isolation
+     * on this kernel" (docs/VIRTUALIZATION.md 3.3, model.js isolationGaps) */
+    {
+        int abi = -1;
+#ifdef __NR_landlock_create_ruleset
+        abi = (int)syscall(__NR_landlock_create_ruleset, NULL, 0U, 1U /* LANDLOCK_CREATE_RULESET_VERSION */);
+#endif
+        set_int(c, o, "landlock", abi > 0 ? abi : 0);
+    }
     /* where machines live: free space and what kind of disk (a microSD card is slow for machines) */
     char where[PATH_MAX];
     const char *home = getenv("HOME");
@@ -235,6 +246,14 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     if (mf >= 0) { ssize_t k = read(mf, model, sizeof model - 1); close(mf); if (k > 0) model[k] = 0; }
     for (char *q = model; *q; q++) if ((unsigned char)*q < 0x20) *q = 0;
     set_str(c, o, "board", model);
+    /* nested virtualization (5.7): KVM's "nested" parameter, Y or 1 */
+    {
+        char nb[8] = "";
+        int nf = open("/sys/module/kvm_intel/parameters/nested", O_RDONLY | O_CLOEXEC);
+        if (nf < 0) nf = open("/sys/module/kvm_amd/parameters/nested", O_RDONLY | O_CLOEXEC);
+        if (nf >= 0) { ssize_t k = read(nf, nb, sizeof nb - 1); close(nf); if (k > 0) nb[k] = 0; }
+        JS_SetPropertyStr(c, o, "nested", JS_NewBool(c, nb[0] == 'Y' || nb[0] == '1'));
+    }
     char *cards = vmnet_cards_json("/sys/class/net");
     JS_SetPropertyStr(c, o, "cards", cards ? JS_ParseJSON(c, cards, strlen(cards), "<cards>") : JS_NewArray(c));
     free(cards);
@@ -315,7 +334,7 @@ static void gvt_memlock(const char *dir) {
     static int next;
     char p[PATH_MAX + 16], buf[2048];
     snprintf(p, sizeof p, "%s/run.json", dir);
-    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
     if (fd >= 0) close(fd);
     if (n <= 0) return;
@@ -356,7 +375,7 @@ static JSValue f_gpus(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 static void run_state(const char *dir, JSContext *c, JSValue o) {
     char p[PATH_MAX + 16], buf[2048];
     snprintf(p, sizeof p, "%s/run.json", dir);
-    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
     if (fd >= 0) close(fd);
     const char *state = "stopped", *reason = "none";
@@ -458,6 +477,8 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         set_str(c, o, "pointer", m.pointer_guest ? "guest" : "lordos");   /* who draws a Windows guest's pointer (7.1.2) */
         JS_SetPropertyStr(c, o, "captureFullscreen", JS_NewBool(c, m.capture_fullscreen));   /* "Capture mouse" (6.25) */
         JS_SetPropertyStr(c, o, "perfProfile", JS_NewBool(c, m.perf_profile));   /* the guest's performance profile (7.1.4) */
+        JS_SetPropertyStr(c, o, "guestLinks", JS_NewBool(c, m.guest_links));     /* links and notifications from the guest (6.12) */
+        JS_SetPropertyStr(c, o, "guestNotify", JS_NewBool(c, m.guest_notify));
         set_str(c, o, "cpuPin", pin_effective(&m));                                           /* "off" | "auto" (3.7.1) */
         JS_SetPropertyStr(c, o, "cpuPinChosen", JS_NewBool(c, m.cpu_pin != VM_PIN_DEFAULT));
         set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
@@ -1130,6 +1151,123 @@ static JSValue f_refusal(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return r;
 }
 
+/* ---- the resource budget (docs/VIRTUALIZATION.md 3.7) ----
+ * One check for every start path: the window (f_start), a start without a window (f_start_detached: the library's
+ * Start Without Window, `machines start`, a group's members). The machines already active (vm_budget_used_mb: run.json
+ * with its lord-vm alive) plus this one, each with QEMU's overhead, must fit in the RAM minus the desktop's floor; one
+ * machine alone always may start (vm_machine_check_host already kept its memory within vm_mem_max_mb). */
+static int lordvm_alive(long pid) {
+    char cp[64], comm[32] = "";
+    snprintf(cp, sizeof cp, "/proc/%ld/comm", pid);
+    int cf = pid > 0 ? open(cp, O_RDONLY | O_CLOEXEC) : -1;
+    ssize_t k = cf >= 0 ? read(cf, comm, sizeof comm - 1) : -1;
+    if (cf >= 0) close(cf);
+    return k > 0 && !strncmp(comm, "lord-vm", 7);
+}
+typedef struct { long used, max, need, free; int running, ok; } Budget;
+static void budget_of(const char *dir, Budget *b) {
+    memset(b, 0, sizeof *b);
+    b->ok = 1;
+    VmHost h;
+    vm_host_probe(&h);
+    b->max = vm_mem_max_mb(&h);
+    char lib[PATH_MAX];
+    if (!library(lib, sizeof lib, 0)) b->used = vm_budget_used_mb(lib, dir, lordvm_alive, vm_group_session_mb, &b->running);
+    b->free = b->max > b->used ? b->max - b->used : 0;
+    VmMachine m;
+    if (!dir || vm_machine_load(dir, &m, NULL, 0)) return;
+    b->need = vm_mem_limit_mb(&m) + vm_group_session_mb(dir, &m);
+    b->ok = !b->running || vm_budget_fits(&h, b->used, b->need);
+}
+/* 1 when dir may start now; else 0 with refusal() "vm.overBudget" */
+static int budget_ok(const char *dir) {
+    Budget b;
+    budget_of(dir, &b);
+    if (b.ok) return 1;
+    fprintf(stderr, "vm: %s refused: needs %ld MB, %ld MB left for machines (%d running)\n", dir, b.need, b.free, b.running);
+    snprintf(refusal, sizeof refusal, "vm.overBudget");
+    return 0;
+}
+/* memory pressure (PSI, /proc/pressure/memory "some avg10"): the share of the last 10 s some task waited for memory, in
+ * percent; -1 where the kernel has no PSI */
+static double mem_pressure(void) {
+    char buf[256];
+    int fd = open("/proc/pressure/memory", O_RDONLY | O_CLOEXEC);
+    ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (n <= 0) return -1;
+    buf[n] = 0;
+    const char *p = strstr(buf, "some avg10=");
+    if (!p) return -1;
+    double v = strtod(p + 11, NULL);
+    return v >= 0 && v <= 100 ? v : -1;
+}
+/* a small world-readable sysfs number (one line); def when missing or not a number */
+static long sysfs_num(const char *path, long def) {
+    char b[32];
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    ssize_t n = fd >= 0 ? read(fd, b, sizeof b - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (n <= 0) return def;
+    b[n] = 0;
+    char *end;
+    long v = strtol(b, &end, 10);
+    return end != b && (*end == 0 || *end == '\n') ? v : def;
+}
+/* sensors() → { tempC, fanRpm, underVoltage }: what "What this computer can run" shows while machines run (5.7): the
+ * first thermal zone (°C, -1 none), the first hwmon fan (rpm, -1 none) and a Raspberry Pi's under-voltage alarm (the
+ * rpi_volt hwmon's in0_lcrit_alarm: 1, 0, -1 none). World-readable sysfs only, nothing run. */
+static JSValue f_sensors(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    long mc = sysfs_num("/sys/class/thermal/thermal_zone0/temp", LONG_MIN);
+    long fan = -1, uv = -1;
+    DIR *d = opendir("/sys/class/hwmon");
+    struct dirent *e;
+    for (int i = 0; d && (e = readdir(d)) && i < 64; i++) {
+        if (strncmp(e->d_name, "hwmon", 5)) continue;
+        char p[96], name[32] = "";
+        snprintf(p, sizeof p, "/sys/class/hwmon/%.32s/name", e->d_name);
+        int fd = open(p, O_RDONLY | O_CLOEXEC);
+        ssize_t k = fd >= 0 ? read(fd, name, sizeof name - 1) : -1;
+        if (fd >= 0) close(fd);
+        if (k > 0) name[k] = 0;
+        if (!strcmp(name, "rpi_volt\n") || !strcmp(name, "rpi_volt")) {
+            snprintf(p, sizeof p, "/sys/class/hwmon/%.32s/in0_lcrit_alarm", e->d_name);
+            long a = sysfs_num(p, -1);
+            uv = a == 0 || a == 1 ? a : -1;
+        }
+        if (fan < 0) {
+            snprintf(p, sizeof p, "/sys/class/hwmon/%.32s/fan1_input", e->d_name);
+            long r = sysfs_num(p, -1);
+            if (r >= 0 && r < 100000) fan = r;
+        }
+    }
+    if (d) closedir(d);
+    JSValue o = JS_NewObject(c);
+    set_int(c, o, "tempC", mc > -50000 && mc < 200000 ? (int)(mc / 1000) : -1);
+    set_int(c, o, "fanRpm", (int)fan);
+    set_int(c, o, "underVoltage", (int)uv);
+    return o;
+}
+/* budget(dir?) → { usedMb, maxMb, freeMb, running, needMb, ok, pressure }: what start would decide for dir (needMb 0
+ * and ok true without one), and the library's summary (the status line) */
+static JSValue f_budget(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX];
+    int have = argc >= 1 && JS_IsString(argv[0]) && !machine_dir(c, argv[0], dir, sizeof dir);
+    Budget b;
+    budget_of(have ? dir : NULL, &b);
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "usedMb", JS_NewFloat64(c, (double)b.used));
+    JS_SetPropertyStr(c, o, "maxMb", JS_NewFloat64(c, (double)b.max));
+    JS_SetPropertyStr(c, o, "freeMb", JS_NewFloat64(c, (double)b.free));
+    JS_SetPropertyStr(c, o, "needMb", JS_NewFloat64(c, (double)b.need));
+    set_int(c, o, "running", b.running);
+    JS_SetPropertyStr(c, o, "ok", JS_NewBool(c, b.ok));
+    JS_SetPropertyStr(c, o, "pressure", JS_NewFloat64(c, mem_pressure()));
+    return o;
+}
+
 /* set(dir, { name, vcpus, memoryMb, diskGb, network, bridge, ports: [{ proto, host, guest, open }], iso,
  *            shares: [{ tag, path, writable }], bootOrder: "auto"|"network,disk"…, bootMenu, pointer: "lordos"|"guest", captureFullscreen, perfProfile,
  *            cpuPin: "off"|"auto" }) → job id: lord-vm --set on a
@@ -1138,7 +1276,7 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[58 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[66 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -1259,6 +1397,10 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "perfProfile");
     if (JS_IsBool(v)) { args[n++] = "--perf-profile"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    v = JS_GetPropertyStr(c, argv[1], "guestLinks");
+    if (JS_IsBool(v)) { args[n++] = "--guest-links"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    v = JS_GetPropertyStr(c, argv[1], "guestNotify");
+    if (JS_IsBool(v)) { args[n++] = "--guest-notify"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
     v = JS_GetPropertyStr(c, argv[1], "cpuPin");
     if (JS_IsString(v)) {
@@ -1449,7 +1591,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     /* run.json is the person's own file: only a hint (which QEMU the Machines cards count, whether to ask lord-vm) */
     snprintf(p, sizeof p, "%s/run.json", dir);
     char buf[2048];
-    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
     if (fd >= 0) close(fd);
     long qpid = 0, hint_passt = 0;
@@ -1789,6 +1931,8 @@ typedef struct {
     int cd_state;
     char cd_msg[VM_TEXT_MAX];
     int ag_state, ag_caps;              /* the guest agent (VM_AGENT_STATE), and what it said about itself */
+    int ag_seen;                        /* it was connected in this run of the guest (a restart forgets it): "lost" when
+                                         * it stops answering while the guest runs (the light's red state, 6.17) */
     char ag_text[VM_TEXT_MAX];
     uint32_t ag_seq;                    /* an Install Agent request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
     uint32_t xf_seq;                    /* a Set Up the Transfer Folder request (VAG_TRANSFER), the same way */
@@ -1818,6 +1962,20 @@ typedef struct {
     int blk_read, blk_write;            /* requests refused, and guest clipboards ignored, while not in use */
     int console_term;                   /* the Shell (6.18): a terminal session on the serial console's stream */
     uint32_t console_seq;
+    /* the agent's shell (6.18, VM_SHELL): a terminal session on its stream, and the size the guest was last told */
+    int shell_term;
+    uint32_t shell_seq;
+    int shell_cols, shell_rows;
+    /* links and notifications from the guest (6.12, VM_GUEST_NOTE, already checked by lord-vm and again here). One link
+     * waits for the person at a time (another one meanwhile is dropped: never swapped in under the pointer); it is
+     * offered only while the machine is in use, and opens only through guestLinkAnswer, no sooner than LINK_MIN_MS after
+     * the app first saw it. Notifications wait for the app in a small queue (a full one drops) */
+    char link[AG_LINK_MAX + 1];
+    uint32_t link_seq;
+    long long link_seen;                /* when the app first saw it (0: not yet) */
+    int link_dropped;
+    struct { char title[AG_NOTE_TITLE_MAX + 1], body[AG_NOTE_BODY_MAX + 1]; } notes[8];
+    int note_n, note_seq, note_dropped;
     int rec;                            /* a recording of the picture (6.20): its media source, fed as frames come */
     int protect;                        /* a protected machine's (lord.vm.protect): its picture never leaves as a picture */
     double rec_fed;
@@ -2188,7 +2346,7 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     int slot = new_slot();
     if (slot < 0 || machine_dir(c, argv[0], dir, sizeof dir) || bin_path("lord-vm", bin, sizeof bin)) return JS_NewInt32(c, 0);
     last_start = time(NULL);
-    if (!machine_shares_ok(dir)) return JS_NewInt32(c, 0);
+    if (!machine_shares_ok(dir) || !budget_ok(dir)) return JS_NewInt32(c, 0);
     int sv[2], ep[2];
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return JS_NewInt32(c, 0);
     if (pipe2(ep, O_CLOEXEC)) { close(sv[0]); close(sv[1]); return JS_NewInt32(c, 0); }
@@ -2663,6 +2821,35 @@ static void clip_ask_expire(Sess *s) {
         if (s->ask_gen[f] && now - s->ask_at[f] > CLIP_ASK_MS) { clip_deny(s, s->ask_gen[f], f, VCD_DECLINED); s->ask_gen[f] = 0; }
 }
 
+/* a link or a notification from the guest (VM_GUEST_NOTE): a sealed memfd of the size said, parsed again */
+#define LINK_MIN_MS 700
+static void guest_note(Sess *s, const VmMsg *m, int fd) {
+    int seals = fcntl(fd, F_GET_SEALS);
+    struct stat st;
+    uint8_t b[VM_GUEST_NOTE_MAX];
+    if (seals < 0 || (seals & (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW)) != (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW) ||
+        fstat(fd, &st) || st.st_size != m->a || m->a > (int)sizeof b || pread(fd, b, (size_t)m->a, 0) != m->a) return;
+    size_t n = (size_t)m->a;
+    if (m->b == AGK_LINK) {
+        /* only while the machine is in use (its window in front): a link in the background is the guest's, not the person's */
+        if (!ag_link_ok(b, n) || n > AG_LINK_MAX) return;
+        if (!clip_in_use(s) || s->link[0]) { s->link_dropped++; return; }
+        memcpy(s->link, b, n);
+        s->link[n] = 0;
+        s->link_seq++;
+        s->link_seen = 0;
+    } else {
+        const uint8_t *t, *bo;
+        uint16_t tn, bn;
+        if (ag_note_parse(b, n, &t, &tn, &bo, &bn)) return;
+        if (s->note_n >= (int)(sizeof s->notes / sizeof *s->notes)) { s->note_dropped++; return; }
+        memcpy(s->notes[s->note_n].title, t, tn); s->notes[s->note_n].title[tn] = 0;
+        memcpy(s->notes[s->note_n].body, bo, bn); s->notes[s->note_n].body[bn] = 0;
+        s->note_n++;
+        s->note_seq++;
+    }
+}
+
 static void from_vm(Sess *s) {
     for (int k = 0; k < VD_POLL_MAX && s->vm >= 0; k++) {
         VmMsg m;
@@ -2680,6 +2867,7 @@ static void from_vm(Sess *s) {
             break;
         case VM_STATE:
             s->state = m.a; s->reason = m.b; s->code = m.c;
+            if (m.b == VR_GUEST_RESET || m.a != VS_RUNNING) s->ag_seen = 0;     /* a restarting guest's agent isn't lost */
             if (m.a == VS_STOPPED && (m.b == VR_GUEST_SHUTDOWN || m.b == VR_HOST_SHUTDOWN)) {
                 /* the system shut down by itself once: its first start is behind it */
                 char fp[PATH_MAX + 32];
@@ -2692,6 +2880,8 @@ static void from_vm(Sess *s) {
             break;
         case VM_AGENT_STATE:
             s->ag_state = m.a; s->ag_caps = m.b;
+            if (m.a == VAS_CONNECTED) s->ag_seen = 1;
+            if (m.a == VAS_OFF) s->ag_seen = 0;
             snprintf(s->ag_text, sizeof s->ag_text, "%s", m.text);
             break;
         case VM_CLIP_REQ:
@@ -2751,6 +2941,16 @@ static void from_vm(Sess *s) {
             break;
         case VM_WINREFUSED:
             if (m.b == LAGA_CLOSE) refused_add(s, (uint32_t)m.a, m.c);
+            break;
+        case VM_SHELL_FD:
+            if (fd >= 0 && m.seq == s->shell_seq) {
+                if (s->shell_term) { Session *old = term_get(s->shell_term); if (old) term_close(old); }
+                Session *ts = term_create_fd(fd, 10000);
+                if (ts) { s->shell_term = ts->id; fd = -1; }
+            }
+            break;
+        case VM_GUEST_NOTE:
+            if (fd >= 0) guest_note(s, &m, fd);
             break;
         case VM_CONSOLE_FD:
             if (fd >= 0 && m.seq == s->console_seq) {
@@ -3097,6 +3297,28 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "cd", s->cd_state);
     if (s->console_term && !term_get(s->console_term)) s->console_term = 0;
     set_int(c, o, "console", s->console_term);
+    /* the agent's shell: its terminal, and its size passed on to the guest when the terminal changed it */
+    {
+        Session *ts = s->shell_term ? term_get(s->shell_term) : NULL;
+        if (s->shell_term && !ts) s->shell_term = 0;
+        if (ts && ts->alive && (ts->t.cols != s->shell_cols || ts->t.rows != s->shell_rows) && ts->t.cols >= 1 && ts->t.rows >= 1 &&
+            ts->t.cols <= AG_SHELL_COLS_MAX && ts->t.rows <= AG_SHELL_ROWS_MAX && s->vm >= 0) {
+            VmMsg sm = vm_msg(VM_SHELL, ++s->seq, VSH_SIZE, ts->t.cols, ts->t.rows, 0, NULL);
+            if (!vm_send(s->vm, &sm, -1)) { s->shell_cols = ts->t.cols; s->shell_rows = ts->t.rows; }
+        }
+        set_int(c, o, "shell", s->shell_term);
+    }
+    /* a link from the guest waiting for the person (6.12): shown from now on; and how many notifications wait */
+    if (s->link[0]) {
+        JSValue l = JS_NewObject(c);
+        set_int(c, l, "seq", s->link_seq);
+        set_str(c, l, "url", s->link);
+        JS_SetPropertyStr(c, o, "guestLink", l);
+        if (!s->link_seen) s->link_seen = mono_ms();
+    }
+    set_int(c, o, "guestLinkSeq", s->link[0] ? (int)s->link_seq : 0);
+    set_int(c, o, "guestLinkDropped", s->link_dropped);
+    set_int(c, o, "guestNotesSeq", s->note_seq);
     {
         JSValue ag = JS_NewObject(c);
         set_str(c, ag, "state", s->ag_state == VAS_CONNECTED ? "connected" : s->ag_state == VAS_WAITING ? "waiting" : "off");
@@ -3112,6 +3334,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         set_str(c, ag, "system", sys);
         set_str(c, ag, "tools", tab2 ? tab2 + 1 : "");
         set_int(c, ag, "install", s->ag_result);
+        JS_SetPropertyStr(c, ag, "lost", JS_NewBool(c, s->ag_seen && s->ag_state == VAS_WAITING && s->state == VS_RUNNING));
         set_str(c, ag, "message", s->ag_msg);
         set_int(c, ag, "transfer", s->xf_result);
         set_str(c, ag, "transferMessage", s->xf_msg);
@@ -3506,6 +3729,8 @@ static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     if (s->rec) { MediaSrc *r = media_src_get(s->rec); if (r) media_src_close(r); s->rec = 0; }     /* finished properly, "done" follows */
     if (s->rec_sound) { vdsend(s, VD_AUDIO_REC, 0, 0); s->rec_sound = 0; }
     if (s->console_term) { Session *ts = term_get(s->console_term); if (ts) term_close(ts); s->console_term = 0; }
+    if (s->shell_term) { Session *ts = term_get(s->shell_term); if (ts) term_close(ts); s->shell_term = 0; }
+    s->link[0] = 0; s->note_n = 0;
     free(s->clip_in); s->clip_in = NULL;
     free(s->clip_html); s->clip_html = NULL; free(s->clip_png); s->clip_png = NULL;
     drop_display(s, 1);
@@ -4179,6 +4404,71 @@ static JSValue f_console(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return JS_TRUE;
 }
 
+/* shell(session, cols, rows) → bool: asks lord-vm for the agent's shell (6.18: the guest's tools start the signed-in
+ * person's own shell over the agent); poll's shell is then the terminal session to show in a <Terminal>. Its size
+ * follows the terminal by itself. shell(session, 0) ends it. Asking again replaces it */
+static JSValue f_shell(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = get(c, argv[0]);
+    int32_t cols = 0, rows = 0;
+    if (argc > 1) JS_ToInt32(c, &cols, argv[1]);
+    if (argc > 2) JS_ToInt32(c, &rows, argv[2]);
+    if (!s || s->vm < 0) return JS_FALSE;
+    if (!cols) {
+        if (s->shell_term) { Session *ts = term_get(s->shell_term); if (ts) term_close(ts); s->shell_term = 0; }
+        VmMsg m = vm_msg(VM_SHELL, ++s->seq, VSH_CLOSE, 0, 0, 0, NULL);
+        return JS_NewBool(c, !vm_send(s->vm, &m, -1));
+    }
+    if (cols < 1 || cols > AG_SHELL_COLS_MAX || rows < 1 || rows > AG_SHELL_ROWS_MAX) return JS_FALSE;
+    VmMsg m = vm_msg(VM_SHELL, ++s->seq, VSH_OPEN, cols, rows, 0, NULL);
+    if (vm_send(s->vm, &m, -1)) return JS_FALSE;
+    s->shell_seq = s->seq;
+    s->shell_cols = cols;
+    s->shell_rows = rows;
+    return JS_TRUE;
+}
+
+/* guestNotes(session) → [{ title, body }]: the guest's notifications that came since (6.12), as text only, for the app
+ * to show as from the machine; taken once */
+static JSValue f_guest_notes(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    JSValue a = JS_NewArray(c);
+    if (!s) return a;
+    for (int i = 0; i < s->note_n; i++) {
+        JSValue o = JS_NewObject(c);
+        set_str(c, o, "title", s->notes[i].title);
+        set_str(c, o, "body", s->notes[i].body);
+        JS_SetPropertyUint32(c, a, (uint32_t)i, o);
+    }
+    s->note_n = 0;
+    return a;
+}
+
+/* guestLinkAnswer(session, seq, open) → bool: the person's answer to the link the guest asked to open (poll's guestLink).
+ * Only that link (never a URL from JS), only the one still waiting with that seq, only LINK_MIN_MS after the app first
+ * saw it (a click meant for something else doesn't open it), only while the machine is still in use; then in the
+ * default browser, as one argument (apps_launch_uri's own checks). Either answer lets the link go */
+static JSValue f_guest_link_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = get(c, argv[0]);
+    int32_t seq = 0;
+    if (argc > 1) JS_ToInt32(c, &seq, argv[1]);
+    int open = argc > 2 && JS_ToBool(c, argv[2]);
+    if (!s || !s->link[0] || (uint32_t)seq != s->link_seq) return JS_FALSE;
+    if (open && (!s->link_seen || mono_ms() - s->link_seen < LINK_MIN_MS)) return JS_FALSE;     /* too soon: the bar stays */
+    char url[AG_LINK_MAX + 1];
+    snprintf(url, sizeof url, "%s", s->link);
+    s->link[0] = 0;
+    if (!open) return JS_TRUE;
+    if (!clip_in_use(s) || !ag_link_ok((const uint8_t *)url, strlen(url))) return JS_FALSE;
+    char def[192];
+    if (!apps_default_for("x-scheme-handler/https", def, sizeof def) && !apps_default_for("x-scheme-handler/http", def, sizeof def)) return JS_FALSE;
+    size_t l = strlen(def);
+    if (l > 8 && !strcmp(def + l - 8, ".desktop")) def[l - 8] = 0;
+    return JS_NewBool(c, !apps_launch_uri(def, url));
+}
+
 /* the recording's sound ring (aring.h): a sealed memfd, 48 kHz, 16-bit, one channel, about 5 s */
 static int sound_ring(void) {
     uint32_t size = 1u << 19;
@@ -4278,7 +4568,7 @@ static JSValue f_eject(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
 static JSValue f_start_detached(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     char dir[PATH_MAX], creds[PATH_MAX];
-    if (machine_dir(c, argv[0], dir, sizeof dir) || !machine_shares_ok(dir)) return JS_NewInt32(c, 0);
+    if (machine_dir(c, argv[0], dir, sizeof dir) || !machine_shares_ok(dir) || !budget_ok(dir)) return JS_NewInt32(c, 0);
     last_start = time(NULL);
     int have = !write_creds(creds, sizeof creds, dir);
     char *args[] = { "lord-vm", "--start", dir, "--detach", "--keep-running", have ? "--credentials-file" : NULL, creds, NULL };
@@ -4312,7 +4602,7 @@ static JSValue f_awake(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (e->d_name[0] == '.' || l < 8 || strcmp(e->d_name + l - 7, ".lordvm")) continue;
         char p[PATH_MAX + 300], buf[2048];
         snprintf(p, sizeof p, "%s/%s/run.json", lib, e->d_name);
-        int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
         ssize_t k = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
         if (fd >= 0) close(fd);
         if (k <= 0) continue;
@@ -4868,11 +5158,12 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
+    JS_CFUNC_DEF("shell", 3, f_shell), JS_CFUNC_DEF("guestNotes", 1, f_guest_notes), JS_CFUNC_DEF("guestLinkAnswer", 3, f_guest_link_answer),
     JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("renamePlan", 2, f_rename_plan), JS_CFUNC_DEF("rename", 2, f_rename), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 2, f_clip_take),
     JS_CFUNC_DEF("clipboardApply", 2, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 2, f_clip_send_host),
     JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 3, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
-    JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
+    JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("budget", 1, f_budget), JS_CFUNC_DEF("sensors", 0, f_sensors), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
     JS_CFUNC_DEF("apps", 2, f_apps), JS_CFUNC_DEF("windows", 1, f_windows), JS_CFUNC_DEF("winIcon", 2, f_win_icon), JS_CFUNC_DEF("winAct", 3, f_win_act), JS_CFUNC_DEF("closeRefusals", 1, f_close_refusals),
     JS_CFUNC_DEF("guestApps", 1, f_guest_apps), JS_CFUNC_DEF("gpus", 0, f_gpus), JS_CFUNC_DEF("launch", 2, f_launch),
 };

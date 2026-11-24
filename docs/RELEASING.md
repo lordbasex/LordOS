@@ -297,6 +297,31 @@ node tools/voice/mkdeb-voice.mjs <dir> <out> <YYYY.MM.DD>
 tools/release/apt-repo.sh build staging <out>/*.deb      # then live, as for any package
 ```
 
+## WPE WebKit (LordOS's backport)
+
+(In development; [WPEWEBKIT.md](WPEWEBKIT.md).) LordOS's own build of Debian's `wpewebkit` for trixie, with
+WPEPlatform. Published when a WebKit security release or a Debian upload needs it, not with every release, and
+**always with its source package**: the binaries are LGPL-2.1+/BSD, and `apt-repo.sh` refuses a `~lordos` rebuild
+whose `.dsc` isn't in the pool.
+
+```sh
+tools/pkg/build-wpewebkit.sh <debian-version> [lordos-revision]        # amd64 (TMPFS=64G on the 20-core machine)
+ARCH=arm64 tools/pkg/build-wpewebkit.sh <debian-version> [revision]    # arm64 under qemu-user, or natively on the Pi 5
+# read out/lintian-summary.txt and out/test/report.txt for both, then (W = the work folder, V = the version):
+tools/release/apt-repo.sh build staging $W/amd64/out/*_amd64.deb $W/amd64/out/*_all.deb $W/arm64/out/*_arm64.deb \
+    $W/amd64/out/wpewebkit_$V.dsc                                      # not the -dbgsym packages
+tools/release/apt-repo.sh publish staging && tools/release/apt-repo.sh verify staging
+# lord-web on the VM with the staging repository (both backends), then the same three commands with live
+```
+
+The `.dsc` goes in once (both architectures share it): `apt-repo.sh` checks every file it names (the upstream
+`.orig.tar.xz` and its `.asc`, LordOS's `.debian.tar.xz`) against its SHA-256 before copying them to
+`pool/main/source/w/wpewebkit/`, indexes them in `dists/stable/main/source/Sources`, and `publish` adds
+`lordos-src.sources` (a `deb-src` stanza for `apt-get source`; systems keep the `deb` one the `lordos` package installs).
+The pool is append-only: a changed source needs a new revision (`… <debian-version> 2`). A test of the whole path with
+a throwaway key and no upload: `LORDOS_APT_OFFLINE=1 LORDOS_APT_TEST_KEYRING=<pub.gpg> LORDOS_APT_GNUPGHOME=<home>
+LORDOS_APT_DIR=<scratch> tools/release/apt-repo.sh build staging …` (publish and verify refuse that key).
+
 ## A newer hardware snapshot between releases
 
 (0.8.7; [BENCHMARK.md](BENCHMARK.md), "Newer snapshots between releases".) System Information's Compatibility panel

@@ -369,5 +369,7 @@
   "settings.listsTitle": "Llistes de paquets",
   "settings.listsHint": "Les llistes de paquets de Debian i de LordOS, d'on vénen les aplicacions noves i les actualitzacions.",
   "settings.webManage": "Perfils, permisos i espai de cada aplicació web",
-  "settings.flathubOff": "Desactiva Flathub a la Botiga. Les aplicacions que n'has instal·lat s'hi queden."
+  "settings.flathubOff": "Desactiva Flathub a la Botiga. Les aplicacions que n'has instal·lat s'hi queden.",
+  "updates.qemuTitle": "Les màquines suspeses podrien no reprendre's després d'aquesta actualització ({count})",
+  "updates.qemuText": "Aquesta actualització canvia QEMU, i una sessió desada per una versió de QEMU pot no carregar-se en una altra. Apaga abans aquestes màquines, o tria Reprèn igualment o Descarta l'estat desat quan s'iniciïn."
 }

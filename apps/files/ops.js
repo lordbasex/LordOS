@@ -1,6 +1,6 @@
 // ops.js — what the Files windows share: the file clipboard, copy jobs in progress, color tags
 // and opening files with the right app.
-import { createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText, clipboard, appsOff, openersAvailable, offerActivate,
+import { bundleFor, createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText, clipboard, appsOff, openersAvailable, offerActivate,
   openProvidersFor, suggestedProviderFor, defaultProviderFor, openHintsFor } from '@lordos/sdk';
 import { kindOf, mimesOf, appOpens, isTextual, isImage, isProgram, isForeignProgram } from './kinds.js';
 import { pasteFrom, offerable } from './clipfiles.js';
@@ -179,6 +179,8 @@ export function openEntry(e, ctx) {
   if (e.app) { launchApp(e.id); return; }
   // archives (M9): browsed like a folder; what is inside is extracted to the cache when opened
   if (e.arc) { if (e.dir) ctx.navigate({ type: 'archive', path: e.arc.file, inner: e.arc.inner }); else ctx.openArc(e); return; }
+  // a bundle (a machine's folder): its app opens it; Open in New Tab still goes in
+  if (e.dir && !e.trash) { const b = bundleFor(e); if (b) { b.open(e.path); return; } }
   if (e.dir) { ctx.navigate({ type: 'dir', path: e.path }); return; }
   if (!e.trash && archive.isArchive(e.name)) { ctx.navigate({ type: 'archive', path: e.path, inner: '' }); return; }
   const { list, off } = openersOf(e, ctx.linuxApps, ctx.t);

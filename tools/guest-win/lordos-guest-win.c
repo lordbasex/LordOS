@@ -90,10 +90,15 @@
 /* w11 (2026-11-23): "perf": the machine's performance profile (AGK_PERF, docs/VIRTUALIZATION.md 7.1.4), as the person:
  * the High performance power plan, visual effects and transparency at their minimum while the host holds the port, and
  * everything put back after (AGK_PERFSTATE says what was done) */
-#define VERSION "w11"
-#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt extra tablet perf"
+/* w12 (2026-11-24): "shell": the agent's shell (AGK_SHELL_*, docs/VIRTUALIZATION.md 6.18): PowerShell in a pseudo
+ * console, as the person and never elevated, with flow control both ways; "links notify": a program of the person's
+ * (`lordos-guest-win.exe --open-on-host URL`, `--notify-host TITLE [BODY]`, by WM_COPYDATA to this session's running
+ * tools) hands over a link or a notification for the host, passed on only while the host's hello says it takes them
+ * (6.12) */
+#define VERSION "w12"
+#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt extra tablet perf shell links notify"
 
-enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED };
+enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED, WM_APP_SHDATA, WM_APP_SHEOF, WM_APP_SHEXIT };
 enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS, T_MONS, T_TABLET };
 
 static HWND win;
@@ -170,6 +175,7 @@ static wchar_t *to_utf16(const uint8_t *s, size_t n) {
 static HANDLE port = INVALID_HANDLE_VALUE, reader, stop_ev, wr_ev;
 static volatile LONG reader_gen;
 static int host_hello, host_clipx, host_elev;      /* host_elev: the host's hello says "elevated" (LAGW_ELEVATED) */
+static int host_links, host_notify;                 /* the host's hello says "links", "notify": the machine takes them */
 
 /* the host's answers to this side's clipboard requests (AGK_CLIPDATA): handed over by the reader thread, since the
  * window's thread waits for them inside WM_RENDERFORMAT */
@@ -244,6 +250,7 @@ static DWORD WINAPI reader_main(LPVOID arg) {
 }
 
 static void apps_stop(void);
+static void shell_end(void);
 static void perf_restore(const char *why, int say);
 static int mons_sent;               /* the displays went to the host (AGK_DISPLAYS) since the port opened */
 static int tablet_mode, tablet_sent; /* how Windows maps the tablet (AG_TABLET_*, 0 not seen yet); said to the host */
@@ -256,7 +263,8 @@ static void port_close(const char *why) {
     CloseHandle(port);
     port = INVALID_HANDLE_VALUE;
     InterlockedIncrement(&reader_gen);
-    host_hello = host_clipx = host_elev = 0;
+    host_hello = host_clipx = host_elev = host_links = host_notify = 0;
+    shell_end();                        /* the host is gone: so is its shell */
     apps_stop();
     mons_sent = 0;
     tablet_sent = 0;
@@ -2418,9 +2426,230 @@ static void perf_recover(void) {
     perf_restore("left by an earlier run", 0);
 }
 
+/* ---- the agent's shell (w12; docs/VIRTUALIZATION.md 6.18) ----
+ * PowerShell (%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo, a fixed path from the system's
+ * own folder; nothing from the host names a program, an argument, a folder or a variable) in a pseudo console, as the
+ * person these tools run as, in their profile folder. Never elevated: tools that run elevated open no shell. A reader
+ * thread hands what it writes to this window, at most AG_SHELL_WINDOW unacknowledged by the host; what the host types
+ * goes into a pipe as big as that window, acknowledged once written. */
+typedef HRESULT (WINAPI *CreatePCFn)(COORD, HANDLE, HANDLE, DWORD, void **);
+typedef HRESULT (WINAPI *ResizePCFn)(void *, COORD);
+typedef void (WINAPI *ClosePCFn)(void *);
+static struct {
+    void *pc;
+    HANDLE in_w, out_r, proc, reader, wait, room;
+    uint32_t id;
+    volatile LONG unacked;              /* sent to the host and not acknowledged */
+    LONG gen;
+    DWORD code;
+    int exited;
+} sh;
+typedef struct { LONG gen; DWORD n; uint8_t d[]; } ShChunk;
+
+static int token_elevated(void) {
+    HANDLE t;
+    TOKEN_ELEVATION e = { 0 };
+    DWORD n = 0;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &t)) return 1;
+    BOOL ok = GetTokenInformation(t, TokenElevation, &e, sizeof e, &n);
+    CloseHandle(t);
+    return !ok || e.TokenIsElevated;
+}
+
+static void sh_close_frame(uint32_t id, int status) {
+    uint8_t b[8];
+    ag_shell_pair_write(b, id, (uint32_t)status);
+    send_frame(AGK_SHELL_CLOSE, b, 8);
+}
+
+static DWORD WINAPI sh_reader(LPVOID arg) {
+    LONG gen = (LONG)(intptr_t)arg;
+    HANDLE r = sh.out_r;
+    for (;;) {
+        while (sh.unacked >= AG_SHELL_WINDOW) if (WaitForSingleObject(sh.room, 1000) == WAIT_FAILED) break;
+        DWORD room = AG_SHELL_WINDOW - (DWORD)sh.unacked;
+        if (room > AG_SHELL_CHUNK) room = AG_SHELL_CHUNK;
+        ShChunk *c = malloc(sizeof *c + room);
+        DWORD got = 0;
+        if (!c || !ReadFile(r, c->d, room, &got, NULL) || !got) { free(c); break; }
+        c->gen = gen;
+        c->n = got;
+        InterlockedExchangeAdd(&sh.unacked, (LONG)got);
+        if (!PostMessageW(win, WM_APP_SHDATA, 0, (LPARAM)c)) free(c);
+    }
+    PostMessageW(win, WM_APP_SHEOF, (WPARAM)gen, 0);
+    return 0;
+}
+
+static VOID CALLBACK sh_exited(PVOID arg, BOOLEAN timed) { (void)timed; PostMessageW(win, WM_APP_SHEXIT, (WPARAM)(intptr_t)arg, 0); }
+
+static ClosePCFn pc_close(void) { HMODULE k = GetModuleHandleW(L"kernel32.dll"); return k ? (ClosePCFn)(void *)GetProcAddress(k, "ClosePseudoConsole") : NULL; }
+
+static void shell_end(void) {
+    if (!sh.id && !sh.pc) return;
+    InterlockedIncrement(&sh.gen);
+    if (sh.wait) { UnregisterWaitEx(sh.wait, INVALID_HANDLE_VALUE); sh.wait = NULL; }
+    if (sh.proc && !sh.exited) TerminateProcess(sh.proc, 1);
+    ClosePCFn cl = pc_close();
+    if (sh.pc && cl) cl(sh.pc);          /* the reader's pipe breaks: it ends */
+    sh.pc = NULL;
+    if (sh.room) SetEvent(sh.room);
+    if (sh.reader) { WaitForSingleObject(sh.reader, 3000); CloseHandle(sh.reader); sh.reader = NULL; }
+    if (sh.in_w) { CloseHandle(sh.in_w); sh.in_w = NULL; }
+    if (sh.out_r) { CloseHandle(sh.out_r); sh.out_r = NULL; }
+    if (sh.proc) { CloseHandle(sh.proc); sh.proc = NULL; }
+    sh.id = 0;
+    sh.unacked = 0;
+    sh.exited = 0;
+}
+
+static void shell_open(uint32_t id, int cols, int rows) {
+    shell_end();
+    HMODULE k = GetModuleHandleW(L"kernel32.dll");
+    CreatePCFn create = k ? (CreatePCFn)(void *)GetProcAddress(k, "CreatePseudoConsole") : NULL;
+    if (token_elevated() || !create) { lg("shell: refused (%s)", create ? "these tools run elevated" : "no pseudo console on this Windows"); sh_close_frame(id, AG_SHELL_NOSTART); return; }
+    HANDLE in_r = NULL, in_w = NULL, out_r = NULL, out_w = NULL;
+    if (!CreatePipe(&in_r, &in_w, NULL, AG_SHELL_WINDOW) || !CreatePipe(&out_r, &out_w, NULL, 0)) {
+        if (in_r) { CloseHandle(in_r); CloseHandle(in_w); }
+        sh_close_frame(id, AG_SHELL_NOSTART);
+        return;
+    }
+    COORD sz = { (SHORT)cols, (SHORT)rows };
+    void *pc = NULL;
+    if (FAILED(create(sz, in_r, out_w, 0, &pc))) { CloseHandle(in_r); CloseHandle(in_w); CloseHandle(out_r); CloseHandle(out_w); sh_close_frame(id, AG_SHELL_NOSTART); return; }
+    CloseHandle(in_r);
+    CloseHandle(out_w);
+    STARTUPINFOEXW si;
+    memset(&si, 0, sizeof si);
+    si.StartupInfo.cb = sizeof si;
+    SIZE_T asz = 0;
+    InitializeProcThreadAttributeList(NULL, 1, 0, &asz);
+    si.lpAttributeList = malloc(asz);
+    wchar_t sys[MAX_PATH], cmd[MAX_PATH + 64], home[MAX_PATH] = L"";
+    UINT sl = GetSystemDirectoryW(sys, MAX_PATH);
+    PROCESS_INFORMATION pi;
+    memset(&pi, 0, sizeof pi);
+    wchar_t *prof = NULL;
+    if (SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_Profile, 0, NULL, &prof))) { wcsncpy(home, prof, MAX_PATH - 1); home[MAX_PATH - 1] = 0; CoTaskMemFree(prof); }
+    int ok = si.lpAttributeList && sl && sl < MAX_PATH &&
+             InitializeProcThreadAttributeList(si.lpAttributeList, 1, 0, &asz) &&
+             UpdateProcThreadAttribute(si.lpAttributeList, 0, 0x00020016 /* PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE */, pc, sizeof pc, NULL, NULL);
+    if (ok) {
+        _snwprintf(cmd, sizeof cmd / sizeof *cmd, L"\"%ls\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoLogo", sys);
+        cmd[sizeof cmd / sizeof *cmd - 1] = 0;
+        ok = CreateProcessW(NULL, cmd, NULL, NULL, FALSE, EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT, NULL,
+                            home[0] ? home : NULL, &si.StartupInfo, &pi);
+    }
+    if (si.lpAttributeList) { DeleteProcThreadAttributeList(si.lpAttributeList); free(si.lpAttributeList); }
+    if (!ok) {
+        lg("shell: PowerShell didn't start (%lu)", (unsigned long)GetLastError());
+        ClosePCFn cl = pc_close();
+        if (cl) cl(pc);
+        CloseHandle(in_w); CloseHandle(out_r);
+        sh_close_frame(id, AG_SHELL_NOSTART);
+        return;
+    }
+    CloseHandle(pi.hThread);
+    sh.pc = pc; sh.in_w = in_w; sh.out_r = out_r; sh.proc = pi.hProcess; sh.id = id; sh.unacked = 0; sh.exited = 0;
+    if (!sh.room) sh.room = CreateEventW(NULL, FALSE, FALSE, NULL);
+    LONG gen = InterlockedIncrement(&sh.gen);
+    sh.reader = CreateThread(NULL, 0, sh_reader, (LPVOID)(intptr_t)gen, 0, NULL);
+    RegisterWaitForSingleObject(&sh.wait, pi.hProcess, sh_exited, (PVOID)(intptr_t)gen, INFINITE, WT_EXECUTEONLYONCE);
+    lg("shell: PowerShell for the host (%dx%d)", cols, rows);
+}
+
+static void shell_frame(const Frame *f) {
+    uint32_t id;
+    int c, r;
+    if (f->kind == AGK_SHELL_OPEN) { if (!ag_shell_size_parse(f->data, f->len, &id, &c, &r)) shell_open(id, c, r); return; }
+    if (f->kind == AGK_SHELL_SIZE) {
+        HMODULE k = GetModuleHandleW(L"kernel32.dll");
+        ResizePCFn rs = k ? (ResizePCFn)(void *)GetProcAddress(k, "ResizePseudoConsole") : NULL;
+        COORD sz;
+        if (!ag_shell_size_parse(f->data, f->len, &id, &c, &r) && id == sh.id && sh.pc && rs) { sz.X = (SHORT)c; sz.Y = (SHORT)r; rs(sh.pc, sz); }
+        return;
+    }
+    if (f->kind == AGK_SHELL_CLOSE) { int st; if (!ag_shell_close_parse(f->data, f->len, &id, &st) && id == sh.id) shell_end(); return; }
+    if (f->kind == AGK_SHELL_ACK) {
+        uint32_t by;
+        if (ag_shell_ack_parse(f->data, f->len, &id, &by) || id != sh.id) return;
+        LONG now = InterlockedExchangeAdd(&sh.unacked, -(LONG)by) - (LONG)by;
+        if (now < 0) InterlockedExchange(&sh.unacked, 0);
+        SetEvent(sh.room);
+        return;
+    }
+    const uint8_t *d;
+    uint32_t dn;
+    if (ag_shell_data_parse(f->data, f->len, &id, &d, &dn) || id != sh.id || !sh.in_w) return;
+    DWORD w = 0;
+    if (WriteFile(sh.in_w, d, dn, &w, NULL) && w) {
+        uint8_t b[8];
+        ag_shell_pair_write(b, id, w);
+        send_frame(AGK_SHELL_ACK, b, 8);
+    }
+}
+
+/* ---- links and notifications for the host (w12; 6.12) ----
+ * `lordos-guest-win.exe --open-on-host URL` or `--notify-host TITLE [BODY]`: run by a program of the person's, it hands
+ * the running tools of this session one frame by WM_COPYDATA (dwData: AGK_LINK or AGK_NOTIFY), parsed here as lord-vm
+ * will, sent on only while the host's hello said it takes that kind. The exit status is a GSA-like code: 0 sent,
+ * 1 not connected, 2 malformed, 3 the machine doesn't take them */
+static LRESULT copydata(const COPYDATASTRUCT *cd) {
+    if (!cd || (cd->dwData != AGK_LINK && cd->dwData != AGK_NOTIFY) || !cd->lpData || cd->cbData > AG_NOTE_BYTES + AG_LINK_MAX) return 2;
+    const uint8_t *p = cd->lpData;
+    int link = cd->dwData == AGK_LINK;
+    if (link ? !ag_link_ok(p, cd->cbData) : ag_note_parse(p, cd->cbData, NULL, NULL, NULL, NULL)) return 2;
+    if (port == INVALID_HANDLE_VALUE || !host_hello) return 1;
+    if (!(link ? host_links : host_notify)) return 3;
+    return send_frame((uint16_t)cd->dwData, p, cd->cbData) ? 1 : 0;
+}
+
+/* UTF-16 to UTF-8, control characters as spaces, at most max bytes, cut on a character */
+static size_t note_utf8(const wchar_t *w, char *out, size_t max) {
+    char tmp[4096];
+    int n = WideCharToMultiByte(CP_UTF8, 0, w, -1, tmp, sizeof tmp, NULL, NULL);
+    if (n <= 0) { out[0] = 0; return 0; }
+    size_t l = strlen(tmp), o = 0;
+    for (size_t i = 0; i < l && o < max; i++) out[o++] = ((unsigned char)tmp[i] < 0x20 || tmp[i] == 0x7f) ? ' ' : tmp[i];
+    while (o && ((unsigned char)out[o - 1] & 0xc0) == 0x80) o--;
+    if (o && ((unsigned char)out[o - 1] & 0xc0) == 0xc0) o--;
+    out[o] = 0;
+    return o;
+}
+
+static int send_to_tools(const wchar_t *what, const wchar_t *a, const wchar_t *b) {
+    static uint8_t payload[AG_NOTE_BYTES + AG_LINK_MAX * 3 + 1];
+    size_t n = 0;
+    ULONG_PTR kind;
+    if (!wcscmp(what, L"--open-on-host")) {
+        char raw[AG_LINK_MAX * 2];
+        int rn = WideCharToMultiByte(CP_UTF8, 0, a, -1, raw, sizeof raw, NULL, NULL);
+        long l = rn > 1 ? ag_link_encode((const uint8_t *)raw, (size_t)rn - 1, (char *)payload, sizeof payload) : -1;
+        if (l <= 0 || !ag_link_ok(payload, (size_t)l)) return 2;
+        n = (size_t)l;
+        kind = AGK_LINK;
+    } else {
+        char t[AG_NOTE_TITLE_MAX + 1], bo[AG_NOTE_BODY_MAX + 1];
+        size_t tn = note_utf8(a, t, AG_NOTE_TITLE_MAX), bn = b ? note_utf8(b, bo, AG_NOTE_BODY_MAX) : 0;
+        if (!b) bo[0] = 0;
+        n = ag_note_write((const uint8_t *)t, tn, (const uint8_t *)bo, bn, payload, sizeof payload);
+        if (!n) return 2;
+        kind = AGK_NOTIFY;
+    }
+    HWND to = FindWindowW(L"LordOSGuestWin", L"LordOS guest tools");
+    if (!to) return 1;
+    COPYDATASTRUCT cd = { kind, (DWORD)n, payload };
+    DWORD_PTR res = 1;
+    if (!SendMessageTimeoutW(to, WM_COPYDATA, 0, (LPARAM)&cd, SMTO_ABORTIFHUNG, 5000, &res)) return 1;
+    return (int)res;
+}
+
 /* ---- frames from the host ---- */
 static void on_frame(const Frame *f) {
     switch (f->kind) {
+    case AGK_SHELL_OPEN: case AGK_SHELL_SIZE: case AGK_SHELL_DATA: case AGK_SHELL_CLOSE: case AGK_SHELL_ACK:
+        if (host_hello) shell_frame(f);
+        break;
     case AGK_HELLO:
         if (f->len < 200) {
             char t[201];
@@ -2429,6 +2658,9 @@ static void on_frame(const Frame *f) {
             host_hello = 1;
             host_clipx = strstr(t, " clipx") != NULL;
             host_elev = strstr(t, " elevated") != NULL;
+            unsigned hc = ag_hello_caps(f->data, f->len);
+            host_links = (hc & AG_HELLO_LINKS) != 0;
+            host_notify = (hc & AG_HELLO_NOTIFY) != 0;
             if (strstr(t, " ask")) say_hello();
             lg("host: %s", ag_utf8_ok(f->data, f->len) ? t : "(hello)");
             /* the displays, for the host's log (an older lord-vm skips the kind), and how the tablet maps */
@@ -2518,6 +2750,41 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
     }
     case WM_APP_OPENED: open_done((OpenJob *)lp); return 0;
+    case WM_APP_SHDATA: {
+        ShChunk *c = (ShChunk *)lp;
+        if (c->gen == sh.gen && sh.id) {
+            uint8_t *b = malloc(4 + c->n);
+            if (b) {
+                uint8_t h8[8];
+                ag_shell_pair_write(h8, sh.id, 0);
+                memcpy(b, h8, 4);                       /* the id, then the data */
+                memcpy(b + 4, c->d, c->n);
+                send_frame(AGK_SHELL_DATA, b, 4 + c->n);
+                free(b);
+            }
+        }
+        free(c);
+        return 0;
+    }
+    case WM_APP_SHEXIT:
+        if ((LONG)wp == sh.gen && sh.proc) {
+            GetExitCodeProcess(sh.proc, &sh.code);
+            sh.exited = 1;
+            ClosePCFn cl = pc_close();
+            if (sh.pc && cl) cl(sh.pc);                 /* the rest of its output, then the reader's pipe breaks */
+            sh.pc = NULL;
+        }
+        return 0;
+    case WM_APP_SHEOF:
+        if ((LONG)wp == sh.gen && sh.id) {
+            uint32_t id = sh.id;
+            int st = sh.exited ? (sh.code > 255 ? 255 : (int)sh.code) : AG_SHELL_NOSTART;
+            shell_end();
+            sh_close_frame(id, st);
+            lg("shell: ended (%d)", st);
+        }
+        return 0;
+    case WM_COPYDATA: return copydata((const COPYDATASTRUCT *)lp);
     case WM_APP_LOST:
         if ((LONG)wp == reader_gen) { char w[64]; snprintf(w, sizeof w, "reading failed (error %lu)", (unsigned long)lp); port_close(w); }
         return 0;
@@ -2584,6 +2851,8 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmd, int show) {
         if (!wcscmp(argv[i], L"--port") && i + 1 < argc) { wcsncpy(port_path, argv[++i], 259); port_path[259] = 0; }
         else if (!wcscmp(argv[i], L"--log") && i + 1 < argc) logf = _wfopen(argv[++i], L"a");
         else if (!wcscmp(argv[i], L"--version")) { MessageBoxW(NULL, L"lordos-guest-win " VERSION, L"LordOS", MB_OK); return 0; }
+        else if ((!wcscmp(argv[i], L"--open-on-host") && i + 2 == argc) || (!wcscmp(argv[i], L"--notify-host") && i + 1 < argc && i + 3 >= argc))
+            return send_to_tools(argv[i], argv[i + 1], i + 2 < argc ? argv[i + 2] : NULL);
     }
     /* the log: %LOCALAPPDATA%\LordOS\lordos-guest-win.log, the person's own, started again past 256 KB */
     if (!logf) {

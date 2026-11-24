@@ -669,5 +669,6 @@
   "stats.p95Row": "CPU 95 パーセンタイル（1 分）",
   "stats.memAvgRow": "メモリ平均（1 · 5 · 15 分）",
   "stats.memPeakRow": "メモリ最大（1 · 5 · 15 分）",
-  "stats.spark": "直近 1 分"
+  "stats.spark": "直近 1 分",
+  "group.showMachine": "マシンを表示"
 }

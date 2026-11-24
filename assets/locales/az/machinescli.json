@@ -105,5 +105,6 @@
   "freshDone": "{name} qrupunun Workstation-ı yenidir: yoxlanılmış şəkli, yeni kimlik.",
   "freshDoneBoth": "{name} yenidir: hər iki maşın yoxlanılmış şəklinə qayıdıb, yeni kimliklə.",
   "freshNotGroup": "{name} maşın qrupu deyil: sıfırdan başlatma qruplar üçündür.",
-  "badMember": "--member gateway və ya workstation qəbul edir."
+  "badMember": "--member gateway və ya workstation qəbul edir.",
+  "overBudget": "{name} başlamadı: {need} MB lazımdır, maşınlar üçün isə {free} MB qalıb. Başqa maşını dayandırın və ya söndürün, ya da ona daha az yaddaş verin."
 }

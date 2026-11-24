@@ -237,6 +237,10 @@ static void test_crypt(void) {
     bkc_wipe(key, sizeof key);
 }
 
+/* the caller's hold: only the machine's disks folder */
+static int holds;
+static int hold_cb(BkRun *r, const char *rel) { (void)r; if (strcmp(rel, "Machines/a.lordvm/disks")) return 0; holds++; return 1; }
+
 int main(void) {
     test_retention();
     test_rel();
@@ -273,8 +277,17 @@ int main(void) {
         snprintf(mkp, sizeof mkp, "%s/dest", H); mkdir(mkp, 0700); mkdir(d0, 0700);
         if (realpath(d0, skip)) r.skip_real = skip;
     }
+    /* a running machine's disks are held back by the caller (backup.c hold_running_machine); its other files go */
+    mk("Machines"); mk("Machines/a.lordvm"); mk("Machines/a.lordvm/disks");
+    put("Machines/a.lordvm/machine.json", "{}\n"); put("Machines/a.lordvm/disks/system.qcow2", "qcow");
+    r.hold = hold_cb;
     int rc = bk_snapshot(&r, t0);
     CHECK(rc == 0, "first snapshot (%d: %s)", rc, r.error);
+    snap_path(r.id, "Machines/a.lordvm/disks", p, sizeof p);
+    CHECK(!exists(p), "a held path isn't copied");
+    snap_path(r.id, "Machines/a.lordvm/machine.json", p, sizeof p);
+    CHECK(exists(p), "beside it, the machine's description is");
+    CHECK(holds == 2, "asked once per pass, for that path only (%d)", holds);
     char id1[BK_ID_LEN];
     snprintf(id1, sizeof id1, "%s", r.id);
     snap_path(id1, "a.txt", p, sizeof p);
@@ -301,6 +314,7 @@ int main(void) {
     put("a.txt", "version 2, a bit longer\n");
     init_run(&r);
     r.skip_real = skip;
+    r.hold = hold_cb;                           /* the machine still runs */
     rc = bk_snapshot(&r, t0 + 3600);
     CHECK(rc == 0, "second snapshot (%s)", r.error);
     char id2[BK_ID_LEN];

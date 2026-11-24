@@ -105,5 +105,6 @@
   "freshDone": "{name} 的 Workstation 已全新开始:经过验证的镜像,新的身份。",
   "freshDoneBoth": "{name} 已全新开始:两台虚拟机都已恢复为经过验证的镜像,并有了新的身份。",
   "freshNotGroup": "{name} 不是虚拟机组:全新开始仅适用于组。",
-  "badMember": "--member 的值只能是 gateway 或 workstation。"
+  "badMember": "--member 的值只能是 gateway 或 workstation。",
+  "overBudget": "{name} 未启动:它需要 {need} MB,而留给虚拟机的只剩 {free} MB。请挂起或关闭另一台虚拟机,或给它更少的内存。"
 }

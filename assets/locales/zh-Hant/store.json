@@ -361,5 +361,7 @@
   "settings.listsTitle": "套件清單",
   "settings.listsHint": "Debian 與 LordOS 的套件清單，新 App 與更新都來自這裡。",
   "settings.webManage": "每個網頁 App 的設定檔、權限與佔用空間",
-  "settings.flathubOff": "在商店中關閉 Flathub。從 Flathub 安裝的 App 會保留。"
+  "settings.flathubOff": "在商店中關閉 Flathub。從 Flathub 安裝的 App 會保留。",
+  "updates.qemuTitle": "已暫停的虛擬機在此更新後可能無法繼續({count})",
+  "updates.qemuText": "此更新會改變 QEMU,由某個 QEMU 版本儲存的工作階段可能無法在另一個版本中載入。請先關閉這些虛擬機,或在它們啟動時選擇「仍然繼續」或「捨棄儲存的狀態」。"
 }

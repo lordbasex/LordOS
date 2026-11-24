@@ -933,5 +933,6 @@
   "llm.noModel": "Acel model local nu este instalat.",
   "sentinela.blockFailed": "Rețeaua lui nu a putut fi blocată.",
   "sentinela.machineGone": "Mașina aceea nu mai este în Mașini.",
-  "sentinela.machineFailed": "Mașina nu a răspuns."
+  "sentinela.machineFailed": "Mașina nu a răspuns.",
+  "vm.overBudget": "Nu este destulă memorie pe lângă mașinile care rulează deja. Suspendă sau oprește una dintre ele ori dă-i acestei mașini mai puțină memorie."
 }
