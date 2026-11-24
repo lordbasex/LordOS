@@ -110,6 +110,8 @@ PPID_PASST=$(sed -n 's/.*"passt_pid":\([0-9]*\).*/\1/p' "$D/run.json")
 t "sandbox: Landlock on QEMU (files)"   'grep -q "\"landlock_fs\":1" "$W/status.json"'
 t "sandbox: Landlock on QEMU (TCP)"     'grep -q "\"landlock_net\":1" "$W/status.json"'
 t "sandbox: our seccomp filter on QEMU" 'grep -q "\"seccomp_ours\":1" "$W/status.json"'
+t "sandbox: it is the allowlist (vmseccomp.h)" 'grep -q "\"seccomp_allowlist\":1" "$W/status.json"'
+t "sandbox: lord-vm holds its listener (a stop is named)" 'grep -q "\"seccomp_named\":1" "$W/status.json"'
 t "sandbox: /dev/kvm by descriptor"     'grep -q "\"kvm_fd\":1" "$W/status.json"'
 t "sandbox: lord-vm's own Landlock"     'grep -q "\"supervisor_landlock\":1" "$W/status.json"'
 t "QEMU: seccomp mode 2, two or more filters, no_new_privs, no capabilities" \
@@ -248,6 +250,18 @@ sleep 5
 t0=$(now)
 "$VM" --stop "$D" --timeout 90 --json >"$W/stop.json"
 t "shutdown: the guest powers off (ACPI) in $(( $(now) - t0 )) s" 'grep -q "\"state\":\"stopped\",\"reason\":\"host-shutdown\"" "$W/stop.json"' "$(cat "$W/stop.json")"
+
+# ---- the seccomp allowlist stops a call that isn't a row, and names it (vmseccomp.h) ----
+# The test build's drop:NAME leaves one row out (lord-vm-testpaths only; the package's lord-vm has no such switch):
+# QEMU calls sched_getaffinity at its start, so it is stopped there, and the failure names the call.
+if [ -x "$BIN/lord-vm-testpaths" ]; then
+    LORDVM_TEST_SECCOMP=drop:sched_getaffinity "$BIN/lord-vm-testpaths" --start "$D" --detach >"$W/start4.json" 2>&1
+    sleep 2
+    "$VM" --status "$D" --json >"$W/status4.json"
+    t "allowlist: a call that isn't a row stops QEMU and the failure names it" \
+      'grep -q "\"state\":\"crashed\"" "$W/status4.json" && grep -q "blocked by the sandbox: sched_getaffinity" "$W/status4.json" && grep -q "seccomp: QEMU made a call its allowlist doesn.t have" "$D/log/lord-vm.log"' \
+      "$(cat "$W/status4.json")"
+else skp "allowlist: a stopped call named" "needs $BIN/lord-vm-testpaths (make build/lord-vm-testpaths)"; fi
 
 echo "== $pass passed, $fail failed, $skip skipped"
 [ "$fail" -eq 0 ]

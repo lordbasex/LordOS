@@ -4,7 +4,7 @@
  * QEMU (in the forked child, right before execve; it lasts across exec and QEMU's own -sandbox stacks on top):
  *   - its own namespaces and a private loader that makes it non-dumpable (vm_ns_enter, vm_ns_setup below);
  *   - no_new_privs; core dumps off (RLIMIT_CORE 0);
- *   - Landlock: read and execute /usr; read /etc/ld.so.cache; read and write only <machine>/disks; read the
+ *   - Landlock: read /usr, execute only QEMU's binary and its loader; read /etc/ld.so.cache; read and write only <machine>/disks; read the
  *     attached ISO; read its own /proc/<pid>; /dev/null; /dev/kvm on KVM machines (it arrives as a descriptor, but on
  *     arm64 QEMU also opens it by path to read the host CPU's features). No other file, no other device. ABI 4+: no TCP bind or connect. ABI 6+: no abstract unix sockets or signals outside itself.
  *     A machine with 3D graphics (VmQemuJail.render: only a Linux machine with graphics "3d") also gets, for
@@ -13,14 +13,12 @@
  *     device: the primary node stays refused. Every other machine gets none of it.
  *     A machine with an Intel vGPU (VmQemuJail.vgpu_dev) gets: read, write and ioctls on /dev/vfio/vfio and its own
  *     /dev/vfio/<group> only; read on that mdev's sysfs folder (the real /sys/devices/... path); the iGPU's render node
- *     as above. Our GOP option ROM is under /usr. The VFIO ioctls need nothing from seccomp (a denylist: only TIOCSTI
- *     and TIOCLINUX are refused).
- *   - seccomp, ours: no socket(2) at all (EACCES), no connect, bind, listen or accept (its sockets are the
- *     socketpairs lord-vm passed), no namespaces (unshare, setns, clone with CLONE_NEW*), no new process (fork,
- *     vfork, clone without CLONE_THREAD: QEMU only makes threads, and a vGPU machine's raised locked-memory limit
- *     can't pass to a child), no mount, ptrace,
- *     process_vm_*, bpf, perf_event_open, keyctl, io_uring, userfaultfd, module or kexec calls, no TIOCSTI.
- *     A denylist: QEMU's own allowlist (-sandbox on,...) is applied by QEMU after it starts.
+ *     as above. Our GOP option ROM is under /usr. Seccomp lets it make VFIO's ioctls (type ';') then, and only then.
+ *   - seccomp, ours: an allowlist (vmseccomp.h, the rows in vmsyscalls.h), per architecture and per machine (KVM,
+ *     TCG, 3D, vGPU, a tap): only the calls QEMU was measured to make, ioctl only on its devices' request types,
+ *     threads only, without TCG executable memory only as a private read-only file mapping, signals and limits only on itself, one exec
+ *     (lord-vm lets the start's own through, vm_sc_exec_once). No socket(2) (EACCES): its sockets are the ones lord-vm passed. Anything
+ *     else stops QEMU, and lord-vm names the call (the filter's listener). QEMU's own -sandbox stacks on top.
  * lord-vm itself, once QEMU and passt run: Landlock with read and write in the machine's folder and removal in
  * its runtime folder, nothing else. Its children already exist, so this doesn't reach them. */
 #ifndef LORD_VM_SANDBOX_H
@@ -42,6 +40,15 @@ typedef struct {
     const char *vgpu_dev;       /* an Intel GVT-g vGPU (docs/MACHINES-GPU.md Mode A): /sys/bus/mdev/devices/<uuid>, or NULL */
     int vgpu_group;             /* its IOMMU group: /dev/vfio/<group> and the container /dev/vfio/vfio; -1 none */
     const char *vgpu_rom;       /* its option ROM, read (the package's is under /usr already; a test build's may not be) */
+    /* the seccomp allowlist (vmseccomp.h) */
+    int tcg;                    /* TCG: its code buffer is writable and executable */
+    int tap;                    /* a bridged network: the tap's TUN ioctls */
+    int exec_fd;                /* the descriptor of QEMU's binary, the only thing execveat may run then (-1: none) */
+    const char *exec_path;      /* that binary's path: Landlock's execute right goes to it and its loader only */
+    int learn;                  /* 0; a test build's learn modes (1, 2) */
+    const char *sc_drop;        /* NULL; a test build's row left out (vmseccomp.h) */
+    int *notify_out;            /* NULL: kill as the default action; else the filter's listener comes back here
+                                 * (cloexec; -1 none), for lord-vm alone: the child sends it and closes it before exec */
 } VmQemuJail;
 
 /* In the child, before execve. Returns the VMS_* bits that applied; the caller refuses to exec without

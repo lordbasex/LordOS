@@ -90,7 +90,7 @@ when the desktop composes on the GPU); 3.3 named a user namespace for QEMU and a
 | KVM amd64 and arm64, TCG labelled Emulated (2.1–2.4) | ✅ | 100 | `lordvm.c` (`-accel`), `assistant.jsx` ("Other architecture…") | Pi 5, nested amd64, Xeon and the i9 PC |
 | Pi defaults (3 vCPUs, RAM − 2 GB) and the microSD warning (2.2) | ✅ | 100 | `machine.c`, `js_vm.c` |  |
 | `/dev/kvm` through `vm-kvm` (ACL now, group next login) (3.4) | ✅ | 100 | `vm_admin.c` |  |
-| Sandbox: Landlock (`disks/` only), PDEATHSIG, `dump-guest-core=off`, fds, our seccomp denylist on top of QEMU's; QEMU in its own user, mount, ipc, uts and net namespaces and non-dumpable (3.3) | ✅ | 95 | `vmsandbox.c` (`vm_ns_enter`, `vm_ns_setup`), `lordvm.c`; `vm-jail-probe`, `vm_isolation.sh` | No allowlist of our own. Namespaces and non-dumpable QEMU in development (2026-11-23); no pid namespace (GLib refuses the D-Bus display's peer then); a GVT-g vGPU machine in them not yet booted |
+| Sandbox: Landlock (`disks/` only), PDEATHSIG, `dump-guest-core=off`, fds, our seccomp allowlist on top of QEMU's own filter (a stopped call named in the log and on the failure page); QEMU in its own user, mount, ipc, uts and net namespaces and non-dumpable (3.3) | ✅ | 95 | `vmsandbox.c` (`vm_ns_enter`, `vm_ns_setup`, `vm_jail_qemu`), `vmseccomp.c`, `vmsyscalls.h`, `lordvm.c` (`sc_serve`); `vmseccomp-test`, `vm-jail-probe`, `vm_isolation.sh` | Namespaces, non-dumpable QEMU and the allowlist in development (2026-11-23); no pid namespace (GLib refuses the D-Bus display's peer then); a GVT-g vGPU machine, a bridged tap and hugetlb memory not yet run under the allowlist (their calls read in QEMU's source) |
 | Every helper jailed too: lord-vm's own Landlock, `qemu-img`, `swtpm`, `passt`, `virtiofsd`; lord-vmdisplay sandboxed with a self-test; render node and VFIO confined by Landlock (3.3) | ✅ | 100 | `lordvm.c` `vm_jail_self`, `vmsandbox.c` `vm_jail_tool*`, `render_rules`, `vgpu_rules`, `vmdisplay.c` `--selftest`; `vm_isolation.sh` | Added by this audit |
 | Sandbox and cgroup state reported (`lord-vm --status`: Landlock, our seccomp, KVM fd, scope), nested cgroup leaves per process (3.3, 3.7) | ✅ | 100 | `lordvm.c` (`setup_cgroups`, `--status`), `diag.js`, `logs.jsx` | Added by this audit |
 | "Weaker isolation on this kernel" notice when Landlock is missing (3.3) | ❌ | 0 |  | Only the log's "Sandbox:" line says it; lord-vm refuses to start only without seccomp or `no_new_privs`. Added by this audit |
@@ -389,7 +389,9 @@ Still open in Phase 2:
 - [ ] 13.8 item 7: render node by descriptor, one slice for all machines under `lord-sessiond` (3.7).
 - [ ] 13.8 item 8: passt's 96–379 MB/s spread on the Pi.
 - [ ] 13.8 item 9: boot time (UEFI is 12.3 s of the Pi's 18.6 s); direct kernel boot for Linux guests.
-- [x] Our own seccomp filter on top of QEMU's: built, a denylist, checked by the isolation gate (3.3). An allowlist is still open.
+- [x] Our own seccomp filter on top of QEMU's: an allowlist since 2026-11-23 (in development), per architecture and per machine,
+  measured on every configuration lord-vm makes that can run here, checked by `vmseccomp-test`, `vm-jail-probe` and the
+  isolation gate (3.3). Not yet run under it: an Intel vGPU (GVT-g), a bridged tap, hugetlb memory.
 - [ ] Open questions in 18 (6, 10, 11) wait for the maintainer; 1, 2, 3, 5, 8 and 9 are settled by the code.
 
 ## 1. Goals
@@ -761,7 +763,8 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
   "Unexpected line 'NEGOTIATE_UNIX_FD' while in WaitingForAuth state", and reproduced with a plain GDBus server under
   `unshare --user --map-user --pid`. So a compromised QEMU can still name the person's processes: signals are refused
   (Landlock's signal scope), `setpriority` and `sched_setaffinity` too (QEMU's own `resourcecontrol=deny`), `/proc` of
-  others too (Landlock), but `prlimit` on another of the person's pids is left to the seccomp allowlist (open, above).
+  others too (Landlock), and `prlimit64` on another pid, `setpriority`, `kill`, `ptrace` and `process_vm_readv` stop QEMU
+  (the seccomp allowlist, below).
   No cgroup namespace: lord-vm places QEMU.
 - **Non-dumpable** (in development, same approval): `execve` makes a process dumpable again unless its binary or its ELF
   interpreter is unreadable. In QEMU's mount namespace the dynamic loader is a copy with mode `0100` mounted over the loader's
@@ -780,13 +783,70 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
   (`vm_nondumpable`: `/proc/<pid>/environ` refused) and reports `"nondumpable"` in `lord-vm --status --json`. `status`, `stat`,
   `comm`, `cmdline` and `cgroup` stay readable, so Monitor, the vCPU use and the vGPU checks keep working; Monitor lists QEMU
   under root, as it already did lord-vm (also non-dumpable).
-- **Landlock:** read and execute `/usr`, read the ISO attached to this VM; read-write only that VM's `disks/` folder (`vmsandbox.h`). On kernels without
+- **Landlock:** read `/usr` (execute only QEMU's binary and its loader, since 2026-11-23 with the seccomp allowlist), read the ISO attached to this VM; read-write only that VM's `disks/` folder (`vmsandbox.h`). On kernels without
   Landlock (see 2.3) the app shows "Weaker isolation on this kernel" (**not built**: only the machine log's "Sandbox:" line says it).
-- **Seccomp:** QEMU's own `-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny` plus ours. Ours is a **denylist** (`vmsandbox.c`): no
-  `socket`, `connect`, `bind`, namespaces, new processes, mount, ptrace, `io_uring`, `userfaultfd`, modules, kexec or `TIOCSTI`; QEMU's own
-  allowlist is applied by QEMU after it starts. An allowlist of our own is still open. QEMU's own filter costs nothing measurable: boot
-  to login 36.5 s with it and 36.0 s without, QEMU RSS 424 MB against 422.5 MB (**Measured**, 2026-11-04, amd64, **nested**, 6 boots
-  each). It also ran in every Pi run, 3D included, with no trouble (**Measured**, 2026-11-04, Pi 5). Our own filter on top is built and checked by the isolation gate (`vm_isolation.sh`).
+- **Seccomp:** QEMU's own `-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny` plus ours, an
+  **allowlist** (in development; approved by the maintainer 2026-11-23 as isolation layer 3, for every machine). `vmseccomp.c` builds
+  it from the rows in `vmsyscalls.h`; `vm_jail_qemu` (`vmsandbox.c`) applies it before the exec, so it covers QEMU from its first
+  instruction. It replaced a denylist.
+  - **The rows**: only the calls Debian 13's QEMU (1:10.0.13) was measured to make, per architecture (amd64 96 rows, arm64 92; a row the
+    other kernel doesn't have doesn't compile there). **Measured** 2026-11-23 with the test build's learn-all mode, where every call
+    that isn't a hot one reaches lord-vm, which logs it once and lets it go on (`SECCOMP_USER_NOTIF_FLAG_CONTINUE`), on: amd64 KVM and
+    TCG with 2D; KVM with 3D on an AMD (radeonsi) and an Intel (i915) render node; a Windows-style machine (TPM through swtpm, secure
+    boot, Hyper-V enlightenments, USB tablet, SATA discs, sound over D-Bus) at its installer; SeaBIOS with the compatible devices at
+    Ubuntu's installer; arm64 KVM and amd64 TCG on the Pi 5. Each went through boot, resize, keys, clipboard, sound and microphone, a
+    shared folder (virtiofsd, `share=on` memory), the agent channels, a snapshot with memory and its revert, reset, suspend to a file
+    and resume (migration to a descriptor), a CD changed while running, passt restarted, shutdown and poweroff, with an
+    `aio=native`, `cache.direct` disk on its I/O thread and vCPU pinning. A handful of rows weren't seen and stay, with the reason next
+    to each (the vDSO's fallback for the clock, the event loop's epoll past 64 descriptors, glibc's `mremap`, `restart_syscall` after
+    the vCPU kick's signal, Mesa's `sched_yield`, GIO's `shutdown`). Not run here, read in QEMU's source instead: an Intel vGPU
+    (VFIO), a bridged tap, hugetlb memory.
+  - **Argument rules**: `ioctl` only on fixed requests (the block layer's `BLKSSZGET` and `XFS_IOC_DIOINFO`; GLib's `TCGETS`,
+    `TIOCGWINSZ` and `FIONREAD`) and on the request types of the machine's own devices: KVM's (`0xAE`) on a KVM machine, DRM's (`'d'`)
+    on a 3D or vGPU machine, VFIO's (`';'`) on a vGPU machine, TUN's (`'T'` 200 and up) with a bridged tap; never `TIOCSTI`. `clone`
+    makes threads only (glibc's `fork` gets EPERM; `clone3` gets ENOSYS and glibc falls back to `clone`). Executable memory,
+    unless the machine runs TCG (whose code buffer must be writable and executable): every `mmap` or `mprotect` with
+    `PROT_EXEC` goes to lord-vm, which lets through only the loader's kind (a private, read-only mapping of a file; on an
+    arm64 CPU with BTI, `mprotect` to `PROT_EXEC|PROT_BTI` without `PROT_WRITE`), and only while QEMU starts: until its QMP
+    handshake, when glibc's loader, QEMU's modules and Mesa's drivers are loaded (`vm_sc_startup_exec`; measured: no
+    configuration above mapped code after it). After that, executable memory of any kind stops QEMU, whatever the file: a
+    memfd (`MFD_NOEXEC_SEAL` wouldn't help: measured on 6.12, it doesn't stop `mmap` with `PROT_EXEC`) or a file of its
+    `disks/` folder written to be run. `memfd_create` never takes `MFD_EXEC`. **What this doesn't stop**: anything during the
+    start itself (QEMU has then read only its command line and its disks' headers); and, without a listener (the kill
+    fallback, never on Debian 13's kernel), the loader's kind passes at any time, so a memfd or a disk file QEMU wrote could
+    be mapped to run; a `noexec` bind of `disks/` in QEMU's mount namespace would close the folder's half there, but that is
+    a second mount where 3.3's namespaces allow exactly one, for the maintainer to decide. `prctl`
+    only the five options measured, and `PR_SET_DUMPABLE` refused, so QEMU can't make itself dumpable again. `prlimit64` only on
+    itself, `tgkill` only its own threads (the vCPU kick), no `kill`. `seccomp` never with a listener. `execve` isn't a row; `execveat` always
+    reaches lord-vm, which lets exactly one through: the first, from the child it forked, before any of QEMU runs
+    (`vm_sc_exec_once`; answered with `SECCOMP_USER_NOTIF_FLAG_CONTINUE`, safe there because that process is single-threaded and
+    runs lord-vm's own code). Any later `execveat` stops QEMU: a descriptor number proves nothing once QEMU runs, since it can
+    close it and put another binary under the same number. Landlock's execute right goes only to QEMU's binary and its loader
+    (`/usr` is read-only otherwise; libraries and Mesa's drivers are mapped, which needs no execute right). Without a listener
+    (the kill fallback) `execveat` passes on lord-vm's descriptor number with `AT_EMPTY_PATH`, so only QEMU itself could be run
+    again, and QEMU's own `spawn=deny` refuses exec once its sandbox is up.
+  - **Refused, never run**: `socket` (EACCES: its sockets are the ones lord-vm passed), `io_uring_*` (EPERM; not approved: QEMU
+    probes it and keeps its other event loop), `kcmp` (EPERM; Mesa's amdgpu copes, as before). `socketpair` only AF_UNIX.
+  - **Anything else stops QEMU, named**: the default action is `SECCOMP_RET_USER_NOTIF`. The filter's listener goes to lord-vm over
+    the start's status socket (`SCM_RIGHTS`); the child closes its copy before the exec (QEMU holding it could answer for its own
+    calls; the probe checks it holds none). The call waits in the kernel; lord-vm kills QEMU, then answers, so the call never runs,
+    and writes `seccomp: QEMU made a call its allowlist doesn't have (thread N): <call and arguments>` to the log and
+    `blocked by the sandbox: <call>` (with an ioctl's request, a prctl option or memory rights) to the failure page. Were lord-vm
+    gone, the kernel fails the call with ENOSYS: it doesn't run either way. Where the kernel refuses a listener, the same rows run
+    with `SECCOMP_RET_KILL_PROCESS` as the default (unnamed). `lord-vm --status --json` says `"seccomp_allowlist"` and
+    `"seccomp_named"`.
+  - **No switch for people**: only the test build `lord-vm-testpaths` (never installed) reads `LORDVM_TEST_SECCOMP`: `learn` and
+    `learn-all` (log and go on: the way to see what a new QEMU needs) and `drop:<name>` (one row left out, to see a stop named).
+  - **Cost** (**Measured** 2026-11-23, amd64 PC, Debian 13 nocloud guest, 2 vCPUs, 1 GB, 5 starts each after a warm-up,
+    alternating with 0.8.9.5's denylist): fork to exec 1–2 ms either way, QMP ready 99–128 ms against 97–133 ms, boot to the serial
+    login 12.06–12.39 s against 12.09–12.59 s, QEMU's RSS at login 391–422 MB against 396–417 MB: no difference past the spread.
+    Per call (6 runs of 2,000,000 calls on one CPU, medians): `read` 120.5 ns against 121.9 ns (103.9 without a filter), `getppid`
+    101.9 against 100.8 (84.5), an ioctl that the rules check 169.9 against 170.0 (117.3). The program has 400–422 instructions and
+    finds a call in about eight comparisons; the kernel's cache skips it altogether for calls allowed whatever their arguments.
+  - `qemu-img` and the other image tools keep the denylist (`vm_jail_tool*`), under their own sandboxes.
+  QEMU's own filter costs nothing measurable: boot to login 36.5 s with it and 36.0 s without, QEMU RSS 424 MB against 422.5 MB
+  (**Measured**, 2026-11-04, amd64, **nested**, 6 boots each). It also ran in every Pi run, 3D included, with no trouble (**Measured**,
+  2026-11-04, Pi 5).
 - **3D graphics (6.10, approved 2026-11-20):** only a Linux machine with Graphics 3D chosen gets, in QEMU's Landlock rules, read,
   write and device ioctls on the GPU's render node (`/dev/dri/renderD<N>`, never the primary `card` node), a listing of `/dev/dri`
   (names only) and read access to that GPU's PCI device folder in sysfs; without the last two Mesa's EGL doesn't start (**Measured**).
@@ -1099,12 +1159,13 @@ lordvm-dev run|attach DIR      plays lord-server: picture memfd, frames, PNG, ty
 
 **What is enforced, and where it stops.**
 
-- QEMU: its own user, mount, ipc, uts and net namespaces and non-dumpable (3.3); Landlock (read and execute `/usr`; read
+- QEMU: its own user, mount, ipc, uts and net namespaces and non-dumpable (3.3); Landlock (read `/usr`, execute only its binary and loader; read
   `/etc/ld.so.cache` and its own `/proc/<pid>`; read and write `disks/`; read the ISO;
-  `/dev/null`; TCP bind and connect refused; abstract unix sockets and signals scoped), `no_new_privs`, our seccomp filter (no
-  `socket`, `connect`, `bind`, `listen`, `accept`, namespaces, mount, `ptrace`, `process_vm_*`, `bpf`, `perf_event_open`, `keyctl`,
-  `io_uring`, `userfaultfd`, modules, kexec, `TIOCSTI`), then QEMU's own filter. Ours is a denylist: an allowlist for QEMU is still
-  **To test** (3.3).
+  `/dev/null`; TCP bind and connect refused; abstract unix sockets and signals scoped), `no_new_privs`, our seccomp allowlist
+  (only the calls QEMU was measured to make, with argument rules; `socket` refused; no `connect`, `bind`, `listen`, `accept`,
+  namespaces, mount, `ptrace`, `process_vm_*`, `bpf`, `perf_event_open`, `keyctl`, `io_uring`, `userfaultfd`, modules, kexec,
+  `TIOCSTI`, a second exec; without TCG no executable memory after the start (only the loader's mappings before it); anything else stops QEMU,
+  named), then QEMU's own filter (3.3).
 - passt sandboxes itself (namespaces and its own seccomp); lord-vm doesn't put Landlock on it, because Landlock would forbid the
   mounts passt's own isolation makes.
 - cgroups: lord-vm enters `app-lordos-lordos-vm-<id>.scope` through lord-sessiond (memory.max = the machine's limit + 128 MB, cpu.max
@@ -1152,7 +1213,7 @@ would copy that file (anything the person can read: keys, other people's shared 
 a raw file can also hold a qcow2 header. So lord-vm decides the format itself from the first bytes and the name (`vm_image_kind`,
 `machine.c`): the qcow2 magic with version 2 or 3, no backing file, no external data file and not marked corrupt, or a `.img`/`.raw`
 name without the magic; anything else is refused. `qemu-img` then sees the image only as a `json:` filename that names the driver
-(never probed) with `"backing": null`, and runs in a jail like QEMU's (`vm_jail_tool`: `no_new_privs`, the same seccomp filter, no TCP,
+(never probed) with `"backing": null`, and runs in a jail like QEMU's (`vm_jail_tool`: `no_new_privs`, the image tools' seccomp denylist, no TCP,
 Landlock with read access to that one file and write access to the machine's `disks/` only); its `info` answer is refused if it
 mentions a backing file or a data file anyway. At every start the system disk's and the NVRAM's headers are checked the same way
 (`vm_qcow2_plain`), and every qcow2 `-blockdev` carries `"backing": null`. `server/tests/vm_import_test.sh` (run by `make test` where
@@ -1318,7 +1379,7 @@ with the ISO moved away (*the attached image is missing*), FirstRun with an empt
 **Not done or not verified:** ~~Esc pressed while one of the window's menus is open closes it and also reaches the guest~~ (fixed in the
 beta, below); BIOS machines were built for but not run from the app; ~~the package engine's download of `vm-enable` waited with no time
 limit while the network didn't answer~~ (beta); ~~ejecting an ISO from a running machine and attaching another one~~ (beta); one slice for all machines and nested
-leaves under lord-sessiond; our seccomp allowlist for QEMU; a guest cursor larger than 64 × 64 after scaling is drawn smaller (the
+leaves under lord-sessiond; ~~our seccomp allowlist for QEMU~~ (in development, 3.3); a guest cursor larger than 64 × 64 after scaling is drawn smaller (the
 cursor plane's size); HiDPI (the guest is asked for the window's logical size); render node and 3D; latency to the screen. Unit tests: `vm_test.c` 167 checks (with `vm_image_kind`), `vm_model_test.mjs` 66 checks (states, actions, the sheet's
 checks, letterbox and pointer scaling, guest size, refresh rate, wheel steps).
 
@@ -2484,7 +2545,7 @@ The app picks by file system and says which one it used. Templates are read-only
 - **raw** optional: fastest, no snapshots.
 - **Reflink** on btrfs and XFS: instant copies.
 - Built: qcow2 through `-blockdev` with `discard=unmap`; Reclaim space compacts offline. Not built: raw disks, encryption,
-  `io_uring` (our seccomp refuses it), export.
+  `io_uring` (our seccomp allowlist refuses it), export.
 - `virtio-blk` by default (the compatible devices: SATA), served by an I/O thread of its own, the host's cache bypassed on ext4 and XFS: 6.4.1.
 - TRIM from guest is passed to shrink. "Reclaim space" compacts offline.
 - Export, with the machine shut down: a `.lordvm` bundle with or without snapshots, OVA, or a bare disk image, optionally encrypted. Import: 6.22.
@@ -2502,7 +2563,7 @@ How lord-vm gives QEMU a machine's disks (`lordvm.c` `blockdev_disk`, `disk_dire
 | Elsewhere (btrfs, tmpfs, a network file system, `O_DIRECT` refused) | the host's page cache and the thread pool, as before. Not on btrfs: `O_DIRECT` there checksums buffers a guest may still change in flight | — |
 | Discard | `unmap` on the file and the qcow2 node (TRIM shrinks the file) | the same |
 | `detect-zeroes` | not set (it checks every write for zeroes; not measured) | the same |
-| io_uring | **not used**: QEMU's seccomp filter refuses `io_uring_*` (`vmsandbox.c`), and loosening it is a sandbox change for the maintainer to approve | the same |
+| io_uring | **not used**: our seccomp allowlist refuses `io_uring_*` (EPERM, `vmsyscalls.h`), and loosening it is a sandbox change for the maintainer to approve | the same |
 
 The firmware, the installer's and the drivers' discs and the seed disk keep the plain file node. Snapshots with memory
 (take, revert while running, delete) were checked on a running machine with the I/O thread and `cache.direct` (QEMU 10.0.13).
@@ -3794,7 +3855,7 @@ The LordOS rule holds: this app must not slow the desktop. It's idle until opene
    `cpu-usage.json`), in Configure → CPU & memory and on the library's card; the assistant still uses the host's default (6.27).
 4. The disk path. **Built** (in development): an iothread, `cache.direct` with `aio=native` on ext4 and XFS (6.4.1);
    kept after measuring real work against the host's cache (6.4.1, "Host cache or not").
-   `io_uring` stays off: our seccomp denylist refuses `io_uring_*` (`vmsandbox.c`) and loosening it needs the maintainer's
+   `io_uring` stays off: our seccomp allowlist refuses `io_uring_*` (`vmsyscalls.h`) and loosening it needs the maintainer's
    review (not measured against it).
 5. A guest-side performance profile applied by the guest tools. **Built** for Windows guests (tools w11, 7.1.4); pausing
    Windows Search and the Linux side are not built.
@@ -4537,7 +4598,7 @@ acts only on the person's click.
 in the group's folder, the Gateway's QEMU listening and the Workstation's connecting, with Landlock letting each QEMU
 reach only that socket. Our code and kernel rule that out:
 
-- Our seccomp filter refuses `socket`, `bind`, `listen`, `connect` and `accept` to QEMU (`vmsandbox.c`). QEMU only gets
+- Our seccomp allowlist refuses `socket` to QEMU and has no row for `bind`, `listen`, `connect` or `accept` (`vmsyscalls.h`). QEMU only gets
   sockets that `lord-vm` made (passt's socketpair, the TPM's, virtiofsd's connected socket). A listening QEMU would be a
   sandbox exception for no gain.
 - Landlock in Debian 13's kernel (6.12, ABI 6) has no rule for connecting to a path-named Unix socket; it only scopes
