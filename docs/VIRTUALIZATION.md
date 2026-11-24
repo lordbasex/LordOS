@@ -258,11 +258,11 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Unit and headless suites in `make test` (12) | ✅ | 90 | `server/mk/vm.mk`, `vmpin.mk`, `tests/run_suites.sh` | 27 C programs (new: `vmseccomp`, `vm-jail-probe`, `vmgroup`, `vmlink`, `vmimage-group`, `vmunpack`, `np-torgw`, `vmwatch`, `guest-dbus`), 10 scripts (new: `vm_whonix_xml_test.sh`, `vm_group_link.sh`, `guest_perf_test.sh`, migration 011's), 12 node tests (new: `vm_group_model`, `vm_group_ui`, `sentinela_vm`, `protect_model`). No settings → QEMU arguments table test (`build_qemu_args` is static in `lordvm.c`; only a Whonix member's arguments are checked, against Whonix's XML) |
-| Release gates: isolation, integrity, recovery, leaks (12) | ✅ | 85 | `vm_*.sh`, `tools/vm/bare-metal-gates.sh` | Manual; never run on the i9 PC |
-| End-to-end bench: a headless session driven over `remote.sock` (12) | 🟡 | 50 | `tools/vm/e2e/` | Manual, not in `make test`; not every flow of 12 is scripted. Added by the audit of 2026-11-23 |
-| Boot matrix in CI, virtio-win install test, storage figures, agent kill tests (12) | ❌ | 0 |  | No QEMU or KVM job in `.github/workflows` |
-| Hardware matrix: Pi 5 and Xeon bare metal (gates), the i9 with RX 580 and UHD 630 (3D, GVT-g) | 🟡 | 50 | CHANGELOG | No Pi 4, no 4K Pi kernel, no Intel 3D, no NVIDIA |
+| Unit and headless suites in `make test` (12) | ✅ | 100 | `server/mk/vm.mk`, `vmpin.mk`, `tests/run_suites.sh`, `tests/vm_qemu_args_test.py` | 27 C programs (new: `vmseccomp`, `vm-jail-probe`, `vmgroup`, `vmlink`, `vmimage-group`, `vmunpack`, `np-torgw`, `vmwatch`, `guest-dbus`), 11 scripts (new: `vm_whonix_xml_test.sh`, `vm_group_link.sh`, `guest_perf_test.sh`, migration 011's, and *in development* `vm_qemu_args_test.py`: settings → QEMU arguments as a table, 12 rows, 12 of 12 on the i9; skipped without KVM), 12 node tests (new: `vm_group_model`, `vm_group_ui`, `sentinela_vm`, `protect_model`) (was 90) |
+| Release gates: isolation, integrity, recovery, leaks (12) | ✅ | 100 | `vm_*.sh`, `tools/vm/bare-metal-gates.sh`, `make -C server e2e-machines-gates`, `tools/vm/e2e/machines/ns-run.sh` | Manual (minutes each). *In development*: run on the i9 PC's bare metal on 2026-11-24, in private namespaces: isolation 72 passed (2 skipped: no delegated cgroup, no session bus in the run), integrity 45, recovery 40 (1 skipped), leaks 10; the script refused every physical PC (its virtual-machine check) and the leak gate's zombie check counted other programs' children, both fixed (was 85) |
+| End-to-end bench: a headless session driven over `remote.sock` (12) | ✅ | 95 | `tools/vm/e2e/machines/` (`mh.py`, `probe.js`, `flows.py`, README), `make -C server e2e-machines` | *In development*: a headless lord-server-test with the real theme in private user and mount namespaces, a scratch library, a real Debian guest; the assistant to first boot, Shut Down, Configure, start, the agent and its install, the clipboard both ways, a file drop, kill tests, snapshots, clone, storage, a group's card, checked on screen and on disk: run on the i9 on 2026-11-24. Input through the test hooks, the remote desktop's own injection (`remote.sock` takes only root). Not scripted: apps mode (needs a LordOS guest) and USB; not in `make test` (KVM, minutes) (was 50) |
+| Boot matrix in CI, virtio-win install test, storage figures, agent kill tests (12) | 🟡 | 90 | `tools/vm/e2e/machines/boot-matrix.py`, `images.py --windows`, `flows.py` (`windows`, `storage`, `kills`, `killcopy`) | *In development*: the boot matrix ran on the i9 (9 rows: KVM and TCG, OVMF and SeaBIOS, TPM, Secure Boot, compatible devices, 3D on both cards) and the Pi 5 (3 rows; it found that an arm64 machine with the compatible devices doesn't boot, AAVMF has no SATA driver); the virtio-win install test installed the catalog's 90-day evaluation with virtio-win 0.1.271 unattended on the i9; storage figures on ext4 only (said 1,075.5 MB, freed 1,073.1 MB; btrfs and XFS need a disk of theirs); kill tests of the agent, passt, virtiofsd and lord-vm, and of the agent mid-copy, pass. Not in a hosted CI: GitHub's runners have no KVM (was 0) |
+| Hardware matrix: Pi 5 and Xeon bare metal (gates), the i9 with RX 580 and UHD 630 (3D, GVT-g) | 🟡 | 75 | CHANGELOG; 12 (boot matrix, bare-metal gates) | Pi 5 (gates 2026-11-06, boot matrix 2026-11-24), Xeon (gates), the i9: gates on bare metal and 3D boots on both the RX 580 and the UHD 630 (2026-11-24, *in development*). No Pi 4, no Pi kernel with 4 KiB pages, no NVIDIA; a 3D machine's picture on the UHD 630 not checked (was 50) |
 
 ## Status and how to continue (read this first)
 
@@ -4188,7 +4188,12 @@ and virtio-win 0.1.271 from their makers' servers, kept only when their SHA-256 
 on 2026-11-24), given to `lord.vm.create` as the assistant's evaluation card gives them, started from the library card,
 installed without questions; done when lord-vm says Windows is installed and the LordOS tools for Windows say hello.
 
-WINDOWS-RESULTS
+**Run on the i9 PC on 2026-11-24 (KVM, 4 vCPUs, 8 GB, 64 GB disk, CPU path): 9 of 9.** The machine was made with Secure
+Boot, a TPM, Hyper-V and the windows devices; Setup ran unattended through its restarts and lord-vm said "Windows is
+installed" 25.9 minutes after the start from the card; the LordOS tools for Windows said hello (`w11`, the installed
+LordOS 0.8.9.5's) from the installed system; its desktop (the evaluation's watermark, the `tester` account) was drawn in
+the machine's window; Shut Down through the agent turned it off. Screenshots every five minutes of the install are kept
+by the run (`--out`).
 
 **Bare-metal gates.** The three gates (disk integrity, failure recovery, leaks) have run on the nested amd64 build VM
 and on the Pi 5 (3.9); on a physical amd64 PC they run with `tools/vm/bare-metal-gates.sh`, which checks the PC first
