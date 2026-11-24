@@ -72,7 +72,7 @@ export function freshPlan(item, gateway, snapsOf = () => 0) {
 // member active), linux (both members are Linux machines), never under the other system's chip
 export function groupShows(item, { query, show } = {}) {
   const q = (query || '').trim().toLowerCase();
-  if (show === 'windows') return false;
+  if (show === 'windows' || show === 'templates') return false;
   if (show === 'running' && (item?.state === 'off' || item?.state === 'damaged')) return false;
   return !q || String(item?.group?.name || '').toLowerCase().includes(q) || 'whonix tor'.includes(q);
 }

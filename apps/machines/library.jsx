@@ -19,7 +19,7 @@ import { BUILTIN } from './profiles.js';
 import { loadProfiles, storeRev } from './store.js';
 import { usePal, has, gb, bytes, gib, OsMark, Bar, Btn, PopMenu, markColors, overlayRoot, vmRefusal, startPrep } from './ui.jsx';
 import { COLOR_HEX } from './systems.js';
-import { readMeta, readCpuUse, isProtectedMachine } from './meta.js';
+import { readMeta, writeMeta, readCpuUse, isProtectedMachine } from './meta.js';
 import { CloneSheet } from './clone.jsx';
 import { withAsk } from './openwith.js';
 import { libraryItems, groupMenu, groupShows } from './group.js';
@@ -104,6 +104,7 @@ function stateOf(m, windowed) {
   const bad = unreadableOf(m);
   if (bad) return { text: tr(`machines.unreadable.${bad}`), color: '#ff9a9a', on: false };
   const d = doingOf(m, windowed);
+  if (m.meta?.template && !v.active) return { text: tr('machines.tpl.badge'), color: '#7cc4e8', on: false };
   if (d === 'running') return { text: tr('machines.lib.state.running'), color: '#30d158', on: true };
   return { text: tr(`machines.doing.${d}`), color: v.why ? '#ff9a9a' : d === 'suspended' ? '#ffd60a' : v.active ? '#30d158' : null, on: v.active };
 }
@@ -861,7 +862,10 @@ export function Library() {
       '-',
       { label: tr('machines.cmd.configure'), onClick: () => setCfg({ dir: m.dir }) },
       { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m) },
-      { label: tr('machines.cmd.clone'), onClick: () => setCopying(m) },
+      { label: m.meta?.template ? tr('machines.tpl.newFrom') : tr('machines.cmd.clone'), onClick: () => setCopying(m) },
+      // Templates (5.1): a machine kept as it is to make others from; it doesn't start from here while it is one
+      { label: m.meta?.template ? tr('machines.tpl.unmake') : tr('machines.tpl.make'), disabled: !m.meta?.template && !a.remove,
+        onClick: () => { writeMeta(m.dir, { template: !m.meta?.template }); refresh(); } },
       { label: tr('machines.cmd.logs'), onClick: () => openLogs(m) },
       { label: tr('machines.cmd.showInFiles'), onClick: () => revealPath(m.dir) },
       ...(m.transfer ? [{ label: tr('machines.tb.transferOpen'), onClick: () => { const x = lord.vm.transferFolder(m.dir); if (x) openFolder(x); } }] : []),
@@ -975,6 +979,7 @@ export function Library() {
           {chip('running', tr('machines.lib.chip.running', { n: counts.running }))}
           {chip('linux', tr('machines.lib.chip.linux', { n: counts.linux }))}
           {chip('windows', tr('machines.win.lib.chip', { n: counts.windows }))}
+          {counts.templates || lv.show === 'templates' ? chip('templates', tr('machines.tpl.chip', { n: counts.templates })) : null}
         </View>
       ) : shell ? <SkelChips pad={pad} /> : null}
       {error ? <Text style={{ marginHorizontal: pad, marginTop: 10, fontSize: 13, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}

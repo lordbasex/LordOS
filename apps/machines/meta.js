@@ -43,6 +43,8 @@ export function readMeta(dir) {
       if (typeof j.transferSetup === 'boolean') meta.transferSetup = j.transferSetup;   // set up the transfer folder once (Windows)
       // the snapshot "Fresh install" still to take when its unattended install ends (assistant.jsx, vmwindow.jsx)
       if (typeof j.freshSnap === 'boolean') meta.freshSnap = j.freshSnap;
+      // a template (5.1): kept as it is, new machines are made from it (the library's Templates chip)
+      if (typeof j.template === 'boolean') meta.template = j.template;
       // Configure → General: the card's own color (a key of systems.js COLOR_HEX, its mark then the name's first letter) and its tags
       if (typeof j.color === 'string' && /^[a-z]{3,8}$/.test(j.color)) meta.color = j.color;
       if (Array.isArray(j.tags)) meta.tags = tagsOf(j.tags);

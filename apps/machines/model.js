@@ -743,7 +743,7 @@ export function doingOf(m, windowed = true) {
 // which machines show (all, running, Linux, the other system's); 'off' of before is read as all
 export const LIB_VIEWS = ['grid', 'list'];
 export const LIB_SORTS = ['name', 'state', 'last', 'disk'];
-export const LIB_SHOWS = ['all', 'running', 'linux', 'windows'];
+export const LIB_SHOWS = ['all', 'running', 'linux', 'windows', 'templates'];
 export function libView(v) {
   const o = v && typeof v === 'object' ? v : {};
   return {
@@ -792,7 +792,8 @@ export function familyOf(m) {
   if (id === 'windows') return 'windows';
   return LINUX.includes(id) || m?.meta?.family === 'linux' ? 'linux' : 'other';
 }
-const shows = (m, show) => (show === 'running' ? stateView(m.state, m.reason).active : show === 'linux' || show === 'windows' ? familyOf(m) === show
+// templates (5.1, app.json template): machines kept as they are, to make new ones from (a clone); their own chip
+const shows = (m, show) => (show === 'templates' ? !!m.meta?.template : show === 'running' ? stateView(m.state, m.reason).active : show === 'linux' || show === 'windows' ? familyOf(m) === show
   : show === 'off' ? !stateView(m.state, m.reason).active : true);
 // A machine's tags (Configure → General, app.json): trimmed, no control characters, 1 to 24 characters each, at most 8,
 // each once (case-insensitively), in the order given. "#tag" in the library's search finds them exactly.
@@ -1259,7 +1260,8 @@ export const cloneWinName = (name) => `${hostnameFrom(name).slice(0, WIN_NAME_MA
 // A machine whose machine.json this LordOS can't read (lord.vm.list's error): "newer" (a newer LordOS wrote it) or
 // "invalid"; its numbers aren't known and it can't start
 export const unreadableOf = (m) => (m?.error === 'newer' || m?.error === 'invalid' ? m.error : null);
-export const actionsOf = (m) => (unreadableOf(m) ? { ...actionsFor(m.state), start: false } : actionsFor(m?.state));
+// a template (5.1) doesn't start from the library: it stays as it was made, and New Machine from Template clones it
+export const actionsOf = (m) => (unreadableOf(m) || (m?.meta?.template && !stateView(m.state, m.reason).active) ? { ...actionsFor(m.state), start: false } : actionsFor(m?.state));
 export const isWindowsMachine = (m) => !!m && (!!m.windowsDevices || m.devices === 'windows');
 
 export function cloneMethod(info, kind, fromSnapshot = false) {
