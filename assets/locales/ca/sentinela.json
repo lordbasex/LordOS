@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Apaga",
   "analysis.rule": "Es mostra sempre: aquesta alerta no necessita cap model.",
   "settings.seesMachines": "De les màquines virtuals: el nom, el rol i l’estat, per què s’han aturat, i els recomptes de CPU, memòria i xarxa del seu motor. Mai la seva pantalla, els seus fitxers ni el seu porta-retalls.",
-  "sandbox.unverified": "la prova que el seu motor és el de la mateixa màquina"
+  "sandbox.unverified": "la prova que el seu motor és el de la mateixa màquina",
+  "block.ended": "S’ha finalitzat un programa bloquejat: {name}",
+  "block.endedBody": "És a la teva llista de bloqueig. Revisa la llista a Configuració → IA → Sentinela.",
+  "block.title": "Llista de bloqueig",
+  "block.hint": "Aquests programes es finalitzen cada cop que s’inicien al teu compte, tant si Sentinela està activat com si no. Afegeix-ne un des de Monitor → Obtén informació → Investiga amb Lumo; treu-lo perquè es pugui tornar a executar.",
+  "block.empty": "No hi ha cap programa bloquejat.",
+  "block.remove": "Treu",
+  "block.script": "Script de {interp}",
+  "block.binary": "Programa",
+  "block.pkg": "i tots els programes del paquet {pkg}",
+  "block.added": "bloquejat el {date}"
 }

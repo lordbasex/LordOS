@@ -484,6 +484,7 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         set_str(c, o, "pointer", m.pointer_guest ? "guest" : "lordos");   /* who draws a Windows guest's pointer (7.1.2) */
         JS_SetPropertyStr(c, o, "captureFullscreen", JS_NewBool(c, m.capture_fullscreen));   /* "Capture mouse" (6.25) */
         JS_SetPropertyStr(c, o, "perfProfile", JS_NewBool(c, m.perf_profile));   /* the guest's performance profile (7.1.4) */
+        JS_SetPropertyStr(c, o, "cpuModel", JS_NewString(c, VM_CPU_NAMES[m.cpu_model == VM_CPU_COMPAT]));   /* 5.5, schema 18 */
         /* storage (schema 16): 6.2, 6.4, 8; keyId: where its key lives in the keyring (its id, or its group's) */
         set_str(c, o, "disposable", VM_DISP_NAMES[m.disposable][0] ? VM_DISP_NAMES[m.disposable] : "off");
         JS_SetPropertyStr(c, o, "encrypted", JS_NewBool(c, m.encrypted));
@@ -524,6 +525,7 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         }
         JS_SetPropertyStr(c, o, "guestLinks", JS_NewBool(c, m.guest_links));     /* links and notifications from the guest (6.12) */
         JS_SetPropertyStr(c, o, "guestNotify", JS_NewBool(c, m.guest_notify));
+        set_int(c, o, "heads", m.heads > 1 ? m.heads : 1);                       /* All Displays (5.4) */
         JS_SetPropertyStr(c, o, "automation", JS_NewBool(c, m.automation));      /* machines exec and cp may run programs (6.15) */
         set_str(c, o, "cpuPin", pin_effective(&m));                                           /* "off" | "auto" (3.7.1) */
         JS_SetPropertyStr(c, o, "cpuPinChosen", JS_NewBool(c, m.cpu_pin != VM_PIN_DEFAULT));
@@ -1455,7 +1457,7 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[78 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[94 + 2 * VM_SHARES + 2 * VM_PORTS], hds[4] = "", shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -1595,6 +1597,26 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     v = JS_GetPropertyStr(c, argv[1], "guestNotify");
     if (JS_IsBool(v)) { args[n++] = "--guest-notify"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
+    /* All Displays (5.4): the guest's displays, 1..VM_HEADS_MAX (lord-vm refuses it while the machine runs or is suspended) */
+    int hv = prop_int(c, argv[1], "heads");
+    if (hv) { if (hv < 1 || hv > VM_HEADS_MAX) ok = 0; else { snprintf(hds, sizeof hds, "%d", hv); args[n++] = "--heads"; args[n++] = hds; } }
+    /* Configure (5.5, schema 18): the processor the guest sees; a new network card address; one more data disk (GB) */
+    v = JS_GetPropertyStr(c, argv[1], "cpuModel");
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && (!strcmp(s, "host") || !strcmp(s, "compatible"))) { args[n++] = "--cpu-model"; args[n++] = !strcmp(s, "host") ? "host" : "compatible"; } else ok = 0;
+        if (s) JS_FreeCString(c, s);
+    } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "newMac");
+    if (JS_IsBool(v)) { if (JS_ToBool(c, v)) { args[n++] = "--mac"; args[n++] = "new"; } }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    char addd[16];
+    int add = prop_int(c, argv[1], "addDiskGb");
+    if (add) {
+        if (add < VM_DISK_MIN_GB || add > VM_DISK_MAX_GB) ok = 0;
+        else { snprintf(addd, sizeof addd, "%d", add); args[n++] = "--add-disk"; args[n++] = addd; }
+    }
     /* automation (6.15): `machines exec` and `cp` may run programs in the guest; lord-vm refuses it for anonymity */
     v = JS_GetPropertyStr(c, argv[1], "automation");
     if (JS_IsBool(v)) { args[n++] = "--automation"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
@@ -1738,9 +1760,12 @@ static int vm_exe_is(long pid, const char *name) {
     return realpath(want, rw) && vmwatch_exe_same(got, rw);
 }
 
-/* where lord-sessiond puts a machine's scope: beside lord-server's own leaf (".../lordos-session-<uid>/server"), the
- * exact cgroup path; "" outside a LordOS session */
-static void vm_scope_path(const char *id, int tor, char *out, size_t n) { vmwatch_scope_path(cgroup_self(), id, tor, out, n); }
+/* where lord-sessiond puts a machine's scope: in the session's machines' slice (3.7), the exact cgroup path; "" outside a
+ * LordOS session. old: where a machine started before the slice existed is, beside lord-server's own leaf */
+static void vm_scope_path(const char *id, int tor, char *out, size_t n, char *old, size_t on) {
+    vmwatch_scope_path(cgroup_self(), id, tor, 1, out, n);
+    vmwatch_scope_path(cgroup_self(), id, tor, 0, old, on);
+}
 
 /* the process's cgroup (v2) is exactly `scope` or below it */
 static int vm_in_cgroup(long pid, const char *scope) {
@@ -1752,6 +1777,11 @@ static int vm_in_cgroup(long pid, const char *scope) {
     if (k <= 3) return 0;
     buf[k] = 0;
     return vmwatch_cg_under(buf, scope);
+}
+
+/* the process is under the machine's scope, in the slice or (started before it) in the old place */
+static int vm_in_scope(long pid, const char *scope, const char *old) {
+    return (scope[0] && vm_in_cgroup(pid, scope)) || (old[0] && vm_in_cgroup(pid, old));
 }
 
 /* the machine's own lord-vm, asked over its socket (vmwatch_live) */
@@ -1805,9 +1835,9 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     }
     /* Sentinela's facts (docs/SENTINELA.md, "Machines") come from the machine's lord-vm itself, never from run.json */
     static VmMachine sm;
-    char serr[128], scope[PATH_MAX] = "";
+    char serr[128], scope[PATH_MAX] = "", scope_old[PATH_MAX] = "";
     int have_m = !vm_machine_load(dir, &sm, serr, sizeof serr) && sm.id[0];
-    if (have_m) vm_scope_path(sm.id, sm.uplink_tor, scope, sizeof scope);
+    if (have_m) vm_scope_path(sm.id, sm.uplink_tor, scope, sizeof scope, scope_old, sizeof scope_old);
     if (qpid > 0 && have_m) {
         VmLive lv;
         int ok = !vm_live(sm.id, &lv);
@@ -1826,7 +1856,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
                 set_str(c, o, "cgMode", lv.cg & VMC_NESTED ? "nested" : lv.cg & VMC_SCOPE ? "scope" : "none");
                 /* in its own machine's scope (exactly that cgroup or below it), lord-vm and QEMU both; "" when this
                  * isn't a LordOS session and the scope's place isn't known */
-                if (scope[0]) set_str(c, o, "scope", vm_in_cgroup(lv.qemu, scope) && vm_in_cgroup(lv.pid, scope) ? "in" : "out");
+                if (scope[0]) set_str(c, o, "scope", vm_in_scope(lv.qemu, scope, scope_old) && vm_in_scope(lv.pid, scope, scope_old) ? "in" : "out");
                 /* its passt (Shared network): a passt of the person's, lord-vm's child or in the machine's scope */
                 long pt = hint_passt, ppp = -1;
                 int alive = 0, d1, d2;
@@ -1837,7 +1867,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
                     ssize_t k = cf >= 0 ? read(cf, comm, sizeof comm - 1) : -1;
                     if (cf >= 0) close(cf);
                     if (k > 0) comm[k] = 0;
-                    alive = k > 0 && !strncmp(comm, "passt", 5) && proc_uid(pt) == getuid() && (ppp == lv.pid || (scope[0] && vm_in_cgroup(pt, scope)));
+                    alive = k > 0 && !strncmp(comm, "passt", 5) && proc_uid(pt) == getuid() && (ppp == lv.pid || vm_in_scope(pt, scope, scope_old));
                 }
                 JS_SetPropertyStr(c, o, "passt", JS_NewBool(c, alive));
             }
@@ -1864,7 +1894,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
             /* QEMU's own leaf, or the machine's scope when lord-vm couldn't divide it; never an unrelated cgroup */
             if (strstr(buf + 3, "lordos-vm-") && strlen(buf + 3) < sizeof cg) snprintf(cg, sizeof cg, "%s", buf + 3);
             /* with the scope's place known: its counters only when QEMU is really under it */
-            if (scope[0] && !vm_in_cgroup(qpid, scope)) cg[0] = 0;
+            if (scope[0] && !vm_in_scope(qpid, scope, scope_old)) cg[0] = 0;
         }
     }
     if (cg[0]) {
@@ -2106,7 +2136,8 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
 
 /* ---- sessions: one running machine and its window ---- */
 
-#define MAX_SESS 4
+/* sessions: one per machine window, and with All Displays (5.4) one per extra head of a machine (at most VM_HEADS_MAX) */
+#define MAX_SESS 8
 /* one dmabuf of a 3D machine's picture (VD_DMABUF) and its import: a texture of the desktop's GPU (tex) or of the reader
  * on the buffer's own render node (ri, gpu/dmaread.h); gfail/rfail: that one refused it (not tried again for this dmabuf) */
 typedef struct { int fd; ino_t ino; int w, h, stride, flip; uint32_t fourcc; uint64_t mod; GpuTex *tex; DmaImg *ri; int gfail, rfail; unsigned used, gen; } VmDmabuf;
@@ -2139,6 +2170,8 @@ typedef struct {
     int job_kind, job_status, job_pct;  /* the last VM_JOB (suspend, resume, snapshots) */
     char job_text[VM_TEXT_MAX];
     uint32_t cd_seq;                    /* VM_CDROM: the request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
+    uint32_t cable_seq;                 /* VM_NETCABLE: the request; cable_down: pulled in this run (poll's cableOut) */
+    int cable_down, cable_want;
     int cd_state;
     char cd_msg[VM_TEXT_MAX];
     int ag_state, ag_caps;              /* the guest agent (VM_AGENT_STATE), and what it said about itself */
@@ -2251,6 +2284,17 @@ typedef struct {
     /* closes the guest refused (VM_WINREFUSED with LAGA_CLOSE): the last per window, newest last; closeRefusedSeq */
     struct { uint32_t gid; int reason; double at; } refused[8];
     int layout[6];                      /* VM_GUEST_LAYOUT, handed to lord-vmdisplay (VD_LAYOUT); 0s none */
+    /* All Displays (docs/VIRTUALIZATION.md 5.4): head is the virtio-gpu output this session shows (0 the machine's own
+     * window; 1..VM_HEADS_MAX-1 an attach for another output: no sound, no microphone, and the guest's clipboard, links,
+     * notifications and apps-mode windows stay the head 0 session's). QEMU's peer-to-peer D-Bus display serves one
+     * connection, so one lord-vmdisplay (head 0's, started with --heads N) serves every output, each on a channel of its
+     * own: head 0's session keeps the other outputs' ends (hpool) until their sessions take them (head_claim); another
+     * output's session never asks lord-vm for the display. hlayout: where this output sits in the desktop the outputs make
+     * (vm_heads_layout, lord.vm.allDisplays), used instead of the guest's layout while hl_on. want_heads: the outputs the
+     * next helper serves; heads_mode: the current one's (0 or 1: one) */
+    int head, hl_on, hlayout[6];
+    int want_heads, heads_mode, hpool[VM_HEADS_MAX];
+    int hn, hw[VM_HEADS_MAX], hh[VM_HEADS_MAX];   /* head 0's: the outputs' sizes lord.vm.allDisplays gave (hn 0: none) */
     int refused_n, refused_seq;
     /* "Capture mouse" (6.25): the pointer lock is this session's (pointerlock.h); how many captures ended and why the last one
      * did (PTRLOCK_END_*), for the window */
@@ -2344,6 +2388,7 @@ static void init_sess(Sess *s, const char *dir) {
     s->db_cur = -1;
     for (int i = 0; i < 4; i++) s->db[i].fd = -1;
     s->gshow = s->gpend = -1;
+    for (int i = 0; i < VM_HEADS_MAX; i++) s->hpool[i] = -1;
     snprintf(s->dir, sizeof s->dir, "%s", dir);
     VmMachine m;
     if (!vm_machine_load(dir, &m, NULL, 0)) {
@@ -2372,7 +2417,8 @@ static int mic_permitted(void) {
 /* the guest's layout to lord-vmdisplay (its tablet points at the shown display) */
 static void layout_send(Sess *s) {
     if (s->vd < 0) return;
-    VdMsg m = vd_msg(VD_LAYOUT, s->layout[0], s->layout[1], s->layout[2], s->layout[3], s->layout[4], s->layout[5]);
+    const int *L = s->hl_on ? s->hlayout : s->layout;
+    VdMsg m = vd_msg(VD_LAYOUT, L[0], L[1], L[2], L[3], L[4], L[5]);
     vd_send(s->vd, &m, -1);
 }
 static void vdsend_fd(Sess *s, int type, int a, int fd) { if (s->vd >= 0) { VdMsg m = vd_msg((uint16_t)type, a, 0, 0, 0, 0, 0); vd_send(s->vd, &m, fd); } }
@@ -2408,6 +2454,7 @@ static const char *snd_target(int kind, const char *chosen) {
 }
 
 static void snd_apply(Sess *s) {
+    if (s->head > 0) return;            /* another output's window: the sound is the machine's own window's */
     MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
     int up = s->vd >= 0 && s->vd_up && ms;
     if (up) snd_retry(s, ms);
@@ -2620,13 +2667,23 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     return JS_NewInt32(c, slot + 1);
 }
 
-/* a machine already running: its runtime socket ($XDG_RUNTIME_DIR/lordos-vm/<id>.sock) */
+/* a machine already running: its runtime socket ($XDG_RUNTIME_DIR/lordos-vm/<id>.sock). attach(dir, { head }) with head
+ * 1..heads-1 (All Displays, 5.4): a session that shows that output of the machine's display; it is protected when another
+ * session of the machine is (lord.vm.protect) */
 static JSValue f_attach(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc;
+    (void)t;
     char dir[PATH_MAX];
     int slot = new_slot();
     VmMachine m;
     if (slot < 0 || machine_dir(c, argv[0], dir, sizeof dir) || vm_machine_load(dir, &m, NULL, 0)) return JS_NewInt32(c, 0);
+    int head = 0;
+    if (argc >= 2 && JS_IsObject(argv[1])) {
+        JSValue v = JS_GetPropertyStr(c, argv[1], "head");
+        int32_t hv = 0;
+        if (!JS_IsUndefined(v) && (JS_ToInt32(c, &hv, v) || hv < 1 || hv >= m.heads || hv >= VM_HEADS_MAX)) { JS_FreeValue(c, v); return JS_NewInt32(c, 0); }
+        JS_FreeValue(c, v);
+        head = hv;
+    }
     const char *rt = getenv("XDG_RUNTIME_DIR");
     char base[256], path[sizeof ((struct sockaddr_un *)0)->sun_path];
     if (rt && rt[0] == '/') snprintf(base, sizeof base, "%s", rt); else snprintf(base, sizeof base, "/run/user/%u", (unsigned)getuid());
@@ -2639,35 +2696,80 @@ static JSValue f_attach(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     init_sess(s, dir);
     s->vm = fd;
     snprintf(s->id, sizeof s->id, "%s", m.id);
+    s->head = head;
+    if (head) {
+        s->snd_on = 0; s->mic_allowed = 0;
+        s->display_asked = 1;           /* its picture comes over head 0's helper (head_claim) */
+        for (int i = 0; i < MAX_SESS; i++) if (&sess[i] != s && sess[i].used && sess[i].protect && !strcmp(sess[i].id, s->id)) s->protect = 1;
+    }
     ask(s, VM_STATUS, 0);
     return JS_NewInt32(c, slot + 1);
 }
 
+/* the other outputs' channels head 0's session still holds (All Displays): closed when its helper goes */
+static void hpool_close(Sess *s) {
+    for (int i = 0; i < VM_HEADS_MAX; i++) if (s->hpool[i] >= 0) { close(s->hpool[i]); s->hpool[i] = -1; }
+    s->heads_mode = 0;
+}
+
 static void spawn_vmdisplay(Sess *s, int dbus_fd) {
     char bin[PATH_MAX];
-    int sv[2];
+    int sv[2], hv[VM_HEADS_MAX][2];
+    /* All Displays (5.4): one channel more per further output of the machine's display */
+    int n = s->head == 0 && s->want_heads > 1 && s->want_heads <= VM_HEADS_MAX ? s->want_heads : 1, made = 1;
+    hpool_close(s);
     if (bin_path("lord-vmdisplay", bin, sizeof bin) || socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) { close(dbus_fd); s->display_failed = 1; return; }
+    for (; made < n; made++) if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, hv[made])) break;
+    if (made < n) {
+        for (int k = 1; k < made; k++) { close(hv[k][0]); close(hv[k][1]); }
+        close(sv[0]); close(sv[1]); close(dbus_fd); s->display_failed = 1; return;
+    }
     pid_t p = fork();
     if (!p) {
-        int a = fcntl(sv[1], F_DUPFD, 20), b = fcntl(dbus_fd, F_DUPFD, 21);
+        int a = fcntl(sv[1], F_DUPFD, 20), b = fcntl(dbus_fd, F_DUPFD, 21), hx[VM_HEADS_MAX];
+        for (int k = 1; k < n; k++) hx[k] = fcntl(hv[k][1], F_DUPFD, 30);
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); dup2(null, 1); }          /* its notes go to the session's log (stderr) */
         dup2(a, 3);
         dup2(b, 4);
-        syscall(SYS_close_range, 5, ~0u, 0);
+        for (int k = 1; k < n; k++) dup2(hx[k], 4 + k);           /* output k's channel on fd 4 + k */
+        syscall(SYS_close_range, 4 + n, ~0u, 0);
         sigset_t none;
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
-        char *args[] = { "lord-vmdisplay", s->id, NULL };
+        char hn[2] = { (char)('0' + n), 0 };
+        char *args[] = { "lord-vmdisplay", s->id, n > 1 ? "--heads" : NULL, hn, NULL };
         execve(bin, args, environ);
         _exit(127);
     }
     close(sv[1]);
     close(dbus_fd);
-    if (p < 0) { close(sv[0]); s->display_failed = 1; return; }
+    for (int k = 1; k < n; k++) close(hv[k][1]);
+    if (p < 0) { close(sv[0]); for (int k = 1; k < n; k++) close(hv[k][0]); s->display_failed = 1; return; }
+    for (int k = 1; k < n; k++) s->hpool[k] = hv[k][0];
+    s->heads_mode = n;
     s->vd = sv[0];
     s->vd_pid = p;
     s->vd_up = 0;
+}
+
+/* Another output's session takes its channel from head 0's session of the same machine, once that one's helper serves
+ * it (All Displays) */
+static void head_claim(Sess *s) {
+    if (s->head <= 0 || s->vd >= 0 || s->head >= VM_HEADS_MAX || !s->id[0]) return;
+    for (int i = 0; i < MAX_SESS; i++) {
+        Sess *o = &sess[i];
+        if (o == s || !o->used || o->head || strcmp(o->id, s->id) || o->heads_mode <= s->head || o->hpool[s->head] < 0) continue;
+        s->vd = o->hpool[s->head];
+        o->hpool[s->head] = -1;
+        s->vd_up = 0;
+        s->vd_state = -1;
+        s->display_failed = 0;
+        if (o->protect) s->protect = 1;
+        /* its place in the desktop the outputs make, sent once its helper says it is ready (VD_READY) */
+        s->hl_on = o->hn > s->head && !vm_heads_layout(o->hn, o->hw, o->hh, s->head, s->hlayout);
+        return;
+    }
 }
 
 static void resume_once(Sess *s) {
@@ -2676,6 +2778,7 @@ static void resume_once(Sess *s) {
 }
 
 static void maybe_display(Sess *s) {
+    if (s->head > 0) { head_claim(s); return; }     /* another output: never its own display connection (All Displays) */
     if (s->display_asked || !s->have_info || (s->state != VS_RUNNING && s->state != VS_PAUSED)) return;
     s->display_asked = 1;
     int q = ask(s, VM_DISPLAY, 0);
@@ -2901,6 +3004,7 @@ static int db_read(Sess *s, MediaSrc *ms, int *ry0, int *ry1) {
 static void drop_display(Sess *s, int close_helper) {
     ptrlock_end_owner(s);               /* no picture, no capture (it tells lord-vm and the helper first) */
     if (s->vd >= 0) { if (close_helper) vdsend(s, VD_CLOSE, 0, 0); close(s->vd); s->vd = -1; }
+    hpool_close(s);
     if (s->vd_pid > 0) {
         if (waitpid(s->vd_pid, NULL, WNOHANG) == 0) { kill(s->vd_pid, SIGKILL); waitpid(s->vd_pid, NULL, 0); }
         s->vd_pid = 0;
@@ -3105,6 +3209,7 @@ static void from_vm(Sess *s) {
             snprintf(s->ag_text, sizeof s->ag_text, "%s", m.text);
             break;
         case VM_CLIP_REQ:
+            if (s->head > 0) break;         /* another head's window: the machine's own window answers (All Displays) */
             /* a program in the guest pastes: the host's clipboard only while the machine is in use, and in ask mode
              * only once the person says yes (clipboardAnswer) */
             if (!clip_in_use(s)) { s->blk_read++; clip_deny(s, (uint32_t)m.a, m.b, VCD_BACKGROUND); break; }
@@ -3118,6 +3223,7 @@ static void from_vm(Sess *s) {
             clip_give(s, (uint32_t)m.a, m.b);
             break;
         case VM_CLIP_DATA:
+            if (s->head > 0) break;
             /* the guest's clipboard, only while the machine is in use: in the background it's ignored (and lord-vm
              * logs it), so a guest can't change this computer's clipboard behind the person's back */
             if (fd >= 0 && !clip_in_use(s)) {
@@ -3152,7 +3258,7 @@ static void from_vm(Sess *s) {
             }
             break;
         case VM_WINDATA:
-            if (fd >= 0) windata(s, &m, fd);
+            if (fd >= 0 && s->head <= 0) windata(s, &m, fd);
             break;
         case VM_GUEST_LAYOUT:
             s->layout[0] = m.a; s->layout[1] = m.b; s->layout[2] = (m.c >> 16) & 0xffff; s->layout[3] = m.c & 0xffff;
@@ -3170,7 +3276,7 @@ static void from_vm(Sess *s) {
             }
             break;
         case VM_GUEST_NOTE:
-            if (fd >= 0) guest_note(s, &m, fd);
+            if (fd >= 0 && s->head <= 0) guest_note(s, &m, fd);
             break;
         case VM_CONSOLE_FD:
             if (fd >= 0 && m.seq == s->console_seq) {
@@ -3197,6 +3303,7 @@ static void from_vm(Sess *s) {
             if (s->disc_seq && m.seq == s->disc_seq) { snprintf(s->disc_msg, sizeof s->disc_msg, "%s", m.a == VME_OK ? "" : m.text); s->disc_seq = 0; }
             if (s->ag_seq && m.seq == s->ag_seq) { s->ag_result = m.a == VME_OK ? 2 : 3; snprintf(s->ag_msg, sizeof s->ag_msg, "%s", m.text); s->ag_seq = 0; }
             if (s->xf_seq && m.seq == s->xf_seq) { s->xf_result = m.a == VME_OK ? 2 : 3; snprintf(s->xf_msg, sizeof s->xf_msg, "%s", m.text); s->xf_seq = 0; }
+            if (s->cable_seq && m.seq == s->cable_seq) { if (m.a == VME_OK) s->cable_down = !s->cable_want; s->cable_seq = 0; }
             if (s->cd_seq && m.seq == s->cd_seq) { s->cd_state = m.a == VME_OK ? 2 : 3; snprintf(s->cd_msg, sizeof s->cd_msg, "%s", m.text); s->cd_seq = 0; }
             if (m.a != VME_OK) {
                 snprintf(s->last_error, sizeof s->last_error, "%s", m.text);
@@ -3493,6 +3600,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     Sess *s = get(c, argv[0]);
     if (!s) return JS_NULL;
     from_vm(s);
+    head_claim(s);
     if (s->vgpu && (s->state == VS_STARTING || s->state == VS_PAUSED)) gvt_memlock(s->dir);
     /* the picture's frames are read by lord-server's loop (js_vm_dispatch) and acknowledged after each paint
      * (js_vm_painted); this poll only reports the state */
@@ -3549,6 +3657,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "picTex", (int)s->pic_tex);
     set_int(c, o, "pace", s->pace.kind);
     set_int(c, o, "cd", s->cd_state);
+    JS_SetPropertyStr(c, o, "cableOut", JS_NewBool(c, s->cable_down));
     if (s->console_term && !term_get(s->console_term)) s->console_term = 0;
     set_int(c, o, "console", s->console_term);
     /* the agent's shell: its terminal, and its size passed on to the guest when the terminal changed it */
@@ -3607,7 +3716,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     }
     set_str(c, o, "cdMessage", s->cd_msg);
     set_str(c, o, "notice", s->notice == VMN_NET_LOST ? "network-lost" : s->notice == VMN_RECOVERED ? "recovered" : s->notice == VMN_NET_BACK ? "network-back"
-                          : s->notice == VMN_IDENTITY ? "identity" : "");
+                          : s->notice == VMN_IDENTITY ? "identity" : s->notice == VMN_SHARE_LOST ? "share-lost" : "");
     set_int(c, o, "noticeCode", s->notice_code);
     set_int(c, o, "noticeSeq", s->notice_seq);
     if (s->job_kind) {
@@ -3828,6 +3937,20 @@ static JSValue f_cdrom(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     if (fd >= 0) close(fd);
     if (ok) { s->cd_seq = s->seq; s->cd_state = 1; s->cd_msg[0] = 0; }
     return JS_NewBool(c, ok);
+}
+
+/* netCable(id, plugged) → bool: the running machine's network cable plugged in or pulled (VM_NETCABLE, the window's
+ * Devices → Network); poll's cableOut says where it is. A new run starts plugged in. */
+static JSValue f_net_cable(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s || s->vm < 0 || s->cable_seq) return JS_FALSE;
+    int on = JS_ToBool(c, argv[1]);
+    VmMsg m = vm_msg(VM_NETCABLE, ++s->seq, on ? 1 : 0, 0, 0, 0, "");
+    if (vm_send(s->vm, &m, -1)) return JS_FALSE;
+    s->cable_seq = s->seq;
+    s->cable_want = on ? 1 : 0;
+    return JS_TRUE;
 }
 
 static JSValue f_cmd(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -4179,12 +4302,67 @@ static JSValue f_protect(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     (void)t; (void)argc;
     Sess *s = get(c, argv[0]);
     if (!s) return JS_FALSE;
-    s->protect = 1;
-    MediaSrc *m = s->media ? media_src_get(s->media) : NULL;
-    media_src_protect(m);
-    if (s->rec) rec_end(s, media_src_get(s->rec));
+    /* every session of the machine: its other heads' windows too (All Displays) */
+    for (int i = 0; i < MAX_SESS; i++) {
+        Sess *o = &sess[i];
+        if (!o->used || (o != s && (!s->id[0] || strcmp(o->id, s->id)))) continue;
+        o->protect = 1;
+        media_src_protect(o->media ? media_src_get(o->media) : NULL);
+        if (o->rec) rec_end(o, media_src_get(o->rec));
+    }
     char p[PATH_MAX + 16];
     if (s->dir[0] == '/' && snprintf(p, sizeof p, "%s/thumb.png", s->dir) < (int)sizeof p) unlink(p);
+    return JS_TRUE;
+}
+
+/* allDisplays(session, [[w, h], ...] | null) → bool (docs/VIRTUALIZATION.md 5.4): the heads' sizes, head 0 first, one per
+ * output of the machine (2..its heads); the desktop they make side by side (vm_heads_layout) goes to each of the machine's
+ * sessions as its head's place: the tablet's clicks land on that head's pixels and the guest is asked for each head's size
+ * at that corner. null: back to the guest's own layout (one display again) */
+static JSValue f_all_displays(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = get(c, argv[0]);
+    if (!s || !s->id[0] || s->head) return JS_FALSE;
+    int n = 0, w[VM_HEADS_MAX], h[VM_HEADS_MAX];
+    if (argc >= 2 && JS_IsArray(c, argv[1])) {
+        JSValue lv = JS_GetPropertyStr(c, argv[1], "length");
+        int32_t len = 0;
+        JS_ToInt32(c, &len, lv);
+        JS_FreeValue(c, lv);
+        if (len < 2 || len > VM_HEADS_MAX) return JS_FALSE;
+        for (int i = 0; i < len; i++) {
+            JSValue e = JS_GetPropertyUint32(c, argv[1], (uint32_t)i);
+            JSValue a = JS_GetPropertyUint32(c, e, 0), b = JS_GetPropertyUint32(c, e, 1);
+            int32_t x = 0, y = 0;
+            int bad = JS_ToInt32(c, &x, a) || JS_ToInt32(c, &y, b);
+            JS_FreeValue(c, a); JS_FreeValue(c, b); JS_FreeValue(c, e);
+            if (bad) return JS_FALSE;
+            w[i] = x; h[i] = y;
+        }
+        n = len;
+        int L[6];
+        if (vm_heads_layout(n, w, h, 0, L)) return JS_FALSE;      /* every size checked before anything changes */
+        VmMachine m;
+        if (vm_machine_load(s->dir, &m, NULL, 0) || n > m.heads || strcmp(m.id, s->id)) return JS_FALSE;
+    }
+    /* a helper for that many outputs: the picture again from a new one (QEMU's display takes one connection) */
+    int want = n ? n : 1;
+    if (want != (s->heads_mode > 1 ? s->heads_mode : 1) && (s->state == VS_RUNNING || s->state == VS_PAUSED)) {
+        s->want_heads = want;
+        drop_display(s, 1);
+        s->display_asked = 0; s->display_failed = 0; s->vd_state = -1;
+        maybe_display(s);
+    }
+    s->want_heads = want;
+    s->hn = n;
+    for (int i = 0; i < n; i++) { s->hw[i] = w[i]; s->hh[i] = h[i]; }
+    for (int i = 0; i < MAX_SESS; i++) {
+        Sess *o = &sess[i];
+        if (!o->used || strcmp(o->id, s->id)) continue;
+        if (n && o->head < n && !vm_heads_layout(n, w, h, o->head, o->hlayout)) o->hl_on = 1;
+        else { o->hl_on = 0; memset(o->hlayout, 0, sizeof o->hlayout); }
+        layout_send(o);
+    }
     return JS_TRUE;
 }
 
@@ -5596,9 +5774,9 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate), JS_CFUNC_DEF("shown", 2, f_shown),
-    JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
+    JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("allDisplays", 2, f_all_displays), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot), JS_CFUNC_DEF("protect", 1, f_protect),
-    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
+    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("netCable", 2, f_net_cable), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),

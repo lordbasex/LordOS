@@ -932,5 +932,19 @@
   "sentinela.blockFailed": "ネットワークをブロックできませんでした。",
   "sentinela.machineGone": "そのマシンはもう「仮想マシン」にありません。",
   "sentinela.machineFailed": "マシンが応答しませんでした。",
-  "vm.overBudget": "すでに実行中のマシンと並べて動かすにはメモリが足りません。どれかをサスペンドするかシャットダウンするか、このマシンのメモリを減らしてください。"
+  "vm.overBudget": "すでに実行中のマシンと並べて動かすにはメモリが足りません。どれかをサスペンドするかシャットダウンするか、このマシンのメモリを減らしてください。",
+  "llm.timeout": "ローカルモデルの応答に時間がかかりすぎました。",
+  "llm.failed": "ローカルモデルが応答できませんでした。",
+  "llm.answer": "ローカルモデルの応答を読み取れませんでした。",
+  "llm.start": "ローカルモデルを起動できませんでした。",
+  "sentinela.lumo.off": "Sentinela はオフです。設定 → AI → Sentinela でオンにしてください。",
+  "sentinela.lumo.noEngine": "ローカルモデルのエンジンがインストールされていません。",
+  "sentinela.lumo.noModel": "Sentinela 用のローカルモデルがインストールされていません。",
+  "sentinela.lumo.rejected": "Lumo の応答が想定した形式ではなかったため、採用しませんでした。",
+  "sentinela.blockRefused": "LordOS 自身のプログラム、スクリプトインタプリタそのもの、システムの中核プログラムはブロックできません。",
+  "sentinela.blockFull": "ブロックリストがいっぱいです。",
+  "sentinela.notBlocked": "そのプログラムはブロックリストに入っていません。",
+  "sentinela.noAppNetwork": "このプロセスには、ネットワークをブロックできる専用のアプリがありません。",
+  "sys.failed": "問題が発生しました。",
+  "sys.unsupported": "このバージョンの LordOS ではできません。"
 }

@@ -39,7 +39,24 @@
     P(3300, 1, 'syncd', me, { exe: '/home/alex/bin/syncd', rss: 14 * MB, cpu: 0.006, threads: 4 }),
     P(3400, 1, 'pipewire', me, { prot: 'system', exe: '/usr/bin/pipewire (deleted)', rss: 18 * MB, cpu: 0.008, threads: 3 }),
     P(3500, 410, 'qemu-system-x86', me, { app: 'desktop:lordos-vm-7f3a', exe: '/usr/bin/qemu-system-x86_64', rss: 2140 * MB, cpu: 0.12, threads: 9 }),
+    ...big(me),
   ];
+  // MONITOR_BIG (tests/monitor_freeze_headless.sh): a Terminal with 240 programs (shells, node, a build), the size of
+  // the group whose opening froze the desktop (0.8.9.6)
+  function big(me) {
+    if (!globalThis.MONITOR_BIG) return [];
+    const out = [];
+    const names = ['bash', 'node', 'claude', 'sh', 'make', 'cc1', 'python3', 'git', 'ssh', 'rg'];
+    for (let i = 0; i < 24; i++) {
+      const sh = 5000 + i * 20;
+      out.push(P(sh, 520, 'bash', me, { app: 'lordos:terminal', exe: '/usr/bin/bash', rss: 5 * MB }));
+      for (let k = 1; k < 10; k++) {
+        const n = names[k];
+        out.push(P(sh + k, k < 4 ? sh + k - 1 : sh + 3, n, me, { app: 'lordos:terminal', exe: `/usr/bin/${n}`, rss: k * 7 * MB, cpu: ((i * k) % 7) / 300, threads: 1 + (k % 4) }));
+      }
+    }
+    return out;
+  }
   const OWN = {
     '/usr/lib/lordos/lord-sessiond': 'lordos', '/usr/lib/lordos/lord-server': 'lordos', '/usr/lib/lordos/lord-media': 'lordos', '/usr/lib/lordos/lord-web': 'lordos-web',
     '/opt/google/chrome/chrome': 'google-chrome-stable', '/opt/google/chrome/chrome_crashpad_handler': 'google-chrome-stable', '/usr/bin/bwrap': 'bubblewrap',

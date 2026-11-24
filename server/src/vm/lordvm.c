@@ -2511,8 +2511,14 @@ static void build_qemu_args(void) {
      * checked 2026-11-23): pmu off, pv-unhalt on, kvmclock on for the gateway and off for the workstation */
     if (kvm && m->timers) { arg("-cpu"); argf("host,pmu=off,kvm-pv-unhalt=on,kvmclock=%s", m->timers == VM_TIMERS_WHONIX_WORKSTATION ? "off" : "on"); }
     else {
-        arg("-cpu"); arg(!kvm ? "max" : m->hyperv ? "host,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,hv_vpindex,hv_runtime,hv_synic,hv_stimer,hv_time,"
-                                                     "hv_frequencies,hv_reset,hv_tlbflush,hv_ipi" : "host");
+        /* "compatible" (5.5, schema 16): QEMU's Nehalem-v2, the x86-64-v2 level (SSE4.2, POPCNT: what Windows 11 needs),
+         * the same on every amd64 computer, so a machine moved to another one or kept across a new processor sees no change */
+        const char *base = m->cpu_model == VM_CPU_COMPAT ? "Nehalem-v2" : "host";
+        arg("-cpu");
+        if (!kvm) arg("max");
+        else if (m->hyperv) argf("%s,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,hv_vpindex,hv_runtime,hv_synic,hv_stimer,hv_time,"
+                                 "hv_frequencies,hv_reset,hv_tlbflush,hv_ipi", base);
+        else arg(base);
     }
     if (m->cpu_sockets) { arg("-smp"); argf("%d,sockets=%d,cores=%d,threads=%d", m->vcpus, m->cpu_sockets, m->cpu_cores, m->cpu_threads); }
     else { arg("-smp"); argf("%d", m->vcpus); }
@@ -2752,6 +2758,8 @@ static void build_qemu_args(void) {
          * guest's Vulkan allocates is backed, by the GPU's driver), and needs blob resources */
         if (S.gl && S.venus) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",blob=on,hostmem=%dM,venus=on", VM_VENUS_HOSTMEM_MB);
         if (m->res_w && m->res_h) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",xres=%d,yres=%d", m->res_w, m->res_h);
+        /* All Displays (5.4): one output per display, each a console of the D-Bus display (Console_<n>) */
+        if (m->heads > 1) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",max_outputs=%d", m->heads);
         /* an Intel vGPU instead (decide_vgpu): its own display, the OpRegion QEMU hands over (the VBT Intel's driver
          * reads), and our GOP option ROM, which lights the UEFI screen on it; the guest's resets end QEMU (they crash a
          * GVT-g guest otherwise, 3 of 3) and Machines starts it again */
@@ -2761,6 +2769,9 @@ static void build_qemu_args(void) {
             if (!S.unattended) { arg("-action"); arg("reboot=shutdown"); }
         } else { arg("-device"); arg(vga); }
     }
+    static char arm_gpu[64];
+    snprintf(arm_gpu, sizeof arm_gpu, "virtio-gpu-pci,id=video0,addr=0x4");
+    if (m->heads > 1) snprintf(arm_gpu + strlen(arm_gpu), sizeof arm_gpu - strlen(arm_gpu), ",max_outputs=%d", m->heads);
     char dbus_disp[96];
     /* the render node by descriptor (render_open): QEMU opens /proc/self/fd/<n>, the device lord-vm checked */
     S.render_qfd = (S.gl || S.vgpu) && S.render_fd >= 0 ? xfd++ : -1;
@@ -2772,7 +2783,7 @@ static void build_qemu_args(void) {
         /* the windows devices on arm64: ramfb, the firmware's own framebuffer, which their basic display driver keeps
          * after the firmware leaves (virtio-gpu's picture stops there until viogpudo is in) */
         if (win_arm) { arg("-device"); arg("ramfb"); }
-        else if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); }
+        else if (arm) { arg("-device"); arg(arm_gpu); }
         if (m->devices != VM_DEV_WINDOWS) { arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5"); }
         if (arm) { arg("-device"); arg("usb-kbd,bus=xhci.0"); }
         arg("-device"); arg("usb-tablet,bus=xhci.0");
@@ -2785,7 +2796,7 @@ static void build_qemu_args(void) {
         arg("-audiodev"); arg("dbus,id=snd0,out.frequency=48000,out.channels=2,out.format=s16,in.frequency=48000,in.channels=2,in.format=s16");
         arg("-display"); arg(dbus_disp);
     } else if (m->display == VM_DISPLAY_WINDOW) {
-        if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); arg("-device"); arg("virtio-keyboard-pci,addr=0x5"); }
+        if (arm) { arg("-device"); arg(arm_gpu); arg("-device"); arg("virtio-keyboard-pci,addr=0x5"); }
         arg("-device"); arg(arm ? "virtio-tablet-pci,addr=0x6" : "virtio-tablet-pci,addr=0x5");
         /* the relative mouse for "Capture mouse" (6.25), on a free slot (0x10-0x13 are the data disks, 0x18 on the extra
          * cards) */
@@ -6373,6 +6384,17 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (fd >= 0) close(fd);
         return;
     }
+    case VM_NETCABLE: {
+        if (fd >= 0) { close(fd); fd = -1; }
+        if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
+        if (S.m.group[0] || (S.m.network != VM_NET_SHARED && S.m.network != VM_NET_HOSTONLY && S.m.network != VM_NET_BRIDGED)) {
+            reply(ci, m->seq, VME_DENIED, "this machine's network has no cable to pull");
+            return;
+        }
+        if (qmp_do("set_link", m->a ? "{\"name\":\"nic0\",\"up\":true}" : "{\"name\":\"nic0\",\"up\":false}", P_REPLY, ci, m->seq, -1, -1)) reply(ci, m->seq, VME_BUSY, "busy");
+        else vlog("network: the cable is %s", m->a ? "plugged in" : "pulled");
+        return;
+    }
     case VM_SHELL: {
         if (fd >= 0) { close(fd); fd = -1; }
         if (m->a == VSH_CLOSE) { shell_end("closed by the window", 1); reply(ci, m->seq, VME_OK, "closed"); return; }
@@ -7134,7 +7156,11 @@ static void reap(void) {
             S.vfs[k] = 0;
             vlog("share %d: virtiofsd exited (%s %d)", k + 1, WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
             /* it also ends by itself when QEMU closes the connection (a suspend, a shutdown): news only while the machine runs on */
-            if (!S.qemu_done && !S.suspending && S.state == VS_RUNNING) vlog("share %d: the folder %s is gone from the machine until it starts again", k + 1, sh_tag(k));
+            if (!S.qemu_done && !S.suspending && S.state == VS_RUNNING) {
+                vlog("share %d: the folder %s is gone from the machine until it starts again", k + 1, sh_tag(k));
+                /* the machine's window says so (VMN_SHARE_LOST): nothing reconnects a vhost-user device QEMU lost */
+                notice_all(VMN_SHARE_LOST, k == VM_SHARES, sh_tag(k));
+            }
         } else if (p == S.tpm) {
             S.tpm = 0;
             vlog("tpm: swtpm exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
@@ -8127,7 +8153,7 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1, autom = -1, vk = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1, autom = -1, heads = 0, vk = -1;
     int dispo = -1, bkp = -1, fwup = 0;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
@@ -8144,10 +8170,22 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     int boot[VM_BOOT_DEVS], nboot = -1, bmenu = -1;
     /* the sound's output and input (6.9): --sound-out, --sound-in NODE|default */
     const char *sout = NULL, *sin = NULL;
+    /* Configure (5.5, schema 16): --cpu-model host|compatible; --mac new (a new random address of QEMU's 52:54:00 range for
+     * the first card); --add-disk GB (one more empty data disk, disks/data-<n>.qcow2, up to VM_DATA_DISKS) */
+    int cpum = -1, newmac = 0, adddisk = 0;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
         i++;
+        if (!strcmp(a, "--cpu-model")) { cpum = parse_enum(v, "host", "compatible"); if (cpum < 0) { fprintf(stderr, "lord-vm: --cpu-model host|compatible\n"); return 2; } continue; }
+        if (!strcmp(a, "--mac")) { if (strcmp(v, "new")) { fprintf(stderr, "lord-vm: --mac new\n"); return 2; } newmac = 1; continue; }
+        if (!strcmp(a, "--add-disk")) {
+            char *end = NULL;
+            long x = strtol(v, &end, 10);
+            if (!*v || *end || x < VM_DISK_MIN_GB || x > VM_DISK_MAX_GB) { fprintf(stderr, "lord-vm: --add-disk %d..%d (GB)\n", VM_DISK_MIN_GB, VM_DISK_MAX_GB); return 2; }
+            adddisk = (int)x;
+            continue;
+        }
         if (!strcmp(a, "--boot-order")) { nboot = vm_boot_parse(v, boot); if (nboot < 0) { fprintf(stderr, "lord-vm: --boot-order auto, or disk, cd and network in the order wanted (\"network,disk\")\n"); return 2; } continue; }
         if (!strcmp(a, "--boot-menu")) { bmenu = parse_enum(v, "off", "on"); if (bmenu < 0) { fprintf(stderr, "lord-vm: --boot-menu on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--port")) {
@@ -8188,6 +8226,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         if (!strcmp(a, "--backup")) { bkp = parse_enum(v, "off", "on"); if (bkp < 0) { fprintf(stderr, "lord-vm: --backup on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--firmware-update")) { fwup = parse_enum(v, "no", "yes"); if (fwup < 0) { fprintf(stderr, "lord-vm: --firmware-update yes\n"); return 2; } continue; }
         if (!strcmp(a, "--guest-links")) { glinks = parse_enum(v, "off", "on"); if (glinks < 0) { fprintf(stderr, "lord-vm: --guest-links on|off\n"); return 2; } continue; }
+        /* All Displays (5.4): the virtio-gpu's outputs, 1 to VM_HEADS_MAX (hardware: refused while suspended) */
+        if (!strcmp(a, "--heads")) { heads = (strlen(v) == 1 && v[0] >= '1' && v[0] <= '0' + VM_HEADS_MAX) ? v[0] - '0' : 0; if (!heads) { fprintf(stderr, "lord-vm: --heads 1 to %d\n", VM_HEADS_MAX); return 2; } continue; }
         if (!strcmp(a, "--guest-notify")) { gnote = parse_enum(v, "off", "on"); if (gnote < 0) { fprintf(stderr, "lord-vm: --guest-notify on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
@@ -8240,7 +8280,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
         /* the graphics card changes with 2D or 3D: a saved state holds the other one's */
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (vk >= 0 && vk != m.vulkan) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || adddisk || newmac || (cpum >= 0 && cpum != m.cpu_model) || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (vk >= 0 && vk != m.vulkan) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu) || (heads && heads != (m.heads > 1 ? m.heads : 1)))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     /* a new name (6.26): refused when another machine has it or, as the folder follows, when its folder's or transfer
      * folder's new name is taken; the same name again only brings the folder in line when it can */
@@ -8276,8 +8316,28 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (perf >= 0) { m.perf_profile = perf; if (perf) m.schema = VM_SCHEMA; }
     if (glinks >= 0) { m.guest_links = glinks; if (glinks) m.schema = VM_SCHEMA; }
     if (gnote >= 0) { m.guest_notify = gnote; if (gnote) m.schema = VM_SCHEMA; }
+    if (heads) { m.heads = heads; if (heads > 1) m.schema = VM_SCHEMA; }
     if (autom >= 0) { m.automation = autom; if (autom) m.schema = VM_SCHEMA; }
     if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
+    if (cpum >= 0) { m.cpu_model = cpum; if (cpum) m.schema = VM_SCHEMA; }
+    if (newmac) {
+        uint8_t r[3];
+        if (getrandom(r, sizeof r, 0) != (ssize_t)sizeof r) { fprintf(stderr, "lord-vm: no random bytes for the address\n"); goto out; }
+        snprintf(m.mac, sizeof m.mac, "52:54:00:%02x:%02x:%02x", r[0], r[1], r[2]);
+    }
+    if (adddisk) {
+        if (m.n_data >= VM_DATA_DISKS) { fprintf(stderr, "lord-vm: a machine has at most %d data disks\n", VM_DATA_DISKS); goto out; }
+        if (m.base[0]) { fprintf(stderr, "lord-vm: a linked clone gets no new disk: make a full clone of it first\n"); goto out; }
+        /* an encrypted machine's disks are all encrypted, a raw machine's all raw (6.4, 8): an empty qcow2 would be neither */
+        if (m.encrypted || m.raw) { fprintf(stderr, "lord-vm: an encrypted machine or one with raw disks gets no new disk here yet\n"); goto out; }
+        /* a snapshot covers every disk the machine had then: going back to it with a disk it never saw fails in QEMU */
+        VmSnap sl[VM_SNAPS_MAX];
+        if (vm_snaps_load(real, sl, VM_SNAPS_MAX) > 0) { fprintf(stderr, "lord-vm: the machine has snapshots: a new disk would make going back to them fail; delete them first\n"); goto out; }
+        m.data_gb[m.n_data] = adddisk;
+        snprintf(m.data_serial[m.n_data], sizeof m.data_serial[0], "LORDOS-DATA-%d", (m.n_data + 1) & 7);
+        m.n_data++;
+        m.schema = VM_SCHEMA;
+    }
     if (dispo >= 0) { m.disposable = dispo; if (dispo) m.schema = VM_SCHEMA; }
     if (bkp >= 0) { m.no_backup = !bkp; if (!bkp) m.schema = VM_SCHEMA; }
     if (fwup && m.firmware == VM_FW_UEFI) {
@@ -8367,6 +8427,21 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         jb_free(&sb_);
         if (bad) { fprintf(stderr, "lord-vm: growing the disk failed: %s\n", err); goto out; }
     }
+    if (adddisk) {
+        /* the new disk: made empty under a temporary name, renamed into place, before machine.json names it; a disk of
+         * that name already there (left by hand or by an interrupted add) is never reused */
+        char dp[PATH_MAX + 64], tmp[PATH_MAX + 64], dd[PATH_MAX + 8], size[32];
+        snprintf(dd, sizeof dd, "%s/disks", real);
+        snprintf(dp, sizeof dp, "%s/data-%d.qcow2", dd, m.n_data & 7);
+        snprintf(tmp, sizeof tmp, "%s/.data-%d.qcow2.new", dd, m.n_data & 7);
+        snprintf(size, sizeof size, "%dG", adddisk);
+        struct stat dst;
+        if (!lstat(dp, &dst)) { fprintf(stderr, "lord-vm: disks/data-%d.qcow2 is there already: move it away first\n", m.n_data); goto out; }
+        unlink(tmp);
+        char *mk[] = { QEMU_IMG, "create", "-q", "-f", "qcow2", tmp, size, NULL };
+        if (run_tool_in(mk, err, sizeof err, dd, dd)) { unlink(tmp); fprintf(stderr, "lord-vm: making the disk failed: %s\n", err); goto out; }
+        if (renameat2(AT_FDCWD, tmp, AT_FDCWD, dp, RENAME_NOREPLACE)) { unlink(tmp); fprintf(stderr, "lord-vm: making the disk failed: %s\n", strerror(errno)); goto out; }
+    }
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
     /* the name is saved: now the folders follow it. A folder that can't move keeps its name, and says why */
@@ -8385,7 +8460,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
            VM_NIC_MODELS[m.nic_model], m.graphics == VM_GFX_3D ? "3d" : "2d", VM_VGPU_NAMES[m.vgpu], bspec, m.boot_menu ? "true" : "false", m.transfer ? "true" : "false");
     printf(",\"name\":"); print_json_str(m.name);
     printf(",\"dir\":"); print_json_str(newdir[0] ? newdir : real);
-    printf(",\"folder\":\"%s\"", folder);
+    printf(",\"folder\":\"%s\",\"cpu_model\":\"%s\",\"data_disks\":%d,\"mac\":\"%s\"", folder, VM_CPU_NAMES[m.cpu_model == VM_CPU_COMPAT], m.n_data, m.mac);
     if (why[0]) { printf(",\"why\":"); print_json_str(why); }
     printf("}\n");
     rc = 0;
@@ -10553,7 +10628,8 @@ out:
  * beside it removed, a new id and new MAC addresses. 0, or -1 (said on stderr) */
 static int fresh_member(const char *mdir, const char *dirname, VmMachine *m, const char *base) {
     char disks[PATH_MAX + VMG_DIR_MAX + 16], nw[PATH_MAX + VMG_DIR_MAX + 48], sys[PATH_MAX + VMG_DIR_MAX + 48], err[256];
-    snprintf(disks, sizeof disks, "%s/disks", mdir);
+    /* a path too long is refused, not cut (gcc on arm64 warns about the truncation otherwise) */
+    if ((size_t)snprintf(disks, sizeof disks, "%s/disks", mdir) >= sizeof disks) { fprintf(stderr, "lord-vm: %s's path is too long\n", dirname); return -1; }
     snprintf(nw, sizeof nw, "%s/.system.qcow2.fresh", disks);
     snprintf(sys, sizeof sys, "%s/system.qcow2", disks);
     unlink(nw);
@@ -10566,8 +10642,7 @@ static int fresh_member(const char *mdir, const char *dirname, VmMachine *m, con
     unlink_in(mdir, "suspend.state");
     unlink_in(disks, ".session-empty.qcow2");
     char logs[PATH_MAX + VMG_DIR_MAX + 16];
-    snprintf(logs, sizeof logs, "%s/log", mdir);
-    DIR *d = opendir(logs);
+    DIR *d = (size_t)snprintf(logs, sizeof logs, "%s/log", mdir) < sizeof logs ? opendir(logs) : NULL;
     if (d) {
         struct dirent *e;
         while ((e = readdir(d))) if (e->d_name[0] != '.') unlinkat(dirfd(d), e->d_name, 0);
@@ -11407,6 +11482,7 @@ static int usage(void) {
             "                         [--perf-profile on|off]   (the guest tools switch the guest to its performance profile while it runs)\n"
             "                         [--guest-links on|off]   (links the guest's tools send are offered to open on this computer)\n"
             "                         [--guest-notify on|off]   (the guest's notifications are shown here, as from the machine)\n"
+            "                         [--heads 1-4]   (All Displays, 5.4: the guest's displays; while it is off)\n"
             "                         [--automation on|off]   (machines exec and cp may run programs in the guest: docs/VIRTUALIZATION.md 6.15)\n"
             "                         [--vulkan on|off]   (a 3D machine's guest gets Vulkan through venus: docs/VIRTUALIZATION.md 6.10)\n"
             "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"

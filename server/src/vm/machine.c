@@ -81,6 +81,7 @@ int vm_serial_valid(const char *s) {
     return 1;
 }
 
+const char *const VM_CPU_NAMES[] = { "host", "compatible", NULL };
 const char *const VM_NIC_MODELS[VM_NIC_COUNT + 1] = { "virtio", "e1000e", "e1000", "e1000-82545em", "e1000-82544gc", "vmxnet3", "rtl8139", "pcnet", NULL };
 
 /* 1..64 bytes of valid UTF-8, no control characters, no '/' or '\\', not only spaces */
@@ -556,6 +557,8 @@ static int check_member(const VmMachine *m, char *err, size_t n) {
             return fail(err, n, VM_E_RANGE, "locked for anonymity: SMBIOS strings and disk serials");
         if (m->perf_profile) return fail(err, n, VM_E_RANGE, "locked for anonymity: the guest's performance profile (it needs the agent)");
         if (m->guest_links || m->guest_notify) return fail(err, n, VM_E_RANGE, "locked for anonymity: links and notifications from the guest");
+        /* All Displays would tell the guest how many displays this computer has, and their sizes */
+        if (m->heads > 1) return fail(err, n, VM_E_RANGE, "locked for anonymity: several displays");
         if (m->automation) return fail(err, n, VM_E_RANGE, "locked for anonymity: automation");
     }
     return VM_OK;
@@ -666,8 +669,15 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 15 && (m->guest_links || m->guest_notify)) return fail(err, n, VM_E_FIELD, "guest_links and guest_notify need schema 15");
     if (m->automation & ~1) return fail(err, n, VM_E_RANGE, "automation is true or false");
     if (m->schema < 17 && m->automation) return fail(err, n, VM_E_FIELD, "automation needs schema 17");
+    if (m->cpu_model < VM_CPU_HOST || m->cpu_model > VM_CPU_COMPAT) return fail(err, n, VM_E_RANGE, "cpu_model is host or compatible");
+    if (m->schema < 18 && m->cpu_model) return fail(err, n, VM_E_FIELD, "cpu_model needs schema 18");
+    if (m->cpu_model == VM_CPU_COMPAT && (m->arch != VM_ARCH_AMD64 || m->accel != VM_ACCEL_KVM)) return fail(err, n, VM_E_RANGE, "a compatible processor is for amd64 machines with KVM");
+    if (m->heads < 0 || m->heads > VM_HEADS_MAX) return fail(err, n, VM_E_RANGE, "heads is 1 to %d", VM_HEADS_MAX);   /* 0: one, as a VmMachine made before the key */
+    if (m->schema < 19 && m->heads > 1) return fail(err, n, VM_E_FIELD, "heads needs schema 19");
+    /* one picture per output needs virtio-gpu's own: not an Intel vGPU's, and only on a machine with a window */
+    if (m->heads > 1 && (m->vgpu || m->display != VM_DISPLAY_WINDOW)) return fail(err, n, VM_E_RANGE, "several displays need virtio graphics and a window");
     if (m->vulkan & ~1) return fail(err, n, VM_E_RANGE, "vulkan is true or false");
-    if (m->schema < 18 && m->vulkan) return fail(err, n, VM_E_FIELD, "vulkan needs schema 18");
+    if (m->schema < 21 && m->vulkan) return fail(err, n, VM_E_FIELD, "vulkan needs schema 21");
     if (m->vulkan && m->graphics != VM_GFX_3D) return fail(err, n, VM_E_RANGE, "vulkan needs graphics 3d");
     if (m->cpu_pin < VM_PIN_DEFAULT || m->cpu_pin > VM_PIN_AUTO) return fail(err, n, VM_E_RANGE, "cpu_pin is off or auto");
     if (m->schema < 13 && m->cpu_pin) return fail(err, n, VM_E_FIELD, "cpu_pin needs schema 13");
@@ -823,7 +833,7 @@ static const char *const KEYS[] = {
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
-    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation", "vulkan", NULL,
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation", "cpu_model", "heads", "vulkan", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -1115,7 +1125,17 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         const JVal *au = json_get(o, "automation");
         if (au && au->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "automation must be true or false"); goto out; }
         m->automation = au ? json_bool(o, "automation", 0) : 0;
-        /* schema 18: missing means no Vulkan (venus, 6.10) */
+        /* schema 18: missing means this computer's processor */
+        char cpum[16];
+        if ((r = get_str(o, "cpu_model", cpum, sizeof cpum, 0, err, n))) goto out;
+        m->cpu_model = VM_CPU_HOST;
+        if (cpum[0] && !strcmp(cpum, "compatible")) m->cpu_model = VM_CPU_COMPAT;
+        else if (cpum[0] && strcmp(cpum, "host")) { r = fail(err, n, VM_E_RANGE, "cpu_model is host or compatible"); goto out; }
+        /* schema 19: missing means one display */
+        m->heads = 1;
+        if ((r = get_opt_int(o, "heads", &m->heads, err, n))) goto out;
+        if (json_get(o, "heads") && m->heads < 1) { r = fail(err, n, VM_E_RANGE, "heads is 1 to %d", VM_HEADS_MAX); goto out; }
+        /* schema 21: missing means no Vulkan (venus, 6.10) */
         const JVal *vk = json_get(o, "vulkan");
         if (vk && vk->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "vulkan must be true or false"); goto out; }
         m->vulkan = vk ? json_bool(o, "vulkan", 0) : 0;
@@ -1255,7 +1275,9 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 15 && m->guest_links) jb_raw(&b, ",\n  \"guest_links\": true");
     if (m->schema >= 15 && m->guest_notify) jb_raw(&b, ",\n  \"guest_notify\": true");
     if (m->schema >= 17 && m->automation) jb_raw(&b, ",\n  \"automation\": true");
-    if (m->schema >= 18 && m->vulkan) jb_raw(&b, ",\n  \"vulkan\": true");
+    if (m->schema >= 18 && m->cpu_model == VM_CPU_COMPAT) jb_raw(&b, ",\n  \"cpu_model\": \"compatible\"");
+    if (m->schema >= 19 && m->heads > 1) jb_printf(&b, ",\n  \"heads\": %d", m->heads);
+    if (m->schema >= 21 && m->vulkan) jb_raw(&b, ",\n  \"vulkan\": true");
     if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
     if (m->schema >= 14 && m->group[0]) {
         jb_raw(&b, ",\n  \"group\": "); jb_str(&b, m->group);

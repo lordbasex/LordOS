@@ -1407,7 +1407,14 @@ static int cp_step(const Machine *x, const char *script, const char *const *args
         return -1;
     }
     size_t c = res.outlen < cap ? res.outlen : cap;
-    if (out && cap) { memcpy(out, res.out, c); if (c < cap) out[c] = 0; }
+    /* every caller passes sizeof out - 1, so out[cap] exists: the answer is always NUL-terminated inside the buffer, and
+     * an answer that doesn't fit is refused rather than cut (it comes from the guest: hostile) */
+    if (out && cap && res.outlen >= cap) {
+        ERR("execFailed", "name", x->m.name, "why", "the machine gave a strange answer", NULL);
+        free(keep);
+        return -1;
+    }
+    if (out && cap) { memcpy(out, res.out, c); out[c] = 0; }
     if (outlen) *outlen = c;
     free(keep);
     return 0;
@@ -1442,7 +1449,7 @@ static int cp_put(Machine *x, const char *src, const char *gpath, int force) {
     char *nl = memchr(out, '\n', ol);
     if (!nl) { close(fd); ERR("execFailed", "name", x->m.name, "why", "the machine gave no folder", NULL); return VMCLI_FAILED; }
     *nl = 0;
-    char *w = (char *)out, *t = nl + 1, *nl2 = strchr(t, '\n');
+    char *w = (char *)out, *t = nl + 1, *nl2 = memchr(t, '\n', ol - (size_t)(t - (char *)out));
     if (nl2) *nl2 = 0;
     if (w[0] != '/' || t[0] != '/' || !vmx_guest_path_ok(w) || !vmx_guest_path_ok(t)) { close(fd); ERR("execFailed", "name", x->m.name, "why", "the machine gave a strange path", NULL); return VMCLI_FAILED; }
     char wtmp[8200], target[8200];

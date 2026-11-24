@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Desligar",
   "analysis.rule": "Sempre mostrado: este alerta não precisa de modelo.",
   "settings.seesMachines": "Para máquinas virtuais: nome, função e estado, por que terminaram, e as contagens de CPU, memória e rede do motor delas. Nunca a tela, os arquivos ou a área de transferência.",
-  "sandbox.unverified": "a prova de que o motor é o da própria máquina"
+  "sandbox.unverified": "a prova de que o motor é o da própria máquina",
+  "block.ended": "Programa bloqueado encerrado: {name}",
+  "block.endedBody": "Ele está na sua lista de bloqueio. Revise a lista em Ajustes → IA → Sentinela.",
+  "block.title": "Lista de bloqueio",
+  "block.hint": "Estes programas são encerrados sempre que iniciam na sua conta, com a Sentinela ligada ou desligada. Adicione um em Monitor → Obter informações → Investigar com o Lumo; remova-o para deixá-lo rodar de novo.",
+  "block.empty": "Nenhum programa bloqueado.",
+  "block.remove": "Remover",
+  "block.script": "Script de {interp}",
+  "block.binary": "Programa",
+  "block.pkg": "e todos os programas do pacote {pkg}",
+  "block.added": "bloqueado em {date}"
 }

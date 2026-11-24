@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Tắt máy",
   "analysis.rule": "Luôn hiển thị: cảnh báo này không cần mô hình.",
   "settings.seesMachines": "Với máy ảo: tên, vai trò và trạng thái, lý do chúng dừng, cùng các số đo CPU, bộ nhớ và mạng của bộ máy chạy. Không bao giờ thấy màn hình, tệp hay bảng nhớ tạm của chúng.",
-  "sandbox.unverified": "bằng chứng rằng bộ máy của nó đúng là của chính máy này"
+  "sandbox.unverified": "bằng chứng rằng bộ máy của nó đúng là của chính máy này",
+  "block.ended": "Đã kết thúc chương trình bị chặn: {name}",
+  "block.endedBody": "Nó nằm trong danh sách chặn của bạn. Xem lại danh sách trong Cài đặt → AI → Sentinela.",
+  "block.title": "Danh sách chặn",
+  "block.hint": "Các chương trình này bị kết thúc mỗi khi khởi động trong tài khoản của bạn, dù Sentinela đang bật hay tắt. Thêm chương trình từ Giám sát → Xem thông tin → Tìm hiểu bằng Lumo; xóa khỏi danh sách để cho nó chạy lại.",
+  "block.empty": "Không có chương trình nào bị chặn.",
+  "block.remove": "Xóa",
+  "block.script": "Tập lệnh {interp}",
+  "block.binary": "Chương trình",
+  "block.pkg": "và mọi chương trình của gói {pkg}",
+  "block.added": "bị chặn vào {date}"
 }

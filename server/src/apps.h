@@ -16,6 +16,7 @@ typedef struct {
     char bin[128];                      /* program name from Exec (for the Monitor: process → app) */
     int user;                           /* from ~/.local/share/applications */
     int terminal;                       /* Terminal=true: it runs in a Terminal tab (apps_launch_terminal) */
+    int comment_l10n;                   /* (0.8.9.6) the Comment is in the language asked for (Comment[lang]) */
 } DesktopApp;
 
 /* Lists the apps visible to LordOS (Type=Application, no NoDisplay/Hidden, OnlyShowIn and

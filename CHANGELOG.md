@@ -11,6 +11,44 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: All Displays** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.4). View → All
+  Displays shows a machine across this computer's displays: one output of its virtio-gpu per display (up to four), each full
+  screen at that display's size, beside the others; the machine's own window keeps the first, and each further window's
+  top edge has Back to One Display. A machine with fewer outputs gets them while it's off (machine.json schema 19,
+  "heads"; lord-vm --set --heads). One lord-vmdisplay serves every output on a channel of its own (QEMU's peer-to-peer
+  display serves one connection), and an output whose window goes is turned off for the guest. Not for a machine with a
+  graphics card, apps mode or a protected machine (the anonymity profile keeps one display: the guest never learns this
+  computer's displays). Checked with a real KVM guest (tests/vm_multihead.sh) and a headless scene.
+- **Machines: one parent for every machine** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.7).
+  lord-sessiond places each machine's scope in its session's `lordos-machines.slice` (root-owned, made on the first
+  machine) with a fixed `cpu.weight` 50 and `io.weight` 50: half of one app's, a twentieth of the compositor's. Under load,
+  the machines together yield to the desktop and the apps; idle cores and an idle disk are still theirs. Each machine keeps
+  its own memory and CPU limit. lord-netperm's programs look one level down into the slice, so each machine keeps its own
+  firewall policy (the Machines rules while a just-started one isn't registered). Monitor, the process owner, the battery
+  history and Sentinela's scope check find machines there and in the old place. lordos.service restarts with live
+  sessions keep the slice's limits. lord-sessiond uses the slice only while the running lord-netperm is the installed
+  one, so a half-restarted update never leaves a machine without a firewall.
+- **Machines: the app's last parts** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.1, 5.2,
+  5.3, 5.5, 6.14).
+  - **New Machine: Detect.** An installer disc chosen or dropped on the assistant gets a step of its own: what its
+    label and boot files say, which system it is, which processors it starts on, and, before anything is made, when it
+    would run emulated on this computer or when its name and its boot files disagree.
+  - **New Machine: drop, place, Fresh install.** Drop an installer disc, a disk image or another app's machine anywhere
+    on the first step. The Name step says where the machine goes and how much space is free there. After an
+    unattended install, the machine takes a "Fresh install" snapshot before its first start (on by default).
+  - **Templates.** Make Template keeps a machine as it is; its card says Template, the library has a Templates chip,
+    and New Machine from Template makes a copy to use.
+  - **Configure.** A machine's icon color and tags (the library's search finds them, `#tag` exactly); the processor
+    the guest sees (this computer's, or Compatible: the same on every computer, so a machine keeps working when it
+    moves); Add Disk (one more empty data disk); a new network card address; huge pages shown as automatic; where the
+    guest prints. `machine.json` schema 18 adds `cpu_model`.
+  - **The machine's window.** View → Scale (50 % to 200 %); with a fixed resolution the window keeps the guest's shape
+    after a resize; a dot on the bar for each device the guest can use now; Devices → Network pulls or plugs in the
+    network cable while the machine runs, and Devices → Folders.
+  - **Cleaner** sends a machine's space to Machines' Storage window (Reclaim in Machines) instead of offering its files.
+  - **Decided:** no memory ballooning (the guest would decide what it gives back, and it is one more device a guest
+    talks to); no network speed limit; this computer's printing service is never opened to a machine; machines stay in
+    the Machines library; the capture release keys stay fixed.
 - **Machines: programs, files, logs and an MCP server from the terminal, per machine with the person's consent**
   (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.15 and 6.24). `/usr/bin/lordvm` is a second link
   to the `machines` command, which gains:
@@ -135,6 +173,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     qemu-guest-agent on the same guest (`server/tests/vm_guest_tools_e2e.sh`); `guesttools-test` reads the image back
     with lord-vm's own ISO reader and checks its hash and the writer's refusals; `guest_tools_install_test.sh` checks
     `install.sh`'s choices on 18 kinds of system; shellcheck is clean.
+- **Monitor: Get Info says what a program is** (in development; latest release 0.8.9.5-beta). A **Description** line
+  between the command line and the tabs, in the grouped and the plain view, from what the computer already has and
+  never the network: LordOS's own programs and the kernel's threads, the app's manifest or `.desktop`/Flatpak
+  `Comment` (the person's language when it has one), the well-known system programs (systemd, (sd-pam), dbus, PipeWire,
+  WirePlumber, the portals…), the program's manual page (a translated page first, read without running `man`), the
+  service's `Description=`, and the package's description from dpkg's database, in the person's language when apt has
+  Debian's translation (matched by `Description-md5`). lord-server reads them in a worker thread
+  (`server/src/monitor/describe.c`, `lord.monitor.describe`); one SDK function gives the same text to anyone
+  (`sdk/describe.js`: `describeProgram`, `describeApp`). An English-only text says so and offers **Translate with Lumo**
+  while Sentinela is on (kept per language). On the development machine 616 of 647 processes were described, 176 of
+  them in Spanish for free. Every LordOS app and `lord-*` program must have an English description:
+  `tools/desc-check.mjs`, run by `tools/i18n-check.mjs`. `lord.apps.linux`/`flatpak` now say whether the `Comment` is in
+  the language asked (`commentLocal`).
+- **Sentinela: Investigate with Lumo** (in development; approved by the maintainer on 2026-11-24). A program Get Info
+  can't describe shows **Unknown** and, with Sentinela on and a local model installed, **Investigate with Lumo**: on that
+  click only, for the person's own process, the local model reads the facts Sentinela already sees (name, path, package
+  or none, parents, how it started, CPU, memory, socket counts) and, read by lord-server and fenced as data between two
+  markers with a random nonce, the program's script text (at most 64 KB read, 6000 bytes sent; opened by descriptor,
+  no links, a regular file the user or root owns, only when it is that interpreter's script) or a binary's metadata (ELF
+  type, size, SHA-256, loaded libraries, a sample of its strings) (`server/src/llm/evidence.c`). It answers in the
+  person's language what it does, why it probably runs, a risk and one action of a closed list, checked strictly; the
+  actions (End, Pause, Block its network, Blocklist) run only on the person's click.
+- **Sentinela: a blocklist** (in development; approved 2026-11-24). **Blocklist** puts a program (by its file's SHA-256,
+  a script by the script's, optionally with its package) on `~/.config/lordos/sentinela/blocked.json`, which only
+  lord-server writes (protected from apps and `lord.fs`), and ends it; from then on a thread of lord-server's ends it
+  with SIGKILL through a pidfd within about half a second whenever it starts in the person's account, under any name
+  (`server/src/llm/blockwatch.c`). LordOS's own programs, an interpreter itself and the system's core programs can't be
+  blocked. Settings → AI → Sentinela lists the programs with **Remove**. Stopping a program before it runs, and for every
+  user, would need a root part (fanotify `FAN_OPEN_EXEC_PERM`): proposed in docs/SENTINELA.md, not built.
 - **Machines: a shell inside the machine, links and notifications from it, and more of the logs** (in development;
   latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.17, 6.18, 6.19).
   - **The agent's shell.** The Shell pane of a machine's window shows a shell inside the guest as the person signed in
@@ -638,6 +705,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   to answer QMP. The import now writes the converted disk out (`fsync`) before putting it in place. Found while checking
   a migration from a 20 GB whole-disk image of a Linux PC (docs/VIRTUALIZATION.md 6.11), which now imports and boots.
 
+- **Machines: a shared folder that stops working while the machine runs is said in its window** (in development; the
+  latest release is 0.8.9.5-beta): when a folder's virtiofsd ended (killed, crashed), the folder was gone from the guest
+  until the next start and only lord-vm's log said it. lord-vm now tells the machine's window (`VMN_SHARE_LOST`), whose
+  notice bar says "The transfer folder stopped working in this machine…" or "The shared folder “TAG” stopped working…",
+  in every language. Found by the new agent kill tests.
+- **Machines: the bare-metal release gates refused every real PC** (`tools/vm/bare-metal-gates.sh`): `systemd-detect-virt`
+  prints `none` and exits 1 on bare metal, and the script added a second `none`, so its check read "this is a virtual
+  machine (none none)". It reads the program's own words now; the gates then ran on the i9 PC for the first time (Tests).
+  The leak gate's "no zombie processes" looked at every process of the computer, so another program's child that was a
+  zombie for a moment failed it on a desktop in use; it looks at lord-vm's, QEMU's, passt's, virtiofsd's and swtpm's.
+  Its results file names passt's version from its package when passt prints none.
+- **Machines: lord-vm builds on arm64 without warnings again**: three paths of a machine group (a member's base, its disks
+  and log folders) were cut silently when too long, which gcc on the Pi warned about; they are refused instead.
 - **Machines: LordOS 0.8.9 inside a machine waited for the agent forever** (in development). Nothing in that LordOS
   spoke to Machines: it had neither qemu-guest-agent nor `lordos-guest.service` (the "opened, closed" in the log at
   start is the UEFI firmware's own virtio-serial driver, not the system). 0.8.9.5 added the service, but its udev rule
@@ -648,6 +728,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `lordos-guest` 9 takes the clipboard's text from the guest's own lord-server (`lordos-guestwin.sock` says `clipboard`;
   only the program that holds the agent port and passes it along gets it, never a secret; the helper is non-dumpable). A 0.8.9 guest gets it by updating LordOS inside
   the machine, or right away with the disc above.
+- **Monitor: opening a large group in Processes no longer freezes the desktop** (in development; latest release
+  0.8.9.5-beta). Expanding the Terminal's group with about 240 programs stopped the pointer for about a second, and the
+  list's once-a-second redraw did it again while the group stayed open: the table drew every row at once (about 12 800
+  nodes). The SDK's `Table` now draws only the rows in sight plus a margin of six (`sight`, told by the tab's
+  ScrollView), at most four new rows per pass with those in sight first, and keeps a row whose drawn values didn't
+  change (`rowSig`); a row the keys move to is scrolled into sight by its place. Measured in a headless lord-server
+  over a made-up Terminal of 240 programs (`server/tests/monitor_freeze_headless.sh`, the main thread's longest run):
+  opening 1547 ms → about 20 ms, a redraw with the group open 1110 ms → about 17 ms. The order of the rows is the same.
+  New test `tests/monitor_freeze_scene.mjs` in `make test` (a 300-program group: the first pass within 16 ms).
 - **Machines: two machines starting at the same moment no longer collide on a shared folder's socket**: the socket lord-vm
   hands virtiofsd was `<runtime>/lordos-vm/fs<N>.sock`, the same name for every machine, so a second start unlinked and
   re-made the first's (found while starting six test machines at once: "socket: Address already in use", then "can't
@@ -1066,6 +1155,54 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   running guest.
 
 ### Tests
+
+- **Machines: an end-to-end harness, a boot matrix and kill tests** (`tools/vm/e2e/machines/`, its README says how other
+  tests use it; docs/VIRTUALIZATION.md 12; in development, the latest release is 0.8.9.5-beta).
+  - **The harness** (`mh.py`): a real headless session, `build/lord-server-test` with the real default theme, started in
+    its own user and mount namespaces (an empty folder over the person's home, a tmpfs over their runtime folder, a
+    private `HOME` and `XDG_RUNTIME_DIR` under `/var/tmp/lordos-m100-e2e/`), so it never sees the person's files, machines
+    or session, with an empty Machines library. Pointer, buttons, wheel and keys go in through the test hooks, which call
+    the remote desktop's own injection (`remote.sock` itself takes only root's connections); pictures come from the hooks'
+    `frame output`. A test-only `probe.js` keeps lord-server's node tree on the JS side (it wraps the `lord.*` node calls,
+    nothing in the runtime changes), so a test finds a text or an icon where it is drawn, shown and on top (not under a
+    sheet, a menu or a question), and clicks it there. Commands run in the session through the bench's `driver.js`, now
+    with the probe and the SDK in scope. `build-e2e.mjs --out FILE` writes the bundle outside the tree (a development
+    build loads a theme outside the LordOS folder unchecked, so nothing in it is replaced). `ns-run.sh` runs any command in
+    the same kind of namespaces (lord-vm, the release gates).
+  - **The guests** (`images.py`): Debian 13's nocloud image, SHA-512 checked against Debian's list, and one made from it
+    once under KVM with qemu-guest-agent, a person's account, root on the serial console and `MH-READY` written there at
+    each boot; the 90-day evaluation of the catalog's `windows` card and virtio-win from their makers' servers with the
+    SHA-256 the catalog pins (8.2 GB and 0.7 GB, both matched on 2026-11-24). Cached in `/var/tmp/lordos-m100-images`, read only.
+  - **The flows** (`flows.py`, `run.py`, `make -C server e2e-machines`): the empty library; the New Machine assistant
+    from Import a machine through the file picker, the Light profile, a typed name and the review to Create and Start,
+    the guest's boot and its picture in the machine's window; Shut Down; Configure (network, the guest agent); a start
+    from the card; the agent's popover and Install Clipboard Helper; the clipboard both ways (lordos-guest and xclip on the guest's Xvfb
+    display); a file dragged from Files onto the machine's window;
+    the kill tests; Snapshots (take, go back, delete); Clone; the storage figures; a machine group's card. Each step checks
+    the texts on screen and what landed on disk or in lord-vm, and keeps a screenshot. `make e2e-machines` skips cleanly
+    without KVM or the network and isn't part of `make test`.
+  - **Agent kill tests** (the `kills` flow): qemu-guest-agent killed in the guest (the app sees it go, then come back by
+    itself when it starts again), passt killed (the network back by itself, measured), the transfer folder's virtiofsd
+    killed (the machine keeps running and its window says so, below) and lord-vm itself killed (the library says its
+    supervisor ended; a new start recovers it and the log says what it recovered).
+  - **The boot matrix** (`boot-matrix.py`, `make -C server e2e-machines-matrix`): the prepared guest under each setting
+    this computer can run, KVM and TCG, OVMF/AAVMF and SeaBIOS, a TPM, Secure Boot with a TPM, the compatible devices, 3D
+    on each render node, the other architecture emulated: seconds to `MH-READY`, to the agent, a clean Shut Down, the
+    disk's size.
+  - **The virtio-win install test** (`run.py windows`): the evaluation and the pinned virtio-win given to
+    `lord.vm.create` as the assistant's evaluation card gives them, started from the library card, installed without
+    questions, done when lord-vm says the install is done and the LordOS guest tools (`lordos-guest-win`) say hello.
+  - **The settings → QEMU arguments table** (`server/tests/vm_qemu_args_test.py`, in `make test`, skipped without KVM):
+    12 rows (defaults, BIOS without a display on an isolated network, host only, TCG, CPU and memory, compatible devices,
+    the `windows` card's template (Secure Boot, TPM, Hyper-V, local clock), the agent on and off, boot order and menu, a shared folder and the transfer folder, 3D), each
+    a throwaway machine started paused and its logged command line checked for what the setting adds and must not.
+  - **`make -C server e2e-machines-gates`**: the three release gates with this build's lord-vm and the cached image,
+    through `ns-run.sh`.
+  - **Run on the i9 PC on 2026-11-24**: the flows 57 of 57; the release gates on its bare metal for the first time
+    (isolation 72, integrity 45, recovery 40, leaks 10 passed); the boot matrix's 9 rows, 3D on both the RX 580 and the
+    UHD 630; the virtio-win install test 9 of 9 (installed unattended in 25.9 minutes, the guest tools' hello from the
+    installed system). On the Pi 5: arm64 under KVM and emulated boot; an arm64 machine with the compatible devices
+    doesn't (its firmware has no SATA driver: stops at the UEFI shell), recorded in docs/VIRTUALIZATION.md 12.
 
 - **Sentinela** (`docs/SENTINELA.md`): `build/llm-engine-test` runs a stand-in engine in lord-llm's real sandbox and
   checks that TCP, UDP, IPv6, netlink and packet sockets, Unix datagrams, `connect`, reading `/etc` or `/home`, writing

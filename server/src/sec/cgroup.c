@@ -74,8 +74,12 @@ static int base_dir(char *out, size_t n) {
  * CPU can be limited in the child scopes). Best effort. */
 static void enable_controllers(const char *base) {
     char path[PATH_MAX];
-    if ((size_t)snprintf(path, sizeof path, "%s/cgroup.subtree_control", base) < sizeof path)
+    if ((size_t)snprintf(path, sizeof path, "%s/cgroup.subtree_control", base) < sizeof path) {
         write_file(path, "+memory +cpu +pids");
+        /* (docs/VIRTUALIZATION.md 3.7) io on its own write: the machines' slice weighs disk I/O with it, and a kernel
+         * without it must not lose the other three */
+        write_file(path, "+io");
+    }
 }
 
 /* Writes val into file `leaf` inside directory dirfd (openat avoids building long paths). */
@@ -99,6 +103,13 @@ int cgroup_scope_name_ok(const char *name) {
     for (const char *p = name; *p; p++)
         if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '-' || *p == '.' || *p == '_' || *p == '@')) return 0;
     return !strstr(name, "..");
+}
+
+#define VM_SCOPE_PREFIX "app-lordos-lordos-vm-"
+
+int cgroup_scope_in_machines(const char *name) {
+    return cgroup_scope_name_ok(name) && !strncmp(name, VM_SCOPE_PREFIX, sizeof VM_SCOPE_PREFIX - 1)
+        && strlen(name) > sizeof VM_SCOPE_PREFIX - 1 + 6 && strlen(name) <= sizeof VM_SCOPE_PREFIX - 1 + 4 + 36 + 6;   /* "tor-" and a UUID at most */
 }
 
 /* Ask lord-sessiond (root) over CGROUP_SOCK to move THIS process into the scope. Returns 0 when
@@ -147,6 +158,20 @@ int cgroup_enter(const char *name, const CgroupLimits *lim) {
     if (via != -2) return via;
     if (base_dir(base, sizeof base)) { fprintf(stderr, "cgroup: no delegated subtree (%s); the app runs without a scope\n", errno == EACCES ? "not writable" : strerror(errno)); return -1; }
     enable_controllers(base);
+    /* (3.7) a machine's scope goes into the machines' slice here too, when we may make it (development) */
+    char slice[PATH_MAX];
+    if (cgroup_scope_in_machines(name) && cgroup_netperm_current(CG_NETPERM_PROCS) && (size_t)snprintf(slice, sizeof slice, "%s/" CG_MACHINES_SLICE, base) < sizeof slice
+        && (!mkdir(slice, 0755) || errno == EEXIST) && !access(slice, W_OK)) {
+        int sl = open(slice, O_PATH | O_DIRECTORY | O_CLOEXEC);
+        if (sl >= 0) {
+            write_at(sl, "cgroup.subtree_control", "+memory +cpu +pids");
+            write_at(sl, "cgroup.subtree_control", "+io");
+            write_at(sl, "cpu.weight", CG_MACHINES_CPU_WEIGHT);
+            write_at(sl, "io.weight", CG_MACHINES_IO_WEIGHT);
+            close(sl);
+            snprintf(base, sizeof base, "%s", slice);
+        }
+    }
     if ((size_t)snprintf(scope, sizeof scope, "%s/%s", base, name) >= sizeof scope) return -1;
     if (mkdir(scope, 0755) && errno != EEXIST) { fprintf(stderr, "cgroup: could not create %s: %s\n", name, strerror(errno)); return -1; }
     int dir = open(scope, O_PATH | O_DIRECTORY | O_CLOEXEC);
@@ -223,7 +248,48 @@ static int session_dir_ok(const char *name) {
     char tail;
     return strlen(name) < 40 && sscanf(name, "lordos-session-%u%c", &u, &tail) == 1;
 }
-static int session_child_ok(const char *name) { return !strcmp(name, "server") || cgroup_scope_name_ok(name); }
+int cgroup_session_child_ok(const char *name) {
+    static const char sl[] = CG_MACHINES_SLICE "/";
+    if (name && !strncmp(name, sl, sizeof sl - 1)) return cgroup_scope_in_machines(name + sizeof sl - 1);
+    return name && (!strcmp(name, "server") || cgroup_scope_name_ok(name));
+}
+#define session_child_ok cgroup_session_child_ok
+
+int cgroup_netperm_current(const char *procs) {
+    int fd = open(procs, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) return 1;                           /* not running: the installed one starts next */
+    char buf[64];
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    buf[n > 0 ? n : 0] = 0;
+    char *end;
+    long pid = strtol(buf, &end, 10);
+    if (n <= 0) return 1;                           /* empty: restarting, the installed one */
+    if (end == buf) return 0;
+    if (pid <= 1 || (*end != '\n' && *end)) return 0;
+    char p[64], exe[PATH_MAX];
+    snprintf(p, sizeof p, "/proc/%ld/exe", pid);
+    ssize_t l = readlink(p, exe, sizeof exe - 1);
+    if (l <= 0) return 0;
+    exe[l] = 0;
+    const char *base = strrchr(exe, '/');
+    return base && !strcmp(base, "/lord-netperm");  /* "/lord-netperm (deleted)": an older one still runs */
+}
+
+int cgroup_machines_slice(int sessfd) {
+    if (sessfd < 0) return -1;
+    if (mkdirat(sessfd, CG_MACHINES_SLICE, 0755) && errno != EEXIST) return -1;
+    int fd = openat(sessfd, CG_MACHINES_SLICE, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) return -1;
+    if (geteuid() == 0) chown_root_dir(fd);
+    /* io first on the session (it may be missing: then only CPU is weighed), each controller its own write */
+    write_at(sessfd, "cgroup.subtree_control", "+io");
+    write_at(fd, "cgroup.subtree_control", "+memory +cpu +pids");
+    write_at(fd, "cgroup.subtree_control", "+io");
+    write_at(fd, "cpu.weight", CG_MACHINES_CPU_WEIGHT);
+    write_at(fd, "io.weight", CG_MACHINES_IO_WEIGHT);
+    return fd;
+}
 
 /* the whole (small) file at dirfd/leaf, without the final newline; -1 if unreadable */
 static int read_at(int dirfd, const char *leaf, char *buf, size_t n) {
@@ -262,6 +328,7 @@ int cgroup_release_at(int svcfd, int outfd) {
     int d = dup(svcfd);
     DIR *dir = d >= 0 ? fdopendir(d) : NULL;
     if (!dir) { if (d >= 0) close(d); return -1; }
+    rewinddir(dir);                     /* a dup shares the offset: a second call on the same svcfd starts at the top too */
     struct dirent *e;
     int bad = 0;
     while ((e = readdir(dir))) {
@@ -274,7 +341,31 @@ int cgroup_release_at(int svcfd, int outfd) {
             if (!sd && d2 >= 0) close(d2);
             struct dirent *s;
             while (sd && (s = readdir(sd))) {
-                if (s->d_name[0] == '.' || s->d_type != DT_DIR || !session_child_ok(s->d_name)) continue;
+                if (s->d_name[0] == '.' || s->d_type != DT_DIR) continue;
+                if (!strcmp(s->d_name, CG_MACHINES_SLICE)) {     /* (3.7) the machines' scopes inside it, then its controllers */
+                    int vfd = openat(cfd, s->d_name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+                    if (vfd < 0) continue;
+                    int d3 = dup(vfd);
+                    DIR *vd = d3 >= 0 ? fdopendir(d3) : NULL;
+                    if (!vd && d3 >= 0) close(d3);
+                    struct dirent *m;
+                    while (vd && (m = readdir(vd))) {
+                        if (m->d_name[0] == '.' || m->d_type != DT_DIR || !cgroup_scope_in_machines(m->d_name)) continue;
+                        int lfd = openat(vfd, m->d_name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+                        if (lfd < 0) continue;
+                        for (size_t i = 0; i < sizeof LIMIT_FILES / sizeof *LIMIT_FILES; i++) {
+                            char v[64];
+                            if (read_at(lfd, LIMIT_FILES[i], v, sizeof v) || !limit_value_ok(v) || limit_default(LIMIT_FILES[i], v)) continue;
+                            if (outfd >= 0) dprintf(outfd, "%s %s/%s %s %s\n", e->d_name, CG_MACHINES_SLICE, m->d_name, LIMIT_FILES[i], v);
+                        }
+                        close(lfd);
+                    }
+                    if (vd) closedir(vd);
+                    if (controllers_off_at(vfd)) { bad = 1; fprintf(stderr, "cgroup: %s/%s keeps its controllers (%s)\n", e->d_name, CG_MACHINES_SLICE, strerror(errno)); }
+                    close(vfd);
+                    continue;
+                }
+                if (!session_child_ok(s->d_name)) continue;
                 int lfd = openat(cfd, s->d_name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
                 if (lfd < 0) continue;
                 for (size_t i = 0; i < sizeof LIMIT_FILES / sizeof *LIMIT_FILES; i++) {
@@ -460,6 +551,12 @@ int cgroup_service_init(void) {
         if (sfd < 0) continue;
         /* its app scopes' controllers again: ExecStartPre turned them off (cgroup_service_release, #140) */
         write_at(sfd, "cgroup.subtree_control", "+memory +cpu +pids");
+        /* (3.7) the machines' slice, if this session has one: its controllers and weights again */
+        struct stat vs;
+        if (!fstatat(sfd, CG_MACHINES_SLICE, &vs, AT_SYMLINK_NOFOLLOW) && S_ISDIR(vs.st_mode)) {
+            int vfd = cgroup_machines_slice(sfd);
+            if (vfd >= 0) close(vfd);
+        }
         cgroup_harden_session(sfd);
         close(sfd);
     }
@@ -631,6 +728,13 @@ int cgroup_place_serve(int cfd, const char *bindir, int insecure) {
     if ((size_t)snprintf(sess, sizeof sess, "%s/lordos-session-%u", svc, (unsigned)cr.uid) >= sizeof sess) return -1;
     int sfd = open(sess, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
     if (sfd < 0) { reply(cfd, "err no session subtree"); return -1; }
+    if (cgroup_scope_in_machines(name) && cgroup_netperm_current(CG_NETPERM_PROCS)) {
+        /* (3.7) a machine's scope goes inside the machines' slice; where the slice can't be made, beside the server
+         * leaf as before (both places are machines' to lord-netperm, Monitor and Sentinela) */
+        int vfd = cgroup_machines_slice(sfd);
+        if (vfd >= 0) { close(sfd); sfd = vfd; }
+        else fprintf(stderr, "cgroup: the machines' slice of session %u: %s; %s goes beside the server leaf\n", (unsigned)cr.uid, strerror(errno), name);
+    }
     if (mkdirat(sfd, name, 0755) && errno != EEXIST) { close(sfd); reply(cfd, "err mkdir"); return -1; }
     int dfd = openat(sfd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
     close(sfd);

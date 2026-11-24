@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Sluit af",
   "analysis.rule": "Altijd getoond: deze melding heeft geen model nodig.",
   "settings.seesMachines": "Bij virtuele machines: hun naam, rol en status, waarom ze stopten, en de CPU-, geheugen- en netwerktellingen van hun engine. Nooit hun scherm, bestanden of klembord.",
-  "sandbox.unverified": "het bewijs dat de engine echt van de machine zelf is"
+  "sandbox.unverified": "het bewijs dat de engine echt van de machine zelf is",
+  "block.ended": "Geblokkeerd programma gestopt: {name}",
+  "block.endedBody": "Het staat op je blokkeerlijst. Bekijk de lijst in Instellingen → AI → Sentinela.",
+  "block.title": "Blokkeerlijst",
+  "block.hint": "Deze programma's worden gestopt telkens als ze in je account starten, of Sentinela nu aan of uit staat. Voeg er een toe via Monitor → Toon info → Onderzoeken met Lumo; verwijder het om het weer te laten draaien.",
+  "block.empty": "Geen geblokkeerde programma's.",
+  "block.remove": "Verwijderen",
+  "block.script": "{interp}-script",
+  "block.binary": "Programma",
+  "block.pkg": "en elk programma van het pakket {pkg}",
+  "block.added": "geblokkeerd op {date}"
 }

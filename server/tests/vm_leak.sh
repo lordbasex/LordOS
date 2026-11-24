@@ -31,7 +31,10 @@ total=$(( $(ms) - t0 ))
 echo "      $N cycles in $((total / 1000)) s, $((total / N)) ms each on average, the slowest $slow ms"
 t "every cycle started and stopped" '[ $bad_cycles = 0 ]' "$bad_cycles bad"
 t "no lord-vm, QEMU or passt left for the machine" '! pgrep -f "$ID" >/dev/null && ! pgrep -f "lord-vm --start $D" >/dev/null'
-t "no zombie processes" '[ -z "$(ps -eo stat= | grep "^Z")" ]'
+# zombies of the machine's own programs only: on a desktop in use another program's child can be a zombie for a moment
+# (a package tool's, 2026-11-24 on the i9), which says nothing about Machines
+ours_zombies() { ps -eo stat=,comm= | awk '$1 ~ /^Z/ && $2 ~ /^(lord-vm|lord-vmdisplay|qemu-system|qemu-img|passt|virtiofsd|swtpm)/'; }
+t "no zombie processes of lord-vm, QEMU, passt, virtiofsd or swtpm" '[ -z "$(ours_zombies)" ]' "$(ours_zombies)"
 t "no control socket left" '[ ! -e "$RT/$ID.sock" ]'
 t "no cgroup scope left" '! systemctl --user list-units --all --no-legend "app-lordos-lordos-vm-$ID.scope" 2>/dev/null | grep -q scope && ! ls -d /sys/fs/cgroup/*/*/*lordos-vm-$ID* >/dev/null 2>&1'
 t "the lock is free, no operation pending" 'flock -n "$D/lock" true && [ ! -f "$D/operation.json" ]'

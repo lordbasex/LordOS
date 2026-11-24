@@ -132,5 +132,15 @@
   "action.vm_shutdown": "关机",
   "analysis.rule": "始终显示：此提醒不需要模型。",
   "settings.seesMachines": "对于虚拟机：名称、角色和状态、结束的原因，以及其引擎的 CPU、内存和网络计数。绝不会看到它们的屏幕、文件或剪贴板。",
-  "sandbox.unverified": "确认其引擎确实属于该虚拟机本身"
+  "sandbox.unverified": "确认其引擎确实属于该虚拟机本身",
+  "block.ended": "已结束被拦截的程序：{name}",
+  "block.endedBody": "它在你的拦截列表中。可在 设置 → AI → Sentinela 中查看列表。",
+  "block.title": "拦截列表",
+  "block.hint": "这些程序只要在你的账户中启动就会被结束，无论 Sentinela 是否打开。可在 监视器 → 显示简介 → 让 Lumo 调查 中添加；把它移除即可让它重新运行。",
+  "block.empty": "没有被拦截的程序。",
+  "block.remove": "移除",
+  "block.script": "{interp} 脚本",
+  "block.binary": "程序",
+  "block.pkg": "以及软件包 {pkg} 中的所有程序",
+  "block.added": "于 {date} 拦截"
 }
