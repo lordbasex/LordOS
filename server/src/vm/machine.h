@@ -336,6 +336,14 @@ long vm_mem_limit_mb(const VmMachine *m);
 /* Resource budget (3.7): does a machine of `want_mb` fit beside running machines using `running_mb` in total
  * (each as vm_mem_limit_mb)? 1 yes. */
 int vm_budget_fits(const VmHost *h, long running_mb, long want_mb);
+/* Resource budget (3.7), what every start path asks (js_vm.c budget_refusal: the window, startDetached, `machines start`,
+ * a group's members): the memory the library's active machines hold, each as vm_mem_limit_mb, the folder `exclude`
+ * (same device and inode) left out. Active is what run.json says (starting, running, paused, stopping) when
+ * alive(its lord-vm's pid) agrees; a machine whose supervisor died holds nothing. The library's top level and a machine
+ * group's members one level down (<name>.lordgroup/<member>.lordvm), at most 256 machines; symbolic links are never
+ * followed. extra (may be NULL) adds a machine's own share beside its limit (vm_group_session_mb: a disposable session).
+ * *n: how many were counted. A run.json or machine.json that can't be read counts nothing. */
+long vm_budget_used_mb(const char *lib, const char *exclude, int (*alive)(long pid), long (*extra)(const char *dir, const VmMachine *m), int *n);
 /* Graphics 3D (virgl) for this start, the part that needs no probe of the host's files: why a machine that asks for 3D
  * starts with 2D graphics instead, or NULL (lord-vm then checks QEMU's GL modules and the render node). An unattended
  * install's start (installing: lord-vm's disks/unattended) is always 2D: the installer is a text console, and QEMU

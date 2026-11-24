@@ -105,5 +105,6 @@
   "freshDone": "De workstation van {name} is opnieuw begonnen: haar geverifieerde image, een nieuwe identiteit.",
   "freshDoneBoth": "{name} is opnieuw begonnen: beide machines zijn terug op hun geverifieerde image, met een nieuwe identiteit.",
   "freshNotGroup": "{name} is geen machinegroep: opnieuw beginnen is voor groepen.",
-  "badMember": "--member neemt gateway of workstation."
+  "badMember": "--member neemt gateway of workstation.",
+  "overBudget": "{name} is niet gestart: ze heeft {need} MB nodig en er is {free} MB over voor machines. Zet een andere machine in sluimerstand of sluit die af, of geef haar minder geheugen."
 }

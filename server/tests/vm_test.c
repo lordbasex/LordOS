@@ -16,6 +16,7 @@
 #include "vm/vmgvtwin.h"
 #include "vm/vmperfwin.h"
 #include "vm/vmhoststop.h"
+#include "vm/vmgroup.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -30,6 +31,11 @@
 
 static int fails, checks;
 #define CHECK(c) do { checks++; if (!(c)) { fails++; fprintf(stderr, "%s:%d: CHECK(%s) failed\n", __FILE__, __LINE__, #c); } } while (0)
+
+/* vm_budget_used_mb's liveness in the test: pids 100-199 are "alive" lord-vms */
+static int budget_alive(long pid) { return pid >= 100 && pid < 200; }
+/* ... and a share beside the limit: 700 MB for a group member, a nonsense one for the rest */
+static long budget_extra(const char *dir, const VmMachine *m) { (void)m; return strstr(dir, ".lordgroup/") ? 700 : -5; }
 
 static const char GOOD[] =
     "{\"schema\":1,\"id\":\"0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b\",\"name\":\"Debian 13 \xc3\xa9t\xc3\xa9\",\"arch\":\"arm64\",\"accel\":\"kvm\","
@@ -907,6 +913,70 @@ static void test_host(void) {
     CHECK(vm_mem_limit_mb(&m) == 2048 + VM_OVERHEAD_TCG_MB);
     CHECK(vm_budget_fits(&pi, 0, 14160) && !vm_budget_fits(&pi, 0, 14161));
     CHECK(vm_budget_fits(&pi, 8000, 6000) && !vm_budget_fits(&pi, 8000, 7000) && !vm_budget_fits(&pi, -1, 10));
+    /* the library's active machines (vm_budget_used_mb): run.json's state with a live supervisor, top level and a group's
+     * members, the starting machine left out, symbolic links and damaged files counting nothing */
+    {
+        char lib[] = "/tmp/vm-budget-XXXXXX";
+        if (mkdtemp(lib)) {
+            static const char *const st[] = { "running", "paused", "stopped", "running", "starting", "running" };
+            static const long pids[] = { 100, 101, 102, 999, 103, 104 };
+            char d[6][300], gd[256];
+            snprintf(gd, sizeof gd, "%s/g.lordgroup", lib);
+            snprintf(d[0], sizeof d[0], "%s/a.lordvm", lib);
+            snprintf(d[1], sizeof d[1], "%s/b.lordvm", lib);
+            snprintf(d[2], sizeof d[2], "%s/c.lordvm", lib);
+            snprintf(d[3], sizeof d[3], "%s/dead.lordvm", lib);
+            snprintf(d[4], sizeof d[4], "%s/gw.lordvm", gd);
+            snprintf(d[5], sizeof d[5], "%s/notamachine", lib);
+            CHECK(!mkdir(gd, 0700));
+            for (int i = 0; i < 6; i++) {
+                VmMachine x = m;
+                x.memory_mb = 1000 * (i + 1);
+                x.accel = VM_ACCEL_KVM;
+                CHECK(!mkdir(d[i], 0700) && vm_machine_save(d[i], &x) == VM_OK);
+                char rp[300], rj[128];
+                snprintf(rp, sizeof rp, "%s/run.json", d[i]);
+                snprintf(rj, sizeof rj, "{\"state\":\"%s\",\"pid\":%ld}\n", st[i], pids[i]);
+                FILE *f = fopen(rp, "w");
+                CHECK(f && fputs(rj, f) >= 0 && !fclose(f));
+            }
+            int cnt = -1;
+            long o = VM_OVERHEAD_KVM_MB;
+            /* a (1000), b (2000) and the group's gw (5000) count; c is stopped, dead's lord-vm is gone, notamachine isn't one */
+            CHECK(vm_budget_used_mb(lib, NULL, budget_alive, NULL, &cnt) == 1000 + 2000 + 5000 + 3 * o && cnt == 3);
+            CHECK(vm_budget_used_mb(lib, d[1], budget_alive, NULL, &cnt) == 1000 + 5000 + 2 * o && cnt == 2);
+            /* a machine's own share beside its limit (a disposable session); a nonsense share is ignored */
+            CHECK(vm_budget_used_mb(lib, NULL, budget_alive, budget_extra, &cnt) == 1000 + 2000 + 5000 + 3 * o + 700 && cnt == 3);
+            /* vm_group_session_mb: not a group's disposable workstation, nothing */
+            CHECK(vm_group_session_mb(d[4], &m) == 0 && vm_group_session_mb(NULL, &m) == 0);
+            /* the same folder spelled another way is still left out (device and inode) */
+            char alt[400];
+            snprintf(alt, sizeof alt, "%s/./g.lordgroup/../g.lordgroup/gw.lordvm", lib);
+            CHECK(vm_budget_used_mb(lib, alt, budget_alive, NULL, &cnt) == 1000 + 2000 + 2 * o && cnt == 2);
+            /* a damaged run.json counts nothing; a run.json that is a symbolic link isn't followed */
+            char rp[400], lk[400], ln[400];
+            snprintf(rp, sizeof rp, "%s/run.json", d[0]);
+            FILE *f = fopen(rp, "w");
+            CHECK(f && fputs("{\"state\":\"running\",\"pid\":", f) >= 0 && !fclose(f));
+            CHECK(vm_budget_used_mb(lib, NULL, budget_alive, NULL, &cnt) == 2000 + 5000 + 2 * o && cnt == 2);
+            CHECK(!unlink(rp));
+            snprintf(lk, sizeof lk, "%s/run.json", d[1]);
+            CHECK(!symlink(lk, rp));
+            CHECK(vm_budget_used_mb(lib, NULL, budget_alive, NULL, &cnt) == 2000 + 5000 + 2 * o && cnt == 2);
+            /* a machine folder that is a symbolic link to another machine isn't counted twice */
+            snprintf(ln, sizeof ln, "%s/link.lordvm", lib);
+            CHECK(!symlink(d[1], ln));
+            CHECK(vm_budget_used_mb(lib, NULL, budget_alive, NULL, &cnt) == 2000 + 5000 + 2 * o && cnt == 2);
+            /* a pid out of range */
+            f = fopen(lk, "w");
+            CHECK(f && fputs("{\"state\":\"running\",\"pid\":1e300}", f) >= 0 && !fclose(f));
+            CHECK(vm_budget_used_mb(lib, NULL, budget_alive, NULL, &cnt) == 5000 + o && cnt == 1);
+            CHECK(vm_budget_used_mb("/nonexistent-lib", NULL, budget_alive, NULL, &cnt) == 0 && cnt == 0);
+            char cmd[300];
+            snprintf(cmd, sizeof cmd, "rm -rf '%s'", lib);
+            CHECK(system(cmd) == 0);
+        }
+    }
     /* defaults */
     VmMachine d;
     vm_machine_defaults(&d, &pi, VM_ARCH_ARM64);

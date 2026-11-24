@@ -105,5 +105,6 @@
   "freshDone": "{name} workstationje újrakezdve: az ellenőrzött lemezkép, új identitás.",
   "freshDoneBoth": "{name} újrakezdve: mindkét gép újra az ellenőrzött lemezképén van, új identitással.",
   "freshNotGroup": "{name} nem gépcsoport: az újrakezdés csoportoknak szól.",
-  "badMember": "A --member értéke gateway vagy workstation lehet."
+  "badMember": "A --member értéke gateway vagy workstation lehet.",
+  "overBudget": "{name} nem indult el: {need} MB kell neki, és {free} MB maradt a gépeknek. Függessz fel vagy állíts le egy másik gépet, vagy adj neki kevesebb memóriát."
 }

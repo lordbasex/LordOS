@@ -1280,18 +1280,9 @@ static int cg_write(const char *dir, const char *file, const char *val) {
 
 static int qemu_procs_fd = -1, passt_procs_fd = -1, vfs_procs_fd = -1, tpm_procs_fd = -1;
 
-/* A group's disposable session (docs/VIRTUALIZATION.md 19.7): this machine is the workstation of a group whose
- * group.json has "disposable" on, and its machine.json names that group. Its cap in MB, 0 when it isn't one: as much as
- * the workstation's memory (at least VMG_SESSION_MIN_MB), counted in the machine's memory limit (the memfd's pages are
- * charged to QEMU, which writes them) and in the group's budget (model.js groupBudget) */
-#define VMG_SESSION_MIN_MB 1024
-static int session_cap_mb(void) {
-    if (S.m.role != VM_ROLE_WORKSTATION || !S.m.group[0] || S.m.profile_lock != VM_LOCK_ANONYMITY) return 0;
-    char gdir[PATH_MAX];
-    VmGroup g;
-    if (!vm_group_parent(S.dir, gdir, sizeof gdir) || vm_group_load(gdir, &g, NULL, 0) || strcmp(g.id, S.m.group) || !g.disposable) return 0;
-    return S.m.memory_mb > VMG_SESSION_MIN_MB ? S.m.memory_mb : VMG_SESSION_MIN_MB;
-}
+/* A group's disposable session (docs/VIRTUALIZATION.md 19.7): this machine's cap in MB, 0 when it isn't one
+ * (vmgroup.c vm_group_session_mb) */
+static int session_cap_mb(void) { return (int)vm_group_session_mb(S.dir, &S.m); }
 
 /* the machine's scope, then leaves inside it when the scope is ours to divide (3.7) */
 static void setup_cgroups(void) {

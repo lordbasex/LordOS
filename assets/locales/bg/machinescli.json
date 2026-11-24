@@ -105,5 +105,6 @@
   "freshDone": "Workstation на {name} е започната наново: проверен образ, нова идентичност.",
   "freshDoneBoth": "{name} е започната наново: двете машини са върнати към проверения си образ, с нова идентичност.",
   "freshNotGroup": "{name} не е група машини: започването наново е за групи.",
-  "badMember": "--member приема gateway или workstation."
+  "badMember": "--member приема gateway или workstation.",
+  "overBudget": "{name} не стартира: нужни са ѝ {need} MB, а за машини остават {free} MB. Приспете или изключете друга машина, или ѝ дайте по-малко памет."
 }
