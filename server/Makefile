@@ -747,6 +747,13 @@ build/apps-actions-test: tests/apps_actions_test.c $(LAUNCH_CLI_SRC) src/apps.h 
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/apps_actions_test.c $(LAUNCH_CLI_SRC)
 	./$@ || { rm -f $@; exit 1; }
+# tests/apps_profile_test.c: lord.apps.launchProfile (approved 2026-11-24): the browser table, its system .desktop, the
+# profile folder its own Local State lists (hostile files refused), the one argv element built in C
+test: build/apps-profile-test
+build/apps-profile-test: tests/apps_profile_test.c $(LAUNCH_CLI_SRC) src/apps.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/apps_profile_test.c $(LAUNCH_CLI_SRC)
+	./$@ || { rm -f $@; exit 1; }
 # tests/iconfind_test.c: where an icon name's file is (src/iconfind.c): PNG, then SVG, then symbolic, over a made-up tree
 test: build/iconfind-test
 build/iconfind-test: tests/iconfind_test.c src/iconfind.c src/iconfind.h
@@ -926,7 +933,7 @@ build/lordlog-test: tests/lordlog_test.c src/lordlog.c src/lordlog.h
 	    -o $@ tests/lordlog_test.c src/lordlog.c
 	./$@ || { rm -f $@; exit 1; }
 build/fsops-test: tests/fsops_test.c src/fsops.c src/fsops.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/fsops_test.c src/fsops.c -lpthread
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFSOPS_TEST -o $@ tests/fsops_test.c src/fsops.c -lpthread
 # lord.fs's Async calls (Files on Cloud and network folders): a slow file system never holds the caller (0.8.8.7)
 build/fsasync-test: tests/fsasync_test.c src/fsasync.c src/fsasync.h src/fsops.c src/fsops.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFSASYNC_TEST -o $@ tests/fsasync_test.c src/fsasync.c src/fsops.c -lpthread
@@ -1560,3 +1567,9 @@ build/wallpaper-image-test: tests/wallpaper_image_test.c src/hw/wallpaper_image.
 	$(CC) $(CPPFLAGS) -O1 -g -w -std=gnu11 -fsanitize=address,undefined -fno-sanitize=shift -fno-sanitize-recover=all -o $@ tests/wallpaper_image_test.c src/hw/wallpaper_image.c src/ui/stb.c -lm
 	ASAN_OPTIONS=detect_leaks=0 ./$@ || { rm -f $@; exit 1; }
 test: build/wallpaper-image-test
+
+# a Wayland app that behaves like Google Chrome with profiles (a picker, then the browser window, a dialog told its parent
+# late), for Lord Workspaces' launch placement: tests/launchplace_headless.sh (tests/launchplace_client.c)
+test: build/launchplace-client build/lord-server-test
+build/launchplace-client: tests/launchplace_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/launchplace_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client

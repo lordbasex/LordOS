@@ -12,6 +12,7 @@
 //   <FilePicker onPick={(path) => …} onClose={() => …} filter={/\.(png|jpe?g)$/i} title={t('…')} multiple />
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Image, addListener, displayFor } from '@lordos/runtime';
+import { portalFilter, portalBox } from './portalfilemodel.js';
 import { useTheme, ThemeContext, DEFAULT_TOKENS, shellTokens } from './theme.js';
 import { t, direction } from './i18n.js';
 import { Button, ScrollView, TextInput, takeTextFocus, releaseTextFocus, hasTextFocus } from './components.jsx';
@@ -356,11 +357,6 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
 // The home folder and the local disks, like every other picker here. The app gets only what the person picks.
 export const portalFile = createStore(null);
 
-const globPart = (c) => (c === '*' ? '.*' : c === '?' ? '.' : c.replace(/[.+^${}()|[\]\\]/g, '\\$&'));
-const portalFilter = (patterns) => {
-  if (!patterns?.length || patterns.includes('*')) return null;
-  return new RegExp(`^(${patterns.map((p) => [...p].map(globPart).join('')).join('|')})$`, 'i');
-};
 export function PortalFilePrompt() {
   const p = useStore(portalFile);
   // the system layer is outside the theme's ThemeProvider: the dialog takes the same tokens as Files
@@ -369,8 +365,11 @@ export function PortalFilePrompt() {
   const owner = useStore(windows, (ws) => (p?.parent ? ws.find((w) => w.id === `linux#${p.parent}` && !w.minimized && onActiveDesktop(w)) || null : null));
   if (!p) return null;
   const answer = (paths) => lord.portal.chosen(p.id, paths);
-  const a = owner ? workAreaOf(displayFor(owner)) : null;
-  const box = owner ? overParent(wm.frame(owner), Math.round(Math.min(920, a.w * 0.96)), Math.round(Math.min(620, a.h * 0.94)), a) : null;
+  // over that window, else on the display of the window in front (the app that asked, almost always), never centered
+  // across every display (sdk/portalfilemodel.js portalBox)
+  const front = wm.get(wm.focused());
+  const box = portalBox(owner ? wm.frame(owner) : null, owner ? workAreaOf(displayFor(owner)) : null,
+    front ? workAreaOf(displayFor(wm.frame(front))) : null, workAreaOf(null), overParent);
   return (
     <ThemeContext.Provider value={tokens || DEFAULT_TOKENS}>
       <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }}>

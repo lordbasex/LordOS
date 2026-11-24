@@ -44,6 +44,7 @@ import { Spine } from './components/Spine.jsx';
 import { Surface } from './components/Surface.jsx';
 import { ActivityStrip, ActivityPeek, StatusCluster, VolumePanel, STATUS_W } from './components/TopBar.jsx';
 import { GroupFrame, trayNodes } from './components/GroupFrame.jsx';
+import { AppWindowsPeek } from './components/AppWindows.jsx';
 import { Search } from './components/Search.jsx';
 import { ControlCenter } from './components/ControlCenter.jsx';
 import { ActivityEditor } from './components/ActivityEditor.jsx';
@@ -81,9 +82,9 @@ const H = {
   crown: (e) => crownMenu.set({ x: e.x + 8, y: e.y + 8 }),
   activities: () => { panel.set(null); toggleOverview(); },
   apps: (e) => { if (e) noteLaunch(e.x, e.y); panel.set((p) => (p?.name === 'search' && p.mode === 'apps' ? null : { name: 'search', mode: 'apps', display: pointerDisplay().id })); },
-  files: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay()); launchApp('files'); },
-  store: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay()); launchApp('store'); },
-  monitor: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay()); launchApp('monitor'); },
+  files: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay(), 1, 'files'); launchApp('files'); },
+  store: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay(), 1, 'store'); launchApp('store'); },
+  monitor: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay(), 1, 'monitor'); launchApp('monitor'); },
   control: () => panel.set((p) => (p?.name === 'control' ? null : { name: 'control', display: pointerDisplay().id })),
   notif: () => panel.set((p) => (p?.name === 'notif' ? null : { name: 'notif', display: mainDisplay().id })),
   volume: () => panel.set((p) => (p?.name === 'volume' ? null : { name: 'volume', display: mainDisplay().id })),
@@ -114,7 +115,7 @@ const table = [
     label: 'shell.ws.shortcuts.activityN', group: 'desktops' },
   { id: 'activityTab', keys: ['Meta+Tab', 'Meta+Shift+Tab'], run: (e) => stepActivity(e.shift ? -1 : 1), when: () => !switcherKeys('meta').includes('Meta+Tab'),
     listed: () => !switcherKeys('meta').includes('Meta+Tab'), label: 'shell.ws.shortcuts.activityTab', group: 'desktops' },
-  { id: 'forceQuit', keys: ['Meta+Alt+Escape'], run: () => { aimLaunch(pointerDisplay()); wm.open('forcequit'); }, when: () => !!getApp('forcequit'), label: 'shell.shortcuts.forceQuit', group: 'apps' },
+  { id: 'forceQuit', keys: ['Meta+Alt+Escape'], run: () => { aimLaunch(pointerDisplay(), 1, 'forcequit'); wm.open('forcequit'); }, when: () => !!getApp('forcequit'), label: 'shell.shortcuts.forceQuit', group: 'apps' },
   { id: 'help', keys: ['Meta+/'], show: ['❖/'], run: () => H.help(), label: 'shell.ws.shortcuts.help', group: 'system' },
   { id: 'bars', keys: ['Ctrl+F2'], run: () => { panel.set(null); enterBars(`pill:${activeDesktop.get()}`); }, label: 'shell.ws.shortcuts.bars', group: 'system' },
   { id: 'switchApps', keys: switcherKeys('meta'), run: (e) => openSwitcher(switcherHold(e), e.shift), label: 'shell.shortcuts.switchApps', group: 'windows' },
@@ -315,7 +316,7 @@ function App() {
   const leavingWins = leaving.map((id) => all.find((w) => w.id === id)).filter((w) => w && !mounted.includes(w));
   const tight = new Set(tiles.tight);
   // what the crown's menu opens goes to the display that menu is on (the spine's), not to wherever the last window was
-  const openHere = (id) => { aimLaunch((crown && displayAt(crown.x, crown.y)) || mainDisplay()); wm.open(id); };
+  const openHere = (id) => { aimLaunch((crown && displayAt(crown.x, crown.y)) || mainDisplay(), 1, id); wm.open(id); };
   const crownItems = [
     { label: tr('shell.menu.about'), onClick: () => openHere('about') },
     { label: tr('shell.menu.settings'), onClick: () => openHere('settings') },
@@ -374,6 +375,7 @@ function App() {
             <>
               <ActivityStrip t={t} rect={stripRect} onEdit={H.edit} />
               <ActivityPeek t={t} />
+              <AppWindowsPeek t={t} />
               <StatusCluster t={t} rect={main.plan.top} rtl={rtl} screenW={screen.width} unread={unread} onControl={H.control} onNotif={H.notif} onVolume={H.volume} />
             </>
           ) : null}

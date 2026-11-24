@@ -61,6 +61,8 @@
   "backup.saveFailed": "バックアップ設定を保存できませんでした",
   "backup.setupFailed": "暗号化をオンにできませんでした",
   "backup.snapshotFailed": "バックアップを完了できませんでした：{errno}",
+  "backup.someFilesFailed": "一部のファイルを復元できませんでした",
+  "backup.restoreStartFailed": "復元を開始できませんでした",
   "backup.sourceUnreadable": "元のフォルダを読み取れません",
   "backup.tooManyExclusions": "除外項目が多すぎます",
   "backup.verifyFailed": "バックアップファイルの検証に失敗しました（改ざんされたか、鍵が違います）",

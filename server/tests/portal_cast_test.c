@@ -155,6 +155,34 @@ static void call(const char *iface, const char *member, const char *sig, DBuf *b
     }
 }
 
+/* the version property of an interface served at the portal's object (org.freedesktop.DBus.Properties.Get), or -1 */
+static long prop_version(const char *iface) {
+    DBuf b; dw_init(&b);
+    dw_str(&b, iface);
+    dw_str(&b, "version");
+    DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/portal/desktop", .iface = "org.freedesktop.DBus.Properties", .member = "Get",
+               .dest = "org.freedesktop.portal.Desktop", .sig = "ss" };
+    uint32_t s = dbus_send(&app, &h, &b);
+    dw_free(&b);
+    dbus_flush(&app);
+    long v = -1;
+    for (int left = 2000; left > 0 && v < 0; left -= 10) {
+        struct pollfd p[2] = { { portal_fd(), POLLIN | (portal_wants_write() ? POLLOUT : 0), 0 }, { app.fd, POLLIN, 0 } };
+        poll(p, 2, 10);
+        portal_dispatch();
+        DMsg m;
+        while (dbus_next(&app, &m) == 1) {
+            if (m.type == DBUS_RETURN && m.reply_serial == s && m.sig && !strcmp(m.sig, "v")) {
+                DRd r; dr_init(&r, &m);
+                const char *sig = dr_variant(&r);
+                if (!r.err && sig && !strcmp(sig, "u")) v = dr_u32(&r);
+            } else if (m.type == DBUS_ERROR && m.reply_serial == s) v = -2;
+            dbus_msg_free(&m);
+        }
+    }
+    return v;
+}
+
 static void opt_s(DBuf *b, const char *k, const char *v) { dw_struct(b); dw_str(b, k); dw_variant(b, "s"); dw_str(b, v); }
 static void opt_u(DBuf *b, const char *k, uint32_t v) { dw_struct(b); dw_str(b, k); dw_variant(b, "u"); dw_u32(b, v); }
 
@@ -414,6 +442,39 @@ int main(void) {
     pump(100);
     g = last_response();
     CHECK(g && g->code == 0 && g->has_color && g->color[0] > 0.24 && g->color[0] < 0.26 && g->color[1] > 0.49 && g->color[2] == 1);
+
+    /* 7b. the FileChooser says version 3, the one Chromium and Google Chrome need before they use it instead of their own
+     * GTK dialog (select_file_dialog_linux_portal.cc kXdgPortalRequiredVersion); Settings stays at 2 */
+    CHECK(prop_version("org.freedesktop.portal.FileChooser") == 3);
+    CHECK(prop_version("org.freedesktop.portal.Settings") == 2);
+    /* Chrome's Save as: SaveFile with current_name, a NUL-ended current_folder and a glob filter in Chromium's form */
+    {
+        fake_app = "desktop:google-chrome";
+        DBuf c; dw_init(&c);
+        dw_str(&c, "wayland:00000000000000000000000000000000");
+        dw_str(&c, "Save File");
+        size_t o = dw_arr_begin(&c, 8);
+        opt_s(&c, "handle_token", "chrome1");
+        opt_s(&c, "current_name", "report.pdf");
+        dw_struct(&c); dw_str(&c, "current_folder"); dw_variant(&c, "ay");
+        { static const uint8_t f[] = "/home/x/Downloads"; dw_bytes(&c, f, sizeof f); }   /* with its NUL, as Chromium sends it */
+        dw_struct(&c); dw_str(&c, "filters"); dw_variant(&c, "a(sa(us))");
+        { size_t fa = dw_arr_begin(&c, 8); dw_struct(&c); dw_str(&c, "PDF"); size_t pa = dw_arr_begin(&c, 8); dw_struct(&c); dw_u32(&c, 0); dw_str(&c, "*.[pP][dD][fF]"); dw_arr_end(&c, pa); dw_arr_end(&c, fa); }
+        dw_arr_end(&c, o);
+        ngot = 0;
+        call("org.freedesktop.portal.FileChooser", "SaveFile", "ssa{sv}", &c, req, err);
+        dw_free(&c);
+        pump(100);
+        CHECK(!err[0] && strstr(req, "/request/") && strstr(req, "chrome1"));
+        CHECK(!strcmp(last_kind, "portal-file") && strstr(last_json, "\"mode\":\"save\"") && strstr(last_json, "\"name\":\"report.pdf\"")
+              && strstr(last_json, "\"folder\":\"/home/x/Downloads\"") && strstr(last_json, "\"patterns\":[\"*.[pP][dD][fF]\"]")
+              && strstr(last_json, "\"parent\":0"));                         /* an unknown handle names no window */
+        const char *saved[] = { "/home/x/Downloads/report.pdf" };
+        portal_file_chosen(json_id(), saved, 1);
+        pump(100);
+        g = last_response();
+        CHECK(g && g->code == 0 && !strcmp(g->uri, "file:///home/x/Downloads/report.pdf"));
+    }
 
     /* 8. the FileChooser: a Flatpak app gets the chosen file lent, anyone else the real path */
     fake_app = "flatpak:org.gnome.TextEditor";

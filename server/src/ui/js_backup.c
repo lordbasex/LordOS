@@ -7,7 +7,8 @@
  *   list()                           [{ id, time }] oldest first
  *   ls(id, rel)                      [{ name, dir, link, size, mtime }] inside a snapshot
  *   path(id)                         real path of the snapshot (to open it in Files)
- *   restore(id, rel, { replace, suffix, to })   rel '' = everything; runs in the thread, the
+ *   restore(id, rel | [rel, …], { replace, suffix, to })   rel '' = everything (alone); a list: up to 64 files and
+ *                                      folders, each checked as one (#231); runs in the thread, the
  *                                      result arrives in status().restore
  *   remove(id)                       delete a snapshot
  *   unlock(pass, create) / lock()    encryption: the key is derived from the passphrase (Argon2id, in
@@ -17,6 +18,7 @@
 #include "js_err.h"
 #include "../backup/backup.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -116,7 +118,28 @@ static JSValue f_restore(JSContext *c, JSValueConst t, int argc, JSValueConst *a
         JS_FreeValue(c, v);
     }
     char err[256] = "";
-    int r = id ? backup_restore(id, rel ? rel : "", replace, suffix ? suffix : " (restaurado)", to, err, sizeof err) : -1;
+    /* several files and folders (#231): an array of 1..BACKUP_RESTORE_MAX strings, each checked as one restore is */
+    const char *many[BACKUP_RESTORE_MAX] = { 0 };
+    int nmany = 0, bad = 0;
+    if (argc > 1 && JS_IsArray(c, argv[1])) {
+        uint32_t len = 0;
+        JSValue lv = JS_GetPropertyStr(c, argv[1], "length");
+        if (JS_ToUint32(c, &len, lv)) len = 0;
+        JS_FreeValue(c, lv);
+        if (len < 1 || len > BACKUP_RESTORE_MAX) bad = 1;
+        for (uint32_t i = 0; !bad && i < len; i++) {
+            JSValue v = JS_GetPropertyUint32(c, argv[1], i);
+            if (JS_IsString(v)) many[nmany++] = JS_ToCString(c, v);
+            if (!many[i]) bad = 1;
+            JS_FreeValue(c, v);
+        }
+    }
+    int r;
+    if (!id) r = -1;
+    else if (bad) { snprintf(err, sizeof err, "backup.badPath"); r = -1; }
+    else if (nmany) r = backup_restore_list(id, many, nmany, replace, suffix ? suffix : " (restaurado)", to, err, sizeof err);
+    else r = backup_restore(id, rel ? rel : "", replace, suffix ? suffix : " (restaurado)", to, err, sizeof err);
+    for (int i = 0; i < nmany; i++) JS_FreeCString(c, many[i]);
     if (id) JS_FreeCString(c, id);
     if (rel) JS_FreeCString(c, rel);
     if (suffix) JS_FreeCString(c, suffix);

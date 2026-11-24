@@ -61,6 +61,8 @@
   "backup.saveFailed": "Ehtiyat nüsxə parametrlərini saxlamaq mümkün olmadı",
   "backup.setupFailed": "Şifrələməni yandırmaq mümkün olmadı",
   "backup.snapshotFailed": "Ehtiyat nüsxəni tamamlamaq mümkün olmadı: {errno}",
+  "backup.someFilesFailed": "Onun bəzi faylları bərpa edilə bilmədi",
+  "backup.restoreStartFailed": "Bərpanı başlatmaq mümkün olmadı",
   "backup.sourceUnreadable": "Mənbə qovluğunu oxumaq mümkün deyil",
   "backup.tooManyExclusions": "Həddindən çox istisna",
   "backup.verifyFailed": "Ehtiyat nüsxə fayllarından biri yoxlamadan keçmədi (dəyişdirilib və ya açar səhvdir)",

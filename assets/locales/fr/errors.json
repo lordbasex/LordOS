@@ -61,6 +61,8 @@
   "backup.saveFailed": "Impossible d’enregistrer les réglages de sauvegarde",
   "backup.setupFailed": "Impossible d’activer le chiffrement",
   "backup.snapshotFailed": "Impossible de terminer la sauvegarde : {errno}",
+  "backup.someFilesFailed": "Certains de ses fichiers n’ont pas pu être restaurés",
+  "backup.restoreStartFailed": "Impossible de lancer la restauration",
   "backup.sourceUnreadable": "Impossible de lire le dossier source",
   "backup.tooManyExclusions": "Trop d’exclusions",
   "backup.verifyFailed": "Un fichier de sauvegarde n’a pas passé la vérification (fichier altéré ou mauvaise clé)",

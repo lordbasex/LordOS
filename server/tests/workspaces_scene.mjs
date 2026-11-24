@@ -258,28 +258,51 @@ await flush();
   await flush();
 }
 
-// minimized windows stay on their display: its frame header shows them, and a click brings each back where it was
+// the display's bar (its frame header): every window of the activity on that display, open and minimized, in the order
+// they opened; a minimized one has a line under its icon; a click brings an open one forward and a minimized one back
+// where it was; no "Minimized" label any more
 {
-  const label = sdk.t('shell.ws.minimized.label');
-  const trays = () => [...texts].filter(([id, v]) => v === label && attached(id) && ![parents.get(id), parents.get(parents.get(id))].some((p) => styles.get(p)?.display === 'none')).map(([id]) => id);
+  const hiddenUp = (id) => { for (let n = id; n; n = parents.get(n)) if (styles.get(n)?.display === 'none') return true; return false; };
+  // a tray: the chip (height 32, gap 1) whose children are window icons (28 × 28 with the line node under them)
+  const trays = () => [...styles].filter(([id, st]) => st.height === 32 && st.gap === 1 && st.borderRadius === 12 && attached(id) && !hiddenUp(id)).map(([id]) => id);
+  const iconsIn = (tray) => [...parents].filter(([c, p]) => p === tray && styles.get(c)?.width === 28 && attached(c)).map(([c]) => c);
+  const lineOf = (icon) => [...parents].filter(([c, p]) => p === icon && styles.get(c)?.height === 2.5).map(([c]) => c)[0];
+  const marked = (icon) => styles.get(lineOf(icon))?.display === 'flex';
   tiler.setLayout(desk, 'HDMI-A-1', 'free');   // One at a time would minimize the store window behind it
   for (let i = 0; i < 2; i++) await flush();
+  check('bar: the old "Minimized" label is gone', [...texts].some(([id, v]) => v === 'Minimized' && attached(id) && !hiddenUp(id)), false);
+  const before = trays().length;
+  const counts0 = new Map(trays().map((id) => [id, iconsIn(id).length]));
   const m1 = sdk.wm.open('extra40', { frame: { x: R.x + 300, y: 300, w: 500, h: 400 } });
-  await flush();
+  for (let i = 0; i < 2; i++) await flush();
+  const m2 = sdk.wm.open('extra41', { frame: { x: R.x + 700, y: 320, w: 500, h: 400 } });
+  for (let i = 0; i < 2; i++) await flush();
   const f1 = frameOf(m1);
-  check('tray: none with nothing minimized', trays().length, 0);
+  const tr = trays();
+  check('bar: a tray on each display with windows', tr.length >= 1 && tr.length >= before, true);
+  const mine = tr.filter((id) => iconsIn(id).length - (counts0.get(id) || 0) === 2);
+  check('bar: the open windows are in it, before any is minimized', mine.length, 1);
+  const icons = mine.length ? iconsIn(mine[0]) : [];
+  check('bar: no line under open windows', icons.map(marked), icons.map(() => false));
+  sdk.wm.focus(m1);                                 // the stacking order changes; the icons keep the order they opened in
+  for (let i = 0; i < 2; i++) await flush();
+  check('bar: icons keep their order after a focus', mine.length ? iconsIn(mine[0]) : [], icons);
   sdk.wm.minimize(m1);
   for (let i = 0; i < 3; i++) await flush();
-  const tr = trays();
-  check('tray: one, on the display the window was on', tr.length, 1);
-  const up = (id) => [parents.get(id), parents.get(parents.get(id))];
-  const icon = tr.length ? [...parents].filter(([c, p]) => up(tr[0]).includes(p) && styles.get(c)?.width === 26 && attached(c)).map(([c]) => c) : [];
-  check('tray: the window\'s icon', icon.length, 1);
-  if (icon.length) { globalThis.__lordEvent('down', icon[0], 0, 0, 0); globalThis.__lordEvent('up', icon[0], 0, 0, 0); }
+  const after = mine.length ? iconsIn(mine[0]) : [];
+  check('bar: a minimized window stays in the bar', after.length, icons.length);
+  check('bar: a line under the minimized one only', after.map(marked).filter(Boolean).length, 1);
+  const target = after.find(marked);
+  if (target) { globalThis.__lordEvent('down', target, 0, 0, 0); globalThis.__lordEvent('up', target, 0, 0, 0); }
   for (let i = 0; i < 3; i++) await flush();
-  check('tray: a click brings it back, where it was', [!!sdk.wm.get(m1).minimized, frameOf(m1)], [false, f1]);
-  check('tray: empty again', trays().length, 0);
-  sdk.wm.close(m1, true);
+  check('bar: a click brings it back, where it was', [!!sdk.wm.get(m1).minimized, frameOf(m1)], [false, f1]);
+  check('bar: no line once back', (mine.length ? iconsIn(mine[0]) : []).map(marked).filter(Boolean).length, 0);
+  // the app's windows from its icon: the Dock's rows (sdk/dock.js appWindowItems), titles cleaned, New window last
+  const aw = await import('../../themes/workspaces/components/AppWindows.jsx');
+  sdk.wm.setTitle(m2, 'Work\u202e - Chrome\nsecond line');
+  const items = aw.appMenuItems(sdk.launcherIdOf(sdk.wm.get(m2)), desk, R, null, true);
+  check('app menu: its window, then New window', items.map((x) => (x === '-' ? '-' : x.label)), ['Work - Chrome second line', '-', sdk.t('shell.dock.newWindow')]);
+  for (const id of [m1, m2]) sdk.wm.close(id, true);
   tiler.setLayout(desk, 'HDMI-A-1', 'single');
   await flush();
 }
@@ -863,6 +886,110 @@ check('idle again: still no timer every second', intervals(1000), 0);
   sdk.removeDesktopById(nd3);
   sdk.removeDesktopById(nd2);
   await flush();
+}
+
+
+// a launch from a display's bar: the app's windows go to THAT display and THAT activity, in its layout slot, wherever the
+// app puts them and whatever activity is in view when they come. Google Chrome with profiles: its picker takes the
+// place, closes, and the real browser window follows it there (model/launches.js); another app's window doesn't take it
+{
+  const key = 'linux:fakechrome';
+  sdk.switchDesktop(desk);
+  tiler.setLayout(desk, 'HDMI-A-1', 'halves');
+  for (let i = 0; i < 3; i++) await flush();
+  const here = sdk.windows.get().filter((w) => w.desktop === desk && sdk.displayFor(frameOf(w.id))?.id === R.id).map((w) => w.id);
+  for (const id of here) sdk.wm.close(id, true);
+  await flush();
+  const first = sdk.wm.open('extra59', { frame: { x: R.x + 200, y: 200, w: 600, h: 400 } });
+  for (let i = 0; i < 3; i++) await flush();
+  const halves = tileRects('halves', plan(R).work, 2, 0.5);
+  tiler.aimLaunch(R, 1, key);
+  check('launch: pending for that display and activity', tiler.pendingLaunches().filter((p) => p.key === key).map((p) => [p.key, p.dk, p.desk]), [[key, 'HDMI-A-1', desk]]);
+  // another app's window opens meanwhile on the main display: not taken
+  const other = sdk.wm.open('linux', { instance: '9001', frame: { x: M.x + 100, y: 100, w: 500, h: 400 }, args: { surface: 9001, appId: 'gedit-like' } });
+  // the profile picker, where Chrome puts it (the main display)
+  const picker = sdk.wm.open('linux', { instance: '9002', frame: { x: M.x + 300, y: 200, w: 800, h: 600 }, args: { surface: 9002, appId: 'fakechrome' } });
+  for (let i = 0; i < 3; i++) await flush();
+  check('launch: another app\'s window stays where it opened', sdk.displayFor(frameOf(other))?.id, M.id);
+  check('launch: the picker on the launch\'s display, in its slot', [sdk.displayFor(frameOf(picker))?.id, frameOf(picker)], [R.id, halves[1]]);
+  // the person goes to another activity while choosing; the picker closes and the browser window opens there
+  const nd = state.newActivity();
+  for (let i = 0; i < 3; i++) await flush();
+  sdk.wm.close(picker, true);
+  await flush();
+  const real = sdk.wm.open('linux', { instance: '9003', frame: { x: M.x + 50, y: 60, w: 1200, h: 800 }, args: { surface: 9003, appId: 'fakechrome' } });
+  for (let i = 0; i < 3; i++) await flush();
+  check('launch: the browser window goes to the launch\'s activity', sdk.wm.get(real)?.desktop, desk);
+  sdk.switchDesktop(desk);
+  for (let i = 0; i < 4; i++) await flush();
+  check('launch: on the launch\'s display, in the picker\'s slot', [sdk.displayFor(frameOf(real))?.id, frameOf(real), frameOf(first)], [R.id, halves[1], halves[0]]);
+  // a dialog of that window (transient for it): never placed by a launch, over its parent (sdk/wayland.js)
+  check('launch: nothing pending after', tiler.pendingLaunches().filter((p) => p.key === key).length, 0);
+  for (const id of [first, other, real]) sdk.wm.close(id, true);
+  sdk.removeDesktopById(nd);
+  tiler.setLayout(desk, 'HDMI-A-1', 'single');
+  for (let i = 0; i < 2; i++) await flush();
+}
+
+
+// a browser profile chosen for an activity (the activity first, the display's connector as the fallback): the launch
+// asks lord-server's profile path for that folder, only when it exists (awaiting approval), and the window it opens is
+// tied to that profile; without the path the browser opens as before
+{
+  const C = 'desktop:google-chrome';
+  const was = lord.apps;
+  const calls = [];
+  const stub = (withProfile) => new Proxy(withProfile ? { launchProfile: (id, dir) => { calls.push([id, dir]); return true; } } : {},
+    { get: (o, k) => (k in o ? o[k] : typeof k === 'string' ? () => [] : undefined) });
+  sdk.switchDesktop(desk);
+  state.updateActivity(desk, (m) => ({ ...m, profiles: { [C]: 'Profile 2', 'desktop:evil': 'Default', 'desktop:chromium': '../../x' } }));
+  check('profiles: only browsers and folder names are kept', state.activityOf(desk).profiles, { [C]: 'Profile 2' });
+  lord.apps = stub(true);
+  tiler.launchOn(R, C);
+  check('profiles: the activity\'s profile asked for', calls, [['google-chrome', 'Profile 2']]);
+  const pw = sdk.wm.open('linux', { instance: '9101', frame: { x: M.x + 50, y: 60, w: 900, h: 700 }, args: { surface: 9101, appId: 'google-chrome' } });
+  for (let i = 0; i < 3; i++) await flush();
+  check('profiles: its window on the launch\'s display', sdk.displayFor(frameOf(pw))?.id, R.id);
+  // no activity choice: the display's (by connector)
+  state.updateActivity(desk, (m) => ({ ...m, profiles: {} }));
+  sdk.settings.set({ browserProfiles: { displays: { 'HDMI-A-1': { [C]: 'Profile 3' } } } });
+  calls.length = 0;
+  tiler.launchOn(R, C);
+  tiler.launchOn(L, C);
+  check('profiles: the display\'s profile when the activity has none', calls, [['google-chrome', 'Profile 3']]);
+  // without the profile path: no profile asked, the plain launch
+  lord.apps = stub(false);
+  calls.length = 0;
+  tiler.launchOn(R, C);
+  check('profiles: no path, no profile', calls, []);
+  lord.apps = was;
+  sdk.settings.set({ browserProfiles: undefined });
+  sdk.wm.close(pw, true);
+  for (let i = 0; i < 2; i++) await flush();
+}
+
+
+// ❖` (sdk/appswitcher.jsx cycleAppWindows, in Lord Workspaces' table and Settings → Keyboard): the next window of the app
+// in front, only among that app's windows in the activity in view; a window of the same app in another activity is left
+{
+  tiler.forgetLaunches();                // the profile launches above never showed a window
+  sdk.switchDesktop(desk);
+  const a1 = sdk.wm.open('linux', { instance: '9201', frame: { x: M.x + 100, y: 100, w: 500, h: 400 }, args: { surface: 9201, appId: 'cyclechrome' } });
+  const a2 = sdk.wm.open('linux', { instance: '9202', frame: { x: M.x + 200, y: 150, w: 500, h: 400 }, args: { surface: 9202, appId: 'cyclechrome' } });
+  const other = state.newActivity();
+  const a3 = sdk.wm.open('linux', { instance: '9203', desktop: other, frame: { x: M.x + 300, y: 200, w: 500, h: 400 }, args: { surface: 9203, appId: 'cyclechrome' } });
+  sdk.switchDesktop(desk);
+  for (let i = 0; i < 3; i++) await flush();
+  sdk.wm.focus(a2);
+  await flush();
+  const seen = new Set();
+  for (let i = 0; i < 4; i++) { sdk.cycleAppWindows(false); await flush(); seen.add(sdk.wm.focused()); }
+  check('❖`: cycles the app\'s windows of this activity only', [...seen].sort(), [a1, a2].sort());
+  check('❖`: the activity in view stays', sdk.activeDesktop.get(), desk);
+  check('❖`: in the shortcuts table, shown in Settings → Keyboard', sdk.shortcutList().some((g) => g.items.some((x) => x.id === 'cycleWindows')), true);
+  for (const id of [a1, a2, a3]) sdk.wm.close(id, true);
+  sdk.removeDesktopById(other);
+  for (let i = 0; i < 2; i++) await flush();
 }
 
 process.exit(0);

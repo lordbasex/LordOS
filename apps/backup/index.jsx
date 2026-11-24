@@ -7,10 +7,10 @@ import {
   View, Text, ScrollView, Segmented, Toggle, Button, TextInput, useTheme, useBackup, backup, fs, wm, t as tr, errorText,
   formatBytes, formatDate, formatTime, formatNumber, direction,
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SidebarItem, SectionTitle, EmptyState, GroupBox, FormRow, Hairline, spacing, typeScale,
-  useSidebar, SidebarToggle, SidebarOverlay, cloudModel, FilePicker,
+  useSidebar, SidebarToggle, SidebarOverlay, cloudModel, FilePicker, NO_SELECTION, clickSelect,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { exclusionFor, addExclusion } from './model.js';
+import { exclusionFor, addExclusion, restoreTarget, baseName } from './model.js';
 
 // ---- icon: a clock with a returning arrow (drawn with View) ----
 export function Icon({ size }) {
@@ -354,7 +354,8 @@ function Browser({ st }) {
   const [sel, setSel] = useState(null);
   const [rel, setRel] = useState('');
   const [items, setItems] = useState([]);
-  const [pick, setPick] = useState(null);
+  // the rows picked, as in Files: a click picks one, Shift a range from the last one, Ctrl (or ⌘) adds or takes out (#231)
+  const [pick, setPick] = useState(NO_SELECTION);
   const [replace, setReplace] = useState(false);
   const [ask, setAsk] = useState(null);       // 'all' | 'delete'
   const [err, setErr] = useState('');
@@ -363,12 +364,14 @@ function Browser({ st }) {
   const list = useMemo(() => [...snaps].reverse(), [snaps]);
   useEffect(() => { if (!sel && list.length) setSel(list[0].id); if (sel && !snaps.find((s) => s.id === sel)) setSel(list[0]?.id || null); }, [list]);
   useEffect(() => {
-    setPick(null);
+    setPick(NO_SELECTION);
     if (!sel) { setItems([]); return; }
     try { setItems(backup.ls(sel, rel)); setErr(''); } catch (e) { setItems([]); setErr(String(e.message || e)); }
   }, [sel, rel]);
   const busy = st && st.state !== 'idle' && st.state !== 'nodest';
-  const restore = (r) => { setErr(''); try { backup.restore(sel, r, { replace }); } catch (e) { setErr(String(e.message || e)); } };
+  const restore = (r) => { if (r == null) return; setErr(''); try { backup.restore(sel, r, { replace }); } catch (e) { setErr(String(e.message || e)); } };
+  const picked = pick.selected;
+  const target = restoreTarget(rel, picked);
   // grouped by day
   const groups = [];
   for (const s of list) {
@@ -389,7 +392,10 @@ function Browser({ st }) {
   }
   const whenSel = () => when(snaps.find((s) => s.id === sel)?.time);
   const caption = { fontSize: typeScale.caption, fontWeight: 600, color: th.textDim, whiteSpace: 'nowrap' };
-  const restoreLabel = pick ? tr('backup.restoreItem', { name: pick }) : rel ? tr('backup.restoreFolder') : tr('backup.restorePick');
+  const restoreLabel = picked.length > 1 ? tr('backup.restoreSelected', { count: Math.min(picked.length, 64) })
+    : picked.length ? tr('backup.restoreItem', { name: picked[0] }) : rel ? tr('backup.restoreFolder') : tr('backup.restorePick');
+  const keys = items.map((it) => it.name);
+  const restoring = st?.state === 'restoring' && rr && rr.id === sel && rr.count > 1;
   const sidebar = (
     <View style={{ width: 220, ...(side.narrow ? { flex: 1 } : null), backgroundColor: th.sidebarBg }}>
       <ScrollView style={{ flex: 1 }}>
@@ -440,10 +446,11 @@ function Browser({ st }) {
         <ScrollView resetKey={`${sel}|${rel}`} style={{ flex: 1 }}>
           <View style={{ paddingVertical: spacing.xs, paddingHorizontal: spacing.s }}>
             {items.map((it, i) => {
-              const on = pick === it.name;
+              const on = picked.includes(it.name);
               const dimFg = on ? 'rgba(255,255,255,0.85)' : th.textDim;
               return (
-                <View key={it.name} onClick={() => setPick(it.name)} onDoubleClick={() => it.dir && setRel(join(rel, it.name))}
+                <View key={it.name} onClick={(e) => setPick(clickSelect(pick, keys, it.name, { shift: !!e?.shift, toggle: !!(e?.ctrl || e?.meta), multiple: true }))}
+                  onDoubleClick={() => it.dir && setRel(join(rel, it.name))}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 28, paddingHorizontal: spacing.s, borderRadius: 6,
                     backgroundColor: on ? th.accent : i % 2 ? (th.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)') : 'transparent' }}>
                   <View style={{ width: 18, alignItems: 'center' }}>
@@ -460,9 +467,19 @@ function Browser({ st }) {
         </ScrollView>
         <View style={{ paddingHorizontal: spacing.l, paddingVertical: spacing.m, gap: spacing.s }}>
           <Hairline edge="top" />
+          {restoring ? <Label size={typeScale.callout} dim style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {tr('backup.restoringItem', { index: rr.index, count: rr.count, name: baseName(rr.current) })}</Label> : null}
           {rr && rr.done && rr.id === sel ? (
             <Label size={typeScale.callout} dim>{rr.ok ? tr('backup.restoredInfo', { count: rr.files, both: rr.keptBoth, replaced: rr.replaced })
-              : tr('backup.restoreFailed', { error: errText(rr.error) || tr('backup.restoreErrors', { count: rr.errors }) })}</Label>
+              : (rr.failed || []).length ? tr('backup.restoredInfo', { count: rr.files, both: rr.keptBoth, replaced: rr.replaced })
+                : tr('backup.restoreFailed', { error: errText(rr.error) || tr('backup.restoreErrors', { count: rr.errors }) })}</Label>
+          ) : null}
+          {rr && rr.done && rr.id === sel && !rr.ok ? (rr.failed || []).map((f, i) => (
+            <Label key={`f${i}`} size={typeScale.callout} style={{ color: '#e5534b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {tr('backup.restoreItemFailed', { name: baseName(f.rel), error: errText(f.error) })}</Label>
+          )) : null}
+          {rr && rr.done && rr.id === sel && rr.failedCount > (rr.failed || []).length ? (
+            <Label size={typeScale.callout} style={{ color: '#e5534b' }}>{tr('backup.restoreMoreFailed', { count: rr.failedCount - (rr.failed || []).length })}</Label>
           ) : null}
           {err && items.length ? <Label size={typeScale.callout} style={{ color: '#e5534b' }}>{err}</Label> : null}
           <Row style={{ gap: spacing.s }}>
@@ -479,8 +496,8 @@ function Browser({ st }) {
               <Button key="del" label={tr('backup.delete')} disabled={busy} onClick={() => setAsk('delete')} />,
               <Button key="all" label={tr('backup.restoreAll')} disabled={busy} onClick={() => setAsk('all')} />,
             ]}
-            <Button label={restoreLabel} primary disabled={busy || (!pick && !rel)} style={{ maxWidth: narrow ? 200 : 260, overflow: 'hidden' }}
-              onClick={() => (pick ? restore(join(rel, pick)) : rel ? restore(rel) : null)} />
+            <Button label={restoreLabel} primary disabled={busy || target == null} style={{ maxWidth: narrow ? 200 : 260, overflow: 'hidden' }}
+              onClick={() => restore(target)} />
           </Row>
         </View>
       </View>

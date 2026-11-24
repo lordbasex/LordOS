@@ -61,6 +61,8 @@
   "backup.saveFailed": "بیک اپ ترتیبات محفوظ نہیں ہو سکیں",
   "backup.setupFailed": "انکرپشن آن نہیں ہو سکی",
   "backup.snapshotFailed": "بیک اپ مکمل نہیں ہو سکا: {errno}",
+  "backup.someFilesFailed": "اس کی کچھ فائلیں بحال نہیں ہو سکیں",
+  "backup.restoreStartFailed": "بحالی شروع نہیں ہو سکی",
   "backup.sourceUnreadable": "ماخذ فولڈر پڑھا نہیں جا سکتا",
   "backup.tooManyExclusions": "بہت زیادہ استثنا",
   "backup.verifyFailed": "بیک اپ کی ایک فائل تصدیق میں ناکام رہی (چھیڑ چھاڑ یا غلط کی)",

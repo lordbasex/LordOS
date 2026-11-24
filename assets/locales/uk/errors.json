@@ -61,6 +61,8 @@
   "backup.saveFailed": "Не вдалося зберегти налаштування резервного копіювання",
   "backup.setupFailed": "Не вдалося ввімкнути шифрування",
   "backup.snapshotFailed": "Не вдалося завершити резервне копіювання: {errno}",
+  "backup.someFilesFailed": "Деякі його файли не вдалося відновити",
+  "backup.restoreStartFailed": "Не вдалося почати відновлення",
   "backup.sourceUnreadable": "Не вдається прочитати вихідну теку",
   "backup.tooManyExclusions": "Забагато винятків",
   "backup.verifyFailed": "Файл резервної копії не пройшов перевірку (його змінено або ключ неправильний)",

@@ -28,6 +28,63 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `make test`) and the headless scene `tests/app_scene_headless.sh files_slowrename_scene` (the three views, a real
   rename on disk, and each case that must not rename, with screenshots in the four desktops and in Arabic). Enter and
   the menu's Rename are unchanged.
+- **Lord Workspaces: each display's bar shows every window of the activity; launched windows land where they were
+  launched; Chrome's Save as is LordOS's dialog** (in development; latest release 0.8.9.5-beta).
+  - The frame header's tray (each display's bar) lists the activity's windows on that display, **open and minimized**,
+    in the order they opened, a short line under a minimized one and no "Minimized" label; a click brings an open
+    window forward or a minimized one back into the slot it kept (`themes/workspaces/components/AppWindows.jsx`).
+  - An app's icon (a window's, a pinned app's, an app in Search's grid) lists that app's windows in the activity on
+    hover (two or more) and right click, with New window opened on that display. The rows are the Dock's
+    (`appWindowItems`, `sdk/dock.js`); a title is cleaned to one plain line (`sdk/windowlistmodel.js`: control and
+    bidi-override characters dropped, 80 characters), so a window can't draw a second line or reorder its label to
+    pass for another.
+  - Launch placements keyed by the app (`themes/workspaces/model/launches.js`): a window launched from a display's
+    "+", Add window, Used most on this display, its pinned or usual apps or Search goes to that display **and that
+    activity**, into its layout slot, even if another activity is in view when it comes; another app's window no longer
+    takes the launch. Google Chrome's profile picker takes the place, and when it closes the browser window that follows
+    goes to the same display, activity and slot (both orders; at most 3 re-arms, 9 placements, 30 s / 20 s).
+  - Dialogs told their parent late (X11 `WM_TRANSIENT_FOR` read after the map, xdg-foreign) go over the parent, on its
+    display and activity, at the size they asked for (`sdk/dialogmodel.js lateParentFrame`, every theme).
+  - `org.freedesktop.portal.FileChooser` says **version 3** (was 2): Chromium and Google Chrome use LordOS's file
+    dialog for Open and Save as, over the window that asked (xdg-foreign) or on the display of the window in front,
+    never centered across all displays; the app's globs with classes (Chromium's `*.[pP][dD][fF]`) are matched by a
+    linear matcher, never a RegExp (`sdk/portalfilemodel.js`). No new privilege: any app could already call it, and the
+    answer still goes only to the caller. Checked with Google Chrome 158 in a headless session
+    (`server/tests/chrome_portal_headless.sh`, opt-in): Ctrl+S showed LordOS's dialog and the file was saved.
+  - **Browser profiles** (`sdk/browserprofilemodel.js`, `sdk/browserprofiles.js`): Chrome, Chromium, Brave and Edge
+    profiles read from the browser's own `Local State` as untrusted data (1 MiB, no link, `JSON.parse`, 32 profiles,
+    folder names only of the form `Default`/`Profile N`, names cleaned), on demand only and again only when its mtime
+    or size changed. An activity keeps the profile a browser opens there, each display by connector as the fallback for
+    every theme (`settings.browserProfiles`); the icon menu offers Open profile and both choices, and Used most on this
+    display shows "Chrome · Dev". The launch, `lord.apps.launchProfile` (approved by the maintainer 2026-11-24;
+    `apps_launch_profile` in `server/src/apps.c`): a fixed browser table in C, the system `.desktop` only, a profile
+    folder the browser's own `Local State` lists (`O_NOFOLLOW`, regular, <= 1 MiB, `sec/json.c`), one argv element
+    `--profile-directory=<profile>` built in C; desktop session only, not in the broker (`build/apps-profile-test`:
+    the argv, bad names, unlisted folders, a hostile `Local State` — not JSON, wrong shape, duplicate keys, oversize, a
+    link, a FIFO — a browser outside the table, a user `.desktop`). Chrome names no profile in its window titles on
+    Linux and gives every profile one app_id, so a window's profile (its colour dot on the bar icon, its name in the
+    window lists) is known only for a window LordOS launched for that profile.
+  - ❖` cycles the windows of the app in front within the activity (checked in the scene; listed in Settings →
+    Keyboard).
+  - Tests: `server/tests/launchplace_headless.sh` (in `make test`, en and ar: a headless `lord-server-test`, the real
+    launcher and `build/launchplace-client`, a fake Chrome with a profile picker and a late-parent dialog, screenshots),
+    `browser_profiles_test.mjs`, `portal_file_model_test.mjs`, `dialog_model_test.mjs`, `workspaces_model_test.mjs`
+    (launches, labels), `workspaces_scene.mjs` (the bar, the icon menu, the picker flow over three displays, profiles,
+    ❖`), `portal-cast-test` (versions, a Chrome-style SaveFile). Strings in all 35 languages; docs/WORKSPACES.md.
+- **Backups restores several files and folders at once (GitHub #231 follow-up)** (in development; latest release
+  0.8.9.5-beta). The restore browser picks rows as Files does: a click picks one, Shift a range from the last one,
+  Ctrl (or ⌘) adds or takes one out; Restore then reads "Restore Selected (N)" and sends them together
+  (`apps/backup/model.js` `restoreTarget`, the SDK's `clickSelect`). `lord.backup.restore(id, [rel, …])` takes up to 64
+  paths; the list is checked whole before anything is queued (`bk_restore_list_valid`: every item a safe relative path,
+  "everything" only alone) and each item is then restored by the same `bk_restore` a single restore uses, with every
+  check it makes (nothing outside the snapshot or through a link in it, nothing outside lord.fs's roots, protected
+  folders skipped), one after the other in the backup thread (`bk_restore_list`). An item inside another listed folder
+  is restored once, with it. While it runs the window says "Restoring 2 of 5: name"; afterwards each item that failed is
+  named with its own error (up to 8, then a count), and the rest are reported as restored
+  (`status().restore.count/index/current/failed`). The thread also no longer returned without its lock when a locked
+  encrypted destination refused a restore. Tests: `build/backup-test` (lists, nesting, a bad item beside good ones, links
+  out of the backup, protected folders, refusals, cancel), `tests/backup_model_test.mjs`, and the
+  `backup_restore_scene` (Shift and Ctrl picks, the list sent, progress and per-item errors).
 - **A mouse's Back and Forward buttons work in LordOS's own apps (GitHub #234)** (in development; latest release
   0.8.9.5-beta). They reached the desktop as buttons 3 and 4 and were dropped, so that no title bar, button or slider
   took them as a press (#159); only Linux apps (Firefox, Chromium) used them. `runtime/events.js` still keeps them from
@@ -1035,6 +1092,28 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Settings → Language & Region → Region names each region's language (GitHub #239 follow-up)** (in development;
+  latest release 0.8.9.5-beta). A row named only its country, so the five regions of France (Breton, Catalan, Basque,
+  French and Occitan) all read "France · xx_FR", and Basque was picked by mistake. Each row now reads "Basque · France
+  (eu_FR)", with the language and the country in the interface language, sorted by that name, and a search by either
+  finds it (`sdk/localename.js` `regionLabel`). The names come from Unicode CLDR through Node.js's ICU,
+  written by `tools/gen-language-names.mjs` into a new `languages` catalog in all 35 languages (195 glibc languages).
+  Tests: `tests/localename_test.mjs` and the headless `settings_region_scene` (screenshots of the list).
+- **Check This Account no longer fails its delete step on pCloud (GitHub #243 follow-up)** (in development; latest
+  release 0.8.9.5-beta). The check moves its own folder out of the account, and the move's last step removed the
+  emptied folder at once; pCloud still lists a file it has just deleted for a moment, so that rmdir said "not empty"
+  and the step failed (`cloud.checkDeleteFailed`). A move between disks now tries only that folder's rmdir again on
+  ENOTEMPTY, with a short backoff and at most 4.5 s in all, on the copy job's own thread (`server/src/fsops.c`
+  `rm_tree_patient`); nothing is walked or deleted again, and a folder that really holds something still fails.
+  The Trash and the interface's thread never wait. Test: `build/fsops-test` (a folder that reads ENOTEMPTY once, and
+  one that always does).
+- **Screenshots' Options menu opens above the bar the first time (GitHub #237)** (in development; latest release
+  0.8.9.5-beta). The floating bar sits just above the Dock, and on its first open the menu was laid out downward, cut
+  to the little room above the Dock, and moved up only at the next render. A Popover chose its side from its own
+  height before it had been laid out (zero) and from its height cut to the room below; it is now drawn invisible until
+  it has been laid out, a popover cut to its room counts as not fitting there, and it is shown once it is on its side
+  (`sdk/controls.jsx` `Popover`, which every popover of the SDK uses). Test: the headless `screenshots_menu_scene`
+  (the menu's box on every frame of the first open, and a screenshot).
 - **A note's or a mail's attachment never runs a program** (in development; #238 follow-up, automated security review).
   Opening an attachment that its default Linux app would run (a `.desktop` launcher, an AppImage, a program run
   under Wine, a `.jar`, a script, an installer package; by name or by its detected type) now shows it in Files instead;
