@@ -391,6 +391,7 @@ static int node_part(const MediaSrc *s, const Node *n, int x, int y, int w, int 
 
 int media_src_damage_rect(MediaSrc *s, int x, int y, int w, int h) {
     int k = 0;
+    media_pd_note(s, x, y, w, h);
     Node *n = s->node ? node_get(s->node) : NULL;
     if (n && n->type == NODE_MEDIA && n->term == s->id && !n->crop && n->prev_box.x1 > n->prev_box.x0) {
         /* only where the picture changed (Machines: a pointer, a clock), as the crop nodes below: the rest of the
@@ -431,6 +432,32 @@ struct GpuTex *media_gpu_tex(int id, int *flip) {
     if (!s || !s->gtex || !gpu_tex_current(s->gtex)) return NULL;
     if (flip) *flip = s->gtex_flip;
     return s->gtex;
+}
+
+int media_src_tex_rect(MediaSrc *s, int x, int y, int w, int h) {
+    if (!s || !s->tex_px || !s->px || !s->ptex || s->gtex != s->ptex || !gpu_tex_current(s->ptex) || !gpu_active()) return 0;
+    if (x < 0 || y < 0 || w <= 0 || h <= 0 || x > s->w - w || y > s->h - h) return 0;
+    GpuTex *t = gpu_tex_pixels_rect(s->ptex, s->px, s->w, s->h, 1, (Rect){ x, y, x + w, y + h });
+    if (!t) { s->ptex = NULL; s->gtex = NULL; s->gpu_drawn = 0; return 0; }
+    s->ptex = s->gtex = t;
+    return 1;
+}
+
+void media_src_tex_off(MediaSrc *s) {
+    if (!s) return;
+    s->tex_px = 0;
+    if (s->ptex && s->gtex == s->ptex) { s->gtex = NULL; s->gpu_drawn = 0; }
+}
+
+void media_src_tex_fresh(MediaSrc *s) {
+    if (!s || !s->tex_px || !s->px || s->w <= 0 || s->h <= 0 || s->cpu_stale || !gpu_active()) return;
+    if (s->gtex && s->gtex != s->ptex) return;              /* another texture is the picture (a 3D machine's) */
+    if (s->ptex && s->gtex == s->ptex && gpu_tex_current(s->ptex)) return;
+    GpuTex *t = gpu_tex_pixels(s->ptex, s->px, s->w, s->h, 1);
+    s->ptex = t;
+    s->gtex = t;
+    s->gtex_flip = 0;
+    if (!t) s->gpu_drawn = 0;
 }
 
 void media_src_need_cpu(MediaSrc *s) {
@@ -541,6 +568,10 @@ static void unmap_pixels(MediaSrc *s) {
     s->cache_w = s->cache_h = 0;
     for (int i = 0; i < s->nmip; i++) free(s->mip[i]);
     s->nmip = 0;
+    if (s->gtex == s->ptex) { s->gtex = NULL; s->gpu_drawn = 0; }
+    gpu_tex_free(s->ptex);
+    s->ptex = NULL;
+    s->tex_px = 0;
 }
 
 static void drop_helper(MediaSrc *s, int grace) {

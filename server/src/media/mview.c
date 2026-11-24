@@ -114,6 +114,7 @@ static void paint_crop(Canvas *c, MediaSrc *s, int node, const float *r, float x
     const uint32_t *px = pixels_of(s, &sw, &sh);
     if (!px) return;
     s->painted_seq = s->frame_seq;
+    media_src_tex_fresh(s);
     /* the part, kept inside the picture (the guest's window may reach past its screen's edge) */
     float cx0 = fmaxf(r[0], 0), cy0 = fmaxf(r[1], 0), cx1 = fminf(r[0] + r[2], (float)sw), cy1 = fminf(r[1] + r[3], (float)sh);
     Rect old = canvas_push_clip(c, x, y, w, h);
@@ -155,6 +156,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     int sw, sh;
     const uint32_t *px = pixels_of(s, &sw, &sh);
     if (px) s->painted_seq = s->frame_seq;
+    if (px) media_src_tex_fresh(s);         /* a picture the GPU shows from its own pixels: made whole when it must be */
     if (!px) {
         if (s->view.bg >> 24) canvas_rrect(c, x, y, w, h, radius, with_opacity(s->view.bg, op));
         canvas_set_clip(c, old);
@@ -222,13 +224,39 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     int vw = vx1 - vx0, vh = vy1 - vy0;
     if (vw <= 0 || vh <= 0 || vw > 8192 || vh > 8192) { canvas_set_clip(c, old); return; }
     float key[4] = { dx - vx0, dy - vy0, sc, (float)(vw * 65536 + vh) };
-    if (!s->cache || s->cache_w != vw || s->cache_h != vh || s->cache_seq != s->frame_seq || s->cache_gen != s->view.gen ||
-        memcmp(key, s->cache_box, sizeof key)) {
+    /* only new frames since the copy was made, each one's change known (media_src_damage_rect), the same place and
+     * scale, no rotation, mirror or halvings: only the part of the copy those changes reach is made again (a 2D
+     * machine scaled to its window: a clock no longer costs the whole picture; MACHINES-GPU.md Part 1 step 5) */
+    int j0 = 0, j1 = vh, i0 = 0, i1 = vw, redo = 0, whole = 0;
+    if (s->cache && s->cache_w == vw && s->cache_h == vh && s->cache_gen == s->view.gen && !memcmp(key, s->cache_box, sizeof key) &&
+        s->cache_seq != s->frame_seq && s->pd_n > 0 && s->pd_base == s->cache_seq && s->frame_seq - s->cache_seq == (unsigned)s->pd_n &&
+        !rot && !s->view.mirror && !(!ring && sc < 0.5f)) {
+        /* cache pixel i samples picture u = (vx0 + i + 0.5 - dx) / sc - 0.5 and the next one: a change in [x0, x1) reaches
+         * the pixels whose u lies in (x0 - 1, x1); one more each side for rounding */
+        j0 = (int)floorf((s->pd_y0 - 1) * sc + dy - vy0 - 1);
+        j1 = (int)ceilf((s->pd_y1 + 1) * sc + dy - vy0 + 1);
+        i0 = (int)floorf((s->pd_x0 - 1) * sc + dx - vx0 - 1);
+        i1 = (int)ceilf((s->pd_x1 + 1) * sc + dx - vx0 + 1);
+        if (j0 < 0) j0 = 0;
+        if (i0 < 0) i0 = 0;
+        if (j1 > vh) j1 = vh;
+        if (i1 > vw) i1 = vw;
+        redo = j1 > j0 && i1 > i0;
+        s->cache_seq = s->frame_seq;
+        s->pd_n = 0;
+        s->pd_band++;
+    } else if (!s->cache || s->cache_w != vw || s->cache_h != vh || s->cache_seq != s->frame_seq || s->cache_gen != s->view.gen ||
+               memcmp(key, s->cache_box, sizeof key)) {
+        redo = whole = 1;           /* the whole copy */
+        s->pd_n = 0;
+    }
+    if (redo) {
         /* whoever drops the cache (a new picture, unmap_pixels) leaves cache_w × cache_h as they were: a
          * size that fits isn't proof that there's a buffer. Before 2026-11-05 a Machines or Remote Desk
          * picture replaced while scaled (full screen) left the cache NULL and the box black for good */
-        if (!s->cache || s->cache_w * s->cache_h < vw * vh) { free(s->cache); s->cache = malloc((size_t)vw * vh * 4); }
+        if (whole && (!s->cache || s->cache_w * s->cache_h < vw * vh)) { free(s->cache); s->cache = malloc((size_t)vw * vh * 4); }
         if (!s->cache) { canvas_set_clip(c, old); return; }
+        if (whole) s->pd_full++;
         s->cache_w = vw;
         s->cache_h = vh;
         s->cache_seq = s->frame_seq;
@@ -243,10 +271,10 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
             for (int l = 0; l < s->nmip && sc * lf < 0.5f; l++) { lp = s->mip[l]; lw = s->mip_w[l]; lh = s->mip_h[l]; lf *= 2; }
         }
         float inv = 1.0f / sc;
-        for (int j = 0; j < vh; j++) {
+        for (int j = j0; j < j1; j++) {
             uint32_t *o = s->cache + (size_t)j * vw;
             float vp = (vy0 + j + 0.5f - dy) * inv;               /* coordinate in the rotated image */
-            for (int i = 0; i < vw; i++) {
+            for (int i = i0; i < i1; i++) {
                 float up = (vx0 + i + 0.5f - dx) * inv;
                 if (s->view.mirror) up = rw - up;
                 float u, v;
@@ -265,10 +293,11 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
             double k = (100.0 + s->view.contrast) / 100.0, bo = s->view.bright * 1.28;
             k *= k;
             for (int i = 0; i < 256; i++) { double v = (i - 128.0) * k + 128.0 + bo; lut[i] = (uint8_t)(v < 0 ? 0 : v > 255 ? 255 : v + 0.5); }
-            for (size_t i = 0; i < (size_t)vw * vh; i++) {
-                uint32_t q = s->cache[i];
-                s->cache[i] = (q & 0xff000000u) | (uint32_t)lut[(q >> 16) & 255] << 16 | (uint32_t)lut[(q >> 8) & 255] << 8 | lut[q & 255];
-            }
+            for (int j = j0; j < j1; j++)
+                for (int i = i0; i < i1; i++) {
+                    uint32_t q = s->cache[(size_t)j * vw + i];
+                    s->cache[(size_t)j * vw + i] = (q & 0xff000000u) | (uint32_t)lut[(q >> 16) & 255] << 16 | (uint32_t)lut[(q >> 8) & 255] << 8 | lut[q & 255];
+                }
         }
     }
     canvas_blit(c, s->cache, vw, vh, vx0, vy0, 0, op, opaque);

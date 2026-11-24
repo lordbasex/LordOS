@@ -190,8 +190,10 @@
  *   VD_SHM. The helper writes 32-bit pixels, B, G, R, X bytes in memory (x8r8g8b8 little endian; alpha is not
  *   meaningful, treat it as opaque), stride width × 4. It never hands lord-server QEMU's own memory: it copies
  *   the damaged area from QEMU's buffer into this one, at most VD_RATE times a second.
- *   VD_FRAME a, b, c, d = damage x, y, w, h (inside the picture), e = frame number. lord-server reads the picture
- *   (uploads it) and answers VD_FRAME_DONE e = that frame number; the helper doesn't write the picture again
+ *   VD_FRAME a, b, c, d = damage x, y, w, h (inside the picture), e = frame number, f = how many more rectangles of
+ *   the same frame follow (0..VD_FRAME_RECTS - 1; 0 on the last): a frame is up to VD_FRAME_RECTS of them, sent one
+ *   after the other (vmdamage.h; MACHINES-GPU.md Part 1 step 4). lord-server reads the picture (uploads each
+ *   rectangle) and answers VD_FRAME_DONE e = that frame number; the helper doesn't write the picture again
  *   until then (no tearing), or until 250 ms passed with no answer.
  *   VD_CURSOR a, b = width, height (1..256), c, d = hotspot; one descriptor: a memfd sealed against writing,
  *   shrinking and growing (check with vm_cursor_check), width × height × 4 bytes of B, G, R, A (straight alpha).
@@ -415,6 +417,7 @@ typedef struct {
 #define VD_MAX_CURSOR   256
 #define VD_REL_MAX      8192        /* VD_REL: the most one message moves, each way */
 #define VD_POLL_MAX     256         /* messages lord-server takes per poll, as Remote Desk */
+#define VD_FRAME_RECTS  8           /* rectangles in one frame at most (VMDMG_MAX, vmdamage.h) */
 /* VD_DMABUF */
 #define VD_DMABUF_FLIP        0x40000000    /* in c: the first row in memory is the picture's bottom */
 #define VD_DMABUF_STRIDE_MAX  (VD_MAX_DIM * 4 * 2)
@@ -584,7 +587,7 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
     case VD_READY: return 1;
     case VD_SIZE: return m->a > 0 && m->b > 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM &&
                          (uint64_t)m->a * (uint64_t)m->b * 4 <= VD_MAX_BYTES;
-    case VD_FRAME: return m->a >= 0 && m->b >= 0 && m->c > 0 && m->d > 0;
+    case VD_FRAME: return m->a >= 0 && m->b >= 0 && m->c > 0 && m->d > 0 && m->f >= 0 && m->f < VD_FRAME_RECTS;
     case VD_CURSOR: return m->a > 0 && m->b > 0 && m->a <= VD_MAX_CURSOR && m->b <= VD_MAX_CURSOR &&
                            m->c >= 0 && m->d >= 0 && m->c < m->a && m->d < m->b;
     case VD_POINTER: return m->c == 0 || m->c == 1;

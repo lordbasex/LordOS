@@ -3278,9 +3278,15 @@ static void guest_cursor(Sess *s, int fd, int w, int h, int hx, int hy) {
     if (s->media) media_src_cursor_guest_draws(s->media, 0);
 }
 
+/* a 2D frame's rectangles (VD_FRAME, one message each; vmdamage.h), gathered over the messages one poll takes: kept
+ * apart up to FRAME_RECTS, then only their union (du) is used */
+#define FRAME_RECTS (VD_FRAME_RECTS * 4)
+
 static void from_vd(Sess *s) {
     int frames = 0, last = 0;
     struct { int x0, y0, x1, y1, c; } du = { 0, 0, 0, 0, 0 };     /* the frames' changed area, together (2D) */
+    struct { int x, y, w, h; } dr[FRAME_RECTS];
+    int ndr = 0, over = 0, pic2d = 0, whole = 0;        /* whole: frames whose last rectangle came (for the counts) */
     for (int k = 0; k < VD_POLL_MAX && s->vd >= 0; k++) {
         VdMsg m;
         int fd = -1;
@@ -3305,7 +3311,12 @@ static void from_vd(Sess *s) {
                 s->db_pending = 1; s->db_frame = m.e;
                 break;
             }
+            /* a frame is its rectangles, the last one with f = 0 (vmproto.h) */
             frames++; last = m.e;
+            if (!m.f) whole++;
+            pic2d = 1;
+            if (ndr < FRAME_RECTS) { dr[ndr].x = m.a; dr[ndr].y = m.b; dr[ndr].w = m.c; dr[ndr].h = m.d; ndr++; }
+            else over = 1;
             if (!du.c) { du.x0 = m.a; du.y0 = m.b; du.x1 = m.a + m.c; du.y1 = m.b + m.d; du.c = 1; }
             else { du.x0 = m.a < du.x0 ? m.a : du.x0; du.y0 = m.b < du.y0 ? m.b : du.y0; du.x1 = m.a + m.c > du.x1 ? m.a + m.c : du.x1; du.y1 = m.b + m.d > du.y1 ? m.b + m.d : du.y1; }
             break;
@@ -3356,12 +3367,31 @@ static void from_vd(Sess *s) {
             gpu_frame = r == 1 && ms && ms->gtex;
         }
     }
+    /* a 2D picture with the GPU composing: the picture's own memory is a texture (media_src_tex_*), its changed
+     * rectangles uploaded as they come; the GPU scales it (MACHINES-GPU.md Part 1 step 5). A hidden window's picture
+     * isn't uploaded: the texture is made whole again at the paint that shows it */
+    if (ms && s->db_cur < 0) {
+        /* 2D frames again after a dmabuf picture (the guest's driver went back to 2D): its texture isn't the picture */
+        if (pic2d && ms->gtex && ms->gtex != ms->ptex) { ms->gtex = NULL; ms->gpu_drawn = 0; ms->cpu_stale = 0; }
+        if (gpu_show_ok(s) && !s->pic_hidden) ms->tex_px = 1;
+        else if (ms->tex_px) media_src_tex_off(ms);
+    }
+    if (pic2d && frames && ms && ms->tex_px && !over) {
+        int up = 1;
+        for (int i = 0; i < ndr && up; i++) up = media_src_tex_rect(ms, dr[i].x, dr[i].y, dr[i].w, dr[i].h);
+        gpu_frame = up && ndr > 0;
+    } else if (pic2d && frames && ms && ms->tex_px && over)
+        gpu_frame = media_src_tex_rect(ms, du.x0, du.y0, du.x1 - du.x0, du.y1 - du.y0);
     if (frames && ms) {
         ms->frame_seq++;
         int shown;
         /* a frame in the texture the last paint drew: presenting again is enough (no UI damage, no paint) */
         if (gpu_frame && ms->gpu_drawn) { media_src_present(ms); shown = 1; }
-        else shown = du.c ? media_src_damage_rect(ms, du.x0, du.y0, du.x1 - du.x0, du.y1 - du.y0) : (media_src_damage(ms), 1);
+        else if (pic2d && !over && ndr > 0) {
+            /* each rectangle on its own: a clock and a moving square repaint two small boxes (Part 1 step 4) */
+            shown = 0;
+            for (int i = 0; i < ndr; i++) shown += media_src_damage_rect(ms, dr[i].x, dr[i].y, dr[i].w, dr[i].h);
+        } else shown = du.c ? media_src_damage_rect(ms, du.x0, du.y0, du.x1 - du.x0, du.y1 - du.y0) : (media_src_damage(ms), 1);
         /* what changed isn't in the part of the picture shown (zoomed in), or in apps mode in any of the guest's
          * windows shown here (or none is): nothing to paint, so the frame counts as read at once (the helper isn't
          * held 250 ms) */
@@ -3369,7 +3399,7 @@ static void from_vd(Sess *s) {
         /* the node it was drawn in went away (the window's tree was made again): one repaint of everything finds
          * the new node, and that paint binds it */
         else if (!ms->node && !media_src_crop_count(ms)) damage_add((Box){ 0, 0, 16384, 16384 });
-        s->frames += frames;
+        s->frames += pic2d ? whole : frames;
         s->ack_pending = 1; s->ack_frame = last; s->ack_seq = ms->frame_seq;
     }
     pace_tell(s);

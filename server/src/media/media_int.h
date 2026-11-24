@@ -82,6 +82,16 @@ typedef struct {
     int cpu_stale;
     int gpu_drawn;                      /* the last paint of its node(s) drew gtex: a new frame needs only a present */
     int (*cpu_read)(int id);            /* 0 when map holds the shown frame now */
+    /* a picture whose own pixels (px) the GPU shows (a Machines 2D picture; MACHINES-GPU.md Part 1 step 5): its owner sets
+     * tex_px while the GPU may draw it; the texture is ptex (gtex points at it while shown), made whole at a paint when it
+     * isn't current (a new picture, a new GPU context), then only the changed rectangles go up (media_src_tex_rect) */
+    int tex_px;
+    struct GpuTex *ptex;
+    /* what changed since the scaled copy (cache) was made: pd_n frames from cache_seq on, inside pd_* (picture pixels);
+     * a paint of a scaled picture remakes only that part of the cache (Part 1 step 5, the CPU path) */
+    unsigned pd_base, pd_last;
+    int pd_n, pd_x0, pd_y0, pd_x1, pd_y1;
+    unsigned pd_band, pd_full;          /* copies remade in part, whole (mview-test) */
     /* player state */
     int64_t pos, dur;
     int playing;
@@ -119,6 +129,24 @@ void media_src_damage(MediaSrc *s);
 /* A new frame changed (x, y, w, h) of the picture: the node that shows all of it is damaged whole (as
  * media_src_damage), each node showing a part only where its part changed. Returns how many nodes were damaged. */
 int  media_src_damage_rect(MediaSrc *s, int x, int y, int w, int h);
+/* for the scaled copy (mview.c): (x, y, w, h) of the picture changed in the frame frame_seq is now */
+static inline void media_pd_note(MediaSrc *s, int x, int y, int w, int h) {
+    if (s->pd_base != s->cache_seq || s->pd_n <= 0) { s->pd_base = s->cache_seq; s->pd_n = 0; s->pd_x0 = x; s->pd_y0 = y; s->pd_x1 = x + w; s->pd_y1 = y + h; }
+    else {
+        if (x < s->pd_x0) s->pd_x0 = x;
+        if (y < s->pd_y0) s->pd_y0 = y;
+        if (x + w > s->pd_x1) s->pd_x1 = x + w;
+        if (y + h > s->pd_y1) s->pd_y1 = y + h;
+    }
+    if (!s->pd_n || s->pd_last != s->frame_seq) { s->pd_n++; s->pd_last = s->frame_seq; }
+}
+/* the GPU picture made of px (tex_px): (x, y, w, h) of px changed. 1 when the shown texture has it now (a present is
+ * enough), 0 when it isn't shown as a texture (the next paint makes it whole or draws px) */
+int  media_src_tex_rect(MediaSrc *s, int x, int y, int w, int h);
+/* tex_px off: the CPU's pixels are drawn again */
+void media_src_tex_off(MediaSrc *s);
+/* at a paint: ptex made whole when tex_px is on and it isn't the shown, current texture (mview.c) */
+void media_src_tex_fresh(MediaSrc *s);
 /* how many nodes show a part of it now */
 int  media_src_crop_count(MediaSrc *s);
 int  media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *pid);

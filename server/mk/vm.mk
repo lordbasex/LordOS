@@ -160,6 +160,12 @@ build/vmmem-test: tests/vmmem_test.c src/vm/vmmem.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmmem_test.c
 	./$@ || { rm -f $@; exit 1; }
+# a machine picture's damage as a few rectangles (vmdamage.h, MACHINES-GPU.md Part 1 step 4), with a fuzz pass
+test: build/vmdamage-test
+build/vmdamage-test: tests/vmdamage_test.c src/vm/vmdamage.h src/vm/vmproto.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmdamage_test.c
+	./$@ || { rm -f $@; exit 1; }
 # how often a machine's picture is taken (vmpace.h, VD_PACE)
 build/vmpace-test: tests/vmpace_test.c src/vm/vmpace.h src/vm/vmproto.h
 	@mkdir -p build
