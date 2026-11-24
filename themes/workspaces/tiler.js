@@ -18,7 +18,7 @@
 // and an app that answers with another size (a minimum size, a character grid) keeps it and stays in its tile
 // (model/layouts.js judgeFrame); at most MOVES_PER_SEC moves per window and MAX_PASSES passes per second, whatever
 // changes the windows meanwhile: past that the pass waits a second.
-import { windows, locksChanged, activeDesktop, desktopList, settings, launchApp, isProfileBrowser, profileChoice, noteLaunchedProfile, refreshBrowserProfiles, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore, wm, openDisplayApps } from '@lordos/sdk';
+import { windows, locksChanged, activeDesktop, desktopList, settings, launchApp, isProfileBrowser, profileChoice, noteLaunchedProfile, forgetLaunchedProfile, refreshBrowserProfiles, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore, wm, openDisplayApps } from '@lordos/sdk';
 import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget, slotStacks, shownIn, dropInto, slotAt, dropSlot, slotLimits, trimSlots } from './model/layouts.js';
 import { shownDisplays } from './model/geometry.js';
 import { addLaunch, claim, gone, pending as pendingOf, LAUNCH_MS } from './model/launches.js';
@@ -92,6 +92,7 @@ function followLaunches(all, disp, keys, now) {
   for (const id of [...born.keys()]) {
     if (liveIds.has(id)) continue;
     born.delete(id);
+    forgetLaunchedProfile(id);            // a surface id may come back for another window
     const { p, early } = gone(launches, id, now, born, (wid) => (byId.get(wid) ? launcherIdOf(byId.get(wid)) : ''), (wid) => floating.has(wid));
     if (p && keys.includes(p.dk)) for (const wid of early) if (byId.get(wid)) placeAt(byId.get(wid), p, disp, keys);
   }
