@@ -1645,5 +1645,16 @@
   "run.powerLow": "Alimentation : trop faible (sous-tension)",
   "win.run.row": "Windows 11",
   "win.run.note": "Avec TPM, démarrage sécurisé et les outils LordOS",
-  "win.run.noteArm": "Pas encore sur ce processeur"
+  "win.run.noteArm": "Pas encore sur ce processeur",
+  "search.open": "Ouvrir {name}",
+  "atLogin.failed": "{name} n'a pas démarré avec la session",
+  "battery.title": "Sur batterie avec des machines en cours ({count})",
+  "battery.body": "Le travail d'une machine occupe l'ordinateur et vide la batterie plus vite.",
+  "battery.pauseAll": "Tout mettre en pause",
+  "cfg.atLogin": "Démarrer avec la session",
+  "cfg.atLoginNote": "Démarre sans fenêtre à la connexion, s'il y a assez de mémoire.",
+  "cfg.autoPause": "Mettre en pause pendant mon absence",
+  "cfg.autoPauseNote": "Se met en pause après 10 minutes sans clavier ni souris, et reprend à votre retour.",
+  "bundle.machine": "Machine",
+  "bundle.group": "Groupe de machines"
 }

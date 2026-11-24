@@ -1645,5 +1645,16 @@
   "run.powerLow": "Catu daya: terlalu lemah (tegangan rendah)",
   "win.run.row": "Windows 11",
   "win.run.note": "Dengan TPM, Secure Boot, dan alat LordOS",
-  "win.run.noteArm": "Belum di prosesor ini"
+  "win.run.noteArm": "Belum di prosesor ini",
+  "search.open": "Buka {name}",
+  "atLogin.failed": "{name} tidak mulai bersama sesi",
+  "battery.title": "Memakai baterai dengan mesin berjalan ({count})",
+  "battery.body": "Kerja sebuah mesin membuat komputer sibuk dan menguras baterai lebih cepat.",
+  "battery.pauseAll": "Jeda semua",
+  "cfg.atLogin": "Mulai bersama sesi",
+  "cfg.atLoginNote": "Dimulai tanpa jendela saat Anda masuk, jika memorinya cukup.",
+  "cfg.autoPause": "Jeda saat saya pergi",
+  "cfg.autoPauseNote": "Berhenti sejenak setelah 10 menit tanpa keyboard atau mouse, dan lanjut saat Anda kembali.",
+  "bundle.machine": "Mesin",
+  "bundle.group": "Grup mesin"
 }

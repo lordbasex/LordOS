@@ -1645,5 +1645,16 @@
   "run.powerLow": "Voeding: te zwak (onderspanning)",
   "win.run.row": "Windows 11",
   "win.run.note": "Met TPM, Secure Boot en de LordOS-hulpmiddelen",
-  "win.run.noteArm": "Nog niet op deze processor"
+  "win.run.noteArm": "Nog niet op deze processor",
+  "search.open": "{name} openen",
+  "atLogin.failed": "{name} is niet met de sessie gestart",
+  "battery.title": "Op de accu met draaiende machines ({count})",
+  "battery.body": "Het werk van een machine houdt de computer bezig en maakt de accu sneller leeg.",
+  "battery.pauseAll": "Alles pauzeren",
+  "cfg.atLogin": "Starten met de sessie",
+  "cfg.atLoginNote": "Start zonder venster als je inlogt, als er geheugen voor is.",
+  "cfg.autoPause": "Pauzeren als ik weg ben",
+  "cfg.autoPauseNote": "Pauzeert na 10 minuten zonder toetsenbord of muis en gaat verder als je terug bent.",
+  "bundle.machine": "Machine",
+  "bundle.group": "Machinegroep"
 }

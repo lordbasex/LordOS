@@ -4,7 +4,7 @@
 // the machine runs it changes alone (`lord-vm --rename`), and its folders follow it once it's off.
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
+import { atLoginToggle, stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
   portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
 import { readMeta, writeMeta, readCpuUse } from './meta.js';
@@ -362,8 +362,15 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         <Segmented small value={closeChoice(meta)} onChange={(x) => { writeMeta(dir, { onClose: x }); setMeta(readMeta(dir)); }}
           options={CLOSE_CHOICES.map((k) => [k, tr(`machines.cfg.close.${k}`)])} />
       </Row>
-      <Row label={tr('machines.cfg.keepAwake')} last note={tr('machines.cfg.keepAwakeNote')}>
+      <Row label={tr('machines.cfg.keepAwake')} note={tr('machines.cfg.keepAwakeNote')}>
         <Toggle on={meta.keepAwake !== false} onChange={(x) => { writeMeta(dir, { keepAwake: x }); setMeta(readMeta(dir)); }} />
+      </Row>
+      {/* 6.14: in settings.json (apps can't write it), by the machine's id; a group's members start with their group */}
+      {m.groupDir ? null : <Row label={tr('machines.cfg.atLogin')} note={tr('machines.cfg.atLoginNote')}>
+        <Toggle on={(settings.get().machinesAtLogin || []).includes(m.id)} onChange={(x) => { settings.set({ machinesAtLogin: atLoginToggle(settings.get().machinesAtLogin, m.id, x) }); setMeta(readMeta(dir)); }} />
+      </Row>}
+      <Row label={tr('machines.cfg.autoPause')} last note={tr('machines.cfg.autoPauseNote')}>
+        <Toggle on={meta.autoPause === true} onChange={(x) => { writeMeta(dir, { autoPause: x }); setMeta(readMeta(dir)); }} />
       </Row>
     </Group>
     {m.suspended ? <Group><Row label={tr('machines.cfg.saved')} value={bytes(m.stateBytes || 0)} last note={tr('machines.cfg.savedNote')} /></Group> : null}

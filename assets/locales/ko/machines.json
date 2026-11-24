@@ -1645,5 +1645,16 @@
   "run.powerLow": "전원 공급: 너무 약함(저전압)",
   "win.run.row": "Windows 11",
   "win.run.note": "TPM, 보안 부팅, LordOS 도구 포함",
-  "win.run.noteArm": "이 프로세서에서는 아직 안 됩니다"
+  "win.run.noteArm": "이 프로세서에서는 아직 안 됩니다",
+  "search.open": "{name} 열기",
+  "atLogin.failed": "{name}이(가) 세션과 함께 시작되지 않았습니다",
+  "battery.title": "배터리 사용 중 머신 실행 중({count})",
+  "battery.body": "머신의 작업이 컴퓨터를 바쁘게 하고 배터리를 더 빨리 소모합니다.",
+  "battery.pauseAll": "모두 일시 정지",
+  "cfg.atLogin": "세션과 함께 시작",
+  "cfg.atLoginNote": "로그인할 때 메모리가 충분하면 창 없이 시작합니다.",
+  "cfg.autoPause": "자리를 비우면 일시 정지",
+  "cfg.autoPauseNote": "키보드나 마우스 입력이 10분 없으면 일시 정지하고, 돌아오면 다시 시작합니다.",
+  "bundle.machine": "머신",
+  "bundle.group": "머신 그룹"
 }

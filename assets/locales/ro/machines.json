@@ -1645,5 +1645,16 @@
   "run.powerLow": "Alimentare: prea slabă (subtensiune)",
   "win.run.row": "Windows 11",
   "win.run.note": "Cu TPM, Secure Boot și instrumentele LordOS",
-  "win.run.noteArm": "Încă nu pe acest procesor"
+  "win.run.noteArm": "Încă nu pe acest procesor",
+  "search.open": "Deschide {name}",
+  "atLogin.failed": "{name} nu a pornit odată cu sesiunea",
+  "battery.title": "Pe baterie cu mașini care rulează ({count})",
+  "battery.body": "Munca unei mașini ține computerul ocupat și golește bateria mai repede.",
+  "battery.pauseAll": "Pune totul pe pauză",
+  "cfg.atLogin": "Pornește odată cu sesiunea",
+  "cfg.atLoginNote": "Pornește fără fereastră când te conectezi, dacă e memorie pentru ea.",
+  "cfg.autoPause": "Pauză cât sunt plecat",
+  "cfg.autoPauseNote": "Intră în pauză după 10 minute fără tastatură sau mouse și continuă când revii.",
+  "bundle.machine": "Mașină",
+  "bundle.group": "Grup de mașini"
 }

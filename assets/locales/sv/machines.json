@@ -1645,5 +1645,16 @@
   "run.powerLow": "Strömförsörjning: för svag (underspänning)",
   "win.run.row": "Windows 11",
   "win.run.note": "Med TPM, säker start och LordOS-verktygen",
-  "win.run.noteArm": "Inte på den här processorn än"
+  "win.run.noteArm": "Inte på den här processorn än",
+  "search.open": "Öppna {name}",
+  "atLogin.failed": "{name} startade inte med sessionen",
+  "battery.title": "På batteri med maskiner igång ({count})",
+  "battery.body": "En maskins arbete håller datorn upptagen och tömmer batteriet snabbare.",
+  "battery.pauseAll": "Pausa alla",
+  "cfg.atLogin": "Starta med sessionen",
+  "cfg.atLoginNote": "Startar utan fönster när du loggar in, om det finns minne för den.",
+  "cfg.autoPause": "Pausa när jag är borta",
+  "cfg.autoPauseNote": "Pausar efter 10 minuter utan tangentbord eller mus och fortsätter när du är tillbaka.",
+  "bundle.machine": "Maskin",
+  "bundle.group": "Maskingrupp"
 }

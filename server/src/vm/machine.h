@@ -343,6 +343,14 @@ int vm_budget_fits(const VmHost *h, long running_mb, long want_mb);
  * group's members one level down (<name>.lordgroup/<member>.lordvm), at most 256 machines; symbolic links are never
  * followed. extra (may be NULL) adds a machine's own share beside its limit (vm_group_session_mb: a disposable session).
  * *n: how many were counted. A run.json or machine.json that can't be read counts nothing. */
+/* A machine folder whose run.json says it is active (starting, running, paused, stopping) with its lord-vm alive
+ * (alive(pid); NULL: run.json alone): 1, else 0. run.json is read with O_NOFOLLOW, at most 2 KB. */
+int vm_dir_active(const char *dir, int (*alive)(long pid));
+/* Backups (docs/VIRTUALIZATION.md 6.14): a path relative to the home folder that is a machine's disks folder or saved
+ * session ("<...>.lordvm/disks" or "<...>.lordvm/suspend.state", a machine at any depth, a group's members included):
+ * the length of its machine folder's part ("<...>.lordvm"), else 0. Backups holds those back while the machine runs:
+ * a disk QEMU is writing isn't a consistent copy. */
+size_t vm_backup_hold(const char *rel);
 long vm_budget_used_mb(const char *lib, const char *exclude, int (*alive)(long pid), long (*extra)(const char *dir, const VmMachine *m), int *n);
 /* Graphics 3D (virgl) for this start, the part that needs no probe of the host's files: why a machine that asks for 3D
  * starts with 2D graphics instead, or NULL (lord-vm then checks QEMU's GL modules and the render node). An unattended

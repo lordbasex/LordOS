@@ -1645,5 +1645,16 @@
   "run.powerLow": "پاور سپلائی: بہت کمزور (کم وولٹیج)",
   "win.run.row": "Windows 11",
   "win.run.note": "TPM، سیکیور بوٹ اور LordOS ٹولز کے ساتھ",
-  "win.run.noteArm": "اس پروسیسر پر ابھی نہیں"
+  "win.run.noteArm": "اس پروسیسر پر ابھی نہیں",
+  "search.open": "{name} کھولیں",
+  "atLogin.failed": "{name} سیشن کے ساتھ شروع نہیں ہوئی",
+  "battery.title": "بیٹری پر، مشینیں چل رہی ہیں ({count})",
+  "battery.body": "مشین کا کام کمپیوٹر کو مصروف رکھتا ہے اور بیٹری جلد ختم کرتا ہے۔",
+  "battery.pauseAll": "سب روکیں",
+  "cfg.atLogin": "سیشن کے ساتھ شروع کریں",
+  "cfg.atLoginNote": "لاگ اِن پر ونڈو کے بغیر شروع ہوتی ہے، اگر اس کے لیے میموری ہو۔",
+  "cfg.autoPause": "میری غیر موجودگی میں روکیں",
+  "cfg.autoPauseNote": "کی بورڈ یا ماؤس کے بغیر 10 منٹ بعد رک جاتی ہے، اور آپ کی واپسی پر جاری ہوتی ہے۔",
+  "bundle.machine": "مشین",
+  "bundle.group": "مشین گروپ"
 }

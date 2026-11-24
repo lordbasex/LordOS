@@ -1645,5 +1645,16 @@
   "run.powerLow": "Alimentació: massa feble (subtensió)",
   "win.run.row": "Windows 11",
   "win.run.note": "Amb TPM, arrencada segura i les eines de LordOS",
-  "win.run.noteArm": "Encara no en aquest processador"
+  "win.run.noteArm": "Encara no en aquest processador",
+  "search.open": "Obre {name}",
+  "atLogin.failed": "{name} no s'ha iniciat amb la sessió",
+  "battery.title": "Amb bateria i màquines en marxa ({count})",
+  "battery.body": "La feina d'una màquina manté ocupat l'ordinador i gasta la bateria més de pressa.",
+  "battery.pauseAll": "Posa-ho tot en pausa",
+  "cfg.atLogin": "Inicia amb la sessió",
+  "cfg.atLoginNote": "S'inicia sense finestra quan entres, si hi ha memòria per a ella.",
+  "cfg.autoPause": "Pausa mentre no hi soc",
+  "cfg.autoPauseNote": "Es posa en pausa després de 10 minuts sense teclat ni ratolí, i continua quan tornes.",
+  "bundle.machine": "Màquina",
+  "bundle.group": "Grup de màquines"
 }

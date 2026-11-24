@@ -1645,5 +1645,16 @@
   "run.powerLow": "Bekalan kuasa: terlalu lemah (voltan rendah)",
   "win.run.row": "Windows 11",
   "win.run.note": "Dengan TPM, But Selamat dan alat LordOS",
-  "win.run.noteArm": "Belum pada pemproses ini"
+  "win.run.noteArm": "Belum pada pemproses ini",
+  "search.open": "Buka {name}",
+  "atLogin.failed": "{name} tidak bermula bersama sesi",
+  "battery.title": "Pada bateri dengan mesin berjalan ({count})",
+  "battery.body": "Kerja sesebuah mesin membuatkan komputer sibuk dan menghabiskan bateri lebih cepat.",
+  "battery.pauseAll": "Jeda semua",
+  "cfg.atLogin": "Mulakan bersama sesi",
+  "cfg.atLoginNote": "Bermula tanpa tetingkap apabila anda log masuk, jika ada memori untuknya.",
+  "cfg.autoPause": "Jeda semasa saya tiada",
+  "cfg.autoPauseNote": "Berjeda selepas 10 minit tanpa papan kekunci atau tetikus, dan bersambung apabila anda kembali.",
+  "bundle.machine": "Mesin",
+  "bundle.group": "Kumpulan mesin"
 }

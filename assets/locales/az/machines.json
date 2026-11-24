@@ -1645,5 +1645,16 @@
   "run.powerLow": "Qida bloku: çox zəifdir (aşağı gərginlik)",
   "win.run.row": "Windows 11",
   "win.run.note": "TPM, Təhlükəsiz Yükləmə və LordOS alətləri ilə",
-  "win.run.noteArm": "Bu prosessorda hələ yox"
+  "win.run.noteArm": "Bu prosessorda hələ yox",
+  "search.open": "{name} aç",
+  "atLogin.failed": "{name} seansla birlikte başlamadı",
+  "battery.title": "Batareyada, maşınlar işləyir ({count})",
+  "battery.body": "Maşının işi kompüteri məşğul saxlayır və batareyanı daha tez boşaldır.",
+  "battery.pauseAll": "Hamısını fasilə ver",
+  "cfg.atLogin": "Seansla birlikte başlat",
+  "cfg.atLoginNote": "Daxil olanda, yaddaş çatırsa pəncərəsiz başlayır.",
+  "cfg.autoPause": "Mən yoxkən fasilə ver",
+  "cfg.autoPauseNote": "Klaviatura və ya siçan olmadan 10 dəqiqədən sonra fasilə verir, qayıdanda davam edir.",
+  "bundle.machine": "Maşın",
+  "bundle.group": "Maşın qrupu"
 }

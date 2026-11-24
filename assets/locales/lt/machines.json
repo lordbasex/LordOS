@@ -1645,5 +1645,16 @@
   "run.powerLow": "Maitinimo šaltinis: per silpnas (per maža įtampa)",
   "win.run.row": "Windows 11",
   "win.run.note": "Su TPM, saugiąja paleidimo funkcija ir LordOS įrankiais",
-  "win.run.noteArm": "Šiame procesoriuje dar ne"
+  "win.run.noteArm": "Šiame procesoriuje dar ne",
+  "search.open": "Atverti {name}",
+  "atLogin.failed": "{name} nepasileido kartu su sesija",
+  "battery.title": "Maitinama baterija, veikia mašinos ({count})",
+  "battery.body": "Mašinos darbas užima kompiuterį ir greičiau iškrauna bateriją.",
+  "battery.pauseAll": "Pristabdyti visas",
+  "cfg.atLogin": "Paleisti kartu su sesija",
+  "cfg.atLoginNote": "Prisijungus pasileidžia be lango, jei jai pakanka atminties.",
+  "cfg.autoPause": "Pristabdyti, kai manęs nėra",
+  "cfg.autoPauseNote": "Pristabdoma po 10 minučių be klaviatūros ar pelės ir tęsiama jums grįžus.",
+  "bundle.machine": "Mašina",
+  "bundle.group": "Mašinų grupė"
 }

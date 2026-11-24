@@ -1645,5 +1645,16 @@
   "run.powerLow": "Power supply: masyadong mahina (under-voltage)",
   "win.run.row": "Windows 11",
   "win.run.note": "May TPM, Secure Boot at ang LordOS tools",
-  "win.run.noteArm": "Hindi pa sa processor na ito"
+  "win.run.noteArm": "Hindi pa sa processor na ito",
+  "search.open": "Buksan ang {name}",
+  "atLogin.failed": "Hindi nagsimula ang {name} kasabay ng session",
+  "battery.title": "Naka-battery habang may tumatakbong machine ({count})",
+  "battery.body": "Pinananatiling abala ng trabaho ng machine ang computer at mas mabilis nitong inuubos ang battery.",
+  "battery.pauseAll": "I-pause Lahat",
+  "cfg.atLogin": "Simulan kasabay ng session",
+  "cfg.atLoginNote": "Nagsisimula nang walang window pag-log in mo, kung may memory para rito.",
+  "cfg.autoPause": "I-pause habang wala ako",
+  "cfg.autoPauseNote": "Humihinto pagkalipas ng 10 minutong walang keyboard o mouse, at nagpapatuloy pagbalik mo.",
+  "bundle.machine": "Machine",
+  "bundle.group": "Grupo ng machine"
 }

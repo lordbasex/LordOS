@@ -7,7 +7,7 @@
 // Requirements and the Pi page are the other screens of this window.
 import {
   View, Text, Image, ScrollView, TextInput, useAppWindow, useStore, createStore, admin, fs, wm, windows, revealPath, openFolder, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
-  EmptyState, useNarrow, useWindowWidth, addListener, direction, Overlay, screen, t as tr,
+  EmptyState, useNarrow, useWindowWidth, addListener, direction, Overlay, screen, t as tr, battery,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { canRun, sensorLines, cardLights, budgetLine, isolationGaps, stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
@@ -833,6 +833,10 @@ export function Library() {
   const bl = has() && lord.vm.budget && list.length ? budgetLine(lord.vm.budget()) : null;
   // "Weaker isolation on this kernel" (3.3): what of QEMU's jail this kernel can't give
   const gaps = isolationGaps(host, null);
+  // on battery with machines running: Pause All on the toolbar (6.14; the notice is ties.js's)
+  const bat = battery.get();          // not a hook: below the early return; the list is read again every 1.5 s
+  const runningNow = list.filter((m) => m.state === 'running');
+  const pauseAll = bat?.discharging && runningNow.length ? () => { for (const m of runningNow) lord.vm.stop(m.dir, 'pause'); refresh(); } : null;
   const missing = missingFor(host, [host.arch]);
   const remove = (m) => {
     setDel(null);
@@ -963,6 +967,7 @@ export function Library() {
             </View>
           ))}
         </View>
+        {pauseAll ? <Square icon="pause" title={tr('machines.battery.pauseAll')} onClick={pauseAll} /> : null}
         <Square primary icon="plus" title={tr('machines.newMachine')} onClick={newMachine} />
       </View>
       {list.length ? (

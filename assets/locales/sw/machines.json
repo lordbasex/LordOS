@@ -1645,5 +1645,16 @@
   "run.powerLow": "Chanzo cha umeme: dhaifu mno (volteji ya chini)",
   "win.run.row": "Windows 11",
   "win.run.note": "Na TPM, Secure Boot na zana za LordOS",
-  "win.run.noteArm": "Bado si kwenye kichakataji hiki"
+  "win.run.noteArm": "Bado si kwenye kichakataji hiki",
+  "search.open": "Fungua {name}",
+  "atLogin.failed": "{name} haikuanza pamoja na kipindi",
+  "battery.title": "Kwa betri huku mashine zikiendeshwa ({count})",
+  "battery.body": "Kazi ya mashine huishughulisha kompyuta na kumaliza betri haraka zaidi.",
+  "battery.pauseAll": "Sitisha zote",
+  "cfg.atLogin": "Anza pamoja na kipindi",
+  "cfg.atLoginNote": "Huanza bila dirisha unapoingia, ikiwa kuna kumbukumbu ya kutosha.",
+  "cfg.autoPause": "Sitisha nikiwa sipo",
+  "cfg.autoPauseNote": "Husitishwa baada ya dakika 10 bila kibodi wala kipanya, na huendelea unaporudi.",
+  "bundle.machine": "Mashine",
+  "bundle.group": "Kikundi cha mashine"
 }

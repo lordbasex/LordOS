@@ -1645,5 +1645,16 @@
   "run.powerLow": "Zasilacz: zbyt słaby (za niskie napięcie)",
   "win.run.row": "Windows 11",
   "win.run.note": "Z TPM, Secure Boot i narzędziami LordOS",
-  "win.run.noteArm": "Jeszcze nie na tym procesorze"
+  "win.run.noteArm": "Jeszcze nie na tym procesorze",
+  "search.open": "Otwórz {name}",
+  "atLogin.failed": "{name} nie uruchomiła się z sesją",
+  "battery.title": "Na baterii z działającymi maszynami ({count})",
+  "battery.body": "Praca maszyny zajmuje komputer i szybciej rozładowuje baterię.",
+  "battery.pauseAll": "Wstrzymaj wszystkie",
+  "cfg.atLogin": "Uruchamiaj z sesją",
+  "cfg.atLoginNote": "Uruchamia się bez okna po zalogowaniu, jeśli jest dla niej pamięć.",
+  "cfg.autoPause": "Wstrzymaj, gdy mnie nie ma",
+  "cfg.autoPauseNote": "Wstrzymuje się po 10 minutach bez klawiatury i myszy i wznawia, gdy wrócisz.",
+  "bundle.machine": "Maszyna",
+  "bundle.group": "Grupa maszyn"
 }

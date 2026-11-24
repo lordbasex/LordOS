@@ -4,8 +4,8 @@
 // opened with args.machine is a machine's window, args.configure its Configure window, args.logs its logs, args.guestWin
 // one window of a guest in apps mode (appsmode.jsx), args.settings Machines settings (settingswin.jsx).
 import { useEffect } from 'react';
-import { useAppWindow, addListener, wm, t as tr, registerDockActions, registerDockActivate, registerWindowMenuItems, registerOpenProviders } from '@lordos/sdk';
-import { Library, AppMark, openInMachine } from './library.jsx';
+import { useAppWindow, addListener, wm, t as tr, registerDockActions, registerDockActivate, registerWindowMenuItems, registerOpenProviders, registerBundle } from '@lordos/sdk';
+import { Library, AppMark, openInMachine, openMachine } from './library.jsx';
 import { openMachines, windowsNeedsTools } from './openwith.js';
 import { readMeta } from './meta.js';
 import { isForeignProgram } from '../../sdk/filekinds.js';
@@ -17,6 +17,7 @@ import { Storage } from './storage.jsx';
 import { GuestWindow } from './appsmode.jsx';
 import { startAppsStatus } from './appsstatus.jsx';
 import { startMachinesCli } from './cli.js';
+import { startMachinesTies } from './ties.js';
 import { MachinesSettings } from './settingswin.jsx';
 import { useMachineDir } from './ui.jsx';
 
@@ -56,8 +57,16 @@ registerOpenProviders('machines', () => {
   return out;
 });
 
+// Files shows a machine's folder (and a group's) as one item, a bundle (docs/VIRTUALIZATION.md 6.14): opening it opens the
+// machine's window (a group's: the library); Open in New Tab still goes in
+const machineAt = (path) => { try { return (lord.vm.list() || []).find((m) => m.dir === path && !m.error) || null; } catch (e) { return null; } };
+registerBundle({ id: 'machines', suffix: '.lordvm', kind: () => tr('machines.bundle.machine'), open: (path) => { const m = machineAt(path); if (m) openMachine(m); else openLibrary(); } });
+registerBundle({ id: 'machines', suffix: '.lordgroup', kind: () => tr('machines.bundle.group'), open: () => openLibrary() });
+
 // the `machines` command's start and open go through this session (cli.js); a moment after the desktop is up
 setTimeout(startMachinesCli, 1000);
+// Search, start with the session, the battery notice and "Pause while I'm away" (ties.js)
+setTimeout(startMachinesTies, 1500);
 // apps mode's item by the clock, one per machine in it (appsstatus.jsx)
 startAppsStatus();
 

@@ -1645,5 +1645,16 @@
   "run.powerLow": "Fuente de alimentación: demasiado débil (baja tensión)",
   "win.run.row": "Windows 11",
   "win.run.note": "Con TPM, arranque seguro y las herramientas de LordOS",
-  "win.run.noteArm": "Todavía no en este procesador"
+  "win.run.noteArm": "Todavía no en este procesador",
+  "search.open": "Abrir {name}",
+  "atLogin.failed": "{name} no se inició con la sesión",
+  "battery.title": "Con batería y máquinas en marcha ({count})",
+  "battery.body": "El trabajo de una máquina mantiene ocupada la computadora y gasta la batería más rápido.",
+  "battery.pauseAll": "Pausar todas",
+  "cfg.atLogin": "Iniciar con la sesión",
+  "cfg.atLoginNote": "Se inicia sin ventana cuando entrás, si hay memoria para ella.",
+  "cfg.autoPause": "Pausar mientras no estoy",
+  "cfg.autoPauseNote": "Se pausa tras 10 minutos sin teclado ni mouse, y sigue cuando volvés.",
+  "bundle.machine": "Máquina",
+  "bundle.group": "Grupo de máquinas"
 }

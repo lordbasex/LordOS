@@ -1645,5 +1645,16 @@
   "run.powerLow": "Power supply: too weak (under-voltage)",
   "win.run.row": "Windows 11",
   "win.run.note": "With TPM, Secure Boot and the LordOS tools",
-  "win.run.noteArm": "Not on this processor yet"
+  "win.run.noteArm": "Not on this processor yet",
+  "search.open": "Open {name}",
+  "atLogin.failed": "{name} didn't start with the session",
+  "battery.title": "On battery with machines running ({count})",
+  "battery.body": "A machine's work keeps the computer busy and drains the battery faster.",
+  "battery.pauseAll": "Pause All",
+  "cfg.atLogin": "Start with the session",
+  "cfg.atLoginNote": "Starts without a window when you log in, if there's memory for it.",
+  "cfg.autoPause": "Pause while I'm away",
+  "cfg.autoPauseNote": "Pauses after 10 minutes without keyboard or mouse, and resumes when you're back.",
+  "bundle.machine": "Machine",
+  "bundle.group": "Machine group"
 }

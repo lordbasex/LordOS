@@ -1645,5 +1645,16 @@
   "run.powerLow": "مزود الطاقة: ضعيف جدًا (جهد منخفض)",
   "win.run.row": "Windows 11",
   "win.run.note": "مع TPM والإقلاع الآمن وأدوات LordOS",
-  "win.run.noteArm": "ليس على هذا المعالج بعد"
+  "win.run.noteArm": "ليس على هذا المعالج بعد",
+  "search.open": "فتح {name}",
+  "atLogin.failed": "لم تبدأ {name} مع الجلسة",
+  "battery.title": "على البطارية مع آلات تعمل ({count})",
+  "battery.body": "عمل الآلة يُبقي الحاسوب مشغولًا ويستنزف البطارية أسرع.",
+  "battery.pauseAll": "إيقاف الكل مؤقتًا",
+  "cfg.atLogin": "البدء مع الجلسة",
+  "cfg.atLoginNote": "تبدأ دون نافذة عند تسجيل الدخول، إن توفرت لها الذاكرة.",
+  "cfg.autoPause": "إيقاف مؤقت أثناء غيابي",
+  "cfg.autoPauseNote": "تتوقف مؤقتًا بعد 10 دقائق دون لوحة مفاتيح أو فأرة، وتستأنف عند عودتك.",
+  "bundle.machine": "آلة",
+  "bundle.group": "مجموعة آلات"
 }

@@ -970,5 +970,6 @@
   "themeSwitch.changingTo": "正在切换到 {name}…",
   "themeSwitch.failedTitle": "无法应用 {name}",
   "themeSwitch.refusedBody": "它的代码与 LordOS 的签名副本不一致，因此未加载。你的桌面风格保持不变。",
-  "themeSwitch.failedBody": "它没有启动。你的桌面风格保持不变。"
+  "themeSwitch.failedBody": "它没有启动。你的桌面风格保持不变。",
+  "spotlight.section.machines": "虚拟机"
 }

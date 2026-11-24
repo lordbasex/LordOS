@@ -1645,5 +1645,16 @@
   "run.powerLow": "電源:太弱(電壓不足)",
   "win.run.row": "Windows 11",
   "win.run.note": "附 TPM、安全開機和 LordOS 工具",
-  "win.run.noteArm": "此處理器上暫不支援"
+  "win.run.noteArm": "此處理器上暫不支援",
+  "search.open": "開啟 {name}",
+  "atLogin.failed": "{name} 未隨工作階段啟動",
+  "battery.title": "使用電池且有虛擬機在執行({count})",
+  "battery.body": "虛擬機的工作會讓電腦保持忙碌,電池消耗更快。",
+  "battery.pauseAll": "全部暫停",
+  "cfg.atLogin": "隨工作階段啟動",
+  "cfg.atLoginNote": "登入時若記憶體足夠,會無視窗啟動。",
+  "cfg.autoPause": "我離開時暫停",
+  "cfg.autoPauseNote": "10 分鐘沒有鍵盤或滑鼠操作後暫停,你回來後繼續。",
+  "bundle.machine": "虛擬機",
+  "bundle.group": "虛擬機群組"
 }

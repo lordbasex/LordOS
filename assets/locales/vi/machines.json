@@ -1645,5 +1645,16 @@
   "run.powerLow": "Nguồn điện: quá yếu (thiếu điện áp)",
   "win.run.row": "Windows 11",
   "win.run.note": "Có TPM, Secure Boot và các công cụ LordOS",
-  "win.run.noteArm": "Chưa có trên bộ xử lý này"
+  "win.run.noteArm": "Chưa có trên bộ xử lý này",
+  "search.open": "Mở {name}",
+  "atLogin.failed": "{name} không khởi động cùng phiên",
+  "battery.title": "Đang dùng pin khi có máy chạy ({count})",
+  "battery.body": "Công việc của máy khiến máy tính bận và làm pin cạn nhanh hơn.",
+  "battery.pauseAll": "Tạm dừng tất cả",
+  "cfg.atLogin": "Khởi động cùng phiên",
+  "cfg.atLoginNote": "Khởi động không có cửa sổ khi bạn đăng nhập, nếu đủ bộ nhớ.",
+  "cfg.autoPause": "Tạm dừng khi tôi vắng mặt",
+  "cfg.autoPauseNote": "Tạm dừng sau 10 phút không có bàn phím hay chuột, và tiếp tục khi bạn quay lại.",
+  "bundle.machine": "Máy",
+  "bundle.group": "Nhóm máy"
 }

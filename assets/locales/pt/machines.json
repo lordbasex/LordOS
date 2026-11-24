@@ -1645,5 +1645,16 @@
   "run.powerLow": "Fonte de alimentação: fraca demais (subtensão)",
   "win.run.row": "Windows 11",
   "win.run.note": "Com TPM, Inicialização Segura e as ferramentas do LordOS",
-  "win.run.noteArm": "Ainda não neste processador"
+  "win.run.noteArm": "Ainda não neste processador",
+  "search.open": "Abrir {name}",
+  "atLogin.failed": "{name} não iniciou com a sessão",
+  "battery.title": "Na bateria com máquinas rodando ({count})",
+  "battery.body": "O trabalho de uma máquina mantém o computador ocupado e gasta a bateria mais rápido.",
+  "battery.pauseAll": "Pausar todas",
+  "cfg.atLogin": "Iniciar com a sessão",
+  "cfg.atLoginNote": "Inicia sem janela quando você entra, se houver memória para ela.",
+  "cfg.autoPause": "Pausar enquanto estou ausente",
+  "cfg.autoPauseNote": "Pausa após 10 minutos sem teclado ou mouse, e continua quando você volta.",
+  "bundle.machine": "Máquina",
+  "bundle.group": "Grupo de máquinas"
 }

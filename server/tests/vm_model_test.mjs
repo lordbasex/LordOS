@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
 const D = await import(path.join(here, '../../apps/machines/diag.js'));
-const { stateView, offers2d, restartsAgain, offHint, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetPlan, budgetLine, failCause, failActions, cardLights, isolationGaps, pipFrame, actualFrame, infoLines, canRun, sensorLines, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
+const { stateView, offers2d, restartsAgain, offHint, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetPlan, budgetLine, failCause, failActions, cardLights, isolationGaps, pipFrame, actualFrame, infoLines, canRun, sensorLines, searchMachines, sessionStarts, atLoginToggle, batteryNotice, awayStep, AWAY_SEC, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -196,6 +196,37 @@ eq('sensors: all three', sensorLines({ tempC: 81, fanRpm: 3200, underVoltage: 1 
   [['machines.run.temp', true], ['machines.run.fan', false], ['machines.run.powerLow', true]]);
 eq('sensors: none', sensorLines({ tempC: -1, fanRpm: -1, underVoltage: -1 }), []);
 eq('sensors: fine power', sensorLines({ tempC: 45, fanRpm: -1, underVoltage: 0 }).map((l) => l.key), ['machines.run.temp', 'machines.run.power']);
+
+// Machines and the rest of the system (ties.js): Search, start with the session, the battery notice, away
+const lib6 = [{ id: 'a', dir: '/m/Debian 13.lordvm', name: 'Debian 13', state: 'stopped' }, { id: 'b', dir: '/m/Win.lordvm', name: 'Work debian', state: 'running' },
+  { id: 'c', dir: '/m/G/gw.lordvm', name: 'Debian Gateway', state: 'stopped', groupDir: '/m/G.lordgroup' }, { id: 'd', dir: '/m/x.lordvm', name: 'x', error: 'newer', state: 'stopped' }];
+eq('search: every word, the start first', searchMachines(lib6, 'debian').map((r) => r.m.id), ['a', 'b']);
+eq('search: two words', searchMachines(lib6, 'debian 13').map((r) => r.m.id), ['a']);
+eq('search: none', searchMachines(lib6, '  '), []);
+eq('at login: off ones named, no group member, no unreadable', sessionStarts(lib6, ['a', 'b', 'c', 'd', 7]).map((m) => m.id), ['a']);
+eq('at login: nothing chosen', sessionStarts(lib6, null), []);
+eq('at login: toggle on', atLoginToggle(['a'], 'b', true), ['a', 'b']);
+eq('at login: toggle off', atLoginToggle(['a', 'b'], 'a', false), ['b']);
+eq('at login: no twice', atLoginToggle(['a'], 'a', true), ['a']);
+eq('at login: at most the max', atLoginToggle(['1', '2', '3', '4', '5', '6', '7', '8'], '9', true).length, 8);
+let bm = batteryNotice({ discharging: false }, lib6, {});
+eq('battery: on the charger', bm.notice, 0);
+bm = batteryNotice({ discharging: true }, lib6, bm.mem);
+eq('battery: unplugged with one running', bm.notice, 1);
+bm = batteryNotice({ discharging: true }, lib6, bm.mem);
+eq('battery: once per unplug', bm.notice, 0);
+bm = batteryNotice({ discharging: false }, lib6, bm.mem);
+bm = batteryNotice({ discharging: true }, [], bm.mem);
+eq('battery: none running, no notice', bm.notice, 0);
+bm = batteryNotice({ discharging: true }, lib6, bm.mem);
+eq('battery: one starts while on battery', bm.notice, 1);
+const metaA = (d) => (d === '/m/Win.lordvm' ? { autoPause: true } : {});
+eq('away: not yet', awayStep(AWAY_SEC - 1, lib6, metaA, new Set()), { pause: [], resume: [] });
+eq('away: pause the ones that chose it', awayStep(AWAY_SEC, lib6, metaA, new Set()).pause, ['/m/Win.lordvm']);
+eq('away: not twice', awayStep(AWAY_SEC, lib6, metaA, new Set(['/m/Win.lordvm'])).pause, []);
+const lib7 = lib6.map((m) => (m.id === 'b' ? { ...m, state: 'paused' } : m));
+eq('back: resume the ones it paused', awayStep(3, lib7, metaA, new Set(['/m/Win.lordvm'])).resume, ['/m/Win.lordvm']);
+eq('back: never one the person paused', awayStep(3, lib7, metaA, new Set()).resume, []);
 
 // the Control Center and the assistant
 eq('system from label', systemOf('Debian 13.1.0 amd64 n').id, 'debian');

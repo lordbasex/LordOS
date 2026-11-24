@@ -1645,5 +1645,16 @@
   "run.powerLow": "Virtalähde: liian heikko (alijännite)",
   "win.run.row": "Windows 11",
   "win.run.note": "TPM:n, Secure Bootin ja LordOS-työkalujen kanssa",
-  "win.run.noteArm": "Ei vielä tällä suorittimella"
+  "win.run.noteArm": "Ei vielä tällä suorittimella",
+  "search.open": "Avaa {name}",
+  "atLogin.failed": "{name} ei käynnistynyt istunnon mukana",
+  "battery.title": "Akkuvirralla koneiden ollessa käynnissä ({count})",
+  "battery.body": "Koneen työ pitää tietokoneen kiireisenä ja kuluttaa akkua nopeammin.",
+  "battery.pauseAll": "Keskeytä kaikki",
+  "cfg.atLogin": "Käynnistä istunnon mukana",
+  "cfg.atLoginNote": "Käynnistyy ilman ikkunaa kirjautuessasi, jos muistia riittää.",
+  "cfg.autoPause": "Tauko, kun olen poissa",
+  "cfg.autoPauseNote": "Pysähtyy 10 minuutin kuluttua ilman näppäimistöä tai hiirtä ja jatkaa, kun palaat.",
+  "bundle.machine": "Kone",
+  "bundle.group": "Koneryhmä"
 }

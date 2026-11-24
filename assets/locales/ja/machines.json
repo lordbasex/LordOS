@@ -1645,5 +1645,16 @@
   "run.powerLow": "電源:弱すぎます(低電圧)",
   "win.run.row": "Windows 11",
   "win.run.note": "TPM、セキュアブート、LordOS ツール付き",
-  "win.run.noteArm": "このプロセッサではまだ使えません"
+  "win.run.noteArm": "このプロセッサではまだ使えません",
+  "search.open": "{name} を開く",
+  "atLogin.failed": "{name} はセッションと一緒に起動しませんでした",
+  "battery.title": "バッテリー駆動中にマシンが実行中({count})",
+  "battery.body": "マシンの処理でコンピュータが忙しくなり、バッテリーが早く減ります。",
+  "battery.pauseAll": "すべて一時停止",
+  "cfg.atLogin": "セッションと一緒に起動",
+  "cfg.atLoginNote": "ログイン時に、メモリが足りればウインドウなしで起動します。",
+  "cfg.autoPause": "離席中は一時停止",
+  "cfg.autoPauseNote": "キーボードやマウスの操作が 10 分ないと一時停止し、戻ると再開します。",
+  "bundle.machine": "マシン",
+  "bundle.group": "マシングループ"
 }

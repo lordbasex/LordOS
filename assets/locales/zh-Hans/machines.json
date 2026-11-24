@@ -1645,5 +1645,16 @@
   "run.powerLow": "电源:太弱(欠压)",
   "win.run.row": "Windows 11",
   "win.run.note": "带 TPM、安全启动和 LordOS 工具",
-  "win.run.noteArm": "此处理器上暂不支持"
+  "win.run.noteArm": "此处理器上暂不支持",
+  "search.open": "打开 {name}",
+  "atLogin.failed": "{name} 未随会话启动",
+  "battery.title": "使用电池且有虚拟机在运行({count})",
+  "battery.body": "虚拟机的工作会让计算机保持忙碌,电池消耗更快。",
+  "battery.pauseAll": "全部暂停",
+  "cfg.atLogin": "随会话启动",
+  "cfg.atLoginNote": "登录时若内存足够,会无窗口启动。",
+  "cfg.autoPause": "我离开时暂停",
+  "cfg.autoPauseNote": "10 分钟没有键盘或鼠标操作后暂停,你回来后继续。",
+  "bundle.machine": "虚拟机",
+  "bundle.group": "虚拟机组"
 }

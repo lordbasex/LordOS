@@ -913,6 +913,13 @@ static void test_host(void) {
     CHECK(vm_mem_limit_mb(&m) == 2048 + VM_OVERHEAD_TCG_MB);
     CHECK(vm_budget_fits(&pi, 0, 14160) && !vm_budget_fits(&pi, 0, 14161));
     CHECK(vm_budget_fits(&pi, 8000, 6000) && !vm_budget_fits(&pi, 8000, 7000) && !vm_budget_fits(&pi, -1, 10));
+    /* what Backups holds back while a machine runs (vm_backup_hold): its disks folder and its saved session */
+    CHECK(vm_backup_hold("Machines/Debian.lordvm/disks") == strlen("Machines/Debian.lordvm"));
+    CHECK(vm_backup_hold("Machines/Whonix.lordgroup/Gateway.lordvm/suspend.state") == strlen("Machines/Whonix.lordgroup/Gateway.lordvm"));
+    CHECK(vm_backup_hold("x.lordvm/disks") == 8);
+    CHECK(!vm_backup_hold("Machines/Debian.lordvm/machine.json") && !vm_backup_hold("Machines/Debian.lordvm/disks/system.qcow2"));
+    CHECK(!vm_backup_hold("Machines/.lordvm/disks") && !vm_backup_hold("Machines/.x.lordvm/disks") && !vm_backup_hold(".lordvm/disks"));
+    CHECK(!vm_backup_hold("Machines/Debian.lordvmx/disks") && !vm_backup_hold("disks") && !vm_backup_hold("") && !vm_backup_hold(NULL));
     /* the library's active machines (vm_budget_used_mb): run.json's state with a live supervisor, top level and a group's
      * members, the starting machine left out, symbolic links and damaged files counting nothing */
     {
@@ -972,6 +979,9 @@ static void test_host(void) {
             CHECK(f && fputs("{\"state\":\"running\",\"pid\":1e300}", f) >= 0 && !fclose(f));
             CHECK(vm_budget_used_mb(lib, NULL, budget_alive, NULL, &cnt) == 5000 + o && cnt == 1);
             CHECK(vm_budget_used_mb("/nonexistent-lib", NULL, budget_alive, NULL, &cnt) == 0 && cnt == 0);
+            /* vm_dir_active: the same reading, one folder */
+            CHECK(vm_dir_active(d[4], budget_alive) && !vm_dir_active(d[2], budget_alive) && !vm_dir_active(d[3], budget_alive) && vm_dir_active(d[3], NULL));
+            CHECK(!vm_dir_active(d[0], NULL) && !vm_dir_active(NULL, NULL));      /* d[0]'s run.json is a symbolic link */
             char cmd[300];
             snprintf(cmd, sizeof cmd, "rm -rf '%s'", lib);
             CHECK(system(cmd) == 0);

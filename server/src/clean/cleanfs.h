@@ -30,6 +30,11 @@ int clean_project_idle_days(int kind);                  /* offered only after th
 int clean_type(const char *name);
 const char *clean_type_name(int type);
 /* path is ex or under it */
+/* Machines (docs/VIRTUALIZATION.md 6.14): Cleaner never offers a machine's files. 1 when path (absolute) is the
+ * Machines library (<home>/Machines) or inside it, or has a component "<name>.lordvm" or "<name>.lordgroup" anywhere
+ * (a machine folder, a group's): a duplicate disk can be a linked clone's base, a "project output" can be in a guest's
+ * shared folder. Reclaiming a machine's space is Machines' own Storage window. A relative path counts as one. */
+int clean_machine_path(const char *path, const char *home);
 int clean_under(const char *path, const char *ex);
 /* Two images whose difference hashes are within CLEAN_SIMILAR_BITS and whose proportions match. */
 int clean_similar(uint64_t a, uint64_t b, unsigned aw, unsigned ah, unsigned bw, unsigned bh);

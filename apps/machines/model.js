@@ -1809,3 +1809,51 @@ export function groupCliPlan(req, groups, list) {
     default: return { code: CLI.USAGE, key: '', vars };
   }
 }
+
+// ---- Machines and the rest of the system (docs/VIRTUALIZATION.md 6.14; ties.js) ----
+// Search: machines whose name has every word of the query (q: lowercase, accents folded by the caller's fold), the
+// name's start first; a group's members are found through their group's card, not one by one
+export function searchMachines(list, q, fold = (s) => String(s || '').toLowerCase()) {
+  const words = String(q || '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const out = [];
+  for (const m of list || []) {
+    if (!m || m.error || m.groupDir) continue;
+    const n = fold(m.name);
+    if (!words.every((w) => n.includes(w))) continue;
+    out.push({ m, score: n.startsWith(words[0]) ? 60 : 40 });
+  }
+  return out.sort((a, b) => b.score - a.score || String(a.m.name).localeCompare(String(b.m.name))).slice(0, 6);
+}
+// Start with the session: the machines settings.machinesAtLogin names by id (at most SESSION_START_MAX), off now and
+// readable, a group's members left to their group; in the library's order. The list is in settings.json, which apps
+// can't write (lord.fs's protected list): an app can't make a machine start at login.
+export const SESSION_START_MAX = 8;
+export function sessionStarts(list, ids) {
+  const want = new Set((Array.isArray(ids) ? ids : []).filter((x) => typeof x === 'string').slice(0, SESSION_START_MAX));
+  return (list || []).filter((m) => m && want.has(m.id) && !m.error && !m.groupDir && !stateView(m.state, m.reason).active);
+}
+// the ids after turning one machine on or off (at most the max, the newest kept)
+export function atLoginToggle(ids, id, on) {
+  const cur = (Array.isArray(ids) ? ids : []).filter((x) => typeof x === 'string' && x !== id);
+  return (on ? [...cur, id] : cur).slice(-SESSION_START_MAX);
+}
+// On battery (bat: the battery store, lord.power.state()): once each time the computer leaves the charger while
+// machines run, a notice with Pause All. mem: { was } between calls. → { notice: how many run, or 0; mem }
+export function batteryNotice(bat, list, mem = {}) {
+  const on = !!bat && !!bat.discharging;
+  const running = (list || []).filter((m) => m && m.state === 'running').length;
+  const notice = on && !mem.was && running > 0 ? running : 0;
+  return { notice, mem: { was: on && (!!mem.was || running > 0) } };
+}
+// "Pause while I'm away" (Configure → Startup and shutdown; app.json autoPause): after AWAY_SEC without input the
+// running machines that chose it pause; once input comes back, the ones this paused resume (a machine the person paused
+// stays paused). paused: the dirs this paused. → { pause: [dirs], resume: [dirs] }
+export const AWAY_SEC = 600;
+export function awayStep(idleSec, list, metaOf, paused) {
+  const mine = paused instanceof Set ? paused : new Set(paused || []);
+  if (idleSec >= AWAY_SEC) {
+    return { pause: (list || []).filter((m) => m && m.state === 'running' && !mine.has(m.dir) && metaOf(m.dir)?.autoPause === true).map((m) => m.dir), resume: [] };
+  }
+  return { pause: [], resume: (list || []).filter((m) => m && mine.has(m.dir) && m.state === 'paused').map((m) => m.dir) };
+}

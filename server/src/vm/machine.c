@@ -682,13 +682,9 @@ int vm_budget_fits(const VmHost *h, long running_mb, long want_mb) {
     return running_mb >= 0 && want_mb > 0 && running_mb + want_mb <= h->ram_mb - floor;
 }
 
-/* one machine folder for vm_budget_used_mb: its limit when run.json says active and alive() agrees, else 0 */
-static long budget_one(const char *dir, const struct stat *ex, int (*alive)(long), long (*extra)(const char *, const VmMachine *), int *n) {
-    struct stat st;
-    if (lstat(dir, &st) || !S_ISDIR(st.st_mode)) return 0;
-    if (ex && st.st_dev == ex->st_dev && st.st_ino == ex->st_ino) return 0;
+int vm_dir_active(const char *dir, int (*alive)(long pid)) {
     char p[VM_PATH_MAX + 32], buf[2048];
-    if ((size_t)snprintf(p, sizeof p, "%s/run.json", dir) >= sizeof p) return 0;
+    if (!dir || (size_t)snprintf(p, sizeof p, "%s/run.json", dir) >= sizeof p) return 0;
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     if (fd < 0) return 0;
     struct stat rs;
@@ -702,7 +698,32 @@ static long budget_one(const char *dir, const struct stat *ex, int (*alive)(long
     int on = s && (!strcmp(s, "starting") || !strcmp(s, "running") || !strcmp(s, "paused") || !strcmp(s, "stopping"));
     long pid = pd >= 1 && pd <= 4194304 ? (long)pd : 0;
     json_free(&d);
-    if (!on || !pid || (alive && !alive(pid))) return 0;
+    return on && pid && (!alive || alive(pid));
+}
+
+size_t vm_backup_hold(const char *rel) {
+    if (!rel) return 0;
+    size_t n = strlen(rel);
+    static const char *const tails[] = { ".lordvm/disks", ".lordvm/suspend.state" };
+    for (int i = 0; i < 2; i++) {
+        size_t t = strlen(tails[i]);
+        if (n <= t || strcmp(rel + n - t, tails[i])) continue;
+        size_t dirlen = n - t + 7;                          /* up to and with ".lordvm" */
+        /* a name before ".lordvm": the folder's own name isn't empty and doesn't start with '.' */
+        size_t b = n - t;
+        while (b > 0 && rel[b - 1] != '/') b--;
+        if (b == n - t || rel[b] == '.') return 0;
+        return dirlen;
+    }
+    return 0;
+}
+
+/* one machine folder for vm_budget_used_mb: its limit when it is active, else 0 */
+static long budget_one(const char *dir, const struct stat *ex, int (*alive)(long), long (*extra)(const char *, const VmMachine *), int *n) {
+    struct stat st;
+    if (lstat(dir, &st) || !S_ISDIR(st.st_mode)) return 0;
+    if (ex && st.st_dev == ex->st_dev && st.st_ino == ex->st_ino) return 0;
+    if (!vm_dir_active(dir, alive)) return 0;
     VmMachine m;
     if (vm_machine_load(dir, &m, NULL, 0)) return 0;
     (*n)++;

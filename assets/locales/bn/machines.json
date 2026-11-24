@@ -1645,5 +1645,16 @@
   "run.powerLow": "পাওয়ার সাপ্লাই: খুব দুর্বল (কম ভোল্টেজ)",
   "win.run.row": "Windows 11",
   "win.run.note": "TPM, সিকিউর বুট ও LordOS টুলসহ",
-  "win.run.noteArm": "এই প্রসেসরে এখনো নয়"
+  "win.run.noteArm": "এই প্রসেসরে এখনো নয়",
+  "search.open": "{name} খুলুন",
+  "atLogin.failed": "{name} সেশনের সাথে চালু হয়নি",
+  "battery.title": "ব্যাটারিতে, মেশিন চলছে ({count})",
+  "battery.body": "মেশিনের কাজ কম্পিউটারকে ব্যস্ত রাখে এবং ব্যাটারি দ্রুত শেষ করে।",
+  "battery.pauseAll": "সব থামান",
+  "cfg.atLogin": "সেশনের সাথে চালু করুন",
+  "cfg.atLoginNote": "লগ ইন করলে উইন্ডো ছাড়া চালু হয়, যদি মেমরি থাকে।",
+  "cfg.autoPause": "আমি না থাকলে থামান",
+  "cfg.autoPauseNote": "কিবোর্ড বা মাউস ছাড়া ১০ মিনিট পর থামে, আর আপনি ফিরলে চলে।",
+  "bundle.machine": "মেশিন",
+  "bundle.group": "মেশিন গ্রুপ"
 }

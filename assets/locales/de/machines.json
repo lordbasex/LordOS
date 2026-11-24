@@ -1645,5 +1645,16 @@
   "run.powerLow": "Netzteil: zu schwach (Unterspannung)",
   "win.run.row": "Windows 11",
   "win.run.note": "Mit TPM, Secure Boot und den LordOS-Werkzeugen",
-  "win.run.noteArm": "Noch nicht auf diesem Prozessor"
+  "win.run.noteArm": "Noch nicht auf diesem Prozessor",
+  "search.open": "{name} öffnen",
+  "atLogin.failed": "{name} ist nicht mit der Sitzung gestartet",
+  "battery.title": "Akkubetrieb mit laufenden Maschinen ({count})",
+  "battery.body": "Die Arbeit einer Maschine hält den Computer beschäftigt und leert den Akku schneller.",
+  "battery.pauseAll": "Alle pausieren",
+  "cfg.atLogin": "Mit der Sitzung starten",
+  "cfg.atLoginNote": "Startet beim Anmelden ohne Fenster, wenn genug Speicher frei ist.",
+  "cfg.autoPause": "Pausieren, während ich weg bin",
+  "cfg.autoPauseNote": "Pausiert nach 10 Minuten ohne Tastatur oder Maus und läuft weiter, wenn du zurück bist.",
+  "bundle.machine": "Maschine",
+  "bundle.group": "Maschinengruppe"
 }

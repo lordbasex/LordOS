@@ -1645,5 +1645,16 @@
   "run.powerLow": "Tápegység: túl gyenge (alacsony feszültség)",
   "win.run.row": "Windows 11",
   "win.run.note": "TPM-mel, biztonságos rendszerindítással és a LordOS eszközeivel",
-  "win.run.noteArm": "Ezen a processzoron még nem"
+  "win.run.noteArm": "Ezen a processzoron még nem",
+  "search.open": "{name} megnyitása",
+  "atLogin.failed": "{name} nem indult el a munkamenettel",
+  "battery.title": "Akkuról, futó gépekkel ({count})",
+  "battery.body": "Egy gép munkája lefoglalja a számítógépet, és gyorsabban meríti az akkut.",
+  "battery.pauseAll": "Összes szüneteltetése",
+  "cfg.atLogin": "Indítás a munkamenettel",
+  "cfg.atLoginNote": "Bejelentkezéskor ablak nélkül indul, ha van hozzá memória.",
+  "cfg.autoPause": "Szünet, amíg távol vagyok",
+  "cfg.autoPauseNote": "10 perc billentyűzet és egér nélkül szünetel, és folytatja, amikor visszajössz.",
+  "bundle.machine": "Gép",
+  "bundle.group": "Gépcsoport"
 }
