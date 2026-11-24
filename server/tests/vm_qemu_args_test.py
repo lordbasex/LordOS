@@ -93,7 +93,7 @@ ROWS = [
     ("compatible devices with a data disk, no display", ["--devices", "compat", "--display", "none"], ["--transfer", "off", "--add-disk", "1"], [], [
         lacks("virtio-blk-pci,id=sysdisk", "virtio-blk-pci,id=datadisk1")]
      + ([has("ide-hd,id=datadisk1,drive=data1,bus=ide.1")] if ARCH == "amd64" else
-        [has("nvme,id=datadisk1,drive=data1,addr=0x10,serial=lordvm-data1"), has("qemu-xhci,id=xhci,addr=0x5", "scsi-cd,id=cd0,bus=cdbot0.0"),
+        [has("nvme,id=datadisk1,drive=data1,addr=0x10,serial=LORDOS-DATA-1"), has("qemu-xhci,id=xhci,addr=0x5", "scsi-cd,id=cd0,bus=cdbot0.0"),
          lacks("ich9-ahci")]), True),
     ("Windows 11 (secure boot, TPM, Hyper-V, local clock)",
      ["--devices", "windows", "--secure-boot", "on", "--tpm", "on", "--hyperv", "on", "--rtc", "local", "--display", "window"], ["--transfer", "off"], [], [

@@ -1,6 +1,6 @@
 // Pieces the Machines windows share: the state dot, the system marks, the three lights, bars, a context menu and the
 // surfaces of the Control Center (docs/VIRTUALIZATION.md, "The app"; the approved mocks, Main and Toolbar).
-import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, useSettings, useStore, createStore, fs, useAppWindow, LordOSLogo, t as tr } from '@lordos/sdk';
+import { View, Text, Image, Overlay, ScrollView, screen, addListener, useTheme, errorText, admin, useSettings, useStore, createStore, fs, useAppWindow, LordOSLogo, t as tr } from '@lordos/sdk';
 import { logoFor } from './logos.js';
 import { storeRev } from './store.js';
 import { readMeta, writeMeta } from './meta.js';
@@ -342,19 +342,23 @@ export const soundDevItems = (list, chosen, pick) => soundDevChoices(list, chose
 export const overlayRoot = { current: null };
 
 // A dialog over the window (the mocks' Clone and the snapshot sheets): title, body, actions on the right. Esc cancels.
-// An alert in hypervisaur's look (kit.jsx): the window dimmed behind, a rounded card with a hairline edge.
-export function Sheet({ title, children, actions, width = 560, onCancel }) {
+// An alert in hypervisaur's look (kit.jsx): the window dimmed behind, a rounded card with a hairline edge. It is never
+// taller than the window (the Control Center's first size is 760×500): the title and the buttons stay, and the body
+// between them scrolls when it doesn't fit. over: what covers the whole window above the sheet (the file picker of
+// Export… and Bring In), never squeezed inside its card.
+export function Sheet({ title, children, actions, width = 560, onCancel, over }) {
   const p = usePal();
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') onCancel?.(); }), [onCancel]);
   return (
-    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: 24,
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: 16,
       backgroundColor: p.dark ? 'rgba(0,0,0,0.5)' : 'rgba(30,30,40,0.28)' }}>
-      <View style={{ width, maxWidth: '100%', padding: 22, gap: 14, borderRadius: 16, backgroundColor: p.dark ? '#26262f' : '#f6f6f8',
+      <View style={{ width, maxWidth: '100%', maxHeight: '100%', padding: 22, gap: 14, borderRadius: 16, backgroundColor: p.dark ? '#26262f' : '#f6f6f8',
         border: `1px solid ${p.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`, boxShadow: '0 24px 64px rgba(0,0,0,0.55)' }}>
         <Text style={{ fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
-        {children}
+        <ScrollView style={{ flex: -1 }} contentStyle={{ gap: 14 }}>{children}</ScrollView>
         {actions?.length ? <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 4 }}>{actions}</View> : null}
       </View>
+      {over || null}
     </View>
   );
 }
