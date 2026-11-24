@@ -658,16 +658,19 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
         else if (now() - z.at > 400) { lord.vm.resize(sid, want[0], want[1]); z.last = want; z.want = null; z.asked = want; z.askedAt = now(); }
       }
       // a fixed resolution: after the person resized the window (the frame the same for 400 ms), it takes the guest's
-      // shape again, keeping its width (shapeFrame); tried once per frame size, so a window that can't go there isn't fought
+      // shape again, keeping its width (shapeFrame); tried once per frame size, so a window that can't go there isn't fought.
+      // Only the person's resize starts it (the frame changed, and not to the size set here): a guest that keeps changing
+      // its own display size never moves this window
       if (q.display === 'up' && box.current && shapeRef.current && q.w > 0 && q.h > 0) {
         const w0 = windows.get().find((x) => x.id === winId);
         const f0 = w0 ? wm.frame(w0) : null, b0 = lord.getLayout(box.current.id);
-        const key = f0 ? `${f0.w}x${f0.h}:${q.w}x${q.h}` : '';
-        if (key && key !== z.shapeKey) { z.shapeKey = key; z.shapeAt = now(); z.shapeDone = false; }
+        const key = f0 ? `${f0.w}x${f0.h}` : '';
+        if (key && z.shapeKey === undefined) z.shapeKey = key;                 // the frame it opened with: not a resize
+        else if (key && key !== z.shapeKey) { z.shapeKey = key; z.shapeAt = now(); z.shapeDone = key === z.shapeSet; }
         else if (key && !z.shapeDone && now() - z.shapeAt > 400) {
           z.shapeDone = true;
           const s = shapeFrame(f0, { w: b0[2], h: b0[3] }, q.w, q.h, workAreaOf(displayFor(f0)));
-          if (s) wm.resize(winId, s.w, s.h);
+          if (s) { z.shapeSet = `${s.w}x${s.h}`; wm.resize(winId, s.w, s.h); }
         }
       }
       // asked for a size the guest didn't take (Follow the window): the resolution menu says so
