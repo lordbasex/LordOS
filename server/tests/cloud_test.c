@@ -8,12 +8,15 @@
 #include "../src/sec/json.h"
 
 #include <errno.h>
+#include <math.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+void cloud_test_transfer(const char *id, const char *name, double pct, int up);   /* cloud.c, test builds */
 
 static int pass, failc;
 #define CHECK(x) do { if (x) pass++; else { failc++; printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #x); } } while (0)
@@ -300,6 +303,34 @@ static void t_refused(void) {
     CHECK(!strcmp(cl, "ñ"));
     cloud_clean_text(NULL, cl, sizeof cl);
     CHECK(!cl[0]);
+    /* #244: the names the Cloud menu shows next to their percentage */
+    char mn[CLOUD_MOVING_NAME];
+    cloud_moving_name("Projects/2026/report.pdf", mn, sizeof mn);
+    CHECK(!strcmp(mn, "report.pdf"));
+    cloud_moving_name("a\x01" "b\x7f\xc2\x85" "c\n.txt", mn, sizeof mn);            /* C0, DEL, C1 (U+0085) */
+    CHECK(!strcmp(mn, "abc.txt"));
+    cloud_moving_name("invoice\xe2\x80\xae" "fdp.exe", mn, sizeof mn);           /* U+202E, a name that reads backwards */
+    CHECK(!strcmp(mn, "invoicefdp.exe"));
+    cloud_moving_name("\xe2\x81\xa6x\xe2\x81\xa9\xe2\x80\x8f\xd8\x9c\xef\xbb\xbf", mn, sizeof mn);   /* isolates, RLM, ALM, BOM */
+    CHECK(!strcmp(mn, "x"));
+    cloud_moving_name("\xc0\xaf\xed\xa0\x80\xf4\x90\x80\x80\xff\xe2\x82ok", mn, sizeof mn);   /* overlong, surrogate, > U+10FFFF, junk, cut */
+    CHECK(!strcmp(mn, "ok"));
+    cloud_moving_name("\xd7\xa9\xd7\x9c\xd7\x95\xd7\x9d.txt", mn, sizeof mn);     /* Hebrew stays */
+    CHECK(!strcmp(mn, "\xd7\xa9\xd7\x9c\xd7\x95\xd7\x9d.txt"));
+    cloud_moving_name("dir/", mn, sizeof mn);
+    CHECK(!mn[0]);
+    cloud_moving_name(NULL, mn, sizeof mn);
+    CHECK(!mn[0]);
+    cloud_moving_name(big, mn, sizeof mn);
+    CHECK(strlen(mn) == CLOUD_MOVING_NAME - 1);
+    char ln[400] = "";
+    for (int i = 0; i < 100; i++) strcat(ln, "\xc3\xb1");                        /* 200 bytes of ñ */
+    cloud_moving_name(ln, mn, sizeof mn);
+    CHECK(strlen(mn) == CLOUD_MOVING_NAME - 1 - 1 && !(strlen(mn) & 1));         /* never half a character */
+    cloud_moving_name("abc", mn, 3);
+    CHECK(!strcmp(mn, "ab"));
+    CHECK(cloud_moving_pct(42.9, 0) == 42 && cloud_moving_pct(42.9, 1) == 40 && cloud_moving_pct(-3, 0) == 0);
+    CHECK(cloud_moving_pct(250, 0) == 100 && cloud_moving_pct(100, 1) == 100 && cloud_moving_pct(NAN, 0) == 0);
     /* the conflict rule: did the cloud's object change since it came down? */
     const char *h1[] = { "d41d8cd98f00b204e9800998ecf8427e" };
     CHECK(cloud_remote_changed("6", 6, -1, NULL, 0, 1) == 0 && cloud_remote_changed("6", 21, -1, NULL, 0, 1) == 1);
@@ -601,6 +632,25 @@ static void t_state(void) {
         CHECK(k && k->len == 1 && !strncmp(k->kid->str, home, strlen(home)) && strstr(k->kid->str, "/Cloud/Work/Kept"));
         CHECK(json_get(d.root, "signin")->type == J_NULL && json_get(d.root, "recent")->type == J_ARR);
         CHECK(json_bool(json_get(d.root, "available") ? d.root : NULL, "available", 1) == 0);
+        json_free(&d);
+    }
+    free(s);
+    /* #244: the files moving now, bounded, uploads first, with their percentage */
+    cloud_test_transfer("cab12cd34", "Down/one.bin", 12.5, 0);
+    cloud_test_transfer("cab12cd34", "Up/\xe2\x80\xaetwo.txt", 99.9, 1);
+    cloud_test_transfer("cab12cd34", "\x01\x02", 50, 0);                 /* nothing printable: left out */
+    for (int i = 0; i < 6; i++) cloud_test_transfer("cab12cd34", "Many/more.bin", 7, 0);
+    s = cloud_state_json();
+    CHECK(s && !json_parse(s, strlen(s), &d, NULL, 0));
+    if (s && d.root) {
+        const JVal *as = json_get(d.root, "accounts");
+        const JVal *mv = as && as->kid ? json_get(as->kid, "moving") : NULL;
+        CHECK(mv && mv->type == J_ARR && mv->len == CLOUD_MOVING_MAX);
+        const JVal *m0 = mv ? mv->kid : NULL, *m1 = m0 ? m0->next : NULL;
+        CHECK(m0 && !strcmp(json_str(m0, "name"), "two.txt") && json_num(m0, "pct", -1) == 99 && json_bool(m0, "up", 0) == 1);
+        CHECK(m1 && !strcmp(json_str(m1, "name"), "one.bin") && json_num(m1, "pct", -1) == 12 && json_bool(m1, "up", 1) == 0);
+        const JVal *dn = as && as->kid ? json_get(as->kid, "down") : NULL;
+        CHECK(dn && json_num(dn, "files", 0) == 8);                       /* the totals still count every file */
         json_free(&d);
     }
     free(s);

@@ -12,9 +12,11 @@
  * Models, root being /usr/share/lordos/voice (the lordos-voice-* packages) or ~/.local/share/lordos/voice:
  *   standard  <root>/models/<language>/standard.gguf, its voices in <root>/models/<language>/embeddings/<voice>.safetensors
  *   hd        <root>/models/<language>/hd/ (Kyutai's model.safetensors, tokenizer.model and embeddings/<voice>.safetensors)
+ *   Dutch's standard model is Kyutai's folder too, <root>/models/nl/standard/ (audio.cpp publishes no Dutch GGUF).
  * The quality is -q, else voice.json's "quality", else "auto": HD when it is installed. The voice is -v, else
  * voice.json's "voices" for the language ({"es": "juergen"}), else its "voice", else the language's own (Lola,
- * Rafael, Alba); a voice that isn't installed for that model falls back to the language's own, then to any that is.
+ * Rafael, Alba, Estelle, Juergen, Giovanni, Daan); a voice that isn't installed for that model falls back to the
+ * language's own, then to any that is.
  * <root>/voices/<name>.wav is a voice to clone instead. Without -l, the language is the text's (say_language);
  * voice.json's "language", then $LANG's, when the text is too short to tell.
  *
@@ -76,9 +78,9 @@ static void die_as(int code, const char *msg, const char *detail) {
 static void die(const char *msg, const char *detail) { die_as(1, msg, detail); }
 
 static void usage(void) {
-    fputs("usage: say [-l es|en|pt] [-v voice] [-q auto|standard|hd] [-b auto|cpu|gpu] [-o file.wav|-] [-f file|-] [text…]\n"
+    fputs("usage: say [-l es|en|pt|fr|de|it|nl] [-v voice] [-q auto|standard|hd] [-b auto|cpu|gpu] [-o file.wav|-] [-f file|-] [text…]\n"
           "       say --voices\n"
-          "       say --preview es|en|pt <voice>\n", stderr);
+          "       say --preview es|en|pt|fr|de|it|nl <voice>\n", stderr);
     exit(2);
 }
 
@@ -99,9 +101,26 @@ static char *read_all(int fd, size_t *len) {
     return b;
 }
 
+/* The languages LordOS has voices for (sdk/voicecatalog.js's VOICE_LANGS): the HD model as audio.cpp names it
+ * (h_tts.c's DIR_LANGUAGES), the language's own voice, and, for a standard model kept as Kyutai's folder
+ * (<root>/models/<lang>/standard/, as audio.cpp publishes no GGUF of it), its name. */
+#define NLANGS 7
+static const struct { const char *id, *hd, *own, *std_dir; } LANGS[NLANGS] = {
+    { "es", "spanish_24l", "lola", NULL },
+    { "en", "english_2026-09_24l", "alba", NULL },
+    { "pt", "portuguese_24l", "rafael", NULL },
+    { "fr", "french_24l", "estelle", NULL },
+    { "de", "german_24l", "juergen", NULL },
+    { "it", "italian_24l", "giovanni", NULL },
+    { "nl", "dutch_24l", "daan", "dutch" },
+};
+static int lang_index(const char *l) {
+    for (int i = 0; l && i < NLANGS; i++) if (!strcmp(l, LANGS[i].id)) return i;
+    return -1;
+}
+
 /* ~/.config/lordos/voice.json: the defaults Settings → AI → Voice keeps */
-static char conf_lang[8], conf_voice[64], conf_backend[8], conf_quality[12], conf_voices[3][64];
-static const char *const LANGS[3] = { "es", "en", "pt" };
+static char conf_lang[8], conf_voice[64], conf_backend[8], conf_quality[12], conf_voices[NLANGS][64];
 static void read_settings(const char *home) {
     char path[PATH_MAX];
     snprintf(path, sizeof path, "%s/.config/lordos/voice.json", home);
@@ -118,8 +137,8 @@ static void read_settings(const char *home) {
         if ((v = json_str(d.root, "backend"))) snprintf(conf_backend, sizeof conf_backend, "%s", v);
         if ((v = json_str(d.root, "quality"))) snprintf(conf_quality, sizeof conf_quality, "%s", v);
         const JVal *vs = json_get(d.root, "voices");
-        for (int i = 0; vs && i < 3; i++)
-            if ((v = json_str(vs, LANGS[i]))) snprintf(conf_voices[i], sizeof conf_voices[i], "%s", v);
+        for (int i = 0; vs && i < NLANGS; i++)
+            if ((v = json_str(vs, LANGS[i].id))) snprintf(conf_voices[i], sizeof conf_voices[i], "%s", v);
     }
     json_free(&d);
     free(t);
@@ -200,39 +219,38 @@ static int simple_name(const char *s, size_t max) {
 
 static int is_file(const char *p) { struct stat st; return !stat(p, &st) && S_ISREG(st.st_mode); }
 
-/* a language's HD model as audio.cpp names it (h_tts.c's HD_LANGUAGES), and its own voice */
-static const char *hd_language(const char *lang) {
-    return !strcmp(lang, "es") ? "spanish_24l" : !strcmp(lang, "pt") ? "portuguese_24l" : "english_2026-09_24l";
-}
-static const char *own_voice(const char *lang) { return !strcmp(lang, "es") ? "lola" : !strcmp(lang, "pt") ? "rafael" : "alba"; }
+/* a model's folder under <root>/models/<lang>/: "hd/", "standard/" (a standard model kept as Kyutai's folder) or ""
+ * (standard.gguf, its voices in embeddings/) */
+static const char *model_dir(int li, int hd) { return hd ? "hd/" : LANGS[li].std_dir ? "standard/" : ""; }
 
 /* <root>/models/<lang>/<model dir>embeddings/<voice>.safetensors: the voice is installed for that model */
-static int has_voice(const char *root, const char *lang, int hd, const char *voice) {
+static int has_voice(const char *root, int li, int hd, const char *voice) {
     char p[PATH_MAX];
-    snprintf(p, sizeof p, "%s/models/%s/%sembeddings/%s.safetensors", root, lang, hd ? "hd/" : "", voice);
+    snprintf(p, sizeof p, "%s/models/%s/%sembeddings/%s.safetensors", root, LANGS[li].id, model_dir(li, hd), voice);
     return is_file(p);
 }
 
-static int has_model(const char *root, const char *lang, int hd) {
+static int has_model(const char *root, int li, int hd) {
     char p[PATH_MAX];
-    snprintf(p, sizeof p, "%s/models/%s/%s", root, lang, hd ? "hd/model.safetensors" : "standard.gguf");
+    snprintf(p, sizeof p, "%s/models/%s/%s", root, LANGS[li].id,
+             hd ? "hd/model.safetensors" : LANGS[li].std_dir ? "standard/model.safetensors" : "standard.gguf");
     return is_file(p);
 }
 
 /* every installed voice, by language and quality; then the voices to clone */
 static void list_voices(const char *user_root) {
     const char *roots[2] = { user_root, ROOTS_SYS };
-    for (int l = 0; l < 3; l++)
+    for (int l = 0; l < NLANGS; l++)
         for (int hd = 1; hd >= 0; hd--)
             for (int r = 0; r < 2; r++) {
-                if (!has_model(roots[r], LANGS[l], hd)) continue;
+                if (!has_model(roots[r], l, hd)) continue;
                 char dir[PATH_MAX];
-                snprintf(dir, sizeof dir, "%s/models/%s/%sembeddings", roots[r], LANGS[l], hd ? "hd/" : "");
+                snprintf(dir, sizeof dir, "%s/models/%s/%sembeddings", roots[r], LANGS[l].id, model_dir(l, hd));
                 DIR *d = opendir(dir);
                 for (struct dirent *e; d && (e = readdir(d));) {
                     size_t n = strlen(e->d_name);
                     if (n > 12 && !strcmp(e->d_name + n - 12, ".safetensors"))
-                        printf("%s %s %.*s\n", LANGS[l], hd ? "hd" : "standard", (int)(n - 12), e->d_name);
+                        printf("%s %s %.*s\n", LANGS[l].id, hd ? "hd" : "standard", (int)(n - 12), e->d_name);
                 }
                 if (d) closedir(d);
             }
@@ -408,9 +426,7 @@ static void start_player(int rate) {
 
 /* --preview: a voice's recorded sample, <root>/previews/<lang>/<voice>.wav, a 16-bit mono WAV; played as speech is */
 static int play_preview(const char *const roots[2], const char *lang, const char *voice) {
-    int ok_lang = 0;
-    for (int i = 0; i < 3; i++) ok_lang |= !strcmp(lang, LANGS[i]);
-    if (!ok_lang || !simple_name(voice, 60)) die("a preview is a language (es, en, pt) and a voice name", NULL);
+    if (lang_index(lang) < 0 || !simple_name(voice, 60)) die("a preview is a language (es, en, pt, fr, de, it, nl) and a voice name", NULL);
     int fd = -1;
     for (int r = 0; r < 2 && fd < 0; r++) {
         char p[PATH_MAX];
@@ -564,8 +580,8 @@ int main(int argc, char **argv) {
         if (!fallback) { const char *l = getenv("LANG"); if (l && strlen(l) >= 2) { envlang[0] = l[0]; envlang[1] = l[1]; fallback = envlang; } }
         lang = say_language(text, len, fallback);
     }
-    if (strcmp(lang, "es") && strcmp(lang, "en") && strcmp(lang, "pt")) lang = "en";    /* the languages LordOS has voices for */
-    /* Spanish and Portuguese models don't read digits or symbols: numbers, times, money… written out as words
+    if (lang_index(lang) < 0) lang = "en";                    /* the languages LordOS has voices for */
+    /* Only the English models read digits and symbols: for the others numbers, times, money… are written out as words
      * (saytext.c), before the text is split so the pieces are measured on what is spoken. English stays as it is. */
     if (strcmp(lang, "en")) {
         size_t nlen;
@@ -581,7 +597,7 @@ int main(int argc, char **argv) {
     if (!quality) quality = conf_quality[0] ? conf_quality : "auto";
     if (strcmp(quality, "auto") && strcmp(quality, "standard") && strcmp(quality, "hd")) die("quality is auto, standard or hd", quality);
     const char *roots[2] = { user_root, ROOTS_SYS };
-    int li = !strcmp(lang, "es") ? 0 : !strcmp(lang, "en") ? 1 : 2;
+    int li = lang_index(lang);
 
     /* the voice asked for: -v, the language's in voice.json, voice.json's own; a WAV to clone when there is one */
     if (!voice) voice = conf_voices[li][0] ? conf_voices[li] : conf_voice[0] ? conf_voice : NULL;
@@ -599,7 +615,7 @@ int main(int argc, char **argv) {
     for (int pass = 0; pass < 2 && !root; pass++) {
         int want_hd = !strcmp(quality, "standard") ? pass : !pass;
         for (int r = 0; r < 2 && !root; r++)
-            if (has_model(roots[r], lang, want_hd)) { root = roots[r]; hd = want_hd; }
+            if (has_model(roots[r], li, want_hd)) { root = roots[r]; hd = want_hd; }
     }
     if (!root) die_as(EXIT_NO_MODEL, "no voice model for this language; download one in Settings → AI → Voice", lang);
 
@@ -607,11 +623,11 @@ int main(int argc, char **argv) {
     const char *voice_id = NULL;
     static char any[64];
     if (voice_fd < 0) {
-        if (voice && has_voice(root, lang, hd, voice)) voice_id = voice;
-        else if (has_voice(root, lang, hd, own_voice(lang))) voice_id = own_voice(lang);
+        if (voice && has_voice(root, li, hd, voice)) voice_id = voice;
+        else if (has_voice(root, li, hd, LANGS[li].own)) voice_id = LANGS[li].own;
         else {
             char dir[PATH_MAX];
-            snprintf(dir, sizeof dir, "%s/models/%s/%sembeddings", root, lang, hd ? "hd/" : "");
+            snprintf(dir, sizeof dir, "%s/models/%s/%sembeddings", root, lang, model_dir(li, hd));
             DIR *d = opendir(dir);
             for (struct dirent *e; d && (e = readdir(d)) && !voice_id;) {
                 size_t n = strlen(e->d_name);
@@ -625,8 +641,8 @@ int main(int argc, char **argv) {
         if (!voice_id) die_as(EXIT_NO_VOICE, "no voice installed for this language; download one in Settings → AI → Voice", lang);
     }
     char model_file[64];
-    snprintf(model_file, sizeof model_file, "%s/%s", lang, hd ? "hd" : "standard.gguf");
-    const char *language = hd ? hd_language(lang) : NULL;
+    snprintf(model_file, sizeof model_file, "%s/%s", lang, hd ? "hd" : LANGS[li].std_dir ? "standard" : "standard.gguf");
+    const char *language = hd ? LANGS[li].hd : LANGS[li].std_dir;
     snprintf(path, sizeof path, "%s/models", root);
     int models_fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if (models_fd < 0) die("can't open", path);

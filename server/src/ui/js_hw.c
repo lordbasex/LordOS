@@ -80,6 +80,8 @@
 #include "../apps.h"
 #include "../hw/defaults.h"
 #include "../hw/display.h"
+#include "../remote/greeterscale.h"
+#include "../remote/mirror.h"
 #include "../hw/hw.h"
 #include "../hw/hwscan.h"
 #include "../gpu/gpu.h"
@@ -109,6 +111,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 static JSValue json_or_null(JSContext *c, char *j) {
@@ -173,6 +176,41 @@ static JSValue f_display_main(JSContext *c, JSValueConst t, int argc, JSValueCon
     (void)t;
     int conn = argc ? arg_int(c, argv[0], 0) : 0;
     return JS_NewBool(c, conn > 0 && display_set_main((uint32_t)conn) == 0);
+}
+
+/* #242: lord.display.loginScale() → { connector, scale } | null: the login screen's scale an administrator chose, read
+ * from lord-sessiond's file (root's, 0644; greeterscale.h) */
+static JSValue f_display_login_scale(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    int fd = open(GSCALE_FILE, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (fd < 0) return JS_NULL;
+    struct stat st;
+    char buf[48];
+    ssize_t n = -1;
+    if (!fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_size < (off_t)sizeof buf) n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return JS_NULL;
+    buf[n] = 0;
+    char conn[GSCALE_CONN_MAX + 1];
+    int pct;
+    if (gscale_parse_file(buf, conn, sizeof conn, &pct)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "connector", JS_NewString(c, conn));
+    JS_SetPropertyStr(c, o, "scale", JS_NewInt32(c, pct));
+    return o;
+}
+
+/* #242: lord.display.setLoginScale(connector, scale) → bool: asks lord-sessiond to use this scale on the login screen
+ * for that display (0: back to the recommended one). Only a request: lord-sessiond takes it only from the session on
+ * the monitor and only when its user is an administrator (checked as root); Settings reads loginScale() back. */
+static JSValue f_display_set_login_scale(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char conn[GSCALE_CONN_MAX + 1], m[128];
+    if (argc < 2 || display_is_greeter() || arg_str(c, argv[0], conn, sizeof conn)) return JS_FALSE;
+    int pct = arg_int(c, argv[1], -1);
+    if (gscale_msg(m, sizeof m, conn, pct)) return JS_FALSE;
+    mirror_session(m);
+    return JS_TRUE;
 }
 
 static JSValue f_display_capture(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -246,6 +284,8 @@ static const JSCFunctionListEntry display_funcs[] = {
     JS_CFUNC_DEF("arrange", 4, f_display_arrange),
     JS_CFUNC_DEF("setMirror", 1, f_display_mirror),
     JS_CFUNC_DEF("setMain", 1, f_display_main),
+    JS_CFUNC_DEF("loginScale", 0, f_display_login_scale),
+    JS_CFUNC_DEF("setLoginScale", 2, f_display_set_login_scale),
     JS_CFUNC_DEF("setCaptureAll", 1, f_display_capture),
     JS_CFUNC_DEF("setAutoRotate", 1, f_display_auto_rotate),
     JS_CFUNC_DEF("setTemperature", 1, f_display_set_temp),

@@ -10,8 +10,9 @@
  * clone, up to 30 s) → DR_BLOB: a WAV (16-bit mono) in a sealed memfd; a sentence with hiss is made again (hiss.c).
  * The model ("file", relative to the read-only folder in "slot") is loaded by the first request and kept; a request
  * for another file, backend or language is refused. "file" is a GGUF (the standard models), or, with "language" (one
- * of the HD models: HD_LANGUAGES), a folder with Kyutai's model.safetensors, tokenizer.model and embeddings/, read
- * with pocket_tts_dir.json (audio.cpp's description of the model, reading that folder), next to libaudiocpp. */
+ * of DIR_LANGUAGES: the HD models, and Dutch's standard one, of which audio.cpp publishes no GGUF), a folder with
+ * Kyutai's model.safetensors, tokenizer.model and embeddings/, read with pocket_tts_dir.json (audio.cpp's description
+ * of the model, reading that folder), next to libaudiocpp. */
 #include "helper.h"
 #include "../tts/hiss.h"
 
@@ -37,17 +38,21 @@ static audiocpp_model *model;
 static audiocpp_session *sess;
 static char loaded[300], loaded_backend[8], loaded_language[24];
 
-/* Kyutai's 24-layer models ("HD"), named as audio.cpp knows them */
-static const char *const HD_LANGUAGES[] = { "spanish_24l", "portuguese_24l", "english_2026-09_24l" };
+/* the models read as Kyutai ships them (a folder), named as audio.cpp knows them: the 24-layer ones ("HD"), and the
+ * 6-layer Dutch one ("dutch", its standard model: audio.cpp publishes no Dutch GGUF) */
+static const char *const DIR_LANGUAGES[] = { "spanish_24l", "portuguese_24l", "english_2026-09_24l", "french_24l",
+    "german_24l", "italian_24l", "dutch_24l", "dutch" };
 
 static int valid_language(const char *s) {
-    for (size_t i = 0; i < sizeof HD_LANGUAGES / sizeof *HD_LANGUAGES; i++) if (!strcmp(s, HD_LANGUAGES[i])) return 1;
+    for (size_t i = 0; i < sizeof DIR_LANGUAGES / sizeof *DIR_LANGUAGES; i++) if (!strcmp(s, DIR_LANGUAGES[i])) return 1;
     return 0;
 }
 
 /* What Kyutai's own code does to the text before the model (pocket_tts/config/<language>.yaml, replace_characters)
  * and audio.cpp doesn't: quotes, brackets and, in Spanish, ¡ ¿ are dropped, curly apostrophes become ', a dash a
- * comma. Without it the Spanish model stumbled over ¿…? and «…». The language is the model file's (es/, pt/, en/). */
+ * comma (in German the em dash too); in French ":" becomes a comma, and in French and German ";" does
+ * (remove_semicolons). Without it the Spanish model stumbled over ¿…? and «…». The language is the model file's
+ * (es/, pt/, fr/, de/, it/, nl/, en/): s, p, f, d, i, n or e. */
 static void kyutai_text(const char *in, char *out, size_t cap, char lang) {
     static const char *const drop_all[] = { "\"", "\xe2\x80\x9c", "\xe2\x80\x9d", "\xe2\x80\x9e", "\xc2\xab", "\xc2\xbb", "(", ")", "[", "]" };
     static const char *const drop_es[] = { "\xc2\xa1", "\xc2\xbf" };                  /* ¡ ¿ */
@@ -62,6 +67,8 @@ static void kyutai_text(const char *in, char *out, size_t cap, char lang) {
         if (skip) { p += skip; continue; }
         if (!strncmp(p, "\xe2\x80\x99", 3) || !strncmp(p, "\xe2\x80\x98", 3)) { out[o++] = '\''; p += 3; continue; }   /* ’ ‘ */
         if (lang != 'e' && !strncmp(p, "\xe2\x80\x93", 3)) { out[o++] = ','; p += 3; continue; }                     /* – */
+        if (lang == 'd' && !strncmp(p, "\xe2\x80\x94", 3)) { out[o++] = ','; p += 3; continue; }                     /* — */
+        if ((lang == 'f' && *p == ':') || ((lang == 'f' || lang == 'd') && *p == ';')) { out[o++] = ','; p++; continue; }
         out[o++] = *p++;
     }
     out[o] = 0;
@@ -227,8 +234,10 @@ int tts_handle(const DocMsg *m, const JVal *args) {
     audiocpp_request *rq = audiocpp_request_create();
     float *voice = NULL;
     if (!rq) { reply_err(m->h.id, "memory", ""); return 1; }
-    /* the model's language from its file: es/…, pt/…, en/… (say.c's layout); s, p or e */
-    char lang = !strncmp(file, "es/", 3) ? 's' : !strncmp(file, "pt/", 3) ? 'p' : 'e';
+    /* the model's language from its file: es/…, pt/…, fr/…, de/…, it/…, nl/…, else e (say.c's layout) */
+    static const char *const dirs[6] = { "es/", "pt/", "fr/", "de/", "it/", "nl/" };
+    char lang = 'e';
+    for (int i = 0; i < 6; i++) if (!strncmp(file, dirs[i], 3)) lang = "spfdin"[i];
     char clean[TEXT_MAX + 1];
     kyutai_text(text, clean, sizeof clean, lang);
     audiocpp_request_set_text(rq, clean, NULL);

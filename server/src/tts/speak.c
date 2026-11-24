@@ -39,6 +39,14 @@ static char *last_text;                 /* for speak_replay */
 static size_t last_n;
 static char last_lang[3], last_voice[64];
 
+/* the languages LordOS has voices for (say.c's LANGS): a closed list, as each one goes into lord-say's environment
+ * or arguments */
+int speak_lang_ok(const char *l) {
+    static const char *const langs[] = { "es", "en", "pt", "fr", "de", "it", "nl" };
+    for (size_t i = 0; l && i < sizeof langs / sizeof *langs; i++) if (!strcmp(l, langs[i])) return 1;
+    return 0;
+}
+
 /* the wave: the bands lord-say wrote, the last RING of them */
 #define RING 256
 static int lev_fd = -1;
@@ -241,7 +249,7 @@ static int spawn_say(int in, int out, int lev, const char *lang, char *const arg
 
 static int check_args(const char *text, size_t n, const char **lang) {
     if (!text || !n || n > SPEAK_TEXT_MAX) { errno = EINVAL; return -1; }
-    if (*lang && strcmp(*lang, "es") && strcmp(*lang, "en") && strcmp(*lang, "pt")) *lang = NULL;
+    if (*lang && !speak_lang_ok(*lang)) *lang = NULL;
     if (!speak_available()) { errno = ENOENT; return -1; }
     return 0;
 }
@@ -289,7 +297,7 @@ int speak_start(const char *text, size_t n, const char *lang, const char *voice)
  * wave as for reading; never something to read again (speak_replay keeps the text before) */
 int speak_preview(const char *lang, const char *voice) {
     speak_stop();
-    if (!lang || (strcmp(lang, "es") && strcmp(lang, "en") && strcmp(lang, "pt"))) { errno = EINVAL; return -1; }
+    if (!speak_lang_ok(lang)) { errno = EINVAL; return -1; }
     if (!plain_voice(voice)) { errno = EINVAL; return -1; }
     size_t vn = strlen(voice);
     if (!speak_available()) { errno = ENOENT; return -1; }

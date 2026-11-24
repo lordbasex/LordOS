@@ -189,6 +189,15 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('#83 recent: every account', M.recentRows(rec, two, now).map((r) => r.name), ['w0', 'w1', 'w2', 'w3', 'w4']);
   eq('#83 recent: one account, found by id or by path, still five deep', [M.recentRows(rec, two, now, 5, ['3']).map((r) => r.name), M.recentRows(rec, two, now, 5, ['2']).length], [['h0', 'h1'], 5]);
   eq('#83 recent: two accounts', M.recentRows(rec, two, now, 20, ['3', '2']).map((r) => r.account), [...Array(8).fill('2'), '3', '3']);
+  // #244: the panel's "Moving now" rows
+  const mv = [acc('2', 'Work', { moving: [{ name: 'a.pdf', pct: 41.7, up: true }, { name: 'b.mp4', pct: 250, up: false }, { name: '', pct: 5 }, { name: 7, pct: 5 }, null] }),
+    acc('3', 'Home', { moving: [{ name: 'c.txt', pct: 'x', up: 'yes' }, { name: 'x'.repeat(400), pct: -4, up: true }] }),
+    acc('4', 'Off', { disabled: true, moving: [{ name: 'gone.bin', pct: 9, up: true }] }), acc('5', 'Old')];
+  eq('#244 moving: every live account, in order, pct whole and clamped, names checked', M.movingRows(mv, [], 10).rows.map((r) => [r.name.length > 20 ? r.name.length : r.name, r.pct, r.dir, r.account]),
+    [['a.pdf', 41, 'up', '2'], ['b.mp4', 100, 'down', '2'], ['c.txt', 0, 'down', '3'], [M.MOVING_NAME_MAX, 0, 'up', '3']]);
+  eq('#244 moving: capped, with how many more', [M.movingRows(mv, [], 2).rows.length, M.movingRows(mv, [], 2).more], [2, 2]);
+  eq('#244 moving: follows the chosen accounts', M.movingRows(mv, ['3']).rows.map((r) => r.name.slice(0, 5)), ['c.txt', 'xxxxx']);
+  eq('#244 moving: nothing moving', [M.movingRows([acc('5', 'Old')]), M.movingRows(null)], [{ rows: [], more: 0 }, { rows: [], more: 0 }]);
   eq('#83 recent: an account without recent files', M.recentRows(rec, [...two, acc('4', 'Empty')], now, 5, ['4']), []);
   eq('#83 toggle', [M.toggleOnly([], 'a'), M.toggleOnly(['a'], 'b'), M.toggleOnly(['a', 'b'], 'a'), M.toggleOnly(null, 'a')], [['a'], ['a', 'b'], ['b'], ['a']]);
   eq('#83 an account that is gone drops out', M.liveOnly(['2', 'x'], two), ['2']);

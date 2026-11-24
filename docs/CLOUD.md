@@ -465,6 +465,18 @@ The choice stays while the session runs. With one account chosen, **Show in File
 account; with none or several, Show in Files opens `~/Cloud`. `recentRows(…, only)`, `toggleOnly`, `liveOnly` and
 `panelAction` in `sdk/cloudmodel.js` decide it (`cloud_model_test.mjs`).
 
+In development after 0.8.9.5-beta (#244), the panel lists the files moving now under **Moving now**, between the accounts
+and Recent: an arrow (up or down), the file's name, cut with an ellipsis, and its percentage on the end side (the left in
+a right-to-left language), at most four, then "and N more". It follows the accounts chosen for Recent. lord-server's state
+gives each account a `moving` list (`state_json` in `server/src/cloud/cloud.c`): rclone's `core/stats` `transferring[]`
+for that account, at most `CLOUD_MOVING_MAX` (4) entries, uploads first, each `{ name, pct, up }`. `name` is only the last
+part of the path, cleaned by `cloud_moving_name` (`cloud_pure.c`): control characters (C0, DEL, C1), the marks that reorder
+or hide text (U+061C, U+200E/F, U+202A–U+202E, U+2066–U+2069, U+FEFF) and broken or overlong UTF-8 dropped, cut at a
+character boundary to 127 bytes. `pct` is a whole 0–100 (`cloud_moving_pct`); the state compared to decide a push rounds
+it down to steps of 5, so a slow file pushes the state at most 20 times, and pushes stay at most two a second as before.
+The totals (`up`, `down`) still count every file. `movingRows` in `sdk/cloudmodel.js` checks the list again in JS
+(`cloud_model_test.mjs`); `cloud-test` checks the cleaning and the list in the state.
+
 ## 12. Settings → Cloud
 
 In Settings' second group, next to Sharing, glyph `☁`, color `#0a84ff`:

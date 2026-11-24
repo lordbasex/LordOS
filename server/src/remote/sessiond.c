@@ -36,6 +36,7 @@
 #include "../lordlog.h"
 #include "../users/admingroups.h"
 #include "startlogin.h"
+#include "greeterscale.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -962,6 +963,69 @@ static void show_from(const char *buf, int fd) {
     if (!strncmp(buf, "greeter-in ", 11) && shown == 'g') sd_mon_greeter(buf + 11);
 }
 
+/* #242: the login screen's scale, chosen by an administrator in Settings → Displays for one display (greeterscale.h).
+ * The request comes only from the session being shown (from_shown); whose it is, and whether that user is an
+ * administrator, is decided here as root from shown_user (the session lord-sessiond started), never from the message.
+ * Kept in GSCALE_FILE (root's, 0644, in root's /var/lib/lordos); written at most once every 2 s; read back only
+ * when it parses. Two administrators who disagree overwrite each other: the last one wins. */
+static void load_greeter_scale(void) {
+    sd_main_scale[0] = 0;
+    int fd = open(GSCALE_FILE, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (fd < 0) return;
+    struct stat st;
+    char buf[48];
+    ssize_t n = -1;
+    if (!fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 && !(st.st_mode & 022) && st.st_size < (off_t)sizeof buf)
+        n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return;
+    buf[n] = 0;
+    char conn[GSCALE_CONN_MAX + 1];
+    int pct;
+    if (!gscale_parse_file(buf, conn, sizeof conn, &pct)) snprintf(sd_main_scale, sizeof sd_main_scale, GSCALE_ENV "=%s:%d", conn, pct);
+}
+
+/* /var/lib/lordos itself: a directory of root's that no one else can write (mkdir'ed if missing) */
+static int lib_dir_ok(void) {
+    mkdir("/var/lib/lordos", 0755);
+    struct stat st;
+    return !lstat("/var/lib/lordos", &st) && S_ISDIR(st.st_mode) && st.st_uid == 0 && !(st.st_mode & 022);
+}
+
+static void save_greeter_scale(const char *j) {
+    static double last;
+    /* one request every 2 s at most, before anything else: a flood (or a refused user asking again) costs nothing and
+     * logs nothing */
+    double now = rd_now();
+    if (last && now - last < 2) return;
+    last = now;
+    char conn[GSCALE_CONN_MAX + 1];
+    int pct;
+    if (gscale_from_msg(j, conn, sizeof conn, &pct) != 1) { sd_log("login screen scale: a request that isn't valid, ignored"); return; }
+    struct passwd *pw = sd_valid_username(shown_user) ? getpwnam(shown_user) : NULL;
+    if (!pw || !is_admin(pw)) { sd_log("%s asked to change the login screen's scale: not an administrator, refused", shown_user); return; }
+    char env[sizeof sd_main_scale] = "";
+    if (pct) snprintf(env, sizeof env, GSCALE_ENV "=%s:%d", conn, pct);
+    if (!strcmp(env, sd_main_scale)) return;
+    if (!lib_dir_ok()) { sd_log("login screen scale: /var/lib/lordos isn't root's, not saved"); return; }
+    if (!pct) {
+        if (unlink(GSCALE_FILE) && errno != ENOENT) return;
+        sd_main_scale[0] = 0;
+        sd_log("%s set the login screen's scale back to the recommended one", shown_user);
+        return;
+    }
+    char line[48];
+    int len = snprintf(line, sizeof line, "%s %d\n", conn, pct);
+    unlink(GSCALE_FILE ".new");
+    int fd = open(GSCALE_FILE ".new", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0644);
+    if (fd < 0) return;
+    int ok = !fchmod(fd, 0644) && len > 0 && write(fd, line, (size_t)len) == len && !fsync(fd);
+    close(fd);
+    if (!ok || rename(GSCALE_FILE ".new", GSCALE_FILE)) { unlink(GSCALE_FILE ".new"); return; }
+    memcpy(sd_main_scale, env, sizeof env);
+    sd_log("%s set the login screen's scale to %d %% on %s", shown_user, pct, conn);
+}
+
 /* Restart or shut down from the session on the monitor (0.8.1: the crown menu, the Classic start
  * menu; docs/SESSIONS.md, "Restart and Shut Down from a session"). Only "reboot" or "poweroff",
  * through the same closed path as the login screen. Policy, decided here as root: the user on the
@@ -1031,6 +1095,7 @@ static void from_shown(int type, const char *j) {
         jstr(j, "a", a, sizeof a);
         if (!strcmp(a, "power")) { session_power(j); return; }
         if (!strcmp(a, "display")) {
+            if (strstr(j, "\"scaleOn\"")) { save_greeter_scale(j); return; }   /* #242: an administrator only */
             char m[40] = "";
             jstr(j, "main", m, sizeof m);
             save_main_display(m);
@@ -1621,6 +1686,7 @@ int main(int argc, char **argv) {
     load_config();
     load_last_user();
     load_main_display();
+    load_greeter_scale();
     stop_greeters("left over from before this start");
     mkdir("/run/lordos", 0755);
     /* delegated cgroup (Delegate=yes): sessiond moves into the "supervisor" leaf and each session gets

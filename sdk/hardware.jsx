@@ -237,6 +237,20 @@ export function setMainDisplay(conn) {
   if (ok) setTimeout(() => lord.display.save(conn), 0);
   return ok;
 }
+// #242: the login screen's scale. loginScreenScale() → { connector, scale } | null (lord-sessiond's file, read by
+// lord-server); setLoginScreenScale(connector, scale) only asks: lord-sessiond takes it from the session on the monitor
+// and only when its user is an administrator (checked as root), and it applies to every user of the computer. 0 goes
+// back to the recommended scale.
+export function loginScreenScale() {
+  try { return has('display') && lord.display.loginScale ? lord.display.loginScale() : null; } catch (e) { return null; }
+}
+export function setLoginScreenScale(connector, scale) {
+  return has('display') && lord.display.setLoginScale ? lord.display.setLoginScale(String(connector || ''), scale | 0) : false;
+}
+// whether this session's user is an administrator (the same list lord-sessiond checks: lord.users, admingroups.c)
+export function selfIsAdmin() {
+  try { return !!((typeof lord.users !== 'undefined' ? lord.users.list().users : []) || []).find((u) => u.self)?.admin; } catch (e) { return false; }
+}
 export function setCaptureAllDisplays(on) { return has('display') && lord.display.setCaptureAll ? lord.display.setCaptureAll(on) : false; }
 // Settings → Displays, "Rotate automatically": the built-in panel follows the accelerometer (lord-server
 // saves it in displays.json and sends the new list).
