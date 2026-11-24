@@ -19,6 +19,7 @@
 # real home and a tmpfs over the real runtime folder: it never sees the person's files or their session.
 cd "$(dirname "$0")/.." || exit 1
 THEME=../themes/default/theme.bundle.js
+[ -f "${WHONIX_GW:-}" ] && [ -f "${WHONIX_WS:-}" ] && { [ -x build/lord-vm-testpaths ] || make -s build/lord-vm-testpaths >/dev/null 2>&1; }
 [ -x build/lord-server ] && [ -x build/machines ] && [ -x build/lord-vm ] && [ -x build/lord-vm-testpaths ] && [ -f "$THEME" ] || { echo "skipped: needs build/lord-server, machines, lord-vm, lord-vm-testpaths and $THEME"; exit 77; }
 [ -r /dev/kvm ] && command -v qemu-system-x86_64 >/dev/null 2>&1 && command -v unshare >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1 || { echo "skipped: needs KVM, QEMU, unshare and python3"; exit 77; }
 [ -f "${WHONIX_GW:-}" ] && [ -f "${WHONIX_WS:-}" ] || { echo "skipped: needs WHONIX_GW and WHONIX_WS (Whonix's disks with a serial root shell)"; exit 77; }
@@ -116,6 +117,11 @@ qg=$(sed -n 's/.*"qemu_pid": *\([0-9]*\).*/\1/p' "$G/Gateway.lordvm/run.json"); 
 if [ -n "$qg" ] && [ -n "$qw" ]; then
     pair=$(ss -xpH 2>/dev/null | awk -v g="pid=$qg," -v w="pid=$qw," 'index($0, g) || index($0, w)' | awk '$5 == "*" && $7 == "*"' | wc -l)
     ok "host: $pair unnamed sockets between the QEMUs (the link among them)"
+    # the anonymity profile's memory: no transparent huge pages for either QEMU (PR_SET_THP_DISABLE)
+    for q in "$qg" "$qw"; do
+        t=$(sed -n 's/^THP_enabled:[[:space:]]*//p' "/proc/$q/status")
+        [ -z "$t" ] || [ "$t" = 0 ] && ok "QEMU $q: no transparent huge pages (THP_enabled ${t:-not shown})" || bad "QEMU $q has transparent huge pages"
+    done
 fi
 
 # the gateway off: no network for the workstation
