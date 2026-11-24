@@ -1066,7 +1066,8 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   (`webback_platform.c`: our buffer path, dmabuf and shm, input, scale, cursor, clipboard, screen; the IME and drag and
   drop are lord-web's own on both), `mk/web.mk` choosing it, and `build/web-backend-test` passing on both backends
   (Debian 13's 2.48.3 and sid's 2.54.3) plus lord-web in a headless weston on 2.54.3 (shm and dmabuf). **Left:** build
-  and test against the backport packages, then re-test every web app feature on the VM and the PC (keys and IME with a
+  and test against the backport packages (built by `tools/pkg/build-wpewebkit.sh`, published with its source in the LordOS APT
+  repository, [WPEWEBKIT.md](WPEWEBKIT.md); from then on LordOS rebuilds it for every WebKit security release), then re-test every web app feature on the VM and the PC (keys and IME with a
   real input method, touch, the clipboard both ways, drops, the context menu, downloads, notifications, the developer
   tools, fractional scale on a real output), ship lordos-web built on WPEPlatform with the backport, and drop the
   legacy backend once no supported LordOS has 2.48. Watch trixie's wpewebkit security updates until then. With it comes real

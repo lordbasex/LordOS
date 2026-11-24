@@ -42,6 +42,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [WAYLAND.md](WAYLAND.md) | Linux apps (GTK, Qt, browsers) on our Wayland compositor; its point-by-point conformance scores are in [wayland-conformance.json](wayland-conformance.json) (`tools/wl-conformance.mjs`) |
 | [SYNCOBJ-PLAN.md](SYNCOBJ-PLAN.md) | Plan for explicit sync (`linux-drm-syncobj-v1`): approved, built and released in 0.8.9.5 |
 | [WEBAPPS.md](WEBAPPS.md) | Web apps and PWAs: the LordOS Web Runtime (`lord-web`, WPE WebKit), profiles, isolation (0.8.8.8) |
+| [WPEWEBKIT.md](WPEWEBKIT.md) | LordOS's backport of WPE WebKit 2.54 with WPEPlatform to Debian 13: build, verification, source offer, security rebuilds |
 | [WINDOWS.md](WINDOWS.md) | Moving and resizing windows, the Window menu, cursors |
 | [DISPLAYS.md](DISPLAYS.md) | Several displays and HiDPI |
 | [GPU.md](GPU.md) | GPU composition, dmabuf and the CPU path |

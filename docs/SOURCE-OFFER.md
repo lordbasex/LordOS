@@ -61,6 +61,13 @@ Where the source is, by origin:
   `tarball` line of `rpi-mirror.list`; `build-kernel.sh` prepares that folder for every new kernel
   (`out/source/`), and the list then points at its `SOURCE`. The earlier revisions (`-1`, `-2`, 0.8.0 to 0.8.3) are
   the same tree with the script at their tags and the `.config` in their images' `/boot`; they are sent on request.
+  **Debian packages LordOS rebuilds** (a version ending in `~lordos<n>+<m>`; in development: WPE WebKit
+  `2.54.3-1~lordos13+1`, [WPEWEBKIT.md](WPEWEBKIT.md)) are Debian's source packages with LordOS's small changes, built
+  by `tools/pkg/build-wpewebkit.sh`. Debian never published those versions, so snapshot.debian.org doesn't have them:
+  LordOS publishes the exact source package that built the binaries (the `.dsc`, the upstream `.orig.tar.xz` with
+  its signature and LordOS's `.debian.tar.xz`) next to them in the APT repository, and the list points at the `.dsc`
+  in `https://lordos.org/apt/pool/main/source/<letter>/<source>/` (`dget` takes it). Each binary package carries
+  Debian's `debian/copyright` as `/usr/share/doc/<package>/copyright`.
 - **`vendor`**: `lordos-rclone` is rclone's own signed release binary, unmodified (MIT): its source is
   `https://github.com/rclone/rclone` at that version's tag.
 
