@@ -81,6 +81,7 @@ typedef struct {
     uint32_t idx;
     unsigned gen;                       /* generation of its installed nodes */
     int has_domains, seen;
+    int slice;                          /* the session's Machines slice (NP_A_SLICE): the machines' scopes are inside it */
     NpApp app_v;                        /* the last thing written to np_apps */
     uint64_t allowed, denied;           /* kernel counters */
     uint64_t blocked;                   /* bytes the packet filter dropped (np_counts) */
@@ -93,6 +94,7 @@ typedef struct {
     unsigned uid;
     char dir[64];
     int wd, seen;
+    int swd;                            /* the watch on its Machines slice (FW_VM_SLICE), -1 none */
     FwStore *store;
     Scope *sc;
     int nsc, cap;
@@ -357,6 +359,7 @@ static void sync_scope(Session *s, Scope *sc) {
      * just joined a list is cut by the sweep after the change (sync_blk), so the per-packet filter
      * doesn't decide for every app because lists are on (it would cost every packet a decision) */
     if (s->lists) c.app.blk = s->blkset;
+    if (sc->slice) c.app.flags |= NP_A_SLICE;
     sc->app_v = c.app;
     if (bpfs_map_update(G.m_np_apps, &sc->cgid, &c.app, BPF_ANY)) logf_("np_apps: %s", strerror(errno));
     /* the counters' entry exists from the start: the accounting programs only add to existing
@@ -505,7 +508,7 @@ static void sync_union(Session *s) {
      * residual risk (docs/FIREWALL.md). */
     /* nor the Tor gateway's built-in restriction: it is about that machine's passt, and under user@ it would take UDP
      * and the LAN from every process of the user while the gateway runs */
-    for (int k = 0; k < s->nsc; k++) u.flags |= s->sc[k].app_v.flags & ~(NP_R_NO_MIC | NP_R_TOR_UPLINK);
+    for (int k = 0; k < s->nsc; k++) u.flags |= s->sc[k].app_v.flags & ~(NP_R_NO_MIC | NP_R_TOR_UPLINK | NP_A_SLICE);
     if (u.flags) {
         u.trusted = 1;                  /* whatever the union doesn't restrict is allowed without notice */
         u.mode = NP_M_SILENT;
@@ -574,6 +577,60 @@ static int scope_of_app(const Session *s, uint64_t cgid, const char *app) {
     return 0;
 }
 
+/* One scope found in dfd (the session folder or its Machines slice): registered if new, marked seen. -1 out of memory */
+static int see_scope(Session *s, int dfd, const char *name, const char *app, int slice) {
+    uint64_t id = bpfs_cgroup_id(dfd, name);
+    if (!id) return 0;
+    Scope *sc = NULL;
+    for (int i = 0; i < s->nsc; i++) if (s->sc[i].cgid == id && !strcmp(s->sc[i].name, name)) sc = &s->sc[i];
+    if (!sc) {
+        if (s->nsc == s->cap) {
+            int nc = s->cap ? s->cap * 2 : 8;
+            Scope *ns = realloc(s->sc, (size_t)nc * sizeof *ns);
+            if (!ns) return -1;
+            s->sc = ns;
+            s->cap = nc;
+        }
+        sc = &s->sc[s->nsc++];
+        memset(sc, 0, sizeof *sc);
+        snprintf(sc->name, sizeof sc->name, "%s", name);
+        snprintf(sc->app, sizeof sc->app, "%s", app);
+        sc->cgid = id;
+        sc->slice = slice;
+        sc->idx = idx_of(s->uid, app);
+        sync_scope(s, sc);
+    }
+    sc->seen = 1;
+    return 0;
+}
+
+/* (docs/VIRTUALIZATION.md 3.7) The session's Machines slice: the slice itself is lordos:machines (what a machine's
+ * scope gets until it is registered here), and inside it only machines' scopes count (fw_vm_scope); nothing else in
+ * it is an app. lord-sessiond makes it root-owned, so a user process can't add a folder there. */
+static void scan_slice(Session *s, int dfd) {
+    if (see_scope(s, dfd, FW_VM_SLICE, "lordos:machines", 1)) return;
+    int vfd = openat(dfd, FW_VM_SLICE, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (vfd < 0) return;
+    {   /* the same folder gives the same watch back; a slice made again gets a new one */
+        char path[200];
+        snprintf(path, sizeof path, CG_ROOT "/" CG_SERVICE "/%s/" FW_VM_SLICE, s->dir);
+        int wd = inotify_add_watch(G.ifd, path, IN_CREATE | IN_DELETE | IN_ONLYDIR);
+        if (wd >= 0) s->swd = wd;
+    }
+    int d2 = dup(vfd);
+    DIR *d = d2 >= 0 ? fdopendir(d2) : NULL;
+    if (!d && d2 >= 0) close(d2);
+    struct dirent *e;
+    while (d && (e = readdir(d))) {
+        if (e->d_type != DT_DIR || e->d_name[0] == '.' || strlen(e->d_name) >= sizeof s->sc[0].name) continue;
+        char app[FW_APP_MAX];
+        if (fw_vm_scope(e->d_name, NULL, 0) || scope_app(e->d_name, app)) continue;
+        if (see_scope(s, vfd, e->d_name, app, 0)) break;
+    }
+    if (d) closedir(d);
+    close(vfd);
+}
+
 static void scan_session(Session *s) {
     char path[160];
     snprintf(path, sizeof path, CG_ROOT "/" CG_SERVICE "/%s", s->dir);
@@ -582,33 +639,17 @@ static void scan_session(Session *s) {
     DIR *d = fdopendir(dup(dfd));
     for (int i = 0; i < s->nsc; i++) s->sc[i].seen = 0;
     struct dirent *e;
+    int slice = 0;
     while (d && (e = readdir(d))) {
         if (e->d_type != DT_DIR || e->d_name[0] == '.' || strlen(e->d_name) >= sizeof s->sc[0].name) continue;
+        if (!strcmp(e->d_name, FW_VM_SLICE)) { slice = 1; continue; }
         char app[FW_APP_MAX];
         if (scope_app(e->d_name, app)) continue;
-        uint64_t id = bpfs_cgroup_id(dfd, e->d_name);
-        if (!id) continue;
-        Scope *sc = NULL;
-        for (int i = 0; i < s->nsc; i++) if (s->sc[i].cgid == id && !strcmp(s->sc[i].name, e->d_name)) sc = &s->sc[i];
-        if (!sc) {
-            if (s->nsc == s->cap) {
-                int nc = s->cap ? s->cap * 2 : 8;
-                Scope *ns = realloc(s->sc, (size_t)nc * sizeof *ns);
-                if (!ns) break;
-                s->sc = ns;
-                s->cap = nc;
-            }
-            sc = &s->sc[s->nsc++];
-            memset(sc, 0, sizeof *sc);
-            snprintf(sc->name, sizeof sc->name, "%s", e->d_name);
-            snprintf(sc->app, sizeof sc->app, "%s", app);
-            sc->cgid = id;
-            sc->idx = idx_of(s->uid, app);
-            sync_scope(s, sc);
-        }
-        sc->seen = 1;
+        if (see_scope(s, dfd, e->d_name, app, 0)) break;
     }
     if (d) closedir(d);
+    if (slice) scan_slice(s, dfd);
+    else if (s->swd >= 0) { inotify_rm_watch(G.ifd, s->swd); s->swd = -1; }
     close(dfd);
     for (int i = 0; i < s->nsc;) {
         if (s->sc[i].seen) { i++; continue; }
@@ -629,6 +670,7 @@ static void drop_session(int k) {
     drop_user_links(s);
     if (s->user_cg) { bpfs_map_delete(G.m_np_union, &s->user_cg); bpfs_map_delete(G.m_np_counts, &s->user_cg); }
     if (s->wd >= 0) inotify_rm_watch(G.ifd, s->wd);
+    if (s->swd >= 0) inotify_rm_watch(G.ifd, s->swd);
     free(s->sc);
     fw_store_free(s->store);
     G.sess[k] = G.sess[--G.nsess];
@@ -691,6 +733,7 @@ static void scan_all(void) {
             s = &G.sess[G.nsess++];
             memset(s, 0, sizeof *s);
             s->uid = uid;
+            s->swd = -1;
             snprintf(s->dir, sizeof s->dir, "lordos-session-%u", uid);
             char path[160];
             snprintf(path, sizeof path, CG_ROOT "/" CG_SERVICE "/%s", s->dir);

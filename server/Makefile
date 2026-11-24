@@ -257,6 +257,13 @@ build/np-torgw-test: tests/np_torgw_test.c src/netperm/bpfsys.c src/netperm/npco
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/np_torgw_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/nplocal.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
+# tests/np_slice_test.c (docs/VIRTUALIZATION.md 3.7): a machine's scope one level down in the machines' slice is decided
+# by its own entry (NP_A_SLICE), and by the slice's while it isn't registered; as root, on a throwaway cgroup
+test: build/np-slice-test
+build/np-slice-test: tests/np_slice_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h) $(NP_GEN)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/np_slice_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c
+	./$@ || { rm -f $@; exit 1; }
 endif
 test: build/npcompile-test
 build/npcompile-test: tests/npcompile_test.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h)
