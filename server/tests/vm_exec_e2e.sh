@@ -101,19 +101,21 @@ o=$(printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"prot
   '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"list_machines","arguments":{}}}' \
   'not json' "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":$J,\"command\":[\"true\"],\"evil\":1}}}" \
   "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"get_logs\",\"arguments\":{\"name\":$J,\"which\":\"machine\",\"lines\":3}}}" \
-  "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":$JO,\"command\":[\"true\"]}}}" | $B/machines mcp 2>/dev/null)
+  "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":$JO,\"command\":[\"true\"]}}}" \
+  '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"requirements","arguments":{}}}' | $B/machines mcp 2>/dev/null)
 echo "$o" | python3 -I -c '
 import json,sys
 user, name = sys.argv[1], sys.argv[2]
 ls=[json.loads(l) for l in sys.stdin if l.strip()]
 by={m.get("id"):m for m in ls}
 assert by[1]["result"]["protocolVersion"]=="2025-06-18"
-assert len(by[2]["result"]["tools"])==8
+assert len(by[2]["result"]["tools"])==9
+q=json.loads(by[8]["result"]["content"][0]["text"]); assert q["arch"] in ("amd64","arm64") and q["memory_mb"]>0 and set(q["runs"])=={"amd64","arm64"} and q["machines_running"]>=1, q
 r=json.loads(by[3]["result"]["content"][0]["text"]); assert r["stdout"]=="hi\n"+user+"\n" and r["exit"]==0, r
 assert name in [m["name"] for m in json.loads(by[4]["result"]["content"][0]["text"])]
 assert any(m.get("error",{}).get("code")==-32700 for m in ls)
 assert by[5]["error"]["code"]==-32602
 assert not by[6]["result"]["isError"]
 assert by[7]["result"]["isError"]
-' "$U" "$N" && ok "MCP: initialize, tools/list, run_command, list, parse errors, unknown argument, logs, a machine without automation" || bad "mcp: $o"
+' "$U" "$N" && ok "MCP: initialize, tools/list, run_command, list, parse errors, unknown argument, logs, a machine without automation, requirements" || bad "mcp: $o"
 exit $R

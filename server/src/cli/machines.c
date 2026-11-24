@@ -2257,7 +2257,9 @@ static const char MCP_TOOLS[] =
     "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"which\":{\"type\":\"string\",\"enum\":[\"journal\",\"serial\",\"machine\"]},"
     "\"lines\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2000}},\"required\":[\"name\"],\"additionalProperties\":false}},"
     "{\"name\":\"clone_machine\",\"description\":\"Clones a machine that is off into a new one with its own identity.\","
-    "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"new_name\":{\"type\":\"string\"}},\"required\":[\"name\",\"new_name\"],\"additionalProperties\":false}}"
+    "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"new_name\":{\"type\":\"string\"}},\"required\":[\"name\",\"new_name\"],\"additionalProperties\":false}},"
+    "{\"name\":\"requirements\",\"description\":\"What this computer can run (as Machines' What This Computer Can Run says): its architecture, processors and memory, whether KVM is there, which architectures run at full speed or emulated, the memory machines may use now and the free space of the library.\","
+    "\"inputSchema\":{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}}"
     "]}";
 
 /* the arguments' keys must be among `allowed`; each a string unless listed in ints/arrays */
@@ -2320,6 +2322,29 @@ static void mcp_list(const char *id) {
     free(b);
 }
 
+/* requirements: this computer, as the app's "What this computer can run" (5.7) reads it: nothing of a machine, no path */
+static void mcp_requirements(const char *id) {
+    VmHost h;
+    vm_host_probe(&h);
+    load_library();
+    int n = 0;
+    long used = library_path() ? 0 : vm_budget_used_mb(library, "", lordvm_alive, vm_group_session_mb, &n), mx = vm_mem_max_mb(&h);
+    struct statvfs vf;
+    double free_b = !library_path() && !statvfs(library, &vf) ? (double)vf.f_bavail * vf.f_frsize : -1;
+    const char *an = h.arch == VM_ARCH_AMD64 ? "amd64" : h.arch == VM_ARCH_ARM64 ? "arm64" : "other";
+    char *b = NULL;
+    size_t bn = 0;
+    FILE *f = open_memstream(&b, &bn);
+    if (!f) { mcp_error(id, -32603, "out of memory"); return; }
+    fprintf(f, "{\"arch\":\"%s\",\"cpus\":%d,\"memory_mb\":%ld,\"kvm\":%s,", an, h.cpus, h.ram_mb, h.kvm ? "true" : "false");
+    /* each architecture: full speed with KVM on its own kind of computer, else emulated (TCG: slow) */
+    fprintf(f, "\"runs\":{\"amd64\":\"%s\",\"arm64\":\"%s\"},", h.kvm && h.arch == VM_ARCH_AMD64 ? "kvm" : "emulated", h.kvm && h.arch == VM_ARCH_ARM64 ? "kvm" : "emulated");
+    fprintf(f, "\"machines_memory_max_mb\":%ld,\"machines_memory_used_mb\":%ld,\"machines_running\":%d,\"library_free_bytes\":%.0f}", mx, used, n, free_b);
+    fclose(f);
+    mcp_result(id, (const uint8_t *)b, bn, 0);
+    free(b);
+}
+
 static void mcp_run(const char *id, Machine *x, const JVal *args) {
     const JVal *cmd = json_get(args, "command");
     const char *av[VMX_ARGC_MAX + 1];
@@ -2366,6 +2391,7 @@ static void mcp_call(const char *id, const JVal *params) {
     static const char *const K_NAME[] = { "name", NULL }, *const K_WAIT[] = { "name", "timeout", NULL }, *const K_RUN[] = { "name", "command", "input", "timeout", NULL },
                              *const K_LOGS[] = { "name", "which", "lines", NULL }, *const K_CLONE[] = { "name", "new_name", NULL }, *const K_NONE[] = { NULL };
     if (!strcmp(tool, "list_machines")) { if (!args_ok(args, K_NONE)) { mcp_error(id, -32602, "no arguments"); return; } mcp_list(id); return; }
+    if (!strcmp(tool, "requirements")) { if (!args_ok(args, K_NONE)) { mcp_error(id, -32602, "no arguments"); return; } mcp_requirements(id); return; }
     const char *const *allowed = !strcmp(tool, "wait_until_ready") ? K_WAIT : !strcmp(tool, "run_command") ? K_RUN : !strcmp(tool, "get_logs") ? K_LOGS
                                : !strcmp(tool, "clone_machine") ? K_CLONE : K_NAME;
     if (strcmp(tool, "machine_status") && strcmp(tool, "start_machine") && strcmp(tool, "stop_machine") && strcmp(tool, "wait_until_ready") &&
