@@ -493,6 +493,8 @@
   "comp.lanHint": "Bestanden → Netwerk: computers en gedeelde mappen op het lokale netwerk.",
   "comp.machines": "Machines",
   "comp.machinesHint": "Machines: het netwerkverkeer van de virtuele machines die je draait, de systemen die je downloadt in de assistent Nieuwe machine, en hun controlesomlijsten. Een regel voor Machines geldt voor allemaal.",
+  "comp.torGateway": "Tor-gateway",
+  "comp.torGatewayHint": "De Tor-gateway van een machinegroep: hij mag alleen uitgaande TCP-verbindingen naar het internet openen. Geen UDP, geen DNS, niets op je lokale netwerk of op deze computer, en geen inkomende verbindingen. Je regels kunnen alleen nog meer afnemen.",
   "net.shareHolder": "{app} deelt het scherm van deze sessie.",
   "gpu.title": "GPU",
   "gpu.none": "Deze computer heeft geen grafische processor die LordOS kan lezen: het tekenen gebeurt door de processor.",

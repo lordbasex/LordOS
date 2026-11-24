@@ -91,10 +91,22 @@ int fw_component_scope(const char *scope, char *app, size_t n) {
     return w < 0 || (size_t)w >= n ? -1 : 0;
 }
 
+int fw_vm_scope_tor(const char *scope) {
+    if (fw_vm_scope(scope, NULL, 0)) return -1;
+    return !strncmp(scope, FW_VMTOR_SCOPE_PREFIX, sizeof FW_VMTOR_SCOPE_PREFIX - 1);
+}
+
+uint32_t fw_builtin_restricted(const char *app) { return app && !strcmp(app, FW_APP_TOR_GATEWAY) ? FW_R_TOR_UPLINK : 0; }
+
+int fw_tor_uplink_denies(FwDir dir, FwProto proto, int lan, unsigned port) {
+    return dir != FW_OUT || proto != FW_PROTO_TCP || lan != 0 || port == 53 || port == 853;
+}
+
 int fw_vm_scope(const char *scope, char *id, size_t n) {
-    static const size_t pl = sizeof FW_VM_SCOPE_PREFIX - 1;
+    size_t pl = sizeof FW_VM_SCOPE_PREFIX - 1;
     size_t l = scope ? strnlen(scope, 128) : 0;
-    if (l <= pl + 6 || l >= 128 || strncmp(scope, FW_VM_SCOPE_PREFIX, pl) || strcmp(scope + l - 6, ".scope")) return -1;
+    if (l > pl + 4 && !strncmp(scope, FW_VMTOR_SCOPE_PREFIX, sizeof FW_VMTOR_SCOPE_PREFIX - 1)) pl = sizeof FW_VMTOR_SCOPE_PREFIX - 1;
+    if (l <= pl + 6 || l >= 128 || strncmp(scope, FW_VM_SCOPE_PREFIX, sizeof FW_VM_SCOPE_PREFIX - 1) || strcmp(scope + l - 6, ".scope")) return -1;
     size_t il = l - pl - 6;
     if (il > 36) return -1;
     for (size_t i = 0; i < il; i++) {
@@ -114,7 +126,7 @@ int fw_scope_app(const char *scope, char *app, size_t n) {
     if (!l || l >= FW_APP_MAX || !app || !n) return -1;
     if (!strncmp(scope, "lordos-net-", 11)) return fw_component_scope(scope, app, n);
     if (!fw_vm_scope(scope, NULL, 0)) {
-        int w = snprintf(app, n, "lordos:machines");
+        int w = snprintf(app, n, "%s", fw_vm_scope_tor(scope) == 1 ? FW_APP_TOR_GATEWAY : "lordos:machines");
         return w < 0 || (size_t)w >= n ? -1 : 0;
     }
     if (l < 18 || strncmp(scope, "app-lordos-", 11) || strcmp(scope + l - 6, ".scope")) return -1;
@@ -722,7 +734,9 @@ FwDecision fw_decide(FwStore *s, const FwQuery *q) {
     /* 1. restrictions */
     uint32_t rf = a ? a->restricted : 0;
     uint32_t hit = 0;
+    rf |= fw_builtin_restricted(c);
     if (rf & FW_R_NO_NETWORK) hit = FW_R_NO_NETWORK;
+    else if ((rf & FW_R_TOR_UPLINK) && fw_tor_uplink_denies(q->dir, q->proto, lan, q->port)) hit = FW_R_TOR_UPLINK;
     else if (q->dir == FW_IN && (rf & FW_R_NO_INCOMING)) hit = FW_R_NO_INCOMING;
     else if ((rf & FW_R_NO_INTERNET) && lan != 1) hit = FW_R_NO_INTERNET;   /* unknown: internet */
     else if ((rf & FW_R_NO_LAN) && lan == 1) hit = FW_R_NO_LAN;

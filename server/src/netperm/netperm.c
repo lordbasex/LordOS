@@ -27,6 +27,7 @@
 #include "netperm/npcompile.h"
 #include "netperm/npdiag.h"
 #include "netperm/npdns.h"
+#include "netperm/nplocal.h"
 #include "netperm/npload.h"
 #include "netperm/npproto.h"
 #include "fw/fwmap.h"
@@ -40,6 +41,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/bpf.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 #include <netinet/in.h>
 #include <pwd.h>
 #include <signal.h>
@@ -128,7 +131,7 @@ static struct {
     int bpf_ok;
     char bpf_err[200];                  /* a code line (errcode.h): the firewall page shows it translated */
     int m_np_cfg, m_np_apps, m_np_union, m_np_lpm4, m_np_lpm6, m_np_seen, m_np_counts, m_np_events, m_np_snd, m_np_flows, m_np_bound;
-    int m_np_blk4, m_np_blk6, m_np_sysc;
+    int m_np_blk4, m_np_blk6, m_np_sysc, m_np_local;
     uint32_t next_blkset;
     long long blk_pass;
     struct { uint64_t cgid; int links[4], nlinks; uint64_t rx, tx; double rrx, rtx; } sys[3];   /* dns, time, network */
@@ -148,6 +151,9 @@ static struct {
     BpfRing ring;
     int cgfd;
     int ep, lfd, ifd, tfd, root_wd, dns_fd;
+    int addr_fd;                        /* rtnetlink, this computer's address changes (np_local) */
+    NpLocalKey local[NP_MAX_LOCAL];     /* what np_local holds */
+    int nlocal;
     Session sess[MAX_SESS];
     int nsess;
     Client cl[MAX_CLIENTS];
@@ -272,6 +278,7 @@ static int map_fd(const char *name) {
     if (!strcmp(name, "np_blk4")) return G.m_np_blk4;
     if (!strcmp(name, "np_blk6")) return G.m_np_blk6;
     if (!strcmp(name, "np_sysc")) return G.m_np_sysc;
+    if (!strcmp(name, "np_local")) return G.m_np_local;
     return -1;
 }
 #endif
@@ -495,7 +502,9 @@ static void sync_union(Session *s) {
      * it back). A process escaped there is held by the PipeWire guard instead (its clients count
      * as restricted while restricted apps run); reading the card directly from there is the
      * residual risk (docs/FIREWALL.md). */
-    for (int k = 0; k < s->nsc; k++) u.flags |= s->sc[k].app_v.flags & ~NP_R_NO_MIC;
+    /* nor the Tor gateway's built-in restriction: it is about that machine's passt, and under user@ it would take UDP
+     * and the LAN from every process of the user while the gateway runs */
+    for (int k = 0; k < s->nsc; k++) u.flags |= s->sc[k].app_v.flags & ~(NP_R_NO_MIC | NP_R_TOR_UPLINK);
     if (u.flags) {
         u.trusted = 1;                  /* whatever the union doesn't restrict is allowed without notice */
         u.mode = NP_M_SILENT;
@@ -1445,7 +1454,7 @@ static int bpf_setup(void) {
 #define NP_MKMAP(n, t, k, v, m, f) G.m_##n = bpfs_map_create(t, k, v, m, f, #n);
     NP_MAPS(NP_MKMAP)
 #undef NP_MKMAP
-    if (G.m_np_blk4 < 0 || G.m_np_blk6 < 0 || G.m_np_sysc < 0 || G.m_np_bound < 0 || G.m_np_flows < 0 || G.m_np_snd < 0 || G.m_np_cfg < 0 || G.m_np_apps < 0 || G.m_np_union < 0 || G.m_np_lpm4 < 0 || G.m_np_lpm6 < 0 || G.m_np_seen < 0 || G.m_np_counts < 0 || G.m_np_events < 0) {
+    if (G.m_np_local < 0 || G.m_np_blk4 < 0 || G.m_np_blk6 < 0 || G.m_np_sysc < 0 || G.m_np_bound < 0 || G.m_np_flows < 0 || G.m_np_snd < 0 || G.m_np_cfg < 0 || G.m_np_apps < 0 || G.m_np_union < 0 || G.m_np_lpm4 < 0 || G.m_np_lpm6 < 0 || G.m_np_seen < 0 || G.m_np_counts < 0 || G.m_np_events < 0) {
         lerr_set(G.bpf_err, sizeof G.bpf_err, "fw.bpfMaps", "errno", lerr_errno(errno), NULL);
         return -1;
     }
@@ -1530,6 +1539,37 @@ static void attach_service(void) {
     logf_("%d BPF programs attached to " CG_SERVICE " (scopes at level %d)", G.nlinks, SCOPE_LEVEL);
 }
 
+/* ---- this computer's own addresses (np_local) --------------------------------------------------
+ *
+ * (Whonix groups, docs/FIREWALL.md "The Tor gateway") The Tor gateway's built-in restriction never lets it reach this
+ * computer, whatever range its address is in (a public IPv4 or a global IPv6 on an interface): the addresses of every
+ * interface, read with an RTM_GETADDR dump over rtnetlink (NETLINK_ROUTE: no AF_INET socket), go into np_local at start,
+ * on every address change (RTMGRP_*_IFADDR) and with the 5-second rescan. Only addresses are taken from the answer. */
+
+static void sync_local(void) {
+    if (!G.bpf_ok) return;
+    static NpLocalKey now[NP_MAX_LOCAL];
+    int n = np_host_addrs(now, NP_MAX_LOCAL);
+    if (n < 0) { logf_("this computer's addresses: rtnetlink: %s", strerror(errno)); return; }
+    uint8_t one = 1;
+    for (int i = 0; i < n; i++) bpfs_map_update(G.m_np_local, &now[i], &one, BPF_ANY);
+    for (int i = 0; i < G.nlocal; i++) {
+        int keep = 0;
+        for (int k = 0; k < n && !keep; k++) keep = !memcmp(&now[k], &G.local[i], sizeof now[k]);
+        if (!keep) bpfs_map_delete(G.m_np_local, &G.local[i]);
+    }
+    memcpy(G.local, now, sizeof now[0] * (size_t)n);
+    G.nlocal = n;
+}
+
+static int addr_watch_open(void) {
+    int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK, NETLINK_ROUTE);
+    if (fd < 0) return -1;
+    struct sockaddr_nl sa = { .nl_family = AF_NETLINK, .nl_groups = RTMGRP_IPV4_IFADDR | RTMGRP_IPV6_IFADDR };
+    if (bind(fd, (struct sockaddr *)&sa, sizeof sa)) { close(fd); return -1; }
+    return fd;
+}
+
 /* ---- main ------------------------------------------------------------------------------------ */
 
 static volatile sig_atomic_t quit;
@@ -1603,6 +1643,9 @@ int main(int argc, char **argv) {
     G.sys_wd = inotify_add_watch(G.ifd, CG_ROOT "/system.slice", IN_CREATE | IN_ONLYDIR);
     attach_service();
     if (G.root_wd < 0) G.root_wd = inotify_add_watch(G.ifd, CG_ROOT "/" CG_SERVICE, IN_CREATE | IN_DELETE | IN_ONLYDIR);
+    G.addr_fd = G.bpf_ok ? addr_watch_open() : -1;
+    if (G.addr_fd >= 0) { ev.data.u64 = 6; epoll_ctl(G.ep, EPOLL_CTL_ADD, G.addr_fd, &ev); }
+    sync_local();
     scan_all();
     sweep((unsigned)-1);                /* what was opened while this service wasn't running, and the servers' ports */
     watch_dns();
@@ -1626,7 +1669,7 @@ int main(int argc, char **argv) {
                 attach_service();
                 sync_system();
                 if (G.dns) { npdns_tick(G.dns); watch_dns(); }
-                if (G.tick % 5 == 0) scan_all();    /* in case an inotify notice was lost */
+                if (G.tick % 5 == 0) { scan_all(); sync_local(); }   /* in case an inotify or address notice was lost */
                 if (G.tick % 30 == 0) {
                     dnsmap_expire(G.names, mono());
                     for (int s = 0; s < G.nsess; s++) if (G.sess[s].lists || G.sess[s].blkin.n) sync_blk(&G.sess[s]);
@@ -1637,6 +1680,11 @@ int main(int argc, char **argv) {
                 push_counts();
             } else if (t == 4) bpfs_ring_drain(&G.ring, on_event, NULL);
             else if (t == 5) { if (G.dns) npdns_ready(G.dns); watch_dns(); }
+            else if (t == 6) {
+                char buf[8192];
+                while (recv(G.addr_fd, buf, sizeof buf, 0) > 0) {}
+                sync_local();                       /* an address came or went: dump them all again */
+            }
             else if (t >= 1000) {
                 int fd = (int)(t - 1000);
                 for (int k = 0; k < G.ncl; k++) {

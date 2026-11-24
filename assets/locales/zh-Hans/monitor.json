@@ -478,6 +478,8 @@
   "comp.lanHint": "文件 → 网络：本地网络上的电脑和共享。",
   "comp.machines": "虚拟机",
   "comp.machinesHint": "虚拟机：你运行的虚拟机的网络流量、你在“新建虚拟机”助理中下载的系统及其校验和列表。针对“虚拟机”的规则适用于所有这些。",
+  "comp.torGateway": "Tor 网关",
+  "comp.torGatewayHint": "机器组的 Tor 网关：只能打开通往互联网的出站 TCP 连接。不能使用 UDP 和 DNS，无法访问你的本地网络或这台电脑，也没有入站连接。你的规则只能进一步限制它。",
   "net.shareHolder": "{app} 正在共享此会话的屏幕。",
   "gpu.title": "GPU",
   "gpu.none": "这台电脑没有 LordOS 可读取的图形处理器：绘制由处理器完成。",

@@ -221,7 +221,7 @@ ALL += build/lord-claude-status
 # builds and the service warns that it has no BPF. No libbpf or bcc.
 .DEFAULT_GOAL := all
 BPF ?= $(shell command -v clang >/dev/null 2>&1 && echo 1 || echo 0)
-NP_SRC := src/netperm/netperm.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/npdiag.c \
+NP_SRC := src/netperm/netperm.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/npdiag.c src/netperm/nplocal.c \
           src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/sec/json.c
 ALL += build/lord-netperm
 ifeq ($(BPF),1)
@@ -248,6 +248,14 @@ test: build/npverify-test
 build/npverify-test: tests/npverify_test.c src/netperm/bpfsys.c $(wildcard src/netperm/*.h) $(NP_GEN)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/npverify_test.c src/netperm/bpfsys.c
+	./$@ || { rm -f $@; exit 1; }
+# tests/np_torgw_test.c (Whonix groups): the Tor gateway's built-in restriction in the real kernel, as root, on a
+# throwaway cgroup of its own (never lordos.service or user@); without root it says it skipped. `run` holds the policy
+# around a command (tests/vm_gateway_fw.sh).
+test: build/np-torgw-test
+build/np-torgw-test: tests/np_torgw_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/nplocal.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h) $(NP_GEN)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/np_torgw_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/nplocal.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
 endif
 test: build/npcompile-test

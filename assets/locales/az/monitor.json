@@ -493,6 +493,8 @@
   "comp.lanHint": "Fayllar → Şəbəkə: yerli şəbəkədəki kompüterlər və paylaşımlar.",
   "comp.machines": "Virtual maşınlar",
   "comp.machinesHint": "Virtual maşınlar: işlətdiyiniz virtual maşınların şəbəkə trafiki, Yeni maşın köməkçisində endirdiyiniz sistemlər və onların yoxlama cəmi siyahıları. Virtual maşınlar üçün qayda hamısına tətbiq olunur.",
+  "comp.torGateway": "Tor şlüzü",
+  "comp.torGatewayHint": "Maşın qrupunun Tor şlüzü: yalnız internetə çıxan TCP bağlantıları aça bilər. UDP yox, DNS yox, yerli şəbəkənizdə və bu kompüterdə heç nə yox, gələn bağlantı da yox. Qaydalarınız yalnız daha çoxunu qadağan edə bilər.",
   "net.shareHolder": "{app} bu seansın ekranını paylaşır.",
   "gpu.title": "GPU",
   "gpu.none": "Bu kompüterdə LordOS-un oxuya biləcəyi qrafik prosessor yoxdur: təsviri prosessor çəkir.",

@@ -24,6 +24,8 @@
  *   np_blk6    LPM    (list set, IPv6/n) → u8         the addresses the resolver gave for their domains (NpApp.blk)
  *   np_sysc    HASH   cgroup id → NpCount            (0.8.5) the essential system services' bytes (name
  *                                                     resolution, time, the network service), counted only
+ *   np_local   HASH   NpLocalKey → u8                (Whonix groups) this computer's own addresses, for the
+ *                                                     Tor gateway's built-in restriction (NP_R_TOR_UPLINK)
  *
  * Besides the network, the same per-app policy carries the device restrictions (docs/FIREWALL.md,
  * "Linux apps"): "no camera", "no USB" and "no screen capture" (/dev/fb*) (cgroup/dev, by device
@@ -71,8 +73,15 @@ typedef uint64_t np_u64;
 #define NP_R_NO_SCREEN    (1u << 6)
 #define NP_R_NO_USB       (1u << 7)
 #define NP_R_NO_BLUETOOTH (1u << 8)
-#define NP_R_NET_MASK     (NP_R_NO_INTERNET | NP_R_NO_LAN | NP_R_NO_NETWORK | NP_R_NO_INCOMING)
+#define NP_R_TOR_UPLINK   (1u << 12)   /* FW_R_TOR_UPLINK: built in for a machine group's Tor gateway, never from firewall.json */
+#define NP_R_NET_MASK     (NP_R_NO_INTERNET | NP_R_NO_LAN | NP_R_NO_NETWORK | NP_R_NO_INCOMING | NP_R_TOR_UPLINK)
 #define NP_R_DEV_MASK     (NP_R_NO_CAMERA | NP_R_NO_MIC | NP_R_NO_SCREEN | NP_R_NO_USB | NP_R_NO_BLUETOOTH)
+
+/* (Whonix groups) np_local: this computer's own interface addresses (lord-netperm reads them with rtnetlink), which
+ * FW_R_TOR_UPLINK treats as LAN whatever their range: the gateway never reaches the host, not even its public
+ * address. Key: family (4 or 6) and the address (IPv4 in the first 4 bytes). */
+typedef struct { np_u8 fam; np_u8 pad[3]; np_u8 addr[16]; } NpLocalKey;
+#define NP_MAX_LOCAL      256
 
 /* Character device majors (Documentation/admin-guide/devices.txt; hidraw is dynamic and comes
  * from /proc/devices, in NpCfg). */
@@ -255,6 +264,8 @@ NP_INLINE void np_decide(const NpApp *a, const NpList *l, int dir, int proto, in
     r->verdict = NP_V_DENY; r->reason = NP_BY_RESTRICTED; r->record = 1; r->rule_id = 0; r->flag = 0;
     np_u32 f = a->flags;
     if (f & NP_R_NO_NETWORK) { r->flag = NP_R_NO_NETWORK; return; }
+    /* the Tor gateway (fw_tor_uplink_denies): outgoing TCP to the internet only, never to port 53 or 853 */
+    if ((f & NP_R_TOR_UPLINK) && (dir != NP_D_OUT || proto != NP_P_TCP || lan != 0 || port == 53 || port == 853)) { r->flag = NP_R_TOR_UPLINK; return; }
     if (dir == NP_D_IN && (f & NP_R_NO_INCOMING)) { r->flag = NP_R_NO_INCOMING; return; }
     if ((f & NP_R_NO_INTERNET) && lan != 1) { r->flag = NP_R_NO_INTERNET; return; }
     if ((f & NP_R_NO_LAN) && lan == 1) { r->flag = NP_R_NO_LAN; return; }

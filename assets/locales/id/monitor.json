@@ -478,6 +478,8 @@
   "comp.lanHint": "Berkas → Jaringan: komputer dan folder bersama di jaringan lokal.",
   "comp.machines": "Mesin Virtual",
   "comp.machinesHint": "Mesin Virtual: lalu lintas jaringan mesin virtual yang Anda jalankan, sistem yang Anda unduh di asisten Mesin Baru, dan daftar checksum-nya. Aturan untuk Mesin Virtual berlaku untuk semuanya.",
+  "comp.torGateway": "Gateway Tor",
+  "comp.torGatewayHint": "Gateway Tor dari sebuah grup mesin: hanya boleh membuka koneksi TCP keluar ke internet. Tanpa UDP, tanpa DNS, tidak ada apa pun di jaringan lokal Anda atau di komputer ini, dan tanpa koneksi masuk. Aturan Anda hanya dapat membatasi lebih jauh.",
   "net.shareHolder": "{app} sedang membagikan layar sesi ini.",
   "gpu.title": "GPU",
   "gpu.none": "Komputer ini tidak memiliki prosesor grafis yang dapat dibaca LordOS: penggambaran dilakukan oleh prosesor.",

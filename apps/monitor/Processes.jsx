@@ -58,7 +58,7 @@ const isAdmin = () => {
 const myUid = (procs) => procs?.list.find((p) => p.self)?.uid;
 const procLabel = (tr, p) => (p.app === 'lordos' ? tr('monitor.lordos') : isolatedAppOf(p) ? appName(isolatedAppOf(p)) : p.name);
 // a machine's name (Machines' list), else "Machines"
-const machineOf = (app) => /^desktop:lordos-vm-(.+)$/.exec(app || '')?.[1] || null;
+const machineOf = (app) => /^desktop:lordos-vm-(?:tor-)?(.+)$/.exec(app || '')?.[1] || null;
 const machineName = (id) => (id ? monitor.machineNames([id])[id] || null : null);
 const groupLabel = (tr, g) => {
   if (g.kind === 'kernel') return tr('monitor.group.kernel');

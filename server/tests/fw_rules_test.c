@@ -84,6 +84,14 @@ static void test_canon(void) {
           !strcmp(vid, "0f8e2a6c-1b2d-4c3e-9a7b-112233445566"));
     CHECK(!fw_scope_app("app-lordos-lordos-vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope", o, sizeof o) && !strcmp(o, "lordos:machines"));
     CHECK(!fw_scope_app("lordos-net-machines.scope", o, sizeof o) && !strcmp(o, "lordos:machines"));
+    /* (Whonix groups) a group's Tor gateway: its own app, its machine's id */
+    CHECK(!fw_vm_scope("app-lordos-lordos-vm-tor-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope", vid, sizeof vid) &&
+          !strcmp(vid, "0f8e2a6c-1b2d-4c3e-9a7b-112233445566"));
+    CHECK(fw_vm_scope_tor("app-lordos-lordos-vm-tor-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope") == 1);
+    CHECK(fw_vm_scope_tor("app-lordos-lordos-vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope") == 0);
+    CHECK(fw_vm_scope_tor("app-lordos-firefox.scope") == -1 && fw_vm_scope_tor("app-lordos-lordos-vm-tor-.scope") == -1);
+    CHECK(!fw_scope_app("app-lordos-lordos-vm-tor-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope", o, sizeof o) && !strcmp(o, FW_APP_TOR_GATEWAY));
+    CHECK(fw_scope_app("app-lordos-lordos-vm-tor-x.scope", o, sizeof o) == -1 && fw_scope_app("app-lordos-lordos-vm-torx-0f8e.scope", o, sizeof o) == -1);
     CHECK(!fw_scope_app("lordos-net-mail.scope", o, sizeof o) && !strcmp(o, "lordos:mail"));
     CHECK(!fw_scope_app("app-lordos-firefox.scope", o, sizeof o) && !strcmp(o, "desktop:firefox"));
     CHECK(!fw_scope_app("app-lordos-lpk-notes.scope", o, sizeof o) && !strcmp(o, "lpk:notes"));

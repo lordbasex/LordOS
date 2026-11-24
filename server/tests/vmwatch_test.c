@@ -17,14 +17,15 @@ int main(void) {
     char sc[256];
 
     /* where the scope must be */
-    CHECK(!vmwatch_scope_path(self, id, sc, sizeof sc) && !strcmp(sc, "/lordos.slice/lordos-session-1000/app-lordos-lordos-vm-6f1c0d2e-1111-4222-8333-444455556666.scope"), "scope: %s", sc);
-    CHECK(vmwatch_scope_path("/user.slice/session-3.scope", id, sc, sizeof sc) && !sc[0], "not a LordOS session: unknown");
-    CHECK(vmwatch_scope_path("/x/notasession/server", id, sc, sizeof sc) && !sc[0], "a server leaf outside a session");
-    CHECK(vmwatch_scope_path(self, "../../evil", sc, sizeof sc) && !sc[0], "an id with a path in it");
-    CHECK(vmwatch_scope_path(self, "", sc, sizeof sc) && !sc[0], "no id");
+    CHECK(!vmwatch_scope_path(self, id, 0, sc, sizeof sc) && !strcmp(sc, "/lordos.slice/lordos-session-1000/app-lordos-lordos-vm-6f1c0d2e-1111-4222-8333-444455556666.scope"), "scope: %s", sc);
+    CHECK(!vmwatch_scope_path(self, id, 1, sc, sizeof sc) && !strcmp(sc, "/lordos.slice/lordos-session-1000/app-lordos-lordos-vm-tor-6f1c0d2e-1111-4222-8333-444455556666.scope"), "a Tor gateway's scope: %s", sc);
+    CHECK(vmwatch_scope_path("/user.slice/session-3.scope", id, 0, sc, sizeof sc) && !sc[0], "not a LordOS session: unknown");
+    CHECK(vmwatch_scope_path("/x/notasession/server", id, 0, sc, sizeof sc) && !sc[0], "a server leaf outside a session");
+    CHECK(vmwatch_scope_path(self, "../../evil", 0, sc, sizeof sc) && !sc[0], "an id with a path in it");
+    CHECK(vmwatch_scope_path(self, "", 0, sc, sizeof sc) && !sc[0], "no id");
     char tiny[16];
-    CHECK(vmwatch_scope_path(self, id, tiny, sizeof tiny) && !tiny[0], "too small: nothing, not a cut path");
-    vmwatch_scope_path(self, id, sc, sizeof sc);
+    CHECK(vmwatch_scope_path(self, id, 0, tiny, sizeof tiny) && !tiny[0], "too small: nothing, not a cut path");
+    vmwatch_scope_path(self, id, 0, sc, sizeof sc);
 
     /* in it: exactly, or a leaf below */
     char t[512];

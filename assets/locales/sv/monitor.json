@@ -493,6 +493,8 @@
   "comp.lanHint": "Filer → Nätverk: datorer och delade mappar på det lokala nätverket.",
   "comp.machines": "Maskiner",
   "comp.machinesHint": "Maskiner: nätverkstrafiken från de virtuella maskiner du kör, systemen du laddar ner i assistenten Ny maskin och deras kontrollsummelistor. En regel för Maskiner gäller för dem alla.",
+  "comp.torGateway": "Tor-gateway",
+  "comp.torGatewayHint": "Tor-gatewayen i en maskingrupp: den får bara öppna utgående TCP-anslutningar till internet. Ingen UDP, ingen DNS, inget i ditt lokala nätverk eller på den här datorn och inga inkommande anslutningar. Dina regler kan bara ta bort mer.",
   "net.shareHolder": "{app} delar den här sessionens skärm.",
   "gpu.title": "GPU",
   "gpu.none": "Den här datorn har ingen grafikprocessor som LordOS kan läsa: ritningen görs av processorn.",

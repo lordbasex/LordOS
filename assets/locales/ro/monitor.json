@@ -508,6 +508,8 @@
   "comp.lanHint": "Fișiere → Rețea: computere și partajări din rețeaua locală.",
   "comp.machines": "Mașini",
   "comp.machinesHint": "Mașini: traficul de rețea al mașinilor virtuale pe care le rulați, al sistemelor descărcate în asistentul Mașină nouă și al listelor lor de sume de control. O regulă pentru Mașini se aplică tuturor.",
+  "comp.torGateway": "Gateway Tor",
+  "comp.torGatewayHint": "Gateway-ul Tor al unui grup de mașini: poate deschide doar conexiuni TCP de ieșire către internet. Fără UDP, fără DNS, nimic în rețeaua locală sau pe acest computer și nicio conexiune de intrare. Regulile tale pot doar să restrângă mai mult.",
   "net.shareHolder": "{app} partajează ecranul acestei sesiuni.",
   "gpu.title": "GPU",
   "gpu.none": "Acest computer nu are un procesor grafic pe care LordOS să-l poată citi: desenarea este făcută de procesor.",

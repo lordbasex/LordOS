@@ -1334,7 +1334,7 @@ static int vm_exe_is(long pid, const char *name) {
 
 /* where lord-sessiond puts a machine's scope: beside lord-server's own leaf (".../lordos-session-<uid>/server"), the
  * exact cgroup path; "" outside a LordOS session */
-static void vm_scope_path(const char *id, char *out, size_t n) { vmwatch_scope_path(cgroup_self(), id, out, n); }
+static void vm_scope_path(const char *id, int tor, char *out, size_t n) { vmwatch_scope_path(cgroup_self(), id, tor, out, n); }
 
 /* the process's cgroup (v2) is exactly `scope` or below it */
 static int vm_in_cgroup(long pid, const char *scope) {
@@ -1401,7 +1401,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     static VmMachine sm;
     char serr[128], scope[PATH_MAX] = "";
     int have_m = !vm_machine_load(dir, &sm, serr, sizeof serr) && sm.id[0];
-    if (have_m) vm_scope_path(sm.id, scope, sizeof scope);
+    if (have_m) vm_scope_path(sm.id, sm.uplink_tor, scope, sizeof scope);
     if (qpid > 0 && have_m) {
         VmLive lv;
         int ok = !vm_live(sm.id, &lv);

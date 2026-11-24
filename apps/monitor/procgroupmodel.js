@@ -261,7 +261,7 @@ export function originOf(p, facts = {}) {
   let m;
   if ((m = /^lpk:(.+)$/.exec(app))) return { kind: 'lordos', id: m[1], signer: facts.signer?.(m[1]) || null, updated };
   if ((m = /^flatpak:(.+)$/.exec(app))) return { kind: 'flatpak', id: m[1], updated };
-  if ((m = /^desktop:lordos-vm-(.+)$/.exec(app))) return { kind: 'machine', id: m[1], name: facts.machine?.(m[1]) || null, updated };
+  if ((m = /^desktop:lordos-vm-(?:tor-)?(.+)$/.exec(app))) return { kind: 'machine', id: m[1], name: facts.machine?.(m[1]) || null, updated };
   if ((m = /^desktop:lordos-web-(.+)$/.exec(app))) return { kind: 'webapp', id: m[1], site: facts.webapp?.(m[1]) || null, updated };
   const exe = exePath(p.exe);
   if (!exe) return null;

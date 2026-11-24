@@ -1262,7 +1262,9 @@ static int qemu_procs_fd = -1, passt_procs_fd = -1, vfs_procs_fd = -1, tpm_procs
 /* the machine's scope, then leaves inside it when the scope is ours to divide (3.7) */
 static void setup_cgroups(void) {
     char scope[96];
-    snprintf(scope, sizeof scope, "app-lordos-lordos-vm-%s.scope", S.m.id);
+    /* a machine group's Tor gateway has a scope of its own: the firewall app lordos:tor-gateway, whose built-in
+     * restriction lets its passt make only outgoing TCP to the internet (docs/FIREWALL.md, "The Tor gateway") */
+    snprintf(scope, sizeof scope, "app-lordos-lordos-vm-%s%s.scope", S.m.uplink_tor ? "tor-" : "", S.m.id);
     long limit = vm_mem_limit_mb(&S.m);
     int cpu = S.m.vcpus * 100 + 50;
     if (cpu > 6400) cpu = 6400;
