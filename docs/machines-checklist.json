@@ -293,11 +293,11 @@
   },
   {
    "area": "C",
-   "item": "Library: toolbar, chips, grid or list, sort, search, status line, live card (5.1)",
+   "item": "Library: toolbar, chips, grid or list, sort, search, status line, live card, Templates (5.1)",
    "status": "✅",
-   "pct": 95,
-   "file": "`library.jsx` (`Lights`), `model.js` (`skeletonPlan`, `cardLights`); `vm_model_test.mjs`, `machines_app_headless.sh`",
-   "note": "Placeholders from the first frame; agent and disk lights with words on the card and the row (*in development*). No Export or Templates in ···"
+   "pct": 97,
+   "file": "`library.jsx` (`Lights`, Templates in ···), `model.js` (`skeletonPlan`, `cardLights`, `actionsOf`, `tagsOf`, `filterMachines`); `vm_model_test.mjs`, `machines_app_headless.sh`, `machines_app2_headless.sh`",
+   "note": "*In development*: Templates (Make Template, the Templates chip, New Machine from Template; a template doesn't start from the library), the card's own color and tags, seen on screen in the headless scene. Export in ··· is the storage work's (`m100/storage`, `lord.vm.export`): 100 with it"
   },
   {
    "area": "C",
@@ -310,18 +310,18 @@
   {
    "area": "C",
    "item": "New Machine assistant (5.2)",
-   "status": "🟡",
-   "pct": 70,
-   "file": "`assistant.jsx` (5 steps)",
-   "note": "No Detect step, folder choice, **Fresh install** snapshot or file drop"
+   "status": "🧪",
+   "pct": 100,
+   "file": "`assistant.jsx` (Detect step, drop, the place, Fresh install), `vm/vmiso.c` (`lord-vm --iso-detect`, seccomp strict mode), `js_vm.c` `isoDetect`, `model.js` `detectPlan`, `dropSource`; `vmiso-test`, `vm_model_test.mjs`, `machines_app2_headless.sh`",
+   "note": "*In development*: Detect (label, UEFI and El Torito boot entries, emulated said before anything is made; real discs read), drop of a file on the first step, where the machine goes (no folder choice: decided, every protection keys on the library), the Fresh install snapshot after an unattended install. The Detect and Name steps seen on screen headless with the real reader; the Fresh install snapshot after a real unattended install not yet watched"
   },
   {
    "area": "C",
-   "item": "Machine window: bar, Actions, Devices, Apps, close dialog, resolution menu (5.3)",
-   "status": "🟡",
-   "pct": 85,
-   "file": "`vmwindow.jsx` (View and Info menus), `library.jsx` (Start in Full Screen), `model.js` `actualFrame`, `infoLines`",
-   "note": "*In development*: View (Window, Full Screen, Apps, Picture in Picture, Actual Size), Info (CPU, memory, disk, the sandbox, Open Configuration), Start in Full Screen. Not built: Scale, device dots, the window keeping the guest's shape; no USB, Network or Camera in Devices"
+   "item": "Machine window: bar, Actions, Devices, Apps, close dialog, resolution menu, Scale, device dots, the guest's shape (5.3)",
+   "status": "🧪",
+   "pct": 95,
+   "file": "`vmwindow.jsx` (View → Scale, `DeviceDots`, Devices → Network and Folders, shape keeping), `model.js` `scaleFrame`, `shapeFrame`, `deviceDots`, `cableOffered`, `VM_NETCABLE` (`vmproto.h`, `lordvm.c`, `js_vm.c` `netCable`); `vm_model_test.mjs`, `vmlink-test`, `vm_configure_boot.sh`",
+   "note": "*In development*: Scale, the window keeping the guest's shape, device dots, the network cable while it runs (checked in a real KVM guest: carrier lost and back). USB and Camera show in Devices only once the devices work's backend says they're supported (`lord.vm.deviceCaps`). The new bar and menus not yet seen in a running window on screen"
   },
   {
    "area": "C",
@@ -342,26 +342,26 @@
   {
    "area": "C",
    "item": "Configure, one window with summaries (5.5)",
-   "status": "🟡",
-   "pct": 65,
-   "file": "`configure.jsx` (11 sections), `kit.jsx` (`SideRow` dot), `model.js` `changedSections`, `sectionsMatching`",
-   "note": "Search over the sections and a dot on each with an unsaved change (*in development*). No Backup, ballooning, CPU model, USB rules, disk add or encryption, printers, icon and tags, MAC, speed limit; huge pages are automatic, no switch"
+   "status": "✅",
+   "pct": 90,
+   "file": "`configure.jsx` (11 sections; icon, tags, processor, huge pages, Add Disk, New Address, printers), `kit.jsx` (`SideRow` dot), `model.js` `changedSections`, `sectionsMatching`, `parseTags`; `lordvm.c` `--cpu-model`, `--mac new`, `--add-disk`, `machine.c` (`cpu_model`, schema 16); `vm_model_test.mjs`, `machines_app2_headless.sh`, `vm_configure_boot.sh`",
+   "note": "*In development*: search and unsaved dots; icon and tags, the processor (this computer's or Compatible, booted for real), Add Disk, a new MAC, huge pages shown as automatic. Decided not to build: ballooning, a network speed limit, sharing this computer's printers, a folder outside the library. Backup and encryption come with the storage work (95 with it), USB rules with the devices work"
   },
   {
    "area": "C",
    "item": "Profiles and `.lordprofile` (5.6)",
    "status": "✅",
-   "pct": 95,
+   "pct": 100,
    "file": "`profiles.js`; `vm_profiles_test.mjs`",
-   "note": ""
+   "note": "A profile's logo is never downloaded (decided 2026-11-24: a profile never makes this computer fetch anything)"
   },
   {
    "area": "C",
    "item": "Official logos, opt-in (5.6.2)",
    "status": "✅",
    "pct": 90,
-   "file": "`logos.js`",
-   "note": ""
+   "file": "`logos.js`; `vm_profiles_test.mjs`",
+   "note": "The helper's download ran on the maintainer's PC (the Debian logo is in the image store); the app's check and lord-media re-encode to the card not watched on screen"
   },
   {
    "area": "C",
@@ -375,9 +375,9 @@
    "area": "C",
    "item": "❖ shortcuts, Keys panel, focus gate (5.8)",
    "status": "✅",
-   "pct": 95,
+   "pct": 100,
    "file": "`keys.jsx`; `vm_keys_scene.mjs`",
-   "note": "The release combination is fixed"
+   "note": "The release keys (❖Esc, Ctrl+Alt) are fixed on purpose: lord-server's own, so the pointer can always be taken back (decided 2026-11-24, 6.25)"
   },
   {
    "area": "C",
@@ -725,11 +725,11 @@
   },
   {
    "area": "K",
-   "item": "Cleaner, Backups, Files bundle, Search, Pause All on battery, start with the session, auto-pause, balloon (6.14, 16)",
-   "status": "🟡",
-   "pct": 75,
-   "file": "`clean/cleanfs.c` `clean_machine_path`, `backup/engine.c` (`hold`), `backup.c`, `machine.c` `vm_backup_hold`, `vm_dir_active`, `sdk/openwith.js` `registerBundle`, `apps/files`, `apps/machines/ties.js`; `clean-test`, `backup-test`, `vm-test`, `vm_model_test.mjs`, `machines_app_headless.sh`",
-   "note": "*In development*: Cleaner never offers a machine's files; Backups hold back a running machine's disks and saved session; Files shows a machine as one item; Search finds machines; Pause All on battery (notice and toolbar); Start with the session; Pause while I'm away. No balloon (see 6.14), no Reclaim space in Cleaner (Machines' Storage window has it)"
+   "item": "Cleaner, Backups, Files bundle, Search, Pause All on battery, start with the session, auto-pause, Reclaim in Machines (6.14, 16)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`clean/cleanfs.c` `clean_machine_path`, `apps/cleaner/vmspace.js` `machinesSpace`, `backup/engine.c` (`hold`), `backup.c`, `machine.c` `vm_backup_hold`, `vm_dir_active`, `sdk/openwith.js` `registerBundle`, `apps/files`, `apps/machines/ties.js`; `clean-test`, `backup-test`, `vm-test`, `vm_model_test.mjs`, `machines_app_headless.sh`",
+   "note": "*In development*: Cleaner never offers a machine's files and its Storage view sends a machine's space to Machines' Storage window (Reclaim in Machines); Backups hold back a running machine's disks and saved session; Files shows a machine as one item; Search finds machines; Pause All on battery; Start with the session; Pause while I'm away. No balloon: decided 2026-11-24 (6.14)"
   },
   {
    "area": "K",
@@ -914,8 +914,8 @@
    "name": "The app",
    "weight": 11,
    "items": 12,
-   "mean": 84.58,
-   "score": 85
+   "mean": 91.0,
+   "score": 91
   },
   {
    "id": "D",
@@ -978,8 +978,8 @@
    "name": "System ties",
    "weight": 3,
    "items": 4,
-   "mean": 83.75,
-   "score": 84
+   "mean": 90.0,
+   "score": 90
   },
   {
    "id": "L",
@@ -1006,6 +1006,6 @@
    "score": 55
   }
  ],
- "total": 74,
- "total_exact": 73.98
+ "total": 75,
+ "total_exact": 74.82
 }
