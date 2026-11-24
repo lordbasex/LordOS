@@ -433,12 +433,19 @@ def flow_kills(s, r, c):
     name = json.dumps(NAME)
     s.wait_js("lord.vm.list().find((m) => m.name === %s)?.agentState === 'connected'" % name, 90)
     con = s.console(mid)
-    # 1. the guest agent
+    # 1. the guest agent: Machines sees its port close (lord-vm's log, agentState "waiting") and takes it back when the
+    # agent is there again (systemd may start it again at once in the guest; if not, the test starts it)
+    n0 = s.vmlog(mdir).count("the guest closed qemu-guest-agent's port")
     con.run("systemctl kill -s KILL qemu-guest-agent")
-    r.step("kill: the guest agent killed in the guest is seen (agentState leaves connected)", lambda: s.wait_js(
-        "lord.vm.list().find((m) => m.name === %s)?.agentState !== 'connected'" % name, 60))
-    con.run("systemctl start qemu-guest-agent")
-    r.step("kill: started again, it connects again by itself", lambda: s.wait_js(
+    r.step("kill: the guest agent killed in the guest is seen (its port closed, the agent waited for)", lambda: _until(
+        lambda: s.vmlog(mdir).count("the guest closed qemu-guest-agent's port") > n0, 30, 0.5))
+    try:
+        _until(lambda: "agent: connected" in s.vmlog(mdir).split("the guest closed qemu-guest-agent's port")[-1], 20, 1)
+        c["agent_back"] = "by itself"
+    except TimeoutError:
+        con.run("systemctl start qemu-guest-agent")
+        c["agent_back"] = "started again by the test"
+    r.step("kill: the agent connects again (%s)" % c["agent_back"], lambda: s.wait_js(
         "lord.vm.list().find((m) => m.name === %s)?.agentState === 'connected'" % name, 90))
     # 2. passt (the shared network): lord-vm attaches a new one and the guest's network comes back
     run = json.load(open(os.path.join(mdir, "run.json")))
