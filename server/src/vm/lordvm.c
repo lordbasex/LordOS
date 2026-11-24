@@ -3391,6 +3391,10 @@ static int start_machine(void) {
         /* QEMU's binary by descriptor (in this mount namespace, after the private loader): the allowlist's only exec */
         int xfd = open(qargv[0], O_PATH | O_CLOEXEC);
         int lfd = -1;
+        /* asked before the jail: landlock_create_ruleset isn't a row of the allowlist, and the child's own call would wait on
+         * a listener lord-vm doesn't hold yet (a vGPU machine hung there at every start: 2026-11-24, the first run of a vGPU
+         * under the allowlist) */
+        int ll_abi = vm_landlock_abi();
         VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL,
                          S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : S.vgpu ? S.vgpu_render : NULL,
                          S.vgpu ? S.vgpu_dev : NULL, S.vgpu ? S.vgpu_group : -1, S.vgpu ? GVT_ROM : NULL,
@@ -3400,7 +3404,7 @@ static int start_machine(void) {
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
         /* a vGPU only inside Landlock where the kernel has it: its device rules must have applied (vgpu_rules) */
-        if (S.vgpu && vm_landlock_abi() >= 1 && !(mask & VMS_LANDLOCK_FS)) mask &= ~VMS_SECCOMP_OURS;
+        if (S.vgpu && ll_abi >= 1 && !(mask & VMS_LANDLOCK_FS)) mask &= ~VMS_SECCOMP_OURS;
         if (!(mask & VMS_SECCOMP_OURS) || !(mask & VMS_NO_NEW_PRIVS)) { msg[0] = mask; write_all(stf, msg, sizeof msg[0]); _exit(126); }
         msg[0] = mask;
         /* the mask, with the allowlist's listener for lord-vm; QEMU never keeps it (it could answer for itself) */
