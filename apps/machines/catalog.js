@@ -5,7 +5,8 @@
 import { hostOf, redactUrl } from './systems.js';
 
 // the cards for an architecture, in the catalog's order: { id, name, release, approxMb, kind }
-export function systemsFor(cat, arch) {
+// opts: { kvm, hostArch } (lord.vm.host()): a group's card shows only with KVM on the host's own architecture
+export function systemsFor(cat, arch, opts) {
   const out = [];
   for (const s of Array.isArray(cat?.systems) ? cat.systems : []) {
     const a = s?.arch?.[arch];
@@ -14,10 +15,13 @@ export function systemsFor(cat, arch) {
     // an ISO whose maker signs no list (Android, 4.2): the catalog pins its one file and hash itself (pinnedImage)
     const pinned = (s?.kind || 'iso') === 'iso' && !!pinnedImage(a);
     if (!a || s.hidden || typeof s.id !== 'string' || (typeof a.file !== 'string' && !win && !pinned)) continue;
+    // a machine group (Whonix, docs/VIRTUALIZATION.md 19.8): its card needs KVM on this computer's own architecture
+    const group = s.kind === 'group';
+    if (group && (!opts || !opts.kvm || opts.hostArch !== arch)) continue;
     // family: what a profile's system kind suggests it for ('linux', 'windows'; Android is neither: "family" in its entry)
-    const family = s.kind === 'windows' ? 'windows' : /^[a-z]+$/.test(s.family || '') ? s.family : 'linux';
+    const family = s.kind === 'windows' ? 'windows' : group ? 'group' : /^[a-z]+$/.test(s.family || '') ? s.family : 'linux';
     out.push({ id: s.id, name: String(s.name || s.id), release: String(s.release || ''), approxMb: Number(a.approxMb) || 0, kind: s.kind || 'iso', family,
-      listed: !a.sums && !pinned, ...(pinned ? { pinned: true } : {}) });
+      listed: !a.sums && !pinned, ...(pinned ? { pinned: true } : {}), ...(group ? { group: String(s.group || ''), members: groupMachines(s) } : {}) });
   }
   return out;
 }
@@ -40,10 +44,34 @@ export function noticeOf(cat, id) {
 
 export function entryOf(cat, id, arch) {
   const s = (cat?.systems || []).find((x) => x?.id === id);
-  return s?.arch?.[arch] ? { ...s.arch[arch], id, name: s.name, release: s.release } : null;
+  return s?.arch?.[arch] ? { ...s.arch[arch], id, name: s.name, release: s.release, hash: s.hash === 'sha512' ? 'sha512' : 'sha256', kind: s.kind || 'iso' } : null;
 }
 
-const SHA = /^[0-9a-fA-F]{64}$/;
+// ---- machine groups (docs/VIRTUALIZATION.md 19.6, 19.8) ----
+// a group entry's members as the catalog sets them: [{ role, vcpus, memoryMb }], the gateway first
+export function groupMachines(s) {
+  const m = s?.machine || {};
+  return ['gateway', 'workstation'].filter((r) => m[r]).map((r) => ({ role: r, vcpus: Number(m[r].vcpus) || 1, memoryMb: Number(m[r].memoryMb) || 1024 }));
+}
+// the release folders a "releases" listing links to (href="18.2.4.3/"), matching the entry's pattern
+export function releaseNames(html, pattern) {
+  const r = new RegExp(pattern || '^$');
+  const out = [];
+  for (const m of String(html || '').matchAll(/href="([0-9][0-9.]{0,30})\/"/g)) if (r.test(m[1]) && !out.includes(m[1])) out.push(m[1]);
+  return out;
+}
+// "18.2.4.3" against "18.2.10.1", by numbers
+export function releaseCmp(a, b) {
+  const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; }
+  return 0;
+}
+// the newest release, never older than the floor (the admin helper checks the floor and its high-water mark again)
+export function newestRelease(names, floor) {
+  return (names || []).filter((n) => !floor || releaseCmp(n, floor) >= 0).sort(releaseCmp).pop() || null;
+}
+
+const SHA = /^([0-9a-fA-F]{64}|[0-9a-fA-F]{128})$/;
 const NAME = /^[A-Za-z0-9_+~][A-Za-z0-9._+~-]{0,126}$/;
 
 // A maker's SHA-256 list → [{ name, sha, size }]. GNU lines ("<hash>  <name>", "<hash> *<name>"), BSD lines
@@ -53,7 +81,7 @@ export function parseSums(text) {
   const out = [], sizes = new Map();
   for (const raw of String(text || '').split('\n')) {
     const l = raw.replace(/\r$/, '');
-    let m = /^([0-9a-fA-F]{64}) [ *]([^\s]+)$/.exec(l) || null;
+    let m = /^([0-9a-fA-F]{64}|[0-9a-fA-F]{128}) [ *]([^\s]+)$/.exec(l) || null;
     let name, sha;
     if (m) { sha = m[1]; name = m[2]; } else if ((m = /^SHA256 \(([^\s()]+)\) = ([0-9a-fA-F]{64})$/.exec(l))) { name = m[1]; sha = m[2]; }
     else if ((m = /^# ([^\s:]+): (\d+) bytes$/.exec(l))) { sizes.set(m[1], Number(m[2])); continue; } else continue;
@@ -93,7 +121,9 @@ export function newest(names, re) {
 export function pickImage(entry, sumsText) {
   const pin = pinnedImage(entry);
   if (pin) return pin;
-  const files = parseSums(sumsText);
+  // a SHA-512 entry (Whonix) takes only 128-digit lines, every other only 64-digit ones
+  const len = entry?.hash === 'sha512' ? 128 : 64;
+  const files = parseSums(sumsText).filter((f) => f.sha.length === len);
   const name = newest(files.map((f) => f.name), entry.file);
   return name ? files.find((f) => f.name === name) : null;
 }
@@ -129,7 +159,7 @@ export const sizeMb = (approxMb, bytes) => Math.round(bytes > 0 ? bytes / 104857
 // that folder; infoOf(sha): the parsed .json or null; machines: lord.vm.list() (this account's: { name, iso, state }).
 // → [{ sha, path, partial, size, id, arch, file, version, label, users: [names], dirs, running: [names] }], biggest first
 export const IMAGES_DIR = '/var/lib/lordos/machines/images';
-export function downloadedImages(cat, entries, infoOf, machines, runningOf = (m) => m.state === 'running' || m.state === 'paused') {
+export function downloadedImages(cat, entries, infoOf, machines, runningOf = (m) => m.state === 'running' || m.state === 'paused', groups = []) {
   const out = new Map();
   for (const e of Array.isArray(entries) ? entries : []) {
     const m = /^([0-9a-f]{64})\.iso(\.part)?$/.exec(String(e?.name || ''));
@@ -156,6 +186,22 @@ export function downloadedImages(cat, entries, infoOf, machines, runningOf = (m)
     const from = info?.id === 'user' && typeof info.from === 'string' ? hostOf(redactUrl(info.from)) : '';
     out.set(m[1], { sha: m[1], path, partial, size: Number(e.size) || 0, id: sys ? sys.id : 'other', arch: info?.arch === 'arm64' || info?.arch === 'amd64' ? info.arch : '',
       file, version, label: sys ? [sys.name, version].filter(Boolean).join(' ') : file && from ? `${file} · ${from}` : '', users, dirs, running });
+  }
+  // a machine group's verified archive (Whonix, 19.6): <sha512>.tar.xz; its users are the groups made from it, and it
+  // may go once their bases are there (Start Fresh needs only the bases; a missing base is made again from a new download)
+  for (const e of Array.isArray(entries) ? entries : []) {
+    const m = /^([0-9a-f]{128})\.tar\.xz(\.dl\.part|\.dl)?$/.exec(String(e?.name || ''));
+    if (!m || e.dir || e.link) continue;
+    const partial = !!m[2];
+    if (out.get(m[1]) && !out.get(m[1]).partial) continue;
+    let info = null;
+    try { info = infoOf(m[1]); } catch (x) { info = null; }
+    const sys = (cat?.systems || []).find((s) => s?.id === info?.id && s?.kind === 'group');
+    const file = typeof info?.file === 'string' && NAME.test(info.file) ? info.file : '';
+    const gs = partial ? [] : (Array.isArray(groups) ? groups : []).filter((g) => g?.archiveSha512 === m[1]);
+    out.set(m[1], { sha: m[1], path: `${IMAGES_DIR}/${m[1]}.tar.xz`, partial, size: Number(e.size) || 0, id: sys ? sys.id : 'other', arch: 'amd64', file,
+      version: '', label: sys ? `${sys.name} (${file || 'tar.xz'})` : file, users: gs.map((g) => g.name), dirs: [], running: [], archive: true,
+      basesThere: gs.length > 0 && gs.every((g) => g.basesThere) });
   }
   return [...out.values()].sort((a, b) => b.size - a.size || a.sha.localeCompare(b.sha));
 }

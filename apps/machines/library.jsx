@@ -21,6 +21,8 @@ import { usePal, has, gb, bytes, gib, OsMark, Bar, Btn, PopMenu, markColors, ove
 import { readMeta, readCpuUse, isProtectedMachine } from './meta.js';
 import { CloneSheet } from './clone.jsx';
 import { withAsk } from './openwith.js';
+import { libraryItems, groupMenu, groupShows } from './group.js';
+import { GroupMark, TorChip, groupLine, groupStateOf, groupColors, startGroup, stopGroup, FreshDialog, GroupSnapDialog } from './groupui.jsx';
 
 const winIdOf = (m) => `machines#vm-${m.id || m.folder}`;
 // how long the Requirements page waits for a word from the package engine before it says the network isn't answering
@@ -209,6 +211,89 @@ function Card({ m, u, sel, onSelect, onMenu, windowed, picH, gpuName, host }) {
         </View>
         <MoreBtn m={m} onMenu={onMenu} />
       </View>
+    </View>
+  );
+}
+
+// A machine group's ONE card (docs/VIRTUALIZATION.md 19.8, the approved mock): the group's mark (its members are
+// protected machines: no picture of them is kept), its state, a "Tor" chip with the gateway's dot, Start or Open (the
+// workstation's window), its name and "Group of 2 machines · CPU · memory", its ··· menu
+function GroupPicture({ height, on, radius = 0 }) {
+  return (
+    <View style={{ height, borderRadius: radius, overflow: 'hidden', background: `linear-gradient(135deg, ${groupColors[0]}, ${groupColors[1]})`, opacity: on ? 1 : 0.85,
+      alignItems: 'center', justifyContent: 'center' }}>
+      <GroupMark size={Math.min(56, height * 0.4)} />
+    </View>
+  );
+}
+const gwOn = (item) => !!item.gw && stateView(item.gw.state, item.gw.reason).active;
+function GroupCard({ item, sel, onSelect, onMenu, onGo, picH }) {
+  const p = usePal();
+  const st = groupStateOf(item);
+  const wsOn = !!item.ws && stateView(item.ws.state, item.ws.reason).active;
+  const [hover, setHover] = useState(false);
+  const m = { name: item.group.name };
+  return (
+    <View onClick={onSelect} onDoubleClick={onGo} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      onContextMenu={(e) => { e.stopPropagation?.(); onSelect(); onMenu(e); }}
+      style={{ flex: 1, minWidth: 0, borderRadius: 16, overflow: 'hidden', backgroundColor: p.card, border: `1px solid ${sel ? p.accent : p.line}` }}>
+      <View style={{ height: picH }}>
+        <GroupPicture height={picH} on={st.on} />
+        <View style={{ ...pillStyle, position: 'absolute', insetInlineStart: 12, top: 12 }}>
+          {st.color ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: st.color }} /> : null}
+          <Text style={{ fontSize: 12, fontWeight: 600, color: '#f2f2f5', whiteSpace: 'nowrap' }}>{st.text}</Text>
+        </View>
+        <View style={{ position: 'absolute', insetInlineEnd: 12, top: 13 }}><TorChip on={gwOn(item)} /></View>
+        {item.state !== 'damaged' ? (
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+            {wsOn ? (
+              <View onClick={(e) => { e.stopPropagation?.(); onGo(); }} title={tr('machines.open')}
+                style={{ height: 40, paddingHorizontal: 18, borderRadius: 20, justifyContent: 'center', backgroundColor: hover ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.6)' }}>
+                <Text style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{tr('machines.open')}</Text>
+              </View>
+            ) : (
+              <View onClick={(e) => { e.stopPropagation?.(); onGo(); }} title={tr('machines.lib.startName', { name: item.group.name })}
+                style={{ width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: hover ? 'rgba(0,0,0,0.72)' : 'rgba(0,0,0,0.55)' }}>
+                <Sym name="play" size={26} color="#ffffff" />
+              </View>
+            )}
+          </View>
+        ) : null}
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 18 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 18, fontWeight: 600, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{item.group.name}</Text>
+          <Text style={{ marginTop: 4, fontSize: 13, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{groupLine(item)}</Text>
+          {item.group.disposable ? <Text style={{ marginTop: 4, fontSize: 12, color: p.accent, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{tr('machines.group.disposableOn')}</Text> : null}
+        </View>
+        <MoreBtn m={m} onMenu={onMenu} />
+      </View>
+    </View>
+  );
+}
+function GroupRow({ item, sel, onSelect, onMenu, onGo }) {
+  const p = usePal();
+  const st = groupStateOf(item);
+  const narrow = useNarrow();
+  const wsOn = !!item.ws && stateView(item.ws.state, item.ws.reason).active;
+  return (
+    <View onClick={onSelect} onDoubleClick={onGo} onContextMenu={(e) => { e.stopPropagation?.(); onSelect(); onMenu(e); }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 18, padding: 12, borderRadius: 14, backgroundColor: p.card, border: `1px solid ${sel ? p.accent : p.line}` }}>
+      <View style={{ width: narrow ? 96 : 132, height: narrow ? 58 : 78 }}><GroupPicture height={narrow ? 58 : 78} on={st.on} radius={10} /></View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text style={{ flexShrink: 1, fontSize: 17, fontWeight: 600, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{item.group.name}</Text>
+          <TorChip on={gwOn(item)} />
+          <Text style={{ fontSize: 12, color: st.color || p.dim, whiteSpace: 'nowrap' }}>{st.text}</Text>
+        </View>
+        <Text style={{ marginTop: 4, fontSize: 13, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{groupLine(item)}</Text>
+      </View>
+      {item.state !== 'damaged' ? (
+        <View onClick={(e) => { e.stopPropagation?.(); onGo(); }} style={{ height: 34, paddingHorizontal: 16, borderRadius: 17, justifyContent: 'center', backgroundColor: wsOn ? p.accent : p.btn }}>
+          <Text style={{ fontSize: 13, fontWeight: 600, color: wsOn ? '#fff' : p.text }}>{tr(wsOn ? 'machines.open' : 'machines.start')}</Text>
+        </View>
+      ) : null}
+      <MoreBtn m={{ name: item.group.name }} onMenu={onMenu} />
     </View>
   );
 }
@@ -583,6 +668,9 @@ export function Library() {
   const { id: winId, focused } = useAppWindow();
   const [host, setHost] = useState(() => (has() ? lord.vm.host() : null));
   const [list, setList] = useState([]);
+  const [groups, setGroups] = useState([]);           // the library's machine groups (lord.vm.groups(), 19.8)
+  const [fresh, setFresh] = useState(null);           // a group's "Destroy and start fresh…" dialog
+  const [gsnap, setGsnap] = useState(null);           // a group's "Group snapshot…" dialog
   // false until the first read is in: the first frame draws placeholders in the view's layout (Skeleton), never the
   // empty library (FirstRun) of a library that has machines
   const [loaded, setLoaded] = useState(false);
@@ -636,6 +724,7 @@ export function Library() {
       prev.current[m.dir] = s.at ? s : null;
     }
     setList(ms);
+    try { setGroups(typeof lord.vm.groups === 'function' ? lord.vm.groups() || [] : []); } catch (e) { setGroups([]); }
     setUsages(next);
     setLoaded(true);
   };
@@ -664,7 +753,10 @@ export function Library() {
     ] }]);
   }, [host?.arch, lv.view, lv.sort]);
 
-  const sorted = host ? sortMachines(filterMachines(list, { query, show: lv.show }), lv.sort) : [];
+  // a group's members are one card, the group's (19.8)
+  const items = libraryItems(list, groups);
+  const sorted = host ? sortMachines(filterMachines(items.machines, { query, show: lv.show }), lv.sort) : [];
+  const groupCells = host ? items.groups.filter((g) => groupShows(g, { query, show: lv.show })) : [];
   // what it showed, for the next first frame's placeholders (only written when it changed)
   useEffect(() => {
     if (!loaded) return;
@@ -674,7 +766,7 @@ export function Library() {
   // the keyboard: arrows move the selection, Return opens or starts it, Escape clears the search
   const keys = useRef(null);
   keys.current = (e) => {
-    if (page !== 'main' || cfg || menu || del || discard || copying) return;
+    if (page !== 'main' || cfg || menu || del || discard || copying || fresh || gsnap) return;
     const i = sorted.findIndex((m) => m.dir === sel);
     const cols = lv.view === 'list' ? 1 : Math.max(1, keys.cols || 1);
     const fwd = direction() === 'rtl' ? -1 : 1;
@@ -726,6 +818,27 @@ export function Library() {
       { label: tr('machines.cmd.remove'), destructive: true, disabled: !a.remove, onClick: () => setDel(m) },
     ];
   };
+  // a group's card: Play starts the group (the gateway, then the workstation in its window), Open shows the workstation
+  const goGroup = (item) => {
+    if (item.ws && stateView(item.ws.state, item.ws.reason).active) { openMachine(item.ws); return; }
+    setError('');
+    startGroup(item, (ws) => openMachine(ws), host).then((why) => { if (why) setError(why); refresh(); });
+  };
+  const groupMenuFor = (item) => groupMenu(item).map((x) => (x === '-' ? x : {
+    label: tr(`machines.group.menu.${x.k}`), disabled: x.disabled, destructive: x.destructive, checked: x.k === 'disposable' ? x.checked : undefined,
+    onClick: () => {
+      if (x.k === 'start') goGroup(item);
+      else if (x.k === 'showWorkstation') openMachine(item.ws);
+      else if (x.k === 'showGateway') openMachine(item.gw);
+      else if (x.k === 'shutdown' || x.k === 'poweroff') stopGroup(item, x.k).then(refresh);
+      else if (x.k === 'snapshot') setGsnap(item);
+      else if (x.k === 'configure') setCfg({ dir: item.ws.dir, group: item.group.dir });
+      else if (x.k === 'disposable') follow(lord.vm.groupSet(item.group.dir, { disposable: !item.group.disposable }), item.group.name);
+      else if (x.k === 'logs') openLogs(item.ws);
+      else if (x.k === 'showInFiles') revealPath(item.group.dir);
+      else if (x.k === 'fresh') setFresh(item);
+    },
+  }));
   const rl = root.current ? lord.getLayout(root.current.id) : [0, 0, 1000, 700];
   // as many cards as fit at 300 px or more, the New machine card first; each picture about half as tall as wide. The
   // window's width from the window store: the root isn't laid out yet in the first frames
@@ -734,7 +847,9 @@ export function Library() {
   keys.cols = cols;
   const skel = loaded ? null : skeletonPlan(s0.machinesSeen);
   const shell = !!list.length || (skel && !skel.empty);     // the chips and the status line: with machines, or their placeholders
-  const cells = [{ isNew: true }, ...sorted];
+  const cells = [{ isNew: true }, ...groupCells.map((g) => ({ isGroup: true, dir: g.group.dir, item: g })), ...sorted];
+  const groupProps = (g) => ({ item: g, sel: sel === g.group.dir, onSelect: () => setSel(g.group.dir), onGo: () => goGroup(g),
+    onMenu: (e) => setMenu({ x: e.x, y: e.y, above: e.above, group: g }) });
   const rows = [];
   for (let i = 0; i < cells.length; i += cols) rows.push(cells.slice(i, i + cols));
   const cardProps = (m) => ({ m, u: usages[m.dir], sel: sel === m.dir, onSelect: () => setSel(m.dir), windowed: wins.split(' ').includes(winIdOf(m)), host,
@@ -745,7 +860,9 @@ export function Library() {
   // the assistant, the requirements and the Pi page are sheets over the library, which stays behind them
   const sheet = page === 'new' ? (
     <Sheet width={940} height={700} modal onClose={() => { setPage('main'); setNewMode(null); }}>
-      <Assistant host={host} mode={newMode} names={list.map((m) => m.name)} onClose={() => { setPage('main'); setNewMode(null); refresh(); }}
+      <Assistant host={host} mode={newMode} names={list.map((m) => m.name)} groupNames={groups.map((g) => g.name)}
+        onGroup={(dir) => { setPage('main'); setNewMode(null); refresh(); const it = libraryItems(lord.vm.list(), lord.vm.groups()).groups.find((x) => x.group.dir === dir); if (it) { setSel(dir); goGroup(it); } }}
+        onClose={() => { setPage('main'); setNewMode(null); refresh(); }}
         onCreated={(m) => { setPage('main'); setNewMode(null); refresh(); if (m) openMachine(m); }} onConfigure={(m) => { setPage('main'); refresh(); if (m) setCfg({ dir: m.dir, section: 'cpu' }); }}
         onNeeds={() => setPage('requirements')} />
     </Sheet>
@@ -756,10 +873,11 @@ export function Library() {
   ) : null;
   if (skel && !skel.empty) body = <Skeleton view={lv.view} n={skel.cards} grid={grid} onNew={newMachine} />;
   else if (!list.length) body = <FirstRun host={host} onNew={newMachine} onImport={() => { setNewMode('import'); setPage('new'); }} onCheck={refresh} />;
-  else if (!sorted.length) body = <EmptyState icon="⌕" hint={query.trim() ? tr('machines.lib.noMatch', { q: query.trim() }) : (lv.show === 'windows' ? tr('machines.win.lib.none') : tr(`machines.lib.none.${lv.show}`))} />;
+  else if (!sorted.length && !groupCells.length) body = <EmptyState icon="⌕" hint={query.trim() ? tr('machines.lib.noMatch', { q: query.trim() }) : (lv.show === 'windows' ? tr('machines.win.lib.none') : tr(`machines.lib.none.${lv.show}`))} />;
   else if (lv.view === 'list') body = (
     <ScrollView style={{ flex: 1 }} contentStyle={{ paddingHorizontal: pad, paddingVertical: 16, gap: 12 }}>
       <NewCard row onClick={newMachine} />
+      {groupCells.map((g) => <GroupRow key={g.group.dir} {...groupProps(g)} />)}
       {sorted.map((m) => <ListRow key={m.dir} {...cardProps(m)} />)}
     </ScrollView>
   );
@@ -767,7 +885,8 @@ export function Library() {
     <ScrollView style={{ flex: 1 }} contentStyle={{ paddingHorizontal: pad, paddingVertical: 16, gap }}>
       {rows.map((r, i) => (
         <View key={i} style={{ flexDirection: 'row', gap }}>
-          {r.map((c) => (c.isNew ? <NewCard key="new" picH={picH} onClick={newMachine} /> : <Card key={c.dir} {...cardProps(c)} picH={picH} gpuName={gpuName} />))}
+          {r.map((c) => (c.isNew ? <NewCard key="new" picH={picH} onClick={newMachine} /> : c.isGroup ? <GroupCard key={c.dir} {...groupProps(c.item)} picH={picH} />
+            : <Card key={c.dir} {...cardProps(c)} picH={picH} gpuName={gpuName} />))}
           {Array.from({ length: cols - r.length }, (_, k) => <View key={`f${k}`} style={{ flex: 1 }} />)}
         </View>
       ))}
@@ -813,15 +932,17 @@ export function Library() {
           {list.length && sum.free ? <Summary label={tr('machines.lib.freeDisk')} value={bytes(sum.free.a)} onClick={openStorage} /> : null}
         </View>
       ) : null}
-      {menu ? <CardMenu at={menu} root={root} rl={rl} items={menuFor(menu.m)} onClose={() => setMenu(null)} /> : null}
+      {menu ? <CardMenu at={menu} root={root} rl={rl} items={menu.group ? groupMenuFor(menu.group) : menuFor(menu.m)} onClose={() => setMenu(null)} /> : null}
       {sheet}
       {cfg ? <Sheet width={1000} height={700} modal onClose={() => setCfg(null)}>
-        <Configure dir={cfg.dir} section={cfg.section} onClose={() => { setCfg(null); refresh(); }} />
+        <Configure key={cfg.dir} dir={cfg.dir} group={cfg.group} section={cfg.group ? cfg.section || 'group' : cfg.section} onMember={(d) => setCfg((c) => ({ ...c, dir: d, section: 'group' }))} onClose={() => { setCfg(null); refresh(); }} />
       </Sheet> : null}
       {copying ? <CloneSheet m={copying} running={stateView(copying.state, copying.reason).active} onClose={() => setCopying(null)}
         onDone={(out) => { setCopying(null); refresh(); if (out?.dir) setSel(out.dir); }} /> : null}
       {discard ? <ConfirmDialog title={tr('machines.discard.title', { name: discard.name })} detail={tr('machines.discard.detail')} okLabel={tr('machines.fail.discardState')} cancelLabel={tr('machines.cancel')} destructive
         onOk={() => { const d = discard; setDiscard(null); follow(lord.vm.discardState(d.dir), d.name); }} onCancel={() => setDiscard(null)} /> : null}
+      {fresh ? <FreshDialog item={fresh} onCancel={() => setFresh(null)} onDone={(id) => { const g = fresh; setFresh(null); follow(id, g.group.name); refresh(); }} /> : null}
+      {gsnap ? <GroupSnapDialog item={gsnap} onCancel={() => setGsnap(null)} onDone={(ids) => { const g = gsnap; setGsnap(null); for (const id of ids) follow(id, g.group.name); }} /> : null}
       {del ? <ConfirmDialog title={tr('machines.deleteTitle', { name: del.name })} detail={tr('machines.deleteDetail')} okLabel={tr('machines.deleteOk')} cancelLabel={tr('machines.cancel')} destructive
         onOk={() => remove(del)} onCancel={() => setDel(null)} /> : null}
     </View>

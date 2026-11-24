@@ -22,7 +22,9 @@ const readInfo = (sha) => JSON.parse(fs.read(`${IMAGES_DIR}/${sha}.json`));
 function listImages(ms) {
   let entries = [];
   try { entries = lord.fs.list(IMAGES_DIR); } catch (e) { entries = []; }     // none downloaded yet: no folder
-  return downloadedImages(CATALOG, entries, readInfo, ms, (m) => stateView(m.state, m.reason).active);
+  let gs = [];
+  try { gs = typeof lord.vm.groups === 'function' ? lord.vm.groups() || [] : []; } catch (e) { gs = []; }
+  return downloadedImages(CATALOG, entries, readInfo, ms, (m) => stateView(m.state, m.reason).active, gs);
 }
 import { openSnapshots } from './library.jsx';
 
@@ -283,6 +285,7 @@ export function Storage() {
             {img.file ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{img.file}</Text> : null}
             <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>
               {img.partial ? tr('machines.storage.dlPartial', { size: bytes(img.size) })
+                : img.archive ? tr(img.users.length ? (img.basesThere ? 'machines.group.storage.archiveDone' : 'machines.group.storage.archiveNeeded') : 'machines.group.storage.archiveUnused', { names: img.users.join(', ') })
                 : img.users.length ? tr('machines.storage.dlUsed', { names: img.users.join(', ') }) : tr('machines.storage.dlUnused')}</Text>
             <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.dlShared')}</Text>
             <View style={{ flex: 1 }} />

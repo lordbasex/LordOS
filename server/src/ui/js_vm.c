@@ -642,6 +642,13 @@ static JSValue f_groups(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
             set_str(c, o, "release", g.release);
             JS_SetPropertyStr(c, o, "disposable", JS_NewBool(c, g.disposable));
             JS_SetPropertyStr(c, o, "freshGateway", JS_NewBool(c, g.fresh_gateway));
+            /* the verified archive the members came from, and whether both bases are there (Storage: the archive may
+             * go once they are; Start Fresh needs only the bases, 19.6) */
+            set_str(c, o, "archiveSha512", g.archive_sha512);
+            struct stat bs;
+            int both = 1;
+            for (int r = 1; r < VM_ROLE_COUNT; r++) if (!g.base[r][0] || lstat(g.base[r], &bs) || !S_ISREG(bs.st_mode)) both = 0;
+            JS_SetPropertyStr(c, o, "basesThere", JS_NewBool(c, both));
             JSValue ms = JS_NewArray(c);
             for (int i = 0; i < g.n; i++) {
                 JSValue m = JS_NewObject(c);
@@ -4621,6 +4628,22 @@ static JSValue f_storage(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     struct dirent *e;
     while (d && (e = readdir(d))) {
         size_t l = strlen(e->d_name);
+        /* a machine group (19.6): its members' bases, and the ones its group.json names, are in use (never offered
+         * for removal: Start Fresh makes the members again from them) */
+        if (e->d_name[0] != '.' && l > 10 && !strcmp(e->d_name + l - 10, VMG_SUFFIX)) {
+            char gd[PATH_MAX + 260];
+            snprintf(gd, sizeof gd, "%s/%s", lib, e->d_name);
+            VmGroup g;
+            if (vm_group_load(gd, &g, NULL, 0)) continue;
+            for (int r = 1; r < VM_ROLE_COUNT; r++) if (g.base[r][0]) nb = base_note(bases, nb, 64, g.base[r], 0);
+            for (int i = 0; i < g.n; i++) {
+                char mp[PATH_MAX + 520];
+                snprintf(mp, sizeof mp, "%s/%s", gd, g.m[i].dir);
+                VmMachine m;
+                if (!vm_machine_load(mp, &m, NULL, 0) && m.base[0] && (!g.base[m.role][0] || strcmp(m.base, g.base[m.role]))) nb = base_note(bases, nb, 64, m.base, 0);
+            }
+            continue;
+        }
         if (e->d_name[0] == '.' || l < 8 || strcmp(e->d_name + l - 7, ".lordvm")) continue;
         char p[PATH_MAX + 260];
         snprintf(p, sizeof p, "%s/%s", lib, e->d_name);

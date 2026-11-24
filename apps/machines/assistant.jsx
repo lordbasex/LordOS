@@ -22,10 +22,12 @@ import { customUnattended, systemState } from './systems.js';
 import { loadProfiles, loadSystems, defaultsOf, profileTitle } from './store.js';
 import { usePal, OsMark, Btn, Bar, gb, bytes } from './ui.jsx';
 import { SheetHeader, Pill, Round, Sym } from './kit.jsx';
+import { GroupMark, groupColors } from './groupui.jsx';
 import { writeMeta } from './meta.js';
 import { Migrate } from './migrate.jsx';
 import { windowsEntry, driversFor, matchIso, evalFiles, evalFor, newestDownload, windowsZone, inputLocale, userLocale, editionPlan, checkWindowsSetup, windowsHostname, windowsSize } from './windows.js';
 import ZONES from '../../assets/machines/windows-zones.json';
+import { GroupFlow, resolveGroup } from './whonix.jsx';
 
 // what Migrate from another app takes: other apps' settings files and packages, and their disk formats
 const MIGRATE_FILES = /(\.(vmx|vbox|pvs|ovf|ova|vmdk|vdi|vhdx|vhd|hds)|\/config\.pvs)$/i;
@@ -50,7 +52,7 @@ function Tile({ title, hint, onClick, selected, disabled, mark, height = 76, chi
   );
 }
 
-export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, onNeeds }) {
+export function Assistant({ host, mode, names, groupNames, onClose, onCreated, onConfigure, onNeeds, onGroup }) {
   const p = usePal();
   const [step, setStep] = useState(0);
   const [source, setSource] = useState(mode === 'import' ? 'import' : null);
@@ -202,8 +204,24 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     setSys({ id: s.kind === 'windows' ? 'windows' : 'other', name: s.name }); setVer(''); setName(suggestName({ name: s.name }, '', names));
     if (profileById(s.profile, own, host)) setProfile(s.profile);
   };
+  // a machine group's card (Whonix, docs/VIRTUALIZATION.md 19.8): its newest verified release's archive
+  const pickGroup = async (s) => {
+    const seq = ++pickSeq.current;
+    setSource('group'); setPath(''); setPicking(false); setAlt(null);
+    setSys({ id: s.id, name: s.name }); setVer(s.release);
+    setDl({ id: s.id, name: s.name, phase: 'list' });
+    try {
+      const img = await resolveGroup(CATALOG, s.id, host.arch);
+      if (seq !== pickSeq.current) return;
+      setVer(img.release);
+      setDl({ id: s.id, name: s.name, phase: 'ready', image: img });
+    } catch (err) {
+      if (seq === pickSeq.current) setDl({ id: s.id, name: s.name, phase: 'error', err: err.message || String(err) });
+    }
+  };
   const pickDownload = async (s, a = arch) => {
     if (s.kind === 'windows') { pickWindows(); return; }
+    if (s.kind === 'group') { pickGroup(s); return; }
     const seq = ++pickSeq.current;
     setSource('download'); setPath(''); setPicking(false); setAlt(null);
     setSys({ id: s.id, name: s.name }); setVer(s.release); setName(suggestName({ name: s.name }, s.release, names));
@@ -220,6 +238,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   };
   // another architecture: the same card for it
   useEffect(() => {
+    if (source === 'group' && arch !== host.arch) { setSource(null); setDl(null); return; }
     if (!downloading || !dl) return;
     const s = systemsFor(CATALOG, arch).find((x) => x.id === dl.id);
     if (s) pickDownload(s, arch); else { setSource(null); setDl(null); }
@@ -363,8 +382,11 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   };
   const stopDownload = () => { cancelled.current = true; admin.run('vm-image-cancel', '', null, { quiet: true }).catch(() => {}); };
 
+  const grp = source === 'group';
+  if (grp && step > 0 && dl?.phase === 'ready') return <GroupFlow step={step} setStep={setStep} dl={dl} host={host} names={names} groupNames={groupNames} catalog={CATALOG}
+    onCancel={onClose} onGroup={(dir) => onGroup?.(dir)} />;
   if (source === 'migrate' && path && !picking) return <Migrate host={host} path={path} names={names} onClose={onClose} onDone={() => onClose()} onStart={(m) => onCreated(m)} />;
-  const can = windows ? [win?.mode === 'eval' ? !!evalFile : win?.phase === 'ready', true, !v.errors.name && (!un.on || (setup.ok && plan.ok)),
+  const can = grp ? [dl?.phase === 'ready', false, false, false, false][step] : windows ? [win?.mode === 'eval' ? !!evalFile : win?.phase === 'ready', true, !v.errors.name && (!un.on || (setup.ok && plan.ok)),
     v.ok && !missing.length, false][step]
     : [downloading ? dl?.phase === 'ready' : !!source && !!path && !v.errors.path, true, !v.errors.name && (!unOn || (setup.ok && !!inst)),
       v.ok && !missing.length && (!downloading || !!inst), false][step];
@@ -374,13 +396,16 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   if (step === 0) body = <>
     <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.as.download')}</Text>
     {/* the mock's grid of four: one row per four systems of the catalog, for the chosen architecture */}
-    {rowsOf(systemsFor(CATALOG, arch), 4).map((row, i) => (
+    {rowsOf(systemsFor(CATALOG, arch, { kvm: host.kvm, hostArch: host.arch }), 4).map((row, i) => (
       <View key={i} style={{ flexDirection: 'row', gap: 12 }}>
         {row.map((s) => {
-          const mine = (downloading && dl?.id === s.id) || (windows && s.kind === 'windows');
+          const mine = ((downloading || source === 'group') && dl?.id === s.id) || (windows && s.kind === 'windows');
           const exact = mine && dl?.image?.size > 0;
           const title = [s.name, mine && dl?.phase === 'ready' ? ver : s.release].filter(Boolean).join(' ');
           const sz = bytes(exact ? dl.image.size : s.approxMb * 1048576);
+          // a group's card: "Whonix (Tor)", the group's mark and its "Group · 2 machines" badge
+          if (s.kind === 'group') return <Tile key={s.id} height={118} selected={mine} mark={<GroupTileMark n={(s.members || []).length || 2} />}
+            title={tr('machines.whonix.card', { name: s.name })} hint={tr('machines.whonix.cardHint', { size: sz, mem: gb((s.members || []).reduce((a, m) => a + m.memoryMb, 0)) })} onClick={() => pickDownload(s)} />;
           return <Tile key={s.id} height={118} selected={mine} mark={<OsMark id={s.id} size={40} />} title={title}
             hint={tr(exact ? 'machines.dl.size' : 'machines.dl.sizeAbout', { arch, size: sz })} onClick={() => pickDownload(s)} />;
         })}
@@ -407,13 +432,14 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       <Tile title={tr('machines.as.import')} hint={fileHint('import')} selected={source === 'import'} onClick={() => { pickSeq.current++; setDl(null); if (source !== 'import') setPath(''); setSource('import'); setPicking(true); }} />
     </View>
     {windows ? <WinChoose win={win} setWin={setWin} entry={winE} arch={arch} lang={hd.locale} onPick={() => setPicking(true)} /> : null}
-    {downloading && dl ? (
+    {(downloading || grp) && dl ? (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 10, backgroundColor: p.raised }}>
         <OsMark id={dl.id} size={36} />
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{`${[dl.name, ver].filter(Boolean).join(' ')}, ${arch}`}</Text>
           <Text style={{ fontSize: 12, color: dl.phase === 'error' ? '#ff453a' : p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-            {dl.phase === 'list' ? tr('machines.dl.reading', { name: dl.name }) : dl.phase === 'error' ? dl.err : tr(dl.image.pinned ? 'machines.dl.pinned' : 'machines.dl.found', { file: dl.image.name })}</Text>
+            {dl.phase === 'list' ? tr('machines.dl.reading', { name: dl.name }) : dl.phase === 'error' ? dl.err : grp ? tr('machines.whonix.found', { file: dl.image.name, release: dl.image.release })
+              : tr(dl.image.pinned ? 'machines.dl.pinned' : 'machines.dl.found', { file: dl.image.name })}</Text>
         </View>
         {dl.phase === 'error' ? <Btn label={tr('machines.dl.retry')} onClick={() => { const s = systemsFor(CATALOG, arch).find((x) => x.id === dl.id); if (s) pickDownload(s); }} /> : null}
       </View>
@@ -634,6 +660,18 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
         filter={source === 'iso' || windows ? /\.iso$/i : source === 'migrate' ? MIGRATE_FILES : /\.(qcow2|img|raw)$/i}
         onPick={(x) => { const pth = Array.isArray(x) ? x[0] : x; if (windows) checkIso(pth); else if (source === 'migrate') setPath(pth); else chose(pth); setPicking(false); }}
         onClose={() => { setPicking(false); if (source === 'migrate' && !path) setSource(null); }} /> : null}
+    </View>
+  );
+}
+
+// a group card's mark: the group's two machines and a badge "Group · 2 machines"
+function GroupTileMark({ n }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <View style={{ width: 56, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', background: `linear-gradient(135deg, ${groupColors[0]}, ${groupColors[1]})` }}><GroupMark size={26} /></View>
+      <View style={{ height: 20, paddingHorizontal: 8, borderRadius: 10, justifyContent: 'center', backgroundColor: 'rgba(125,70,152,0.85)' }}>
+        <Text style={{ fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>{tr('machines.whonix.badge', { n })}</Text>
+      </View>
     </View>
   );
 }

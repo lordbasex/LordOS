@@ -51,7 +51,7 @@ id_of() { sed -n 's/.*"id": "\(.*\)".*/\1/p' "$G/$1.lordvm/machine.json" | head 
 GW=$(id_of Gateway); WS=$(id_of Workstation)
 
 # the session
-ns $E LORD_GPU=0 ./build/lord-server --headless 1024x768 --theme "$THEME" --timeout 1500 >"$D/server.log" 2>&1 &
+ns $E LORD_GPU=0 ./build/lord-server --headless 1024x768 --theme "$THEME" --timeout 4000 >"$D/server.log" 2>&1 &
 P=$!
 for i in $(seq 1 100); do [ -S "$D/run/lordos-machines.sock" ] && break; sleep 0.1; done
 sleep 2
@@ -141,6 +141,85 @@ echo "$o" | grep -q '"IsTor":true' && ok "the workstation's network is back thro
 out=$(ns $E ./build/machines poweroff Whonix 2>&1) && ok "machines poweroff Whonix: $out" || bad "poweroff: $out"
 gs=$(grep "state stopped" "$G/Gateway.lordvm/log/lord-vm.log" | tail -1 | cut -c1-24); ws=$(grep "state stopped" "$G/Workstation.lordvm/log/lord-vm.log" | tail -1 | cut -c1-24)
 [[ "$ws" < "$gs" ]] && ok "the workstation stopped before the gateway" || bad "stop order: workstation $ws, gateway $gs"
+
+# ---- the shutdown (19.0): both members power off by themselves, the gateway's Tor stopping cleanly ----
+st=$(ns $E ./build/machines start Whonix --no-window 2>&1) || bad "start for the shutdown check: $st"
+wait_shell Gateway && wait_shell Workstation; sleep 60
+# the gateway's Tor and logind on its serial log, so the stop can be read after it powered off
+con "$GW" 20 "(journalctl -f -n0 -o short-monotonic -u tor@default -u systemd-logind > /dev/ttyS0 2>&1 &); echo ok" >/dev/null
+con "$GW" 20 "systemctl is-active tor@default" | grep -q '^active' && ok "the gateway's Tor runs" || bad "the gateway's Tor isn't running"
+t0=$(date +%s)
+out=$(ns $E ./build/machines stop Whonix 2>&1) && ok "machines stop Whonix: $out ($(( $(date +%s) - t0 )) s)" || bad "stop: $out"
+for m in Workstation Gateway; do
+    l=$(grep "state stopped" "$G/$m.lordvm/log/lord-vm.log" | tail -1)
+    echo "$l" | grep -q "forced" && bad "$m was forced off: $l" || ok "$m powered off by itself: ${l:25:80}"
+done
+grep -q "shut down: the power button" "$G/Workstation.lordvm/log/lord-vm.log" && ok "the keys and the power button were sent" || bad "no shutdown sequence in the workstation's log"
+grep -a -q "Power key pressed" "$G/Gateway.lordvm/log/serial.log" && grep -a -q "Powering off" "$G/Gateway.lordvm/log/serial.log" && ok "the gateway: logind took the power key and powered off" || bad "the gateway's logind didn't power off"
+grep -a -E -q "Stopped tor@default|tor@default.service: Deactivated successfully" "$G/Gateway.lordvm/log/serial.log" && ok "the gateway's Tor stopped cleanly" || bad "no clean stop of Tor in the gateway's log"
+
+# ---- the disposable session (19.7, isolation layer 6): in memory only, gone at power-off ----
+ws_disk="$G/Workstation.lordvm/disks/system.qcow2"
+before=$(sha256sum "$ws_disk" | cut -c1-64); bm=$(stat -c %Y "$ws_disk")
+ls -la "$G/Workstation.lordvm/disks" > "$D/disks.before"
+ns $E ./build/lord-vm --group-set "$G" --disposable on >/dev/null && ok "disposable on" || bad "lord-vm --group-set --disposable on"
+# a marker the guest writes 600 MB of: afterwards it must be in no file of this computer (only in memory)
+M="LORDOS-SESSION-MARK-$RANDOM$RANDOM$(date +%N)"
+st=$(ns $E ./build/machines start Whonix --no-window 2>&1) || bad "start in a disposable session: $st"
+wait_shell Workstation; sleep 20
+grep -q "disposable session: the workstation's changes stay in memory" "$G/Workstation.lordvm/log/lord-vm.log" && ok "the workstation started in a disposable session" || bad "no disposable session in the log"
+qw=$(sed -n 's/.*"qemu_pid": *\([0-9]*\).*/\1/p' "$G/Workstation.lordvm/run.json")
+o=$(con "$WS" 200 "yes $M | head -c 600M > /home/user/session-blob; sync; ls -la /home/user/session-blob")
+echo "$o" | grep -q session-blob && ok "the guest wrote 600 MB" || bad "the guest's write: $o"
+ls -la "$G/Workstation.lordvm/disks" > "$D/disks.during"
+diff -q <(awk '{print $5, $9}' "$D/disks.before") <(awk '{print $5, $9}' "$D/disks.during") >/dev/null && ok "the disks folder didn't change during the session" || { bad "the disks folder changed"; diff "$D/disks.before" "$D/disks.during"; }
+[ "$(stat -c %Y "$ws_disk")" = "$bm" ] && ok "system.qcow2 wasn't written" || bad "system.qcow2 was written during the session"
+# every file written since the session began, in the library, /tmp, /var/tmp and the runtime folder: none holds the marker
+# (the serial log is the console's text, which never echoes it); the host's page cache of those files then can't either
+hits=$(find "$D" /tmp /var/tmp -xdev -newer "$D/disks.before" -type f -size +0 2>/dev/null | grep -v '/log/serial.log$' | xargs -r grep -lF --binary-files=text "$M" 2>/dev/null | head -5)
+[ -z "$hits" ] && ok "the session's data is in no file of this computer (the library, /tmp, /var/tmp, the runtime folder)" || bad "the session's data is in: $hits"
+# the cap: the workstation's memory (2 GB); past it the guest is paused
+o=$(con "$WS" 400 "dd if=/dev/urandom of=/home/user/session-blob2 bs=1M count=1800 status=none; sync; echo wrote" 2>&1)
+for i in $(seq 1 30); do grep -q "session-full" "$G/Workstation.lordvm/log/lord-vm.log" && break; sleep 2; done
+grep -q "its cap: the guest is paused" "$G/Workstation.lordvm/log/lord-vm.log" && ok "at the cap the workstation was paused" || bad "no pause at the session's cap"
+s=$(ns $E ./build/machines status "$G/Workstation.lordvm" --json 2>/dev/null)
+echo "$s" | grep -q 'session-full' && ok "its state says session-full" || bad "its state: $s"
+out=$(ns $E ./build/machines poweroff Whonix 2>&1) && ok "the group off: $out" || bad "poweroff: $out"
+grep -q "disposable session: .* MB in memory, gone" "$G/Workstation.lordvm/log/lord-vm.log" && ok "the session's memory went with QEMU" || bad "no end of the session in the log"
+mb=$(sed -n 's/.*disposable session: \([0-9]*\) MB in memory, gone.*/\1/p' "$G/Workstation.lordvm/log/lord-vm.log" | tail -1)
+[ "${mb:-0}" -ge 600 ] && ok "the session held ${mb} MB in memory, then nothing" || bad "the session's memory at its end: ${mb:-?} MB"
+[ "$(sha256sum "$ws_disk" | cut -c1-64)" = "$before" ] && ok "system.qcow2 is byte for byte as before the session" || bad "system.qcow2 changed"
+ns $E ./build/lord-vm --group-set "$G" --disposable off >/dev/null
+st=$(ns $E ./build/machines start Whonix --no-window 2>&1) || bad "start after the session: $st"
+wait_shell Workstation; sleep 15
+o=$(con "$WS" 30 "ls /home/user/session-blob /home/user/session-blob2 2>&1 | head -2")
+echo "$o" | grep -q "No such file" && ! echo "$o" | grep -q "^/home/user/session-blob$" && ok "the session's files are gone" || bad "the session's files: $o"
+
+# ---- Start Fresh (19.7): the workstation only, then the gateway too ----
+o=$(con "$WS" 30 "echo kept > /home/user/fresh-marker; sync; cat /home/user/fresh-marker")
+echo "$o" | grep -q kept || bad "the marker: $o"
+ns $E ./build/machines poweroff Whonix >/dev/null 2>&1
+out=$(ns $E ./build/machines fresh Whonix 2>&1 </dev/null); [ $? = 2 ] && ok "fresh without --yes and no terminal is refused" || bad "fresh without --yes: $out"
+gw0=$(id_of Gateway); ws0=$(id_of Workstation); wsmac0=$(sed -n 's/.*"mac": "\(.*\)".*/\1/p' "$G/Workstation.lordvm/machine.json" | head -1)
+out=$(ns $E ./build/machines fresh Whonix --yes 2>&1) && ok "machines fresh Whonix --yes: $out" || bad "fresh: $out"
+[ "$(id_of Workstation)" != "$ws0" ] && ok "the workstation has a new id" || bad "the workstation's id didn't change"
+[ "$(sed -n 's/.*"mac": "\(.*\)".*/\1/p' "$G/Workstation.lordvm/machine.json" | head -1)" != "$wsmac0" ] && ok "the workstation has a new MAC address" || bad "its MAC didn't change"
+[ "$(id_of Gateway)" = "$gw0" ] && ok "the gateway kept its identity" || bad "the gateway changed without --gateway"
+[ "$(stat -c %s "$ws_disk")" -lt 10000000 ] && ok "the workstation's disk is an empty overlay again ($(stat -c %s "$ws_disk") bytes)" || bad "the workstation's disk: $(stat -c %s "$ws_disk") bytes"
+WS=$(id_of Workstation)
+st=$(ns $E ./build/machines start Whonix --no-window 2>&1) || bad "start after Start Fresh: $st"
+wait_shell Workstation; sleep 15
+o=$(con "$WS" 30 "cat /home/user/fresh-marker 2>&1")
+echo "$o" | grep -q "No such file" && ok "the workstation's file is gone after Start Fresh" || bad "after Start Fresh: $o"
+ns $E ./build/machines poweroff Whonix >/dev/null 2>&1
+out=$(ns $E ./build/machines fresh Whonix --gateway --yes 2>&1) && ok "machines fresh Whonix --gateway --yes: $out" || bad "fresh --gateway: $out"
+[ "$(id_of Gateway)" != "$gw0" ] && ok "the gateway has a new id too" || bad "the gateway's id didn't change with --gateway"
+ns $E ./build/lord-vm --group-set "$G" --disposable on >/dev/null
+out=$(ns $E ./build/machines start Whonix --member gateway --no-window 2>&1) && ok "--member gateway starts the gateway alone: $out" || bad "--member gateway: $out"
+s=$(ns $E ./build/machines status Whonix --json)
+echo "$s" | grep -q '"state":"partial"' && ok "the group is partial" || bad "after --member gateway: $s"
+ns $E ./build/machines poweroff Whonix --member gateway >/dev/null 2>&1 && ok "--member gateway powers the gateway off" || bad "poweroff --member gateway"
+
 if grep -qi "TypeError\|ReferenceError\|exception" "$D/server.log"; then bad "a JS error in the session"; grep -i -A3 "TypeError\|ReferenceError\|exception" "$D/server.log" | head -20; fi
 [ $R = 0 ] || { echo "-- server log"; grep -i "vm\|group\|error" "$D/server.log" | tail -20; }
 exit $R

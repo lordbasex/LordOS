@@ -9,13 +9,69 @@ import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mo
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
 import { readMeta, writeMeta, readCpuUse } from './meta.js';
 import { defaultsOf } from './store.js';
-import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
+import { SideRow, PaneHeader, Pill, Section, Sym } from './kit.jsx';
 import { BUILTIN, builtinProfile, onHost } from './profiles.js';
+import { LOCKED_ROWS, sessionCapMb } from './group.js';
 
 const SECTIONS = ['general', 'startup', 'cpu', 'display', 'network', 'sound', 'disks', 'sharing', 'agent', 'boot', 'security'];
 // each section's glyph (assets/machines/symbols)
 const ICONS = { general: 'general', startup: 'startup', cpu: 'cpu', display: 'display', network: 'network', sound: 'sound', disks: 'disks',
-  sharing: 'sharing', agent: 'agent', boot: 'boot', security: 'security' };
+  sharing: 'sharing', agent: 'agent', boot: 'boot', security: 'security', group: 'security' };
+// a machine group's member (docs/VIRTUALIZATION.md 19.8): the Group section first; its sharing, guest tools and network
+// are the anonymity profile's, shown off and locked with a short reason
+const GROUP_SECTIONS = ['group', 'general', 'cpu', 'display', 'network', 'disks', 'sharing', 'agent', 'security'];
+const LOCKED_SECTIONS = { sharing: ['clipboard', 'transfer', 'shares'], agent: ['agent', 'identity'], network: ['ports', 'uplink'] };
+
+// a locked row: its name, "Off" with a lock, and why (machines.group.lock.<k>, machines.group.why.<k>)
+function LockedRows({ keys }) {
+  const p = usePal();
+  return <Group>{keys.map((k, i) => (
+    <Row key={k} label={tr(`machines.group.lock.${k}`)} last={i === keys.length - 1} note={tr(`machines.group.why.${k}`)}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: 0.7 }}>
+        <Text style={{ fontSize: 13, color: p.dim }}>{tr('machines.group.lockedOff')}</Text>
+        <Sym name="security" size={14} color={p.dim} />
+      </View>
+    </Row>
+  ))}</Group>;
+}
+
+// the Group section: the member switcher, the disposable session, the order, the release, the locks
+function GroupPane({ group, m, onMember }) {
+  const p = usePal();
+  const [g, setG] = useState(null);
+  const [job, setJob] = useState(0);
+  const read = () => { try { setG((lord.vm.groups() || []).find((x) => x.dir === group) || null); } catch (e) { setG(null); } };
+  useEffect(() => { read(); const t = setInterval(read, 2000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    if (!job) return undefined;
+    const t = setInterval(() => { const r = lord.vm.job(job); if (!r || r.done) { setJob(0); read(); } }, 300);
+    return () => clearInterval(t);
+  }, [job]);
+  if (!g) return null;
+  const members = g.members || [];
+  const roleName = (r) => tr(`machines.group.role.${r}`);
+  const order = (k) => [...members].sort((a, b) => a[k] - b[k]).map((x) => roleName(x.role)).join(' → ');
+  return <>
+    <Group title={tr('machines.group.cfg.members')}>
+      <Row label={tr('machines.group.cfg.member')} last note={tr('machines.group.cfg.memberNote')}>
+        <Segmented value={m.role} options={members.map((x) => [x.role, roleName(x.role)])}
+          onChange={(r) => { const x = members.find((y) => y.role === r); if (x && x.dir !== m.dir) onMember?.(x.dir); }} />
+      </Row>
+    </Group>
+    <Group title={tr('machines.group.cfg.session')}>
+      <Row label={tr('machines.group.cfg.disposable')} last note={tr('machines.group.cfg.disposableNote', { cap: gb(sessionCapMb(m.role === 'workstation' ? m : { memoryMb: 2048 })) })}>
+        <Toggle on={!!g.disposable} busy={!!job} onChange={(on) => setJob(lord.vm.groupSet(g.dir, { disposable: on }))} />
+      </Row>
+    </Group>
+    <Group title={tr('machines.group.cfg.about')}>
+      <Row label={tr('machines.group.cfg.startOrder')} value={order('start')} />
+      <Row label={tr('machines.group.cfg.stopOrder')} value={order('stop')} />
+      <Row label={tr('machines.group.cfg.release')} value={g.release || '—'} last note={tr('machines.group.cfg.releaseNote')} />
+    </Group>
+    <Text style={{ fontSize: 12, fontWeight: 700, color: p.dim, textAlign: 'start' }}>{tr('machines.group.cfg.locked')}</Text>
+    <LockedRows keys={LOCKED_ROWS} />
+  </>;
+}
 
 // a group of rows on a rounded card, with a title above it when it has one
 function Group({ children, title }) { return <Section title={title}>{children}</Section>; }
@@ -129,14 +185,15 @@ function VcpuAdvice({ m, host, meta, later, busy, use, keep }) {
   );
 }
 
-export function Configure({ dir, section: section0, onClose }) {
+export function Configure({ dir, group, onMember, section: section0, onClose }) {
   const p = usePal();
   const { id: winId } = useAppWindow();
   const [m, setM] = useState(null);
   const [host] = useState(() => (has() ? lord.vm.host() : null));
   // the computer's graphics cards (lord.vm.gpus): a spare Intel iGPU shared with machines (docs/MACHINES-GPU.md, Mode A)
   const [gpus, setGpus] = useState(null);
-  const [sec, setSec] = useState(SECTIONS.includes(section0) ? section0 : 'general');
+  const SECS = group ? GROUP_SECTIONS : SECTIONS;
+  const [sec, setSec] = useState(SECS.includes(section0) ? section0 : group ? 'group' : 'general');
   const [draft, setDraft] = useState({});
   const [meta, setMeta] = useState(() => readMeta(dir));
   const [job, setJob] = useState(0);
@@ -255,7 +312,12 @@ export function Configure({ dir, section: section0, onClose }) {
   const offNote = running ? tr('machines.cfg.needsOff') : null;
 
   let pane = null;
-  if (sec === 'general') pane = <>
+  // the anonymity profile (19.5): these sections are locked, shown as such
+  const locked = m.profileLock === 'anonymity';
+  summary.group = tr('machines.group.cfg.summary', { role: tr(`machines.group.role.${m.role || 'workstation'}`) });
+  if (locked && LOCKED_SECTIONS[sec]) pane = <LockedRows keys={LOCKED_SECTIONS[sec]} />;
+  else if (sec === 'group') pane = <GroupPane group={group} m={m} onMember={onMember} />;
+  else if (sec === 'general') pane = <>
     <Group>
       <Row label={tr('machines.new.name')}>
         <TextInput value={cur.name} onChange={(x) => set({ name: x })} />
@@ -578,7 +640,7 @@ export function Configure({ dir, section: section0, onClose }) {
       backgroundColor: p.dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)', borderEndWidth: 1, borderColor: p.line }}>
       <Text style={{ marginHorizontal: 10, marginBottom: 6, fontSize: 12, fontWeight: 700, color: p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{m.name}</Text>
       <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 2 }}>
-        {SECTIONS.map((k) => <SideRow key={k} icon={ICONS[k]} title={tr(`machines.cfg.sec.title.${k}`)} detail={summary[k]} selected={sec === k}
+        {SECS.map((k) => <SideRow key={k} icon={ICONS[k]} title={tr(k === 'group' ? 'machines.group.cfg.title' : `machines.cfg.sec.title.${k}`)} detail={summary[k]} selected={sec === k}
           onClick={() => { setSec(k); if (side.narrow) side.close(); }} />)}
       </ScrollView>
     </View>
@@ -599,9 +661,9 @@ export function Configure({ dir, section: section0, onClose }) {
         {side.narrow ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <SidebarToggle shown={side.shown} onClick={side.toggle} />
-            <View style={{ flex: 1, minWidth: 0 }}><PaneHeader icon={ICONS[sec]} title={tr(`machines.cfg.sec.title.${sec}`)} detail={summary[sec]} /></View>
+            <View style={{ flex: 1, minWidth: 0 }}><PaneHeader icon={ICONS[sec]} title={tr(sec === 'group' ? 'machines.group.cfg.title' : `machines.cfg.sec.title.${sec}`)} detail={summary[sec]} /></View>
           </View>
-        ) : <PaneHeader icon={ICONS[sec]} title={tr(`machines.cfg.sec.title.${sec}`)} detail={summary[sec]} />}
+        ) : <PaneHeader icon={ICONS[sec]} title={tr(sec === 'group' ? 'machines.group.cfg.title' : `machines.cfg.sec.title.${sec}`)} detail={summary[sec]} />}
         {running ? <View style={{ padding: 10, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.cfg.runningBanner')}</Text></View> : null}
         <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 14 }}>{pane}</ScrollView>
         {msg ? <Text style={{ fontSize: 13, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text> : null}

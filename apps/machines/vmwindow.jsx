@@ -1243,7 +1243,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       {st?.state === 'paused' && !card ? (
         <View style={{ position: 'absolute', top: BAR + 12, left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ paddingHorizontal: 12, height: 26, borderRadius: 13, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)' }}>
-            <Text style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{tr('machines.state.paused')}</Text>
+            <Text style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{tr(st.reason === 'session-full' ? 'machines.group.sessionFull' : 'machines.state.paused')}</Text>
           </View>
         </View>
       ) : null}

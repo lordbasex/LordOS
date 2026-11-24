@@ -99,9 +99,9 @@
       }
     },
     {
-      "id": "whonix", "name": "Whonix", "release": "18", "kind": "group", "group": "whonix", "edition": "LXQt", "hidden": true,
+      "id": "whonix", "name": "Whonix", "release": "18", "kind": "group", "group": "whonix", "edition": "LXQt",
       "homepage": "https://www.whonix.org/wiki/KVM",
-      "hashSource": "the .sha512sums list Whonix publishes next to the KVM archive in each release folder of download.whonix.org/libvirt, its OpenPGP signature .sha512sums.asc checked with Whonix's signing key; the newest release folder whose list verifies, never older than releases.floor (docs/VIRTUALIZATION.md 19.6). Hidden until the New Machine assistant has the group's card",
+      "hashSource": "the .sha512sums list Whonix publishes next to the KVM archive in each release folder of download.whonix.org/libvirt, its OpenPGP signature .sha512sums.asc checked with Whonix's signing key; the newest release folder whose list verifies, never older than releases.floor (docs/VIRTUALIZATION.md 19.6)",
       "signature": { "type": "detached", "suffix": ".asc" }, "keys": "whonix-derivative.asc", "hash": "sha512",
       "fingerprints": ["916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA"],
       "keySource": "https://www.whonix.org/keys/derivative.asc, fetched 2026-11-23 (no expiry; signing subkey 6E979B28A6F37C43BE30AFA1CB8D50BB77BB3C48)",
