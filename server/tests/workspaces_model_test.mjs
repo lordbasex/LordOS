@@ -397,4 +397,14 @@ eq('contrast option: read from the theme options', wsPrefs({ themeOptions: { wor
   eq('pending bounded', l9.length, L.MAX_PENDING);
 }
 
+// ---- a window's title as a label in a window list (sdk/windowlistmodel.js) ----
+{
+  const { cleanWindowLabel, WINDOW_LABEL_MAX } = await import('../../sdk/windowlistmodel.js');
+  eq('label: bidi override and line break gone', cleanWindowLabel('Bank\u202Egnp.exe\nsecond'), 'Bank gnp.exe second');
+  eq('label: isolates and zero-width gone', cleanWindowLabel('A\u2067B\u200bC'), 'A B C');
+  eq('label: cut with an ellipsis', [...cleanWindowLabel('x'.repeat(500))].length, WINDOW_LABEL_MAX);
+  eq('label: arabic kept', cleanWindowLabel('بريد — Chrome'), 'بريد — Chrome');
+  eq('label: not a string', cleanWindowLabel(null), '');
+}
+
 console.log(process.exitCode ? 'workspaces-model-test: FAILED' : `workspaces-model-test: ${ok} ok`);

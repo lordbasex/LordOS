@@ -1,5 +1,5 @@
 // dialog_model_test.mjs — a Linux app's dialog kept with the window it belongs to (sdk/dialogmodel.js).
-import { ownerOf, overParent, followParents } from '../../sdk/dialogmodel.js';
+import { ownerOf, overParent, followParents, lateParentFrame, LATE_PARENT_MS } from '../../sdk/dialogmodel.js';
 
 let ok = 0, bad = 0;
 const eq = (label, got, want) => {
@@ -94,6 +94,20 @@ eq('an unrelated change: the same list', (() => { const n = [A, D, { ...O, x: 9 
 {
   const n = [D, O];
   eq('a dialog without its parent', followParents(base, n) === n, true);
+}
+
+
+// a parent told after the dialog showed (X11 WM_TRANSIENT_FOR read late, xdg-foreign): over the parent if it is new
+{
+  const area = { x: 1920, y: 0, w: 1920, h: 1080 };
+  const parent = { x: 2000, y: 100, w: 1200, h: 800 };
+  const shown = { t: 1000, frame: { x: 100, y: 100, w: 600, h: 400 } };
+  // a theme already put it in a tile on another display: it still goes over its parent, with the size it showed with
+  const tiled = { x: 0, y: 0, w: 960, h: 1080 };
+  eq('late parent: over it', lateParentFrame(tiled, parent, shown, 1500, area), { x: 2300, y: 300, w: 600, h: 400 });
+  eq('late parent: too late, stays', lateParentFrame(tiled, parent, shown, 1000 + LATE_PARENT_MS + 1, area), null);
+  eq('late parent: maximized stays', lateParentFrame({ ...tiled, maximized: true }, parent, shown, 1200, area), null);
+  eq('late parent: never shown here', lateParentFrame(tiled, parent, null, 1200, area), null);
 }
 
 console.log(`dialog-model: ${ok} ok, ${bad} failed`);

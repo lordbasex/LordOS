@@ -57,3 +57,17 @@ export function followParents(prev, next) {
   }
   return changed ? list : next;
 }
+
+// A dialog told its parent only after it was shown (an X11 app's WM_TRANSIENT_FOR read after the map; a portal's or a
+// browser's GTK dialog that imports its parent with xdg-foreign once it is up): if it showed less than LATE_PARENT_MS
+// ago, it goes over its parent now, on the parent's display (and, through followParents, its desktop). The frame it had
+// is no sign of the person's choice in that time: a theme may already have placed it as a window of its own (Lord
+// Workspaces' tiles). A maximized, fullscreen or minimized one, or one told later, stays put (null).
+// mapped: { t, frame } when and how it was shown; it keeps the size it showed with (not a tile's).
+export const LATE_PARENT_MS = 1500;
+export function lateParentFrame(w, parent, mapped, now, area) {
+  if (!w || !parent || !mapped || !area || now < mapped.t || now - mapped.t > LATE_PARENT_MS) return null;
+  if (w.maximized || w.fullscreen || w.minimized || w.pip) return null;
+  const f = mapped.frame || w;
+  return overParent(parent, f.w, f.h, area);
+}

@@ -756,6 +756,9 @@ EOF
     # (0.8.8.8) a Linux app's OpenURI request: web addresses, files, and asking when the app is not in front (sdk/portalopenmodel.js)
     if have node; then run "portal-open-model-test (sdk/portalopenmodel.js)" node tests/portal_open_model_test.mjs
     else skip "portal-open-model-test" "node"; fi
+    # the FileChooser portal's dialog: the app's glob filters (Chromium's "*.[pP][dD][fF]") and where it goes (sdk/portalfilemodel.js)
+    if have node; then run "portal-file-model-test (sdk/portalfilemodel.js)" node tests/portal_file_model_test.mjs
+    else skip "portal-file-model-test" "node"; fi
     # (0.8.8.8) a Linux app's global shortcuts: the sheet's rows, the combination a key names, what is refused (sdk/globalshortcutsmodel.js)
     if have node; then run "global-shortcuts-model-test (sdk/globalshortcutsmodel.js)" node tests/global_shortcuts_model_test.mjs
     else skip "global-shortcuts-model-test" "node"; fi
