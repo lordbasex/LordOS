@@ -286,6 +286,12 @@ build/vm-net-cli: $(VMNET_CLI_SRC) src/vm/vmnet.h src/vm/vm_admin.h src/net/netp
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ $(VMNET_CLI_SRC)
 
+# the same, but a scratch dummy interface named lordtest<N> counts as a wired card (tests/vm_net_dummy_wrap.c, vmnet_card
+# wrapped at link time): the Bridged run of tests/vm_bridge_dummy.sh without the real wired card. Test only.
+build/vm-net-cli-dummy: $(VMNET_CLI_SRC) tests/vm_net_dummy_wrap.c src/vm/vmnet.h src/vm/vm_admin.h src/net/netpriv.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -Isrc -Wl,--wrap=vmnet_card -o $@ $(VMNET_CLI_SRC) tests/vm_net_dummy_wrap.c
+
 # vm-gvt-create, vm-gvt-remove and gpu-min-freq like the admin helper runs them (tests/vm_gvt_cli.c; a manual check, not
 # in make test: it needs root and an iGPU running GVT-g, and makes a real mdev)
 build/vm-gvt-cli: tests/vm_gvt_cli.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmgpu.h src/vm/vm_admin.h
