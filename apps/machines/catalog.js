@@ -201,9 +201,10 @@ export function downloadedImages(cat, entries, infoOf, machines, runningOf = (m)
 }
 
 // ---- unattended installs (vmunattend.h) ----
-// the answer files lord-vm makes: Debian's preseed, Ubuntu's autoinstall, Fedora's kickstart and LordOS's own
+// the answer files lord-vm makes: Debian's preseed (and Kali's, the same with its archive and tasks), Ubuntu's
+// autoinstall, Fedora's kickstart and LordOS's own
 // lordos-auto.conf (the live ISO's unattended install, docs/UNATTENDED.md)
-export const UNATTENDED_KINDS = ['preseed', 'autoinstall', 'kickstart', 'lordos'];
+export const UNATTENDED_KINDS = ['preseed', 'kali', 'autoinstall', 'kickstart', 'lordos'];
 // how a card installs without questions on this architecture: { kind, image (the entry whose image it boots: the card's
 // own, or a hidden one), kernel, initrd, append } or null
 export function unattendedOf(cat, id, arch) {
@@ -213,7 +214,9 @@ export function unattendedOf(cat, id, arch) {
   if (!u || !a || !UNATTENDED_KINDS.includes(u.kind) || typeof a.kernel !== 'string' || typeof a.initrd !== 'string') return null;
   const image = typeof u.image === 'string' ? u.image : id;
   if (!entryOf(cat, image, arch)) return null;
-  return { kind: u.kind, image, kernel: a.kernel, initrd: a.initrd, append: String(u.append || ''), release: String(s.release || '') };
+  // an architecture's own command line when it has one (arm64: the screen as the console, 4.1)
+  const append = typeof a.append === 'string' ? a.append : u.append;
+  return { kind: u.kind, image, kernel: a.kernel, initrd: a.initrd, append: String(append || ''), release: String(s.release || '') };
 }
 
 // LordOS's interface language for its unattended install: this LordOS's own, as a locale id ("es", "zh-Hans"), or "en"

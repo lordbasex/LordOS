@@ -1737,12 +1737,13 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
   open (`/proc/*/fd`: QEMU of any account's running machine, `vm.imageInUse`) or it is downloading, and deletes its
   part and `.json` with it; the app then ejects it from this account's machines (`lord.vm.eject`), so they still start.
 - *Install without questions (0.8.9, the mock "Unattended").* Step 3 becomes *Set up* for a card whose catalog entry
-  has an `unattended` block (Debian, Ubuntu, Fedora; not Kali yet): a switch, on by default as in the mock, *Account
+  has an `unattended` block (LordOS, Debian, Ubuntu, Fedora, Kali): a switch, on by default as in the mock, *Account
   name* (the person's own login name), *Password*, and *Computer name*, *Time zone* and *Keyboard* filled from this
   computer (`lord.vm.hostDefaults()`: `/etc/localtime`, `/etc/default/keyboard`, `LANG`). The Review says *Without
   questions: account … on …*. What happens:
-  - *The answer file* is the system's own installer's: a Debian **preseed**, an Ubuntu **autoinstall** (cloud-init
-    NoCloud `user-data` and `meta-data`) or a Fedora **kickstart**, made by `lord-vm --create … --unattended SPEC`
+  - *The answer file* is the system's own installer's: a Debian **preseed** (Kali's is the same, kind `kali`, with
+    Kali's archive `http.kali.org/kali`, no Debian `security, updates` services and Kali's own tasks), an Ubuntu
+    **autoinstall** (cloud-init NoCloud `user-data` and `meta-data`) or a Fedora **kickstart**, made by `lord-vm --create … --unattended SPEC`
     (`vm/vmunattend.c`). lord-server writes SPEC (0600, in the runtime folder; lord-vm reads and deletes it at once)
     from the assistant's words, with the password replaced by its SHA-512 crypt hash (`crypt_r`, a random salt): the
     text the person typed never reaches a file, and the answer files carry `passwd/user-password-crypted`,
@@ -1750,7 +1751,10 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
     control characters, a crypt hash, an RFC 1123 host name, the ISO paths and a command line without shell
     characters); the root account is locked, the person's account is the administrator (sudo, wheel).
   - *What is installed:* the system's own desktop (Debian's GNOME task, Ubuntu's `ubuntu-desktop-minimal`, Fedora
-    Workstation), plus `qemu-guest-agent`, and the agent is turned on for the machine. Ubuntu installs from its server
+    Workstation with `xconfig --startxonboot`, Kali's Xfce and default tools: tasks `desktop, desktop-xfce, meta-default,
+    standard`), plus `qemu-guest-agent`, and the agent is turned on for the machine. Without the desktop (`desktop:
+    false` in the spec, not offered by the assistant): the standard system (Debian, Kali, with `acpid`), Ubuntu's server
+    or Fedora's `custom-environment` (Fedora 45 has no `minimal-environment` any more). Ubuntu installs from its server
     image with the desktop's packages added, and Fedora from its network installer (both hidden catalog entries,
     `ubuntu-server` and `fedora-netinst`, checked against the same signed lists as the cards): the desktop images run
     a live session that needs 4 GB and doesn't take an answer file in the same way, and Fedora's live image doesn't
@@ -1758,7 +1762,10 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
   - *How it reaches the installer, with no network server and no boot menu to type into:* the first start boots the
     installer's own kernel and initrd, read from the ISO (`vmu_iso_find`: ISO 9660 with Rock Ridge, Joliet or plain
     names, every record bounded), with the entry's command line (`-kernel`, `-initrd`, `-append`; `{label}` becomes the
-    ISO's volume label, which Fedora's `inst.stage2` needs). Debian's preseed goes **inside the initrd**, as a second
+    ISO's volume label, which Fedora's `inst.stage2` needs; on arm64 each Linux card has its own line with `console=tty0
+    acpi=nospcr`: there the firmware's ACPI serial port table, SPCR, makes the serial port the kernel's console even
+    with `console=tty0`, and Debian's and Kali's installers ran only on the serial port, the window black). Debian's
+    and Kali's preseed goes **inside the initrd**, as a second
     cpio archive after the maker's (the kernel unpacks both and the installer reads `/preseed.cfg` before its first
     question); Ubuntu's and Fedora's go on a **seed disk**, a 2 MiB FAT image made in C (`vmu_fat_image`, long names
     so `user-data` and `ks.cfg` read as such) labelled `CIDATA` (cloud-init) or `OEMDRV` (anaconda), on a read-only
@@ -1821,6 +1828,62 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
     set (language, time zone *America/Argentina/Buenos_Aires*, the metalink source, *Fedora Workstation*, automatic
     partitioning, network) and installed: disk label, ext4 `/boot`, btrfs, EFI, *Installing the software, Downloading
     packages* (`u-16`). Stopped there, as asked (the disk).
+- *The cards run end to end (2026-11-24, `m100/cards-runs`).* Every card with an unattended install was run from its
+  card through the installed system's login, on the maintainer's PC (amd64, 20 threads, KVM, Debian 13's QEMU
+  10.0.13) and on the Raspberry Pi 5 (16 GB, LordOS 0.8.9 arm64, KVM, the same QEMU). The path: the card's image
+  resolved and downloaded by `apps/machines/catalog.js` (`unattendedOf`, `listingNames`, `newest`, `pickImage`) with
+  the admin actions `vm-image-list` and `vm-image-get` run as root by `tests/vm_image_cli.c` (the same
+  `vmimage_admin.c`, a scratch store); on the PC the machine made by `lord.vm.create` in a headless lord-server of this
+  branch (the assistant's request: `createRequest` and the unattended object of `assistant.jsx`; the password hashed
+  by `js_vm.c`), on the Pi by `lord-vm --create … --unattended SPEC` with the spec `js_vm.c` writes (no session there);
+  then `lord-vm --start`, both in a private user and mount namespace with a scratch home (never the person's own),
+  pictures by QMP `screendump` (`--dev-qmp`), keys by QMP `send-key`. Account `tester`, keyboard and time zone this
+  computer's (*latam*, *America/Argentina/Buenos_Aires*) on the PC, US and UTC on the Pi. Nothing was typed in any
+  installer. Pictures and logs: `/var/tmp/lordos-cards-runs/` on the maintainer's PC (not in the repository).
+  - **Downloads, verified:** PC, in parallel: Fedora 45 netinst 1,261,156,352 bytes in 142 s, Kali 2026.3 installer
+    5,047,031,808 in 89 s, LordOS 0.8.9 live 1,189,533,696 in 92 s (its signed list from the copy on lordos.org, the
+    first source, which answered), Ubuntu 26.04.1 server 2,927,861,760 in 148 s, Kali arm64 4,051,513,344 in 54 s. Pi
+    5: Debian 13.8 arm64 netinst (737,456,128) in 14 s, Fedora 45 arm64 netinst (1,426,759,680) in 35 s, LordOS 0.8.9
+    arm64 (1,113,196,544) in 14 s, Kali arm64 in 59 s; Remove (`vm-image-remove`) deleted two images there and refused
+    the one a running installer held (`vm.imageInUse`).
+  - **LordOS 0.8.9 (PC):** 4 vCPU, 4 GB, 32 GB, 3D (the card's size). `lordos-auto.conf` on the LORDOSAUTO seed disk,
+    `lord-autoinstall` erased only `vda` and installed in **1 min 19 s**; the installer's restart ended the first start
+    (`installed`), the seed disk and ISO were gone; the next start ran with 3D (virgl) and shut down cleanly; started
+    in 2D for the picture: the greeter with `tester` (`lordos-02-installed`), the assistant's password logged in to the
+    desktop's first-run chooser (`lordos-03-desktop`).
+  - **LordOS 0.8.9 arm64 (Pi):** installed in **2 min 2 s** (`pi-lordos-01-installer`, the installer on screen), the
+    greeter (`pi-lordos-02-greeter`), logged in to the desktop (`pi-lordos-03-desktop`; the installed 0.8.9 then
+    offered the Store's update to 0.8.9.5).
+  - **Ubuntu 26.04.1 without the desktop (PC):** 2 vCPU, 3 GB, 20 GB; autoinstall in **10 min 40 s**, then the login
+    prompt, `tester` logged in, `qemu-guest-agent` active (`ubuntu-console-04-logged-in`).
+  - **Fedora 45 Workstation (PC):** 4 vCPU, 4 GB, 32 GB; the first run installed in 18 min 9 s, and the session's open
+    machine window started it again by itself, but it booted to a **text login** (`multi-user.target`, GDM
+    inactive; `fedora-05-console-login`): anaconda in text mode leaves the console as the default unless the kickstart
+    says `xconfig --startxonboot`, which it now does. The run after the fix: **21 min 47 s**, GDM with `tester`
+    (`fedora-06-gdm`), logged in to GNOME's welcome (`fedora-07-desktop`); Shut Down through the agent.
+  - **Fedora 45 arm64 without the desktop (Pi):** 3 vCPU, 3 GB, 14 GB; the first run stopped at anaconda's menu, *No
+    match for argument: minimal-environment* (Fedora 45's comps has no such environment any more; the console system is
+    now `custom-environment`); the run after the fix installed in **17 min 32 s** and logged in on the console,
+    `qemu-guest-agent` active, `aarch64` (`pi-fedora-05-logged-in`).
+  - **Debian 13.8 arm64 without the desktop (Pi):** 3 vCPU, 3 GB, 12 GB; installed in **7 min 53 s**, the login on
+    `tty1`, `qemu-guest-agent` active (`pi-debian-03-logged-in`), Shut Down by the guest. While it installed, the
+    machine's picture was black: the installer ran only on the serial port (the firmware's ACPI SPCR table makes it
+    the kernel's console). Each Linux card's arm64 entry now boots its installer with `console=tty0 acpi=nospcr`.
+  - **Kali 2026.3 (PC):** 4 vCPU, 4 GB, 40 GB; the new `kali` preseed with Kali's own disc profiles installed Xfce and
+    the default tools in **36 min 27 s** with no question, LightDM with the keyboard *latam* (`kali-06-login`), logged
+    in to the Xfce desktop (`kali-07-desktop`); Shut Down through the agent in 1.3 s; its disk took 19 GB.
+  - **Kali 2026.3 arm64 without the desktop (Pi):** 3 vCPU, 3 GB, 14 GB; its first run showed the same black picture
+    (the installer on the serial port only); with the arm64 line (`console=tty0 acpi=nospcr`) the installer was on
+    the screen (`pi-kali-01-installer`), installed in **11 min 5 s**, the login on `tty1`, `qemu-guest-agent` active,
+    `aarch64` (`pi-kali-03-logged-in`). Debian arm64 was then installed again with its new line: the installer on the
+    screen too (`pi-debian-04-installer-on-screen`).
+  - **Not run, for space:** the Pi 5's SD card had 5.6 GB free and its `/tmp` (tmpfs) 8 GB: the desktops on arm64
+    (GNOME, Workstation, Ubuntu's, Xfce with the tools: 9 to 19 GB each) and Ubuntu 26.04.1 arm64 at all (its server
+    image is 3 GB and its console install took 6.3 GB on amd64). Their path is the same code as the arm64 console runs
+    above plus the amd64 desktop runs.
+  - **Seen, not changed here:** in the Fedora Workstation guest the agent couldn't mount the transfer folder
+    (`mkdir: cannot create directory '/mnt/LordOS': Permission denied`): Fedora confines `qemu-ga` with SELinux
+    (`virt_qemu_ga_t`), most likely why its `guest-exec` can't make the folder (not looked into; 6.7.1).
 - *The power button (6.1), confirmed (2026-11-07).* In a console-only Debian installed by the card's preseed
   (`desktop: false`: the *standard* task, `qemu-guest-agent`, `acpid`): the guest has the ACPI *Power Button* input
   device (`/proc/bus/input/devices`: *Power Button*, `kbd event3`), `dbus` installed, and `systemd-logind`, `acpid` and
@@ -1980,7 +2043,7 @@ Every current Linux has virtio drivers in its kernel. Linux cards: LordOS, Debia
 
 **Always the newest image of a release.** The catalog doesn't pin a file. An entry names a release, the maker's list that names its images (a `SHA256SUMS` file, a directory listing, a releases file) and a file-name pattern, so "Ubuntu 26.04" keeps working when 26.04.2 appears. The app reads the list, takes the newest matching name (there is no separate check that it can still be downloaded: a removed file fails at `vm-image-get`), and verifies the download against that same list, whose signature it checks with the maker's key (confirmed for all four cards on 2026-11-06: every maker signs its list, with the keys pinned in 3.9, "The Linux download cards"). So the catalog stays small and rarely needs an update, and our own signature covers only the entry: which list and which key are trusted. LordOS itself is a guest too, since we build UEFI ISOs for both architectures.
 
-Automatic install: Debian preseed, Ubuntu autoinstall, Fedora kickstart, and LordOS's own `lordos-auto.conf` (the live ISO's unattended install, since 0.8.9.5: 3.9, "The LordOS card"). The person gives a name and password once, in the assistant;
+Automatic install: Debian preseed (Kali's too, with its archive and tasks), Ubuntu autoinstall, Fedora kickstart, and LordOS's own `lordos-auto.conf` (the live ISO's unattended install, since 0.8.9.5: 3.9, "The LordOS card"). The person gives a name and password once, in the assistant;
 it reaches the guest through a small seed disk (Debian: inside the installer's initrd) that is deleted after the first boot, and only
 its hash is ever stored (built in 0.8.9: 3.9, "Install without questions").
 

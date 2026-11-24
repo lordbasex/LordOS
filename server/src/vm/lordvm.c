@@ -9274,7 +9274,7 @@ static int make_member(const char *gdir, const char *folder, const char *name, i
     m.graphics = VM_GFX_2D;
     m.n_ports = 0;
     m.n_shares = 0;
-    snprintf(m.base, sizeof m.base, "%s", base);
+    if (snprintf(m.base, sizeof m.base, "%s", base) >= (int)sizeof m.base) { snprintf(why, wn, "the base's path is too long"); return -1; }
     snprintf(m.group, sizeof m.group, "%s", gid);
     m.role = role;
     m.profile_lock = VM_LOCK_ANONYMITY;

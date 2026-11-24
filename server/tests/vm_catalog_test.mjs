@@ -181,10 +181,19 @@ eq('bar without downloads', M.storageBar(st).map((b) => b.key), ['machines', 'is
 // ---- unattended installs ----
 eq('hidden entries have no card', systemsFor(CAT, 'amd64').some((s) => s.id.includes('-')), false);
 eq('unattended: debian', unattendedOf(CAT, 'debian', 'amd64'), { kind: 'preseed', image: 'debian', kernel: 'install.amd/vmlinuz', initrd: 'install.amd/initrd.gz', append: 'auto=true priority=critical --- quiet', release: '13' });
+// the installers on the machine's screen on arm64: the firmware's ACPI SPCR table makes the serial port the kernel's
+// console there (seen on the Pi 5: Debian's and Kali's installers only on the serial port), so arm64 has its own line
+for (const id of ['debian', 'ubuntu', 'fedora', 'kali']) {
+  eq(`unattended: ${id} arm64 on the screen`, / console=tty0 acpi=nospcr /.test(unattendedOf(CAT, id, 'arm64')?.append), true);
+  eq(`unattended: ${id} amd64 as its maker boots it`, /console=|acpi=/.test(unattendedOf(CAT, id, 'amd64')?.append), false);
+}
+eq('unattended: an architecture\'s own line', unattendedOf({ systems: [{ id: 'x', unattended: { kind: 'preseed', append: 'a', arch: { amd64: { kernel: 'k', initrd: 'i' }, arm64: { kernel: 'k', initrd: 'i', append: 'b' } } }, arch: { amd64: { file: '^x$' }, arm64: { file: '^x$' } } }] }, 'x', 'arm64')?.append, 'b');
 eq('unattended: debian arm64', unattendedOf(CAT, 'debian', 'arm64')?.kernel, 'install.a64/vmlinuz');
 eq('unattended: ubuntu from the server image', [unattendedOf(CAT, 'ubuntu', 'amd64')?.kind, unattendedOf(CAT, 'ubuntu', 'amd64')?.image], ['autoinstall', 'ubuntu-server']);
 eq('unattended: fedora from the network installer', [unattendedOf(CAT, 'fedora', 'arm64')?.kind, unattendedOf(CAT, 'fedora', 'arm64')?.image, unattendedOf(CAT, 'fedora', 'amd64')?.append.includes('{label}')], ['kickstart', 'fedora-netinst', true]);
-eq('unattended: none for kali', unattendedOf(CAT, 'kali', 'amd64'), null);
+eq('unattended: kali, a preseed from its own disc', unattendedOf(CAT, 'kali', 'amd64'), { kind: 'kali', image: 'kali', kernel: 'install.amd/vmlinuz', initrd: 'install.amd/initrd.gz',
+  append: 'net.ifnames=0 preseed/file=/cdrom/simple-cdd/default.preseed simple-cdd/profiles=kali,offline desktop=xfce auto=true priority=critical --- quiet', release: '2026' });
+eq('unattended: kali arm64', unattendedOf(CAT, 'kali', 'arm64')?.kernel, 'install.a64/vmlinuz');
 eq('unattended: an unknown kind is none', unattendedOf({ systems: [{ id: 'x', unattended: { kind: 'other', arch: { amd64: { kernel: 'k', initrd: 'i' } } }, arch: { amd64: { file: '^x$' } } }] }, 'x', 'amd64'), null);
 eq('ubuntu server image in the signed list', pickImage(entryOf(CAT, 'ubuntu-server', 'amd64'), fs.readFileSync(path.join(here, 'vmimage/ubuntu-amd64.sums'), 'utf8'))?.name, 'ubuntu-26.04.1-live-server-amd64.iso');
 eq('ubuntu arm64 server image, not largemem', pickImage(entryOf(CAT, 'ubuntu-server', 'arm64'), fs.readFileSync(path.join(here, 'vmimage/ubuntu-arm64.sums'), 'utf8'))?.name, 'ubuntu-26.04.1-live-server-arm64.iso');
