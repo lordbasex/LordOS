@@ -69,7 +69,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "15", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "16", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -112,7 +112,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":15,\"whatever\":true}";
+    const char newer[] = "{\"schema\":16,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -482,6 +482,44 @@ static void test_schema(void) {
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 12);
         }
+        /* schema 15: storage (docs/VIRTUALIZATION.md 6.2, 6.4, 8): disposable memory|disk, encrypted, disk_format raw,
+         * backup false; each written only when it differs from a new machine, never below 15; raw excludes encrypted */
+        {
+            struct { const char *add; int schema, want; } s15[] = {
+                { "\"disposable\":\"memory\"", 15, VM_OK }, { "\"disposable\":\"disk\"", 15, VM_OK }, { "\"disposable\":\"off\"", 15, VM_E_RANGE },
+                { "\"disposable\":\"ram\"", 15, VM_E_RANGE }, { "\"disposable\":true", 15, VM_E_FIELD }, { "\"disposable\":\"memory\"", 14, VM_E_FIELD },
+                { "\"encrypted\":true", 15, VM_OK }, { "\"encrypted\":false", 15, VM_OK }, { "\"encrypted\":1", 15, VM_E_FIELD }, { "\"encrypted\":true", 14, VM_E_FIELD },
+                { "\"disk_format\":\"raw\"", 15, VM_OK }, { "\"disk_format\":\"qcow2\"", 15, VM_OK }, { "\"disk_format\":\"vmdk\"", 15, VM_E_RANGE },
+                { "\"disk_format\":\"raw\",\"encrypted\":true", 15, VM_E_RANGE }, { "\"disk_format\":\"raw\"", 14, VM_E_FIELD },
+                { "\"backup\":false", 15, VM_OK }, { "\"backup\":true", 15, VM_OK }, { "\"backup\":\"no\"", 15, VM_E_FIELD }, { "\"backup\":false", 14, VM_E_FIELD },
+                { "\"disposable\":\"disk\",\"encrypted\":true,\"backup\":false", 15, VM_OK },
+            };
+            for (size_t i = 0; i < sizeof s15 / sizeof s15[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s15[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s15[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s15[i].want) fprintf(stderr, "  schema 15 %s (%d): got %d (%s)\n", s15[i].add, s15[i].schema, r, err);
+                CHECK(r == s15[i].want);
+                if (r != VM_OK) continue;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                CHECK(jj && !strstr(jj, "\"backup\": true") && !strstr(jj, "\"encrypted\": false") && !strstr(jj, "\"disk_format\": \"qcow2\""));
+                free(jj);
+            }
+            /* a group's member: its group has the disposable switch, and its disk is qcow2 */
+            VmMachine gm;
+            vm_machine_parse(GOOD, strlen(GOOD), &gm, err, sizeof err);
+            CHECK(!strcmp(vm_disk_ext(&gm), "qcow2"));
+            gm.raw = 1;
+            CHECK(!strcmp(vm_disk_ext(&gm), "raw"));
+            /* the key's form: exactly 64 lowercase hex digits */
+            CHECK(vm_key_valid("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", 64));
+            CHECK(!vm_key_valid("0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef", 64));
+            CHECK(!vm_key_valid("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde", 63));
+            CHECK(!vm_key_valid("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg", 64));
+            CHECK(!vm_key_valid("a passphrase someone chose", 26));
+        }
         /* schema 13: perf_profile (the guest's performance profile, 7.1.4), true or false, written only when true, never
          * below 13 */
         {
@@ -489,7 +527,7 @@ static void test_schema(void) {
                 { "\"perf_profile\":true", 13, VM_OK, 1 }, { "\"perf_profile\":false", 13, VM_OK, 0 }, { "\"agent\":true", 13, VM_OK, 0 },
                 { "\"perf_profile\":1", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":\"on\"", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":null", 13, VM_E_FIELD, 0 },
                 { "\"perf_profile\":true", 12, VM_E_FIELD, 0 }, { "\"perf_profile\":false", 12, VM_OK, 0 },
-                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 15, VM_E_NEWER, 0 },
+                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 15, VM_OK, 1 }, { "\"perf_profile\":true", 16, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s13 / sizeof s13[0]; i++) {
                 char t[4096];

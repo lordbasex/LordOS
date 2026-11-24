@@ -7081,7 +7081,15 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         S.ncreds = 0;
     }
     S.lock_fd = open_lock(S.dir);
-    if (S.lock_fd == -2) { fprintf(stderr, "lord-vm: %s is already running\n", S.m.name); return 3; }
+    if (S.lock_fd == -2) {
+        /* the lock held while the machine is off: Backups copying its folder (it holds the lock shared, 6.14) or an
+         * operation of another lord-vm (a clone, an export) */
+        RunInfo ri;
+        int on = !runinfo_read(S.dir, &ri) && state_active(ri.state);
+        if (on) fprintf(stderr, "lord-vm: %s is already running\n", S.m.name);
+        else fprintf(stderr, "lord-vm: %s is busy: Backups is copying it, or it is being cloned or exported; it can start when that ends\n", S.m.name);
+        return 3;
+    }
     if (S.lock_fd < 0) { fprintf(stderr, "lord-vm: can't write in %s\n", S.dir); return 1; }
     {
         /* a Duplicate has the original's identity (6.3): the two never run at once (one socket, one -uuid) */
