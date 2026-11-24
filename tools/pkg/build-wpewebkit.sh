@@ -26,7 +26,12 @@
 # TMPFS=<size> (e.g. 64G) builds in a tmpfs mounted on the chroot folders: on a busy hard disk, dpkg's syncs while the
 # chroots are made take far longer than the build; the build needs about 30 GB. The chroots are throwaway, so dpkg also
 # runs with force-unsafe-io in them.
-# Builds for the machine's architecture (amd64, or arm64 on an arm64 host: docs/WPEWEBKIT.md "arm64").
+# ARCH=amd64|arm64 (default: this machine's). Another architecture than the machine's runs under qemu-user (its binfmt
+# handler must be registered with the F flag, as Debian's qemu-user-static does): slow, but the same chroots, checks and
+# tests (docs/WPEWEBKIT.md "arm64").
+# LORDOS_SRC=<LordOS tree> (default: the tree this script is in) adds lord-web to the test: built on both of its view
+# backends (WPEPlatform and legacy) against the new packages, then its web-backend-test and probe test; LORDOS_SRC=none
+# skips it.
 set -eu
 
 DVER=${1:?usage: build-wpewebkit.sh <debian-version, e.g. 2.54.3-1> [lordos-revision]}
@@ -37,7 +42,9 @@ case "$REV" in *[!0-9]*|'') echo "build-wpewebkit.sh: the LordOS revision is a n
 UP=${DVER%-*}
 NEWVER="$DVER~lordos13+$REV"
 HERE=$(cd "$(dirname "$0")" && pwd)
-WORK=${LORDOS_WPE_WORK:-/var/tmp/lordos-wpewebkit}/$NEWVER
+ARCH=${ARCH:-$(dpkg --print-architecture)}
+case "$ARCH" in amd64|arm64) ;; *) echo "build-wpewebkit.sh: ARCH is amd64 or arm64, not $ARCH" >&2; exit 1 ;; esac
+WORK=${LORDOS_WPE_WORK:-/var/tmp/lordos-wpewebkit}/$NEWVER/$ARCH
 MIRROR=${DEBIAN_MIRROR:-http://deb.debian.org/debian}
 SECURITY=${DEBIAN_SECURITY:-http://security.debian.org/debian-security}
 SUITE=trixie
@@ -46,12 +53,18 @@ SOURCES1="deb $MIRROR $SUITE main"
 SOURCES2="deb $MIRROR $SUITE-updates main"
 SOURCES3="deb $SECURITY $SUITE-security main"
 JOBS=${JOBS:-$(nproc)}
-ARCH=$(dpkg --print-architecture)
 
 die() { echo "build-wpewebkit.sh: $*" >&2; exit 1; }
 command -v mmdebstrap >/dev/null || die "needs mmdebstrap (sudo apt-get install mmdebstrap)"
 command -v curl >/dev/null || die "needs curl"
 SUDO=; [ "$(id -u)" = 0 ] || SUDO=sudo
+if [ "$ARCH" != "$(dpkg --print-architecture)" ]; then
+    q=$(case "$ARCH" in arm64) echo aarch64 ;; amd64) echo x86_64 ;; esac)
+    grep -qs '^enabled' "/proc/sys/fs/binfmt_misc/qemu-$q" && grep -qs '^flags:.*F' "/proc/sys/fs/binfmt_misc/qemu-$q" ||
+        die "building $ARCH here needs qemu-user's binfmt handler for $q with the F flag (apt-get install qemu-user-static)"
+fi
+LORDOS_SRC=${LORDOS_SRC:-$(cd "$HERE/../.." && pwd)}
+[ "$LORDOS_SRC" = none ] || [ -f "$LORDOS_SRC/server/mk/web.mk" ] || die "LORDOS_SRC=$LORDOS_SRC is not a LordOS tree (or say none)"
 TMPFS=${TMPFS:-}
 case "$TMPFS" in ''|[0-9]*[GM]) ;; *) die "TMPFS is a size like 64G" ;; esac
 
@@ -104,7 +117,7 @@ cat "$WORK/out/SHA256SUMS.debian-source"
 # 2. build in a fresh chroot (kept in $WORK/build-chroot until the next run, for a look after a failure)
 if [ -z "${TEST_ONLY:-}" ]; then
     fresh_dir "$WORK/build-chroot"
-    $SUDO mmdebstrap --variant=buildd --mode=root --dpkgopt=force-unsafe-io \
+    $SUDO mmdebstrap --variant=buildd --mode=root --architectures="$ARCH" --dpkgopt=force-unsafe-io \
         --include=ca-certificates,devscripts,debian-keyring,lintian,equivs,gnupg,gpgv,fakeroot \
         --customize-hook='mkdir -p "$1/build/in" "$1/build/out"' \
         --customize-hook="sync-in $WORK/in /build/in" \
@@ -125,10 +138,18 @@ mkdir -p "$WORK/out/test" "$WORK/debs"
 cp "$WORK/out/"*.deb "$WORK/debs/"
 rm -f "$WORK/debs/"*-dbgsym_*.deb "$WORK/debs/libwpewebkit-doc_"*.deb
 fresh_dir "$WORK/test-chroot"
-$SUDO mmdebstrap --variant=apt --mode=root --dpkgopt=force-unsafe-io \
-    --include=ca-certificates,gcc,libc6-dev,pkgconf,binutils,libegl-mesa0,libgl1-mesa-dri,libwpebackend-fdo-1.0-dev,passwd \
+rm -f "$WORK/lordos-src.tar"
+SRC_HOOK=true
+if [ "$LORDOS_SRC" != none ]; then
+    # the tree as it is on disk (its own build output left out)
+    tar -C "$LORDOS_SRC" --exclude=server/build -cf "$WORK/lordos-src.tar" server third_party package.json
+    SRC_HOOK="upload $WORK/lordos-src.tar /build/lordos-src.tar"
+fi
+$SUDO mmdebstrap --variant=apt --mode=root --architectures="$ARCH" --dpkgopt=force-unsafe-io \
+    --include=ca-certificates,gcc,libc6-dev,pkgconf,binutils,libegl-mesa0,libgl1-mesa-dri,libwpebackend-fdo-1.0-dev,passwd,make,libwayland-dev,wayland-protocols,libxkbcommon-dev,libegl-dev,python3 \
     --customize-hook='mkdir -p "$1/build/debs" "$1/build/test"' \
     --customize-hook="sync-in $WORK/debs /build/debs" \
+    --customize-hook="$SRC_HOOK" \
     --customize-hook="upload $HERE/wpewebkit-chroot.sh /build/wpewebkit-chroot.sh" \
     --customize-hook="upload $HERE/wpewebkit-headless-test.c /build/wpewebkit-headless-test.c" \
     --customize-hook="unshare --mount --pid --fork sh $HERE/wpewebkit-pivot.sh \"\$1\" /bin/sh /build/wpewebkit-chroot.sh test || echo FAILED > \"\$1/build/test/FAILED\"" \
