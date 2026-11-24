@@ -61,6 +61,8 @@
   "backup.saveFailed": "Nem sikerült menteni a mentési beállításokat",
   "backup.setupFailed": "Nem sikerült bekapcsolni a titkosítást",
   "backup.snapshotFailed": "Nem sikerült befejezni a biztonsági mentést: {errno}",
+  "backup.someFilesFailed": "Néhány fájlját nem sikerült visszaállítani",
+  "backup.restoreStartFailed": "Nem sikerült elindítani a visszaállítást",
   "backup.sourceUnreadable": "A forrásmappa nem olvasható",
   "backup.tooManyExclusions": "Túl sok kizárás",
   "backup.verifyFailed": "Egy mentési fájl nem ment át az ellenőrzésen (manipulálták, vagy rossz a kulcs)",

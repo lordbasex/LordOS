@@ -61,6 +61,8 @@
   "backup.saveFailed": "백업 설정을 저장할 수 없습니다",
   "backup.setupFailed": "암호화를 켤 수 없습니다",
   "backup.snapshotFailed": "백업을 마칠 수 없습니다: {errno}",
+  "backup.someFilesFailed": "일부 파일을 복원할 수 없었습니다",
+  "backup.restoreStartFailed": "복원을 시작할 수 없습니다",
   "backup.sourceUnreadable": "원본 폴더를 읽을 수 없습니다",
   "backup.tooManyExclusions": "제외 항목이 너무 많습니다",
   "backup.verifyFailed": "백업 파일 확인에 실패했습니다(변조되었거나 키가 잘못됨)",

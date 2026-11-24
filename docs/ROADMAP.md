@@ -965,6 +965,14 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   `issues/features-1` (on `test/integration-1125`), its tests pass there, and the 191 packages of the four languages
   plus the seven-language previews were built with version `2026.11.24` from the files fetched on 2026-11-22
   (unsigned, not published; 6.15 GB). Left: sign and publish them on the maintainer's Mac.
+- [ ] **Icons and files on the desktop** (maintainer, 2026-11-24; not started). Today the desktop holds widgets only, in
+  every desktop style. Plan: files and folders of `~/Desktop` (and optional app launchers and mounted volumes) shown as
+  icons on each display, in every theme through one SDK piece (per-display positions keyed by connector, grid snap,
+  RTL), with the same selection rules as Files (click, Shift/Ctrl, rubber band `apps/files/marquee.js`), drag and drop
+  to and from Files and apps, the context menu, and renaming by Enter, F2 or the slow second click on the name
+  (`sdk/slowclick.js`, already shared). Widgets stay above or beside them. Security: the folder is the user's own; a
+  `.desktop` file shown there never runs without the same trust check as the launcher; nothing outside `~/Desktop` is
+  written.
 - [ ] **iCloud: choose what to sync** ([#241](https://github.com/lordbasex/LordOS/issues/241); on the roadmap, not
   started). Today adding an iCloud account in Mail syncs every calendar and every address book it finds and adds an
   "iCloud – Calendar & Contacts" row to Mail's sidebar even when it carries no mail. Plan:

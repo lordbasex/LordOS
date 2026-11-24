@@ -313,13 +313,13 @@ site's "Tested graphics cards" page (draft: `web/content/hardware/gpus.*.md`) wi
 ## Monitor → GPU on NVIDIA (2026-11-24)
 
 The proprietary driver exposes no DRM fdinfo, no hwmon and no `gpu_busy_percent`, so Monitor → GPU (docs/MONITOR.md,
-"GPU") reads it through **lord-nvgpu**, a sandboxed helper approved by the maintainer on 2026-11-24 and built on its own
-branch (`mon/nvgpu-helper`): started by lord-server only while an NVIDIA card (vendor 0x10de, `nvidia` bound) exists and
+"GPU") reads it through **lord-nvgpu**, a sandboxed helper approved by the maintainer on 2026-11-24 (docs/MONITOR.md,
+"NVIDIA"): started by lord-server only while an NVIDIA card (vendor 0x10de, `nvidia` bound) exists and
 the GPU tab or the Overview is on screen; it `dlopen`s only `libnvidia-ml.so.1` from root-owned system library folders
 and answers with fixed-size records of numbers; lord-server never links or loads NVML, never runs `nvidia-smi`, and keeps
-only the session user's pids. Already in the Monitor (branch `mon/gpu-view`): `gpustat.c` reads
+only the session user's pids. The Monitor's side: `gpustat.c` reads
 `/proc/driver/nvidia/gpus/<slot>/information` (Model, Video BIOS) and which `/dev/nvidia<N>` each of the user's processes
-holds, links the helper's `nvgpu_json` weakly and adds its `"nv"` array; `gpumodel.js` merges it into the card (only
+holds, `mon.c` splices the helper's `"nv"` array into the sample, and `gpumodel.js` merges it into the card (only
 where sysfs has nothing) and the process rows by PCI bus id and pid, with every number's range checked again. Not yet
 tested on NVIDIA hardware: only canned and hostile values in `server/tests/gpu_model_test.mjs`.
 

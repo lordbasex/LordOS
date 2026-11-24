@@ -332,6 +332,17 @@ EOF
         77) skip "protected-windows" "build/lord-server-test, python3 and node with esbuild (make, npm install)" ;;
         *) bad "protected-windows (tests/protected_headless.sh, headless lord-server-test)"; cat "$T/out" ;;
     esac
+    # Lord Workspaces: a window launched from a display's bar lands on that display, in that activity and its slot, even
+    # after a profile picker and with another activity in view; a dialog told its parent late goes over it; the bar
+    # marks a minimized window (themes/workspaces/model/launches.js; left to right and right to left)
+    for lp in en ar; do
+        mkdir -p -m 700 "$T/launchplace"; LAUNCHPLACE_LANG=$lp LAUNCHPLACE_DIR="$T/launchplace" sh tests/launchplace_headless.sh >"$T/out" 2>&1
+        case $? in
+            0) ok "launch-placement-$lp (tests/launchplace_headless.sh, headless lord-server-test, a fake Chrome with a profile picker)" ;;
+            77) skip "launch-placement-$lp" "build/lord-server-test, build/launchplace-client, python3 and node with esbuild" ;;
+            *) bad "launch-placement-$lp (tests/launchplace_headless.sh)"; cat "$T/out" ;;
+        esac
+    done
     # launching an app that already runs (a browser's single instance) shows its window, even on a desktop not in view,
     # and a copy running with no window shows a new one (the 2026-11-23 Google Chrome case)
     sh tests/handoff_headless.sh >"$T/out" 2>&1
@@ -729,6 +740,9 @@ EOF
     # the rubber band: the rectangle, which cards and rows it touches, Shift and Ctrl, autoscroll, right to left, one update per frame (apps/files/marquee.js, GitHub #233)
     if have node; then run "files-marquee-test (apps/files/marquee.js)" node tests/files_marquee_test.mjs
     else skip "files-marquee-test" "node"; fi
+    # the slow second click that renames in place: double click, too late, drag, moved pointer, modifiers, selection, focus (sdk/slowclick.js)
+    if have node; then run "slowclick-test (sdk/slowclick.js)" node tests/slowclick_test.mjs
+    else skip "slowclick-test" "node"; fi
     # color tags and comments: the last tag and an emptied comment are removed (apps/files/tags.js, GitHub #181)
     if have node; then run "files-tags-test (apps/files/tags.js)" node tests/files_tags_test.mjs
     else skip "files-tags-test" "node"; fi
@@ -756,6 +770,12 @@ EOF
     # (0.8.8.8) a Linux app's OpenURI request: web addresses, files, and asking when the app is not in front (sdk/portalopenmodel.js)
     if have node; then run "portal-open-model-test (sdk/portalopenmodel.js)" node tests/portal_open_model_test.mjs
     else skip "portal-open-model-test" "node"; fi
+    # the FileChooser portal's dialog: the app's glob filters (Chromium's "*.[pP][dD][fF]") and where it goes (sdk/portalfilemodel.js)
+    if have node; then run "portal-file-model-test (sdk/portalfilemodel.js)" node tests/portal_file_model_test.mjs
+    else skip "portal-file-model-test" "node"; fi
+    # a Chromium-family browser's profiles from its own Local State (untrusted) and the profile an activity or display picks
+    if have node; then run "browser-profiles-test (sdk/browserprofilemodel.js)" node tests/browser_profiles_test.mjs
+    else skip "browser-profiles-test" "node"; fi
     # (0.8.8.8) a Linux app's global shortcuts: the sheet's rows, the combination a key names, what is refused (sdk/globalshortcutsmodel.js)
     if have node; then run "global-shortcuts-model-test (sdk/globalshortcutsmodel.js)" node tests/global_shortcuts_model_test.mjs
     else skip "global-shortcuts-model-test" "node"; fi

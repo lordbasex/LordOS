@@ -61,6 +61,8 @@
   "backup.saveFailed": "Tidak dapat menyimpan pengaturan cadangan",
   "backup.setupFailed": "Tidak dapat mengaktifkan enkripsi",
   "backup.snapshotFailed": "Tidak dapat menyelesaikan pencadangan: {errno}",
+  "backup.someFilesFailed": "Sebagian filenya tidak dapat dipulihkan",
+  "backup.restoreStartFailed": "Tidak dapat memulai pemulihan",
   "backup.sourceUnreadable": "Tidak dapat membaca folder sumber",
   "backup.tooManyExclusions": "Terlalu banyak pengecualian",
   "backup.verifyFailed": "Sebuah berkas cadangan gagal diverifikasi (telah dirusak atau kunci salah)",

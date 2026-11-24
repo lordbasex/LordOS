@@ -13,7 +13,7 @@ export { cleanThemeMeta, themeOptions, themeOptionValue, themeOptionPatch, theme
 export { settings, useSettings, useTrackedSettings } from './settings.js';
 export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPreferredLanguages, CORE_LANGUAGES, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
-export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage } from './localename.js';   // glibc region names (installer, Settings)
+export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage, regionLanguageCode, regionLabel } from './localename.js';   // glibc region names (installer, Settings)
 export { LANGUAGE_NAMES } from './langnames.js';   // languages not translated yet (Settings → Language & Region)
 export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken, addMenuBarKeys } from './shortcuts.js';
 export { ContextMenu } from './contextmenu.jsx';
@@ -110,12 +110,17 @@ export { startDisplayApps, useQuickApps, useDisplaySuggestion, quietDisplayApps,
 export { registerWidgetKind, widgetKinds, widgetCatalog, addDeskWidget, removeDeskWidget, setDeskWidget, resizeDeskWidget, startDeskWidgets, deskWidgetSize, kindSizes, WidgetDropTarget, widgetDrag, deskWidgetsShown, widgetDisplayKey } from './deskwidgets.jsx';
 export { Markdown, markdownHeadings, parseMarkdown, parseInline, toggleTask } from './markdown.jsx';
 export {
-  dock, useDockEntries, dockActivate, dockMenu, registerDockMenu, registerDockActions, registerDockActivate, dockQuickActions, launcherIdOf, dockIdOf, dockIdOfWindow,
+  dock, useDockEntries, dockActivate, dockMenu, appWindowItems, registerDockMenu, registerDockActions, registerDockActivate, dockQuickActions, launcherIdOf, dockIdOf, dockIdOfWindow,
   launchDockItem, dockPrefs, DOCK_DEFAULTS, dockHideSettings, DOCK_HIDE_MODES, DOCK_SIZE_MIN, DOCK_SIZE_MAX, DOCK_MAGNIFY_MAX, dockBadgeMetrics, useDockCovered, quitApp, DOCK_LAUNCHER, useTrash, trashState, refreshTrash, openTrash, emptyTrash, trashMenu,
   dockDrag, dockPoof, beginDockDrag, registerDockTarget, dockDragJustEnded,
 } from './dock.js';
+export { cleanWindowLabel, WINDOW_LABEL_MAX } from './windowlistmodel.js';
+// Chromium-family browsers' profiles (sdk/browserprofilemodel.js): read from their Local State as untrusted data
+export { browserProfiles, refreshBrowserProfiles, windowProfile, noteLaunchedProfile, forgetLaunchedProfile, launchedProfiles } from './browserprofiles.js';
+export { BROWSERS as PROFILE_BROWSERS, isProfileBrowser, profileChoice, cleanProfileChoices, cleanDisplayProfiles } from './browserprofilemodel.js';
 export { sound, useSound, useSoundPeak, soundState, defaultSink, defaultSource, microphones, headsetMics } from './sound.js';
 export { nearbyDevices, lowEnergySide, btErrorKey } from './btlistmodel.js';   // Settings → Bluetooth's nearby list (issue #78)
+export { NO_SELECTION, clickSelect, keepShown } from './listmodel.js';   // a list's pointer selection (Shift range, Ctrl toggle), e.g. Backups' restore browser (#231)
 export { SoundOutputList, useSoundOutputs } from './soundoutputs.js';   // choosing the output by the volume (issue #58)
 export { monitor, useMonitor, monitorSamples, monitorProcesses, monitorConnections, monitorDevices, monitorDetail, MONITOR_HISTORY, diskTempHistory, DISK_TEMP_HISTORY, firewall, firewallState } from './monitor.js';
 export * as fwRule from './fwrule.js';            // checks what the user types for a firewall rule
@@ -176,6 +181,7 @@ export {
 export { sortDrop, dropCount } from './filedrop.js';
 // Keyboard focus (sdk/focus.js): a highlighted item that skips separators, for lists that open from a focusable control
 export { menuStep } from './focusmodel.js';
+export { slowClick, DOUBLE_CLICK_MS, SLOW_CLICK_MAX_MS, SLOW_CLICK_SLOP } from './slowclick.js';   // the slow second click that renames in place (Files)
 import { FloatingWindows } from './components.jsx';
 // One stacking order for the desktop: <Layer name>, <Overlay anchor> (docs/LAYERS.md)
 export { LAYERS, Layer, Overlay, shellLayers } from './layers.js';

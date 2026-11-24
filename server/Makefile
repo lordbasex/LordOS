@@ -71,7 +71,7 @@ QJS_OBJ := $(patsubst %,build/qjs/%.o,quickjs libregexp libunicode cutils dtoa)
 
 # .lpk app isolation, permissions and signing (src/sec, see docs/PRIVACY.md and docs/SIGNING.md)
 # Monitor: metrics, connections and the country of an IP (src/monitor, see docs/MONITOR.md)
-MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/exeown.c src/monitor/describe.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
+MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/exeown.c src/monitor/describe.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
 # Media (src/media, docs/MEDIA.md): only the lord-server side. Only lord-media links FFmpeg.
 MEDIA_SRC := src/media/mstudio.c src/media/mstudiohub.c src/ui/js_studio.c src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
@@ -747,6 +747,13 @@ build/apps-actions-test: tests/apps_actions_test.c $(LAUNCH_CLI_SRC) src/apps.h 
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/apps_actions_test.c $(LAUNCH_CLI_SRC)
 	./$@ || { rm -f $@; exit 1; }
+# tests/apps_profile_test.c: lord.apps.launchProfile (approved 2026-11-24): the browser table, its system .desktop, the
+# profile folder its own Local State lists (hostile files refused), the one argv element built in C
+test: build/apps-profile-test
+build/apps-profile-test: tests/apps_profile_test.c $(LAUNCH_CLI_SRC) src/apps.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/apps_profile_test.c $(LAUNCH_CLI_SRC)
+	./$@ || { rm -f $@; exit 1; }
 # tests/iconfind_test.c: where an icon name's file is (src/iconfind.c): PNG, then SVG, then symbolic, over a made-up tree
 test: build/iconfind-test
 build/iconfind-test: tests/iconfind_test.c src/iconfind.c src/iconfind.h
@@ -834,16 +841,16 @@ build/backup-test: tests/backup_test.c src/backup/engine.c src/backup/crypt.c sr
 build/mmdb-test: tests/mmdb_test.c src/monitor/mmdb.c src/monitor/mmdb.h src/pkg/xz.c build/obj/ui/stb.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/mmdb_test.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o -lm
 # drawing time of the Monitor's vector map (not a test: it measures; see docs/MONITOR.md)
-build/map-bench: tests/map_bench.c src/monitor/map.c src/monitor/map.h src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/map_bench.c src/monitor/map.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
+build/map-bench: tests/map_bench.c src/monitor/map.c src/monitor/map.h src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/map_bench.c src/monitor/map.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
 # Monitor process actions (src/monitor/procctl.c): the protected list, stat parsing, a signal that
 # refuses a stale start time (PID reuse), TERM/KILL on a child, and the Get Info JSON
 test: build/procctl-test
 # one reading of Monitor → Network's sockets (tests/conn_dump.c), for checking conn.c by hand
-build/conn-dump: tests/conn_dump.c src/monitor/conn.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/conn_dump.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
-build/procctl-test: tests/procctl_test.c src/monitor/procctl.c src/monitor/procctl.h src/monitor/exeown.c src/monitor/exeown.h src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/procctl_test.c src/monitor/procctl.c src/monitor/exeown.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
+build/conn-dump: tests/conn_dump.c src/monitor/conn.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/conn_dump.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
+build/procctl-test: tests/procctl_test.c src/monitor/procctl.c src/monitor/procctl.h src/monitor/exeown.c src/monitor/exeown.h src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/procctl_test.c src/monitor/procctl.c src/monitor/exeown.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
 # (0.8.9.6) Monitor → Get Info's description (src/monitor/describe.c): Debian's Description-md5, a package's description
 # and its translation, manual pages' NAME, a unit's Description=
@@ -926,7 +933,7 @@ build/lordlog-test: tests/lordlog_test.c src/lordlog.c src/lordlog.h
 	    -o $@ tests/lordlog_test.c src/lordlog.c
 	./$@ || { rm -f $@; exit 1; }
 build/fsops-test: tests/fsops_test.c src/fsops.c src/fsops.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/fsops_test.c src/fsops.c -lpthread
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFSOPS_TEST -o $@ tests/fsops_test.c src/fsops.c -lpthread
 # lord.fs's Async calls (Files on Cloud and network folders): a slow file system never holds the caller (0.8.8.7)
 build/fsasync-test: tests/fsasync_test.c src/fsasync.c src/fsasync.h src/fsops.c src/fsops.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFSASYNC_TEST -o $@ tests/fsasync_test.c src/fsasync.c src/fsops.c -lpthread
@@ -1560,3 +1567,9 @@ build/wallpaper-image-test: tests/wallpaper_image_test.c src/hw/wallpaper_image.
 	$(CC) $(CPPFLAGS) -O1 -g -w -std=gnu11 -fsanitize=address,undefined -fno-sanitize=shift -fno-sanitize-recover=all -o $@ tests/wallpaper_image_test.c src/hw/wallpaper_image.c src/ui/stb.c -lm
 	ASAN_OPTIONS=detect_leaks=0 ./$@ || { rm -f $@; exit 1; }
 test: build/wallpaper-image-test
+
+# a Wayland app that behaves like Google Chrome with profiles (a picker, then the browser window, a dialog told its parent
+# late), for Lord Workspaces' launch placement: tests/launchplace_headless.sh (tests/launchplace_client.c)
+test: build/launchplace-client build/lord-server-test
+build/launchplace-client: tests/launchplace_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/launchplace_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client

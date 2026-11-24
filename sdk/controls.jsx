@@ -468,25 +468,42 @@ export function Popover({ anchor, onClose, width = 240, padding = 6, children, s
   const win = useAppWindow();
   const box = useRef(null);
   const [up, setUp] = useState(false);
+  // the side is chosen from the popover's own height, which exists only once it has been laid out: until then it is drawn
+  // invisible, and the side is checked again on the next frame (GitHub #237: Screenshots' Options menu first opened
+  // downward, cut off above the Dock, and moved up only on the next render)
+  const [placed, setPlaced] = useState(false);
+  const tries = useRef(0);
   const [, force] = useState(0);
   useFocusScope(box);
   usePopup(true, box, anchor, onClose);
   const a = boxOf(refNode(anchor));
   const area = inArea && inArea.w > 0 && inArea.h > 0 ? inArea : areaOf(win);
+  const room = a && inArea ? popoverRoom(a, area, up) : undefined;
   useEffect(() => {
     if (!a) { const id = setTimeout(() => force((v) => v + 1), 16); return () => clearTimeout(id); }
     const b = box.current && boxOf(box.current);
-    if (b) { const want = opensUp(a, area, b.h + 4); if (want !== up) setUp(want); }
+    if (!b || !(b.h > 0)) {
+      // not laid out yet; after a few frames without a size it is shown where it is
+      if (tries.current++ < 30) { const id = setTimeout(() => force((v) => v + 1), 16); return () => clearTimeout(id); }
+      if (!placed) setPlaced(true);
+      return undefined;
+    }
+    // cut to the room on its side (maxHeight): its own height is more than that, so it fits only where there is more room
+    const clipped = room != null && b.h >= room - 1;
+    const want = opensUp(a, area, clipped ? Infinity : b.h + 4);
+    // shown once it is on its side: a flip is drawn (still invisible) first, then shown on the next render
+    if (want !== up) setUp(want);
+    else if (!placed) setPlaced(true);
     return undefined;
   });
   if (!a) return null;
   const w = Math.max(0, Math.min(width, area.w - 16));
   const rtl = direction() === 'rtl';
   const x = Math.max(area.x + 8, Math.min(area.x + area.w - w - 8, rtl ? a.x + a.w - w : a.x));
-  const room = inArea ? popoverRoom(a, area, up) : undefined;
   return (
     <Overlay anchor={anchor}>
       <View ref={box} style={[{ position: 'absolute', left: x - a.x, [up ? 'bottom' : 'top']: a.h + 4, width: w, ...(room ? { maxHeight: room } : null), padding,
+        opacity: placed ? 1 : 0,
         borderRadius: t.menuRadius + 2, backgroundColor: popupBg(t), border: `1px solid ${t.separator}`, boxShadow: '0 12px 32px rgba(0,0,0,0.32)' }, style]}>
         {children}
       </View>

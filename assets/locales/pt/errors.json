@@ -61,6 +61,8 @@
   "backup.saveFailed": "Não foi possível salvar a configuração de backup",
   "backup.setupFailed": "Não foi possível ativar a criptografia",
   "backup.snapshotFailed": "Não foi possível concluir o backup: {errno}",
+  "backup.someFilesFailed": "Alguns dos seus arquivos não puderam ser restaurados",
+  "backup.restoreStartFailed": "Não foi possível iniciar a restauração",
   "backup.sourceUnreadable": "Não é possível ler a pasta de origem",
   "backup.tooManyExclusions": "Exclusões demais",
   "backup.verifyFailed": "Um arquivo do backup falhou na verificação (adulterado ou chave errada)",

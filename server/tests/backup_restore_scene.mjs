@@ -2,7 +2,8 @@
 // restore browser (GitHub #231). A file's icon is a page with lines, not a bare outline that reads as an empty check
 // box; a selected file with a long name gives the Restore button a label that ends with "…" inside the button's width
 // (the label used to overflow the 260 px button and lose both ends), and the button restores that file. Prints
-// "ok <name>" or "FAIL <name> <detail>".
+// "ok <name>" or "FAIL <name> <detail>". Several rows at once (#231): Ctrl adds a row, Shift picks a range, Restore sends
+// the list, the progress names the item going, and each item that failed is named with its error.
 import './battery_settings_scene_stubs.js';
 import React from 'react';
 import * as rt from '@lordos/runtime';
@@ -21,13 +22,15 @@ lord.locale.catalog = (lang, ns) => (lang === 'en' && ns === 'backup' ? JSON.str
 
 const LONG = 'lordos-rclone_1.75.2-1_amd64-with-a-much-longer-name.deb';
 const restored = [];
+let status = { state: 'idle', dest: '/media/u/USB', destAvailable: true, last: { when: 1 }, progress: {}, restore: {}, unlock: {} };
 lord.backup = {
-  status: () => ({ state: 'idle', dest: '/media/u/USB', destAvailable: true, last: { when: 1 }, progress: {}, restore: {}, unlock: {} }),
   config: () => ({ dest: '/media/u/USB', interval: 'hourly', pauseOnBattery: true, encrypt: false, exclude: [] }),
   configure: () => {},
   list: () => [{ id: 's1', time: 1763900000 }],
-  ls: (id, rel) => (rel ? [] : [{ name: 'Soft', dir: true, size: 0, mtime: 1 }, { name: LONG, dir: false, size: 20e6, mtime: 1 }]),
+  ls: (id, rel) => (rel ? [] : [{ name: 'Soft', dir: true, size: 0, mtime: 1 }, { name: LONG, dir: false, size: 20e6, mtime: 1 },
+    { name: 'notes.txt', dir: false, size: 10, mtime: 1 }, { name: 'Photos', dir: true, size: 0, mtime: 1 }]),
   restore: (id, rel, opts) => { restored.push([id, rel, !!opts.replace]); },
+  status: () => status,
   path: () => '/media/u/USB/s1',
 };
 
@@ -60,4 +63,48 @@ check('a long name ends with … inside the button (#231)', ls.textOverflow === 
   JSON.stringify(ls));
 await clickText(label, () => restored.length > 0);
 check('Restore restores that file', JSON.stringify(restored) === `[["s1","${LONG}",false]]`, JSON.stringify(restored));
+
+// ---- several rows (#231) ----
+const keyMod = async (flags) => { globalThis.__lordKey(flags ? 29 : 29, flags ? 1 : 0, flags & 1 ? 'Shift' : 'Control', '', '', flags); await flush(); };
+const rowOf = (name) => parents.get(chainOf(nodes(name)[0]));
+const clickRow = async (name, flags = 0) => {
+  if (flags) await keyMod(flags);
+  const r = rowOf(name);
+  __lordEvent('down', r, 2, 2, 0); __lordEvent('up', r, 2, 2, 0); await flush();
+  if (flags) await keyMod(0);
+};
+const selLabel = (n) => backupEn.restoreSelected.replace('{count}', n);
+await clickRow('Soft');
+check('a plain click picks one row', shown(backupEn.restoreItem.replace('{name}', 'Soft')));
+await clickRow('notes.txt', 2);
+check('Ctrl adds a row: Restore names how many', shown(selLabel(2)));
+await clickRow('Photos', 1);
+check('Shift picks the range from the last row', shown(selLabel(2)));
+// (never the same row twice in a row: that is a double click, which opens a folder)
+await clickRow(LONG, 2);
+check('Ctrl puts a row in', shown(selLabel(3)));
+await clickRow('notes.txt', 2);
+check('Ctrl takes a picked row out', shown(selLabel(2)));
+await clickRow('Soft', 2);
+await clickRow('notes.txt', 2);
+await clickRow('Soft', 2);
+check('Ctrl in and out again', shown(selLabel(3)));
+restored.length = 0;
+await clickText(selLabel(3), () => restored.length > 0);
+check('Restore sends the list of the picked rows, in their order', JSON.stringify(restored) === `[["s1",["${LONG}","notes.txt","Photos"],false]]`, JSON.stringify(restored));
+// progress, then a result with one item that failed
+status = { ...status, state: 'restoring', restore: { done: false, id: 's1', count: 3, index: 2, current: 'notes.txt' } };
+globalThis.__lordBackup(status);
+await flush();
+const going = backupEn.restoringItem.replace('{index}', 2).replace('{count}', 3).replace('{name}', 'notes.txt');
+check('the progress names the item going', shown(going));
+status = { ...status, state: 'idle', restore: { done: true, ok: false, id: 's1', files: 4, keptBoth: 0, replaced: 0, errors: 1, error: 'backup.badPath',
+  count: 3, index: 3, current: '', failedCount: 1, failed: [{ rel: 'Photos', error: 'backup.badPath' }] } };
+globalThis.__lordBackup(status);
+await flush();
+// (this stub has no errors catalog: the error shows as its code)
+const failedLine = (e) => backupEn.restoreItemFailed.replace('{name}', 'Photos').replace('{error}', e);
+check('the item that failed is named with its error', shown(failedLine('Invalid path')) || shown(failedLine('backup.badPath')),
+  [...texts.values()].filter((x) => String(x).includes('Photos')).join(' | '));
+check('the others are counted as restored', shown(backupEn.restoredInfo.other.replace('{count}', 4).replace('{both}', 0).replace('{replaced}', 0)));
 process.exit(0);

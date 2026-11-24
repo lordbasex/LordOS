@@ -522,13 +522,13 @@ With Monocypher 4.0.2 (vendored in `third_party/monocypher`, the same copy Passw
 | `runNow()`, `pause(on)`, `cancel()` | |
 | `list()` | `[{ id, time }]` |
 | `ls(id, rel)` | `[{ name, dir, link, size, mtime }]` (sizes already decrypted) |
-| `restore(id, rel, { replace, suffix, to })` | empty `rel`: everything |
+| `restore(id, rel, { replace, suffix, to })` | empty `rel`: everything. `rel` may be a list of 1 to 64 files and folders (#231): checked whole first (`bk_restore_list_valid`: each a safe relative path, "everything" only alone), then each restored by `bk_restore` with all its checks, one after the other (`bk_restore_list`); an item inside another listed folder comes with it once. `status().restore` adds `count`, `index`, `current` while it runs and `failed: [{ rel, error }]` (at most 8; `failedCount` all) |
 | `remove(id)`, `path(id)` | delete a snapshot; its real path for Files |
 | `unlock(passphrase, create)`, `lock()` | encryption |
 
 ### Tests and measurements
 
-`make -C server test` → `build/backup-test` (`server/tests/backup_test.c`), **220 checks**:
+`make -C server test` → `build/backup-test` (`server/tests/backup_test.c`), **243 checks**:
 snapshot, exclusions, fifo, symlinks stored as links, the destination inside the home folder, hard
 links (same inode), a run interrupted in the middle of a 40 MB file and resumed (already copied
 files are linked, no leftovers), restore (keep both, numbering, replace, creating folders, a

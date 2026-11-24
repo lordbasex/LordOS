@@ -61,6 +61,8 @@
   "backup.saveFailed": "Настройките за резервни копия не можаха да се запазят",
   "backup.setupFailed": "Шифроването не можа да се включи",
   "backup.snapshotFailed": "Резервното копие не можа да завърши: {errno}",
+  "backup.someFilesFailed": "Някои от файловете му не можаха да бъдат възстановени",
+  "backup.restoreStartFailed": "Възстановяването не можа да започне",
   "backup.sourceUnreadable": "Изходната папка не може да се прочете",
   "backup.tooManyExclusions": "Твърде много изключения",
   "backup.verifyFailed": "Файл от резервното копие не премина проверката (подправен е или ключът е грешен)",

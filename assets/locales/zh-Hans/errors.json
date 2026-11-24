@@ -61,6 +61,8 @@
   "backup.saveFailed": "无法保存备份设置",
   "backup.setupFailed": "无法开启加密",
   "backup.snapshotFailed": "无法完成备份：{errno}",
+  "backup.someFilesFailed": "其中部分文件无法恢复",
+  "backup.restoreStartFailed": "无法开始恢复",
   "backup.sourceUnreadable": "无法读取源文件夹",
   "backup.tooManyExclusions": "排除项太多",
   "backup.verifyFailed": "某个备份文件未通过验证（已被篡改或密钥错误）",

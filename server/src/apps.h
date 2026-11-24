@@ -108,6 +108,13 @@ int apps_window_names(const char *desktop_id, const char *app_id);
  * for lord.pkg.ownerOfApp (which package brought it). The id is validated and looked up as the launcher
  * does; the caller never gives a path. 0 if found. */
 int apps_system_file(const char *id, char *out, size_t n);
+/* lord.apps.launchProfile (approved by the maintainer 2026-11-24): a Chromium-family browser of apps.c's fixed table,
+ * from its system .desktop only, with one argv element "--profile-directory=<profile>" built here; profile must
+ * pass apps_profile_name_ok and be a key of profile.info_cache in that browser's own Local State (no link, a regular
+ * file of at most 1 MiB, sec/json.c). 0 if the process started. */
+int apps_launch_profile(const char *id, const char *profile);
+/* "Default" or "Profile N" (1 to 9999, no leading zero): 1 or 0 */
+int apps_profile_name_ok(const char *profile);
 /* Why the last apps_launch/apps_launch_with refused, as an error code ("" = no specific reason). */
 const char *apps_last_error(void);
 

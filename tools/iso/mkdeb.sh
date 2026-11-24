@@ -116,7 +116,7 @@ for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
          lord-stream:"libavcodec-dev libavformat-dev" lord-studio:"libavcodec-dev libavformat-dev" \
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
-         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-appstream:"" \
+         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-nvgpu:"" lord-appstream:"" \
          lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lord-vmunpack:"" lord-pgpv:"" lord-llm:"" lordos-guest:""; do
     b=${h%%:*}; need=${h#*:}
     [ -x "server/build/$b" ] && continue
@@ -334,6 +334,10 @@ fi
 # sandbox, on memfds lord-server hands it (docs/VIRTUALIZATION.md 5.6.1)
 [ -x server/build/lord-pgpv ] && install -m 755 server/build/lord-pgpv "$L/bin/lord-pgpv"
 [ -x "$L/bin/lord-pgpv" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-pgpv" 2>/dev/null || true; }
+# lord-nvgpu (approved 2026-11-24): Monitor → GPU's NVIDIA numbers, the only program that loads NVML, sandboxed;
+# lord-server starts it next to itself only while the GPU view is on screen (docs/MONITOR.md, "NVIDIA")
+[ -x server/build/lord-nvgpu ] && install -m 755 server/build/lord-nvgpu "$L/bin/lord-nvgpu"
+[ -x "$L/bin/lord-nvgpu" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-nvgpu" 2>/dev/null || true; }
 # lord-vmunpack (0.8.9, approved 2026-11-23): unpacks a machine group's verified archive (Whonix's KVM disks) in its
 # sandbox, from descriptors lord-vm hands it (docs/VIRTUALIZATION.md 19.6); next to lord-vm, which starts it
 [ -x server/build/lord-vmunpack ] && install -m 755 server/build/lord-vmunpack "$L/bin/lord-vmunpack"
@@ -559,6 +563,12 @@ License: CC-BY-4.0
 Files: usr/lib/lordos/assets/monitor/land.bin usr/lib/lordos/assets/locales/*/countries.json
 License: public-domain
  Natural Earth (https://www.naturalearthdata.com).
+
+Files: usr/lib/lordos/assets/locales/*/languages.json
+Copyright: Unicode, Inc.
+License: Unicode-3.0
+ Language names from Unicode CLDR (https://cldr.unicode.org) through Node.js's ICU, written by
+ tools/gen-language-names.mjs. https://www.unicode.org/license.txt
 
 Files: third_party/quickjs/* third_party/stb/*
 License: MIT and public-domain

@@ -850,11 +850,12 @@ static int build_filter(struct sock_filter *f, int cap, int net, const int *extr
     /* ioctl(2): only for decoding helpers, and only by device class
      * (type byte _IOC_TYPE = (request >> 8) & 0xff). Never a generic ioctl nor TIOCSTI. */
     if (ioctl_classes) {
-        int types[4], nt = 0;
+        int types[5], nt = 0;
         if (ioctl_classes & SANDBOX_IOCTL_DRM) types[nt++] = 'd';      /* DRM / VA-API */
         if (ioctl_classes & SANDBOX_IOCTL_V4L2) types[nt++] = 'V';     /* V4L2 (Pi 5) */
         if (ioctl_classes & SANDBOX_IOCTL_DMABUF) types[nt++] = 'b';   /* DMA-BUF sync */
         if (ioctl_classes & SANDBOX_IOCTL_MEDIA) types[nt++] = '|';    /* media controller requests (Pi 5) */
+        if (ioctl_classes & SANDBOX_IOCTL_NVIDIA) types[nt++] = 'F';   /* NV_IOCTL_MAGIC: lord-nvgpu only */
         EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_ioctl), 0, (unsigned char)(nt + 4)));
         EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[1])));   /* request (low 32 bits) */
         EMIT(BPF_STMT(BPF_ALU | BPF_AND | BPF_K, 0x0000ff00u));                             /* _IOC_TYPE << 8 */

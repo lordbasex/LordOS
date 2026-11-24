@@ -61,6 +61,8 @@
   "backup.saveFailed": "Die Backup-Einstellungen konnten nicht gespeichert werden",
   "backup.setupFailed": "Die Verschlüsselung konnte nicht eingeschaltet werden",
   "backup.snapshotFailed": "Das Backup konnte nicht abgeschlossen werden: {errno}",
+  "backup.someFilesFailed": "Einige seiner Dateien konnten nicht wiederhergestellt werden",
+  "backup.restoreStartFailed": "Die Wiederherstellung konnte nicht gestartet werden",
   "backup.sourceUnreadable": "Der Quellordner kann nicht gelesen werden",
   "backup.tooManyExclusions": "Zu viele Ausschlüsse",
   "backup.verifyFailed": "Eine Backup-Datei hat die Prüfung nicht bestanden (manipuliert oder falscher Schlüssel)",

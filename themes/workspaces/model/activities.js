@@ -18,6 +18,7 @@
 //   effectiveSurface(prefs, s)       'opaque' when Settings → Appearance → Transparency is off
 //   metaFromSaved(list, saved)       desktop id → activity, from the saved positions
 //   savedFromMeta(list, meta)        back to positions, for the settings file
+import { cleanProfileChoices } from '../../../sdk/browserprofilemodel.js';
 import { cleanLayout, cleanRatio } from './layouts.js';
 import { themeOptions, themeOptionPatch } from '../../../sdk/thememeta.js';
 
@@ -79,6 +80,9 @@ export function cleanActivity(a, index = 0) {
     pins: Array.isArray(a.pins) ? [...new Set(a.pins.filter(isKey))].slice(0, MAX_PINS) : [],
     layouts: cleanLayouts(a.layouts),
     setup: a.setup === true,
+    // the browser profile a launch from this activity opens, per browser (sdk/browserprofilemodel.js; used once the
+    // profile launch path is approved, docs/WORKSPACES.md "Browser profiles")
+    ...(Object.keys(cleanProfileChoices(a.profiles)).length ? { profiles: cleanProfileChoices(a.profiles) } : null),
     // when the person last changed it (the proposal's updatedAt), an ISO date
     ...(typeof a.updatedAt === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(a.updatedAt) ? { updatedAt: a.updatedAt } : null),
     ...(groups.length ? { groups, ...(groups.some((g) => g.id === a.group) ? { group: a.group } : null) } : null),

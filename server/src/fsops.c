@@ -210,15 +210,50 @@ int fsops_rename(const char *from, const char *to, char *err, size_t errlen) {
 
 /* ---- deleting a tree (only used by cross-disk move and the trash) ---- */
 
+#ifdef FSOPS_TEST
+int (*fsops_test_rmdir)(const char *) = rmdir;     /* tests/fsops_test.c: a folder a provider still lists as full */
+#define RMDIR(p) fsops_test_rmdir(p)
+#else
+#define RMDIR(p) rmdir(p)
+#endif
+
+/* The wait a cross-disk move's removal may spend on a folder that reads ENOTEMPTY (GitHub #243): a Cloud account
+ * (pCloud) can still list a file it has just deleted, for a moment, so the folder's rmdir fails although everything in
+ * it is gone. Only that rmdir is tried again, with a short backoff, never a new walk of the folder: nothing that wasn't
+ * moved is ever deleted, and a folder that really has something in it still fails, after the budget. Per thread: only
+ * a copy job's own thread sets it (rm_tree_patient); the Trash and the interface's thread never wait. */
+#define RM_PATIENCE_MS 4500
+static _Thread_local int rm_wait_ms;
+static int rm_dir(const char *p) {
+    int delay = 100;
+    for (;;) {
+        if (!RMDIR(p)) return 0;
+        if (errno != ENOTEMPTY || rm_wait_ms <= 0) return -1;
+        int d = delay < rm_wait_ms ? delay : rm_wait_ms;
+        struct timespec ts = { d / 1000, (long)(d % 1000) * 1000000L };
+        while (nanosleep(&ts, &ts) && errno == EINTR) {}
+        rm_wait_ms -= d;
+        delay *= 2;
+    }
+}
 static int rm_cb(const char *p, const struct stat *st, int flag, struct FTW *f) {
     (void)st; (void)f;
-    return flag == FTW_DP ? rmdir(p) : unlink(p);
+    return flag == FTW_DP ? rm_dir(p) : unlink(p);
 }
 static int rm_tree(const char *p) {
     struct stat st;
     if (lstat(p, &st)) return errno == ENOENT ? 0 : -1;
     if (!S_ISDIR(st.st_mode)) return unlink(p);
     return nftw(p, rm_cb, 32, FTW_DEPTH | FTW_PHYS);
+}
+/* rm_tree for a move's source, on the job's thread: a folder may read ENOTEMPTY for up to RM_PATIENCE_MS in all */
+static int rm_tree_patient(const char *p) {
+    rm_wait_ms = RM_PATIENCE_MS;
+    int r = rm_tree(p);
+    int e = errno;
+    rm_wait_ms = 0;
+    errno = e;
+    return r;
 }
 
 /* ---- copy / move ---- */
@@ -342,7 +377,7 @@ static void *job_main(void *arg) {
         seterrno(j->error, sizeof j->error, errno);
         rm_tree(j->dst);                                /* no half-done copies */
         j->failed = 1;
-    } else if (j->move && rm_tree(j->src)) {
+    } else if (j->move && rm_tree_patient(j->src)) {
         lerr_set(j->error, sizeof j->error, "fs.moveRemoveFailed", "errno", lerr_errno(errno), NULL);
         j->failed = 1;
     }

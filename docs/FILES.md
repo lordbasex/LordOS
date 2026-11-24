@@ -78,8 +78,19 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   **sort** by name (natural: «2» before «10»), kind, date or size. Folders go first. Recents and
   the Trash go by date.
 - **Selection:** click, ❖/Ctrl+click, ⇧+click (range), ❖A, and typing the start of a name.
-- **Rename in place** (Enter): the name is selected and what you type replaces it
-  (`TextInput selectAll`, new in the SDK). Tags follow the file.
+- **Rename in place** (Enter or F2): the name is selected and what you type replaces it
+  (`TextInput selectAll`, new in the SDK). Tags follow the file. A **slow second click** on the name of the selected
+  item starts it too (in the icon, list and column views): the item is already the only one selected, the second click
+  lands on its name (not the icon) at least the double-click interval (450 ms, the runtime's; there is no setting for
+  it) and at most 1.5 s after the first, within 4 px of it, with the left button and no modifier key, and no other
+  press follows within the double-click interval (a double click still opens). A drag (the item, or the rubber band)
+  never renames, and neither does a click that only brought the window forward: the first click must land on an
+  already focused window. Only what Rename changes without a notice: never in a read-only folder, the Trash, an
+  archive, Applications, the Network page or on a mount point. A key, a double click or the window losing the focus
+  cancels a rename that is waiting. The timing rule is the SDK's `sdk/slowclick.js` (pure; `server/tests/slowclick_test.mjs`)
+  for every view that shows files; LordOS's desktops (Lord Flow, Lord Classic, Lord Workspaces, Lord Celeste) don't
+  show files on the desktop, so Files is its only user today. Headless scene: `tests/app_scene_headless.sh
+  files_slowrename_scene`.
 - **Copy, cut and paste files:** Files keeps its own list (a cut moves only between Files windows) and
   also puts the paths on the session clipboard as Linux file managers do (`text/uri-list`,
   `x-special/gnome-copied-files`, the paths as text), so they paste in a Linux file manager, a chat or an
@@ -455,7 +466,7 @@ on VM 116 with the development stand-in for `lord.cloud` (`sdk/cloudmock.js`, `"
 | Ctrl + / Ctrl − / Ctrl 0, Ctrl + wheel | Zoom in / out / actual size (icons and list) |
 | ❖[ / ❖] / ❖↑ | Back / forward / enclosing folder |
 | ❖↓ or double click | Open |
-| Enter | Rename |
+| Enter or F2, or a slow second click on the selected name | Rename |
 | ❖⇧N | New folder |
 | ❖D | Duplicate |
 | ❖C / ❖X / Ctrl+V | Copy / cut / paste files (also with Ctrl) |
