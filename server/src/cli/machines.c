@@ -1408,8 +1408,9 @@ static int cp_step(const Machine *x, const char *script, const char *const *args
     }
     size_t c = res.outlen < cap ? res.outlen : cap;
     /* every caller passes sizeof out - 1, so out[cap] exists: the answer is always NUL-terminated inside the buffer, and
-     * an answer that doesn't fit is refused rather than cut (it comes from the guest: hostile) */
-    if (out && cap && res.outlen >= cap) {
+     * an answer that doesn't fit is refused rather than cut (it comes from the guest: hostile). An answer of exactly cap
+     * bytes fits: a whole 128 KB piece of cp's copy out (it was refused, so every file over 128 KB failed) */
+    if (out && cap && res.outlen > cap) {
         ERR("execFailed", "name", x->m.name, "why", "the machine gave a strange answer", NULL);
         free(keep);
         return -1;

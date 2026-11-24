@@ -8433,11 +8433,12 @@ static int kboot_ready(const char *real) {
     return file_exists(p);
 }
 
-/* one of the person's files copied into disks/boot/NAME: opened without following a link, a regular file of 1 byte to
- * max, its start checked when it is the kernel; written under a temporary name, synced, renamed over the old one. The
- * copy is read from the descriptor (fstat on it), so a name changed meanwhile can't swap another file in */
-static int kboot_copy(const char *real, const char *src, const char *name, long max, int kernel_arch, char *err, size_t errlen) {
-    char dst[PATH_MAX + 64], tmp[PATH_MAX + 80];
+/* one of the person's files staged as disks/boot/.new-<base> (base: "vmlinuz", "initrd"): opened without following a
+ * link, a regular file of 1 byte to max, its start checked when it is the kernel (kernel_arch >= 0), copied from the
+ * descriptor (fstat on it, so a name changed meanwhile can't swap another file in) and synced. kboot_files renames the
+ * staged files only once every one of them is in, so a refused --set changes nothing */
+static int kboot_stage(const char *real, const char *src, const char *base, long max, int kernel_arch, char *err, size_t errlen) {
+    char tmp[PATH_MAX + 80];
     int in = open(src, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NOCTTY | O_NONBLOCK), out = -1, rc = -1;
     struct stat st;
     if (in < 0) { snprintf(err, errlen, "%s: %s", src, strerror(errno)); return -1; }
@@ -8451,11 +8452,10 @@ static int kboot_copy(const char *real, const char *src, const char *name, long 
             goto done;
         }
     }
-    snprintf(dst, sizeof dst, "%s/disks/%s", real, name);
-    snprintf(tmp, sizeof tmp, "%s/disks/" VM_KBOOT_DIR "/.new-%s", real, strrchr(name, '/') + 1);
+    snprintf(tmp, sizeof tmp, "%s/disks/" VM_KBOOT_DIR "/.new-%s", real, base);
     unlink(tmp);
     out = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
-    if (out < 0) { snprintf(err, errlen, "disks/%s: %s", name, strerror(errno)); goto done; }
+    if (out < 0) { snprintf(err, errlen, "disks/boot: %s", strerror(errno)); goto done; }
     static uint8_t buf[1 << 20];
     off_t left = st.st_size;
     while (left > 0) {
@@ -8463,53 +8463,67 @@ static int kboot_copy(const char *real, const char *src, const char *name, long 
         if (r < 0 && errno == EINTR) continue;
         if (r <= 0) { snprintf(err, errlen, "%s: %s", src, r < 0 ? strerror(errno) : "it got shorter while being read"); goto done; }
         if (r > left) r = (ssize_t)left;     /* a file that grew meanwhile: only the size it had */
-        if (write_all(out, buf, (size_t)r)) { snprintf(err, errlen, "disks/%s: %s", name, strerror(errno)); goto done; }
+        if (write_all(out, buf, (size_t)r)) { snprintf(err, errlen, "disks/boot: %s", strerror(errno)); goto done; }
         left -= r;
     }
-    if (fsync(out)) { snprintf(err, errlen, "disks/%s: %s", name, strerror(errno)); goto done; }
-    close(out); out = -1;
-    if (rename(tmp, dst)) { snprintf(err, errlen, "disks/%s: %s", name, strerror(errno)); goto done; }
+    if (fsync(out)) { snprintf(err, errlen, "disks/boot: %s", strerror(errno)); goto done; }
     rc = 0;
 done:
     if (out >= 0) close(out);
-    if (rc) unlink(tmp);
+    if (rc && out >= 0) unlink(tmp);
     close(in);
     return rc;
 }
 
-/* --kernel, --initrd FILE|none, --cmdline TEXT: disks/boot made (0700) and filled. Refused for a machine whose checks
- * refuse kernel_boot (secure boot, the virtio-win devices, encryption, a group): the files would never be used, and an
- * encrypted machine's would lie in the clear */
+/* --kernel, --initrd FILE|none, --cmdline TEXT: disks/boot made (0700) and filled, all or nothing. Refused for a machine
+ * whose checks refuse kernel_boot (secure boot, the virtio-win devices, encryption, a group): the files would never be
+ * used, and an encrypted machine's would lie in the clear */
 static int kboot_files(const char *real, const VmMachine *m, const char *kfile, const char *ifile, const char *kcmd, char *err, size_t errlen) {
     VmMachine t = *m;
     t.kernel_boot = 1; t.schema = VM_SCHEMA;
     if (vm_machine_check(&t, err, errlen)) return -1;
+    char c[VM_KBOOT_CMDLINE_MAX + 2] = "";
+    if (kcmd) {
+        if (strlen(kcmd) > VM_KBOOT_CMDLINE_MAX + 1) { snprintf(err, errlen, "the command line is longer than %d characters", VM_KBOOT_CMDLINE_MAX); return -1; }
+        snprintf(c, sizeof c, "%s", kcmd);
+        if (!kboot_cmdline_clean(c)) { snprintf(err, errlen, "the command line is 1 to %d printable characters", VM_KBOOT_CMDLINE_MAX); return -1; }
+    }
     char d[PATH_MAX + 32];
     snprintf(d, sizeof d, "%s/disks/" VM_KBOOT_DIR, real);
     if (mkdir(d, 0700) && errno != EEXIST) { snprintf(err, errlen, "disks/boot: %s", strerror(errno)); return -1; }
     struct stat st;
     if (lstat(d, &st) || !S_ISDIR(st.st_mode)) { snprintf(err, errlen, "disks/boot isn't a folder"); return -1; }
+    /* staged: the kernel, the initrd, the command line; nothing is replaced until all of them are in */
+    static const char *const base[3] = { "vmlinuz", "initrd", "cmdline" };
+    static const char *const final[3] = { VM_KBOOT_KERNEL, VM_KBOOT_INITRD, VM_KBOOT_CMDLINE };
+    int staged[3] = { 0, 0, 0 }, rc = -1;
+    char tp[PATH_MAX + 80], fp[PATH_MAX + 64];
+    int drop_initrd = ifile && !strcmp(ifile, "none");
+    if (kfile) { if (kboot_stage(real, kfile, base[0], VM_KBOOT_KERNEL_MAX, m->arch, err, errlen)) goto out; staged[0] = 1; }
+    if (ifile && !drop_initrd) { if (kboot_stage(real, ifile, base[1], VM_KBOOT_INITRD_MAX, -1, err, errlen)) goto out; staged[1] = 1; }
     if (kcmd) {
-        char c[VM_KBOOT_CMDLINE_MAX + 2];
-        if (strlen(kcmd) > VM_KBOOT_CMDLINE_MAX + 1) { snprintf(err, errlen, "the command line is longer than %d characters", VM_KBOOT_CMDLINE_MAX); return -1; }
-        snprintf(c, sizeof c, "%s", kcmd);
-        if (!kboot_cmdline_clean(c)) { snprintf(err, errlen, "the command line is 1 to %d printable characters", VM_KBOOT_CMDLINE_MAX); return -1; }
-        char p[PATH_MAX + 64], tmp[PATH_MAX + 80];
-        snprintf(p, sizeof p, "%s/disks/" VM_KBOOT_CMDLINE, real);
-        snprintf(tmp, sizeof tmp, "%s/disks/" VM_KBOOT_DIR "/.new-cmdline", real);
-        unlink(tmp);
-        int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
-        if (fd < 0 || write_all(fd, c, strlen(c)) || fsync(fd)) { if (fd >= 0) close(fd); unlink(tmp); snprintf(err, errlen, "disks/boot/cmdline: %s", strerror(errno)); return -1; }
+        snprintf(tp, sizeof tp, "%s/disks/" VM_KBOOT_DIR "/.new-cmdline", real);
+        unlink(tp);
+        int fd = open(tp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+        if (fd < 0 || write_all(fd, c, strlen(c)) || fsync(fd)) { if (fd >= 0) { close(fd); unlink(tp); } snprintf(err, errlen, "disks/boot/cmdline: %s", strerror(errno)); goto out; }
         close(fd);
-        if (rename(tmp, p)) { unlink(tmp); snprintf(err, errlen, "disks/boot/cmdline: %s", strerror(errno)); return -1; }
+        staged[2] = 1;
     }
-    if (kfile && kboot_copy(real, kfile, VM_KBOOT_KERNEL, VM_KBOOT_KERNEL_MAX, m->arch, err, errlen)) return -1;
-    if (ifile && !strcmp(ifile, "none")) {
-        char p[PATH_MAX + 64];
-        snprintf(p, sizeof p, "%s/disks/" VM_KBOOT_INITRD, real);
-        if (unlink(p) && errno != ENOENT) { snprintf(err, errlen, "disks/boot/initrd: %s", strerror(errno)); return -1; }
-    } else if (ifile && kboot_copy(real, ifile, VM_KBOOT_INITRD, VM_KBOOT_INITRD_MAX, -1, err, errlen)) return -1;
-    return 0;
+    for (int i = 0; i < 3; i++) {
+        if (!staged[i]) continue;
+        snprintf(tp, sizeof tp, "%s/disks/" VM_KBOOT_DIR "/.new-%s", real, base[i]);
+        snprintf(fp, sizeof fp, "%s/disks/%s", real, final[i]);
+        if (rename(tp, fp)) { snprintf(err, errlen, "disks/%s: %s", final[i], strerror(errno)); goto out; }
+        staged[i] = 0;
+    }
+    if (drop_initrd) {
+        snprintf(fp, sizeof fp, "%s/disks/" VM_KBOOT_INITRD, real);
+        if (unlink(fp) && errno != ENOENT) { snprintf(err, errlen, "disks/boot/initrd: %s", strerror(errno)); goto out; }
+    }
+    rc = 0;
+out:
+    for (int i = 0; i < 3; i++) if (staged[i]) { snprintf(tp, sizeof tp, "%s/disks/" VM_KBOOT_DIR "/.new-%s", real, base[i]); unlink(tp); }
+    return rc;
 }
 
 static int cmd_set(const char *dir, int argc, char **argv) {

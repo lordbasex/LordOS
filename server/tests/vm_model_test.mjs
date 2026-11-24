@@ -861,12 +861,77 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   const fsm = await import('node:fs');
   const en = JSON.parse(fsm.readFileSync(path.join(here, '../../assets/locales/en/machines.json'), 'utf8'));
   const host = { kvm: false, kvmDevice: true };
-  const ids = new Set(M.reqRows(host, ['amd64', 'arm64'], ['swtpm', 'ovmf']).map(([k]) => k.split('.')[0]));
+  const ids = new Set([null, { windows: true, unattended: true }, { windows: false }].flatMap((sys) => M.reqRows(host, ['amd64', 'arm64'], ['swtpm', 'ovmf'], sys)).map(([k]) => k.split('.')[0]));
   eq('requirements: every id is known', [...ids].sort(), [...M.REQ_IDS].sort());
   for (const id of M.REQ_IDS) eq(`requirements: ${id} has req.row and req.use`, [typeof en[`req.row.${id}`], typeof en[`req.use.${id}`]], ['string', 'string']);
   eq('requirements: tpm only with amd64', M.reqRows(host, ['arm64'], []).some(([k]) => k === 'tpm'), false);
   eq('requirements: missing swtpm', M.reqRows(host, ['amd64'], ['swtpm']).find(([k]) => k === 'tpm')[1], 'missing');
   eq('library menu key', typeof en.libraryMenu, 'string');
+  // a chosen system's page (5.2): only what it needs, with the parts that aren't packages
+  const tools = { ...host, guestTools: { linux: true, windows: false } };
+  const lx = M.reqRows(tools, ['amd64'], [], { windows: false, unattended: true });
+  eq('requirements: a Linux system has no TPM row', lx.some(([k]) => k === 'tpm'), false);
+  eq('requirements: a Linux system has its tools and answers', [lx.find(([k]) => k === 'tools')[1], lx.find(([k]) => k === 'answers')[1]], ['ready', 'builtin']);
+  const win = M.reqRows(tools, ['amd64'], ['swtpm'], { windows: true, unattended: false });
+  eq('requirements: a virtio-win system: TPM, drivers, WinFsp, its tools', ['tpm', 'drivers', 'winfsp', 'toolsWin'].map((k) => (win.find(([x]) => x === k) || [])[1]), ['missing', 'download', 'download', 'missing']);
+  eq('requirements: no answers without an unattended install', win.some(([k]) => k === 'answers'), false);
+  for (const st of ['ready', 'missing', 'notAllowed', 'off', 'download', 'builtin']) eq(`requirements: status ${st} has a word`, typeof en[`req.st.${st}`], 'string');
+  eq('requirements: a system page has a title', typeof en['req.pageFor'], 'string');
+}
+
+// ---- "Guest can see" (8, 16): one list of every channel, its state, its switch ----
+{
+  const fsm = await import('node:fs');
+  const en = JSON.parse(fsm.readFileSync(path.join(here, '../../assets/locales/en/machines.json'), 'utf8'));
+  const m = { network: 'shared', ports: [{}], clipboard: 'to-guest', shares: [{ tag: 'a' }], transfer: true, agent: true, automation: false, guestFiles: true,
+    guestLinks: false, guestNotify: true, sound: true, microphone: false, graphics: '3d', agentState: 'connected' };
+  const rows = M.guestChannels(m, m, {});
+  const on = Object.fromEntries(rows.map((r) => [r.id, r.on]));
+  eq('see: the channels', rows.map((r) => r.id), ['network', 'display', 'input', 'sound', 'microphone', 'clipIn', 'clipOut', 'folders', 'transfer', 'agent', 'automation', 'files', 'links', 'notify']);
+  eq('see: states', [on.network, on.clipIn, on.clipOut, on.folders, on.transfer, on.agent, on.automation, on.files, on.links, on.notify, on.sound, on.microphone],
+    [true, true, false, true, true, true, false, true, false, true, true, false]);
+  eq('see: display kind', rows.find((r) => r.id === 'display').vars.kind, '3d');
+  for (const r of rows) eq(`see: ${r.id} has a label`, typeof en[`cfg.see.row.${r.id}`], 'string');
+  for (const k of ['2d', '3d', 'vgpu']) eq(`see: display ${k} words`, typeof en[`cfg.see.display.${k}`], 'string');
+  for (const k of ['connected', 'waiting', 'next']) eq(`see: live ${k} words`, typeof en[`cfg.see.live.${k}`], 'string');
+  // every row either has a switch, a section or is fixed
+  eq('see: every row can be changed or says where', rows.every((r) => r.key || r.section || r.fixed), true);
+  // live: the agent's state while running; a draft change says "at the next start"
+  const live = M.guestChannels({ ...m, transfer: false }, m, { running: true, agentState: 'connected' });
+  eq('see: live agent', live.find((r) => r.id === 'agent').live, 'connected');
+  eq('see: a changed switch waits for the next start', live.find((r) => r.id === 'transfer').live, 'next');
+  eq('see: agent waiting', M.guestChannels(m, m, { running: true, agentState: 'waiting' }).find((r) => r.id === 'agent').live, 'waiting');
+  eq('see: not running, no live state', M.guestChannels(m, m, {}).every((r) => r.live === ''), true);
+  // the agent off: its children are off and locked
+  const noag = M.guestChannels({ ...m, agent: false }, m, {});
+  eq('see: no agent, no automation, files, links, notes', ['automation', 'files', 'links', 'notify'].map((id) => { const r = noag.find((x) => x.id === id); return [r.on, r.locked]; }),
+    [[false, true], [false, true], [false, true], [false, true]]);
+  // anonymity: host-to-guest channels locked
+  const anon = M.guestChannels({ ...m, clipboard: 'off', shares: [], transfer: false, agent: false }, { ...m, profileLock: 'anonymity' }, {});
+  eq('see: anonymity locks the clipboard, folders, transfer, agent', ['clipIn', 'clipOut', 'folders', 'transfer', 'agent'].map((id) => anon.find((r) => r.id === id).locked), [true, true, true, true, true]);
+  // switches
+  eq('see: clipboard in off', M.channelSet('clipIn', false, { clipboard: 'both' }), { clipboard: 'from-guest' });
+  eq('see: clipboard out on', M.channelSet('clipOut', true, { clipboard: 'to-guest' }), { clipboard: 'both' });
+  eq('see: clipboard both off', M.channelSet('clipOut', false, { clipboard: 'from-guest' }), { clipboard: 'off' });
+  eq('see: network off is isolated', M.channelSet('network', false, { network: 'bridged' }), { network: 'isolated' });
+  eq('see: network on keeps its mode', M.channelSet('network', true, { network: 'hostonly' }), { network: 'hostonly' });
+  eq('see: network back on is shared', M.channelSet('network', true, { network: 'isolated' }), { network: 'shared' });
+  eq('see: files', M.channelSet('files', false, {}), { guestFiles: false });
+  eq('see: unknown', M.channelSet('display', true, {}), {});
+}
+
+// ---- Start Linux directly (6.1, schema 21): when the switch is refused ----
+{
+  const fsm = await import('node:fs');
+  const en = JSON.parse(fsm.readFileSync(path.join(here, '../../assets/locales/en/machines.json'), 'utf8'));
+  eq('kboot: a Linux machine', M.kbootBlocked({ firmware: 'uefi', secureBoot: false }), '');
+  eq('kboot: secure boot', M.kbootBlocked({ firmware: 'uefi', secureBoot: true }), 'secureBoot');
+  eq('kboot: BIOS ignores secureBoot', M.kbootBlocked({ firmware: 'bios', secureBoot: true }), '');
+  eq('kboot: virtio-win devices', M.kbootBlocked({ windowsDevices: true }), 'windows');
+  eq('kboot: encrypted', M.kbootBlocked({ encrypted: true }), 'encrypted');
+  eq('kboot: group member', M.kbootBlocked({ groupId: 'x' }), 'group');
+  for (const k of ['secureBoot', 'windows', 'encrypted', 'group']) eq(`kboot: why ${k} has words`, typeof en[`cfg.kboot.no.${k}`], 'string');
+  eq('kboot: draft fields in the boot section', [M.FIELD_SECTION.kernelBoot, M.FIELD_SECTION.cmdline], ['boot', 'boot']);
 }
 
 // ---- the LordOS Guest Tools disc (6.17, lordvm.c VAG_DISC): when the popover offers it, and what it shows ----

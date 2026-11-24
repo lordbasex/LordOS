@@ -191,8 +191,14 @@ export function isolationGaps(host, st) {
 const OPTIONAL = ['swtpm'];
 // The Requirements page's rows (library.jsx): [id, status]; each id has machines.req.row.<id> and machines.req.use.<id>
 // (an id "engine.amd64" uses "engine" with { arch })
-export function reqRows(host, list, missing) {
+// With sys (the system chosen in the assistant: { windows, unattended }), the page is that system's (5.2, "Requirements
+// check"): the TPM only for a virtio-win guest, and the parts that aren't packages: its drivers and WinFsp (downloaded at
+// Create from the maker's pinned file, 'download'), the LordOS guest tools (in the lordos package, host.guestTools) and
+// the unattended install's answers (made by lord-vm itself, 'builtin')
+export function reqRows(host, list, missing, sys = null) {
   const have = (pk) => !missing.includes(pk);
+  const tools = host.guestTools || {};
+  const tpm = sys ? !!sys.windows : list.includes('amd64');
   return [
     ['kvm', host.kvm ? 'ready' : host.kvmDevice ? 'notAllowed' : 'off'],
     ...list.map((a) => [`engine.${a}`, have(a === 'amd64' ? 'qemu-system-x86' : 'qemu-system-arm') ? 'ready' : 'missing']),
@@ -201,10 +207,79 @@ export function reqRows(host, list, missing) {
     ['disk', have('qemu-utils') ? 'ready' : 'missing'],
     ['network', have('passt') ? 'ready' : 'missing'],
     ['folders', have('virtiofsd') ? 'ready' : 'missing'],
-    ...(list.includes('amd64') ? [['tpm', have('swtpm') ? 'ready' : 'missing']] : []),
+    ...(tpm ? [['tpm', have('swtpm') ? 'ready' : 'missing']] : []),
+    ...(sys && sys.windows ? [['drivers', 'download'], ['winfsp', 'download']] : []),
+    ...(sys ? [[sys.windows ? 'toolsWin' : 'tools', (sys.windows ? tools.windows : tools.linux) ? 'ready' : 'missing']] : []),
+    ...(sys && sys.unattended ? [['answers', 'builtin']] : []),
   ];
 }
-export const REQ_IDS = ['kvm', 'engine', 'firmware', 'display', 'disk', 'network', 'folders', 'tpm'];
+export const REQ_IDS = ['kvm', 'engine', 'firmware', 'display', 'disk', 'network', 'folders', 'tpm', 'drivers', 'winfsp', 'tools', 'toolsWin', 'answers'];
+
+// "Guest can see" (8, 16; Configure → Security): every way between a machine and this computer, one row each, in one
+// list: whether it is on (from the draft, so a switch shows at once), what it does right now when the machine runs
+// (live: 'connected' or 'waiting' for the agent, 'next' when the draft differs from what the running machine started
+// with) and what changes it: key (a draft field the row's switch sets; on/off maps through channelSet), section (a
+// button to the section that holds a list or a choice), or fixed (always there while it runs: the screen, the keyboard
+// and mouse while its window has them). A machine locked for anonymity (19.5) refuses every host-to-guest channel:
+// locked rows show their switch off and can't change
+export function guestChannels(cur, m, { running = false, agentState = '' } = {}) {
+  const lock = !!(m && m.profileLock);
+  const clip = cur.clipboard || 'off';
+  const net = cur.network || 'shared';
+  const shares = (cur.shares || []).length;
+  const rows = [
+    { id: 'network', on: net !== 'isolated', key: 'network', vars: { mode: net, ports: (cur.ports || []).length } },
+    { id: 'display', on: true, section: 'display', vars: { kind: cur.gpu ? 'vgpu' : cur.graphics === '3d' ? '3d' : '2d' } },
+    { id: 'input', on: true, fixed: true },
+    { id: 'sound', on: !!(m && m.sound), section: 'sound' },
+    { id: 'microphone', on: !!(m && m.microphone), section: 'sound' },
+    { id: 'clipIn', on: clip === 'both' || clip === 'to-guest', key: 'clipboard', locked: lock },
+    { id: 'clipOut', on: clip === 'both' || clip === 'from-guest', key: 'clipboard', locked: lock },
+    { id: 'folders', on: shares > 0, section: 'sharing', vars: { n: shares }, locked: lock },
+    { id: 'transfer', on: !!cur.transfer, key: 'transfer', locked: lock },
+    { id: 'agent', on: !!cur.agent, key: 'agent', locked: lock },
+    { id: 'automation', on: !!cur.agent && !!cur.automation, key: 'automation', locked: lock || !cur.agent },
+    { id: 'files', on: !!cur.agent && cur.guestFiles !== false && !lock, key: 'guestFiles', locked: lock || !cur.agent },
+    { id: 'links', on: !!cur.agent && !!cur.guestLinks, key: 'guestLinks', locked: lock || !cur.agent },
+    { id: 'notify', on: !!cur.agent && !!cur.guestNotify, key: 'guestNotify', locked: lock || !cur.agent },
+  ];
+  for (const r of rows) {
+    r.live = '';
+    if (!running) continue;
+    const was = m ? channelWas(r.id, m) : r.on;
+    if (was !== r.on) r.live = 'next';
+    else if (r.id === 'agent' && r.on) r.live = agentState === 'connected' ? 'connected' : 'waiting';
+  }
+  return rows;
+}
+// what the machine itself has (machine.json as lord.vm.list reads it), for a running machine's 'next'
+function channelWas(id, m) {
+  return guestChannels({ ...m, clipboard: m.clipboard, shares: m.shares, ports: m.ports }, { ...m, profileLock: m.profileLock }, {})
+    .find((r) => r.id === id).on;
+}
+// a row's switch turned on or off: the draft patch it makes (the clipboard's two ways combine into one setting; the
+// network's switch turns Isolated on, and back to Shared)
+export function channelSet(id, on, cur) {
+  const clip = cur.clipboard || 'off';
+  const inn = clip === 'both' || clip === 'to-guest', out = clip === 'both' || clip === 'from-guest';
+  const both = (a, b) => (a && b ? 'both' : a ? 'to-guest' : b ? 'from-guest' : 'off');
+  if (id === 'clipIn') return { clipboard: both(on, out) };
+  if (id === 'clipOut') return { clipboard: both(inn, on) };
+  if (id === 'network') return { network: on ? (cur.network && cur.network !== 'isolated' ? cur.network : 'shared') : 'isolated' };
+  const key = { transfer: 'transfer', agent: 'agent', automation: 'automation', files: 'guestFiles', links: 'guestLinks', notify: 'guestNotify' }[id];
+  return key ? { [key]: !!on } : {};
+}
+
+// Start Linux directly (6.1, schema 21): why the switch can't go on for this machine, or '' (lord-vm's
+// vm_machine_check refuses the same)
+export function kbootBlocked(m) {
+  if (!m) return 'none';
+  if (m.groupId || m.profileLock) return 'group';
+  if (m.windowsDevices) return 'windows';
+  if (m.firmware === 'uefi' && m.secureBoot) return 'secureBoot';
+  if (m.encrypted) return 'encrypted';
+  return '';
+}
 
 export function missingFor(host, arches, { windows = false } = {}) {
   const out = [];
@@ -2007,7 +2082,8 @@ export const FIELD_SECTION = {
   name: 'general', vcpus: 'cpu', memoryMb: 'cpu', cpuPin: 'cpu', cpuModel: 'cpu', perfProfile: 'cpu', resolution: 'display', graphics: 'display',
   gpu: 'display', pointer: 'display', captureFullscreen: 'display', network: 'network', bridge: 'network', ports: 'network',
   nicModel: 'network', diskGb: 'disks', iso: 'disks', shares: 'sharing', transfer: 'sharing', clipboard: 'sharing', agent: 'agent',
-  bootOrder: 'boot', bootMenu: 'boot',
+  bootOrder: 'boot', bootMenu: 'boot', kernelBoot: 'boot', cmdline: 'boot', guestLinks: 'agent', guestNotify: 'agent', guestFiles: 'agent',
+  automation: 'agent',
 };
 export function changedSections(draft, differs) {
   const out = new Set();

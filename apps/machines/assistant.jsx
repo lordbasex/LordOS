@@ -671,7 +671,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
       {missing.length ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}>
           <Text style={{ flex: 1, fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.new.needs', { list: missing.join(', ') })}</Text>
-          <Btn label={tr('machines.req.button')} onClick={onNeeds} />
+          <Btn label={tr('machines.req.button')} onClick={() => onNeeds({ arch, windows, unattended: windows ? !!un.on : !!downloading, name: [sys.name, ver].filter(Boolean).join(' ') })} />
         </View>
       ) : null}
       {Object.keys(v.errors).length ? <Text style={{ fontSize: 13, color: '#ff453a', textAlign: 'start' }}>{Object.values(v.errors).map((e) => tr(`machines.new.err.${e}`, { max: host.memMaxMb })).join(' ')}</Text> : null}

@@ -233,6 +233,19 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 #endif
         set_int(c, o, "landlock", abi > 0 ? abi : 0);
     }
+    /* the LordOS guest tools this computer can hand a machine (lord-vm's fixed paths, 7.1): the Linux helper for this
+     * architecture's guests and the tools for virtio-win guests, for the Requirements page of a chosen system (5.2) */
+    {
+        JSValue gt = JS_NewObject(c);
+#if defined(__aarch64__)
+        const char *lx = "/usr/lib/lordos/guest/lordos-guest-arm64";
+#else
+        const char *lx = "/usr/lib/lordos/guest/lordos-guest-amd64";
+#endif
+        JS_SetPropertyStr(c, gt, "linux", JS_NewBool(c, !access(lx, R_OK)));
+        JS_SetPropertyStr(c, gt, "windows", JS_NewBool(c, !access("/usr/lib/lordos/guest/windows/lordos-guest-win.exe", R_OK)));
+        JS_SetPropertyStr(c, o, "guestTools", gt);
+    }
     /* where machines live: free space and what kind of disk (a microSD card is slow for machines) */
     char where[PATH_MAX];
     const char *home = getenv("HOME");
