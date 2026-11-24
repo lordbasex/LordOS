@@ -58,7 +58,7 @@ async function main() {
   check('the poll says it is a camera', (st.usb.devices || []).some((d) => d.camera && d.audio), JSON.stringify(st.usb.devices));
   check('another machine sees it held', lord.vm.usbDevices().find((d) => d.bus === bus && d.dev === dev)?.holder === sid);
   out('MARK in');
-  await wait(4000);
+  await wait(10000);                                            // vm_usb_e2e.sh looks at who holds the node meanwhile
   // the rule, while it runs (lord-vm writes machine.json)
   check('usbAuto adds a rule', lord.vm.usbAuto(sid, `${vendor}:${product}`, true));
   await until(() => (lord.vm.list().find((m) => m.dir === dir)?.usbAuto || []).length === 1, 5000);
