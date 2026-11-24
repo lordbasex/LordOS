@@ -444,6 +444,7 @@ EOF
         0) ok "machines-group-manage (tests/machines_group_manage_headless.sh, headless lord-server, throwaway groups)" ;;
         77) skip "machines-group-manage" "build/lord-server, lord-vm, lord-vm-testpaths, lord-vmunpack, the default theme, /dev/kvm, unshare and an installed catalog and image store to mount over" ;;
         *) bad "machines-group-manage (tests/machines_group_manage_headless.sh, headless lord-server, throwaway groups)"; tail -20 "$T/out" ;;
+    esac
     # Machines' storage under real QEMU/KVM (tests/vm_storage_test.sh): encrypted machines, both disposable sessions,
     # snapshot, clone, Export (.lordvm and OVA), the import of an export (tampered and hostile), raw disks
     bash tests/vm_storage_test.sh >"$T/out" 2>&1
@@ -530,6 +531,7 @@ EOF
     if have node; then run "vm-catalog-test (apps/machines/catalog.js)" node tests/vm_catalog_test.mjs; fi
     if have node; then run "vm-windows-test (apps/machines/windows.js)" node tests/vm_windows_test.mjs; fi
     if have node; then run "vm-capture-test (apps/machines/capture.js, Capture mouse)" node tests/vm_capture_test.mjs; fi
+    if have node; then run "vm-alldisplays-test (apps/machines/alldisplays.js, All Displays)" node tests/vm_alldisplays_test.mjs; fi
     # Machines: crafted images the import must refuse (needs qemu-img and this computer's qemu-system)
     if have qemu-img && { have qemu-system-x86_64 || have qemu-system-aarch64; } && [ -x build/lord-vm ]; then run "vm-import-test" sh tests/vm_import_test.sh build
     else skip "vm-import-test" "qemu-img, qemu-system"; fi

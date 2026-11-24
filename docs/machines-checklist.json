@@ -5,11 +5,11 @@
  "items": [
   {
    "area": "A",
-   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 17, lock, `run.json`, crash recovery (3.8, 3.9)",
+   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 19, lock, `run.json`, crash recovery (3.8, 3.9)",
    "status": "✅",
    "pct": 100,
-   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 17`); `vm-test`, `vmgroup-test`",
-   "note": "Schema 17 (*in development*) adds `automation` (6.15); 16 the storage keys `disposable`, `encrypted`, `disk_format` and `backup` (6.2, 6.4, 8); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4)"
+   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 19`); `vm-test`, `vmgroup-test`",
+   "note": "Schema 19 (*in development*) adds `heads` (5.4, All Displays); 18 `cpu_model` (5.5); 17 `automation` (6.15); 16 the storage keys `disposable`, `encrypted`, `disk_format` and `backup` (6.2, 6.4, 8); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4)"
   },
   {
    "area": "A",
@@ -326,10 +326,10 @@
   {
    "area": "C",
    "item": "All Displays (multi-head), Picture in Picture of a machine (5.4)",
-   "status": "🟡",
-   "pct": 45,
-   "file": "`vmwindow.jsx` (`PipBack`, View → Picture in Picture), `model.js` `pipFrame`; `vm_model_test.mjs`",
-   "note": "*In development*: Picture in Picture of a machine (`wm.setPip`, on the window's display, the guest's shape, no keys and no pointer for the guest, not for a protected machine). All Displays (virtio-gpu heads, one per display) not built"
+   "status": "🧪",
+   "pct": 95,
+   "file": "`vmwindow.jsx` (`PipBack`, View → Picture in Picture, View → All Displays), `model.js` `pipFrame`; `alldisplays.js` (`allDisplaysPlan`), `alldisplays.jsx` (`useAllDisplays`, `HeadWindow`), `machine.c` (`heads`, schema 19), `lordvm.c` (`max_outputs`, `--heads`), `vmdisplay.c` (`--heads N`, one listener and one channel per output), `vmproto.h` (`vm_heads_layout`), `js_vm.c` (`allDisplays`, `attach(dir, { head })`, `head_claim`); `vm_model_test.mjs`, `vm_alldisplays_test.mjs`, `vm-test`, `vmgroup-test`, `vm_multihead.sh` (KVM), `machines_alldisplays_headless.sh`",
+   "note": "*In development*: Picture in Picture of a machine (`wm.setPip`, on the window's display, the guest's shape, no keys and no pointer for the guest, not for a protected machine). All Displays: up to four virtio-gpu outputs, one full-screen window per display, each output asked for its display's size at its place beside the others; checked with a real Debian 13 guest under KVM (two outputs lit, sized, drawn on and one turned off again) and headless with two made-up displays. Not checked: real monitors on screen, a guest desktop (GNOME, KDE) placing its outputs where it is told and the pointer across them"
   },
   {
    "area": "C",
@@ -906,8 +906,8 @@
    "name": "The app",
    "weight": 11,
    "items": 12,
-   "mean": 91.0,
-   "score": 91
+   "mean": 95.17,
+   "score": 95
   },
   {
    "id": "D",
@@ -998,6 +998,6 @@
    "score": 92
   }
  ],
- "total": 82,
- "total_exact": 82.33
+ "total": 83,
+ "total_exact": 82.77
 }

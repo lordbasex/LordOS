@@ -280,8 +280,8 @@ const lib = [
   { dir: 'c', name: 'Fedora 43', state: 'stopped', suspended: true, meta: { os: 'fedora' }, vcpus: 4, memoryMb: 8192, diskGb: 40, network: 'shared' },
   { dir: 'd', name: 'FreeBSD', state: 'stopped', meta: { os: 'freebsd' }, vcpus: 2, memoryMb: 2048, diskGb: 20, network: 'isolated' },
 ];
-eq('chip counts', M.chipCounts(lib, ''), { all: 4, running: 1, linux: 2, windows: 1 });
-eq('chip counts with a search', M.chipCounts(lib, 'fed'), { all: 1, running: 0, linux: 1, windows: 0 });
+eq('chip counts', M.chipCounts(lib, ''), { all: 4, running: 1, linux: 2, windows: 1, templates: 0 });
+eq('chip counts with a search', M.chipCounts(lib, 'fed'), { all: 1, running: 0, linux: 1, windows: 0, templates: 0 });
 eq('linux chip', M.filterMachines(lib, { show: 'linux' }).map((m) => m.dir), ['a', 'c']);
 eq('the other system\'s chip', M.filterMachines(lib, { show: 'windows' }).map((m) => m.dir), ['b']);
 eq('family', lib.map(M.familyOf), ['linux', 'windows', 'linux', 'other']);

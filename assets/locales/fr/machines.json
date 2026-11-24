@@ -1873,5 +1873,18 @@
   "tpl.newFrom": "Nouvelle machine depuis un modèle…",
   "tpl.make": "Transformer en modèle",
   "tpl.unmake": "Ne plus être un modèle",
-  "tpl.chip": "Modèles · {n}"
+  "tpl.chip": "Modèles · {n}",
+  "alld.item": "Tous les écrans",
+  "alld.title": "{name} · Écran {n}",
+  "alld.back": "Revenir à un seul écran",
+  "alld.waiting": "En attente que la machine utilise cet écran…",
+  "alld.why.noMachine": "La machine n'est pas prête",
+  "alld.why.noWindow": "Cette machine n'a pas d'écran",
+  "alld.why.vgpu": "Une machine avec carte graphique affiche un seul écran",
+  "alld.why.anonymity": "Pas pour une machine protégée",
+  "alld.why.windows": "Le pilote d'affichage de ce système affiche un seul écran",
+  "alld.why.apps": "Quittez d'abord le mode apps",
+  "alld.why.oneDisplay": "Cet ordinateur a un seul écran",
+  "alld.why.notRunning": "Démarre la machine sur tous les écrans",
+  "alld.why.restart": "Éteignez d'abord la machine : elle redémarre avec {n} écrans"
 }

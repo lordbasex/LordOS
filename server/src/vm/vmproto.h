@@ -504,6 +504,30 @@ static inline int vd_abs_map(int p, int pic, int off, int shown, int desk) {
     long long q = ((2 * g + 1) * pic) / (2LL * desk);
     return q < 0 ? 0 : q >= pic ? pic - 1 : (int)q;
 }
+/* All Displays (docs/VIRTUALIZATION.md 5.4): one digit 0..max-1 (lord-vmdisplay's --heads, given max = VM_HEADS_MAX + 1); -1 anything else */
+static inline int vd_head_arg(const char *s, int max) {
+    if (!s || s[0] < '0' || s[0] > '9' || s[1]) return -1;
+    int h = s[0] - '0';
+    return h < max ? h : -1;
+}
+/* The guest's desktop as the heads make it: n heads (2..8) side by side from the left in their order, tops aligned, each
+ * w[i] × h[i] (320..VD_MAX_DIM). L gets head k's layout as VD_LAYOUT takes it: its corner, its size, the desktop's size.
+ * 0 ok; -1 when the sizes or k are out of range, or the desktop would be wider than vm_layout_ok allows (L all 0) */
+static inline int vm_heads_layout(int n, const int *w, const int *h, int k, int L[6]) {
+    for (int i = 0; i < 6; i++) L[i] = 0;
+    if (n < 2 || n > 8 || k < 0 || k >= n || !w || !h) return -1;
+    long long x = 0, dw = 0, dh = 0;
+    for (int i = 0; i < n; i++) {
+        if (w[i] < 320 || h[i] < 200 || w[i] > 32767 || h[i] > 32767) return -1;
+        if (i == k) x = dw;
+        dw += w[i];
+        if (h[i] > dh) dh = h[i];
+    }
+    if (dw > 32767) return -1;
+    if (!vm_layout_ok((int)x, 0, w[k], h[k], (int)dw, (int)dh)) return -1;
+    L[0] = (int)x; L[1] = 0; L[2] = w[k]; L[3] = h[k]; L[4] = (int)dw; L[5] = (int)dh;
+    return 0;
+}
 static inline VmMsg vm_msg(uint16_t type, uint32_t seq, int a, int b, int c, int d, const char *text) {
     VmMsg m;
     memset(&m, 0, sizeof m);

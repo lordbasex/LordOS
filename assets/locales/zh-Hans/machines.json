@@ -1873,5 +1873,18 @@
   "tpl.newFrom": "从模板新建虚拟机…",
   "tpl.make": "设为模板",
   "tpl.unmake": "取消模板",
-  "tpl.chip": "模板 · {n}"
+  "tpl.chip": "模板 · {n}",
+  "alld.item": "所有显示器",
+  "alld.title": "{name} · 显示器 {n}",
+  "alld.back": "返回单个显示器",
+  "alld.waiting": "正在等待虚拟机使用此显示器…",
+  "alld.why.noMachine": "虚拟机尚未就绪",
+  "alld.why.noWindow": "此虚拟机没有显示器",
+  "alld.why.vgpu": "使用显卡的虚拟机只显示一个显示器",
+  "alld.why.anonymity": "不适用于受保护的虚拟机",
+  "alld.why.windows": "此系统的显示驱动只显示一个显示器",
+  "alld.why.apps": "请先退出应用模式",
+  "alld.why.oneDisplay": "这台电脑只有一个显示器",
+  "alld.why.notRunning": "在所有显示器上启动虚拟机",
+  "alld.why.restart": "请先关闭虚拟机：它将以 {n} 个显示器重新启动"
 }

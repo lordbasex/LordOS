@@ -1873,5 +1873,18 @@
   "tpl.newFrom": "Mașină nouă din șablon…",
   "tpl.make": "Transformă în șablon",
   "tpl.unmake": "Nu mai este șablon",
-  "tpl.chip": "Șabloane · {n}"
+  "tpl.chip": "Șabloane · {n}",
+  "alld.item": "Toate ecranele",
+  "alld.title": "{name} · Ecranul {n}",
+  "alld.back": "Înapoi la un ecran",
+  "alld.waiting": "Se așteaptă ca mașina să folosească acest ecran…",
+  "alld.why.noMachine": "Mașina nu este pregătită",
+  "alld.why.noWindow": "Această mașină nu are ecran",
+  "alld.why.vgpu": "O mașină cu placă grafică arată un ecran",
+  "alld.why.anonymity": "Nu pentru o mașină protejată",
+  "alld.why.windows": "Driverul de afișare al acestui sistem arată un ecran",
+  "alld.why.apps": "Ieșiți mai întâi din modul aplicații",
+  "alld.why.oneDisplay": "Acest computer are un ecran",
+  "alld.why.notRunning": "Pornește mașina pe toate ecranele",
+  "alld.why.restart": "Opriți mai întâi mașina: pornește din nou cu {n} ecrane"
 }

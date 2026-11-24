@@ -1873,5 +1873,18 @@
   "tpl.newFrom": "Şablondan yeni maşın…",
   "tpl.make": "Şablon et",
   "tpl.unmake": "Şablon olmaqdan çıxar",
-  "tpl.chip": "Şablonlar · {n}"
+  "tpl.chip": "Şablonlar · {n}",
+  "alld.item": "Bütün ekranlar",
+  "alld.title": "{name} · Ekran {n}",
+  "alld.back": "Bir ekrana qayıt",
+  "alld.waiting": "Maşının bu ekrandan istifadə etməsi gözlənilir…",
+  "alld.why.noMachine": "Maşın hazır deyil",
+  "alld.why.noWindow": "Bu maşının ekranı yoxdur",
+  "alld.why.vgpu": "Qrafik kartlı maşın bir ekran göstərir",
+  "alld.why.anonymity": "Qorunan maşın üçün deyil",
+  "alld.why.windows": "Bu sistemin ekran sürücüsü bir ekran göstərir",
+  "alld.why.apps": "Əvvəlcə tətbiqlər rejimindən çıxın",
+  "alld.why.oneDisplay": "Bu kompüterin bir ekranı var",
+  "alld.why.notRunning": "Maşını bütün ekranlarda başladır",
+  "alld.why.restart": "Əvvəlcə maşını söndürün: {n} ekranla yenidən başlayacaq"
 }

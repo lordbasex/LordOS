@@ -1873,5 +1873,18 @@
   "tpl.newFrom": "Bagong Makina mula sa Template…",
   "tpl.make": "Gawing Template",
   "tpl.unmake": "Huwag Nang Gawing Template",
-  "tpl.chip": "Mga Template · {n}"
+  "tpl.chip": "Mga Template · {n}",
+  "alld.item": "Lahat ng Display",
+  "alld.title": "{name} · Display {n}",
+  "alld.back": "Bumalik sa Isang Display",
+  "alld.waiting": "Hinihintay ang makina na gamitin ang display na ito…",
+  "alld.why.noMachine": "Hindi pa handa ang makina",
+  "alld.why.noWindow": "Walang display ang makinang ito",
+  "alld.why.vgpu": "Isang display ang ipinapakita ng makinang may graphics card",
+  "alld.why.anonymity": "Hindi para sa protektadong makina",
+  "alld.why.windows": "Isang display ang ipinapakita ng display driver ng sistemang ito",
+  "alld.why.apps": "Lumabas muna sa apps mode",
+  "alld.why.oneDisplay": "Isa ang display ng computer na ito",
+  "alld.why.notRunning": "Sinisimulan ang makina sa bawat display",
+  "alld.why.restart": "Patayin muna ang makina: magsisimula itong muli na may {n} display"
 }

@@ -1873,5 +1873,18 @@
   "tpl.newFrom": "Új gép sablonból…",
   "tpl.make": "Sablonná alakítás",
   "tpl.unmake": "Sablon megszüntetése",
-  "tpl.chip": "Sablonok · {n}"
+  "tpl.chip": "Sablonok · {n}",
+  "alld.item": "Minden kijelző",
+  "alld.title": "{name} · {n}. kijelző",
+  "alld.back": "Vissza egy kijelzőre",
+  "alld.waiting": "Várakozás, hogy a gép használja ezt a kijelzőt…",
+  "alld.why.noMachine": "A gép nem áll készen",
+  "alld.why.noWindow": "Ennek a gépnek nincs kijelzője",
+  "alld.why.vgpu": "A videokártyás gép egy kijelzőt mutat",
+  "alld.why.anonymity": "Nem védett géphez",
+  "alld.why.windows": "A rendszer kijelzőillesztője egy kijelzőt mutat",
+  "alld.why.apps": "Előbb lépjen ki az alkalmazásmódból",
+  "alld.why.oneDisplay": "Ennek a számítógépnek egy kijelzője van",
+  "alld.why.notRunning": "A gépet minden kijelzőn elindítja",
+  "alld.why.restart": "Előbb állítsa le a gépet: {n} kijelzővel indul újra"
 }

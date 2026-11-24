@@ -1873,5 +1873,18 @@
   "tpl.newFrom": "Nueva máquina desde plantilla…",
   "tpl.make": "Convertir en plantilla",
   "tpl.unmake": "Dejar de ser plantilla",
-  "tpl.chip": "Plantillas · {n}"
+  "tpl.chip": "Plantillas · {n}",
+  "alld.item": "Todas las pantallas",
+  "alld.title": "{name} · Pantalla {n}",
+  "alld.back": "Volver a una pantalla",
+  "alld.waiting": "Esperando que la máquina use esta pantalla…",
+  "alld.why.noMachine": "La máquina no está lista",
+  "alld.why.noWindow": "Esta máquina no tiene pantalla",
+  "alld.why.vgpu": "Una máquina con tarjeta gráfica muestra una pantalla",
+  "alld.why.anonymity": "No para una máquina protegida",
+  "alld.why.windows": "El controlador de pantalla de este sistema muestra una pantalla",
+  "alld.why.apps": "Primero salí del modo apps",
+  "alld.why.oneDisplay": "Esta computadora tiene una pantalla",
+  "alld.why.notRunning": "Inicia la máquina en todas las pantallas",
+  "alld.why.restart": "Primero apagá la máquina: vuelve a iniciar con {n} pantallas"
 }
