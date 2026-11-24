@@ -1059,10 +1059,17 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   per-card in Settings → Displays, with the NVIDIA opt-in driver (docs/NVIDIA-PLAN.md) and with AMD/Intel hybrids.
   Large; after the 0.8.9.x series.
 - [ ] **lord-web on the new WPE API (WPEPlatform)** ([#142](https://github.com/lordbasex/LordOS/issues/142), maintainer's
-  decision 2026-11-15: it will be done, before 1.0). The legacy API lord-web uses (libwpe, wpebackend-fdo) is deprecated
-  upstream and already missing on some distributions; Debian 13 keeps it for its whole life. Rewrite `webwin.c` on
-  WPEPlatform keeping our buffer path (dmabuf, shm), input, IME, clipboard, drag and drop and fractional scale, and
-  re-test every web app feature on the VM. Watch trixie's wpewebkit security updates until then. With it comes real
+  decision 2026-11-15: it will be done, before 1.0; 2026-11-23: on LordOS's own wpewebkit 2.54 backport for Debian 13
+  with both APIs on). The legacy API lord-web uses (libwpe, wpebackend-fdo) is deprecated upstream and already missing
+  on some distributions; Debian 13 keeps it for its whole life. **Done (in development):** the backend interface
+  (`server/src/web/webback.h`) with the legacy code behind it unchanged and a WPEPlatform backend of lord-web's own
+  (`webback_platform.c`: our buffer path, dmabuf and shm, input, scale, cursor, clipboard, screen; the IME and drag and
+  drop are lord-web's own on both), `mk/web.mk` choosing it, and `build/web-backend-test` passing on both backends
+  (Debian 13's 2.48.3 and sid's 2.54.3) plus lord-web in a headless weston on 2.54.3 (shm and dmabuf). **Left:** build
+  and test against the backport packages, then re-test every web app feature on the VM and the PC (keys and IME with a
+  real input method, touch, the clipboard both ways, drops, the context menu, downloads, notifications, the developer
+  tools, fractional scale on a real output), ship lordos-web built on WPEPlatform with the backport, and drop the
+  legacy backend once no supported LordOS has 2.48. Watch trixie's wpewebkit security updates until then. With it comes real
   dark mode for web apps (maintainer, 2026-11-15): set `prefers-color-scheme` through the new API so CSS `@media`
   rules follow too, then bring back each app's Appearance (Light and Dark), held back until then (`WEBSCHEME_PER_APP`
   in `server/src/web/webscheme.h`, `COLOR_SCHEMES_AVAILABLE` in `sdk/webappsmodel.js`, `webAppearanceItem` in the app
