@@ -929,5 +929,7 @@
   "llm.busy": "Sentinela đang phân tích nhiều thứ. Hãy thử lại sau giây lát.",
   "llm.noEngine": "Bộ máy mô hình cục bộ chưa được cài đặt.",
   "llm.noModel": "Mô hình cục bộ đó chưa được cài đặt.",
-  "sentinela.blockFailed": "Không thể chặn mạng của nó."
+  "sentinela.blockFailed": "Không thể chặn mạng của nó.",
+  "sentinela.machineGone": "Máy đó không còn trong Máy ảo nữa.",
+  "sentinela.machineFailed": "Máy không phản hồi."
 }

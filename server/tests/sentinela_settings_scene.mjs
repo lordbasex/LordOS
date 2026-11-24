@@ -82,6 +82,19 @@ check('… what Lumo analyzed', shows('sentinela.analyzed') && shows('sentinela.
 check('… every closed action', ['end_block', 'pause', 'limit', 'monitor', 'ignore'].every((a) => shows(`sentinela.action.${a}`)));
 check('… and "you decide"', shows('sentinela.youDecide'));
 
+// the machines: their triggers (one always on), and a machine's alert with the machine's actions only
+check('the machine triggers', ['vmAlways', 'vmUsage', 'vmCrash', 'vmAnon'].every((x) => shows(`sentinela.trigger.${x}`)) && shows('sentinela.settings.always'));
+check('what it sees of machines', shows('sentinela.settings.seesMachines'));
+sentinelaAlerts.set(() => [{ id: 'v1', time: Date.now(), rule: 'vmSandbox', kind: 'machine', name: 'Whonix-Gateway', pid: 0, st: null,
+  machine: { id: 'aaaa-1', name: 'Whonix-Gateway', dir: '/home/ana/Machines/Whonix-Gateway.lordvm', role: 'gateway', anon: true }, analysis: 'rule',
+  ev: { rule: 'vmSandbox', kind: 'machine', missing: ['landlockFs', 'seccomp'], machine: { id: 'aaaa-1', name: 'Whonix-Gateway', role: 'gateway' } } }]);
+await flush();
+check('the machine alert listed', shows('sentinela.title.vmSandbox'));
+await click(parents.get(textNode('sentinela.title.vmSandbox')));
+check('… why, with what is missing', shows('sentinela.why.vmSandbox') && shows('sentinela.fact.machine') && shows('sentinela.analysis.rule'));
+check('… the machine\'s actions', ['vm_open', 'vm_shutdown', 'monitor', 'pause'].every((a) => shows(`sentinela.action.${a}`)));
+check('… and none of a process\'s', !shows('sentinela.action.end_block') && !shows('sentinela.action.ignore'));
+
 // "It's mine" entries
 settings.set((s) => ({ ...s, sentinela: { ...s.sentinela, ignore: [{ exe: '/home/ana/bin/tool', pkg: null, name: 'tool' }] } }));
 await flush();

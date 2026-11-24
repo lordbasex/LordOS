@@ -930,5 +930,7 @@
   "llm.busy": "Sentinela zaten birkaç şeyi analiz ediyor. Biraz sonra yeniden deneyin.",
   "llm.noEngine": "Yerel model motoru kurulu değil.",
   "llm.noModel": "O yerel model kurulu değil.",
-  "sentinela.blockFailed": "Ağı engellenemedi."
+  "sentinela.blockFailed": "Ağı engellenemedi.",
+  "sentinela.machineGone": "O makine artık Sanal Makineler’de yok.",
+  "sentinela.machineFailed": "Makine yanıt vermedi."
 }

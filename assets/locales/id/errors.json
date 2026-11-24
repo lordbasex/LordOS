@@ -929,5 +929,7 @@
   "llm.busy": "Sentinela sedang menganalisis beberapa hal. Coba lagi sebentar lagi.",
   "llm.noEngine": "Mesin model lokal belum terpasang.",
   "llm.noModel": "Model lokal itu belum terpasang.",
-  "sentinela.blockFailed": "Jaringannya tidak dapat diblokir."
+  "sentinela.blockFailed": "Jaringannya tidak dapat diblokir.",
+  "sentinela.machineGone": "Mesin itu sudah tidak ada di Mesin Virtual.",
+  "sentinela.machineFailed": "Mesin tidak menjawab."
 }

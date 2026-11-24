@@ -14,6 +14,7 @@ export { formatBytes } from '../../sdk/system.js';
 export * as fs from '../../sdk/fs.js';
 export { LLM_MODELS, packagesForModel } from '../../sdk/llmcatalog.js';
 export { TRIGGERS, ACTIONS, factLines, presentAlert } from '../../sdk/sentinelamodel.js';
+export { VM_ACTIONS, vmWhy, vmFactLines } from '../../sdk/sentinelavm.js';
 export {
   sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, runSentinelaAction, sentinelaOnBattery,
   clearSentinelaAlerts, actionLabel as sentinelaActionLabel, installLlm, removeLlm,

@@ -490,6 +490,7 @@ EOF
     if have node; then run "devices-model-test (sdk/devicesmodel.js)" node tests/devices_model_test.mjs; else skip "devices-model-test" node; fi
     if have node; then run "battery-policy-test (sdk/batterypolicy.js)" node tests/battery_policy_test.mjs; else skip "battery-policy-test" node; fi
     if have node; then run "sentinela-model-test (sdk/sentinelamodel.js, sdk/llmcatalog.js)" node tests/sentinela_model_test.mjs; else skip "sentinela-model-test" node; fi
+    if have node; then run "sentinela-vm-test (sdk/sentinelavm.js: the machine rules)" node tests/sentinela_vm_test.mjs; else skip "sentinela-vm-test" node; fi
     if have node; then run "avatar-model-test (apps/settings/avatarmodel.js)" node tests/avatar_model_test.mjs; else skip "avatar-model-test" node; fi
     if have node; then run "weather-model-test (sdk/weathermodel.js)" node tests/weather_model_test.mjs; else skip "weather-model-test" node; fi
     if have node; then run "vpn-model-test (sdk/vpnmodel.js)" node tests/vpn_model_test.mjs; else skip "vpn-model-test" node; fi

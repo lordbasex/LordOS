@@ -44,6 +44,11 @@ char *mon_conns_json(uint64_t *seq);
  * without keeping the 4 Hz sampling awake. Off frees it. */
 void mon_watch_procs(int on);
 MonProcs *mon_procs_watched(uint64_t *seq);
+/* Sentinela's machine rules: with on (and the process list watched), each watched list also brings the running
+ * machines' network counts, {"t","ok","machines":{"<id>":{"socks","listen","peers","bytes"}}} (conn.c conn_machines);
+ * mon_machines_watched: the latest if newer than *seq (a copy), or NULL */
+void mon_watch_machines(int on);
+char *mon_machines_watched(uint64_t *seq);
 /* Get Info (procctl.c): the process whose details the thread builds once per second (pid 0: none)
  * and the latest JSON. start: its start time in ticks, so a reused PID shows as gone. */
 void mon_detail(int pid, unsigned long long start);

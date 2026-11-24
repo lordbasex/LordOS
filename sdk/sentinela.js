@@ -11,6 +11,11 @@
 //      action of LordOS's closed list as a suggestion;
 //   3. a desktop notification (sdk/notify.js: banner, sound, Do Not Disturb and the history like any other) with that
 //      explanation, the facts and up to three of the closed actions; clicking it opens the alert in Settings.
+// The virtual machines of Machines are watched too (sdk/sentinelavm.js, docs/SENTINELA.md "Machines"): every 10 s
+// lord.vm.list(), lord.vm.stats(dir) of the running ones and their network counts (lord.monitor.machinesWatched). A QEMU
+// out of its machine's scope, a sandbox missing a part or a Workstation with another way out is always shown, with no
+// model; the other machine rules may ask the model like the process rules. Machine actions: open it, show it in Monitor,
+// pause, resume, shut down, each from the person's click.
 // Nothing runs without the person's click. The alerts are kept in ~/.local/share/lordos/sentinela/alerts.json (the last
 // 50), "It's mine" in settings.sentinela.ignore (settings.json, which no app can write).
 //
@@ -33,6 +38,10 @@ import {
   SENTINELA_DEFAULTS, TRIGGER_DEFAULTS, createTracker, buildSummary, systemPrompt, parseVerdict, ignoreMatch, ruleAction, factLines,
   placeOf, clean, presentAlert,
 } from './sentinelamodel.js';
+import {
+  createMachineTracker, machineRow, machineSummary, machineSystemPrompt, machineNoticeActions, vmSuggested, vmWhy, vmFactLines,
+  VM_ALWAYS, VM_TRIGGER_OF, VM_ACTIONS,
+} from './sentinelavm.js';
 
 const TICK_MS = 10 * 1000, AUTOSTART_MS = 5 * 60 * 1000, ANSWER_WAIT_MS = 25 * 1000, ANSWER_MAX_MS = 200 * 1000;
 const HISTORY = 50;
@@ -117,9 +126,38 @@ export function clearSentinelaAlerts() { sentinelaAlerts.set(() => []); saveAler
 // ---- actions: a closed list, each one run only from the person's click ----
 
 const PROC_ACTIONS = new Set(['end_block', 'pause', 'resume', 'limit']);
-export const actionLabel = (id) => t(`sentinela.action.${id}`);
+const VM_LABEL = { vm_monitor: 'monitor', vm_pause: 'pause', vm_resume: 'resume' };
+export const actionLabel = (id) => t(`sentinela.action.${VM_LABEL[id] || id}`);
+
+// a machine's actions: by its id (a renamed machine moves its folder), only on the person's click
+const vmApi = () => (typeof lord !== 'undefined' && lord.vm && typeof lord.vm.list === 'function' ? lord.vm : null);
+function vmNow(alert) {
+  const v = vmApi();
+  const id = alert && alert.machine && alert.machine.id;
+  if (!v || !id) return null;
+  try { return (v.list() || []).find((m) => m && m.id === id) || null; } catch (e) { return null; }
+}
+function runVmAction(alert, id) {
+  const m = vmNow(alert);
+  if (id === 'vm_monitor') { wm.open('monitor', { args: { tab: 'processes', nonce: Date.now() } }); return true; }
+  if (id === 'vm_open') {
+    const live = m && ['running', 'paused', 'starting', 'stopping'].includes(m.state);
+    // a running machine's own window; otherwise the library (opening its window would start it again)
+    if (live) wm.open('machines', { instance: `vm-${m.id}`, args: { machine: m.dir, name: m.name } });
+    else wm.open('machines');
+    return true;
+  }
+  const how = { vm_pause: 'pause', vm_resume: 'resume', vm_shutdown: 'shutdown' }[id];
+  let err = null;
+  if (!m) err = 'sentinela.machineGone';
+  else { try { if (!vmApi().stop(m.dir, how)) err = 'sentinela.machineFailed'; } catch (e) { err = 'sentinela.machineFailed'; } }
+  patchAlert(alert.id, { done: err ? null : id, error: err });
+  if (err) notify({ label: t('sentinela.name'), icon: ShieldGlyph, title: t('sentinela.actionFailed', { name: alert.name }), body: t(`errors.${err}`), sound: false });
+  return !err;
+}
 
 export async function runSentinelaAction(alert, id) {
+  if (alert && alert.kind === 'machine') return [...VM_ACTIONS, 'vm_resume'].includes(id) ? runVmAction(alert, id) : false;
   if (!alert || !['end_block', 'pause', 'resume', 'limit', 'monitor', 'ignore'].includes(id)) return false;
   if (id === 'monitor') { wm.open('monitor', { args: { tab: 'processes', nonce: Date.now() } }); return true; }
   if (id === 'ignore') {
@@ -149,6 +187,7 @@ export async function runSentinelaAction(alert, id) {
 
 // the actions a notification shows (at most three): the suggested one first, then Monitor and "It's mine"
 export function noticeActions(alert) {
+  if (alert && alert.kind === 'machine') return machineNoticeActions(alert);
   const first = alert.suggested && !['monitor', 'ignore'].includes(alert.suggested) ? alert.suggested : ruleAction(alert.rule, alert.place);
   const ids = alert.rule === 'autostart' ? ['monitor', 'ignore'] : [first, 'monitor', 'ignore'];
   return ids.filter((x, i) => ids.indexOf(x) === i);
@@ -163,6 +202,10 @@ function openAlert(a) { wm.open('settings', { args: { section: 'ai', page: 'sent
 function alertText(a) {
   const vars = { name: clean(a.name, 40) };
   const p = presentAlert(a);
+  if (a.kind === 'machine') {
+    const why = p.reason || vmWhy(a.ev || a, t);
+    return { title: t(p.title, vars), body: [why, ...(p.note ? [t(p.note)] : []), ...vmFactLines(a.ev || a, t)].join('\n'), sticky: p.sticky || VM_ALWAYS.has(a.rule) };
+  }
   const lines = factLines(a.ev || a, a.facts, { home: home(), user: user() }).map((l) => t(l.key, l.vars));
   const why = p.reason || t(`sentinela.why.${a.rule}`, { ...vars, place: t(`sentinela.place.${a.place || 'none'}`) });
   return { title: t(p.title, vars), body: [why, ...(p.note ? [t(p.note)] : []), ...lines].join('\n'), sticky: p.sticky };
@@ -180,7 +223,47 @@ function show(a) {
 let home = () => { try { return fs.home(); } catch (e) { return ''; } };
 let user = () => { const h = home(); return h.split('/').filter(Boolean).pop() || ''; };
 
+// a machine's alert: the "always" rules with no model; the others with the same engine and the same limits as a process's
+async function handleMachine(ev, prefs) {
+  const a = api();
+  const alert = {
+    id: `${ev.at}-${ev.key}-${ev.rule}`, time: ev.at, rule: ev.rule, kind: 'machine', name: ev.name, machine: ev.machine, pid: 0, st: null,
+    ev, verdict: null, reason: null, suggested: null, analysis: 'none', done: null,
+  };
+  let pending = null;
+  if (VM_ALWAYS.has(ev.rule)) alert.analysis = 'rule';
+  else {
+    const eng = refreshSentinelaEngine();
+    const model = prefs.model && eng.models.some((m) => m.id === prefs.model) ? prefs.model : null;
+    if (!model || !eng.available || !a) alert.analysis = 'noModel';
+    else if (sentinelaOnBattery()) alert.analysis = 'battery';
+    else {
+      try {
+        const language = langName(locale.get().lang);
+        const id = a.analyze(model, machineSystemPrompt(language), machineSummary(ev, { language }));
+        alert.analysis = 'running';
+        pending = job(id, ANSWER_MAX_MS);
+      } catch (e) { alert.analysis = 'failed'; }
+    }
+  }
+  const apply = (r) => {
+    const v = r && r.ok ? parseVerdict(r.content) : null;
+    if (!v) return { analysis: r && r.ok ? 'rejected' : 'failed' };
+    return { analysis: 'done', verdict: v.verdict, reason: v.reason, suggested: vmSuggested(v.action), ms: r.ms };
+  };
+  if (pending) {
+    const first = await Promise.race([pending, new Promise((res) => setTimeout(() => res(undefined), ANSWER_WAIT_MS))]);
+    if (first !== undefined) Object.assign(alert, apply(first));
+    else pending.then((r) => patchAlert(alert.id, apply(r)));
+  }
+  // a rule raised it: always shown, whatever the model said (presentAlert)
+  putAlert(alert);
+  show(alert);
+  return alert;
+}
+
 async function handle(ev, prefs) {
+  if (ev.kind === 'machine') return handleMachine(ev, prefs);
   const a = api();
   let facts = null;
   if (a && ev.pid) { try { facts = await job(a.facts(ev.pid, ev.st), 15000); } catch (e) { facts = null; } }
@@ -253,7 +336,29 @@ function checkAutostart(prefs, now) {
 
 // ---- the service ----
 
-let started = false, watching = false, tracker = null, uid = null, lastAutostart = 0, busy = 0;
+let started = false, watching = false, tracker = null, uid = null, lastAutostart = 0, busy = 0, vmTracker = null;
+
+// the machines now: lord.vm.list(), lord.vm.stats(dir) of the running ones and their network counts (null: no new
+// sample this tick, so no network sample is taken)
+const VM_ACTIVE = new Set(['starting', 'running', 'paused', 'stopping']);
+function machineRows() {
+  const v = vmApi();
+  if (!v) return null;
+  let list = [];
+  try { list = v.list() || []; } catch (e) { return null; }
+  let net = null;
+  try {
+    const w = typeof lord.monitor.machinesWatched === 'function' ? lord.monitor.machinesWatched() : null;
+    if (w && w.ok && w.machines && typeof w.machines === 'object') net = w.machines;
+  } catch (e) { net = null; }
+  const zero = { socks: 0, listen: 0, peers: 0, bytes: 0 };
+  return list.filter((m) => m && typeof m.id === 'string' && m.id && !m.error).map((m) => {
+    const live = VM_ACTIVE.has(m.state);
+    let st = null;
+    if (live) { try { st = v.stats(m.dir); } catch (e) { st = null; } }
+    return machineRow(m, st, live && net ? (net[m.id] || zero) : null);
+  });
+}
 
 export function sentinelaTick(now = Date.now()) {
   const prefs = sentinelaPrefs();
@@ -262,12 +367,18 @@ export function sentinelaTick(now = Date.now()) {
     if (watching) {
       watching = false;
       tracker = null;
+      vmTracker = null;
       try { lord.monitor.watchProcs(false); } catch (e) { /* older server */ }
+      try { lord.monitor.watchMachines?.(false); } catch (e) { /* older server */ }
       try { a?.stop(); } catch (e) { /* nothing running */ }
     }
     return [];
   }
-  if (!watching) { watching = true; tracker = null; lastAutostart = 0; try { lord.monitor.watchProcs(true); } catch (e) { return []; } }
+  if (!watching) {
+    watching = true; tracker = null; vmTracker = null; lastAutostart = 0;
+    try { lord.monitor.watchProcs(true); } catch (e) { return []; }
+    try { lord.monitor.watchMachines?.(true); } catch (e) { /* older server */ }
+  }
   const events = [];
   let list = null;
   try { list = lord.monitor.procsWatched(locale.get().lang); } catch (e) { list = null; }
@@ -277,8 +388,17 @@ export function sentinelaTick(now = Date.now()) {
     events.push(...tracker.feed(list.list, now).filter((ev) => prefs.triggers[ev.rule]));
   }
   if (prefs.triggers.autostart && now - lastAutostart >= AUTOSTART_MS) { lastAutostart = now; events.push(...checkAutostart(prefs, now)); }
+  // the machines: the "always" rules whatever the toggles say
+  const rows = machineRows();
+  if (rows) {
+    if (!vmTracker) vmTracker = createMachineTracker();
+    const vmEvents = vmTracker.feed(rows, now).filter((ev) => VM_ALWAYS.has(ev.rule) || prefs.triggers[VM_TRIGGER_OF[ev.rule]] !== false);
+    // first in line: a machine out of its limits doesn't wait for a busy process's analysis
+    events.unshift(...vmEvents.filter((ev) => VM_ALWAYS.has(ev.rule)));
+    events.push(...vmEvents.filter((ev) => !VM_ALWAYS.has(ev.rule)));
+  }
   // at most two analyses at a time; the rest wait for the next tick's events (a rule fires once an hour per process)
-  for (const ev of events.slice(0, 4)) {
+  for (const ev of events.slice(0, 4 + events.filter((x) => VM_ALWAYS.has(x.rule)).length)) {
     busy++;
     handle(ev, prefs).finally(() => { busy--; });
   }
@@ -294,4 +414,4 @@ export function startSentinela() {
 }
 
 // tests: the clock's helpers
-export const __sentinelaTest = { handle, show, alertText, setHome: (fn) => { home = fn; user = () => home().split('/').filter(Boolean).pop() || ''; }, busy: () => busy };
+export const __sentinelaTest = { handle, show, alertText, machineRows, setHome: (fn) => { home = fn; user = () => home().split('/').filter(Boolean).pop() || ''; }, busy: () => busy };

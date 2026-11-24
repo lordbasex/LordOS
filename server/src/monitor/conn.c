@@ -502,3 +502,63 @@ void conn_scan(Buf *b, const Mmdb *geo) {
     }
     mon_buf_printf(b, "],\"others\":%d}", others);
 }
+
+/* Sentinela's machine rules (docs/SENTINELA.md, "Machines"): per running machine (its scope and leaves, the same
+ * attribution as the Machines row of Monitor → Network), only counts: {"t", "ok", "machines": {"<id>": {"socks",
+ * "listen", "peers", "bytes"}}}. socks: its sockets that aren't listening; peers: the different remote addresses on the
+ * internet or the LAN; bytes: TCP bytes moved since the previous call (sockets seen both times: the difference; new
+ * ones: all of theirs). No address, port or process leaves this function. */
+#define CM_MAX 32
+#define CM_PEERS 128
+static struct { uint32_t inode; uint64_t bytes; } cm_prev[MAX_SOCK], cm_cur[MAX_SOCK];
+static int cm_nprev;
+
+void conn_machines(Buf *b) {
+    unsigned me = (unsigned)getuid();
+    if (sock_dump()) { mon_buf_printf(b, "{\"t\":%.0f,\"ok\":false,\"machines\":{}}", mon_wall_ms()); return; }
+    scopes_scan();
+    static struct { char id[40]; int socks, listen, peers; uint64_t bytes; uint8_t peer[CM_PEERS][16]; } m[CM_MAX];
+    int nm = 0, ncur = 0;
+    for (int i = 0; i < nsock; i++) {
+        Sock *s = &socks[i];
+        if (s->uid != me || !s->inode || !s->cg || s->proto == PROTO_PACKET) continue;
+        const char *sub = scope_sub_of(s->cg);
+        if (!sub[0]) continue;
+        int k = 0;
+        while (k < nm && strcmp(m[k].id, sub)) k++;
+        if (k == nm) {
+            if (nm >= CM_MAX) continue;
+            memset(&m[k], 0, sizeof m[k]);
+            snprintf(m[k].id, sizeof m[k].id, "%s", sub);
+            nm++;
+        }
+        int tcp = s->proto == IPPROTO_TCP;
+        if ((tcp && s->state == 10) || (!tcp && !s->dport)) { m[k].listen++; continue; }
+        m[k].socks++;
+        if (s->bytes) {
+            uint64_t now = s->sent + s->recv, before = 0;
+            for (int j = 0; j < cm_nprev; j++) if (cm_prev[j].inode == s->inode) { before = cm_prev[j].bytes; break; }
+            m[k].bytes += now >= before ? now - before : now;
+            if (ncur < MAX_SOCK) { cm_cur[ncur].inode = s->inode; cm_cur[ncur].bytes = now; ncur++; }
+        }
+        uint8_t dst[16];
+        memcpy(dst, s->dst, 16);
+        int fam = s->fam;
+        if (fam == 6 && is_mapped4(dst)) { fam = 4; memmove(dst, dst + 12, 4); memset(dst + 4, 0, 12); }
+        const char *sc = scope(fam, dst);
+        if (strcmp(sc, "internet") && strcmp(sc, "lan")) continue;
+        int seen = 0;
+        for (int j = 0; j < m[k].peers && !seen; j++) seen = !memcmp(m[k].peer[j], dst, 16);
+        if (!seen && m[k].peers < CM_PEERS) memcpy(m[k].peer[m[k].peers++], dst, 16);
+    }
+    memcpy(cm_prev, cm_cur, sizeof cm_cur[0] * (size_t)ncur);
+    cm_nprev = ncur;
+    mon_buf_printf(b, "{\"t\":%.0f,\"ok\":true,\"machines\":{", mon_wall_ms());
+    for (int k = 0; k < nm; k++) {
+        mon_buf_printf(b, "%s", k ? "," : "");
+        mon_buf_str(b, m[k].id);
+        mon_buf_printf(b, ":{\"socks\":%d,\"listen\":%d,\"peers\":%d,\"bytes\":%llu}", m[k].socks, m[k].listen, m[k].peers,
+                       (unsigned long long)m[k].bytes);
+    }
+    mon_buf_printf(b, "}}");
+}

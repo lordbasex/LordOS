@@ -1,10 +1,11 @@
 // Settings → AI → Sentinela (docs/SENTINELA.md): the process guard. Off by default. When on: the local model it uses
 // (installed lordos-llm-* packages, or a button that downloads one with the engine, sdk/llmcatalog.js), the triggers
 // (the ready ones; the others "coming soon"), its limits, what it reads, the alerts with their facts and the closed
-// list of actions, and the programs marked "It's mine".
+// list of actions, and the programs marked "It's mine". The virtual machines' alerts (sdk/sentinelavm.js) have their own
+// actions: open the machine, show it in Monitor, pause or resume, shut down.
 import {
   View, Text, Button, Toggle, useTheme, useLocale, useStore, formatBytes, formatTime, formatDate, spacing, typeScale,
-  LLM_MODELS, packagesForModel, TRIGGERS, ACTIONS, factLines, presentAlert, sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs,
+  LLM_MODELS, packagesForModel, TRIGGERS, ACTIONS, VM_ACTIONS, vmWhy, vmFactLines, factLines, presentAlert, sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs,
   refreshSentinelaEngine, runSentinelaAction, sentinelaOnBattery, clearSentinelaAlerts, sentinelaActionLabel, installLlm, removeLlm,
   ShieldGlyph, settings, fs,
 } from '@lordos/sdk';
@@ -93,8 +94,10 @@ export function SentinelaSettings({ alertId }) {
 
           <Section title={tr('sentinela.settings.triggers')} footer={tr('sentinela.settings.triggersFooter')}>
             {TRIGGERS.map((x) => (
-              <SettingRow key={x.id} label={tr(`sentinela.trigger.${x.id}`)} hint={x.ready ? null : tr('sentinela.settings.soon')} disabled={!x.ready}>
-                <Toggle small on={x.ready && p.triggers[x.id] !== false} onChange={(on) => x.ready && setSentinelaPrefs({ triggers: { ...p.triggers, [x.id]: on } })} />
+              <SettingRow key={x.id} label={tr(`sentinela.trigger.${x.id}`)} hint={x.always ? tr('sentinela.settings.always') : x.ready ? null : tr('sentinela.settings.soon')}
+                disabled={!x.ready || x.always}>
+                <Toggle small on={x.always || (x.ready && p.triggers[x.id] !== false)}
+                  onChange={(on) => x.ready && !x.always && setSentinelaPrefs({ triggers: { ...p.triggers, [x.id]: on } })} />
               </SettingRow>
             ))}
           </Section>
@@ -110,6 +113,7 @@ export function SentinelaSettings({ alertId }) {
 
           <Section title={tr('sentinela.settings.sees')}>
             <Text style={{ fontSize: typeScale.callout, color: th.text, lineHeight: 1.45, textAlign: 'start', paddingVertical: spacing.s }}>{tr('sentinela.settings.seesText')}</Text>
+            <Text style={{ fontSize: typeScale.callout, color: th.text, lineHeight: 1.45, textAlign: 'start', paddingVertical: spacing.s }}>{tr('sentinela.settings.seesMachines')}</Text>
           </Section>
 
           <Section title={tr('sentinela.settings.history')} accessory={alerts.length ? <Button small label={tr('sentinela.settings.clear')} onClick={clearSentinelaAlerts} /> : null}>
@@ -138,8 +142,11 @@ function AlertRow({ a, open, onToggle }) {
   const pres = presentAlert(a);
   const title = tr(pres.title, { name: a.name });
   const home = (() => { try { return fs.home(); } catch (e) { return ''; } })();
-  const lines = factLines(a.ev || a, a.facts, { home, user: home.split('/').filter(Boolean).pop() || '' });
-  const acts = a.rule === 'autostart' ? ['monitor', 'ignore'] : [...ACTIONS.filter((x) => x !== 'pause' || a.done !== 'pause'), ...(a.done === 'pause' ? ['resume'] : [])];
+  const vm = a.kind === 'machine';
+  const lines = vm ? vmFactLines(a.ev || a, tr) : factLines(a.ev || a, a.facts, { home, user: home.split('/').filter(Boolean).pop() || '' }).map((l) => tr(l.key, l.vars));
+  const acts = vm ? [...VM_ACTIONS.filter((x) => x !== 'vm_pause' || a.done !== 'vm_pause'), ...(a.done === 'vm_pause' ? ['vm_resume'] : [])]
+    : a.rule === 'autostart' ? ['monitor', 'ignore'] : [...ACTIONS.filter((x) => x !== 'pause' || a.done !== 'pause'), ...(a.done === 'pause' ? ['resume'] : [])];
+  const why = pres.reason || (vm ? vmWhy(a.ev || a, tr) : tr(`sentinela.why.${a.rule}`, { name: a.name, place: tr(`sentinela.place.${a.place || 'none'}`) }));
   return (
     <View style={{ paddingVertical: spacing.s, gap: spacing.xs }}>
       <View onClick={onToggle} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
@@ -150,15 +157,15 @@ function AlertRow({ a, open, onToggle }) {
       {open ? (
         <View style={{ gap: spacing.xs, paddingStart: 16 }}>
           <Text style={{ fontSize: typeScale.callout, color: th.text, lineHeight: 1.45, textAlign: 'start' }}>
-            {pres.reason || tr(`sentinela.why.${a.rule}`, { name: a.name, place: tr(`sentinela.place.${a.place || 'none'}`) })}</Text>
+            {why}</Text>
           {pres.note ? <Text style={{ fontSize: typeScale.caption, color: th.textDim, textAlign: 'start' }}>{tr(pres.note)}</Text> : null}
           <Text style={{ fontSize: typeScale.caption, color: th.textDim, textAlign: 'start' }}>{tr('sentinela.analyzed')}</Text>
-          {lines.map((l, i) => <Text key={i} style={{ fontSize: typeScale.caption, color: th.text, textAlign: 'start' }}>{tr(l.key, l.vars)}</Text>)}
+          {lines.map((l, i) => <Text key={i} style={{ fontSize: typeScale.caption, color: th.text, textAlign: 'start' }}>{l}</Text>)}
           <Text style={{ fontSize: typeScale.caption, color: th.textDim, textAlign: 'start' }}>{tr(`sentinela.analysis.${a.analysis || 'none'}`)}</Text>
           {a.done ? <Text style={{ fontSize: typeScale.caption, color: tint.ok, textAlign: 'start' }}>{tr('sentinela.done', { action: sentinelaActionLabel(a.done) })}</Text> : null}
           {a.error ? <Text style={{ fontSize: typeScale.caption, color: tint.error, textAlign: 'start' }}>{tr(`errors.${a.error}`)}</Text> : null}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s, marginTop: spacing.xs }}>
-            {acts.map((id) => <Button key={id} small primary={id === a.suggested} destructive={id === 'end_block'} label={sentinelaActionLabel(id)}
+            {acts.map((id) => <Button key={id} small primary={id === a.suggested} destructive={id === 'end_block' || id === 'vm_shutdown'} label={sentinelaActionLabel(id)}
               onClick={() => runSentinelaAction(a, id)} />)}
           </View>
           <Text style={{ fontSize: typeScale.caption, color: th.textDim, textAlign: 'start' }}>{tr('sentinela.youDecide')}</Text>

@@ -3300,6 +3300,24 @@ now measures what a machine's vCPUs really use and suggests a count; it never ch
   `tests/vm_model_test.mjs` (`cpuWindows`, `vcpuAdvice`: the maintainer's idle case, too little time, another count,
   old windows, the floor, a busy spell, saturation, the ceiling; `vcpuDefault`) and `tests/vm_profiles_test.mjs`.
 
+### 6.28 Sentinela watches the machines (built 2026-11-23, in development; approved by the maintainer 2026-11-23)
+
+Sentinela (docs/SENTINELA.md, "Machines"; off by default, local model only) reads what Machines already exposes every
+10 s: `lord.vm.list()`, `lord.vm.stats(dir)` and per-machine socket counts from the Monitor's thread
+(`lord.monitor.machinesWatched`). For it, `lord-vm` now writes QEMU's sandbox bits and cgroup mode into `run.json`
+while QEMU runs (`"sandbox"`, `"cgroup"`, the values of `lord-vm --status`), and `stats(dir)` adds `qemuPid` (only a
+QEMU whose parent is the machine's lord-vm), `scope` (`in`/`out` of `app-lordos-lordos-vm-<id>.scope`), the kernel's
+`seccomp` and `noNewPrivs` for that QEMU, `sandbox`, `cgMode` and `passt`. All read-only; no new action on a machine.
+
+- **Always alerted, no model:** a QEMU moved out of its machine's scope; a sandbox missing Landlock, seccomp,
+  no_new_privs or its cgroup; a Workstation of an anonymity group with any way out besides its link (19.3).
+- **Toggles:** a machine far above its own usual CPU or memory; crash loops (3 unexpected ends in 15 minutes); for an
+  anonymity group, a Gateway whose traffic or number of remote addresses jumps far above its own pattern, any
+  unexpected end of a member, restarts and a pegged CPU.
+- Alerts carry the machine's name and role; the model only gets counts and those words, never the guest's screen,
+  files or clipboard, and can't silence an alert. Actions, each from the person's click: open the machine, show it in
+  Monitor, pause or resume, shut down.
+
 ## 7. Guest tools
 
 ### 7.1 What each guest receives
@@ -4240,6 +4258,12 @@ fixed internal addresses); Machines has to give it exactly that wiring and nothi
 - **Side channels** between the two guests or with the host (Spectre-class, rowhammer). Pinning the members on
   different physical cores and keeping guest memory off huge pages and KSM (19.5) reduce them, nothing more.
 - The person signing in to an account that names them.
+
+**Layer 9: Sentinela** (6.28, approved 2026-11-23; off by default). With Sentinela on, a member's QEMU leaving its
+scope, a member's sandbox missing a part, or the Workstation showing any network path besides its link is always
+alerted; a Gateway whose traffic or remote addresses change sharply, unexpected ends, restarts and a pegged CPU are
+alerted too. It reads the members' `role` and `profileLock` (19.4) from `lord.vm.list()`; it watches and tells, and
+acts only on the person's click.
 
 ### 19.2 Architecture
 

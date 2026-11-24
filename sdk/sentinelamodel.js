@@ -32,6 +32,12 @@ export const TRIGGERS = [
   { id: 'imitation', ready: true },
   { id: 'replaced', ready: true },     // its file deleted or replaced after it started (outside the system folders)
   { id: 'autostart', ready: true },
+  // virtual machines (sdk/sentinelavm.js): vmAlways can't be turned off (a machine out of its limits, its sandbox missing
+  // a part, a Workstation with another way out)
+  { id: 'vmAlways', ready: true, always: true },
+  { id: 'vmUsage', ready: true },
+  { id: 'vmCrash', ready: true },
+  { id: 'vmAnon', ready: true },
 ];
 export const TRIGGER_DEFAULTS = Object.fromEntries(TRIGGERS.filter((x) => x.ready).map((x) => [x.id, true]));
 
@@ -89,16 +95,18 @@ export function createTracker({ uid = null, home = '' } = {}) {
         deleted: exeDeleted(p.exe), app: p.app || null, threads: p.threads || 0, start: p.start || 0, at: now, ...extra });
     };
     const win = (ms) => s.samples.filter((x) => x.t >= now - ms);
+    // a machine's QEMU (its scope's processes): its CPU and memory are the machine's rules', against its own usual
+    const vmProc = /^desktop:lordos-vm-/.test(String(p.app || ''));
     // CPU: every sample of the last 5 minutes above the limit, and 5 minutes of samples
     const cw = win(CPU_WINDOW_MS + SAMPLE_MS / 2);
-    if (cw.length >= 3 && now - cw[0].t >= CPU_WINDOW_MS - SAMPLE_MS / 2 && cw.every((x) => x.cpu >= CPU_LIMIT)) {
+    if (!vmProc && cw.length >= 3 && now - cw[0].t >= CPU_WINDOW_MS - SAMPLE_MS / 2 && cw.every((x) => x.cpu >= CPU_LIMIT)) {
       const avg = cw.reduce((a, x) => a + x.cpu, 0) / cw.length;
       fire('cpu', { cpuAvg: avg, cpuPeak: Math.max(...cw.map((x) => x.cpu)), minutes: Math.round((now - cw[0].t) / 60000), rss: p.rss });
     }
     // memory: grown steadily for 10 minutes (most steps up, none of them half the growth: not one spike), by half
     // again and 256 MB, now at least 512 MB
     const mw = win(MEM_WINDOW_MS + SAMPLE_MS / 2);
-    if (mw.length >= 6 && now - mw[0].t >= MEM_WINDOW_MS - SAMPLE_MS / 2) {
+    if (!vmProc && mw.length >= 6 && now - mw[0].t >= MEM_WINDOW_MS - SAMPLE_MS / 2) {
       const first = mw[0].rss, last = mw[mw.length - 1].rss;
       let up = 0, down = 0, step = 0;
       for (let i = 1; i < mw.length; i++) {

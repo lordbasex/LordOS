@@ -930,5 +930,7 @@
   "llm.busy": "Sentinela tayari inachanganua mambo kadhaa. Jaribu tena baada ya muda mfupi.",
   "llm.noEngine": "Injini ya modeli ya ndani haijasakinishwa.",
   "llm.noModel": "Modeli hiyo ya ndani haijasakinishwa.",
-  "sentinela.blockFailed": "Mtandao wake haukuweza kuzuiwa."
+  "sentinela.blockFailed": "Mtandao wake haukuweza kuzuiwa.",
+  "sentinela.machineGone": "Mashine hiyo haimo tena katika Mashine.",
+  "sentinela.machineFailed": "Mashine haikujibu."
 }

@@ -15,7 +15,7 @@ const check = (name, ok, detail = '') => console.log(ok ? `ok ${name}` : `FAIL $
 const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
 const HOME = '/home/ana';
-const calls = { watch: [], analyze: [], signal: [], restricted: [], facts: [] };
+const calls = { watch: [], watchVm: [], analyze: [], signal: [], restricted: [], facts: [] };
 let answer = '{"verdict":"dangerous","reason":"Parece un minero de criptomonedas: usa casi toda la CPU y no vino de ningún paquete.","action":"end_block"}';
 let onBattery = false;
 let tick = 0;
@@ -24,6 +24,7 @@ const miner = (o) => ({ pid: 4242, st: 777, ppid: 4000, uid: 1000, name: 'miner-
 let procs = [{ pid: 10, st: 1, uid: 1000, self: true, name: 'lord-server', exe: '/usr/lib/lordos/bin/lord-server', cpu: 0.1, rss: 1 << 28 }, miner()];
 lord.monitor = {
   watchProcs: (on) => { calls.watch.push(on); return true; },
+  watchMachines: (on) => { calls.watchVm.push(on); return true; },
   procsWatched: () => ({ t: Date.now(), total: procs.length, list: procs.map((p) => ({ ...p })), seq: tick++ }),
   info: () => ({ cores: 8 }),
   signal: (pid, st, kind) => { calls.signal.push([pid, st, kind]); return null; },
@@ -156,8 +157,45 @@ procs = [procs[0], miner({ pid: 8181, st: 2222, name: 'kworker/3:3', cpu: 0 })];
 await run(1);
 check('… and not warned about again', notifyHistory.get().length === k);
 
+// ---- the machines: a QEMU moved out of its scope, always and with no model; the actions reach lord.vm only on a click ----
+const vmCalls = { stop: [], stats: 0 };
+const gw = { id: 'aaaa-1', name: 'Whonix-Gateway', dir: `${HOME}/Machines/Whonix-Gateway.lordvm`, state: 'running', reason: 'none', since: 's1',
+  vcpus: 1, memoryMb: 2048, network: 'shared', ports: [], role: 'gateway', profileLock: 'anonymity' };
+let vmScope = 'in';
+lord.vm = {
+  list: () => [{ ...gw }],
+  stats: () => { vmCalls.stats++; return { at: clock, cpuUsec: clock, memBytes: 1 << 30, qemuPid: 900, scope: vmScope, seccomp: 2, noNewPrivs: 1, sandbox: 511, cgMode: 'nested', passt: true }; },
+  stop: (dir, how) => { vmCalls.stop.push([dir, how]); return true; },
+};
+lord.monitor.machinesWatched = () => ({ t: clock, ok: true, machines: { 'aaaa-1': { socks: 3, listen: 0, peers: 1, bytes: 20000 } } });
+const analyzedBefore = calls.analyze.length, nBefore = notifyHistory.get().length;
+await run(2);
+check('machines: watched with the processes', calls.watchVm[0] === true && vmCalls.stats >= 2);
+check('a machine in its scope: nothing', notifyHistory.get().length === nBefore);
+vmScope = 'out';
+await run(2);
+const nv = notifyHistory.get()[0];
+const av = sentinelaAlerts.get()[0];
+check('out of its scope: one notification', notifyHistory.get().length === nBefore + 1 && nv && nv.title === 'sentinela.title.vmScope', nv && nv.title);
+check('… with no model asked', calls.analyze.length === analyzedBefore && av && av.analysis === 'rule');
+check('… its why and the machine', nv && nv.body.startsWith('sentinela.why.vmScope') && nv.body.includes('sentinela.fact.machine'), nv && nv.body);
+check('… stays until the person acts', notifications.get()[0]?.sticky === true);
+check('… the machine\'s actions', nv && JSON.stringify(nv.actions.map((a) => a.id)) === '["vm_shutdown","vm_open","vm_monitor"]', nv && JSON.stringify(nv.actions.map((a) => a.id)));
+check('… nothing ran before the click', vmCalls.stop.length === 0);
+nv.actions[0].run();
+check('Shut down: lord.vm.stop on that machine', JSON.stringify(vmCalls.stop[0]) === JSON.stringify([gw.dir, 'shutdown']), JSON.stringify(vmCalls.stop));
+// even with every machine toggle off
+settings.set((s) => ({ ...s, sentinela: { ...s.sentinela, triggers: { ...(s.sentinela.triggers || {}), vmUsage: false, vmCrash: false, vmAnon: false } } }));
+gw.since = 's2';
+vmScope = 'out';
+const k2 = notifyHistory.get().length;
+lord.vm.stats = () => ({ at: clock, cpuUsec: clock, memBytes: 1 << 30, qemuPid: 901, scope: 'out', seccomp: 2, noNewPrivs: 1, sandbox: 511, cgMode: 'nested', passt: true });
+await run(1);
+check('a new QEMU out of scope, every toggle off: still shown', notifyHistory.get().length === k2 + 1 && notifyHistory.get()[0].title === 'sentinela.title.vmScope');
+
 // ---- off again: the watch stops ----
 settings.set((s) => ({ ...s, sentinela: { ...s.sentinela, on: false } }));
 await run(1);
 check('off: the process list is no longer built', calls.watch[calls.watch.length - 1] === false);
+check('… nor the machines\' counts', calls.watchVm[calls.watchVm.length - 1] === false);
 process.exit(0);

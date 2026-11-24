@@ -11,6 +11,31 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Sentinela watches the virtual machines** (in development; latest release 0.8.9.5; approved by the maintainer
+  2026-11-23 as layer 9 of the anonymity group's isolation, docs/SENTINELA.md "Machines", docs/VIRTUALIZATION.md 6.28).
+  Still off by default and local only. Every 10 s it reads what Machines already exposes (`lord.vm.list()`,
+  `lord.vm.stats(dir)`) and per-machine socket counts from the Monitor's thread.
+  - **Always alerted, without the model, and they can't be turned off:** a machine's QEMU moved out of its own cgroup
+    scope (its limits no longer apply); a QEMU sandbox missing Landlock (files or network), seccomp, no_new_privs or its
+    cgroup, from the bits lord-vm applied and from the kernel's own `/proc/<pid>/status`; the Workstation of an
+    anonymity group with any way to the network besides its link (another network setting, forwarded ports, a bridge,
+    a live passt, a socket of its own). Each fires once per QEMU and finding and stays on screen until the person acts.
+  - **New toggles** in Settings → AI → Sentinela: a machine using far more CPU or memory than its own usual (after half
+    an hour of history: 10 minutes at 60 % of its vCPUs and 40 points above its usual; 1.5× its usual memory and
+    512 MB more); a machine that keeps crashing (3 unexpected ends in 15 minutes); for an anonymity group, a Gateway
+    whose traffic (8×) or remote addresses (3×) jump far above its own pattern, any unexpected end of a member, 3
+    restarts in 10 minutes and a CPU pegged at 90 % for 15 minutes. These may ask the local model, which gets only the
+    machine's name (as a quoted field), role, settings and the rule's numbers; its answer can't silence an alert.
+  - **Actions**, each only from the person's click: Open the machine (its window when it runs, the library otherwise),
+    Show in Monitor, Pause or Resume, Shut down.
+  - **Under the hood:** `lord-vm` writes QEMU's sandbox bits and cgroup mode into `run.json` while QEMU runs;
+    `lord.vm.stats` adds `qemuPid` (only a QEMU whose parent is the machine's lord-vm), `scope`, `seccomp`,
+    `noNewPrivs`, `sandbox`, `cgMode` and `passt`; `lord.monitor.watchMachines`/`machinesWatched` give each running
+    machine's sockets, remote addresses and TCP bytes as counts only (`conn_machines`), never an address. A machine's
+    QEMU is no longer judged by the process CPU and memory rules (the machine rules compare it with its own usual).
+  - Tests: `tests/sentinela_vm_test.mjs` (every rule on synthetic machine stats, baselines, the summary's bounds and an
+    injected name, the action mapping), and machine cases in the Sentinela notification and Settings scenes. Strings in
+    all 35 languages.
 - **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
   Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
   threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores

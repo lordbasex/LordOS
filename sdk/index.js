@@ -25,6 +25,7 @@ export { scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoi
 // Sentinela, the process guard (docs/SENTINELA.md): its models, its rules and its session service
 export { LLM_MODELS, ENGINE_PACKAGE, llmModel, packagesForModel, llmPackageOk } from './llmcatalog.js';
 export { TRIGGERS, ACTIONS, SENTINELA_DEFAULTS, factLines, presentAlert } from './sentinelamodel.js';
+export { VM_ACTIONS, vmWhy, vmFactLines } from './sentinelavm.js';
 export {
   sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, runSentinelaAction, sentinelaOnBattery,
   clearSentinelaAlerts, actionLabel as sentinelaActionLabel, installLlm, removeLlm,

@@ -931,5 +931,7 @@
   "llm.busy": "Sentinela analizează deja mai multe lucruri. Încercați din nou peste câteva clipe.",
   "llm.noEngine": "Motorul modelului local nu este instalat.",
   "llm.noModel": "Acel model local nu este instalat.",
-  "sentinela.blockFailed": "Rețeaua lui nu a putut fi blocată."
+  "sentinela.blockFailed": "Rețeaua lui nu a putut fi blocată.",
+  "sentinela.machineGone": "Mașina aceea nu mai este în Mașini.",
+  "sentinela.machineFailed": "Mașina nu a răspuns."
 }
