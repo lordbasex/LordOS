@@ -1089,6 +1089,16 @@ static struct {
     int layout[6];                          /* where the picture sits in the guest's desktop (VM_GUEST_LAYOUT), 0s none */
     int lag_extra, lag_extraoff, extra_avail; /* the tools turn off an extra display (AGK_EXTRA); one is off; one is there */
     int lag_perf;                           /* the tools apply the performance profile (AGK_PERF, "perf", w11) */
+    /* tools 8 and w12: the agent's shell (6.18), links and notifications from the guest (6.12), each said in the hello */
+    int lag_shell, lag_links, lag_notify;
+    AgRate link_rate, note_rate;            /* the guest's links and notifications, each at most a burst then one per interval */
+    int link_over, note_over;               /* refused over the rate since the last line in the log */
+    /* the agent's shell (VM_SHELL): our end of lord-server's stream, the shell's id, what went to the guest and isn't
+     * acknowledged yet, and what the guest wrote that lord-server's terminal hasn't read yet (at most AG_SHELL_WINDOW) */
+    int sh_fd;
+    uint32_t sh_id, sh_next, sh_to_guest;
+    uint8_t *sh_buf;
+    size_t sh_n;
     unsigned perf_said;                     /* the last AGK_PERFSTATE logged, as 1 << 24 | on << 16 | done << 8 | failed; 0 none */
     AgDisplay disp_list[AG_DISPLAYS_MAX];   /* the guest's displays (AGK_DISPLAYS) as last said, for the tablet's layout */
     int disp_n, disp_shown;
@@ -3481,7 +3491,8 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * every 10 s. lordos-guest answers on org.lordos.agent (vmagent.h) for the clipboard. Everything the guest sends is
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
 /* what org.lordos.agent's helper brings (kept when qemu-guest-agent comes and goes) */
-#define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | VAC_OPEN | VAC_PLACE | (int)LAG_CAP_WINDOWS | VAC_EXTRA | VAC_EXTRA_OFF)
+#define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | VAC_OPEN | VAC_PLACE | (int)LAG_CAP_WINDOWS | VAC_EXTRA | VAC_EXTRA_OFF | \
+                 VAC_SHELL | VAC_LINKS | VAC_NOTIFY)
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
        AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS,
@@ -3518,6 +3529,8 @@ static const char IDENTITY_PS[] =
 static int qga_do(const char *cmd, const char *args, int kind);
 static int fx_exec_ps(const char *script, int kind);
 static void lag_send(uint16_t kind, const uint8_t *data, uint32_t n);
+static void host_hello(int ask);
+static void shell_end(const char *why, int tell_guest);
 static void id_begin(void) {
     if (S.id_state != 1 || !(S.ag_caps & VAC_EXEC)) return;
     if (S.ag_windows) {
@@ -3929,7 +3942,7 @@ static void on_qga_reply(const JVal *root, int ok) {
         search_begin();
         /* a machine that resumed from a saved state has a clipboard helper that said hello to the lord-vm before: it
          * is asked to say it again (once; its answer gets the plain hello) */
-        if (!S.lag_hello && S.lag_fd >= 0) { static const char ask[] = "lord-vm 2 clipboard clipx clipreq elevated ask"; lag_send(AGK_HELLO, (const uint8_t *)ask, sizeof ask - 1); }
+        if (!S.lag_hello && S.lag_fd >= 0) host_hello(1);
         break;
     }
     case AQ_PING: if (ok) S.ping_at = now_ms(); break;
@@ -5044,6 +5057,16 @@ static void lag_send(uint16_t kind, const uint8_t *data, uint32_t n) {
     lag_flush();
 }
 
+/* lord-vm's own hello: what it understands ("elevated": LAGW_ELEVATED), and, only while machine.json allows them,
+ * "links" and "notify", so the guest's tools can tell a person who tries that this machine takes neither; "ask": a
+ * machine that resumed asks the tools to say hello again */
+static void host_hello(int ask) {
+    char me[128];
+    snprintf(me, sizeof me, "lord-vm 2 clipboard clipx clipreq elevated%s%s%s", S.m.guest_links ? " links" : "",
+             S.m.guest_notify ? " notify" : "", ask ? " ask" : "");
+    lag_send(AGK_HELLO, (const uint8_t *)me, (uint32_t)strlen(me));
+}
+
 static int clip_allows(int to_guest) {
     return S.m.clipboard == VM_CLIP_BOTH || S.m.clipboard == (to_guest ? VM_CLIP_TO_GUEST : VM_CLIP_FROM_GUEST);
 }
@@ -5203,6 +5226,125 @@ static void lag_windata(const AgFrame *f) {
     free(out);
 }
 
+/* ---- links and notifications from the guest (6.12) ----
+ * The guest is hostile: a frame of either kind is taken only from tools that said hello, only while machine.json allows
+ * that kind, only within its rate (a burst, then one per interval), only when it parses exactly (vmagent.c); then it is
+ * written again and given to lord-server as a sealed memfd, which checks it again and asks the person before a link
+ * opens. Nothing here opens, runs or shows anything; the log says what came, never the link or the words. */
+static void guest_note(const AgFrame *f) {
+    int link = f->kind == AGK_LINK;
+    if (S.m.profile_lock || !(link ? S.m.guest_links : S.m.guest_notify) || !(link ? S.lag_links : S.lag_notify)) {
+        static int said;
+        if (!(said & (link ? 1 : 2))) { said |= link ? 1 : 2; vlog("agent: the guest sent a %s, but this machine doesn't take them (Configure, Sharing): dropped", link ? "link" : "notification"); }
+        return;
+    }
+    uint8_t out[VM_GUEST_NOTE_MAX];
+    size_t n = 0;
+    if (link) {
+        if (!ag_link_ok(f->data, f->len) || f->len > sizeof out) { vlog("agent: a link from the guest that isn't one this computer opens (http, https, mailto): dropped"); return; }
+        memcpy(out, f->data, f->len);
+        n = f->len;
+    } else {
+        const uint8_t *t, *b;
+        uint16_t tn, bn;
+        if (ag_note_parse(f->data, f->len, &t, &tn, &b, &bn) || !(n = ag_note_write(t, tn, b, bn, out, sizeof out))) { vlog("agent: a notification from the guest that doesn't parse: dropped"); return; }
+    }
+    long long now = now_ms();
+    int *over = link ? &S.link_over : &S.note_over;
+    if (!(link ? ag_rate_take(&S.link_rate, now, AG_LINK_BURST, AG_LINK_EVERY_MS) : ag_rate_take(&S.note_rate, now, AG_NOTE_BURST, AG_NOTE_EVERY_MS))) {
+        if (!(*over)++) vlog("agent: the guest sends %s faster than this computer takes them: dropped until it slows down", link ? "links" : "notifications");
+        return;
+    }
+    if (*over) { vlog("agent: %d %s from the guest were dropped (too many)", *over, link ? "links" : "notifications"); *over = 0; }
+    int fd = memfd_create("lordos-vm-note", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    if (fd >= 0 && !write_all(fd, out, n) && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+        VmMsg m = vm_msg(VM_GUEST_NOTE, 0, (int)n, f->kind, 0, 0, "");
+        int sent = 0;
+        for (int i = 0; i < MAX_CLIENTS; i++) if (S.cl[i].fd >= 0) { send_to(i, &m, fd); sent++; }
+        vlog("agent: the guest %s%s", link ? "asks to open a link" : "sent a notification", sent ? "" : " (no window to show it: dropped)");
+    }
+    if (fd >= 0) close(fd);
+}
+
+/* ---- the agent's shell (6.18) ----
+ * lord-server's terminal holds one end of a stream (VM_SHELL_FD); this side relays it to the guest's tools as
+ * AGK_SHELL_* frames, with flow control both ways (AG_SHELL_WINDOW: never more than that in flight, so a shell that
+ * writes without end, or a terminal that doesn't read, keeps memory flat). The guest's tools start the signed-in
+ * person's own shell; nothing here names a program. */
+static void shell_end(const char *why, int tell_guest) {
+    if (S.sh_fd < 0 && !S.sh_id) return;
+    if (tell_guest && S.sh_id && S.lag_fd >= 0) { uint8_t b[8]; ag_shell_pair_write(b, S.sh_id, 0); lag_send(AGK_SHELL_CLOSE, b, 8); }
+    if (S.sh_fd >= 0) {
+        if (S.sh_n) { ssize_t w = write(S.sh_fd, S.sh_buf, S.sh_n); (void)w; }     /* the last words, best effort */
+        close(S.sh_fd);
+    }
+    S.sh_fd = -1;
+    S.sh_id = 0;
+    S.sh_to_guest = 0;
+    S.sh_n = 0;
+    if (why) vlog("shell: ended (%s)", why);
+}
+
+/* what the guest's shell wrote, on to lord-server's terminal as far as it reads now; each byte delivered is acknowledged */
+static void shell_flush(void) {
+    if (S.sh_fd < 0 || !S.sh_n) return;
+    ssize_t w = write(S.sh_fd, S.sh_buf, S.sh_n);
+    if (w < 0) { if (errno != EAGAIN && errno != EINTR) shell_end("the terminal went away", 1); return; }
+    if (!w) return;
+    memmove(S.sh_buf, S.sh_buf + w, S.sh_n - (size_t)w);
+    S.sh_n -= (size_t)w;
+    uint8_t b[8];
+    ag_shell_pair_write(b, S.sh_id, (uint32_t)w);
+    lag_send(AGK_SHELL_ACK, b, 8);
+}
+
+static void shell_frame(const AgFrame *f) {
+    uint32_t id;
+    if (f->kind == AGK_SHELL_DATA) {
+        const uint8_t *d;
+        uint32_t dn;
+        if (ag_shell_data_parse(f->data, f->len, &id, &d, &dn)) { vlog("shell: a malformed piece from the guest: dropped"); return; }
+        if (!S.sh_id || id != S.sh_id || S.sh_fd < 0) return;              /* an old shell's last words */
+        if (S.sh_n + dn > AG_SHELL_WINDOW) { shell_end("the guest sent more than its window", 1); return; }
+        if (!S.sh_buf && !(S.sh_buf = malloc(AG_SHELL_WINDOW))) { shell_end("out of memory", 1); return; }
+        memcpy(S.sh_buf + S.sh_n, d, dn);
+        S.sh_n += dn;
+        shell_flush();
+    } else if (f->kind == AGK_SHELL_ACK) {
+        uint32_t by;
+        if (ag_shell_ack_parse(f->data, f->len, &id, &by)) { vlog("shell: a malformed acknowledgement from the guest: dropped"); return; }
+        if (!S.sh_id || id != S.sh_id) return;
+        if (by > S.sh_to_guest) { shell_end("the guest acknowledged more than it was sent", 1); return; }
+        S.sh_to_guest -= by;
+    } else {
+        int st;
+        if (ag_shell_close_parse(f->data, f->len, &id, &st)) { vlog("shell: a malformed end from the guest: dropped"); return; }
+        if (!S.sh_id || id != S.sh_id) return;
+        char why[64];
+        if (st == AG_SHELL_NOSTART) snprintf(why, sizeof why, "the guest couldn't start a shell");
+        else if (st > 255) snprintf(why, sizeof why, "the shell was ended by signal %d", st - 256);
+        else snprintf(why, sizeof why, "the shell exited with %d", st);
+        shell_end(why, 0);
+    }
+}
+
+/* lord-server's side of the stream: typing goes to the guest within its window; what waits for the terminal goes on */
+static void shell_pump(short ev) {
+    if (S.sh_fd < 0) return;
+    if (ev & POLLOUT) shell_flush();
+    if (S.sh_fd < 0 || !(ev & (POLLIN | POLLHUP | POLLERR))) return;
+    if (S.sh_to_guest >= AG_SHELL_WINDOW) return;
+    static uint8_t buf[4 + AG_SHELL_CHUNK];
+    size_t room = AG_SHELL_WINDOW - S.sh_to_guest;
+    if (room > AG_SHELL_CHUNK) room = AG_SHELL_CHUNK;
+    ssize_t r = read(S.sh_fd, buf + 4, room);
+    if (r == 0 || (r < 0 && errno != EAGAIN && errno != EINTR)) { shell_end("the terminal closed it", 1); return; }
+    if (r < 0) return;
+    { uint8_t h8[8]; ag_shell_pair_write(h8, S.sh_id, 0); memcpy(buf, h8, 4); }      /* the id only: the data follows */
+    lag_send(AGK_SHELL_DATA, buf, (uint32_t)(4 + r));
+    S.sh_to_guest += (uint32_t)r;
+}
+
 static void drain_lag(void) {
     if (!S.lag_buf) { S.lag_buf = malloc(AG_FRAME_MAX + AG_HEAD); S.lag_n = 0; if (!S.lag_buf) return; }
     ssize_t r = read(S.lag_fd, S.lag_buf + S.lag_n, AG_FRAME_MAX + AG_HEAD - S.lag_n);
@@ -5236,6 +5378,11 @@ static void drain_lag(void) {
                 S.lag_extraoff = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_EXTRAOFF) != 0;
                 if (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_STOPPING) stop_announces = 1;
                 S.lag_perf = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_PERF) != 0;
+                unsigned hw = ag_hello_caps((const uint8_t *)t + 13, l - 13);
+                S.lag_shell = (hw & AG_HELLO_SHELL) != 0;
+                S.lag_links = (hw & AG_HELLO_LINKS) != 0;
+                S.lag_notify = (hw & AG_HELLO_NOTIFY) != 0;
+                if (!S.lag_shell) shell_end("the guest's tools have no shell any more", 0);
                 /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
                  * again with "clipboard" once one is installed */
                 unsigned hc = ag_hello_caps((const uint8_t *)t + 13, l - 13);
@@ -5252,10 +5399,11 @@ static void drain_lag(void) {
                 S.ag_caps = (S.ag_caps & ~VAC_LAG) | (clip ? VAC_CLIPBOARD : 0) | (clip && S.lag_clipreq ? VAC_CLIP_LAZY : 0) |
                             (notool ? VAC_CLIP_NOTOOL : 0) | (S.lag_display ? VAC_DISPLAY : 0) | (S.lag_windows ? (int)LAG_CAP_WINDOWS : 0) |
                             (S.lag_open && S.ag_windows ? VAC_OPEN : 0) | (S.lag_place && S.ag_windows ? VAC_PLACE : 0) |
-                            (S.lag_extra && S.extra_avail ? VAC_EXTRA : 0) | (S.lag_extra && S.lag_extraoff ? VAC_EXTRA_OFF : 0);
+                            (S.lag_extra && S.extra_avail ? VAC_EXTRA : 0) | (S.lag_extra && S.lag_extraoff ? VAC_EXTRA_OFF : 0) |
+                            (S.lag_shell ? VAC_SHELL : 0) | (S.lag_links && S.m.guest_links ? VAC_LINKS : 0) |
+                            (S.lag_notify && S.m.guest_notify ? VAC_NOTIFY : 0);
                 if (!S.lag_open && !S.lag_place) open_all_end();
-                static const char me[] = "lord-vm 2 clipboard clipx clipreq elevated";   /* elevated: LAGW_ELEVATED is understood */
-                lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
+                host_hello(0);
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
                 /* the performance profile (7.1.4): said after every hello, off too, so tools that kept it from an
                  * earlier run (a crash) put the guest's own settings back */
@@ -5364,6 +5512,10 @@ static void drain_lag(void) {
             lag_windata(&f);
         } else if ((f.kind == AGK_OPENED && S.lag_hello && S.lag_open) || (f.kind == AGK_PLACED && S.lag_hello && S.lag_place)) {
             open_answer(&f);
+        } else if ((f.kind == AGK_LINK || f.kind == AGK_NOTIFY) && S.lag_hello) {
+            guest_note(&f);
+        } else if ((f.kind == AGK_SHELL_DATA || f.kind == AGK_SHELL_ACK || f.kind == AGK_SHELL_CLOSE) && S.lag_hello && S.lag_shell) {
+            shell_frame(&f);
         }
         /* other kinds: skipped, so either side can grow */
         memmove(S.lag_buf, S.lag_buf + k, S.lag_n - (size_t)k);
@@ -5517,6 +5669,35 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (fd < 0 && !S.cd_node[0]) { reply(ci, m->seq, VME_OK, "ejected"); return; }
         cd_change(ci, m->seq, fd, m->text);
         if (fd >= 0) close(fd);
+        return;
+    }
+    case VM_SHELL: {
+        if (fd >= 0) { close(fd); fd = -1; }
+        if (m->a == VSH_CLOSE) { shell_end("closed by the window", 1); reply(ci, m->seq, VME_OK, "closed"); return; }
+        if (m->a == VSH_SIZE) {
+            uint8_t b[8];
+            if (S.sh_id && S.lag_fd >= 0 && !ag_shell_size_write(b, S.sh_id, m->b, m->c)) lag_send(AGK_SHELL_SIZE, b, 8);
+            reply(ci, m->seq, VME_OK, "");
+            return;
+        }
+        if (!alive || !S.m.agent || S.m.profile_lock) { reply(ci, m->seq, VME_DENIED, "the guest agent is off for this machine"); return; }
+        if (!S.lag_hello || !S.lag_shell || S.lag_fd < 0) { reply(ci, m->seq, VME_WRONG_STATE, "the LordOS tools in the guest have no shell (lordos-guest 8 or w12, signed in)"); return; }
+        shell_end(S.sh_id ? "a new one was opened" : NULL, 1);
+        int sv[2];
+        if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sv)) { reply(ci, m->seq, VME_INTERNAL, strerror(errno)); return; }
+        fcntl(sv[0], F_SETFL, O_NONBLOCK);
+        S.sh_fd = sv[0];
+        if (!++S.sh_next) S.sh_next = 1;
+        S.sh_id = S.sh_next;
+        S.sh_to_guest = 0;
+        S.sh_n = 0;
+        uint8_t b[8];
+        ag_shell_size_write(b, S.sh_id, m->b, m->c);
+        lag_send(AGK_SHELL_OPEN, b, 8);
+        VmMsg r = vm_msg(VM_SHELL_FD, m->seq, 0, 0, 0, 0, "");
+        send_to(ci, &r, sv[1]);
+        close(sv[1]);
+        vlog("shell: the agent's shell opened for client %d (%dx%d)", ci, m->b, m->c);
         return;
     }
     case VM_LINK: {
@@ -5919,7 +6100,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = S.lag_perf = 0; S.perf_said = 0; S.disp_n = 0; S.tablet = 0; S.tablet_far = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
+            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = S.lag_perf = 0; S.lag_shell = S.lag_links = S.lag_notify = 0; shell_end("the guest closed org.lordos.agent", 0); S.perf_said = 0; S.disp_n = 0; S.tablet = 0; S.tablet_far = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
@@ -6345,8 +6526,8 @@ static int sig_count;
 
 static void loop(void) {
     while (!S.qemu_done) {
-        struct pollfd p[MAX_CLIENTS + 8];
-        int ci[MAX_CLIENTS + 8], n = 0;
+        struct pollfd p[MAX_CLIENTS + 16];
+        int ci[MAX_CLIENTS + 16], n = 0;
         /* the system bus first: what's queued already is dispatched here (PrepareForShutdown included, before the
          * deadlines below are read), so its POLLIN is asked for again (vmlogind.h: a queued message left it out and
          * the signal waited ~30 s, until the bus hung up at the end of the shutdown, 2026-11-23) */
@@ -6366,6 +6547,11 @@ static void loop(void) {
         WATCH(S.passt_pidfd, -10);
         WATCH(S.fx_cpipe, -12);
         WATCH(S.sc_fd, -13);
+        /* the agent's shell: read from lord-server only while the guest's window has room; written to while some waits */
+        if (S.sh_fd >= 0 && (S.sh_to_guest < AG_SHELL_WINDOW || S.sh_n)) {
+            p[n] = (struct pollfd){ S.sh_fd, (short)((S.sh_to_guest < AG_SHELL_WINDOW ? POLLIN : 0) | (S.sh_n ? POLLOUT : 0)), 0 };
+            ci[n++] = -14;
+        }
         for (int i = 0; i < MAX_CLIENTS; i++) WATCH(S.cl[i].fd, i);
 #undef WATCH
         long long now = now_ms(), next = -1;
@@ -6469,6 +6655,7 @@ static void loop(void) {
             case -11: logind_process(); break;
             case -12: fx_xcopy_read(); break;
             case -13: sc_serve(); break;
+            case -14: shell_pump(p[i].revents); break;
             default: {
                 int k = ci[i];
                 if (S.cl[k].fd < 0) break;
@@ -6731,7 +6918,7 @@ static int connect_machine(const VmMachine *m);
 static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
-    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = -1;
+    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = S.sh_fd = -1;
     S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
@@ -7198,7 +7385,7 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -7252,6 +7439,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         if (!strcmp(a, "--cpu-pin")) { pin = !strcmp(v, "off") ? VM_PIN_OFF : !strcmp(v, "auto") ? VM_PIN_AUTO : !strcmp(v, "default") ? VM_PIN_DEFAULT : -1; if (pin < 0) { fprintf(stderr, "lord-vm: --cpu-pin off|auto|default\n"); return 2; } continue; }
         if (!strcmp(a, "--capture-fullscreen")) { capfs = parse_enum(v, "off", "on"); if (capfs < 0) { fprintf(stderr, "lord-vm: --capture-fullscreen on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--perf-profile")) { perf = parse_enum(v, "off", "on"); if (perf < 0) { fprintf(stderr, "lord-vm: --perf-profile on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--guest-links")) { glinks = parse_enum(v, "off", "on"); if (glinks < 0) { fprintf(stderr, "lord-vm: --guest-links on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--guest-notify")) { gnote = parse_enum(v, "off", "on"); if (gnote < 0) { fprintf(stderr, "lord-vm: --guest-notify on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--volume")) {
@@ -7336,6 +7525,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (ptr >= 0) { m.pointer_guest = ptr; if (ptr) m.schema = VM_SCHEMA; }
     if (capfs >= 0) { m.capture_fullscreen = capfs; if (capfs) m.schema = VM_SCHEMA; }
     if (perf >= 0) { m.perf_profile = perf; if (perf) m.schema = VM_SCHEMA; }
+    if (glinks >= 0) { m.guest_links = glinks; if (glinks) m.schema = VM_SCHEMA; }
+    if (gnote >= 0) { m.guest_notify = gnote; if (gnote) m.schema = VM_SCHEMA; }
     if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
     if (gfx >= 0) m.graphics = gfx;
     /* a vGPU and 3D graphics are one or the other: the one asked for now wins */
@@ -9403,6 +9594,8 @@ static int usage(void) {
             "                         [--pointer lordos|guest]   (who draws a Windows guest's pointer: LordOS, or its display driver)\n"
             "                         [--capture-fullscreen on|off]   (the window captures the mouse when it goes full screen)\n"
             "                         [--perf-profile on|off]   (the guest tools switch the guest to its performance profile while it runs)\n"
+            "                         [--guest-links on|off]   (links the guest's tools send are offered to open on this computer)\n"
+            "                         [--guest-notify on|off]   (the guest's notifications are shown here, as from the machine)\n"
             "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"

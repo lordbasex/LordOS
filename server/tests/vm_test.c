@@ -69,7 +69,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "15", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "16", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -112,7 +112,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":15,\"whatever\":true}";
+    const char newer[] = "{\"schema\":16,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -489,7 +489,7 @@ static void test_schema(void) {
                 { "\"perf_profile\":true", 13, VM_OK, 1 }, { "\"perf_profile\":false", 13, VM_OK, 0 }, { "\"agent\":true", 13, VM_OK, 0 },
                 { "\"perf_profile\":1", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":\"on\"", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":null", 13, VM_E_FIELD, 0 },
                 { "\"perf_profile\":true", 12, VM_E_FIELD, 0 }, { "\"perf_profile\":false", 12, VM_OK, 0 },
-                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 15, VM_E_NEWER, 0 },
+                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 16, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s13 / sizeof s13[0]; i++) {
                 char t[4096];
@@ -512,6 +512,38 @@ static void test_schema(void) {
             m.perf_profile = 2; m.schema = VM_SCHEMA;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 13);
+        }
+        /* schema 15: guest_links and guest_notify (6.12), true or false, written only when true, never below 15, never
+         * for a machine locked for anonymity */
+        {
+            struct { const char *add; int schema, want, links, notify; } s15[] = {
+                { "\"guest_links\":true", 15, VM_OK, 1, 0 }, { "\"guest_notify\":true", 15, VM_OK, 0, 1 },
+                { "\"guest_links\":true,\"guest_notify\":true", 15, VM_OK, 1, 1 }, { "\"guest_links\":false", 15, VM_OK, 0, 0 },
+                { "\"guest_links\":1", 15, VM_E_FIELD, 0, 0 }, { "\"guest_notify\":\"on\"", 15, VM_E_FIELD, 0, 0 },
+                { "\"guest_links\":true", 14, VM_E_FIELD, 0, 0 }, { "\"guest_notify\":true", 14, VM_E_FIELD, 0, 0 },
+                { "\"guest_notify\":false", 14, VM_OK, 0, 0 }, { "\"guest_links\":true", 16, VM_E_NEWER, 0, 0 },
+            };
+            for (size_t i = 0; i < sizeof s15 / sizeof s15[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s15[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s15[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s15[i].want) fprintf(stderr, "  schema 15 %s (%d): got %d (%s)\n", s15[i].add, s15[i].schema, r, err);
+                CHECK(r == s15[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.guest_links == s15[i].links && m.guest_notify == s15[i].notify);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"guest_links\": true") == s15[i].links && !!strstr(jj, "\"guest_notify\": true") == s15[i].notify && !strstr(jj, "\": false\n"));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && !m.guest_links && !m.guest_notify);
+            m.guest_links = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.guest_links = 2; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 15);
         }
         /* schema 13: cpu_pin (vCPU pinning, 3.7.1), "off" or "auto", written only when chosen, never below 13 */
         {
@@ -2408,6 +2440,133 @@ static void test_open_with(void) {
     }
 }
 
+/* guest → host links and notifications (6.12) and the agent's shell (6.18): the guest is hostile, so every parser is
+ * strict, exact and fuzzed */
+static int link_ok(const char *s) { return ag_link_ok((const uint8_t *)s, strlen(s)); }
+static int lk_char_ok(uint8_t c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c && strchr("-._~:/?#[]@&=+,;%", c)); }
+static void test_guest_links(void) {
+    const char *good[] = { "https://lordos.org/", "http://example.com", "HTTPS://Example.COM:8443/a?b=c#d", "https://xn--bcher-kva.example/",
+                           "https://a-b.c-d.e/%20x", "http://[::1]:8080/", "http://[2001:db8::1]/", "https://a.b/x@y",
+                           "https://example.com?q=1", "https://example.com#top", "https://1.2.3.4:65535", "https://a.b/~x/y&z+,;=:@[]" };
+    for (size_t i = 0; i < sizeof good / sizeof *good; i++) { if (!link_ok(good[i])) fprintf(stderr, "refused: %s\n", good[i]); CHECK(link_ok(good[i])); }
+    const char *bad[] = { "", "https://", "http:///x", "file:///etc/passwd", "javascript:alert(1)", "data:text/html,x", "ftp://a.b/",
+                          "https://user:pw@bank.example/", "https://bank.example@evil.example/", "https://a b/", "https://a.b/ x",
+                          "https://a.b/\"", "https://a.b/<x>", "https://a.b/\\x", "https://a.b/{x}", "https://a.b/|", "https://a.b/^", "https://a.b/`",
+                          "https://-a.b/", "https://a-.b/", "https://a..b/", "https://.a.b/", "https://a.b./", "https://a.b:0/", "https://a.b:65536/",
+                          "https://a.b:123456/", "https://a.b:/", "https://a.b:8x/", "https://[]/", "https://[::1/", "https://[::g]/", "https://[::1]x/",
+                          "https://a.b/%", "https://a.b/%2", "https://a.b/%zz", "mailto:a@b.c", "https://a_b.c/", "https://a.b/(x)",
+                          "https://a.b/'", "https://a.b/!", "https://a.b/$", "https://a.b/*", "https://a.b/\x7f",
+                          "https://a.b/\xc3\xa9", "\x01https://a.b/", "https://a.b/\n", "https:a.b", "http//a.b" };
+    for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) { if (link_ok(bad[i])) fprintf(stderr, "taken: %s\n", bad[i]); CHECK(!link_ok(bad[i])); }
+    CHECK(!ag_link_ok(NULL, 4));
+    static uint8_t lng[AG_LINK_MAX + 2];
+    memcpy(lng, "https://a.b/", 12);
+    memset(lng + 12, 'x', sizeof lng - 12);
+    CHECK(ag_link_ok(lng, AG_LINK_MAX) && !ag_link_ok(lng, AG_LINK_MAX + 1));
+    CHECK(!ag_link_ok((const uint8_t *)"https://a.b/\0x", 15));                     /* a NUL inside */
+    char enc[64];
+    const char *raw = "https://x.org/a (b)/\xc3\xa9?q=\"1\"&r=50%";
+    CHECK(ag_link_encode((const uint8_t *)raw, strlen(raw), enc, sizeof enc) > 0 && !strcmp(enc, "https://x.org/a%20%28b%29/%C3%A9?q=%221%22&r=50%25"));
+    CHECK(link_ok(enc) && ag_link_encode((const uint8_t *)raw, strlen(raw), enc, 20) == -1);
+    CHECK(ag_link_encode((const uint8_t *)"https://a.b/%41", 15, enc, sizeof enc) == 15 && !strcmp(enc, "https://a.b/%41"));
+
+    /* AGK_NOTIFY */
+    uint8_t nb[AG_NOTE_BYTES + 8];
+    const uint8_t *ti, *bo; uint16_t tn, bn;
+    size_t k = ag_note_write((const uint8_t *)"Build done", 10, (const uint8_t *)"make: 0 errors \xe2\x80\x94 ok", 19, nb, sizeof nb);
+    CHECK(k == 33 && !ag_note_parse(nb, k, &ti, &tn, &bo, &bn) && tn == 10 && bn == 19 && !memcmp(ti, "Build done", 10));
+    CHECK(ag_note_parse(nb, k - 1, NULL, NULL, NULL, NULL) == -1 && ag_note_parse(nb, k + 1, NULL, NULL, NULL, NULL) == -1);
+    k = ag_note_write((const uint8_t *)"T", 1, NULL, 0, nb, sizeof nb);
+    CHECK(k == 5 && !ag_note_parse(nb, k, &ti, &tn, &bo, &bn) && tn == 1 && bn == 0);
+    CHECK(!ag_note_write((const uint8_t *)"", 0, NULL, 0, nb, sizeof nb));                                    /* no title */
+    CHECK(!ag_note_write((const uint8_t *)"a\nb", 3, NULL, 0, nb, sizeof nb));                               /* a control character */
+    CHECK(!ag_note_write((const uint8_t *)"\xe2\x80\xae" "gpj.exe", 10, NULL, 0, nb, sizeof nb));           /* RLO */
+    CHECK(!ag_note_write((const uint8_t *)"a", 1, (const uint8_t *)"\xe2\x81\xa6x", 4, nb, sizeof nb));     /* LRI in the body */
+    CHECK(!ag_note_write((const uint8_t *)"\xc2\x85", 2, NULL, 0, nb, sizeof nb));                          /* C1 */
+    CHECK(!ag_note_write((const uint8_t *)"\xff", 1, NULL, 0, nb, sizeof nb));
+    static uint8_t big[AG_NOTE_BODY_MAX + 1];
+    memset(big, 'a', sizeof big);
+    CHECK(!ag_note_write(big, AG_NOTE_TITLE_MAX + 1, NULL, 0, nb, sizeof nb) && ag_note_write(big, AG_NOTE_TITLE_MAX, big, AG_NOTE_BODY_MAX, nb, sizeof nb) == AG_NOTE_BYTES);
+    CHECK(!ag_note_write(big, 1, big, AG_NOTE_BODY_MAX + 1, nb, sizeof nb) && !ag_note_write(big, 5, NULL, 0, nb, 8));
+    nb[0] = 0xff; nb[1] = 0xff; CHECK(ag_note_parse(nb, AG_NOTE_BYTES, NULL, NULL, NULL, NULL) == -1);       /* a length past the end */
+
+    /* the rate limit: a burst, then one per interval, never more however often it's asked */
+    AgRate r = { 0, 0 };
+    int got = 0;
+    for (int i = 0; i < 50; i++) got += ag_rate_take(&r, 1000, AG_LINK_BURST, AG_LINK_EVERY_MS);
+    CHECK(got == AG_LINK_BURST);
+    CHECK(!ag_rate_take(&r, 1000 + AG_LINK_EVERY_MS - 1, AG_LINK_BURST, AG_LINK_EVERY_MS));
+    CHECK(ag_rate_take(&r, 1000 + AG_LINK_EVERY_MS, AG_LINK_BURST, AG_LINK_EVERY_MS) && !ag_rate_take(&r, 1000 + AG_LINK_EVERY_MS, AG_LINK_BURST, AG_LINK_EVERY_MS));
+    got = 0;
+    for (long long t = 2000000; t < 2000000 + 60000; t += 10) got += ag_rate_take(&r, t, AG_NOTE_BURST, AG_NOTE_EVERY_MS);
+    CHECK(got <= AG_NOTE_BURST + 60000 / AG_NOTE_EVERY_MS + 1 && got >= 60000 / AG_NOTE_EVERY_MS);
+    CHECK(!ag_rate_take(NULL, 1, 1, 1) && !ag_rate_take(&r, 1, 0, 1));
+    r.at = 5000000; r.tokens = 0; CHECK(ag_rate_take(&r, 10, 2, 100));                                     /* the clock went back: a fresh bucket */
+
+    /* the hello's words */
+    const char *h = "lordos-guest 8 clipboard clipx shell links notify";
+    unsigned caps = ag_hello_caps((const uint8_t *)h + 13, strlen(h) - 13);
+    CHECK((caps & AG_HELLO_SHELL) && (caps & AG_HELLO_LINKS) && (caps & AG_HELLO_NOTIFY));
+    CHECK(!(ag_hello_caps((const uint8_t *)"shells linksx notif", 19) & (AG_HELLO_SHELL | AG_HELLO_LINKS | AG_HELLO_NOTIFY)));
+
+    /* the shell */
+    uint8_t s8[8];
+    uint32_t id = 0, by = 0; int c = 0, rw = 0, st = 0;
+    CHECK(!ag_shell_size_write(s8, 7, 120, 40) && !ag_shell_size_parse(s8, 8, &id, &c, &rw) && id == 7 && c == 120 && rw == 40);
+    CHECK(ag_shell_size_parse(s8, 7, NULL, NULL, NULL) == -1 && ag_shell_size_write(s8, 0, 80, 24) == -1);
+    CHECK(ag_shell_size_write(s8, 1, AG_SHELL_COLS_MAX + 1, 24) == -1 && ag_shell_size_write(s8, 1, 80, 0) == -1);
+    s8[4] = 0; s8[5] = 0; CHECK(ag_shell_size_parse(s8, 8, NULL, NULL, NULL) == -1);
+    ag_shell_pair_write(s8, 3, 4096); CHECK(!ag_shell_ack_parse(s8, 8, &id, &by) && id == 3 && by == 4096);
+    ag_shell_pair_write(s8, 3, 0); CHECK(ag_shell_ack_parse(s8, 8, NULL, NULL) == -1);
+    ag_shell_pair_write(s8, 3, AG_SHELL_WINDOW + 1); CHECK(ag_shell_ack_parse(s8, 8, NULL, NULL) == -1);
+    ag_shell_pair_write(s8, 0, 1); CHECK(ag_shell_ack_parse(s8, 8, NULL, NULL) == -1);
+    ag_shell_pair_write(s8, 3, (uint32_t)AG_SHELL_NOSTART); CHECK(!ag_shell_close_parse(s8, 8, &id, &st) && st == AG_SHELL_NOSTART);
+    ag_shell_pair_write(s8, 3, 256 + 9); CHECK(!ag_shell_close_parse(s8, 8, &id, &st) && st == 265);
+    ag_shell_pair_write(s8, 3, (uint32_t)-2); CHECK(ag_shell_close_parse(s8, 8, NULL, NULL) == -1);
+    ag_shell_pair_write(s8, 3, 512); CHECK(ag_shell_close_parse(s8, 8, NULL, NULL) == -1);
+    static uint8_t sd[4 + AG_SHELL_CHUNK + 1];
+    ag_shell_pair_write(sd, 9, 0);
+    const uint8_t *dp; uint32_t dn = 0;
+    CHECK(!ag_shell_data_parse(sd, 4 + AG_SHELL_CHUNK, &id, &dp, &dn) && dn == AG_SHELL_CHUNK && dp == sd + 4);
+    CHECK(ag_shell_data_parse(sd, 4 + AG_SHELL_CHUNK + 1, NULL, NULL, NULL) == -1 && ag_shell_data_parse(sd, 4, NULL, NULL, NULL) == -1);
+    sd[0] = 0; CHECK(ag_shell_data_parse(sd, 8, NULL, NULL, NULL) == -1);
+
+    /* random bytes never crash the parsers, and what they take is exactly what they promise */
+    uint8_t b[700];
+    uint32_t seed = 9001;
+    for (int it = 0; it < 80000; it++) {
+        size_t len = (seed = seed * 1103515245 + 12345) % (it % 4 ? 40 : 700);
+        for (size_t i = 0; i < len; i++) b[i] = (uint8_t)((seed = seed * 1103515245 + 12345) >> 16);
+        /* often printable, often a plausible start, so the deeper checks are reached */
+        if (it % 2) for (size_t i = 0; i < len; i++) b[i] = (uint8_t)(0x21 + b[i] % 94);
+        if (it % 3 == 0 && len > 8) memcpy(b, it % 6 ? "https://" : "http://a", 8);
+        if (it % 5 == 0 && len >= 4) { size_t t = (len - 4) / 2; b[0] = (uint8_t)t; b[1] = 0; b[2 + t] = (uint8_t)(len - 4 - t); b[3 + t] = (uint8_t)((len - 4 - t) >> 8); }
+        if (ag_link_ok(b, len)) {
+            CHECK(len >= 8 && len <= AG_LINK_MAX);
+            int all = 1;
+            for (size_t i = 0; i < len; i++) all &= b[i] > 0x20 && b[i] < 0x7f && !strchr("\"\\<>`'()!$* {}|^", b[i]);
+            CHECK(all);
+        }
+        {
+            char e2[700 * 3 + 1];
+            long el = ag_link_encode(b, len, e2, sizeof e2);
+            CHECK(el >= (long)len && (size_t)el <= len * 3);
+            int all = 1;
+            for (long i = 0; i < el; i++) all &= lk_char_ok((uint8_t)e2[i]);
+            CHECK(all);
+        }
+        if (!ag_note_parse(b, len, &ti, &tn, &bo, &bn)) {
+            CHECK(tn >= 1 && tn <= AG_NOTE_TITLE_MAX && bn <= AG_NOTE_BODY_MAX && 4u + tn + bn == len && lag_text_ok(ti, tn) && (!bn || lag_text_ok(bo, bn)));
+            uint8_t again[AG_NOTE_BYTES];
+            CHECK(ag_note_write(ti, tn, bo, bn, again, sizeof again) == len && !memcmp(again, b, len));
+        }
+        if (!ag_shell_size_parse(b, len, &id, &c, &rw)) CHECK(len == 8 && id && c >= 1 && c <= AG_SHELL_COLS_MAX && rw >= 1 && rw <= AG_SHELL_ROWS_MAX);
+        if (!ag_shell_ack_parse(b, len, &id, &by)) CHECK(len == 8 && id && by >= 1 && by <= AG_SHELL_WINDOW);
+        if (!ag_shell_close_parse(b, len, &id, &st)) CHECK(len == 8 && id && st >= AG_SHELL_NOSTART && st <= 511);
+        if (!ag_shell_data_parse(b, len, &id, &dp, &dn)) CHECK(len >= 5 && id && dn == len - 4 && dn <= AG_SHELL_CHUNK);
+    }
+}
+
 /* a host stop's steps (vmhoststop.h, 6.1): everything, SIGKILL included, inside logind's delay with a margin */
 static void test_host_stop_plan(void) {
     VmHostStopPlan p = vm_host_stop_plan(45000);            /* LordOS's InhibitDelayMaxSec=45 */
@@ -2437,6 +2596,7 @@ static void test_host_stop_plan(void) {
 }
 
 int main(void) {
+    test_guest_links();
     test_gvtwin();
     test_perfwin();
     test_open_with();

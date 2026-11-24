@@ -49,6 +49,7 @@
 #include "../sound/snd.h"
 #include "ui.h"
 #include "../term/term.h"
+#include "../apps.h"
 #include "../fsops.h"
 #include "../pointerlock.h"
 
@@ -1818,6 +1819,20 @@ typedef struct {
     int blk_read, blk_write;            /* requests refused, and guest clipboards ignored, while not in use */
     int console_term;                   /* the Shell (6.18): a terminal session on the serial console's stream */
     uint32_t console_seq;
+    /* the agent's shell (6.18, VM_SHELL): a terminal session on its stream, and the size the guest was last told */
+    int shell_term;
+    uint32_t shell_seq;
+    int shell_cols, shell_rows;
+    /* links and notifications from the guest (6.12, VM_GUEST_NOTE, already checked by lord-vm and again here). One link
+     * waits for the person at a time (another one meanwhile is dropped: never swapped in under the pointer); it is
+     * offered only while the machine is in use, and opens only through guestLinkAnswer, no sooner than LINK_MIN_MS after
+     * the app first saw it. Notifications wait for the app in a small queue (a full one drops) */
+    char link[AG_LINK_MAX + 1];
+    uint32_t link_seq;
+    long long link_seen;                /* when the app first saw it (0: not yet) */
+    int link_dropped;
+    struct { char title[AG_NOTE_TITLE_MAX + 1], body[AG_NOTE_BODY_MAX + 1]; } notes[8];
+    int note_n, note_seq, note_dropped;
     int rec;                            /* a recording of the picture (6.20): its media source, fed as frames come */
     int protect;                        /* a protected machine's (lord.vm.protect): its picture never leaves as a picture */
     double rec_fed;
@@ -2663,6 +2678,35 @@ static void clip_ask_expire(Sess *s) {
         if (s->ask_gen[f] && now - s->ask_at[f] > CLIP_ASK_MS) { clip_deny(s, s->ask_gen[f], f, VCD_DECLINED); s->ask_gen[f] = 0; }
 }
 
+/* a link or a notification from the guest (VM_GUEST_NOTE): a sealed memfd of the size said, parsed again */
+#define LINK_MIN_MS 700
+static void guest_note(Sess *s, const VmMsg *m, int fd) {
+    int seals = fcntl(fd, F_GET_SEALS);
+    struct stat st;
+    uint8_t b[VM_GUEST_NOTE_MAX];
+    if (seals < 0 || (seals & (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW)) != (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW) ||
+        fstat(fd, &st) || st.st_size != m->a || m->a > (int)sizeof b || pread(fd, b, (size_t)m->a, 0) != m->a) return;
+    size_t n = (size_t)m->a;
+    if (m->b == AGK_LINK) {
+        /* only while the machine is in use (its window in front): a link in the background is the guest's, not the person's */
+        if (!ag_link_ok(b, n) || n > AG_LINK_MAX) return;
+        if (!clip_in_use(s) || s->link[0]) { s->link_dropped++; return; }
+        memcpy(s->link, b, n);
+        s->link[n] = 0;
+        s->link_seq++;
+        s->link_seen = 0;
+    } else {
+        const uint8_t *t, *bo;
+        uint16_t tn, bn;
+        if (ag_note_parse(b, n, &t, &tn, &bo, &bn)) return;
+        if (s->note_n >= (int)(sizeof s->notes / sizeof *s->notes)) { s->note_dropped++; return; }
+        memcpy(s->notes[s->note_n].title, t, tn); s->notes[s->note_n].title[tn] = 0;
+        memcpy(s->notes[s->note_n].body, bo, bn); s->notes[s->note_n].body[bn] = 0;
+        s->note_n++;
+        s->note_seq++;
+    }
+}
+
 static void from_vm(Sess *s) {
     for (int k = 0; k < VD_POLL_MAX && s->vm >= 0; k++) {
         VmMsg m;
@@ -2751,6 +2795,16 @@ static void from_vm(Sess *s) {
             break;
         case VM_WINREFUSED:
             if (m.b == LAGA_CLOSE) refused_add(s, (uint32_t)m.a, m.c);
+            break;
+        case VM_SHELL_FD:
+            if (fd >= 0 && m.seq == s->shell_seq) {
+                if (s->shell_term) { Session *old = term_get(s->shell_term); if (old) term_close(old); }
+                Session *ts = term_create_fd(fd, 10000);
+                if (ts) { s->shell_term = ts->id; fd = -1; }
+            }
+            break;
+        case VM_GUEST_NOTE:
+            if (fd >= 0) guest_note(s, &m, fd);
             break;
         case VM_CONSOLE_FD:
             if (fd >= 0 && m.seq == s->console_seq) {
@@ -3097,6 +3151,27 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "cd", s->cd_state);
     if (s->console_term && !term_get(s->console_term)) s->console_term = 0;
     set_int(c, o, "console", s->console_term);
+    /* the agent's shell: its terminal, and its size passed on to the guest when the terminal changed it */
+    {
+        Session *ts = s->shell_term ? term_get(s->shell_term) : NULL;
+        if (s->shell_term && !ts) s->shell_term = 0;
+        if (ts && ts->alive && (ts->t.cols != s->shell_cols || ts->t.rows != s->shell_rows) && ts->t.cols >= 1 && ts->t.rows >= 1 &&
+            ts->t.cols <= AG_SHELL_COLS_MAX && ts->t.rows <= AG_SHELL_ROWS_MAX && s->vm >= 0) {
+            VmMsg sm = vm_msg(VM_SHELL, ++s->seq, VSH_SIZE, ts->t.cols, ts->t.rows, 0, NULL);
+            if (!vm_send(s->vm, &sm, -1)) { s->shell_cols = ts->t.cols; s->shell_rows = ts->t.rows; }
+        }
+        set_int(c, o, "shell", s->shell_term);
+    }
+    /* a link from the guest waiting for the person (6.12): shown from now on; and how many notifications wait */
+    if (s->link[0]) {
+        JSValue l = JS_NewObject(c);
+        set_int(c, l, "seq", s->link_seq);
+        set_str(c, l, "url", s->link);
+        JS_SetPropertyStr(c, o, "guestLink", l);
+        if (!s->link_seen) s->link_seen = mono_ms();
+    }
+    set_int(c, o, "guestLinkDropped", s->link_dropped);
+    set_int(c, o, "guestNotesSeq", s->note_seq);
     {
         JSValue ag = JS_NewObject(c);
         set_str(c, ag, "state", s->ag_state == VAS_CONNECTED ? "connected" : s->ag_state == VAS_WAITING ? "waiting" : "off");
@@ -3506,6 +3581,8 @@ static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     if (s->rec) { MediaSrc *r = media_src_get(s->rec); if (r) media_src_close(r); s->rec = 0; }     /* finished properly, "done" follows */
     if (s->rec_sound) { vdsend(s, VD_AUDIO_REC, 0, 0); s->rec_sound = 0; }
     if (s->console_term) { Session *ts = term_get(s->console_term); if (ts) term_close(ts); s->console_term = 0; }
+    if (s->shell_term) { Session *ts = term_get(s->shell_term); if (ts) term_close(ts); s->shell_term = 0; }
+    s->link[0] = 0; s->note_n = 0;
     free(s->clip_in); s->clip_in = NULL;
     free(s->clip_html); s->clip_html = NULL; free(s->clip_png); s->clip_png = NULL;
     drop_display(s, 1);
@@ -4177,6 +4254,71 @@ static JSValue f_console(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     if (q < 0) return JS_FALSE;
     s->console_seq = (uint32_t)q;
     return JS_TRUE;
+}
+
+/* shell(session, cols, rows) → bool: asks lord-vm for the agent's shell (6.18: the guest's tools start the signed-in
+ * person's own shell over the agent); poll's shell is then the terminal session to show in a <Terminal>. Its size
+ * follows the terminal by itself. shell(session, 0) ends it. Asking again replaces it */
+static JSValue f_shell(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = get(c, argv[0]);
+    int32_t cols = 0, rows = 0;
+    if (argc > 1) JS_ToInt32(c, &cols, argv[1]);
+    if (argc > 2) JS_ToInt32(c, &rows, argv[2]);
+    if (!s || s->vm < 0) return JS_FALSE;
+    if (!cols) {
+        if (s->shell_term) { Session *ts = term_get(s->shell_term); if (ts) term_close(ts); s->shell_term = 0; }
+        VmMsg m = vm_msg(VM_SHELL, ++s->seq, VSH_CLOSE, 0, 0, 0, NULL);
+        return JS_NewBool(c, !vm_send(s->vm, &m, -1));
+    }
+    if (cols < 1 || cols > AG_SHELL_COLS_MAX || rows < 1 || rows > AG_SHELL_ROWS_MAX) return JS_FALSE;
+    VmMsg m = vm_msg(VM_SHELL, ++s->seq, VSH_OPEN, cols, rows, 0, NULL);
+    if (vm_send(s->vm, &m, -1)) return JS_FALSE;
+    s->shell_seq = s->seq;
+    s->shell_cols = cols;
+    s->shell_rows = rows;
+    return JS_TRUE;
+}
+
+/* guestNotes(session) → [{ title, body }]: the guest's notifications that came since (6.12), as text only, for the app
+ * to show as from the machine; taken once */
+static JSValue f_guest_notes(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    JSValue a = JS_NewArray(c);
+    if (!s) return a;
+    for (int i = 0; i < s->note_n; i++) {
+        JSValue o = JS_NewObject(c);
+        set_str(c, o, "title", s->notes[i].title);
+        set_str(c, o, "body", s->notes[i].body);
+        JS_SetPropertyUint32(c, a, (uint32_t)i, o);
+    }
+    s->note_n = 0;
+    return a;
+}
+
+/* guestLinkAnswer(session, seq, open) → bool: the person's answer to the link the guest asked to open (poll's guestLink).
+ * Only that link (never a URL from JS), only the one still waiting with that seq, only LINK_MIN_MS after the app first
+ * saw it (a click meant for something else doesn't open it), only while the machine is still in use; then in the
+ * default browser, as one argument (apps_launch_uri's own checks). Either answer lets the link go */
+static JSValue f_guest_link_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = get(c, argv[0]);
+    int32_t seq = 0;
+    if (argc > 1) JS_ToInt32(c, &seq, argv[1]);
+    int open = argc > 2 && JS_ToBool(c, argv[2]);
+    if (!s || !s->link[0] || (uint32_t)seq != s->link_seq) return JS_FALSE;
+    if (open && (!s->link_seen || mono_ms() - s->link_seen < LINK_MIN_MS)) return JS_FALSE;     /* too soon: the bar stays */
+    char url[AG_LINK_MAX + 1];
+    snprintf(url, sizeof url, "%s", s->link);
+    s->link[0] = 0;
+    if (!open) return JS_TRUE;
+    if (!clip_in_use(s) || !ag_link_ok((const uint8_t *)url, strlen(url))) return JS_FALSE;
+    char def[192];
+    if (!apps_default_for("x-scheme-handler/https", def, sizeof def) && !apps_default_for("x-scheme-handler/http", def, sizeof def)) return JS_FALSE;
+    size_t l = strlen(def);
+    if (l > 8 && !strcmp(def + l - 8, ".desktop")) def[l - 8] = 0;
+    return JS_NewBool(c, !apps_launch_uri(def, url));
 }
 
 /* the recording's sound ring (aring.h): a sealed memfd, 48 kHz, 16-bit, one channel, about 5 s */
@@ -4868,6 +5010,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
+    JS_CFUNC_DEF("shell", 3, f_shell), JS_CFUNC_DEF("guestNotes", 1, f_guest_notes), JS_CFUNC_DEF("guestLinkAnswer", 3, f_guest_link_answer),
     JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("renamePlan", 2, f_rename_plan), JS_CFUNC_DEF("rename", 2, f_rename), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 2, f_clip_take),
     JS_CFUNC_DEF("clipboardApply", 2, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 2, f_clip_send_host),
     JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 3, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
