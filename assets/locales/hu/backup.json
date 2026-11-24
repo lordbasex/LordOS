@@ -14,6 +14,10 @@
   "never": "Még nincs mentés",
   "next": "Következő: {when}",
   "lastError": "Az utolsó mentés sikertelen: {error}",
+  "machinesBusy": {
+    "one": "{count} gép futott: a lemezei ebben a mentésben az előzőből származnak",
+    "other": "{count} gép futott: a lemezeik ebben a mentésben az előzőből származnak"
+  },
   "todayAt": "ma {time}-kor",
   "now": "Mentés most",
   "pause": "Szüneteltetés",

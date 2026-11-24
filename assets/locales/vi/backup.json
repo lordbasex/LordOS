@@ -14,6 +14,9 @@
   "never": "Chưa có bản sao lưu nào",
   "next": "Lần tới: {when}",
   "lastError": "Lần sao lưu gần nhất thất bại: {error}",
+  "machinesBusy": {
+    "other": "{count} máy ảo đang chạy: ổ đĩa của chúng trong bản sao lưu này là từ bản trước"
+  },
   "todayAt": "hôm nay lúc {time}",
   "now": "Sao lưu ngay",
   "pause": "Tạm dừng",
