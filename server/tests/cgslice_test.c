@@ -205,7 +205,7 @@ int main(int argc, char **argv) {
         unlink(pf);
     }
     int current = cgroup_netperm_current(CG_NETPERM_PROCS);
-    printf("cgslice-test: this computer's lord-netperm %s\n", current ? "knows the slice (or isn't running)" : "is older than its installed file: machines go beside the server leaf");
+    printf("cgslice-test: the lord-netperm of " CG_NETPERM_PROCS " %s\n", current ? "knows the slice (or isn't running)" : "is older than its installed file: machines go beside the server leaf");
     for (int round = 0; round < 2; round++) {
         const char *name = round == 0 ? VMID : "app-lordos-featherpad.scope";
         pid_t srv = fork();

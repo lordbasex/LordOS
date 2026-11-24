@@ -60,7 +60,9 @@ int cgroup_delegate_session(unsigned uid, unsigned gid);
  * would have no firewall at all. So: 1 when procs (CG_NETPERM_PROCS, systemd's root-owned file) can't be read or is
  * empty (not running: the installed one starts next), or its first process runs the installed lord-netperm (not
  * "(deleted)"); 0 otherwise, and the machine's scope goes beside the server leaf, where every lord-netperm reads it. */
+#ifndef CG_NETPERM_PROCS     /* tests/vm_slice.sh's build of cgslice-test points it at a stand-in */
 #define CG_NETPERM_PROCS "/sys/fs/cgroup/system.slice/lord-netperm.service/cgroup.procs"
+#endif
 int cgroup_netperm_current(const char *procs);
 /* 1 if a scope of this name belongs in CG_MACHINES_SLICE (a machine's, by its reserved prefix) */
 int cgroup_scope_in_machines(const char *name);

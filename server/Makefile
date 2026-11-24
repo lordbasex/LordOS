@@ -285,7 +285,7 @@ build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.
 test: build/cgslice-test
 build/cgslice-test: tests/cgslice_test.c src/sec/cgroup.c src/sec/cgroup.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/cgslice_test.c src/sec/cgroup.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE '-DCG_NETPERM_PROCS="/var/tmp/lordos-slice/netperm.procs"' -o $@ tests/cgslice_test.c src/sec/cgroup.c
 	./$@ || { rm -f $@; exit 1; }
 test: build/cgroup-restart-test
 build/cgroup-restart-test: tests/cgroup_restart_test.c src/sec/cgroup.c src/sec/cgroup.h
