@@ -59,10 +59,12 @@ One session and one library, in this order; a flow that needs what an earlier on
 | `library` | the Control Center, empty: its texts, its picture |
 | `assistant` | New Machine → Import a machine → the file picker → `~/Images/debian13.qcow2` → Light → a typed name → Review → Create and Start; machine.json, the machine's window, the guest's boot (`MH-READY`) and its console's text in the window |
 | `lifecycle` | Actions → Shut Down: the power button, the guest's own shutdown, Off |
-| `configure` | the card's menu → Configure… (a sheet): Network → Isolated, Done; Guest agent on, Done; Shared, Done; each in machine.json |
+| `configure` | the card's menu → Configure… (a sheet): Network → Isolated, Done; Guest agent on, Done; Shared and Clipboard → Both ways, Done; each in machine.json |
 | `start` | a double click on the card starts it in its window; it boots again |
 | `agent` | qemu-guest-agent connects (`agentState`); the agent popover and what it says works; Install Clipboard Helper through it; lordos-guest in the guest |
+| `clipboard` | Configure's Both ways (the configure flow), lordos-guest started on the guest's Xvfb display: a text copied here and the machine turned to (a click on its picture) is what `xclip -o` reads there; a text copied there with `xclip -i` reaches this computer's clipboard |
 | `filedrop` | a file dragged from Files onto the machine's window: the drop is taken, the file is in `~tester/Downloads` with the same bytes |
+| `killcopy` | a 300 MB file dropped, the guest agent killed while it is copied in: nothing partial in the guest's Downloads, lord-vm says what happened |
 | `kills` | agent kill tests: qemu-guest-agent, passt and the transfer folder's virtiofsd killed mid-run, then lord-vm itself; each reported (agentState, the network back, the share-lost notice, supervisor-lost) and recovered |
 | `snapshots` | Snapshots…: Take, listed by lord-vm, Go Back to This (a snapshot of now first), Delete |
 | `clone` | Clone or Duplicate… → Clone: a second card with its own id and MAC |
@@ -132,8 +134,8 @@ KVM. The admin helper isn't there in the harness (no root), so the assistant's o
 
 ## Limits
 
-- Apps mode and the clipboard need a guest with a desktop (apps mode a LordOS guest): the console-only Debian image
-  can't show them; their guest side is `tests/guestwin_headless.sh` and `tests/guest_clip_test.sh`.
+- Apps mode needs a LordOS guest with its desktop: not scripted here (its guest side is `tests/guestwin_headless.sh`). The
+  clipboard is checked on a bare Xvfb display, not a guest desktop. USB isn't scripted.
 - Pictures are from the CPU path. A 3D machine's picture (dmabuf) needs `Session(gpu=True)` on a computer with a render
   node and isn't in the default flows. Machines' symbols (`svg:` images, drawn by lord-media) come out blank in the
   harness; `click_icon` finds them by their source, not their pixels.

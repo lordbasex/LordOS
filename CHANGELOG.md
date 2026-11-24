@@ -953,7 +953,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **The flows** (`flows.py`, `run.py`, `make -C server e2e-machines`): the empty library; the New Machine assistant
     from Import a machine through the file picker, the Light profile, a typed name and the review to Create and Start,
     the guest's boot and its picture in the machine's window; Shut Down; Configure (network, the guest agent); a start
-    from the card; the agent's popover and Install Clipboard Helper; a file dragged from Files onto the machine's window;
+    from the card; the agent's popover and Install Clipboard Helper; the clipboard both ways (lordos-guest and xclip on the guest's Xvfb
+    display); a file dragged from Files onto the machine's window;
     the kill tests; Snapshots (take, go back, delete); Clone; the storage figures; a machine group's card. Each step checks
     the texts on screen and what landed on disk or in lord-vm, and keeps a screenshot. `make e2e-machines` skips cleanly
     without KVM or the network and isn't part of `make test`.

@@ -4126,10 +4126,12 @@ the New Machine assistant from Import a machine through the file picker, Light, 
 and Start (made in 2.2 s, `MH-READY` 13.9 s after the click, its console's text in the machine's window); Shut Down (the
 power button, then the guest's own shutdown); Configure (Network → Isolated, the guest agent on, back to Shared, each in
 `machine.json`); a start from the card; the agent's popover (what works) and Install Clipboard Helper (lordos-guest in the
-guest); a file dragged from Files onto the machine's window, in `~tester/Downloads` with its bytes; the kill tests (next
+guest); the clipboard both ways (Configure's Both ways; lordos-guest and `xclip` on the guest's Xvfb display: a text copied
+here and the machine turned to is what the guest pastes, a text copied there reaches this computer's clipboard); a file
+dragged from Files onto the machine's window, in `~tester/Downloads` with its bytes; the kill tests (next
 paragraph); Snapshots (take, go back with a snapshot of now first, delete; lord-vm's list agrees); Clone (its own id and
-MAC); the storage figure (below); a machine group's card. No JS error in the session. Not covered: apps mode and the
-clipboard need a guest with a desktop (their guest side is `guestwin_headless.sh` and `guest_clip_test.sh`), USB.
+MAC); the storage figure (below); a machine group's card. No JS error in the session. Not covered: apps mode (it needs a
+LordOS guest; its guest side is `guestwin_headless.sh`) and USB.
 
 **Agent kill tests** (the `kills` and `killcopy` flows): qemu-guest-agent killed in the guest (the app's `agentState`
 leaves `connected`, and comes back by itself once the agent runs again); passt killed (lord-vm attaches a new one, "the
@@ -4148,7 +4150,38 @@ scratch folder (`MH_SCRATCH`) must be on one, and none of the test computers has
 setting the computer can run: seconds from the start to `MH-READY` on its serial console, to the agent's connection, a
 clean Shut Down (the agent, then ACPI) and its seconds, the disk's size.
 
-BOOT-MATRIX-RESULTS
+*The i9 PC* (bare metal: i9-10900, RX 580 `amdgpu` and UHD 630 `i915`, Debian's QEMU 10.0.13), **measured** 2026-11-24:
+
+| Row | To `MH-READY` | Agent | Shut Down | Disk |
+|---|---:|---:|---|---:|
+| KVM, UEFI (OVMF), 2D | 11.2 s | 11.2 s | 4.5 s, clean | 1,053 MB |
+| KVM, SeaBIOS, 2D | 10.2 s | 13.2 s | 4.4 s, clean | 1,052 MB |
+| KVM, UEFI, TPM 2.0 (swtpm) | 13.2 s | 13.2 s | 4.8 s, clean | 1,053 MB |
+| KVM, Secure Boot (Microsoft's keys) and a TPM: Debian's signed shim | 14.2 s | 14.2 s | 4.4 s, clean | 1,053 MB |
+| KVM, the compatible devices (SATA, USB tablet) | 13.2 s | 13.2 s | 4.3 s, clean | 1,053 MB |
+| KVM, 3D (virgl) on the UHD 630's render node | 11.3 s | 11.3 s | 5.3 s, clean | 1,053 MB |
+| KVM, 3D (virgl) on the RX 580's render node | 12.4 s | 12.4 s | 4.7 s, clean | 1,053 MB |
+| TCG (emulated), UEFI | 36.3 s | 38.3 s | 4.4 s, clean | 1,053 MB |
+| TCG (emulated), SeaBIOS | 34.3 s | 36.3 s | 5.2 s, clean | 1,052 MB |
+| arm64 emulated on amd64 | — | — | — | skipped: `qemu-system-aarch64` isn't installed there |
+
+The 3D rows check that QEMU starts with `virtio-vga-gl` and its D-Bus display on that card's render node and the guest
+boots; the picture of a 3D machine is the harness's to check with `Session(gpu=True)` (not run yet).
+
+*The Pi 5* (16 GB, LordOS kernel 6.18.57, 16 KiB pages, QEMU 10.0.13, AAVMF), **measured** 2026-11-24 in a scratch
+folder of `/var/tmp`, its desktop session untouched:
+
+| Row | To `MH-READY` | Agent | Shut Down | Disk |
+|---|---:|---:|---|---:|
+| KVM, UEFI (AAVMF), virtio | 25.6 s | 25.6 s | 1.9 s, clean | 1,166 MB |
+| TCG (arm64 emulated on the Pi) | 95.2 s | 97.2 s | 11.3 s, clean | 1,166 MB |
+| KVM, the compatible devices | **fails** | — | forced after 90 s | — |
+
+**Found:** an arm64 machine with the compatible devices doesn't boot from its disk: AAVMF has no AHCI (SATA) driver, so
+the firmware finds nothing and stops at its UEFI shell (`Shell>`; the row keeps the guest's last lines). The same row
+boots on amd64 (OVMF and SeaBIOS have it). Such a machine is made by an import of another app's arm64 machine with
+`--devices compat` (6.22); until it is fixed, an arm64 import should keep `virtio`. Not fixed in this work (the import's).
+amd64 emulated on the Pi wasn't run: the Pi had about 3 GB free, and its image and copy need more.
 
 **Windows install test** (`images.py --windows`, `run.py windows`): Microsoft's Windows 11 Enterprise Evaluation (English)
 and virtio-win 0.1.271 from their makers' servers, kept only when their SHA-256 is the one the catalog pins (both matched
