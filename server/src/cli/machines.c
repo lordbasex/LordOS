@@ -727,6 +727,47 @@ static int cmd_start(Machine *x, int window) {
     return 0;
 }
 
+/* a snapshot's tag from its tag or its unique label (snapshots.json through lord-vm --snapshot list); 0, else said why */
+static int snap_tag_of(Machine *x, const char *q, char *tag, size_t tn) {
+    Run r;
+    char *la[] = { NULL, "--snapshot", x->dir, "list", NULL };
+    int st = run_lordvm(la, &r);
+    if (st) { if (st > 0) ERR("opFailed", "name", x->m.name, "why", why_of(&r), NULL); return -1; }
+    JDoc d;
+    if (json_parse(r.out, r.no, &d, NULL, 0)) { ERR("noSnap", "name", x->m.name, "tag", q, NULL); return -1; }
+    const JVal *snaps = json_get(d.root, "snapshots");
+    int n = 0;
+    tag[0] = 0;
+    for (const JVal *s = snaps ? snaps->kid : NULL; s; s = s->next) {
+        const char *t = json_str(s, "tag"), *nm = json_str(s, "name");
+        if (t && !strcmp(t, q)) { snprintf(tag, tn, "%s", t); n = 1; break; }
+        if (t && nm && !strcasecmp(nm, q)) { snprintf(tag, tn, "%s", t); n++; }
+    }
+    json_free(&d);
+    if (n != 1) { ERR("noSnap", "name", x->m.name, "tag", q, NULL); return -1; }
+    return 0;
+}
+
+/* start --no-window --snapshot TAG (TAG, or a snapshot's unique label): lord-vm --start --loadvm, run by this command
+ * itself, only for a machine that needs no admin step (as a start without a session) */
+static int cmd_start_snapshot(Machine *x, const char *tag) {
+    if (x->st.active) { SAY("alreadyRunning", "name", x->m.name, NULL); return 0; }
+    if (x->ok && (x->m.network == VM_NET_BRIDGED || x->m.vgpu)) {
+        ERR("needsSession", "name", x->m.name, "why", T(x->m.vgpu ? "why.gpu" : "why.bridged"), NULL);
+        return VMCLI_NO_SESSION;
+    }
+    /* a label names its snapshot when only one has it (snapshots.json, as `snapshot revert` does) */
+    char t[40];
+    if (snap_tag_of(x, tag, t, sizeof t)) return VMCLI_USAGE;
+    Run r;
+    char *a[] = { NULL, "--start", x->dir, "--detach", "--keep-running", "--loadvm", t, NULL };
+    int st = run_lordvm(a, &r);
+    if (st < 0) return VMCLI_FAILED;
+    if (st) { read_state(x); ERR("failed", "name", x->m.name, "why", r.ne || !x->st.detail[0] ? why_of(&r) : x->st.detail, NULL); return our_rc(st); }
+    SAY("startedNoWindow", "name", x->m.name, NULL);
+    return 0;
+}
+
 static int cmd_snapshot(Machine *x, int argc, char **argv) {
     if (argc < 1) { ERR("missing", "what", "list|take|revert|delete", NULL); return VMCLI_USAGE; }
     const char *what = argv[0];
@@ -899,7 +940,7 @@ static int cmd_help(void) {
     static const struct { const char *use, *key; } H[] = {
         { "machines list [--json]", "help.list" },
         { "machines status NAME [--json]", "help.status" },
-        { "machines start NAME [--no-window]", "help.start" },
+        { "machines start NAME [--no-window [--snapshot TAG]]", "help.start" },
         { "machines open NAME", "help.open" },
         { "machines stop NAME", "help.stop" },
         { "machines poweroff NAME", "help.poweroff" },
@@ -2112,6 +2153,9 @@ int main(int argc, char **argv) {
         return cmd_status(x, rest == 1);
     }
     if (!strcmp(cmd, "start")) {
+        /* --snapshot TAG: from a snapshot with memory, without a window (lord-vm --loadvm, as the app's Snapshots window) */
+        if (rest == 3 && !strcmp(rv[0], "--no-window") && !strcmp(rv[1], "--snapshot")) return cmd_start_snapshot(x, rv[2]);
+        if (rest == 3 && !strcmp(rv[0], "--snapshot") && !strcmp(rv[2], "--no-window")) return cmd_start_snapshot(x, rv[1]);
         if (rest > 1 || (rest == 1 && strcmp(rv[0], "--no-window"))) { ERR("unknown", "arg", rv[rest - 1], NULL); return VMCLI_USAGE; }
         return cmd_start(x, rest == 0);
     }

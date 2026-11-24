@@ -31,7 +31,7 @@ _machines() {
         status) COMPREPLY=($(compgen -W '--json' -- "$cur")) ;;
         logs) COMPREPLY=($(compgen -W $'--serial\n--machine\n--follow\n--lines' -- "$cur")) ;;
         cp) COMPREPLY=($(compgen -f -- "$cur")) ;;
-        start) COMPREPLY=($(compgen -W '--no-window' -- "$cur")) ;;
+        start) COMPREPLY=($(compgen -W $'--no-window\n--snapshot' -- "$cur")) ;;
         snapshot) [ "$COMP_CWORD" -eq 3 ] && COMPREPLY=($(compgen -W $'list\ntake\nrevert\ndelete' -- "$cur")) ;;
         clone) [ "$COMP_CWORD" -ge 4 ] && COMPREPLY=($(compgen -W $'--duplicate\n--keep-identity' -- "$cur")) ;;
         set)
