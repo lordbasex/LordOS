@@ -74,8 +74,12 @@ static int base_dir(char *out, size_t n) {
  * CPU can be limited in the child scopes). Best effort. */
 static void enable_controllers(const char *base) {
     char path[PATH_MAX];
-    if ((size_t)snprintf(path, sizeof path, "%s/cgroup.subtree_control", base) < sizeof path)
+    if ((size_t)snprintf(path, sizeof path, "%s/cgroup.subtree_control", base) < sizeof path) {
         write_file(path, "+memory +cpu +pids");
+        /* (docs/VIRTUALIZATION.md 3.7) io on its own write: the machines' slice weighs disk I/O with it, and a kernel
+         * without it must not lose the other three */
+        write_file(path, "+io");
+    }
 }
 
 /* Writes val into file `leaf` inside directory dirfd (openat avoids building long paths). */
@@ -303,6 +307,7 @@ int cgroup_release_at(int svcfd, int outfd) {
     int d = dup(svcfd);
     DIR *dir = d >= 0 ? fdopendir(d) : NULL;
     if (!dir) { if (d >= 0) close(d); return -1; }
+    rewinddir(dir);                     /* a dup shares the offset: a second call on the same svcfd starts at the top too */
     struct dirent *e;
     int bad = 0;
     while ((e = readdir(dir))) {

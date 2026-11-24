@@ -280,6 +280,13 @@ build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC) src/lordlog.c src/users/admingroups.c
 # lordos.service restarts with live sessions on systemd 258+: controllers off and limits back (src/sec/cgroup.c, #140)
+# tests/cgslice_test.c (docs/VIRTUALIZATION.md 3.7): lord-sessiond's placement of a machine's scope into the machines'
+# slice, on a throwaway tree of the real cgroupfs; as root (without root it says it skipped)
+test: build/cgslice-test
+build/cgslice-test: tests/cgslice_test.c src/sec/cgroup.c src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/cgslice_test.c src/sec/cgroup.c
+	./$@ || { rm -f $@; exit 1; }
 test: build/cgroup-restart-test
 build/cgroup-restart-test: tests/cgroup_restart_test.c src/sec/cgroup.c src/sec/cgroup.h
 	@mkdir -p build

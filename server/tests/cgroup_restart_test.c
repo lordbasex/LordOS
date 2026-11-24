@@ -180,6 +180,53 @@ int main(void) {
     CHECK(!strcmp(get("lordos-session-1000/server/memory.max"), "max\n"), "memory.max changed: %s", get("lordos-session-1000/server/memory.max"));
     CHECK(access(saved_path, F_OK) == 0, "saved");
 
+    /* (docs/VIRTUALIZATION.md 3.7) the machines' slice: which names go into it and which noted children are accepted */
+    CHECK(cgroup_scope_in_machines("app-lordos-lordos-vm-6f1c0d2e-1111-4222-8333-444455556666.scope"), "a machine's scope");
+    CHECK(cgroup_scope_in_machines("app-lordos-lordos-vm-tor-6f1c0d2e-1111-4222-8333-444455556666.scope"), "a Tor gateway's");
+    CHECK(!cgroup_scope_in_machines("app-lordos-firefox.scope") && !cgroup_scope_in_machines("lordos-machines.slice")
+          && !cgroup_scope_in_machines("app-lordos-lordos-vm-.scope") && !cgroup_scope_in_machines("app-lordos-lordos-vm-x/../y.scope")
+          && !cgroup_scope_in_machines("app-lordos-lordos-vm-x.slice") && !cgroup_scope_in_machines(NULL), "not a machine's");
+    CHECK(!cgroup_scope_name_ok("lordos-machines.slice"), "nobody may ask to enter the slice itself");
+    CHECK(cgroup_session_child_ok("server") && cgroup_session_child_ok("app-lordos-x.scope")
+          && cgroup_session_child_ok("lordos-machines.slice/app-lordos-lordos-vm-6f1c0d2e.scope"), "children");
+    CHECK(!cgroup_session_child_ok("lordos-machines.slice") && !cgroup_session_child_ok("lordos-machines.slice/server")
+          && !cgroup_session_child_ok("lordos-machines.slice/app-lordos-firefox.scope")
+          && !cgroup_session_child_ok("lordos-machines.slice/../server") && !cgroup_session_child_ok("other.slice/app-lordos-lordos-vm-1.scope")
+          && !cgroup_session_child_ok("lordos-machines.slice/app-lordos-lordos-vm-1.scope/qemu"), "not children");
+    {
+        dir("lordos-session-1002");
+        put("lordos-session-1002/cgroup.subtree_control", "cpu io memory pids\n");
+        dir("lordos-session-1002/lordos-machines.slice");
+        put("lordos-session-1002/lordos-machines.slice/cgroup.subtree_control", "cpu io memory pids\n");
+        put("lordos-session-1002/lordos-machines.slice/cpu.weight", "50\n");
+        dir("lordos-session-1002/lordos-machines.slice/app-lordos-lordos-vm-6f1c0d2e.scope");
+        put("lordos-session-1002/lordos-machines.slice/app-lordos-lordos-vm-6f1c0d2e.scope/memory.max", "4429185024\n");
+        put("lordos-session-1002/lordos-machines.slice/app-lordos-lordos-vm-6f1c0d2e.scope/cpu.max", "450000 100000\n");
+        dir("lordos-session-1002/lordos-machines.slice/app-lordos-firefox.scope");     /* never made there: not noted */
+        put("lordos-session-1002/lordos-machines.slice/app-lordos-firefox.scope/memory.max", "1\n");
+        char sp[300];
+        snprintf(sp, sizeof sp, "%s.slice", root);
+        int so = open(sp, O_RDWR | O_CREAT | O_TRUNC, 0600);
+        CHECK(cgroup_release_at(svc, so) == 0, "release with a slice");
+        char notes[4096] = "";
+        ssize_t sn = pread(so, notes, sizeof notes - 1, 0);
+        notes[sn > 0 ? sn : 0] = 0;
+        close(so);
+        unlink(sp);
+        CHECK(!strcmp(get("lordos-session-1002/lordos-machines.slice/cgroup.subtree_control"), "-cpu -io -memory -pids"), "the slice first: %s",
+              get("lordos-session-1002/lordos-machines.slice/cgroup.subtree_control"));
+        CHECK(!strcmp(get("lordos-session-1002/cgroup.subtree_control"), "-cpu -io -memory -pids"), "then its session");
+        CHECK(strstr(notes, "lordos-session-1002 lordos-machines.slice/app-lordos-lordos-vm-6f1c0d2e.scope memory.max 4429185024\n")
+              && strstr(notes, "lordos-session-1002 lordos-machines.slice/app-lordos-lordos-vm-6f1c0d2e.scope cpu.max 450000 100000\n"), "noted:\n%s", notes);
+        CHECK(!strstr(notes, "firefox") && !strstr(notes, "lordos-machines.slice cpu.weight"), "noted too much:\n%s", notes);
+        put("lordos-session-1002/lordos-machines.slice/app-lordos-lordos-vm-6f1c0d2e.scope/memory.max", "max\n");
+        int ff = -1;
+        CHECK(cgroup_restore_at(svc, notes, &ff) >= 2 && ff == 0, "put back %d", ff);
+        CHECK(!strcmp(get("lordos-session-1002/lordos-machines.slice/app-lordos-lordos-vm-6f1c0d2e.scope/memory.max"), "4429185024"), "a machine's memory.max back");
+        CHECK(cgroup_restore_at(svc, "lordos-session-1002 lordos-machines.slice/app-lordos-firefox.scope memory.max 9\n"
+                                     "lordos-session-1002 lordos-machines.slice/../server memory.max 9\n", NULL) == 0, "a hostile slice line was written");
+    }
+
     close(svc);
     char cmd[700];
     snprintf(cmd, sizeof cmd, "rm -rf '%s' '%s'", root, saved_path);
