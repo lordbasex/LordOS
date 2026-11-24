@@ -430,6 +430,8 @@
   "tb.cdRefused": "Het station kan nu geen schijf aannemen.",
   "tb.cdFailed": "De schijf kon niet worden gewisseld: {why}",
   "win.netLost": "Het netwerk van deze machine is gestopt en kon niet worden hersteld. Het komt terug als de machine opnieuw start; het logboek van de machine vertelt waarom.",
+  "win.shareLost": "De gedeelde map ‘{folder}’ werkt niet meer in deze machine. Hij komt terug als de machine opnieuw start; het logboek van de machine zegt waarom.",
+  "win.transferLost": "De overdrachtsmap werkt niet meer in deze machine. Hij komt terug als de machine opnieuw start; het logboek van de machine zegt waarom.",
   "win.netReconnecting": "Het netwerk van deze machine is gestopt. Opnieuw verbinden…",
   "win.netBack": "Het netwerk is terug ({s} s zonder).",
   "cmd.suspend": "Sluimer",

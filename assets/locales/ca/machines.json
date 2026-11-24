@@ -430,6 +430,8 @@
   "tb.cdRefused": "Ara la unitat no pot acceptar cap disc.",
   "tb.cdFailed": "No s’ha pogut canviar el disc: {why}",
   "win.netLost": "La xarxa d’aquesta màquina s’ha aturat i no s’ha pogut recuperar. Tornarà quan la màquina es torni a iniciar; el registre de la màquina diu per què.",
+  "win.shareLost": "La carpeta compartida «{folder}» ha deixat de funcionar en aquesta màquina. Torna quan la màquina s'engegui de nou; el registre de la màquina diu per què.",
+  "win.transferLost": "La carpeta de transferència ha deixat de funcionar en aquesta màquina. Torna quan la màquina s'engegui de nou; el registre de la màquina diu per què.",
   "win.netReconnecting": "La xarxa d’aquesta màquina s’ha aturat. S’està tornant a connectar…",
   "win.netBack": "La xarxa ha tornat ({s} s sense xarxa).",
   "cmd.suspend": "Suspèn",

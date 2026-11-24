@@ -430,6 +430,8 @@
   "tb.cdRefused": "Napęd nie może teraz przyjąć płyty.",
   "tb.cdFailed": "Nie udało się zmienić płyty: {why}",
   "win.netLost": "Sieć tej maszyny zatrzymała się i nie udało się jej przywrócić. Wróci przy następnym uruchomieniu maszyny; dziennik maszyny mówi dlaczego.",
+  "win.shareLost": "Folder udostępniony „{folder}” przestał działać w tej maszynie. Wróci, gdy maszyna uruchomi się ponownie; dziennik maszyny mówi dlaczego.",
+  "win.transferLost": "Folder transferu przestał działać w tej maszynie. Wróci, gdy maszyna uruchomi się ponownie; dziennik maszyny mówi dlaczego.",
   "win.netReconnecting": "Sieć tej maszyny się zatrzymała. Ponowne łączenie…",
   "win.netBack": "Sieć wróciła ({s} s bez niej).",
   "cmd.suspend": "Uśpij",

@@ -650,8 +650,8 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     return false;
   }), [winId]);
 
-  // lord-vm's notices (VM_NOTICE): the network going and coming back (6.5), a Clone's new identity (6.3); the good news
-  // goes away by itself
+  // lord-vm's notices (VM_NOTICE): the network going and coming back (6.5), a Clone's new identity (6.3), a shared folder
+  // gone because its virtiofsd ended (6.7: back at the next start); the good news goes away by itself
   const [noticeGone, setNoticeGone] = useState(0);
   useEffect(() => {
     if (!st?.noticeSeq || !['network-back', 'identity'].includes(st.notice)) return undefined;
@@ -663,6 +663,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const noticeText = !st?.notice ? '' : st.notice === 'recovered' ? tr('machines.win.recovered')
     : st.notice === 'network-back' ? tr('machines.win.netBack', { s: (Math.max(0, st.noticeCode || 0) / 1000).toFixed(1) })
     : st.notice === 'identity' ? tr(st.noticeCode === 1 ? 'machines.win.identityName' : 'machines.win.identityDone')
+    : st.notice === 'share-lost' ? (st.noticeCode === 1 ? tr('machines.win.transferLost') : tr('machines.win.shareLost', { folder: st.noticeText || '' }))
     : /reconnecting/.test(st.noticeText || '') ? tr('machines.win.netReconnecting') : tr('machines.win.netLost');
   const v = startPhase(sid, st, starting) === 'starting' && st ? stateView('starting') : stateView(st?.state, st?.reason);
   const a0 = actionsFor(sid ? st?.state : 'stopped');

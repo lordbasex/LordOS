@@ -430,6 +430,8 @@
   "tb.cdRefused": "Kiendeshi hakiwezi kupokea diski sasa.",
   "tb.cdFailed": "Diski haikuweza kubadilishwa: {why}",
   "win.netLost": "Mtandao wa mashine hii ulisimama na haukuweza kurejeshwa. Unarudi mashine inapowashwa tena; kumbukumbu ya mashine inaeleza sababu.",
+  "win.shareLost": "Folda inayoshirikiwa “{folder}” imeacha kufanya kazi kwenye mashine hii. Inarudi mashine inapowashwa tena; kumbukumbu ya mashine inaeleza sababu.",
+  "win.transferLost": "Folda ya kuhamisha imeacha kufanya kazi kwenye mashine hii. Inarudi mashine inapowashwa tena; kumbukumbu ya mashine inaeleza sababu.",
   "win.netReconnecting": "Mtandao wa mashine hii umesimama. Inaunganisha upya…",
   "win.netBack": "Mtandao umerudi (sekunde {s} bila huo).",
   "cmd.suspend": "Simamisha kwa Muda",

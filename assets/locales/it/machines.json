@@ -430,6 +430,8 @@
   "tb.cdRefused": "L'unità non può ricevere un disco ora.",
   "tb.cdFailed": "Impossibile cambiare il disco: {why}",
   "win.netLost": "La rete di questa macchina si è fermata e non è stato possibile ripristinarla. Torna al prossimo avvio; il registro della macchina dice perché.",
+  "win.shareLost": "La cartella condivisa «{folder}» ha smesso di funzionare in questa macchina. Torna al prossimo avvio della macchina; il registro della macchina dice perché.",
+  "win.transferLost": "La cartella di trasferimento ha smesso di funzionare in questa macchina. Torna al prossimo avvio della macchina; il registro della macchina dice perché.",
   "win.netReconnecting": "La rete di questa macchina si è fermata. Riconnessione…",
   "win.netBack": "La rete è tornata ({s} s senza).",
   "cmd.suspend": "Sospendi",

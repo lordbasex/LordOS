@@ -430,6 +430,8 @@
   "tb.cdRefused": "Das Laufwerk kann gerade keine Disc aufnehmen.",
   "tb.cdFailed": "Die Disc konnte nicht gewechselt werden: {why}",
   "win.netLost": "Das Netzwerk dieser Maschine wurde beendet und konnte nicht wiederhergestellt werden. Es kehrt zurück, wenn die Maschine erneut startet; das Protokoll der Maschine nennt den Grund.",
+  "win.shareLost": "Der freigegebene Ordner „{folder}“ funktioniert in dieser Maschine nicht mehr. Er kehrt zurück, wenn die Maschine erneut startet; das Protokoll der Maschine nennt den Grund.",
+  "win.transferLost": "Der Transferordner funktioniert in dieser Maschine nicht mehr. Er kehrt zurück, wenn die Maschine erneut startet; das Protokoll der Maschine nennt den Grund.",
   "win.netReconnecting": "Das Netzwerk dieser Maschine wurde beendet. Verbindung wird wiederhergestellt …",
   "win.netBack": "Das Netzwerk ist wieder da ({s} s ohne).",
   "cmd.suspend": "Ruhezustand",

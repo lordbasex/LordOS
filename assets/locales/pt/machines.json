@@ -430,6 +430,8 @@
   "tb.cdRefused": "A unidade não pode receber um disco agora.",
   "tb.cdFailed": "Não foi possível trocar o disco: {why}",
   "win.netLost": "A rede desta máquina parou e não pôde ser recuperada. Ela volta quando a máquina iniciar de novo; o registro da máquina diz por quê.",
+  "win.shareLost": "A pasta compartilhada “{folder}” parou de funcionar nesta máquina. Ela volta quando a máquina iniciar de novo; o registro da máquina diz por quê.",
+  "win.transferLost": "A pasta de transferência parou de funcionar nesta máquina. Ela volta quando a máquina iniciar de novo; o registro da máquina diz por quê.",
   "win.netReconnecting": "A rede desta máquina parou. Reconectando…",
   "win.netBack": "A rede voltou ({s} s sem ela).",
   "cmd.suspend": "Suspender",

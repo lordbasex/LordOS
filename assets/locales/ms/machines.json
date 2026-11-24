@@ -430,6 +430,8 @@
   "tb.cdRefused": "Pemacu tidak dapat menerima cakera padat sekarang.",
   "tb.cdFailed": "Cakera padat tidak dapat ditukar: {why}",
   "win.netLost": "Rangkaian mesin ini berhenti dan tidak dapat dipulihkan. Ia kembali apabila mesin dimulakan semula; log mesin menyatakan sebabnya.",
+  "win.shareLost": "Folder kongsi “{folder}” berhenti berfungsi dalam mesin ini. Ia kembali apabila mesin dimulakan semula; log mesin menyatakan sebabnya.",
+  "win.transferLost": "Folder pemindahan berhenti berfungsi dalam mesin ini. Ia kembali apabila mesin dimulakan semula; log mesin menyatakan sebabnya.",
   "win.netReconnecting": "Rangkaian mesin ini berhenti. Menyambung semula…",
   "win.netBack": "Rangkaian telah kembali ({s} s tanpanya).",
   "cmd.suspend": "Gantung",

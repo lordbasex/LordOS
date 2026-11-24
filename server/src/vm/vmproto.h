@@ -156,7 +156,9 @@
  *                   until it starts again; VMN_NET_BACK: a new passt is attached, b = milliseconds without network;
  *                   VMN_RECOVERED: an interrupted operation was finished or rolled back at this start; VMN_IDENTITY: a
  *                   Clone's guest got its own hostname and machine-id; b = 1: a Windows guest's computer name, from its next
- *                   restart), b = detail number (a signal or exit status),
+ *                   restart; VMN_SHARE_LOST: a shared folder's virtiofsd ended while the machine runs, so the folder is
+ *                   gone from the guest until it starts again, b = 1 for the transfer folder, 0 for one of the person's,
+ *                   text = its tag), b = detail number (a signal or exit status),
  *                   text = detail.
  *                   Sent to every client, and again to one that connects later (VM_STATUS)
  *
@@ -258,7 +260,7 @@ enum {
  * (or it's a secret); DECLINED: the person said no (ask mode), or didn't answer in time */
 enum { VCD_BACKGROUND = 1, VCD_STALE, VCD_NONE, VCD_DECLINED, VCD_LAST = VCD_DECLINED };
 /* VM_NOTICE a */
-enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_NET_BACK, VMN_IDENTITY, VMN_COUNT };
+enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_NET_BACK, VMN_IDENTITY, VMN_SHARE_LOST, VMN_COUNT };
 /* VM_JOB a, b */
 enum { VJ_NONE = 0, VJ_SUSPEND, VJ_RESUME, VJ_SNAPSHOT, VJ_REVERT, VJ_DELETE, VJ_COUNT };
 enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };

@@ -430,6 +430,8 @@
   "tb.cdRefused": "Asemaan ei voi nyt asettaa levyä.",
   "tb.cdFailed": "Levyä ei voitu vaihtaa: {why}",
   "win.netLost": "Tämän koneen verkko pysähtyi, eikä sitä saatu palautettua. Se palaa, kun kone käynnistyy uudelleen; koneen loki kertoo syyn.",
+  "win.shareLost": "Jaettu kansio ”{folder}” lakkasi toimimasta tässä koneessa. Se palaa, kun kone käynnistyy uudelleen; koneen loki kertoo syyn.",
+  "win.transferLost": "Siirtokansio lakkasi toimimasta tässä koneessa. Se palaa, kun kone käynnistyy uudelleen; koneen loki kertoo syyn.",
   "win.netReconnecting": "Tämän koneen verkko pysähtyi. Yhdistetään uudelleen…",
   "win.netBack": "Verkko palasi ({s} s ilman sitä).",
   "cmd.suspend": "Lepotila",
