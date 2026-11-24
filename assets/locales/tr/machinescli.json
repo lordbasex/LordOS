@@ -133,5 +133,8 @@
   "applyCreated": "{name}, {file} dosyasının dediği gibi oluşturuldu.",
   "applyUpdated": "{name} artık {file} ayarlarına sahip.",
   "applyRunning": "{name} çalışıyor: bir dosyadan değiştirmek için kapatın.",
-  "overBudget": "{name} başlamadı: {need} MB gerekiyor ve makineler için {free} MB kaldı. Başka bir makineyi askıya alın ya da kapatın veya ona daha az bellek verin."
+  "overBudget": "{name} başlamadı: {need} MB gerekiyor ve makineler için {free} MB kaldı. Başka bir makineyi askıya alın ya da kapatın veya ona daha az bellek verin.",
+  "help.migrate": "başka bir bilgisayarın tüm diskini ağ üzerinden SSH'nizle (ya da buraya bağlı bir diski) yeni bir makineye kopyalar ve içe aktarır",
+  "migrating": "Disk kopyalanıyor: {done} / {total} GB…",
+  "migratePassword": "{host} üzerindeki sudo parolası: "
 }

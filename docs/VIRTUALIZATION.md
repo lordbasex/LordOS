@@ -2412,7 +2412,7 @@ action `vm-enable`, not the Store. The design was:
 5. **Review:** CPU, memory, disk, network, firmware, plus "Customize".
 6. **Progress:** download with verified signature, install with live picture and a "Open console" option, drivers, tools, snapshot **Fresh install**.
 
-**Requirements check.** Before anything downloads, one screen lists each part the chosen system needs (engine, TPM, firmware, drivers, install tools), which are present and which aren't, and installs what's missing through the Store in one click. Nothing comes from outside the signed repositories, except the pinned driver ISO.
+**Requirements check.** Before anything downloads, one screen lists each part the chosen system needs (engine, TPM, firmware, drivers, install tools), which are present and which aren't, and installs what's missing in one click. Nothing comes from outside the signed repositories, except the pinned driver ISO. **Built (2026-11-24, in development):** the Review's *What's Missing* opens the chosen system's own page, *What ‹system› needs* (`library.jsx` `Requirements` with `sys`, `model.js` `reqRows`): KVM, the engine and the firmware for its architecture, the display, disk tools, the shared network and folders; the TPM only for a virtio-win guest; the parts that aren't packages with their own state: its drivers (virtio-win) and WinFsp *At Create* (downloaded then from the maker's pinned file and checked against its SHA-256), the LordOS guest tools for it (in the `lordos` package, `host().guestTools`), and an unattended install's answers *Built in*. The Machine menu's page is the computer's (every architecture in use). The packages go in through `vm-enable`, LordOS's own package engine with the Store's signed sources (the Store app itself isn't opened: one click here); decided 2026-11-24 instead of the Store's window.
 
 **Automatic setup for virtio-win guests.** A switch, off unless chosen: an answer file on a small generated disk installs the system with no questions and creates a local account, with the name and optional password given here. Debian has `wimtools` (**Measured**) for building a boot disk that starts faster than the original ISO. No product key is added and nothing gets activated: the system stays as its own rules leave it, and the screen says so. Install time is shown as an estimate only after we've measured it.
 
@@ -2813,6 +2813,31 @@ with ‹N› MB** after running out of memory, **Go Back to a Snapshot…** when
 system inside or the engine; Store → Updates warns when an update changes QEMU while machines are suspended
 (`apps/store/syspkg.js` `qemuUpdateRisk`). Nothing is unplugged before a save: the HDA card is migrated with the state, and what
 can't be saved (a graphics card, 3D graphics) is never suspended (`noSuspend`). *Built:* a state saved by another QEMU build is named before loading, with **Resume anyway** or **Discard saved state** (`lordvm.c`, `vmwindow.jsx`).
+
+**Start Linux directly** (direct kernel boot of an installed Linux guest; built 2026-11-24, in development; 13.8 item 9).
+Configure → Boot → *Start Linux directly* keeps a kernel, an optional initial RAM disk and a command line with the machine
+and starts them instead of the boot loader on its disk: no firmware menu and no boot loader countdown. `machine.json`
+schema 21 adds `"kernel_boot": true` (written only then). The files are copied into the machine's `disks/boot/`
+(`vmlinuz`, `initrd`, `cmdline`, 0600) by `lord-vm --set --kernel FILE --initrd FILE|none --cmdline TEXT --kernel-boot on|off`
+(Configure's *Choose…* and the command line field go through `lord.vm.set`): never a link to the person's file, so the
+machine is whole by itself, and QEMU's Landlock still reads only `disks/`. The copy is all or nothing: each file is
+opened without following a link, checked to be a regular file of 1 byte to 128 MB (kernel) or 1 GB (initrd), its start
+checked to be a Linux kernel for the machine's architecture (a bzImage on amd64; an Image, Image.gz or EFI zboot image on
+arm64: `vmkboot.h` `kboot_kernel_ok`), copied from the descriptor into a temporary name, synced, and only renamed into
+place once every file of the request is in; a refused request leaves `disks/boot` as it was. The command line is 1 to
+1023 printable ASCII characters (a final newline and outer spaces dropped, `kboot_cmdline_clean`) and reaches QEMU as one
+argument of its own (`-append`), never through a shell. At each cold start lord-vm reads it again and checks it; when
+`disks/boot` lacks a kernel or a usable command line it starts from the disk and says so in its log. QEMU gets `-kernel`,
+`-initrd` and `-append`; the firmware stays the machine's (OVMF, AAVMF or SeaBIOS load the kernel through fw_cfg), and
+the kernel takes boot index 0, the disks follow it. Refused (`vm_machine_check`, the same in Configure with the reason):
+with Secure Boot (a kernel started directly would skip its checks: refused, not weakened), with the virtio-win devices,
+for an encrypted machine (its kernel and initrd would lie on this computer's disk in the clear) and for a group's member.
+A clone keeps `disks/boot`; an export and an import leave the switch off (the machine starts from its disk's boot loader
+there). **Where the files come from:** the guest's own, in its `/boot` (`vmlinuz-<version>`, `initrd.img-<version>`; the
+command line in `/proc/cmdline`), copied out with `machines cp` with Automation on (6.15), or any kernel the person built.
+After the guest updates its kernel, the kept one still boots but its modules go with the next cleanup: choose the new one
+(Configure says so). Measured on the i9 (KVM, the harness's Debian 13 guest, 2 vCPUs, cold start to `MH-READY` on the
+serial console, `tools/vm/e2e/machines/kernel-boot.py`): see 13.8 item 9.
 
 ### 6.2 Snapshots
 
@@ -3316,6 +3341,45 @@ through the agent (its root on `/dev/sda2`). That run found a bug: a machine sta
 QEMU's first open of the disk with `O_DIRECT` waiting behind gigabytes of writeback; the import now writes the disk out
 (`fsync`) before it is put in place. Not built: the agent on the old PC and the copy over the network, reading a
 connected disk (it needs root), driver injection for virtio-win systems, BitLocker or LUKS recovery.
+
+**Built since (2026-11-24, in development): `machines migrate`, the copy over the network and a connected disk**
+(`server/src/cli/machines.c` `cmd_migrate`):
+
+```sh
+machines migrate alex@old-pc:/dev/sda "Old PC" --sudo      # the old PC's whole disk over the LAN, through your SSH
+machines migrate /dev/sdb "Old PC" --sudo                   # the old PC's disk connected here (USB), read through sudo
+machines migrate /media/alex/backup/old.img "Old PC"        # a backup image
+```
+
+- **The old PC's agent is its SSH server.** Nothing of ours runs or is installed there: any Linux PC, or a live USB of
+  LordOS or another Linux system on a PC whose own system has no SSH server. The copy is the person's own SSH session
+  (`/usr/bin/ssh`, their keys and `known_hosts`): the old PC's host key is checked by ssh, the stream is encrypted and
+  authenticated by it. So no new listening port, no new key exchange and no new root on this computer. On the old PC the
+  disk is read by the account logged in, or with `--sudo` through that PC's sudo: the password is typed here with echo
+  off and handed to its `sudo -S` on the session's standard input, never an argument, then wiped. A disk connected here
+  is read as the person, or with `--sudo` through this computer's sudo, which asks on the terminal itself (the person's
+  own privilege, as when they type sudo; no admin action of ours).
+- **One fixed script runs there:** the size of SOURCE (a block device or a file) as 20 digits, then its bytes with `dd`.
+  HOST is checked to letters, digits and `@._-` (not starting with `-`), SOURCE to an absolute path of letters, digits and
+  `/._+-` (no `/../`), so both reach the remote shell inside single quotes with nothing to escape; ssh gets `-T -e none`
+  and no forwarding.
+- **What comes back is data only:** the 20 digits parsed strictly (1 byte to 16 TB), then at most that many bytes written
+  into a sparse raw file in the library (`.migrate-<pid>.raw`, `O_EXCL`, 0600; all-zero 4 MB blocks become holes); a
+  stream that ends early, runs longer or a copy that fails there is refused and the file removed (Ctrl+C removes it too).
+  Then the import of 6.22 makes a qcow2 machine of it (jailed `qemu-img`), with the compatible devices unless `--devices
+  virtio`, and the raw file is removed.
+- **Drivers:** no injection. A migrated system starts on the compatible devices (SATA or, on arm64, NVMe, and e1000e),
+  which a PC's Linux or virtio-win system already has drivers for; the guest tools and the virtio drivers go in afterwards
+  from inside, and Configure moves the machine to virtio. Writing drivers into an offline system's registry stays not
+  built (delicate, and not needed for these devices).
+- **Encrypted disks** are copied as they are: LUKS asks its passphrase at the first start as on the old PC; a system that
+  unlocked with the old PC's TPM asks its recovery key (the new machine's TPM is another).
+- **Checked (2026-11-24):** from the i9 PC, the Raspberry Pi 5 as the old PC over the LAN: a 20 GB disk (the harness's
+  Debian 13 amd64 system on a read-only loop device, root only) copied with `--sudo` in 190 s (about 113 MB/s, the gigabit link's rate; all-zero blocks still cross the network), imported with
+  `--arch amd64` and started to `MH-READY`; without `--sudo` the root-only device is refused (the old PC's `dd: Permission
+  denied` and "the other side didn't send a disk"); a SOURCE with a shell character and a HOST starting with `-` refused
+  before anything runs; the same disk as a local image. Not built: an assistant tile for it (the terminal only), a copy
+  that goes on after the network drops, driver injection.
 
 ### 6.12 Guest app integration
 
@@ -4566,7 +4630,7 @@ will register itself the same way, with no change to Files.
   Development and Design turn the clipboard (both ways) and the transfer folder on, Games the clipboard, Light neither; shared
   folders and the microphone stay off until the person turns them on. (Corrected by the audit of 2026-11-23: this line said
   "off in every profile".)
-- Guest → host channels: virtio devices, the virtio-serial port of `lordos-guest`, clipboard, folders, the transfer folder. Each has an on/off in Configure. **Not built:** the **Guest can see** panel (Configure → Security holds six notes on the sandbox, not the channels); USB (no usbredir).
+- Guest → host channels: virtio devices, the virtio-serial port of `lordos-guest`, clipboard, folders, the transfer folder. Each has an on/off in Configure, and all of them are in one list: **Guest can see** (Configure → Security, built 2026-11-24, in development; `model.js` `guestChannels`, `channelSet`, `configure.jsx` `GuestCanSee`): the network (its mode and forwarded ports), the screen (2D, 3D through the sandbox or a share of the Intel card), the keyboard and mouse, sound, the microphone, the clipboard into and out of the machine, shared folders, the transfer folder, the guest agent, Automation, files sent from the machine, links and notifications from it. Each row says whether it is on and, while the machine runs, what it does now (the agent *Connected* or *Not answering*; a switch changed since the start: *At the next start*); each has its switch (the same draft field the section's own switch sets, so Done saves it) or a *Show* button to the section that holds a list or a choice (folders, sound, the microphone, the screen). A machine locked for anonymity (19.5) shows its host-to-guest rows off and locked. **Not built:** USB (no usbredir).
 - `lordos-guest` traffic is treated as untrusted: strict parser, size limits, fuzz target. A guest can't start a host process, read host files beyond its folder, or inject input into other windows.
 - **An encrypted machine has to be encrypted whole,** or the disk is the only safe part. An encrypted machine from another app is refused at import. **Built (in development, 2026-11-24):** "Encrypt this machine" in the assistant's review (and "Encrypt the machines' disks" on the Whonix card, isolation layer 5 of 19.1). lord-server makes the key (32 bytes of `getrandom`, 64 hex digits) and keeps it in the session keyring through lord-vault, owner `machines`, service `machines:<id>` (a group's id for its members), before the machine is made; Passwords shows it as "Machines: <name>", its **recovery key** for another computer. lord-server reads it back itself on a worker thread (`vc_request_wait`, `vm/vmkeysrv.c`): JS only sees its state (`lord.vm.keyState`), holds it 120 s in a locked page that never goes to a core dump, wipes it when the screen locks, and hands it to lord-vm on a pipe (`--key-fd`). lord-vm keeps it in a locked page and passes it on only through a new pipe per use, which QEMU, `qemu-img` and swtpm read (`secret,file=/proc/self/fd/N`, swtpm's `--key pwdfd=`): never an argument, the environment or a file. Every disk, the UEFI variables and a disposable session's layers are qcow2 with LUKS (a fast key derivation: the key is random); the TPM's state is swtpm's own AES-256-CBC encrypted state (checked in Debian's swtpm 0.7.1: its blob header says encrypted); a snapshot's memory is written inside the encrypted qcow2; Suspend, which writes memory to a file, is refused. No card picture, snapshot picture, serial log or journal is kept in the folder; `lord-vm.log` (lord-vm's own lines) stays. Locked keyring: the system's unlock prompt; no key here (a machine brought from another computer): its recovery key in a window of its own, protected whole (`RecoveryKeyWindow`, a secure field). Clones and exports keep the key: a Clone's is kept under its new id first. Security says the disks are encrypted, where the key is, and that host swap can still hold guest memory (only encrypted swap solves that). Not built: encrypting an existing machine (chosen when it's made), Suspend of an encrypted machine. Tests: `vm_storage_test.sh` (real QEMU: wrong key and no key refused, the guest's bytes not in the file in the clear, swtpm's encrypted state, QEMU's sandbox unchanged, snapshots, clone, export, import, an encrypted group), `vmkeysrv-test` (the keyring's side), `vm_storage_model_test.mjs`. Bridged mode and encrypted disks each state what they mean in one line.
 - `vm-enable`, `vm-kvm`, `vm-net-bridge`, `vm-net-unbridge`, `vm-memlock`, `vm-gvt-create`, `vm-gvt-remove` and `vm-image-get`, `-get-user`, `-list`, `-remove`, `-cancel` are closed actions with fixed arguments, on the list maintainers review (AGENTS.md). There is no `vm-usb-allow` yet.
@@ -5067,7 +5131,8 @@ networking, virtiofs on both architectures, the desktop under a 3-vCPU load. Sti
    graphical guest (`VD_CURSOR`), suspend (6.1).
 8. **`passt` on the Pi:** why its speed ranges from 96 to 379 MB/s from run to run, and whether that matters for real traffic.
 9. **Boot time:** UEFI firmware is 12.3 s of the Pi's 18.6 s. Whether a lighter firmware setup or direct kernel boot for Linux guests is
-   worth offering.
+   worth offering. **Answered (2026-11-24):** direct kernel boot is offered as Configure → Boot → *Start Linux directly* (6.1);
+   it skips the boot loader and its countdown, the firmware stays. KBOOT_RESULTS
 
 ## 14. Phases
 

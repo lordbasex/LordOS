@@ -972,7 +972,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 
 /* ---- the supervisor ---- */
 
-typedef struct { int fd, control; } Client;
+typedef struct { int fd, control, gone_said; } Client;   /* gone_said: its peer went (EPIPE), said once in the log */
 enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME,
        P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET, P_PINQ };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
@@ -1280,7 +1280,13 @@ static int sh_rw(int i) { return i == VM_SHARES ? 1 : S.m.share_rw[i]; }
 static void awake_update(void);
 static void send_to(int ci, const VmMsg *m, int fd) {
     if (ci < 0 || ci >= MAX_CLIENTS || S.cl[ci].fd < 0) return;
-    if (vm_send(S.cl[ci].fd, m, fd)) vlog("client %d: message %d not delivered (%s)", ci, m->type, strerror(errno));
+    /* a peer that went away (a command killed or timed out) is dropped when the loop sees its hangup; until then each send
+     * fails: said once, not once a message (a machine's log filled with the same line several times a second) */
+    if (vm_send(S.cl[ci].fd, m, fd) && !S.cl[ci].gone_said) {
+        int e = errno;
+        vlog("client %d: message %d not delivered (%s)", ci, m->type, strerror(e));
+        if (e == EPIPE || e == ECONNRESET) S.cl[ci].gone_said = 1;
+    }
 }
 
 static void reply(int ci, uint32_t seq, int code, const char *text) {
@@ -7411,7 +7417,7 @@ static void reap(void) {
 /* ---- the loop ---- */
 
 static void add_client(int fd, int control) {
-    for (int i = 0; i < MAX_CLIENTS; i++) if (S.cl[i].fd < 0) { S.cl[i] = (Client){ fd, control }; return; }
+    for (int i = 0; i < MAX_CLIENTS; i++) if (S.cl[i].fd < 0) { S.cl[i] = (Client){ fd, control, 0 }; return; }
     close(fd);
 }
 

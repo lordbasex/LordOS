@@ -133,5 +133,8 @@
   "applyCreated": "{name} a fost creată cum spune {file}.",
   "applyUpdated": "{name} are acum setările din {file}.",
   "applyRunning": "{name} rulează: oprește-o ca s-o schimbi dintr-un fișier.",
-  "overBudget": "{name} nu a pornit: are nevoie de {need} MB și au rămas {free} MB pentru mașini. Suspendă sau oprește altă mașină ori dă-i mai puțină memorie."
+  "overBudget": "{name} nu a pornit: are nevoie de {need} MB și au rămas {free} MB pentru mașini. Suspendă sau oprește altă mașină ori dă-i mai puțină memorie.",
+  "help.migrate": "copiază întregul disc al altui PC într-o mașină nouă, prin rețea cu SSH-ul tău (sau un disc conectat aici), și o importă",
+  "migrating": "Se copiază discul: {done} din {total} GB…",
+  "migratePassword": "Parola sudo pe {host}: "
 }

@@ -133,5 +133,8 @@
   "applyCreated": "已依照 {file} 建立 {name}。",
   "applyUpdated": "{name} 現在使用 {file} 中的設定。",
   "applyRunning": "{name} 正在執行：請先關機，再從檔案變更它。",
-  "overBudget": "{name} 未啟動:它需要 {need} MB,而留給虛擬機的只剩 {free} MB。請暫停或關閉另一台虛擬機,或給它較少的記憶體。"
+  "overBudget": "{name} 未啟動:它需要 {need} MB,而留給虛擬機的只剩 {free} MB。請暫停或關閉另一台虛擬機,或給它較少的記憶體。",
+  "help.migrate": "透過你的 SSH 經網路（或從接在這裡的磁碟）把另一台電腦的整個磁碟複製到新機器並匯入",
+  "migrating": "正在複製磁碟：{done} / {total} GB…",
+  "migratePassword": "{host} 上的 sudo 密碼："
 }

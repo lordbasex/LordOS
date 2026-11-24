@@ -133,5 +133,8 @@
   "applyCreated": "S'ha creat {name} com diu {file}.",
   "applyUpdated": "{name} ja té la configuració que dona {file}.",
   "applyRunning": "{name} està en marxa: atura-la per canviar-la des d'un fitxer.",
-  "overBudget": "{name} no s'ha iniciat: necessita {need} MB i en queden {free} per a màquines. Suspèn o apaga una altra màquina, o dona-li menys memòria."
+  "overBudget": "{name} no s'ha iniciat: necessita {need} MB i en queden {free} per a màquines. Suspèn o apaga una altra màquina, o dona-li menys memòria.",
+  "help.migrate": "copia el disc sencer d'un altre PC en una màquina nova, per la xarxa amb el teu SSH (o un disc connectat aquí), i la importa",
+  "migrating": "S'està copiant el disc: {done} de {total} GB…",
+  "migratePassword": "Contrasenya de sudo a {host}: "
 }

@@ -133,5 +133,8 @@
   "applyCreated": "{file} のとおりに {name} を作成しました。",
   "applyUpdated": "{name} は {file} の設定になりました。",
   "applyRunning": "{name} は実行中です。ファイルから変更するにはシャットダウンしてください。",
-  "overBudget": "{name} は起動しませんでした:{need} MB 必要ですが、マシンに使えるのは残り {free} MB です。別のマシンをサスペンドかシャットダウンするか、メモリを減らしてください。"
+  "overBudget": "{name} は起動しませんでした:{need} MB 必要ですが、マシンに使えるのは残り {free} MB です。別のマシンをサスペンドかシャットダウンするか、メモリを減らしてください。",
+  "help.migrate": "別の PC のディスク全体を、ネットワーク経由であなたの SSH で (またはここにつないだディスクから) 新しいマシンにコピーして取り込みます",
+  "migrating": "ディスクをコピー中: {done} / {total} GB…",
+  "migratePassword": "{host} の sudo パスワード: "
 }

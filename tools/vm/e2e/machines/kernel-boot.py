@@ -67,19 +67,24 @@ def main():
             return {}
 
     def serial_count(M):
+        """MH-READY lines in the serial log, and the log's inode (lord-vm starts a new one at each start)"""
         p = os.path.join(M, "log", "serial.log")
-        return open(p, errors="replace").read().count("MH-READY") if os.path.exists(p) else 0
+        try:
+            return open(p, errors="replace").read().count("MH-READY"), os.stat(p).st_ino
+        except OSError:
+            return 0, 0
 
     def boot(M, *start):
         """a cold start to MH-READY: its seconds, or None"""
-        n0 = serial_count(M)
+        n0, ino0 = serial_count(M)
         t0 = time.time()
         r = vm("--start", M, "--detach", "--keep-running", *start)
         if r.returncode:
             print("      start: " + (r.stdout + r.stderr).strip()[-300:])
             return None
         while time.time() - t0 < 240:
-            if serial_count(M) > n0:
+            n, ino = serial_count(M)
+            if n > (n0 if ino == ino0 else 0):
                 return round(time.time() - t0, 2)
             if status(M).get("state") in ("crashed", "stopped") and time.time() - t0 > 5:
                 return None

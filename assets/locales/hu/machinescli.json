@@ -133,5 +133,8 @@
   "applyCreated": "{name} elkészült, ahogy {file} mondja.",
   "applyUpdated": "{name} most {file} beállításait használja.",
   "applyRunning": "{name} fut: állítsd le, hogy fájlból módosítsd.",
-  "overBudget": "{name} nem indult el: {need} MB kell neki, és {free} MB maradt a gépeknek. Függessz fel vagy állíts le egy másik gépet, vagy adj neki kevesebb memóriát."
+  "overBudget": "{name} nem indult el: {need} MB kell neki, és {free} MB maradt a gépeknek. Függessz fel vagy állíts le egy másik gépet, vagy adj neki kevesebb memóriát.",
+  "help.migrate": "egy másik PC teljes lemezét új gépbe másolja a hálózaton, a saját SSH-ddal (vagy egy ide csatlakoztatott lemezt), és importálja",
+  "migrating": "Lemez másolása: {done} / {total} GB…",
+  "migratePassword": "sudo jelszó itt: {host}: "
 }

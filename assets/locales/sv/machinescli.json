@@ -133,5 +133,8 @@
   "applyCreated": "{name} skapades så som {file} säger.",
   "applyUpdated": "{name} har nu inställningarna från {file}.",
   "applyRunning": "{name} körs: stäng av den för att ändra den från en fil.",
-  "overBudget": "{name} startade inte: den behöver {need} MB och {free} MB finns kvar för maskiner. Försätt en annan maskin i viloläge eller stäng av den, eller ge den mindre minne."
+  "overBudget": "{name} startade inte: den behöver {need} MB och {free} MB finns kvar för maskiner. Försätt en annan maskin i viloläge eller stäng av den, eller ge den mindre minne.",
+  "help.migrate": "kopierar en annan dators hela disk till en ny maskin, över nätverket via din SSH (eller en disk ansluten här), och importerar den",
+  "migrating": "Kopierar disken: {done} av {total} GB…",
+  "migratePassword": "Lösenord för sudo på {host}: "
 }

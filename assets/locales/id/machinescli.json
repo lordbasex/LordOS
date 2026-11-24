@@ -133,5 +133,8 @@
   "applyCreated": "{name} dibuat seperti kata {file}.",
   "applyUpdated": "{name} kini memakai pengaturan dari {file}.",
   "applyRunning": "{name} sedang berjalan: matikan untuk mengubahnya dari berkas.",
-  "overBudget": "{name} tidak mulai: butuh {need} MB dan tersisa {free} MB untuk mesin. Tangguhkan atau matikan mesin lain, atau beri memori lebih sedikit."
+  "overBudget": "{name} tidak mulai: butuh {need} MB dan tersisa {free} MB untuk mesin. Tangguhkan atau matikan mesin lain, atau beri memori lebih sedikit.",
+  "help.migrate": "menyalin seluruh disk PC lain ke mesin baru, lewat jaringan melalui SSH Anda (atau disk yang tersambung di sini), lalu mengimpornya",
+  "migrating": "Menyalin disk: {done} dari {total} GB…",
+  "migratePassword": "Kata sandi sudo di {host}: "
 }
