@@ -867,6 +867,39 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **A fullscreen video in Firefox no longer repaints the desktop under it at every frame (#232)** (in development;
+  latest release 0.8.9.5-beta). Firefox draws its page in a subsurface of its window that commits on its own. Since
+  0.8.9.5-beta such a commit repaints its own box in a window, but in a fullscreen window it still repainted all of the
+  window's place in the desktop below, which the fullscreen window covers, and on the GPU path painted that part of the
+  desktop again and uploaded it at every frame of the video; a window only presented the new frame. That matches the
+  report (YouTube 1080p on an RX 7800 XT: about 7 % GPU use in a window, 17 % fullscreen at 60 Hz, 25 % at 120 Hz). Now a
+  fullscreen window's subsurface repaints its own box within its display on the CPU path, and on the GPU path presenting
+  again is enough, as for the fullscreen window's own commits; a subsurface that moved or changed size, or a window of
+  another size scaled to the display, still repaints it whole (`wl.c` `damage_sub`, the new `fs_sig`).
+  `tests/fsub_client.c` (`tests/fsub_headless.sh`, in `run_suites.sh`) counts the pixels repainted through a new test
+  hook of `lord-server-test` (`painted`, only in that build): 256,000 a frame before (the window's place), 15,416 after
+  (the subsurface's box), with every frame checked against a full repaint (`LORD_PAINT_VERIFY=1`). Not yet measured on
+  a GPU: Firefox's page still can't go to the display by direct scanout, which takes a fullscreen window without
+  subsurfaces.
+- **Menus of X11 apps open again (#209; also the menus of #212 and #213)** (in development; latest release 0.8.9.5-beta).
+  Since 0.8.9-beta no menu, dropdown, right-click menu or tooltip of an app running under Xwayland appeared: LibreOffice,
+  Qt apps with `QT_QPA_PLATFORM=xcb` or without Qt's Wayland plugin (MuseScore 3, AppImages), GTK apps with
+  `GDK_BACKEND=x11`, Java and Electron apps such as the Arduino IDE. The menu bar item lit up and nothing opened. The fix
+  for GTK 4 popovers (#159) made a commit on a popup with no `xdg_popup` return before mapping it, and an X11 menu never
+  has one (X places and sizes it), so it never reached the screen; an X11 app's drag icon was hidden the same way. Only
+  Wayland popups take that early return now (`wl.c` `surface_commit_role`). `tests/xpopup_x11.c`
+  (`tests/xpopup_headless.sh`, in `run_suites.sh`) maps an override-redirect menu and a `POPUP_MENU` window under
+  Xwayland against a headless `lord-server-test` and reads the screen: shown where X put it, clickable, gone once
+  unmapped; it failed before the fix. FeatherPad's File menu with `QT_QPA_PLATFORM=xcb` checked on the CPU and GPU
+  paths, and with Qt's Wayland plugin.
+- **The live ISO finds MediaTek Wi-Fi cards such as the MT7921 (#227)** (in development; latest release 0.8.9.5-beta).
+  The card's driver (`mt7921e`) bound, but its firmware wasn't on the ISO, so no Wi-Fi interface appeared and Settings →
+  Network said the computer had no Wi-Fi adapter. Debian moved MediaTek's firmware out of `firmware-misc-nonfree` into
+  `firmware-mediatek`, which `firmware-misc-nonfree` only Recommends, and the ISO is built without Recommends. Both ISOs
+  now carry `firmware-mediatek`, and `firmware-intel-graphics` for the same reason (i915 asked for its DMC firmware and
+  turned runtime power management off without it). `tests/iso_firmware_test.mjs` checks that every Wi-Fi, network and
+  graphics package of the Store's missing-firmware map is on the ISO, except the two left out on purpose
+  (`firmware-libertas`, `firmware-nvidia-graphics`; the Store still offers them when the kernel asks).
 - **Machines: a global security pass over how the new pieces work together** (in development; latest release
   0.8.9.5-beta; docs/VIRTUALIZATION.md 3.6, 6.2, 7.2, 8; docs/SENTINELA.md "Machines"). Each item had been reviewed alone;
   this pass looked at the chains between them, with a hostile guest, a hostile program of the same account and hostile

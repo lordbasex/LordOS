@@ -26,6 +26,9 @@
  *                       media_composed hands the remote desktop, the screen-sharing API and the recording; portal, the
  *                       Screenshot portal's still of the screen (cast_still); window N, a window (node N) shared alone.
  *                       The protected windows' test (tests/protected_headless.sh, docs/PRIVACY.md)
+ *   painted             "ok N": the pixels of the UI repainted (its damage, summed over every frame) since the last
+ *                       time it was asked. A fullscreen window's subsurface repaints its own box, not the window's
+ *                       place (tests/fsub_headless.sh, GitHub #232)
  *
  * The answer is "ok" or "err <why>". Nothing here reaches a real device, card or another session. */
 #ifndef LORD_TESTHOOKS_H
@@ -43,6 +46,7 @@ typedef struct {
     int  (*lease)(int plugged);                                  /* 0 on success */
     void (*key)(int code, int down);                             /* a key (testhooks.c checks the code's range) */
     int  (*frame)(const char *which, long node);                 /* 0 when the picture was written */
+    long long (*painted)(void);                                  /* UI pixels repainted since the last call */
 } TestHooks;
 
 int  testhooks_start(const TestHooks *h);   /* after dropping privileges; 0 when the socket listens */

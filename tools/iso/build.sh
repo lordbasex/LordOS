@@ -57,8 +57,11 @@ PKGS_LORDOS="libwayland-server0 libwayland-client0 libxkbcommon0 xkb-data pipewi
  libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libva2 libva-drm2 mesa-va-drivers
  bluez libspa-0.2-bluetooth power-profiles-daemon systemd-timesyncd shared-mime-info
  gsettings-desktop-schemas xwayland pciutils usbutils"
+# firmware-mediatek and firmware-intel-graphics were split out of firmware-misc-nonfree, which only Recommends
+# them, and this list installs without Recommends: without them a MediaTek MT7921/MT7922 card binds mt7921e but
+# never gets a Wi-Fi interface (#227) and i915 runs without its DMC firmware (server/tests/iso_firmware_test.mjs)
 PKGS_FIRMWARE="firmware-amd-graphics firmware-misc-nonfree firmware-iwlwifi firmware-realtek firmware-atheros
- firmware-brcm80211 firmware-sof-signed wireless-regdb bluez-firmware"
+ firmware-brcm80211 firmware-mediatek firmware-intel-graphics firmware-sof-signed wireless-regdb bluez-firmware"
 PKGS_GPU="libgl1-mesa-dri libegl1 libgles2 libgbm1 mesa-vulkan-drivers mesa-utils vulkan-tools glmark2-es2-wayland"
 # preinstalled browsers (Linux apps; they draw their own bar with LordOS's window buttons, see docs/WAYLAND.md)
 PKGS_APPS="foot featherpad qt6-wayland chromium firefox-esr"

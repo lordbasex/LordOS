@@ -243,6 +243,7 @@ EOF
     if have node; then run "guest-apps-test (sdk/guestappsmodel.js, guest apps in the launcher)" node tests/guest_apps_test.mjs; fi
     if have node; then run "theme-gallery-test (sdk/themegallery.js, Settings → Appearance)" node tests/theme_gallery_test.mjs; fi
     if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
+    if have node; then run "iso-firmware-test (tools/iso/build.sh firmware list vs the Store map, #227)" node tests/iso_firmware_test.mjs; fi
     if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
     if have node; then run "vm-group-model-test (apps/machines/model.js groupPlan: a machine group's start and stop order, its link)" node tests/vm_group_model_test.mjs; fi
     if have node; then run "vm-storage-model-test (apps/machines/storagemodel.js: key steps, recovery key, disposable, Export)" node tests/vm_storage_model_test.mjs; fi
@@ -292,6 +293,20 @@ EOF
         0) ok "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test: off, move, resize, lock, shortcuts)" ;;
         77) skip "moddrag" "build/lord-server-test and the default theme (make, npm run build)" ;;
         *) bad "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test)"; cat "$T/out" ;;
+    esac
+    # (#232) a fullscreen window's desync subsurface (Firefox's page) repaints its own box, checked against a full repaint
+    sh tests/fsub_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "fsub (tests/fsub_client.c, headless lord-server-test: a fullscreen window's subsurface repaints its box, #232)" ;;
+        77) skip "fsub" "build/lord-server-test and the default theme (make, npm run build)" ;;
+        *) bad "fsub (tests/fsub_client.c, headless lord-server-test, #232)"; cat "$T/out" ;;
+    esac
+    # (#209) an X11 app's menus: an override-redirect and a POPUP_MENU window shown where X put them, clicked, hidden
+    sh tests/xpopup_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "xpopup (tests/xpopup_x11.c, headless lord-server-test + Xwayland: X11 menus shown, clicked, hidden, #209)" ;;
+        77) skip "xpopup" "build/lord-server-test, build/xpopup-x11 (libxcb1-dev), Xwayland and the default theme (make, npm run build)" ;;
+        *) bad "xpopup (tests/xpopup_x11.c, headless lord-server-test + Xwayland, #209)"; cat "$T/out" ;;
     esac
     # a Whonix group's members (docs/VIRTUALIZATION.md 19.5): each one's QEMU and passt arguments against Whonix's own
     # libvirt XML of the pinned release; started paused from two empty disks, nothing boots

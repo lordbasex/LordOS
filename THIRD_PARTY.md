@@ -158,6 +158,7 @@ New on the images in 0.8.8 (installed from Debian, not linked; each keeps its ow
 | `libnss-mdns` | both ISOs and the Raspberry Pi image; recommended by `lordos` | `.local` names | LGPL-2.1-or-later |
 | `wireless-regdb` | both ISOs and the Raspberry Pi image | Wi-Fi's country rules for the kernel | ISC |
 | `firmware-brcm80211` | both ISOs (the Raspberry Pi image already had it, from Raspberry Pi's archive) | Broadcom Wi-Fi cards such as the BCM43602 | **non-free firmware** (Debian's `non-free-firmware`): Broadcom's binary licence, which allows redistribution unmodified; no source |
+| `firmware-mediatek`, `firmware-intel-graphics` | both ISOs (in development, after 0.8.9.5-beta) | MediaTek Wi-Fi and Bluetooth such as the MT7921/MT7922 (#227); Intel graphics firmware (i915 DMC/GuC/HuC, xe) | **non-free firmware** (Debian's `non-free-firmware`): the vendors' binary licences, which allow redistribution unmodified; no source |
 
 New on the images in 0.8.8.6 (installed from Debian, not linked):
 

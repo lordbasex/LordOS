@@ -1910,7 +1910,8 @@ connection the way lord-server makes Xwayland's (a socketpair it creates itself)
 Xwayland runs, so xwayland-shell-v1 is spoken under the very rule that keeps it from everyone else; `lease
 plug|unplug` gives `drmlease.c` a fake card (a desktop display and a non-desktop "LordOS test headset", memfds for
 `drm_fd` and every `lease_fd`, no ioctl) while the rest is real: `drmlcore.c`'s rules, the `vr` permission, the
-theme's prompt. None of it reaches a device, a card or another session.
+theme's prompt; `painted` answers how many pixels of the UI were repainted since it was last asked (a fullscreen window's
+subsurface repaints its own box, `tests/fsub_headless.sh`, GitHub #232). None of it reaches a device, a card or another session.
 
 **What it reads.** The protocol XML files: the ones the build names in `server/Makefile` and `server/mk/*.mk` first, then
 copies vendored in the repository, then `/usr/share/wayland`, `/usr/share/wayland-protocols` and
