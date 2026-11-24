@@ -13,7 +13,7 @@ export { cleanThemeMeta, themeOptions, themeOptionValue, themeOptionPatch, theme
 export { settings, useSettings, useTrackedSettings } from './settings.js';
 export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPreferredLanguages, CORE_LANGUAGES, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
-export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage } from './localename.js';   // glibc region names (installer, Settings)
+export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage, regionLanguageCode, regionLabel } from './localename.js';   // glibc region names (installer, Settings)
 export { LANGUAGE_NAMES } from './langnames.js';   // languages not translated yet (Settings → Language & Region)
 export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken, addMenuBarKeys } from './shortcuts.js';
 export { ContextMenu } from './contextmenu.jsx';
