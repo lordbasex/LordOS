@@ -114,8 +114,11 @@ static const char *const FW_ARM64[][2] = {
 static const char *const FW_AMD64[][2] = {
     { "/usr/share/OVMF/OVMF_CODE_4M.fd", "/usr/share/OVMF/OVMF_VARS_4M.fd" },
 };
-/* secure boot (Windows 11, 4.3): the code built with it and the variables with Microsoft's keys enrolled (Debian's ovmf) */
+/* secure boot (virtio-win guests, 4.3): the code built with it and the variables with Microsoft's keys enrolled (Debian's
+ * ovmf and qemu-efi-aarch64). arm64's virt has no SMM: AAVMF keeps its variables in flash the guest's kernel can reach, so
+ * there secure boot checks what boots but doesn't stop a guest's own kernel from changing its keys (docs 4.3) */
 static const char *const FW_AMD64_SB[2] = { "/usr/share/OVMF/OVMF_CODE_4M.secboot.fd", "/usr/share/OVMF/OVMF_VARS_4M.ms.fd" };
+static const char *const FW_ARM64_SB[2] = { "/usr/share/AAVMF/AAVMF_CODE.secboot.fd", "/usr/share/AAVMF/AAVMF_VARS.ms.fd" };
 
 #define LOG_CAP      (4 << 20)
 #define SERIAL_CAP   (1 << 20)
@@ -447,9 +450,10 @@ static int machine_type_for(int arch, char *out, size_t n) {
 }
 
 static int firmware_for(int arch, const char **code, const char **vars);
-static int firmware_sb(const char **code, const char **vars) {
-    if (!file_exists(FW_AMD64_SB[0]) || !file_exists(FW_AMD64_SB[1])) return -1;
-    *code = FW_AMD64_SB[0]; *vars = FW_AMD64_SB[1];
+static int firmware_sb(int arch, const char **code, const char **vars) {
+    const char *const *f = arch == VM_ARCH_ARM64 ? FW_ARM64_SB : FW_AMD64_SB;
+    if (!file_exists(f[0]) || !file_exists(f[1])) return -1;
+    *code = f[0]; *vars = f[1];
     return 0;
 }
 static int firmware_for(int arch, const char **code, const char **vars) {
@@ -792,7 +796,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     if (fw < 0) fw = firmware_for(arch, &code, &vars) ? VM_FW_BIOS : VM_FW_UEFI;
     m.firmware = fw;
     if (fw == VM_FW_UEFI) {
-        if (sb ? (arch != VM_ARCH_AMD64 || firmware_sb(&code, &vars)) : firmware_for(arch, &code, &vars)) { fprintf(stderr, "lord-vm: no UEFI firmware for %s is installed (%s)\n", vm_arch_name(arch), arch == VM_ARCH_ARM64 ? "qemu-efi-aarch64" : "ovmf"); return 1; }
+        if (sb ? firmware_sb(arch, &code, &vars) : firmware_for(arch, &code, &vars)) { fprintf(stderr, "lord-vm: no UEFI firmware for %s is installed (%s)\n", vm_arch_name(arch), arch == VM_ARCH_ARM64 ? "qemu-efi-aarch64" : "ovmf"); return 1; }
         snprintf(m.firmware_code, sizeof m.firmware_code, "%s", code);
         if (sha256_file(code, m.firmware_sha256)) { fprintf(stderr, "lord-vm: can't read %s\n", code); return 1; }
     }
@@ -2144,6 +2148,9 @@ static void session_check(void) {
 static void build_qemu_args(void) {
     const VmMachine *m = &S.m;
     int kvm = m->accel == VM_ACCEL_KVM, arm = m->arch == VM_ARCH_ARM64, uefi = m->firmware == VM_FW_UEFI;
+    /* the windows devices on arm64 (4.3): virt with a GICv3 (vm_machine_check_host refuses KVM on a GICv2 host), USB
+     * CD/DVD drives, ramfb, a TPM on the system bus */
+    int win_arm = arm && m->devices == VM_DEV_WINDOWS;
     char esc[2 * VM_NAME_MAX + 8], p[PATH_MAX + 64];
     qargc = 0;
     arg(QEMU_BIN_OF(m->arch));
@@ -2158,12 +2165,12 @@ static void build_qemu_args(void) {
     int anon = m->profile_lock == VM_LOCK_ANONYMITY;
     int mem = anon ? VMMEM_ANON : mem_backing(m);
     if (anon) vlog("memory: a private memfd in 4 KB pages, no KSM, no huge pages (anonymity profile)");
-    arg("-machine"); argf("%s,dump-guest-core=off%s%s%s%s", m->machine_type, uefi ? ",pflash0=fw-code,pflash1=fw-vars" : "",
-                          mem != VMMEM_ANON || anon ? ",memory-backend=mem" : "", m->secure_boot ? ",smm=on" : "",
-                          anon ? ",mem-merge=off,vmport=off,hpet=off" : m->timers ? ",hpet=off" : "");
+    arg("-machine"); argf("%s,dump-guest-core=off%s%s%s%s%s", m->machine_type, uefi ? ",pflash0=fw-code,pflash1=fw-vars" : "",
+                          mem != VMMEM_ANON || anon ? ",memory-backend=mem" : "", m->secure_boot && !arm ? ",smm=on" : "",
+                          anon ? ",mem-merge=off,vmport=off,hpet=off" : m->timers ? ",hpet=off" : "", win_arm ? ",gic-version=3" : "");
     if (anon) { arg("-object"); argf("memory-backend-memfd,id=mem,size=%dM,share=off", m->memory_mb); }
     /* secure boot: the firmware's variables can be written only from SMM, so the guest's system can't change its own keys */
-    if (m->secure_boot) { arg("-global"); arg("driver=cfi.pflash01,property=secure,value=on"); }
+    if (m->secure_boot && !arm) { arg("-global"); arg("driver=cfi.pflash01,property=secure,value=on"); }
     if (mem != VMMEM_ANON) { char mo[160]; arg("-object"); arg(vmmem_object(mo, sizeof mo, mem, m->memory_mb, sh_count() > 0)); }
     if (kvm) { arg("-accel"); arg("kvm,device=/dev/fdset/1"); arg("-add-fd"); arg("fd=3,set=1,opaque=kvm"); }
     else { arg("-accel"); arg("tcg,thread=multi,tb-size=256"); }
@@ -2271,6 +2278,25 @@ static void build_qemu_args(void) {
             arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,drive=cd%s", bus, bi_cd);
             snprintf(S.cd_node, sizeof S.cd_node, "cd");
         } else { arg("-device"); argf("ide-cd,id=cd0,bus=%s.5%s", bus, bi_cd); S.cd_node[0] = 0; }
+    } else if (win_arm) {
+        /* the windows devices on arm64: virt has no SATA of its own, and Setup for Arm has no driver for virtio's CD/DVD;
+         * USB mass storage (usb-bot) with a SCSI CD/DVD on it is what its own drivers read, and its disc can still be
+         * changed (VM_CDROM's "cd0") */
+        virtio_disks(m, bi_sys, ser);
+        arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5");
+        arg("-device"); arg("usb-bot,id=cdbot0,bus=xhci.0");
+        if (m->iso[0]) {
+            arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
+            arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
+            arg("-device"); argf("scsi-cd,id=cd0,bus=cdbot0.0,drive=cd%s", bi_cd);
+            snprintf(S.cd_node, sizeof S.cd_node, "cd");
+        } else { arg("-device"); argf("scsi-cd,id=cd0,bus=cdbot0.0%s", bi_cd); S.cd_node[0] = 0; }
+        if (m->drivers[0]) {
+            arg("-blockdev"); argj(blockdev_file("drv-file", m->drivers, 1));
+            arg("-blockdev"); argj(blockdev_fmt("raw", "drv", "drv-file", 1));
+            arg("-device"); arg("usb-bot,id=cdbot1,bus=xhci.0");
+            arg("-device"); arg("scsi-cd,id=cd1,bus=cdbot1.0,drive=drv");
+        }
     } else if (m->devices == VM_DEV_WINDOWS) {
         /* Windows (4.3): virtio disks (Setup loads viostor from the drivers), the CD/DVD drives on q35's own SATA (ide.4
          * the drivers' disc, ide.5 the installer's), which Setup reads with the drivers it has */
@@ -2373,7 +2399,10 @@ static void build_qemu_args(void) {
     else snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,audiodev=snd0");
     if (m->display == VM_DISPLAY_WINDOW && (m->devices == VM_DEV_COMPAT || m->devices == VM_DEV_WINDOWS)) {
         /* a USB tablet (and keyboard on arm64) on xHCI: drivers every system has */
-        if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); }
+        /* the windows devices on arm64: ramfb, the firmware's own framebuffer, which their basic display driver keeps
+         * after the firmware leaves (virtio-gpu's picture stops there until viogpudo is in) */
+        if (win_arm) { arg("-device"); arg("ramfb"); }
+        else if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); }
         if (m->devices != VM_DEV_WINDOWS) { arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5"); }
         if (arm) { arg("-device"); arg("usb-kbd,bus=xhci.0"); }
         arg("-device"); arg("usb-tablet,bus=xhci.0");
@@ -2440,10 +2469,11 @@ static void build_qemu_args(void) {
         arg("-device"); argf("vhost-user-fs-pci,id=share%d,chardev=vfs%d,tag=%s,addr=0x%x", i, i, sh_tag(i), 0xb + i);
     }
     if (m->tpm) {
-        /* a TPM 2.0 (CRB interface, what Windows 11 looks for) served by swtpm on the fd after the shares' */
+        /* a TPM 2.0 served by swtpm on the fd after the shares': CRB on amd64 (what Windows 11 looks for), TIS on the
+         * system bus on arm64's virt (QEMU's tpm-tis-device, the one virt takes) */
         arg("-chardev"); argf("socket,id=chrtpm,fd=%d", (m->agent ? 9 : 7) + S.ncreds + sh_count());
         arg("-tpmdev"); arg("emulator,id=tpm0,chardev=chrtpm");
-        arg("-device"); arg("tpm-crb,tpmdev=tpm0");
+        arg("-device"); arg(arm ? "tpm-tis-device,tpmdev=tpm0" : "tpm-crb,tpmdev=tpm0");
     }
 }
 

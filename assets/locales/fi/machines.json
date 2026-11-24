@@ -1593,5 +1593,12 @@
   "whonix.phase.unpack": "Puretaan kaksi levyä",
   "whonix.phase.base": "Luodaan vain luku -pohjat",
   "whonix.phase.done": "Valmis",
-  "whonix.phaseHint": "Lataus tarkistetaan Whonixin allekirjoitettua luetteloa vasten; levyt purkaa eristetty apuohjelma, jolla ei ole omia tiedostoja eikä verkkoa."
+  "whonix.phaseHint": "Lataus tarkistetaan Whonixin allekirjoitettua luetteloa vasten; levyt purkaa eristetty apuohjelma, jolla ei ole omia tiedostoja eikä verkkoa.",
+  "as.isoDrop": "Pudota käyttääksesi tätä ISO-tiedostoa",
+  "as.isoDropNone": "Tähän käy vain .iso-tiedosto",
+  "as.archFromBoot": "{arch}, luettu käynnistystiedostoista",
+  "as.archFromName": "{arch}, nimen perusteella (käynnistystiedostot eivät kerro)",
+  "as.archUnknown": "Käynnistystiedostot eivät kerro arkkitehtuuria: oletetaan {arch}",
+  "as.archOther": "Käynnistystiedostot ovat arkkitehtuurille {arch}, jota Koneet ei voi ajaa",
+  "win.noGicThree": "Windows for Arm tarvitsee GICv3-keskeytysohjaimen, ja tämän tietokoneen ohjain on GICv2 (kuten Raspberry Pi 5:ssä): kone emuloidaan, hyvin hitaasti."
 }

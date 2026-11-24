@@ -1593,5 +1593,12 @@
   "whonix.phase.unpack": "Die beiden Festplatten werden entpackt",
   "whonix.phase.base": "Schreibgeschützte Basen werden erstellt",
   "whonix.phase.done": "Fertig",
-  "whonix.phaseHint": "Der Download wird anhand der signierten Liste von Whonix geprüft; die Festplatten werden von einem isolierten Helfer ohne eigene Dateien oder eigenes Netzwerk entpackt."
+  "whonix.phaseHint": "Der Download wird anhand der signierten Liste von Whonix geprüft; die Festplatten werden von einem isolierten Helfer ohne eigene Dateien oder eigenes Netzwerk entpackt.",
+  "as.isoDrop": "Loslassen, um diese ISO zu verwenden",
+  "as.isoDropNone": "Hier passt nur eine .iso-Datei",
+  "as.archFromBoot": "{arch}, aus den Startdateien gelesen",
+  "as.archFromName": "{arch}, nach dem Namen (die Startdateien sagen es nicht)",
+  "as.archUnknown": "Die Startdateien nennen keine Architektur: {arch} wird angenommen",
+  "as.archOther": "Die Startdateien sind für {arch}, das Maschinen nicht ausführen kann",
+  "win.noGicThree": "Windows für Arm braucht einen GICv3-Interrupt-Controller, dieser Computer hat GICv2 (wie der Raspberry Pi 5): Die Maschine wird emuliert und ist sehr langsam."
 }

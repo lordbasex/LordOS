@@ -80,6 +80,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "../vm/vmpin.h"
+#include "../vm/vmiso.h"
 
 extern char **environ;
 
@@ -187,6 +188,8 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     struct stat st;
     JS_SetPropertyStr(c, o, "kvmDevice", JS_NewBool(c, !stat("/dev/kvm", &st) && S_ISCHR(st.st_mode)));
     JS_SetPropertyStr(c, o, "kvm", JS_NewBool(c, kvm_usable()));
+    /* arm64: a GICv3 host, where KVM can give the windows devices the GICv3 they ask for (4.3); the Pi 5 is GICv2 */
+    JS_SetPropertyStr(c, o, "gicv3", JS_NewBool(c, h.gicv3));
     set_int(c, o, "vcpusRecommended", vm_vcpus_recommended(&h));
     set_int(c, o, "memMaxMb", vm_mem_max_mb(&h));
     char pk[512], bin[PATH_MAX];
@@ -939,7 +942,7 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     if (ok && JS_IsObject(vw)) {
         JSValue vdr = JS_GetPropertyStr(c, vw, "drivers");
         windows = 1;
-        if (!JS_IsString(vdr) || user_file(c, vdr, drv, sizeof drv) || strcmp(arch, "amd64")) ok = 0;
+        if (!JS_IsString(vdr) || user_file(c, vdr, drv, sizeof drv)) ok = 0;
         JS_FreeValue(c, vdr);
     }
     JS_FreeValue(c, vw);
@@ -959,6 +962,8 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         snprintf(dir, sizeof dir, "%s/%s.lordvm", lib, folder);
         for (int k = 2; !access(dir, F_OK) && k < 100; k++) snprintf(dir, sizeof dir, "%s/%s %d.lordvm", lib, folder, k);
         int native = (!strcmp(arch, "amd64") ? VM_ARCH_AMD64 : VM_ARCH_ARM64) == host_arch();
+        /* the windows devices on arm64 ask for a GICv3: on a GICv2 host (the Pi 5) the machine is emulated (4.3) */
+        if (native && windows && !strcmp(arch, "arm64")) { VmHost hh; vm_host_probe(&hh); if (!hh.gicv3) native = 0; }
         char sv[16], sm[16], sd[16];
         snprintf(sv, sizeof sv, "%d", vcpus); snprintf(sm, sizeof sm, "%d", mem); snprintf(sd, sizeof sd, "%d", disk);
         char *args[48] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
@@ -970,8 +975,9 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         /* the Design profile's 3D graphics (6.10): Linux machines only; lord-vm refuses them for the windows devices */
         if (gfx3d && !windows) { args[na++] = "--graphics"; args[na++] = "3d"; }
         if (windows) {
+            /* Hyper-V's enlightenments are x86's: arm64 has none */
             static char *const W[] = { "--secure-boot", "on", "--tpm", "on", "--hyperv", "on", "--rtc", "local", "--devices", "windows", "--drivers" };
-            for (size_t i = 0; i < sizeof W / sizeof W[0]; i++) args[na++] = W[i];
+            for (size_t i = 0; i < sizeof W / sizeof W[0]; i++) args[na++] = i == 5 && strcmp(arch, "amd64") ? "off" : W[i];
             args[na++] = drv;
         }
         args[na] = NULL;
@@ -1542,24 +1548,38 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
 /* snapshot(session) → bool: the machine's picture now as its card picture (<machine>/thumb.png) */
 static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *argv);
 
-/* isoInfo(path) → { label } : the ISO 9660 volume label (32 bytes at 0x8028), to recognize the system in it */
+/* isoInfo(path) → { label, arch, archFrom, bios, efi, efiArchs, windows } or null: what the ISO boots on, read from its
+ * boot files by vmiso.c (docs/VIRTUALIZATION.md 5.2): the volume label; arch the architecture the UEFI boot files' PE
+ * headers (or their names, or El Torito's x86 BIOS entry) name, "" when they don't say or name two; archFrom "boot"
+ * when arch came from there (model.js isoArch falls back to the file's name); efiArchs every UEFI boot file's; windows
+ * when it is an install disc (sources/install.wim|esd|swm). The ISO is the person's and untrusted: vmiso reads it
+ * through this descriptor only, with bounded, counted reads. */
 static JSValue f_isoinfo(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc;
+    (void)t;
     char path[PATH_MAX];
-    if (user_file(c, argv[0], path, sizeof path)) return JS_NULL;
-    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (argc < 1 || !JS_IsString(argv[0]) || user_file(c, argv[0], path, sizeof path)) return JS_NULL;
+    /* on a network or cloud mount, only the volume descriptors and a few more (a slow server holds this thread) */
+    unsigned max = fsops_remote_path(path) ? 40 : 0;
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     if (fd < 0) return JS_NULL;
-    unsigned char pvd[72];
-    ssize_t k = pread(fd, pvd, sizeof pvd, 0x8000);
+    VmIso v;
+    int rc = vmiso_probe(fd, &v, max);
     close(fd);
+    if (rc) memset(&v, 0, sizeof v);
+    const char *arch = rc ? "" : vmiso_arch(&v);
     JSValue o = JS_NewObject(c);
-    char label[33] = "";
-    if (k == (ssize_t)sizeof pvd && pvd[0] == 1 && !memcmp(pvd + 1, "CD001", 5)) {
-        memcpy(label, pvd + 40, 32);
-        for (int i = 31; i >= 0 && (label[i] == ' ' || !label[i]); i--) label[i] = 0;
-        for (int i = 0; label[i]; i++) if ((unsigned char)label[i] < 0x20 || (unsigned char)label[i] > 0x7e) label[i] = '?';
-    }
-    set_str(c, o, "label", label);
+    set_str(c, o, "label", v.label);
+    set_str(c, o, "arch", arch);
+    set_str(c, o, "archFrom", arch[0] ? "boot" : "");
+    JS_SetPropertyStr(c, o, "bios", JS_NewBool(c, v.bios));
+    JS_SetPropertyStr(c, o, "efi", JS_NewBool(c, v.efi));
+    JS_SetPropertyStr(c, o, "windows", JS_NewBool(c, v.windows));
+    JSValue a = JS_NewArray(c);
+    static const struct { unsigned bit; const char *name; } A[] = { { VMISO_X64, "amd64" }, { VMISO_AA64, "arm64" }, { VMISO_IA32, "i386" }, { VMISO_RISCV64, "riscv64" } };
+    unsigned m = v.efi_pe ? v.efi_pe : v.efi_named;
+    uint32_t n = 0;
+    for (size_t i = 0; i < sizeof A / sizeof A[0]; i++) if (m & A[i].bit) JS_SetPropertyUint32(c, a, n++, JS_NewString(c, A[i].name));
+    JS_SetPropertyStr(c, o, "efiArchs", a);
     return o;
 }
 

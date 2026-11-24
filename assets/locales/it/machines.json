@@ -1593,5 +1593,12 @@
   "whonix.phase.unpack": "Estrazione dei due dischi",
   "whonix.phase.base": "Creazione delle basi di sola lettura",
   "whonix.phase.done": "Fatto",
-  "whonix.phaseHint": "Il download viene verificato con la lista firmata di Whonix; i dischi vengono estratti da un helper isolato, senza file né rete propri."
+  "whonix.phaseHint": "Il download viene verificato con la lista firmata di Whonix; i dischi vengono estratti da un helper isolato, senza file né rete propri.",
+  "as.isoDrop": "Rilascia per usare questa ISO",
+  "as.isoDropNone": "Qui va solo un file .iso",
+  "as.archFromBoot": "{arch}, letto dai file di avvio",
+  "as.archFromName": "{arch}, dal nome (i file di avvio non lo dicono)",
+  "as.archUnknown": "I file di avvio non indicano l'architettura: si presume {arch}",
+  "as.archOther": "I file di avvio sono per {arch}, che Macchine non può eseguire",
+  "win.noGicThree": "Windows per Arm richiede un controller di interrupt GICv3 e quello di questo computer è GICv2 (come sul Raspberry Pi 5): la macchina sarà emulata, molto lenta."
 }

@@ -1593,5 +1593,12 @@
   "whonix.phase.unpack": "Se despachetează cele două discuri",
   "whonix.phase.base": "Se creează bazele doar-citire",
   "whonix.phase.done": "Gata",
-  "whonix.phaseHint": "Descărcarea este verificată cu lista semnată a Whonix; discurile sunt despachetate de un ajutor izolat, fără fișiere sau rețea proprii."
+  "whonix.phaseHint": "Descărcarea este verificată cu lista semnată a Whonix; discurile sunt despachetate de un ajutor izolat, fără fișiere sau rețea proprii.",
+  "as.isoDrop": "Eliberează pentru a folosi acest ISO",
+  "as.isoDropNone": "Aici merge doar un fișier .iso",
+  "as.archFromBoot": "{arch}, citit din fișierele de pornire",
+  "as.archFromName": "{arch}, după nume (fișierele de pornire nu spun)",
+  "as.archUnknown": "Fișierele de pornire nu spun arhitectura: se presupune {arch}",
+  "as.archOther": "Fișierele de pornire sunt pentru {arch}, pe care Mașini nu îl poate rula",
+  "win.noGicThree": "Windows pentru Arm are nevoie de un controler de întreruperi GICv3, iar acest computer are GICv2 (ca Raspberry Pi 5): mașina va fi emulată, foarte lent."
 }

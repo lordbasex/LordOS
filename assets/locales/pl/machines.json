@@ -1593,5 +1593,12 @@
   "whonix.phase.unpack": "Rozpakowywanie dwóch dysków",
   "whonix.phase.base": "Tworzenie baz tylko do odczytu",
   "whonix.phase.done": "Gotowe",
-  "whonix.phaseHint": "Pobrany plik jest sprawdzany z podpisaną listą Whonix; dyski rozpakowuje pomocnik w piaskownicy, bez własnych plików i sieci."
+  "whonix.phaseHint": "Pobrany plik jest sprawdzany z podpisaną listą Whonix; dyski rozpakowuje pomocnik w piaskownicy, bez własnych plików i sieci.",
+  "as.isoDrop": "Upuść, aby użyć tego obrazu ISO",
+  "as.isoDropNone": "Tu pasuje tylko plik .iso",
+  "as.archFromBoot": "{arch}, odczytane z plików rozruchowych",
+  "as.archFromName": "{arch}, z nazwy (pliki rozruchowe tego nie mówią)",
+  "as.archUnknown": "Pliki rozruchowe nie podają architektury: przyjęto {arch}",
+  "as.archOther": "Pliki rozruchowe są dla {arch}, której Maszyny nie mogą uruchomić",
+  "win.noGicThree": "Windows dla Arm wymaga kontrolera przerwań GICv3, a ten komputer ma GICv2 (jak Raspberry Pi 5): maszyna będzie emulowana, bardzo wolno."
 }

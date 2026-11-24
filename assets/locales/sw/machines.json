@@ -1593,5 +1593,12 @@
   "whonix.phase.unpack": "Inafungua diski mbili",
   "whonix.phase.base": "Inaunda misingi ya kusoma tu",
   "whonix.phase.done": "Imekamilika",
-  "whonix.phaseHint": "Upakuaji unakaguliwa dhidi ya orodha iliyosainiwa ya Whonix; diski zinafunguliwa na msaidizi aliye kwenye sandbox asiye na faili wala mtandao wake mwenyewe."
+  "whonix.phaseHint": "Upakuaji unakaguliwa dhidi ya orodha iliyosainiwa ya Whonix; diski zinafunguliwa na msaidizi aliye kwenye sandbox asiye na faili wala mtandao wake mwenyewe.",
+  "as.isoDrop": "Achilia ili kutumia ISO hii",
+  "as.isoDropNone": "Faili la .iso pekee linakubaliwa hapa",
+  "as.archFromBoot": "{arch}, imesomwa kutoka faili za kuwasha",
+  "as.archFromName": "{arch}, kutoka jina lake (faili za kuwasha hazisemi)",
+  "as.archUnknown": "Faili za kuwasha hazisemi usanifu: {arch} inachukuliwa",
+  "as.archOther": "Faili za kuwasha ni za {arch}, ambayo Mashine haziwezi kuendesha",
+  "win.noGicThree": "Windows ya Arm inahitaji kidhibiti cha kukatiza cha GICv3, na cha kompyuta hii ni GICv2 (kama Raspberry Pi 5): mashine itaigwa, polepole sana."
 }

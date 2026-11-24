@@ -1593,5 +1593,12 @@
   "whonix.phase.unpack": "正在解压两个磁盘",
   "whonix.phase.base": "正在生成只读基础镜像",
   "whonix.phase.done": "完成",
-  "whonix.phaseHint": "下载文件会对照 Whonix 的签名列表校验;磁盘由一个沙盒化的辅助程序解压,它本身没有文件和网络访问权限。"
+  "whonix.phaseHint": "下载文件会对照 Whonix 的签名列表校验;磁盘由一个沙盒化的辅助程序解压,它本身没有文件和网络访问权限。",
+  "as.isoDrop": "松开以使用此 ISO",
+  "as.isoDropNone": "此处只接受 .iso 文件",
+  "as.archFromBoot": "{arch}，从启动文件读取",
+  "as.archFromName": "{arch}，根据名称（启动文件未说明）",
+  "as.archUnknown": "启动文件未说明架构：假定为 {arch}",
+  "as.archOther": "启动文件适用于 {arch}，虚拟机无法运行",
+  "win.noGicThree": "Arm 版 Windows 需要 GICv3 中断控制器，而这台电脑是 GICv2（与 Raspberry Pi 5 相同）：虚拟机将以模拟方式运行，非常慢。"
 }

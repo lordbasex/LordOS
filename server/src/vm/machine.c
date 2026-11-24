@@ -625,10 +625,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 4 && m->n_shares) return fail(err, n, VM_E_FIELD, "shares need schema 4");
     if (m->drivers[0] && !path_valid(m->drivers)) return fail(err, n, VM_E_RANGE, "drivers must be an absolute path without '..', ',' or control characters");
     if (m->schema < 5 && (m->devices == VM_DEV_WINDOWS || m->drivers[0])) return fail(err, n, VM_E_FIELD, "the windows devices and drivers need schema 5");
-    if ((m->devices == VM_DEV_WINDOWS || m->drivers[0]) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "the windows devices are for amd64 machines for now");
     if ((m->secure_boot | m->tpm | m->hyperv) & ~1) return fail(err, n, VM_E_RANGE, "secure_boot, tpm and hyperv are true or false");
     if (m->schema < 5 && (m->secure_boot || m->tpm || m->hyperv)) return fail(err, n, VM_E_FIELD, "secure_boot, tpm and hyperv need schema 5");
-    if ((m->secure_boot || m->tpm || m->hyperv) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "secure boot, TPM and Hyper-V are for amd64 machines for now");
+    /* arm64 (4.3): secure boot (AAVMF), a TPM (tpm-tis-device) and the windows devices; Hyper-V's enlightenments are x86's */
+    if (m->hyperv && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "Hyper-V enlightenments are for amd64 machines");
     if (m->secure_boot && m->firmware != VM_FW_UEFI) return fail(err, n, VM_E_RANGE, "secure boot needs UEFI");
     if (m->graphics != VM_GFX_2D && m->graphics != VM_GFX_3D) return fail(err, n, VM_E_RANGE, "graphics");
     if ((m->res_w || m->res_h) && !vm_resolution_ok(m->res_w, m->res_h)) return fail(err, n, VM_E_RANGE, "resolution must be 640x480 to 7680x4320, even numbers");
@@ -695,6 +695,9 @@ int vm_machine_check_host(const VmMachine *m, const VmHost *h, char *err, size_t
     if (m->accel == VM_ACCEL_KVM) {
         if (h->arch != m->arch) return fail(err, n, VM_E_HOST, "KVM runs %s machines on a %s computer only; use emulation (tcg)", vm_arch_name(m->arch), vm_arch_name(m->arch));
         if (!h->kvm) return fail(err, n, VM_E_HOST, "this computer's /dev/kvm can't be opened (virtualization off, or the user isn't allowed)");
+        /* the windows devices on arm64 ask for a GICv3 (build_qemu_args); KVM gives one only on a GICv3 host */
+        if (m->arch == VM_ARCH_ARM64 && m->devices == VM_DEV_WINDOWS && !h->gicv3)
+            return fail(err, n, VM_E_HOST, "this computer's interrupt controller is GICv2, and KVM can't give the windows devices the GICv3 they need here; use emulation (tcg)");
     }
     if (m->vcpus > h->cpus) return fail(err, n, VM_E_HOST, "%d vCPUs, this computer has %d", m->vcpus, h->cpus);
     long mx = vm_mem_max_mb(h);
@@ -1291,6 +1294,30 @@ void vm_host_probe(VmHost *h) {
     int fd = open("/dev/kvm", O_RDWR | O_CLOEXEC);
     h->kvm = fd >= 0;
     if (fd >= 0) close(fd);
+    h->gicv3 = h->arch == VM_ARCH_ARM64 && vm_gicv3_in("/proc/interrupts") == 1;
+}
+
+int vm_gicv3_in(const char *path) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return -1;
+    char b[65536 + 8];
+    size_t keep = 0, total = 0;
+    int found = 0;
+    while (!found && total < (8u << 20)) {
+        ssize_t k = read(fd, b + keep, sizeof b - 1 - keep);
+        if (k < 0 && errno == EINTR) continue;
+        if (k <= 0) break;
+        total += (size_t)k;
+        size_t len = keep + (size_t)k;
+        b[len] = 0;
+        for (size_t i = 0; i < len; i++) if (!b[i]) b[i] = ' ';
+        if (strstr(b, "GICv3") || strstr(b, "GICv4")) found = 1;
+        /* a name cut between two reads: the last 5 bytes go first in the next */
+        keep = len < 5 ? len : 5;
+        memmove(b, b + len - keep, keep);
+    }
+    close(fd);
+    return found;
 }
 
 /* ---- images (vm_image_kind) ---- */

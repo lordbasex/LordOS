@@ -1593,5 +1593,12 @@
   "whonix.phase.unpack": "A két lemez kicsomagolása",
   "whonix.phase.base": "Az írásvédett alapok létrehozása",
   "whonix.phase.done": "Kész",
-  "whonix.phaseHint": "A letöltést a Whonix aláírt listájával ellenőrizzük; a lemezeket egy elszigetelt segédprogram csomagolja ki, amelynek nincsenek saját fájljai és hálózata."
+  "whonix.phaseHint": "A letöltést a Whonix aláírt listájával ellenőrizzük; a lemezeket egy elszigetelt segédprogram csomagolja ki, amelynek nincsenek saját fájljai és hálózata.",
+  "as.isoDrop": "Engedd el az ISO használatához",
+  "as.isoDropNone": "Ide csak .iso fájl kerülhet",
+  "as.archFromBoot": "{arch}, a rendszerindító fájlokból olvasva",
+  "as.archFromName": "{arch}, a név alapján (a rendszerindító fájlok nem mondják meg)",
+  "as.archUnknown": "A rendszerindító fájlok nem adják meg az architektúrát: {arch} feltételezve",
+  "as.archOther": "A rendszerindító fájlok {arch} rendszerre készültek, amelyet a Gépek nem tud futtatni",
+  "win.noGicThree": "A Windows for Arm GICv3 megszakításvezérlőt igényel, ennek a számítógépnek GICv2-je van (mint a Raspberry Pi 5-nek): a gép emulálva fut, nagyon lassan."
 }

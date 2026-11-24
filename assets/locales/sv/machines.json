@@ -1593,5 +1593,12 @@
   "whonix.phase.unpack": "Packar upp de två diskarna",
   "whonix.phase.base": "Skapar de skrivskyddade baserna",
   "whonix.phase.done": "Klart",
-  "whonix.phaseHint": "Hämtningen kontrolleras mot Whonix signerade lista; diskarna packas upp av en sandlådad hjälpare utan egna filer eller eget nätverk."
+  "whonix.phaseHint": "Hämtningen kontrolleras mot Whonix signerade lista; diskarna packas upp av en sandlådad hjälpare utan egna filer eller eget nätverk.",
+  "as.isoDrop": "Släpp för att använda denna ISO",
+  "as.isoDropNone": "Bara en .iso-fil hör hit",
+  "as.archFromBoot": "{arch}, läst från dess startfiler",
+  "as.archFromName": "{arch}, efter namnet (startfilerna säger inget)",
+  "as.archUnknown": "Startfilerna anger ingen arkitektur: {arch} antas",
+  "as.archOther": "Startfilerna är för {arch}, som Maskiner inte kan köra",
+  "win.noGicThree": "Windows för Arm kräver en GICv3-avbrottskontroller och den här datorn har GICv2 (som Raspberry Pi 5): maskinen emuleras, mycket långsamt."
 }

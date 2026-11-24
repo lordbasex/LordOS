@@ -12,11 +12,11 @@
 // Windows 11 (windows.js, 4.3): the person's own multi-edition ISO from Microsoft's page (found in Downloads and checked
 // against Microsoft's published SHA-256) or Microsoft's 90-day evaluation (downloaded by the helper); the machine is
 // made ready for it (secure boot, TPM 2.0, virtio-win drivers) and installs without questions or with Windows' own.
-import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, locale, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, locale, useFilesDrop, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
 import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, noticeOf, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor, lordosLang } from './catalog.js';
-import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard } from './model.js';
+import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, isoArch, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard } from './model.js';
 import { allProfiles, profileById, builtinProfile, defaultProfileId, onHost, setPatch, shareAbs, DEFAULT_PROFILE } from './profiles.js';
 import { customUnattended, systemState } from './systems.js';
 import { loadProfiles, loadSystems, defaultsOf, profileTitle } from './store.js';
@@ -25,7 +25,7 @@ import { SheetHeader, Pill, Round, Sym } from './kit.jsx';
 import { GroupMark, groupColors } from './groupui.jsx';
 import { writeMeta } from './meta.js';
 import { Migrate } from './migrate.jsx';
-import { windowsEntry, driversFor, matchIso, evalFiles, evalFor, newestDownload, windowsZone, inputLocale, userLocale, editionPlan, checkWindowsSetup, windowsHostname, windowsSize } from './windows.js';
+import { windowsEntry, driversFor, matchIso, evalFiles, evalFor, newestDownload, windowsZone, inputLocale, userLocale, editionPlan, checkWindowsSetup, windowsHostname, windowsSize, windowsEmulatedWhy } from './windows.js';
 import ZONES from '../../assets/machines/windows-zones.json';
 import { GroupFlow, resolveGroup } from './whonix.jsx';
 
@@ -35,11 +35,11 @@ const MIGRATE_FILES = /(\.(vmx|vbox|pvs|ovf|ova|vmdk|vdi|vhdx|vhd|hds)|\/config\
 const STEPS = ['choose', 'profile', 'name', 'review', 'install'];
 const rowsOf = (list, n) => { const out = []; for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n)); return out; };
 
-function Tile({ title, hint, onClick, selected, disabled, mark, height = 76, children }) {
+function Tile({ title, hint, onClick, selected, disabled, mark, height = 76, drop, children }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   return (
-    <View onClick={disabled ? undefined : onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+    <View {...(drop || {})} onClick={disabled ? undefined : onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ flex: 1, height, padding: 12, gap: 6, justifyContent: mark ? 'space-between' : 'center', borderRadius: 10, opacity: disabled ? 0.5 : 1,
         border: `1px solid ${selected ? p.accent : p.line}`, backgroundColor: selected ? (p.dark ? '#1c3550' : '#e6f1ff') : hover && !disabled ? p.btn : p.card }}>
       {mark}
@@ -61,6 +61,8 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   const [sys, setSys] = useState({ id: 'other', name: '' });
   const [ver, setVer] = useState('');
   const [arch, setArch] = useState(host.arch);
+  // where a chosen ISO's architecture came from (isoArch): its boot files, its name, or an architecture Machines doesn't run
+  const [isoA, setIsoA] = useState(null);
   // profiles (Machines settings → Profiles): LordOS's five and the person's own; the default one first chosen
   const [own] = useState(loadProfiles);
   const [customs] = useState(loadSystems);
@@ -117,21 +119,31 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
     graphics: arch === host.arch ? gfxFor(size.gfx, host, windows, arch) : '2d' };
   const v = validateDraft(d, host, names);
   const missing = missingFor(host, [arch], { windows });
-  const emulated = arch !== host.arch;
+  // a virtio-win guest on arm64 needs a GICv3: on a GICv2 computer (the Pi 5) it is emulated too (4.3, windows.js)
+  const winEmu = windows ? windowsEmulatedWhy(host, arch) : '';
+  const emulated = arch !== host.arch || !!winEmu;
 
-  const chose = (pth) => {
+  // src: the tile it came from (a drop on the ISO tile picks it before `source` says so)
+  const chose = (pth, src = source) => {
     setPath(pth);
     const file = pth.split('/').pop();
-    const label = source === 'iso' ? (lord.vm.isoInfo(pth)?.label || '') : '';
-    const s = systemOf(label, file);
+    // what the ISO boots on, from its boot files (vmiso.c), else its name (5.2)
+    const info = src === 'iso' ? lord.vm.isoInfo(pth) : null;
+    const label = info?.label || '';
+    const ia = src === 'iso' ? isoArch(info, file) : { arch: archOf(file), from: archOf(file) ? 'name' : '', other: '' };
+    setIsoA(src === 'iso' ? ia : null);
+    const s = info?.windows ? { id: 'windows', name: 'Windows' } : systemOf(label, file);
     // a Windows ISO goes the Windows way: checked against Microsoft's list and made into the Windows 11 template
-    if (source === 'iso' && s.id === 'windows' && windowsEntry(CATALOG, archOf(file) || archOf(label) || arch)) { pickWindows(); checkIso(pth); return; }
+    if (src === 'iso' && s.id === 'windows' && windowsEntry(CATALOG, ia.arch || arch)) { if (ia.arch) setArch(ia.arch); pickWindows(); checkIso(pth); return; }
     const vv = versionOf(label) || versionOf(file);
     setSys(s); setVer(vv);
-    const a = archOf(file) || archOf(label);
-    if (a) setArch(a);
+    if (ia.arch) setArch(ia.arch);
     setName(suggestName(s, vv, names));
   };
+  // an .iso dragged from Files onto the "Use an ISO" tile: picked as if chosen in the file picker
+  const isoDrop = useFilesDrop({ accepts: (n) => /\.iso$/i.test(n), onDrop: ({ files }) => {
+    pickSeq.current++; setDl(null); setSource('iso'); setPicking(false); chose(files[0], 'iso');
+  } });
   // an entry's maker's list (and, when the list's name changes per build, the folder's listing first), checked by the
   // helper, and the newest image in it
   const resolve = async (id, a) => {
@@ -427,7 +439,9 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
     </> : null}
     <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.as.own')}</Text>
     <View style={{ flexDirection: 'row', gap: 12 }}>
-      <Tile title={tr('machines.as.iso')} hint={fileHint('iso')} selected={source === 'iso'} onClick={() => { pickSeq.current++; setDl(null); if (source !== 'iso') setPath(''); setSource('iso'); setPicking(true); }} />
+      <Tile title={tr('machines.as.iso')} drop={isoDrop.props} selected={source === 'iso' || !!isoDrop.over?.files.length}
+        hint={isoDrop.over ? tr(isoDrop.over.files.length ? 'machines.as.isoDrop' : 'machines.as.isoDropNone') : fileHint('iso')}
+        onClick={() => { pickSeq.current++; setDl(null); if (source !== 'iso') setPath(''); setSource('iso'); setPicking(true); }} />
       <Tile title={tr('machines.as.migrate')} hint={tr('machines.as.migrateHint')} selected={source === 'migrate'} onClick={() => { pickSeq.current++; setDl(null); setPath(''); setSource('migrate'); setPicking(true); }} />
       <Tile title={tr('machines.as.import')} hint={fileHint('import')} selected={source === 'import'} onClick={() => { pickSeq.current++; setDl(null); if (source !== 'import') setPath(''); setSource('import'); setPicking(true); }} />
     </View>
@@ -454,10 +468,13 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{[sys.name || tr('machines.as.unknownSystem'), ver].filter(Boolean).join(' ')}{`, ${arch}`}</Text>
           <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{path}</Text>
+          {source === 'iso' && isoA ? <Text style={{ fontSize: 12, color: isoA.other ? '#ff453a' : p.dim, textAlign: 'start' }}>
+            {isoA.other ? tr('machines.as.archOther', { arch: isoA.other }) : isoA.from === 'boot' ? tr('machines.as.archFromBoot', { arch })
+              : isoA.from === 'name' ? tr('machines.as.archFromName', { arch }) : tr('machines.as.archUnknown', { arch })}</Text> : null}
         </View>
       </View>
     ) : null}
-    {emulated ? <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{tr('machines.as.emulated', { arch, host: host.arch })}</Text></View> : null}
+    {emulated ? <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{winEmu ? tr('machines.win.noGicThree') : tr('machines.as.emulated', { arch, host: host.arch })}</Text></View> : null}
   </>;
   else if (step === 1) {
     // the mock "Profiles": two columns of cards, each with what it's for and what it gives on this computer

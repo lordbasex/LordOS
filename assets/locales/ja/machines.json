@@ -1593,5 +1593,12 @@
   "whonix.phase.unpack": "2 つのディスクを展開中",
   "whonix.phase.base": "読み取り専用のベースを作成中",
   "whonix.phase.done": "完了",
-  "whonix.phaseHint": "ダウンロードは Whonix の署名付きリストで確認されます。ディスクは、自分のファイルもネットワークも持たないサンドボックス化されたヘルパーが展開します。"
+  "whonix.phaseHint": "ダウンロードは Whonix の署名付きリストで確認されます。ディスクは、自分のファイルもネットワークも持たないサンドボックス化されたヘルパーが展開します。",
+  "as.isoDrop": "離してこの ISO を使う",
+  "as.isoDropNone": "ここには .iso ファイルのみ",
+  "as.archFromBoot": "{arch}（起動ファイルから判定）",
+  "as.archFromName": "{arch}（名前から判定。起動ファイルには記載なし）",
+  "as.archUnknown": "起動ファイルにアーキテクチャの記載がありません: {arch} とみなします",
+  "as.archOther": "起動ファイルは {arch} 用で、マシンでは実行できません",
+  "win.noGicThree": "Arm 版 Windows には GICv3 割り込みコントローラーが必要ですが、このコンピュータは GICv2 です（Raspberry Pi 5 と同じ）: マシンはエミュレーションで動作し、非常に遅くなります。"
 }

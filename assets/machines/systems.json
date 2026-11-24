@@ -124,7 +124,7 @@
       "release": "11",
       "kind": "windows",
       "homepage": "https://www.microsoft.com/software-download/windows11",
-      "hashSource": "The SHA-256 of each language's ISO as Microsoft publishes it on its download page (www.microsoft.com/software-download/windows11, \"Verify your download\"), read 2026-11-20; Microsoft signs no list, so these hashes are pinned here, in LordOS's signed package. The evaluation's hashes: Microsoft's KB5130867 (aka.ms/VerifyWindowsISO), read 2026-11-20; the Spanish one checked against a download the same day.",
+      "hashSource": "The SHA-256 of each language's ISO as Microsoft publishes it on its download page (www.microsoft.com/software-download/windows11, \"Verify your download\"), read 2026-11-20; Microsoft signs no list, so these hashes are pinned here, in LordOS's signed package. The evaluation's hashes: Microsoft's KB5130867 (aka.ms/VerifyWindowsISO), read 2026-11-20; the Spanish one checked against a download the same day. arm64: the SHA-256 of each language's ISO as Microsoft publishes it on its Arm64 page (www.microsoft.com/software-download/windows11arm64, \"Verify your download\", Version 26H2), read 2026-11-24; there is no Arm64 evaluation.",
       "license": "Windows is licensed by Microsoft to the person. Machines doesn't ship, host or activate it: the person downloads it from Microsoft's own page (the full version, activated with their own product key) or Machines downloads Microsoft's 90-day evaluation from Microsoft's own server. No activation tools.",
       "checked": "2026-11-20",
       "editions": [
@@ -375,6 +375,203 @@
             }
           ],
           "approxEvalMb": 7850
+        },
+        "arm64": {
+          "page": "https://www.microsoft.com/software-download/windows11arm64",
+          "version": "26H2",
+          "approxMb": 6900,
+          "isos": [
+            {
+              "lang": "ar-SA",
+              "label": "Arabic",
+              "sha256": "92775cad76e5b90b6bc0d2f7ada982b5e399cbb59bfa797320872016927848dd"
+            },
+            {
+              "lang": "bg-BG",
+              "label": "Bulgarian",
+              "sha256": "a56988dae9be80f1d5737e5f5066260110ed175b02f5ed849ca5baa99321cc1b"
+            },
+            {
+              "lang": "cs-CZ",
+              "label": "Czech",
+              "sha256": "a299c5b56a5fe93996f4c4ebd390338e00c1208e94f04f14085dc05fec262f06"
+            },
+            {
+              "lang": "da-DK",
+              "label": "Danish",
+              "sha256": "0df64fa738e25beacdf844d9b74dac7f67345f5003b23787f6ae87e3451bfbf1"
+            },
+            {
+              "lang": "de-DE",
+              "label": "German",
+              "sha256": "10cb224a54aee8022ed250da75b00cc8e614b0336d975100a0f80dbbc38ecdc2"
+            },
+            {
+              "lang": "el-GR",
+              "label": "Greek",
+              "sha256": "390042887ee2fbe34ac831c64e71d9057eb82cd98f989ac585ecf719e7f27f1b"
+            },
+            {
+              "lang": "en-GB",
+              "label": "English International",
+              "sha256": "500bcb6f272b7c455156470ea06816f558f13b885723f84ee9eab7534c7dee61"
+            },
+            {
+              "lang": "en-US",
+              "label": "English",
+              "sha256": "8992f2d2cfd2fa647e579e9eb31fc21f34da8333c29b6170fde17d2ed6623e9c"
+            },
+            {
+              "lang": "es-ES",
+              "label": "Spanish",
+              "sha256": "dbf606ceb4ce1390f9f21ad1d96331848bc6b701cbab0012785881a1a1c0ec63"
+            },
+            {
+              "lang": "es-MX",
+              "label": "Spanish (Mexico)",
+              "sha256": "23d5d42e8cd37fe1bacc37920eaa1ab0bb044aae0d41eeeb6a77e82a8ca9a483"
+            },
+            {
+              "lang": "et-EE",
+              "label": "Estonian",
+              "sha256": "f2b835d2894afe3160b53f2cfc58daed95dab80d677596f0a69544fbae17dd05"
+            },
+            {
+              "lang": "fi-FI",
+              "label": "Finnish",
+              "sha256": "0bf586cf3de2d8abdfc998b5a5270f3f5bc9586f7342aab7b0e3d1c212ae730b"
+            },
+            {
+              "lang": "fr-CA",
+              "label": "French Canadian",
+              "sha256": "595a083f8b63efec1fc2cd5e7875d88c1c7e71d7b34369c3bc359e8a7ce666bf"
+            },
+            {
+              "lang": "fr-FR",
+              "label": "French",
+              "sha256": "d086fb0bc1574188e8533a7422b55a3fe3bc39d0e48da0e895dec3f370e472df"
+            },
+            {
+              "lang": "he-IL",
+              "label": "Hebrew",
+              "sha256": "bbf9f2284fe7559ea8bdf960851a80231eada3aa7e740958948b79ab01d23478"
+            },
+            {
+              "lang": "hr-HR",
+              "label": "Croatian",
+              "sha256": "78b7388ea549c3440cc48c7c427cb1c118ec40408a914b6a98d4684c6dee138e"
+            },
+            {
+              "lang": "hu-HU",
+              "label": "Hungarian",
+              "sha256": "c511b047920a571e5d58d983e5ea3cc6811e20bb9cd6d255b73e85da88fd5bab"
+            },
+            {
+              "lang": "it-IT",
+              "label": "Italian",
+              "sha256": "de651996af788d7f55b8d11bfa45d5b20e22013687ea2c37f3325a8cd4d7c5e5"
+            },
+            {
+              "lang": "ja-JP",
+              "label": "Japanese",
+              "sha256": "8618e995c48fb6bb4d32c8cdf0e4b280473640736071c53943789f93a03bdd51"
+            },
+            {
+              "lang": "ko-KR",
+              "label": "Korean",
+              "sha256": "833e132e94335a7eecc2b3bb6ba9e16b199413504049cc19743752f402fb9cf7"
+            },
+            {
+              "lang": "lt-LT",
+              "label": "Lithuanian",
+              "sha256": "635899ea6901e7c9ce1c42e629d2e6daaff71128ed9d03c63b7dc0999805d613"
+            },
+            {
+              "lang": "lv-LV",
+              "label": "Latvian",
+              "sha256": "94aba682d5d3a1cba7f7a096a0e2a2b7a203513e75dd184ac4daf3a36b36f273"
+            },
+            {
+              "lang": "nb-NO",
+              "label": "Norwegian",
+              "sha256": "2c85ad913811599893b510a8278bd64cd6a0c1e1238582a57cc81fb28f7a76a3"
+            },
+            {
+              "lang": "nl-NL",
+              "label": "Dutch",
+              "sha256": "554267a82102284894e874625c6e8c5fde0850c9a998d16dc25db968b9b2d575"
+            },
+            {
+              "lang": "pl-PL",
+              "label": "Polish",
+              "sha256": "6d9b301e9009fe9191a75dc537ce7d648649c3f991511105a89822bc19aed933"
+            },
+            {
+              "lang": "pt-BR",
+              "label": "Brazilian Portuguese",
+              "sha256": "48eec10eaff055a62a1516ce83e103dfdbe72a4aaf12a221e99ecb29caa3fb77"
+            },
+            {
+              "lang": "pt-PT",
+              "label": "Portuguese",
+              "sha256": "8f9e526b24bdb89c4ee6bb550d8e42fee08fd9f657e4941a8f89fea77ca9be17"
+            },
+            {
+              "lang": "ro-RO",
+              "label": "Romanian",
+              "sha256": "deba3aa801c8eb6c6d354d124a62a4ce8f7c1e52d0c081fd132d0fa5e9017a0e"
+            },
+            {
+              "lang": "ru-RU",
+              "label": "Russian",
+              "sha256": "311879b09b0a990082bf4e47a1533bf994bc5379d9a41e4d386e5202df2719a1"
+            },
+            {
+              "lang": "sk-SK",
+              "label": "Slovak",
+              "sha256": "7fe3233a5162bd73f38ff378b824ca466a949354002d09fe47aa9aee2ab67d10"
+            },
+            {
+              "lang": "sl-SI",
+              "label": "Slovenian",
+              "sha256": "2178f38d5571b706770c932399f8a6139b58edb537872a0d9973ce7297a9eb6d"
+            },
+            {
+              "lang": "sr-Latn-RS",
+              "label": "Serbian Latin",
+              "sha256": "e9994bbd05440cd2fa2db846710119cf33a5aa2afd4ff71834d22a52cab5ffa6"
+            },
+            {
+              "lang": "sv-SE",
+              "label": "Swedish",
+              "sha256": "0d706bc138c9cd287c30d316fe9e623c5f700d085c430cb5329c8c4a1745e9bf"
+            },
+            {
+              "lang": "th-TH",
+              "label": "Thai",
+              "sha256": "768e8ce3bc0a5fe1d8102063791f056d52d073d2c3f1a6d47c40c5dc9f5f6560"
+            },
+            {
+              "lang": "tr-TR",
+              "label": "Turkish",
+              "sha256": "13eeab6c3df650a8a219c2266f0768ba8583f8eede5d62eebf2caee641ce747e"
+            },
+            {
+              "lang": "uk-UA",
+              "label": "Ukrainian",
+              "sha256": "99b00684f0fff80c64e305a5559d6bf30356b17303bd8e7ffb379cde9e7d23e7"
+            },
+            {
+              "lang": "zh-CN",
+              "label": "Chinese Simplified",
+              "sha256": "cd573df724862300895d0f5d0836e663756d22cc4e964c752efdc05b4fc09e8b"
+            },
+            {
+              "lang": "zh-TW",
+              "label": "Chinese Traditional",
+              "sha256": "c0486202732b8d91918ff83e014d52d936a37cac65b80f5b34023aa188f25c6e"
+            }
+          ]
         }
       }
     },
@@ -408,11 +605,22 @@
       "kind": "drivers",
       "hidden": true,
       "homepage": "https://github.com/virtio-win/virtio-win-pkg-scripts",
-      "hashSource": "virtio-win publishes no hash for its ISO (only MD5s of its RPMs): this SHA-256 is of the ISO downloaded from the project's own folder on 2026-11-20, pinned here. 0.1.271 is the release reported to install Windows 11 on arm64 as well (RHEL-114121).",
+      "hashSource": "virtio-win publishes no hash for its ISO (only MD5s of its RPMs): this SHA-256 is of the ISO downloaded from the project's own folder on 2026-11-20, pinned here. 0.1.271 is the release reported to install Windows 11 on arm64 as well (RHEL-114121). The same ISO serves arm64: its <driver>\\w11\\ARM64 folders (viostor, NetKVM, vioscsi, viogpudo, vioinput, vioserial, viorng, Balloon), read from the pinned ISO 2026-11-24; it has no guest tools installer for Arm, only the x86-64 guest agent.",
       "license": "The drivers are BSD-licensed, qxldod Apache-2.0, the rest GPLv2 (virtio-win.spec); the signed binaries are Red Hat's, downloaded from the project's own folder.",
       "checked": "2026-11-20",
       "arch": {
         "amd64": {
+          "pinned": [
+            {
+              "name": "virtio-win-0.1.271.iso",
+              "url": "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.271-1/virtio-win-0.1.271.iso",
+              "sha256": "bbe6166ad86a490caefad438fef8aa494926cb0a1b37fa1212925cfd81656429",
+              "bytes": 726501376
+            }
+          ],
+          "approxMb": 693
+        },
+        "arm64": {
           "pinned": [
             {
               "name": "virtio-win-0.1.271.iso",

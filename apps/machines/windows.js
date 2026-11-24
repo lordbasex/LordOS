@@ -123,6 +123,12 @@ export function windowsHostname(name) {
   return s && !/^[0-9]+$/.test(s) ? s.toUpperCase() : 'WINDOWS';
 }
 
+// arm64 (4.3): the template asks for a GICv3, which KVM gives only on a GICv3 host; on a GICv2 one (the Raspberry Pi 5)
+// the machine is emulated (lord.vm.create picks TCG there, and lord-vm refuses KVM): 'gic' then, else ''
+export function windowsEmulatedWhy(host, arch) {
+  return arch === 'arm64' && host?.arch === 'arm64' && !host?.gicv3 ? 'gic' : '';
+}
+
 // a profile's size, raised to what Windows 11 asks for
 export function windowsSize(size, host) {
   const vcpus = Math.min(Math.max(size.vcpus, WIN_MIN.vcpus), Math.max(1, host?.cpus || WIN_MIN.vcpus));

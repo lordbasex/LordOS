@@ -376,9 +376,20 @@ static char *windows_xml(const VmUnattend *u) {
     bput(&b, "</DisplayName>\n      <Group>Administrators</Group>\n      <Password><Value>%s</Value><PlainText>%s</PlainText></Password>\n     </LocalAccount>\n    </LocalAccounts>\n   </UserAccounts>\n", pv, plain);
     bput(&b, "   <AutoLogon>\n    <Enabled>true</Enabled>\n    <LogonCount>1</LogonCount>\n    <Username>"); xput(&b, u->user);
     bput(&b, "</Username>\n    <Password><Value>%s</Value><PlainText>%s</PlainText></Password>\n   </AutoLogon>\n", pv, plain);
-    bput(&b, "   <FirstLogonCommands>\n    <SynchronousCommand wcm:action=\"add\">\n     <Order>1</Order>\n"
-             "     <CommandLine>cmd /c for %%d in (D E F G H I J K) do if exist %%d:\\virtio-win-guest-tools.exe start /wait %%d:\\virtio-win-guest-tools.exe /install /passive /norestart</CommandLine>\n"
-             "     <Description>virtio-win guest tools</Description>\n    </SynchronousCommand>\n   </FirstLogonCommands>\n");
+    if (strcmp(arch, "arm64"))
+        bput(&b, "   <FirstLogonCommands>\n    <SynchronousCommand wcm:action=\"add\">\n     <Order>1</Order>\n"
+                 "     <CommandLine>cmd /c for %%d in (D E F G H I J K) do if exist %%d:\\virtio-win-guest-tools.exe start /wait %%d:\\virtio-win-guest-tools.exe /install /passive /norestart</CommandLine>\n"
+                 "     <Description>virtio-win guest tools</Description>\n    </SynchronousCommand>\n   </FirstLogonCommands>\n");
+    else
+        /* arm64: virtio-win 0.1.271 has no guest tools installer for Arm, only the drivers (<driver>\w11\ARM64) and the
+         * x86-64 guest agent, which the system runs emulated: the drivers go in with pnputil, then the agent, whose
+         * first answer ends the install as on amd64 */
+        bput(&b, "   <FirstLogonCommands>\n    <SynchronousCommand wcm:action=\"add\">\n     <Order>1</Order>\n"
+                 "     <CommandLine>cmd /c for %%d in (D E F G H I J K) do if exist %%d:\\viostor\\w11\\ARM64\\viostor.inf for %%i in (Balloon NetKVM viogpudo vioinput viorng vioscsi vioserial viostor) do pnputil /add-driver %%d:\\%%i\\w11\\ARM64\\*.inf /install</CommandLine>\n"
+                 "     <Description>virtio-win drivers (ARM64)</Description>\n    </SynchronousCommand>\n"
+                 "    <SynchronousCommand wcm:action=\"add\">\n     <Order>2</Order>\n"
+                 "     <CommandLine>cmd /c for %%d in (D E F G H I J K) do if exist %%d:\\guest-agent\\qemu-ga-x86_64.msi msiexec /i %%d:\\guest-agent\\qemu-ga-x86_64.msi /qn /norestart</CommandLine>\n"
+                 "     <Description>QEMU guest agent</Description>\n    </SynchronousCommand>\n   </FirstLogonCommands>\n");
     bput(&b, "  </component>\n </settings>\n</unattend>\n");
     if (b.oom) { if (b.p) { explicit_bzero(b.p, b.cap); free(b.p); } return NULL; }
     return b.p;

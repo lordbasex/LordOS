@@ -1593,5 +1593,12 @@
   "whonix.phase.unpack": "De twee schijven uitpakken",
   "whonix.phase.base": "De alleen-lezen-basissen maken",
   "whonix.phase.done": "Klaar",
-  "whonix.phaseHint": "De download wordt gecontroleerd met de ondertekende lijst van Whonix; de schijven worden uitgepakt door een helper in een sandbox, zonder eigen bestanden of netwerk."
+  "whonix.phaseHint": "De download wordt gecontroleerd met de ondertekende lijst van Whonix; de schijven worden uitgepakt door een helper in een sandbox, zonder eigen bestanden of netwerk.",
+  "as.isoDrop": "Loslaten om deze ISO te gebruiken",
+  "as.isoDropNone": "Hier past alleen een .iso-bestand",
+  "as.archFromBoot": "{arch}, gelezen uit de opstartbestanden",
+  "as.archFromName": "{arch}, op basis van de naam (de opstartbestanden zeggen het niet)",
+  "as.archUnknown": "De opstartbestanden noemen geen architectuur: {arch} wordt aangenomen",
+  "as.archOther": "De opstartbestanden zijn voor {arch}, dat Machines niet kan draaien",
+  "win.noGicThree": "Windows voor Arm heeft een GICv3-interruptcontroller nodig en deze computer heeft GICv2 (zoals de Raspberry Pi 5): de machine wordt geëmuleerd, erg traag."
 }

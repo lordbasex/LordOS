@@ -1593,5 +1593,12 @@
   "whonix.phase.unpack": "Išpakuojami du diskai",
   "whonix.phase.base": "Kuriamos tik skaitomos bazės",
   "whonix.phase.done": "Atlikta",
-  "whonix.phaseHint": "Atsisiuntimas tikrinamas pagal pasirašytą Whonix sąrašą; diskus išpakuoja izoliuota pagalbinė programa, neturinti savų failų ar tinklo."
+  "whonix.phaseHint": "Atsisiuntimas tikrinamas pagal pasirašytą Whonix sąrašą; diskus išpakuoja izoliuota pagalbinė programa, neturinti savų failų ar tinklo.",
+  "as.isoDrop": "Paleiskite, kad naudotumėte šį ISO",
+  "as.isoDropNone": "Čia tinka tik .iso failas",
+  "as.archFromBoot": "{arch}, perskaityta iš paleidimo failų",
+  "as.archFromName": "{arch}, pagal pavadinimą (paleidimo failai to nenurodo)",
+  "as.archUnknown": "Paleidimo failai nenurodo architektūros: laikoma {arch}",
+  "as.archOther": "Paleidimo failai skirti {arch}, kurios Mašinos negali paleisti",
+  "win.noGicThree": "Windows for Arm reikia GICv3 pertraukčių valdiklio, o šio kompiuterio valdiklis yra GICv2 (kaip Raspberry Pi 5): mašina bus emuliuojama, labai lėtai."
 }
