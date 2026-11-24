@@ -867,6 +867,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **A fullscreen video in Firefox no longer repaints the desktop under it at every frame (#232)** (in development;
+  latest release 0.8.9.5-beta). Firefox draws its page in a subsurface of its window that commits on its own. Since
+  0.8.9.5-beta such a commit repaints its own box in a window, but in a fullscreen window it still repainted all of the
+  window's place in the desktop below, which the fullscreen window covers, and on the GPU path painted that part of the
+  desktop again and uploaded it at every frame of the video; a window only presented the new frame. That matches the
+  report (YouTube 1080p on an RX 7800 XT: about 7 % GPU use in a window, 17 % fullscreen at 60 Hz, 25 % at 120 Hz). Now a
+  fullscreen window's subsurface repaints its own box within its display on the CPU path, and on the GPU path presenting
+  again is enough, as for the fullscreen window's own commits; a subsurface that moved or changed size, or a window of
+  another size scaled to the display, still repaints it whole (`wl.c` `damage_sub`, the new `fs_sig`).
+  `tests/fsub_client.c` (`tests/fsub_headless.sh`, in `run_suites.sh`) counts the pixels repainted through a new test
+  hook of `lord-server-test` (`painted`, only in that build): 256,000 a frame before (the window's place), 15,416 after
+  (the subsurface's box), with every frame checked against a full repaint (`LORD_PAINT_VERIFY=1`). Not yet measured on
+  a GPU: Firefox's page still can't go to the display by direct scanout, which takes a fullscreen window without
+  subsurfaces.
 - **Menus of X11 apps open again (#209; also the menus of #212 and #213)** (in development; latest release 0.8.9.5-beta).
   Since 0.8.9-beta no menu, dropdown, right-click menu or tooltip of an app running under Xwayland appeared: LibreOffice,
   Qt apps with `QT_QPA_PLATFORM=xcb` or without Qt's Wayland plugin (MuseScore 3, AppImages), GTK apps with

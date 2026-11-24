@@ -104,6 +104,12 @@ static void command(int fd, char *line) {
         reply(fd, host.frame(arg, a) ? "err frame" : "ok", -1);
         return;
     }
+    if (!strcmp(line, "painted") && host.painted) {
+        char r[40];
+        snprintf(r, sizeof r, "ok %lld", host.painted());
+        reply(fd, r, -1);
+        return;
+    }
     if (!strcmp(line, "xwl")) {
         int f = host.xwl();
         if (f < 0) { reply(fd, "err xwl (Xwayland is running, or no Wayland)", -1); return; }

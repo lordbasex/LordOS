@@ -1044,6 +1044,10 @@ build/moddrag-client: tests/moddrag_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/moddrag_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 build/moddrag-x11: tests/moddrag_x11.c
 	$(CC) $(CFLAGS) -D_GNU_SOURCE $(WARN) -std=c11 -o $@ tests/moddrag_x11.c -lxcb
+# a fullscreen window drawn in a desync subsurface, as Firefox (GitHub #232; tests/fsub_headless.sh)
+build/fsub-client: tests/fsub_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/fsub_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+test: build/fsub-client
 # an X11 app's menus (override-redirect and POPUP_MENU windows) shown, clicked and hidden (GitHub #209; tests/xpopup_headless.sh)
 build/xpopup-x11: tests/xpopup_x11.c
 	$(CC) $(CFLAGS) -D_GNU_SOURCE $(WARN) -std=c11 -o $@ tests/xpopup_x11.c -lxcb

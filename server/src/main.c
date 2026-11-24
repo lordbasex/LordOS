@@ -1540,6 +1540,12 @@ static void tablet_gone(Server *s, const InputDevice *d) {
 }
 
 #ifdef LORD_TEST_HOOKS
+/* the UI's repainted pixels, summed (render_ui) and taken by the test hooks' "painted" */
+static long long test_painted_px;
+static long long test_painted(void) { long long n = test_painted_px; test_painted_px = 0; return n; }
+#endif
+
+#ifdef LORD_TEST_HOOKS
 /* build/lord-server-test only (-DLORD_TEST_HOOKS, testhooks.h; never in the installed lord-server): the conformance tool's fake graphics tablet, a pen and a pad made
  * with tablet.c's own tablet_new and fed evdev events through tablet_input, as a real device's are. */
 static InputDevice test_tab[2] = { { .fd = -1 }, { .fd = -1 } };
@@ -1743,6 +1749,9 @@ static Box paint_ui(Server *s) {
     if (!box_empty(d)) {
         Box rs[DAMAGE_MAX];
         int nr = paint_damage_rects(rs, DAMAGE_MAX);
+#ifdef LORD_TEST_HOOKS
+        for (int k = 0; k < nr; k++) test_painted_px += (long long)((rs[k].x1 - rs[k].x0) * (rs[k].y1 - rs[k].y0));
+#endif
         for (int i = 0; i <= OUT_MAX; i++) {
             Out *o = i < OUT_MAX ? &s->out[i] : &s->cap;
             if (i < OUT_MAX && !o->on) continue;
@@ -3222,7 +3231,7 @@ int main(int argc, char **argv) {
     if (ok && !s.greeter && share_start(&share_host)) fprintf(stderr, "lord-server: no screen-sharing API (socket)\n");
 #ifdef LORD_TEST_HOOKS
     static const TestHooks test_host = { test_pointer, remote_button, remote_wheel, test_tablet, test_tablet_event, wl_test_xwl, drmlease_fake_card, test_key,
-                                         test_frame };
+                                         test_frame, test_painted };
     if (ok && test_hooks && testhooks_start(&test_host)) fprintf(stderr, "lord-server: no test hooks socket\n");
 #endif
     char current[sizeof ui.theme_request];

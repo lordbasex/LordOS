@@ -205,6 +205,7 @@ struct Surf {
     int cursor_hx, cursor_hy, p_hx, p_hy;   /* cursor role: hotspot */
     int dnd_x, dnd_y, p_dnd_x, p_dnd_y;     /* drag icon role: where it goes from the pointer (attach and offset add up) */
     unsigned hole_sig;          /* GPU path: shape of the hole the UI left last time */
+    unsigned fs_sig;            /* CPU path: its shape when the fullscreen copy last drew it (blit_tree_r) */
     struct wl_list sent_feedback;   /* presentation: already in a frame, flip pending */
     int fs_saved_w, fs_saved_h;     /* size before fullscreen */
     uint32_t conf_serial, acked_serial;   /* xdg_surface: the last configure sent, the last one acked */
@@ -537,10 +538,14 @@ static void damage_node_ex(Surf *s, int whole) {
 static void damage_node(Surf *s) { damage_node_ex(s, 0); }
 
 static void popup_box_damage(Surf *s);
+static void fs_box(float *x, float *y, float *sx, float *sy);
 /* A subsurface changed on its own: a commit of a desync one (GTK 3 maps Firefox's <select> lists and its tooltips as
  * desync subsurfaces of the window), or it came, moved, was unmapped or destroyed (whole). The window's own last damage
  * (damage_box) says nothing of it: such a list stayed on screen after it closed and the next one never showed. Its own
- * box when it has the shape it was painted with; else (whole, new, moved, resized, unmapped) all of the window. */
+ * box when it has the shape it was painted with; else (whole, new, moved, resized, unmapped) all of the window.
+ * A fullscreen window's too, within its display: Firefox draws its page in a desync subsurface, and each frame of a
+ * fullscreen video repainted all of the window's place in the desktop under it (uploaded again on the GPU path), where
+ * the same video in a window only presented the new frame (GitHub #232; tests/fsub_client.c). */
 static void damage_sub(Surf *s, int whole) {
     Surf *root = s;
     while (root->role == R_SUB && root->parent) root = root->parent;
@@ -548,16 +553,26 @@ static void damage_sub(Surf *s, int whole) {
     if (root->role == R_POPUP) { popup_box_damage(root); return; }
     Node *n = root->node ? node_get(root->node) : NULL;
     float x, y;
-    if (whole || root->role != R_TOPLEVEL || root == fs_surf || root->tf_drawn || !n || n->has_tf || !s->content ||
-        s->lw <= 0 || s->lh <= 0 || hole_sig(s) != s->hole_sig || !origin(s, &x, &y)) {
+    /* fullscreen: only at its own size (fs_box scales a window of another size), and on the CPU path with the shape
+     * the fullscreen copy last drew it with; the GPU path draws the fullscreen window whole at every present */
+    int fs = root == fs_surf, same = hole_sig(s) == s->hole_sig;
+    if (fs) {
+        float bx, by, ksx = 0, ksy = 0;
+        fs_box(&bx, &by, &ksx, &ksy);
+        same = ksx == 1.0f && ksy == 1.0f && (gpu_active() || hole_sig(s) == s->fs_sig);
+    }
+    if (whole || root->role != R_TOPLEVEL || root->tf_drawn || !n || n->has_tf || !s->content ||
+        s->lw <= 0 || s->lh <= 0 || !same || !origin(s, &x, &y)) {
         damage_node_ex(root, 1);
         return;
     }
+    Box lim = n->prev_box;                      /* where the window is; fullscreen, its display */
+    if (fs) { float fx, fy, fw, fh; fs_rect(&fx, &fy, &fw, &fh); lim = (Box){ fx, fy, fx + fw, fy + fh }; }
     Box b = { floorf(x) - 2, floorf(y) - 2, ceilf(x + (float)s->lw) + 2, ceilf(y + (float)s->lh) + 2 };
-    if (b.x0 < n->prev_box.x0) b.x0 = n->prev_box.x0;
-    if (b.y0 < n->prev_box.y0) b.y0 = n->prev_box.y0;
-    if (b.x1 > n->prev_box.x1) b.x1 = n->prev_box.x1;
-    if (b.y1 > n->prev_box.y1) b.y1 = n->prev_box.y1;
+    if (b.x0 < lim.x0) b.x0 = lim.x0;
+    if (b.y0 < lim.y0) b.y0 = lim.y0;
+    if (b.x1 > lim.x1) b.x1 = lim.x1;
+    if (b.y1 > lim.y1) b.y1 = lim.y1;
     if (b.x1 <= b.x0 || b.y1 <= b.y0) return;   /* outside the window: not shown */
     if (content_on) content_note(b);
     if (gpu_active()) { new_on(surf_keys(root)); return; }
@@ -4850,6 +4865,7 @@ static void blit_tree(Canvas *c, Surf *s, float x, float y, float sxk, float syk
 static void blit_tree_r(Canvas *c, Surf *s, float x, float y, float sxk, float syk) {
     for (int i = 0; i < s->nbelow; i++)
         blit_tree(c, s->kids[i], x + s->kids[i]->sx * sxk, y + s->kids[i]->sy * syk, sxk, syk);
+    s->fs_sig = hole_sig(s);                    /* the shape it was drawn with (damage_sub) */
     if (s->content) {
         uint32_t *tmp = s->px ? NULL : capture_readback(s);      /* a GPU app in a screenshot */
         if (tmp) s->px = tmp;

@@ -294,6 +294,13 @@ EOF
         77) skip "moddrag" "build/lord-server-test and the default theme (make, npm run build)" ;;
         *) bad "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test)"; cat "$T/out" ;;
     esac
+    # (#232) a fullscreen window's desync subsurface (Firefox's page) repaints its own box, checked against a full repaint
+    sh tests/fsub_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "fsub (tests/fsub_client.c, headless lord-server-test: a fullscreen window's subsurface repaints its box, #232)" ;;
+        77) skip "fsub" "build/lord-server-test and the default theme (make, npm run build)" ;;
+        *) bad "fsub (tests/fsub_client.c, headless lord-server-test, #232)"; cat "$T/out" ;;
+    esac
     # (#209) an X11 app's menus: an override-redirect and a POPUP_MENU window shown where X put them, clicked, hidden
     sh tests/xpopup_headless.sh >"$T/out" 2>&1
     case $? in
