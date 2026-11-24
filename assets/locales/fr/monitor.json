@@ -493,6 +493,8 @@
   "comp.lanHint": "Fichiers → Réseau : ordinateurs et partages du réseau local.",
   "comp.machines": "Machines",
   "comp.machinesHint": "Machines : le trafic réseau des machines virtuelles que vous exécutez, les systèmes que vous téléchargez dans l’assistant Nouvelle machine et leurs listes de sommes de contrôle. Une règle pour Machines s’applique à tout cela.",
+  "comp.torGateway": "Passerelle Tor",
+  "comp.torGatewayHint": "La passerelle Tor d'un groupe de machines : elle ne peut ouvrir que des connexions TCP sortantes vers internet. Pas d'UDP, pas de DNS, rien sur votre réseau local ni sur cet ordinateur, et aucune connexion entrante. Vos règles ne peuvent que restreindre davantage.",
   "net.shareHolder": "{app} partage l’écran de cette session.",
   "gpu.title": "GPU",
   "gpu.none": "Cet ordinateur n’a pas de processeur graphique que LordOS puisse lire : le dessin est fait par le processeur.",

@@ -25,7 +25,7 @@ export const CAST_MAX = 4;              // CAST_MAX_STREAMS in server/src/cast/c
 // Since 2026-11-22 the capture indicator also names what lord-server tells from the kernel without a verified scope
 // (server/src/sec/appid.h, "only to show it"): a running machine's scope "desktop:lordos-vm-<uuid>" (machine(uuid): its
 // name with Machines', '' unknown), a LordOS component "lordos:<name>" and LordOS itself "lordos" (lordos(id): '' unknown).
-const VM_ID = /^desktop:lordos-vm-([0-9a-f-]{1,36})$/;
+const VM_ID = /^desktop:lordos-vm-(?:tor-)?([0-9a-f-]{1,36})$/;   // tor-: a machine group's Tor gateway
 export function castAskerName(who, { linux = () => '', flatpak = () => '', machine = () => '', lordos = () => '' } = {}) {
   const w = typeof who === 'string' ? who : '';
   const vm = VM_ID.exec(w);

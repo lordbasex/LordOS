@@ -493,6 +493,8 @@
   "comp.lanHint": "Faili → Mtandao: kompyuta na vilivyoshirikiwa kwenye mtandao wa karibu.",
   "comp.machines": "Mashine",
   "comp.machinesHint": "Mashine: trafiki ya mtandao ya mashine pepe unazoendesha, mifumo unayopakua kwenye msaidizi wa Mashine Mpya, na orodha zake za checksum. Sheria ya Mashine inatumika kwa zote.",
+  "comp.torGateway": "Lango la Tor",
+  "comp.torGatewayHint": "Lango la Tor la kikundi cha mashine: linaweza kufungua tu miunganisho ya TCP inayotoka kwenda intaneti. Hakuna UDP, hakuna DNS, hakuna chochote kwenye mtandao wako wa ndani au kwenye kompyuta hii, na hakuna miunganisho inayoingia. Sheria zako zinaweza tu kuzuia zaidi.",
   "net.shareHolder": "{app} inashiriki skrini ya kipindi hiki.",
   "gpu.title": "GPU",
   "gpu.none": "Kompyuta hii haina kichakataji cha michoro ambacho LordOS inaweza kusoma: uchoraji hufanywa na kichakataji.",

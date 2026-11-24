@@ -493,6 +493,8 @@
   "comp.lanHint": "Dosyalar → Ağ: yerel ağdaki bilgisayarlar ve paylaşımlar.",
   "comp.machines": "Sanal Makineler",
   "comp.machinesHint": "Sanal Makineler: çalıştırdığınız sanal makinelerin, Yeni Makine yardımcısında indirdiğiniz sistemlerin ve sağlama toplamı listelerinin ağ trafiği. Sanal Makineler için bir kural hepsine uygulanır.",
+  "comp.torGateway": "Tor ağ geçidi",
+  "comp.torGatewayHint": "Bir makine grubunun Tor ağ geçidi: yalnızca internete giden TCP bağlantıları açabilir. UDP yok, DNS yok, yerel ağınızda veya bu bilgisayarda hiçbir şey yok ve gelen bağlantı yok. Kurallarınız yalnızca daha fazlasını kısıtlayabilir.",
   "net.shareHolder": "{app} bu oturumun ekranını paylaşıyor.",
   "gpu.title": "GPU",
   "gpu.none": "Bu bilgisayarda LordOS’un okuyabileceği bir grafik işlemcisi yok: çizim işlemci tarafından yapılıyor.",

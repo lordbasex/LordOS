@@ -478,6 +478,8 @@
   "comp.lanHint": "檔案 → 網路：區域網路上的電腦與共享資料夾。",
   "comp.machines": "虛擬機器",
   "comp.machinesHint": "虛擬機器：你執行的虛擬機器的網路流量、你在「新增虛擬機器」助理中下載的系統，以及其總和檢查碼清單。針對「虛擬機器」的規則會套用到上述全部。",
+  "comp.torGateway": "Tor 閘道",
+  "comp.torGatewayHint": "機器群組的 Tor 閘道：只能開啟通往網際網路的連出 TCP 連線。不能使用 UDP 與 DNS，無法存取你的區域網路或這台電腦，也沒有連入連線。你的規則只能進一步限制它。",
   "net.shareHolder": "{app} 正在分享此工作階段的螢幕。",
   "gpu.title": "GPU",
   "gpu.none": "這部電腦沒有 LordOS 能讀取的圖形處理器：繪圖由處理器負責。",

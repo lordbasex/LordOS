@@ -65,6 +65,11 @@ enum {
     FW_R_NO_NOTIFICATIONS = 1u << 10,
     FW_R_NO_CLIPBOARD     = 1u << 11,   /* no reading the clipboard */
     FW_R_ALL              = (1u << 12) - 1,
+    /* (Whonix groups, docs/FIREWALL.md "The Tor gateway") built in, never in firewall.json or FW_R_ALL: the app
+     * FW_APP_TOR_GATEWAY always has it (fw_builtin_restricted). Only outgoing TCP to internet addresses, never to
+     * remote port 53 or 853: no incoming, no UDP, no LAN, private, link-local, loopback or unknown address. Decided
+     * right after FW_R_NO_NETWORK, before any rule, so the owner's rules can only take more away. */
+    FW_R_TOR_UPLINK       = 1u << 12,
 };
 
 typedef struct {
@@ -134,6 +139,17 @@ int fw_component_scope(const char *scope, char *app, size_t n);
  * (optional, n bytes) if scope is one, -1 otherwise. */
 #define FW_VM_SCOPE_PREFIX "app-lordos-lordos-vm-"
 int fw_vm_scope(const char *scope, char *id, size_t n);
+/* (Whonix groups) A machine group's Tor gateway runs in "app-lordos-lordos-vm-tor-<id>.scope" (vm/lordvm.c, the member
+ * with uplink "tor"): firewall app FW_APP_TOR_GATEWAY, with FW_R_TOR_UPLINK built in. fw_vm_scope accepts it too (the
+ * id without "tor-"); fw_vm_scope_tor says which form it is: 1 the gateway's, 0 another machine's, -1 not a machine's. */
+#define FW_VMTOR_SCOPE_PREFIX "app-lordos-lordos-vm-tor-"
+#define FW_APP_TOR_GATEWAY "lordos:tor-gateway"
+int fw_vm_scope_tor(const char *scope);
+/* The restrictions an app always has whatever firewall.json says: FW_R_TOR_UPLINK for FW_APP_TOR_GATEWAY, else 0 */
+uint32_t fw_builtin_restricted(const char *app);
+/* FW_R_TOR_UPLINK's own test: 1 if it denies (dir, proto, lan as fw_decide computes it: 1 LAN, 0 internet, -1 unknown,
+ * remote port) */
+int fw_tor_uplink_denies(FwDir dir, FwProto proto, int lan, unsigned port);
 /* The firewall app of a session scope, the one translation lord-netperm and Monitor share:
  * lordos-net-<name>.scope → lordos:<name>, a machine's scope → lordos:machines,
  * app-lordos-lpk-<id>.scope → lpk:<id>, app-lordos-<id>.scope → desktop:<id>. 0 ok, -1 otherwise. */

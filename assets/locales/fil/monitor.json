@@ -493,6 +493,8 @@
   "comp.lanHint": "Mga File → Network: mga computer at share sa lokal na network.",
   "comp.machines": "Mga Makina",
   "comp.machinesHint": "Mga Makina: ang network traffic ng mga virtual machine na pinapatakbo mo, ng mga system na dina-download mo sa assistant na Bagong Makina, at ng mga checksum list nila. Ang panuntunan para sa Mga Makina ay naaangkop sa lahat ng ito.",
+  "comp.torGateway": "Tor gateway",
+  "comp.torGatewayHint": "Ang Tor gateway ng isang grupo ng machine: makakapagbukas lang ito ng mga palabas na TCP na koneksyon papunta sa internet. Walang UDP, walang DNS, walang anuman sa iyong lokal na network o sa computer na ito, at walang papasok na koneksyon. Ang mga patakaran mo ay makakapagbawas lang ng higit pa.",
   "net.shareHolder": "Ibinabahagi ng {app} ang screen ng session na ito.",
   "gpu.title": "GPU",
   "gpu.none": "Walang graphics processor ang computer na ito na mababasa ng LordOS: ang processor ang gumuguhit.",

@@ -478,6 +478,8 @@
   "comp.lanHint": "Fail → Rangkaian: komputer dan perkongsian dalam rangkaian setempat.",
   "comp.machines": "Mesin Maya",
   "comp.machinesHint": "Mesin Maya: trafik rangkaian mesin maya yang anda jalankan, sistem yang anda muat turun dalam pembantu Mesin Baharu, dan senarai checksumnya. Peraturan untuk Mesin Maya terpakai pada kesemuanya.",
+  "comp.torGateway": "Get laluan Tor",
+  "comp.torGatewayHint": "Get laluan Tor bagi kumpulan mesin: ia hanya boleh membuka sambungan TCP keluar ke internet. Tiada UDP, tiada DNS, tiada apa-apa di rangkaian setempat anda atau di komputer ini, dan tiada sambungan masuk. Peraturan anda hanya boleh menyekat lebih lagi.",
   "net.shareHolder": "{app} sedang berkongsi skrin sesi ini.",
   "gpu.title": "GPU",
   "gpu.none": "Komputer ini tiada pemproses grafik yang boleh dibaca oleh LordOS: lukisan dilakukan oleh pemproses.",

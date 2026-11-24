@@ -508,6 +508,8 @@
   "comp.lanHint": "Failai → Tinklas: kompiuteriai ir bendrinami ištekliai vietiniame tinkle.",
   "comp.machines": "Virtualios mašinos",
   "comp.machinesHint": "Virtualios mašinos: jūsų paleistų virtualių mašinų tinklo srautas, sistemos, kurias atsisiunčiate naujos mašinos vedliu, ir jų kontrolinių sumų sąrašai. Taisyklė Virtualioms mašinoms taikoma joms visoms.",
+  "comp.torGateway": "Tor šliuzas",
+  "comp.torGatewayHint": "Mašinų grupės Tor šliuzas: jis gali atidaryti tik išeinančius TCP ryšius į internetą. Jokio UDP, jokio DNS, nieko vietiniame tinkle ar šiame kompiuteryje ir jokių įeinančių ryšių. Jūsų taisyklės gali tik dar labiau apriboti.",
   "net.shareHolder": "{app} bendrina šio seanso ekraną.",
   "gpu.title": "GPU",
   "gpu.none": "Šis kompiuteris neturi grafikos procesoriaus, kurį LordOS galėtų nuskaityti: piešia procesorius.",

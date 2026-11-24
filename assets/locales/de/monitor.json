@@ -493,6 +493,8 @@
   "comp.lanHint": "Dateien → Netzwerk: Computer und Freigaben im lokalen Netzwerk.",
   "comp.machines": "Maschinen",
   "comp.machinesHint": "Maschinen: der Netzwerkverkehr der virtuellen Maschinen, die du ausführst, der Systeme, die du im Assistenten „Neue Maschine“ herunterlädst, und ihrer Prüfsummenlisten. Eine Regel für Maschinen gilt für alle davon.",
+  "comp.torGateway": "Tor-Gateway",
+  "comp.torGatewayHint": "Das Tor-Gateway einer Maschinengruppe: Es darf nur ausgehende TCP-Verbindungen ins Internet öffnen. Kein UDP, kein DNS, nichts im lokalen Netzwerk oder auf diesem Computer und keine eingehenden Verbindungen. Deine Regeln können nur weiter einschränken.",
   "net.shareHolder": "{app} teilt den Bildschirm dieser Sitzung.",
   "gpu.title": "GPU",
   "gpu.none": "Dieser Computer hat keinen Grafikprozessor, den LordOS lesen kann: Gezeichnet wird vom Prozessor.",

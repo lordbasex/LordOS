@@ -493,6 +493,8 @@
   "comp.lanHint": "Tiedostot → Verkko: lähiverkon tietokoneet ja jaot.",
   "comp.machines": "Koneet",
   "comp.machinesHint": "Koneet: ajamiesi virtuaalikoneiden verkkoliikenne, Uusi kone -avustajassa lataamasi järjestelmät ja niiden tarkistussummaluettelot. Koneiden sääntö koskee niitä kaikkia.",
+  "comp.torGateway": "Tor-yhdyskäytävä",
+  "comp.torGatewayHint": "Konerymän Tor-yhdyskäytävä: se voi avata vain lähteviä TCP-yhteyksiä internetiin. Ei UDP:tä, ei DNS:ää, ei mitään lähiverkossasi tai tällä tietokoneella eikä saapuvia yhteyksiä. Sääntösi voivat vain rajoittaa lisää.",
   "net.shareHolder": "{app} jakaa tämän istunnon näyttöä.",
   "gpu.title": "Näytönohjain",
   "gpu.none": "Tässä tietokoneessa ei ole grafiikkasuoritinta, jota LordOS voisi lukea: piirtämisen hoitaa suoritin.",

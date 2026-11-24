@@ -24,6 +24,8 @@
  *   np_blk6    LPM    (list set, IPv6/n) → u8         the addresses the resolver gave for their domains (NpApp.blk)
  *   np_sysc    HASH   cgroup id → NpCount            (0.8.5) the essential system services' bytes (name
  *                                                     resolution, time, the network service), counted only
+ *   np_local   LPM    NpLocalKey → u8                (Whonix groups) this computer's own addresses and networks, for the
+ *                                                     Tor gateway's built-in restriction (NP_R_TOR_UPLINK)
  *
  * Besides the network, the same per-app policy carries the device restrictions (docs/FIREWALL.md,
  * "Linux apps"): "no camera", "no USB" and "no screen capture" (/dev/fb*) (cgroup/dev, by device
@@ -71,8 +73,57 @@ typedef uint64_t np_u64;
 #define NP_R_NO_SCREEN    (1u << 6)
 #define NP_R_NO_USB       (1u << 7)
 #define NP_R_NO_BLUETOOTH (1u << 8)
-#define NP_R_NET_MASK     (NP_R_NO_INTERNET | NP_R_NO_LAN | NP_R_NO_NETWORK | NP_R_NO_INCOMING)
+#define NP_R_TOR_UPLINK   (1u << 12)   /* FW_R_TOR_UPLINK: built in for a machine group's Tor gateway, never from firewall.json */
+#define NP_R_NET_MASK     (NP_R_NO_INTERNET | NP_R_NO_LAN | NP_R_NO_NETWORK | NP_R_NO_INCOMING | NP_R_TOR_UPLINK)
 #define NP_R_DEV_MASK     (NP_R_NO_CAMERA | NP_R_NO_MIC | NP_R_NO_SCREEN | NP_R_NO_USB | NP_R_NO_BLUETOOTH)
+
+/* (Whonix groups) np_local: this computer's own networks, which FW_R_TOR_UPLINK treats as LAN whatever their range,
+ * so the gateway reaches neither the host (not even a public address of it) nor another machine on one of its links
+ * (a public-address LAN, a routed /64): every interface address as a host (/32, /128) and with its on-link prefix,
+ * and every directly connected route (no gateway; never a default route). lord-netperm reads them over rtnetlink
+ * (netperm/nplocal.c). An LPM trie: prefixlen = 8 + the network's bits; data[0] the family (4 or 6), then the
+ * address (IPv4 in the first 4 bytes). When they don't all fit, NpCfg.local_full makes the gateway's restriction deny
+ * every address (fail closed). */
+typedef struct { np_u32 prefixlen; np_u8 data[17]; np_u8 pad[3]; } NpLocalKey;
+#define NP_MAX_LOCAL      1024
+
+/* (Whonix groups) addresses FW_R_TOR_UPLINK never lets the gateway reach besides the LAN of np_is_lan4/6: special,
+ * shared or documentation IPv4 (0/8, 100.64/10, 192.0.0/24, 192.0.2/24, 198.18/15, 198.51.100/24, 203.0.113/24,
+ * 240/4 and broadcast), and every IPv6 range that carries an IPv4 address inside (an IPv4-compatible ::/96 or
+ * IPv4-mapped ::ffff:0:0/96, NAT64 64:ff9b::/96 and 64:ff9b:1::/48, Teredo 2001::/32, 6to4 2002::/16), which could
+ * reach a LAN or this computer through a translator, plus 100::/64 (discard) and 2001:db8::/32 (documentation).
+ * 1: the gateway may not go there (counted as LAN). */
+NP_INLINE int np_tor_special(int fam, const np_u8 *a) {
+    if (fam == 4) {
+        np_u8 b0 = a[0], b1 = a[1], b2 = a[2];
+        if (b0 == 0 || b0 >= 240) return 1;
+        if (b0 == 100 && (b1 & 0xc0) == 64) return 1;
+        if (b0 == 192 && b1 == 0 && (b2 == 0 || b2 == 2)) return 1;
+        if (b0 == 198 && (b1 & 0xfe) == 18) return 1;
+        if (b0 == 198 && b1 == 51 && b2 == 100) return 1;
+        if (b0 == 203 && b1 == 0 && b2 == 113) return 1;
+        return 0;
+    }
+    if (fam != 6) return 0;
+    np_u32 hi = 0;                              /* the first 80 bits zero: ::/96 and ::ffff:0:0/96 */
+    for (int i = 0; i < 10; i++) hi |= a[i];
+    if (!hi && ((a[10] == 0 && a[11] == 0) || (a[10] == 0xff && a[11] == 0xff))) return 1;
+    if (a[0] == 0x00 && a[1] == 0x64 && a[2] == 0xff && a[3] == 0x9b) {
+        np_u32 mid = 0;
+        for (int i = 4; i < 12; i++) mid |= a[i];
+        if (!mid) return 1;                                         /* 64:ff9b::/96 */
+        if (a[4] == 0 && a[5] == 1) return 1;                       /* 64:ff9b:1::/48 */
+    }
+    if (a[0] == 0x20 && a[1] == 0x01 && a[2] == 0 && a[3] == 0) return 1;              /* Teredo 2001::/32 */
+    if (a[0] == 0x20 && a[1] == 0x02) return 1;                                         /* 6to4 2002::/16 */
+    if (a[0] == 0x20 && a[1] == 0x01 && a[2] == 0x0d && a[3] == 0xb8) return 1;        /* 2001:db8::/32 */
+    if (a[0] == 0x01 && a[1] == 0x00) {                                                 /* 100::/64 */
+        np_u32 z = 0;
+        for (int i = 2; i < 8; i++) z |= a[i];
+        if (!z) return 1;
+    }
+    return 0;
+}
 
 /* Character device majors (Documentation/admin-guide/devices.txt; hidraw is dynamic and comes
  * from /proc/devices, in NpCfg). */
@@ -131,6 +182,8 @@ typedef struct {
     np_u32 on;                  /* 0: everything is allowed without looking at anything */
     np_u32 user_level;          /* depth of user@<uid>.service; 0: don't look at the user@ union */
     np_u32 hidraw_major;        /* /dev/hidraw* (dynamic major), 0 if the kernel has none */
+    np_u32 local_full;          /* (Whonix groups) 1: np_local couldn't hold (or read) this computer's networks:
+                                 * NP_R_TOR_UPLINK denies every address */
 } NpCfg;
 
 typedef struct {
@@ -255,6 +308,8 @@ NP_INLINE void np_decide(const NpApp *a, const NpList *l, int dir, int proto, in
     r->verdict = NP_V_DENY; r->reason = NP_BY_RESTRICTED; r->record = 1; r->rule_id = 0; r->flag = 0;
     np_u32 f = a->flags;
     if (f & NP_R_NO_NETWORK) { r->flag = NP_R_NO_NETWORK; return; }
+    /* the Tor gateway (fw_tor_uplink_denies): outgoing TCP to the internet only, never to port 53 or 853 */
+    if ((f & NP_R_TOR_UPLINK) && (dir != NP_D_OUT || proto != NP_P_TCP || lan != 0 || port == 53 || port == 853)) { r->flag = NP_R_TOR_UPLINK; return; }
     if (dir == NP_D_IN && (f & NP_R_NO_INCOMING)) { r->flag = NP_R_NO_INCOMING; return; }
     if ((f & NP_R_NO_INTERNET) && lan != 1) { r->flag = NP_R_NO_INTERNET; return; }
     if ((f & NP_R_NO_LAN) && lan == 1) { r->flag = NP_R_NO_LAN; return; }

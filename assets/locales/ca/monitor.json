@@ -493,6 +493,8 @@
   "comp.lanHint": "Fitxers → Xarxa: ordinadors i recursos compartits de la xarxa local.",
   "comp.machines": "Màquines",
   "comp.machinesHint": "Màquines: el trànsit de xarxa de les màquines virtuals que executes, els sistemes que baixes a l’assistent Màquina nova i les seves llistes de sumes de verificació. Una regla per a Màquines s’aplica a totes.",
+  "comp.torGateway": "Passarel·la Tor",
+  "comp.torGatewayHint": "La passarel·la Tor d'un grup de màquines: només pot obrir connexions TCP sortints cap a internet. Res d'UDP ni DNS, res a la xarxa local ni en aquest ordinador, i cap connexió entrant. Les teves regles només en poden treure més.",
   "net.shareHolder": "{app} està compartint la pantalla d’aquesta sessió.",
   "gpu.title": "GPU",
   "gpu.none": "Aquest ordinador no té cap processador gràfic que LordOS pugui llegir: el dibuix el fa el processador.",

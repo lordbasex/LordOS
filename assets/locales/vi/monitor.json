@@ -478,6 +478,8 @@
   "comp.lanHint": "Tệp → Mạng: máy tính và thư mục chia sẻ trên mạng cục bộ.",
   "comp.machines": "Máy ảo",
   "comp.machinesHint": "Máy ảo: lưu lượng mạng của các máy ảo bạn chạy, các hệ thống bạn tải về trong trình hướng dẫn Máy mới, và danh sách tổng kiểm của chúng. Một quy tắc cho Máy ảo áp dụng cho tất cả.",
+  "comp.torGateway": "Cổng Tor",
+  "comp.torGatewayHint": "Cổng Tor của một nhóm máy: chỉ được mở các kết nối TCP đi ra internet. Không UDP, không DNS, không gì trong mạng cục bộ hay trên máy tính này, và không có kết nối đến. Quy tắc của bạn chỉ có thể hạn chế thêm.",
   "net.shareHolder": "{app} đang chia sẻ màn hình của phiên này.",
   "gpu.title": "GPU",
   "gpu.none": "Máy tính này không có bộ xử lý đồ họa nào mà LordOS đọc được: việc vẽ do bộ xử lý đảm nhận.",

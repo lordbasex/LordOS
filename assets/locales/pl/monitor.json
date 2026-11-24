@@ -508,6 +508,8 @@
   "comp.lanHint": "Pliki → Sieć: komputery i udziały w sieci lokalnej.",
   "comp.machines": "Maszyny",
   "comp.machinesHint": "Maszyny: ruch sieciowy uruchamianych maszyn wirtualnych, systemów pobieranych w kreatorze Nowa maszyna i ich list sum kontrolnych. Reguła dla Maszyn dotyczy ich wszystkich.",
+  "comp.torGateway": "Brama Tor",
+  "comp.torGatewayHint": "Brama Tor grupy maszyn: może otwierać tylko wychodzące połączenia TCP do internetu. Bez UDP, bez DNS, nic w sieci lokalnej ani na tym komputerze i żadnych połączeń przychodzących. Twoje reguły mogą tylko ograniczyć więcej.",
   "net.shareHolder": "{app} udostępnia ekran tej sesji.",
   "gpu.title": "GPU",
   "gpu.none": "Ten komputer nie ma procesora graficznego, który LordOS może odczytać: rysowaniem zajmuje się procesor.",

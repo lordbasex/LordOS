@@ -196,7 +196,7 @@ int np_compile_app(FwStore *s, const char *app, uint32_t idx, DnsMap *names, con
      * their permission and restriction checks (js_media.c, the broker), so the kernel doesn't
      * take its devices away. */
     uint32_t keep = NP_R_NET_MASK | (strcmp(app, "lordos") ? NP_R_DEV_MASK : 0);
-    a->flags = fw_restricted(s, app) & keep;
+    a->flags = (fw_restricted(s, app) | fw_builtin_restricted(app)) & keep;
     a->trusted = (np_u8)(fw_is_trusted(s, app) != 0);
     a->mode = fw_mode(s) == FW_MODE_OFF ? NP_M_OFF : fw_mode(s) == FW_MODE_DENY ? NP_M_DENY : NP_M_SILENT;
 

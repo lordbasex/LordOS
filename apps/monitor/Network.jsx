@@ -34,7 +34,7 @@ export const appKeyOf = netModel.connAppKey;
 // The row's name: LordOS's own components by their label, LordOS itself, or the app's name.
 // (0.8.8.6) The Machines row also names the running machines whose guests are on the network.
 export const labelOf = (tr, g) => (COMPONENTS[g.key]
-  ? (g.key === 'lordos:machines' && g.machines?.size ? machinesLabel(tr(COMPONENTS[g.key].label), g.machines, g.machineNames)
+  ? ((g.key === 'lordos:machines' || g.key === 'lordos:tor-gateway') && g.machines?.size ? machinesLabel(tr(COMPONENTS[g.key].label), g.machines, g.machineNames)
     : tr(COMPONENTS[g.key].label))
   : g.key === 'lordos' ? tr('monitor.lordos') : g.name);
 const countryName = (cc) => (cc ? tOptional(`countries.${cc}`) || cc : '');

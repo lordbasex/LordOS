@@ -493,6 +493,8 @@
   "comp.lanHint": "Archivos → Red: computadoras y recursos compartidos en la red local.",
   "comp.machines": "Máquinas",
   "comp.machinesHint": "Máquinas: el tráfico de red de las máquinas virtuales que ejecutás, los sistemas que descargás en el asistente de Nueva máquina y sus listas de sumas de verificación. Una regla para Máquinas se aplica a todo eso.",
+  "comp.torGateway": "Puerta de enlace Tor",
+  "comp.torGatewayHint": "La puerta de enlace Tor de un grupo de máquinas: solo puede abrir conexiones TCP salientes hacia internet. Nada de UDP ni DNS, nada en tu red local ni en esta computadora, y ninguna conexión entrante. Tus reglas solo pueden quitarle más.",
   "net.shareHolder": "{app} está compartiendo la pantalla de esta sesión.",
   "gpu.title": "GPU",
   "gpu.none": "Este equipo no tiene un procesador gráfico que LordOS pueda leer: el dibujo lo hace el procesador.",

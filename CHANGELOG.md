@@ -63,6 +63,32 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     breaking it, and the session relinking a restarted gateway. Still open: neither Whonix member powers off on ACPI's
     power button (checked with the unchanged images: forced off after 120 s), so a group's Shut Down ends as a forced
     power-off for now.
+- **Firewall: the Tor gateway of a machine group has its own identity and a rule built in** (in development; latest
+  release 0.8.9.5; isolation layer 4 of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23;
+  docs/FIREWALL.md "The Tor gateway"). The gateway member of a Whonix group (the one with `"uplink": "tor"`) now runs in
+  `app-lordos-lordos-vm-tor-<id>.scope`, which the firewall and Monitor read as the app `lordos:tor-gateway`, shown as its
+  own row ("Tor gateway · <name>") in Monitor and Settings, in every language; other machines stay `lordos:machines`.
+  - **lord-netperm enforces a built-in restriction for it** (`FW_R_TOR_UPLINK`, bit 12, outside what `firewall.json`
+    can set or clear), checked before any rule, so the owner's rules can only take more away: only outgoing TCP to
+    internet addresses. Refused: anything incoming; UDP, ICMP and raw sockets (`cgroup/sock_create` refuses them before
+    they exist; the gateway's passt needs none and still carries Tor); every LAN, private, CGNAT, link-local, ULA,
+    multicast, broadcast, loopback or unknown address, the special and documentation IPv4 ranges (192.0.0/24,
+    192.0.2/24, 198.18/15, 198.51.100/24, 203.0.113/24, 240/4) and every IPv6 range that carries an IPv4 inside
+    (IPv4-compatible and IPv4-mapped, NAT64 `64:ff9b::/96` and `64:ff9b:1::/48`, Teredo, 6to4) plus `2001:db8::/32`;
+    remote ports 53 and 853 (DNS over TCP and TLS).
+  - **Never this computer or its links:** a new trie `np_local` holds this computer's interface addresses with their
+    prefixes and its directly connected routes (never a default route or a VPN's 0/1 and 128/1), read by lord-netperm
+    over rtnetlink (`RTM_GETADDR`, `RTM_GETROUTE`, `netperm/nplocal.c`) at start, on every address or route change and
+    every 5 seconds; for the gateway they count as LAN even when public (a public-address LAN, a routed /64). When they
+    can't be read or don't fit (1024), the gateway is refused every address until they fit (fail closed, logged).
+  - The restriction is left out of the `user@` union (as "no microphone" is): it would otherwise take UDP and the LAN
+    from every process of the person while a gateway runs.
+  - Tests: `npcompile-test` (the gateway against `fw_decide`, fixed cases and random rounds), `fw-rules-test` and
+    `vmwatch-test` (the new scope name), `np-torgw-test` (as root: the real programs on a throwaway cgroup of its own:
+    UDP, ICMP, TCP 53/853, LAN, loopback, the special and IPv4-carrying IPv6 ranges, this computer's addresses and
+    networks and binds refused, TCP 443 connects, everything refused when `np_local` is full; and its netlink parser) and
+    `tests/vm_gateway_fw.sh` (a Whonix group under that policy: Tor works, the gateway's UDP DNS, TCP 53 and LAN
+    connections don't).
 - **Protected windows, everywhere a picture leaves** (in development; latest release 0.8.9.5; approved by the maintainer on
   2026-11-23 as isolation layer 8 of the Whonix group, docs/VIRTUALIZATION.md 19.5, and useful for any window). A
   protected window shows normally on the display and never appears in anything that captures the screen

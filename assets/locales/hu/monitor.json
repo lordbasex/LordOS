@@ -493,6 +493,8 @@
   "comp.lanHint": "Fájlok → Hálózat: számítógépek és megosztások a helyi hálózaton.",
   "comp.machines": "Gépek",
   "comp.machinesHint": "Gépek: a futtatott virtuális gépek hálózati forgalma, az Új gép varázslóban letöltött rendszerek és ellenőrzőösszeg-listáik. A Gépekre vonatkozó szabály mindegyikre érvényes.",
+  "comp.torGateway": "Tor-átjáró",
+  "comp.torGatewayHint": "Egy gépcsoport Tor-átjárója: csak kimenő TCP-kapcsolatokat nyithat az internet felé. Nincs UDP, nincs DNS, semmi a helyi hálózaton vagy ezen a számítógépen, és nincs bejövő kapcsolat. A szabályaid csak további korlátozást adhatnak.",
   "net.shareHolder": "{app} megosztja ennek a munkamenetnek a képernyőjét.",
   "gpu.title": "GPU",
   "gpu.none": "Ennek a számítógépnek nincs a LordOS által olvasható grafikus processzora: a rajzolást a processzor végzi.",

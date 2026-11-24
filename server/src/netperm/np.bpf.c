@@ -8,7 +8,8 @@
  *   cgroup/connect4, connect6   TCP and connected UDP (also the UDP getaddrinfo uses for sorting)
  *   cgroup/sendmsg4, sendmsg6   unconnected UDP (sendto with an address)
  *   cgroup/bind4, bind6         "no incoming connections" and inbound rules (local port != 0)
- *   cgroup/sock_create          "no network": not even creating an AF_INET/AF_INET6 socket
+ *   cgroup/sock_create          "no network": not even creating an AF_INET/AF_INET6 socket; the Tor
+ *                               gateway's built-in restriction: only TCP sockets
  *   cgroup/dev                  "no camera", "no USB", "no screen capture" and "no microphone":
  *                               opening video devices, raw USB devices (/dev/bus/usb), hidraw,
  *                               ttyACM, ttyUSB, the framebuffer (by major) and ALSA capture
@@ -77,6 +78,7 @@ char np_bound[4] SEC("maps");
 char np_blk4[4] SEC("maps");
 char np_blk6[4] SEC("maps");
 char np_sysc[4] SEC("maps");
+char np_local[4] SEC("maps");
 
 #define AF_INET  2
 #define AF_INET6 10
@@ -171,6 +173,20 @@ NP_INLINE int lookup_blk(NpApp *app, int fam, const np_u8 *addr) {
     return 0;
 }
 
+/* (Whonix groups) for the Tor gateway's restriction, an address it may never reach though it isn't LAN: one of this
+ * computer's own addresses or networks (np_local; every address when np_local didn't fit), or a special range
+ * (np_tor_special). Counted as LAN, which the restriction denies. */
+NP_INLINE int tor_lan(NpCfg *cfg, NpApp *app, int fam, const np_u8 *addr) {
+    if (!(app->flags & NP_R_TOR_UPLINK) || (fam != 4 && fam != 6)) return 0;
+    if (cfg->local_full || np_tor_special(fam, addr)) return 1;
+    NpLocalKey k;
+    __builtin_memset(&k, 0, sizeof k);
+    k.prefixlen = 8 + 128;
+    k.data[0] = (np_u8)fam;
+    for (int i = 0; i < 16; i++) k.data[1 + i] = addr[i];
+    return bpf_map_lookup_elem(&np_local, &k) != 0;
+}
+
 /* fam 0: unknown address. addr: 16 bytes (IPv4 in the first 4). always_count: connect and
  * bind always count; sendto only the first time within NP_REPEAT_NS. */
 NP_INLINE int handle(int fam, np_u8 *addr, int port, int proto, int dir, int always_count) {
@@ -183,6 +199,7 @@ NP_INLINE int handle(int fam, np_u8 *addr, int port, int proto, int dir, int alw
 
     int lan = -1;
     NpList *l = lookup_list(app, fam, addr, &lan);
+    if (tor_lan(cfg, app, fam, addr)) lan = 1;
     NpRes r;
     np_decide(app, l, dir, proto, port, lan, lookup_blk(app, fam, addr), np_is_loop(fam, addr), &r);
     int deny = r.verdict == NP_V_DENY;
@@ -322,7 +339,15 @@ SEC("cgroup/sock_create") int np_sock_create(struct bpf_sock *sk) {
     np_u64 cgid = bpf_get_current_ancestor_cgroup_id((int)cfg->level);
     if (!cgid) return 1;
     NpApp *app = bpf_map_lookup_elem(&np_apps, &cgid);
-    if (!app || !(app->flags & NP_R_NO_NETWORK)) return 1;
+    if (!app) return 1;
+    /* (Whonix groups) the Tor gateway makes TCP sockets only: no UDP, ICMP or raw socket at all */
+    if ((app->flags & NP_R_TOR_UPLINK) && !(app->flags & NP_R_NO_NETWORK)) {
+        if (sk->type == 1 /* SOCK_STREAM */ && sk->protocol == IPPROTO_TCP) return 1;
+        np_u8 z[16] = { 0 };
+        handle(0, z, 0, proto_of(sk->protocol), NP_D_OUT, 1);   /* counts and reports (the restriction denies it) */
+        return 0;
+    }
+    if (!(app->flags & NP_R_NO_NETWORK)) return 1;
     np_u8 a[16] = { 0 };
     handle(0, a, 0, proto_of(sk->protocol), NP_D_OUT, 1);   /* counts and reports (denies because of the restriction) */
     return 0;
@@ -530,6 +555,7 @@ NP_INLINE int filter(struct __sk_buff *skb, int in) {
     if (app && app->can_deny) {
         int lan = -1;
         NpList *l = lookup_list(app, k.fam, k.addr, &lan);
+        if (tor_lan(cfg, app, k.fam, k.addr)) lan = 1;
         np_decide(app, l, dir, proto, port, lan, lookup_blk(app, k.fam, k.addr), np_is_loop(k.fam, k.addr), &r);
         /* a reset always goes through: it is what tells the other end the connection is over */
         deny = r.verdict == NP_V_DENY && !rst;
