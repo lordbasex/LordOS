@@ -747,6 +747,13 @@ build/apps-actions-test: tests/apps_actions_test.c $(LAUNCH_CLI_SRC) src/apps.h 
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/apps_actions_test.c $(LAUNCH_CLI_SRC)
 	./$@ || { rm -f $@; exit 1; }
+# tests/apps_profile_test.c: lord.apps.launchProfile (approved 2026-11-24): the browser table, its system .desktop, the
+# profile folder its own Local State lists (hostile files refused), the one argv element built in C
+test: build/apps-profile-test
+build/apps-profile-test: tests/apps_profile_test.c $(LAUNCH_CLI_SRC) src/apps.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/apps_profile_test.c $(LAUNCH_CLI_SRC)
+	./$@ || { rm -f $@; exit 1; }
 # tests/iconfind_test.c: where an icon name's file is (src/iconfind.c): PNG, then SVG, then symbolic, over a made-up tree
 test: build/iconfind-test
 build/iconfind-test: tests/iconfind_test.c src/iconfind.c src/iconfind.h

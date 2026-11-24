@@ -2120,6 +2120,21 @@ static JSValue f_apps_launch_action(JSContext *c, JSValueConst this_val, int arg
     return JS_NewBool(c, ok);
 }
 
+/* lord.apps.launchProfile(id, profile) (approved by the maintainer 2026-11-24): a Chromium-family browser opened in
+ * one of its own profiles (apps.c apps_launch_profile: the fixed browser table, its system .desktop, a profile folder its
+ * own Local State lists, one argv element built in C). The desktop session only: never in an isolated app (no broker
+ * entry), never in the greeter. */
+static JSValue f_apps_launch_profile(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) return JS_FALSE;
+    const char *id = JS_ToCString(c, argv[0]);
+    const char *prof = JS_ToCString(c, argv[1]);
+    int ok = id && prof && apps_launch_profile(id, prof) == 0;
+    if (id) JS_FreeCString(c, id);
+    if (prof) JS_FreeCString(c, prof);
+    return JS_NewBool(c, ok);
+}
+
 /* lord.apps.lastError(): the error code of the last refused launch ("" if none), no arguments */
 static JSValue f_apps_last_error(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
@@ -2718,6 +2733,7 @@ static const JSCFunctionListEntry apps_funcs[] = {
     JS_CFUNC_DEF("launchUri", 2, f_apps_launch_uri),
     JS_CFUNC_DEF("actions", 2, f_apps_actions),
     JS_CFUNC_DEF("launchAction", 2, f_apps_launch_action),
+    JS_CFUNC_DEF("launchProfile", 2, f_apps_launch_profile),
     JS_CFUNC_DEF("lastError", 0, f_apps_last_error),
     JS_CFUNC_DEF("packages", 0, f_apps_packages),
     JS_CFUNC_DEF("inspectPackage", 1, f_apps_inspect),
