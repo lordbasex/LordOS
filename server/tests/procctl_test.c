@@ -52,6 +52,11 @@ int main(void) {
         CHECK(mon_scope_parse("0::/app-lordos-.scope\n", id, sizeof id) == 0);
         CHECK(mon_scope_parse("0::/app-lordos-foot.scope/sub\n", id, sizeof id) == 0);
         CHECK(mon_scope_parse("", id, sizeof id) == 0);
+        /* a machine's scope only in the session's root-owned subtree; the same name under user@ is nobody's */
+        CHECK(mon_scope_parse("0::/system.slice/lordos.service/lordos-session-1000/lordos-machines.slice/app-lordos-lordos-vm-0c1d.scope\n", id, sizeof id) == 'd' && !strcmp(id, "lordos-vm-0c1d"));
+        CHECK(mon_scope_parse("0::/system.slice/lordos.service/lordos-session-1000/app-lordos-lordos-vm-tor-0c1d.scope\n", id, sizeof id) == 'd' && !strcmp(id, "lordos-vm-tor-0c1d"));
+        CHECK(mon_scope_parse("0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-lordos-lordos-vm-0c1d.scope\n", id, sizeof id) == 0 && id[0] == 0);
+        CHECK(mon_scope_parse("0::/app-lordos-lordos-vm-0c1d.scope\n", id, sizeof id) == 0);
         /* (0.8.9.6) a LordOS component's scope: the Terminal's programs are lordos:terminal */
         CHECK(mon_scope_parse("0::/user.slice/lordos-net-terminal.scope\n", id, sizeof id) == 'n' && !strcmp(id, "terminal"));
         CHECK(mon_scope_parse("0::/lordos-net-mail.scope\n", id, sizeof id) == 'n' && !strcmp(id, "mail"));

@@ -1333,6 +1333,8 @@ static struct {
     /* tools 8 and w12: the agent's shell (6.18), links and notifications from the guest (6.12), each said in the hello */
     int lag_shell, lag_links, lag_notify;
     AgRate link_rate, note_rate;            /* the guest's links and notifications, each at most a burst then one per interval */
+    AgRate clip_rate;                       /* the guest's clipboard (AGK_CLIP, AGK_CLIPX), the same way */
+    unsigned clip_dropped;
     int link_over, note_over;               /* refused over the rate since the last line in the log */
     /* the agent's shell (VM_SHELL): our end of lord-server's stream, the shell's id, what went to the guest and isn't
      * acknowledged yet, and what the guest wrote that lord-server's terminal hasn't read yet (at most AG_SHELL_WINDOW) */
@@ -4191,6 +4193,9 @@ static int suspend_usable(char *err, size_t n) {
     char st[PATH_MAX + 32], meta[PATH_MAX + 32];
     state_paths(st, meta, NULL, NULL, sizeof st);
     if (!file_exists(st)) return 0;
+    /* never resumed over an encrypted machine's or a disposable session's disks (begin_suspend never writes one for them):
+     * a state file there came from elsewhere, or from before that changed */
+    if (S.m.encrypted || S.m.disposable != VM_DISP_OFF || session_cap_mb() > 0) { snprintf(err, n, "a saved state is never resumed on an encrypted or disposable machine"); return -1; }
     SuspendMeta sm;
     if (suspend_meta_read(S.dir, &sm)) { snprintf(err, n, "the saved state's description is missing or damaged"); return -1; }
     if (strcmp(sm.machine_type, S.m.machine_type) || sm.vcpus != S.m.vcpus || sm.memory_mb != S.m.memory_mb) {
@@ -4259,6 +4264,19 @@ static void suspend_done(void) {
 }
 
 static void begin_suspend(int ci, uint32_t seq) {
+    /* the one gate for every way here (the person's Suspend, the computer's shutdown, a session that ends): a machine whose
+     * memory must never become a file (encrypted: 8; a disposable session: 6.2, 19.7; locked for anonymity: 19.5) or
+     * can't be migrated (3D, a vGPU) is shut down instead, never saved */
+    const char *never = S.m.encrypted ? "an encrypted machine's memory is never saved to a file"
+                      : S.sess_on || S.m.disposable != VM_DISP_OFF ? "a disposable session keeps nothing"
+                      : S.m.profile_lock ? "locked for anonymity: its memory is never saved to disk"
+                      : S.gl || S.vgpu ? "a machine with 3D graphics or a graphics card can't be saved to disk" : NULL;
+    if (never) {
+        if (ci >= 0) { reply(ci, seq, VME_WRONG_STATE, never); return; }
+        vlog("%s: shutting it down instead", never);
+        host_shutdown();
+        return;
+    }
     char st[PATH_MAX + 32], meta[PATH_MAX + 32], tmp[PATH_MAX + 32], mtmp[PATH_MAX + 32];
     state_paths(st, meta, tmp, mtmp, sizeof st);
     if (vm_op_begin(S.dir, "suspend", NULL, tmp, NULL)) { reply(ci, seq, VME_INTERNAL, "can't write operation.json"); return; }
@@ -6948,6 +6966,11 @@ static void drain_lag(void) {
                 uint8_t b = (uint8_t)mode;
                 lag_send(AGK_STOPPING, &b, 1);
             }
+        } else if ((f.kind == AGK_CLIP || f.kind == AGK_CLIPX) && S.lag_hello && clip_allows(0) && f.len &&
+                   !ag_rate_take(&S.clip_rate, now_ms(), AG_CLIP_BURST, AG_CLIP_EVERY_MS)) {
+            /* a guest that copies in a loop: what comes faster than the limit is dropped (lord-server and lord-media
+             * would hold a memfd and a picture's re-encode for each one) */
+            if (!S.clip_dropped++) vlog("agent: the guest's clipboard changes faster than %d a second: the extra ones are ignored", 1000 / AG_CLIP_EVERY_MS);
         } else if (f.kind == AGK_CLIP && S.lag_hello && clip_allows(0) && f.len && ag_utf8_ok(f.data, f.len)) {
             int fd = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING);
             if (fd >= 0 && !write_all(fd, f.data, f.len) && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
@@ -12558,6 +12581,10 @@ static void import_untrust(VmMachine *m) {
     m->link_mac[0] = 0;
     m->microphone = 0;
     m->sound_out[0] = m->sound_in[0] = 0;
+    /* links and notifications the guest may send this computer (6.12), and running programs in it from here (6.15):
+     * the person's consent on this computer, never the file's; they would wake up as soon as the agent is turned on */
+    m->guest_links = m->guest_notify = 0;
+    m->automation = 0;
     m->clipboard = VM_CLIP_OFF;
     m->clipboard_ask = 1;
     m->transfer = 0;

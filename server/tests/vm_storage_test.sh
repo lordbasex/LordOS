@@ -50,6 +50,13 @@ pattern ab && ok "a normal session's write is kept" || bad "persistent write"
 grep -aq "$(printf '\xab\xab\xab\xab\xab\xab\xab\xab\xab\xab\xab\xab')" "$M/disks/system.qcow2" && bad "the guest's bytes in the clear" || ok "the guest's bytes aren't in the file in the clear"
 "$LV" --start "$M" --detach --key-fd 5 5< <(kf) >/dev/null 2>&1; sleep 2
 "$LV" --suspend "$M" 2>&1 | grep -q "never saved to a file" && ok "suspend refused" || bad "suspend of an encrypted machine"
+# the computer's own stop (SIGTERM, as logind's shutdown or the session's end) never saves it either
+VP=$(pgrep -u "$(id -u)" -f "^$LV .*$M" | head -1)
+if [ -n "$VP" ]; then
+    kill -TERM "$VP"; for _ in $(seq 1 60); do running || break; sleep 0.5; done
+    [ -e "$M/suspend.state" ] || [ -e "$M/.suspend.state.tmp" ] && bad "an encrypted machine's memory saved at the computer's stop" ||
+        { grep -q "an encrypted machine's memory is never saved to a file: shutting it down instead" "$M/log/lord-vm.log" && ok "the computer's stop shuts it down, never saves it" || bad "host stop of an encrypted machine"; }
+else bad "lord-vm's pid"; fi
 stopm
 
 # ---- disposable sessions (6.2), both kinds
@@ -58,6 +65,9 @@ for mode in memory disk; do
     startm || bad "start ($mode session)"
     gwrite cd
     "$LV" --snapshot "$M" take x >/dev/null 2>&1; "$LV" --suspend "$M" 2>&1 | grep -q "keeps nothing" && ok "$mode: suspend refused" || bad "$mode suspend"
+    VP=$(pgrep -u "$(id -u)" -f "^$LV .*$M" | head -1)
+    [ -n "$VP" ] && kill -TERM "$VP"; for _ in $(seq 1 60); do running || break; sleep 0.5; done
+    [ -e "$M/suspend.state" ] && bad "$mode: the session's memory saved at the computer's stop" || ok "$mode: the computer's stop keeps no memory"
     stopm
     grep -q "disposable session: [0-9]* MB .*, gone" "$M/log/lord-vm.log" && ok "$mode: the session's layers went with QEMU" || bad "$mode log"
     pattern ab && ok "$mode: the session's write is gone after power-off" || bad "$mode: the session's write reached the disk"
@@ -97,8 +107,8 @@ mkdir -p "$T/out/ova" && tar -xf "$T/out/p.ova" -C "$T/out/ova" && qemu-img info
 python3 -I - "$T/lib/h.lordvm/machine.json" <<'EOF' && ok "a hostile machine.json comes in with a new machine's safe defaults" || bad "hostile machine.json kept settings"
 import json, sys
 m = json.load(open(sys.argv[1]))
-bad = [k for k, v in {'agent': False, 'transfer': False, 'microphone': False}.items() if m.get(k, False) != v]
-bad += [k for k in ('ports', 'shares', 'iso', 'sound_out', 'sound_in', 'capture_fullscreen', 'pointer', 'perf_profile', 'cpu_pin', 'disposable', 'backup', 'group', 'role', 'profile_lock') if k in m]
+bad = [k for k, v in {'agent': False, 'transfer': False, 'microphone': False, 'guest_links': False, 'guest_notify': False, 'automation': False}.items() if m.get(k, False) != v]
+bad += [k for k in ('ports', 'shares', 'iso', 'sound_out', 'sound_in', 'capture_fullscreen', 'pointer', 'perf_profile', 'cpu_pin', 'disposable', 'backup', 'group', 'role', 'profile_lock', 'usb_auto') if k in m]
 if m.get('clipboard', 'off') != 'off' or m.get('clipboard_ask') is not True: bad.append('clipboard')
 if m.get('graphics', '2d') != '2d' or m.get('network') != 'shared': bad += ['graphics/network']
 sys.exit(1 if bad else print(*bad) or 0)

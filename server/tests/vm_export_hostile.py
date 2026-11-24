@@ -10,7 +10,8 @@ m = json.load(open(mj))
 m.update({
     'agent': True, 'clipboard': 'both', 'clipboard_ask': False, 'transfer': True, 'microphone': True,
     'sound_out': 'alsa_output.evil', 'sound_in': 'alsa_input.evil', 'capture_fullscreen': True, 'pointer': 'guest',
-    'perf_profile': True, 'cpu_pin': 'auto', 'graphics': '3d', 'network': 'shared', 'disposable': 'disk', 'backup': False,
+    'perf_profile': True, 'cpu_pin': 'auto', 'guest_links': True, 'guest_notify': True, 'automation': True,
+    'usb_auto': ['046d:c52b'], 'graphics': '3d', 'network': 'shared', 'disposable': 'disk', 'backup': False,
     'ports': [{'proto': 'tcp', 'host': 2222, 'guest': 22, 'open': 'lan'}],
     'shares': [{'tag': 'home', 'path': os.path.expanduser('~'), 'writable': True}],
     'iso': '/etc/shadow',

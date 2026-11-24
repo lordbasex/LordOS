@@ -527,7 +527,7 @@ static inline int vd_recv(int sock, VdMsg *m, int *fd) { return vm_recv_raw(sock
 static inline int vm_layout_ok(int ox, int oy, int sw, int sh, int dw, int dh) {
     if (!ox && !oy && !sw && !sh && !dw && !dh) return 1;
     return ox >= 0 && oy >= 0 && sw >= 1 && sh >= 1 && dw >= 1 && dh >= 1 && sw <= 32767 && sh <= 32767 && dw <= 32767 && dh <= 32767 &&
-           ox + sw <= dw && oy + sh <= dh;
+           (int64_t)ox + sw <= dw && (int64_t)oy + sh <= dh;
 }
 /* the position to give QEMU's Mouse.SetAbsPosition (which scales by the picture's size, pic) for the picture's point p
  * (one axis), so that a tablet the guest spreads over its whole desktop (desk) lands on the shown display's pixel (that
@@ -537,7 +537,7 @@ static inline int vd_abs_map(int p, int pic, int off, int shown, int desk) {
     if (pic <= 0) return 0;
     if (p < 0) p = 0;
     if (p >= pic) p = pic - 1;
-    if (desk <= 0 || shown <= 0 || off < 0 || off + shown > desk) return p;
+    if (desk <= 0 || shown <= 0 || off < 0 || (int64_t)off + shown > desk) return p;
     long long g = off + (long long)p * shown / pic;               /* the guest desktop's pixel */
     long long q = ((2 * g + 1) * pic) / (2LL * desk);
     return q < 0 ? 0 : q >= pic ? pic - 1 : (int)q;

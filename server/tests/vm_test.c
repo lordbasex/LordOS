@@ -2875,7 +2875,13 @@ static void test_guest_links(void) {
     for (long long t = 2000000; t < 2000000 + 60000; t += 10) got += ag_rate_take(&r, t, AG_NOTE_BURST, AG_NOTE_EVERY_MS);
     CHECK(got <= AG_NOTE_BURST + 60000 / AG_NOTE_EVERY_MS + 1 && got >= 60000 / AG_NOTE_EVERY_MS);
     CHECK(!ag_rate_take(NULL, 1, 1, 1) && !ag_rate_take(&r, 1, 0, 1));
-    r.at = 5000000; r.tokens = 0; CHECK(ag_rate_take(&r, 10, 2, 100));                                     /* the clock went back: a fresh bucket */
+    r.at = 5000000; r.tokens = 0; CHECK(ag_rate_take(&r, 10, 2, 100));
+    /* a layout whose corner is near INT_MAX: refused without a signed overflow (UBSan) */
+    CHECK(!vm_layout_ok(2147483647, 0, 1, 1, 32767, 1) && !vm_layout_ok(0, 2147483647, 1, 1, 1, 32767) && vm_layout_ok(10, 0, 100, 100, 110, 100));
+    CHECK(vd_abs_map(5, 100, 2147483647, 100, 200) == 5);
+    /* the guest's clipboard: a copy loop gets the burst, then 4 a second */
+    { AgRate cr = { 0, 0 }; int n = 0; for (long long t = 1; t <= 10000; t += 5) n += ag_rate_take(&cr, t, AG_CLIP_BURST, AG_CLIP_EVERY_MS);
+      CHECK(n >= 10000 / AG_CLIP_EVERY_MS && n <= AG_CLIP_BURST + 10000 / AG_CLIP_EVERY_MS + 1); }                                     /* the clock went back: a fresh bucket */
 
     /* the hello's words */
     const char *h = "lordos-guest 8 clipboard clipx shell links notify";
