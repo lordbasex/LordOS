@@ -104,6 +104,50 @@ if m.get('graphics', '2d') != '2d' or m.get('network') != 'shared': bad += ['gra
 sys.exit(1 if bad else print(*bad) or 0)
 EOF
 
+# ---- the UEFI code kept with the machine (3.6): a "firmware update" is the system's file no longer being the one the
+# machine was made with (here machine.json is pointed at another OVMF build, which has another hash)
+F=$T/lib/f.lordvm
+"$LV" --create "$F" --name F --memory 512 --disk 1 --display none --network isolated >/dev/null || bad "firmware machine"
+"$LV" --start "$F" --detach >/dev/null 2>&1; sleep 1; "$LV" --poweroff "$F" >/dev/null 2>&1; sleep 1
+cmp -s "$F/firmware-code.fd" /usr/share/OVMF/OVMF_CODE_4M.fd && ok "the code file is kept at the first start" || bad "kept copy"
+ALT=/usr/share/OVMF/OVMF_CODE_4M.snakeoil.fd
+if [ -f "$ALT" ] && ! cmp -s "$ALT" /usr/share/OVMF/OVMF_CODE_4M.fd; then
+    sed -i "s|/usr/share/OVMF/OVMF_CODE_4M.fd|$ALT|" "$F/machine.json"
+    "$LV" --start "$F" --detach >/dev/null 2>&1; sleep 2
+    grep -q "starts with the copy kept with it" "$F/log/lord-vm.log" && grep -q "fw-code-file.*/dev/fdset/3" "$F/log/lord-vm.log" &&
+        "$LV" --status "$F" | grep -q running && ok "after a firmware change it starts with the kept code, by descriptor" || bad "kept firmware not used"
+    "$LV" --poweroff "$F" >/dev/null 2>&1; sleep 1
+    printf 'x' >> "$F/firmware-code.fd"
+    "$LV" --start "$F" --detach >/dev/null 2>&1; sleep 1
+    grep -q "no copy of the old one is kept" "$F/log/lord-vm.log" && ok "a kept copy that changed is never used" || bad "a changed kept copy was used"
+    "$LV" --poweroff "$F" >/dev/null 2>&1; sleep 1
+    "$LV" --set "$F" --firmware-update yes >/dev/null && [ ! -e "$F/firmware-code.fd" ] && grep -q "$(sha256sum "$ALT" | cut -c1-64)" "$F/machine.json" &&
+        ok "--firmware-update moves to this computer's code" || bad "firmware update"
+else echo "note: no second OVMF build to change to: the firmware change isn't tried"; fi
+
+# ---- an encrypted machine group (19.1, isolation layer 5): two empty stand-in disks through the test build's
+# --dev-gateway/--dev-workstation (no archive); the members' overlays are LUKS, the bases (Whonix's public image) aren't
+LVT=$PWD/build/lord-vm-testpaths
+if [ -x "$LVT" ]; then
+    mkdir -p "$T/g"; qemu-img create -q -f qcow2 "$T/g/gw.qcow2" 1G; qemu-img create -q -f qcow2 "$T/g/ws.qcow2" 1G
+    GID=$(cat /proc/sys/kernel/random/uuid)
+    G=$T/lib/W.lordgroup
+    LORDVM_TEST_CATALOG="$(realpath ../assets/machines/systems.json)" "$LVT" --group-create "$G" --catalog-id whonix --dev-gateway "$T/g/gw.qcow2" \
+        --dev-workstation "$T/g/ws.qcow2" --encrypt on --id "$GID" --key-fd 5 5< <(kf) >/dev/null 2>&1 || bad "encrypted group"
+    n=0; for mm in "$G"/*.lordvm; do grep -q '"encrypted": true' "$mm/machine.json" && qemu-img info "$mm/disks/system.qcow2" | grep -q "encrypted: yes" && n=$((n + 1)); done
+    [ $n = 2 ] && ok "both members' disks are LUKS under the group's key" || bad "group members not encrypted"
+    for b in "$T"/lib/.shared/whonix-*.qcow2; do qemu-img info "$b" | grep -q "encrypted: yes" && bad "a group's base encrypted"; done
+    WS=$(grep -l '"role": "workstation"' "$G"/*.lordvm/machine.json | xargs dirname)
+    "$LVT" --group-set "$G" --disposable on >/dev/null
+    "$LVT" --start "$WS" --detach --key-fd 5 5< <(kf) >/dev/null 2>&1; sleep 2
+    "$LVT" --status "$WS" | grep -q running && grep -q "disposable session: the workstation's changes stay in memory" "$WS/log/lord-vm.log" &&
+        ok "the encrypted workstation runs its disposable session" || bad "encrypted workstation"
+    "$LVT" --poweroff "$WS" >/dev/null 2>&1; sleep 1
+    "$LVT" --group-fresh "$G" >/dev/null 2>&1 && bad "Start Fresh of an encrypted group without its key"
+    "$LVT" --group-fresh "$G" --key-fd 5 5< <(kf) >/dev/null 2>&1 && qemu-img info "$WS/disks/system.qcow2" | grep -q "encrypted: yes" &&
+        ok "Start Fresh keeps the workstation encrypted" || bad "Start Fresh of an encrypted group"
+else echo "note: build/lord-vm-testpaths isn't built: the encrypted group isn't tried"; fi
+
 # ---- raw disks (6.4)
 R=$T/lib/r.lordvm
 "$LV" --create "$R" --name R --memory 512 --disk 1 --display none --network isolated --firmware bios --disk-format raw >/dev/null && [ -f "$R/disks/system.raw" ] && ok "a raw disk" || bad "raw create"
