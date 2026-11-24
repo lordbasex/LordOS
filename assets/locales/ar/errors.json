@@ -934,5 +934,7 @@
   "llm.busy": "يحلّل Sentinela عدة أشياء بالفعل. حاول مرة أخرى بعد قليل.",
   "llm.noEngine": "محرك النموذج المحلي غير مثبّت.",
   "llm.noModel": "هذا النموذج المحلي غير مثبّت.",
-  "sentinela.blockFailed": "تعذّر حظر شبكته."
+  "sentinela.blockFailed": "تعذّر حظر شبكته.",
+  "sentinela.machineGone": "لم يعد هذا الجهاز موجودًا في «الأجهزة الافتراضية».",
+  "sentinela.machineFailed": "لم يستجب الجهاز."
 }

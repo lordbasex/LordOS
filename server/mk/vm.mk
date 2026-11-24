@@ -189,3 +189,11 @@ build/vmlog-test: tests/vmlog_test.c src/vm/vmlog.c src/vm/vmlog.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmlog_test.c src/vm/vmlog.c
 	./$@ || { rm -f $@; exit 1; }
+# what Sentinela checks of a running machine (vm/vmwatch.h, js_vm.c stats): the scope's exact path, a cgroup "in" it only
+# when it is that path or below it (never a path that merely contains it), the installed lord-vm; under ASan and UBSan
+test: build/vmwatch-test
+build/vmwatch-test: tests/vmwatch_test.c src/vm/vmwatch.h src/vm/vmproto.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmwatch_test.c
+	./$@ || { rm -f $@; exit 1; }
+build/obj/ui/js_vm.o: src/vm/vmwatch.h

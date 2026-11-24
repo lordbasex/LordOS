@@ -930,5 +930,7 @@
   "llm.busy": "Sentinela همین حالا چند چیز را تحلیل می‌کند. کمی بعد دوباره امتحان کنید.",
   "llm.noEngine": "موتور مدل محلی نصب نیست.",
   "llm.noModel": "آن مدل محلی نصب نیست.",
-  "sentinela.blockFailed": "شبکه‌اش مسدود نشد."
+  "sentinela.blockFailed": "شبکه‌اش مسدود نشد.",
+  "sentinela.machineGone": "این ماشین دیگر در «ماشین‌های مجازی» نیست.",
+  "sentinela.machineFailed": "ماشین پاسخ نداد."
 }

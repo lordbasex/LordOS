@@ -23,5 +23,7 @@ double mon_wall_ms(void);                     /* wall-clock time (for the JSON) 
  * geo may be NULL (no country database). */
 void conn_scan(Buf *b, const Mmdb *geo);
 void conn_reset(void);
+/* Sentinela: per running machine, counts only (conn.c) */
+void conn_machines(Buf *b);
 
 #endif

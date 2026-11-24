@@ -930,5 +930,7 @@
   "llm.busy": "Sentinela artıq bir neçə şeyi təhlil edir. Bir azdan yenidən cəhd edin.",
   "llm.noEngine": "Yerli model mühərriki quraşdırılmayıb.",
   "llm.noModel": "Həmin yerli model quraşdırılmayıb.",
-  "sentinela.blockFailed": "Onun şəbəkəsi bloklana bilmədi."
+  "sentinela.blockFailed": "Onun şəbəkəsi bloklana bilmədi.",
+  "sentinela.machineGone": "O maşın artıq “Virtual maşınlar”-da yoxdur.",
+  "sentinela.machineFailed": "Maşın cavab vermədi."
 }

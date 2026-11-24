@@ -930,5 +930,7 @@
   "llm.busy": "Sentinela پہلے ہی کئی چیزوں کا تجزیہ کر رہا ہے۔ کچھ دیر بعد دوبارہ کوشش کریں۔",
   "llm.noEngine": "مقامی ماڈل کا انجن انسٹال نہیں ہے۔",
   "llm.noModel": "وہ مقامی ماڈل انسٹال نہیں ہے۔",
-  "sentinela.blockFailed": "اس کا نیٹ ورک بلاک نہیں ہو سکا۔"
+  "sentinela.blockFailed": "اس کا نیٹ ورک بلاک نہیں ہو سکا۔",
+  "sentinela.machineGone": "وہ مشین اب “ورچوئل مشینیں” میں نہیں ہے۔",
+  "sentinela.machineFailed": "مشین نے جواب نہیں دیا۔"
 }

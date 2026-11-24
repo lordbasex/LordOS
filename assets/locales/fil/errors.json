@@ -930,5 +930,7 @@
   "llm.busy": "Marami nang sinusuri ang Sentinela. Subukan ulit mamaya.",
   "llm.noEngine": "Hindi naka-install ang engine ng lokal na modelo.",
   "llm.noModel": "Hindi naka-install ang lokal na modelong iyon.",
-  "sentinela.blockFailed": "Hindi ma-block ang network nito."
+  "sentinela.blockFailed": "Hindi ma-block ang network nito.",
+  "sentinela.machineGone": "Wala na ang makinang iyon sa Mga Makina.",
+  "sentinela.machineFailed": "Hindi sumagot ang makina."
 }

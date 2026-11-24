@@ -930,5 +930,7 @@
   "llm.busy": "Sentinela ya está analizando varias cosas. Probá de nuevo en un momento.",
   "llm.noEngine": "El motor del modelo local no está instalado.",
   "llm.noModel": "Ese modelo local no está instalado.",
-  "sentinela.blockFailed": "No se pudo bloquear su red."
+  "sentinela.blockFailed": "No se pudo bloquear su red.",
+  "sentinela.machineGone": "Esa máquina ya no está en Máquinas.",
+  "sentinela.machineFailed": "La máquina no respondió."
 }
