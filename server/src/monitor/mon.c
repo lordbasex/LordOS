@@ -15,6 +15,7 @@
 #include "disktemp.h"
 #include "voltage.h"
 #include "gpustat.h"
+#include "nvgpu.h"
 #include "../meminfo.h"
 
 #include <ctype.h>
@@ -797,6 +798,11 @@ static void *worker(void *arg) {
         pthread_mutex_lock(&M.mu);
         int slept = 0;
         while (!(M.refs > 0 && mon_now_ms() - M.last_poll < IDLE_MS)) {
+            if (!slept) {                   /* nobody looks: lord-nvgpu stops (it starts again on the next tick) */
+                pthread_mutex_unlock(&M.mu);
+                nvgpu_suspend();
+                pthread_mutex_lock(&M.mu);
+            }
             slept = 1;
             if (!M.watch_disks && !M.watch_procs) { pthread_cond_wait(&M.cv, &M.mu); continue; }
             /* nobody looks at the Monitor, but the session wants disk temperature notices (only the disk list and its
@@ -901,11 +907,20 @@ static void *worker(void *arg) {
             proc_detail_json(&d, dpid, dstart, own, (int)getpid());
             publish(&M.detail, &M.dseq, &d);
         }
+        if (wgpu) nvgpu_poll();             /* never blocks: takes the helper's answer if one came */
         if (wgpu && tick % 4 == 3) {
             /* Monitor → GPU and the Overview's GPU card: the cards and the user's processes' DRM clients, once per second */
             static const char *const ids[] = { "/usr/share/misc/pci.ids", "/usr/share/hwdata/pci.ids" };
             const char *pci = access(ids[0], R_OK) ? ids[1] : ids[0];
             Buf g = { .p = gpu_json("", pci, (unsigned)getuid(), (int)getpid(), M.home) };
+            /* NVIDIA's numbers from lord-nvgpu's latest sample (nvgpu.c), spliced in before the closing brace */
+            static char nv[128 * 1024];
+            int nl = g.p ? nvgpu_json(nv, sizeof nv) : 0;
+            size_t gl = g.p ? strlen(g.p) : 0;
+            if (nl > 0 && gl > 1 && g.p[gl - 1] == '}') {
+                char *m = realloc(g.p, gl + (size_t)nl + 2);
+                if (m) { g.p = m; g.p[gl - 1] = ','; memcpy(g.p + gl, nv, (size_t)nl); g.p[gl + (size_t)nl] = '}'; g.p[gl + (size_t)nl + 1] = 0; }
+            }
             if (g.p) publish(&M.gpu, &M.gseq, &g);
         }
         if (wc && tick % 4 == 2) {
@@ -942,6 +957,7 @@ void mon_reset(void) {
     pthread_mutex_lock(&M.mu);
     M.refs = 0;
     M.want_procs = M.want_conns = M.want_geo = M.want_volt = M.want_gpu = 0;
+    nvgpu_want(0);
     M.detail_pid = 0;
     M.watch_disks = 0;
     M.watch_procs = 0;
@@ -1044,6 +1060,7 @@ void mon_want_gpu(int on) {
     pthread_mutex_lock(&M.mu);
     M.want_gpu = !!on;
     pthread_mutex_unlock(&M.mu);
+    nvgpu_want(on);                     /* lord-nvgpu runs only while the GPU view is on screen */
 }
 
 static char *take(char *slot, uint64_t have, uint64_t *seq) {
