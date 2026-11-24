@@ -5715,6 +5715,17 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (fd >= 0) close(fd);
         return;
     }
+    case VM_NETCABLE: {
+        if (fd >= 0) { close(fd); fd = -1; }
+        if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
+        if (S.m.group[0] || (S.m.network != VM_NET_SHARED && S.m.network != VM_NET_HOSTONLY && S.m.network != VM_NET_BRIDGED)) {
+            reply(ci, m->seq, VME_DENIED, "this machine's network has no cable to pull");
+            return;
+        }
+        if (qmp_do("set_link", m->a ? "{\"name\":\"nic0\",\"up\":true}" : "{\"name\":\"nic0\",\"up\":false}", P_REPLY, ci, m->seq, -1, -1)) reply(ci, m->seq, VME_BUSY, "busy");
+        else vlog("network: the cable is %s", m->a ? "plugged in" : "pulled");
+        return;
+    }
     case VM_SHELL: {
         if (fd >= 0) { close(fd); fd = -1; }
         if (m->a == VSH_CLOSE) { shell_end("closed by the window", 1); reply(ci, m->seq, VME_OK, "closed"); return; }

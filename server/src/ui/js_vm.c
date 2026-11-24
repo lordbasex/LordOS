@@ -1957,6 +1957,8 @@ typedef struct {
     int job_kind, job_status, job_pct;  /* the last VM_JOB (suspend, resume, snapshots) */
     char job_text[VM_TEXT_MAX];
     uint32_t cd_seq;                    /* VM_CDROM: the request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
+    uint32_t cable_seq;                 /* VM_NETCABLE: the request; cable_down: pulled in this run (poll's cableOut) */
+    int cable_down, cable_want;
     int cd_state;
     char cd_msg[VM_TEXT_MAX];
     int ag_state, ag_caps;              /* the guest agent (VM_AGENT_STATE), and what it said about itself */
@@ -3005,6 +3007,7 @@ static void from_vm(Sess *s) {
             if (fx_reply(s, &m)) break;
             if (s->ag_seq && m.seq == s->ag_seq) { s->ag_result = m.a == VME_OK ? 2 : 3; snprintf(s->ag_msg, sizeof s->ag_msg, "%s", m.text); s->ag_seq = 0; }
             if (s->xf_seq && m.seq == s->xf_seq) { s->xf_result = m.a == VME_OK ? 2 : 3; snprintf(s->xf_msg, sizeof s->xf_msg, "%s", m.text); s->xf_seq = 0; }
+            if (s->cable_seq && m.seq == s->cable_seq) { if (m.a == VME_OK) s->cable_down = !s->cable_want; s->cable_seq = 0; }
             if (s->cd_seq && m.seq == s->cd_seq) { s->cd_state = m.a == VME_OK ? 2 : 3; snprintf(s->cd_msg, sizeof s->cd_msg, "%s", m.text); s->cd_seq = 0; }
             if (m.a != VME_OK) {
                 snprintf(s->last_error, sizeof s->last_error, "%s", m.text);
@@ -3324,6 +3327,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "picSkipped", s->pic_skipped);
     set_int(c, o, "pace", s->pace.kind);
     set_int(c, o, "cd", s->cd_state);
+    JS_SetPropertyStr(c, o, "cableOut", JS_NewBool(c, s->cable_down));
     if (s->console_term && !term_get(s->console_term)) s->console_term = 0;
     set_int(c, o, "console", s->console_term);
     /* the agent's shell: its terminal, and its size passed on to the guest when the terminal changed it */
@@ -3602,6 +3606,20 @@ static JSValue f_cdrom(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     if (fd >= 0) close(fd);
     if (ok) { s->cd_seq = s->seq; s->cd_state = 1; s->cd_msg[0] = 0; }
     return JS_NewBool(c, ok);
+}
+
+/* netCable(id, plugged) → bool: the running machine's network cable plugged in or pulled (VM_NETCABLE, the window's
+ * Devices → Network); poll's cableOut says where it is. A new run starts plugged in. */
+static JSValue f_net_cable(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s || s->vm < 0 || s->cable_seq) return JS_FALSE;
+    int on = JS_ToBool(c, argv[1]);
+    VmMsg m = vm_msg(VM_NETCABLE, ++s->seq, on ? 1 : 0, 0, 0, 0, "");
+    if (vm_send(s->vm, &m, -1)) return JS_FALSE;
+    s->cable_seq = s->seq;
+    s->cable_want = on ? 1 : 0;
+    return JS_TRUE;
 }
 
 static JSValue f_cmd(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -5182,7 +5200,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate), JS_CFUNC_DEF("shown", 2, f_shown),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot), JS_CFUNC_DEF("protect", 1, f_protect),
-    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("isoDetect", 1, f_iso_detect), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
+    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("netCable", 2, f_net_cable), JS_CFUNC_DEF("isoDetect", 1, f_iso_detect), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
