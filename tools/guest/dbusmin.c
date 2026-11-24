@@ -51,6 +51,15 @@ void dbw_bytes(DbW *w, const uint8_t *p, size_t n) {
     w_mem(w, p, n);
 }
 void dbw_variant_str(DbW *w, const char *s) { dbw_sig(w, "s"); dbw_str(w, s); }
+void dbw_u32(DbW *w, uint32_t v) { w_u32(w, v); }
+void dbw_strv(DbW *w, const char *const *v, int n) {
+    w_u32(w, 0);
+    size_t start = w->n;                                /* a string's alignment (4) is the array's: no padding first */
+    for (int i = 0; i < n; i++) dbw_str(w, v[i]);
+    if (w->bad) return;
+    uint32_t len = (uint32_t)(w->n - start);
+    for (int i = 0; i < 4; i++) w->p[start - 4 + i] = (uint8_t)(len >> (8 * i));
+}
 
 /* names as D-Bus takes them: a path ("/a/b_c"), a member ("Get"), a bus or interface name ("a.b-c.D") */
 static int name_ok(const char *s, int kind) {
@@ -166,6 +175,9 @@ int db_msg_parse(const uint8_t *p, size_t n, DbMsg *m) {
         if (code == 4) { if (l >= sizeof m->err) return -1; memcpy(m->err, s, l); m->err[l] = 0; }
         if (code == 5) { if (!v) return -1; m->reply_serial = v; }
         if (code == 8) { if (l >= sizeof m->sig || !sig_ok(s)) return -1; memcpy(m->sig, s, l); m->sig[l] = 0; have_sig = 1; }
+        if ((code == 2 || code == 3) && t != 's') return -1;
+        if (code == 3 && l < sizeof m->member) { memcpy(m->member, s, l); m->member[l] = 0; }
+        if (code == 2 && l < sizeof m->iface) { memcpy(m->iface, s, l); m->iface[l] = 0; }
     }
     if (o != hend) return -1;
     for (size_t i = hend; i < bstart; i++) if (p[i]) return -1;
@@ -335,4 +347,86 @@ int db_open(Db *b, const char *path, int timeout_ms) {
         return -1;
     }
     return 0;
+}
+
+/* ---- the guest desktop's own notifications (lordos-guest 9, gnotes.c) ---- */
+
+long db_msg_total(const uint8_t *p, size_t n) {
+    if (!p) return -1;
+    if (n < 16) return 0;
+    int big = p[0] == 'B';
+    if ((p[0] != 'l' && !big) || p[1] < DB_CALL || p[1] > DB_SIGNAL || p[3] != 1) return -1;
+    uint32_t blen = rd32(p + 4, big), flen = rd32(p + 12, big);
+    if (flen > DB_SKIP_MAX || blen > DB_SKIP_MAX) return -1;
+    size_t total = ((16 + (size_t)flen + 7) & ~(size_t)7) + blen;
+    return total > DB_SKIP_MAX ? -1 : (long)total;
+}
+
+/* at most cap - 1 bytes of s (length l), cut on a character boundary */
+static void cut_copy(char *out, size_t cap, const char *s, size_t l) {
+    if (!cap) return;
+    if (l > cap - 1) { l = cap - 1; while (l && ((unsigned char)s[l] & 0xc0) == 0x80) l--; }
+    memcpy(out, s, l);
+    out[l] = 0;
+}
+
+int db_notify_body(const DbMsg *m, char *app, size_t an, char *summary, size_t sn, char *body, size_t bn) {
+    if (!m || m->type != DB_CALL || strncmp(m->sig, "susss", 5) || strcmp(m->member, "Notify") || strcmp(m->iface, "org.freedesktop.Notifications") || !m->body) return -1;
+    size_t o = 0;
+    const char *s;
+    uint32_t l;
+    if (rd_text(m->body, &o, m->body_n, 0, m->big, &s, &l)) return -1;
+    cut_copy(app, an, s, l);
+    if (skip_pad(m->body, &o, 4, m->body_n) || o + 4 > m->body_n) return -1;     /* replaces_id */
+    o += 4;
+    if (rd_text(m->body, &o, m->body_n, 0, m->big, &s, &l)) return -1;           /* app_icon */
+    if (rd_text(m->body, &o, m->body_n, 0, m->big, &s, &l)) return -1;
+    cut_copy(summary, sn, s, l);
+    if (rd_text(m->body, &o, m->body_n, 0, m->big, &s, &l)) return -1;
+    cut_copy(body, bn, s, l);
+    return 0;
+}
+
+/* the length of the valid UTF-8 character at p (n bytes left), 0 when it isn't one */
+static size_t u8len(const unsigned char *p, size_t n) {
+    if (p[0] < 0x80) return 1;
+    size_t k = p[0] >= 0xf0 && p[0] <= 0xf4 ? 4 : p[0] >= 0xe0 && p[0] < 0xf0 ? 3 : p[0] >= 0xc2 && p[0] < 0xe0 ? 2 : 0;
+    if (!k || k > n) return 0;
+    for (size_t i = 1; i < k; i++) if ((p[i] & 0xc0) != 0x80) return 0;
+    uint32_t c = k == 2 ? (uint32_t)(p[0] & 0x1f) << 6 | (p[1] & 0x3f)
+               : k == 3 ? (uint32_t)(p[0] & 0x0f) << 12 | (uint32_t)(p[1] & 0x3f) << 6 | (p[2] & 0x3f)
+               : (uint32_t)(p[0] & 0x07) << 18 | (uint32_t)(p[1] & 0x3f) << 12 | (uint32_t)(p[2] & 0x3f) << 6 | (p[3] & 0x3f);
+    if ((k == 3 && (c < 0x800 || (c >= 0xd800 && c <= 0xdfff))) || (k == 4 && (c < 0x10000 || c > 0x10ffff))) return 0;
+    return k;
+}
+
+size_t db_note_plain(const char *in, char *out, size_t max) {
+    static const struct { const char *e; char c; } ent[] = { { "&amp;", '&' }, { "&lt;", '<' }, { "&gt;", '>' }, { "&quot;", '"' }, { "&apos;", '\'' } };
+    const unsigned char *p = (const unsigned char *)(in ? in : "");
+    size_t n = strlen((const char *)p), o = 0;
+    int space = 1;                                     /* no leading space, no runs */
+    for (size_t i = 0; i < n && o < max;) {
+        if (p[i] == '<') { const unsigned char *e = memchr(p + i, '>', n - i); if (e) { i = (size_t)(e - p) + 1; continue; } }
+        char one = 0;
+        if (p[i] == '&')
+            for (size_t k = 0; k < sizeof ent / sizeof *ent && !one; k++) {
+                size_t el = strlen(ent[k].e);
+                if (!strncmp((const char *)p + i, ent[k].e, el)) { one = ent[k].c; i += el; }
+            }
+        if (one) { out[o++] = one; space = 0; continue; }
+        size_t k = u8len(p + i, n - i);
+        if (!k) { out[o++] = '?'; space = 0; i++; continue; }
+        int blank = p[i] < 0x20 || p[i] == 0x7f || p[i] == ' ';
+        /* C1 controls, and the bidi controls U+200E, U+200F, U+202A..U+202E, U+2066..U+2069 */
+        if (k == 2 && p[i] == 0xc2 && p[i + 1] < 0xa0) blank = 1;
+        if (k == 3 && p[i] == 0xe2 && ((p[i + 1] == 0x80 && (p[i + 2] == 0x8e || p[i + 2] == 0x8f || (p[i + 2] >= 0xaa && p[i + 2] <= 0xae))) ||
+                                       (p[i + 1] == 0x81 && p[i + 2] >= 0xa6 && p[i + 2] <= 0xa9))) blank = 1;
+        if (blank) { if (!space) { out[o++] = ' '; space = 1; } i += k; continue; }
+        if (o + k > max) break;
+        memcpy(out + o, p + i, k);
+        o += k; i += k; space = 0;
+    }
+    while (o && out[o - 1] == ' ') o--;
+    out[o] = 0;
+    return o;
 }

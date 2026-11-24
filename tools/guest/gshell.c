@@ -4,6 +4,7 @@
 #define _GNU_SOURCE
 #endif
 #include "gshell.h"
+#include "gsend.h"
 #include "../../server/src/vm/vmagent.h"
 
 #include <errno.h>
@@ -207,7 +208,7 @@ void gshell_pump(int port, short ev) {
 
 static int ls_fd = -1;
 static char ls_path[256];
-static struct { int fd; long long until; size_t n; uint8_t b[AG_HEAD + AG_NOTE_BYTES + AG_LINK_MAX]; } cl[4];
+static struct { int fd; long long until; size_t n; uint8_t b[AG_HEAD + 4096 + AG_NOTE_BYTES + AG_LINK_MAX]; } cl[4];
 
 static long long mono(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (long long)t.tv_sec * 1000 + t.tv_nsec / 1000000; }
 
@@ -272,6 +273,18 @@ void gshell_client(int i, int port, unsigned host_caps) {
     int used = ag_frame_next(cl[i].b, cl[i].n, &f);
     if (used < 0 || (!used && cl[i].n == sizeof cl[i].b)) { cl_done(i, GSA_MALFORMED); return; }
     if (!used) return;
+    if (f.kind == AGK_SEND_OFFER) {
+        /* a file to send (tools 9): its absolute path, sent on only while the host takes files */
+        char path[4096 + 1];
+        if (!f.len || f.len > 4096 || memchr(f.data, 0, f.len)) { cl_done(i, GSA_MALFORMED); return; }
+        memcpy(path, f.data, f.len);
+        path[f.len] = 0;
+        if (port < 0) { cl_done(i, GSA_NOHOST); return; }
+        if (!(host_caps & AG_HELLO_SEND)) { cl_done(i, GSA_REFUSED); return; }
+        int r = gsend_queue(path);
+        cl_done(i, r == 0 ? GSA_SENT : r == 1 ? GSA_MALFORMED : GSA_FULL);
+        return;
+    }
     int link = f.kind == AGK_LINK;
     if ((!link && f.kind != AGK_NOTIFY) || (link ? !ag_link_ok(f.data, f.len) : ag_note_parse(f.data, f.len, NULL, NULL, NULL, NULL))) { cl_done(i, GSA_MALFORMED); return; }
     if (port < 0) { cl_done(i, GSA_NOHOST); return; }

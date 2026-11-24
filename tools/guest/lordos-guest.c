@@ -51,9 +51,13 @@
  * the person's programs hand this helper a link or a notification over $XDG_RUNTIME_DIR/lordos-guest.sock, which goes
  * on only when the host's hello says the machine takes them.
  *
+ * Tools 9 ("send" in the hello; gsend.h, gnotes.h): "Send to LordOS" (`lordos-guest --send-to-host FILE...`, the file
+ * manager's entry lordos-send-to-host.desktop) sends files to the host's quarantine folder for this machine, one at a time,
+ * with flow control and resume; and while the host takes notifications, the person's own desktop notifications go on too.
+ *
  *   lordos-guest [--port PATH] [--windows PATH] [--once] [--system-bus PATH] [--session-bus PATH]
  *   lordos-guest [--port PATH] --stopping poweroff|halt|reboot|kexec
- *   lordos-guest --open-on-host URL | --notify-host TITLE [BODY]
+ *   lordos-guest --open-on-host URL | --notify-host TITLE [BODY] | --send-to-host FILE...
  *     --port: the agent's port (a character device; a Unix socket path for tests); --windows: lord-server's socket
  *     (default $XDG_RUNTIME_DIR/lordos-guestwin.sock); --once: one look at the clipboard and the port, for tests;
  *     --system-bus, --session-bus: other buses' sockets for the performance profile, for tests;
@@ -64,6 +68,8 @@
 #include "../../server/src/vm/vmagent.h"
 #include "x11clip.h"
 #include "gshell.h"
+#include "gsend.h"
+#include "gnotes.h"
 #ifndef LG_NO_PERF
 #include "perf.h"
 #endif
@@ -83,7 +89,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define VERSION "8"
+#define VERSION "9"
 #define PORT "/dev/virtio-ports/org.lordos.agent"
 #define CLIP_MAX AG_TEXT_MAX
 
@@ -294,7 +300,7 @@ static int stop_hook(void) {
 }
 
 static void say_hello(int fd) {
-    char h[144];
+    char h[160];
 #ifndef LG_NO_PERF
     static const char perf_word[] = " perf";
 #else
@@ -302,7 +308,7 @@ static void say_hello(int fd) {
 #endif
     /* "noclip": the helper is there but the guest has no clipboard tool (Machines says what to install) */
     snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s%s%s%s shell%s", tool_n ? " clipboard clipx" : " noclip", tool_n && xc_fd() >= 0 ? " clipreq" : "",
-             wfd >= 0 ? " windows" : "", stop_hook() ? " stopping" : "", perf_word, gshell_listen_fd() >= 0 ? " links notify" : "");
+             wfd >= 0 ? " windows" : "", stop_hook() ? " stopping" : "", perf_word, gshell_listen_fd() >= 0 ? " links notify send" : "");
     send_frame(fd, AGK_HELLO, (const uint8_t *)h, (uint32_t)strlen(h));
 }
 
@@ -433,7 +439,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--version")) { printf("lordos-guest %s\n", VERSION); return 0; }
         else if (!strcmp(argv[i], "--open-on-host") && i + 1 < argc && i + 2 == argc) return gshell_cli(argv[i], argv[i + 1], NULL);
         else if (!strcmp(argv[i], "--notify-host") && i + 1 < argc && i + 3 >= argc) return gshell_cli(argv[i], argv[i + 1], i + 2 < argc ? argv[i + 2] : NULL);
-        else { fprintf(stderr, "usage: lordos-guest [--port PATH] [--windows PATH] [--once] [--system-bus PATH] [--session-bus PATH] | [--port PATH] --stopping VERB | --open-on-host URL | --notify-host TITLE [BODY]\n"); return 2; }
+        else if (!strcmp(argv[i], "--send-to-host") && i + 1 < argc) return gsend_cli(argc - i - 1, argv + i + 1);
+        else { fprintf(stderr, "usage: lordos-guest [--port PATH] [--windows PATH] [--once] [--system-bus PATH] [--session-bus PATH] | [--port PATH] --stopping VERB | --open-on-host URL | --notify-host TITLE [BODY] | --send-to-host FILE...\n"); return 2; }
     }
     signal(SIGPIPE, SIG_IGN);
     if (stopping) return say_stopping(port, stopping);
@@ -483,6 +490,7 @@ int main(int argc, char **argv) {
         if (fd < 0 && perf_active()) perf_do(-1, 0);
 #endif
         if (fd < 0 && gshell_fd() >= 0) gshell_end();             /* the host is gone: so is its shell */
+        if (fd < 0) { gsend_port_lost(); gnotes_want(0, NULL); }
         if (fd < 0) {
             fd = open_port(port);
             if (fd < 0) { if (once) { perror(port); return 1; } sleep(3); continue; }
@@ -492,6 +500,8 @@ int main(int argc, char **argv) {
             host_caps = 0;
         }
         gshell_expire();
+        gnotes_want((host_caps & AG_HELLO_NOTIFY) != 0, ses_bus);
+        int send_wait = gsend_pump(fd);
         long long now = now_ms();
         /* lord-server's endpoint: tried every 3 s while it isn't there; the hello says "windows" while it is */
         if (wfd < 0 && wpath[0] && now >= win_try) {
@@ -567,17 +577,20 @@ int main(int argc, char **argv) {
             if (once) return 0;
         }
         int xfd0 = xc_fd();
-        struct pollfd pp[9] = { { fd, POLLIN, 0 }, { wfd, POLLIN, 0 }, { xfd0, POLLIN, 0 },
+        struct pollfd pp[10] = { { fd, POLLIN, 0 }, { wfd, POLLIN, 0 }, { xfd0, POLLIN, 0 },
                                 { gshell_fd(), (short)((gshell_can_read() ? POLLIN : 0) | (gshell_wants_out() ? POLLOUT : 0)), 0 },
                                 { gshell_listen_fd(), POLLIN, 0 } };
         for (int i = 0; i < 4; i++) pp[5 + i] = (struct pollfd){ gshell_client_fd(i), POLLIN, 0 };
+        pp[9] = (struct pollfd){ gnotes_fd(), POLLIN, 0 };
         long long until = next_look - now_ms();
         if (until > 250) until = 250;          /* the requests' time limits */
-        int r = poll(pp, 9, (int)(until > 0 ? until : 0));
+        if (send_wait >= 0 && send_wait < until) until = send_wait;      /* a file on its way */
+        int r = poll(pp, 10, (int)(until > 0 ? until : 0));
         if (r < 0 && errno != EINTR) { close(fd); fd = -1; continue; }
         if (r <= 0) continue;
         if (pp[3].fd >= 0 && pp[3].revents) gshell_pump(fd, pp[3].revents);
         if (pp[4].fd >= 0 && (pp[4].revents & POLLIN)) gshell_accept();
+        if (pp[9].fd >= 0 && pp[9].revents) gnotes_read(fd);
         for (int i = 0; i < 4; i++) if (pp[5 + i].fd >= 0 && pp[5 + i].revents) gshell_client(i, fd, host_caps);
         if (xfd0 >= 0 && (pp[2].revents & (POLLIN | POLLHUP | POLLERR)) && xc_read() < 0) say_hello(fd);
         if (wfd >= 0 && (pp[1].revents & (POLLIN | POLLHUP | POLLERR))) {
@@ -600,11 +613,13 @@ int main(int argc, char **argv) {
                 host_clipx = f.len < 200 && memmem(f.data, f.len, " clipx", 6) != NULL;
                 host_clipreq = f.len < 200 && (ag_hello_caps(f.data, f.len) & AG_HELLO_CLIPREQ);
                 host_caps = f.len < 200 ? ag_hello_caps(f.data, f.len) : 0;
+                gsend_host(fd, (host_caps & AG_HELLO_SEND) != 0);
                 /* a new lord-vm (after a resume) asks once: the hello again */
                 if (f.len < 200 && memmem(f.data, f.len, " ask", 4)) say_hello(fd);
             }
             if (f.kind == LAG_APPS || f.kind == LAG_WINACT || f.kind == LAG_LAUNCH) to_server(&f);
             gshell_frame(fd, f.kind, f.data, f.len);
+            gsend_frame(fd, f.kind, f.data, f.len);
 #ifndef LG_NO_PERF
             int perf_on;
             /* the desktop's name (XDG_CURRENT_DESKTOP) may still be on its way from the user's manager */
