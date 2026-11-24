@@ -962,6 +962,22 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   (`mkdeb-voice.mjs`), sign and publish them on the maintainer's Mac (`tools/release/apt-repo.sh`), then merge the
   branch and add `fr`, `de`, `it`, `nl` to the closed lists in AGENTS.md (lord-tts, `lord.voice`). Also a whisper
   round trip for the four languages, as was done for Spanish and Portuguese.
+- [ ] **iCloud: choose what to sync** ([#241](https://github.com/lordbasex/LordOS/issues/241); on the roadmap, not
+  started). Today adding an iCloud account in Mail syncs every calendar and every address book it finds and adds an
+  "iCloud – Calendar & Contacts" row to Mail's sidebar even when it carries no mail. Plan:
+  - **Setup asks what to sync:** Mail (IMAP), Calendars and Contacts, each on or off; with Calendars on, the calendars
+    the server lists (CalDAV discovery already reads them) as a checklist, all checked by default, so only the chosen
+    ones sync. The same choices later from the account's sheet in Mail, Calendar and Contacts.
+  - **A per-collection `subscribed` flag** in `lord-maild` (`server/src/mail/pim.c`, `dav.c`): kept in `pim/colls`, an
+    unsubscribed collection is listed (so it can be turned on again) but never fetched or shown, and its cached items
+    are dropped. The `pim/colls` line gains a field, so a **migration** reads the old line as subscribed (every
+    collection syncs as today) and the old format stays readable; `mail-test` cases for the old and new lines and for a
+    discovery answer with collections added or removed on the server.
+  - **Labels by what is synced:** "iCloud – Calendar" when only calendars sync, "iCloud – Contacts" when only contacts,
+    "iCloud – Calendar & Contacts" when both; **Mail's sidebar shows the account only when it carries mail** (IMAP on).
+    Texts in all 35 languages; the same rule for any CalDAV/CardDAV account, not only iCloud.
+  - Tests: the setup's model and the label rule as node tests; a scene with an account that has mail off; checked on
+    the VM against a CalDAV server with several calendars before it is marked done.
 - [ ] **The five X11 items at 100 % but not "complete"** (`docs/WAYLAND.md`, "Conformance"): `ewmh.wm_pid`, `xdnd`,
   `xwayland.hidpi`, `xwayland.cursor` and `xwayland.security` need tests written for each that cover every point, so
   all 28 X11 items are complete as the 48 Wayland globals are.

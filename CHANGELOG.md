@@ -1435,6 +1435,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   shows six cards, arm64 five.
 
 ### Documentation
+- **Roadmap: choosing what an iCloud account syncs** ([#241](https://github.com/lordbasex/LordOS/issues/241); in
+  development, not started; latest release 0.8.9.5-beta). `docs/ROADMAP.md`, "Next release after 0.8.9.5": setup asks
+  for Mail, Calendars (which ones) and Contacts; a per-collection `subscribed` flag in `lord-maild` (`pim.c`, `dav.c`)
+  with a migration of `pim/colls` that reads old lines as subscribed; labels by what is synced ("iCloud – Calendar",
+  "iCloud – Contacts"); Mail's sidebar shows the account only when it carries mail.
 
 - **Hardware reports: #245, #230 and the graphics card report #235 (`docs/HARDWARE-REPORT.md`, updated 2026-11-24),
   in development (the latest release is 0.8.9.5-beta).** #245 adds an Acer Aspire R3-131T laptop with an Intel Celeron
