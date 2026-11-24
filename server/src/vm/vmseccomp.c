@@ -58,6 +58,7 @@ static const uint32_t IOCTL_ANY[] = {
 #define IOC_TYPE_SYNC   0x3E    /* '>': sync_file (Mesa merges fences: SYNC_IOC_MERGE measured on i915, 2026-11-23) */
 #define IOC_TYPE_DMABUF 0x62    /* 'b': dma-buf (Mesa's fence export and import on the dmabufs it shares; read in Mesa) */
 #define IOC_TYPE_VFIO   0x3B    /* ';': VFIO's (hw/vfio, read: an Intel vGPU can't run here) */
+#define IOC_TYPE_USB    0x55    /* 'U': usbfs's USBDEVFS_* (libusb in QEMU's usb-host, on a host USB device's descriptor) */
 #define IOC_TYPE_TUN    0x54    /* 'T': TUNSETIFF is 202; below 200 are the terminal's, TIOCSTI among them */
 #define IOC_TUN_FIRST   200
 
@@ -129,12 +130,13 @@ static int body(Emit *e, const VmScRow *r, const VmScOpts *o) {
         return 0;
     case VSR_IOCTL: {
         LD_ARG(1);
-        uint32_t types[5];
+        uint32_t types[6];
         int nt = 0;
         if (o->kvm) types[nt++] = IOC_TYPE_KVM;
         /* learn-all: only KVM's (hot) stay allowed; the others are logged */
         if (o->render && !learn_all) { types[nt++] = IOC_TYPE_DRM; types[nt++] = IOC_TYPE_SYNC; types[nt++] = IOC_TYPE_DMABUF; }
         if (o->vgpu && !learn_all) types[nt++] = IOC_TYPE_VFIO;
+        if (o->usb && !learn_all) types[nt++] = IOC_TYPE_USB;
         /* [exact requests] → ALLOW at the end; then the type byte; then a tap's TUN range */
         int nx = learn_all ? 0 : (int)(sizeof IOCTL_ANY / sizeof IOCTL_ANY[0]);   /* learn-all: logged */
         /* each exact request jumps over what follows it to the final ALLOW: the distance is counted below */
