@@ -672,6 +672,11 @@ export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math
 // screenshot, recording or snapshot picture), and its card never shows a thumb.png.
 export const ANONYMITY_PROFILE = 'anonymity';
 export const machineProtected = (m) => !!m && (m.profileLock === ANONYMITY_PROFILE || m.meta?.profile === ANONYMITY_PROFILE || m.group?.kind === 'whonix');
+// The one question every call site asks (meta.js isProtectedMachine): lord.vm.list()'s entry for the machine (machine.json:
+// profile_lock, its group) and its app.json meta together, or a window of it that is already protected (home: the
+// machine's own window, so its apps-mode windows can never be less protected than it). Each part alone is enough.
+export const machineProtectedOf = (entry, meta, homeProtected = false) =>
+  !!homeProtected || machineProtected({ ...(entry && typeof entry === 'object' ? entry : null), meta: meta || entry?.meta || {} });
 
 // ---- the guest agent (6.17) ----
 

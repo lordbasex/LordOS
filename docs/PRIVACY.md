@@ -592,7 +592,7 @@ Up to 0.8.9.5 the fill was plain black and the theme's title bar stayed visible;
 |---|---|---|
 | A native app | `wm.open(app, { protected: true })`, or `"protected": true` in its manifest (Passwords) | No: locked (`protectLocked`, `sdk/protectmodel.js`) |
 | A native app, later | `wm.setProtected(id, true)` (System Information while serial numbers show; Screenshots' "Protect the front window") | Yes, `wm.setProtected(id, false)`, unless locked (`{ lock: true }` locks it) |
-| Machines | a machine with the anonymity profile (`machineProtected`: machine.json `profile_lock: "anonymity"`, app.json `profile`, a Whonix group): its window and its apps-mode windows open protected and locked, and `lord.vm.protect(session)` | No |
+| Machines | a machine with the anonymity profile (`isProtectedMachine` in `apps/machines/meta.js`, the one question every call site asks: machine.json `profile_lock: "anonymity"` from `lord.vm.list()`, app.json `profile`, a Whonix group, or its own window already protected): its window and its apps-mode windows open protected and locked, and `lord.vm.protect(session)` | No |
 | A built-in isolated app | its manifest's `"protected"` (`sdk/wayland.js`) | No |
 | A Linux app (Wayland or X11) | never by itself: no Wayland or X11 protocol asks for capture exclusion, and LordOS adds no trust in a client's word | — |
 
@@ -622,6 +622,7 @@ overview reused it).
 | A machine's picture: the card picture (`lord.vm.snapshot` → `thumb.png`), `lord.vm.screenshot`, `lord.vm.record` (and a recording already running), a snapshot's picture (`lord.vm.snapTake`) | `ui/js_vm.c` `pic_out_ok` | refused for a protected session (`lord.vm.protect`, one way; it also removes the old `thumb.png`) or a picture shown in a protected window; the Machines window doesn't ask, and the library card never shows a protected machine's `thumb.png` |
 | Remote Desk's card picture (`lord.rdesk.snapshot`) | `ui/js_rdesk.c` | `media_src_exportable` |
 | Window switcher, overview and Dock previews | painted live on the local screen | shown normally on the display, the fill in any capture of it (they are nodes of the same tree) |
+| A protected source's picture in any window (defense in depth) | `ui/paint.c` | in capture mode a NODE_MEDIA whose source is marked protected (`media_id_protected`: `lord.vm.protect`, or found in a protected window) is the fill whatever window holds it; it counts as protected for the remote desktop's CPU path (`media_protected_count`) and its window is refused alone |
 
 Not a capture path of the compositor: `lord-rdesk` shows *another* computer's screen; X11 apps under Xwayland can read
 each other's windows (never a Wayland or LordOS window); the DRM device is the session's alone and a restricted app is
@@ -631,7 +632,9 @@ denied the framebuffer device.
 
 - `build/engine-test`: `test_capture_protected` (the fill, what covers it, the window refused alone),
   `test_protected_transform_cache` (a protected window under the overview's cached scale and its own cached rotation),
-  `test_protected_label` (the lock and label inside the box, never outside; the label cut and cleaned) and
+  `test_protected_label` (the lock and label inside the box, never outside; the label cut and cleaned),
+  `test_protected_media` (a protected machine's picture inside an unprotected window: the fill, through a cached
+  transform too, its window refused alone) and
   `test_protected_fuzz` (300 random scenes: places, overlaps, radii, a protected frame or only its content, its own scale,
   rotation and opacity, the overview's scale, a blurred panel over it, the drag layer, the CPU and GPU paths with their
   caches filled first; each captured whole at 100, 125, 150 and 200 % and at an offset, each window as Screenshots'
@@ -642,7 +645,7 @@ denied the framebuffer device.
   screenshot, the remote desktop's frame, the Screenshot portal's still and each window shared alone, and
   `tests/protected_check.py` wants Calculator drawn on the display and the fill everywhere else, Notes identical.
 - `tests/protect_model_test.mjs`: the flag (`sdk/protectmodel.js`: open, reopen, lock, the label) and Machines'
-  `machineProtected`.
+  `machineProtected` and `machineProtectedOf` (the list entry and app.json together, the home window).
 
 | On the display | In a screenshot | What the remote desktop gets |
 |---|---|---|

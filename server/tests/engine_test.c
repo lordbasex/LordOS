@@ -87,7 +87,15 @@ int wl_draws_meet(Rect r) {
     }
     return 0;
 }
-void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)r; (void)op; }
+/* a media node: nothing, except source PROT_MEDIA_ID, which paints a protected machine's picture (red, as the protected
+ * tests' secret) for test_protected_media; media_id_protected says whether that source is marked protected */
+enum { PROT_MEDIA_ID = 4242 };
+static int prot_media_marked;
+void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) {
+    (void)node; (void)r;
+    if (id == PROT_MEDIA_ID) canvas_rrect(c, x, y, w, h, 0, ((uint32_t)(op * 255 + 0.5f) << 24) | 0xd01010);
+}
+int media_id_protected(int id) { return id == PROT_MEDIA_ID && prot_media_marked; }
 void media_paint_note(Canvas *c, int id, int node, float x, float y, float w, float h, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)op; }
 int media_cover_node(float x0, float y0, float x1, float y1) { (void)x0; (void)y0; (void)x1; (void)y1; return 0; }
 int gpu_active(void) { return test_gpu; }
@@ -800,6 +808,56 @@ static void test_protected_transform_cache(void) {
     CHECK(!leaks(px, 200, 120), "a rotated protected window: %d leaked", leaks(px, 200, 120));
     render(root, 200, 120);
     CHECK(leaks(fb, 200, 120) > 100, "and the screen's next frame shows it again (the capture's raster was not kept)");
+    free(px);
+}
+
+/* Defense in depth (2026-11-23 review): a protected source's picture (a machine with the anonymity profile, lord.vm.protect)
+ * is the fill in every capture even inside a window nobody protected, through a cached transform too; the window holding
+ * it is refused alone; before it is marked, it is captured as any picture. */
+static void test_protected_media(void) {
+    ui_reset();
+    prot_media_marked = 0;
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xffffffff);
+    Node *ov = view(root);
+    ss(ov, "position", "absolute");
+    sn(ov, "left", 0); sn(ov, "top", 0); sn(ov, "width", 240); sn(ov, "height", 140);
+    Node *win = box_in(ov, 20, 10, 160, 110, 0xff2060ff);           /* an ordinary window (not protected): blue */
+    Node *pic = node_new(NODE_MEDIA);                                /* the machine's picture in it */
+    node_append(win, pic);
+    ss(pic, "position", "absolute");
+    sn(pic, "left", 10); sn(pic, "top", 20); sn(pic, "width", 140); sn(pic, "height", 80);
+    pic->term = PROT_MEDIA_ID;
+    render(root, 240, 140);
+    uint32_t *px = calloc(240 * 140, 4);
+    Canvas c;
+    canvas_init(&c, px, 240, 140, 240);
+    paint_capture(&c, root);
+    CHECK(leaks(px, 240, 140) > 1000, "an unmarked picture is captured as any picture");
+    CHECK(paint_capture_until(&c, root, win->id, NULL, 0) == 1, "and its window alone too");
+    prot_media_marked = 1;
+    render(root, 240, 140);
+    CHECK(leaks(fb, 240, 140) > 1000, "marked: the screen still shows it");
+    memset(px, 0, 240 * 140 * 4);
+    paint_capture(&c, root);
+    int fill = 0;
+    for (int i = 0; i < 240 * 140; i++) fill += (px[i] & 0xffffff) == PROT_RGB;
+    CHECK(!leaks(px, 240, 140) && fill > 5000, "marked: the fill in a capture of the screen (%d leaked, %d fill)", leaks(px, 240, 140), fill);
+    CHECK((px[60 * 240 + 25] & 0xffffff) == 0x2060ff, "the unprotected window around it is captured: %06x", px[60 * 240 + 25]);
+    CHECK(paint_node_protected(win), "the window holding it counts as protected");
+    for (int i = 0; i < 240 * 140; i++) px[i] = 0xff123456u;
+    CHECK(paint_capture_until(&c, root, win->id, NULL, 0) == -1, "its window alone is refused");
+    memset(px, 0, 240 * 140 * 4);
+    paint_capture_node(&c, root, win->id, NULL, 0);
+    CHECK(!leaks(px, 240, 140), "its window shared alone: %d leaked", leaks(px, 240, 140));
+    sn(ov, "scaleX", 0.7); sn(ov, "scaleY", 0.7);                   /* the overview, its raster cached */
+    render(root, 240, 140);
+    render(root, 240, 140);
+    memset(px, 0, 240 * 140 * 4);
+    paint_capture(&c, root);
+    CHECK(!leaks(px, 240, 140), "through a cached transform: %d leaked", leaks(px, 240, 140));
+    prot_media_marked = 0;
     free(px);
 }
 
@@ -4289,6 +4347,7 @@ int main(int argc, char **argv) {
     test_capture_protected();
     test_protected_transform_cache();
     test_protected_label();
+    test_protected_media();
     test_protected_fuzz();
     test_node_ref();
     test_backdrop_band();

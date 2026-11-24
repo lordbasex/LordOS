@@ -20,8 +20,8 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { ClipAskBar } from './clipask.jsx';
 import { menus } from './ui.jsx';
-import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, iconsToAsk, AGENT_CAPS, copyLine, placeBatch, closeRefusedOf, launchStart, launchPending, launchPrune, closeStart, closePrune, guestKeys, guestMayTakeFront, anchorPoint, cropsStale, STALE_MS, machineProtected } from './model.js';
-import { readMeta } from './meta.js';
+import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, iconsToAsk, AGENT_CAPS, copyLine, placeBatch, closeRefusedOf, launchStart, launchPending, launchPrune, closeStart, closePrune, guestKeys, guestMayTakeFront, anchorPoint, cropsStale, STALE_MS } from './model.js';
+import { isProtectedMachine } from './meta.js';
 
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
 // window (vmwindow.jsx) and its apps mode windows alike
@@ -150,8 +150,8 @@ function sync(dir, sid, mid, name, list, gw, gh) {
   // behind the window in front, which keeps the keyboard (model.js guestMayTakeFront: no focus stealing from a Terminal)
   const front = wm.focused();
   const keep = guestMayTakeFront(front ? wm.get(front) : null, dir) ? null : front;
-  // a protected machine's guest windows are protected from their first frame, as its own window (machineProtected)
-  const prot = machineProtected({ meta: readMeta(dir) }) || !!wm.get(guests.get()[dir]?.home)?.protected;
+  // a protected machine's guest windows are protected from their first frame, as its own window (meta.js isProtectedMachine, the same question everywhere)
+  const prot = isProtectedMachine(dir, null, !!wm.get(guests.get()[dir]?.home)?.protected);
   // bottom first, so the guest's front window ends up in front here too
   for (const w of [...plan.open].reverse()) {
     const instance = guestInstance(mid, w.id);

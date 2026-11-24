@@ -2,7 +2,7 @@
 // (apps/machines/model.js machineProtected). docs/PRIVACY.md "Protected windows".
 import assert from 'node:assert';
 import { protectOnOpen, protectOnReopen, protectPatch, protectLabel, PROTECT_LABEL_MAX } from '../../sdk/protectmodel.js';
-import { machineProtected, ANONYMITY_PROFILE } from '../../apps/machines/model.js';
+import { machineProtected, machineProtectedOf, ANONYMITY_PROFILE } from '../../apps/machines/model.js';
 
 // opened protected: by the option or by the native app's manifest, and locked
 assert.deepEqual(protectOnOpen({ protected: true }, null), { protected: true, protectLocked: true });
@@ -53,5 +53,18 @@ assert.equal(machineProtected({ meta: { profile: 'productivity' } }), false);
 assert.equal(machineProtected({ profileLock: '' }), false);
 assert.equal(machineProtected({}), false);
 assert.equal(machineProtected(null), false);
+
+// the shared question (meta.js isProtectedMachine): the list entry and app.json together, each enough alone, and a
+// protected home window protects its apps-mode windows whatever the rest says
+assert.equal(machineProtectedOf({ dir: '/m', profileLock: 'anonymity' }, {}), true);          // machine.json only
+assert.equal(machineProtectedOf({ dir: '/m' }, { profile: 'anonymity' }), true);              // app.json only
+assert.equal(machineProtectedOf({ dir: '/m', group: { kind: 'whonix' } }, null), true);       // a group member
+assert.equal(machineProtectedOf(null, { profile: 'anonymity' }), true);                       // no list entry
+assert.equal(machineProtectedOf({ dir: '/m', meta: { profile: 'anonymity' } }, null), true);  // the entry's own meta
+assert.equal(machineProtectedOf({ dir: '/m', profileLock: 'anonymity' }, { profile: 'productivity' }), true);
+assert.equal(machineProtectedOf({ dir: '/m' }, { profile: 'productivity' }), false);
+assert.equal(machineProtectedOf({ dir: '/m' }, {}, true), true);                              // the home window
+assert.equal(machineProtectedOf(null, null), false);
+assert.equal(machineProtectedOf('x', null), false);
 
 console.log('protect-model-test: ok');

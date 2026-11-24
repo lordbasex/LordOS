@@ -43,7 +43,7 @@ static double now_ms(void) {
 
 static int count_protected(const Node *n) {
     if (!n || n->type == NODE_RAW || n->s.display_none) return 0;
-    if (n->protect) return 1;
+    if (n->protect || (n->type == NODE_MEDIA && media_id_protected(n->term))) return 1;
     int c = 0;
     for (const Node *k = n->first; k; k = k->next) c += count_protected(k);
     return c;
@@ -61,6 +61,11 @@ static int shows_protected(const Node *n, int id, int under, int depth) {
 }
 
 void media_src_protect(MediaSrc *src) { if (src) src->protect = 1; }
+
+int media_id_protected(int id) {
+    MediaSrc *s = id > 0 ? media_src_get(id) : NULL;
+    return s && s->protect;
+}
 
 int media_src_exportable(MediaSrc *src) {
     if (!src) return 0;

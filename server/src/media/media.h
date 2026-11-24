@@ -71,7 +71,10 @@ const Canvas *media_composed(const Canvas *out, int remote, const MediaCursor *c
 /* The LordOS arrow with its tip at (x, y), as the recordings draw the pointer (sharing a screen, cast/cast.c). */
 void media_draw_arrow(Canvas *c, int x, int y);
 
-/* Protected windows present in the tree (counted at the moment). */
+/* Protected windows present in the tree (counted at the moment), a NODE_MEDIA showing a protected source included. */
 int media_protected_count(void);
+/* Is media source id's picture a protected one (MediaSrc.protect: lord.vm.protect, or found shown in a protected
+ * window)? paint.c then paints any NODE_MEDIA showing it as the protected fill in a capture, whatever window holds it. */
+int media_id_protected(int id);
 
 #endif

@@ -10,10 +10,10 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, machineProtected, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending } from './model.js';
+import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
 import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
-import { readMeta, writeMeta } from './meta.js';
+import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
 import { defaultsOf } from './store.js';
 import { ClipAskBar } from './clipask.jsx';
 import { KeysBtn, sendKeysItems } from './keys.jsx';
@@ -422,7 +422,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   gpuRef.current = gpu;
   // a protected machine (the anonymity profile, model.js machineProtected): its window is protected and locked (a neutral
   // fill in every capture of the screen), and lord.vm.protect keeps its picture from leaving as a picture of its own
-  const [prot] = useWindowState('vm.prot', () => machineProtected({ ...(has() ? lord.vm.list().find((x) => x.dir === dir) : null), meta: readMeta(dir) }));
+  const [prot] = useWindowState('vm.prot', () => has() && isProtectedMachine(dir));
   const protRef = useRef(prot);
   protRef.current = prot;
   useEffect(() => { if (prot) wm.setProtected(winId, true, { lock: true }); }, [prot, winId]);

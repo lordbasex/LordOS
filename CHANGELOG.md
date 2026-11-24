@@ -43,8 +43,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `profile`, a Whonix group) opens its window and its apps-mode windows protected; `lord.vm.protect(session)` (new,
     one way) refuses its card picture (`lord.vm.snapshot`; the old `thumb.png` is removed), screenshot, recording (one
     running stops) and snapshot picture, the window doesn't offer Screenshot or Record and stops taking card pictures,
-    and the library card shows no `thumb.png` for it.
-  - **Tests:** `engine-test` `test_protected_transform_cache`, `test_protected_label` and `test_protected_fuzz` (300 random
+    and the library card shows no `thumb.png` for it. Every call site asks one helper (`isProtectedMachine`, meta.js:
+    the `lord.vm.list()` entry and app.json together, or the machine's own window already protected), so the window,
+    its apps-mode windows and the card can't disagree.
+  - **Defense in depth:** in a capture, a picture whose source is marked protected (a protected machine's, whatever
+    window shows it) is the fill too, counts as a protected node for the remote desktop and keeps its window from being
+    captured alone.
+  - **Tests:** `engine-test` `test_protected_transform_cache`, `test_protected_label`, `test_protected_media` and `test_protected_fuzz` (300 random
     scenes through every capture function at four display scales, both paint paths, the drag layer and a blurred panel:
     no protected pixel may reach any capture); `tests/protected_headless.sh` (a headless `lord-server-test` with Lord
     Flow: Calculator opened protected is drawn on the display and is the fill in the screenshot, the remote frame, the

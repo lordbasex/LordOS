@@ -143,7 +143,9 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
     if (!plain) for (int i = 0; i < 4; i++) r4[i] = ex->r.rad[i] * k;
     if (!plain) rad = max4(r4);
     int corners_differ = !plain && (r4[1] != r4[0] || r4[2] != r4[0] || r4[3] != r4[0]);
-    if (paint_capture_mode && n->protect) {     /* a protected window: the neutral fill and the lock in every capture */
+    /* a protected window, or a picture of a protected source (a protected machine's, lord.vm.protect) wherever it is shown:
+     * the neutral fill and the lock in every capture */
+    if (paint_capture_mode && (n->protect || (n->type == NODE_MEDIA && media_id_protected(n->term)))) {
         float rr[4] = { rad, rad, rad, rad };
         paint_protected_fill(c, x, y, w, h, corners_differ ? r4 : rr);
         return;
@@ -2505,7 +2507,7 @@ static int in_tree(const Node *n, const Node *root) {
 }
 
 static int subtree_protected(const Node *n, int depth) {
-    if (n->protect) return 1;
+    if (n->protect || (n->type == NODE_MEDIA && media_id_protected(n->term))) return 1;
     if (depth > 4096) return 1;                     /* deeper than any real tree: treated as protected, never captured */
     for (const Node *k = n->first; k; k = k->next) if (subtree_protected(k, depth + 1)) return 1;
     return 0;
