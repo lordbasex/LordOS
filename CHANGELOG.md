@@ -131,6 +131,39 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     and `process_vm_readv` are refused. `vm-jail-probe --before` runs the old jail for comparison: 9 of those checks fail
     there. `tests/vm_isolation.sh` checks the status fields, the refused reads, `PTRACE_SEIZE` and `process_vm_readv` on
     a real machine; it no longer lists QEMU's descriptors, which the person's programs can't any more.
+- **Web apps: lord-web on WPEPlatform, WPE WebKit's new API** (in development; the latest release is 0.8.9.5-beta;
+  issue #142, maintainer's decision 2026-11-23). Everything lord-web does with WebKit's frames and input now goes
+  through one small interface, `server/src/web/webback.h`, with two implementations, one of them built:
+  - `webback_platform.c`, on **WPEPlatform** (WPE WebKit 2.50 and later; LordOS will ship its own build of wpewebkit
+    2.54 for Debian 13 with both APIs on). lord-web brings its own platform (a `WPEDisplay`, `WPEView`, `WPEToplevel`
+    and `WPEScreen` of its own) instead of WPEPlatform's Wayland one, so it keeps its window and hands lord-server its
+    frames itself, exactly as before: a `WPEBufferDMABuf` becomes a `wl_buffer` of the window with no copy (the
+    formats and modifiers offered to WebKit are the ones lord-server announces, and its DRM device is lord-server's
+    GPU, read from EGL), a `WPEBufferSHM` is copied into one of the window's `wl_shm` buffers (the CPU path, `LORD_GPU=0`).
+    Keys (the compositor's keymap through WPEPlatform's xkb keymap), the pointer, the wheel and touchpad, touch,
+    focus, size, fractional scale, the page's cursor (by its CSS name, now exact instead of guessed from the hovered
+    element), the clipboard (WPEPlatform's `WPEClipboard`, which keeps UTF-8 as UTF-8) and the screen's size and
+    refresh rate all reach WebKit as `WPEEvent`s and WPEPlatform calls. The input method stays lord-web's
+    text-input-v3 context, now shared by both backends.
+  - `webback_legacy.c`: the libwpe + wpebackend-fdo code lord-web had, moved behind the interface unchanged, so
+    Debian 13's WPE WebKit 2.48 keeps building and working exactly as before.
+  - `mk/web.mk` picks the backend: WPEPlatform when `pkg-config` finds `wpe-platform-2.0`, else legacy;
+    `LORD_WEB_BACKEND=legacy|platform` forces one (an error when its packages are missing). When lord-web is skipped
+    the build now says why: which packages are missing for each backend, or that `WEB=0` was given. Switching backend
+    rebuilds lord-web; `tools/iso/mkdeb-web.sh` writes the Depends of the backend that was built (no `libwpe`,
+    `wpebackend-fdo` or `libwayland-server` for WPEPlatform); lord-web's log names the backend and WebKit's version.
+  - Isolation: nothing was added to lord-web's sandbox. With WPEPlatform lord-web no longer runs wpebackend-fdo's
+    nested Wayland compositor (no `libwayland-server`, no socket pair for frames: frames come over WebKit's own IPC);
+    the web process opens the GPU's render node with GBM where the legacy one opened it through EGL (WebKit's sandbox
+    exposes `/dev/dri` in both); the `WPE_*` variables WPEPlatform reads were already dropped (docs/WEBAPPS.md, "The
+    view's backend").
+  - New test, `build/web-backend-test` (`tests/web_backend_test.c`, in `make -C server test`): the backend alone,
+    headless, with a throwaway HOME and WebKit's sandbox: a local page's pixels in the frame, a click and keys reaching
+    the page's listeners and the next frame, the wheel, a resize, scale 2 (`devicePixelRatio`, the frame's size, a click
+    at the same CSS position) and hidden then visible. It passes on the legacy backend with Debian 13's 2.48.3 and on
+    both backends with Debian sid's 2.54.3; lord-web also showed a page in a window of a headless weston on 2.54.3 with
+    both backends, by shared memory and by dmabuf. Still to check on LordOS's 2.54 backport and the VM: every web app
+    feature, before the backport ships.
 - **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
   Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
   threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores

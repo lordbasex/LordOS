@@ -17,6 +17,7 @@
 #include "web.h"
 #include "webmanifest.h"
 #include "weburl.h"
+#include "webback.h"
 
 #include <errno.h>
 #include <netdb.h>
@@ -31,7 +32,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <wpe/unstable/fdo-shm.h>
 
 #define CHAN 3
 #define PROBE_DEADLINE_S 18
@@ -280,21 +280,15 @@ static gboolean deny_all(WebKitWebView *v, WebKitPermissionRequest *r, gpointer 
 /* no window: every frame is given back at once */
 static gboolean complete(gpointer d) {
     Web *w = d;
-    if (w->exportable) wpe_view_backend_exportable_fdo_dispatch_frame_complete(w->exportable);
+    webback_frame_done(w->back);
     return G_SOURCE_REMOVE;
 }
-static void headless_shm(void *d, struct wpe_fdo_shm_exported_buffer *b) {
+static void headless_frame(void *d, const WebFrame *f) {
     Web *w = d;
-    wpe_view_backend_exportable_fdo_dispatch_release_shm_exported_buffer(w->exportable, b);
+    if (f->kind != WEBFRAME_SHM) webback_release(w->back, f->key);
     g_idle_add(complete, w);
 }
-static void headless_res(void *d, struct wl_resource *r) {
-    Web *w = d;
-    wpe_view_backend_exportable_fdo_dispatch_release_buffer(w->exportable, r);
-    g_idle_add(complete, w);
-}
-static void headless_dmabuf(void *d, struct wpe_view_backend_exportable_fdo_dmabuf_resource *r) { headless_res(d, r->buffer_resource); }
-static const struct wpe_view_backend_exportable_fdo_client headless = { headless_res, headless_dmabuf, headless_shm, NULL, NULL };
+static const WebBackSink headless = { headless_frame, NULL };
 
 int webprobe_run(Web *w) {
     char url[WEBARGS_LINE_MAX + 1];
@@ -303,18 +297,17 @@ int webprobe_run(Web *w) {
     typed_set(url);
     snprintf(current, sizeof current, "%s", url);
     setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
-    if (!wpe_fdo_initialize_shm()) { answer_error(w, "web.probe.load"); return 1; }
-    w->exportable = wpe_view_backend_exportable_fdo_create(&headless, w, 1280, 800);
+    WebBackConfig cfg = { .width = 1280, .height = 800, .scale = 1 };
+    if (!(w->back = webback_new(&cfg, &headless, w))) { answer_error(w, "web.probe.load"); return 1; }
     w->context = web_context_new();
     w->session = webkit_network_session_new_ephemeral();
     WebKitSettings *settings = web_settings_new(WEBREG_UA_CHROME);
     webkit_settings_set_enable_media_stream(settings, FALSE);
     webkit_settings_set_enable_webrtc(settings, FALSE);
     webkit_settings_set_media_playback_requires_user_gesture(settings, TRUE);
-    WebKitWebViewBackend *backend = webkit_web_view_backend_new(wpe_view_backend_exportable_fdo_get_view_backend(w->exportable), NULL, NULL);
-    w->view = g_object_new(WEBKIT_TYPE_WEB_VIEW, "backend", backend, "web-context", w->context, "network-session", w->session, "settings", settings, NULL);
+    w->view = webback_view_new(w->back, w->context, w->session, settings);
     g_object_unref(settings);
-    wpe_view_backend_add_activity_state(wpe_view_backend_exportable_fdo_get_view_backend(w->exportable), wpe_view_activity_state_visible | wpe_view_activity_state_in_window);
+    webback_set_visible(w->back, 1);
     g_signal_connect(w->view, "load-changed", G_CALLBACK(on_load), w);
     g_signal_connect(w->view, "load-failed", G_CALLBACK(on_load_failed), w);
     g_signal_connect(w->view, "load-failed-with-tls-errors", G_CALLBACK(on_tls), w);

@@ -15,11 +15,13 @@ identify the services; LordOS is not affiliated with, endorsed or sponsored by t
 
 ## What it is
 
-- **`lord-web`** (`server/src/web/`, C): one process per app and profile. It is the only binary that links WPE WebKit:
-  Debian 13's `libwpewebkit-2.0` 2.48, `libwpe` 1.16 and `wpebackend-fdo` 1.16, which bring GStreamer and libsoup. It
-  ships in the optional package `lordos-web` (`tools/iso/mkdeb-web.sh`, which depends on WebKit, GStreamer's good and
-  bad plugins, `bubblewrap` and `xdg-dbus-proxy`; built only when `pkg-config` finds WPE, `WEB=0` skips it). Without that package the rest of LordOS works unchanged and the web app
-  features say how to get it.
+- **`lord-web`** (`server/src/web/`, C): one process per app and profile. It is the only binary that links WPE WebKit,
+  which brings GStreamer and libsoup, through one of two backends ("The view's backend", below): **WPEPlatform** (WPE
+  WebKit 2.54 built with it: LordOS's own backport for Debian 13, in development) or the **legacy API** (Debian 13's
+  `libwpewebkit-2.0` 2.48, `libwpe` 1.16 and `wpebackend-fdo` 1.16). It ships in the optional package `lordos-web`
+  (`tools/iso/mkdeb-web.sh`, which depends on WebKit, GStreamer's good and bad plugins, `bubblewrap` and
+  `xdg-dbus-proxy`; built only when `pkg-config` finds WPE, `WEB=0` skips it, and the build says why it skipped it).
+  Without that package the rest of LordOS works unchanged and the web app features say how to get it.
 - **The manager** lives in what LordOS already has:
   - `lord.webapps` in lord-server (`server/src/ui/js_webapps.c`) keeps the registry and starts `lord-web`;
   - the Store has a "Web apps" section;
@@ -81,6 +83,72 @@ Data, per app and profile, under `~/.local/share/lordos/web/<app>/<profile>/` (a
 `cache/`, `cookies.sqlite` and `state.json`, lord-web's own (what it learned about the page: `{ "ownSound": true }`).
 Nothing of one profile is readable by another.
 
+## The view's backend: WPEPlatform or the legacy API (issue #142, in development)
+
+WPE WebKit has two ways for an application to show a web view. The legacy one (libwpe and wpebackend-fdo) is
+deprecated upstream and already missing on some distributions; Debian 13 keeps it at 2.48 for its whole life.
+WPEPlatform is its replacement (WPE WebKit 2.50 and later). The maintainer decided on 2026-11-23 that lord-web moves to
+WPEPlatform, with LordOS's own build of wpewebkit 2.54 for Debian 13 that has both APIs on.
+
+Everything lord-web does with WebKit's frames and input goes through one small interface, `server/src/web/webback.h`;
+the rest of lord-web (the window, the clipboard, drops, the input method, the page's scripts, the bus) uses WebKit's
+own `webkit_web_view_*` API and is the same on both. Exactly one backend is built:
+
+- **`webback_platform.c` (WPEPlatform):** lord-web brings its own platform instead of WPEPlatform's Wayland one, which
+  would open a window of its own; lord-web keeps its window (`webwin.c`) and hands lord-server its frames itself, as
+  before. `LordWebDisplay` (a `WPEDisplay`) has no connection of its own: its DRM device is the compositor's GPU (the
+  render and primary node `webwin.c` reads from EGL, `EGL_EXT_device_query`), its preferred buffer formats the ARGB and
+  XRGB formats and modifiers lord-server announces on `zwp_linux_dmabuf_v1`, its keymap WPEPlatform's xkb keymap fed
+  with the compositor's, its clipboard WPEPlatform's in-process `WPEClipboard` (`webwin.c` mirrors the session's
+  clipboard into it, as it did into libwpe's pasteboard; it reads UTF-8 back as UTF-8), and one `WPEScreen` (the output
+  the window is on: its size and refresh rate). `LordWebView` (a `WPEView`) gets each frame in `render_buffer`, a
+  `WPEBufferDMABuf` (its planes become a `wl_buffer` of the window, no copy) or a `WPEBufferSHM` (copied into one of
+  the window's `wl_shm` buffers); `buffer-rendered` is emitted at lord-server's frame callback and `buffer-released`
+  when lord-server releases the `wl_buffer` (or right after the copy). The page's cursor arrives by its CSS name and
+  becomes a `wp_cursor_shape` shape. `LordWebToplevel` (a `WPEToplevel`) has the view; its size, scale and active state
+  are the `xdg_toplevel`'s, and WebKit's own requests to resize, maximize or go fullscreen are refused, as before.
+  Input becomes `WPEEvent`s in surface coordinates (WPEPlatform's are logical pixels; libwpe's were buffer pixels).
+  The input method stays lord-web's `WebKitInputMethodContext` on text-input-v3, which replaces the one WebKit builds
+  on a display's `WPEInputMethodContext`: one input method for both backends. Without a GPU (`LORD_GPU=0`,
+  `LORD_WEB_SHM`, no `zwp_linux_dmabuf_v1`) the display has no DRM device and WebKit draws on the CPU into shared memory.
+- **`webback_legacy.c` (legacy API):** the code lord-web had, moved behind the interface unchanged: wpebackend-fdo's
+  exportable view backend (`webshm.c` reads its own `wl_shm` buffers and watches its `wl_resource`s), libwpe's input
+  events and xkb context, libwpe's pasteboard.
+
+`mk/web.mk` picks the backend: WPEPlatform when `pkg-config` finds `wpe-platform-2.0`, else legacy when it finds
+`wpe-1.0` and `wpebackend-fdo-1.0`; `LORD_WEB_BACKEND=legacy|platform` forces one (an error when its packages are
+missing). Without either, or with `WEB=0`, the build prints why lord-web was skipped. A switch rebuilds lord-web
+(`build/gen/web_backend`), `tools/iso/mkdeb-web.sh` writes the matching Depends (no `libwpe`, `wpebackend-fdo` or
+`libwayland-server` for WPEPlatform), and lord-web's log names the backend and WebKit's version at start
+(`lord-web: platform backend (WPE WebKit 2.54.3), dmabuf`).
+
+**What WPEPlatform changes in lord-web's isolation** (for review; nothing was added to lord-web's own sandbox):
+
+- lord-web no longer runs wpebackend-fdo's nested Wayland compositor: no `libwayland-server`, no socket pair to the
+  web process for frames. Frames and their dmabuf or shared memory fds come over WebKit's own IPC, which already
+  carried everything else.
+- The GPU: lord-web still opens EGL on lord-server's display only to check `EGL_EXT_image_dma_buf_import` and to read
+  the GPU's node names (`/dev/dri/renderD*`, `/dev/dri/card*`), as before; it now passes those names to WebKit
+  (`WPEDRMDevice`), and the web process opens the render node with GBM, where the legacy web process opened the same
+  node through EGL. WebKit's sandbox exposes `/dev/dri` to the web process in both (`--dev-bind-try /dev/dri`); WebKit
+  2.54's sandbox also exposes `/dev/udmabuf` (GStreamer 1.28's software decoders), a change of WebKit's version, not of
+  the backend. The primary node is passed by name only; nothing in lord-web opens it.
+- Shared memory: the web process's `WPEBufferSHM` is mapped by lord-web from an fd WebKit passes (before, a `wl_shm`
+  pool of wpebackend-fdo's); lord-web also makes one sealed memfd for the keymap it hands WPEPlatform.
+- The environment: WPEPlatform reads `WPE_DISPLAY`, `WPE_DRM_DEVICE` and other `WPE_*` variables, which lord-web
+  already drops before WebKit starts (`clean_env`); `LIBGL_ALWAYS_SOFTWARE` is set by lord-web itself on the CPU path.
+- No new socket, device, file or D-Bus name; the session's Wayland socket is still lord-web's alone (WebKit's web
+  process never gets it on WPE).
+
+**Checked** (2026-11-23): `build/web-backend-test` (`tests/web_backend_test.c`, run by `make -C server test`) drives
+the backend alone, headless, with a throwaway HOME and WebKit's sandbox: a local page's pixels in the frame, a click
+(button and position) and keys (`a`/`KeyA`, Shift+`B`) reaching the page's listeners and the next frame, a wheel notch
+down (`deltaY > 0`), a resize to 500×400, scale 2 (`devicePixelRatio` 2, a 1000×800 frame, a click at the same CSS
+position) and hidden then visible (`visibilitychange`). It passes on the legacy backend with Debian 13's 2.48.3 and on
+both backends with Debian sid's 2.54.3 (both APIs on, as the backport will be). In a window: lord-web in a headless
+weston (sid, 2.54.3), both backends, shared memory (pixman) and dmabuf (GL on the GPU), the page's colour in weston's
+screenshot. Still to check on the backport and the VM: every web app feature (`docs/ROADMAP.md`, the WPEPlatform item).
+
 ## Starting an app
 
 Only lord-server starts `lord-web`:
@@ -109,7 +177,8 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
 - **One process per app and profile:** the profile folder holds a `lock` (flock). A second start finds it taken, calls
   `Show(token)` on `org.lordos.WebApp1` (`/org/lordos/WebApp1`) at the bus name
   `org.lordos.WebApp.app_<app>.profile_<profile>` (`-` as `_`) with its `XDG_ACTIVATION_TOKEN`, and exits with 0.
-- **Frames:** WebKit's web process draws into wpebackend-fdo's exportable view backend. When the compositor offers
+- **Frames:** WebKit's web process draws through the view's backend (below): into wpebackend-fdo's exportable view
+  backend (legacy), or into WPEPlatform buffers handed to lord-web's own `WPEView` (platform). When the compositor offers
   `zwp_linux_dmabuf_v1` and EGL works on its display, a dmabuf frame becomes a `wl_buffer` of the window (no copy); a
   frame the compositor can't import restarts lord-web once on the shared memory path. Otherwise (`LORD_GPU=0`, no GPU,
   VM 127) every frame is copied into one of three `wl_shm` buffers. WebKit's next frame is released only after the
