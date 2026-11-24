@@ -40,7 +40,7 @@ recomputes both from the rows; the arithmetic:
 |---|---:|---:|---:|---:|---:|---:|
 | A. Engine, lifecycle, sandbox, display | 14 | 22 | 92.05 | 92 % | 14 × 92 % = 12.88 | 78 % |
 | B. Getting a system in (cards, unattended, import) | 12 | 13 | 87.85 | 88 % | 12 × 88 % = 10.56 | 76 % |
-| C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 91.00 | 91 % | 11 × 91 % = 10.01 | 75 % |
+| C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 95.17 | 95 % | 11 × 95 % = 10.45 | 75 % |
 | D. Snapshots, clones, storage | 9 | 6 | 85.00 | 85 % | 9 × 85 % = 7.65 | 60 % |
 | E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 80 % |
 | F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 56.00 | 56 % | 6 × 56 % = 3.36 | 56 % |
@@ -52,9 +52,9 @@ recomputes both from the rows; the arithmetic:
 | L. Privacy and security model | 4 | 7 | 85.71 | 86 % | 4 × 86 % = 3.44 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 92.00 | 92 % | 3 × 92 % = 2.76 | 55 % |
-| **Total** | **100** | **110** | | | **84.08 → 84 %** | 69 % |
+| **Total** | **100** | **110** | | | **84.52 → 85 %** | 69 % |
 
-Σ = 12.88 + 10.56 + 10.01 + 7.65 + 4.80 + 3.36 + 10.92 + 3.22 + 6.44 + 2.79 + 2.67 + 3.44 + 2.58 + 2.76 = 84.08, rounded **84 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
+Σ = 12.88 + 10.56 + 10.45 + 7.65 + 4.80 + 3.36 + 10.92 + 3.22 + 6.44 + 2.79 + 2.67 + 3.44 + 2.58 + 2.76 = 84.52, rounded **85 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); USB, then camera and printers (F, +1.2
@@ -93,7 +93,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| `lord-vm` supervisor over direct QMP, `machine.json` schema 17, lock, `run.json`, crash recovery (3.8, 3.9) | ✅ | 100 | `lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 17`); `vm-test`, `vmgroup-test` | Schema 17 (*in development*) adds `automation` (6.15); 16 the storage keys `disposable`, `encrypted`, `disk_format` and `backup` (6.2, 6.4, 8); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4) |
+| `lord-vm` supervisor over direct QMP, `machine.json` schema 19, lock, `run.json`, crash recovery (3.8, 3.9) | ✅ | 100 | `lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 19`); `vm-test`, `vmgroup-test` | Schema 19 (*in development*) adds `heads` (5.4, All Displays); 18 `cpu_model` (5.5); 17 `automation` (6.15); 16 the storage keys `disposable`, `encrypted`, `disk_format` and `backup` (6.2, 6.4, 8); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4) |
 | KVM amd64 and arm64, TCG labelled Emulated (2.1–2.4) | ✅ | 100 | `lordvm.c` (`-accel`), `assistant.jsx` ("Other architecture…") | Pi 5, nested amd64, Xeon and the i9 PC |
 | Pi defaults (3 vCPUs, RAM − 2 GB) and the microSD warning (2.2) | ✅ | 100 | `machine.c`, `js_vm.c` |  |
 | `/dev/kvm` through `vm-kvm` (ACL now, group next login) (3.4) | ✅ | 100 | `vm_admin.c` |  |
@@ -134,7 +134,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Migrate from another PC (6.11) | 🟡 | 25 | `lordvm.c` `--import-machine` (a raw whole-disk image), `machines.c` `cmd_import` | *In development*: a backup image of a Linux PC's disk imports and boots (a 20 GB Ubuntu 26.04.1 image, 2026-11-24, with the import's `fsync` fix). Not built: the old PC's agent and the LAN copy, a connected disk, driver injection, encrypted disks (was ❌ 0) |
 | Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19) | 🟡 | 92 | `vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `--group-delete`, `--group-rename`, `--group-repair`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_ui_test.mjs`, `vm_group_link.sh`, `vm_group_manage.sh`, `machines_group_manage_headless.sh` | *In development*: G0–G4 plus Delete, Rename and Repair of a group, Start Gateway and Stop Gateway, and a missing or changed base made again from the archive (2026-11-24; headless, screenshots of the dialogs; the Start Gateway bar node-tested only, its window being protected). Creating a group from the app was refused before (the image store's file name); fixed. Left: the release gate on real hardware (G5) and disk encryption of the members (layer 5) (was 80) |
 
-### C. The app (91 %)
+### C. The app (95 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
@@ -143,7 +143,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | New Machine assistant (5.2) | 🧪 | 100 | `assistant.jsx` (Detect step, drop, the place, Fresh install), `vm/vmiso.c` (`lord.vm.isoInfo`), `model.js` `detectPlan`, `isoArch`, `dropSource`; `vmiso-test`, `vm_model_test.mjs`, `machines_app2_headless.sh` | *In development*: Detect (label, boot files, emulated said before anything is made), drop of a file on the first step, where the machine goes (no folder choice: decided, every protection keys on the library), the Fresh install snapshot after an unattended install. The Detect and Name steps seen on screen headless with the real reader; the Fresh install snapshot after a real unattended install not yet watched |
 | Machine window: bar, Actions, Devices, Apps, close dialog, resolution menu, Scale, device dots, the guest's shape (5.3) | 🧪 | 95 | `vmwindow.jsx` (View → Scale, `DeviceDots`, Devices → Network and Folders, shape keeping), `model.js` `scaleFrame`, `shapeFrame`, `deviceDots`, `cableOffered`, `VM_NETCABLE` (`vmproto.h`, `lordvm.c`, `js_vm.c` `netCable`); `vm_model_test.mjs`, `vmlink-test`, `vm_configure_boot.sh` | *In development*: Scale, the window keeping the guest's shape, device dots, the network cable while it runs (checked in a real KVM guest: carrier lost and back). USB and Camera show in Devices only once the devices work's backend says they're supported (`lord.vm.deviceCaps`). The new bar and menus not yet seen in a running window on screen |
 | Display modes: Window, Full Screen, Apps (5.4) | ✅ | 100 | `vmwindow.jsx`, `appsmode.jsx` |  |
-| All Displays (multi-head), Picture in Picture of a machine (5.4) | 🟡 | 45 | `vmwindow.jsx` (`PipBack`, View → Picture in Picture), `model.js` `pipFrame`; `vm_model_test.mjs` | *In development*: Picture in Picture of a machine (`wm.setPip`, on the window's display, the guest's shape, no keys and no pointer for the guest, not for a protected machine). All Displays (virtio-gpu heads, one per display) not built |
+| All Displays (multi-head), Picture in Picture of a machine (5.4) | 🧪 | 95 | `vmwindow.jsx` (`PipBack`, View → Picture in Picture, View → All Displays), `model.js` `pipFrame`; `alldisplays.js` (`allDisplaysPlan`), `alldisplays.jsx` (`useAllDisplays`, `HeadWindow`), `machine.c` (`heads`, schema 19), `lordvm.c` (`max_outputs`, `--heads`), `vmdisplay.c` (`--heads N`, one listener and one channel per output), `vmproto.h` (`vm_heads_layout`), `js_vm.c` (`allDisplays`, `attach(dir, { head })`, `head_claim`); `vm_model_test.mjs`, `vm_alldisplays_test.mjs`, `vm-test`, `vmgroup-test`, `vm_multihead.sh` (KVM), `machines_alldisplays_headless.sh` | *In development*: Picture in Picture of a machine (`wm.setPip`, on the window's display, the guest's shape, no keys and no pointer for the guest, not for a protected machine). All Displays: up to four virtio-gpu outputs, one full-screen window per display, each output asked for its display's size at its place beside the others; checked with a real Debian 13 guest under KVM (two outputs lit, sized, drawn on and one turned off again) and headless with two made-up displays. Not checked: real monitors on screen, a guest desktop (GNOME, KDE) placing its outputs where it is told and the pointer across them |
 | Configure, one window with summaries (5.5) | ✅ | 90 | `configure.jsx` (11 sections; icon, tags, processor, huge pages, Add Disk, New Address, printers), `kit.jsx` (`SideRow` dot), `model.js` `changedSections`, `sectionsMatching`, `parseTags`; `lordvm.c` `--cpu-model`, `--mac new`, `--add-disk`, `machine.c` (`cpu_model`, schema 18); `vm_model_test.mjs`, `machines_app2_headless.sh`, `vm_configure_boot.sh` | *In development*: search and unsaved dots; icon and tags, the processor (this computer's or Compatible, booted for real), Add Disk, a new MAC, huge pages shown as automatic. Decided not to build: ballooning, a network speed limit, sharing this computer's printers, a folder outside the library. Backup and encryption come with the storage work (95 with it), USB rules with the devices work |
 | Profiles and `.lordprofile` (5.6) | ✅ | 100 | `profiles.js`; `vm_profiles_test.mjs` | A profile's logo is never downloaded (decided 2026-11-24: a profile never makes this computer fetch anything) |
 | Official logos, opt-in (5.6.2) | ✅ | 90 | `logos.js`; `vm_profiles_test.mjs` | The helper's download ran on the maintainer's PC (the Debian logo is in the image store); the app's check and lord-media re-encode to the card not watched on screen |
@@ -374,7 +374,8 @@ Still open in Phase 2:
   item 2, open decision 5).
 - [x] dmabuf import in the compositor (13.8 item 3): read back into the picture by the GPU path (3.2). Still open: showing the
   dmabuf with no copy, and latency to the screen (13.8 item 4).
-- [ ] Picture in Picture, multi-head.
+- [x] Picture in Picture and All Displays (multi-head, up to four outputs; 5.4, *in development*). Still open: a run on real monitors
+  with a guest desktop.
 - [x] Export (`.lordvm` with a checked manifest, OVA) and its import, backups of machines (consistent copies), encrypted
   machines, raw disks, disposable sessions for any machine (in development, 2026-11-24; 3.6, 6.2, 6.4, 8). Monitor shows
   each machine as one row (6.14); no drill-in.
@@ -2431,7 +2432,7 @@ sound, microphone, shared folders), named together in one tooltip (`deviceDots`)
 Connected**: lord-vm pulls or plugs in the first card's cable while the machine runs, `VM_NETCABLE`, QMP `set_link`; only the
 shared, host-only and bridged networks, never a group's member; a new run starts plugged in; Network Settings…) and
 **Folders** (their count, Folder Settings…). USB and the camera appear in Devices only once their backend says they are
-supported (`lord.vm.deviceCaps`, the devices work). Checked by `vm_model_test.mjs` and a real KVM boot,
+supported (`lord.vm.deviceCaps`, the devices work). **View → All Displays** (5.4). Checked by `vm_model_test.mjs` and a real KVM boot,
 `vm_configure_boot.sh`: the cable pulled, the guest's card lost its carrier; plugged in, it came back. The design was:
 
 | Group | Items |
@@ -2457,10 +2458,36 @@ Quick actions stay on the bar itself, icons with tooltips, in this order: **agen
 |---|---|---|
 | **Window** | The guest's desktop in a window; the guest's resolution follows the window | Guest agent or virtio-gpu resize |
 | **Full Screen** | Takes one display, its own desktop | Nothing |
-| **All Displays** (not built) | One head per display | virtio-gpu multi-head |
+| **All Displays** (built, *in development*: View → All Displays) | One output of the guest's display per display of this computer (up to four), each full screen on its display; output 0 stays the machine's own window | virtio-gpu with several outputs (`"heads"`), a guest that drives them (Linux); not a Windows guest, a graphics card machine or a protected one |
 | **Apps** (seamless) | Guest apps as LordOS windows, no guest desktop (built, 7.2) | LordOS or Windows in the guest, with the LordOS tools |
 | **Picture in Picture** (built, *in development*: View → Picture in Picture) | Small floating view at the bottom end of the window's display, the guest's shape kept (`pipFrame`); it takes no keys and no pointer for the guest (live control is off and not offered); its name and **Back to Window** show under the pointer, a double click goes back too; never for a protected machine (it floats on every desktop) | Our `setPip` |
 | **Thumbnail** (the library's card: last picture with a round Play) | Paused at last frame, one click to resume | Suspend |
+
+**All Displays, as built (2026-11-24, *in development*).** A machine has `"heads"` outputs (machine.json schema 19, 1 to 4,
+written only above one; `lord-vm --set --heads`, refused while it runs or is suspended, since the guest sees them as hardware;
+locked to one for the anonymity profile, which would otherwise tell the guest how many displays this computer has, and refused
+with an Intel vGPU or without a window). lord-vm gives QEMU's `virtio-vga` (`virtio-gpu-pci` on arm64) `max_outputs=N`. QEMU's
+peer-to-peer D-Bus display serves one connection at a time (a new `add_client` takes the objects from the one before), so one
+`lord-vmdisplay`, started with `--heads N`, serves every output: it checks that `Console_k` is the graphic console of output
+`k`, registers a listener on each (without waiting, serving the ones already made, since QEMU asks a new listener for its
+properties before it answers anything else) and talks to lord-server on one channel per output (output 0 on fd 3, output `k` on
+fd 4 + k). Only output 0's channel carries the guest's sound and microphone; a closed channel of another output stops that output
+alone and tells the guest it is off (`SetUIInfo` with no size), so its desktop shrinks back. In lord-server (`js_vm.c`) the
+machine's window keeps its session (head 0); `lord.vm.allDisplays(session, [[w, h], …])` starts a new helper for that many
+outputs and keeps the other channels until each further output's session (`lord.vm.attach(dir, { head: k })`, which never asks
+lord-vm for a display connection of its own) takes its own; each gets its place in the desktop the outputs make side by side
+(`vm_heads_layout`): the guest is asked for each output's size at that corner, and the absolute tablet's clicks land on that
+output's pixels (`vd_abs_map`). A further output's session has no sound, no microphone, and leaves the clipboard, links,
+notifications and apps mode to the machine's own window; it is protected when the machine is. In the app (`alldisplays.js`,
+`alldisplays.jsx`): View → All Displays puts the machine's window full screen on its display and opens one window per other
+display (left to right, at most four), each full screen; the top edge of such a window shows the machine's name and **Back to One
+Display**. A machine with fewer outputs than displays: while it is off, All Displays sets them and starts it across the displays;
+while it runs, the item says to shut it down first. It goes back to one display when the machine stops, a display is added or
+taken away, or a further output's window asks. Not for a Windows guest (viogpudo drives one output), a graphics card machine,
+apps mode or a protected machine. Tests: `vm_test.c` (schema 19, `--heads`'s digit, `vm_heads_layout` and where each output's
+pixels land), `vmgroup_test.c` (the anonymity lock), `vm_alldisplays_test.mjs` (the plan), `tests/vm_multihead.sh` (a real
+Debian 13 guest under KVM: two outputs, each lit at the size asked for and drawn on, one closed alone and turned off for the
+guest, a missing output refused cleanly), `tests/machines_alldisplays_headless.sh` (the app on two made-up displays).
 
 ### 5.5 Configuration (one screen)
 
@@ -3724,7 +3751,7 @@ The camera icon saves the guest's display at its real resolution, directly from 
 through qemu-guest-agent. Files arrive as hidden `.lordos-drop-*.part` files renamed when complete, and a name in use gets
 " (n)".
 
-**Built 2026-11-24 (*in development*; tools 10 and w13, machine.json schema 19): the panel, Cancel, files from the guest
+**Built 2026-11-24 (*in development*; tools 10 and w13, machine.json schema 20): the panel, Cancel, files from the guest
 ("Send to LordOS") with flow control and resume, the quarantine folder.**
 
 - *The panel* (`apps/machines/transfers.jsx`, model `xfer.js`, `vm_xfer_test.mjs`): along the bottom of the machine's

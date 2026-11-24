@@ -24,7 +24,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Files shows where it came from in Get Info and never opens a program, installer, package or desktop entry from a
     machine with a double click (Open With still does); the marks follow copies and everything extracted from an archive
     that came from a machine. At least 1 GiB stays free; at most 8 unfinished files are kept for a resume, none older than
-    7 days. Configure → Sharing → **Files from the machine** turns it off (machine.json schema 19, `guest_files`); a
+    7 days. Configure → Sharing → **Files from the machine** turns it off (machine.json schema 20, `guest_files`); a
     machine locked for anonymity never takes files.
   - **The file copy panel** along the bottom of the machine's window: every file on its way in (drops) or out, with its
     size, a bar, the speed, the time left and **Cancel** (a drop can now be cancelled too), Show in Files, Open Received
@@ -40,8 +40,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **The LordOS tools 10 (Linux) and w13**; Machines updates older tools by itself. The Linux tools now write every frame
     whole (a virtio-serial port takes at most 32 KiB a call: a large clipboard picture could be cut before).
   - Tests: `vm-test` (the new frames, fuzzed with 80 000 random frames, the quarantine folder against links, hard links,
-    collisions and sizes, schema 19), `guest_send_test.sh`, `guest-dbus-test` (the notification monitor's parser),
+    collisions and sizes, schema 20), `guest_send_test.sh`, `guest-dbus-test` (the notification monitor's parser),
     `fsops-test` (the marks), `vm_xfer_test.mjs`, `guest_apps_test.mjs`, and a real Debian 13 KVM guest.
+- **Machines: All Displays** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.4). View → All
+  Displays shows a machine across this computer's displays: one output of its virtio-gpu per display (up to four), each full
+  screen at that display's size, beside the others; the machine's own window keeps the first, and each further window's
+  top edge has Back to One Display. A machine with fewer outputs gets them while it's off (machine.json schema 19,
+  "heads"; lord-vm --set --heads). One lord-vmdisplay serves every output on a channel of its own (QEMU's peer-to-peer
+  display serves one connection), and an output whose window goes is turned off for the guest. Not for a machine with a
+  graphics card, apps mode or a protected machine (the anonymity profile keeps one display: the guest never learns this
+  computer's displays). Checked with a real KVM guest (tests/vm_multihead.sh) and a headless scene.
 - **Machines: one parent for every machine** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.7).
   lord-sessiond places each machine's scope in its session's `lordos-machines.slice` (root-owned, made on the first
   machine) with a fixed `cpu.weight` 50 and `io.weight` 50: half of one app's, a twentieth of the compositor's. Under load,

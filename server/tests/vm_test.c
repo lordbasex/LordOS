@@ -78,7 +78,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "20", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "99", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -121,7 +121,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":20,\"whatever\":true}";
+    const char newer[] = "{\"schema\":99,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -567,7 +567,7 @@ static void test_schema(void) {
                 { "\"perf_profile\":true", 13, VM_OK, 1 }, { "\"perf_profile\":false", 13, VM_OK, 0 }, { "\"agent\":true", 13, VM_OK, 0 },
                 { "\"perf_profile\":1", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":\"on\"", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":null", 13, VM_E_FIELD, 0 },
                 { "\"perf_profile\":true", 12, VM_E_FIELD, 0 }, { "\"perf_profile\":false", 12, VM_OK, 0 },
-                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 16, VM_OK, 1 }, { "\"perf_profile\":true", 20, VM_E_NEWER, 0 },
+                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 16, VM_OK, 1 }, { "\"perf_profile\":true", 99, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s13 / sizeof s13[0]; i++) {
                 char t[4096];
@@ -599,7 +599,7 @@ static void test_schema(void) {
                 { "\"guest_links\":true,\"guest_notify\":true", 15, VM_OK, 1, 1 }, { "\"guest_links\":false", 15, VM_OK, 0, 0 },
                 { "\"guest_links\":1", 15, VM_E_FIELD, 0, 0 }, { "\"guest_notify\":\"on\"", 15, VM_E_FIELD, 0, 0 },
                 { "\"guest_links\":true", 14, VM_E_FIELD, 0, 0 }, { "\"guest_notify\":true", 14, VM_E_FIELD, 0, 0 },
-                { "\"guest_notify\":false", 14, VM_OK, 0, 0 }, { "\"guest_links\":true", 20, VM_E_NEWER, 0, 0 },
+                { "\"guest_notify\":false", 14, VM_OK, 0, 0 }, { "\"guest_links\":true", VM_SCHEMA + 1, VM_E_NEWER, 0, 0 },
             };
             for (size_t i = 0; i < sizeof s15 / sizeof s15[0]; i++) {
                 char t[4096];
@@ -623,18 +623,18 @@ static void test_schema(void) {
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 15);
         }
-        /* schema 19: guest_files (6.21), true or false, written only when false, never below 19 */
+        /* schema 20: guest_files (6.21), true or false, written only when false, never below 20 */
         {
             struct { const char *add; int schema, want, off; } s18[] = {
-                { "\"guest_files\":false", 19, VM_OK, 1 }, { "\"guest_files\":true", 19, VM_OK, 0 }, { "\"guest_files\":0", 19, VM_E_FIELD, 0 },
-                { "\"guest_files\":false", 18, VM_E_FIELD, 0 }, { "\"guest_files\":true", 18, VM_OK, 0 }, { "\"guest_files\":false", 20, VM_E_NEWER, 0 },
+                { "\"guest_files\":false", 20, VM_OK, 1 }, { "\"guest_files\":true", 20, VM_OK, 0 }, { "\"guest_files\":0", 20, VM_E_FIELD, 0 },
+                { "\"guest_files\":false", 19, VM_E_FIELD, 0 }, { "\"guest_files\":true", 19, VM_OK, 0 }, { "\"guest_files\":false", VM_SCHEMA + 1, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s18 / sizeof s18[0]; i++) {
                 char t[4096];
                 const char *at = strstr(GOOD, "\"schema\":1");
                 snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s18[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s18[i].add);
                 int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
-                if (r != s18[i].want) fprintf(stderr, "  schema 19 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
+                if (r != s18[i].want) fprintf(stderr, "  schema 20 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
                 CHECK(r == s18[i].want);
                 if (r != VM_OK) continue;
                 CHECK(m.guest_files_off == s18[i].off);
@@ -649,14 +649,14 @@ static void test_schema(void) {
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
             m.guest_files_off = 2; m.schema = VM_SCHEMA;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
-            CHECK(VM_SCHEMA >= 19);
+            CHECK(VM_SCHEMA >= 20);
         }
         /* schema 17: automation (6.15), true or false, written only when true, never below 17, never for anonymity */
         {
             struct { const char *add; int schema, want, on; } s16[] = {
                 { "\"automation\":true", 17, VM_OK, 1 }, { "\"automation\":false", 17, VM_OK, 0 }, { "\"agent\":true", 17, VM_OK, 0 },
                 { "\"automation\":1", 17, VM_E_FIELD, 0 }, { "\"automation\":\"on\"", 17, VM_E_FIELD, 0 }, { "\"automation\":null", 17, VM_E_FIELD, 0 },
-                { "\"automation\":true", 16, VM_E_FIELD, 0 }, { "\"automation\":false", 16, VM_OK, 0 }, { "\"automation\":true", 20, VM_E_NEWER, 0 },
+                { "\"automation\":true", 16, VM_E_FIELD, 0 }, { "\"automation\":false", 16, VM_OK, 0 }, { "\"automation\":true", 99, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s16 / sizeof s16[0]; i++) {
                 char t[4096];
@@ -687,14 +687,14 @@ static void test_schema(void) {
                 { "\"cpu_model\":\"host\"", 18, VM_OK, VM_CPU_HOST }, { "\"agent\":true", 18, VM_OK, VM_CPU_HOST },
                 { "\"cpu_model\":\"max\"", 18, VM_E_RANGE, 0 }, { "\"cpu_model\":true", 18, VM_E_FIELD, 0 },
                 { "\"cpu_model\":\"compatible\"", 18, VM_E_RANGE, 0 }, { "\"cpu_model\":\"compatible\"", 17, VM_E_FIELD, 0 },
-                { "\"cpu_model\":\"host\"", 20, VM_E_NEWER, 0 },
+                { "\"cpu_model\":\"host\"", 99, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s18 / sizeof s18[0]; i++) {
                 char t[4096];
                 const char *at = strstr(GOOD, "\"schema\":1");
                 snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s18[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s18[i].add);
                 int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
-                if (r != s18[i].want) fprintf(stderr, "  schema 19 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
+                if (r != s18[i].want) fprintf(stderr, "  schema 20 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
                 CHECK(r == s18[i].want);
                 if (r == VM_OK) CHECK(m.cpu_model == s18[i].model);
             }
@@ -713,6 +713,45 @@ static void test_schema(void) {
                 CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             }
             CHECK(VM_SCHEMA >= 18);
+        }
+        /* schema 19: heads (All Displays, 5.4), 1..VM_HEADS_MAX, written only when more than one, never below 19, only with
+         * a window and virtio graphics */
+        {
+            struct { const char *add; int schema, want, heads; } s19[] = {
+                { "\"heads\":2", 19, VM_OK, 2 }, { "\"heads\":4", 19, VM_OK, 4 }, { "\"heads\":1", 19, VM_OK, 1 },
+                { "\"heads\":0", 19, VM_E_RANGE, 0 }, { "\"heads\":5", 19, VM_E_RANGE, 0 }, { "\"heads\":-1", 19, VM_E_RANGE, 0 },
+                { "\"heads\":\"2\"", 19, VM_E_FIELD, 0 }, { "\"heads\":2.5", 19, VM_E_FIELD, 0 }, { "\"heads\":2", 18, VM_E_FIELD, 0 },
+                { "\"heads\":1", 18, VM_OK, 1 }, { "\"heads\":2,\"display\":\"none\"", 19, VM_E_FIELD, 0 },
+                { "\"heads\":4294967298", 19, VM_E_FIELD, 0 }, { "\"heads\":2", VM_SCHEMA + 1, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s19 / sizeof s19[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s19[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s19[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if ((r == VM_OK) != (s19[i].want == VM_OK) || (s19[i].want == VM_OK && r != VM_OK)) fprintf(stderr, "  schema 19 %s (%d): got %d (%s)\n", s19[i].add, s19[i].schema, r, err);
+                CHECK((r == VM_OK) == (s19[i].want == VM_OK));
+                if (s19[i].want == VM_E_NEWER) CHECK(r == VM_E_NEWER);
+                if (r != VM_OK) continue;
+                CHECK(m.heads == s19[i].heads);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"heads\"") == (s19[i].heads > 1));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && m.heads == 1);
+            m.heads = 2;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);          /* schema 1 */
+            m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_OK);
+            m.vgpu = VM_VGPU_SHARED;
+            CHECK(vm_machine_check(&m, err, sizeof err) != VM_OK);             /* a vGPU has one display */
+            m.vgpu = VM_VGPU_NONE; m.heads = 0;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_OK);             /* a VmMachine from before: one */
+            m.heads = VM_HEADS_MAX + 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 19 && VM_HEADS_MAX == 4);
         }
         /* schema 13: cpu_pin (vCPU pinning, 3.7.1), "off" or "auto", written only when chosen, never below 13 */
         {
@@ -2090,6 +2129,39 @@ static void test_tablet_layout(void) {
     CHECK(vd_abs_map(10, 1920, 2000, 1920, 2942) == 10);                    /* a layout that doesn't fit: ignored */
     /* the right edge of the shown display stays left of the other display */
     CHECK(vd_abs_map(1919, 1920, 0, 1920, 2942) * 2942LL / 1920 < 1920);
+
+    /* All Displays (5.4): lord-vmdisplay's --heads digit and the desktop the outputs make side by side */
+    CHECK(vd_head_arg("0", 4) == 0 && vd_head_arg("3", 4) == 3 && vd_head_arg("4", 4) == -1 && vd_head_arg("9", 4) == -1);
+    CHECK(vd_head_arg("", 4) == -1 && vd_head_arg(NULL, 4) == -1 && vd_head_arg("01", 4) == -1 && vd_head_arg("-1", 4) == -1 && vd_head_arg("a", 4) == -1);
+    {
+        int hw[4] = { 1920, 2560, 1280, 1920 }, hh[4] = { 1080, 1440, 1024, 1200 }, HL[6];
+        CHECK(!vm_heads_layout(2, hw, hh, 0, HL) && HL[0] == 0 && HL[1] == 0 && HL[2] == 1920 && HL[3] == 1080 && HL[4] == 4480 && HL[5] == 1440);
+        CHECK(!vm_heads_layout(2, hw, hh, 1, HL) && HL[0] == 1920 && HL[2] == 2560 && HL[4] == 4480);
+        CHECK(!vm_heads_layout(4, hw, hh, 3, HL) && HL[0] == 1920 + 2560 + 1280 && HL[4] == 7680 && HL[5] == 1440);
+        for (int k = 0; k < 4; k++) {
+            CHECK(!vm_heads_layout(4, hw, hh, k, HL) && vm_layout_ok(HL[0], HL[1], HL[2], HL[3], HL[4], HL[5]));
+            /* every pixel of head k lands on its own pixel of the guest's desktop (within 2), the guest spreading the
+             * tablet over all of it */
+            int worst = 0;
+            for (int p = 0; p < HL[2]; p++) {
+                int q = vd_abs_map(p, HL[2], HL[0], HL[2], HL[4]);
+                long long g = ((long long)q * 0x7fff / HL[2]) * HL[4] / 0x7fff;
+                int e = (int)(g - (HL[0] + p));
+                if (e < 0) e = -e;
+                if (e > worst) worst = e;
+            }
+            CHECK(worst <= 8);                                                   /* desk/pic pixels a step */
+        }
+        CHECK(vm_heads_layout(1, hw, hh, 0, HL) == -1 && !HL[4]);                 /* one head: no layout */
+        CHECK(vm_heads_layout(2, hw, hh, 2, HL) == -1 && vm_heads_layout(2, hw, hh, -1, HL) == -1);
+        CHECK(vm_heads_layout(9, hw, hh, 0, HL) == -1 && vm_heads_layout(2, NULL, hh, 0, HL) == -1);
+        int bw[2] = { 319, 1920 }, bh[2] = { 1080, 1080 };
+        CHECK(vm_heads_layout(2, bw, bh, 1, HL) == -1);
+        int ww[3] = { 16000, 16000, 1000 }, wh[3] = { 1080, 1080, 1080 };
+        CHECK(vm_heads_layout(3, ww, wh, 0, HL) == -1 && !HL[4]);                 /* wider than 32767 together */
+        int xw[2] = { 2147483647, 2147483647 }, xh[2] = { 1080, 1080 };
+        CHECK(vm_heads_layout(2, xw, xh, 0, HL) == -1);                           /* no overflow */
+    }
 
     /* How the guest maps the tablet (AGK_TABLET, tools w10), over every layout of the maintainer's log (2026-11-22, ws126,
      * tools w9): the vGPU's \\.\DISPLAY2 (shown) beside a display not on a PCI adapter, \\.\DISPLAY1 1784x830 */

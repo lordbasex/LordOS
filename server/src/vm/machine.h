@@ -21,10 +21,12 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). 15: guest_links, guest_notify (6.12). 16: disposable, encrypted, backup, disk_format (storage: 6.2, 6.4, 8). 17: automation (6.15, `machines exec` and `cp`). 18: cpu_model (5.5). 19: guest_files (6.21). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). 15: guest_links, guest_notify (6.12). 16: disposable, encrypted, backup, disk_format (storage: 6.2, 6.4, 8). 17: automation (6.15, `machines exec` and `cp`). 18: cpu_model (5.5). 19: heads (5.4, All Displays). 20: guest_files (6.21). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 19
+#define VM_SCHEMA 20
+/* the most displays (virtio-gpu outputs) a machine may have: "heads" (schema 19) */
+#define VM_HEADS_MAX 4
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -208,11 +210,14 @@ typedef struct {
      * when on): "guest_links": true, a link the guest's tools send is offered in a bar the person must click;
      * "guest_notify": true, the guest's notifications are shown as from the machine, rate-limited */
     int guest_links, guest_notify;
+    /* schema 19: the guest's displays (docs/VIRTUALIZATION.md 5.4, All Displays): the virtio-gpu's outputs, 1 (missing) to
+     * VM_HEADS_MAX; written only when more than one. Hardware the guest sees: changed only while the machine is off */
+    int heads;
     /* schema 18: the processor the guest sees (docs/VIRTUALIZATION.md 5.5, Configure → CPU and memory), written only when
      * chosen: "cpu_model": "compatible", a fixed x86-64-v2 model (amd64 with KVM only: the guest moves between computers and
      * keeps working after this one's processor changes); missing: "host", this computer's own processor */
     int cpu_model;                      /* VM_CPU_HOST, VM_CPU_COMPAT */
-    /* schema 19: files sent from the guest (docs/VIRTUALIZATION.md 6.21, "Send to LordOS"): taken into the machine's
+    /* schema 20: files sent from the guest (docs/VIRTUALIZATION.md 6.21, "Send to LordOS"): taken into the machine's
      * quarantine folder unless "guest_files": false (written only then); a machine locked for anonymity never takes them */
     int guest_files_off;
     /* schema 14: a member of a machine group (docs/VIRTUALIZATION.md 19.4), written only for members. group: the group's

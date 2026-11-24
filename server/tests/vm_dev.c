@@ -61,6 +61,10 @@
  *   launch TOKEN|NAME   one of the guest's apps, by its place in the list (VM_LAUNCH; lord-vm refuses another)
  *   quit
  * LORDVM_DEV_CURSOR_PNG=FILE: each pointer shape the guest hands over (VD_CURSOR) is saved there.
+ * LORDVM_DEV_HEADS=N (All Displays, 5.4): lord-vmdisplay --heads N, as lord-server starts it for a machine with "heads":
+ *   one channel more per output; the commands above drive output 0, and for output k (1..N-1):
+ *   hK png PATH | hK resize W H | hK layout X Y W H DW DH | hK move X Y | hK close   (its events carry "head":K)
+ *   layout X Y W H DW DH  where output 0's picture sits in the guest's desktop (VD_LAYOUT, as lord.vm.allDisplays sends it)
  * LORDVM_DEV_NODISPLAY=1 with attach: only the control channel (lord-server shows the picture; this one sends commands).
  * stdout: one JSON line per event or answer. Binaries are looked for next to this one, or in $LORDVM_BIN.
  *
@@ -226,21 +230,31 @@ static void recv_state(const VmMsg *m) {
     rcv.fd = rcv.dfd = -1;
     rcv.id = 0;
 }
+/* All Displays: the further outputs' channels (LORDVM_DEV_HEADS), each with a picture of its own */
+static struct { int vd, w, h, frames; uint8_t *pic; size_t len; } xh[4] = { { .vd = -1 }, { .vd = -1 }, { .vd = -1 }, { .vd = -1 } };
+static int nheads = 1;
 
 static void spawn_vmdisplay(int dbus_fd) {
-    int sv[2];
+    int sv[2], hv[4][2];
+    const char *hs = getenv("LORDVM_DEV_HEADS");
+    nheads = hs && hs[0] >= '2' && hs[0] <= '4' && !hs[1] ? hs[0] - '0' : 1;
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return;
+    for (int k = 1; k < nheads; k++) if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, hv[k])) return;
     pid_t p = fork();
     if (!p) {
-        int a = fcntl(sv[1], F_DUPFD, 20), b = fcntl(dbus_fd, F_DUPFD, 21);
+        int a = fcntl(sv[1], F_DUPFD, 20), b = fcntl(dbus_fd, F_DUPFD, 21), hx[4];
+        for (int k = 1; k < nheads; k++) hx[k] = fcntl(hv[k][1], F_DUPFD, 30);
         dup2(a, 3);
         dup2(b, 4);
-        syscall(SYS_close_range, 5, ~0u, 0);
-        char bin[PATH_MAX + 32];
+        for (int k = 1; k < nheads; k++) dup2(hx[k], 4 + k);
+        syscall(SYS_close_range, 4 + nheads, ~0u, 0);
+        char bin[PATH_MAX + 32], hn[2] = { (char)('0' + nheads), 0 };
         snprintf(bin, sizeof bin, "%s/lord-vmdisplay", bindir);
-        execl(bin, "lord-vmdisplay", machine_id, (char *)NULL);
+        if (nheads > 1) execl(bin, "lord-vmdisplay", machine_id, "--heads", hn, (char *)NULL);
+        else execl(bin, "lord-vmdisplay", machine_id, (char *)NULL);
         _exit(127);
     }
+    for (int k = 1; k < nheads; k++) { close(hv[k][1]); xh[k].vd = hv[k][0]; }
     close(sv[1]);
     close(dbus_fd);
     vd = sv[0];
@@ -446,6 +460,69 @@ static void from_vm(void) {
         }
         if (fd >= 0 && m.type != VM_DISPLAY_FD) close(fd);
     }
+}
+
+/* a further output's messages: its picture, frames (acknowledged at once), state */
+static void from_xh(int k) {
+    for (int i = 0; i < VD_POLL_MAX && xh[k].vd >= 0; i++) {
+        VdMsg m;
+        int fd = -1;
+        int r = vd_recv(xh[k].vd, &m, &fd);
+        if (r < 0) { out("{\"ev\":\"vmdisplay-gone\",\"head\":%d}", k); close(xh[k].vd); xh[k].vd = -1; return; }
+        if (!r) return;
+        if (fd >= 0) { close(fd); fd = -1; }
+        if (!vd_msg_valid(&m, 0)) { out("{\"ev\":\"refused\",\"from\":\"lord-vmdisplay\",\"head\":%d,\"type\":%u}", k, m.type); continue; }
+        switch (m.type) {
+        case VD_READY: out("{\"ev\":\"display_ready\",\"head\":%d,\"w\":%d,\"h\":%d,\"abs\":%d}", k, m.a, m.b, m.c); break;
+        case VD_SIZE: {
+            if (xh[k].pic) munmap(xh[k].pic, xh[k].len);
+            xh[k].pic = NULL;
+            size_t len = (size_t)m.a * m.b * 4;
+            int pf = vm_picture_memfd(len);
+            if (pf < 0) break;
+            xh[k].pic = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, pf, 0);
+            if (xh[k].pic == MAP_FAILED) { xh[k].pic = NULL; close(pf); break; }
+            xh[k].w = m.a; xh[k].h = m.b; xh[k].len = len;
+            VdMsg sm = vd_msg(VD_SHM, 0, 0, 0, 0, 0, 0);
+            vd_send(xh[k].vd, &sm, pf);
+            close(pf);
+            out("{\"ev\":\"picture\",\"head\":%d,\"w\":%d,\"h\":%d}", k, m.a, m.b);
+            break;
+        }
+        case VD_FRAME: {
+            if (!vd_rect_inside(&m, xh[k].w, xh[k].h)) { out("{\"ev\":\"refused\",\"head\":%d,\"what\":\"frame outside the picture\"}", k); break; }
+            if (++xh[k].frames == 1) out("{\"ev\":\"first_frame\",\"head\":%d,\"w\":%d,\"h\":%d}", k, xh[k].w, xh[k].h);
+            VdMsg a = vd_msg(VD_FRAME_DONE, 0, 0, 0, 0, m.e, 0);
+            vd_send(xh[k].vd, &a, -1);
+            break;
+        }
+        case VD_STATE: out("{\"ev\":\"display_state\",\"head\":%d,\"state\":%d,\"reason\":%d}", k, m.a, m.b); break;
+        }
+    }
+}
+static void xh_cmd(int k, const char *c) {
+    int x, y, L[6];
+    VdMsg m;
+    if (k < 1 || k >= nheads || xh[k].vd < 0) { out("{\"ok\":false,\"cmd\":\"head\",\"head\":%d}", k); return; }
+    if (!strncmp(c, "png ", 4)) {
+        if (!xh[k].pic) { out("{\"ok\":false,\"cmd\":\"png\",\"head\":%d,\"why\":\"no picture\"}", k); return; }
+        int w = xh[k].w, h = xh[k].h;
+        uint8_t *rgb = malloc((size_t)w * h * 3);
+        long lit = 0;
+        for (int i = 0; rgb && i < w * h; i++) {
+            const uint8_t *q = xh[k].pic + (size_t)i * 4;
+            rgb[i * 3] = q[2]; rgb[i * 3 + 1] = q[1]; rgb[i * 3 + 2] = q[0];
+            if (q[0] > 16 || q[1] > 16 || q[2] > 16) lit++;
+        }
+        int ok = rgb && stbi_write_png(c + 4, w, h, 3, rgb, w * 3);
+        free(rgb);
+        out("{\"ok\":%s,\"cmd\":\"png\",\"head\":%d,\"w\":%d,\"h\":%d,\"lit_pct\":%.2f}", ok ? "true" : "false", k, w, h, 100.0 * lit / ((double)w * h));
+    } else if (sscanf(c, "resize %d %d", &x, &y) == 2) { m = vd_msg(VD_RESIZE, x, y, 0, 0, 0, 0); vd_send(xh[k].vd, &m, -1); out("{\"ok\":true,\"cmd\":\"resize\",\"head\":%d}", k); }
+    else if (sscanf(c, "move %d %d", &x, &y) == 2) { m = vd_msg(VD_MOTION, x, y, 0, 0, 0, 0); vd_send(xh[k].vd, &m, -1); out("{\"ok\":true,\"cmd\":\"move\",\"head\":%d}", k); }
+    else if (sscanf(c, "layout %d %d %d %d %d %d", &L[0], &L[1], &L[2], &L[3], &L[4], &L[5]) == 6 && vm_layout_ok(L[0], L[1], L[2], L[3], L[4], L[5])) {
+        m = vd_msg(VD_LAYOUT, L[0], L[1], L[2], L[3], L[4], L[5]); vd_send(xh[k].vd, &m, -1); out("{\"ok\":true,\"cmd\":\"layout\",\"head\":%d}", k);
+    } else if (!strcmp(c, "close")) { m = vd_msg(VD_CLOSE, 0, 0, 0, 0, 0, 0); vd_send(xh[k].vd, &m, -1); close(xh[k].vd); xh[k].vd = -1; out("{\"ok\":true,\"cmd\":\"close\",\"head\":%d}", k); }
+    else out("{\"ok\":false,\"cmd\":\"head\",\"head\":%d}", k);
 }
 
 static void from_vd(void) {
@@ -749,7 +826,8 @@ static void lat_pump(void) {
 static int handle(char *line) {
     char a1[1024];
     int x, y, b;
-    if (!strncmp(line, "png ", 4)) save_png(line + 4);
+    if (line[0] == 'h' && line[1] >= '1' && line[1] <= '3' && line[2] == ' ') xh_cmd(line[1] - '0', line + 3);
+    else if (!strncmp(line, "png ", 4)) save_png(line + 4);
     else if (!strncmp(line, "type ", 5)) {
         for (const char *p = line + 5; *p; p++) {
             char c = *p;
@@ -769,6 +847,14 @@ static int handle(char *line) {
         vdsend(VD_MOTION, x, y); vdsend(VD_BUTTON, b, 1); vdsend(VD_BUTTON, b, 0);
         out("{\"ok\":true,\"cmd\":\"click\"}");
     } else if (sscanf(line, "wheel %d", &x) == 1) { VdMsg m = vd_msg(VD_WHEEL, x, 0, 0, 0, 0, 0); if (vd >= 0) vd_send(vd, &m, -1); out("{\"ok\":true,\"cmd\":\"wheel\"}"); }
+    else if (!strncmp(line, "layout ", 7)) {
+        int L[6];
+        if (sscanf(line + 7, "%d %d %d %d %d %d", &L[0], &L[1], &L[2], &L[3], &L[4], &L[5]) == 6 && vm_layout_ok(L[0], L[1], L[2], L[3], L[4], L[5])) {
+            VdMsg m = vd_msg(VD_LAYOUT, L[0], L[1], L[2], L[3], L[4], L[5]);
+            if (vd >= 0) vd_send(vd, &m, -1);
+            out("{\"ok\":true,\"cmd\":\"layout\"}");
+        } else out("{\"ok\":false,\"cmd\":\"layout\"}");
+    }
     else if (sscanf(line, "resize %d %d", &x, &y) == 2) {
         /* as lord-server: to lord-vmdisplay (QEMU's ui_info) and to lord-vm (a guest helper that sets its own size) */
         vdsend(VD_RESIZE, x, y);
@@ -996,11 +1082,13 @@ int main(int argc, char **argv) {
         if (vm < 0 && vd < 0) break;
         short aev = 0;
         int afd = spk ? maudio_pollfd(spk, &aev) : -1;
-        struct pollfd p[5] = { { vm, POLLIN, 0 }, { vd, POLLIN, 0 }, { stdin_open ? 0 : -1, POLLIN, 0 }, { afd, aev, 0 }, { shfd, POLLIN, 0 } };
+        struct pollfd p[8] = { { vm, POLLIN, 0 }, { vd, POLLIN, 0 }, { stdin_open ? 0 : -1, POLLIN, 0 }, { afd, aev, 0 }, { shfd, POLLIN, 0 },
+                               { xh[1].vd, POLLIN, 0 }, { xh[2].vd, POLLIN, 0 }, { xh[3].vd, POLLIN, 0 } };
         int to = kq_h != kq_t ? 12 : frames_target >= 0 ? 50 : 500;
         if (lat.left || lat.waiting_f || lat.waiting_p || fpsm.left) to = 1;
         if ((spk || mic) && to > 10) to = 10;
-        poll(p, 5, to);
+        poll(p, 8, to);
+        for (int k = 1; k < 4; k++) if (p[4 + k].revents && xh[k].vd >= 0) from_xh(k);
         if (p[4].revents && shfd >= 0) shell_read();
         /* PipeWire not there when the stream opened, or gone: tried again every 2 s while the guest plays (js_vm.c) */
         static long long spk_retry_at;
