@@ -867,6 +867,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **The live ISO finds MediaTek Wi-Fi cards such as the MT7921 (#227)** (in development; latest release 0.8.9.5-beta).
+  The card's driver (`mt7921e`) bound, but its firmware wasn't on the ISO, so no Wi-Fi interface appeared and Settings →
+  Network said the computer had no Wi-Fi adapter. Debian moved MediaTek's firmware out of `firmware-misc-nonfree` into
+  `firmware-mediatek`, which `firmware-misc-nonfree` only Recommends, and the ISO is built without Recommends. Both ISOs
+  now carry `firmware-mediatek`, and `firmware-intel-graphics` for the same reason (i915 asked for its DMC firmware and
+  turned runtime power management off without it). `tests/iso_firmware_test.mjs` checks that every Wi-Fi, network and
+  graphics package of the Store's missing-firmware map is on the ISO, except the two left out on purpose
+  (`firmware-libertas`, `firmware-nvidia-graphics`; the Store still offers them when the kernel asks).
 - **Machines: a global security pass over how the new pieces work together** (in development; latest release
   0.8.9.5-beta; docs/VIRTUALIZATION.md 3.6, 6.2, 7.2, 8; docs/SENTINELA.md "Machines"). Each item had been reviewed alone;
   this pass looked at the chains between them, with a hostile guest, a hostile program of the same account and hostile

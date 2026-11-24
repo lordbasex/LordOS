@@ -58,6 +58,10 @@ materials (SBOM) published with each release. The website summary is at
   `firmware-brcm80211` on both ISOs, from Debian's `non-free-firmware` component: Broadcom's binary-only firmware,
   redistributed unmodified under its own licence, with no source to publish. The Raspberry Pi image already carried
   it, from Raspberry Pi's archive.
+- **ISO firmware added in development (after 0.8.9.5-beta)** (`tools/iso/build.sh`; listed in `THIRD_PARTY.md`):
+  `firmware-mediatek` and `firmware-intel-graphics` on both ISOs, from Debian's `non-free-firmware` component (#227).
+  Debian split them out of `firmware-misc-nonfree`, which only Recommends them, and the ISO installs without Recommends.
+  Binary-only vendor firmware, redistributed unmodified under its own licences, with no source to publish.
 - **The app catalog (0.8.5, Store → Artificial Intelligence, Commercial, Remote access and Third-party apps;**
   `apt/catalog.json`, `apt/README.md`, [UPDATES.md](UPDATES.md), "Mirrored apps (catalog)") records each app's licence.
   Apps delivered `direct` (Claude Code, Claude Desktop, Visual Studio Code, Cursor, Google Chrome,
