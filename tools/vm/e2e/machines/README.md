@@ -72,7 +72,13 @@ One session and one library, in this order; a flow that needs what an earlier on
 | `group` | a machine group made by `lord-vm-testpaths --group-create` from two empty disks: its card in the library |
 
 Not in the default list: `premade` (the assistant's machine made by lord-vm directly, so a later flow runs alone:
-`run.py premade snapshots`) and `windows` (below).
+`run.py premade snapshots`) and `windows` (below). What a person sees of a running machine, on screen:
+`run.py premade s3prep start agent s3window s3guest s3links s3send s3shell s3agentlost s3monitor` (the window's bar and
+menus, a link and a notification from the guest, Send to LordOS and the file copies panel, the agent's shell pane and its
+Terminal tab, the agent's red light, Monitor; the guest gets this build's `lordos-guest` through the transfer folder).
+`win-agent.py MACHINE_DIR` (in `ns-run.sh`) drives a machine the `windows` flow installed through `lordvm-dev` with this
+build's `lordos-guest-win`: the tools' update, the agent's PowerShell, links, notifications, Send to LordOS, WinFsp and the
+transfer drive, the event logs and apps mode. `storage-fs.sh` runs the storage flow on btrfs and XFS (sudo for the mounts).
 
 ## Using it from another test
 

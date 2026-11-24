@@ -11,6 +11,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: checked for real, and what that found** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
+  6.5, 6.7, 6.14, 6.16, 6.17, 6.19).
+  - **Monitor names a machine's own disk and network numbers.** A running machine's row in Processes says
+    "Disk 2.0 MB/s · Network ↓ 3.0 KB/s ↑ 1.0 KB/s": its QEMU's cgroup I/O read every 2 s (`lord.vm.stats`, never in a
+    draw) and what the firewall counts for the machine's scope; a part not measured is left out, never shown as 0
+    (`apps/monitor/vmiomodel.js`, `monitor_vmio_test.mjs`, the grouped Processes scene).
+  - **A lost guest agent says so.** When qemu-guest-agent stops answering in a running machine, the red light's popover
+    now says "The agent stopped answering" and that it comes back by itself, instead of telling the person to install it
+    and offering the Guest Tools disc (all 35 languages).
+  - **Checked on real systems:** Bridged end to end on a scratch dummy interface (`tests/vm_bridge_dummy.sh`, 23 checks:
+    the real wired-card check refuses the dummy; the macvtap, its alias and `/dev/tapN`, the guest's MAC and traffic, the
+    cable pulled and back, unbridge refused while running and done after); the Storage window's figures on btrfs, btrfs
+    with zstd compression and XFS (`storage-fs.sh`); shared folders and the transfer folder in a real KVM guest on the PC
+    and on the Raspberry Pi 5 (`tests/vm_share_boot.sh`, 14 checks each); the machine window's bar and menus, a guest's link
+    and notification, Send to LordOS and its panel, the agent's shell pane and Terminal tab, the agent's red light, in a
+    headless session with a real Debian 13 guest (`flows.py`, 41 checks); "What this computer can run" on the Pi with its
+    own facts and sensors; a virtio-win guest's tools (the evaluation install), PowerShell, links, Send to LordOS, transfer drive, event logs and
+    apps mode through `win-agent.py`.
+
 - **Machines: Start Linux directly, Guest can see, each system's requirements, migrate another PC** (in development; latest
   release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.2, 6.1, 6.11, 8).
   - **Start Linux directly.** Configure → Boot keeps a kernel, an initial RAM disk and a command line with an installed
@@ -848,6 +867,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Machines: lord-vm keeps no dead client.** A client of a machine that shut its reading side but kept its socket never
+  hung up, so lord-vm kept it for the whole run and refused every broadcast to it again ("message 71 not delivered" in a
+  loop); the first refused send now marks it and the next turn of the loop drops it (`tests/vm_client_gone.sh`).
+- **Machines: a virtio-win guest's event logs without lord-vm's own noise.** qemu-guest-agent logs each `guest-exec` lord-vm
+  runs to read the logs, so two thirds of such a guest's log in a 45-minute run were those lines; its informational
+  lines are left out now (its warnings and errors stay).
+- **Tests: `make -C server test` rebuilds `build/lord-vm-testpaths`**, so the group and storage suites never run a stale
+  one.
 - **Machines: `machines cp` out of a machine refused every file over 128 KB** ("the machine gave a strange answer"): a
   whole 128 KB piece was taken for one too long (in development).
 - **Machines: a command that went away filled its machine's `lord-vm.log`** with the same "not delivered" line several

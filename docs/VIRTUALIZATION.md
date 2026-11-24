@@ -160,14 +160,14 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Clone, Duplicate, linked clone, Clone from Here, new identity (6.3) | ✅ | 90 | `lordvm.c` `--clone`, `vmops.c`, `clone.jsx`; `machines_sheets_headless.sh` | The source must be off; no templates. An encrypted machine's Clone keeps its key under the Clone's id (`--new-id`, *in development*). *In development*: the sheet fits the Control Center's first size (760×500; its body scrolls, its buttons stay), checked with the other sheets in a headless scene |
 | Disks: qcow2, discard, Reclaim space, grow (6.4, 6.4.1) | ✅ | 100 | `lordvm.c` (`blockdev_disk`, `--compact --estimate`, `--compact --compress`, `qemu-img resize`), `storage.jsx` (Compress the disk too); `vm_snap_store_test.sh` | An interrupted compaction is rolled back. Compression (*in development*, 2026-11-24): Reclaim space can compress every cluster (`qemu-img convert -c`); 96 MB of data became 380 KB, `qemu-img check` passed, the data read back intact and the machine started on it under KVM; refused for an encrypted machine (qcow2 can't). The disk path itself is scored in M (was 85) |
 | Raw disks, disk encryption, export (`.lordvm`, OVA), backups (6.4, 3.6) | 🧪 | 85 | `lordvm.c` (`--disk-format raw`, `cmd_export`, `cmd_import_lordvm`), `vmexport.c`, `vmkeysrv.c`, `backup/engine.c`, `vmkey.jsx`; `vm_storage_test.sh`, `vmexport-test`, `vmkeysrv-test`, `backup-machines-test` | *In development*, 2026-11-24: raw disk files (never host block devices: decided), encryption (8), Export as `.lordvm` with a checked manifest and as OVA, the import of an export, consistent backups. The OVA never imported into another app; the app's sheets not driven end to end; no bare disk image export (was ❌ 0) |
-| Storage window: shared extents, frees-if-deleted, downloads (6.16) | 🧪 | 90 | `storage.jsx`, `js_vm.c` (FIEMAP, `FIEMAP_EXTENT_ENCODED`), `model.js` (`oldSnapshots`, `unusedImages`); `vm_model_test.mjs`, `flows.py` (`storage`), `tools/vm/e2e/machines/storage-fs.sh` | *In development* (2026-11-24): Delete Old Snapshots (every one but the newest, asked first with the figure), Remove Unused downloads (asked first; the existing `vm-image-remove`), figures marked "about" when an extent is stored compressed, every disk counted (raw and data disks were left out). Seen on ext4 only: a btrfs or XFS run needs root to make and mount the scratch file systems (`storage-fs.sh`, Maintainer checks) (was 75) |
+| Storage window: shared extents, frees-if-deleted, downloads (6.16) | ✅ | 100 | `storage.jsx`, `js_vm.c` (FIEMAP, `FIEMAP_EXTENT_ENCODED`), `model.js` (`oldSnapshots`, `unusedImages`); `vm_model_test.mjs`, `flows.py` (`storage`), `tools/vm/e2e/machines/storage-fs.sh`, `storage-fs.sh` (btrfs, btrfs with `compress-force=zstd`, XFS) | *In development* (2026-11-24): Delete Old Snapshots (every one but the newest, asked first with the figure), Remove Unused downloads (asked first; the existing `vm-image-remove`), figures marked "about" when an extent is stored compressed, every disk counted (raw and data disks were left out). **Run on btrfs and XFS on 2026-11-24** (`storage-fs.sh` as the person, `sudo -n` only to mount three scratch 12 GB loop file systems under /var/tmp, unmounted and deleted after; mkfs from `dpkg -x` of Debian's btrfs-progs and xfsprogs): premade, clone and storage passed on each (7, 8 and 7 checks); the clone is a reflink there, so what Machines said deleting it frees (0.0, 0.0 and 0.1 MB) is what the file system gave back (-0.7, -0.0, -0.3 MB); with `compress-force=zstd` the figures say "about" (was 🧪 90) |
 
 ### E. Network (98 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
 | Shared (passt over a socketpair), Isolated (6.5) | ✅ | 100 | `lordvm.c` (`vm_passt_argv`) |  |
-| Bridged (macvtap, `vm-net-bridge`), Host only (passt on 127.0.0.1), port rules (6.5) | 🧪 | 95 | `vmnet_admin.c`, `vmnet.c`, `lordvm.c`; `vm_nic_boot.sh` | Host only checked in a real KVM guest (2026-11-24, `vm_nic_boot.sh`): the guest reached a listener on this computer's loopback through 10.0.2.2 and, on a second card, 10.0.3.2. Bridged not run: its macvtap device is made by root (`vm-net-bridge`), and in a user and network namespace the device node stays root's (measured: `/dev/tapN` owned by nobody, open refused), so it needs root (Maintainer checks). `vhost=off`, no `vhost-net` (was 90) |
+| Bridged (macvtap, `vm-net-bridge`), Host only (passt on 127.0.0.1), port rules (6.5) | ✅ | 100 | `vmnet_admin.c`, `vmnet.c`, `lordvm.c`; `vm_nic_boot.sh`, `vm_bridge_dummy.sh`, `build/vm-net-cli-dummy` | Host only checked in a real KVM guest (2026-11-24, `vm_nic_boot.sh`): the guest reached a listener on this computer's loopback through 10.0.2.2 and, on a second card, 10.0.3.2. **Bridged run on 2026-11-24** (`vm_bridge_dummy.sh`, 23 of 23; root only through `sudo -n` for a scratch dummy `lordtest0`, a macvlan peer in a scratch network namespace, all deleted after; the real wired card and the firewall untouched): the real `vm-net-bridge` refuses the dummy (`vm.bridgeNotWired`: no device behind it) and makes nothing; the admin helper's own code with only the wired-card check told the dummy is one (`vm-net-cli-dummy`, `vmnet_card` wrapped at link time, test only) makes the macvtap in bridge mode on it with the machine's MAC, the alias `lordos-vm <uid> <id>`, no address of this computer's (no IPv6 link-local either), `/dev/tapN` the person's 0600; lord-vm opens it and gives QEMU the descriptor; a Debian 13 guest under KVM has the machine's MAC and pings the peer, which sees that MAC; the cable pulled and plugged in (VM_NETCABLE) is seen by the guest and the ping works again; `vm-net-unbridge` refuses while the machine runs (`vm.bridgeInUse`) and removes the macvtap once it is off. `vhost=off`, no `vhost-net` (was 🧪 95) |
 | Each machine named in the firewall (6.5) | 🧪 | 95 | `fw/rules.c` (`fw_vm_app`, `fw_app_parent`, `fw_effective_restricted`, `fw_effective_trusted`, `fw_decide`), `netperm/npcompile.c` (`load_rules`), `sdk/netmodel.js` (`vmIdOf`, `componentOf`, `componentLabel`, `forwardedRules`), `apps/monitor/Network.jsx`, `FwRules.jsx`, `Firewall.jsx`, `apps/machines/configure.jsx` (Network → Firewall); `fw-rules-test` (`test_machine_inherits`), `npcompile-test` (random rounds with a machine and Machines against `fw_decide`), `netmodel_test.mjs` | *In development*: each machine is its own firewall app and row, `lordos:vm-<id>`, which inherits the rules, restrictions and trust of `lordos:machines` (nothing a Machines rule denies is allowed by the split); Monitor names the row after the machine and lists its forwarded ports as its own incoming lines; Settings' rule and restriction lists offer each machine; Configure → Network opens its rules. Not yet run through a live lord-netperm with a running machine (the kernel path is the same compile, tested against `fw_decide`) |
 | Network card model (`--nic-model`) and an import's extra cards (3.9, 6.22) | ✅ | 100 | `machine.h` (`nic_model`, `VM_EXTRA_NICS`), `lordvm.c` (`xnic_attach`, `keeper_ask`, `vm_passt_argv`); `vm_nic_e2e.sh`, `vm_nic_boot.sh` | Booted with each model (*in development*, 2026-11-24): seven reach the internet; PCnet gets its address, then receive errors (QEMU's PCnet with Linux 6.12). An import's extra cards are connected (*in development*, 2026-11-24): each through its own passt on a network of its own (10.0.3.0/24, 10.0.4.0/24…), in the first card's mode, no forwarded ports; checked under KVM in Shared (addresses from passt) and Host only (this computer reached through the second card); Bridged and Isolated leave them without a cable (was 95) |
 
@@ -279,17 +279,6 @@ checked). Grouped by area.
   pointer lock → `VD_REL`), ❖Esc and Ctrl+Alt each release it, the pointer comes back where it was.
 - **C. All Displays (5.4):** with two real monitors, View → All Displays on a GNOME or KDE guest: one window per
   monitor, each output its monitor's size, the guest's desktop placing its outputs as told and the pointer crossing them.
-- **D. Storage window on btrfs and XFS (6.16):** `bash tools/vm/e2e/machines/storage-fs.sh` (sudo asks to make, mount and
-  hand over three 12 GB scratch loop file systems; with `MKFS_ROOT` pointing at `dpkg -x` of `btrfs-progs` and
-  `xfsprogs` if they aren't installed): the storage flow's figure must hold on btrfs and XFS, and btrfs with
-  `compress-force=zstd` must mark the figures "about". Root is needed only for the mounts: btrfs and XFS can't be
-  mounted in a user namespace.
-- **E. Bridged network (6.5):** on a machine without a second wired card, as root: `ip link add lordos-test0 type dummy`
-  (or a veth pair), up; Configure → Network → Bridged on `lordos-test0`; start the machine from Machines (`vm-net-bridge`
-  makes the macvtap and gives the person `/dev/tapN`): the guest's card has the machine's MAC on the dummy (`ip link
-  show` there lists the macvtap), the window's cable dot works, and stopping the machine removes the macvtap. Never on
-  the real wired card or with the live firewall changed. A user namespace can't do it: the macvtap's device node stays
-  root's there (measured 2026-11-24).
 - **A. A 3D guest's stop (3.2, 6.10):** in your session, a Debian 13 or LordOS guest with Graphics 3D and kernel 6.12.117
   or later, its window open. Run in the guest `systemctl poweroff` after a minute: the card says Off (no error page), and
   `log/lord-vm.log` ends with `qemu-3d-stop` (no guest tools) or `guest-shutdown` (tools 7 with their hook). Then
@@ -3231,6 +3220,13 @@ working…". A virtiofsd that ends because QEMU closed the connection (a suspend
 
 - **Linux guests on both architectures** mount it with `mount -t virtiofs`; a 200 MB file reads back with the host's SHA-256, and writing
   fails with "Read-only file system". On arm64 virtio-win guests it's still **To test**.
+- **Again on 2026-11-24, this build** (`tests/vm_share_boot.sh`, in the harness's namespaces; 14 of 14 on each): a Debian 13
+  guest under KVM with a read-only share, a writable share and the transfer folder, each its own virtiofsd, on the amd64
+  PC and on the Raspberry Pi 5 (arm64, LordOS kernel 6.18.57): the three mount, a 64 MB file reads back with this
+  computer's SHA-256, a write in the read-only one is refused ("Read-only file system") and lands nowhere, the writable
+  one and the transfer folder show the guest's files here at once, QEMU holds no folder, the sandbox is kept, no
+  virtiofsd is left once it's off. 200 MB copied out through the transfer folder: 0.44 s on the PC (NVMe), 14.8 s on the
+  Pi (its SD card is the bound).
 - **The host kernel needs no FUSE or virtiofs option:** virtiofsd works entirely in user space, and the guest's kernel has the driver
   built in. What the host needs is `memfd_create`, which LordOS's Pi kernel has. The earlier "Pi kernels need `CONFIG_FUSE_FS`" was wrong.
 - **Speed:** copying the 200 MB file inside the guest takes 0.23 s (about 870–900 MB/s) on the Pi and on amd64. On amd64 (**nested**) the
@@ -3648,7 +3644,14 @@ Monitor shows each VM as one row (built: Processes groups `desktop:lordos-vm-<id
 development*, "Machines to 100 %"):
 
 - **Monitor:** a machine's row opens to its processes, and **Show Machine** on the selected row opens its window through Machines
-  (`args.show`), so a protected machine's window is protected from its first frame.
+  (`args.show`), so a protected machine's window is protected from its first frame. The row also says what the machine
+  does now, after its name: "Disk 2.0 MB/s · Network ↓ 3.0 KB/s ↑ 1.0 KB/s" (`apps/monitor/vmiomodel.js`). Disk is its
+  QEMU's cgroup `io.stat` read and written bytes (`lord.vm.stats(dir).ioBytes`, two reads 2 s apart, never in a draw:
+  the read asks the machine's lord-vm over its socket); Network is what lord-netperm counts for the machine's scope
+  (`lordos:vm-<id>`, the same numbers as its own row in Monitor → Network). A part that isn't measured (no cgroup, not a
+  LordOS session, the firewall counting no bytes) is left out, never shown as 0. Tested by `monitor_vmio_test.mjs` and
+  the grouped Processes scene (`monitor_grouped_scene.mjs`: the row named after the machine with both numbers); the
+  headless e2e session has no machine scopes, so its QEMU is found by a search there (`flows.py` `s3monitor`).
 - **Cleaner** never offers a machine's files: `clean_machine_path` (`clean/cleanfs.c`) refuses the Machines library and any
   `‹name›.lordvm` or `‹name›.lordgroup` folder wherever it is, during the scan and again when a plan is made (a duplicate disk can be
   a linked clone's base; a "project output" can be in a guest's shared folder). Reclaiming a machine's space is Machines' Storage
@@ -3858,7 +3861,11 @@ How it knows: backing-file chains are read from qcow2 headers; shared extents fr
 
 The first icon on the bar shows its state (`agentTone`, `model.js`): off (not connected), running (connected), paused, or red
 (*in development*): the agent answered in this run of the guest and stopped answering while the guest runs (`lost`, kept by
-lord-server: a guest that restarts or stops isn't lost), or installing the LordOS tools failed. Tools older than the shipped
+lord-server: a guest that restarts or stops isn't lost), or installing the LordOS tools failed. A lost agent's popover says
+"The agent stopped answering" and that it connects again by itself once qemu-guest-agent runs in the machine again, not
+the install hint nor the LordOS Guest Tools disc (seen on screen on 2026-11-24 with qemu-guest-agent stopped in a running
+Debian 13 guest, `flows.py` `s3agentlost`: the light red, the popover worded so, green again once it was started; before,
+the popover told a person whose agent had just stopped to install it). Tools older than the shipped
 ones show a blue dot. Clicking it opens a popover:
 
 - **Connected:** the system and architecture as the agent reports them, agent version, connection time.
