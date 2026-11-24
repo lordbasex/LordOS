@@ -464,5 +464,6 @@
   },
   "select.nothing": "No hi ha res seleccionat",
   "activity.app": "Aplicació eliminada",
-  "activity.system": "Neteja del sistema: {name}"
+  "activity.system": "Neteja del sistema: {name}",
+  "map.machines": "Recupera a Màquines"
 }

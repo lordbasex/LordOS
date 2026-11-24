@@ -2154,6 +2154,13 @@ and always in its tooltip. On battery with machines running the toolbar has **Pa
 notice under the toolbar says "Weaker isolation on this kernel" (3.3). Machines settings (gear or the Machine menu): General, Profiles (5.6), Systems
 (5.6.1), Network, Graphics cards, Keyboard and mouse (`settingswin.jsx`).
 
+**Templates** (*in development*): ··· → **Make Template** keeps a machine as it is, to make others from (`app.json`
+`template`). Its card says "Template", the chips gain **Templates · n**, it doesn't start from the library (`actionsOf`), and
+its ··· offers **New Machine from Template…**, the Clone sheet (6.3); the clone is an ordinary machine (its `template` and
+`freshSnap` cleared). **Stop Being a Template** gives it back. A card shows the machine's own color and letter when Configure →
+General chose one, and the search finds its tags (5.5). **Export** in ··· is the storage work's (`m100/storage`:
+`machines.cmd.export`, the Export sheet, `lord.vm.export`).
+
 The original plan below is kept for reference.
 
 
@@ -2192,9 +2199,30 @@ A light never carries meaning by color alone: each has a tooltip and the state i
 
 Steps, each one screen, with Back always available.
 
-**Built (audited 2026-11-23, `assistant.jsx`):** five steps, Choose, Profile, Name (or Set up), Review, Create. There is no separate
-Detect step (an ISO is recognized inline, `lord.vm.isoInfo`), no folder choice (machines go in `~/Machines`), no **Fresh install**
-snapshot and no drop of a file on the ISO tile. Automatic setup of a Windows guest is **on** by default, and the person may type a
+**Built (audited 2026-11-23, `assistant.jsx`):** five steps, Choose, Profile, Name (or Set up), Review, Create; since then
+(*in development*, "Machines to 100 %"):
+
+- **Detect**, a step of its own after Choose for an installer disc of the person's (a card's image and a disk image know
+  their system): `lord.vm.isoDetect` runs `lord-vm --iso-detect` (`vm/vmiso.c`), which maps the file read-only, drops to
+  seccomp's strict mode (read, write and exit only) and then reads the ISO 9660 volume label, the UEFI boot files in
+  `/EFI/BOOT` (`BOOTX64.EFI`, `BOOTAA64.EFI`, `BOOTIA32.EFI`, `BOOTARM.EFI`, `BOOTRISCV64.EFI`) and El Torito's catalog (a
+  BIOS or UEFI entry). The step shows the system, the label, what the disc starts on and the architecture (`detectPlan`: the
+  boot files decide; then the name; then this computer), and says before anything is made when the disc would run emulated
+  ("This disc starts on arm64, and this computer is amd64…"), when its name and its boot files disagree, or when it starts
+  only on processors Machines doesn't run, with **Choose Another File**. `vmiso-test` (made-up and hostile images, 20 000
+  mutations under ASan and UBSan; run on the real LordOS, Ubuntu Server, Bliss OS, virtio-win and Windows 11 discs).
+- **Drop a file** anywhere on the first step: an `.iso` goes to Install from an ISO file (and Detect), a disk image to Import,
+  another app's machine to Migrate (`dropSource`).
+- **The place**: the Name step says where the machine goes, `~/Machines/<name>.lordvm`, with the space free there.
+  **Decided (2026-11-24):** no folder choice. Every protection of a machine's folder keys on the library (`machine_dir`,
+  lord.fs's protected list, Cleaner's `clean_machine_path`, Backups' hold, the shares' `vm_share_allowed`); a machine
+  elsewhere would escape them. To keep machines on another disk, `~/Machines` itself may live there.
+- **Fresh install**: with an unattended install, the review has "Take a "Fresh install" snapshot" (on by default,
+  `app.json` `freshSnap`); when the install ends (lord-vm's reason `installed`), the machine window takes it with the machine
+  off, once, before its first start.
+
+Before: no separate Detect step (an ISO was recognized inline, `lord.vm.isoInfo`), no folder shown, no **Fresh install**
+snapshot and no drop of a file. Automatic setup of a Windows guest is **on** by default, and the person may type a
 product key (else the edition's KMS client key, 4.3.1). The requirements check is the app's **What's Missing** page with the admin
 action `vm-enable`, not the Store. The design was:
 
@@ -2228,8 +2256,17 @@ The resolution menu is always shown, with **Follow the window** as one of its it
 with ❖Esc or Ctrl+Alt (fixed, 6.25). Built since (*in development*): a **View** menu (Window, Full Screen, Apps, **Picture in Picture**, **Actual Size**: the window
 sized to the guest's display while the resolution is fixed, `actualFrame`), an **Info** menu (CPU, memory and disk from two
 `lord.vm.stats` reads 2 s apart, the sandbox, Open Configuration…, `infoLines`) and **Start in Full Screen** in the machine's ···
-menu (the window takes its display as it opens). Not built: Scale, USB, Folders, Network and Camera in Devices, per-device
-status dots, the window keeping the guest's shape. The design was:
+menu (the window takes its display as it opens). Built since (*in development*, "Machines to 100 %"): **View → Scale** (50, 75,
+125, 150 and 200 % of the guest's display, the largest of that shape that fits the display, `scaleFrame`); the window
+**keeps the guest's shape** while the resolution is fixed: after the person resizes it, the frame takes the guest's
+proportions again, keeping its width (`shapeFrame`, once per size, so a window that can't go there isn't fought);
+**device dots** beside Devices on the bar, one per device the guest can use now (network, a pulled cable in amber, a disc,
+sound, microphone, shared folders), named together in one tooltip (`deviceDots`); **Devices → Network** (the mode, **Cable
+Connected**: lord-vm pulls or plugs in the first card's cable while the machine runs, `VM_NETCABLE`, QMP `set_link`; only the
+shared, host-only and bridged networks, never a group's member; a new run starts plugged in; Network Settings…) and
+**Folders** (their count, Folder Settings…). USB and the camera appear in Devices only once their backend says they are
+supported (`lord.vm.deviceCaps`, the devices work). Checked by `vm_model_test.mjs` and a real KVM boot,
+`vm_configure_boot.sh`: the cable pulled, the guest's card lost its carrier; plugged in, it came back. The design was:
 
 | Group | Items |
 |---|---|
@@ -2265,8 +2302,33 @@ Quick actions stay on the bar itself, icons with tooltips, in this order: **agen
 titles and summaries and a dot on each section with a change not saved yet (`changedSections`, `sectionsMatching`); one window with eleven sections and their summaries: General, Startup and
 shutdown, CPU and memory, Display, Network, Sound and input, Disks, Sharing, Boot, Security (what the engine can reach: sandbox,
 files, network, limits, picture and input, passwords), plus the guest agent (tools updated by themselves), Notes, "Pointer drawn by",
-compatible or fast devices and "Capture automatically in full screen". **Keep this computer awake** is on by default. Not built:
-search, changed-section dots, Backup, hugepages, ballooning, CPU model, printers, USB rules, adding, resizing or encrypting disks.
+compatible or fast devices and "Capture automatically in full screen". **Keep this computer awake** is on by default.
+
+**Built since (*in development*, "Machines to 100 %"):** General has the card's **icon** (the system's mark, or one of six
+colors of its own with the name's first letter; `app.json` `color`) and **tags** (up to 8, `tagsOf`; the library's search
+finds them, `#tag` exactly). CPU and memory has the **processor** the guest sees: this computer's (`-cpu host`, the
+default) or **Compatible**, QEMU's `Nehalem-v2`, the x86-64-v2 level (SSE4.2 and POPCNT, what Windows 11 asks for), the
+same on every amd64 computer so a machine keeps working when it moves or this computer's processor changes (`machine.json`
+`cpu_model`, schema 16; amd64 with KVM only; a system built for x86-64-v3 needs this computer's); and **Huge pages: Automatic**,
+shown and not a switch (3.7.2). Disks has **Add Disk**: one more empty data disk (`lord-vm --add-disk GB`, up to four,
+`disks/data-<n>.qcow2` made under a temporary name and renamed into place, refused for a linked clone and while the machine
+has snapshots, which a disk they never saw would break). Network has **New Address** for the card (`lord-vm --mac new`, a
+random address of QEMU's `52:54:00` range). Sharing says where the guest prints (below). Checked: `vm_model_test.mjs`, the
+headless scene `machines_app2_headless.sh` (each section on screen) and a real KVM boot, `vm_configure_boot.sh` (2026-11-24,
+amd64: the guest's `/proc/cpuinfo` said "Intel Core i7 9xx (Nehalem Core i7, IBRS update)" with SSE4.2 and no AVX2, two
+disks and the new MAC, under the full sandbox). **Backup** and **encryption** come with the storage work (`m100/storage`);
+**USB rules** with the devices work.
+
+**Decided (2026-11-24):**
+- **No memory ballooning.** A `virtio-balloon` device lets the guest decide how much memory it gives back (a hostile one gives
+  nothing), it is one more device model parsing what the guest writes, and Whonix lists ballooning among the features that
+  weaken anonymity (19.5). A machine's memory is bounded by its `memory.max` and the budget (3.7), whatever the guest does.
+- **Printers:** the guest prints to the printers of the network with its own driverless printing (IPP Everywhere). This
+  computer's printing service (CUPS, a root service) is never opened to a machine: no machine network reaches this computer's
+  services (Shared and Host only have `--no-map-gw`; a bridged card can't talk to its own host).
+- **No speed limit for the network:** passt and QEMU's stream backend have no rate limit, and shaping a macvtap would take a
+  root action for little gain; the firewall decides what a machine reaches (6.5).
+- **Huge pages** are lord-vm's choice (3.7.2), shown as "Automatic", never a switch.
 
 **Decision: one window with every section down the side, each with a one-line summary of its current values, and no tabs.** The roadmap says tabs. Its five groups stay, as headings in that side list, because they're a good order, but tabs lose:
 
@@ -2284,7 +2346,7 @@ Reachable from the bar and from `⋯`. Changes that need a power-off are marked 
 
 **Options:**
 - Startup and shutdown: start with session, delay, on window close, on host shutdown (Suspend, Shut down).
-- Optimization: Faster guest / Balanced / Faster host; battery; background priority; hugepages; memory ballooning; auto-pause when idle.
+- Optimization: Faster guest / Balanced / Faster host; battery; background priority; hugepages; auto-pause when idle. (No memory ballooning: decided 2026-11-24, see above.)
 - Sharing: folders (per folder read-only by default), Downloads, Desktop; clipboard (Off, To guest, From guest, Both); drag and drop; printers.
 - Applications: guest apps in the launcher and Dock; file associations.
 - Apps mode: on or off.
@@ -2478,7 +2540,8 @@ project's official site and stay on this computer only. The marks belong to thei
   the root-owned image store (not listed in Storage); removing it needs the admin action `vm-image-remove`.
 - **Profiles and added systems** may carry `logo: { url, sha256 }` (PNG, https): validated, shown in the import summary
   with "A logo in a profile is its author's responsibility: LordOS doesn't host or share it", exported as address and hash
-  only, never the image. This version doesn't download them (vm-image-get-user is for a system's image only).
+  only, never the image. They are never downloaded (decided 2026-11-24): a profile never makes this computer fetch anything by
+  itself, and a stranger's file would otherwise choose an address this computer contacts. Such a system shows LordOS's own mark.
 - About shows the trademark notice in every language.
 
 ### 5.7 What this computer can run
@@ -2492,7 +2555,7 @@ read from world-readable sysfs (`lord.vm.sensors()`); a microSD library and an e
 
 ### 5.8 Menus, shortcuts
 
-Follows `docs/SHORTCUTS.md`: app menus, ❖ shortcuts for the host while the app has focus outside capture, all passed to the guest while captured. The release combination (❖Esc or Ctrl+Alt) is shown when capture starts; it is fixed, not configurable (`capture.js`). In Lord Classic the same table.
+Follows `docs/SHORTCUTS.md`: app menus, ❖ shortcuts for the host while the app has focus outside capture, all passed to the guest while captured. The release combination (❖Esc or Ctrl+Alt) is shown when capture starts; it is fixed on purpose (6.25: lord-server's own keys, so the pointer can always be taken back), not configurable (`capture.js`). In Lord Classic the same table.
 
 Since 0.8.8.8 the VM window can also take the desktop's shortcuts (❖, ⌥Tab and the rest) while it has the keyboard, so they reach the guest (`apps/machines/vmwindow.jsx` → `sdk/kbinhibit.js`, `sdk/kbinhibitmodel.js`). It follows the same rule as a Linux app's keyboard-shortcuts inhibitor: the person allows it once (the `shortcuts` permission, Settings → Privacy → Keyboard shortcuts), ❖Esc turns it off for that window and back on, and the lock, the console switch and the media keys always stay LordOS's.
 
@@ -3081,11 +3144,15 @@ development*, "Machines to 100 %"):
 - **Pause while I'm away** (the same section; `app.json` `autoPause`): after 10 minutes without keyboard or mouse the machine pauses,
   and resumes on the next input; one the person paused stays paused (`awayStep`).
 
-Not built: the balloon. A `virtio-balloon` device would let the host take memory back from an idle guest, but the guest decides how
-much it gives (a hostile one gives nothing), it is one more device model parsing what the guest writes, and Whonix lists ballooning
-among the features that weaken its anonymity (19.5). The memory a machine can use stays its `memory.max` (3.7), which the host
-enforces whatever the guest does, and the budget (3.7) keeps the sum within what this computer can give. Decision left to the
-maintainer: whether the design keeps the balloon at all.
+- **Reclaim space from Cleaner** (*in development*): Cleaner's Storage view, on the Machines library, a machine's folder or a
+  group's, offers **Reclaim in Machines** in place of Review, which opens Machines' Storage window (6.16), where a machine's
+  disks are compacted safely (`apps/cleaner/vmspace.js` `machinesSpace`, the same places `clean_machine_path` refuses).
+
+**No balloon (decided 2026-11-24).** A `virtio-balloon` device would let the host take memory back from an idle guest, but the
+guest decides how much it gives (a hostile one gives nothing), it is one more device model parsing what the guest writes, and
+Whonix lists ballooning among the features that weaken its anonymity (19.5). The memory a machine can use stays its
+`memory.max` (3.7), which the host enforces whatever the guest does, and the budget (3.7) keeps the sum within what this
+computer can give.
 
 ### 6.15 Command line and coding agents
 
@@ -3512,7 +3579,9 @@ pointer is hidden and held inside the picture, and the guest gets relative motio
   goes out before each button and wheel step, in both modes. `tests/vmdisplay_test.c` checks the order for right, left and wheel
   clicks, free and captured, and that release-all lets go of a right button. **To check** on the Windows 11 GVT-g machine: a
   right-click with the mouse free, on the desktop and in Explorer, in a window and in apps mode.
-- Hotkeys are fixed for now (❖Esc and Ctrl+Alt); choosing them is for later.
+- The release keys are fixed on purpose (decided 2026-11-24): ❖Esc and Ctrl+Alt are lord-server's own, handled before any
+  app or guest sees them, the same in every capture and on every machine, so a person can always get the pointer back and no
+  setting, profile or guest can take that away (the same rule as the keyboard-shortcuts permission, AGENTS.md).
 
 ### 6.26 Renaming a machine (built 2026-11-23, in development; asked by the maintainer 2026-11-23)
 
@@ -4377,7 +4446,7 @@ Machines (React + LordOS SDK)
 | Desktop stutters while a machine works | Fails the LordOS rule | Budget, measured target, fewer default cores on a Pi |
 | Dependence on 16 KiB behaviour | Pi path rests on To test items | Phase 0 measured a 4K guest working on the 16K kernel at native CPU speed; the GICV trapping cost is still open (13.8) |
 | A guest aborts its own QEMU (3D on arm64, QEMU 10.0.13) | The machine dies on every UEFI boot or by the guest's choice | 3D off on arm64 until fixed (6.10) |
-| Host page and swap pressure | Host starves | Memory limits (cgroup, built); balloon and the warning at 80 % not built |
+| Host page and swap pressure | Host starves | Memory limits (cgroup, built), the budget and its PSI warning ("Short of memory", built); no balloon (decided, 6.14) |
 | Sandbox on Pi 4 kernel | Weaker isolation | Stated in Security |
 | WinFsp and agents add third-party code in guests | Maintenance | Pinned, verified, opt-in |
 
@@ -4398,7 +4467,7 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 | Keep running after closing the window, start with no window | 2 | Yes | |
 | Start with the session, order and delay | 3 | Yes | |
 | Auto-pause when idle | 3 | Work | Needs an idle signal from the agent |
-| Memory ballooning, CPU and memory hotplug | 3 | Partly | Depends on guest |
+| CPU and memory hotplug | 3 | Partly | Depends on guest. No memory ballooning (decided 2026-11-24, 6.14) |
 | Keep host and guest awake while running | 2 | Yes | |
 | Battery awareness, Pause All | 3 | Yes | |
 | Nested virtualization | 2 | Partly | amd64 yes; arm64 only on FEAT_NV CPUs, not any Pi |

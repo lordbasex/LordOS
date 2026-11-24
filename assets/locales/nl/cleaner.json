@@ -464,5 +464,6 @@
   },
   "select.nothing": "Niets geselecteerd",
   "activity.app": "App verwijderd",
-  "activity.system": "Systeem opgeruimd: {name}"
+  "activity.system": "Systeem opgeruimd: {name}",
+  "map.machines": "Terugwinnen in Machines"
 }

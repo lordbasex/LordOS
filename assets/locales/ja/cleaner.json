@@ -446,5 +446,6 @@
   },
   "select.nothing": "何も選択されていません",
   "activity.app": "アプリを削除しました",
-  "activity.system": "システムのクリーンアップ：{name}"
+  "activity.system": "システムのクリーンアップ：{name}",
+  "map.machines": "仮想マシンで解放"
 }

@@ -818,7 +818,7 @@ export function tagsOf(list) {
   return out;
 }
 // "work, test" as typed in Configure → tags
-export const parseTags = (text) => tagsOf(String(text || '').split(','));
+export const parseTags = (text) => tagsOf(String(text || '').split(/[,\u060c\uff0c\u3001]/));
 // the machines a search and the chip leave: the query matches the name, the system, the architecture or a tag;
 // "#name" only a tag of that name
 export function filterMachines(list, { query, show } = {}) {

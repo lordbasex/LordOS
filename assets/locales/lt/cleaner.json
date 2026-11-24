@@ -482,5 +482,6 @@
   },
   "select.nothing": "Niekas nepažymėta",
   "activity.app": "Programa pašalinta",
-  "activity.system": "Sistemos valymas: {name}"
+  "activity.system": "Sistemos valymas: {name}",
+  "map.machines": "Atlaisvinti „Virtualiose mašinose“"
 }

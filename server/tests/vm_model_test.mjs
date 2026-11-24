@@ -1208,6 +1208,7 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('tags cleaned', tagsOf([' work ', 'WORK', '#test', '', 'a\u0001b', 5, 'x'.repeat(25), 'w  x']), ['work', 'test', 'ab', 'w x']);
   eq('tags at most 8', tagsOf(['1', '2', '3', '4', '5', '6', '7', '8', '9']).length, 8);
   eq('tags typed', parseTags('work, tests,, work'), ['work', 'tests']);
+  eq('tags typed with an Arabic or a full-width comma', parseTags('a\u060cb\uff0cc\u3001d'), ['a', 'b', 'c', 'd']);
   const lib = [{ name: 'Alpha', meta: { tags: ['Work'] }, state: 'stopped' }, { name: 'Beta', meta: { tags: ['home'], template: true }, state: 'stopped' }, { name: 'Gamma', state: 'running' }];
   eq('search by tag text', filterMachines(lib, { query: 'wor' }).map((m) => m.name), ['Alpha']);
   eq('search #tag exact', filterMachines(lib, { query: '#hom' }).map((m) => m.name), []);
