@@ -33,6 +33,7 @@
 #include "../vm/vmops.h"
 #include "../vm/logclean.h"
 #include "../vm/vmagent.h"
+#include "../vm/vmrecv.h"
 #include "../vm/vmnet.h"
 #include "../vm/vmgpu.h"
 #include "../vm/vmsig.h"
@@ -1930,16 +1931,10 @@ typedef struct {
 static Sess sess[MAX_SESS];
 
 /* ---- files sent from the guest (6.21, VM_RECV_OFFER / VM_RECV_STATE) ----
- * Every file from a guest lands in the machine's quarantine folder, <library>/Received/<machine folder's name>, made here
- * (0700, each step opened without following a link, this account's own), never anywhere the guest names. lord-vm gets
- * only the descriptor of a part file, ".lordos-part-<the guest's key in hex>" (a resume finds it again), opened O_RDWR
- * without following a link (a regular file of this account with one link). Once lord-vm says the SHA-256 matched, the part
- * gets its name (ag_recv_name, never replacing a file: " (2)"…), mode 0600 (never executable) and the marks of where it
- * came from (user.lordos.from, user.lordos.machine, user.xdg.origin.url, user.lordos.quarantine), which Files shows. */
+ * Every file from a guest lands in the machine's quarantine folder (vm/vmrecv.h: <library>/Received/<machine>), never
+ * anywhere the guest names; lord-vm gets only the part file's descriptor. Once lord-vm says the SHA-256 matched, the part
+ * is made 0600, marked as from this machine and named (vmrecv_finish). */
 static long long mono_ms(void);
-#define RX_RESERVE (1ULL << 30)             /* an offer must leave this much free */
-#define RX_PARTS_MAX 8                      /* parts kept for resumes, per machine; older ones go */
-#define RX_PART_DAYS 7
 
 static void rx_slot_free(RxSlot *r) {
     if (r->fd >= 0) close(r->fd);
@@ -1949,62 +1944,6 @@ static void rx_slot_free(RxSlot *r) {
 }
 
 static void rx_free_all(Sess *s) { for (int i = 0; i < RX_SLOTS; i++) if (s->rx[i].state) rx_slot_free(&s->rx[i]); }
-
-/* the machine's quarantine folder, made when missing; -1 when it can't be one of this account's own folders */
-static int rx_dir_open(Sess *s, char *shown, size_t sn) {
-    char lib[PATH_MAX];
-    snprintf(lib, sizeof lib, "%s", s->dir);
-    size_t l = strlen(lib);
-    while (l > 1 && lib[l - 1] == '/') lib[--l] = 0;
-    char *slash = strrchr(lib, '/');
-    if (!slash || slash == lib) return -1;
-    *slash = 0;
-    char base[NAME_MAX + 1];
-    snprintf(base, sizeof base, "%s", slash + 1);
-    size_t bl = strlen(base);
-    if (bl <= 7 || strcmp(base + bl - 7, ".lordvm")) return -1;
-    base[bl - 7] = 0;
-    if (!base[0] || base[0] == '.' || strchr(base, '/')) return -1;
-    int lf = open(lib, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-    if (lf < 0) return -1;
-    struct stat st;
-    if (mkdirat(lf, "Received", 0700) && errno != EEXIST) { close(lf); return -1; }
-    int rf = openat(lf, "Received", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-    close(lf);
-    if (rf < 0 || fstat(rf, &st) || st.st_uid != getuid()) { if (rf >= 0) close(rf); return -1; }
-    if (mkdirat(rf, base, 0700) && errno != EEXIST) { close(rf); return -1; }
-    int df = openat(rf, base, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-    close(rf);
-    if (df < 0 || fstat(df, &st) || st.st_uid != getuid() || (st.st_mode & 022)) { if (df >= 0) close(df); return -1; }
-    if (shown) snprintf(shown, sn, "%s/Received/%s", lib, base);
-    return df;
-}
-
-/* parts left by transfers that never came back: older than RX_PART_DAYS, or more than RX_PARTS_MAX (the oldest first);
- * never `keep` */
-static void rx_parts_trim(int dfd, const char *keep) {
-    int d2 = dup(dfd);
-    DIR *d = d2 >= 0 ? fdopendir(d2) : NULL;
-    if (!d) { if (d2 >= 0) close(d2); return; }
-    struct { char n[96]; time_t t; } p[64];
-    int k = 0;
-    time_t now = time(NULL);
-    rewinddir(d);
-    for (struct dirent *e; (e = readdir(d));) {
-        if (strncmp(e->d_name, ".lordos-part-", 13) || strlen(e->d_name) >= sizeof p[0].n || !strcmp(e->d_name, keep)) continue;
-        struct stat st;
-        if (fstatat(dfd, e->d_name, &st, AT_SYMLINK_NOFOLLOW) || !S_ISREG(st.st_mode)) continue;
-        if (now - st.st_mtime > RX_PART_DAYS * 86400) { unlinkat(dfd, e->d_name, 0); continue; }
-        if (k < 64) { snprintf(p[k].n, sizeof p[k].n, "%s", e->d_name); p[k].t = st.st_mtime; k++; }
-    }
-    closedir(d);
-    while (k >= RX_PARTS_MAX) {                         /* room for this one */
-        int o = 0;
-        for (int i = 1; i < k; i++) if (p[i].t < p[o].t) o = i;
-        unlinkat(dfd, p[o].n, 0);
-        p[o] = p[--k];
-    }
-}
 
 static void rx_refuse(Sess *s, uint32_t id, int status) {
     VmMsg m = vm_msg(VM_RECV, ++s->seq, (int)id, status, 0, 0, NULL);
@@ -2026,36 +1965,15 @@ static void rx_offer(Sess *s, const VmMsg *m, int fd) {
     /* finished entries the app hasn't listed yet make room */
     for (int i = 0; i < RX_SLOTS && slot < 0; i++) if (s->rx[i].state >= RXS_DONE) { rx_slot_free(&s->rx[i]); slot = i; }
     if (slot < 0) { rx_refuse(s, (uint32_t)m->b, AGSA_BUSY); return; }
-    char shown[PATH_MAX];
-    char hex0[65], part0[96];
-    for (int i = 0; i < 32; i++) snprintf(hex0 + i * 2, 3, "%02x", o.key[i]);
-    snprintf(part0, sizeof part0, ".lordos-part-%s", hex0);
-    /* the same file offered again (a resume): its paused entry gives way to this one */
-    for (int i = 0; i < RX_SLOTS; i++) if (s->rx[i].state == RXS_PAUSED && !strcmp(s->rx[i].part, part0)) rx_slot_free(&s->rx[i]);
-    int dfd = rx_dir_open(s, shown, sizeof shown);
+    char shown[PATH_MAX], part[VMRECV_PART_NAME];
+    int dfd = vmrecv_dir_open(s->dir, shown, sizeof shown);
     if (dfd < 0) { rx_refuse(s, (uint32_t)m->b, AGSA_BUSY); return; }
-    char part[96], hex[65];
-    for (int i = 0; i < 32; i++) snprintf(hex + i * 2, 3, "%02x", o.key[i]);
-    snprintf(part, sizeof part, ".lordos-part-%s", hex);
-    rx_parts_trim(dfd, part);
-    int pf = openat(dfd, part, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC | O_NOCTTY, 0600);
-    struct stat ps;
-    if (pf < 0 || fstat(pf, &ps) || !S_ISREG(ps.st_mode) || ps.st_nlink != 1 || ps.st_uid != getuid()) {
-        if (pf >= 0) close(pf);
-        close(dfd);
-        rx_refuse(s, (uint32_t)m->b, AGSA_BUSY);
-        return;
-    }
-    uint64_t have = (uint64_t)ps.st_size <= o.size ? (uint64_t)ps.st_size : 0;
-    struct statvfs vs;
-    if (fstatvfs(dfd, &vs) || (uint64_t)vs.f_bavail * vs.f_frsize < o.size - have + RX_RESERVE) {
-        close(pf);
-        if (!have) unlinkat(dfd, part, 0);
-        close(dfd);
-        s->rx_nospace++;
-        rx_refuse(s, (uint32_t)m->b, AGSA_SPACE);
-        return;
-    }
+    uint64_t have = 0;
+    int status = AGSA_BUSY;
+    int pf = vmrecv_part_open(dfd, o.key, o.size, part, &have, &status);
+    if (pf < 0) { close(dfd); if (status == AGSA_SPACE) s->rx_nospace++; rx_refuse(s, (uint32_t)m->b, status); return; }
+    /* the same file offered again (a resume): its paused entry gives way to this one */
+    for (int i = 0; i < RX_SLOTS; i++) if (s->rx[i].state == RXS_PAUSED && !strcmp(s->rx[i].part, part)) rx_slot_free(&s->rx[i]);
     int give = fcntl(pf, F_DUPFD_CLOEXEC, 0);
     VmMsg r = vm_msg(VM_RECV, ++s->seq, m->b, AGSA_OK, 0, 0, NULL);
     if (give < 0 || vm_send(s->vm, &r, give)) { if (give >= 0) close(give); close(pf); close(dfd); return; }
@@ -2070,20 +1988,6 @@ static void rx_offer(Sess *s, const VmMsg *m, int fd) {
     s->rx_changes++;
 }
 
-/* the kept file's name: `name`, else "stem (2).ext" … (never replacing a file); 0 renamed, -1 not */
-static int rx_name_free(RxSlot *x) {
-    char cand[AG_NAME_MAX + 16];
-    const char *dot = strrchr(x->name, '.');
-    size_t stem = dot && dot != x->name ? (size_t)(dot - x->name) : strlen(x->name);
-    for (int n = 1; n < 1000; n++) {
-        if (n == 1) snprintf(cand, sizeof cand, "%s", x->name);
-        else snprintf(cand, sizeof cand, "%.*s (%d)%s", (int)stem, x->name, n, x->name + stem);
-        if (!syscall(SYS_renameat2, x->dfd, x->part, x->dfd, cand, 1 /* RENAME_NOREPLACE */)) { snprintf(x->final, sizeof x->final, "%s", cand); return 0; }
-        if (errno != EEXIST) return -1;
-    }
-    return -1;
-}
-
 static void rx_state(Sess *s, const VmMsg *m) {
     RxSlot *x = NULL;
     for (int i = 0; i < RX_SLOTS && !x; i++) if (s->rx[i].state == RXS_RUNNING && s->rx[i].id == (uint32_t)m->a) x = &s->rx[i];
@@ -2093,23 +1997,8 @@ static void rx_state(Sess *s, const VmMsg *m) {
     s->rx_changes++;
     if (m->b == VRS_RUNNING) return;
     if (m->b == VRS_PAUSED) { x->state = RXS_PAUSED; return; }      /* the part stays, for the guest's next offer */
-    if (m->b == VRS_FAILED) {
-        x->state = RXS_FAILED;
-        x->code = m->d;
-        unlinkat(x->dfd, x->part, 0);
-        return;
-    }
-    /* kept: never executable, marked as from this machine, then named */
-    struct stat st;
-    if (fstat(x->fd, &st) || (uint64_t)st.st_size != x->size) { x->state = RXS_FAILED; x->code = AGSD_FAILED; unlinkat(x->dfd, x->part, 0); return; }
-    fchmod(x->fd, 0600);
-    char origin[64];
-    snprintf(origin, sizeof origin, "lordos-machine:%s", s->id);
-    x->marked = !fsetxattr(x->fd, "user.lordos.quarantine", "1", 1, 0);
-    fsetxattr(x->fd, "user.lordos.from", s->name, strlen(s->name), 0);
-    fsetxattr(x->fd, "user.lordos.machine", s->id, strlen(s->id), 0);
-    fsetxattr(x->fd, "user.xdg.origin.url", origin, strlen(origin), 0);
-    if (rx_name_free(x)) { x->state = RXS_FAILED; x->code = AGSD_FAILED; unlinkat(x->dfd, x->part, 0); return; }
+    if (m->b == VRS_FAILED) { x->state = RXS_FAILED; x->code = m->d; unlinkat(x->dfd, x->part, 0); return; }
+    if (vmrecv_finish(x->dfd, x->fd, x->part, x->name, s->name, s->id, x->size, x->final, sizeof x->final, &x->marked)) { x->state = RXS_FAILED; x->code = AGSD_FAILED; return; }
     x->got = x->size;
     x->state = RXS_DONE;
 }

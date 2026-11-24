@@ -16,6 +16,9 @@
 #include "vm/vmgvtwin.h"
 #include "vm/vmperfwin.h"
 #include "vm/vmhoststop.h"
+#include "vm/vmrecv.h"
+#include <sys/xattr.h>
+#include <time.h>
 
 #include <limits.h>
 #include <stdio.h>
@@ -2690,6 +2693,95 @@ static void test_guest_send(void) {
     CHECK(ag_hello_caps((const uint8_t *)"9 shell send links", 18) & AG_HELLO_SEND);
 }
 
+
+/* the quarantine folder (vmrecv.c, 6.21): made without following links, part files only plain files of ours, names never
+ * replace a file, kept files 0600 and marked, old parts trimmed */
+static void test_vmrecv(void) {
+    char base[] = "/tmp/vmrecv-test.XXXXXX", p[PATH_MAX], q[PATH_MAX], shown[PATH_MAX], part[VMRECV_PART_NAME], fin[256];
+    if (!mkdtemp(base)) { CHECK(0); return; }
+    snprintf(p, sizeof p, "%s/lib", base); mkdir(p, 0700);
+    snprintf(p, sizeof p, "%s/lib/Test VM.lordvm", base); mkdir(p, 0700);
+    int d = vmrecv_dir_open(p, shown, sizeof shown);
+    snprintf(q, sizeof q, "%s/lib/Received/Test VM", base);
+    struct stat st;
+    CHECK(d >= 0 && !strcmp(shown, q) && !stat(q, &st) && (st.st_mode & 0777) == 0700);
+    CHECK(vmrecv_dir_open("relative.lordvm", NULL, 0) == -1);
+    snprintf(q, sizeof q, "%s/lib/Other", base);
+    CHECK(vmrecv_dir_open(q, NULL, 0) == -1);                          /* not a machine folder */
+    /* Received, or the machine's folder in it, a link the guest or anyone planted: refused */
+    snprintf(q, sizeof q, "%s/lib2", base); mkdir(q, 0700);
+    snprintf(q, sizeof q, "%s/elsewhere", base); mkdir(q, 0700);
+    snprintf(p, sizeof p, "%s/lib2/Received", base); CHECK(!symlink(q, p));
+    snprintf(p, sizeof p, "%s/lib2/X.lordvm", base); mkdir(p, 0700);
+    CHECK(vmrecv_dir_open(p, NULL, 0) == -1);
+    snprintf(q, sizeof q, "%s/lib/Received/Y", base); CHECK(!symlink("/tmp", q));
+    snprintf(p, sizeof p, "%s/lib/Y.lordvm", base); mkdir(p, 0700);
+    CHECK(vmrecv_dir_open(p, NULL, 0) == -1);
+    if (d < 0) return;
+    /* a part: what came before is kept for a resume, unless it's longer than the file */
+    uint8_t key[32];
+    for (int i = 0; i < 32; i++) key[i] = (uint8_t)i;
+    uint64_t have = 9;
+    int status = -1;
+    int f = vmrecv_part_open(d, key, 20, part, &have, &status);
+    CHECK(f >= 0 && have == 0 && status == AGSA_OK && !strncmp(part, ".lordos-part-000102", 19) && strlen(part) == 13 + 64);
+    if (f >= 0) { CHECK(write(f, "0123456789", 10) == 10); close(f); }
+    f = vmrecv_part_open(d, key, 20, part, &have, &status);
+    CHECK(f >= 0 && have == 10);
+    if (f >= 0) close(f);
+    f = vmrecv_part_open(d, key, 5, part, &have, &status);
+    CHECK(f >= 0 && have == 0);
+    if (f >= 0) close(f);
+    /* a part that is a link or has another name (a hard link) is never written through */
+    uint8_t k2[32];
+    memset(k2, 0xee, sizeof k2);
+    char p2[VMRECV_PART_NAME];
+    int n = snprintf(p2, sizeof p2, ".lordos-part-");
+    for (int i = 0; i < 32; i++) n += snprintf(p2 + n, sizeof p2 - (size_t)n, "ee");
+    CHECK(!symlinkat("/etc/passwd", d, p2));
+    CHECK(vmrecv_part_open(d, k2, 20, part, &have, &status) == -1 && status == AGSA_BUSY);
+    unlinkat(d, p2, 0);
+    int t = openat(d, "victim", O_CREAT | O_WRONLY, 0600); if (t >= 0) close(t);
+    CHECK(!linkat(d, "victim", d, p2, 0));
+    CHECK(vmrecv_part_open(d, k2, 20, part, &have, &status) == -1);
+    unlinkat(d, p2, 0); unlinkat(d, "victim", 0);
+    /* no room: more than the file system has */
+    CHECK(vmrecv_part_open(d, k2, AG_SEND_SIZE_MAX, part, &have, &status) == -1 && status == AGSA_SPACE && faccessat(d, p2, F_OK, AT_SYMLINK_NOFOLLOW));
+    /* kept: 0600, marked, never replacing a file */
+    f = vmrecv_part_open(d, key, 4, part, &have, &status);
+    CHECK(f >= 0 && write(f, "data", 4) == 4 && !fchmod(f, 0755));
+    t = openat(d, "run me.sh", O_CREAT | O_WRONLY, 0600); if (t >= 0) close(t);
+    int marked = -1;
+    CHECK(!vmrecv_finish(d, f, part, "run me.sh", "Test VM", "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b", 4, fin, sizeof fin, &marked) && !strcmp(fin, "run me (2).sh"));
+    CHECK(!fstatat(d, fin, &st, 0) && (st.st_mode & 0777) == 0600 && st.st_size == 4);
+    char x[64];
+    ssize_t xl = fgetxattr(f, "user.lordos.from", x, sizeof x);
+    CHECK(!marked || (xl == 7 && !memcmp(x, "Test VM", 7)));
+    if (f >= 0) close(f);
+    /* a size that isn't the one offered: removed, not named */
+    f = vmrecv_part_open(d, key, 4, part, &have, &status);
+    CHECK(f >= 0 && write(f, "abc", 3) == 3);
+    CHECK(vmrecv_finish(d, f, part, "short.txt", "Test VM", "x", 4, fin, sizeof fin, &marked) == -1 && faccessat(d, part, F_OK, 0) && faccessat(d, "short.txt", F_OK, 0));
+    if (f >= 0) close(f);
+    /* parts nobody came back for: at most VMRECV_PARTS_MAX, old ones gone */
+    for (int i = 0; i < 12; i++) {
+        char nm[VMRECV_PART_NAME];
+        snprintf(nm, sizeof nm, ".lordos-part-%064d", i);
+        t = openat(d, nm, O_CREAT | O_WRONLY, 0600);
+        if (t >= 0) { struct timespec ts[2] = { { 1000000 + i, 0 }, { time(NULL) - (i == 0 ? 30 * 86400 : 100 - i), 0 } }; futimens(t, ts); close(t); }
+    }
+    vmrecv_parts_trim(d, NULL);
+    int left = 0;
+    for (int i = 0; i < 12; i++) { char nm[VMRECV_PART_NAME]; snprintf(nm, sizeof nm, ".lordos-part-%064d", i); left += !faccessat(d, nm, F_OK, 0); }
+    char nm0[VMRECV_PART_NAME], nm11[VMRECV_PART_NAME];
+    snprintf(nm0, sizeof nm0, ".lordos-part-%064d", 0);
+    snprintf(nm11, sizeof nm11, ".lordos-part-%064d", 11);
+    CHECK(left == VMRECV_PARTS_MAX - 1 && faccessat(d, nm0, F_OK, 0) && !faccessat(d, nm11, F_OK, 0));
+    close(d);
+    char cmd[PATH_MAX + 16];
+    snprintf(cmd, sizeof cmd, "rm -rf '%s'", base);
+    CHECK(system(cmd) == 0);
+}
 /* a host stop's steps (vmhoststop.h, 6.1): everything, SIGKILL included, inside logind's delay with a margin */
 static void test_host_stop_plan(void) {
     VmHostStopPlan p = vm_host_stop_plan(45000);            /* LordOS's InhibitDelayMaxSec=45 */
@@ -2721,6 +2813,7 @@ static void test_host_stop_plan(void) {
 int main(void) {
     test_guest_links();
     test_guest_send();
+    test_vmrecv();
     test_gvtwin();
     test_perfwin();
     test_open_with();
