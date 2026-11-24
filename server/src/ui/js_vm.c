@@ -1756,9 +1756,12 @@ static int vm_exe_is(long pid, const char *name) {
     return realpath(want, rw) && vmwatch_exe_same(got, rw);
 }
 
-/* where lord-sessiond puts a machine's scope: beside lord-server's own leaf (".../lordos-session-<uid>/server"), the
- * exact cgroup path; "" outside a LordOS session */
-static void vm_scope_path(const char *id, int tor, char *out, size_t n) { vmwatch_scope_path(cgroup_self(), id, tor, out, n); }
+/* where lord-sessiond puts a machine's scope: in the session's machines' slice (3.7), the exact cgroup path; "" outside a
+ * LordOS session. old: where a machine started before the slice existed is, beside lord-server's own leaf */
+static void vm_scope_path(const char *id, int tor, char *out, size_t n, char *old, size_t on) {
+    vmwatch_scope_path(cgroup_self(), id, tor, 1, out, n);
+    vmwatch_scope_path(cgroup_self(), id, tor, 0, old, on);
+}
 
 /* the process's cgroup (v2) is exactly `scope` or below it */
 static int vm_in_cgroup(long pid, const char *scope) {
@@ -1770,6 +1773,11 @@ static int vm_in_cgroup(long pid, const char *scope) {
     if (k <= 3) return 0;
     buf[k] = 0;
     return vmwatch_cg_under(buf, scope);
+}
+
+/* the process is under the machine's scope, in the slice or (started before it) in the old place */
+static int vm_in_scope(long pid, const char *scope, const char *old) {
+    return (scope[0] && vm_in_cgroup(pid, scope)) || (old[0] && vm_in_cgroup(pid, old));
 }
 
 /* the machine's own lord-vm, asked over its socket (vmwatch_live) */
@@ -1823,9 +1831,9 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     }
     /* Sentinela's facts (docs/SENTINELA.md, "Machines") come from the machine's lord-vm itself, never from run.json */
     static VmMachine sm;
-    char serr[128], scope[PATH_MAX] = "";
+    char serr[128], scope[PATH_MAX] = "", scope_old[PATH_MAX] = "";
     int have_m = !vm_machine_load(dir, &sm, serr, sizeof serr) && sm.id[0];
-    if (have_m) vm_scope_path(sm.id, sm.uplink_tor, scope, sizeof scope);
+    if (have_m) vm_scope_path(sm.id, sm.uplink_tor, scope, sizeof scope, scope_old, sizeof scope_old);
     if (qpid > 0 && have_m) {
         VmLive lv;
         int ok = !vm_live(sm.id, &lv);
@@ -1844,7 +1852,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
                 set_str(c, o, "cgMode", lv.cg & VMC_NESTED ? "nested" : lv.cg & VMC_SCOPE ? "scope" : "none");
                 /* in its own machine's scope (exactly that cgroup or below it), lord-vm and QEMU both; "" when this
                  * isn't a LordOS session and the scope's place isn't known */
-                if (scope[0]) set_str(c, o, "scope", vm_in_cgroup(lv.qemu, scope) && vm_in_cgroup(lv.pid, scope) ? "in" : "out");
+                if (scope[0]) set_str(c, o, "scope", vm_in_scope(lv.qemu, scope, scope_old) && vm_in_scope(lv.pid, scope, scope_old) ? "in" : "out");
                 /* its passt (Shared network): a passt of the person's, lord-vm's child or in the machine's scope */
                 long pt = hint_passt, ppp = -1;
                 int alive = 0, d1, d2;
@@ -1855,7 +1863,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
                     ssize_t k = cf >= 0 ? read(cf, comm, sizeof comm - 1) : -1;
                     if (cf >= 0) close(cf);
                     if (k > 0) comm[k] = 0;
-                    alive = k > 0 && !strncmp(comm, "passt", 5) && proc_uid(pt) == getuid() && (ppp == lv.pid || (scope[0] && vm_in_cgroup(pt, scope)));
+                    alive = k > 0 && !strncmp(comm, "passt", 5) && proc_uid(pt) == getuid() && (ppp == lv.pid || vm_in_scope(pt, scope, scope_old));
                 }
                 JS_SetPropertyStr(c, o, "passt", JS_NewBool(c, alive));
             }
@@ -1882,7 +1890,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
             /* QEMU's own leaf, or the machine's scope when lord-vm couldn't divide it; never an unrelated cgroup */
             if (strstr(buf + 3, "lordos-vm-") && strlen(buf + 3) < sizeof cg) snprintf(cg, sizeof cg, "%s", buf + 3);
             /* with the scope's place known: its counters only when QEMU is really under it */
-            if (scope[0] && !vm_in_cgroup(qpid, scope)) cg[0] = 0;
+            if (scope[0] && !vm_in_scope(qpid, scope, scope_old)) cg[0] = 0;
         }
     }
     if (cg[0]) {

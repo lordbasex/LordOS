@@ -257,6 +257,13 @@ build/np-torgw-test: tests/np_torgw_test.c src/netperm/bpfsys.c src/netperm/npco
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/np_torgw_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/nplocal.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
+# tests/np_slice_test.c (docs/VIRTUALIZATION.md 3.7): a machine's scope one level down in the machines' slice is decided
+# by its own entry (NP_A_SLICE), and by the slice's while it isn't registered; as root, on a throwaway cgroup
+test: build/np-slice-test
+build/np-slice-test: tests/np_slice_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h) $(NP_GEN)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/np_slice_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c
+	./$@ || { rm -f $@; exit 1; }
 endif
 test: build/npcompile-test
 build/npcompile-test: tests/npcompile_test.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h)
@@ -273,6 +280,13 @@ build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC) src/lordlog.c src/users/admingroups.c
 # lordos.service restarts with live sessions on systemd 258+: controllers off and limits back (src/sec/cgroup.c, #140)
+# tests/cgslice_test.c (docs/VIRTUALIZATION.md 3.7): lord-sessiond's placement of a machine's scope into the machines'
+# slice, on a throwaway tree of the real cgroupfs; as root (without root it says it skipped)
+test: build/cgslice-test
+build/cgslice-test: tests/cgslice_test.c src/sec/cgroup.c src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE '-DCG_NETPERM_PROCS="/var/tmp/lordos-slice/netperm.procs"' -o $@ tests/cgslice_test.c src/sec/cgroup.c
+	./$@ || { rm -f $@; exit 1; }
 test: build/cgroup-restart-test
 build/cgroup-restart-test: tests/cgroup_restart_test.c src/sec/cgroup.c src/sec/cgroup.h
 	@mkdir -p build

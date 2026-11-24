@@ -19,11 +19,15 @@ int appid_of_cgroup(const char *path, char *out, size_t n) {
     unsigned long uid = strtoul(p, &end, 10);
     if (end == p || *end != '/' || uid != (unsigned long)getuid()) return -1;
     p = end + 1;
+    /* (docs/VIRTUALIZATION.md 3.7) the machines' slice holds only machines' scopes: one level down, and only those */
+    int in_slice = 0;
+    if (!strncmp(p, FW_VM_SLICE "/", sizeof FW_VM_SLICE)) { p += sizeof FW_VM_SLICE; in_slice = 1; }
     char scope[FW_APP_MAX + 32];
     size_t l = strcspn(p, "/\n");
     if (l < 18 || l >= sizeof scope || strncmp(p, "app-lordos-", 11) || strncmp(p + l - 6, ".scope", 6)) return -1;
     memcpy(scope, p, l);
     scope[l] = 0;
+    if (in_slice && fw_vm_scope(scope, NULL, 0)) return -1;
     return fw_app_canon(scope, out, n);
 }
 
@@ -39,9 +43,9 @@ int appid_of_pid(unsigned pid, char *out, size_t n) {
     return r;
 }
 
-int appid_running(int (*match)(const char *app, void *u), void *u) {
-    char dir[96];
-    snprintf(dir, sizeof dir, "/sys/fs/cgroup/system.slice/lordos.service/lordos-session-%u", (unsigned)getuid());
+static int running_in(const char *sub, int (*match)(const char *app, void *u), void *u) {
+    char dir[160];
+    snprintf(dir, sizeof dir, "/sys/fs/cgroup/system.slice/lordos.service/lordos-session-%u%s", (unsigned)getuid(), sub);
     DIR *d = opendir(dir);
     if (!d) return 0;
     int found = 0;
@@ -57,11 +61,15 @@ int appid_running(int (*match)(const char *app, void *u), void *u) {
         while (f && fgets(line, sizeof line, f)) if (!strncmp(line, "populated ", 10)) { populated = line[10] != '0'; break; }
         if (f) fclose(f);
         if (!populated) continue;
-        snprintf(path, sizeof path, "/system.slice/lordos.service/lordos-session-%u/%s", (unsigned)getuid(), e->d_name);
+        snprintf(path, sizeof path, "/system.slice/lordos.service/lordos-session-%u%s/%s", (unsigned)getuid(), sub, e->d_name);
         if (!appid_of_cgroup(path, app, sizeof app)) found = match(app, u);
     }
     closedir(d);
     return found;
+}
+
+int appid_running(int (*match)(const char *app, void *u), void *u) {
+    return running_in("", match, u) || running_in("/" FW_VM_SLICE, match, u);
 }
 
 /* ---- who a process belongs to, only to show it (see appid.h) ------------------------------------------------------ */
@@ -79,6 +87,7 @@ int appid_session_owner(const char *cg, char *out, size_t n) {
         memcpy(seg, p, l);
         seg[l] = 0;
         if (!fw_component_scope(seg, out, n)) return 0;
+        if (!strcmp(seg, FW_VM_SLICE)) return -1;      /* the machines' slice, but not a machine's scope in it */
         /* an app-lordos-* name that isn't an app (the machines' prefix misused, a bad id): nobody's */
         if (!strncmp(seg, "app-lordos-", 11)) return -1;
     }
