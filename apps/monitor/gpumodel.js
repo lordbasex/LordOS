@@ -461,7 +461,8 @@ export function gpuStep(state, raw) {
       memSplit: memSplit(cardApps, c.slot, kind === 'integrated' && !(num(c.vramTotal) > 0)),
       nv: nv ? { computeMode: nv.computeMode ?? null, ecc: num(nv.ecc), cuda: typeof nv.cuda === 'string' ? nv.cuda : null, driver: typeof nv.driver === 'string' ? nv.driver : null } : null,
       model: c.nvModel || null,
-      hidden: (raw.hidden || []).filter((h) => Number.isInteger(h?.pid)).map((h) => ({ pid: h.pid, name: String(h.name || ''), kind: h.kind })),
+      // another user's KFD process (ROCm: amdgpu cards only)
+      hidden: c.driver === 'amdgpu' ? (raw.hidden || []).filter((h) => Number.isInteger(h?.pid) && h.kind === 'kfd').map((h) => ({ pid: h.pid, name: String(h.name || ''), kind: h.kind })) : [],
     };
   });
   // virtual machines: their CPU (share of one core) and memory

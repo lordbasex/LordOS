@@ -180,7 +180,7 @@ eq('hostile nv', [vh.apps.map((a) => a.pids), Math.round(vh.apps[0].total * 100)
 eq('no nv', gpuStep(createGpuState(), { ...raw1, nv: 'x' }).cards.length, 1);
 // link, idle (RC6), hidden rows, memory busy
 const sti = createGpuState();
-const ic = { ...intel, slot: '0000:00:02.0', link: { gts: 8, width: 16 }, linkMax: { gts: 16, width: 16 }, rc6Ms: 1000, memBusy: 38, temps: [{ label: 'edge', c: 70, crit: 94 }] };
+const ic = { ...intel, driver: 'amdgpu', slot: '0000:00:02.0', link: { gts: 8, width: 16 }, linkMax: { gts: 16, width: 16 }, rc6Ms: 1000, memBusy: 38, temps: [{ label: 'edge', c: 70, crit: 94 }] };
 gpuStep(sti, { ...raw1, mono: 1000, cards: [ic], list: [] });
 const vi2 = gpuStep(sti, { ...raw1, mono: 2000, cards: [{ ...ic, rc6Ms: 1910 }], list: [], hidden: [{ pid: 1044, name: 'ollama', kind: 'kfd' }, { pid: 'x' }] });
 eq('link idle hidden', [vi2.cards[0].link, vi2.cards[0].linkMax, vi2.cards[0].idle, vi2.cards[0].memBusy, vi2.cards[0].tempCrit, vi2.cards[0].hidden],

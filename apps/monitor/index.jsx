@@ -6,7 +6,7 @@
 import {
   View, Text, Image, ScrollView, Segmented, Toolbar, typeScale, useTheme, useLocale, useStore, useSettings, useAppWindow,
   useMonitor, monitor, monitorSamples, monitorProcesses, formatBytes, formatNumber, LordOSLogo, iconFromFile, getApp, appName,
-  Dropdown, useNarrow, useBattery, useDevices,
+  Dropdown, useNarrow, useBattery, useDevices, useWindowWidth, useWindowHeight,
 } from '@lordos/sdk';
 import { registerDockActions } from '@lordos/sdk';
 import * as sdk from '@lordos/sdk';
@@ -25,7 +25,8 @@ import { DevicesTab, BatteryTab } from './Devices.jsx';
 import { ProcessesTab, ProcessLayers, procScroll, noteSight } from './Processes.jsx';
 import { DisksTab } from './DisksTab.jsx';
 import { VoltageTab } from './Voltage.jsx';
-import { GpuTab, OverviewGpu, OverviewAiVms } from './Gpu.jsx';
+import { OverviewGpu, OverviewAiVms } from './Gpu.jsx';
+import { GpuTab } from './GpuView.jsx';
 
 export function Icon({ size }) { return <MonitorIcon size={size} />; }
 
@@ -427,6 +428,8 @@ export function AppGlyph({ item, size = 16 }) {
 let lastTab = 'overview';
 // a small window (a Lord Workspaces tile): below TABS_AT the tabs become a pop-up menu and the pages lose some margin
 const TABS_AT = 900;
+// the GPU tab fits without scrolling from this window size up (GpuView.jsx)
+const GPU_FIT_W = 1100, GPU_FIT_H = 600;
 
 // Each tab subscribes to what it shows, at the rate it needs: the chart tabs on every sample (4 per
 // second in front, 1 in the background); Processes and Network, once per second. The window itself
@@ -478,6 +481,8 @@ export default function Monitor() {
   const [settings] = useSettings();
   const prefs = settings.monitor || {};
   const narrow = useNarrow(TABS_AT);
+  const winW = useWindowWidth(), winH = useWindowHeight();
+  const gpuFit = winW >= GPU_FIT_W && winH >= GPU_FIT_H;
   const [tab, setTabState] = useState(lastTab);
   const setTab = (v) => { lastTab = v; setTabState(v); };
   useEffect(() => { if (args?.tab) setTab(args.tab); }, [args?.tab, args?.nonce]);
@@ -522,9 +527,14 @@ export default function Monitor() {
       ) : view === 'network' ? (
         <Network prefs={prefs} />
       ) : view === 'gpu' ? (
-        <ScrollView resetKey="gpu" style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><GpuTab /></View>
-        </ScrollView>
+        // (0.8.9.6) at about 1100×600 and up the GPU tab fits the window with no scrolling; smaller, it scrolls
+        gpuFit ? (
+          <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 16, paddingVertical: 12 }}><GpuTab fit /></View>
+        ) : (
+          <ScrollView resetKey="gpu" style={{ flex: 1 }}>
+            <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><GpuTab /></View>
+          </ScrollView>
+        )
       ) : view === 'voltage' ? (
         <ScrollView resetKey="voltage" style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><VoltageTab /></View>
