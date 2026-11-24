@@ -16,7 +16,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the
   gateway. Built so far: the download, its checks and unpacking, the group, the link between its two machines, and the
   `machines` command; the assistant's card, the library's group card, Configure's group view and Start Fresh come next.
-  - **The catalog entry** `whonix` (hidden until its card exists): Whonix's signing key pinned
+  - **The catalog entry** `whonix` (its card came with the second part, below): Whonix's signing key pinned
     (`packaging/keys/machines/whonix-derivative.asc`, primary key `916B 8D99 C38E AF5E 8ADC 7A2A 8D66 066A 2EEA CCDA`,
     compared on 2026-11-23 with Whonix's signing key page and keys.openpgp.org). The catalog learned SHA-512 lists, a
     detached signature named after its list (`.asc`), the newest release folder whose list verifies with a floor no
@@ -60,9 +60,43 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Checked on the dev host, headless**: the gateway's eth0 at slot 0x2 (passt) and eth1 at 0x18 (the link), the
     workstation's only card at 0x2 with its only route through 10.152.152.10, Tor's own check answering `"IsTor":true`
     from the workstation, no network for it with the gateway off, the link swapped three times during a download without
-    breaking it, and the session relinking a restarted gateway. Still open: neither Whonix member powers off on ACPI's
+    breaking it, and the session relinking a restarted gateway. Then still open (solved in the second part, below): neither Whonix member powers off on ACPI's
     power button (checked with the unchanged images: forced off after 120 s), so a group's Shut Down ends as a forced
     power-off for now.
+- **Machines: machine groups and Whonix, second part** (in development; latest release 0.8.9.5; docs/VIRTUALIZATION.md
+  19.0, "Built in G3–G4"). What the first part left, on the decisions the maintainer took on 2026-11-23:
+  - **The New Machine card "Whonix (Tor)"** with a "Group · 2 machines" badge, only with KVM on amd64. Choosing it finds
+    the newest Whonix release whose signed SHA-512 list verifies, never older than the catalog's floor. A new step,
+    **About Whonix**, shows the diagram (Internet, Gateway, private link, Workstation), what is locked off, the random
+    identity of each group, what it doesn't protect against (malware on this computer, an escape from a machine,
+    fingerprinting, timing attacks on Tor, Tor being visible to the network provider) and a **Disposable session**
+    switch. **Download and Create** downloads the archive, checks it, makes the group and starts it (the Gateway first).
+  - **One library card per group**: the group's mark, a "Tor" chip with the Gateway's dot, "Group of 2 machines", and a
+    menu with Start the Group, Show Workstation, Show Gateway, Shut Down the Group (Workstation, then Gateway), Force Off
+    Both, Group Snapshot…, Configure…, Disposable Session, Logs, Show in Files and **Destroy and Start Fresh…**. Its
+    confirm dialog resets only the Workstation by default; "Also reset the Gateway" warns that Tor's entry guards go
+    with it. The group's start checks the memory of both machines (and the disposable session's) at once.
+  - **Start Fresh** (`lord-vm --group-fresh`, `machines fresh NAME [--gateway] [--yes]`): with the group off, the
+    Workstation (and the Gateway when asked) goes back to its verified base, checked by SHA-256, with a new machine id and
+    new network addresses; its files, snapshots, logs and usage history go. The other machine is untouched.
+  - **The disposable session in memory** (isolation layer 6): the Workstation's changes live in a memory file handed to
+    QEMU, over its system disk opened read-only; nothing of the session is written to a file of this computer, and it is
+    gone at power-off. It may hold as much as the Workstation's memory (2 GB by default); when it is full the Workstation
+    pauses and says so. Snapshots are refused during a session.
+  - **Configure for a group**: a Group section (which machine, the disposable session, the start and stop order, the
+    Whonix release) and every anonymity setting shown off with a lock and a one-line reason.
+  - **Shut Down works**: both Whonix machines ignored the power button (the desktop's power manager holds logind's
+    power-key lock, and on the Workstation kloak, Whonix's keystroke anonymizer, grabs the power button itself). Machines
+    now sends Ctrl+Alt+F2, then kloak's own Right Shift+Esc, then the power button, so each guest shuts down cleanly,
+    Tor included, in seconds (the group in 8 s on the dev host) instead of being forced off after 2 minutes. No agent and
+    no change to Whonix's images.
+  - **`machines --member gateway|workstation`** for `start`, `stop`, `poweroff`, `status` and `open` on a group.
+  - **Storage** shows a group's verified download, with whether it is still needed; a group's read-only bases are never
+    offered for removal (they were counted as unused before).
+  - Both machines' windows and their apps-mode windows are protected in every capture of the screen from the first frame.
+  - Tests: `vm_group_ui_test.mjs`, `vm_whonix_xml_test.sh` (each machine's QEMU and passt arguments against Whonix's own
+    XML), and `vm_group_link.sh` now checks the shutdown, the disposable session leaving nothing on disk, and Start Fresh.
+    Every new text is in all 35 languages.
 - **Firewall: the Tor gateway of a machine group has its own identity and a rule built in** (in development; latest
   release 0.8.9.5; isolation layer 4 of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23;
   docs/FIREWALL.md "The Tor gateway"). The gateway member of a Whonix group (the one with `"uplink": "tor"`) now runs in
