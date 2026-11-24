@@ -19,6 +19,16 @@
  * launchApp (sdk/guestwin.js). It never runs a command, a path or an Exec line, and lists nothing but the windows'
  * titles, app names, places and icons.
  *
+ *
+ * The clipboard (docs/VIRTUALIZATION.md 6.8, "LordOS as a guest"): lord-server has no data-control protocol and its X
+ * selection is offered only to a focused X window, so lordos-guest can't use wl-paste or xclip here. When both hellos
+ * say "clipboard" (lordos-guest's: "lordos-guest <v> clipboard"), lord-server sends the clipboard's text as AGK_CLIP
+ * after each change (never a secret: term_clipboard_sensitive) and takes the peer's AGK_CLIP (valid UTF-8, at most
+ * AG_TEXT_MAX) as the clipboard's new text, marked as coming from "machines". Only a peer that holds the agent port itself
+ * (it passes the port's descriptor with its hello, SCM_RIGHTS: a character device with the port's device number, open
+ * for reading and writing; lord-server looks at it and closes it at once, never keeping the port open) gets or sets it: another program of the same person that connects here gets the windows as before, never the
+ * clipboard. lord-vm and lord-server on the host decide whether it goes on (machine.json "clipboard", the gate).
+ *
  * JS: lord.guestwin.active() → the endpoint exists; poll() → [{ type: 'apps', on } | { type: 'act', id, action, x, y,
  * w, h } | { type: 'launch', token }] (also accepts and reads the peer: sdk/guestwin.js calls it every 100 ms);
  * publish([{ id, title, app, x, y, w, h, focused, minimized, owner, pid, icon }]) (rects in framebuffer pixels;
@@ -27,6 +37,7 @@
 #include "ui.h"
 #include "../media/svgicon.h"
 #include "../vm/vmagent.h"
+#include "../term/term.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -44,7 +55,10 @@
 
 static int tried, lfd = -1, cfd = -1;
 static char sock_path[108];
-static uint8_t in_buf[AG_HEAD + GW_IN_MAX];
+static uint8_t in_buf[AG_HEAD + AG_TEXT_MAX];       /* AGK_CLIP may be AG_TEXT_MAX; every other kind GW_IN_MAX */
+static int peer_clip;                   /* the peer said "clipboard" and holds the agent port */
+static int peer_port = -1;              /* the descriptor the peer passed with its hello (SCM_RIGHTS), until it is looked at */
+static unsigned clip_sent_gen;          /* the clipboard's generation last sent (or set from the peer) */
 static size_t in_n;
 static uint8_t *out_q;
 static size_t out_n, out_off;
@@ -91,6 +105,8 @@ static void drop_peer(void) {
     if (cfd >= 0) close(cfd);
     cfd = -1;
     in_n = 0;
+    peer_clip = 0;
+    if (peer_port >= 0) { close(peer_port); peer_port = -1; }
     out_n = out_off = 0;
     if (apps_on) { GwEvent e = { .type = 1, .on = 0 }; push_ev(&e); apps_on = 0; }
 }
@@ -135,8 +151,31 @@ static void send_icons(void) {
     }
 }
 
+/* does process pid hold the agent port (a descriptor on the same character device)? 1 yes */
+static int holds_port(int fd) {
+    struct stat port, st;
+    /* tests (LORD_GUESTWIN=1 only): LORD_GUESTWIN_PORT names another character device as the port */
+    const char *force = getenv("LORD_GUESTWIN"), *alt = getenv("LORD_GUESTWIN_PORT");
+    const char *path = force && !strcmp(force, "1") && alt && alt[0] == '/' ? alt : "/dev/virtio-ports/org.lordos.agent";
+    if (fd < 0 || stat(path, &port) || !S_ISCHR(port.st_mode)) return 0;
+    int fl = fcntl(fd, F_GETFL);
+    return !fstat(fd, &st) && S_ISCHR(st.st_mode) && st.st_rdev == port.st_rdev && fl >= 0 && (fl & O_ACCMODE) == O_RDWR;
+}
+
+/* the clipboard's text to the peer when it changed (not a secret, not empty, at most AG_TEXT_MAX, valid UTF-8) */
+static void send_clip(void) {
+    if (cfd < 0 || !peer_clip) return;
+    unsigned g = term_clipboard_gen();
+    if (g == clip_sent_gen) return;
+    clip_sent_gen = g;
+    const char *t = term_clipboard();
+    size_t n = t ? strlen(t) : 0;
+    if (!n || n > AG_TEXT_MAX || term_clipboard_sensitive() || !ag_utf8_ok((const uint8_t *)t, n)) return;
+    send_frame(AGK_CLIP, (const uint8_t *)t, n);
+}
+
 static void hello(void) {
-    static const char me[] = "lord-server 1 windows";
+    static const char me[] = "lord-server 1 windows clipboard";
     send_frame(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
     send_windows();
     if (apps_bytes) send_frame(LAG_APPLIST, apps_bytes, apps_len);
@@ -173,6 +212,7 @@ static void take_peer(void) {
         if (getsockopt(c, SOL_SOCKET, SO_PEERCRED, &cr, &cl) || cr.uid != getuid()) { close(c); continue; }
         drop_peer();
         cfd = c;
+        clip_sent_gen = term_clipboard_gen() - 1;     /* the current text goes once the peer says "clipboard" */
         hello();
     }
 }
@@ -185,19 +225,52 @@ static int listed(uint32_t id) {
 
 static void read_peer(void) {
     while (cfd >= 0) {
-        ssize_t r = recv(cfd, in_buf + in_n, sizeof in_buf - in_n, MSG_DONTWAIT);
+        /* recvmsg: lordos-guest passes the agent port's descriptor with its hello; any other descriptor is closed */
+        union { struct cmsghdr c; char b[CMSG_SPACE(4 * sizeof(int))]; } u;
+        struct iovec io = { in_buf + in_n, sizeof in_buf - in_n };
+        struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = u.b, .msg_controllen = sizeof u.b };
+        ssize_t r = recvmsg(cfd, &mh, MSG_DONTWAIT | MSG_CMSG_CLOEXEC);
+        for (struct cmsghdr *c = r > 0 ? CMSG_FIRSTHDR(&mh) : NULL; c; c = CMSG_NXTHDR(&mh, c)) {
+            if (c->cmsg_level != SOL_SOCKET || c->cmsg_type != SCM_RIGHTS) continue;
+            size_t k = (c->cmsg_len - CMSG_LEN(0)) / sizeof(int);
+            for (size_t i = 0; i < k; i++) {
+                int pfd;
+                memcpy(&pfd, CMSG_DATA(c) + i * sizeof(int), sizeof pfd);
+                if (peer_port < 0 && !peer_clip) peer_port = pfd; else close(pfd);
+            }
+        }
         if (r == 0 || (r < 0 && errno != EAGAIN && errno != EINTR)) { drop_peer(); return; }
         if (r < 0) return;
         in_n += (size_t)r;
         for (;;) {
-            if (in_n >= 4 && ((uint32_t)in_buf[0] | (uint32_t)in_buf[1] << 8 | (uint32_t)in_buf[2] << 16 | (uint32_t)in_buf[3] << 24) > GW_IN_MAX) { drop_peer(); return; }
+            if (in_n >= 6) {
+                uint32_t len = (uint32_t)in_buf[0] | (uint32_t)in_buf[1] << 8 | (uint32_t)in_buf[2] << 16 | (uint32_t)in_buf[3] << 24;
+                uint16_t kind = (uint16_t)(in_buf[4] | in_buf[5] << 8);
+                if (len > (kind == AGK_CLIP && peer_clip ? AG_TEXT_MAX : GW_IN_MAX)) { drop_peer(); return; }
+            }
             AgFrame f;
             int k = ag_frame_next(in_buf, in_n, &f);
             if (k < 0) { drop_peer(); return; }
             if (!k) break;
             GwEvent e;
             memset(&e, 0, sizeof e);
-            if (f.kind == LAG_APPS && f.len == 1 && f.data[0] <= 1) {
+            if (f.kind == AGK_HELLO && f.len < 200 && !peer_clip) {
+                /* "lordos-guest <v> clipboard": the clipboard, only for the program that holds the agent port */
+                int words = (ag_hello_caps(f.data, f.len) & AG_HELLO_CLIPBOARD) != 0;
+                if (words && holds_port(peer_port)) { peer_clip = 1; send_clip(); }
+                else if (words) fprintf(stderr, "guestwin: a peer asked for the clipboard without holding the agent port: refused\n");
+                if (peer_port >= 0) { close(peer_port); peer_port = -1; }
+            } else if (f.kind == AGK_CLIP && peer_clip && f.len && f.len <= AG_TEXT_MAX && ag_utf8_ok(f.data, f.len)) {
+                /* the host's text, through lordos-guest: the clipboard's new text (and not sent back) */
+                char *t = malloc(f.len + 1);
+                if (t) {
+                    memcpy(t, f.data, f.len);
+                    t[f.len] = 0;
+                    if (strcmp(t, term_clipboard() ? term_clipboard() : "")) { term_set_clipboard(t, f.len); term_clipboard_mark("machines", 0); }
+                    clip_sent_gen = term_clipboard_gen();
+                    free(t);
+                }
+            } else if (f.kind == LAG_APPS && f.len == 1 && f.data[0] <= 1) {
                 e.type = 1; e.on = f.data[0];
                 apps_on = e.on;
                 push_ev(&e);
@@ -253,6 +326,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     if (lfd >= 0) take_peer();
     read_peer();
     send_icons();
+    send_clip();
     flush();
     JSValue arr = JS_NewArray(c);
     for (int i = 0; i < evn; i++) {

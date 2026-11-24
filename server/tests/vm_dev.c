@@ -24,6 +24,8 @@
  *   console             the serial console's stream (VM_CONSOLE) in its place: shell-type types into it too
  *   (events) "note": a link or a notification from the guest (VM_GUEST_NOTE, 6.12), as lord-vm passed it on
  *   agent install       the guest agent's Install (VAG_INSTALL: lordos-guest, or the LordOS guest tools on Windows)
+ *   agent disc | agent disc-out   the LordOS Guest Tools disc in or out of the CD drive (VAG_DISC; a guest without
+ *                       qemu-guest-agent): lord-vm takes it out by itself when the agent answers
  *   clip-text TEXT | clip-html HTML | clip-png PATH    the host's clipboard for the guest (VM_CLIP); the guest's comes
  *                       back as "clip" events (a picture is saved as clip-in.png in the current folder)
  *   clip-offer TEXT     the host's clipboard on demand (VM_CLIP_OFFER, a helper with "clipreq"): an offer of that text;
@@ -730,6 +732,10 @@ static int handle(char *line) {
         out("{\"ok\":true,\"cmd\":\"resize\"}");
     }
     else if (!strcmp(line, "agent install")) ask(VM_AGENT, VAG_INSTALL, NULL);
+    else if (!strcmp(line, "agent disc") || !strcmp(line, "agent disc-out")) {
+        VmMsg m = vm_msg(VM_AGENT, ++seq, VAG_DISC, !strcmp(line, "agent disc"), 0, 0, NULL);
+        if (vm_send(vm, &m, -1)) out("{\"ev\":\"error\",\"what\":\"can't reach lord-vm\"}");
+    }
     else if (sscanf(line, "raw-apps %d", &x) == 1) { snprintf(a1, sizeof a1, "lag-apps %d", x ? 1 : 0); ask(VM_QMP, 0, a1); }
     else if (!strncmp(line, "raw-winact ", 11)) { snprintf(a1, sizeof a1, "lag-winact %.150s", line + 11); ask(VM_QMP, 0, a1); }
     else if (!strncmp(line, "raw-launch ", 11)) { snprintf(a1, sizeof a1, "lag-launch %.180s", line + 11); ask(VM_QMP, 0, a1); }

@@ -100,7 +100,10 @@ cmd_build() {
     end=$(date +%s)
     echo "build time: $((end - start)) s" | tee /build/out/build-time.txt
     cd /build/work
-    cp ./*.deb ./*.dsc ./*.debian.tar.xz ./*.orig.tar.xz ./*.orig.tar.xz.asc ./*.changes ./*.buildinfo /build/out/
+    # /build/out is the build machine's disk (a bind mount): the results are kept from here on, whatever happens next
+    cp ./*.deb ./*.dsc ./*.debian.tar.xz ./*.orig.tar.xz ./*.orig.tar.xz.asc ./*.buildinfo /build/out/
+    cp ./*.changes /build/out/    # last: a .changes in out/ means the rest is there
+    sync
     # the source package alone, re-checked: every file the .dsc names is in /build/out and matches
     (cd /build/out && dscverify --no-sig-check "wpewebkit_${newver}.dsc")
     lintian --info --display-info --pedantic --profile debian /build/out/wpewebkit_${newver}_*.changes > /build/out/lintian.txt 2>&1 || true

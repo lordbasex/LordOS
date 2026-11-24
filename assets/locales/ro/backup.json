@@ -14,6 +14,11 @@
   "never": "Încă nicio copie de rezervă",
   "next": "Următoarea: {when}",
   "lastError": "Ultima copie de rezervă a eșuat: {error}",
+  "machinesBusy": {
+    "one": "{count} mașină rula: discurile ei din această copie sunt cele din copia anterioară",
+    "few": "{count} mașini rulau: discurile lor din această copie sunt cele din copia anterioară",
+    "other": "{count} de mașini rulau: discurile lor din această copie sunt cele din copia anterioară"
+  },
   "todayAt": "azi la {time}",
   "now": "Fă copia acum",
   "pause": "Pauză",

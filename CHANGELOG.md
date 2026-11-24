@@ -11,6 +11,130 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: programs, files, logs and an MCP server from the terminal, per machine with the person's consent**
+  (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.15 and 6.24). `/usr/bin/lordvm` is a second link
+  to the `machines` command, which gains:
+  - `machines exec NAME [--timeout S] -- PROGRAM ARGS…`: runs a program in a Linux machine as the person signed in to it
+    (never as root), in their home folder, with this terminal's input (up to 1 MB), and gives back its output and its exit
+    status (124: its time ran out, 125: it couldn't run). It goes only through the machine's own lord-vm (a new request,
+    `VM_EXEC`, a sealed memfd on lord-vm's socket, which only the person's processes reach) and qemu-guest-agent: two fixed
+    scripts, one as root that only finds the signed-in person, one as that person that runs the program under
+    `timeout`; the program, its arguments and its input are data, never script text. Output is cut at 128 KB and errors
+    at 32 KB in the guest, parsed as hostile, and shown on a terminal with control characters as `?`.
+  - `machines cp [--force] FILE NAME:PATH` and the other way: files checked by SHA-256 at the end, written under a
+    temporary name and renamed without replacing (unless `--force`); on this computer only the person's files under
+    lord.fs's rules (never a protected path), checked on the opened descriptor; a size claimed beyond the free space is
+    refused, and Ctrl+C removes the half-copied file.
+  - `machines logs NAME [--serial|--machine] [--follow]`, `machines console NAME` (the serial console, Ctrl+] leaves),
+    `machines shell NAME` (the agent's shell as the signed-in person, sized to the terminal),
+    `machines import SRC NAME` (another app's machine, as Migrate does), `machines start NAME --no-window --snapshot TAG`
+    (from a snapshot with memory).
+  - `machines apply FILE`: a machine made or changed from a short TOML file kept beside a project. The file is untrusted:
+    an ISO, ports, shared folders, a bridged or host-only network, the clipboard and the agent it asks for are listed and
+    need the person's yes on their terminal (no terminal, no change), and its ISO must be in Downloads or the Machines
+    library.
+  - `machines mcp`: a local MCP server (JSON-RPC over standard input and output, strictly parsed) with `list_machines`,
+    `machine_status`, `start_machine`, `stop_machine`, `wait_until_ready`, `run_command`, `get_logs` and
+    `clone_machine`; only a machine of the library named by its name or id, nothing destructive.
+  - **Consent per machine**: `machine.json` schema 17 adds `"automation"`, off by default, turned on in Configure → Guest
+    agent → Automation after a question (5 new texts in all 35 languages); `machines set` can't set it; the anonymity
+    profile refuses it. lord-vm reads it again at each request and writes each program (never its arguments) in its log;
+    the command also writes `log/automation.log`. 28 new terminal texts in all 35 languages.
+  - `machines set` now passes `--cpu-pin`, `--perf-profile` and `--capture-fullscreen` to lord-vm, and the bash
+    completion knows them and the new commands (also for `lordvm`).
+  - Tests: `build/vmexec-test` (formats, limits, the guest scripts under `/bin/sh`, fuzz), `build/mcli-test` (cp sides,
+    terminal cleaning, the TOML subset, the MCP envelope and names, the apply file's boundary list, fuzz), schema 17 in
+    `build/vm-test` and `build/vmgroup-test`, `tests/vm_exec_e2e.sh` (28 checks, run on 2026-11-24 in a real Ubuntu
+    26.04.1 machine made by the Ubuntu card on the dev PC). Not built: `exec` in
+    virtio-win guests, folders in `cp`, packages and `rebuild` in `apply`, creating a machine from a card through MCP.
+- **Machines: Kali installs without questions, and every card was run end to end** (in development). Kali gets its own
+  unattended install (Debian's preseed with Kali's archive and tasks: Xfce and the default tools). Fedora Workstation
+  installed by its card now starts its graphical login, and Fedora without the desktop installs again (Fedora 45 renamed
+  its smallest environment). On arm64 the installers of Debian, Ubuntu, Fedora and Kali show on the machine's screen
+  instead of only on its serial port (`console=tty0 acpi=nospcr` per architecture in the catalog). lord-vm builds with no
+  warning on arm64. On 2026-11-24 every card was run from its verified download to the installed system's login on amd64
+  (Fedora 45 Workstation, Ubuntu 26.04.1 server, Kali 2026.3, LordOS 0.8.9) and on the Raspberry Pi 5 (Debian 13.8, Fedora
+  45 and Kali consoles, LordOS); the arm64 desktops and Ubuntu arm64 didn't fit on the Pi's disk.
+- **Machines: an ISO's architecture from its boot files** (in development; docs/VIRTUALIZATION.md 5.2). A new reader
+  (`server/src/vm/vmiso.c`, bounded reads through one descriptor) finds the UEFI boot loaders in the ISO 9660, UDF and El
+  Torito trees and reads their PE headers; install discs are known by their `sources/install.*`; the name or label decide
+  only when the boot files say nothing, and the summary card says which. An `.iso` dropped on "Use an ISO" picks it.
+  Tests: `build/vmiso-test` (images built byte by byte, hostile ones, a fuzz pass), 9 new `isoArch` checks.
+- **Machines: virtio-win guests on arm64** (in development; 4.3.2): `virt` with GICv3, secure boot (AAVMF), a TPM on
+  `tpm-tis-device`, USB CD/DVD drives, ramfb, the ARM64 drivers in the unattended answer and the maker's 38 published
+  Arm64 ISO hashes pinned. On a computer whose GIC is version 2, such as the Raspberry Pi 5, KVM can't run it: the
+  machine is Emulated and the card says so. `swtpm` comes with `vm-enable` on arm64 too. Checked on the Pi 5 under TCG
+  with an Alpine ISO; an install of the guest itself is not yet checked. 7 new texts in all 35 languages.
+- **Machines: a machine group's Delete, Rename and Repair** (in development; docs/VIRTUALIZATION.md 19.7–19.9). The
+  group's card menu gains Rename… (the group, its members' names and its folder, with the group off; also `machines rename
+  GROUP NEW`), Delete… (for good: every member's lock held, the folder renamed out of sight, checked and removed by
+  descriptors without following links, then each base nothing else names) and Repair… on a damaged group (a base missing
+  or changed made again from the verified archive through the sandboxed `lord-vmunpack`, a missing member made again from
+  its base). Start Fresh now remakes a missing or changed base instead of refusing, fetching the archive again when it is
+  gone (refused unless its SHA-512 is the recorded one). While the Gateway is off, the Workstation's window says "No
+  network: the Gateway is off" with Start Gateway; the card offers Shut Down the Gateway when it runs alone. Fixed: creating
+  a group from the app was refused (the image store's file name never matched the catalog's pattern), and a base already
+  in `.shared` was reused without checking it. 34 new texts in all 35 languages. Tests: `vmgroup-test`,
+  `tests/vm_group_manage.sh` (37 checks), `tests/machines_group_manage_headless.sh` (20, a headless lord-server in its own
+  namespaces), `vm_group_ui_test.mjs`, `vm_group_model_test.mjs`.
+- **Machines: encrypted machines, disposable sessions for any machine, raw disks, Export, consistent backups** (in
+  development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.5, 3.6, 6.2, 6.4, 6.14, 8, 19.7). `machine.json`
+  schema 16 adds `disposable`, `encrypted`, `disk_format` and `backup`.
+  - **Encrypted machines.** "Encrypt this machine" in the New Machine assistant's review. Every disk, the UEFI
+    variables and a disposable session's layers are qcow2 with LUKS, the TPM's state is swtpm's own encrypted state,
+    and a snapshot's memory is written inside the encrypted disk. The key is 32 random bytes made by lord-server and
+    kept in your keyring before the machine is made; Passwords shows it as "Machines: <name>", the machine's recovery
+    key. lord-server reads it back itself (JS only ever sees whether it's ready), holds it for two minutes in locked
+    memory, forgets it when the screen locks, and gives it to lord-vm on a pipe; QEMU, qemu-img and swtpm read it from a
+    pipe too, never from an argument, the environment or a file. With the keyring locked, the system's unlock prompt
+    opens; for a machine from another computer, its recovery key is typed in a window of its own that is never
+    captured. No card picture, snapshot picture, serial log or guest journal of an encrypted machine is kept. Suspend
+    is refused for it (it would write the memory to a file); a snapshot with memory works. Configure → Security says
+    where the key is, and that this computer's swap can still hold a machine's memory.
+  - **Encrypted machine groups** (isolation layer 5 of the Whonix card, approved 2026-11-23): "Encrypt the machines'
+    disks" on the card; each member's disk is encrypted under the group's key, the verified public base images aren't.
+    Start Fresh and the workstation's disposable session keep it encrypted.
+  - **Disposable sessions for any machine.** Configure → Disks → Disposable session: Off, In memory or On disk. Each
+    start begins from the disks as they are and everything changed is thrown away at shutdown: a layer over every disk
+    and the UEFI variables, in memory (capped at the machine's memory, the machine pauses when full) or in unnamed files
+    that go with QEMU even after a crash; the TPM's state is a copy in memory. Snapshots and Suspend are refused while
+    one runs.
+  - **Raw disks**: a machine whose disks are plain files (`lord-vm --create --disk-format raw`): the fastest, with no
+    snapshots, linked clones or encryption. Never a disk or partition of this computer.
+  - **Export** (the library's ··· and Configure → Disks): a whole machine as a `.lordvm` folder with a list of
+    checksums (an encrypted machine's stays encrypted), or as an OVA for other apps (the disks as VMDK, an OVF
+    description and its checksums). **Bring In an Exported Machine…** checks every file against the list before
+    copying, refuses anything extra, a link or a changed byte, asks for the recovery key of an encrypted machine, and
+    turns off everything the file asks of this computer (forwarded ports, shared folders, clipboard, microphone,
+    agent…), to be turned on again by you.
+  - **The UEFI firmware a machine was made with is kept in its folder**, and used after a firmware update, until
+    Configure → Disks → "Use This Computer's Firmware".
+  - **Backups and machines**: a machine is copied while it's off, holding it so it can't start half way; a running
+    machine's disks are taken from the previous backup; its temporary files are left out; Configure → Disks →
+    "Include in Backups" leaves a machine out. Backups says how many machines were running.
+  - Tests: `vm_storage_test.sh` (real QEMU and KVM: keys, a write kept or thrown away, swtpm's encrypted state, export
+    and import, hostile exports, an encrypted group, the kept firmware, raw disks), `vmexport-test`, `vmkeysrv-test`,
+    `backup-machines-test` (ASan and UBSan) and `vm_storage_model_test.mjs`.
+- **Machines: Install Agent without qemu-guest-agent, the LordOS Guest Tools disc** (in development; latest release
+  0.8.9.5). A Linux machine whose system has no qemu-guest-agent (Debian's own images, LordOS 0.8.9, most desktop
+  installs) stayed on "Waiting for the agent" with nothing to click. Its agent popover now offers **Install Agent from
+  Disc**: lord-vm puts the LordOS Guest Tools disc in the machine's CD drive (read-only, only its own copy, whose SHA-256
+  is compiled into it; never in a machine locked for anonymity, a non-Linux guest, or while the drive has a disc),
+  the popover shows the line to run in the machine, and lord-vm takes the disc out by itself once the agent answers.
+  - **The disc** (`/usr/lib/lordos/guest/lordos-guest-tools-<arch>.iso`, volume `LORDOS_TOOLS`) is made at build time by
+    our own ISO 9660 writer (`tools/guest/mkguestiso.c`, the same bytes for the same files): `install.sh`, `lordos-guest`
+    for the package's architecture, its SHA-256, the architecture and a README.
+  - **`install.sh`** asks for the administrator's password with the machine's own prompt (`pkexec` with a desktop polkit
+    agent, else `sudo`, `doas` or `su`): Machines never sees or types it. As root it checks the processor and the
+    helper's checksum, copies `lordos-guest` with its udev rule, user unit (an XDG autostart entry without systemd) and
+    shutdown hook, installs `qemu-guest-agent` with the system's own package manager (`apt-get`, `dnf`, `yum`, `zypper`,
+    `pacman`, `apk`) and starts it (systemd or OpenRC), installs `xclip` and `wl-clipboard` best effort, and starts the
+    helper for the person who ran it. `install.sh --plan` says what it would do and changes nothing.
+  - Checked on a real Debian 13 guest under KVM with lord-vm: no agent, the disc in, `install.sh` run on the guest's
+    console, qemu-guest-agent connected 17 to 31 s later (two runs), the disc out by itself one second after, then Install through
+    qemu-guest-agent on the same guest (`server/tests/vm_guest_tools_e2e.sh`); `guesttools-test` reads the image back
+    with lord-vm's own ISO reader and checks its hash and the writer's refusals; `guest_tools_install_test.sh` checks
+    `install.sh`'s choices on 18 kinds of system; shellcheck is clean.
 - **Machines: a shell inside the machine, links and notifications from it, and more of the logs** (in development;
   latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.17, 6.18, 6.19).
   - **The agent's shell.** The Shell pane of a machine's window shows a shell inside the guest as the person signed in
@@ -36,7 +160,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Logs:** a virtio-win guest's event logs (System and Application, through
     the guest agent every 10 s, one fixed script); a filter by unit or source (click it); the guest's times in this
     computer's local time, with the guest's own zone named when it differs.
-  - **The LordOS tools 8 (Linux) and w12** bring the shell and the links and notifications; Machines updates older
+  - **The LordOS tools 9 (Linux) and w12** bring the shell and the links and notifications; Machines updates older
     tools by itself. machine.json schema 15 adds `guest_links` and `guest_notify`; a machine locked for anonymity
     (Whonix) refuses both.
   - Tests: `vm-test` (the new frames' parsers, fuzzed with 80 000 random frames, the link encoder, the rate limit,
@@ -509,7 +633,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Machines: a machine started right after a large import timed out** (in development). `qemu-img convert` leaves the
+  disk in the page cache, and QEMU's first open of it with `O_DIRECT` waited behind gigabytes of writeback past its 20 s
+  to answer QMP. The import now writes the converted disk out (`fsync`) before putting it in place. Found while checking
+  a migration from a 20 GB whole-disk image of a Linux PC (docs/VIRTUALIZATION.md 6.11), which now imports and boots.
 
+- **Machines: LordOS 0.8.9 inside a machine waited for the agent forever** (in development). Nothing in that LordOS
+  spoke to Machines: it had neither qemu-guest-agent nor `lordos-guest.service` (the "opened, closed" in the log at
+  start is the UEFI firmware's own virtio-serial driver, not the system). 0.8.9.5 added the service, but its udev rule
+  (`uaccess`) gives the agent port only to the person at a logind seat, and LordOS's own sessions aren't logind seats, so
+  the helper couldn't open it either; and it had no clipboard on a LordOS desktop. Now the rule gives the port to the
+  `video` group too (every LordOS desktop user is in it), the `lordos` package recommends `qemu-guest-agent`, migration
+  012 applies the rule and starts the helper right after the update (only inside a Machines guest whose agent is on), and
+  `lordos-guest` 9 takes the clipboard's text from the guest's own lord-server (`lordos-guestwin.sock` says `clipboard`;
+  only the program that holds the agent port and passes it along gets it, never a secret; the helper is non-dumpable). A 0.8.9 guest gets it by updating LordOS inside
+  the machine, or right away with the disc above.
 - **Machines: two machines starting at the same moment no longer collide on a shared folder's socket**: the socket lord-vm
   hands virtiofsd was `<runtime>/lordos-vm/fs<N>.sock`, the same name for every machine, so a second start unlinked and
   re-made the first's (found while starting six test machines at once: "socket: Address already in use", then "can't
@@ -852,6 +990,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Deactivated). `apps/store/installedmodel.js`; the `filter` argument also takes `lordos`, `debian`, `flathub` and
   `web`.
 - Three new texts (`store.installed.noneDebian`, `noneFlathub`, `noneWeb`), in all 35 languages.
+
+### Removed
+- **Machines: the Android card** (in development; latest release 0.8.9.5-beta). The maintainer removed it on 2026-11-24:
+  it added nothing. Gone: its entry in `assets/machines/systems.json` (the pinned Bliss OS 16.9.7 ISO), the assistant's
+  "archived image" notice under a download (`catalog.js` `noticeOf`, `machines.dl.notice.archived` in all 35
+  languages), its tests in `vm_catalog_test.mjs` and `vmcatalog-test` (the pinned-card path is now tested with a made-up
+  entry and virtio-win's pin), and its descriptions in docs/VIRTUALIZATION.md (4.2 says it was removed), the roadmap,
+  the paper and its validation table. A person's own Android ISO chosen from a file is still named as such. amd64 now
+  shows six cards, arm64 five.
 
 ### Documentation
 

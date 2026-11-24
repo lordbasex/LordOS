@@ -162,8 +162,9 @@ int vmu_parse(const char *json, size_t n, VmUnattend *u, char *err, size_t errle
         return rc;
     }
     const char *bad = NULL;
-    u->kind = !k ? 0 : !strcmp(k, "preseed") ? VMU_PRESEED : !strcmp(k, "autoinstall") ? VMU_AUTOINSTALL : !strcmp(k, "kickstart") ? VMU_KICKSTART :
-              !strcmp(k, "lordos") ? VMU_LORDOS : 0;
+    u->kind = !k ? 0 : !strcmp(k, "preseed") || !strcmp(k, "kali") ? VMU_PRESEED : !strcmp(k, "autoinstall") ? VMU_AUTOINSTALL :
+              !strcmp(k, "kickstart") ? VMU_KICKSTART : !strcmp(k, "lordos") ? VMU_LORDOS : 0;
+    u->kali = k && !strcmp(k, "kali");
     /* the strings must fit their fields: a longer one is refused, not cut */
     static const char *const keys[] = { "user", "fullname", "hash", "hostname", "timezone", "keymap", "variant", "locale", "release", "arch", "kernel", "initrd", "append", "keydesc", "lang" };
     static const size_t caps[] = { 33, 65, 128, 64, 64, 32, 32, 32, 16, 8, 128, 128, 512, 96, 16 };
@@ -236,8 +237,8 @@ static char *preseed(const VmUnattend *u) {
     }
     bput(&b, "d-i netcfg/choose_interface select auto\n");
     bput(&b, "d-i netcfg/get_hostname string %s\nd-i netcfg/hostname string %s\nd-i netcfg/get_domain string\n", u->hostname, u->hostname);
-    bput(&b, "d-i mirror/country string manual\nd-i mirror/http/hostname string deb.debian.org\nd-i mirror/http/directory string /debian\n"
-             "d-i mirror/http/proxy string\n");
+    bput(&b, "d-i mirror/country string manual\nd-i mirror/http/hostname string %s\nd-i mirror/http/directory string %s\n"
+             "d-i mirror/http/proxy string\n", u->kali ? "http.kali.org" : "deb.debian.org", u->kali ? "/kali" : "/debian");
     bput(&b, "d-i passwd/root-login boolean false\n");
     bput(&b, "d-i passwd/user-fullname string %s\nd-i passwd/username string %s\n", u->fullname[0] ? u->fullname : u->user, u->user);
     bput(&b, "d-i passwd/user-password-crypted password %s\n", u->hash);
@@ -245,8 +246,11 @@ static char *preseed(const VmUnattend *u) {
     bput(&b, "d-i partman-auto/method string regular\nd-i partman-auto/choose_recipe select atomic\n"
              "d-i partman-partitioning/confirm_write_new_label boolean true\nd-i partman/choose_partition select finish\n"
              "d-i partman/confirm boolean true\nd-i partman/confirm_nooverwrite boolean true\n");
-    bput(&b, "d-i apt-setup/cdrom/set-first boolean false\nd-i apt-setup/services-select multiselect security, updates\n");
-    bput(&b, "tasksel tasksel/first multiselect %s\n", u->desktop ? "standard, desktop, gnome-desktop" : "standard");
+    /* Kali is a rolling archive: no security or updates services (its own preseed says the same) */
+    bput(&b, "d-i apt-setup/cdrom/set-first boolean false\nd-i apt-setup/services-select multiselect %s\n", u->kali ? "" : "security, updates");
+    /* Kali's tasks (tasksel-data's descs): its Xfce desktop and default tools, what its installer selects by itself */
+    if (u->kali) bput(&b, "tasksel tasksel/first multiselect %s\n", u->desktop ? "desktop, desktop-xfce, meta-default, standard" : "standard");
+    else bput(&b, "tasksel tasksel/first multiselect %s\n", u->desktop ? "standard, desktop, gnome-desktop" : "standard");
     /* the guest agent (Shut Down, clock, clipboard) and something that honours the power button without a desktop */
     bput(&b, "d-i pkgsel/include string qemu-guest-agent%s\n", u->desktop ? "" : " acpid acpi-support-base");
     bput(&b, "d-i pkgsel/upgrade select none\npopularity-contest popularity-contest/participate boolean false\n");
@@ -286,7 +290,12 @@ static char *kickstart(const VmUnattend *u) {
     bput(&b, "rootpw --lock\n");
     bput(&b, "user --name=%s --gecos=\"%s\" --groups=wheel --iscrypted --password=%s\n", u->user, u->fullname[0] ? u->fullname : u->user, u->hash);
     bput(&b, "zerombr\nclearpart --all --initlabel\nautopart\nbootloader\nfirstboot --disable\nreboot\n");
-    bput(&b, "%%packages\n%s\nqemu-guest-agent\n%%end\n", u->desktop ? "@^workstation-product-environment" : "@^minimal-environment");
+    /* a text-mode install leaves the installed system booting to the console (multi-user.target) unless it is told to
+     * start the graphical login (seen with Workstation on 2026-11-24: GDM installed, the machine at a text login) */
+    if (u->desktop) bput(&b, "xconfig --startxonboot\n");
+    /* Fedora's environments (comps): Workstation, or the smallest one; Fedora 45 has no "minimal-environment" any more
+     * (anaconda stops at its menu on "No match"), its least is "custom-environment" (the core group) */
+    bput(&b, "%%packages\n%s\nqemu-guest-agent\n%%end\n", u->desktop ? "@^workstation-product-environment" : "@^custom-environment");
     if (b.oom) { free(b.p); return NULL; }
     return b.p;
 }
@@ -376,9 +385,20 @@ static char *windows_xml(const VmUnattend *u) {
     bput(&b, "</DisplayName>\n      <Group>Administrators</Group>\n      <Password><Value>%s</Value><PlainText>%s</PlainText></Password>\n     </LocalAccount>\n    </LocalAccounts>\n   </UserAccounts>\n", pv, plain);
     bput(&b, "   <AutoLogon>\n    <Enabled>true</Enabled>\n    <LogonCount>1</LogonCount>\n    <Username>"); xput(&b, u->user);
     bput(&b, "</Username>\n    <Password><Value>%s</Value><PlainText>%s</PlainText></Password>\n   </AutoLogon>\n", pv, plain);
-    bput(&b, "   <FirstLogonCommands>\n    <SynchronousCommand wcm:action=\"add\">\n     <Order>1</Order>\n"
-             "     <CommandLine>cmd /c for %%d in (D E F G H I J K) do if exist %%d:\\virtio-win-guest-tools.exe start /wait %%d:\\virtio-win-guest-tools.exe /install /passive /norestart</CommandLine>\n"
-             "     <Description>virtio-win guest tools</Description>\n    </SynchronousCommand>\n   </FirstLogonCommands>\n");
+    if (strcmp(arch, "arm64"))
+        bput(&b, "   <FirstLogonCommands>\n    <SynchronousCommand wcm:action=\"add\">\n     <Order>1</Order>\n"
+                 "     <CommandLine>cmd /c for %%d in (D E F G H I J K) do if exist %%d:\\virtio-win-guest-tools.exe start /wait %%d:\\virtio-win-guest-tools.exe /install /passive /norestart</CommandLine>\n"
+                 "     <Description>virtio-win guest tools</Description>\n    </SynchronousCommand>\n   </FirstLogonCommands>\n");
+    else
+        /* arm64: virtio-win 0.1.271 has no guest tools installer for Arm, only the drivers (<driver>\w11\ARM64) and the
+         * x86-64 guest agent, which the system runs emulated: the drivers go in with pnputil, then the agent, whose
+         * first answer ends the install as on amd64 */
+        bput(&b, "   <FirstLogonCommands>\n    <SynchronousCommand wcm:action=\"add\">\n     <Order>1</Order>\n"
+                 "     <CommandLine>cmd /c for %%d in (D E F G H I J K) do if exist %%d:\\viostor\\w11\\ARM64\\viostor.inf for %%i in (Balloon NetKVM viogpudo vioinput viorng vioscsi vioserial viostor) do pnputil /add-driver %%d:\\%%i\\w11\\ARM64\\*.inf /install</CommandLine>\n"
+                 "     <Description>virtio-win drivers (ARM64)</Description>\n    </SynchronousCommand>\n"
+                 "    <SynchronousCommand wcm:action=\"add\">\n     <Order>2</Order>\n"
+                 "     <CommandLine>cmd /c for %%d in (D E F G H I J K) do if exist %%d:\\guest-agent\\qemu-ga-x86_64.msi msiexec /i %%d:\\guest-agent\\qemu-ga-x86_64.msi /qn /norestart</CommandLine>\n"
+                 "     <Description>QEMU guest agent</Description>\n    </SynchronousCommand>\n   </FirstLogonCommands>\n");
     bput(&b, "  </component>\n </settings>\n</unattend>\n");
     if (b.oom) { if (b.p) { explicit_bzero(b.p, b.cap); free(b.p); } return NULL; }
     return b.p;
