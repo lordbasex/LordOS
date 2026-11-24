@@ -4,7 +4,8 @@
 # (Google Chrome with profiles; themes/workspaces/model/launches.js, docs/WORKSPACES.md "Where launched windows go"), a
 # dialog told its parent late goes over it (sdk/dialogmodel.js lateParentFrame), and the bar shows every window of the
 # activity, a line under a minimized one. Against a headless build/lord-server-test (CPU path, --test-hooks for the
-# screenshots) in a private runtime folder and home under ${LAUNCHPLACE_DIR:-/var/tmp/lordos-ws-bar}, with the real
+# screenshots) in a private runtime folder and home in a fresh private folder (or $LAUNCHPLACE_DIR, an existing folder
+# of this user), with the real
 # launcher: a .desktop entry runs build/launchplace-client (tests/launchplace_client.c). LAUNCHPLACE_LANG=ar runs it
 # right to left. The screenshots stay in $LAUNCHPLACE_DIR/shots-<lang>/ (PNG). Never against a live session.
 # Run from server/. Exit 77 when something it needs is missing, 1 on a failure.
@@ -12,11 +13,19 @@ cd "$(dirname "$0")/.." || exit 1
 [ -x build/lord-server-test ] && [ -x build/launchplace-client ] || { echo "skipped: needs build/lord-server-test and build/launchplace-client"; exit 77; }
 command -v node >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1 || { echo "skipped: needs node and python3"; exit 77; }
 LANG_UI=${LAUNCHPLACE_LANG:-en}
-BASE=${LAUNCHPLACE_DIR:-/var/tmp/lordos-ws-bar}
-mkdir -p "$BASE" && chmod 700 "$BASE"
+# the folder for the run and its pictures: a fresh private one (mktemp -d), or the one given if it is a real folder of
+# this user (not a link someone else could have planted)
+if [ -n "$LAUNCHPLACE_DIR" ]; then
+    [ -d "$LAUNCHPLACE_DIR" ] && [ -O "$LAUNCHPLACE_DIR" ] && [ ! -L "$LAUNCHPLACE_DIR" ] || { echo "FAIL: $LAUNCHPLACE_DIR must be an existing folder of this user, not a link"; exit 1; }
+    BASE=$LAUNCHPLACE_DIR
+else
+    BASE=$(mktemp -d "${TMPDIR:-/tmp}/lordos-ws-bar.XXXXXX") || exit 1
+fi
+chmod 700 "$BASE"
 D=$(mktemp -d "$BASE/run.XXXXXX") || exit 1
 SHOTS="$BASE/shots-$LANG_UI"
-rm -rf "$SHOTS"; mkdir -p "$SHOTS"
+[ -L "$SHOTS" ] && { echo "FAIL: $SHOTS is a link"; exit 1; }
+rm -rf "$SHOTS"; mkdir -m 700 "$SHOTS" || exit 1
 P=''
 stop() { [ -n "$P" ] && { kill $P 2>/dev/null; sleep 0.3; kill -9 $P 2>/dev/null; }; pkill -f "$D/launchplace-client" 2>/dev/null; [ -z "$LAUNCHPLACE_KEEP" ] && rm -rf "$D"; }
 trap stop EXIT

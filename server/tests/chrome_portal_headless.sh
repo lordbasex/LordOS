@@ -2,8 +2,9 @@
 # chrome_portal_headless.sh — Google Chrome's "Save as" goes through LordOS's own FileChooser portal (version 3,
 # src/ui/portal.c; Chromium's select_file_dialog_linux_portal.cc wants 3), shows LordOS's file dialog over the Chrome
 # window (its xdg-foreign handle) and saves where the person picks. A real Chrome (/opt/google/chrome/chrome) against a
-# headless build/lord-server-test on a private session bus (dbus-run-session) with a private home and Chrome profile under
-# ${CHROME_PORTAL_DIR:-/var/tmp/lordos-ws-bar}; the screenshot stays there as chrome-saveas.png. Opt-in (not in
+# headless build/lord-server-test on a private session bus (dbus-run-session) with a private home and Chrome profile in a
+# fresh private folder (or $CHROME_PORTAL_DIR, an existing folder of this user); the screenshot stays there as
+# chrome-saveas.png. Opt-in (not in
 # run_suites.sh: it needs Google Chrome, and the clicks are at the places this 1600×900 scene puts Chrome's idle
 # permission prompt and the dialog's Save button). Never against a live session.
 #   dbus-run-session -- sh tests/chrome_portal_headless.sh        (from server/)
@@ -12,8 +13,15 @@ cd "$(dirname "$0")/.." || exit 1
 CHROME=/opt/google/chrome/chrome
 [ -x build/lord-server-test ] && [ -x "$CHROME" ] && [ -f ../themes/workspaces/theme.bundle.js ] || { echo "skipped: needs build/lord-server-test, Google Chrome and the Workspaces bundle"; exit 77; }
 [ -n "$DBUS_SESSION_BUS_ADDRESS" ] || { echo "skipped: run it under dbus-run-session"; exit 77; }
-BASE=${CHROME_PORTAL_DIR:-/var/tmp/lordos-ws-bar}
-mkdir -p "$BASE" && chmod 700 "$BASE"
+# the folder for the run and its pictures: a fresh private one (mktemp -d), or the one given if it is a real folder of
+# this user (not a link someone else could have planted)
+if [ -n "$CHROME_PORTAL_DIR" ]; then
+    [ -d "$CHROME_PORTAL_DIR" ] && [ -O "$CHROME_PORTAL_DIR" ] && [ ! -L "$CHROME_PORTAL_DIR" ] || { echo "FAIL: $CHROME_PORTAL_DIR must be an existing folder of this user, not a link"; exit 1; }
+    BASE=$CHROME_PORTAL_DIR
+else
+    BASE=$(mktemp -d "${TMPDIR:-/tmp}/lordos-ws-bar.XXXXXX") || exit 1
+fi
+chmod 700 "$BASE"
 D=$(mktemp -d "$BASE/chrome.XXXXXX") || exit 1
 P='' C=''
 stop() { [ -n "$C" ] && kill $C 2>/dev/null; [ -n "$P" ] && kill $P 2>/dev/null; sleep 0.5; [ -n "$C" ] && kill -9 $C 2>/dev/null; [ -n "$P" ] && kill -9 $P 2>/dev/null; rm -rf "$D"; }

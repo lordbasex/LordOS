@@ -968,4 +968,28 @@ check('idle again: still no timer every second', intervals(1000), 0);
   for (let i = 0; i < 2; i++) await flush();
 }
 
+
+// ❖` (sdk/appswitcher.jsx cycleAppWindows, in Lord Workspaces' table and Settings → Keyboard): the next window of the app
+// in front, only among that app's windows in the activity in view; a window of the same app in another activity is left
+{
+  tiler.forgetLaunches();                // the profile launches above never showed a window
+  sdk.switchDesktop(desk);
+  const a1 = sdk.wm.open('linux', { instance: '9201', frame: { x: M.x + 100, y: 100, w: 500, h: 400 }, args: { surface: 9201, appId: 'cyclechrome' } });
+  const a2 = sdk.wm.open('linux', { instance: '9202', frame: { x: M.x + 200, y: 150, w: 500, h: 400 }, args: { surface: 9202, appId: 'cyclechrome' } });
+  const other = state.newActivity();
+  const a3 = sdk.wm.open('linux', { instance: '9203', desktop: other, frame: { x: M.x + 300, y: 200, w: 500, h: 400 }, args: { surface: 9203, appId: 'cyclechrome' } });
+  sdk.switchDesktop(desk);
+  for (let i = 0; i < 3; i++) await flush();
+  sdk.wm.focus(a2);
+  await flush();
+  const seen = new Set();
+  for (let i = 0; i < 4; i++) { sdk.cycleAppWindows(false); await flush(); seen.add(sdk.wm.focused()); }
+  check('❖`: cycles the app\'s windows of this activity only', [...seen].sort(), [a1, a2].sort());
+  check('❖`: the activity in view stays', sdk.activeDesktop.get(), desk);
+  check('❖`: in the shortcuts table, shown in Settings → Keyboard', sdk.shortcutList().some((g) => g.items.some((x) => x.id === 'cycleWindows')), true);
+  for (const id of [a1, a2, a3]) sdk.wm.close(id, true);
+  sdk.removeDesktopById(other);
+  for (let i = 0; i < 2; i++) await flush();
+}
+
 process.exit(0);

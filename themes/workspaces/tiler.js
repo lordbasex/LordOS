@@ -59,6 +59,8 @@ export function launchOn(d, key) {
   if (dir) { try { if (lord.apps.launchProfile(key.slice('desktop:'.length), dir)) return true; } catch (e) { /* the plain launch below */ } }
   return launchApp(key);
 }
+// for the tests: forget every placement (a launch whose app never showed a window would otherwise wait LAUNCH_MS)
+export function forgetLaunches() { launches = []; }
 // for the tests: the placements still waiting
 export const pendingLaunches = () => pendingOf(launches, Date.now()).map((p) => ({ key: p.key, desk: p.desk, dk: p.dk, left: p.left }));
 // a window that may take a launch's place: an app's own window, not a dialog, a notice or a panel

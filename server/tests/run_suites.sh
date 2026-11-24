@@ -336,7 +336,7 @@ EOF
     # after a profile picker and with another activity in view; a dialog told its parent late goes over it; the bar
     # marks a minimized window (themes/workspaces/model/launches.js; left to right and right to left)
     for lp in en ar; do
-        LAUNCHPLACE_LANG=$lp LAUNCHPLACE_DIR="$T/launchplace" sh tests/launchplace_headless.sh >"$T/out" 2>&1
+        mkdir -p -m 700 "$T/launchplace"; LAUNCHPLACE_LANG=$lp LAUNCHPLACE_DIR="$T/launchplace" sh tests/launchplace_headless.sh >"$T/out" 2>&1
         case $? in
             0) ok "launch-placement-$lp (tests/launchplace_headless.sh, headless lord-server-test, a fake Chrome with a profile picker)" ;;
             77) skip "launch-placement-$lp" "build/lord-server-test, build/launchplace-client, python3 and node with esbuild" ;;
