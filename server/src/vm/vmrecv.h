@@ -7,7 +7,7 @@
  * after a lost connection finds what came before), opened O_RDWR without following a link and kept only as a regular file
  * of this account with one link. Once lord-vm says the SHA-256 matched, the part is made 0600 (never executable), marked
  * as from that machine (user.lordos.quarantine "1", user.lordos.from its name, user.lordos.machine its id,
- * user.xdg.origin.url "lordos-machine:<id>"; Files shows them) and named (ag_recv_name's name, never replacing a file:
+ * user.xdg.origin.url "lordos-machine:<id>"; Files shows them) and named (ag_recv_name's name, given to the checked file itself by its descriptor, never replacing a file:
  * "name (2).ext"…). Parts nobody came back for go after VMRECV_PART_DAYS, and at most VMRECV_PARTS_MAX stay. */
 #ifndef LORD_VM_RECV_H
 #define LORD_VM_RECV_H

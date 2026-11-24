@@ -2763,6 +2763,21 @@ static void test_vmrecv(void) {
     CHECK(f >= 0 && write(f, "abc", 3) == 3);
     CHECK(vmrecv_finish(d, f, part, "short.txt", "Test VM", "x", 4, fin, sizeof fin, &marked) == -1 && faccessat(d, part, F_OK, 0) && faccessat(d, "short.txt", F_OK, 0));
     if (f >= 0) close(f);
+    /* another process swaps the part's name for a file of its own before it is named: the checked file gets the name */
+    f = vmrecv_part_open(d, key, 4, part, &have, &status);
+    CHECK(f >= 0 && write(f, "good", 4) == 4);
+    CHECK(!renameat(d, part, d, "moved-away"));
+    t = openat(d, part, O_CREAT | O_WRONLY | O_EXCL, 0600);
+    CHECK(t >= 0 && write(t, "evil", 4) == 4);
+    if (t >= 0) close(t);
+    CHECK(!vmrecv_finish(d, f, part, "swap.txt", "Test VM", "x", 4, fin, sizeof fin, &marked) && !strcmp(fin, "swap.txt"));
+    char got4[8] = "";
+    t = openat(d, "swap.txt", O_RDONLY);
+    CHECK(t >= 0 && read(t, got4, 4) == 4 && !memcmp(got4, "good", 4));
+    if (t >= 0) close(t);
+    CHECK(!faccessat(d, part, F_OK, 0));                                  /* the impostor stays where it was, unnamed */
+    unlinkat(d, part, 0); unlinkat(d, "moved-away", 0);
+    if (f >= 0) close(f);
     /* parts nobody came back for: at most VMRECV_PARTS_MAX, old ones gone */
     for (int i = 0; i < 12; i++) {
         char nm[VMRECV_PART_NAME];

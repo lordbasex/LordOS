@@ -13,14 +13,10 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
-#include <sys/syscall.h>
 #include <sys/xattr.h>
 #include <time.h>
 #include <unistd.h>
 
-#ifndef RENAME_NOREPLACE
-#define RENAME_NOREPLACE 1
-#endif
 
 static int own_dir(int fd) {
     struct stat st;
@@ -119,15 +115,24 @@ int vmrecv_finish(int dfd, int fd, const char *part, const char *name, const cha
         if (machine_id) fsetxattr(fd, "user.lordos.machine", machine_id, strlen(machine_id), 0);
         fsetxattr(fd, "user.xdg.origin.url", origin, strlen(origin), 0);
     }
-    char cand[AG_NAME_MAX + 16];
+    char cand[AG_NAME_MAX + 16], self[40];
+    snprintf(self, sizeof self, "/proc/self/fd/%d", fd);
     const char *dot = strrchr(name, '.');
     size_t stem = dot && dot != name ? (size_t)(dot - name) : strlen(name);
     for (int n = 1; n < 1000; n++) {
         if (n == 1) snprintf(cand, sizeof cand, "%s", name);
         else snprintf(cand, sizeof cand, "%.*s (%d)%s", (int)stem, name, n, name + stem);
-        if (!syscall(SYS_renameat2, dfd, part, dfd, cand, RENAME_NOREPLACE)) { snprintf(final, fn, "%s", cand); return 0; }
+        /* the name is given to the very file that was checked (its descriptor, through /proc), never to whatever another
+         * process of this account may have put at the part's name meanwhile; never replacing a file */
+        if (!linkat(AT_FDCWD, self, dfd, cand, AT_SYMLINK_FOLLOW)) {
+            struct stat ps;
+            if (!fstatat(dfd, part, &ps, AT_SYMLINK_NOFOLLOW) && ps.st_dev == st.st_dev && ps.st_ino == st.st_ino) unlinkat(dfd, part, 0);
+            snprintf(final, fn, "%s", cand);
+            return 0;
+        }
         if (errno != EEXIST) break;
     }
-    unlinkat(dfd, part, 0);
+    struct stat ps;
+    if (!fstatat(dfd, part, &ps, AT_SYMLINK_NOFOLLOW) && ps.st_dev == st.st_dev && ps.st_ino == st.st_ino) unlinkat(dfd, part, 0);
     return -1;
 }
