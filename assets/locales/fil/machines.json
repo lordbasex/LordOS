@@ -1629,5 +1629,12 @@
   "whonix.phase.unpack": "Ina-unpack ang dalawang disk",
   "whonix.phase.base": "Ginagawa ang mga read-only na base",
   "whonix.phase.done": "Tapos na",
-  "whonix.phaseHint": "Sinusuri ang download laban sa signed na listahan ng Whonix; ina-unpack ang mga disk ng isang naka-sandbox na helper na walang sariling file o network."
+  "whonix.phaseHint": "Sinusuri ang download laban sa signed na listahan ng Whonix; ina-unpack ang mga disk ng isang naka-sandbox na helper na walang sariling file o network.",
+  "as.isoDrop": "Bitawan para gamitin ang ISO na ito",
+  "as.isoDropNone": "Isang .iso file lang ang puwede rito",
+  "as.archFromBoot": "{arch}, binasa mula sa mga boot file",
+  "as.archFromName": "{arch}, mula sa pangalan (hindi sinasabi ng mga boot file)",
+  "as.archUnknown": "Hindi sinasabi ng mga boot file ang architecture: ipinapalagay na {arch}",
+  "as.archOther": "Para sa {arch} ang mga boot file, na hindi kayang patakbuhin ng Machines",
+  "win.noGicThree": "Kailangan ng Windows para sa Arm ng GICv3 interrupt controller, at GICv2 ang sa computer na ito (gaya ng Raspberry Pi 5): ie-emulate ang machine, napakabagal."
 }

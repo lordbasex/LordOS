@@ -1629,5 +1629,12 @@
   "whonix.phase.unpack": "Membuka kedua-dua cakera",
   "whonix.phase.base": "Membuat asas baca-sahaja",
   "whonix.phase.done": "Selesai",
-  "whonix.phaseHint": "Muat turun disemak dengan senarai bertandatangan Whonix; cakera dibuka oleh pembantu dalam kotak pasir yang tiada fail atau rangkaiannya sendiri."
+  "whonix.phaseHint": "Muat turun disemak dengan senarai bertandatangan Whonix; cakera dibuka oleh pembantu dalam kotak pasir yang tiada fail atau rangkaiannya sendiri.",
+  "as.isoDrop": "Lepaskan untuk menggunakan ISO ini",
+  "as.isoDropNone": "Hanya fail .iso di sini",
+  "as.archFromBoot": "{arch}, dibaca daripada fail but",
+  "as.archFromName": "{arch}, daripada namanya (fail but tidak menyatakan)",
+  "as.archUnknown": "Fail but tidak menyatakan seni bina: {arch} diandaikan",
+  "as.archOther": "Fail but adalah untuk {arch}, yang tidak dapat dijalankan oleh Mesin",
+  "win.noGicThree": "Windows untuk Arm memerlukan pengawal sampukan GICv3, dan komputer ini menggunakan GICv2 (seperti Raspberry Pi 5): mesin akan diemulasi, sangat perlahan."
 }

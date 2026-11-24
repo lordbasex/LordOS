@@ -221,6 +221,9 @@ typedef struct {
     int cpus;
     long ram_mb;
     int kvm;                            /* /dev/kvm can be opened */
+    int gicv3;                          /* arm64: the interrupt controller is GICv3 (or v4), so KVM can give a guest a GICv3;
+                                         * the Raspberry Pi 5's GIC-400 is GICv2 (measured: "KVM does not support GICv3
+                                         * emulation") */
 } VmHost;
 
 enum {
@@ -349,6 +352,9 @@ const char *vm_gl_refusal(const VmMachine *m, int host_arch, int installing);
 
 /* reads this computer: arch, CPUs online, RAM, /dev/kvm access */
 void vm_host_probe(VmHost *h);
+/* 1 when an interrupts table (/proc/interrupts) names a GICv3 or GICv4 controller, 0 when not, -1 when unreadable; read
+ * in bounded chunks, at most 8 MB */
+int vm_gicv3_in(const char *path);
 /* its physical cores (each core's first thread in /sys/devices/system/cpu), at most cpus; cpus when it can't tell */
 int vm_host_cores(int cpus);
 

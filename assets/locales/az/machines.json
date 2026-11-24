@@ -1629,5 +1629,12 @@
   "whonix.phase.unpack": "İki disk açılır",
   "whonix.phase.base": "Yalnız oxunan əsaslar yaradılır",
   "whonix.phase.done": "Hazırdır",
-  "whonix.phaseHint": "Endirmə Whonix-in imzalı siyahısı ilə yoxlanılır; disklər öz faylı və şəbəkəsi olmayan, sandboxda işləyən köməkçi tərəfindən açılır."
+  "whonix.phaseHint": "Endirmə Whonix-in imzalı siyahısı ilə yoxlanılır; disklər öz faylı və şəbəkəsi olmayan, sandboxda işləyən köməkçi tərəfindən açılır.",
+  "as.isoDrop": "Bu ISO-nu istifadə etmək üçün buraxın",
+  "as.isoDropNone": "Bura yalnız .iso faylı gəlir",
+  "as.archFromBoot": "{arch}, yükləmə fayllarından oxundu",
+  "as.archFromName": "{arch}, adından (yükləmə faylları demir)",
+  "as.archUnknown": "Yükləmə faylları arxitekturanı demir: {arch} qəbul edilir",
+  "as.archOther": "Yükləmə faylları {arch} üçündür, Maşınlar onu işlədə bilmir",
+  "win.noGicThree": "Arm üçün Windows GICv3 kəsilmə nəzarətçisi tələb edir, bu kompüterinki GICv2-dir (Raspberry Pi 5-dəki kimi): maşın emulyasiya ilə, çox yavaş işləyəcək."
 }

@@ -1629,5 +1629,12 @@
   "whonix.phase.unpack": "Membongkar kedua disk",
   "whonix.phase.base": "Membuat basis baca-saja",
   "whonix.phase.done": "Selesai",
-  "whonix.phaseHint": "Unduhan diperiksa dengan daftar bertandatangan milik Whonix; disk dibongkar oleh helper dalam sandbox yang tidak punya berkas atau jaringan sendiri."
+  "whonix.phaseHint": "Unduhan diperiksa dengan daftar bertandatangan milik Whonix; disk dibongkar oleh helper dalam sandbox yang tidak punya berkas atau jaringan sendiri.",
+  "as.isoDrop": "Lepaskan untuk memakai ISO ini",
+  "as.isoDropNone": "Hanya file .iso di sini",
+  "as.archFromBoot": "{arch}, dibaca dari file boot",
+  "as.archFromName": "{arch}, dari namanya (file boot tidak menyebutkan)",
+  "as.archUnknown": "File boot tidak menyebut arsitektur: dianggap {arch}",
+  "as.archOther": "File boot untuk {arch}, yang tidak bisa dijalankan Mesin",
+  "win.noGicThree": "Windows untuk Arm memerlukan pengendali interupsi GICv3, dan komputer ini memakai GICv2 (seperti Raspberry Pi 5): mesin akan diemulasikan, sangat lambat."
 }

@@ -234,12 +234,43 @@ static void test_schema(void) {
                 free(jj);
             }
         }
-        /* arm64 (GOOD) and a bios machine refuse them */
+        /* arm64 (GOOD, 4.3): secure boot, a TPM and the windows devices, never Hyper-V; a bios machine refuses secure boot */
         {
             char t[4096];
             const char *at = strstr(GOOD, "\"schema\":1");
             snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"tpm\":true}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
+            CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_OK);
+            snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"secure_boot\":true,\"tpm\":true,\"devices\":\"windows\",\"drivers\":\"/home/ana/virtio-win.iso\"}",
+                     (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
+            CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_OK && m.devices == VM_DEV_WINDOWS && m.secure_boot && m.tpm);
+            /* KVM gives the windows devices' GICv3 only on a GICv3 host (the Pi 5 is GICv2): refused there, emulation allowed */
+            VmHost g2 = { .arch = VM_ARCH_ARM64, .cpus = 4, .ram_mb = 16000, .kvm = 1, .gicv3 = 0 }, g3 = g2;
+            g3.gicv3 = 1;
+            CHECK(vm_machine_check_host(&m, &g2, err, sizeof err, NULL, 0) == VM_E_HOST && strstr(err, "GICv2"));
+            CHECK(vm_machine_check_host(&m, &g3, err, sizeof err, NULL, 0) == VM_OK);
+            m.accel = VM_ACCEL_TCG;
+            CHECK(vm_machine_check_host(&m, &g2, err, sizeof err, NULL, 0) == VM_OK);
+            m.accel = VM_ACCEL_KVM; m.devices = VM_DEV_VIRTIO;
+            CHECK(vm_machine_check_host(&m, &g2, err, sizeof err, NULL, 0) == VM_OK);       /* a Linux machine: GICv2 is fine */
+            snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"hyperv\":true}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
             CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_E_RANGE);
+            /* the interrupts table: GICv3 or GICv4 named, a name cut between two reads, GICv2 only, none */
+            {
+                char tf[] = "/tmp/vm-test-irq-XXXXXX";
+                int fd = mkstemp(tf);
+                static char big[200000];
+                memset(big, ' ', sizeof big);
+                memcpy(big + 65536 + 8 - 3, "GICv3", 5);
+                CHECK(fd >= 0 && write(fd, big, sizeof big) == (ssize_t)sizeof big);
+                CHECK(vm_gicv3_in(tf) == 1);
+                CHECK(fd >= 0 && !ftruncate(fd, 0) && pwrite(fd, " 12:  9752  GICv2  27 Level  kvm guest vtimer\n", 47, 0) == 47);
+                CHECK(vm_gicv3_in(tf) == 0);
+                CHECK(fd >= 0 && pwrite(fd, " 12:  9752  GICv4  27 Level  kvm guest vtimer\n", 47, 0) == 47);
+                CHECK(vm_gicv3_in(tf) == 1);
+                if (fd >= 0) close(fd);
+                unlink(tf);
+                CHECK(vm_gicv3_in("/nonexistent/interrupts") == -1);
+            }
             CHECK(vm_machine_parse(amd, strlen(amd), &m, err, sizeof err) == VM_OK);
             m.schema = 5; m.firmware = VM_FW_BIOS; m.firmware_code[0] = m.firmware_sha256[0] = 0; m.secure_boot = 1;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
@@ -907,7 +938,7 @@ static void test_host(void) {
     VmMachine m;
     char err[256], warn[256];
     vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err);
-    VmHost pi = { VM_ARCH_ARM64, 4, 16208, 1 }, small = { VM_ARCH_ARM64, 4, 3884, 1 }, pc = { VM_ARCH_AMD64, 8, 16000, 1 };
+    VmHost pi = { VM_ARCH_ARM64, 4, 16208, 1, 0 }, small = { VM_ARCH_ARM64, 4, 3884, 1, 0 }, pc = { VM_ARCH_AMD64, 8, 16000, 1, 0 };
     CHECK(vm_vcpus_recommended(&pi) == 3 && vm_mem_max_mb(&pi) == 16208 - 2048 && vm_mem_max_mb(&small) == 3884 - 1024);
     CHECK(vm_machine_check_host(&m, &pi, err, sizeof err, warn, sizeof warn) == VM_OK && !warn[0]);
     m.vcpus = 4;

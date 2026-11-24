@@ -23,7 +23,7 @@ const H = (c) => c.repeat(64);
 
 // ---- the cards ----
 eq('amd64 cards, LordOS first', systemsFor(CAT, 'amd64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali', 'windows']);
-eq('arm64 cards', systemsFor(CAT, 'arm64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali']);
+eq('arm64 cards (with the virtio-win guest from its maker\'s Arm64 ISO, 4.3.2)', systemsFor(CAT, 'arm64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali', 'windows']);
 // ---- a pinned card (an ISO whose maker signs no list): the catalog pins its one file and hash ----
 {
   const PIN = { systems: [{ id: 'pinned-os', name: 'Pinned', release: '1', kind: 'iso', family: 'other', machine: { vcpus: 4, memoryMb: 4096, diskGb: 32, graphics: '3d' },

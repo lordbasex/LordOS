@@ -1629,5 +1629,12 @@
   "whonix.phase.unpack": "Unpacking the two disks",
   "whonix.phase.base": "Making the read-only bases",
   "whonix.phase.done": "Done",
-  "whonix.phaseHint": "The download is checked against Whonix's signed list; the disks are unpacked by a sandboxed helper with no files or network of its own."
+  "whonix.phaseHint": "The download is checked against Whonix's signed list; the disks are unpacked by a sandboxed helper with no files or network of its own.",
+  "as.isoDrop": "Let go to use this ISO",
+  "as.isoDropNone": "Only an .iso file goes here",
+  "as.archFromBoot": "{arch}, read from its boot files",
+  "as.archFromName": "{arch}, from its name (its boot files don't say)",
+  "as.archUnknown": "Its boot files don't say which architecture: {arch} is assumed",
+  "as.archOther": "Its boot files are for {arch}, which Machines can't run",
+  "win.noGicThree": "Windows for Arm needs a GICv3 interrupt controller, and this computer's is GICv2 (as on the Raspberry Pi 5): the machine will be emulated, very slowly."
 }

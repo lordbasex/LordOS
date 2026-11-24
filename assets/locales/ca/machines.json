@@ -1629,5 +1629,12 @@
   "whonix.phase.unpack": "S'estan desempaquetant els dos discos",
   "whonix.phase.base": "S'estan creant les bases de només lectura",
   "whonix.phase.done": "Fet",
-  "whonix.phaseHint": "La baixada es comprova amb la llista signada de Whonix; els discos els desempaqueta un ajudant aïllat, sense fitxers ni xarxa propis."
+  "whonix.phaseHint": "La baixada es comprova amb la llista signada de Whonix; els discos els desempaqueta un ajudant aïllat, sense fitxers ni xarxa propis.",
+  "as.isoDrop": "Deixa-la anar per usar aquesta ISO",
+  "as.isoDropNone": "Aquí només hi va un fitxer .iso",
+  "as.archFromBoot": "{arch}, llegit dels fitxers d'arrencada",
+  "as.archFromName": "{arch}, pel nom (els fitxers d'arrencada no ho diuen)",
+  "as.archUnknown": "Els fitxers d'arrencada no diuen l'arquitectura: se suposa {arch}",
+  "as.archOther": "Els fitxers d'arrencada són per a {arch}, que Màquines no pot executar",
+  "win.noGicThree": "Windows per a Arm necessita un controlador d'interrupcions GICv3 i el d'aquest ordinador és GICv2 (com al Raspberry Pi 5): la màquina serà emulada, molt lenta."
 }

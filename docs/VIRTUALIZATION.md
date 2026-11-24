@@ -790,6 +790,24 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
   (`vm_nondumpable`: `/proc/<pid>/environ` refused) and reports `"nondumpable"` in `lord-vm --status --json`. `status`, `stat`,
   `comm`, `cmdline` and `cgroup` stay readable, so Monitor, the vCPU use and the vGPU checks keep working; Monitor lists QEMU
   under root, as it already did lord-vm (also non-dumpable).
+- **Nothing QEMU writes can run** (in development, approved by the maintainer 2026-11-24; `noexec_bind` and `vm_ns_setup` in
+  `vmsandbox.c`): in QEMU's mount namespace, after the private loader is mounted and only after the user namespace is joined,
+  the machine's `disks/` folder is bound over itself and that bind remounted `noexec,nosuid,nodev`; the same is done to
+  `/dev/shm`, `/tmp`, `/var/tmp` and `$XDG_RUNTIME_DIR`, which QEMU's Landlock already keeps it from writing (they count only on
+  a kernel without Landlock). The kernel then refuses to run a file there (EACCES) or to map one executable (`mmap` or `mprotect`
+  with `PROT_EXEC`: EPERM), whatever seccomp lets through, which closes the disk-file half of the allowlist's kill fallback
+  (below). These binds and the loader's are the only mounts added there. What the outer mount had stays (read-only stays
+  read-only, its atime flags are kept; the kernel refuses to clear a flag the outer mount locked), and the loader's bind, a
+  mount of its own made before, keeps exec. Nothing QEMU needs to run lives there: qcow2 and raw disks, the NVRAM, snapshots
+  with memory (inside the qcow2) are read and written as before; swtpm, virtiofsd and passt run outside QEMU's namespaces
+  and reach it through descriptors, as do the suspend file and a disposable session's memfd; guest memory is a memfd
+  (hugetlb or not), which no mount covers. If a remount fails QEMU still runs and its log says exactly which folder and why
+  (`lord-vm: QEMU's disks folder couldn't be made noexec in its mount namespace (...)`); Landlock and seccomp still hold.
+  `lord-vm --status --json` says `"noexec_disks"`. **Checked** 2026-11-24 (amd64 PC, Debian 13): `build/vm-jail-probe` writes a
+  real program (`/usr/bin/true`'s bytes) into a file of `disks/` from inside the jail with the allowlist in its kill fallback
+  (no listener) and can neither map it executable (EPERM; with the remount left out, the same probe maps it) nor run it
+  (EACCES); and real machines booted with it: a Linux guest with 2D graphics, one with 3D graphics (virgl), and an OVMF one
+  with a TPM, through snapshot with memory and revert, reset, and suspend to a file and resume.
 - **Landlock:** read `/usr` (execute only QEMU's binary and its loader, since 2026-11-23 with the seccomp allowlist), read the ISO attached to this VM; read-write only that VM's `disks/` folder (`vmsandbox.h`). On kernels without
   Landlock (see 2.3) the app shows "Weaker isolation on this kernel" (**not built**: only the machine log's "Sandbox:" line says it).
 - **Seccomp:** QEMU's own `-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny` plus ours, an
@@ -820,9 +838,8 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
     memfd (`MFD_NOEXEC_SEAL` wouldn't help: measured on 6.12, it doesn't stop `mmap` with `PROT_EXEC`) or a file of its
     `disks/` folder written to be run. `memfd_create` never takes `MFD_EXEC`. **What this doesn't stop**: anything during the
     start itself (QEMU has then read only its command line and its disks' headers); and, without a listener (the kill
-    fallback, never on Debian 13's kernel), the loader's kind passes at any time, so a memfd or a disk file QEMU wrote could
-    be mapped to run; a `noexec` bind of `disks/` in QEMU's mount namespace would close the folder's half there, but that is
-    a second mount where 3.3's namespaces allow exactly one, for the maintainer to decide. `prctl`
+    fallback, never on Debian 13's kernel), the loader's kind passes at any time, so a memfd QEMU wrote could be mapped to
+    run; a file of its `disks/` folder can't, since that folder is `noexec` in QEMU's mount namespace (above). `prctl`
     only the five options measured, and `PR_SET_DUMPABLE` refused, so QEMU can't make itself dumpable again. `prlimit64` only on
     itself, `tgkill` only its own threads (the vCPU kick), no `kill`. `seccomp` never with a listener. `execve` isn't a row; `execveat` always
     reaches lord-vm, which lets exactly one through: the first, from the child it forked, before any of QEMU runs
@@ -1976,25 +1993,30 @@ The Android card was removed on 2026-11-24 by the maintainer's decision: it adde
 
 ### 4.3 virtio-win guests
 
-amd64: full path, built (4.3.1). arm64: **not built** (stage C): `machine.c` refuses the Windows devices on arm64 and the
-`windows` and `virtio-win` catalog entries are amd64 only, though `vmunattend.c` already writes arm64 answer files. arm64 is
-**Reported** to work under KVM on Pi 5 with no 3D at all; lighter hardware needs an older release. What's needed:
+amd64: full path, built (4.3.1). arm64: **built, not yet installed end to end** (stage C, in development after 0.8.9.5-beta;
+4.3.2): the same card, template and answer file on an arm64 computer, from Microsoft's Arm64 ISO checked against the hashes
+Microsoft publishes. What it uses:
 
 | Need | amd64 | arm64 |
 |---|---|---|
-| Firmware | OVMF with secure boot | AAVMF (`qemu-efi-aarch64`, Debian 2025.02) |
-| TPM 2.0 | swtpm 0.7.1 | swtpm |
-| Disk during install | virtio-win viostor or vioscsi | `viostor/w11/ARM64` on the ISO (**Reported**) |
-| Network | NetKVM | NetKVM ARM64 (**Reported**) |
-| Display | viogpudo, 2D | viogpudo ARM64, 2D; `ramfb` early in boot (**Reported**) |
+| Machine | q35, SMM | virt with `gic-version=3`; KVM only on a GICv3 host, else emulated (TCG) |
+| Firmware | OVMF with secure boot (`OVMF_CODE_4M.secboot.fd`, `OVMF_VARS_4M.ms.fd`) | AAVMF with secure boot (`AAVMF_CODE.secboot.fd`, `AAVMF_VARS.ms.fd`, `qemu-efi-aarch64` 2025.02): no SMM on virt (below) |
+| TPM 2.0 | swtpm 0.7.1, `tpm-crb` | swtpm, `tpm-tis-device` |
+| CD/DVD drives | q35's SATA (`ide-cd`) | USB mass storage (`usb-bot` + `scsi-cd`), changeable like the others |
+| Disk during install | viostor from `$WinPEDriver$` | `viostor/w11/ARM64` from `$WinPEDriver$` (present in virtio-win 0.1.271, **Measured**) |
+| Network | NetKVM | `NetKVM/w11/ARM64` (with `netkvmp.exe`) from `$WinPEDriver$` |
+| Display | virtio-vga, viogpudo, 2D | `ramfb` (the firmware's framebuffer, kept by the basic display driver), 2D at the firmware's resolution |
+| Keyboard, pointer | q35's PS/2 keyboard, USB tablet | USB keyboard, USB tablet (in-box drivers) |
 | 3D | none free; an Intel GVT-g vGPU with Intel's driver (6.10.1) | none |
-| Agents | virtio-win's guest tools plus our `lordos-guest-win` (7.1.2) | not built |
+| Agents | virtio-win's guest tools plus our `lordos-guest-win` (7.1.2) | the ARM64 drivers with `pnputil` and the x86-64 guest agent (emulated by the system); virtio-win 0.1.271 has no Arm guest tools installer; `lordos-guest-win` not built for Arm |
 
 Facts to keep in view:
 
-- arm64 virtio-win guests use KVM's GIC. On the Pi the guest sees GICv2. A project boots it with `-M virt -cpu host`, leaving the GIC
-  choice to QEMU (**Measured**, read in its script). Whether current releases keep working on GICv2 is **To test** on every Phase 2
-  rebuild, since a system update could end it.
+- arm64 virtio-win guests use KVM's GIC. The Raspberry Pi 5's GIC-400 is GICv2: its KVM refuses a GICv3 guest ("KVM does not
+  support GICv3 emulation", **Measured** 2026-11-24 with QEMU 10.0.13; `gic-version=2`, `host` and `max` start). A project boots
+  the system there with `-M virt -cpu host`, leaving the GIC choice to QEMU (**Reported**, read in its script), which we have
+  not run. Machines asks for GICv3, what Microsoft's Arm requirements name: on a GICv2 host the machine is emulated (TCG) and the
+  card says so; KVM with GICv2 waits for a real install on the Pi (4.3.2).
 - **virtio-win signing.** Public stable drivers are signed with a vendor certificate plus attestation for current systems, and don't carry the system maker's own certification
   (**Reported**, Fedora and the virtio-win project). Certified builds come only with a paid subscription. The installer may ask to trust the
   publisher: the assistant handles it, and the app says what it did.
@@ -2061,6 +2083,43 @@ from `lord-vm` in the first seconds of the first start.
 
 **Guided.** Windows' own installer asks everything; the seed disk holds only the drivers.
 
+### 4.3.2 arm64 (stage C), built 2026-11-24, in development
+
+**Where it comes from.** Microsoft's Arm64 page (www.microsoft.com/software-download/windows11arm64, "Windows 11 for
+Arm-based PCs", Version 26H2): the person downloads; Machines finds `Win11_*_Arm64*.iso` in Downloads or the person
+chooses it, and `lord-vm --sha256` checks it against the 38 SHA-256 hashes Microsoft publishes on that page ("Verify your
+download"), pinned in `systems.json` (`windows.arch.arm64.isos`, read 2026-11-24). Microsoft offers no Arm64 evaluation,
+so that tile is off. The drivers' disc is the same pinned virtio-win 0.1.271 (`virtio-win.arch.arm64`).
+
+**The machine** (`lord-vm --create --arch arm64 --secure-boot on --tpm on --hyperv off --rtc local --devices windows`):
+`virt` with `gic-version=3`, AAVMF's secure boot code and Microsoft's keys, swtpm on `tpm-tis-device`, virtio disk and
+network, the installer's and the drivers' discs on two USB mass storage devices (`usb-bot` + `scsi-cd`, so the disc can be
+changed like on amd64), `ramfb`, USB keyboard and tablet on xHCI, the seed disk as a USB stick. No Hyper-V enlightenments
+(x86 only; `machine.c` refuses them on arm64). `vm_machine_check_host` refuses KVM for these devices on a host whose
+`/proc/interrupts` names no GICv3 or GICv4 controller (`vm_gicv3_in`), and `lord.vm.create` picks TCG there itself; the
+assistant says why (`windows.js` `windowsEmulatedWhy`, `machines.win.noGicThree`). `swtpm` is in `vm-enable`'s list for
+both architectures.
+
+**Secure boot on arm64.** virt has no SMM, so AAVMF keeps its variables in flash the guest's own kernel could write: secure
+boot checks what boots (an unsigned loader is refused, **Measured** below) but doesn't protect the keys from a system that
+is already running. amd64's OVMF keeps them SMM-only.
+
+**Install without questions.** `vmu_prepare_windows` copies `viostor` and `NetKVM` from `<driver>/w11/ARM64` into
+`$WinPEDriver$`; `Autounattend.xml` names `processorArchitecture="arm64"` in every component; at the first sign-in
+`pnputil /add-driver …\w11\ARM64\*.inf /install` adds Balloon, NetKVM, viogpudo, vioinput, viorng, vioscsi, vioserial and
+viostor, then `msiexec` installs the x86-64 guest agent (`guest-agent/qemu-ga-x86_64.msi`), which the system runs emulated;
+its first answer ends the install as on amd64.
+
+**Measured on the Raspberry Pi 5** (2026-11-24, a scratch `lord-vm` in private namespaces with a private home; Alpine
+3.24.4 aarch64 as the disc, since it isn't signed by Microsoft): with `--accel kvm` lord-vm refuses ("this computer's
+interrupt controller is GICv2…"); with TCG the machine starts as above, AAVMF finds the USB CD/DVD and refuses Alpine's
+loader with secure boot on ("Access Denied"), and with secure boot off it boots it from that drive.
+
+**Not verified:** a Windows 11 Arm64 install itself (the ISO is 6.9 GB and comes only through Microsoft's page, which
+Machines doesn't imitate; the Pi has 5.6 GB free), whether Setup reads the USB CD/DVD and the ramfb picture, whether the
+x86-64 guest agent runs emulated over vioserial (the install-done signal), swtpm on arm64 (not installed on our Pi), and KVM
+on a GICv3 arm64 host (we have none). Until a real install passes, the card is offered on arm64 as built, not as tested.
+
 ### 4.4 Not offered
 
 Guests whose license restricts them to their maker's hardware. Guests needing a real GPU for their desktop on hardware without passthrough.
@@ -2126,8 +2185,26 @@ A light never carries meaning by color alone: each has a tooltip and the state i
 Steps, each one screen, with Back always available.
 
 **Built (audited 2026-11-23, `assistant.jsx`):** five steps, Choose, Profile, Name (or Set up), Review, Create. There is no separate
-Detect step (an ISO is recognized inline, `lord.vm.isoInfo`), no folder choice (machines go in `~/Machines`), no **Fresh install**
-snapshot and no drop of a file on the ISO tile. Automatic setup of a Windows guest is **on** by default, and the person may type a
+Detect step, no folder choice (machines go in `~/Machines`) and no **Fresh install** snapshot.
+
+**An ISO is recognized inline from its boot files (in development, after 0.8.9.5-beta):** `lord.vm.isoInfo` runs
+`vm/vmiso.c` on the chosen file through one descriptor: the primary volume's label; the El Torito catalog's platforms (x86
+BIOS 0x00, UEFI 0xEF); every `EFI/BOOT/BOOT*.EFI` (case-insensitive: X64, AA64, IA32, RISCV64) in the ISO 9660 tree (Rock
+Ridge or plain names, then Joliet), in the UDF tree (an install disc keeps its files there; its ISO 9660 side has only a
+README) and in El Torito's UEFI image (its FAT12/16/32 ESP, short and long names), each one's PE header machine (0x8664
+amd64, 0xAA64 arm64, 0x14C i386, 0x5064 riscv64); and `sources/install.wim|esd|swm` for an install disc. The architecture
+is the PE headers', else the boot files' names, else x86 when El Torito has only a BIOS entry (`archFrom: "boot"`); when
+they say nothing, or name both amd64 and arm64, `model.js` `isoArch` takes it from the file's name or label (`"name"`),
+and the summary card says which ("arm64, read from its boot files"), or that the boot files are for an architecture
+Machines can't run (riscv64). The file is untrusted: every offset and length is checked against the file, paths are fixed
+(no tree walk, so a directory that points at itself can't loop), FAT chains and UDF descriptors are capped, and a probe
+stops at 4,096 reads or 24 MB (40 reads on a network or cloud mount). `tests/vmiso_test.c` builds each kind of image byte
+by byte, adds hostile ones and fuzzes them under ASan and UBSan. Checked on real ISOs: Alpine 3.24.4 aarch64 virt (arm64
+from its PE headers, though its file name says nothing), an amd64 install disc's evaluation (UDF, install.wim, amd64 from
+the ESP), Ubuntu Server 26.04.1, Bliss OS 16.9.7, LordOS 0.8.9 live, virtio-win 0.1.271 (no boot files: name).
+
+An `.iso` dragged from Files onto the "Use an ISO" tile is picked as if chosen in its file picker (`useFilesDrop`); another
+file says only an .iso goes there. Automatic setup of a Windows guest is **on** by default, and the person may type a
 product key (else the edition's KMS client key, 4.3.1). The requirements check is the app's **What's Missing** page with the admin
 action `vm-enable`, not the Store. The design was:
 

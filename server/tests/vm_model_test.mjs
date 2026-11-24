@@ -136,6 +136,17 @@ eq('version none', versionOf('netinst.iso'), '');
 eq('arch arm', archOf('debian-13-nocloud-arm64.qcow2'), 'arm64');
 eq('arch x86', archOf('Fedora-Server-dvd-x86_64-41.iso'), 'amd64');
 eq('arch unknown', archOf('mysystem.iso'), '');
+// an ISO's architecture (lord.vm.isoInfo, vmiso.c): its boot files win over its name; the name when they don't say
+const { isoArch } = M;
+eq('arch from the boot files', isoArch({ label: 'alpine-virt 3.24.4 aarch64', arch: 'arm64', archFrom: 'boot', efiArchs: ['arm64'] }, 'mysystem.iso'), { arch: 'arm64', from: 'boot', other: '' });
+eq('boot files beat a wrong name', isoArch({ label: 'X', arch: 'amd64', archFrom: 'boot', efiArchs: ['amd64'] }, 'debian-arm64.iso'), { arch: 'amd64', from: 'boot', other: '' });
+eq('x86 BIOS only: amd64 from boot', isoArch({ label: '', arch: 'amd64', archFrom: 'boot', bios: true, efiArchs: [] }, 'x.iso'), { arch: 'amd64', from: 'boot', other: '' });
+eq('boot files silent: the name', isoArch({ label: 'MYDISC', arch: '', archFrom: '', efiArchs: [] }, 'Fedora-Server-dvd-x86_64-41.iso'), { arch: 'amd64', from: 'name', other: '' });
+eq('boot files silent: the label', isoArch({ label: 'Debian 13 arm64 n', arch: '', archFrom: '' }, 'disc.iso'), { arch: 'arm64', from: 'name', other: '' });
+eq('two architectures: the name picks one of them', isoArch({ arch: '', archFrom: '', efiArchs: ['amd64', 'arm64'] }, 'multi-arm64.iso'), { arch: 'arm64', from: 'name', other: '' });
+eq('nothing says', isoArch({ label: 'MYDISC', arch: '', archFrom: '' }, 'mysystem.iso'), { arch: '', from: '', other: '' });
+eq('riscv64: not one Machines runs', isoArch({ arch: 'riscv64', archFrom: 'boot', efiArchs: ['riscv64'] }, 'x-amd64.iso'), { arch: '', from: 'boot', other: 'riscv64' });
+eq('no info (not an ISO, or isoInfo null): the name', isoArch(null, 'ubuntu-24.04-desktop-arm64.iso'), { arch: 'arm64', from: 'name', other: '' });
 eq('name', suggestName({ name: 'Debian' }, '13', ['Debian 13']), 'Debian 13 2');
 // 5.6 on a Pi 5 (4 cores, 16 GB) and on a small VM (4 cores, 3.8 GB)
 const pi5 = { cpus: 4, vcpusRecommended: 3, ramMb: 16219, memMaxMb: 14171 }, small = { cpus: 4, vcpusRecommended: 3, ramMb: 3946, memMaxMb: 2922 };

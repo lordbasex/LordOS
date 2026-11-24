@@ -405,6 +405,20 @@ export function archOf(name) {
   if (/amd64|x86[_-]64|x64\b/.test(s)) return 'amd64';
   return '';
 }
+// an ISO's architecture (5.2): what its boot files say (lord.vm.isoInfo: the UEFI boot files' PE headers, their names, or
+// El Torito's x86 BIOS entry) wins over its file name and label; { arch, from: 'boot' | 'name' | '', other } — `other`
+// an architecture the boot files name that Machines doesn't run (riscv64), and when the boot files name two (amd64 and
+// arm64 on one disc) the name picks between them
+const RUNS = ['amd64', 'arm64'];
+export function isoArch(info, file) {
+  const boot = String(info?.arch || '');
+  const named = archOf(file) || archOf(info?.label);
+  if (info?.archFrom === 'boot' && RUNS.includes(boot)) return { arch: boot, from: 'boot', other: '' };
+  if (info?.archFrom === 'boot' && boot) return { arch: '', from: 'boot', other: boot };
+  const both = Array.isArray(info?.efiArchs) ? info.efiArchs.filter((a) => RUNS.includes(a)) : [];
+  if (named && (both.length < 2 || both.includes(named))) return { arch: named, from: 'name', other: '' };
+  return { arch: '', from: '', other: '' };
+}
 // a machine name from a system and version, unique among names
 export function suggestName(sys, version, names = []) {
   const base = [sys?.name || 'Machine', version].filter(Boolean).join(' ');

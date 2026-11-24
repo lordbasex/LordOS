@@ -1629,5 +1629,12 @@
   "whonix.phase.unpack": "Đang giải nén hai đĩa",
   "whonix.phase.base": "Đang tạo các nền chỉ đọc",
   "whonix.phase.done": "Xong",
-  "whonix.phaseHint": "Bản tải được kiểm tra với danh sách có ký số của Whonix; các đĩa được giải nén bởi một trình trợ giúp trong hộp cát, không có tệp hay mạng riêng."
+  "whonix.phaseHint": "Bản tải được kiểm tra với danh sách có ký số của Whonix; các đĩa được giải nén bởi một trình trợ giúp trong hộp cát, không có tệp hay mạng riêng.",
+  "as.isoDrop": "Thả ra để dùng ISO này",
+  "as.isoDropNone": "Chỉ nhận tệp .iso ở đây",
+  "as.archFromBoot": "{arch}, đọc từ các tệp khởi động",
+  "as.archFromName": "{arch}, theo tên (các tệp khởi động không cho biết)",
+  "as.archUnknown": "Các tệp khởi động không cho biết kiến trúc: giả định {arch}",
+  "as.archOther": "Các tệp khởi động dành cho {arch}, Máy ảo không chạy được",
+  "win.noGicThree": "Windows cho Arm cần bộ điều khiển ngắt GICv3, còn máy tính này là GICv2 (như Raspberry Pi 5): máy sẽ được giả lập, rất chậm."
 }

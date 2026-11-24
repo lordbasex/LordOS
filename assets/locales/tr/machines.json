@@ -1629,5 +1629,12 @@
   "whonix.phase.unpack": "İki disk açılıyor",
   "whonix.phase.base": "Salt okunur tabanlar oluşturuluyor",
   "whonix.phase.done": "Bitti",
-  "whonix.phaseHint": "İndirme Whonix'in imzalı listesiyle denetlenir; diskler kendine ait dosyası ve ağı olmayan yalıtılmış bir yardımcı tarafından açılır."
+  "whonix.phaseHint": "İndirme Whonix'in imzalı listesiyle denetlenir; diskler kendine ait dosyası ve ağı olmayan yalıtılmış bir yardımcı tarafından açılır.",
+  "as.isoDrop": "Bu ISO'yu kullanmak için bırakın",
+  "as.isoDropNone": "Buraya yalnızca .iso dosyası gelir",
+  "as.archFromBoot": "{arch}, önyükleme dosyalarından okundu",
+  "as.archFromName": "{arch}, adından (önyükleme dosyaları söylemiyor)",
+  "as.archUnknown": "Önyükleme dosyaları mimariyi söylemiyor: {arch} varsayılıyor",
+  "as.archOther": "Önyükleme dosyaları {arch} için; Makineler bunu çalıştıramaz",
+  "win.noGicThree": "Arm için Windows bir GICv3 kesme denetleyicisi ister, bu bilgisayarınki GICv2 (Raspberry Pi 5'teki gibi): makine çok yavaş, öykünmeyle çalışacak."
 }
