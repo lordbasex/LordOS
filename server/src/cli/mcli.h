@@ -50,6 +50,18 @@ void mcli_bytes(double b, char *out, size_t n);
  * 1 and name, *path filled; 0 a path on this computer (write ./a:b for a local name with a colon) */
 int mcli_cp_side(const char *arg, char *name, size_t nn, const char **path);
 
+/* cp of a folder (6.15): a path relative to the folder, as the guest's listing gives it (hostile): components of 1 to
+ * 255 bytes, never "." or "..", no leading or trailing '/', no control characters, at most MCLI_TREE_DEPTH deep and
+ * MCLI_TREE_PATH_MAX bytes */
+#define MCLI_TREE_DEPTH    32
+#define MCLI_TREE_PATH_MAX 3072
+#define MCLI_TREE_MAX      10000          /* files and folders in one copy */
+int mcli_rel_path_ok(const char *p);
+/* the guest's listing: entries "d PATH\0" and "f SIZE PATH\0" (find -printf). 1 an entry (e->path points into b),
+ * 0 the end, -1 anything else (the whole copy is refused) */
+typedef struct { int dir; unsigned long long size; const char *path; } McliTreeEnt;
+int mcli_tree_next(const char *b, size_t n, size_t *off, McliTreeEnt *e);
+
 /* n bytes as a JSON string (quotes included): every byte that isn't valid UTF-8 becomes U+FFFD, controls are escaped */
 #include <stdint.h>
 void mcli_json_bytes(FILE *f, const uint8_t *b, size_t n);

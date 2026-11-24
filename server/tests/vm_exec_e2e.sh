@@ -48,6 +48,24 @@ $B/machines cp --force "$N:vmexec-big.bin" "$HOME/.config/lordos/settings.json"
 ln -sf /etc/passwd link.txt; $B/machines cp link.txt "$N:~/"; [ $? != 0 ] && ok "a link out of the files refused" || bad "symlink read"
 $B/machines cp vmexec-big.bin back.bin; [ $? = 2 ] && ok "two local sides refused" || bad "two local"
 $B/machines exec "$N" -- rm -f vmexec-big.bin
+# folders, both ways: every file with its bytes, links left out (never followed), an existing folder refused without
+# --force, a guest listing with a name no path may have refused before anything is made here
+$B/machines exec "$N" -- rm -rf vmexec-tree vmexec-evil
+rm -rf vmexec-tree back; mkdir -p vmexec-tree/sub/deep; echo a > vmexec-tree/a.txt; head -c 300000 /dev/urandom > vmexec-tree/sub/b.bin; : > vmexec-tree/sub/deep/empty; ln -s /etc/passwd vmexec-tree/link
+sums() { (cd "$1" && find . -type f | LC_ALL=C sort | xargs -d '\n' sha256sum); }
+$B/machines cp vmexec-tree "$N:~/" && ok "cp of a folder into the machine" || bad "cp folder in"
+g=$($B/machines exec "$N" -- sh -c 'cd ~/vmexec-tree && find . -type f | LC_ALL=C sort | xargs -d "\n" sha256sum'); h=$(sums vmexec-tree)
+[ "$g" = "$h" ] && ok "the folder's files arrived, same bytes ($(echo "$h" | wc -l) files)" || bad "folder in: $g vs $h"
+$B/machines exec "$N" -- test ! -e vmexec-tree/link && ok "a link in the folder isn't copied (nor followed)" || bad "link copied"
+$B/machines cp vmexec-tree "$N:~/"; [ $? != 0 ] && ok "an existing folder in the machine refused without --force" || bad "folder overwrite"
+$B/machines cp --force vmexec-tree "$N:~/" && ok "--force merges into the existing folder" || bad "folder --force"
+$B/machines cp "$N:vmexec-tree" back && [ "$(sums back)" = "$(sums vmexec-tree)" ] && [ -d back/sub/deep ] && ok "cp of a folder out of the machine, same files" || bad "folder out"
+$B/machines cp "$N:vmexec-tree" back >/dev/null && [ -f back/vmexec-tree/a.txt ] && ok "into an existing folder: the machine's folder goes in it, as cp -r" || bad "into a folder"
+$B/machines cp "$N:vmexec-tree" back; [ $? != 0 ] && ok "an existing folder here refused without --force" || bad "host folder overwrite"
+$B/machines exec "$N" -- sh -c 'mkdir -p ~/vmexec-evil && : > "$HOME/vmexec-evil/a
+b" && : > ~/vmexec-evil/ok'
+$B/machines cp "$N:vmexec-evil" evil; [ $? != 0 ] && [ ! -e evil ] && ok "a guest name with a control character refuses the whole copy, nothing made here" || bad "evil listing"
+$B/machines exec "$N" -- rm -rf vmexec-tree vmexec-evil
 $B/machines logs "$N" --machine --lines 5 | grep -q "automation: program" && ok "lord-vm's log names each program" || bad "log"
 grep -q "exec: id" "$DIR/log/automation.log" && ok "automation.log written" || bad "automation.log"
 ! grep -q "\$(id)" "$DIR/log/lord-vm.log" && ok "arguments never in the log" || bad "args in log"

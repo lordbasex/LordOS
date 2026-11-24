@@ -651,7 +651,11 @@ def flow_storage(s, r, c):
     freed = vfs.f_bavail * vfs.f_frsize - free0
     said = clone.get("frees") or 0
     c["storage"] = {"fs": fs, "clone_bytes": clone.get("total"), "said_frees": said, "freed": freed, "clone_base": clone.get("base") or "",
-                    "orig_bytes": orig and orig.get("total"), "how": c.get("clone_how", "")}
+                    "orig_bytes": orig and orig.get("total"), "how": c.get("clone_how", ""), "shared": clone.get("shared"),
+                    "approx": bool(clone.get("approx"))}
+    # compressed extents (btrfs with compression): the figures are "about", and the window says so (6.16)
+    if os.environ.get("MH_EXPECT_APPROX") == "1":
+        r.t("storage: compressed extents make the figures \"about\"", bool(clone.get("approx")) or bool(orig and orig.get("approx")), c["storage"])
     log("storage: %s; Machines said deleting the clone frees %.1f MB, the free space grew %.1f MB" % (fs, said / 1e6, freed / 1e6))
     tol = max(32 << 20, said * 0.05)
     r.t("storage: what Machines said the clone frees (%.1f MB) is what deleting it gave back (%.1f MB) on %s" % (said / 1e6, freed / 1e6, fs),

@@ -293,6 +293,47 @@ static void test_cp_side(void) {
     CHECK(!mcli_cp_side("toolong:x", small, sizeof small, &p));
 }
 
+/* cp of a folder: the relative paths and the guest's listing, both hostile */
+static void test_tree(void) {
+    CHECK(mcli_rel_path_ok("a") && mcli_rel_path_ok("src/main.c") && mcli_rel_path_ok(".hidden/x") && mcli_rel_path_ok("a b/\xc3\xa9t\xc3\xa9") && mcli_rel_path_ok("..x/y.."));
+    CHECK(!mcli_rel_path_ok("") && !mcli_rel_path_ok(NULL) && !mcli_rel_path_ok("/etc/passwd") && !mcli_rel_path_ok("a/") && !mcli_rel_path_ok("a//b"));
+    CHECK(!mcli_rel_path_ok("..") && !mcli_rel_path_ok("../x") && !mcli_rel_path_ok("a/../../x") && !mcli_rel_path_ok("a/./b") && !mcli_rel_path_ok("."));
+    CHECK(!mcli_rel_path_ok("a\nb") && !mcli_rel_path_ok("a\x1b[2Jb") && !mcli_rel_path_ok("del\x7f"));
+    {
+        char deep[200] = "";
+        for (int i = 0; i < MCLI_TREE_DEPTH; i++) strcat(deep, i ? "/d" : "d");
+        CHECK(mcli_rel_path_ok(deep));
+        strcat(deep, "/d");
+        CHECK(!mcli_rel_path_ok(deep));
+        char longc[300];
+        memset(longc, 'x', 256); longc[256] = 0;
+        CHECK(!mcli_rel_path_ok(longc));
+        longc[255] = 0;
+        CHECK(mcli_rel_path_ok(longc));
+    }
+    static const char L[] = "d src\0f 12 src/a.c\0f 0 empty\0d src/sub\0";
+    size_t off = 0;
+    McliTreeEnt e;
+    CHECK(mcli_tree_next(L, sizeof L - 1, &off, &e) == 1 && e.dir && !strcmp(e.path, "src"));
+    CHECK(mcli_tree_next(L, sizeof L - 1, &off, &e) == 1 && !e.dir && e.size == 12 && !strcmp(e.path, "src/a.c"));
+    CHECK(mcli_tree_next(L, sizeof L - 1, &off, &e) == 1 && !e.dir && e.size == 0 && !strcmp(e.path, "empty"));
+    CHECK(mcli_tree_next(L, sizeof L - 1, &off, &e) == 1 && e.dir && !strcmp(e.path, "src/sub"));
+    CHECK(mcli_tree_next(L, sizeof L - 1, &off, &e) == 0);
+    static const char *const BAD[] = { "d ../x", "f 1 /etc/shadow", "f x a", "f 1a b", "l a", "d ", "f 12345678901234567 a", "f  a", "d a/../b", "fx 1 a" };
+    for (size_t i = 0; i < sizeof BAD / sizeof BAD[0]; i++) { off = 0; CHECK(mcli_tree_next(BAD[i], strlen(BAD[i]) + 1, &off, &e) == -1); }
+    off = 0;
+    CHECK(mcli_tree_next("f 1 cut", 7, &off, &e) == -1);       /* no NUL: the listing was cut */
+    /* fuzz: random bytes never read past the buffer (ASan) and every entry taken is a safe relative path */
+    unsigned s = 77;
+    for (int r = 0; r < 20000; r++) {
+        char b[64];
+        size_t n = 1 + (s = s * 1103515245u + 12345u) % sizeof b;
+        for (size_t i = 0; i < n; i++) { s = s * 1103515245u + 12345u; b[i] = (char)((s >> 16) % 5 == 0 ? 0 : "df ./.a1\n9"[(s >> 8) % 10]); }
+        off = 0;
+        for (int k = 0; k < 64; k++) { int g = mcli_tree_next(b, n, &off, &e); if (g <= 0) break; CHECK(mcli_rel_path_ok(e.path) && e.path >= b && e.path < b + n); }
+    }
+}
+
 static void test_json_bytes(void) {
     char buf[256];
     FILE *f = fmemopen(buf, sizeof buf, "w");
@@ -450,6 +491,7 @@ int main(void) {
     test_fill();
     test_channel();
     test_cp_side();
+    test_tree();
     test_json_bytes();
     test_term_clean();
     test_apply();
