@@ -29,6 +29,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     private loader). `/proc/<qemu>/` files become root's; `status`, `stat`, `comm`, `cmdline` and `cgroup` stay readable,
     so the vCPU use, vCPU pinning, Monitor and root's `vm-memlock` checks keep working. lord-vm checks it after exec
     (`vm_nondumpable`) and says it in the log and in `lord-vm --status --json` (`"nondumpable"`).
+  - **Cost** (measured on the amd64 PC, Debian 13 guest, 5 starts each after a warm-up): fork to QEMU's exec 5 ms
+    against 1 ms, QMP ready 135 ms against 115 ms (spread 43–172 ms either way), boot to login 18.5 s against 18.3 s,
+    QEMU's RSS 409 MB against 404 MB (within the spread), plus a 225 KB tmpfs copy of the loader per running machine.
+    Nothing per frame or per guest exit.
   - **The namespaces**: the user namespace is made once at lord-vm's start, while lord-vm is still dumpable (a
     non-dumpable process can't write its own `uid_map`), by a short-lived child that maps the person's uid, and kept as a
     descriptor (`vm_userns_open`). QEMU's child joins it and makes the mount, ipc, uts and net namespaces

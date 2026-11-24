@@ -767,7 +767,11 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
   interpreter is unreadable. In QEMU's mount namespace the dynamic loader is a copy with mode `0100` mounted over the loader's
   path (made in lord-vm's private runtime folder and unlinked once mounted: a detached mount of a nameless `O_TMPFILE` can't be
   moved, ENOENT; then a write lease proves nobody else holds it open, and its inode and bytes are checked), so the kernel makes
-  QEMU non-dumpable at exec. No root helper and no file shipped for it. The kernel then looks for the first user namespace where
+  QEMU non-dumpable at exec. No root helper and no file shipped for it. **Measured** (2026-11-23, amd64 PC, Debian 13
+  nocloud guest, 2 vCPUs, 1 GB, 5 starts each after a warm-up, alternating): fork to QEMU's exec 5 ms against 1 ms
+  without, QMP ready 135 ms against 115 ms (spread 43–172 ms either way), boot to the serial login 18.5 s against 18.3 s,
+  QEMU's RSS at login 409 MB against 404 MB (within run-to-run spread); the loader's copy is 225 KB of tmpfs per running
+  machine. Nothing runs per frame or per guest exit, so there is no runtime cost beyond that. The kernel then looks for the first user namespace where
   the copy's owner and group are both mapped: QEMU's maps no group, so that is the computer's own, where only root has
   `CAP_SYS_PTRACE` (a namespace the person owns would let their programs back in). Its `/proc/<pid>` files become root's: the
   person's other programs, lord-vm itself and the test script that started it can't read its memory (`/proc/<pid>/mem`,
