@@ -294,6 +294,13 @@ EOF
         77) skip "moddrag" "build/lord-server-test and the default theme (make, npm run build)" ;;
         *) bad "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test)"; cat "$T/out" ;;
     esac
+    # (#209) an X11 app's menus: an override-redirect and a POPUP_MENU window shown where X put them, clicked, hidden
+    sh tests/xpopup_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "xpopup (tests/xpopup_x11.c, headless lord-server-test + Xwayland: X11 menus shown, clicked, hidden, #209)" ;;
+        77) skip "xpopup" "build/lord-server-test, build/xpopup-x11 (libxcb1-dev), Xwayland and the default theme (make, npm run build)" ;;
+        *) bad "xpopup (tests/xpopup_x11.c, headless lord-server-test + Xwayland, #209)"; cat "$T/out" ;;
+    esac
     # a Whonix group's members (docs/VIRTUALIZATION.md 19.5): each one's QEMU and passt arguments against Whonix's own
     # libvirt XML of the pinned release; started paused from two empty disks, nothing boots
     bash tests/vm_whonix_xml_test.sh >"$T/out" 2>&1

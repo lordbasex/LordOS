@@ -4412,8 +4412,10 @@ static void surface_commit_role(Surf *s) {
         damage_node(s);
         if (s->mapped) popups_follow(s);        /* reactive menus (xdg_positioner.set_reactive) */
     } else if (s->role == R_POPUP) {
-        if (!s->popup || !s->xdg) return;   /* its popup is gone (closed): unmapped until a new one is made */
-        if (!s->sent_configure) {
+        /* its xdg_popup is gone (closed): unmapped until a new one is made. An X11 menu or tooltip (xpop) never has
+         * one: X placed and sized it, and returning here left every X app's menu invisible (GitHub #209) */
+        if (!s->xpop && (!s->popup || !s->xdg)) return;
+        if (!s->sent_configure && !s->xpop) {
             xdg_popup_send_configure(s->popup, s->pop_x, s->pop_y, s->conf_w, s->conf_h);
             xdg_configure(s);
             s->sent_configure = 1;

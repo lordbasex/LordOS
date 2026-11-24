@@ -867,6 +867,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Menus of X11 apps open again (#209; also the menus of #212 and #213)** (in development; latest release 0.8.9.5-beta).
+  Since 0.8.9-beta no menu, dropdown, right-click menu or tooltip of an app running under Xwayland appeared: LibreOffice,
+  Qt apps with `QT_QPA_PLATFORM=xcb` or without Qt's Wayland plugin (MuseScore 3, AppImages), GTK apps with
+  `GDK_BACKEND=x11`, Java and Electron apps such as the Arduino IDE. The menu bar item lit up and nothing opened. The fix
+  for GTK 4 popovers (#159) made a commit on a popup with no `xdg_popup` return before mapping it, and an X11 menu never
+  has one (X places and sizes it), so it never reached the screen; an X11 app's drag icon was hidden the same way. Only
+  Wayland popups take that early return now (`wl.c` `surface_commit_role`). `tests/xpopup_x11.c`
+  (`tests/xpopup_headless.sh`, in `run_suites.sh`) maps an override-redirect menu and a `POPUP_MENU` window under
+  Xwayland against a headless `lord-server-test` and reads the screen: shown where X put it, clickable, gone once
+  unmapped; it failed before the fix. FeatherPad's File menu with `QT_QPA_PLATFORM=xcb` checked on the CPU and GPU
+  paths, and with Qt's Wayland plugin.
 - **The live ISO finds MediaTek Wi-Fi cards such as the MT7921 (#227)** (in development; latest release 0.8.9.5-beta).
   The card's driver (`mt7921e`) bound, but its firmware wasn't on the ISO, so no Wi-Fi interface appeared and Settings →
   Network said the computer had no Wi-Fi adapter. Debian moved MediaTek's firmware out of `firmware-misc-nonfree` into
