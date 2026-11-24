@@ -11,6 +11,31 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Displays: the login and lock screens can use the desktop's scale, set by an administrator** (in development; latest
+  release 0.8.9.5-beta; [#242](https://github.com/lordbasex/LordOS/issues/242); docs/DISPLAYS.md "The login screen's
+  scale", docs/SESSIONS.md). The login screen opened every display at its recommended scale, so a 15.6" 1080p laptop
+  jumped from 125 % at login or lock to 100 % on a desktop set to 100 %. Settings → Displays has **Use this scale on the
+  login screen** under the scale. It is a setting of the computer: **only an administrator can change it**, its hint
+  says it applies to every user of this computer, others see it dimmed with "Only an administrator can change it", and
+  the hint names the login screen's current choice when it is another display or scale. Two administrators who want
+  different scales overwrite each other (the last one wins).
+  - **How:** `lord.display.setLoginScale(connector, scale)` sends `{"a":"display","scaleOn":"<connector>","scale":<pct>}`
+    on the monitor channel (the main display's message, extended; no new admin action). `lord-sessiond` takes it only from
+    the session being shown, parses the whole message strictly (`gscale_from_msg`, `server/src/remote/greeterscale.c`),
+    and checks as root, from the user it started that session for, never from the message, that the user is an
+    administrator (`is_admin`: the sudo, admin or wheel group, as for Restart with other sessions open). One request every
+    2 s at most, dropped before parsing or logging. It keeps `/var/lib/lordos/greeter-scale` (`<connector> <pct>`, root's,
+    0644, `.new` with `O_EXCL | O_NOFOLLOW` then rename, only in a `/var/lib/lordos` of root's that no one else can write;
+    read back only as a small regular file of root's that parses) and starts the login screen with
+    `LORD_MAIN_SCALE=<connector>:<pct>`. lord-server applies it only with `--greeter`, only to the display on that
+    connector and only when the display has no saved scale; the lock screen is the same login screen. Settings reads the
+    file back (`lord.display.loginScale()`). Four new texts in all 35 languages.
+  - **Tests:** `build/greeterscale-test` (new, in `make test`, ASan and UBSan; 1,082 checks): forged fields (a `user`),
+    other orders, spaces, trailing data, truncation, signs, leading zeros, huge numbers, decimals, connectors with quotes,
+    slashes, new lines, UTF-8 or 32 characters, every scale from -5 to 1000 against `out_scale_valid`, and 200,000
+    random and mutated inputs, everything accepted valid and exactly what lord-server sends; `lid-test` (43 checks) for
+    `display_plan` with `LORD_MAIN_SCALE`; `display_layout_test.mjs` (48) for the switch. Not yet checked on the VM with
+    a screenshot.
 - **Cloud: the Cloud menu shows each file moving now with its percentage** (in development; latest release 0.8.9.5-beta;
   [#244](https://github.com/lordbasex/LordOS/issues/244); docs/CLOUD.md section 11). The panel by the clock has a
   **Moving now** list between the accounts and Recent: an up or down arrow, the file's name and its percentage on the end

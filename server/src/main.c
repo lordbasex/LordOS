@@ -3096,6 +3096,7 @@ int main(int argc, char **argv) {
     if (test_hooks) mstudio_hub_off();
 #endif
     js_sys_set_greeter(s.greeter);
+    display_set_greeter(s.greeter);     /* #242: the login screen's scale (LORD_MAIN_SCALE) */
     wl_set_greeter(s.greeter);          /* the login screen never lets an app take the shortcuts */
     if (text_init(fonts)) return 1;
     {   /* assets/ = la carpeta de las fuentes, un nivel arriba */

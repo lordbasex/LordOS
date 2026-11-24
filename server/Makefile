@@ -99,6 +99,7 @@ SRC += src/ui/js_guestwin.c
 SRC += src/ui/js_vmcli.c src/vm/vmcli.c
 # Machines' pictures the desktop's GPU can't import (an Intel GVT-g machine's Y-tiled dmabufs): read on their own render node
 SRC += src/gpu/dmaread.c
+SRC += src/remote/greeterscale.c
 SRC += src/wl/wlcolor.c src/wl/colorconv.c
 # Shell extras (src/wl/wlshell.h): xdg-toplevel-drag, xdg-toplevel-tag, xdg-system-bell, xdg-session-management,
 # ext-background-effect, one file each
@@ -1327,7 +1328,8 @@ all: build/lord-server-test
 SESSIOND_OBJ := build/obj/remote/sessiond.o build/obj/remote/sess.o build/obj/remote/monitor.o build/obj/remote/blackfb.o build/obj/remote/conn.o \
                 build/obj/remote/enc.o build/obj/remote/pages.o build/obj/sec/cgroup.o build/obj/remote/netsup.o build/obj/remote/cgsup.o \
                 build/obj/remote/rsec.o build/obj/remote/ipnet.o build/obj/remote/lockout.o build/obj/remote/rtcwire.o build/obj/remote/rtc.o \
-                build/obj/bench/boottest.o build/obj/lordlog.o build/obj/users/admingroups.o
+                build/obj/bench/boottest.o build/obj/lordlog.o build/obj/users/admingroups.o \
+                build/obj/remote/greeterscale.o build/obj/outputs.o
 # The remote desktop shows the screen only over WebRTC (docs/REMOTE.md, "Video (WebRTC)"): our own peer in
 # the bridge, on Debian's libsrtp2 and usrsctp (and OpenSSL's DTLS). lord-sessiond can't be built without
 # them (libsrtp2-dev, libusrsctp-dev).
@@ -1341,6 +1343,13 @@ endif
 build/obj/remote/pages.o: src/remote/login.html src/remote/client.html
 	@mkdir -p $(dir $@)
 	$(LD) -r -b binary -z noexecstack -o $@ src/remote/login.html src/remote/client.html
+# #242: the login screen's scale. lord-sessiond (root) parses the session's request with these: strict shapes, the
+# scale only from out_scale_valid; the fuzz part throws random and mutated messages, files and environments at them.
+test: build/greeterscale-test
+build/greeterscale-test: tests/greeterscale_test.c src/remote/greeterscale.c src/remote/greeterscale.h src/outputs.c src/outputs.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ tests/greeterscale_test.c src/remote/greeterscale.c src/outputs.c -lm
+	./$@ || { rm -f $@; exit 1; }
 # Root over SSH (advanced, src/remote/ssh_root.c): public key lines and fingerprints.
 test: build/ssh-root-test
 build/ssh-root-test: tests/ssh_root_test.c src/remote/ssh_root.c src/remote/ssh_root.h src/pkg/crypto.c
@@ -1355,7 +1364,7 @@ build/blackfb-test: tests/blackfb_test.c src/remote/blackfb.c src/remote/blackfb
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/blackfb_test.c src/remote/blackfb.c -Wl,--wrap=ioctl -Wl,--wrap=mmap -Wl,--wrap=munmap
 	./$@ || { rm -f $@; exit 1; }
 build/lord-sessiond: $(SESSIOND_OBJ)
-	$(CC) $(LDFLAGS) -o $@ $^ $(shell pkg-config --libs openssl) $(SESSIOND_LIBS) -lcrypt -lpthread
+	$(CC) $(LDFLAGS) -o $@ $^ $(shell pkg-config --libs openssl) $(SESSIOND_LIBS) -lcrypt -lpthread -lm
 
 # Version, channel and build of LordOS, shown in About and Settings → General (lord.version and
 # lord.system.info()). Version and channel come from ../package.json ("version" and "lordos": {"channel"}),

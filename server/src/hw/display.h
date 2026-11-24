@@ -53,6 +53,9 @@ typedef struct {
 } DisplayPlan;
 
 void display_init(const DisplayHost *h);                /* after dropping root (needs $HOME) */
+/* lord-server --greeter (#242): the display on LORD_MAIN_SCALE's connector opens at that scale when it has none saved */
+void display_set_greeter(int on);
+int  display_is_greeter(void);
 /* For kms_set_picker: the display the session opens first (the main one), and its mode. */
 int  display_pick(const KmsOutput *o, int n, int *index, struct drm_mode_modeinfo *mode);
 /* The configuration for the connected outputs (o from kms_outputs). Returns plan->n. */

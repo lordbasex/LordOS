@@ -246,6 +246,11 @@ an admin helper. Its runtime is in `/run/lordos/greeter` and its home in
   - the keyboard, if the system has several (`/etc/default/keyboard`);
   - Restart and Shut Down. If there are open sessions, they ask for confirmation.
 - A wrong password shakes the field. After many attempts, it asks you to wait.
+- **Its scale (#242, in development after 0.8.9.5-beta):** each display opens at its recommended scale, except the one
+  an administrator chose in Settings → Displays → "Use this scale on the login screen", which opens at that scale for
+  every user (`/var/lib/lordos/greeter-scale`, `LORD_MAIN_SCALE`; only an administrator's session may change it, checked
+  by lord-sessiond as root; see `docs/DISPLAYS.md`, "The login screen's scale"). The lock screen is this same login
+  screen, so it follows too.
 - **Several displays (0.8.5):** the clock, the user and the password field go on the main display
   (the wallpaper still covers every display), instead of being laid out over the whole desktop and
   cut at the seam between two displays; they follow a display plugged in or out while the screen
