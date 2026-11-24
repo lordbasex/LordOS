@@ -8,6 +8,8 @@
 #
 #   python3 -I tools/vm/e2e/machines/nolandlock.py [--out DIR] [--tree COPY]   (COPY: the tree elsewhere, when its path has a
 #   hidden folder, which Machines won't share)
+# The same guest runs other checks that need a computer of their own (a package changed under a machine):
+#   nolandlock.py --inner pkgchange_inner.py --keep-landlock --as root     (pkgchange_inner.py says what it checks)
 # Needs KVM, the guest image (images.py) and a built tree (make -C server, npm install). About 10 minutes with the network.
 import os, re, shutil, subprocess, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -21,6 +23,9 @@ def main():
     a = sys.argv[1:]
     out = os.path.abspath(a[a.index("--out") + 1] if "--out" in a else os.path.join(mh.SCRATCH, "nolandlock-shots"))
     tree = os.path.abspath(a[a.index("--tree") + 1]) if "--tree" in a else mh.ROOT    # a copy when ROOT's path has a hidden folder
+    inner = a[a.index("--inner") + 1] if "--inner" in a else "nolandlock_inner.py"
+    who = a[a.index("--as") + 1] if "--as" in a else "tester"
+    keep = "--keep-landlock" in a
     if not mh.kvm_ok():
         print("skipped: no /dev/kvm"); return 77
     L = Lib()
@@ -42,22 +47,23 @@ def main():
         o, st = con.run("DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive "
                         "apt-get install -y -qq --no-install-recommends %s >/tmp/apt.log 2>&1; echo APT=$?" % PKGS, 1800)
         print(o[-200:], flush=True)
-        o, _ = con.run("cat /sys/kernel/security/lsm; echo; sed -i 's/^GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"lsm=lockdown,capability,yama,apparmor /' "
-                       "/etc/default/grub && update-grub 2>&1 | tail -1", 300)
-        print(o, flush=True)
-        con.close()
-        L.vm("--stop", M, "--timeout", "60", timeout=120)
-        end = time.time() + 90
-        while time.time() < end and L.status(M).get("state") not in ("stopped", "crashed"):
-            time.sleep(0.5)
-        L.boot(M)
-        con = L.console(M)
+        if not keep:
+            o, _ = con.run("cat /sys/kernel/security/lsm; echo; sed -i 's/^GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"lsm=lockdown,capability,yama,apparmor /' "
+                           "/etc/default/grub && update-grub 2>&1 | tail -1", 300)
+            print(o, flush=True)
+            con.close()
+            L.vm("--stop", M, "--timeout", "60", timeout=120)
+            end = time.time() + 90
+            while time.time() < end and L.status(M).get("state") not in ("stopped", "crashed"):
+                time.sleep(0.5)
+            L.boot(M)
+            con = L.console(M)
         o, _ = con.run("cat /sys/kernel/security/lsm; echo; cat /proc/cmdline", 30)
         print("guest:", o, flush=True)
         con.run("mkdir -p /mnt/src && mount -t virtiofs src /mnt/src && chmod 666 /dev/kvm 2>/dev/null; true", 30)
         con.run("mkdir -p /mnt/out && mount -t virtiofs out /mnt/out && chmod 777 /mnt/out", 30)
-        o, _ = con.run("su - tester -c 'MH_SCRATCH=/var/tmp/nll MH_OUT=/mnt/out python3 -I "
-                       "/mnt/src/tools/vm/e2e/machines/nolandlock_inner.py' 2>&1 | tail -40", 1500)
+        cmd = "MH_SCRATCH=/var/tmp/nll MH_OUT=/mnt/out python3 -I /mnt/src/tools/vm/e2e/machines/%s" % inner
+        o, _ = con.run(("%s 2>&1 | tail -60" % cmd) if who == "root" else ("su - tester -c '%s' 2>&1 | tail -60" % cmd), 3600)
         print(o, flush=True)
         rc = 0 if re.search(r"\b0 failed", o) else 1
         os.makedirs(out, exist_ok=True)
