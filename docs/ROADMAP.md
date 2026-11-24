@@ -961,7 +961,10 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   (`make-previews.sh`, the previews package now covers seven languages), build the `lordos-voice-*` packages
   (`mkdeb-voice.mjs`), sign and publish them on the maintainer's Mac (`tools/release/apt-repo.sh`), then merge the
   branch and add `fr`, `de`, `it`, `nl` to the closed lists in AGENTS.md (lord-tts, `lord.voice`). Also a whisper
-  round trip for the four languages, as was done for Spanish and Portuguese.
+  round trip for the four languages, as was done for Spanish and Portuguese. 2026-11-24: the branch is merged into
+  `issues/features-1` (on `test/integration-1125`), its tests pass there, and the 191 packages of the four languages
+  plus the seven-language previews were built with version `2026.11.24` from the files fetched on 2026-11-22
+  (unsigned, not published; 6.15 GB). Left: sign and publish them on the maintainer's Mac.
 - [ ] **iCloud: choose what to sync** ([#241](https://github.com/lordbasex/LordOS/issues/241); on the roadmap, not
   started). Today adding an iCloud account in Mail syncs every calendar and every address book it finds and adds an
   "iCloud – Calendar & Contacts" row to Mail's sidebar even when it carries no mail. Plan:

@@ -91,6 +91,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `fetch-voices.sh` now refuses a file Hugging Face publishes no SHA-256 for. `make-previews.sh` keeps its temporary
     home next to the source folder: with the source on another filesystem than `/tmp`, its copy of the models failed
     halfway and the samples were made with the installed system models instead (or not at all for a new language).
+  - **Merged for the next release (2026-11-24)** on top of 0.8.9.5-beta's integration; `saytext_test.c` had a French
+    case whose `\x99est` escape swallowed the `e` (a compiler warning, a wrong test string), now split. The 191 packages
+    of the four languages and the seven-language previews (`2026.11.24`, 6.15 GB: each language's Standard model
+    122–209 MB, HD 642 MB, 22–23 voices of each quality) were built from the files fetched on 2026-11-22, unsigned and
+    unpublished until they are signed on the maintainer's Mac. `tts_test.sh` passes with them (HD and Standard in all four, on the CPU).
 
 - **Machines: checked for real, and what that found** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
   6.5, 6.7, 6.14, 6.16, 6.17, 6.19).

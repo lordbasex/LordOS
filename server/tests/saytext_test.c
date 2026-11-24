@@ -682,7 +682,7 @@ int main(void) {
     lang("terminal output in English", "Error: the file was not found in the folder and it can not be opened", "es", "en");
     lang("French", "Bonjour, je suis l'une des voix de LordOS. Je peux lire à voix haute tout texte que vous sélectionnez.", "en", "fr");
     lang("French with its elisions", "C'est l'été, qu'il fait beau et j'ai le temps.", "es", "fr");
-    lang("French with curly apostrophes", "C\xe2\x80\x99est l\xe2\x80\x99été, qu\xe2\x80\x99il fait beau.", "es", "fr");
+    lang("French with curly apostrophes", "C\xe2\x80\x99" "est l\xe2\x80\x99été, qu\xe2\x80\x99il fait beau.", "es", "fr");
     lang("French over a Spanish fallback", "Le fichier est dans le dossier et il ne peut pas être ouvert.", "es", "fr");
     lang("German", "Hallo, ich bin eine der Stimmen von LordOS. Ich kann jeden Text, den du auswählst, laut vorlesen.", "en", "de");
     lang("German by its letters", "Größe und Maße", "en", "de");
