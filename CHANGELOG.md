@@ -20,7 +20,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     control both ways keeps memory flat whatever the shell writes. The terminal is titled with the machine's name and
     marked, so it can't be taken for this computer's.
   - **A guest's terminal stays text** (the agent's shell and the serial console): what a guest writes can no longer
-    set this computer's clipboard (OSC 52 and iTerm's Copy did, past the clipboard's gate and a clipboard set to Off),
+    set this computer's clipboard (OSC 52 and OSC 1337 Copy did, past the clipboard's gate and a clipboard set to Off),
     start tmux's control mode, make links, or raise a title, notification, password prompt or any other terminal event
     on this computer.
   - **Links from the machine** (off by default, Configure → Sharing): a program in the guest can ask to open a web
