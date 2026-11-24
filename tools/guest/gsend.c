@@ -38,11 +38,24 @@ static long long retry_at, first_at;
 
 static long long mono(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (long long)t.tv_sec * 1000 + t.tv_nsec / 1000000; }
 
-static int send_frame(int port, uint16_t kind, const uint8_t *p, uint32_t n) {
+/* the whole frame, however the port takes it: a virtio-serial port writes at most 32 KiB per call (virtio_console), so
+ * a frame is written in a loop and never left half sent */
+static int send_frame(int fd, uint16_t kind, const uint8_t *p, uint32_t n) {
     uint8_t h[AG_HEAD];
     ag_frame_head(h, kind, 0, n);
-    struct iovec io[2] = { { h, AG_HEAD }, { (void *)p, n } };
-    return writev(port, io, n ? 2 : 1) == (ssize_t)(AG_HEAD + n) ? 0 : -1;
+    size_t total = AG_HEAD + (size_t)n, done = 0;
+    while (done < total) {
+        struct iovec io[2];
+        int k = 0;
+        if (done < AG_HEAD) { io[k++] = (struct iovec){ h + done, AG_HEAD - done }; if (n) io[k++] = (struct iovec){ (void *)p, n }; }
+        else io[k++] = (struct iovec){ (void *)(p + (done - AG_HEAD)), total - done };
+        ssize_t w = writev(fd, io, k);
+        if (w < 0 && errno == EINTR) continue;
+        if (w < 0 && errno == EAGAIN) { struct pollfd q = { fd, POLLOUT, 0 }; if (poll(&q, 1, 2000) <= 0) return -1; continue; }
+        if (w <= 0) return -1;
+        done += (size_t)w;
+    }
+    return 0;
 }
 
 static void close_cur(void) {

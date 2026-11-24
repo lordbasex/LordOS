@@ -265,11 +265,24 @@ static int clip_write_type(const char *type, const uint8_t *p, size_t n) {
 }
 static int clip_write(const uint8_t *p, size_t n) { return clip_write_type("text", p, n); }
 
+/* the whole frame, however the port takes it: a virtio-serial port writes at most 32 KiB per call (virtio_console), so
+ * a frame is written in a loop and never left half sent */
 static int send_frame(int fd, uint16_t kind, const uint8_t *p, uint32_t n) {
     uint8_t h[AG_HEAD];
     ag_frame_head(h, kind, 0, n);
-    struct iovec io[2] = { { h, AG_HEAD }, { (void *)p, n } };
-    return writev(fd, io, n ? 2 : 1) == (ssize_t)(AG_HEAD + n) ? 0 : -1;
+    size_t total = AG_HEAD + (size_t)n, done = 0;
+    while (done < total) {
+        struct iovec io[2];
+        int k = 0;
+        if (done < AG_HEAD) { io[k++] = (struct iovec){ h + done, AG_HEAD - done }; if (n) io[k++] = (struct iovec){ (void *)p, n }; }
+        else io[k++] = (struct iovec){ (void *)(p + (done - AG_HEAD)), total - done };
+        ssize_t w = writev(fd, io, k);
+        if (w < 0 && errno == EINTR) continue;
+        if (w < 0 && errno == EAGAIN) { struct pollfd q = { fd, POLLOUT, 0 }; if (poll(&q, 1, 2000) <= 0) return -1; continue; }
+        if (w <= 0) return -1;
+        done += (size_t)w;
+    }
+    return 0;
 }
 
 /* ---- apps mode: the relay to the guest's own lord-server ---- */
