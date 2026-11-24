@@ -27,7 +27,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `pacman`, `apk`) and starts it (systemd or OpenRC), installs `xclip` and `wl-clipboard` best effort, and starts the
     helper for the person who ran it. `install.sh --plan` says what it would do and changes nothing.
   - Checked on a real Debian 13 guest under KVM with lord-vm: no agent, the disc in, `install.sh` run on the guest's
-    console, qemu-guest-agent connected 31 s later, the disc out by itself one second after, then Install through
+    console, qemu-guest-agent connected 17 to 31 s later (two runs), the disc out by itself one second after, then Install through
     qemu-guest-agent on the same guest (`server/tests/vm_guest_tools_e2e.sh`); `guesttools-test` reads the image back
     with lord-vm's own ISO reader and checks its hash and the writer's refusals; `guest_tools_install_test.sh` checks
     `install.sh`'s choices on 18 kinds of system; shellcheck is clean.

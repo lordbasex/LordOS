@@ -25,8 +25,9 @@
  * say "clipboard" (lordos-guest's: "lordos-guest <v> clipboard"), lord-server sends the clipboard's text as AGK_CLIP
  * after each change (never a secret: term_clipboard_sensitive) and takes the peer's AGK_CLIP (valid UTF-8, at most
  * AG_TEXT_MAX) as the clipboard's new text, marked as coming from "machines". Only a peer that holds the agent port itself
- * (one of its descriptors is /dev/virtio-ports/org.lordos.agent's device: the port opens once, so that is lordos-guest)
- * gets or sets it: another program of the same person that connects here gets the windows as before, never the
+ * (one of its descriptors is /dev/virtio-ports/org.lordos.agent's device: the port opens once) and runs the installed
+ * lordos-guest (/proc/<pid>/exe is /usr/local/bin/lordos-guest or /usr/lib/lordos/guest/lordos-guest-<arch>, root's
+ * files) gets or sets it: another program of the same person that connects here gets the windows as before, never the
  * clipboard. lord-vm and lord-server on the host decide whether it goes on (machine.json "clipboard", the gate).
  *
  * JS: lord.guestwin.active() → the endpoint exists; poll() → [{ type: 'apps', on } | { type: 'act', id, action, x, y,
@@ -158,6 +159,17 @@ static int holds_port(pid_t pid) {
     const char *path = force && !strcmp(force, "1") && alt && alt[0] == '/' ? alt : "/dev/virtio-ports/org.lordos.agent";
     if (pid <= 0 || stat(path, &port) || !S_ISCHR(port.st_mode)) return 0;
     char d[64], f[96];
+    /* and it is lordos-guest itself, as installed (the package's or Install Agent's copy): not another program of the
+     * same person that took the port while the helper was gone (tests run the build's own copy) */
+    char exe[256];
+    snprintf(f, sizeof f, "/proc/%d/exe", (int)pid);
+    ssize_t el = readlink(f, exe, sizeof exe - 1);
+    if (el <= 0) return 0;
+    exe[el] = 0;
+    /* a helper still running from a file an update replaced */
+    if (el > 10 && !strcmp(exe + el - 10, " (deleted)")) exe[el - 10] = 0;
+    if (!(path == alt) && strcmp(exe, "/usr/local/bin/lordos-guest") && strcmp(exe, "/usr/lib/lordos/guest/lordos-guest-amd64") &&
+        strcmp(exe, "/usr/lib/lordos/guest/lordos-guest-arm64")) return 0;
     snprintf(d, sizeof d, "/proc/%d/fd", (int)pid);
     DIR *dir = opendir(d);
     if (!dir) return 0;

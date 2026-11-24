@@ -3144,6 +3144,13 @@ LordOS 0.8.9, most desktop installs). For those, Machines brings a disc:
 - *Taking it out.* lord-vm takes the disc out by itself once qemu-guest-agent connects or `lordos-guest` says hello
   (`gt_eject`, at the agent's next turn); **Take the Disc Out** does it at once. Changing the disc by hand forgets it.
   From then on Install and the automatic update of older tools (7.1.3) go through qemu-guest-agent as for any guest.
+- *Checked (2026-11-24):* `guesttools-test` (the image read back with lord-vm's own ISO reader, its hash against the
+  compiled one, the same bytes twice, the writer's refusals; ASan, UBSan); `guest_tools_install_test.sh` (`install.sh
+  --plan` on 18 kinds of system); `install.sh` for real as root in a Debian 13 chroot (qemu-guest-agent from Debian's
+  mirror, the helper, the rule, twice); shellcheck clean; `vm_guest_tools_e2e.sh` on a Debian 13 nocloud guest under KVM
+  with lord-vm (no agent → disc in → `install.sh` typed on the guest's console → qemu-guest-agent connected 17 to 31 s later (two runs) and
+  the disc out one second after → Install through qemu-guest-agent → the disc refused while it can install), and an
+  installed LordOS 0.8.9 (below). Fedora, openSUSE, Arch and Alpine ran only as `--plan`; arm64 wasn't built here.
 
 **LordOS as a guest, and why LordOS 0.8.9 waited for the agent forever (2026-11-24).** In the maintainer's LordOS 0.8.9
 machine the log said `agent: the guest opened org.lordos.agent` and, 4 s later, `closed`, and never a hello. That open
@@ -3169,8 +3176,19 @@ window. Now (*in development*):
 - `lordos-guest` 8 takes the clipboard from the guest's own lord-server: its `lordos-guestwin.sock` endpoint (7.2) says
   `clipboard` in its hello, sends the clipboard's text after each change (never a secret) and takes the host's text as the
   clipboard's (marked as from `machines`), only for the peer that holds the agent port (`js_guestwin.c` `holds_port`: one
-  of its descriptors is the port's device). On such a desktop `lordos-guest` makes no X connection (it would start
-  Xwayland for nothing) and its hello says `clipboard` without `clipx`: text only, pushed.
+  of its descriptors is the port's device, and its `/proc/<pid>/exe` is the installed `lordos-guest`). On such a desktop
+  `lordos-guest` makes no X connection (it would start Xwayland for nothing) and its hello says `clipboard` without
+  `clipx`: text only, pushed. A 0.8.9 guest's lord-server has no such endpoint (it came with apps mode, after 0.8.9):
+  there the clipboard waits for the LordOS update inside the machine; the agent itself (qemu-guest-agent, the helper's
+  hello, the display) works at once.
+- *Checked (2026-11-24, KVM on this PC):* an installed LordOS 0.8.9 made by the card's unattended install: the same
+  firmware open/close at start and "Waiting for the agent"; the disc in, the person signed in, `install.sh` on a text
+  console with the guest's own `sudo` prompt; `lordos-guest 8 said hello` and qemu-guest-agent connected in the same
+  second, the disc out by itself; the port `crw-rw---- root video`, the unit on `default.target`, the helper running as
+  the person; Install through qemu-guest-agent again (`INSTALL_SH`'s LordOS variant kept the `video` rule); the display
+  followed a resize to 1024 × 768. The clipboard through lord-server ran on a headless lord-server
+  (`guestwin_headless.sh`, `--clip`: host → `lordos-guest` → lord-server → a new `lordos-guest` → host), not yet in a guest
+  running this LordOS.
 
 **Protocol.** A virtio-serial port named `org.lordos.agent`, chosen over vsock because it works in every guest without extra drivers. Length-prefixed frames with a channel number, a `hello` carrying version and capabilities, skipped unknown kinds so that either side can grow, and a hard frame limit. `lord-vm`, not `lord-server`, parses it, inside the sandbox. A newer host updates older tools itself, on by default with a switch to turn it off, through qemu-guest-agent (7.1.3).
 
