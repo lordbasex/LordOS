@@ -264,6 +264,12 @@ for b in lord-vm lord-vmdisplay; do
     [ -x "server/build/$b" ] && install -m 755 "server/build/$b" "$L/bin/$b"
     [ -x "$L/bin/$b" ] && { "$STRIP" --strip-unneeded "$L/bin/$b" 2>/dev/null || true; }
 done
+# lord-vm-usb.so: preloaded by lord-vm into the QEMU of a machine with USB devices on, so that its libusb looks for no
+# device of its own (docs/VIRTUALIZATION.md 6.6; AGENTS.md "Machines' USB devices"); root's, 644, at this fixed path only
+if [ -f server/build/lord-vm-usb.so ]; then
+    install -D -m 644 server/build/lord-vm-usb.so "$L/lib/lord-vm-usb.so"
+    "$STRIP" --strip-unneeded "$L/lib/lord-vm-usb.so" 2>/dev/null || true
+fi
 # lordos-guest (0.8.9 beta): the clipboard helper Machines copies into a guest of this architecture (Install Agent)
 if [ -x server/build/lordos-guest ]; then
     install -d "$L/guest"
