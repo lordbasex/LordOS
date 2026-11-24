@@ -11,6 +11,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Backups restores several files and folders at once (GitHub #231 follow-up)** (in development; latest release
+  0.8.9.5-beta). The restore browser picks rows as Files does: a click picks one, Shift a range from the last one,
+  Ctrl (or ⌘) adds or takes one out; Restore then reads "Restore Selected (N)" and sends them together
+  (`apps/backup/model.js` `restoreTarget`, the SDK's `clickSelect`). `lord.backup.restore(id, [rel, …])` takes up to 64
+  paths; the list is checked whole before anything is queued (`bk_restore_list_valid`: every item a safe relative path,
+  "everything" only alone) and each item is then restored by the same `bk_restore` a single restore uses, with every
+  check it makes (nothing outside the snapshot or through a link in it, nothing outside lord.fs's roots, protected
+  folders skipped), one after the other in the backup thread (`bk_restore_list`). An item inside another listed folder
+  is restored once, with it. While it runs the window says "Restoring 2 of 5: name"; afterwards each item that failed is
+  named with its own error (up to 8, then a count), and the rest are reported as restored
+  (`status().restore.count/index/current/failed`). The thread also no longer returned without its lock when a locked
+  encrypted destination refused a restore. Tests: `build/backup-test` (lists, nesting, a bad item beside good ones, links
+  out of the backup, protected folders, refusals, cancel), `tests/backup_model_test.mjs`, and the
+  `backup_restore_scene` (Shift and Ctrl picks, the list sent, progress and per-item errors).
 - **A mouse's Back and Forward buttons work in LordOS's own apps (GitHub #234)** (in development; latest release
   0.8.9.5-beta). They reached the desktop as buttons 3 and 4 and were dropped, so that no title bar, button or slider
   took them as a press (#159); only Linux apps (Firefox, Chromium) used them. `runtime/events.js` still keeps them from
@@ -1018,6 +1032,28 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Settings → Language & Region → Region names each region's language (GitHub #239 follow-up)** (in development;
+  latest release 0.8.9.5-beta). A row named only its country, so the five regions of France (Breton, Catalan, Basque,
+  French and Occitan) all read "France · xx_FR", and Basque was picked by mistake. Each row now reads "Basque · France
+  (eu_FR)", with the language and the country in the interface language, sorted by that name, and a search by either
+  finds it (`sdk/localename.js` `regionLabel`). The names come from Unicode CLDR through Node.js's ICU,
+  written by `tools/gen-language-names.mjs` into a new `languages` catalog in all 35 languages (195 glibc languages).
+  Tests: `tests/localename_test.mjs` and the headless `settings_region_scene` (screenshots of the list).
+- **Check This Account no longer fails its delete step on pCloud (GitHub #243 follow-up)** (in development; latest
+  release 0.8.9.5-beta). The check moves its own folder out of the account, and the move's last step removed the
+  emptied folder at once; pCloud still lists a file it has just deleted for a moment, so that rmdir said "not empty"
+  and the step failed (`cloud.checkDeleteFailed`). A move between disks now tries only that folder's rmdir again on
+  ENOTEMPTY, with a short backoff and at most 4.5 s in all, on the copy job's own thread (`server/src/fsops.c`
+  `rm_tree_patient`); nothing is walked or deleted again, and a folder that really holds something still fails.
+  The Trash and the interface's thread never wait. Test: `build/fsops-test` (a folder that reads ENOTEMPTY once, and
+  one that always does).
+- **Screenshots' Options menu opens above the bar the first time (GitHub #237)** (in development; latest release
+  0.8.9.5-beta). The floating bar sits just above the Dock, and on its first open the menu was laid out downward, cut
+  to the little room above the Dock, and moved up only at the next render. A Popover chose its side from its own
+  height before it had been laid out (zero) and from its height cut to the room below; it is now drawn invisible until
+  it has been laid out, a popover cut to its room counts as not fitting there, and it is shown once it is on its side
+  (`sdk/controls.jsx` `Popover`, which every popover of the SDK uses). Test: the headless `screenshots_menu_scene`
+  (the menu's box on every frame of the first open, and a screenshot).
 - **A note's or a mail's attachment never runs a program** (in development; #238 follow-up, automated security review).
   Opening an attachment that its default Linux app would run (a `.desktop` launcher, an AppImage, a program run
   under Wine, a `.jar`, a script, an installer package; by name or by its detected type) now shows it in Files instead;
