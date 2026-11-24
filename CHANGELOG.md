@@ -11,6 +11,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Files: a slow second click on the selected item's name renames it in place** (in development; latest release
+  0.8.9.5-beta). As in the reference desktop's file manager: with one item selected, a second click on its name (not the
+  icon) at least the double-click interval and at most 1.5 s after the first, within 4 px of it, with the left button
+  and no modifier key, opens the same rename field as Enter or the menu's Rename, once the double-click interval has
+  passed after that click with no other press. A real double click still opens, a drag (the item, or the rubber band of
+  #233) still drags, a click that only brought the window forward doesn't count (the first click must land on a window
+  that already had the focus), and a key, a double click or the window losing the focus cancels a rename that is
+  waiting. Never in a read-only folder (no notice pops up for a click), the Trash, an archive, Applications, the Network
+  page or on a mount point. Icon, list and column views. The timing rule is one pure SDK module, `sdk/slowclick.js`
+  (`slowClick`, `DOUBLE_CLICK_MS` = the runtime's 450 ms, there is no setting for it; `SLOW_CLICK_MAX_MS`,
+  `SLOW_CLICK_SLOP`), for any view that shows files; none of the four desktops (Lord Flow, Lord Classic, Lord
+  Workspaces, Lord Celeste) shows files on the desktop, so Files is its only user. Tests:
+  `server/tests/slowclick_test.mjs` (35 cases: double click vs slow click, too late, drag, moved pointer, modifiers,
+  other buttons, two items selected, the icon, an item that can't be renamed, a focus click, cancel, right to left; in
+  `make test`) and the headless scene `tests/app_scene_headless.sh files_slowrename_scene` (the three views, a real
+  rename on disk, and each case that must not rename, with screenshots in the four desktops and in Arabic). Enter and
+  the menu's Rename are unchanged.
 - **A mouse's Back and Forward buttons work in LordOS's own apps (GitHub #234)** (in development; latest release
   0.8.9.5-beta). They reached the desktop as buttons 3 and 4 and were dropped, so that no title bar, button or slider
   took them as a press (#159); only Linux apps (Firefox, Chromium) used them. `runtime/events.js` still keeps them from

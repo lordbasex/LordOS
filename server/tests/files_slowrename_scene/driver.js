@@ -11,7 +11,8 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const box = (id) => { const l = lord.getLayout(id); return l && l[2] > 0 && l[3] > 0 ? l : null; };
   const ev = (type, id, x, y, b = 0) => globalThis.__lordEvent(type, id, x, y, b);
-  const textId = (label) => { let best = null; for (const [raw, s] of P.texts) if (s === label) { const id = P.parent.get(raw); if (id && box(id) && (!best || id > best)) best = id; } return best; };
+  // (a name's line: at most 40 px high, so never a bigger node that kept the same text)
+  const textId = (label) => { let best = null; for (const [raw, s] of P.texts) if (s === label) { const id = P.parent.get(raw); const b = id && box(id); if (b && b[3] <= 40 && (!best || id > best)) best = id; } return best; };
   const nameId = (base) => textId(`${base}.txt`) || textId(base);
   const up = (id, n) => { let x = id; for (let i = 0; i < n && x; i++) x = P.parent.get(x); return x; };
   const step = (what, ok, extra) => log(`${what} ${ok ? 'done' : 'missing'}${extra ? ` (${extra})` : ''}`);
@@ -46,7 +47,13 @@
   };
   const escape = async () => { if (editing()) { key(1, 'Escape', ''); await sleep(400); } };
   // the slow click on a name: a first click, a pause past the double-click interval, a second click; then the wait
-  const slowClick = async (base, gap = 800) => { const id = nameId(base); if (!id) return false; click(id); await sleep(gap); click(nameId(base)); await sleep(800); return true; };
+  const slowClick = async (base, gap = 800) => {
+    const id = nameId(base);
+    if (!id) return false;
+    click(id); await sleep(gap);
+    if (globalThis.SCENE_DEBUG) log(`first ${id} ${box(id)} second ${nameId(base)} ${box(nameId(base))} focused ${sdk.wm.focused()}`);
+    click(box(id) ? id : nameId(base)); await sleep(800); return true;      // the same node (the column view's preview shows the name too)
+  };
   // the slow click renames: the field opens, "z" + Enter renames the file on disk to <view>-z
   const renames = async (view, base, shotName) => {
     const drawn = await slowClick(base);
@@ -103,7 +110,10 @@
       await open('icons');
       const fw = files().pop();
       sdk.wm.open('calculator', { new: true });
-      await sleep(2000);
+      await sleep(1500);
+      // out of the way of the file being clicked (a real click there would land on the Calculator)
+      { const cw = (sdk.windows.get() || []).find((x) => x.app === 'calculator'); if (cw) sdk.wm.move(cw.id, 900, 380); }
+      await sleep(800);
       step('icons: another window has the focus', sdk.wm.focused() !== fw.id, `focused ${sdk.wm.focused()}`);
       click(nameId('delta')); await sleep(800);
       log(`focused after the first click: ${sdk.wm.focused()} (files ${fw.id})`);

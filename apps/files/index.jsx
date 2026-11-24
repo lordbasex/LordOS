@@ -927,7 +927,7 @@ export default function Files() {
   const GO_KEYS = { h: () => navigate(homeLoc()), d: () => goDir('desktop'), o: () => goDir('documents'), c: () => navigate(computerLoc()), a: () => navigate({ type: 'apps' }),
     f: () => navigate({ type: 'recent' }), k: () => { if (lan.available()) navigate({ type: 'network' }); }, g: () => setSheet('goto') };
   useKeyboard((e) => {
-    cancelSlow();                 // a key while a slow click waits: no rename by itself (F2 and Enter still rename)
+    cancelSlow();                 // a key while a slow click waits: no rename by itself (Enter still renames)
     if (renaming || confirm || menu || sheet || connAsk || remoteAsk || sharing || offlineAsk) return;
     const mod = e.meta || e.ctrl;
     const b = (e.base || e.char || '').toLowerCase();
