@@ -488,7 +488,13 @@ static void t_status(void) {
     l.kept = 1;
     CHECK(!strcmp(cloud_file_status(&whole, &l, &pct), "kept"));
     CHECK(!strcmp(cloud_file_status(&part, &l, &pct), "down") && pct == 40);
+    l.busy = 1;                     /* its keeper pass is still reading the kept folder */
     CHECK(!strcmp(cloud_file_status(NULL, &l, &pct), "down") && pct == 0);
+    /* GitHub #240: rclone keeps no copy (no vfsMeta) of an empty file or folder. Once a pass read the kept folder whole,
+     * what has none has nothing to bring: kept, not "coming down" for ever */
+    l.busy = 0;
+    CHECK(!strcmp(cloud_file_status(NULL, &l, &pct), "kept") && pct < 0);
+    CHECK(!strcmp(cloud_file_status(&part, &l, &pct), "down") && pct == 40);   /* a copy started: still coming */
     l = (CloudLive){ .downloading = 1, .down_pct = 69 };
     CHECK(!strcmp(cloud_file_status(&part, &l, &pct), "down") && pct == 69);
     l = (CloudLive){ .queued = 1 };

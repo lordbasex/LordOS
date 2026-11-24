@@ -867,6 +867,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Cloud: empty files and empty folders stayed "coming down" in a folder kept on this computer (GitHub #240)** (in
+  development; latest release 0.8.9.5-beta). With In Sync with This Computer (Keep on This Computer), a 0-byte file, an
+  empty folder and a folder holding only 0-byte files kept the down arrow for ever, on Google Drive and Filen alike.
+  rclone keeps no copy of an empty file and no folder for an empty one in its cache (no `vfsMeta` entry, checked with
+  rclone's own mount), and a kept path without one read as "still coming". Now a kept path with nothing in the cache is
+  "kept" once the keeper's pass has read its kept entry whole, and "coming down" only while that pass is still running
+  (`CloudLive.busy`, `cloud_file_status` in `cloud_pure.c`); the keeper no longer opens an empty file on every pass,
+  which marked the whole kept entry as coming down each time (`fetch_tree` in `cloud_files.c`). A file added in the
+  cloud since the last pass shows kept until the next one (every 5 minutes, or at once on a provider's change notice).
+  `cloud-test` checks both cases. rclone's own lines for a mount ("vfs cache: detected external removal of cache file")
+  still can't name the account: rclone doesn't say which mount they come from (#183).
 - **Machines: a global security pass over how the new pieces work together** (in development; latest release
   0.8.9.5-beta; docs/VIRTUALIZATION.md 3.6, 6.2, 7.2, 8; docs/SENTINELA.md "Machines"). Each item had been reviewed alone;
   this pass looked at the chains between them, with a hostile guest, a hostile program of the same account and hostile
