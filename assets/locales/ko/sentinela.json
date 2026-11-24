@@ -131,5 +131,6 @@
   "action.vm_open": "머신 열기",
   "action.vm_shutdown": "시스템 종료",
   "analysis.rule": "항상 표시: 이 알림에는 모델이 필요하지 않습니다.",
-  "settings.seesMachines": "가상 머신의 경우: 이름, 역할, 상태, 종료된 이유, 엔진의 CPU·메모리·네트워크 수치. 화면, 파일, 클립보드는 절대 보지 않습니다."
+  "settings.seesMachines": "가상 머신의 경우: 이름, 역할, 상태, 종료된 이유, 엔진의 CPU·메모리·네트워크 수치. 화면, 파일, 클립보드는 절대 보지 않습니다.",
+  "sandbox.unverified": "엔진이 실제로 그 머신의 것이라는 확인"
 }

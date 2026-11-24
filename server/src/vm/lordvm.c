@@ -362,9 +362,7 @@ static int socket_path(const VmMachine *m, char *out, size_t n, char *rundir, si
 
 /* ---- run.json ---- */
 
-/* sandbox, cg: the VMS_* bits QEMU's sandbox applied and the VMC_* cgroup mode, written while QEMU runs (-1: not
- * known) for Sentinela's machine rules (docs/SENTINELA.md, "Machines"); `lord-vm --status` reads them live */
-typedef struct { int state, reason, code; long qemu_pid, passt_pid, pid; char since[21], detail[160]; int agent, sandbox, cg; } RunInfo;
+typedef struct { int state, reason, code; long qemu_pid, passt_pid, pid; char since[21], detail[160]; int agent; } RunInfo;
 
 static void runinfo_write(const char *dir, const RunInfo *r) {
     JBuf b;
@@ -374,8 +372,6 @@ static void runinfo_write(const char *dir, const RunInfo *r) {
     jb_str(&b, r->since);
     jb_raw(&b, ",\"detail\":"); jb_str(&b, r->detail);
     jb_printf(&b, ",\"agent\":\"%s\"", r->agent == VAS_CONNECTED ? "connected" : r->agent == VAS_WAITING ? "waiting" : "off");
-    if (r->qemu_pid > 0 && r->sandbox > 0)
-        jb_printf(&b, ",\"sandbox\":%d,\"cgroup\":\"%s\"", r->sandbox, r->cg & VMC_NESTED ? "nested" : r->cg & VMC_SCOPE ? "scope" : "none");
     jb_raw(&b, "}\n");
     if (b.oom) { jb_free(&b); return; }
     char tmp[PATH_MAX + 32], path[PATH_MAX + 32];
@@ -1138,9 +1134,7 @@ static void set_state(int st, int why, int code, const char *detail) {
     S.code = code;
     if (detail) snprintf(S.detail, sizeof S.detail, "%s", detail);
     vm_now_iso(S.since);
-    int live = st == VS_RUNNING || st == VS_PAUSED;
-    RunInfo r = { st, why, code, S.qemu, S.passt > 0 ? S.passt : S.passt_ext, getpid(), "", "", live ? S.ag_state : VAS_OFF,
-                  live && S.qemu > 0 ? S.sandbox : -1, S.cg_mode };
+    RunInfo r = { st, why, code, S.qemu, S.passt > 0 ? S.passt : S.passt_ext, getpid(), "", "", st == VS_RUNNING || st == VS_PAUSED ? S.ag_state : VAS_OFF };
     memcpy(r.since, S.since, sizeof r.since);
     memcpy(r.detail, S.detail, sizeof r.detail);
     runinfo_write(S.dir, &r);

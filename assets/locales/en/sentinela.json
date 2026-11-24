@@ -131,5 +131,6 @@
   "action.vm_open": "Open the machine",
   "action.vm_shutdown": "Shut down",
   "analysis.rule": "Always shown: this alert needs no model.",
-  "settings.seesMachines": "For virtual machines: their name, role and state, why they ended, and the CPU, memory and network counts of their engine. Never their screen, files or clipboard."
+  "settings.seesMachines": "For virtual machines: their name, role and state, why they ended, and the CPU, memory and network counts of their engine. Never their screen, files or clipboard.",
+  "sandbox.unverified": "proof that its engine is the machine’s own"
 }

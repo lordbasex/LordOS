@@ -28,12 +28,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     machine's name (as a quoted field), role, settings and the rule's numbers; its answer can't silence an alert.
   - **Actions**, each only from the person's click: Open the machine (its window when it runs, the library otherwise),
     Show in Monitor, Pause or Resume, Shut down.
-  - **Under the hood:** `lord-vm` writes QEMU's sandbox bits and cgroup mode into `run.json` while QEMU runs;
-    `lord.vm.stats` adds `qemuPid` (only a QEMU whose parent is the machine's lord-vm), `scope`, `seccomp`,
-    `noNewPrivs`, `sandbox`, `cgMode` and `passt`; `lord.monitor.watchMachines`/`machinesWatched` give each running
+  - **Under the hood:** `lord.vm.stats` asks the machine's own lord-vm over its socket (as `lord-vm --status`) and
+    trusts the answer only from the person's installed `lord-vm` (the kernel's `SO_PEERCRED`, `/proc/<pid>/exe`) whose
+    child is that QEMU; `run.json` is only a hint. It adds `verified`, `qemuPid`, `sandbox`, `cgMode`, the kernel's
+    `seccomp` and `noNewPrivs`, `scope` (exactly the session's machine scope or below it, never a lookalike path) and
+    `passt`. A machine that looks running but can't be verified twice in a row is itself a sandbox alert; `lord.monitor.watchMachines`/`machinesWatched` give each running
     machine's sockets, remote addresses and TCP bytes as counts only (`conn_machines`), never an address. A machine's
     QEMU is no longer judged by the process CPU and memory rules (the machine rules compare it with its own usual).
-  - Tests: `tests/sentinela_vm_test.mjs` (every rule on synthetic machine stats, baselines, the summary's bounds and an
+  - Tests: `build/vmwatch-test` (exact scope paths against lookalikes, the installed-program check, a stand-in lord-vm
+    answering, silent or half), `tests/sentinela_vm_test.mjs` (every rule on synthetic machine stats, an unverified
+    engine, baselines, the summary's bounds and an
     injected name, the action mapping), and machine cases in the Sentinela notification and Settings scenes. Strings in
     all 35 languages.
 - **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or

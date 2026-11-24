@@ -3359,10 +3359,13 @@ now measures what a machine's vCPUs really use and suggests a count; it never ch
 
 Sentinela (docs/SENTINELA.md, "Machines"; off by default, local model only) reads what Machines already exposes every
 10 s: `lord.vm.list()`, `lord.vm.stats(dir)` and per-machine socket counts from the Monitor's thread
-(`lord.monitor.machinesWatched`). For it, `lord-vm` now writes QEMU's sandbox bits and cgroup mode into `run.json`
-while QEMU runs (`"sandbox"`, `"cgroup"`, the values of `lord-vm --status`), and `stats(dir)` adds `qemuPid` (only a
-QEMU whose parent is the machine's lord-vm), `scope` (`in`/`out` of `app-lordos-lordos-vm-<id>.scope`), the kernel's
-`seccomp` and `noNewPrivs` for that QEMU, `sandbox`, `cgMode` and `passt`. All read-only; no new action on a machine.
+(`lord.monitor.machinesWatched`). `stats(dir)` takes nothing of it from `run.json` (the person's file, a hint only):
+it asks the machine's lord-vm over its socket as `lord-vm --status` does, and trusts the answer only when the peer
+(`SO_PEERCRED`) is the person's installed `lord-vm` and the QEMU it names is its child. It then adds `qemuPid`,
+`sandbox` and `cgMode` (lord-vm's answer), the kernel's `seccomp` and `noNewPrivs` for that QEMU, `scope` (`in` only
+when QEMU and lord-vm are exactly in the session's `app-lordos-lordos-vm-<id>.scope` or below it) and `passt`; and
+`verified: false` when the machine looks running but can't be checked, which Sentinela alerts as a sandbox problem.
+All read-only; no new action on a machine, and lord-vm is unchanged (`src/vm/vmwatch.h`, `build/vmwatch-test`).
 
 - **Always alerted, no model:** a QEMU moved out of its machine's scope; a sandbox missing Landlock, seccomp,
   no_new_privs or its cgroup; a Workstation of an anonymity group with any way out besides its link (19.3).

@@ -131,5 +131,6 @@
   "action.vm_open": "Öppna maskinen",
   "action.vm_shutdown": "Stäng av",
   "analysis.rule": "Visas alltid: den här varningen behöver ingen modell.",
-  "settings.seesMachines": "För virtuella maskiner: namn, roll och tillstånd, varför de avslutades, och motorns siffror för CPU, minne och nätverk. Aldrig deras skärm, filer eller urklipp."
+  "settings.seesMachines": "För virtuella maskiner: namn, roll och tillstånd, varför de avslutades, och motorns siffror för CPU, minne och nätverk. Aldrig deras skärm, filer eller urklipp.",
+  "sandbox.unverified": "beviset på att motorn verkligen är maskinens egen"
 }

@@ -131,5 +131,6 @@
   "action.vm_open": "Atidaryti mašiną",
   "action.vm_shutdown": "Išjungti",
   "analysis.rule": "Rodoma visada: šiam įspėjimui modelio nereikia.",
-  "settings.seesMachines": "Virtualių mašinų: pavadinimą, vaidmenį ir būseną, kodėl jos baigė darbą, ir jų variklio CPU, atminties bei tinklo skaitiklius. Niekada jų ekrano, failų ar iškarpinės."
+  "settings.seesMachines": "Virtualių mašinų: pavadinimą, vaidmenį ir būseną, kodėl jos baigė darbą, ir jų variklio CPU, atminties bei tinklo skaitiklius. Niekada jų ekrano, failų ar iškarpinės.",
+  "sandbox.unverified": "įrodymas, kad jos variklis tikrai yra pačios mašinos"
 }

@@ -131,5 +131,6 @@
   "action.vm_open": "Machine openen",
   "action.vm_shutdown": "Sluit af",
   "analysis.rule": "Altijd getoond: deze melding heeft geen model nodig.",
-  "settings.seesMachines": "Bij virtuele machines: hun naam, rol en status, waarom ze stopten, en de CPU-, geheugen- en netwerktellingen van hun engine. Nooit hun scherm, bestanden of klembord."
+  "settings.seesMachines": "Bij virtuele machines: hun naam, rol en status, waarom ze stopten, en de CPU-, geheugen- en netwerktellingen van hun engine. Nooit hun scherm, bestanden of klembord.",
+  "sandbox.unverified": "het bewijs dat de engine echt van de machine zelf is"
 }

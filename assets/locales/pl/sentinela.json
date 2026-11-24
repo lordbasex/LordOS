@@ -131,5 +131,6 @@
   "action.vm_open": "Otwórz maszynę",
   "action.vm_shutdown": "Wyłącz",
   "analysis.rule": "Zawsze pokazywane: ten alert nie potrzebuje modelu.",
-  "settings.seesMachines": "W maszynach wirtualnych: nazwę, rolę i stan, powód zakończenia oraz liczniki CPU, pamięci i sieci ich silnika. Nigdy ich ekranu, plików ani schowka."
+  "settings.seesMachines": "W maszynach wirtualnych: nazwę, rolę i stan, powód zakończenia oraz liczniki CPU, pamięci i sieci ich silnika. Nigdy ich ekranu, plików ani schowka.",
+  "sandbox.unverified": "dowód, że jej silnik jest naprawdę silnikiem tej maszyny"
 }

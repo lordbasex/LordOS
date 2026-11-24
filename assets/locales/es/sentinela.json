@@ -131,5 +131,6 @@
   "action.vm_open": "Abrir la máquina",
   "action.vm_shutdown": "Apagar",
   "analysis.rule": "Se muestra siempre: esta alerta no necesita modelo.",
-  "settings.seesMachines": "En máquinas virtuales: su nombre, rol y estado, por qué terminaron, y los conteos de CPU, memoria y red de su motor. Nunca su pantalla, sus archivos ni su portapapeles."
+  "settings.seesMachines": "En máquinas virtuales: su nombre, rol y estado, por qué terminaron, y los conteos de CPU, memoria y red de su motor. Nunca su pantalla, sus archivos ni su portapapeles.",
+  "sandbox.unverified": "la prueba de que su motor es el propio de la máquina"
 }

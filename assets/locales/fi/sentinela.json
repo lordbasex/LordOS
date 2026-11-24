@@ -131,5 +131,6 @@
   "action.vm_open": "Avaa kone",
   "action.vm_shutdown": "Sammuta",
   "analysis.rule": "Näytetään aina: tämä hälytys ei tarvitse mallia.",
-  "settings.seesMachines": "Virtuaalikoneista: nimen, roolin ja tilan, miksi ne sammuivat, sekä niiden moottorin suoritin-, muisti- ja verkkolukemat. Ei koskaan niiden näyttöä, tiedostoja eikä leikepöytää."
+  "settings.seesMachines": "Virtuaalikoneista: nimen, roolin ja tilan, miksi ne sammuivat, sekä niiden moottorin suoritin-, muisti- ja verkkolukemat. Ei koskaan niiden näyttöä, tiedostoja eikä leikepöytää.",
+  "sandbox.unverified": "todiste siitä, että sen moottori on koneen oma"
 }

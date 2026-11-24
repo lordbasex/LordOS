@@ -131,5 +131,6 @@
   "action.vm_open": "Maşını aç",
   "action.vm_shutdown": "Söndür",
   "analysis.rule": "Həmişə göstərilir: bu xəbərdarlığa model lazım deyil.",
-  "settings.seesMachines": "Virtual maşınlar üçün: adları, rolları və vəziyyətləri, niyə dayandıqları, həmçinin mühərriklərinin CPU, yaddaş və şəbəkə göstəriciləri. Heç vaxt ekranlarını, fayllarını və ya mübadilə buferlərini görmür."
+  "settings.seesMachines": "Virtual maşınlar üçün: adları, rolları və vəziyyətləri, niyə dayandıqları, həmçinin mühərriklərinin CPU, yaddaş və şəbəkə göstəriciləri. Heç vaxt ekranlarını, fayllarını və ya mübadilə buferlərini görmür.",
+  "sandbox.unverified": "mühərrikinin həqiqətən maşının özünə aid olduğunun sübutu"
 }

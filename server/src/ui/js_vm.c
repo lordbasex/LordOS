@@ -42,6 +42,8 @@
 #include "../sec/json.h"
 #include "../sec/perms.h"
 #include "../sec/restrict.h"
+#include "../sec/cgroup.h"
+#include "../vm/vmwatch.h"
 #include "../sound/snd.h"
 #include "ui.h"
 #include "../term/term.h"
@@ -1124,10 +1126,12 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
 
 /* stats(dir) → { cpuUsec, memBytes, ioBytes, at } from the running QEMU's cgroup (counters: the app takes the
  * differences), diskBytes (what the machine's disks use on this computer), or only diskBytes when it's off.
- * While it runs, also what Sentinela's machine rules check (docs/SENTINELA.md, "Machines"), read-only: qemuPid (absent
- * when run.json's QEMU isn't its lord-vm's child), scope ("in": in app-lordos-lordos-vm-<id>.scope, "out": somewhere
- * else), seccomp and noNewPrivs (the kernel's /proc/<pid>/status), sandbox (the VMS_* bits lord-vm wrote in run.json,
- * -1 not known), cgMode ("nested", "scope", "none", "" not known), passt (its passt process is alive) */
+ * While it runs, also what Sentinela's machine rules check (docs/SENTINELA.md, "Machines"), read-only and never from
+ * run.json (the person's file, a hint only): verified (false: run.json says it runs but its lord-vm didn't answer as the
+ * installed lord-vm, of this user, with that QEMU as its child), and when true qemuPid, sandbox and cgMode (the VMS_*
+ * bits and VMC_* mode the machine's lord-vm reports over its socket, as `lord-vm --status`), seccomp and noNewPrivs (the
+ * kernel's /proc/<qemu>/status), scope ("in": QEMU and lord-vm exactly in the session's app-lordos-lordos-vm-<id>.scope
+ * or below it, "out" otherwise), passt (its passt process alive) */
 static long long cg_num(const char *cg, const char *file, const char *key) {
     char p[PATH_MAX + 64], buf[4096];
     snprintf(p, sizeof p, "/sys/fs/cgroup%s/%s", cg, file);
@@ -1149,6 +1153,74 @@ static long long cg_num(const char *cg, const char *file, const char *key) {
         } else if (!strncmp(line, key, strlen(key)) && line[strlen(key)] == ' ') { sum = atoll(line + strlen(key) + 1); found = 1; break; }
     }
     return found ? sum : -1;
+}
+/* ---- what Sentinela checks of a running machine (docs/SENTINELA.md, "Machines") ---- */
+
+/* /proc/<pid>/status: PPid, Seccomp (2: a filter), NoNewPrivs */
+static int proc_status(long pid, long *ppid, int *sec, int *nnp) {
+    char p[64], st[4096];
+    snprintf(p, sizeof p, "/proc/%ld/status", pid);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    ssize_t k = fd >= 0 ? read(fd, st, sizeof st - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (k <= 0) return -1;
+    st[k] = 0;
+    *ppid = -1; *sec = -1; *nnp = -1;
+    for (char *line = st; line && *line; line = strchr(line, '\n') ? strchr(line, '\n') + 1 : NULL) {
+        if (!strncmp(line, "PPid:", 5)) *ppid = atol(line + 5);
+        else if (!strncmp(line, "Seccomp:", 8)) *sec = atoi(line + 8);
+        else if (!strncmp(line, "NoNewPrivs:", 11)) *nnp = atoi(line + 11);
+    }
+    return *ppid < 0 ? -1 : 0;
+}
+static long proc_uid(long pid) {
+    char p[64], st[4096];
+    snprintf(p, sizeof p, "/proc/%ld/status", pid);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    ssize_t k = fd >= 0 ? read(fd, st, sizeof st - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (k <= 0) return -1;
+    st[k] = 0;
+    const char *u = strstr(st, "\nUid:");
+    return u ? atol(u + 5) : -1;
+}
+
+/* the process runs the installed program `name` (the one next to lord-server, bin_path): an upgraded one shows as
+ * "(deleted)" and still counts */
+static int vm_exe_is(long pid, const char *name) {
+    char want[PATH_MAX], got[PATH_MAX], p[64];
+    if (pid <= 1 || bin_path(name, want, sizeof want)) return 0;
+    snprintf(p, sizeof p, "/proc/%ld/exe", pid);
+    ssize_t k = readlink(p, got, sizeof got - 1);
+    if (k <= 0) return 0;
+    got[k] = 0;
+    char rw[PATH_MAX];
+    return realpath(want, rw) && vmwatch_exe_same(got, rw);
+}
+
+/* where lord-sessiond puts a machine's scope: beside lord-server's own leaf (".../lordos-session-<uid>/server"), the
+ * exact cgroup path; "" outside a LordOS session */
+static void vm_scope_path(const char *id, char *out, size_t n) { vmwatch_scope_path(cgroup_self(), id, out, n); }
+
+/* the process's cgroup (v2) is exactly `scope` or below it */
+static int vm_in_cgroup(long pid, const char *scope) {
+    char p[64], buf[PATH_MAX + 8];
+    snprintf(p, sizeof p, "/proc/%ld/cgroup", pid);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    ssize_t k = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (k <= 3) return 0;
+    buf[k] = 0;
+    return vmwatch_cg_under(buf, scope);
+}
+
+/* the machine's own lord-vm, asked over its socket (vmwatch_live) */
+static int vm_live(const char *id, VmLive *lv) {
+    const char *rt = getenv("XDG_RUNTIME_DIR");
+    char base[256], path[sizeof ((struct sockaddr_un *)0)->sun_path];
+    if (rt && rt[0] == '/') snprintf(base, sizeof base, "%s", rt); else snprintf(base, sizeof base, "/run/user/%u", (unsigned)getuid());
+    if ((size_t)snprintf(path, sizeof path, "%s/lordos-vm/%s.sock", base, id) >= sizeof path) return -1;
+    return vmwatch_live(path, lv, 150);
 }
 static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
@@ -1173,76 +1245,71 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (!vm_machine_load(dir, &bm, berr, sizeof berr) && bm.base[0] && vm_base_valid(bm.base) && !stat(bm.base, &st) && S_ISREG(st.st_mode))
             JS_SetPropertyStr(c, o, "baseBytes", JS_NewFloat64(c, (double)st.st_blocks * 512));
     }
+    /* run.json is the person's own file: only a hint (which QEMU the Machines cards count, whether to ask lord-vm) */
     snprintf(p, sizeof p, "%s/run.json", dir);
     char buf[2048];
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
     if (fd >= 0) close(fd);
-    long qpid = 0, vpid = 0, ppid = 0;
-    int sandbox = -1;
-    char cgmode[8] = "";
+    long qpid = 0, hint_passt = 0;
     if (n > 0) {
         JDoc d;
         if (!json_parse(buf, (size_t)n, &d, NULL, 0)) {
             const char *s = json_str(d.root, "state");
             if (s && (!strcmp(s, "running") || !strcmp(s, "paused"))) {
                 qpid = (long)json_num(d.root, "qemu_pid", 0);
-                ppid = (long)json_num(d.root, "passt_pid", 0);
-                vpid = (long)json_num(d.root, "pid", 0);
-                double sb = json_num(d.root, "sandbox", -1);
-                if (sb >= 0 && sb < 65536) sandbox = (int)sb;
-                const char *cm = json_str(d.root, "cgroup");
-                if (cm && (!strcmp(cm, "nested") || !strcmp(cm, "scope") || !strcmp(cm, "none"))) snprintf(cgmode, sizeof cgmode, "%s", cm);
+                hint_passt = (long)json_num(d.root, "passt_pid", 0);
             }
             json_free(&d);
         }
     }
-    if (qpid > 1 && qpid <= 999999999) {
-        /* run.json is the person's file: the QEMU it names must be its lord-vm's child, or nothing is said about it */
-        long pp = -1;
-        int sec = -1, nnp = -1;
-        char st[2048];
-        snprintf(p, sizeof p, "/proc/%ld/status", qpid);
-        int sf = open(p, O_RDONLY | O_CLOEXEC);
-        ssize_t k = sf >= 0 ? read(sf, st, sizeof st - 1) : -1;
-        if (sf >= 0) close(sf);
-        if (k > 0) {
-            st[k] = 0;
-            for (char *line = st; line && *line; line = strchr(line, '\n') ? strchr(line, '\n') + 1 : NULL) {
-                if (!strncmp(line, "PPid:", 5)) pp = atol(line + 5);
-                else if (!strncmp(line, "Seccomp:", 8)) sec = atoi(line + 8);
-                else if (!strncmp(line, "NoNewPrivs:", 11)) nnp = atoi(line + 11);
+    /* Sentinela's facts (docs/SENTINELA.md, "Machines") come from the machine's lord-vm itself, never from run.json */
+    static VmMachine sm;
+    char serr[128], scope[PATH_MAX] = "";
+    int have_m = !vm_machine_load(dir, &sm, serr, sizeof serr) && sm.id[0];
+    if (have_m) vm_scope_path(sm.id, scope, sizeof scope);
+    if (qpid > 0 && have_m) {
+        VmLive lv;
+        int ok = !vm_live(sm.id, &lv);
+        if (ok && (lv.state == VS_RUNNING || lv.state == VS_PAUSED)) {
+            /* the peer of the machine's socket is the installed lord-vm, the person's, and the QEMU it names is its child */
+            long pp = -1;
+            int sec = -1, nnp = -1;
+            ok = lv.uid == getuid() && vm_exe_is(lv.pid, "lord-vm") && lv.qemu > 1 && !proc_status(lv.qemu, &pp, &sec, &nnp) && pp == lv.pid;
+            JS_SetPropertyStr(c, o, "verified", JS_NewBool(c, ok));
+            if (ok) {
+                qpid = lv.qemu;
+                JS_SetPropertyStr(c, o, "qemuPid", JS_NewInt32(c, (int32_t)lv.qemu));
+                set_int(c, o, "seccomp", sec);
+                set_int(c, o, "noNewPrivs", nnp);
+                set_int(c, o, "sandbox", lv.sandbox);
+                set_str(c, o, "cgMode", lv.cg & VMC_NESTED ? "nested" : lv.cg & VMC_SCOPE ? "scope" : "none");
+                /* in its own machine's scope (exactly that cgroup or below it), lord-vm and QEMU both; "" when this
+                 * isn't a LordOS session and the scope's place isn't known */
+                if (scope[0]) set_str(c, o, "scope", vm_in_cgroup(lv.qemu, scope) && vm_in_cgroup(lv.pid, scope) ? "in" : "out");
+                /* its passt (Shared network): a passt of the person's, lord-vm's child or in the machine's scope */
+                long pt = hint_passt, ppp = -1;
+                int alive = 0, d1, d2;
+                if (pt > 1 && pt <= 999999999 && !proc_status(pt, &ppp, &d1, &d2)) {
+                    char comm[32] = "";
+                    snprintf(p, sizeof p, "/proc/%ld/comm", pt);
+                    int cf = open(p, O_RDONLY | O_CLOEXEC);
+                    ssize_t k = cf >= 0 ? read(cf, comm, sizeof comm - 1) : -1;
+                    if (cf >= 0) close(cf);
+                    if (k > 0) comm[k] = 0;
+                    alive = k > 0 && !strncmp(comm, "passt", 5) && proc_uid(pt) == getuid() && (ppp == lv.pid || (scope[0] && vm_in_cgroup(pt, scope)));
+                }
+                JS_SetPropertyStr(c, o, "passt", JS_NewBool(c, alive));
             }
+        } else if (!ok) {
+            /* no answer: unverified unless the machine stopped meanwhile */
+            int still = 0;
+            fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+            n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+            if (fd >= 0) close(fd);
+            if (n > 0) { buf[n] = 0; still = strstr(buf, "\"state\":\"running\"") || strstr(buf, "\"state\":\"paused\""); }
+            if (still) JS_SetPropertyStr(c, o, "verified", JS_FALSE);
         }
-        if (pp > 1 && pp == vpid) {
-            JS_SetPropertyStr(c, o, "qemuPid", JS_NewInt32(c, (int32_t)qpid));
-            set_int(c, o, "seccomp", sec);
-            set_int(c, o, "noNewPrivs", nnp);
-            set_int(c, o, "sandbox", sandbox);
-            set_str(c, o, "cgMode", cgmode);
-        } else qpid = 0;
-    } else qpid = 0;
-    if (qpid > 0) {
-        /* its passt (Shared network): alive, a passt, and the person's */
-        int alive = 0;
-        if (ppid > 1 && ppid <= 999999999) {
-            char comm[32] = "", st[2048];
-            snprintf(p, sizeof p, "/proc/%ld/comm", ppid);
-            int cf = open(p, O_RDONLY | O_CLOEXEC);
-            ssize_t k = cf >= 0 ? read(cf, comm, sizeof comm - 1) : -1;
-            if (cf >= 0) close(cf);
-            if (k > 0) { comm[k] = 0; alive = !strncmp(comm, "passt", 5); }
-            snprintf(p, sizeof p, "/proc/%ld/status", ppid);
-            cf = alive ? open(p, O_RDONLY | O_CLOEXEC) : -1;
-            k = cf >= 0 ? read(cf, st, sizeof st - 1) : -1;
-            if (cf >= 0) close(cf);
-            if (k > 0) {
-                st[k] = 0;
-                const char *u = strstr(st, "\nUid:");
-                alive = u && (uid_t)atol(u + 5) == getuid();
-            } else alive = 0;
-        }
-        JS_SetPropertyStr(c, o, "passt", JS_NewBool(c, alive));
     }
     char cg[PATH_MAX] = "";
     if (qpid > 0) {
@@ -1256,16 +1323,8 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
             if (nl) *nl = 0;
             /* QEMU's own leaf, or the machine's scope when lord-vm couldn't divide it; never an unrelated cgroup */
             if (strstr(buf + 3, "lordos-vm-") && strlen(buf + 3) < sizeof cg) snprintf(cg, sizeof cg, "%s", buf + 3);
-            /* in its own machine's scope, or moved out of it (for Sentinela, always an alert) */
-            static VmMachine sm;
-            char serr[128], want[96];
-            if (!vm_machine_load(dir, &sm, serr, sizeof serr) && sm.id[0]) {
-                snprintf(want, sizeof want, "/app-lordos-lordos-vm-%s.scope", sm.id);
-                const char *at = strstr(buf + 3, want);
-                int in = at && (at[strlen(want)] == 0 || at[strlen(want)] == '/');
-                set_str(c, o, "scope", in ? "in" : "out");
-                if (!in) cg[0] = 0;          /* another cgroup's counters are not this machine's */
-            }
+            /* with the scope's place known: its counters only when QEMU is really under it */
+            if (scope[0] && !vm_in_cgroup(qpid, scope)) cg[0] = 0;
         }
     }
     if (cg[0]) {

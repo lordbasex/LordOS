@@ -131,5 +131,6 @@
   "action.vm_open": "Mở máy",
   "action.vm_shutdown": "Tắt máy",
   "analysis.rule": "Luôn hiển thị: cảnh báo này không cần mô hình.",
-  "settings.seesMachines": "Với máy ảo: tên, vai trò và trạng thái, lý do chúng dừng, cùng các số đo CPU, bộ nhớ và mạng của bộ máy chạy. Không bao giờ thấy màn hình, tệp hay bảng nhớ tạm của chúng."
+  "settings.seesMachines": "Với máy ảo: tên, vai trò và trạng thái, lý do chúng dừng, cùng các số đo CPU, bộ nhớ và mạng của bộ máy chạy. Không bao giờ thấy màn hình, tệp hay bảng nhớ tạm của chúng.",
+  "sandbox.unverified": "bằng chứng rằng bộ máy của nó đúng là của chính máy này"
 }

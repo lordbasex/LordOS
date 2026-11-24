@@ -131,5 +131,6 @@
   "action.vm_open": "Deschide mașina",
   "action.vm_shutdown": "Oprește",
   "analysis.rule": "Afișat mereu: această alertă nu are nevoie de model.",
-  "settings.seesMachines": "Pentru mașinile virtuale: numele, rolul și starea, de ce s-au oprit, și contoarele de CPU, memorie și rețea ale motorului lor. Niciodată ecranul, fișierele sau clipboardul lor."
+  "settings.seesMachines": "Pentru mașinile virtuale: numele, rolul și starea, de ce s-au oprit, și contoarele de CPU, memorie și rețea ale motorului lor. Niciodată ecranul, fișierele sau clipboardul lor.",
+  "sandbox.unverified": "dovada că motorul este chiar al mașinii"
 }

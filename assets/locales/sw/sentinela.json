@@ -131,5 +131,6 @@
   "action.vm_open": "Fungua mashine",
   "action.vm_shutdown": "Zima",
   "analysis.rule": "Huonyeshwa kila wakati: arifa hii haihitaji modeli.",
-  "settings.seesMachines": "Kwa mashine pepe: jina, jukumu na hali yake, kwa nini ziliisha, na idadi za CPU, kumbukumbu na mtandao za injini yake. Kamwe si skrini, faili wala ubao wa kunakili wake."
+  "settings.seesMachines": "Kwa mashine pepe: jina, jukumu na hali yake, kwa nini ziliisha, na idadi za CPU, kumbukumbu na mtandao za injini yake. Kamwe si skrini, faili wala ubao wa kunakili wake.",
+  "sandbox.unverified": "uthibitisho kwamba injini yake ni ya mashine yenyewe kweli"
 }

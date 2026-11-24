@@ -131,5 +131,6 @@
   "action.vm_open": "Gép megnyitása",
   "action.vm_shutdown": "Leállítás",
   "analysis.rule": "Mindig megjelenik: ehhez a riasztáshoz nem kell modell.",
-  "settings.seesMachines": "Virtuális gépeknél: a nevüket, a szerepüket és az állapotukat, hogy miért álltak le, valamint a motorjuk CPU-, memória- és hálózati számait. Soha nem látja a képernyőjüket, a fájljaikat és a vágólapjukat."
+  "settings.seesMachines": "Virtuális gépeknél: a nevüket, a szerepüket és az állapotukat, hogy miért álltak le, valamint a motorjuk CPU-, memória- és hálózati számait. Soha nem látja a képernyőjüket, a fájljaikat és a vágólapjukat.",
+  "sandbox.unverified": "annak igazolása, hogy a motorja valóban a gép sajátja"
 }

@@ -80,6 +80,8 @@ export function machineRow(m, stats, net) {
     qemuPid: num(s.qemuPid), scope: s.scope === 'in' || s.scope === 'out' ? s.scope : null,
     seccomp: s.seccomp == null ? null : num(s.seccomp, -1), noNewPrivs: s.noNewPrivs == null ? null : num(s.noNewPrivs, -1),
     sandbox: s.sandbox == null ? -1 : num(s.sandbox, -1), cgMode: typeof s.cgMode === 'string' ? s.cgMode : '', passt: s.passt === true,
+    // false: it runs, but its lord-vm didn't answer as the installed one with that QEMU as its child (js_vm.c stats)
+    verified: s.verified === false ? false : s.verified === true ? true : null,
     net: net && typeof net === 'object' ? { socks: num(net.socks), listen: num(net.listen), peers: num(net.peers), bytes: num(net.bytes) } : null,
   };
 }
@@ -118,7 +120,7 @@ export function createMachineTracker() {
   function stateOf(r) {
     let s = ms.get(r.id);
     if (!s) {
-      s = { samples: [], prev: null, active: false, qemuPid: 0, since: r.since, reason: r.reason, starts: [], ends: [], fired: {}, firedRun: {} };
+      s = { samples: [], prev: null, active: false, qemuPid: 0, since: r.since, reason: r.reason, starts: [], ends: [], fired: {}, firedRun: {}, unverified: 0 };
       ms.set(r.id, s);
     }
     return s;
@@ -157,6 +159,13 @@ export function createMachineTracker() {
     if (s.ends.length >= CRASH_LOOP_N || (r.anon && s.starts.length >= RESTART_N)) {
       const last = s.ends[s.ends.length - 1];
       fire('vmCrashLoop', { ends: s.ends.length, starts: s.starts.length, minutes: Math.round(CRASH_LOOP_MS / 60000), reason: last ? last.reason : r.reason, code: last ? last.code : r.code });
+    }
+    // a machine whose engine can't be checked is a sandbox alert too: forged data must never pass for a healthy one
+    // (twice in a row, so a machine stopping between two reads doesn't count)
+    s.unverified = active && r.verified === false ? s.unverified + 1 : 0;
+    if (s.unverified >= 2 && s.firedRun.vmSandbox !== `unverified|${r.since}`) {
+      s.firedRun.vmSandbox = `unverified|${r.since}`;
+      out.push(ev('vmSandbox', { missing: ['unverified'] }));
     }
     if (!active || !(r.qemuPid > 0)) { s.prev = null; return; }
 

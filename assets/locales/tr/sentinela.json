@@ -131,5 +131,6 @@
   "action.vm_open": "Makineyi aç",
   "action.vm_shutdown": "Kapat",
   "analysis.rule": "Her zaman gösterilir: bu uyarının modele ihtiyacı yok.",
-  "settings.seesMachines": "Sanal makineler için: adları, rolleri ve durumları, neden kapandıkları ve motorlarının işlemci, bellek ve ağ sayıları. Ekranları, dosyaları ya da panoları asla görülmez."
+  "settings.seesMachines": "Sanal makineler için: adları, rolleri ve durumları, neden kapandıkları ve motorlarının işlemci, bellek ve ağ sayıları. Ekranları, dosyaları ya da panoları asla görülmez.",
+  "sandbox.unverified": "motorunun gerçekten makinenin kendisine ait olduğunun kanıtı"
 }

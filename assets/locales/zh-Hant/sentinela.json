@@ -131,5 +131,6 @@
   "action.vm_open": "開啟虛擬機器",
   "action.vm_shutdown": "關機",
   "analysis.rule": "永遠顯示：此警示不需要模型。",
-  "settings.seesMachines": "對於虛擬機器：名稱、角色和狀態、結束的原因，以及其引擎的 CPU、記憶體和網路計數。絕不會看到它們的螢幕、檔案或剪貼簿。"
+  "settings.seesMachines": "對於虛擬機器：名稱、角色和狀態、結束的原因，以及其引擎的 CPU、記憶體和網路計數。絕不會看到它們的螢幕、檔案或剪貼簿。",
+  "sandbox.unverified": "確認其引擎確實屬於該虛擬機器本身"
 }

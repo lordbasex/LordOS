@@ -131,5 +131,6 @@
   "action.vm_open": "Buka mesin",
   "action.vm_shutdown": "Matikan",
   "analysis.rule": "Sentiasa ditunjukkan: amaran ini tidak memerlukan model.",
-  "settings.seesMachines": "Untuk mesin maya: nama, peranan dan keadaannya, sebab ia berhenti, serta kiraan CPU, memori dan rangkaian enjinnya. Tidak sekali-kali skrin, fail atau papan keratannya."
+  "settings.seesMachines": "Untuk mesin maya: nama, peranan dan keadaannya, sebab ia berhenti, serta kiraan CPU, memori dan rangkaian enjinnya. Tidak sekali-kali skrin, fail atau papan keratannya.",
+  "sandbox.unverified": "bukti bahawa enjinnya benar-benar milik mesin itu sendiri"
 }

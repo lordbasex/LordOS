@@ -131,5 +131,6 @@
   "action.vm_open": "Apri la macchina",
   "action.vm_shutdown": "Spegni",
   "analysis.rule": "Mostrato sempre: questo avviso non ha bisogno di un modello.",
-  "settings.seesMachines": "Per le macchine virtuali: nome, ruolo e stato, perché si sono chiuse, e i conteggi di CPU, memoria e rete del loro motore. Mai il loro schermo, i loro file o i loro appunti."
+  "settings.seesMachines": "Per le macchine virtuali: nome, ruolo e stato, perché si sono chiuse, e i conteggi di CPU, memoria e rete del loro motore. Mai il loro schermo, i loro file o i loro appunti.",
+  "sandbox.unverified": "la prova che il suo motore è proprio quello della macchina"
 }

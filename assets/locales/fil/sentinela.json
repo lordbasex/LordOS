@@ -131,5 +131,6 @@
   "action.vm_open": "Buksan ang makina",
   "action.vm_shutdown": "I-shut down",
   "analysis.rule": "Laging ipinapakita: hindi kailangan ng modelo ang alertong ito.",
-  "settings.seesMachines": "Para sa mga virtual machine: ang pangalan, papel at estado nila, kung bakit sila huminto, at ang mga bilang ng CPU, memorya at network ng engine nila. Hindi kailanman ang screen, mga file o clipboard nila."
+  "settings.seesMachines": "Para sa mga virtual machine: ang pangalan, papel at estado nila, kung bakit sila huminto, at ang mga bilang ng CPU, memorya at network ng engine nila. Hindi kailanman ang screen, mga file o clipboard nila.",
+  "sandbox.unverified": "ang patunay na ang engine nito ay talagang sa makina mismo"
 }

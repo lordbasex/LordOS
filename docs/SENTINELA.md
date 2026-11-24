@@ -162,11 +162,18 @@ and local only; the machine rules run in the same 10-second tick as the process 
 - `lord.vm.list()`: each machine's name, id, state, end reason (lord-vm's closed list), `since`, vCPUs, memory, network
   setting, forwarded ports and bridge, and its role in an anonymity group (`role`, `profileLock`, the keys of
   machine.json schema 14; a machine without them is ordinary).
-- `lord.vm.stats(dir)` of each running machine: QEMU's cgroup counters (CPU, memory) and, new for Sentinela:
-  `qemuPid` (only when run.json's QEMU is its lord-vm's child, from `/proc/<pid>/status` `PPid`), `scope` (`in` when
-  QEMU's cgroup is in `app-lordos-lordos-vm-<id>.scope`, `out` otherwise), `seccomp` and `noNewPrivs` (the kernel's
-  `/proc/<pid>/status`), `sandbox` and `cgMode` (the `VMS_*` bits and cgroup mode lord-vm now writes into run.json while
-  QEMU runs, as `lord-vm --status` reports them), `passt` (its passt process alive, the person's).
+- `lord.vm.stats(dir)` of each running machine: QEMU's cgroup counters (CPU, memory) and, new for Sentinela, facts
+  that never come from `run.json` (the person's own file, only a hint that the machine runs). lord-server asks the
+  machine's lord-vm over its socket, as `lord-vm --status` does (`vmwatch_live`, 150 ms at most): the peer's pid and uid
+  come from the kernel (`SO_PEERCRED`), its answer gives QEMU's pid, the `VMS_*` sandbox bits and the cgroup mode. It is
+  **verified** only when that peer is the person's, runs the installed lord-vm (`/proc/<pid>/exe` is the `lord-vm` next
+  to lord-server; an upgraded one, "(deleted)", still counts) and the QEMU it names is its child (`PPid`). Then:
+  `qemuPid`, `sandbox`, `cgMode`, `seccomp` and `noNewPrivs` (the kernel's `/proc/<qemu>/status`), `scope` (`in` only
+  when QEMU's and lord-vm's cgroups are exactly the session's `app-lordos-lordos-vm-<id>.scope`, the sibling of
+  lord-server's own leaf, or below it, never a path that merely contains that name; `vm/vmwatch.h`), and `passt` (a
+  passt of the person's, lord-vm's child or in that scope). When `run.json` says the machine runs and none of that can be
+  verified, `verified` is `false`, and twice in a row that is itself a `vmSandbox` alert ("proof that its engine is the
+  machine's own"): forged data can never pass for a healthy sandbox.
 - `lord.monitor.watchMachines(on)` / `machinesWatched()`: with the watched process list, the Monitor's thread counts each
   running machine's sockets by cgroup (the attribution of Monitor → Network's Machines row, `conn.c conn_machines`):
   sockets, listening sockets, different remote addresses, TCP bytes moved since the last count. Counts only: no
@@ -179,7 +186,7 @@ Never the guest's screen, files, clipboard, logs' text or any address.
 | Rule | Machines | Fires when | Model |
 |---|---|---|---|
 | `vmScope` | any | QEMU's cgroup is outside its machine's scope (moved out: its limits no longer apply) | never: always shown |
-| `vmSandbox` | any | QEMU's sandbox misses Landlock (files or network), seccomp, no_new_privs or the cgroup; the kernel's `Seccomp`/`NoNewPrivs` count even if run.json says otherwise | never: always shown |
+| `vmSandbox` | any | QEMU's sandbox misses Landlock (files or network), seccomp, no_new_privs or the cgroup (lord-vm's own answer and the kernel's `Seccomp`/`NoNewPrivs`); or its engine can't be verified twice in a row | never: always shown |
 | `vmLeak` | Workstation | any way out besides its link: a network setting other than `link`/`isolated`, forwarded ports, a bridge, a live passt, a socket in its scope | never: always shown |
 | `vmNet` | Gateway | after 20 minutes of its own pattern: 2 minutes at 8× its usual traffic (and 1 MB/s more), or 3× its usual remote addresses (and 15 more) | asked |
 | `vmCrash` | anonymity members | every end without being asked (`qemu-signal`, `guest-panic`, `out-of-memory`, `supervisor-lost`…), also one seen only by a new `since` | asked |
@@ -203,7 +210,9 @@ silence or lower the alert.
 **Pause** / **Resume**, **Open the machine** (its window when it runs; the library otherwise, so a stopped machine isn't
 started), **Show in Monitor**. The machine is found again by its id, so a renamed machine is still reached.
 
-Tests: `tests/sentinela_vm_test.mjs` (synthetic machine stats for every rule, the baselines, the summary's bounds and
+Tests: `build/vmwatch-test` (`make test`: the scope's exact path and lookalike cgroup paths, the installed-program
+check, the live answer from a stand-in lord-vm on a socket, a silent and a half answer), `tests/sentinela_vm_test.mjs`
+(synthetic machine stats for every rule, an unverified engine, the baselines, the summary's bounds and
 injection, the action mapping), and the machine parts of `sentinela_notify_scene.mjs` and `sentinela_settings_scene.mjs`.
 
 ## Limits

@@ -131,5 +131,6 @@
   "action.vm_open": "Buka mesin",
   "action.vm_shutdown": "Matikan",
   "analysis.rule": "Selalu ditampilkan: peringatan ini tidak butuh model.",
-  "settings.seesMachines": "Untuk mesin virtual: nama, peran, dan statusnya, alasan berhenti, serta angka CPU, memori, dan jaringan dari mesin penggeraknya. Tidak pernah layar, berkas, atau papan klipnya."
+  "settings.seesMachines": "Untuk mesin virtual: nama, peran, dan statusnya, alasan berhenti, serta angka CPU, memori, dan jaringan dari mesin penggeraknya. Tidak pernah layar, berkas, atau papan klipnya.",
+  "sandbox.unverified": "bukti bahwa mesinnya benar-benar milik mesin itu sendiri"
 }

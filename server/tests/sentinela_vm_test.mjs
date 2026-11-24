@@ -82,6 +82,21 @@ function run(tr, n, f, base = {}) {
   const tr = createMachineTracker();
   const ev = run(tr, 6, () => ({ st: { sandbox: OK_SANDBOX & ~1 } }));
   assert.deepEqual(ev.map((e) => e.rule), ['vmSandbox'], 'once per run');
+  // its engine can't be checked (run.json says it runs, its lord-vm didn't answer as the installed one with that QEMU):
+  // the sandbox alert, never a healthy machine; one miss alone (a machine stopping between two reads) is not enough
+  const unv = { qemuPid: undefined, seccomp: undefined, noNewPrivs: undefined, sandbox: undefined, cgMode: undefined, scope: undefined, verified: false };
+  const tu = createMachineTracker();
+  let e2 = run(tu, 1, () => ({ st: unv }));
+  assert.equal(e2.length, 0, 'one miss');
+  e2 = run(tu, 4, () => ({ st: unv }));
+  assert.deepEqual(e2.map((e) => [e.rule, e.missing.join()]), [['vmSandbox', 'unverified']], 'twice: the alert, once');
+  assert.equal(machineRow(machine().m, { verified: false }, null).verified, false);
+  assert.equal(machineRow(machine().m, {}, null).verified, null, 'an older lord-server says nothing');
+  // a forged healthy state can't hide it: no qemuPid means no sandbox facts are trusted at all
+  assert.deepEqual(sandboxMissing(machineRow(machine().m, { ...unv, sandbox: OK_SANDBOX, seccomp: 2, noNewPrivs: 1 }, null)), [], 'nothing trusted without a QEMU');
+  const tv = createMachineTracker();
+  e2 = run(tv, 6, (i) => ({ st: i % 2 ? unv : {} }));
+  assert.equal(e2.length, 0, 'alternating misses: not twice in a row');
 }
 
 // ---- the anonymity profile: a Workstation's ways out ----
@@ -243,7 +258,7 @@ function run(tr, n, f, base = {}) {
     ...Object.fromEntries(Object.entries(JSON.parse(fs.readFileSync(new URL('../../assets/locales/en/machines.json', import.meta.url)))).map(([k, x]) => [`machines.${k}`, x])) };
   const t = (k, vars = {}) => { assert.ok(k in en, `missing ${k}`); return en[k].replace(/\{(\w+)\}/g, (_, n) => String(vars[n] ?? `{${n}}`)); };
   const evs = [
-    { rule: 'vmScope' }, { rule: 'vmSandbox', missing: ['landlockFs', 'seccomp', 'cgroup'] }, { rule: 'vmLeak', paths: ['network', 'ports', 'bridge', 'passt', 'sockets'] },
+    { rule: 'vmScope' }, { rule: 'vmSandbox', missing: ['landlockFs', 'seccomp', 'cgroup', 'unverified'] }, { rule: 'vmLeak', paths: ['network', 'ports', 'bridge', 'passt', 'sockets'] },
     { rule: 'vmNet', rate: 1, rateBase: 1, peers: 1, peersBase: 1 }, { rule: 'vmCrash', reason: 'guest-panic' }, { rule: 'vmCrashLoop', reason: 'qemu-signal', ends: 3, starts: 4, minutes: 15 },
     { rule: 'vmCpu', cpuAvg: 0.9, cpuBase: 0.1, minutes: 10 }, { rule: 'vmMemory', mem: 2 << 30, memBase: 1 << 30 },
   ];
