@@ -94,5 +94,16 @@
   "groupDamaged": "{name} imeharibika: moja ya mashine zake haipo au si yake.",
   "gatewayFailed": "Lango la {name} halikuanza ({why}), kwa hiyo kituo cha kazi hakikuanzishwa.",
   "workstationFailed": "Kituo cha kazi cha {name} hakikuanza ({why}); lango bado linaendeshwa.",
-  "kind.group": "kikundi cha {count}"
+  "kind.group": "kikundi cha {count}",
+  "help.fresh": "rudisha kikundi cha mashine kwenye picha yake iliyothibitishwa ukiwa na utambulisho mpya: workstation, na gateway pia kwa --gateway (walinzi wa kuingilia wa Tor wanaondoka pamoja nayo); kikundi lazima kiwe kimezimwa",
+  "help.member": "mashine moja ya kikundi: --member gateway peke yake; --member workstation huwasha gateway kwanza",
+  "freshRunning": "{name} inafanya kazi: zima kikundi kwanza.",
+  "freshNeedsYes": "Anza Upya inatupa mabadiliko ya workstation: ongeza --yes ili kuifanya bila kuulizwa.",
+  "freshAsk": "Anza {name} upya kabisa? Mabadiliko, faili na picha za hali za workstation zinaondoka; gateway inabaki kama ilivyo. [y/N]",
+  "freshAskBoth": "Anza {name} upya kabisa, pamoja na gateway? Mabadiliko ya mashine zote mbili yanaondoka, na Tor inachagua walinzi wapya wa kuingilia. [y/N]",
+  "freshKept": "{name} iko kama ilivyokuwa.",
+  "freshDone": "Workstation ya {name} ni mpya: picha yake iliyothibitishwa, utambulisho mpya.",
+  "freshDoneBoth": "{name} ni mpya: mashine zote mbili zimerudi kwenye picha yao iliyothibitishwa, zikiwa na utambulisho mpya.",
+  "freshNotGroup": "{name} si kikundi cha mashine: Anza Upya ni kwa ajili ya vikundi.",
+  "badMember": "--member inakubali gateway au workstation."
 }

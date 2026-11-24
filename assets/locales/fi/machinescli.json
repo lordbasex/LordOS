@@ -94,5 +94,16 @@
   "groupDamaged": "{name} on vaurioitunut: yksi sen koneista puuttuu tai ei kuulu siihen.",
   "gatewayFailed": "Kohteen {name} yhdyskäytävä ei käynnistynyt ({why}), joten työasemaa ei käynnistetty.",
   "workstationFailed": "Kohteen {name} työasema ei käynnistynyt ({why}); yhdyskäytävä on yhä käynnissä.",
-  "kind.group": "{count} koneen ryhmä"
+  "kind.group": "{count} koneen ryhmä",
+  "help.fresh": "palauttaa koneryhmän vahvistettuun levykuvaansa uudella identiteetillä: workstationin, ja --gateway-valitsimella myös gatewayn (Torin sisääntulovartijat lähtevät sen mukana); ryhmän on oltava sammutettuna",
+  "help.member": "yksi ryhmän kone: --member gateway yksinään; --member workstation käynnistää ensin gatewayn",
+  "freshRunning": "{name} on käynnissä: sammuta ryhmä ensin.",
+  "freshNeedsYes": "Alusta aloittaminen hylkää workstationin muutokset: lisää --yes tehdäksesi sen kysymättä.",
+  "freshAsk": "Aloitetaanko {name} alusta? Workstationin muutokset, tiedostot ja tilannevedokset poistuvat; gateway pysyy ennallaan. [y/N]",
+  "freshAskBoth": "Aloitetaanko {name} alusta, myös gateway? Molempien koneiden muutokset poistuvat, ja Tor valitsee uudet sisääntulovartijat. [y/N]",
+  "freshKept": "{name} on ennallaan.",
+  "freshDone": "Ryhmän {name} workstation on aloitettu alusta: vahvistettu levykuva, uusi identiteetti.",
+  "freshDoneBoth": "{name} on aloitettu alusta: molemmat koneet ovat taas vahvistetussa levykuvassaan, uudella identiteetillä.",
+  "freshNotGroup": "{name} ei ole koneryhmä: alusta aloittaminen on ryhmille.",
+  "badMember": "--member hyväksyy arvon gateway tai workstation."
 }

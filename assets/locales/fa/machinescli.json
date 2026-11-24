@@ -94,5 +94,16 @@
   "groupDamaged": "{name} آسیب دیده است: یکی از ماشین‌هایش نیست یا مال خودش نیست.",
   "gatewayFailed": "دروازهٔ {name} شروع نشد ({why})، پس ایستگاه کاری شروع نشد.",
   "workstationFailed": "ایستگاه کاری {name} شروع نشد ({why})؛ دروازه هنوز در حال اجراست.",
-  "kind.group": "گروه {count}تایی"
+  "kind.group": "گروه {count}تایی",
+  "help.fresh": "بازگرداندن یک گروه ماشین به تصویر تأییدشده‌اش با هویتی تازه: Workstation، و با --gateway خود Gateway هم (نگهبان‌های ورودی Tor هم همراهش می‌روند)؛ گروه باید خاموش باشد",
+  "help.member": "یک ماشین از گروه: --member gateway به‌تنهایی؛ --member workstation اول Gateway را آغاز می‌کند",
+  "freshRunning": "{name} در حال اجراست: اول گروه را خاموش کنید.",
+  "freshNeedsYes": "آغاز از نو تغییرات Workstation را دور می‌ریزد: برای انجامش بدون پرسش --yes را اضافه کنید.",
+  "freshAsk": "{name} از نو آغاز شود؟ تغییرات، فایل‌ها و اسنپ‌شات‌های Workstation از بین می‌روند؛ Gateway همان‌طور می‌ماند. [y/N]",
+  "freshAskBoth": "{name} همراه با Gateway از نو آغاز شود؟ تغییرات هر دو ماشین از بین می‌رود و Tor نگهبان‌های ورودی تازه برمی‌گزیند. [y/N]",
+  "freshKept": "{name} همان‌طور که بود ماند.",
+  "freshDone": "Workstation ‏{name} تازه است: تصویر تأییدشده‌اش، با هویتی تازه.",
+  "freshDoneBoth": "{name} تازه است: هر دو ماشین به تصویر تأییدشده‌شان برگشتند، با هویتی تازه.",
+  "freshNotGroup": "{name} گروه ماشین نیست: آغاز از نو برای گروه‌هاست.",
+  "badMember": "--member مقدار gateway یا workstation می‌گیرد."
 }

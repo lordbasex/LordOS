@@ -94,5 +94,16 @@
   "groupDamaged": "„{name}“ sugadinta: trūksta vienos jos mašinos arba ji ne jos.",
   "gatewayFailed": "„{name}“ tinklų sietuvas nepasileido ({why}), todėl darbo stotis nepaleista.",
   "workstationFailed": "„{name}“ darbo stotis nepasileido ({why}); tinklų sietuvas vis dar veikia.",
-  "kind.group": "{count} mašinų grupė"
+  "kind.group": "{count} mašinų grupė",
+  "help.fresh": "grąžina mašinų grupę į patikrintą atvaizdą su nauja tapatybe: workstation, o su --gateway ir gateway (kartu dingsta Tor įėjimo sargai); grupė turi būti išjungta",
+  "help.member": "viena grupės mašina: --member gateway – tik ji; --member workstation pirmiausia paleidžia gateway",
+  "freshRunning": "„{name}“ veikia: pirmiausia išjunkite grupę.",
+  "freshNeedsYes": "Pradėjimas iš naujo išmeta workstation pakeitimus: pridėkite --yes, kad tai būtų atlikta neklausiant.",
+  "freshAsk": "Pradėti „{name}“ iš naujo? Workstation pakeitimai, failai ir momentinės kopijos dings; gateway liks nepakitęs. [y/N]",
+  "freshAskBoth": "Pradėti „{name}“ iš naujo kartu su gateway? Abiejų mašinų pakeitimai dings, o Tor pasirinks naujus įėjimo sargus. [y/N]",
+  "freshKept": "„{name}“ liko nepakitusi.",
+  "freshDone": "„{name}“ workstation pradėta iš naujo: patikrintas atvaizdas, nauja tapatybė.",
+  "freshDoneBoth": "„{name}“ pradėta iš naujo: abi mašinos vėl turi patikrintą atvaizdą ir naują tapatybę.",
+  "freshNotGroup": "„{name}“ nėra mašinų grupė: pradėjimas iš naujo skirtas grupėms.",
+  "badMember": "--member priima gateway arba workstation."
 }

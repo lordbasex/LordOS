@@ -94,5 +94,16 @@
   "groupDamaged": "{name} ist beschädigt: Eine seiner Maschinen fehlt oder gehört nicht dazu.",
   "gatewayFailed": "Das Gateway von {name} ist nicht gestartet ({why}), daher wurde die Workstation nicht gestartet.",
   "workstationFailed": "Die Workstation von {name} ist nicht gestartet ({why}); das Gateway läuft weiter.",
-  "kind.group": "Gruppe aus {count}"
+  "kind.group": "Gruppe aus {count}",
+  "help.fresh": "eine Maschinengruppe zurück auf ihr verifiziertes Image mit neuer Identität: die Workstation, mit --gateway auch das Gateway (Tors Eintrittswächter gehen mit); die Gruppe muss aus sein",
+  "help.member": "eine Maschine einer Gruppe: --member gateway allein; --member workstation startet zuerst das Gateway",
+  "freshRunning": "{name} läuft: Fahre die Gruppe zuerst herunter.",
+  "freshNeedsYes": "Neu beginnen verwirft die Änderungen der Workstation: Füge --yes hinzu, um es ohne Rückfrage zu tun.",
+  "freshAsk": "{name} neu beginnen? Die Änderungen, Dateien und Snapshots der Workstation gehen verloren; das Gateway bleibt, wie es ist. [y/N]",
+  "freshAskBoth": "{name} neu beginnen, auch das Gateway? Die Änderungen beider Maschinen gehen verloren, und Tor wählt neue Eintrittswächter. [y/N]",
+  "freshKept": "{name} ist unverändert.",
+  "freshDone": "Die Workstation von {name} ist neu: ihr verifiziertes Image, eine neue Identität.",
+  "freshDoneBoth": "{name} ist neu: Beide Maschinen sind wieder auf ihrem verifizierten Image, mit neuer Identität.",
+  "freshNotGroup": "{name} ist keine Maschinengruppe: Neu beginnen ist für Gruppen.",
+  "badMember": "--member nimmt gateway oder workstation."
 }

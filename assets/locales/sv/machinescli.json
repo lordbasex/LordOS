@@ -94,5 +94,16 @@
   "groupDamaged": "{name} är skadad: en av dess maskiner saknas eller hör inte till den.",
   "gatewayFailed": "Gatewayen i {name} startade inte ({why}), så arbetsstationen startades inte.",
   "workstationFailed": "Arbetsstationen i {name} startade inte ({why}); gatewayen körs fortfarande.",
-  "kind.group": "grupp med {count}"
+  "kind.group": "grupp med {count}",
+  "help.fresh": "en maskingrupp tillbaka till sin verifierade avbildning med ny identitet: workstation, och med --gateway även gateway (Tors ingångsvakter följer med); gruppen måste vara avstängd",
+  "help.member": "en maskin i en grupp: --member gateway ensam; --member workstation startar gateway först",
+  "freshRunning": "{name} körs: stäng av gruppen först.",
+  "freshNeedsYes": "Att börja om kastar workstations ändringar: lägg till --yes för att göra det utan fråga.",
+  "freshAsk": "Börja om {name} från början? Workstations ändringar, filer och ögonblicksbilder försvinner; gateway förblir som den är. [y/N]",
+  "freshAskBoth": "Börja om {name} från början, även gateway? Båda maskinernas ändringar försvinner och Tor väljer nya ingångsvakter. [y/N]",
+  "freshKept": "{name} är som förut.",
+  "freshDone": "Workstation i {name} är ny: sin verifierade avbildning, en ny identitet.",
+  "freshDoneBoth": "{name} är ny: båda maskinerna är tillbaka på sin verifierade avbildning, med en ny identitet.",
+  "freshNotGroup": "{name} är ingen maskingrupp: att börja om är för grupper.",
+  "badMember": "--member tar gateway eller workstation."
 }

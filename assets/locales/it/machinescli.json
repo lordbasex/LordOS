@@ -94,5 +94,16 @@
   "groupDamaged": "{name} è danneggiato: una delle sue macchine manca o non è sua.",
   "gatewayFailed": "Il gateway di {name} non si è avviato ({why}), quindi la workstation non è stata avviata.",
   "workstationFailed": "La workstation di {name} non si è avviata ({why}); il gateway è ancora in esecuzione.",
-  "kind.group": "gruppo di {count}"
+  "kind.group": "gruppo di {count}",
+  "help.fresh": "riporta un gruppo di macchine alla sua immagine verificata con una nuova identità: la workstation, e anche il gateway con --gateway (i nodi di ingresso di Tor se ne vanno con lui); il gruppo deve essere spento",
+  "help.member": "una sola macchina di un gruppo: --member gateway da solo; --member workstation avvia prima il gateway",
+  "freshRunning": "{name} è in funzione: spegni prima il gruppo.",
+  "freshNeedsYes": "Ricominciare da zero scarta le modifiche della workstation: aggiungi --yes per farlo senza domande.",
+  "freshAsk": "Ricominciare {name} da zero? Le modifiche, i file e le istantanee della workstation se ne vanno; il gateway resta com'è. [y/N]",
+  "freshAskBoth": "Ricominciare {name} da zero, gateway compreso? Le modifiche di entrambe le macchine se ne vanno, e Tor sceglie nuovi nodi di ingresso. [y/N]",
+  "freshKept": "{name} è rimasto com'era.",
+  "freshDone": "La workstation di {name} è come nuova: la sua immagine verificata, una nuova identità.",
+  "freshDoneBoth": "{name} è come nuovo: entrambe le macchine sono tornate alla loro immagine verificata, con una nuova identità.",
+  "freshNotGroup": "{name} non è un gruppo di macchine: Ricomincia da zero è per i gruppi.",
+  "badMember": "--member accetta gateway o workstation."
 }

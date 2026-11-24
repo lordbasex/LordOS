@@ -94,5 +94,16 @@
   "groupDamaged": "{name} zədələnib: maşınlarından biri yoxdur və ya ona aid deyil.",
   "gatewayFailed": "{name} şlüzü başlamadı ({why}), ona görə iş stansiyası başladılmadı.",
   "workstationFailed": "{name} iş stansiyası başlamadı ({why}); şlüz hələ də işləyir.",
-  "kind.group": "{count} maşınlıq qrup"
+  "kind.group": "{count} maşınlıq qrup",
+  "help.fresh": "maşın qrupunu yeni kimliklə yoxlanılmış şəklinə qaytarır: Workstation-ı, --gateway ilə Gateway-i də (Tor-un giriş qoruyucuları da onunla gedir); qrup söndürülmüş olmalıdır",
+  "help.member": "qrupun bir maşını: --member gateway təkbaşına; --member workstation əvvəlcə Gateway-i başladır",
+  "freshRunning": "{name} işləyir: əvvəlcə qrupu söndürün.",
+  "freshNeedsYes": "Sıfırdan başlatma Workstation-ın dəyişikliklərini atır: sualsız etmək üçün --yes əlavə edin.",
+  "freshAsk": "{name} sıfırdan başladılsın? Workstation-ın dəyişiklikləri, faylları və snapşotları silinəcək; Gateway olduğu kimi qalır. [y/N]",
+  "freshAskBoth": "{name} Gateway ilə birlikdə sıfırdan başladılsın? Hər iki maşının dəyişiklikləri silinəcək və Tor yeni giriş qoruyucuları seçəcək. [y/N]",
+  "freshKept": "{name} olduğu kimi qaldı.",
+  "freshDone": "{name} qrupunun Workstation-ı yenidir: yoxlanılmış şəkli, yeni kimlik.",
+  "freshDoneBoth": "{name} yenidir: hər iki maşın yoxlanılmış şəklinə qayıdıb, yeni kimliklə.",
+  "freshNotGroup": "{name} maşın qrupu deyil: sıfırdan başlatma qruplar üçündür.",
+  "badMember": "--member gateway və ya workstation qəbul edir."
 }

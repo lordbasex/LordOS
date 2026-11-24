@@ -94,5 +94,16 @@
   "groupDamaged": "{name} bozuk: makinelerinden biri eksik ya da ona ait değil.",
   "gatewayFailed": "{name} ağ geçidi başlamadı ({why}), bu yüzden iş istasyonu başlatılmadı.",
   "workstationFailed": "{name} iş istasyonu başlamadı ({why}); ağ geçidi hâlâ çalışıyor.",
-  "kind.group": "{count} makinelik grup"
+  "kind.group": "{count} makinelik grup",
+  "help.fresh": "bir makine grubunu yeni bir kimlikle doğrulanmış kalıbına döndürür: workstation'ı, --gateway ile gateway'i de (Tor'un giriş düğümleri de onunla gider); grup kapalı olmalıdır",
+  "help.member": "bir grubun tek makinesi: --member gateway yalnız onu; --member workstation önce gateway'i başlatır",
+  "freshRunning": "{name} çalışıyor: önce grubu kapatın.",
+  "freshNeedsYes": "Sıfırdan başlatmak workstation'ın değişikliklerini atar: soru sorulmadan yapmak için --yes ekleyin.",
+  "freshAsk": "{name} sıfırdan başlatılsın mı? Workstation'ın değişiklikleri, dosyaları ve anlık görüntüleri gider; gateway olduğu gibi kalır. [y/N]",
+  "freshAskBoth": "{name}, gateway de dahil sıfırdan başlatılsın mı? İki makinenin de değişiklikleri gider ve Tor yeni giriş düğümleri seçer. [y/N]",
+  "freshKept": "{name} olduğu gibi kaldı.",
+  "freshDone": "{name} grubunun workstation'ı sıfırlandı: doğrulanmış kalıbı, yeni bir kimlik.",
+  "freshDoneBoth": "{name} sıfırlandı: iki makine de yeni bir kimlikle doğrulanmış kalıbına döndü.",
+  "freshNotGroup": "{name} bir makine grubu değil: Sıfırdan Başlat gruplar içindir.",
+  "badMember": "--member, gateway ya da workstation alır."
 }

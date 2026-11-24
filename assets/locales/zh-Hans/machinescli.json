@@ -94,5 +94,16 @@
   "groupDamaged": "{name} 已损坏：其中一台机器缺失或不属于它。",
   "gatewayFailed": "{name} 的网关没有启动（{why}），因此没有启动工作站。",
   "workstationFailed": "{name} 的工作站没有启动（{why}）；网关仍在运行。",
-  "kind.group": "{count} 台的组"
+  "kind.group": "{count} 台的组",
+  "help.fresh": "将虚拟机组恢复为经过验证的镜像并赋予新身份:Workstation;加上 --gateway 时 Gateway 也一样(Tor 的入口守卫也随之更换);该组必须处于关闭状态",
+  "help.member": "组中的一台虚拟机:--member gateway 只启动 Gateway;--member workstation 会先启动 Gateway",
+  "freshRunning": "{name} 正在运行:请先关闭该组。",
+  "freshNeedsYes": "全新开始会丢弃 Workstation 的更改:加上 --yes 即可不经询问直接执行。",
+  "freshAsk": "要让 {name} 全新开始吗?Workstation 的更改、文件和快照都会删除;Gateway 保持不变。[y/N]",
+  "freshAskBoth": "要让 {name} 连同 Gateway 一起全新开始吗?两台虚拟机的更改都会删除,Tor 会选择新的入口守卫。[y/N]",
+  "freshKept": "{name} 保持原样。",
+  "freshDone": "{name} 的 Workstation 已全新开始:经过验证的镜像,新的身份。",
+  "freshDoneBoth": "{name} 已全新开始:两台虚拟机都已恢复为经过验证的镜像,并有了新的身份。",
+  "freshNotGroup": "{name} 不是虚拟机组:全新开始仅适用于组。",
+  "badMember": "--member 的值只能是 gateway 或 workstation。"
 }

@@ -292,6 +292,9 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
     cpu: tr('machines.cfg.sum.cpu', { n: m.vcpus, mem: gb(m.memoryMb) }),
     display: m.display === 'window' ? (m.resolution && m.resolution !== 'follow' ? m.resolution.replace('x', ' × ') : tr('machines.cfg.sum.display')) + (m.graphics === '3d' ? `, ${tr('machines.cfg.graphics3d')}` : '') + (m.gpu ? `, ${tr('machines.cfg.sum.gpu')}` : '') : tr('machines.cfg.sum.noDisplay'),
     network: (() => {
+      // a group's member (19.5): the workstation's private link, the gateway's Tor-only way out
+      if (m.role === 'workstation' && m.groupDir) return tr('machines.whonix.d.link');
+      if (m.role === 'gateway' && m.groupDir) return tr('machines.whonix.d.internetSub');
       const ns = netSummary(m);
       return [tr(`machines.cfg.net.${ns.mode}`), ns.card || null, ns.ports ? tr('machines.cfg.sum.ports', { n: ns.ports }) : null].filter(Boolean).join(', ');
     })(),

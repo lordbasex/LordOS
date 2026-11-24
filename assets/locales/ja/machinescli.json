@@ -94,5 +94,16 @@
   "groupDamaged": "{name} は壊れています: マシンの 1 つがないか、このグループのものではありません。",
   "gatewayFailed": "{name} のゲートウェイが起動しなかったため（{why}）、ワークステーションは起動していません。",
   "workstationFailed": "{name} のワークステーションが起動しませんでした（{why}）。ゲートウェイは実行中のままです。",
-  "kind.group": "{count} 台のグループ"
+  "kind.group": "{count} 台のグループ",
+  "help.fresh": "マシングループを検証済みイメージに戻し、新しい ID を付けます：Workstation を、--gateway を付けると Gateway も（Tor のエントリーガードも一緒に変わります）。グループは停止している必要があります",
+  "help.member": "グループの 1 台のマシン：--member gateway は Gateway だけ、--member workstation は先に Gateway を起動します",
+  "freshRunning": "{name} は実行中です。先にグループをシャットダウンしてください。",
+  "freshNeedsYes": "新しく始めると Workstation の変更は破棄されます。確認なしで実行するには --yes を付けてください。",
+  "freshAsk": "{name} を新しく始めますか？Workstation の変更、ファイル、スナップショットは削除されます。Gateway はそのままです。[y/N]",
+  "freshAskBoth": "{name} を Gateway も含めて新しく始めますか？両方のマシンの変更が削除され、Tor は新しいエントリーガードを選びます。[y/N]",
+  "freshKept": "{name} はそのままです。",
+  "freshDone": "{name} の Workstation を新しくしました：検証済みイメージと新しい ID です。",
+  "freshDoneBoth": "{name} を新しくしました：両方のマシンが検証済みイメージに戻り、新しい ID が付きました。",
+  "freshNotGroup": "{name} はマシングループではありません。新しく始める機能はグループ専用です。",
+  "badMember": "--member には gateway か workstation を指定します。"
 }

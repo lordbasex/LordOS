@@ -94,5 +94,16 @@
   "groupDamaged": "{name} เสียหาย: เครื่องหนึ่งหายไปหรือไม่ใช่ของกลุ่มนี้",
   "gatewayFailed": "เกตเวย์ของ {name} ไม่เริ่มทำงาน ({why}) จึงไม่ได้เริ่มเวิร์กสเตชัน",
   "workstationFailed": "เวิร์กสเตชันของ {name} ไม่เริ่มทำงาน ({why}) เกตเวย์ยังทำงานอยู่",
-  "kind.group": "กลุ่ม {count} เครื่อง"
+  "kind.group": "กลุ่ม {count} เครื่อง",
+  "help.fresh": "คืนกลุ่มเครื่องกลับเป็นอิมเมจที่ตรวจสอบแล้วพร้อมตัวตนใหม่: Workstation และ Gateway ด้วยหากใส่ --gateway (entry guard ของ Tor จะเปลี่ยนไปด้วย) กลุ่มต้องปิดอยู่",
+  "help.member": "เครื่องหนึ่งในกลุ่ม: --member gateway เฉพาะ Gateway, --member workstation จะเริ่ม Gateway ก่อน",
+  "freshRunning": "{name} กำลังทำงาน: ปิดกลุ่มก่อน",
+  "freshNeedsYes": "การเริ่มใหม่จะทิ้งการเปลี่ยนแปลงของ Workstation: เพิ่ม --yes เพื่อทำโดยไม่ถาม",
+  "freshAsk": "เริ่ม {name} ใหม่ทั้งหมดไหม การเปลี่ยนแปลง ไฟล์ และสแนปช็อตของ Workstation จะหายไป ส่วน Gateway คงเดิม [y/N]",
+  "freshAskBoth": "เริ่ม {name} ใหม่ทั้งหมด รวมทั้ง Gateway ไหม การเปลี่ยนแปลงของทั้งสองเครื่องจะหายไป และ Tor จะเลือก entry guard ใหม่ [y/N]",
+  "freshKept": "{name} ยังคงเหมือนเดิม",
+  "freshDone": "Workstation ของ {name} เริ่มใหม่แล้ว: อิมเมจที่ตรวจสอบแล้วและตัวตนใหม่",
+  "freshDoneBoth": "{name} เริ่มใหม่แล้ว: ทั้งสองเครื่องกลับเป็นอิมเมจที่ตรวจสอบแล้วพร้อมตัวตนใหม่",
+  "freshNotGroup": "{name} ไม่ใช่กลุ่มเครื่อง: การเริ่มใหม่ใช้ได้กับกลุ่มเท่านั้น",
+  "badMember": "--member รับค่า gateway หรือ workstation"
 }

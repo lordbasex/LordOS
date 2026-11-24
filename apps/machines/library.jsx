@@ -782,7 +782,9 @@ export function Library() {
   useEffect(() => (focused ? addListener('keydown', (e) => keys.current?.(e)) : undefined), [focused]);
   if (!host) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg }}><Text style={{ color: p.dim }}>{tr('machines.noBackend')}</Text></View>;
 
-  const counts = chipCounts(list, query);
+  // a group counts once (its card), under the chips its card shows with
+  const counts = chipCounts(items.machines, query);
+  for (const g of items.groups) for (const k of Object.keys(counts)) if (groupShows(g, { query, show: k })) counts[k]++;
   const sum = summaryOf(list, usages, host);
   const missing = missingFor(host, [host.arch]);
   const remove = (m) => {

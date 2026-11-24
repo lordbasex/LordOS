@@ -94,5 +94,16 @@
   "groupDamaged": "{name} este deteriorat: una dintre mașinile sale lipsește sau nu este a sa.",
   "gatewayFailed": "Gateway-ul lui {name} nu a pornit ({why}), deci stația de lucru nu a fost pornită.",
   "workstationFailed": "Stația de lucru a lui {name} nu a pornit ({why}); gateway-ul rulează în continuare.",
-  "kind.group": "grup de {count}"
+  "kind.group": "grup de {count}",
+  "help.fresh": "readuce un grup de mașini la imaginea lui verificată, cu o identitate nouă: workstation-ul, și gateway-ul cu --gateway (nodurile de intrare Tor pleacă odată cu el); grupul trebuie să fie oprit",
+  "help.member": "o singură mașină dintr-un grup: --member gateway singur; --member workstation pornește întâi gateway-ul",
+  "freshRunning": "{name} rulează: oprește întâi grupul.",
+  "freshNeedsYes": "Luarea de la capăt aruncă modificările workstation-ului: adaugă --yes ca să o faci fără întrebare.",
+  "freshAsk": "Iei {name} de la capăt? Modificările, fișierele și instantaneele workstation-ului dispar; gateway-ul rămâne cum este. [y/N]",
+  "freshAskBoth": "Iei {name} de la capăt, inclusiv gateway-ul? Modificările ambelor mașini dispar, iar Tor alege noduri de intrare noi. [y/N]",
+  "freshKept": "{name} a rămas cum era.",
+  "freshDone": "Workstation-ul lui {name} e ca nou: imaginea lui verificată, o identitate nouă.",
+  "freshDoneBoth": "{name} e ca nou: ambele mașini au revenit la imaginea lor verificată, cu o identitate nouă.",
+  "freshNotGroup": "{name} nu este un grup de mașini: luarea de la capăt este pentru grupuri.",
+  "badMember": "--member primește gateway sau workstation."
 }

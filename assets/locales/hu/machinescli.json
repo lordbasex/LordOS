@@ -94,5 +94,16 @@
   "groupDamaged": "A(z) {name} sérült: az egyik gépe hiányzik, vagy nem az övé.",
   "gatewayFailed": "A(z) {name} átjárója nem indult el ({why}), ezért a munkaállomás nem indult el.",
   "workstationFailed": "A(z) {name} munkaállomása nem indult el ({why}); az átjáró továbbra is fut.",
-  "kind.group": "{count} gépes csoport"
+  "kind.group": "{count} gépes csoport",
+  "help.fresh": "egy gépcsoport visszaállítása az ellenőrzött lemezképére új identitással: a workstation, --gateway kapcsolóval a gateway is (a Tor belépő őrei vele mennek); a csoportnak kikapcsolva kell lennie",
+  "help.member": "egy csoport egyetlen gépe: --member gateway önmagában; --member workstation előbb a gatewayt indítja",
+  "freshRunning": "{name} fut: előbb állítsa le a csoportot.",
+  "freshNeedsYes": "Az újrakezdés eldobja a workstation módosításait: adja meg a --yes kapcsolót, hogy kérdés nélkül megtörténjen.",
+  "freshAsk": "Újrakezdi ezt: {name}? A workstation módosításai, fájljai és pillanatképei elvesznek; a gateway változatlan marad. [y/N]",
+  "freshAskBoth": "Újrakezdi ezt: {name}, a gatewayjel együtt? Mindkét gép módosításai elvesznek, és a Tor új belépő őröket választ. [y/N]",
+  "freshKept": "{name} változatlan maradt.",
+  "freshDone": "{name} workstationje újrakezdve: az ellenőrzött lemezkép, új identitás.",
+  "freshDoneBoth": "{name} újrakezdve: mindkét gép újra az ellenőrzött lemezképén van, új identitással.",
+  "freshNotGroup": "{name} nem gépcsoport: az újrakezdés csoportoknak szól.",
+  "badMember": "A --member értéke gateway vagy workstation lehet."
 }

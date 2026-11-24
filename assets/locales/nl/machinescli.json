@@ -94,5 +94,16 @@
   "groupDamaged": "{name} is beschadigd: een van zijn machines ontbreekt of hoort er niet bij.",
   "gatewayFailed": "De gateway van {name} is niet gestart ({why}), dus het werkstation is niet gestart.",
   "workstationFailed": "Het werkstation van {name} is niet gestart ({why}); de gateway draait nog.",
-  "kind.group": "groep van {count}"
+  "kind.group": "groep van {count}",
+  "help.fresh": "een machinegroep terug naar haar geverifieerde image met een nieuwe identiteit: de workstation, en met --gateway ook de gateway (de entry guards van Tor gaan mee); de groep moet uit staan",
+  "help.member": "één machine van een groep: --member gateway alleen; --member workstation start eerst de gateway",
+  "freshRunning": "{name} draait: sluit de groep eerst af.",
+  "freshNeedsYes": "Opnieuw beginnen gooit de wijzigingen van de workstation weg: voeg --yes toe om het zonder vraag te doen.",
+  "freshAsk": "{name} opnieuw beginnen? De wijzigingen, bestanden en snapshots van de workstation verdwijnen; de gateway blijft zoals hij is. [y/N]",
+  "freshAskBoth": "{name} opnieuw beginnen, ook de gateway? De wijzigingen van beide machines verdwijnen en Tor kiest nieuwe entry guards. [y/N]",
+  "freshKept": "{name} is gebleven zoals het was.",
+  "freshDone": "De workstation van {name} is opnieuw begonnen: haar geverifieerde image, een nieuwe identiteit.",
+  "freshDoneBoth": "{name} is opnieuw begonnen: beide machines zijn terug op hun geverifieerde image, met een nieuwe identiteit.",
+  "freshNotGroup": "{name} is geen machinegroep: opnieuw beginnen is voor groepen.",
+  "badMember": "--member neemt gateway of workstation."
 }

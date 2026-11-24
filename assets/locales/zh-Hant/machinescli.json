@@ -94,5 +94,16 @@
   "groupDamaged": "{name} 已損壞：其中一台機器遺失或不屬於它。",
   "gatewayFailed": "{name} 的閘道沒有啟動（{why}），因此沒有啟動工作站。",
   "workstationFailed": "{name} 的工作站沒有啟動（{why}）；閘道仍在執行。",
-  "kind.group": "{count} 台的群組"
+  "kind.group": "{count} 台的群組",
+  "help.fresh": "將虛擬機器群組還原為經過驗證的映像檔並給予新身分:Workstation;加上 --gateway 時 Gateway 也一樣(Tor 的入口守衛也隨之更換);群組必須處於關閉狀態",
+  "help.member": "群組中的一台虛擬機器:--member gateway 只啟動 Gateway;--member workstation 會先啟動 Gateway",
+  "freshRunning": "{name} 正在執行:請先關閉群組。",
+  "freshNeedsYes": "重新開始會捨棄 Workstation 的變更:加上 --yes 即可不經詢問直接執行。",
+  "freshAsk": "要讓 {name} 重新開始嗎?Workstation 的變更、檔案和快照都會刪除;Gateway 保持不變。[y/N]",
+  "freshAskBoth": "要讓 {name} 連同 Gateway 一起重新開始嗎?兩台虛擬機器的變更都會刪除,Tor 會挑選新的入口守衛。[y/N]",
+  "freshKept": "{name} 維持原樣。",
+  "freshDone": "{name} 的 Workstation 已重新開始:經過驗證的映像檔,新的身分。",
+  "freshDoneBoth": "{name} 已重新開始:兩台虛擬機器都已還原為經過驗證的映像檔,並有了新的身分。",
+  "freshNotGroup": "{name} 不是虛擬機器群組:重新開始只適用於群組。",
+  "badMember": "--member 的值只能是 gateway 或 workstation。"
 }

@@ -94,5 +94,16 @@
   "groupDamaged": "{name} bị hỏng: một máy của nó bị thiếu hoặc không phải của nó.",
   "gatewayFailed": "Cổng của {name} không khởi động ({why}), nên máy trạm không được khởi động.",
   "workstationFailed": "Máy trạm của {name} không khởi động ({why}); cổng vẫn đang chạy.",
-  "kind.group": "nhóm {count} máy"
+  "kind.group": "nhóm {count} máy",
+  "help.fresh": "đưa một nhóm máy ảo về ảnh đã xác minh với danh tính mới: Workstation, và cả Gateway nếu có --gateway (entry guard của Tor cũng đổi theo); nhóm phải đang tắt",
+  "help.member": "một máy ảo của nhóm: --member gateway chỉ Gateway; --member workstation khởi động Gateway trước",
+  "freshRunning": "{name} đang chạy: hãy tắt nhóm trước.",
+  "freshNeedsYes": "Bắt đầu lại từ đầu sẽ bỏ các thay đổi của Workstation: thêm --yes để làm mà không hỏi.",
+  "freshAsk": "Bắt đầu lại {name} từ đầu? Các thay đổi, tệp và bản chụp nhanh của Workstation sẽ mất; Gateway giữ nguyên. [y/N]",
+  "freshAskBoth": "Bắt đầu lại {name} từ đầu, cả Gateway? Các thay đổi của cả hai máy ảo sẽ mất, và Tor chọn entry guard mới. [y/N]",
+  "freshKept": "{name} vẫn như cũ.",
+  "freshDone": "Workstation của {name} đã được làm mới: ảnh đã xác minh, danh tính mới.",
+  "freshDoneBoth": "{name} đã được làm mới: cả hai máy ảo đã về ảnh đã xác minh, với danh tính mới.",
+  "freshNotGroup": "{name} không phải là nhóm máy ảo: Bắt đầu lại từ đầu chỉ dành cho nhóm.",
+  "badMember": "--member nhận gateway hoặc workstation."
 }

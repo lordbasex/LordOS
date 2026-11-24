@@ -94,5 +94,16 @@
   "groupDamaged": "{name} rusak: salah satu mesinnya hilang atau bukan miliknya.",
   "gatewayFailed": "Gateway {name} tidak berjalan ({why}), jadi workstation tidak dijalankan.",
   "workstationFailed": "Workstation {name} tidak berjalan ({why}); gateway masih berjalan.",
-  "kind.group": "grup {count}"
+  "kind.group": "grup {count}",
+  "help.fresh": "mengembalikan grup mesin ke image terverifikasinya dengan identitas baru: workstation, dan gateway juga dengan --gateway (entry guard Tor ikut terhapus); grup harus dalam keadaan mati",
+  "help.member": "satu mesin dari sebuah grup: --member gateway saja; --member workstation memulai gateway terlebih dahulu",
+  "freshRunning": "{name} sedang berjalan: matikan grup terlebih dahulu.",
+  "freshNeedsYes": "Mulai dari Awal membuang perubahan workstation: tambahkan --yes untuk melakukannya tanpa pertanyaan.",
+  "freshAsk": "Mulai {name} dari awal? Perubahan, berkas, dan snapshot workstation akan hilang; gateway tetap seperti adanya. [y/N]",
+  "freshAskBoth": "Mulai {name} dari awal, termasuk gateway? Perubahan kedua mesin akan hilang, dan Tor memilih entry guard baru. [y/N]",
+  "freshKept": "{name} tetap seperti semula.",
+  "freshDone": "Workstation {name} sudah baru: image terverifikasinya, identitas baru.",
+  "freshDoneBoth": "{name} sudah baru: kedua mesin kembali ke image terverifikasinya, dengan identitas baru.",
+  "freshNotGroup": "{name} bukan grup mesin: Mulai dari Awal hanya untuk grup.",
+  "badMember": "--member menerima gateway atau workstation."
 }

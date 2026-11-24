@@ -94,5 +94,16 @@
   "groupDamaged": "{name} est endommagé : une de ses machines manque ou n’est pas la sienne.",
   "gatewayFailed": "La passerelle de {name} n’a pas démarré ({why}), son poste de travail n’a donc pas été démarré.",
   "workstationFailed": "Le poste de travail de {name} n’a pas démarré ({why}) ; sa passerelle tourne toujours.",
-  "kind.group": "groupe de {count}"
+  "kind.group": "groupe de {count}",
+  "help.fresh": "ramène un groupe de machines à son image vérifiée avec une nouvelle identité : la workstation, et aussi la gateway avec --gateway (les nœuds d’entrée de Tor partent avec elle) ; le groupe doit être éteint",
+  "help.member": "une seule machine d’un groupe : --member gateway seule ; --member workstation démarre d’abord la gateway",
+  "freshRunning": "{name} est en marche : éteignez d’abord le groupe.",
+  "freshNeedsYes": "Repartir de zéro efface les modifications de la workstation : ajoutez --yes pour le faire sans question.",
+  "freshAsk": "Repartir de zéro avec {name} ? Les modifications, fichiers et instantanés de la workstation disparaissent ; la gateway reste telle quelle. [y/N]",
+  "freshAskBoth": "Repartir de zéro avec {name}, gateway comprise ? Les modifications des deux machines disparaissent, et Tor choisit de nouveaux nœuds d’entrée. [y/N]",
+  "freshKept": "{name} est resté tel quel.",
+  "freshDone": "La workstation de {name} est remise à neuf : son image vérifiée, une nouvelle identité.",
+  "freshDoneBoth": "{name} est remis à neuf : les deux machines sont revenues à leur image vérifiée, avec une nouvelle identité.",
+  "freshNotGroup": "{name} n’est pas un groupe de machines : Repartir de zéro est réservé aux groupes.",
+  "badMember": "--member accepte gateway ou workstation."
 }

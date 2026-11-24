@@ -94,5 +94,16 @@
   "groupDamaged": "Sira ang {name}: nawawala ang isa sa mga machine nito o hindi ito kanya.",
   "gatewayFailed": "Hindi nagsimula ang gateway ng {name} ({why}), kaya hindi sinimulan ang workstation.",
   "workstationFailed": "Hindi nagsimula ang workstation ng {name} ({why}); tumatakbo pa rin ang gateway.",
-  "kind.group": "grupo ng {count}"
+  "kind.group": "grupo ng {count}",
+  "help.fresh": "ibalik ang isang grupo ng makina sa na-verify nitong image na may bagong pagkakakilanlan: ang workstation, at pati ang gateway gamit ang --gateway (kasamang mawawala ang mga entry guard ng Tor); dapat naka-off ang grupo",
+  "help.member": "isang makina ng grupo: --member gateway nang mag-isa; sinisimulan muna ng --member workstation ang gateway",
+  "freshRunning": "Tumatakbo ang {name}: i-shut down muna ang grupo.",
+  "freshNeedsYes": "Itinatapon ng Magsimulang Muli ang mga pagbabago ng workstation: idagdag ang --yes para gawin ito nang walang tanong.",
+  "freshAsk": "Simulan muli ang {name} mula sa simula? Mawawala ang mga pagbabago, file at snapshot ng workstation; mananatili ang gateway gaya ng dati. [y/N]",
+  "freshAskBoth": "Simulan muli ang {name} mula sa simula, pati ang gateway? Mawawala ang mga pagbabago ng dalawang makina, at pipili ang Tor ng mga bagong entry guard. [y/N]",
+  "freshKept": "Walang nagbago sa {name}.",
+  "freshDone": "Bago na ang workstation ng {name}: ang na-verify nitong image, bagong pagkakakilanlan.",
+  "freshDoneBoth": "Bago na ang {name}: bumalik ang dalawang makina sa na-verify nilang image, na may bagong pagkakakilanlan.",
+  "freshNotGroup": "Hindi grupo ng makina ang {name}: para sa mga grupo ang Magsimulang Muli.",
+  "badMember": "Tumatanggap ang --member ng gateway o workstation."
 }

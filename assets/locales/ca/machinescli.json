@@ -94,5 +94,16 @@
   "groupDamaged": "{name} està malmès: falta una de les seves màquines o no és seva.",
   "gatewayFailed": "La passarel·la de {name} no ha arrencat ({why}), així que l’estació de treball no s’ha arrencat.",
   "workstationFailed": "L’estació de treball de {name} no ha arrencat ({why}); la passarel·la continua en marxa.",
-  "kind.group": "grup de {count}"
+  "kind.group": "grup de {count}",
+  "help.fresh": "torna un grup de màquines a la seva imatge verificada amb una identitat nova: la workstation, i també el gateway amb --gateway (els nodes d'entrada de Tor se'n van amb ell); el grup ha d'estar apagat",
+  "help.member": "una sola màquina d'un grup: --member gateway tot sol; --member workstation inicia primer el gateway",
+  "freshRunning": "{name} està en marxa: apaga primer el grup.",
+  "freshNeedsYes": "Començar de zero descarta els canvis de la workstation: afegeix --yes per fer-ho sense cap pregunta.",
+  "freshAsk": "Vols començar {name} de zero? Els canvis, els fitxers i les instantànies de la workstation se'n van; el gateway es queda com està. [y/N]",
+  "freshAskBoth": "Vols començar {name} de zero, gateway inclòs? Els canvis de totes dues màquines se'n van, i Tor tria nodes d'entrada nous. [y/N]",
+  "freshKept": "{name} es queda com estava.",
+  "freshDone": "La workstation de {name} és com nova: la seva imatge verificada, una identitat nova.",
+  "freshDoneBoth": "{name} és com nou: totes dues màquines han tornat a la seva imatge verificada, amb una identitat nova.",
+  "freshNotGroup": "{name} no és un grup de màquines: Començar de zero és per a grups.",
+  "badMember": "--member accepta gateway o workstation."
 }

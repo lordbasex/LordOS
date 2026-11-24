@@ -94,5 +94,16 @@
   "groupDamaged": "{name} jest uszkodzona: brakuje jednej z jej maszyn lub nie jest jej.",
   "gatewayFailed": "Brama {name} się nie uruchomiła ({why}), więc stacja robocza nie została uruchomiona.",
   "workstationFailed": "Stacja robocza {name} się nie uruchomiła ({why}); brama nadal działa.",
-  "kind.group": "grupa {count}"
+  "kind.group": "grupa {count}",
+  "help.fresh": "przywraca grupę maszyn do zweryfikowanego obrazu z nową tożsamością: workstation, a z --gateway także gateway (razem z nim znikają węzły wejściowe Tora); grupa musi być wyłączona",
+  "help.member": "jedna maszyna grupy: --member gateway sam; --member workstation najpierw uruchamia gateway",
+  "freshRunning": "{name} działa: najpierw wyłącz grupę.",
+  "freshNeedsYes": "Zaczęcie od nowa wyrzuca zmiany workstation: dodaj --yes, aby zrobić to bez pytania.",
+  "freshAsk": "Zacząć {name} od nowa? Zmiany, pliki i migawki workstation znikną; gateway zostanie bez zmian. [y/N]",
+  "freshAskBoth": "Zacząć {name} od nowa, razem z gateway? Zmiany obu maszyn znikną, a Tor wybierze nowe węzły wejściowe. [y/N]",
+  "freshKept": "{name} jest bez zmian.",
+  "freshDone": "Workstation grupy {name} zaczyna od nowa: zweryfikowany obraz, nowa tożsamość.",
+  "freshDoneBoth": "{name} zaczyna od nowa: obie maszyny wróciły do zweryfikowanego obrazu, z nową tożsamością.",
+  "freshNotGroup": "{name} nie jest grupą maszyn: zaczynanie od nowa jest dla grup.",
+  "badMember": "--member przyjmuje gateway lub workstation."
 }

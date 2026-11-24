@@ -94,5 +94,16 @@
   "groupDamaged": "{name} está dañado: falta una de sus máquinas o no es suya.",
   "gatewayFailed": "La puerta de enlace de {name} no arrancó ({why}), así que su estación de trabajo no se arrancó.",
   "workstationFailed": "La estación de trabajo de {name} no arrancó ({why}); su puerta de enlace sigue en marcha.",
-  "kind.group": "grupo de {count}"
+  "kind.group": "grupo de {count}",
+  "help.fresh": "devuelve un grupo de máquinas a su imagen verificada con una identidad nueva: la workstation, y también el gateway con --gateway (con él se van los nodos de entrada de Tor); el grupo tiene que estar apagado",
+  "help.member": "una sola máquina de un grupo: --member gateway solo; --member workstation inicia primero el gateway",
+  "freshRunning": "{name} está funcionando: apagá el grupo primero.",
+  "freshNeedsYes": "Empezar de cero descarta los cambios de la workstation: agregá --yes para hacerlo sin preguntar.",
+  "freshAsk": "¿Empezar {name} de cero? Se van los cambios, archivos e instantáneas de la workstation; el gateway queda como está. [y/N]",
+  "freshAskBoth": "¿Empezar {name} de cero, gateway incluido? Se van los cambios de las dos máquinas, y Tor elige nodos de entrada nuevos. [y/N]",
+  "freshKept": "{name} quedó como estaba.",
+  "freshDone": "La workstation de {name} está como nueva: su imagen verificada, una identidad nueva.",
+  "freshDoneBoth": "{name} está como nuevo: las dos máquinas volvieron a su imagen verificada, con una identidad nueva.",
+  "freshNotGroup": "{name} no es un grupo de máquinas: Empezar de cero es para grupos.",
+  "badMember": "--member acepta gateway o workstation."
 }

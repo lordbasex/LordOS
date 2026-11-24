@@ -94,5 +94,16 @@
   "groupDamaged": "{name} rosak: salah satu mesinnya hilang atau bukan miliknya.",
   "gatewayFailed": "Get laluan {name} tidak bermula ({why}), jadi stesen kerja tidak dimulakan.",
   "workstationFailed": "Stesen kerja {name} tidak bermula ({why}); get laluan masih berjalan.",
-  "kind.group": "kumpulan {count}"
+  "kind.group": "kumpulan {count}",
+  "help.fresh": "kembalikan kumpulan mesin kepada imejnya yang disahkan dengan identiti baharu: workstation, dan gateway juga dengan --gateway (entry guard Tor turut dibuang); kumpulan mesti dimatikan",
+  "help.member": "satu mesin daripada kumpulan: --member gateway sahaja; --member workstation memulakan gateway dahulu",
+  "freshRunning": "{name} sedang berjalan: matikan kumpulan dahulu.",
+  "freshNeedsYes": "Mula Semula membuang perubahan workstation: tambah --yes untuk melakukannya tanpa soalan.",
+  "freshAsk": "Mulakan {name} semula dari awal? Perubahan, fail dan petikan workstation akan dibuang; gateway kekal seperti sedia ada. [y/N]",
+  "freshAskBoth": "Mulakan {name} semula dari awal, termasuk gateway? Perubahan kedua-dua mesin akan dibuang, dan Tor memilih entry guard baharu. [y/N]",
+  "freshKept": "{name} kekal seperti sebelumnya.",
+  "freshDone": "Workstation {name} kini baharu: imejnya yang disahkan, identiti baharu.",
+  "freshDoneBoth": "{name} kini baharu: kedua-dua mesin kembali kepada imejnya yang disahkan, dengan identiti baharu.",
+  "freshNotGroup": "{name} bukan kumpulan mesin: Mula Semula hanya untuk kumpulan.",
+  "badMember": "--member menerima gateway atau workstation."
 }
