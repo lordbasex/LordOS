@@ -19,6 +19,57 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   an early return, in Settings → Wallpaper (only reached by a theme with no wallpapers); it is moved as well.
 
 ### Added
+- **Settings → Wallpaper is a gallery, with three new collections of still pictures: Abstract, Epic and Anime.** The
+  approved redesign (apps/settings/WallpaperGallery.jsx) reorganises the page; nothing it had goes away.
+  - *What shows now*, at the top: a large picture with its name, collection and license, and three controls: **For**
+    (Desktop / Login screen), **Display** (All / each display, when there are several; the per-display rules of
+    `sdk/wallpapermodel.js` as before) and **Quality** (Auto / HD / 4K). Auto downloads a picture's 4K file only for a
+    display wider than 1920 or taller than 1080 device pixels and the HD file for the others, decided per display;
+    the line under it says what each display gets ("4K on DP-1 (3840 × 2160), HD on HDMI-A-1 (1920 × 1080)"). The
+    choice is the new setting `wallpaperQuality` (`auto` by default; a new key, no migration).
+  - *A search and five filters with their counts*: All, On this computer, Pictures, Moving and My photos. The search
+    folds accents and matches every word against the name, the id and the collection's name in your language.
+  - *Collections first*: with no search and the All filter, each collection is a card (a stack of three thumbnails,
+    its count, NEW on Abstract, Epic and Anime), then one row of each collection with "See all N". A collection's page
+    has its description, how many are on this computer, **Download all · HD** and **· 4K** (the bytes still to fetch)
+    and **Use as slideshow** where the theme has a slideshow (Lord Workspaces; two pictures or more on this computer).
+  - *Every tile says its state*: a cloud (it downloads when chosen), a check (on this computer), 4K or HD, a play mark
+    when it moves, and a download's progress as a bar along its bottom edge. Moving wallpapers stay dimmed without a
+    compatible GPU, as before.
+  - *A sheet per wallpaper*: a large picture, its collection and credits (the new pictures: made with AI for LordOS,
+    CC0), the quality options with the catalog's real sizes ("4K · 3840 × 2160 · 1.2 MB"), and **Use on desktop**
+    (Download and use when it isn't here), **Login screen**, **Only <display>** with several displays, and **Remove
+    download** when this account doesn't use it.
+  - *At the bottom*: the space the downloaded wallpapers take, with **Free up space…**, which deletes the catalog's
+    files on this computer that this account doesn't use (the desktop, any display, the login screen, the moving
+    wallpapers, random's videos, and a running slideshow's collection all stay); the thumbnails' size (the same
+    `wallpaperThumbs` setting); the slideshow; and the moving wallpapers' options (speed, random, an added video, back
+    to a still picture, credits).
+  - 68 new texts in all 35 languages. `server/tests/app_scene_headless.sh settings_wallpaper_scene` drives the page
+    headless and keeps screenshots of the cards, a collection, a sheet, a search and the rows (Arabic too).
+- **Still pictures in the wallpapers catalog.** `assets/wallpapers/motion.json` (installed as
+  `/usr/share/backgrounds/lordos/motion.json`) keeps its structure and gains still pictures: items in the sections
+  `abstract`, `epic` and `anime` whose variants have codec `jpeg` (`1080.jpeg`, 1920 × 1080, and `2160.jpeg`, 3840 ×
+  2160). This release ships the 50 Epic pictures and their 320 × 180 thumbnails in `assets/wallpapers/motion/`; the
+  code doesn't depend on the count. A chosen picture is saved as `cat:<catalog id>` in `wallpaper`, a display's entry
+  of `wallpapers`, `loginWallpaper` or the slideshow, and `findWallpaper` (sdk/wallpapers.js) resolves it to the files
+  on this computer, so every theme (Lord Flow, Lord Classic, Lord Workspaces, Celeste), the login screen and the
+  slideshow show it with no change of their own; each display draws the file that covers it, or the one Quality
+  names. A picture whose files are gone shows the theme's default (the login screen: its own). The pure logic is
+  `sdk/wallpapergallery.js`, tested by `server/tests/wallpaper_gallery_test.mjs` (75 checks, the shipped catalog
+  included).
+- **`wallpaper-get` keeps a still picture as `/var/lib/lordos/wallpapers/<sha256>.jpg`.** The extension comes from the
+  catalog's codec, read as root, never from the caller: `hevc` and `h264` are kept as `.mp4`, `jpeg` as `.jpg`; any
+  other codec, or a variant whose file isn't of that kind, is no entry. A variant's `file` must now be a relative
+  `[a-z0-9._/-]` name with no `..`, `//` or leading dot or slash, and its size a whole number. `wallpaper-remove`
+  deletes either kind. `wallpaper-login` never links a picture as the login video, and takes a catalog picture as
+  `still cat:<id>` (kept in `login-still`, like a built-in one). The checks that were there stay (catalog entries
+  only, the project's GitHub base, size and SHA-256, the download as `nobody` in the Store's scope); no new action,
+  helper, dependency or network path. Tests: `wallpaper-find-test` gains the `jpeg` cases and the refusals, and the new
+  `build/wallpaper-admin-test` runs the actions with a fake download (a `.jpg` and an `.mp4`, refused arguments never
+  fetch, a wrong hash or a 404 is never kept, remove, `still cat:<id>`, and every entry of the shipped catalog).
+  `sdk/motion.jsx` ignores `jpeg` variants: the moving wallpapers are the catalog's video items only.
+
 - **"Copy details" when an app stops at its own window.** The notice "<app> ran into a problem" now shows the error and
   has a button that copies a short report for a GitHub issue: the app, the LordOS version, the error, the first lines of
   its stack and React's component stack. Home folder paths are shortened to `~`, so the report carries no user name.
