@@ -36,6 +36,8 @@
 #   /usr/lib/lordos/code-manifest.json    SHA-256 of every bundle LordOS runs as its own code, and
 #   /usr/lib/lordos/code-manifest.sig     its Ed25519 signature (release key; docs/SIGNING.md)
 #   /usr/lib/lordos/lordos-live-prep      live preparation (grub language, folders)
+#   /usr/lib/lordos/toolkit-audit/        the harnesses of "lordos-testbench --toolkits" (tools/toolkit-audit/*.py,
+#                                         not the *_test.py); each runs only with what is already installed
 #   /usr/lib/systemd/system/lordos.service  lord-sessiond on tty1
 #   /usr/lib/systemd/system/lordos-text-login.service  a login prompt on tty1 in text mode (docs/SESSIONS.md)
 #   /etc/grub.d/11_lordos_text            the boot menu's "LordOS (text mode)" entry
@@ -462,6 +464,13 @@ install -d "$X"
     install -D -m 644 "assets/browser/video/$f" "$X/$f"
 done
 find "$PKG/usr/share/chromium" -type d -exec chmod 755 {} +
+# "lordos-testbench --toolkits": one small Python 3 harness per toolkit (x11.py needs only the standard library; the
+# GTK and Qt ones run only when their bindings are already installed). LordOS depends on none of them. New files.
+install -d "$L/toolkit-audit"
+for f in tools/toolkit-audit/*.py; do
+    case "$f" in *_test.py) continue ;; esac
+    install -m 755 "$f" "$L/toolkit-audit/${f##*/}"
+done
 # boot splash (docs/brand/README.md, "Boot splash"): the Plymouth theme and the hand-off to LordOS
 install -m 755 tools/boot/lordos-splash "$L/lordos-splash"
 install -m 644 tools/boot/systemd/lordos-splash-quit.service "$PKG/usr/lib/systemd/system/lordos-splash-quit.service"
