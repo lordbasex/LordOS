@@ -1,6 +1,6 @@
 {
   "title": "এই ডেস্কটপে Linux টুলকিট",
-  "usage": "ব্যবহার: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "ব্যবহার: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "অজানা সমন্বয়: {id}। পরিচিত: {list}",
   "running": "{combo} পরীক্ষা করা হচ্ছে...",
   "col.combo": "সমন্বয়",

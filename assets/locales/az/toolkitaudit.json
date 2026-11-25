@@ -1,6 +1,6 @@
 {
   "title": "Bu masaüstündə Linux alət dəstləri",
-  "usage": "İstifadə: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "İstifadə: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Naməlum birləşmə: {id}. Məlum olanlar: {list}",
   "running": "{combo} sınaqdan keçirilir...",
   "col.combo": "Birləşmə",

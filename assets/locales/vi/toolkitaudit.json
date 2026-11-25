@@ -1,6 +1,6 @@
 {
   "title": "Các bộ công cụ Linux trên màn hình nền này",
-  "usage": "Cách dùng: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Cách dùng: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Tổ hợp không xác định: {id}. Đã biết: {list}",
   "running": "Đang kiểm tra {combo}...",
   "col.combo": "Tổ hợp",

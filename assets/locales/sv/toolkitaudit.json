@@ -1,6 +1,6 @@
 {
   "title": "Linux-verktygslådor på det här skrivbordet",
-  "usage": "Användning: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Användning: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Okänd kombination: {id}. Kända: {list}",
   "running": "Testar {combo}...",
   "col.combo": "Kombination",

@@ -1,6 +1,6 @@
 {
   "title": "Zana za kiolesura za Linux kwenye eneo-kazi hili",
-  "usage": "Matumizi: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Matumizi: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Mchanganyiko usiojulikana: {id}. Inayojulikana: {list}",
   "running": "Inajaribu {combo}...",
   "col.combo": "Mchanganyiko",

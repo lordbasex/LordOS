@@ -17,6 +17,12 @@
 # window title is fixed and no path, user or environment value is printed.
 # Exit status: 0 the checks ran, 2 PyQt5 is not installed, 3 the asked backend can't start (no display, no platform
 # plugin: qtwayland5 for Wayland, or the display refused the connection); the JSON line says so too.
+#
+# Show mode (--show, or LORDOS_TOOLKIT_AUDIT_SHOW=1; the test bench's Frameworks screen): the same checks and the same
+# line, slowed down so a person can follow them (each popup held open about 0.9 s, the text typed one character at a
+# time, fullscreen held on and off), the current step's id in a label on the window (a check id, never translated),
+# and before the line one progress line per step and per check on stdout: "#lordos-ta step <id>" and
+# "#lordos-ta check <id> pass|fail|skip". The watchdog then fires at 14.6 s (the orchestrator kills at 20 s).
 import json
 import os
 import sys
@@ -27,7 +33,10 @@ T0 = time.monotonic()
 CHECK_IDS = ('map', 'size', 'scale', 'theme', 'backend', 'decoration', 'first_frame', 'menu', 'combo', 'tooltip',
              'clipboard', 'dnd', 'text', 'fullscreen')
 WANT_W, WANT_H = 600, 400
-DEADLINE_S = 4.6            # the orchestrator asks for an exit within 5 s and kills at 8 s
+SHOW = '--show' in sys.argv[1:] or os.environ.get('LORDOS_TOOLKIT_AUDIT_SHOW') == '1'
+DEADLINE_S = 14.6 if SHOW else 4.6   # the orchestrator asks for an exit within 5 s (15 s) and kills at 8 s (20 s)
+HOLD_MS = 900 if SHOW else 0         # show mode: how long a popup or a state stays on screen once decided
+GAP_MS = 300 if SHOW else 0          # show mode: the pause between two steps
 
 _lock = threading.Lock()
 _done = False
@@ -45,6 +54,11 @@ def emit_and_exit(code=0):
         for cid in CHECK_IDS:
             if cid not in checks:
                 checks[cid] = {'ok': False, 'detail': 'timed out'}
+                if SHOW:
+                    try:
+                        sys.stdout.write('#lordos-ta check %s fail\n' % cid)
+                    except Exception:
+                        pass
         out = {'toolkit': result['toolkit'], 'version': result['version'], 'backend': result['backend'],
                'checks': {cid: checks[cid] for cid in CHECK_IDS}}
         try:
@@ -77,6 +91,19 @@ def process_age_ms():
     return ms_since(T0)
 
 
+def progress(line):
+    """Show mode: one progress line on stdout (never after the JSON line)."""
+    if not SHOW:
+        return
+    with _lock:
+        if not _done:
+            try:
+                sys.stdout.write('#lordos-ta ' + line + '\n')
+                sys.stdout.flush()
+            except Exception:
+                pass
+
+
 def check(cid, ok, ms=None, detail=None):
     if cid in result['checks']:
         return
@@ -86,6 +113,8 @@ def check(cid, ok, ms=None, detail=None):
     if detail:
         c['detail'] = str(detail)[:200]
     result['checks'][cid] = c
+    if cid in CHECK_IDS:
+        progress('check %s %s' % (cid, 'skip' if ok is None else 'pass' if ok is True else 'fail'))
 
 
 def skip(cid, why):
@@ -160,6 +189,16 @@ class Win(QtWidgets.QMainWindow):
         for w in (self.entry, self.check, self.slider, self.combo):
             col.addWidget(w)
         col.addStretch(1)
+        # show mode: the current step's id (a fixed check id, not translated)
+        self.step_label = None
+        if SHOW:
+            self.step_label = QtWidgets.QLabel('map', central)
+            f = self.step_label.font()
+            f.setFamily('monospace')
+            f.setBold(True)
+            f.setPointSizeF(f.pointSizeF() * 1.4 if f.pointSizeF() > 0 else 14)
+            self.step_label.setFont(f)
+            col.addWidget(self.step_label)
         self.setCentralWidget(central)
 
     def paintEvent(self, ev):
@@ -249,9 +288,26 @@ class Audit:
             QtCore.QTimer.singleShot(0, lambda: emit_and_exit(0))
             return
         step = self.steps.pop(0)
-        QtCore.QTimer.singleShot(0, lambda: self.run(step))
+        QtCore.QTimer.singleShot(GAP_MS if step != self.s_map else 0, lambda: self.run(step))
+
+    def mark(self, cid):
+        """Show mode: the step now on screen, in the label and as a progress line."""
+        if not SHOW:
+            return
+        progress('step ' + cid)
+        if self.win.step_label is not None:
+            self.win.step_label.setText(cid)
+
+    def held(self, fn):
+        """fn, run HOLD_MS later in show mode (what the step opened stays on screen), at once otherwise."""
+        if not SHOW:
+            return fn
+        return lambda *_: QtCore.QTimer.singleShot(HOLD_MS, fn)
 
     def run(self, step):
+        name = step.__name__[2:]
+        if name in CHECK_IDS:
+            self.mark(name)
         try:
             step()
         except Exception as e:      # one broken check must not cost the others
@@ -409,24 +465,41 @@ class Audit:
         self.win.entry.setFocus(QtCore.Qt.OtherFocusReason)
         word = 'lordos'
 
+        how = 'QTest' if QTest is not None else 'key events'
+
+        def type_chars(chars):
+            if QTest is not None:
+                QTest.keyClicks(self.win.entry, chars)
+                return
+            for ch in chars:
+                for kind in (QtCore.QEvent.KeyPress, QtCore.QEvent.KeyRelease):
+                    ev = QtGui.QKeyEvent(kind, QtCore.Qt.Key_A + ord(ch) - ord('a'), QtCore.Qt.NoModifier, ch)
+                    QtWidgets.QApplication.sendEvent(self.win.entry, ev)
+
         def typed(_ok, _ms):
             t = time.monotonic()
-            if QTest is not None:
-                QTest.keyClicks(self.win.entry, word)
-                how = 'QTest'
-            else:
-                for ch in word:
-                    for kind in (QtCore.QEvent.KeyPress, QtCore.QEvent.KeyRelease):
-                        ev = QtGui.QKeyEvent(kind, QtCore.Qt.Key_A + ord(ch) - ord('a'), QtCore.Qt.NoModifier, ch)
-                        QtWidgets.QApplication.sendEvent(self.win.entry, ev)
-                how = 'key events'
+            if SHOW:            # one character at a time, as a person types
+                left = list(word)
+
+                def one():
+                    type_chars(left.pop(0))
+                    if left:
+                        QtCore.QTimer.singleShot(70, one)
+                    else:
+                        result_of(t)
+                QtCore.QTimer.singleShot(0, one)
+                return
+            type_chars(word)
+            result_of(t)
+
+        def result_of(t):
             got = self.win.entry.text()
             active = self.win.isActiveWindow()
             check('text', got == word, ms=ms_since(t),
                   detail='%s, %d of %d characters; keyboard focus %s' % (how, len(got) if got == word else
                                                                          sum(a == b for a, b in zip(got, word)),
                                                                          len(word), 'yes' if active else 'no'))
-            self.next()
+            self.held(self.next)()
         # wait a little for the compositor's keyboard focus; type anyway after that
         self.poll(lambda: self.win.isActiveWindow(), 500, typed)
 
@@ -441,7 +514,7 @@ class Audit:
             check('clipboard', ok, ms=ms_since(t) if ok else None,
                   detail='own selection %s' % ('yes' if owns else 'no') if ok
                   else 'read back something else; own selection %s' % ('yes' if owns else 'no'))
-            self.next()
+            self.held(self.next)()
         self.poll(lambda: cb.text(QtGui.QClipboard.Clipboard) == token, 1000, done)
 
     def settle(self, then):
@@ -479,11 +552,15 @@ class Audit:
             QtWidgets.QToolTip.showText(at, '50', btn, QtCore.QRect(), 3000)
 
             def done(ok, _ms):
-                QtWidgets.QToolTip.hideText()
                 if ok:
                     check('tooltip', True, ms=ms_since(t), detail='QToolTip')
-                    self.next()
+
+                    def close():
+                        QtWidgets.QToolTip.hideText()
+                        self.next()
+                    self.held(close)()
                     return
+                QtWidgets.QToolTip.hideText()
                 # QToolTip hides itself when the pointer isn't over its widget (a Leave or an activation change),
                 # and there is no real pointer here: the same kind of window (Qt::ToolTip, an xdg_popup without a
                 # grab on Wayland) is shown directly instead
@@ -496,9 +573,12 @@ class Audit:
                     check('tooltip', ok2, ms=ms_since(t2) if ok2 else None,
                           detail='a Qt::ToolTip window; QToolTip hid itself without a pointer over the button'
                           if ok2 else 'neither QToolTip nor a Qt::ToolTip window was exposed')
-                    label.hide()
-                    label.deleteLater()
-                    self.settle(self.next)
+
+                    def close():
+                        label.hide()
+                        label.deleteLater()
+                        self.settle(self.next)
+                    self.held(close)()
                 self.poll(lambda: exposed(label), 1000, done2)
             self.poll(lambda: exposed(tip()), 600, done)
         self.settle(go)
@@ -517,9 +597,12 @@ class Audit:
                 check('menu', ok, ms=ms_since(t) if ok else None,
                       detail=self.popup_kind() if ok else
                       ('shown but not exposed' if menu.isVisible() else 'closed at once'))
-                menu.hide()
-                self.win.menuBar().setActiveAction(None)
-                self.settle(self.next)
+
+                def close():
+                    menu.hide()
+                    self.win.menuBar().setActiveAction(None)
+                    self.settle(self.next)
+                self.held(close)()
             self.poll(lambda: exposed(menu), 1000, done)
         self.settle(go)
 
@@ -539,8 +622,11 @@ class Audit:
                 check('combo', ok, ms=ms_since(t) if ok else None,
                       detail=self.popup_kind() if ok else
                       ('shown but not exposed' if p is not None and p.isVisible() else 'closed at once'))
-                combo.hidePopup()
-                self.settle(self.next)
+
+                def close():
+                    combo.hidePopup()
+                    self.settle(self.next)
+                self.held(close)()
             self.poll(lambda: exposed(popup()), 1000, done)
         self.settle(go)
 
@@ -575,16 +661,18 @@ class Audit:
                                                                '%dx%d' % full_size if full_size else '?'))
                 self.poll(lambda: (win.width(), win.height()) == normal, 800, lambda _o, _m: self.next())
                 return
-            t2 = time.monotonic()
-            win.showNormal()
+            def leave():
+                t2 = time.monotonic()
+                win.showNormal()
 
-            def on_normal(ok2, _ms2):
-                back = (win.width(), win.height())
-                check('fullscreen', ok2, ms=full_ms + ms_since(t2),
-                      detail='on %dx%d in %d ms, off %dx%d' % (got[0], got[1], full_ms, back[0], back[1]))
-                self.next()
-            self.poll(lambda: not (win.windowState() & QtCore.Qt.WindowFullScreen)
-                      and (win.width(), win.height()) == normal, 1200, on_normal)
+                def on_normal(ok2, _ms2):
+                    back = (win.width(), win.height())
+                    check('fullscreen', ok2, ms=full_ms + ms_since(t2),
+                          detail='on %dx%d in %d ms, off %dx%d' % (got[0], got[1], full_ms, back[0], back[1]))
+                    self.held(self.next)()
+                self.poll(lambda: not (win.windowState() & QtCore.Qt.WindowFullScreen)
+                          and (win.width(), win.height()) == normal, 1200, on_normal)
+            self.held(leave)()          # show mode: fullscreen stays on screen a moment
         self.poll(is_full, 1200, on_full)
 
     def s_dnd(self):

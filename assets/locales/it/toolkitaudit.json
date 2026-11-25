@@ -1,6 +1,6 @@
 {
   "title": "Toolkit Linux su questo desktop",
-  "usage": "Uso: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Uso: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Combinazione sconosciuta: {id}. Note: {list}",
   "running": "Verifica di {combo}...",
   "col.combo": "Combinazione",

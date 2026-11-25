@@ -1,6 +1,6 @@
 {
   "title": "Mga toolkit ng Linux sa desktop na ito",
-  "usage": "Paggamit: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Paggamit: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Hindi kilalang kombinasyon: {id}. Mga kilala: {list}",
   "running": "Sinusubok ang {combo}...",
   "col.combo": "Kombinasyon",

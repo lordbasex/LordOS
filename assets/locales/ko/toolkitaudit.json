@@ -1,6 +1,6 @@
 {
   "title": "이 데스크톱의 Linux 툴킷",
-  "usage": "사용법: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "사용법: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "알 수 없는 조합: {id}. 알려진 조합: {list}",
   "running": "{combo} 테스트 중...",
   "col.combo": "조합",

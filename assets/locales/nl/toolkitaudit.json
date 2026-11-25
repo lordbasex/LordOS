@@ -1,6 +1,6 @@
 {
   "title": "Linux-toolkits op dit bureaublad",
-  "usage": "Gebruik: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Gebruik: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Onbekende combinatie: {id}. Bekend: {list}",
   "running": "{combo} testen...",
   "col.combo": "Combinatie",

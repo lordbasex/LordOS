@@ -1,6 +1,6 @@
 {
   "title": "Linux įrankių rinkiniai šiame darbalaukyje",
-  "usage": "Naudojimas: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Naudojimas: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Nežinomas derinys: {id}. Žinomi: {list}",
   "running": "Tikrinama {combo}...",
   "col.combo": "Derinys",

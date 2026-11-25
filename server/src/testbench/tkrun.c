@@ -129,6 +129,13 @@ static void on_signal(int sig) {
     raise(sig);
 }
 
+void tk_signals(void) {
+    signal(SIGINT, on_signal);
+    signal(SIGTERM, on_signal);
+    signal(SIGHUP, on_signal);
+    signal(SIGPIPE, SIG_IGN);
+}
+
 /* spawns argv in its own process group; out/err: our ends of its stdout/stderr (-1: /dev/null) */
 static pid_t spawn(char *const argv[], char *const envp[], int *out, int *err) {
     int po[2] = { -1, -1 }, pe[2] = { -1, -1 };
@@ -173,7 +180,19 @@ static pid_t spawn(char *const argv[], char *const envp[], int *out, int *err) {
 
 /* waits for pid until deadline (ms, monotonic), reading its pipes meanwhile. how: 1 exit, 2 signal, 3 killed at
  * the deadline. */
-typedef struct { char *out; size_t olen, ocap; int truncated; TkLog *log; } Sink;
+typedef struct {
+    char *out; size_t olen, ocap; int truncated; TkLog *log;
+    /* show mode: the progress lines, reported as they come */
+    const TkRunOpts *o; int slot, combo; TkProgBuf prog;
+} Sink;
+
+static void on_prog(void *ctx, const TkProg *p) {
+    Sink *s = ctx;
+    TkEvent e = { p->kind == TK_PROG_STEP ? TK_EV_STEP : TK_EV_CHECK, s->slot, s->combo, p->check, p->result, NULL };
+    s->o->on_event(s->o->ctx, &e);
+}
+
+static int aborted(const TkRunOpts *o) { return o && o->abort && *o->abort; }
 
 static void collect(pid_t pid, int fo, int fe, double deadline, Sink *s, int *how, int *code) {
     int exited = 0, killed = 0, status = 0;
@@ -188,7 +207,7 @@ static void collect(pid_t pid, int fo, int fe, double deadline, Sink *s, int *ho
                 exited = 1;
                 kill(-pid, SIGKILL);                /* whatever it left behind in its group (the leader is a zombie) */
                 drain_until = now + 500;
-            } else if (now >= deadline) {
+            } else if (now >= deadline || aborted(s->o)) {
                 kill(-pid, SIGKILL);
                 kill(pid, SIGKILL);
                 killed = 1;
@@ -212,6 +231,7 @@ static void collect(pid_t pid, int fo, int fe, double deadline, Sink *s, int *ho
                 memcpy(s->out + s->olen, buf, take);
                 s->olen += take;
                 if (take < (size_t)k) s->truncated = 1;
+                if (s->o && s->o->show && s->o->on_event) tk_progress_feed(&s->prog, buf, (size_t)k, on_prog, s);
             } else if (k > 0) {
                 tk_log_feed(s->log, buf, (size_t)k);
             } else if (k == 0 || (k < 0 && errno != EINTR && errno != EAGAIN)) {
@@ -282,6 +302,55 @@ void tk_report_free(TkReport *rep) {
     for (int i = 0; i < TK_COMBOS; i++) { free(rep->r[i].log); rep->r[i].log = NULL; }
 }
 
+/* one combination into r (its status set when it doesn't run); -1 when memory ran out */
+static int run_one(const TkRunOpts *o, const int *which, int i, int slot, TkResult *r, int *probed, char *ob) {
+    const TkCombo *c = tk_combo(which[i]);
+    if (!c) { r->status = TK_ST_NO_HARNESS; return 0; }
+    r->log = malloc(sizeof *r->log);
+    if (!r->log) return -1;
+    tk_log_init(r->log);
+    char hp[PATH_MAX], ebuf[16384], *envp[48];
+    if (harness_path(o, c, hp, sizeof hp)) { r->status = TK_ST_NO_HARNESS; return 0; }
+    if (access(o->python, X_OK)) { r->status = TK_ST_NOT_INSTALLED; return 0; }
+    int first = i;                                  /* the toolkit's probe, once */
+    for (int j = 0; j < i; j++) if (!strcmp(tk_combo(which[j])->toolkit, c->toolkit)) { first = j; break; }
+    char *penv[] = { "PATH=/usr/bin:/bin", "LANG=C.UTF-8", "PYTHONDONTWRITEBYTECODE=1", NULL };
+    if (!probed[first]) probed[first] = probe(o, c, penv) ? -1 : 1;
+    if (probed[first] < 0) { r->status = TK_ST_NOT_INSTALLED; return 0; }
+    if (tk_env(o, which[i], ebuf, sizeof ebuf, envp, 48) < 0) { r->status = TK_ST_NO_DISPLAY; return 0; }
+    if (aborted(o)) return 0;
+    if (o->progress && o->T) {
+        char line[256];
+        const char *kv[] = { "combo", c->id, NULL };
+        tk_fill(o->T("running"), kv, line, sizeof line);
+        fprintf(stderr, "%s\n", line);
+    }
+    /* a fixed argument list: the harness's path (checked above) and, in show mode, the fixed word --show */
+    char *argv[] = { (char *)o->python, "-I", hp, o->show ? "--show" : NULL, NULL };
+    int fo = -1, fe = -1;
+    double t0 = mono_ms();
+    pid_t pid = spawn(argv, envp, &fo, &fe);
+    if (pid < 0) { r->status = TK_ST_NOT_INSTALLED; return 0; }
+    if (o->on_event) {
+        TkEvent e = { TK_EV_START, slot, which[i], -1, 0, NULL };
+        o->on_event(o->ctx, &e);
+    }
+    Sink s;
+    memset(&s, 0, sizeof s);
+    s.out = ob;
+    s.ocap = TK_OUT_MAX;
+    s.log = r->log;
+    s.o = o;
+    s.slot = slot;
+    s.combo = which[i];
+    int how = 1, code = 0;
+    collect(pid, fo, fe, t0 + o->kill_ms, &s, &how, &code);
+    r->elapsed_ms = (int)(mono_ms() - t0);
+    tk_parse_output(r, s.out, s.olen, s.truncated);
+    tk_finish(r, how, code);
+    return 0;
+}
+
 int tk_audit(const TkRunOpts *o, const int *which, int n, TkReport *rep) {
     memset(rep, 0, sizeof *rep);
     rep->at_ms = (long long)time(NULL) * 1000;
@@ -289,40 +358,15 @@ int tk_audit(const TkRunOpts *o, const int *which, int n, TkReport *rep) {
     memset(probed, 0, sizeof probed);
     char *ob = malloc(TK_OUT_MAX);
     if (!ob) return -1;
-    for (int i = 0; i < n && i < TK_COMBOS; i++) {
+    for (int i = 0; i < n && i < TK_COMBOS && !aborted(o); i++) {
+        int slot = rep->n;
         TkResult *r = &rep->r[rep->n++];
         tk_result_init(r, which[i]);
-        const TkCombo *c = tk_combo(which[i]);
-        if (!c) { r->status = TK_ST_NO_HARNESS; continue; }
-        r->log = malloc(sizeof *r->log);
-        if (!r->log) { free(ob); return -1; }
-        tk_log_init(r->log);
-        char hp[PATH_MAX], ebuf[16384], *envp[48];
-        if (harness_path(o, c, hp, sizeof hp)) { r->status = TK_ST_NO_HARNESS; continue; }
-        if (access(o->python, X_OK)) { r->status = TK_ST_NOT_INSTALLED; continue; }
-        int first = i;                              /* the toolkit's probe, once */
-        for (int j = 0; j < i; j++) if (!strcmp(tk_combo(which[j])->toolkit, c->toolkit)) { first = j; break; }
-        char *penv[] = { "PATH=/usr/bin:/bin", "LANG=C.UTF-8", "PYTHONDONTWRITEBYTECODE=1", NULL };
-        if (!probed[first]) probed[first] = probe(o, c, penv) ? -1 : 1;
-        if (probed[first] < 0) { r->status = TK_ST_NOT_INSTALLED; continue; }
-        if (tk_env(o, which[i], ebuf, sizeof ebuf, envp, 48) < 0) { r->status = TK_ST_NO_DISPLAY; continue; }
-        if (o->progress && o->T) {
-            char line[256];
-            const char *kv[] = { "combo", c->id, NULL };
-            tk_fill(o->T("running"), kv, line, sizeof line);
-            fprintf(stderr, "%s\n", line);
+        if (run_one(o, which, i, slot, r, probed, ob)) { free(ob); return -1; }
+        if (o->on_event) {
+            TkEvent e = { TK_EV_DONE, slot, which[i], -1, 0, r };
+            o->on_event(o->ctx, &e);
         }
-        char *argv[] = { (char *)o->python, "-I", hp, NULL };
-        int fo = -1, fe = -1;
-        double t0 = mono_ms();
-        pid_t pid = spawn(argv, envp, &fo, &fe);
-        if (pid < 0) { r->status = TK_ST_NOT_INSTALLED; continue; }
-        Sink s = { ob, 0, TK_OUT_MAX, 0, r->log };
-        int how = 1, code = 0;
-        collect(pid, fo, fe, t0 + o->kill_ms, &s, &how, &code);
-        r->elapsed_ms = (int)(mono_ms() - t0);
-        tk_parse_output(r, s.out, s.olen, s.truncated);
-        tk_finish(r, how, code);
     }
     free(ob);
     tk_report_global(rep);
@@ -459,43 +503,70 @@ static int last_main(void) {
     return ferror(stdout) ? 1 : 0;
 }
 
+int tk_parse_only(const char *only, int *which, char *bad, size_t blen) {
+    int n = 0;
+    if (bad && blen) bad[0] = 0;
+    for (const char *p = only; *p;) {
+        const char *e = strchr(p, ',');
+        size_t len = e ? (size_t)(e - p) : strlen(p);
+        if (len) {
+            int k = tk_combo_find(p, len);
+            if (k < 0) {
+                if (bad && blen) {
+                    snprintf(bad, blen, "%.*s", (int)(len < 40 ? len : 40), p);
+                    for (char *q = bad; *q; q++) if ((unsigned char)*q < 0x20 || *q == 0x7f) *q = '?';
+                }
+                return -1;
+            }
+            int dup = 0;
+            for (int j = 0; j < n; j++) dup |= which[j] == k;
+            if (!dup && n < TK_COMBOS) which[n++] = k;
+        }
+        if (!e) break;
+        p = e + 1;
+    }
+    return n;
+}
+
+const char *tk_harness_dir(void) {
+    const char *dir = getenv("LORDOS_TOOLKIT_AUDIT_DIR");
+    return dir && dir[0] == '/' ? dir : TK_HARNESS_DIR;
+}
+
+/* --show in a terminal: each check as the harness decides it */
+static void term_event(void *ctx, const TkEvent *e) {
+    (void)ctx;
+    if (e->kind != TK_EV_CHECK) return;
+    static const char *mark[3] = { "-", "\xe2\x9c\x93", "\xe2\x9c\x97" };     /* skip, pass, fail: - ✓ ✗ */
+    fprintf(stderr, "  %s %s\n", mark[e->result >= 0 && e->result <= 2 ? e->result : 0], tk_check_id(e->check));
+}
+
 int toolkits_main(int argc, char **argv) {
-    int json = 0, which[TK_COMBOS], n = 0;
+    int json = 0, show = 0, which[TK_COMBOS], n = 0;
     const char *only = NULL;
     texts_init();
     for (int i = 1; i < argc; i++) if (!strcmp(argv[i], "--last")) return argc == 3 ? last_main() : (usage(), 2);
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--toolkits")) continue;
         if (!strcmp(argv[i], "--json")) json = 1;
+        else if (!strcmp(argv[i], "--show")) show = 1;
         else if (!strcmp(argv[i], "--only") && i + 1 < argc) only = argv[++i];
         else if (!strncmp(argv[i], "--only=", 7)) only = argv[i] + 7;
         else { usage(); return 2; }
     }
     if (only) {
-        for (const char *p = only; *p;) {
-            const char *e = strchr(p, ',');
-            size_t len = e ? (size_t)(e - p) : strlen(p);
-            if (len) {
-                int k = tk_combo_find(p, len);
-                if (k < 0) {
-                    char id[64], list[256] = "", line[512];
-                    snprintf(id, sizeof id, "%.*s", (int)(len < 40 ? len : 40), p);
-                    for (char *q = id; *q; q++) if ((unsigned char)*q < 0x20 || *q == 0x7f) *q = '?';
-                    for (int j = 0; j < TK_COMBOS; j++) {
-                        strncat(list, j ? ", " : "", sizeof list - strlen(list) - 1);
-                        strncat(list, tk_combo(j)->id, sizeof list - strlen(list) - 1);
-                    }
-                    const char *kv[] = { "id", id, "list", list, NULL };
-                    tk_fill(T("badOnly"), kv, line, sizeof line);
-                    fprintf(stderr, "%s\n", line);
-                    return 2;
-                }
-                int dup = 0;
-                for (int j = 0; j < n; j++) dup |= which[j] == k;
-                if (!dup && n < TK_COMBOS) which[n++] = k;
+        char id[64];
+        n = tk_parse_only(only, which, id, sizeof id);
+        if (n < 0) {
+            char list[256] = "", line[512];
+            for (int j = 0; j < TK_COMBOS; j++) {
+                strncat(list, j ? ", " : "", sizeof list - strlen(list) - 1);
+                strncat(list, tk_combo(j)->id, sizeof list - strlen(list) - 1);
             }
-            if (!e) break;
-            p = e + 1;
+            const char *kv[] = { "id", id, "list", list, NULL };
+            tk_fill(T("badOnly"), kv, line, sizeof line);
+            fprintf(stderr, "%s\n", line);
+            return 2;
         }
         if (!n) { usage(); return 2; }
     } else {
@@ -503,12 +574,9 @@ int toolkits_main(int argc, char **argv) {
     }
     /* the harnesses are GUI clients of this session: never as root (sudo, pkexec), like any Wayland client here */
     if (geteuid() == 0) { fprintf(stderr, "%s\n", T("root")); return 2; }
-    signal(SIGINT, on_signal);
-    signal(SIGTERM, on_signal);
-    signal(SIGHUP, on_signal);
-    signal(SIGPIPE, SIG_IGN);
-    const char *dir = getenv("LORDOS_TOOLKIT_AUDIT_DIR");
-    TkRunOpts o = { dir && dir[0] == '/' ? dir : TK_HARNESS_DIR, TK_PYTHON, TK_KILL_MS, TK_PROBE_MS, isatty(2), T, environ };
+    tk_signals();
+    TkRunOpts o = { tk_harness_dir(), TK_PYTHON, show ? TK_SHOW_KILL_MS : TK_KILL_MS, TK_PROBE_MS, isatty(2), T, environ,
+                    show, show && isatty(2) ? term_event : NULL, NULL, NULL };
     TkReport rep;
     if (tk_audit(&o, which, n, &rep)) { fprintf(stderr, "lordos-testbench: out of memory\n"); return 1; }
     if (json) tk_report_json(stdout, &rep);

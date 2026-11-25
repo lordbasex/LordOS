@@ -1,6 +1,6 @@
 {
   "title": "此桌面上的 Linux 工具包",
-  "usage": "用法: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "用法: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "未知组合: {id}。已知: {list}",
   "running": "正在测试 {combo}...",
   "col.combo": "组合",

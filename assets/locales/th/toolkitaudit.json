@@ -1,6 +1,6 @@
 {
   "title": "ชุดเครื่องมือ Linux บนเดสก์ท็อปนี้",
-  "usage": "วิธีใช้: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "วิธีใช้: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "ไม่รู้จักชุดผสม: {id} ที่รู้จัก: {list}",
   "running": "กำลังทดสอบ {combo}...",
   "col.combo": "ชุดผสม",

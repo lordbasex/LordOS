@@ -1,6 +1,6 @@
 {
   "title": "इस डेस्कटॉप पर Linux टूलकिट",
-  "usage": "उपयोग: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "उपयोग: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "अज्ञात संयोजन: {id}। ज्ञात: {list}",
   "running": "{combo} की जाँच हो रही है...",
   "col.combo": "संयोजन",

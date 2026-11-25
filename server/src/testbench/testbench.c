@@ -25,6 +25,10 @@
  *                                       docs/TOOLKIT-AUDIT.md)
  *   lordos-testbench --toolkits --last  the saved result (~/.cache/lordos/toolkit-audit.json) in a few checked
  *                                       English lines, for lordos-issue
+ *   lordos-testbench --frameworks [--only gtk4-wayland,...]
+ *                                       opens on the Frameworks screen (fwscreen.c; F from the test card): the toolkit
+ *                                       audit in show mode, each harness's window beside this one and every check
+ *                                       ticking here as it is decided; the result is saved as --toolkits saves it
  *
  * Except --toolkits, it reads no files and talks to nothing but the compositor. */
 #ifndef _GNU_SOURCE
@@ -37,9 +41,12 @@
 #include "lockkey.h"
 #include "../bench/bench.h"
 #include "tkrun.h"
+#include "fwscreen.h"
 
 #include <errno.h>
+#include <pthread.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <linux/input-event-codes.h>
 #include <poll.h>
 #include <signal.h>
@@ -140,6 +147,75 @@ static int video_run;
 static unsigned long video_hold[5];     /* frames held 1, 2, 3, 4, 5+ refreshes */
 /* the 3D view's presentation */
 static unsigned long g_presented, g_zero;          /* F5 runs the checklist again; Pause freezes the picture */
+
+/* ---- the Frameworks screen (fwscreen.c): the toolkit audit in show mode, run in a thread of its own ---- */
+static int fw_on;                       /* the screen is shown instead of the test card */
+static FwState fw;
+static pthread_mutex_t fw_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_t fw_thr;
+static int fw_live;                     /* a thread was started and not joined yet */
+static volatile int fw_abort, fw_ended; /* stop the run (closing); the thread has ended */
+static int fw_which[TK_COMBOS], fw_n;
+static int fw_btn[4];                   /* the card's FRAMEWORKS button: x, y, w, h */
+
+static void fw_ev(void *ctx, const TkEvent *e) {
+    (void)ctx;
+    pthread_mutex_lock(&fw_lock);
+    fw_event(&fw, e, bench_now_ms());
+    pthread_mutex_unlock(&fw_lock);
+}
+
+static void *fw_run(void *arg) {
+    (void)arg;
+    /* as `lordos-testbench --toolkits --show`: the same harness folder, python3, deadlines and environment */
+    TkRunOpts o = { tk_harness_dir(), TK_PYTHON, TK_SHOW_KILL_MS, TK_PROBE_MS, 0, NULL, environ, 1, fw_ev, NULL, &fw_abort };
+    TkReport rep;
+    int saved = -1;
+    if (!tk_audit(&o, fw_which, fw_n, &rep)) {
+        char path[PATH_MAX];
+        if (!fw_abort && !tk_cache_path(path, sizeof path, environ)) saved = tk_save(&rep, path);
+        pthread_mutex_lock(&fw_lock);
+        fw_finish(&fw, &rep, saved);
+        pthread_mutex_unlock(&fw_lock);
+        tk_report_free(&rep);
+    } else {
+        pthread_mutex_lock(&fw_lock);
+        fw_finish(&fw, NULL, -1);
+        pthread_mutex_unlock(&fw_lock);
+    }
+    fw_ended = 1;
+    return NULL;
+}
+
+/* (re)starts the run, unless one is going */
+static void fw_start(void) {
+    if (fw_live && !fw_ended) return;
+    if (fw_live) { pthread_join(fw_thr, NULL); fw_live = 0; }
+    pthread_mutex_lock(&fw_lock);
+    fw_init(&fw, fw_which, fw_n);
+    /* the harnesses are GUI clients of this session: never as root (tkrun.c refuses --toolkits the same way) */
+    if (geteuid() == 0) fw.state = FW_REFUSED;
+    pthread_mutex_unlock(&fw_lock);
+    if (geteuid() == 0) return;
+    tk_signals();                        /* a signal kills the running harness's group with us */
+    fw_abort = 0;
+    fw_ended = 0;
+    if (!pthread_create(&fw_thr, NULL, fw_run, NULL)) fw_live = 1;
+    else { pthread_mutex_lock(&fw_lock); fw_finish(&fw, NULL, -1); pthread_mutex_unlock(&fw_lock); }
+}
+
+static void fw_show(int on) {
+    fw_on = on;
+    if (on && gl3d_on()) gl3d_stop();
+    if (on && !fw_live) fw_start();
+}
+
+static void fw_stop(void) {
+    if (!fw_live) return;
+    fw_abort = 1;
+    pthread_join(fw_thr, NULL);
+    fw_live = 0;
+}
 
 /* ---- the keyboard drawn on screen: evdev codes, widths in quarter units ---- */
 typedef struct { int code, w; const char *label; } Key;
@@ -268,6 +344,11 @@ static void draw_panel(Surf *s, int x0) {
     d_fill(s, x0, 0, pw, s->h - kbd_h(), C_PANEL);
     int x = x0 + 14, y = 14;
     d_text(s, x, y, 2, C_TEXT, "TEST BENCH");
+    /* the Frameworks screen's button (F) */
+    fw_btn[0] = x0 + pw - 14 - 118; fw_btn[1] = y - 3; fw_btn[2] = 118; fw_btn[3] = 20;
+    d_fill(s, fw_btn[0], fw_btn[1], fw_btn[2], fw_btn[3], C_KEY);
+    d_frame(s, fw_btn[0], fw_btn[1], fw_btn[2], fw_btn[3], 1, C_HEAD);
+    d_text_c(s, fw_btn[0] + fw_btn[2] / 2, fw_btn[1] + fw_btn[3] / 2, 1, C_TEXT, "F: FRAMEWORKS");
     y += 26;
     char v[160];
     /* timing */
@@ -419,6 +500,12 @@ static void draw_pad(Surf *s) {
 
 static void draw(Buf *b) {
     Surf s = { b->px, b->w, b->h, b->w };
+    if (fw_on) {
+        pthread_mutex_lock(&fw_lock);
+        fw_draw(&s, &fw, now_ms());
+        pthread_mutex_unlock(&fw_lock);
+        return;
+    }
     d_fill(&s, 0, 0, b->w, b->h, C_BG);
     /* the card: 4:3 in the area left of the panel and above the keyboard */
     int aw = b->w - panel_w(), ah = b->h - kbd_h();
@@ -591,6 +678,18 @@ static void kb_key(void *d, struct wl_keyboard *k, uint32_t serial, uint32_t t, 
     if (pressed && key == KEY_F5) rerun_checks = 1;
     if (pressed && key == KEY_PAUSE) { paused = !paused; if (!paused && !frame_pending) redraw(); }
     if (pressed) { lat_ev = t; lat_pending = 1; }
+    if (fw_on) {                                 /* the Frameworks screen's keys; the card's are off meanwhile */
+        if (pressed && key == KEY_ESC) fw_show(0);
+        else if (pressed && key == KEY_R && fw_ended) fw_start();
+        else if (pressed && (key == KEY_UP || key == KEY_DOWN)) {
+            pthread_mutex_lock(&fw_lock);
+            int cur = fw_detail_slot(&fw);
+            if (fw.n) fw.sel = ((cur < 0 ? 0 : cur) + (key == KEY_UP ? fw.n - 1 : 1)) % fw.n;
+            pthread_mutex_unlock(&fw_lock);
+        }
+        return;
+    }
+    if (pressed && key == KEY_F) fw_show(1);
     if (pressed && key == KEY_G) { if (gl3d_on()) gl3d_stop(); else if (subcomp) gl3d_start(dpy, comp, subcomp, surf, card_x, card_y, card.w, card.h); }
     if (pressed && key == KEY_V) { video_fps = video_fps == 0 ? 24 : video_fps == 24 ? 30 : video_fps == 30 ? 60 : 0; memset(video_hold, 0, sizeof video_hold); video_last = -1; video_run = 0; }
     int ctrl = kstate && xkb_state_mod_name_is_active(kstate, XKB_MOD_NAME_CTRL, XKB_STATE_MODS_EFFECTIVE) > 0;
@@ -650,6 +749,19 @@ static void p_button(void *d, struct wl_pointer *p, uint32_t s, uint32_t t, uint
     ptr_serial = s;
     int i = (int)button - BTN_LEFT;              /* BTN_LEFT, RIGHT, MIDDLE, SIDE, EXTRA, FORWARD, BACK, TASK */
     if (i < 0 || i >= 8) return;
+    if (button == BTN_LEFT && state == WL_POINTER_BUTTON_STATE_PRESSED && ptr_in) {
+        int px = (int)ptr_x, py = (int)ptr_y;
+        if (fw_on) {
+            pthread_mutex_lock(&fw_lock);
+            int h = fw_hit(&fw, win_w, win_h, px, py);
+            if (h >= 0) fw.sel = h;
+            pthread_mutex_unlock(&fw_lock);
+            if (h == FW_HIT_BACK) fw_show(0);
+            else if (h == FW_HIT_AGAIN && fw_ended) fw_start();
+            return;
+        }
+        if (px >= fw_btn[0] && px < fw_btn[0] + fw_btn[2] && py >= fw_btn[1] && py < fw_btn[1] + fw_btn[3]) { fw_show(1); return; }
+    }
     btn_down[i] = state == WL_POINTER_BUTTON_STATE_PRESSED;
     if (btn_down[i]) { btn_seen[i] = 1; lat_ev = t; lat_pending = 1; }
 }
@@ -766,18 +878,28 @@ static void save_report(void) { bench_save("testbench", report); }
 
 int main(int argc, char **argv) {
     double auto_s = 0;
-    int auto_gl = 0, only_globals = 0;
+    int auto_gl = 0, only_globals = 0, frameworks = 0;
     for (int i = 1; i < argc; i++)
         if (!strcmp(argv[i], "--toolkits")) return toolkits_main(argc, argv);
+    for (int i = 0; i < TK_COMBOS; i++) fw_which[fw_n++] = i;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--gl")) auto_gl = 1;
+        else if (!strcmp(argv[i], "--frameworks")) frameworks = 1;
+        else if (frameworks && (!strcmp(argv[i], "--only") || !strncmp(argv[i], "--only=", 7))) {
+            const char *only = argv[i][6] == '=' ? argv[i] + 7 : i + 1 < argc ? argv[++i] : "";
+            char bad[64];
+            int n = tk_parse_only(only, fw_which, bad, sizeof bad);
+            if (n <= 0) { fprintf(stderr, "lordos-testbench: --only: unknown combination %s\n", n < 0 ? bad : "(none)"); return 2; }
+            fw_n = n;
+        }
         else if (!strcmp(argv[i], "--globals")) only_globals = 1;
         else if (!strcmp(argv[i], "--auto")) {
             auto_s = 5;
             if (i + 1 < argc && atof(argv[i + 1]) > 0) auto_s = atof(argv[++i]);
             if (auto_s > 600) auto_s = 600;
         } else {
-            fprintf(stderr, "usage: lordos-testbench [--gl] [--auto [seconds]] | --globals | --toolkits [--json] [--only id,...]\n");
+            fprintf(stderr, "usage: lordos-testbench [--gl] [--auto [seconds]] | --frameworks [--only id,...] | --globals |\n"
+                            "       --toolkits [--show] [--json] [--only id,...]\n");
             return 2;
         }
     }
@@ -805,6 +927,9 @@ int main(int argc, char **argv) {
     xdg_toplevel_set_title(top, "Test Bench");
     xdg_toplevel_set_app_id(top, "lordos-testbench");
     xdg_toplevel_set_min_size(top, 640, 480);
+    /* the Frameworks screen asks for less room, so each harness's 600x400 window can open beside it (where the
+     * compositor puts either is its own choice: a Wayland client can't place its window) */
+    if (frameworks) { win_w = 820; win_h = 600; fw_show(1); }
     if (decoman) {
         struct zxdg_toplevel_decoration_v1 *deco = zxdg_decoration_manager_v1_get_toplevel_decoration(decoman, top);
         zxdg_toplevel_decoration_v1_set_mode(deco, ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
@@ -814,7 +939,8 @@ int main(int argc, char **argv) {
     int ran = 0;
     while (!closed && wl_display_dispatch(dpy) != -1) {
         if (tb_lock_over(locked != NULL, lock_t, now_ms())) toggle_lock();
-        if ((!ran && ft.frames > 2) || rerun_checks) {
+        if (fw_on) rerun_checks = 0;         /* the checklist's test windows wait for the card */
+        else if ((!ran && ft.frames > 2) || rerun_checks) {
             ran = 1;
             rerun_checks = 0;
             if (checks_run() < 0) { save_report(); break; }   /* the compositor ended the connection */
@@ -824,8 +950,9 @@ int main(int argc, char **argv) {
         if (auto_s > 0 && ft.frames && now_ms() - start > auto_s * 1000) break;
     }
     if (wl_display_get_error(dpy) && !checks_done) fprintf(stderr, "lordos-testbench: the connection ended (error %d)\n", wl_display_get_error(dpy));
+    fw_stop();
     if (auto_s > 0) report(stdout);
-    if (ft.frames) save_report();
+    if (ft.frames && ran) save_report();
     for (int i = 0; i < 2; i++) buf_free(&bufs[i]);
     card_free(&card);
     wl_display_disconnect(dpy);

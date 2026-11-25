@@ -1,6 +1,6 @@
 {
   "title": "مجموعات أدوات لينكس على سطح المكتب هذا",
-  "usage": "الاستخدام: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "الاستخدام: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "تركيبة غير معروفة: {id}. المعروفة: {list}",
   "running": "جارٍ اختبار {combo}...",
   "col.combo": "التركيبة",

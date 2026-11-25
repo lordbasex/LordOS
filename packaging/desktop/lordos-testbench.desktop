@@ -10,3 +10,46 @@ Exec=/usr/bin/lordos-testbench
 Icon=utilities-system-monitor
 Terminal=false
 Categories=System;Monitor;
+Actions=frameworks;
+
+# the Frameworks screen: the toolkit audit in show mode (docs/TOOLKIT-AUDIT.md); System Information's hardware
+# report starts it with lord.apps.launchAction("lordos-testbench", "frameworks")
+[Desktop Action frameworks]
+Name=Framework tests
+Name[ar]=اختبارات أطر العمل
+Name[az]=Freymvork testləri
+Name[bg]=Тестове на фреймуърци
+Name[bn]=ফ্রেমওয়ার্ক পরীক্ষা
+Name[ca]=Proves de frameworks
+Name[de]=Framework-Tests
+Name[el]=Δοκιμές πλαισίων
+Name[es]=Pruebas de frameworks
+Name[fa]=آزمون چارچوب‌ها
+Name[fi]=Kehysten testit
+Name[fil]=Mga pagsubok ng framework
+Name[fr]=Tests des frameworks
+Name[hi]=फ़्रेमवर्क परीक्षण
+Name[hu]=Keretrendszer-tesztek
+Name[id]=Uji framework
+Name[it]=Test dei framework
+Name[ja]=フレームワークのテスト
+Name[ko]=프레임워크 테스트
+Name[lt]=Karkasų testai
+Name[ms]=Ujian rangka kerja
+Name[nl]=Frameworktests
+Name[pl]=Testy frameworków
+Name[pt]=Testes de frameworks
+Name[ro]=Teste de framework-uri
+Name[ru]=Тесты фреймворков
+Name[sv]=Ramverkstester
+Name[sw]=Majaribio ya mifumo
+Name[th]=ทดสอบเฟรมเวิร์ก
+Name[tr]=Çerçeve testleri
+Name[uk]=Тести фреймворків
+Name[ur]=فریم ورک ٹیسٹ
+Name[vi]=Kiểm thử framework
+Name[zh_CN]=框架测试
+Name[zh_Hans]=框架测试
+Name[zh_TW]=框架測試
+Name[zh_Hant]=框架測試
+Exec=/usr/bin/lordos-testbench --frameworks

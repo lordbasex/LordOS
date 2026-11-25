@@ -1,6 +1,6 @@
 {
   "title": "このデスクトップでの Linux ツールキット",
-  "usage": "使い方: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "使い方: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "不明な組み合わせ: {id}。既知: {list}",
   "running": "{combo} をテスト中...",
   "col.combo": "組み合わせ",
