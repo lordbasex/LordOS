@@ -49,6 +49,7 @@
 #include "../keyboard.h"
 #include "../fsops.h"
 #include "../fsasync.h"
+#include "../fswatch.h"
 #include "../remote/mirror.h"
 #include "js_share.h"
 #include "../pkg/crypto.h"
@@ -1456,6 +1457,10 @@ static JSValue f_fs_stat(JSContext *c, JSValueConst this_val, int argc, JSValueC
     JS_SetPropertyStr(c, o, "ctime", JS_NewFloat64(c, s.ctime));
     if (s.has_btime) JS_SetPropertyStr(c, o, "btime", JS_NewFloat64(c, s.btime));
     JS_SetPropertyStr(c, o, "writable", JS_NewBool(c, s.writable));
+    /* (read-only) it is, or lies in, a folder lord.fs never writes (fsops_protected), the links on its way followed: the
+     * desktop shows nothing for a Desktop folder that points at ~/.config/autostart (docs/drafts/DESKTOP-ICONS.md 2.1) */
+    char real[PATH_MAX];
+    JS_SetPropertyStr(c, o, "protected", JS_NewBool(c, r == -2 || fsops_protected(target) || (realpath(target, real) && fsops_protected(real))));
     /* a file a Machines guest sent (6.21): Files says where it came from and never opens a runnable one by itself */
     if (s.quarantine) { JS_SetPropertyStr(c, o, "quarantine", JS_TRUE); JS_SetPropertyStr(c, o, "fromMachine", JS_NewString(c, s.from)); }
     return o;
@@ -1637,7 +1642,62 @@ static JSValue f_fs_mounts(JSContext *c, JSValueConst this_val, int argc, JSValu
     return a.arr;
 }
 
+/* lord.fs.watch(folder, fn) → id; lord.fs.unwatch(id) → bool (fswatch.c, docs/drafts/DESKTOP-ICONS.md 5.1): read-only.
+ * fn({ changed: true, overflow, gone }) at most every 150 ms per watch, with no file names: the caller lists the folder
+ * again (listAsync). overflow: list again and resolve the folder again (the kernel's queue overflowed, or the folder
+ * itself was deleted, moved or unmounted); gone: the watch no longer sees the folder. At most 16 per session, refused on
+ * cloud and network folders (fs.watchRemote) and on what lord.fs doesn't read. Every watch ends with this context. */
+static struct { int id; JSValue fn; } watch_fn[FSWATCH_MAX];
+
+static JSValue f_fs_watch(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 2 || !JS_IsFunction(c, argv[1])) return js_throw_code(c, "sys.badArgument", NULL);
+    const char *p = JS_ToCString(c, argv[0]);
+    if (!p) return JS_EXCEPTION;
+    char err[256] = "";
+    int id = fswatch_add(p, err, sizeof err);
+    JS_FreeCString(c, p);
+    if (id < 0) return js_throw_line(c, err);
+    for (int i = 0; i < FSWATCH_MAX; i++) if (!watch_fn[i].id) {
+        watch_fn[i].id = id;
+        watch_fn[i].fn = JS_DupValue(c, argv[1]);
+        return JS_NewInt32(c, id);
+    }
+    fswatch_remove(id);                 /* (can't happen: as many slots as watches) */
+    return js_throw_code(c, "fs.tooManyWatches", "max", "16", NULL);
+}
+
+static JSValue f_fs_unwatch(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    int id = 0;
+    if (JS_ToInt32(c, &id, argv[0])) return JS_EXCEPTION;
+    if (id <= 0) return JS_FALSE;
+    for (int i = 0; i < FSWATCH_MAX; i++) if (watch_fn[i].id == id) {
+        JSValue fn = watch_fn[i].fn;
+        watch_fn[i].id = 0;
+        watch_fn[i].fn = JS_UNDEFINED;
+        JS_FreeValue(c, fn);
+    }
+    return JS_NewBool(c, fswatch_remove(id) == 0);
+}
+
+JSValue js_sys_fswatch_fn(JSContext *c, int id) {
+    if (id > 0) for (int i = 0; i < FSWATCH_MAX; i++) if (watch_fn[i].id == id) return JS_DupValue(c, watch_fn[i].fn);
+    return JS_UNDEFINED;
+}
+
+void js_sys_fswatch_reset(JSContext *c) {
+    for (int i = 0; i < FSWATCH_MAX; i++) {
+        if (watch_fn[i].id && c) JS_FreeValue(c, watch_fn[i].fn);
+        watch_fn[i].id = 0;
+        watch_fn[i].fn = JS_UNDEFINED;
+    }
+    fswatch_clear();
+}
+
 static const JSCFunctionListEntry fs_funcs[] = {
+    JS_CFUNC_DEF("watch", 2, f_fs_watch),
+    JS_CFUNC_DEF("unwatch", 1, f_fs_unwatch),
     JS_CFUNC_DEF("listAsync", 1, f_fs_list_async),
     JS_CFUNC_DEF("statAsync", 1, f_fs_stat_async),
     JS_CFUNC_DEF("trashAsync", 1, f_fs_trash_async),

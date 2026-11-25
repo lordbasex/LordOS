@@ -55,6 +55,7 @@ void   js_disk_event(const char *what);      /* Disks app: something changed (di
 void   js_backup_event(const char *json);    /* Backups → __lordBackup */
 void   js_cloud_event(const char *json);     /* Cloud → __lordCloud */
 void   js_cloud_reply(int req, const char *json);   /* Cloud: a link's answer → __lordCloudReply */
+void   js_fswatch_dispatch(double now);  /* every pass: lord.fs.watch's calls that are due (fswatch.c) */
 void   js_fs_dispatch(void);             /* fsasync_fd() is readable: lord.fs.*Async answers → __lordFsReply */
 void   js_admin_event(int id, const char *kind, const char *text);
 void   js_logs_event(const char *kind, int id, const char *name);   /* app Registros */

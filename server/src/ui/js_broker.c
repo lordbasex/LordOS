@@ -247,6 +247,17 @@ static JSValue f_fs_list(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return JS_IsException(v) ? (JS_FreeValue(c, JS_GetException(c)), JS_NewArray(c)) : v;
 }
 
+/* lord.fs.watch is not offered to isolated apps (docs/drafts/DESKTOP-ICONS.md 5.1): the broker has no operation for it
+ * (brokersrv.c answers any other op with an error), and the call says so here instead of being a missing function */
+static JSValue f_fs_watch(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return js_throw_code(c, "sys.unsupported", NULL);
+}
+static JSValue f_fs_unwatch(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)c; (void)t; (void)argc; (void)argv;
+    return JS_FALSE;
+}
+
 /* ---- lord.clipboard ---- */
 
 static JSValue f_clip_get(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -809,6 +820,7 @@ static JSValue f_load_app(JSContext *c, JSValueConst t, int argc, JSValueConst *
 static const JSCFunctionListEntry fs_funcs[] = {
     JS_CFUNC_DEF("home", 0, f_fs_home), JS_CFUNC_DEF("read", 2, f_fs_read),
     JS_CFUNC_DEF("write", 2, f_fs_write), JS_CFUNC_DEF("list", 1, f_fs_list),
+    JS_CFUNC_DEF("watch", 2, f_fs_watch), JS_CFUNC_DEF("unwatch", 1, f_fs_unwatch),
 };
 static const JSCFunctionListEntry clip_funcs[] = { JS_CFUNC_DEF("get", 0, f_clip_get), JS_CFUNC_DEF("set", 1, f_clip_set), JS_CFUNC_DEF("status", 1, f_clip_status) };
 static const JSCFunctionListEntry broker_funcs[] = {

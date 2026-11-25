@@ -2,7 +2,7 @@
 // /run/media/$USER); the server rejects paths outside them. Writing is atomic and cannot touch
 // ~/.local/share/applications, ~/.config/autostart, ~/.local/share/lordos/apps or
 // ~/.config/lordos/settings.json (see server/src/ui/js_sys.c and server/src/fsops.c).
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { codeError } from './errors.js';
 import { remoteOf } from './mountmodel.js';
 import { compareNames } from './collate.js';
@@ -55,7 +55,8 @@ export const restore = (id) => lord.fs.restore(id);
 export const removeFromTrash = (id) => lord.fs.removeFromTrash(id);
 export const emptyTrash = () => lord.fs.emptyTrash();
 
-// Info: { name, path, dir, link, target, size, mode, user, group, mtime, atime, ctime, btime, writable }
+// Info: { name, path, dir, link, target, size, mode, user, group, mtime, atime, ctime, btime, writable, protected }
+// protected: it is, or lies in, a folder lord.fs never writes (autostart, the apps' launchers, settings…), links followed.
 export const stat = (path) => lord.fs.stat(path);
 export const du = (path, ms) => lord.fs.du(path, ms);          // { size, files, dirs, complete } (bounded)
 export const free = (path) => lord.fs.free(path);              // { total, free } of the disk
@@ -115,4 +116,37 @@ export function isRemote(path) {
   }
   const full = path.startsWith('/') ? path : `${home()}/${path}`;
   return remoteOf(full, mounts);
+}
+
+// ---- folder changes (lord.fs.watch, server/src/fswatch.c; read-only) ----
+// fn({ changed: true, overflow, gone }) at most every 150 ms per watch, with no file names: list the folder again
+// (listAsync). overflow: something may have been missed, or the folder itself was deleted or moved (resolve it again);
+// gone: this watch no longer sees the folder. Returns a function that stops watching. Throws like lord.fs: fs.watchRemote
+// on cloud and network folders, fs.tooManyWatches past 16 per session, fs.notFolder, sys.unsupported in an isolated app;
+// then list again on focus instead. Every watch ends with the theme (a theme switch).
+export function watch(path, fn) {
+  if (typeof lord.fs.watch !== 'function') throw codeError('sys.unsupported');
+  const id = lord.fs.watch(path, (ev) => fn(ev || { changed: true, overflow: false, gone: false }));
+  let on = true;
+  return () => {
+    if (!on) return;
+    on = false;
+    try { lord.fs.unwatch(id); } catch (e) { /* the context already ended */ }
+  };
+}
+
+// The same, while a component is shown: fn runs on each change (the latest fn, without watching again). Returns whether
+// the folder is watched; false (refused, as above) means the caller lists again on focus or on a timer instead.
+export function useWatch(path, fn) {
+  const ref = useRef(fn);
+  ref.current = fn;
+  const [watched, setWatched] = useState(false);
+  useEffect(() => {
+    if (!path) { setWatched(false); return undefined; }
+    let stop = null;
+    try { stop = watch(path, (ev) => ref.current && ref.current(ev)); } catch (e) { stop = null; }
+    setWatched(!!stop);
+    return () => { if (stop) stop(); };
+  }, [path]);
+  return watched;
 }

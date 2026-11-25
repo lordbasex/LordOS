@@ -245,6 +245,8 @@ int main(void) {
     /* ---- clipboard ---- */
     check(call(BOP_COMPANION, NULL, 0) && got_status == BST_DENIED && !spawned, "companion: an app from the home folder is refused, nothing started");
     check(call(BOP_STATUS, "{}", 2) && got_status == BST_DENIED, "status item: refused without the permission");
+    /* lord.fs.watch has no broker operation (docs/drafts/DESKTOP-ICONS.md 5.1): any op outside the closed list is an error */
+    check(call(99, "Desktop", 7) && got_status == BST_ERROR && got_len == 0, "fs.watch: an op outside the broker's list is refused");
     check(call(BOP_CLIP_GET, NULL, 0) && got_status == BST_OK && !strcmp(got, "clipboard text"), "clipboard: read with the permission");
     restrict_app("lpk:game", FW_R_NO_CLIPBOARD);
     check(call(BOP_CLIP_GET, NULL, 0) && denied_with("fw.restricted.clipboard"), "clipboard: no-clipboard refuses it with fw.restricted.clipboard");

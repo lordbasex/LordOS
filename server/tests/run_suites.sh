@@ -205,6 +205,8 @@ EOF
     else skip "portal-cast-test" "dbus-run-session"; fi
     run "fsasync-test" build/fsasync-test
     run "bgsave-test (#250: saves off the interface's thread)" build/bgsave-test
+    run "fswatch-test" build/fswatch-test
+    if have node; then run "fs-watch-sdk-test (sdk/fs.js watch)" node tests/fs_watch_sdk_test.mjs; fi
     run "sign-test" build/sign-test
     # migration 008: a tablet's power-button defaults (packaging/migrations, issue #131)
     run "migration 008 tablet-power" sh tests/migration_tablet_power_test.sh

@@ -19,6 +19,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   an early return, in Settings → Wallpaper (only reached by a theme with no wallpapers); it is moved as well.
 
 ### Added
+- **`lord.fs.watch` / `lord.fs.unwatch` and `lord.fs.stat`'s `protected` flag** (in development; designed for the desktop
+  icons, `docs/drafts/DESKTOP-ICONS.md` 5.1, decision D13; in this release Notes uses it to see new notes at once). Read-only: `lord.fs.watch(folder, fn)` returns an id and calls
+  `fn({ changed: true, overflow, gone })` when the folder changes, at most once every 150 ms per watch (the first change
+  after a quiet time at once, the rest coalesced into one call), with no file names: the caller lists the folder again
+  with `listAsync`. `overflow` says something may have been missed (the kernel's queue overflowed, or the folder itself
+  was deleted, moved or unmounted) and `gone` that the watch no longer sees the folder; the kernel's watch is dropped
+  then, so a moved folder isn't followed elsewhere. One inotify fd in lord-server's poll loop (`server/src/fswatch.c`),
+  one non-recursive watch per folder (`IN_ONLYDIR | IN_DONT_FOLLOW | IN_EXCL_UNLINK`), two watches of one folder share
+  the kernel's watch. The folder is resolved like a read (never `/proc`, `/sys`, `/dev`, `/run`), must be a folder
+  (`fs.notFolder`), and is refused on a cloud, network or other FUSE mount, from the mount table and the file system's
+  magic number (`fs.watchRemote`: inotify doesn't see the server's changes); a folder swapped between the check and the
+  watch is refused. At most 16 per session (`fs.tooManyWatches`); every watch ends with the theme's context. Isolated
+  apps don't get it: the broker has no operation for it and their `lord.fs.watch` throws `sys.unsupported`.
+  `lord.fs.stat` gains `protected`: the path is, or lies in, a folder `lord.fs` never writes (`fsops_protected`), links
+  followed, so the desktop icons (when they come) show nothing for a Desktop folder that points at `~/.config/autostart`. `sdk/fs.js` gains
+  `watch(path, fn)` (returns a stop function) and `useWatch(path, fn)`. Tests: `build/fswatch-test` (create, delete,
+  renames within, into and out of the folder, attributes, a 200-file burst as one call, the 150 ms coalescing and the
+  poll timeout, non-recursive, a queue overflow telling every watch, a folder deleted or moved and replaced by a link,
+  the 16-watch limit, shared watches, `/proc`, a file, a link to a file, a missing path, FUSE and CIFS mounts, clearing),
+  a broker case and `tests/fs_watch_sdk_test.mjs`. 3 new error strings in all 35 languages.
 - **"Copy details" when an app stops at its own window.** The notice "<app> ran into a problem" now shows the error and
   has a button that copies a short report for a GitHub issue: the app, the LordOS version, the error, the first lines of
   its stack and React's component stack. Home folder paths are shortened to `~`, so the report carries no user name.
