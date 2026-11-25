@@ -27,6 +27,7 @@
 #include "ui/wave.h"
 #include "sound/spectrum.h"
 #include "ui/unicode.h"
+#include "media/media_int.h"
 
 /* ---- stubs for what paint.c reaches outside the UI engine ---- */
 /* the terminal (test_drag_exact): a dark box with a cursor block; where it was painted is noted in
@@ -91,13 +92,27 @@ int wl_draws_meet(Rect r) {
  * tests' secret) for test_protected_media; media_id_protected says whether that source is marked protected */
 enum { PROT_MEDIA_ID = 4242 };
 static int prot_media_marked;
+/* media sources: the real mviews.c (which nodes show a source, a new frame's damage, media_cover_node) over one test
+ * source, MV_MEDIA_ID, a "video" whose frames are flat colours from frame_seq, painted opaque over the whole box
+ * (test_media_views) */
+enum { MV_MEDIA_ID = 4343 };
+static MediaSrc mv_src;
+MediaSrc *media_src_at(int i) { return i == 0 && mv_src.used ? &mv_src : NULL; }
+MediaSrc *media_src_get(int id) { return mv_src.used && id == mv_src.id ? &mv_src : NULL; }
+static uint32_t mv_colour(unsigned seq) { return 0xff000000u | ((seq * 0x3b5d1fu + 0x204080u) & 0xffffffu); }
 void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) {
-    (void)node; (void)r;
+    (void)r;
     if (id == PROT_MEDIA_ID) canvas_rrect(c, x, y, w, h, 0, ((uint32_t)(op * 255 + 0.5f) << 24) | 0xd01010);
+    MediaSrc *s = media_src_get(id);
+    if (!s) return;
+    Node *nd = node_get(node);
+    if (nd && nd->crop) { media_src_view_drop(s, node); return; }
+    s->node = node;                                         /* as mview.c's media_paint */
+    media_src_view_note(s, node, (int)lroundf(w), (int)lroundf(h));
+    canvas_rrect(c, x, y, w, h, 0, mv_colour(s->frame_seq));
 }
 int media_id_protected(int id) { return id == PROT_MEDIA_ID && prot_media_marked; }
 void media_paint_note(Canvas *c, int id, int node, float x, float y, float w, float h, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)op; }
-int media_cover_node(float x0, float y0, float x1, float y1) { (void)x0; (void)y0; (void)x1; (void)y1; return 0; }
 int gpu_active(void) { return test_gpu; }
 void lbf_input(uint64_t ev_ns) { (void)ev_ns; }   /* bench/lbinput.c: only lbi_path is used */
 
@@ -1153,6 +1168,107 @@ static int full_differs(Node *root, int w, int h, int *where) {
             if (dv > worst) { worst = dv; *where = i; }
         }
     return worst;
+}
+
+/* One moving wallpaper on three displays (sdk/motion.jsx: one player per file, a <MediaView> per display). Up to
+ * 0.8.9.6.2 the source remembered only the node painted last: a new frame damaged that display's copy alone, the
+ * others stayed on an old frame (and showed patches of the new one where something else repainted them). Now every
+ * plain node showing the source is damaged by a new frame, only inside its own box; each one covers its own damage
+ * (media_cover_node); nodes that die, show another source or a part of it are dropped. */
+static int mv_rect_in(Box r, Node *const *v, int n) {
+    for (int i = 0; i < n; i++)
+        if (v[i] && r.x0 >= floorf(v[i]->ax) && r.y0 >= floorf(v[i]->ay) && r.x1 <= ceilf(v[i]->ax + v[i]->w) && r.y1 <= ceilf(v[i]->ay + v[i]->h)) return 1;
+    return 0;
+}
+/* the boxes a new frame damaged: how many, all inside a view, and their area */
+static int mv_damage(Node *const *v, int n, float *area, int *outside) {
+    *area = 0; *outside = 0;
+    for (int i = 0; i < ui.dlist.n; i++) {
+        Box r = ui.dlist.r[i];
+        if (r.x1 <= r.x0 || r.y1 <= r.y0) continue;
+        *area += (r.x1 - r.x0) * (r.y1 - r.y0);
+        if (!mv_rect_in(r, v, n)) (*outside)++;
+    }
+    return ui.dlist.n;
+}
+static void test_media_views(void) {
+    enum { DW = 120, DH = 80, W = 3 * DW, H = DH };
+    int was_multi = paint_multi_damage;
+    paint_multi_damage = 1;
+    ui_reset();
+    memset(&mv_src, 0, sizeof mv_src);
+    static uint8_t ring[4];
+    mv_src = (MediaSrc){ .used = 1, .id = MV_MEDIA_ID, .kind = SK_PLAYER, .sock = -1, .cur_slot = -1, .map = ring, .w = DW, .h = DH };
+    mv_src.view.bg = 0xff000000u;
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xff202020);
+    Node *v[3];
+    for (int i = 0; i < 3; i++) {                                   /* each display's MotionWallpaper */
+        Node *d = box_in(root, (float)(i * DW), 0, DW, DH, 0xff303030);     /* its still wallpaper */
+        v[i] = node_new(NODE_MEDIA);
+        node_append(d, v[i]);
+        ss(v[i], "position", "absolute");
+        sn(v[i], "left", 0); sn(v[i], "top", 0); sn(v[i], "width", DW); sn(v[i], "height", DH);
+        v[i]->term = MV_MEDIA_ID;
+    }
+    Node *clock = box_in(root, 10, 10, 30, 12, 0xffe0e0e0);         /* something else on the first display */
+    render(root, W, H);
+    CHECK(media_src_view_count(&mv_src) == 3, "three displays show the one player: %d", media_src_view_count(&mv_src));
+    int bw = 0, bh = 0;
+    CHECK(media_src_view_box(&mv_src, &bw, &bh) && bw == DW && bh == DH, "the helper scales to one display's box: %dx%d", bw, bh);
+    /* a new frame: every copy damaged, nothing outside them, and a partial repaint equals a full one */
+    float area;
+    int outside, where = 0;
+    for (int f = 0; f < 3; f++) {
+        ui.damage = (Box){ 0, 0, 0, 0 };
+        mv_src.frame_seq++;
+        media_src_damage(&mv_src);
+        int n = mv_damage(v, 3, &area, &outside);
+        CHECK(n == 3 && outside == 0 && area == 3.0f * DW * DH, "frame %d: %d boxes damaged, %d outside the views, area %.0f", f, n, outside, area);
+        for (int i = 0; i < 3; i++)
+            CHECK(media_cover_node(v[i]->ax, v[i]->ay, v[i]->ax + v[i]->w, v[i]->ay + v[i]->h) == v[i]->id, "display %d's view covers its own damage", i);
+        int nr;
+        float pa;
+        CHECK(paint_partial(root, W, H, &nr, &pa) == 1, "frame %d: painted in part", f);
+        for (int i = 0; i < 3; i++) {
+            int cx = (int)(v[i]->ax + 60), cy = (int)(v[i]->ay + 60);
+            CHECK(fb[cy * W + cx] == mv_colour(mv_src.frame_seq), "frame %d: display %d shows it (%08x, want %08x)", f, i, fb[cy * W + cx], mv_colour(mv_src.frame_seq));
+        }
+        CHECK((fb[15 * W + 20] & 0xffffff) == 0xe0e0e0, "frame %d: the clock over the first copy is still drawn", f);
+        CHECK(full_differs(root, W, H, &where) == 0, "frame %d: partial repaint equals a full one", f);
+    }
+    /* a part of the picture changed (Machines' damage_rect): with several copies, each one whole, none outside */
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    mv_src.frame_seq++;
+    int k = media_src_damage_rect(&mv_src, 10, 10, 4, 4);
+    int n = mv_damage(v, 3, &area, &outside);
+    CHECK(k == 3 && n == 3 && outside == 0, "damage_rect: %d nodes, %d boxes, %d outside", k, n, outside);
+    render(root, W, H);
+    /* the third display's view now shows another source, the second's is destroyed: only the first one is left */
+    v[2]->term = MV_MEDIA_ID + 1;
+    node_invalidate(v[2]);
+    node_destroy(v[1]->parent);
+    v[1] = NULL;
+    render(root, W, H);
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    mv_src.frame_seq++;
+    media_src_damage(&mv_src);
+    n = mv_damage(v, 1, &area, &outside);
+    CHECK(media_src_view_count(&mv_src) == 1 && n == 1 && outside == 0 && area == (float)DW * DH, "retargeted and destroyed views dropped: %d views, %d boxes, %d outside", media_src_view_count(&mv_src), n, outside);
+    CHECK(mv_src.node == v[0]->id, "the node painted last follows the live view: %d", mv_src.node);
+    CHECK(media_cover_node(v[2]->ax, 0, v[2]->ax + DW, DH) == 0, "the retargeted view covers nothing for this source");
+    /* a view that shows a part of the picture now (Node.crop) is no longer a whole copy */
+    float crop[4] = { 0, 0, DW / 2, DH };
+    v[0]->crop = malloc(sizeof crop);
+    memcpy(v[0]->crop, crop, sizeof crop);
+    node_invalidate(v[0]);
+    render(root, W, H);
+    CHECK(media_src_view_count(&mv_src) == 0 && mv_src.node == 0, "a crop node is not a whole copy: %d views", media_src_view_count(&mv_src));
+    (void)clock;
+    ui_reset();
+    mv_src.used = 0;
+    paint_multi_damage = was_multi;
 }
 
 static void test_multi_damage(void) {
@@ -4394,6 +4510,7 @@ int main(int argc, char **argv) {
     test_node_ref();
     test_backdrop_band();
     test_multi_damage();
+    test_media_views();
     test_text_child_damage();
     test_minimize_damage();
     test_hidden_blur_damage();

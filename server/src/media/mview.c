@@ -109,7 +109,7 @@ static void paint_crop(Canvas *c, MediaSrc *s, int node, const float *r, float x
         else if (free_at < 0 && (!s->crop_nodes[i] || !node_get(s->crop_nodes[i]) || node_get(s->crop_nodes[i])->term != s->id)) free_at = i;
     }
     if (!known && free_at >= 0) s->crop_nodes[free_at] = node;
-    if (s->node == node) s->node = 0;
+    media_src_view_drop(s, node);      /* it showed all of the picture before */
     int sw, sh;
     const uint32_t *px = pixels_of(s, &sw, &sh);
     if (!px) return;
@@ -144,13 +144,18 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     if (nd && nd->crop) { paint_crop(c, s, node, nd->crop, x, y, w, h, op); return; }
     s->node = node;
     int bw = (int)lroundf(w), bh = (int)lroundf(h);
-    s->box_w = bw;
-    s->box_h = bh;
-    /* the helper scales to the box size: it's notified when it changes */
-    if ((s->kind == SK_PLAYER || s->kind == SK_CAMERA) && s->sock >= 0 && (bw != s->sent_w || bh != s->sent_h)) {
-        int rw = (s->view.rot % 180) ? bh : bw, rh = (s->view.rot % 180) ? bw : bh;
+    /* every node showing all of it is remembered (mviews.c): one player on several displays damages each one */
+    media_src_view_note(s, node, bw, bh);
+    /* the helper scales to the box size: it's notified when it changes. Several boxes (a moving wallpaper on
+     * displays of different sizes): the largest one, the others scaled down here (never a size sent per paint) */
+    int hw, hh;
+    if (!media_src_view_box(s, &hw, &hh)) { hw = bw; hh = bh; }
+    s->box_w = hw;
+    s->box_h = hh;
+    if ((s->kind == SK_PLAYER || s->kind == SK_CAMERA) && s->sock >= 0 && (hw != s->sent_w || hh != s->sent_h)) {
+        int rw = (s->view.rot % 180) ? hh : hw, rh = (s->view.rot % 180) ? hw : hh;
         if (s->view.zoom > 0 || s->view.fit) { rw = 0; rh = 0; }      /* with zoom: original size */
-        if (rw > 0 && mp_sendv(s->sock, MM_SIZE, 0, rw, rh, 0, 0) == 0) { s->sent_w = bw; s->sent_h = bh; }
+        if (rw > 0 && mp_sendv(s->sock, MM_SIZE, 0, rw, rh, 0, 0) == 0) { s->sent_w = hw; s->sent_h = hh; }
     }
     Rect old = canvas_push_clip(c, x, y, w, h);
     int sw, sh;
@@ -330,25 +335,7 @@ void media_paint_note(Canvas *c, int handle, int node, float x, float y, float w
     wl_paint_media(c, s->id, node, x, y, w, h, dx, dy, dw, dh, 0, 0, (float)sw, (float)sh, op);
 }
 
-/* The frame of a video or of the camera covers its whole box (the bands are painted opaque): if everything
- * that changed is inside, what's beneath that node isn't visible. */
-int media_cover_node(float x0, float y0, float x1, float y1) {
-    if (x1 <= x0 || y1 <= y0) return 0;
-    for (int i = 0; i < MEDIA_MAX_SRC; i++) {
-        MediaSrc *s = media_src_at(i);
-        if (!s) continue;
-        if (!s->node || (s->kind != SK_PLAYER && s->kind != SK_CAMERA) || (s->view.bg >> 24) != 255 || !s->map) continue;
-        Node *n = node_get(s->node);
-        if (!n || n->type != NODE_MEDIA || n->term != s->id || n->s.opacity < 1 || n->s.radius > 0) continue;
-        /* the box must be visible and without transparency in the ancestors */
-        int ok = 1;
-        for (Node *p = n; p && ok; p = p->parent) if (p->s.display_none || p->s.opacity < 1) ok = 0;
-        if (!ok) continue;
-        float nx0 = floorf(n->ax), ny0 = floorf(n->ay), nx1 = ceilf(n->ax + n->w), ny1 = ceilf(n->ay + n->h);
-        if (x0 >= nx0 && y0 >= ny0 && x1 <= nx1 && y1 <= ny1) return n->id;
-    }
-    return 0;
-}
+/* media_cover_node: mviews.c */
 
 int media_src_to_screen(int id, float u, float v, float *x, float *y) {
     MediaSrc *s = media_src_get(id);

@@ -11,6 +11,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Fixed
+- **A moving wallpaper on several displays: every display's copy moves, and none spills over another** (found testing
+  0.8.9.6.2 on three 1920×1080 monitors). Settings → Wallpaper → a moving wallpaper for all displays plays one video per
+  file (one hardware decoder, `sdk/motion.jsx`) and each display draws it in its own `<MediaView>`. lord-server's media
+  source remembered only the plain media node it had painted last (`MediaSrc.node`, the rightmost display), so a new
+  frame damaged that display's copy alone: the other displays stayed on an old frame, and wherever something else
+  repainted part of them (the clock, a hover, a window moving) a patch of the current frame was drawn into the old one,
+  the moving picture seeming to spill over the neighbouring monitor. Playback itself was fine (the log showed the
+  frames decoded and shown). A source now keeps every plain node that shows all of it (`view_nodes`, up to 16, beside
+  the crop nodes Machines' apps mode already had), pruned when a node dies, shows another source or only a part of it:
+  a new frame damages each node's own box and nothing outside them, a GPU picture's present covers all of them,
+  `media_cover_node` lets each display's repaint start from its own copy, and the helper scales frames to the largest
+  box shown (the smaller copies are scaled down in lord-server, never a new size asked per paint). With one node, a
+  frame that changed only a part (a machine's clock) still damages only that part. The node bookkeeping moved to
+  `server/src/media/mviews.c`, which engine-test links: the new `test_media_views` puts one player on three displays and
+  checks that each frame damages exactly the three boxes, each display covers its own damage, a partial repaint shows
+  the new frame on all three and equals a full repaint, and retargeted, destroyed and cropped nodes are dropped.
 - **Settings → Wallpaper: a much larger picture, and the whole wallpaper over the window** (asked for while testing
   0.8.9.6.2). The sheet's picture takes up to 60 % of the window (900 px at most, it was 480), and a click on it ("Click
   to enlarge") shows the wallpaper whole over the window, uncropped, with its name; the arrows and ← → still step, and a

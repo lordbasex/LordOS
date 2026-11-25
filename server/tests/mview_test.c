@@ -24,6 +24,9 @@ int wl_paint_media(Canvas *c, int sid, int node, float bx, float by, float bw, f
 }
 void media_src_need_cpu(MediaSrc *s) { (void)s; }
 void media_src_tex_fresh(MediaSrc *s) { (void)s; }
+void media_src_view_note(MediaSrc *s, int node, int bw, int bh) { (void)s; (void)node; (void)bw; (void)bh; }
+void media_src_view_drop(MediaSrc *s, int node) { if (s->node == node) s->node = 0; }
+int media_src_view_box(MediaSrc *s, int *bw, int *bh) { (void)s; *bw = *bh = 0; return 0; }
 
 static int fails, checks;
 #define CHECK(cond, what) do { checks++; if (!(cond)) { fails++; fprintf(stderr, "FAIL: %s\n", what); } } while (0)
