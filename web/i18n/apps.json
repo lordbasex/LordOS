@@ -534,21 +534,21 @@
     },
     "features": {
       "en": [
-        "In development (after 0.8.9.5)",
+        "Since 0.8.9.6",
         "A live preview with background blur, a picture or a short video behind you, Face Light, Auto Framing, filters and retouch",
         "Mic Mode: Standard, Noise Reduction or Full Range",
         "Browsers and other apps get the effects by choosing the “LordOS Studio” camera (LordOS Studio Camera, from the Store)",
         "Also from the capture indicator by the clock, while an app uses the camera or the microphone"
       ],
       "es": [
-        "En desarrollo (después de la 0.8.9.5)",
+        "Desde la 0.8.9.6",
         "Vista en vivo con fondo desenfocado, una imagen o un video corto detrás tuyo, Luz para el rostro, Encuadre automático, filtros y retoque",
         "Modo de micrófono: Estándar, Reducción de ruido o Rango completo",
         "Los navegadores y otras apps reciben los efectos eligiendo la cámara «LordOS Studio» (LordOS Studio Camera, desde la Tienda)",
         "También desde el indicador de captura junto al reloj, mientras una app usa la cámara o el micrófono"
       ],
       "pt": [
-        "Em desenvolvimento (depois da 0.8.9.5)",
+        "Desde a 0.8.9.6",
         "Visualização ao vivo com fundo desfocado, uma imagem ou um vídeo curto atrás de você, Luz no rosto, Enquadramento automático, filtros e retoque",
         "Modo de Microfone: Padrão, Redução de ruído ou Faixa completa",
         "Navegadores e outros apps recebem os efeitos escolhendo a câmera “LordOS Studio” (LordOS Studio Camera, pela Loja)",
@@ -653,7 +653,8 @@
         "The system file dialog looks and works like Files (0.8.8)",
         "Markup in Quick Preview: crop, resize, redact, arrows and text (0.8.8.4)",
         "CDs and DVDs mount read-only; Cloud and network folders never freeze the desktop (0.8.8.7)",
-        "Resizable columns; copy, paste and drag to and from Linux apps (0.8.8.8)"
+        "Resizable columns; copy, paste and drag to and from Linux apps (0.8.8.8)",
+        "Rename with a slow second click or F2, and select with a rubber band (0.8.9.6)"
       ],
       "es": [
         "Pestañas y cuatro vistas: íconos, lista, columnas, galería",
@@ -664,7 +665,8 @@
         "El diálogo de archivos del sistema se ve y funciona como Archivos (0.8.8)",
         "Marcar en la Vista rápida: recortar, cambiar tamaño, tapar zonas, flechas y texto (0.8.8.4)",
         "Los CD y DVD se montan en solo lectura; las carpetas de la Nube y de red nunca congelan el escritorio (0.8.8.7)",
-        "Columnas que se ensanchan; copiar, pegar y arrastrar desde y hacia apps de Linux (0.8.8.8)"
+        "Columnas que se ensanchan; copiar, pegar y arrastrar desde y hacia apps de Linux (0.8.8.8)",
+        "Renombrá con un segundo clic lento o F2, y seleccioná con un rectángulo (0.8.9.6)"
       ],
       "pt": [
         "Abas e quatro visões: ícones, lista, colunas, galeria",
@@ -675,7 +677,8 @@
         "O diálogo de arquivos do sistema parece e funciona como o Arquivos (0.8.8)",
         "Marcar na Visualização rápida: recortar, redimensionar, tapar áreas, setas e texto (0.8.8.4)",
         "CDs e DVDs montados só para leitura; pastas da Nuvem e de rede nunca congelam o desktop (0.8.8.7)",
-        "Colunas redimensionáveis; copiar, colar e arrastar de e para apps Linux (0.8.8.8)"
+        "Colunas redimensionáveis; copiar, colar e arrastar de e para apps Linux (0.8.8.8)",
+        "Renomeie com um segundo clique lento ou F2, e selecione com um retângulo (0.8.9.6)"
       ]
     }
   },
@@ -746,7 +749,8 @@
         "Each app's sites, addresses and ports as a tree, and on a world map",
         "Allow or block an app, or one destination, with a switch",
         "Temperatures and fans in the Cooling tab",
-        "New in 0.8.7: a Voltage view on machines that report voltages"
+        "New in 0.8.7: a Voltage view on machines that report voltages",
+        "New in 0.8.9.6: a GPU view with each engine's use, memory by process type, the PCIe link and the AI running on this computer; NVIDIA cards through a sandboxed helper (in development)"
       ],
       "es": [
         "Gráficos en vivo de CPU, memoria, red y disco",
@@ -754,7 +758,8 @@
         "Los sitios, direcciones y puertos de cada app en un árbol y en un mapa del mundo",
         "Permití o bloqueá una app, o un destino, con un interruptor",
         "Temperaturas y ventiladores en la pestaña Refrigeración",
-        "Nuevo en 0.8.7: una vista Voltaje en las máquinas que informan voltajes"
+        "Nuevo en 0.8.7: una vista Voltaje en las máquinas que informan voltajes",
+        "Nuevo en la 0.8.9.6: una vista de GPU con el uso de cada motor, la memoria por tipo de proceso, el enlace PCIe y la IA que corre en esta computadora; las placas NVIDIA a través de un ayudante aislado (en desarrollo)"
       ],
       "pt": [
         "Gráficos ao vivo de CPU, memória, rede e disco",
@@ -762,7 +767,8 @@
         "Os sites, endereços e portas de cada app em uma árvore e em um mapa-múndi",
         "Permita ou bloqueie um app, ou um destino, com um botão",
         "Temperaturas e ventoinhas na aba Resfriamento",
-        "Novo na 0.8.7: uma visão Tensão nas máquinas que informam tensões"
+        "Novo na 0.8.7: uma visão Tensão nas máquinas que informam tensões",
+        "Novo na 0.8.9.6: uma visão de GPU com o uso de cada motor, a memória por tipo de processo, o link PCIe e a IA que roda neste computador; as placas NVIDIA por um ajudante isolado (em desenvolvimento)"
       ]
     }
   },
@@ -918,19 +924,22 @@
         "Back up to an external disk or a folder",
         "Runs on a schedule, with exclusions",
         "Browse backups by date and restore files",
-        "Optional encryption"
+        "Optional encryption",
+        "Restore several files and folders at once (0.8.9.6)"
       ],
       "es": [
         "Copiá a un disco externo o a una carpeta",
         "Corre con un horario, con exclusiones",
         "Recorré las copias por fecha y restaurá archivos",
-        "Cifrado opcional"
+        "Cifrado opcional",
+        "Restaurá varios archivos y carpetas a la vez (0.8.9.6)"
       ],
       "pt": [
         "Copie para um disco externo ou uma pasta",
         "Roda com agendamento, com exclusões",
         "Navegue pelas cópias por data e restaure arquivos",
-        "Criptografia opcional"
+        "Criptografia opcional",
+        "Restaure vários arquivos e pastas de uma vez (0.8.9.6)"
       ]
     }
   },
@@ -1266,6 +1275,7 @@
       "en": [
         "Since 0.8.8.5",
         "Since 0.8.9.5: Windows 11 machines with an install without questions, sound and microphone, Bridged and Host-only networks, 3D for Linux machines and apps mode",
+        "Since 0.8.9.6: encrypted machines, your USB devices and camera in a machine, the Whonix (Tor) group, All Displays and a tighter sandbox",
         "Download a Linux system from one of four projects, checked against its maker's signed checksums",
         "Most of them install without questions",
         "Suspend, snapshots, Clone and Duplicate",
@@ -1276,6 +1286,7 @@
       "es": [
         "Desde la 0.8.8.5",
         "Desde la 0.8.9.5: máquinas Windows 11 que se instalan sin preguntas, sonido y micrófono, redes En puente y Solo anfitrión, 3D para máquinas Linux y modo apps",
+        "Desde la 0.8.9.6: máquinas cifradas, tus dispositivos USB y tu cámara en una máquina, el grupo Whonix (Tor), Todas las pantallas y un aislamiento más estricto",
         "Descargá un sistema Linux de cuatro proyectos, verificado con las sumas firmadas de quien lo publica",
         "La mayoría se instala sin preguntas",
         "Suspender, instantáneas, Clonar y Duplicar",
@@ -1286,6 +1297,7 @@
       "pt": [
         "Desde a 0.8.8.5",
         "Desde a 0.8.9.5: máquinas Windows 11 que se instalam sem perguntas, som e microfone, redes Em ponte e Somente host, 3D para máquinas Linux e modo apps",
+        "Desde a 0.8.9.6: máquinas criptografadas, seus dispositivos USB e sua câmera numa máquina, o grupo Whonix (Tor), Todas as telas e um isolamento mais rígido",
         "Baixe um sistema Linux de quatro projetos, verificado com as somas assinadas de quem o publica",
         "A maioria se instala sem perguntas",
         "Suspender, snapshots, Clonar e Duplicar",

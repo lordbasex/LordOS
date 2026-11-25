@@ -45,6 +45,7 @@ The three run on the same display server, the same interface engine and the same
 - **The Control Atlas**: light or dark, high contrast, the effects style (Opaque, Translucent or Crystal), the accent colour, the wallpaper, the layout and your activities, in one place.
 - **Widgets**: 21 of them, in six groups, on a grid of each display. They all read from one shared feed, and only while you can see them: a widget behind a window, on a display that is off, or while the session is locked reads nothing.
 - **Its own look**: a pink accent and the Cyberpunk City HD wallpapers by default, an optional slideshow, and a pointer filled with your accent colour.
+- **The bar on each display (since 0.8.9.6)** lists the activity's windows there, open and minimized, and a click brings one back to its place. A window you launch from a display goes to that display and that activity, in its slot, even if you switched meanwhile. Chrome, Chromium, Brave and Edge open in the profile you use in that activity, and Chrome's Save as uses LordOS's own file dialog.
 
 **Who it's for:** anyone who works with many windows, or with two or three monitors.
 

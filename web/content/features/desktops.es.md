@@ -45,6 +45,7 @@ Los tres corren sobre el mismo servidor gráfico, el mismo motor de interfaz y l
 - **El Control Atlas**: claro u oscuro, alto contraste, el estilo de efectos (Opaco, Translúcido o Cristal), el color de acento, el fondo, la disposición y tus actividades, en un solo lugar.
 - **Widgets**: 21, en seis grupos, sobre una grilla de cada pantalla. Todos leen de un mismo canal compartido, y solo mientras los ves: un widget detrás de una ventana, en una pantalla apagada o con la sesión bloqueada no lee nada.
 - **Su propio estilo**: un acento rosa y los fondos de Cyberpunk City HD de fábrica, una presentación de fondos opcional y un puntero relleno con tu color de acento.
+- **La barra de cada pantalla (desde la 0.8.9.6)** muestra las ventanas de la actividad en esa pantalla, abiertas y minimizadas, y un clic devuelve una a su lugar. Una ventana que abrís desde una pantalla va a esa pantalla y a esa actividad, en su lugar, aunque mientras tanto hayas cambiado. Chrome, Chromium, Brave y Edge abren en el perfil que usás en esa actividad, y Guardar como de Chrome usa el diálogo de archivos propio de LordOS.
 
 **Para quién es:** quien trabaja con muchas ventanas, o con dos o tres monitores.
 
