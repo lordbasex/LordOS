@@ -88,7 +88,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Raspberry Pi page, the Imager guide, About and the 404 page. On the /language/ page the 3D Lumo waves with an open
     paw that cannot hold a stick, so the small Argentine flag now stands planted on the embassy's steps at the side Lumo
     waves to, swaying gently (still off with reduced motion).
-  - **The Imager for Mac, Windows and Linux** (`desktop/imager`) draws the same renders, 128 px with the 256 px one for
+  - **The desktop Imager** (`desktop/imager`, the one for other computers) draws the same renders, 128 px with the 256 px one for
     2x screens (`srcset`).
   - **Alt text:** "Lumo asleep on a laptop" no longer matches the picture (the 3D Lumo sleeps curled up, with no laptop):
     it is "Lumo curled up asleep" now, in all 35 languages.
