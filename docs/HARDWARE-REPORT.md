@@ -228,6 +228,37 @@ and later; #171's Alder Lake has no integrated GPU); hybrid laptops with two GPU
 (unchecked in every report file; only #14's Wi-Fi after waking is reported); ARM machines other than the reference
 Raspberry Pi 5.
 
+## Toolkits (the optional "toolkits" section, in development)
+
+Since the toolkit audit (docs/TOOLKIT-AUDIT.md), a report can also say how GTK 3, GTK 4, Qt 5, Qt 6 and a plain X11
+client did on that machine. It is optional and off by default: System Information → Report → Share on GitHub →
+**Include framework compatibility** uses `lordos-testbench --toolkits`' result from the last day, or opens the audit
+in a Terminal window and waits for a new one. No report so far has it.
+
+- **What it carries** (`apps/sysinfo/hwreport.schema.json`, `$defs/toolkits`): `v` 1, the day it ran, the global
+  score, how many combinations ran, and per combination (at most 9) its id, status, fatal word, toolkit version,
+  the backend it saw, score, points, total, skipped count, milliseconds, the failed and skipped check ids, the
+  protocol counts (globals bound and failed, binds outside the table, errors, unattributed errors) and the
+  recommended variable (`GDK_BACKEND=x11` or `QT_QPA_PLATFORM=xcb`). An optional `detail` may hold at most 80
+  printable ASCII characters without `/`; the audit itself never writes one.
+- **How it is built** (`apps/sysinfo/toolkits.js`): from the saved file, keeping only known ids and numbers, then
+  picked through the schema like the rest of the report. A hand-edited saved file can't put text into a report.
+- **The report stays format 1.** Without the tick the key is absent, so such a report is exactly what older
+  checkers know.
+- **The workflow** (`tools/hwreport/lib.mjs`): the schema's lists (9 combinations, 6 statuses, the fatal words,
+  the 14 shared check ids and `global.<interface>` for the 48 globals of the protocol table), the privacy scan over
+  every string, two plausibility flags (`toolkits-date`, a day in the future; `toolkit-score`, a score that isn't
+  its points), a "Toolkits" row in the comment, and the labels `toolkit:<combination>-fail` for a combination that
+  crashed or scored under 80 % (docs/RELEASING.md lists all 42 labels).
+- **lordos.org/hardware** shows each machine's scores under its card when its report has them.
+- **The signed snapshot** keeps `lordos-hwsnapshot` version 1. `server/src/sysreport/hwsnap.c` accepts an optional
+  `toolkits` field (per combination and LordOS version: reports, failures, mean score), checked as strictly as the
+  devices, and `apps/sysinfo/community.js` ignores it. `tools/hwreport/catalog.mjs` writes it only with
+  `--toolkits`: the readers of 0.8.9.6.1 and older accept exactly five fields and `lordos-hwdata` reaches them
+  between releases, so the default snapshot stays in that shape (`build/hwsnap-test` and
+  `tests/hwreport_test.mjs` check it against the old reader's rule). Turn it on once no supported release reads
+  the snapshot with the old check.
+
 ## Thanks
 
 Thank you to everyone who took the time to report how LordOS runs on their machine, and to those who came back to

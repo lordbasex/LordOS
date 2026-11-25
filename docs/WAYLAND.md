@@ -1881,7 +1881,10 @@ trusted programs show as not offered). The number is the version of the protocol
 
 On an installed system, without the repository, `lordos-testbench --toolkits` scores what real toolkits see instead
 (GTK 3 and 4, Qt 5 and 6 on both backends, and a plain X11 client under Xwayland): see
-[TOOLKIT-AUDIT.md](TOOLKIT-AUDIT.md).
+[TOOLKIT-AUDIT.md](TOOLKIT-AUDIT.md). This script runs the same audit (the same harnesses and scoring, from this
+tree) against its headless server and reports it as a separate `toolkits` section when the bindings are installed;
+it doesn't change the globals' scores. Its results can also travel in a hardware report
+([HARDWARE-REPORT.md](HARDWARE-REPORT.md), "Toolkits").
 
 A script checks the compositor **point by point** against the protocol XML files and gives every advertised
 global, and every X11 area, a score from 0 to 100 %. The numbers below are from 2026-11-22 (X11 re-recorded after "Always on top", branch `feat/always-on-top`)

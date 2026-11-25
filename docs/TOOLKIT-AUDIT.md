@@ -10,7 +10,11 @@ the other question: what does a real GTK or Qt app see here?
 lordos-testbench --toolkits                       # the table, then the matrix of Wayland globals bound
 lordos-testbench --toolkits --json                # the result below, one line
 lordos-testbench --toolkits --only gtk4-wayland,qt6-xcb
+lordos-testbench --toolkits --last                # the saved result, checked and summed up (what lordos-issue adds)
 ```
+
+There is also a launcher entry, **Toolkit Audit** (`lordos-toolkit-audit.desktop`), that runs it in a Terminal
+window; System Information opens it for the hardware report (below).
 
 Run it inside a LordOS session (it needs the session's Wayland socket and, for the X11 rows, `DISPLAY`). Each
 harness opens one 600x400 window for a second or two, one after the other, and takes the clipboard for a moment.
@@ -170,6 +174,26 @@ are only ever added (`v` changes if one changes meaning).
 | `matrix.globals` | the 48 interfaces, in the table's order |
 | `matrix.rows[].cells` | one per global: the version bound, `0` not bound, negative (minus the version) when a protocol error was attributed to it |
 
+## Where the result goes
+
+The saved file (`~/.cache/lordos/toolkit-audit.json`) is read by three things, and each treats it as the person's own
+file that may have been edited:
+
+- **The hardware report.** System Information → Report → Share on GitHub → **Include framework compatibility**
+  (off by default, never remembered). A result from the last day is used as it is; an older one or none opens the
+  Toolkit Audit entry in a Terminal window (System Information runs no command itself) and waits up to three
+  minutes for a newer file. `apps/sysinfo/toolkits.js` builds the report's optional `toolkits` section from known
+  ids and numbers, and the schema drops anything else: see docs/HARDWARE-REPORT.md, "Toolkits".
+- **`lordos-issue`** runs `lordos-testbench --toolkits --last` as the person. It reads the file without following a
+  link (a regular file of theirs, at most 256 KiB), parses it strictly, and prints a few English lines (the age,
+  the global score, each combination's score, version and failed check ids, a recommendation) only when every
+  value is a known id, status, fatal word, check id, `[0-9A-Za-z.+~-]` version or number. Anything else gives one
+  line, "the saved result is unreadable".
+- **`tools/wl-conformance.mjs`** (developers) runs `build/lordos-testbench --toolkits --json` with this tree's
+  harnesses (`LORDOS_TOOLKIT_AUDIT_DIR=tools/toolkit-audit`) against its own headless lord-server, with a private
+  `XDG_CACHE_HOME`, and adds the result as its `toolkits` section (`--no-toolkits` skips it). It changes none of the
+  48 globals' scores.
+
 ## Tests
 
 `make -C server test` builds and runs `build/toolkit-audit-test` (`server/tests/toolkit_audit_test.c`), with
@@ -200,4 +224,10 @@ ASan and UBSan. It covers:
   - a failed import probe, `installed: false`, a missing harness and a missing `python3`;
   - the saved file's modes and contents.
 
-The harnesses have their own checks (`tools/toolkit-audit/x11_test.py` against Xvfb).
+- **`--last`** on the JSON the audit writes (the age in minutes, hours or days, a crash with its signal, a
+  failed check), and on hand-edited files: another tool, an unknown combination, a version with shell characters,
+  an unknown status, a path as a fatal word, a check id or a result, an `LD_PRELOAD=` recommendation, a text signal
+  and another `v`. Each is refused as a whole and none of its text is printed. A link to the file is not followed.
+
+The harnesses have their own checks (`tools/toolkit-audit/x11_test.py` against Xvfb). The report side is tested by
+`server/tests/hwreport_test.mjs` and `build/hwsnap-test` (docs/HARDWARE-REPORT.md).
