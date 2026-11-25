@@ -3,7 +3,7 @@
 The technical paper (https://lordos.org/paper/, `docs/PAPER.md`) makes claims about LordOS. This page was
 written against its 0.8.0 edition and lists each claim with how it is checked today and its state in 0.8.5, with rows added for the
 0.8.6 edition (published with the 0.8.6-beta release on 2026-10-30) and for what the paper marks in 0.8.7, and one section per 0.8.8.x release up to 0.8.8.9 (2026-11-15), and one for 0.8.9 (2026-11-18; the 0.8.8.10 pre-release
-never shipped) and each 0.8.9.x release up to 0.8.9.5 (2026-11-23, the latest release and the paper's current edition), so anyone can see what is proven, what was measured once and what is not tested. **The rows marked
+never shipped) and each 0.8.9.x release up to 0.8.9.6 (2026-11-25, the latest release and the paper's current edition), so anyone can see what is proven, what was measured once and what is not tested. **The rows marked
 Outdated were corrected in the paper's 0.8.5 edition (2026-10-26; published with the 0.8.5-beta release on
 2026-10-27)**, which also separates whole-system
 memory from a process's RSS (§7.1) and points to versioned results (§11.5, `docs/RESULTS.md`).
@@ -363,6 +363,29 @@ pre-release that never shipped. The paper marked all of it "0.8.9, in developmen
 | 5.1 | A paused Cloud account sends nothing to its provider: no mount retries, check listing, quota call, background listing or change polling (#194) | Test (`cloud-test` `t_pause`: `cloud_bring_up_ok` and the `vfs/poll-interval` call) | Not yet with a real Google account or a packet capture |
 | 5.1 | The package installs `assets/cloud/providers.json`, so verified providers read verified (#195) | Test (`cloud_model_test.mjs`: mkdeb.sh installs `assets/cloud`, the fallback) | Not yet in a built .deb |
 
+## 0.8.9.6 (released 2026-11-25; the paper's edition of that day)
+
+The paper's edition of 2026-11-25 names 0.8.9.6 Beta as the latest release and turns every "in development after
+0.8.9.5" label into "since 0.8.9.6" (§0, §3.4, §3.5, §4.4, §5.1, §5.3, §5.4, §6.5, §6.11, §7.2, §10.1), except what
+has not run on real hardware, which stays "in development": `lord-nvgpu` on NVIDIA cards (and its sandbox under
+`strace` there), WebKit from LordOS's arm64 build of WPE WebKit 2.54 on the Raspberry Pi 5, and Sentinela (off by
+default, its models unpublished). The rows of "Work that became 0.8.9.6" below are the claims, checked as recorded
+there; this table adds what the release edition says that is new.
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 0, 10.1 | 0.8.9.6 Beta, released on 2026-11-25, is the latest release: an update of the package through the Store and `apt`, with no new images | `CHANGELOG.md` "0.8.9.6-beta"; `package.json` 0.8.9.6 | To verify at release (signed and published on the maintainer's Mac) |
+| 2.2, 5.1, 6.7 | `lord-nvgpu` is the only program that loads NVML (fixed system folders, empty environment), then `sandbox_apply_helper`: no network or sockets, no exec, Landlock read-only on the driver's files, NVIDIA's ioctl type only; numbers only, range-checked again in `lord-server`, which never links NVML | Test (`build/nvgpu-test`: ASan/UBSan, a 120,000-case parser fuzz, a fake NVML with canned, hostile, failing and hanging answers, a sandbox probe); `AGENTS.md` | Holds with the fake NVML; **in development** on NVIDIA hardware (not run, sandbox not checked with `strace`) |
+| 5.1 | Monitor → GPU's `/proc` walk every 5 s, about 0.45 ms a second on the RX 580 PC with 8 GPU processes (15 ms with about 600 processes before) | Measured (the author's PC); `build/gpustat-test`, `tests/gpu_model_test.mjs` | Measured once |
+| 3.5, 6.3 | The login screen's scale is kept only for an administrator, checked as root by `lord-sessiond` from the user it started the session for; strict parser, no new admin action | Test (`build/greeterscale-test`, 1,082 checks and 200,000 random inputs; `lid-test`; `display_layout_test.mjs`) | Holds; not yet seen on the VM with a screenshot |
+| 6.3 | `vm-usb-allow` serves only the session on the monitor, read as root from `lord-sessiond`'s own record (Claude Security F1, F3) | Test (`build/vmusb-test` seat cases; `tests/vm_usb_e2e.sh` with a real device and guest) | Holds |
+| 6.7 | The Claude Security review of 2026-11-24: 16 findings (F1–F16), all fixed in 0.8.9.6 | `CHANGELOG.md` "0.8.9.6-beta", Fixed; `vmusb-test`, `mcli-test`, `vmkeysrv_test`, `webapp_test`, `migration_guest_port_test.sh`, `procctl-test`, `monitor_procgroup_test.mjs` | Holds (each fix has its test) |
+| 6.7 | Machines' QEMU in its own namespaces and non-dumpable, a seccomp allowlist (96 rows on amd64, 92 on arm64), the disks folder `noexec` in its view | Test (`build/vm-test`, the seccomp table's build per architecture); real KVM runs (`tests/vm_storage_test.sh`) | Holds |
+| 5.4 | LordOS's WPE WebKit `2.54.3-1~lordos13+2` for Debian 13: same SONAME as trixie's 2.48 and none of its 930 exported symbols removed, no `libinput`/`libudev`; `web-backend-test` and the probe test pass on both backends on amd64 | `tools/pkg/build-wpewebkit.sh` (its test chroot), `docs/WPEWEBKIT.md` | Holds on amd64; **in development** on arm64 (WebKit not yet run on the Raspberry Pi 5) |
+| 7.2 | A fullscreen window's subsurface repaints its own box: 256,000 pixels a frame before, 15,416 after (#232) | Test (`tests/fsub_headless.sh` in `run_suites.sh`, every frame against a full repaint) | Holds headless; not measured on a GPU |
+| 5.1 | Every Machines card run from its verified download to the installed system's login on amd64 and the Raspberry Pi 5 (2026-11-24); the Whonix group's release gate on a PC (Tor reached, an onion site answered, only the gateway's Tor connections left the computer) | `CHANGELOG.md` "0.8.9.6-beta"; `tools/vm/e2e/machines/` | Verified on real hardware once |
+| 8 | Lord Workspaces' bar lists open and minimized windows; launches land on the display, activity and slot they came from; browser profiles only through `lord.apps.launchProfile` (fixed browser table, one argv element built in C) | Test (`tests/launchplace_headless.sh`, `build/apps-profile-test`, `browser_profiles_test.mjs`, `workspaces_scene.mjs`) | Holds headless; not yet on real monitors |
+
 ## 0.8.9.5 (released 2026-11-23; the paper's edition of that day)
 
 The paper's edition of 2026-11-23 names 0.8.9.5 Beta as the latest release and turns every "in development after
@@ -381,9 +404,10 @@ edition says that is new.
 | 10.3 | After 1.0, no Android container in LordOS: Android apps in the Store are for LordBridge, a separate project | The maintainer's decisions of 2026-11-22 and 2026-11-24; `docs/ROADMAP.md` ("Android"), `docs/LORDBRIDGE.md` | Design (replaces the earlier "Android container with LineageOS" plan) |
 | 5.1, 6.7 | Not yet tried on real hardware: LordOS Studio's virtual camera in browsers and OBS, the Secure Boot (MOK) enrolment, Mic Mode's Noise Reduction in a real call, the Raspberry Pi with this release | `CHANGELOG.md` "0.8.9.5-beta" (the release summary and the Studio entries) | Not yet |
 
-## In development after 0.8.9.5
+## Work that became 0.8.9.6 (then "in development after 0.8.9.5")
 
-The paper marks this work "in development (the latest release is 0.8.9.5)".
+The paper marked this work "in development (the latest release is 0.8.9.5)" until the release; since the edition of
+2026-11-25 it is "since 0.8.9.6".
 
 | § | Claim | How | State |
 |---|---|---|---|
