@@ -28,13 +28,16 @@ enum { CODEC_H264 = 1, CODEC_VP8 = 2 };
 
 typedef struct {
     AVCodecContext *c;
+    AVBufferRef *dev;               /* VA-API: the device it encodes on (kept to reopen at another rate) */
     AVBufferRef *frames;            /* VA-API surfaces */
     struct SwsContext *sws;
     AVFrame *yuv;
     AVPacket *pkt;
     int w, h, codec, hw, force_key, fps;
     const char *name;
-    unsigned kbps;
+    unsigned kbps;                  /* the rate asked for (MM_RATE) */
+    unsigned open_kbps;             /* VA-API: the rate it was opened with (it reads it only then) */
+    double opened_at;
     /* VA-API only: its first keyframe is decoded here before any packet goes out (lm_encheck.h, #94) */
     int checking, unchecked_frames;
     LmEncCheck chk;
@@ -42,6 +45,12 @@ typedef struct {
 
 #define VID_HWBAD (-1000)           /* the hardware encoder failed or made a stream no browser shows */
 #define VID_CHECK_FRAMES 8          /* frames the hardware encoder may take to give its first packet */
+/* VA-API's rate: FFmpeg's h264_vaapi reads it when it opens, so a new rate means a new encoder (and a
+ * keyframe). Only when the target moved by a fifth or more, and not more often than every 3 s upwards
+ * (the bridge raises it by a quarter a second on a clean link) or every second downwards (loss). */
+#define VID_RATE_STEP 20            /* percent */
+#define VID_RATE_UP_MS 3000
+#define VID_RATE_DOWN_MS 1000
 
 typedef struct {
     AVCodecContext *c;
@@ -101,11 +110,22 @@ static AVCodecContext *open_h264_vaapi(Vid *e, AVBufferRef *hw, int fps) {
     c->bit_rate = (int64_t)e->kbps * 1000;
     c->rc_max_rate = c->bit_rate;
     c->rc_buffer_size = (int)(c->bit_rate / 2);
+    /* the same colour tags as libx264's stream (open_sw): BT.709, limited range, sRGB transfer */
+    c->color_range = AVCOL_RANGE_MPEG;
+    c->colorspace = AVCOL_SPC_BT709;
+    c->color_primaries = AVCOL_PRI_BT709;
+    c->color_trc = AVCOL_TRC_IEC61966_2_1;
     av_opt_set(c->priv_data, "rc_mode", "VBR", 0);
-    if (avcodec_open2(c, codec, NULL) < 0) { av_buffer_unref(&fr); avcodec_free_context(&c); LM_LOG("VA-API does not encode H.264 here: libx264"); return NULL; }
+    /* one frame in flight, not FFmpeg's 2: each frame's packet comes out as that frame goes in, so the
+     * last frame of a change doesn't wait for the next frame (or the 70 ms flush frame, mstream.c) */
+    av_opt_set_int(c->priv_data, "async_depth", 1, 0);
+    av_opt_set_int(c->priv_data, "sei", 0, 0);            /* no identifier/timing/recovery SEI: browsers ignore them */
+    if (avcodec_open2(c, codec, NULL) < 0) { av_buffer_unref(&fr); avcodec_free_context(&c); return NULL; }
     e->frames = fr;
     e->hw = 1;
     e->name = "h264_vaapi";
+    e->open_kbps = e->kbps;
+    e->opened_at = lm_now_ms();
     return c;
 }
 
@@ -171,7 +191,9 @@ AVCodecContext *lm_stream_sw_encoder(int vp8, int w, int h, int fps, unsigned kb
     return open_sw(&e, vp8 ? "libvpx" : "libx264", fps);
 }
 
-static int vid_open(Vid *e, int codec, int w, int h, int fps, unsigned kbps, AVBufferRef *hw) {
+/* render: the render nodes lord-server sent, the compositor's first; the first one whose VA-API driver opens
+ * an H.264 encoder is kept (the next one is only tried if that fails), else libx264 */
+static int vid_open(Vid *e, int codec, int w, int h, int fps, unsigned kbps, const char *accel, const int *render, int nrender) {
     memset(e, 0, sizeof *e);
     e->codec = codec;
     e->w = w & ~1;
@@ -180,7 +202,14 @@ static int vid_open(Vid *e, int codec, int w, int h, int fps, unsigned kbps, AVB
     e->fps = fps;
     if (e->w < 16 || e->h < 16) return -1;
     if (codec == CODEC_H264) {
-        e->c = open_h264_vaapi(e, hw, fps);
+        for (int i = 0; i < nrender && !e->c; i++) {
+            AVBufferRef *hw = lm_hw_device(accel, render[i]);
+            if (!hw) continue;
+            e->c = open_h264_vaapi(e, hw, fps);
+            if (e->c) { e->dev = hw; LM_LOG("remote desktop video: H.264 on render node %d of %d", i + 1, nrender); }
+            else { LM_LOG("remote desktop video: render node %d of %d has VA-API but no H.264 encoder", i + 1, nrender); av_buffer_unref(&hw); }
+        }
+        if (!e->c && nrender) LM_LOG("VA-API does not encode H.264 on any of the %d render nodes: libx264", nrender);
         if (!e->c) e->c = open_sw(e, "libx264", fps);
     } else e->c = open_sw(e, "libvpx", fps);
     if (!e->c) return -1;
@@ -198,6 +227,7 @@ static int vid_open(Vid *e, int codec, int w, int h, int fps, unsigned kbps, AVB
 static void vid_close(Vid *e) {
     avcodec_free_context(&e->c);
     av_buffer_unref(&e->frames);
+    av_buffer_unref(&e->dev);
     sws_freeContext(e->sws);
     av_frame_free(&e->yuv);
     av_packet_free(&e->pkt);
@@ -210,7 +240,7 @@ static int vid_software(Vid *e) {
     int codec = e->codec, w = e->w, h = e->h, fps = e->fps;
     unsigned kbps = e->kbps;
     vid_close(e);
-    if (vid_open(e, codec, w, h, fps, kbps, NULL)) { LM_LOG("remote desktop video: libx264 did not open either"); return -1; }
+    if (vid_open(e, codec, w, h, fps, kbps, NULL, NULL, 0)) { LM_LOG("remote desktop video: libx264 did not open either"); return -1; }
     e->force_key = 1;
     return 0;
 }
@@ -276,8 +306,32 @@ static int vid_encode(Vid *e, const uint8_t *bgra, int w, int h, int64_t ms) {
     return 0;
 }
 
+/* Is it time to reopen VA-API at the rate asked for? (see VID_RATE_STEP) */
+static int rate_due(unsigned open_kbps, unsigned want, double since_ms) {
+    if (!open_kbps || want == open_kbps) return 0;
+    if ((uint64_t)want * 100 >= (uint64_t)open_kbps * (100 + VID_RATE_STEP)) return since_ms >= VID_RATE_UP_MS;
+    if ((uint64_t)want * 100 <= (uint64_t)open_kbps * (100 - VID_RATE_STEP)) return since_ms >= VID_RATE_DOWN_MS;
+    return 0;
+}
+
+/* A new VA-API encoder at the rate asked for, on the same device: what the old one still holds goes out
+ * first, and the new one starts with a keyframe (the RTP timestamps go on: they are the frames' own). */
+static int vid_reopen(Vid *e) {
+    unsigned was = e->open_kbps;
+    if (avcodec_send_frame(e->c, NULL) >= 0) vid_drain(e);
+    avcodec_free_context(&e->c);
+    av_buffer_unref(&e->frames);
+    e->c = open_h264_vaapi(e, e->dev, e->fps);
+    if (!e->c) { LM_LOG("remote desktop video: VA-API did not open again at %u kbit/s: libx264", e->kbps); return VID_HWBAD; }
+    e->force_key = 1;
+    LM_LOG("remote desktop video: VA-API from %u to %u kbit/s", was, e->kbps);
+    return 0;
+}
+
 static int vid_frame(Vid *e, const uint8_t *bgra, int w, int h, int64_t ms) {
-    int r = vid_encode(e, bgra, w, h, ms);
+    int r = 0;
+    if (e->hw && e->dev && !e->checking && rate_due(e->open_kbps, e->kbps, lm_now_ms() - e->opened_at)) r = vid_reopen(e);
+    if (r == 0) r = vid_encode(e, bgra, w, h, ms);
     if (r != VID_HWBAD) return r;
     if (vid_software(e)) return -1;
     return vid_encode(e, bgra, w, h, ms);
@@ -286,7 +340,8 @@ static int vid_frame(Vid *e, const uint8_t *bgra, int w, int h, int64_t ms) {
 static void vid_rate(Vid *e, unsigned kbps) {
     if (!e->c || kbps == e->kbps) return;
     e->kbps = kbps;
-    /* libx264 reconfigures itself when these change between frames; the others keep their rate */
+    /* libx264 reconfigures itself when these change between frames; VA-API is opened again at the next
+     * frame when the change is large enough (rate_due); libvpx keeps its rate */
     if (e->codec == CODEC_H264 && !e->hw) {
         e->c->rc_max_rate = (int64_t)kbps * 1000;
         e->c->rc_buffer_size = (int)(e->c->rc_max_rate / 3);
@@ -342,7 +397,7 @@ static void on_pcm(const int16_t *s, int k) {
     }
 }
 
-void lm_stream(const char *params, int ring_fd, int render) {
+void lm_stream(const char *params, int ring_fd, const int *render, int nrender) {
     char cname[16] = "";
     mp_param(params, "codec", cname, sizeof cname);
     int codec = !strcmp(cname, "vp8") ? CODEC_VP8 : !strcmp(cname, "h264") ? CODEC_H264 : 0;
@@ -352,8 +407,9 @@ void lm_stream(const char *params, int ring_fd, int render) {
     if (fps < 5 || fps > 240) fps = 30;
     if (kbps < 200 || kbps > 50000) kbps = 4000;
     char accel[24];
-    AVBufferRef *hw = codec == CODEC_H264 ? lm_hw_device(lm_hw_accel(params, accel, sizeof accel), render) : NULL;
-    if (!codec || w < 16 || h < 16 || w > MP_MAX_DIM || h > MP_MAX_DIM || vid_open(&V, codec, w, h, fps, (unsigned)kbps, hw)) {
+    lm_hw_accel(params, accel, sizeof accel);
+    if (!codec || w < 16 || h < 16 || w > MP_MAX_DIM || h > MP_MAX_DIM ||
+        vid_open(&V, codec, w, h, fps, (unsigned)kbps, accel, render, codec == CODEC_H264 ? nrender : 0)) {
         lm_error("media.noVideoEncoder");
         mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0);
         return;
@@ -404,7 +460,7 @@ void lm_stream(const char *params, int ring_fd, int render) {
         }
         if (ring) lm_mic_drain(ring, on_pcm);
         if (lm_now_ms() - last_stats >= 2000) {
-            mp_sendv(LM_SOCK, MM_STATS, 0, frames, frames ? (int64_t)(enc_ms * 100 / frames) : 0, V.hw, V.kbps);
+            mp_sendv(LM_SOCK, MM_STATS, 0, frames, frames ? (int64_t)(enc_ms * 100 / frames) : 0, V.hw, V.hw ? V.open_kbps : V.kbps);
             last_stats = lm_now_ms();
         }
     }

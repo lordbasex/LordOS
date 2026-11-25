@@ -110,14 +110,16 @@ static int start(Enc *e, int codec) {
     if (!fpx || fw < 16 || fh < 16 || now_ms() < e->retry_at) return -1;
     MediaSrc *s = media_src_new(SK_STREAM, "remote");
     if (!s) return -1;
-    int ring = -1, render = codec == 1 ? media_render_fd() : -1;
+    /* H.264: the compositor's render node first, and the others after it, for the first that encodes H.264
+     * (lm_stream.c); the sound ring takes one of the MP_MAX_FDS */
+    int ring = -1, fds[MP_MAX_FDS] = { -1, -1, -1, -1 }, nrender = codec == 1 ? media_render_fds(fds + 1, MP_MAX_FDS - 1) : 0;
     if (e->audio) s->mic = maudio_open(1, "LordOS", "Remote desktop", "@DEFAULT_MONITOR@", &ring);
+    fds[0] = ring;
     char params[200];
     snprintf(params, sizeof params, "codec=%s\nwidth=%d\nheight=%d\nfps=%d\nkbps=%u\nhw=%d\nhwaccel=%s\naudio=%d\nrender=%d\n",
-             codec == 1 ? "h264" : "vp8", fw, fh, e->fps, e->kbps, render >= 0, media_hwaccel(), ring >= 0, render >= 0);
-    int fds[2] = { ring, render };
-    s->sock = media_spawn(MK_STREAM, params, fds, 2, &s->pid);
-    if (render >= 0) close(render);
+             codec == 1 ? "h264" : "vp8", fw, fh, e->fps, e->kbps, nrender > 0, media_hwaccel(), ring >= 0, nrender);
+    s->sock = media_spawn(MK_STREAM, params, fds, 1 + nrender, &s->pid);
+    for (int i = 1; i <= nrender; i++) close(fds[i]);
     if (s->sock < 0) { media_src_close(s); e->retry_at = now_ms() + 10000; return -1; }
     s->bk_msg = on_msg;
     /* input slots: lord-server writes, lord-media only reads */

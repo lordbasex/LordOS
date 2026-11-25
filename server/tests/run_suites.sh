@@ -1102,12 +1102,17 @@ EOF
         run "media-test svg (over 1 MB)" build/media-test svg "$T/big.svg" 32 - fail
     else skip "media-test svg" "build/lord-media (FFmpeg -dev packages) and python3"; fi
     # the remote desktop's live encoder (#94): libx264, then VA-API with its first keyframe checked and, with a
-    # build whose check always fails, the way out to libx264 (only where a card encodes H.264)
+    # build whose check always fails, the way out to libx264 (only where a card encodes H.264). Every render node
+    # goes in, as lord-server sends them: the first one is not always the card that encodes (an Intel iGPU
+    # without its VA driver next to an AMD card)
     if [ -x build/lord-media ] && [ -x build/lmstream-test ]; then
         run "lmstream-test (libx264)" build/lmstream-test build/lord-media
-        if [ -e /dev/dri/renderD128 ] && [ -x build/lord-media-encfail ]; then
-            run "lmstream-test (VA-API)" build/lmstream-test build/lord-media /dev/dri/renderD128
-            run "lmstream-test (VA-API fails the check)" build/lmstream-test build/lord-media-encfail /dev/dri/renderD128
+        nodes=$(ls /dev/dri/renderD* 2>/dev/null | head -3)
+        if [ -n "$nodes" ] && [ -x build/lord-media-encfail ]; then
+            # shellcheck disable=SC2086
+            run "lmstream-test (VA-API)" build/lmstream-test build/lord-media $nodes
+            # shellcheck disable=SC2086
+            run "lmstream-test (VA-API fails the check)" build/lmstream-test build/lord-media-encfail $nodes
         else skip "lmstream-test (VA-API)" "a render node"; fi
     else skip "lmstream-test" "build/lord-media (FFmpeg -dev packages)"; fi
     # document helper: malicious archives and the confinement

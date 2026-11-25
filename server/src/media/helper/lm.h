@@ -129,7 +129,7 @@ int  lm_cam_read(LmCam *c, AVFrame *frame);     /* after POLLIN: 1 a picture, 0 
 void lm_cam_close(LmCam *c);
 void lm_audiorec(const char *params, int out, int pulse);               /* lm_rec.c */
 void lm_hwprobe(const int *render, int n_render);                       /* lm_hwprobe.c */
-void lm_stream(const char *params, int ring, int render);               /* lm_stream.c */
+void lm_stream(const char *params, int ring, const int *render, int nrender);   /* lm_stream.c */
 /* the remote desktop's software encoder with its own settings (libx264, or libvpx for VP8), for LordBench */
 AVCodecContext *lm_stream_sw_encoder(int vp8, int w, int h, int fps, unsigned kbps);
 void lm_live(const char *params, int link, int ring);                   /* lm_live.c */

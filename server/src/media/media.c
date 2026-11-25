@@ -271,15 +271,37 @@ const char *media_hwaccel(void) {
     return pi ? "v4l2request" : "vaapi";
 }
 
-int media_render_fd(void) {
-    if (!strcmp(media_hwaccel(), "none")) return -1;
-    for (int i = 128; i < 136; i++) {
+/* The render nodes lord-media may use, opened here (it gets fds, never paths): first the one the
+ * compositor renders on (gpu_device), then the others by number. The first node is not always the GPU: on
+ * a PC with an Intel iGPU and an AMD card, renderD128 can be the iGPU with no VA driver installed, and the
+ * card that composes (and encodes) is renderD129. Without the GPU path (headless, LORD_GPU=0) the order is
+ * the nodes' own; the remote desktop's encoder then tries each one it gets (lm_stream.c). */
+int media_render_fds(int *out, int max) {
+    int n = 0, own = -1;
+    if (max <= 0 || !strcmp(media_hwaccel(), "none")) return 0;
+    dev_t dev = 0;
+    if (gpu_active() && !gpu_device(&dev))
+        for (int i = 128; i < 136 && own < 0; i++) {
+            char p[32];
+            struct stat st;
+            snprintf(p, sizeof p, "/dev/dri/renderD%d", i);
+            if (stat(p, &st) || !S_ISCHR(st.st_mode) || st.st_rdev != dev) continue;
+            int fd = open(p, O_RDWR | O_CLOEXEC);
+            if (fd >= 0) { out[n++] = fd; own = i; }
+        }
+    for (int i = 128; i < 136 && n < max; i++) {
+        if (i == own) continue;
         char p[32];
         snprintf(p, sizeof p, "/dev/dri/renderD%d", i);
         int fd = open(p, O_RDWR | O_CLOEXEC);
-        if (fd >= 0) return fd;
+        if (fd >= 0) out[n++] = fd;
     }
-    return -1;
+    return n;
+}
+
+int media_render_fd(void) {
+    int fd = -1;
+    return media_render_fds(&fd, 1) ? fd : -1;
 }
 
 /* ---- paths ---- */
