@@ -309,6 +309,68 @@ void tk_log_end(TkLog *l) {
     l->overlong = 0;
 }
 
+/* ---- show mode: progress lines (toolkits.h) ---- */
+
+int tk_progress_parse(const char *s, size_t n, TkProg *p) {
+    static const char pre[] = TK_PROG_PREFIX;
+    const size_t pl = sizeof pre - 1;
+    memset(p, 0, sizeof *p);
+    if (n < pl || n >= TK_PROG_LINE_MAX || memcmp(s, pre, pl)) return -1;
+    const char *q = s + pl, *e = s + n;
+    for (const char *c = q; c < e; c++)            /* only [a-z_] and single spaces */
+        if (!((*c >= 'a' && *c <= 'z') || *c == '_' || (*c == ' ' && c > q && c[-1] != ' ' && c + 1 < e))) return -1;
+    const char *w[4];
+    size_t wl[4];
+    int nw = 0;
+    for (const char *c = q; c < e && nw < 4;) {
+        const char *b = c;
+        while (c < e && *c != ' ') c++;
+        w[nw] = b;
+        wl[nw++] = (size_t)(c - b);
+        if (c < e) c++;
+    }
+    if (nw < 2 || nw > 3) return -1;
+    int check = -1;
+    for (int i = 0; i < TK_CHECKS; i++)
+        if (strlen(check_tab[i].id) == wl[1] && !memcmp(check_tab[i].id, w[1], wl[1])) { check = i; break; }
+    if (check < 0) return -1;
+    if (nw == 2 && wl[0] == 4 && !memcmp(w[0], "step", 4)) {
+        p->kind = TK_PROG_STEP;
+        p->check = check;
+        return 0;
+    }
+    if (nw == 3 && wl[0] == 5 && !memcmp(w[0], "check", 5)) {
+        int r = wl[2] == 4 && !memcmp(w[2], "pass", 4) ? TK_PASS : wl[2] == 4 && !memcmp(w[2], "fail", 4) ? TK_FAIL
+              : wl[2] == 4 && !memcmp(w[2], "skip", 4) ? TK_SKIP : -1;
+        if (r < 0) return -1;
+        p->kind = TK_PROG_CHECK;
+        p->check = check;
+        p->result = r;
+        return 0;
+    }
+    memset(p, 0, sizeof *p);
+    return -1;
+}
+
+void tk_progress_feed(TkProgBuf *b, const char *buf, size_t n, TkProgFn cb, void *ctx) {
+    for (size_t i = 0; i < n; i++) {
+        char c = buf[i];
+        if (c == '\n') {
+            TkProg p;
+            if (!b->overlong && b->events < TK_PROG_MAX_EVENTS && !tk_progress_parse(b->line, b->len, &p)) {
+                b->events++;
+                if (cb) cb(ctx, &p);
+            }
+            b->len = 0;
+            b->overlong = 0;
+            continue;
+        }
+        if (b->overlong) continue;
+        if (b->len + 1 < sizeof b->line) b->line[b->len++] = c;
+        else b->overlong = 1;                       /* too long for a progress line: the whole line is ignored */
+    }
+}
+
 /* ---- the harness's line ---- */
 
 void tk_result_init(TkResult *r, int combo) {

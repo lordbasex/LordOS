@@ -1,6 +1,6 @@
 {
   "title": "Toolkits de Linux en aquest escriptori",
-  "usage": "Ús: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Ús: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Combinació desconeguda: {id}. Conegudes: {list}",
   "running": "S'està provant {combo}...",
   "col.combo": "Combinació",

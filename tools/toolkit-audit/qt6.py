@@ -17,6 +17,12 @@
 #
 # Privacy: the line carries only the toolkit, its version, the backend, numbers and check ids; no names, paths or
 # titles. The window shows no words (icons, digits and symbols only), so it needs no translations.
+#
+# Show mode (--show, or LORDOS_TOOLKIT_AUDIT_SHOW=1; the test bench's Frameworks screen): the same checks and the same
+# line, slowed down so a person can follow them (each popup held open about 0.9 s, the text typed one character at a
+# time, fullscreen held on and off), the current step's id in a label on the window (a check id, never translated),
+# and before the line one progress line per step and per check on stdout: "#lordos-ta step <id>" and
+# "#lordos-ta check <id> pass|fail|skip". It then exits within 15 s (the orchestrator kills at 20 s).
 import json
 import os
 import random
@@ -28,7 +34,9 @@ T0 = time.monotonic()
 CHECK_IDS = ('map', 'size', 'scale', 'theme', 'backend', 'decoration', 'first_frame', 'menu', 'combo', 'tooltip',
              'clipboard', 'dnd', 'text', 'fullscreen')
 WANT_W, WANT_H = 600, 400
-SELF_EXIT_S = 4.6      # everything done or not, the line is printed by then (the orchestrator kills at 8 s)
+SHOW = '--show' in sys.argv[1:] or os.environ.get('LORDOS_TOOLKIT_AUDIT_SHOW') == '1'
+SELF_EXIT_S = 14.6 if SHOW else 4.6   # the line is printed by then (the orchestrator kills at 8 s, 20 s in show mode)
+HOLD_MS = 900 if SHOW else 0          # show mode: how long a step stays on screen once decided
 
 _out_lock = threading.RLock()   # put() and the final print: the watchdog thread prints while the checks run
 _printed = False
@@ -37,6 +45,19 @@ RESULT = {'toolkit': 'qt6', 'version': None, 'backend': None, 'checks': {}}
 
 def ms_since(t):
     return int(round((time.monotonic() - t) * 1000))
+
+
+def progress(line):
+    """Show mode: one progress line on stdout (never after the JSON line)."""
+    if not SHOW:
+        return
+    with _out_lock:
+        if not _printed:
+            try:
+                sys.stdout.write('#lordos-ta ' + line + '\n')
+                sys.stdout.flush()
+            except Exception:
+                pass
 
 
 def put(cid, ok, ms=None, detail=None):
@@ -48,6 +69,8 @@ def put(cid, ok, ms=None, detail=None):
     with _out_lock:
         if not _printed:
             RESULT['checks'][cid] = c
+            if cid in CHECK_IDS:
+                progress('check %s %s' % (cid, 'skip' if ok is None else 'pass' if ok is True else 'fail'))
 
 
 def skip(cid, why):
@@ -62,6 +85,7 @@ def emit_and_exit(code=0, missing='timeout: not finished before the harness had 
             for cid in CHECK_IDS:
                 if cid not in RESULT['checks']:
                     RESULT['checks'][cid] = {'ok': False, 'detail': missing}
+                    progress('check %s fail' % cid)
             RESULT['checks'] = {cid: RESULT['checks'][cid] for cid in CHECK_IDS}
             _printed = True
             try:
@@ -245,11 +269,29 @@ class Audit:
         dnd.addWidget(self.drop)
         v.addLayout(dnd)
         v.addStretch(1)
+        # show mode: the current step's id (a fixed check id, not translated)
+        self.step_label = None
+        if SHOW:
+            self.step_label = QLabel('map')
+            f = self.step_label.font()
+            f.setFamily('monospace')
+            f.setBold(True)
+            f.setPointSizeF(f.pointSizeF() * 1.4 if f.pointSizeF() > 0 else 14)
+            self.step_label.setFont(f)
+            v.addWidget(self.step_label)
         w.setCentralWidget(c)
         w.resize(WANT_W, WANT_H)
 
     def first_paint(self):
         self.t_paint = time.monotonic()
+
+    def mark(self, cid):
+        """Show mode: the step now on screen, in the label and as a progress line."""
+        if not SHOW:
+            return
+        progress('step ' + cid)
+        if self.step_label is not None:
+            self.step_label.setText(cid)
 
     # ---------------------------------------------------------------- the step runner
     def start(self):
@@ -290,6 +332,7 @@ class Audit:
         want = (os.environ.get('QT_QPA_PLATFORM') or '').split(';')[0].split(':')[0].strip()
         platform = QGuiApplication.platformName()
         RESULT['backend'] = platform
+        hold = (lambda: False, HOLD_MS)     # show mode: a wait that keeps what was just done on screen
 
         # backend: the platform plugin Qt really loaded, against the one asked for
         if want:
@@ -298,6 +341,7 @@ class Audit:
             put('backend', bool(platform), detail=platform + ' (none asked)')
 
         # map + first_frame
+        self.mark('map')
         self.t_show = time.monotonic()
         w.show()
         ok = yield (lambda: exposed(w), 2000)
@@ -319,6 +363,7 @@ class Audit:
             return
 
         # size: the client area the compositor gave us (decorations not counted), after configure settles
+        self.mark('size')
         yield (lambda: False, 120)
         s = w.size()
         put('size', s.width() == WANT_W and s.height() == WANT_H, detail='%dx%d' % (s.width(), s.height()))
@@ -342,15 +387,21 @@ class Audit:
             put('decoration', True, detail='server-side (no frame margins; zxdg_toplevel_decoration_v1 in the protocol log)'
                 if platform.startswith('wayland') else 'server-side (no _NET_FRAME_EXTENTS)')
 
+        self.mark('theme')
         self.theme_check()
+        if SHOW:
+            yield hold
 
         # menu: the menu bar's menu opens as a popup and maps
+        self.mark('menu')
         t = time.monotonic()
         said = QT_SAID['no_grab_serial']
         pos = w.menuBar().mapToGlobal(w.menuBar().actionGeometry(self.menu_action).bottomLeft())
         self.menu.popup(pos)
         yield (lambda: exposed(self.menu) or QT_SAID['no_grab_serial'] > said, 1000)
         self.popup_result('menu', exposed(self.menu), said, t)
+        if SHOW:
+            yield hold
         self.menu.hide()
         yield (lambda: not self.menu.isVisible(), 300)
         # a menu opened as a toplevel (no input serial yet): the compositor gives the keyboard back to the window a
@@ -361,17 +412,21 @@ class Audit:
         yield self.settled()
 
         # combo: the combo box's list popup opens and maps
+        self.mark('combo')
         t = time.monotonic()
         said = QT_SAID['no_grab_serial']
         self.combo.showPopup()
         pop = self.combo.view().window()
         yield (lambda: (pop is not w and exposed(pop)) or QT_SAID['no_grab_serial'] > said, 1000)
         self.popup_result('combo', pop is not w and exposed(pop), said, t)
+        if SHOW:
+            yield hold
         self.combo.hidePopup()
         yield (lambda: not pop.isVisible(), 300)
         yield self.settled()                # the combo list too, before the tooltip (a focus change hides it)
 
         # tooltip: shown by the toolkit, it maps as its own popup
+        self.mark('tooltip')
         t = time.monotonic()
         QToolTip.showText(self.b_end.mapToGlobal(self.b_end.rect().center()), qVersion(), self.b_end)
 
@@ -382,14 +437,20 @@ class Audit:
             return False
         ok = yield (tip, 1000)
         put('tooltip', ok, ms=ms_since(t), detail=None if ok else 'the tooltip did not map in 1 s')
+        if SHOW:
+            yield hold
         QToolTip.hideText()
 
         # clipboard: copy a random token and read it back within this process
+        self.mark('clipboard')
         self.clipboard_start()
         yield (lambda: self.clip_done(), 600)
         self.clipboard_end()
+        if SHOW:
+            yield hold
 
         # text: focus the line edit and type with the toolkit's own key events
+        self.mark('text')
         t = time.monotonic()
         w.activateWindow()
         self.entry.setFocus()
@@ -399,14 +460,22 @@ class Audit:
             mods = Qt.KeyboardModifier.ShiftModifier if ch.isupper() else Qt.KeyboardModifier.NoModifier
             QApplication.sendEvent(self.entry, QKeyEvent(QEvent.Type.KeyPress, key, mods, ch))
             QApplication.sendEvent(self.entry, QKeyEvent(QEvent.Type.KeyRelease, key, mods, ch))
+            if SHOW:        # one character at a time, as a person types
+                yield (lambda: False, 70)
         ok = yield (lambda: self.entry.text() == typed, 300)
         put('text', ok, ms=ms_since(t), detail='typed %d of %d characters' % (len(self.entry.text()), len(typed))
             + ('' if self.entry.hasFocus() else '; the field had no keyboard focus'))
+        if SHOW:
+            yield hold
 
         # dnd: a drag from the icon to the frame in this window, moved with the toolkit's own mouse events
+        self.mark('dnd')
         yield from self.dnd_steps(platform)
+        if SHOW:
+            yield hold
 
         # fullscreen: on, then back to the normal size
+        self.mark('fullscreen')
         t = time.monotonic()
         before = w.size()
         w.showFullScreen()
@@ -415,12 +484,18 @@ class Audit:
         on = yield (lambda: bool(w.windowState() & Qt.WindowState.WindowFullScreen)
                     and (full is None or w.size() == full or w.width() > WANT_W), 1200)
         on_size = '%dx%d' % (w.width(), w.height())
+        if SHOW and on:     # show mode: fullscreen stays on screen a moment
+            t_hold = time.monotonic()
+            yield hold
+            t += time.monotonic() - t_hold
         w.showNormal()
         off = yield (lambda: not (w.windowState() & Qt.WindowState.WindowFullScreen)
                      and w.size() == before, 1200)
         put('fullscreen', on and off, ms=ms_since(t), detail='on %s (screen %s), off %dx%d (before %dx%d)' % (
             on_size, '%dx%d' % (full.width(), full.height()) if full else '?', w.width(), w.height(),
             before.width(), before.height()))
+        if SHOW:
+            yield hold
 
     def popup_result(self, cid, ok, said, t):
         if ok:

@@ -24,6 +24,11 @@
 #     theme name or window title.
 #   - It finishes within BUDGET seconds (a watchdog prints what it has and exits); the orchestrator kills it at 8 s.
 #   - The window shows no words (icons, digits and a light or dark swatch), so it needs no translations.
+#   - Show mode (--show, or LORDOS_TOOLKIT_AUDIT_SHOW=1; the test bench's Frameworks screen): the same checks and the
+#     same JSON line, slowed down so a person can follow them (each popup held open about 0.9 s, the text typed one
+#     character at a time, fullscreen held on and off), the current step's id in a label on the window (a check
+#     id, never translated), and before the JSON line one progress line per step and per check on stdout:
+#     "#lordos-ta step <id>" and "#lordos-ta check <id> pass|fail|skip". The budget is then 14.6 s (killed at 20 s).
 
 import os
 import sys
@@ -47,7 +52,9 @@ def _process_start():
 
 
 T0 = _process_start()
-BUDGET = 4.6          # seconds from the start: after this, the remaining checks are skipped and the line printed
+SHOW = '--show' in sys.argv[1:] or os.environ.get('LORDOS_TOOLKIT_AUDIT_SHOW') == '1'
+BUDGET = 14.6 if SHOW else 4.6   # seconds from the start: after this, the remaining checks are skipped and the line printed
+HOLD_MS = 900 if SHOW else 0     # show mode: how long a step stays on screen once decided
 REQ_W, REQ_H = 600, 400
 CHECK_IDS = ('map', 'size', 'scale', 'theme', 'backend', 'decoration', 'first_frame', 'menu', 'combo', 'tooltip',
              'clipboard', 'dnd', 'text', 'fullscreen')
@@ -62,6 +69,16 @@ def ms_since(t):
     return int(round((time.monotonic() - t) * 1000))
 
 
+def progress(line):
+    """Show mode: one progress line on stdout (never after the JSON line)."""
+    if not SHOW:
+        return
+    with _printed:
+        if not _done[0]:
+            sys.stdout.write('#lordos-ta ' + line + '\n')
+            sys.stdout.flush()
+
+
 def check(cid, ok, ms=None, detail=None):
     if cid in result['checks']:
         return
@@ -71,6 +88,8 @@ def check(cid, ok, ms=None, detail=None):
     if detail:
         c['detail'] = detail
     result['checks'][cid] = c
+    if cid in CHECK_IDS:
+        progress('check %s %s' % (cid, 'skip' if ok is None else 'pass' if ok is True else 'fail'))
 
 
 def skip(cid, why):
@@ -156,6 +175,12 @@ class Harness:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         box.set_border_width(12)
         w.add(box)
+        # show mode: the current step's id (a fixed check id, not translated)
+        self.step_label = None
+        if SHOW:
+            self.step_label = Gtk.Label()
+            self.step_label.set_halign(Gtk.Align.START)
+            box.pack_end(self.step_label, False, False, 0)
 
         # the top row: buttons strictly at the start and at the end
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -218,6 +243,7 @@ class Harness:
         self.swatch.drag_dest_set(Gtk.DestDefaults.ALL, [self.dnd_target], Gdk.DragAction.COPY)
         self.swatch.connect('drag-data-received', self.on_drag_received)
 
+        self.mark('map')
         w.connect('realize', self.on_realize)
         w.connect('map-event', self.on_map)
         w.connect('delete-event', lambda *a: emit(0))
@@ -227,6 +253,24 @@ class Harness:
         css.load_from_data(('#ta-swatch { background-color: %s; border: 1px solid #808080; }' % v).encode())
         self.swatch.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         w.show_all()
+
+    # -------------------------------------------------- show mode
+    def mark(self, cid):
+        """Show mode: the step now on screen, in the label and as a progress line."""
+        if not SHOW:
+            return
+        progress('step ' + cid)
+        if self.step_label is not None:
+            self.step_label.set_markup('<span font_family="monospace" weight="bold" size="large">%s</span>' % cid)
+
+    def held(self, fn):
+        """fn, run HOLD_MS later in show mode (the step stays on screen), at once otherwise."""
+        if not SHOW:
+            return fn
+
+        def later():
+            GLib.timeout_add(max(1, min(HOLD_MS, int((BUDGET - (time.monotonic() - T0)) * 1000))), lambda: fn() and False)
+        return later
 
     # -------------------------------------------------- first frame, map, then the static checks
     def on_realize(self, *_a):
@@ -250,6 +294,7 @@ class Harness:
     def after_map(self):
         if self.first_draw is None:
             check('first_frame', False, detail='no frame painted by the map')
+        self.mark('size')
         w, h = self.win.get_size()
         check('size', (w, h) == (REQ_W, REQ_H), detail='%dx%d' % (w, h))
         f = self.win.get_scale_factor()
@@ -264,7 +309,7 @@ class Harness:
         check('decoration', bool(self.win.get_decorated()), detail=deco)
         self.steps = [self.step_menu, self.step_combo, self.step_tooltip, self.step_clipboard, self.step_text,
                       self.step_dnd, self.step_fullscreen]
-        self.next_step()
+        self.held(self.next_step)()
         return False
 
     # -------------------------------------------------- the steps, one after another, each with its own deadline
@@ -328,6 +373,7 @@ class Harness:
 
     # menu: popped up from its button with no trigger event (GTK uses the last one it has)
     def step_menu(self):
+        self.mark('menu')
         t = time.monotonic()
         top = self.menu.get_toplevel()
         self.mbtn.set_active(True)
@@ -337,10 +383,11 @@ class Harness:
             self.mbtn.set_active(False)
             self.menu.popdown()
             self.later(60, self.next_step)
-        self.wait_for('menu', mapped, 700, 'popup not mapped', close, t)
+        self.wait_for('menu', mapped, 700, 'popup not mapped', self.held(close), t)
 
     # combo: its popup (a GtkMenu by default)
     def step_combo(self):
+        self.mark('combo')
         t = time.monotonic()
         self.combo.popup()
 
@@ -358,13 +405,14 @@ class Harness:
         def close():
             self.combo.popdown()
             self.later(60, self.next_step)
-        self.wait_for('combo', shown, 700, 'popup not shown', close, t)
+        self.wait_for('combo', shown, 700, 'popup not shown', self.held(close), t)
 
     # tooltip: GTK 3 shows a tooltip only where the real pointer is (it asks the device, so a synthetic motion
     # isn't enough and no test hook is used); the tooltip window is shown the way GTK shows one instead: a TOOLTIP
     # popup transient for the window, placed against the start button with move_to_rect (an xdg_popup without a
     # grab on Wayland, an override-redirect window on X11)
     def step_tooltip(self):
+        self.mark('tooltip')
         t = time.monotonic()
         if self.win.get_window() is None:
             skip('tooltip', 'no window')
@@ -388,11 +436,12 @@ class Harness:
         def close():
             self.tip.hide()
             self.later(30, self.next_step)
-        self.wait_for('tooltip', self.stays_mapped(self.tip), 700, 'not shown', close, t)
+        self.wait_for('tooltip', self.stays_mapped(self.tip), 700, 'not shown', self.held(close), t)
 
     # clipboard: set a text and read it back, both through the toolkit; the compositor (Wayland) or the X server
     # must also confirm the new owner (GTK's owner-change), since GTK reads its own selection without a round trip
     def step_clipboard(self):
+        self.mark('clipboard')
         t = time.monotonic()
         cb = Gtk.Clipboard.get_for_display(DISPLAY, Gdk.SELECTION_CLIPBOARD)
         got = [None]
@@ -419,11 +468,12 @@ class Harness:
             c = result['checks'].get('clipboard')
             if c is not None and not c['ok'] and got[0] == TOKEN and not owner[0]:
                 c['detail'] = 'text back, but the new owner was never confirmed'
-            self.next_step()
+            self.held(self.next_step)()
         self.wait_for('clipboard', back, 600, 'no text back', fin, t)
 
     # text: key presses made with the toolkit's own events, delivered to the window; the entry must hold the text
     def step_text(self):
+        self.mark('text')
         t = time.monotonic()
         gw = self.win.get_window()
         kb = SEAT.get_keyboard() if SEAT else None
@@ -435,34 +485,61 @@ class Harness:
         self.entry.grab_focus()
         self.entry.set_text('')
         keymap = Gdk.Keymap.get_for_display(DISPLAY)
-        try:
-            for ch in TOKEN:
-                kv = Gdk.unicode_to_keyval(ord(ch))
-                code = 0
-                okk, keys = keymap.get_entries_for_keyval(kv)
-                if okk and keys:
-                    code = keys[0].keycode
-                for typ in (Gdk.EventType.KEY_PRESS, Gdk.EventType.KEY_RELEASE):
-                    ev = Gdk.Event.new(typ)
-                    ev.window = gw
-                    ev.send_event = 1
-                    ev.time = Gtk.get_current_event_time()
-                    ev.keyval = kv
-                    ev.hardware_keycode = code
-                    ev.set_device(kb)
-                    ev.set_source_device(kb)
-                    Gtk.main_do_event(ev)
-        except Exception as e:
+
+        def type_char(ch):
+            kv = Gdk.unicode_to_keyval(ord(ch))
+            code = 0
+            okk, keys = keymap.get_entries_for_keyval(kv)
+            if okk and keys:
+                code = keys[0].keycode
+            for typ in (Gdk.EventType.KEY_PRESS, Gdk.EventType.KEY_RELEASE):
+                ev = Gdk.Event.new(typ)
+                ev.window = gw
+                ev.send_event = 1
+                ev.time = Gtk.get_current_event_time()
+                ev.keyval = kv
+                ev.hardware_keycode = code
+                ev.set_device(kb)
+                ev.set_source_device(kb)
+                Gtk.main_do_event(ev)
+
+        def failed(e):
             check('text', False, ms_since(t), 'error: ' + type(e).__name__)
             self.next_step()
+
+        def verify():
+            self.wait_for('text', lambda: self.entry.get_text() == TOKEN, 300,
+                          lambda: 'entry has %d of %d characters' % (len(self.entry.get_text()), len(TOKEN)),
+                          self.held(self.next_step), t)
+
+        if SHOW:            # one character at a time, as a person types
+            left = list(TOKEN)
+
+            def one():
+                try:
+                    type_char(left.pop(0))
+                except Exception as e:
+                    failed(e)
+                    return False
+                if left:
+                    return True
+                verify()
+                return False
+            GLib.timeout_add(60, one)
             return
-        self.wait_for('text', lambda: self.entry.get_text() == TOKEN, 300,
-                      lambda: 'entry has %d of %d characters' % (len(self.entry.get_text()), len(TOKEN)), None, t)
+        try:
+            for ch in TOKEN:
+                type_char(ch)
+        except Exception as e:
+            failed(e)
+            return
+        verify()
 
     # drag and drop: the toolkit starts a drag from the end button to the swatch with its own button press; the
     # drop needs the compositor (Wayland) or the X server to follow a pointer, so a drag that starts but gets no
     # drop is reported as skipped, not failed
     def step_dnd(self):
+        self.mark('dnd')
         t = time.monotonic()
         gw = self.win.get_window()
         dev = SEAT.get_pointer() if SEAT else None
@@ -515,7 +592,7 @@ class Harness:
                     Gtk.drag_cancel(ctx)
             except Exception:
                 pass
-            self.later(60, self.next_step)
+            self.later(60 + HOLD_MS, self.next_step)
             return False
         GLib.timeout_add(20, wait)
 
@@ -530,6 +607,7 @@ class Harness:
 
     # fullscreen on, then off: the window-state the compositor confirms
     def step_fullscreen(self):
+        self.mark('fullscreen')
         t = time.monotonic()
         st = self.win.get_window()
         if st is None:
@@ -574,7 +652,7 @@ class Harness:
                 det = 'on %dx%d%s, off %dx%d' % (fw, fh, '' if geo is None else ' of %dx%d' % (geo.width, geo.height), w, h)
                 check('fullscreen', bool(c['ok'] and fills), on_ms + c.get('ms', 0),
                       det if c['ok'] else 'did not leave fullscreen')
-                self.next_step()
+                self.held(self.next_step)()
             self.wait_for('fullscreen_off', is_off, 800, 'still fullscreen', fin, t2)
 
         def on_done():
@@ -584,7 +662,7 @@ class Harness:
                 check('fullscreen', False, ms_since(t), 'not fullscreen')
                 self.win.unfullscreen()
                 return self.next_step()
-            off()
+            self.held(off)()             # show mode: fullscreen stays on screen a moment
         self.wait_for('fullscreen_on', is_fs, 900, 'not fullscreen', on_done, t)
 
     # -------------------------------------------------- light or dark

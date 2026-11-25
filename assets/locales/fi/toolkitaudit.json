@@ -1,6 +1,6 @@
 {
   "title": "Linuxin käyttöliittymäkirjastot tällä työpöydällä",
-  "usage": "Käyttö: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Käyttö: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Tuntematon yhdistelmä: {id}. Tunnetut: {list}",
   "running": "Testataan {combo}...",
   "col.combo": "Yhdistelmä",

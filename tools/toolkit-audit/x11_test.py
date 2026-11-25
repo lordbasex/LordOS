@@ -6,10 +6,13 @@
 # Runs the harness against a private Xvfb (never the session's display): once with no window manager, once with a tiny
 # window manager written here (it answers MapRequest, _NET_REQUEST_FRAME_EXTENTS and _NET_WM_STATE fullscreen the way
 # LordOS's xwm does), and once with no display at all. Each run must print exactly one JSON line with every shared
-# check id, within 5 s. Prints "skipped: needs Xvfb" when Xvfb is not installed.
+# check id, within 5 s. Show mode (--show) runs once with the window manager: within 15 s, the same results, and
+# before the JSON line only well-formed progress lines (a step and a check line for every id). Prints "skipped: needs
+# Xvfb" when Xvfb is not installed.
 import importlib.util
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -34,14 +37,26 @@ def expect(cond, what):
         print("FAIL:", what)
 
 
-def run_harness(env):
+PROGRESS = re.compile(r"^#lordos-ta (?:step ([a-z_]+)|check ([a-z_]+) (?:pass|fail|skip))$")
+
+
+def run_harness(env, show=False):
     t = time.monotonic()
-    p = subprocess.run([sys.executable, "-I", HARNESS], env=env, capture_output=True, timeout=8)
+    p = subprocess.run([sys.executable, "-I", HARNESS] + (["--show"] if show else []), env=env, capture_output=True,
+                       timeout=20 if show else 8)
     took = time.monotonic() - t
     lines = p.stdout.decode().splitlines()
     expect(p.returncode == 0, "exit status %d" % p.returncode)
+    if show:
+        prog, lines = lines[:-1], lines[-1:]
+        steps = {m.group(1) for m in map(PROGRESS.match, prog) if m and m.group(1)}
+        checked = [m.group(2) for m in map(PROGRESS.match, prog) if m and m.group(2)]
+        expect(all(PROGRESS.match(ln) for ln in prog), "show: only progress lines before the result")
+        expect(sorted(checked) == sorted(xh.CHECK_IDS), "show: one check line per id (%s)" % checked)
+        expect(steps <= set(xh.CHECK_IDS) and {"map", "menu", "text", "fullscreen"} <= steps, "show: steps %s" % steps)
+        expect(3.0 < took < 15.0, "show: slowed down, finished in %.1f s" % took)
     expect(len(lines) == 1, "one JSON line, got %d" % len(lines))
-    expect(took < 5.0, "finished in %.1f s" % took)
+    expect(show or took < 5.0, "finished in %.1f s" % took)
     expect(p.stderr == b"", "nothing on stderr: %r" % p.stderr[:200])
     r = json.loads(lines[0]) if lines else {}
     expect(set(r) == {"toolkit", "version", "backend", "checks"}, "top-level keys %s" % sorted(r))
@@ -133,12 +148,17 @@ def main():
         wm = FakeWM()
         wm.start()
         c = run_harness(env)
+        cs = run_harness(env, show=True)
         wm.stop = True
         wm.join(1)
         expect(c["decoration"]["ok"] is True, "WM: decoration (%s)" % c["decoration"])
         expect(c["fullscreen"]["ok"] is True, "WM: fullscreen (%s)" % c["fullscreen"])
         expect(c["fullscreen"].get("detail") == "on 1280x800, off 600x400", "WM: fullscreen sizes")
         expect(c["map"]["ok"] is True and c["size"]["ok"] is True, "WM: map and size")
+        # show mode: the same results as the fast run (only the times differ)
+        for cid in xh.CHECK_IDS:
+            expect(cs[cid]["ok"] == c[cid]["ok"], "show: %s same result (%s / %s)" % (cid, cs[cid], c[cid]))
+        expect(cs["fullscreen"].get("detail") == c["fullscreen"].get("detail"), "show: fullscreen sizes")
 
         env.pop("DISPLAY")
         c = run_harness(env)

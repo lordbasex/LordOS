@@ -1,6 +1,6 @@
 {
   "title": "Toolkit Linux di desktop ini",
-  "usage": "Penggunaan: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Penggunaan: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Kombinasi tidak dikenal: {id}. Yang dikenal: {list}",
   "running": "Menguji {combo}...",
   "col.combo": "Kombinasi",

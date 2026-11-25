@@ -1,6 +1,6 @@
 {
   "title": "جعبه‌ابزارهای لینوکس در این میزکار",
-  "usage": "کاربرد: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "کاربرد: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "ترکیب ناشناخته: {id}. شناخته‌شده‌ها: {list}",
   "running": "در حال آزمودن {combo}...",
   "col.combo": "ترکیب",

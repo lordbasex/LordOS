@@ -16,7 +16,14 @@
 # start of this script. Privacy: only toolkit names and versions, the backend, numbers and fixed words; never a
 # user name, a path, a window title or an error text (an exception is reported by its type name).
 # Exit codes: 0 ran, 2 no display could be opened, 3 the bindings are not installed.
+#
+# Show mode (--show, or LORDOS_TOOLKIT_AUDIT_SHOW=1; the test bench's Frameworks screen): the same checks and the same
+# JSON line, slowed down so a person can follow them (each popup held open about 0.9 s, the text typed one character
+# at a time, fullscreen held on and off), the current step's id in a label on the window (a check id, never
+# translated), and before the JSON line one progress line per step and per check on stdout: "#lordos-ta step <id>"
+# and "#lordos-ta check <id> pass|fail|skip". The deadline is then 14.6 s (the orchestrator kills at 20 s).
 import json
+import os
 import sys
 import time
 
@@ -25,12 +32,21 @@ TOOLKIT = 'gtk4'
 IDS = ('map', 'size', 'scale', 'theme', 'backend', 'decoration', 'first_frame', 'menu', 'combo', 'tooltip',
        'clipboard', 'dnd', 'text', 'fullscreen')
 REQ_W, REQ_H = 600, 400
-DEADLINE_MS = 4600          # everything still pending then is reported as a timeout, and the harness exits
+SHOW = '--show' in sys.argv[1:] or os.environ.get('LORDOS_TOOLKIT_AUDIT_SHOW') == '1'
+DEADLINE_MS = 14600 if SHOW else 4600   # everything still pending then is reported as a timeout, and the harness exits
+HOLD_MS = 900 if SHOW else 0            # show mode: how long a step stays on screen once decided
 SAMPLE = 'LordOS-audit-0123'
 
 
 def ms():
     return int((time.monotonic() - T0) * 1000)
+
+
+def progress(line):
+    """Show mode: one progress line on stdout, before the JSON line."""
+    if SHOW:
+        sys.stdout.write('#lordos-ta ' + line + '\n')
+        sys.stdout.flush()
 
 
 def emit(version, backend, checks, code):
@@ -85,14 +101,30 @@ class Audit:
         if detail:
             r['detail'] = detail
         self.checks[cid] = r
+        if cid in IDS and not self.done:
+            progress('check %s %s' % (cid, 'skip' if ok is None else 'pass' if ok is True else 'fail'))
+
+    def mark(self, cid):
+        """Show mode: the step now on screen, in the label and as a progress line."""
+        if not SHOW or self.done:
+            return
+        progress('step ' + cid)
+        if self.step_label is not None:
+            self.step_label.set_markup('<span font_family="monospace" weight="bold" size="large">%s</span>' % cid)
+
+    def held(self, fn, ms=None):
+        """fn, run HOLD_MS later in show mode (the step stays on screen), at once otherwise."""
+        if not SHOW:
+            return fn
+        return lambda *_: GLib.timeout_add(max(1, HOLD_MS if ms is None else ms), lambda: fn() and False) and False
 
     def finish(self, *_):
         if self.done:
             return False
-        self.done = True
         for i in IDS:
             if i not in self.checks:
                 self.put(i, False, 'timeout')
+        self.done = True
         emit(VERSION, self.backend, self.checks, 0)
         self.loop.quit()
         return False
@@ -104,6 +136,8 @@ class Audit:
             self.finish()
             return False
         step = self.steps.pop(0)
+        name = step.__name__.replace('step_', '')
+        self.mark('size' if name == 'static' else name)
         try:
             step()
         except Exception as e:  # a step that throws fails alone; the next one still runs
@@ -147,6 +181,12 @@ class Audit:
 
         self.entry = Gtk.Entry()
         box.append(self.entry)
+        # show mode: the current step's id (a fixed check id, not translated)
+        self.step_label = None
+        if SHOW:
+            self.step_label = Gtk.Label(halign=Gtk.Align.START)
+            self.step_label.set_markup('<span font_family="monospace" weight="bold" size="large">map</span>')
+            box.append(self.step_label)
         box.append(Gtk.CheckButton())
         self.scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
         self.scale.set_value(40)
@@ -209,7 +249,7 @@ class Audit:
             deco = 'ssd' if w.get_decorated() else 'none'
         hb = w.get_titlebar()
         self.put('decoration', w.get_decorated() and hb is not None and hb.get_mapped(), deco)
-        GLib.idle_add(self.next_step)
+        GLib.idle_add(self.held(self.next_step, HOLD_MS // 2))
 
     def step_theme(self):
         # the desktop's color scheme through the Settings portal, and what GTK itself was told
@@ -231,7 +271,7 @@ class Audit:
                          ms() - t)
             else:
                 self.put('theme', False, '%s toolkit=%s' % (how, 'dark' if dark_tk else 'light'), ms() - t)
-            GLib.idle_add(self.next_step)
+            GLib.idle_add(self.held(self.next_step, HOLD_MS // 2))
 
         def unpack(v):
             while isinstance(v, GLib.Variant):
@@ -275,11 +315,14 @@ class Audit:
                 return False
             state['over'] = True
             self.put(cid, ok, detail, ms() - t)
-            try:
-                stop()
-            except Exception:
-                pass
-            self.after(120, self.next_step)
+
+            def close():
+                try:
+                    stop()
+                except Exception:
+                    pass
+                self.after(120, self.next_step)
+            self.held(close)()          # show mode: the popup stays open a moment
             return False
 
         def surface_ok(*_):
@@ -353,10 +396,21 @@ class Audit:
             ok = got == SAMPLE and focus
             self.put('text', ok, 'synthetic=insert-at-cursor focus=%s active=%s match=%s' % (
                 yesno(focus), yesno(active), yesno(got == SAMPLE)), ms() - t)
-            GLib.idle_add(self.next_step)
+            GLib.idle_add(self.held(self.next_step))
             return False
 
         def go():
+            if SHOW:        # one character at a time, as a person types
+                left = list(SAMPLE)
+
+                def one():
+                    text.emit('insert-at-cursor', left.pop(0))
+                    if left:
+                        return True
+                    GLib.idle_add(check)
+                    return False
+                GLib.timeout_add(60, one)
+                return False
             text.emit('insert-at-cursor', SAMPLE)
             GLib.idle_add(check)
             return False
@@ -382,9 +436,12 @@ class Audit:
                 return False
             state['over'] = True
             self.put('clipboard', ok, detail, ms() - t)
-            if state['w2'] is not None:
-                state['w2'].destroy()
-            self.after(120, self.next_step)
+
+            def close():
+                if state['w2'] is not None:
+                    state['w2'].destroy()
+                self.after(120, self.next_step)
+            self.held(close)()          # show mode: the reading window stays a moment
             return False
 
         self.display.get_clipboard().set(SAMPLE)
@@ -426,7 +483,7 @@ class Audit:
     def step_dnd(self):
         # a drag needs a pointer button held down (its serial); GTK 4 cannot fake one
         self.put('dnd', None, 'skipped: needs a held pointer button, GTK 4 has no synthetic pointer input')
-        GLib.idle_add(self.next_step)
+        GLib.idle_add(self.held(self.next_step, HOLD_MS // 2))
 
     def step_fullscreen(self):
         w = self.win
@@ -438,7 +495,7 @@ class Audit:
                 return False
             state['over'] = True
             self.put('fullscreen', ok, detail, ms() - t)
-            GLib.idle_add(self.next_step)
+            GLib.idle_add(self.held(self.next_step))
             return False
 
         def poll():
@@ -448,8 +505,17 @@ class Audit:
                 fw, fh = win_size(w)
                 if w.is_fullscreen() and (fw > REQ_W or fh > REQ_H):
                     state['full'] = '%dx%d' % (fw, fh)
-                    state['phase'] = 'off'
-                    w.unfullscreen()
+                    state['phase'] = 'hold' if SHOW else 'off'
+                    if SHOW:        # show mode: fullscreen stays on screen a moment
+                        def leave():
+                            state['phase'] = 'off'
+                            w.unfullscreen()
+                            return False
+                        GLib.timeout_add(HOLD_MS, leave)
+                    else:
+                        w.unfullscreen()
+                return True
+            if state['phase'] == 'hold':
                 return True
             if not w.is_fullscreen() and win_size(w) == (REQ_W, REQ_H):
                 result(True, 'on=%s off=%dx%d' % (state['full'], REQ_W, REQ_H))
@@ -465,7 +531,7 @@ class Audit:
 
         w.fullscreen()
         GLib.timeout_add(25, poll)
-        self.after(1400, give_up)
+        self.after(1400 + HOLD_MS, give_up)
 
     def run(self):
         self.steps = [self.step_static, self.step_theme, self.step_menu, self.step_combo, self.step_tooltip,

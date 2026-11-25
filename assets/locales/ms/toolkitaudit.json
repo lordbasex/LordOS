@@ -1,6 +1,6 @@
 {
   "title": "Kit alat Linux di desktop ini",
-  "usage": "Penggunaan: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Penggunaan: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Gabungan tidak dikenali: {id}. Yang dikenali: {list}",
   "running": "Menguji {combo}...",
   "col.combo": "Gabungan",

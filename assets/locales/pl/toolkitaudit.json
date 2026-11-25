@@ -1,6 +1,6 @@
 {
   "title": "Zestawy narzędzi Linuksa na tym pulpicie",
-  "usage": "Użycie: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Użycie: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Nieznana kombinacja: {id}. Znane: {list}",
   "running": "Testowanie {combo}...",
   "col.combo": "Kombinacja",

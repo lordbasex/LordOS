@@ -149,6 +149,31 @@ void tk_report_table(FILE *o, const TkReport *rep, TkText T);
 #define TK_LAST_MAX (256 * 1024)
 int tk_last_summary(FILE *o, const char *json, size_t len, long long now_ms);
 
+/* ---- show mode: the harness's progress lines (docs/TOOLKIT-AUDIT.md, "Show mode") ----
+ * With --show a harness slows down so a person can follow it, and before its JSON line it prints on stdout, as it
+ * goes:
+ *
+ *   #lordos-ta step <check id>                      the step it is on now (one of the 14 shared ids)
+ *   #lordos-ta check <check id> pass|fail|skip      a check just decided
+ *
+ * Exactly that: one space between words, no other character, at most TK_PROG_LINE_MAX bytes with the newline. Any
+ * other line (or one cut by TK_PROG_LINE_MAX) is ignored, never shown: the harness's output is untrusted. Only the
+ * fixed ids are kept, as indexes; the final result still comes from the JSON line alone. */
+#define TK_PROG_PREFIX "#lordos-ta "
+#define TK_PROG_LINE_MAX 96
+#define TK_PROG_MAX_EVENTS 512          /* per run: the rest are dropped */
+
+typedef enum { TK_PROG_NONE, TK_PROG_STEP, TK_PROG_CHECK } TkProgKind;
+typedef struct { TkProgKind kind; int check; int result; } TkProg;   /* check: tk_check_id's index; result TK_PASS ... */
+
+/* One line (no '\n'): 0 and *p filled when it is a valid progress line, -1 otherwise. */
+int tk_progress_parse(const char *s, size_t n, TkProg *p);
+
+/* stdout bytes, any chunking: every complete valid line calls cb (at most TK_PROG_MAX_EVENTS times) */
+typedef struct { char line[TK_PROG_LINE_MAX]; size_t len; int overlong; int events; } TkProgBuf;
+typedef void (*TkProgFn)(void *ctx, const TkProg *p);
+void tk_progress_feed(TkProgBuf *b, const char *buf, size_t n, TkProgFn cb, void *ctx);
+
 /* {name} placeholders: kv is name, value, ..., NULL */
 void tk_fill(const char *tmpl, const char *const *kv, char *out, size_t n);
 

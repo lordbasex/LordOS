@@ -1,6 +1,6 @@
 {
   "title": "Инструментариуми на Linux на този работен плот",
-  "usage": "Употреба: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Употреба: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Непозната комбинация: {id}. Известни: {list}",
   "running": "Проверка на {combo}...",
   "col.combo": "Комбинация",

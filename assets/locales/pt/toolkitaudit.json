@@ -1,6 +1,6 @@
 {
   "title": "Toolkits do Linux nesta área de trabalho",
-  "usage": "Uso: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Uso: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Combinação desconhecida: {id}. Conhecidas: {list}",
   "running": "Testando {combo}...",
   "col.combo": "Combinação",

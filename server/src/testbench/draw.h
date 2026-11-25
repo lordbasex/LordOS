@@ -12,7 +12,12 @@ void d_fill(Surf *s, int x, int y, int w, int h, uint32_t c);
 void d_frame(Surf *s, int x, int y, int w, int h, int thick, uint32_t c);
 void d_circle(Surf *s, int cx, int cy, int r, uint32_t c);
 int  d_text(Surf *s, int x, int y, int scale, uint32_t c, const char *t);   /* returns the width drawn */
+int  d_textl(Surf *s, int x, int y, int scale, uint32_t c, const char *t);  /* lowercase kept */
 int  d_text_w(const char *t, int scale);
+void d_line(Surf *s, int x0, int y0, int x1, int y1, int thick, uint32_t c);
+void d_tick(Surf *s, int x, int y, int sz, uint32_t c);                     /* ✓ in an sz × sz box */
+void d_cross(Surf *s, int x, int y, int sz, uint32_t c);                    /* ✗ in an sz × sz box */
+void d_ring(Surf *s, int cx, int cy, int r, int thick, uint32_t c);
 void d_text_c(Surf *s, int cx, int cy, int scale, uint32_t c, const char *t);
 
 #endif

@@ -1,6 +1,6 @@
 {
   "title": "Linuxos eszközkészletek ezen az asztalon",
-  "usage": "Használat: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Használat: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Ismeretlen kombináció: {id}. Ismertek: {list}",
   "running": "{combo} tesztelése...",
   "col.combo": "Kombináció",

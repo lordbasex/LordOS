@@ -1,6 +1,6 @@
 {
   "title": "Bu masaüstündeki Linux araç takımları",
-  "usage": "Kullanım: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Kullanım: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Bilinmeyen birleşim: {id}. Bilinenler: {list}",
   "running": "{combo} sınanıyor...",
   "col.combo": "Birleşim",

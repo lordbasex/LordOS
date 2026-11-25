@@ -678,35 +678,42 @@ function shareRows(tr, rep) {
 // ~/.cache/lordos/toolkit-audit.json. A result from the last day is used as it is; otherwise the audit is opened in a
 // Terminal window (its own launcher entry, lordos-toolkit-audit.desktop: this app runs no command) and the file is
 // read again until a newer result appears. toolkits.js and the schema keep only ids and numbers from it.
+// "Watch the tests" runs it again, fresh result or not, in the Test Bench's Frameworks screen instead: the desktop
+// action "frameworks" of lordos-testbench.desktop (lordos-testbench --frameworks) through lord.apps.launchAction, the
+// launcher's own path, with the slower show mode (every harness up to 20 s), so it waits longer.
 const TOOLKIT_WAIT_MS = 180000;
+const TOOLKIT_WATCH_WAIT_MS = 300000;
 function readToolkitAudit() {
   try { const a = JSON.parse(fs.read(`${fs.home()}/.cache/lordos/toolkit-audit.json`)); return isAudit(a) ? a : null; } catch (e) { return null; }
 }
 
-function useToolkitAudit(on) {
-  const [st, setSt] = useState({ busy: false, audit: null, error: null });
+function useToolkitAudit(on, watch) {
+  const [st, setSt] = useState({ busy: false, audit: null, error: null, watch: false });
   useEffect(() => {
-    if (!on) { setSt({ busy: false, audit: null, error: null }); return undefined; }
+    if (!on) { setSt({ busy: false, audit: null, error: null, watch: false }); return undefined; }
     const saved = readToolkitAudit();
-    if (isFresh(saved)) { setSt({ busy: false, audit: saved, error: null }); return undefined; }
+    if (!watch && isFresh(saved)) { setSt({ busy: false, audit: saved, error: null, watch: false }); return undefined; }
     const since = Date.now() - 1000;
     let ok = false;
-    try { ok = !!launchApp('desktop:lordos-toolkit-audit'); } catch (e) { ok = false; }
-    if (!ok) { setSt({ busy: false, audit: null, error: 'failed' }); return undefined; }
-    setSt({ busy: true, audit: null, error: null });
+    try {
+      ok = watch ? lord.apps.launchAction('lordos-testbench', 'frameworks') === true : !!launchApp('desktop:lordos-toolkit-audit');
+    } catch (e) { ok = false; }
+    if (!ok) { setSt({ busy: false, audit: null, error: 'failed', watch }); return undefined; }
+    setSt({ busy: true, audit: null, error: null, watch });
     const t0 = Date.now();
+    const limit = watch ? TOOLKIT_WATCH_WAIT_MS : TOOLKIT_WAIT_MS;
     const id = setInterval(() => {
       const a = readToolkitAudit();
-      if (a && a.at >= since) { clearInterval(id); setSt({ busy: false, audit: a, error: null }); }
-      else if (Date.now() - t0 > TOOLKIT_WAIT_MS) { clearInterval(id); setSt({ busy: false, audit: null, error: 'timeout' }); }
+      if (a && a.at >= since) { clearInterval(id); setSt({ busy: false, audit: a, error: null, watch }); }
+      else if (Date.now() - t0 > limit) { clearInterval(id); setSt({ busy: false, audit: null, error: 'timeout', watch }); }
     }, 1000);
     return () => clearInterval(id);
-  }, [on]);
+  }, [on, watch]);
   return st;
 }
 
 function toolkitStatus(tr, st) {
-  if (st.busy) return tr('sysinfo.share.toolkits.running');
+  if (st.busy) return tr(st.watch ? 'sysinfo.share.toolkits.watching' : 'sysinfo.share.toolkits.running');
   if (st.error) return tr(`sysinfo.share.toolkits.${st.error}`);
   if (!st.audit) return tr('sysinfo.share.toolkits.hint');
   const time = new Date(st.audit.at).toLocaleString();
@@ -722,7 +729,8 @@ function Share({ r, onClose }) {
   const { t: tr, lang, dir } = useLocale();
   const [msg, setMsg] = useState(null);
   const [withToolkits, setWithToolkits] = useState(false);
-  const tk = useToolkitAudit(withToolkits);
+  const [watchToolkits, setWatchToolkits] = useState(false);
+  const tk = useToolkitAudit(withToolkits, withToolkits && watchToolkits);
   const rep = useMemo(() => buildShareReport({
     report: r, bench: savedBench(0), desktop: savedBench(2), compat: compatibility(r), schema: HWREPORT_SCHEMA,
     toolkits: withToolkits && tk.audit ? toolkitSection(tk.audit) : null,
@@ -759,6 +767,12 @@ function Share({ r, onClose }) {
         <Text style={{ fontSize: typeScale.callout, color: tk.error ? '#ff453a' : t.textDim, textAlign: 'start', lineHeight: 1.4, paddingStart: 20 }}>
           {withToolkits ? toolkitStatus(tr, tk) : tr('sysinfo.share.toolkits.hint')}
         </Text>
+        {withToolkits ? (
+          <View style={{ paddingStart: 20, gap: 2 }}>
+            <Checkbox checked={watchToolkits} disabled={tk.busy} label={tr('sysinfo.share.toolkits.watch')} onChange={(v) => { setWatchToolkits(v); setMsg(null); }} />
+            <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start', lineHeight: 1.4, paddingStart: 20 }}>{tr('sysinfo.share.toolkits.watchHint')}</Text>
+          </View>
+        ) : null}
       </View>
       {narrow ? <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{tr('sysinfo.share.exact')}</Text> : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>

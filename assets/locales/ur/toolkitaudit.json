@@ -1,6 +1,6 @@
 {
   "title": "اس ڈیسک ٹاپ پر لینکس ٹول کٹس",
-  "usage": "استعمال: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "استعمال: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "نامعلوم امتزاج: {id}۔ معلوم: {list}",
   "running": "{combo} کی جانچ ہو رہی ہے...",
   "col.combo": "امتزاج",

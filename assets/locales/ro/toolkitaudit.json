@@ -1,6 +1,6 @@
 {
   "title": "Toolkit-uri Linux pe acest desktop",
-  "usage": "Utilizare: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Utilizare: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Combinație necunoscută: {id}. Cunoscute: {list}",
   "running": "Se testează {combo}...",
   "col.combo": "Combinație",

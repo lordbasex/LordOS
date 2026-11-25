@@ -10,6 +10,14 @@
 #define TK_PYTHON "/usr/bin/python3"
 #define TK_KILL_MS 8000                 /* a harness exits by itself within 5 s; at 8 s its process group is killed */
 #define TK_PROBE_MS 5000
+#define TK_SHOW_KILL_MS 20000           /* show mode (--show): a harness finishes within 15 s; killed at 20 s */
+
+/* What tk_audit reports while it runs (TkRunOpts.on_event, from the thread that called it). slot: the index in
+ * rep->r. START: the harness was started; STEP and CHECK: a progress line (show mode only, toolkits.h); DONE: the
+ * combination's result is final (every combination asked gets one, run or not) and r points at it. */
+typedef enum { TK_EV_START, TK_EV_STEP, TK_EV_CHECK, TK_EV_DONE } TkEvKind;
+typedef struct { TkEvKind kind; int slot, combo, check, result; const TkResult *r; } TkEvent;
+typedef void (*TkEventFn)(void *ctx, const TkEvent *e);
 
 typedef struct {
     const char *dir;                    /* the harnesses (TK_HARNESS_DIR, or LORDOS_TOOLKIT_AUDIT_DIR) */
@@ -18,6 +26,10 @@ typedef struct {
     int progress;                       /* "Testing ..." on stderr */
     TkText T;
     char *const *env;                   /* the caller's environment (environ): only the listed variables are kept */
+    int show;                           /* show mode: the harness gets --show (slowed down, progress lines) */
+    TkEventFn on_event;                 /* NULL: none */
+    void *ctx;
+    volatile int *abort;                /* set (another thread, a signal): the running harness is killed, no more run */
 } TkRunOpts;
 
 /* Runs the combinations which[0..n-1] (indexes of tk_combo) in that order. rep's logs are allocated here; free them
@@ -38,7 +50,15 @@ int tk_cache_path(char *out, size_t n, char *const *env);
  * or, for a development folder, by root or this user, and not writable by group or others. 0, or -1. */
 int tk_harness_path(const char *dir, const char *toolkit, char *p, size_t n);
 
-/* lordos-testbench --toolkits [--json] [--only id,...] */
+/* --only's list into which[] (indexes, no duplicates); the number, or -1 with the bad id (printable, cut) in bad */
+int tk_parse_only(const char *only, int *which, char *bad, size_t blen);
+/* The harness folder: LORDOS_TOOLKIT_AUDIT_DIR when absolute, else TK_HARNESS_DIR */
+const char *tk_harness_dir(void);
+
+/* SIGINT, SIGTERM and SIGHUP kill the running harness's process group, then end this process; SIGPIPE ignored */
+void tk_signals(void);
+
+/* lordos-testbench --toolkits [--show] [--json] [--only id,...] */
 int toolkits_main(int argc, char **argv);
 
 /* The saved result's bytes (a regular file owned by the caller, no link, at most TK_LAST_MAX), or NULL; free() it. */

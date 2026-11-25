@@ -1,6 +1,6 @@
 {
   "title": "Εργαλειοθήκες Linux σε αυτή την επιφάνεια εργασίας",
-  "usage": "Χρήση: lordos-testbench --toolkits [--json] [--only COMBINATION,...]",
+  "usage": "Χρήση: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
   "badOnly": "Άγνωστος συνδυασμός: {id}. Γνωστοί: {list}",
   "running": "Δοκιμή {combo}...",
   "col.combo": "Συνδυασμός",

@@ -15,6 +15,13 @@
 #
 # Measurement uses no test hooks, only what any X client can see. Results carry only names, versions, numbers and check
 # ids: no user names, paths, host names or window titles. Only the local Unix socket of $DISPLAY is used, never TCP.
+#
+# Show mode (--show, or LORDOS_TOOLKIT_AUDIT_SHOW=1; the test bench's Frameworks screen): the same checks and the same
+# line, slowed down so a person can follow them (each popup held open about 0.9 s, the text typed one character at a
+# time, fullscreen held on and off), the current step's id drawn on the window (a check id in a small built-in
+# bitmap font: no X font, never translated), and before the line one progress line per step and per check on stdout:
+# "#lordos-ta step <id>" and "#lordos-ta check <id> pass|fail|skip". The budget is then 14.6 s (SIGALRM at 15 s; the
+# orchestrator kills at 20 s).
 import json
 import os
 import re
@@ -28,7 +35,10 @@ import sys
 import time
 
 T0 = time.monotonic()
-DEADLINE = T0 + 4.6          # every wait is clipped to this; SIGALRM at 5 s prints what is done and exits
+SHOW = "--show" in sys.argv[1:] or os.environ.get("LORDOS_TOOLKIT_AUDIT_SHOW") == "1"
+BUDGET = 14.6 if SHOW else 4.6
+DEADLINE = T0 + BUDGET       # every wait is clipped to this; SIGALRM at 5 s (15 s) prints what is done and exits
+HOLD = 0.9 if SHOW else 0.0  # show mode: how long a step stays on screen once decided
 CHECK_IDS = ("map", "size", "scale", "theme", "backend", "decoration", "first_frame", "menu", "combo", "tooltip",
              "clipboard", "dnd", "text", "fullscreen")
 REQ_W, REQ_H = 600, 400
@@ -41,13 +51,23 @@ def ms_since(t):
     return round((time.monotonic() - t) * 1000)
 
 
+def progress(line):
+    """Show mode: one progress line on stdout (never after the JSON line)."""
+    if SHOW and not printed:
+        sys.stdout.write("#lordos-ta " + line + "\n")
+        sys.stdout.flush()
+
+
 def check(cid, ok, ms=None, detail=None):
     c = {"ok": ok}
     if ms is not None:
         c["ms"] = ms
     if detail:
         c["detail"] = detail
+    new = cid not in result["checks"]
     result["checks"][cid] = c
+    if new and cid in CHECK_IDS:
+        progress("check %s %s" % (cid, "skip" if ok is None else "pass" if ok is True else "fail"))
 
 
 def skip(cid, why):
@@ -58,9 +78,10 @@ def emit():
     global printed
     if printed:
         return
-    printed = True
     for cid in CHECK_IDS:
-        result["checks"].setdefault(cid, {"ok": None, "detail": "skipped: not reached in time"})
+        if cid not in result["checks"]:
+            skip(cid, "not reached in time")
+    printed = True
     sys.stdout.write(json.dumps(result, separators=(",", ":")) + "\n")
     sys.stdout.flush()
 
@@ -459,6 +480,30 @@ def finish_theme_read(p):
     return True, {0: "no-preference", 1: "dark", 2: "light"}.get(v, "unknown")
 
 
+# ---- show mode: the step's id, drawn with a 5x7 bitmap font of lowercase letters and "_" (bit 4 = left column) ----
+GLYPHS = {
+    "a": (0, 0, 14, 1, 15, 17, 15), "b": (16, 16, 22, 25, 17, 17, 30), "c": (0, 0, 14, 16, 16, 17, 14),
+    "d": (1, 1, 13, 19, 17, 17, 15), "e": (0, 0, 14, 17, 31, 16, 14), "f": (6, 9, 8, 28, 8, 8, 8),
+    "g": (0, 0, 15, 17, 15, 1, 14), "h": (16, 16, 22, 25, 17, 17, 17), "i": (4, 0, 12, 4, 4, 4, 14),
+    "j": (2, 0, 6, 2, 2, 18, 12), "k": (16, 16, 18, 20, 24, 20, 18), "l": (12, 4, 4, 4, 4, 4, 14),
+    "m": (0, 0, 26, 21, 21, 17, 17), "n": (0, 0, 22, 25, 17, 17, 17), "o": (0, 0, 14, 17, 17, 17, 14),
+    "p": (0, 0, 30, 17, 30, 16, 16), "q": (0, 0, 15, 17, 15, 1, 1), "r": (0, 0, 22, 25, 16, 16, 16),
+    "s": (0, 0, 14, 16, 14, 1, 30), "t": (8, 8, 28, 8, 8, 9, 6), "u": (0, 0, 17, 17, 17, 19, 13),
+    "v": (0, 0, 17, 17, 17, 10, 4), "w": (0, 0, 17, 17, 21, 21, 10), "x": (0, 0, 17, 10, 4, 10, 17),
+    "y": (0, 0, 17, 17, 15, 1, 14), "z": (0, 0, 31, 2, 4, 8, 31), "_": (0, 0, 0, 0, 0, 0, 31),
+}
+
+
+def glyph_rects(text, ox, oy, scale):
+    out = []
+    for i, ch in enumerate(text):
+        for row, bits in enumerate(GLYPHS.get(ch, ())):
+            for col in range(5):
+                if bits & (16 >> col):
+                    out.append((ox + (i * 6 + col) * scale, oy + row * scale, scale, scale))
+    return out
+
+
 # ---- the harness ------------------------------------------------------------------------------------------------
 LIGHT = {"window": 0xF4F4F4, "widget": 0xFFFFFF, "accent": 0x3584E4, "line": 0x9A9A9A, "ind": 0xFFFFFF}
 DARK = {"window": 0x242424, "widget": 0x363636, "accent": 0x78AEED, "line": 0x5E5E5E, "ind": 0x101010}
@@ -472,13 +517,43 @@ class Harness:
         self.keymap = {}
         self.kcodes = {}
         self.server_time = 0
+        self.step = "map"
+
+    def mark(self, cid):
+        """Show mode: the step now on screen, drawn on the window and as a progress line."""
+        if not SHOW:
+            return
+        self.step = cid
+        progress("step " + cid)
+        if getattr(self, "kids", None) and "step" in self.kids:
+            self.draw_step()
+            self.x.sync()
+
+    def draw_step(self):
+        x, c = self.x, self.colors
+        x.fill_rects(self.kids["step"], self.gc, c["widget"], [(0, 0, 240, 24)])
+        x.fill_rects(self.kids["step"], self.gc, c["accent"], glyph_rects(self.step, 6, 5, 2))
+
+    def hold(self, secs=None):
+        """Show mode: keep what the step did on screen, redrawing the window when it is exposed meanwhile."""
+        if not SHOW:
+            return
+        x = self.x
+        end = min(time.monotonic() + (HOLD if secs is None else secs), DEADLINE - 0.3)
+        mine = set(self.kids.values()) | {self.top} if getattr(self, "kids", None) else set()
+        while time.monotonic() < end:
+            e = x.wait(lambda e: ev_code(e) == Expose and u32(e, 4) in mine, end - time.monotonic())
+            if e:
+                self.draw()
+                x.sync()
 
     def layout(self, w, h):
         # (name, x, y, w, h): the top row's buttons sit strictly at the start and at the end
         return [("btn_start", 8, 8, 96, 28), ("btn_end", w - 8 - 96, 8, 96, 28),
                 ("entry", 8, 52, min(320, w - 16), 28), ("check", 8, 96, 18, 18),
                 ("slider", 8, 130, min(320, w - 16), 18), ("combo", 8, 164, 200, 28),
-                ("menu_btn", 8, 208, 96, 28), ("indicator", w - 8 - 28, h - 8 - 28, 28, 28)]
+                ("menu_btn", 8, 208, 96, 28), ("indicator", w - 8 - 28, h - 8 - 28, 28, 28)] + \
+            ([("step", 180, 10, 240, 24)] if SHOW else [])
 
     def build(self):
         x, a = self.x, self.a
@@ -517,6 +592,8 @@ class Harness:
         x.fill_rects(k["combo"], self.gc, c["line"], [(180, 12, 10, 4)])
         x.fill_rects(k["menu_btn"], self.gc, c["line"], [(8, 9, 16, 2), (8, 13, 16, 2), (8, 17, 16, 2)])
         x.fill_rects(k["indicator"], self.gc, c["ind"], [(0, 0, 28, 28)])
+        if "step" in k:
+            self.draw_step()
 
     def get_time(self):
         """A server timestamp: an empty append to our own property and its PropertyNotify."""
@@ -562,6 +639,13 @@ class Harness:
             x.fill_rects(p, self.gc, self.colors["accent"], [(0, 0, w, 4)])
             x.sync()
         geo = x.geometry(p) if ex else None
+        if ex and SHOW:             # the decision is made: the popup stays open a moment, then closes
+            sz = "%dx%d" % (geo[2], geo[3]) if geo else "?"
+            check(cid, bool(geo and geo[2] == w and geo[3] == h), ms_since(t), "override-redirect " + sz)
+            self.hold()
+            x.unmap(p)
+            x.destroy(p)
+            return
         x.unmap(p)
         x.destroy(p)
         if not m:
@@ -599,6 +683,7 @@ class Harness:
                     self.kcodes.setdefault(s, x.min_kc + i)
 
         # window, map, first frame
+        self.mark("map")
         self.build()
         x.map(self.top)
         m = x.wait(lambda e: ev_code(e) == MapNotify and u32(e, 8) == self.top, 2.0)
@@ -615,6 +700,7 @@ class Harness:
             check("first_frame", False, detail="no Expose after map")
 
         # size
+        self.mark("size")
         geo = x.geometry(self.top)
         if geo:
             check("size", (geo[2], geo[3]) == (REQ_W, REQ_H), detail="%dx%d" % (geo[2], geo[3]))
@@ -652,6 +738,8 @@ class Harness:
                 check("decoration", False, detail="no frame from the window manager")
 
         # theme
+        self.hold(HOLD / 2)
+        self.mark("theme")
         ok, scheme = finish_theme_read(theme_proc)
         if ok is None:
             skip("theme", scheme)
@@ -663,15 +751,27 @@ class Harness:
                 x.sync()
 
         # menu, combo popup and tooltip, placed under their widgets
+        self.hold(HOLD / 2)
         ox, oy = x.to_root(self.top, 0, 0)
+        self.mark("menu")
         self.popup("menu", "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU", ox + 8, oy + 236, 180, 120)
+        self.mark("combo")
         self.popup("combo", "_NET_WM_WINDOW_TYPE_COMBO", ox + 8, oy + 192, 200, 96)
+        self.mark("tooltip")
         self.popup("tooltip", "_NET_WM_WINDOW_TYPE_TOOLTIP", ox + 30, oy + 40, 140, 24)
 
+        self.mark("text")
         self.check_text()
+        self.hold()
+        self.mark("clipboard")
         self.check_clipboard()
+        self.hold()
+        self.mark("dnd")
         self.check_dnd()
+        self.hold()
+        self.mark("fullscreen")
         self.check_fullscreen()
+        self.hold()
         x.destroy(self.top)
         x.sync()
 
@@ -688,6 +788,14 @@ class Harness:
         for kc in codes:
             ev = struct.pack("<BBHIIIIhhhhHBx", KeyPress, kc, 0, 0, x.root, entry, 0, 0, 0, 10, 10, 0, 1)
             x.send_event(entry, 0, ev)
+            if SHOW:                # one character at a time, as a person types: each drawn as it arrives
+                e = x.wait(lambda e: ev_code(e) == KeyPress and u32(e, 12) == entry, 0.3)
+                s = self.keymap.get(e[1], 0) if e else 0
+                if 0x20 <= s < 0x7F:
+                    self.typed += chr(s)
+                self.draw()
+                x.sync()
+                self.hold(0.07)
         end = time.monotonic() + 0.8
         while len(self.typed) < len(word) and time.monotonic() < end:
             e = x.wait(lambda e: ev_code(e) == KeyPress and u32(e, 12) == entry, end - time.monotonic())
@@ -826,6 +934,10 @@ class Harness:
         ask(True)
         on = settle(True, min(1.0, left() / 2))
         on_ms = ms_since(t)
+        if on and SHOW:             # fullscreen stays on screen a moment (not counted in the time)
+            th = time.monotonic()
+            self.hold()
+            t += time.monotonic() - th
         ask(False)
         off = settle(False, min(1.0, left()))
         if not on:
@@ -838,7 +950,7 @@ class Harness:
 
 def main():
     signal.signal(signal.SIGALRM, on_alarm)
-    signal.setitimer(signal.ITIMER_REAL, 5.0)
+    signal.setitimer(signal.ITIMER_REAL, BUDGET + 0.4)
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     x = X()
     try:

@@ -2,12 +2,15 @@
  * the scoring, the WAYLAND_DEBUG and stderr reader, the harness's JSON line with hostile output (oversized lines,
  * bad JSON, control characters), the environment a harness gets, the cache file, and real runs of fake harnesses
  * (shell scripts behind a fake python3 written into a temporary folder: fixed JSON, a protocol error, a crash, a
- * hang killed at the deadline with a child left behind, missing bindings). */
+ * hang killed at the deadline with a child left behind, missing bindings). Show mode: the progress lines (hostile ones
+ * too), a run of fake show-mode harnesses through the Frameworks screen (fwscreen.c) to the end, drawn headless
+ * (TK_SHOT_DIR=dir keeps its pictures as PPMs), and a run stopped by its abort flag. */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 #include "../src/testbench/toolkits.h"
 #include "../src/testbench/tkrun.h"
+#include "../src/testbench/fwscreen.h"
 #include "../src/sec/json.h"
 
 #include <errno.h>
@@ -444,7 +447,7 @@ static void test_env(void) {
     snprintf(xa, sizeof xa, "XAUTHORITY=%s/lord-xauth.7", tmp);
     char *in[] = { "HOME=/home/x", rt, "WAYLAND_DISPLAY=wayland-1", "DISPLAY=:7", "LD_PRELOAD=/evil.so", "SECRET_TOKEN=1",
                    "PYTHONPATH=/evil", "GDK_BACKEND=broadway", "LANG=es_AR.UTF-8", NULL };
-    TkRunOpts o = { tmp, "/bin/false", 1000, 1000, 0, NULL, in };
+    TkRunOpts o = { tmp, "/bin/false", 1000, 1000, 0, NULL, in, 0, NULL, NULL, NULL };
     char buf[8192], *env[48];
     int n = tk_env(&o, combo("gtk4-wayland"), buf, sizeof buf, env, 48);
     CHECK(n > 0);
@@ -556,7 +559,7 @@ static void test_runs(void) {
     snprintf(rt, sizeof rt, "XDG_RUNTIME_DIR=%s", tmp);
     snprintf(py, sizeof py, "%s/python3", tmp);
     char *in[] = { "HOME=/nonexistent", rt, "WAYLAND_DISPLAY=wayland-test", "DISPLAY=:99", NULL };
-    TkRunOpts o = { tmp, py, 1500, 2000, 0, NULL, in };
+    TkRunOpts o = { tmp, py, 1500, 2000, 0, NULL, in, 0, NULL, NULL, NULL };
     int which[TK_COMBOS];
     for (int i = 0; i < TK_COMBOS; i++) which[i] = i;
     TkReport rep;
@@ -649,6 +652,256 @@ static void test_runs(void) {
     CHECK(tk_harness_path(tmp, "linked", hp, sizeof hp) == -1);
     CHECK(tk_harness_path("relative/dir", "qt6", hp, sizeof hp) == -1);
     CHECK(!tk_harness_path(tmp, "qt6", hp, sizeof hp));
+}
+
+/* ---- show mode ---- */
+
+static int prog_n, prog_last_kind, prog_last_check, prog_last_result;
+static void prog_cb(void *ctx, const TkProg *p) {
+    (void)ctx;
+    prog_n++;
+    prog_last_kind = p->kind;
+    prog_last_check = p->check;
+    prog_last_result = p->result;
+}
+static int ck(const char *id) {
+    for (int i = 0; i < TK_CHECKS; i++) if (!strcmp(tk_check_id(i), id)) return i;
+    return -1;
+}
+
+static void test_progress(void) {
+    TkProg p;
+#define PARSE(str) tk_progress_parse(str, strlen(str), &p)
+    CHECK(!PARSE("#lordos-ta step menu") && p.kind == TK_PROG_STEP && p.check == ck("menu"));
+    CHECK(!PARSE("#lordos-ta check first_frame pass") && p.kind == TK_PROG_CHECK && p.check == ck("first_frame") && p.result == TK_PASS);
+    CHECK(!PARSE("#lordos-ta check dnd skip") && p.result == TK_SKIP);
+    CHECK(!PARSE("#lordos-ta check fullscreen fail") && p.result == TK_FAIL);
+    /* hostile or merely odd lines: none is a progress line, and nothing of theirs is kept */
+    static const char *bad[] = {
+        "", "#lordos-ta", "#lordos-ta ", "#lordos-ta step", "#lordos-ta step ", "#lordos-ta step  menu", " #lordos-ta step menu",
+        "#lordos-ta step menu ", "#lordos-ta step menu\r", "#lordos-ta step MENU", "#lordos-ta Step menu", "#lordos-tax step menu",
+        "#lordos-ta step global.wl_shm", "#lordos-ta step fullscreen_on", "#lordos-ta step unknown_id", "#lordos-ta step menu menu",
+        "#lordos-ta check menu", "#lordos-ta check menu ok", "#lordos-ta check menu PASS", "#lordos-ta check menu pass extra",
+        "#lordos-ta check menu pass; rm -rf ~", "#lordos-ta check menu true", "#lordos-ta check ../../etc/passwd pass",
+        "#lordos-ta step map\x1b[2J", "\x1b[2J#lordos-ta step map", "#lordos-ta step m\xc3\xa9nu", "#lordos-ta check map pass\x01",
+        "{\"toolkit\":\"gtk3\"}", "#lordos-ta stepmenu", "#lordos-ta  step menu", "#lordos-ta check  map pass",
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+        int r = PARSE(bad[i]);
+        if (!r) fprintf(stderr, "accepted: %s\n", bad[i]);
+        CHECK(r == -1 && p.kind == TK_PROG_NONE);
+    }
+    /* a NUL inside the line */
+    CHECK(tk_progress_parse("#lordos-ta step map\0x", 21, &p) == -1);
+    /* too long: TK_PROG_LINE_MAX bytes or more */
+    char longl[256];
+    snprintf(longl, sizeof longl, "#lordos-ta step map");
+    CHECK(tk_progress_parse(longl, TK_PROG_LINE_MAX, &p) == -1);
+#undef PARSE
+
+    /* the stream: any chunking, a cut overlong line, at most TK_PROG_MAX_EVENTS events */
+    TkProgBuf b;
+    memset(&b, 0, sizeof b);
+    const char *stream = "noise\n#lordos-ta step menu\n#lordos-ta check menu pass\n#lordos-ta check combo fa";
+    prog_n = 0;
+    for (const char *q = stream; *q; q++) tk_progress_feed(&b, q, 1, prog_cb, NULL);
+    CHECK(prog_n == 2 && prog_last_kind == TK_PROG_CHECK && prog_last_check == ck("menu") && prog_last_result == TK_PASS);
+    tk_progress_feed(&b, "il\n", 3, prog_cb, NULL);
+    CHECK(prog_n == 3 && prog_last_check == ck("combo") && prog_last_result == TK_FAIL);
+    /* an overlong line whose end looks like a progress line is ignored whole, the next line is read */
+    char big[600];
+    memset(big, 'x', 400);
+    snprintf(big + 400, sizeof big - 400, "#lordos-ta check map fail\n#lordos-ta check map pass\n");
+    tk_progress_feed(&b, big, strlen(big), prog_cb, NULL);
+    CHECK(prog_n == 4 && prog_last_check == ck("map") && prog_last_result == TK_PASS);
+    /* a flood: only TK_PROG_MAX_EVENTS events */
+    memset(&b, 0, sizeof b);
+    prog_n = 0;
+    for (int i = 0; i < TK_PROG_MAX_EVENTS + 300; i++) tk_progress_feed(&b, "#lordos-ta step map\n", 20, prog_cb, NULL);
+    CHECK(prog_n == TK_PROG_MAX_EVENTS);
+    /* a 1 MiB line with no newline: nothing, and the buffer stays bounded */
+    memset(&b, 0, sizeof b);
+    prog_n = 0;
+    char *mb = malloc(1 << 20);
+    memset(mb, '#', 1 << 20);
+    tk_progress_feed(&b, mb, 1 << 20, prog_cb, NULL);
+    free(mb);
+    CHECK(prog_n == 0 && b.len < TK_PROG_LINE_MAX && b.overlong);
+}
+
+/* A show-mode harness: refuses to run without --show, prints each check's step and result (and hostile lines in
+ * between), then its JSON line. results: one letter per check in toolkits.c's order, p pass, f fail, s skip. */
+static void put_show_harness(const char *name, const char *toolkit, const char *results, const char *backend, int fatal) {
+    char out[16384], over[256] = "";
+    size_t k = (size_t)snprintf(out, sizeof out, "[ \"$1\" = --show ] || exit 7\n");
+    for (int i = 0; i < TK_CHECKS; i++) {
+        const char *id = tk_check_id(i), *res = results[i] == 'f' ? "fail" : results[i] == 's' ? "skip" : "pass";
+        k += (size_t)snprintf(out + k, sizeof out - k, "echo '#lordos-ta step %s'\necho '#lordos-ta check %s %s'\n", id, id, res);
+        if (i == 3) k += (size_t)snprintf(out + k, sizeof out - k,
+            "echo '#lordos-ta check %s fail; rm -rf ~'\nprintf '\\033[2J#lordos-ta check %s fail\\n'\necho '#lordos-ta step global.wl_shm'\n"
+            "head -c 300 /dev/zero | tr '\\0' 'x'; echo '#lordos-ta check %s fail'\n", id, id, id);
+        if (results[i] != 'p') {
+            size_t o = strlen(over);
+            snprintf(over + o, sizeof over - o, " %s=%s", id, results[i] == 'f' ? "false" : "null");
+        }
+    }
+    if (fatal) k += (size_t)snprintf(out + k, sizeof out - k, "kill -SEGV $$\n");
+    char line[4096];
+    snprintf(line, sizeof line, "%s", line_for(toolkit, over));
+    char *be = strstr(line, "\"wayland\"");
+    if (be && strcmp(backend, "wayland")) { memcpy(be, "\"x11\"", 5); memmove(be + 5, be + 9, strlen(be + 9) + 1); }
+    line[strcspn(line, "\n")] = 0;
+    snprintf(out + k, sizeof out - k, "echo '%s'\n", line);
+    write_file(name, out, 0644);
+}
+
+typedef struct { FwState *fw; int checks[TK_COMBOS], steps[TK_COMBOS], done; const char *shot; int shot_slot, shot_at, shots; double now; } ShowRun;
+
+static void save_ppm(const Surf *s, const char *path) {
+    FILE *f = fopen(path, "wb");
+    if (!f) return;
+    fprintf(f, "P6\n%d %d\n255\n", s->w, s->h);
+    for (int y = 0; y < s->h; y++)
+        for (int x = 0; x < s->w; x++) {
+            uint32_t p = s->px[(size_t)y * s->stride + x];
+            unsigned char rgb[3] = { (unsigned char)(p >> 16), (unsigned char)(p >> 8), (unsigned char)p };
+            fwrite(rgb, 1, 3, f);
+        }
+    fclose(f);
+}
+
+static void shot(ShowRun *sr, const char *name) {
+    Surf s = { calloc(820 * 600, 4), 820, 600, 820 };
+    fw_draw(&s, sr->fw, sr->now);
+    /* something was drawn: the background isn't the only colour */
+    int colours = 0;
+    for (int i = 1; i < 820 * 600 && colours < 2; i += 97) colours += s.px[i] != s.px[0];
+    CHECK(colours >= 1);
+    if (sr->shot) {
+        char p[600];
+        snprintf(p, sizeof p, "%s/%s.ppm", sr->shot, name);
+        save_ppm(&s, p);
+    }
+    sr->shots++;
+    free(s.px);
+}
+
+static void show_ev(void *ctx, const TkEvent *e) {
+    ShowRun *sr = ctx;
+    sr->now += 120;                     /* a steady clock for the spinner and the elapsed time */
+    fw_event(sr->fw, e, sr->now);
+    if (e->kind == TK_EV_CHECK) sr->checks[e->slot]++;
+    if (e->kind == TK_EV_STEP) sr->steps[e->slot]++;
+    if (e->kind == TK_EV_DONE) sr->done++;
+    /* mid-run: the picture while a combination is half way through its checks */
+    if (e->kind == TK_EV_CHECK && e->slot == sr->shot_slot && sr->checks[e->slot] == sr->shot_at) {
+        const FwCombo *c = &sr->fw->c[e->slot];
+        CHECK(sr->fw->running == e->slot && c->phase == FWC_RUN);
+        CHECK(c->tick[sr->shot_at - 1] != -1 && c->tick[sr->shot_at] == -1);    /* ticked so far, not beyond */
+        CHECK(c->tick[ck("theme")] == TK_PASS);         /* the hostile "fail" lines after theme changed nothing */
+        shot(sr, "frameworks-mid-run");
+    }
+}
+
+static volatile int abort_flag;
+static void abort_ev(void *ctx, const TkEvent *e) { (void)ctx; if (e->kind == TK_EV_START) abort_flag = 1; }
+
+static void test_show(void) {
+    char dir[300];
+    snprintf(dir, sizeof dir, "%s/show", tmp);
+    mkdir(dir, 0700);
+    char sub[340];
+    /* gtk3: size fails on Wayland, theme on X11; gtk4: all pass (one skip); qt5: no bindings; qt6: theme fails on
+     * Wayland, crashes on xcb after its checks; x11: dnd skipped, fullscreen failed */
+#define PUT(n, tk, res, be, fat) do { snprintf(sub, sizeof sub, "show/%s", n); put_show_harness(sub, tk, res, be, fat); } while (0)
+    write_file("show/python3", "#!/bin/sh\n[ \"$1\" = -I ] && shift\nif [ \"$1\" = -c ]; then case \"$2\" in *PyQt5*) exit 1;; esac; exit 0; fi\n"
+                               "f=$1; shift\nb=${GDK_BACKEND:-${QT_QPA_PLATFORM:-x11}}\nexec /bin/sh \"${f%.py}-$b.sh\" \"$@\"\n", 0755);
+    PUT("gtk3-wayland.sh", "gtk3", "pfpppppppppspp", "wayland", 0);
+    PUT("gtk3-x11.sh", "gtk3", "pppfpppppppspp", "x11", 0);
+    PUT("gtk4-wayland.sh", "gtk4", "pppppppppppspp", "wayland", 0);
+    PUT("gtk4-x11.sh", "gtk4", "pppppppppppspp", "x11", 0);
+    PUT("qt6-wayland.sh", "qt6", "pppfpppppppspp", "wayland", 0);
+    PUT("qt6-xcb.sh", "qt6", "pppppppppppspp", "x11", 1);
+    PUT("x11-x11.sh", "x11", "pppppppppppspf", "x11", 0);
+#undef PUT
+    for (const char *const *t = (const char *const[]){ "gtk3", "gtk4", "qt5", "qt6", "x11", NULL }; *t; t++) {
+        snprintf(sub, sizeof sub, "show/%s.py", *t);
+        write_file(sub, "exit 9\n", 0644);         /* trusted harness files; python3 above runs the per-backend script */
+    }
+    char rt[300], py[340];
+    snprintf(rt, sizeof rt, "XDG_RUNTIME_DIR=%s", tmp);
+    snprintf(py, sizeof py, "%s/python3", dir);
+    char *in[] = { "HOME=/nonexistent", rt, "WAYLAND_DISPLAY=wayland-test", "DISPLAY=:99", NULL };
+    int which[TK_COMBOS];
+    for (int i = 0; i < TK_COMBOS; i++) which[i] = i;
+    FwState *fw = malloc(sizeof *fw);
+    fw_init(fw, which, TK_COMBOS);
+    ShowRun sr;
+    memset(&sr, 0, sizeof sr);
+    sr.fw = fw;
+    sr.shot = getenv("TK_SHOT_DIR");
+    sr.shot_slot = combo("gtk4-x11");
+    sr.shot_at = 9;
+    sr.now = 1000;
+    TkRunOpts o = { dir, py, TK_SHOW_KILL_MS, 2000, 0, NULL, in, 1, show_ev, &sr, NULL };
+    TkReport rep;
+    CHECK(!tk_audit(&o, which, TK_COMBOS, &rep));
+    fw_finish(fw, &rep, 0);
+    CHECK(sr.done == TK_COMBOS && fw->state == FW_DONE && fw->saved == 1);
+    /* every valid line arrived, none of the hostile ones: 14 steps and 14 checks per harness that ran */
+    for (int i = 0; i < TK_COMBOS; i++) {
+        int ran = i != combo("qt5-wayland") && i != combo("qt5-xcb");
+        CHECK(sr.checks[i] == (ran ? TK_CHECKS : 0) && sr.steps[i] == (ran ? TK_CHECKS : 0));
+        if (sr.checks[i] != (ran ? TK_CHECKS : 0)) fprintf(stderr, "%s: %d checks\n", tk_combo(i)->id, sr.checks[i]);
+    }
+    /* the screen ends as the report says */
+    const FwCombo *c = &fw->c[combo("gtk3-wayland")];
+    CHECK(c->phase == FWC_DONE && c->status == TK_ST_RAN && c->tick[ck("size")] == TK_FAIL && c->tick[ck("dnd")] == TK_SKIP);
+    CHECK(c->score == rep.r[combo("gtk3-wayland")].score && c->score > 90);
+    for (int i = 0; i < TK_COMBOS; i++)
+        if (i != combo("qt5-wayland") && i != combo("qt5-xcb") && i != combo("qt6-xcb"))
+            CHECK(rep.r[i].status == TK_ST_RAN && rep.r[i].json_ok);
+    CHECK(fw->c[combo("qt5-wayland")].status == TK_ST_NOT_INSTALLED);
+    c = &fw->c[combo("qt6-xcb")];
+    CHECK(c->status == TK_ST_FATAL && c->fatal == TK_F_CRASH && c->score == 0);
+    c = &fw->c[combo("x11-xwayland")];
+    CHECK(c->status == TK_ST_RAN && c->tick[ck("fullscreen")] == TK_FAIL);
+    CHECK(rep.ran == 7 && fw->global == rep.global && fw->ran == 7);
+    /* qt6: its X11 row crashed, so nothing is recommended; the details box picks the first row with trouble */
+    CHECK(!fw->c[combo("qt6-wayland")].recommend[0]);
+    CHECK(fw_detail_slot(fw) == combo("gtk3-wayland"));
+    CHECK(fw_hit(fw, 820, 600, 100, 92 + 26 * 2 + 5) == 2);
+    shot(&sr, "frameworks-end");
+    fw->sel = combo("qt6-xcb");
+    shot(&sr, "frameworks-end-crash");
+    CHECK(sr.shots == 3);
+    /* the same results as a run without --show: the show-mode JSON line is the fast one's */
+    for (int i = 0; i < TK_COMBOS; i++) for (int j = 0; j < TK_CHECKS; j++)
+        CHECK(fw->c[i].tick[j] == (rep.r[i].status == TK_ST_RAN || rep.r[i].json_ok ? rep.r[i].checks[j].result : -1));
+    tk_report_free(&rep);
+
+    /* a harness without --show refuses (exit 7, no line): the orchestrator passes it only in show mode */
+    o.show = 0;
+    o.on_event = NULL;
+    int one[] = { combo("gtk3-wayland") };
+    CHECK(!tk_audit(&o, one, 1, &rep) && rep.r[0].status == TK_ST_FATAL && rep.r[0].exit_code == 7);
+    tk_report_free(&rep);
+
+    /* the abort flag (the window closed): the running harness is killed at once, nothing more runs */
+    write_file("show/gtk4-wayland.sh", "sleep 30.456 &\nsleep 30\n", 0644);
+    o.show = 1;
+    o.on_event = abort_ev;
+    o.abort = &abort_flag;
+    int two[] = { combo("gtk4-wayland"), combo("gtk4-x11") };
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    CHECK(!tk_audit(&o, two, 2, &rep));
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    double secs = (double)(t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9;
+    CHECK(secs < 3 && rep.n == 1);
+    CHECK(system("pgrep -fx 'sleep 30.456' >/dev/null") != 0);
+    tk_report_free(&rep);
+    free(fw);
 }
 
 /* --toolkits --last: the saved result in fixed lines; a hand-edited file prints nothing of its own */
@@ -762,6 +1015,8 @@ int main(void) {
     test_output();
     test_env();
     test_runs();
+    test_progress();
+    test_show();
     test_last();
     char cmd[400];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", tmp);
