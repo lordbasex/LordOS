@@ -623,7 +623,7 @@ saying why:
 | Badge | When |
 |---|---|
 | Blue verified seal: LordOS | the executable belongs to the `lordos` package (or a `lordos-*` one) |
-| Pink verified seal: LordOS app | an isolated `.lpk` app (its scope), with its signer (`lord.sign.status`) |
+| Pink verified seal: LordOS app | an isolated `.lpk` app, with its signer (`lord.sign.status`): its scope `app-lordos-lpk-<id>` right inside the session's root-owned subtree (`/system.slice/lordos.service/lordos-session-<uid>/`, made only by lord-sessiond for lord-server; `mon_scope_parse`), and its executable the `lordos` package's `lord-server` (`lord-server --app <id>`) or a file of its own package folder `/usr/lib/lordos-apps/<id>/` (its companion). A scope of that name under `user@` is just a name any program of the person can pick (security finding F10): such a process is badged by its executable |
 | Flatpak | a Flatpak app's scope, with its app id |
 | Package (the repository's name, such as "Debian" or a vendor's) | another installed package owns the executable; the repository is the package index's label (`lord.pkg.info`); "installed from a file" when no index lists it |
 | Web app | a web app's scope, with its site |

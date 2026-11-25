@@ -45,7 +45,16 @@ int main(void) {
     {
         char id[MON_SCOPE_MAX];
         CHECK(mon_scope_parse("0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-lordos-foot.scope\n", id, sizeof id) == 'd' && !strcmp(id, "foot"));
-        CHECK(mon_scope_parse("0::/user.slice/app-lordos-lpk-org.example.notes.scope\n", id, sizeof id) == 'l' && !strcmp(id, "org.example.notes"));
+        /* an isolated .lpk app's scope only right inside the session's root-owned subtree (security finding F10): Monitor's
+         * verified seal stands on it; the same name under user@ (systemd-run --user --scope), or deeper, is nobody's */
+        CHECK(mon_scope_parse("0::/system.slice/lordos.service/lordos-session-1000/app-lordos-lpk-org.example.notes.scope\n", id, sizeof id) == 'l' && !strcmp(id, "org.example.notes"));
+        CHECK(mon_scope_parse("0::/user.slice/app-lordos-lpk-org.example.notes.scope\n", id, sizeof id) == 0 && id[0] == 0);
+        CHECK(mon_scope_parse("0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-lordos-lpk-org.example.notes.scope\n", id, sizeof id) == 0);
+        CHECK(mon_scope_parse("0::/app-lordos-lpk-org.example.notes.scope\n", id, sizeof id) == 0);
+        CHECK(mon_scope_parse("0::/system.slice/lordos.service/lordos-session-1000/server/app-lordos-lpk-org.example.notes.scope\n", id, sizeof id) == 0);
+        CHECK(mon_scope_parse("0::/system.slice/lordos.service/lordos-session-/app-lordos-lpk-org.example.notes.scope\n", id, sizeof id) == 0);
+        CHECK(mon_scope_parse("0::/system.slice/lordos.service/lordos-session-1000x/app-lordos-lpk-org.example.notes.scope\n", id, sizeof id) == 0);
+        CHECK(mon_scope_parse("0::/system.slice/lordos.service/lordos-session-1000/lordos-machines.slice/app-lordos-lpk-org.example.notes.scope\n", id, sizeof id) == 0);
         CHECK(mon_scope_parse("0::/user.slice/app-lordos-fp-org.gimp.GIMP.scope\n", id, sizeof id) == 'f' && !strcmp(id, "org.gimp.GIMP"));
         CHECK(mon_scope_parse("12:cpu:/x\n0::/app-lordos-a.scope", id, sizeof id) == 'd' && !strcmp(id, "a"));
         CHECK(mon_scope_parse("0::/user.slice/session-2.scope\n", id, sizeof id) == 0 && id[0] == 0);
