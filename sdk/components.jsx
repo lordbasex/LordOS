@@ -22,6 +22,7 @@ import { dropSorter, dropCount } from './filedrop.js';
 import { setTextFocusBridge, useFocusArea, focusRingColor } from './focus.js';
 import { rangeKey, choiceKey, scrollKey } from './focusmodel.js';
 import { wheelValue } from './controlmodel.js';
+import { crashReport } from './crashreport.js';
 
 // ---- actions that take a while (docs/MAIN-THREAD.md) ----
 // Everything on the screen, the pointer too, waits for the JavaScript of the desktop: an action that blocks (an
@@ -1272,23 +1273,41 @@ export function FilesDropHint({ over, title, note }) {
 // An app that throws while it renders or in an effect stops at its own window: the window shows what happened and a
 // button to close it, and the rest of the desktop keeps running. Without it React unmounts the whole shell, a black
 // screen (0.8.8.10: Photos restored with a picture that no longer existed). The error goes to the log.
-function CrashNotice({ id, name }) {
+function CrashNotice({ id, name, app, error, componentStack }) {
   const t = useTheme() || {};
+  const [copied, setCopied] = useState(false);
+  const report = crashReport({ app, name, version: (typeof lord !== 'undefined' && lord.version) || '', error, componentStack });
+  // "Copy details": the report for a GitHub issue (no history entry: lord.clipboard directly, clipboard.js imports this file)
+  const copy = () => { try { lord.clipboard.set(report, { secure: false, origin: 'lordos' }); setCopied(true); } catch (e) { /* no clipboard */ } };
+  const btn = (primary) => ({ paddingHorizontal: 14, paddingVertical: 7, borderRadius: t.controlRadius || 8, backgroundColor: primary ? t.accent : t.control || 'rgba(127,127,127,0.18)' });
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24, backgroundColor: t.windowBg }}>
       <Text style={{ fontSize: 15, fontWeight: 600, color: t.text, textAlign: 'center' }}>{tr('shell.app.crashed', { app: name })}</Text>
       <Text style={{ fontSize: 12.5, color: t.textDim, textAlign: 'center', maxWidth: 360 }}>{tr('shell.app.crashedBody')}</Text>
-      <View onClick={() => wm.close(id)} style={{ marginTop: 6, paddingHorizontal: 14, paddingVertical: 7, borderRadius: t.controlRadius || 8, backgroundColor: t.accent }}>
-        <Text style={{ fontSize: 13, fontWeight: 600, color: t.onAccent || '#fff' }}>{tr('shell.app.crashedClose')}</Text>
+      <Text style={{ fontSize: 11.5, color: t.textDim, textAlign: 'center', maxWidth: 460, fontFamily: 'monospace', direction: 'ltr' }}>{String(error?.message || error || '').slice(0, 300)}</Text>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+        <View onClick={copy} style={btn(false)}>
+          <Text style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{copied ? tr('shell.app.crashedCopied') : tr('shell.app.crashedCopy')}</Text>
+        </View>
+        <View onClick={() => wm.close(id)} style={btn(true)}>
+          <Text style={{ fontSize: 13, fontWeight: 600, color: t.onAccent || '#fff' }}>{tr('shell.app.crashedClose')}</Text>
+        </View>
       </View>
+      {copied ? <Text style={{ fontSize: 11.5, color: t.textDim, textAlign: 'center', maxWidth: 400 }}>{tr('shell.app.crashedReport', { url: 'github.com/lordbasex/LordOS/issues' })}</Text> : null}
     </View>
   );
 }
 class AppBoundary extends Component {
-  constructor(props) { super(props); this.state = { failed: false }; }
-  static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch(err) { console.error(`app ${this.props.app}: ${err?.message || err}`); }
-  render() { return this.state.failed ? <CrashNotice id={this.props.id} name={this.props.name} /> : this.props.children; }
+  constructor(props) { super(props); this.state = { failed: false, error: null, componentStack: '' }; }
+  static getDerivedStateFromError(error) { return { failed: true, error }; }
+  componentDidCatch(err, info) {
+    console.error(`app ${this.props.app}: ${err?.message || err}`);
+    this.setState({ componentStack: String(info?.componentStack || '') });
+  }
+  render() {
+    const st = this.state;
+    return st.failed ? <CrashNotice id={this.props.id} name={this.props.name} app={this.props.app} error={st.error} componentStack={st.componentStack} /> : this.props.children;
+  }
 }
 
 // Memoized, and so is the app's element: a theme re-renders its whole tree when a setting, the window list or the

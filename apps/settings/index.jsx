@@ -353,13 +353,13 @@ function Wallpapers() {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
   const list = t.wallpapers || [];
-  if (!list.length) return <Stack><Note>{tr('settings.noWallpapers')}</Note></Stack>;
   const [target, setTarget] = useState('desktop');
-  const login = target === 'login';
   const [note, setNote] = useState('');
+  const [scope, setScope] = useState('*');
+  if (!list.length) return <Stack><Note>{tr('settings.noWallpapers')}</Note></Stack>;   // after every hook (React's order)
+  const login = target === 'login';
   // several displays: the picture of every display ('*') or of one (its own, settings.wallpapers; sdk/wallpapers.js)
   const displays = screenDisplays() || [];
-  const [scope, setScope] = useState('*');
   const scopeDisplay = !login && displays.length > 1 ? displays.find((d) => d.id === scope) || null : null;
   const desk = wallpaperIdFor(s, scopeDisplay, t.defaultWallpaper);
   const shown = login ? s.loginWallpaper : desk;

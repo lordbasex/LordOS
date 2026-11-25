@@ -11,6 +11,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Fixed
+- **Machines stopped with "Machines ran into a problem" after choosing Whonix (Tor) and pressing Continue.** The new
+  machine assistant (apps/machines/assistant.jsx) returned the Whonix group's pages (`GroupFlow`), and the migrate page,
+  before its `useFilesDrop` hook, so React saw fewer hooks than in the previous render (React error #300) and the app's
+  boundary took over the window. The hook is now above both early returns. A file dropped on the migrate path would have
+  stopped it the same way. A sweep of apps, themes and the SDK with React's rules-of-hooks lint found one more hook after
+  an early return, in Settings → Wallpaper (only reached by a theme with no wallpapers); it is moved as well.
+
+### Added
+- **"Copy details" when an app stops at its own window.** The notice "<app> ran into a problem" now shows the error and
+  has a button that copies a short report for a GitHub issue: the app, the LordOS version, the error, the first lines of
+  its stack and React's component stack. Home folder paths are shortened to `~`, so the report carries no user name.
+  `sdk/crashreport.js`, tested by `server/tests/crashreport_test.mjs`; the three new texts are in every language.
+
 - **An X11 window that asked for fullscreen before its first frame stayed at its own size** (found by the toolkit
   audit, docs/TOOLKIT-AUDIT.md). The window manager wrote `_NET_WM_STATE_FULLSCREEN` but never resized the window:
   `enter_fullscreen()` (server/src/wl/wl.c) set the display's size in `conf_w`/`conf_h`, the first commit then mapped

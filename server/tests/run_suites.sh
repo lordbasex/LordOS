@@ -238,6 +238,7 @@ EOF
     if have node; then run "protect-model-test (sdk/protectmodel.js, Machines' protected machines)" node tests/protect_model_test.mjs; fi
     run "spectrum-test" build/spectrum-test
     if have node; then run "soundwave-model-test (sdk/soundwavemodel.js, widgetgrid.js pins)" node tests/soundwave_model_test.mjs; fi
+    if have node; then run "crashreport-test (sdk/crashreport.js, an app crash's Copy details)" node tests/crashreport_test.mjs; fi
     if have node; then run "statusplace-test (sdk/statusplace.js)" node tests/statusplace_test.mjs; fi
     if have node; then run "logfile-test (sdk/logfile.js)" node tests/logfile_test.mjs; fi
     if have node; then run "browserframe-notes-test (sdk/browserframe.js, #222)" node tests/browserframe_notes_test.mjs; fi

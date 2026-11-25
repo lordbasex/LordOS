@@ -411,6 +411,15 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   };
   const stopDownload = () => { cancelled.current = true; admin.run('vm-image-cancel', '', null, { quiet: true }).catch(() => {}); };
 
+  // a file dropped on the first step goes to the tile that takes it (an ISO, a disk image, another app's machine).
+  // A hook, so it stays above the group and migrate pages' early returns (React's hook order).
+  const drop = useFilesDrop({ accepts: (n) => !!dropSource(n), onDrop: ({ files }) => {
+    const f = files[0];
+    const src = f && step === 0 && !job ? dropSource(f.split('/').pop()) : null;
+    if (!src) return;
+    pickSeq.current++; setDl(null); setDetectPage(false); setPicking(false); setSource(src);
+    if (src === 'migrate') setPath(f); else chose(f, src);
+  } });
   const grp = source === 'group';
   if (grp && step > 0 && dl?.phase === 'ready') return <GroupFlow step={step} setStep={setStep} dl={dl} host={host} names={names} groupNames={groupNames} catalog={CATALOG}
     onCancel={onClose} onGroup={(dir) => onGroup?.(dir)} />;
@@ -428,14 +437,6 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   const title = onDetect ? tr('machines.as.title.detect') : step === 2 && (uo || windows) ? tr('machines.as.title.setup') : tr(`machines.as.title.${STEPS[step]}`);
   const goBack = () => { if (onDetect) setDetectPage(false); else if (step === 1 && needsDetect) { setStep(0); setDetectPage(true); } else setStep(step - 1); };
   const goOn = () => { if (step === 0 && needsDetect && !onDetect) { setDetectPage(true); return; } setDetectPage(false); setStep(step + 1); };
-  // a file dropped on the first step goes to the tile that takes it (an ISO, a disk image, another app's machine)
-  const drop = useFilesDrop({ accepts: (n) => !!dropSource(n), onDrop: ({ files }) => {
-    const f = files[0];
-    const src = f && step === 0 && !job ? dropSource(f.split('/').pop()) : null;
-    if (!src) return;
-    pickSeq.current++; setDl(null); setDetectPage(false); setPicking(false); setSource(src);
-    if (src === 'migrate') setPath(f); else chose(f, src);
-  } });
   const fileHint = (k) => (source === k && path ? path.split('/').pop() : tr(`machines.as.${k}Hint`));
   let body = null;
   if (onDetect) body = <DetectPage detect={detect} dp={dp} sys={sys} ver={ver} path={path} host={host}
