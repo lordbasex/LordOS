@@ -1,3 +1,9 @@
+# Wallpapers
+
+Settings → Wallpaper is a gallery (0.8.9.6.2, "The gallery" below) of four kinds of wallpaper: LordOS's built-in pictures
+(`assets/wallpapers/index.json`), the catalog's still pictures (Abstract, Epic, Anime; downloaded when chosen), the moving
+wallpapers (most of this document) and your own pictures.
+
 # Moving wallpapers
 
 Short loops behind the desktop and the login screen, chosen in Settings → Wallpaper. They exist only with the hardware for
@@ -69,14 +75,21 @@ Videos are downloaded on demand by closed admin actions (`server/src/hw/wallpape
 
 | Action | Who | What |
 |---|---|---|
-| `wallpaper-get "<id> <variant>"` | anyone | downloads a catalog file to `/var/lib/lordos/wallpapers/<sha256>.mp4` |
-| `wallpaper-remove "<id> <variant>"` | admin | deletes it |
-| `wallpaper-login "<id> <variant>"` or `default` | admin | the login screen plays it (`login.mp4`) or the built-in one |
+| `wallpaper-get "<id> <variant>"` | anyone | downloads a catalog file to `/var/lib/lordos/wallpapers/<sha256>.mp4` (codec `hevc`, `h264`) or `<sha256>.jpg` (codec `jpeg`, a still picture) |
+| `wallpaper-remove "<id> <variant>"` | admin | deletes it, either kind |
+| `wallpaper-login "<id> <variant>"` or `default` | admin | the login screen plays it (`login.mp4`; a video variant only) or the built-in one |
+| `wallpaper-login "still <id>"` or `"still cat:<id>"` | admin | the login screen shows that built-in or catalog picture, with no video (`login-still`) |
 
 JS names an entry, never a URL or a path. The base must be the project's GitHub owner on `raw.githubusercontent.com`, the
 bytes go through `fetch_batch` (a child as `nobody`, in the Store's scope, so the firewall sees `lordos:store`), and a file
-whose size or hash isn't the catalog's is deleted. `lord-media` keeps its sandbox and receives an open file, and
-`media_open_input` accepts those two system folders besides the user's own files. `server/tests/wallpaper_find_test.c` covers the lookup.
+whose size or hash isn't the catalog's is deleted. The extension a file is kept with comes from the variant's `codec`, read
+as root (`hw_wallpaper_find`): `hevc` and `h264` are `.mp4` and their `file` must end in `.mp4`, `jpeg` is `.jpg` and its
+`file` must end in `.jpg`; any other codec is no entry. The `file` must be a relative `[a-z0-9._/-]` name with no `..`,
+`//` or leading dot or slash, and the `size` a whole number of bytes, at most 100 MB. `lord-media` keeps its sandbox and receives an open file, and
+`media_open_input` accepts those two system folders besides the user's own files. `server/tests/wallpaper_find_test.c` covers the lookup, and
+`server/tests/wallpaper_admin_test.c` the actions themselves with a fake download (a picture kept as `.jpg`, a video as
+`.mp4`, refused arguments never fetch, a wrong hash or a 404 never kept, remove, `still cat:<id>`, every entry of the
+shipped catalog accepted).
 
 An added video stays in the user's files. It needs at most 10 s and a format this machine decodes in hardware.
 
@@ -132,3 +145,65 @@ A moving wallpaper plays with `hwOnly`: if the hardware decoder doesn't start, o
 Files live in a separate repository, `LordOS-wallpapers`, because 353 MB of video doesn't belong in the code's history. Its
 README credits each clip; licenses come from each file's own page. Only public domain, CC0, CC BY and CC BY-SA sources are
 used.
+
+# The gallery and the still pictures (0.8.9.6.2)
+
+## The catalog's still pictures
+
+The catalog (`assets/wallpapers/motion.json`, a copy of the `LordOS-wallpapers` repository's `catalog.json`) keeps its
+structure. A still picture is an item like a moving one, in the section `abstract`, `epic` or `anime`, whose variants have
+codec `jpeg`, `fps` and `seconds` 0:
+
+```json
+{ "name": "1080.jpeg", "codec": "jpeg", "w": 1920, "h": 1080, "fps": 0.0, "seconds": 0.0,
+  "file": "stills/<section>/<id>/1080.jpg", "size": 437074, "sha256": "…" }
+```
+
+and the same with `2160.jpeg`, 3840 × 2160. Its 320 × 180 thumbnail ships as `assets/wallpapers/motion/<id>.thumb.jpg`,
+next to the moving wallpapers'. 0.8.9.6.2 ships the 50 Epic pictures; nothing in the code depends on how many there
+are. The pictures are made with AI for LordOS and released as CC0. `sdk/motion.jsx` plays only the video items
+(`motionCatalog`): a `jpeg` variant is never a moving wallpaper.
+
+## How a chosen picture is saved and drawn
+
+A catalog picture is saved as **`cat:<catalog id>`** wherever a wallpaper id goes: `settings.wallpaper` (every display),
+`settings.wallpapers[connector]` (one display), `settings.loginWallpaper` and `login-still` (the login screen,
+`wallpaper-login "still cat:<id>"`), and a slideshow's category is the collection's section. Older settings keep working
+as they were: no migration.
+
+`findWallpaper` (sdk/wallpapers.js) resolves `cat:<id>` after the theme's own list and your pictures: it lists
+`/var/lib/lordos/wallpapers` (at most every 10 s, or at once after a download or a removal in this session) and offers
+the variants whose `<sha256>.jpg` is there at the catalog's size. Every theme (Lord Flow, Lord Classic, Lord Workspaces,
+Celeste), the greeter and the slideshow already go through `findWallpaper` and `wallpaperSrc`, so each display draws the
+smallest file that covers it. A picture whose files are gone (removed, or settings brought from another computer)
+gives `null`, and the theme's default shows (the login screen: its own).
+
+**Quality** (`settings.wallpaperQuality`): `auto` (the default), `hd` or `4k`. Auto takes the 4K file only for a display
+wider than 1920 or taller than 1080 device pixels (its scale applied) and the HD file for the others, display by display;
+choosing a picture downloads what the displays it goes on need. HD and 4K offer only that file when it is on this
+computer, and otherwise what is. The rules are in `sdk/wallpapergallery.js` (`autoQuality`, `variantsToGet`,
+`drawnVariant`, `stillWallpaper`), tested by `server/tests/wallpaper_gallery_test.mjs`.
+
+## The page
+
+`apps/settings/WallpaperGallery.jsx`:
+
+- **What shows now**: a large picture with its name, collection and license; For (Desktop / Login screen), Display (All /
+  each display, with several) and Quality, with the resolution each display gets.
+- **Search and filters**: All, On this computer, Pictures (built-in and catalog pictures), Moving, My photos, each with its
+  count. All leaves your pictures to My photos.
+- **Collections**: with no search and All, a card per collection (a stack of three thumbnails, its count, NEW on the
+  still collections), then one row of each with See all. Order: the still collections, the built-in categories
+  (`WALLPAPER_CATEGORIES`, then a theme's own), the moving sections. A collection's page offers Download all in HD or 4K
+  (the bytes still to fetch) and Use as slideshow where the theme has one (two pictures or more on this computer).
+- **Tiles**: a cloud (downloads when chosen), a check (on this computer), 4K or HD, a play mark for a moving one, the
+  download's progress along the bottom edge.
+- **A sheet per wallpaper**: a large picture, credits, the quality options with the catalog's sizes, Use on desktop,
+  Login screen, Only <display>, and Remove download when this account doesn't use it.
+- **The bottom**: the space the catalog's files on this computer take, **Free up space** (deletes the ones this account
+  doesn't use: the desktop and every display, the login screen, the moving wallpapers, random's videos and a running
+  slideshow's collection stay), the thumbnails' size, the slideshow, the moving wallpapers' options.
+
+The store is shared by every account and only an administrator removes from it (`wallpaper-remove`); another account's
+wallpaper whose file is removed falls back to its theme's default. `server/tests/app_scene_headless.sh
+settings_wallpaper_scene` drives the page headless and keeps screenshots.

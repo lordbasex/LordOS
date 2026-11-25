@@ -1,6 +1,7 @@
 // Settings → Wallpaper → the slideshow (0.8.9): shown only for a theme that declares "wallpaper": { "slideshow": true }
-// in its theme.json (sdk/thememeta.js; Lord Workspaces). The rules are in sdk/slideshowmodel.js; the theme draws it.
-import { useLocale, useSettings, useTheme, Toggle, slideshowPrefs, slideshowPatch, slideshowCategories, SLIDESHOW_EVERY, WALLPAPER_CATEGORIES, tOptional } from '@lordos/sdk';
+// in its theme.json (sdk/thememeta.js; Lord Workspaces). The rules are in sdk/slideshowmodel.js; the theme draws it. Its
+// place is the bottom of Settings → Wallpaper (./WallpaperGallery.jsx), whose collection pages also offer Use as slideshow.
+import { useLocale, useSettings, useTheme, Toggle, slideshowPrefs, slideshowPatch, slideshowCategories, withDownloadedStills, SLIDESHOW_EVERY, WALLPAPER_CATEGORIES, tOptional } from '@lordos/sdk';
 import { Section, SettingRow, PopUp } from './ui.jsx';
 
 export function SlideshowSettings({ displays }) {
@@ -8,7 +9,8 @@ export function SlideshowSettings({ displays }) {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
   const p = slideshowPrefs(s);
-  const cats = slideshowCategories(t.wallpapers || [], WALLPAPER_CATEGORIES);
+  // the theme's categories, and the catalog's still collections with two pictures or more on this computer (0.8.9.6.2)
+  const cats = slideshowCategories(withDownloadedStills(t.wallpapers), WALLPAPER_CATEGORIES);
   if (!cats.length) return null;
   const category = cats.includes(p.category) ? p.category : cats[0];
   const catName = (c) => tOptional(`settings.wallpaperCategory.${c}`) || tr('settings.wallpaperCategory.other');

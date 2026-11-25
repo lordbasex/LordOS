@@ -48,7 +48,7 @@ const PALETTE = [['#5b9cff', '#2f6fe0'], ['#f0915a', '#d0602b'], ['#4cc37a', '#2
 // covers the wallpaper once it plays: no file, no helper or a crash leave the still image, with nothing on screen.
 const LOGIN_PICKED = '/var/lib/lordos/wallpapers/login.mp4';      // chosen in Settings (wallpaper-login)
 const LOGIN_BUILTIN = '/usr/share/backgrounds/lordos/motion/crown';
-const LOGIN_STILL = '/var/lib/lordos/wallpapers/login-still';     // a still wallpaper's id: no video at all
+const LOGIN_STILL = '/var/lib/lordos/wallpapers/login-still';     // a still wallpaper's id (a built-in one, or cat:<id> from the catalog): no video at all
 const loginStill = () => { try { return String(fs.read(LOGIN_STILL)).trim(); } catch (e) { return ''; } };
 // A picture of the user's own, kept there by wallpaper-login-image; the greeter never sees a home.
 function loginImage(still) {
@@ -336,7 +336,7 @@ function Greeter() {
             the whole desktop showed a slice of it on each display of a laptop and an ultrawide side by side */}
         {(screen.displays && screen.displays.length ? screen.displays : [{ id: 0, x: 0, y: 0, w: screen.width, h: screen.height }]).map((d) => (
           <Image key={`${d.id}:${d.x}:${d.y}`}
-            src={image || wallpaperSrc(findWallpaper(lordosWallpapers, still || GREETER_WALLPAPER), d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100) || 'assets/background.jpg'}
+            src={image || wallpaperSrc(findWallpaper(lordosWallpapers, still || GREETER_WALLPAPER, GREETER_WALLPAPER), d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100) || 'assets/background.jpg'}
             style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, objectFit: 'cover' }} />
         ))}
         {still || image ? null : <LoginVideo box={M} stop={entered} />}
