@@ -1,6 +1,7 @@
 // driver.js — goes after the theme bundle in tests/monitor_headless.sh: it opens Monitor on Processes (pre.js's made-up
 // list) and saves a screenshot after each step in the home folder (shot-1.png …): the flat list with its origin badges
-// and filters; Grouped; Chrome and the Terminal open, with who started each program; a group's hover summary; Quit
+// and filters; Grouped; Chrome and the Terminal open, with who started each program; a group's hover summary; an origin
+// badge's tooltip without the row's summary; Quit
 // All's sheet; a Terminal program's Get Info (Statistics: "Started by"); the Flatpak filter with the program picker.
 // Nodes are found by the text they show (pre.js keeps it), in the scene's language (MONITOR_L: the labels).
 // Lines start with "MONITOR-SCENE" in the shell log.
@@ -34,7 +35,7 @@
     const r = id ? await sdk.media.saveImage(id, `${lord.fs.home()}/shot-${n}.png`, { format: 'png' }) : null;
     log(`shot ${n} ${name} ${r && r.ok !== false ? 'saved' : 'failed'}`);
   };
-  const step = (what, ok) => log(`${what} ${ok ? 'done' : 'missing'}`);
+  const step = (what, ok, extra) => log(`${what} ${ok ? 'done' : 'missing'}${extra ? ` (${extra})` : ''}`);
   (async () => {
     await sleep(2500);
     sdk.wm.open('monitor', { args: { tab: 'processes', nonce: Date.now() } });
@@ -59,6 +60,33 @@
     step('hover', move(byText('Google Chrome')));
     await sleep(1200);
     await shot('summary');
+    // a group row's origin badge (a verified seal, or a pill such as Chrome's "Google LLC"): its own tooltip, never the
+    // row's summary with it (they overlapped); back on the row's name, the summary comes again
+    {
+      const summaryShown = () => [...P.summaries].some((id) => box(id));
+      const rowAt = (name) => { const b = box(byText(name)); return b ? b[1] + b[3] / 2 : -1; };
+      const onRow = (y) => (b) => b && inWin(b) && Math.abs(b[1] + b[3] / 2 - y) < 8;
+      const badgeOf = (name) => {
+        const y = rowAt(name);
+        const seal = [...P.seals].find((id) => onRow(y)(box(id)));
+        if (seal) return seal;
+        for (const [raw, txt] of P.texts) if (txt === 'Google LLC') { const id = P.parent.get(raw); if (id && onRow(y)(box(id))) return id; }
+        return null;
+      };
+      const badge = badgeOf('Google Chrome');
+      step('badge found', !!badge);
+      move(byText(L.processes));
+      await sleep(300);
+      if (badge) { move(byText('Google Chrome')); await sleep(100); move(badge); }
+      await sleep(1500);
+      step('on the badge: no row summary', !!badge && !summaryShown());
+      await shot('badge-tooltip');
+      move(byText('Google Chrome'));
+      await sleep(1300);
+      step('back on the row: the summary', summaryShown());
+      move(byText(L.processes));
+      await sleep(400);
+    }
     // Quit All's sheet, from the selected row's own button
     step('select chrome', click(byText('Google Chrome')));
     await sleep(300);

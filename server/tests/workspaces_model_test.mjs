@@ -1,6 +1,6 @@
 // Lord Workspaces as plain data (themes/workspaces/model/*.js, tokens.js) and the theme.json fields Settings reads
-// (sdk/thememeta.js): where things go on each display, the tiles, the activities' settings key, the three effects
-// styles and the palette's contrast. node server/tests/workspaces_model_test.mjs
+// (sdk/thememeta.js): where things go on each display, the top band's room, the tiles, the activities' settings key,
+// the three effects styles and the palette's contrast. node server/tests/workspaces_model_test.mjs
 import { displayPlan, shownDisplays, spineMode, onChrome, SPINE_BLUR, SPINE_GAP, FRAME_PAD, SPINE_W, MARGIN, SMALL_W, SPINE_SHADOW_REACH, WINDOW_SHADOW } from '../../themes/workspaces/model/geometry.js';
 import { tileRects, fitTile, splitterAt, ratioFrom, orderFor, homeFor, displayKey, displayKeys, judgeFrame, underBudget, ANSWER_MS, MOVES_PER_SEC, savedDisplay, foldMissing, cleanLayout, cleanRatio, LAYOUTS, TILE_GAP, RATIO_MIN, RATIO_MAX } from '../../themes/workspaces/model/layouts.js';
 import { activitySummary, barStep, newGroup, groupOfWindow, groupPlan, groupApps, everyActivity, MAX_GROUPS } from '../../themes/workspaces/model/activities.js';
@@ -405,6 +405,24 @@ eq('contrast option: read from the theme options', wsPrefs({ themeOptions: { wor
   eq('label: cut with an ellipsis', [...cleanWindowLabel('x'.repeat(500))].length, WINDOW_LABEL_MAX);
   eq('label: arabic kept', cleanWindowLabel('بريد — Chrome'), 'بريد — Chrome');
   eq('label: not a string', cleanWindowLabel(null), '');
+}
+
+// ---- the top band's room (model/topband.js): the strip gets what the status cluster leaves, never more ----
+{
+  const T = await import('../../themes/workspaces/model/topband.js');
+  const four = { names: [90, 90, 90, 90], active: 0, newW: 30, posW: 150 };
+  eq('band: room is the band less the cluster and the gap', T.stripRoom(1400, 300), 1400 - 300 - T.BAND_GAP);
+  eq('band: no room below zero', T.stripRoom(200, 300), 0);
+  yes('band: compact needs less than full', T.stripWidth(four, true) < T.stripWidth(four, false));
+  eq('band: a pill is capped', T.stripWidth({ names: [1000], active: 0 }, false) - T.stripWidth({ names: [0], active: 0 }, false), T.PILL_MAX - (2 * T.PILL_PAD + T.PILL_ICON + T.PILL_GAP));
+  eq('band: compact keeps the active name', T.stripWidth({ ...four, active: 1 }, true), T.stripWidth({ ...four, active: 2 }, true));
+  yes('band: four activities fit full on a wide band', !T.stripCompact(T.stripRoom(1460, 300), four));
+  // a wider cluster (a long date, as in German or Arabic) or a narrow screen leaves less: the strip goes compact before it
+  // would reach the cluster
+  const need = T.stripWidth(four, false);
+  yes('band: compact once the cluster leaves less than it needs', T.stripCompact(T.stripRoom(need + 300 + T.BAND_GAP - 10, 300), four));
+  yes('band: full when it just fits', !T.stripCompact(T.stripRoom(need + 300 + T.BAND_GAP + 2, 300), four));
+  yes('band: longer names need more', T.stripWidth({ ...four, names: [160, 160, 160, 160] }, false) > need);
 }
 
 console.log(process.exitCode ? 'workspaces-model-test: FAILED' : `workspaces-model-test: ${ok} ok`);

@@ -65,6 +65,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Recommends a new version adds and leaves out one the sources don't carry without stopping (`pkg-test` now names
   `firmware-mediatek` among the missing ones). The next ISO already carries it and `firmware-intel-graphics` (0.8.9.6);
   `iso_firmware_test.mjs` now also checks the package's Recommends (`docs/UPDATES.md`, "Store → Updates").
+### Fixed
+- **Monitor → Processes: an origin badge's tooltip no longer shows under a group row's hover summary.** Resting the
+  pointer on a group row's "Verified" seal or origin pill (Google LLC, Flatpak, …) started both the badge's own tooltip
+  (550 ms) and the row's summary card (700 ms), drawn one over the other: the badge sits inside the row, so the row's
+  `onMouseEnter` timer kept running. `OriginBadge` now takes `onHover`; while the pointer is on the badges the summary
+  is hidden and its timer stopped, and back on the rest of the row it comes again after its delay
+  (`apps/monitor/Processes.jsx`). Same code in every desktop; checked headless in Lord Flow, Lord Classic, Lord
+  Workspaces and Celeste. `tests/monitor_headless.sh` gained the step (shot 4: the tooltip alone; then the summary
+  back on the row).
+- **Files: the rename field no longer moves the icon grid.** The field (22 px) replaced the name's 16 px line, so the
+  renamed item's card grew 6 px and every row of icons below it moved down while the field was open (F2 or the slow
+  second click). The field now sits in a box as high as the name's lines were (one or two in the icon view, measured
+  in the view's room), centred over it and out of the layout (`apps/files/views.jsx` `Name`); the list and column views
+  keep their fixed row heights. New scene `server/tests/files_renamelayout_scene` (icons with F2, the slow click and a
+  two-line name; list; columns): no other name moves and the renamed item keeps its box; run in every desktop by
+  `make test-full`.
+- **Lord Workspaces: the top band in right-to-left languages and on narrow screens.** The activity strip and the status
+  cluster were each placed by their own `left` (physical) offset, so in Arabic both started at the band's left edge
+  and the strip covered the clock; in every language the strip's room was the band less a fixed 330 px, wrong when the
+  cluster is wider (a long date, as in German) and the compact form was a guess of 130 px per activity. The band is now
+  one row (`TopBand`, mirrored by the layout in RTL, `pointerEvents: 'box-none'` so the desktop between stays
+  clickable): the cluster keeps its measured width, the strip shrinks into the rest and goes compact from the widths
+  its names, "+ New" and the position text need in the current language (`themes/workspaces/model/topband.js`,
+  tested in `workspaces_model_test.mjs`). The accent under the activity in view is placed from the strip's start edge
+  (`insetInlineStart`, scaled from the right in RTL): in Arabic it was left under another activity after one was
+  added. New scene `server/tests/ws_topbar_scene` (Arabic 1600×900, German 1024×768, English 1280×800 in `make
+  test-full`): both surfaces on screen, never overlapping, the accent under the activity in view, with four and nine
+  activities. `tests/app_scene_headless.sh` takes `SCENE_SIZE` for the screen size.
 
 ## [0.8.9.6-beta] - 2026-11-25
 

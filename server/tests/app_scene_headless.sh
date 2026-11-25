@@ -4,14 +4,16 @@
 # setup.sh, when there is one, fills it first: `setup.sh HOME`). Scenes: notes_scene (Notes: the window, its attachments
 # and the sticky notes on the desktop, GitHub #238), files_marquee_scene (Files' rubber-band selection, GitHub #233),
 # screenshots_menu_scene (Screenshots' Options menu above the bar on its first open, #237) and settings_region_scene
-# (Settings → Region names each region's language, #239).
+# (Settings → Region names each region's language, #239), files_renamelayout_scene (Files' rename field keeps the layout)
+# and ws_topbar_scene (Lord Workspaces' top band in any language and size; run it with the workspaces theme).
 # The driver prints lines starting with "APP-SCENE" in the shell log; each check says "done" or "missing", and the exit
 # status is 1 when one is missing. Nothing outside the temporary home is read or written (never the person's own notes).
-# A test tool, never installed; not part of `make test` (`make test-full` runs files_slowrename_scene in every
-# desktop). From server/, after `npm run build` and `make`:
+# A test tool, never installed; not part of `make test` (`make test-full` runs files_slowrename_scene and
+# files_renamelayout_scene in every desktop, and ws_topbar_scene). From server/, after `npm run build` and `make`:
 #   tests/app_scene_headless.sh SCENE OUT_DIR [theme] [language] [dark|light] [restart]
 #     → OUT_DIR/<scene>-<theme>-<language>-<mode>-1.png …
 #   SCENE_TIMEOUT (seconds, default 170): how long the server runs, for a longer scene.
+#   SCENE_SIZE (WxH, default 1280x800): the headless screen's size.
 #   restart: the server is started a second time on the same home (the scene's driver is told RESTART=1), to check what
 #   persists across a new session.
 cd "$(dirname "$0")/.." || exit 1
@@ -52,7 +54,7 @@ run() {
     rm -f "$D/home/.cache/lordos/shell.log"
     env -u WAYLAND_DISPLAY -u DISPLAY -u LORD_SESSIOND -u LORDOS_SESSIOND -u DBUS_SESSION_BUS_ADDRESS \
         XDG_RUNTIME_DIR="$D" HOME="$D/home" LORD_GPU=0 LANG=en_US.UTF-8 LORD_HEADLESS_DRAW=1 \
-        ./build/lord-server --headless 1280x800 --theme "$T/theme.bundle.js" --timeout "${SCENE_TIMEOUT:-170}" >"$D/server.log" 2>&1 &
+        ./build/lord-server --headless "${SCENE_SIZE:-1280x800}" --theme "$T/theme.bundle.js" --timeout "${SCENE_TIMEOUT:-170}" >"$D/server.log" 2>&1 &
     P=$!
     for i in $(seq 1 320); do grep -aq 'APP-SCENE done' "$D/home/.cache/lordos/shell.log" 2>/dev/null && break; sleep 0.5; done
     sleep 2
