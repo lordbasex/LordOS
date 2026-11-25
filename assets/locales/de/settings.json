@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} geladen",
   "wallpaperGallery.useDesktop": "Auf dem Schreibtisch verwenden",
   "wallpaperGallery.useLogin": "Anmeldebildschirm",
-  "wallpaperGallery.useSlideshow": "Als Diashow verwenden"
+  "wallpaperGallery.useSlideshow": "Als Diashow verwenden",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · enthalten, funktioniert offline"
 }

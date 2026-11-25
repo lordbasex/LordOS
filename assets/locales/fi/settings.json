@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} ladattu",
   "wallpaperGallery.useDesktop": "Käytä työpöydällä",
   "wallpaperGallery.useLogin": "Kirjautumisnäyttö",
-  "wallpaperGallery.useSlideshow": "Käytä diaesityksenä"
+  "wallpaperGallery.useSlideshow": "Käytä diaesityksenä",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · mukana, toimii ilman verkkoa"
 }

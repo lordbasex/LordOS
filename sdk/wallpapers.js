@@ -7,7 +7,7 @@
 import index from '../assets/wallpapers/index.json';
 import catalog from '../assets/wallpapers/motion.json';
 import { DEFAULT_WALLPAPER } from './wallpapermodel.js';
-import { stillCatalog, stillOf, stillWallpaper, storeIndex } from './wallpapergallery.js';
+import { catalogOnly, twinMap, stillOf, stillWallpaper, storeIndex, withTwin } from './wallpapergallery.js';
 import { settings } from './settings.js';
 import { createStore } from './store.js';
 
@@ -69,7 +69,10 @@ function userWallpaper(id) {
 // computer's settings): null, and the theme's default shows. Works in every theme, on the login screen and in the
 // slideshow, which all go through findWallpaper. The rules are in wallpapergallery.js.
 export const STILL_STORE = '/var/lib/lordos/wallpapers';
-export const stillItems = stillCatalog(catalog.items);
+// The catalog's pictures of their own (cat:<id>), and its twins of built-in pictures: an item with a built-in's id is
+// that built-in's 4K (Cyberpunk City HD today), never a second wallpaper. The rules are in wallpapergallery.js.
+export const stillItems = catalogOnly(catalog.items, index.map((e) => e.id));
+export const twinItems = twinMap(catalog.items, index.map((e) => e.id));
 export const stillThumb = (it) => `asset:wallpapers/motion/${it.id}.thumb.jpg`;
 // The store's listing, read again at most every 10 s (a theme asks on each render), or at once after a change here.
 export const stillStore = createStore(0);           // bumped when the listing changes: downloads, removals
@@ -95,8 +98,11 @@ function catalogWallpaper(id) {
 export const downloadedStills = () => stillItems.map((it) => stillWallpaper(it, stillFiles(), { quality: quality(), store: STILL_STORE, thumb: stillThumb })).filter(Boolean);
 
 // The wallpaper chosen in the settings, among a theme's list; def: the theme's default (tokens.defaultWallpaper).
-export const findWallpaper = (list, id, def = DEFAULT_WALLPAPER) => (list || []).find((w) => w.id === (id || def)) || userWallpaper(id) || catalogWallpaper(id)
-  || (list || []).find((w) => w.id === def) || (list || []).find((w) => w.id === DEFAULT_WALLPAPER) || (list || [])[0] || null;
+// A built-in picture with a catalog twin comes with the twin's 4K file once it is on disk (withTwin), per quality.
+export const withTwinFile = (w) => (w && twinItems.has(w.id) ? withTwin(w, twinItems.get(w.id), stillFiles(), { quality: quality(), store: STILL_STORE }) : w);
+const builtinFind = (list, id) => withTwinFile((list || []).find((w) => w.id === id) || null);
+export const findWallpaper = (list, id, def = DEFAULT_WALLPAPER) => builtinFind(list, id || def) || userWallpaper(id) || catalogWallpaper(id)
+  || builtinFind(list, def) || builtinFind(list, DEFAULT_WALLPAPER) || withTwinFile((list || [])[0] || null);
 
 // The small image for a picker (falls back to the full one for theme wallpapers without a thumb).
 export const wallpaperThumb = (w) => (w && (w.thumb || w.src)) || null;

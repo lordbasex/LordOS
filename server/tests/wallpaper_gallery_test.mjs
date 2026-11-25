@@ -8,7 +8,7 @@ import {
   STILL_SECTIONS, GALLERY_FILTERS, stillId, stillOf, stillVariants, videoVariants, isStill, stillCatalog, motionCatalog, storeName,
   storeIndex, onDisk, qualityOf, autoQuality, displayQuality, variantFor, variantsToGet, drawnVariant, qualityPlan, stillWallpaper,
   stillEntry, motionEntry, builtinEntry, mineEntry, matchesQuery, filterItems, filterCounts, collectionOrder, groupCollections,
-  collectionCard, collectionBytes, downloadPlan, filesOnDisk, usedBytes, idsInUse, freeUpPlan,
+  collectionCard, collectionBytes, downloadPlan, filesOnDisk, usedBytes, idsInUse, freeUpPlan, twinMap, catalogOnly, twinExtra, withTwin,
 } from '../../sdk/wallpapergallery.js';
 
 let ok = 0, bad = 0;
@@ -149,6 +149,41 @@ eq('a slideshow keeps its collection', [...idsInUse({ slideshow: { on: true, cat
 eq('a slideshow that is off keeps nothing', [...idsInUse({ slideshow: { on: false, category: 'abstract' } }, catalog)], []);
 eq('random keeps every downloaded video', [...idsInUse({ motion: { '*': 'random' }, motionFiles: { 'earth-orbit': '1080.hevc' } }, catalog)].sort(), ['earth-orbit', 'random']);
 
+// ---- twins: a built-in picture and the catalog's item of the same id ----
+const pano = { id: 'cyberpunk-panorama', category: 'cyberpunk', name: 'Panorama', thumb: 'tp', src: 'asset:wallpapers/cyberpunk/p.jpg',
+  variants: [{ w: 1920, h: 1080, src: 'asset:wallpapers/cyberpunk/p.jpg' }] };
+const road = { id: 'cyberpunk-road', category: 'cyberpunk', name: 'Road', thumb: 'tr', src: 'asset:r.jpg', variants: [{ w: 1920, h: 1080, src: 'asset:r.jpg' }, { w: 3840, h: 2160, src: 'asset:r4.jpg' }] };
+const panoTwin = still('cyberpunk-panorama', 'cyberpunk', '7', '8'), roadTwin = still('cyberpunk-road', 'cyberpunk', 'a', 'b');
+const cat2 = [...catalog, panoTwin, roadTwin];
+const builtinIds = ['cyberpunk-panorama', 'cyberpunk-road', 'crystal-crown'];
+const twins = twinMap(cat2, builtinIds);
+eq('twins: the catalog items with a built-in id', [...twins.keys()], ['cyberpunk-panorama', 'cyberpunk-road']);
+eq('twins are not pictures of their own (no cat: duplicate)', catalogOnly(cat2, builtinIds).map((i) => i.id), ['epic-01-king', 'abstract-lake', 'anime-sakura']);
+eq('a twin adds its 4K to an HD built-in', twinExtra(pano, panoTwin).name, '2160.jpeg');
+eq('a built-in with its own 4K gets nothing more', twinExtra(road, roadTwin), null);
+const k4Here = storeIndex([{ name: `${H('8')}.jpg`, size: 1200 }]);
+const none = storeIndex([]);
+const tw = (q, idx) => withTwin(pano, panoTwin, idx, { quality: q, store: STORE });
+eq('auto, 4K not downloaded: the built-in alone (never a missing picture)', tw('auto', none), pano);
+eq('auto, 4K here: both, each display takes the one that covers it', tw('auto', k4Here).variants.map((v) => v.w), [1920, 3840]);
+eq('auto, 4K here: the store file', tw('auto', k4Here).variants[1].src, `${STORE}/${H('8')}.jpg`);
+eq('the id stays the built-in\'s', tw('auto', k4Here).id, 'cyberpunk-panorama');
+eq('HD: the built-in file only, even with 4K here', tw('hd', k4Here).variants.map((v) => v.src), ['asset:wallpapers/cyberpunk/p.jpg']);
+eq('4K, here: only the 4K file', tw('4k', k4Here).variants.map((v) => v.w), [3840]);
+eq('4K, not downloaded: falls back to the built-in HD', tw('4k', none).variants.map((v) => v.w), [1920]);
+eq('no twin: unchanged', withTwin(builtins[0], null, k4Here, { store: STORE }), builtins[0]);
+const pe = builtinEntry(pano, 'Panorama', panoTwin, none), pe4 = builtinEntry(pano, 'Panorama', panoTwin, k4Here);
+eq('one tile: built-in, here (HD), 4K badge, the 4K size', [pe.kind, pe.here, pe.k4, pe.sizes.k4, pe.k4Here], ['builtin', true, true, 1200, false]);
+eq('its 4K once downloaded', pe4.k4Here, true);
+eq('the collection: one entry per picture', groupCollections([pe, builtinEntry(road, 'Road', roadTwin, none)], ['cyberpunk']).map(([c, es]) => [c, es.length]), [['cyberpunk', 2]]);
+eq('download all · 4K: the twins\' 4K still missing', collectionBytes([pe, pe4]), { hd: 0, k4: 1200, missing: 1 });
+eq('download all · 4K plan', downloadPlan([pe], '4k', none).map((p) => [p.it.id, p.name]), [['cyberpunk-panorama', '2160.jpeg']]);
+eq('download all · HD: nothing (built in)', downloadPlan([pe], 'hd', none), []);
+eq('free up: a twin shown on a display stays', freeUpPlan(cat2, k4Here, idsInUse({ wallpapers: { 'DP-1': 'cyberpunk-panorama' } }, cat2)).map((f) => f.it.id), []);
+eq('free up: the theme\'s default (setting unset) stays', freeUpPlan(cat2, k4Here, idsInUse({ wallpaper: null }, cat2, ['cyberpunk-panorama'])).length, 0);
+eq('free up: a twin nobody shows goes (the built-in HD stays)', freeUpPlan(cat2, k4Here, idsInUse({ wallpaper: 'crystal-crown' }, cat2, ['lumo-celestial'])).map((f) => f.it.id), ['cyberpunk-panorama']);
+eq('free up: a slideshow of that collection keeps it', freeUpPlan(cat2, k4Here, idsInUse({ wallpaper: 'x', slideshow: { on: true, category: 'cyberpunk' } }, cat2)).length, 0);
+
 // ---- the shipped catalog ----
 const path = fileURLToPath(new URL('../../assets/wallpapers/motion.json', import.meta.url));
 if (existsSync(path)) {
@@ -157,7 +192,12 @@ if (existsSync(path)) {
   eq('shipped: every item is a still or a moving wallpaper', st.length + mv.length, shipped.items.length);
   eq('shipped: ids fit cat:<id>', st.every((it) => stillOf(stillId(it.id)) === it.id), true);
   eq('shipped: every still has HD and 4K', st.every((it) => variantFor(it, 'hd').w === 1920 && variantFor(it, '4k').w === 3840), true);
-  eq('shipped: every still is in a known section', st.every((it) => STILL_SECTIONS.includes(it.section)), true);
+  // a picture of its own is in a still section; a built-in's twin has the built-in's id and its category as section
+  const index = JSON.parse(readFileSync(fileURLToPath(new URL('../../assets/wallpapers/index.json', import.meta.url)), 'utf8'));
+  const builtin = new Map(index.map((e) => [e.id, e.category]));
+  eq('shipped: every still is in a known section, or the twin of a built-in in its category',
+    st.filter((it) => !(STILL_SECTIONS.includes(it.section) || builtin.get(it.id) === it.section)).map((it) => it.id), []);
+  console.log(`shipped twins of built-in pictures: ${twinMap(shipped.items, [...builtin.keys()]).size}`);
   const thumbs = (it) => existsSync(fileURLToPath(new URL(`../../assets/wallpapers/motion/${it.id}.thumb.jpg`, import.meta.url)));
   eq('shipped: every item has its thumbnail', shipped.items.filter((it) => !thumbs(it)).map((it) => it.id), []);
   console.log(`shipped catalog: ${st.length} still pictures, ${mv.length} moving wallpapers`);

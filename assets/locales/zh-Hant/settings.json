@@ -900,5 +900,6 @@
   "wallpaperGallery.spaceUsed": "已下載 {size}",
   "wallpaperGallery.useDesktop": "用於桌面",
   "wallpaperGallery.useLogin": "登入畫面",
-  "wallpaperGallery.useSlideshow": "用作投影片秀"
+  "wallpaperGallery.useSlideshow": "用作投影片秀",
+  "wallpaperGallery.option.builtinHd": "高畫質 · 1920 × 1080 · 內建，離線可用"
 }

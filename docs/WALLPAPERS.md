@@ -184,6 +184,25 @@ choosing a picture downloads what the displays it goes on need. HD and 4K offer 
 computer, and otherwise what is. The rules are in `sdk/wallpapergallery.js` (`autoQuality`, `variantsToGet`,
 `drawnVariant`, `stillWallpaper`), tested by `server/tests/wallpaper_gallery_test.mjs`.
 
+## Built-in pictures with a catalog twin
+
+A catalog still item whose id is a built-in wallpaper's (`assets/wallpapers/index.json`, e.g. Cyberpunk City HD's
+`cyberpunk-panorama`, section = the built-in's category) is that built-in's 4K, never a picture of its own: `stillItems`
+(the `cat:<id>` pictures) leaves it out and `twinItems` holds it. There is no special case for a category in the code.
+
+- **One tile** in the built-in collection: ✓ (the HD file is built in), the 4K badge; the sheet lists the built-in HD
+  ("included, works offline") and the twin's 4K with its size; the collection's page offers Download all · 4K.
+- **Settings keep the plain built-in id.** Choosing it where a display wants 4K (Auto above 1920 × 1080, or 4K) fetches
+  the twin's largest variant first (`wallpaper-get "<id> 2160.jpeg"`).
+- **Drawing**: `findWallpaper` passes a built-in through `withTwinFile` → `withTwin`: Auto adds the twin's 4K file to the
+  built-in's variants once it is on disk, so `wallpaperSrc` picks it per display and the built-in HD everywhere else and
+  while it isn't there; HD keeps the built-in files only; 4K keeps the 4K file when it is here, else the built-in. A
+  built-in that already ships a larger file than the twin's keeps its own (`twinExtra` is null). The same path serves
+  every theme, the login screen (`login-still` holds the built-in id) and the slideshow (`withDownloadedStills`).
+- **Free up space** may delete a twin's 4K only when nothing of this account shows it: the desktop and every display,
+  the login screen, a running slideshow of its collection, or the theme's default while the wallpaper setting is unset.
+  The built-in HD is what shows afterwards.
+
 ## The page
 
 `apps/settings/WallpaperGallery.jsx`:

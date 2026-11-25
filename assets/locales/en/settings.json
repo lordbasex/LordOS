@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} downloaded",
   "wallpaperGallery.useDesktop": "Use on desktop",
   "wallpaperGallery.useLogin": "Login screen",
-  "wallpaperGallery.useSlideshow": "Use as slideshow"
+  "wallpaperGallery.useSlideshow": "Use as slideshow",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · included, works offline"
 }

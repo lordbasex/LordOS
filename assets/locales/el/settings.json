@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} σε λήψεις",
   "wallpaperGallery.useDesktop": "Χρήση στην επιφάνεια εργασίας",
   "wallpaperGallery.useLogin": "Οθόνη σύνδεσης",
-  "wallpaperGallery.useSlideshow": "Χρήση ως παρουσίαση"
+  "wallpaperGallery.useSlideshow": "Χρήση ως παρουσίαση",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · ενσωματωμένο, λειτουργεί εκτός σύνδεσης"
 }

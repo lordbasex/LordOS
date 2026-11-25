@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} indirildi",
   "wallpaperGallery.useDesktop": "Masaüstünde kullan",
   "wallpaperGallery.useLogin": "Giriş ekranı",
-  "wallpaperGallery.useSlideshow": "Slayt gösterisi olarak kullan"
+  "wallpaperGallery.useSlideshow": "Slayt gösterisi olarak kullan",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · dahil, çevrimdışı çalışır"
 }

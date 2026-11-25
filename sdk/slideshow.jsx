@@ -18,7 +18,7 @@ import { windowHidden } from './desktopmodel.js';
 import { battery, powerProfiles } from './hardware.jsx';
 import { displayCovered } from './motionmodel.js';
 import { displayWallpaperKey } from './wallpapermodel.js';
-import { downloadedStills, stillStore } from './wallpapers.js';
+import { downloadedStills, stillStore, withTwinFile } from './wallpapers.js';
 import {
   slideshowPrefs, slideshowIds, drawNext, staggerMs, nextDue, preloadAt, transitionFor, transitionFrame, slideshowPause, MARGIN,
 } from './slideshowmodel.js';
@@ -195,7 +195,8 @@ function Slide({ d, group, list, entry, onContextMenu }) {
 
 // The wallpapers a slideshow can go through: the theme's, and the catalog's still pictures on this computer (their
 // collections, Abstract, Epic and Anime, are categories too: Settings → Wallpaper → Use as slideshow).
-export const withDownloadedStills = (list) => [...(list || []), ...downloadedStills()];
+// A built-in with a catalog twin brings its 4K file once it is on disk (sdk/wallpapers.js withTwinFile).
+export const withDownloadedStills = (list) => [...(list || []).map(withTwinFile), ...downloadedStills()];
 
 // Every display's wallpaper while the slideshow is on: list is the theme's wallpapers, displays screenDisplays().
 export function SlideshowWallpapers({ list: themeList, displays, onContextMenu }) {

@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} gedownload",
   "wallpaperGallery.useDesktop": "Gebruiken op bureaublad",
   "wallpaperGallery.useLogin": "Inlogscherm",
-  "wallpaperGallery.useSlideshow": "Als diavoorstelling gebruiken"
+  "wallpaperGallery.useSlideshow": "Als diavoorstelling gebruiken",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · inbegrepen, werkt offline"
 }

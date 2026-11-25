@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} letöltve",
   "wallpaperGallery.useDesktop": "Használat az asztalon",
   "wallpaperGallery.useLogin": "Bejelentkezési képernyő",
-  "wallpaperGallery.useSlideshow": "Használat diavetítésként"
+  "wallpaperGallery.useSlideshow": "Használat diavetítésként",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · beépített, hálózat nélkül is működik"
 }

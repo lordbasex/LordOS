@@ -12,15 +12,16 @@
 import {
   View, Text, Image, useTheme, useSettings, useLocale, tOptional, useStore, useAppWindow, useKeyboard, Button, Slider, SearchField, Segmented,
   RadioGroup, Layer, FilePicker, wm, spacing, typeScale, settings, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop,
-  slideshowPatch, slideshowPrefs, themes, displayLabel, displayFor, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, setLoginStill, setLoginImage,
+  slideshowPatch, slideshowPrefs, themes, displayLabel, displayFor, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage,
   addWallpaperImage, removeWallpaperImage, userWallpaperName, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs,
   downloadMotion, removeMotion, setLoginMotion, variantFor as motionVariantFor, userVideoProblem, media, screenDisplays, errorText,
-  stillItems, stillThumb, stillStore, stillFiles, fetchCatalogFile, removeCatalogFile, formatBytes,
+  stillItems, twinItems, stillThumb, stillStore, stillFiles, fetchCatalogFile, removeCatalogFile, formatBytes,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
   GALLERY_FILTERS, QUALITIES, stillOf, qualityOf, variantsToGet, qualityPlan, stillEntry, motionEntry, builtinEntry, mineEntry, filterItems,
-  filterCounts, collectionOrder, groupCollections, collectionCard, collectionBytes, downloadPlan, usedBytes, idsInUse, freeUpPlan,
+  filterCounts, collectionOrder, groupCollections, collectionCard, collectionBytes, downloadPlan, usedBytes, idsInUse, freeUpPlan, twinExtra,
+  displayQuality,
 } from '../../sdk/wallpapergallery.js';
 import { Stack, Section, SettingRow, Note, Actions, tint } from './ui.jsx';
 import { SlideshowSettings } from './Slideshow.jsx';
@@ -30,7 +31,8 @@ const GAP = 10, CARD = 170;
 const thumbWidth = (s) => Math.max(80, Math.min(240, Math.round(+s.wallpaperThumbs) || 100));
 // A theme names its wallpapers with a locale key (nameKey) and an English fallback (name).
 const wallpaperName = (w) => (w && w.nameKey && tOptional(w.nameKey)) || (w && w.name) || '';
-const allCatalog = () => [...stillItems, ...motionItems];
+// every catalog item: its own pictures, the built-ins' 4K twins, the moving wallpapers
+const allCatalog = () => [...stillItems, ...twinItems.values(), ...motionItems];
 const sizeText = (w, h) => `${w} × ${h}`;
 
 // The width of a box after layout (the page column narrows with the window), as Appearance's gallery does.
@@ -175,7 +177,8 @@ function Sheet({ e, ctx, onClose }) {
     : motion ? `${e.author} · ${e.license}`
       : e.kind === 'builtin' ? tr('settings.wallpaperGallery.credit.builtin') : tr('settings.wallpaperImage.hint');
   const opts = [['auto', tr('settings.wallpaperGallery.option.auto')]];
-  if (e.sizes.hd) opts.push(['hd', tr('settings.wallpaperGallery.option.hd', { size: formatBytes(e.sizes.hd) })]);
+  if (e.twin) opts.push(['hd', tr('settings.wallpaperGallery.option.builtinHd')]);    // HD: the built-in file
+  else if (e.sizes.hd) opts.push(['hd', tr('settings.wallpaperGallery.option.hd', { size: formatBytes(e.sizes.hd) })]);
   if (e.sizes.k4) opts.push(['4k', tr('settings.wallpaperGallery.option.4k', { size: formatBytes(e.sizes.k4) })]);
   const only = ctx.onlyDisplay;
   const inUse = ctx.inUse.has(e.item?.id) || ctx.inUse.has(e.id);
@@ -196,7 +199,7 @@ function Sheet({ e, ctx, onClose }) {
               </Text>
             </View>
             <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{credit}</Text>
-            {still || motion ? <RadioGroup value={q} onChange={setQ} options={opts} /> : null}
+            {still || motion || e.twin ? <RadioGroup value={q} onChange={setQ} options={opts} /> : null}
             {percent != null ? (
               <View style={{ gap: 4 }}>
                 <View style={{ height: 6, borderRadius: 3, backgroundColor: t.control, overflow: 'hidden', direction: 'ltr' }}>
@@ -214,7 +217,7 @@ function Sheet({ e, ctx, onClose }) {
               {only ? <Button small disabled={blocked || percent != null} label={tr('settings.wallpaperGallery.onlyDisplay', { display: only.label })} onClick={() => ctx.use(e, 'display', q)} /> : null}
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s, alignItems: 'center' }}>
-              {(still || motion) && e.here && !inUse ? <Button small label={tr('settings.motion.remove')} onClick={() => ctx.remove(e)} /> : null}
+              {((still || motion) && e.here || (e.twin && e.k4Here)) && !inUse ? <Button small label={tr('settings.motion.remove')} onClick={() => ctx.remove(e)} /> : null}
               {e.kind === 'mine' && !inUse ? <Button small label={tr('settings.wallpaperImage.remove')} onClick={() => ctx.remove(e)} /> : null}
               <Link label={tr('settings.wallpaperGallery.close')} onClick={onClose} />
             </View>
@@ -399,6 +402,9 @@ function CollectionPage({ col, entries, ctx, onBack }) {
             </Text>
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s }}>
+            {kind === 'builtin' && bytes.missing ? (
+              <Button small primary disabled={getting} label={tr('settings.wallpaperGallery.downloadAll', { quality: tr('settings.wallpaperGallery.quality4k'), size: formatBytes(bytes.k4) })} onClick={() => getAll('4k')} />
+            ) : null}
             {kind === 'still' && bytes.missing ? (
               <>
                 <Button small disabled={getting} label={tr('settings.wallpaperGallery.downloadAll', { quality: tr('settings.wallpaperGallery.qualityHd'), size: formatBytes(bytes.hd) })} onClick={() => getAll('hd')} />
@@ -452,7 +458,7 @@ export function WallpaperGallery() {
   // every wallpaper as a gallery entry
   const entries = [
     ...stillItems.map((it) => stillEntry(it, index, tOptional(`settings.wallpaperItem.${it.id}`) || it.name, stillThumb(it))),
-    ...list.map((w) => builtinEntry(w, wallpaperName(w))),
+    ...list.map((w) => builtinEntry(w, wallpaperName(w), twinItems.get(w.id) || null, index)),
     ...motionItems.map((it) => motionEntry(it, index, tOptional(`settings.motion.item.${it.id}`) || it.name, motionThumb(it), s.motionFiles || {})),
     ...(s.wallpaperImages || []).map((id) => findWallpaper([], id)).filter(Boolean).map((w) => mineEntry(w, tr('settings.wallpaperImage.name'))),
   ];
@@ -465,9 +471,9 @@ export function WallpaperGallery() {
   const shownId = login ? s.loginWallpaper : desk;
   const stillNow = findWallpaper(list, login ? (list.some((w) => w.id === shownId) || userWallpaperName(shownId) || stillOf(shownId) ? shownId : GREETER_WALLPAPER) : desk, t.defaultWallpaper);
   const nowEntry = (motionNow && entries.find((e) => e.id === motionNow)) || entries.find((e) => e.id === stillNow?.id)
-    || (stillNow ? builtinEntry(stillNow, wallpaperName(stillNow)) : null);
+    || (stillNow ? builtinEntry(stillNow, wallpaperName(stillNow), twinItems.get(stillNow.id) || null, index) : null);
   const current = nowEntry ? nowEntry.id : null;
-  const inUse = idsInUse(s, allCatalog());
+  const inUse = idsInUse(s, allCatalog(), [t.defaultWallpaper || DEFAULT_WALLPAPER, GREETER_WALLPAPER]);
   for (const id of [s.wallpaper, ...Object.values(s.wallpapers || {}), s.loginWallpaper]) if (id) inUse.add(id);
 
   const slideshow = !!themes.info()?.wallpaperSlideshow;
@@ -492,6 +498,9 @@ export function WallpaperGallery() {
         if (where === 'login') { await setLoginMotion(it); set({ loginWallpaper: it.id }); setNote(tr('settings.motion.loginDone')); }
         else { const m = { ...(settingsNow().motion || {}) }; m[d ? d.id : '*'] = it.id; set({ motion: m, ...slideshowStop(settingsNow()) }); }
       } else {
+        // a built-in with a catalog twin: its HD is here; the twin's 4K is fetched when a display it goes on wants it
+        const extra = e.kind === 'builtin' && e.twin ? twinExtra(e.item, e.twin) : null;
+        if (extra && !e.k4Here && (where === 'login' ? displays : ds).some((x) => displayQuality(q, x) === '4k')) await fetchCatalogFile(e.twin, extra.name);
         if (e.kind === 'still') for (const name of variantsToGet(e.item, q, ds)) {
           const v = e.item.variants.find((x) => x.name === name);
           if (v && !(index.get(`${v.sha256}.jpg`) === v.size)) await fetchCatalogFile(e.item, name);
@@ -512,6 +521,7 @@ export function WallpaperGallery() {
     setNote('');
     try {
       if (e.kind === 'motion') await removeMotion(e.item);
+      else if (e.kind === 'builtin' && e.twin) { const v = twinExtra(e.item, e.twin); if (v) await removeCatalogFile(e.twin, v.name); }
       else if (e.kind === 'still') { for (const v of e.item.variants) if (index.get(`${v.sha256}.jpg`) === v.size) await removeCatalogFile(e.item, v.name); }
       else if (e.kind === 'mine') {
         await removeWallpaperImage(e.id);
@@ -530,7 +540,7 @@ export function WallpaperGallery() {
   };
 
   // ---- the top: what shows now ----
-  const plan = qualityPlan(nowEntry && nowEntry.kind === 'still' ? nowEntry.item : null, quality, displays.length ? (scopeDisplay ? [scopeDisplay] : displays) : [{ w: 1920, h: 1080 }]);
+  const plan = qualityPlan(nowEntry && nowEntry.kind === 'still' ? nowEntry.item : nowEntry && nowEntry.twin ? nowEntry.twin : null, quality, displays.length ? (scopeDisplay ? [scopeDisplay] : displays) : [{ w: 1920, h: 1080 }]);
   const qLabel = (q) => tr(q === '4k' ? 'settings.wallpaperGallery.quality4k' : 'settings.wallpaperGallery.qualityHd');
   const planText = plan.length > 1
     ? plan.map((p) => tr('settings.wallpaperGallery.planItem', { quality: qLabel(p.quality), display: displayLabel(p.display, displays), size: sizeText(p.size.w, p.size.h) })).join(', ')

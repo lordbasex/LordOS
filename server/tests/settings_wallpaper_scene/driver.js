@@ -66,6 +66,31 @@
     const back = textId(t('wallpaperGallery.back'));
     if (back) click(back);
     await sleep(1200);
+    // a built-in collection whose pictures have catalog twins: one tile each, HD built in, 4K from the catalog
+    const twin = [...(sdk.twinItems ? sdk.twinItems.values() : [])][0];
+    if (twin) {
+      const card = textId(sdk.tOptional(`settings.wallpaperCategory.${twin.section}`) || twin.section);
+      if (card) click(card);
+      await sleep(1500);
+      const tx = shownTexts();
+      step('a twin collection: Download all · 4K', tx.some((x) => x.startsWith(t('wallpaperGallery.downloadAll', { quality: t('wallpaperGallery.quality4k'), size: '' }).slice(0, 8))));
+      await shot('collection-twins');
+      const w = sdk.lordosWallpapers.find((x) => x.id === twin.id);
+      const ti = w ? textId(sdk.tOptional(w.nameKey) || w.name) : null;
+      step('one tile for the twin', !!ti && tx.filter((x) => x === (sdk.tOptional(w.nameKey) || w.name)).length === 1);
+      if (ti) {
+        click(ti);
+        await sleep(1500);
+        step('the sheet: HD built in and 4K with its size', shownTexts().includes(t('wallpaperGallery.option.builtinHd')));
+        await shot('sheet-twin');
+        const c2 = textId(t('wallpaperGallery.close'));
+        if (c2) click(c2);
+        await sleep(800);
+      }
+      const b2 = textId(t('wallpaperGallery.back'));
+      if (b2) click(b2);
+      await sleep(1200);
+    } else log('twins: skipped: needs catalog items with a built-in id');
     // a search
     const search = textId(t('wallpaperGallery.search'));
     if (search) click(search);

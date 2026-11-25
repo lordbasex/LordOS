@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} بارگیری‌شده",
   "wallpaperGallery.useDesktop": "استفاده روی میز کار",
   "wallpaperGallery.useLogin": "صفحهٔ ورود",
-  "wallpaperGallery.useSlideshow": "استفاده به‌صورت نمایش اسلاید"
+  "wallpaperGallery.useSlideshow": "استفاده به‌صورت نمایش اسلاید",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · همراه سیستم، بدون اینترنت کار می‌کند"
 }

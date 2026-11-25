@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} na-download",
   "wallpaperGallery.useDesktop": "Gamitin sa desktop",
   "wallpaperGallery.useLogin": "Screen ng pag-login",
-  "wallpaperGallery.useSlideshow": "Gamitin bilang slideshow"
+  "wallpaperGallery.useSlideshow": "Gamitin bilang slideshow",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · kasama, gumagana offline"
 }

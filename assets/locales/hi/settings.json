@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} डाउनलोड किए गए",
   "wallpaperGallery.useDesktop": "डेस्कटॉप पर उपयोग करें",
   "wallpaperGallery.useLogin": "लॉगिन स्क्रीन",
-  "wallpaperGallery.useSlideshow": "स्लाइड शो के रूप में उपयोग करें"
+  "wallpaperGallery.useSlideshow": "स्लाइड शो के रूप में उपयोग करें",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · शामिल, ऑफ़लाइन चलता है"
 }
