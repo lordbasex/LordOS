@@ -13,7 +13,7 @@ import {
   View, Text, Image, useTheme, useSettings, useLocale, tOptional, useStore, direction, useAppWindow, useKeyboard, Button, Slider, SearchField, Segmented,
   RadioGroup, Layer, Overlay, FilePicker, wm, spacing, typeScale, settings, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop,
   slideshowPatch, slideshowPrefs, themes, displayLabel, displayFor, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage,
-  addWallpaperImage, removeWallpaperImage, userWallpaperName, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs,
+  addWallpaperImage, removeWallpaperImage, userWallpaperName, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs,
   downloadMotion, removeMotion, setLoginMotion, variantFor as motionVariantFor, userVideoProblem, media, screenDisplays, errorText,
   stillItems, twinItems, stillThumb, stillStore, stillFiles, fetchCatalogFile, removeCatalogFile, formatBytes,
 } from '@lordos/sdk';
@@ -225,16 +225,28 @@ function Sheet({ e, ctx, onClose, onStep }) {
   const { t: tr } = useLocale();
   const win = useAppWindow();
   const [q, setQ] = useState(ctx.quality);
+  const [big, setBig] = useState(false);                 // the picture over the whole window (a click on it)
+  const [loadingHd, setLoadingHd] = useState(false);
   useEffect(() => { setQ(ctx.quality); }, [e.id]);       // a new wallpaper starts from the page's quality again
+  // the large view of a catalog picture not on this computer: its HD file first (the thumbnail is 320 px), the same
+  // download "Download and use" makes; stepping with the arrows does it for each one shown
+  useEffect(() => {
+    if (!big || e.kind !== 'still' || e.here || !e.item?.variants?.some((v) => v.name === '1080.jpeg')) return;
+    let gone = false;
+    setLoadingHd(true);
+    fetchCatalogFile(e.item, '1080.jpeg').catch(() => {}).finally(() => { if (!gone) setLoadingHd(false); });
+    return () => { gone = true; };
+  }, [big, e.id]);
   useKeyboard((ev) => {
-    if (ev.key === 'Escape') onClose();
+    if (ev.key === 'Escape') { if (big) setBig(false); else onClose(); }
     // ← and → as the arrows draw them (mirrored in right-to-left)
     else if ((ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') && onStep) onStep((ev.key === 'ArrowRight') !== (direction() === 'rtl') ? 1 : -1);
   });
   const g = wm.frame(wm.get(win.id) || {}) || {};
   const W = g.w || 720, H = g.h || 560;
   const wide = W >= 700;
-  const pw = wide ? Math.min(480, Math.round(W * 0.55)) : Math.min(W - 64, 480), ph = Math.round(pw * 9 / 16);
+  // the picture takes most of the sheet on a large window (up to 900 px), with 280 px left for the choices
+  const pw = wide ? Math.max(360, Math.min(900, Math.round(W * 0.6), W - 64 - 280)) : Math.min(W - 64, 480), ph = Math.round(pw * 9 / 16);
   const percent = ctx.downloads[e.item?.id ?? ''];
   const still = e.kind === 'still', motion = e.kind === 'motion';
   const blocked = motion && !ctx.canPlay;
@@ -255,8 +267,11 @@ function Sheet({ e, ctx, onClose, onStep }) {
         backgroundColor: 'rgba(0,0,0,0.45)' }}>
         <View onClick={(ev) => ev?.stopPropagation?.()} style={{ flexDirection: wide ? 'row' : 'column', maxWidth: W - 32, maxHeight: H - 32, borderRadius: 14, overflow: 'hidden',
           backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
-          <View style={{ width: pw, height: ph, backgroundColor: '#000', direction: 'ltr' }}>
+          <View onClick={() => setBig(true)} style={{ width: pw, height: ph, backgroundColor: '#000', direction: 'ltr' }}>
             <Image src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <View style={{ position: 'absolute', top: 8, insetInlineEnd: 8, paddingHorizontal: 7, height: 20, borderRadius: 6, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }}>
+              <Text style={{ fontSize: 10.5, color: '#fff' }}>{tr('settings.wallpaperGallery.viewLarge')}</Text>
+            </View>
             {onStep ? <StepArrow side="start" onClick={() => onStep(direction() === 'rtl' ? 1 : -1)} /> : null}
             {onStep ? <StepArrow side="end" onClick={() => onStep(direction() === 'rtl' ? -1 : 1)} /> : null}
           </View>
@@ -293,6 +308,20 @@ function Sheet({ e, ctx, onClose, onStep }) {
           </View>
         </View>
       </View>
+      {big ? (
+        <View onClick={() => setBig(false)} style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: W, height: H, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: 'rgba(0,0,0,0.92)', direction: 'ltr' }}>
+          <Image src={local ? `thumb:${Math.min(4096, Math.round(W * 2))}:${local}` : motion ? motionPoster(e.item) : e.thumb}
+            style={{ width: W - 40, height: H - 110, marginBottom: 40, objectFit: 'contain' }} />
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 14, alignItems: 'center', gap: 2, direction: direction() }}>
+            <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: '#fff' }}>{e.name}</Text>
+            <Text style={{ fontSize: typeScale.caption, color: 'rgba(255,255,255,0.7)' }}>
+              {loadingHd ? tr('settings.wallpaperGallery.loadingHd') : tr('settings.wallpaperGallery.viewLargeHint')}</Text>
+          </View>
+          {onStep ? <StepArrow side="start" onClick={() => onStep(direction() === 'rtl' ? 1 : -1)} /> : null}
+          {onStep ? <StepArrow side="end" onClick={() => onStep(direction() === 'rtl' ? -1 : 1)} /> : null}
+        </View>
+      ) : null}
     </Layer>
   );
 }

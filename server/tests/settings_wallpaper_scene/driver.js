@@ -46,7 +46,7 @@
     click(epic);
     await sleep(1500);
     const page = shownTexts();
-    step('a collection page: Back and Download all', page.includes(t('wallpaperGallery.back')) && page.some((s) => s.startsWith(t('wallpaperGallery.downloadAll', { quality: t('wallpaperGallery.qualityHd'), size: '' }).trim().split('·')[0].trim())));
+    step('a collection page: the breadcrumb back and Download all', (page.includes(t('wallpaperGallery.back')) || page.filter((s) => s === sdk.t('settings.section.wallpaper')).length >= 2) && page.some((s) => s.startsWith(t('wallpaperGallery.downloadAll', { quality: t('wallpaperGallery.qualityHd'), size: '' }).trim().split('·')[0].trim())));
     await shot('collection-epic');
     // a wallpaper's sheet
     const first = sdk.stillItems.find((it) => it.section === 'epic');
@@ -64,6 +64,18 @@
       step('the sheet: Download and use, Login screen', sh.includes(t('wallpaperGallery.downloadUse')) && sh.includes(t('wallpaperGallery.useLogin')));
       step('the sheet: the catalog\'s sizes', sh.some((s) => s.startsWith(sdk.t('settings.wallpaperGallery.option.4k', { size: '' }).slice(0, 4))));
       await shot('sheet');
+      // a click on the sheet's picture shows it over the whole window (0.8.9.6.2); a click closes it again
+      const enlarge = textId(t('wallpaperGallery.viewLarge'));
+      step('the sheet: Click to enlarge', !!enlarge);
+      if (enlarge) {
+        click(enlarge);
+        await sleep(1500);
+        step('the large view', shownTexts().includes(t('wallpaperGallery.viewLargeHint')) || shownTexts().includes(t('wallpaperGallery.loadingHd')));
+        await shot('large-view');
+        const hint = textId(t('wallpaperGallery.viewLargeHint')) || textId(t('wallpaperGallery.loadingHd'));
+        if (hint) click(hint);
+        await sleep(600);
+      }
       const close = textId(t('wallpaperGallery.close'));
       if (close) click(close);
       await sleep(800);

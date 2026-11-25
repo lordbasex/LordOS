@@ -11,6 +11,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Fixed
+- **Settings → Wallpaper: a much larger picture, and the whole wallpaper over the window** (asked for while testing
+  0.8.9.6.2). The sheet's picture takes up to 60 % of the window (900 px at most, it was 480), and a click on it ("Click
+  to enlarge") shows the wallpaper whole over the window, uncropped, with its name; the arrows and ← → still step, and a
+  click or Esc closes it. A catalog picture not on this computer is shown from its HD file, downloaded then (the same
+  download as "Download and use", about half a megabyte), since its thumbnail is only 320 px; a moving wallpaper shows
+  its poster. Three new texts in every language.
 - **Settings → Wallpaper: a large preview on hover** (asked for while testing 0.8.9.6.2: the tiles are small). The pointer
   resting on a tile for 0.4 s shows the wallpaper at 320 x 180 with its name and quality, above the tile (below it near
   the window's top) and kept inside the window: the file itself once it is on this computer, else the catalog's
