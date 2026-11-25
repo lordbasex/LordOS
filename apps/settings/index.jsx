@@ -1,12 +1,12 @@
 // Settings — the window (a 220 px sidebar with a search field, the user card and colored section
-// icons, and the open page under a title bar) plus the appearance, wallpaper, language and region,
+// icons, and the open page under a title bar) plus the appearance, language and region,
 // keyboard, themes and session pages. The other pages are in their own files; all of them are built
-// from ./ui.jsx (docs/DESIGN.md, "Settings").
+// from ./ui.jsx (docs/DESIGN.md, "Settings"); the wallpaper page is ./WallpaperGallery.jsx.
 import { BatterySettings } from './Battery.jsx';
 import {
-  View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
-  reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Slider, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useVisitHistory, useTrackpads,
-  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop, displayWallpaperKey, displayLabel, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
+  View, Text, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
+  reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useVisitHistory, useTrackpads,
+  spacing, typeScale, registerDockActions, hasTouchpad, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionLabel, compareNames,
   useSidebar, SidebarToggle, SidebarOverlay, battery, deviceList,
 } from '@lordos/sdk';
@@ -25,7 +25,7 @@ import { WindowPrefs } from './WindowPrefs.jsx';
 import { DockSettings } from './Dock.jsx';
 import { ThemeOptions } from './ThemeExtras.jsx';
 import { ThemeGallery } from './ThemeGallery.jsx';   // Desktop style: the gallery of themes (docs/THEMES-PLAN.md, stage 1)
-import { SlideshowSettings } from './Slideshow.jsx';
+import { WallpaperGallery } from './WallpaperGallery.jsx';   // Wallpaper: the gallery (0.8.9.6.2)
 import { SwitcherSettings } from './Switcher.jsx';
 import { GlobalShortcutsSettings } from './GlobalShortcuts.jsx';
 import { BrowserFrameSettings } from './BrowserFrame.jsx';
@@ -150,286 +150,6 @@ function Appearance() {
       </Section>
       <WindowPrefs />
       <BrowserFrameSettings />
-    </Stack>
-  );
-}
-
-// A theme names its wallpapers with a locale key (nameKey) and an English fallback (name).
-const wallpaperName = (w) => (w.nameKey && tOptional(w.nameKey)) || w.name;
-
-// While a chosen wallpaper is starting; it turns only then.
-function TileSpinner() {
-  const [a, setA] = useState(0);
-  useEffect(() => { const id = setInterval(() => setA((x) => (x + 30) % 360), 80); return () => clearInterval(id); }, []);
-  return (
-    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' }}>
-      <Text style={{ fontSize: 22, color: '#fff', transform: `rotate(${a}deg)` }}>⟳</Text>
-    </View>
-  );
-}
-
-// The wallpaper grids' thumbnail width (issue #58, Settings → Wallpaper → Thumbnail size): 80-240 px, 100 by default.
-const thumbWidth = (s) => Math.max(80, Math.min(240, Math.round(+s.wallpaperThumbs) || 100));
-
-function MotionTile({ it, on, avail, percent, busy, onClick, tw = 100 }) {
-  const t = useTheme();
-  const { t: tr } = useLocale();
-  const name = tOptional(`settings.motion.item.${it.id}`) || it.name;
-  return (
-    <View onClick={avail ? onClick : undefined} style={{ alignItems: 'center', gap: 6, width: tw + 8, opacity: avail ? 1 : 0.45 }}>
-      <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${on ? t.accent : 'transparent'}` }}>
-        <View style={{ width: tw, height: Math.round(tw * 9 / 16), borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
-          <Image src={motionThumb(it)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          {busy || percent != null ? <TileSpinner /> : null}
-          {percent != null ? <View style={{ position: 'absolute', left: 0, bottom: 0, height: 4, width: `${percent}%`, backgroundColor: t.accent }} /> : null}
-        </View>
-      </View>
-      <Text style={{ fontSize: typeScale.caption, color: on ? t.text : t.textDim, fontWeight: on ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: tw + 8 }}>{name}</Text>
-    </View>
-  );
-}
-
-// Moving wallpapers: downloaded on demand, played only with a compatible GPU.
-function MotionWallpapers({ login }) {
-  const t = useTheme();
-  const { t: tr } = useLocale();
-  const [s, set] = useSettings();
-  const codecs = useCodecs();
-  const downloads = useStore(motionDownloads);
-  const busy = useStore(motionBusy);
-  const [scope, setScope] = useState('*');
-  const [msg, setMsg] = useState('');
-  const [pick, setPick] = useState(false);
-  const [credits, setCredits] = useState(false);
-  const can = codecs.length > 0;
-  const displays = screenDisplays() || [];
-  const main = displays[0] || { w: 1920, h: 1080 };
-  const motion = s.motion || {};
-  const cur = motion[scope] || null;
-  // a video chosen ends the slideshow, which it would hide (sdk/slideshowmodel.js)
-  const choose = (id) => { const m = { ...motion }; if (id) m[scope] = id; else delete m[scope]; set({ motion: m, ...(id ? slideshowStop(s) : null) }); };
-  const select = (it) => {
-    setMsg('');
-    const apply = () => (login ? setLoginMotion(it).then(() => { set({ loginWallpaper: it.id }); setMsg(tr('settings.motion.loginDone')); }, (e) => setMsg(errorText(e))) : choose(it.id));
-    if ((s.motionFiles || {})[it.id]) { apply(); return; }
-    const v = variantFor(it, codecs, main);
-    if (!v) return;
-    downloadMotion(it, v).then(apply, (e) => setMsg(errorText(e)));
-  };
-  const curItem = motionItems.find((x) => x.id === cur);
-  const addFile = (path) => {
-    setPick(false);
-    media.probe(path).then((info) => {
-      const why = userVideoProblem(info, codecs);
-      if (why) { setMsg(tr(`settings.motion.problem.${why}`)); return; }
-      const id = `user:${Date.now()}`;
-      set({ motionUser: [...(s.motionUser || []), { id, name: path.split('/').pop(), path }] });
-      choose(id);
-    });
-  };
-  return (
-    <>
-      <Section title={tr('settings.motion.title')} footer={can ? tr('settings.motion.hint') : undefined}>
-        {!can ? <Note>{tr('settings.motion.needsGpu')}</Note> : null}
-        {msg ? <Note tone="warn">{msg}</Note> : null}
-        {can && displays.length > 1 ? (
-          <SettingRow label={tr('settings.motion.display')}>
-            <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.motion.allDisplays')], ...displays.map((d) => [d.id, displayLabel(d, displays)])]} />
-          </SettingRow>
-        ) : null}
-        {can ? (
-          <>
-            {login ? null : <><SettingRow label={tr('settings.motion.speed')}>
-              <Segmented small options={MOTION_RATES.map((r) => [r, `${r / 100}×`])} value={MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100} onChange={(v) => set({ motionRate: v })} />
-            </SettingRow></>}
-            {!login && cur ? (
-              <SettingRow label={curItem ? (tOptional(`settings.motion.item.${curItem.id}`) || curItem.name) : tr('settings.motion.random')}>
-                <Actions>
-                  {curItem ? <Button small label={tr('settings.motion.remove')} onClick={() => removeMotion(curItem).catch((e) => setMsg(errorText(e)))} /> : null}
-                  <Button small label={tr('settings.motion.none')} onClick={() => choose(null)} />
-                </Actions>
-              </SettingRow>
-            ) : null}
-            <Actions style={{ paddingVertical: spacing.s }}>
-              {login ? <Button small label={tr('settings.motion.loginDefault')} onClick={() => setLoginMotion(null).then(() => { set({ loginWallpaper: null }); setMsg(tr('settings.motion.loginReset')); }, (e) => setMsg(errorText(e)))} /> : null}
-              {login ? null : <Button small label={tr('settings.motion.random')} disabled={Object.keys(s.motionFiles || {}).length < 2} onClick={() => choose('random')} />}
-              {login ? null : <Button small label={tr('settings.motion.add')} onClick={() => setPick(true)} />}
-              <Button small label={tr('settings.motion.credits')} onClick={() => setCredits(!credits)} />
-            </Actions>
-          </>
-        ) : null}
-      </Section>
-      {MOTION_SECTIONS.map((sec) => (
-        <Section key={sec} title={tr(`settings.wallpaperCategory.${sec}`)}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
-            {motionItems.filter((it) => it.section === sec).map((it) => (
-              <MotionTile key={it.id} it={it} avail={can} on={(login ? s.loginWallpaper : cur) === it.id} percent={downloads[it.id]} busy={!login && busy && cur === it.id} onClick={() => select(it)} tw={thumbWidth(s)} />
-            ))}
-          </View>
-        </Section>
-      ))}
-      {credits ? (
-        <Section title={tr('settings.motion.credits')}>
-          <View style={{ gap: 6, paddingVertical: spacing.s }}>
-            {motionItems.map((it) => (
-              <Text key={it.id} style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{`${tOptional(`settings.motion.item.${it.id}`) || it.name} — ${it.author} — ${it.license} — ${it.source}`}</Text>
-            ))}
-          </View>
-        </Section>
-      ) : null}
-      {pick ? <FilePicker onPick={(p) => addFile(Array.isArray(p) ? p[0] : p)} onClose={() => setPick(false)} /> : null}
-    </>
-  );
-}
-
-// Pictures of the user's own. On the desktop a copy in their home is enough; the login screen gets one of its own.
-const MAX_IMAGES = 12;
-function UserImages({ login, curId, onChoose, onDefault, setNote }) {
-  const t = useTheme();
-  const { t: tr } = useLocale();
-  const [s, set] = useSettings();
-  const win = useAppWindow();
-  const [picking, setPicking] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const ids = s.wallpaperImages || [];
-  const images = ids.map((id) => findWallpaper([], id)).filter(Boolean);
-  const tw = thumbWidth(s);
-  const add = (path) => {
-    setPicking(false);
-    if (!path) return;
-    setBusy(true);
-    setNote('');
-    addWallpaperImage(path).then((id) => {
-      set({ wallpaperImages: [id, ...ids.filter((x) => x !== id)].slice(0, MAX_IMAGES) });
-      return onChoose(id);
-    }).catch((e) => setNote(errorText(e))).finally(() => setBusy(false));
-  };
-  const cur = ids.includes(curId) ? curId : null;
-  const remove = () => {
-    removeWallpaperImage(cur).then(() => {
-      // a display that showed it goes back to the picture of every display, and that one to the theme's default
-      const own = Object.fromEntries(Object.entries(s.wallpapers || {}).filter(([, v]) => v !== cur));
-      set({ wallpaperImages: ids.filter((x) => x !== cur), wallpapers: own, ...(s.wallpaper === cur ? { wallpaper: null } : {}) });
-    }, (e) => setNote(errorText(e)));
-  };
-  return (
-    <Section title={tr('settings.wallpaperCategory.mine')} footer={tr('settings.wallpaperImage.hint')}>
-      {images.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
-          {images.map((w) => (
-            <View key={w.id} onClick={() => { setNote(''); Promise.resolve(onChoose(w.id)).catch((e) => setNote(errorText(e))); }} style={{ alignItems: 'center', width: tw + 8 }}>
-              <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${curId === w.id ? t.accent : 'transparent'}` }}>
-                <View style={{ width: tw, height: Math.round(tw * 9 / 16), borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
-                  <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </View>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      <Actions style={{ paddingVertical: spacing.s }}>
-        <Button small disabled={busy} label={tr(busy ? 'settings.wallpaperImage.working' : 'settings.wallpaperImage.choose')} onClick={() => setPicking(true)} />
-        {!login && cur && s.loginWallpaper !== cur ? <Button small label={tr('settings.wallpaperImage.remove')} onClick={remove} /> : null}
-        {login && cur ? <Button small label={tr('settings.motion.loginDefault')} onClick={onDefault} /> : null}
-      </Actions>
-      {picking ? (() => {
-        // over this Settings window, in the modal layer: the page itself scrolls
-        const g = wm.frame(wm.get(win.id) || {});
-        return (
-          <Layer name="modal">
-            <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 640, height: g.h || 480 }}>
-              <FilePicker computer title={tr('settings.wallpaperImage.pick')} filter={/\.(png|jpe?g)$/i} onClose={() => setPicking(false)} onPick={(p) => add([].concat(p)[0])} />
-            </View>
-          </Layer>
-        );
-      })() : null}
-    </Section>
-  );
-}
-
-// Grouped by category (Signature, Lumo, Cosmos, then the theme's own); grids use the thumbnails.
-function Wallpapers() {
-  const t = useTheme();
-  const { t: tr } = useLocale();
-  const [s, set] = useSettings();
-  const list = t.wallpapers || [];
-  const [target, setTarget] = useState('desktop');
-  const [note, setNote] = useState('');
-  const [scope, setScope] = useState('*');
-  if (!list.length) return <Stack><Note>{tr('settings.noWallpapers')}</Note></Stack>;   // after every hook (React's order)
-  const login = target === 'login';
-  // several displays: the picture of every display ('*') or of one (its own, settings.wallpapers; sdk/wallpapers.js)
-  const displays = screenDisplays() || [];
-  const scopeDisplay = !login && displays.length > 1 ? displays.find((d) => d.id === scope) || null : null;
-  const desk = wallpaperIdFor(s, scopeDisplay, t.defaultWallpaper);
-  const shown = login ? s.loginWallpaper : desk;
-  const cur = findWallpaper(list, login ? (list.some((w) => w.id === shown) || userWallpaperName(shown) ? shown : GREETER_WALLPAPER) : desk, t.defaultWallpaper);
-  // a picture chosen ends the slideshow (sdk/slideshowmodel.js)
-  const chooseDesk = (id) => set({ ...wallpaperPatch(s, id, scopeDisplay), ...slideshowStop(s) });
-  const slideshow = !login && !!themes.info()?.wallpaperSlideshow;
-  const ownCount = Object.keys(s.wallpapers || {}).filter((k) => displays.some((d) => displayWallpaperKey(d) === k)).length;
-  const stillPick = (id) => {
-    if (!login) { chooseDesk(id); return; }
-    setLoginStill(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }, (e) => setNote(errorText(e)));
-  };
-  const cats = [...new Set([...WALLPAPER_CATEGORIES, ...list.map((w) => w.category || 'other')])]
-    .map((c) => [c, list.filter((w) => (w.category || 'other') === c)]).filter(([, ws]) => ws.length);
-  const catName = (c) => tOptional(`settings.wallpaperCategory.${c}`) || tr('settings.wallpaperCategory.other');
-  // the grids' thumbnails: 16:9 like the thumbnails themselves
-  const tw = thumbWidth(s), th = Math.round(tw * 9 / 16);
-  const cap = { fontSize: typeScale.caption, color: t.textDim };
-  return (
-    <Stack>
-      <Segmented value={target} onChange={(v) => { setTarget(v); setNote(''); }} options={[['desktop', tr('settings.wallpaperFor.desktop')], ['login', tr('settings.wallpaperFor.login')]]} />
-      {note ? <Note>{note}</Note> : null}
-      {!login && displays.length > 1 ? (
-        <Section footer={scope === '*' && ownCount ? tr('settings.wallpaperFor.allResets') : tr('settings.wallpaperFor.displayHint')}>
-          <SettingRow label={tr('settings.wallpaperFor.display')}>
-            <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.motion.allDisplays')], ...displays.map((d) => [d.id, displayLabel(d, displays)])]} />
-          </SettingRow>
-        </Section>
-      ) : null}
-      <Section>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.l, paddingVertical: spacing.m }}>
-          <View style={{ width: 128, height: 72, borderRadius: 8, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
-            <Image src={wallpaperThumb(cur)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </View>
-          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-            <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{wallpaperName(cur)}</Text>
-            <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{catName(cur.category || 'other')}</Text>
-          </View>
-        </View>
-        <SettingRow label={tr('settings.wallpaperThumbs.size')}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, direction: 'ltr' }}>
-            <Text style={cap}>{tr('settings.wallpaperThumbs.small')}</Text>
-            <Slider value={tw} min={80} max={240} width={150} onChange={(v) => set({ wallpaperThumbs: Math.round(v) })} />
-            <Text style={cap}>{tr('settings.wallpaperThumbs.large')}</Text>
-          </View>
-        </SettingRow>
-      </Section>
-      {slideshow ? <SlideshowSettings displays={displays} /> : null}
-      <UserImages login={login} curId={shown} setNote={setNote}
-        onChoose={(id) => (login ? setLoginImage(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }) : chooseDesk(id))}
-        onDefault={() => setLoginMotion(null).then(() => { set({ loginWallpaper: null }); setNote(tr('settings.motion.loginReset')); }, (e) => setNote(errorText(e)))} />
-      <MotionWallpapers login={login} />
-      {cats.map(([c, ws]) => (
-        <Section key={c} title={catName(c)}>
-          {/* 108 px items (the default size) with 10 px gaps: a category of five fits on one row in the default window */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
-            {ws.map((w) => (
-              <View key={w.id} onClick={() => stillPick(w.id)} style={{ alignItems: 'center', gap: 6, width: tw + 8 }}>
-                <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${cur.id === w.id ? t.accent : 'transparent'}` }}>
-                  <View style={{ width: tw, height: th, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
-                    <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </View>
-                </View>
-                <Text style={{ fontSize: typeScale.caption, color: cur.id === w.id ? t.text : t.textDim, fontWeight: cur.id === w.id ? 600 : 400,
-                  whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: tw + 8 }}>{wallpaperName(w)}</Text>
-              </View>
-            ))}
-          </View>
-        </Section>
-      ))}
     </Stack>
   );
 }
@@ -856,7 +576,7 @@ function GpuGlyph() {
 
 // Sidebar groups (as in TangoOS): [id, component, icon color, symbol (a glyph or a component)].
 const GROUPS = [
-  [['general', General, '#8e8e93', 'i'], ['appearance', Appearance, '#3a3a3c', '◐'], ['wallpaper', Wallpapers, '#30b0c7', '▣'], ['dock', DockSettings, '#3a3a3c', '▁'], ['displays', DisplaysSettings, '#0a84ff', '▭']],
+  [['general', General, '#8e8e93', 'i'], ['appearance', Appearance, '#3a3a3c', '◐'], ['wallpaper', WallpaperGallery, '#30b0c7', '▣'], ['dock', DockSettings, '#3a3a3c', '▁'], ['displays', DisplaysSettings, '#0a84ff', '▭']],
   [['network', NetworkSettings, '#0a84ff', '⇅'], ['bluetooth', BluetoothSettings, '#0a84ff', 'ᛒ'], ['sound', SoundSettings, '#ff375f', '♪'], ['notifications', NotificationsSettings, '#ff3b30', '◉'], ['printers', PrintersSettings, '#636366', '⎙'], ['clipboard', ClipboardSettings, '#5e5ce6', '⎘'], ['sharing', SharingSettings, '#34c759', '⇄'], ['cloud', CloudSettings, '#0a84ff', '☁']],
   [['language', LanguageRegion, '#30b0c7', 'A'], ['datetime', DateTimeSettings, '#0a84ff', '◷'], ['keyboard', Keyboard, '#8e8e93', '⌨'], ['trackpad', TrackpadSettings, '#8e8e93', '▭'], ['defaultapps', DefaultAppsSettings, '#8e8e93', '◫'], ['webapps', WebAppsSettings, '#5e5ce6', '◎'], ['flatpak', FlatpakSettings, '#4a86cf', '◇'], ['ai', AISettings, '#bf5af2', '✦']],
   [['battery', BatterySettings, '#30d158', '▮'], ['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['gpus', GpusSettings, '#5e5ce6', GpuGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
