@@ -58,16 +58,19 @@ backport() {
 	   -DENABLE_MEDIA_STREAM=ON \\\
 	   -DENABLE_WEB_RTC=ON \\\
 	   -DUSE_GSTREAMER_WEBRTC=ON \\\
-	   -DUSE_LIBRICE=OFF/' debian/rules
+	   -DUSE_LIBRICE=ON/' debian/rules
     #    WebRTC (maintainer's decision, 2026-11-25: voice and video calls in web apps): WebKit's GStreamer backend
     #    (webrtcbin, GStreamer 1.26's), not Google's libwebrtc, and getUserMedia (MediaStream, on by default, written
     #    out). Its only new build dependency is OpenSSL 3 (libssl-dev: WebCore links libcrypto for SFrame); webrtcbin's
     #    own pieces come at run time: libnice's ICE (gstreamer1.0-nice), DTLS, SRTP and SCTP (plugins-bad), RTP,
-    #    VP8 and Opus (plugins-good and -base), H.264 through OpenH264 (plugins-bad). librice (another ICE agent) isn't
-    #    in Debian 13, so it stays off
+    #    VP8 and Opus (plugins-good and -base), H.264 through OpenH264 (plugins-bad). ICE with librice (+4, maintainer's
+    #    decision of 2026-11-25): WebKit then runs ICE and its UDP and TCP sockets in its network process, which has the
+    #    network already, and the web process keeps none (bubblewrap's --unshare-net, unchanged). librice isn't in
+    #    Debian 13: LordOS builds it (tools/pkg/build-librice.sh) and this build installs it from EXTRA_DEBS
     grep -q '^               libgstreamer-plugins-bad1.0-dev,$' debian/control || die "debian/control changed: the Build-Depends anchor is gone"
     sed -i 's/^               libgstreamer-plugins-bad1.0-dev,$/               libgstreamer-plugins-bad1.0-dev,\
-               libssl-dev,/' debian/control
+               libssl-dev,\
+               librice-dev (>= 0.4.3),/' debian/control
     #    what WebRTC needs at run time, as Recommends of the library (like any GStreamer element WebKit loads)
     awk '/^Package: libwpewebkit-2.0-1$/ { p = 1 } p && /^Suggests:/ { print "Recommends: gstreamer1.0-nice, gstreamer1.0-plugins-bad, gstreamer1.0-plugins-good, gstreamer1.0-plugins-base"; p = 0 } { print }' \
         debian/control > debian/control.new && mv debian/control.new debian/control
@@ -126,6 +129,7 @@ PATCH
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Build WPEPlatform (wpe-platform-2.0: headless, Wayland) and keep the legacy libwpe API, both explicitly."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Don't build WPEPlatform's DRM backend, so libinput and libudev aren't linked; its symbols leave debian/libwpewebkit-2.0-1.symbols."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Build WebRTC with WebKit's GStreamer backend (webrtcbin) and MediaStream; Build-Depends on libssl-dev, Recommends the GStreamer plugins WebRTC uses (libnice, bad, good, base)."
+    DEBEMAIL=$DEBEMAIL_LORDOS dch --append "ICE with librice (USE_LIBRICE) in the network process, so the web process keeps no network; Build-Depends on librice-dev (LordOS's package)."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "lordos-sharedarraybuffer-coi.patch: SharedArrayBuffer in cross-origin-isolated web processes only, as on Cocoa."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Maintainer: LordOS (the packaging is the Debian WebKit Maintainers')."
     sed -i "0,/^ -- /s/^\( -- .*>  \).*$/\1$debdate/" debian/changelog
@@ -144,7 +148,9 @@ cmd_build() {
     dpkg-source --no-check -x "$dsc" /build/work/wpewebkit-$up
     cd /build/work/wpewebkit-$up
     backport "$newver"
-    # the build dependencies, from trixie only (a missing one stops here and is named)
+    # LordOS's own build dependencies (librice: tools/pkg/build-librice.sh), from /build/extra, then the rest from trixie
+    # only (a missing one stops here and is named)
+    if ls /build/extra/*.deb >/dev/null 2>&1; then apt-get install -y --no-install-recommends /build/extra/*.deb; fi
     mk-build-deps --install --remove --tool 'apt-get -y --no-install-recommends' debian/control
     rm -f wpewebkit-build-deps_*
     chown -R builder: /build/work
@@ -210,6 +216,8 @@ cmd_test() {
     # WebRTC built (maintainer's decision, 2026-11-25): WebKit's GStreamer backend links GStreamer's WebRTC library
     readelf -d "$lib" | grep -q 'NEEDED.*\[libgstwebrtc-1\.0\.so' || die "libWPEWebKit-2.0 doesn't link libgstwebrtc-1.0: WebRTC isn't built"
     echo "WebRTC: libgstwebrtc-1.0 in libWPEWebKit-2.0's NEEDED" | tee -a "$out/report.txt"
+    readelf -d "$lib" | grep -q 'NEEDED.*\[librice-proto\.so' || die "libWPEWebKit-2.0 doesn't link librice-proto: ICE isn't librice's"
+    echo "ICE: librice-proto and librice-io in libWPEWebKit-2.0's NEEDED (the network process runs ICE)" | tee -a "$out/report.txt"
     gcc -Wall -Wextra -O1 -o "$out/wpe-headless-render" /build/wpewebkit-headless-test.c \
         $(pkg-config --cflags --libs wpe-webkit-2.0 wpe-platform-2.0 wpe-platform-headless-2.0)
     id -u tester >/dev/null 2>&1 || useradd -m tester
@@ -254,17 +262,16 @@ lordweb_check() {
     done
     # WebRTC (maintainer's decision, 2026-11-25): on WPEPlatform, the call checks against this engine: Chrome's identity,
     # SharedArrayBuffer only when cross-origin isolated (lordos-sharedarraybuffer-coi.patch), and two peer connections in
-    # one page exchanging audio and video (Opus, VP8 and H.264), with WebKit's sandbox on. --no-network-known: the web
-    # process has no network in the sandbox and ICE runs there without librice, so the loopback gathers no candidate
-    # (docs/WEBAPPS.md "Calls"); it is reported, and anything else still fails
+    # one page exchanging audio and video (Opus, VP8 and H.264), with WebKit's sandbox on (ICE in the network process,
+    # librice: the loopback must connect)
     if [ -z "${EMULATED:-}" ]; then
         runuser -u tester -- make -C /build/src/server -j"$(nproc)" LORD_WEB_BACKEND=platform build/webcalls-check > "$out/webcalls-build.log" 2>&1 ||
             { tail -n 30 "$out/webcalls-build.log"; die "webcalls-check does not build"; }
         ! grep -E 'warning:' "$out/webcalls-build.log" || die "webcalls-check builds with warnings"
-        (cd /build/src/server && runuser -u tester -- env HOME=/home/tester XDG_RUNTIME_DIR=/tmp timeout 600 python3 -I tests/webcalls_check.py build/webcalls-check --webrtc --no-network-known) \
+        (cd /build/src/server && runuser -u tester -- env HOME=/home/tester XDG_RUNTIME_DIR=/tmp timeout 600 python3 -I tests/webcalls_check.py build/webcalls-check --webrtc) \
             > "$out/webcalls.txt" 2>&1 || { cat "$out/webcalls.txt"; die "webcalls_check failed"; }
         cat "$out/webcalls.txt" >> "$out/report.txt"
-        echo "WebRTC: webcalls_check passes (identity, SharedArrayBuffer; loopback as reported above)" | tee -a "$out/report.txt"
+        echo "WebRTC: webcalls_check passes (identity, SharedArrayBuffer, loopback call)" | tee -a "$out/report.txt"
     fi
 }
 

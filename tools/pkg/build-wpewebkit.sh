@@ -34,6 +34,9 @@
 # ARCH=amd64|arm64 (default: this machine's). Another architecture than the machine's runs under qemu-user (its binfmt
 # handler must be registered with the F flag, as Debian's qemu-user-static does): slow, but the same chroots, checks and
 # tests (docs/WPEWEBKIT.md "arm64").
+# EXTRA_DEBS=<folder> (since +4): LordOS's own packages the build needs that trixie lacks (librice0 and librice-dev,
+# tools/pkg/build-librice.sh), installed in the build chroot before the build dependencies and in the test chroot with
+# the new packages; never anything else (the folder's *.deb only, no -dbgsym).
 # LORDOS_SRC=<LordOS tree> (default: the tree this script is in) adds lord-web to the test: built on both of its view
 # backends (WPEPlatform and legacy) against the new packages, then its web-backend-test and probe test; LORDOS_SRC=none
 # skips it.
@@ -92,7 +95,13 @@ fresh_dir() {
     [ -z "$TMPFS" ] || $SUDO mount -t tmpfs -o "size=$TMPFS,mode=0755" lordos-wpewebkit "$1"
 }
 
-mkdir -p "$WORK/in" "$WORK/out"
+EXTRA_DEBS=${EXTRA_DEBS:-}
+mkdir -p "$WORK/in" "$WORK/out" "$WORK/extra"
+rm -f "$WORK/extra/"*.deb
+if [ -n "$EXTRA_DEBS" ]; then
+    ls "$EXTRA_DEBS"/*.deb >/dev/null 2>&1 || die "EXTRA_DEBS=$EXTRA_DEBS has no .deb"
+    cp "$EXTRA_DEBS"/*.deb "$WORK/extra/" && rm -f "$WORK/extra/"*-dbgsym_*.deb
+fi
 rm -f "$WORK/out/FAILED" "$WORK/out/test/FAILED"
 echo "== wpewebkit $DVER -> $NEWVER ($ARCH) in $WORK"
 
@@ -133,6 +142,8 @@ if [ -z "${TEST_ONLY:-}" ] && { [ -n "${REBUILD:-}" ] || ! built; }; then
         --include=ca-certificates,devscripts,debian-keyring,lintian,equivs,gnupg,gpgv,fakeroot \
         --customize-hook='mkdir -p "$1/build/in" "$1/build/out"' \
         --customize-hook="sync-in $WORK/in /build/in" \
+        --customize-hook='mkdir -p "$1/build/extra"' \
+        --customize-hook="sync-in $WORK/extra /build/extra" \
         --customize-hook="upload $HERE/wpewebkit-chroot.sh /build/wpewebkit-chroot.sh" \
         --customize-hook="mount --bind \"$WORK/out\" \"\$1/build/out\"" \
         --customize-hook="chroot \"\$1\" env JOBS=$JOBS sh /build/wpewebkit-chroot.sh build $DVER $NEWVER || { echo FAILED > \"\$1/build/out/FAILED\"; }; sync; umount \"\$1/build/out\"" \
@@ -150,6 +161,7 @@ fi
 $SUDO rm -rf "$WORK/out/test" "$WORK/debs"
 mkdir -p "$WORK/out/test" "$WORK/debs"
 cp "$WORK/out/"*.deb "$WORK/debs/"
+cp "$WORK/extra/"*.deb "$WORK/debs/" 2>/dev/null || true
 rm -f "$WORK/debs/"*-dbgsym_*.deb "$WORK/debs/libwpewebkit-doc_"*.deb
 fresh_dir "$WORK/test-chroot"
 rm -f "$WORK/lordos-src.tar"

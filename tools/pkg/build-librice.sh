@@ -6,6 +6,7 @@
 #
 # 1. fetch    upstream's tag tarball (github.com/ystreet/librice, v$UPV), checked against its pinned SHA-256
 #             (tools/pkg/librice.sums)
+#             and cbindgen $CBV's .crate (crates.io's checksum, pinned)
 # 2. vendor   in a clean trixie chroot with cargo: `cargo vendor --locked`, every crate upstream's Cargo.lock names, at
 #             the version and checksum it pins (cargo checks each download against the lock file), as the second
 #             orig tarball (librice_<v>.orig-vendor.tar.xz, made reproducibly: sorted, fixed time and owner), checked
@@ -25,6 +26,7 @@
 set -eu
 
 UPV=0.4.3
+CBV=0.29.2          # cbindgen, for the headers (Debian 13's cargo-c has 0.27: see librice-chroot.sh)
 REV=${1:-1}
 case "$REV" in *[!0-9]*|'') echo "build-librice.sh: the LordOS revision is a number" >&2; exit 1 ;; esac
 NEWVER="$UPV-1~lordos13+$REV"
@@ -72,22 +74,33 @@ want=$(pinned "$ORIG")
 [ -n "$want" ] || die "$ORIG has no pinned SHA-256 in $SUMS"
 [ "$(sha256sum < "$WORK/in/$ORIG" | cut -d' ' -f1)" = "$want" ] || die "$ORIG doesn't match its pinned SHA-256"
 echo "upstream tarball: $want (pinned)"
+CBC=cbindgen-$CBV.crate
+if [ ! -s "$WORK/in/$CBC" ]; then
+    curl -fsSL -o "$WORK/in/$CBC.part" "https://static.crates.io/crates/cbindgen/$CBC" || die "cannot download $CBC"
+    mv "$WORK/in/$CBC.part" "$WORK/in/$CBC"
+fi
+want=$(pinned "$CBC")
+[ -n "$want" ] && [ "$(sha256sum < "$WORK/in/$CBC" | cut -d' ' -f1)" = "$want" ] || die "$CBC doesn't match its pinned SHA-256 (crates.io's checksum)"
+echo "cbindgen crate: $want (pinned)"
 
 # 2. vendor (the network, once)
 VEND=librice_$UPV.orig-vendor.tar.xz
-if [ -n "${VENDOR:-}" ] || [ ! -s "$WORK/in/$VEND" ]; then
+CBT=librice_$UPV.orig-cbindgen.tar.xz
+if [ -n "${VENDOR:-}" ] || [ ! -s "$WORK/in/$VEND" ] || [ ! -s "$WORK/in/$CBT" ]; then
     fresh_dir "$WORK/vendor-chroot"
     $SUDO $LOW mmdebstrap --variant=apt --mode=root --architectures="$(dpkg --print-architecture)" --dpkgopt=force-unsafe-io \
         --include=ca-certificates,cargo,rustc,python3,xz-utils \
-        --customize-hook='mkdir -p "$1/build/in" "$1/build/out"' \
+        --customize-hook='mkdir -p "$1/build/in" "$1/build/out" "$1/build/licenses"' \
         --customize-hook="upload $WORK/in/$ORIG /build/in/$ORIG" \
+        --customize-hook="upload $WORK/in/$CBC /build/in/$CBC" \
         --customize-hook="upload $HERE/librice-chroot.sh /build/librice-chroot.sh" \
-        --customize-hook="chroot \"\$1\" sh /build/librice-chroot.sh vendor $UPV || echo FAILED > \"\$1/build/out/FAILED\"" \
+        --customize-hook="sync-in $HERE/librice/licenses /build/licenses" \
+        --customize-hook="chroot \"\$1\" sh /build/librice-chroot.sh vendor $UPV $CBV || echo FAILED > \"\$1/build/out/FAILED\"" \
         --customize-hook="sync-out /build/out $WORK/vendor-out" \
         "$SUITE" "$WORK/vendor-chroot" "$SOURCES1" "$SOURCES2" "$SOURCES3"
     $SUDO chown -R "$(id -u):$(id -g)" "$WORK/vendor-out"
     [ ! -e "$WORK/vendor-out/FAILED" ] || die "vendoring failed"
-    cp "$WORK/vendor-out/$VEND" "$WORK/vendor-out/copyright" "$WORK/in/"
+    cp "$WORK/vendor-out/$VEND" "$WORK/vendor-out/$CBT" "$WORK/vendor-out/copyright" "$WORK/in/"
     [ -n "${KEEP:-}" ] || drop_dir "$WORK/vendor-chroot"
 fi
 got=$(sha256sum < "$WORK/in/$VEND" | cut -d' ' -f1)
@@ -95,6 +108,11 @@ want=$(pinned "$VEND")
 [ -n "$want" ] || die "$VEND is $got and has no pinned SHA-256 in $SUMS: check it (the crates Cargo.lock names) and pin it"
 [ "$got" = "$want" ] || die "$VEND is $got, not the pinned $want: the vendored crates differ"
 echo "vendored crates: $got (pinned)"
+got=$(sha256sum < "$WORK/in/$CBT" | cut -d' ' -f1)
+want=$(pinned "$CBT")
+[ -n "$want" ] || die "$CBT is $got and has no pinned SHA-256 in $SUMS: check it and pin it"
+[ "$got" = "$want" ] || die "$CBT is $got, not the pinned $want"
+echo "cbindgen with its crates: $got (pinned)"
 
 # 3. build
 built() { [ -s "$WORK/out/librice_${NEWVER}_$ARCH.changes" ] && [ -s "$WORK/out/lintian-summary.txt" ] && [ ! -e "$WORK/out/FAILED" ]; }
@@ -103,7 +121,7 @@ if [ -z "${TEST_ONLY:-}" ] && { [ -n "${REBUILD:-}" ] || ! built; }; then
     $SUDO find "$WORK/out" -maxdepth 1 -type f -delete
     tar -C "$HERE/librice" -cf "$WORK/debian.tar" debian
     $SUDO $LOW mmdebstrap --variant=buildd --mode=root --architectures="$ARCH" --dpkgopt=force-unsafe-io \
-        --include=ca-certificates,devscripts,lintian,equivs,fakeroot \
+        --include=ca-certificates,devscripts,lintian,equivs,fakeroot,passwd,xz-utils \
         --customize-hook='mkdir -p "$1/build/in" "$1/build/out"' \
         --customize-hook="sync-in $WORK/in /build/in" \
         --customize-hook="upload $WORK/debian.tar /build/debian.tar" \

@@ -17,15 +17,22 @@ CAPI := --release --frozen --offline --prefix=/usr --libdir=/usr/lib/$(DEB_HOST_
 # rice-proto: the C API, and TURN over TLS through the system's OpenSSL (not rustls: no second TLS stack)
 PROTO := -p rice-proto --no-default-features --features capi,openssl
 IO := -p rice-io --features capi
+# cbindgen for the headers (the third orig tarball: cbindgen/ with its own vendor/). Debian 13's cargo-c has cbindgen
+# 0.27, which doesn't read Rust 2024's #[unsafe(no_mangle)] and writes empty headers. Built here, used only to write
+# the two headers, never installed
+CBG_HOME := $(CURDIR)/debian/cargo-home-cbindgen
+CBG := $(CURDIR)/target-cbindgen/release/cbindgen
 
 %:
 	dh $@
 
 override_dh_auto_configure:
-	mkdir -p $(CARGO_HOME)
+	mkdir -p $(CARGO_HOME) $(CBG_HOME)
 	printf '[source.crates-io]\nreplace-with = "vendored-sources"\n\n[source.vendored-sources]\ndirectory = "%s/vendor"\n\n[net]\noffline = true\n' "$(CURDIR)" > $(CARGO_HOME)/config.toml
+	printf '[source.crates-io]\nreplace-with = "vendored-sources"\n\n[source.vendored-sources]\ndirectory = "%s/cbindgen/vendor"\n\n[net]\noffline = true\n' "$(CURDIR)" > $(CBG_HOME)/config.toml
 
 override_dh_auto_build:
+	CARGO_HOME=$(CBG_HOME) CARGO_TARGET_DIR=$(CURDIR)/target-cbindgen cargo build --release --frozen --offline --manifest-path cbindgen/Cargo.toml $(if $(JOBS),-j$(JOBS))
 	cargo cbuild $(CAPI) $(PROTO)
 	cargo cbuild $(CAPI) $(IO)
 
@@ -34,10 +41,12 @@ override_dh_auto_install:
 	cargo cinstall $(CAPI) $(IO) --destdir=$(CURDIR)/debian/tmp
 	# shared libraries only
 	rm -f debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/*.a
+	# the headers again with cbindgen 0.29, each keeping the version defines cargo-c wrote into its own (empty) one
+	sh debian/headers.sh $(CBG) debian/tmp/usr/include/rice
 
 # upstream's tests need the workspace's dev-dependencies and a network; the build's own test is LordOS's
 # (tools/pkg/librice-chroot.sh: pkg-config, a C program against both libraries)
 override_dh_auto_test:
 
 override_dh_auto_clean:
-	rm -rf target debian/cargo-home
+	rm -rf target target-cbindgen debian/cargo-home debian/cargo-home-cbindgen debian/headers
