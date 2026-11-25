@@ -254,7 +254,7 @@ static char *op_write(const char *path, const char *data, size_t len) {
     mode_t mode = 0644;
     if (!lstat(target, &st)) {
         if (!S_ISREG(st.st_mode)) return error_json("fs.notRegular");
-        mode = st.st_mode & 07777;
+        mode = st.st_mode & 0777;      /* never carry set-id or sticky bits over */
     }
     char tmp[PATH_MAX + 64];
     snprintf(tmp, sizeof tmp, "%s/.lordos-write-XXXXXX", dir);
