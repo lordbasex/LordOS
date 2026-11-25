@@ -10,6 +10,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+- **Settings → Wallpaper: "Download and use" downloaded the picture but didn't use it, and showed a lone "0".** The
+  admin helper reports a download's progress as `PROGRESS <n>` lines (`wallpaper-get`, and `studio-bg-get` for LordOS
+  Studio's backgrounds). `sdk/admin.js` took any line that wasn't `LOG` as the request's answer, so the first
+  `PROGRESS 0` rejected it as an error whose text was "0". The file went on downloading on the root side, but the
+  gallery never got to use it, its bar never moved, and pressing the button again used the picture already on disk.
+  A moving wallpaper's or a Studio background's download failed the same way. `PROGRESS` is now a progress line:
+  `onLog` gets `PROGRESS <n>` (what `sdk/motion.jsx` and `sdk/studiobg.js` already parse), and only `OK` or `ERR`
+  settles a request. Found while testing the 0.8.9.6.2 gallery. Test: `server/tests/admin_js_test.mjs`.
+
 ### Changed
 - **Web apps: Light and Dark per app are back, and now they reach the pages' CSS.** lord-web runs on WPEPlatform (WPE
   WebKit 2.54) since 0.8.9.6, whose display settings have `WPE_SETTING_DARK_MODE`: lord-web now sets it at start and on
