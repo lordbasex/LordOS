@@ -175,8 +175,6 @@ static void test_call_log(void) {
     line_is("{\"k\":\"pair\",\"id\":1,\"local\":\"host\",\"remote\":\"relay\",\"proto\":\"udp\"}", "peer connection 1: candidate pair host -> relay over udp");
     line_is("{\"k\":\"error\",\"id\":3,\"op\":\"setRemoteDescription\",\"name\":\"OperationError\"}", "peer connection 3: setRemoteDescription failed: OperationError");
     line_is("{\"k\":\"error\",\"id\":0,\"op\":\"RTCPeerConnection\",\"name\":\"NotSupportedError\"}", "RTCPeerConnection failed: NotSupportedError");
-    line_is("{\"k\":\"gum\",\"op\":\"getUserMedia\",\"audio\":true,\"video\":true,\"result\":\"granted\",\"labels\":[\"Built-in Audio Analog Stereo\",\"HD Pro Webcam C920 (046d:082d)\"]}",
-            "getUserMedia audio+video: granted (Built-in Audio Analog Stereo, HD Pro Webcam C920 (046d:082d))");
     line_is("{\"k\":\"gum\",\"op\":\"getUserMedia\",\"audio\":true,\"video\":false,\"result\":\"failed\",\"name\":\"NotAllowedError\"}",
             "getUserMedia audio: failed: NotAllowedError");
     /* what is never written: anything outside the closed lists and patterns */
@@ -191,19 +189,38 @@ static void test_call_log(void) {
     line_is("{\"k\":\"note\",\"text\":\"hello\"}", NULL);
     line_is("not json", NULL);
     line_is("[]", NULL);
-    /* a label keeps no phone number, serial or markup */
-    char l[64];
-    webcall_label("Camera +54 9 11 5555 1234 <b>x</b>", l, sizeof l);
-    CHECK(!strstr(l, "5555") && !strchr(l, '<') && !strchr(l, '+'), "label: %s", l);
-    webcall_label("USB Camera SN 1234567890", l, sizeof l);
-    CHECK(!strcmp(l, "USB Camera SN"), "serial dropped: '%s'", l);
-    webcall_label("", l, sizeof l);
-    CHECK(!l[0], "empty");
-    /* client hints line; an IP host is not written */
+    /* a granted line names each device by a closed word, never its label */
+    const char *labelled = "{\"k\":\"gum\",\"op\":\"getUserMedia\",\"audio\":true,\"video\":true,\"result\":\"granted\",\"tracks\":["
+                           "{\"kind\":\"audio\",\"label\":\"Federico's AirPods Headset 5491155551234\"},"
+                           "{\"kind\":\"video\",\"label\":\"HD Pro Webcam C920 (046d:082d)\"}]}";
     char out[700];
-    CHECK(webcall_hints_line("https://web.example", WEBUA_HINT_ARCH | WEBUA_HINT_BITNESS, out, sizeof out)
-          && !strcmp(out, "client hints asked by https://web.example: sec-ch-ua-arch, sec-ch-ua-bitness"), "hints line: %s", out);
-    CHECK(webcall_hints_line("http://127.0.0.1:8080", 0, out, sizeof out) && !strcmp(out, "client hints asked by an address: none"), "ip: %s", out);
+    size_t ln = webcall_line(labelled, strlen(labelled), out, sizeof out);
+    CHECK(ln && !strcmp(out, "getUserMedia audio+video: granted (audio bluetooth, video usb)"), "granted line: %s", ln ? out : "(dropped)");
+    CHECK(!strstr(out, "Federico") && !strstr(out, "AirPods") && !strstr(out, "5491") && !strstr(out, "C920") && !strstr(out, "046d"), "no label text: %s", out);
+    struct { const char *op, *label, *want; } classes[] = {
+        { "getUserMedia", "LordOS Studio", "lordos-studio" }, { "getUserMedia", "Dummy video device (0x0000)", "virtual" },
+        { "getUserMedia", "Monitor of Built-in Audio", "virtual" }, { "getUserMedia", "Built-in Audio Analog Stereo", "built-in" },
+        { "getUserMedia", "Integrated Camera: Integrated C", "built-in" }, { "getUserMedia", "USB Advanced Audio Device Analog Stereo", "usb" },
+        { "getUserMedia", "WH-1000XM4 (HFP)", "bluetooth" }, { "getUserMedia", "Ana's phone", "other" }, { "getUserMedia", "", "unnamed" },
+        { "getDisplayMedia", "screen:0", "screen" },
+    };
+    for (size_t i = 0; i < sizeof classes / sizeof classes[0]; i++)
+        CHECK(!strcmp(webcall_device_class(classes[i].op, classes[i].label), classes[i].want), "class of '%s': %s, want %s",
+              classes[i].label, webcall_device_class(classes[i].op, classes[i].label), classes[i].want);
+    line_is("{\"k\":\"gum\",\"op\":\"getUserMedia\",\"audio\":true,\"video\":false,\"result\":\"granted\",\"tracks\":[{\"kind\":\"sdp\",\"label\":\"x\"}]}",
+            "getUserMedia audio: granted");
+    /* the Client Hints line has no origin, and only the app's own site is ever kept or logged */
+    CHECK(webcall_hints_line(WEBUA_HINT_ARCH | WEBUA_HINT_BITNESS, out, sizeof out)
+          && !strcmp(out, "client hints asked by the app: sec-ch-ua-arch, sec-ch-ua-bitness"), "hints line: %s", out);
+    CHECK(webcall_hints_line(0, out, sizeof out) && !strcmp(out, "client hints asked by the app: none"), "none: %s", out);
+    char o[256];
+    const char *scope = "https://web.example.org/", *origin = "https://web.example.org";
+    CHECK(!webcall_hints_site("https://web.example.org/chat?x=1", scope, origin, o, sizeof o) && !strcmp(o, origin), "the app's own page");
+    CHECK(webcall_hints_site("https://login.other.example/", scope, origin, o, sizeof o), "a sign-in on another site: not kept");
+    CHECK(webcall_hints_site("https://cdn.example.org/x", scope, origin, o, sizeof o), "a third party: not kept");
+    CHECK(webcall_hints_site("https://web.example.org.evil.example/", scope, origin, o, sizeof o), "a look-alike: not kept");
+    CHECK(webcall_hints_site("http://web.example.org/", scope, origin, o, sizeof o), "plain http: not kept");
+    CHECK(webcall_hints_site(NULL, scope, origin, o, sizeof o), "no address");
     /* the rate */
     unsigned dropped = 0;
     int ok = 0;

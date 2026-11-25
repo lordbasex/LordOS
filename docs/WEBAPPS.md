@@ -418,9 +418,38 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   system's identity), picked from a closed list in Settings (never typed), in this order. `<version>` is always
   `LORD_VERSION`, the installed LordOS's, never written by hand.
   - `chrome`, **Chrome on Linux**, the default (a profile without the key):
-    `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36`,
+    `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36`,
     exactly what desktop Chrome on Linux sends, nothing added. Chrome's reduced user agent says `Linux x86_64` on
-    every Linux, an ARM one too, so this string is the same on `aarch64`.
+    every Linux, an ARM one too, so this string is the same on `aarch64`. Since the calls work (in development,
+    "Calls" below) Chrome is also Chrome in the two other places sites look, from the same table
+    (`webua.h`, `webua.c`; Chrome's whole version `WEBPAGE_CHROME_FULL`, `158.0.8127.36`, next to the string's major in
+    `webpage.h`): the **User-Agent Client Hints** on the page's requests and **`navigator.userAgentData`**. Both are
+    exactly what Chrome 158 on Linux sent and answered on 2026-11-25 (a throwaway profile against a local echo server):
+    - every request to a secure origin (https, or http on localhost) carries `Sec-CH-UA: "Chromium";v="158",
+      "Not.A/Brand";v="24", "Google Chrome";v="158"`, `Sec-CH-UA-Mobile: ?0` and `Sec-CH-UA-Platform: "Linux"`. The
+      third brand ("GREASE") and the order change with each major, worked out as Chromium does
+      (`webua_brands`; checked for 120, 124 and 158);
+    - after the app's own site sends `Accept-CH` (read on the main frame's responses inside the app's scope and on its
+      origin only, `webcall_hints_site`, kept in the profile's `state.json`, `clientHints`, as Chrome keeps it; another
+      site's, a sign-in's or a redirect's, is neither kept nor logged, so no trail of other sites is written), that
+      site's own requests also carry the ones it named:
+      `Sec-CH-UA-Full-Version-List` (`"Chromium";v="158.0.8127.36", "Not.A/Brand";v="24.0.0.0", "Google
+      Chrome";v="158.0.8127.36"`), `-Full-Version`, `-Platform-Version` (`""`), `-Arch` (`"x86"`; `"arm"` on
+      `aarch64`), `-Bitness` (`"64"`), `-Model` (`""`), `-WoW64` (`?0`), `-Form-Factors` (`"Desktop"`). Another site's
+      requests from that page carry only the first three (no Permissions-Policy delegation, a limit);
+    - `navigator.userAgentData` in a secure context (brands, `mobile` false, `platform` "Linux", `getHighEntropyValues()`
+      with the same values in a dictionary's order, `toJSON()`), the `NavigatorUAData` interface (not constructible), and
+      `navigator.vendor` "Google Inc." (WebKit says "Apple Computer, Inc."). `navigator.platform` stays WebKit's
+      ("Linux x86_64" on a PC, as Chrome; "Linux aarch64" on a Pi). Not in workers: the script reaches frames only.
+    The headers come from **`lord-web-ext.so`** (`webext.c`), WebKit's web process extension, because no API of the
+    UI process can add a header to every request: WebKit loads it only from `lord-web-ext/` next to lord-web
+    (`/usr/lib/lordos/bin/lord-web-ext/`, a folder lord-web names itself from `/proc/self/exe`), inside the web process's
+    sandbox, and it only adds those headers in `send-request`, from what lord-web tells it (Chrome or not, the machine,
+    each site's hint bits, all checked again there). The script is `webua.js`, in the page's world with no privileges
+    and no message handler (`webhints.c`); its functions read as native code, as Chrome's do. Other identities get
+    neither (Firefox sends no hints; Edge's own brands and LordOS's are not made up), and switching identity adds or
+    removes both at once. Checked by `build/webua-test` (the table, GREASE, every header, Accept-CH, the state file)
+    and `tests/webcalls_check.py` (the real engine against Chrome 158's captured headers and values).
   - `edge`, **Edge on Linux**: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)
     Chrome/158.0.0.0 Safari/537.36 Edg/158.0.0.0`, what desktop Edge on Linux sends, without LordOS's token. For the
     office, mail and team chat sites of Edge's own maker, which expect it.
@@ -726,7 +755,8 @@ silently.
     with an unknown key, a wrong type, a bad id or address, a scope that isn't a prefix of `startUrl` or not on
     `origin`, or an app or profile that isn't the one asked for (`webargs.c`, `webreg.c`, `weburl.c`, tested by
     `tests/webapp_test.c`); and when `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS` is set. It drops the variables that
-    point WebKit or GStreamer at other code (`WEBKIT_*`, `WPE_*`, `GST_PLUGIN*`, `GIO_EXTRA_MODULES`, `LD_PRELOAD`…).
+    point WebKit or GStreamer at other code (`WEBKIT_*`, `WPE_*`, `GST_PLUGIN*`, `GIO_EXTRA_MODULES`, `LD_PRELOAD`…)
+    and JavaScriptCore's options (`JSC_*`: `JSC_useSharedArrayBuffer` would give every page SharedArrayBuffer, "Calls").
 - **What a page never gets:** no `lord.*`, no broker, no script injected with privileges. The one script of lord-web's
   a page can see is the clipboard's `write` and `writeText` that WPE lacks, and what it hands over reaches the
   session only right after the person's own key or click in the window. The files of a drop are only the ones the
@@ -1006,4 +1036,4 @@ When the app's own page (an address inside its `scope`) can't load for lack of n
 - Dark mode through CSS alone: pages that choose their colors only with `@media (prefers-color-scheme)` rules stay
   light (WPE 2.48 has no API for the scheme; "Light and dark" above). Scripts that ask `matchMedia` follow the desktop.
   For the same reason Light and Dark per app are held back until the move to WPEPlatform.
-- WhatsApp Web's calls: they depend on WPE's WebRTC and on the service. Still to check.
+- Calls: in development ("Calls" above).

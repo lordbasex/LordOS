@@ -270,8 +270,7 @@ if r.get("gum") is None or not any(("getUserMedia audio: failed: %s" % r["gum"])
 envline = [c for c in calls if c.startswith("webcall: page: ")]
 if not envline:
     fail("no 'page:' line in the call log: %r" % calls)
-if not any(c.startswith("webcall: client hints asked by http://127.0.0.1:") for c in calls) and \
-   not any("client hints asked by an address" in c for c in calls):
+if not any(c.startswith("webcall: client hints asked by the app: sec-ch-ua-full-version-list") for c in calls):
     fail("the Client Hints the site asked for aren't in the call log: %r" % calls)
 ok("call log: " + " | ".join(c[len("webcall: "):] for c in calls))
 api = r["api"]

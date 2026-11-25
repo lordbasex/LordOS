@@ -5,8 +5,9 @@
  *   - the Sec-CH-UA-* request headers: lord-web-ext.so (webext.c), WebKit's web process extension, loaded only from
  *     lord-web's own folder (<lord-web's folder>/lord-web-ext/), told the identity, the machine and the hints each site
  *     asked for (each new web process at its start, running ones with a message when something changes);
- *   - Accept-CH: read here on the main frame's responses, kept per site in the profile's state.json as Chrome keeps
- *     it, and logged (webcall.h: "the Client Hints the site requested").
+ *   - Accept-CH: read here on the main frame's responses of the app's own site only (inside its scope, on its origin),
+ *     kept in the profile's state.json as Chrome keeps it and logged without the origin (webcall.h); another site's
+ *     is ignored, so no trail of other sites is kept or written.
  *
  * Another identity gets none of it, and switching identity (SetUserAgent) adds or removes all of it at once. */
 #include "web.h"
@@ -106,15 +107,18 @@ void webhints_identity(Web *w) {
 
 void webhints_response(Web *w, WebKitURIResponse *r) {
     if (!r || !is_chrome(w)) return;
+    /* only the app's own site: another site's Accept-CH (a sign-in, a redirect, anything outside the app's scope) is
+     * neither kept nor logged, so neither state.json nor the log becomes a trail of where the window went. Such a site
+     * still gets the low-entropy hints, as from Chrome, and no high-entropy ones */
     char origin[256];
-    if (webua_origin(webkit_uri_response_get_uri(r), origin, sizeof origin)) return;
+    if (webcall_hints_site(webkit_uri_response_get_uri(r), w->app.scope, w->app.origin, origin, sizeof origin)) return;
     SoupMessageHeaders *h = webkit_uri_response_get_http_headers(r);
     const char *v = h ? soup_message_headers_get_list(h, "Accept-CH") : NULL;
     /* no Accept-CH keeps what the site asked before, as Chrome does; an empty one asks for nothing more */
     if (!v) return;
     unsigned mask = webua_accept_ch(v);
     if (!webua_sites_set(&w->state.hints, origin, mask)) return;
-    webcall_log_hints(origin, mask);
+    webcall_log_hints(mask);
     web_state_save(w);
     tell_extensions(w);
 }

@@ -1,12 +1,14 @@
 /* webcall.c — see webcall.h. */
 #include "webcall.h"
 #include "webua.h"
+#include "weburl.h"
 #include "../sec/json.h"
 
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 
 static int in_list(const char *s, const char *const *list) {
@@ -65,33 +67,35 @@ static size_t out_fmt(char *out, size_t n, const char *fmt, ...) {
     return k < 0 || (size_t)k >= n ? 0 : (size_t)k;
 }
 
-void webcall_label(const char *in, char *out, size_t n) {
-    if (!out || !n) return;
-    out[0] = 0;
-    if (!in) return;
-    char tmp[64];
-    size_t k = 0;
-    for (const char *s = in; *s && k < 48; s++) {
-        unsigned char c = (unsigned char)*s;
-        if (isalnum(c) || strchr(" ._()-:", c)) tmp[k++] = (char)c;
+/* case-insensitive substring */
+static int has(const char *s, const char *word) {
+    size_t n = strlen(word);
+    for (; s && *s; s++) if (!strncasecmp(s, word, n)) return 1;
+    return 0;
+}
+
+/* "(046d:082d)": a USB vendor and product id, as PipeWire and V4L2 name USB devices */
+static int has_usb_id(const char *s) {
+    for (; s && *s; s++) {
+        if (*s != '(') continue;
+        int ok = 1;
+        for (int i = 1; i <= 9 && ok; i++) ok = i == 5 ? s[i] == ':' : isxdigit((unsigned char)s[i]) != 0;
+        if (ok && s[10] == ')') return 1;
     }
-    tmp[k] = 0;
-    /* a stretch of digits, spaces and dashes with 5 or more digits goes (a serial number, a phone number written
-     * "11 5555 1234"): nobody's business here */
-    size_t j = 0;
-    for (size_t i = 0; i < k;) {
-        size_t r = i, digits = 0;
-        while (r < k && (isdigit((unsigned char)tmp[r]) || tmp[r] == ' ' || tmp[r] == '-')) digits += isdigit((unsigned char)tmp[r++]) != 0;
-        if (r == i) r = i + 1;
-        else if (digits >= 5) { if (j + 1 < n) out[j++] = ' '; i = r; continue; }
-        while (i < r && j + 1 < n) out[j++] = tmp[i++];
-        i = r;
-    }
-    while (j && out[j - 1] == ' ') j--;
-    size_t s = 0;
-    while (s < j && out[s] == ' ') s++;
-    memmove(out, out + s, j - s);
-    out[j - s] = 0;
+    return 0;
+}
+
+const char *webcall_device_class(const char *op, const char *label) {
+    if (op && !strcmp(op, "getDisplayMedia")) return "screen";
+    if (!label || !label[0]) return "unnamed";
+    if (has(label, "LordOS Studio")) return "lordos-studio";
+    if (has(label, "virtual") || has(label, "loopback") || has(label, "dummy") || has(label, "monitor of")) return "virtual";
+    if (has(label, "bluetooth") || has(label, "bluez") || has(label, "headset") || has(label, "hands-free") || has(label, "handsfree")
+        || has(label, "a2dp") || has(label, "hfp")) return "bluetooth";
+    if (has(label, "usb") || has_usb_id(label) || has(label, "webcam")) return "usb";
+    if (has(label, "built-in") || has(label, "internal") || has(label, "integrated") || has(label, "analog stereo")
+        || has(label, "digital microphone") || has(label, "hda ")) return "built-in";
+    return "other";
 }
 
 size_t webcall_line(const char *json, size_t len, char *out, size_t n) {
@@ -142,21 +146,21 @@ size_t webcall_line(const char *json, size_t len, char *out, size_t n) {
             r = out_fmt(out, n, "%s %s: failed: %s", op, what, name);
             goto done;
         }
-        char labels[256] = "";
+        /* what kind of device each track came from, in closed words (webcall_device_class): never its label, which
+         * can be a person's name ("<name>'s headphones") or a serial number */
+        char kinds[256] = "";
         size_t at = 0;
-        const JVal *ls = json_get(o, "labels");
+        const JVal *ts = json_get(o, "tracks");
         int count = 0;
-        for (const JVal *l = ls && ls->type == J_ARR ? ls->kid : NULL; l && count < 4; l = l->next) {
-            if (l->type != J_STR) continue;
-            char one[64];
-            webcall_label(l->str, one, sizeof one);
-            if (!one[0]) snprintf(one, sizeof one, "(no label)");
-            int w = snprintf(labels + at, sizeof labels - at, "%s%s", count ? ", " : "", one);
-            if (w < 0 || (size_t)w >= sizeof labels - at) break;
+        for (const JVal *t = ts && ts->type == J_ARR ? ts->kid : NULL; t && count < 4; t = t->next) {
+            const char *tk = t->type == J_OBJ ? json_str(t, "kind") : NULL, *label = t->type == J_OBJ ? json_str(t, "label") : NULL;
+            if (!in_list(tk, KINDS)) continue;
+            int w = snprintf(kinds + at, sizeof kinds - at, "%s%s %s", count ? ", " : "", tk, webcall_device_class(op, label));
+            if (w < 0 || (size_t)w >= sizeof kinds - at) break;
             at += (size_t)w;
             count++;
         }
-        r = count ? out_fmt(out, n, "%s %s: granted (%s)", op, what, labels) : out_fmt(out, n, "%s %s: granted", op, what);
+        r = count ? out_fmt(out, n, "%s %s: granted (%s)", op, what, kinds) : out_fmt(out, n, "%s %s: granted", op, what);
     }
 done:
     json_free(&d);
@@ -174,19 +178,8 @@ int webcall_rate(double now_s, unsigned *dropped) {
     return 1;
 }
 
-/* a host written as an IP address (v4 digits and dots, or a bracketed v6) */
-static int host_is_ip(const char *origin) {
-    const char *h = strstr(origin, "://");
-    if (!h) return 1;
-    h += 3;
-    if (*h == '[') return 1;
-    size_t len = strcspn(h, ":");
-    for (size_t i = 0; i < len; i++) if (!isdigit((unsigned char)h[i]) && h[i] != '.') return 0;
-    return 1;
-}
-
-size_t webcall_hints_line(const char *origin, unsigned mask, char *out, size_t n) {
-    if (!origin || !out || !n) return 0;
+size_t webcall_hints_line(unsigned mask, char *out, size_t n) {
+    if (!out || !n) return 0;
     char names[512] = "";
     size_t at = 0;
     for (unsigned b = 1; b & WEBUA_HINT_ALL; b <<= 1) {
@@ -195,7 +188,14 @@ size_t webcall_hints_line(const char *origin, unsigned mask, char *out, size_t n
         if (k < 0 || (size_t)k >= sizeof names - at) return 0;
         at += (size_t)k;
     }
-    return out_fmt(out, n, "client hints asked by %s: %s", host_is_ip(origin) ? "an address" : origin, at ? names : "none");
+    return out_fmt(out, n, "client hints asked by the app: %s", at ? names : "none");
+}
+
+int webcall_hints_site(const char *uri, const char *scope, const char *app_origin, char *out, size_t n) {
+    char mine[256];
+    if (!uri || !scope || !app_origin || !weburl_in_scope(uri, scope) || webua_origin(uri, out, n) || webua_origin(app_origin, mine, sizeof mine)
+        || strcmp(out, mine)) return -1;
+    return 0;
 }
 
 void webcall_log(const char *line) {
@@ -208,7 +208,7 @@ void webcall_log(const char *line) {
     fprintf(stderr, "webcall: %s\n", line);
 }
 
-void webcall_log_hints(const char *origin, unsigned mask) {
+void webcall_log_hints(unsigned mask) {
     char line[700];
-    if (webcall_hints_line(origin, mask, line, sizeof line)) webcall_log(line);
+    if (webcall_hints_line(mask, line, sizeof line)) webcall_log(line);
 }

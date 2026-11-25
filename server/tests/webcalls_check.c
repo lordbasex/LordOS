@@ -53,7 +53,7 @@ static gboolean on_decide(WebKitWebView *v, WebKitPolicyDecision *dec, WebKitPol
     const char *ach = h ? soup_message_headers_get_list(h, "Accept-CH") : NULL;
     if (ach && !webua_origin(webkit_uri_response_get_uri(resp), origin, sizeof origin) && webua_sites_set(&sites, origin, webua_accept_ch(ach))) {
         char line[700];
-        if (webcall_hints_line(origin, webua_sites_get(&sites, origin), line, sizeof line)) printf("webcall: %s\n", line);
+        if (webcall_hints_line(webua_sites_get(&sites, origin), line, sizeof line)) printf("webcall: %s\n", line);
         webkit_web_context_send_message_to_all_extensions(ctx, webkit_user_message_new("lordos-ua", webhints_variant(1, machine, &sites)));
     }
     return FALSE;

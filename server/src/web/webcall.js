@@ -167,9 +167,11 @@
         if (op === 'getDisplayMedia' && !c) v = true;
         var p = Reflect_.apply(orig, this, arguments);
         if (p && typeof p.then === 'function') p.then(function (stream) {
-          var labels = [];
-          try { stream.getTracks().forEach(function (t) { labels.push(String(t.label || '')); }); } catch (e) { /* no tracks */ }
-          send({ k: 'gum', op: op, audio: a, video: v, result: 'granted', labels: labels });
+          // each track's kind and label: lord-web turns the label into a closed word (webcall_device_class) and never
+          // writes it
+          var tracks = [];
+          try { stream.getTracks().forEach(function (t) { tracks.push({ kind: t.kind, label: String(t.label || '').slice(0, 128) }); }); } catch (e) { /* no tracks */ }
+          send({ k: 'gum', op: op, audio: a, video: v, result: 'granted', tracks: tracks });
         }, function (e) {
           send({ k: 'gum', op: op, audio: a, video: v, result: 'failed', name: errName(e) });
         });
