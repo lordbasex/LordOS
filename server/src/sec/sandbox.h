@@ -72,6 +72,13 @@ typedef struct {
      * netlink or socketpair. Only lord-stream (0.8.8.10, maintainer's approval 2026-11-16: cameras and IPTV), which
      * runs in its own firewall scope lordos-net-streams.scope. 0 for every other helper. */
     int network;
+    /* 1: what the filter refuses with EPERM (a syscall off the lists, an ioctl of a type not allowed) returns
+     * SECCOMP_RET_TRAP instead, and the helper's own SIGSYS handler records the number and returns -EPERM itself, so
+     * the program sees exactly the same EPERM. The kernel never runs a refused call either way: TRAP allows nothing
+     * ERRNO doesn't. The caller must install that handler before (SA_SIGINFO) and keep SIGSYS unblocked in every
+     * thread, or the kernel kills the process with SIGSYS. Only lord-nvgpu (0.8.9.6.1, so a tester's report names
+     * what NVML needed; docs/MONITOR.md "NVIDIA"); 0 for every other helper. */
+    int trap_denied;
 } SandboxHelperCfg;
 
 /* Callers can detect the ro_dir_fds/rw_dir_fds fields. */

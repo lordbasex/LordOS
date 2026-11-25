@@ -1,5 +1,6 @@
 /* nvgpu.c — lord-server's side of lord-nvgpu (nvgpu.h). See nvgpu_main.c for the helper and nvproto.h for the wire. */
 #include "monitor/nvgpu.h"
+#include "sysreport/ids.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -28,6 +29,8 @@
 #define CLK_MAX_MHZ    100000
 #define JSON_MAX       (128 * 1024)
 #define ZOMBIES        8
+#define DYING_MS       2000             /* a helper that closed its socket gets this long to be reaped by its status */
+#define NV_PCI_MAX     8
 
 static struct {
     pthread_mutex_t mu;
@@ -36,9 +39,25 @@ static struct {
     double last_req, next_start, present_at;
     int present, backoff;
     pid_t zombies[ZOMBIES];
+    pid_t dying;                        /* the helper that closed its socket: its exit status says why */
+    double dying_at;
+    NvDiag diag;                        /* why there is (or isn't) data: nvgpu_diag_json */
+    double pci_at;
+    int npci;
+    NvPci pci[NV_PCI_MAX];
+    char drv_version[NVP_DRIVER_LEN];
     char json[JSON_MAX];
     int jlen;
-} N = { .mu = PTHREAD_MUTEX_INITIALIZER, .sock = -1, .backoff = BACKOFF_MIN_MS };
+} N = { .mu = PTHREAD_MUTEX_INITIALIZER, .sock = -1, .backoff = BACKOFF_MIN_MS, .diag = { .code = NVP_ST_STARTING } };
+
+/* NVP_ST_*'s fixed names, the only strings nvDiag's state can hold (apps/monitor/nvreport.js knows each) */
+static const char *const ST_NAMES[NVP_ST_COUNT_] = {
+    [NVP_ST_OK] = "ok", [NVP_ST_NO_DRIVER] = "noDriver", [NVP_ST_LIB_MISSING] = "libMissing", [NVP_ST_DLOPEN] = "dlopen",
+    [NVP_ST_SYMBOL] = "symbol", [NVP_ST_INIT] = "init", [NVP_ST_COUNT] = "count", [NVP_ST_NO_DEVICE] = "noDevice",
+    [NVP_ST_SANDBOX] = "sandbox", [NVP_ST_KILLED] = "killed", [NVP_ST_CRASH] = "crash", [NVP_ST_EXIT] = "exit",
+    [NVP_ST_TIMEOUT] = "timeout", [NVP_ST_BAD_MESSAGE] = "badMessage", [NVP_ST_NO_HELPER] = "noHelper",
+    [NVP_ST_SPAWN] = "spawn", [NVP_ST_STARTING] = "starting",
+};
 
 static NvSample S;                      /* only the Monitor's thread (nvgpu_poll) touches it, under N.mu */
 static unsigned char RX[NVP_MSG_MAX + 1];
@@ -51,6 +70,7 @@ void nvgpu_test_helper(const char *path, char *const *argv, char *const *envp) {
 void nvgpu_test_timing(int to, int bo) { timeout_ms = to; backoff_min = bo; N.backoff = bo; }
 static int t_starts;
 int nvgpu_test_pid(int *starts) { pthread_mutex_lock(&N.mu); int p = N.pid; if (starts) *starts = t_starts; pthread_mutex_unlock(&N.mu); return p; }
+void nvgpu_test_diag(NvDiag *d) { pthread_mutex_lock(&N.mu); *d = N.diag; pthread_mutex_unlock(&N.mu); }
 #endif
 
 static double now_ms(void) {
@@ -78,7 +98,29 @@ int nvgpu_parse(const unsigned char *msg, size_t len, unsigned uid, int (*own)(i
     memcpy(&h, msg, sizeof h);
     if (h.magic != NVP_MAGIC || h.ngpu > NVP_MAX_GPUS || h.nproc > NVP_MAX_PROCS) return -1;
     if (len != sizeof h + (size_t)h.ngpu * sizeof(NvGpu) + (size_t)h.nproc * sizeof(NvProc)) return -1;
-    if (h.status != 0) return 0;                         /* NVML failed: no cards */
+    /* the reason (only the codes the helper may send) and what its sandbox refused: numbers, checked */
+    if (h.code < NVP_ST_OK || h.code > NVP_ST_NO_DEVICE) return -1;
+    NvDiag *d = &s->diag;
+    d->code = h.code;
+    if (d->code == NVP_ST_OK && h.status != 0) d->code = NVP_ST_INIT, h.detail = h.status;
+    if (d->code != NVP_ST_OK && h.detail != 0 && h.detail > -100000 && h.detail < 100000) d->detail = h.detail, d->has_detail = 1;
+    d->denied = h.denied;
+    for (int i = 0; i < NVP_DENIED_MAX; i++) {
+        int nr = h.denied_nr[i];
+        if (nr >= 0 && nr < 4096) {
+            int dup = 0;
+            for (int j = 0; j < d->nsys; j++) dup |= d->sys[j] == nr;
+            if (!dup) d->sys[d->nsys++] = nr;
+        }
+        unsigned io = h.denied_ioctl[i];
+        if (io) {
+            int dup = 0;
+            for (int j = 0; j < d->nioc; j++) dup |= d->ioc[j] == io;
+            if (!dup) d->ioc[d->nioc++] = io;
+        }
+    }
+    if (d->code != NVP_ST_OK) return 0;                  /* the helper couldn't read the cards: none */
+    if (!h.ngpu) d->code = NVP_ST_NO_DEVICE;
     /* the driver's version: NUL-terminated within the field, digits and dots only */
     size_t k = 0;
     while (k < NVP_DRIVER_LEN && ((h.driver[k] >= '0' && h.driver[k] <= '9') || h.driver[k] == '.')) k++;
@@ -178,6 +220,164 @@ int nvgpu_format(const NvSample *s, char *out, size_t n) {
     return (int)o.len;
 }
 
+/* ---------- the diagnostic ---------- */
+
+/* printable ASCII but quote and backslash; at most 159 characters (sysfs and pci.ids names) */
+static void wname(W *o, const char *k, const char *v) {
+    if (!v || !*v) { w(o, "\"%s\":null", k); return; }
+    char b[160];
+    size_t j = 0;
+    for (const char *p = v; *p && j < sizeof b - 1; p++) b[j++] = (*p >= 0x20 && *p < 0x7f && *p != '"' && *p != '\\') ? *p : ' ';
+    b[j] = 0;
+    w(o, "\"%s\":\"%s\"", k, b);
+}
+
+/* digits and dots only, NUL-terminated within n: a driver's version; "" otherwise */
+static void version_only(char *v, size_t n) {
+    size_t k = 0;
+    while (k < n && ((v[k] >= '0' && v[k] <= '9') || v[k] == '.')) k++;
+    if (k == n || v[k] != 0 || !k) v[0] = 0;
+}
+
+int nvgpu_diag_format(const NvDiag *d, const NvPci *pci, int npci, const char *ver, char *out, size_t n) {
+    if (!out || !n) return 0;
+    out[0] = 0;
+    W o = { out, n, 0, 0 };
+    int code = d->code >= 0 && d->code < NVP_ST_COUNT_ ? d->code : NVP_ST_EXIT;
+    w(&o, "\"nvDiag\":{\"state\":\"%s\",", ST_NAMES[code]);
+    if (d->has_detail) w(&o, "\"detail\":%d,", d->detail); else w(&o, "\"detail\":null,");
+    w(&o, "\"denied\":%u,\"syscalls\":[", d->denied);
+    for (int i = 0; i < d->nsys && i < NVP_DENIED_MAX; i++) w(&o, "%s%d", i ? "," : "", d->sys[i]);
+    w(&o, "],\"ioctls\":[");
+    for (int i = 0; i < d->nioc && i < NVP_DENIED_MAX; i++) w(&o, "%s%u", i ? "," : "", d->ioc[i]);
+    w(&o, "],");
+    char v[NVP_DRIVER_LEN];
+    snprintf(v, sizeof v, "%s", ver ? ver : "");
+    version_only(v, sizeof v);
+    wname(&o, "driverVersion", v);
+    w(&o, ",\"pci\":[");
+    for (int i = 0; i < npci; i++) {
+        w(&o, "%s{", i ? "," : "");
+        wname(&o, "slot", pci[i].slot); w(&o, ",");
+        wname(&o, "id", pci[i].id); w(&o, ",");
+        wname(&o, "class", pci[i].cls); w(&o, ",");
+        wname(&o, "driver", pci[i].driver); w(&o, ",");
+        wname(&o, "name", pci[i].name); w(&o, "}");
+    }
+    w(&o, "]}");
+    if (o.over) { out[0] = 0; return 0; }
+    return (int)o.len;
+}
+
+/* a small sysfs file's first line, trimmed; "" when unreadable */
+static void read_line(const char *path, char *out, size_t n) {
+    out[0] = 0;
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return;
+    ssize_t r = read(fd, out, n - 1);
+    close(fd);
+    if (r <= 0) { out[0] = 0; return; }
+    out[r] = 0;
+    out[strcspn(out, "\n")] = 0;
+}
+
+static int hex_ok(const char *s, size_t len) {
+    if (strlen(s) != len) return 0;
+    for (size_t i = 0; i < len; i++) if (!((s[i] >= '0' && s[i] <= '9') || (s[i] >= 'a' && s[i] <= 'f'))) return 0;
+    return 1;
+}
+
+/* the 0x10de display devices (class 0x03xxxx) and the driver's version, names kept from the last scan */
+static void pci_scan_locked(const char *pci_ids) {
+    NvPci found[NV_PCI_MAX];
+    int nf = 0;
+    DIR *dd = opendir("/sys/bus/pci/devices");
+    if (dd) {
+        struct dirent *e;
+        while (nf < NV_PCI_MAX && (e = readdir(dd))) {
+            if (e->d_name[0] == '.' || strlen(e->d_name) >= sizeof found[0].slot) continue;
+            char p[PATH_MAX], v[16], dv[16], cl[16], drv[PATH_MAX];
+            snprintf(p, sizeof p, "/sys/bus/pci/devices/%s/vendor", e->d_name);
+            read_line(p, v, sizeof v);
+            if (strcmp(v, "0x10de")) continue;
+            snprintf(p, sizeof p, "/sys/bus/pci/devices/%s/class", e->d_name);
+            read_line(p, cl, sizeof cl);
+            if (strncmp(cl, "0x03", 4) || !hex_ok(cl + 2, 6)) continue;
+            snprintf(p, sizeof p, "/sys/bus/pci/devices/%s/device", e->d_name);
+            read_line(p, dv, sizeof dv);
+            if (strncmp(dv, "0x", 2) || !hex_ok(dv + 2, 4)) continue;
+            NvPci *c = &found[nf++];
+            memset(c, 0, sizeof *c);
+            snprintf(c->slot, sizeof c->slot, "%s", e->d_name);
+            snprintf(c->id, sizeof c->id, "10de:%s", dv + 2);
+            snprintf(c->cls, sizeof c->cls, "%s", cl + 2);
+            snprintf(p, sizeof p, "/sys/bus/pci/devices/%s/driver", e->d_name);
+            ssize_t l = readlink(p, drv, sizeof drv - 1);
+            if (l > 0) {
+                drv[l] = 0;
+                const char *b = strrchr(drv, '/');
+                snprintf(c->driver, sizeof c->driver, "%.23s", b ? b + 1 : drv);
+            }
+            for (int i = 0; i < N.npci; i++) if (!strcmp(N.pci[i].id, c->id)) memcpy(c->name, N.pci[i].name, sizeof c->name);
+        }
+        closedir(dd);
+    }
+    /* names from pci.ids only for an id not named before (the file is read once for them) */
+    IdsDb db = { 0 };
+    int opened = 0;
+    for (int i = 0; i < nf; i++) {
+        if (found[i].name[0] || !pci_ids) continue;
+        if (!opened) { opened = 1; if (ids_open(&db, pci_ids)) memset(&db, 0, sizeof db); }
+        char vn[96];
+        ids_lookup(&db, "10de", found[i].id + 5, vn, sizeof vn, found[i].name, sizeof found[i].name);
+    }
+    if (opened) ids_close(&db);
+    memcpy(N.pci, found, sizeof found);
+    N.npci = nf;
+    read_line("/sys/module/nvidia/version", N.drv_version, sizeof N.drv_version);
+    version_only(N.drv_version, sizeof N.drv_version);
+}
+
+int nvgpu_diag_json(char *out, size_t n, const char *pci_ids) {
+    if (!out || !n) return 0;
+    out[0] = 0;
+    pthread_mutex_lock(&N.mu);
+    double t = now_ms();
+    if (!N.pci_at || t - N.pci_at > PRESENT_EVERY_MS) { pci_scan_locked(pci_ids); N.pci_at = t; }
+    int show = N.npci > 0;
+#ifdef NVGPU_TEST
+    if (t_path) show = 1;
+#endif
+    int r = 0;
+    if (show) {
+        NvDiag d = N.diag;
+        /* a card on another driver (nouveau, vfio-pci) or none: the helper isn't started at all */
+        int bound = 0;
+        for (int i = 0; i < N.npci; i++) bound |= !strcmp(N.pci[i].driver, "nvidia");
+        if (!bound && N.npci) { memset(&d, 0, sizeof d); d.code = NVP_ST_NO_DRIVER; }
+        r = nvgpu_diag_format(&d, N.pci, N.npci, N.drv_version, out, n);
+    }
+    pthread_mutex_unlock(&N.mu);
+    return r;
+}
+
+static void diag_set(int code, int detail, int has_detail) {
+    N.diag.code = code;
+    N.diag.detail = detail;
+    N.diag.has_detail = has_detail;
+}
+
+/* the helper's exit status → the diagnostic */
+static void diag_status(int st) {
+    if (WIFSIGNALED(st)) {
+        if (WTERMSIG(st) == SIGSYS) diag_set(NVP_ST_KILLED, SIGSYS, 1);
+        else diag_set(NVP_ST_CRASH, WTERMSIG(st), 1);
+    } else if (WIFEXITED(st)) {
+        if (WEXITSTATUS(st) == 70) diag_set(NVP_ST_SANDBOX, 70, 1);
+        else diag_set(NVP_ST_EXIT, WEXITSTATUS(st), 1);
+    }
+}
+
 /* ---------- the helper ---------- */
 
 /* a PCI device of vendor 0x10de bound to `nvidia` */
@@ -225,7 +425,16 @@ static int helper_path(char *bin, size_t size) {
     return 0;
 }
 
+static void forget_dying_locked(void);
+
 static void reap_zombies(void) {
+    if (N.dying > 0) {
+        int st = 0;
+        pid_t r = waitpid(N.dying, &st, WNOHANG);
+        if (r == N.dying) { diag_status(st); N.dying = 0; }
+        else if (r < 0 && errno == ECHILD) N.dying = 0;
+        else if (now_ms() - N.dying_at > DYING_MS) { forget_dying_locked(); diag_set(NVP_ST_TIMEOUT, 0, 0); }  /* closed its socket but doesn't end */
+    }
     for (int i = 0; i < ZOMBIES; i++)
         if (N.zombies[i] > 0) {
             pid_t r = waitpid(N.zombies[i], NULL, WNOHANG);
@@ -253,15 +462,39 @@ static void stop_locked(int failed) {
     }
 }
 
+/* stop following a dying helper's status (a newer one's result counts now): reaped as a plain zombie */
+static void forget_dying_locked(void) {
+    if (N.dying <= 0) return;
+    kill(N.dying, SIGKILL);                             /* no effect on one already exiting: its status stays */
+    int i;
+    for (i = 0; i < ZOMBIES && N.zombies[i] > 0; i++) {}
+    if (i < ZOMBIES) N.zombies[i] = N.dying;
+    N.dying = 0;
+}
+
+/* the helper ended on its own (its socket closed): its exit status, now or on a later tick, says why */
+static void gone_locked(void) {
+    forget_dying_locked();
+    pid_t pid = N.pid;
+    N.pid = 0;
+    stop_locked(1);                                     /* closes the socket; no pid left to kill */
+    if (pid <= 0) return;
+    int st = 0;
+    pid_t r = waitpid(pid, &st, WNOHANG);
+    if (r == pid) diag_status(st);
+    else if (r == 0) { N.dying = pid; N.dying_at = now_ms(); diag_set(NVP_ST_EXIT, 0, 0); }
+}
+
 static int start_locked(void) {
+    forget_dying_locked();
     char bin[PATH_MAX];
-    if (helper_path(bin, sizeof bin)) return -1;
+    if (helper_path(bin, sizeof bin)) { diag_set(NVP_ST_NO_HELPER, 0, 0); return -1; }
     int sv[2];
-    if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return -1;
+    if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) { diag_set(NVP_ST_SPAWN, errno, 1); return -1; }
     if (sv[1] == 3) {                                   /* dup2(3, 3) wouldn't clear CLOEXEC */
         int t = fcntl(sv[1], F_DUPFD_CLOEXEC, 10);
         close(sv[1]);
-        if (t < 0) { close(sv[0]); return -1; }
+        if (t < 0) { diag_set(NVP_ST_SPAWN, errno, 1); close(sv[0]); return -1; }
         sv[1] = t;
     }
     posix_spawn_file_actions_t fa;
@@ -289,7 +522,7 @@ static int start_locked(void) {
     posix_spawn_file_actions_destroy(&fa);
     posix_spawnattr_destroy(&at);
     close(sv[1]);
-    if (e) { close(sv[0]); return -1; }
+    if (e) { close(sv[0]); diag_set(NVP_ST_SPAWN, e, 1); return -1; }
     N.pid = pid;
 #ifdef NVGPU_TEST
     t_starts++;
@@ -311,7 +544,7 @@ void nvgpu_poll(void) {
     if (N.pid <= 0) {
         if (t < N.next_start) goto out;
         if (!N.present_at || t - N.present_at > PRESENT_EVERY_MS) { N.present = nvidia_present(); N.present_at = t; }
-        if (!N.present) goto out;
+        if (!N.present) { diag_set(NVP_ST_NO_DRIVER, 0, 0); goto out; }
         if (start_locked()) { N.next_start = t + BACKOFF_MAX_MS; goto out; }
     }
     /* the answers that came (normally one), the last good one kept */
@@ -319,19 +552,22 @@ void nvgpu_poll(void) {
         ssize_t r = recv(N.sock, RX, sizeof RX, MSG_DONTWAIT | MSG_TRUNC);
         if (r < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) break;
         if (r < 0 && errno == EINTR) continue;
-        if (r <= 0 || (size_t)r > NVP_MSG_MAX || !N.pending) { stop_locked(1); N.have = 0; goto out; }  /* gone, too big or unasked */
+        if (r <= 0) { gone_locked(); N.have = 0; goto out; }                                  /* ended: why, from its status */
+        if ((size_t)r > NVP_MSG_MAX || !N.pending) { stop_locked(1); diag_set(NVP_ST_BAD_MESSAGE, 0, 0); N.have = 0; goto out; }  /* too big or unasked */
         N.pending = 0;
-        if (nvgpu_parse(RX, (size_t)r, session_uid(), nvgpu_pid_owned, &S)) { stop_locked(1); N.have = 0; goto out; }
+        if (nvgpu_parse(RX, (size_t)r, session_uid(), nvgpu_pid_owned, &S)) { stop_locked(1); diag_set(NVP_ST_BAD_MESSAGE, 0, 0); N.have = 0; goto out; }
+        N.diag = S.diag;
+        if (S.diag.code != NVP_ST_OK) { stop_locked(1); N.have = 0; goto out; }    /* it said why it can't: try again later */
         N.jlen = nvgpu_format(&S, N.json, sizeof N.json);
         N.have = N.jlen > 0;
         N.first = 0;
         N.backoff = backoff_min;
     }
-    if (N.pending && t - N.last_req > (N.first ? 3 * timeout_ms : timeout_ms)) { stop_locked(1); N.have = 0; goto out; }   /* slow */
+    if (N.pending && t - N.last_req > (N.first ? 3 * timeout_ms : timeout_ms)) { stop_locked(1); diag_set(NVP_ST_TIMEOUT, 0, 0); N.have = 0; goto out; }   /* slow */
     if (!N.pending && t - N.last_req >= REQ_EVERY_MS) {
         unsigned char req = NVP_REQ_SAMPLE;
         if (send(N.sock, &req, 1, MSG_DONTWAIT | MSG_NOSIGNAL) == 1) { N.pending = 1; N.last_req = t; }
-        else if (errno != EAGAIN && errno != EINTR) { stop_locked(1); N.have = 0; }
+        else if (errno != EAGAIN && errno != EINTR) { gone_locked(); N.have = 0; }
     }
 out:
     pthread_mutex_unlock(&N.mu);
@@ -339,6 +575,7 @@ out:
 
 void nvgpu_want(int on) {
     pthread_mutex_lock(&N.mu);
+    if (on && !N.want) { N.next_start = 0; N.backoff = backoff_min; }   /* the view opened again: try now */
     N.want = !!on;
     if (!on) { stop_locked(0); N.have = 0; }
     pthread_mutex_unlock(&N.mu);

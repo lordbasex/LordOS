@@ -18,8 +18,12 @@ build/lord-nvgpu-test: $(LORD_NVGPU_SRC) $(NVGPU_HDR)
 build/libnvfake.so: tests/nvgpu_fake_nvml.c src/monitor/nvmlmin.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -shared -fPIC -o $@ tests/nvgpu_fake_nvml.c
-test: build/nvgpu-test
-build/nvgpu-test: tests/nvgpu_test.c src/monitor/nvgpu.c $(NVGPU_HDR) src/sec/json.c build/lord-nvgpu-test build/libnvfake.so
+# the same fake without nvmlInit_v2: the "missing symbol" report
+build/libnvfake-nosym.so: tests/nvgpu_fake_nvml.c src/monitor/nvmlmin.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DNVGPU_TEST -fsanitize=address,undefined -fno-sanitize-recover=undefined -o $@ tests/nvgpu_test.c src/monitor/nvgpu.c src/sec/json.c -lpthread
-	./$@ build/lord-nvgpu-test build/libnvfake.so || (rm -f $@; exit 1)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -shared -fPIC -DNVFAKE_NOINIT -o $@ tests/nvgpu_fake_nvml.c
+test: build/nvgpu-test
+build/nvgpu-test: tests/nvgpu_test.c src/monitor/nvgpu.c $(NVGPU_HDR) src/sec/json.c src/sysreport/ids.c build/lord-nvgpu-test build/libnvfake.so build/libnvfake-nosym.so
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DNVGPU_TEST -fsanitize=address,undefined -fno-sanitize-recover=undefined -o $@ tests/nvgpu_test.c src/monitor/nvgpu.c src/sysreport/ids.c src/sec/json.c -lpthread
+	./$@ build/lord-nvgpu-test build/libnvfake.so build/libnvfake-nosym.so || (rm -f $@; exit 1)

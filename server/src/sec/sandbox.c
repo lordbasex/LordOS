@@ -837,9 +837,12 @@ static const int allow[] = {
  * and unrestricted clone/clone3. Never socketpair. */
 static const int allow_app[] = { NR(SYS_bind), NR(SYS_connect), NR(SYS_clone), NR(SYS_clone3) };
 
-/* helper = 1: hardened helper profile. self = getpid() (for kcmp). */
-static int build_filter(struct sock_filter *f, int cap, int net, const int *extra, int ioctl_classes, int helper, unsigned self) {
+/* helper = 1: hardened helper profile. self = getpid() (for kcmp). trap = 1 (lord-nvgpu only, SandboxHelperCfg's
+ * trap_denied): the refused ioctl types and the final "everything else" return TRAP instead of EPERM, for the helper's
+ * SIGSYS handler to record and answer EPERM itself. */
+static int build_filter(struct sock_filter *f, int cap, int net, const int *extra, int ioctl_classes, int helper, unsigned self, int trap) {
     int n = 0;
+    const unsigned denied = trap ? SECCOMP_RET_TRAP : SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA);
 #define EMIT(stmt) do { if (n < cap) f[n] = (struct sock_filter)stmt; n++; } while (0)
 #define RELOAD_NR() EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)))
     /* correct architecture or the process is killed */
@@ -861,7 +864,7 @@ static int build_filter(struct sock_filter *f, int cap, int net, const int *extr
         EMIT(BPF_STMT(BPF_ALU | BPF_AND | BPF_K, 0x0000ff00u));                             /* _IOC_TYPE << 8 */
         for (int i = 0; i < nt; i++)
             EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, (unsigned)(types[i] << 8), (unsigned char)(nt - i), 0));
-        EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA)));    /* type not allowed */
+        EMIT(BPF_STMT(BPF_RET | BPF_K, denied));                                            /* type not allowed */
         EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW));                                 /* type allowed */
         RELOAD_NR();
     }
@@ -946,17 +949,17 @@ static int build_filter(struct sock_filter *f, int cap, int net, const int *extr
         EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW));
     }
     /* the rest: EPERM (doesn't kill, so a libc probing a new syscall doesn't die) */
-    EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA)));
+    EMIT(BPF_STMT(BPF_RET | BPF_K, denied));
 #undef RELOAD_NR
 #undef EMIT
     return n;
 }
 
 /* Applies the filter to all threads (TSYNC). Returns 0 on success. */
-static int apply_seccomp_extra(int net, const int *extra, int ioctl_classes, int helper) {
+static int apply_seccomp_extra(int net, const int *extra, int ioctl_classes, int helper, int trap) {
     if (!SB_AUDIT_ARCH) { fprintf(stderr, "sandbox: seccomp not supported on this architecture\n"); return -1; }
     static struct sock_filter filt[1024];
-    int n = build_filter(filt, (int)(sizeof filt / sizeof filt[0]), net, extra, ioctl_classes, helper, (unsigned)getpid());
+    int n = build_filter(filt, (int)(sizeof filt / sizeof filt[0]), net, extra, ioctl_classes, helper, (unsigned)getpid(), trap);
     if (n > (int)(sizeof filt / sizeof filt[0])) { fprintf(stderr, "sandbox: seccomp filter too large (%d)\n", n); return -1; }
     struct sock_fprog prog = { .len = (unsigned short)n, .filter = filt };
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) return -1;
@@ -984,7 +987,7 @@ int sandbox_apply(const SandboxConfig *cfg) {
     if (!apply_landlock(cfg, NULL, NULL, &fs_ok, &net_ok)) { if (fs_ok) mask |= SB_LANDLOCK_FS; if (net_ok) mask |= SB_LANDLOCK_NET; }
 
     /* seccomp last: once in place, no more folders are opened for Landlock */
-    if (!apply_seccomp_extra(cfg->network, NULL, 0, 0)) mask |= SB_SECCOMP;
+    if (!apply_seccomp_extra(cfg->network, NULL, 0, 0, 0)) mask |= SB_SECCOMP;
 
     fprintf(stderr, "sandbox[%s]: cgroup=%d landlock-fs=%d landlock-net=%d seccomp=%d nopriv=%d nocaps=%d net=%s\n",
             cfg->id, !!(mask & SB_CGROUP), !!(mask & SB_LANDLOCK_FS), !!(mask & SB_LANDLOCK_NET),
@@ -1216,7 +1219,7 @@ int sandbox_apply_helper(const SandboxHelperCfg *cfg) {
                          .list_dirs = cfg->list_dirs, .network = cfg->network ? 1 : 0 };
     int fs_ok = 0, net_ok = 0;
     if (!apply_landlock(&ro, cfg->ro_dir_fds, cfg->rw_dir_fds, &fs_ok, &net_ok)) { if (fs_ok) mask |= SB_LANDLOCK_FS; if (net_ok) mask |= SB_LANDLOCK_NET; }
-    if (apply_seccomp_extra(cfg->network ? 1 : 0, cfg->extra_syscalls, cfg->allow_ioctl_classes, 1)) {
+    if (apply_seccomp_extra(cfg->network ? 1 : 0, cfg->extra_syscalls, cfg->allow_ioctl_classes, 1, cfg->trap_denied ? 1 : 0)) {
         /* fails closed: a helper decoding foreign data doesn't run without seccomp */
         fprintf(stderr, "sandbox-helper[%s]: no seccomp; the helper exits\n", ro.id);
         _exit(70);

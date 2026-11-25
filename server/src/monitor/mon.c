@@ -925,12 +925,15 @@ static void *worker(void *arg) {
             const char *pci = access(ids[0], R_OK) ? ids[1] : ids[0];
             Buf g = { .p = gpu_json("", pci, (unsigned)getuid(), (int)getpid(), M.home) };
             /* NVIDIA's numbers from lord-nvgpu's latest sample (nvgpu.c), spliced in before the closing brace */
+            /* and why there is (or isn't) any: "nvDiag", only with a PCI display device of vendor 0x10de */
             static char nv[128 * 1024];
-            int nl = g.p ? nvgpu_json(nv, sizeof nv) : 0;
-            size_t gl = g.p ? strlen(g.p) : 0;
-            if (nl > 0 && gl > 1 && g.p[gl - 1] == '}') {
-                char *m = realloc(g.p, gl + (size_t)nl + 2);
-                if (m) { g.p = m; g.p[gl - 1] = ','; memcpy(g.p + gl, nv, (size_t)nl); g.p[gl + (size_t)nl] = '}'; g.p[gl + (size_t)nl + 1] = 0; }
+            for (int part = 0; part < 2 && g.p; part++) {
+                int nl = part ? nvgpu_diag_json(nv, sizeof nv, pci) : nvgpu_json(nv, sizeof nv);
+                size_t gl = strlen(g.p);
+                if (nl > 0 && gl > 1 && g.p[gl - 1] == '}') {
+                    char *m = realloc(g.p, gl + (size_t)nl + 2);
+                    if (m) { g.p = m; g.p[gl - 1] = ','; memcpy(g.p + gl, nv, (size_t)nl); g.p[gl + (size_t)nl] = '}'; g.p[gl + (size_t)nl + 1] = 0; }
+                }
             }
             if (g.p) publish(&M.gpu, &M.gseq, &g);
         }
