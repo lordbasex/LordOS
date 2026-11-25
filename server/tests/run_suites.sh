@@ -1130,6 +1130,26 @@ EOF
             *) bad "files-slowrename-scene $th (tests/files_slowrename_scene, headless lord-server)" ;;
         esac
     done
+    # (0.8.9.6.1) Files' rename field takes the name's place without moving the icon grid, in every desktop and view
+    for th in default classic workspaces celeste; do
+        SCENE_TIMEOUT=100 sh tests/app_scene_headless.sh files_renamelayout_scene "$T/scene" "$th" >"$T/out" 2>&1
+        case $? in
+            0) ok "files-renamelayout-scene $th (tests/files_renamelayout_scene, headless lord-server)" ;;
+            77) skip "files-renamelayout-scene $th" "build/lord-server and themes/$th/theme.bundle.js (make, npm run build)" ;;
+            *) bad "files-renamelayout-scene $th (tests/files_renamelayout_scene, headless lord-server)" ;;
+        esac
+    done
+    # (0.8.9.6.1) Lord Workspaces' top band: the activity strip never over the status cluster (Arabic at 1600 px, German
+    # on a narrow screen), the accent under the activity in view
+    for c in "ar 1600x900" "de 1024x768" "en 1280x800"; do
+        lg=${c% *} sz=${c#* }
+        SCENE_TIMEOUT=40 SCENE_SIZE=$sz sh tests/app_scene_headless.sh ws_topbar_scene "$T/scene" workspaces "$lg" >"$T/out" 2>&1
+        case $? in
+            0) ok "ws-topbar-scene $lg $sz (tests/ws_topbar_scene, headless lord-server)" ;;
+            77) skip "ws-topbar-scene $lg $sz" "build/lord-server and themes/workspaces/theme.bundle.js (make, npm run build)" ;;
+            *) bad "ws-topbar-scene $lg $sz (tests/ws_topbar_scene, headless lord-server)" ;;
+        esac
+    done
 }
 
 case $mode in
