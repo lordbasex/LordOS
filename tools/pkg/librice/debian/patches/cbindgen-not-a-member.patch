@@ -1,0 +1,18 @@
+Description: cbindgen/ is not a workspace member
+ The package builds cbindgen 0.29 from the third orig tarball (cbindgen/) to write the C headers; cargo must not
+ read it as a member of librice's workspace.
+Author: LordOS <lord.basex@gmail.com>
+Forwarded: not-needed
+Last-Update: 2026-11-25
+
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,6 +1,8 @@
+ [workspace]
+ members = ["rice-proto", "librice", "rice-io", "rice-c", "rice-stun-types", "rice-ctypes", "fuzz"]
+ default-members = ["librice", "rice-proto", "rice-c", "rice-stun-types", "rice-ctypes"]
++# LordOS: cbindgen/ (the third orig tarball, the header generator built for the package) is its own package
++exclude = ["cbindgen"]
+ resolver = "2"
+ 
+ [workspace.package]
