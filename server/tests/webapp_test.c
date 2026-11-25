@@ -17,6 +17,7 @@
 #include "../src/web/webclip.h"
 #include "../src/web/webdrop.h"
 #include "../src/web/webedit.h"
+#include "../src/web/webframe.h"
 #include "../src/web/webguard.h"
 #include "../src/web/webinspect.h"
 #include "../src/web/webpage.h"
@@ -1201,7 +1202,46 @@ static void test_guard(void) {
     CHECK(webguard_switched("HTTP/1.1 404 Not Found\r\n", 24) == 0 && webguard_switched("HTTP/1.1 1010", 13) == 0 && webguard_switched("X", 1) == 0, "not 101");
 }
 
+/* a shared-memory frame from the (untrusted) web process: hostile sides and strides never size or overrun a copy */
+static void test_frame(void) {
+    CHECK(webframe_shm_ok(1920, 1080, 1920 * 4, SIZE_MAX), "frame: plain");
+    CHECK(webframe_shm_ok(1920, 1080, 1920 * 4 + 64, (size_t)(1920 * 4 + 64) * 1080), "frame: padded, exact size");
+    CHECK(!webframe_shm_ok(1920, 1080, 1920 * 4, (size_t)1920 * 4 * 1080 - 1), "frame: one byte short");
+    CHECK(!webframe_shm_ok(0, 10, 0, SIZE_MAX) && !webframe_shm_ok(10, 0, 40, SIZE_MAX) && !webframe_shm_ok(-4, 10, 40, SIZE_MAX), "frame: empty or negative");
+    CHECK(!webframe_shm_ok(10, 10, 39, SIZE_MAX) && !webframe_shm_ok(10, 10, -40, SIZE_MAX), "frame: stride under the width");
+    /* the report's case: w just above 2^30, so an int w * 4 wraps to 4096 */
+    CHECK(!webframe_shm_ok(0x40000400, 1, 0x40000400, SIZE_MAX), "frame: wrapping width");
+    CHECK(!webframe_shm_ok(INT_MAX, 1, INT_MAX, SIZE_MAX) && !webframe_shm_ok(1, INT_MAX, 4, SIZE_MAX), "frame: huge sides");
+    CHECK(!webframe_shm_ok(WEBFRAME_MAX_SIDE + 1, 1, (WEBFRAME_MAX_SIDE + 1) * 4, SIZE_MAX), "frame: over the cap");
+    CHECK(webframe_shm_ok(WEBFRAME_MAX_SIDE, WEBFRAME_MAX_SIDE, WEBFRAME_MAX_SIDE * 4, SIZE_MAX), "frame: at the cap");
+
+    /* the copy: a guard byte after the destination must never change, whatever the source claims */
+    enum { DW = 8, DH = 4, DS = DW * 4, GUARD = 64 };
+    static unsigned char dst[DS * DH + GUARD], src[4096];
+    memset(src, 0xAB, sizeof src);
+    int hostile[][3] = { { DW, DH, DS }, { 0x40000400, 1, 0x40000400 }, { DW * 100, DH, DS }, { DW, DH * 100, DS },
+                         { DW * 2, DH, DS * 2 }, { 1, DH, 4 }, { INT_MAX, INT_MAX, INT_MAX } };
+    for (size_t i = 0; i < sizeof hostile / sizeof hostile[0]; i++) {
+        memset(dst, 0, sizeof dst);
+        /* the source buffer is only 4096 bytes: clamp its stride the way a checked source would be (stride * rows) */
+        int sw = hostile[i][0], sh = hostile[i][1], ss = hostile[i][2];
+        int rows = webframe_copy(dst, (size_t)DS * DH, DW, DH, DS, src, sw, sh, ss > 512 ? 512 : ss);
+        int ok = rows >= 0 && rows <= DH;
+        for (int g = 0; g < GUARD; g++) ok &= dst[DS * DH + g] == 0;
+        CHECK(ok, "frame copy %zu: stays in the destination (rows %d)", i, rows);
+    }
+    memset(dst, 0, sizeof dst);
+    CHECK(webframe_copy(dst, (size_t)DS * DH, DW, DH, DS, src, DW, DH, DS) == DH && dst[DS * DH - 1] == 0xAB, "frame copy: whole frame");
+    memset(dst, 0, sizeof dst);
+    CHECK(webframe_copy(dst, (size_t)DS * DH, DW, DH, DS, src, 2, 2, 8) == 2 && dst[7] == 0xAB && dst[8] == 0 && dst[DS * 2] == 0, "frame copy: smaller source");
+    /* a destination smaller than its own numbers say: the size wins */
+    memset(dst, 0, sizeof dst);
+    CHECK(webframe_copy(dst, DS, DW, DH, DS, src, DW, DH, DS) == 1 && dst[DS] == 0, "frame copy: size caps the rows");
+    CHECK(webframe_copy(dst, 0, DW, DH, DS, src, DW, DH, DS) == 0 && webframe_copy(dst, DS, DW, DH, 0, src, DW, DH, DS) == 0, "frame copy: nonsense");
+}
+
 int main(void) {
+    test_frame();
     test_guard();
     test_offline();
     test_scheme();

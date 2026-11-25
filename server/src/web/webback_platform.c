@@ -21,6 +21,7 @@
  * The input method stays webwin.c's WebKitInputMethodContext on text-input-v3, which replaces the one WebKit builds
  * on the display's WPEInputMethodContext (there is none here: WPEPlatform's "none" context). */
 #include "webback.h"
+#include "webframe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -127,7 +128,7 @@ static gboolean view_render(WPEView *v, WPEBuffer *buf, const WPERectangle *dama
         f.pixels = bytes ? g_bytes_get_data(bytes, &len) : NULL;
         f.stride = (int)wpe_buffer_shm_get_stride(s);
         f.format = 0;                               /* WL_SHM_FORMAT_ARGB8888: WPE_PIXEL_FORMAT_ARGB8888 is the only one */
-        if (f.pixels && f.w > 0 && f.h > 0 && f.stride >= f.w * 4 && len >= (gsize)f.stride * (gsize)f.h) b->sink->frame(b->sd, &f);
+        if (f.pixels && webframe_shm_ok(f.w, f.h, f.stride, (size_t)len)) b->sink->frame(b->sd, &f);
         else webback_frame_done(b);
         return TRUE;
     }

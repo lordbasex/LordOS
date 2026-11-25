@@ -33,6 +33,7 @@
 #include "webaxis.h"
 #include "webback.h"
 #include "webclip.h"
+#include "webframe.h"
 
 #include "xdg-shell-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
@@ -427,6 +428,8 @@ static ShmBuf *shm_buf_get(WebWin *win, int w, int h, unsigned format) {
         if (!free_one) free_one = s;
     }
     if (!free_one) return NULL;
+    /* the backend checked these already; checked again here so a wrapped w * 4 can never size the buffer */
+    if (w <= 0 || h <= 0 || w > WEBFRAME_MAX_SIDE || h > WEBFRAME_MAX_SIDE) return NULL;
     shm_buf_free(free_one);
     int stride = w * 4;
     size_t size = (size_t)stride * (size_t)h;
@@ -463,11 +466,8 @@ static void show_shm(WebWin *win, const WebFrame *f) {
     ShmBuf *s = NULL;
     gint64 t0 = win->trace ? g_get_monotonic_time() : 0;
     if (can_show(win) && (s = shm_buf_get(win, f->w, f->h, f->format))) {
-        size_t line = (size_t)f->w * 4;
-        const unsigned char *src = f->pixels;
-        unsigned char *out = s->data;
-        if (f->stride == s->stride) memcpy(out, src, (size_t)s->stride * (size_t)s->h);
-        else for (int y = 0; y < s->h; y++) memcpy(out + (size_t)y * (size_t)s->stride, src + (size_t)y * (size_t)f->stride, line);
+        /* every row clamped to both widths and strides, every row count to both heights and our buffer's size */
+        webframe_copy(s->data, s->size, s->w, s->h, s->stride, f->pixels, f->w, f->h, f->stride);
     }
     if (s) trace_frame(win, win->trace ? g_get_monotonic_time() - t0 : 0);
     if (!s) { g_idle_add(complete_later, win); return; }
