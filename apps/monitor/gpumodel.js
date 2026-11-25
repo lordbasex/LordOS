@@ -477,7 +477,9 @@ export function gpuStep(state, raw) {
   }
   state.vms = vmsNext;
   state.mono = mono;
-  return { t: raw.t, cards, apps, ai: aiEngines(raw, apps), vms: { count: (raw.vms || []).length, cpu: dtNs > 0 ? vcpu : null, rss: vrss }, caps };
+  // why there is (or isn't) NVIDIA data (nvgpu.c's nvDiag; nvreport.js reads it), and whether lord-nvgpu sent any
+  const nvDiag = raw.nvDiag && typeof raw.nvDiag === 'object' && !Array.isArray(raw.nvDiag) ? raw.nvDiag : null;
+  return { t: raw.t, cards, apps, ai: aiEngines(raw, apps), vms: { count: (raw.vms || []).length, cpu: dtNs > 0 ? vcpu : null, rss: vrss }, caps, nvDiag, hasNv: nvCards.length > 0 };
 }
 
 // ---- AI on this computer ----
