@@ -870,6 +870,1656 @@
      "sha256": "b6e90854551e47beab07c977cf136d67ce906a11c7336ee181b2d3f548fb1ea0"
     }
    ]
+  },
+  {
+   "id": "epic-01-warrior-king",
+   "section": "epic",
+   "name": "Warrior king",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-01-warrior-king/1080.jpg",
+     "size": 437074,
+     "sha256": "3316cf902b8bbf5150b349bd98649b892a753eefbbf14df8f53d013fd81bb952"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-01-warrior-king/2160.jpg",
+     "size": 1287227,
+     "sha256": "e3f02b38f4b0d9ec7913e7cb634f4bcdd0e36fd5c045a7735fd5df1652d18966"
+    }
+   ]
+  },
+  {
+   "id": "epic-02-bridge-duel",
+   "section": "epic",
+   "name": "Bridge duel",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-02-bridge-duel/1080.jpg",
+     "size": 630753,
+     "sha256": "a8aec3f0d2825a2b933a1cf5f77f09fc5beb5e9c05b27b46c939a22abbdef56b"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-02-bridge-duel/2160.jpg",
+     "size": 1792092,
+     "sha256": "c37231d5bcc66f6b94bae994ebd2ef71a3bcde3f9f085f92601675906714e3b3"
+    }
+   ]
+  },
+  {
+   "id": "epic-03-golden-queen",
+   "section": "epic",
+   "name": "Golden queen",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-03-golden-queen/1080.jpg",
+     "size": 807728,
+     "sha256": "c725e1a0649f6c312a66ac30ef34f036428e0a4a280dfde929813b9d89045ca6"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-03-golden-queen/2160.jpg",
+     "size": 2274633,
+     "sha256": "94deb8652b9a0184ab925e091fbf2eb6bb90c7c659262330f98446d4457e57cf"
+    }
+   ]
+  },
+  {
+   "id": "epic-04-aurora-ridge",
+   "section": "epic",
+   "name": "Aurora ridge",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-04-aurora-ridge/1080.jpg",
+     "size": 598935,
+     "sha256": "6df08f5755e8083464fe571d82f86d273d6fd0838b18bf0a51afb1e1711102d9"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-04-aurora-ridge/2160.jpg",
+     "size": 1738822,
+     "sha256": "42c9362372fc7227f03e9ebed733b4f92e36833812271e7a909ea3278d47b317"
+    }
+   ]
+  },
+  {
+   "id": "epic-05-titan",
+   "section": "epic",
+   "name": "Titan",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-05-titan/1080.jpg",
+     "size": 590148,
+     "sha256": "012240e1b5463ddaad79f233af7379c6fc856982b1da1242523364e9457700bd"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-05-titan/2160.jpg",
+     "size": 1689034,
+     "sha256": "91973430a2e14b6b64099c7311e3f84c6f8d00302ba5041b60da8e788883425a"
+    }
+   ]
+  },
+  {
+   "id": "epic-06-sakura-blade",
+   "section": "epic",
+   "name": "Sakura blade",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-06-sakura-blade/1080.jpg",
+     "size": 542260,
+     "sha256": "f52e9f917a91ff498803c2e2c26824ceaa9a7deaded0f3751ca97b4bfa64c1e7"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-06-sakura-blade/2160.jpg",
+     "size": 1542471,
+     "sha256": "745d2926e501a29fb0bc13905eefa8f6d941d018011b7d37380c53d6fd24dd5c"
+    }
+   ]
+  },
+  {
+   "id": "epic-07-dragon-cathedral",
+   "section": "epic",
+   "name": "Dragon cathedral",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-07-dragon-cathedral/1080.jpg",
+     "size": 428144,
+     "sha256": "9f5db42a571b8d099de49d9e77287a0371ca0613972831d32871bfaf0f388b45"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-07-dragon-cathedral/2160.jpg",
+     "size": 1292176,
+     "sha256": "a8e7b2c302765e16518619356f6b39cff5eba2c29621d6d02fba28e2bdf93b13"
+    }
+   ]
+  },
+  {
+   "id": "epic-08-druid-forest",
+   "section": "epic",
+   "name": "Druid forest",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-08-druid-forest/1080.jpg",
+     "size": 700766,
+     "sha256": "1328484e53df404b6d738a2b7cebf12ef020ada342d4b7f3f6c7343985d908a8"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-08-druid-forest/2160.jpg",
+     "size": 1976133,
+     "sha256": "d84b398d85e7d5ca0ff5ad8dc2d28d73e4727ed6c5b5185bdb7674623eb3cf5d"
+    }
+   ]
+  },
+  {
+   "id": "epic-09-desert-moons",
+   "section": "epic",
+   "name": "Desert moons",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-09-desert-moons/1080.jpg",
+     "size": 400832,
+     "sha256": "dd95cbc0778a7781d9c2dde962dbdde16645cd75102be5be9a1ce71503cfa4e2"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-09-desert-moons/2160.jpg",
+     "size": 1201432,
+     "sha256": "d4db2e2c8b329f30e4e5823a11c938b880276aee5826b505fd6fd4e61deeac52"
+    }
+   ]
+  },
+  {
+   "id": "epic-10-ice-duel",
+   "section": "epic",
+   "name": "Ice duel",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-10-ice-duel/1080.jpg",
+     "size": 646749,
+     "sha256": "d209204fde79f547458a617931fac3bf227d737fdee724b8bafcdf09b85beab1"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-10-ice-duel/2160.jpg",
+     "size": 1869453,
+     "sha256": "f2ea83d2a51f3fceaedc178fa5e717a7c215e17d7edd440ef9f48a807e5f0046"
+    }
+   ]
+  },
+  {
+   "id": "epic-11-elven-archer",
+   "section": "epic",
+   "name": "Elven archer",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-11-elven-archer/1080.jpg",
+     "size": 796441,
+     "sha256": "52ae26c96b7baedcf76d23e129410d49ec046117f7294820c0592214b2a78d70"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-11-elven-archer/2160.jpg",
+     "size": 2169300,
+     "sha256": "8a0d57ba5eef95db3c104031bc39cd832cf43da5f3cbc80e3971a3b4519a72dc"
+    }
+   ]
+  },
+  {
+   "id": "epic-12-empty-throne",
+   "section": "epic",
+   "name": "Empty throne",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-12-empty-throne/1080.jpg",
+     "size": 484701,
+     "sha256": "17666db6a41ce0dabafc1cbcc015bc9df39a6d7a85ca473f5848ff6c5ddd6f59"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-12-empty-throne/2160.jpg",
+     "size": 1430827,
+     "sha256": "f4db43047eafef4a96093e65fa8fd0f6b4f3fc4a5054949428cc680ad03495de"
+    }
+   ]
+  },
+  {
+   "id": "epic-13-sunset-riders",
+   "section": "epic",
+   "name": "Sunset riders",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-13-sunset-riders/1080.jpg",
+     "size": 537112,
+     "sha256": "09737f81a4bb7ae86b31167189fe8ff5ef7d53d641c8b3657ae9606fbd2e5545"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-13-sunset-riders/2160.jpg",
+     "size": 1517323,
+     "sha256": "2839d429a698bfd1a88ff2ed44e005de26acf9e9fdb7b4735b20abe85eb35d56"
+    }
+   ]
+  },
+  {
+   "id": "epic-14-storm-captain",
+   "section": "epic",
+   "name": "Storm captain",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-14-storm-captain/1080.jpg",
+     "size": 586752,
+     "sha256": "3a52d48df6b1491078aad1ba846218f4824448c24308afa88f455944f319fe1f"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-14-storm-captain/2160.jpg",
+     "size": 1727751,
+     "sha256": "e771dbd3b18acfdb59c35c8d1a50d71b86a54f2cc04dcc8b99ccaf745907276f"
+    }
+   ]
+  },
+  {
+   "id": "epic-15-pyramid-warrior",
+   "section": "epic",
+   "name": "Pyramid warrior",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-15-pyramid-warrior/1080.jpg",
+     "size": 705215,
+     "sha256": "281cf303df74e187b48e2e8b05965f799a45a4d9438f7ff6aadebbe01230cad8"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-15-pyramid-warrior/2160.jpg",
+     "size": 1997830,
+     "sha256": "8901d5a474177dbfea622c9cc898c7f13070551ababbe3ea7f64bcefbb694ba2"
+    }
+   ]
+  },
+  {
+   "id": "epic-16-moon-rooftop",
+   "section": "epic",
+   "name": "Moon rooftop",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-16-moon-rooftop/1080.jpg",
+     "size": 492095,
+     "sha256": "d61b67f85f3959cf2a2654ca64940cbc86cb8a404d016fa63bab2e16a41b0e1c"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-16-moon-rooftop/2160.jpg",
+     "size": 1414355,
+     "sha256": "bcdc57c0f5944b613ac6e5d87a8fc17f5b349eef1e5242878f681c989cc21414"
+    }
+   ]
+  },
+  {
+   "id": "epic-17-phoenix-dawn",
+   "section": "epic",
+   "name": "Phoenix dawn",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-17-phoenix-dawn/1080.jpg",
+     "size": 678311,
+     "sha256": "2455736a6c17e5d9649d891e57879504fe6995d38a7c6824e89a95053031fca7"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-17-phoenix-dawn/2160.jpg",
+     "size": 1919142,
+     "sha256": "d5047158fa9076c5d81d03469e7514572405aa586ee6b66705bbe4c48c8e10c3"
+    }
+   ]
+  },
+  {
+   "id": "epic-18-silver-sorcerer",
+   "section": "epic",
+   "name": "Silver sorcerer",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-18-silver-sorcerer/1080.jpg",
+     "size": 435596,
+     "sha256": "574a7d29517e315874e967d388682a1ce3c3ebb788397c97ec2cf9bcd74c7156"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-18-silver-sorcerer/2160.jpg",
+     "size": 1288167,
+     "sha256": "f6eccf1a35f0a66a8f11e7cae17158a65a21ee9398e1d2b369ae564b7016e0ac"
+    }
+   ]
+  },
+  {
+   "id": "epic-19-cathedral-light",
+   "section": "epic",
+   "name": "Cathedral light",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-19-cathedral-light/1080.jpg",
+     "size": 771086,
+     "sha256": "4cd638eb8fd90874265abc0e93637f4954bdbc4e2ba34ec08bec8a6badb5aac0"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-19-cathedral-light/2160.jpg",
+     "size": 2222361,
+     "sha256": "a9657420c6a2086dca4d57ca567795ddfde0f6b505ab9cbe2dcd83e81d4eb943"
+    }
+   ]
+  },
+  {
+   "id": "epic-20-fjord-ships",
+   "section": "epic",
+   "name": "Fjord ships",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-20-fjord-ships/1080.jpg",
+     "size": 702561,
+     "sha256": "43680e3d17a0c9410677a37d65f92b2b996a14b394d292f8699bfcb4d12c7798"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-20-fjord-ships/2160.jpg",
+     "size": 2035508,
+     "sha256": "b9aabb5165e98ef07c8ddbb743c236d9f9f1d5ef6e29a43e54a0dd61d512a94f"
+    }
+   ]
+  },
+  {
+   "id": "epic-21-jade-peaks",
+   "section": "epic",
+   "name": "Jade peaks",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-21-jade-peaks/1080.jpg",
+     "size": 579933,
+     "sha256": "e81c8f0c8d05ca2caf9497fd3510a57279f9e4ba43d1d97f5fad9c804804efba"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-21-jade-peaks/2160.jpg",
+     "size": 1665009,
+     "sha256": "5de0b7c405e67c2397dd3e5ec826a5b78fed280ed22302fc843454da3899f33c"
+    }
+   ]
+  },
+  {
+   "id": "epic-22-campfire-stars",
+   "section": "epic",
+   "name": "Campfire stars",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-22-campfire-stars/1080.jpg",
+     "size": 777748,
+     "sha256": "fcb5812b13b41765321e5c6e82368532d330fab839c1533cac22db1974e052f7"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-22-campfire-stars/2160.jpg",
+     "size": 2195030,
+     "sha256": "797e27743b9f15f3fc5903f5779dc3baf77112e4edae4c6fbc525bcaa95a9262"
+    }
+   ]
+  },
+  {
+   "id": "epic-23-sky-island",
+   "section": "epic",
+   "name": "Sky island",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-23-sky-island/1080.jpg",
+     "size": 545413,
+     "sha256": "be5a741485299b8300958cd93dfde366dca7c6c7fa0f4533b39b6a46897f9434"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-23-sky-island/2160.jpg",
+     "size": 1559135,
+     "sha256": "9a987303026f6539cdd5a2a9eb125fe993da3533d4ea035202d534b5cb85e3b0"
+    }
+   ]
+  },
+  {
+   "id": "epic-24-lantern-snow",
+   "section": "epic",
+   "name": "Lantern snow",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-24-lantern-snow/1080.jpg",
+     "size": 784097,
+     "sha256": "c813ef2ed0102f1025bfa75b481901abeee11eae98c9bcd7fca830697998607d"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-24-lantern-snow/2160.jpg",
+     "size": 2204280,
+     "sha256": "adf64009b76b752d49f148c6e0cd7e945016f21913da9ab9983343da720fcf72"
+    }
+   ]
+  },
+  {
+   "id": "epic-25-labyrinth",
+   "section": "epic",
+   "name": "Labyrinth",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-25-labyrinth/1080.jpg",
+     "size": 749170,
+     "sha256": "ee15394b9dcac885bd949ff61d7dce39f667f5a6e082797500da82f3f7beafdb"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-25-labyrinth/2160.jpg",
+     "size": 2131771,
+     "sha256": "70ebfbf372e75c50d9251560fa545c961ef1099befff91a59e70c0e4d82e43fb"
+    }
+   ]
+  },
+  {
+   "id": "epic-26-sunken-temple",
+   "section": "epic",
+   "name": "Sunken temple",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-26-sunken-temple/1080.jpg",
+     "size": 854769,
+     "sha256": "24c650627198b86b7cf0c11442568ca51c5a62c31f7671eb6d03e479a7e77703"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-26-sunken-temple/2160.jpg",
+     "size": 2424462,
+     "sha256": "a7ce59c2f6a41c8b5f777cdbcb0c718a296700d3f69ee87b4fa58343acf9aed9"
+    }
+   ]
+  },
+  {
+   "id": "epic-27-silver-warrior",
+   "section": "epic",
+   "name": "Silver warrior",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-27-silver-warrior/1080.jpg",
+     "size": 420825,
+     "sha256": "ab8a25ecd276c2b35076022565098643bdd0bb2b4aa8afefb81bfaf8cc6355a0"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-27-silver-warrior/2160.jpg",
+     "size": 1238483,
+     "sha256": "d8e549b74e69641de9b9e98b17e4e17228213017b54a419e28505a863f06cbb3"
+    }
+   ]
+  },
+  {
+   "id": "epic-28-neon-blade",
+   "section": "epic",
+   "name": "Neon blade",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-28-neon-blade/1080.jpg",
+     "size": 809522,
+     "sha256": "a486f800778de3092ac7cd534ec4172000a563312b2fe48e27dc56bdc2795143"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-28-neon-blade/2160.jpg",
+     "size": 2274397,
+     "sha256": "d35ebf63db4e6998154230d1544e83346aecbb6bf297d092bbf43453fe80fe95"
+    }
+   ]
+  },
+  {
+   "id": "epic-29-rain-ronin",
+   "section": "epic",
+   "name": "Rain ronin",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-29-rain-ronin/1080.jpg",
+     "size": 670064,
+     "sha256": "db2fdfb6e23e601556a6c0222054eddc50fe88004b760ac0aecb45e88b2dbaaa"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-29-rain-ronin/2160.jpg",
+     "size": 1871063,
+     "sha256": "0bb8d2b737d087164c4a52789e17a6d2441dc45c3e85e57108597822e2c0e0e4"
+    }
+   ]
+  },
+  {
+   "id": "epic-30-sword-stone",
+   "section": "epic",
+   "name": "Sword stone",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-30-sword-stone/1080.jpg",
+     "size": 772304,
+     "sha256": "60830ff793c84356d8a7fc51c3bc60c292508d5719f6850785136f240dd57b8e"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-30-sword-stone/2160.jpg",
+     "size": 2168972,
+     "sha256": "828f1d89437757d27f069155b6d3d6ac8e54d6d2bfaa51c7fdb5d3a159be409a"
+    }
+   ]
+  },
+  {
+   "id": "epic-31-storm-army",
+   "section": "epic",
+   "name": "Storm army",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-31-storm-army/1080.jpg",
+     "size": 651290,
+     "sha256": "bd23f5f3c9632ed49cbb0cade0045818be6ffc518ba876530b3b5bd4b3d82aeb"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-31-storm-army/2160.jpg",
+     "size": 1874588,
+     "sha256": "c201f7e2979c20a507b1dba053679a12b24e665bccd0b8a43bf5d1bcdfccc26b"
+    }
+   ]
+  },
+  {
+   "id": "epic-32-dragon-rider",
+   "section": "epic",
+   "name": "Dragon rider",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-32-dragon-rider/1080.jpg",
+     "size": 522283,
+     "sha256": "d22694caeab0e80faaebc4f3d9e710cbc06d53292919a64129be60aee5361a62"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-32-dragon-rider/2160.jpg",
+     "size": 1500843,
+     "sha256": "729de5537c59e08413fde72b97a76b57a22180a2f9e7fd4e3bf0219c99010ca2"
+    }
+   ]
+  },
+  {
+   "id": "epic-33-oasis-princess",
+   "section": "epic",
+   "name": "Oasis princess",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-33-oasis-princess/1080.jpg",
+     "size": 849276,
+     "sha256": "e7d66a4e7877a82770a79c4ac510d5be8aafb859904c278c2f375957a1e7eb47"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-33-oasis-princess/2160.jpg",
+     "size": 2366336,
+     "sha256": "7c1610d4153b596dc381604a186f783dfff6a15e31a1d4548962cfe67e80c137"
+    }
+   ]
+  },
+  {
+   "id": "epic-34-ice-queen",
+   "section": "epic",
+   "name": "Ice queen",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-34-ice-queen/1080.jpg",
+     "size": 703752,
+     "sha256": "41ec2f660994eb90052b75ff74d183806e22b80b06f27cee31c8b0867157e134"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-34-ice-queen/2160.jpg",
+     "size": 2041647,
+     "sha256": "710a76287bd8f5ae62011ff24af2c2d291bee6a34501060fd366cfa76c61ba20"
+    }
+   ]
+  },
+  {
+   "id": "epic-35-autumn-hunter",
+   "section": "epic",
+   "name": "Autumn hunter",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-35-autumn-hunter/1080.jpg",
+     "size": 811361,
+     "sha256": "9e5eba5be304b2bb27b70fc9effb632538f849151de5a8eb1fd866dba9b8bf79"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-35-autumn-hunter/2160.jpg",
+     "size": 2243668,
+     "sha256": "f45e64748ca7ea6ce346c5856bc870d19c385488293efc3cd12636bb911c049e"
+    }
+   ]
+  },
+  {
+   "id": "epic-36-arena",
+   "section": "epic",
+   "name": "Arena",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-36-arena/1080.jpg",
+     "size": 732832,
+     "sha256": "3554cf40d6993dc19ae0f04c9a193035c01b7a092b78ddb50a5057944b60e2dc"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-36-arena/2160.jpg",
+     "size": 2139199,
+     "sha256": "5ca497e8e1544b3d2f5481e54adf44535d46f6cf6a3d84697aef3c5ca8929ad3"
+    }
+   ]
+  },
+  {
+   "id": "epic-37-griffin-knight",
+   "section": "epic",
+   "name": "Griffin knight",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-37-griffin-knight/1080.jpg",
+     "size": 682128,
+     "sha256": "1e7bd3b216451f3f6f37ca1af3faabfbfef457154b66df13efb86378c8c2c197"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-37-griffin-knight/2160.jpg",
+     "size": 1944363,
+     "sha256": "9a1a1a2dc1546597440c7fa3c0459068a0cf5b3c25c333624f3749a61067d525"
+    }
+   ]
+  },
+  {
+   "id": "epic-38-dark-crown",
+   "section": "epic",
+   "name": "Dark crown",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-38-dark-crown/1080.jpg",
+     "size": 461268,
+     "sha256": "3493fbbdb21082546a63e5e9c4df0697a21d35e39b0243b3c18d82cba12dbf08"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-38-dark-crown/2160.jpg",
+     "size": 1341948,
+     "sha256": "4219ac508a49bb66ef90dfeab413ffa0a17fb904d9097a6cea893780f967c7c1"
+    }
+   ]
+  },
+  {
+   "id": "epic-39-temple-stairs",
+   "section": "epic",
+   "name": "Temple stairs",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-39-temple-stairs/1080.jpg",
+     "size": 601289,
+     "sha256": "e4d6c5eafadee64f6c5e212e95fe12aa579945e8a5f39dcca4b4b8e6d64989be"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-39-temple-stairs/2160.jpg",
+     "size": 1705428,
+     "sha256": "66086d5930af22b1e48fc54e12307e149c5e750b89d922fd660eae82a464a3f5"
+    }
+   ]
+  },
+  {
+   "id": "epic-40-bamboo-duel",
+   "section": "epic",
+   "name": "Bamboo duel",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-40-bamboo-duel/1080.jpg",
+     "size": 663125,
+     "sha256": "ce23f8736e1c5fb18eee64bd45611afba16c90b0476b80277c4a6ab2cebda0f6"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-40-bamboo-duel/2160.jpg",
+     "size": 1857336,
+     "sha256": "6315b7775d6d9905ce72b358a2c2945549a6250b434d6d770c6597c664206f4a"
+    }
+   ]
+  },
+  {
+   "id": "epic-41-shield-wall",
+   "section": "epic",
+   "name": "Shield wall",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-41-shield-wall/1080.jpg",
+     "size": 525125,
+     "sha256": "cf68a0182e6b230ef59884e4946666d4f30f121c776908ad52dbff96b52f3214"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-41-shield-wall/2160.jpg",
+     "size": 1520039,
+     "sha256": "cfbf010f27beae3a3d9ebd0b85e13127324d6e1f98232d9d680a8955f5e0b5d8"
+    }
+   ]
+  },
+  {
+   "id": "epic-42-sea-goddess",
+   "section": "epic",
+   "name": "Sea goddess",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-42-sea-goddess/1080.jpg",
+     "size": 704157,
+     "sha256": "0454c566e57b5054de45ab97f3b872b3288a16139f07a88a91d09298f908b4d2"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-42-sea-goddess/2160.jpg",
+     "size": 2047279,
+     "sha256": "9a1d2afed3bd231e0dad8ef9282685bff22e16397674c3b62b3fb6a93598474a"
+    }
+   ]
+  },
+  {
+   "id": "epic-43-storm-god",
+   "section": "epic",
+   "name": "Storm god",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-43-storm-god/1080.jpg",
+     "size": 454171,
+     "sha256": "6ae52fa44711ea7676d9146cb96158595c74b9776e13b274cb478b800af5da82"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-43-storm-god/2160.jpg",
+     "size": 1313860,
+     "sha256": "2fe5f07e77718913a4021fc27847b607e6447894eee0357fc6c78627f857a9c2"
+    }
+   ]
+  },
+  {
+   "id": "epic-44-wolf-ranger",
+   "section": "epic",
+   "name": "Wolf ranger",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-44-wolf-ranger/1080.jpg",
+     "size": 589211,
+     "sha256": "35ba61f3d097171245b9ecf141af80dfde0e19fc1ae2665a787511b6a965022b"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-44-wolf-ranger/2160.jpg",
+     "size": 1700589,
+     "sha256": "d85a5c473e3f4edf58a90dfe5e246937e3c03ce8d7148d66c323d1a214ac79bd"
+    }
+   ]
+  },
+  {
+   "id": "epic-45-dragon-hoard",
+   "section": "epic",
+   "name": "Dragon hoard",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-45-dragon-hoard/1080.jpg",
+     "size": 823647,
+     "sha256": "6d73a19f627fc8cf7e1da66bd47d812abe7bd61025b08a023e561888a1a29d9f"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-45-dragon-hoard/2160.jpg",
+     "size": 2266414,
+     "sha256": "3f64bed69c8a466a016675d03113297552662aec589458eb2e8e9a4424dd923b"
+    }
+   ]
+  },
+  {
+   "id": "epic-46-dawn-ruins",
+   "section": "epic",
+   "name": "Dawn ruins",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-46-dawn-ruins/1080.jpg",
+     "size": 528705,
+     "sha256": "420c01cdf1ce8dd86c6de25c9909df31ffba0157363479826bd4ebba30d239a7"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-46-dawn-ruins/2160.jpg",
+     "size": 1505779,
+     "sha256": "6cfb67da1dd7de9c1334b2388e9d9c1a9d80b78f5e57ae1f8b7d9a43a5402e8a"
+    }
+   ]
+  },
+  {
+   "id": "epic-47-neon-samurai",
+   "section": "epic",
+   "name": "Neon samurai",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-47-neon-samurai/1080.jpg",
+     "size": 618196,
+     "sha256": "2050d4c761e0b9d54325e4884c9957ee61fdfc13ee246fa4179b54890887f812"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-47-neon-samurai/2160.jpg",
+     "size": 1739534,
+     "sha256": "c43b9ada42f3e439b3c221dacd660cee42d0cbadc549c95eba2ba1b94b3812ac"
+    }
+   ]
+  },
+  {
+   "id": "epic-48-moon-assassin",
+   "section": "epic",
+   "name": "Moon assassin",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-48-moon-assassin/1080.jpg",
+     "size": 456277,
+     "sha256": "979d4ada87d93862f4e81a7242138fbd840741cee06bf711c5d486e0f983e0a3"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-48-moon-assassin/2160.jpg",
+     "size": 1359784,
+     "sha256": "9de51911e32611671b668edb9cca2c8d46965491c3534480ba29424863a71b9b"
+    }
+   ]
+  },
+  {
+   "id": "epic-49-fallen-crown",
+   "section": "epic",
+   "name": "Fallen crown",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-49-fallen-crown/1080.jpg",
+     "size": 657236,
+     "sha256": "293d5a2de16217bf4e435dc33a8a2dce5253f9ede21e08b6f37d5814d1cce63d"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-49-fallen-crown/2160.jpg",
+     "size": 1904176,
+     "sha256": "6ceebbe41ecd3658e9e6b2eab1c8296e8c8e2a36be0b5843a5cb7bca2081b708"
+    }
+   ]
+  },
+  {
+   "id": "epic-50-crystal-crown",
+   "section": "epic",
+   "name": "Crystal crown",
+   "author": "LordOS (AI-generated)",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.jpeg",
+     "codec": "jpeg",
+     "w": 1920,
+     "h": 1080,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-50-crystal-crown/1080.jpg",
+     "size": 423362,
+     "sha256": "f61b0e3f4a29116aea44ea1559022c20e9278f2f700f4f5edc8e73deee506792"
+    },
+    {
+     "name": "2160.jpeg",
+     "codec": "jpeg",
+     "w": 3840,
+     "h": 2160,
+     "fps": 0.0,
+     "seconds": 0.0,
+     "file": "stills/epic/epic-50-crystal-crown/2160.jpg",
+     "size": 1245143,
+     "sha256": "de5ee4796ffa57011d48b9c41a6858ecb873d3a6cc923ac7237af5c4b63ff746"
+    }
+   ]
   }
  ]
 }

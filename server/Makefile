@@ -1567,10 +1567,21 @@ build/hwdec-test: tests/hwdec_test.c src/media/hwdec.c src/media/hwdec.h src/med
 
 build/wallpaper-find-test: tests/wallpaper_find_test.c src/hw/wallpaper_find.c src/sec/json.c src/hw/wallpaper_find.h
 	@mkdir -p build
-	$(CC) $(CFLAGS) -o $@ tests/wallpaper_find_test.c src/hw/wallpaper_find.c src/sec/json.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -o $@ tests/wallpaper_find_test.c src/hw/wallpaper_find.c src/sec/json.c
 	./$@
 
 test: build/wallpaper-find-test
+
+# the catalog's closed actions (src/hw/wallpaper_admin.c): wallpaper-get keeps a video as <sha256>.mp4 and a still picture
+# as <sha256>.jpg (from the catalog's codec), wallpaper-remove deletes either, wallpaper-login "still cat:<id>"; a fake
+# download, a catalog and a store under build/; and the shipped assets/wallpapers/motion.json
+build/wallpaper-admin-test: tests/wallpaper_admin_test.c src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_find.h src/hw/wallpaper_image.c src/sec/json.c src/pkg/crypto.c build/obj/ui/stb.o ../assets/wallpapers/motion.json
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -D'WALLPAPER_CATALOG="build/wallpaper-admin-files/catalog.json"' \
+	    -D'WALLPAPER_STORE="build/wallpaper-admin-files/store"' -D'WALLPAPER_OWNER_OK(st)=((st).st_uid == getuid())' \
+	    -o $@ tests/wallpaper_admin_test.c src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/sec/json.c src/pkg/crypto.c build/obj/ui/stb.o -lm
+	./$@ || { rm -f $@; exit 1; }
+test: build/wallpaper-admin-test
 
 # a picture chosen as wallpaper (src/hw/wallpaper_image.c): only real images, no links, EXIF applied, nothing oversized
 build/wallpaper-image-test: tests/wallpaper_image_test.c src/hw/wallpaper_image.c src/hw/wallpaper_image.h src/ui/stb.c
