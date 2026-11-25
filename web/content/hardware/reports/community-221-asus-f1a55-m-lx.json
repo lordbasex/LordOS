@@ -1,0 +1,503 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-11-21",
+  "source": "community",
+  "lordos": "0.8.9.4-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "",
+      "product": "",
+      "version": "System Version",
+      "boardVendor": "ASUSTeK COMPUTER INC.",
+      "boardName": "F1A55-M LX",
+      "chassis": "desktop",
+      "model": "",
+      "biosVendor": "American Megatrends Inc.",
+      "biosVersion": "1504",
+      "biosDate": "08/08/2013",
+      "firmware": "bios",
+      "secureBoot": null,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "AMD A4-3400 APU with Radeon(tm) HD Graphics",
+      "vendor": "AuthenticAMD",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 2,
+      "threads": 2,
+      "minMHz": 800,
+      "maxMHz": 2700,
+      "governor": "schedutil",
+      "l1dKB": 64,
+      "l1iKB": 64,
+      "l2KB": 512,
+      "l3KB": 0
+    },
+    "memory": {
+      "totalKB": 8118112,
+      "swapKB": 2097148,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "1002",
+        "deviceId": "68f9",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Cedar [Radeon HD 5000/6000/7350/8350 Series]",
+        "driver": "radeon",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 3,
+        "connected": 1
+      }
+    ],
+    "displays": [
+      {
+        "connector": "HDMI-A-1",
+        "enabled": true,
+        "name": "LG FULL HD",
+        "manufacturer": "GSM",
+        "product": "5b55",
+        "year": 2016,
+        "widthCm": 48,
+        "heightCm": 27,
+        "diagonalTenths": 217,
+        "nativeWidth": 1920,
+        "nativeHeight": 1080,
+        "mode": "1920x1080"
+      }
+    ],
+    "storage": [
+      {
+        "model": "Hitachi HDS72161",
+        "vendor": "ATA",
+        "bytes": 164696555520,
+        "rotational": true,
+        "removable": false,
+        "transport": "sata",
+        "link": ""
+      },
+      {
+        "model": "CDDVDW SH-224FB",
+        "vendor": "TSSTcorp",
+        "bytes": 1073741312,
+        "rotational": false,
+        "removable": true,
+        "transport": "sata",
+        "link": ""
+      }
+    ],
+    "pci": [
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1705",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Family 12h Processor Root Complex",
+        "driver": ""
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "1707",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Family 12h Processor Root Port",
+        "driver": "pcieport"
+      },
+      {
+        "class": "010601",
+        "className": "SATA controller",
+        "vendorId": "1022",
+        "deviceId": "7800",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH SATA Controller [IDE mode]",
+        "driver": "ahci"
+      },
+      {
+        "class": "0c0310",
+        "className": "USB controller",
+        "vendorId": "1022",
+        "deviceId": "7807",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH USB OHCI Controller",
+        "driver": "ohci-pci"
+      },
+      {
+        "class": "0c0320",
+        "className": "USB controller",
+        "vendorId": "1022",
+        "deviceId": "7808",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH USB EHCI Controller",
+        "driver": "ehci-pci"
+      },
+      {
+        "class": "0c0310",
+        "className": "USB controller",
+        "vendorId": "1022",
+        "deviceId": "7807",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH USB OHCI Controller",
+        "driver": "ohci-pci"
+      },
+      {
+        "class": "0c0320",
+        "className": "USB controller",
+        "vendorId": "1022",
+        "deviceId": "7808",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH USB EHCI Controller",
+        "driver": "ehci-pci"
+      },
+      {
+        "class": "0c0500",
+        "className": "SMBus",
+        "vendorId": "1022",
+        "deviceId": "780b",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH SMBus Controller",
+        "driver": "piix4_smbus"
+      },
+      {
+        "class": "01018a",
+        "className": "IDE interface",
+        "vendorId": "1022",
+        "deviceId": "780c",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH IDE Controller",
+        "driver": "pata_atiixp"
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "1022",
+        "deviceId": "780d",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH Azalia Controller",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "060100",
+        "className": "ISA bridge",
+        "vendorId": "1022",
+        "deviceId": "780e",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH LPC Bridge",
+        "driver": ""
+      },
+      {
+        "class": "060401",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "780f",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH PCI Bridge",
+        "driver": ""
+      },
+      {
+        "class": "0c0310",
+        "className": "USB controller",
+        "vendorId": "1022",
+        "deviceId": "7809",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH USB OHCI Controller",
+        "driver": "ohci-pci"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "43a0",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Hudson PCI to PCI bridge (PCIE port 0)",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "43a1",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Hudson PCI to PCI bridge (PCIE port 1)",
+        "driver": "pcieport"
+      },
+      {
+        "class": "0c0310",
+        "className": "USB controller",
+        "vendorId": "1022",
+        "deviceId": "7807",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH USB OHCI Controller",
+        "driver": "ohci-pci"
+      },
+      {
+        "class": "0c0320",
+        "className": "USB controller",
+        "vendorId": "1022",
+        "deviceId": "7808",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH USB EHCI Controller",
+        "driver": "ehci-pci"
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1700",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Family 12h/14h Processor Function 0",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1701",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Family 12h/14h Processor Function 1",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1702",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Family 12h/14h Processor Function 2",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1703",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Family 12h/14h Processor Function 3",
+        "driver": "k10temp"
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1704",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Family 12h/14h Processor Function 4",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1718",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Family 12h/14h Processor Function 6",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1716",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Family 12h/14h Processor Function 5",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1719",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Family 12h/14h Processor Function 7",
+        "driver": ""
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "1002",
+        "deviceId": "68f9",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Cedar [Radeon HD 5000/6000/7350/8350 Series]",
+        "driver": "radeon"
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "1002",
+        "deviceId": "aa68",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Cedar HDMI Audio [Radeon HD 5400/6300/7300 Series]",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "020000",
+        "className": "Ethernet controller",
+        "vendorId": "10ec",
+        "deviceId": "8168",
+        "vendor": "Realtek Semiconductor Co., Ltd.",
+        "device": "RTL8111/8168/8211/8411 PCI Express Gigabit Ethernet Controller",
+        "driver": "r8169"
+      }
+    ],
+    "usb": [
+      {
+        "vendorId": "275d",
+        "productId": "0a29",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 1,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "046d",
+        "productId": "c31c",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 1,
+        "driver": "usbhid"
+      }
+    ],
+    "network": [
+      {
+        "kind": "ethernet",
+        "driver": "r8169",
+        "up": true,
+        "speedMbps": 1000
+      }
+    ],
+    "audio": [
+      "HD-Audio Generic",
+      "HDA ATI HDMI"
+    ],
+    "bluetooth": [],
+    "power": [],
+    "thermal": [
+      {
+        "sensor": "radeon",
+        "milliC": 53500,
+        "fans": 0
+      },
+      {
+        "sensor": "drivetemp",
+        "milliC": 32000,
+        "fans": 0
+      },
+      {
+        "sensor": "k10temp",
+        "milliC": 19125,
+        "fans": 0
+      },
+      {
+        "sensor": "asus",
+        "milliC": null,
+        "fans": 0
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.117+deb13-amd64",
+      "lordos": "0.8.9.4-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,tomoyo,bpf,ipe,ima,evm",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false,
+      "bootMedium": "internal",
+      "bootLinkMbps": null,
+      "bootToRam": false,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_SECCOMP_FILTER": "y",
+        "CONFIG_USER_NS": "y",
+        "CONFIG_BPF_SYSCALL": "y",
+        "CONFIG_BPF_JIT": "y",
+        "CONFIG_CGROUP_BPF": "y",
+        "CONFIG_BPF_LSM": "y",
+        "CONFIG_INET_DIAG_DESTROY": "y",
+        "CONFIG_INET_UDP_DIAG": "m",
+        "CONFIG_MEMCG": "y",
+        "CONFIG_PSI": "y",
+        "CONFIG_ZRAM": "m",
+        "CONFIG_DRM": "m",
+        "CONFIG_UHID": "m"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": true
+      }
+    },
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "AMD CEDAR (DRM 2.50.0 / 6.12.117+deb13-amd64, LLVM 19.1.7)",
+      "dmabuf": true,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "works",
+      "note": "gpuComposes"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "absent",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "absent",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "absent",
+      "note": null
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": null,
+  "desktop": null
+}

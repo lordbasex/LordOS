@@ -14,6 +14,28 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - The paper (en, es, pt) and `docs/PAPER-VALIDATION.md`: since 0.8.9.6.1 the arm64 `lordos-web` package is built against
   LordOS's WPE WebKit 2.54 (WPEPlatform), like amd64's, and depends on `libwpewebkit-2.0-1 (>= 2.54)`; `web-backend-test`
   passed with the platform backend on the Raspberry Pi 5 at the release build.
+- **Hardware report #249 (`docs/HARDWARE-REPORT.md`, updated 2026-11-25), in development (the latest release is
+  0.8.9.6.1-beta).** A HUAWEI CREFG-XX laptop with an Intel Core i9-13900H (Raptor Lake, 20 threads), Intel Iris Xe
+  Graphics (Raptor Lake-P, `i915`), 15 GB of memory and a 2520×1680 panel, installed on its NVMe disk and running
+  0.8.9.6-beta: the desktop is composed on the GPU (Mesa's Iris driver), and every row of the report says *works*
+  (GPU, display, storage, network, Wi-Fi, Bluetooth, audio, power, isolation; suspend unchecked). The reporter says
+  everything else works perfectly, but the laptop plays no sound although its Sound Open Firmware card
+  (`sof-hda-dsp`) is found (the report's audio row only says a card is there), and the fingerprint reader doesn't
+  work (LordOS has no fingerprint sign-in, and the reader is not among the report's USB devices); both are listed as
+  open, with no separate issue yet. The same person's earlier #179 had arrived empty. It is the first Raptor Lake
+  machine, the first Intel graphics newer than Whiskey Lake and the first HUAWEI. The counts are now 27 physical
+  machines (13 with a hardware report's data), 28 people, 16 Intel GPUs, 20 Intel CPUs and 16 laptops, with the
+  comparison, what works, the open problems, the untested combinations and the thanks updated. The paper (en, es,
+  pt, §3.2, §3.5, §10.2 and §10.3, mirrored in `docs/PAPER.md`), the "Own desktop" feature page and the FAQ's
+  release and NVIDIA answers follow, as do `docs/GPU.md`, `docs/SESSIONS.md`, `docs/BENCHMARK.md` and
+  `docs/PAPER-VALIDATION.md`.
+
+### Hardware
+- The tested-hardware snapshot of 2026-11-25 was published: 16 reports (`lordos-hwdata` 2026.11.25, APT staging and
+  live). The 14 community reports labelled `report:valid` (#42, #105, #129, #135, #136, #137, #155, #156, #212, #221,
+  #224, #230, #245, #249) are in `web/content/hardware/reports/`, each byte for byte as attached after
+  `tools/hwreport/validate.mjs` passed it, plus the two reference machines; 102 device entries. #224's file was made on
+  0.8.8.9-beta although its form names 0.8.9.4-beta, so its rows count for 0.8.8.9. `hwreport_test.mjs` expects them.
 
 ## [0.8.9.6.1-beta] - 2026-11-25
 

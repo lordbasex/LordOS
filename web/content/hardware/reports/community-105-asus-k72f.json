@@ -1,0 +1,535 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-11-10",
+  "source": "community",
+  "lordos": "0.8.8.7-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "ASUSTeK Computer Inc.",
+      "product": "K72F",
+      "version": "1.0",
+      "boardVendor": "ASUSTeK Computer Inc.",
+      "boardName": "K72F",
+      "chassis": "laptop",
+      "model": "",
+      "biosVendor": "American Megatrends Inc.",
+      "biosVersion": "K72F.211",
+      "biosDate": "02/22/2011",
+      "firmware": "bios",
+      "secureBoot": null,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "Intel(R) Pentium(R) CPU        P6200  @ 2.13GHz",
+      "vendor": "GenuineIntel",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 2,
+      "threads": 2,
+      "minMHz": 933,
+      "maxMHz": 2133,
+      "governor": "schedutil",
+      "l1dKB": 32,
+      "l1iKB": 32,
+      "l2KB": 256,
+      "l3KB": 3072
+    },
+    "memory": {
+      "totalKB": 7922576,
+      "swapKB": 2097148,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "8086",
+        "deviceId": "0046",
+        "vendor": "Intel Corporation",
+        "device": "Core Processor Integrated Graphics Controller",
+        "driver": "i915",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 4,
+        "connected": 1
+      }
+    ],
+    "displays": [
+      {
+        "connector": "LVDS-1",
+        "enabled": true,
+        "name": "",
+        "manufacturer": "SEC",
+        "product": "544b",
+        "year": 2008,
+        "widthCm": 38,
+        "heightCm": 21,
+        "diagonalTenths": 171,
+        "nativeWidth": 1600,
+        "nativeHeight": 900,
+        "mode": "1600x900"
+      }
+    ],
+    "storage": [
+      {
+        "model": "PNY CS900 1TB SS",
+        "vendor": "ATA",
+        "bytes": 1000204886016,
+        "rotational": false,
+        "removable": false,
+        "transport": "sata",
+        "link": ""
+      },
+      {
+        "model": "KINGSTON SV300S3",
+        "vendor": "ATA",
+        "bytes": 120034123776,
+        "rotational": false,
+        "removable": false,
+        "transport": "sata",
+        "link": ""
+      },
+      {
+        "model": "SanDisk 3.2Gen1",
+        "vendor": "USB",
+        "bytes": 123048296448,
+        "rotational": true,
+        "removable": true,
+        "transport": "usb",
+        "link": ""
+      },
+      {
+        "model": "DVDRAM GT32N",
+        "vendor": "HL-DT-ST",
+        "bytes": 1073741312,
+        "rotational": false,
+        "removable": true,
+        "transport": "sata",
+        "link": ""
+      }
+    ],
+    "pci": [
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "0044",
+        "vendor": "Intel Corporation",
+        "device": "Core Processor DRAM Controller",
+        "driver": ""
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "8086",
+        "deviceId": "0046",
+        "vendor": "Intel Corporation",
+        "device": "Core Processor Integrated Graphics Controller",
+        "driver": "i915"
+      },
+      {
+        "class": "078000",
+        "className": "Communication controller",
+        "vendorId": "8086",
+        "deviceId": "3b64",
+        "vendor": "Intel Corporation",
+        "device": "5 Series/3400 Series Chipset HECI Controller",
+        "driver": "mei_me"
+      },
+      {
+        "class": "0c0320",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "3b3c",
+        "vendor": "Intel Corporation",
+        "device": "5 Series/3400 Series Chipset USB2 Enhanced Host Controller",
+        "driver": "ehci-pci"
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "8086",
+        "deviceId": "3b56",
+        "vendor": "Intel Corporation",
+        "device": "5 Series/3400 Series Chipset High Definition Audio",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "3b42",
+        "vendor": "Intel Corporation",
+        "device": "5 Series/3400 Series Chipset PCI Express Root Port 1",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "3b44",
+        "vendor": "Intel Corporation",
+        "device": "5 Series/3400 Series Chipset PCI Express Root Port 2",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "3b4c",
+        "vendor": "Intel Corporation",
+        "device": "5 Series/3400 Series Chipset PCI Express Root Port 6",
+        "driver": "pcieport"
+      },
+      {
+        "class": "0c0320",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "3b34",
+        "vendor": "Intel Corporation",
+        "device": "5 Series/3400 Series Chipset USB2 Enhanced Host Controller",
+        "driver": "ehci-pci"
+      },
+      {
+        "class": "060401",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "2448",
+        "vendor": "Intel Corporation",
+        "device": "82801 Mobile PCI Bridge",
+        "driver": ""
+      },
+      {
+        "class": "060100",
+        "className": "ISA bridge",
+        "vendorId": "8086",
+        "deviceId": "3b09",
+        "vendor": "Intel Corporation",
+        "device": "HM55 Chipset LPC Interface Controller",
+        "driver": "lpc_ich"
+      },
+      {
+        "class": "010601",
+        "className": "SATA controller",
+        "vendorId": "8086",
+        "deviceId": "3b29",
+        "vendor": "Intel Corporation",
+        "device": "5 Series/3400 Series Chipset 4 port SATA AHCI Controller",
+        "driver": "ahci"
+      },
+      {
+        "class": "0c0500",
+        "className": "SMBus",
+        "vendorId": "8086",
+        "deviceId": "3b30",
+        "vendor": "Intel Corporation",
+        "device": "5 Series/3400 Series Chipset SMBus Controller",
+        "driver": ""
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "3b32",
+        "vendor": "Intel Corporation",
+        "device": "5 Series/3400 Series Chipset Thermal Subsystem",
+        "driver": ""
+      },
+      {
+        "class": "028000",
+        "className": "Network controller",
+        "vendorId": "168c",
+        "deviceId": "002b",
+        "vendor": "Qualcomm Atheros",
+        "device": "AR9285 Wireless Network Adapter (PCI-Express)",
+        "driver": "ath9k"
+      },
+      {
+        "class": "020000",
+        "className": "Ethernet controller",
+        "vendorId": "1969",
+        "deviceId": "1063",
+        "vendor": "Qualcomm Atheros",
+        "device": "AR8131 Gigabit Ethernet",
+        "driver": "atl1c"
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "2c62",
+        "vendor": "Intel Corporation",
+        "device": "Core Processor QuickPath Architecture Generic Non-core Registers",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "2d01",
+        "vendor": "Intel Corporation",
+        "device": "Core Processor QuickPath Architecture System Address Decoder",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "2d10",
+        "vendor": "Intel Corporation",
+        "device": "Core Processor QPI Link 0",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "2d11",
+        "vendor": "Intel Corporation",
+        "device": "1st Generation Core i3/5/7 Processor QPI Physical 0",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "2d12",
+        "vendor": "Intel Corporation",
+        "device": "1st Generation Core i3/5/7 Processor Reserved",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "2d13",
+        "vendor": "Intel Corporation",
+        "device": "1st Generation Core i3/5/7 Processor Reserved",
+        "driver": ""
+      }
+    ],
+    "usb": [
+      {
+        "vendorId": "8087",
+        "productId": "0020",
+        "vendor": "",
+        "product": "",
+        "class": "09",
+        "speedMbps": 480,
+        "driver": "hub"
+      },
+      {
+        "vendorId": "13d3",
+        "productId": "5130",
+        "vendor": "",
+        "product": "",
+        "class": "ef",
+        "speedMbps": 480,
+        "driver": "uvcvideo"
+      },
+      {
+        "vendorId": "8087",
+        "productId": "0020",
+        "vendor": "",
+        "product": "",
+        "class": "09",
+        "speedMbps": 480,
+        "driver": "hub"
+      },
+      {
+        "vendorId": "046d",
+        "productId": "c077",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 1,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "0781",
+        "productId": "5581",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 480,
+        "driver": "usb-storage"
+      }
+    ],
+    "network": [
+      {
+        "kind": "ethernet",
+        "driver": "atl1c",
+        "up": true,
+        "speedMbps": 1000
+      },
+      {
+        "kind": "wifi",
+        "driver": "ath9k",
+        "up": false,
+        "speedMbps": null
+      }
+    ],
+    "audio": [
+      "HDA Intel MID"
+    ],
+    "bluetooth": [],
+    "power": [
+      {
+        "kind": "ac",
+        "vendor": "",
+        "model": "",
+        "technology": "",
+        "status": "",
+        "capacity": null,
+        "health": null,
+        "online": 1
+      },
+      {
+        "kind": "battery",
+        "vendor": "ASUSTek",
+        "model": "K72J-44",
+        "technology": "Li-ion",
+        "status": "Not charging",
+        "capacity": 96,
+        "health": 100,
+        "online": null
+      }
+    ],
+    "thermal": [
+      {
+        "sensor": "acpitz",
+        "milliC": 55000,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 55000,
+        "fans": 0
+      },
+      {
+        "sensor": "BAT0",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "drivetemp",
+        "milliC": 33000,
+        "fans": 0
+      },
+      {
+        "sensor": "drivetemp",
+        "milliC": 32000,
+        "fans": 0
+      },
+      {
+        "sensor": "AC0",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "coretemp",
+        "milliC": null,
+        "fans": 0
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.116+deb13-amd64",
+      "lordos": "0.8.8.7-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,tomoyo,bpf,ipe,ima,evm",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false,
+      "bootMedium": "internal",
+      "bootLinkMbps": null,
+      "bootToRam": false,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_SECCOMP_FILTER": "y",
+        "CONFIG_USER_NS": "y",
+        "CONFIG_BPF_SYSCALL": "y",
+        "CONFIG_BPF_JIT": "y",
+        "CONFIG_CGROUP_BPF": "y",
+        "CONFIG_BPF_LSM": "y",
+        "CONFIG_INET_DIAG_DESTROY": "y",
+        "CONFIG_INET_UDP_DIAG": "m",
+        "CONFIG_MEMCG": "y",
+        "CONFIG_PSI": "y",
+        "CONFIG_ZRAM": "m",
+        "CONFIG_DRM": "m",
+        "CONFIG_UHID": "m"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": true
+      }
+    },
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) HD Graphics (ILK)",
+      "dmabuf": true,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "works",
+      "note": "gpuComposes"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "absent",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "works",
+      "note": "batteryHealth"
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": null,
+  "desktop": null
+}

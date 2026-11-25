@@ -4,12 +4,12 @@ What LordOS has been run on, from the maintainer's own machine, from the hardwar
 ([issues labelled `hardware-report`](https://github.com/lordbasex/LordOS/issues?q=label%3Ahardware-report)) and from
 the other GitHub issues, open and closed, that name the machine they ran on. It is a knowledge base: what works, what
 was found and fixed, and which combinations nobody has reported yet. Every line comes from a report, its issue thread
-or this repository. Last updated 2026-11-24, after reading every issue up to #189, the hardware reports #212, #221,
-#224, #230 and #245, and the graphics card report #235.
+or this repository. Last updated 2026-11-25, after reading every issue up to #189, the hardware reports #212, #221,
+#224, #230, #245 and #249, and the graphics card report #235.
 
-**In numbers**: 26 physical machines (the maintainer's PC, 12 machines with a hardware report's data, 12 machines
-named in other issues and 1 graphics card report) from the maintainer and 23 other people, plus 4 reports from virtual
-machines; 27 people reported in all. GPU: 15 Intel, 5 AMD, 2 NVIDIA, 4 not
+**In numbers**: 27 physical machines (the maintainer's PC, 13 machines with a hardware report's data, 12 machines
+named in other issues and 1 graphics card report) from the maintainer and 24 other people, plus 4 reports from virtual
+machines; 28 people reported in all. GPU: 16 Intel, 5 AMD, 2 NVIDIA, 4 not
 given. Not one report says LordOS failed to reach the desktop on real hardware; the problems found are listed per
 machine below, with what was fixed and who confirmed it.
 
@@ -18,7 +18,10 @@ file and opens GitHub's form; the person attaches the file and submits it with t
 the FAQ "How do I share how LordOS runs on my computer?"). The hardware-report workflow (`tools/hwreport/validate.mjs`)
 checks the file and labels the issue (`report:valid` or `report:missing`, `kind:*`, `gpu:*`, `cpu:*`, `boot:*`). A
 report a maintainer accepts goes to `web/content/hardware/reports/` and from there to lordos.org/hardware and the signed
-snapshot System Information's Compatibility panel reads (`tools/hwreport/catalog.mjs`); so far that is #42.
+snapshot System Information's Compatibility panel reads (`tools/hwreport/catalog.mjs`); so far that is every
+`report:valid` report: #42, #105, #129, #135, #136, #137, #155, #156, #212, #221, #224, #230, #245 and #249 (14
+reports from 13 machines: #105, #212 and #230 are the same ASUS K72F on three versions), in the `lordos-hwdata`
+2026.11.25 snapshot.
 
 The report has no serial numbers, MAC or IP addresses, host, user or network names, or paths, and this page adds none.
 
@@ -64,7 +67,7 @@ What it found and what was fixed on it:
 
 ## Community reports with the report file
 
-Twelve machines from eleven people, in fifteen report issues, 2026-11-06 to 2026-11-24: #212 and #230 are later
+Thirteen machines from twelve people, in sixteen report issues, 2026-11-06 to 2026-11-25: #212 and #230 are later
 reports of #105's laptop, on newer versions, and #224 brought the `.json` file #171 had left out (#171 attached the page System
 Information opens instead; its data was the issue's summary and that page). The kind is the one the report detected from the firmware's
 chassis type; where the firmware says "desktop" for a machine the reporter describes elsewhere as a tablet, the table
@@ -84,6 +87,7 @@ says "reported as desktop".
 | [#171](https://github.com/lordbasex/LordOS/issues/171) | Gigabyte B760M C | desktop | Intel Core i9-12900F, 24 threads, Alder Lake | NVIDIA GeForce RTX 3060, GA106 (nvidia, the proprietary driver) | installed on a USB drive (480 Mbps) | 0.8.8.9 | GPU *limits* (the proprietary driver, which LordOS doesn't support for GPU composition); display, storage, network, Wi-Fi, Bluetooth, audio and isolation work; suspend unchecked. The first report with an NVIDIA card. The `.json` file itself arrived later, in [#224](https://github.com/lordbasex/LordOS/issues/224) (2026-11-22): the issue's form says 0.8.9.4, but the file is still the 0.8.8.9 capture of 2026-11-16, and it matches this row. |
 | [#221](https://github.com/lordbasex/LordOS/issues/221) | ASUS F1A55-M LX (motherboard; no system vendor in the firmware) | desktop | AMD A4-3400 APU, 2 threads, K10 Llano | AMD Radeon HD 5450, Cedar, TeraScale 2 (kernel `radeon`, Mesa r600); only this card shows in the report | internal, a mechanical hard disk; legacy BIOS boot | 0.8.9.4 | All works: GPU composition on r600, one HDMI monitor at 1920×1080, Ethernet, audio and isolation; no Wi-Fi, Bluetooth or battery; suspend unchecked. The reporter finds it very fast and stable on this hardware. The first TeraScale 2 card and the first Llano APU. |
 | [#245](https://github.com/lordbasex/LordOS/issues/245) | Acer Aspire R3-131T | laptop | Intel Celeron N3050, 2 threads, Braswell | Intel Atom/Celeron/Pentium x5-E8000/J3xxx/N3xxx integrated, Braswell (i915) | eMMC | 0.8.9.5-beta | All works: GPU, display, storage, network, Wi-Fi, Bluetooth, audio, power and isolation; suspend unchecked. 2 GB of memory: five pages open in Brave (YouTube and Google Maps among them) used about 1.3 GB. Includes LordBench (quick, 19 measurements). Open: the Fn key with the brightness keys does nothing; no separate issue yet. The first Braswell machine and the first Acer. |
+| [#249](https://github.com/lordbasex/LordOS/issues/249) | HUAWEI CREFG-XX | laptop | Intel Core i9-13900H, 20 threads, Raptor Lake | Intel Iris Xe Graphics, Raptor Lake-P (i915) | internal, NVMe | 0.8.9.6-beta | GPU composition on Mesa's Iris driver, a 2520×1680 BOE panel (16.2"), Intel CNVi Wi-Fi, Bluetooth, power (the battery holds 85 % of its design capacity) and isolation work, and every row of the report says *works* (suspend unchecked); the reporter says everything else works perfectly. Open: **no sound** from the laptop, although the sound card is found (Intel's Sound Open Firmware driver, `sof-hda-dsp`) and the report's audio row says *works*: that row only says a card is there, not that the speakers play; no separate issue yet. The fingerprint reader doesn't work: LordOS has no fingerprint sign-in, and the reader is not among the report's USB devices. The same person's earlier [#179](https://github.com/lordbasex/LordOS/issues/179) (0.8.8.9) arrived empty. The first Raptor Lake machine, the first Intel graphics newer than Whiskey Lake and the first HUAWEI. |
 
 ## Graphics card reports
 
@@ -134,7 +138,7 @@ not say. Two other issues are about machines already above: [#132](https://githu
 
 ## Comparison
 
-All 26 physical machines: the maintainer's PC, the twelve with a report's data (#149 is incomplete but its data is
+All 27 physical machines: the maintainer's PC, the thirteen with a report's data (#149 is incomplete but its data is
 readable), the twelve from other issues and the graphics card report #235 (its card only). A count of "not given" means the issue does not say. Virtual machines are
 counted apart.
 
@@ -142,7 +146,7 @@ counted apart.
 
 | Vendor | Machines | Families (count) | What is known |
 |---|---|---|---|
-| Intel (i915) | 15 | Ironlake (1), Sandy Bridge HD 2000 (1), Haswell Crystal Well (1), Broadwell Iris 6100 (2), Kaby Lake HD 620 (4), Kaby Lake R and Whiskey Lake UHD 620 (2), Cherry Trail Atom (2), Braswell Celeron (1, #245), Gemini Lake UHD 600 (1) | GPU composition works on every one that says. The only GPU *limits* is a rotated tablet panel, which LordOS composes on the CPU by design (#135). One report of DMC firmware lockups on HD 620 with `firmware-intel-graphics`, worked around with `i915.enable_dc=0` (#42). |
+| Intel (i915) | 16 | Ironlake (1), Sandy Bridge HD 2000 (1), Haswell Crystal Well (1), Broadwell Iris 6100 (2), Kaby Lake HD 620 (4), Kaby Lake R and Whiskey Lake UHD 620 (2), Raptor Lake-P Iris Xe (1, #249), Cherry Trail Atom (2), Braswell Celeron (1, #245), Gemini Lake UHD 600 (1) | GPU composition works on every one that says. The only GPU *limits* is a rotated tablet panel, which LordOS composes on the CPU by design (#135). One report of DMC firmware lockups on HD 620 with `firmware-intel-graphics`, worked around with `i915.enable_dc=0` (#42). |
 | AMD | 5 | TeraScale 2, Cedar (1, Radeon HD 5450 on the `radeon` kernel driver and Mesa r600, #221), GCN 2, Bonaire (1, FirePro W6150M on the `radeon` kernel driver), GCN 4, Polaris (1, RX 580), RDNA 3 (1, RX 7800 XT), RDNA 4 (1, RX 9060 XT) | All compose on the GPU. The cursor-plane size fix (0.8.8.6) came from the RX 580 and also fixed the FirePro; the RX 580 brought the login-screen and display hand-off fixes. Open on the RX 7800 XT: uneven window drag at 120 Hz (#159). |
 | NVIDIA | 2 | Ampere, RTX 3060 (1, #171, the proprietary driver); Blackwell, RTX 5070 Ti (1, #235, NVIDIA's open kernel modules 620.73.04) | Both reach the desktop on NVIDIA's own driver. #171's GPU is *limits* (LordOS doesn't support the proprietary driver for GPU composition); #235's desktop is smooth, and its report doesn't say how it was composed. Mesa's nouveau and NVK are included and untested. |
 | Not given | 4 | MacBook Pro 2012, HP 4K laptop, ThinkPad, tablet PC | Reached the desktop; the issues are about input, scale and displays. |
@@ -151,7 +155,7 @@ counted apart.
 
 | Vendor | Machines | Generations (count) |
 |---|---|---|
-| Intel | 19 | Westmere, Pentium P6200 (1); Sandy Bridge (1); Ivy Bridge (1); Haswell (2); Broadwell (2); Kaby Lake (4); Kaby Lake R (1); Whiskey Lake (1); Comet Lake, i9-10900 (1); Alder Lake, i9-12900F (1); Cherry Trail Atom (2); Braswell Celeron N3050 (1); Gemini Lake Celeron (1) |
+| Intel | 20 | Westmere, Pentium P6200 (1); Sandy Bridge (1); Ivy Bridge (1); Haswell (2); Broadwell (2); Kaby Lake (4); Kaby Lake R (1); Whiskey Lake (1); Comet Lake, i9-10900 (1); Alder Lake, i9-12900F (1); Raptor Lake, i9-13900H (1); Cherry Trail Atom (2); Braswell Celeron N3050 (1); Gemini Lake Celeron (1) |
 | AMD | 3 | K10 Llano, A4-3400 APU (1); Zen 3, Ryzen 7 5700X (1); Zen 4, Ryzen 7 7800X3D (1) |
 | Not given | 4 | HP 4K laptop, ThinkPad, tablet PC, #235's computer (a graphics card report) |
 
@@ -162,7 +166,7 @@ All are x86-64. No ARM machine in the issues (the Raspberry Pi 5 is the project'
 
 | Kind | Machines |
 |---|---|
-| Laptop | 15 (Apple 4, Dell 3, HP 3, ASUS 2, Lenovo 2, Acer 1) |
+| Laptop | 16 (Apple 4, Dell 3, HP 3, ASUS 2, Lenovo 2, Acer 1, HUAWEI 1) |
 | Desktop | 5 (the maintainer's, #156, #159, #171, #221) |
 | 2-in-1 | 1 (Dell Latitude 5289) |
 | Tablet | 1 (#127, as the reporter says) |
@@ -173,7 +177,7 @@ All are x86-64. No ARM machine in the issues (the Raspberry Pi 5 is the project'
 
 | How | Machines |
 |---|---|
-| Installed, internal disk (from the report file) | 9 (eight reports and the maintainer's; #221 on a mechanical disk) |
+| Installed, internal disk (from the report file) | 10 (nine reports and the maintainer's; #221 on a mechanical disk) |
 | Installed, eMMC (from the report file) | 3 (#135, #137, #245) |
 | Installed, USB drive (from the report data) | 1 (#171) |
 | Installed, medium not in the issue | 7 (one of them, the ZBook, with `install.sh` over an existing Debian 13) |
@@ -192,14 +196,15 @@ All are x86-64. No ARM machine in the issues (the Raspberry Pi 5 is the project'
 | 0.8.8.9 | 1 (#171; #224's file is the same 0.8.8.9 capture) |
 | 0.8.9.4 | 1 (#221) |
 | 0.8.9.5-beta | 3 (#105's laptop, in #230 after #212 on 0.8.9.2; #235; #245) |
+| 0.8.9.6-beta | 1 (#249) |
 
 **What works**, each from at least one report: GPU composition on Intel graphics from 2010 (Ironlake) to 2019 (Whiskey
-Lake) and on Cherry Trail, Braswell and Gemini Lake, and on five AMD generations from TeraScale 2 (a Radeon HD 5450 on `radeon`
+Lake), on 2023's Raptor Lake Iris Xe (#249) and on Cherry Trail, Braswell and Gemini Lake, and on five AMD generations from TeraScale 2 (a Radeon HD 5450 on `radeon`
 and r600, #221) to RDNA 4; three monitors with DisplayPort (the RX 580), two monitors at 120 Hz (the RX 7800 XT), a
 laptop with an external monitor (four reports, the latest the K72F's Dell on HDMI, #212); a 2011 Llano desktop with a
 mechanical disk and legacy BIOS boot, fast and stable (#221);
 a 15.3" 4K laptop panel at 300 %; Alps I2C touchpads (since 0.8.8.6) and Apple trackpads; automatic rotation and the
-touchscreen on Cherry Trail tablets; Wi-Fi on Broadcom BCM43602 and Intel 3165 and 8265; a Bluetooth headset on three
+touchscreen on Cherry Trail tablets; Wi-Fi on Broadcom BCM43602, Intel 3165 and 8265 and Raptor Lake's CNVi (#249); a Bluetooth headset on three
 laptops; the volume, brightness and keyboard light keys on two MacBook Pros; a 2 GB Celeron N4000 laptop, smooth; a
 2 GB Celeron N3050 laptop booting from eMMC with every component working (#245); an RTX 5070 Ti on NVIDIA's open
 kernel modules, smooth (#235).
@@ -219,12 +224,14 @@ driver LordOS can't ship (#21); the Fn brightness keys on the Acer Aspire R3-131
 Files but not opening on the ASUS K72F, which a Kubuntu session on the same machine reaches (#230), and menus in
 MuseScore and Arduino there (#209); the `nouveau` module loaded next to NVIDIA's driver on the RTX 5070 Ti (#235: not
 bound to the card, which is on `nvidia` and works, but NVIDIA's packages should keep `nouveau` from loading at all;
-whether their blacklist reached that kernel's initramfs is to ask, `docs/NVIDIA-PLAN.md`, A.4).
+whether their blacklist reached that kernel's initramfs is to ask, `docs/NVIDIA-PLAN.md`, A.4); no sound from the
+HUAWEI CREFG-XX, whose Sound Open Firmware card is found (#249; no separate issue yet), and its fingerprint reader,
+which LordOS doesn't use for sign-in (#249).
 
 **Untested combinations**: NVIDIA cards other than an RTX 3060 on the proprietary driver (#171) and an RTX 5070 Ti on
 the open kernel modules (#235), and nouveau or NVK on any; AMD integrated graphics (APUs) on bare metal (a Radeon 780M only as a
-virtual machine's host, #92; #221's A4-3400 APU draws through its HD 5450 card, and only the card shows in the report); Intel Arc and Intel graphics newer than Whiskey Lake (Ice Lake, Tiger Lake, Alder Lake
-and later; #171's Alder Lake has no integrated GPU); hybrid laptops with two GPUs; DisplayPort MST hubs; 4K and HiDPI external monitors; suspend and resume
+virtual machine's host, #92; #221's A4-3400 APU draws through its HD 5450 card, and only the card shows in the report); Intel Arc, Intel graphics between Whiskey Lake and Raptor Lake (Ice Lake, Tiger Lake, Alder Lake;
+#171's Alder Lake has no integrated GPU) and newer than Raptor Lake (#249); hybrid laptops with two GPUs; DisplayPort MST hubs; 4K and HiDPI external monitors; suspend and resume
 (unchecked in every report file; only #14's Wi-Fi after waking is reported); ARM machines other than the reference
 Raspberry Pi 5.
 
@@ -246,6 +253,7 @@ confirm that a fix works:
 - [Diegossa2](https://github.com/Diegossa2): #171, #224
 - [javiernocito-tech](https://github.com/javiernocito-tech): #221
 - [kessbarrasa](https://github.com/kessbarrasa): #245
+- [altikardes](https://github.com/altikardes): #249, #179
 - [chevro](https://github.com/chevro): #235
 - [Kazukighost](https://github.com/Kazukighost): #2; confirmed
 - [pccasto](https://github.com/pccasto): #40, #57, #94; confirmed #57

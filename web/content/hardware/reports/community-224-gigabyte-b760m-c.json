@@ -1,0 +1,666 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-11-16",
+  "source": "community",
+  "lordos": "0.8.8.9-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "Gigabyte Technology Co., Ltd.",
+      "product": "B760M C",
+      "version": "-CF",
+      "boardVendor": "Gigabyte Technology Co., Ltd.",
+      "boardName": "B760M C",
+      "chassis": "desktop",
+      "model": "",
+      "biosVendor": "American Megatrends International, LLC.",
+      "biosVersion": "F16",
+      "biosDate": "06/13/2026",
+      "firmware": "uefi",
+      "secureBoot": null,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "12th Gen Intel(R) Core(TM) i9-12900F",
+      "vendor": "GenuineIntel",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 16,
+      "threads": 24,
+      "minMHz": 800,
+      "maxMHz": 5000,
+      "governor": "powersave",
+      "l1dKB": 48,
+      "l1iKB": 32,
+      "l2KB": 1280,
+      "l3KB": 30720
+    },
+    "memory": {
+      "totalKB": 65678348,
+      "swapKB": 4194300,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "10de",
+        "deviceId": "2504",
+        "vendor": "NVIDIA Corporation",
+        "device": "GA106 [GeForce RTX 3060 Lite Hash Rate]",
+        "driver": "nvidia",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 4,
+        "connected": 1
+      }
+    ],
+    "displays": [
+      {
+        "connector": "HDMI-A-1",
+        "enabled": false,
+        "name": "KG241Y X3",
+        "manufacturer": "ACR",
+        "product": "100c",
+        "year": 2025,
+        "widthCm": 53,
+        "heightCm": 30,
+        "diagonalTenths": 240,
+        "nativeWidth": 1920,
+        "nativeHeight": 1080,
+        "mode": "1920x1080"
+      }
+    ],
+    "storage": [
+      {
+        "model": "WD Green SN350 1TB 2G0C",
+        "vendor": "",
+        "bytes": 1000204886016,
+        "rotational": false,
+        "removable": false,
+        "transport": "nvme",
+        "link": "8.0 GT/s PCIe x4"
+      },
+      {
+        "model": "P3-512",
+        "vendor": "ATA",
+        "bytes": 512110190592,
+        "rotational": false,
+        "removable": false,
+        "transport": "sata",
+        "link": ""
+      },
+      {
+        "model": "Patriot Burst",
+        "vendor": "ATA",
+        "bytes": 480103981056,
+        "rotational": false,
+        "removable": false,
+        "transport": "sata",
+        "link": ""
+      },
+      {
+        "model": "SanDisk 3.2Gen1",
+        "vendor": "USB",
+        "bytes": 61524148224,
+        "rotational": true,
+        "removable": true,
+        "transport": "usb",
+        "link": ""
+      },
+      {
+        "model": "OnlyDisk",
+        "vendor": "Netac",
+        "bytes": 62264442880,
+        "rotational": true,
+        "removable": true,
+        "transport": "usb",
+        "link": ""
+      },
+      {
+        "model": "RTL9210 NVME",
+        "vendor": "Realtek",
+        "bytes": 512110190592,
+        "rotational": true,
+        "removable": false,
+        "transport": "usb",
+        "link": ""
+      }
+    ],
+    "pci": [
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "4660",
+        "vendor": "Intel Corporation",
+        "device": "12th Gen Core Processor Host Bridge/DRAM Registers",
+        "driver": ""
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "460d",
+        "vendor": "Intel Corporation",
+        "device": "12th Gen Core Processor PCI Express x16 Controller #1",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "464d",
+        "vendor": "Intel Corporation",
+        "device": "12th Gen Core Processor PCI Express x4 Controller #0",
+        "driver": "pcieport"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "7a60",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake USB 3.2 Gen 2x2 (20 Gb/s) XHCI Host Controller",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "050000",
+        "className": "RAM memory",
+        "vendorId": "8086",
+        "deviceId": "7a27",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake-S PCH Shared SRAM",
+        "driver": ""
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "7a4c",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake Serial IO I2C Host Controller #0",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "7a4d",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake Serial IO I2C Host Controller #1",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "7a4e",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake Serial IO I2C Host Controller #2",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "7a4f",
+        "vendor": "Intel Corporation",
+        "device": "",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "078000",
+        "className": "Communication controller",
+        "vendorId": "8086",
+        "deviceId": "7a68",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake CSME HECI #1",
+        "driver": "mei_me"
+      },
+      {
+        "class": "010601",
+        "className": "SATA controller",
+        "vendorId": "8086",
+        "deviceId": "7a62",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake SATA AHCI Controller",
+        "driver": "ahci"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "7a7c",
+        "vendor": "Intel Corporation",
+        "device": "",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "7a7d",
+        "vendor": "Intel Corporation",
+        "device": "",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "7a38",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake PCI Express Root Port #1",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "7a3a",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Point-S PCH - PCI Express Root Port 3",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "7a3b",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake PCI Express Root Port #4",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060100",
+        "className": "ISA bridge",
+        "vendorId": "8086",
+        "deviceId": "7a06",
+        "vendor": "Intel Corporation",
+        "device": "",
+        "driver": ""
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "8086",
+        "deviceId": "7a50",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake High Definition Audio Controller",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "0c0500",
+        "className": "SMBus",
+        "vendorId": "8086",
+        "deviceId": "7a23",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake-S PCH SMBus Controller",
+        "driver": "i801_smbus"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "7a24",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake SPI (flash) Controller",
+        "driver": ""
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "10de",
+        "deviceId": "2504",
+        "vendor": "NVIDIA Corporation",
+        "device": "GA106 [GeForce RTX 3060 Lite Hash Rate]",
+        "driver": "nvidia"
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "10de",
+        "deviceId": "228e",
+        "vendor": "NVIDIA Corporation",
+        "device": "GA106 High Definition Audio Controller",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "010802",
+        "className": "Non-Volatile memory controller",
+        "vendorId": "15b7",
+        "deviceId": "5019",
+        "vendor": "Sandisk Corp",
+        "device": "WD Green SN350 240GB (DRAM-less) / SN560E NVMe SSD",
+        "driver": "nvme"
+      },
+      {
+        "class": "020000",
+        "className": "Ethernet controller",
+        "vendorId": "10ec",
+        "deviceId": "8168",
+        "vendor": "Realtek Semiconductor Co., Ltd.",
+        "device": "RTL8111/8168/8211/8411 PCI Express Gigabit Ethernet Controller",
+        "driver": "r8169"
+      },
+      {
+        "class": "028000",
+        "className": "Network controller",
+        "vendorId": "10ec",
+        "deviceId": "c821",
+        "vendor": "Realtek Semiconductor Co., Ltd.",
+        "device": "RTL8821CE 802.11ac PCIe Wireless Network Adapter",
+        "driver": "rtw_8821ce"
+      }
+    ],
+    "usb": [
+      {
+        "vendorId": "048d",
+        "productId": "5702",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 12,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "13d3",
+        "productId": "3558",
+        "vendor": "",
+        "product": "",
+        "class": "e0",
+        "speedMbps": 12,
+        "driver": "btusb"
+      },
+      {
+        "vendorId": "1c4f",
+        "productId": "0048",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 1,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "05e3",
+        "productId": "0608",
+        "vendor": "",
+        "product": "",
+        "class": "09",
+        "speedMbps": 480,
+        "driver": "hub"
+      },
+      {
+        "vendorId": "05e3",
+        "productId": "0608",
+        "vendor": "",
+        "product": "",
+        "class": "09",
+        "speedMbps": 480,
+        "driver": "hub"
+      },
+      {
+        "vendorId": "2109",
+        "productId": "2815",
+        "vendor": "",
+        "product": "",
+        "class": "09",
+        "speedMbps": 480,
+        "driver": "hub"
+      },
+      {
+        "vendorId": "214b",
+        "productId": "7260",
+        "vendor": "",
+        "product": "",
+        "class": "09",
+        "speedMbps": 480,
+        "driver": "hub"
+      },
+      {
+        "vendorId": "214b",
+        "productId": "7260",
+        "vendor": "",
+        "product": "",
+        "class": "09",
+        "speedMbps": 480,
+        "driver": "hub"
+      },
+      {
+        "vendorId": "0bda",
+        "productId": "9210",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 480,
+        "driver": "usb-storage"
+      },
+      {
+        "vendorId": "1c4f",
+        "productId": "0002",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 1,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "0dd8",
+        "productId": "2300",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 480,
+        "driver": "usb-storage"
+      },
+      {
+        "vendorId": "2109",
+        "productId": "0815",
+        "vendor": "",
+        "product": "",
+        "class": "09",
+        "speedMbps": 5000,
+        "driver": "hub"
+      },
+      {
+        "vendorId": "0781",
+        "productId": "5583",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 5000,
+        "driver": "uas"
+      }
+    ],
+    "network": [
+      {
+        "kind": "ethernet",
+        "driver": "r8169",
+        "up": false,
+        "speedMbps": null
+      },
+      {
+        "kind": "wifi",
+        "driver": "rtw_8821ce",
+        "up": true,
+        "speedMbps": null
+      }
+    ],
+    "audio": [
+      "HDA Intel PCH",
+      "HDA NVidia"
+    ],
+    "bluetooth": [
+      {
+        "driver": "btusb"
+      }
+    ],
+    "power": [],
+    "thermal": [
+      {
+        "sensor": "acpitz",
+        "milliC": 16800,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 27800,
+        "fans": 0
+      },
+      {
+        "sensor": "x86_pkg_temp",
+        "milliC": 47000,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 16800,
+        "fans": 0
+      },
+      {
+        "sensor": "nvme",
+        "milliC": 39850,
+        "fans": 0
+      },
+      {
+        "sensor": "drivetemp",
+        "milliC": 42000,
+        "fans": 0
+      },
+      {
+        "sensor": "drivetemp",
+        "milliC": 33000,
+        "fans": 0
+      },
+      {
+        "sensor": "gigabyte_wmi",
+        "milliC": 29000,
+        "fans": 0
+      },
+      {
+        "sensor": "spd5118",
+        "milliC": 34500,
+        "fans": 0
+      },
+      {
+        "sensor": "spd5118",
+        "milliC": 35250,
+        "fans": 0
+      },
+      {
+        "sensor": "spd5118",
+        "milliC": 33500,
+        "fans": 0
+      },
+      {
+        "sensor": "spd5118",
+        "milliC": 32000,
+        "fans": 0
+      },
+      {
+        "sensor": "coretemp",
+        "milliC": 33000,
+        "fans": 0
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.117+deb13-amd64",
+      "lordos": "0.8.8.9-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,tomoyo,bpf,ipe,ima,evm",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false,
+      "bootMedium": "usb",
+      "bootLinkMbps": 480,
+      "bootToRam": false,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_SECCOMP_FILTER": "y",
+        "CONFIG_USER_NS": "y",
+        "CONFIG_BPF_SYSCALL": "y",
+        "CONFIG_BPF_JIT": "y",
+        "CONFIG_CGROUP_BPF": "y",
+        "CONFIG_BPF_LSM": "y",
+        "CONFIG_INET_DIAG_DESTROY": "y",
+        "CONFIG_INET_UDP_DIAG": "m",
+        "CONFIG_MEMCG": "y",
+        "CONFIG_PSI": "y",
+        "CONFIG_ZRAM": "m",
+        "CONFIG_DRM": "m",
+        "CONFIG_UHID": "m"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": true
+      }
+    },
+    "session": {
+      "composition": "gpu-off",
+      "gpuInit": "no-context",
+      "renderer": "",
+      "dmabuf": false,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "limits",
+      "note": "cpu.no-context"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "absent",
+      "note": null
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": null,
+  "desktop": null
+}

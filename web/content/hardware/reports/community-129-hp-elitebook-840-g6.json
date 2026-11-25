@@ -1,0 +1,566 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-11-11",
+  "source": "community",
+  "lordos": "0.8.8.7-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "HP",
+      "product": "HP EliteBook 840 G6",
+      "version": "SBKPFV3",
+      "boardVendor": "HP",
+      "boardName": "8549",
+      "chassis": "laptop",
+      "model": "",
+      "biosVendor": "HP",
+      "biosVersion": "R70 Ver. 01.36.00",
+      "biosDate": "06/13/2026",
+      "firmware": "uefi",
+      "secureBoot": false,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "Intel(R) Core(TM) i5-8365U CPU @ 1.60GHz",
+      "vendor": "GenuineIntel",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 4,
+      "threads": 8,
+      "minMHz": 400,
+      "maxMHz": 4100,
+      "governor": "powersave",
+      "l1dKB": 32,
+      "l1iKB": 32,
+      "l2KB": 256,
+      "l3KB": 6144
+    },
+    "memory": {
+      "totalKB": 16194812,
+      "swapKB": 2097148,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "8086",
+        "deviceId": "3ea0",
+        "vendor": "Intel Corporation",
+        "device": "WhiskeyLake-U GT2 [UHD Graphics 620]",
+        "driver": "i915",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 7,
+        "connected": 1
+      }
+    ],
+    "displays": [
+      {
+        "connector": "eDP-1",
+        "enabled": true,
+        "name": "",
+        "manufacturer": "LGD",
+        "product": "060f",
+        "year": 2018,
+        "widthCm": 31,
+        "heightCm": 17,
+        "diagonalTenths": 139,
+        "nativeWidth": 1920,
+        "nativeHeight": 1080,
+        "mode": "1920x1080"
+      }
+    ],
+    "storage": [
+      {
+        "model": "CT1000P3PSSD8",
+        "vendor": "",
+        "bytes": 1000204886016,
+        "rotational": false,
+        "removable": false,
+        "transport": "nvme",
+        "link": "8.0 GT/s PCIe x4"
+      }
+    ],
+    "pci": [
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "3e34",
+        "vendor": "Intel Corporation",
+        "device": "Coffee Lake HOST and DRAM Controller",
+        "driver": "skl_uncore"
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "8086",
+        "deviceId": "3ea0",
+        "vendor": "Intel Corporation",
+        "device": "WhiskeyLake-U GT2 [UHD Graphics 620]",
+        "driver": "i915"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "1903",
+        "vendor": "Intel Corporation",
+        "device": "Xeon E3-1200 v5/E3-1500 v5/6th Gen Core Processor Thermal Subsystem",
+        "driver": "proc_thermal"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "9df9",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP Thermal Controller",
+        "driver": "intel_pch_thermal"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "9ded",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP USB 3.1 xHCI Controller",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "050000",
+        "className": "RAM memory",
+        "vendorId": "8086",
+        "deviceId": "9def",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP Shared SRAM",
+        "driver": ""
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "9de8",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP Serial IO I2C Controller #0",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "9de9",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP Serial IO I2C Controller #1",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "078000",
+        "className": "Communication controller",
+        "vendorId": "8086",
+        "deviceId": "9de0",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP MEI Controller #1",
+        "driver": "mei_me"
+      },
+      {
+        "class": "070002",
+        "className": "Serial controller",
+        "vendorId": "8086",
+        "deviceId": "9de3",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP Keyboard and Text (KT) Redirection",
+        "driver": "serial"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "9dbc",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP PCI Express Root Port #5",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "9dbf",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point PCI Express Root Port #8",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "9db4",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP PCI Express Root Port #13",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060100",
+        "className": "ISA bridge",
+        "vendorId": "8086",
+        "deviceId": "9d84",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP LPC Controller",
+        "driver": ""
+      },
+      {
+        "class": "040100",
+        "className": "Multimedia audio controller",
+        "vendorId": "8086",
+        "deviceId": "9dc8",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP High Definition Audio Controller",
+        "driver": "sof-audio-pci-intel-cnl"
+      },
+      {
+        "class": "0c0500",
+        "className": "SMBus",
+        "vendorId": "8086",
+        "deviceId": "9da3",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP SMBus Controller",
+        "driver": "i801_smbus"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "9da4",
+        "vendor": "Intel Corporation",
+        "device": "Cannon Point-LP SPI Controller",
+        "driver": ""
+      },
+      {
+        "class": "020000",
+        "className": "Ethernet controller",
+        "vendorId": "8086",
+        "deviceId": "15bd",
+        "vendor": "Intel Corporation",
+        "device": "Ethernet Connection (6) I219-LM",
+        "driver": "e1000e"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "15e7",
+        "vendor": "Intel Corporation",
+        "device": "JHL7540 Thunderbolt 3 Bridge [Titan Ridge 2C 2018]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "15e7",
+        "vendor": "Intel Corporation",
+        "device": "JHL7540 Thunderbolt 3 Bridge [Titan Ridge 2C 2018]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "15e7",
+        "vendor": "Intel Corporation",
+        "device": "JHL7540 Thunderbolt 3 Bridge [Titan Ridge 2C 2018]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "15e7",
+        "vendor": "Intel Corporation",
+        "device": "JHL7540 Thunderbolt 3 Bridge [Titan Ridge 2C 2018]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "088000",
+        "className": "System peripheral",
+        "vendorId": "8086",
+        "deviceId": "15e8",
+        "vendor": "Intel Corporation",
+        "device": "JHL7540 Thunderbolt 3 NHI [Titan Ridge 2C 2018]",
+        "driver": "thunderbolt"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "15e9",
+        "vendor": "Intel Corporation",
+        "device": "JHL7540 Thunderbolt 3 USB Controller [Titan Ridge 2C 2018]",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "028000",
+        "className": "Network controller",
+        "vendorId": "8086",
+        "deviceId": "272b",
+        "vendor": "Intel Corporation",
+        "device": "Wi-Fi 7(802.11be) AX1775*/AX1790*/BE20*/BE401/BE1750* 2x2",
+        "driver": "iwlwifi"
+      },
+      {
+        "class": "010802",
+        "className": "Non-Volatile memory controller",
+        "vendorId": "c0a9",
+        "deviceId": "540a",
+        "vendor": "Micron/Crucial Technology",
+        "device": "P2 [Nick P2] / P3 / P3 Plus NVMe PCIe SSD (DRAM-less)",
+        "driver": "nvme"
+      }
+    ],
+    "usb": [
+      {
+        "vendorId": "8087",
+        "productId": "0036",
+        "vendor": "",
+        "product": "",
+        "class": "e0",
+        "speedMbps": 12,
+        "driver": "btusb"
+      },
+      {
+        "vendorId": "04ca",
+        "productId": "7095",
+        "vendor": "",
+        "product": "",
+        "class": "ef",
+        "speedMbps": 480,
+        "driver": "uvcvideo"
+      }
+    ],
+    "network": [
+      {
+        "kind": "ethernet",
+        "driver": "e1000e",
+        "up": false,
+        "speedMbps": null
+      },
+      {
+        "kind": "wifi",
+        "driver": "iwlwifi",
+        "up": true,
+        "speedMbps": null
+      }
+    ],
+    "audio": [
+      "sof-hda-dsp"
+    ],
+    "bluetooth": [
+      {
+        "driver": "btusb"
+      }
+    ],
+    "power": [
+      {
+        "kind": "ac",
+        "vendor": "",
+        "model": "",
+        "technology": "",
+        "status": "",
+        "capacity": null,
+        "health": null,
+        "online": 0
+      },
+      {
+        "kind": "battery",
+        "vendor": "Hewlett-Packard",
+        "model": "Primary",
+        "technology": "Li-ion",
+        "status": "Discharging",
+        "capacity": 29,
+        "health": 67,
+        "online": null
+      }
+    ],
+    "thermal": [
+      {
+        "sensor": "acpitz",
+        "milliC": 30000,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 38000,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 0,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 34000,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 33000,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 33000,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 34000,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 0,
+        "fans": 0
+      },
+      {
+        "sensor": "INT3400 Thermal",
+        "milliC": 20000,
+        "fans": 0
+      },
+      {
+        "sensor": "SEN1",
+        "milliC": 34050,
+        "fans": 0
+      },
+      {
+        "sensor": "pch_cannonlake",
+        "milliC": 35000,
+        "fans": 0
+      },
+      {
+        "sensor": "SEN2",
+        "milliC": 33050,
+        "fans": 0
+      },
+      {
+        "sensor": "B0D4",
+        "milliC": 38050,
+        "fans": 0
+      },
+      {
+        "sensor": "x86_pkg_temp",
+        "milliC": 38000,
+        "fans": 0
+      },
+      {
+        "sensor": "iwlwifi_1",
+        "milliC": 41000,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 30000,
+        "fans": 0
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.116+deb13-amd64",
+      "lordos": "0.8.8.7-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,tomoyo,bpf,ipe,ima,evm",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false,
+      "bootMedium": "internal",
+      "bootLinkMbps": null,
+      "bootToRam": false,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_SECCOMP_FILTER": "y",
+        "CONFIG_USER_NS": "y",
+        "CONFIG_BPF_SYSCALL": "y",
+        "CONFIG_BPF_JIT": "y",
+        "CONFIG_CGROUP_BPF": "y",
+        "CONFIG_BPF_LSM": "y",
+        "CONFIG_INET_DIAG_DESTROY": "y",
+        "CONFIG_INET_UDP_DIAG": "m",
+        "CONFIG_MEMCG": "y",
+        "CONFIG_PSI": "y",
+        "CONFIG_ZRAM": "m",
+        "CONFIG_DRM": "m",
+        "CONFIG_UHID": "m"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": true
+      }
+    },
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) UHD Graphics 620 (WHL GT2)",
+      "dmabuf": true,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "works",
+      "note": "gpuComposes"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "limits",
+      "note": "batteryWorn"
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": null,
+  "desktop": null
+}
