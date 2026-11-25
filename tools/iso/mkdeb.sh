@@ -28,6 +28,9 @@
 #   /usr/lib/lordos/lordos-dm-check       another display manager enabled next to lordos.service (#187): postinst warns
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
 #   /usr/share/applications/lordos-testbench.desktop   its launcher entry
+#   /usr/lib/lordos/toolkit-audit/        the harnesses of `lordos-testbench --toolkits` (tools/toolkit-audit/: small
+#                                         Python 3 windows per toolkit; each runs only if that toolkit's bindings are
+#                                         already installed, so no GTK, Qt or binding is a dependency)
 #   /usr/lib/lordos/themes/<theme>/       theme.json, theme.bundle.js and their resources (greeter: the
 #                                         login screen)
 #   /usr/lib/lordos/firmware/lordos-gvt-gop.rom  the GVT-g GOP option ROM Machines gives a vGPU (amd64; firmware/gvt-gop)
@@ -186,6 +189,12 @@ ln -s machines "$PKG/usr/share/bash-completion/completions/lordvm"
     install -d "$PKG/usr/share/applications"
     install -m 644 packaging/desktop/lordos-testbench.desktop "$PKG/usr/share/applications/lordos-testbench.desktop"
 }
+# the toolkit harnesses (GTK 3/4, Qt 5/6, ...) that `lordos-testbench --toolkits` runs; they import their bindings
+# only when present, so nothing is added to Depends or Recommends. New files, no migration.
+install -d "$L/toolkit-audit"
+for f in tools/toolkit-audit/*.py; do
+    [ -f "$f" ] && install -m 755 "$f" "$L/toolkit-audit/$(basename "$f")"
+done
 # isolated PDF and archive helper (optional: make skips it without libpoppler-glib-dev/libarchive-dev);
 # lord-server only launches the lord-doc in its own folder
 [ -x server/build/lord-doc ] && install -m 755 server/build/lord-doc "$L/bin/lord-doc"
