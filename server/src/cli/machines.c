@@ -439,7 +439,10 @@ static const char *why_of(const Run *r) {
         s = e ? e + 1 : s + l;
     }
     if (!w[0]) snprintf(w, sizeof w, "lord-vm exited with %d", r->status);
-    return w;
+    /* lord-vm's last line can quote names and guest text: printed to a terminal, so no controls or escapes */
+    static char shown[sizeof w + 8];
+    mcli_term_clean((const uint8_t *)w, strlen(w), shown, sizeof shown);
+    return shown;
 }
 
 /* lord-vm's exit status as ours: 0, 2 (a value it refused), 3 (not running), else 1 */
@@ -935,6 +938,8 @@ static int cmd_rename(Machine *x, int argc, char **argv) {
     return rc;
 }
 
+/* room for the longest apply: its arguments, lord-vm --set DIR in front, the closing NULL */
+_Static_assert(3 + MCLI_APPLY_ARGV <= 96, "cmd_set's out[] must hold apply's worst case");
 static int cmd_set(Machine *x, int argc, char **argv) {
     char *out[96];
     McliStore store;
@@ -1263,7 +1268,13 @@ static int vm_exec(const Machine *x, unsigned timeout, int argc, const char *con
 static void exec_refused(const Machine *x, int code, const char *why) {
     if (code == VME_DENIED && strstr(why, "automation is off")) ERR("noAutomation", "name", x->m.name, NULL);
     else if (code == VME_WRONG_STATE && strstr(why, "isn't running")) ERR("notRunning", "name", x->m.name, NULL);
-    else ERR("execFailed", "name", x->m.name, "why", why, NULL);
+    else {
+        /* the text can carry the guest agent's own error (lord-vm's "qemu-guest-agent refused: ..."): a guest must
+         * not drive this terminal, so its escapes and controls never reach it */
+        char shown[1200];
+        mcli_term_clean((const uint8_t *)why, strlen(why), shown, sizeof shown);
+        ERR("execFailed", "name", x->m.name, "why", shown, NULL);
+    }
 }
 
 static void write_all_fd(int fd, const uint8_t *b, size_t n) {
@@ -2000,7 +2011,13 @@ static int cmd_console(Machine *x, int shell) {
         if (!k) continue;
         if (r.seq == 77 && r.type == (shell ? VM_SHELL_FD : VM_CONSOLE_FD) && fd >= 0) { cfd = fd; break; }
         if (fd >= 0) close(fd);
-        if (r.seq == 77 && r.type == VM_REPLY) { ERR("opFailed", "name", x->m.name, "why", r.text, NULL); close(s); return VMCLI_FAILED; }
+        if (r.seq == 77 && r.type == VM_REPLY) {
+            char shown[1200];
+            mcli_term_clean((const uint8_t *)r.text, strnlen(r.text, sizeof r.text), shown, sizeof shown);
+            ERR("opFailed", "name", x->m.name, "why", shown, NULL);
+            close(s);
+            return VMCLI_FAILED;
+        }
     }
     if (cfd < 0) { close(s); ERR("notRunning", "name", x->m.name, NULL); return VMCLI_NOT_RUNNING; }
     auto_log(x, shell ? "shell: opened" : "console: opened");
@@ -2014,6 +2031,8 @@ static int cmd_console(Machine *x, int shell) {
         cfmakeraw(&raw);
         tcsetattr(0, TCSANOW, &raw);
     }
+    static McliVtf vtf;
+    mcli_vtf_init(&vtf);
     struct pollfd pf[3] = { { 0, POLLIN, 0 }, { cfd, POLLIN, 0 }, { s, POLLIN, 0 } };
     for (;;) {
         if (shell && winch && isatty(0)) {
@@ -2035,9 +2054,12 @@ static int cmd_console(Machine *x, int shell) {
         if (pf[1].revents) {
             ssize_t k = read(cfd, b, sizeof b);
             if (k <= 0) break;
-            /* the serial console is the guest's terminal: its escapes pass, as in the app's Shell, only to a terminal
-             * the person opened for it */
-            write_all_fd(1, b, (size_t)k);
+            /* the serial console is the guest's terminal: colors, cursor and modes pass to the terminal the person
+             * opened for it, but nothing that reaches past it (the clipboard, links, notifications, window
+             * operations, DCS), as the app's Shell does with no_clip_set */
+            uint8_t fo[sizeof b + MCLI_VTF_SLACK];
+            size_t fl = mcli_vtf_feed(&vtf, b, (size_t)k, fo, sizeof fo);
+            write_all_fd(1, fo, fl);
         }
         if (pf[0].revents) {
             ssize_t k = read(0, b, sizeof b);
@@ -2158,22 +2180,10 @@ static int cmd_apply(int argc, char **argv) {
         if (!x) { free(a); return 0; }
     }
     /* the settings the file gives (for a machine just made, the ones --create didn't take) */
-    char *so[80];
-    int k = 0;
-    if (a->memory[0] && !made) { so[k++] = "--memory"; so[k++] = a->memory; }
-    if (a->cpus > 0 && !made) { so[k++] = "--cpus"; so[k++] = cpus; }
-    if (a->disk[0] && !made) { so[k++] = "--disk"; so[k++] = a->disk; }
-    if (a->network[0] && (!made || !strcmp(a->network, "bridged"))) { so[k++] = "--network"; so[k++] = a->network; }
-    if (a->graphics[0]) { so[k++] = "--graphics"; so[k++] = a->graphics; }
-    if (a->clipboard[0]) { so[k++] = "--clipboard"; so[k++] = a->clipboard; }
-    if (a->agent >= 0) { so[k++] = "--agent"; so[k++] = a->agent ? "on" : "off"; }
-    if (a->iso[0] && !made) { so[k++] = "--iso"; so[k++] = a->iso; }
-    if (a->ports_set && !a->n_ports) { so[k++] = "--ports"; so[k++] = "none"; }
-    for (int i = 0; i < a->n_ports; i++) { so[k++] = "--port"; so[k++] = a->ports[i]; }
-    if (a->shares_set && !a->n_shares) { so[k++] = "--shares"; so[k++] = "none"; }
-    for (int i = 0; i < a->n_shares; i++) { so[k++] = "--share"; so[k++] = a->shares[i]; }
+    char *so[MCLI_APPLY_ARGV];
+    int k = mcli_apply_set_argv(a, made, cpus, so, MCLI_APPLY_ARGV);
+    if (k < 0) { ERR("applyBad", "file", argv[0], "line", "0", "why", "too many settings", NULL); free(a); return VMCLI_USAGE; }
     if (k) {
-        so[k] = NULL;
         if (x->st.active) { ERR("applyRunning", "name", x->m.name, NULL); free(a); return VMCLI_FAILED; }
         rc = cmd_set(x, k, so);
         if (!rc) SAY("applyUpdated", "name", x->m.name, "file", argv[0], NULL);

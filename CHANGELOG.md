@@ -1139,6 +1139,41 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **The `machines` command no longer lets a guest drive the host terminal, and `machines apply` no longer overflows
+  its stack (Claude Security review of 2026-11-24: F2, F8, F11)** (in development; latest release 0.8.9.5-beta).
+  - **F2 (MEDIUM): the guest agent's error text is cleaned.** `machines exec` and `machines cp` printed lord-vm's
+    refusal as it came, and that text can carry a hostile qemu-guest-agent's own error (`qemu-guest-agent refused:
+    ...`, where `\u001b` decodes to a raw ESC). A compromised guest could write the host clipboard with OSC 52 or fake
+    the visible output. `exec_refused` now passes the text through `mcli_term_clean` (controls, C1 controls and broken
+    UTF-8 become `?`), as the command's stdout, stderr and `cp` errors already were; so do the console's and shell's
+    refusals and every lord-vm reason (`why_of`) the command prints (`server/src/cli/machines.c`).
+  - **F8 (LOW): `machines apply`'s argument array is sized from the parser's limits.** An apply file may give 32
+    ports, 4 shares and 8 single settings, up to 88 arguments plus the closing NULL, but `cmd_apply` filled a
+    `char *so[80]` on the stack without a bound: up to 9 pointers past its end. The arguments are now built by
+    `mcli_apply_set_argv` (`server/src/cli/mcli.c`) into `so[MCLI_APPLY_ARGV]` (`2 * (8 + MCLI_APPLY_PORTS +
+    MCLI_APPLY_SHARES) + 1`), every store is bound-checked and the file is refused ("too many settings") rather than
+    overrun. `mcli_set_args` now keeps at most one store entry per option (the option name is compared from a local
+    buffer, `--opt value` is passed as given), so the worst case also goes through `machines set` whole instead of
+    being refused at the 25th port; `_Static_assert`s tie `cmd_set`'s `out[96]` and `McliStore` to those limits.
+  - **F11 (LOW): `machines console` and `machines shell` filter the guest's stream.** The bytes went straight to the
+    person's terminal, so a guest could set the host clipboard with OSC 52 whatever the machine's clipboard setting,
+    and make links, notifications and prompt marks, which the app's Shell blocks with `no_clip_set`. A new streaming
+    filter, `mcli_vtf_feed` (`server/src/cli/mcli.c`), is a small state machine kept between reads, so a sequence
+    split across reads is handled the same as a whole one. Text, C0 controls, CSI and short escape sequences pass
+    (colors, cursor movement, the alternate screen, bracketed paste and mouse modes keep working); OSC passes only for
+    titles and colors (0, 1, 2, 4, 10..12, 104, 110..112), rebuilt as `ESC ] ... BEL` and only when its text is valid
+    UTF-8 without controls; every other OSC (52, 8, 9, 7, 133, 777, 1337 ...), DCS, SOS, PM, APC, `CSI ... t` window
+    operations and the C1 controls (their UTF-8 forms; C1 CSI becomes `ESC [`) are dropped; CAN and SUB abort a
+    sequence, an ESC inside a string ends it unfinished (dropped), an OSC longer than 1 KB is dropped whole, and
+    broken UTF-8 becomes `?`.
+  - Tests (`build/mcli-test`, under ASan and UBSan): `test_apply_argv` parses the worst-case apply file (every
+    setting, 32 ports, 4 shares), checks it fills `MCLI_APPLY_ARGV` exactly with canaries past the end untouched, is
+    refused at every smaller size without a write at or past the cap, and converts whole through `mcli_set_args`;
+    `test_vtf` checks colors, cursor, modes, titles and colors pass, and that OSC 52 (BEL, ST and C1 forms), iTerm
+    Copy and File, links, notifications, cwd, prompt marks, DCS (DECRQSS, sixel, tmux pass-through), SOS, PM, APC,
+    window operations and C1 controls are dropped, every case fed at every split size from 1 byte to whole, plus a
+    fuzz pass of 4000 random streams that checks the output is the same however the input is split and never holds
+    a disallowed OSC, a DCS/SOS/PM/APC introducer or a C1 control.
 - **Settings → Language & Region → Region names each region's language (GitHub #239 follow-up)** (in development;
   latest release 0.8.9.5-beta). A row named only its country, so the five regions of France (Breton, Catalan, Basque,
   French and Occitan) all read "France · xx_FR", and Basque was picked by mistake. Each row now reads "Basque · France
