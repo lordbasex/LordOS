@@ -39,6 +39,7 @@
 #include "../vm/vmgpu.h"
 #include "../vm/vmsig.h"
 #include "../vm/vmusb.h"
+#include "../hw/display.h"
 #include "../admin.h"
 #include "../wl/wl.h"
 #include "../gpu/gpu.h"
@@ -2920,6 +2921,9 @@ static void usb_tick(Sess *s) {
     }
     s->usb_tried_n = keep;
     if (!s->n_usb_auto || !s->usb_ctrl || s->usb_lock || s->usb_busy) return;
+    /* only while this session is the one on the screen: root refuses anyone else (vm-usb-allow, remote/seat.h), and a
+     * device not tried now is tried when the person is back */
+    if (!display_on_monitor()) return;
     VmUsbDev list[VMUSB_MAX];
     int n = vmusb_list(VMUSB_SYS, list, VMUSB_MAX);
     for (int i = 0; i < n; i++) {

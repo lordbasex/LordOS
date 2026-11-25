@@ -915,6 +915,7 @@
   "vm.usbInputInUse": "Bu, bu kompüterin istifadə etdiyi klaviatura və ya siçandır",
   "vm.usbMounted": "Həmin disk bu kompüterdə istifadə olunur: əvvəlcə çıxarın",
   "vm.usbAdminOnly": "Maşına disk, şəbəkə kartı və ya Bluetooth adapterini yalnız administrator verə bilər",
+  "vm.usbNotAtSeat": "Maşına USB cihazını yalnız bu kompüterin ekranındakı sessiya verə bilər",
   "vm.usbGone": "Həmin USB cihazı artıq taxılı deyil",
   "vm.usbLocked": "Bu maşın anonimlik üçün kilidlənib: USB cihazı yoxdur",
   "vm.usbNoController": "Bu maşının USB nəzarətçisi yoxdur: Konfiqurasiyada USB cihazlarını aktivləşdirib yenidən başladın",

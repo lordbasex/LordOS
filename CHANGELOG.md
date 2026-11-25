@@ -1139,6 +1139,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Machines: `vm-usb-allow` serves only the person at the computer (Claude Security F1 and F3)** (in development; latest
+  release 0.8.9.5-beta). The root admin action that opens a host USB device read and write for a machine was `A_ANYONE`
+  and never checked that the asking session was the one on the monitor, so a non-administrator's session in the
+  background (fast user switching) or reached through the remote desktop could take a webcam, a microphone, a smart-card
+  reader or a key the person at the seat was using, by hand or through a machine's usb_auto rule. The helper now refuses
+  (`vm.usbNotAtSeat`, logged to admin.log) unless the session user is the one lord-sessiond has on the monitor, read as root
+  from lord-sessiond's own record and never from the request (`server/src/remote/seat.c` `seat_user_is_active`):
+  `/run/lordos/status.json` owned by root, a regular file opened with `O_NOFOLLOW` and not group- or world-writable, the pid
+  it names a running `lord-sessiond` (`/proc/<pid>/exe`), and the last `"monitor"` key (after the lists a stranger's text
+  can reach, such as a name typed on the login screen) exactly that user. The login screen or a locked screen in front, no
+  lord-sessiond, or a file left by one that died all mean "no". The action stays closed and keeps every earlier check.
+  lord-server no longer tries usb_auto rules while its session isn't on the screen (`display_on_monitor`) and tries them
+  when it is back. The new message is in all 35 languages. Tests: `vmusb-test` gains the seat cases (the user on the
+  monitor may; a background or remote user, the login screen, a dead or foreign pid, a file another user owns, a
+  world-writable file, a symlink, no file, a forged `monitor` key earlier in the file, names that aren't user names, a cut
+  file, and random input under ASan).
 - **Settings → Language & Region → Region names each region's language (GitHub #239 follow-up)** (in development;
   latest release 0.8.9.5-beta). A row named only its country, so the five regions of France (Breton, Catalan, Basque,
   French and Occitan) all read "France · xx_FR", and Basque was picked by mistake. Each row now reads "Basque · France

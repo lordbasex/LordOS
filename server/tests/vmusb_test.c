@@ -1,7 +1,10 @@
 /* vmusb_test.c — src/vm/vmusb.c on a made-up sysfs (docs/VIRTUALIZATION.md 6.6): listing, the refusals (a hub, the
  * session's keyboard held open, storage for someone who isn't an administrator, a mounted or held disk, swap), the
- * request, rule and line parsers (and random input into each), and the descriptor check. Built with ASan and UBSan. */
+ * request, rule and line parsers (and random input into each), and the descriptor check; and remote/seat.c, vm-usb-allow's
+ * "only the person at the computer" (the session user is the one lord-sessiond has on the monitor), on a made-up status.json
+ * and /proc. Built with ASan and UBSan. */
 #include "../src/vm/vmusb.h"
+#include "../src/remote/seat.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -294,6 +297,92 @@ static void test_fd(void) {
     }
 }
 
+/* remote/seat.c: vm-usb-allow serves only the user lord-sessiond has on the monitor */
+#define ST_HEAD "{\"running\":true,\"pid\":%d,\"port\":5673,\"allow\":\"all\",\"clients\":[],\"net\":\"lan\",\"blocked\":[%s],\"allowed\":[],"
+static void status(int pid, const char *blocked, const char *monitor, const char *sessions) {
+    char j[2048];
+    int n = snprintf(j, sizeof j, ST_HEAD, pid, blocked);
+    snprintf(j + n, sizeof j - (size_t)n, "\"monitor\":\"%s\",\"sessions\":[%s]}\n", monitor, sessions);
+    put("run/status.json", j);
+    char p[1024];
+    snprintf(p, sizeof p, "%s/run/status.json", root);
+    chmod(p, 0644);
+}
+
+static void test_seat(void) {
+    char st[512], proc[512], ln[512];
+    p(st, "run/status.json");
+    p(proc, "proc");
+    uid_t me = getuid();
+    mk("proc/4242");
+    lnk("proc/4242/exe", "/usr/sbin/lord-sessiond");
+    mk("proc/4243");
+    lnk("proc/4243/exe", "/usr/bin/bash");
+    mk("proc/4244");
+    lnk("proc/4244/exe", "/usr/sbin/lord-sessiond (deleted)");
+    const char *two = "{\"pid\":900,\"user\":\"alice\",\"since\":1},{\"pid\":901,\"user\":\"bob\",\"since\":2}";
+
+    /* the user on the monitor may; another user with a session (in the background, or through the remote desktop) may not */
+    status(4242, "", "alice", two);
+    CHECK(seat_user_is_active(st, proc, me, "alice") == 1, "the user on the monitor is at the seat");
+    CHECK(seat_user_is_active(st, proc, me, "bob") == 0, "a background or remote session's user is not");
+    char who[40] = "x";
+    CHECK(!seat_monitor_user("{\"running\":true,\"pid\":1,\"allowed\":[],\"monitor\":\"alice\",\"sessions\":[]}", who, sizeof who) &&
+          !strcmp(who, "alice"), "monitor read");
+    /* the login screen or a locked screen in front: nobody is */
+    status(4242, "", "", two);
+    CHECK(seat_user_is_active(st, proc, me, "alice") == 0, "login or lock screen: nobody at the seat");
+    CHECK(seat_user_is_active(st, proc, me, "") == 0, "an empty user never matches the empty monitor");
+    /* lord-sessiond must be the one running: a file left by one that died, or a pid now another program's, says nothing */
+    status(4243, "", "alice", two);
+    CHECK(seat_user_is_active(st, proc, me, "alice") == 0, "the pid isn't lord-sessiond");
+    status(4245, "", "alice", two);
+    CHECK(seat_user_is_active(st, proc, me, "alice") == 0, "no such process");
+    status(4244, "", "alice", two);
+    CHECK(seat_user_is_active(st, proc, me, "alice") == 1, "lord-sessiond replaced by an upgrade still counts");
+    /* the file must be the owner's (root), not writable by others, not a symlink, and there */
+    status(4242, "", "alice", two);
+    CHECK(seat_user_is_active(st, proc, me + 1, "alice") == 0, "a file someone else owns");
+    chmod(st, 0666);
+    CHECK(seat_user_is_active(st, proc, me, "alice") == 0, "a world-writable file");
+    chmod(st, 0644);
+    p(ln, "run/link.json");
+    unlink(ln);
+    if (!symlink(st, ln)) CHECK(seat_user_is_active(ln, proc, me, "alice") == 0, "a symlink");
+    p(ln, "run/none.json");
+    CHECK(seat_user_is_active(ln, proc, me, "alice") == 0, "no file (no lord-sessiond)");
+    /* text a stranger reaches (a name typed on the login screen ends up in the blocked list) can't name someone */
+    status(4242, "{\"ip\":\"monitor:x\\\"}],\"monitor\":\"bob\",\"sessions\":[\",\"until\":9}", "alice", two);
+    CHECK(seat_user_is_active(st, proc, me, "bob") == 0, "a forged monitor key earlier in the file");
+    CHECK(seat_user_is_active(st, proc, me, "alice") == 1, "the real one still counts");
+    status(4242, "{\"ip\":\"monitor:x\"}],\"monitor\":\"bob\",\"sessions\":[{\"ip\":\"y\",\"until\":9}", "", two);
+    CHECK(seat_user_is_active(st, proc, me, "bob") == 0, "a forged key before the real empty one");
+    /* names that aren't user names, and broken files */
+    status(4242, "", "alice", two);
+    CHECK(seat_user_is_active(st, proc, me, "Alice") == 0 && seat_user_is_active(st, proc, me, "../alice") == 0 &&
+          seat_user_is_active(st, proc, me, NULL) == 0, "not a user name");
+    put("run/status.json", "{\"running\":true,\"pid\":4242,\"monitor\":\"alice\"");
+    chmod(st, 0644);
+    CHECK(seat_user_is_active(st, proc, me, "alice") == 0, "a cut file");
+    put("run/status.json", "{\"pid\":4242,\"allowed\":[],\"monitor\":\"alice\",\"sessions\":[]}");
+    chmod(st, 0644);
+    CHECK(seat_user_is_active(st, proc, me, "alice") == 0, "not lord-sessiond's layout");
+    CHECK(seat_monitor_user("],\"monitor\":\"al\\\"ice\",\"sessions\":[", who, sizeof who) == -1, "a quote in the name");
+    CHECK(seat_monitor_user("],\"monitor\":\"alice\"}", who, sizeof who) == -1, "no sessions after it");
+    char tiny[4];
+    CHECK(seat_monitor_user("],\"monitor\":\"alice\",\"sessions\":[", tiny, sizeof tiny) == -1, "too long for out");
+    /* random input never reads out of bounds (ASan) */
+    srand(7);
+    for (int i = 0; i < 20000; i++) {
+        char buf[64];
+        static const char al[] = "],\"monitorsein:[{ab_-";
+        int n = rand() % 63;
+        for (int k = 0; k < n; k++) buf[k] = al[rand() % (int)(sizeof al - 1)];
+        buf[n] = 0;
+        if (!seat_monitor_user(buf, who, sizeof who)) CHECK(strlen(who) <= 32, "random status");
+    }
+}
+
 int main(void) {
     snprintf(root, sizeof root, "%s/vmusb-test.XXXXXX", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
     if (!mkdtemp(root)) { perror("mkdtemp"); return 1; }
@@ -302,6 +391,7 @@ int main(void) {
     test_refusals();
     test_parsers();
     test_fd();
+    test_seat();
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", root);
     if (system(cmd)) {}

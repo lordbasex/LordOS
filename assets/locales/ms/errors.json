@@ -914,6 +914,7 @@
   "vm.usbInputInUse": "Itu papan kekunci atau tetikus yang digunakan komputer ini",
   "vm.usbMounted": "Cakera itu sedang digunakan pada komputer ini: keluarkannya dahulu",
   "vm.usbAdminOnly": "Hanya pentadbir boleh memberi mesin cakera, kad rangkaian atau penyesuai Bluetooth",
+  "vm.usbNotAtSeat": "Hanya sesi pada skrin komputer ini boleh memberi mesin peranti USB",
   "vm.usbGone": "Peranti USB itu tidak lagi dipasang",
   "vm.usbLocked": "Mesin ini dikunci untuk ketanpanamaan: tiada peranti USB",
   "vm.usbNoController": "Mesin ini tiada pengawal USB: hidupkan peranti USB dalam Konfigurasi dan mulakannya semula",

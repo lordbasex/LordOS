@@ -915,6 +915,7 @@
   "vm.usbInputInUse": "Dat is het toetsenbord of de muis die deze computer gebruikt",
   "vm.usbMounted": "Die schijf is in gebruik op deze computer: werp hem eerst uit",
   "vm.usbAdminOnly": "Alleen een beheerder kan een machine een schijf, een netwerkkaart of een Bluetooth-adapter geven",
+  "vm.usbNotAtSeat": "Alleen de sessie op het scherm van deze computer kan een machine een USB-apparaat geven",
   "vm.usbGone": "Dat USB-apparaat is niet meer aangesloten",
   "vm.usbLocked": "Deze machine is vergrendeld voor anonimiteit: geen USB-apparaten",
   "vm.usbNoController": "Deze machine heeft geen USB-controller: zet USB-apparaten aan in Configureren en start haar opnieuw",

@@ -3156,6 +3156,15 @@ this computer's drivers when it leaves. One machine holds a device at a time, an
   or a Bluetooth adapter (a `net` or `bluetooth` folder under one of its interfaces) when the person isn't an administrator
   (`vm.usbAdminOnly`: a person at the seat could otherwise cut this computer's network); a machine locked for anonymity (19.5, `vm.usbLocked`: refused by lord-server,
   by lord-vm and by machine.json's check). The boot disk is mounted, so it is refused like any mounted disk.
+- *Only the person at the computer* (root only, since the Claude Security findings F1/F3 of 2026-11-24): `vm-usb-allow`
+  serves only the session user lord-sessiond has on the monitor (`vm.usbNotAtSeat` otherwise). Root reads that from
+  lord-sessiond's own record, never from the request (`server/src/remote/seat.c` `seat_user_is_active`):
+  `/run/lordos/status.json` must be root's, a regular file opened without following a symlink and not writable by group or
+  others; the pid it names must be a running `lord-sessiond`; and its `monitor` key (the last one in the file, after every
+  list a stranger's text can reach) must be exactly that user. So a session in the background (fast user switching), one
+  reached through the remote desktop, a session behind the login or lock screen, and any lord-server without lord-sessiond
+  get no device. A device already in a machine stays when the session leaves the screen. lord-server also stops trying
+  usb_auto rules while it isn't the session on the screen (`display_on_monitor`), and tries them again when it is back.
 - *QEMU's side.* QEMU's usb-host calls `libusb_init`, which looks for every USB device of the computer (a netlink socket,
   `/sys/bus/usb`, `/run/udev`): none of that is allowed in its sandbox. lord-vm preloads `lord-vm-usb.so`
   (`/usr/lib/lordos/lib`, `vmusbshim.c`), which only sets libusb's default to `LIBUSB_OPTION_NO_DEVICE_DISCOVERY`

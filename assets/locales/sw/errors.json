@@ -915,6 +915,7 @@
   "vm.usbInputInUse": "Hiyo ni kibodi au kipanya kinachotumiwa na kompyuta hii",
   "vm.usbMounted": "Diski hiyo inatumika kwenye kompyuta hii: iondoe kwanza",
   "vm.usbAdminOnly": "Msimamizi pekee anaweza kuipa mashine diski, kadi ya mtandao au adapta ya Bluetooth",
+  "vm.usbNotAtSeat": "Kipindi kilicho kwenye skrini ya kompyuta hii pekee kinaweza kuipa mashine kifaa cha USB",
   "vm.usbGone": "Kifaa hicho cha USB hakijachomekwa tena",
   "vm.usbLocked": "Mashine hii imefungwa kwa ajili ya kutojulikana: hakuna vifaa vya USB",
   "vm.usbNoController": "Mashine hii haina kidhibiti cha USB: washa vifaa vya USB katika Sanidi kisha iwashe upya",

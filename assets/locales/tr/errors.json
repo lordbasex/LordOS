@@ -915,6 +915,7 @@
   "vm.usbInputInUse": "Bu, bu bilgisayarın kullandığı klavye ya da fare",
   "vm.usbMounted": "O disk bu bilgisayarda kullanılıyor: önce çıkarın",
   "vm.usbAdminOnly": "Bir makineye disk, ağ kartı ya da Bluetooth bağdaştırıcısını yalnızca bir yönetici verebilir",
+  "vm.usbNotAtSeat": "Bir makineye USB aygıtını yalnızca bu bilgisayarın ekranındaki oturum verebilir",
   "vm.usbGone": "O USB aygıtı artık takılı değil",
   "vm.usbLocked": "Bu makine anonimlik için kilitli: USB aygıtı yok",
   "vm.usbNoController": "Bu makinenin USB denetleyicisi yok: Yapılandır'da USB aygıtlarını açıp yeniden başlatın",

@@ -915,6 +915,7 @@
   "vm.usbInputInUse": "Ez a számítógép használatban lévő billentyűzete vagy egere",
   "vm.usbMounted": "A lemez használatban van a számítógépen: előbb add ki",
   "vm.usbAdminOnly": "Csak rendszergazda adhat egy gépnek lemezt, hálózati kártyát vagy Bluetooth-adaptert",
+  "vm.usbNotAtSeat": "Csak a számítógép képernyőjén lévő munkamenet adhat USB-eszközt egy gépnek",
   "vm.usbGone": "Az USB-eszköz már nincs bedugva",
   "vm.usbLocked": "Ez a gép névtelenség miatt zárolt: nincs USB-eszköz",
   "vm.usbNoController": "A gépnek nincs USB-vezérlője: kapcsold be az USB-eszközöket a Beállításban, és indítsd újra",

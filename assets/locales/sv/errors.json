@@ -915,6 +915,7 @@
   "vm.usbInputInUse": "Det är tangentbordet eller musen som den här datorn använder",
   "vm.usbMounted": "Den disken används på den här datorn: mata ut den först",
   "vm.usbAdminOnly": "Bara en administratör kan ge en maskin en disk, ett nätverkskort eller en Bluetooth-adapter",
+  "vm.usbNotAtSeat": "Bara sessionen på den här datorns skärm kan ge en maskin en USB-enhet",
   "vm.usbGone": "Den USB-enheten är inte ansluten längre",
   "vm.usbLocked": "Den här maskinen är låst för anonymitet: inga USB-enheter",
   "vm.usbNoController": "Den här maskinen har ingen USB-styrenhet: slå på USB-enheter i Konfigurera och starta den igen",

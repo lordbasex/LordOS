@@ -915,6 +915,7 @@
   "vm.usbInputInUse": "C'est le clavier ou la souris utilisés sur cet ordinateur",
   "vm.usbMounted": "Ce disque est utilisé sur cet ordinateur : éjectez-le d'abord",
   "vm.usbAdminOnly": "Seul un administrateur peut donner à une machine un disque, une carte réseau ou un adaptateur Bluetooth",
+  "vm.usbNotAtSeat": "Seule la session affichée sur l'écran de cet ordinateur peut donner un périphérique USB à une machine",
   "vm.usbGone": "Ce périphérique USB n'est plus branché",
   "vm.usbLocked": "Cette machine est verrouillée pour l'anonymat : pas de périphériques USB",
   "vm.usbNoController": "Cette machine n'a pas de contrôleur USB : activez les périphériques USB dans sa configuration et redémarrez-la",

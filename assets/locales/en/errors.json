@@ -915,6 +915,7 @@
   "vm.usbInputInUse": "That's the keyboard or mouse in use on this computer",
   "vm.usbMounted": "That disk is in use on this computer: eject it first",
   "vm.usbAdminOnly": "Only an administrator can give a disk, a network card or a Bluetooth adapter to a machine",
+  "vm.usbNotAtSeat": "Only the session on this computer's screen can give a USB device to a machine",
   "vm.usbGone": "That USB device isn't plugged in any more",
   "vm.usbLocked": "This machine is locked for anonymity: no USB devices",
   "vm.usbNoController": "This machine has no USB controller: turn on USB devices in its Configure and start it again",

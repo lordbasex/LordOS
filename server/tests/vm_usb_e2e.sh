@@ -3,6 +3,7 @@
 # "Machines' USB devices"). Not in `make test`: it needs root (sudo -n), KVM, QEMU, a USB device nobody uses, a Linux guest
 # image with qemu-guest-agent, and a LordOS install's /usr/lib/lordos/lib folder (where lord-vm-usb.so goes; the test
 # mounts its own copy over it in a private mount namespace, the system's files never change).
+# Run it from the session on the monitor: vm-usb-allow serves only the user lord-sessiond has there (remote/seat.h).
 #
 #   VM_USB_DEV="BUS DEV VVVV:PPPP"   the device (a webcam for the camera checks: VM_USB_CAMERA=1)
 #   VM_USB_HUB="BUS DEV VVVV:PPPP"   a hub of this computer (only asked for: it must be refused)

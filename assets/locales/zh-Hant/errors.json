@@ -914,6 +914,7 @@
   "vm.usbInputInUse": "這是這台電腦正在使用的鍵盤或滑鼠",
   "vm.usbMounted": "該磁碟正在這台電腦上使用：請先退出",
   "vm.usbAdminOnly": "只有管理員才能把磁碟、網路卡或藍牙配接器交給機器",
+  "vm.usbNotAtSeat": "只有這台電腦螢幕上的工作階段才能把 USB 裝置交給機器",
   "vm.usbGone": "該 USB 裝置已不再插入",
   "vm.usbLocked": "這台機器為匿名而鎖定：沒有 USB 裝置",
   "vm.usbNoController": "這台機器沒有 USB 控制器：請在「設定」中開啟 USB 裝置並重新啟動它",

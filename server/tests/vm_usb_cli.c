@@ -5,7 +5,8 @@
  *
  * The caller is SUDO_USER (as the helper's session user; --not-admin: as someone who isn't an administrator). It prints the
  * answer line ("OK vm.usbReady" or "ERR <code>"); with a program, on OK it becomes SUDO_USER (groups, gid, uid) and runs it
- * with the device's descriptor as fd 5, the way lord-server hands it to lord-vm: nothing else of root goes along. */
+ * with the device's descriptor as fd 5, the way lord-server hands it to lord-vm: nothing else of root goes along. Like the
+ * helper, it answers "ERR vm.usbNotAtSeat" unless SUDO_USER is the user lord-sessiond has on the monitor (remote/seat.h). */
 #include "admin.h"
 #include "vm/vm_admin.h"
 

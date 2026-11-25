@@ -5,9 +5,13 @@
  * picked (vendor and product); never a hub or a root hub, a device whose keyboard or mouse a process holds (the session's),
  * a disk this computer has mounted, uses as swap or under another block device, or storage when the person isn't an
  * administrator (vmusb_refusal). The node opened is checked by its device number against sysfs, and sysfs read again
- * after the open, so a device unplugged and another one given the same address in between is refused. */
+ * after the open, so a device unplugged and another one given the same address in between is refused. Only for the person
+ * at the computer: the session user must be the one lord-sessiond has on the monitor (remote/seat.h, read here as root from
+ * lord-sessiond's own record, never from the request), so a session in the background (fast user switching), one reached
+ * through the remote desktop, or one behind the login or lock screen never gets a device the person at the seat plugged in. */
 #include "vm_admin.h"
 #include "vmusb.h"
+#include "../remote/seat.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -22,6 +26,11 @@ void vm_act_usb_allow(const AdminReq *r, const char *arg, size_t len) {
     int bus, dev;
     unsigned vendor, product;
     if (vmusb_req_parse(arg, len, id, &bus, &dev, &vendor, &product)) { admin_err("admin.invalidArgument", NULL); return; }
+    if (!seat_user_is_active(SEAT_STATUS, "/proc", 0, r->user)) {
+        fprintf(stderr, "admin: %s vm-usb-allow %04x:%04x refused: not the session on the monitor\n", r->user, vendor, product);
+        admin_err("vm.usbNotAtSeat", NULL);
+        return;
+    }
     VmUsbDev d;
     if (vmusb_find(VMUSB_SYS, bus, dev, &d) || d.vendor != vendor || d.product != product) { admin_err("vm.usbGone", NULL); return; }
     const char *no = vmusb_refusal(VMUSB_SYS, "/proc", "/proc/self/mountinfo", "/proc/swaps", &d, r->admin);
