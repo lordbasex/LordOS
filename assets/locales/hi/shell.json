@@ -606,6 +606,7 @@
   "widgets.subtitle": "एक आकार चुनें: यह इस गतिविधि में इस डिस्प्ले की ग्रिड पर अपनी जगह लेता है। हिलाने के लिए खींचें।",
   "widgets.search": "विजेट खोजें",
   "widgets.noMatch": "खोज से कोई विजेट मेल नहीं खाता",
+  "widgets.back": "वापस",
   "widgets.cat.all": "सभी",
   "widgets.cat.time": "समय",
   "widgets.cat.system": "सिस्टम",

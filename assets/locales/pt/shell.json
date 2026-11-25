@@ -606,6 +606,7 @@
   "widgets.subtitle": "Escolha um tamanho: ele ocupa seu lugar na grade deste monitor, nesta atividade. Arraste para mover.",
   "widgets.search": "Buscar widgets",
   "widgets.noMatch": "Nenhum widget corresponde à busca",
+  "widgets.back": "Voltar",
   "widgets.cat.all": "Todos",
   "widgets.cat.time": "Tempo",
   "widgets.cat.system": "Sistema",

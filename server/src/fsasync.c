@@ -10,8 +10,10 @@
  * Security: the request carries the path exactly as JS gave it. The worker resolves it with the same fsops.c functions
  * the synchronous lord.fs calls use (fsops_resolve_readable / _target / _stat: the roots, the pseudo-filesystems, the
  * protected folders, a share that stopped answering), then fstrash_put adds its own checks (fsops_protected_below).
- * Nothing new is reachable: the operations are a closed list (list, stat, free, du, and three writes lord.fs already had:
- * move to the Trash, new folder, rename), each the synchronous call's own checks and code on another thread.
+ * Nothing new is reachable: the operations are a closed list (list, stat, free, du, and four writes lord.fs already had:
+ * move to the Trash, new folder, rename, and (0.8.9.6.2, writeAsync) writing a file), each the synchronous call's own
+ * checks and code on another thread. A write to a file waits for an older one to the same file still on a worker
+ * (writes holds them), and lord.fs.write waits for them too (fsasync_wait_write): the newest text always lands last.
  * FSA_FN runs a function of lord-server's own that a native call names in C (lord.media.camerasAsync: the camera list
  * lord.media.cameras makes), never one chosen from JS: the same code as the synchronous call, on another thread. */
 #include "fsasync.h"
@@ -35,12 +37,14 @@
 void (*fsasync_test_hook)(int op, const char *path);
 #endif
 
-typedef struct Req { int req, op; double ms; char *path, *path2, *json; FsaFn fn; struct Req *next; } Req;
+typedef struct Req { int req, op; double ms; char *path, *path2, *json, *data; size_t len; FsaFn fn; struct Req *next, *wnext; } Req;
 
 static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
 static Req *todo, *todo_tail, *done, *done_tail;
 static int nthreads, nidle, ntodo, inflight, next_req = 1, efd = -1;
+static pthread_cond_t wcv = PTHREAD_COND_INITIALIZER;
+static Req *writes;                 /* FSA_WRITE requests queued or running, oldest first (path2: the resolved file) */
 
 /* ---- a small JSON writer (strings as valid UTF-8: a byte that isn't becomes U+FFFD) ---- */
 
@@ -237,6 +241,63 @@ static char *op_du(const char *path, double ms) {
     return strdup(b);
 }
 
+/* as lord.fs.write (js_sys.c f_fs_write): the file resolved like a destination, a regular file or a new one (its mode
+ * kept), written whole to a temporary file next to it, fsync'd and renamed over it */
+static char *op_write(const char *path, const char *data, size_t len) {
+#ifdef FSASYNC_TEST
+    if (fsasync_test_hook) fsasync_test_hook(FSA_WRITE, path);
+#endif
+    char target[PATH_MAX + 300], dir[PATH_MAX];
+    int down = 0, r = fsops_resolve_target(path, target, sizeof target, dir, sizeof dir, &down);
+    if (r) return path_error(r, down, path);
+    struct stat st;
+    mode_t mode = 0644;
+    if (!lstat(target, &st)) {
+        if (!S_ISREG(st.st_mode)) return error_json("fs.notRegular");
+        mode = st.st_mode & 07777;
+    }
+    char tmp[PATH_MAX + 64];
+    snprintf(tmp, sizeof tmp, "%s/.lordos-write-XXXXXX", dir);
+    int fd = mkstemp(tmp);
+    int ok = fd >= 0;
+    if (ok) {
+        fchmod(fd, mode);
+        for (size_t off = 0; ok && off < len;) {
+            ssize_t w = write(fd, data + off, len - off);
+            if (w < 0 && errno == EINTR) continue;
+            if (w <= 0) ok = 0; else off += (size_t)w;
+        }
+        if (ok && fsync(fd)) ok = 0;
+        if (close(fd)) ok = 0;
+        if (ok && rename(tmp, target)) ok = 0;
+        if (!ok) { int e = errno; unlink(tmp); errno = e; }
+    }
+    if (!ok) return errno_json(errno ? errno : EIO);
+    return strdup("{\"ok\":true}");
+}
+
+/* an older write to the same file is still queued or running: this one waits for it (called with mu held) */
+static int older_write(const Req *r) {
+    for (const Req *w = writes; w && w != r; w = w->wnext) if (!strcmp(w->path2, r->path2)) return 1;
+    return 0;
+}
+static void writes_remove(Req *r) {
+    for (Req **p = &writes; *p; p = &(*p)->wnext) if (*p == r) { *p = r->wnext; break; }
+    pthread_cond_broadcast(&wcv);
+}
+
+void fsasync_wait_write(const char *target) {
+    if (!target) return;
+    pthread_mutex_lock(&mu);
+    for (;;) {
+        int busy = 0;
+        for (const Req *w = writes; w; w = w->wnext) if (!strcmp(w->path2, target)) { busy = 1; break; }
+        if (!busy) break;
+        pthread_cond_wait(&wcv, &mu);
+    }
+    pthread_mutex_unlock(&mu);
+}
+
 static char *run(int op, const char *path, const char *path2, double ms, FsaFn fn) {
 #ifdef FSASYNC_TEST
     if (fsasync_test_hook) fsasync_test_hook(op, path);
@@ -265,10 +326,12 @@ static void *worker(void *arg) {
         todo = r->next;
         if (!todo) todo_tail = NULL;
         ntodo--;
+        if (r->op == FSA_WRITE) while (older_write(r)) pthread_cond_wait(&wcv, &mu);
         pthread_mutex_unlock(&mu);
-        r->json = run(r->op, r->path, r->path2, r->ms, r->fn);
+        r->json = r->op == FSA_WRITE ? op_write(r->path, r->data, r->len) : run(r->op, r->path, r->path2, r->ms, r->fn);
         r->next = NULL;
         pthread_mutex_lock(&mu);
+        if (r->op == FSA_WRITE) { writes_remove(r); free(r->data); r->data = NULL; }
         if (done_tail) done_tail->next = r; else done = r;
         done_tail = r;
         pthread_mutex_unlock(&mu);
@@ -295,7 +358,7 @@ static int spawn(void) {
 }
 
 static int submit(int op, const char *path, const char *path2, double ms, char *err, size_t errlen);
-static int enqueue(int op, const char *path, const char *path2, double ms, FsaFn fn, char *err, size_t errlen);
+static int enqueue(int op, const char *path, const char *path2, double ms, FsaFn fn, char *data, size_t len, char *err, size_t errlen);
 
 int fsasync_submit(int op, const char *path, char *err, size_t errlen) {
     return op == FSA_DU ? fsasync_submit_du(path, 0, err, errlen) : submit(op, path, NULL, 0, err, errlen);
@@ -303,6 +366,25 @@ int fsasync_submit(int op, const char *path, char *err, size_t errlen) {
 int fsasync_submit2(int op, const char *path, const char *path2, char *err, size_t errlen) {
     if (op == FSA_DU) { lerr_set(err, errlen, "sys.badArgument", NULL); return -1; }
     return submit(op, path, path2, 0, err, errlen);
+}
+
+int fsasync_submit_write(const char *path, const char *data, size_t len, char *err, size_t errlen) {
+    if (!path || !path[0] || strlen(path) >= PATH_MAX || (!data && len)) { lerr_set(err, errlen, "sys.badArgument", NULL); return -1; }
+    if (len > FSA_WRITE_MAX) { lerr_set(err, errlen, "fs.tooLarge", "max", "32 MB", NULL); return -1; }
+    /* resolved now too, as the key that orders the writes to one file (the worker resolves it again before writing) */
+    char target[PATH_MAX + 300];
+    int down = 0, r = fsops_resolve_target(path, target, sizeof target, NULL, 0, &down);
+    if (r) {
+        if (r == -1 && !down && fsops_name_too_long(path)) lerr_set(err, errlen, "fs.nameTooLong", "max", "255", NULL);
+        else lerr_set(err, errlen, r == -2 ? "fs.protected" : down ? "share.notResponding" : "fs.outsideHome", NULL);
+        return -1;
+    }
+    char *copy = malloc(len ? len : 1);
+    if (!copy) { lerr_set(err, errlen, "sys.outOfMemory", NULL); return -1; }
+    if (len) memcpy(copy, data, len);
+    int id = enqueue(FSA_WRITE, path, target, 0, NULL, copy, len, err, errlen);
+    if (id < 0) free(copy);
+    return id;
 }
 
 int fsasync_submit_du(const char *path, double ms, char *err, size_t errlen) {
@@ -313,7 +395,7 @@ int fsasync_submit_du(const char *path, double ms, char *err, size_t errlen) {
 
 int fsasync_submit_fn(FsaFn fn, const char *arg, char *err, size_t errlen) {
     if (!fn || !arg || strlen(arg) >= PATH_MAX) { lerr_set(err, errlen, "sys.badArgument", NULL); return -1; }
-    return enqueue(FSA_FN, arg, NULL, 0, fn, err, errlen);
+    return enqueue(FSA_FN, arg, NULL, 0, fn, NULL, 0, err, errlen);
 }
 
 static int submit(int op, const char *path, const char *path2, double ms, char *err, size_t errlen) {
@@ -322,10 +404,10 @@ static int submit(int op, const char *path, const char *path2, double ms, char *
         lerr_set(err, errlen, "sys.badArgument", NULL);
         return -1;
     }
-    return enqueue(op, path, path2, ms, NULL, err, errlen);
+    return enqueue(op, path, path2, ms, NULL, NULL, 0, err, errlen);
 }
 
-static int enqueue(int op, const char *path, const char *path2, double ms, FsaFn fn, char *err, size_t errlen) {
+static int enqueue(int op, const char *path, const char *path2, double ms, FsaFn fn, char *data, size_t len, char *err, size_t errlen) {
     pthread_mutex_lock(&mu);
     if (efd < 0) efd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (efd < 0) { pthread_mutex_unlock(&mu); lerr_set(err, errlen, "sys.errno", "errno", lerr_errno(errno), NULL); return -1; }
@@ -345,6 +427,13 @@ static int enqueue(int op, const char *path, const char *path2, double ms, FsaFn
     r->op = op;
     r->ms = ms;
     r->fn = fn;
+    if (op == FSA_WRITE) {          /* data is the caller's malloc'd copy: it belongs to the request from here */
+        r->data = data;
+        r->len = len;
+        Req **p = &writes;
+        while (*p) p = &(*p)->wnext;
+        *p = r;
+    }
     r->req = next_req++;
     if (next_req <= 0) next_req = 1;
     if (todo_tail) todo_tail->next = r; else todo = r;

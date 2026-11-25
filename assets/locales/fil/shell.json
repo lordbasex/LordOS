@@ -606,6 +606,7 @@
   "widgets.subtitle": "Pumili ng laki: kukunin nito ang puwesto sa grid ng display na ito, sa aktibidad na ito. I-drag para ilipat.",
   "widgets.search": "Maghanap ng widget",
   "widgets.noMatch": "Walang widget na tugma sa paghahanap",
+  "widgets.back": "Bumalik",
   "widgets.cat.all": "Lahat",
   "widgets.cat.time": "Oras",
   "widgets.cat.system": "System",

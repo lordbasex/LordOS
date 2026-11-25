@@ -606,6 +606,7 @@
   "widgets.subtitle": "Válasszon méretet: elfoglalja helyét e kijelző rácsán, ebben a tevékenységben. Mozgatáshoz húzza.",
   "widgets.search": "Widgetek keresése",
   "widgets.noMatch": "Egy widget sem felel meg a keresésnek",
+  "widgets.back": "Vissza",
   "widgets.cat.all": "Mind",
   "widgets.cat.time": "Idő",
   "widgets.cat.system": "Rendszer",

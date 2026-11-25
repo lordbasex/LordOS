@@ -19,6 +19,91 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   an early return, in Settings → Wallpaper (only reached by a theme with no wallpapers); it is moved as well.
 
 ### Added
+- **Notes sees new notes at once, the widget catalog can put an existing note on the desktop, and File → Import…**
+  (apps/notes, in development).
+  - *New notes made outside the app.* Until now `~/Notes` was read once, at login, so a note written by another program
+    (an assistant writing `~/Notes/<slug>/nota.md` with `desktop: true`, a sync tool, the terminal) appeared only at the
+    next login. Notes now watches `~/Notes` with the new read-only `lord.fs.watch` (one watch; a note folder made or
+    deleted fires it) and reads the folder again on each coalesced change, with no window open and no timer: a desktop
+    note written elsewhere shows on the desktop within a second, and in the list. A file written inside a note's folder
+    doesn't change `~/Notes`, so a few folders are watched too: one made in the last 10 minutes that has no `nota.md`
+    yet (at most 3: the program is about to write it) and the notes shown on the desktop (at most 4, most recently
+    updated first), so an edit made elsewhere to a desktop note comes in too; at most 8 of the session's 16 watches. The
+    Notes window reads the folder again when it opens and each time it gets the focus (the fallback for any other note,
+    and for a cloud or network `~/Notes`, which `lord.fs.watch` refuses). A read is cheap: a `nota.md` whose size and
+    time didn't change isn't read again, and at most 4000 notes are read (`MAX_NOTES`; `MAX_NOTE` and the folder-name
+    and link checks are unchanged). The fresh read is merged with the notes in memory (`apps/notes/notesmodel.js`
+    `mergeScan`): a note with a change not saved yet, or whose save failed, keeps what is in memory until a save
+    succeeds (before, a failed save was simply logged); any other note is what the disk says (an edit made elsewhere comes in,
+    a deleted folder goes, from the desktop too); new notes go first, newest first, and the others keep their place and
+    their objects, so nothing redraws when nothing changed. A change in a note's folder in the second after Notes saved
+    that note is its own save and isn't read again, so there is no loop.
+  - *Pick a note for the desktop.* "Sticky note" in Add widget (every theme with the catalog: Lord Flow, Lord
+    Workspaces, Celeste) now opens a list in the same panel, under a ‹ Back row: "New Note" (what it did before) and every
+    note, with its colour, title and date, most recently updated first, a search over title and text (no accents, no
+    case; every word), and "on the desktop" on the ones already there; arrows and Enter work. The folder is read again
+    when the list opens. A note picked goes on the desktop where the widget is being added (that display and activity),
+    moved inside the display's work area, with its text and size; one already on the desktop moves there. The catalog
+    gains a generic hook for this: a kind registered with `registerWidgetKind` may give a `Chooser` component, shown in
+    the panel after its card (`sdk/widgetpicker.jsx`); the other kinds are unchanged.
+  - *Show on desktop finds a display.* File → On desktop and ··· → On desktop now put a note whose saved place is off
+    every current display (a monitor unplugged, a note from another computer) on the display the Notes window is on,
+    80 px in from its work area; a note whose header bar can be seen on a display keeps its place.
+  - *Import.* File → Import… (after New Note) opens the system file dialog for `.md`, `.markdown` and `.txt`, one or
+    several files; each one becomes a new note in a new folder, so an import never writes over a note. The file is
+    untrusted text: a Notes header in it gives only its title and colour (never its place, `desktop`, dates or folder),
+    another program's front matter stays in the text whole, a title is cleaned like any title (no control or direction
+    override characters), CRLF and a BOM are read as plain lines, and a file larger than `MAX_NOTE`, with a NUL byte, a
+    link or a folder isn't read; nothing the text names is copied (its images and links point into the new note's own
+    empty folder). Markdown and text files dropped from Files on the notes list are imported the same way (and dropped
+    anywhere on the window when no note is open); other files, and any file dropped on an open note, are still its
+    attachments.
+  - *Round checklists.* In the reading view (the window and the desktop notes) a checklist item is now a round check,
+    like a phone's notes app: a 21 px ring when open; when done, filled with the note colour's tint (a deep tone of the
+    paper colour, readable with a white ✓ on every paper colour, in light and dark mode) and the text left readable (no
+    longer dimmed to 60 %, not struck through); a 28 px target centred on the item's first line; right to left, the
+    circle is at the start. `<Markdown taskStyle="round" taskTint>` in `sdk/markdown.jsx`; other apps keep the square
+    box. A checklist button in the toolbar (a ring with a tick, beside the colours) makes the caret's line or the
+    selected lines `- [ ] ` (or plain again), as ❖⇧9 does, opening the editor first from the reading view; with nothing
+    selected the caret now stays a caret at the end of the line (it selected the line, so the next key replaced it).
+    The editor is plain markdown text, so the circles are ticked in the reading view.
+  - *Editing is fluid, and wrapped rows no longer overlap.* Every key used to put a new list in the store: the whole
+    window and every desktop note drew again, the desktop widgets were published again, and the editor wrapped the
+    whole note again, measuring each character alone, and drew every row anew (on a 300-line note the longest
+    main-thread run while typing was 41–68 ms, and the caret's blink alone 58 ms). Now the editor keeps the text itself
+    (`store.js` `editBody`): the text goes into the store and is saved 500 ms after typing stops, when the editor closes
+    or another note is chosen, or on `flushAll`; the widgets are published only when the desktop's notes change; only
+    the edited line is wrapped again (a per-line cache) and each row is a memoized component; the caret and selection are
+    drawn over the rows. In the headless scene the longest run while typing is now 9–12 ms (the key's own handling 5–11
+    ms instead of 26–44 ms). A row is measured the way it is drawn (`apps/notes/wrapmodel.js`): the row's whole string,
+    bold for headings, so CJK and emoji runs (whose spaces are drawn narrower), a tab (drawn as four spaces, before as a
+    box but measured as four spaces), a CR from CRLF line ends (not drawn) and accents no longer make the caret drift
+    off the letters or a row wider than the editor, which was drawn over the next row; a cut never splits a character.
+  - *Saves off the interface's thread.* A note is saved with the new `lord.fs.writeAsync` (`server/src/fsasync.c`
+    `FSA_WRITE`, `sdk/fs.js` `writeAsync`): `lord.fs.write`'s own resolution and checks (made again on the worker), a
+    temporary file next to it, fsync and rename, so a slow disk never holds typing (as #250 did for settings). Writes to
+    one file land in the order asked (a later one waits for an older one on a worker) and `lord.fs.write` waits for one
+    still on a worker, so a save at logout never lands before an older one; Notes keeps one save in flight per note. A
+    failed save keeps the note not saved (the folder's reads keep what is in memory) and is tried again in 5 s. Isolated
+    apps have no `writeAsync` (the broker has no operation for it) and the SDK writes at once there.
+  - Tests: `server/tests/notes_wrap_test.mjs` (32 checks: long lines, leading spaces, tabs, a CR, CJK, emoji, combining
+    accents and bold headings with a fake measure that shapes like the engine; every row fits, the rows cover the text,
+    no character split, a click at the caret's x gives the caret's offset, one changed line of 300 wrapped again);
+    `build/fsasync-test` gains `writeAsync` (written whole, in order, the refusals, `lord.fs.write`'s wait for a held
+    write); `notes_store_test.mjs` gains typing (no store change or widget publish per key, the text saved once typing
+    stops, a slow disk landing the newest text last, a failed save keeping the note until `flushAll`); new headless
+    scenes `notes_pick_scene` (a note written elsewhere on the desktop in about 50 ms, the catalog's pick, round
+    checklists ticked with a click, the checklist button, On desktop for a note off every display) and
+    `notes_edit_scene` (a 300-line note in Edit mode: no two rows overlap, none wider than the editor, and the
+    main-thread time per key).
+  - Tests: `server/tests/notes_model_test.mjs` (59 checks: the header round trip for titles with a colon, quotes,
+    `true`, `123`, a leading space or a line break; titles without bidi or control characters; the merge; the pick list;
+    the placement on one or two displays; import) and new cases in `notes_store_test.mjs` over a real temporary home (a
+    folder made elsewhere and its `nota.md` written after it, read through the watches; an edit made elsewhere; a change
+    not saved yet and a failed save winning over the disk; Notes' own save not read again; a folder deleted elsewhere
+    leaving the desktop; import of a header, a `.txt`, the same file twice, a link and other types). The title and
+    combining-mark patterns in Notes use `\u` escapes instead of literal invisible characters. New texts in all 35
+    languages.
 - **`lord.fs.watch` / `lord.fs.unwatch` and `lord.fs.stat`'s `protected` flag** (in development; designed for the desktop
   icons, `docs/drafts/DESKTOP-ICONS.md` 5.1, decision D13; in this release Notes uses it to see new notes at once). Read-only: `lord.fs.watch(folder, fn)` returns an id and calls
   `fn({ changed: true, overflow, gone })` when the folder changes, at most once every 150 ms per watch (the first change

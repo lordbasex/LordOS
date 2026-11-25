@@ -1236,6 +1236,7 @@ static JSValue f_fs_write(JSContext *c, JSValueConst this_val, int argc, JSValue
     }
     const uint8_t *data = bin ? bin : (const uint8_t *)text;
     if (len > FS_WRITE_MAX) { if (text) JS_FreeCString(c, text); return js_throw_code(c, "fs.tooLarge", "max", "32 MB", NULL); }
+    fsasync_wait_write(target);         /* an older writeAsync of this file still on a worker lands first (fsasync.c) */
     struct stat st;
     mode_t mode = 0644;
     if (!lstat(target, &st)) {
@@ -1262,6 +1263,30 @@ static JSValue f_fs_write(JSContext *c, JSValueConst this_val, int argc, JSValue
     if (text) JS_FreeCString(c, text);
     if (!ok) return js_throw_code(c, "sys.errno", "errno", lerr_errno(err), NULL);
     return JS_TRUE;
+}
+
+/* lord.fs.writeAsync(path, data) → req: lord.fs.write on an fsasync.c worker, the same checks (resolved again there),
+ * answered as __lordFsReply(req, { ok } | { error }). For saves made while the person works (Notes): a slow disk never
+ * holds the interface. Writes to one file land in the order they were asked, and lord.fs.write waits for them. */
+static JSValue f_fs_write_async(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2) return js_throw_code(c, "sys.badArgument", NULL);
+    const char *p = JS_ToCString(c, argv[0]);
+    if (!p) return JS_EXCEPTION;
+    size_t len = 0;
+    const char *text = NULL;
+    uint8_t *bin = JS_IsString(argv[1]) ? NULL : JS_GetArrayBuffer(c, &len, argv[1]);
+    if (!bin) {
+        JS_FreeValue(c, JS_GetException(c));
+        text = JS_ToCStringLen(c, &len, argv[1]);
+        if (!text) { JS_FreeCString(c, p); return JS_EXCEPTION; }
+    }
+    char err[256] = "";
+    int req = fsasync_submit_write(p, bin ? (const char *)bin : text, len, err, sizeof err);   /* FSA_WRITE_MAX: 32 MB */
+    if (text) JS_FreeCString(c, text);
+    JS_FreeCString(c, p);
+    if (req < 0) return js_throw_line(c, err);
+    return JS_NewInt32(c, req);
 }
 
 /* lord.fs.mkdir(path): a new folder (the parent must exist). */
@@ -1705,6 +1730,7 @@ static const JSCFunctionListEntry fs_funcs[] = {
     JS_CFUNC_DEF("duAsync", 2, f_fs_du_async),
     JS_CFUNC_DEF("mkdirAsync", 1, f_fs_mkdir_async),
     JS_CFUNC_DEF("renameAsync", 2, f_fs_rename_async),
+    JS_CFUNC_DEF("writeAsync", 2, f_fs_write_async),
     JS_CFUNC_DEF("mounts", 0, f_fs_mounts),
     JS_CFUNC_DEF("home", 0, f_fs_home),
     JS_CFUNC_DEF("list", 1, f_fs_list),

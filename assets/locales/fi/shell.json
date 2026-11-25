@@ -606,6 +606,7 @@
   "widgets.subtitle": "Valitse koko: se asettuu tämän näytön ruudukkoon tässä toiminnossa. Siirrä vetämällä.",
   "widgets.search": "Hae pienoisohjelmia",
   "widgets.noMatch": "Mikään pienoisohjelma ei vastaa hakua",
+  "widgets.back": "Takaisin",
   "widgets.cat.all": "Kaikki",
   "widgets.cat.time": "Aika",
   "widgets.cat.system": "Järjestelmä",

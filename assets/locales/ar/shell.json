@@ -634,6 +634,7 @@
   "widgets.subtitle": "اختر حجمًا: يأخذ مكانه في شبكة هذه الشاشة ضمن هذا النشاط. اسحبه لتحريكه.",
   "widgets.search": "ابحث عن الأدوات",
   "widgets.noMatch": "لا توجد أداة تطابق البحث",
+  "widgets.back": "رجوع",
   "widgets.cat.all": "الكل",
   "widgets.cat.time": "الوقت",
   "widgets.cat.system": "النظام",

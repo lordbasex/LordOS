@@ -54,7 +54,7 @@ export const fs = {
     return { name: npath.basename(abs(p)), path: abs(p), dir, link: st.isSymbolicLink(), size: st.size, mtime: st.mtimeMs };
   },
   read: (p) => nfs.readFileSync(abs(p), 'utf8'),
-  write(p, data) { rec(p); nfs.writeFileSync(abs(p), data); },
+  write(p, data) { if (failWrites) throw new Error('disk full'); rec(p); nfs.writeFileSync(abs(p), data); },
   mkdir(p) { rec(p); nfs.mkdirSync(abs(p)); },
   rename(a, b) { rec(b); nfs.renameSync(abs(a), abs(b)); },
   copy(a, b) {
@@ -65,23 +65,34 @@ export const fs = {
     return 1;
   },
   trash(p) { rec(p); nfs.rmSync(abs(p), { recursive: true }); return true; },
+  // sdk/fs.js writeAsync: written after a turn of the event loop (as on a worker); refused like write
+  writeAsync(p, data) { return new Promise((res, rej) => setTimeout(() => { try { this.write(p, data); res(true); } catch (e) { rej(e); } }, asyncDelay)); },
+  // sdk/fs.js watch(path, fn) → stop: the test calls a watch's fn itself (watches)
+  watch(p, fn) { const w = { path: npath.resolve(abs(p)), fn, on: true }; watches.push(w); return () => { w.on = false; }; },
 };
+export const watches = [];
+export let asyncDelay = 0;
+export const setAsyncDelay = (v) => { asyncDelay = v; };
+export let failWrites = false;
+export const setFailWrites = (v) => { failWrites = v; };
 export function createStore(v) {
   let s = v; const subs = new Set();
-  return { get: () => s, set(n) { s = typeof n === 'function' ? n(s) : n; for (const f of subs) f(s); }, subscribe(f) { subs.add(f); return () => subs.delete(f); } };
+  return { get: () => s, set(n) { s = typeof n === 'function' ? n(s) : n; for (const f of subs) f(); }, subscribe(f) { subs.add(f); return () => subs.delete(f); } };
 }
 export const screen = { width: 1920, height: 1080 };
 export const workArea = () => ({ x: 0, y: 24, w: 1920, h: 1000 });
 export const registerWidgetType = () => {};
 export const widgets = [];
-export const setWidgets = (type, list) => { widgets.splice(0, widgets.length, ...list); };
+export let publishes = 0;
+export const publishCount = () => publishes;
+export const setWidgets = (type, list) => { publishes++; widgets.splice(0, widgets.length, ...list); };
 `;
 const stubFile = path.join(tmp, 'sdk-stub.mjs');
 fs.writeFileSync(stubFile, STUB);
 const entry = path.join(tmp, 'entry.mjs');
 fs.writeFileSync(entry, `export * from ${JSON.stringify(path.join(root, 'apps/notes/store.js'))};
 export * as links from ${JSON.stringify(path.join(root, 'apps/notes/links.js'))};
-export { writes, HOME, widgets } from ${JSON.stringify(stubFile)};`);
+export { writes, HOME, widgets, watches, setFailWrites, setAsyncDelay, publishCount } from ${JSON.stringify(stubFile)};`);
 const out = path.join(tmp, 'bundle.mjs');
 await esbuild.build({
   entryPoints: [entry], bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'silent',
@@ -155,6 +166,8 @@ eq('textual', ['a.md', 'b.TXT', 'c.pdf', 'd.png'].map(L.textual), [true, true, f
 S.loadNotes();
 eq('the Notes folder is made', fs.existsSync(path.join(home, 'Notes')), true);
 const slug = S.createNote({ body: '# First\n\nhello' });
+eq('a new note is saved on a worker (not yet on the disk at once)', fs.existsSync(path.join(home, 'Notes', slug, 'nota.md')), false);
+await wait(10);
 eq('a new note', !!slug && fs.existsSync(path.join(home, 'Notes', slug, 'nota.md')), true);
 const nd = path.join(home, 'Notes', slug);
 // attachments
@@ -199,8 +212,10 @@ eq('image: absolute', S.noteImageSrc(slug, path.join(outside, 'pic.png')), null)
 eq('image: a PDF is not drawn', S.noteImageSrc(slug, 'my%20report%20%28v2%29.pdf'), null);
 fs.mkdirSync(path.join(nd, 'sub.png'));
 eq('image: a folder named .png is not drawn', S.noteImageSrc(slug, 'sub.png'), null);
+const dup = S.duplicateNote(slug);
+await wait(10);
 eq('duplicate: links and folders are not copied', (() => {
-  const c = S.duplicateNote(slug);
+  const c = dup;
   const names = fs.readdirSync(path.join(home, 'Notes', c)).sort();
   return [names.includes('planted.txt'), names.includes('sub.png'), names.includes('shot.png'), names.includes('nota.md')];
 })(), [false, false, true, true]);
@@ -218,6 +233,7 @@ fs.writeFileSync(path.join(home, 'Notes', 'odd', 'nota.md'), '---\ntitle: "a‮b
 // a nota.md too large to be a note
 fs.mkdirSync(path.join(home, 'Notes', 'big'));
 { const fd = fs.openSync(path.join(home, 'Notes', 'big', 'nota.md'), 'w'); fs.ftruncateSync(fd, 9 * 1024 * 1024); fs.closeSync(fd); }
+await wait(10);
 S.loadNotes();
 const list = S.notesStore.get().list;
 const by = (s) => list.find((n) => n.slug === s);
@@ -228,6 +244,117 @@ const odd = by('odd');
 eq('load: odd header made sane', odd && [odd.title, odd.color, odd.w, odd.h, odd.x, odd.desktop, Number.isNaN(Date.parse(odd.created))], ['ab', 'yellow', 4000, 110, 80, false, false]);
 eq('load: the real notes are there', !!by(slug), true);
 
+// ---- read again: made, edited and deleted elsewhere; watched; a change not saved yet; a save that failed ----
+{
+  const N = path.join(home, 'Notes');
+  const live = () => S.watches.filter((w) => w.on);
+  const fire = (dir) => { for (const w of live()) if (w.path === path.resolve(dir)) w.fn({ changed: true, overflow: false, gone: false }); };
+  eq('watch: one watch on ~/Notes', live().filter((w) => w.path === path.resolve(N)).length, 1);
+  // another program (an assistant) makes a folder, then writes its nota.md with desktop: true
+  fs.mkdirSync(path.join(N, 'from-outside'));
+  fire(N);
+  eq('watch: a new folder without nota.md is not a note yet', !!S.notesStore.get().list.find((x) => x.slug === 'from-outside'), false);
+  eq('watch: that folder is watched until its note is written', live().some((w) => w.path === path.resolve(path.join(N, 'from-outside'))), true);
+  fs.writeFileSync(path.join(N, 'from-outside', 'nota.md'), '---\ntitle: Outside\ndesktop: true\nx: 300\ny: 200\n---\n# Outside\n- [ ] one\n');
+  fire(path.join(N, 'from-outside'));
+  const o = S.notesStore.get().list.find((x) => x.slug === 'from-outside');
+  eq('watch: the note written elsewhere is read at once, first in the list', [!!o, S.notesStore.get().list[0]?.slug, o?.desktop], [true, 'from-outside', true]);
+  eq('watch: and shows on the desktop', S.widgets.some((w) => w.id === 'from-outside' && w.x === 300 && w.y === 200), true);
+  eq('watch: at most 1 + 3 + 4 watches', live().length <= 8, true);
+  // edited elsewhere (a desktop note's folder is watched)
+  fs.writeFileSync(path.join(N, 'from-outside', 'nota.md'), '---\ntitle: Outside\ndesktop: true\n---\nedited elsewhere\n');
+  fire(path.join(N, 'from-outside'));
+  eq('watch: an edit made elsewhere to a desktop note comes in', S.notesStore.get().list.find((x) => x.slug === 'from-outside')?.body, 'edited elsewhere\n');
+  // typed in Notes, not saved yet: a read keeps it
+  S.updateNote('from-outside', { body: 'typing' });
+  fs.writeFileSync(path.join(N, 'from-outside', 'nota.md'), '---\ntitle: x\n---\nother program\n');
+  S.rescanNotes();
+  eq('rescan: a change not saved yet wins', S.notesStore.get().list.find((x) => x.slug === 'from-outside')?.body, 'typing');
+  // the save fails: still kept, and the next read does not take the disk's copy
+  S.setFailWrites(true);
+  S.flushAll();
+  S.rescanNotes();
+  eq('rescan: after a failed save the note in memory still wins', S.notesStore.get().list.find((x) => x.slug === 'from-outside')?.body, 'typing');
+  S.setFailWrites(false);
+  S.updateNote('from-outside', { body: 'saved now' });
+  S.flushAll();
+  eq('the save that succeeds writes it', fs.readFileSync(path.join(N, 'from-outside', 'nota.md'), 'utf8').endsWith('saved now'), true);
+  // Notes' own save: its folder's event is not read again (no loop)
+  const before = S.notesStore.get().list;
+  fire(path.join(N, 'from-outside'));
+  eq('watch: the event of Notes\' own save changes nothing', S.notesStore.get().list === before, true);
+  // deleted elsewhere
+  fs.rmSync(path.join(N, 'from-outside'), { recursive: true });
+  fire(N);
+  eq('watch: a folder deleted elsewhere goes, and off the desktop', [!!S.notesStore.get().list.find((x) => x.slug === 'from-outside'), S.widgets.some((w) => w.id === 'from-outside')], [false, false]);
+}
+
+// ---- typing: the editor's text stays out of notesStore until typing stops; saves on a worker, in order ----
+{
+  const N = path.join(home, 'Notes');
+  const t = S.createNote({ body: '# Typing\n', desktop: true });
+  await wait(10);
+  S.flushAll();
+  let sets = 0;
+  const off = S.notesStore.subscribe(() => { sets++; });
+  const pubs = S.publishCount();
+  for (const ch of 'hello world') S.editBody(t, `# Typing\n${'hello world'.slice(0, 'hello world'.indexOf(ch) + 1)}`);
+  eq('typing: no notesStore change per key', sets, 0);
+  eq('typing: the desktop widgets are not published again', S.publishCount(), pubs);
+  eq('typing: the live text is there for whoever asks', S.liveBody(t), '# Typing\nhello world');
+  // a read of the folder meanwhile (the disk still has the old text): the typing wins
+  fs.writeFileSync(path.join(N, t, 'nota.md'), '---\ntitle: x\n---\nchanged elsewhere\n');
+  S.rescanNotes();
+  await wait(S.LIVE_MS + 100);
+  eq('typing stops: one notesStore change', sets >= 1 && sets <= 2, true, );
+  eq('typing stops: the text is in the note', S.notesStore.get().list.find((x) => x.slug === t)?.body, '# Typing\nhello world');
+  eq('typing stops: and saved', fs.readFileSync(path.join(N, t, 'nota.md'), 'utf8').endsWith('hello world'), true);
+  eq('typing stops: the widgets still not published again (only the text changed)', S.publishCount(), pubs);
+  off();
+  // two saves of one note while the disk is slow: they land in order, the newest last
+  S.setAsyncDelay(40);
+  S.editBody(t, 'first');
+  S.commitLive(t);
+  S.editBody(t, 'second');
+  S.commitLive(t);
+  await wait(150);
+  eq('slow disk: the newest text lands last', fs.readFileSync(path.join(N, t, 'nota.md'), 'utf8').endsWith('second'), true);
+  // a save that fails: the note stays not saved (a read keeps it) until a save works
+  S.setFailWrites(true);
+  S.editBody(t, 'not on disk yet');
+  S.commitLive(t);
+  await wait(80);
+  fs.writeFileSync(path.join(N, t, 'nota.md'), '---\ntitle: x\n---\nother program\n');
+  S.rescanNotes();
+  eq('failed async save: the note in memory still wins', S.notesStore.get().list.find((x) => x.slug === t)?.body, 'not on disk yet');
+  S.setFailWrites(false);
+  S.setAsyncDelay(0);
+  S.flushAll();
+  eq('flushAll writes it at once', fs.readFileSync(path.join(N, t, 'nota.md'), 'utf8').endsWith('not on disk yet'), true);
+  S.rescanNotes();
+  eq('… and then it counts as saved (a read changes nothing)', S.notesStore.get().list.find((x) => x.slug === t)?.body, 'not on disk yet');
+}
+
+// ---- import ----
+{
+  fs.writeFileSync(path.join(outside, 'plan.md'), '---\ntitle: Imported\ncolor: pink\ndesktop: true\nx: 5\n---\n# Plan\n![x](secret.txt)\n');
+  fs.writeFileSync(path.join(outside, 'list.txt'), 'milk\n');
+  fs.writeFileSync(path.join(outside, 'pic.md.png'), 'png');
+  fs.symlinkSync(path.join(outside, 'secret.txt'), path.join(outside, 'link.md'));
+  const count = S.notesStore.get().list.length;
+  const a = S.importFile(path.join(outside, 'plan.md'));
+  await wait(10);
+  const na = S.notesStore.get().list.find((x) => x.slug === a);
+  eq('import: a new note with the header\'s title and colour, never its place or desktop', na && [na.title, na.color, na.desktop, na.body], ['Imported', 'pink', false, '# Plan\n![x](secret.txt)\n']);
+  eq('import: nothing it names is copied', fs.readdirSync(path.join(home, 'Notes', a)), ['nota.md']);
+  const b = S.importFile(path.join(outside, 'plan.md'));
+  eq('import: the same file again is another note (never written over)', !!b && b !== a, true);
+  const c = S.importFile(path.join(outside, 'list.txt'));
+  eq('import: a .txt', S.notesStore.get().list.find((x) => x.slug === c)?.title, 'milk');
+  eq('import: not .md/.txt, a link, a missing file: refused', [S.importFile(path.join(outside, 'pic.md.png')), S.importFile(path.join(outside, 'link.md')), S.importFile(path.join(outside, 'nope.md'))], [null, null, null]);
+  eq('import: three notes made', S.notesStore.get().list.length, count + 3);
+}
+
 // ---- every write stays under ~/Notes ----
 S.updateNote(slug, { body: '# First\n\nchanged' });
 S.flushAll();
@@ -236,7 +363,7 @@ await wait(700);
 const notesDir = path.resolve(path.join(home, 'Notes'));
 const outsideWrites = S.writes.filter((w) => w !== notesDir && !w.startsWith(`${notesDir}/`));
 eq('every write is inside ~/Notes', outsideWrites, []);
-eq('the outside folder is untouched', fs.readdirSync(outside).sort(), ['elsewhere', 'pic.png', 'secret.txt']);
+eq('the outside folder is untouched', fs.readdirSync(outside).sort(), ['elsewhere', 'link.md', 'list.txt', 'pic.md.png', 'pic.png', 'plan.md', 'secret.txt']);
 eq('desktop notes are published as widgets', S.widgets.some((w) => w.type === 'note'), true);
 
 fs.rmSync(tmp, { recursive: true, force: true });

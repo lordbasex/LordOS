@@ -3,7 +3,9 @@
 //
 //   registerWidgetKind({ type, nameKey, descKey, sizes?, add?(x, y) })   an entry of the catalog. Built-in kinds have
 //                          sizes (s 1×1, m 2×1, l 2×2, w 4×1, xl 4×2); an app's kind without sizes adds its own widget
-//                          (the Notes app's sticky note, which it keeps itself)
+//                          (the Notes app's sticky note, which it keeps itself). Such a kind may also give a Chooser
+//                          component, shown in the catalog after its card is clicked (sdk/widgetpicker.jsx): Notes
+//                          offers a new note or one already made there
 //   widgetKinds()          the catalog, in order (a kind may say it isn't available here: Battery with no battery)
 //   addDeskWidget(type, size, display)   a widget on the first free block of that display's grid, in the activity in
 //                          view; null when there is no room

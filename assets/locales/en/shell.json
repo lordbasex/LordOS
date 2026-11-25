@@ -606,6 +606,7 @@
   "widgets.subtitle": "Pick a size: it takes its place on this display's grid, in this activity. Drag it to move it.",
   "widgets.search": "Search widgets",
   "widgets.noMatch": "No widget matches your search",
+  "widgets.back": "Back",
   "widgets.cat.all": "All",
   "widgets.cat.time": "Time",
   "widgets.cat.system": "System",

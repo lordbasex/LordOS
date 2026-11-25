@@ -606,6 +606,7 @@
   "widgets.subtitle": "اندازه‌ای انتخاب کنید: جای خود را در شبکهٔ این نمایشگر و این فعالیت می‌گیرد. برای جابه‌جایی بکشید.",
   "widgets.search": "جستجوی ابزارک‌ها",
   "widgets.noMatch": "هیچ ابزارکی با جستجو مطابقت ندارد",
+  "widgets.back": "بازگشت",
   "widgets.cat.all": "همه",
   "widgets.cat.time": "زمان",
   "widgets.cat.system": "سیستم",

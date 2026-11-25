@@ -606,6 +606,7 @@
   "widgets.subtitle": "Trieu una mida: ocupa el seu lloc a la graella d'aquesta pantalla, en aquesta activitat. Arrossegueu-lo per moure'l.",
   "widgets.search": "Cerca ginys",
   "widgets.noMatch": "Cap giny coincideix amb la cerca",
+  "widgets.back": "Enrere",
   "widgets.cat.all": "Tots",
   "widgets.cat.time": "Temps",
   "widgets.cat.system": "Sistema",

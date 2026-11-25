@@ -7,7 +7,9 @@
  *   - other requests finish while slow ones are held (one stuck mount doesn't hold up the others);
  *   - the answers: list (entries with the columns' fields), stat, trash, free;
  *   - the checks are the synchronous calls' own: outside the roots, /proc, the protected folders, the Trash only;
- *   - a full queue answers fs.busy at once instead of waiting. */
+ *   - a full queue answers fs.busy at once instead of waiting;
+ *   - writeAsync (0.8.9.6.2): written whole, in the order asked, the same refusals, and lord.fs.write's wait for one
+ *     still on a worker. */
 #include "fsasync.h"
 #include "fsops.h"
 
@@ -43,6 +45,7 @@ static void hook(int op, const char *path) {
     pthread_mutex_unlock(&gmu);
 }
 static void open_gate(void) { pthread_mutex_lock(&gmu); gate_open = 1; pthread_cond_broadcast(&gcv); pthread_mutex_unlock(&gmu); }
+static void *opener(void *x) { (void)x; usleep(100 * 1000); open_gate(); return NULL; }
 static int held_now(void) { pthread_mutex_lock(&gmu); int n = held; pthread_mutex_unlock(&gmu); return n; }
 
 /* ---- answers, by request id ---- */
@@ -243,6 +246,50 @@ int main(void) {
     r = submit(FSA_LIST, "fast");                     /* the queue has room again */
     CHECK(r > 0);
     CHECK(wait_for(r, 3000) != NULL);
+
+    /* writeAsync (0.8.9.6.2, Notes' saves): written whole on a worker, in the order asked; lord.fs.write waits for one
+     * still on a worker (fsasync_wait_write); the same refusals as lord.fs.write */
+    {
+        char err[256] = "", path[512], buf[64] = "";
+        snprintf(path, sizeof path, "%s/fast/w.txt", H);
+        int w1 = fsasync_submit_write(path, "one", 3, err, sizeof err);
+        int w2 = fsasync_submit_write(path, "two!", 4, err, sizeof err);
+        CHECK(w1 > 0 && w2 > 0);
+        CHECK(has(wait_for(w1, 3000), "\"ok\":true"));
+        CHECK(has(wait_for(w2, 3000), "\"ok\":true"));
+        FILE *f = fopen(path, "r");
+        if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
+        CHECK(!strcmp(buf, "two!"));                   /* the newer text landed last */
+        snprintf(path, sizeof path, "%s/.config/lordos/settings.json", H);
+        err[0] = 0;
+        CHECK(fsasync_submit_write(path, "{}", 2, err, sizeof err) < 0 && strstr(err, "fs.protected"));
+        err[0] = 0;
+        CHECK(fsasync_submit_write("/etc/lordos-fsasync-test", "x", 1, err, sizeof err) < 0 && strstr(err, "fs.outsideHome"));
+        snprintf(path, sizeof path, "%s/fast/sub", H);
+        CHECK(has(wait_for(fsasync_submit_write(path, "x", 1, err, sizeof err), 3000), "fs.notRegular"));
+        err[0] = 0;
+        CHECK(fsasync_submit_write(path, NULL, 5, err, sizeof err) < 0);
+        /* a write held on a slow disk: the synchronous write's wait returns only once it is on the disk */
+        pthread_mutex_lock(&gmu); gate_open = 0; pthread_mutex_unlock(&gmu);
+        snprintf(path, sizeof path, "%s/slow/w.txt", H);
+        int ws = fsasync_submit_write(path, "held", 4, err, sizeof err);
+        CHECK(ws > 0);
+        for (int k = 0; k < 200 && held_now() < 1; k++) usleep(5000);
+        pthread_t th;
+        pthread_create(&th, NULL, opener, NULL);
+        double t1 = now_ms();
+        fsasync_wait_write(path);
+        CHECK(now_ms() - t1 >= 60);
+        buf[0] = 0;
+        f = fopen(path, "r");
+        if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
+        CHECK(!strcmp(buf, "held"));
+        pthread_join(th, NULL);
+        CHECK(has(wait_for(ws, 3000), "\"ok\":true"));
+        t1 = now_ms();
+        fsasync_wait_write(path);                      /* nothing on a worker: at once */
+        CHECK(now_ms() - t1 < 50);
+    }
 
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", H);

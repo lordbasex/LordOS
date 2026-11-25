@@ -599,6 +599,7 @@
   "widgets.subtitle": "Pilih ukuran: widget mengambil tempatnya di kisi layar ini, dalam aktivitas ini. Seret untuk memindahkan.",
   "widgets.search": "Cari widget",
   "widgets.noMatch": "Tidak ada widget yang cocok",
+  "widgets.back": "Kembali",
   "widgets.cat.all": "Semua",
   "widgets.cat.time": "Waktu",
   "widgets.cat.system": "Sistem",

@@ -599,6 +599,7 @@
   "widgets.subtitle": "选择一个大小：它会在这个活动中占据这个显示器网格上的位置。拖动即可移动。",
   "widgets.search": "搜索小组件",
   "widgets.noMatch": "没有与搜索匹配的小组件",
+  "widgets.back": "返回",
   "widgets.cat.all": "全部",
   "widgets.cat.time": "时间",
   "widgets.cat.system": "系统",

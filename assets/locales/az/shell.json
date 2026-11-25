@@ -606,6 +606,7 @@
   "widgets.subtitle": "Ölçü seçin: bu ekranın şəbəkəsində, bu fəaliyyətdə yerini tutur. Köçürmək üçün sürüşdürün.",
   "widgets.search": "Vidjetləri axtar",
   "widgets.noMatch": "Axtarışa uyğun vidjet yoxdur",
+  "widgets.back": "Geri",
   "widgets.cat.all": "Hamısı",
   "widgets.cat.time": "Vaxt",
   "widgets.cat.system": "Sistem",

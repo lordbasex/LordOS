@@ -99,6 +99,15 @@ export function duAsync(path, ms) {
   try { req = lord.fs.duAsync(path, ms); } catch (e) { return Promise.reject(e); }
   return new Promise((resolve, reject) => waiting.set(req, (r) => (r && r.error ? reject(codeError(r.error)) : resolve(r))));
 }
+// lord.fs.write on a worker (0.8.9.6.2): the same checks; resolves true once the file is on the disk (written to a
+// temporary file, fsync'd, renamed over it). Writes to one file land in the order asked, and a later lord.fs.write waits
+// for them. Isolated apps (no writeAsync in the broker) write at once instead.
+export function writeAsync(path, data) {
+  if (typeof lord.fs.writeAsync !== 'function') return Promise.resolve().then(() => { lord.fs.write(path, data); return true; });
+  let req;
+  try { req = lord.fs.writeAsync(path, data); } catch (e) { return Promise.reject(e); }
+  return new Promise((resolve, reject) => waiting.set(req, (r) => (r && r.error ? reject(codeError(r.error)) : resolve(true))));
+}
 export function renameAsync(from, to) {
   if (typeof lord.fs.renameAsync !== 'function') return Promise.resolve().then(() => lord.fs.rename(from, to));
   let req;
