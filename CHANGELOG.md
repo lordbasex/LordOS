@@ -93,6 +93,61 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   added. New scene `server/tests/ws_topbar_scene` (Arabic 1600×900, German 1024×768, English 1280×800 in `make
   test-full`): both surfaces on screen, never overlapping, the accent under the activity in view, with four and nine
   activities. `tests/app_scene_headless.sh` takes `SCENE_SIZE` for the screen size.
+- **`lordos-testbench --globals`: the compositor's registry against LordOS's protocol table, with no window.** It
+  connects, waits for the registry, prints the advertised globals and their versions and the comparison as JSON, and
+  exits; it runs on any compositor for comparison. The expected list is no longer 12 globals named by hand in
+  `server/src/testbench/checks.c`: `tools/gen-wayland-table.mjs` now also writes `server/src/testbench/expected_globals.h`
+  from `docs/wayland-protocols.json` (the source of `docs/WAYLAND.md`'s table and lordos.org's), and
+  `server/tests/wayland_table_test.mjs` and `gen-wayland-table.mjs --check` fail when it is stale, so the three can't
+  drift. `server/src/testbench/globtable.c` marks each of the 48 globals offered, newer, older, missing, or "not here"
+  for a global lord-server offers only to some clients or machines: a new optional `lordos.offered` field in the JSON
+  (`xwayland` for `xwayland_shell_v1`, `headset` for drm-lease, `render-node` for explicit sync, `unsandboxed` for the
+  security-context manager), validated by the generator. The checklist's last rows became "seat" and "protocol table"
+  ("48 OF 48 OFFERED", or what is missing or older), and `--auto`'s JSON report has the comparison as `table`
+  (interface names from the compositor are written only as `[A-Za-z0-9_]`). Tests: `build/testbench-globals-test`
+  (every state, a display's `wl_output` twice, extras, hostile names in the JSON, under ASan and UBSan) and
+  `tests/testbench_globals_headless.sh` in `make test` against a headless `build/lord-server-test`: an ordinary client
+  with the test hooks' VR headset plugged in sees 47 of 48 at their versions, the hooks' Xwayland-like connection
+  sees `xwayland_shell_v1`, together all 48.
+- **`lordos-issue`: a "Wayland and X11" section.** `lordos-testbench --globals` summarized (globals advertised; offered,
+  newer, older, missing; the ones offered only to some clients and why; globals not in the table), the `xwayland`
+  package's version, the variables that choose an app's backend (`WAYLAND_DISPLAY` and `DISPLAY` as set or unset only;
+  `XDG_SESSION_TYPE`, `GDK_BACKEND`, `QT_QPA_PLATFORM`, `MOZ_ENABLE_WAYLAND`, `ELECTRON_OZONE_PLATFORM_HINT`,
+  `SDL_VIDEODRIVER`, `_JAVA_AWT_WM_NONREPARENTING`, with a value that isn't a plain word left out), and the programs
+  connected to the Wayland and X11 sockets, each marked Wayland or X11 (from `ss -xpn`: the user's own processes, the
+  15-character program name only, never titles or arguments; lord-server itself left out). lord-server has no
+  interface that lists its windows to a local tool, and none was added: the list is of connected programs, not
+  windows. The section is collected as the user before the password is asked and handed to the root run in a private
+  temporary file read back as the user, so a Wayland client never runs as root.
+- **`lordos-issue --app <program> [args]`** (and `--seconds N`, default 20, at most 300): runs the program as the user
+  with `WAYLAND_DEBUG=1` and saves its last 200 Wayland protocol lines to `~/lordos-wayland-<date>.txt` (0600), then
+  says where and to read it before pasting. Only libwayland's protocol lines are kept (the program's own output is
+  dropped, and counted); in them every quoted string becomes `<text>` (titles, typed text, file names, error messages,
+  a monitor's description), an app id becomes `app-id:` and a hash, and only interface names in `global`/`bind` and
+  clipboard types in `offer`/`receive`/`accept`/`send` stay. A line's span from its first quote to its last is judged
+  as one string, so a title with quotes in it can't pass. Nothing raw reaches the disk. Refused as root.
+  `lordos-issue --scrub-wayland-debug` scrubs a log made by hand the same way. Tested by `tests/lordos_issue_test.sh`
+  (`make test`): a fixture log with titles, paths, typed text, an app id, a monitor's serial and quotes inside strings,
+  a fixture `ss` listing with a hostile process name, the globals summary, and `--app` with a fake program (scrubbed,
+  0600, the last 200 lines, stopped after `--seconds`).
+- **`lordos-sysreport` and `lordos-issue --gpu`: each card's display engine**, for the protocols that depend on it, read
+  without root and without libdrm through the kernel's DRM interface on the card and render nodes the user may open
+  (`server/src/sysreport/drmprobe.c`): explicit sync (`DRM_CAP_SYNCOBJ`, `DRM_CAP_SYNCOBJ_TIMELINE`), atomic
+  modesetting (`DRM_CLIENT_CAP_ATOMIC` on its own fd), the planes by type, the primary plane's scanout formats and
+  distinct modifiers (`IN_FORMATS`), framebuffer modifiers, PRIME import and export, and whether drm-lease is possible
+  (connectors marked `non-desktop`). No modeset, no connector probe (`GETCONNECTOR` is never called), and DRM master,
+  which the kernel gives the opener of a card nobody drives, is dropped at once. The graphics report has two lines per
+  card ("display engine", "explicit sync"), its JSON a `drm` object per card; `lordos-sysreport report` has a "Display
+  engine" table and a `drm` object per GPU. Only the CLI probes: Settings' report and System Information inside
+  lord-server are unchanged (`drm` is `null` there). Tests: `build/drmprobe-test` (IN_FORMATS blobs good, cut, lying
+  and 20,000 random ones under ASan and UBSan; the text and JSON; `DRMPROBE_LIVE=1` also probes this machine's cards),
+  and new cases in `build/gpureport-test` and `build/sysreport-test`.
+
+### Changed
+- `lordos-testbench --auto`'s and the saved report's `globals` are written through the same filter as the table (an
+  interface name with a quote or a control character could break the JSON before).
+- `docs/wayland-protocols.json`: `lordos.offered` on `drm-lease-v1`, `linux-drm-syncobj-v1`, `xwayland-shell-v1` and
+  `security-context-v1`; the site's table data is unchanged.
 
 ## [0.8.9.6-beta] - 2026-11-25
 

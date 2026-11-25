@@ -183,6 +183,21 @@ static void test_collect(const char *root) {
     text = gpureport_text(r);
     CHECK(has(text, "not known from the command line"), "the command line says what it can't know");
     free(text);
+    /* the display engine (drmprobe.h): absent until the CLI probes it, then two lines per card and an object in the JSON */
+    json = gpureport_json(r);
+    CHECK(has(json, "\"desktop\":0,\"drm\":null}"), "not probed: drm null");
+    free(json);
+    DrmFacts *d = &r->card[1].drm;
+    drmprobe_init(d);
+    d->probed = d->card_node = d->render_node = 1;
+    d->atomic = 1; d->planes = 4; d->primary = 1; d->overlay = 2; d->cursor = 1; d->scanout_formats = 20; d->scanout_modifiers = 3;
+    d->syncobj = d->syncobj_timeline = 1; d->non_desktop = 1; d->connectors = 3;
+    text = gpureport_text(r); json = gpureport_json(r);
+    CHECK(has(text, "DRM node: card1; render node: yes\n  display engine: atomic yes; planes 4 (1 primary, 2 overlay, 1 cursor); scanout formats 20, modifiers 3"), "the engine's line");
+    CHECK(has(text, "  explicit sync: syncobj yes, timeline yes; PRIME import unknown, export unknown; drm-lease: yes (1 non-desktop connector)\n"), "explicit sync and drm-lease");
+    CHECK(has(json, "\"drm\":{\"cardNode\":true,\"renderNode\":true,\"atomic\":1,\"planes\":4,") && has(json, "\"nonDesktop\":1}"), "the engine in the JSON");
+    CHECK(!has(text, "card0; render node: yes\n  display engine"), "an unprobed card has no engine line");
+    free(text); free(json);
     free(r);
 }
 

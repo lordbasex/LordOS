@@ -16,6 +16,8 @@
  *                                       the picture: one still frame to compare or capture, Ctrl+L
  *                                       locks the pointer for 10 s)
  *   lordos-testbench --auto [seconds]   runs for a while (default 5 s), prints a JSON report and exits
+ *   lordos-testbench --globals          opens no window: prints the advertised globals and their comparison with
+ *                                       LordOS's protocol table (expected_globals.h) as JSON and exits
  *   --gl                                 also starts the 3D view (G does it interactively)
  *
  * It reads no files and talks to nothing but the compositor. */
@@ -717,14 +719,16 @@ static void report(FILE *o) {
     fprintf(o, "{\"tool\":\"lordos-testbench\",\"v\":1,\"at\":%lld,\"window\":[%d,%d],\"frames\":%lu,\"fps\":%.2f,\"frameMsAvg\":%.3f,\"frameMsMax\":%.3f,"
                "\"frameMsP50\":%.3f,\"frameMsP99\":%.3f,\"missedBudget\":%d,"
                "\"noFreeBuffer\":%lu,\"presentation\":%s,\"presented\":%lu,\"discarded\":%lu,\"refreshHz\":%.3f,\"vblankSkips\":%lu,\"zeroCopy\":%lu,"
-               "\"keyboard\":%s,\"pointer\":%s,\"repeat\":[%d,%d],\"globals\":[",
+               "\"keyboard\":%s,\"pointer\":%s,\"repeat\":[%d,%d],\"globals\":",
             (long long)time(NULL) * 1000, win_w, win_h, ft.frames, bench_frames_fps(&ft), fs.avg, fs.max,
             fs.p50, fs.p99, hz > 0 ? bench_frames_missed(&ft, 1000.0 / hz) : 0,
             no_buffer, presentation ? "true" : "false", pr.presented, pr.discarded, bench_refresh_hz(&pr), pr.vblank_skips, pr.zero_copy,
             keyboard ? "true" : "false", pointer ? "true" : "false", repeat_rate, repeat_delay);
-    for (int i = 0; i < nglobals; i++) fprintf(o, "%s{\"interface\":\"%s\",\"version\":%u}", i ? "," : "", globals[i].iface, globals[i].version);
+    gt_json_globals(o, globals, nglobals);
+    fprintf(o, ",\"table\":");
+    gt_json(o, globals, nglobals);
     static const char *st[4] = { "untested", "pass", "fail", "info" };
-    fprintf(o, "],\"outputRefreshHz\":%.3f,\"latency\":{\"n\":%lu,\"avgMs\":%.2f,\"notPresented\":%lu},", out_refresh_mhz / 1000.0, lat.n, bench_latency_avg(&lat), lat.lost);
+    fprintf(o, ",\"outputRefreshHz\":%.3f,\"latency\":{\"n\":%lu,\"avgMs\":%.2f,\"notPresented\":%lu},", out_refresh_mhz / 1000.0, lat.n, bench_latency_avg(&lat), lat.lost);
     fprintf(o, "\"gl\":{\"renderer\":");
     bench_json_str(o, gl3d.renderer);
     fprintf(o, ",\"vendor\":");
@@ -741,20 +745,30 @@ static void report(FILE *o) {
     fprintf(o, "]}\n");
 }
 
+/* --globals: the registry and the table, nothing else (lordos-issue's "Wayland and X11" section) */
+static void globals_report(FILE *o) {
+    fprintf(o, "{\"tool\":\"lordos-testbench\",\"v\":1,\"mode\":\"globals\",\"at\":%lld,\"globals\":", (long long)time(NULL) * 1000);
+    gt_json_globals(o, globals, nglobals);
+    fprintf(o, ",\"table\":");
+    gt_json(o, globals, nglobals);
+    fprintf(o, "}\n");
+}
+
 /* The last report, for System Information's Checks: ~/.local/state/lordos/testbench.json (bench_save). */
 static void save_report(void) { bench_save("testbench", report); }
 
 int main(int argc, char **argv) {
     double auto_s = 0;
-    int auto_gl = 0;
+    int auto_gl = 0, only_globals = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--gl")) auto_gl = 1;
+        else if (!strcmp(argv[i], "--globals")) only_globals = 1;
         else if (!strcmp(argv[i], "--auto")) {
             auto_s = 5;
             if (i + 1 < argc && atof(argv[i + 1]) > 0) auto_s = atof(argv[++i]);
             if (auto_s > 600) auto_s = 600;
         } else {
-            fprintf(stderr, "usage: lordos-testbench [--gl] [--auto [seconds]]\n");
+            fprintf(stderr, "usage: lordos-testbench [--gl] [--auto [seconds]] | --globals\n");
             return 2;
         }
     }
@@ -765,6 +779,13 @@ int main(int argc, char **argv) {
     registry = wl_display_get_registry(dpy);
     wl_registry_add_listener(registry, &reg_listener, NULL);
     wl_display_roundtrip(dpy);
+    if (only_globals) {                 /* no window: what the registry says, compared with the table */
+        wl_display_roundtrip(dpy);
+        int err = wl_display_get_error(dpy);
+        globals_report(stdout);
+        wl_display_disconnect(dpy);
+        return err || ferror(stdout) ? 1 : 0;
+    }
     if (!comp || !shm || !wm) { fprintf(stderr, "lordos-testbench: the compositor lacks wl_compositor, wl_shm or xdg_wm_base\n"); return 1; }
     if (presentation) wp_presentation_add_listener(presentation, &pres_listener, NULL);
     surf = wl_compositor_create_surface(comp);

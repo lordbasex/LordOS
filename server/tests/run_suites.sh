@@ -171,6 +171,9 @@ EOF
     fi
 
     run "sound-test" build/sound-test
+    # lordos-issue's parsers of untrusted text (packaging/bin/lordos-issue): the WAYLAND_DEBUG scrubbing, the programs on the
+    # Wayland and X11 sockets, lordos-testbench --globals' summary, --app with a fake program (tests/data/lordos-issue)
+    run "lordos-issue-test (WAYLAND_DEBUG scrubbing, connected programs, --app)" sh tests/lordos_issue_test.sh
     # WebAssembly modules: built by tests/wasm/build.sh (*.wasm is not committed)
     if [ -f tests/wasm/demo.wasm ] && [ -f tests/wasm/api.wasm ] || { have clang && have wasm-ld && have wat2wasm && sh tests/wasm/build.sh >"$T/out" 2>&1; }; then
         run "wasm-test" build/wasm-test
@@ -331,6 +334,14 @@ EOF
         0) ok "protected-windows (tests/protected_headless.sh, headless lord-server-test: output, screenshot, mirror, portal, window share)" ;;
         77) skip "protected-windows" "build/lord-server-test, python3 and node with esbuild (make, npm install)" ;;
         *) bad "protected-windows (tests/protected_headless.sh, headless lord-server-test)"; cat "$T/out" ;;
+    esac
+    # lordos-testbench --globals: every global of LordOS's protocol table offered at its version (an ordinary client with
+    # the fake headset plugged in, and the Xwayland-like connection for xwayland_shell_v1)
+    sh tests/testbench_globals_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "testbench-globals (tests/testbench_globals_headless.sh, headless lord-server-test: $(sed -n 's/^together: //p' "$T/out"))" ;;
+        77) skip "testbench-globals" "build/lord-server-test, build/lordos-testbench, the default theme and python3" ;;
+        *) bad "testbench-globals (tests/testbench_globals_headless.sh, headless lord-server-test)" ;;
     esac
     # Lord Workspaces: a window launched from a display's bar lands on that display, in that activity and its slot, even
     # after a profile picker and with another activity in view; a dialog told its parent late goes over it; the bar

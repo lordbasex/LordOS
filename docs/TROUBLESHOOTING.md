@@ -37,6 +37,28 @@ log and every package file; without it (or with `--no-root`) the report is short
 **Read the file before posting it**, since issues are public, and paste it in the issue form's **Logs** box
 ([CONTRIBUTING.md](../CONTRIBUTING.md)).
 
+Since 0.8.9.6.1 (in development) the report has a **Wayland and X11** section, collected as you before the password is
+asked: `lordos-testbench --globals` against LordOS's protocol table (offered, missing, older; the globals only some
+clients get, such as `xwayland_shell_v1`, say so), the `xwayland` package's version, the variables that choose an
+app's backend (`WAYLAND_DISPLAY` and `DISPLAY` only as set or unset; `XDG_SESSION_TYPE`, `GDK_BACKEND`,
+`QT_QPA_PLATFORM`, `MOZ_ENABLE_WAYLAND`, `ELECTRON_OZONE_PLATFORM_HINT`, `SDL_VIDEODRIVER`,
+`_JAVA_AWT_WM_NONREPARENTING`, a value that isn't a plain word left out) and the programs connected to the Wayland and
+X11 sockets (from `ss`, your own processes only: program names, never titles). lord-server has no interface that lists
+its windows to a local tool, so the list is of connected programs, not windows.
+
+For a Linux app that misbehaves, run it through the report:
+
+```sh
+lordos-issue --app featherpad                # or: lordos-issue --seconds 60 --app firefox --new-window
+```
+
+It runs the program as you with `WAYLAND_DEBUG=1` for up to 20 seconds (`--seconds`, at most 300) and saves its last
+200 Wayland protocol lines to `~/lordos-wayland-<date>.txt` (0600). Only protocol lines are kept, and in them every text
+becomes `<text>` (titles, typed text, file names, error messages, a monitor's name), an app id a short hash, and only
+interface names (`wl_registry.global`, `bind`) and clipboard types (`offer`, `receive`, `accept`, `send`) stay. Nothing
+raw is written to disk. `lordos-issue --scrub-wayland-debug < log > clean` does the same to a log you made yourself.
+Read it before pasting it into the issue.
+
 ## Virtual machines
 
 - **VirtualBox's default display (VMSVGA) shows no desktop.** Fixed in 0.8.8 ([#9](https://github.com/lordbasex/LordOS/issues/9)):

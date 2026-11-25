@@ -460,6 +460,21 @@ static void test_kind(const char *kind) {
     CHECK(ll && bl && zr, "%s: kernel config", kind);
     if (strcmp(kind, "rpi5")) CHECK(r->naudio == 1 && !strcmp(r->audio[0], "HD-Audio Generic"), "%s: audio %s", kind, r->audio[0]);
     CHECK(contains(md, "# System report") && contains(md, "| LordOS | 0.8.5-beta |"), "%s: markdown head", kind);
+    /* the display engine (drmprobe.h): only the CLI probes it, so a collected report has none; probed, a table */
+    if (r->ngpu) {
+        CHECK(contains(json, "\"drm\":null") && !contains(md, "### Display engine"), "%s: no engine facts unless probed", kind);
+        DrmFacts *d = &r->gpu[0].drm;
+        drmprobe_init(d);
+        d->probed = d->render_node = 1;
+        d->syncobj = d->syncobj_timeline = 1;
+        char *md2 = sysreport_markdown(r), *json2 = sysreport_json(r);
+        CHECK(contains(md2, "### Display engine") && contains(md2, "| unknown | unknown (unknown, unknown, unknown) | unknown, unknown | yes, yes | unknown |"), "%s: engine table", kind);
+        JDoc doc;
+        char err[128] = "";
+        CHECK(json2 && !json_parse(json2, strlen(json2), &doc, err, sizeof err) && contains(json2, "\"drm\":{\"cardNode\":false,\"renderNode\":true,\"atomic\":-1"), "%s: engine JSON %s", kind, err);
+        if (json2 && !err[0]) json_free(&doc);
+        free(md2); free(json2);
+    }
 
     if (!strcmp(kind, "amd")) {
         CHECK(!strcmp(r->machine.vendor, "Micro-Star International Co., Ltd.") && !r->machine.version[0], "amd: dmi (placeholder dropped)");

@@ -59,7 +59,7 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Run `lordos-issue` in Terminal and paste the file it saves. Read it first, issues are public. If it isn't there, see CONTRIBUTING.md.
+      description: Run `lordos-issue` in Terminal and paste the file it saves. For a Linux app that misbehaves, also run `lordos-issue --app <program>` and paste the Wayland log it saves (titles, text and file names are replaced). Read both first, issues are public. If it isn't there, see CONTRIBUTING.md.
       render: text
   - type: checkboxes
     id: confirm

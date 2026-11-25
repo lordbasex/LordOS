@@ -69,7 +69,9 @@ char *sysreport_json(const SysReport *r) {
         js(&b, &h, "vendor", x->vendor); js(&b, &h, "device", x->device); js(&b, &h, "driver", x->driver);
         jb(&b, &h, "bootVga", x->boot_vga); jb(&b, &h, "renderNode", x->render_node);
         ji(&b, &h, "connectors", x->connectors); ji(&b, &h, "connected", x->connected);
-        hb_printf(&b, "}");
+        char dj[400];
+        drmprobe_json(&x->drm, dj, sizeof dj);
+        hb_printf(&b, ",\"drm\":%s}", dj);
     }
     hb_printf(&b, "]");
 
@@ -295,6 +297,30 @@ char *sysreport_markdown(const SysReport *r) {
     }
     if (!r->ngpu) hb_printf(&b, "| — | none found | | | |\n");
     hb_printf(&b, "\n");
+    /* the display engine (drmprobe.h): only the CLI probes it */
+    int probed = 0;
+    for (int i = 0; i < r->ngpu; i++) probed |= r->gpu[i].drm.probed;
+    if (probed) {
+        hb_printf(&b, "### Display engine\n\n| Card | Atomic | Planes (primary, overlay, cursor) | Scanout formats, modifiers | Explicit sync (syncobj, timeline) | drm-lease |\n|---|---|---|---|---|---|\n");
+        for (int i = 0; i < r->ngpu; i++) {
+            const DrmFacts *f = &r->gpu[i].drm;
+            if (!f->probed) continue;
+            char n1[16], n2[16], n3[16], n4[16], n5[16], n6[16], l[48];
+            hb_printf(&b, "|"); cell(&b, r->gpu[i].card);
+            if (!f->card_node && !f->render_node) { hb_printf(&b, " not readable by this user | | | | |\n"); continue; }
+            cell(&b, drmprobe_tri(f->atomic));
+            snprintf(t, sizeof t, "%s (%s, %s, %s)", drmprobe_num(f->planes, n1, sizeof n1), drmprobe_num(f->primary, n2, sizeof n2),
+                     drmprobe_num(f->overlay, n3, sizeof n3), drmprobe_num(f->cursor, n4, sizeof n4));
+            cell(&b, t);
+            snprintf(t, sizeof t, "%s, %s", drmprobe_num(f->scanout_formats, n5, sizeof n5), drmprobe_num(f->scanout_modifiers, n6, sizeof n6));
+            cell(&b, t);
+            snprintf(t, sizeof t, "%s, %s", drmprobe_tri(f->syncobj), drmprobe_tri(f->syncobj_timeline));
+            cell(&b, t);
+            cell(&b, drmprobe_lease(f, l, sizeof l));
+            hb_printf(&b, "\n");
+        }
+        hb_printf(&b, "\n");
+    }
 
     if (r->ndisplay) {
         hb_printf(&b, "## Displays\n\n| Output | Monitor | Size | Native mode |\n|---|---|---|---|\n");

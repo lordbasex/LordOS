@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <wayland-client.h>
 
+#include "globtable.h"
+
 struct xdg_wm_base;
 struct xdg_surface;
 struct xdg_toplevel;
@@ -25,7 +27,6 @@ extern int win_w, win_h;
 extern uint32_t kb_serial, ptr_serial;     /* the last enter or input serials (0: none yet) */
 extern uint32_t toplevel_states;           /* bit per xdg_toplevel state of the last configure */
 
-typedef struct { uint32_t name, version; char iface[64]; } Global;
 extern Global globals[96];
 extern int nglobals;
 

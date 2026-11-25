@@ -70,7 +70,8 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 
 Every protocol, with what lord-server offers next to KDE's KWin and GNOME's Mutter and why some are left out on
 purpose, is in "Protocol table (generated)" below and on [lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/),
-both made from `docs/wayland-protocols.json`.
+both made from `docs/wayland-protocols.json`. So is the Test Bench's expected list (`server/src/testbench/expected_globals.h`):
+`lordos-testbench --globals` compares any compositor's registry with it, and `lordos-issue` includes the result.
 
 Windows enter the SDK's window manager (`sdk/wayland.js`) as the internal app `linux` (id
 `linux#<surface>`): the theme sees them like any other, with their title, focus, maximize,
