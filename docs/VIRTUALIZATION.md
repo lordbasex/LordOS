@@ -2102,7 +2102,7 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
     default (`/usr/lib/systemd/user/default.target.wants`) that runs `/usr/lib/lordos/guest/lordos-guest` only where
     `/dev/virtio-ports/org.lordos.agent` exists, which is only inside a Machines guest whose agent is on, and
     `71-lordos-guest.rules` (the same rule the Install Agent writes in other guests: the seat's person may open the
-    port; since 0.8.9.6 also the `video` group, because LordOS's own sessions aren't logind seats and `uaccess` gave the
+    port; since 0.8.9.6 also the guest's administrators, the `sudo` group, because LordOS's own sessions aren't logind seats and `uaccess` gave the
     port to nobody there, 6.17 "LordOS as a guest"). On a computer, or a machine without the agent, nothing runs. The
     package also `Recommends: qemu-guest-agent` (0.8.9.6), so an installed LordOS gets it with its next update. The live ISO now also has `qemu-guest-agent`
     (`ISO.md`): Debian's unit starts only when the host gives the `org.qemu.guest_agent.0` port. So a LordOS machine
@@ -3920,7 +3920,7 @@ LordOS 0.8.9, most desktop installs). For those, Machines brings a disc:
   (`apt-get`, `dnf`, `yum`, `zypper`, `pacman`, `apk`, the first found) and starts it (systemd or OpenRC); installs `xclip`
   and `wl-clipboard` best effort (not on LordOS, below); starts `lordos-guest` again for the person who ran it
   (`PKEXEC_UID`, `SUDO_UID`, `DOAS_UID`) or every signed-in person. On LordOS its udev rule also gives the port to the
-  `video` group. `install.sh --plan` prints these choices and changes nothing (the tests).
+  `sudo` group (the guest's administrators; not `video`, which every desktop account is in: F9, F13). `install.sh --plan` prints these choices and changes nothing (the tests).
 - *Taking it out.* lord-vm takes the disc out by itself once qemu-guest-agent connects or `lordos-guest` says hello
   (`gt_eject`, at the agent's next turn); **Take the Disc Out** does it at once. Changing the disc by hand forgets it.
   From then on Install and the automatic update of older tools (7.1.3) go through qemu-guest-agent as for any guest.
@@ -3945,14 +3945,23 @@ gives the port only to the person at a logind seat, and LordOS's own sessions (l
 desktop: lord-server has no data-control protocol (wl-paste can't read it) and offers its X selection only to a focused X
 window. Now (*in development*):
 
-- `71-lordos-guest.rules` gives the port to the `video` group too (`GROUP="video", MODE="0660"`): every LordOS desktop user
-  is in it (users_admin.c, firstrun, the installer, the live user), as for the screen; whoever's `lordos-guest` starts
-  first holds the port (it opens once). Elsewhere (logind seats) `uaccess` still applies.
+- `71-lordos-guest.rules` gives the port to the guest's administrators too (`GROUP="sudo", MODE="0660"`; the people
+  Settings → Users, firstrun, the installer and the live user make administrators); whoever's `lordos-guest` starts first
+  holds the port (it opens once). Elsewhere (logind seats) `uaccess` still applies. A first version gave it to the `video`
+  group, which every desktop account is in: since the port opens once and its holder gets the host's shell (its own
+  login shell), clipboard and dropped files, a standard account that opened it first could read what the host's person
+  typed into that shell, a `sudo` password included (security findings F9, F13). An administrator can already do anything
+  in the guest, so the port gives them nothing new; a standard account can't open it, so a guest used only from a
+  standard account has no agent (Machines keeps waiting for it). Migration `013-0.8.9.6-guest-agent-admins.sh` rewrites the
+  old `video` rule where the disc or Install Agent wrote it in `/etc/udev/rules.d` (only that exact line), applies the
+  rule to the port, stops the non-administrators' `lordos-guest` and restarts the administrators'. A program of a
+  standard account other than `lordos-guest` that already holds the port keeps it until it closes it or the machine
+  restarts.
 - The `lordos` package `Recommends: qemu-guest-agent` (the Store installs new Recommends; Debian's udev rule starts it only
   where the port exists), and migration `012-0.8.9.6-guest-agent-port.sh` applies the rule to the port at once and starts
   `lordos-guest` for the signed-in people, only inside a Machines guest whose agent is on. A 0.8.9 guest gets all of it by
   updating LordOS inside the machine; the disc above works there too without updating (`install.sh` writes the same
-  `video` rule on LordOS).
+  `sudo` rule on LordOS).
 - `lordos-guest` 9 takes the clipboard from the guest's own lord-server: its `lordos-guestwin.sock` endpoint (7.2) says
   `clipboard` in its hello, sends the clipboard's text after each change (never a secret) and takes the host's text as the
   clipboard's (marked as from `machines`), only for the peer that holds the agent port (`js_guestwin.c` `holds_port`: it
@@ -3960,7 +3969,7 @@ window. Now (*in development*):
   reading and writing, which lord-server looks at and closes at once). `lordos-guest` is non-dumpable
   (`PR_SET_DUMPABLE` 0): another program of the same person can't attach to it or open its descriptors to reach the port
   or the clipboard; one that kills it and takes the port before its restart would still pass (the port opens for one
-  program at a time, the `video` group's people). On such a desktop
+  program at a time, the guest's administrators). On such a desktop
   `lordos-guest` makes no X connection (it would start Xwayland for nothing) and its hello says `clipboard` without
   `clipx`: text only, pushed. A 0.8.9 guest's lord-server has no such endpoint (it came with apps mode, after 0.8.9):
   there the clipboard waits for the LordOS update inside the machine; the agent itself (qemu-guest-agent, the helper's

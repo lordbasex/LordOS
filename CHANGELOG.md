@@ -1139,6 +1139,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Security (F9, F13): a LordOS Machines guest's agent port is its administrators', not every desktop account's** (in
+  development; latest release 0.8.9.5-beta; `docs/VIRTUALIZATION.md` 6.17 "LordOS as a guest"). The guest end of
+  `org.lordos.agent` was `GROUP="video", MODE="0660"` in the `lordos` package's `71-lordos-guest.rules`, in the Guest
+  Tools disc's `install.sh` and in Install Agent's `INSTALL_SH` (`lordvm.c`) on LordOS guests. Every LordOS desktop
+  account is in `video`, and the port opens only once, so a standard account that opened it first (at boot with
+  lingering, by SSH, or in a restart gap of the main user's `lordos-guest`) became the guest's agent: it received the
+  host's clipboard, the files dropped on the machine and Machines' Shell, a login shell of its own in which the host's
+  person might type a `sudo` password. The three rules now say `GROUP="sudo"`: only the guest's administrators, who can
+  already do anything in it, may open the port; elsewhere logind's `uaccess` still applies. A guest used only from a
+  standard account has no agent. New migration `013-0.8.9.6-guest-agent-admins.sh` (root, idempotent): rewrites
+  `/etc/udev/rules.d/71-lordos-guest.rules` only when it is exactly the old `video` line (written by an earlier disc or
+  Install Agent; it overrides the package's rule), and, only where the port exists, reloads and triggers udev, stops
+  `lordos-guest` for each signed-in person who isn't an administrator and restarts it for each administrator. Another
+  program of a standard account that already holds the port keeps it until it closes it or the machine restarts. Tests:
+  `migration_guest_port_test.sh` (now migrations 012 and 013: six more fake trees, run twice under `sh -eu`, and a check
+  that no rule gives the port to `video`).
 - **Settings → Language & Region → Region names each region's language (GitHub #239 follow-up)** (in development;
   latest release 0.8.9.5-beta). A row named only its country, so the five regions of France (Breton, Catalan, Basque,
   French and Occitan) all read "France · xx_FR", and Basque was picked by mistake. Each row now reads "Basque · France
