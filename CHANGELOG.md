@@ -1139,6 +1139,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **An encrypted machine's key can no longer be read by the person's other programs while it is handed over**
+  (in development; latest release 0.8.9.5-beta; Claude Security F4 of 2026-11-24, MEDIUM; `server/src/vm/vmkeysrv.c`,
+  `server/src/vm/lordvm.c`). The disk-encryption key went from lord-server to lord-vm, and from lord-vm to QEMU,
+  `qemu-img` and swtpm, in anonymous pipes held by dumpable processes; any program of the same user could reopen such
+  a pipe through `/proc/<pid>/fd/N` (read access, which Yama's scope 1 doesn't restrict), stopping the holder with
+  SIGSTOP if needed, and read the 64 hex digits. Now lord-server hands the key over on an AF_UNIX socketpair, which
+  `/proc` can't reopen (ENXIO); lord-vm makes QEMU's user namespace and then goes non-dumpable as soon as it reads
+  `--key-fd`; and QEMU, `qemu-img` and swtpm each run in QEMU's namespaces with the private loader, their pipe empty
+  until they have exec'd and lord-vm has checked that the kernel made them non-dumpable (`key_give`, after an exec
+  sync). A reader that isn't non-dumpable gets no key and the start, create, clone, export or snapshot fails with a
+  message, instead of exposing the key. `tests/vmkeysrv_test.c` reopens the key's descriptor from another process
+  (refused, ENXIO), shows a plain pipe being read that way, and a non-dumpable holder's pipe refused (both ends);
+  `tests/vm_storage_test.sh` (real QEMU/KVM: encrypted create, start with swtpm, snapshots, clone, export, import and
+  an encrypted group) and `tests/vm_snap_store_test.sh` pass with the new hand-off.
+- **lord-web: a hostile shared-memory frame size can no longer overflow lord-web's heap** (in development; latest
+  release 0.8.9.5-beta; Claude Security F5 of 2026-11-24, MEDIUM; `server/src/web/webwin.c`, `webshm.c`,
+  `webback_platform.c`, new `webframe.h`). The frame copy had stopped clamping each row to the destination, and a
+  width just above 2^30 from a compromised WebKit web process wrapped `w * 4` in `int`, so lord-web mapped one page and
+  then copied gigabytes into it. Both backends now check every shared-memory frame with `webframe_shm_ok` (sides
+  1..16384, stride at least `w * 4` and at most `INT32_MAX`, all in 64 bits, and stride × height within the buffer's
+  size on the WPEPlatform path); lord-web's own buffer refuses such sides too; and `webframe_copy` copies at most the
+  smaller width, stride and height of the two buffers and never more rows than the destination's size holds.
+  `tests/webapp_test.c` adds the report's dimensions (0x40000400 × 1), `INT_MAX` sides, strides under the width, a
+  one-byte-short buffer and copies with hostile sizes checked against a guard area.
 - **Settings → Language & Region → Region names each region's language (GitHub #239 follow-up)** (in development;
   latest release 0.8.9.5-beta). A row named only its country, so the five regions of France (Breton, Catalan, Basque,
   French and Occitan) all read "France · xx_FR", and Basque was picked by mistake. Each row now reads "Basque · France
