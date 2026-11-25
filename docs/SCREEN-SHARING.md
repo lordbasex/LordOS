@@ -136,6 +136,11 @@ The encoder makes one only when asked. At most one every 500 ms always. If the s
 3 at most, one more every 30 s. A request is never lost, it waits its turn; a first request or a new viewer after a quiet spell is served at once.
 So a viewer asking every 3 s on a still screen costs about 2 keyframes a minute, not 20. On a changing screen only the 500 ms applies.
 
+The encoder is the remote desktop's ([REMOTE.md](REMOTE.md), "One encoder per session"): H.264 on the compositor's own card through
+VA-API when its driver encodes it (another render node if not, libx264 if none), one frame in flight, tagged BT.709 limited range.
+With VA-API, an `RP_RATE` that moves the target by a fifth or more opens the encoder again at that rate, which starts with a keyframe
+of its own (at most every 3 s upwards and every second downwards); those keyframes don't spend the tokens above.
+
 ## Clipboard
 
 Only with the `clipboard` flag and `remote-input`, text only, starting from what is copied after the start. Items marked sensitive never go.

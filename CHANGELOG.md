@@ -35,6 +35,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   the count and the first 8 distinct syscall numbers and ioctl requests.
 
 ### Tests
+- `build/lmstream-test` (`make -C server test-full`) takes up to three render nodes, as lord-server passes them (the
+  suite now passes every `/dev/dri/renderD*`, so a PC whose first node has no VA driver still tests VA-API), and checks
+  whichever encoder runs: each lone frame's packet comes out before the next frame goes in (VA-API's `async_depth`),
+  the stream is tagged BT.709 limited range, and asking 12000 kbit/s after 4000 gives at least 1.5× the bits (VA-API
+  must reopen, from a keyframe). It prints `lord-media`'s CPU per frame; `LMSTREAM_SIZE=WxH` measures at another size.
 - `build/nvgpu-test`: every helper failure code end to end with the fake NVML (a build without `nvmlInit_v2`, a
   library that doesn't exist, `nvmlInit` and the count failing, the real path with no card bound to `nvidia`), a
   sampling call that tries `socket()` and a tty ioctl after the sandbox (data still flows, both counted with the
@@ -44,6 +49,44 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `make -C server test`): the reason for each state, every reason key in every language, the report's lines, and a
   report from hostile fields holding no home path, host or user name, or pid.
 ### Fixed
+- **Remote desktop (5673) and the screen-sharing API: the hardware encoder is the compositor's own card, and VA-API
+  follows the bit rate** (`docs/REMOTE.md`, "One encoder per session"; `docs/drafts/REMOTE-5673-OPTIMIZATION.md`,
+  improvement 1). Four faults, all confirmed on the RX 580 PC (i9-10900 with an Intel UHD 630 next to the RX 580):
+  - *The wrong render node.* lord-server passed `lord-media` the first render node that opened. Since the 2026-11-23
+    boot that is `renderD128` = the UHD 630 (i915), which has no VA driver installed, while the RX 580 the compositor
+    renders on is `renderD129` (the session log says `render /dev/dri/renderD129`; the video probe says `"gpu":"i915"`).
+    So the remote desktop silently encoded with libx264. lord-server now opens the compositor's render node first
+    (`media_render_fds`: the GPU path's EGL device via `gpu_device`, then the other nodes by number) and passes up to
+    three as descriptors (`render=N`; still fds, never paths, and the same DRM ioctl class the job already had); the
+    encoder takes the first whose VA-API driver opens H.264 and logs which ("H.264 on render node 2 of 2"), libx264
+    only when none does. `media_render_fd` (video playback, screen recording, camera, Machines) also starts with the
+    compositor's node now.
+  - *One frame held back.* FFmpeg's `h264_vaapi` keeps `async_depth=2` frames in flight, so each packet came out only
+    when the next frame went in, and the last frame of every change waited for the 70 ms flush frame. Now
+    `async_depth=1`: each frame's packet comes out with it.
+  - *The rate never followed the bridge.* `vid_rate` changed only libx264's cap; VA-API stayed at the 4000 kbit/s it
+    opened with for the whole connection while the bridge believed it had raised it to 12000. VA-API reads its rate
+    only when it opens, so it is now opened again on the same card at the new rate, from a keyframe, when the target
+    moved by a fifth or more, at most every 3 s upwards and every second downwards (the bridge raises it by a quarter a
+    second on a clean link: about two reopenings from 4000 to 12000). Driving libva directly, without the keyframe, is
+    left for later.
+  - *No colour tags.* The VA-API stream now carries BT.709 primaries and matrix, limited range and the sRGB transfer,
+    like libx264's, so browsers show the same colours as the lossless tiles; and no SEI (identifier, timing, recovery
+    point: a few bytes a frame nobody reads).
+
+  Measured with `build/lmstream-test` at 1920×1080 (`LMSTREAM_SIZE=1920x1080`, three runs each, the RX 580 also
+  driving the live three-monitor desktop): before, as lord-server sent it (`renderD128` first) libx264 ran: 10.6 ms of
+  `lord-media` CPU a frame, a lone frame's packet in 6.3 ms, 2950 / 8640 kbit/s when 4000 / 12000 were asked. The old
+  build forced onto `renderD129` used VA-API but no lone frame came out before the next one went in (0 of 12; in a
+  session, the 70 ms flush frame), and the rate stayed put (4000 asked: 1010, 12000 asked: 2320 kbit/s), with no colour
+  tags. After: VA-API on `renderD129` with 4.4 ms of CPU a frame (−59 %; it is now FFmpeg's BGRA→NV12 conversion and the
+  upload, about 3.9 ms), every lone frame out before the next (median 14.3 ms, of which about 11.5 ms is the RX 580's
+  VCE 3.4 encoding a 1080p frame), 985 / 8860 kbit/s when 4000 / 12000 were asked (the encoder reopened once), BT.709
+  limited range in the SPS. At 640×368: 1.0 ms of CPU a frame instead of libx264's 2.1, 4460 / 11900 kbit/s. Trade-offs
+  measured, not changed: VCE 3.4 takes about 11.5 ms per 1080p frame (`ffmpeg -benchmark`: 87 fps at any
+  `async_depth`), so one frame in flight caps a 1080p stream near 65 frames a second (conversion + encode) where
+  libx264 on this i9 managed about 135, and radeonsi's VBR spends well under the cap on easy content. A full
+  click-to-pixel run through a browser was not possible here (a viewer on `remote.sock` must be root).
 - **Check This Account's delete step on pCloud, again (GitHub #243)**. pCloud keeps listing the check's folder as not
   empty for a few seconds after its `check.bin` was deleted, longer than the 4.5 s the move's own rmdir retry of
   0.8.9.6 waits, so the step could still end in `cloud.checkDeleteFailed` and leave `.lordos-check-…` in the account.
