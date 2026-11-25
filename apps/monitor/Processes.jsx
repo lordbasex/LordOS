@@ -249,18 +249,26 @@ function pillLabel(tr, o) {
   return tr(`monitor.badge.${o.kind}`);
 }
 
-export function OriginBadge({ o, selected }) {
+// onHover(on): the pointer comes onto the badges and leaves them (a group row's hover summary waits meanwhile, so it is
+// never shown with the badge's own tooltip over it)
+export function OriginBadge({ o, selected, onHover }) {
   const { t: tr } = useLocale();
   if (!o) return null;
   const tip = badgeTip(tr, o);
   const mark = o.kind === 'system' || o.kind === 'lordos'
     ? <Seal kind={o.kind} />
     : <Pill color={PILL[o.kind]} label={pillLabel(tr, o)} selected={selected} />;
-  return (
+  const badges = (
     <>
       <Tooltip text={tip}><View accessibilityLabel={tip} style={{ flexDirection: 'row', alignItems: 'center' }}>{mark}</View></Tooltip>
       {o.updated ? <Tooltip text={tr('monitor.badge.updatedTip')}><Pill color={PILL.updated} label={tr('monitor.badge.updated')} selected={selected} /></Tooltip> : null}
     </>
+  );
+  if (!onHover) return badges;
+  return (
+    <View onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+      {badges}
+    </View>
   );
 }
 
@@ -337,6 +345,8 @@ export function ProcessesTab() {
   const [leftAt, setLeftAt] = useState(0);
   const held = useRef({ reset: '', flat: null, groups: null });
   const tipTimer = useRef(0), tipKey = useRef(null);
+  // the pointer on a row's origin badge (its tooltip shows instead of the summary) and the group row it last came onto
+  const onBadge = useRef(false), lastEnter = useRef(null);
   const me = myUid(procs);
   const narrow = useNarrow(760);           // a small window: fewer columns, the header on two lines
   const cols = [
@@ -478,19 +488,29 @@ export function ProcessesTab() {
   // a group row's hover summary: what it says is taken when it opens, and stays until the pointer leaves the row
   const onRowEnter = (r, e) => {
     clearTimeout(tipTimer.current);
-    if (!r.group || r.group.gone) { hideTip(); return; }
+    if (!r.group || r.group.gone) { lastEnter.current = null; hideTip(); return; }
+    lastEnter.current = { r, e };
     const key = r.group.key;
     tipKey.current = key;
     if (ui.get().tip) put({ tip: null });
     const at = layerRoot.current && e?.local ? e.local(layerRoot.current) : { x: e?.x || 0, y: e?.y || 0 };
     tipTimer.current = setTimeout(() => {
       const s = ui.get();
-      if (tipKey.current !== key || s.menu || s.stop || s.gstop || s.info) return;
+      if (tipKey.current !== key || onBadge.current || s.menu || s.stop || s.gstop || s.info) return;
       const g = shownGroups.list.find((x) => x.key === key);
       if (g && !g.gone) put({ tip: { key, x: at.x, y: at.y, name: groupLabel(tr, g), sum: groupSummary(g), stats: stats.get(groupRowKey(key)) } });
     }, TIP_MS);
   };
-  const onRowLeave = (r) => { if (r.group && tipKey.current === r.group.key) hideTip(); };
+  const onRowLeave = (r) => {
+    if (lastEnter.current?.r === r) lastEnter.current = null;
+    if (r.group && tipKey.current === r.group.key) hideTip();
+  };
+  // on the badge: its tooltip, the summary goes; back on the row: the summary comes after its delay again
+  const onBadgeHover = (on) => {
+    onBadge.current = on;
+    if (on) { clearTimeout(tipTimer.current); if (ui.get().tip) put({ tip: null }); }
+    else if (lastEnter.current) onRowEnter(lastEnter.current.r, lastEnter.current.e);
+  };
   const ended = (dim) => <Text style={{ fontSize: 11, color: dim, whiteSpace: 'nowrap' }}>{tr('monitor.proc.ended')}</Text>;
   const cpuText = (v, color) => <Text style={{ fontSize: 12, color, fontWeight: v > 0.5 ? 600 : 400, whiteSpace: 'nowrap', textAlign: 'end' }}>{formatNumber(v * 100, 1)}</Text>;
   const groupCell = (g, c, { color, dim, selected: on }) => {
@@ -500,7 +520,7 @@ export function ProcessesTab() {
           <Disclosure state={g.match === 'procs' || open.has(g.key) ? 'open' : 'closed'} color={dim} onToggle={() => toggleGroup(g.key)} />
           <AppGlyph item={groupGlyph(g)} />
           <Text style={{ fontSize: 12, fontWeight: 600, color, whiteSpace: 'nowrap' }}>{groupLabel(tr, g)}</Text>
-          <OriginBadge o={groupOriginOf(g, facts)} selected={on} />
+          <OriginBadge o={groupOriginOf(g, facts)} selected={on} onHover={onBadgeHover} />
           {ioOf(g) ? <Text style={{ fontSize: 11, color: dim, whiteSpace: 'nowrap' }}>{ioOf(g)}</Text> : null}
           {g.gone ? ended(dim) : null}
           {on && !g.gone && (g.stoppable || (g.kind === 'app' && machineOf(g.item?.app))) ? <View style={{ flex: 1 }} /> : null}

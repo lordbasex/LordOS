@@ -3,7 +3,7 @@
 // programs, a program from the home folder, one updated on disk, a machine) instead of the machine's own, with the
 // owners and repositories fixed, so the screenshots are the same everywhere. lord.monitor.signal is a no-op: the scene
 // never signals a real process. Everything else is the real code. It also keeps which text each node shows and where
-// it hangs, so driver.js can click them.
+// it hangs, so driver.js can click them, the origin seals and a group's hover summary.
 (function () {
   const MB = 1024 * 1024;
   let st = 1200000;
@@ -102,6 +102,12 @@
   wrap('setText', (id, s) => texts.set(id, String(s)));
   wrap('appendChild', (p, c) => parent.set(c, p));
   wrap('insertBefore', (p, c) => parent.set(c, p));
-  wrap('destroy', (id) => { texts.delete(id); parent.delete(id); });
-  globalThis.__monitorScene = { texts, parent };
+  // the origin seals (13 px drawn at 2×: a 26 px canvas) and a group's hover summary (zIndex 280), to hover the one and
+  // tell whether the other is shown
+  const seals = new Set(), summaries = new Set();
+  wrap('setProp', (id, k, v) => { if (k === 'pixels' && v && v.width === 26) seals.add(id); });
+  wrap('setStyle', (id, k, v) => { if (k === 'zIndex' && v === 280) summaries.add(id); });
+  wrap('destroy', (id) => { texts.delete(id); parent.delete(id); seals.delete(id); summaries.delete(id); });
+  wrap('removeChild', (p, c) => { summaries.delete(c); });
+  globalThis.__monitorScene = { texts, parent, seals, summaries };
 })();
