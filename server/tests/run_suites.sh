@@ -170,6 +170,11 @@ EOF
         skip "thbrk_compare.sh" "libthai-dev and python3"
     fi
 
+    # the toolkit audit's plain X11 harness (lordos-testbench --toolkits, docs/TOOLKIT-AUDIT.md) against a private Xvfb
+    if ! have python3; then skip "toolkit-audit x11.py" "python3"
+    elif ! have Xvfb; then skip "toolkit-audit x11.py" "Xvfb"
+    else run "toolkit-audit x11.py" python3 -I ../tools/toolkit-audit/x11_test.py; fi
+
     run "sound-test" build/sound-test
     # lordos-issue's parsers of untrusted text (packaging/bin/lordos-issue): the WAYLAND_DEBUG scrubbing, the programs on the
     # Wayland and X11 sockets, lordos-testbench --globals' summary, --app with a fake program (tests/data/lordos-issue)
