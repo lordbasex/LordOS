@@ -41,7 +41,7 @@ await esbuild.build({
   outfile: path.join(dist, 'app.js'), plugins: [swap], loader: { '.json': 'json' },
   define: { 'process.env.NODE_ENV': '"production"' },
 });
-for (const f of fs.readdirSync(path.join(repo, 'assets/mascot'))) if (f.endsWith('-256.png')) fs.copyFileSync(path.join(repo, 'assets/mascot', f), path.join(dist, 'assets/mascot', f));
+for (const f of fs.readdirSync(path.join(repo, 'assets/mascot'))) if (/^lumo-(wave|shield|celebrate|confused|sleep|run)-(128|256)\.png$/.test(f)) fs.copyFileSync(path.join(repo, 'assets/mascot', f), path.join(dist, 'assets/mascot', f));
 fs.copyFileSync(path.join(repo, 'assets/icons/lordos-icon-128.png'), path.join(dist, 'assets/icons/lordos-icon-128.png'));
 for (const f of ['Inter-Regular.ttf', 'Inter-Medium.ttf', 'Inter-SemiBold.ttf', 'Inter-Bold.ttf', 'Inter-LICENSE.txt', 'JetBrainsMono-Regular.ttf', 'JetBrainsMono-LICENSE.txt'])
   fs.copyFileSync(path.join(repo, 'assets/fonts', f), path.join(dist, 'assets/fonts', f));

@@ -103,8 +103,9 @@ in a `Text` for this.
   `textDim`), centered. At most one primary button.
   For an outcome worth a little warmth (an error or an unavailable service, "everything is up to
   date") pass `mascot` instead of the icon: `mascot="confused"`, `"celebrate"`, `"shield"` or
-  `"wave"` draws Lumo at 112 px (`sdk/mascot.js`, docs/LORDOS-BRAND.md). Not in "nothing selected"
-  panes, and never more than one Lumo per view.
+  `"wave"` draws the 3D Lumo at 112 px (`sdk/mascot.js` picks the 128 or 256 px render for the
+  display scale; docs/LORDOS-BRAND.md). Not in "nothing selected" panes, and never more than one Lumo
+  per view; under 48 px use the avatar, not a pose.
 - **Dialogs and sheets:** 20 px padding, title 15/600, body 13 with `lineHeight: 1.4`, buttons at
   the end of the last row with 12 px above them. The default action is `primary`.
 - **Hierarchy:** one primary (accent) action per view. Everything else is plain or neutral.

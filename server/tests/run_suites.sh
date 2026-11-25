@@ -170,6 +170,10 @@ EOF
         skip "thbrk_compare.sh" "libthai-dev and python3"
     fi
 
+    # Lumo's runtime renders (assets/mascot, what sdk/mascot.js draws) are the ones the 3D masters give (tools/gen-mascot.py)
+    if ! have python3 || ! python3 -c 'import PIL, numpy' 2>/dev/null; then skip "gen-mascot --check" "python3 with Pillow and NumPy"
+    else run "gen-mascot --check (assets/mascot)" python3 -I ../tools/gen-mascot.py --check; fi
+
     # the toolkit audit's plain X11 harness (lordos-testbench --toolkits, docs/TOOLKIT-AUDIT.md) against a private Xvfb
     if ! have python3; then skip "toolkit-audit x11.py" "python3"
     elif ! have Xvfb; then skip "toolkit-audit x11.py" "Xvfb"
