@@ -262,17 +262,22 @@ try {
 const model = buildModel(entries);
 eq('the page model', model.machines.map((m) => [m.name, m.kind, m.source, m.perf.map((p) => p.cat)]),
   [['QEMU Standard PC (Q35 + ICH9, 2009)', 'vm', 'reference', ['cpu', 'memory', 'gpu', 'storage']], ['Raspberry Pi 5 Model B Rev 1.1', 'board', 'reference', ['cpu', 'memory', 'gpu', 'storage']],
-    ['', 'desktop', 'community', ['cpu', 'memory', 'gpu']], ['', 'desktop', 'community', []], ['Acer Aspire R3-131T', 'laptop', 'community', ['cpu', 'memory', 'gpu']],
+    ['Acer Aspire R3-131T', 'laptop', 'community', ['cpu', 'memory', 'gpu']],
     ['Apple Inc. MacBookPro11,4', 'laptop', 'community', []], ['Apple Inc. MacBookPro12,1', 'laptop', 'community', []],
     ['ASUSTeK Computer Inc. K72F', 'laptop', 'community', []], ['ASUSTeK Computer Inc. K72F', 'laptop', 'community', []], ['ASUSTeK Computer Inc. K72F', 'laptop', 'community', []],
     ['Dell Inc. Latitude 7480', 'laptop', 'community', []], ['Gigabyte Technology Co., Ltd. B760M C', 'desktop', 'community', []], ['Hampoo P02BD6_HI-122LP', 'desktop', 'community', []],
-    ['HP HP EliteBook 840 G6', 'laptop', 'community', []], ['HUAWEI CREFG-XX', 'laptop', 'community', []], ['TECLAST X98Pro', 'desktop', 'community', []]]);
+    ['HP HP EliteBook 840 G6', 'laptop', 'community', []], ['HUAWEI CREFG-XX', 'laptop', 'community', []], ['TECLAST X98Pro', 'desktop', 'community', []],
+    ['', 'desktop', 'community', ['cpu', 'memory', 'gpu']], ['', 'desktop', 'community', []]]);
 eq('problems listed', model.problems.map((p) => [p.id, p.state, p.note]),
   [['power', 'limits', 'batteryWorn'], ['gpu', 'limits', 'cpu.rotated'], ['gpu', 'limits', 'cpu.no-context'], ['power', 'limits', 'batteryWorn'], ['gpu', 'limits', 'cpu.software']]);
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const html = renderSections({ ...model, machines: [{ ...model.machines[0], name: '<img src=x onerror=alert(1)>' }] }, { reference: 'Reference', state: { works: 'Works' } }, esc, (k) => `https://github.com/x/issues/${k}`);
 ok('the page sections escape report text', !html.machines.includes('<img') && html.machines.includes('&lt;img'));
 ok('references are marked as such', html.machines.includes('class="hw-ref">Reference'));
+const unnamedT = { unnamed: { computer: 'Unnamed computer', laptop: 'Unnamed laptop' }, notes: { 'cpu.noContext': '(no context)' } };
+const unnamed = renderSections({ machines: [{ ...model.machines[0], name: '', kind: 'laptop' }, { ...model.machines[0], name: '', kind: 'desktop' }], gpus: [], problems: [{ machine: '', kind: 'laptop', id: 'gpu', state: 'limits', note: 'cpu.no-context', lordos: '0.8.9', fixedIn: null }] }, unnamedT, esc, (k) => `https://github.com/x/issues/${k}`);
+ok('a machine with no vendor or product gets the name of its kind', unnamed.machines.includes('<h3>Unnamed laptop</h3>') && unnamed.machines.includes('<h3>Unnamed computer</h3>') && !unnamed.machines.includes('<h3></h3>'));
+ok('the problems table names it the same way and finds the camelCase note', unnamed.problems.includes('<td>Unnamed laptop</td>') && unnamed.problems.includes('(no context)'));
 
 // ---- community data in the Compatibility panel (community.js) ----
 const keys = deviceKeys(laptop.system);
