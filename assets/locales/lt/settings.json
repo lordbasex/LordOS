@@ -914,5 +914,6 @@
   "wallpaperGallery.spaceUsed": "Atsisiųsta: {size}",
   "wallpaperGallery.useDesktop": "Naudoti darbalaukyje",
   "wallpaperGallery.useLogin": "Prisijungimo ekranas",
-  "wallpaperGallery.useSlideshow": "Naudoti kaip skaidrių peržiūrą"
+  "wallpaperGallery.useSlideshow": "Naudoti kaip skaidrių peržiūrą",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · įtraukta, veikia be ryšio"
 }

@@ -914,5 +914,6 @@
   "wallpaperGallery.spaceUsed": "{size} descărcate",
   "wallpaperGallery.useDesktop": "Folosește pe desktop",
   "wallpaperGallery.useLogin": "Ecranul de autentificare",
-  "wallpaperGallery.useSlideshow": "Folosește ca prezentare"
+  "wallpaperGallery.useSlideshow": "Folosește ca prezentare",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · inclus, funcționează offline"
 }

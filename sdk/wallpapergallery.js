@@ -114,6 +114,44 @@ export function stillWallpaper(it, index, { quality = 'auto', store, thumb } = {
   };
 }
 
+// ---- twins: a built-in picture with a catalog item of the same id ----
+// A built-in wallpaper (assets/wallpapers/index.json) whose id is also a still item of the catalog is ONE wallpaper:
+// its HD is the built-in file (always here, works offline), its 4K the catalog's largest variant (downloaded when
+// wanted). It keeps its plain built-in id in the settings; findWallpaper adds the 4K file on disk to its variants
+// (withTwin), so every theme, the login screen and the slideshow pick it per display, and fall back to the built-in
+// file while it isn't there. Nothing here names a category: any built-in collection whose ids get catalog twins
+// behaves the same.
+
+// The still items that are a built-in's twin, by id, and the ones that are pictures of their own (cat:<id>).
+export function twinMap(items, builtinIds) {
+  const ids = new Set(builtinIds || []);
+  const m = new Map();
+  for (const it of stillCatalog(items)) if (ids.has(it.id)) m.set(it.id, it);
+  return m;
+}
+export const catalogOnly = (items, builtinIds) => { const ids = new Set(builtinIds || []); return stillCatalog(items).filter((it) => !ids.has(it.id)); };
+// The twin's file that adds something to the built-in: its largest variant, when it is larger than every built-in one.
+export function twinExtra(w, twin) {
+  const v = variantFor(twin, '4k');
+  const own = Math.max(0, ...((w && w.variants) || []).map((x) => num(x.w)));
+  return v && num(v.w) > own ? v : null;
+}
+// The built-in entry as a theme draws it for a quality: Auto, every built-in file and the twin's 4K once on disk;
+// HD, the built-in files up to 1920 × 1080; 4K, only files of 3840 or more when there is one here (the twin's once on
+// disk, or the built-in's own), else the built-in ones. Never an entry with no file.
+export function withTwin(w, twin, index, { quality = 'auto', store } = {}) {
+  if (!w || !twin) return w;
+  const q = qualityOf(quality);
+  const base = (w.variants || []).slice().sort((a, b) => num(a.w) - num(b.w));
+  const extra = twinExtra(w, twin);
+  const got = extra && onDisk(extra, index) ? [{ w: extra.w, h: extra.h, src: `${store}/${storeName(extra)}` }] : [];
+  let vars = [...base, ...got];
+  if (q === 'hd') { const hd = base.filter((v) => num(v.w) <= HD.w && num(v.h) <= HD.h); if (hd.length) vars = hd; }
+  if (q === '4k') { const big = vars.filter((v) => num(v.w) >= 3840); if (big.length) vars = big; }
+  if (!got.length && q === 'auto') return w;
+  return { ...w, variants: vars, twin: true };
+}
+
 // ---- the gallery's entries ----
 // { id, kind: 'still' | 'motion' | 'builtin' | 'mine', col, name, thumb, here, k4, sizes: { hd, k4 }, item }
 //   id    what is saved when it is chosen: 'cat:<id>' for a still, the catalog id for a moving one, the theme's id
@@ -141,10 +179,16 @@ export function motionEntry(it, index, name, thumb, files) {
     author: it.author || '', license: it.license || '',
   };
 }
-export const builtinEntry = (w, name) => ({
-  id: w.id, kind: 'builtin', col: w.category || 'other', name: name || w.name || w.id, thumb: w.thumb || w.src,
-  here: true, k4: (w.variants || []).some((v) => num(v.w) >= 3840), sizes: { hd: 0, k4: 0 }, item: w, author: 'LordOS', license: 'MIT',
-});
+// twin: its catalog item, if any (then the 4K is that item's largest file, downloaded on demand: k4Here says if it is).
+export function builtinEntry(w, name, twin = null, index = null) {
+  const extra = twin ? twinExtra(w, twin) : null;
+  const own4k = (w.variants || []).some((v) => num(v.w) >= 3840);
+  return {
+    id: w.id, kind: 'builtin', col: w.category || 'other', name: name || w.name || w.id, thumb: w.thumb || w.src,
+    here: true, k4: own4k || !!extra, sizes: { hd: 0, k4: extra ? num(extra.size) : 0 }, item: w, author: 'LordOS', license: 'MIT',
+    twin: extra ? twin : null, k4Here: own4k || (!!extra && onDisk(extra, index)),
+  };
+}
 export const mineEntry = (w, name) => ({
   id: w.id, kind: 'mine', col: 'mine', name: name || w.name || w.id, thumb: w.thumb || w.src, here: true, k4: false,
   sizes: { hd: 0, k4: 0 }, item: w, author: '', license: '',
@@ -210,6 +254,7 @@ export function collectionCard(col, entries) {
 export function collectionBytes(entries) {
   let hd = 0, k4 = 0, missing = 0;
   for (const e of entries || []) {
+    if (e.kind === 'builtin' && e.twin && !e.k4Here) { missing++; k4 += e.sizes.k4; continue; }   // HD is built in
     if (e.here || (e.kind !== 'still' && e.kind !== 'motion')) continue;
     missing++;
     hd += e.sizes.hd || 0;
@@ -221,6 +266,11 @@ export function collectionBytes(entries) {
 export function downloadPlan(entries, q, index) {
   const out = [];
   for (const e of entries || []) {
+    if (e.kind === 'builtin' && e.twin && q === '4k') {
+      const v = twinExtra(e.item, e.twin);
+      if (v && !onDisk(v, index)) out.push({ it: e.twin, name: v.name, size: num(v.size) });
+      continue;
+    }
     if (e.kind !== 'still') continue;
     const v = variantFor(e.item, q === '4k' ? '4k' : 'hd');
     if (v && !onDisk(v, index)) out.push({ it: e.item, name: v.name, size: num(v.size) });
@@ -238,11 +288,14 @@ export function filesOnDisk(items, index) {
 }
 export const usedBytes = (items, index) => filesOnDisk(items, index).reduce((a, f) => a + f.size, 0);
 // The catalog ids this user's settings show now: the desktop (every display), the login screen, the moving wallpapers,
-// and every picture of a slideshow's collection while it is on.
-export function idsInUse(s, items) {
+// and every picture of a slideshow's collection while it is on. A built-in id counts for its twin (the same id).
+// defaults: what shows while a setting is unset (the theme's default wallpaper, the login screen's).
+export function idsInUse(s, items, defaults = []) {
   const out = new Set();
   const add = (id) => { if (typeof id !== 'string' || !id) return; out.add(stillOf(id) || id); };
   add(s && s.wallpaper);
+  if (!(s && s.wallpaper)) add(defaults[0]);
+  if (!(s && s.loginWallpaper)) add(defaults[1]);
   for (const v of Object.values((s && s.wallpapers) || {})) add(v);
   add(s && s.loginWallpaper);
   for (const v of Object.values((s && s.motion) || {})) add(v);

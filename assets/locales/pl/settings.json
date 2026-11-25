@@ -914,5 +914,6 @@
   "wallpaperGallery.spaceUsed": "Pobrano {size}",
   "wallpaperGallery.useDesktop": "Użyj na pulpicie",
   "wallpaperGallery.useLogin": "Ekran logowania",
-  "wallpaperGallery.useSlideshow": "Użyj jako pokazu slajdów"
+  "wallpaperGallery.useSlideshow": "Użyj jako pokazu slajdów",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · wbudowane, działa offline"
 }

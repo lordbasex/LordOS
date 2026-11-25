@@ -58,6 +58,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   names. A picture whose files are gone shows the theme's default (the login screen: its own). The pure logic is
   `sdk/wallpapergallery.js`, tested by `server/tests/wallpaper_gallery_test.mjs` (75 checks, the shipped catalog
   included).
+- **Built-in pictures in HD and 4K: a catalog twin.** A catalog still item with the same id as a built-in wallpaper
+  (`assets/wallpapers/index.json`) is that built-in's 4K, not a second wallpaper: Cyberpunk City HD's 17 pictures get
+  theirs (`section: "cyberpunk"`, upscaled to 3840 × 2160). The gallery shows one tile per picture in the built-in
+  collection, with ✓ (its HD file is built in: offline, nothing to download) and the 4K badge; its sheet lists "HD · 1920
+  × 1080 · included, works offline" and "4K · 3840 × 2160 · <size>", and the collection's page offers "Download all ·
+  4K". Choosing it keeps the plain built-in id in the settings (Lord Workspaces' default panorama and existing settings
+  are unchanged); choosing it for a display above 1920 × 1080 (Auto) or with 4K downloads the twin's 4K file first.
+  `findWallpaper` adds that file to the built-in's variants once it is on disk (`withTwin`, sdk/wallpapergallery.js),
+  so every theme, the login screen and the slideshow use the 4K on a display that needs it and the built-in HD
+  everywhere else, and while the 4K isn't on this computer: never a missing picture. Quality HD keeps the built-in
+  file only. Free up space never removes a twin the desktop, any display, the login screen, a running slideshow or the
+  theme's default (setting unset) shows. Nothing names Cyberpunk: any built-in collection whose ids get twins behaves
+  the same. A built-in that already ships its own 4K file (Panorama, Neon Road Entrance) keeps it and needs no download.
+  Tests in `wallpaper_gallery_test.mjs` (twins merged, Auto falling back, 4K and HD, Download all, Free up space; 97
+  checks), screenshots in `settings_wallpaper_scene`; one new text in all 35 languages.
 - **`wallpaper-get` keeps a still picture as `/var/lib/lordos/wallpapers/<sha256>.jpg`.** The extension comes from the
   catalog's codec, read as root, never from the caller: `hevc` and `h264` are kept as `.mp4`, `jpeg` as `.jpg`; any
   other codec, or a variant whose file isn't of that kind, is no entry. A variant's `file` must now be a relative

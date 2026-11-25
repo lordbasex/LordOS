@@ -935,5 +935,6 @@
   "wallpaperGallery.spaceUsed": "تم تنزيل {size}",
   "wallpaperGallery.useDesktop": "استخدام على سطح المكتب",
   "wallpaperGallery.useLogin": "شاشة تسجيل الدخول",
-  "wallpaperGallery.useSlideshow": "استخدام كعرض شرائح"
+  "wallpaperGallery.useSlideshow": "استخدام كعرض شرائح",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · مضمّنة، تعمل دون اتصال"
 }

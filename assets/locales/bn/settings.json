@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} ডাউনলোড করা",
   "wallpaperGallery.useDesktop": "ডেস্কটপে ব্যবহার করুন",
   "wallpaperGallery.useLogin": "লগইন স্ক্রিন",
-  "wallpaperGallery.useSlideshow": "স্লাইডশো হিসেবে ব্যবহার করুন"
+  "wallpaperGallery.useSlideshow": "স্লাইডশো হিসেবে ব্যবহার করুন",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · অন্তর্ভুক্ত, অফলাইনে চলে"
 }

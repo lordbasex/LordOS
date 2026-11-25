@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} baixats",
   "wallpaperGallery.useDesktop": "Fes servir a l’escriptori",
   "wallpaperGallery.useLogin": "Pantalla d’inici de sessió",
-  "wallpaperGallery.useSlideshow": "Fes-la servir com a presentació"
+  "wallpaperGallery.useSlideshow": "Fes-la servir com a presentació",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · inclòs, funciona sense connexió"
 }

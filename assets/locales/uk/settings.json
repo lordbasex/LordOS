@@ -914,5 +914,6 @@
   "wallpaperGallery.spaceUsed": "Завантажено: {size}",
   "wallpaperGallery.useDesktop": "На робочий стіл",
   "wallpaperGallery.useLogin": "Екран входу",
-  "wallpaperGallery.useSlideshow": "Як слайд-шоу"
+  "wallpaperGallery.useSlideshow": "Як слайд-шоу",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · вбудовано, працює без мережі"
 }

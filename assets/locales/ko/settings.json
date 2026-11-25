@@ -900,5 +900,6 @@
   "wallpaperGallery.spaceUsed": "{size} 다운로드됨",
   "wallpaperGallery.useDesktop": "데스크톱에 사용",
   "wallpaperGallery.useLogin": "로그인 화면",
-  "wallpaperGallery.useSlideshow": "슬라이드쇼로 사용"
+  "wallpaperGallery.useSlideshow": "슬라이드쇼로 사용",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · 기본 제공, 오프라인에서도 사용"
 }

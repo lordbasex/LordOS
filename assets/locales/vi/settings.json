@@ -900,5 +900,6 @@
   "wallpaperGallery.spaceUsed": "Đã tải {size}",
   "wallpaperGallery.useDesktop": "Dùng trên màn hình nền",
   "wallpaperGallery.useLogin": "Màn hình đăng nhập",
-  "wallpaperGallery.useSlideshow": "Dùng làm trình chiếu"
+  "wallpaperGallery.useSlideshow": "Dùng làm trình chiếu",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · có sẵn, dùng được khi ngoại tuyến"
 }

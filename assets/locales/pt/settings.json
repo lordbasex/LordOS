@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} baixados",
   "wallpaperGallery.useDesktop": "Usar na área de trabalho",
   "wallpaperGallery.useLogin": "Tela de login",
-  "wallpaperGallery.useSlideshow": "Usar como apresentação"
+  "wallpaperGallery.useSlideshow": "Usar como apresentação",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · incluído, funciona sem conexão"
 }

@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} téléchargés",
   "wallpaperGallery.useDesktop": "Utiliser sur le bureau",
   "wallpaperGallery.useLogin": "Écran de connexion",
-  "wallpaperGallery.useSlideshow": "Utiliser en diaporama"
+  "wallpaperGallery.useSlideshow": "Utiliser en diaporama",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · inclus, fonctionne hors ligne"
 }

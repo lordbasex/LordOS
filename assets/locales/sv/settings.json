@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} hämtat",
   "wallpaperGallery.useDesktop": "Använd på skrivbordet",
   "wallpaperGallery.useLogin": "Inloggningsskärm",
-  "wallpaperGallery.useSlideshow": "Använd som bildspel"
+  "wallpaperGallery.useSlideshow": "Använd som bildspel",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · ingår, fungerar offline"
 }

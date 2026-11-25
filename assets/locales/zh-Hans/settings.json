@@ -900,5 +900,6 @@
   "wallpaperGallery.spaceUsed": "已下载 {size}",
   "wallpaperGallery.useDesktop": "用于桌面",
   "wallpaperGallery.useLogin": "登录屏幕",
-  "wallpaperGallery.useSlideshow": "用作幻灯片"
+  "wallpaperGallery.useSlideshow": "用作幻灯片",
+  "wallpaperGallery.option.builtinHd": "高清 · 1920 × 1080 · 内置，离线可用"
 }

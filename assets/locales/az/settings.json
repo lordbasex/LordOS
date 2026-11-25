@@ -907,5 +907,6 @@
   "wallpaperGallery.spaceUsed": "{size} endirilib",
   "wallpaperGallery.useDesktop": "İş masasında istifadə et",
   "wallpaperGallery.useLogin": "Giriş ekranı",
-  "wallpaperGallery.useSlideshow": "Slayd şousu kimi istifadə et"
+  "wallpaperGallery.useSlideshow": "Slayd şousu kimi istifadə et",
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · daxildir, oflayn işləyir"
 }
