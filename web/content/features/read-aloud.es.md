@@ -17,7 +17,7 @@ Pensalo como un lector sentado a tu lado que solo lee lo que le señalás. No to
 - **Voz en tiempo real** (❖⇧Esc): un cuadro donde escribís, apretás Enter y se dice con la voz que elegiste. Las frases recientes quedan abajo, solo en memoria, para decirlas otra vez. Ayuda a quien no puede o prefiere no hablar.
 - **El comando `say`** en una terminal: `say "Hola"`, `echo texto | say`, `say -f notas.txt -o notas.wav`, `say -v <voz>`, `say --voices`.
 
-El idioma (español, inglés o portugués) se deduce del propio texto; cuando no se puede, se usa el de la interfaz.
+El idioma (español, inglés, portugués, francés, alemán, italiano o neerlandés) se deduce del propio texto; cuando no se puede, se usa el de la interfaz.
 
 ## Las voces que elegís
 
@@ -52,7 +52,7 @@ Medido en una PC, un Intel i9-10900 con una Radeon RX 580: unos 10 segundos de v
 
 ## Límites honestos
 
-- **Tres idiomas en la última versión (0.8.9.5-beta):** español, inglés y portugués. Francés, alemán, italiano y neerlandés están en desarrollo: las mismas dos calidades y 23 voces, con los números, fechas, horas e importes leídos con las palabras de cada idioma.
+- **Siete idiomas:** español, inglés y portugués y, desde la 0.8.9.6, francés, alemán, italiano y neerlandés: las mismas dos calidades y 23 voces, con los números, fechas, horas e importes leídos con las palabras de cada idioma.
 - **Primero descargás un modelo.** Hasta entonces, Habla avisa que no hay ninguna voz instalada.
 - **No se probó en la Raspberry Pi** (los caminos de código de su procesador y el driver gráfico de la Pi 5).
 - **Lee lo que seleccionás; no es un lector de pantalla.** Un lector de pantalla, el zoom y el alto contraste siguen en la hoja de ruta.

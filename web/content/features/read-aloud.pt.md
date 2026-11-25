@@ -17,7 +17,7 @@ Pense num leitor sentado ao seu lado que só lê o que você aponta. Ele não an
 - **Fala ao vivo** (❖⇧Esc): uma caixa onde você digita, pressiona Enter e é dito com a voz escolhida. As frases recentes ficam embaixo, só na memória, para dizer de novo. Ajuda quem não pode ou prefere não falar.
 - **O comando `say`** num terminal: `say "Olá"`, `echo texto | say`, `say -f notas.txt -o notas.wav`, `say -v <voz>`, `say --voices`.
 
-O idioma (espanhol, inglês ou português) é deduzido do próprio texto; quando não dá, usa-se o da interface.
+O idioma (espanhol, inglês, português, francês, alemão, italiano ou holandês) é deduzido do próprio texto; quando não dá, usa-se o da interface.
 
 ## As vozes que você escolhe
 
@@ -52,7 +52,7 @@ Medido num PC, um Intel i9-10900 com uma Radeon RX 580: cerca de 10 segundos de 
 
 ## Limites honestos
 
-- **Três idiomas na última versão (0.8.9.5-beta):** espanhol, inglês e português. Francês, alemão, italiano e holandês estão em desenvolvimento: as mesmas duas qualidades e 23 vozes, com números, datas, horas e valores lidos com as palavras de cada idioma.
+- **Sete idiomas:** espanhol, inglês e português e, desde a 0.8.9.6, francês, alemão, italiano e holandês: as mesmas duas qualidades e 23 vozes, com números, datas, horas e valores lidos com as palavras de cada idioma.
 - **Primeiro você baixa um modelo.** Até lá, a Fala avisa que nenhuma voz está instalada.
 - **Não foi testado no Raspberry Pi** (os caminhos de código do processador dele e o driver gráfico do Pi 5).
 - **Ele lê o que você seleciona; não é um leitor de tela.** Um leitor de tela, zoom e alto contraste continuam no roadmap.

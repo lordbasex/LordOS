@@ -6,7 +6,7 @@ Não é um cliente nativo de nenhum serviço. **O LordOS não muda os sites nem 
 
 [[shot:6]]
 
-É novo no **LordOS 0.8.8.8**, lançado em 12 de novembro de 2026; a versão mais recente é a 0.8.9.5. Fica num pacote opcional, `lordos-web`: sem ele, o resto do LordOS funciona igual, e a Loja o instala para você com o seu primeiro app web.
+É novo no **LordOS 0.8.8.8**, lançado em 12 de novembro de 2026; a versão mais recente é a 0.8.9.6. Fica num pacote opcional, `lordos-web`: sem ele, o resto do LordOS funciona igual, e a Loja o instala para você com o seu primeiro app web.
 
 [[figure:web-runtime]]
 
@@ -27,9 +27,9 @@ A coluna do meio descreve como esses apps funcionam em geral, não um produto es
 
 A Loja tem uma seção **Apps web**, um banner e uma prateleira em Descobrir, e os apps web aparecem na busca e na categoria deles. Cada cartão diz "App web", para você distingui-los dos apps do LordOS e dos apps Linux.
 
-A seção abre na loja dela: *Adicionar a partir de um endereço* e o catálogo (em desenvolvimento; a versão mais recente é a 0.8.9.5). Os apps web que você instalou ficam em **Instalados**, no topo da segunda coluna da seção, acima das categorias, cada um com Ver mais, Gerenciar e Abrir; Loja → Instalados também os mostra junto com todos os outros apps, com um filtro Apps web.
+A seção abre na loja dela: *Adicionar a partir de um endereço* e o catálogo (desde a 0.8.9.6). Os apps web que você instalou ficam em **Instalados**, no topo da segunda coluna da seção, acima das categorias, cada um com Ver mais, Gerenciar e Abrir; Loja → Instalados também os mostra junto com todos os outros apps, com um filtro Apps web.
 
-Os **Ajustes**, abaixo de Instalados, dizem o que é um app web, se o motor web do LordOS já está instalado, e abrem Ajustes → Apps web para os perfis, permissões e espaço de cada app; o campo de busca ("Buscar apps web") procura só no catálogo (em desenvolvimento).
+Os **Ajustes**, abaixo de Instalados, dizem o que é um app web, se o motor web do LordOS já está instalado, e abrem Ajustes → Apps web para os perfis, permissões e espaço de cada app; o campo de busca ("Buscar apps web") procura só no catálogo (desde a 0.8.9.6).
 
 [[shot:0]]
 

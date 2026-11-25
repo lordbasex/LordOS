@@ -2,7 +2,7 @@
 
 **Machines** runs other systems in windows of your LordOS desktop, at native speed with KVM where the hardware allows it. It shipped in **0.8.8.5** (alpha): download cards for Debian, Ubuntu, Fedora and Kali that check their makers' signatures and can install with no questions, snapshots, clones, a migration from other virtualization apps, and since 0.8.8.7 shared folders.
 
-**New in 0.8.9.5.** Everything below arrived in **0.8.9.5**, the latest release. It brings Windows 11 machines, the LordOS tools for Windows, a clipboard that only moves when you paste, fast file transfers both ways, apps mode, sound and microphone, real networks, 3D for Linux machines and a picture at the guest's full rate.
+**New in 0.8.9.5 and 0.8.9.6.** Most of what follows arrived in **0.8.9.5**; **0.8.9.6**, the latest release, adds encrypted machines, this computer's USB devices and camera, the Whonix (Tor) group and a tighter sandbox (below). It brings Windows 11 machines, the LordOS tools for Windows, a clipboard that only moves when you paste, fast file transfers both ways, apps mode, sound and microphone, real networks, 3D for Linux machines and a picture at the guest's full rate.
 
 [[shot:0]]
 
@@ -96,12 +96,23 @@ The rest of the desktop got the same care: Settings, the Store, Files and Monito
 - **Apps mode, from the menu bar**: an item by the clock for each machine, whose menu works like the machine's Start menu, and a panel with its open windows and its apps.
 - **Capture mouse** for games and 3D programs; ❖Esc or Ctrl+Alt lets it go.
 - **A real graphics card for a machine**: a share of an Intel iGPU (Broadwell to Comet Lake) through GVT-g, with LordOS's own start-up driver for it, written from public sources.
-- **`machines` in the Terminal**: list, start, stop, snapshot, clone and change machines from a terminal. In development: run a program in a Linux machine, copy files in and out, read its logs, make a machine from a short file kept with a project, and a local MCP server for coding agents, only for a machine you allowed in its Configure.
+- **`machines` in the Terminal**: list, start, stop, snapshot, clone and change machines from a terminal. Since 0.8.9.6: run a program in a Linux machine, copy files in and out, read its logs, make a machine from a short file kept with a project, and a local MCP server for coding agents, only for a machine you allowed in its Configure.
+
+## New in 0.8.9.6
+
+- **Encrypted machines**: every disk, the firmware's variables and the TPM encrypted, with a key kept in your keyring (Passwords shows it as "Machines: <name>").
+- **Your USB devices and camera in a machine**, from the window's Devices menu, given back when you pick them again, unplug them or stop the machine. Only the person at the computer can hand one over, and disks, network cards and Bluetooth adapters need an administrator. Checked with a real webcam in a real guest.
+- **Whonix (Tor)**: a gateway and a workstation from Whonix's signed images, started and stopped together, the workstation wired only to the gateway, with nine extra isolation layers. Checked on a PC: Tor reached, an onion site answered, nothing left the computer but the gateway's connections to Tor.
+- **All Displays**: one machine across up to four of your displays.
+- **Start Linux directly**, **Guest can see** (every channel between a machine and your computer in one list), **Vulkan for Linux machines**, **vCPU pinning**, a **performance profile** inside the guest, and **`machines migrate`**, which turns another PC's whole disk into a machine.
+- **Send to LordOS** and a **shell inside the machine** over the guest agent's own channel, with no network; Install Agent from the LordOS Guest Tools disc for Linux machines without one.
+- **Disposable sessions** for any machine, Export, compressed disks and snapshots that keep the machine's settings and a note.
+- **A tighter sandbox**: each machine's QEMU in its own namespaces, unreadable by your other programs, with a filter that allows only the system calls it needs and nothing it writes able to run; each machine its own firewall row.
 
 ## What was tested, and what not
 
 Checked on one 64-bit PC with KVM, mostly with a development tool that plays the part of LordOS's display server: the Windows 11 unattended install and its tools (resolution, clipboard both ways, apps mode's window list, icons and actions), the transfer folder's numbers above, the three new network modes against a real LAN, sound and microphone through PipeWire, and 3D with an Ubuntu guest on a Radeon RX 580.
 
-**Not yet:** apps mode drawing on a real display, every Configure pane on screen, Windows on the Raspberry Pi, 3D for Windows machines without an Intel GVT-g share, USB devices passed to a machine, and dragging files out of a machine.
+**Not yet:** apps mode drawing on a real display, every Configure pane on screen, an install of Windows on the Raspberry Pi (it runs emulated there), 3D for Windows machines without an Intel GVT-g share, and dragging files out of a machine.
 
 The full design, the security rules and every measurement are in `docs/VIRTUALIZATION.md` and `docs/MACHINES-GPU.md`.

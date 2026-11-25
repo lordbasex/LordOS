@@ -45,6 +45,7 @@ Os três rodam sobre o mesmo servidor gráfico, o mesmo motor de interface e os 
 - **O Control Atlas**: claro ou escuro, alto contraste, o estilo de efeitos (Opaco, Translúcido ou Cristal), a cor de destaque, o fundo, o layout e suas atividades, num só lugar.
 - **Widgets**: 21, em seis grupos, sobre uma grade de cada tela. Todos leem de um mesmo canal compartilhado, e só enquanto você os vê: um widget atrás de uma janela, numa tela desligada ou com a sessão bloqueada não lê nada.
 - **Visual próprio**: um destaque rosa e os fundos de Cyberpunk City HD por padrão, uma apresentação de fundos opcional e um ponteiro preenchido com a sua cor de destaque.
+- **A barra de cada tela (desde a 0.8.9.6)** mostra as janelas da atividade naquela tela, abertas e minimizadas, e um clique devolve uma ao seu lugar. Uma janela que você abre a partir de uma tela vai para essa tela e essa atividade, no seu lugar, mesmo que nesse meio-tempo você tenha trocado. Chrome, Chromium, Brave e Edge abrem no perfil que você usa naquela atividade, e o Salvar como do Chrome usa o diálogo de arquivos do próprio LordOS.
 
 **Para quem é:** quem trabalha com muitas janelas, ou com dois ou três monitores.
 
