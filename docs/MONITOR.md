@@ -877,8 +877,9 @@ on 2026-11-24; AGENTS.md, `lord-nvgpu`). `lord-server` never links or loads NVML
   `lord.monitor.wantGpu(true)` is in force (the GPU tab or the Overview on screen) and a PCI device of vendor `0x10de`
   is bound to the `nvidia` driver (checked at most every 30 s). At most one helper; it is killed when the view goes
   away (`wantGpu(false)`), when the Monitor's thread goes idle, and when lord-server dies (`PR_SET_PDEATHSIG`).
-  A helper that exits, sends something malformed or doesn't answer within 5 s (15 s for the first sample, while
-  NVML initializes) is killed and started again after 2, 4, 8 … 60 s.
+  A helper that exits, says it can't read the cards, sends something malformed or doesn't answer within 5 s (15 s for
+  the first sample, while NVML initializes) is killed and started again after 2, 4, 8 … 60 s; opening the view again
+  tries at once.
 - **The helper** (`monitor/nvgpu_main.c`): no arguments, an empty environment, fd 3 a `SOCK_SEQPACKET` socketpair,
   fds 0–2 `/dev/null`, every other fd closed, `no_new_privs`. It `dlopen`s only `libnvidia-ml.so.1` from
   `/usr/lib/x86_64-linux-gnu`, `/usr/lib/aarch64-linux-gnu`, `/usr/lib64` or `/usr/lib`, after checking that the
@@ -895,7 +896,25 @@ on 2026-11-24; AGENTS.md, `lord-nvgpu`). `lord-server` never links or loads NVML
   31 digits and dots), one record per GPU (PCI address as numbers, utilization of SM, memory, encoder and decoder,
   temperature, fan, power and its limit in mW, core and memory clocks, VRAM used and total, compute mode as a number,
   ECC on/off) and one per process (GPU index, pid, memory, SM/encoder/decoder share from NVML's latest sample).
-  Numbers only.
+  Numbers only. The header (`"NVG2"` since 0.8.9.6.1) also carries why there are no GPUs and what the sandbox refused
+  (below).
+- **Why there is no data (0.8.9.6.1).** The helper answers even when it can't read the cards, with a fixed code in the
+  header and one number, never NVML's or the driver's text: `noDriver` (no `0x10de` device bound to `nvidia`),
+  `libMissing` (`libnvidia-ml.so.1` not in the fixed folders, or not root's), `dlopen`, `symbol` (which of
+  `nvmlInit_v2`, `nvmlDeviceGetCount_v2`, `nvmlDeviceGetHandleByIndex_v2` is missing), `init` and `count` (the
+  `nvmlReturn_t`: 9 driver not loaded, 18 driver/library version mismatch, …), `noDevice`. lord-server adds what only it
+  sees: `sandbox` (the helper exited 70: seccomp couldn't be applied), `killed` (it died of `SIGSYS`), `crash` (another
+  signal), `exit` (its exit code), `timeout`, `badMessage`, `noHelper` (`lord-nvgpu` missing or not root's), `spawn`.
+  The helper's exit status is read when its socket closes (`waitpid` without blocking, again on later ticks).
+- **What the sandbox refused (0.8.9.6.1).** For this helper only, `sandbox_apply_helper`'s `trap_denied` makes the
+  filter's two EPERM answers (a syscall off the lists, an ioctl of a type other than `'F'`) `SECCOMP_RET_TRAP`
+  instead. The helper's `SIGSYS` handler (`on_sigsys`, installed before the filter, SIGSYS unblocked) makes no
+  syscall and takes no lock: it adds the syscall number (and an ioctl's request, from the saved registers) to small
+  static arrays with atomics, puts `-EPERM` in the return register and returns, so NVML sees exactly the EPERM it got
+  before. The kernel never runs a refused call either way; TRAP allows nothing ERRNO didn't. Every header carries the
+  count and the first 8 distinct syscall numbers and ioctl requests. If a thread had SIGSYS blocked, the kernel would
+  kill the helper with SIGSYS instead, and lord-server reports `killed`. Nothing else about the filter changed: no
+  syscall, ioctl type, path or device was added.
 - **The checks** (`nvgpu_parse`): exact size for the counts, at most 64 GPUs and 256 processes; percentages 0–100,
   temperature −50…150 °C, clocks ≤ 100 000 MHz, power ≤ 10 kW, sizes ≤ 1 PiB, compute mode 0–3, ECC 0/1, the PCI
   address in range, the driver string NUL-terminated digits and dots; anything else becomes `null`. A process is kept
@@ -907,14 +926,39 @@ on 2026-11-24; AGENTS.md, `lord-nvgpu`). `lord-server` never links or loads NVML
   powerLimit, clk: { core, mem }, vram: { used, total }, cuda, driver, computeMode, ecc, procs: [{ pid, mem, sm, enc,
   dec }] }]` (power in watts, clocks in MHz, memory in bytes, temperature in °C, the rest percent; `null` when not
   reported; `computeMode` one of `default`, `exclusiveThread`, `prohibited`, `exclusiveProcess`). Without an NVIDIA
-  card, a helper or a sample, `nv` is absent.
+  card, a helper or a sample, `nv` is absent. With a PCI display device of vendor `0x10de` it also gains
+  `nvDiag: { state, detail, denied, syscalls, ioctls, driverVersion, pci: [{ slot, id, class, driver, name }] }`
+  (`nvgpu_diag_json`): one of the fixed state names above (or `ok`, `starting`), its number or `null`, the refusals,
+  `/sys/module/nvidia/version` (digits and dots, or `null`) and the cards from sysfs (`10de:<device>`, the class, the
+  bound driver, the name from `pci.ids`), rescanned at most every 30 s. Only numbers and fixed names. A card bound to
+  another driver (`nouveau`, `vfio-pci`) or to none shows `noDriver`.
+- **"Couldn't read NVIDIA data" (0.8.9.6.1).** When `nvDiag` says the helper failed and there is no `nv`,
+  Monitor → GPU shows a card above the GPU's header (`apps/monitor/nvreport.js`'s `nvFailure`): the reason in plain
+  words (another driver in use, no driver, the library missing or unusable, the driver not loaded, a version mismatch
+  that a restart fixes, access refused, NVML's error number, no card, the sandbox couldn't start, the sandbox stopped
+  the reader, it stopped, it didn't answer, it couldn't start) and **Copy report**. With data but refusals counted, a
+  shorter line says some readings were blocked, with the same button. The report (`nvReportText`, in English like
+  every GitHub issue) is plain text: the LordOS version, the kernel release and architecture, each card's PCI slot,
+  `10de:<device>`, name, class and driver, the driver version from sysfs, the state with its number (and the NVML
+  error's or signal's name), the refusals (syscall numbers, ioctl requests with their type and number), and where to
+  open an issue (`gpu-report.yml`). Each field is checked against its expected shape (anything else is left out), and
+  the text goes through `sdk/gpureport.js`'s `scrubReport` with the home, the user and the host name: no user data,
+  no path in the home, no host name, no pid.
 - **Tested** (`build/nvgpu-test`, ASan and UBSan): hand-made messages (canned, out of range, bad sizes and headers,
   the largest one); 120 000 mutated messages, every parsed one giving valid JSON within range; the helper end to end
   with a fake NVML (`tests/nvgpu_fake_nvml.c`, test-only `build/lord-nvgpu-test --lib`): canned values, hostile
   values (a billion GPUs and processes, out-of-range numbers, a driver string with no NUL, root's and impossible
   pids), every call failing, init failing, a call that hangs (killed and restarted, `nvgpu_poll` never blocked more
   than 100 ms), and `wantGpu(false)` killing it; and the sandbox: after it, the helper can't create a socket, exec,
-  write a file, read `/etc` or do a tty ioctl. The installed `lord-nvgpu` has no `--lib` or `--probe`.
+  write a file, read `/etc` or do a tty ioctl, and the socket, execve and `TCGETS` it tried are recorded while each
+  still fails with EPERM. The failure codes end to end: a fake without `nvmlInit_v2` (`build/libnvfake-nosym.so`:
+  `symbol`), a library that doesn't exist (`dlopen`), `nvmlInit` returning 9 (`init`, 9), the count failing
+  (`count`, 999), the real path on a machine with no card bound to `nvidia` (`noDriver`), a sampling call that tries
+  `socket()` and a tty ioctl after the sandbox (data still flows; both syscall numbers and the request `0x5401`
+  counted), the same with SIGSYS blocked (`killed`, signal 31), and a hang (`timeout`); the header's codes and numbers
+  range-checked, and `nvDiag`'s JSON valid with hostile names. `tests/nv_report_test.mjs`: the reason for each state,
+  every reason key in every language, the report's lines, and a report built from hostile fields (paths in the home,
+  the host and user names, a pid) holding none of them. The installed `lord-nvgpu` has no `--lib` or `--probe`.
 - **Not yet verified on NVIDIA hardware:** the exact files NVML reads after init (Landlock might need another
   read-only path), that every NVML ioctl after init is of type `'F'` (strace shows `_IOC(..., 0x46, ...)` for the RM
   escapes; `/dev/nvidia-uvm`, whose ioctls aren't, is not allowed and NVML shouldn't need it), the 256 MB cap,
@@ -923,8 +967,9 @@ on 2026-11-24; AGENTS.md, `lord-nvgpu`). `lord-server` never links or loads NVML
   under strace, with fd 3 a seqpacket socket and one request:
   `python3 -c 'import socket,subprocess,os;a,b=socket.socketpair(socket.AF_UNIX,socket.SOCK_SEQPACKET);os.dup2(b.fileno(),3);p=subprocess.Popen(["strace","-f","-o","/tmp/nv.trace","/usr/lib/lordos/bin/lord-nvgpu"],pass_fds=(3,));a.send(b"s");print(len(a.recv(20000)));a.send(b"s");print(len(a.recv(20000)))'`
   — two answers of the same size mean the sandboxed sampling works; in `/tmp/nv.trace`, after the `seccomp` line,
-  look for `EACCES` (a path Landlock refused) and `EPERM` (an ioctl type or syscall refused), and check every
-  `ioctl` is `_IOC(..., 0x46, ...)`.
+  look for `EACCES` (a path Landlock refused) and `SIGSYS {si_code=SYS_SECCOMP …}` (a syscall or ioctl type refused:
+  the handler answers EPERM), and check every `ioctl` is `_IOC(..., 0x46, ...)`. Simpler for a tester: Monitor → GPU
+  → **Copy report** gives the same refusals as numbers.
 
 ## Disk temperature and health (0.8.2)
 

@@ -10,6 +10,40 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+- **Monitor → GPU: "Couldn't read NVIDIA data" and a report to send us** (`docs/MONITOR.md`, "NVIDIA"), so NVIDIA
+  users can test the sandboxed `lord-nvgpu` in 0.8.9.6.1-beta and tell us what failed. The helper now answers even when
+  it can't read the cards, with a fixed code and one number in its header (wire `"NVG2"`), never a string from NVML or
+  the driver: no card bound to `nvidia`, `libnvidia-ml.so.1` missing or not root's, `dlopen` failing, a missing NVML
+  function (which one), `nvmlInit` or the device count failing (the `nvmlReturn_t`), no device. lord-server adds what
+  only it sees, from the helper's exit status and its own timers: seccomp couldn't be applied (exit 70), killed by the
+  sandbox (`SIGSYS`), another signal, another exit code, no answer in time, a malformed answer, the helper missing or
+  not starting. `lord.monitor.gpu()` gains `nvDiag` (only with a PCI display device of vendor `0x10de`): the state, its
+  number, the sandbox's refusals, `/sys/module/nvidia/version` and the cards from sysfs (slot, `10de:<device>`, class,
+  driver, `pci.ids` name). When the helper gave no data the GPU tab shows a card with the reason in plain words and
+  **Copy report**: plain text in English with the LordOS version, the kernel, each card's PCI id and name, the driver
+  version, the helper's code and numbers (with the NVML error's or signal's name) and the refused syscall numbers and
+  ioctl requests, and where to open an issue; every field checked against its shape and scrubbed of the home, user and
+  host names (`apps/monitor/nvreport.js`). With data but some readings refused, a shorter line and the same button.
+  Opening the GPU view again now retries the helper at once instead of waiting out its backoff. 20 new strings in all
+  35 languages.
+- **lord-nvgpu counts what its sandbox refuses.** For this helper only (`SandboxHelperCfg.trap_denied`), the filter's
+  two EPERM answers (a syscall off the lists, an ioctl of a type other than NVIDIA's `'F'`) are `SECCOMP_RET_TRAP`; the
+  helper's `SIGSYS` handler (no syscall, no lock, atomics on static arrays) records the syscall number and an ioctl's
+  request, sets the return register to `-EPERM` and returns, so NVML gets exactly the EPERM it got before. The kernel
+  never runs a refused call either way. No syscall, ioctl type, path or device was added. Every sample's header carries
+  the count and the first 8 distinct syscall numbers and ioctl requests.
+
+### Tests
+- `build/nvgpu-test`: every helper failure code end to end with the fake NVML (a build without `nvmlInit_v2`, a
+  library that doesn't exist, `nvmlInit` and the count failing, the real path with no card bound to `nvidia`), a
+  sampling call that tries `socket()` and a tty ioctl after the sandbox (data still flows, both counted with the
+  request `0x5401`), the same with SIGSYS blocked (reported as killed by the sandbox, signal 31), a hang (timeout); the
+  header's codes range-checked; `nvDiag`'s JSON valid with hostile names; the sandbox probe also checks that socket,
+  execve and `TCGETS` were recorded while still failing with EPERM. New `tests/nv_report_test.mjs` (in
+  `make -C server test`): the reason for each state, every reason key in every language, the report's lines, and a
+  report from hostile fields holding no home path, host or user name, or pid.
+
 ## [0.8.9.6-beta] - 2026-11-25
 
 ### Added
