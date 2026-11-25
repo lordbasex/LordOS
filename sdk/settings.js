@@ -23,6 +23,8 @@ const DEFAULTS = {
   playerStreams: [],        // 0.8.8.10: the Player's saved streams [{ name, url, user }] (no password: the keyring has it)   // 0.8.8.10: the weather widget asks Open-Meteo only once turned on (sdk/weathermodel.js)
   deskWidgets: [],      // 0.8.8.10: Lord Workspaces' desktop widgets, [{ id, type, x, y }] (sdk/deskwidgets.jsx)
   wallpapers: {},       // 0.8.8.10: a display's own picture, { [connector]: id } (sdk/wallpapers.js wallpaperIdFor)
+  wallpaperQuality: 'auto',   // 0.8.9.6.2, Settings → Wallpaper → Quality of the catalog's still pictures: 'auto' (4K only on a display
+                              // above 1920 × 1080) | 'hd' | '4k' (sdk/wallpapergallery.js); new key, no migration
   keyboard: null,        // before M5; now keyboards (see keyboard.js). It was 'latam' until 0.8.8.6 (#55)
   keyboards: null,       // [{ layout, variant }] from xkb-data
   keyboardIndex: 0,

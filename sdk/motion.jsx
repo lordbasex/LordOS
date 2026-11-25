@@ -12,16 +12,19 @@ import { createStore, useStore } from './store.js';
 import { admin } from './admin.js';
 import { windows } from './windows.js';
 import { battery } from './hardware.jsx';
-import { userWallpaperName } from './wallpapers.js';
+import { userWallpaperName, refreshStillFiles } from './wallpapers.js';
 import { displayCovered, motionCodecs, nextRandom, pauseReason, pickVariant } from './motionmodel.js';
+import { motionCatalog } from './wallpapergallery.js';
 
 const STORE = '/var/lib/lordos/wallpapers';
 export const MOTION_RATES = [100, 75, 50, 25];
 export const MOTION_SECTIONS = ['dynamic', 'landscape', 'urban', 'underwater', 'earth'];
-export const motionItems = catalog.items;
+// The catalog's moving wallpapers: its still pictures (variants with codec jpeg, since 0.8.9.6.2) are Settings →
+// Wallpaper's gallery's (sdk/wallpapers.js), never played here.
+export const motionItems = motionCatalog(catalog.items);
 export const motionThumb = (it) => `asset:wallpapers/motion/${it.id}.thumb.jpg`;
 export const motionPoster = (it) => `asset:wallpapers/motion/${it.id}.poster.jpg`;
-export const motionDownloads = createStore({});     // id → percent while downloading
+export const motionDownloads = createStore({});     // catalog id → percent while downloading (a video or a still picture)
 
 // What this machine can play: empty until lord-media answers, and empty for good without the hardware.
 export function currentCodecs() {
@@ -41,23 +44,29 @@ const pathOf = (v) => `${STORE}/${v.sha256}.mp4`;
 // a display's own entry wins, even null (a still picture chosen for that display: sdk/wallpapers.js wallpaperPatch)
 const wanted = (s, display) => { const m = s.motion || {}; return display in m ? m[display] || null : m['*'] || null; };
 
-export function downloadMotion(it, variant) {
-  const arg = `${it.id} ${variant.name}`;
+// One file of the catalog, by its item and variant name: root keeps it in the store (a video as .mp4, a picture as .jpg,
+// from the catalog's codec) after checking its size and SHA-256. The progress goes to motionDownloads.
+export function fetchCatalogFile(it, name) {
   motionDownloads.set((d) => ({ ...d, [it.id]: 0 }));
-  const done = () => motionDownloads.set((d) => { const x = { ...d }; delete x[it.id]; return x; });
-  return admin.run('wallpaper-get', arg, (line) => {
+  const done = () => { motionDownloads.set((d) => { const x = { ...d }; delete x[it.id]; return x; }); refreshStillFiles(); };
+  return admin.run('wallpaper-get', `${it.id} ${name}`, (line) => {
     const m = /^PROGRESS (\d+)/.exec(line);
     if (m) motionDownloads.set((d) => ({ ...d, [it.id]: Number(m[1]) }));
-  }, { quiet: true }).then(() => {
-    done();
+  }, { quiet: true }).then(() => { done(); }, (e) => { done(); throw e; });
+}
+// Deletes one (administrators only: the store is every user's).
+export const removeCatalogFile = (it, name) => admin.run('wallpaper-remove', `${it.id} ${name}`, null, { quiet: true }).finally(refreshStillFiles);
+
+export function downloadMotion(it, variant) {
+  return fetchCatalogFile(it, variant.name).then(() => {
     settings.set({ motionFiles: { ...(settings.get().motionFiles || {}), [it.id]: variant.name } });
-  }, (e) => { done(); throw e; });
+  });
 }
 
 export async function removeMotion(it) {
   const s = settings.get();
   const name = (s.motionFiles || {})[it.id];
-  if (name) await admin.run('wallpaper-remove', `${it.id} ${name}`, null, { quiet: true });
+  if (name) await removeCatalogFile(it, name);
   const files = { ...(s.motionFiles || {}) };
   delete files[it.id];
   const motion = Object.fromEntries(Object.entries(s.motion || {}).filter(([, v]) => v !== it.id));
@@ -82,7 +91,7 @@ function resolve(s, choice, w, h_, codecs) {
   const on = (s.motionFiles || {});
   let id = choice;
   if (id === 'random') id = randomFor(Object.keys(on));
-  const it = catalog.items.find((x) => x.id === id);
+  const it = motionItems.find((x) => x.id === id);
   if (!it || !on[id]) return null;
   const v = it.variants.find((x) => x.name === on[id]);
   // only a format this machine decodes in hardware, however it was downloaded
@@ -187,7 +196,7 @@ export function MotionWallpaper({ display }) {
   const px = (display.scale || 100) / 100;
   const path = codecs.length ? resolve(s, wanted(s, display.id), display.w * px, display.h * px, codecs) : null;
   const chosen = wanted(s, display.id);
-  const it = catalog.items.find((x) => x.id === chosen);
+  const it = motionItems.find((x) => x.id === chosen);
   if (!path) {
     // chosen, but this machine can't play it: its still poster
     return it && !codecs.length ? h(Image, { src: motionPoster(it), style: { position: 'absolute', left: display.x, top: display.y, width: display.w, height: display.h, objectFit: 'cover' } }) : null;

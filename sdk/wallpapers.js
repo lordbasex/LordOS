@@ -5,7 +5,11 @@
 //   thumb     320×180 for grids (Settings, Control Center); never decode the full image for those
 //   variants  [{ w, h, src }] from small to large: wallpaperSrc() picks the one that fits a screen
 import index from '../assets/wallpapers/index.json';
+import catalog from '../assets/wallpapers/motion.json';
 import { DEFAULT_WALLPAPER } from './wallpapermodel.js';
+import { stillCatalog, stillOf, stillWallpaper, storeIndex } from './wallpapergallery.js';
+import { settings } from './settings.js';
+import { createStore } from './store.js';
 
 // The desktop of a user who never chose one (settings.wallpaper null, sdk/settings.js) and the fallback for an
 // unknown id, unless the theme names its own (theme.json "wallpaper": { "default" }, tokens.defaultWallpaper: Lord
@@ -58,8 +62,40 @@ function userWallpaper(id) {
   return { id, category: 'mine', nameKey: 'settings.wallpaperImage.name', name: 'Your picture', src: `${base}.jpg`, thumb: `${base}.thumb.jpg` };
 }
 
+// A still picture of the catalog (Settings → Wallpaper's Abstract, Epic and Anime collections, 0.8.9.6.2): the id is
+// `cat:<catalog id>`, and its files are the ones wallpaper-get keeps in /var/lib/lordos/wallpapers/<sha256>.jpg (shared
+// by every user, read-only for them). Only the variants on disk are offered, so each display draws the one that covers
+// it (wallpaperSrc: Auto) or the one settings.wallpaperQuality names ('hd', '4k'). Not on disk (removed, or another
+// computer's settings): null, and the theme's default shows. Works in every theme, on the login screen and in the
+// slideshow, which all go through findWallpaper. The rules are in wallpapergallery.js.
+export const STILL_STORE = '/var/lib/lordos/wallpapers';
+export const stillItems = stillCatalog(catalog.items);
+export const stillThumb = (it) => `asset:wallpapers/motion/${it.id}.thumb.jpg`;
+// The store's listing, read again at most every 10 s (a theme asks on each render), or at once after a change here.
+export const stillStore = createStore(0);           // bumped when the listing changes: downloads, removals
+let storeList = null, storeAt = 0;
+export function stillFiles(fresh = false) {
+  if (fresh || !storeList || Date.now() - storeAt > 10000) {
+    let list = [];
+    try { list = lord.fs.list(STILL_STORE) || []; } catch (e) { list = []; }
+    storeList = storeIndex(list);
+    storeAt = Date.now();
+  }
+  return storeList;
+}
+export function refreshStillFiles() { stillFiles(true); stillStore.set((n) => n + 1); }
+const quality = () => { try { return settings.get().wallpaperQuality; } catch (e) { return 'auto'; } };
+function catalogWallpaper(id) {
+  const cid = stillOf(id);
+  if (!cid) return null;
+  const it = stillItems.find((x) => x.id === cid);
+  return it ? stillWallpaper(it, stillFiles(), { quality: quality(), store: STILL_STORE, thumb: stillThumb }) : null;
+}
+// Every catalog picture on this computer, as wallpaper entries (the slideshow's collections, sdk/slideshow.jsx).
+export const downloadedStills = () => stillItems.map((it) => stillWallpaper(it, stillFiles(), { quality: quality(), store: STILL_STORE, thumb: stillThumb })).filter(Boolean);
+
 // The wallpaper chosen in the settings, among a theme's list; def: the theme's default (tokens.defaultWallpaper).
-export const findWallpaper = (list, id, def = DEFAULT_WALLPAPER) => (list || []).find((w) => w.id === (id || def)) || userWallpaper(id)
+export const findWallpaper = (list, id, def = DEFAULT_WALLPAPER) => (list || []).find((w) => w.id === (id || def)) || userWallpaper(id) || catalogWallpaper(id)
   || (list || []).find((w) => w.id === def) || (list || []).find((w) => w.id === DEFAULT_WALLPAPER) || (list || [])[0] || null;
 
 // The small image for a picker (falls back to the full one for theme wallpapers without a thumb).
