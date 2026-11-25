@@ -606,6 +606,7 @@
   "widgets.subtitle": "একটি আকার বেছে নিন: এই কাজে এই ডিসপ্লের গ্রিডে নিজের জায়গা নেয়। সরাতে টানুন।",
   "widgets.search": "উইজেট খুঁজুন",
   "widgets.noMatch": "অনুসন্ধানের সাথে কোনো উইজেট মেলেনি",
+  "widgets.back": "পেছনে",
   "widgets.cat.all": "সব",
   "widgets.cat.time": "সময়",
   "widgets.cat.system": "সিস্টেম",

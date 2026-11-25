@@ -36,6 +36,7 @@
 #include "ui/js_cloud.h"
 #include "fsasync.h"
 #include "bgsave.h"
+#include "fswatch.h"
 #include "sound/snd.h"
 #include "ui/wave.h"
 #include "sec/json.h"
@@ -3489,6 +3490,8 @@ int main(int argc, char **argv) {
         cast_tick();
         double cad = cast_timeout();
         if (cad >= 0 && (delay < 0 || cad < delay)) delay = cad;
+        double fwd = fswatch_timeout(now_ms());        /* lord.fs.watch: a coalesced call waiting for its 150 ms */
+        if (fwd >= 0 && (delay < 0 || fwd < delay)) delay = fwd;
 
         {   /* a Linux app's content updates held for a refresh or a time (fifo-v1, commit-timing-v1, wl.c): after the
              * render, whose frame may have let some apply that now want the next one */
@@ -3508,7 +3511,7 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[203 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +16 machines, +40 Spawn helpers, +5 test hooks (lord-server-test) */
+        struct pollfd pfd[204 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +16 machines, +40 Spawn helpers, +5 test hooks (lord-server-test) */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
@@ -3532,6 +3535,8 @@ int main(int argc, char **argv) {
         if (clbase >= 0) pfd[n++] = (struct pollfd){ cloud_fd(), POLLIN, 0 };
         int fabase = fsasync_fd() >= 0 ? n : -1;                 /* lord.fs.*Async answers (Files on slow mounts) */
         if (fabase >= 0) pfd[n++] = (struct pollfd){ fsasync_fd(), POLLIN, 0 };
+        int fwbase = fswatch_fd() >= 0 ? n : -1;                 /* lord.fs.watch's inotify (fswatch.c) */
+        if (fwbase >= 0) pfd[n++] = (struct pollfd){ fswatch_fd(), POLLIN, 0 };
         int imbase = image_async_fd() >= 0 ? n : -1;              /* thumbnails decoded off this thread (ui/image.c) */
         if (imbase >= 0) pfd[n++] = (struct pollfd){ image_async_fd(), POLLIN, 0 };
         int sbase = snd_fd() >= 0 ? n : -1;
@@ -3656,6 +3661,8 @@ int main(int argc, char **argv) {
         if (bkbase >= 0 && pfd[bkbase].revents) backup_dispatch(js_backup_event);
         if (clbase >= 0 && pfd[clbase].revents) js_cloud_dispatch();
         if (fabase >= 0 && pfd[fabase].revents) js_fs_dispatch();
+        if (fwbase >= 0 && pfd[fwbase].revents) fswatch_read(now_ms());
+        js_fswatch_dispatch(now_ms());                  /* the watches whose coalesced call is due */
         if (imbase >= 0 && pfd[imbase].revents) image_async_dispatch();
         if (lgbase >= 0 && pfd[lgbase].revents) logs_dispatch(js_logs_event);
         if (lbibase >= 0 && pfd[lbibase].revents) lbi_drain();  /* taken once per frame by grab_script_tick */

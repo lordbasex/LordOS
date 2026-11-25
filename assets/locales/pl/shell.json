@@ -613,6 +613,7 @@
   "widgets.subtitle": "Wybierz rozmiar: zajmie swoje miejsce w siatce tego ekranu, w tej aktywności. Przeciągnij, aby przenieść.",
   "widgets.search": "Szukaj widżetów",
   "widgets.noMatch": "Żaden widżet nie pasuje do wyszukiwania",
+  "widgets.back": "Wstecz",
   "widgets.cat.all": "Wszystkie",
   "widgets.cat.time": "Czas",
   "widgets.cat.system": "System",

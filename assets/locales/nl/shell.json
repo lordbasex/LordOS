@@ -606,6 +606,7 @@
   "widgets.subtitle": "Kies een formaat: hij neemt zijn plaats in op het raster van dit scherm, in deze activiteit. Sleep om te verplaatsen.",
   "widgets.search": "Widgets zoeken",
   "widgets.noMatch": "Geen widget komt overeen met de zoekopdracht",
+  "widgets.back": "Terug",
   "widgets.cat.all": "Alle",
   "widgets.cat.time": "Tijd",
   "widgets.cat.system": "Systeem",

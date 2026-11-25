@@ -613,6 +613,7 @@
   "widgets.subtitle": "Pasirinkite dydį: jis užims vietą šio ekrano tinklelyje, šioje veikloje. Norėdami perkelti, vilkite.",
   "widgets.search": "Ieškoti valdiklių",
   "widgets.noMatch": "Paiešką atitinkančių valdiklių nėra",
+  "widgets.back": "Atgal",
   "widgets.cat.all": "Visi",
   "widgets.cat.time": "Laikas",
   "widgets.cat.system": "Sistema",

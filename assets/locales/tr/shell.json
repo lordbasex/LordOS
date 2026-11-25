@@ -606,6 +606,7 @@
   "widgets.subtitle": "Bir boyut seçin: bu etkinlikte bu ekranın ızgarasında yerini alır. Taşımak için sürükleyin.",
   "widgets.search": "Widget ara",
   "widgets.noMatch": "Aramayla eşleşen widget yok",
+  "widgets.back": "Geri",
   "widgets.cat.all": "Tümü",
   "widgets.cat.time": "Zaman",
   "widgets.cat.system": "Sistem",

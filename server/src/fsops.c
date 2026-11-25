@@ -814,6 +814,8 @@ int fsops_mount_type_in(const char *mounts, const char *real, char *ty_out, size
     return found ? 0 : -1;
 }
 
+int fsops_remote_type(const char *ty) { return ty && remote_type(ty); }
+
 int fsops_remote_path(const char *real) {
     char ty[64];
     return !fsops_mount_type_in("/proc/self/mounts", real, ty, sizeof ty) && remote_type(ty);

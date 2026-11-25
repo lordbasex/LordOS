@@ -606,6 +606,7 @@
   "widgets.subtitle": "Välj en storlek: den tar sin plats i rutnätet på den här skärmen, i den här aktiviteten. Dra för att flytta.",
   "widgets.search": "Sök widgetar",
   "widgets.noMatch": "Ingen widget matchar sökningen",
+  "widgets.back": "Tillbaka",
   "widgets.cat.all": "Alla",
   "widgets.cat.time": "Tid",
   "widgets.cat.system": "System",

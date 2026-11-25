@@ -599,6 +599,7 @@
   "widgets.subtitle": "크기를 고르세요. 이 활동에서 이 디스플레이 격자의 자리를 차지합니다. 끌어서 옮기세요.",
   "widgets.search": "위젯 검색",
   "widgets.noMatch": "검색과 일치하는 위젯이 없습니다",
+  "widgets.back": "뒤로",
   "widgets.cat.all": "모두",
   "widgets.cat.time": "시간",
   "widgets.cat.system": "시스템",

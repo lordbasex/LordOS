@@ -366,7 +366,9 @@ desktop until rclone finished, because Files listed the folder again (and asked 
 the list view's columns) on the interface's thread while the FUSE `unlink` still held the folder's lock in the kernel,
 and going back to the parent waited for rclone's listing. Files now asks every folder for which `fs.isRemote(path)`
 says so (`lord.fs.mounts()`: the mount table's `fuse.*`, `cifs`, `smb3`, `nfs*`, `9p`… mounts) through
-`lord.fs.listAsync / statAsync / trashAsync / freeAsync / mkdirAsync / renameAsync`, which run on
+`lord.fs.listAsync / statAsync / trashAsync / freeAsync / mkdirAsync / renameAsync` (and, since 0.8.9.6.2, `writeAsync`,
+Notes' saves: written to a temporary file, fsync'd and renamed, in the order asked; `lord.fs.write` waits for one still
+on a worker), which run on
 `server/src/fsasync.c`'s workers (at most 6; 256 requests queued, `fs.busy` past that) with the same `fsops.c`
 resolution and checks as the synchronous calls, and answer through `__lordFsReply`. `apps/files/remotedirs.js` keeps
 each folder's last listing (shown while a new one comes), lists a folder once at a time, and hides items while a delete

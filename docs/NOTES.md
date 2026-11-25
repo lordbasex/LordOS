@@ -35,8 +35,14 @@ in the home folder through `lord.fs`). If both folders exist, Notes uses `~/Note
 `~/Notas` untouched; Search also falls back to `~/Notas` while `~/Notes` doesn't exist yet. If
 there is no Trash, a deleted note goes to `~/Notes/.trash`.
 
-`nota.md` is plain markdown with a small YAML header: it opens with any editor. If it is edited
-by hand while LordOS is running, the change shows up the next time the session is opened.
+`nota.md` is plain markdown with a small YAML header: it opens with any editor. Since 0.8.9.6.2 Notes sees changes
+made by other programs at once: it watches `~/Notes` with `lord.fs.watch` (read-only inotify, coalesced; a note folder
+made or deleted), the folders of up to 4 notes on the desktop, and for a moment a folder just made without its
+`nota.md` (at most 3), and reads the folder again on each change, with no window open and no timer (a note an
+assistant writes with `desktop: true` is on the desktop within a second). The window reads it again when it opens and
+when it gets the focus (any other edit by hand, and a cloud or network `~/Notes`, which `lord.fs.watch` refuses). A
+note with a change not saved yet, or whose save failed, keeps what is in memory (`apps/notes/notesmodel.js`
+`mergeScan`); a change in a note's folder in the second after Notes saved it is its own save and is not read again.
 
 ```markdown
 ---
@@ -80,7 +86,19 @@ PNG and JPEG files become images and the others attachments, as «Image» and «
 skipped. While the drag is over the window a dashed outline says what letting go will do (`useFilesDrop`
 and `FilesDropHint`, `sdk/filedrop.js`).
 
-The File menu also has «New note» (❖N) and «Show in Files».
+The File menu also has «New note» (❖N), «Import…» and «Show in Files». **Import…** (0.8.9.6.2) takes `.md`,
+`.markdown` and `.txt` files from the system file dialog, one or several: each becomes a new note in a new folder (an
+import never writes over a note). The file is untrusted text: a Notes header in it gives only its title and colour,
+another program's front matter stays in the text, a file over 8 MB, with a NUL byte, a link or a folder is not read,
+and nothing it names is copied. Markdown and text files dropped on the list are imported too (and on the window when no
+note is open); other files, and files dropped on an open note, are its attachments.
+
+The toolbar's **checklist** button (a ring with a tick, beside the colours) makes the caret's line (or the selected
+lines) a checklist item, `- [ ] `, or plain text again, as ❖⇧9 does; from the reading view the editor opens first. In
+the reading view (the window and the desktop notes) a checklist item is a round check (`<Markdown taskStyle="round">`):
+a 21 px ring when open, filled with the note colour's tint and a white ✓ when done, in a 28 px target on the item's
+first line; the done text stays readable (not dimmed, not struck through). The editor itself shows the markdown
+(`- [ ]`), so the circles are ticked in the reading view.
 
 ### Attachments and links (GitHub #238)
 
@@ -112,6 +130,13 @@ Each note marked «On the desktop» is a sticky note between the wallpaper and t
   place (tested).
 - It is edited right there: it takes the text focus (the SDK's `takeTextFocus`), so keys don't
   go to the frontmost window. Esc goes back to reading.
+- **Add widget → Sticky note** (0.8.9.6.2, every theme with the catalog) offers «New Note» or one of the notes already
+  made: a searchable list (title and text, no accents or case), most recently updated first, with each note's colour
+  and date and «on the desktop» on those already there. A note picked goes where the widget is being added, moved
+  inside that display's work area, with its text and size (a generic hook: `registerWidgetKind({ …, Chooser })`,
+  `sdk/widgetpicker.jsx`).
+- «On desktop» from the window puts a note whose saved place is off every display (a monitor gone) on the window's
+  display; a note whose bar can be seen keeps its place.
 
 ## Editing
 
@@ -131,6 +156,17 @@ Each note marked «On the desktop» is a sticky note between the wallpaper and t
 The editor is our own (`apps/notes/NoteEditor.jsx`): text in a monospace font with word wrap,
 mouse selection (double click: word; triple click: line), input methods (Japanese, Chinese,
 Korean) and highlighted headings.
+
+Since 0.8.9.6.2 a row is measured the way it is drawn (`apps/notes/wrapmodel.js`): the whole row's string with
+`lord.measureText` (regular, or bold for headings), so CJK, emoji, accents and a tab (drawn as four spaces; a CR from CRLF
+line ends is not drawn) never make a row wider than the editor or the caret drift off the letters. Typing is fluid
+on long notes: the editor keeps the text itself; only the line being edited is wrapped again; only the rows in sight are
+drawn, each a memoized row; the text goes into the note's store and is saved 500 ms after typing stops (and when the
+editor closes), so the list, the other views and the desktop widgets no longer redraw on every key; the save runs on a
+worker (`lord.fs.writeAsync`, `server/src/fsasync.c`: a temporary file, fsync, rename; one at a time per note, in
+order; a failed save is kept as not saved and tried again in 5 s; closing or logging out writes at once). On a 300-line
+note in the headless scene (`tests/app_scene_headless.sh notes_edit_scene`) the longest main-thread run while typing
+went from 41–68 ms to 9–12 ms.
 
 ## Markdown (the SDK's `<Markdown>`)
 

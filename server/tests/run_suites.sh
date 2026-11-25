@@ -205,6 +205,8 @@ EOF
     else skip "portal-cast-test" "dbus-run-session"; fi
     run "fsasync-test" build/fsasync-test
     run "bgsave-test (#250: saves off the interface's thread)" build/bgsave-test
+    run "fswatch-test" build/fswatch-test
+    if have node; then run "fs-watch-sdk-test (sdk/fs.js watch)" node tests/fs_watch_sdk_test.mjs; fi
     run "sign-test" build/sign-test
     # migration 008: a tablet's power-button defaults (packaging/migrations, issue #131)
     run "migration 008 tablet-power" sh tests/migration_tablet_power_test.sh
@@ -878,6 +880,10 @@ EOF
     else skip "textfield-menu-test" "node and the repository's node_modules (npm install)"; fi
     # (#238) Notes' storage over a real temporary home: the format, titles, geometry, attachments (odd names, links,
     # folders, a huge file) and what a link or image may reach (file://, javascript:, absolute paths, ..); writes stay in ~/Notes
+    # (0.8.9.6.2) Notes' pure logic: the rescan merge, the widget catalog's pick list, placing a note on a display, import
+    if have node; then run "notes-model-test (apps/notes/notesmodel.js)" node tests/notes_model_test.mjs; else skip "notes-model-test" node; fi
+    # (0.8.9.6.2) Notes' editor rows: wrapped as drawn (no row wider than the editor), the caret and clicks, the line cache
+    if have node; then run "notes-wrap-test (apps/notes/wrapmodel.js)" node tests/notes_wrap_test.mjs; else skip "notes-wrap-test" node; fi
     if have node && [ -d ../node_modules/esbuild ]; then run "notes-store-test (apps/notes/store.js, links.js)" node tests/notes_store_test.mjs
     else skip "notes-store-test" "node and the repository's node_modules (npm install)"; fi
     if have node; then run "sysopen-untrusted-test (sdk/runscode.js: attachments that would run never reach a Linux app)" node tests/sysopen_untrusted_test.mjs; else skip "sysopen-untrusted-test" node; fi

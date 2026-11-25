@@ -606,6 +606,7 @@
   "widgets.subtitle": "Wählen Sie eine Größe: Es nimmt seinen Platz im Raster dieses Bildschirms ein, in dieser Aktivität. Zum Verschieben ziehen.",
   "widgets.search": "Widgets suchen",
   "widgets.noMatch": "Kein Widget passt zur Suche",
+  "widgets.back": "Zurück",
   "widgets.cat.all": "Alle",
   "widgets.cat.time": "Zeit",
   "widgets.cat.system": "System",

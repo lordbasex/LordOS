@@ -599,6 +599,7 @@
   "widgets.subtitle": "選擇一個大小：它會在這個活動中佔據這個顯示器格線上的位置。拖動即可移動。",
   "widgets.search": "搜尋小工具",
   "widgets.noMatch": "沒有符合搜尋的小工具",
+  "widgets.back": "返回",
   "widgets.cat.all": "全部",
   "widgets.cat.time": "時間",
   "widgets.cat.system": "系統",

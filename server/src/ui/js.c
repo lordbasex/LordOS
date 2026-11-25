@@ -44,6 +44,7 @@
 #include "js_wm.h"
 #include "js_disk.h"
 #include "../fsasync.h"
+#include "../fswatch.h"
 #include "js_imager.h"
 #include "js_logs.h"
 #include "js_flatpak.h"
@@ -1078,6 +1079,7 @@ int js_app_recovery(void) {
 void js_shutdown(void) {
     media_shutdown();                   /* the lord-media helpers belong to this context */
     if (ctx) js_wasm_shutdown(ctx);
+    js_sys_fswatch_reset(ctx);          /* lord.fs.watch's watches end with the context that made them */
     if (ctx && run.open) { run.open = 0; JS_FreeAtom(ctx, run.name); JS_FreeValue(ctx, run.detail); run.detail = JS_UNDEFINED; }
     stall.depth = 0;
     if (ctx && hot_rt == rt) for (int i = 0; i < HOT_N; i++) JS_FreeAtom(ctx, hot_atom[i]);
@@ -1366,6 +1368,31 @@ static void fs_reply(void *ud, int req, const char *json) {
 void js_fs_dispatch(void) {
     if (!ctx) return;
     if (fsasync_dispatch(fs_reply, NULL)) drain_jobs();
+}
+
+/* lord.fs.watch (fswatch.c): a watched folder changed → its fn({ changed: true, overflow, gone }), no file names. */
+static void fswatch_call(void *ud, int id, int overflow, int gone) {
+    (void)ud;
+    JSValue fn = js_sys_fswatch_fn(ctx, id);
+    if (!JS_IsFunction(ctx, fn)) { JS_FreeValue(ctx, fn); return; }
+    JSValue ev = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, ev, "changed", JS_TRUE);
+    JS_SetPropertyStr(ctx, ev, "overflow", JS_NewBool(ctx, overflow));
+    JS_SetPropertyStr(ctx, ev, "gone", JS_NewBool(ctx, gone));
+    js_run_begin();
+    JSValue r = JS_Call(ctx, fn, JS_UNDEFINED, 1, (JSValueConst *)&ev);
+    if (JS_IsException(r)) dump_exception(ctx);
+    JSAtom name = JS_NewAtom(ctx, "lord.fs.watch");
+    js_run_called(name, 0, NULL);
+    JS_FreeAtom(ctx, name);
+    JS_FreeValue(ctx, r);
+    JS_FreeValue(ctx, ev);
+    JS_FreeValue(ctx, fn);
+}
+
+void js_fswatch_dispatch(double now) {
+    if (!ctx) return;
+    if (fswatch_dispatch(now, fswatch_call, NULL)) drain_jobs();
 }
 
 /* Network (net/state.c): something changed in links, addresses or routes → __lordNet("link"|"addr"|"route"). */

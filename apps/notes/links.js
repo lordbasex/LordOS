@@ -12,7 +12,7 @@
 
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
 // direction overrides and isolates: "gpj.exe" shown as "exe.jpg" (the classic spoof); zero-width joiners stay (emoji)
-const BIDI = /[‪-‮⁦-⁩‎‏؜]/g;
+const BIDI = /[\u202a-\u202e\u2066-\u2069\u200e\u200f\u061c]/g;
 
 export function linkTarget(url) {
   const raw = String(url == null ? '' : url).trim();

@@ -599,6 +599,7 @@
   "widgets.subtitle": "เลือกขนาด: จะวางในกริดของจอนี้ในกิจกรรมนี้ ลากเพื่อย้าย",
   "widgets.search": "ค้นหาวิดเจ็ต",
   "widgets.noMatch": "ไม่มีวิดเจ็ตที่ตรงกับการค้นหา",
+  "widgets.back": "ย้อนกลับ",
   "widgets.cat.all": "ทั้งหมด",
   "widgets.cat.time": "เวลา",
   "widgets.cat.system": "ระบบ",

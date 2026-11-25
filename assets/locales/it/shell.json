@@ -606,6 +606,7 @@
   "widgets.subtitle": "Scegli una dimensione: prende il suo posto nella griglia di questo schermo, in questa attività. Trascinalo per spostarlo.",
   "widgets.search": "Cerca widget",
   "widgets.noMatch": "Nessun widget corrisponde alla ricerca",
+  "widgets.back": "Indietro",
   "widgets.cat.all": "Tutti",
   "widgets.cat.time": "Tempo",
   "widgets.cat.system": "Sistema",

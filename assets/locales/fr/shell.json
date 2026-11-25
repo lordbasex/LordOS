@@ -606,6 +606,7 @@
   "widgets.subtitle": "Choisissez une taille : il prend sa place dans la grille de cet écran, dans cette activité. Faites-le glisser pour le déplacer.",
   "widgets.search": "Rechercher des widgets",
   "widgets.noMatch": "Aucun widget ne correspond à la recherche",
+  "widgets.back": "Retour",
   "widgets.cat.all": "Tous",
   "widgets.cat.time": "Temps",
   "widgets.cat.system": "Système",

@@ -599,6 +599,7 @@
   "widgets.subtitle": "サイズを選ぶと、このアクティビティのこのディスプレイのグリッドに配置されます。ドラッグで移動できます。",
   "widgets.search": "ウィジェットを検索",
   "widgets.noMatch": "検索に一致するウィジェットはありません",
+  "widgets.back": "戻る",
   "widgets.cat.all": "すべて",
   "widgets.cat.time": "時間",
   "widgets.cat.system": "システム",

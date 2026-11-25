@@ -19,6 +19,10 @@ void js_sys_cpu_name(char *out, size_t size);
 extern int js_sys_unseen;   /* processor (x86 or ARM; the Monitor uses it too) */
 /* Valid destination path for writing (home folder or user mounts, never the
  * protected folders): 0 if it is OK; out receives the real path. */
+/* lord.fs.watch's callbacks (fswatch.c): the function of watch id (a new reference, or undefined); every watch ended
+ * and its function freed (the context is ending) */
+JSValue js_sys_fswatch_fn(JSContext *c, int id);
+void js_sys_fswatch_reset(JSContext *c);
 int js_sys_resolve_target(const char *path, char *out, size_t n);
 
 #endif
