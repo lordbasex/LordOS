@@ -748,16 +748,22 @@ Voice and video calls in web apps (a messaging web app first, also video meeting
   V4L2 (`/dev/video*`, which WebKit's sandbox binds for the web process), which the indicator doesn't see
   (PRIVACY.md, "Not covered"): lord-web logs WebKit's own capture state (`capture: camera on`) and a way for it to tell
   the indicator is proposed for the maintainer's review (a new lord-web → lord-server method, not built).
-- **The network.** WebKit's web process has no network of its own (bubblewrap's `--unshare-net`), and without librice
-  (not in Debian 13) WebKit's GStreamer backend runs ICE inside it. libnice there sees only the sandbox's loopback
-  interface, which it ignores, and gathers **no candidate at all** (checked 2026-11-25 with libnice's debug output:
-  "Interface: lo … Ignoring loopback interface"; the loopback test's two peer connections stay `new`, gathering never
-  completes). So calls can't connect yet, not even two peers in one page. The ways out, for the maintainer to choose:
-  (a) build librice (Rust, `rice-proto`/`rice-io` 0.4.2+ through cargo-c, not packaged by Debian) into the WebKit
-  backport with `-DUSE_LIBRICE=ON`: ICE then runs in WebKit's network process, which has the network already, and the
-  web process keeps none (WebKit's own design since 2.50; recommended); or (b) a WebKit patch that keeps the host's
-  network for the web process (bubblewrap without `--unshare-net`), which gives all web content raw network access
-  (not recommended). Until then `tests/webcalls_check.py --no-network-known` reports the loopback as blocked.
+- **The network: ICE in WebKit's network process (librice, `+4`).** WebKit's web process has no network of its own
+  (bubblewrap's `--unshare-net`, unchanged). With `+3` WebKit's GStreamer backend ran ICE (libnice) inside it, saw only
+  the sandbox's loopback interface, ignored it and gathered no candidate at all, so nothing connected. The maintainer
+  chose librice on 2026-11-25: with `-DUSE_LIBRICE=ON` WebCore's ICE agent speaks librice's protocol and every ICE
+  socket (UDP, and TCP for ICE-TCP and TURN over TCP/TLS) is opened by WebKit's **network process**, which already has
+  the network for every page load and runs in lord-web's firewall scope like the rest of the app; the web process keeps
+  none. LordOS builds librice for Debian 13 ([WPEWEBKIT.md](WPEWEBKIT.md), "librice"). Checked 2026-11-25 on amd64 in
+  the build's test chroot with WebKit's sandbox on (`tests/webcalls_check.py --webrtc`): the two peer connections of
+  one page gather host candidates (4 UDP, 8 TCP) and connect in 300 to 400 ms, with Opus and VP8 (215 to 221 audio
+  packets, 64 to 67 frames of 320×240 in 4 s), and again with Opus and H.264; the audio comes from WebKit's mock
+  microphone (`WEBCALLS_MOCK_CAPTURE=1`, test only), the video from a canvas.
+- **TURN URLs with `?transport=`.** WebKit 2.54's `RTCPeerConnection` refused every TURN server URL with a query (an
+  inverted check), and sites hand out `turn:host:443?transport=tcp` (RFC 7065): a video meeting site's page threw
+  `SyntaxError` when it created its connection. `lordos-turn-transport-query.patch` (`+4`) accepts exactly
+  `transport=udp` and `transport=tcp`, which the ICE agent reads; `tests/webcalls_check.py` checks both and that another
+  query is still refused.
 - **The call log** (`webcall.h`, `webcall.c`, `webcalls.c`, `webcall.js`): lines starting `webcall: ` in the app's log
   (`web/<app>-<profile>.log` in the user's log folder, docs/SYSTEM.md "Log files"; the Logs app and `lordos-issue` show
   it), always on, at most 60 a minute. They say what the page has for calls, each peer connection, its ICE gathering,

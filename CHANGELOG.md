@@ -19,9 +19,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `libwpewebkit-2.0-1` Recommends `gstreamer1.0-nice`, `gstreamer1.0-plugins-bad`, `-good` and `-base`. The test
     checks that the library links `libgstwebrtc-1.0` and runs the call checks below. `lordos-web` depends on
     `gstreamer1.0-nice`. Built and tested on amd64 on 2026-11-25 (lintian 0 errors; every earlier check passes):
-    `RTCPeerConnection` exists, with Opus, PCMU, PCMA, H.264, VP8 and VP9. **Calls don't connect yet:** WebKit's web
-    process has no network in its sandbox and, without librice (not in Debian 13), ICE runs there and gathers no
-    candidate; building librice into the backport is proposed (docs/WEBAPPS.md, "Calls").
+    `RTCPeerConnection` exists, with Opus, PCMU, PCMA, H.264, VP8 and VP9.
+  - **ICE in WebKit's network process, with librice** (`2.54.3-1~lordos13+4`, approved by the maintainer on
+    2026-11-25): with `+3` ICE ran in the web process, which has no network in WebKit's sandbox, and gathered no
+    candidate. `-DUSE_LIBRICE=ON` moves every ICE socket to WebKit's network process; the web process keeps none.
+    librice isn't in Debian 13, so LordOS builds it: `tools/pkg/build-librice.sh` makes `librice 0.4.3-1~lordos13+1`
+    (`librice0`, `librice-dev`) from upstream's tag and the 291 crates its `Cargo.lock` pins, vendored once
+    (reproducible: the same SHA-256 twice) and pinned in `tools/pkg/librice.sums`, built offline, with cbindgen 0.29.2
+    vendored too (Debian 13's cargo-c writes empty headers for Rust 2024 code), the vendored crates' prebuilt binaries
+    removed, `debian/copyright` generated from each crate's license, and a C test of both libraries; its source package
+    is published next to WebKit's. `build-wpewebkit.sh` takes it with `EXTRA_DEBS`. Checked in the build's test chroot
+    with WebKit's sandbox on: two peer connections in one page connect in 300 to 400 ms with Opus and VP8, and with Opus
+    and H.264, audio and video arriving.
+  - **TURN URLs with `?transport=udp|tcp` accepted** (`lordos-turn-transport-query.patch`, `+4`): WebKit's check was
+    inverted and refused every TURN URL with a query, so a video meeting site's `new RTCPeerConnection()` threw
+    `SyntaxError`.
   - **SharedArrayBuffer for cross-origin-isolated pages only** (`lordos-sharedarraybuffer-coi.patch` in the same build):
     WebKit already starts a web process of its own for a page served with COOP `same-origin` and COEP `require-corp`;
     the patch turns SharedArrayBuffer on in that process only (`JSC_useSharedArrayBuffer`, removed from every other
