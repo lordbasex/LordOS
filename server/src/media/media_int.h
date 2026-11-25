@@ -13,6 +13,7 @@
 #define MEDIA_MAX_SRC 48
 #define MEDIA_APP_MAX 48
 #define MEDIA_CROP_NODES 64       /* LAG_WIN_MAX: a machine's windows in apps mode */
+#define MEDIA_VIEW_NODES 16       /* plain nodes showing all of one source (a moving wallpaper on every display) */
 
 typedef struct MAudio MAudio;
 
@@ -50,7 +51,11 @@ typedef struct {
     unsigned painted_seq;       /* the frame_seq the last paint read (Machines acknowledges frames with it) */
     /* drawing */
     MediaView view;
-    int node, box_w, box_h, sent_w, sent_h;
+    int node, box_w, box_h, sent_w, sent_h;     /* node: the plain node painted last (its pointer, Machines) */
+    /* every plain node (no Node.crop) that shows all of it, with the box (physical px) its last paint had: one player
+     * shared by the displays (sdk/motion.jsx) damages and presents each one, not only the one painted last (mviews.c) */
+    int view_nodes[MEDIA_VIEW_NODES], view_w[MEDIA_VIEW_NODES], view_h[MEDIA_VIEW_NODES];
+    int views_over;                     /* a node found no slot: a new frame damages the whole screen */
     int crop_nodes[MEDIA_CROP_NODES];   /* nodes that show a part of it (Node.crop): each one damaged for its part */
     uint32_t *cache;            /* scaled/rotated (when copying isn't enough) */
     int cache_w, cache_h;
@@ -149,6 +154,13 @@ void media_src_tex_off(MediaSrc *s);
 void media_src_tex_fresh(MediaSrc *s);
 /* how many nodes show a part of it now */
 int  media_src_crop_count(MediaSrc *s);
+/* mviews.c: a plain node shows all of s (media_paint, js_media_node), at bw × bh physical px (0: not painted yet); a node
+ * dropped (it shows a part now). media_src_view_count: the live plain nodes. media_src_view_box: the box the helper
+ * scales to, the largest one shown (0 if none) */
+void media_src_view_note(MediaSrc *s, int node, int bw, int bh);
+void media_src_view_drop(MediaSrc *s, int node);
+int  media_src_view_count(MediaSrc *s);
+int  media_src_view_box(MediaSrc *s, int *bw, int *bh);
 int  media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *pid);
 /* the same with lord-stream (0.8.8.10: network players and M3U lists, src/media/stream; streamurl.h) */
 int  media_spawn_stream(int kind, const char *params, const int *fds, int nfds, pid_t *pid);

@@ -73,7 +73,7 @@ QJS_OBJ := $(patsubst %,build/qjs/%.o,quickjs libregexp libunicode cutils dtoa)
 # Monitor: metrics, connections and the country of an IP (src/monitor, see docs/MONITOR.md)
 MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/exeown.c src/monitor/describe.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
 # Media (src/media, docs/MEDIA.md): only the lord-server side. Only lord-media links FFmpeg.
-MEDIA_SRC := src/media/mstudio.c src/media/mstudiohub.c src/ui/js_studio.c src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
+MEDIA_SRC := src/media/mstudio.c src/media/mstudiohub.c src/ui/js_studio.c src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/mviews.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
@@ -902,8 +902,8 @@ test: build/engine-test
 test: build/term-damage-test
 build/term-damage-test: tests/term_damage_test.c $(ENGINE_SRC) src/term/term.c src/term/term_paint.c src/term/hold.c src/term/pty.c src/term/pastefilter.c src/term/tcapture.c src/term/tsecret.c src/sec/cgroup.c build/obj/term/vt.o build/obj/ui/stb.o $(HDR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_damage_test.c $(ENGINE_SRC) src/term/term.c src/term/term_paint.c src/term/hold.c src/term/pty.c src/term/pastefilter.c src/term/tcapture.c src/term/tsecret.c src/sec/cgroup.c build/obj/term/vt.o build/obj/ui/stb.o -lm -lpthread
-build/engine-test: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR) tests/drag_golden_cpu.txt tests/drag_golden_gpu.txt
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread
+build/engine-test: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c src/media/mviews.c build/obj/ui/stb.o $(HDR) tests/drag_golden_cpu.txt tests/drag_golden_gpu.txt
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c src/media/mviews.c build/obj/ui/stb.o -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
 # the frame pipeline's decisions (src/fpipe.c, docs/GPU.md "The frame pipeline"): LORD_PIPELINE, the auto
 # mode, what a display does next, when input waits, and a display on a vblank grid with and without it
@@ -915,8 +915,8 @@ build/fpipe-test: tests/fpipe_test.c src/fpipe.c src/fpipe.h
 # test_drag_exact's golden hashes for this architecture: only on the reference code (001633b plus
 # step 9, the corners' restore on the drag layer and main's blur-margin repaint), never to make a changed frame pass
 # (tests/engine_test.c, "The dragged window, pixel for pixel")
-drag-golden: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o build/engine-golden tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread
+drag-golden: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c src/media/mviews.c build/obj/ui/stb.o $(HDR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o build/engine-golden tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c src/media/mviews.c build/obj/ui/stb.o -lm -lpthread
 	./build/engine-golden drag-golden
 build/canvas-test: tests/canvas_test.c src/canvas.c src/canvas.h
 	@mkdir -p build

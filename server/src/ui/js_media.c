@@ -1038,5 +1038,5 @@ void js_media_node(Node *n, int id) {
     if (!n || n->type != NODE_MEDIA) return;
     n->term = id;
     MediaSrc *s = media_src_get(id);
-    if (s) { s->node = n->id; s->sent_w = s->sent_h = 0; }
+    if (s) { s->node = n->id; s->sent_w = s->sent_h = 0; if (!n->crop) media_src_view_note(s, n->id, 0, 0); }
 }
