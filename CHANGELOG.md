@@ -10,9 +10,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.9.6-beta] - 2026-11-25
+
 ### Added
-- **Monitor → GPU, redrawn after the mockup the maintainer approved on 2026-11-24** (in development; latest release
-  0.8.9.5-beta; `docs/MONITOR.md`, "GPU", "The 0.8.9.6 layout"). `apps/monitor/GpuView.jsx`: a chip per GPU (vendor
+- **Monitor → GPU, redrawn after the mockup the maintainer approved on 2026-11-24** (`docs/MONITOR.md`, "GPU", "The 0.8.9.6 layout"). `apps/monitor/GpuView.jsx`: a chip per GPU (vendor
   dot, name, three-minute load sparkline, load, temperature, VRAM) and, with two or more GPUs, a One / Side-by-side
   switch; the card's header with tiles for Load, Temperature (with `temp*_crit`), Power (of `power1_cap`, or
   `power1_max` on Intel), Fan or Idle (RC6, from i915's `power/rc6_residency_ms` or xe's `gtidle`), Core clock (of the
@@ -39,10 +40,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   cache, pid reuse, another user; ASan/UBSan clean), `tests/gpu_model_test.mjs` (categories, types, memory split,
   PCIe generation, RC6 idle, hidden rows, canned and hostile NVML numbers, AI rows, rows that fit), and screenshots with
   made-up data from `server/tests/gpu_headless.sh`.
-- **Files: F2 renames** the selected item too (in development; latest release 0.8.9.5-beta), like Enter and the slow
+- **Files: F2 renames** the selected item too, like Enter and the slow
   second click on its name.
-- **Files: a slow second click on the selected item's name renames it in place** (in development; latest release
-  0.8.9.5-beta). As in the reference desktop's file manager: with one item selected, a second click on its name (not the
+- **Files: a slow second click on the selected item's name renames it in place**. As in the reference desktop's file manager: with one item selected, a second click on its name (not the
   icon) at least the double-click interval and at most 1.5 s after the first, within 4 px of it, with the left button
   and no modifier key, opens the same rename field as Enter or the menu's Rename, once the double-click interval has
   passed after that click with no other press. A real double click still opens, a drag (the item, or the rubber band of
@@ -58,8 +58,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `make test`) and the headless scene `tests/app_scene_headless.sh files_slowrename_scene` (the three views, a real
   rename on disk, and each case that must not rename, with screenshots in the four desktops and in Arabic). Enter and
   the menu's Rename are unchanged.
-- **The slow-rename scene passes in all four desktops and runs in `make test-full`** (in development; latest release
-  0.8.9.5-beta). Its two failures (Lord Classic's "a first click that only focused the window" case, Lord Workspaces'
+- **The slow-rename scene passes in all four desktops and runs in `make test-full`**. Its two failures (Lord Classic's "a first click that only focused the window" case, Lord Workspaces'
   column view) were in the scene, not in Files or the themes: lord-server hands a freed node's id out again, and
   `lord.destroy` frees a whole subtree while the scene's `pre.js` only heard about its root, so a name kept from a
   closed window (the Editor the double-click case opens, an earlier Files window) stayed attached to an id now reused in
@@ -70,7 +69,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `tests/run_suites.sh full` runs the scene in Lord Flow, Lord Classic, Lord Workspaces and Lord Celeste (about a
   minute each, headless, no hardware).
 - **Lord Workspaces: each display's bar shows every window of the activity; launched windows land where they were
-  launched; Chrome's Save as is LordOS's dialog** (in development; latest release 0.8.9.5-beta).
+  launched; Chrome's Save as is LordOS's dialog**.
   - The frame header's tray (each display's bar) lists the activity's windows on that display, **open and minimized**,
     in the order they opened, a short line under a minimized one and no "Minimized" label; a click brings an open
     window forward or a minimized one back into the slot it kept (`themes/workspaces/components/AppWindows.jsx`).
@@ -112,8 +111,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `browser_profiles_test.mjs`, `portal_file_model_test.mjs`, `dialog_model_test.mjs`, `workspaces_model_test.mjs`
     (launches, labels), `workspaces_scene.mjs` (the bar, the icon menu, the picker flow over three displays, profiles,
     ❖`), `portal-cast-test` (versions, a Chrome-style SaveFile). Strings in all 35 languages; docs/WORKSPACES.md.
-- **Backups restores several files and folders at once (GitHub #231 follow-up)** (in development; latest release
-  0.8.9.5-beta). The restore browser picks rows as Files does: a click picks one, Shift a range from the last one,
+- **Backups restores several files and folders at once (GitHub #231 follow-up)**. The restore browser picks rows as Files does: a click picks one, Shift a range from the last one,
   Ctrl (or ⌘) adds or takes one out; Restore then reads "Restore Selected (N)" and sends them together
   (`apps/backup/model.js` `restoreTarget`, the SDK's `clickSelect`). `lord.backup.restore(id, [rel, …])` takes up to 64
   paths; the list is checked whole before anything is queued (`bk_restore_list_valid`: every item a safe relative path,
@@ -126,7 +124,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   encrypted destination refused a restore. Tests: `build/backup-test` (lists, nesting, a bad item beside good ones, links
   out of the backup, protected folders, refusals, cancel), `tests/backup_model_test.mjs`, and the
   `backup_restore_scene` (Shift and Ctrl picks, the list sent, progress and per-item errors).
-- **Monitor → GPU shows NVIDIA cards' own numbers** (in development; latest release 0.8.9.5-beta; approved by the
+- **Monitor → GPU shows NVIDIA cards' own numbers** (approved by the
   maintainer on 2026-11-24). NVIDIA's proprietary driver has no fdinfo stats or hwmon, so the GPU view had almost
   nothing for it. The new sandboxed helper `lord-nvgpu` (`server/src/monitor/nvgpu_main.c`) is the only program that
   loads NVIDIA's NVML: `dlopen` of `libnvidia-ml.so.1` only from the fixed system library folders, folder and file
@@ -143,8 +141,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `nvidia-smi`. Tests: `build/nvgpu-test` (ASan/UBSan; 120 000-case parser fuzz; the helper end to end with a
   test-only fake NVML giving canned, hostile, failing and hanging answers; a sandbox probe that it can't open a socket,
   exec or write). Not yet verified on NVIDIA hardware (docs/MONITOR.md, "NVIDIA").
-- **A mouse's Back and Forward buttons work in LordOS's own apps (GitHub #234)** (in development; latest release
-  0.8.9.5-beta). They reached the desktop as buttons 3 and 4 and were dropped, so that no title bar, button or slider
+- **A mouse's Back and Forward buttons work in LordOS's own apps (GitHub #234)**. They reached the desktop as buttons 3 and 4 and were dropped, so that no title bar, button or slider
   took them as a press (#159); only Linux apps (Firefox, Chromium) used them. `runtime/events.js` still keeps them from
   onMouseDown, onClick and the pointer listeners, and now turns the press into a `navigate` event ('back' or
   'forward') for the window under the pointer: `onNavigate` along the nodes under it, then `addListener('navigate')`.
@@ -156,7 +153,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   window. Linux apps get the raw buttons from lord-server as before. `navbuttons-test` checks the runtime's dispatch,
   which window takes it, the history and each app's wiring.
 - **Notes: attachments open alone, a + New Note button, inserting from the reading view, the sticky note's emoji
-  picker, and links that can't reach out** (GitHub #238; in development; latest release 0.8.9.5-beta; docs/NOTES.md).
+  picker, and links that can't reach out** (GitHub #238; docs/NOTES.md).
   - **An attachment opens by itself.** A click on a note's attachment opened Files on the note's folder (with `nota.md`
     and every other attachment in it). Now a text file opens alone in Text Editor and anything else in its default app,
     Photos showing only that picture (`openFileWithApps(path, name, { reveal: false, single: true })`, new options in
@@ -192,7 +189,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `tests/app_scene_headless.sh notes_scene` (a headless lord-server with real pointer and key events and screenshots:
     the window, search, the reading view, what each link opens, ⊕ from the reading view, + New Note, Duplicate, Delete,
     On Desktop, and the sticky note from the catalog through a restart), run in the four desktops and in Arabic.
-- **Files: rubber-band selection** (GitHub #233; in development; latest release 0.8.9.5-beta). A drag that starts on
+- **Files: rubber-band selection** (GitHub #233). A drag that starts on
   the empty space of the icon or list view draws a translucent rectangle in the accent colour and selects every card or
   row it touches; Shift adds them to what was selected, Ctrl (⌘) toggles them, and with no modifier it starts afresh. Near
   the view's top or bottom edge the view scrolls by itself, faster the closer the pointer is, and the rectangle follows
@@ -208,8 +205,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   pointer and key events (`tests/app_scene_headless.sh files_marquee_scene`, 11 checks with screenshots, in English
   and Arabic): a 2×2 drag selects 4, Shift adds the next 2, Ctrl toggles 3, a click clears, the list view takes the 5 rows
   it crosses, and in a folder of 400 files the view scrolls while the pointer rests at the bottom edge.
-- **Displays: the login and lock screens can use the desktop's scale, set by an administrator** (in development; latest
-  release 0.8.9.5-beta; [#242](https://github.com/lordbasex/LordOS/issues/242); docs/DISPLAYS.md "The login screen's
+- **Displays: the login and lock screens can use the desktop's scale, set by an administrator** ([#242](https://github.com/lordbasex/LordOS/issues/242); docs/DISPLAYS.md "The login screen's
   scale", docs/SESSIONS.md). The login screen opened every display at its recommended scale, so a 15.6" 1080p laptop
   jumped from 125 % at login or lock to 100 % on a desktop set to 100 %. Settings → Displays has **Use this scale on the
   login screen** under the scale. It is a setting of the computer: **only an administrator can change it**, its hint
@@ -233,8 +229,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     random and mutated inputs, everything accepted valid and exactly what lord-server sends; `lid-test` (43 checks) for
     `display_plan` with `LORD_MAIN_SCALE`; `display_layout_test.mjs` (48) for the switch. Not yet checked on the VM with
     a screenshot.
-- **Cloud: the Cloud menu shows each file moving now with its percentage** (in development; latest release 0.8.9.5-beta;
-  [#244](https://github.com/lordbasex/LordOS/issues/244); docs/CLOUD.md section 11). The panel by the clock has a
+- **Cloud: the Cloud menu shows each file moving now with its percentage** ([#244](https://github.com/lordbasex/LordOS/issues/244); docs/CLOUD.md section 11). The panel by the clock has a
   **Moving now** list between the accounts and Recent: an up or down arrow, the file's name and its percentage on the end
   side (the left in right-to-left languages), at most four files, then "and N more"; it follows the accounts chosen for
   Recent, as Settings' account tile already showed the first file.
@@ -250,7 +245,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     isolates, overlong forms, surrogates, a Hebrew name kept, cuts never halfway through a character) and checks the list
     in the state (cap, order, a name with nothing printable left out, totals still counting every file);
     `cloud_model_test.mjs` 347 checks.
-- **Voice: French, German, Italian and Dutch, in development (the latest release is 0.8.9.5-beta).** Reading aloud, `say`,
+- **Voice: French, German, Italian and Dutch.** Reading aloud, `say`,
   Live Speech and Personal Voice now speak seven languages: French ([#215](https://github.com/lordbasex/LordOS/issues/215),
   approved by the maintainer on 2026-11-22), German, Italian and Dutch join Spanish, English and Portuguese. See
   `docs/VOICE.md`, phase 4.
@@ -294,7 +289,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     122–209 MB, HD 642 MB, 22–23 voices of each quality) were built from the files fetched on 2026-11-22, unsigned and
     unpublished until they are signed on the maintainer's signing machine. `tts_test.sh` passes with them (HD and Standard in all four, on the CPU).
 
-- **Machines: checked for real, and what that found** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
+- **Machines: checked for real, and what that found** (docs/VIRTUALIZATION.md
   6.5, 6.7, 6.14, 6.16, 6.17, 6.19).
   - **Monitor names a machine's own disk and network numbers.** A running machine's row in Processes says
     "Disk 2.0 MB/s · Network ↓ 3.0 KB/s ↑ 1.0 KB/s": its QEMU's cgroup I/O read every 2 s (`lord.vm.stats`, never in a
@@ -313,8 +308,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     own facts and sensors; a virtio-win guest's tools (the evaluation install), PowerShell, links, Send to LordOS, transfer drive, event logs and
     apps mode through `win-agent.py`.
 
-- **Machines: Start Linux directly, Guest can see, each system's requirements, migrate another PC** (in development; latest
-  release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.2, 6.1, 6.11, 8).
+- **Machines: Start Linux directly, Guest can see, each system's requirements, migrate another PC** (docs/VIRTUALIZATION.md 5.2, 6.1, 6.11, 8).
   - **Start Linux directly.** Configure → Boot keeps a kernel, an initial RAM disk and a command line with an installed
     Linux machine and starts them instead of the boot loader on its disk (no firmware menu, no countdown): `machine.json`
     schema 23 `kernel_boot`, the files copied into the machine's `disks/boot` by `lord-vm --set --kernel --initrd
@@ -332,7 +326,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     old PC needs only its SSH server, or a live USB; `--sudo` reads a root-only disk with that PC's sudo), or a disk
     connected here. The size comes first and is checked, the copy is written sparse, then imported with the compatible
     devices. Checked with a Raspberry Pi 5 as the old PC: 20 GB in 190 s, booted.
-- **Machines: Vulkan for Linux guests (venus)** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.10,
+- **Machines: Vulkan for Linux guests (venus)** (docs/VIRTUALIZATION.md 6.10,
   3.3). Configure → Display → Vulkan, with Graphics 3D (machine.json schema 22, "vulkan"; lord-vm --set --vulkan). The guest's
   Vulkan apps draw with this computer's GPU through virglrenderer's render server, which lord-vm starts in a jail of its own (a
   pid namespace, Landlock, a seccomp allowlist with a listener, one exec, only the start's library mappings); QEMU gets the
@@ -340,46 +334,43 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   into the guest (RADV and NVK need Linux 6.13; a discrete GPU with an Intel processor, Linux 6.16 and QEMU 11), else the log says
   why. Checked with a Vulkan compute shader in a Debian 13 guest on an Intel UHD 630. The render server comes from Debian's
   `virgl-server`, which Machines' setup installs.
-- **Machines: a smoother picture, Part 1 steps 4 and 5** (in development; docs/MACHINES-GPU.md). A machine's picture changes
+- **Machines: a smoother picture, Part 1 steps 4 and 5** (docs/MACHINES-GPU.md). A machine's picture changes
   reach lord-server as up to 8 rectangles a frame instead of one box over all of them, each damaged on its own; a 2D picture
   is a GPU texture when the desktop composes on the GPU (only the changed rectangles uploaded, the frame presented without a UI
   paint), and on the CPU path a scaled picture's copy is remade only where it changed.
-- **Machines: snapshots keep the settings, take notes, and come before a tools update** (in development; latest release
-  0.8.9.5-beta; docs/VIRTUALIZATION.md 6.2). Each snapshot keeps `machine.json` as it was (`snapshots/<tag>.json`; a
+- **Machines: snapshots keep the settings, take notes, and come before a tools update** (docs/VIRTUALIZATION.md 6.2). Each snapshot keeps `machine.json` as it was (`snapshots/<tag>.json`; a
   running machine's hardware as it started); going back puts that hardware back (processors, memory, devices, cards,
   graphics, displays, TPM, agent channels, MAC) and keeps every other choice; a disk added since refuses going back
   before anything changes. A note of the person's own per snapshot (Add Note…, or with the new snapshot; at most 1000
   bytes, no control or bidi characters). When the LordOS tools bring themselves up to date, a snapshot with the
   machine's memory comes first, once per run and version. No file system freeze, decided: a snapshot is taken off or with
   its memory, so a freeze adds nothing. `tests/vm_snap_store_test.sh` (real QEMU/KVM, 21 checks).
-- **Machines: Reclaim space can compress the disk** (in development; 6.4). *Compress the disk too* in the sheet
+- **Machines: Reclaim space can compress the disk** (6.4). *Compress the disk too* in the sheet
   (`lord-vm --compact DIR --compress`, `qemu-img convert -c`): 96 MB became 380 KB in the test, checked, read back and
   booted; refused for an encrypted machine.
-- **Machines: the Storage window deletes old snapshots and removes unused downloads** (in development; 6.16). Delete Old
+- **Machines: the Storage window deletes old snapshots and removes unused downloads** (6.16). Delete Old
   Snapshots (every one but the newest) and Remove Unused (every download no machine uses), each after a question with
   the figure; figures read from compressed extents are marked "about"; raw and data disks are counted (they were left
   out). `tools/vm/e2e/machines/storage-fs.sh` runs the storage flow on scratch btrfs, compressed btrfs and XFS (needs
   sudo for the mounts).
-- **Machines: the disposable session's switch in the machine window and on the card** (in development; 6.2). Actions →
+- **Machines: the disposable session's switch in the machine window and on the card** (6.2). Actions →
   Disposable Session and the card's menu turn it on (in memory) or off with the machine off; the card says so.
-- **Machines: an imported machine's other network cards are connected** (in development; 6.22). Each extra card gets its
+- **Machines: an imported machine's other network cards are connected** (6.22). Each extra card gets its
   own passt in the first card's mode, on a network of its own (10.0.3.0/24, 10.0.4.0/24…), with no forwarded ports;
   checked under KVM in Shared and Host only (`tests/vm_nic_boot.sh`, `tests/vm_nic_e2e.sh`).
-- **`machines cp` copies folders, and the MCP server says what this computer can run** (in development; 6.15). Folders
+- **`machines cp` copies folders, and the MCP server says what this computer can run** (6.15). Folders
   both ways as `cp -r`; links are never followed; a guest's listing is parsed as hostile and refused whole (before
   anything is made) when it names a protected path, `..`, a control or bidi character, or goes too deep. The MCP tool
   `requirements`. `tools/vm/e2e/machines/exec-guest.sh` runs `tests/vm_exec_e2e.sh` against a throwaway Debian 13
   machine (38 of 38).
-- **Machines: real runs of sound, recording and card models** (in development; latest release 0.8.9.5-beta;
-  docs/VIRTUALIZATION.md 6.9, 6.20, 6.22). `tests/vm_sound_e2e.sh`: a headless lord-server in its own namespaces with only
+- **Machines: real runs of sound, recording and card models** (docs/VIRTUALIZATION.md 6.9, 6.20, 6.22). `tests/vm_sound_e2e.sh`: a headless lord-server in its own namespaces with only
   this account's pulse socket mounted in, a guest playing a tone and recording its microphone: the speakers' PipeWire
   stream named after the machine, the microphone closed without LordOS's permission and open with it (the guest heard the
   maintainer's webcam microphone), a screenshot at the guest's size and an H.264 and AAC recording carrying the guest's tone
   even with the speakers at volume 0. `tests/vm_nic_e2e.sh`: every card model booted; seven reach the internet, PCnet gets
   its address and then only receive errors (QEMU 10.0's PCnet with Linux 6.12, documented); an import's extra cards are
   there with their MACs, and now each on a network of its own (below).
-- **Machines: this computer's USB devices in a machine, and the camera** (in development; latest release 0.8.9.5-beta;
-  docs/VIRTUALIZATION.md 6.6 and 6.9; approved by the maintainer on 2026-11-24, AGENTS.md "Machines' USB devices").
+- **Machines: this computer's USB devices in a machine, and the camera** (docs/VIRTUALIZATION.md 6.6 and 6.9; approved by the maintainer on 2026-11-24, AGENTS.md "Machines' USB devices").
   - The machine window's **Devices** menu lists this computer's USB devices; one picked goes into the running machine
     whole (QEMU's `usb-host` on the machine's xHCI controller) and back to this computer's drivers when it is picked again,
     when it is unplugged, or when the machine stops. One machine holds a device at a time, a machine at most 8.
@@ -417,15 +408,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     lord-server started as root in a private mount namespace driving `lord.vm` through the real admin helper), and
     `build/vm-usb-cli` (vm-usb-allow as the helper runs it, for manual checks). lordvm-dev gains `usb-in`, `usb-out`,
     `usb-auto`, `usb-noauto`.
-- **Machines checked on real hardware (in development; latest release 0.8.9.5-beta).** The Whonix group's release gate
+- **Machines checked on real hardware.** The Whonix group's release gate
   ran on a PC in a headless session: Tor reached, an onion site answered, nothing left the computer but the Gateway's
   connections to Tor relays, Start Gateway, the group's stop order, Start Fresh and a disposable session. Fixed on the
   way: after Start Fresh the Workstation's old window stayed open, and the next start of the group then said it didn't
   start. Also checked: the "Weaker isolation" notice on a kernel without Landlock, real updates of QEMU and of the UEFI
   firmware under existing machines, a machine on hugetlb pages under the seccomp allowlist, the guest performance profile
   in a real Linux guest, and the performance targets measured on a PC and a Raspberry Pi 5 (docs/VIRTUALIZATION.md 9).
-- **Machines: files from the machine, a file copy panel, the guest's own notifications, its apps before it runs** (in
-  development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.18, 6.21).
+- **Machines: files from the machine, a file copy panel, the guest's own notifications, its apps before it runs** (docs/VIRTUALIZATION.md 6.12, 6.18, 6.21).
   - **Send to LordOS.** A file chosen in the machine (Linux: the file manager's Send to LordOS, or `lordos-guest
     --send-to-host FILE…`; virtio-win guests: Send To → LordOS) is copied to this computer over the guest agent's own
     channel, one at a time, with flow control (never more than 4 MiB in flight) and resume after a lost connection (the
@@ -455,7 +445,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - Tests: `vm-test` (the new frames, fuzzed with 80 000 random frames, the quarantine folder against links, hard links,
     collisions and sizes, schema 20), `guest_send_test.sh`, `guest-dbus-test` (the notification monitor's parser),
     `fsops-test` (the marks), `vm_xfer_test.mjs`, `guest_apps_test.mjs`, and a real Debian 13 KVM guest.
-- **Machines: All Displays** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.4). View → All
+- **Machines: All Displays** (docs/VIRTUALIZATION.md 5.4). View → All
   Displays shows a machine across this computer's displays: one output of its virtio-gpu per display (up to four), each full
   screen at that display's size, beside the others; the machine's own window keeps the first, and each further window's
   top edge has Back to One Display. A machine with fewer outputs gets them while it's off (machine.json schema 19,
@@ -463,13 +453,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display serves one connection), and an output whose window goes is turned off for the guest. Not for a machine with a
   graphics card, apps mode or a protected machine (the anonymity profile keeps one display: the guest never learns this
   computer's displays). Checked with a real KVM guest (tests/vm_multihead.sh) and a headless scene.
-- **Machines: each machine its own firewall row** (in development; docs/FIREWALL.md, docs/VIRTUALIZATION.md 6.5). A
+- **Machines: each machine its own firewall row** (docs/FIREWALL.md, docs/VIRTUALIZATION.md 6.5). A
   running machine's traffic is the firewall app `lordos:vm-<id>`, named after the machine in Monitor, with its forwarded
   ports listed as its incoming lines; Settings' rule and restriction lists offer each machine, and Configure → Network
   opens its rules. Every machine still inherits the Machines rules, restrictions and trust (`lordos:machines`), decided as
   one list with the usual precedence; lord-netperm compiles the same union. The Tor gateway keeps its own row and
   inherits nothing.
-- **Machines: one parent for every machine** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.7).
+- **Machines: one parent for every machine** (docs/VIRTUALIZATION.md 3.7).
   lord-sessiond places each machine's scope in its session's `lordos-machines.slice` (root-owned, made on the first
   machine) with a fixed `cpu.weight` 50 and `io.weight` 50: half of one app's, a twentieth of the compositor's. Under load,
   the machines together yield to the desktop and the apps; idle cores and an idle disk are still theirs. Each machine keeps
@@ -478,7 +468,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   history and Sentinela's scope check find machines there and in the old place. lordos.service restarts with live
   sessions keep the slice's limits. lord-sessiond uses the slice only while the running lord-netperm is the installed
   one, so a half-restarted update never leaves a machine without a firewall.
-- **Machines: the app's last parts** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.1, 5.2,
+- **Machines: the app's last parts** (docs/VIRTUALIZATION.md 5.1, 5.2,
   5.3, 5.5, 6.14).
   - **New Machine: Detect.** An installer disc chosen or dropped on the assistant gets a step of its own: what its
     label and boot files say, which system it is, which processors it starts on, and, before anything is made, when it
@@ -500,7 +490,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     talks to); no network speed limit; this computer's printing service is never opened to a machine; machines stay in
     the Machines library; the capture release keys stay fixed.
 - **Machines: programs, files, logs and an MCP server from the terminal, per machine with the person's consent**
-  (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.15 and 6.24). `/usr/bin/lordvm` is a second link
+  (docs/VIRTUALIZATION.md 6.15 and 6.24). `/usr/bin/lordvm` is a second link
   to the `machines` command, which gains:
   - `machines exec NAME [--timeout S] -- PROGRAM ARGS…`: runs a program in a Linux machine as the person signed in to it
     (never as root), in their home folder, with this terminal's input (up to 1 MB), and gives back its output and its exit
@@ -535,7 +525,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `build/vm-test` and `build/vmgroup-test`, `tests/vm_exec_e2e.sh` (28 checks, run on 2026-11-24 in a real Ubuntu
     26.04.1 machine made by the Ubuntu card on the dev PC). Not built: `exec` in
     virtio-win guests, folders in `cp`, packages and `rebuild` in `apply`, creating a machine from a card through MCP.
-- **Machines: Kali installs without questions, and every card was run end to end** (in development). Kali gets its own
+- **Machines: Kali installs without questions, and every card was run end to end**. Kali gets its own
   unattended install (Debian's preseed with Kali's archive and tasks: Xfce and the default tools). Fedora Workstation
   installed by its card now starts its graphical login, and Fedora without the desktop installs again (Fedora 45 renamed
   its smallest environment). On arm64 the installers of Debian, Ubuntu, Fedora and Kali show on the machine's screen
@@ -543,17 +533,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   warning on arm64. On 2026-11-24 every card was run from its verified download to the installed system's login on amd64
   (Fedora 45 Workstation, Ubuntu 26.04.1 server, Kali 2026.3, LordOS 0.8.9) and on the Raspberry Pi 5 (Debian 13.8, Fedora
   45 and Kali consoles, LordOS); the arm64 desktops and Ubuntu arm64 didn't fit on the Pi's disk.
-- **Machines: an ISO's architecture from its boot files** (in development; docs/VIRTUALIZATION.md 5.2). A new reader
+- **Machines: an ISO's architecture from its boot files** (docs/VIRTUALIZATION.md 5.2). A new reader
   (`server/src/vm/vmiso.c`, bounded reads through one descriptor) finds the UEFI boot loaders in the ISO 9660, UDF and El
   Torito trees and reads their PE headers; install discs are known by their `sources/install.*`; the name or label decide
   only when the boot files say nothing, and the summary card says which. An `.iso` dropped on "Use an ISO" picks it.
   Tests: `build/vmiso-test` (images built byte by byte, hostile ones, a fuzz pass), 9 new `isoArch` checks.
-- **Machines: virtio-win guests on arm64** (in development; 4.3.2): `virt` with GICv3, secure boot (AAVMF), a TPM on
+- **Machines: virtio-win guests on arm64** (4.3.2): `virt` with GICv3, secure boot (AAVMF), a TPM on
   `tpm-tis-device`, USB CD/DVD drives, ramfb, the ARM64 drivers in the unattended answer and the maker's 38 published
   Arm64 ISO hashes pinned. On a computer whose GIC is version 2, such as the Raspberry Pi 5, KVM can't run it: the
   machine is Emulated and the card says so. `swtpm` comes with `vm-enable` on arm64 too. Checked on the Pi 5 under TCG
   with an Alpine ISO; an install of the guest itself is not yet checked. 7 new texts in all 35 languages.
-- **Machines: a machine group's Delete, Rename and Repair** (in development; docs/VIRTUALIZATION.md 19.7–19.9). The
+- **Machines: a machine group's Delete, Rename and Repair** (docs/VIRTUALIZATION.md 19.7–19.9). The
   group's card menu gains Rename… (the group, its members' names and its folder, with the group off; also `machines rename
   GROUP NEW`), Delete… (for good: every member's lock held, the folder renamed out of sight, checked and removed by
   descriptors without following links, then each base nothing else names) and Repair… on a damaged group (a base missing
@@ -565,8 +555,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   in `.shared` was reused without checking it. 34 new texts in all 35 languages. Tests: `vmgroup-test`,
   `tests/vm_group_manage.sh` (37 checks), `tests/machines_group_manage_headless.sh` (20, a headless lord-server in its own
   namespaces), `vm_group_ui_test.mjs`, `vm_group_model_test.mjs`.
-- **Machines: encrypted machines, disposable sessions for any machine, raw disks, Export, consistent backups** (in
-  development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.5, 3.6, 6.2, 6.4, 6.14, 8, 19.7). `machine.json`
+- **Machines: encrypted machines, disposable sessions for any machine, raw disks, Export, consistent backups** (docs/VIRTUALIZATION.md 3.5, 3.6, 6.2, 6.4, 6.14, 8, 19.7). `machine.json`
   schema 16 adds `disposable`, `encrypted`, `disk_format` and `backup`.
   - **Encrypted machines.** "Encrypt this machine" in the New Machine assistant's review. Every disk, the UEFI
     variables and a disposable session's layers are qcow2 with LUKS, the TPM's state is swtpm's own encrypted state,
@@ -603,8 +592,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - Tests: `vm_storage_test.sh` (real QEMU and KVM: keys, a write kept or thrown away, swtpm's encrypted state, export
     and import, hostile exports, an encrypted group, the kept firmware, raw disks), `vmexport-test`, `vmkeysrv-test`,
     `backup-machines-test` (ASan and UBSan) and `vm_storage_model_test.mjs`.
-- **Machines: Install Agent without qemu-guest-agent, the LordOS Guest Tools disc** (in development; latest release
-  0.8.9.5). A Linux machine whose system has no qemu-guest-agent (Debian's own images, LordOS 0.8.9, most desktop
+- **Machines: Install Agent without qemu-guest-agent, the LordOS Guest Tools disc**. A Linux machine whose system has no qemu-guest-agent (Debian's own images, LordOS 0.8.9, most desktop
   installs) stayed on "Waiting for the agent" with nothing to click. Its agent popover now offers **Install Agent from
   Disc**: lord-vm puts the LordOS Guest Tools disc in the machine's CD drive (read-only, only its own copy, whose SHA-256
   is compiled into it; never in a machine locked for anonymity, a non-Linux guest, or while the drive has a disc),
@@ -623,7 +611,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     qemu-guest-agent on the same guest (`server/tests/vm_guest_tools_e2e.sh`); `guesttools-test` reads the image back
     with lord-vm's own ISO reader and checks its hash and the writer's refusals; `guest_tools_install_test.sh` checks
     `install.sh`'s choices on 18 kinds of system; shellcheck is clean.
-- **Monitor: Get Info says what a program is** (in development; latest release 0.8.9.5-beta). A **Description** line
+- **Monitor: Get Info says what a program is**. A **Description** line
   between the command line and the tabs, in the grouped and the plain view, from what the computer already has and
   never the network: LordOS's own programs and the kernel's threads, the app's manifest or `.desktop`/Flatpak
   `Comment` (the person's language when it has one), the well-known system programs (systemd, (sd-pam), dbus, PipeWire,
@@ -652,8 +640,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (`server/src/llm/blockwatch.c`). LordOS's own programs, an interpreter itself and the system's core programs can't be
   blocked. Settings → AI → Sentinela lists the programs with **Remove**. Stopping a program before it runs, and for every
   user, would need a root part (fanotify `FAN_OPEN_EXEC_PERM`): proposed in docs/SENTINELA.md, not built.
-- **Machines: a shell inside the machine, links and notifications from it, and more of the logs** (in development;
-  latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.17, 6.18, 6.19).
+- **Machines: a shell inside the machine, links and notifications from it, and more of the logs** (docs/VIRTUALIZATION.md 6.12, 6.17, 6.18, 6.19).
   - **The agent's shell.** The Shell pane of a machine's window shows a shell inside the guest as the person signed in
     there, over the guest agent's own channel (no network, no SSH, works with Isolated network), with a switch to the
     serial console and New Shell. Linux guests: that person's own login shell in a pty; virtio-win guests: PowerShell in a
@@ -684,7 +671,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     schema 15), `vmgroup-test` (the anonymity lock), `guest_shell_test.sh` (the shell's pty, size, exit status, 2 MB
     with late acknowledgements never past its window, the host's close, the helper's socket), `vm_model_test.mjs`
     (the agent's lines, the red light, the logs' times and zones).
-- **Machines: the app and its ties to the system** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
+- **Machines: the app and its ties to the system** (docs/VIRTUALIZATION.md
   3.3, 3.7, 5.1, 5.3, 5.4, 5.5, 5.7, 6.1, 6.14).
   - **One resource budget for every start.** lord-server checks it on the window's start, Start Without Window,
     `machines start` (through the session and without one) and a group's members: the memory the library's running
@@ -708,7 +695,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     machine's files; Monitor's machine row has Show Machine; a notice with Pause All when the computer leaves the charger
     while machines run; Store → Updates warns before a QEMU update while machines are suspended.
   - Fixed on the way: the Whonix group's Start Fresh dialog counted its snapshots as none.
-- **Machines: machine groups and Whonix, first part** (in development; latest release 0.8.9.5). The parts under the
+- **Machines: machine groups and Whonix, first part**. The parts under the
   Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
   workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the
   gateway. Built so far: the download, its checks and unpacking, the group, the link between its two machines, and the
@@ -760,7 +747,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     breaking it, and the session relinking a restarted gateway. Then still open (solved in the second part, below): neither Whonix member powers off on ACPI's
     power button (checked with the unchanged images: forced off after 120 s), so a group's Shut Down ends as a forced
     power-off for now.
-- **Machines: machine groups and Whonix, second part** (in development; latest release 0.8.9.5; docs/VIRTUALIZATION.md
+- **Machines: machine groups and Whonix, second part** (docs/VIRTUALIZATION.md
   19.0, "Built in G3–G4"). What the first part left, on the decisions the maintainer took on 2026-11-23:
   - **The New Machine card "Whonix (Tor)"** with a "Group · 2 machines" badge, only with KVM on amd64. Choosing it finds
     the newest Whonix release whose signed SHA-512 list verifies, never older than the catalog's floor. A new step,
@@ -794,8 +781,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - Tests: `vm_group_ui_test.mjs`, `vm_whonix_xml_test.sh` (each machine's QEMU and passt arguments against Whonix's own
     XML), and `vm_group_link.sh` now checks the shutdown, the disposable session leaving nothing on disk, and Start Fresh.
     Every new text is in all 35 languages.
-- **Firewall: the Tor gateway of a machine group has its own identity and a rule built in** (in development; latest
-  release 0.8.9.5; isolation layer 4 of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23;
+- **Firewall: the Tor gateway of a machine group has its own identity and a rule built in** (isolation layer 4 of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23;
   docs/FIREWALL.md "The Tor gateway"). The gateway member of a Whonix group (the one with `"uplink": "tor"`) now runs in
   `app-lordos-lordos-vm-tor-<id>.scope`, which the firewall and Monitor read as the app `lordos:tor-gateway`, shown as its
   own row ("Tor gateway · <name>") in Monitor and Settings, in every language; other machines stay `lordos:machines`.
@@ -820,7 +806,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     networks and binds refused, TCP 443 connects, everything refused when `np_local` is full; and its netlink parser) and
     `tests/vm_gateway_fw.sh` (a Whonix group under that policy: Tor works, the gateway's UDP DNS, TCP 53 and LAN
     connections don't).
-- **Protected windows, everywhere a picture leaves** (in development; latest release 0.8.9.5; approved by the maintainer on
+- **Protected windows, everywhere a picture leaves** (approved by the maintainer on
   2026-11-23 as isolation layer 8 of the Whonix group, docs/VIRTUALIZATION.md 19.5, and useful for any window). A
   protected window shows normally on the display and never appears in anything that captures the screen
   (docs/PRIVACY.md, "Protected windows").
@@ -864,7 +850,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Flow: Calculator opened protected is drawn on the display and is the fill in the screenshot, the remote frame, the
     portal still and its window share, Notes beside it captured exactly; new test hook `frame`, only in
     `lord-server-test`); `tests/protect_model_test.mjs`.
-- **Sentinela watches the virtual machines** (in development; latest release 0.8.9.5; approved by the maintainer
+- **Sentinela watches the virtual machines** (in development; approved by the maintainer
   2026-11-23 as layer 9 of the anonymity group's isolation, docs/SENTINELA.md "Machines", docs/VIRTUALIZATION.md 6.28).
   Still off by default and local only. Every 10 s it reads what Machines already exposes (`lord.vm.list()`,
   `lord.vm.stats(dir)`) and per-machine socket counts from the Monitor's thread.
@@ -893,7 +879,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     engine, baselines, the summary's bounds and an
     injected name, the action mapping), and machine cases in the Sentinela notification and Settings scenes. Strings in
     all 35 languages.
-- **Machines: QEMU in its own namespaces, and non-dumpable** (in development; latest release 0.8.9.5-beta; approved by
+- **Machines: QEMU in its own namespaces, and non-dumpable** (approved by
   the maintainer 2026-11-23; docs/VIRTUALIZATION.md 3.3, which promised both). Every machine's QEMU now starts in its own
   user, mount, ipc, uts and net namespaces, and the kernel makes it non-dumpable at exec, so the person's other programs,
   which run as the same user, can no longer read the guest's memory, keys or typing.
@@ -940,8 +926,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     and `process_vm_readv` are refused. `vm-jail-probe --before` runs the old jail for comparison: 9 of those checks fail
     there. `tests/vm_isolation.sh` checks the status fields, the refused reads, `PTRACE_SEIZE` and `process_vm_readv` on
     a real machine; it no longer lists QEMU's descriptors, which the person's programs can't any more.
-- **Web apps: lord-web on WPEPlatform, WPE WebKit's new API** (in development; the latest release is 0.8.9.5-beta;
-  issue #142, maintainer's decision 2026-11-23). Everything lord-web does with WebKit's frames and input now goes
+- **Web apps: lord-web on WPEPlatform, WPE WebKit's new API** (issue #142, maintainer's decision 2026-11-23). Everything lord-web does with WebKit's frames and input now goes
   through one small interface, `server/src/web/webback.h`, with two implementations, one of them built:
   - `webback_platform.c`, on **WPEPlatform** (WPE WebKit 2.50 and later; LordOS will ship its own build of wpewebkit
     2.54 for Debian 13 with both APIs on). lord-web brings its own platform (a `WPEDisplay`, `WPEView`, `WPEToplevel`
@@ -973,8 +958,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     both backends with Debian sid's 2.54.3; lord-web also showed a page in a window of a headless weston on 2.54.3 with
     both backends, by shared memory and by dmabuf. Still to check on LordOS's 2.54 backport and the VM: every web app
     feature, before the backport ships.
-- **WPE WebKit 2.54 with WPEPlatform for Debian 13, built by LordOS** (in development, not published yet; latest
-  release 0.8.9.5). Maintainer's decisions of 2026-11-23 and 2026-11-24, for lord-web's move to WebKit's new API
+- **WPE WebKit 2.54 with WPEPlatform for Debian 13, built by LordOS**. Maintainer's decisions of 2026-11-23 and 2026-11-24, for lord-web's move to WebKit's new API
   ([#142](https://github.com/lordbasex/LordOS/issues/142)). Debian 13's `wpewebkit` 2.48 is built without WPEPlatform,
   so LordOS rebuilds Debian's own 2.54.3-1 source package for trixie as `2.54.3-1~lordos13+2`
   ([docs/WPEWEBKIT.md](docs/WPEWEBKIT.md)), to be published in the LordOS APT repository with its exact source.
@@ -1022,7 +1006,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     key. `tools/release/image-sources.sh` lists a package LordOS rebuilt (version `~lordos<n>+<m>`) with origin
     `lordos` and its `.dsc` in `lordos.org/apt/pool/main/source/`. Docs: WPEWEBKIT.md (new), RELEASING.md ("WPE
     WebKit (LordOS's backport)"), ARCHITECTURE.md's dependency row, SOURCE-OFFER.md, WEBAPPS.md, ROADMAP.md (#142).
-- **Machines: QEMU's seccomp filter is an allowlist** (in development; latest release 0.8.9.5-beta; approved by the
+- **Machines: QEMU's seccomp filter is an allowlist** (approved by the
   maintainer 2026-11-23 as isolation layer 3, for every machine; docs/VIRTUALIZATION.md 3.3). Our filter on QEMU used to
   refuse a list of dangerous calls and allow the rest; now it allows only the calls QEMU was measured to make, checks the
   arguments where it matters, and stops QEMU on anything else, naming the call.
@@ -1092,7 +1076,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     again) through `tests/vm_group_link.sh`.
   - **Not run under it yet**: an Intel vGPU (GVT-g), a bridged tap and hugetlb memory: their calls were read in QEMU's
     source (VFIO's and TUN's request types are in the rules).
-- **Machines: nothing QEMU writes can run** (in development; latest release 0.8.9.5-beta; approved by the maintainer
+- **Machines: nothing QEMU writes can run** (approved by the maintainer
   2026-11-24; docs/VIRTUALIZATION.md 3.3). In QEMU's own mount namespace the machine's `disks/` folder is now bound over
   itself and that bind remounted `noexec,nosuid,nodev` (`vmsandbox.c` `noexec_bind`, from `vm_ns_setup`, after the
   private loader is mounted and only once the user namespace is joined). The kernel then refuses to run a file there
@@ -1118,7 +1102,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     is). `tests/vm_isolation.sh` checks `"noexec_disks":1`. Real machines started with it on the amd64 PC: a Debian 13
     guest with 2D graphics and one with UEFI and a TPM (swtpm), each through boot to login, keys, a snapshot with memory
     and its revert, reset, suspend to a file and resume, and shutdown; a LordOS live machine with 3D graphics (virgl).
-- **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
+- **Machines: vCPU pinning**. Configure → CPU & memory → *Pin cores*, Off or
   Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
   threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores
   and SMT siblings (docs/VIRTUALIZATION.md 3.7.1).
@@ -1151,7 +1135,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 - **Lord Workspaces: a minimized window's line sits centred under its icon, and a quick right click no longer gets
-  the hover list on top of its menu** (in development; latest release 0.8.9.5-beta). Found in the desktop e2e pass on
+  the hover list on top of its menu**. Found in the desktop e2e pass on
   the test VM (ws147). The short line under a minimized window's icon in each display's bar was drawn at the icon
   button's left edge: lord-server places an absolute child without `left`/`right` at the start of its parent (as CSS
   does), not where the parent's `alignItems` would put it, so it now has `left: 8` ((28 − 12) / 2). And a right click
@@ -1159,8 +1143,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   opened the menu and then let the waiting list come up over it: the click and the right click cleared the shown list
   but not the timer. Both now cancel the timer too (`peekCancel` in `components/AppWindows.jsx` and
   `components/TopBar.jsx`). Checked on the VM with screendumps.
-- **Machines: `vm-usb-allow` serves only the person at the computer (Claude Security F1 and F3)** (in development; latest
-  release 0.8.9.5-beta). The root admin action that opens a host USB device read and write for a machine was `A_ANYONE`
+- **Machines: `vm-usb-allow` serves only the person at the computer (Claude Security F1 and F3)**. The root admin action that opens a host USB device read and write for a machine was `A_ANYONE`
   and never checked that the asking session was the one on the monitor, so a non-administrator's session in the
   background (fast user switching) or reached through the remote desktop could take a webcam, a microphone, a smart-card
   reader or a key the person at the seat was using, by hand or through a machine's usb_auto rule. The helper now refuses
@@ -1176,7 +1159,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   world-writable file, a symlink, no file, a forged `monitor` key earlier in the file, names that aren't user names, a cut
   file, and random input under ASan).
 - **Test and developer scripts no longer work in shared, fixed `/var/tmp` folders (Claude Security F6, F7, F12, F14,
-  F15, F16)** (in development; latest release 0.8.9.5-beta). Nothing here ships, but these scripts run as root or as the
+  F15, F16)**. Nothing here ships, but these scripts run as root or as the
   developer, and another local account could create their fixed folders first and swap files in them.
   `server/tests/cgslice_test.c` (root) keeps its socket in `/run/lordos-slicetest`, a folder only root can make and that
   the test checks is a real folder of root's (0711, not a link), and its scratch files and the stand-in `lord-netperm`
@@ -1193,8 +1176,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   only if it is a `lord-server` of this account leading its own group; `reap` skips folders and processes that are not
   this account's. Checked: `sudo build/cgslice-test` 28/28 (and it refuses a link at `/run/lordos-slicetest`), `serve`
   mode, `mh.py start`/`js`/`stop`/`reap` with a real headless session, a forged state file and a hostile folder name.
-- **Security (F9, F13): a LordOS Machines guest's agent port is its administrators', not every desktop account's** (in
-  development; latest release 0.8.9.5-beta; `docs/VIRTUALIZATION.md` 6.17 "LordOS as a guest"). The guest end of
+- **Security (F9, F13): a LordOS Machines guest's agent port is its administrators', not every desktop account's** (`docs/VIRTUALIZATION.md` 6.17 "LordOS as a guest"). The guest end of
   `org.lordos.agent` was `GROUP="video", MODE="0660"` in the `lordos` package's `71-lordos-guest.rules`, in the Guest
   Tools disc's `install.sh` and in Install Agent's `INSTALL_SH` (`lordvm.c`) on LordOS guests. Every LordOS desktop
   account is in `video`, and the port opens only once, so a standard account that opened it first (at boot with
@@ -1209,8 +1191,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   program of a standard account that already holds the port keeps it until it closes it or the machine restarts. Tests:
   `migration_guest_port_test.sh` (now migrations 012 and 013: six more fake trees, run twice under `sh -eu`, and a check
   that no rule gives the port to `video`).
-- **Security (F10): Monitor's "Verified … signed by" seal no longer stands on a scope name** (in development; latest
-  release 0.8.9.5-beta; `docs/MONITOR.md`, origin badges). Monitor gave the pink LordOS-app seal and the app's signer to
+- **Security (F10): Monitor's "Verified … signed by" seal no longer stands on a scope name** (`docs/MONITOR.md`, origin badges). Monitor gave the pink LordOS-app seal and the app's signer to
   any process whose cgroup leaf read `app-lordos-lpk-<id>.scope`, a name any program of the person can pick
   (`systemd-run --user --scope --unit=app-lordos-lpk-<id> ./payload`). Now `mon_scope_parse` (`mon.c`) counts such a scope
   only right inside the session's root-owned subtree (`/system.slice/lordos.service/lordos-session-<uid>/`), where only
@@ -1226,7 +1207,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   program, a Debian program, a `lord-server` the `lordos` package doesn't own, another app's folder, a path out of the
   folder, an unknown owner, an unreadable executable).
 - **The `machines` command no longer lets a guest drive the host terminal, and `machines apply` no longer overflows
-  its stack (Claude Security review of 2026-11-24: F2, F8, F11)** (in development; latest release 0.8.9.5-beta).
+  its stack (Claude Security review of 2026-11-24: F2, F8, F11)**.
   - **F2 (MEDIUM): the guest agent's error text is cleaned.** `machines exec` and `machines cp` printed lord-vm's
     refusal as it came, and that text can carry a hostile qemu-guest-agent's own error (`qemu-guest-agent refused:
     ...`, where `\u001b` decodes to a raw ESC). A compromised guest could write the host clipboard with OSC 52 or fake
@@ -1261,7 +1242,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     fuzz pass of 4000 random streams that checks the output is the same however the input is split and never holds
     a disallowed OSC, a DCS/SOS/PM/APC introducer or a C1 control.
 - **An encrypted machine's key can no longer be read by the person's other programs while it is handed over**
-  (in development; latest release 0.8.9.5-beta; Claude Security F4 of 2026-11-24, MEDIUM; `server/src/vm/vmkeysrv.c`,
+  (Claude Security F4 of 2026-11-24, MEDIUM; `server/src/vm/vmkeysrv.c`,
   `server/src/vm/lordvm.c`). The disk-encryption key went from lord-server to lord-vm, and from lord-vm to QEMU,
   `qemu-img` and swtpm, in anonymous pipes held by dumpable processes; any program of the same user could reopen such
   a pipe through `/proc/<pid>/fd/N` (read access, which Yama's scope 1 doesn't restrict), stopping the holder with
@@ -1274,8 +1255,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (refused, ENXIO), shows a plain pipe being read that way, and a non-dumpable holder's pipe refused (both ends);
   `tests/vm_storage_test.sh` (real QEMU/KVM: encrypted create, start with swtpm, snapshots, clone, export, import and
   an encrypted group) and `tests/vm_snap_store_test.sh` pass with the new hand-off.
-- **lord-web: a hostile shared-memory frame size can no longer overflow lord-web's heap** (in development; latest
-  release 0.8.9.5-beta; Claude Security F5 of 2026-11-24, MEDIUM; `server/src/web/webwin.c`, `webshm.c`,
+- **lord-web: a hostile shared-memory frame size can no longer overflow lord-web's heap** (Claude Security F5 of 2026-11-24, MEDIUM; `server/src/web/webwin.c`, `webshm.c`,
   `webback_platform.c`, new `webframe.h`). The frame copy had stopped clamping each row to the destination, and a
   width just above 2^30 from a compromised WebKit web process wrapped `w * 4` in `int`, so lord-web mapped one page and
   then copied gigabytes into it. Both backends now check every shared-memory frame with `webframe_shm_ok` (sides
@@ -1284,35 +1264,31 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   smaller width, stride and height of the two buffers and never more rows than the destination's size holds.
   `tests/webapp_test.c` adds the report's dimensions (0x40000400 × 1), `INT_MAX` sides, strides under the width, a
   one-byte-short buffer and copies with hostile sizes checked against a guard area.
-- **Settings → Language & Region → Region names each region's language (GitHub #239 follow-up)** (in development;
-  latest release 0.8.9.5-beta). A row named only its country, so the five regions of France (Breton, Catalan, Basque,
+- **Settings → Language & Region → Region names each region's language (GitHub #239 follow-up)**. A row named only its country, so the five regions of France (Breton, Catalan, Basque,
   French and Occitan) all read "France · xx_FR", and Basque was picked by mistake. Each row now reads "Basque · France
   (eu_FR)", with the language and the country in the interface language, sorted by that name, and a search by either
   finds it (`sdk/localename.js` `regionLabel`). The names come from Unicode CLDR through Node.js's ICU,
   written by `tools/gen-language-names.mjs` into a new `languages` catalog in all 35 languages (195 glibc languages).
   Tests: `tests/localename_test.mjs` and the headless `settings_region_scene` (screenshots of the list).
-- **Check This Account no longer fails its delete step on pCloud (GitHub #243 follow-up)** (in development; latest
-  release 0.8.9.5-beta). The check moves its own folder out of the account, and the move's last step removed the
+- **Check This Account no longer fails its delete step on pCloud (GitHub #243 follow-up)**. The check moves its own folder out of the account, and the move's last step removed the
   emptied folder at once; pCloud still lists a file it has just deleted for a moment, so that rmdir said "not empty"
   and the step failed (`cloud.checkDeleteFailed`). A move between disks now tries only that folder's rmdir again on
   ENOTEMPTY, with a short backoff and at most 4.5 s in all, on the copy job's own thread (`server/src/fsops.c`
   `rm_tree_patient`); nothing is walked or deleted again, and a folder that really holds something still fails.
   The Trash and the interface's thread never wait. Test: `build/fsops-test` (a folder that reads ENOTEMPTY once, and
   one that always does).
-- **Screenshots' Options menu opens above the bar the first time (GitHub #237)** (in development; latest release
-  0.8.9.5-beta). The floating bar sits just above the Dock, and on its first open the menu was laid out downward, cut
+- **Screenshots' Options menu opens above the bar the first time (GitHub #237)**. The floating bar sits just above the Dock, and on its first open the menu was laid out downward, cut
   to the little room above the Dock, and moved up only at the next render. A Popover chose its side from its own
   height before it had been laid out (zero) and from its height cut to the room below; it is now drawn invisible until
   it has been laid out, a popover cut to its room counts as not fitting there, and it is shown once it is on its side
   (`sdk/controls.jsx` `Popover`, which every popover of the SDK uses). Test: the headless `screenshots_menu_scene`
   (the menu's box on every frame of the first open, and a screenshot).
-- **A note's or a mail's attachment never runs a program** (in development; #238 follow-up, automated security review).
+- **A note's or a mail's attachment never runs a program** (#238 follow-up, automated security review).
   Opening an attachment that its default Linux app would run (a `.desktop` launcher, an AppImage, a program run
   under Wine, a `.jar`, a script, an installer package; by name or by its detected type) now shows it in Files instead;
   documents, pictures, media and text still open in LordOS's own apps (`sdk/runscode.js`, `openFileWithApps`'
   `untrusted`; `tests/sysopen_untrusted_test.mjs`).
-- **A fullscreen video in Firefox no longer repaints the desktop under it at every frame (#232)** (in development;
-  latest release 0.8.9.5-beta). Firefox draws its page in a subsurface of its window that commits on its own. Since
+- **A fullscreen video in Firefox no longer repaints the desktop under it at every frame (#232)**. Firefox draws its page in a subsurface of its window that commits on its own. Since
   0.8.9.5-beta such a commit repaints its own box in a window, but in a fullscreen window it still repainted all of the
   window's place in the desktop below, which the fullscreen window covers, and on the GPU path painted that part of the
   desktop again and uploaded it at every frame of the video; a window only presented the new frame. That matches the
@@ -1325,7 +1301,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (the subsurface's box), with every frame checked against a full repaint (`LORD_PAINT_VERIFY=1`). Not yet measured on
   a GPU: Firefox's page still can't go to the display by direct scanout, which takes a fullscreen window without
   subsurfaces.
-- **Menus of X11 apps open again (#209; also the menus of #212 and #213)** (in development; latest release 0.8.9.5-beta).
+- **Menus of X11 apps open again (#209; also the menus of #212 and #213)**.
   Since 0.8.9-beta no menu, dropdown, right-click menu or tooltip of an app running under Xwayland appeared: LibreOffice,
   Qt apps with `QT_QPA_PLATFORM=xcb` or without Qt's Wayland plugin (MuseScore 3, AppImages), GTK apps with
   `GDK_BACKEND=x11`, Java and Electron apps such as the Arduino IDE. The menu bar item lit up and nothing opened. The fix
@@ -1336,7 +1312,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Xwayland against a headless `lord-server-test` and reads the screen: shown where X put it, clickable, gone once
   unmapped; it failed before the fix. FeatherPad's File menu with `QT_QPA_PLATFORM=xcb` checked on the CPU and GPU
   paths, and with Qt's Wayland plugin.
-- **The live ISO finds MediaTek Wi-Fi cards such as the MT7921 (#227)** (in development; latest release 0.8.9.5-beta).
+- **The live ISO finds MediaTek Wi-Fi cards such as the MT7921 (#227)**.
   The card's driver (`mt7921e`) bound, but its firmware wasn't on the ISO, so no Wi-Fi interface appeared and Settings →
   Network said the computer had no Wi-Fi adapter. Debian moved MediaTek's firmware out of `firmware-misc-nonfree` into
   `firmware-mediatek`, which `firmware-misc-nonfree` only Recommends, and the ISO is built without Recommends. Both ISOs
@@ -1345,7 +1321,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   graphics package of the Store's missing-firmware map is on the ISO, except the two left out on purpose
   (`firmware-libertas`, `firmware-nvidia-graphics`; the Store still offers them when the kernel asks).
 - **A check mark or any text that comes and goes in a box of its own size wasn't redrawn: Screenshots' Options menu kept
-  its old checks while open (GitHub #237)** (in development; latest release 0.8.9.5-beta). Choosing 5 Seconds saved it,
+  its old checks while open (GitHub #237)**. Choosing 5 Seconds saved it,
   but the check stayed on None until the menu was closed and opened again. React adds and removes a Text's text node
   (`{on ? '✓' : ''}`) instead of setting it to '', and in a Text of a fixed width neither changed the Text's box; the
   text node has no box of its own, so nothing was damaged and the partial repaint left the old pixels (a full repaint,
@@ -1355,13 +1331,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   check mark between three fixed-width Texts and compares each partial repaint with a full one, and the Screenshots
   toolbar scene checks the check follows the choice while the menu stays open.
 - **Backups: a file's icon looked like an empty check box, and a long name pushed the Restore button's label out at
-  both ends (GitHub #231)** (in development; latest release 0.8.9.5-beta). The restore list drew a file as a bare
+  both ends (GitHub #231)**. The restore list drew a file as a bare
   outline, which read as a check box that never checked; it is now a page with lines. The Restore "<name>" button is
   held to 260 px, and its label overflowed and was cut on both sides ("estore “lordos-rclone…"); every SDK `Button`'s
   label now ends with "…" inside the button when the button is held narrower than it (`sdk/components.jsx`). New
   `backup-restore-scene`. Choosing several files or folders to restore at once is a feature request, not in this fix.
-- **Cloud: empty files and empty folders stayed "coming down" in a folder kept on this computer (GitHub #240)** (in
-  development; latest release 0.8.9.5-beta). With In Sync with This Computer (Keep on This Computer), a 0-byte file, an
+- **Cloud: empty files and empty folders stayed "coming down" in a folder kept on this computer (GitHub #240)**. With In Sync with This Computer (Keep on This Computer), a 0-byte file, an
   empty folder and a folder holding only 0-byte files kept the down arrow for ever, on Google Drive and Filen alike.
   rclone keeps no copy of an empty file and no folder for an empty one in its cache (no `vfsMeta` entry, checked with
   rclone's own mount), and a kept path without one read as "still coming". Now a kept path with nothing in the cache is
@@ -1371,8 +1346,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   cloud since the last pass shows kept until the next one (every 5 minutes, or at once on a provider's change notice).
   `cloud-test` checks both cases. rclone's own lines for a mount ("vfs cache: detected external removal of cache file")
   still can't name the account: rclone doesn't say which mount they come from (#183).
-- **Machines: a global security pass over how the new pieces work together** (in development; latest release
-  0.8.9.5-beta; docs/VIRTUALIZATION.md 3.6, 6.2, 7.2, 8; docs/SENTINELA.md "Machines"). Each item had been reviewed alone;
+- **Machines: a global security pass over how the new pieces work together** (docs/VIRTUALIZATION.md 3.6, 6.2, 7.2, 8; docs/SENTINELA.md "Machines"). Each item had been reviewed alone;
   this pass looked at the chains between them, with a hostile guest, a hostile program of the same account and hostile
   downloads or exports in mind.
   - **An encrypted machine's or a disposable session's memory is never saved at the computer's stop.** The computer's
@@ -1407,13 +1381,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `agent-fuzz` now also fuzzes file offers, file names, PNG headers, HTML and the clipboard's cleaning (`ag_clip_clean`,
     moved out of `lordvm.c`), which found `ag_drop_name` reading before its buffer for an output smaller than a file's
     extension (never with lord-vm's own sizes).
-- **A test's lord-server never drives LordOS Studio's camera for apps** (in development). A headless session started
+- **A test's lord-server never drives LordOS Studio's camera for apps**. A headless session started
   by a test (`--timeout`, or the test hooks of `lord-server-test`) also started the loopback's lord-studio on the
   computer's real `/dev/video50`, which the person's own session may be feeding to a video call; it now leaves the
   loopback alone (`mstudio_hub_off`). `tests/theme_switch_headless.sh` waits for the log lines it checks instead of
   fixed sleeps, and its Wayland client lasts as long as the session: both failed on a loaded computer.
-- **Escape that closes a menu no longer reaches the app or machine behind it** (in development; latest release
-  0.8.9.5-beta). Closing a menu-bar, Dock or right-click menu with Escape also sent Escape to the window in front: a
+- **Escape that closes a menu no longer reaches the app or machine behind it**. Closing a menu-bar, Dock or right-click menu with Escape also sent Escape to the window in front: a
   Linux app, or the guest of a machine in Machines (found while checking Machines' window menus). A shell menu now
   holds the keyboard while it shows, like search and system prompts do (`holdKeyboard()` in `@lordos/runtime`, used by
   the Lord Flow and Lord Classic menus, which Celeste and Workspaces share; docs/LAYERS.md); its keys, arrows and
@@ -1427,11 +1400,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Tests: `make -C server test` rebuilds `build/lord-vm-testpaths`**, so the group and storage suites never run a stale
   one.
 - **Machines: `machines cp` out of a machine refused every file over 128 KB** ("the machine gave a strange answer"): a
-  whole 128 KB piece was taken for one too long (in development).
+  whole 128 KB piece was taken for one too long.
 - **Machines: a command that went away filled its machine's `lord-vm.log`** with the same "not delivered" line several
-  times a second; now said once per client (in development).
+  times a second; now said once per client.
 - **Machines: what the display engine and the guest helper take from the other side is fuzzed, and three faults it found
-  are fixed** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 8, 12).
+  are fixed** (docs/VIRTUALIZATION.md 8, 12).
   - **The session's log took QEMU's words raw.** A console's label and the text of QEMU's refusals (a sound listener
     refused, a new size refused, a missing console) went into the log as QEMU sent them, so a QEMU taken over by its
     guest could write new lines, escape sequences or a forged entry there. They now go in as one line of printable ASCII,
@@ -1444,15 +1417,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Machines: a machine with an Intel graphics card (GVT-g vGPU) hung at every start** since QEMU's seccomp allowlist: the
   starting child asked Landlock's version after its jail, a call the allowlist sends to lord-vm, which wasn't listening yet.
   Found by the first run of a vGPU machine under the allowlist (a Debian 13 guest on a scratch vGPU, 2026-11-24).
-- **`machines cp` out of a machine works again for files over 128 KB** (in development): a check meant to refuse a guest
+- **`machines cp` out of a machine works again for files over 128 KB**: a check meant to refuse a guest
   answer that doesn't fit took every full 128 KB piece for one, so such a copy failed with "a strange answer".
 - **Sentinela: a false "weaker sandbox" alert on every running machine** (in development). lord-vm is non-dumpable since
   QEMU's namespaces, so lord-server could no longer read which program a machine's engine runs and never counted one as
   checked. lord-server now keeps a pidfd of every lord-vm it starts (a machine started without a window sends its own) and
   checks the machine's socket against it; after lord-server restarts, a running engine is checked again only when the
   kernel places it in the machine's own scope. A mismatch still raises the alert. Checked live on a real KVM machine.
-- **Machines: an arm64 machine with the compatible devices now boots** (in development; latest release 0.8.9.5-beta;
-  docs/VIRTUALIZATION.md 6.22, 12). Its disks were SATA, and the arm64 UEFI firmware (AAVMF) has no SATA driver, so it
+- **Machines: an arm64 machine with the compatible devices now boots** (docs/VIRTUALIZATION.md 6.22, 12). Its disks were SATA, and the arm64 UEFI firmware (AAVMF) has no SATA driver, so it
   stopped at the firmware's shell; every import of another app's arm64 machine starts on these devices. On arm64 they are
   now NVMe disks (one controller each, the disk's own serial kept) and a USB CD/DVD that can still be changed while it runs:
   what the firmware starts from and what arm64 guests without virtio drivers carry. Configure and the import's plan say
@@ -1461,13 +1433,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   of Export and Bring In were drawn inside their sheets, a few lines tall. A sheet is now never taller than its window (its
   title and buttons stay, its body scrolls), and the pickers cover the window. Every sheet and dialog of the library checked
   at that size (`server/tests/machines_sheets_headless.sh`).
-- **Machines: a machine started right after a large import timed out** (in development). `qemu-img convert` leaves the
+- **Machines: a machine started right after a large import timed out**. `qemu-img convert` leaves the
   disk in the page cache, and QEMU's first open of it with `O_DIRECT` waited behind gigabytes of writeback past its 20 s
   to answer QMP. The import now writes the converted disk out (`fsync`) before putting it in place. Found while checking
   a migration from a 20 GB whole-disk image of a Linux PC (docs/VIRTUALIZATION.md 6.11), which now imports and boots.
 
-- **Machines: a shared folder that stops working while the machine runs is said in its window** (in development; the
-  latest release is 0.8.9.5-beta): when a folder's virtiofsd ended (killed, crashed), the folder was gone from the guest
+- **Machines: a shared folder that stops working while the machine runs is said in its window**: when a folder's virtiofsd ended (killed, crashed), the folder was gone from the guest
   until the next start and only lord-vm's log said it. lord-vm now tells the machine's window (`VMN_SHARE_LOST`), whose
   notice bar says "The transfer folder stopped working in this machine…" or "The shared folder “TAG” stopped working…",
   in every language. Found by the new agent kill tests.
@@ -1479,7 +1450,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Its results file names passt's version from its package when passt prints none.
 - **Machines: lord-vm builds on arm64 without warnings again**: three paths of a machine group (a member's base, its disks
   and log folders) were cut silently when too long, which gcc on the Pi warned about; they are refused instead.
-- **Machines: LordOS 0.8.9 inside a machine waited for the agent forever** (in development). Nothing in that LordOS
+- **Machines: LordOS 0.8.9 inside a machine waited for the agent forever**. Nothing in that LordOS
   spoke to Machines: it had neither qemu-guest-agent nor `lordos-guest.service` (the "opened, closed" in the log at
   start is the UEFI firmware's own virtio-serial driver, not the system). 0.8.9.5 added the service, but its udev rule
   (`uaccess`) gives the agent port only to the person at a logind seat, and LordOS's own sessions aren't logind seats, so
@@ -1489,8 +1460,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `lordos-guest` 9 takes the clipboard's text from the guest's own lord-server (`lordos-guestwin.sock` says `clipboard`;
   only the program that holds the agent port and passes it along gets it, never a secret; the helper is non-dumpable). A 0.8.9 guest gets it by updating LordOS inside
   the machine, or right away with the disc above.
-- **Monitor: opening a large group in Processes no longer freezes the desktop** (in development; latest release
-  0.8.9.5-beta). Expanding the Terminal's group with about 240 programs stopped the pointer for about a second, and the
+- **Monitor: opening a large group in Processes no longer freezes the desktop**. Expanding the Terminal's group with about 240 programs stopped the pointer for about a second, and the
   list's once-a-second redraw did it again while the group stayed open: the table drew every row at once (about 12 800
   nodes). The SDK's `Table` now draws only the rows in sight plus a margin of six (`sight`, told by the tab's
   ScrollView), at most four new rows per pass with those in sight first, and keeps a row whose drawn values didn't
@@ -1502,8 +1472,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   hands virtiofsd was `<runtime>/lordos-vm/fs<N>.sock`, the same name for every machine, so a second start unlinked and
   re-made the first's (found while starting six test machines at once: "socket: Address already in use", then "can't
   reach virtiofsd"). It is now named after the machine's id.
-- **Downloads: a GitHub release file refused now and then with a 403 is asked for again** (in development; the latest
-  release is 0.8.9.5-beta). Reported by the maintainer: Machines → New machine → the LordOS 0.8.9 card said "Couldn't
+- **Downloads: a GitHub release file refused now and then with a 403 is asked for again**. Reported by the maintainer: Machines → New machine → the LordOS 0.8.9 card said "Couldn't
   download the list of images: the server answered 403". `vm-image-list` downloads the release's `SHA256SUMS` and
   `SHA256SUMS.sig` from `github.com/…/releases/download/…`, which answers 302 to a signed URL of about 950 bytes on
   `release-assets.githubusercontent.com` (an Azure SAS plus a JWT valid for 5 minutes).
@@ -1526,8 +1495,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     requests to the original URL and a new signed URL each time, after 2 s; a 503 once; always 403: one try and two
     more, then the 403 reported; a 404 after a redirect and a 403 without one not asked again; a redirect loop still
     stops after 5.
-- **Machines: the LordOS card reads its signed image list from lordos.org** (in development; the latest release is
-  0.8.9.5-beta; maintainer's decision 2026-11-23). GitHub's release downloads sometimes answer 403 on their signed
+- **Machines: the LordOS card reads its signed image list from lordos.org** (maintainer's decision 2026-11-23). GitHub's release downloads sometimes answer 403 on their signed
   redirect, and the card then could not read `SHA256SUMS` or `SHA256SUMS.sig` at all.
   - **What changed.** The `lordos` entry of `assets/machines/systems.json` has a `list` for each architecture,
     `{ "dir": "https://lordos.org/releases/v0.8.9-beta/", "sums": "SHA256SUMS.txt", "signature": "SHA256SUMS.sig" }`:
@@ -1553,8 +1521,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     a name, on a maker's entry or on a `sumsPattern` entry is refused. `vm_catalog_test.mjs`: both architectures'
     copies, the same tag as the ISO folder, an extension on the list, GitHub kept as the fallback, and only LordOS's
     entry has one. Docs: `docs/VIRTUALIZATION.md` 3.9 ("The LordOS card"), `docs/RELEASING.md`.
-- **Machines: the library draws its machines' place from the first frame, with placeholders until they are read**
-  (in development; the latest release is 0.8.9.5-beta). Reported by the maintainer: opened again (after logging back
+- **Machines: the library draws its machines' place from the first frame, with placeholders until they are read**.
+  Reported by the maintainer: opened again (after logging back
   in), the library with the New machine card, an Ubuntu machine and a guest of the other system took 1 to 2 seconds to
   look right.
   - **What made it slow.** Not the reads: on a headless `lord-server-test` with two machines every `lord.vm` call the
@@ -1683,16 +1651,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `qemu-3d-stop`; nothing said with tools → `qemu-3d-crash`; Shut Down asked → `host-shutdown`; …), with lord-vm's
     echo received each time and the disk check at each next start. Not yet checked with a real 6.12.117 guest with 3D.
 ### Changed
-- **Machines: QEMU's render node by descriptor** (in development; docs/VIRTUALIZATION.md 3.3): lord-vm opens and checks the GPU's
+- **Machines: QEMU's render node by descriptor** (docs/VIRTUALIZATION.md 3.3): lord-vm opens and checks the GPU's
   render node, QEMU reopens that descriptor (`rendernode=/proc/self/fd/N`) and its Landlock rule is made from it, so the
   device checked is the only one QEMU may open.
-- **Machines: an installer disc is read out of the desktop's process** (in development; docs/VIRTUALIZATION.md 5.2). The
+- **Machines: an installer disc is read out of the desktop's process** (docs/VIRTUALIZATION.md 5.2). The
   disc a person chooses is untrusted; its boot files are now read by `lord-vm --iso-probe` in seccomp strict mode (it can
   only read the mapped file and write one fixed 64-byte answer), and lord-server only checks that answer. Same results
   on real discs.
 
-- **Machines: a guest's picture is taken less often when it doesn't change or no window shows it** (in development;
-  the latest release is 0.8.9.5-beta). Seen on the maintainer's PC: a guest on an Intel GVT-g vGPU in apps mode with a
+- **Machines: a guest's picture is taken less often when it doesn't change or no window shows it**. Seen on the maintainer's PC: a guest on an Intel GVT-g vGPU in apps mode with a
   static window kept lord-server at ~28 % of a core and QEMU at 10–28 %, because QEMU's vfio display hands over the whole
   picture on every refresh (~33 a second) whether anything changed or not, and each one was copied and compared on the
   iGPU and went back and forth through lord-vmdisplay.
@@ -1723,8 +1690,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     again (`apps/machines/vmwindow.jsx`). With the timer gone, lord-server's main thread spent ~2.5 % of a core with
     that guest on screen or minimized.
 
-- **Machines: a guest's memory uses 2 MB hugetlb pages when the administrator reserved enough of them** (in
-  development). lord-vm reads `/proc/meminfo` at start: when all of the machine's memory fits in free, unreserved 2 MB
+- **Machines: a guest's memory uses 2 MB hugetlb pages when the administrator reserved enough of them**. lord-vm reads `/proc/meminfo` at start: when all of the machine's memory fits in free, unreserved 2 MB
   hugetlb pages (`vm.nr_hugepages`), QEMU gets `memory-backend-memfd,hugetlb=on,hugetlbsize=2M,prealloc=on` (shared when
   the machine has a shared folder or the transfer folder), allocated whole at start; otherwise the memory is backed as
   before, never a failed start. The session log says which (`memory: …`). Nothing changes on a computer without
@@ -1737,7 +1703,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     4 KB pages), and touching new memory took a third longer. Fixed by the next entry.
   - Tests: `build/vmmem-test` (`/proc/meminfo`'s fields, hugetlb only when it all fits).
 
-- **Machines: a machine with a shared folder or the transfer folder gets 2 MB pages too** (in development; the system
+- **Machines: a machine with a shared folder or the transfer folder gets 2 MB pages too** (the system
   setting approved by the maintainer on 2026-11-23). Two changes, each useless without the other:
   - The `lordos` package sets `/sys/kernel/mm/transparent_hugepage/shmem_enabled` to `advise`
     (`/usr/lib/tmpfiles.d/lordos-thp.conf`, applied at every boot; migration `011-0.8.9.6-shmem-huge-pages.sh` applies
@@ -1756,8 +1722,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     touching and shuffling 1 GB took 1.00 s before and 0.52 s now. docs/VIRTUALIZATION.md 3.7.2.
   - Tests: `build/vmmem-test` (the backend's `-object`, `shmem_enabled`'s value read).
 
-- **Machines: a machine's disks get an I/O thread of their own and bypass the host's cache on ext4 and XFS** (in
-  development). The system disk and the data disks (virtio-blk) are served by one QEMU I/O thread instead of its main
+- **Machines: a machine's disks get an I/O thread of their own and bypass the host's cache on ext4 and XFS**. The system disk and the data disks (virtio-blk) are served by one QEMU I/O thread instead of its main
   loop (which also runs the display, QMP and the other devices). On ext4 and XFS, when the file takes `O_DIRECT`, the
   disk files are opened with `cache.direct` and Linux native AIO, so the guest's data isn't cached twice; elsewhere
   (btrfs, tmpfs, a network file system) as before. Discard stays on; io_uring stays off (QEMU's seccomp filter refuses
@@ -1849,7 +1814,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - Three new texts (`store.installed.noneDebian`, `noneFlathub`, `noneWeb`), in all 35 languages.
 
 ### Removed
-- **Machines: the Android card** (in development; latest release 0.8.9.5-beta). The maintainer removed it on 2026-11-24:
+- **Machines: the Android card**. The maintainer removed it on 2026-11-24:
   it added nothing. Gone: its entry in `assets/machines/systems.json` (the pinned Bliss OS 16.9.7 ISO), the assistant's
   "archived image" notice under a download (`catalog.js` `noticeOf`, `machines.dl.notice.archived` in all 35
   languages), its tests in `vm_catalog_test.mjs` and `vmcatalog-test` (the pinned-card path is now tested with a made-up
@@ -1858,14 +1823,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   shows six cards, arm64 five.
 
 ### Documentation
-- **Roadmap: choosing what a provider's mail, calendars and contacts account syncs** ([#241](https://github.com/lordbasex/LordOS/issues/241); in
-  development, not started; latest release 0.8.9.5-beta). `docs/ROADMAP.md`, "Next release after 0.8.9.5": setup asks
+- **Roadmap: choosing what a provider's mail, calendars and contacts account syncs** ([#241](https://github.com/lordbasex/LordOS/issues/241); not started). `docs/ROADMAP.md`, "Next release after 0.8.9.5": setup asks
   for Mail, Calendars (which ones) and Contacts; a per-collection `subscribed` flag in `lord-maild` (`pim.c`, `dav.c`)
   with a migration of `pim/colls` that reads old lines as subscribed; labels by what is synced ("<provider> – Calendar",
   "<provider> – Contacts"); Mail's sidebar shows the account only when it carries mail.
 
-- **Hardware reports: #245, #230 and the graphics card report #235 (`docs/HARDWARE-REPORT.md`, updated 2026-11-24),
-  in development (the latest release is 0.8.9.5-beta).** #245 adds an Acer Aspire R3-131T laptop with an Intel Celeron
+- **Hardware reports: #245, #230 and the graphics card report #235 (`docs/HARDWARE-REPORT.md`, updated 2026-11-24).** #245 adds an Acer Aspire R3-131T laptop with an Intel Celeron
   N3050 (Braswell) and 2 GB of memory, booting from eMMC on 0.8.9.5-beta: every row works (GPU, display, storage,
   network, Wi-Fi, Bluetooth, audio, power, isolation; suspend unchecked), five browser pages used about 1.3 GB, and
   the Fn brightness keys do nothing (listed as open). #230 is the third report of #105's ASUS K72F, a fresh install on
@@ -1948,7 +1911,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   running guest.
 
 ### Tests
-- Machines (in development): `server/tests/vm_usb_e2e.sh` passes again with the seat check (Claude Security F1, F3).
+- Machines: `server/tests/vm_usb_e2e.sh` passes again with the seat check (Claude Security F1, F3).
   Part B's headless lord-server runs with the development-only `LORD_IDLE_HEADLESS=1` (as `tests/lock_e2e.sh` does), so
   it counts as the session on the screen and the usb_auto rule connects the device at the next start; without it the
   rule was skipped (lord-server runs usb_auto only on the screen) and "the rule connects it at the next start" failed.
@@ -1958,19 +1921,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   QEMU already held the node when the shell looked). Run on the RX 580 PC on 2026-11-25 with a Logitech C930e that
   nothing was using (hub 05e3:0608 for the refusals): 38 passed, 0 failed, including the guest capturing 30 frames of
   640x480. `vm-usb-cli` as `nobody`, as `glk1` (an account not on the monitor) and as root answers `ERR vm.usbNotAtSeat`.
-- Machines (in development): `tools/vm/e2e/machines/storage-fs.sh` with `MKFS_ROOT` (btrfs-progs and xfsprogs
+- Machines: `tools/vm/e2e/machines/storage-fs.sh` with `MKFS_ROOT` (btrfs-progs and xfsprogs
   unpacked with `apt-get download` + `dpkg -x`, not installed) runs mkfs with `MKFS_ROOT`'s library folders on
   `LD_LIBRARY_PATH`, so the unpacked `libinih1` and `liburcu8t64` are found; before, mkfs.btrfs and mkfs.xfs failed to
   start on a computer without those libraries. Only mkfs gets that path. Run on the RX 580 PC on 2026-11-25: btrfs,
   compressed btrfs and XFS each mounted `nosuid,nodev`, 22 passed, 0 failed. `server/tests/vm_slice.sh` (private
   `mktemp` folders) 12 passed, 0 failed.
-- Machines (in development): `vmkboot-test` (direct kernel boot's checks, ASan and UBSan, a random pass), schema 21 in
+- Machines: `vmkboot-test` (direct kernel boot's checks, ASan and UBSan, a random pass), schema 21 in
   `vm-test`, the requirements, Guest can see and Start Linux directly in `vm_model_test.mjs`;
   `tools/vm/e2e/machines/kernel-boot.py` (real QEMU/KVM: a guest's kernel taken out with `machines cp`, started directly
   with UEFI and BIOS, a clone, the switch off, the refusals) and `server/tests/machines_see_headless.sh` (screenshots of
   Guest can see, Start Linux directly and both Requirements pages).
 
-- **Machines: three fuzz harnesses for the guest's side** (in development; docs/VIRTUALIZATION.md 8, 12), in
+- **Machines: three fuzz harnesses for the guest's side** (docs/VIRTUALIZATION.md 8, 12), in
   `make -C server test`, each built with ASan and UBSan and checked by taking a bounds check out on purpose (it failed).
   `vmdisplay-fuzz` plays a hostile QEMU against lord-vmdisplay in its own sandbox: about 12,000 seeded calls a run on the
   display listener, its shared-memory interface and both sound listeners, with edge values, wrong signatures, pipes and
@@ -1981,7 +1944,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   every frame kind of the agent's channel, both ends (500,000 checks), and cuts a stream of frames anywhere.
   `guest-dbus-test` gained a mutation pass over well-formed D-Bus messages.
 
-- **Two tests made steady on a busy computer** (in development). `webreg-test`'s stand-in web runtime wrote the files the
+- **Two tests made steady on a busy computer**. `webreg-test`'s stand-in web runtime wrote the files the
   test reads in place, so a loaded computer let the test read an empty one: it now writes them whole and renames them, and
   each wait for one may last 10 s (it ends as soon as the file is there; its content is still checked). `wlperf`'s frame rate
   check shared its lord-server with the paint check, which repaints every frame a second time: with a load of about 24 it
@@ -1990,7 +1953,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Machines: the boot matrix's compatible-devices rows** `tcg-compat` and `other-tcg-compat-<arch>`, and two rows of the
   QEMU arguments test (the compatible devices on arm64, and with a data disk).
 - **Machines: an end-to-end harness, a boot matrix and kill tests** (`tools/vm/e2e/machines/`, its README says how other
-  tests use it; docs/VIRTUALIZATION.md 12; in development, the latest release is 0.8.9.5-beta).
+  tests use it; docs/VIRTUALIZATION.md 12).
   - **The harness** (`mh.py`): a real headless session, `build/lord-server-test` with the real default theme, started in
     its own user and mount namespaces (an empty folder over the person's home, a tmpfs over their runtime folder, a
     private `HOME` and `XDG_RUNTIME_DIR` under `/var/tmp/lordos-m100-e2e/`), so it never sees the person's files, machines
@@ -2066,7 +2029,6 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   and the general Installed with its Flathub and Web apps filters in a headless lord-server (`tests/store_scene/installed.js`;
   `pre.js` seeds two Flatpak and two web apps and installs nothing). Checked in Spanish, light and dark, on 2026-11-23,
   and the second column in Arabic (right to left). Not yet on a real display or the VM.
-In development; the latest release is 0.8.9.5-beta.
 
 ### Fixed
 
@@ -2134,8 +2096,7 @@ In development; the latest release is 0.8.9.5-beta.
     native app alone; `PERF_APPS`). `build/uevent-test` covers `video4linux`, `build/fsasync-test` `fsasync_submit_fn`.
 ### Added
 
-- **A performance profile per machine, applied inside a guest by the LordOS guest tools** (in development; the latest
-  release is 0.8.9.5-beta). Approved by the maintainer on 2026-11-23 (Machines performance, item 5). Configure → Guest
+- **A performance profile per machine, applied inside a guest by the LordOS guest tools**. Approved by the maintainer on 2026-11-23 (Machines performance, item 5). Configure → Guest
   agent → **Performance profile**, shown for every guest (the guest tools w11, the Linux helper 7), off by default (machine.json
   `perf_profile`, schema 13, written only when on; `lord-vm --set DIR --perf-profile on|off`; `lord.vm.set`
   `perfProfile`). Details in `docs/VIRTUALIZATION.md` 7.1.4.
@@ -2196,8 +2157,7 @@ In development; the latest release is 0.8.9.5-beta.
     warning and import only system DLLs (powrprof added). The tools' part was checked in the maintainer's guest on
     2026-11-23 ("performance profile is on (applied: power plan visual effects transparency; refused: nothing)"); the
     search script and the Linux helper's part are not yet checked in a running guest.
-- **Machines suggests a vCPU count from what a machine really uses** (in development; the latest release is
-  0.8.9.5-beta). Approved by the maintainer on 2026-11-23, after his guest with 10 vCPUs idled at 10 to 28 % of one
+- **Machines suggests a vCPU count from what a machine really uses**. Approved by the maintainer on 2026-11-23, after his guest with 10 vCPUs idled at 10 to 28 % of one
   core in apps mode with a text editor. Details in `docs/VIRTUALIZATION.md` 6.27.
   - **Measured by lord-vm**: the CPU time of QEMU's vCPU threads (`CPU <n>/KVM`), read once a minute while the machine
     runs from their `/proc/<qemu>/task/<tid>/stat` files, opened before lord-vm's own Landlock and re-read with `pread`
@@ -2216,8 +2176,7 @@ In development; the latest release is 0.8.9.5-beta.
   - Texts in all 35 languages (Machines settings' "half" note updated to say cores, 6 at most).
   - Tests: `build/vmcpu-test` (new, in `make -C server test`), `tests/vm_model_test.mjs`, `tests/vm_profiles_test.mjs`.
 
-- **Renaming a machine renames its folder and its transfer folder too** (in development; the latest release is
-  0.8.9.5-beta). Asked by the maintainer on 2026-11-23: a guest machine renamed in Configure → General kept its folder
+- **Renaming a machine renames its folder and its transfer folder too**. Asked by the maintainer on 2026-11-23: a guest machine renamed in Configure → General kept its folder
   `~/Machines/<old name>.lordvm` and its transfer folder `~/Machines/Transfer/<old name>`, which Files kept showing
   under the old name. Details in `docs/VIRTUALIZATION.md` 6.26.
   - **With the machine off** the name, then the folder `<name>.lordvm` (named as a new machine's is, `vm_folder_name`)
@@ -2259,7 +2218,7 @@ In development; the latest release is 0.8.9.5-beta.
     renamed and started again.
 
 - **Monitor → Processes: Grouped, a steady list, who started each process, origin badges, filters and rolling
-  statistics** (in development; the latest release is 0.8.9.5-beta). Asked by the maintainer: a browser shows as
+  statistics**. Asked by the maintainer: a browser shows as
   twenty rows, and ending it meant ending each one. Details in `docs/MONITOR.md` ("Grouped view" to "Rolling
   statistics").
   - **Grouped** (next to Mine | All, combined with either, remembered): one row per app with an arrow that opens its
@@ -2305,7 +2264,7 @@ In development; the latest release is 0.8.9.5-beta.
   - Strings in all 35 languages. Tests: `tests/monitor_procgroup_test.mjs` (87 checks), `tests/monitor_grouped_scene.mjs`
     (22 checks), `build/procctl-test` (the owner lookup and the component scopes); screenshots with
     `tests/monitor_headless.sh` (a made-up list, nothing signalled).
-- **Sentinela, the process guard (phase 1; in development, the latest release is 0.8.9.5).** Approved by the maintainer
+- **Sentinela, the process guard (phase 1; in development).** Approved by the maintainer
   on 2026-11-23 with three new pieces: llama-server as a local model engine in its own sandbox, Qwen3 models shipped as
   signed packages checked by SHA-256, and the service that reads the Monitor's process data. Off by default: Settings →
   AI has two pages now, Voice and Sentinela (`apps/settings/Sentinela.jsx`). Design, privacy and the sandbox in
@@ -13120,7 +13079,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.5-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6-beta...HEAD
+[0.8.9.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.5-beta...v0.8.9.6-beta
 [0.8.9.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.4-beta...v0.8.9.5-beta
 [0.8.9.4-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.3-beta...v0.8.9.4-beta
 [0.8.9.3-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.2-beta...v0.8.9.3-beta
