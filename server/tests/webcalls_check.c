@@ -8,7 +8,8 @@
  * (webhints_variant), each main-frame response's Accept-CH remembered and sent to it (as webhints_response does), the
  * navigator.userAgentData script (webhints_script_new) and the call log's scripts and bridge (webcalls_add_scripts),
  * whose lines it prints as lord-web writes them ("webcall: ..."). WebRTC and getUserMedia on, a camera or microphone
- * request allowed (the pages use no real device: a canvas and WebAudio). With a throwaway HOME and WebKit's sandbox on.
+ * request allowed (the pages use no real device: a canvas and WebAudio; WEBCALLS_MOCK_CAPTURE=1 gives WebKit's mock camera
+ * and microphone instead, for tests/webcalls_jitsi.py). With a throwaway HOME and WebKit's sandbox on.
  * It ends when the page's title becomes "done" (exit 0, the title printed) or after seconds (exit 1). */
 #include "../src/web/web.h"
 #include "../src/web/webcall.h"
@@ -89,6 +90,9 @@ int main(int argc, char **argv) {
     webpage_user_agent(WEBREG_UA_CHROME, machine, LORD_VERSION, ua, sizeof ua);
     WebKitSettings *st = webkit_settings_new_with_settings("user-agent", ua, "enable-media-stream", TRUE, "enable-webrtc", TRUE,
                                                            "enable-mediasource", TRUE, "media-playback-requires-user-gesture", FALSE, NULL);
+    /* WEBCALLS_MOCK_CAPTURE=1 (tests/webcalls_jitsi.py): WebKit's own mock camera and microphone, for a real call from a
+     * machine without devices; never in lord-web */
+    if (getenv("WEBCALLS_MOCK_CAPTURE") && !strcmp(getenv("WEBCALLS_MOCK_CAPTURE"), "1")) webkit_settings_set_enable_mock_capture_devices(st, TRUE);
     WPEDisplay *disp = wpe_display_headless_new();
     WebKitWebView *v = g_object_new(WEBKIT_TYPE_WEB_VIEW, "display", disp, "web-context", ctx, "network-session", session, "settings", st, NULL);
     WebKitUserContentManager *ucm = webkit_web_view_get_user_content_manager(v);
