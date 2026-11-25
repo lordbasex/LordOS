@@ -3,7 +3,8 @@
  * The key is 32 random bytes as 64 lowercase hex digits (vm_key_valid), made here, kept in the session keyring by
  * lord-vault (owner "machines", service "machines:<id>": the machine's id, or a group's id for its members) and read
  * back from it by lord-server's own C code on a worker thread (vc_request_wait): it never reaches JS. lord-vm gets it on
- * a pipe (--key-fd). Here it lives for VMKEY_TTL_S in one locked page that never goes to a core dump, then is wiped.
+ * a socketpair (--key-fd), which no other program of the person's can reopen through /proc/<pid>/fd. Here it lives for
+ * VMKEY_TTL_S in one locked page that never goes to a core dump, then is wiped.
  * The one way in from JS is vmkey_enter: the recovery key the person types to bring an exported machine in (a protected
  * window), checked and kept like the others. */
 #ifndef LORD_VM_VMKEYSRV_H
@@ -25,7 +26,9 @@ int vmkey_enter(const char *id, const char *typed, const char *name);
 void vmkey_forget(const char *id);
 /* VMK_* of id */
 int vmkey_state(const char *id);
-/* a pipe's read end (O_CLOEXEC) holding id's key when it's ready, else -1 */
+/* one end of an AF_UNIX socketpair (O_CLOEXEC) holding id's key, then EOF, when it's ready, else -1. A socket, not a
+ * pipe: a pipe can be reopened through /proc/<pid>/fd/N by the person's other programs while lord-server or its child
+ * before exec holds it */
 int vmkey_pipe(const char *id);
 /* wipe every key held here (the session locks) */
 void vmkey_wipe_all(void);

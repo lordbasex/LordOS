@@ -6,10 +6,16 @@
 #include "../src/vm/machine.h"
 #include "../src/sec/json.h"
 
+#include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -73,6 +79,40 @@ static int read_pipe(const char *id, char out[80]) {
     return (int)n;
 }
 
+/* another program of the person's (here: this test) reopens fd of a child holding it, through /proc/<pid>/fd, the way
+ * CLAUDE-SECURITY F4 read the key: the bytes it got (-1: the open was refused, errno in *err). The child is dumpable
+ * unless nondump (lord-vm and every reader of its pipes: non-dumpable) */
+static int reopen_from(int fd, int nondump, int *err) {
+    int go[2], hold[2];
+    if (pipe(go) || pipe(hold)) return -2;
+    pid_t pid = fork();
+    if (pid < 0) return -2;
+    if (!pid) {
+        close(go[0]);
+        close(hold[1]);
+        if (nondump) prctl(PR_SET_DUMPABLE, 0);
+        char c = 1;
+        if (write(go[1], &c, 1) != 1) _exit(1);
+        while (read(hold[0], &c, 1) < 0 && errno == EINTR) {}
+        _exit(0);
+    }
+    close(go[1]);
+    close(hold[0]);
+    char c, p[64], buf[80];
+    int n = -1;
+    *err = 0;
+    if (read(go[0], &c, 1) == 1) {
+        snprintf(p, sizeof p, "/proc/%d/fd/%d", (int)pid, fd);
+        int r = open(p, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        if (r < 0) *err = errno;
+        else { ssize_t k = read(r, buf, sizeof buf); n = k > 0 ? (int)k : 0; close(r); }
+    }
+    close(go[0]);
+    close(hold[1]);
+    waitpid(pid, NULL, 0);
+    return n;
+}
+
 int main(void) {
     const char *A = "11111111-2222-4333-8444-555555555555", *B = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", *C = "99999999-8888-4777-8666-555555555555";
     char k1[80], k2[80];
@@ -126,6 +166,31 @@ int main(void) {
     for (int i = 0; i < 20; i++) if (took[i]) { int st = wait_state(ids[i]); CHECK(st == VMK_READY || st == VMK_NONE); }
     for (int i = 0; i < 20; i++) if (!took[i]) { CHECK(vmkey_new(ids[i], "m") == 0); CHECK(wait_state(ids[i]) == VMK_READY); }
     CHECK(bad_requests == 0);
+    /* F4: the key lord-vm gets can't be reopened through /proc/<pid>/fd by the person's other programs while
+     * lord-server (or its child before exec) holds it: a socket, ENXIO */
+    CHECK(vmkey_fetch(A) == 0 && wait_state(A) == VMK_READY);
+    {
+        int fd = vmkey_pipe(A), err = 0;
+        struct stat st;
+        CHECK(fd >= 0 && !fstat(fd, &st) && S_ISSOCK(st.st_mode));
+        CHECK(reopen_from(fd, 0, &err) == -1 && err == ENXIO);
+        char k[80];
+        ssize_t n = fd >= 0 ? read(fd, k, sizeof k) : -1;
+        CHECK(n == 64 && vm_key_valid(k, 64));                  /* lord-vm still gets the whole key */
+        if (fd >= 0) close(fd);
+        /* what it was: a pipe holding the key, reopened and read from a dumpable holder; and the same pipe held by a
+         * non-dumpable process (lord-vm, QEMU, qemu-img and swtpm with the private loader), refused */
+        int p[2];
+        CHECK(!pipe(p) && write(p[1], "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", 64) == 64);
+        int dump = reopen_from(p[0], 0, &err);
+        if (dump == -1 && err == EACCES) printf("vmkeysrv: note: this kernel refuses /proc/<pid>/fd even to a dumpable process's peers\n");
+        else CHECK(dump == 64);
+        CHECK(reopen_from(p[0], 1, &err) == -1 && (err == EACCES || err == EPERM));
+        /* the write end too: a pipe reopens as either end */
+        CHECK(reopen_from(p[1], 1, &err) == -1 && (err == EACCES || err == EPERM));
+        close(p[0]);
+        close(p[1]);
+    }
     printf("vmkeysrv: %d checks, %d failed (%d keyring requests)\n", checks, fails, requests);
     return fails ? 1 : 0;
 }

@@ -43,7 +43,7 @@ endif
 WEB_PURE_SRC := src/web/webargs.c src/web/webreg.c src/web/weburl.c src/web/webmanifest.c src/web/webdl.c src/web/webaxis.c src/web/webpage.c \
                 src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/webscheme.c src/web/webinspect.c src/web/webguard.c src/sec/json.c
 WEB_PURE_HDR := src/web/webargs.h src/web/webreg.h src/web/weburl.h src/web/webmanifest.h src/web/webdl.h src/web/webaxis.h src/web/webpage.h \
-                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/webscheme.h src/web/webinspect.h src/web/webguard.h src/web/weblangid.h src/web/weboffline.h src/sec/json.h
+                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/webscheme.h src/web/webinspect.h src/web/webguard.h src/web/weblangid.h src/web/weboffline.h src/web/webframe.h src/sec/json.h
 
 test: build/webapp-test
 build/webapp-test: tests/webapp_test.c $(WEB_PURE_SRC) $(WEB_PURE_HDR)
@@ -98,7 +98,7 @@ build/lord-web: $(WEB_SRC) $(WEB_HDR) $(CLIENT_GEN) $(WEB_GEN) build/obj/ui/stb.
 
 # the backend alone, headless (tests/web_backend_test.c): a local page rendered and its pixels checked, a key and a
 # click that reach the page's listeners, a resize and a scale; run by tests/run_suites.sh (WebKit's sandbox: bwrap)
-build/web-backend-test: tests/web_backend_test.c $(WEB_BACK_SRC) src/web/webback.h src/web/webshm.h src/web/webaxis.h build/gen/web_backend
+build/web-backend-test: tests/web_backend_test.c $(WEB_BACK_SRC) src/web/webback.h src/web/webshm.h src/web/webframe.h src/web/webaxis.h build/gen/web_backend
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(WEB_CFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/web_backend_test.c $(WEB_BACK_SRC) $(WEB_LIBS) -lm
 test: build/web-backend-test

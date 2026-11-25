@@ -1,6 +1,7 @@
 /* webshm.c — the libwayland-server side of wpebackend-fdo's exported frames (webshm.h, for webback_legacy.c): its
  * nested compositor, where WebKit's web process draws, hands lord-web wl_shm buffers and wl_resources of its own. */
 #include "webshm.h"
+#include "webframe.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +16,8 @@ int webshm_begin(struct wpe_fdo_shm_exported_buffer *b, int *w, int *h, int *str
     *h = wl_shm_buffer_get_height(sb);
     *stride = wl_shm_buffer_get_stride(sb);
     *format = wl_shm_buffer_get_format(sb);
-    if (*w <= 0 || *h <= 0 || *stride < *w * 4 || (*format != WL_SHM_FORMAT_ARGB8888 && *format != WL_SHM_FORMAT_XRGB8888)) return -1;
+    /* libwayland-server checked stride * h against the pool; the sides and stride are still the web process's */
+    if (!webframe_shm_ok(*w, *h, *stride, SIZE_MAX) || (*format != WL_SHM_FORMAT_ARGB8888 && *format != WL_SHM_FORMAT_XRGB8888)) return -1;
     wl_shm_buffer_begin_access(sb);
     *pixels = wl_shm_buffer_get_data(sb);
     return 0;
