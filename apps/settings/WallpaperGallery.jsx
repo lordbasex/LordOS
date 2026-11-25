@@ -10,7 +10,7 @@
 // (Abstract, Epic, Anime: downloaded when chosen, saved as "cat:<id>", sdk/wallpapers.js), the moving wallpapers (a
 // compatible GPU only, sdk/motion.jsx) and your own pictures. The pure parts are sdk/wallpapergallery.js.
 import {
-  View, Text, Image, useTheme, useSettings, useLocale, tOptional, useStore, useAppWindow, useKeyboard, Button, Slider, SearchField, Segmented,
+  View, Text, Image, useTheme, useSettings, useLocale, tOptional, useStore, direction, useAppWindow, useKeyboard, Button, Slider, SearchField, Segmented,
   RadioGroup, Layer, FilePicker, wm, spacing, typeScale, settings, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop,
   slideshowPatch, slideshowPrefs, themes, displayLabel, displayFor, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage,
   addWallpaperImage, removeWallpaperImage, userWallpaperName, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs,
@@ -24,9 +24,12 @@ import {
   displayQuality,
 } from '../../sdk/wallpapergallery.js';
 import { Stack, Section, SettingRow, Note, Actions, PopUp, tint } from './ui.jsx';
+import { subPage } from './subpage.js';
 import { SlideshowSettings } from './Slideshow.jsx';
 
-const GAP = 10, CARD = 170;
+const GAP = 10, CARD = 170, CARD_GAP = 12;
+// collection cards fill their row: as many columns of at least CARD px as fit, each stretched to share the width
+export const cardWidth = (avail) => { const cols = Math.max(1, Math.floor((avail + CARD_GAP) / (CARD + CARD_GAP))); return Math.floor((avail - (cols - 1) * CARD_GAP) / cols); };
 // The grids' thumbnail width (issue #58, Thumbnail size): 80-240 px, 100 by default; 16:9 like the thumbnails.
 const thumbWidth = (s) => Math.max(80, Math.min(240, Math.round(+s.wallpaperThumbs) || 100));
 // A theme names its wallpapers with a locale key (nameKey) and an English fallback (name).
@@ -123,18 +126,20 @@ function Grid({ entries, ctx, limit }) {
 }
 
 // A collection's card: a stack of three thumbnails, its name (NEW for this release's), its count and kind.
-function CollectionCard({ card, name, onOpen }) {
+function CollectionCard({ card, name, onOpen, w = CARD }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [hover, setHover] = useState(false);
   const thumbs = [...card.thumbs].reverse();
-  const at = [{ right: 0, top: 0, opacity: 0.55 }, { right: 17, top: 9, opacity: 0.8 }, { left: 0, bottom: 0, opacity: 1 }].slice(3 - thumbs.length);
+  // the stack scales with the card (its width fills the row: see the grid below)
+  const inner = w - 18, sw = Math.round(inner * 0.78), sh = Math.round(sw * 9 / 16), step = Math.round(inner * 0.11);
+  const at = [{ right: 0, top: 0, opacity: 0.55 }, { right: step, top: Math.round(step * 0.55), opacity: 0.8 }, { left: 0, bottom: 0, opacity: 1 }].slice(3 - thumbs.length);
   return (
     <View onClick={onOpen} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ width: CARD, padding: 8, gap: 6, borderRadius: 11, border: `1px solid ${hover ? t.accent : t.separator}`, backgroundColor: hover ? t.hover : t.control }}>
-      <View style={{ width: CARD - 18, height: Math.round((CARD - 18) * 9 / 16), direction: 'ltr' }}>
+      style={{ width: w, padding: 8, gap: 6, borderRadius: 11, border: `1px solid ${hover ? t.accent : t.separator}`, backgroundColor: hover ? t.hover : t.control }}>
+      <View style={{ width: inner, height: Math.round(inner * 9 / 16), direction: 'ltr' }}>
         {thumbs.map((src, i) => (
-          <View key={i} style={{ position: 'absolute', ...at[i], width: 118, height: 66, borderRadius: 7, overflow: 'hidden', border: `2px solid ${t.control}` }}>
+          <View key={i} style={{ position: 'absolute', ...at[i], width: sw, height: sh, borderRadius: 7, overflow: 'hidden', border: `2px solid ${t.control}` }}>
             <Image src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </View>
         ))}
@@ -391,7 +396,16 @@ function CollectionPage({ col, entries, ctx, onBack }) {
   };
   return (
     <View style={{ gap: spacing.l }}>
-      <View style={{ flexDirection: 'row' }}><Button small label={tr('settings.wallpaperGallery.back')} onClick={onBack} /></View>
+      {/* where you are, as a browser shows it: "‹ Wallpaper › Anime"; the first part goes back (so do Esc and the mouse's Back) */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <View focusable onClick={onBack} onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') onBack(); }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, marginInlineStart: -8, borderRadius: 6 }}>
+          <Text style={{ fontSize: 17, color: t.accent, transform: direction() === 'rtl' ? 'scaleX(-1)' : undefined }}>‹</Text>
+          <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.accent }}>{tr('settings.section.wallpaper')}</Text>
+        </View>
+        <Text style={{ fontSize: typeScale.callout, color: t.textDim }}>›</Text>
+        <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text }}>{ctx.colName(col)}</Text>
+      </View>
       <Section>
         <View style={{ gap: spacing.m, paddingVertical: spacing.m }}>
           <View style={{ gap: 3 }}>
@@ -438,7 +452,8 @@ export function WallpaperGallery() {
   const [note, setNote] = useState('');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
-  const [view, setView] = useState(null);              // a collection's page, or null: the gallery
+  const view = useStore(subPage);                      // a collection's page, or null: the gallery (in Settings' back/forward history)
+  const setView = (v) => subPage.set(v || null);
   const [sheet, setSheet] = useState(null);            // the id of the wallpaper whose sheet is open
   const page = useRef(null);
   const width = useWidth(page, 640);
@@ -592,6 +607,7 @@ export function WallpaperGallery() {
   const groups = groupCollections(shown, order);
   const allGroups = groupCollections(entries, order);
   const perRow = Math.max(1, Math.floor((width - 32 + GAP) / (tw + 4 + GAP)));     // inside a section: its padding
+  const cardW = cardWidth(width - 32);
   const toolbar = (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.s }}>
       <SearchField value={query} onChange={(q) => { setQuery(q); setView(null); }} placeholder={tr('settings.wallpaperGallery.search')} style={{ flex: 1, minWidth: 200 }} />
@@ -617,8 +633,8 @@ export function WallpaperGallery() {
         {!query.trim() && filter === 'all' ? (
           <Section title={tr('settings.wallpaperGallery.collections')}
             accessory={<Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{tr('settings.wallpaperGallery.collectionsCount', { count: entries.filter((e) => e.kind !== 'mine').length, collections: allGroups.length })}</Text>}>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingVertical: spacing.m }}>
-              {groups.map(([c, es]) => <CollectionCard key={c} card={collectionCard(c, es)} name={colName(c)} onOpen={() => setView(c)} />)}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: CARD_GAP, paddingVertical: spacing.m }}>
+              {groups.map(([c, es]) => <CollectionCard key={c} w={cardW} card={collectionCard(c, es)} name={colName(c)} onOpen={() => setView(c)} />)}
             </View>
           </Section>
         ) : null}

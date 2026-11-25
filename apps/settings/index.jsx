@@ -25,7 +25,8 @@ import { WindowPrefs } from './WindowPrefs.jsx';
 import { DockSettings } from './Dock.jsx';
 import { ThemeOptions } from './ThemeExtras.jsx';
 import { ThemeGallery } from './ThemeGallery.jsx';   // Desktop style: the gallery of themes (docs/THEMES-PLAN.md, stage 1)
-import { WallpaperGallery } from './WallpaperGallery.jsx';   // Wallpaper: the gallery (0.8.9.6.2)
+import { WallpaperGallery } from './WallpaperGallery.jsx';
+import { subPage, placeOf, splitPlace } from './subpage.js';   // Wallpaper: the gallery (0.8.9.6.2)
 import { SwitcherSettings } from './Switcher.jsx';
 import { GlobalShortcutsSettings } from './GlobalShortcuts.jsx';
 import { BrowserFrameSettings } from './BrowserFrame.jsx';
@@ -639,8 +640,10 @@ export default function Settings() {
   const [section, setSectionState] = useState(lastSection);
   const [query, setQuery] = useState('');
   const side = useSidebar(SIDE_AT);
-  const setSection = (s) => { lastSection = s; setSectionState(s); if (side.narrow) side.close(); };
-  useVisitHistory(section, (s) => { lastSection = s; setSectionState(s); });   // the mouse's back and forward buttons (#234)
+  const setSection = (s) => { lastSection = s; setSectionState(s); subPage.set(null); if (side.narrow) side.close(); };
+  // the mouse's back and forward buttons (#234) walk sections and a section's sub-pages (subpage.js: Wallpaper's collections)
+  const sub = useStore(subPage);
+  useVisitHistory(placeOf(section, sub), (p) => { const [s, sp] = splitPlace(p); lastSection = s; setSectionState(s); subPage.set(sp); });
   // 'themes' (the old Themes page, links from older help) now opens Appearance
   useEffect(() => { const sec = args?.section === 'themes' ? 'appearance' : args?.section; if (sec && SECTIONS.some(([id]) => id === sec)) setSection(sec); }, [args?.nonce]);
   const [, Body] = SECTIONS.find(([id]) => id === section) || SECTIONS[0];

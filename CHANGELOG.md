@@ -11,6 +11,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Fixed
+- **Settings → Wallpaper: a clear way back from a collection, and collection cards that fill the page** (found testing
+  0.8.9.6.2). A collection's page had a small "All wallpapers" button that read as a label; it now opens with
+  "‹ Wallpaper › Anime", whose first part goes back, as a browser's breadcrumb does. The mouse's Back and Forward
+  buttons (GitHub #234) now walk a collection page too: Settings' visit history records `section/sub-page`
+  (`apps/settings/subpage.js`), so Back from Anime returns to the gallery's home before it leaves Wallpaper. Esc
+  still goes back. The collection cards had a fixed 170 px width and left an empty band on the right; they now take as
+  many columns of at least 170 px as fit and stretch to share the row (`cardWidth`), their stack of pictures scaled
+  with them.
 - **Settings → Wallpaper's top card overflowed with three displays** (found testing 0.8.9.6.2 on the maintainer's PC with
   three monitors). The Display choice, a segmented control of every display's model and connector, ran past the card's
   right edge, and the line saying what each display gets ran past its bottom. With more than two displays the choice
