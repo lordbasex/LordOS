@@ -109,6 +109,34 @@ Last-Update: 2026-11-25
  
 PATCH
     echo lordos-sharedarraybuffer-coi.patch >> debian/patches/series
+    #    TURN URLs with RFC 7065's transport query (turn:host:443?transport=tcp, as a video meeting site and others hand
+    #    out) were refused with a SyntaxError by RTCPeerConnection's check, which is inverted: the GStreamer ICE agent
+    #    reads that query, so the check now accepts exactly transport=udp and transport=tcp (+4)
+    cat > debian/patches/lordos-turn-transport-query.patch <<'PATCH'
+Description: accept TURN URLs with ?transport=udp|tcp in RTCPeerConnection
+ RTCPeerConnection::iceServersFromConfiguration refused every TURN URL that has a query: URL::query() has no "?",
+ so findIgnoringASCIICase("?transport=") is notFound, and !!notFound is true. Sites hand out
+ "turn:host:443?transport=tcp" (RFC 7065), and the GStreamer ICE agent reads that parameter. Accept exactly
+ transport=udp and transport=tcp; any other query is still a SyntaxError.
+Author: LordOS <lord.basex@gmail.com>
+Forwarded: no
+Last-Update: 2026-11-26
+
+--- a/Source/WebCore/Modules/mediastream/RTCPeerConnection.cpp
++++ b/Source/WebCore/Modules/mediastream/RTCPeerConnection.cpp
+@@ -555,7 +555,9 @@
+             if (!serverURL.hasOpaquePath())
+                 return Exception { ExceptionCode::SyntaxError, "STUN/TURN URL should be opaque-path"_s };
+             if (serverURL.protocolIs("turn"_s) || serverURL.protocolIs("turns"_s)) {
+-                if (serverURL.hasQuery() && !!serverURL.query().findIgnoringASCIICase("?transport="_s))
++                // LordOS: RFC 7065's only query, "transport=udp" or "transport=tcp" (the ICE agent reads it). The check
++                // before refused every TURN URL with a query: query() has no "?", so find() was notFound, which is true.
++                if (serverURL.hasQuery() && !equalLettersIgnoringASCIICase(serverURL.query(), "transport=udp"_s) && !equalLettersIgnoringASCIICase(serverURL.query(), "transport=tcp"_s))
+                     return Exception { ExceptionCode::SyntaxError, "Invalid TURN URL query string"_s };
+                 if (server.credential.isNull() || server.username.isNull())
+                     return Exception { ExceptionCode::InvalidAccessError, "TURN/TURNS server requires both username and credential"_s };
+PATCH
+    echo lordos-turn-transport-query.patch >> debian/patches/series
     #    The DRM backend's own API (WPEDisplayDRM, WPEScreenDRM, WPEToplevelDRM, WPEViewDRM: wpe_display_drm_* and the
     #    _get_type of the others) isn't in the library then, so it leaves Debian's symbols file too; WPEPlatform's core
     #    DRM device API (wpe_drm_device_*, used for dmabuf) stays
@@ -129,6 +157,7 @@ PATCH
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Build WPEPlatform (wpe-platform-2.0: headless, Wayland) and keep the legacy libwpe API, both explicitly."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Don't build WPEPlatform's DRM backend, so libinput and libudev aren't linked; its symbols leave debian/libwpewebkit-2.0-1.symbols."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Build WebRTC with WebKit's GStreamer backend (webrtcbin) and MediaStream; Build-Depends on libssl-dev, Recommends the GStreamer plugins WebRTC uses (libnice, bad, good, base)."
+    DEBEMAIL=$DEBEMAIL_LORDOS dch --append "lordos-turn-transport-query.patch: TURN URLs with ?transport=udp or ?transport=tcp are accepted."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "ICE with librice (USE_LIBRICE) in the network process, so the web process keeps no network; Build-Depends on librice-dev (LordOS's package)."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "lordos-sharedarraybuffer-coi.patch: SharedArrayBuffer in cross-origin-isolated web processes only, as on Cocoa."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Maintainer: LordOS (the packaging is the Debian WebKit Maintainers')."

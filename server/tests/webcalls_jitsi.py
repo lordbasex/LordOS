@@ -33,7 +33,7 @@ HOOK = """(() => {
   window.RTCPeerConnection = new Proxy(PC, { construct(t, a, n) { const pc = Reflect.construct(t, a, n); window.__lordosPcs.push(pc); return pc; } });
 })();"""
 
-STATS = """(async () => {
+STATS = r"""(async () => {
   const out = [];
   for (const pc of (window.__lordosPcs || [])) {
     const r = { state: pc.connectionState, ice: pc.iceConnectionState, in: {}, out: {}, pair: null };

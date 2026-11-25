@@ -63,7 +63,10 @@ UA_PAGE = b"""<!doctype html><title>ua</title><script>
            setSinkId: typeof HTMLMediaElement.prototype.setSinkId,
            insertableStreams: typeof RTCRtpSender !== 'undefined' && 'createEncodedStreams' in RTCRtpSender.prototype,
            codecsAudio: window.RTCRtpSender ? RTCRtpSender.getCapabilities('audio').codecs.map(c => c.mimeType) : null,
-           codecsVideo: window.RTCRtpSender ? [...new Set(RTCRtpSender.getCapabilities('video').codecs.map(c => c.mimeType))] : null } };
+           codecsVideo: window.RTCRtpSender ? [...new Set(RTCRtpSender.getCapabilities('video').codecs.map(c => c.mimeType))] : null,
+           // a TURN server as sites give it (RFC 7065's transport query): accepted, and a bad query refused
+           turnQuery: (() => { if (!window.RTCPeerConnection) return null; const t = q => { try { new RTCPeerConnection({ iceServers: [{ urls: 'turn:127.0.0.1:3478' + q, username: 'u', credential: 'p' }] }).close(); return 'ok'; } catch (e) { return e.name; } };
+             return [t('?transport=tcp'), t('?transport=udp'), t('?foo=bar')].join(' '); })() } };
   // a device that can't exist: the request fails by its name and no real microphone is opened
   try { await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: 'lordos-no-such-device' } } }); } catch (e) { o.gum = e.name; }
   await fetch('/report/ua', { method: 'POST', body: JSON.stringify(o) });
@@ -80,9 +83,9 @@ fetch(location.pathname.replace('/page/', '/report/'), { method: 'POST', body: J
 LOOPBACK_PAGE = b"""<!doctype html><title>loopback</title><canvas id=c width=320 height=240></canvas><script>
 async function call(prefer) {
   const r = { prefer };
-  const ac = new AudioContext();
-  const osc = ac.createOscillator(); osc.frequency.value = 440;
-  const dst = ac.createMediaStreamDestination(); osc.connect(dst); osc.start();
+  // audio from WebKit's mock microphone (WEBCALLS_MOCK_CAPTURE=1: a tone, no device; WebAudio can't run without a sound
+  // server, as in the build's test chroot)
+  const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
   const c = document.getElementById('c'), g = c.getContext('2d');
   let n = 0;
   const tick = setInterval(() => { g.fillStyle = `hsl(${(n++ * 7) % 360} 80% 50%)`; g.fillRect(0, 0, 320, 240); }, 33);
@@ -95,13 +98,17 @@ async function call(prefer) {
   b.onicecandidate = e => { if (e.candidate) { count(e.candidate); a.addIceCandidate(e.candidate); } };
   const got = { audio: false, video: false };
   b.ontrack = e => { got[e.track.kind] = true; };
-  a.addTrack(dst.stream.getAudioTracks()[0], dst.stream);
+  a.addTrack(mic.getAudioTracks()[0], mic);
   a.addTrack(vs.getVideoTracks()[0], vs);
+  // the codec asked for, on the sending side's offer (setCodecPreferences, where the engine has it)
+  const order = cs => cs.filter(x => x.mimeType === prefer).concat(cs.filter(x => x.mimeType !== prefer));
+  if (prefer) for (const t of a.getTransceivers())
+    if (t.sender.track && t.sender.track.kind === 'video' && t.setCodecPreferences) t.setCodecPreferences(order(RTCRtpSender.getCapabilities('video').codecs));
+  r.codecPreferences = typeof RTCRtpTransceiver !== 'undefined' && 'setCodecPreferences' in RTCRtpTransceiver.prototype;
   const offer = await a.createOffer(); await a.setLocalDescription(offer); await b.setRemoteDescription(offer);
   if (prefer) for (const t of b.getTransceivers()) {
     if (t.receiver.track.kind !== 'video' || !t.setCodecPreferences) continue;
-    const cs = RTCRtpReceiver.getCapabilities('video').codecs;
-    t.setCodecPreferences(cs.filter(x => x.mimeType === prefer).concat(cs.filter(x => x.mimeType !== prefer)));
+    t.setCodecPreferences(order(RTCRtpReceiver.getCapabilities('video').codecs));
   }
   const answer = await b.createAnswer(); await b.setLocalDescription(answer); await a.setRemoteDescription(answer);
   const t0 = performance.now();
@@ -119,9 +126,11 @@ async function call(prefer) {
     if (x.kind === 'video') Object.assign(r, { videoCodec: codecs[x.codecId], framesDecoded: x.framesDecoded, width: x.frameWidth, height: x.frameHeight, fps: x.framesPerSecond, videoBytes: x.bytesReceived });
     if (x.kind === 'audio') Object.assign(r, { audioCodec: codecs[x.codecId], audioPackets: x.packetsReceived, audioSamples: x.totalSamplesReceived, audioBytes: x.bytesReceived });
   });
+  const sa = await a.getStats();
+  sa.forEach(x => { if (x.type === 'outbound-rtp') r['sent_' + x.kind] = x.packetsSent; });
   s.forEach(x => { if (x.type === 'local-candidate') r.local = (r.local || []).concat(x.candidateType + '/' + x.protocol); });
   r.tracks = got;
-  clearInterval(tick); a.close(); b.close(); ac.close();
+  clearInterval(tick); a.close(); b.close(); mic.getTracks().forEach(t => t.stop());
   return r;
 }
 (async () => {
@@ -185,8 +194,10 @@ def ok(msg):
     print("ok  ", msg)
 
 
-def run(path, secs=40):
+def run(path, secs=40, mock=False):
     env = dict(os.environ)
+    if mock:
+        env["WEBCALLS_MOCK_CAPTURE"] = "1"
     home = tempfile.mkdtemp(prefix="webcalls-home-")
     env.update(HOME=home, XDG_CACHE_HOME=home + "/.cache", XDG_DATA_HOME=home + "/.local/share", XDG_CONFIG_HOME=home + "/.config")
     p = subprocess.run([CHECK, "http://127.0.0.1:%d%s" % (port, path), str(secs)], env=env, capture_output=True, text=True, timeout=secs + 30)
@@ -283,6 +294,10 @@ if not any(c.startswith("webcall: client hints asked by the app: sec-ch-ua-full-
     fail("the Client Hints the site asked for aren't in the call log: %r" % calls)
 ok("call log: " + " | ".join(c[len("webcall: "):] for c in calls))
 api = r["api"]
+if api["RTCPeerConnection"] == "function":
+    if api.get("turnQuery") != "ok ok SyntaxError":
+        fail("TURN URLs with ?transport=: %r, want 'ok ok SyntaxError' (lordos-turn-transport-query.patch)" % api.get("turnQuery"))
+    ok("TURN URLs with ?transport=tcp and ?transport=udp accepted, another query refused")
 print("     APIs:", json.dumps(api, sort_keys=True))
 
 # ---- isolation ----
@@ -309,7 +324,7 @@ if api["RTCPeerConnection"] != "function":
         fail("RTCPeerConnection is %s: this WebKit has no WebRTC" % api["RTCPeerConnection"])
     print("skip WebRTC loopback: not built in this WebKit (RTCPeerConnection %s)" % api["RTCPeerConnection"])
     sys.exit(0)
-calls, out = run("/page/loopback", 90)
+calls, out = run("/page/loopback", 90, mock=True)
 lb = reports.get("/report/loopback") or fail("no report from the loopback page")
 print("     loopback:", json.dumps(lb, sort_keys=True))
 for want, res in (("video/VP8", lb.get("video/VP8")), ("video/H264", lb.get("video/H264"))):
@@ -326,9 +341,9 @@ for want, res in (("video/VP8", lb.get("video/VP8")), ("video/H264", lb.get("vid
         fail("%s: no video frames: %r" % (want, res))
     if (res.get("audioPackets") or 0) < 10:
         fail("%s: no audio: %r" % (want, res))
-    if res.get("audioCodec") != "audio/opus":
+    if (res.get("audioCodec") or "").lower() != "audio/opus":       # WebKit writes "audio/OPUS"
         fail("%s: audio codec %r" % (want, res.get("audioCodec")))
-    if res.get("videoCodec") != want:
+    if (res.get("videoCodec") or "").lower() != want.lower():
         fail("video codec %r, the receiver preferred %s" % (res.get("videoCodec"), want))
     ok("loopback %s: connected in %d ms, %s + %s, %d frames %dx%d at %.0f fps, %d audio packets" % (
         want, res["connectMs"], res["audioCodec"], res["videoCodec"], res["framesDecoded"], res["width"], res["height"],
