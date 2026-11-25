@@ -26,5 +26,6 @@
   "recommend": "Ứng dụng {toolkit} chạy tốt hơn trên X11 ở đây ({wayland} % trên Wayland, {x11} % trên X11): hãy khởi động chúng với {env}.",
   "matrix": "Các global Wayland mà mỗi bộ công cụ đã gắn (phiên bản; ! lỗi giao thức; - không gắn):",
   "saved": "Đã lưu cho lordos-issue: {path}",
-  "notSaved": "Không thể lưu kết quả vào ~/.cache/lordos."
+  "notSaved": "Không thể lưu kết quả vào ~/.cache/lordos.",
+  "root": "Kiểm tra bộ công cụ không chạy với quyền root: hãy chạy lordos-testbench --toolkits bằng tài khoản của bạn, trong Terminal của LordOS."
 }

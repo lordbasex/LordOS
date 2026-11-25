@@ -26,5 +26,6 @@
   "recommend": "여기서는 {toolkit} 앱이 X11에서 더 잘 작동합니다 (Wayland {wayland} %, X11 {x11} %): {env}로 실행하세요.",
   "matrix": "각 툴킷이 바인딩한 Wayland 전역 객체 (버전; ! 프로토콜 오류; - 바인딩 안 함):",
   "saved": "lordos-issue용으로 저장함: {path}",
-  "notSaved": "결과를 ~/.cache/lordos에 저장할 수 없습니다."
+  "notSaved": "결과를 ~/.cache/lordos에 저장할 수 없습니다.",
+  "root": "툴킷 점검은 root로 실행되지 않습니다. LordOS 터미널에서 본인 계정으로 lordos-testbench --toolkits를 실행하세요."
 }

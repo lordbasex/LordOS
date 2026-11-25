@@ -26,5 +26,6 @@
   "recommend": "{toolkit} programos čia geriau veikia su X11 ({wayland} % su Wayland, {x11} % su X11): paleiskite jas su {env}.",
   "matrix": "Wayland globalūs objektai, kuriuos susiejo kiekvienas rinkinys (versija; ! protokolo klaida; - nesusieta):",
   "saved": "Išsaugota lordos-issue: {path}",
-  "notSaved": "Rezultato nepavyko išsaugoti ~/.cache/lordos."
+  "notSaved": "Rezultato nepavyko išsaugoti ~/.cache/lordos.",
+  "root": "Įrankių rinkinių patikra neveikia kaip root: paleiskite lordos-testbench --toolkits savo naudotoju LordOS terminale."
 }

@@ -26,5 +26,6 @@
   "recommend": "A {toolkit} alkalmazások itt jobban működnek X11 alatt ({wayland} % Waylanden, {x11} % X11-en): indítsd őket így: {env}.",
   "matrix": "Az egyes eszközkészletek által kötött Wayland-globálisok (verzió; ! protokollhiba; - nincs kötve):",
   "saved": "Mentve a lordos-issue számára: {path}",
-  "notSaved": "Az eredményt nem sikerült menteni a ~/.cache/lordos mappába."
+  "notSaved": "Az eredményt nem sikerült menteni a ~/.cache/lordos mappába.",
+  "root": "Az eszközkészlet-ellenőrzés nem fut root-ként: futtassa a lordos-testbench --toolkits parancsot a saját felhasználójával, a LordOS Terminálban."
 }

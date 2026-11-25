@@ -26,5 +26,6 @@
   "recommend": "{toolkit}-appar fungerar bättre på X11 här ({wayland} % på Wayland, {x11} % på X11): starta dem med {env}.",
   "matrix": "Wayland-globaler som varje verktygslåda band (version; ! protokollfel; - inte bunden):",
   "saved": "Sparat för lordos-issue: {path}",
-  "notSaved": "Resultatet kunde inte sparas i ~/.cache/lordos."
+  "notSaved": "Resultatet kunde inte sparas i ~/.cache/lordos.",
+  "root": "Verktygslådegranskningen körs inte som root: kör lordos-testbench --toolkits som dig själv, i LordOS-terminalen."
 }

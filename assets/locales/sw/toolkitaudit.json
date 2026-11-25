@@ -26,5 +26,6 @@
   "recommend": "Programu za {toolkit} zinafanya kazi vizuri zaidi kwenye X11 hapa ({wayland} % kwenye Wayland, {x11} % kwenye X11): zianzishe kwa {env}.",
   "matrix": "Vitu vya jumla vya Wayland vilivyofungwa na kila zana (toleo; ! hitilafu ya itifaki; - haikufungwa):",
   "saved": "Imehifadhiwa kwa lordos-issue: {path}",
-  "notSaved": "Matokeo hayakuweza kuhifadhiwa katika ~/.cache/lordos."
+  "notSaved": "Matokeo hayakuweza kuhifadhiwa katika ~/.cache/lordos.",
+  "root": "Ukaguzi wa toolkit hauendeshwi kama root: endesha lordos-testbench --toolkits kama wewe mwenyewe, kwenye Terminal ya LordOS."
 }

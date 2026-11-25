@@ -26,5 +26,6 @@
   "recommend": "ここでは {toolkit} アプリは X11 のほうがよく動きます (Wayland で {wayland} %、X11 で {x11} %): {env} を付けて起動してください。",
   "matrix": "各ツールキットがバインドした Wayland グローバル (バージョン; ! プロトコルエラー; - 未バインド):",
   "saved": "lordos-issue 用に保存しました: {path}",
-  "notSaved": "結果を ~/.cache/lordos に保存できませんでした。"
+  "notSaved": "結果を ~/.cache/lordos に保存できませんでした。",
+  "root": "ツールキット監査は root では実行されません。LordOS ターミナルで自分のユーザーとして lordos-testbench --toolkits を実行してください。"
 }

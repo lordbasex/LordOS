@@ -26,5 +26,6 @@
   "recommend": "Les apps de {toolkit} funcionen millor amb X11 aquí ({wayland} % amb Wayland, {x11} % amb X11): inicia-les amb {env}.",
   "matrix": "Globals de Wayland que ha usat cada toolkit (versió; ! error de protocol; - sense usar):",
   "saved": "Desat per a lordos-issue: {path}",
-  "notSaved": "No s'ha pogut desar el resultat a ~/.cache/lordos."
+  "notSaved": "No s'ha pogut desar el resultat a ~/.cache/lordos.",
+  "root": "L'auditoria de toolkits no s'executa com a root: executeu lordos-testbench --toolkits amb el vostre usuari, al Terminal del LordOS."
 }

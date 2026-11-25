@@ -26,5 +26,6 @@
   "recommend": "{toolkit} uygulamaları burada X11'de daha iyi çalışıyor (Wayland'de %{wayland}, X11'de %{x11}): onları {env} ile başlatın.",
   "matrix": "Her araç takımının bağladığı Wayland globalleri (sürüm; ! protokol hatası; - bağlanmadı):",
   "saved": "lordos-issue için kaydedildi: {path}",
-  "notSaved": "Sonuç ~/.cache/lordos içine kaydedilemedi."
+  "notSaved": "Sonuç ~/.cache/lordos içine kaydedilemedi.",
+  "root": "Araç takımı denetimi root olarak çalışmaz: lordos-testbench --toolkits komutunu kendi kullanıcınızla, LordOS Terminali'nde çalıştırın."
 }

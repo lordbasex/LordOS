@@ -26,5 +26,6 @@
   "recommend": "Os apps de {toolkit} funcionam melhor no X11 aqui ({wayland} % no Wayland, {x11} % no X11): inicie-os com {env}.",
   "matrix": "Globais do Wayland usados por cada toolkit (versão; ! erro de protocolo; - não usado):",
   "saved": "Salvo para o lordos-issue: {path}",
-  "notSaved": "Não foi possível salvar o resultado em ~/.cache/lordos."
+  "notSaved": "Não foi possível salvar o resultado em ~/.cache/lordos.",
+  "root": "A auditoria de toolkits não roda como root: execute lordos-testbench --toolkits com o seu usuário, no Terminal do LordOS."
 }

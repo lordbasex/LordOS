@@ -452,6 +452,17 @@ static void test_env(void) {
     CHECK(has_var(env, "LANG=C.UTF-8") && has_var(env, "HOME=/home/x"));
     CHECK(!has_key(env, "DISPLAY") && !has_key(env, "LD_PRELOAD") && !has_key(env, "SECRET_TOKEN") && !has_key(env, "PYTHONPATH"));
     CHECK(!has_var(env, "GDK_BACKEND=broadway"));
+    /* GTK 3's GSettings: the keyfile lord-server gives every app, unless the caller has another GLib backend */
+    CHECK(has_var(env, "GSETTINGS_BACKEND=keyfile"));
+    {
+        char *in3[] = { "HOME=/home/x", rt, "WAYLAND_DISPLAY=wayland-1", "GSETTINGS_BACKEND=dconf", NULL };
+        char *in4[] = { "HOME=/home/x", rt, "WAYLAND_DISPLAY=wayland-1", "GSETTINGS_BACKEND=/evil", NULL };
+        o.env = in3;
+        CHECK(tk_env(&o, combo("gtk3-wayland"), buf, sizeof buf, env, 48) > 0 && has_var(env, "GSETTINGS_BACKEND=dconf"));
+        o.env = in4;
+        CHECK(tk_env(&o, combo("gtk3-wayland"), buf, sizeof buf, env, 48) > 0 && has_var(env, "GSETTINGS_BACKEND=keyfile"));
+        o.env = in;
+    }
     n = tk_env(&o, combo("qt5-xcb"), buf, sizeof buf, env, 48);
     CHECK(n > 0 && has_var(env, "DISPLAY=:7") && has_var(env, xa) && has_var(env, "QT_QPA_PLATFORM=xcb") && !has_key(env, "WAYLAND_DISPLAY"));
     n = tk_env(&o, combo("x11-xwayland"), buf, sizeof buf, env, 48);
@@ -617,6 +628,27 @@ static void test_runs(void) {
     o.python = "/nonexistent/python3";
     CHECK(!tk_audit(&o, one, 1, &rep) && rep.r[0].status == TK_ST_NOT_INSTALLED);
     tk_report_free(&rep);
+
+    /* a harness someone else could have changed is never run: group- or world-writable file or folder, a link, a
+     * relative folder */
+    char hp[600], ln[400];
+    CHECK(!tk_harness_path(tmp, "qt6", hp, sizeof hp));
+    snprintf(ln, sizeof ln, "%s/qt6.py", tmp);
+    chmod(ln, 0664);
+    CHECK(tk_harness_path(tmp, "qt6", hp, sizeof hp) == -1);
+    o.python = py;
+    int q6[] = { combo("qt6-wayland") };
+    CHECK(!tk_audit(&o, q6, 1, &rep) && rep.r[0].status == TK_ST_NO_HARNESS);
+    tk_report_free(&rep);
+    chmod(ln, 0644);
+    chmod(tmp, 0777);
+    CHECK(tk_harness_path(tmp, "qt6", hp, sizeof hp) == -1);
+    chmod(tmp, 0700);
+    snprintf(hp, sizeof hp, "%s/linked.py", tmp);
+    CHECK(!symlink(ln, hp));
+    CHECK(tk_harness_path(tmp, "linked", hp, sizeof hp) == -1);
+    CHECK(tk_harness_path("relative/dir", "qt6", hp, sizeof hp) == -1);
+    CHECK(!tk_harness_path(tmp, "qt6", hp, sizeof hp));
 }
 
 /* --toolkits --last: the saved result in fixed lines; a hand-edited file prints nothing of its own */

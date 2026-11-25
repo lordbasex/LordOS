@@ -26,5 +26,6 @@
   "recommend": "এখানে {toolkit} অ্যাপ X11-এ ভালো চলে (Wayland-এ {wayland} %, X11-এ {x11} %): সেগুলো {env} দিয়ে চালু করুন।",
   "matrix": "প্রতিটি টুলকিট যে Wayland গ্লোবাল বেঁধেছে (সংস্করণ; ! প্রোটোকল ত্রুটি; - বাঁধা হয়নি):",
   "saved": "lordos-issue-এর জন্য সংরক্ষিত: {path}",
-  "notSaved": "ফলাফল ~/.cache/lordos-এ সংরক্ষণ করা যায়নি।"
+  "notSaved": "ফলাফল ~/.cache/lordos-এ সংরক্ষণ করা যায়নি।",
+  "root": "টুলকিট অডিট root হিসেবে চলে না: LordOS টার্মিনালে নিজের অ্যাকাউন্ট দিয়ে lordos-testbench --toolkits চালান।"
 }

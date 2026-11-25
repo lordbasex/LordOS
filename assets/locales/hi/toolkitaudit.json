@@ -26,5 +26,6 @@
   "recommend": "यहाँ {toolkit} ऐप्स X11 पर बेहतर चलते हैं (Wayland पर {wayland} %, X11 पर {x11} %): उन्हें {env} के साथ शुरू करें।",
   "matrix": "हर टूलकिट द्वारा बाँधे गए Wayland ग्लोबल (संस्करण; ! प्रोटोकॉल त्रुटि; - नहीं बाँधा):",
   "saved": "lordos-issue के लिए सहेजा गया: {path}",
-  "notSaved": "परिणाम ~/.cache/lordos में सहेजा नहीं जा सका।"
+  "notSaved": "परिणाम ~/.cache/lordos में सहेजा नहीं जा सका।",
+  "root": "टूलकिट ऑडिट root के रूप में नहीं चलता: LordOS टर्मिनल में अपने खाते से lordos-testbench --toolkits चलाएँ।"
 }

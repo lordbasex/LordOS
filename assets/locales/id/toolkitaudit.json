@@ -26,5 +26,6 @@
   "recommend": "Aplikasi {toolkit} berjalan lebih baik di X11 di sini ({wayland} % di Wayland, {x11} % di X11): jalankan dengan {env}.",
   "matrix": "Global Wayland yang diikat tiap toolkit (versi; ! galat protokol; - tidak diikat):",
   "saved": "Disimpan untuk lordos-issue: {path}",
-  "notSaved": "Hasil tidak dapat disimpan di ~/.cache/lordos."
+  "notSaved": "Hasil tidak dapat disimpan di ~/.cache/lordos.",
+  "root": "Audit toolkit tidak berjalan sebagai root: jalankan lordos-testbench --toolkits sebagai diri Anda, di Terminal LordOS."
 }

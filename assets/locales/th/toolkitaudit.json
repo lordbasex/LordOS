@@ -26,5 +26,6 @@
   "recommend": "แอป {toolkit} ทำงานบน X11 ได้ดีกว่าที่นี่ ({wayland} % บน Wayland, {x11} % บน X11): เริ่มด้วย {env}",
   "matrix": "Wayland global ที่แต่ละชุดเครื่องมือผูกไว้ (รุ่น; ! ข้อผิดพลาดโพรโทคอล; - ไม่ได้ผูก):",
   "saved": "บันทึกไว้สำหรับ lordos-issue: {path}",
-  "notSaved": "บันทึกผลลัพธ์ลงใน ~/.cache/lordos ไม่ได้"
+  "notSaved": "บันทึกผลลัพธ์ลงใน ~/.cache/lordos ไม่ได้",
+  "root": "การตรวจสอบชุดเครื่องมือไม่ทำงานในฐานะ root: ให้รัน lordos-testbench --toolkits ด้วยบัญชีของคุณเองในเทอร์มินัลของ LordOS"
 }

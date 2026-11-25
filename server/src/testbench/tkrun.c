@@ -88,6 +88,11 @@ int tk_env(const TkRunOpts *o, int combo, char *buf, size_t blen, char **out, in
         const char *v = env_get(env, keep_vars[i]);
         if (v) env_put(&b, keep_vars[i], v);
     }
+    /* GTK 3 reads its theme and dark mode from GSettings, and lord-server gives every app it starts
+     * GSETTINGS_BACKEND=keyfile (ui/portal.c portal_start): the harness gets the same, or the caller's own when it is
+     * one of GLib's backends. Without it GTK 3 read dconf's defaults and the theme check failed for nothing. */
+    const char *gb = env_get(env, "GSETTINGS_BACKEND");
+    env_put(&b, "GSETTINGS_BACKEND", gb && (!strcmp(gb, "keyfile") || !strcmp(gb, "dconf") || !strcmp(gb, "memory")) ? gb : "keyfile");
     if (c->wayland) env_put(&b, "WAYLAND_DISPLAY", wl);
     else {
         env_put(&b, "DISPLAY", dpy);
@@ -232,29 +237,45 @@ static int probe(const TkRunOpts *o, const TkCombo *c, char *const envp[]) {
     if (pid < 0) return -1;
     double deadline = mono_ms() + o->probe_ms;
     int status = 0;
+    int timed_out = 0;
     for (;;) {
-        pid_t w = waitpid(pid, &status, WNOHANG);
-        if (w == pid) break;
-        if (w < 0 && errno != EINTR) { running_group = 0; return -1; }
-        if (mono_ms() >= deadline) {
-            kill(-pid, SIGKILL);
-            kill(pid, SIGKILL);
-            while (waitpid(pid, &status, 0) < 0 && errno == EINTR) { }
-            running_group = 0;
-            return -1;
-        }
+        /* WNOWAIT: the exited leader stays a zombie, so its process group id can't be reused before the kill below */
+        siginfo_t si;
+        memset(&si, 0, sizeof si);
+        int w = waitid(P_PID, (id_t)pid, &si, WEXITED | WNOHANG | WNOWAIT);
+        if (!w && si.si_pid == pid) break;
+        if (w < 0 && errno != EINTR) { kill(-pid, SIGKILL); running_group = 0; return -1; }
+        if (mono_ms() >= deadline) { timed_out = 1; break; }
         struct timespec t = { 0, 20 * 1000 * 1000 };
         nanosleep(&t, NULL);
     }
-    kill(-pid, SIGKILL);
+    kill(-pid, SIGKILL);                            /* whatever it left in its group (or itself, at the deadline) */
+    kill(pid, SIGKILL);
+    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) { }
     running_group = 0;
+    if (timed_out) return -1;
     return WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 0 : -1;
 }
 
-static int harness_path(const TkRunOpts *o, const TkCombo *c, char *p, size_t n) {
+/* A folder or file the harness may come from: no link, owned by root (the installed folder) or, for a development
+ * folder (LORDOS_TOOLKIT_AUDIT_DIR), by root or this user, and writable by nobody else. A harness someone else could
+ * have changed is never run: it would run as this user, with this session's displays and bus. */
+static int trusted(const char *path, int want_dir, int installed) {
     struct stat st;
-    snprintf(p, n, "%s/%s.py", o->dir, c->toolkit);
-    return !stat(p, &st) && S_ISREG(st.st_mode) ? 0 : -1;
+    if (lstat(path, &st) || (want_dir ? !S_ISDIR(st.st_mode) : !S_ISREG(st.st_mode))) return 0;
+    if (st.st_uid != 0 && (installed || st.st_uid != geteuid())) return 0;
+    return !(st.st_mode & (S_IWGRP | S_IWOTH));
+}
+
+int tk_harness_path(const char *dir, const char *toolkit, char *p, size_t n) {
+    int installed = !strcmp(dir, TK_HARNESS_DIR);
+    int k = snprintf(p, n, "%s/%s.py", dir, toolkit);
+    if (k <= 0 || (size_t)k >= n || dir[0] != '/') return -1;
+    return trusted(dir, 1, installed) && trusted(p, 0, installed) ? 0 : -1;
+}
+
+static int harness_path(const TkRunOpts *o, const TkCombo *c, char *p, size_t n) {
+    return tk_harness_path(o->dir, c->toolkit, p, n);
 }
 
 void tk_report_free(TkReport *rep) {
@@ -480,6 +501,8 @@ int toolkits_main(int argc, char **argv) {
     } else {
         for (int i = 0; i < TK_COMBOS; i++) which[n++] = i;
     }
+    /* the harnesses are GUI clients of this session: never as root (sudo, pkexec), like any Wayland client here */
+    if (geteuid() == 0) { fprintf(stderr, "%s\n", T("root")); return 2; }
     signal(SIGINT, on_signal);
     signal(SIGTERM, on_signal);
     signal(SIGHUP, on_signal);

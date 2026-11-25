@@ -26,5 +26,6 @@
   "recommend": "Aplikacje {toolkit} działają tu lepiej w X11 ({wayland} % w Wayland, {x11} % w X11): uruchamiaj je z {env}.",
   "matrix": "Obiekty globalne Wayland użyte przez każdy zestaw (wersja; ! błąd protokołu; - nieużyty):",
   "saved": "Zapisano dla lordos-issue: {path}",
-  "notSaved": "Nie udało się zapisać wyniku w ~/.cache/lordos."
+  "notSaved": "Nie udało się zapisać wyniku w ~/.cache/lordos.",
+  "root": "Audyt zestawów narzędzi nie działa jako root: uruchom lordos-testbench --toolkits jako swój użytkownik, w Terminalu LordOS."
 }

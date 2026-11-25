@@ -26,5 +26,6 @@
   "recommend": "{toolkit} tətbiqləri burada X11-də daha yaxşı işləyir (Wayland-də {wayland} %, X11-də {x11} %): onları {env} ilə başladın.",
   "matrix": "Hər alət dəstinin bağladığı Wayland qlobalları (versiya; ! protokol xətası; - bağlanmayıb):",
   "saved": "lordos-issue üçün saxlanıldı: {path}",
-  "notSaved": "Nəticə ~/.cache/lordos qovluğunda saxlanıla bilmədi."
+  "notSaved": "Nəticə ~/.cache/lordos qovluğunda saxlanıla bilmədi.",
+  "root": "Toolkit auditi root kimi işləmir: lordos-testbench --toolkits əmrini öz istifadəçinizlə, LordOS Terminalında işə salın."
 }

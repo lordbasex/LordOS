@@ -26,5 +26,6 @@
   "recommend": "تعمل تطبيقات {toolkit} بشكل أفضل على X11 هنا ({wayland} % على Wayland، {x11} % على X11): شغّلها باستخدام {env}.",
   "matrix": "كائنات Wayland العامة التي ربطتها كل مجموعة أدوات (الإصدار؛ ! خطأ بروتوكول؛ - غير مربوط):",
   "saved": "حُفظ من أجل lordos-issue: {path}",
-  "notSaved": "تعذّر حفظ النتيجة في ~/.cache/lordos."
+  "notSaved": "تعذّر حفظ النتيجة في ~/.cache/lordos.",
+  "root": "لا يعمل تدقيق مجموعات الأدوات بصلاحيات root: شغّل lordos-testbench --toolkits بحسابك، في طرفية LordOS."
 }

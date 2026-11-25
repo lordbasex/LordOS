@@ -26,5 +26,6 @@
   "recommend": "{toolkit}-apps werken hier beter op X11 ({wayland} % op Wayland, {x11} % op X11): start ze met {env}.",
   "matrix": "Wayland-globals die elke toolkit heeft gebonden (versie; ! protocolfout; - niet gebonden):",
   "saved": "Opgeslagen voor lordos-issue: {path}",
-  "notSaved": "Het resultaat kon niet worden opgeslagen in ~/.cache/lordos."
+  "notSaved": "Het resultaat kon niet worden opgeslagen in ~/.cache/lordos.",
+  "root": "De toolkit-controle draait niet als root: voer lordos-testbench --toolkits uit als jezelf, in de LordOS-terminal."
 }

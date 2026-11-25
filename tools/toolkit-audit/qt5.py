@@ -393,7 +393,9 @@ class Audit:
             names = {0: 'default', 1: 'dark', 2: 'light'}
             dark = scheme == 1
             self.win.set_scheme(dark)
-            check('theme', scheme in names, ms=ms_since(t),
+            # Qt 5 has no colour scheme of its own: its palette is what an app shows, so it must follow the portal's
+            # dark or light (with no preference, either is right), as in the GTK and Qt 6 harnesses
+            check('theme', scheme in names and (scheme == 0 or pal_dark == dark), ms=ms_since(t),
                   detail='portal %s (%s); palette %s' % (names.get(scheme, str(scheme)), how,
                                                          'dark' if pal_dark else 'light'))
         self.next()

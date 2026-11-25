@@ -181,6 +181,9 @@ class Audit:
     def __init__(self, app):
         self.app = app
         self.t_app = time.monotonic()
+        # when the keyboard focus last moved between this app's windows (wl_keyboard.enter / FocusIn)
+        self.focus_changed = self.t_app
+        app.focusWindowChanged.connect(self.on_focus)
         self.t_show = None
         self.t_paint = None
         self.gen = None
@@ -350,6 +353,12 @@ class Audit:
         self.popup_result('menu', exposed(self.menu), said, t)
         self.menu.hide()
         yield (lambda: not self.menu.isVisible(), 300)
+        # a menu opened as a toplevel (no input serial yet): the compositor gives the keyboard back to the window a
+        # frame or so after it is gone, and Qt closes a combo list that is open when that happens (a focus change
+        # closes popups). A person never opens the combo before that either, so wait, as qt5.py's settle() does,
+        # until the window has the keyboard again and it has been quiet for 100 ms (at most 700 ms).
+        # focusWindow follows the compositor's keyboard focus; isActiveWindow doesn't (Qt sets it when a popup closes).
+        yield self.settled()
 
         # combo: the combo box's list popup opens and maps
         t = time.monotonic()
@@ -360,6 +369,7 @@ class Audit:
         self.popup_result('combo', pop is not w and exposed(pop), said, t)
         self.combo.hidePopup()
         yield (lambda: not pop.isVisible(), 300)
+        yield self.settled()                # the combo list too, before the tooltip (a focus change hides it)
 
         # tooltip: shown by the toolkit, it maps as its own popup
         t = time.monotonic()
@@ -420,6 +430,16 @@ class Audit:
         else:
             put(cid, False, ms=ms_since(t), detail='the popup did not map in 1 s')
 
+    def settled(self):
+        """A wait (for steps()): until the main window has the keyboard again and it has been quiet for 100 ms, at
+        most 700 ms. focusWindow follows the compositor's keyboard focus; isActiveWindow doesn't."""
+        t = time.monotonic()
+        return (lambda: time.monotonic() - t >= 0.1 and time.monotonic() - self.focus_changed >= 0.1
+                and QGuiApplication.focusWindow() is self.win.windowHandle(), 700)
+
+    def on_focus(self, _win):
+        self.focus_changed = time.monotonic()
+
     def theme_check(self):
         """theme: the colour scheme Qt follows, and the portal's own setting when the session bus has one."""
         qt = 'unknown'
@@ -432,10 +452,10 @@ class Audit:
         win = self.app.palette().color(self.app.palette().ColorRole.Window)
         pal = 'dark' if win.lightness() < 128 else 'light'
         self.indicator.set_dark((qt if qt != 'unknown' else pal) == 'dark')
-        if qt == 'unknown':
-            ok = False
-        elif portal in ('dark', 'light'):
-            ok = qt == portal
+        # without a platform theme Qt 6 reports no colour scheme: then its palette is what an app shows
+        tk = qt if qt != 'unknown' else pal
+        if portal in ('dark', 'light'):
+            ok = tk == portal
         else:
             ok = True
         put('theme', ok, detail='qt %s, palette %s, portal %s' % (qt, pal, portal))

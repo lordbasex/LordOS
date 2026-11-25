@@ -34,6 +34,10 @@ int tk_save(const TkReport *rep, const char *path);
 /* $XDG_CACHE_HOME/lordos/toolkit-audit.json, or ~/.cache/lordos/toolkit-audit.json; -1 without a home */
 int tk_cache_path(char *out, size_t n, char *const *env);
 
+/* <dir>/<toolkit>.py into p when it may be run: dir absolute; dir and file no link, owned by root (TK_HARNESS_DIR)
+ * or, for a development folder, by root or this user, and not writable by group or others. 0, or -1. */
+int tk_harness_path(const char *dir, const char *toolkit, char *p, size_t n);
+
 /* lordos-testbench --toolkits [--json] [--only id,...] */
 int toolkits_main(int argc, char **argv);
 

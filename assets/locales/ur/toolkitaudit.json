@@ -26,5 +26,6 @@
   "recommend": "یہاں {toolkit} ایپس X11 پر بہتر چلتی ہیں (Wayland پر {wayland} %، X11 پر {x11} %): انہیں {env} کے ساتھ شروع کریں۔",
   "matrix": "ہر ٹول کٹ کے باندھے گئے Wayland گلوبلز (ورژن؛ ! پروٹوکول کی خرابی؛ - نہیں باندھا):",
   "saved": "lordos-issue کے لیے محفوظ کیا گیا: {path}",
-  "notSaved": "نتیجہ ~/.cache/lordos میں محفوظ نہیں ہو سکا۔"
+  "notSaved": "نتیجہ ~/.cache/lordos میں محفوظ نہیں ہو سکا۔",
+  "root": "ٹول کٹ آڈٹ root کے طور پر نہیں چلتا: LordOS ٹرمینل میں اپنے اکاؤنٹ سے lordos-testbench --toolkits چلائیں۔"
 }

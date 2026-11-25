@@ -26,5 +26,6 @@
   "recommend": "这里 {toolkit} 应用在 X11 上运行得更好 (Wayland 上 {wayland} %, X11 上 {x11} %): 请用 {env} 启动它们。",
   "matrix": "各工具包绑定的 Wayland 全局对象 (版本; ! 协议错误; - 未绑定):",
   "saved": "已为 lordos-issue 保存: {path}",
-  "notSaved": "无法将结果保存到 ~/.cache/lordos。"
+  "notSaved": "无法将结果保存到 ~/.cache/lordos。",
+  "root": "工具包审核不以 root 身份运行：请在 LordOS 终端中以你自己的用户运行 lordos-testbench --toolkits。"
 }
