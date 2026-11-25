@@ -619,6 +619,108 @@ static void test_runs(void) {
     tk_report_free(&rep);
 }
 
+/* --toolkits --last: the saved result in fixed lines; a hand-edited file prints nothing of its own */
+static char *last_of(const char *json, long long now, int *rc) {
+    char *buf = NULL;
+    size_t len = 0;
+    FILE *f = open_memstream(&buf, &len);
+    *rc = tk_last_summary(f, json, strlen(json), now);
+    fclose(f);
+    return buf;
+}
+
+static void test_last(void) {
+    TkReport rep;
+    memset(&rep, 0, sizeof rep);
+    rep.n = 3;
+    rep.at_ms = 1764072000000LL;
+    TkLog *l = malloc(sizeof *l);
+    tk_log_init(l);
+    feed(l, "[1.0]  -> wl_registry#2.bind(1, \"xdg_wm_base\", 6, new id [unknown]#3)\n");
+    tk_result_init(&rep.r[0], combo("gtk4-wayland"));
+    rep.r[0].log = l;
+    const char *s = "{\"toolkit\":\"gtk4\",\"version\":\"4.18.6\",\"backend\":\"wayland\",\"checks\":{\"theme\":{\"ok\":false,\"detail\":\"/home/alice\"}}}";
+    tk_parse_output(&rep.r[0], s, strlen(s), 0);
+    tk_finish(&rep.r[0], 1, 0);
+    tk_result_init(&rep.r[1], combo("qt6-xcb"));
+    rep.r[1].status = TK_ST_NOT_INSTALLED;
+    tk_result_init(&rep.r[2], combo("qt5-wayland"));
+    tk_finish(&rep.r[2], 2, 11);
+    tk_report_global(&rep);
+    char *json = NULL;
+    size_t jl = 0;
+    FILE *f = open_memstream(&json, &jl);
+    tk_report_json(f, &rep);
+    fclose(f);
+    free(l);
+    int rc = -1;
+    char *out = last_of(json, rep.at_ms + 2 * 3600 * 1000LL, &rc);
+    CHECK(rc == 0);
+    CHECK(strstr(out, "saved 2 hours ago"));
+    CHECK(strstr(out, "global score: "));
+    CHECK(strstr(out, "gtk4-wayland"));
+    CHECK(strstr(out, "4.18.6"));
+    CHECK(strstr(out, "failed: theme"));
+    CHECK(strstr(out, "qt6-xcb        not-installed"));
+    CHECK(strstr(out, "crash (signal 11)"));
+    CHECK(!strstr(out, "alice") && !strstr(out, "/home"));
+    free(out);
+    out = last_of(json, rep.at_ms + 5 * 60 * 1000LL, &rc);
+    CHECK(rc == 0 && strstr(out, "saved 5 minutes ago"));
+    free(out);
+    out = last_of(json, rep.at_ms + 3 * 86400 * 1000LL, &rc);
+    CHECK(rc == 0 && strstr(out, "saved 3 days ago"));
+    free(out);
+
+    /* hand-edited files: each one is refused as a whole, and none of its text comes out */
+    struct { const char *from, *to; } bad[] = {
+        { "\"tool\":\"lordos-testbench\"", "\"tool\":\"other\"" },
+        { "\"id\":\"qt6-xcb\"", "\"id\":\"/home/alice\"" },
+        { "\"version\":\"4.18.6\"", "\"version\":\"4.18;rm -rf ~\"" },
+        { "\"status\":\"not-installed\"", "\"status\":\"Alice's laptop\"" },
+        { "\"fatal\":\"crash\"", "\"fatal\":\"/home/alice\"" },
+        { "\"id\":\"theme\"", "\"id\":\"global.evil_secret\"" },
+        { "\"result\":\"fail\"", "\"result\":\"/home/alice\"" },
+        { "\"recommend\":null", "\"recommend\":\"LD_PRELOAD=/home/alice/x.so\"" },
+        { "\"signal\":11", "\"signal\":\"alice\"" },
+        { "\"v\":1", "\"v\":2" },
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+        const char *at = strstr(json, bad[i].from);
+        CHECK(at);
+        if (!at) continue;
+        char *e = malloc(jl + 256);
+        snprintf(e, jl + 256, "%.*s%s%s", (int)(at - json), json, bad[i].to, at + strlen(bad[i].from));
+        out = last_of(e, rep.at_ms, &rc);
+        if (rc != 1 || !strstr(out, "unreadable") || strstr(out, "alice") || strstr(out, "rm -rf") || strstr(out, "evil"))
+            { fprintf(stderr, "last: case %zu not refused: %s\n", i, out); fails++; }
+        free(out);
+        free(e);
+    }
+    out = last_of("not json", 0, &rc);
+    CHECK(rc == 1 && strstr(out, "unreadable"));
+    free(out);
+    out = last_of("[]", 0, &rc);
+    CHECK(rc == 1);
+    free(out);
+
+    /* the file itself: a link is not followed, a regular file is read */
+    char p[600], lp[600];
+    snprintf(p, sizeof p, "%s/saved.json", tmp);
+    snprintf(lp, sizeof lp, "%s/link.json", tmp);
+    FILE *w = fopen(p, "w");
+    if (w) { fputs(json, w); fclose(w); }
+    size_t n = 0;
+    char *r = tk_read_saved(p, &n);
+    CHECK(r && n == jl);
+    free(r);
+    CHECK(!symlink(p, lp));
+    CHECK(!tk_read_saved(lp, &n));
+    snprintf(p, sizeof p, "%s/missing.json", tmp);
+    CHECK(!tk_read_saved(p, &n));
+    free(json);
+}
+
 int main(void) {
     snprintf(tmp, sizeof tmp, "/tmp/tk-audit-test-XXXXXX");
     if (!mkdtemp(tmp)) { perror("mkdtemp"); return 1; }
@@ -628,6 +730,7 @@ int main(void) {
     test_output();
     test_env();
     test_runs();
+    test_last();
     char cmd[400];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", tmp);
     if (system(cmd)) { }

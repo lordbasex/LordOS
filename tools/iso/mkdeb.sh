@@ -28,6 +28,7 @@
 #   /usr/lib/lordos/lordos-dm-check       another display manager enabled next to lordos.service (#187): postinst warns
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
 #   /usr/share/applications/lordos-testbench.desktop   its launcher entry
+#   /usr/share/applications/lordos-toolkit-audit.desktop   lordos-testbench --toolkits in a Terminal window
 #   /usr/lib/lordos/toolkit-audit/        the harnesses of `lordos-testbench --toolkits` (tools/toolkit-audit/*.py, not
 #                                         the *_test.py: small Python 3 windows per toolkit; each runs only if that
 #                                         toolkit's bindings are already installed, so no GTK, Qt or binding is a dependency)
@@ -188,6 +189,9 @@ ln -s machines "$PKG/usr/share/bash-completion/completions/lordvm"
     "$STRIP" --strip-unneeded "$PKG/usr/bin/lordos-testbench" 2>/dev/null || true
     install -d "$PKG/usr/share/applications"
     install -m 644 packaging/desktop/lordos-testbench.desktop "$PKG/usr/share/applications/lordos-testbench.desktop"
+    # lordos-testbench --toolkits in a Terminal window (docs/TOOLKIT-AUDIT.md): System Information's hardware report
+    # opens it when "Include framework compatibility" is ticked and the saved result is older than a day
+    install -m 644 packaging/desktop/lordos-toolkit-audit.desktop "$PKG/usr/share/applications/lordos-toolkit-audit.desktop"
 }
 # isolated PDF and archive helper (optional: make skips it without libpoppler-glib-dev/libarchive-dev);
 # lord-server only launches the lord-doc in its own folder
@@ -419,7 +423,7 @@ install -m 755 tools/iso/rootfs/usr/lib/lordos/lordos-live-prep "$L/lordos-live-
 install -d "$L/toolkit-audit"
 for f in tools/toolkit-audit/*.py; do
     case "$f" in *_test.py) continue ;; esac
-    install -m 755 "$f" "$L/toolkit-audit/${f##*/}"
+    install -m 644 "$f" "$L/toolkit-audit/${f##*/}"
 done
 # updates in place (docs/UPDATES.md): the repository, its key, the migrations and the restart notice
 install -D -m 644 packaging/apt/lordos.sources "$L/apt/lordos.sources"

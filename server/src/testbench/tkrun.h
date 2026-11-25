@@ -37,4 +37,7 @@ int tk_cache_path(char *out, size_t n, char *const *env);
 /* lordos-testbench --toolkits [--json] [--only id,...] */
 int toolkits_main(int argc, char **argv);
 
+/* The saved result's bytes (a regular file owned by the caller, no link, at most TK_LAST_MAX), or NULL; free() it. */
+char *tk_read_saved(const char *path, size_t *len);
+
 #endif

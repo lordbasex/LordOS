@@ -397,13 +397,52 @@ static void texts_init(void) {
 }
 
 static void usage(void) {
-    fprintf(stderr, "%s\n", T("usage"));
+    fprintf(stderr, "%s\n       lordos-testbench --toolkits --last\n", T("usage"));
+}
+
+/* the saved result, read as it is: a regular file of the user's, no link, at most TK_LAST_MAX bytes */
+char *tk_read_saved(const char *path, size_t *len) {
+    *len = 0;
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NOCTTY | O_NONBLOCK);
+    if (fd < 0) return NULL;
+    struct stat st;
+    char *buf = NULL;
+    if (fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_uid != geteuid() || st.st_size <= 0 || st.st_size > TK_LAST_MAX) goto out;
+    buf = malloc((size_t)st.st_size + 1);
+    if (!buf) goto out;
+    size_t got = 0;
+    while (got < (size_t)st.st_size) {
+        ssize_t k = read(fd, buf + got, (size_t)st.st_size - got);
+        if (k < 0 && errno == EINTR) continue;
+        if (k <= 0) break;
+        got += (size_t)k;
+    }
+    if (got != (size_t)st.st_size) { free(buf); buf = NULL; goto out; }
+    buf[got] = 0;
+    *len = got;
+out:
+    close(fd);
+    return buf;
+}
+
+/* --toolkits --last: the saved result, summed up in fixed English lines (lordos-issue pastes them into a report) */
+static int last_main(void) {
+    char path[PATH_MAX];
+    size_t len = 0;
+    char *j = tk_cache_path(path, sizeof path, environ) ? NULL : tk_read_saved(path, &len);
+    if (!j) { puts("no saved result (run lordos-testbench --toolkits in the LordOS Terminal)"); return 0; }
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    tk_last_summary(stdout, j, len, (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000);   /* "unreadable" is an answer too */
+    free(j);
+    return ferror(stdout) ? 1 : 0;
 }
 
 int toolkits_main(int argc, char **argv) {
     int json = 0, which[TK_COMBOS], n = 0;
     const char *only = NULL;
     texts_init();
+    for (int i = 1; i < argc; i++) if (!strcmp(argv[i], "--last")) return argc == 3 ? last_main() : (usage(), 2);
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--toolkits")) continue;
         if (!strcmp(argv[i], "--json")) json = 1;

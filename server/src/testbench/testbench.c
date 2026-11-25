@@ -23,6 +23,8 @@
  *                                       opens no window itself: runs the toolkit harnesses (GTK 3/4, Qt 5/6, plain
  *                                       X11) in /usr/lib/lordos/toolkit-audit and scores each one (tkrun.c,
  *                                       docs/TOOLKIT-AUDIT.md)
+ *   lordos-testbench --toolkits --last  the saved result (~/.cache/lordos/toolkit-audit.json) in a few checked
+ *                                       English lines, for lordos-issue
  *
  * Except --toolkits, it reads no files and talks to nothing but the compositor. */
 #ifndef _GNU_SOURCE

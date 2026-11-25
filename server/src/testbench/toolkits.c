@@ -719,3 +719,102 @@ void tk_report_table(FILE *o, const TkReport *rep, TkText T) {
         fputc('\n', o);
     }
 }
+
+/* ---- the saved result, summed up (--toolkits --last, for lordos-issue) ---- */
+
+/* The file is the user's and may have been edited by hand: every value printed is checked against the fixed lists
+ * first (ids, statuses, fatal words, check ids, a version of [0-9A-Za-z.+~-]), and anything else makes the whole
+ * file "unreadable". Only check ids, numbers and those words are printed; never a path or a title. */
+static int is_word_in(const char *s, const char *const *list, int n) {
+    for (int i = 0; s && i < n; i++) if (!strcmp(s, list[i])) return i;
+    return -1;
+}
+
+static int version_ok(const char *s) {
+    if (!s) return 0;
+    size_t n = strlen(s);
+    if (n > 31) return 0;
+    for (size_t i = 0; i < n; i++) {
+        char c = s[i];
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '.' || c == '+' || c == '~' || c == '-')) return 0;
+    }
+    return 1;
+}
+
+/* a shared check id, or "global." and one of the table's interfaces */
+static int check_id_ok(const char *s) {
+    if (!s) return 0;
+    for (int i = 0; i < TK_CHECKS; i++) if (!strcmp(s, check_tab[i].id)) return 1;
+    return !strncmp(s, "global.", 7) && global_index(s + 7, strlen(s + 7)) >= 0;
+}
+
+static int recommend_ok(const char *s) {
+    static const char *const ok[] = { "GDK_BACKEND=x11", "GDK_BACKEND=wayland", "QT_QPA_PLATFORM=xcb", "QT_QPA_PLATFORM=wayland" };
+    return is_word_in(s, ok, 4) >= 0;
+}
+
+/* a score: null or 0..100; a missing one counts as null */
+static int pct_ok(const JVal *v) { return !v || v->type == J_NULL || (v->type == J_NUM && v->num >= 0 && v->num <= 100); }
+
+int tk_last_summary(FILE *o, const char *json, size_t len, long long now_ms) {
+    static const char *const status[] = { "ran", "fatal", "not-installed", "no-display", "no-harness", "not-run" };
+    static const char *const fatal[] = { "timeout", "crash", "protocol-error", "connection-lost", "egl", "vulkan",
+                                         "platform-plugin", "no-result" };
+    JDoc doc;
+    if (!json || !len || len > TK_LAST_MAX || json_parse(json, len, &doc, NULL, 0)) {
+        fputs("the saved result is unreadable\n", o);
+        return 1;
+    }
+    const JVal *r = doc.root, *combos = json_get(r, "combos");
+    const JVal *at = json_get(r, "at"), *score = json_get(r, "score");
+    int ok = r && r->type == J_OBJ && json_str(r, "tool") && !strcmp(json_str(r, "tool"), "lordos-testbench")
+          && json_str(r, "mode") && !strcmp(json_str(r, "mode"), "toolkits") && json_num(r, "v", 0) == 1
+          && at && at->type == J_NUM && at->num > 0 && at->num < 1e15 && score && pct_ok(score)
+          && combos && combos->type == J_ARR && combos->len <= TK_COMBOS;
+    /* every row first, then print */
+    for (const JVal *c = ok ? combos->kid : NULL; c && ok; c = c->next) {
+        const char *id = json_str(c, "id"), *st = json_str(c, "status");
+        const JVal *f = json_get(c, "fatal"), *ch = json_get(c, "checks"), *rec = json_get(c, "recommend");
+        const JVal *sig = json_get(c, "signal");
+        ok = c->type == J_OBJ && id && tk_combo_find(id, strlen(id)) >= 0 && is_word_in(st, status, 6) >= 0
+          && f && (f->type == J_NULL || (f->type == J_STR && is_word_in(f->str, fatal, 8) >= 0))
+          && (!json_get(c, "version") || version_ok(json_str(c, "version"))) && pct_ok(json_get(c, "score"))
+          && (!rec || rec->type == J_NULL || (rec->type == J_STR && recommend_ok(rec->str)))
+          && (!sig || (sig->type == J_NUM && sig->num >= 0 && sig->num < 128))
+          && (!ch || (ch->type == J_ARR && ch->len <= TK_CHECKS + TK_GLOBALS));
+        for (const JVal *k = ok && ch ? ch->kid : NULL; k && ok; k = k->next) {
+            const char *res = json_str(k, "result");
+            ok = k->type == J_OBJ && check_id_ok(json_str(k, "id")) && res && (!strcmp(res, "pass") || !strcmp(res, "fail") || !strcmp(res, "skip"));
+        }
+    }
+    if (!ok) {
+        fputs("the saved result is unreadable\n", o);
+        json_free(&doc);
+        return 1;
+    }
+    long long age = now_ms > (long long)at->num ? (now_ms - (long long)at->num) / 1000 : 0;
+    if (age < 3600) fprintf(o, "saved %lld minutes ago\n", age / 60);
+    else if (age < 172800) fprintf(o, "saved %lld hours ago\n", age / 3600);
+    else fprintf(o, "saved %lld days ago\n", age / 86400);
+    double ran = json_num(r, "ran", 0);
+    if (score->type == J_NUM) fprintf(o, "global score: %.1f %% (%d of %d combinations ran)\n", score->num, ran >= 0 && ran <= TK_COMBOS ? (int)ran : 0, (int)combos->len);
+    else fputs("global score: none (no combination ran)\n", o);
+    for (const JVal *c = combos->kid; c; c = c->next) {
+        const char *id = json_str(c, "id"), *st = json_str(c, "status"), *ver = json_str(c, "version");
+        const JVal *f = json_get(c, "fatal"), *sc = json_get(c, "score"), *ch = json_get(c, "checks"), *rec = json_get(c, "recommend");
+        fprintf(o, "  %-14s ", id);
+        if (!strcmp(st, "ran") && sc && sc->type == J_NUM) fprintf(o, "%5.1f %%", sc->num);
+        else if (!strcmp(st, "fatal")) {
+            fprintf(o, "  0.0 %%  %s", f->type == J_STR ? f->str : "fatal");
+            if (f->type == J_STR && !strcmp(f->str, "crash")) fprintf(o, " (signal %d)", (int)json_num(c, "signal", 0));
+        } else fputs(st, o);
+        if (ver && *ver) fprintf(o, "  %s", ver);
+        int any = 0;
+        for (const JVal *k = ch ? ch->kid : NULL; k; k = k->next)
+            if (!strcmp(json_str(k, "result"), "fail")) fprintf(o, "%s%s", any++ ? ", " : "  failed: ", json_str(k, "id"));
+        if (rec && rec->type == J_STR) fprintf(o, "  recommended: %s", rec->str);
+        fputc('\n', o);
+    }
+    json_free(&doc);
+    return 0;
+}

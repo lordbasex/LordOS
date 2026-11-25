@@ -143,6 +143,12 @@ void tk_report_json(FILE *o, const TkReport *rep);
 typedef const char *(*TkText)(const char *key);
 void tk_report_table(FILE *o, const TkReport *rep, TkText T);
 
+/* --toolkits --last (for lordos-issue): the saved result (docs/TOOLKIT-AUDIT.md's JSON, at most TK_LAST_MAX bytes) as a
+ * few fixed English lines. Every value printed is checked against the fixed lists first; a file that doesn't pass
+ * prints one "unreadable" line and returns 1. now_ms: the clock, for the result's age. */
+#define TK_LAST_MAX (256 * 1024)
+int tk_last_summary(FILE *o, const char *json, size_t len, long long now_ms);
+
 /* {name} placeholders: kv is name, value, ..., NULL */
 void tk_fill(const char *tmpl, const char *const *kv, char *out, size_t n);
 
