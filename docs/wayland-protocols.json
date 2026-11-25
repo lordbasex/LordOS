@@ -417,6 +417,7 @@
         "globals": {
           "wp_drm_lease_device_v1": 1
         },
+        "offered": "headset",
         "since": "0.8.9.5",
         "note": "Only a connector the kernel marks non-desktop (a VR headset), only to an app the person allowed (the vr permission: Allow once, Always allow, Don't allow), never to a sandboxed or isolated app or Xwayland; revoked on unplug, permission taken back, lock, user switch or text console. Approved by the maintainer 2026-11-22. Not yet checked with a real headset.",
         "checked": "build/drmlease-test, drmlease-e2e-test",
@@ -444,6 +445,7 @@
         "globals": {
           "wp_linux_drm_syncobj_manager_v1": 1
         },
+        "offered": "render-node",
         "since": "0.8.9.5",
         "note": "A dmabuf frame is applied once its acquire point is signalled, without blocking, and its release point is signalled when LordOS is done with it. Offered when a render node has timeline syncobjs and SYNCOBJ_EVENTFD (Linux 6.6), on the GPU and the CPU path (docs/WAYLAND.md, \"Explicit sync\").",
         "checked": "build/syncobj-test, tests/syncobj_headless.sh; vkcube (Mesa 25.0.7 Vulkan) on an AMD RX 580",
@@ -627,6 +629,7 @@
         "globals": {
           "xwayland_shell_v1": 1
         },
+        "offered": "xwayland",
         "since": "0.8.9.5",
         "note": "Offered to Xwayland only (hidden from every other client; a bind by anyone else is an error). X windows are matched to their surfaces by serial (WL_SURFACE_SERIAL), so a recycled surface id can't show another window; WL_SURFACE_ID still works for older Xwayland (server/src/wl/xwshell.c, xwm.c).",
         "checked": "Xwayland 24.1.6 with xterm on a headless lord-server (docs/wayland-proofs/x11-xwayland.startup.png); x11-conformance-client",
@@ -729,6 +732,7 @@
         "globals": {
           "wp_security_context_manager_v1": 1
         },
+        "offered": "unsandboxed",
         "checked": "build/secctx-test",
         "checkedDate": "2026-11-22",
         "since": "0.8.8.8",

@@ -4,7 +4,7 @@
 # times, presentation, latency, the GL renderer's kind, the 3D scene, the report file) are shared with
 # LordBench (0.8.6, docs/BENCHMARK.md) and tested on their own (build/bench-test).
 BENCH_SRC := src/bench/bench.c
-TESTBENCH_SRC := src/testbench/testbench.c src/testbench/checks.c src/testbench/gl3d.c src/testbench/card.c src/testbench/draw.c $(BENCH_SRC)
+TESTBENCH_SRC := src/testbench/testbench.c src/testbench/checks.c src/testbench/globtable.c src/testbench/gl3d.c src/testbench/card.c src/testbench/draw.c $(BENCH_SRC)
 all: build/lordos-testbench
 # the 3D view needs EGL, GLESv2 and wayland-egl (Mesa); without them the bench builds and says so
 TB_GL := $(shell pkg-config --exists egl glesv2 wayland-egl 2>/dev/null && echo 1)
@@ -18,4 +18,11 @@ test: build/bench-test
 build/bench-test: tests/bench_test.c $(BENCH_SRC) src/bench/bench.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/bench_test.c $(BENCH_SRC) -lm
+	./$@ || { rm -f $@; exit 1; }
+# the registry against LordOS's protocol table (globtable.c, expected_globals.h generated from docs/wayland-protocols.json):
+# offered, newer, older, missing, offered only to some clients; hostile interface names in the JSON
+test: build/testbench-globals-test build/lordos-testbench
+build/testbench-globals-test: tests/testbench_globals_test.c src/testbench/globtable.c src/testbench/globtable.h src/testbench/expected_globals.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ tests/testbench_globals_test.c src/testbench/globtable.c
 	./$@ || { rm -f $@; exit 1; }
