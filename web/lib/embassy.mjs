@@ -2,8 +2,10 @@
 // plain shapes: the building follows the site's colours (CSS classes in site.css, light and dark), the flags are
 // simple stripes and discs (decoration only, like the small flag on each language card: a language's own name
 // stays its identifier).
-// lumo is the URL of the hashed mascot SVG (assets/brand/mascot/lumo-wave.svg). Lumo waves a small Argentine flag in
-// its raised paw, a nod to where LordOS is made.
+// lumo is the URL of the 3D mascot waving (build.mjs LUMO.wave: a WebP of the 512 px render of
+// assets/brand/mascot/png/lumo-wave-1024.png). Its raised paw is open, so it cannot hold anything: a small Argentine
+// flag on a stick stands planted on the steps at Lumo's side, the side it waves to, a nod to where LordOS is made.
+// The flag sways from the stick's foot and waves from the stick (site.css, .lg-hand and .lg-ar).
 
 const W = 56, H = 36;   // one flag
 const stripesH = (cs) => cs.map((c, i) => `<rect x="0" y="${(H / cs.length) * i}" width="${W}" height="${H / cs.length + 0.5}" fill="${c}"/>`).join('');
@@ -16,7 +18,7 @@ const FLAGS = [
   stripesV(['#0055A4', '#fff', '#EF4135']),
   stripesH(['#0057B7', '#FFD700']),
 ];
-// the small flag in Lumo's paw: light blue, white, light blue, with the sun
+// the small flag at Lumo's side: light blue, white, light blue, with the sun
 const HAND = `<rect width="52" height="33" fill="#74ACDF"/><rect y="11" width="52" height="11" fill="#fff"/><circle cx="26" cy="16.5" r="4" fill="#F6B40E"/>`;
 const EDGE = '<path class="lg-edge" d="M0 2Q14-2 28 2T56 2V36Q42 40 28 36T0 36Z"/>';   // a hairline, so a white flag shows on a light page
 const BRAND = `<rect width="${W}" height="${H}" fill="#5B3FE0"/><path d="M17 24 19 13 24 18 28 10 32 18 37 13 39 24z" fill="#fff"/>`;   // a small crown
@@ -48,8 +50,9 @@ ${cols}
 <g class="lg-pole"><rect x="318" y="58" width="4" height="50" rx="2"/><circle cx="320" cy="55" r="4.5"/></g>
 <g transform="translate(322 60)"><g class="lg-flag lg-f6" clip-path="url(#lg-wave)">${BRAND}</g></g>
 ${poles}
-<g class="lg-hand"><g transform="rotate(-22 272 320)"><rect class="lg-stick" x="270" y="222" width="4.5" height="100" rx="2.25"/>
-<g transform="translate(219 224)"><g class="lg-flag lg-ar">${HAND}<rect class="lg-edge-r" width="52" height="33" fill="none"/></g></g></g></g>
-<image href="${lumo}" x="230" y="196" width="180" height="180"/>
+<image href="${lumo}" x="226" y="190" width="184" height="184"/>
+<g class="lg-hand"><g transform="rotate(8 412 350)"><rect class="lg-stick" x="410" y="258" width="4.5" height="94" rx="2.25"/>
+<circle class="lg-stick" cx="412.25" cy="257" r="3.4"/>
+<g transform="translate(414 261)"><g class="lg-flag lg-ar">${HAND}<rect class="lg-edge-r" width="52" height="33" fill="none"/></g></g></g></g>
 </svg>`;
 }

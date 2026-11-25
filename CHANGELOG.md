@@ -30,6 +30,56 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   stopped it the same way. A sweep of apps, themes and the SDK with React's rules-of-hooks lint found one more hook after
   an early return, in Settings → Wallpaper (only reached by a theme with no wallpapers); it is moved as well.
 
+### Changed
+- **Lumo is now the 3D Lumo, in the OS and on lordos.org.** The flat, outlined vector mascot is replaced everywhere by
+  the 3D Lumo approved by the maintainer: soft rendered fur and cloth, the white and lavender fox of the LordOS 0.8.8.9
+  cover with the white crown and its golden gems and the violet cape with its diamond brooch. The ten pictures (views
+  front, three-quarter, back and avatar; poses wave, shield, run, sleep, celebrate and confused, the same names as
+  before) are AI-generated art made from that cover, raster PNG with a real transparent background, kept as delivered
+  in `assets/brand/mascot/png/lumo-<name>-{512,1024}.png` (1024 is the high-quality master, 512 the standard one).
+  - **The OS** (`assets/mascot/`, drawn by `sdk/mascot.js`): every place that shows Lumo gets the new art with no change
+    to the app: the installer's welcome and the first-login tour (wave), Monitor → Network with the firewall on (shield),
+    the Store's updates and suggestions when all is done (celebrate), the error, "not available" and empty states of
+    Calendar, Contacts, Reminders, Logs, Disks, Help, System Information and the Store's package engine (confused, through
+    `EmptyState`), the Imager's tips and its last step, and About's avatar. `lumoSource(pose, size, scale)` now picks
+    the smallest render that covers the size drawn times the largest display scale: the poses at 128, 256 or 512 px (a
+    112 px empty state reads 128 px at 100 % and 256 px at 200 %; 512 only for a 128 px Lumo above 200 %), the avatar at
+    128 or 256 px, and up to 40 px a new tighter crop of the avatar (head, crown and the top of the cape, no margin) at 32
+    or 64 px, so About's 24 px avatar is as big as its box allows.
+  - **`tools/gen-mascot.py`** no longer assembles SVGs: it makes those renders from the 1024 masters with Lanczos on
+    premultiplied alpha, so the soft fur edges keep their own colour and show no dark or light halo on either background
+    (checked on dark and light); in the renders it also closes the 1 % see-through the generator left in the body (alpha
+    250–254 becomes 255) and drops invisible specks (alpha under 3). `--import DIR` takes a new set of masters
+    (recompressed only when that is smaller, pixels checked unchanged), `--check` verifies the renders (part of
+    `make test`), `--preview OUT` writes a sheet of every render on dark and light.
+  - **Retired:** the vector mascot's SVGs and parts file (`assets/brand/mascot/*.svg`, `src/lumo-parts.svg`), their copies
+    and renders in `docs/brand/mascot/` (the brand kit now points at the masters), and the SVG generator. They are in the
+    git history.
+  - **The site** (`web/build.mjs`): every Lumo is a WebP of the 256 and 512 px renders and of the 1024 master, with
+    `srcset` and the width each page draws it at, so a 64 px tip loads the 256 px file and a hero on a 2x screen the
+    1024 one; hashed like every other asset. The home page's support card and "Meet Lumo", the feature pages' hero, the
+    Raspberry Pi page, the Imager guide, About and the 404 page. On the /language/ page the 3D Lumo waves with an open
+    paw that cannot hold a stick, so the small Argentine flag now stands planted on the embassy's steps at the side Lumo
+    waves to, swaying gently (still off with reduced motion).
+  - **The Imager for Mac, Windows and Linux** (`desktop/imager`) draws the same renders, 128 px with the 256 px one for
+    2x screens (`srcset`).
+  - **Alt text:** "Lumo asleep on a laptop" no longer matches the picture (the 3D Lumo sleeps curled up, with no laptop):
+    it is "Lumo curled up asleep" now, in all 35 languages.
+  - **Size:** the OS's `assets/mascot/` grows from 265 KB (8 files) to 2.2 MB (22 files; the 512 px renders, 1.5 MB, are
+    only for 300 % displays and could be left out); the masters (9.4 MB) are in the repository but not in the package.
+    The site's Lumo pictures are 1.4 MB in all (27 WebP files), a page loads one size of each.
+  - **Docs:** `docs/LORDOS-BRAND.md` ("Lumo") describes the 3D design and its provenance, the views and poses with
+    their uses, which file to use for which size (the 512/1024 quality rule), small sizes (under 48 px use the avatar;
+    at 20–24 px it reads as Lumo but the gems become dots) and the do's and don'ts; `docs/brand/README.md` and
+    `docs/DESIGN.md` follow. The brand screenshots in `docs/brand/mascot/screens/` (also on the site's gallery: the tour,
+    the installer's welcome, Calendar without its service, About) are taken again with the new Lumo, by the headless
+    scene below; About's computer and user names are neutral ones there.
+  - **Tests:** `make test` runs `tools/gen-mascot.py --check` (the renders match the masters, up to 3 levels of
+    rounding between Pillow versions). A new headless scene, `tests/app_scene_headless.sh lumo_scene`, opens the
+    first-login tour, Help's empty state, Calendar, the installer and About, checks that each Lumo is drawn with the render
+    `lumoSource` picks (`lumo-wave-128.png` at 120 px, `lumo-confused-128.png` at 112, `lumo-avatar-small-32.png` at 24)
+    and keeps the screenshots.
+
 ### Added
 - **Settings → Wallpaper is a gallery, with three new collections of still pictures: Abstract, Epic and Anime.** The
   approved redesign (apps/settings/WallpaperGallery.jsx) reorganises the page; nothing it had goes away.

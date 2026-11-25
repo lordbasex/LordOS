@@ -6,8 +6,9 @@
 # screenshots_menu_scene (Screenshots' Options menu above the bar on its first open, #237) and settings_region_scene
 # (Settings → Region names each region's language, #239), files_renamelayout_scene (Files' rename field keeps the layout)
 # notes_pick_scene (Notes: a note written elsewhere shows by itself, the catalog's pick, round checklists; 0.8.9.6.2),
-# ws_topbar_scene (Lord Workspaces' top band in any language and size; run it with the workspaces theme), and
-# settings_wallpaper_scene (Settings → Wallpaper's gallery: the cards, a collection, a sheet, a search; run it in ar too).
+# ws_topbar_scene (Lord Workspaces' top band in any language and size; run it with the workspaces theme),
+# settings_wallpaper_scene (Settings → Wallpaper's gallery: the cards, a collection, a sheet, a search; run it in ar too), and
+# lumo_scene (the 3D Lumo in the tour, an empty state and About; it also takes docs/brand/mascot/screens).
 # The driver prints lines starting with "APP-SCENE" in the shell log; each check says "done" or "missing", and the exit
 # status is 1 when one is missing. Nothing outside the temporary home is read or written (never the person's own notes).
 # A test tool, never installed; not part of `make test` (`make test-full` runs files_slowrename_scene and

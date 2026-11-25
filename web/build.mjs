@@ -183,13 +183,27 @@ const themeSrc = minJs(src('theme.js'));
 const themeUrl = hashed(Buffer.from(themeSrc), 'theme', 'js');
 
 // ---------- images ----------
+// Lumo, the 3D mascot (docs/LORDOS-BRAND.md "Lumo"): WebP of the OS renders (assets/mascot, 256 and 512, resized
+// with premultiplied alpha by tools/gen-mascot.py) and of the 1024 master, without resizing here. LUMO[pose] is the
+// 512 one (an `src`, and the picture in the /language/ SVG); LUMOSET[pose] the srcset, to go with a `sizes` of the
+// width the page draws it at, so a 64 px tip loads the 256 file and a hero on a 2x screen the 1024 one.
+const LUMO_POSES = ['wave', 'shield', 'run', 'sleep', 'celebrate', 'confused', 'front', 'three-quarter', 'back'];
+const lumoFile = (p, px) => (px < 1024 && fs.existsSync(r(`assets/mascot/lumo-${p}-${px}.png`)) ? r(`assets/mascot/lumo-${p}-${px}.png`) : r(`assets/brand/mascot/png/lumo-${p}-${px === 1024 ? 1024 : 512}.png`));
+const lumoWebp = (p, px) => webp(lumoFile(p, px), px, 86, `lumo-${p}`);
+const LUMO = {}, LUMOSET = {};
+for (const p of LUMO_POSES) {
+  if (!fs.existsSync(r(`assets/brand/mascot/png/lumo-${p}-1024.png`))) continue;
+  const set = [256, 512, 1024].map((px) => lumoWebp(p, px));
+  LUMO[p] = set[1].url;
+  LUMOSET[p] = set.map((x) => `${x.url} ${x.w}w`).join(', ');
+}
 const img = {
   logoLight: asset(r('assets/brand/logo-horizontal-light.svg'), 'logo-light'),
   logoDark: asset(r('assets/brand/logo-horizontal-dark.svg'), 'logo-dark'),
-  lumoWave: asset(r('assets/brand/mascot/lumo-wave.svg'), 'lumo-wave'),
-  lumoShield: asset(r('assets/brand/mascot/lumo-shield.svg'), 'lumo-shield'),
-  lumoCelebrate: asset(r('assets/brand/mascot/lumo-celebrate.svg'), 'lumo-celebrate'),
-  lumoConfused: asset(r('assets/brand/mascot/lumo-confused.svg'), 'lumo-confused'),
+  lumoWave: LUMO.wave, lumoWaveSet: LUMOSET.wave,
+  lumoShield: LUMO.shield, lumoShieldSet: LUMOSET.shield,
+  lumoCelebrate: LUMO.celebrate, lumoCelebrateSet: LUMOSET.celebrate,
+  lumoConfused: LUMO.confused, lumoConfusedSet: LUMOSET.confused,
   federico: webp(path.join(WEB, 'src/team/federico-pereira.jpg'), 240, 82).url,
 };
 
@@ -421,7 +435,6 @@ const footerFile = path.join(CONTENT, 'footer.json');
 const footerJson = fs.existsSync(footerFile) ? readJson(footerFile) : null;
 log(`content: ${legalPages.length} legal pages${legalHeld.length ? ` (held back, placeholders: ${legalHeld.join(', ')})` : ''}, FAQ ${HAS_FAQ ? 'yes' : 'no'}${faqHeld ? ` (${faqHeld} questions with placeholders hidden)` : ''}, footer.json ${footerJson ? 'yes' : 'no'}`);
 log(`content: ${featureList.length} feature pages, paper ${HAS_PAPER ? 'yes' : 'no'} (from ${path.relative(REPO, CONTENT) || CONTENT})`);
-const LUMO = Object.fromEntries(['wave', 'shield', 'run', 'sleep', 'celebrate', 'confused', 'front', 'three-quarter', 'back'].filter((p) => fs.existsSync(r(`assets/brand/mascot/lumo-${p}.svg`))).map((p) => [p, asset(r(`assets/brand/mascot/lumo-${p}.svg`), `lumo-${p}`)]));
 let HAS_PDF = false;
 if (HAS_PAPER && TOOLS) { try { createRequire(path.join(TOOLS, 'package.json')).resolve('playwright'); HAS_PDF = true; } catch { /* no playwright */ } }
 if (HAS_PAPER && !HAS_PDF) console.warn('[web] paper: set WEB_TOOLS to a folder with playwright to build the PDFs; the PDF link is left out');
@@ -984,7 +997,7 @@ ${shotList.join('\n')}
       shotsSection,
       benchSteps: P.benchSteps.map(([h, x], i) => `<li><h3>${esc(h)}</h3><p>${esc(x)}</p>${i === 1 ? '<pre class="pi-pre">lordos-sysreport bench --quick\nlordos-sysreport bench --full --json</pre>' : ''}</li>`).join('\n'),
       tools: P.tools.map(([c, x]) => `<article class="pi-tool"><h3><code>${esc(c)}</code></h3><p>${c === 'lordos-issue' || c === 'lordos-testbench' ? esc(x) : code(x)}</p></article>`).join('\n'),
-      lumo: LUMO.wave || img.lumoWave,
+      lumo: LUMO.wave, lumoSet: LUMOSET.wave,
       browseLink: HAS_HW ? `<a class="pi-browse" href="${pageUrl(l, 'hardware')}">${esc(P.shareBrowse)}</a>` : '',
     }, t));
   }
@@ -1046,7 +1059,7 @@ ${shotList.join('\n')}
     const pose = (m.lumo && m.lumo.pose) || 'front';
     write(path.join(pageUrl(l, page), 'index.html'), render(tpl.feature, {
       ...common(page, [`${title} · LordOS`, loc(m.tagline, l) || t.meta.description], true),
-      lumo: LUMO[pose] || LUMO.front || img.lumoWave,
+      lumo: LUMO[pose] || LUMO.front, lumoSet: LUMOSET[pose] || LUMOSET.front,
       title: esc(title), tagline: esc(loc(m.tagline, l)), intro: inline(loc(m.lumo && m.lumo.intro, l)),
       body: bodyHtml, shots, sources, prevnext: pn,
     }, t));
@@ -1496,7 +1509,7 @@ ${HAS_WLCONF ? `<p class="wc-also">${esc(t.pages.wlconf.fromTable)} <a href="${p
     const work = A.work.map(([title, text]) => `<article class="feat"><h3>${esc(title)}</h3><p>${esc(text)}</p></article>`).join('\n');
     write(path.join(pageUrl(l, 'about'), 'index.html'), render(tpl.about, {
       ...common('about', [A.metaTitle, A.metaDescription], true),
-      people, work, liIcon: li, lumoWave: img.lumoWave,
+      people, work, liIcon: li, lumoWave: img.lumoWave, lumoWaveSet: img.lumoWaveSet,
       siteUrl: esc(team.company.site.replace('{lang}', l)), companyLinkedin: esc(team.company.linkedin),
       contactUrl: esc(team.company.contact.replace('{lang}', l)), supportUrl: prefix(l) + '#support',
     }, t));
@@ -1507,7 +1520,7 @@ ${HAS_WLCONF ? `<p class="wc-also">${esc(t.pages.wlconf.fromTable)} <a href="${p
 if (HAS_GUIDE) {
   for (const l of LANGS) {
     const t = dict[l];
-    const { main, meta } = imagerGuide({ content: imagerDir, repo: REPO, lang: l, t, g: guideText[l], version: MEDIA_VERSION, esc, webp, hashed, read, lumo: LUMO, pageUrl, prefix, links: imagerLinks(l), videoDir: IMAGER_VIDEO_DIR });
+    const { main, meta } = imagerGuide({ content: imagerDir, repo: REPO, lang: l, t, g: guideText[l], version: MEDIA_VERSION, esc, webp, hashed, read, lumo: LUMO, lumoSet: LUMOSET, pageUrl, prefix, links: imagerLinks(l), videoDir: IMAGER_VIDEO_DIR });
     write(path.join(pageUrl(l, 'imager'), 'index.html'), render(tpl.imager, {
       js: jsUrl, header: header(t, 'imager'), footer: footer(t, 'imager'), head: head(t, 'imager', meta, 'imager'), lightbox: render(tpl.lightbox, {}, t), main,
     }, t));

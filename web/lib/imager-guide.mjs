@@ -11,7 +11,9 @@ import { inline } from './md.mjs';
 export const VIDEO_BASE = 'lordos_imager_guide';
 export const VIDEO_LANGS = ['en', 'es', 'pt'];
 
-export function imagerGuide({ content, repo, lang: l, t, g, version, esc, webp, hashed, read, lumo, pageUrl, prefix, links, videoDir }) {
+export function imagerGuide({ content, repo, lang: l, t, g, version, esc, webp, hashed, read, lumo, lumoSet = {}, pageUrl, prefix, links, videoDir }) {
+  // a Lumo picture: its 512 px WebP and the srcset for the width it is drawn at (build.mjs, LUMO / LUMOSET)
+  const lumoImg = (p, px, attrs = '') => `<img src="${lumo[p] || lumo.wave}"${lumoSet[p] || lumoSet.wave ? ` srcset="${lumoSet[p] || lumoSet.wave}" sizes="${px}px"` : ''} alt="" width="${px}" height="${px}"${attrs}>`;
   const md = (s) => inline(String(s || ''));
   const fill = (s) => String(s).replace('{v}', version);
   const shotDir = (theme) => path.join(content, 'shots', theme, l);
@@ -43,7 +45,7 @@ export function imagerGuide({ content, repo, lang: l, t, g, version, esc, webp, 
     const thumb = webp(f, 800, 80), full = webp(f, 1600, 80);
     return `<figure class="ig-screen"><a class="g-card" href="${full.url}" data-w="${full.w}" data-h="${full.h}" data-cap="${esc(caption)}" aria-label="${esc(g.open + ': ' + caption)}"><img src="${thumb.url}" srcset="${thumb.url} ${thumb.w}w, ${full.url} ${full.w}w" sizes="(max-width: 900px) 92vw, 380px" width="${thumb.w}" height="${thumb.h}" alt="${esc(caption)}" loading="lazy" decoding="async"></a><figcaption>${esc(caption)}</figcaption></figure>`;
   }
-  const tip = (x) => (x ? `<aside class="ig-tip" aria-label="${esc(g.tipFrom)}"><img src="${lumo[x[0]] || lumo.wave}" alt="" width="64" height="64" loading="lazy"><div><p class="ig-tip-t">${esc(x[1])}</p><p>${md(x[2])}</p></div></aside>` : '');
+  const tip = (x) => (x ? `<aside class="ig-tip" aria-label="${esc(g.tipFrom)}">${lumoImg(x[0], 64, ' loading="lazy"')}<div><p class="ig-tip-t">${esc(x[1])}</p><p>${md(x[2])}</p></div></aside>` : '');
   const num = (i) => String(i + 1).padStart(2, '0');
 
   const dl = `<div class="ig-dl">
@@ -64,7 +66,7 @@ ${dl}
 </div>
 <div class="ig-hero-art">
 ${shot('01-device', g.heroAlt, { eager: true, sizes: '(max-width: 900px) 92vw, 600px', cls: 'ig-tilt' })}
-<div class="ig-hello"><img src="${lumo.wave}" alt="" width="132" height="132"><p class="ig-bubble">${esc(g.hello)}</p></div>
+<div class="ig-hello">${lumoImg('wave', 132)}<p class="ig-bubble">${esc(g.hello)}</p></div>
 </div>
 </div>
 </section>`;
@@ -124,7 +126,7 @@ ${shot(g.optShot[0], g.optShot[1], { sizes: '(max-width: 900px) 92vw, 520px' })}
 
   const safety = `<section class="ig-safe" id="safety" aria-labelledby="safety-h">
 <div class="wrap">
-<img class="ig-safe-lumo" src="${lumo.shield}" alt="" width="120" height="120" loading="lazy">
+${lumoImg('shield', 120, ' class="ig-safe-lumo" loading="lazy"')}
 <h2 id="safety-h" class="ig-h2s">${esc(g.secTitle)}</h2>
 <p class="ig-sub">${esc(g.secLead)}</p>
 <ul class="ig-safe-grid">${g.sec.map(([a, b]) => `<li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg><h3>${esc(a)}</h3><p>${md(b)}</p></li>`).join('')}</ul>
@@ -139,7 +141,7 @@ ${shot(g.optShot[0], g.optShot[1], { sizes: '(max-width: 900px) 92vw, 520px' })}
 
   const end = `<section class="wrap ig-end" aria-labelledby="end-h">
 <div class="ig-end-card">
-<img src="${lumo.celebrate}" alt="" width="150" height="150" loading="lazy">
+${lumoImg('celebrate', 150, ' loading="lazy"')}
 <div>
 <h2 id="end-h" class="ig-h2s">${esc(g.endTitle)}</h2>
 <p>${esc(g.endText)}</p>
