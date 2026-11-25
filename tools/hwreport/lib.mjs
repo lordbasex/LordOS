@@ -10,6 +10,7 @@
 // inside code spans. Labels come from fixed lists, never from the report's text.
 import { validate } from './jsonschema.mjs';
 import { REFERENCES } from '../../apps/sysinfo/references.js';
+import { TOOLKIT_LABELS, toolkitLabels, toolkitRows } from '../../apps/sysinfo/toolkits.js';
 import { reportKind, gpuVendor, cpuVendor, machineLabel, sameVersion, mainGpu, bootInfo, BOOT_MEDIA, FORMAT } from '../../apps/sysinfo/share.js';
 
 export const MAX_BYTES = 512 * 1024;
@@ -208,6 +209,16 @@ export function plausibility(rep, { today = new Date().toISOString().slice(0, 10
     const r = b.results || {};
     if (r['sustained.start'] && r['sustained.end'] && r['sustained.end'].value > r['sustained.start'].value * 1.5) flag('sustained-rise', `${r['sustained.start'].value} → ${r['sustained.end'].value}`);
   }
+  // the toolkit audit (optional): not from the future, and each score is its own points (one decimal, rounded down)
+  const tk = rep.toolkits;
+  if (tk) {
+    if (tk.at > today) flag('toolkits-date', tk.at);
+    for (const c of tk.combos || []) {
+      if (c.status === 'ran' && typeof c.score === 'number' && c.total > 0 && Math.abs(Math.floor(c.points / c.total * 1000) / 10 - c.score) > 0.15) flag('toolkit-score', `${c.id}: ${c.points}/${c.total} ≠ ${c.score}`);
+      if (c.status !== 'ran' && c.status !== 'fatal' && typeof c.score === 'number') flag('toolkit-score', `${c.id}: ${c.status} with a score`);
+      if (c.status === 'fatal' && !c.fatal) flag('toolkit-score', `${c.id}: fatal without a reason`);
+    }
+  }
   return flags;
 }
 
@@ -229,7 +240,7 @@ const GPU_V = ['intel', 'amd', 'nvidia', 'virtual', 'broadcom', 'arm', 'vivante'
 const CPU_V = ['intel', 'amd', 'arm', 'riscv', 'other'];
 // Every label the workflow can set (the repository must have them: docs/RELEASING.md, "The labels of hardware reports").
 export const ALL_LABELS = ['hardware-report', ...STATUS_LABELS, ...KINDS.map((k) => `kind:${k}`), ...GPU_V.map((g) => `gpu:${g}`),
-  ...CPU_V.map((c) => `cpu:${c}`), 'live', 'installed', ...BOOT_MEDIA.map((b) => `boot:${b}`)];
+  ...CPU_V.map((c) => `cpu:${c}`), 'live', 'installed', ...BOOT_MEDIA.map((b) => `boot:${b}`), ...TOOLKIT_LABELS];
 
 // Labels from fixed lists only.
 export function labelsFor(status, rep) {
@@ -242,6 +253,8 @@ export function labelsFor(status, rep) {
     out.push(rep.live ? 'live' : 'installed');
     const b = bootInfo(rep).medium;
     if (BOOT_MEDIA.includes(b)) out.push(`boot:${b}`);
+    // the toolkit audit, when the report has one: a combination that crashed or scored under 80 % (toolkits.js)
+    for (const l of toolkitLabels(rep.toolkits)) if (TOOLKIT_LABELS.includes(l)) out.push(l);
   }
   return out;
 }
@@ -255,6 +268,7 @@ function summaryOf(rep) {
     gpu: g ? `${[g.vendor, g.device].filter(Boolean).join(' ')}${g.driver ? ` (${g.driver})` : ''}` : '',
     compat: (rep.compatibility || []).filter((c) => c.state !== 'absent').map((c) => `${c.id}: ${c.state}`),
     bench: rep.bench ? `${rep.bench.mode}, ${Object.keys(rep.bench.results || {}).length} measurements` : '',
+    toolkits: rep.toolkits ? toolkitRows(rep.toolkits).map((r) => `${r.id}: ${r.fatal || (r.score == null ? '-' : `${r.score} %`)}`) : null,
   };
 }
 
@@ -285,7 +299,8 @@ export function commentBody(result, { fileName = '' } = {}) {
       `| CPU | ${code(s.cpu)}${s.threads ? ` — ${s.threads} threads` : ''} |`,
       `| GPU | ${code(s.gpu)} |`,
       `| Compatibility | ${s.compat.length ? s.compat.slice(0, 12).map(code).join(' ') : '—'} |`,
-      `| LordBench | ${s.bench ? code(s.bench) : 'not included'} |`, '');
+      `| LordBench | ${s.bench ? code(s.bench) : 'not included'} |`,
+      `| Toolkits | ${s.toolkits ? (s.toolkits.length ? s.toolkits.slice(0, 9).map(code).join(' ') : 'none ran') : 'not included'} |`, '');
   }
   if (result.errors && result.errors.length) {
     L.push('**What doesn’t match the format:**', '');

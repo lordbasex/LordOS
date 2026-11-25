@@ -1,10 +1,11 @@
 # lordos-testbench (src/testbench, docs/PAPER-VALIDATION.md): the visual test bench, a plain Wayland
 # client (test card, frame and presentation timing, every key, the pointer, the compositor's globals).
-# libwayland-client and libxkbcommon only; it reads no files. The measurement pieces (src/bench: frame
+# libwayland-client and libxkbcommon only; it reads no files, except --toolkits (src/testbench/tkrun.c,
+# docs/TOOLKIT-AUDIT.md), which runs the Python harnesses in /usr/lib/lordos/toolkit-audit and reads their output. The measurement pieces (src/bench: frame
 # times, presentation, latency, the GL renderer's kind, the 3D scene, the report file) are shared with
 # LordBench (0.8.6, docs/BENCHMARK.md) and tested on their own (build/bench-test).
 BENCH_SRC := src/bench/bench.c
-TESTBENCH_SRC := src/testbench/testbench.c src/testbench/checks.c src/testbench/globtable.c src/testbench/gl3d.c src/testbench/card.c src/testbench/draw.c $(BENCH_SRC)
+TESTBENCH_SRC := src/testbench/testbench.c src/testbench/checks.c src/testbench/globtable.c src/testbench/gl3d.c src/testbench/card.c src/testbench/draw.c src/testbench/toolkits.c src/testbench/tkrun.c src/sec/json.c $(BENCH_SRC)
 all: build/lordos-testbench
 # the 3D view needs EGL, GLESv2 and wayland-egl (Mesa); without them the bench builds and says so
 TB_GL := $(shell pkg-config --exists egl glesv2 wayland-egl 2>/dev/null && echo 1)
@@ -25,4 +26,13 @@ test: build/testbench-globals-test build/lordos-testbench
 build/testbench-globals-test: tests/testbench_globals_test.c src/testbench/globtable.c src/testbench/globtable.h src/testbench/expected_globals.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ tests/testbench_globals_test.c src/testbench/globtable.c
+	./$@ || { rm -f $@; exit 1; }
+# the toolkit audit (--toolkits): the scoring, the WAYLAND_DEBUG and stderr reader, the harness's line (hostile
+# output: oversized lines, bad JSON, control characters), and real runs of fake harnesses (fixed JSON, a crash, a
+# hang killed at the deadline) through a fake python3 (tests/toolkit_audit/)
+TK_SRC := src/testbench/toolkits.c src/testbench/tkrun.c src/testbench/globtable.c src/sec/json.c
+test: build/toolkit-audit-test
+build/toolkit-audit-test: tests/toolkit_audit_test.c $(TK_SRC) src/testbench/toolkits.h src/testbench/tkrun.h src/testbench/expected_globals.h $(wildcard tests/toolkit_audit/*)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ tests/toolkit_audit_test.c $(TK_SRC) -lm
 	./$@ || { rm -f $@; exit 1; }

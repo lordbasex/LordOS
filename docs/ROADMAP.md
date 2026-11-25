@@ -941,6 +941,13 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 
 ## Next release after 0.8.9.6.1
 
+- [ ] **Toolkit audit** (`docs/TOOLKIT-AUDIT.md`; branches `feat/toolkit-audit`, `feat/ta-score`, `feat/ta-report`).
+  Done in code: `lordos-testbench --toolkits` scores GTK 3, GTK 4, Qt 5, Qt 6 (both backends each) and a plain X11
+  client from small Python harnesses in `/usr/lib/lordos/toolkit-audit/` (no new dependency); its result in the
+  hardware report ("Include framework compatibility", the `toolkit:*-fail` labels, lordos.org/hardware), in
+  `lordos-issue` (`--toolkits --last`) and in `tools/wl-conformance.mjs`. Left: Qt 5 and Qt 6 end to end, the X11
+  rows inside a real LordOS session (dev VM screenshot), creating the 9 `toolkit:*` labels on GitHub, and turning on
+  the snapshot's `toolkits` field once no supported release reads it with the old 5-field check.
 - [ ] **Desktop icons in every theme** (approved by the maintainer on 2026-11-25; design `docs/drafts/DESKTOP-ICONS.md`,
   being built on branch `feat/desktop-icons`). The Desktop folder's files, optional places and app launchers on the
   desktop of Flow, Classic, Workspaces and Celeste, with Files' selection, rename, menus and Trash, drag and drop with

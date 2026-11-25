@@ -13,7 +13,7 @@
 #                                               id a hash; interface names and clipboard types stay), to
 #                                               ~/lordos-wayland-<date>.txt. Nothing else the program prints is kept.
 #        lordos-issue --scrub-wayland-debug     the same scrubbing for a WAYLAND_DEBUG log you made yourself: stdin → stdout
-# The "Wayland and X11" section (lordos-testbench --globals, Xwayland's version, the variables that choose an app's
+# The "Wayland and X11" section (lordos-testbench --globals, the last toolkit audit's summary, Xwayland's version, the variables that choose an app's
 # backend, the programs connected to the Wayland and X11 sockets) is collected as the user, before the password is asked:
 # a Wayland client never runs as root.
 UPATH=$PATH                         # the user's own, for --app's program
@@ -139,6 +139,12 @@ wayland_section() {
     elif j=$(timeout -k 2 10 "$TB" --globals 2>/dev/null) && [ -n "$j" ]; then
         printf '%s\n' "$j" | wl_globals_summary
     else echo "lordos-testbench --globals failed (no Wayland connection?)"; fi
+    # the last toolkit audit (docs/TOOLKIT-AUDIT.md), if the person ran one: lordos-testbench checks the saved file
+    # (~/.cache/lordos/toolkit-audit.json) and prints only combination ids, scores, versions and check ids
+    echo "-- Linux toolkits (the last lordos-testbench --toolkits)"
+    if [ -z "$TB" ]; then echo "not shown: lordos-testbench isn't installed"
+    elif t=$(timeout -k 2 5 "$TB" --toolkits --last 2>/dev/null); then printf '%s\n' "$t" | head -n 16
+    else echo "not shown: this lordos-testbench can't read the saved result"; fi
     echo "-- Xwayland"
     v=$(dpkg-query -W -f='${Version}' xwayland 2>/dev/null)
     if [ -n "$v" ]; then echo "xwayland package: $v"

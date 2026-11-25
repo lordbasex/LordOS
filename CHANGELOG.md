@@ -69,6 +69,99 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     editor inside the main display with Save to: Markup editor and inside the other display from that display's
     thumbnail; 16 of its 20 checks fail without the fix) and `screenshots_newcapture_scene.mjs` (the toolbar wraps at
     1000 px).
+### Added
+- **`lordos-testbench --toolkits [--json] [--only id,...]`** (docs/TOOLKIT-AUDIT.md): an installed command that
+  scores how well the Linux GUI toolkits work on LordOS's compositor, on the person's own machine, without the
+  repository.
+  - **What runs:** nine combinations, one after the other: GTK 3 and GTK 4 (`GDK_BACKEND=wayland` and `x11`),
+    Qt 5 and Qt 6 (`QT_QPA_PLATFORM=wayland` and `xcb`), and a plain X11 window under Xwayland. Each is a small
+    Python 3 harness, now installed in `/usr/lib/lordos/toolkit-audit/` (`gtk3.py`, `gtk4.py`, `qt5.py`,
+    `qt6.py`, `x11.py`).
+  - **No new dependency:** LordOS depends on no toolkit and no binding. A quick import probe runs first, and a
+    toolkit whose bindings aren't already installed (python3-gi with Gtk 3.0/4.0, PyQt5, PyQt6) shows "not
+    installed". Nothing is ever installed. `x11.py` speaks the X11 core protocol itself with Python's standard
+    library: no libX11, python3-xlib or xprop.
+  - **How a harness runs:** as the person, in its own process group, with a clean environment. That environment
+    has the session's display, the backend variable, `WAYLAND_DEBUG=1` and the C locale, and nothing else from the
+    caller (no `LD_PRELOAD`, no `PYTHONPATH`). It also gets `GSETTINGS_BACKEND=keyfile`, as every app lord-server
+    starts does: without it GTK 3 read dconf's defaults and failed the theme check in dark mode. A harness exits by
+    itself within 5 s; at 8 s its whole group is killed. It never runs as root, and only from a folder and file
+    that are no links and that nobody else can write (root's in `/usr/lib/lordos/toolkit-audit`); the import probe's
+    process group is killed before it is reaped.
+  - **What is measured, with no test hooks:**
+    - each harness's own checks: map, size against 600x400, scale, the colour scheme read, the backend really
+      used, decorations, time to the first frame, a menu and a combo list that map, a tooltip, a clipboard round
+      trip, drag and drop, typed text, and fullscreen on and off;
+    - from the `WAYLAND_DEBUG` log, which of the 48 globals in LordOS's protocol table it bound, and at which
+      version. A protocol error is attributed to the global its object came from;
+    - fatal Wayland, EGL, Vulkan and Qt platform-plugin errors in stderr.
+  - **The score:** the same shape as `tools/wl-conformance.mjs`. Map, size, backend, first frame and decorations
+    weigh 2; menu, combo, clipboard and drag and drop weigh 3; the rest weigh 1. On Wayland, each global bound is
+    one more check. Skipped checks aren't counted. A crash, a timeout or a fatal error gives that combination
+    0 %. The global score is the mean of the combinations that ran.
+  - **The output:**
+    - a table with each combination's score and its failed checks, and the recommended variable (e.g.
+      `GDK_BACKEND=x11`) when a toolkit's Wayland run is 20 points or more under its X11 run;
+    - a toolkit x protocol matrix;
+    - `--json`.
+  - **The saved result:** the last one is saved to `~/.cache/lordos/toolkit-audit.json` (0600) for `lordos-issue`
+    and the hardware report.
+  - **Privacy:** results carry only toolkit names and versions, the backend, numbers and check ids. Never the
+    harness's free text, the log, a path or a window title.
+  - **Texts and tests:** the texts are in every language (`toolkitaudit.json`). `build/toolkit-audit-test` covers
+    the scoring, the log and line parsers with hostile output (oversized lines, bad JSON, control characters),
+    and real runs of fake harnesses (fixed JSON, a protocol error, a crash, a hang killed with its child).
+  - **Checked:** against a private headless lord-server, with the GTK typelibs unpacked locally. GTK 3 scored 100 % on both backends and GTK 4 98.0 % on
+    Wayland and 95.8 % on X11 (the theme check, without a session bus). Plain X11 scored 92.5 %: fullscreen
+    didn't return to 600x400. Qt 5 and Qt 6 weren't installed on that machine.
+  - **Checked in a real session** on VM 127 (Lord Flow, dark mode): 97.5 % over all nine combinations. GTK 4 100 %
+    on both backends, GTK 3 95.2 % / 95.8 %, Qt 5 97.2 % / 95.8 %, Qt 6 97.7 % / 96.2 %, plain X11 100 %; no crash,
+    timeout or protocol error. What fails is the dark theme where the toolkit can't follow it (GTK 3 on X11, Qt) and
+    a size LordOS's window memory restored. The scores and the two compositor and shell bugs the runs found are in
+    docs/TOOLKIT-AUDIT.md, "Measured".
+  - **The harnesses, after those runs:** Qt 6 waits for the keyboard to come back to its window before opening the
+    combo list and the tooltip (Qt closes a popup opened in between), as the Qt 5 harness did; the theme check now
+    asks the same of every toolkit, that the scheme it draws with is the portal's (Qt 5 passed by reading the
+    portal itself).
+- **The toolkit audit reaches the hardware report, `lordos-issue` and `tools/wl-conformance.mjs`**
+  (docs/TOOLKIT-AUDIT.md, docs/HARDWARE-REPORT.md "Toolkits").
+  - **System Information → Report → Share on GitHub** has a new box, **Include framework compatibility** (off by
+    default, never remembered). Ticked, it uses the audit saved in the last day, or opens `lordos-testbench
+    --toolkits` in a Terminal window through its own launcher entry (`lordos-toolkit-audit.desktop`, so the app runs
+    no command) and waits for the new result. The report then carries an optional `toolkits` section: combination
+    ids, statuses, versions, scores, the failed and skipped check ids and the protocol counts. No free text, paths
+    or titles: `apps/sysinfo/toolkits.js` builds it from known ids and numbers only, and the schema
+    (`hwreport.schema.json`, `$defs/toolkits`) drops anything outside its lists. The report stays format 1; without
+    the tick the key is absent, exactly as before. The summary that goes into the issue's link gets a `toolkits`
+    row.
+  - **The workflow's checks** (`tools/hwreport`): the schema accepts only the 9 combinations, the 6 statuses, the
+    fatal words, the 14 shared check ids and `global.<interface>` for the 48 globals of the protocol table (a test
+    keeps that list equal to `expected_globals.h`), versions of `[0-9A-Za-z.+~-]`, scores of 0 to 100 and an
+    optional `detail` of at most 80 printable ASCII characters without `/`, which the privacy scan also reads. Two
+    new plausibility flags: `toolkits-date` (from the future) and `toolkit-score` (a score that isn't its
+    points). The issue comment gets a "Toolkits" row.
+  - **Labels:** `toolkit:<combination>-fail` (9 new labels, 42 in all) when a combination crashed or scored under
+    80 %. `ALL_LABELS` and docs/RELEASING.md's loop list them; the 9 must be created before the release.
+  - **The signed snapshot** stays `lordos-hwsnapshot` version 1. lord-server's reader (`hwsnap.c`) now accepts an
+    optional `toolkits` field (per combination and LordOS version: reports, failures, mean score), checked as
+    strictly as the devices; any other extra field is still refused. `tools/hwreport/catalog.mjs` writes it only
+    with `--toolkits`: the readers of 0.8.9.6.1 and older refuse a sixth field, and `lordos-hwdata` reaches them
+    between releases. Tests prove the default snapshot is still the exact shape those readers accept.
+  - **lordos.org/hardware** shows each machine's toolkit scores when its report has them (en, es, pt).
+  - **`lordos-issue`** adds a short summary of the last audit to its "Wayland and X11" section, from the new
+    `lordos-testbench --toolkits --last`: the saved file is read without following links, at most 256 KiB, parsed
+    strictly and printed only when every value is a known id, status, version or number; otherwise one
+    "unreadable" line.
+  - **`tools/wl-conformance.mjs`** runs `build/lordos-testbench --toolkits --json` with this tree's harnesses
+    against its headless lord-server, with a private cache folder, and reports a `toolkits` section with the same
+    scoring (`--no-toolkits` skips it). The 48 globals' scores don't change.
+  - **Packaging:** the harnesses are now installed 0644 (they are run as `python3 -I <file>`, never executed).
+  - **Texts** in every language (8 new `sysinfo.share.*` keys; the launcher entry's name and comment in all 35).
+  - **Tests:** `build/toolkit-audit-test` (`--last` with hand-edited files: another tool, unknown ids, a version
+    with shell characters, a path as a fatal word or check id, a link instead of the file), `build/hwsnap-test`
+    (the optional field and 12 malformed ones; the old 5-field reader against the shipped snapshot), and
+    `tests/hwreport_test.mjs` (the section, a hand-edited audit, the schema, labels, the comment, the snapshot
+    summary, the site's HTML).
 
 ### Documentation
 - The paper (en, es, pt) and `docs/PAPER-VALIDATION.md`: since 0.8.9.6.1 the arm64 `lordos-web` package is built against

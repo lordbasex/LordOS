@@ -4,7 +4,7 @@
 //
 //   node tools/wl-conformance.mjs                 static + dynamic (a headless lord-server) + X11 + real clients
 //   make -C server wl-conformance                 the same (builds lord-server and the theme first)
-//   options: --static-only  --no-x11  --no-smoke  --only <global,...>  --json <file>  --record (docs/wayland-conformance.json)
+//   options: --static-only  --no-x11  --no-smoke  --no-toolkits  --only <global,...>  --json <file>  --record (docs/wayland-conformance.json)
 //            --claims <file> (default docs/wayland-protocols.json)  --xml-dirs <dir:dir>  --allow <file>  --verbose
 //
 // Inputs: the protocol XML files (the build's wayland-protocols, /usr/share/wayland, vendored copies in the
@@ -18,7 +18,11 @@
 //   X11      build/x11-conformance-client (server/tests/x11_conformance.c) against Xwayland on that server:
 //            ICCCM, EWMH, selections (INCR both ways), plus patterns in xwm.c and the unit tests;
 //   clients  real programs that are installed (weston-simple-*, foot, vkcube, GTK and Qt demos, ...), each pass or
-//            fail with the globals it bound (reported, not scored).
+//            fail with the globals it bound (reported, not scored);
+//   toolkits the toolkit audit (docs/TOOLKIT-AUDIT.md): build/lordos-testbench --toolkits --json with this tree's
+//            harnesses (tools/toolkit-audit) against the same server, scored as the installed command scores them
+//            (GTK 3/4, Qt 5/6, plain X11; a row whose bindings aren't installed says so). Its own section: it
+//            changes none of the globals' scores.
 // Weights: a request 3, an event 2, an error 1, a protocol-specific dynamic check 3, a generic bind/destroy 1,
 // an X11 dynamic check 3, an X11 source pattern or unit test 1. Allowed exceptions (tools/wl-conformance/allow.json,
 // each with its reason) count as passed and are listed. Skipped checks don't count, but an item with skips, without
@@ -43,6 +47,7 @@ const OPTS = {
   staticOnly: flag('--static-only'),
   x11: !flag('--no-x11'),
   smoke: !flag('--no-smoke'),
+  toolkits: !flag('--no-toolkits'),
   only: opt('--only', '') ? opt('--only', '').split(',') : null,
   json: opt('--json', path.join(BUILD, 'wl-conformance.json')),
   record: flag('--record'),
@@ -704,6 +709,29 @@ function hintWhere(hint, src) {
   return null;
 }
 
+// The toolkit audit against this server: the installed command's code and scoring, this tree's harnesses. A private
+// cache folder, so the developer's own ~/.cache/lordos/toolkit-audit.json is untouched.
+function toolkitsSection(S) {
+  const bin = path.join(BUILD, 'lordos-testbench');
+  if (!fs.existsSync(bin)) sh('make', ['-C', SERVER, 'build/lordos-testbench']);
+  if (!fs.existsSync(bin)) return { run: 'not run: build/lordos-testbench doesn\'t build' };
+  const env = {
+    PATH: process.env.PATH, HOME: path.join(S.D, 'home'), XDG_RUNTIME_DIR: S.D, XDG_CACHE_HOME: path.join(S.D, 'tk-cache'),
+    WAYLAND_DISPLAY: S.sock, LANG: 'C.UTF-8', LORDOS_TOOLKIT_AUDIT_DIR: path.join(ROOT, 'tools', 'toolkit-audit'),
+  };
+  const disp = S.display();
+  if (disp) { env.DISPLAY = disp; env.XAUTHORITY = path.join(S.D, `lord-xauth.${disp.slice(1)}`); }
+  // 9 harnesses, each killed at 8 s, plus the import probes
+  const r = sh(bin, ['--toolkits', '--json'], { env, cwd: SERVER, timeout: 240000 });
+  const line = (r.stdout || '').trim().split('\n').pop() || '';
+  let j = null;
+  try { j = JSON.parse(line); } catch {}
+  if (!j || j.tool !== 'lordos-testbench' || j.mode !== 'toolkits' || !Array.isArray(j.combos)) {
+    return { run: `not run: lordos-testbench --toolkits gave no result (${r.signal || r.status})` };
+  }
+  return { run: disp ? 'ran' : 'ran (no X display: the X11 rows are no-display)', score: j.score, ran: j.ran, weights: j.weights, combos: j.combos, matrix: j.matrix };
+}
+
 async function main() {
   const t0 = Date.now();
   const P = loadProtocols();
@@ -797,6 +825,7 @@ async function main() {
     for (const it of x11.items) it.complete = it.score === 100 && !it.skipped && it.checks.some((c) => c.kind === 'dynamic');
   }
   if (S && OPTS.smoke && !OPTS.only) smokeRes = await smoke(S);
+  const toolkits = S && OPTS.toolkits && !OPTS.only ? toolkitsSection(S) : null;
   if (S) { if (!S.alive()) notes.push('lord-server was not alive at the end'); S.stop(); if (!OPTS.verbose) fs.rmSync(S.D, { recursive: true, force: true }); else console.error(`kept ${S.D}`); }
 
   const result = {
@@ -824,6 +853,7 @@ async function main() {
     protocols: items,
     xwayland: x11,
     clients: smokeRes,
+    toolkits,
     seconds: Math.round((Date.now() - t0) / 1000),
   };
   fs.mkdirSync(path.dirname(OPTS.json), { recursive: true });
@@ -851,6 +881,15 @@ function printReport(r) {
   if (r.clients.length) {
     console.log('\nReal clients (not scored)');
     for (const c of r.clients) console.log(`  ${pad(c.client, 30)} ${pad(c.result, 5)} ${c.msg}${c.bound?.length ? ` — bound ${c.bound.length} globals` : ''}`);
+  }
+  if (r.toolkits) {
+    console.log(`\nToolkits (lordos-testbench --toolkits; ${r.toolkits.run})`);
+    for (const c of r.toolkits.combos || []) {
+      const fails = (c.checks || []).filter((k) => k.result === 'fail').map((k) => k.id);
+      const what = c.status === 'ran' ? `${(c.score ?? 0).toFixed(1)} %` : c.status === 'fatal' ? `0.0 % (${c.fatal})` : c.status;
+      console.log(`  ${pad(c.id, 16)} ${pad(c.version || '', 12)} ${lpad(what, 8)}${fails.length ? `  fails: ${fails.join(', ')}` : ''}`);
+    }
+    if (r.toolkits.score != null) console.log(`  global ${r.toolkits.score} % over ${r.toolkits.ran} combinations`);
   }
   console.log('\nFailing checks');
   for (const i of [...r.protocols, ...(r.xwayland?.items || [])]) for (const c of i.checks) if (c.result === 'fail') console.log(`  ${i.global || i.id}: ${c.id} — ${c.msg}${c.where ? `  [${c.where}]` : ''}`);

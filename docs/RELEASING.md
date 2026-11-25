@@ -263,7 +263,9 @@ images they describe are covered by it, and the lists only name public sources.
 ## The labels of hardware reports
 
 The `hardware-report` issue form and its workflow (`.github/workflows/hardware-report.yml`, on `main`) label each
-report from fixed lists (`ALL_LABELS` in `tools/hwreport/lib.mjs`, 33 labels). Create them once, by hand, before the
+report from fixed lists (`ALL_LABELS` in `tools/hwreport/lib.mjs`, 42 labels: since the toolkit audit, also
+`toolkit:<combination>-fail` for a report whose optional "toolkits" section has a combination that crashed or scored
+under 80 %, docs/TOOLKIT-AUDIT.md). Create them once, by hand, before the
 workflow reaches `main`: the form can only apply `hardware-report` if the repository already has it. It takes an
 account with write access to the repository and `gh auth login` done; `gh label create --force` updates a label
 that already exists, so it can be run again. `server/tests/hwreport_test.mjs` fails if this list and the code differ.
@@ -277,12 +279,15 @@ for l in hardware-report \
     gpu:intel gpu:amd gpu:nvidia gpu:virtual gpu:broadcom gpu:arm gpu:vivante gpu:qualcomm gpu:other gpu:none \
     cpu:intel cpu:amd cpu:arm cpu:riscv cpu:other \
     live installed \
-    boot:internal boot:usb boot:sd boot:emmc boot:optical boot:network; do
+    boot:internal boot:usb boot:sd boot:emmc boot:optical boot:network \
+    toolkit:gtk3-wayland-fail toolkit:gtk3-x11-fail toolkit:gtk4-wayland-fail toolkit:gtk4-x11-fail \
+    toolkit:qt5-wayland-fail toolkit:qt5-xcb-fail toolkit:qt6-wayland-fail toolkit:qt6-xcb-fail toolkit:x11-xwayland-fail; do
   gh label create "$l" --repo "$R" --force
 done
 ```
 
-Check with `gh label list --repo lordbasex/LordOS --limit 100`. Done for 0.8.7: 33 labels created.
+Check with `gh label list --repo lordbasex/LordOS --limit 100`. Done for 0.8.7: 33 labels created. The 9
+`toolkit:*` labels are new (in development): run the loop again before the release that ships the toolkit audit.
 with a fake fetch), never on a real issue, because workflows for `issues` events run from the default branch.
 
 ## Voice packages

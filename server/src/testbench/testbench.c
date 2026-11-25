@@ -19,8 +19,14 @@
  *   lordos-testbench --globals          opens no window: prints the advertised globals and their comparison with
  *                                       LordOS's protocol table (expected_globals.h) as JSON and exits
  *   --gl                                 also starts the 3D view (G does it interactively)
+ *   lordos-testbench --toolkits [--json] [--only gtk4-wayland,...]
+ *                                       opens no window itself: runs the toolkit harnesses (GTK 3/4, Qt 5/6, plain
+ *                                       X11) in /usr/lib/lordos/toolkit-audit and scores each one (tkrun.c,
+ *                                       docs/TOOLKIT-AUDIT.md)
+ *   lordos-testbench --toolkits --last  the saved result (~/.cache/lordos/toolkit-audit.json) in a few checked
+ *                                       English lines, for lordos-issue
  *
- * It reads no files and talks to nothing but the compositor. */
+ * Except --toolkits, it reads no files and talks to nothing but the compositor. */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -30,6 +36,7 @@
 #include "gl3d.h"
 #include "lockkey.h"
 #include "../bench/bench.h"
+#include "tkrun.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -760,6 +767,8 @@ static void save_report(void) { bench_save("testbench", report); }
 int main(int argc, char **argv) {
     double auto_s = 0;
     int auto_gl = 0, only_globals = 0;
+    for (int i = 1; i < argc; i++)
+        if (!strcmp(argv[i], "--toolkits")) return toolkits_main(argc, argv);
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--gl")) auto_gl = 1;
         else if (!strcmp(argv[i], "--globals")) only_globals = 1;
@@ -768,7 +777,7 @@ int main(int argc, char **argv) {
             if (i + 1 < argc && atof(argv[i + 1]) > 0) auto_s = atof(argv[++i]);
             if (auto_s > 600) auto_s = 600;
         } else {
-            fprintf(stderr, "usage: lordos-testbench [--gl] [--auto [seconds]] | --globals\n");
+            fprintf(stderr, "usage: lordos-testbench [--gl] [--auto [seconds]] | --globals | --toolkits [--json] [--only id,...]\n");
             return 2;
         }
     }

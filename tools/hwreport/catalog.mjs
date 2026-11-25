@@ -5,9 +5,10 @@
 //       shipped in the lordos package and signed on the maintainer's machine with tools/release/sign-hwsnapshot.sh;
 //       lord-server verifies it in C, server/src/sysreport/hwsnap.c, before JS sees it).
 //
-//   node tools/hwreport/catalog.mjs [--reports <dir>] [--snapshot <out.json>] [--check]
+//   node tools/hwreport/catalog.mjs [--reports <dir>] [--snapshot <out.json>] [--check] [--toolkits]
 //
 // --check builds the snapshot and compares it with the file instead of writing it (exit 1 if they differ).
+// --toolkits adds the optional "toolkits" field (toolkitSummary below); off by default, see there why.
 // Every report is validated against the schema first; one that doesn't pass stops the build. The output
 // depends only on the reports (sorted keys, "generated" is the newest report's date), so the same folder
 // always gives the same bytes and the same signature.
@@ -22,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { validate } from './jsonschema.mjs';
 import { deviceKeys, SNAPSHOT_FORMAT, COMPONENTS } from '../../apps/sysinfo/community.js';
 import { reportKind, machineLabel, gpuVendor, mainGpu } from '../../apps/sysinfo/share.js';
+import { TOOLKIT_COMBOS, toolkitRows } from '../../apps/sysinfo/toolkits.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const SCHEMA_FILE = path.join(REPO, 'apps/sysinfo/hwreport.schema.json');
@@ -54,7 +56,7 @@ export function readReports(dir, schema = loadSchema()) {
 }
 
 // (b) the snapshot: one entry per device key, component and LordOS version, with the states reported.
-export function buildSnapshot(entries) {
+export function buildSnapshot(entries, { toolkits = false } = {}) {
   const map = new Map();
   let generated = '';
   for (const { report } of entries) {
@@ -74,7 +76,35 @@ export function buildSnapshot(entries) {
     }
   }
   const devices = [...map.values()].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : a.component < b.component ? -1 : a.component > b.component ? 1 : cmpVer(a.lordos, b.lordos)));
-  return { format: SNAPSHOT_FORMAT, version: 1, generated, reports: entries.length, devices };
+  const snap = { format: SNAPSHOT_FORMAT, version: 1, generated, reports: entries.length, devices };
+  if (toolkits) snap.toolkits = toolkitSummary(entries);
+  return snap;
+}
+
+// The optional "toolkits" field of the snapshot (format 1 kept): per combination and LordOS version, how many
+// reports ran it, how many failed (toolkits.js FAIL_BELOW) and their mean score, one decimal rounded down.
+// lord-server's reader (hwsnap.c) and community.js accept a snapshot with or without it, but the readers of
+// LordOS 0.8.9.6.1 and older refuse any field they don't know, and lordos-hwdata reaches them between releases:
+// so buildSnapshot writes it only when asked (--toolkits), not by default, until no supported release reads the
+// snapshot with the old strict check (docs/HARDWARE-REPORT.md, "Toolkits").
+export function toolkitSummary(entries) {
+  const map = new Map();
+  for (const { report } of entries) {
+    const v = base(report.lordos);
+    if (!v) continue;
+    for (const r of toolkitRows(report.toolkits)) {
+      if (r.score == null) continue;
+      const id = `${r.id}\u0000${v}`;
+      let e = map.get(id);
+      if (!e) map.set(id, (e = { id: r.id, lordos: v, reports: 0, fail: 0, sum: 0 }));
+      e.reports++;
+      e.sum += r.score;
+      if (r.failed) e.fail++;
+    }
+  }
+  return [...map.values()]
+    .sort((a, b) => TOOLKIT_COMBOS.indexOf(a.id) - TOOLKIT_COMBOS.indexOf(b.id) || cmpVer(a.lordos, b.lordos))
+    .map((e) => ({ id: e.id, lordos: e.lordos, reports: e.reports, fail: e.fail, score: Math.floor(e.sum / e.reports * 10) / 10 }));
 }
 export const snapshotText = (snap) => `${JSON.stringify(snap)}\n`;
 
@@ -99,6 +129,7 @@ export function buildModel(entries) {
       wifi: (s.network || []).filter((n) => n.kind === 'wifi').map((n) => n.driver).filter(Boolean).join(', '),
       battery: (s.power || []).some((p) => p.kind === 'battery'),
       compat, perf, fixedIn,
+      toolkits: report.toolkits ? { at: report.toolkits.at, score: report.toolkits.score ?? null, rows: toolkitRows(report.toolkits) } : null,
     };
     machines.push(m);
     if (g) {
@@ -116,6 +147,17 @@ export function buildModel(entries) {
   const order = { reference: 0, community: 1 };
   machines.sort((a, b) => order[a.source] - order[b.source] || a.name.localeCompare(b.name));
   return { machines, gpus: [...gpus.values()].sort((a, b) => a.name.localeCompare(b.name)), problems };
+}
+
+// A machine's toolkit audit (when its report has one): each combination that ran, its score, and a mark on the
+// ones that failed. Combination ids and numbers only (they passed the schema); the words are the site's.
+const TK_NAME = { gtk3: 'GTK 3', gtk4: 'GTK 4', qt5: 'Qt 5', qt6: 'Qt 6', x11: 'X11' };
+export function toolkitsHtml(tk, t, esc) {
+  if (!tk || !tk.rows || !tk.rows.length) return '';
+  const tt = t.toolkits || {};
+  const name = (id) => { const [k, b] = id.split('-'); return `${TK_NAME[k] || k} · ${b === 'xcb' ? 'X11' : b === 'xwayland' ? 'Xwayland' : b === 'x11' ? 'X11' : 'Wayland'}`; };
+  const cells = tk.rows.map((r) => `<li class="${r.failed ? 'hw-tk-fail' : 'hw-tk-ok'}">${esc(name(r.id))} <b>${r.fatal ? esc((tt.fatal && tt.fatal[r.fatal]) || r.fatal) : r.score == null ? '—' : `${esc(String(r.score))} %`}</b></li>`).join('');
+  return `<p class="hw-tk-head">${esc(tt.title || 'Linux toolkits')}${typeof tk.score === 'number' ? ` · <b>${esc(String(tk.score))} %</b>` : ''}</p><ul class="hw-tk">${cells}</ul>`;
 }
 
 // The page's sections as HTML, with the site's escaping and strings (web/i18n/pages.json "hardware").
@@ -138,6 +180,7 @@ ${m.wifi ? `<dt>${esc(t.wifi)}</dt><dd><code>${esc(m.wifi)}</code></dd>` : ''}
 </dl>
 <ul class="hw-compat">${Object.entries(m.compat).filter(([, c]) => c.state !== 'absent').map(([id, c]) => `<li>${comp(id)} ${st(c.state)}</li>`).join('')}</ul>
 ${m.perf.length ? `<p class="hw-perf">${m.perf.map((p) => `<span>${esc((t.perf && t.perf[p.cat]) || p.cat)} <b>${fmt(p.value)}</b> ${esc(p.unit)}</span>`).join(' · ')}</p>` : ''}
+${toolkitsHtml(m.toolkits, t, esc)}
 </article>`).join('\n');
   const gpuRows = model.gpus.map((g) => `<tr><td>${esc(g.name)}</td><td><code>${esc(g.driver)}</code></td><td>${g.works ? st('works') : g.limits ? st('limits') : st('no')}</td><td>${esc(g.versions.join(', '))}</td></tr>`).join('\n');
   const note = (k) => (k && t.notes && t.notes[k] ? ` ${esc(t.notes[k])}` : '');
@@ -157,7 +200,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const dir = arg('--reports', REPORTS_DIR), out = arg('--snapshot', SNAPSHOT_FILE);
   try {
     const entries = readReports(dir);
-    const text = snapshotText(buildSnapshot(entries));
+    const text = snapshotText(buildSnapshot(entries, { toolkits: process.argv.includes('--toolkits') }));
     if (process.argv.includes('--check')) {
       const have = fs.existsSync(out) ? fs.readFileSync(out, 'utf8') : '';
       if (have !== text) { console.error(`${path.relative(REPO, out)} is not the snapshot of ${path.relative(REPO, dir)}: run node tools/hwreport/catalog.mjs`); process.exit(1); }

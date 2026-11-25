@@ -13,7 +13,8 @@ import { pick, buildShareReport, summaryRows, summaryText, issueTitle, issueUrl,
 import { deviceKeys, communityFor, communitySummary } from '../../apps/sysinfo/community.js';
 import { compatibility } from '../../apps/sysinfo/model.js';
 import { embeddedReport, findAttachments, allowedUrl, fetchAttachment, parseLimited, privacyScan, plausibility, checkReport, labelsFor, commentBody, code, formVersion, MARKER, ALL_LABELS } from '../../tools/hwreport/lib.mjs';
-import { readReports, buildSnapshot, snapshotText, buildModel, renderSections, SNAPSHOT_FILE, REPORTS_DIR } from '../../tools/hwreport/catalog.mjs';
+import { readReports, buildSnapshot, snapshotText, buildModel, renderSections, toolkitsHtml, toolkitSummary, SNAPSHOT_FILE, REPORTS_DIR } from '../../tools/hwreport/catalog.mjs';
+import { toolkitSection, toolkitLabels, toolkitRows, isFresh, isAudit, TOOLKIT_COMBOS, SHARED_CHECKS, TOOLKIT_LABELS, FRESH_MS } from '../../apps/sysinfo/toolkits.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const schema = JSON.parse(fs.readFileSync(path.join(ROOT, 'apps/sysinfo/hwreport.schema.json'), 'utf8'));
@@ -208,7 +209,7 @@ eq('labels for an invalid report', labelsFor('invalid', null), ['hardware-report
   const words = new Set(block.split(/[\s;]+/));
   eq('every label is in the steps', ALL_LABELS.filter((l) => !words.has(l)), []);
   eq('no extra label in the steps', [...words].filter((w) => w.includes(':') && !ALL_LABELS.includes(w)), []);
-  eq('33 labels', ALL_LABELS.length, 33);
+  eq('42 labels', ALL_LABELS.length, 42);
 }
 const evil = variant((r) => { r.system.machine.vendor = '@everyone `x` [link](https://evil)'; r.system.machine.product = 'A B'; });
 const cm = commentBody(checkReport(evil, schema, today), { fileName: 'a`b.json' });
@@ -294,6 +295,103 @@ eq('summary: works', communitySummary(cf.gpu), { works: 2, limits: 1, no: 0, rep
 eq('summary: only references', communitySummary(cf.wifi).onlyReferences, true);
 eq('summary: nothing', communitySummary([]), null);
 eq('not a snapshot', [communityFor({ ...sn, format: 'x' }, laptop.system, '0.8.7'), communityFor(null, laptop.system, '0.8.7'), communityFor({ ...sn, version: 2 }, laptop.system, '0.8.7')], [{}, {}, {}]);
+
+// ---- the toolkit audit (toolkits.js; docs/TOOLKIT-AUDIT.md, the optional "toolkits" section) ----
+{
+  const at = Date.UTC(2026, 9, 20, 10);
+  const chk = (id, result) => ({ id, weight: 1, result });
+  const audit = {
+    tool: 'lordos-testbench', v: 1, mode: 'toolkits', at, source: 'docs/wayland-protocols.json', expected: 48, score: 64.6, ran: 3,
+    combos: [
+      { id: 'gtk4-wayland', toolkit: 'gtk4', backend: 'wayland', status: 'ran', fatal: null, version: '4.18.6', backendSeen: 'wayland', exit: 0, ms: 1450,
+        score: 98, points: 49, total: 50, skipped: 1, checks: [chk('map', 'pass'), chk('theme', 'fail'), chk('dnd', 'skip'), chk('global.xdg_wm_base', 'pass')],
+        protocol: { bound: 26, failed: 0, extra: 0, errors: 0, unattributed: 0 }, recommend: null },
+      { id: 'qt6-wayland', toolkit: 'qt6', backend: 'wayland', status: 'fatal', fatal: 'crash', signal: 11, version: '6.8.2', backendSeen: '', exit: -1, ms: 300,
+        score: 0, points: 0, total: 0, skipped: 0, checks: [], protocol: { bound: 3, failed: 0, extra: 0, errors: 0, unattributed: 0 }, recommend: 'QT_QPA_PLATFORM=xcb' },
+      { id: 'qt6-xcb', toolkit: 'qt6', backend: 'xcb', status: 'ran', fatal: null, version: '6.8.2', backendSeen: 'x11', exit: 0, ms: 900,
+        score: 95.8, points: 23, total: 24, skipped: 0, checks: [chk('theme', 'fail')], recommend: null },
+      { id: 'qt5-wayland', toolkit: 'qt5', backend: 'wayland', status: 'not-installed', fatal: null, version: '', backendSeen: '', exit: -1, ms: 0, score: null, points: 0, total: 0, skipped: 0, checks: [], recommend: null },
+    ],
+    matrix: { globals: [], rows: [] },
+  };
+  ok('an audit is recognised', isAudit(audit) && !isAudit({ ...audit, tool: 'x' }) && !isAudit(null) && !isAudit([]));
+  eq('fresh within a day only', [isFresh(audit, at + 1000), isFresh(audit, at + FRESH_MS + 1), isFresh(audit, at - 3600000)], [true, false, false]);
+  const sec = toolkitSection(audit);
+  eq('the section: date, ids, failed and skipped checks', [sec.at, sec.combos.map((c) => c.id), sec.combos[0].failed, sec.combos[0].skippedChecks, sec.combos[1].fatal],
+    ['2026-10-20', ['gtk4-wayland', 'qt6-wayland', 'qt6-xcb', 'qt5-wayland'], ['theme'], ['dnd'], 'crash']);
+  const rep = buildShareReport({ report: laptop.system, compat: [], toolkits: sec, schema, date: '2026-11-25' });
+  ok('a report with toolkits is valid', validate(schema, rep).length === 0);
+  ok('without the tick the key is left out', !('toolkits' in buildShareReport({ report: laptop.system, compat: [], schema, date: '2026-11-25' })));
+  eq('labels: a crash and nothing under 80 % else', toolkitLabels(rep.toolkits), ['toolkit:qt6-wayland-fail']);
+  eq('labels in the workflow', labelsFor('valid', { ...laptop, toolkits: rep.toolkits }).filter((l) => l.startsWith('toolkit:')), ['toolkit:qt6-wayland-fail']);
+  ok('every toolkit label is in ALL_LABELS', TOOLKIT_LABELS.every((l) => ALL_LABELS.includes(l)) && TOOLKIT_LABELS.length === 9);
+  eq('a low score fails too', toolkitLabels({ combos: [{ id: 'gtk3-x11', status: 'ran', score: 79.9 }, { id: 'gtk3-wayland', status: 'ran', score: 80 }] }), ['toolkit:gtk3-x11-fail']);
+  ok('the summary row', summaryRows(rep).some(([k, v]) => k === 'toolkits' && v === 'gtk4-wayland=98% qt6-wayland=crash qt6-xcb=95%'));
+  eq('rows', toolkitRows(rep.toolkits).map((r) => [r.id, r.score, r.failed]), [['gtk4-wayland', 98, false], ['qt6-wayland', 0, true], ['qt6-xcb', 95.8, false]]);
+
+  // a hand-edited saved file: nothing outside the lists reaches the report
+  const evilAudit = clone(audit);
+  evilAudit.combos[0].version = '4.18 /home/alice';
+  evilAudit.combos[0].checks.push(chk('global.alice_secret', 'fail'), chk('/home/alice', 'fail'));
+  evilAudit.combos[0].recommend = 'LD_PRELOAD=/home/alice/x.so';
+  evilAudit.combos[0].title = 'Secret window';
+  evilAudit.combos[0].backendSeen = 'alice';
+  evilAudit.combos.push({ id: 'alice-wayland', status: 'ran', score: 50 }, { ...audit.combos[2] });
+  const evilRep = buildShareReport({ report: laptop.system, compat: [], toolkits: toolkitSection(evilAudit), schema, date: '2026-11-25' });
+  ok('an edited audit still gives a valid report', validate(schema, evilRep).length === 0);
+  ok('none of its text survives', !/alice|Secret|LD_PRELOAD/i.test(JSON.stringify(evilRep)));
+  eq('a combination appears once', evilRep.toolkits.combos.filter((c) => c.id === 'qt6-xcb').length, 1);
+
+  // the schema: known ids only, no path in detail, numbers in range
+  const withTk = (f) => { const r = clone(laptop); r.toolkits = clone(rep.toolkits); f(r.toolkits); return r; };
+  const tkBad = {
+    'an unknown combination': (t) => { t.combos[0].id = 'gtk5-wayland'; },
+    'an unknown check id': (t) => { t.combos[0].failed.push('global.evil'); },
+    'a free-text check id': (t) => { t.combos[0].failed.push('the menu'); },
+    'a version with spaces': (t) => { t.combos[0].version = '4.18 beta'; },
+    'a score over 100': (t) => { t.combos[0].score = 101; },
+    'another recommendation': (t) => { t.combos[1].recommend = 'LD_PRELOAD=x'; },
+    'a detail with a path': (t) => { t.combos[0].detail = 'saw /home/alice'; },
+    'a long detail': (t) => { t.combos[0].detail = 'x'.repeat(81); },
+    'a title field': (t) => { t.combos[0].title = 'x'; },
+    'version 2': (t) => { t.v = 2; },
+    'ten combinations': (t) => { while (t.combos.length < 10) t.combos.push(clone(t.combos[0])); },
+  };
+  for (const [what, f] of Object.entries(tkBad)) ok(`toolkits: ${what} is invalid`, !valid(withTk(f)));
+  ok('toolkits: a short detail without a slash is valid', valid(withTk((t) => { t.combos[0].detail = 'menu did not map'; })));
+  eq('toolkits: an e-mail in the detail is personal', checkReport(withTk((t) => { t.combos[0].detail = 'alice@example.org'; }), schema, today).privacy.map((p) => p.kind), ['email']);
+  eq('toolkits: a score that isn\'t its points', checkReport(withTk((t) => { t.combos[0].score = 50; }), schema, today).flags.map((f) => f.id), ['toolkit-score']);
+  eq('toolkits: a fine section raises no flag', checkReport(withTk(() => {}), schema, today).status, 'valid');
+  const cmt = commentBody(checkReport(withTk(() => {}), schema, today));
+  ok('the comment lists the toolkits', cmt.includes('| Toolkits | `gtk4-wayland: 98 %` `qt6-wayland: crash` `qt6-xcb: 95.8 %` |'));
+  ok('the comment says when there are none', commentBody(checkReport(laptop, schema, today)).includes('| Toolkits | not included |'));
+  const schemaChecks = schema.$defs.toolkitCheck.enum;
+  const header = fs.readFileSync(path.join(ROOT, 'server/src/testbench/expected_globals.h'), 'utf8');
+  const globals = [...header.matchAll(/\{ "([a-z0-9_]+)", \d+,/g)].map((m) => m[1]);
+  eq('the schema\'s check ids are the shared checks and the 48 globals', schemaChecks, [...SHARED_CHECKS, ...globals.map((g) => `global.${g}`)]);
+  eq('48 globals', globals.length, 48);
+  eq('the schema\'s combinations are toolkits.js\'s', schema.$defs.toolkitCombo.properties.id.enum, TOOLKIT_COMBOS);
+
+  // the snapshot: written without the field by default (the old readers refuse it), with it on --toolkits
+  const tkEntries = [{ report: { ...laptop, toolkits: rep.toolkits } }, { report: { ...laptop, toolkits: { ...rep.toolkits, combos: [{ id: 'qt6-xcb', status: 'ran', score: 50 }] } } }];
+  const oldReaderAccepts = (sn) => JSON.stringify(Object.keys(sn)) === JSON.stringify(['format', 'version', 'generated', 'reports', 'devices']) && sn.devices.every((d) => Object.keys(d).length === 9);
+  ok('the default snapshot is the old format', oldReaderAccepts(buildSnapshot(tkEntries)) && oldReaderAccepts(snap));
+  const sTk = buildSnapshot(tkEntries, { toolkits: true });
+  ok('--toolkits adds the field', !oldReaderAccepts(sTk) && Array.isArray(sTk.toolkits));
+  eq('the toolkit summary', toolkitSummary(tkEntries), [
+    { id: 'gtk4-wayland', lordos: '0.8.7', reports: 1, fail: 0, score: 98 },
+    { id: 'qt6-wayland', lordos: '0.8.7', reports: 1, fail: 1, score: 0 },
+    { id: 'qt6-xcb', lordos: '0.8.7', reports: 2, fail: 1, score: 72.9 },
+  ]);
+  eq('community data ignores the field', communityFor({ ...sn, toolkits: sTk.toolkits }, laptop.system, '0.8.7-beta'), cf);
+
+  // the site
+  const m2 = buildModel([{ file: 'x.json', report: { ...laptop, toolkits: rep.toolkits }, issue: 1, fixedIn: {} }]);
+  const th = toolkitsHtml(m2.machines[0].toolkits, { toolkits: { title: 'Linux toolkits', fatal: { crash: 'crashed' } } }, esc);
+  ok('the site shows the toolkits', th.includes('GTK 4 · Wayland <b>98 %</b>') && th.includes('class="hw-tk-fail">Qt 6 · Wayland <b>crashed</b>') && th.includes('Qt 6 · X11'));
+  eq('no toolkits, no line', toolkitsHtml(null, {}, esc), '');
+  ok('the site escapes the title text', toolkitsHtml(m2.machines[0].toolkits, { toolkits: { title: '<b>x' } }, esc).includes('&lt;b&gt;x'));
+}
 
 console.log(`hwreport-test: ${n - bad} ok, ${bad} failed`);
 process.exit(bad ? 1 : 0);

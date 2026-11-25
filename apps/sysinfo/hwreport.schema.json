@@ -26,9 +26,48 @@
       }
     },
     "bench": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/bench" }] },
-    "desktop": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/bench" }] }
+    "desktop": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/bench" }] },
+    "toolkits": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/toolkits" }] }
   },
   "$defs": {
+    "toolkits": {
+      "description": "Optional (format 1 is kept): the last lordos-testbench --toolkits on this machine (docs/TOOLKIT-AUDIT.md), only when the person ticked 'Include framework compatibility'. Combination ids, statuses, versions, numbers and check ids; no free text but an optional detail of printable ASCII without '/'.",
+      "type": "object", "additionalProperties": false, "required": ["v", "at", "combos"],
+      "properties": {
+        "v": { "const": 1 },
+        "at": { "type": "string", "pattern": "^20[2-9][0-9]-[01][0-9]-[0-3][0-9]$" },
+        "score": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/pct" }] },
+        "ran": { "type": "integer", "minimum": 0, "maximum": 9 },
+        "combos": { "type": "array", "maxItems": 9, "items": { "$ref": "#/$defs/toolkitCombo" } }
+      }
+    },
+    "toolkitCombo": {
+      "type": "object", "additionalProperties": false, "required": ["id", "status"],
+      "properties": {
+        "id": { "enum": ["gtk3-wayland", "gtk3-x11", "gtk4-wayland", "gtk4-x11", "qt5-wayland", "qt5-xcb", "qt6-wayland", "qt6-xcb", "x11-xwayland"] },
+        "status": { "enum": ["ran", "fatal", "not-installed", "no-display", "no-harness", "not-run"] },
+        "fatal": { "anyOf": [{ "type": "null" }, { "enum": ["timeout", "crash", "protocol-error", "connection-lost", "egl", "vulkan", "platform-plugin", "no-result"] }] },
+        "version": { "type": "string", "maxLength": 31, "pattern": "^[0-9A-Za-z.+~-]*$" },
+        "backendSeen": { "enum": ["", "wayland", "x11"] },
+        "score": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/pct" }] },
+        "points": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "total": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "skipped": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "ms": { "type": "integer", "minimum": 0, "maximum": 600000 },
+        "failed": { "type": "array", "maxItems": 62, "items": { "$ref": "#/$defs/toolkitCheck" } },
+        "skippedChecks": { "type": "array", "maxItems": 14, "items": { "$ref": "#/$defs/toolkitCheck" } },
+        "protocol": {
+          "type": "object", "additionalProperties": false,
+          "properties": { "bound": { "$ref": "#/$defs/smallCount" }, "failed": { "$ref": "#/$defs/smallCount" }, "extra": { "$ref": "#/$defs/smallCount" },
+            "errors": { "$ref": "#/$defs/smallCount" }, "unattributed": { "$ref": "#/$defs/smallCount" } }
+        },
+        "recommend": { "anyOf": [{ "type": "null" }, { "enum": ["GDK_BACKEND=x11", "QT_QPA_PLATFORM=xcb"] }] },
+        "detail": { "type": "string", "maxLength": 80, "pattern": "^[ -.0-~]*$" }
+      }
+    },
+    "toolkitCheck": { "enum": ["map", "size", "backend", "first_frame", "decoration", "menu", "combo", "clipboard", "dnd", "scale", "theme", "tooltip", "text", "fullscreen", "global.wl_compositor", "global.wl_shm", "global.wl_data_device_manager", "global.wl_seat", "global.wl_output", "global.wl_subcompositor", "global.wl_fixes", "global.wp_presentation", "global.wp_viewporter", "global.xdg_wm_base", "global.zwp_linux_dmabuf_v1", "global.zwp_tablet_manager_v2", "global.xdg_activation_v1", "global.wp_drm_lease_device_v1", "global.wp_linux_drm_syncobj_manager_v1", "global.wp_single_pixel_buffer_manager_v1", "global.wp_content_type_manager_v1", "global.ext_idle_notifier_v1", "global.wp_tearing_control_manager_v1", "global.xwayland_shell_v1", "global.wp_fractional_scale_manager_v1", "global.wp_cursor_shape_manager_v1", "global.wp_security_context_manager_v1", "global.xdg_toplevel_drag_manager_v1", "global.xdg_toplevel_icon_manager_v1", "global.xdg_wm_dialog_v1", "global.wp_alpha_modifier_v1", "global.wp_commit_timing_manager_v1", "global.wp_fifo_manager_v1", "global.xdg_system_bell_v1", "global.wp_color_manager_v1", "global.wp_color_representation_manager_v1", "global.xdg_toplevel_tag_manager_v1", "global.wp_pointer_warp_v1", "global.ext_background_effect_manager_v1", "global.xdg_session_manager_v1", "global.zwp_idle_inhibit_manager_v1", "global.zwp_keyboard_shortcuts_inhibit_manager_v1", "global.zwp_pointer_constraints_v1", "global.zwp_pointer_gestures_v1", "global.zwp_primary_selection_device_manager_v1", "global.zwp_relative_pointer_manager_v1", "global.zwp_text_input_manager_v3", "global.zxdg_decoration_manager_v1", "global.zxdg_exporter_v2", "global.zxdg_importer_v2", "global.zxdg_output_manager_v1", "global.org_kde_kwin_server_decoration_manager"] },
+    "pct": { "type": "number", "minimum": 0, "maximum": 100 },
+    "smallCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
     "text": { "type": "string", "maxLength": 128, "pattern": "^[^\\u0000-\\u001f\\u007f]*$" },
     "word": { "type": "string", "maxLength": 48, "pattern": "^[A-Za-z0-9._+:,/ -]*$" },
     "hex": { "type": "string", "maxLength": 8, "pattern": "^[0-9a-fA-F]*$" },
