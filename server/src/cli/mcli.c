@@ -84,10 +84,13 @@ int mcli_set_args(int argc, char **args, char **out, int max, McliStore *store, 
         if (strncmp(a, "--", 2) || !a[2]) return -1;
         /* --opt=value or --opt value */
         const char *eq = strchr(a, '='), *val;
-        char *opt;
-        if (eq) { opt = keep_s(store, a + 2, (size_t)(eq - a - 2)); val = eq + 1; }
-        else { opt = keep_s(store, a + 2, strlen(a + 2)); if (i + 1 >= argc) return -1; val = args[++i]; }
-        if (!opt) return -1;
+        char opt[24];                                   /* only compared: the store keeps values, one per option at most */
+        size_t ol = eq ? (size_t)(eq - a - 2) : strlen(a + 2);
+        if (ol + 1 > sizeof opt) return -1;
+        memcpy(opt, a + 2, ol);
+        opt[ol] = 0;
+        if (eq) val = eq + 1;
+        else { if (i + 1 >= argc) return -1; val = args[++i]; }
         *bad_val = val;
         if (k + 3 > max) return -1;
         if (!strcmp(opt, "memory")) {
@@ -114,7 +117,7 @@ int mcli_set_args(int argc, char **args, char **out, int max, McliStore *store, 
             int known = 0;
             for (int p = 0; PASS[p]; p++) if (!strcmp(opt, PASS[p])) known = 1;
             if (!known) { *bad_val = NULL; return -1; }
-            char *o = keep_s(store, a, eq ? (size_t)(eq - a) : strlen(a));
+            char *o = eq ? keep_s(store, a, (size_t)(eq - a)) : (char *)a;
             if (!o) return -1;
             out[k++] = o; out[k++] = (char *)val;
         }
@@ -524,4 +527,169 @@ int mcli_iso_place_ok(const char *real, const char *const *roots) {
         if (r > 1 && roots[i][0] == '/' && n > r + 1 && !strncmp(real, roots[i], r) && real[r] == '/') return 1;
     }
     return 0;
+}
+
+/* ---- apply's settings as `machines set` arguments (security review 2026-11-24, F8: sized from the parser's limits) ---- */
+
+/* mcli_set_args keeps at most one store entry per option: room for every option of apply's worst case */
+_Static_assert(sizeof ((McliStore *)0)->v / sizeof ((McliStore *)0)->v[0] >= 8 + MCLI_APPLY_PORTS + MCLI_APPLY_SHARES, "McliStore too small for apply");
+
+int mcli_apply_set_argv(const McliApply *a, int made, const char *cpus, char **so, int cap) {
+    int k = 0;
+#define PUT(o, v) do { if (k + 2 >= cap) return -1; so[k++] = (char *)(o); so[k++] = (char *)(v); } while (0)
+    if (cap < 1) return -1;
+    if (a->memory[0] && !made) PUT("--memory", a->memory);
+    if (a->cpus > 0 && !made) PUT("--cpus", cpus);
+    if (a->disk[0] && !made) PUT("--disk", a->disk);
+    if (a->network[0] && (!made || !strcmp(a->network, "bridged"))) PUT("--network", a->network);
+    if (a->graphics[0]) PUT("--graphics", a->graphics);
+    if (a->clipboard[0]) PUT("--clipboard", a->clipboard);
+    if (a->agent >= 0) PUT("--agent", a->agent ? "on" : "off");
+    if (a->iso[0] && !made) PUT("--iso", a->iso);
+    if (a->ports_set && !a->n_ports) PUT("--ports", "none");
+    for (int i = 0; i < a->n_ports && i < MCLI_APPLY_PORTS; i++) PUT("--port", a->ports[i]);
+    if (a->shares_set && !a->n_shares) PUT("--shares", "none");
+    for (int i = 0; i < a->n_shares && i < MCLI_APPLY_SHARES; i++) PUT("--share", a->shares[i]);
+#undef PUT
+    so[k] = NULL;
+    return k;
+}
+
+/* ---- a guest's terminal stream, filtered (security review 2026-11-24, F11) ---- */
+
+enum { VTF_GROUND, VTF_UTF8, VTF_ESC, VTF_CSI, VTF_OSC, VTF_STR };
+#define VTF_ESC_MAX 8
+#define VTF_CSI_MAX 64
+
+void mcli_vtf_init(McliVtf *f) { memset(f, 0, sizeof *f); }
+
+typedef struct { uint8_t *p; size_t n, cap; } VtfOut;
+static void vtf_put(VtfOut *o, const uint8_t *b, size_t n) {
+    if (o->n + n > o->cap) return;                /* never with the documented room; dropped rather than overrun */
+    memcpy(o->p + o->n, b, n);
+    o->n += n;
+}
+static void vtf_byte(VtfOut *o, uint8_t c) { vtf_put(o, &c, 1); }
+
+/* an OSC we let through: titles and colors only, its text valid UTF-8 without C0 or C1 controls */
+static int vtf_osc_ok(const uint8_t *b, size_t n) {
+    size_t i = 0;
+    int num = 0;
+    while (i < n && i < 4 && b[i] >= '0' && b[i] <= '9') num = num * 10 + (b[i++] - '0');
+    if (!i || (i < n && b[i] != ';')) return 0;
+    static const int OK[] = { 0, 1, 2, 4, 10, 11, 12, 104, 110, 111, 112 };
+    int known = 0;
+    for (size_t j = 0; j < sizeof OK / sizeof OK[0]; j++) if (OK[j] == num) known = 1;
+    if (!known) return 0;
+    while (i < n) {
+        if (b[i] < 0x20 || b[i] == 0x7f) return 0;
+        size_t k = utf8_len(b + i, n - i);
+        if (!k || (k == 2 && b[i] == 0xc2 && b[i + 1] < 0xa0)) return 0;
+        i += k;
+    }
+    return 1;
+}
+
+static void vtf_osc_end(McliVtf *f, VtfOut *o) {
+    if (!f->bad && vtf_osc_ok(f->buf, f->n)) {
+        vtf_put(o, (const uint8_t *)"\033]", 2);
+        vtf_put(o, f->buf, f->n);
+        vtf_byte(o, 0x07);
+    }
+    f->st = VTF_GROUND; f->n = 0; f->bad = 0; f->esc = 0;
+}
+
+static void vtf_to_esc(McliVtf *f) { f->st = VTF_ESC; f->buf[0] = 0x1b; f->n = 1; f->bad = 0; f->esc = 0; }
+
+/* a C1 control (U+0080..U+009F, as UTF-8 C2 xx): the introducers start what their 7-bit forms start, the rest is dropped */
+static void vtf_c1(McliVtf *f, uint8_t c) {
+    f->n = 0; f->bad = 0; f->esc = 0; f->st = VTF_GROUND;
+    if (c == 0x9b) { f->st = VTF_CSI; f->buf[0] = 0x1b; f->buf[1] = '['; f->n = 2; }
+    else if (c == 0x9d) f->st = VTF_OSC;
+    else if (c == 0x90 || c == 0x98 || c == 0x9e || c == 0x9f) f->st = VTF_STR;
+}
+
+size_t mcli_vtf_feed(McliVtf *f, const uint8_t *in, size_t n, uint8_t *out, size_t cap) {
+    VtfOut o = { out, 0, cap };
+    for (size_t i = 0; i < n;) {
+        uint8_t c = in[i];
+        switch (f->st) {
+        case VTF_GROUND:
+            i++;
+            if (c == 0x1b) vtf_to_esc(f);
+            else if (c < 0x80) { if (c) vtf_byte(&o, c); }
+            else if (c >= 0xc2 && c <= 0xf4) { f->st = VTF_UTF8; f->buf[0] = c; f->n = 1; f->need = c <= 0xdf ? 1 : c <= 0xef ? 2 : 3; }
+            else vtf_byte(&o, '?');
+            break;
+        case VTF_UTF8:
+            if ((c & 0xc0) != 0x80) { vtf_byte(&o, '?'); f->st = VTF_GROUND; f->n = 0; break; }   /* c again, as text */
+            i++;
+            f->buf[f->n++] = c;
+            if (--f->need) break;
+            if (f->n == 2 && f->buf[0] == 0xc2 && c < 0xa0) { vtf_c1(f, c); break; }
+            if (utf8_len(f->buf, f->n) == f->n) vtf_put(&o, f->buf, f->n);
+            else vtf_byte(&o, '?');
+            f->st = VTF_GROUND; f->n = 0;
+            break;
+        case VTF_ESC:
+            if (c == 0x1b) { i++; vtf_to_esc(f); break; }
+            if (c == 0x18 || c == 0x1a) { i++; f->st = VTF_GROUND; f->n = 0; break; }
+            if (c == 0x7f) { i++; break; }
+            if (c < 0x20 || c >= 0x80) { f->st = VTF_GROUND; f->n = 0; break; }                 /* c again */
+            i++;
+            if (f->n == 1 && c == '[') { f->st = VTF_CSI; f->buf[f->n++] = c; break; }
+            if (f->n == 1 && c == ']') { f->st = VTF_OSC; f->n = 0; break; }
+            if (f->n == 1 && (c == 'P' || c == 'X' || c == '^' || c == '_')) { f->st = VTF_STR; f->n = 0; break; }
+            if (f->n == 1 && c == '\\') { f->st = VTF_GROUND; f->n = 0; break; }                  /* a lone ST: nothing to end */
+            if (c < 0x30) { if (f->n < VTF_ESC_MAX) f->buf[f->n++] = c; else f->bad = 1; break; }
+            if (!f->bad) { vtf_put(&o, f->buf, f->n); vtf_byte(&o, c); }
+            f->st = VTF_GROUND; f->n = 0; f->bad = 0;
+            break;
+        case VTF_CSI:
+            if (c == 0x1b) { i++; vtf_to_esc(f); break; }
+            if (c == 0x18 || c == 0x1a) { i++; f->st = VTF_GROUND; f->n = 0; f->bad = 0; break; }
+            if (c == 0x7f) { i++; break; }
+            if (c >= 0x80) { f->st = VTF_GROUND; f->n = 0; f->bad = 0; break; }                   /* c again */
+            i++;
+            if (c < 0x20) { if (c) vtf_byte(&o, c); break; }    /* a terminal runs C0 controls inside a CSI too */
+            if (c < 0x40) {
+                if (c >= 0x30 && f->n > 2 && f->buf[f->n - 1] < 0x30) f->bad = 1;   /* a parameter after an intermediate */
+                if (f->n < VTF_CSI_MAX) f->buf[f->n++] = c; else f->bad = 1;
+                break;
+            }
+            if (!f->bad && c != 't') { vtf_put(&o, f->buf, f->n); vtf_byte(&o, c); }
+            f->st = VTF_GROUND; f->n = 0; f->bad = 0;
+            break;
+        case VTF_OSC:
+        case VTF_STR: {
+            int osc = f->st == VTF_OSC;
+            if (f->esc == 1) {
+                f->esc = 0;
+                if (c == '\\') { i++; if (osc) vtf_osc_end(f, &o); else { f->st = VTF_GROUND; f->n = 0; } break; }
+                vtf_to_esc(f);                                  /* the string ends unfinished, dropped; c again */
+                break;
+            }
+            if (f->esc == 2 && c == 0x9c) {                     /* C1 ST as UTF-8: C2 9C */
+                i++;
+                f->esc = 0;
+                if (osc) { if (f->n) f->n--; vtf_osc_end(f, &o); } else { f->st = VTF_GROUND; f->n = 0; }
+                break;
+            }
+            f->esc = 0;
+            i++;
+            if (c == 0x07) { if (osc) vtf_osc_end(f, &o); else { f->st = VTF_GROUND; f->n = 0; } break; }
+            if (c == 0x1b) { f->esc = 1; break; }
+            if (c == 0x18 || c == 0x1a) { f->st = VTF_GROUND; f->n = 0; f->bad = 0; break; }
+            if (c == 0xc2) f->esc = 2;
+            if (!osc) break;
+            if (c < 0x20 || c == 0x7f) f->bad = 1;
+            if (f->n < sizeof f->buf) f->buf[f->n++] = c; else f->bad = 1;
+            break;
+        }
+        default:
+            f->st = VTF_GROUND; f->n = 0;
+            break;
+        }
+    }
+    return o.n;
 }

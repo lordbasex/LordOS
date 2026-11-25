@@ -19,7 +19,7 @@ int mcli_resolve(const char *const *names, int n, const char *q, int *out, int m
 /* `machines set` → lord-vm --set's options. args: the person's words after NAME. out gets the lord-vm words (pointers into
  * args or into store, NULL-terminated, at most max - 1); store holds converted values. 0 ok; else -1 with the option
  * (and value) at fault in *bad_opt / *bad_val (bad_val NULL: it needs a value or isn't known) */
-typedef struct { char v[24][24]; int n; } McliStore;
+typedef struct { char v[48][24]; int n; } McliStore;   /* at most one entry per option: room for apply's worst case */
 int mcli_set_args(int argc, char **args, char **out, int max, McliStore *store, const char **bad_opt, const char **bad_val);
 
 /* the folder name the Machines app gives a machine of that name (js_vm.c folder_name): letters, digits, ' ', '-', '_'
@@ -87,6 +87,32 @@ typedef struct {
     int n_ports, n_shares, ports_set, shares_set;
 } McliApply;
 int mcli_apply_parse(const char *text, size_t n, McliApply *a, int *line, const char **why);
+
+/* the `machines set` arguments an apply file gives (for a machine just made, made = 1: the ones --create didn't take),
+ * cpus its --cpus value as text. At most MCLI_APPLY_ARGV entries with the closing NULL: 8 single settings, every port
+ * and every share, two entries each. Returns how many (so[k] = NULL), -1 if they wouldn't fit in cap (nothing beyond
+ * so[cap - 1] is ever written) */
+#define MCLI_APPLY_ARGV (2 * (8 + MCLI_APPLY_PORTS + MCLI_APPLY_SHARES) + 1)
+int mcli_apply_set_argv(const McliApply *a, int made, const char *cpus, char **so, int cap);
+
+/* a guest's terminal stream (`machines console`, `machines shell`) made safe for the person's terminal, as the app's
+ * Shell does it for its tabs: text, C0 controls, CSI and short escape sequences pass (colors, cursor, modes); OSC only for
+ * titles and colors (0, 1, 2, 4, 10..12, 104, 110..112), rebuilt as ESC ] ... BEL; every other OSC (52 the clipboard, 8
+ * links, 9 and 777 notifications, 7, 133, 1337 ...), DCS, SOS, PM, APC, CSI ... t (window operations) and the C1
+ * controls dropped; broken UTF-8 becomes '?'. A sequence may be split across reads: the state is kept between calls.
+ * out needs n + MCLI_VTF_SLACK bytes; returns how many were written */
+#define MCLI_VTF_BUF   1024
+#define MCLI_VTF_SLACK (MCLI_VTF_BUF + 16)
+typedef struct {
+    int st;                       /* where the parser is (mcli.c) */
+    int bad;                      /* the sequence being read is dropped at its end */
+    int esc;                      /* in a string: an ESC was just seen (ST or the start of a new escape) */
+    int need;                     /* UTF-8: continuation bytes still expected */
+    size_t n;                     /* bytes in buf */
+    uint8_t buf[MCLI_VTF_BUF];
+} McliVtf;
+void mcli_vtf_init(McliVtf *f);
+size_t mcli_vtf_feed(McliVtf *f, const uint8_t *in, size_t n, uint8_t *out, size_t cap);
 
 /* one MCP message (JSON-RPC 2.0, one per line, at most MCLI_RPC_MAX bytes): exactly the keys jsonrpc "2.0", method (1..64
  * bytes), id (an integer or a string of at most 128 bytes; absent: a notification) and params (an object or array).

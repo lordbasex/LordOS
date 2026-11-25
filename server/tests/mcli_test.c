@@ -493,6 +493,152 @@ static void test_review(void) {
           !mcli_iso_place_ok("x.iso", roots) && !mcli_iso_place_ok("/home/a/Downloads/x.iso", NULL) && !mcli_iso_place_ok(NULL, roots));
 }
 
+/* F8 of the security review of 2026-11-24: apply's worst case (every scalar, 32 ports, 4 shares) fits its argv exactly,
+ * a smaller array is refused without a write past it, and set's conversion takes all of it */
+static void test_apply_argv(void) {
+    static char text[MCLI_APPLY_MAX];
+    size_t o = 0;
+    o += (size_t)snprintf(text + o, sizeof text - o, "name = \"dev\"\nmemory = \"8G\"\ncpus = 4\ndisk = \"64G\"\nnetwork = \"shared\"\n"
+                          "iso = \"/x.iso\"\ngraphics = \"2d\"\nclipboard = \"off\"\nagent = true\nports = [");
+    for (int i = 0; i < MCLI_APPLY_PORTS; i++) o += (size_t)snprintf(text + o, sizeof text - o, "%s\"tcp:%d:%d\"", i ? ", " : "", 20000 + i, 22);
+    o += (size_t)snprintf(text + o, sizeof text - o, "]\nshares = [");
+    for (int i = 0; i < MCLI_APPLY_SHARES; i++) o += (size_t)snprintf(text + o, sizeof text - o, "%s\"ro:t%d:/srv/%d\"", i ? ", " : "", i, i);
+    o += (size_t)snprintf(text + o, sizeof text - o, "]\n");
+    McliApply *a = malloc(sizeof *a);
+    int line;
+    const char *why;
+    CHECK(!mcli_apply_parse(text, o, a, &line, &why) && a->n_ports == MCLI_APPLY_PORTS && a->n_shares == MCLI_APPLY_SHARES);
+    /* guarded on both sides: a canary past the end must never be touched */
+    char *so[MCLI_APPLY_ARGV + 4];
+    char canary[] = "canary";
+    for (size_t i = 0; i < sizeof so / sizeof so[0]; i++) so[i] = canary;
+    int k = mcli_apply_set_argv(a, 0, "4", so, MCLI_APPLY_ARGV);
+    CHECK(k == MCLI_APPLY_ARGV - 1 && k == 2 * (8 + MCLI_APPLY_PORTS + MCLI_APPLY_SHARES) && so[k] == NULL);
+    for (size_t i = MCLI_APPLY_ARGV; i < sizeof so / sizeof so[0]; i++) CHECK(so[i] == canary);
+    CHECK(!strcmp(so[0], "--memory") && !strcmp(so[k - 2], "--share") && !strcmp(so[k - 1], "ro:t3:/srv/3"));
+    /* one entry short (the old so[80] is far shorter): refused, nothing written at or past cap */
+    for (int cap = MCLI_APPLY_ARGV - 1; cap >= 0; cap -= cap > 70 ? 1 : 13) {
+        for (size_t i = 0; i < sizeof so / sizeof so[0]; i++) so[i] = canary;
+        CHECK(mcli_apply_set_argv(a, 0, "4", so, cap) == -1);
+        for (size_t i = (size_t)cap; i < sizeof so / sizeof so[0]; i++) CHECK(so[i] == canary);
+    }
+    /* a machine just made: the settings --create took are left out */
+    k = mcli_apply_set_argv(a, 1, "4", so, MCLI_APPLY_ARGV);
+    CHECK(k == 2 * (3 + MCLI_APPLY_PORTS + MCLI_APPLY_SHARES));   /* memory, cpus, disk, iso and a shared network: --create's */
+    /* and `machines set` converts the worst case whole (its store and its out[] have room) */
+    k = mcli_apply_set_argv(a, 0, "4", so, MCLI_APPLY_ARGV);
+    char *out[96];
+    McliStore st;
+    const char *bo, *bv;
+    int sr = mcli_set_args(k, so, out + 3, 96 - 3, &st, &bo, &bv);
+    if (sr) fprintf(stderr, "  set_args refused %s %s\n", bo ? bo : "-", bv ? bv : "-");
+    CHECK(!sr);
+    free(a);
+}
+
+/* F11 of the security review of 2026-11-24: a guest's console stream keeps colors and the cursor, loses what reaches
+ * past the terminal; every split of the input gives the same output */
+static size_t vtf_all(const char *in, size_t n, size_t step, char *out) {
+    McliVtf *f = malloc(sizeof *f);
+    mcli_vtf_init(f);
+    size_t o = 0;
+    for (size_t i = 0; i < n; i += step) {
+        size_t c = n - i < step ? n - i : step;
+        o += mcli_vtf_feed(f, (const uint8_t *)in + i, c, (uint8_t *)out + o, c + MCLI_VTF_SLACK);
+    }
+    out[o] = 0;
+    free(f);
+    return o;
+}
+static int vtf_is(const char *in, const char *want) {
+    static char out[8192];
+    size_t n = strlen(in);
+    for (size_t step = 1; step <= n + 1; step++) {
+        vtf_all(in, n, step, out);
+        if (strcmp(out, want)) { fprintf(stderr, "  vtf step %zu: got \"", step); for (char *p = out; *p; p++) fprintf(stderr, (unsigned char)*p < 0x20 || (unsigned char)*p >= 0x7f ? "\\x%02x" : "%c", (unsigned char)*p); fprintf(stderr, "\"\n"); return 0; }
+    }
+    return 1;
+}
+static void test_vtf(void) {
+    /* what an interactive console needs passes */
+    CHECK(vtf_is("plain text\r\n", "plain text\r\n"));
+    CHECK(vtf_is("\033[1;31mred\033[0m \033[2J\033[H\033[?1049h\033[?2004h\033[10;5H", "\033[1;31mred\033[0m \033[2J\033[H\033[?1049h\033[?2004h\033[10;5H"));
+    CHECK(vtf_is("\033(B\0337\0338\033M\033=\033>", "\033(B\0337\0338\033M\033=\033>"));
+    CHECK(vtf_is("a\bb\tc\a", "a\bb\tc\a"));
+    CHECK(vtf_is("año €😀", "año €😀"));
+    CHECK(vtf_is("\033]0;guest: ~\a", "\033]0;guest: ~\a"));
+    CHECK(vtf_is("\033]2;título\033\\x", "\033]2;título\ax"));
+    CHECK(vtf_is("\033]11;?\a\033]4;1;rgb:ff/00/00\a\033]104\a", "\033]11;?\a\033]4;1;rgb:ff/00/00\a\033]104\a"));
+    /* the clipboard, in every form, is dropped and the text around it kept */
+    CHECK(vtf_is("a\033]52;c;Y3VybCBldmlsfHNoCg==\ab", "ab"));
+    CHECK(vtf_is("a\033]52;c;Y3VybA==\033\\b", "ab"));
+    CHECK(vtf_is("a\xc2\x9d" "52;c;Y3VybA==\xc2\x9c" "b", "ab"));
+    CHECK(vtf_is("a\xc2\x9d" "52;c;Y3VybA==\ab", "ab"));
+    CHECK(vtf_is("a\033]1337;Copy=:Y3VybA==\ab\033]1337;File=inline=1:AAAA\a", "ab"));
+    /* links, notifications, cwd, prompt marks, unknown OSC */
+    CHECK(vtf_is("\033]8;;http://evil/\afake\033]8;;\a", "fake"));
+    CHECK(vtf_is("\033]9;pwned\a\033]777;notify;x;y\a\033]7;file://h/etc\a\033]133;A\a\033]99999;x\a.", "."));
+    /* DCS (DECRQSS, sixel, tmux pass-through), SOS, PM, APC: dropped whole */
+    CHECK(vtf_is("x\033P$qm\033\\y\033Ptmux;\033\033]52;c;QQ==\a\033\\z", "xyz"));
+    CHECK(vtf_is("x\033P$qm\033\\y", "xy"));
+    CHECK(vtf_is("x\033Pq#0;2;0;0;0~~\033\\y\033X sos \033\\\033^pm\033\\\033_apc\033\\z", "xyz"));
+    CHECK(vtf_is("x\xc2\x90$qm\xc2\x9cy", "xy"));
+    /* an ESC inside a string ends it unfinished (dropped) and starts its own escape: no OSC 52 slips through after it */
+    CHECK(vtf_is("\033]0;t\033]52;c;QQ==\ax", "x"));
+    CHECK(vtf_is("\033P1\033[31mx", "\033[31mx"));
+    /* window operations dropped, C1 CSI rebuilt as 7-bit, other C1 dropped, broken UTF-8 replaced */
+    CHECK(vtf_is("\033[8;100;300t\033[21tok", "ok"));
+    CHECK(vtf_is("\xc2\x9b" "31mr", "\033[31mr"));
+    CHECK(vtf_is("a\xc2\x85" "b\xc2\x84" "c", "abc"));
+    CHECK(vtf_is("a\x9d" "52;c;QQ==\x07" "b", "a?52;c;QQ==\ab"));
+    CHECK(vtf_is("\xff\xc3(\xe2\x82", "?" "?("));
+    CHECK(vtf_is("\033[31\033]52;c;QQ==\ax", "x"));
+    /* CAN and SUB abort a sequence; an over-long or bad-character OSC is dropped, never cut */
+    CHECK(vtf_is("\033]52;c;QQ\x18" "after", "after"));
+    CHECK(vtf_is("\033]0;a\x01" "b\ac", "c"));
+    {
+        static char big[MCLI_VTF_BUF + 64];
+        size_t o = (size_t)snprintf(big, sizeof big, "\033]0;");
+        while (o < MCLI_VTF_BUF + 10) big[o++] = 'A';
+        big[o++] = '\a'; big[o++] = 'z'; big[o] = 0;
+        char out[sizeof big + MCLI_VTF_SLACK];
+        CHECK(vtf_all(big, o, 1, out) == 1 && !strcmp(out, "z"));
+        CHECK(vtf_all(big, o, 4096, out) == 1 && !strcmp(out, "z"));
+    }
+    /* fuzz: whatever the guest sends, the output has no OSC but the allowed ones, no DCS/SOS/PM/APC, no C1, stays in
+     * bounds, and is the same however the input is split */
+    unsigned s = 12345;
+    static const char *const bits[] = { "\033", "]", "52;c;", "0;", "P", "[", "\\", "\a", "\x18", "\xc2", "\x9d", "\x9c", "\x9b",
+                                        "\x90", "A", ";", "1337;Copy=", "31m", "t", "\xe2\x82", "\xac", "_", "^", "X", "8;;" };
+    for (int it = 0; it < 4000; it++) {
+        char in[256];
+        size_t n = 0;
+        int parts = 1 + (int)((s = s * 1103515245u + 12345u) >> 16) % 30;
+        for (int p = 0; p < parts; p++) {
+            const char *b = bits[((s = s * 1103515245u + 12345u) >> 16) % (sizeof bits / sizeof bits[0])];
+            size_t l = strlen(b);
+            if (n + l >= sizeof in) break;
+            memcpy(in + n, b, l);
+            n += l;
+        }
+        char o1[sizeof in + MCLI_VTF_SLACK + 1], o2[sizeof in + MCLI_VTF_SLACK + 1];
+        size_t l1 = vtf_all(in, n, n ? n : 1, o1), l2 = vtf_all(in, n, 1 + it % 7, o2);
+        CHECK(l1 == l2 && !memcmp(o1, o2, l1));
+        for (size_t i = 0; i < l1; i++) {
+            unsigned char c = (unsigned char)o1[i];
+            if (c == 0x1b && i + 1 < l1) {
+                char nx = o1[i + 1];
+                CHECK(nx != 'P' && nx != 'X' && nx != '^' && nx != '_');
+                if (nx == ']') {
+                    int num = atoi(o1 + i + 2);
+                    CHECK(num == 0 || num == 1 || num == 2 || num == 4 || (num >= 10 && num <= 12) || num == 104 || (num >= 110 && num <= 112));
+                }
+            }
+            if (c == 0xc2 && i + 1 < l1) CHECK((unsigned char)o1[i + 1] >= 0xa0);
+        }
+    }
+}
+
 int main(void) {
     test_sizes();
     test_resolve();
@@ -506,6 +652,8 @@ int main(void) {
     test_json_bytes();
     test_term_clean();
     test_apply();
+    test_apply_argv();
+    test_vtf();
     test_rpc();
     test_review();
     fuzz_channel();
