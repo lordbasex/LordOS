@@ -11,7 +11,7 @@
 import {
   View, Text, MediaView, Button, Toggle, Segmented, TextInput, Toolbar, ToolbarButton, ToolbarGroup, ToolbarDivider, ToolbarSpacer, Hairline,
   useTheme, useAppWindow, useKeyboard, useStore, windows, wm, t as tr, media, fs, addListener, errorText, imageEdit as M,
-  clipboard, settings, useNarrow,
+  clipboard, settings,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { ocrLangs, cleanText, transcribeRect } from './ocr.js';
@@ -32,7 +32,6 @@ const nameOf = (p) => String(p || '').split('/').pop();
 export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved, onNewCapture }) {
   const th = useTheme();
   const win = useAppWindow();
-  const narrow = useNarrow(900);
   useStore(windows, (ws) => { const w = ws.find((x) => x.id === win.id); return w ? `${w.w}x${w.h}` : ''; });   // redraw the overlays on resize
   const [path, setPath] = useState(firstPath || null);
   const [steps, setSteps] = useState(handle ? [{ id: handle, ops: [] }] : []);
@@ -261,8 +260,10 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved, 
   const dim = 'rgba(0,0,0,0.55)';
   const knob = (x, y) => <View style={{ position: 'absolute', left: x - 5, top: y - 5, width: 10, height: 10, borderRadius: 2, backgroundColor: '#fff', border: '1px solid rgba(0,0,0,0.5)' }} />;
   const label = (k) => <Text style={{ fontSize: 12, color: th.textDim }}>{tr(k)}</Text>;
-  // a small window (a tile): the toolbar and the crop and resize bars wrap onto more rows instead of running past the edge
-  const wrap = narrow ? { height: 'auto', minHeight: 44, flexWrap: 'wrap', paddingVertical: 6 } : null;
+  // the toolbar and the crop and resize bars wrap onto more rows instead of running past the edge: in a small window
+  // (a tile), and in any window when the labels are long (issue #252: in French Save a Copy and Save were cut off
+  // at 1000 px wide, the editor's default)
+  const wrap = { height: 'auto', minHeight: 44, flexWrap: 'wrap', paddingVertical: 6 };
   return (
     <View style={{ flex: 1 }}>
       <Toolbar style={wrap}>

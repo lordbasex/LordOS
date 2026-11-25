@@ -880,6 +880,9 @@ EOF
         run "notes-breaks-scene (sdk/markdown.jsx breaks, apps/notes)" node tests/textfield_menu_test.mjs notes_breaks_scene.mjs
         # (#166) Screenshots' markup editor: New Screenshot and Ctrl+N bring the capture panel back, the editor staying open
         run "screenshots-newcapture-scene (apps/screenshots/editor.jsx)" node tests/textfield_menu_test.mjs screenshots_newcapture_scene.mjs
+        # (#252) Screenshots with several displays: Print Screen copies the main display's capture, a thumbnail per display
+        # inside it, the markup editor inside one display (side by side, main listed second; another above-left at 200 %)
+        run "screenshots-displays-scene (apps/screenshots/index.jsx)" node tests/textfield_menu_test.mjs screenshots_displays_scene.mjs
         # the Screenshots toolbar: modes, the primary button, the Options menu and its choices saved in settings
         run "screenshots-toolbar-scene (apps/screenshots/toolbar.jsx)" node tests/textfield_menu_test.mjs screenshots_toolbar_scene.mjs
         # (#200) Backups: Choose… for the destination (no Cloud folder) and the exclusions (inside home), typing still works

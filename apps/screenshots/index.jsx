@@ -15,9 +15,13 @@ import {
   View, Text, Image, MediaView, FilePicker, clipboard,
   useAppWindow, useStore, useWindows, wm, windows, getApp,
   t as tr, media, userDirs, fs, addListener, addShortcuts, createStore, windowTitle, settings, notify, microphones, soundState, toast, errorText, dndActive, appNotifyPrefs, direction,
+  workAreaOf, screenDisplays,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
-import { captureRect, displaysToCapture, displayAt, dragRect, capturePixel, magnify, middleColor, LOUPE_PX, LOUPE_ZOOM } from './geometry.js';
+import {
+  captureRect, displaysToCapture, displayAt, dragRect, capturePixel, magnify, middleColor, LOUPE_PX, LOUPE_ZOOM,
+  displayById, thumbFrame, editorFrame, countdownFrame, badgeFrame,
+} from './geometry.js';
 import { ocrLangs, cleanText } from './ocr.js';
 import { Editor } from './editor.jsx';
 import { APP, recording, recent, bar, options, setOptions, addRecent } from './state.js';
@@ -75,8 +79,9 @@ const opts = options;
 
 // Saved to ~/Pictures/Screenshots and on the clipboard as well (pasted into a Terminal it goes in as its path,
 // which Claude Code attaches as an image); with "only copy" on, the clipboard alone. copy: false for the other
-// displays of a ❖⇧3 (the clipboard keeps the first one's).
-async function finish(handle, { copy = true } = {}) {
+// displays of a ❖⇧3 (the clipboard keeps the first one's: the main display's, displaysToCapture). display: the one
+// it was taken of (null: the main one), where its thumbnail or editor shows (issue #252).
+async function finish(handle, { copy = true, display = null } = {}) {
   if (!handle) return;
   const o = opts();
   const dir = saveDir(o);
@@ -90,14 +95,20 @@ async function finish(handle, { copy = true } = {}) {
   if (failed) notSaved(failed);
   // Save to Mail: a new message with the file attached; Save to the editor: it opens on the capture at once
   if (path && copy && o.saveTo === 'mail' && getApp('mail')) wm.open('mail', { new: true, args: { compose: { attachments: [path] } } });
-  if (copy && o.saveTo === 'editor' && !failed) { openEditor(handle, path); return; }
-  if (o.thumbnail) showThumb(handle, path, failed ? failed.what : null, dir);
+  const at = display ? display.id : null;
+  if (copy && o.saveTo === 'editor' && !failed) { openEditor(handle, path, at); return; }
+  if (o.thumbnail) showThumb(handle, path, failed ? failed.what : null, dir, at);
   else if (!windows.get().some((w) => w.args?.handle === handle)) media.close(handle);
 }
 
-function openEditor(handle, path) {
-  const w = Math.min(1000, lord.screen.width - 80), h = Math.min(680, lord.screen.height - 140);
-  wm.open(APP, { instance: `edit${handle}`, args: { handle, path }, frame: { x: Math.round((lord.screen.width - w) / 2), y: 60, w, h } });
+// The work area of a display of lord.screen.displays, by its id (null or gone: the main one), as the theme gives it
+// (its menu bar and Dock left out, in every theme). The app's own windows go inside one display: they were placed
+// on the whole logical space, so with two displays the editor sat across both (issue #252).
+const areaOn = (id) => workAreaOf(displayById(screenDisplays(), id));
+
+// the markup editor, on the display the capture was taken of (display: its id)
+function openEditor(handle, path, display = null) {
+  wm.open(APP, { instance: `edit${handle}`, args: { handle, path }, frame: editorFrame(areaOn(display)) });
 }
 
 // The capture was taken but couldn't be saved or copied (lord-media missing, a full disk…): said, never silent
@@ -108,13 +119,13 @@ function notSaved({ what, error }) {
   if (!banner || dndActive() || appNotifyPrefs(APP).style === 'none') toast.set(`${title}: ${body}`);
 }
 
-// the floating thumbnail, a few seconds in the bottom corner of the main display (Options → Show Floating Thumbnail)
-function showThumb(handle, path, failed = null, dir = null) {
+// the floating thumbnail, a few seconds in the bottom corner of the display that was captured (Options → Show
+// Floating Thumbnail). One per display: a ❖⇧3 on two displays shows both captures, each on its own display; with a
+// single thumbnail on the main display the last capture (another display's) replaced the main one's (issue #252).
+function showThumb(handle, path, failed = null, dir = null, display = null) {
   const folder = dir ? dir.split('/').pop() : '';
-  const id = wm.open(APP, { instance: 'thumb', args: { handle, path, failed, folder } });
-  const w = 240, h = 150;
-  const d = (lord.screen.displays || []).find((x) => x.main) || { x: 0, y: 0, w: lord.screen.width, h: lord.screen.height };
-  wm.setPip(id, { x: d.x + d.w - w - 20, y: d.y + d.h - h - 90, w, h });
+  const id = wm.open(APP, { instance: display == null ? 'thumb' : `thumb-${display}`, args: { handle, path, failed, folder, display } });
+  wm.setPip(id, thumbFrame(areaOn(display)));
 }
 
 // takes the screen once a frame without our windows was drawn (it closes them first)
@@ -127,7 +138,7 @@ function withTimer(fn) {
   const secs = opts().timer;
   if (!secs) { fn(); return; }
   const id = wm.open(APP, { instance: 'count', args: { secs, start: Date.now() } });
-  wm.setPip(id, { x: Math.round(lord.screen.width / 2 - 60), y: Math.round(lord.screen.height / 2 - 60), w: 120, h: 120 });
+  wm.setPip(id, countdownFrame(areaOn(null)));
   setTimeout(() => { wm.close(id, true); setTimeout(fn, 180); }, secs * 1000);
 }
 
@@ -199,7 +210,7 @@ async function areaDone(r, at) {
   const c = media.crop(shot.handle, p.x, p.y, p.w, p.h, a.mode === 'window' ? p.radius : 0);
   media.close(shot.handle);
   if (a.mode === 'text') { await copyText(c); return; }
-  await finish(c);
+  await finish(c, { display: shot.display });
 }
 
 // "Copy the text": the selection read by the lord-ocr helper, in the interface's languages, to the clipboard
@@ -234,7 +245,7 @@ export const capture = {
   // ❖⇧3: a file per display, as other systems do
   full: () => afterHide(() => withTimer(async () => {
     let first = true;
-    for (const d of displaysToCapture(lord.screen)) { const h = await grab(d); if (!h) return; await finish(h, { copy: first }); first = false; }
+    for (const d of displaysToCapture(lord.screen)) { const h = await grab(d); if (!h) return; await finish(h, { copy: first, display: d }); first = false; }
   })),
   // mode: 'area', 'window', 'color', 'text' or 'record' (the area to record: on the main display, which is what is
   // recorded). With Remember Last Selection the last area comes back with its handles, and Enter or the button takes
@@ -281,7 +292,7 @@ export const capture = {
         }
       });
       const rid = wm.open(APP, { instance: 'rec' });
-      wm.setPip(rid, { x: lord.screen.width - 210, y: 40, w: 190, h: 44 });
+      wm.setPip(rid, badgeFrame(areaOn(null)));
     }), 220);
   },
 };
@@ -336,8 +347,7 @@ const barActions = {
   // (the toolbar goes meanwhile, so its keys are the dialog's, and comes back after)
   chooseFolder() {
     closeToolbar();
-    const w = Math.min(820, lord.screen.width - 80), h = Math.min(540, lord.screen.height - 120);
-    wm.open(APP, { instance: 'folder', frame: { x: Math.round((lord.screen.width - w) / 2), y: Math.round((lord.screen.height - h) / 2), w, h } });
+    wm.open(APP, { instance: 'folder', frame: editorFrame(areaOn(null), 820, 540) });
   },
 };
 
@@ -544,7 +554,7 @@ function Overlay({ index }) {
   );
 }
 
-function Thumb({ handle, path, failed, folder }) {
+function Thumb({ handle, path, failed, folder, display }) {
   const win = useAppWindow();
   const [hover, setHover] = useState(false);
   useEffect(() => {
@@ -557,7 +567,7 @@ function Thumb({ handle, path, failed, folder }) {
     <View style={{ flex: 1 }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       accessibilityLabel={tr('screenshots.thumbOpen')} title={tr('screenshots.thumbOpen')}
       onClick={() => {
-        openEditor(handle, path);
+        openEditor(handle, path, display);
         setTimeout(() => wm.close(win.id, true), 50);
       }}>
       <MediaView media={handle} style={{ flex: 1 }} />
@@ -629,7 +639,7 @@ export default function Screenshots() {
   const inst = String(win.id).split('#')[1] || '';
   const a = win.args || {};
   if (String(inst).startsWith('overlay') && a.index != null) return <Overlay index={a.index} />;
-  if (inst === 'thumb' && a.handle) return <Thumb handle={a.handle} path={a.path} failed={a.failed} folder={a.folder} />;
+  if (inst.startsWith('thumb') && a.handle) return <Thumb handle={a.handle} path={a.path} failed={a.failed} folder={a.folder} display={a.display} />;
   if (inst === 'count') return <Countdown secs={a.secs} start={a.start} />;
   if (inst === 'rec') return <RecBadge />;
   if (inst === 'folder') return <FolderWindow />;
