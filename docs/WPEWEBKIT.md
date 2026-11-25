@@ -72,6 +72,17 @@ backends with no warnings, `web-backend-test` prints `ok platform (WPE WebKit 2.
 `+1`, `tools/release/image-sources.sh` run on the test chroot listed `wpewebkit` with origin `lordos` (176 other source
 packages `debian`). Not checked yet: lord-web's windows on the VM with these packages.
 
+Results of `+3` on amd64 (2026-11-25; WebRTC and the SharedArrayBuffer patch, `out/test/report.txt` and
+`out/test/webcalls.txt`): every check of `+2` above passes again (pkg-config, no DRM backend, no `libinput`/`libudev`,
+SONAME, 930 of 930 symbols kept, 1345 exported, the headless render, lord-web on both backends); the library links
+`libgstwebrtc-1.0`; lintian 0 errors, 5 warnings. `tests/webcalls_check.py` (in the test chroot, sandbox on): Chrome's
+Client Hints and `navigator.userAgentData` equal Chrome 158's; SharedArrayBuffer is a function on a page served with
+COOP and COEP and undefined on a plain page, before and after it; `RTCPeerConnection` exists; the loopback call gathers
+no ICE candidate because the web process has no network (WEBAPPS.md, "Calls"). The build was interrupted by a desktop
+session restart at step 8428 of 8967 and finished in the same tmpfs tree (`dpkg-buildpackage -b -nc`, then
+`dpkg-genchanges -sa`); the source package was made before the interruption. arm64: not built yet; the same command
+with `ARCH=arm64` (below), then the test stage on the Pi 5.
+
 Output, in `$LORDOS_WPE_WORK/<version>/out/` (default `/var/tmp/lordos-wpewebkit`; on the maintainer's build machine
 `/mnt/HD08TB/build/wpewebkit`): the `.deb`s, the **source package** (`wpewebkit_<version>.dsc`,
 `wpewebkit_<upstream>.orig.tar.xz`, `wpewebkit_<upstream>.orig.tar.xz.asc`, `wpewebkit_<version>.debian.tar.xz`),

@@ -716,6 +716,83 @@ doesn't play a second sound. lord-web remembers it for the profile (`state.json`
 first time nothing waits or guesses. notifyd passes `suppress-sound` to the shell, which then shows the banner
 silently.
 
+## Calls (in development; approved by the maintainer on 2026-11-25)
+
+Voice and video calls in web apps (a messaging web app first, also video meeting sites), for the release after
+0.8.9.6.2. What a call needs, and where each piece is:
+
+- **WebRTC in the engine.** Debian builds WPE WebKit without WebRTC, so `RTCPeerConnection` didn't exist. LordOS's
+  build `2.54.3-1~lordos13+3` turns it on with WebKit's GStreamer backend (GStreamer 1.26's `webrtcbin`; ICE by libnice,
+  `gstreamer1.0-nice`; DTLS, SRTP and SCTP from plugins-bad; Opus, VP8, H.264 through OpenH264) ([WPEWEBKIT.md](WPEWEBKIT.md)).
+  `lordos-web` depends on `gstreamer1.0-nice`. Checked 2026-11-25 on amd64 (`tests/webcalls_check.py` in the build's test
+  chroot, WebKit's sandbox on): `RTCPeerConnection`, `RTCRtpSender.getCapabilities` and `RTCRtpScriptTransform` exist;
+  the engine offers audio `opus`, `PCMU`, `PCMA`, `telephone-event` and video `H264`, `VP8`, `VP9` (Chrome 158 also has
+  `red`, `G722`, `CN`, `AV1`, `rtx`, `ulpfec`); `createEncodedStreams`, `MediaStreamTrackProcessor`/`Generator`,
+  `WebTransport` and `setSinkId` don't exist (Chrome has them).
+- **SharedArrayBuffer when the site is cross-origin isolated.** A messaging web app checks, before it offers calls,
+  `SharedArrayBuffer`, `Atomics` and `RTCPeerConnection` (its own gating code, read 2026-11-25), and its page is served
+  with COOP `same-origin` and COEP `require-corp`. WPE never had SharedArrayBuffer: WebKit gives such a page a web
+  process of its own but only its Cocoa ports turned SharedArrayBuffer on there. LordOS's build does the same on Linux
+  (`lordos-sharedarraybuffer-coi.patch`), so SharedArrayBuffer exists only in cross-origin-isolated pages, as in
+  Chrome and Safari (Spectre: never for a page that isn't isolated). lord-web drops `JSC_*` from its environment, so
+  nothing turns it on for every page.
+- **Chrome's identity, all of it** ("Browser identity" above): the site reads the User-Agent string, the Client Hints
+  and `navigator.userAgentData`, and treats a WebKit it recognises differently (another code path for calls); with the
+  Chrome identity all three say Chrome 158 on Linux, from one table.
+- **Microphone and camera** ("Permissions" above): the page's `getUserMedia` reaches lord-web as WebKit's permission
+  request and is answered from the registry or by LordOS's own prompt (`Ask`, lord-server's dialog), once per app,
+  revocable in Settings → Web Apps (Camera, Microphone, Screen). The page lists devices (`enumerateDevices`, with
+  names) only once one of them is allowed, and chooses among them with its own picker; LordOS Studio's virtual camera
+  is one of them when it is on. WebKit captures the microphone through PulseAudio (pipewire-pulse) from its sandboxed
+  web process, which the capture indicator already shows under the web app (PRIVACY.md); the camera WebKit opens through
+  V4L2 (`/dev/video*`, which WebKit's sandbox binds for the web process), which the indicator doesn't see
+  (PRIVACY.md, "Not covered"): lord-web logs WebKit's own capture state (`capture: camera on`) and a way for it to tell
+  the indicator is proposed for the maintainer's review (a new lord-web → lord-server method, not built).
+- **The network.** WebKit's web process has no network of its own (bubblewrap's `--unshare-net`), and without librice
+  (not in Debian 13) WebKit's GStreamer backend runs ICE inside it. libnice there sees only the sandbox's loopback
+  interface, which it ignores, and gathers **no candidate at all** (checked 2026-11-25 with libnice's debug output:
+  "Interface: lo … Ignoring loopback interface"; the loopback test's two peer connections stay `new`, gathering never
+  completes). So calls can't connect yet, not even two peers in one page. The ways out, for the maintainer to choose:
+  (a) build librice (Rust, `rice-proto`/`rice-io` 0.4.2+ through cargo-c, not packaged by Debian) into the WebKit
+  backport with `-DUSE_LIBRICE=ON`: ICE then runs in WebKit's network process, which has the network already, and the
+  web process keeps none (WebKit's own design since 2.50; recommended); or (b) a WebKit patch that keeps the host's
+  network for the web process (bubblewrap without `--unshare-net`), which gives all web content raw network access
+  (not recommended). Until then `tests/webcalls_check.py --no-network-known` reports the loopback as blocked.
+- **The call log** (`webcall.h`, `webcall.c`, `webcalls.c`, `webcall.js`): lines starting `webcall: ` in the app's log
+  (`web/<app>-<profile>.log` in the user's log folder, docs/SYSTEM.md "Log files"; the Logs app and `lordos-issue` show
+  it), always on, at most 60 a minute. They say what the page has for calls, each peer connection, its ICE gathering,
+  ICE connection, connection and signaling states, once connected (and every 5 minutes) the codec, size and frame rate
+  of each direction and the kinds of ICE candidates in use, errors by name and the call that failed, `getUserMedia` and
+  `getDisplayMedia` (what, the result, the error's name, each device as a closed word: `built-in`, `usb`,
+  `bluetooth`, `virtual`, `lordos-studio`, `other`), the permission answers, WebKit's capture state, and the Client
+  Hints the app's own site asked for. Never SDP, ICE candidates, addresses, ports, tokens, ids, phone numbers, device
+  labels, other sites' addresses or anything said in the call: the page-side script sends only fixed fields, and
+  `webcall_line` checks each against a closed list or pattern again and drops the rest. Example:
+
+  ```
+  webcall: page: crossOriginIsolated yes, SharedArrayBuffer yes, Atomics yes, RTCPeerConnection yes, getUserMedia yes
+  webcall: client hints asked by the app: sec-ch-ua-full-version-list, sec-ch-ua-arch, sec-ch-ua-bitness
+  webcall: permission microphone: allowed (asked)
+  webcall: getUserMedia audio: granted (audio usb)
+  webcall: capture: microphone on
+  webcall: peer connection 1 created
+  webcall: peer connection 1: ice-gathering gathering
+  webcall: peer connection 1: ice-connection checking
+  webcall: peer connection 1: connection failed
+  ```
+
+  The page-side script (`webcall.js`, the app's main frame, the page's world) only watches: `RTCPeerConnection` stays
+  the engine's (a proxy that constructs the same object; `instanceof`, statics and `constructor` unchanged), its
+  methods are the engine's called through, every function reads as native code, and nothing is added that the engine
+  lacks. It reports through a DOM event with a name random per process to a bridge in lord-web's own isolated world
+  (`lordos-web-call`), the only world with the `lordosCall` message handler: the page never sees a
+  `webkit.messageHandlers` of lord-web's.
+- **Tests:** `build/webua-test` (the line for each kind of report, what is dropped: an address, SDP, a candidate, an
+  unknown kind or word, a label; the device words; the rate; only the app's own site's Client Hints kept),
+  `tests/webcalls_check.py` with `build/webcalls-check` (the real engine, headless, WebKit's sandbox on: Chrome's
+  identity, SharedArrayBuffer only when isolated, and with `--webrtc` the loopback below), also run by
+  `tools/pkg/wpewebkit-chroot.sh`'s test on the WebRTC build.
+
 ## What `lord-web` uses of the session (like any Linux app)
 
 - **Files:** WebKit's file chooser goes through the FileChooser portal. Downloads go to the XDG Downloads folder only,

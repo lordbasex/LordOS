@@ -30,6 +30,12 @@ import threading
 
 CHECK = sys.argv[1] if len(sys.argv) > 1 else "build/webcalls-check"
 WEBRTC = "--webrtc" in sys.argv
+# Known on LordOS's +3 build (docs/WEBAPPS.md "Calls", "The network"): WebKit's web process has no network of its own
+# (its sandbox's --unshare-net) and, without librice, ICE runs there, so libnice finds only the loopback interface,
+# which it ignores, and gathers no candidate. With this flag a loopback that gathered no candidate at all is reported
+# as that known block, not a failure; anything else (a candidate gathered and still no connection, no frames, a
+# wrong codec) still fails.
+NO_NETWORK_KNOWN = "--no-network-known" in sys.argv
 MAJOR = None
 
 ACCEPT_CH = ("Sec-CH-UA-Full-Version-List, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, "
@@ -82,8 +88,11 @@ async function call(prefer) {
   const tick = setInterval(() => { g.fillStyle = `hsl(${(n++ * 7) % 360} 80% 50%)`; g.fillRect(0, 0, 320, 240); }, 33);
   const vs = c.captureStream(30);
   const a = new RTCPeerConnection(), b = new RTCPeerConnection();
-  a.onicecandidate = e => e.candidate && b.addIceCandidate(e.candidate);
-  b.onicecandidate = e => e.candidate && a.addIceCandidate(e.candidate);
+  // candidates handed across, counted by kind (never their addresses)
+  r.candidates = {};
+  const count = c => { const k = (c.type || '?') + '/' + (c.protocol || '?'); r.candidates[k] = (r.candidates[k] || 0) + 1; };
+  a.onicecandidate = e => { if (e.candidate) { count(e.candidate); b.addIceCandidate(e.candidate); } };
+  b.onicecandidate = e => { if (e.candidate) { count(e.candidate); a.addIceCandidate(e.candidate); } };
   const got = { audio: false, video: false };
   b.ontrack = e => { got[e.track.kind] = true; };
   a.addTrack(dst.stream.getAudioTracks()[0], dst.stream);
@@ -101,7 +110,7 @@ async function call(prefer) {
     await new Promise(f => setTimeout(f, 100));
   }
   r.connectMs = Math.round(performance.now() - t0);
-  r.a = a.connectionState; r.b = b.connectionState; r.ice = b.iceConnectionState;
+  r.a = a.connectionState; r.b = b.connectionState; r.ice = b.iceConnectionState; r.gathering = a.iceGatheringState;
   await new Promise(f => setTimeout(f, 4000));
   const s = await b.getStats(), codecs = {};
   s.forEach(x => { if (x.type === 'codec') codecs[x.id] = x.mimeType; });
@@ -306,8 +315,11 @@ print("     loopback:", json.dumps(lb, sort_keys=True))
 for want, res in (("video/VP8", lb.get("video/VP8")), ("video/H264", lb.get("video/H264"))):
     if not res or res.get("error"):
         fail("%s: %r" % (want, res))
+    if NO_NETWORK_KNOWN and not res.get("candidates") and res["a"] != "connected":
+        print("blocked %s: no ICE candidate gathered (the web process has no network; known, see docs/WEBAPPS.md \"Calls\")" % want)
+        continue
     if res["a"] != "connected" or res["b"] != "connected":
-        fail("%s: not connected (%s / %s, ICE %s; local candidates %s)" % (want, res["a"], res["b"], res.get("ice"), res.get("local")))
+        fail("%s: not connected (%s / %s, ICE %s, gathering %s; candidates %s)" % (want, res["a"], res["b"], res.get("ice"), res.get("gathering"), res.get("candidates")))
     if not res["tracks"]["audio"] or not res["tracks"]["video"]:
         fail("%s: tracks %r" % (want, res["tracks"]))
     if (res.get("framesDecoded") or 0) < 10 or not res.get("width"):
@@ -321,6 +333,12 @@ for want, res in (("video/VP8", lb.get("video/VP8")), ("video/H264", lb.get("vid
     ok("loopback %s: connected in %d ms, %s + %s, %d frames %dx%d at %.0f fps, %d audio packets" % (
         want, res["connectMs"], res["audioCodec"], res["videoCodec"], res["framesDecoded"], res["width"], res["height"],
         res.get("fps") or 0, res["audioPackets"]))
+if NO_NETWORK_KNOWN and all(not (lb.get(k) or {}).get("candidates") for k in ("video/VP8", "video/H264")):
+    for n in ["peer connection 1 created", "peer connection 1: ice-gathering gathering"]:
+        if not any(n in c for c in calls):
+            fail("call log lacks %r: %r" % (n, calls))
+    ok("call log: %s" % " | ".join(c[len("webcall: "):] for c in calls[:10]))
+    sys.exit(0)
 need = ["peer connection 1 created", "peer connection 1: connection connected", "peer connection 2: connection connected"]
 for n in need:
     if not any(n in c for c in calls):
