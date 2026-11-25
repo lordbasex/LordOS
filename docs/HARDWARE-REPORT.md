@@ -240,7 +240,9 @@ Raspberry Pi 5.
 Since the toolkit audit (docs/TOOLKIT-AUDIT.md), a report can also say how GTK 3, GTK 4, Qt 5, Qt 6 and a plain X11
 client did on that machine. It is optional and off by default: System Information → Report → Share on GitHub →
 **Include framework compatibility** uses `lordos-testbench --toolkits`' result from the last day, or opens the audit
-in a Terminal window and waits for a new one. No report so far has it.
+in a Terminal window and waits for a new one. Its **Watch the tests** box runs it again in the Test Bench's
+Frameworks screen instead, where each harness's window and every check can be followed (docs/TOOLKIT-AUDIT.md, "Show
+mode"); the saved result and what the report takes from it are the same. No report so far has it.
 
 - **What it carries** (`apps/sysinfo/hwreport.schema.json`, `$defs/toolkits`): `v` 1, the day it ran, the global
   score, how many combinations ran, and per combination (at most 9) its id, status, fatal word, toolkit version,

@@ -162,6 +162,59 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     (the optional field and 12 malformed ones; the old 5-field reader against the shipped snapshot), and
     `tests/hwreport_test.mjs` (the section, a hand-edited audit, the schema, labels, the comment, the snapshot
     summary, the site's HTML).
+- **The toolkit audit's visible mode: watch the tests happen** (docs/TOOLKIT-AUDIT.md, "Show mode"), asked for by the
+  maintainer, in development (the latest release is 0.8.9.6.1-beta).
+  - **The harnesses' show mode** (`--show`, or `LORDOS_TOOLKIT_AUDIT_SHOW=1`; `gtk3.py`, `gtk4.py`, `qt5.py`,
+    `qt6.py`, `x11.py`). The same checks and the same JSON line, slowed down so a person can follow them: the menu,
+    the combo list and the tooltip stay open about 0.9 s, the text is typed one character at a time (60 to 70 ms
+    apart), the clipboard and drag steps stay on screen, fullscreen is held on and then off. A label on the window
+    names the current step by its check id (`menu`, `clipboard`, ...: a fixed id, never translated; `x11.py` draws
+    it with its own 5x7 bitmap font, no X font). The harness finishes within 15 s (14.6 s budget) instead of 5 s;
+    the hold comes after each decision, so no check's result changes. Before its JSON line a harness in show mode
+    prints one progress line per step and per check: `#lordos-ta step <id>` and `#lordos-ta check <id>
+    pass|fail|skip`.
+  - **`lordos-testbench --toolkits --show`** runs it from a terminal, each check printed as ✓, ✗ or - when it is
+    decided; the harness is killed at **20 s** in show mode (8 s otherwise). The orchestrator passes the fixed word
+    `--show` as the harness's last argument; nothing else changes in how a harness runs (fixed paths, no shell, never
+    as root, the clean environment, its own process group).
+  - **The progress lines are untrusted and parsed strictly** (`tk_progress_parse`/`tk_progress_feed`,
+    `server/src/testbench/toolkits.c`): exactly `#lordos-ta`, one of the two words, one of the 14 shared check ids
+    and, for a check, `pass`, `fail` or `skip`, single spaces, under 96 bytes; anything else (another id, a
+    `global.*` name, upper case, control characters, extra words, a longer line, even one whose end looks right) is
+    ignored whole, never shown. At most 512 lines per run are taken, and only indexes are kept. The final result
+    still comes from the JSON line alone, read and scored as before.
+  - **The Test Bench's Frameworks screen** (`lordos-testbench --frameworks [--only ...]`, or **F** / the new
+    **F: FRAMEWORKS** button on the test card; `server/src/testbench/fwscreen.c`). The nine combinations as a list,
+    each one waiting (a ring), running (highlighted, a spinner and its seconds), done (✓ and its score, ✗ and the
+    reason, or `not-installed`), with its 14 checks ticking ✓, ✗ or - as the harness reports them and the current
+    step's cell blinking. At the end each row shows the final result (exactly the JSON's), the global score sits at
+    the top, and a details box shows what failed: the failed and skipped check ids with the harness's checked detail
+    text, a crash's signal, the globals bound and failed, the recommended variable (`-> GDK_BACKEND=x11`), or the
+    packages a missing toolkit needs. Up/Down or a click picks the row, **R** runs it again, **Esc** goes back to the
+    card. The run is `tk_audit` in a thread of its own with the same folder, `python3`, deadlines and environment as
+    `--toolkits --show`; it refuses to run as root, kills the running harness's group when the window closes or a
+    signal arrives, and saves the result to `~/.cache/lordos/toolkit-audit.json` (0600) as `--toolkits` does. The
+    screen asks for 820x600 so a harness's 600x400 window can open beside it; where either opens is the
+    compositor's choice (a Wayland client can't place its window), so in Lord Flow the harness's window opens over the
+    middle of it. Like the rest of the bench it draws with its own 5x7 font (now with lower case), so it shows only
+    fixed ids, numbers, symbols and a few English words.
+  - **System Information → Report → Share on GitHub → Include framework compatibility → Watch the tests** (off by
+    default): runs the audit again, fresh result or not, in the Test Bench's Frameworks screen instead of a Terminal
+    window, through `lord.apps.launchAction('lordos-testbench', 'frameworks')`: a new desktop action of
+    `lordos-testbench.desktop` (`Exec=/usr/bin/lordos-testbench --frameworks`; no new way to run a program), which the
+    Dock's menu also lists. It waits up to 5 minutes for the new saved result, then includes it as before.
+  - **Texts:** 3 new `sysinfo.share.toolkits.*` keys and the action's name in all 35 languages; `--show` in
+    `toolkitaudit.json`'s usage line.
+  - **Tests:** `build/toolkit-audit-test` parses progress lines (31 hostile or odd ones refused, chunked input, an
+    overlong line whose end looks valid, a flood capped at 512, a 1 MiB line without a newline) and runs nine fake
+    show-mode harnesses through the Frameworks screen to the end, headless: hostile lines among the real ones change
+    no tick, the screen ends exactly as the report (crash, not installed, failed checks, the global score), it is
+    drawn mid-run and at the end (`TK_SHOT_DIR=dir` keeps the pictures), a harness without `--show` refuses, and the
+    abort flag kills a hanging harness's group at once. `tools/toolkit-audit/x11_test.py` runs `x11.py --show`
+    against Xvfb: only well-formed progress lines, one check line per id, slowed down but under 15 s, and the same
+    results as the fast run. Checked against a headless `build/lord-server-test` with Lord Flow: `--toolkits` and
+    `--toolkits --show` gave the same `x11-xwayland` results, and the Frameworks screen ran the whole list beside the
+    X11 harness's window.
 
 ### Documentation
 - The paper (en, es, pt) and `docs/PAPER-VALIDATION.md`: since 0.8.9.6.1 the arm64 `lordos-web` package is built against

@@ -11,10 +11,14 @@ lordos-testbench --toolkits                       # the table, then the matrix o
 lordos-testbench --toolkits --json                # the result below, one line
 lordos-testbench --toolkits --only gtk4-wayland,qt6-xcb
 lordos-testbench --toolkits --last                # the saved result, checked and summed up (what lordos-issue adds)
+lordos-testbench --toolkits --show                # slowed down to watch, each check printed as it is decided
+lordos-testbench --frameworks                     # the same, watched in the Test Bench's Frameworks screen
 ```
 
 There is also a launcher entry, **Toolkit Audit** (`lordos-toolkit-audit.desktop`), that runs it in a Terminal
-window; System Information opens it for the hardware report (below).
+window, and a desktop action of the Test Bench's entry, **Framework tests** (`lordos-testbench.desktop`, action
+`frameworks`), that opens the Frameworks screen; System Information opens one or the other for the hardware report
+(below).
 
 Run it inside a LordOS session (it needs the session's Wayland socket and, for the X11 rows, `DISPLAY`). Each
 harness opens one 600x400 window for a second or two, one after the other, and takes the clipboard for a moment.
@@ -56,7 +60,7 @@ used: LordOS links no X11 library (docs/ARCHITECTURE.md).
   dark mode, and its theme check failed for nothing. Nothing else from the caller's environment passes (no
   `LD_PRELOAD`, no `PYTHONPATH`, no `GDK_BACKEND` of its own).
 - A harness exits by itself within 5 s. At **8 s** its whole process group is killed. When it exits, whatever it
-  left in its group is killed as well.
+  left in its group is killed as well. In show mode (below) it exits within 15 s and is killed at **20 s**.
 - `LORDOS_TOOLKIT_AUDIT_DIR` (an absolute folder) replaces `/usr/lib/lordos/toolkit-audit` for development.
 
 **No test hooks.** The compositor runs as it always does. The harness checks what it can see from the inside, and
@@ -81,6 +85,79 @@ the orchestrator reads two streams:
     - `platform-plugin`: Qt's "Could not load the Qt platform plugin", "no Qt platform plugin could be initialized".
 
   Warnings (`libEGL warning`, `Gtk-WARNING`, a renderer falling back from Vulkan) are not fatal.
+
+## Show mode (`--show`) and the Frameworks screen
+
+Asked for by the maintainer: when the audit runs from the native interface, the person sees the tests happen.
+
+**The harness.** `--show` (the orchestrator passes it as the harness's last argument, a fixed word) or
+`LORDOS_TOOLKIT_AUDIT_SHOW=1` (by hand; the orchestrator's clean environment never passes it) slows every harness
+down so a person can follow it:
+
+- the menu, the combo list and the tooltip stay open about 0.9 s after they mapped; the clipboard and drag steps
+  stay on screen as long; fullscreen is held on, then off, for as long;
+- the text is typed one character at a time, 60 to 70 ms apart;
+- a label on the window names the current step by its check id (`map`, `size`, `theme`, `menu`, `combo`,
+  `tooltip`, `clipboard`, `text`, `dnd`, `fullscreen`). It is a fixed id, not a text: the harnesses have no
+  translations. GTK and Qt draw it with a label widget in a monospace font; `x11.py` draws it with its own 5x7
+  bitmap font (lower case and `_`), since it uses no X font;
+- the budget rises from 4.6 s to 14.6 s (it exits within 15 s); the orchestrator kills it at 20 s instead of 8 s.
+
+Every hold comes after the check it shows is decided, so **the results and the JSON line are the same as in the
+fast mode** (only the `ms` of the text and fullscreen checks may include the typing and the hold).
+`tools/toolkit-audit/x11_test.py` checks that on Xvfb, and a headless `build/lord-server-test` gave the same
+`x11-xwayland` results both ways.
+
+**Progress lines.** Before its JSON line, a harness in show mode prints on stdout, as it goes:
+
+```
+#lordos-ta step menu                 the step on screen now
+#lordos-ta check menu pass           a check just decided: pass, fail or skip
+```
+
+The orchestrator reads them as untrusted input (`tk_progress_parse`, `tk_progress_feed` in
+`server/src/testbench/toolkits.c`): exactly that prefix, `step` or `check`, one of the 14 shared check ids and, for a
+check, `pass`, `fail` or `skip`, separated by single spaces, the whole line under 96 bytes. Anything else is ignored
+whole: another id (`global.*`, `fullscreen_on`), upper case, control or non-ASCII bytes, a missing or extra word,
+extra spaces, and any longer line, even one whose end looks valid. Only indexes are kept, never text, and at most 512
+lines per run. They only animate the screen: the result still comes from the JSON line, read and scored as above,
+and those lines are not results (the parser skips them).
+
+**In a terminal**, `lordos-testbench --toolkits --show` prints each check as ✓, ✗ or - under the "Testing ..." line
+when stderr is a terminal; the table, the JSON and the saved file are the usual ones.
+
+**The Frameworks screen** (`lordos-testbench --frameworks [--only id,...]`, or **F** and the **F: FRAMEWORKS**
+button on the test card; `server/src/testbench/fwscreen.c`):
+
+- the nine combinations (or the `--only` ones) as a list: waiting (a ring), running (highlighted, a spinner and its
+  seconds), done (✓ and the score, ✗ with `0 %` and the fatal word, or `not-installed`, `no-display`,
+  `no-harness`);
+- each row's 14 checks as cells under their short codes (`MAP`, `SIZ`, `SCL`, `THM`, `BKE`, `DEC`, `FRM`, `MNU`, `CMB`,
+  `TIP`, `CLP`, `DND`, `TXT`, `FUL`), ticking ✓, ✗ or - as the progress lines arrive, the current step's cell
+  blinking; when the combination ends, its cells show the final result, which is exactly the JSON's;
+- the global score at the top when the run ends, and a details box for the selected row (Up/Down or a click; by
+  default the running one, then the first with a problem): the failed and skipped check ids with the harness's
+  checked detail (printable ASCII, cut at the first `/`), a crash's signal, the globals bound and failed, the
+  recommended variable (`-> GDK_BACKEND=x11`), or for a missing toolkit the packages it needs;
+- **R** (or the button) runs it again, **Esc** goes back to the test card.
+
+The run is the same `tk_audit` as `--toolkits --show`, in a thread of its own: the same folder (and
+`LORDOS_TOOLKIT_AUDIT_DIR`), `/usr/bin/python3 -I`, deadlines, clean environment and process groups. It does not run
+as root (the screen says "not as root"). Closing the window, or a signal, kills the running harness's group. The
+result is saved to `~/.cache/lordos/toolkit-audit.json` (0600) like `--toolkits`. The bench's protocol checklist (its
+test windows) waits until the person goes back to the card, and the bench's own report is not rewritten by a
+Frameworks-only run.
+
+**Where the windows go.** The screen asks for 820x600 so a harness's 600x400 window fits beside it on a common
+screen, but a Wayland client can't choose where its window opens (xdg-shell has no position for a toplevel), and an
+X11 harness's position is the window manager's as well. Lord Flow opens each new window over the middle of the
+desktop, so the harness's window covers part of the screen while it runs (the rows' left part and the details box);
+the row, its ticks and the step on the harness's own label stay visible.
+
+**Text.** Like the rest of the test bench, the screen draws with its own 5x7 bitmap font (ASCII; lower case was
+added for ids, variables and paths), so it shows only fixed ids, numbers, symbols and a few English words, as the
+card does; the bench has no translations. The hardware report's option and the desktop action's name are translated
+in every language.
 
 ## The score
 
@@ -190,7 +267,10 @@ file that may have been edited:
 - **The hardware report.** System Information → Report → Share on GitHub → **Include framework compatibility**
   (off by default, never remembered). A result from the last day is used as it is; an older one or none opens the
   Toolkit Audit entry in a Terminal window (System Information runs no command itself) and waits up to three
-  minutes for a newer file. `apps/sysinfo/toolkits.js` builds the report's optional `toolkits` section from known
+  minutes for a newer file. Its second box, **Watch the tests** (off by default), runs the audit again, fresh result
+  or not, in the Test Bench's Frameworks screen: `lord.apps.launchAction('lordos-testbench', 'frameworks')`, the
+  launcher's own path for a desktop action the installed entry lists (`Exec=/usr/bin/lordos-testbench
+  --frameworks`), and waits up to five minutes for the newer file. `apps/sysinfo/toolkits.js` builds the report's optional `toolkits` section from known
   ids and numbers, and the schema drops anything else: see docs/HARDWARE-REPORT.md, "Toolkits".
 - **`lordos-issue`** runs `lordos-testbench --toolkits --last` as the person. It reads the file without following a
   link (a regular file of theirs, at most 256 KiB), parses it strictly, and prints a few English lines (the age,
@@ -234,12 +314,23 @@ ASan and UBSan. It covers:
   - a failed import probe, `installed: false`, a missing harness and a missing `python3`;
   - the saved file's modes and contents.
 
+- **Show mode.** Progress lines: the four valid forms, and 31 hostile or odd lines refused (upper case, extra or
+  missing words, double, leading or trailing spaces, `\r`, escape sequences, UTF-8, a `global.*` id, an internal id,
+  shell text after the result, a path as an id, JSON), a NUL inside a line, a line of 96 bytes, byte-by-byte
+  chunking, an overlong line whose end is a valid line, a flood capped at 512, and 1 MiB without a newline (the
+  buffer stays bounded). Then a run of nine fake show-mode harnesses through the Frameworks screen, headless: each
+  prints its 14 step and check lines with hostile lines in between (a `fail` after a `pass` hidden behind shell
+  text, an escape sequence or 300 bytes of padding), which change no tick; the screen is drawn mid-run (only the
+  checks reported so far ticked) and at the end, where it matches the report exactly (scores, the global score, a
+  crash, not-installed rows, the details box's choice, a click on a row). `TK_SHOT_DIR=dir` keeps the pictures as
+  PPMs. A harness run without `--show` refuses (the orchestrator passes it only in show mode), and the abort flag
+  kills a hanging harness and the child it left in under 3 s.
 - **`--last`** on the JSON the audit writes (the age in minutes, hours or days, a crash with its signal, a
   failed check), and on hand-edited files: another tool, an unknown combination, a version with shell characters,
   an unknown status, a path as a fatal word, a check id or a result, an `LD_PRELOAD=` recommendation, a text signal
   and another `v`. Each is refused as a whole and none of its text is printed. A link to the file is not followed.
 
-The harnesses have their own checks (`tools/toolkit-audit/x11_test.py` against Xvfb). The report side is tested by
+The harnesses have their own checks (`tools/toolkit-audit/x11_test.py` against Xvfb, fast and in show mode). The report side is tested by
 `server/tests/hwreport_test.mjs` and `build/hwsnap-test` (docs/HARDWARE-REPORT.md).
 
 ## Measured (in development, 2026-11-25)
