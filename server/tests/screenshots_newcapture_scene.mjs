@@ -9,7 +9,7 @@ import { AppWindowContext } from '../../sdk/components.jsx';
 import { Editor } from '../../apps/screenshots/editor.jsx';
 import shotsEn from '../../assets/locales/en/screenshots.json';
 
-const { texts, parents, removed } = globalThis.__lordTest;
+const { texts, parents, removed, styles } = globalThis.__lordTest;
 const h = React.createElement;
 const flush = async () => { for (let i = 0; i < 20; i++) await new Promise((res) => setImmediate(res)); };
 const check = (name, ok, detail = '') => console.log(ok ? `ok ${name}` : `FAIL ${name} ${detail}`);
@@ -44,6 +44,10 @@ let b = button();
 // a press reaches the Button's own node or the text inside it
 for (let n = b, i = 0; n && i < 3 && !asked; n = parents.get(n), i++) await click(n);
 check('New Screenshot asks for the panel', asked === 1, `asked ${asked}`);
+// issue #252: in French New Screenshot, Save a Copy and Save are long, and at the editor's default 1000 px (wider than
+// the small-window width) Save ran past the window's edge: the toolbar wraps onto another row at any width
+{ let bar = parents.get(b), s = bar && styles.get(bar);
+  check('the toolbar wraps its items at 1000 px too', !!s && s.flexWrap === 'wrap' && s.height === 'auto', JSON.stringify(s)); }
 check('the editor is still there after it', !!button());
 asked = 0;
 await key('n', 'n', 2);

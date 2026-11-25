@@ -10,6 +10,28 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+- **Screenshots with several displays (GitHub #252)** (`apps/screenshots/index.jsx`, `geometry.js`, `editor.jsx`,
+  `sdk/media.js`). With two external displays and the laptop's lid closed:
+  - Print Screen (❖⇧3) saves a file per display, but the floating thumbnail was a single window on the main display, so
+    the last capture (the other display's) replaced the main one's, and the clipboard kept whichever display lord-server
+    listed first (its outputs are in connector order). The main display is now captured first, so its picture is the one
+    copied, and each display's capture has its own thumbnail in that display's corner.
+  - The markup editor was centred on the whole logical space, so with two displays side by side it sat across both. It,
+    the thumbnail, the timer's countdown, the recording badge and the Other Location… window are now placed inside one
+    display's work area (`workAreaOf`, which leaves out the menu bar and Dock in every theme): the editor on the display
+    the capture was taken of, the others on the main one. The editor opened from Photos or Quick Preview
+    (`media.openMarkup`) goes on the display under the pointer.
+  - The editor's toolbar wraps onto a second row whenever its items don't fit, not only in a small window: in French,
+    Save a Copy and Save ran past the edge of the 1000 px editor.
+  - Tests: `server/tests/screenshots_model_test.mjs` (the reporter's layout, main display listed second; a main display
+    away from the space's origin with a 200 % display above and to the left; every frame inside its display),
+    `screenshots_displays_scene.mjs` (new, in `make test`: the app itself over the whole SDK on both layouts and mirrored
+    displays: Print Screen grabs the main display first and copies its picture, one thumbnail per display inside it, the
+    editor inside the main display with Save to: Markup editor and inside the other display from that display's
+    thumbnail; 16 of its 20 checks fail without the fix) and `screenshots_newcapture_scene.mjs` (the toolbar wraps at
+    1000 px).
+
 ### Documentation
 - The paper (en, es, pt) and `docs/PAPER-VALIDATION.md`: since 0.8.9.6.1 the arm64 `lordos-web` package is built against
   LordOS's WPE WebKit 2.54 (WPEPlatform), like amd64's, and depends on `libwpewebkit-2.0-1 (>= 2.54)`; `web-backend-test`

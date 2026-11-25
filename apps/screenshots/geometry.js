@@ -36,10 +36,41 @@ export function captureRect(r, iw, ih, screen, display = null) {
 // ---- several displays (a capture each: ❖⇧3 saves one file per display, ❖⇧4 selects on any of them) ----
 
 // The displays to capture one by one: each one when there are several and they aren't mirrored, else [null]
-// (Settings' choice, the main display).
+// (Settings' choice, the main display). The main display comes first whatever lord-server's order (its outputs
+// are in connector order): its capture is the one on the clipboard (issue #252: Print Screen kept the other one).
 export function displaysToCapture(screen = {}) {
   const ds = Array.isArray(screen.displays) ? screen.displays.filter((d) => d && d.w > 0 && d.h > 0) : [];
-  return ds.length > 1 && !screen.mirror ? ds : [null];
+  if (ds.length <= 1 || screen.mirror) return [null];
+  return [...ds.filter((d) => d.main), ...ds.filter((d) => !d.main)];
+}
+
+// The display with this id (a capture's, kept in a window's args), or null: then the main one is used.
+export function displayById(displays, id) {
+  return id == null ? null : (displays || []).find((d) => d && d.id === id) || null;
+}
+
+// ---- where the app's own windows go (issue #252) ----
+// area: a display's work area ({ x, y, w, h } in the global logical space, from the SDK's workAreaOf, which leaves
+// out the theme's menu bar and Dock on that display in every theme). Each window stays inside one display: the
+// markup editor used to be centred on the whole space, so with two displays it sat across both.
+
+// The thumbnail after a capture: the work area's bottom-right corner of the display that was captured.
+export const THUMB_W = 240, THUMB_H = 150;
+export function thumbFrame(area) {
+  return { x: area.x + area.w - THUMB_W - 20, y: area.y + area.h - THUMB_H - 20, w: THUMB_W, h: THUMB_H };
+}
+// The markup editor: up to 1000 × 680, centred across the work area, near its top.
+export function editorFrame(area, maxW = 1000, maxH = 680) {
+  const w = Math.max(320, Math.min(maxW, area.w - 80)), h = Math.max(240, Math.min(maxH, area.h - 40));
+  return { x: area.x + Math.round((area.w - w) / 2), y: area.y + Math.max(0, Math.min(32, Math.round((area.h - h) / 2))), w, h };
+}
+// The timer's countdown: 120 × 120 in the middle of the work area.
+export function countdownFrame(area) {
+  return { x: Math.round(area.x + area.w / 2 - 60), y: Math.round(area.y + area.h / 2 - 60), w: 120, h: 120 };
+}
+// The recording badge: 190 × 44 at the work area's top-right corner.
+export function badgeFrame(area) {
+  return { x: area.x + area.w - 210, y: area.y + 12, w: 190, h: 44 };
 }
 
 // The display a logical point is on (null if none: the gap between displays of different sizes).
