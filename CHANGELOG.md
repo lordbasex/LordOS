@@ -1928,6 +1928,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   running guest.
 
 ### Tests
+- Machines (in development): `server/tests/vm_usb_e2e.sh` passes again with the seat check (Claude Security F1, F3).
+  Part B's headless lord-server runs with the development-only `LORD_IDLE_HEADLESS=1` (as `tests/lock_e2e.sh` does), so
+  it counts as the session on the screen and the usb_auto rule connects the device at the next start; without it the
+  rule was skipped (lord-server runs usb_auto only on the screen) and "the rule connects it at the next start" failed.
+  Root's vm-usb-allow still checks lord-sessiond's record. The "no process holds the node" checks no longer race the
+  script: after each MARK the shell makes `~/.usbe2e-ack-<what>` in the scratch home and `tests/vm_usb_e2e.js` waits for
+  it before the device goes into QEMU (a fixed 1.5 s wait was shorter than the shell's poll plus its own 1 s pause, so
+  QEMU already held the node when the shell looked). Run on the RX 580 PC on 2026-11-25 with a Logitech C930e that
+  nothing was using (hub 05e3:0608 for the refusals): 38 passed, 0 failed, including the guest capturing 30 frames of
+  640x480. `vm-usb-cli` as `nobody`, as `glk1` (an account not on the monitor) and as root answers `ERR vm.usbNotAtSeat`.
 - Machines (in development): `tools/vm/e2e/machines/storage-fs.sh` with `MKFS_ROOT` (btrfs-progs and xfsprogs
   unpacked with `apt-get download` + `dpkg -x`, not installed) runs mkfs with `MKFS_ROOT`'s library folders on
   `LD_LIBRARY_PATH`, so the unpacked `libinih1` and `liburcu8t64` are found; before, mkfs.btrfs and mkfs.xfs failed to

@@ -9,6 +9,9 @@ const adminSaid = {};
 globalThis.__lordAdmin = (id, kind, text) => { if (kind !== 'LOG') adminSaid[id] = `${kind} ${text}`; };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(f, ms, step = 250) { const end = Date.now() + ms; while (Date.now() < end) { const v = f(); if (v) return v; await wait(step); } return f(); }
+// vm_usb_e2e.sh looks at who holds the node after a MARK and then makes ~/.usbe2e-ack-<what>: the script waits for it, so
+// the next step (the device going into QEMU) never comes before the shell's look, however slowly it polls
+const acked = (what) => { try { lord.fs.stat(`${cfg.home}/.usbe2e-ack-${what}`); return true; } catch { return false; } };
 
 async function main() {
   const { dir, bus, dev, vendor, product, hub } = cfg;
@@ -42,7 +45,7 @@ async function main() {
   await until(() => adminSaid[r4], 5000);
   check("JS's own request is answered, without the device", /^OK vm\.usbReady/.test(adminSaid[r4] || ''), adminSaid[r4]);
   out('MARK js-request-done');
-  await wait(1500);
+  if (!await until(() => acked('js'), 15000)) out('FAIL the shell never looked at the node after the request');
   // no permission yet: the camera waits for it
   lord.perms.set('machines', 'camera', 'ask');
   lord.perms.set('machines', 'microphone', 'ask');
@@ -58,7 +61,8 @@ async function main() {
   check('the poll says it is a camera', (st.usb.devices || []).some((d) => d.camera && d.audio), JSON.stringify(st.usb.devices));
   check('another machine sees it held', lord.vm.usbDevices().find((d) => d.bus === bus && d.dev === dev)?.holder === sid);
   out('MARK in');
-  await wait(10000);                                            // vm_usb_e2e.sh looks at who holds the node meanwhile
+  if (!await until(() => acked('in'), 15000)) out('FAIL the shell never looked at the node with the device in');
+  await wait(2000);
   // the rule, while it runs (lord-vm writes machine.json)
   check('usbAuto adds a rule', lord.vm.usbAuto(sid, `${vendor}:${product}`, true));
   await until(() => (lord.vm.list().find((m) => m.dir === dir)?.usbAuto || []).length === 1, 5000);

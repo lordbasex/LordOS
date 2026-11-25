@@ -108,27 +108,32 @@ done
 grep -q "seccomp: QEMU made a call" "$M/log/lord-vm.log" && bad "A: QEMU's allowlist stopped a call: $(grep 'seccomp: QEMU made' "$M/log/lord-vm.log" | tail -1)" || ok "A: QEMU's allowlist unchanged but for usbfs's ioctls and the USB rows: no call stopped"
 
 # ---- part B ----
-printf 'globalThis.USB_E2E = %s;\n' "{\"dir\":\"$REALHOME/Machines/UsbE2E.lordvm\",\"bus\":$BUS,\"dev\":$DEV,\"vendor\":\"${VP%%:*}\",\"product\":\"${VP##*:}\",\"hub\":{\"bus\":$HBUS,\"dev\":$HDEV,\"vendor\":\"${HVP%%:*}\",\"product\":\"${HVP##*:}\"}}" > "$D/theme.js"
+printf 'globalThis.USB_E2E = %s;\n' "{\"home\":\"$REALHOME\",\"dir\":\"$REALHOME/Machines/UsbE2E.lordvm\",\"bus\":$BUS,\"dev\":$DEV,\"vendor\":\"${VP%%:*}\",\"product\":\"${VP##*:}\",\"hub\":{\"bus\":$HBUS,\"dev\":$HDEV,\"vendor\":\"${HVP%%:*}\",\"product\":\"${HVP##*:}\"}}" > "$D/theme.js"
 cat tests/vm_usb_e2e.js >> "$D/theme.js"
 chmod 644 "$D/theme.js"
+# LORD_IDLE_HEADLESS=1 (development only, as in tests/lock_e2e.sh): the headless session counts as the one on the screen,
+# standing in for the person's, so usb_auto's rules run (lord-server skips them in a session that isn't on the screen);
+# root's vm-usb-allow still checks lord-sessiond's own record, where this user must be the one on the monitor.
 sudo -n unshare -m --propagation private sh -c "mount --bind $D/home $REALHOME && mount -t tmpfs -o mode=700,uid=$U,gid=$G tmpfs /run/user/$U && mount --bind $D/lib /usr/lib/lordos/lib && \
-    exec env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=$REALHOME XDG_RUNTIME_DIR=/run/user/$U LANG=C.UTF-8 LORD_GPU=0 $B/lord-server --headless 800x600 --user $ME --theme $D/theme.js --timeout 400" >"$D/server.log" 2>&1 &
+    exec env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=$REALHOME XDG_RUNTIME_DIR=/run/user/$U LANG=C.UTF-8 LORD_GPU=0 LORD_IDLE_HEADLESS=1 $B/lord-server --headless 800x600 --user $ME --theme $D/theme.js --timeout 400" >"$D/server.log" 2>&1 &
 SP=$!
 L="$D/home/.cache/lordos/shell.log"           # what the theme's console.log writes (the scratch home, mounted over the real one)
 usbfds() { sudo -n find /proc/[0-9]*/fd -lname '/dev/bus/usb/*' 2>/dev/null | cut -d/ -f3 | sort -u; }
 seen_js=0; seen_in=0
-for i in $(seq 1 400); do
+for i in $(seq 1 1600); do
     if [ $seen_js = 0 ] && grep -qs 'USBE2E MARK js-request-done' "$L"; then
         seen_js=1; sleep 1
         p=$(usbfds); [ -z "$p" ] && ok "B: after JS's own vm-usb-allow, no process holds the node (lord-server closed the descriptor JS never got)" || bad "B: the node is held by $p"
+        touch "$D/home/.usbe2e-ack-js"          # the script goes on only now (it waits for this file)
     fi
     if [ $seen_in = 0 ] && grep -qs 'USBE2E MARK in$' "$L"; then
         seen_in=1
         p=$(usbfds); qp=$(pgrep -f "qemu-system.*guest=UsbE2E" | head -1)
         [ -n "$p" ] && [ "$p" = "$qp" ] && ok "B: only QEMU holds the device's node (not lord-server, not the admin helper)" || bad "B: held by [$p], QEMU is $qp"
+        touch "$D/home/.usbe2e-ack-in"
     fi
     grep -qs 'USBE2E DONE\|USBE2E FAIL exception' "$L" && break
-    sleep 1
+    sleep 0.25
 done
 grep 'USBE2E ok\|USBE2E FAIL' "$L" | sed 's/^.*USBE2E ok /ok: B: /; s/^.*USBE2E FAIL /FAIL: B: /'
 grep -q 'USBE2E FAIL' "$L" && R=1
