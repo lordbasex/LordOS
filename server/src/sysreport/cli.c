@@ -201,6 +201,8 @@ static int gpu_report(const char *root, int json) {
     GpuReport *g = malloc(sizeof *g);
     if (!g) return 1;
     gpureport_collect(g, root, NULL);
+    /* the display engine (drmprobe.h), on this machine only: a fake tree has no device nodes */
+    if (!root[0]) for (int i = 0; i < g->ncard; i++) if (g->card[i].card[0]) drmprobe_card(g->card[i].card, &g->card[i].drm);
     snprintf(g->lordos, sizeof g->lordos, "%s%s%s", LORD_VERSION, LORD_CHANNEL[0] ? "-" : "", LORD_CHANNEL);
     gpureport_mark_desktop(g, root, NULL);
     char *raw = json ? gpureport_json(g) : gpureport_text(g);
@@ -245,6 +247,7 @@ int main(int argc, char **argv) {
     SysReport *r = malloc(sizeof *r);
     if (!r) return 1;
     sysreport_collect(r, root, NULL, NULL);
+    if (!root[0] && !fetch) for (int i = 0; i < r->ngpu; i++) drmprobe_card(r->gpu[i].card, &r->gpu[i].drm);
     snprintf(r->sw.lordos, sizeof r->sw.lordos, "%s%s%s", LORD_VERSION, LORD_CHANNEL[0] ? "-" : "", LORD_CHANNEL);
     char *out;
     if (fetch) {

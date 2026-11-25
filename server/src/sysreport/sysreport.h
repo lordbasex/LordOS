@@ -17,6 +17,8 @@
 
 #include <stdint.h>
 
+#include "drmprobe.h"
+
 #define SR_NAME 96
 #define SR_MAX_GPU 8
 #define SR_MAX_DISPLAY 12
@@ -67,6 +69,7 @@ typedef struct {
     int boot_vga;                       /* the firmware's console GPU */
     int render_node;                    /* a renderD* node belongs to it */
     int connectors, connected;          /* KMS connectors */
+    DrmFacts drm;                       /* the display engine (drmprobe.h): probed 0 unless the CLI ran drmprobe_card */
 } SrGpu;
 
 typedef struct {
