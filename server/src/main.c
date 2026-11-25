@@ -35,6 +35,7 @@
 #include "cloud/cloud.h"
 #include "ui/js_cloud.h"
 #include "fsasync.h"
+#include "bgsave.h"
 #include "sound/snd.h"
 #include "ui/wave.h"
 #include "sec/json.h"
@@ -2867,6 +2868,7 @@ static int switch_theme(const char *current) {
     share_shell_gone();                 /* the indicator goes with the old shell */
     cast_end_all();                     /* and with it what Linux apps were shown (the ScreenCast portal) */
     js_shutdown();
+    bgsave_flush(NULL);                 /* the new theme reads settings.json and the clipboard's stores (bgsave.c) */
     ui_reset();
     term_detach_all();
     /* the bytes lord.themes.use verified when it was asked (js_sys.c f_themes_use): a refused theme never gets here */
@@ -3705,6 +3707,7 @@ int main(int argc, char **argv) {
     if (ui.quit_requested) fprintf(stderr, "lord-server: the theme asked to log out\n");
     if (ui.quit_requested && !s.headless) mirror_session("{\"a\":\"logout\"}");
     js_before_exit();                     /* what is open goes to settings.json, marked clean */
+    bgsave_flush(NULL);                   /* every save still on bgsave.c's worker is on the disk before the session ends */
     wl_close_all(LOGOUT_CLOSE_MS);        /* the apps close as if the user did it, before wl_stop() */
     cloud_stop();                         /* B11: every cloud folder unmounted (lazily if busy), then rclone quits */
     if (s.renders)
@@ -3727,6 +3730,7 @@ int main(int argc, char **argv) {
     wl_stop();
     snd_stop();
     js_shutdown();
+    bgsave_flush(NULL);
     if (vt_tty >= 0) { struct vt_mode m = { .mode = VT_AUTO }; ioctl(vt_tty, VT_SETMODE, &m); }
     if (vt >= 0) { ioctl(vt, KDSETMODE, KD_TEXT); close(vt); }
     for (int i = 0; i < OUT_MAX; i++) out_free(&s.out[i]);

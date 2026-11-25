@@ -12,6 +12,7 @@
  * not possible to create a .desktop (the only thing lord.apps.launch runs), nor to install apps without
  * lpk.c, nor to overwrite the settings. lord.settings only writes to ~/.config/lordos/settings.json;
  * lord.themes only accepts simple names. */
+#include "../bgsave.h"
 #include "../hw/display.h"
 #include "../hw/hw_admin.h"
 #include "../users/admingroups.h"
@@ -413,6 +414,7 @@ static JSValue f_settings_load(JSContext *c, JSValueConst this_val, int argc, JS
     (void)this_val; (void)argc; (void)argv;
     char path[PATH_MAX + 64];
     settings_path(path, sizeof path, "");
+    bgsave_flush(path);                 /* a save still on the worker (bgsave.c) is read back, not the file before it */
     size_t len;
     char *txt = read_small(path, SETTINGS_MAX, &len);
     if (!txt) return JS_NULL;
@@ -421,6 +423,9 @@ static JSValue f_settings_load(JSContext *c, JSValueConst this_val, int argc, JS
     return s;
 }
 
+/* lord.settings.save(text, durable): the file is written on bgsave.c's worker (GitHub #250: on a spinning disk the
+ * rename over settings.json waited up to 650 ms for ext4's journal, the desktop frozen meanwhile); true once queued.
+ * durable (session restore's marker): on the disk, synced, before this returns, after any save still queued. */
 static JSValue f_settings_save(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;
     size_t len;
@@ -434,16 +439,18 @@ static JSValue f_settings_save(JSContext *c, JSValueConst this_val, int argc, JS
     mkdir(dir, 0700);
     settings_path(tmp, sizeof tmp, ".tmp");
     settings_path(path, sizeof path, "");
-    FILE *f = fopen(tmp, "wb");
-    int ok = f && fwrite(txt, 1, len, f) == len;
     /* second argument true: on the disk before this returns (session restore, sdk/sessionrestore.jsx) */
     int durable = argc > 1 && JS_ToBool(c, argv[1]) == 1;
-    if (f && durable) ok = fflush(f) == 0 && fsync(fileno(f)) == 0 && ok;
-    if (f) ok = (fclose(f) == 0) && ok;
-    if (ok) ok = rename(tmp, path) == 0;
-    if (ok && durable) {
-        int d = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-        if (d >= 0) { fsync(d); close(d); }
+    int ok;
+    if (durable) {
+        bgsave_flush(path);             /* an older save still queued must not land after this one */
+        ok = bgsave_write_now(path, tmp, txt, len, BGS_FSYNC) == 0;
+        if (ok) {
+            int d = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+            if (d >= 0) { fsync(d); close(d); }
+        }
+    } else {
+        ok = bgsave_put(path, tmp, txt, len, 0) == 0;
     }
     JS_FreeCString(c, txt);
     return JS_NewBool(c, ok);

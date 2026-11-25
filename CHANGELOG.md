@@ -10,6 +10,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+- The desktop froze for a moment after every window move and every copy on computers with a spinning hard disk
+  (#250: an HP ProBook 440 G3 with a Core i3-6100U and a SATA HDD logged 80–650 ms in `call settings.save` and
+  56–360 ms in `call clipboard.saveStore`, the window drag dropping to 13–18 FPS). Both calls wrote their file on
+  lord-server's only thread: a new file renamed over `settings.json` (on ext4 the rename of a replaced file waits for the
+  journal, `auto_da_alloc`) and, for the clipboard's `history.json` and `snippets.json`, an `fsync`. A new worker,
+  `server/src/bgsave.c`, now writes them: the call copies the text and returns, one file is written at a time, a save
+  that comes while an older one of the same file is still queued replaces it (each is the whole file, so the file never
+  goes back to older content), and the result is still a whole new file renamed over the old one (the clipboard's still
+  0600 from a `mkstemp` name and synced). `lord.settings.load`, a durable `lord.settings.save` (session restore's
+  marker, still written and synced before it returns), a theme switch and the end of the session wait for what is
+  queued first. A write that fails on the worker is logged (`lord-server: … not saved: …`); `saveStore` still throws for
+  a bad name, size or folder. With every slot taken, or without a thread, a save is written on the caller's thread as
+  before. No new permission: the paths are lord-server's own, never one JS names.
+
+### Tests
+- `build/bgsave-test` (in `make -C server test`): with a test hook standing in for a slow disk, a save returns at once
+  while a write is held, saves made meanwhile collapse into the newest, `bgsave_flush` waits for it, a durable write
+  after a queued one wins, the clipboard's files are 0600 with nothing left behind (also when the write fails), and a
+  ninth file with every slot taken is written on the caller's thread.
+
 ### Documentation
 - The paper (en, es, pt) and `docs/PAPER-VALIDATION.md`: since 0.8.9.6.1 the arm64 `lordos-web` package is built against
   LordOS's WPE WebKit 2.54 (WPEPlatform), like amd64's, and depends on `libwpewebkit-2.0-1 (>= 2.54)`; `web-backend-test`

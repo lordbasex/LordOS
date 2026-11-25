@@ -199,6 +199,7 @@ EOF
     if have dbus-run-session; then run "portal-cast-test (ScreenCast restore token, Screenshot, FileChooser lending)" dbus-run-session -- build/portal-cast-test
     else skip "portal-cast-test" "dbus-run-session"; fi
     run "fsasync-test" build/fsasync-test
+    run "bgsave-test (#250: saves off the interface's thread)" build/bgsave-test
     run "sign-test" build/sign-test
     # migration 008: a tablet's power-button defaults (packaging/migrations, issue #131)
     run "migration 008 tablet-power" sh tests/migration_tablet_power_test.sh

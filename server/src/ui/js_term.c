@@ -10,6 +10,7 @@
 #include "js_term.h"
 #include "../wl/wl.h"
 #include "../wl/urilist.h"
+#include "../bgsave.h"
 #include "ui.h"
 #include "../term/term.h"
 #include "../term/termfill.h"
@@ -909,7 +910,8 @@ static JSValue f_clip_delete_saved(JSContext *c, JSValueConst this_val, int argc
 /* lord.clipboard.saveStore(name, text): the history's or the Snippets' file (GitHub #205), written whole and atomically
  * in ~/.local/share/lordos/clipboard. name is "history.json" or "snippets.json", nothing else (no path from JS). The file
  * is 0600 and the folder is made, or set back to, 0700: what someone copied or kept as a snippet is theirs to read only,
- * the history's images included. At most 32 MB, as lord.fs.write. true, or throws. */
+ * the history's images included. At most 32 MB, as lord.fs.write. true once queued (the write itself runs on bgsave.c's
+ * worker, GitHub #250), or throws. */
 #define CLIP_STORE_MAX (32u << 20)
 static int clip_mkdir(const char *p) { return mkdir(p, 0700) && errno != EEXIST ? -1 : 0; }
 static JSValue f_clip_save_store(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -939,20 +941,10 @@ static JSValue f_clip_save_store(JSContext *c, JSValueConst this_val, int argc, 
     if (dfd >= 0) close(dfd);
     ok = ok && snprintf(tmp, sizeof tmp, "%s/.%s.lordos-XXXXXX", dir, name) < (int)sizeof tmp
             && snprintf(dst, sizeof dst, "%s/%s", dir, name) < (int)sizeof dst;
-    int fd = ok ? mkstemp(tmp) : -1;                /* mkstemp makes it 0600 */
-    ok = fd >= 0;
-    if (ok) {
-        if (fchmod(fd, 0600)) ok = 0;
-        for (size_t off = 0; ok && off < len;) {
-            ssize_t w = write(fd, text + off, len - off);
-            if (w < 0 && errno == EINTR) continue;
-            if (w <= 0) ok = 0; else off += (size_t)w;
-        }
-        if (ok && fsync(fd)) ok = 0;
-        if (close(fd)) ok = 0;
-        if (ok && rename(tmp, dst)) ok = 0;
-        if (!ok) unlink(tmp);
-    }
+    /* the file itself (mkstemp next to it, 0600, fsync, rename) is written on bgsave.c's worker: on a spinning disk the
+     * fsync took up to 360 ms on the interface's thread after every copy (GitHub #250). A write that fails there is
+     * logged; the folder's checks above stay here, before anything is queued. */
+    ok = ok && !bgsave_put(dst, tmp, text, len, BGS_FSYNC | BGS_PRIVATE | BGS_UNIQUE);
     int err = errno;
     JS_FreeCString(c, text);
     if (!ok) return js_throw_code(c, "sys.errno", "errno", lerr_errno(err ? err : EIO), NULL);
