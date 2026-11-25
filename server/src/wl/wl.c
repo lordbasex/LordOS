@@ -209,6 +209,7 @@ struct Surf {
     unsigned fs_sig;            /* CPU path: its shape when the fullscreen copy last drew it (blit_tree_r) */
     struct wl_list sent_feedback;   /* presentation: already in a frame, flip pending */
     int fs_saved_w, fs_saved_h;     /* size before fullscreen */
+    int own_w, own_h;               /* an X window's own size when it was attached (before any configure of ours) */
     uint32_t conf_serial, acked_serial;   /* xdg_surface: the last configure sent, the last one acked */
     int parked, fs_resume;          /* on a hidden desktop (wl_set_parked); fullscreen waits for its return */
     int covered;                    /* wholly under an opaque window of its desktop (wl_set_covered) */
@@ -3896,8 +3897,9 @@ static void enter_fullscreen(Surf *s) {
     if (fs_surf) { fs_surf->fullscreen = 0; send_toplevel_configure(fs_surf); }
     fs_surf = s;
     s->fullscreen = 1;
-    s->fs_saved_w = s->conf_w;
-    s->fs_saved_h = s->conf_h;
+    /* not configured yet (fullscreen asked for before its first frame): an X window's own size, so it comes back to it */
+    s->fs_saved_w = s->conf_w > 0 ? s->conf_w : s->own_w;
+    s->fs_saved_h = s->conf_h > 0 ? s->conf_h : s->own_h;
     Node *fn = s->node ? node_get(s->node) : NULL;
     fs_slot = fn ? slot_for_box(fn->ax, fn->ay, fn->ax + fn->w, fn->ay + fn->h) : out_main;
     if (fs_slot < 0) fs_slot = out_main;
@@ -4362,10 +4364,10 @@ static void emit_map(Surf *s, int w, int h) {
     if (s->xw) {                    /* X11: WM_CLASS class, and its instance for the .desktop match */
         char alt[260];
         json_str(alt, sizeof alt, s->app_alt);
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"skipTaskbar\":%s,\"skipPager\":%s,\"layer\":%d}",
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"skipTaskbar\":%s,\"skipPager\":%s,\"layer\":%d,\"fullscreen\":%s}",
              t, a, alt, w, h, s->csd ? "true" : "false", xwm_is_dialog(s->xw) ? "true" : "false", xwm_is_fixed(s->xw) ? "true" : "false",
              s->owner ? s->owner->id : 0, s->modal ? "true" : "false", xwm_skip_taskbar(s->xw) ? "true" : "false",
-             xwm_skip_pager(s->xw) ? "true" : "false", xwm_layer(s->xw));
+             xwm_skip_pager(s->xw) ? "true" : "false", xwm_layer(s->xw), s == fs_surf ? "true" : "false");
     } else {
         int fixed = s->min_w > 0 && s->min_w == s->max_w && s->min_h > 0 && s->min_h == s->max_h;
         /* a Flatpak app's window: the app lord-server knows from the client's root-owned scope (or its security context),
@@ -4373,9 +4375,9 @@ static void emit_map(Surf *s, int w, int h) {
         const char *who = client_identity(s->client);
         char fp[KBI_ID_MAX + 8] = "";
         if (!strncmp(who, "flatpak:", 8)) json_str(fp, sizeof fp, who + 8);
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"flatpak\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"layer\":%d}",
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"flatpak\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"layer\":%d,\"fullscreen\":%s}",
              t, a, fp, w, h, s->csd ? "true" : "false", s->owner || s->dlg ? "true" : "false", fixed ? "true" : "false",
-             s->owner ? s->owner->id : 0, s->modal ? "true" : "false", s->layer);
+             s->owner ? s->owner->id : 0, s->modal ? "true" : "false", s->layer, s == fs_surf ? "true" : "false");
     }
     wlshell_mapped(s->id);              /* its tag, a drag it follows (wlshell.h) */
 }
@@ -4390,9 +4392,25 @@ void wl_remap_all(void) {
         int w, h;
         geometry(s, &w, &h);
         s->node = 0;
-        emit_map(s, w, h);
+        emit_map(s, s == fs_surf && s->fs_saved_w > 16 ? s->fs_saved_w : w, s == fs_surf && s->fs_saved_h > 16 ? s->fs_saved_h : h);
         if (s->maximized) emit(s, "maximize", "{}");
+        if (s == fs_surf) emit(s, "fullscreen", "{}");
     }
+}
+
+/* The first frame of a window that asked for fullscreen before it (an X window with _NET_WM_STATE_FULLSCREEN set
+ * before its map, an xdg_toplevel.set_fullscreen before its first commit): its size stays the display's, never the one
+ * that frame has (X's own size on the way out, which x_configure would then send back to X: the window stayed small
+ * while presented fullscreen). The theme gets the window at its normal size, the one it comes back to, and then
+ * "fullscreen", as when a mapped window goes fullscreen. */
+static void map_fullscreen(Surf *s, int w, int h) {
+    if (s->fs_saved_w <= 16 || s->fs_saved_h <= 16) { s->fs_saved_w = w; s->fs_saved_h = h; }
+    emit_map(s, s->fs_saved_w, s->fs_saved_h);
+    emit(s, "fullscreen", "{}");
+    if (w != s->conf_w || h != s->conf_h) send_toplevel_configure(s);
+    if (key_focus != s && (!key_focus || fs_hides(key_focus))) wl_set_focus(s->id);
+    damage_add((Box){ 0, 0, ui.width, ui.height });
+    ui.dirty = 1;
 }
 
 static void surface_commit_role(Surf *s) {
@@ -4412,13 +4430,16 @@ static void surface_commit_role(Surf *s) {
         geometry(s, &w, &h);
         if (s->content && !s->mapped) {
             s->mapped = 1;
-            emit_map(s, w, h);
-            s->conf_w = w;
-            s->conf_h = h;
+            if (s == fs_surf) map_fullscreen(s, w, h);
+            else {
+                emit_map(s, w, h);
+                s->conf_w = w;
+                s->conf_h = h;
+            }
         } else if (!s->content && s->mapped) {
             s->mapped = 0;
             emit(s, "unmap", "{}");
-        } else if (s->mapped && s->acked_serial == s->conf_serial && (w != s->conf_w || h != s->conf_h)) {
+        } else if (s->mapped && s != fs_surf && s->acked_serial == s->conf_serial && (w != s->conf_w || h != s->conf_h)) {
             /* a commit made before the app read our last configure is its old size on the way out, not a
              * resize of its own: taken as one, the window kept the size of a maximize just undone */
             emit(s, "geometry", "{\"width\":%d,\"height\":%d}", w, h);
@@ -7793,6 +7814,8 @@ static int xattach(Surf *s, XWin *w, const XWinInfo *in) {
     snprintf(s->app_id, sizeof s->app_id, "%s", in->app_id ? in->app_id : "");
     snprintf(s->app_alt, sizeof s->app_alt, "%s", in->app_alt ? in->app_alt : "");
     s->csd = in->csd;
+    s->own_w = in->width;
+    s->own_h = in->height;
     if (in->popup) { s->role = R_POPUP; s->xpop = 1; s->xx = in->x; s->xy = in->y; }
     else s->role = R_TOPLEVEL;
     if (s->content) surface_commit_role(s);                 /* it already had a buffer */

@@ -636,6 +636,10 @@ async function x11Section(S, src, spec) {
   add('ewmh.wm_state', { kind: 'dynamic', id: 'layer_changes_reach_theme', what: '_NET_WM_STATE_ABOVE', weight: W.x11dyn, result: toggled ? 'pass' : 'fail', msg: `the theme was told the layers ${JSON.stringify(layerEv)} (off, on, below expected)` });
   const pager = ev.some((e) => e.type === 'pager' && String(e.title).startsWith('wlconf-x11') && e.d && e.d.skip === true);
   add('ewmh.wm_state', { kind: 'dynamic', id: 'skip_pager_reaches_theme', what: '_NET_WM_STATE_SKIP_PAGER', weight: W.x11dyn, result: pager ? 'pass' : 'fail', msg: pager ? 'the theme was told to leave it out of the Overview' : 'no pager event reached the theme' });
+  // fullscreen asked for before the first frame: the theme is told (map's "fullscreen" and the "fullscreen" event)
+  const fsf = mapOf('wlconf-x11-fsfirst');
+  const fsfTold = !!fsf && fsf.d.fullscreen === true && ev.some((e) => e.type === 'fullscreen' && e.title === 'wlconf-x11-fsfirst');
+  add('ewmh.wm_state', { kind: 'dynamic', id: 'fullscreen_before_map_reaches_theme', what: '_NET_WM_STATE_FULLSCREEN', weight: W.x11dyn, result: fsfTold ? 'pass' : 'fail', msg: fsfTold ? `the theme got the window at its own size (${fsf.d.width}x${fsf.d.height}) and was told it is fullscreen` : (fsf ? 'the window mapped but the theme was not told it is fullscreen' : 'the window never mapped') });
   add('ewmh.wm_icon', { kind: 'dynamic', id: 'icon_reaches_theme', what: '_NET_WM_ICON', weight: W.x11dyn, result: icon ? 'pass' : 'fail', msg: icon ? 'the theme got the icon' : 'a _NET_WM_ICON never reached the theme' });
   // selections, both ways
   const wlb = path.join(BUILD, 'wl-conformance-client');

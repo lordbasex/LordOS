@@ -197,6 +197,18 @@ static int c_top(void *arg) { int n = 0, i = stack_index(*(xcb_window_t *)arg, &
 static int wait_top(xcb_window_t w, int ms) { return wait_for(c_top, &w, ms); }
 static xcb_window_t active_window(void) { uint32_t a = 0; prop32(scr->root, A_NET_ACTIVE, &a, 1); return a; }
 
+/* a window's size now (GetGeometry), and waiting until it is w x h */
+static int win_size(xcb_window_t w, int *gw, int *gh) {
+    xcb_get_geometry_reply_t *g = xcb_get_geometry_reply(X, xcb_get_geometry(X, w), NULL);
+    if (!g) return 0;
+    *gw = g->width;
+    *gh = g->height;
+    free(g);
+    return 1;
+}
+typedef struct { xcb_window_t w; int want_w, want_h; } FsWait;
+static int c_size(void *arg) { FsWait *f = arg; int w = 0, h = 0; return win_size(f->w, &w, &h) && w == f->want_w && h == f->want_h; }
+
 /* ---------------------------------------------------------------- the window manager */
 static void wm(void) {
     uint32_t v[256];
@@ -418,6 +430,32 @@ static void wm(void) {
           "_NET_WM_STATE_BELOW drops ABOVE and stacks it under the normal window (%d < %d): %s", ia, ib, bl && ia >= 0 && ia < ib ? "yes" : "no");
     xcb_destroy_window(X, wunder);
     xcb_destroy_window(X, w_above);
+    xcb_flush(X);
+    wait_for(c_never, NULL, 400);
+
+    /* Fullscreen asked for before the first frame (_NET_WM_STATE set before the map, as SDL and many games do): the
+     * window gets the screen's size and keeps it, and leaving fullscreen gives it back its own 320x240. A regression
+     * test: the first commit used to overwrite the fullscreen size with the window's own, which the WM then sent to X. */
+    xcb_window_t wfs = make_window("wlconf-x11-fsfirst", 1, 0, 0, A_TYPE_NORMAL, 0, 0);
+    set32(wfs, A_NET_STATE, XCB_ATOM_ATOM, &A_FULLSCREEN, 1);
+    xcb_map_window(X, wfs);
+    WinEv *efs = ev_of(wfs);
+    int mfs = wait_for(c_map, efs, 4000);
+    FsWait screen_sz = { wfs, scr->width_in_pixels, scr->height_in_pixels };
+    int got_big = mfs && wait_state(wfs, A_FULLSCREEN, 1, 2000) && wait_for(c_size, &screen_sz, 2000);
+    wait_for(c_never, NULL, 600);                       /* and it stays at that size after its first frames */
+    int gw0 = 0, gh0 = 0;
+    win_size(wfs, &gw0, &gh0);
+    check("ewmh.wm_state", "fullscreen_before_map", got_big && gw0 == scr->width_in_pixels && gh0 == scr->height_in_pixels, "_NET_WM_STATE_FULLSCREEN",
+          "_NET_WM_STATE_FULLSCREEN set before the map: %s, %dx%d (screen %dx%d)", mfs ? (state_has(wfs, A_FULLSCREEN) ? "fullscreen" : "not fullscreen") : "never mapped",
+          gw0, gh0, scr->width_in_pixels, scr->height_in_pixels);
+    root_message(wfs, A_NET_STATE, 0, A_FULLSCREEN, 0, 1);
+    FsWait own_sz = { wfs, 320, 240 };
+    int back_own = wait_state(wfs, A_FULLSCREEN, 0, 2000) && wait_for(c_size, &own_sz, 2000);
+    win_size(wfs, &gw0, &gh0);
+    check("ewmh.wm_state", "fullscreen_before_map_remove", back_own, "_NET_WM_STATE_FULLSCREEN",
+          "and out of fullscreen it is back at its own 320x240: %dx%d", gw0, gh0);
+    xcb_destroy_window(X, wfs);
     xcb_flush(X);
     wait_for(c_never, NULL, 400);
 
