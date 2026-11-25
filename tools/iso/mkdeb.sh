@@ -39,6 +39,7 @@
 #   /usr/lib/lordos/code-manifest.json    SHA-256 of every bundle LordOS runs as its own code, and
 #   /usr/lib/lordos/code-manifest.sig     its Ed25519 signature (release key; docs/SIGNING.md)
 #   /usr/lib/lordos/lordos-live-prep      live preparation (grub language, folders)
+#   /usr/lib/lordos/toolkit-audit/*.py    lordos-testbench --toolkits' harnesses (GTK, Qt); run only with bindings already installed
 #   /usr/lib/systemd/system/lordos.service  lord-sessiond on tty1
 #   /usr/lib/systemd/system/lordos-text-login.service  a login prompt on tty1 in text mode (docs/SESSIONS.md)
 #   /etc/grub.d/11_lordos_text            the boot menu's "LordOS (text mode)" entry
@@ -419,6 +420,10 @@ if [ "${REQUIRE_SIGNED_CODE:-0}" = 1 ] && [ -d .git ]; then node tools/app-versi
     tail -20 "$PKG/code-check.log" >&2; echo "the staged system code does not match code-manifest.json" >&2; exit 1; }
 tail -1 "$PKG/code-check.log"; rm -f "$PKG/code-check.log"
 install -m 755 tools/iso/rootfs/usr/lib/lordos/lordos-live-prep "$L/lordos-live-prep"
+# lordos-testbench --toolkits: one small harness per GUI toolkit (docs/WAYLAND.md). They use only bindings that are
+# already installed (python3-gi, PyQt5, PyQt6) and report "not installed" otherwise: no Depends, nothing pulled in.
+install -d "$L/toolkit-audit"
+for f in tools/toolkit-audit/*.py; do [ -f "$f" ] && install -m 755 "$f" "$L/toolkit-audit/"; done
 # updates in place (docs/UPDATES.md): the repository, its key, the migrations and the restart notice
 install -D -m 644 packaging/apt/lordos.sources "$L/apt/lordos.sources"
 install -D -m 644 packaging/keys/lordos-archive-keyring.gpg "$PKG/usr/share/keyrings/lordos-archive-keyring.gpg"
