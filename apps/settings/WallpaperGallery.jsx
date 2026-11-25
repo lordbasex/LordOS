@@ -163,12 +163,31 @@ function Link({ label, onClick }) {
 }
 
 // The sheet of one wallpaper, over this Settings window.
-function Sheet({ e, ctx, onClose }) {
+// onStep(-1 | 1): the previous or next wallpaper of the list shown (a collection, or the gallery's filter and search),
+// from the arrows on the picture or the ← and → keys; null at either end.
+// a round arrow on one side of the sheet's picture (the picture box is LTR: start is its left edge)
+function StepArrow({ side, onClick }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <View onClick={(ev) => { ev?.stopPropagation?.(); onClick(); }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ position: 'absolute', top: '50%', marginTop: -18, [side === 'start' ? 'left' : 'right']: 10, width: 36, height: 36, borderRadius: 18,
+        alignItems: 'center', justifyContent: 'center', backgroundColor: hover ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.25)' }}>
+      <Text style={{ fontSize: 22, lineHeight: 1, marginTop: -2, color: '#fff' }}>{side === 'start' ? '‹' : '›'}</Text>
+    </View>
+  );
+}
+
+function Sheet({ e, ctx, onClose, onStep }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const win = useAppWindow();
   const [q, setQ] = useState(ctx.quality);
-  useKeyboard((ev) => { if (ev.key === 'Escape') onClose(); });
+  useEffect(() => { setQ(ctx.quality); }, [e.id]);       // a new wallpaper starts from the page's quality again
+  useKeyboard((ev) => {
+    if (ev.key === 'Escape') onClose();
+    // ← and → as the arrows draw them (mirrored in right-to-left)
+    else if ((ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') && onStep) onStep((ev.key === 'ArrowRight') !== (direction() === 'rtl') ? 1 : -1);
+  });
   const g = wm.frame(wm.get(win.id) || {}) || {};
   const W = g.w || 720, H = g.h || 560;
   const wide = W >= 700;
@@ -193,8 +212,10 @@ function Sheet({ e, ctx, onClose }) {
         backgroundColor: 'rgba(0,0,0,0.45)' }}>
         <View onClick={(ev) => ev?.stopPropagation?.()} style={{ flexDirection: wide ? 'row' : 'column', maxWidth: W - 32, maxHeight: H - 32, borderRadius: 14, overflow: 'hidden',
           backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
-          <View style={{ width: pw, height: ph, backgroundColor: '#000' }}>
+          <View style={{ width: pw, height: ph, backgroundColor: '#000', direction: 'ltr' }}>
             <Image src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {onStep ? <StepArrow side="start" onClick={() => onStep(direction() === 'rtl' ? 1 : -1)} /> : null}
+            {onStep ? <StepArrow side="end" onClick={() => onStep(direction() === 'rtl' ? -1 : 1)} /> : null}
           </View>
           <View style={{ width: wide ? Math.min(320, W - 64 - pw) : pw, padding: spacing.l, gap: spacing.m }}>
             <View style={{ gap: 2 }}>
@@ -617,6 +638,14 @@ export function WallpaperGallery() {
   );
   const sheetEntry = sheet ? entries.find((e) => e.id === sheet) : null;
   const viewEntries = view ? (allGroups.find(([c]) => c === view) || [view, []])[1] : null;
+  // the sheet's arrows walk what is shown: the open collection, else the gallery's filtered and searched list; they wrap
+  const sheetList = viewEntries || shown;
+  const stepSheet = (d) => {
+    const i = sheetList.findIndex((x) => x.id === sheet);
+    if (i < 0 || !sheetList.length) return;
+    setNote('');
+    setSheet(sheetList[(i + d + sheetList.length) % sheetList.length].id);
+  };
 
   let body;
   if (viewEntries) body = <CollectionPage col={view} entries={viewEntries} ctx={ctx} onBack={() => setView(null)} />;
@@ -673,7 +702,7 @@ export function WallpaperGallery() {
         {slideshow && !login ? <SlideshowSettings displays={displays} /> : null}
         <MotionOptions ctx={ctx} />
       </View>
-      {sheetEntry ? <Sheet e={sheetEntry} ctx={ctx} onClose={() => setSheet(null)} /> : null}
+      {sheetEntry ? <Sheet e={sheetEntry} ctx={ctx} onClose={() => setSheet(null)} onStep={sheetList.length > 1 ? stepSheet : null} /> : null}
     </Stack>
   );
 }

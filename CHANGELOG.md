@@ -11,6 +11,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Fixed
+- **Settings → Wallpaper: the sheet steps to the previous or next wallpaper** (asked for while testing 0.8.9.6.2). Two
+  round arrows on the sheet's picture, and the ← and → keys, show the previous or next wallpaper of what is on screen:
+  the open collection, or the gallery's filtered and searched list; they wrap at the ends, mirror in right to left, and
+  each wallpaper starts again from the page's quality.
 - **Settings → Wallpaper: a clear way back from a collection, and collection cards that fill the page** (found testing
   0.8.9.6.2). A collection's page had a small "All wallpapers" button that read as a label; it now opens with
   "‹ Wallpaper › Anime", whose first part goes back, as a browser's breadcrumb does. The mouse's Back and Forward
