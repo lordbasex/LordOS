@@ -1928,6 +1928,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   running guest.
 
 ### Tests
+- Machines (in development): `tools/vm/e2e/machines/storage-fs.sh` with `MKFS_ROOT` (btrfs-progs and xfsprogs
+  unpacked with `apt-get download` + `dpkg -x`, not installed) runs mkfs with `MKFS_ROOT`'s library folders on
+  `LD_LIBRARY_PATH`, so the unpacked `libinih1` and `liburcu8t64` are found; before, mkfs.btrfs and mkfs.xfs failed to
+  start on a computer without those libraries. Only mkfs gets that path. Run on the RX 580 PC on 2026-11-25: btrfs,
+  compressed btrfs and XFS each mounted `nosuid,nodev`, 22 passed, 0 failed. `server/tests/vm_slice.sh` (private
+  `mktemp` folders) 12 passed, 0 failed.
 - Machines (in development): `vmkboot-test` (direct kernel boot's checks, ASan and UBSan, a random pass), schema 21 in
   `vm-test`, the requirements, Guest can see and Start Linux directly in `vm_model_test.mjs`;
   `tools/vm/e2e/machines/kernel-boot.py` (real QEMU/KVM: a guest's kernel taken out with `machines cp`, started directly

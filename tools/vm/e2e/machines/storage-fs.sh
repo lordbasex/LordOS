@@ -3,7 +3,8 @@
 # premade, clone and storage, each on a scratch loop file system: btrfs, btrfs with compression (the figures must say
 # "about": MH_EXPECT_APPROX) and XFS. Needs root only to make, mount and hand over the empty file systems (sudo asks);
 # everything else runs as the person, in the harness's own namespaces. The file systems' tools come from Debian's
-# btrfs-progs and xfsprogs packages: installed, or unpacked with `apt-get download` + `dpkg -x` into MKFS_ROOT.
+# btrfs-progs and xfsprogs packages: installed, or unpacked with `apt-get download` + `dpkg -x` into MKFS_ROOT together
+# with the libraries they need that aren't installed (libinih1, liburcu8t64): mkfs then runs with MKFS_ROOT's library folders.
 #   bash tools/vm/e2e/machines/storage-fs.sh [btrfs] [btrfs-zstd] [xfs]      (from the repository; ~15 min)
 # The work folder (images, mount points, figures) is a fresh private one (mktemp -d /var/tmp/lordos-m100-fs.XXXXXX), or
 # MH_FS_WORK if that is an existing folder of this user and not a link: never a fixed name in /var/tmp that another user
@@ -20,6 +21,9 @@ chmod 700 "$W" || exit 1
 X=${MKFS_ROOT:-}
 ME=$(id -u):$(id -g)
 mkfs_of() { if [ -n "$X" ]; then echo "$X/usr/sbin/$1"; else command -v "$1" || echo "/usr/sbin/$1"; fi; }
+mkfs_run() {   # the unpacked tools find their unpacked libraries; nothing else in the run gets MKFS_ROOT's library path
+    if [ -n "$X" ]; then LD_LIBRARY_PATH=$(printf '%s:' "$X"/lib/*-linux-gnu "$X"/usr/lib/*-linux-gnu) "$@"; else "$@"; fi
+}
 fails=0
 run_one() {
     local kind=$1 mkfs opts approx img mnt
@@ -33,7 +37,7 @@ run_one() {
     img=$W/$kind.img; mnt=$W/mnt-$kind
     mkdir -p "$mnt"
     rm -f "$img"; truncate -s 12G "$img"
-    "$mkfs" -q "$img" >"$W/$kind.mkfs.log" 2>&1 || "$mkfs" "$img" >"$W/$kind.mkfs.log" 2>&1 || { echo "$kind: mkfs failed"; cat "$W/$kind.mkfs.log"; return 1; }
+    mkfs_run "$mkfs" -q "$img" >"$W/$kind.mkfs.log" 2>&1 || mkfs_run "$mkfs" "$img" >"$W/$kind.mkfs.log" 2>&1 || { echo "$kind: mkfs failed"; cat "$W/$kind.mkfs.log"; return 1; }
     sudo mount -o "loop,nosuid,nodev${opts:+,$opts}" "$img" "$mnt" || { echo "$kind: mount failed"; return 1; }
     sudo chown "$ME" "$mnt"
     echo "== $kind: $(stat -f -c %T "$mnt") ($(findmnt -n -o OPTIONS "$mnt"))"
