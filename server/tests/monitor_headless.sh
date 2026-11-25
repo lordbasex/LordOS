@@ -2,7 +2,7 @@
 # monitor_headless.sh — Monitor → Processes in a headless lord-server, as screenshots: the real theme bundle with
 # tests/monitor_scene/pre.js before it (a made-up process list with fixed owners; no real process is ever signalled) and
 # driver.js after it (the flat list, Grouped, groups open with who started each program, a group's hover summary,
-# Quit All's sheet, a program's Get Info, the Flatpak filter, the rolling statistics' columns and a summary's sparklines).
+# an origin badge with its tooltip and not the row's summary, Quit All's sheet, a program's Get Info, the Flatpak filter, the rolling statistics' columns and a summary's sparklines).
 # A test tool: not part of `make test`, never installed. From server/, after `npm run build` and `make`:
 #   tests/monitor_headless.sh OUT_DIR [theme] [language] [WxH] [dark|light]   → OUT_DIR/<theme>-<language>-<mode>-1.png …
 cd "$(dirname "$0")/.." || exit 1
@@ -42,5 +42,5 @@ P=$!
 for i in $(seq 1 200); do grep -aq 'MONITOR-SCENE done' "$D/home/.cache/lordos/shell.log" 2>/dev/null && break; sleep 0.5; done
 sleep 2
 grep -ah 'MONITOR-SCENE' "$D/home/.cache/lordos/shell.log" 2>/dev/null | sed 's/.*MONITOR-SCENE/ /'
-for k in 1 2 3 4 5 6 7; do [ -f "$D/home/shot-$k.png" ] && cp "$D/home/shot-$k.png" "$OUT/$THEME-$LANGID-$MODE-$k.png"; done
+for k in 1 2 3 4 5 6 7 8 9; do [ -f "$D/home/shot-$k.png" ] && cp "$D/home/shot-$k.png" "$OUT/$THEME-$LANGID-$MODE-$k.png"; done
 ls "$OUT"/"$THEME-$LANGID-$MODE"-*.png 2>/dev/null

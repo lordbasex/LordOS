@@ -18,16 +18,27 @@ import { useMarquee, MarqueeBand } from './marqueeview.jsx';
 const where = (p) => { const parts = String(p).split('/'); return parts[parts.length - 2] || '/'; };
 export const kindLabel = (e) => (e.sub ? e.sub : e.app ? tr('files.kind.app') : bundleFor(e) ? bundleFor(e).kind() : tr(`files.kind.${kindOf(e)}`));
 
-// Name, or the field for renaming in place. font and line follow the view's zoom (viewprefs.js).
-function Name({ e, ctx, center, color, lines = 1, font, line, fieldW }) {
+const FIELD_H = 22;
+const textWidth = (s, size) => (typeof lord !== 'undefined' && lord.measureText ? lord.measureText(String(s), size, 400) : String(s).length * size * 0.55);
+
+// Name, or the field for renaming in place. font and line follow the view's zoom (viewprefs.js); room: the width the
+// name wraps in (when it may take more than one line).
+function Name({ e, ctx, center, color, lines = 1, font, line, fieldW, room }) {
   const size = font || (center ? 12 : 13), lh = line || (size <= 13 ? 16 : Math.round(size * 1.34));
+  const shown = ctx.shownName ? ctx.shownName(e) : e.name;
   if (ctx.renaming?.path === e.path) {
+    // the field takes the name's place without changing the layout: its box is as high as the name's lines were (the
+    // 22 px field is taller than a 16 px line, and the icon grid moved down by the difference), the field centred over it
+    const rows = lines > 1 && room && textWidth(shown, size) > room ? lines : 1;
+    const h = rows * lh;
     return (
-      <View onMouseDown={(ev) => ev.stopPropagation()} style={{ width: fieldW || (center ? 110 : 240) }}>
-        {/* Tab keeps the new name, as Enter does, instead of leaving the field open without the keys (sdk/focus.js) */}
-        <TextInput autoFocus selectAll value={ctx.renaming.value} onChange={ctx.onRenameChange} onSubmit={ctx.onRenameCommit} onCancel={ctx.onRenameCancel}
-          onKeyDown={(k) => { if (k.key !== 'Tab' || k.ctrl || k.alt || k.meta) return false; ctx.onRenameCommit(); return true; }}
-          style={{ height: 22, paddingHorizontal: 4 }} />
+      <View onMouseDown={(ev) => ev.stopPropagation()} style={{ width: fieldW || (center ? 110 : 240), height: h }}>
+        <View style={{ position: 'absolute', left: 0, right: 0, top: Math.round((h - FIELD_H) / 2), height: FIELD_H }}>
+          {/* Tab keeps the new name, as Enter does, instead of leaving the field open without the keys (sdk/focus.js) */}
+          <TextInput autoFocus selectAll value={ctx.renaming.value} onChange={ctx.onRenameChange} onSubmit={ctx.onRenameCommit} onCancel={ctx.onRenameCancel}
+            onKeyDown={(k) => { if (k.key !== 'Tab' || k.ctrl || k.alt || k.meta) return false; ctx.onRenameCommit(); return true; }}
+            style={{ height: FIELD_H, paddingHorizontal: 4 }} />
+        </View>
       </View>
     );
   }
@@ -35,7 +46,7 @@ function Name({ e, ctx, center, color, lines = 1, font, line, fieldW }) {
   // (apps/files/index.jsx, sdk/slowclick.js)
   return (
     <Text onMouseDown={(ev) => { ev.onName = true; }} style={{ fontSize: size, color, textAlign: center ? 'center' : 'start', whiteSpace: lines === 1 ? 'nowrap' : 'normal',
-      overflow: 'hidden', maxHeight: lines * lh, lineHeight: lh, textOverflow: 'ellipsis', numberOfLines: lines }}>{ctx.shownName ? ctx.shownName(e) : e.name}</Text>
+      overflow: 'hidden', maxHeight: lines * lh, lineHeight: lh, textOverflow: 'ellipsis', numberOfLines: lines }}>{shown}</Text>
   );
 }
 
@@ -128,7 +139,7 @@ export function IconView({ groups, ctx }) {
                     </View>
                     )}</DropHot>
                     <View style={{ maxWidth: m.cell - 4, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, backgroundColor: sel ? t.accent : 'transparent', alignItems: 'center' }}>
-                      <Name e={e} ctx={ctx} center lines={2} font={m.font} line={m.line} fieldW={m.cell + 10} color={sel ? '#fff' : t.text} />
+                      <Name e={e} ctx={ctx} center lines={2} font={m.font} line={m.line} fieldW={m.cell + 10} room={m.cell - 14} color={sel ? '#fff' : t.text} />
                     </View>
                     <TagDots tags={tagsOf(e.path)} />
                   </View>

@@ -42,7 +42,7 @@ import { tween, EASE, reduceMotion } from './motion.js';
 import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Spine } from './components/Spine.jsx';
 import { Surface } from './components/Surface.jsx';
-import { ActivityStrip, ActivityPeek, StatusCluster, VolumePanel, STATUS_W } from './components/TopBar.jsx';
+import { ActivityStrip, ActivityPeek, StatusCluster, TopBand, VolumePanel } from './components/TopBar.jsx';
 import { GroupFrame, trayNodes } from './components/GroupFrame.jsx';
 import { AppWindowsPeek } from './components/AppWindows.jsx';
 import { Search } from './components/Search.jsx';
@@ -294,7 +294,6 @@ function App() {
   const ga = useStore(guestAppsMode);
   const spineActive = useMemo(() => ({ overview: inOverview, apps: open?.name === 'search' && open.mode === 'apps', control: open?.name === 'control', notif: open?.name === 'notif', help: helpOpen, menu: !!crown }),
     [inOverview, open, crown, helpOpen]);
-  const stripRect = useMemo(() => (main?.plan.top ? { ...main.plan.top, w: main.plan.top.w - STATUS_W } : null), [main]);
   if (open?.name === 'notif' && history.length) seen.current = Math.max(seen.current, history[0].id);
   const unread = history.some((n) => n.id > seen.current);
   const isOnChrome = (x, y) => onChrome(plans.map((p) => p.plan), x, y);
@@ -373,10 +372,12 @@ function App() {
           ) : null))}
           {main?.plan.top ? (
             <>
-              <ActivityStrip t={t} rect={stripRect} onEdit={H.edit} />
+              <TopBand rect={main.plan.top}>
+                <ActivityStrip t={t} band={main.plan.top} onEdit={H.edit} />
+                <StatusCluster t={t} unread={unread} onControl={H.control} onNotif={H.notif} onVolume={H.volume} />
+              </TopBand>
               <ActivityPeek t={t} />
               <AppWindowsPeek t={t} />
-              <StatusCluster t={t} rect={main.plan.top} rtl={rtl} screenW={screen.width} unread={unread} onControl={H.control} onNotif={H.notif} onVolume={H.volume} />
             </>
           ) : null}
         </Layer>}

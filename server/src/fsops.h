@@ -90,6 +90,9 @@ int fsops_resolve_target(const char *path, char *out, size_t n, char *dir, size_
 int fsops_name_too_long(const char *path);
 /* lord.fs.stat's: 0 in the writable roots, 1 read-only elsewhere where reading is allowed, -1 refused, -2 protected */
 int fsops_resolve_stat(const char *path, char *target, size_t n, int *down);
+/* lord.fs.copy's source: 0 in the writable roots, -2 protected there (a copy still reads it), 1 a regular file read-only
+ * elsewhere where reading is allowed (no folder, no link), -1 refused (GitHub #188) */
+int fsops_resolve_copy_source(const char *path, char *out, size_t n, int *down);
 typedef struct {
     const char *name;
     int link, dir, locked;

@@ -546,20 +546,24 @@ int checks_run(void) {
         sync_or();
         set(c, CK_PASS, "%s", "INHIBITOR CREATED AND RELEASED");
     }
-    /* what a desktop expects to find, offered or not */
-    static const struct { const char *iface, *what; int needed; } expect[] = {
-        { "wl_seat", "seat", 1 }, { "xdg_wm_base", "xdg-shell", 1 }, { "zxdg_decoration_manager_v1", "server decorations", 0 },
-        { "wp_presentation", "presentation time", 0 }, { "zwp_text_input_manager_v3", "input methods (text-input v3)", 0 },
-        { "xdg_activation_v1", "xdg-activation", 0 },
-        { "wp_single_pixel_buffer_manager_v1", "single-pixel buffers", 0 }, { "wp_tearing_control_manager_v1", "tearing control (games)", 0 },
-        { "wp_content_type_manager_v1", "content type", 0 }, { "zwp_tablet_manager_v2", "drawing tablets", 0 },
-        { "ext_idle_notifier_v1", "idle notify", 0 }, { "wp_drm_lease_device_v1", "VR headsets (drm-lease)", 0 },
-    };
-    for (size_t i = 0; i < sizeof expect / sizeof expect[0]; i++) {
-        Global *g = find(expect[i].iface);
-        c = begin(expect[i].what);
-        if (g) set(c, CK_PASS, "%s V%u OFFERED", expect[i].iface, g->version);
-        else set(c, expect[i].needed ? CK_FAIL : CK_INFO, "%s NOT OFFERED", expect[i].iface);
+    /* what a desktop expects to find: the seat, then every global of LordOS's protocol table (expected_globals.h,
+     * generated from docs/wayland-protocols.json), offered, missing or at a lower version */
+    c = begin("seat");
+    Global *sg = find("wl_seat");
+    if (sg) set(c, CK_PASS, "WL_SEAT V%u OFFERED", sg->version);
+    else set(c, CK_FAIL, "%s", "WL_SEAT NOT OFFERED: NO KEYBOARD OR POINTER");
+    c = begin("protocol table");
+    GtRow rows[64];
+    GtSummary gs;
+    if (gt_expected_count() > (int)(sizeof rows / sizeof rows[0])) set(c, CK_FAIL, "%s", "THE TABLE OUTGREW THE CHECK");
+    else {
+        gt_compare(globals, nglobals, rows, &gs);
+        const char *first = "";
+        for (int i = 0; i < gt_expected_count() && !first[0]; i++)
+            if (rows[i].state == GT_MISSING || rows[i].state == GT_OLDER) first = gt_expected(i)->iface;
+        if (!gs.missing && !gs.older)
+            set(c, CK_PASS, "%d OF %d OFFERED%s (%d ONLY TO SOME CLIENTS)", gs.offered + gs.newer, gs.expected, gs.newer ? ", SOME NEWER" : "", gs.not_here);
+        else set(c, CK_INFO, "%d OF %d: %d MISSING, %d OLDER (%s)", gs.offered + gs.newer, gs.expected, gs.missing, gs.older, first);
     }
     cur = NULL;
     checks_done = 1;

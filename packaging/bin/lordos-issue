@@ -6,10 +6,220 @@
 # Usage: lordos-issue [--print] [--no-root]     writes ~/lordos-issue-<date>.txt, and with --print shows it too
 #        lordos-issue --gpu                     prints the graphics compatibility report (the same as Settings → Graphics
 #                                               cards → "Send a compatibility report"): no root, nothing saved
+#        lordos-issue [--seconds N] --app PROGRAM [ARGS...]
+#                                               runs PROGRAM as you with WAYLAND_DEBUG=1 for up to N seconds (default 20,
+#                                               at most 300) and saves its last 200 Wayland protocol lines, scrubbed (every
+#                                               text the app sent or got, its titles and file names, becomes <text>; its app
+#                                               id a hash; interface names and clipboard types stay), to
+#                                               ~/lordos-wayland-<date>.txt. Nothing else the program prints is kept.
+#        lordos-issue --scrub-wayland-debug     the same scrubbing for a WAYLAND_DEBUG log you made yourself: stdin → stdout
+# The "Wayland and X11" section (lordos-testbench --globals, Xwayland's version, the variables that choose an app's
+# backend, the programs connected to the Wayland and X11 sockets) is collected as the user, before the password is asked:
+# a Wayland client never runs as root.
+UPATH=$PATH                         # the user's own, for --app's program
 LC_ALL=C.UTF-8; export LC_ALL
 PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
-print=0; noroot=0; gpu=0
-for a in "$@"; do case "$a" in --print) print=1;; --no-root) noroot=1;; --gpu) gpu=1;; esac; done
+print=0; noroot=0; gpu=0; app=0; scrub=0; secs=20; wlfrom=''; testclients=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --print) print=1;; --no-root) noroot=1;; --gpu) gpu=1;;
+        --seconds) shift; case "$1" in ''|*[!0-9]*) echo "lordos-issue: --seconds takes a number" >&2; exit 2;; esac; secs=$1;;
+        --app) shift; app=1; break;;
+        --scrub-wayland-debug) scrub=1;;
+        --test-clients) testclients=1; tw=${2:-}; tx=${3:-}; [ $# -ge 3 ] && shift 2;;   # tests only: `ss -xpnH` text on stdin, WAYLAND_PATH X11_PATH
+        --test-globals) testclients=2;;         # tests only: the summary of `lordos-testbench --globals` JSON on stdin
+        --wl-from) shift; wlfrom=$1;;           # internal: the user's half of the report, handed over to the root run
+    esac
+    shift
+done
+[ "$secs" -gt 300 ] && secs=300
+[ "$secs" -lt 1 ] && secs=1
+
+# ---- the Wayland protocol log's scrubbing (--app, --scrub-wayland-debug) ----
+# Only libwayland's protocol lines ("[1234.567] {Queue}  -> wl_surface#3.commit()") are kept: anything else a program
+# prints (its own messages, paths, documents) is dropped. In a kept line every quoted string becomes <text>, except:
+#   - an interface name in wl_registry.global or .bind ("xdg_wm_base"): [a-z][a-z0-9_]*;
+#   - a clipboard or drag type in offer, receive, accept or send ("text/plain;charset=utf-8");
+#   - an app id (set_app_id): "app-id:" and 8 hex digits of a hash, the same id giving the same hash.
+# And every argument of a key or modifiers event (wl_keyboard, an input method's keyboard grab, a virtual keyboard)
+# becomes <key>: the keycodes alone would spell what was typed.
+# libwayland doesn't escape quotes inside strings, so the whole span from a line's first quote to its last is judged
+# as one string: a title with quotes in it can't split itself into something that passes.
+wl_scrub() {
+    awk '
+    function h32(s,    i, c, x) { x = 5381; for (i = 1; i <= length(s); i++) { c = index(CH, substr(s, i, 1)); x = (x * 33 + c) % 4294967296 } return sprintf("%08x", x) }
+    BEGIN { CH = " !#$%&()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~"; dropped = 0 }
+    !/^\[ *[0-9]+\.[0-9]+\] / { dropped++; next }
+    {
+        line = $0
+        # key presses: which keys were pressed spells what was typed (a password too), so a key or modifier event
+        # keeps its name and loses every argument (wl_keyboard and the key and modifiers of an input method grab and a virtual
+        # keyboard)
+        km = line; p = index(km, "("); if (p) km = substr(km, 1, p - 1); sub(/.*#[0-9]+\./, "", km)
+        ki = line; sub(/^\[[^]]*\] *(\{[^}]*\} *)?(-> )?/, "", ki); sub(/#.*/, "", ki)
+        if ((km == "key" || km == "modifiers") && ki ~ /^(wl_keyboard|zwp_input_method_keyboard_grab_v2|zwp_virtual_keyboard_v1)$/) {
+            p = index(line, "("); print substr(line, 1, p) "<key>)"; fflush(); next
+        }
+        q1 = index(line, "\"")
+        if (q1 == 0) { print line; fflush(); next }
+        rest = substr(line, q1 + 1); q2 = 0
+        for (i = length(rest); i > 0; i--) if (substr(rest, i, 1) == "\"") { q2 = i; break }
+        if (q2 == 0) { print substr(line, 1, q1 - 1) "<text>"; fflush(); next }
+        s = substr(rest, 1, q2 - 1)
+        pre = substr(line, 1, q1 - 1); post = substr(rest, q2 + 1)
+        m = pre; p = index(m, "("); if (p) m = substr(m, 1, p - 1); sub(/.*\./, "", m)
+        keep = 0
+        if ((m == "global" || m == "bind") && s ~ /^[a-z][a-z0-9_]*$/ && length(s) < 64) keep = 1
+        else if ((m == "offer" || m == "receive" || m == "accept" || m == "send") && s ~ /^[a-z][a-z0-9.+_-]*\/[A-Za-z0-9.+_-]+(;[ ]?[a-z]+=[A-Za-z0-9_-]+)?$/ && length(s) < 100) keep = 1
+        if (keep) out = "\"" s "\""
+        else if (m == "set_app_id") out = "\"app-id:" h32(s) "\""
+        else out = "<text>"
+        print pre out post; fflush()
+    }
+    END { if (dropped) printf "(%d lines that were not Wayland protocol left out)\n", dropped }'
+}
+if [ "$scrub" = 1 ]; then wl_scrub; exit 0; fi
+
+# ---- the programs connected to the Wayland and X11 sockets ----
+# From `ss -xpnH`: the user's own Unix sockets (ss shows another user's processes only to root, and this runs as the
+# user). A socket of the server's side whose address is the Wayland (or X11) socket's path names its peer; the peer's
+# process is the client. Program names only (a process's 15-character name), never window titles or arguments.
+# lord-server itself (Xwayland's window manager) is left out; Xwayland shows as a Wayland client.
+# usage: ... | wl_clients WAYLAND_PATH X11_PATH
+wl_clients() {
+    awk -v W="$1" -v X="$2" '
+    function prog(u,    a) { if (!match(u, /\(\("[^"]*"/)) return ""; a = substr(u, RSTART + 3, RLENGTH - 4); gsub(/[^A-Za-z0-9._+-]/, "?", a); return a }
+    $1 == "u_str" && $2 == "ESTAB" {
+        name[$6] = prog($9)
+        if (W != "" && $5 == W) wpeer[$8] = 1
+        if (X != "" && ($5 == X || $5 == "@" X)) xpeer[$8] = 1
+    }
+    END {
+        for (i in wpeer) { p = name[i]; if (p == "") p = "(another user)"; if (p !~ /^lord-server/) wl[p]++ }
+        for (i in xpeer) { p = name[i]; if (p == "") p = "(another user)"; if (p !~ /^lord-server/) x[p]++ }
+        n = 0; for (p in wl) { printf "  %-16s Wayland%s\n", p, (wl[p] > 1 ? " (" wl[p] " connections)" : ""); n++ }
+        for (p in x) { printf "  %-16s X11 (Xwayland)%s\n", p, (x[p] > 1 ? " (" x[p] " connections)" : ""); n++ }
+        if (!n) print "  none"
+    }' | sort
+}
+
+# ---- the "Wayland and X11" section, as the user ----
+# A value of a variable that picks the backend, shown only when it looks like one (no paths or free text)
+env_line() {   # NAME VALUE-OR-EMPTY ISSET
+    if [ "$3" != 1 ]; then printf '%s: unset\n' "$1"
+    elif printf '%s' "$2" | grep -qE '^[A-Za-z0-9_.,;:-]{0,40}$'; then printf '%s=%s\n' "$1" "$2"
+    else printf '%s: set (an unusual value, not shown)\n' "$1"; fi
+}
+isset() { eval "[ \"\${$1+x}\" = x ]" && echo 1 || echo 0; }
+# NVIDIA: the driver's version and which kernel module drives each NVIDIA display device, from sysfs (world-readable,
+# digits and dots or a module name only). lord-nvgpu's own state lives in lord-server; Monitor → GPU → "Copy report"
+# gives it, so this only points there. Prints nothing without an NVIDIA display device.
+nvidia_wayland() {
+    found=0
+    for d in /sys/bus/pci/devices/*; do
+        [ "$(cat "$d/vendor" 2>/dev/null)" = 0x10de ] || continue
+        case "$(cat "$d/class" 2>/dev/null)" in 0x03*) ;; *) continue ;; esac
+        [ $found = 1 ] || echo "-- NVIDIA"
+        found=1
+        drv=$(basename "$(readlink "$d/driver" 2>/dev/null)" 2>/dev/null)
+        printf '%s 10de:%s driver %s\n' "$(basename "$d")" "$(sed 's/^0x//' "$d/device" 2>/dev/null)" "${drv:-none}" |
+            grep -E '^[0-9a-f:.]+ 10de:[0-9a-f]{4} driver [A-Za-z0-9_-]+$'
+    done
+    [ $found = 1 ] || return 0
+    v=$(cat /sys/module/nvidia/version 2>/dev/null | grep -E '^[0-9][0-9.]{0,30}$')
+    echo "nvidia module: ${v:-not loaded}"
+    echo "the stats helper's state: Monitor -> GPU -> Copy report (paste it too if it shows \"Couldn't read NVIDIA data\")"
+}
+wayland_section() {
+    echo "-- the compositor's globals against LordOS's protocol table (lordos-testbench --globals)"
+    TB=/usr/bin/lordos-testbench
+    [ -x "$TB" ] || TB=$(command -v lordos-testbench 2>/dev/null)
+    if [ -z "${WAYLAND_DISPLAY:-}" ]; then echo "not run: WAYLAND_DISPLAY is unset (run lordos-issue in the LordOS Terminal)"
+    elif [ -z "$TB" ]; then echo "not run: lordos-testbench isn't installed"
+    elif j=$(timeout -k 2 10 "$TB" --globals 2>/dev/null) && [ -n "$j" ]; then
+        printf '%s\n' "$j" | wl_globals_summary
+    else echo "lordos-testbench --globals failed (no Wayland connection?)"; fi
+    echo "-- Xwayland"
+    v=$(dpkg-query -W -f='${Version}' xwayland 2>/dev/null)
+    if [ -n "$v" ]; then echo "xwayland package: $v"
+    elif command -v Xwayland >/dev/null 2>&1; then Xwayland -version 2>&1 | grep -m1 -i 'xwayland'
+    else echo "Xwayland isn't installed"; fi
+    echo "-- the variables that choose an app's backend (this terminal's; apps opened from the launcher get LordOS's own)"
+    if [ "$(isset WAYLAND_DISPLAY)" = 1 ]; then echo "WAYLAND_DISPLAY: set"; else echo "WAYLAND_DISPLAY: unset"; fi
+    if [ "$(isset DISPLAY)" = 1 ]; then echo "DISPLAY: set"; else echo "DISPLAY: unset"; fi
+    for n in XDG_SESSION_TYPE GDK_BACKEND QT_QPA_PLATFORM MOZ_ENABLE_WAYLAND ELECTRON_OZONE_PLATFORM_HINT SDL_VIDEODRIVER _JAVA_AWT_WM_NONREPARENTING; do
+        eval "val=\${$n:-}"
+        env_line "$n" "$val" "$(isset "$n")"
+    done
+    echo "-- programs connected to the Wayland and X11 sockets (program names only; one program can have several windows, or none)"
+    W=''; X=''
+    if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+        case $WAYLAND_DISPLAY in /*) W=$WAYLAND_DISPLAY;; *) W=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$WAYLAND_DISPLAY;; esac
+    fi
+    case ${DISPLAY:-} in :[0-9]*) d=${DISPLAY#:}; X=/tmp/.X11-unix/X${d%%.*};; esac
+    if ! command -v ss >/dev/null 2>&1; then echo "not listed: ss isn't installed (package iproute2)"
+    elif [ -z "$W$X" ]; then echo "not listed: neither WAYLAND_DISPLAY nor DISPLAY is set"
+    else ss -xpnH 2>/dev/null | wl_clients "$W" "$X"; fi
+    nvidia_wayland
+}
+# lordos-testbench --globals' JSON (one line, fixed keys) → a few lines
+wl_globals_summary() {
+    tr -d '\n' | awk '
+    function num(k,    m) { if (match(T, "\"" k "\":[0-9]+")) { m = substr(T, RSTART, RLENGTH); sub(/.*:/, "", m); return m } return "?" }
+    {
+        A = $0; t = index(A, "\"table\":"); if (!t) { print "unreadable output"; exit }
+        G = substr(A, 1, t); T = substr(A, t)
+        ng = gsub(/"interface":/, "&", G)
+        printf "advertised: %d globals\n", ng
+        printf "LordOS table: %s expected; %s offered, %s newer, %s older, %s missing, %s offered only to some clients\n", num("expected"), num("offered"), num("newer"), num("older"), num("missing"), num("notHere")
+        n = split(T, R, /\},\{/)
+        for (i = 1; i <= n; i++) {
+            if (!match(R[i], /"interface":"[a-z0-9_]+"/)) continue
+            it = substr(R[i], RSTART + 13, RLENGTH - 14)
+            st = ""; if (match(R[i], /"state":"[a-z-]+"/)) st = substr(R[i], RSTART + 9, RLENGTH - 10)
+            ad = ""; if (match(R[i], /"advertised":[0-9]+/)) ad = substr(R[i], RSTART + 13, RLENGTH - 13)
+            ex = ""; if (match(R[i], /"expected":[0-9]+/)) ex = substr(R[i], RSTART + 11, RLENGTH - 11)
+            to = ""; if (match(R[i], /"offeredTo":"[a-z-]+"/)) to = substr(R[i], RSTART + 13, RLENGTH - 14)
+            if (st == "missing" || st == "older" || st == "newer") printf "  %s: %s (advertised %s, table %s)\n", it, st, ad, ex
+            else if (st == "not-here") printf "  %s: not offered to this client (only to: %s)\n", it, to
+        }
+        if (match(T, /"extra":\[[^]]*\]/)) { e = substr(T, RSTART + 9, RLENGTH - 10); gsub(/"/, "", e); if (e != "") print "not in the table: " e }
+    }'
+}
+
+if [ "$testclients" = 1 ]; then wl_clients "$tw" "$tx"; exit 0; fi
+if [ "$testclients" = 2 ]; then wl_globals_summary; exit 0; fi
+
+# --app: a program's Wayland conversation, scrubbed; as the user only (never a program as root)
+if [ "$app" = 1 ]; then
+    if [ $# -lt 1 ]; then echo "usage: lordos-issue [--seconds N] --app PROGRAM [ARGS...]" >&2; exit 2; fi
+    if [ "$(id -u)" = 0 ]; then echo "lordos-issue --app runs the program as you: start it without sudo" >&2; exit 1; fi
+    prog=$(PATH=$UPATH command -v "$1" 2>/dev/null)
+    [ -n "$prog" ] || { echo "lordos-issue: $1: no such program" >&2; exit 1; }
+    shift
+    [ -n "${WAYLAND_DISPLAY:-}" ] || echo "lordos-issue: WAYLAND_DISPLAY is unset: the program will find no Wayland compositor" >&2
+    wout="${HOME:-/tmp}/lordos-wayland-$(date +%Y%m%d-%H%M%S).txt"
+    [ -w "${HOME:-/nonexistent}" ] || wout="/tmp/lordos-wayland-$(date +%Y%m%d-%H%M%S).txt"
+    host=$(hostname 2>/dev/null); user=$(id -un)
+    echo "Running $(basename "$prog") for up to $secs seconds with WAYLAND_DEBUG=1; close it sooner when the problem has shown." >&2
+    umask 077
+    # nothing raw reaches the disk: the protocol lines are scrubbed as they come and only the last 200 are kept (timeout
+    # ends the program's whole process group, so a helper it started can't hold the pipe open)
+    { printf '<!-- made by lordos-issue --app: the last 200 Wayland protocol lines of %s, scrubbed. Read it before you post it. -->
+' "$(basename "$prog" | tr -c 'A-Za-z0-9._+
+-' '?')"
+      { PATH=$UPATH WAYLAND_DEBUG=1 timeout -k 3 "$secs" "$prog" "$@" </dev/null 2>&1 >/dev/null; } 2>&1 | wl_scrub | tail -n 201
+    } | sed -E -e 's#/home/[^/ :"]+#/home/<user>#g' |
+        { if [ -n "$host" ] && [ "$host" != localhost ]; then sed "s/$host/<host>/g"; else cat; fi; } |
+        { if [ -n "$user" ]; then sed "s/\b$user\b/<user>/g"; else cat; fi; } > "$wout"
+    chmod 600 "$wout" 2>/dev/null
+    printf '
+Saved to %s
+' "$wout" >&2
+    printf 'Read it first: it has no titles, file names or typed text, but check before you paste it into an issue.
+' >&2
+    exit 0
+fi
 
 # --gpu: lordos-sysreport builds the report from world-readable files and scrubs the user's and the computer's names
 # and the home's path itself; it reads nothing that needs root, so no password is asked
@@ -24,11 +234,20 @@ if [ "$gpu" = 1 ]; then
     exit 0
 fi
 
+# The "Wayland and X11" section is the user's: collected now, as the user, and handed to the root run in a private file
+# (read back as the user: root never follows a path the user chose).
+if [ "$(id -u)" != 0 ]; then
+    wlfrom=$(mktemp "${TMPDIR:-/tmp}/lordos-issue-wl.XXXXXX") && wayland_section > "$wlfrom" 2>&1
+fi
 # The complete report needs root. Asked only at a terminal; no password, or Ctrl+C, goes on with what the user can read.
 if [ "$(id -u)" != 0 ] && [ "$noroot" = 0 ] && [ -t 0 ] && command -v sudo >/dev/null 2>&1; then
     echo "lordos-issue reads the kernel log and every package file as root. It changes nothing and sends nothing." >&2
     echo "Enter your password, or press Ctrl+C or Enter to continue without it." >&2
     trap : INT
+    # (the options were read above: only --print matters to the root run)
+    set --
+    [ "$print" = 1 ] && set -- --print
+    [ -n "$wlfrom" ] && set -- "$@" --wl-from "$wlfrom"
     if sudo -p 'Password for %p: ' -v; then trap - INT; exec sudo "$0" "$@"; fi
     trap - INT
     echo "Going on without root: the report will be shorter." >&2
@@ -149,6 +368,12 @@ have() { command -v "$1" >/dev/null 2>&1; }
     grep -E '^(N:|H:)' /proc/bus/input/devices 2>/dev/null | sed -e 's/^N: Name=/ /' -e 's/^H: Handlers=/    /'
     end
 
+    step "Wayland and X11"
+    section "Wayland and X11"
+    if [ -n "$wlfrom" ] && as_user test -f "$wlfrom" && ! as_user test -L "$wlfrom"; then as_user head -c 20000 -- "$wlfrom"
+    else echo "collected only when lordos-issue starts as the user (in the LordOS Terminal, without sudo)"; fi
+    end
+
     step "network and sound"
     section "Network"
     if have rfkill; then rfkill list 2>/dev/null; fi
@@ -244,6 +469,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
     end
 } 2>&1 | clean | head -c "$MAX" > "$out"
 chmod 600 "$out" 2>/dev/null
+[ -n "$wlfrom" ] && as_user rm -f -- "$wlfrom" 2>/dev/null
 [ -n "$SUDO_USER" ] && chown "$SUDO_USER" "$out" 2>/dev/null
 
 [ "$print" = 1 ] && cat "$out"

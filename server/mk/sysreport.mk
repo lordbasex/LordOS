@@ -11,9 +11,9 @@ SYSREPORT_BENCH_SRC := src/bench/lbrun.c src/bench/lbcond.c src/bench/lbproto.c 
                        src/bench/lbvideo.c src/bench/boottest.c src/media/proto.c
 # lordos-fetch's Build line checks the code manifest's signature as lord-server does (src/sec/codesig.c, own code)
 SYSREPORT_CODESIG_SRC := src/sec/codesig.c src/pkg/crypto.c
-build/lordos-sysreport: src/sysreport/cli.c $(SYSREPORT_SRC) $(SYSREPORT_HDR) $(SYSREPORT_BENCH_SRC) $(SYSREPORT_CODESIG_SRC) $(wildcard src/bench/*.h) src/sec/codesig.h build/gen/lord_version.h build/gen/codesig_build.h
+build/lordos-sysreport: src/sysreport/cli.c src/sysreport/drmprobe.c $(SYSREPORT_SRC) $(SYSREPORT_HDR) $(SYSREPORT_BENCH_SRC) $(SYSREPORT_CODESIG_SRC) $(wildcard src/bench/*.h) src/sec/codesig.h build/gen/lord_version.h build/gen/codesig_build.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) -Ibuild/gen $(CFLAGS) $(WARN) -std=c11 -o $@ src/sysreport/cli.c $(SYSREPORT_SRC) $(SYSREPORT_BENCH_SRC) $(SYSREPORT_CODESIG_SRC) -lm -lpthread
+	$(CC) $(CPPFLAGS) -Ibuild/gen $(CFLAGS) $(WARN) -std=c11 -o $@ src/sysreport/cli.c src/sysreport/drmprobe.c $(SYSREPORT_SRC) $(SYSREPORT_BENCH_SRC) $(SYSREPORT_CODESIG_SRC) -lm -lpthread
 # five fake machines full of serials, UUIDs, MACs and names that must not reach a report (periph.c is
 # lord.sysinfo.peripherals(): on screen only, so it is not in SYSREPORT_SRC and the commands can't print it);
 # `build/sysreport-test fixture <dir> amd|intel|nvidia|rpi5|vm` writes one for `--root`
@@ -36,4 +36,11 @@ test: build/gpureport-test
 build/gpureport-test: tests/gpureport_test.c src/sysreport/gpureport.c src/sysreport/gpureport.h src/sysreport/ids.c src/hw/jbuf.c src/sec/json.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ tests/gpureport_test.c src/sysreport/gpureport.c src/sysreport/ids.c src/hw/jbuf.c src/sec/json.c
+	./$@ || { rm -f $@; exit 1; }
+# the display engine's facts (src/sysreport/drmprobe.c, kernel uapi only): IN_FORMATS blobs good, cut, lying and random
+# under ASan and UBSan; DRMPROBE_LIVE=1 build/drmprobe-test also probes this machine's cards (printed, not required)
+test: build/drmprobe-test
+build/drmprobe-test: tests/drmprobe_test.c src/sysreport/drmprobe.c src/sysreport/drmprobe.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ tests/drmprobe_test.c src/sysreport/drmprobe.c
 	./$@ || { rm -f $@; exit 1; }

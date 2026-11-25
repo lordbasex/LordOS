@@ -15,6 +15,8 @@
 
 #include <stddef.h>
 
+#include "drmprobe.h"
+
 #define GR_MAX_CARD 8
 #define GR_LIST 12
 #define GR_TEXT_MAX 6000                /* the report's text is cut here (a GitHub form takes much less) */
@@ -28,6 +30,7 @@ typedef struct {
     int boot_vga;                       /* the firmware's console GPU */
     int render_node;                    /* has a renderD* node */
     int desktop;                        /* 1 draws this desktop, 0 doesn't, -1 unknown */
+    DrmFacts drm;                       /* the display engine (drmprobe.h): probed 0 unless the CLI ran drmprobe_card */
 } GrCard;
 
 typedef struct {
@@ -76,7 +79,7 @@ const char *gpureport_kind(const GrCard *c);
 /* The report as plain text (English: GitHub issues are), malloc'd, NULL on out of memory. Not yet redacted. */
 char *gpureport_text(const GpuReport *r);
 /* The same facts as JSON for Settings: { cards: [{ card, slot, vendorId, deviceId, vendor, device, driver, kind,
- * bootVga, renderNode, desktop }], nvidia: { loaded, version, open, modeset, fbdev, nouveau, cuda, smi, uvm },
+ * bootVga, renderNode, desktop, drm: {...} | null (drmprobe_json) }], nvidia: { loaded, version, open, modeset, fbdev, nouveau, cuda, smi, uvm },
  * secureBoot, lockdown, mesa, vulkan: [], va: [], vdpau: [], opencl, kernel, arch, session: {...} | null }. */
 char *gpureport_json(const GpuReport *r);
 

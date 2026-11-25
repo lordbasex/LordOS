@@ -176,6 +176,13 @@ Signed-By: /usr/share/keyrings/lordos-archive-keyring.gpg
   migration: `lord.sysinfo.community()` reads the files again whenever System Information's Compatibility panel
   asks, and verifies the snapshot's Ed25519 signature before using it. Updating `lordos` from 0.8.5 or 0.8.6
   brings `lordos-hwdata` in as a new dependency (the plan shows it). See "The tested-hardware snapshot" below.
+- **New recommendations come with the update.** Updating `lordos` also installs the Recommends the new version adds
+  (never one the installed version already recommended: a recommended package the user removed stays removed), and
+  one the system's sources don't carry is left out without stopping the update (`server/src/pkg/resolve.c`
+  `enqueue_new_recommends`, `pkg-test`). That is how firmware reaches systems installed from an older ISO: since
+  0.8.9.6.1 the package recommends `firmware-mediatek` (MediaTek MT7921/MT7922 Wi-Fi, #227; ~46 MB installed, Debian's
+  `non-free-firmware`, which the ISO and Raspberry Pi images write into `/etc/apt/sources.list`). A Debian system
+  whose sources leave out `non-free-firmware` updates without it.
 - **Local repositories.** The engine also reads `file:/path` sources (a copy of the repository on a
   disk or USB stick, for machines without internet), checked the same way.
 

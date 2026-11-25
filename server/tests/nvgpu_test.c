@@ -6,7 +6,11 @@
  *      always parses;
  *   3. the helper end to end through nvgpu_poll/nvgpu_json with the fake NVML: good, hostile, failing, init failing
  *      and hanging (killed, restarted with backoff, the caller never blocked), and stopped by nvgpu_want(0);
- *   4. the sandbox: after it, the helper can't make a socket, exec, write a file, read /etc or do a tty ioctl. */
+ *   4. the sandbox: after it, the helper can't make a socket, exec, write a file, read /etc or do a tty ioctl, and
+ *      what it refused is recorded (syscall numbers, the ioctl's request) while the call still fails with EPERM;
+ *   5. the failure report (nvDiag): the helper's codes (a missing symbol, dlopen, nvmlInit and the count failing, no
+ *      driver), a refused syscall and ioctl counted with data still flowing, a helper killed by SIGSYS, a timeout;
+ *      the fragment's JSON holds only numbers and fixed names. */
 #include "monitor/nvgpu.h"
 #include "sec/json.h"
 
@@ -18,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -109,6 +114,57 @@ static void unit(void) {
     CHECK(n > 0 && n < 128 * 1024 && valid_json(J, NULL), "max json %d", n);
     CHECK(nvgpu_format(&S, J, 100) == 0 && !J[0], "small buffer");
     CHECK(nvgpu_pid_owned(getpid(), (unsigned)getuid()) && !nvgpu_pid_owned(1, (unsigned)getuid()) == (getuid() != 0), "pid owner");
+
+    /* the failure codes and the refusals in the header */
+    len = make(M, 0, 0);
+    h = (NvHdr *)M;
+    h->code = NVP_ST_INIT; h->detail = 18; h->status = 18;
+    CHECK(!nvgpu_parse(M, len, 0, own_all, &S) && S.ngpu == 0 && S.diag.code == NVP_ST_INIT && S.diag.has_detail && S.diag.detail == 18, "init code");
+    h->code = NVP_ST_SANDBOX;                           /* only lord-server sets that one */
+    CHECK(nvgpu_parse(M, len, 0, own_all, &S) < 0, "a code the helper may not send");
+    h->code = -1;
+    CHECK(nvgpu_parse(M, len, 0, own_all, &S) < 0, "negative code");
+    h->code = NVP_ST_DLOPEN; h->detail = 0; h->status = -1;
+    CHECK(!nvgpu_parse(M, len, 0, own_all, &S) && S.diag.code == NVP_ST_DLOPEN && !S.diag.has_detail, "dlopen, no number");
+    h->code = NVP_ST_COUNT; h->detail = 0x7fffffff;
+    CHECK(!nvgpu_parse(M, len, 0, own_all, &S) && S.diag.code == NVP_ST_COUNT && !S.diag.has_detail, "absurd number dropped");
+    h->code = 0; h->status = 0; h->detail = 0;
+    CHECK(!nvgpu_parse(M, len, 0, own_all, &S) && S.diag.code == NVP_ST_NO_DEVICE, "ok with no GPU → noDevice");
+    len = make(M, 1, 0);
+    h = (NvHdr *)M;
+    h->denied = 7;
+    int32_t nrs[NVP_DENIED_MAX] = { 41, 41, -1, 5000, 59, NVP_NONE, 16, 16 };
+    uint32_t ios[NVP_DENIED_MAX] = { 0x5401, 0, 0x5401, 0xc0104629u, 0, 0, 0, 0 };
+    memcpy(h->denied_nr, nrs, sizeof nrs);
+    memcpy(h->denied_ioctl, ios, sizeof ios);
+    CHECK(!nvgpu_parse(M, len, 0, own_all, &S) && S.diag.code == NVP_ST_OK && S.ngpu == 1, "ok with refusals");
+    CHECK(S.diag.denied == 7 && S.diag.nsys == 3 && S.diag.sys[0] == 41 && S.diag.sys[1] == 59 && S.diag.sys[2] == 16, "syscalls %d", S.diag.nsys);
+    CHECK(S.diag.nioc == 2 && S.diag.ioc[0] == 0x5401 && S.diag.ioc[1] == 0xc0104629u, "ioctls %d", S.diag.nioc);
+
+    /* the fragment: numbers and fixed names only, valid JSON, hostile names cleaned */
+    NvPci pci[2];
+    memset(pci, 0, sizeof pci);
+    strcpy(pci[0].slot, "0000:01:00.0"); strcpy(pci[0].id, "10de:2684"); strcpy(pci[0].cls, "030000"); strcpy(pci[0].driver, "nvidia");
+    strcpy(pci[0].name, "AD102 \"GeForce\" \\ RTX\n4090");
+    strcpy(pci[1].slot, "0000:02:00.0"); strcpy(pci[1].id, "10de:1b80"); strcpy(pci[1].cls, "030000");
+    n = nvgpu_diag_format(&S.diag, pci, 2, "550.54.14", J, sizeof J);
+    JDoc d;
+    CHECK(n > 0 && valid_json(J, &d), "diag json");
+    if (n > 0) json_free(&d);
+    CHECK(strstr(J, "\"state\":\"ok\"") && strstr(J, "\"denied\":7") && strstr(J, "\"syscalls\":[41,59,16]") &&
+          strstr(J, "\"ioctls\":[21505,3222292009]") && strstr(J, "\"driverVersion\":\"550.54.14\"") &&
+          strstr(J, "\"name\":\"AD102  GeForce    RTX 4090\"") && strstr(J, "\"driver\":null") && strstr(J, "\"detail\":null"), "diag: %s", J);
+    NvDiag dz = { .code = NVP_ST_KILLED, .detail = 31, .has_detail = 1 };
+    n = nvgpu_diag_format(&dz, NULL, 0, "550\n; rm", J, sizeof J);
+    CHECK(n > 0 && valid_json(J, NULL) && strstr(J, "\"state\":\"killed\",\"detail\":31") && strstr(J, "\"driverVersion\":null") &&
+          strstr(J, "\"pci\":[]"), "diag killed: %s", J);
+    dz.code = 9999;
+    CHECK(nvgpu_diag_format(&dz, NULL, 0, NULL, J, sizeof J) > 0 && strstr(J, "\"state\":\"exit\""), "unknown code → exit: %s", J);
+    for (int c = 0; c < NVP_ST_COUNT_; c++) {
+        dz.code = c;
+        CHECK(nvgpu_diag_format(&dz, pci, 2, "1.2", J, sizeof J) > 0 && valid_json(J, NULL) && !strstr(J, "\"state\":\"\""), "code %d has a name", c);
+    }
+    CHECK(nvgpu_diag_format(&dz, pci, 2, "1.2", J, 40) == 0 && !J[0], "diag: small buffer");
 }
 
 static uint64_t rng = 0x9e3779b97f4a7c15ULL;
@@ -149,13 +205,14 @@ static void fuzz(int iters) {
 
 /* ---- the helper with the fake NVML ---- */
 
-static char helper[512], lib[512];
+static char helper[512], lib[512], nosym[512];
 
-static int run_mode(const char *mode, int wait_ms, int want_json) {
-    static char env[64];
+static int run_lib(const char *mode, const char *with, int wait_ms, int want_json) {
+    static char env[64], libarg[512];
     snprintf(env, sizeof env, "NVFAKE_MODE=%s", mode);
+    snprintf(libarg, sizeof libarg, "%s", with ? with : "");
     static char *argv[5], *envp[2];
-    argv[0] = "lord-nvgpu"; argv[1] = "--lib"; argv[2] = lib; argv[3] = NULL;
+    argv[0] = "lord-nvgpu"; argv[1] = with ? "--lib" : NULL; argv[2] = libarg; argv[3] = NULL;
     envp[0] = env; envp[1] = NULL;
     nvgpu_test_helper(helper, argv, envp);
     nvgpu_want(1);
@@ -172,6 +229,86 @@ static int run_mode(const char *mode, int wait_ms, int want_json) {
     }
     CHECK(worst < 100, "%s: nvgpu_poll blocked %.0f ms", mode, worst);
     return got;
+}
+static int run_mode(const char *mode, int wait_ms, int want_json) { return run_lib(mode, lib, wait_ms, want_json); }
+
+/* runs the helper until the diagnostic says `want` (or wait_ms) and returns it; nothing to show meanwhile */
+static NvDiag run_diag(const char *mode, const char *with, int want, int wait_ms) {
+    static char env[64], libarg[512];
+    snprintf(env, sizeof env, "NVFAKE_MODE=%s", mode);
+    snprintf(libarg, sizeof libarg, "%s", with ? with : "");
+    static char *argv[5], *envp[2];
+    argv[0] = "lord-nvgpu"; argv[1] = with ? "--lib" : NULL; argv[2] = libarg; argv[3] = NULL;
+    envp[0] = env; envp[1] = NULL;
+    nvgpu_test_helper(helper, argv, envp);
+    nvgpu_want(1);
+    NvDiag d;
+    double t0 = now_ms(), worst = 0;
+    for (;;) {
+        double a = now_ms();
+        nvgpu_poll();
+        double dt = now_ms() - a;
+        if (dt > worst) worst = dt;
+        nvgpu_test_diag(&d);
+        if (d.code == want || now_ms() - t0 > wait_ms) break;
+        usleep(20000);
+    }
+    CHECK(worst < 100, "%s: nvgpu_poll blocked %.0f ms", mode, worst);
+    CHECK(d.code == want, "%s: diag %d, want %d", mode, d.code, want);
+    return d;
+}
+
+static void failures(void) {
+    if (access(helper, X_OK) || access(lib, R_OK) || access(nosym, R_OK)) { printf("failures: skipped: needs build/libnvfake-nosym.so\n"); return; }
+    nvgpu_test_timing(800, 100);
+    NvDiag d = run_diag("good", lib, NVP_ST_OK, 5000);
+    CHECK(d.denied == 0, "good: %u refusals", d.denied);
+    nvgpu_want(0);
+    d = run_diag("initfail", lib, NVP_ST_INIT, 4000);
+    CHECK(d.has_detail && d.detail == 9, "initfail: nvmlReturn %d", d.detail);
+    CHECK(nvgpu_json(J, sizeof J) == 0, "initfail: a sample");
+    nvgpu_want(0);
+    d = run_diag("fail", lib, NVP_ST_COUNT, 4000);
+    CHECK(d.has_detail && d.detail == 999, "fail: nvmlReturn %d", d.detail);
+    nvgpu_want(0);
+    d = run_diag("good", nosym, NVP_ST_SYMBOL, 4000);
+    CHECK(d.has_detail && d.detail == 1, "nosym: which %d", d.detail);
+    nvgpu_want(0);
+    run_diag("good", "/nonexistent/libnvidia-ml.so.1", NVP_ST_DLOPEN, 4000);
+    nvgpu_want(0);
+    /* no --lib: the real path, on a machine without a card bound to `nvidia` (or without NVML) */
+    {
+        static char *argv[] = { "lord-nvgpu", NULL }, *envp[] = { NULL };
+        nvgpu_test_helper(helper, argv, envp);
+        nvgpu_want(1);
+        double t0 = now_ms();
+        do { nvgpu_poll(); nvgpu_test_diag(&d); usleep(20000); } while (now_ms() - t0 < 4000 && (d.code == NVP_ST_SYMBOL || d.code == NVP_ST_DLOPEN));
+        CHECK(d.code >= NVP_ST_OK && d.code <= NVP_ST_NO_DEVICE && d.code != NVP_ST_SYMBOL, "no --lib: diag %d", d.code);
+        printf("failures: no --lib on this machine: code %d\n", d.code);
+        nvgpu_want(0);
+    }
+    /* a refused socket() and tty ioctl inside NVML's sampling: counted, EPERM to the caller, the data still flows */
+    d = run_diag("forbidden", lib, NVP_ST_OK, 5000);
+    int got = 0;
+    for (double t0 = now_ms(); now_ms() - t0 < 4000; usleep(20000)) {
+        nvgpu_poll();
+        got = nvgpu_json(J, sizeof J);
+        nvgpu_test_diag(&d);
+        if (got > 0 && d.denied >= 2) break;
+    }
+    int sk = 0, ix = 0, tc = 0;
+    for (int i = 0; i < d.nsys; i++) { sk |= d.sys[i] == SYS_socket; ix |= d.sys[i] == SYS_ioctl; }
+    for (int i = 0; i < d.nioc; i++) tc |= d.ioc[i] == 0x5401;
+    CHECK(got > 0 && d.code == NVP_ST_OK, "forbidden: no data (code %d)", d.code);
+    CHECK(d.denied >= 2 && sk && ix && tc, "forbidden: refusals %u socket %d ioctl %d tcgets %d", d.denied, sk, ix, tc);
+    nvgpu_want(0);
+    /* the same with SIGSYS blocked: the kernel kills the helper, lord-server reads it from the exit status */
+    d = run_diag("sigsys", lib, NVP_ST_KILLED, 5000);
+    CHECK(d.has_detail && d.detail == SIGSYS, "sigsys: signal %d", d.detail);
+    nvgpu_want(0);
+    run_diag("slow", lib, NVP_ST_TIMEOUT, 6000);
+    nvgpu_want(0);
+    printf("failures: init, count, symbol, dlopen, no --lib, forbidden (counted), sigsys (killed), timeout: done\n");
 }
 
 static void e2e(void) {
@@ -241,7 +378,8 @@ static void sandbox_probe(void) {
     while (k < sizeof buf - 1 && (r = read(out[0], buf + k, sizeof buf - 1 - k)) > 0) k += (size_t)r;
     int st = 0;
     waitpid(p, &st, 0);
-    CHECK(!strcmp(buf, "socket=0 write=0 read=0 ioctl=0 exec=0\n"), "sandbox probe: '%s'", buf);
+    CHECK(!strncmp(buf, "socket=0 write=0 read=0 ioctl=0 exec=0\n", 39), "sandbox probe: '%s'", buf);
+    CHECK(strstr(buf, "\ntrapped=") && strstr(buf, " socket=1 ioctl=1 exec=1 tcgets=1 eperm=1\n"), "sandbox probe, refusals: '%s'", buf);
     CHECK(access("/var/tmp/lordos-nvgpu-probe", F_OK), "sandbox probe: the file was written");
     printf("sandbox: %s", buf);
     close(out[0]);
@@ -252,11 +390,14 @@ int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
     snprintf(helper, sizeof helper, "%s", argc > 1 ? argv[1] : "build/lord-nvgpu-test");
     snprintf(lib, sizeof lib, "%s", argc > 2 ? argv[2] : "build/libnvfake.so");
+    snprintf(nosym, sizeof nosym, "%s", argc > 3 ? argv[3] : "build/libnvfake-nosym.so");
     char real[PATH_MAX];
     if (realpath(lib, real) && strlen(real) < sizeof lib) memcpy(lib, real, strlen(real) + 1);
+    if (realpath(nosym, real) && strlen(real) < sizeof nosym) memcpy(nosym, real, strlen(real) + 1);
     unit();
     fuzz(120000);
     e2e();
+    failures();
     sandbox_probe();
     if (fails) { fprintf(stderr, "nvgpu-test: %d failures\n", fails); return 1; }
     printf("nvgpu-test: ok\n");

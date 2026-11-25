@@ -441,6 +441,11 @@ char *gpureport_text(const GpuReport *r) {
             hb_printf(&b, " (Mesa %s)", r->mesa);
         hb_printf(&b, "\n  draws the desktop: %s; boot display: %s; DRM node: %s; render node: %s\n",
                   tri(c->desktop, "yes", "no"), c->boot_vga ? "yes" : "no", c->card[0] ? c->card : "none", c->render_node ? "yes" : "no");
+        if (c->drm.probed) {
+            char t[600];
+            drmprobe_text(&c->drm, "  ", t, sizeof t);
+            hb_printf(&b, "%s", t);
+        }
     }
     if (any_nv || r->nv_loaded || r->nouveau_loaded || r->nv_version[0]) {
         hb_printf(&b, "\nNVIDIA\n");
@@ -488,8 +493,10 @@ char *gpureport_json(const GpuReport *r) {
         hb_printf(&b, ",\"vendor\":"); hb_str(&b, c->vendor);
         hb_printf(&b, ",\"device\":"); hb_str(&b, c->device);
         hb_printf(&b, ",\"driver\":"); hb_str(&b, c->driver);
-        hb_printf(&b, ",\"kind\":\"%s\",\"bootVga\":%s,\"renderNode\":%s,\"desktop\":%d}", gpureport_kind(c), c->boot_vga ? "true" : "false",
-                  c->render_node ? "true" : "false", c->desktop);
+        char dj[400];
+        drmprobe_json(&c->drm, dj, sizeof dj);
+        hb_printf(&b, ",\"kind\":\"%s\",\"bootVga\":%s,\"renderNode\":%s,\"desktop\":%d,\"drm\":%s}", gpureport_kind(c), c->boot_vga ? "true" : "false",
+                  c->render_node ? "true" : "false", c->desktop, dj);
     }
     hb_printf(&b, "],\"nvidia\":{\"loaded\":%s,\"version\":", r->nv_loaded ? "true" : "false");
     hb_str(&b, r->nv_version);

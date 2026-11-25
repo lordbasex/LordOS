@@ -1,0 +1,28 @@
+Gtk-Message: 10:12:01.123: Failed to load module "canberra-gtk-module" from /home/secretuser/.local/lib/gtk/canberra.so
+[1234567.890] {Default Queue}  -> wl_display#1.get_registry(new id wl_registry#2)
+[1234567.901] {Display Queue} wl_registry#2.global(1, "wl_compositor", 6)
+[1234567.902] {Display Queue} wl_registry#2.global(2, "xdg_wm_base", 7)
+[1234567.903] {Default Queue}  -> wl_registry#2.bind(2, "xdg_wm_base", 5, new id [unknown]@3)
+[1234567.910] {Default Queue}  -> xdg_toplevel#25.set_title("Budget 2026 - secret-plans.ods - LibreOffice Calc")
+[1234567.911] {Default Queue}  -> xdg_toplevel#25.set_app_id("org.secretcorp.PrivateApp")
+[1234567.912] {Default Queue}  -> xdg_toplevel#25.set_title("He said "hello", see /home/secretuser/Private/letter.txt")
+[1234567.913] {Default Queue} wl_data_offer#40.offer("text/plain;charset=utf-8")
+[1234567.914] {Default Queue} wl_data_offer#40.offer("text/uri-list")
+[1234567.915] {Default Queue}  -> wl_data_offer#40.receive("text/plain;charset=utf-8", fd 31)
+[1234567.916] {Default Queue} wl_data_offer#41.offer("/home/secretuser/Documents/taxes.pdf")
+[1234567.917] {Default Queue}  -> zwp_text_input_v3#30.set_surrounding_text("my password is hunter2", 22, 22)
+[1234567.918] {Default Queue} zwp_text_input_v3#30.commit_string("Dear Alice")
+[1234567.919] {Default Queue}  -> xdg_toplevel_tag_v1#33.set_toplevel_description(xdg_toplevel#25, "Secret window")
+[1234567.920] {Default Queue} wl_display#1.error(xdg_surface#24, 3, "xdg_surface has never been configured: secret-plans.ods")
+[1234567.921] {Default Queue} wl_output#7.description("Dell U2720Q SN-ABC123")
+[1234567.922] {Default Queue} wl_registry#2.global(9, "x"; rm -rf ~; "y", 1)
+[1234567.923] {Default Queue}  -> xdg_activation_token_v1#50.set_app_id("org.secretcorp.PrivateApp")
+[1234567.924] {Default Queue}  -> wl_surface#20.commit()
+[1234567.925] {Default Queue}  -> wl_data_source#60.offer("text/plain
+my secret line two
+[1234567.926] {Default Queue}  -> wl_data_source#60.offer("text/plain")
+(secret-app:1234): Gtk-WARNING **: cannot open /home/secretuser/secret.txt
+[1234567.930] {Default Queue} wl_keyboard#14.key(812, 9917771, 35, 1)
+[1234567.931] {Default Queue} wl_keyboard#14.modifiers(813, 1, 0, 0, 0)
+[1234567.932] {Default Queue}  -> zwp_virtual_keyboard_v1#70.key(9917772, 36, 1)
+[1234567.933] {Default Queue} zwp_input_method_keyboard_grab_v2#71.key(814, 9917773, 37, 0)

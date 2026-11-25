@@ -18,6 +18,15 @@
  *     read-only paths above. Before init no input reaches this program at all (no arguments, no environment).
  *  4. Then, for each byte NVP_REQ_SAMPLE on fd 3, one message of fixed-size records (nvproto.h), numbers only.
  *
+ * When it can't read the cards it still answers, with NvHdr.code saying why (NVP_ST_*: no device bound to `nvidia`,
+ * no library, dlopen, a missing symbol, nvmlInit or the count failing, no device) and a number (the nvmlReturn_t),
+ * never NVML's or the driver's text. What the sandbox refuses is counted too: the filter is built with trap_denied,
+ * so a refused syscall or ioctl type raises SIGSYS instead of failing with EPERM, and on_sigsys() (no syscall, no
+ * lock, only atomics on static arrays) records its number (and an ioctl's request), puts -EPERM in the return
+ * register and returns: NVML sees the same EPERM as before, and the numbers go out in every header. If the kernel
+ * kills the helper with SIGSYS instead (SIGSYS blocked in a thread, a wrong architecture), lord-server sees it in
+ * the exit status and reports "killed by the sandbox".
+ *
  * Test build only (-DNVGPU_TEST, build/lord-nvgpu-test, never installed): `--lib <path>` loads a fake NVML without
  * the ownership checks and without the NVIDIA device check, and `--probe` prints what the sandbox still allows. */
 #include "monitor/nvproto.h"
@@ -38,6 +47,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <ucontext.h>
 #include <unistd.h>
 
 #define NV_PROCS_PER_DEV 64
@@ -133,15 +143,60 @@ static int nvidia_present(void) {
     return found;
 }
 
+/* ---- what the sandbox refused (async-signal-safe: atomics on static arrays only) ---- */
+
+static uint32_t den_total;
+static uint32_t den_nr[NVP_DENIED_MAX];         /* syscall number + 1; 0 = free */
+static uint32_t den_ioc[NVP_DENIED_MAX];        /* ioctl request; 0 = free */
+
+static void den_add(uint32_t *slots, uint32_t v) {
+    for (int i = 0; i < NVP_DENIED_MAX; i++) {
+        uint32_t cur = __atomic_load_n(&slots[i], __ATOMIC_RELAXED);
+        if (cur == v) return;
+        if (cur == 0) {
+            uint32_t zero = 0;
+            if (__atomic_compare_exchange_n(&slots[i], &zero, v, 0, __ATOMIC_RELAXED, __ATOMIC_RELAXED) || zero == v) return;
+        }
+    }
+}
+
+static void on_sigsys(int sig, siginfo_t *si, void *ctx) {
+    (void)sig;
+    if (!si || si->si_code != 1 /* SYS_SECCOMP */ || !ctx) return;
+    ucontext_t *uc = ctx;
+    int nr = si->si_syscall;
+    __atomic_add_fetch(&den_total, 1, __ATOMIC_RELAXED);
+    if (nr >= 0 && nr < 4096) den_add(den_nr, (uint32_t)nr + 1);
+#if defined(__x86_64__)
+    if (nr == SYS_ioctl) den_add(den_ioc, (uint32_t)uc->uc_mcontext.gregs[REG_RSI]);
+    uc->uc_mcontext.gregs[REG_RAX] = -EPERM;
+#elif defined(__aarch64__)
+    if (nr == SYS_ioctl) den_add(den_ioc, (uint32_t)uc->uc_mcontext.regs[1]);
+    uc->uc_mcontext.regs[0] = (unsigned long long)(long long)-EPERM;
+#else
+#  error "lord-nvgpu: on_sigsys needs the return register of this architecture"
+#endif
+}
+
+static void put_denied(NvHdr *h) {
+    h->denied = __atomic_load_n(&den_total, __ATOMIC_RELAXED);
+    for (int i = 0; i < NVP_DENIED_MAX; i++) {
+        uint32_t v = __atomic_load_n(&den_nr[i], __ATOMIC_RELAXED);
+        h->denied_nr[i] = v ? (int32_t)(v - 1) : NVP_NONE;
+        h->denied_ioctl[i] = __atomic_load_n(&den_ioc[i], __ATOMIC_RELAXED);
+    }
+}
+
 static void *sym(void *h, const char *a, const char *b) {
     void *f = dlsym(h, a);
     if (!f && b) f = dlsym(h, b);
     return f;
 }
 
-static int load(const char *path) {
+/* NVP_ST_OK, NVP_ST_DLOPEN or NVP_ST_SYMBOL (*which: 1 init, 2 count, 3 handle) */
+static int load(const char *path, int *which) {
     void *h = dlopen(path, RTLD_NOW | RTLD_LOCAL);
-    if (!h) return -1;
+    if (!h) return NVP_ST_DLOPEN;
     F.init = sym(h, "nvmlInit_v2", "nvmlInit");
     F.count = sym(h, "nvmlDeviceGetCount_v2", "nvmlDeviceGetCount");
     F.handle = sym(h, "nvmlDeviceGetHandleByIndex_v2", "nvmlDeviceGetHandleByIndex");
@@ -162,7 +217,8 @@ static int load(const char *path) {
     F.putil = sym(h, "nvmlDeviceGetProcessUtilization", NULL);
     F.cuda = sym(h, "nvmlSystemGetCudaDriverVersion_v2", "nvmlSystemGetCudaDriverVersion");
     F.driver = sym(h, "nvmlSystemGetDriverVersion", NULL);
-    return F.init && F.count && F.handle ? 0 : -1;
+    *which = !F.init ? 1 : !F.count ? 2 : !F.handle ? 3 : 0;
+    return *which ? NVP_ST_SYMBOL : NVP_ST_OK;
 }
 
 static int32_t pct(nvmlReturn_t r, unsigned v) { return r == NVML_SUCCESS && v <= 100 ? (int32_t)v : NVP_NONE; }
@@ -279,6 +335,7 @@ static size_t build(void) {
     for (unsigned i = 0; i < ndev && np < NVP_MAX_PROCS; i++) np += procs_sample(i, ps + np, NVP_MAX_PROCS - np);
     h->ngpu = (uint16_t)ndev;
     h->nproc = (uint16_t)np;
+    put_denied(h);                                      /* after sampling: this sample's refusals too */
     return sizeof *h + ndev * sizeof(NvGpu) + np * sizeof(NvProc);
 }
 
@@ -331,24 +388,41 @@ int main(int argc, char **argv) {
     (void)argv;
     if (argc != 1) return 2;
 #endif
+    int code = NVP_ST_OK, detail = 0;
     if (!lib) {
-        if (!nvidia_present() || find_nvml(real, sizeof real)) return 3;
-        lib = real;
+        if (!nvidia_present()) code = NVP_ST_NO_DRIVER;
+        else if (find_nvml(real, sizeof real)) code = NVP_ST_LIB_MISSING;
+        else lib = real;
     }
-    if (load(lib)) return 4;
-    NvHdr err = { .magic = NVP_MAGIC, .cuda = NVP_NONE };
-    nvmlReturn_t r = F.init();
+    if (code == NVP_ST_OK) code = load(lib, &detail);
     unsigned cnt = 0;
-    if (r == NVML_SUCCESS) r = F.count(&cnt);
+    if (code == NVP_ST_OK) {
+        nvmlReturn_t r = F.init();
+        if (r != NVML_SUCCESS) code = NVP_ST_INIT, detail = r;
+        else if ((r = F.count(&cnt)) != NVML_SUCCESS) code = NVP_ST_COUNT, detail = r;
+    }
     if (cnt > NVP_MAX_GPUS) cnt = NVP_MAX_GPUS;
-    for (unsigned i = 0; r == NVML_SUCCESS && i < cnt; i++)
+    for (unsigned i = 0; code == NVP_ST_OK && i < cnt; i++)
         if (F.handle(i, &devs[ndev]) == NVML_SUCCESS) ndev++;
-    if (r == NVML_SUCCESS) build();                     /* warm-up: NVML opens what it needs now */
+    if (code == NVP_ST_OK && !ndev) code = NVP_ST_NO_DEVICE;
+    if (code == NVP_ST_OK) build();                     /* warm-up: NVML opens what it needs now */
+    /* the refusals' recorder, before the filter that raises it (trap_denied below) */
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_sigaction = on_sigsys;
+    sa.sa_flags = SA_SIGINFO;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGSYS, &sa, NULL);
+    sigset_t sys;
+    sigemptyset(&sys);
+    sigaddset(&sys, SIGSYS);
+    sigprocmask(SIG_UNBLOCK, &sys, NULL);
     dev_files();
     static const char *const ro[] = { "/proc/driver/nvidia", "/sys/bus/pci/devices", "/sys/devices", "/usr/lib/x86_64-linux-gnu",
                                       "/usr/lib/aarch64-linux-gnu", "/usr/lib64", NULL };
     SandboxHelperCfg sc = { .name = "lordos-nvgpu", .ro_paths = ro, .extra_syscalls = NULL,
-                            .allow_ioctl_classes = SANDBOX_IOCTL_NVIDIA, .mem_max_mb = 256, .dev_files = devlist };
+                            .allow_ioctl_classes = SANDBOX_IOCTL_NVIDIA, .mem_max_mb = 256, .dev_files = devlist,
+                            .trap_denied = 1 };
     sandbox_apply_helper(&sc);
 #ifdef NVGPU_TEST
     if (probe) {
@@ -358,7 +432,20 @@ int main(int argc, char **argv) {
         int io = ioctl(0, 0x5401 /* TCGETS */, NULL);
         char *const av[] = { "/bin/true", NULL };
         int ex = execve("/bin/true", av, av + 1);
+        int se = errno;
         printf("socket=%d write=%d read=%d ioctl=%d exec=%d\n", s >= 0, w >= 0, rd >= 0, io == 0, ex == 0);
+        /* the refusals the SIGSYS handler recorded: socket, ioctl and execve, each still failing with EPERM */
+        NvHdr h;
+        memset(&h, 0, sizeof h);
+        put_denied(&h);
+        int sk = 0, ix = 0, ec = 0, tc = 0;
+        for (int i = 0; i < NVP_DENIED_MAX; i++) {
+            if (h.denied_nr[i] == SYS_socket) sk = 1;
+            if (h.denied_nr[i] == SYS_ioctl) ix = 1;
+            if (h.denied_nr[i] == SYS_execve) ec = 1;
+            if (h.denied_ioctl[i] == 0x5401) tc = 1;
+        }
+        printf("trapped=%u socket=%d ioctl=%d exec=%d tcgets=%d eperm=%d\n", h.denied, sk, ix, ec, tc, se == EPERM);
         fflush(stdout);
         return 0;
     }
@@ -371,8 +458,12 @@ int main(int argc, char **argv) {
         if (got <= 0) return 0;
         if (req != NVP_REQ_SAMPLE) return 2;
         size_t len;
-        if (r != NVML_SUCCESS) { err.status = r ? r : -1; memcpy(msg, &err, sizeof err); len = sizeof err; }
-        else len = build();
+        if (code != NVP_ST_OK) {
+            NvHdr err = { .magic = NVP_MAGIC, .cuda = NVP_NONE, .code = code, .detail = detail, .status = detail ? detail : -1 };
+            put_denied(&err);
+            memcpy(msg, &err, sizeof err);
+            len = sizeof err;
+        } else len = build();
         if (send(3, msg, len, MSG_NOSIGNAL) < 0) return 0;
     }
 }

@@ -6,7 +6,7 @@ It is not a native client of any service. **LordOS doesn't change the sites or t
 
 [[shot:6]]
 
-It is new in **LordOS 0.8.8.8**, released on 12 November 2026; the latest release is 0.8.9.6. It lives in an optional package, `lordos-web`: without it the rest of LordOS works the same, and the Store installs it for you with your first web app.
+It is new in **LordOS 0.8.8.8**, released on 12 November 2026; the latest release is 0.8.9.6.1. It lives in an optional package, `lordos-web`: without it the rest of LordOS works the same, and the Store installs it for you with your first web app.
 
 [[figure:web-runtime]]
 

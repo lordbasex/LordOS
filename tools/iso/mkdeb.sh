@@ -610,10 +610,12 @@ MEDIADEPS=""
 if [ -x "$L/bin/lord-media" ]; then MEDIADEPS=", libavcodec61, libavformat61, libavutil59, libswscale8, libswresample5, libva2, libva-drm2"; fi
 # the remote desktop is WebRTC only (docs/REMOTE.md, "Video (WebRTC)"): lord-sessiond always links libsrtp2 and usrsctp
 RTCDEPS=", libsrtp2-1, libusrsctp2"
-# the CPU's microcode updates on amd64 (non-free-firmware, in every LordOS install's sources): a Depends, so the
-# update to 0.8.8.6 brings them to installs that never had them (they load on the next boot)
-MICROCODEDEPS=""
-[ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ] && MICROCODEDEPS=", intel-microcode, amd64-microcode"
+# the CPU's microcode updates on amd64 (non-free-firmware): a Recommends since 0.8.9.6.1 (a Depends from 0.8.8.6). The
+# ISO and Raspberry Pi images enable non-free-firmware, so APT and the Store's update install them there as before; a
+# Debian system installed with install.sh whose sources leave that component out still installs and updates lordos,
+# only without them (they load on the next boot)
+MICROCODERECS=""
+[ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ] && MICROCODERECS=", intel-microcode, amd64-microcode"
 if ! objdump -p "$L/bin/lord-sessiond" 2>/dev/null | grep -q "libsrtp2"; then echo "lord-sessiond is not linked with libsrtp2: rebuild it (make -C server)" >&2; exit 1; fi
 # the signed tested-hardware snapshot, its own package (tools/iso/mkdeb-hwdata.sh): any version of format 1,
 # the first being the snapshot of 2026-10-27 (a format 2 is a Breaks in lordos-hwdata, not a change here)
@@ -621,6 +623,13 @@ HWDATADEPS=", lordos-hwdata (>= 2026.10.27)"
 # rclone for Cloud and Connect to Server, rclone's signed release binary at /usr/lib/lordos/rclone (tools/iso/mkdeb-rclone.sh, docs/CLOUD.md 3.1);
 # Debian's rclone (1.60) is too old for Cloud, and nothing runs /usr/bin/rclone any more
 RCLONEDEPS=", lordos-rclone (>= 1.75.2)"
+# MediaTek Wi-Fi firmware (MT7921/MT7922, #227): Debian split it out of firmware-misc-nonfree, which only Recommends it,
+# so a system installed from an ISO before 0.8.9.6.1 has the driver but not the firmware and no Wi-Fi interface. A
+# Recommends (non-free-firmware, like the microcode above): the Store's update
+# brings the Recommends a new version adds, and one the sources don't have doesn't stop it (server/src/pkg/resolve.c)
+FIRMWARERECS=", firmware-mediatek"
+# Intel graphics firmware (i915/xe DMC, GuC, HuC), split out of firmware-misc-nonfree the same way: amd64 only
+[ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ] && FIRMWARERECS="$FIRMWARERECS, firmware-intel-graphics"
 SIZE=$(du -sk "$PKG/usr" | awk '{s += $1} END {print s}')
 cat > "$PKG/DEBIAN/control" <<C
 Package: lordos
@@ -628,9 +637,9 @@ Version: $VERSION
 Architecture: ${DEB_ARCH:-$(dpkg --print-architecture)}
 Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
-Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$TTSDEPS$MEDIADEPS$CASTDEPS$RTCDEPS$MICROCODEDEPS
+Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$TTSDEPS$MEDIADEPS$CASTDEPS$RTCDEPS
 Breaks: lordos-web (<< $VERSION)
-Recommends: qemu-guest-agent, pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS
+Recommends: qemu-guest-agent, pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS$MICROCODERECS$FIRMWARERECS
 Section: x11
 Priority: optional
 Protected: yes

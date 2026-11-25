@@ -157,6 +157,7 @@ int  media_spawn_studio(const char *params, const int *fds, int nfds, pid_t *pid
 int  media_has_studio(void);
 int  media_pulse_fd(void);              /* socket connected to PipeWire (the user's) or -1 */
 int  media_render_fd(void);             /* render node for VA-API or -1 */
+int  media_render_fds(int *out, int max);  /* the compositor's render node first, then the others; how many */
 const char *media_hwaccel(void);        /* "vaapi" | "v4l2request" | "none" (LORD_MEDIA_HWACCEL) */
 void media_event(int id, const char *type, const char *fmt, ...) __attribute__((format(printf, 3, 4)));
 void media_json_str(char *out, size_t n, const char *s);

@@ -431,15 +431,29 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
     const st = new Map();
     const looks = new Map();
     const trash = [];
-    let jobs = [];
+    let jobs = [], notEmpty = opts.notEmpty || 0;
+    const moves = [];
+    for (const [k, v] of opts.files || []) files.set(k, v);
     const acc = { id: 'a1', name: 'W', mount: '/h/Cloud/W', group: opts.group || 'server', linksSupported: !!opts.links, about: null, up: { files: 0 }, kind: 'webdav' };
     const fsx = {
       home: () => '/h', list: (p) => [...files.keys()].filter((k) => k.startsWith(`${p}/`) && !k.slice(p.length + 1).includes('/')).map((k) => ({ name: k.split('/').pop(), dir: files.get(k) === 'dir' })),
       mkdir: (p) => files.set(p, 'dir'), write: (p, d) => { files.set(p, new Uint8Array(d)); st.set(p, 'up'); acc.up = { files: 1 }; },
       read: (p) => { const d = files.get(p); return (opts.corrupt ? d.map((x, i) => (i ? x : x ^ 1)) : d).buffer; },
       stat: (p) => { const d = files.get(p); if (!d) throw Object.assign(new Error(`ENOENT ${p}`), { code: 'fs.notFound' }); return d === 'dir' ? { dir: true, size: 0 } : { dir: false, size: d.length }; },
-      move: (a, b) => { for (const k of [...files.keys()]) if (k === a || k.startsWith(`${a}/`)) { files.set(b + k.slice(a.length), files.get(k)); files.delete(k); } acc.up = { files: 0 }; jobs.push({ id: 9, done: true }); return 9; },
-      jobs: () => jobs, forgetJob: () => { jobs = []; }, trash: (p) => { trash.push({ id: 't1', original: p }); for (const k of [...files.keys()]) if (k.startsWith(p)) files.delete(k); }, trashList: () => trash,
+      // #243: opts.notEmpty removals of a folder read "not empty" (the provider still lists the file it just deleted):
+      // the job copies everything and removes the files, but the folder stays and the job fails as fsops.c says
+      move: (a, b) => {
+        moves.push(a);
+        for (const k of [...files.keys()]) if (k === a || k.startsWith(`${a}/`)) { files.set(b + k.slice(a.length), files.get(k)); files.delete(k); }
+        acc.up = { files: 0 };
+        if (files.get(b) === 'dir' && notEmpty-- > 0) { files.set(a, 'dir'); jobs.push({ id: 9, done: true, failed: true, error: 'fs.moveRemoveFailed errno=ENOTEMPTY' }); return 9; }
+        jobs.push({ id: 9, done: true }); return 9;
+      },
+      jobs: () => jobs, forgetJob: () => { jobs = []; },
+      trash: (p) => {
+        if (!files.has(p)) throw Object.assign(new Error(''), { code: 'fs.notFound' });
+        trash.push({ id: `t${trash.length + 1}`, original: p }); for (const k of [...files.keys()]) if (k === p || k.startsWith(`${p}/`)) files.delete(k);
+      }, trashList: () => trash,
       removeFromTrash: (id) => { trash.splice(trash.findIndex((x) => x.id === id), 1); },
     };
     const cl = {
@@ -454,7 +468,7 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
       free: (ps) => { if (opts.kept) { frees++; return { freed: 0, skipped: [{ path: ps[0], reason: 'kept' }] }; } st.set(ps[0], 'cloud'); return { freed: CHECK_SIZE, skipped: [] }; },
       link: async () => ({ url: 'https://x.test/s/1' }), unlink: async () => ({ ok: true }),
     };
-    return { acc, files, trash, frees: () => frees, clock: () => clock, env: { fs: fsx, cloud: cl, sleep: async (ms) => { clock += ms; }, now: () => clock } };
+    return { acc, files, trash, moves, frees: () => frees, clock: () => clock, env: { fs: fsx, cloud: cl, sleep: async (ms) => { clock += ms; }, now: () => clock } };
   };
   const res = (s) => s.map((x) => `${x.id}:${x.result}${x.note ? `(${x.note})` : ''}`).join(' ');
   let w = world({ links: true });
@@ -495,6 +509,42 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   out = await runCheck(w.acc, w.env);
   eq('calls that answer later: every step passes, nothing left', [res(out), [...w.files.keys()].filter((k) => k.includes('lordos-check'))],
     [CHECK_STEPS.map((id) => `${id}:pass`).join(' '), []]);
+  // #243: pCloud lists the folder as not empty for a moment after its file went; the removal is tried again
+  const ours = (w) => [...w.files.keys()].filter((k) => k.includes('lordos-check'));
+  for (const times of [1, 2]) {
+    w = world({ links: true, notEmpty: times });
+    const t1 = w.clock();
+    out = await runCheck(w.acc, w.env);
+    eq(`#243 not empty ${times}x, then removed: every step passes, nothing left in the cloud, the home or the Trash`, [res(out), ours(w), w.trash.length, w.clock() - t1 < 30e3],
+      [CHECK_STEPS.map((id) => `${id}:pass`).join(' '), [], 0, true]);
+  }
+  w = world({ notEmpty: 99 });
+  const t2 = w.clock();
+  out = await runCheck(w.acc, w.env);
+  const del = out.find((x) => x.id === 'delete');
+  eq('#243 a folder that stays not empty: delete fails after about 10 s, the home copies go', [del.result, del.note, del.ms >= 10e3 && del.ms < 12e3, ours(w).filter((k) => k.startsWith('/h/.cache')), w.trash.length, w.clock() - t2 < 15e3],
+    ['fail', 'cloud.checkDeleteFailed', true, [], 0, true]);
+  // a folder still listing a file is waited on, never copied again
+  w = world({ notEmpty: 1 });
+  const realMove = w.env.fs.move;
+  w.env.fs.move = (a, b) => { const r = realMove(a, b); if (w.moves.length === 1) w.files.set(`${a}/check.bin`, new Uint8Array(4)); return r; };
+  out = await runCheck(w.acc, w.env);
+  eq('#243 a folder that still lists a file: never moved again', [out.find((x) => x.id === 'delete').result, w.moves.length, ours(w).filter((k) => k.startsWith('/h/Cloud'))],
+    ['fail', 1, ['/h/Cloud/W/.lordos-check-' + w.moves[0].split('-').pop(), `${w.moves[0]}/check.bin`]]);
+  // #243: what an earlier failed check left goes on the next one; only our exact names holding nothing or check.bin
+  const M1 = '/h/Cloud/W/.lordos-check-0123456789', M2 = '/h/Cloud/W/.lordos-check-abcdef0123', M3 = '/h/Cloud/W/.lordos-check-fedcba9876';
+  const keep = ['/h/Cloud/W/.lordos-check-x', '/h/Cloud/W/.lordos-check-ABCDEF0123', '/h/Cloud/W/lordos-check-0123456789', `${M3}/notes.txt`, `${M3}`, '/h/Cloud/W/docs/.lordos-check-1111111111'];
+  w = world({ links: true, files: [[M1, 'dir'], [`${M1}/check.bin`, new Uint8Array(CHECK_SIZE)], [M2, 'dir'], [M3, 'dir'], [`${M3}/notes.txt`, new Uint8Array(3)],
+    ['/h/Cloud/W/.lordos-check-x', 'dir'], ['/h/Cloud/W/.lordos-check-ABCDEF0123', 'dir'], ['/h/Cloud/W/lordos-check-0123456789', 'dir'], ['/h/Cloud/W/docs/.lordos-check-1111111111', 'dir']] });
+  out = await runCheck(w.acc, w.env);
+  eq('#243 leftovers: ours go, anything else stays, the check passes, the home and the Trash are clean', [res(out), ours(w).sort(), w.trash.length],
+    [CHECK_STEPS.map((id) => `${id}:pass`).join(' '), keep.sort(), 0]);
+  w = world({ files: [[M1, 'dir'], [`${M1}/check.bin`, new Uint8Array(CHECK_SIZE + 1)], [M2, 'dir'], [`${M2}/check.bin`, 'dir']] });
+  out = await runCheck(w.acc, w.env);
+  eq('#243 leftovers: a larger check.bin, or a folder named check.bin, stays', [out.every((x) => x.result !== 'fail'), ours(w).sort()], [true, [M1, `${M1}/check.bin`, M2, `${M2}/check.bin`].sort()]);
+  w = world({ group: 'object', files: [['/h/Cloud/W/lordos-check-0123456789', 'dir'], ['/h/Cloud/W/docs/.lordos-check-0123456789', 'dir'], ['/h/Cloud/W/docs/.lordos-check-0123456789/check.bin', new Uint8Array(8)]] });
+  out = await runCheck(w.acc, w.env);
+  eq('#243 leftovers in object storage: the old bucket and the folder in the first bucket go', [out.every((x) => x.result !== 'fail'), ours(w)], [true, []]);
   const cloudSrc = fs.readFileSync(path.join(root, 'apps/settings/Cloud.jsx'), 'utf8');
   const checkFsSrc = cloudSrc.slice(cloudSrc.indexOf('const checkFs = {'), cloudSrc.indexOf('const checkRev'));
   eq('Settings: the check touches the account only off the main thread', [/fs\.listAsync/.test(checkFsSrc), /fs\.statAsync/.test(checkFsSrc), /fs\.mkdirAsync/.test(checkFsSrc),

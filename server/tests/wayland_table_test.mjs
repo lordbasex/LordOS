@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { load, validate, validateWeb, markdown, withSection, webData, loadConf, confMarkdown, withConfSection, DEPTHS, PROOFS, confDetail, validateDetail, WEBCONF } from '../../tools/gen-wayland-table.mjs';
+import { load, validate, validateWeb, markdown, withSection, webData, loadConf, confMarkdown, withConfSection, DEPTHS, PROOFS, confDetail, validateDetail, WEBCONF, expectedHeader, TBHDR, OFFERED } from '../../tools/gen-wayland-table.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 let fails = 0;
@@ -87,6 +87,20 @@ if (web !== JSON.stringify(webData(d, C), null, 1) + '\n') bad('web/content/wayl
 // every check, for lordos.org/wayland-conformance/
 const confWeb = fs.existsSync(WEBCONF) ? fs.readFileSync(WEBCONF, 'utf8') : '';
 if (confWeb !== (C ? JSON.stringify(confDetail(C)) + '\n' : '')) bad('web/content/wayland/conformance.json is stale: run node tools/gen-wayland-table.mjs');
+// lordos-testbench's expected globals (its --globals report) come from the same table
+const hdr = fs.existsSync(TBHDR) ? fs.readFileSync(TBHDR, 'utf8') : '';
+if (hdr !== expectedHeader(d)) bad('server/src/testbench/expected_globals.h is stale: run node tools/gen-wayland-table.mjs');
+{
+  const n = +(hdr.match(/#define TB_EXPECTED_N (\d+)/) || [, -1])[1];
+  if (n !== table.size) bad(`server/src/testbench/expected_globals.h expects ${n} globals, the table offers ${table.size}`);
+}
+// a global offered only to some clients says so (lordos.offered), so the testbench doesn't call it missing
+for (const [g, want] of [['xwayland_shell_v1', 'xwayland'], ['wp_drm_lease_device_v1', 'headset'], ['wp_linux_drm_syncobj_manager_v1', 'render-node']]) {
+  const p = d.protocols.find((x) => x.lordos.globals && x.lordos.globals[g]);
+  if (p && p.lordos.offered !== want) bad(`${p.id}: lordos.offered should be "${want}" (lord-server offers ${g} only then)`);
+}
+if (!validate({ ...d, protocols: [{ ...d.protocols.find((p) => p.id === 'xdg-shell'), lordos: { ...d.protocols.find((p) => p.id === 'xdg-shell').lordos, offered: '"><x' } }] }).length) bad('validate() accepted a hostile lordos.offered');
+if (OFFERED.some((o) => !/^[a-z-]+$/.test(o))) bad('OFFERED values must be plain words (they go into a C header)');
 
 // the conformance run (docs/wayland-conformance.json) against the table, docs/WAYLAND.md's own words and the screenshots
 if (!C) bad('docs/wayland-conformance.json is missing: record a run (make -C server wl-conformance WLCONF_ARGS=--record)');

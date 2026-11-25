@@ -6,7 +6,8 @@
 // show the rows that fit. Smaller, the page scrolls like every other tab. The data is gpumodel.js's view, sampled by
 // Gpu.jsx's useGpu (once per second, only while this tab or the Overview is on screen and the window isn't minimized).
 import {
-  View, Text, Image, Segmented, useTheme, useLocale, useStore, formatBytes, formatNumber, wm, useFan, VOICE_LANGS,
+  View, Text, Image, Segmented, Button, useTheme, useLocale, useStore, formatBytes, formatNumber, wm, useFan, VOICE_LANGS,
+  clipboard, toast, systemInfo, lordosVersion,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCardStyle, AppGlyph } from './index.jsx';
@@ -14,6 +15,7 @@ import { Chart } from './Chart.jsx';
 import { canvas, drawArea } from './draw.js';
 import { useGpu, gpuHistory, gpuLabel, appLabel, FanControl, ApisCard } from './Gpu.jsx';
 import { ENGINE_CATS, GPU_HISTORY, mesaVersion, rowsThatFit } from './gpumodel.js';
+import { nvFailure, nvReportText } from './nvreport.js';
 
 // the mockup's colors, per theme
 const PALETTE = {
@@ -431,6 +433,33 @@ function AiPanel({ rows, max, style, boxRef, fit }) {
   );
 }
 
+// ---- NVIDIA: why there is no data, and a report to send us (nvreport.js; docs/MONITOR.md, "NVIDIA") ----
+
+function nvReport(diag) {
+  let info = {}, home = '';
+  try { info = systemInfo() || {}; } catch (e) { info = {}; }
+  try { home = lord.fs.home() || ''; } catch (e) { home = ''; }
+  const user = home.split('/').filter(Boolean).pop() || '';
+  return nvReportText({ diag, version: lordosVersion(info).version, kernel: info.kernel, arch: info.arch }, { home, user, host: info.hostname });
+}
+
+function NvFailCard({ fail, diag }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const copy = () => { clipboard.set(nvReport(diag)); toast.set(tr('monitor.gpu.nv.copied')); };
+  return (
+    <GCard title={fail.partial ? null : tr('monitor.gpu.nv.title')} glyph={VENDOR.nvidia}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <View style={{ flex: 1, minWidth: 240, gap: 3 }}>
+          <Text style={{ fontSize: 12.5, color: t.text, textAlign: 'start' }}>{tr(fail.key, fail.params)}</Text>
+          <Text style={{ fontSize: 11, color: t.textDim, textAlign: 'start' }}>{tr('monitor.gpu.nv.hint')}</Text>
+        </View>
+        <Button small label={tr('monitor.gpu.nv.copy')} onClick={copy} />
+      </View>
+    </GCard>
+  );
+}
+
 // ---- the tab ----
 
 let lastCard = 0;
@@ -453,7 +482,16 @@ export function GpuTab({ fit = false }) {
   const setMode = (m) => { lastMode = m; setModeState(m); };
   if (!view) return <Text style={{ fontSize: 12, color: t.textDim }}>{tr('monitor.waiting')}</Text>;
   const cards = view.cards.filter((c) => c.kind !== 'display');
-  if (!cards.length) return <GCard title={tr('monitor.gpu.title')}><Text style={{ fontSize: 13, color: t.textDim }}>{tr('monitor.gpu.none')}</Text></GCard>;
+  const nvFail = nvFailure(view.nvDiag, view.hasNv);
+  const nvCard = nvFail ? <NvFailCard fail={nvFail} diag={view.nvDiag} /> : null;
+  if (!cards.length) {
+    return (
+      <View style={{ gap: 10 }}>
+        {nvCard}
+        <GCard title={tr('monitor.gpu.title')}><Text style={{ fontSize: 13, color: t.textDim }}>{tr('monitor.gpu.none')}</Text></GCard>
+      </View>
+    );
+  }
   const i = Math.min(Number(sel) || 0, cards.length - 1);
   const c = cards[i];
   const side = mode === 'side' && cards.length > 1;
@@ -487,6 +525,7 @@ export function GpuTab({ fit = false }) {
     return (
       <View style={{ gap: 10, ...(fit ? { flex: 1, minHeight: 0 } : {}) }}>
         {chips}
+        {nvCard}
         <View style={{ flexDirection: 'row', gap: 10, ...(fit ? { flex: 1, minHeight: 0 } : {}) }}>
           {cards.slice(0, 2).map((x) => (
             <View key={x.key} style={{ flex: 1, minWidth: 0, gap: 10 }}>
@@ -505,6 +544,7 @@ export function GpuTab({ fit = false }) {
   return (
     <View style={{ gap: 10, ...(fit ? { flex: 1, minHeight: 0 } : {}) }}>
       {chips}
+      {nvCard}
       <Header c={c} view={view} onDetails={() => setDetails((d) => !d)} />
       {details && (
         <View style={{ gap: 10 }}>

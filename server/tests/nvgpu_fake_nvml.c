@@ -1,11 +1,16 @@
 /* nvgpu_fake_nvml.c — test-only fake libnvidia-ml for lord-nvgpu-test (tests/nvgpu_test.c). Never installed.
  * NVFAKE_MODE picks the behaviour: good (canned values), hostile (out-of-range numbers, huge counts, a driver string
  * with no NUL and control bytes, pids that aren't the user's), fail (every call fails), initfail, slow (a sampling
- * call that hangs). */
+ * call that hangs), forbidden (a sampling call also tries socket() and a tty ioctl, which the sandbox refuses),
+ * sigsys (the same socket() with SIGSYS blocked, so the kernel kills the helper). Built with -DNVFAKE_NOINIT it has
+ * no nvmlInit_v2 (build/libnvfake-nosym.so). */
 #include "monitor/nvmlmin.h"
 
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 static int mode(void) {
@@ -15,12 +20,16 @@ static int mode(void) {
     if (!strcmp(m, "fail")) return 2;
     if (!strcmp(m, "initfail")) return 3;
     if (!strcmp(m, "slow")) return 4;
+    if (!strcmp(m, "forbidden")) return 5;
+    if (!strcmp(m, "sigsys")) return 6;
     return 0;
 }
 #define FAIL_IF() do { if (mode() == 2) return 999; } while (0)
 static unsigned char devmem[2];
 
+#ifndef NVFAKE_NOINIT
 nvmlReturn_t nvmlInit_v2(void) { return mode() == 3 ? 9 : NVML_SUCCESS; }
+#endif
 nvmlReturn_t nvmlShutdown(void) { return NVML_SUCCESS; }
 nvmlReturn_t nvmlDeviceGetCount_v2(unsigned *c) { FAIL_IF(); *c = mode() == 1 ? 1000000000u : 2; return NVML_SUCCESS; }
 nvmlReturn_t nvmlDeviceGetHandleByIndex_v2(unsigned i, nvmlDevice_t *d) { FAIL_IF(); *d = (nvmlDevice_t)(void *)&devmem[i & 1]; return NVML_SUCCESS; }
@@ -34,6 +43,14 @@ nvmlReturn_t nvmlDeviceGetPciInfo_v3(nvmlDevice_t d, nvmlPciInfo_t *p) {
 nvmlReturn_t nvmlDeviceGetUtilizationRates(nvmlDevice_t d, nvmlUtilization_t *u) {
     FAIL_IF();
     if (mode() == 4) sleep(60);
+    if (mode() == 5 || mode() == 6) {
+        /* before the sandbox (the warm-up) these work; after it the filter refuses them */
+        if (mode() == 6) { sigset_t b; sigemptyset(&b); sigaddset(&b, SIGSYS); sigprocmask(SIG_BLOCK, &b, NULL); }
+        int s = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (s >= 0) close(s);
+        unsigned char tio[256];
+        (void)ioctl(0, 0x5401 /* TCGETS */, tio);
+    }
     if (mode() == 1) { u->gpu = 500; u->memory = 0xffffffffu; return NVML_SUCCESS; }
     u->gpu = 42 + idx(d); u->memory = 17;
     return NVML_SUCCESS;

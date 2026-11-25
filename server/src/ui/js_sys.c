@@ -1293,9 +1293,12 @@ static JSValue f_fs_copy(JSContext *c, JSValueConst this_val, int argc, JSValueC
     const char *a = JS_ToCString(c, argv[0]), *b = JS_ToCString(c, argv[1]);
     int move = argc > 2 && JS_ToBool(c, argv[2]);
     char from[PATH_MAX + 300], to[PATH_MAX + 300], err[256] = "";
-    /* the source is resolved like a destination: the link itself, not what it points to */
-    int r = !a || !b ? -1 : resolve_target(a, from, sizeof from, NULL, 0);
-    if (r == -2 && !move) r = 0;                          /* copying FROM a protected folder is allowed */
+    /* the source is resolved like a destination: the link itself, not what it points to. A copy (not a move) may also
+     * read a regular file from the read-only tree, such as the message a Linux app wrote to /tmp for a drop on Files
+     * (fsops_resolve_copy_source, GitHub #188); copying FROM a protected folder is allowed */
+    int r = !a || !b ? -1 : move ? resolve_target(a, from, sizeof from, NULL, 0) : fsops_resolve_copy_source(a, from, sizeof from, &share_down);
+    if (!move && r == -1) name_long = !share_down && fsops_name_too_long(a);
+    if (!move && (r == -2 || r == 1)) r = 0;
     if (!r) r = resolve_target(b, to, sizeof to, NULL, 0);
     if (a) JS_FreeCString(c, a);
     if (b) JS_FreeCString(c, b);

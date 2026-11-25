@@ -10,6 +10,218 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.9.6.1-beta] - 2026-11-25
+
+An update of the package through the Store and `apt`, with no new images. Monitor → GPU says why it couldn't read an
+NVIDIA card and offers **Copy report**, for NVIDIA owners to help test the sandboxed `lord-nvgpu`. New diagnostic tools:
+`lordos-testbench --globals` checks the compositor against the 48-protocol table, `lordos-issue` gains a Wayland and X11
+section and `--app` (a scrubbed Wayland log of one app), and `lordos-sysreport` reads each card's display engine. The
+remote desktop encodes with VA-API on the compositor's own card and follows the bit rate. Fixes: a Thunderbird message
+dropped on a Files folder is copied (#188), Check This Account on pCloud (#243), the MediaTek Wi-Fi firmware and Intel
+graphics firmware reach installed systems with the update (#227), the CPU microcode is a Recommends so LordOS installs
+on a Debian without `non-free-firmware`, Monitor's seal tooltip, Files' rename field and Lord Workspaces' top band in
+right-to-left languages and on narrow screens.
+
+### Added
+- **Monitor → GPU: "Couldn't read NVIDIA data" and a report to send us** (`docs/MONITOR.md`, "NVIDIA"), so NVIDIA
+  users can test the sandboxed `lord-nvgpu` in 0.8.9.6.1-beta and tell us what failed. The helper now answers even when
+  it can't read the cards, with a fixed code and one number in its header (wire `"NVG2"`), never a string from NVML or
+  the driver: no card bound to `nvidia`, `libnvidia-ml.so.1` missing or not root's, `dlopen` failing, a missing NVML
+  function (which one), `nvmlInit` or the device count failing (the `nvmlReturn_t`), no device. lord-server adds what
+  only it sees, from the helper's exit status and its own timers: seccomp couldn't be applied (exit 70), killed by the
+  sandbox (`SIGSYS`), another signal, another exit code, no answer in time, a malformed answer, the helper missing or
+  not starting. `lord.monitor.gpu()` gains `nvDiag` (only with a PCI display device of vendor `0x10de`): the state, its
+  number, the sandbox's refusals, `/sys/module/nvidia/version` and the cards from sysfs (slot, `10de:<device>`, class,
+  driver, `pci.ids` name). When the helper gave no data the GPU tab shows a card with the reason in plain words and
+  **Copy report**: plain text in English with the LordOS version, the kernel, each card's PCI id and name, the driver
+  version, the helper's code and numbers (with the NVML error's or signal's name) and the refused syscall numbers and
+  ioctl requests, and where to open an issue; every field checked against its shape and scrubbed of the home, user and
+  host names (`apps/monitor/nvreport.js`). With data but some readings refused, a shorter line and the same button.
+  Opening the GPU view again now retries the helper at once instead of waiting out its backoff. 20 new strings in all
+  35 languages.
+- **lord-nvgpu counts what its sandbox refuses.** For this helper only (`SandboxHelperCfg.trap_denied`), the filter's
+  two EPERM answers (a syscall off the lists, an ioctl of a type other than NVIDIA's `'F'`) are `SECCOMP_RET_TRAP`; the
+  helper's `SIGSYS` handler (no syscall, no lock, atomics on static arrays) records the syscall number and an ioctl's
+  request, sets the return register to `-EPERM` and returns, so NVML gets exactly the EPERM it got before. The kernel
+  never runs a refused call either way. No syscall, ioctl type, path or device was added. Every sample's header carries
+  the count and the first 8 distinct syscall numbers and ioctl requests.
+- **`lordos-testbench --globals`: the compositor's registry against LordOS's protocol table, with no window.** It
+  connects, waits for the registry, prints the advertised globals and their versions and the comparison as JSON, and
+  exits; it runs on any compositor for comparison. The expected list is no longer 12 globals named by hand in
+  `server/src/testbench/checks.c`: `tools/gen-wayland-table.mjs` now also writes `server/src/testbench/expected_globals.h`
+  from `docs/wayland-protocols.json` (the source of `docs/WAYLAND.md`'s table and lordos.org's), and
+  `server/tests/wayland_table_test.mjs` and `gen-wayland-table.mjs --check` fail when it is stale, so the three can't
+  drift. `server/src/testbench/globtable.c` marks each of the 48 globals offered, newer, older, missing, or "not here"
+  for a global lord-server offers only to some clients or machines: a new optional `lordos.offered` field in the JSON
+  (`xwayland` for `xwayland_shell_v1`, `headset` for drm-lease, `render-node` for explicit sync, `unsandboxed` for the
+  security-context manager), validated by the generator. The checklist's last rows became "seat" and "protocol table"
+  ("48 OF 48 OFFERED", or what is missing or older), and `--auto`'s JSON report has the comparison as `table`
+  (interface names from the compositor are written only as `[A-Za-z0-9_]`). Tests: `build/testbench-globals-test`
+  (every state, a display's `wl_output` twice, extras, hostile names in the JSON, under ASan and UBSan) and
+  `tests/testbench_globals_headless.sh` in `make test` against a headless `build/lord-server-test`: an ordinary client
+  with the test hooks' VR headset plugged in sees 47 of 48 at their versions, the hooks' Xwayland-like connection
+  sees `xwayland_shell_v1`, together all 48.
+- **`lordos-issue`: a "Wayland and X11" section.** `lordos-testbench --globals` summarized (globals advertised; offered,
+  newer, older, missing; the ones offered only to some clients and why; globals not in the table), the `xwayland`
+  package's version, the variables that choose an app's backend (`WAYLAND_DISPLAY` and `DISPLAY` as set or unset only;
+  `XDG_SESSION_TYPE`, `GDK_BACKEND`, `QT_QPA_PLATFORM`, `MOZ_ENABLE_WAYLAND`, `ELECTRON_OZONE_PLATFORM_HINT`,
+  `SDL_VIDEODRIVER`, `_JAVA_AWT_WM_NONREPARENTING`, with a value that isn't a plain word left out), and the programs
+  connected to the Wayland and X11 sockets, each marked Wayland or X11 (from `ss -xpn`: the user's own processes, the
+  15-character program name only, never titles or arguments; lord-server itself left out). lord-server has no
+  interface that lists its windows to a local tool, and none was added: the list is of connected programs, not
+  windows. The section is collected as the user before the password is asked and handed to the root run in a private
+  temporary file read back as the user, so a Wayland client never runs as root.
+- **`lordos-issue --app <program> [args]`** (and `--seconds N`, default 20, at most 300): runs the program as the user
+  with `WAYLAND_DEBUG=1` and saves its last 200 Wayland protocol lines to `~/lordos-wayland-<date>.txt` (0600), then
+  says where and to read it before pasting. Only libwayland's protocol lines are kept (the program's own output is
+  dropped, and counted); in them every quoted string becomes `<text>` (titles, typed text, file names, error messages,
+  a monitor's description), an app id becomes `app-id:` and a hash, and only interface names in `global`/`bind` and
+  clipboard types in `offer`/`receive`/`accept`/`send` stay. A line's span from its first quote to its last is judged
+  as one string, so a title with quotes in it can't pass. Key presses lose every argument (`wl_keyboard`'s key and
+  modifiers, an input method's keyboard grab, a virtual keyboard: `key(<key>)`), since the keycodes alone would spell
+  what was typed. Nothing raw reaches the disk. Refused as root.
+  `lordos-issue --scrub-wayland-debug` scrubs a log made by hand the same way. Tested by `tests/lordos_issue_test.sh`
+  (`make test`): a fixture log with titles, paths, typed text, an app id, a monitor's serial and quotes inside strings,
+  a fixture `ss` listing with a hostile process name, the globals summary, and `--app` with a fake program (scrubbed,
+  0600, the last 200 lines, stopped after `--seconds`).
+- **`lordos-sysreport` and `lordos-issue --gpu`: each card's display engine**, for the protocols that depend on it, read
+  without root and without libdrm through the kernel's DRM interface on the card and render nodes the user may open
+  (`server/src/sysreport/drmprobe.c`): explicit sync (`DRM_CAP_SYNCOBJ`, `DRM_CAP_SYNCOBJ_TIMELINE`), atomic
+  modesetting (`DRM_CLIENT_CAP_ATOMIC` on its own fd), the planes by type, the primary plane's scanout formats and
+  distinct modifiers (`IN_FORMATS`), framebuffer modifiers, PRIME import and export, and whether drm-lease is possible
+  (connectors marked `non-desktop`). No modeset, no connector probe (`GETCONNECTOR` is never called), and DRM master,
+  which the kernel gives the opener of a card nobody drives, is dropped at once. The graphics report has two lines per
+  card ("display engine", "explicit sync"), its JSON a `drm` object per card; `lordos-sysreport report` has a "Display
+  engine" table and a `drm` object per GPU. Only the CLI probes: Settings' report and System Information inside
+  lord-server are unchanged (`drm` is `null` there). Tests: `build/drmprobe-test` (IN_FORMATS blobs good, cut, lying
+  and 20,000 random ones under ASan and UBSan; the text and JSON; `DRMPROBE_LIVE=1` also probes this machine's cards),
+  and new cases in `build/gpureport-test` and `build/sysreport-test`.
+
+### Changed
+- **Remote desktop (5673) and the screen-sharing API: the hardware encoder is the compositor's own card, and VA-API
+  follows the bit rate** (`docs/REMOTE.md`, "One encoder per session"; `docs/drafts/REMOTE-5673-OPTIMIZATION.md`,
+  improvement 1). Four faults, all confirmed on the RX 580 PC (i9-10900 with an Intel UHD 630 next to the RX 580):
+  - *The wrong render node.* lord-server passed `lord-media` the first render node that opened. Since the 2026-11-23
+    boot that is `renderD128` = the UHD 630 (i915), which has no VA driver installed, while the RX 580 the compositor
+    renders on is `renderD129` (the session log says `render /dev/dri/renderD129`; the video probe says `"gpu":"i915"`).
+    So the remote desktop silently encoded with libx264. lord-server now opens the compositor's render node first
+    (`media_render_fds`: the GPU path's EGL device via `gpu_device`, then the other nodes by number) and passes up to
+    three as descriptors (`render=N`; still fds, never paths, and the same DRM ioctl class the job already had); the
+    encoder takes the first whose VA-API driver opens H.264 and logs which ("H.264 on render node 2 of 2"), libx264
+    only when none does. `media_render_fd` (video playback, screen recording, camera, Machines) also starts with the
+    compositor's node now.
+  - *One frame held back.* FFmpeg's `h264_vaapi` keeps `async_depth=2` frames in flight, so each packet came out only
+    when the next frame went in, and the last frame of every change waited for the 70 ms flush frame. Now
+    `async_depth=1`: each frame's packet comes out with it.
+  - *The rate never followed the bridge.* `vid_rate` changed only libx264's cap; VA-API stayed at the 4000 kbit/s it
+    opened with for the whole connection while the bridge believed it had raised it to 12000. VA-API reads its rate
+    only when it opens, so it is now opened again on the same card at the new rate, from a keyframe, when the target
+    moved by a fifth or more, at most every 3 s upwards and every second downwards (the bridge raises it by a quarter a
+    second on a clean link: about two reopenings from 4000 to 12000). Driving libva directly, without the keyframe, is
+    left for later.
+  - *No colour tags.* The VA-API stream now carries BT.709 primaries and matrix, limited range and the sRGB transfer,
+    like libx264's, so browsers show the same colours as the lossless tiles; and no SEI (identifier, timing, recovery
+    point: a few bytes a frame nobody reads).
+
+  Measured with `build/lmstream-test` at 1920×1080 (`LMSTREAM_SIZE=1920x1080`, three runs each, the RX 580 also
+  driving the live three-monitor desktop): before, as lord-server sent it (`renderD128` first) libx264 ran: 10.6 ms of
+  `lord-media` CPU a frame, a lone frame's packet in 6.3 ms, 2950 / 8640 kbit/s when 4000 / 12000 were asked. The old
+  build forced onto `renderD129` used VA-API but no lone frame came out before the next one went in (0 of 12; in a
+  session, the 70 ms flush frame), and the rate stayed put (4000 asked: 1010, 12000 asked: 2320 kbit/s), with no colour
+  tags. After: VA-API on `renderD129` with 4.4 ms of CPU a frame (−59 %; it is now FFmpeg's BGRA→NV12 conversion and the
+  upload, about 3.9 ms), every lone frame out before the next (median 14.3 ms, of which about 11.5 ms is the RX 580's
+  VCE 3.4 encoding a 1080p frame), 985 / 8860 kbit/s when 4000 / 12000 were asked (the encoder reopened once), BT.709
+  limited range in the SPS. At 640×368: 1.0 ms of CPU a frame instead of libx264's 2.1, 4460 / 11900 kbit/s. Trade-offs
+  measured, not changed: VCE 3.4 takes about 11.5 ms per 1080p frame (`ffmpeg -benchmark`: 87 fps at any
+  `async_depth`), so one frame in flight caps a 1080p stream near 65 frames a second (conversion + encode) where
+  libx264 on this i9 managed about 135, and radeonsi's VBR spends well under the cap on easy content. A full
+  click-to-pixel run through a browser was not possible here (a viewer on `remote.sock` must be root).
+- `lordos-testbench --auto`'s and the saved report's `globals` are written through the same filter as the table (an
+  interface name with a quote or a control character could break the JSON before).
+- `docs/wayland-protocols.json`: `lordos.offered` on `drm-lease-v1`, `linux-drm-syncobj-v1`, `xwayland-shell-v1` and
+  `security-context-v1`; the site's table data is unchanged.
+- **Intel graphics firmware on update (amd64).** The `lordos` package also recommends `firmware-intel-graphics` (i915/xe DMC, GuC and HuC), which Debian split out of `firmware-misc-nonfree` like the MediaTek firmware: a system installed from an ISO before 0.8.9.6 gets it with the next Store update, so the display's runtime power management works. Like any new Recommends it is optional and skipped if the sources lack it (`tools/iso/mkdeb.sh`, `iso_firmware_test.mjs`).
+
+### Fixed
+- **Monitor → Processes: an origin badge's tooltip no longer shows under a group row's hover summary.** Resting the
+  pointer on a group row's "Verified" seal or origin pill (Google LLC, Flatpak, …) started both the badge's own tooltip
+  (550 ms) and the row's summary card (700 ms), drawn one over the other: the badge sits inside the row, so the row's
+  `onMouseEnter` timer kept running. `OriginBadge` now takes `onHover`; while the pointer is on the badges the summary
+  is hidden and its timer stopped, and back on the rest of the row it comes again after its delay
+  (`apps/monitor/Processes.jsx`). Same code in every desktop; checked headless in Lord Flow, Lord Classic, Lord
+  Workspaces and Celeste. `tests/monitor_headless.sh` gained the step (shot 4: the tooltip alone; then the summary
+  back on the row).
+- **Files: the rename field no longer moves the icon grid.** The field (22 px) replaced the name's 16 px line, so the
+  renamed item's card grew 6 px and every row of icons below it moved down while the field was open (F2 or the slow
+  second click). The field now sits in a box as high as the name's lines were (one or two in the icon view, measured
+  in the view's room), centred over it and out of the layout (`apps/files/views.jsx` `Name`); the list and column views
+  keep their fixed row heights. New scene `server/tests/files_renamelayout_scene` (icons with F2, the slow click and a
+  two-line name; list; columns): no other name moves and the renamed item keeps its box; run in every desktop by
+  `make test-full`.
+- **Lord Workspaces: the top band in right-to-left languages and on narrow screens.** The activity strip and the status
+  cluster were each placed by their own `left` (physical) offset, so in Arabic both started at the band's left edge
+  and the strip covered the clock; in every language the strip's room was the band less a fixed 330 px, wrong when the
+  cluster is wider (a long date, as in German) and the compact form was a guess of 130 px per activity. The band is now
+  one row (`TopBand`, mirrored by the layout in RTL, `pointerEvents: 'box-none'` so the desktop between stays
+  clickable): the cluster keeps its measured width, the strip shrinks into the rest and goes compact from the widths
+  its names, "+ New" and the position text need in the current language (`themes/workspaces/model/topband.js`,
+  tested in `workspaces_model_test.mjs`). The accent under the activity in view is placed from the strip's start edge
+  (`insetInlineStart`, scaled from the right in RTL): in Arabic it was left under another activity after one was
+  added. New scene `server/tests/ws_topbar_scene` (Arabic 1600×900, German 1024×768, English 1280×800 in `make
+  test-full`): both surfaces on screen, never overlapping, the accent under the activity in view, with four and nine
+  activities. `tests/app_scene_headless.sh` takes `SCENE_SIZE` for the screen size.
+- **A message dragged from Thunderbird onto a Files folder is copied there** (GitHub #188). Thunderbird (and other
+  Mozilla apps) drops a message as a `.eml` it writes to `/tmp/dnd_file/` and hands over as `text/uri-list`. The drop
+  itself worked on Wayland and on X11 (Xwayland): lord-server read the list and Files claimed it, but `lord.fs.copy`
+  resolved its source as it does a destination, inside the home folder and the user's mounts only, so the copy failed
+  with "That location is outside your home folder" and nothing appeared. A copy (never a move) now also takes its source
+  from the read-only tree that `lord.fs` already reads (`fsops_readable`), but only a regular file
+  (`fsops_resolve_copy_source` in `server/src/fsops.c`): the folder is resolved and the name kept, so a link is refused
+  rather than followed, and a folder outside the writable roots is refused, so a copy can't walk into `/proc` or `/run`
+  below it; the X cookie stays out. `build/fsops-test` covers a file, a folder, a link, `/proc`, the X cookie and the
+  copy itself (181 checks). Checked on VM 127 (0.8.9.6 code, Thunderbird 153.7 ESR from Debian, Local Folders only)
+  with screenshots, on Wayland and on X11, before and after: moving a message between local folders, at 100 % and 125 %;
+  attaching a `.txt` and an `.eml` from Files to a compose window; a message out to a Files folder (failed before, copied
+  after); a message released over the desktop, which takes no drop, is cancelled at once. The pointer never froze and
+  every release ended the drag; Chromium's HTML5 drag and drop on both backends also dropped.
+- **Check This Account's delete step on pCloud, again (GitHub #243)**. pCloud keeps listing the check's folder as not
+  empty for a few seconds after its `check.bin` was deleted, longer than the 4.5 s the move's own rmdir retry of
+  0.8.9.6 waits, so the step could still end in `cloud.checkDeleteFailed` and leave `.lordos-check-…` in the account.
+  The check now tries the folder's removal again for up to 10 s (waits of 0.5, 1, 2 and 4 s) when the move fails
+  with `fs.moveRemoveFailed`, moving the folder out again only once it lists as empty, never copying a file it still
+  shows; every scratch copy in `~/.cache` goes to the Trash and out of it whatever happens. A folder an earlier check
+  left behind is removed at the start of the next one: only a folder named exactly `.lordos-check-` plus 10 hex
+  digits (in object storage also the bucket `lordos-check-…`) holding nothing or only a `check.bin` no larger than
+  the check's 1 MiB, at most 5 per check; anything else is never touched, and a leftover that stays doesn't fail the
+  check (`sdk/cloudcheck.js`, `docs/CLOUD.md` 19). `cloud_model_test.mjs` drives a fake provider that answers "not
+  empty" once and twice (the check passes and leaves nothing in the cloud, the home or the Trash), always (delete
+  fails after about 10 s and the home copies are gone), and with a file still listed (never moved again), plus
+  leftovers that go and look-alikes that stay (other names, upper-case hex, a folder in a subfolder, another file in
+  it, a `check.bin` that is larger or a folder), in object storage too.
+- **Installed systems get the MediaTek Wi-Fi firmware with the update (GitHub #227)**. The `lordos` package now
+  recommends `firmware-mediatek` (`tools/iso/mkdeb.sh` `FIRMWARERECS`), so updating from the Store installs it on
+  systems installed from an ISO that lacked it, and an MT7921/MT7922 card gets its Wi-Fi interface after the restart.
+  It is in Debian's `non-free-firmware`, which the ISO and Raspberry Pi images enable; the Store's update brings the
+  Recommends a new version adds and leaves out one the sources don't carry without stopping (`pkg-test` now names
+  `firmware-mediatek` among the missing ones). The next ISO already carries it and `firmware-intel-graphics` (0.8.9.6);
+  `iso_firmware_test.mjs` now also checks the package's Recommends (`docs/UPDATES.md`, "Store → Updates").
+- **LordOS installs on any Debian 13, even without `non-free-firmware`.** On amd64 the `lordos` package required `intel-microcode` and `amd64-microcode` (since 0.8.8.6). They come from Debian's `non-free-firmware` component, which the LordOS ISO and Raspberry Pi images enable but `install.sh` on an existing Debian doesn't check, so on such a system installing or updating `lordos` failed. They are now Recommends: APT and Store → Updates still install them wherever the component is enabled (every LordOS image), and a Debian system without it installs LordOS without them (`tools/iso/mkdeb.sh`).
+
+### Tests
+- `build/lmstream-test` (`make -C server test-full`) takes up to three render nodes, as lord-server passes them (the
+  suite now passes every `/dev/dri/renderD*`, so a PC whose first node has no VA driver still tests VA-API), and checks
+  whichever encoder runs: each lone frame's packet comes out before the next frame goes in (VA-API's `async_depth`),
+  the stream is tagged BT.709 limited range, and asking 12000 kbit/s after 4000 gives at least 1.5× the bits (VA-API
+  must reopen, from a keyframe). It prints `lord-media`'s CPU per frame; `LMSTREAM_SIZE=WxH` measures at another size.
+- `build/nvgpu-test`: every helper failure code end to end with the fake NVML (a build without `nvmlInit_v2`, a
+  library that doesn't exist, `nvmlInit` and the count failing, the real path with no card bound to `nvidia`), a
+  sampling call that tries `socket()` and a tty ioctl after the sandbox (data still flows, both counted with the
+  request `0x5401`), the same with SIGSYS blocked (reported as killed by the sandbox, signal 31), a hang (timeout); the
+  header's codes range-checked; `nvDiag`'s JSON valid with hostile names; the sandbox probe also checks that socket,
+  execve and `TCGETS` were recorded while still failing with EPERM. New `tests/nv_report_test.mjs` (in
+  `make -C server test`): the reason for each state, every reason key in every language, the report's lines, and a
+  report from hostile fields holding no home path, host or user name, or pid.
+
 ## [0.8.9.6-beta] - 2026-11-25
 
 ### Added
@@ -13079,7 +13291,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6.1-beta...HEAD
+[0.8.9.6.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6-beta...v0.8.9.6.1-beta
 [0.8.9.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.5-beta...v0.8.9.6-beta
 [0.8.9.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.4-beta...v0.8.9.5-beta
 [0.8.9.4-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.3-beta...v0.8.9.4-beta
