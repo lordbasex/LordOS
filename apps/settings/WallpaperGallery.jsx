@@ -89,7 +89,7 @@ function Tile({ e, tw, on, percent, busy, dim, onOpen }) {
               <Badge label={tr(e.k4 ? 'settings.wallpaperGallery.quality4k' : 'settings.wallpaperGallery.qualityHd')} />
             </View>
           )}
-          {loading || e.kind === 'mine' || e.kind === 'builtin' ? null : (
+          {loading || e.kind === 'mine' ? null : (
             <View style={{ position: 'absolute', bottom: 4, insetInlineStart: 4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
               backgroundColor: e.here ? tint.ok : 'rgba(0,0,0,0.62)' }}>
               <Text style={{ fontSize: 10, fontWeight: 700, color: e.here ? '#08240f' : '#fff' }}>{e.here ? '✓' : '☁'}</Text>
