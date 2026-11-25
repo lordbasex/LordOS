@@ -163,6 +163,7 @@
         "server": "Server",
         "desktop": "Desktop"
       },
+      "motherboard": "{board} (motherboard)",
       "unnamed": {
         "computer": "Unnamed computer",
         "laptop": "Unnamed laptop",
@@ -742,6 +743,7 @@
         "server": "Servidor",
         "desktop": "Escritorio"
       },
+      "motherboard": "{board} (placa madre)",
       "unnamed": {
         "computer": "Equipo sin nombre",
         "laptop": "Portátil sin nombre",
@@ -1321,6 +1323,7 @@
         "server": "Servidor",
         "desktop": "Desktop"
       },
+      "motherboard": "{board} (placa-mãe)",
       "unnamed": {
         "computer": "Computador sem nome",
         "laptop": "Notebook sem nome",

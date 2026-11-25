@@ -46,6 +46,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `cpu.envOff`), so #224's row says why it is composed on the CPU. `hwreport_test.mjs` checks the fallback name and
   the note lookup (156 checks). The paper (en, es, pt, §6.9, mirrored in `docs/PAPER.md`) and the FAQ's hardware-report
   answer, and the hardware page's own lead, no longer say only one community report (#42) was accepted; the page's count of machines reported on GitHub is now 27 (16 with Intel graphics, 5 with AMD, 2 with NVIDIA), as in `docs/HARDWARE-REPORT.md`.
+- lordos.org/hardware: a machine whose firmware has no system vendor or product but names its motherboard (SMBIOS board
+  vendor and name) is now shown by that board, with a translated label: #156 is "ASUSTeK COMPUTER INC. ROG STRIX
+  X570-E GAMING (motherboard)" and #221 "ASUSTeK COMPUTER INC. F1A55-M LX (motherboard)" ("placa madre" in es,
+  "placa-mãe" in pt; new `hardware.motherboard` string in `web/i18n/pages.json`). The card, the problems table and
+  the sort order use the same name; "Unnamed …" stays for a machine with neither. `tools/hwreport/catalog.mjs`
+  treats the board fields as untrusted plain text (control and bidi characters dropped, at most 64 characters,
+  firmware placeholders such as "To be filled by O.E.M." ignored) before the site escapes them, and the label is
+  filled without replacement patterns. `hwreport_test.mjs` covers the board name, the fallback and a hostile board
+  string (169 checks).
 
 ## [0.8.9.6.1-beta] - 2026-11-25
 
