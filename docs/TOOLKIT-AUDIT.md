@@ -40,13 +40,21 @@ used: LordOS links no X11 library (docs/ARCHITECTURE.md).
 
 **How a harness runs** (`server/src/testbench/tkrun.c`):
 
-- `/usr/bin/python3 -I <harness>` as the person, in its own process group, stdin from `/dev/null`.
+- `/usr/bin/python3 -I <harness>` as the person, in its own process group, stdin from `/dev/null`, with no shell.
+  Never as root: `lordos-testbench --toolkits` run with `sudo` or `pkexec` stops with a message.
+- **Only a harness nobody else could have changed runs.** The folder and the file must not be links and must not
+  be writable by group or others; in `/usr/lib/lordos/toolkit-audit` both must be root's (the package installs the
+  harnesses 0644 in a 0755 folder), and in a development folder (`LORDOS_TOOLKIT_AUDIT_DIR`) root's or the
+  person's. Otherwise the row says the harness is missing.
 - A clean environment: `PATH=/usr/local/bin:/usr/bin:/bin`, `LANG=LC_ALL=C.UTF-8` (so the fatal texts below are
   English), `HOME`, the `XDG_*` folders and session type, `DBUS_SESSION_BUS_ADDRESS` (the theme check reads the
   portal), then either `WAYLAND_DISPLAY` (Wayland rows, no `DISPLAY`) or `DISPLAY` and `XAUTHORITY` (X11 rows, no
   `WAYLAND_DISPLAY`; without `XAUTHORITY` it uses `$XDG_RUNTIME_DIR/lord-xauth.<n>` when lord-server wrote it), the
-  backend variable, `WAYLAND_DEBUG=1`, `GTK_A11Y=none`, `NO_AT_BRIDGE=1` and `PYTHONDONTWRITEBYTECODE=1`. Nothing
-  else from the caller's environment passes (no `LD_PRELOAD`, no `PYTHONPATH`, no `GDK_BACKEND` of its own).
+  backend variable, `WAYLAND_DEBUG=1`, `GTK_A11Y=none`, `NO_AT_BRIDGE=1` and `PYTHONDONTWRITEBYTECODE=1`, and
+  `GSETTINGS_BACKEND=keyfile`, what lord-server gives every app it starts (`ui/portal.c`; the caller's own value only
+  when it is `keyfile`, `dconf` or `memory`). Without it GTK 3 read dconf's defaults instead of LordOS's theme and
+  dark mode, and its theme check failed for nothing. Nothing else from the caller's environment passes (no
+  `LD_PRELOAD`, no `PYTHONPATH`, no `GDK_BACKEND` of its own).
 - A harness exits by itself within 5 s. At **8 s** its whole process group is killed. When it exits, whatever it
   left in its group is killed as well.
 - `LORDOS_TOOLKIT_AUDIT_DIR` (an absolute folder) replaces `/usr/lib/lordos/toolkit-audit` for development.
@@ -91,7 +99,7 @@ is passed points / counted points x 100, one decimal, rounded down.
 | `clipboard` | 3 | a clipboard round trip within itself, through the compositor or X server |
 | `dnd` | 3 | a drag and drop within itself (often skipped: it needs a real pointer) |
 | `scale` | 1 | the scale factor |
-| `theme` | 1 | the light or dark scheme read (portal Settings or the toolkit's own) |
+| `theme` | 1 | the toolkit's own light or dark scheme (GTK's settings, Qt 6's colour scheme, else the palette Qt draws with) is the one the portal's Settings says; it passes with no portal preference |
 | `tooltip` | 1 | a tooltip popup maps |
 | `text` | 1 | a text field receives text typed through the toolkit's own synthetic input |
 | `fullscreen` | 1 | fullscreen on (the monitor's size) and off (600x400 again) |
@@ -213,8 +221,10 @@ ASan and UBSan. It covers:
 - **The output.** The JSON parses, carries no detail text, and has the matrix. The table and the placeholders
   are checked too.
 - **The environment.** Only the listed variables pass, and Wayland and X11 rows get the right display and
-  backend variables. The Xwayland cookie is found, a missing display gives no-display, and a full buffer is
-  refused.
+  backend variables. `GSETTINGS_BACKEND` is `keyfile` unless the caller has another GLib backend (a path is not
+  one). The Xwayland cookie is found, a missing display gives no-display, and a full buffer is refused.
+- **Which harness runs.** A group-writable harness, a world-writable folder, a link and a relative folder are
+  refused (the row says no harness).
 - **Real runs** through a fake `python3` and fake harnesses (shell scripts in a temporary folder):
   - fixed JSON on both backends, with a 100 KiB line after the result;
   - a protocol error attributed to `xdg_wm_base`;
@@ -231,3 +241,59 @@ ASan and UBSan. It covers:
 
 The harnesses have their own checks (`tools/toolkit-audit/x11_test.py` against Xvfb). The report side is tested by
 `server/tests/hwreport_test.mjs` and `build/hwsnap-test` (docs/HARDWARE-REPORT.md).
+
+## Measured (in development, 2026-11-25)
+
+Two real runs of `lordos-testbench --toolkits` from `feat/ta-report`, with this tree's harnesses
+(`LORDOS_TOOLKIT_AUDIT_DIR`). The latest release is 0.8.9.6.1; this is in development.
+
+| Combination | Maintainer's PC (headless test server) | VM 127 (installed LordOS, its own session) |
+|---|---|---|
+| `gtk3-wayland` | not installed | 95.2 % (`size`, see below) |
+| `gtk3-x11` | not installed | 95.8 % (`theme`) |
+| `gtk4-wayland` | not installed | 100 % |
+| `gtk4-x11` | not installed | 100 % |
+| `qt5-wayland` | not installed | 97.2 % (`theme`) |
+| `qt5-xcb` | not installed | 95.8 % (`theme`) |
+| `qt6-wayland` | not installed | 97.7 % (`theme`) |
+| `qt6-xcb` | not installed | 96.2 % (`theme`) |
+| `x11-xwayland` | 92.5 % (`theme`, `fullscreen`) | 100 % |
+| **Global** | **92.5 %** (1 of 9 ran) | **97.5 %** (9 of 9 ran) |
+
+- **The maintainer's PC** (Debian 13, Xwayland 24.1.6, python3-gi without the GTK typelibs, no PyQt): a headless
+  `build/lord-server-test --headless 1280x800 --test-hooks --user` with a private `XDG_RUNTIME_DIR` and `HOME`, as
+  `tools/wl-conformance.mjs` starts it. It came up with Lord Workspaces. `theme`: a test server has no session
+  bus, so no portal. `fullscreen`: the window came back 26 px shorter (the Workspaces bug below); with Lord Flow it
+  passes.
+- **VM 127** (0.8.9.6+ws148, Lord Flow, dark mode; GTK 3.24.49, GTK 4.18.6, Qt 5.15.15, Qt 6.8.2, Xwayland 24.1.6),
+  three identical runs. No crash, timeout or protocol error, and no protocol error attributed to any of the 28
+  globals the toolkits bound. The failures are what an app of that toolkit really gets on LordOS:
+  - `theme` on `gtk3-x11`: GTK 3 on X11 reads only XSETTINGS, which LordOS doesn't serve (docs/WAYLAND.md), so it
+    stays light. GTK 3 on Wayland and GTK 4 on both follow dark mode.
+  - `theme` on Qt 5 and Qt 6: neither follows the portal without a platform theme (Qt 5 has no colour scheme at all,
+    and Debian's Qt 6 portal theme isn't installed), so their palette stays light. A toolkit limitation.
+  - `size` on `gtk3-wayland`: LordOS's window memory. The harness's window (`gtk3.py`) was remembered from earlier
+    runs made while GTK 3 still had Adwaita's taller title bar, so its frame came back 6 px taller. With a new app
+    id it is 600x400. A person whose saved size differs sees the same, by design.
+  - Earlier runs also failed `x11-xwayland fullscreen` 2 times in 12 (a compositor bug, below) and `gtk3-x11
+    clipboard` once (CopyQ, installed on that VM, took the clipboard).
+
+**Compositor and shell bugs these runs found** (to fix separately):
+
+- **An X11 window that asks for fullscreen before its first frame stays at its own size.** The window manager
+  writes `_NET_WM_STATE_FULLSCREEN` but the window is never resized. `enter_fullscreen()` (server/src/wl/wl.c:3887)
+  sets the fullscreen size in `conf_w`/`conf_h`; the first commit then maps the surface and overwrites them with the
+  window's own size (wl.c:4414-4416, `s->conf_w = w`), and the next `x_configure()` (wl.c:655) sends that size to X
+  while the window stays fullscreen. `wl_paint()` never corrects it for the fullscreen surface (wl.c:4676), and the
+  theme isn't told either: `emit(s, "fullscreen")` runs only for a mapped surface (wl.c:3908) and the map event
+  doesn't carry the state.
+- **Lord Classic and Lord Workspaces shrink Linux windows by the menu strip's height.** Those themes give every
+  Linux window a 26 px menu strip (the Edit menu with Speech, `sdk/voice.js` `useMenusWithSpeech`, on by default),
+  but `sdk/wayland.js` sizes the frame with `windowChrome().h` only: on map (line 142), on the app's own resize
+  (line 231) and for a restored window (line 312), never `windowChrome().menu`. The app gets 26 px less than it
+  asked for, every fullscreen exit takes another 26 px (400, 374, 348 on the X11 harness), and window memory keeps
+  the smaller size for the next start (322, 296).
+- **Smaller:** the keyboard comes back to a window 60 to 75 ms after one of its child toplevels closes (VM 127). A
+  Qt 6 popup the app opens in that gap is closed by Qt when the focus arrives (the harness now waits for it, as a
+  person does).
+

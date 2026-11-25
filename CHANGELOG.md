@@ -24,8 +24,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     library: no libX11, python3-xlib or xprop.
   - **How a harness runs:** as the person, in its own process group, with a clean environment. That environment
     has the session's display, the backend variable, `WAYLAND_DEBUG=1` and the C locale, and nothing else from the
-    caller (no `LD_PRELOAD`, no `PYTHONPATH`). A harness exits by itself within 5 s; at 8 s its whole group is
-    killed.
+    caller (no `LD_PRELOAD`, no `PYTHONPATH`). It also gets `GSETTINGS_BACKEND=keyfile`, as every app lord-server
+    starts does: without it GTK 3 read dconf's defaults and failed the theme check in dark mode. A harness exits by
+    itself within 5 s; at 8 s its whole group is killed. It never runs as root, and only from a folder and file
+    that are no links and that nobody else can write (root's in `/usr/lib/lordos/toolkit-audit`); the import probe's
+    process group is killed before it is reaped.
   - **What is measured, with no test hooks:**
     - each harness's own checks: map, size against 600x400, scale, the colour scheme read, the backend really
       used, decorations, time to the first frame, a menu and a combo list that map, a tooltip, a clipboard round
@@ -52,6 +55,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Checked:** against a private headless lord-server, with the GTK typelibs unpacked locally. GTK 3 scored 100 % on both backends and GTK 4 98.0 % on
     Wayland and 95.8 % on X11 (the theme check, without a session bus). Plain X11 scored 92.5 %: fullscreen
     didn't return to 600x400. Qt 5 and Qt 6 weren't installed on that machine.
+  - **Checked in a real session** on VM 127 (Lord Flow, dark mode): 97.5 % over all nine combinations. GTK 4 100 %
+    on both backends, GTK 3 95.2 % / 95.8 %, Qt 5 97.2 % / 95.8 %, Qt 6 97.7 % / 96.2 %, plain X11 100 %; no crash,
+    timeout or protocol error. What fails is the dark theme where the toolkit can't follow it (GTK 3 on X11, Qt) and
+    a size LordOS's window memory restored. The scores and the two compositor and shell bugs the runs found are in
+    docs/TOOLKIT-AUDIT.md, "Measured".
+  - **The harnesses, after those runs:** Qt 6 waits for the keyboard to come back to its window before opening the
+    combo list and the tooltip (Qt closes a popup opened in between), as the Qt 5 harness did; the theme check now
+    asks the same of every toolkit, that the scheme it draws with is the portal's (Qt 5 passed by reading the
+    portal itself).
 - **The toolkit audit reaches the hardware report, `lordos-issue` and `tools/wl-conformance.mjs`**
   (docs/TOOLKIT-AUDIT.md, docs/HARDWARE-REPORT.md "Toolkits").
   - **System Information → Report → Share on GitHub** has a new box, **Include framework compatibility** (off by

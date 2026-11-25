@@ -1889,6 +1889,10 @@ sudo apt-get install -y --no-install-recommends picard   # 2026-11-11: a Qt 5 ap
                                    # xcb fallback, docs/WAYLAND.md "How to open an app")
 sudo apt-get install -y gparted    # 2026-11-11: an X11 app run as root through pkexec, for GitHub #107 (the X cookie,
                                    # docs/WAYLAND.md "How it starts"); x11-utils (xdpyinfo) came with the ISO
+sudo apt-get install -y --no-install-recommends gir1.2-gtk-3.0 python3-pyqt6
+                                   # 2026-11-25: the GTK 3 and Qt 6 rows of lordos-testbench --toolkits
+                                   # (docs/TOOLKIT-AUDIT.md, "Measured"; 3.24.49-3 and 6.9.0-2 with Qt 6.8.2).
+                                   # python3-gi, gir1.2-gtk-4.0 and python3-pyqt5 (5.15.11) were already there
 ```
 
 Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm monitor 127` → `screendump` for the screen. The
