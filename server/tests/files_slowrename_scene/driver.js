@@ -116,9 +116,7 @@
       await sleep(800);
       step('icons: another window has the focus', sdk.wm.focused() !== fw.id, `focused ${sdk.wm.focused()}`);
       click(nameId('delta')); await sleep(800);
-      log(`focused after the first click: ${sdk.wm.focused()} (files ${fw.id})`);
-      // (Lord Classic's frame doesn't always take a synthetic press as its own: focus it as the press would have)
-      if (sdk.wm.focused() !== fw.id) { sdk.wm.focus(fw.id); await sleep(300); }
+      step('icons: the first click on a name brings Files forward', sdk.wm.focused() === fw.id, `focused ${sdk.wm.focused()}, files ${fw.id}`);
       click(nameId('delta')); await sleep(800);
       step('icons: a first click that only focused the window doesn\'t count', !editing());
       click(nameId('delta')); await sleep(800);
