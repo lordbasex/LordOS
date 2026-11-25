@@ -21,6 +21,7 @@ import re
 import select
 import signal
 import socket
+import stat
 import struct
 import subprocess
 import sys
@@ -118,19 +119,23 @@ class X:
             raise XError("no local $DISPLAY" if not disp else "only a local display is tested")
         self.dnum = int(m.group(1))
         path = "/tmp/.X11-unix/X%d" % self.dnum
-        last = None
-        for addr in ("\0" + path, path):
-            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.settimeout(max(0.2, left()))
-            try:
-                s.connect(addr)
-                self.sock = s
-                break
-            except OSError as e:
-                last = e
-                s.close()
-        if not self.sock:
-            raise XError("cannot connect to the display (%s)" % type(last).__name__)
+        # Only the filesystem socket, and only when it is a socket of this user's: LordOS's Xwayland serves no abstract
+        # socket (server/src/wl/xwayland.c), and any user can bind an abstract name first and collect the cookie sent
+        # below; a file in the sticky /tmp/.X11-unix that another user made is refused the same way.
+        try:
+            st = os.lstat(path)
+        except OSError as e:
+            raise XError("cannot connect to the display (%s)" % type(e).__name__)
+        if not stat.S_ISSOCK(st.st_mode) or st.st_uid != os.getuid():
+            raise XError("the display's socket is not this user's")
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(max(0.2, left()))
+        try:
+            s.connect(path)
+        except OSError as e:
+            s.close()
+            raise XError("cannot connect to the display (%s)" % type(e).__name__)
+        self.sock = s
         self.sock.setblocking(False)
         name, data = self.cookie()
         req = struct.pack("<BxHHHHxx", 0x6C, 11, 0, len(name), len(data))
