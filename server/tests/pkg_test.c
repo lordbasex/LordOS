@@ -371,9 +371,10 @@ static const char *HW_NEW =        /* 0.8.7 with an older snapshot */
     "Package: lordos-hwdata\nStatus: install ok installed\nVersion: 2026.10.29\nArchitecture: all\nDescription: h\n\n";
 
 /* An upgrade brings the Recommends the new version adds (0.8.8.7: whiptail and zstd), never one the installed version
- * already had (screen: the user removed it), and one missing from the index doesn't stop it. */
+ * already had (screen: the user removed it), and one missing from the index doesn't stop it (nowhere; firmware-mediatek,
+ * #227, on a system whose sources leave out non-free-firmware). */
 static const char *REC_REPO =
-    "Package: lordos\nVersion: 0.8.8.7\nArchitecture: amd64\nDepends: libc6\nRecommends: screen, vim, whiptail, zstd | gzip, nowhere\nFilename: pool/l.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: l\n\n"
+    "Package: lordos\nVersion: 0.8.8.7\nArchitecture: amd64\nDepends: libc6\nRecommends: screen, vim, whiptail, zstd | gzip, nowhere, firmware-mediatek\nFilename: pool/l.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: l\n\n"
     "Package: screen\nVersion: 1\nArchitecture: amd64\nFilename: pool/s.deb\nSize: 1\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: s\n\n"
     "Package: whiptail\nVersion: 1\nArchitecture: amd64\nFilename: pool/w.deb\nSize: 1\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: w\n\n"
     "Package: zstd\nVersion: 1\nArchitecture: amd64\nFilename: pool/z.deb\nSize: 1\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: z\n\n";

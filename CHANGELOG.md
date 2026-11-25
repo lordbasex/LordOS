@@ -10,6 +10,29 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+- **Check This Account's delete step on pCloud, again (GitHub #243)**. pCloud keeps listing the check's folder as not
+  empty for a few seconds after its `check.bin` was deleted, longer than the 4.5 s the move's own rmdir retry of
+  0.8.9.6 waits, so the step could still end in `cloud.checkDeleteFailed` and leave `.lordos-check-…` in the account.
+  The check now tries the folder's removal again for up to 10 s (waits of 0.5, 1, 2 and 4 s) when the move fails
+  with `fs.moveRemoveFailed`, moving the folder out again only once it lists as empty, never copying a file it still
+  shows; every scratch copy in `~/.cache` goes to the Trash and out of it whatever happens. A folder an earlier check
+  left behind is removed at the start of the next one: only a folder named exactly `.lordos-check-` plus 10 hex
+  digits (in object storage also the bucket `lordos-check-…`) holding nothing or only a `check.bin` no larger than
+  the check's 1 MiB, at most 5 per check; anything else is never touched, and a leftover that stays doesn't fail the
+  check (`sdk/cloudcheck.js`, `docs/CLOUD.md` 19). `cloud_model_test.mjs` drives a fake provider that answers "not
+  empty" once and twice (the check passes and leaves nothing in the cloud, the home or the Trash), always (delete
+  fails after about 10 s and the home copies are gone), and with a file still listed (never moved again), plus
+  leftovers that go and look-alikes that stay (other names, upper-case hex, a folder in a subfolder, another file in
+  it, a `check.bin` that is larger or a folder), in object storage too.
+- **Installed systems get the MediaTek Wi-Fi firmware with the update (GitHub #227)**. The `lordos` package now
+  recommends `firmware-mediatek` (`tools/iso/mkdeb.sh` `FIRMWARERECS`), so updating from the Store installs it on
+  systems installed from an ISO that lacked it, and an MT7921/MT7922 card gets its Wi-Fi interface after the restart.
+  It is in Debian's `non-free-firmware`, which the ISO and Raspberry Pi images enable; the Store's update brings the
+  Recommends a new version adds and leaves out one the sources don't carry without stopping (`pkg-test` now names
+  `firmware-mediatek` among the missing ones). The next ISO already carries it and `firmware-intel-graphics` (0.8.9.6);
+  `iso_firmware_test.mjs` now also checks the package's Recommends (`docs/UPDATES.md`, "Store → Updates").
+
 ## [0.8.9.6-beta] - 2026-11-25
 
 ### Added
