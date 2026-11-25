@@ -11,6 +11,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Fixed
+- **Settings → Wallpaper's top card overflowed with three displays** (found testing 0.8.9.6.2 on the maintainer's PC with
+  three monitors). The Display choice, a segmented control of every display's model and connector, ran past the card's
+  right edge, and the line saying what each display gets ran past its bottom. With more than two displays the choice
+  is now a pop-up; the plan is one line per display; and the page takes a wider column on wide windows (1180 px, as
+  Cloud's 980), so the gallery uses the window instead of a narrow strip in the middle.
 - **Settings → Wallpaper: "Download and use" downloaded the picture but didn't use it, and showed a lone "0".** The
   admin helper reports a download's progress as `PROGRESS <n>` lines (`wallpaper-get`, and `studio-bg-get` for LordOS
   Studio's backgrounds). `sdk/admin.js` took any line that wasn't `LOG` as the request's answer, so the first

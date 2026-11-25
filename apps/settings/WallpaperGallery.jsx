@@ -23,7 +23,7 @@ import {
   filterCounts, collectionOrder, groupCollections, collectionCard, collectionBytes, downloadPlan, usedBytes, idsInUse, freeUpPlan, twinExtra,
   displayQuality,
 } from '../../sdk/wallpapergallery.js';
-import { Stack, Section, SettingRow, Note, Actions, tint } from './ui.jsx';
+import { Stack, Section, SettingRow, Note, Actions, PopUp, tint } from './ui.jsx';
 import { SlideshowSettings } from './Slideshow.jsx';
 
 const GAP = 10, CARD = 170;
@@ -542,9 +542,10 @@ export function WallpaperGallery() {
   // ---- the top: what shows now ----
   const plan = qualityPlan(nowEntry && nowEntry.kind === 'still' ? nowEntry.item : nowEntry && nowEntry.twin ? nowEntry.twin : null, quality, displays.length ? (scopeDisplay ? [scopeDisplay] : displays) : [{ w: 1920, h: 1080 }]);
   const qLabel = (q) => tr(q === '4k' ? 'settings.wallpaperGallery.quality4k' : 'settings.wallpaperGallery.qualityHd');
-  const planText = plan.length > 1
-    ? plan.map((p) => tr('settings.wallpaperGallery.planItem', { quality: qLabel(p.quality), display: displayLabel(p.display, displays), size: sizeText(p.size.w, p.size.h) })).join(', ')
-    : plan.length ? tr('settings.wallpaperGallery.planOne', { quality: qLabel(plan[0].quality), size: sizeText(plan[0].size.w, plan[0].size.h) }) : '';
+  // one line per display: a single long text wrapped past the card's bottom with three displays
+  const planLines = plan.length > 1
+    ? plan.map((p) => tr('settings.wallpaperGallery.planItem', { quality: qLabel(p.quality), display: displayLabel(p.display, displays), size: sizeText(p.size.w, p.size.h) }))
+    : plan.length ? [tr('settings.wallpaperGallery.planOne', { quality: qLabel(plan[0].quality), size: sizeText(plan[0].size.w, plan[0].size.h) })] : [];
   const big = Math.max(200, Math.min(340, Math.round(width * 0.42)));
   const nowSub = nowEntry ? [colName(nowEntry.col), tr(nowEntry.kind === 'motion' ? 'settings.wallpaperGallery.kindMotion' : 'settings.wallpaperGallery.kindStill'),
     nowEntry.license].filter(Boolean).join(' · ') : '';
@@ -567,14 +568,18 @@ export function WallpaperGallery() {
           </SettingRow>
           {!login && displays.length > 1 ? (
             <SettingRow label={tr('settings.wallpaperFor.display')}>
-              <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.wallpaperGallery.allDisplays')], ...displays.map((d) => [d.id, displayLabel(d, displays)])]} />
+              {displays.length > 2
+                ? <PopUp width={Math.min(260, Math.max(170, width - big - 200))} value={scope} onChange={setScope} options={[['*', tr('settings.wallpaperGallery.allDisplays')], ...displays.map((d) => [d.id, displayLabel(d, displays)])]} />
+                : <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.wallpaperGallery.allDisplays')], ...displays.map((d) => [d.id, displayLabel(d, displays)])]} />}
             </SettingRow>
           ) : null}
           <SettingRow label={tr('settings.wallpaperGallery.quality')}>
             <Segmented small value={quality} onChange={(v) => set({ wallpaperQuality: v })}
               options={QUALITIES.map((q) => [q, tr(`settings.wallpaperGallery.quality${q === 'auto' ? 'Auto' : q === 'hd' ? 'Hd' : '4k'}`)])} />
           </SettingRow>
-          <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{planText}</Text>
+          <View style={{ gap: 1 }}>
+            {planLines.map((l, i) => <Text key={i} style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l}</Text>)}
+          </View>
         </View>
       </View>
     </Section>
