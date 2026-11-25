@@ -188,7 +188,7 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 3.5 | Scales up to 300 % where the desktop keeps at least 1024 × 600 | `CHANGELOG.md`, 0.8.8.6-beta (#47) | Not automated; a 15.3" 4K laptop panel ran at 300 % (#47, by its reporter, `docs/HARDWARE-REPORT.md`) |
 | 3.5 | The cursor plane at the driver's size (128 × 128 on amdgpu) and the login screen on the chosen main display | Fixed from what one PC with a Radeon RX 580 and three monitors showed | Not automated; the cursor fix confirmed on a FirePro W6150M (#57) and in daily use on the author's RX 580 PC (`docs/HARDWARE-REPORT.md`) |
 | 7.1 | Memory in use counted as `MemTotal − MemFree − (Buffers + Cached + SReclaimable − Shmem)` | Test (`sysreport-test`, `server/src/meminfo.h`) | Holds; the measured rows of §7.1 were not taken again |
-| 2.4 | `intel-microcode` and `amd64-microcode` are dependencies on amd64 | Package control file | Design; the update path against the signed repository not yet run |
+| 2.4 | `intel-microcode` and `amd64-microcode` are dependencies on amd64 (Recommends since 0.8.9.6.1) | Package control file | Design; the update path against the signed repository not yet run |
 
 ## 0.8.8.7 (released on 2026-11-09 as 0.8.8.7-beta; the paper's edition of 2026-11-09)
 

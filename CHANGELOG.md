@@ -98,6 +98,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 - **Intel graphics firmware on update (amd64).** The `lordos` package also recommends `firmware-intel-graphics` (i915/xe DMC, GuC and HuC), which Debian split out of `firmware-misc-nonfree` like the MediaTek firmware: a system installed from an ISO before 0.8.9.6 gets it with the next Store update, so the display's runtime power management works. Like any new Recommends it is optional and skipped if the sources lack it (`tools/iso/mkdeb.sh`, `iso_firmware_test.mjs`).
+- **LordOS installs on any Debian 13, even without `non-free-firmware`.** On amd64 the `lordos` package required `intel-microcode` and `amd64-microcode` (since 0.8.8.6). They come from Debian's `non-free-firmware` component, which the LordOS ISO and Raspberry Pi images enable but `install.sh` on an existing Debian doesn't check, so on such a system installing or updating `lordos` failed. They are now Recommends: APT and Store → Updates still install them wherever the component is enabled (every LordOS image), and a Debian system without it installs LordOS without them (`tools/iso/mkdeb.sh`).
 - **Monitor → GPU, redrawn after the mockup the maintainer approved on 2026-11-24** (`docs/MONITOR.md`, "GPU", "The 0.8.9.6 layout"). `apps/monitor/GpuView.jsx`: a chip per GPU (vendor
   dot, name, three-minute load sparkline, load, temperature, VRAM) and, with two or more GPUs, a One / Side-by-side
   switch; the card's header with tiles for Load, Temperature (with `temp*_crit`), Power (of `power1_cap`, or
