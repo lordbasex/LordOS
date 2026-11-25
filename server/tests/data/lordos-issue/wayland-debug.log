@@ -22,3 +22,7 @@ Gtk-Message: 10:12:01.123: Failed to load module "canberra-gtk-module" from /hom
 my secret line two
 [1234567.926] {Default Queue}  -> wl_data_source#60.offer("text/plain")
 (secret-app:1234): Gtk-WARNING **: cannot open /home/secretuser/secret.txt
+[1234567.930] {Default Queue} wl_keyboard#14.key(812, 9917771, 35, 1)
+[1234567.931] {Default Queue} wl_keyboard#14.modifiers(813, 1, 0, 0, 0)
+[1234567.932] {Default Queue}  -> zwp_virtual_keyboard_v1#70.key(9917772, 36, 1)
+[1234567.933] {Default Queue} zwp_input_method_keyboard_grab_v2#71.key(814, 9917773, 37, 0)

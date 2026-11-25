@@ -41,6 +41,8 @@ done
 #   - an interface name in wl_registry.global or .bind ("xdg_wm_base"): [a-z][a-z0-9_]*;
 #   - a clipboard or drag type in offer, receive, accept or send ("text/plain;charset=utf-8");
 #   - an app id (set_app_id): "app-id:" and 8 hex digits of a hash, the same id giving the same hash.
+# And every argument of a key or modifiers event (wl_keyboard, an input method's keyboard grab, a virtual keyboard)
+# becomes <key>: the keycodes alone would spell what was typed.
 # libwayland doesn't escape quotes inside strings, so the whole span from a line's first quote to its last is judged
 # as one string: a title with quotes in it can't split itself into something that passes.
 wl_scrub() {
@@ -50,6 +52,14 @@ wl_scrub() {
     !/^\[ *[0-9]+\.[0-9]+\] / { dropped++; next }
     {
         line = $0
+        # key presses: which keys were pressed spells what was typed (a password too), so a key or modifier event
+        # keeps its name and loses every argument (wl_keyboard and the key and modifiers of an input method grab and a virtual
+        # keyboard)
+        km = line; p = index(km, "("); if (p) km = substr(km, 1, p - 1); sub(/.*#[0-9]+\./, "", km)
+        ki = line; sub(/^\[[^]]*\] *(\{[^}]*\} *)?(-> )?/, "", ki); sub(/#.*/, "", ki)
+        if ((km == "key" || km == "modifiers") && ki ~ /^(wl_keyboard|zwp_input_method_keyboard_grab_v2|zwp_virtual_keyboard_v1)$/) {
+            p = index(line, "("); print substr(line, 1, p) "<key>)"; fflush(); next
+        }
         q1 = index(line, "\"")
         if (q1 == 0) { print line; fflush(); next }
         rest = substr(line, q1 + 1); q2 = 0
@@ -101,10 +111,25 @@ env_line() {   # NAME VALUE-OR-EMPTY ISSET
     else printf '%s: set (an unusual value, not shown)\n' "$1"; fi
 }
 isset() { eval "[ \"\${$1+x}\" = x ]" && echo 1 || echo 0; }
-# NVIDIA's helper (lord-nvgpu, shown in Monitor → GPU) knows the proprietary driver's side of Wayland: its explicit sync
-# and GBM support. TODO(maintainer, after feat/nvgpu-report merges): print here what Monitor exposes about it, read
-# without root like the rest of this section. Until then it prints nothing.
-nvidia_wayland() { :; }
+# NVIDIA: the driver's version and which kernel module drives each NVIDIA display device, from sysfs (world-readable,
+# digits and dots or a module name only). lord-nvgpu's own state lives in lord-server; Monitor → GPU → "Copy report"
+# gives it, so this only points there. Prints nothing without an NVIDIA display device.
+nvidia_wayland() {
+    found=0
+    for d in /sys/bus/pci/devices/*; do
+        [ "$(cat "$d/vendor" 2>/dev/null)" = 0x10de ] || continue
+        case "$(cat "$d/class" 2>/dev/null)" in 0x03*) ;; *) continue ;; esac
+        [ $found = 1 ] || echo "-- NVIDIA"
+        found=1
+        drv=$(basename "$(readlink "$d/driver" 2>/dev/null)" 2>/dev/null)
+        printf '%s 10de:%s driver %s\n' "$(basename "$d")" "$(sed 's/^0x//' "$d/device" 2>/dev/null)" "${drv:-none}" |
+            grep -E '^[0-9a-f:.]+ 10de:[0-9a-f]{4} driver [A-Za-z0-9_-]+$'
+    done
+    [ $found = 1 ] || return 0
+    v=$(cat /sys/module/nvidia/version 2>/dev/null | grep -E '^[0-9][0-9.]{0,30}$')
+    echo "nvidia module: ${v:-not loaded}"
+    echo "the stats helper's state: Monitor -> GPU -> Copy report (paste it too if it shows \"Couldn't read NVIDIA data\")"
+}
 wayland_section() {
     echo "-- the compositor's globals against LordOS's protocol table (lordos-testbench --globals)"
     TB=/usr/bin/lordos-testbench

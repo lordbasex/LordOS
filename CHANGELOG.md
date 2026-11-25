@@ -125,7 +125,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   dropped, and counted); in them every quoted string becomes `<text>` (titles, typed text, file names, error messages,
   a monitor's description), an app id becomes `app-id:` and a hash, and only interface names in `global`/`bind` and
   clipboard types in `offer`/`receive`/`accept`/`send` stay. A line's span from its first quote to its last is judged
-  as one string, so a title with quotes in it can't pass. Nothing raw reaches the disk. Refused as root.
+  as one string, so a title with quotes in it can't pass. Key presses lose every argument (`wl_keyboard`'s key and
+  modifiers, an input method's keyboard grab, a virtual keyboard: `key(<key>)`), since the keycodes alone would spell
+  what was typed. Nothing raw reaches the disk. Refused as root.
   `lordos-issue --scrub-wayland-debug` scrubs a log made by hand the same way. Tested by `tests/lordos_issue_test.sh`
   (`make test`): a fixture log with titles, paths, typed text, an app id, a monitor's serial and quotes inside strings,
   a fixture `ss` listing with a hostile process name, the globals summary, and `--app` with a fake program (scrubbed,

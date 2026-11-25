@@ -38,11 +38,17 @@ has "$T/scrubbed" 'wl_surface#20.commit()' "a line without strings"
 has "$T/scrubbed" 'wl_data_source#60.offer(<text>' "an unterminated string"
 has "$T/scrubbed" 'wl_data_source#60.offer("text/plain")' "plain mime type"
 has "$T/scrubbed" '(3 lines that were not Wayland protocol left out)' "dropped lines counted"
+# key presses: the keycodes would spell what was typed
+has "$T/scrubbed" 'wl_keyboard#14.key(<key>)' "a key press"
+has "$T/scrubbed" 'wl_keyboard#14.modifiers(<key>)' "modifiers"
+has "$T/scrubbed" 'zwp_virtual_keyboard_v1#70.key(<key>)' "a virtual keyboard's key"
+has "$T/scrubbed" 'zwp_input_method_keyboard_grab_v2#71.key(<key>)' "an input method grab's key"
+hasnt "$T/scrubbed" '9917771' "key event arguments"
 # the app id: a stable hash, the same in both requests
 ids=$(grep -o '"app-id:[0-9a-f]\{8\}"' "$T/scrubbed" | sort -u | wc -l)
 [ "$ids" = 1 ] || bad "app id hash: $ids distinct (want 1)"
 [ "$(grep -c 'app-id:' "$T/scrubbed")" = 2 ] || bad "app id: both requests hashed"
-[ "$(grep -c '^\[' "$T/scrubbed")" = 21 ] || bad "scrub kept $(grep -c '^\[' "$T/scrubbed") protocol lines, want 21"
+[ "$(grep -c '^\[' "$T/scrubbed")" = 25 ] || bad "scrub kept $(grep -c '^\[' "$T/scrubbed") protocol lines, want 25"
 
 # ---- the programs connected to the sockets ----
 sh "$I" --test-clients /run/user/1000/wayland-0 /tmp/.X11-unix/X1 < "$F/ss.txt" > "$T/clients" || bad "clients exited $?"
