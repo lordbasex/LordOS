@@ -1139,6 +1139,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Lord Workspaces: a minimized window's line sits centred under its icon, and a quick right click no longer gets
+  the hover list on top of its menu** (in development; latest release 0.8.9.5-beta). Found in the desktop e2e pass on
+  the test VM (ws147). The short line under a minimized window's icon in each display's bar was drawn at the icon
+  button's left edge: lord-server places an absolute child without `left`/`right` at the start of its parent (as CSS
+  does), not where the parent's `alignItems` would put it, so it now has `left: 8` ((28 − 12) / 2). And a right click
+  on an app's icon within the 450 ms the hover list waits for (or on an activity's pill, whose summary waits the same)
+  opened the menu and then let the waiting list come up over it: the click and the right click cleared the shown list
+  but not the timer. Both now cancel the timer too (`peekCancel` in `components/AppWindows.jsx` and
+  `components/TopBar.jsx`). Checked on the VM with screendumps.
 - **Machines: `vm-usb-allow` serves only the person at the computer (Claude Security F1 and F3)** (in development; latest
   release 0.8.9.5-beta). The root admin action that opens a host USB device read and write for a machine was `A_ANYONE`
   and never checked that the asking session was the one on the monitor, so a non-administrator's session in the

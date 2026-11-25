@@ -71,6 +71,8 @@ function peekSoon(id, pill) {
   }, peek.get() ? 0 : PEEK_MS);
 }
 function peekEnd(ms = 160) { clearTimeout(peekTimer); peekTimer = setTimeout(() => peek.set(null), ms); }
+// a click or a right click on the pill: the summary goes, and one still waiting for its rest never comes up over the menu
+function peekCancel() { clearTimeout(peekTimer); peek.set(null); }
 const own = (w) => !(getApp(w.id)?.builtin && !String(w.id).startsWith('linux#'));
 
 function PeekRow({ t, w, onPick }) {
@@ -140,7 +142,7 @@ const Pill = memo(function Pill({ t, id, active, glide, name, meta, onMenu, pill
     );
   }
   return (
-    <View ref={ref} onClick={() => { peek.set(null); switchDesktop(id); }} onDoubleClick={() => { setValue(name); renaming.set(id); }} onContextMenu={(e) => { peek.set(null); onMenu(id, e); }}
+    <View ref={ref} onClick={() => { peekCancel(); switchDesktop(id); }} onDoubleClick={() => { setValue(name); renaming.set(id); }} onContextMenu={(e) => { peekCancel(); onMenu(id, e); }}
       onMouseEnter={() => { setHover(true); if (!active && self.current) peekSoon(id, self.current); }} onMouseLeave={() => { setHover(false); peekEnd(); }}
       title={active || compact ? name : undefined}
       style={{ height: BAR_ITEM, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: BAR_ITEM / 2, maxWidth: 190,

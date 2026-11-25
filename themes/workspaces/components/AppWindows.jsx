@@ -50,6 +50,8 @@ function peekSoon(node, key, desk, d) {
   }, appPeek.get() ? 0 : HOVER_MS);
 }
 function peekEnd(ms = 180) { clearTimeout(hover.timer); hover.timer = setTimeout(() => appPeek.set(null), ms); }
+// a click or a right click on the icon: the list goes, and one still waiting for its rest never comes up over the menu
+function peekCancel() { clearTimeout(hover.timer); appPeek.set(null); }
 
 // the menu of an app's icon: its windows here, then New window (an app the launcher knows). after: run once a row is
 // chosen (the launcher closes).
@@ -97,8 +99,8 @@ export const AppIcon = memo(function AppIcon({ t, d, desk, appKey, Icon, title, 
   const [menu, setMenu] = useState(null);
   const [over, setOver] = useState(false);
   return (
-    <View ref={ref} title={title} onClick={(e) => { appPeek.set(null); onClick(e); }}
-      onContextMenu={(e) => { appPeek.set(null); const items = appMenuItems(appKey, desk, d, null, launchable); if (items.length) setMenu({ x: e.x, y: e.y, items }); }}
+    <View ref={ref} title={title} onClick={(e) => { peekCancel(); onClick(e); }}
+      onContextMenu={(e) => { peekCancel(); const items = appMenuItems(appKey, desk, d, null, launchable); if (items.length) setMenu({ x: e.x, y: e.y, items }); }}
       onMouseEnter={() => { setOver(true); if (ref.current && appWindowsIn(windows.get(), desk, appKey, groupHidden.get()).length > 1) peekSoon(ref.current, appKey, desk, d); }}
       onMouseLeave={() => { setOver(false); peekEnd(); }}
       style={{ width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: over ? t.hover : 'transparent' }}
@@ -106,8 +108,8 @@ export const AppIcon = memo(function AppIcon({ t, d, desk, appKey, Icon, title, 
       {Icon ? <Icon size={18} /> : <View style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: t.textDim }} />}
       {/* a browser profile's (or a web app profile's) colour: which of two windows of the same app this is */}
       {dot ? <View style={{ position: 'absolute', top: 1, end: 1, width: 8, height: 8, borderRadius: 4, backgroundColor: dot, border: `1.5px solid ${t.chipBg}`, pointerEvents: 'none' }} /> : null}
-      {/* a minimized window: a short line under its icon */}
-      <View style={{ position: 'absolute', bottom: 1, width: 12, height: 2.5, borderRadius: 1.5, backgroundColor: t.frameText, opacity: 0.85, display: minimized ? 'flex' : 'none', pointerEvents: 'none' }} />
+      {/* a minimized window: a short line centred under its icon ((28 - 12) / 2: an absolute child sits at the start) */}
+      <View style={{ position: 'absolute', bottom: 1, left: 8, width: 12, height: 2.5, borderRadius: 1.5, backgroundColor: t.frameText, opacity: 0.85, display: minimized ? 'flex' : 'none', pointerEvents: 'none' }} />
       {menu && <Menu t={t} x={menu.x} y={menu.y} width={280} onClose={() => setMenu(null)} items={menu.items} />}
     </View>
   );
