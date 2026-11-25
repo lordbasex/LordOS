@@ -10,7 +10,9 @@ without touching your files, your session or your machines. Test only: nothing h
 - **Private namespaces.** lord-server and everything it starts (lord-vm, QEMU, passt, virtiofsd) run in their own user
   and mount namespaces: root of the first only to mount an empty folder over your real home and a tmpfs over your
   runtime folder, then your account again. `HOME` and `XDG_RUNTIME_DIR` are folders of the run, under
-  `/var/tmp/lordos-m100-e2e/` (`MH_SCRATCH`); its Machines library is `HOME/Machines`, empty at the start. The pattern of
+  `/var/tmp/lordos-m100-e2e/` (`MH_SCRATCH`; it, and `MH_IMAGES`, must be a real folder of your account: made 0700 if
+  missing, refused if another user made it first or it is a link); its Machines library is `HOME/Machines`, empty at the
+  start. The pattern of
   `server/tests/vm_group_link.sh`. `ns-run.sh COMMAND…` runs any other command the same way (lord-vm, the release gates).
 - **Input.** Pointer, buttons, wheel and keys through the test hooks (`server/src/testhooks.h`: `ptr`, `btn`, `wheel`,
   `key`), which call the remote desktop's own injection (`main.c` `remote_pointer`, `remote_button`, `remote_wheel`,

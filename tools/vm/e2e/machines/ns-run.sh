@@ -12,7 +12,11 @@ KEEP=0
 [ $# -gt 0 ] || { echo "usage: ns-run.sh [--keep] COMMAND [ARG ...]"; exit 2; }
 command -v unshare >/dev/null 2>&1 && unshare -Urm true 2>/dev/null || { echo "skipped: needs unprivileged user namespaces (unshare)"; exit 77; }
 S=${MH_SCRATCH:-/var/tmp/lordos-m100-e2e}
-mkdir -p "$S" && D=$(mktemp -d "$S/ns.XXXXXX") || exit 1
+# the shared scratch folder only if it is a real folder of this account (made here 0700 if missing; never a link or a
+# folder another user made first in /var/tmp), as mh.py's private_dir
+[ -e "$S" ] || [ -L "$S" ] || mkdir -p -m 700 "$S" || exit 1
+[ -d "$S" ] && [ ! -L "$S" ] && [ -O "$S" ] || { echo "FAIL: $S must be a folder of this account, not a link"; exit 1; }
+chmod 700 "$S" && D=$(mktemp -d "$S/ns.XXXXXX") || exit 1
 chmod 700 "$D"
 mkdir -p "$D/home" "$D/run" "$D/fake"
 chmod 700 "$D/home" "$D/run"

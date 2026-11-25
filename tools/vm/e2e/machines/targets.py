@@ -36,8 +36,7 @@ class Lib:
     """A scratch library in private namespaces and the lord-vm calls on it."""
 
     def __init__(self):
-        os.makedirs(mh.SCRATCH, exist_ok=True)
-        self.D = tempfile.mkdtemp(prefix="targets.", dir=mh.SCRATCH)
+        self.D = tempfile.mkdtemp(prefix="targets.", dir=mh.scratch())
         os.chmod(self.D, 0o700)
         for d in ("home/Machines", "run", "fake"):
             os.makedirs(os.path.join(self.D, d))

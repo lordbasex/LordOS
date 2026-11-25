@@ -76,8 +76,7 @@ def main():
         print("skipped: needs server/build/lord-vm"); return 77
     if subprocess.run(["unshare", "-Urm", "true"], capture_output=True).returncode:
         print("skipped: needs unprivileged user namespaces"); return 77
-    os.makedirs(mh.SCRATCH, exist_ok=True)
-    D = tempfile.mkdtemp(prefix="matrix.", dir=mh.SCRATCH)
+    D = tempfile.mkdtemp(prefix="matrix.", dir=mh.scratch())
     os.chmod(D, 0o700)
     for d in ("home/Machines", "run", "fake"):
         os.makedirs(os.path.join(D, d))
