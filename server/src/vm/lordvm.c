@@ -289,12 +289,21 @@ static int sha256_file(const char *path, char out[65]) {
 /* runs a program (no shell) and waits; its output goes to the log. 0 when it exited with 0. With `jail_read`, the
  * program runs inside vm_jail_tool (it may read only that file and write only in `jail_rw`) or not at all. */
 /* ---- an encrypted machine's key (docs/VIRTUALIZATION.md 8, "Encrypted machines") ----
- * lord-server reads it from the session keyring (owner "machines", service "machines:<id>") and hands it over on a pipe
- * (--key-fd N, any command). It lives here in one locked page that never goes to a core dump, and leaves only through a
- * new pipe per use, which QEMU and qemu-img read as a secret object, file=/proc/self/fd/N: never an argument, the
- * environment or a file. 64 lowercase hex digits (32 random bytes, LordOS's own; vm_key_valid) */
+ * lord-server reads it from the session keyring (owner "machines", service "machines:<id>") and hands it over on a
+ * socketpair (--key-fd N, any command; a pipe from a test or the CLI is taken too). It lives here in one locked page
+ * that never goes to a core dump, and leaves only through a new pipe per use, which QEMU and qemu-img read as a secret
+ * object, file=/proc/self/fd/N (swtpm: pwdfd): never an argument, the environment or a file. 64 lowercase hex digits
+ * (32 random bytes, LordOS's own; vm_key_valid).
+ *
+ * The person's other programs can reopen any pipe a dumpable process of theirs holds (/proc/<pid>/fd/N needs only
+ * ptrace's read access, which Yama's scope 1 doesn't restrict), whichever end it is, and read what is in it. So: a
+ * socket from lord-server (a socket can't be reopened through /proc: ENXIO), lord-vm non-dumpable from the moment it
+ * has the key (after QEMU's user namespace is made, which needs it dumpable), and each reader's pipe stays empty until
+ * that reader has exec'd and the kernel made it non-dumpable (the private loader in its own mount namespace, as QEMU's;
+ * vmsandbox.h): key_give writes it then, or never. */
 static char *vkey;
 static size_t vkey_n;
+static int key_userns = -1, key_userns_err;     /* the user namespace made at --key-fd, before lord-vm went non-dumpable */
 static int key_have(void) { return vkey && vkey_n; }
 static void key_wipe(void) {
     if (vkey) { explicit_bzero(vkey, 4096); munlock(vkey, 4096); munmap(vkey, 4096); }
@@ -303,7 +312,7 @@ static void key_wipe(void) {
 }
 static int key_load_fd(int fd) {
     struct stat st;
-    if (fd < 3 || fstat(fd, &st) || !(S_ISFIFO(st.st_mode) || S_ISREG(st.st_mode))) return -1;
+    if (fd < 3 || fstat(fd, &st) || !(S_ISSOCK(st.st_mode) || S_ISFIFO(st.st_mode) || S_ISREG(st.st_mode))) return -1;
     void *pg = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (pg == MAP_FAILED) return -1;
     mlock(pg, 4096);
@@ -322,14 +331,38 @@ static int key_load_fd(int fd) {
     if (!vm_key_valid(vkey, vkey_n)) { key_wipe(); return -1; }
     return 0;
 }
-/* a pipe holding the key, its read end (O_CLOEXEC); 64 bytes, under PIPE_BUF: written whole, never blocks */
-static int key_pipe(void) {
+/* an empty pipe for the key (both ends O_CLOEXEC): the read end for the child, *w for key_give once it has exec'd */
+static int key_pipe(int *w) {
     int p[2];
+    *w = -1;
     if (!key_have() || pipe2(p, O_CLOEXEC)) return -1;
-    ssize_t w = write(p[1], vkey, vkey_n);
-    close(p[1]);
-    if (w != (ssize_t)vkey_n) { close(p[0]); return -1; }
+    *w = p[1];
     return p[0];
+}
+/* after the child's exec (sync: the end it held was closed by exec, or it died; -1 when the caller knows already): the
+ * key into w (64 bytes, under PIPE_BUF: written whole, never blocks) only when the kernel made the child non-dumpable,
+ * so no other program of the person's can reopen its end of the pipe. w is closed either way; 0 when given */
+static int key_give(pid_t pid, int sync, int w, const char *who) {
+    if (w < 0) return -1;
+    ssize_t r = 0;
+    if (sync >= 0) {
+        char c;
+        while ((r = read(sync, &c, 1)) < 0 && errno == EINTR) {}
+        close(sync);
+    }
+    int ok = r == 0 && vm_nondumpable(pid);
+    if (ok) ok = write(w, vkey, vkey_n) == (ssize_t)vkey_n;
+    else fprintf(stderr, "lord-vm: the machine's key isn't given to %s: it isn't non-dumpable (no private loader), so the person's other programs could read it\n", who);
+    close(w);
+    return ok ? 0 : -1;
+}
+/* in a child that gets the key, before its jail: QEMU's namespaces and private loader, so the kernel makes it
+ * non-dumpable at exec (key_give checks). The loader's copy goes in tmpdir (a folder that allows exec), else the
+ * session's runtime folder, else /dev/shm */
+static void key_child_ns(const char *tmpdir) {
+    if (!vm_ns_enter(key_userns)) return;
+    const char *rt = getenv("XDG_RUNTIME_DIR");
+    vm_ns_setup(tmpdir && tmpdir[0] ? tmpdir : rt && rt[0] == '/' ? rt : NULL, NULL);
 }
 /* a qcow2 node's encryption, in QEMU's JSON (blockdev and qemu-img's json: specs), when this machine's disks have it */
 #define KEY_SECRET_ID "lvk"
@@ -349,28 +382,38 @@ static int run_tool_in(char *const argv0[], char *out, size_t outcap, const char
     /* an encrypted machine's qemu-img gets the key as a secret object on fd 3 (a pipe), right after its subcommand */
     char *const *argv = argv0;
     char *kargv[48];
-    int kp = -1;
+    int kp = -1, kw = -1, sy[2] = { -1, -1 };
     if (!tool_nokey && key_have() && !strcmp(argv0[0], QEMU_IMG) && argv0[1]) {
         int n = 0;
         while (argv0[n]) n++;
-        if (n + 3 > (int)(sizeof kargv / sizeof kargv[0]) || (kp = key_pipe()) < 0) return -1;
+        if (n + 3 > (int)(sizeof kargv / sizeof kargv[0]) || (kp = key_pipe(&kw)) < 0) return -1;
+        /* closed by qemu-img's exec: then key_give looks at it */
+        if (pipe2(sy, O_CLOEXEC)) { close(kp); close(kw); return -1; }
         kargv[0] = argv0[0]; kargv[1] = argv0[1];
         kargv[2] = "--object"; kargv[3] = "secret,id=" KEY_SECRET_ID ",file=/proc/self/fd/3";
         for (int i = 2; i <= n; i++) kargv[i + 2] = argv0[i];
         argv = kargv;
     }
     int p[2];
-    if (pipe2(p, O_CLOEXEC)) { if (kp >= 0) close(kp); return -1; }
+    if (pipe2(p, O_CLOEXEC)) { if (kp >= 0) { close(kp); close(kw); close(sy[0]); close(sy[1]); } return -1; }
     pid_t pid = fork();
-    if (pid < 0) { close(p[0]); close(p[1]); if (kp >= 0) close(kp); return -1; }
+    if (pid < 0) { close(p[0]); close(p[1]); if (kp >= 0) { close(kp); close(kw); close(sy[0]); close(sy[1]); } return -1; }
     if (!pid) {
         prctl(PR_SET_PDEATHSIG, SIGKILL);        /* a qemu-img never outlives the lord-vm that runs it (a killed clone) */
         dup2(p[1], 1);
         dup2(p[1], 2);
         int null = open("/dev/null", O_RDONLY);
         if (null >= 0) dup2(null, 0);
-        if (kp >= 0 && (kp == 3 ? fcntl(3, F_SETFD, 0) : dup2(kp, 3)) < 0) _exit(126);
-        syscall(SYS_close_range, kp >= 0 ? 4 : 3, ~0u, 0);
+        /* with the key, qemu-img in QEMU's namespaces and private loader (before the fds move: the namespace's fd is
+         * above them): non-dumpable at exec, or key_give leaves its pipe empty */
+        if (kp >= 0) key_child_ns(NULL);
+        /* the key's pipe on 3, the exec's sync on 4 (closed by the exec), above both moved first so neither overwrites
+         * the other */
+        if (kp >= 0) {
+            int kx = fcntl(kp, F_DUPFD_CLOEXEC, 10), sx = fcntl(sy[1], F_DUPFD_CLOEXEC, 10);
+            if (kx < 0 || sx < 0 || dup2(kx, 3) < 0 || dup2(sx, 4) < 0 || fcntl(4, F_SETFD, FD_CLOEXEC)) _exit(126);
+        }
+        syscall(SYS_close_range, kp >= 0 ? 5 : 3, ~0u, 0);
         if (jail_read) {
             int mask = jail_n > 0 ? vm_jail_tool_n(jail_list, jail_n, jail_rw) : vm_jail_tool2(jail_read, jail_read2, jail_rw);
             if (!(mask & VMS_NO_NEW_PRIVS) || !(mask & VMS_SECCOMP_OURS) || (vm_landlock_abi() >= 1 && !(mask & VMS_LANDLOCK_FS))) {
@@ -384,7 +427,11 @@ static int run_tool_in(char *const argv0[], char *out, size_t outcap, const char
         _exit(127);
     }
     close(p[1]);
-    if (kp >= 0) close(kp);
+    if (kp >= 0) {
+        close(kp);
+        close(sy[1]);
+        key_give(pid, sy[0], kw, "qemu-img");
+    }
     size_t n = 0;
     char tmp[4096];
     for (;;) {
@@ -1168,6 +1215,7 @@ static struct {
      * machine's secret object), the kept UEFI code file (fw_fd, 3.6), then the session's layers. xfd_base: the first one's
      * number in QEMU */
     int key_fd, fw_fd, xfd_base;
+    int key_w;                          /* key_fd's write end: the key goes in once QEMU is non-dumpable (key_give) */
     char un_cmd[640];
     /* direct kernel boot (schema 23, 6.1): this start runs disks/boot's kernel (kboot), with its initrd (kboot_initrd) and
      * the command line read and checked at the start (kb_cmd) */
@@ -2258,18 +2306,24 @@ static int spawn_swtpm(char *err, size_t errlen) {
     int lf = open(logp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
     /* an encrypted machine (8): swtpm's own state encryption, AES-256-CBC with encrypt-then-MAC, its key derived from
      * ours (PBKDF2) and read from a pipe on fd 4 */
-    int kp = key_have() ? key_pipe() : -1;
+    int kw = -1, sy[2] = { -1, -1 };
+    int kp = key_have() ? key_pipe(&kw) : -1;
+    if (kp >= 0 && pipe2(sy, O_CLOEXEC)) { close(kp); close(kw); kp = -1; }
     if (key_have() && kp < 0) { snprintf(err, errlen, "the key couldn't be handed to swtpm"); close(sv[0]); close(sv[1]); if (lf >= 0) close(lf); return -1; }
     pid_t pid = fork();
-    if (pid < 0) { snprintf(err, errlen, "fork: %s", strerror(errno)); close(sv[0]); close(sv[1]); if (lf >= 0) close(lf); if (kp >= 0) close(kp); return -1; }
+    if (pid < 0) { snprintf(err, errlen, "fork: %s", strerror(errno)); close(sv[0]); close(sv[1]); if (lf >= 0) close(lf); if (kp >= 0) { close(kp); close(kw); close(sy[0]); close(sy[1]); } return -1; }
     if (!pid) {
         child_common(tpm_procs_fd);
         int null = open("/dev/null", O_RDWR);
         dup2(null, 0);
         dup2(lf >= 0 ? lf : null, 1);
         dup2(lf >= 0 ? lf : null, 2);
-        int fds[2] = { sv[1], kp };
-        place_fds(fds, kp >= 0 ? 2 : 1);
+        /* 3 the control socket, 4 the key's pipe, 5 the exec's sync (closed by the exec); with the key, swtpm in QEMU's
+         * namespaces and private loader: non-dumpable at exec, or key_give leaves its pipe empty */
+        if (kp >= 0) key_child_ns(S.rundir);        /* before place_fds, which closes the namespace's fd */
+        int fds[3] = { sv[1], kp, sy[1] };
+        place_fds(fds, kp >= 0 ? 3 : 1);
+        if (kp >= 0 && fcntl(5, F_SETFD, FD_CLOEXEC)) _exit(126);
         const char *reads[] = { "/etc/ld.so.cache" };
         int mask = vm_jail_tool_n(reads, 1, dir);
         if (!(mask & VMS_NO_NEW_PRIVS) || !(mask & VMS_SECCOMP_OURS) || (vm_landlock_abi() > 0 && !(mask & VMS_LANDLOCK_FS))) _exit(126);
@@ -2281,7 +2335,12 @@ static int spawn_swtpm(char *err, size_t errlen) {
     }
     close(sv[1]);
     if (lf >= 0) close(lf);
-    if (kp >= 0) close(kp);
+    if (kp >= 0) {
+        close(kp);
+        close(sy[1]);
+        if (key_give(pid, sy[0], kw, "swtpm")) { kill(pid, SIGKILL); waitpid(pid, NULL, 0); close(sv[0]);
+                                                 snprintf(err, errlen, "the key isn't given to swtpm: it isn't non-dumpable"); return -1; }
+    }
     S.tpm = pid;
     vlog("tpm: swtpm pid %d, state in %s%s", (int)pid, S.sess_on && S.sess_tpm[0] ? "the session's copy (memory)" : "disks/tpm",
          kp >= 0 ? ", encrypted" : "");
@@ -3354,6 +3413,9 @@ static void build_qemu_args(void) {
     }
 }
 
+/* a start that fails before QEMU got the key: the key's write end goes unwritten (QEMU reads an empty secret) */
+static void key_drop_w(void) { if (S.key_w >= 0) { close(S.key_w); S.key_w = -1; } }
+
 static void fail_start(const char *fmt, ...) {
     char d[160];
     va_list ap;
@@ -3566,7 +3628,7 @@ static int start_machine(void) {
     decide_graphics();
     /* venus: its render server first (lord-vm's; QEMU only gets its connection) */
     if (S.gl && S.venus && spawn_venus()) S.venus = 0;
-    if (key_have() && (S.key_fd = key_pipe()) < 0) { session_close(); fail_start("the machine's key couldn't be handed to QEMU"); return -1; }
+    if (key_have() && (S.key_fd = key_pipe(&S.key_w)) < 0) { session_close(); fail_start("the machine's key couldn't be handed to QEMU"); return -1; }
     build_qemu_args();
     {
         char line[8192];
@@ -3579,7 +3641,7 @@ static int start_machine(void) {
     }
     if (S.userns < 0) vlog("qemu: no user namespace (%s): QEMU runs in the session's namespaces, readable by the person's programs", strerror(S.userns_err));
     pid_t pid = fork();
-    if (pid < 0) { fail_start("fork: %s", strerror(errno)); return -1; }
+    if (pid < 0) { key_drop_w(); fail_start("fork: %s", strerror(errno)); return -1; }
     if (!pid) {
         child_common(qemu_procs_fd);
         /* a group's member under the anonymity profile (19.5): no transparent huge pages at all, whatever the system's
@@ -3728,11 +3790,17 @@ static int start_machine(void) {
     close(st[0]);
     S.sc_exec_done = 1;     /* the exec is over (or failed): any execveat from now on stops QEMU */
     if (n >= 4) S.sandbox |= got[0];
-    if (n < 4 || !(got[0] & VMS_SECCOMP_OURS) || !(got[0] & VMS_NO_NEW_PRIVS)) { fail_start("QEMU's sandbox couldn't be set up (seccomp %d, no_new_privs %d)", !!(got[0] & VMS_SECCOMP_OURS), !!(got[0] & VMS_NO_NEW_PRIVS)); return -1; }
-    if (n == sizeof got) { fail_start("can't run QEMU: %s", strerror(got[1])); return -1; }
+    if (n < 4 || !(got[0] & VMS_SECCOMP_OURS) || !(got[0] & VMS_NO_NEW_PRIVS)) { key_drop_w(); fail_start("QEMU's sandbox couldn't be set up (seccomp %d, no_new_privs %d)", !!(got[0] & VMS_SECCOMP_OURS), !!(got[0] & VMS_NO_NEW_PRIVS)); return -1; }
+    if (n == sizeof got) { key_drop_w(); fail_start("can't run QEMU: %s", strerror(got[1])); return -1; }
     S.sandbox |= VMS_SECCOMP_QEMU | VMS_PDEATHSIG;
     /* the status pipe closed at exec, after the kernel set QEMU's dumpability: what the person's programs see now */
     if (vm_nondumpable(pid)) S.sandbox |= VMS_NONDUMPABLE;
+    /* an encrypted machine: QEMU's pipe gets the key now, and only when QEMU is non-dumpable (key_give) */
+    if (S.key_w >= 0) {
+        int kw = S.key_w;
+        S.key_w = -1;
+        if (key_give(pid, -1, kw, "QEMU")) { fail_start("the machine's key isn't given to QEMU: QEMU isn't non-dumpable (no private loader), so the person's other programs could read it"); return -1; }
+    }
     vlog("qemu: pid %d; sandbox: landlock-fs=%d landlock-net=%d landlock-scope=%d seccomp(ours)=%d allowlist=%d named=%d%s no-new-privs=%d kvm-by-fd=%d namespaces=%d non-dumpable=%d noexec-disks=%d%s",
          (int)pid, !!(S.sandbox & VMS_LANDLOCK_FS), !!(S.sandbox & VMS_LANDLOCK_NET), !!(S.sandbox & VMS_LANDLOCK_SCOPE),
          !!(S.sandbox & VMS_SECCOMP_OURS), !!(S.sandbox & VMS_SECCOMP_ALLOWLIST), !!(S.sandbox & VMS_SECCOMP_NAMED),
@@ -8761,7 +8829,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = S.sh_fd = S.gt_fd = S.rx_fd = S.rx_hpipe = -1;
     for (int i = 0; i < VM_EXTRA_NICS; i++) S.xnic_err[i] = -1;
-    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = S.render_fd = S.render_qfd = S.vs_pidfd = S.vs_fd = S.vs_qemu_end = S.vs_qfd = S.vs_err = -1;
+    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.key_w = S.fw_fd = S.render_fd = S.render_qfd = S.vs_pidfd = S.vs_fd = S.vs_qemu_end = S.vs_qfd = S.vs_err = -1;
     for (int i = 0; i < 2 + VM_DATA_DISKS; i++) S.sess_fds[i] = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
@@ -8802,8 +8870,8 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         fcntl(pidfd_to, F_SETFD, FD_CLOEXEC);
     }
     /* QEMU's user namespace: made now, while lord-vm is still dumpable (vmsandbox.h) */
-    S.userns = vm_userns_open();
-    S.userns_err = S.userns < 0 ? errno : 0;
+    if (key_have()) { S.userns = key_userns; S.userns_err = key_userns_err; }    /* made at --key-fd (lord-vm is non-dumpable since) */
+    else { S.userns = vm_userns_open(); S.userns_err = S.userns < 0 ? errno : 0; }
     prctl(PR_SET_DUMPABLE, 0);
     signal(SIGPIPE, SIG_IGN);
     if (!realpath(dir, S.dir) || !dir_ok(S.dir)) { fprintf(stderr, "lord-vm: %s: not a machine folder (or its path has ',' or control characters)\n", dir); return 1; }
@@ -12909,6 +12977,11 @@ int main(int argc, char **argv) {
         char *e;
         long fd = strtol(argv[i + 1], &e, 10);
         if (*e || fd < 3 || fd > 1000 || key_load_fd((int)fd)) { fprintf(stderr, "lord-vm: --key-fd: no key on that descriptor\n"); return 2; }
+        /* QEMU's user namespace while lord-vm is still dumpable (vmsandbox.h), then non-dumpable for as long as it holds
+         * the key: no other program of the person's reads its memory or reopens the pipes it hands the key on */
+        key_userns = vm_userns_open();
+        key_userns_err = key_userns < 0 ? errno : 0;
+        prctl(PR_SET_DUMPABLE, 0);
         memmove(argv + i, argv + i + 2, (size_t)(argc - i - 1) * sizeof *argv);
         argc -= 2;
         break;

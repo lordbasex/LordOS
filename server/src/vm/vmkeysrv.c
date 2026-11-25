@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/random.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -199,12 +200,15 @@ int vmkey_state(const char *id) {
     pthread_mutex_unlock(&mu);
     return st;
 }
+/* a socketpair, not a pipe: lord-server and the child it forks before exec are dumpable, and a pipe either of them
+ * holds can be reopened through /proc/<pid>/fd/N by any other program of the person's and read (CLAUDE-SECURITY F4);
+ * a socket can't be (ENXIO), and pidfd_getfd needs ptrace's attach access, which Yama keeps from them */
 int vmkey_pipe(const char *id) {
     int p[2] = { -1, -1 }, ok = 0;
     pthread_mutex_lock(&mu);
     Slot *s = slots ? slot_of(id, 0) : NULL;
-    if (s && s->state == VMK_READY && !pipe2(p, O_CLOEXEC)) {
-        ok = write(p[1], s->key, 64) == 64;
+    if (s && s->state == VMK_READY && !socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, p)) {
+        ok = send(p[1], s->key, 64, MSG_NOSIGNAL) == 64;
         close(p[1]);
     }
     pthread_mutex_unlock(&mu);
