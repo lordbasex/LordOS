@@ -508,6 +508,12 @@ on VM 116 with the development stand-in for `lord.cloud` (`sdk/cloudmock.js`, `"
   same: Files doesn't write there, even in a folder the user owns (such as one given with `chown`). There is no root
   mode. Isolated `.lpk` apps don't get this: their broker only reaches their own data folder.
   «Open with» and the helpers keep the home folder and the user's mounts.
+- A copy (`lord.fs.copy`, never a move) also takes its source from the read-only tree, but only a regular file:
+  `fsops_resolve_copy_source` resolves its folder and keeps its own name, so a link is refused rather than followed,
+  and a folder outside the home folder and the user's mounts is refused, so a copy never walks into a mount that
+  reading leaves out (`/proc`, `/run`). That is what a Linux app hands over when it drops a file it wrote outside the
+  home folder, such as a message Thunderbird writes to `/tmp/dnd_file/` for a drop on Files (GitHub #188). Before,
+  that drop failed with "That location is outside your home folder".
 - Writing, copying to, moving and sending to the Trash reject the protected folders
   (`fsops_protected`: `~/.local/share/applications`, `~/.config/autostart`,
   `~/.local/share/lordos/apps`, `~/.config/lordos/settings.json`, the permission and firewall

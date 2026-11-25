@@ -10,6 +10,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+- **A message dragged from Thunderbird onto a Files folder is copied there** (GitHub #188). Thunderbird (and other
+  Mozilla apps) drops a message as a `.eml` it writes to `/tmp/dnd_file/` and hands over as `text/uri-list`. The drop
+  itself worked on Wayland and on X11 (Xwayland): lord-server read the list and Files claimed it, but `lord.fs.copy`
+  resolved its source as it does a destination, inside the home folder and the user's mounts only, so the copy failed
+  with "That location is outside your home folder" and nothing appeared. A copy (never a move) now also takes its source
+  from the read-only tree that `lord.fs` already reads (`fsops_readable`), but only a regular file
+  (`fsops_resolve_copy_source` in `server/src/fsops.c`): the folder is resolved and the name kept, so a link is refused
+  rather than followed, and a folder outside the writable roots is refused, so a copy can't walk into `/proc` or `/run`
+  below it; the X cookie stays out. `build/fsops-test` covers a file, a folder, a link, `/proc`, the X cookie and the
+  copy itself (181 checks). Checked on VM 127 (0.8.9.6 code, Thunderbird 153.7 ESR from Debian, Local Folders only)
+  with screenshots, on Wayland and on X11, before and after: moving a message between local folders, at 100 % and 125 %;
+  attaching a `.txt` and an `.eml` from Files to a compose window; a message out to a Files folder (failed before, copied
+  after); a message released over the desktop, which takes no drop, is cancelled at once. The pointer never froze and
+  every release ended the drag; Chromium's HTML5 drag and drop on both backends also dropped.
+
 ## [0.8.9.6-beta] - 2026-11-25
 
 ### Added

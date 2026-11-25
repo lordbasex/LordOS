@@ -489,6 +489,51 @@ int main(void) {
         rename(keep, l);
     }
 
+    /* a copy's source outside the home (GitHub #188: Thunderbird drops a message as a file it wrote to /tmp): a regular
+     * file where reading is allowed, never a folder (it could hold a mount reading leaves out) nor a link */
+    {
+        char od[300], f[400], sub[400], ln[400], out[PATH_MAX + 300];
+        snprintf(od, sizeof od, "%s-out", H);
+        mkdir(od, 0755);
+        snprintf(f, sizeof f, "%s/DnD test.eml", od);
+        FILE *fp = fopen(f, "w");
+        if (fp) { fputs("Subject: dnd\n\nbody\n", fp); fclose(fp); }
+        snprintf(sub, sizeof sub, "%s/folder", od);
+        mkdir(sub, 0755);
+        snprintf(ln, sizeof ln, "%s/link.eml", od);
+        CHECK(symlink(f, ln) == 0);
+        CHECK(fsops_resolve_copy_source(f, out, sizeof out, NULL) == 1 && !strcmp(out, f));
+        CHECK(fsops_resolve_copy_source(sub, out, sizeof out, NULL) == -1);
+        CHECK(fsops_resolve_copy_source(ln, out, sizeof out, NULL) == -1);
+        CHECK(fsops_resolve_copy_source(od, out, sizeof out, NULL) == -1);
+        CHECK(fsops_resolve_copy_source("/proc/self/environ", out, sizeof out, NULL) == -1);
+        CHECK(fsops_resolve_copy_source("/proc/self/status", out, sizeof out, NULL) == -1);
+        CHECK(fsops_resolve_copy_source("/etc", out, sizeof out, NULL) == -1);
+        CHECK(fsops_resolve_copy_source("relative.eml", out, sizeof out, NULL) != 1);
+        /* the X cookie stays out even as a plain file outside the home */
+        char xa[400];
+        snprintf(xa, sizeof xa, "%s/lord-xauth", od);
+        fp = fopen(xa, "w");
+        if (fp) { fputs("cookie", fp); fclose(fp); }
+        fsops_protect_file(FSOPS_PF_XAUTH, xa);
+        CHECK(fsops_resolve_copy_source(xa, out, sizeof out, NULL) == -1);
+        fsops_protect_file(FSOPS_PF_XAUTH, "");
+        /* in the home: as a destination resolves it (0), a protected folder's file -2 */
+        put("in-home.txt", "x");
+        path(a, "in-home.txt");
+        CHECK(fsops_resolve_copy_source(a, out, sizeof out, NULL) == 0);
+        /* and the copy itself lands in the home */
+        path(b, "DnD test.eml");
+        int id = fsjob_start(f, b, 0, err, sizeof err);
+        CHECK(id >= 0);
+        if (id >= 0) wait_job(id);
+        CHECK(exists("DnD test.eml"));
+        CHECK(lstat(f, &(struct stat){0}) == 0);           /* a copy: the app's file stays */
+        unlink(ln); unlink(f); unlink(xa); rmdir(sub); rmdir(od);
+        path(a, "DnD test.eml"); unlink(a);
+        path(a, "in-home.txt"); unlink(a);
+    }
+
     /* a name longer than 255 bytes (GitHub #102): refused as a destination, and told apart from "outside the home" */
     {
         char longp[PATH_MAX], name[300], out[PATH_MAX + 300];

@@ -1118,6 +1118,19 @@ int fsops_resolve_stat(const char *path, char *target, size_t n, int *down) {
     return -1;
 }
 
+/* lord.fs.copy's source (never a move's): in the writable roots as fsops_resolve_target says (0, or -2 for a protected
+ * one, which a copy may still read), and outside them only a regular file where reading is allowed (1): what a Linux
+ * app hands over in a drag or a copy, such as the message Thunderbird writes to /tmp for a drop (GitHub #188). Its
+ * folder is resolved and its own name kept, so a link is refused, not followed; a folder outside the roots is refused
+ * too, so a copy never walks into a mount below it that reading leaves out (/proc, /run). -1 refused. */
+int fsops_resolve_copy_source(const char *path, char *out, size_t n, int *down) {
+    int r = fsops_resolve_target(path, out, n, NULL, 0, down);
+    if (r != -1 || (down && *down)) return r;
+    struct stat st;
+    if (fsops_resolve_stat(path, out, n, down) != 1 || lstat(out, &st) || !S_ISREG(st.st_mode)) return -1;
+    return 1;
+}
+
 /* A folder Files shows with a lock: the system's permissions don't let this user open it, or it is one of the
  * pseudo-filesystems lord.fs doesn't read (fsops_readable). */
 static int dir_locked(const char *path) {
