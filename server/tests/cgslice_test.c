@@ -6,7 +6,10 @@
  * All of it on a throwaway tree, /sys/fs/cgroup/lordos-slicetest-<pid> standing in for lordos.service (this process
  * moves itself into its "supervisor" leaf, as lord-sessiond does, and back out at the end); never lordos.service, the
  * running lord-sessiond or a session. The «client» is a child of this test that moves into the stand-in session's
- * server leaf, drops to the user and asks over a Unix socket in /var/tmp/lordos-slice/, as lord-server's lord-vm does.
+ * server leaf, drops to the user and asks over a Unix socket in /run/lordos-slicetest/, as lord-server's lord-vm does.
+ * That folder is root's alone (in /run only root makes folders; checked: a real folder, root's, 0711 so the dropped
+ * client can reach its socket but list or write nothing); the scratch files and the stand-in lord-netperm go in a fresh
+ * mkdtemp folder of root's (0700) in /var/tmp (/run is noexec), never a fixed path another user could have made first.
  *
  *   sudo build/cgslice-test [uid]      (uid: the user to drop to, default SUDO_UID or 1000; without root it skips)
  *   sudo build/cgslice-test serve BINDIR UID
@@ -32,7 +35,7 @@
 static int fails, checks;
 #define CHECK(c, ...) do { checks++; if (!(c)) { fails++; fprintf(stderr, "FAIL %s:%d: ", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } } while (0)
 
-static char root[96], home_cg[PATH_MAX], sockdir[] = "/var/tmp/lordos-slice", sockpath[100];
+static char root[96], home_cg[PATH_MAX], sockdir[] = "/run/lordos-slicetest", sockpath[100];
 static const char *VMID = "app-lordos-lordos-vm-6f1c0d2e-1111-4222-8333-444455556666.scope";
 
 static volatile sig_atomic_t stop;
@@ -59,6 +62,17 @@ static int move_self(const char *dir) {
     snprintf(p, sizeof p, "%s/cgroup.procs", dir);
     snprintf(v, sizeof v, "%d", (int)getpid());
     return put(p, v);
+}
+/* the socket's folder: made here, or one already there that is a real folder of root's that no one else can write to
+ * (a link or someone else's folder fails the test); 0711 so the dropped client reaches the socket by name only */
+static int root_dir(const char *d) {
+    if (mkdir(d, 0711) && errno != EEXIST) return -1;
+    int fd = open(d, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    struct stat s;
+    int ok = fd >= 0 && !fstat(fd, &s) && S_ISDIR(s.st_mode) && s.st_uid == 0 && !(s.st_mode & 022) && !fchmod(fd, 0711);
+    if (fd >= 0) close(fd);
+    if (!ok) { fprintf(stderr, "cgslice-test: %s isn't a folder of root's alone\n", d); return -1; }
+    return 0;
 }
 static void rm_tree(const char *dir) {        /* depth-first; cgroupfs folders only */
     char cmd[PATH_MAX + 64];
@@ -128,11 +142,11 @@ int main(int argc, char **argv) {
         if (f) fclose(f);
     }
     snprintf(root, sizeof root, "/sys/fs/cgroup/lordos-slicetest-%d", (int)getpid());
-    char sup[128], sess[160], server[200], p[600];
+    char sup[128], sess[160], server[200], p[600], scratch[64] = "";   /* scratch: this run's own folder (0700) */
     snprintf(sup, sizeof sup, "%s/supervisor", root);
     snprintf(sess, sizeof sess, "%s/lordos-session-%u", root, uid);
     snprintf(server, sizeof server, "%s/server", sess);
-    mkdir(sockdir, 0755);
+    if (root_dir(sockdir)) return 1;
     snprintf(sockpath, sizeof sockpath, "%s/cg-%d.sock", sockdir, (int)getpid());
     if (mkdir(root, 0755) || mkdir(sup, 0755) || move_self(sup)) { perror("the stand-in service"); rmdir(sup); rmdir(root); return 1; }
     /* as lord-sessiond: controllers on the service root, the session's subtree, root-owned (cgroup_delegate_session's steps) */
@@ -172,13 +186,15 @@ int main(int argc, char **argv) {
     }
 
     /* which lord-netperm runs (cgroup_netperm_current): a stand-in procs file in the scratch folder */
+    snprintf(scratch, sizeof scratch, "/var/tmp/lordos-slicetest.XXXXXX");
+    if (!mkdtemp(scratch)) { perror("cgslice-test: scratch folder"); goto out; }
     {
         char pf[160], copy[160];
-        snprintf(pf, sizeof pf, "%s/procs-%d", sockdir, (int)getpid());
-        snprintf(copy, sizeof copy, "%s/lord-netperm", sockdir);
+        snprintf(pf, sizeof pf, "%s/procs", scratch);
+        snprintf(copy, sizeof copy, "%s/lord-netperm", scratch);
         CHECK(cgroup_netperm_current("/nonexistent/cgroup.procs") == 1, "not running: the installed one starts next");
-        int fd = open(pf, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
-        close(fd);
+        int fd = open(pf, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+        if (fd >= 0) close(fd);
         CHECK(cgroup_netperm_current(pf) == 1, "empty: restarting");
         put(pf, "garbage\n");
         CHECK(cgroup_netperm_current(pf) == 0, "garbage: not sure, the old place");
@@ -189,9 +205,9 @@ int main(int argc, char **argv) {
         put(pf, me);
         CHECK(cgroup_netperm_current(pf) == 0, "another program");
         /* a program named lord-netperm: running from its file it is current; with the file replaced, older */
-        char cmd[400];
-        snprintf(cmd, sizeof cmd, "cp /bin/sleep '%s'", copy);
-        if (system(cmd)) { /* checked below */ }
+        pid_t cp = fork();                           /* cp /bin/sleep COPY, no shell */
+        if (cp == 0) { execl("/bin/cp", "cp", "--", "/bin/sleep", copy, (char *)NULL); _exit(127); }
+        if (cp > 0) waitpid(cp, NULL, 0);
         pid_t sl = fork();
         if (sl == 0) { execl(copy, "lord-netperm", "30", (char *)NULL); _exit(127); }
         usleep(200000);
@@ -253,8 +269,8 @@ int main(int argc, char **argv) {
      * limits noted and put back */
     int svc = open(root, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     char notes_path[200];
-    snprintf(notes_path, sizeof notes_path, "%s/notes-%d", sockdir, (int)getpid());
-    int nf = open(notes_path, O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+    snprintf(notes_path, sizeof notes_path, "%s/notes", scratch);
+    int nf = open(notes_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
     /* the test itself sits in supervisor: the stand-in root keeps its controllers (as on a live lordos.service whose
      * ExecStartPre isn't in the root), so only the sessions' part is checked */
     cgroup_release_at(svc, nf);
@@ -287,6 +303,7 @@ int main(int argc, char **argv) {
 out:
     if (lis >= 0) close(lis);
     unlink(sockpath);
+    if (scratch[0]) rmdir(scratch);
     rmdir(sockdir);
     move_self(home_cg);
     rm_tree(root);

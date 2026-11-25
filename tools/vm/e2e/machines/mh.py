@@ -13,7 +13,7 @@
 #       assert img.varied(s.window_rect("machines"))
 #       s.ns(["./build/lord-vm", "--status", d])   # a command in the same kind of namespaces, as the session sees them
 # As a command (for shell scripts): python3 -I mh.py start|js|ui|shot|stop … (README.md).
-import json, os, re, select, shutil, signal, socket, struct, subprocess, sys, tempfile, threading, time, zlib
+import json, os, re, select, shutil, signal, socket, stat, struct, subprocess, sys, tempfile, threading, time, zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "../../../.."))
@@ -22,6 +22,68 @@ BUILD = os.path.join(SERVER, "build")
 SCRATCH = os.environ.get("MH_SCRATCH", "/var/tmp/lordos-m100-e2e")
 IMAGES = os.environ.get("MH_IMAGES", "/var/tmp/lordos-m100-images")
 SKIP = 77
+
+
+def private_dir(path):
+    """path as a folder only this account can use: made 0700 if missing; if it is already there it must be a real
+    folder (not a link) of this account, and it is set to 0700. Anything else (a folder another user made first in the
+    shared /var/tmp, a link) raises: the harness never works in a folder someone else can swap things in."""
+    parent = os.path.dirname(os.path.abspath(path))
+    if not os.path.isdir(parent):
+        os.makedirs(parent)
+    try:
+        os.mkdir(path, 0o700)
+    except FileExistsError:
+        pass
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        st = os.fstat(fd)
+        if st.st_uid != os.getuid():
+            raise RuntimeError("%s belongs to uid %d, not this account: refusing to use it (remove it or set another path)"
+                               % (path, st.st_uid))
+        if st.st_mode & 0o077:
+            os.fchmod(fd, 0o700)
+    finally:
+        os.close(fd)
+    return path
+
+
+def scratch():
+    """SCRATCH, checked private (private_dir) before any run folder is made in it."""
+    return private_dir(SCRATCH)
+
+
+def own_child(D):
+    """D as one of this harness's run folders: a direct child of SCRATCH, a real folder of this account, 0700. For
+    paths read back from .cli-session.json or found by `reap`, before anything is removed, killed or run on them."""
+    D = os.path.abspath(D)
+    if os.path.dirname(D) != os.path.abspath(SCRATCH) or os.path.basename(D) in ("", ".", ".."):
+        raise RuntimeError("%s isn't a session folder in %s" % (D, SCRATCH))
+    st = os.lstat(D)
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid() or st.st_mode & 0o077:
+        raise RuntimeError("%s isn't a private folder of this account" % D)
+    return D
+
+
+def proc_uid(pid):
+    """The real uid a process runs as (/proc/PID/status; its folder's owner changes for a non-dumpable process)."""
+    with open("/proc/%d/status" % int(pid)) as f:
+        for line in f:
+            if line.startswith("Uid:"):
+                return int(line.split()[1])
+    raise OSError("no Uid in /proc/%s/status" % pid)
+
+
+def own_server(pid):
+    """pid as a lord-server of this account that leads its own process group (Session.start's start_new_session)."""
+    try:
+        pid = int(pid)
+        if pid <= 1 or proc_uid(pid) != os.getuid() or os.getpgid(pid) != pid:
+            return False
+        cmd = open("/proc/%d/cmdline" % pid, "rb").read().split(b"\0")
+    except (OSError, ValueError, TypeError):
+        return False
+    return bool(cmd) and os.path.basename(cmd[0]) in (b"lord-server", b"lord-server-test")
 
 
 class Skip(Exception):
@@ -263,9 +325,10 @@ def ns_prefix(scratch):
     uid, gid = os.getuid(), os.getgid()
     rt = "/run/user/%d" % uid
     fake = os.path.join(scratch, "fake")
-    inner = ("mount --bind '%s' '%s' && { [ -d %s ] && mount -t tmpfs -o mode=700 tmpfs %s || true; } && "
-             "exec unshare --user --map-user=%d --map-group=%d \"$0\" \"$@\"") % (fake, realhome(), rt, rt, uid, gid)
-    return ["unshare", "-Urm", "sh", "-c", inner]
+    # the paths are sh's positional parameters, never part of the script's text (as ns-run.sh does)
+    inner = ('mount --bind "$1" "$2" && { [ -d "$3" ] && mount -t tmpfs -o mode=700 tmpfs "$3" || true; } && shift 3 && '
+             'exec unshare --user --map-user=%d --map-group=%d "$@"') % (uid, gid)
+    return ["unshare", "-Urm", "sh", "-c", inner, "ns", fake, realhome(), rt]
 
 
 def need(cond, why):
@@ -339,8 +402,7 @@ class Session:
 
     def start(self):
         self.check()
-        os.makedirs(SCRATCH, exist_ok=True)
-        self.D = tempfile.mkdtemp(prefix="%s." % self.name, dir=SCRATCH)
+        self.D = tempfile.mkdtemp(prefix="%s." % self.name, dir=scratch())
         os.chmod(self.D, 0o700)
         for d in ("home", "run", "fake", "shots", "home/Machines", "home/.e2e", "home/.config/lordos"):
             os.makedirs(os.path.join(self.D, d), exist_ok=True)
@@ -787,7 +849,12 @@ def _cli():
     if a[0] == "reap":
         # what a run killed with SIGKILL left: every scratch session's machines powered off, its lord-server ended
         import glob
-        for D in [d for d in glob.glob(os.path.join(SCRATCH, "*.*")) if os.path.isdir(d)]:
+        scratch()
+        for D in glob.glob(os.path.join(SCRATCH, "*.*")):
+            try:
+                D = own_child(D)
+            except (OSError, RuntimeError):
+                continue                            # not a run folder of this account's: left alone
             s = Session()
             s.D = D
             for m in s.machines():
@@ -797,9 +864,10 @@ def _cli():
                     continue
                 try:
                     cmd = open("/proc/%s/cmdline" % pid, "rb").read().split(b"\0")
+                    mine = proc_uid(pid) == os.getuid()
                 except OSError:
                     continue
-                if cmd and cmd[0].endswith(b"/lord-server-test") and any(D.encode() in x for x in cmd):
+                if mine and cmd and cmd[0].endswith(b"/lord-server-test") and any(D.encode() in x for x in cmd):
                     os.kill(int(pid), signal.SIGTERM)
                     print("ended lord-server-test %s (%s)" % (pid, D))
             if os.environ.get("MH_KEEP") != "1":
@@ -811,9 +879,10 @@ def _cli():
         s.start()
         json.dump({"D": s.D, "pid": s.proc.pid, "n": s.n}, open(STATE, "w"))
         print(s.D); return 0
+    scratch()                                       # the state file is trusted only inside a private SCRATCH
     st = json.load(open(STATE))
     s = Session()
-    s.D = st["D"]
+    s.D = own_child(st["D"])
     s.n = s.last_cmd()
 
     class P:
@@ -839,10 +908,13 @@ def _cli():
             s.proc = None
             for m in s.machines():
                 s.lordvm("--poweroff", m, check=False)
-            try:
-                os.killpg(st["pid"], signal.SIGTERM)
-            except ProcessLookupError:
-                pass
+            if own_server(st["pid"]):              # this account's lord-server, leading its own group
+                try:
+                    os.killpg(int(st["pid"]), signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+            else:
+                log("not ending pid %r: not a lord-server of this account leading its process group" % st["pid"])
             shutil.rmtree(s.D, ignore_errors=True); os.unlink(STATE)
     finally:
         if os.path.exists(STATE):

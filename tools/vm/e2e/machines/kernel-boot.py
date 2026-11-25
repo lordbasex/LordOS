@@ -38,8 +38,7 @@ def main():
         img = images.agent_image(ARCH)
     except mh.Skip as e:
         print("skipped: %s" % e); return 77
-    os.makedirs(mh.SCRATCH, exist_ok=True)
-    D = tempfile.mkdtemp(prefix="kboot.", dir=mh.SCRATCH)
+    D = tempfile.mkdtemp(prefix="kboot.", dir=mh.scratch())
     os.chmod(D, 0o700)
     for d in ("home/Machines", "run", "fake"):
         os.makedirs(os.path.join(D, d))

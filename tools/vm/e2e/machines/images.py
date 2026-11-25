@@ -20,7 +20,7 @@
 # Exit 77 when it can't be made here (no network, no KVM): the flows that need it skip.
 import hashlib, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from mh import BUILD, IMAGES, ns_prefix, kvm_ok, Skip, skip, log  # noqa: E402
+from mh import BUILD, IMAGES, ns_prefix, private_dir, kvm_ok, Skip, skip, log  # noqa: E402
 
 BASE = "https://cloud.debian.org/images/cloud/trixie/latest"
 ARCH = {"x86_64": "amd64", "aarch64": "arm64"}.get(os.uname().machine, os.uname().machine)
@@ -117,7 +117,7 @@ def fetch(url, out):
 
 def debian(arch=ARCH):
     """Debian 13 nocloud for arch, verified; its path."""
-    os.makedirs(IMAGES, exist_ok=True)
+    private_dir(IMAGES)
     out = os.path.join(IMAGES, "debian13-%s.qcow2" % arch)
     if os.path.exists(out):
         return out
@@ -160,7 +160,7 @@ def fetch_pinned(f, out):
     """f: the catalog's { url, sha256, bytes }. Resumed when a part is there; kept only when the SHA-256 matches."""
     if os.path.exists(out):
         return out
-    os.makedirs(IMAGES, exist_ok=True)
+    private_dir(IMAGES)
     part = out + ".part"
     have = os.path.getsize(part) if os.path.exists(part) else 0
     if have < f["bytes"]:

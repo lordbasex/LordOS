@@ -1155,6 +1155,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   monitor may; a background or remote user, the login screen, a dead or foreign pid, a file another user owns, a
   world-writable file, a symlink, no file, a forged `monitor` key earlier in the file, names that aren't user names, a cut
   file, and random input under ASan).
+- **Test and developer scripts no longer work in shared, fixed `/var/tmp` folders (Claude Security F6, F7, F12, F14,
+  F15, F16)** (in development; latest release 0.8.9.5-beta). Nothing here ships, but these scripts run as root or as the
+  developer, and another local account could create their fixed folders first and swap files in them.
+  `server/tests/cgslice_test.c` (root) keeps its socket in `/run/lordos-slicetest`, a folder only root can make and that
+  the test checks is a real folder of root's (0711, not a link), and its scratch files and the stand-in `lord-netperm`
+  in a fresh `mkdtemp` folder (0700), opened `O_EXCL|O_NOFOLLOW`, copied without a shell; its `CG_NETPERM_PROCS` is now
+  `/run/lordos-slicetest/netperm.procs`. `server/tests/vm_slice.sh` (root) works in a fresh root-owned `mktemp -d`
+  folder: the scripts root runs and the stand-in `lord-netperm` stay root's, only `home/` and `out/` belong to the test
+  user, and the QEMU pid read back from `out/` must be a number. `tools/vm/e2e/machines/storage-fs.sh` makes its work
+  folder with `mktemp -d` (or takes `MH_FS_WORK` only if it is an existing folder of the user and not a link) and
+  loop-mounts the images `nosuid,nodev`. The Machines harness (`mh.py`, `ns-run.sh`, `targets.py`, `kernel-boot.py`,
+  `boot-matrix.py`, `images.py`) uses `MH_SCRATCH` and `MH_IMAGES` only when they are real folders of the user (made
+  0700, set to 0700, refused if someone else's or a link); `ns_prefix` passes the paths to `sh -c` as positional
+  parameters instead of splicing them into the script; `mh.py stop`, `js`, `ui` and `shot` accept a session folder from
+  `.cli-session.json` only if it is a direct private child of `MH_SCRATCH`, and `stop` ends the recorded process group
+  only if it is a `lord-server` of this account leading its own group; `reap` skips folders and processes that are not
+  this account's. Checked: `sudo build/cgslice-test` 28/28 (and it refuses a link at `/run/lordos-slicetest`), `serve`
+  mode, `mh.py start`/`js`/`stop`/`reap` with a real headless session, a forged state file and a hostile folder name.
 - **Settings → Language & Region → Region names each region's language (GitHub #239 follow-up)** (in development;
   latest release 0.8.9.5-beta). A row named only its country, so the five regions of France (Breton, Catalan, Basque,
   French and Occitan) all read "France · xx_FR", and Basque was picked by mistake. Each row now reads "Basque · France
