@@ -110,11 +110,12 @@ export function buildModel(entries) {
       gpus.set(key, e);
     }
     for (const [id, c] of Object.entries(compat)) {
-      if (c.state === 'limits' || c.state === 'no') problems.push({ machine: m.name, id, state: c.state, note: c.note, lordos: report.lordos, fixedIn: fixedIn[id] || null, source: report.source, issue });
+      if (c.state === 'limits' || c.state === 'no') problems.push({ machine: m.name, kind: m.kind, id, state: c.state, note: c.note, lordos: report.lordos, fixedIn: fixedIn[id] || null, source: report.source, issue });
     }
   }
   const order = { reference: 0, community: 1 };
-  machines.sort((a, b) => order[a.source] - order[b.source] || a.name.localeCompare(b.name));
+  // a machine whose firmware gives no vendor or product (name '') goes after the named ones of its source
+  machines.sort((a, b) => order[a.source] - order[b.source] || !a.name - !b.name || a.name.localeCompare(b.name));
   return { machines, gpus: [...gpus.values()].sort((a, b) => a.name.localeCompare(b.name)), problems };
 }
 
@@ -126,9 +127,11 @@ export function renderSections(model, t, esc, issueUrl) {
   const src = (m) => (m.source === 'reference'
     ? `<span class="hw-ref">${esc(t.reference)}</span>`
     : m.issue ? `<a href="${esc(issueUrl(m.issue))}" rel="noopener">#${m.issue}</a>` : '');
+  // a machine with no vendor or product in its firmware: "Unnamed laptop" and the like, by its kind
+  const label = (name, kind) => name || (t.unnamed && (t.unnamed[kind] || t.unnamed.computer)) || kind;
   const fmt = (v) => (v >= 100 ? Math.round(v).toLocaleString('en-US') : String(Math.round(v * 10) / 10));
   const machines = model.machines.map((m) => `<article class="hw-card">
-<h3>${esc(m.name)}</h3>
+<h3>${esc(label(m.name, m.kind))}</h3>
 <p class="hw-meta">${esc((t.kind && t.kind[m.kind]) || m.kind)} · ${esc(m.arch)} · LordOS ${esc(m.lordos)}${m.live ? ` · ${esc(t.live)}` : ''} · ${src(m)}</p>
 <dl class="hw-dl">
 <dt>${esc(t.cpu)}</dt><dd>${esc(m.cpu)}${m.threads ? ` (${m.threads} ${esc(t.threads)})` : ''}</dd>
@@ -140,8 +143,12 @@ ${m.wifi ? `<dt>${esc(t.wifi)}</dt><dd><code>${esc(m.wifi)}</code></dd>` : ''}
 ${m.perf.length ? `<p class="hw-perf">${m.perf.map((p) => `<span>${esc((t.perf && t.perf[p.cat]) || p.cat)} <b>${fmt(p.value)}</b> ${esc(p.unit)}</span>`).join(' · ')}</p>` : ''}
 </article>`).join('\n');
   const gpuRows = model.gpus.map((g) => `<tr><td>${esc(g.name)}</td><td><code>${esc(g.driver)}</code></td><td>${g.works ? st('works') : g.limits ? st('limits') : st('no')}</td><td>${esc(g.versions.join(', '))}</td></tr>`).join('\n');
-  const note = (k) => (k && t.notes && t.notes[k] ? ` ${esc(t.notes[k])}` : '');
-  const probRows = model.problems.map((p) => `<tr><td>${esc(p.machine)}</td><td>${comp(p.id)}</td><td>${st(p.state)}${note(p.note)}</td><td>${esc(p.lordos)}</td><td>${p.fixedIn ? esc(p.fixedIn) : '—'}</td></tr>`).join('\n');
+  // the reports say cpu.<why> with the server's word (cpu.no-context); the strings are camelCase (cpu.noContext)
+  const note = (k) => {
+    const s = k && t.notes && (t.notes[k] || t.notes[k.replace(/-(\w)/g, (_, c) => c.toUpperCase())]);
+    return s ? ` ${esc(s)}` : '';
+  };
+  const probRows = model.problems.map((p) => `<tr><td>${esc(label(p.machine, p.kind))}</td><td>${comp(p.id)}</td><td>${st(p.state)}${note(p.note)}</td><td>${esc(p.lordos)}</td><td>${p.fixedIn ? esc(p.fixedIn) : '—'}</td></tr>`).join('\n');
   return {
     machines,
     gpus: `<div class="hw-table"><table><thead><tr><th>${esc(t.gpu)}</th><th>${esc(t.driver)}</th><th>${esc(t.stateHead)}</th><th>${esc(t.versions)}</th></tr></thead><tbody>${gpuRows}</tbody></table></div>`,
