@@ -8,6 +8,27 @@ const chrome = { w: 2, h: 43 };
 assert.deepEqual(chromeInset(chrome, false), { left: 1, top: 42, w: 2, h: 43 });
 assert.deepEqual(chromeInset(chrome, true), { left: 0, top: 0, w: 0, h: 0 });
 
+// Lord Classic and Lord Workspaces: 1 px borders, a 30 px title bar and a 26 px menu strip under it for a window with
+// menus (every Linux window has its Edit menu with Speech). The strip is part of the frame: left out, the app got
+// 26 px less than it asked for and lost 26 more on each of its own resizes (400, 374, 348 on a fullscreen exit).
+const classic = { w: 2, h: 32, menu: 26 };
+assert.deepEqual(chromeInset(classic, false, true), { left: 1, top: 57, w: 2, h: 58 });
+assert.deepEqual(chromeInset(classic, false, false), { left: 1, top: 31, w: 2, h: 32 });      // no menus: no strip
+assert.deepEqual(chromeInset(classic, true, true), { left: 0, top: 0, w: 0, h: 0 });          // its own frame: no strip either
+assert.deepEqual(chromeInset(chrome, false, true), { left: 1, top: 42, w: 2, h: 43 });        // Lord Flow: no strip (menu bar)
+assert.deepEqual(chromeInset(chrome, false), chromeInset(chrome, false, false));
+// the app's size round trip (sdk/wayland.js: map and 'geometry' make the frame, the theme's layout gives the content back)
+{
+  const inset = chromeInset(classic, false, true);
+  let content = { w: 600, h: 400 };
+  for (let i = 0; i < 3; i++) {                  // three fullscreen exits: the app says its size again each time
+    const frame = { w: content.w + inset.w, h: content.h + inset.h };
+    content = { w: frame.w - classic.w, h: frame.h - classic.h - classic.menu };
+  }
+  assert.deepEqual(content, { w: 600, h: 400 });
+}
+assert.deepEqual(restoredFrame({ x: 333, y: 222, w: 400, h: 300 }, chromeInset(classic, false, true)), { x: 332, y: 165, w: 402, h: 358 });
+
 // xdg-toplevel-drag: the geometry point (20, 10) under the pointer; lord-server's geometry corrects the inset
 const f = { x: 100, y: 100, w: 400, h: 300 };
 assert.deepEqual(dragFrameAt(f, { gx: 101, gy: 142 }, 20, 10, 500, 400, chromeInset(chrome, false)), { x: 479, y: 348 });

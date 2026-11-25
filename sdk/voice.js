@@ -23,7 +23,7 @@
 // only when that app made it, so JS never sees it. When nothing can be read, a short notice says why (toast).
 import { createStore, useStore } from './store.js';
 import { t, locale } from './i18n.js';
-import { wm, useAppMenus } from './windows.js';
+import { wm, useAppMenus, appMenus } from './windows.js';
 import { toast } from './clipboard.js';
 import { settings } from './settings.js';
 import { windowAppName } from './apps.js';
@@ -250,9 +250,14 @@ export function speechItems(getText) {
 export function useMenusWithSpeech(wid) {
   const menus = useAppMenus(wid);
   useStore(settings, (s) => s.voice);    // Settings → AI turns it on and off
+  return menusWithSpeech(wid, menus);
+}
+// the same, read once (no subscription): win is the window, or { id, args } of one about to open (sdk/wayland.js sizes
+// a Linux window's frame by whether a theme's menu strip will show these)
+export function menusWithSpeech(wid, menus = appMenus.get()[wid] || null, win = wm.get(wid)) {
   if (!isLinux(wid)) return menus;
   const sp = speechMenu(null);
-  const edit = webEditMenu(wm.get(wid));
+  const edit = webEditMenu(win);
   if (!sp && !edit) return menus;
   const items = [...(edit || []), ...(edit && sp ? ['-'] : []), ...(sp ? [sp] : [])];
   return [...(menus || []), { label: t('shell.menu.edit'), items }];

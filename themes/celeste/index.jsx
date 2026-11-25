@@ -29,7 +29,7 @@ import { Bar } from './components/Bar.jsx';
 import { Backdrop } from './components/Backdrop.jsx';
 import { Drawer } from './components/Drawer.jsx';
 import { Dashboard, Launcher, SessionPanel, Sidebar, launcherHeight } from './components/Panels.jsx';
-import { Window, TITLE_H } from './components/Window.jsx';
+import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Menu } from '../classic/components/Menu.jsx';
 
 const MIN_MS = 260;
@@ -37,8 +37,9 @@ const rtlNow = () => direction() === 'rtl';
 const framed = (d, s) => hasBar(d, menuBarEveryDisplay(s), screen.mirror);
 const areaFn = (d) => workArea(d, framed(d, settings.get()), rtlNow());
 
-// chrome: borders (1 + 1) and the title bar with its separator; snapping on (Settings → Desktop & Dock → Windows)
-configureWindows({ apps, workArea: areaFn, chrome: () => ({ w: 2, h: titleBarPx(TITLE_H) + 3 }), snap: true });
+// chrome: borders (1 + 1), the title bar with its separator and the menu strip of a window with menus (a Linux app's
+// Edit menu with Speech); snapping on (Settings → Desktop & Dock → Windows)
+configureWindows({ apps, workArea: areaFn, chrome: () => ({ w: 2, h: titleBarPx(TITLE_H) + 3, menu: MENU_H }), snap: true });
 
 // The minimize effect: a window that was just minimized shrinks towards the bar for MIN_MS (none with reduce motion).
 function useMinimizing(windows) {

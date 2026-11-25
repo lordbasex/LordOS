@@ -3,10 +3,15 @@
 
 // What the theme's frame adds around a window drawn with its frame (windowChrome(): { w, h }): borders of w / 2 on the
 // sides and the bottom, the title bar on top. A window that draws its own frame (csd) has none.
-export function chromeInset(chrome, csd) {
+// strip: the window has menus, so a theme that gives each window its own menu strip under the title bar (chrome.menu:
+// Lord Classic, Lord Workspaces, Celeste) draws it, and it is part of the frame too: the app's content is the frame
+// less all of it. Left out, a Linux app got the strip's height less than it asked for, and lost it again on each of
+// its own resizes (a fullscreen exit), which window memory then kept.
+export function chromeInset(chrome, csd, strip = false) {
   if (csd || !chrome) return { left: 0, top: 0, w: 0, h: 0 };
   const side = Math.max(0, Math.round((chrome.w || 0) / 2));
-  return { left: side, top: Math.max(0, (chrome.h || 0) - side), w: chrome.w || 0, h: chrome.h || 0 };
+  const menu = strip ? Math.max(0, Math.round(chrome.menu || 0)) : 0;
+  return { left: side, top: Math.max(0, (chrome.h || 0) - side) + menu, w: chrome.w || 0, h: (chrome.h || 0) + menu };
 }
 
 // xdg-toplevel-drag: where the frame goes so the window's geometry point (ox, oy) is under the pointer (px, py).
