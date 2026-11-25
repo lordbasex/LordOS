@@ -626,6 +626,8 @@ RCLONEDEPS=", lordos-rclone (>= 1.75.2)"
 # Recommends (non-free-firmware, in every LordOS install's sources, like the microcode above): the Store's update
 # brings the Recommends a new version adds, and one the sources don't have doesn't stop it (server/src/pkg/resolve.c)
 FIRMWARERECS=", firmware-mediatek"
+# Intel graphics firmware (i915/xe DMC, GuC, HuC), split out of firmware-misc-nonfree the same way: amd64 only
+[ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ] && FIRMWARERECS="$FIRMWARERECS, firmware-intel-graphics"
 SIZE=$(du -sk "$PKG/usr" | awk '{s += $1} END {print s}')
 cat > "$PKG/DEBIAN/control" <<C
 Package: lordos

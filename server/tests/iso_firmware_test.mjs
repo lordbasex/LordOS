@@ -32,6 +32,7 @@ check('firmware-intel-graphics (i915 DMC, runtime power management)', iso.has('f
 const mkdeb = readFileSync(path.join(repo, 'tools/iso/mkdeb.sh'), 'utf8');
 const recs = (mkdeb.match(/^FIRMWARERECS="([^"]*)"/m) || [, ''])[1];
 check('firmware-mediatek in the lordos package\'s Recommends (tools/iso/mkdeb.sh FIRMWARERECS)', /(^|, )firmware-mediatek(,|$)/.test(recs) && /^Recommends: .*\$FIRMWARERECS$/m.test(mkdeb));
+check('firmware-intel-graphics in the lordos package\'s Recommends on amd64', /FIRMWARERECS="\$FIRMWARERECS, firmware-intel-graphics"/.test(mkdeb));
 for (const p of NOT_IN_ISO) check(`${p} is still a map package (else drop it from NOT_IN_ISO)`, wanted.has(p));
 
 console.log(`iso-firmware-test: ${ok} ok, ${bad} failed`);
