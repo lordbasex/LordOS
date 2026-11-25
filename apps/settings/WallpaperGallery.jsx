@@ -11,7 +11,7 @@
 // compatible GPU only, sdk/motion.jsx) and your own pictures. The pure parts are sdk/wallpapergallery.js.
 import {
   View, Text, Image, useTheme, useSettings, useLocale, tOptional, useStore, direction, useAppWindow, useKeyboard, Button, Slider, SearchField, Segmented,
-  RadioGroup, Layer, FilePicker, wm, spacing, typeScale, settings, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop,
+  RadioGroup, Layer, Overlay, FilePicker, wm, spacing, typeScale, settings, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop,
   slideshowPatch, slideshowPrefs, themes, displayLabel, displayFor, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage,
   addWallpaperImage, removeWallpaperImage, userWallpaperName, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs,
   downloadMotion, removeMotion, setLoginMotion, variantFor as motionVariantFor, userVideoProblem, media, screenDisplays, errorText,
@@ -76,14 +76,57 @@ function Badge({ label }) {
 
 // One wallpaper: its thumbnail, its state (☁ downloads when chosen, ✓ on this computer), 4K or HD, ▶ when it moves, and
 // the download's progress along its bottom edge.
+// The large picture shown while the pointer rests on a tile (the tiles are small): the file itself once it's on this
+// computer (a built-in, a downloaded picture, your own), else the catalog's 320 x 180 thumbnail, drawn at its size.
+const PREVIEW_W = 320, PREVIEW_H = 180, PREVIEW_DELAY = 380;
+const previewSrc = (e) => {
+  const local = e.kind === 'builtin' ? e.item.src : e.kind === 'still' && e.here ? findWallpaper([], e.id)?.src : e.kind === 'mine' ? e.item.src : null;
+  return local ? `thumb:${PREVIEW_W * 2}:${local}` : e.thumb;
+};
+
+function HoverPreview({ e, anchor, tileH }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const win = useAppWindow();
+  let above = true, left = 0;
+  try {
+    const [x, y, w] = lord.getLayout(anchor.current.id);
+    const g = wm.frame(wm.get(win.id) || {}) || {};
+    above = y - (g.y || 0) > PREVIEW_H + 60;                          // below when the tile is near the window's top
+    const want = x + Math.round((w - PREVIEW_W) / 2);                 // centred on the tile, kept inside the window
+    const lo = (g.x || 0) + 8, hi = (g.x || 0) + (g.w || 1e6) - PREVIEW_W - 16;
+    left = Math.max(lo, Math.min(hi, want)) - x;
+  } catch (err) { /* no layout yet: centred above */ }
+  return (
+    <Overlay anchor={anchor} layer="tooltip">
+      <View style={{ position: 'absolute', left, [above ? 'bottom' : 'top']: tileH + 8, width: PREVIEW_W + 8, padding: 4, gap: 4, borderRadius: 12,
+        pointerEvents: 'none', backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 12px 32px rgba(0,0,0,0.45)', direction: 'ltr' }}>
+        <View style={{ width: PREVIEW_W, height: PREVIEW_H, borderRadius: 9, overflow: 'hidden', backgroundColor: '#000' }}>
+          <Image src={previewSrc(e)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, paddingBottom: 2, direction: direction() }}>
+          <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{e.name}</Text>
+          {e.kind === 'mine' ? null : <Badge label={tr(e.k4 ? 'settings.wallpaperGallery.quality4k' : 'settings.wallpaperGallery.qualityHd')} />}
+        </View>
+      </View>
+    </Overlay>
+  );
+}
+
 function Tile({ e, tw, on, percent, busy, dim, onOpen }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [hover, setHover] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const box = useRef(null), timer = useRef(0);
+  useEffect(() => () => clearTimeout(timer.current), []);
   const th = Math.round(tw * 9 / 16);
   const loading = percent != null;
+  const enter = () => { setHover(true); clearTimeout(timer.current); timer.current = setTimeout(() => setPreview(true), PREVIEW_DELAY); };
+  const leave = () => { setHover(false); clearTimeout(timer.current); setPreview(false); };
   return (
-    <View onClick={onOpen} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={{ width: tw + 4, gap: 5, opacity: dim ? 0.45 : 1 }}>
+    <View ref={box} onClick={() => { leave(); onOpen(); }} onMouseEnter={enter} onMouseLeave={leave} style={{ width: tw + 4, gap: 5, opacity: dim ? 0.45 : 1 }}>
+      {preview && tw < PREVIEW_W ? <HoverPreview e={e} anchor={box} tileH={th + 4} /> : null}
       <View style={{ width: tw + 4, height: th + 4, borderRadius: 9, border: `2px solid ${on ? t.accent : hover ? t.separator : 'transparent'}` }}>
         <View style={{ width: tw, height: th, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
           <Image src={e.thumb} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

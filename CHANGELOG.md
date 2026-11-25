@@ -11,6 +11,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Fixed
+- **Settings → Wallpaper: a large preview on hover** (asked for while testing 0.8.9.6.2: the tiles are small). The pointer
+  resting on a tile for 0.4 s shows the wallpaper at 320 x 180 with its name and quality, above the tile (below it near
+  the window's top) and kept inside the window: the file itself once it is on this computer, else the catalog's
+  thumbnail at its own size. It goes away when the pointer leaves or the tile is clicked, and never takes the pointer.
 - **Settings → Wallpaper: the sheet steps to the previous or next wallpaper** (asked for while testing 0.8.9.6.2). Two
   round arrows on the sheet's picture, and the ← and → keys, show the previous or next wallpaper of what is on screen:
   the open collection, or the gallery's filtered and searched list; they wrap at the ends, mirror in right to left, and

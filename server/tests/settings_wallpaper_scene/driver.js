@@ -53,6 +53,11 @@
     const tile = first ? textId(sdk.tOptional(`settings.wallpaperItem.${first.id}`) || first.name) : null;
     step('an Epic tile', !!tile, first && first.name);
     if (tile) {
+      // the pointer resting on a tile shows its large preview (0.8.9.6.2)
+      const b = box(tile);
+      ev('move', tile, b[0] + b[2] / 2, b[1] + b[3] / 2);
+      await sleep(900);
+      await shot('hover-preview');
       click(tile);
       await sleep(1500);
       const sh = shownTexts();
@@ -63,7 +68,8 @@
       if (close) click(close);
       await sleep(800);
     }
-    const back = textId(t('wallpaperGallery.back'));
+    // the breadcrumb's "‹ Wallpaper" (0.8.9.6.2), else the old button's text; Esc goes back as well
+    const back = textId(t('wallpaperGallery.back')) || [...P.texts].filter(([, s]) => s === sdk.t('settings.section.wallpaper')).map(([raw]) => P.parent.get(raw)).filter((id) => id && box(id)).pop();
     if (back) click(back);
     await sleep(1200);
     // a built-in collection whose pictures have catalog twins: one tile each, HD built in, 4K from the catalog
