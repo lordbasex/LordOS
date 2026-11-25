@@ -25,6 +25,7 @@
 #define HWSNAP_DEVICES_MAX 20000
 #define HWSNAP_KEY_MAX     160
 #define HWSNAP_NAME_MAX    128
+#define HWSNAP_TOOLKITS_MAX 2000           /* entries of the optional "toolkits" field (9 combinations x versions) */
 
 typedef enum {
     HWSNAP_OK,          /* signed with the trusted key and well formed */
