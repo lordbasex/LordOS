@@ -939,7 +939,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 - [x] **Raspberry Pi with 0.8.9.1** in the same report (2026-11-19): Lord Flow 113 MB and 6.2 % of one core, as 0.8.9;
   Lord Workspaces, measured on the Pi for the first time, 99 MB and 0.06 %.
 
-## Next release after 0.8.9.6
+## Next release after 0.8.9.6.1
 
 - [ ] **Desktop icons in every theme** (approved by the maintainer on 2026-11-25; design `docs/drafts/DESKTOP-ICONS.md`,
   being built on branch `feat/desktop-icons`). The Desktop folder's files, optional places and app launchers on the
@@ -1003,11 +1003,30 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 - [ ] **The five X11 items at 100 % but not "complete"** (`docs/WAYLAND.md`, "Conformance"): `ewmh.wm_pid`, `xdnd`,
   `xwayland.hidpi`, `xwayland.cursor` and `xwayland.security` need tests written for each that cover every point, so
   all 28 X11 items are complete as the 48 Wayland globals are.
-- [ ] **Thunderbird's drag and drop ([#188](https://github.com/lordbasex/LordOS/issues/188))**: not reproduced yet;
-  reproduce it on the VM or the reporter's setup, then fix. (The menus of [#209](https://github.com/lordbasex/LordOS/issues/209)
-  were fixed in 0.8.9.6.)
+- [x] **Thunderbird's drag and drop ([#188](https://github.com/lordbasex/LordOS/issues/188))**: tested on VM 127 with
+  Thunderbird 153 ESR on Wayland and X11; the freeze was not reproduced, and the one failure found (a message dropped on
+  a Files folder copied nothing) is fixed in 0.8.9.6.1. A drop on the desktop comes with desktop icons (above). (The
+  menus of [#209](https://github.com/lordbasex/LordOS/issues/209) were fixed in 0.8.9.6.)
 - [ ] **Moving and resizing a window with the keyboard only** (every theme, from the Window menu: arrows move or
   resize, Enter keeps, Esc goes back), for people who can't use a pointer.
+
+## Release 0.8.9.6.1 (released 2026-11-25)
+
+An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.6.1-beta"); no new images, and Machines'
+LordOS card is unchanged.
+
+- [x] **Monitor → GPU: why NVIDIA data couldn't be read, and Copy report** (`MONITOR.md`, "NVIDIA"); `lord-nvgpu` counts
+  what its sandbox refuses (`SECCOMP_RET_TRAP` for this helper only, still EPERM, nothing new allowed). Left: reports
+  from NVIDIA owners (asked on #235, #224 and #157).
+- [x] **Diagnostics:** `lordos-testbench --globals` against the 48-protocol table generated from
+  `docs/wayland-protocols.json`; `lordos-issue`'s Wayland and X11 section and `--app` (a scrubbed Wayland log, no
+  keycodes); `lordos-sysreport`'s display engine facts through the DRM uapi.
+- [x] **Remote desktop (5673), improvement 1:** VA-API on the compositor's render node, one frame in flight, following
+  the bit rate, BT.709 tags (`REMOTE.md`). Improvements 2 to 5 are in the next release's list.
+- [x] **Fixes:** Monitor's seal tooltip under a group row's summary; Files' rename field moving the grid; Lord
+  Workspaces' top band in right-to-left languages and narrow screens; a Thunderbird message dropped on a Files folder
+  (#188); Check This Account on pCloud (#243); `firmware-mediatek` (#227) and `firmware-intel-graphics` as Recommends;
+  the CPU microcode as a Recommends, so `lordos` installs on a Debian without `non-free-firmware`.
 
 ## Release 0.8.9.6 (released 2026-11-25)
 

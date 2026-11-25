@@ -2,7 +2,7 @@
 
 **Machines** runs other systems in windows of your LordOS desktop, at native speed with KVM where the hardware allows it. It shipped in **0.8.8.5** (alpha): download cards for Debian, Ubuntu, Fedora and Kali that check their makers' signatures and can install with no questions, snapshots, clones, a migration from other virtualization apps, and since 0.8.8.7 shared folders.
 
-**New in 0.8.9.5 and 0.8.9.6.** Most of what follows arrived in **0.8.9.5**; **0.8.9.6**, the latest release, adds encrypted machines, this computer's USB devices and camera, the Whonix (Tor) group and a tighter sandbox (below). It brings Windows 11 machines, the LordOS tools for Windows, a clipboard that only moves when you paste, fast file transfers both ways, apps mode, sound and microphone, real networks, 3D for Linux machines and a picture at the guest's full rate.
+**New in 0.8.9.5 and 0.8.9.6.** Most of what follows arrived in **0.8.9.5**; **0.8.9.6** adds encrypted machines, this computer's USB devices and camera, the Whonix (Tor) group and a tighter sandbox (below). It brings Windows 11 machines, the LordOS tools for Windows, a clipboard that only moves when you paste, fast file transfers both ways, apps mode, sound and microphone, real networks, 3D for Linux machines and a picture at the guest's full rate.
 
 [[shot:0]]
 

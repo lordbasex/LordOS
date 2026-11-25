@@ -2,7 +2,7 @@
 
 **Máquinas** (Machines) corre otros sistemas en ventanas de tu escritorio de LordOS, a velocidad nativa con KVM donde el hardware lo permite. Salió en la **0.8.8.5** (alfa): tarjetas de descarga para Debian, Ubuntu, Fedora y Kali que comprueban las firmas de sus fabricantes y pueden instalar sin preguntas, instantáneas, clones, migración desde otras apps de virtualización y, desde la 0.8.8.7, carpetas compartidas.
 
-**Nuevo en la 0.8.9.5 y la 0.8.9.6.** Casi todo lo que sigue llegó en la **0.8.9.5**; la **0.8.9.6**, el último lanzamiento, suma máquinas cifradas, los dispositivos USB y la cámara de esta computadora, el grupo Whonix (Tor) y un aislamiento más estricto (abajo). Trae máquinas con Windows 11, las herramientas de LordOS para Windows, un portapapeles que solo se mueve cuando pegás, transferencias de archivos rápidas en los dos sentidos, el modo apps, sonido y micrófono, redes de verdad, 3D para máquinas Linux y la imagen a la velocidad completa del invitado.
+**Nuevo en la 0.8.9.5 y la 0.8.9.6.** Casi todo lo que sigue llegó en la **0.8.9.5**; la **0.8.9.6** suma máquinas cifradas, los dispositivos USB y la cámara de esta computadora, el grupo Whonix (Tor) y un aislamiento más estricto (abajo). Trae máquinas con Windows 11, las herramientas de LordOS para Windows, un portapapeles que solo se mueve cuando pegás, transferencias de archivos rápidas en los dos sentidos, el modo apps, sonido y micrófono, redes de verdad, 3D para máquinas Linux y la imagen a la velocidad completa del invitado.
 
 [[shot:0]]
 

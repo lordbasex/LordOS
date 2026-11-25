@@ -3,7 +3,7 @@
 The technical paper (https://lordos.org/paper/, `docs/PAPER.md`) makes claims about LordOS. This page was
 written against its 0.8.0 edition and lists each claim with how it is checked today and its state in 0.8.5, with rows added for the
 0.8.6 edition (published with the 0.8.6-beta release on 2026-10-30) and for what the paper marks in 0.8.7, and one section per 0.8.8.x release up to 0.8.8.9 (2026-11-15), and one for 0.8.9 (2026-11-18; the 0.8.8.10 pre-release
-never shipped) and each 0.8.9.x release up to 0.8.9.6 (2026-11-25, the latest release and the paper's current edition), so anyone can see what is proven, what was measured once and what is not tested. **The rows marked
+never shipped) and each 0.8.9.x release up to 0.8.9.6.1 (2026-11-25, the latest release and the paper's current edition), so anyone can see what is proven, what was measured once and what is not tested. **The rows marked
 Outdated were corrected in the paper's 0.8.5 edition (2026-10-26; published with the 0.8.5-beta release on
 2026-10-27)**, which also separates whole-system
 memory from a process's RSS (§7.1) and points to versioned results (§11.5, `docs/RESULTS.md`).
@@ -363,6 +363,22 @@ pre-release that never shipped. The paper marked all of it "0.8.9, in developmen
 | 5.1 | A paused Cloud account sends nothing to its provider: no mount retries, check listing, quota call, background listing or change polling (#194) | Test (`cloud-test` `t_pause`: `cloud_bring_up_ok` and the `vfs/poll-interval` call) | Not yet with a real Google account or a packet capture |
 | 5.1 | The package installs `assets/cloud/providers.json`, so verified providers read verified (#195) | Test (`cloud_model_test.mjs`: mkdeb.sh installs `assets/cloud`, the fallback) | Not yet in a built .deb |
 
+## 0.8.9.6.1 (released 2026-11-25; the paper's edition of that day)
+
+The paper's edition names 0.8.9.6.1 Beta as the latest release (an update of 0.8.9.6, package only) and turns "in
+development after 0.8.9.6" into "since 0.8.9.6.1" (§0, §3.4, §10.1). The NVIDIA report has still not run on NVIDIA
+hardware: the release asks NVIDIA owners to test it.
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 0, 10.1 | 0.8.9.6.1 Beta, released on 2026-11-25, is the latest release: an update of the package through the Store and `apt`, with no new images | `CHANGELOG.md` "0.8.9.6.1-beta"; `package.json` 0.8.9.6.1 | To verify at release |
+| 5.1, 6.7 | Monitor → GPU says why `lord-nvgpu` gave no data, with a fixed code and numbers only, and Copy report scrubs the home, user and host names; the helper's sandbox counts refused calls with `SECCOMP_RET_TRAP` and still answers EPERM, allowing nothing new | Test (`build/nvgpu-test`: every failure code with the fake NVML, SIGSYS blocked, a hang; `tests/nv_report_test.mjs`: hostile fields) | Holds in the tests; not yet on NVIDIA hardware |
+| 3.4, 11 | `lordos-testbench --globals` compares the registry with the 48-row table generated from `docs/wayland-protocols.json`; on an ordinary client 46 offered plus 2 offered only to some clients (drm-lease, `xwayland_shell_v1`) | Test (`build/testbench-globals-test`, `tests/testbench_globals_headless.sh`); run on the author's PC with ws148 (expected 48, offered 46, missing 0, not here 2) | Holds |
+| 11 | `lordos-issue`'s Wayland and X11 section and `--app` keep no titles, typed text, paths or keycodes | Test (`tests/lordos_issue_test.sh`); `lordos-issue --print` run on the author's PC with ws148 shows the section | Holds |
+| 3.6 | The remote desktop's VA-API encoder is the compositor's render node, one frame in flight, following the bit rate, BT.709 limited range | Measured (`build/lmstream-test` on the RX 580 PC, three runs at 1920×1080) | Measured once; not yet through a browser |
+| 5.1 | A Thunderbird message dropped on a Files folder is copied; a copy's source may be a regular file in the read-only tree, never a link, a folder or the X cookie | Test (`build/fsops-test`, 181 checks); VM 127 with Thunderbird 153.7 ESR on Wayland and X11 | Holds |
+| 2.4 | `firmware-mediatek`, `firmware-intel-graphics` (amd64) and the CPU microcode (amd64) are Recommends of `lordos` | Package control file; `iso_firmware_test.mjs`; `pkg-test` | Holds; the update path to be seen with the release |
+
 ## 0.8.9.6 (released 2026-11-25; the paper's edition of that day)
 
 The paper's edition of 2026-11-25 names 0.8.9.6 Beta as the latest release and turns every "in development after
@@ -542,7 +558,7 @@ compositor's keymap, modifiers and layout, repeat rate and delay) and every glob
 `--auto [seconds]` prints the same as JSON. On VM 116 (headless session, CPU path) it found that
 `wp_presentation` reports every frame as discarded and no refresh rate when the session has no monitor.
 
-**The protocol table (0.8.9.6.1, in development).** The checklist's last rows no longer name 12 globals by hand: the
+**The protocol table (since 0.8.9.6.1).** The checklist's last rows no longer name 12 globals by hand: the
 expected list is `server/src/testbench/expected_globals.h`, generated by `tools/gen-wayland-table.mjs` from
 `docs/wayland-protocols.json` (the source of `docs/WAYLAND.md`'s table and lordos.org's), and
 `tests/wayland_table_test.mjs` fails when it is stale. `src/testbench/globtable.c` marks each global offered, newer,
