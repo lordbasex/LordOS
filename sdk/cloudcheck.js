@@ -14,6 +14,9 @@
 export const CHECK_STEPS = ['about', 'list', 'folder', 'write', 'up', 'free', 'read', 'link', 'delete', 'deleteUp'];
 export const CHECK_SIZE = 1024 * 1024;
 const UP_TIMEOUT = 120e3, FREE_TIMEOUT = 40e3, DELETE_TIMEOUT = 60e3, ABOUT_TIMEOUT = 6e3, JOB_TIMEOUT = 60e3;
+const DELETE_PATIENCE = 10e3, DELETE_WAIT = 500, LEFTOVERS_MAX = 5;
+// the check's own folder names: .lordos-check-<tag> (a bucket in object storage: lordos-check-<tag>), tag 10 hex digits
+export const LEFTOVER_RE = /^\.lordos-check-[0-9a-f]{10}$/, LEFTOVER_BUCKET_RE = /^lordos-check-[0-9a-f]{10}$/;
 
 // "random" bytes: xorshift from a seed (the check needs bytes the cloud can't have seen, not secrecy)
 export function randomBytes(n, seed) {
@@ -52,6 +55,86 @@ export async function runCheck(acc, env, onStep = () => {}) {
     catch (e) { set(id, 'fail', now() - t0, code(e)); return false; }
   };
   const skipRest = (from) => { for (const s of steps.slice(CHECK_STEPS.indexOf(from))) if (!s.result) set(s.id, 'skipped', 0, 'notReached'); };
+  // One move job out of the account into the home, awaited: 'ok'; 'notEmpty', everything copied but the provider still
+  // listed the emptied folder as full when it was removed (fsops.c already tried that rmdir for 4.5 s); or 'failed'
+  const moveOut = async (from, to) => {
+    const job = fs.move(from, to);
+    const done = await until(() => !(fs.jobs() || []).some((j) => j.id === job && !j.done && !j.failed), JOB_TIMEOUT);
+    const j = (fs.jobs() || []).find((x) => x.id === job);
+    if (j) fs.forgetJob(job);
+    if (!done) return 'failed';
+    if (j && j.failed) return String(j.error || '').split(' ')[0] === 'fs.moveRemoveFailed' ? 'notEmpty' : 'failed';
+    return 'ok';
+  };
+  // A folder an earlier check couldn't remove (#243) goes now, before the new one is made: only one named exactly as the
+  // check names its own (LEFTOVER_RE) with nothing in it, or only its check.bin file, at most LEFTOVERS_MAX of them.
+  // Anything else is never touched. Quietly: a leftover that stays is not this check's failure. → root without them
+  const removeLeftovers = async (a, entries) => {
+    const object = a.group === 'object';
+    const dirs = (entries || []).filter((e) => e.dir && !String(e.name).startsWith('.')).map((e) => e.name).sort();
+    const where = [];
+    for (const e of entries || []) {
+      if (e.dir && (object ? LEFTOVER_BUCKET_RE : LEFTOVER_RE).test(String(e.name))) where.push({ path: `${a.mount}/${e.name}`, top: e.name });
+    }
+    if (object) {
+      const inner = dirs.filter((d) => !LEFTOVER_BUCKET_RE.test(d))[0];
+      let list = [];
+      if (inner) try { list = (await fs.list(`${a.mount}/${inner}`)) || []; } catch (e) { list = []; }
+      for (const e of list) if (e.dir && LEFTOVER_RE.test(String(e.name))) where.push({ path: `${a.mount}/${inner}/${e.name}` });
+    }
+    const removed = new Set();
+    let n = 0;
+    for (const w of where.slice(0, LEFTOVERS_MAX)) {
+      try {
+        if (!await onlyOurs(w.path)) continue;
+        if (await removeFolder(w.path, `${fs.home()}/.cache/lordos-cloud-check-${tag}-old${++n}`) && w.top) removed.add(w.top);
+      } catch (e) { /* stays; the next check tries again */ }
+    }
+    return (entries || []).filter((e) => !removed.has(e.name));
+  };
+  // nothing in it, or only the check's own file (a file named check.bin no larger than the check writes)
+  const onlyOurs = async (dir) => {
+    const inside = await fs.list(dir);
+    if (!Array.isArray(inside)) return false;
+    if (!inside.length) return true;
+    if (inside.length !== 1 || inside[0].name !== 'check.bin' || inside[0].dir) return false;
+    const st = await fs.stat(`${dir}/check.bin`);
+    return !!st && !st.dir && st.size <= CHECK_SIZE;
+  };
+  const gone = async (p) => { try { await fs.stat(p); return false; } catch (e) { return true; } };
+  // The check's folder out of the account (#243): pCloud still lists a file it has just deleted for a few seconds, so
+  // the folder's removal can fail although nothing is left in it. Then, for up to DELETE_PATIENCE with a doubling
+  // wait, the folder is moved out again, but only once it lists as empty: a file it still shows is never copied twice.
+  // Every scratch copy in the home goes to the Trash and out of it, whatever happened.
+  const removeFolder = async (dir, scratch) => {
+    const copies = [scratch];
+    try {
+      const r = await moveOut(dir, scratch);
+      if (r === 'failed') return false;
+      if (r === 'notEmpty') {
+        const end = now() + DELETE_PATIENCE;
+        for (let wait = DELETE_WAIT; !(await gone(dir)); wait *= 2) {
+          if (now() >= end) return false;
+          await sleep(Math.min(wait, end - now()));
+          let left = null;
+          try { left = await fs.list(dir); } catch (e) { continue; }
+          if (!Array.isArray(left) || left.length) continue;
+          const next = `${scratch}-${copies.length + 1}`;
+          copies.push(next);
+          if (await moveOut(dir, next) === 'failed') return false;
+        }
+      }
+      return await gone(dir);
+    } finally {
+      for (const c of copies) {
+        try {
+          await fs.trash(c);
+          const t = (fs.trashList() || []).find((x) => x.original === c);
+          if (t) fs.removeFromTrash(t.id);
+        } catch (e) { /* not there, or only in the home */ }
+      }
+    }
+  };
   const seed = Math.floor(now() % 0xffffffff) ^ 0x5bd1e995;
   const tag = hashBytes(randomBytes(8, seed)).slice(0, 10);
   let root = [];
@@ -63,6 +146,7 @@ export async function runCheck(acc, env, onStep = () => {}) {
     return got ? true : { skipped: true, note: 'noSpaceInfo' };
   });
   if (!await run('list', async () => { root = await fs.list(acc.mount); return Array.isArray(root); })) { skipRest('folder'); return steps; }
+  root = await removeLeftovers(account(), root);
   const f = checkFolder(account(), root, tag);
   folder = f.path; file = `${folder}/check.bin`;
   if (!await run('folder', async () => { await fs.mkdir(folder); made = true; return !!(await fs.stat(folder)).dir; })) { skipRest('write'); return steps; }
@@ -112,20 +196,8 @@ export async function runCheck(acc, env, onStep = () => {}) {
   // folder of the home, then to the Trash and out of it)
   if (made) {
     const okDel = await run('delete', async () => {
-      const scratch = `${fs.home()}/.cache/lordos-cloud-check-${tag}`;
-      const job = fs.move(folder, scratch);
-      const done = await until(() => !(fs.jobs() || []).some((j) => j.id === job && !j.done && !j.failed), JOB_TIMEOUT);
-      const j = (fs.jobs() || []).find((x) => x.id === job);
-      if (j) fs.forgetJob(job);
-      if (!done || (j && j.failed)) throw Object.assign(new Error(''), { code: 'cloud.checkDeleteFailed' });
-      try {
-        await fs.trash(scratch);
-        const t = (fs.trashList() || []).find((x) => x.original === scratch);
-        if (t) fs.removeFromTrash(t.id);
-      } catch (e) { /* the scratch copy is only in the home */ }
-      let gone = false;
-      try { await fs.stat(folder); } catch (e) { gone = true; }
-      return gone;
+      if (await removeFolder(folder, `${fs.home()}/.cache/lordos-cloud-check-${tag}`)) return true;
+      throw Object.assign(new Error(''), { code: 'cloud.checkDeleteFailed' });
     });
     // gone from a fresh listing of its parent, and nothing of it waiting to go up (another file of a busy account may)
     const parent = folder.slice(0, folder.lastIndexOf('/')), leaf = folder.slice(folder.lastIndexOf('/') + 1);
