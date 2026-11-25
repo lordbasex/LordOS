@@ -28,6 +28,10 @@ for (const p of wanted) {
 // the two cases the reports named
 check('firmware-mediatek (MT7921/MT7922 Wi-Fi, #227)', iso.has('firmware-mediatek'));
 check('firmware-intel-graphics (i915 DMC, runtime power management)', iso.has('firmware-intel-graphics'));
+// installed systems: the lordos package recommends it, so the update brings it where the ISO had none (#227)
+const mkdeb = readFileSync(path.join(repo, 'tools/iso/mkdeb.sh'), 'utf8');
+const recs = (mkdeb.match(/^FIRMWARERECS="([^"]*)"/m) || [, ''])[1];
+check('firmware-mediatek in the lordos package\'s Recommends (tools/iso/mkdeb.sh FIRMWARERECS)', /(^|, )firmware-mediatek(,|$)/.test(recs) && /^Recommends: .*\$FIRMWARERECS$/m.test(mkdeb));
 for (const p of NOT_IN_ISO) check(`${p} is still a map package (else drop it from NOT_IN_ISO)`, wanted.has(p));
 
 console.log(`iso-firmware-test: ${ok} ok, ${bad} failed`);

@@ -787,6 +787,12 @@ a problem). `sdk/cloudcheck.js` runs it with `lord.fs` and `cloud.*` only, each 
    deleted (pCloud, GitHub #243) makes that rmdir read ENOTEMPTY for a moment, so a move between disks tries only that
    rmdir again, with a short backoff, for at most 4.5 s in all (`server/src/fsops.c` `rm_tree_patient`): nothing is
    walked or deleted again, and a folder that really holds something still fails.
+   When the move still fails that way, the check itself tries again (`sdk/cloudcheck.js` `removeFolder`): for up to
+   10 s, waiting 0.5, 1, 2, 4 s, it moves the folder out once more, but only after it lists as empty (a file it still
+   shows is never copied twice); every scratch copy in the home goes to the Trash and out of it either way. A folder an
+   earlier check left behind goes at the start of the next one: only one named exactly `.lordos-check-<10 hex digits>`
+   (in object storage also the bucket `lordos-check-<10 hex digits>`) holding nothing or only a `check.bin` no larger
+   than the check writes, at most 5 per check; anything else is never touched (`server/tests/cloud_model_test.mjs`).
 10. **Delete it in the cloud**: gone from a fresh listing and nothing of it waiting to go up, 1 minute at most.
 
 Then a **report** with nothing personal: LordOS version and architecture, rclone's version, the provider's kind and

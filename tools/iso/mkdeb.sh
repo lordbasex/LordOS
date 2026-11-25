@@ -621,6 +621,11 @@ HWDATADEPS=", lordos-hwdata (>= 2026.10.27)"
 # rclone for Cloud and Connect to Server, rclone's signed release binary at /usr/lib/lordos/rclone (tools/iso/mkdeb-rclone.sh, docs/CLOUD.md 3.1);
 # Debian's rclone (1.60) is too old for Cloud, and nothing runs /usr/bin/rclone any more
 RCLONEDEPS=", lordos-rclone (>= 1.75.2)"
+# MediaTek Wi-Fi firmware (MT7921/MT7922, #227): Debian split it out of firmware-misc-nonfree, which only Recommends it,
+# so a system installed from an ISO before 0.8.9.6.1 has the driver but not the firmware and no Wi-Fi interface. A
+# Recommends (non-free-firmware, in every LordOS install's sources, like the microcode above): the Store's update
+# brings the Recommends a new version adds, and one the sources don't have doesn't stop it (server/src/pkg/resolve.c)
+FIRMWARERECS=", firmware-mediatek"
 SIZE=$(du -sk "$PKG/usr" | awk '{s += $1} END {print s}')
 cat > "$PKG/DEBIAN/control" <<C
 Package: lordos
@@ -630,7 +635,7 @@ Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
 Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$TTSDEPS$MEDIADEPS$CASTDEPS$RTCDEPS$MICROCODEDEPS
 Breaks: lordos-web (<< $VERSION)
-Recommends: qemu-guest-agent, pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS
+Recommends: qemu-guest-agent, pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS$FIRMWARERECS
 Section: x11
 Priority: optional
 Protected: yes
