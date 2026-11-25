@@ -107,6 +107,7 @@
 #include "sec/netconn.h"
 #include "bench/lbframes.h"
 #include "fpipe.h"
+#include "nofile.h"
 
 #include <ctype.h>
 #include <libgen.h>
@@ -3177,6 +3178,13 @@ int main(int argc, char **argv) {
     /* the log folder (lordlog.h): /var/log/lordos/users/<user>, which lord-sessiond made at login, or
      * ~/.cache/lordos; worked out once, here, before anything forks a child that opens a log */
     if (ok) lordlog_dir();
+    /* the open files an app's buffers need (nofile.h, GitHub #251): the soft limit raised towards the hard one; every
+     * child forked from here on gets the usual one back */
+    if (ok) {
+        rlim_t nf0 = 0, nf1 = 0;
+        if (nofile_raise(&nf0, &nf1)) fprintf(stderr, "lord-server: the open files' limit stays at %llu\n", (unsigned long long)nf0);
+        else if (nf1 != nf0) fprintf(stderr, "lord-server: open files allowed: %llu (was %llu)\n", (unsigned long long)nf1, (unsigned long long)nf0);
+    }
     if (ok && s.headless && getenv("HOME")) {
         /* no terminal: stderr is stamped into compositor.log and shell.log there, the previous
          * session's kept as .prev (a small lord-log child; it outlives a crash, so nothing written is lost) */

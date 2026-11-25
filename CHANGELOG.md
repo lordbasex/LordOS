@@ -30,6 +30,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   while a write is held, saves made meanwhile collapse into the newest, `bgsave_flush` waits for it, a durable write
   after a queued one wins, the clipboard's files are 0600 with nothing left behind (also when the write fails), and a
   ninth file with every slot taken is written on the caller's thread.
+- Brave, Chromium and Vulkan apps no longer close one after another, and refuse to open again until the next login,
+  when lord-server reaches its limit of open files (#251). Each app's GPU buffer (a dmabuf, one file per plane), each
+  explicit-sync wait, each Wayland connection and each helper's socket is an open file of lord-server, and the session
+  started with the usual soft limit of 1024. Past it the kernel silently drops the files apps send: libwayland then
+  disconnected the next app that sent one (`file descriptor expected ... import_timeline`, Brave and MailCraft in the
+  report) and Xwayland's child could not open `/dev/null` (exit 126, "xwm: read failed"), while LordOS's own apps went
+  on. lord-server now raises its own soft limit towards the hard one, at most 65536 (`src/nofile.c`, as other
+  compositors do). The apps, Xwayland and terminal shells it starts get the usual 1024 back (`nofile_restore()`), so
+  programs that use `select()` keep the limit they expect; it is lowered in the child only after the child closed
+  lord-server's files and just before `execve`, because at `fork()` the child still holds all of them: with more than
+  1024 open, every number under 1024 is taken and Xwayland's child could not have opened `/dev/null` (the same exit 126).
+  LordOS's own helpers keep the raised one. No privilege is involved: a process may raise its soft limit up to its hard
+  one. When libwayland reports a missing file, the log now adds how many files are open of how many allowed (at most
+  once every 10 s), so a report shows whether the limit was the cause. New test `build/nofile-test` (in `make test`):
+  at the limit a file sent over a socket arrives without its descriptor, after the raise it arrives; with more than
+  1024 open, a child lowered before its clean-up can't open `/dev/null` and one lowered after it has 1024 and room under
+  it; the limit is never raised by the child's call; the count is right. Checked on a headless `lord-server-test`:
+  lord-server at 65536; with the limit lowered at run time Chromium was disconnected with `create_pool` "file
+  descriptor expected" and Xwayland failed with "xwm: read failed", as in the report.
 
 ### Documentation
 - The paper (en, es, pt) and `docs/PAPER-VALIDATION.md`: since 0.8.9.6.1 the arm64 `lordos-web` package is built against

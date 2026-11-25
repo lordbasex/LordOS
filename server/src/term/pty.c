@@ -5,6 +5,7 @@
  * The child inherits no capabilities, blocked signals or descriptors from the server. */
 #include "term.h"
 #include "../sec/cgroup.h"
+#include "../nofile.h"
 #include "lord_version.h"           /* build/gen: LordOS version (Makefile, from package.json) */
 
 #include <errno.h>
@@ -53,6 +54,7 @@ static void child(int fd, const char *cwd, int id) {
     dup2(fd, 2);
     if (fd > 2) close(fd);
     syscall(SYS_close_range, 3, ~0u, 0);
+    nofile_restore();               /* the shell gets the usual 1024 (nofile.h, #251) */
 
     sigset_t none;
     sigemptyset(&none);

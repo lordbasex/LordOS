@@ -85,6 +85,7 @@
 #include "xwscale.h"
 #include "framegate.h"
 #include "../outputs.h"
+#include "../nofile.h"
 #include "../cursor.h"
 #include "ptrlock.h"
 #include "outpick.h"
@@ -7468,6 +7469,7 @@ int wl_start(void) {
         if (access(dir, W_OK)) { fprintf(stderr, "wayland: no XDG_RUNTIME_DIR\n"); return -1; }
         setenv("XDG_RUNTIME_DIR", dir, 1);
     }
+    wl_log_set_handler_server(nofile_wl_log);   /* as before, plus the open files when an app's file was lost (#251) */
     dpy = wl_display_create();
     if (!dpy) return -1;
     const char *name = wl_display_add_socket_auto(dpy);
