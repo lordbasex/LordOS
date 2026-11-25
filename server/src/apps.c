@@ -33,6 +33,7 @@
  * xact_take_launch, wl.c launch_was_for, apps_window_names below). */
 #include "apps.h"
 #include "lordlog.h"
+#include "nofile.h"
 #include "iconfind.h"
 #include "hw/defaults.h"
 #include "hw/mimeapps.h"
@@ -1208,6 +1209,7 @@ static int launch_flatpak(const char *id, const char *opened) {
             syscall(SYS_close_range, 3, FPSW_FD - 1, 0);
             syscall(SYS_close_range, ln[1] >= 0 ? FPLEND_FD + 1 : FPSW_FD + 1, ~0u, 0);
         } else syscall(SYS_close_range, 3, ~0u, 0);
+        nofile_restore();                           /* the usual 1024, now that there is room under it (nofile.h, #251) */
         const char *home = getenv("HOME");
         if (home && chdir(home)) {}
         /* its root-owned scope (not app_scope_reserved: "fp-" is reserved for this path alone) */
@@ -1636,6 +1638,7 @@ static int launch(const char *id, const char *file, const char *action, const ch
         if (null >= 0) { dup2(null, 0); dup2(null, 1); dup2(null, 2); }
         if (logfd >= 0) { dup2(logfd, 1); dup2(logfd, 2); }
         syscall(SYS_close_range, 3, ~0u, 0);
+        nofile_restore();                           /* the usual 1024, now that there is room under it (nofile.h, #251) */
         const char *home = getenv("HOME");
         if (!cwd[0] || chdir(cwd)) { if (home && chdir(home)) {} }
         /* its own app-lordos-<id>.scope cgroup: the firewall, the Monitor, the PipeWire guard and
