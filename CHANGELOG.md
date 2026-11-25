@@ -10,6 +10,49 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+- **`lordos-testbench --toolkits [--json] [--only id,...]`** (docs/TOOLKIT-AUDIT.md): an installed command that
+  scores how well the Linux GUI toolkits work on LordOS's compositor, on the person's own machine, without the
+  repository.
+  - **What runs:** nine combinations, one after the other: GTK 3 and GTK 4 (`GDK_BACKEND=wayland` and `x11`),
+    Qt 5 and Qt 6 (`QT_QPA_PLATFORM=wayland` and `xcb`), and a plain X11 window under Xwayland. Each is a small
+    Python 3 harness, now installed in `/usr/lib/lordos/toolkit-audit/` (`gtk3.py`, `gtk4.py`, `qt5.py`,
+    `qt6.py`, `x11.py`).
+  - **No new dependency:** LordOS depends on no toolkit and no binding. A quick import probe runs first, and a
+    toolkit whose bindings aren't already installed (python3-gi with Gtk 3.0/4.0, PyQt5, PyQt6) shows "not
+    installed". Nothing is ever installed. `x11.py` speaks the X11 core protocol itself with Python's standard
+    library: no libX11, python3-xlib or xprop.
+  - **How a harness runs:** as the person, in its own process group, with a clean environment. That environment
+    has the session's display, the backend variable, `WAYLAND_DEBUG=1` and the C locale, and nothing else from the
+    caller (no `LD_PRELOAD`, no `PYTHONPATH`). A harness exits by itself within 5 s; at 8 s its whole group is
+    killed.
+  - **What is measured, with no test hooks:**
+    - each harness's own checks: map, size against 600x400, scale, the colour scheme read, the backend really
+      used, decorations, time to the first frame, a menu and a combo list that map, a tooltip, a clipboard round
+      trip, drag and drop, typed text, and fullscreen on and off;
+    - from the `WAYLAND_DEBUG` log, which of the 48 globals in LordOS's protocol table it bound, and at which
+      version. A protocol error is attributed to the global its object came from;
+    - fatal Wayland, EGL, Vulkan and Qt platform-plugin errors in stderr.
+  - **The score:** the same shape as `tools/wl-conformance.mjs`. Map, size, backend, first frame and decorations
+    weigh 2; menu, combo, clipboard and drag and drop weigh 3; the rest weigh 1. On Wayland, each global bound is
+    one more check. Skipped checks aren't counted. A crash, a timeout or a fatal error gives that combination
+    0 %. The global score is the mean of the combinations that ran.
+  - **The output:**
+    - a table with each combination's score and its failed checks, and the recommended variable (e.g.
+      `GDK_BACKEND=x11`) when a toolkit's Wayland run is 20 points or more under its X11 run;
+    - a toolkit x protocol matrix;
+    - `--json`.
+  - **The saved result:** the last one is saved to `~/.cache/lordos/toolkit-audit.json` (0600) for `lordos-issue`
+    and the hardware report.
+  - **Privacy:** results carry only toolkit names and versions, the backend, numbers and check ids. Never the
+    harness's free text, the log, a path or a window title.
+  - **Texts and tests:** the texts are in every language (`toolkitaudit.json`). `build/toolkit-audit-test` covers
+    the scoring, the log and line parsers with hostile output (oversized lines, bad JSON, control characters),
+    and real runs of fake harnesses (fixed JSON, a protocol error, a crash, a hang killed with its child).
+  - **Checked:** against a private headless lord-server, with the GTK typelibs unpacked locally. GTK 3 scored 100 % on both backends and GTK 4 98.0 % on
+    Wayland and 95.8 % on X11 (the theme check, without a session bus). Plain X11 scored 92.5 %: fullscreen
+    didn't return to 600x400. Qt 5 and Qt 6 weren't installed on that machine.
+
 ### Documentation
 - The paper (en, es, pt) and `docs/PAPER-VALIDATION.md`: since 0.8.9.6.1 the arm64 `lordos-web` package is built against
   LordOS's WPE WebKit 2.54 (WPEPlatform), like amd64's, and depends on `libwpewebkit-2.0-1 (>= 2.54)`; `web-backend-test`
