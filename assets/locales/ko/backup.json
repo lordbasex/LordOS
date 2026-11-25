@@ -14,6 +14,9 @@
   "never": "아직 백업 없음",
   "next": "다음: {when}",
   "lastError": "마지막 백업에 실패했습니다: {error}",
+  "machinesBusy": {
+    "other": "머신 {count}대가 실행 중이었습니다: 이 백업의 디스크는 이전 백업의 것입니다"
+  },
   "todayAt": "오늘 {time}",
   "now": "지금 백업",
   "pause": "일시 정지",
@@ -74,6 +77,10 @@
   "delete": "백업 삭제",
   "restoreAll": "모두 복원",
   "restoreItem": "“{name}” 복원",
+  "restoreSelected": "선택 항목 복원 ({count})",
+  "restoringItem": "복원 중 {index}/{count}: {name}",
+  "restoreItemFailed": "“{name}”을(를) 복원할 수 없음: {error}",
+  "restoreMoreFailed": "복원되지 않은 기타 항목: {count}",
   "restoreFolder": "이 폴더 복원",
   "restorePick": "복원할 항목 선택",
   "restoreAllTitle": "홈 폴더 전체를 복원할까요?",

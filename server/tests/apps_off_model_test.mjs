@@ -27,7 +27,7 @@ const builtIn = fs.readdirSync(appsDir).filter((d) => fs.existsSync(path.join(ap
   .map((d) => JSON.parse(fs.readFileSync(path.join(appsDir, d, 'manifest.json'), 'utf8')).id).sort();
 eq('every built-in app is either core or deactivatable', builtIn, [...DEACTIVATABLE, ...CORE_APPS].sort());
 eq('no app is in both lists', DEACTIVATABLE.filter((id) => CORE_APPS.includes(id)), []);
-eq('21 deactivatable', DEACTIVATABLE.length, 21);
+eq('22 deactivatable', DEACTIVATABLE.length, 22);
 eq('the lists are frozen', [Object.isFrozen(DEACTIVATABLE), Object.isFrozen(CORE_APPS)], [true, true]);
 for (const id of ['files', 'settings', 'store', 'terminal', 'monitor', 'logs', 'disks', 'sysinfo', 'forcequit', 'screenshots', 'help',
   'passwords', 'editor', 'about', 'appabout', 'installer', 'sysprobe']) {

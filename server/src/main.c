@@ -18,6 +18,7 @@
  * Con una señal o --timeout los shells de la Terminal quedan vivos (term/hold.c) y se
  * recuperan en el próximo arranque; las dos primeras formas los cierran.
  */
+#include "media/mstudio.h"
 #include "apps.h"
 #include "admin.h"
 #include "lordlog.h"
@@ -25,6 +26,8 @@
 #include "bench/lbinput.h"
 #ifdef LORD_TEST_HOOKS
 #include "testhooks.h"           /* build/lord-server-test only */
+#include "media/media_int.h"     /* the capture paths' pictures (test_frame) */
+#include "cast/castproto.h"
 #endif
 #include "net/net.h"
 #include "disk/disk.h"
@@ -1537,6 +1540,12 @@ static void tablet_gone(Server *s, const InputDevice *d) {
 }
 
 #ifdef LORD_TEST_HOOKS
+/* the UI's repainted pixels, summed (render_ui) and taken by the test hooks' "painted" */
+static long long test_painted_px;
+static long long test_painted(void) { long long n = test_painted_px; test_painted_px = 0; return n; }
+#endif
+
+#ifdef LORD_TEST_HOOKS
 /* build/lord-server-test only (-DLORD_TEST_HOOKS, testhooks.h; never in the installed lord-server): the conformance tool's fake graphics tablet, a pen and a pad made
  * with tablet.c's own tablet_new and fed evdev events through tablet_input, as a real device's are. */
 static InputDevice test_tab[2] = { { .fd = -1 }, { .fd = -1 } };
@@ -1595,6 +1604,56 @@ static void remote_wheel(int steps);
 static void test_pointer(int x, int y) { remote_pointer(x, y); }
 /* a modifier key only (testhooks.c checks the code), as the remote desktop types it: the window drag modifier's test */
 static void test_key(int code, int value) { remote_key(code, value); }
+/* "frame W [N]" (testhooks.h): the headless display's picture or one of the capture paths', as a PPM in the runtime folder */
+static int test_frame_write(const char *which, const uint32_t *px, int w, int h, int stride) {
+    const char *rt = getenv("XDG_RUNTIME_DIR");
+    char path[PATH_MAX];
+    if (!rt || !px || w < 1 || h < 1 || snprintf(path, sizeof path, "%s/lordos-test-frame-%s.ppm", rt, which) >= (int)sizeof path) return -1;
+    FILE *f = fopen(path, "wbe");
+    if (!f) return -1;
+    fprintf(f, "P6\n%d %d\n255\n", w, h);
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) {
+            uint32_t p = px[(size_t)y * stride + x];
+            unsigned char rgb[3] = { (unsigned char)(p >> 16), (unsigned char)(p >> 8), (unsigned char)p };
+            fwrite(rgb, 1, 3, f);
+        }
+    return fclose(f) ? -1 : 0;
+}
+static int test_frame(const char *which, long node) {
+    Server *s = remote_server;
+    if (!s || !s->headless) return -1;
+    Out *o = &s->out[0];
+    if (!strcmp(which, "output")) return o->scene.px ? test_frame_write(which, o->scene.px, o->scene.w, o->scene.h, o->scene.stride) : -1;
+    if (!strcmp(which, "mirror")) {
+        if (!o->scene.px) return -1;
+        Canvas out = o->scene;
+        const Canvas *seen = media_composed(&out, 1, NULL);
+        int r = test_frame_write(which, seen->px, seen->w, seen->h, seen->stride);
+        media_composed(&out, mirror_watchers() > 0, NULL);      /* back as the session had it */
+        return r;
+    }
+    if (!strcmp(which, "screenshot")) {
+        MediaSrc *m = media_screenshot("test", 0, 0, 0, 0, 0, 0, NULL, 0, NULL);
+        int r = m ? test_frame_write(which, m->px, m->w, m->h, m->w) : -1;
+        if (m) media_src_close(m);
+        return r;
+    }
+    CastSource src = { 0 };
+    if (!strcmp(which, "portal")) src.kind = CAST_SRC_MONITOR;
+    else {
+        const Node *n = node > 0 && node < (1L << 30) ? node_get((int)node) : NULL;
+        if (!n) return -1;
+        src.kind = CAST_SRC_WINDOW;
+        src.node = (int)node;
+        src.serial = n->serial;
+    }
+    int w = 0, h = 0;
+    uint32_t *px = cast_still(&src, NULL, &w, &h);
+    int r = px ? test_frame_write(which, px, w, h, w) : -1;
+    free(px);
+    return r;
+}
 #endif
 
 /* pointer-warp-v1 (wl/wl_warp.c): the app in front moves the pointer on its window. No relative motion: a game sees
@@ -1690,6 +1749,9 @@ static Box paint_ui(Server *s) {
     if (!box_empty(d)) {
         Box rs[DAMAGE_MAX];
         int nr = paint_damage_rects(rs, DAMAGE_MAX);
+#ifdef LORD_TEST_HOOKS
+        for (int k = 0; k < nr; k++) test_painted_px += (long long)((rs[k].x1 - rs[k].x0) * (rs[k].y1 - rs[k].y0));
+#endif
         for (int i = 0; i <= OUT_MAX; i++) {
             Out *o = i < OUT_MAX ? &s->out[i] : &s->cap;
             if (i < OUT_MAX && !o->on) continue;
@@ -2096,14 +2158,14 @@ static void present_cpu(Server *s, Out *o, int index, Rect r, int feed) {
     int px_, py_;
     pointer_phys(s, o, &px_, &py_);
     if (feed) {
-        /* remote desktop (without the cursor) and recording: with protected windows in black */
+        /* remote desktop (without the cursor) and recording: with protected windows as the protected fill */
         MediaCursor mc = { px_, py_, k.mode, k.px, k.w, k.h, k.hx, k.hy };
         view_of(o, index);
         const Canvas *seen = media_composed(&out, mirror_watchers() > 0, &mc);
         view_reset();
         mirror_composed_on_gpu(0);        /* this frame was painted on the CPU */
         /* only what went into this buffer can differ from the last frame (not with a fullscreen app
-         * painted over it, nor when the frame is the copy with protected windows in black) */
+         * painted over it, nor when the frame is the copy with protected windows as the protected fill) */
         int dmg[4] = { need.x0, need.y0, need.x1, need.y1 };
         mirror_frame(seen->px, seen->stride, W, H, seen == &out && !wl_fullscreen_active() ? dmg : NULL);
         mirror_cursor(px_, py_, k.mode, k.px, k.w, k.h, k.hx, k.hy, k.gen);
@@ -2168,7 +2230,7 @@ static void present_memory(Server *s, Out *o, int index, int feed, Rect drawn) {
     int x, y;
     pointer_phys(s, o, &x, &y);
     if (feed) {
-        /* what the browser sees and what is recorded: with the protected windows in black */
+        /* what the browser sees and what is recorded: with the protected windows as the protected fill */
         MediaCursor mc = { x, y, k.mode, k.px, k.w, k.h, k.hx, k.hy };
         const Canvas *seen = media_composed(&out, mirror_watchers() > 0, &mc);
         mirror_composed_on_gpu(0);        /* this frame was painted on the CPU */
@@ -2295,7 +2357,9 @@ static void out_present(Server *s, Out *o, int i, Rect r, const Out *feed, LbPha
         /* the remote desktop watches: the composed frame is read back once for every viewer */
         static uint32_t *rb;
         static size_t rb_n;
-        int readback = o == feed && mirror_watchers() > 0;
+        /* never while a protected window is on screen: only a frame painted in capture mode may leave (media_composed);
+         * cpu_switch moves the session to the CPU at the next frame, and until then the viewers get no frame */
+        int readback = o == feed && mirror_watchers() > 0 && !media_protected_count();
         if (readback) {
             size_t need = (size_t)o->scene.w * o->scene.h;
             if (need > rb_n) { free(rb); rb = malloc(need * 4); rb_n = rb ? need : 0; }
@@ -2790,6 +2854,8 @@ static int check_code(int argc, char **argv) {
     return bad ? 1 : 0;
 }
 
+static unsigned renders_done;          /* frames drawn: a theme switch waits for two (its overlay on screen) */
+
 /* 0 if the requested theme is running; -1 if it failed and `current` (the last one that loaded) was put
  * back: the caller keeps `current` then, so a second failed switch never falls back to a refused theme */
 static int switch_theme(const char *current) {
@@ -2803,7 +2869,8 @@ static int switch_theme(const char *current) {
     js_shutdown();
     ui_reset();
     term_detach_all();
-    int r = js_init(path);
+    /* the bytes lord.themes.use verified when it was asked (js_sys.c f_themes_use): a refused theme never gets here */
+    int r = js_init_prepared(path);
     if (r) {
         fprintf(stderr, "lord-server: the theme failed, going back to %s\n", current);
         snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", path);
@@ -2814,11 +2881,12 @@ static int switch_theme(const char *current) {
         ui.theme_failed_gen = codesig_generation();
         js_shutdown();
         ui_reset();
-        if (js_init(current)) {
-            /* the theme that was running is refused too (its file changed under the running session: a package
-             * update rewrote it and the new code manifest did not verify, sec/codesig.c codesig_reload). Never no JavaScript at
-             * all: the main loop's next js_tick would call into a freed context (the 2026-11-22 13:41 crash,
-             * JS_GetGlobalObject(NULL)). The recovery screen instead, as at start (start_theme). */
+        /* the theme that was running, from the bytes verified when it loaded: not its file again, which a package
+         * update may have replaced under the session (js.c js_init_previous) */
+        if (js_init_previous(current)) {
+            /* it did not start again either (it can only be read again from disk when it was never kept). Never no
+             * JavaScript at all: the main loop's next js_tick would call into a freed context (the 2026-11-22 13:41
+             * crash, JS_GetGlobalObject(NULL)). The recovery screen instead, as at start (start_theme). */
             fprintf(stderr, "lord-server: %s did not load again either: the recovery screen\n", current);
             js_shutdown();
             ui_reset();
@@ -3030,7 +3098,14 @@ int main(int argc, char **argv) {
 #ifdef LORD_TEST_HOOKS
     if (test_hooks && (!s.headless || s.greeter)) { usage(argv[0]); return 2; }   /* never on a monitor or the login screen */
 #endif
+    /* a test's session (--timeout, the test hooks) never drives LordOS Studio's loopback: /dev/video50 is the whole
+     * computer's, and the person's own session may be feeding it to a video call */
+    if (timeout_ms > 0) mstudio_hub_off();
+#ifdef LORD_TEST_HOOKS
+    if (test_hooks) mstudio_hub_off();
+#endif
     js_sys_set_greeter(s.greeter);
+    display_set_greeter(s.greeter);     /* #242: the login screen's scale (LORD_MAIN_SCALE) */
     wl_set_greeter(s.greeter);          /* the login screen never lets an app take the shortcuts */
     if (text_init(fonts)) return 1;
     {   /* assets/ = la carpeta de las fuentes, un nivel arriba */
@@ -3156,7 +3231,8 @@ int main(int argc, char **argv) {
                                           share_point_protected, share_restricted, share_displays_of, remote_refresh };
     if (ok && !s.greeter && share_start(&share_host)) fprintf(stderr, "lord-server: no screen-sharing API (socket)\n");
 #ifdef LORD_TEST_HOOKS
-    static const TestHooks test_host = { test_pointer, remote_button, remote_wheel, test_tablet, test_tablet_event, wl_test_xwl, drmlease_fake_card, test_key };
+    static const TestHooks test_host = { test_pointer, remote_button, remote_wheel, test_tablet, test_tablet_event, wl_test_xwl, drmlease_fake_card, test_key,
+                                         test_frame, test_painted };
     if (ok && test_hooks && testhooks_start(&test_host)) fprintf(stderr, "lord-server: no test hooks socket\n");
 #endif
     char current[sizeof ui.theme_request];
@@ -3217,11 +3293,19 @@ int main(int argc, char **argv) {
     wdog_busy(mono_ns());
     while (!s.quit && !ui.quit_requested) {
         if (ui.theme_request[0]) {
-            char next[sizeof current];
-            snprintf(next, sizeof next, "%s", ui.theme_request);
-            wdog_expect(1);                 /* a theme loads for a second or more by design */
-            if (!switch_theme(current)) snprintf(current, sizeof current, "%s", next);
-            wdog_expect(0);
+            /* two frames first (or 300 ms when none is drawn): the shell's "changing the desktop style" overlay (sdk
+             * themeswitch.jsx) gets on screen, and stays there while the new theme loads behind it */
+            static double asked;
+            static unsigned asked_renders;
+            if (!asked) { asked = now_ms(); asked_renders = renders_done; }
+            if (renders_done - asked_renders >= 2 || now_ms() - asked >= 300) {
+                asked = 0;
+                char next[sizeof current];
+                snprintf(next, sizeof next, "%s", ui.theme_request);
+                wdog_expect(1);                 /* a theme loads for a second or more by design */
+                if (!switch_theme(current)) snprintf(current, sizeof current, "%s", next);
+                wdog_expect(0);
+            }
         }
         {   /* a pointer lock started, ended, or its owner moved the pointer image it shows (pointerlock.h) */
             static unsigned plk;
@@ -3384,6 +3468,7 @@ int main(int argc, char **argv) {
         if (s.headless || soft) pace = softpace_wait(&pace_sw, tnow, period);
         if (wants && (!all_busy(&s) || ahead) && pace <= 0) {
             render(&s);
+            renders_done++;
             js_vm_painted();                /* the machines' frames it showed: lord-vmdisplay may send the next ones */
             wants = 0;
             if (s.headless || soft) { softpace_started(&pace_sw, period); softpace_shown(&pace_sw, now_ms(), period); }
@@ -3402,7 +3487,8 @@ int main(int argc, char **argv) {
             if (twd >= 0 && (delay < 0 || twd < delay)) delay = twd;
         }
         int wait = delay < 0 ? -1 : (int)ceil(delay);
-        if ((wants && (!all_busy(&s) || ahead) && pace <= 0) || ui.theme_request[0] || ui.quit_requested) wait = 0;
+        if ((wants && (!all_busy(&s) || ahead) && pace <= 0) || ui.quit_requested) wait = 0;
+        if (ui.theme_request[0] && (wait < 0 || wait > 16)) wait = 16;     /* a theme switch waits for its overlay's frames */
         if (timeout_ms > 0) {
             double left = start + timeout_ms - now_ms();
             if (left <= 0) break;
@@ -3412,7 +3498,7 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[195 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +8 machines, +40 Spawn helpers, +5 test hooks (lord-server-test) */
+        struct pollfd pfd[203 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +16 machines, +40 Spawn helpers, +5 test hooks (lord-server-test) */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
@@ -3466,7 +3552,7 @@ int main(int argc, char **argv) {
         n += nmed;
         int hwbase = n, nhw = hw_pollfds(pfd + n, 48);   /* 16 fixed + up to 32 Spawn helpers */           /* uevents, the system bus and the session bus clients (src/hw) */
         n += nhw;
-        int vmbase = n, nvm = js_vm_pollfds(pfd + n, 8);         /* Machines: each picture's lord-vmdisplay (ui/js_vm.c) */
+        int vmbase = n, nvm = js_vm_pollfds(pfd + n, 16);        /* Machines: each picture's lord-vmdisplay (ui/js_vm.c) */
         n += nvm;
         wdog_idle();
         int ready = poll(pfd, n, wait);

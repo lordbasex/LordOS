@@ -87,5 +87,6 @@
   },
   "pickAddress": "Pilih alamat untuk mengizinkan atau memblokirnya bagi aplikasi ini.",
   "recent": "koneksi terbaru",
-  "recentDenied": "baru saja ditolak"
+  "recentDenied": "baru saja ditolak",
+  "machineInherits": "Aturan Mesin juga memutuskan untuk mesin ini. Aturannya sendiri ditambahkan: jika keduanya cocok dengan suatu koneksi, yang lebih spesifik memutuskan, dan Blokir mengalahkan Izinkan."
 }

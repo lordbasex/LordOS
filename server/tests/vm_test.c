@@ -14,6 +14,12 @@
 #include "vm/vmagent.h"
 #include "vm/vmnet.h"
 #include "vm/vmgvtwin.h"
+#include "vm/vmperfwin.h"
+#include "vm/vmhoststop.h"
+#include "vm/vmgroup.h"
+#include "vm/vmrecv.h"
+#include <sys/xattr.h>
+#include <time.h>
 
 #include <limits.h>
 #include <stdio.h>
@@ -28,6 +34,11 @@
 
 static int fails, checks;
 #define CHECK(c) do { checks++; if (!(c)) { fails++; fprintf(stderr, "%s:%d: CHECK(%s) failed\n", __FILE__, __LINE__, #c); } } while (0)
+
+/* vm_budget_used_mb's liveness in the test: pids 100-199 are "alive" lord-vms */
+static int budget_alive(long pid) { return pid >= 100 && pid < 200; }
+/* ... and a share beside the limit: 700 MB for a group member, a nonsense one for the rest */
+static long budget_extra(const char *dir, const VmMachine *m) { (void)m; return strstr(dir, ".lordgroup/") ? 700 : -5; }
 
 static const char GOOD[] =
     "{\"schema\":1,\"id\":\"0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b\",\"name\":\"Debian 13 \xc3\xa9t\xc3\xa9\",\"arch\":\"arm64\",\"accel\":\"kvm\","
@@ -67,7 +78,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "13", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "99", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -110,7 +121,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":13,\"whatever\":true}";
+    const char newer[] = "{\"schema\":99,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -232,12 +243,43 @@ static void test_schema(void) {
                 free(jj);
             }
         }
-        /* arm64 (GOOD) and a bios machine refuse them */
+        /* arm64 (GOOD, 4.3): secure boot, a TPM and the windows devices, never Hyper-V; a bios machine refuses secure boot */
         {
             char t[4096];
             const char *at = strstr(GOOD, "\"schema\":1");
             snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"tpm\":true}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
+            CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_OK);
+            snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"secure_boot\":true,\"tpm\":true,\"devices\":\"windows\",\"drivers\":\"/home/ana/virtio-win.iso\"}",
+                     (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
+            CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_OK && m.devices == VM_DEV_WINDOWS && m.secure_boot && m.tpm);
+            /* KVM gives the windows devices' GICv3 only on a GICv3 host (the Pi 5 is GICv2): refused there, emulation allowed */
+            VmHost g2 = { .arch = VM_ARCH_ARM64, .cpus = 4, .ram_mb = 16000, .kvm = 1, .gicv3 = 0 }, g3 = g2;
+            g3.gicv3 = 1;
+            CHECK(vm_machine_check_host(&m, &g2, err, sizeof err, NULL, 0) == VM_E_HOST && strstr(err, "GICv2"));
+            CHECK(vm_machine_check_host(&m, &g3, err, sizeof err, NULL, 0) == VM_OK);
+            m.accel = VM_ACCEL_TCG;
+            CHECK(vm_machine_check_host(&m, &g2, err, sizeof err, NULL, 0) == VM_OK);
+            m.accel = VM_ACCEL_KVM; m.devices = VM_DEV_VIRTIO;
+            CHECK(vm_machine_check_host(&m, &g2, err, sizeof err, NULL, 0) == VM_OK);       /* a Linux machine: GICv2 is fine */
+            snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"hyperv\":true}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
             CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_E_RANGE);
+            /* the interrupts table: GICv3 or GICv4 named, a name cut between two reads, GICv2 only, none */
+            {
+                char tf[] = "/tmp/vm-test-irq-XXXXXX";
+                int fd = mkstemp(tf);
+                static char big[200000];
+                memset(big, ' ', sizeof big);
+                memcpy(big + 65536 + 8 - 3, "GICv3", 5);
+                CHECK(fd >= 0 && write(fd, big, sizeof big) == (ssize_t)sizeof big);
+                CHECK(vm_gicv3_in(tf) == 1);
+                CHECK(fd >= 0 && !ftruncate(fd, 0) && pwrite(fd, " 12:  9752  GICv2  27 Level  kvm guest vtimer\n", 47, 0) == 47);
+                CHECK(vm_gicv3_in(tf) == 0);
+                CHECK(fd >= 0 && pwrite(fd, " 12:  9752  GICv4  27 Level  kvm guest vtimer\n", 47, 0) == 47);
+                CHECK(vm_gicv3_in(tf) == 1);
+                if (fd >= 0) close(fd);
+                unlink(tf);
+                CHECK(vm_gicv3_in("/nonexistent/interrupts") == -1);
+            }
             CHECK(vm_machine_parse(amd, strlen(amd), &m, err, sizeof err) == VM_OK);
             m.schema = 5; m.firmware = VM_FW_BIOS; m.firmware_code[0] = m.firmware_sha256[0] = 0; m.secure_boot = 1;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
@@ -480,6 +522,308 @@ static void test_schema(void) {
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 12);
         }
+        /* schema 16: storage (docs/VIRTUALIZATION.md 6.2, 6.4, 8): disposable memory|disk, encrypted, disk_format raw,
+         * backup false; each written only when it differs from a new machine, never below 16; raw excludes encrypted */
+        {
+            struct { const char *add; int schema, want; } s16[] = {
+                { "\"disposable\":\"memory\"", 16, VM_OK }, { "\"disposable\":\"disk\"", 16, VM_OK }, { "\"disposable\":\"off\"", 16, VM_E_RANGE },
+                { "\"disposable\":\"ram\"", 16, VM_E_RANGE }, { "\"disposable\":true", 16, VM_E_FIELD }, { "\"disposable\":\"memory\"", 15, VM_E_FIELD },
+                { "\"encrypted\":true", 16, VM_OK }, { "\"encrypted\":false", 16, VM_OK }, { "\"encrypted\":1", 16, VM_E_FIELD }, { "\"encrypted\":true", 15, VM_E_FIELD },
+                { "\"disk_format\":\"raw\"", 16, VM_OK }, { "\"disk_format\":\"qcow2\"", 16, VM_OK }, { "\"disk_format\":\"vmdk\"", 16, VM_E_RANGE },
+                { "\"disk_format\":\"raw\",\"encrypted\":true", 16, VM_E_RANGE }, { "\"disk_format\":\"raw\"", 15, VM_E_FIELD },
+                { "\"backup\":false", 16, VM_OK }, { "\"backup\":true", 16, VM_OK }, { "\"backup\":\"no\"", 16, VM_E_FIELD }, { "\"backup\":false", 15, VM_E_FIELD },
+                { "\"disposable\":\"disk\",\"encrypted\":true,\"backup\":false", 16, VM_OK },
+            };
+            for (size_t i = 0; i < sizeof s16 / sizeof s16[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s16[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s16[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s16[i].want) fprintf(stderr, "  schema 16 %s (%d): got %d (%s)\n", s16[i].add, s16[i].schema, r, err);
+                CHECK(r == s16[i].want);
+                if (r != VM_OK) continue;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                CHECK(jj && !strstr(jj, "\"backup\": true") && !strstr(jj, "\"encrypted\": false") && !strstr(jj, "\"disk_format\": \"qcow2\""));
+                free(jj);
+            }
+            /* a group's member: its group has the disposable switch, and its disk is qcow2 */
+            VmMachine gm;
+            vm_machine_parse(GOOD, strlen(GOOD), &gm, err, sizeof err);
+            CHECK(!strcmp(vm_disk_ext(&gm), "qcow2"));
+            gm.raw = 1;
+            CHECK(!strcmp(vm_disk_ext(&gm), "raw"));
+            /* the key's form: exactly 64 lowercase hex digits */
+            CHECK(vm_key_valid("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", 64));
+            CHECK(!vm_key_valid("0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef", 64));
+            CHECK(!vm_key_valid("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde", 63));
+            CHECK(!vm_key_valid("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg", 64));
+            CHECK(!vm_key_valid("a passphrase someone chose", 26));
+        }
+        /* schema 13: perf_profile (the guest's performance profile, 7.1.4), true or false, written only when true, never
+         * below 13 */
+        {
+            struct { const char *add; int schema, want, on; } s13[] = {
+                { "\"perf_profile\":true", 13, VM_OK, 1 }, { "\"perf_profile\":false", 13, VM_OK, 0 }, { "\"agent\":true", 13, VM_OK, 0 },
+                { "\"perf_profile\":1", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":\"on\"", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":null", 13, VM_E_FIELD, 0 },
+                { "\"perf_profile\":true", 12, VM_E_FIELD, 0 }, { "\"perf_profile\":false", 12, VM_OK, 0 },
+                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 16, VM_OK, 1 }, { "\"perf_profile\":true", 99, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s13 / sizeof s13[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s13[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s13[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s13[i].want) fprintf(stderr, "  schema 13 %s (%d): got %d (%s)\n", s13[i].add, s13[i].schema, r, err);
+                CHECK(r == s13[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.perf_profile == s13[i].on);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"perf_profile\": true") == s13[i].on && !strstr(jj, "\"perf_profile\": false"));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && !m.perf_profile);
+            m.perf_profile = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.perf_profile = 2; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 13);
+        }
+        /* schema 15: guest_links and guest_notify (6.12), true or false, written only when true, never below 15, never
+         * for a machine locked for anonymity */
+        {
+            struct { const char *add; int schema, want, links, notify; } s15[] = {
+                { "\"guest_links\":true", 15, VM_OK, 1, 0 }, { "\"guest_notify\":true", 15, VM_OK, 0, 1 },
+                { "\"guest_links\":true,\"guest_notify\":true", 15, VM_OK, 1, 1 }, { "\"guest_links\":false", 15, VM_OK, 0, 0 },
+                { "\"guest_links\":1", 15, VM_E_FIELD, 0, 0 }, { "\"guest_notify\":\"on\"", 15, VM_E_FIELD, 0, 0 },
+                { "\"guest_links\":true", 14, VM_E_FIELD, 0, 0 }, { "\"guest_notify\":true", 14, VM_E_FIELD, 0, 0 },
+                { "\"guest_notify\":false", 14, VM_OK, 0, 0 }, { "\"guest_links\":true", VM_SCHEMA + 1, VM_E_NEWER, 0, 0 },
+            };
+            for (size_t i = 0; i < sizeof s15 / sizeof s15[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s15[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s15[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s15[i].want) fprintf(stderr, "  schema 15 %s (%d): got %d (%s)\n", s15[i].add, s15[i].schema, r, err);
+                CHECK(r == s15[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.guest_links == s15[i].links && m.guest_notify == s15[i].notify);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"guest_links\": true") == s15[i].links && !!strstr(jj, "\"guest_notify\": true") == s15[i].notify && !strstr(jj, "\": false\n"));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && !m.guest_links && !m.guest_notify);
+            m.guest_links = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.guest_links = 2; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 15);
+        }
+        /* schema 20: guest_files (6.21), true or false, written only when false, never below 20 */
+        {
+            struct { const char *add; int schema, want, off; } s18[] = {
+                { "\"guest_files\":false", 20, VM_OK, 1 }, { "\"guest_files\":true", 20, VM_OK, 0 }, { "\"guest_files\":0", 20, VM_E_FIELD, 0 },
+                { "\"guest_files\":false", 19, VM_E_FIELD, 0 }, { "\"guest_files\":true", 19, VM_OK, 0 }, { "\"guest_files\":false", VM_SCHEMA + 1, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s18 / sizeof s18[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s18[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s18[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s18[i].want) fprintf(stderr, "  schema 20 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
+                CHECK(r == s18[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.guest_files_off == s18[i].off);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"guest_files\": false") == s18[i].off && !strstr(jj, "\"guest_files\": true"));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && !m.guest_files_off);
+            m.guest_files_off = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.guest_files_off = 2; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 20);
+        }
+        /* schema 23: kernel_boot (direct kernel boot, 6.1), true or false, written only when true, never below 23; refused
+         * with secure boot, the virtio-win devices, encryption and for a group's member */
+        {
+            struct { const char *add; int schema, want, on; } s21[] = {
+                { "\"kernel_boot\":true", 23, VM_OK, 1 }, { "\"kernel_boot\":false", 23, VM_OK, 0 }, { "\"kernel_boot\":1", 23, VM_E_FIELD, 0 },
+                { "\"kernel_boot\":\"on\"", 23, VM_E_FIELD, 0 }, { "\"kernel_boot\":true", 22, VM_E_FIELD, 0 }, { "\"kernel_boot\":false", 22, VM_OK, 0 },
+                { "\"kernel_boot\":true", VM_SCHEMA + 1, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s21 / sizeof s21[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s21[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s21[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s21[i].want) fprintf(stderr, "  schema 23 %s (%d): got %d (%s)\n", s21[i].add, s21[i].schema, r, err);
+                CHECK(r == s21[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.kernel_boot == s21[i].on);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"kernel_boot\": true") == s21[i].on && !strstr(jj, "\"kernel_boot\": false"));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && !m.kernel_boot);
+            m.kernel_boot = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_OK);
+            m.kernel_boot = 2;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            m.kernel_boot = 1;
+            VmMachine k = m;
+            k.firmware = VM_FW_UEFI; k.secure_boot = 1;
+            CHECK(vm_machine_check(&k, err, sizeof err) == VM_E_RANGE && strstr(err, "secure boot"));
+            k = m; k.devices = VM_DEV_WINDOWS;
+            CHECK(vm_machine_check(&k, err, sizeof err) != VM_OK);
+            k = m; k.encrypted = 1;
+            CHECK(vm_machine_check(&k, err, sizeof err) != VM_OK);
+            k = m; k.kernel_boot = 0; k.encrypted = 1;
+            CHECK(vm_machine_check(&k, err, sizeof err) == VM_OK);
+            CHECK(VM_SCHEMA >= 23);
+        }
+        /* schema 17: automation (6.15), true or false, written only when true, never below 17, never for anonymity */
+        {
+            struct { const char *add; int schema, want, on; } s16[] = {
+                { "\"automation\":true", 17, VM_OK, 1 }, { "\"automation\":false", 17, VM_OK, 0 }, { "\"agent\":true", 17, VM_OK, 0 },
+                { "\"automation\":1", 17, VM_E_FIELD, 0 }, { "\"automation\":\"on\"", 17, VM_E_FIELD, 0 }, { "\"automation\":null", 17, VM_E_FIELD, 0 },
+                { "\"automation\":true", 16, VM_E_FIELD, 0 }, { "\"automation\":false", 16, VM_OK, 0 }, { "\"automation\":true", 99, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s16 / sizeof s16[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s16[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s16[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s16[i].want) fprintf(stderr, "  schema 17 %s (%d): got %d (%s)\n", s16[i].add, s16[i].schema, r, err);
+                CHECK(r == s16[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.automation == s16[i].on);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"automation\": true") == s16[i].on && !strstr(jj, "\"automation\": false"));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && !m.automation);
+            m.automation = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.automation = 2; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 17);
+        }
+        /* schema 18: cpu_model (5.5), "host" or "compatible", written only when compatible, never below 18, amd64 with KVM
+         * only (GOOD is an arm64 machine) */
+        {
+            struct { const char *add; int schema, want, model; } s18[] = {
+                { "\"cpu_model\":\"host\"", 18, VM_OK, VM_CPU_HOST }, { "\"agent\":true", 18, VM_OK, VM_CPU_HOST },
+                { "\"cpu_model\":\"max\"", 18, VM_E_RANGE, 0 }, { "\"cpu_model\":true", 18, VM_E_FIELD, 0 },
+                { "\"cpu_model\":\"compatible\"", 18, VM_E_RANGE, 0 }, { "\"cpu_model\":\"compatible\"", 17, VM_E_FIELD, 0 },
+                { "\"cpu_model\":\"host\"", 99, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s18 / sizeof s18[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s18[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s18[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s18[i].want) fprintf(stderr, "  schema 20 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
+                CHECK(r == s18[i].want);
+                if (r == VM_OK) CHECK(m.cpu_model == s18[i].model);
+            }
+            /* compatible: an amd64 KVM machine, written and read back; never with TCG */
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK);
+            m.arch = VM_ARCH_AMD64; snprintf(m.machine_type, sizeof m.machine_type, "pc-q35-10.0"); m.cpu_model = VM_CPU_COMPAT; m.schema = VM_SCHEMA;
+            int cok = vm_machine_check(&m, err, sizeof err) == VM_OK;
+            if (!cok) fprintf(stderr, "  compatible amd64: %s\n", err);
+            CHECK(cok);
+            if (cok) {
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && strstr(jj, "\"cpu_model\": \"compatible\""));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && m2.cpu_model == VM_CPU_COMPAT);
+                free(jj);
+                m.accel = VM_ACCEL_TCG;
+                CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            }
+            CHECK(VM_SCHEMA >= 18);
+        }
+        /* schema 19: heads (All Displays, 5.4), 1..VM_HEADS_MAX, written only when more than one, never below 19, only with
+         * a window and virtio graphics */
+        {
+            struct { const char *add; int schema, want, heads; } s19[] = {
+                { "\"heads\":2", 19, VM_OK, 2 }, { "\"heads\":4", 19, VM_OK, 4 }, { "\"heads\":1", 19, VM_OK, 1 },
+                { "\"heads\":0", 19, VM_E_RANGE, 0 }, { "\"heads\":5", 19, VM_E_RANGE, 0 }, { "\"heads\":-1", 19, VM_E_RANGE, 0 },
+                { "\"heads\":\"2\"", 19, VM_E_FIELD, 0 }, { "\"heads\":2.5", 19, VM_E_FIELD, 0 }, { "\"heads\":2", 18, VM_E_FIELD, 0 },
+                { "\"heads\":1", 18, VM_OK, 1 }, { "\"heads\":2,\"display\":\"none\"", 19, VM_E_FIELD, 0 },
+                { "\"heads\":4294967298", 19, VM_E_FIELD, 0 }, { "\"heads\":2", VM_SCHEMA + 1, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s19 / sizeof s19[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s19[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s19[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if ((r == VM_OK) != (s19[i].want == VM_OK) || (s19[i].want == VM_OK && r != VM_OK)) fprintf(stderr, "  schema 19 %s (%d): got %d (%s)\n", s19[i].add, s19[i].schema, r, err);
+                CHECK((r == VM_OK) == (s19[i].want == VM_OK));
+                if (s19[i].want == VM_E_NEWER) CHECK(r == VM_E_NEWER);
+                if (r != VM_OK) continue;
+                CHECK(m.heads == s19[i].heads);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"heads\"") == (s19[i].heads > 1));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && m.heads == 1);
+            m.heads = 2;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);          /* schema 1 */
+            m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_OK);
+            m.vgpu = VM_VGPU_SHARED;
+            CHECK(vm_machine_check(&m, err, sizeof err) != VM_OK);             /* a vGPU has one display */
+            m.vgpu = VM_VGPU_NONE; m.heads = 0;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_OK);             /* a VmMachine from before: one */
+            m.heads = VM_HEADS_MAX + 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 19 && VM_HEADS_MAX == 4);
+        }
+        /* schema 13: cpu_pin (vCPU pinning, 3.7.1), "off" or "auto", written only when chosen, never below 13 */
+        {
+            struct { const char *add; int schema, want, pin; } s13p[] = {
+                { "\"cpu_pin\":\"off\"", 13, VM_OK, VM_PIN_OFF }, { "\"cpu_pin\":\"auto\"", 13, VM_OK, VM_PIN_AUTO },
+                { "\"agent\":true", 13, VM_OK, VM_PIN_DEFAULT }, { "\"cpu_pin\":\"\"", 13, VM_OK, VM_PIN_DEFAULT },
+                { "\"cpu_pin\":\"on\"", 13, VM_E_RANGE, 0 }, { "\"cpu_pin\":\"default\"", 13, VM_E_RANGE, 0 }, { "\"cpu_pin\":true", 13, VM_E_FIELD, 0 },
+                { "\"cpu_pin\":\"auto\"", 12, VM_E_FIELD, 0 }, { "\"cpu_pin\":\"off\"", 12, VM_E_FIELD, 0 },
+            };
+            for (size_t i = 0; i < sizeof s13p / sizeof s13p[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s13p[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s13p[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s13p[i].want) fprintf(stderr, "  schema 13 %s (%d): got %d (%s)\n", s13p[i].add, s13p[i].schema, r, err);
+                CHECK(r == s13p[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.cpu_pin == s13p[i].pin);
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"cpu_pin\"") == (s13p[i].pin != VM_PIN_DEFAULT));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && m.cpu_pin == VM_PIN_DEFAULT);
+            m.cpu_pin = VM_PIN_AUTO;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.cpu_pin = 3; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 13);
+        }
         /* which of QEMU's mice "Capture mouse" makes the active one (query-mice's answer, untrusted) */
         {
             struct { const char *json; int rel, want, cur, added; } mp[] = {
@@ -579,6 +923,97 @@ static void test_schema(void) {
             CHECK(vm_transfer_path(dir, xp, sizeof xp) == 0 && lstat(xp, &st));
             CHECK(vm_transfer_aside(dir, A, mv, sizeof mv) == 1);              /* nothing left to move */
             CHECK(vm_transfer_claim(dir, "not-an-id", xp, sizeof xp, mv, sizeof mv) < 0);
+            char cmd[PATH_MAX + 16];
+            snprintf(cmd, sizeof cmd, "rm -rf '%s'", lib);
+            if (system(cmd)) {}
+        }
+    }
+    /* renaming a machine (6.26): the folder a name gives, the names a rename takes, what it would do (vm_rename_plan: another
+     * machine's name, a folder or transfer folder of that name, case ignored), and the transfer folder following its
+     * machine's folder (vm_transfer_adopt: never a Duplicate's, never one put aside, never a guess) */
+    {
+        char f[64];
+        vm_folder_name("Windows 11 Pro", f, sizeof f); CHECK(!strcmp(f, "Windows 11 Pro"));
+        vm_folder_name("Windows 11 Pro (prueba)", f, sizeof f); CHECK(!strcmp(f, "Windows 11 Pro -prueba"));
+        vm_folder_name("Débian/../x", f, sizeof f); CHECK(!strcmp(f, "D-bian-..-x"));
+        vm_folder_name("...", f, sizeof f); CHECK(!strcmp(f, "Machine"));
+        vm_folder_name(".hidden", f, sizeof f); CHECK(f[0] != '.');
+        vm_folder_name("日本語", f, sizeof f); CHECK(!strcmp(f, "Machine"));
+        char longn[200];
+        memset(longn, 'a', sizeof longn - 1); longn[sizeof longn - 1] = 0;
+        vm_folder_name(longn, f, sizeof f); CHECK(strlen(f) == 48);
+        CHECK(vm_rename_name_ok("Windows 11 Pro") && vm_rename_name_ok("Ubuntu 26.04 (dev)") && vm_rename_name_ok("Ñandú"));
+        CHECK(!vm_rename_name_ok(".x") && !vm_rename_name_ok("") && !vm_rename_name_ok("   ") && !vm_rename_name_ok("a/b") && !vm_rename_name_ok("a\\b") &&
+              !vm_rename_name_ok("a\nb") && !vm_rename_name_ok("a\x7f") && !vm_rename_name_ok(longn) && !vm_rename_name_ok("\xff"));
+        char lib[] = "/tmp/vm-rename.XXXXXX";
+        if (mkdtemp(lib)) {
+            /* machines as lord-vm writes them: GOOD with ids of their own */
+            VmMachine a, b;
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &a, NULL, 0) == VM_OK);
+            a.schema = VM_SCHEMA;
+            b = a;
+            vm_new_id(a.id); vm_new_id(b.id);
+            snprintf(a.name, sizeof a.name, "Windows 11 Pro (prueba)");
+            snprintf(b.name, sizeof b.name, "Other");
+            char da[PATH_MAX], db[PATH_MAX], p[PATH_MAX + 64], xp[PATH_MAX], from[NAME_MAX + 1];
+            snprintf(da, sizeof da, "%s/Windows 11 Pro (prueba).lordvm", lib);
+            snprintf(db, sizeof db, "%s/Other.lordvm", lib);
+            CHECK(!mkdir(da, 0700) && !mkdir(db, 0700) && !vm_machine_save(da, &a) && !vm_machine_save(db, &b));
+            VmRenamePlan rp;
+            CHECK(vm_rename_plan(da, "Windows 11 Pro", &rp) == VM_RN_OK && rp.moves && !strcmp(rp.folder, "Windows 11 Pro"));
+            /* the same characters once made safe: the folder stays */
+            CHECK(vm_rename_plan(da, "Windows 11 Pro [prueba]", &rp) == VM_RN_OK && !rp.moves && !strcmp(rp.folder, "Windows 11 Pro (prueba)"));
+            CHECK(vm_rename_plan(da, "other", &rp) == VM_RN_NAME_TAKEN && !strcmp(rp.other, "Other"));
+            CHECK(vm_rename_plan(da, ".x", &rp) == VM_RN_BAD_NAME);
+            CHECK(vm_rename_plan("/nowhere/x.img", "A", &rp) == VM_RN_NOT_MACHINE);
+            /* its own name, another case: not another machine's */
+            CHECK(vm_rename_plan(da, "WINDOWS 11 PRO (PRUEBA)", &rp) == VM_RN_OK && rp.moves);
+            snprintf(p, sizeof p, "%s/new box.lordvm", lib); CHECK(!mkdir(p, 0700));            /* any entry, case ignored */
+            CHECK(vm_rename_plan(da, "New Box", &rp) == VM_RN_FOLDER_TAKEN);
+            snprintf(p, sizeof p, "%s/Transfer", lib); CHECK(!mkdir(p, 0700));
+            snprintf(p, sizeof p, "%s/Transfer/fresh", lib); CHECK(!mkdir(p, 0700));
+            CHECK(vm_rename_plan(da, "Fresh", &rp) == VM_RN_TRANSFER_TAKEN);
+            CHECK(vm_rename_plan(db, "Other", &rp) == VM_RN_OK && !rp.moves);                     /* itself */
+            /* its transfer folder, then the machine folder renamed (as lord-vm does): the transfer folder follows */
+            CHECK(vm_transfer_claim(da, a.id, xp, sizeof xp, NULL, 0) == 0);
+            snprintf(p, sizeof p, "%s/keep.txt", xp);
+            FILE *fp = fopen(p, "w"); if (fp) { fputs("x\n", fp); fclose(fp); }
+            char na[PATH_MAX];
+            snprintf(na, sizeof na, "%s/Windows 11 Pro.lordvm", lib);
+            CHECK(!rename(da, na));
+            CHECK(vm_transfer_adopt(na, a.id, from, sizeof from) == 0 && !strcmp(from, "Windows 11 Pro (prueba)"));
+            snprintf(p, sizeof p, "%s/Transfer/Windows 11 Pro/keep.txt", lib); CHECK(!access(p, F_OK));
+            snprintf(p, sizeof p, "%s/Transfer/.Windows 11 Pro.machine", lib); CHECK(!access(p, F_OK));
+            snprintf(p, sizeof p, "%s/Transfer/.Windows 11 Pro (prueba).machine", lib); CHECK(access(p, F_OK));
+            CHECK(vm_transfer_adopt(na, a.id, from, sizeof from) == 1);                         /* there already */
+            /* a rename that stopped between its steps: the next start's claim brings it along */
+            char nb[PATH_MAX];
+            snprintf(nb, sizeof nb, "%s/Win.lordvm", lib);
+            CHECK(!rename(na, nb));
+            CHECK(vm_transfer_claim(nb, a.id, xp, sizeof xp, from, sizeof from) == 0 && !from[0]);
+            snprintf(p, sizeof p, "%s/Transfer/Win/keep.txt", lib); CHECK(!access(p, F_OK));
+            /* a Duplicate (the same id) beside the original: each keeps its own */
+            char dup[PATH_MAX];
+            snprintf(dup, sizeof dup, "%s/Win 2.lordvm", lib);
+            CHECK(!mkdir(dup, 0700) && !vm_machine_save(dup, &a));
+            CHECK(vm_transfer_adopt(dup, a.id, from, sizeof from) == 1);
+            CHECK(vm_transfer_claim(dup, a.id, xp, sizeof xp, from, sizeof from) == 0);
+            snprintf(p, sizeof p, "%s/Transfer/Win/keep.txt", lib); CHECK(!access(p, F_OK));
+            /* a folder put aside (the Trash, a remade machine) never comes back by itself */
+            VmMachine c = b;
+            vm_new_id(c.id);
+            char dc[PATH_MAX];
+            snprintf(dc, sizeof dc, "%s/Fed.lordvm", lib);
+            CHECK(!mkdir(dc, 0700) && !vm_machine_save(dc, &c) && vm_transfer_claim(dc, c.id, xp, sizeof xp, NULL, 0) == 0);
+            CHECK(vm_transfer_aside(dc, c.id, from, sizeof from) == 0 && !strncmp(from, "Fed (old ", 9));
+            CHECK(vm_transfer_adopt(dc, c.id, from, sizeof from) == 1);
+            /* two folders of the same machine left behind: never a guess */
+            snprintf(p, sizeof p, "%s/Transfer/A1", lib); CHECK(!mkdir(p, 0700));
+            snprintf(p, sizeof p, "%s/Transfer/.A1.machine", lib); fp = fopen(p, "w"); if (fp) { fprintf(fp, "%s\n", c.id); fclose(fp); }
+            snprintf(p, sizeof p, "%s/Transfer/A2", lib); CHECK(!mkdir(p, 0700));
+            snprintf(p, sizeof p, "%s/Transfer/.A2.machine", lib); fp = fopen(p, "w"); if (fp) { fprintf(fp, "%s\n", c.id); fclose(fp); }
+            CHECK(vm_transfer_adopt(dc, c.id, from, sizeof from) == 1);
+            CHECK(vm_transfer_adopt(dc, "bad", from, sizeof from) < 0);
             char cmd[PATH_MAX + 16];
             snprintf(cmd, sizeof cmd, "rm -rf '%s'", lib);
             if (system(cmd)) {}
@@ -725,7 +1160,7 @@ static void test_host(void) {
     VmMachine m;
     char err[256], warn[256];
     vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err);
-    VmHost pi = { VM_ARCH_ARM64, 4, 16208, 1 }, small = { VM_ARCH_ARM64, 4, 3884, 1 }, pc = { VM_ARCH_AMD64, 8, 16000, 1 };
+    VmHost pi = { VM_ARCH_ARM64, 4, 16208, 1, 0 }, small = { VM_ARCH_ARM64, 4, 3884, 1, 0 }, pc = { VM_ARCH_AMD64, 8, 16000, 1, 0 };
     CHECK(vm_vcpus_recommended(&pi) == 3 && vm_mem_max_mb(&pi) == 16208 - 2048 && vm_mem_max_mb(&small) == 3884 - 1024);
     CHECK(vm_machine_check_host(&m, &pi, err, sizeof err, warn, sizeof warn) == VM_OK && !warn[0]);
     m.vcpus = 4;
@@ -754,6 +1189,80 @@ static void test_host(void) {
     CHECK(vm_mem_limit_mb(&m) == 2048 + VM_OVERHEAD_TCG_MB);
     CHECK(vm_budget_fits(&pi, 0, 14160) && !vm_budget_fits(&pi, 0, 14161));
     CHECK(vm_budget_fits(&pi, 8000, 6000) && !vm_budget_fits(&pi, 8000, 7000) && !vm_budget_fits(&pi, -1, 10));
+    /* what Backups holds back while a machine runs (vm_backup_hold): its disks folder and its saved session */
+    CHECK(vm_backup_hold("Machines/Debian.lordvm/disks") == strlen("Machines/Debian.lordvm"));
+    CHECK(vm_backup_hold("Machines/Whonix.lordgroup/Gateway.lordvm/suspend.state") == strlen("Machines/Whonix.lordgroup/Gateway.lordvm"));
+    CHECK(vm_backup_hold("x.lordvm/disks") == 8);
+    CHECK(!vm_backup_hold("Machines/Debian.lordvm/machine.json") && !vm_backup_hold("Machines/Debian.lordvm/disks/system.qcow2"));
+    CHECK(!vm_backup_hold("Machines/.lordvm/disks") && !vm_backup_hold("Machines/.x.lordvm/disks") && !vm_backup_hold(".lordvm/disks"));
+    CHECK(!vm_backup_hold("Machines/Debian.lordvmx/disks") && !vm_backup_hold("disks") && !vm_backup_hold("") && !vm_backup_hold(NULL));
+    /* the library's active machines (vm_budget_used_mb): run.json's state with a live supervisor, top level and a group's
+     * members, the starting machine left out, symbolic links and damaged files counting nothing */
+    {
+        char lib[] = "/tmp/vm-budget-XXXXXX";
+        if (mkdtemp(lib)) {
+            static const char *const st[] = { "running", "paused", "stopped", "running", "starting", "running" };
+            static const long pids[] = { 100, 101, 102, 999, 103, 104 };
+            char d[6][300], gd[256];
+            snprintf(gd, sizeof gd, "%s/g.lordgroup", lib);
+            snprintf(d[0], sizeof d[0], "%s/a.lordvm", lib);
+            snprintf(d[1], sizeof d[1], "%s/b.lordvm", lib);
+            snprintf(d[2], sizeof d[2], "%s/c.lordvm", lib);
+            snprintf(d[3], sizeof d[3], "%s/dead.lordvm", lib);
+            snprintf(d[4], sizeof d[4], "%s/gw.lordvm", gd);
+            snprintf(d[5], sizeof d[5], "%s/notamachine", lib);
+            CHECK(!mkdir(gd, 0700));
+            for (int i = 0; i < 6; i++) {
+                VmMachine x = m;
+                x.memory_mb = 1000 * (i + 1);
+                x.accel = VM_ACCEL_KVM;
+                CHECK(!mkdir(d[i], 0700) && vm_machine_save(d[i], &x) == VM_OK);
+                char rp[300], rj[128];
+                snprintf(rp, sizeof rp, "%s/run.json", d[i]);
+                snprintf(rj, sizeof rj, "{\"state\":\"%s\",\"pid\":%ld}\n", st[i], pids[i]);
+                FILE *f = fopen(rp, "w");
+                CHECK(f && fputs(rj, f) >= 0 && !fclose(f));
+            }
+            int cnt = -1;
+            long o = VM_OVERHEAD_KVM_MB;
+            /* a (1000), b (2000) and the group's gw (5000) count; c is stopped, dead's lord-vm is gone, notamachine isn't one */
+            CHECK(vm_budget_used_mb(lib, NULL, budget_alive, NULL, &cnt) == 1000 + 2000 + 5000 + 3 * o && cnt == 3);
+            CHECK(vm_budget_used_mb(lib, d[1], budget_alive, NULL, &cnt) == 1000 + 5000 + 2 * o && cnt == 2);
+            /* a machine's own share beside its limit (a disposable session); a nonsense share is ignored */
+            CHECK(vm_budget_used_mb(lib, NULL, budget_alive, budget_extra, &cnt) == 1000 + 2000 + 5000 + 3 * o + 700 && cnt == 3);
+            /* vm_group_session_mb: not a group's disposable workstation, nothing */
+            CHECK(vm_group_session_mb(d[4], &m) == 0 && vm_group_session_mb(NULL, &m) == 0);
+            /* the same folder spelled another way is still left out (device and inode) */
+            char alt[400];
+            snprintf(alt, sizeof alt, "%s/./g.lordgroup/../g.lordgroup/gw.lordvm", lib);
+            CHECK(vm_budget_used_mb(lib, alt, budget_alive, NULL, &cnt) == 1000 + 2000 + 2 * o && cnt == 2);
+            /* a damaged run.json counts nothing; a run.json that is a symbolic link isn't followed */
+            char rp[400], lk[400], ln[400];
+            snprintf(rp, sizeof rp, "%s/run.json", d[0]);
+            FILE *f = fopen(rp, "w");
+            CHECK(f && fputs("{\"state\":\"running\",\"pid\":", f) >= 0 && !fclose(f));
+            CHECK(vm_budget_used_mb(lib, NULL, budget_alive, NULL, &cnt) == 2000 + 5000 + 2 * o && cnt == 2);
+            CHECK(!unlink(rp));
+            snprintf(lk, sizeof lk, "%s/run.json", d[1]);
+            CHECK(!symlink(lk, rp));
+            CHECK(vm_budget_used_mb(lib, NULL, budget_alive, NULL, &cnt) == 2000 + 5000 + 2 * o && cnt == 2);
+            /* a machine folder that is a symbolic link to another machine isn't counted twice */
+            snprintf(ln, sizeof ln, "%s/link.lordvm", lib);
+            CHECK(!symlink(d[1], ln));
+            CHECK(vm_budget_used_mb(lib, NULL, budget_alive, NULL, &cnt) == 2000 + 5000 + 2 * o && cnt == 2);
+            /* a pid out of range */
+            f = fopen(lk, "w");
+            CHECK(f && fputs("{\"state\":\"running\",\"pid\":1e300}", f) >= 0 && !fclose(f));
+            CHECK(vm_budget_used_mb(lib, NULL, budget_alive, NULL, &cnt) == 5000 + o && cnt == 1);
+            CHECK(vm_budget_used_mb("/nonexistent-lib", NULL, budget_alive, NULL, &cnt) == 0 && cnt == 0);
+            /* vm_dir_active: the same reading, one folder */
+            CHECK(vm_dir_active(d[4], budget_alive) && !vm_dir_active(d[2], budget_alive) && !vm_dir_active(d[3], budget_alive) && vm_dir_active(d[3], NULL));
+            CHECK(!vm_dir_active(d[0], NULL) && !vm_dir_active(NULL, NULL));      /* d[0]'s run.json is a symbolic link */
+            char cmd[300];
+            snprintf(cmd, sizeof cmd, "rm -rf '%s'", lib);
+            CHECK(system(cmd) == 0);
+        }
+    }
     /* defaults */
     VmMachine d;
     vm_machine_defaults(&d, &pi, VM_ARCH_ARM64);
@@ -763,6 +1272,19 @@ static void test_host(void) {
     VmMachine e;
     vm_machine_defaults(&e, &pi, VM_ARCH_ARM64);
     CHECK(strcmp(d.id, e.id) && d.id[14] == '4');
+    /* Graphics 3D (vm_gl_refusal): a Linux amd64 machine in a window on amd64 may have it, except on an unattended
+     * install's start (QEMU issue 4918: its D-Bus display aborts at the installer's restart) */
+    VmMachine g = e;
+    g.arch = VM_ARCH_AMD64; g.devices = VM_DEV_VIRTIO; g.display = VM_DISPLAY_WINDOW; g.graphics = VM_GFX_3D;
+    CHECK(vm_gl_refusal(&g, VM_ARCH_AMD64, 0) == NULL);
+    CHECK(vm_gl_refusal(&g, VM_ARCH_AMD64, 1) && strstr(vm_gl_refusal(&g, VM_ARCH_AMD64, 1), "installs the system"));
+    CHECK(vm_gl_refusal(&g, VM_ARCH_ARM64, 0) != NULL);
+    g.devices = VM_DEV_WINDOWS;
+    CHECK(vm_gl_refusal(&g, VM_ARCH_AMD64, 0) != NULL);
+    g.devices = VM_DEV_VIRTIO; g.display = VM_DISPLAY_NONE;
+    CHECK(vm_gl_refusal(&g, VM_ARCH_AMD64, 0) != NULL);
+    g.display = VM_DISPLAY_WINDOW; g.arch = VM_ARCH_ARM64;
+    CHECK(vm_gl_refusal(&g, VM_ARCH_AMD64, 0) != NULL);
 }
 
 static void test_messages(void) {
@@ -789,7 +1311,11 @@ static void test_messages(void) {
     /* the transfer folder (6.7.1): VAG_TRANSFER is an agent request (WinFsp's hash as text, or none); the agent's state
      * says whether the guest has it (VAC_TRANSFER) or can once WinFsp is in (VAC_XFER_SETUP) */
     q = vm_msg(VM_AGENT, 7, VAG_TRANSFER, 0, 0, 0, ""); CHECK(vm_msg_valid(&q, 1));
-    q = vm_msg(VM_AGENT, 7, VAG_EXTRA_ON + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
+    /* the LordOS Guest Tools disc (6.17): VAG_DISC is the last agent request; VAC_TOOLS_DISC says it's in the drive */
+    q = vm_msg(VM_AGENT, 7, VAG_DISC, 1, 0, 0, ""); CHECK(vm_msg_valid(&q, 1));
+    q = vm_msg(VM_AGENT, 7, VAG_DISC + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_WAITING, VAC_TOOLS_DISC, 0, 0, "\t\t"); CHECK(vm_msg_valid(&q, 0));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_ALL, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0) && (VAC_ALL & VAC_TOOLS_DISC));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_FILES | VAC_TRANSFER, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_DISPLAY | (int)LAG_CAP_WINDOWS | VAC_TRANSFER | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
@@ -1036,6 +1562,18 @@ static void test_ops(void) {
     vm_snap_tag(tag);
     CHECK(vm_snap_tag_valid(tag));
     CHECK(!vm_snap_tag_valid("x2026") && !vm_snap_tag_valid("s;rm") && !vm_snap_tag_valid("S1") && !vm_snap_tag_valid("s") && !vm_snap_tag_valid(NULL));
+    /* a snapshot's note: UTF-8, line breaks, no other control characters, no bidi overrides, at most 1000 bytes */
+    CHECK(vm_snap_note_valid("") && vm_snap_note_valid("Before the upgrade\nkernel 6.12 / apt") && vm_snap_note_valid("Antes del cambio \xc3\xa9 \xe2\x9c\x93"));
+    CHECK(!vm_snap_note_valid(NULL) && !vm_snap_note_valid("tab\there") && !vm_snap_note_valid("cr\r") && !vm_snap_note_valid("esc\x1b[2J"));
+    CHECK(!vm_snap_note_valid("\xc3") && !vm_snap_note_valid("\xc0\xaf") && !vm_snap_note_valid("\xed\xa0\x80") && !vm_snap_note_valid("\xf4\x90\x80\x80"));
+    CHECK(!vm_snap_note_valid("rlo \xe2\x80\xae") && !vm_snap_note_valid("del\x7f") && !vm_snap_note_valid("c1 \xc2\x85"));
+    {
+        char big[VM_SNAP_NOTE_MAX + 2];
+        memset(big, 'a', sizeof big - 1); big[sizeof big - 1] = 0;
+        CHECK(!vm_snap_note_valid(big));
+        big[VM_SNAP_NOTE_MAX] = 0;
+        CHECK(vm_snap_note_valid(big));
+    }
     VmSnap a[3], b[VM_SNAPS_MAX];
     memset(a, 0, sizeof a);
     snprintf(a[0].tag, sizeof a[0].tag, "s1"); snprintf(a[0].name, sizeof a[0].name, "Fresh install"); snprintf(a[0].created, sizeof a[0].created, "2026-11-05T12:00:00Z");
@@ -1646,6 +2184,39 @@ static void test_tablet_layout(void) {
     /* the right edge of the shown display stays left of the other display */
     CHECK(vd_abs_map(1919, 1920, 0, 1920, 2942) * 2942LL / 1920 < 1920);
 
+    /* All Displays (5.4): lord-vmdisplay's --heads digit and the desktop the outputs make side by side */
+    CHECK(vd_head_arg("0", 4) == 0 && vd_head_arg("3", 4) == 3 && vd_head_arg("4", 4) == -1 && vd_head_arg("9", 4) == -1);
+    CHECK(vd_head_arg("", 4) == -1 && vd_head_arg(NULL, 4) == -1 && vd_head_arg("01", 4) == -1 && vd_head_arg("-1", 4) == -1 && vd_head_arg("a", 4) == -1);
+    {
+        int hw[4] = { 1920, 2560, 1280, 1920 }, hh[4] = { 1080, 1440, 1024, 1200 }, HL[6];
+        CHECK(!vm_heads_layout(2, hw, hh, 0, HL) && HL[0] == 0 && HL[1] == 0 && HL[2] == 1920 && HL[3] == 1080 && HL[4] == 4480 && HL[5] == 1440);
+        CHECK(!vm_heads_layout(2, hw, hh, 1, HL) && HL[0] == 1920 && HL[2] == 2560 && HL[4] == 4480);
+        CHECK(!vm_heads_layout(4, hw, hh, 3, HL) && HL[0] == 1920 + 2560 + 1280 && HL[4] == 7680 && HL[5] == 1440);
+        for (int k = 0; k < 4; k++) {
+            CHECK(!vm_heads_layout(4, hw, hh, k, HL) && vm_layout_ok(HL[0], HL[1], HL[2], HL[3], HL[4], HL[5]));
+            /* every pixel of head k lands on its own pixel of the guest's desktop (within 2), the guest spreading the
+             * tablet over all of it */
+            int worst = 0;
+            for (int p = 0; p < HL[2]; p++) {
+                int q = vd_abs_map(p, HL[2], HL[0], HL[2], HL[4]);
+                long long g = ((long long)q * 0x7fff / HL[2]) * HL[4] / 0x7fff;
+                int e = (int)(g - (HL[0] + p));
+                if (e < 0) e = -e;
+                if (e > worst) worst = e;
+            }
+            CHECK(worst <= 8);                                                   /* desk/pic pixels a step */
+        }
+        CHECK(vm_heads_layout(1, hw, hh, 0, HL) == -1 && !HL[4]);                 /* one head: no layout */
+        CHECK(vm_heads_layout(2, hw, hh, 2, HL) == -1 && vm_heads_layout(2, hw, hh, -1, HL) == -1);
+        CHECK(vm_heads_layout(9, hw, hh, 0, HL) == -1 && vm_heads_layout(2, NULL, hh, 0, HL) == -1);
+        int bw[2] = { 319, 1920 }, bh[2] = { 1080, 1080 };
+        CHECK(vm_heads_layout(2, bw, bh, 1, HL) == -1);
+        int ww[3] = { 16000, 16000, 1000 }, wh[3] = { 1080, 1080, 1080 };
+        CHECK(vm_heads_layout(3, ww, wh, 0, HL) == -1 && !HL[4]);                 /* wider than 32767 together */
+        int xw[2] = { 2147483647, 2147483647 }, xh[2] = { 1080, 1080 };
+        CHECK(vm_heads_layout(2, xw, xh, 0, HL) == -1);                           /* no overflow */
+    }
+
     /* How the guest maps the tablet (AGK_TABLET, tools w10), over every layout of the maintainer's log (2026-11-22, ws126,
      * tools w9): the vGPU's \\.\DISPLAY2 (shown) beside a display not on a PCI adapter, \\.\DISPLAY1 1784x830 */
     struct { int sx, sw, sh, gx, sprim; } logged[] = {
@@ -1717,10 +2288,57 @@ static void test_tablet_layout(void) {
     CHECK(ag_hello_caps((const uint8_t *)"w9 gvt extra", 12) == (AG_HELLO_GVT | AG_HELLO_EXTRA));
     CHECK(ag_hello_caps((const uint8_t *)"w9 extra extraoff", 17) == (AG_HELLO_EXTRA | AG_HELLO_EXTRAOFF));
     CHECK(ag_hello_caps((const uint8_t *)"w9 extras extraof", 17) == 0);
+    /* AGK_STOPPING (the guest's shutdown hook, QEMU issue 4918): one byte, power off or restart; systemd-shutdown's verbs */
+    int sm = 0;
+    CHECK(!ag_stopping_parse((const uint8_t *)"\x01", 1, &sm) && sm == AG_STOP_POWEROFF);
+    CHECK(!ag_stopping_parse((const uint8_t *)"\x02", 1, &sm) && sm == AG_STOP_REBOOT);
+    CHECK(ag_stopping_parse((const uint8_t *)"\x00", 1, &sm) && ag_stopping_parse((const uint8_t *)"\x03", 1, &sm));
+    CHECK(ag_stopping_parse((const uint8_t *)"\x01\x01", 2, &sm) && ag_stopping_parse(NULL, 1, &sm) && ag_stopping_parse((const uint8_t *)"", 0, &sm));
+    CHECK(ag_stop_verb("poweroff") == AG_STOP_POWEROFF && ag_stop_verb("halt") == AG_STOP_POWEROFF);
+    CHECK(ag_stop_verb("reboot") == AG_STOP_REBOOT && ag_stop_verb("kexec") == AG_STOP_REBOOT);
+    CHECK(!ag_stop_verb("") && !ag_stop_verb(NULL) && !ag_stop_verb("Reboot") && !ag_stop_verb("reboot ") && !ag_stop_verb("suspend"));
+    CHECK(ag_hello_caps((const uint8_t *)"6 clipboard clipx stopping", 26) == (AG_HELLO_CLIPBOARD | AG_HELLO_CLIPX | AG_HELLO_STOPPING));
+    CHECK(ag_hello_caps((const uint8_t *)"6 stopped stoppings", 19) == 0);
     m = vm_msg(VM_AGENT, 1, VAG_EXTRA_OFF, 0, 0, 0, ""); CHECK(vm_msg_valid(&m, 1));
     m.a = VAG_EXTRA_ON; CHECK(vm_msg_valid(&m, 1));
-    m.a = VAG_EXTRA_ON + 1; CHECK(!vm_msg_valid(&m, 1));
+    m.a = VAG_DISC; CHECK(vm_msg_valid(&m, 1));
+    m.a = VAG_DISC + 1; CHECK(!vm_msg_valid(&m, 1));
     m = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXTRA | VAC_EXTRA_OFF, 0, 0, "1\tx"); CHECK(vm_msg_valid(&m, 0));
+    /* the guest's performance profile (w11, 7.1.4): AGK_PERF one byte, 0 or 1; AGK_PERFSTATE three bytes, on, the parts
+     * done and refused, known bits only and never a part in both */
+    {
+        int on = -1;
+        unsigned done = 99, failed = 99;
+        CHECK(!ag_perf_parse((const uint8_t *)"\x01", 1, &on) && on == 1 && !ag_perf_parse((const uint8_t *)"\x00", 1, &on) && on == 0);
+        CHECK(ag_perf_parse((const uint8_t *)"\x02", 1, &on) == -1 && ag_perf_parse((const uint8_t *)"\xff", 1, &on) == -1);
+        CHECK(ag_perf_parse((const uint8_t *)"\x01\x00", 2, &on) == -1 && ag_perf_parse((const uint8_t *)"", 0, &on) == -1 && ag_perf_parse(NULL, 1, &on) == -1);
+        CHECK(!ag_perf_parse((const uint8_t *)"\x01", 1, NULL));
+        uint8_t ps[AG_PERFSTATE_BYTES + 1] = { 0 };
+        CHECK(!ag_perfstate_write(ps, 1, AGPF_POWER | AGPF_EFFECTS, AGPF_TRANSPARENCY));
+        CHECK(ps[0] == 1 && ps[1] == 3 && ps[2] == 4);
+        CHECK(!ag_perfstate_parse(ps, AG_PERFSTATE_BYTES, &on, &done, &failed) && on == 1 && done == (AGPF_POWER | AGPF_EFFECTS) && failed == AGPF_TRANSPARENCY);
+        CHECK(!ag_perfstate_write(ps, 0, AGPF_ALL, 0) && !ag_perfstate_parse(ps, AG_PERFSTATE_BYTES, &on, &done, &failed) && on == 0 && done == AGPF_ALL && !failed);
+        CHECK(!ag_perfstate_write(ps, 1, 0, 0) && !ag_perfstate_parse(ps, AG_PERFSTATE_BYTES, NULL, NULL, NULL));
+        CHECK(ag_perfstate_parse(ps, AG_PERFSTATE_BYTES - 1, &on, &done, &failed) == -1 && ag_perfstate_parse(ps, AG_PERFSTATE_BYTES + 1, &on, &done, &failed) == -1);
+        CHECK(ag_perfstate_parse(NULL, AG_PERFSTATE_BYTES, &on, &done, &failed) == -1);
+        const uint8_t bad[][3] = { { 2, 0, 0 }, { 1, 8, 0 }, { 1, 0, 8 }, { 1, AGPF_POWER, AGPF_POWER }, { 0, AGPF_ALL, AGPF_EFFECTS }, { 0xff, 0, 0 }, { 1, 0x80, 0 } };
+        for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(ag_perfstate_parse(bad[i], 3, &on, &done, &failed) == -1);
+        CHECK(ag_perfstate_write(ps, 2, 0, 0) == -1 && ag_perfstate_write(ps, -1, 0, 0) == -1 && ag_perfstate_write(ps, 1, 8, 0) == -1);
+        CHECK(ag_perfstate_write(ps, 1, AGPF_POWER, AGPF_POWER) == -1 && ag_perfstate_write(NULL, 1, 0, 0) == -1);
+        /* every well-formed byte triple parses, every other is refused: the whole space */
+        int good = 0, wrong = 0;
+        for (int a = 0; a < 256; a++)
+            for (int b = 0; b < 256; b++)
+                for (int c2 = 0; c2 < 256; c2++) {
+                    uint8_t x[3] = { (uint8_t)a, (uint8_t)b, (uint8_t)c2 };
+                    int ok = a <= 1 && !(b & ~AGPF_ALL) && !(c2 & ~AGPF_ALL) && !(b & c2);
+                    if ((ag_perfstate_parse(x, 3, NULL, NULL, NULL) == 0) != ok) wrong++;
+                    good += ok;
+                }
+        CHECK(!wrong && good == 2 * 27);                              /* each part in done, failed or neither: 3^3, on or off */
+        CHECK(ag_hello_caps((const uint8_t *)"w11 extra tablet perf", 21) == (AG_HELLO_EXTRA | AG_HELLO_PERF));
+        CHECK(ag_hello_caps((const uint8_t *)"w11 perfs per perf2", 19) == 0);
+    }
 }
 
 /* LAG_WINREFUSED and LAGW_ELEVATED (w8: a window that runs as administrator in Windows) */
@@ -2050,6 +2668,59 @@ static void test_gvtwin(void) {
     CHECK(!strcmp(tiny, "intel d"));
 }
 
+/* Windows Search under the performance profile (vmperfwin.h): the two fixed scripts and every line they may print */
+static void test_perfwin(void) {
+    /* constants only: no printf conversion, no argument, nothing read from outside the two registry places */
+    CHECK(!strchr(PERFWIN_SEARCH_ON, '%') && !strchr(PERFWIN_SEARCH_OFF, '%'));
+    CHECK(!strstr(PERFWIN_SEARCH_ON, "$args") && !strstr(PERFWIN_SEARCH_OFF, "$args"));
+    CHECK(strstr(PERFWIN_SEARCH_ON, "$O='on'") && strstr(PERFWIN_SEARCH_OFF, "$O='off'"));
+    CHECK(strstr(PERFWIN_SEARCH_ON, "start= demand") && !strstr(PERFWIN_SEARCH_OFF, "start= demand"));
+    CHECK(strstr(PERFWIN_SEARCH_OFF, "'delayed-auto'") && !strstr(PERFWIN_SEARCH_ON, "Start-Service"));
+    CHECK(strstr(PERFWIN_SEARCH_ON, "HKLM:\\SOFTWARE\\LordOS\\GuestWin") && strstr(PERFWIN_SEARCH_ON, "Global\\LordOS-wsearch"));
+    /* every "<on|off> <start> <service>" against the rule written out again here */
+    static const char *const S[] = { "set", "ours", "manual", "disabled", "restored", "changed", "nothing", "dropped", "none", "busy" };
+    static const char *const V[] = { "stopped", "idle", "started", "notstarted", "-" };
+    static const char *const on_ok[] = { "set stopped", "set idle", "ours stopped", "ours idle", "manual stopped", "manual idle", "disabled idle", "none -", "busy -" };
+    static const char *const off_ok[] = { "restored started", "restored notstarted", "changed -", "nothing -", "dropped -", "none -", "busy -" };
+    PerfWinResult w;
+    char t[64], line[200];
+    int n_ok = 0;
+    for (int o = 0; o < 2; o++)
+        for (int s = 0; s < 10; s++)
+            for (int v = 0; v < 5; v++) {
+                char sv[32];
+                snprintf(sv, sizeof sv, "%s %s", S[s], V[v]);
+                int want = 0;
+                const char *const *ok = o ? on_ok : off_ok;
+                int nk = o ? (int)(sizeof on_ok / sizeof *on_ok) : (int)(sizeof off_ok / sizeof *off_ok);
+                for (int k = 0; k < nk; k++) if (!strcmp(ok[k], sv)) want = 1;
+                snprintf(t, sizeof t, "%s %s", o ? "on" : "off", sv);
+                int r = perfwin_parse(t, &w);
+                if ((r == 0) != want) fprintf(stderr, "  perfwin_parse \"%s\": got %d\n", t, r);
+                CHECK((r == 0) == want);
+                if (r) { CHECK(!w.on && !w.start && !w.svc); continue; }
+                n_ok++;
+                CHECK(w.on == o && w.start == s + 1 && w.svc == v + 1);
+                perfwin_describe(&w, line, sizeof line);
+                CHECK(!strncmp(line, "performance profile: ", 21) && !strchr(line, '?'));
+            }
+    CHECK(n_ok == 16);
+    static const char *const bad[] = { "", "on", "on set", "on set stopped ", " on set stopped", "on  set stopped", "on set stopped x",
+                                       "ON set stopped", "on Set stopped", "on set\tstopped", "onn set stopped", "of none -", "on set -",
+                                       "off restored -", "on none stopped", "off busy started", "on set stoppedx", "on sett stopped" };
+    for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+        if (perfwin_parse(bad[i], &w) != -1) fprintf(stderr, "  perfwin_parse \"%s\": accepted\n", bad[i]);
+        CHECK(perfwin_parse(bad[i], &w) == -1);
+    }
+    CHECK(perfwin_parse(NULL, &w) == -1);
+    perfwin_parse("on set stopped", &w);
+    perfwin_describe(&w, line, sizeof line);
+    CHECK(!strcmp(line, "performance profile: Windows Search set to start manually (its automatic start kept to put back), stopped"));
+    char tiny[8];
+    perfwin_describe(&w, tiny, sizeof tiny);
+    CHECK(!strcmp(tiny, "perform"));
+}
+
 static void test_open_with(void) {
     static const char tok[] = "0123456789abcdef0123456789abcdef";
     uint8_t sha[32], o[AG_OPEN_BYTES], back[32];
@@ -2143,8 +2814,379 @@ static void test_open_with(void) {
     }
 }
 
+/* guest → host links and notifications (6.12) and the agent's shell (6.18): the guest is hostile, so every parser is
+ * strict, exact and fuzzed */
+static int link_ok(const char *s) { return ag_link_ok((const uint8_t *)s, strlen(s)); }
+static int lk_char_ok(uint8_t c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c && strchr("-._~:/?#[]@&=+,;%", c)); }
+static void test_guest_links(void) {
+    const char *good[] = { "https://lordos.org/", "http://example.com", "HTTPS://Example.COM:8443/a?b=c#d", "https://xn--bcher-kva.example/",
+                           "https://a-b.c-d.e/%20x", "http://[::1]:8080/", "http://[2001:db8::1]/", "https://a.b/x@y",
+                           "https://example.com?q=1", "https://example.com#top", "https://1.2.3.4:65535", "https://a.b/~x/y&z+,;=:@[]" };
+    for (size_t i = 0; i < sizeof good / sizeof *good; i++) { if (!link_ok(good[i])) fprintf(stderr, "refused: %s\n", good[i]); CHECK(link_ok(good[i])); }
+    const char *bad[] = { "", "https://", "http:///x", "file:///etc/passwd", "javascript:alert(1)", "data:text/html,x", "ftp://a.b/",
+                          "https://user:pw@bank.example/", "https://bank.example@evil.example/", "https://a b/", "https://a.b/ x",
+                          "https://a.b/\"", "https://a.b/<x>", "https://a.b/\\x", "https://a.b/{x}", "https://a.b/|", "https://a.b/^", "https://a.b/`",
+                          "https://-a.b/", "https://a-.b/", "https://a..b/", "https://.a.b/", "https://a.b./", "https://a.b:0/", "https://a.b:65536/",
+                          "https://a.b:123456/", "https://a.b:/", "https://a.b:8x/", "https://[]/", "https://[::1/", "https://[::g]/", "https://[::1]x/",
+                          "https://a.b/%", "https://a.b/%2", "https://a.b/%zz", "mailto:a@b.c", "https://a_b.c/", "https://a.b/(x)",
+                          "https://a.b/'", "https://a.b/!", "https://a.b/$", "https://a.b/*", "https://a.b/\x7f",
+                          "https://a.b/\xc3\xa9", "\x01https://a.b/", "https://a.b/\n", "https:a.b", "http//a.b" };
+    for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) { if (link_ok(bad[i])) fprintf(stderr, "taken: %s\n", bad[i]); CHECK(!link_ok(bad[i])); }
+    CHECK(!ag_link_ok(NULL, 4));
+    static uint8_t lng[AG_LINK_MAX + 2];
+    memcpy(lng, "https://a.b/", 12);
+    memset(lng + 12, 'x', sizeof lng - 12);
+    CHECK(ag_link_ok(lng, AG_LINK_MAX) && !ag_link_ok(lng, AG_LINK_MAX + 1));
+    CHECK(!ag_link_ok((const uint8_t *)"https://a.b/\0x", 15));                     /* a NUL inside */
+    char enc[64];
+    const char *raw = "https://x.org/a (b)/\xc3\xa9?q=\"1\"&r=50%";
+    CHECK(ag_link_encode((const uint8_t *)raw, strlen(raw), enc, sizeof enc) > 0 && !strcmp(enc, "https://x.org/a%20%28b%29/%C3%A9?q=%221%22&r=50%25"));
+    CHECK(link_ok(enc) && ag_link_encode((const uint8_t *)raw, strlen(raw), enc, 20) == -1);
+    CHECK(ag_link_encode((const uint8_t *)"https://a.b/%41", 15, enc, sizeof enc) == 15 && !strcmp(enc, "https://a.b/%41"));
+
+    /* AGK_NOTIFY */
+    uint8_t nb[AG_NOTE_BYTES + 8];
+    const uint8_t *ti, *bo; uint16_t tn, bn;
+    size_t k = ag_note_write((const uint8_t *)"Build done", 10, (const uint8_t *)"make: 0 errors \xe2\x80\x94 ok", 19, nb, sizeof nb);
+    CHECK(k == 33 && !ag_note_parse(nb, k, &ti, &tn, &bo, &bn) && tn == 10 && bn == 19 && !memcmp(ti, "Build done", 10));
+    CHECK(ag_note_parse(nb, k - 1, NULL, NULL, NULL, NULL) == -1 && ag_note_parse(nb, k + 1, NULL, NULL, NULL, NULL) == -1);
+    k = ag_note_write((const uint8_t *)"T", 1, NULL, 0, nb, sizeof nb);
+    CHECK(k == 5 && !ag_note_parse(nb, k, &ti, &tn, &bo, &bn) && tn == 1 && bn == 0);
+    CHECK(!ag_note_write((const uint8_t *)"", 0, NULL, 0, nb, sizeof nb));                                    /* no title */
+    CHECK(!ag_note_write((const uint8_t *)"a\nb", 3, NULL, 0, nb, sizeof nb));                               /* a control character */
+    CHECK(!ag_note_write((const uint8_t *)"\xe2\x80\xae" "gpj.exe", 10, NULL, 0, nb, sizeof nb));           /* RLO */
+    CHECK(!ag_note_write((const uint8_t *)"a", 1, (const uint8_t *)"\xe2\x81\xa6x", 4, nb, sizeof nb));     /* LRI in the body */
+    CHECK(!ag_note_write((const uint8_t *)"\xc2\x85", 2, NULL, 0, nb, sizeof nb));                          /* C1 */
+    CHECK(!ag_note_write((const uint8_t *)"\xff", 1, NULL, 0, nb, sizeof nb));
+    static uint8_t big[AG_NOTE_BODY_MAX + 1];
+    memset(big, 'a', sizeof big);
+    CHECK(!ag_note_write(big, AG_NOTE_TITLE_MAX + 1, NULL, 0, nb, sizeof nb) && ag_note_write(big, AG_NOTE_TITLE_MAX, big, AG_NOTE_BODY_MAX, nb, sizeof nb) == AG_NOTE_BYTES);
+    CHECK(!ag_note_write(big, 1, big, AG_NOTE_BODY_MAX + 1, nb, sizeof nb) && !ag_note_write(big, 5, NULL, 0, nb, 8));
+    nb[0] = 0xff; nb[1] = 0xff; CHECK(ag_note_parse(nb, AG_NOTE_BYTES, NULL, NULL, NULL, NULL) == -1);       /* a length past the end */
+
+    /* the rate limit: a burst, then one per interval, never more however often it's asked */
+    AgRate r = { 0, 0 };
+    int got = 0;
+    for (int i = 0; i < 50; i++) got += ag_rate_take(&r, 1000, AG_LINK_BURST, AG_LINK_EVERY_MS);
+    CHECK(got == AG_LINK_BURST);
+    CHECK(!ag_rate_take(&r, 1000 + AG_LINK_EVERY_MS - 1, AG_LINK_BURST, AG_LINK_EVERY_MS));
+    CHECK(ag_rate_take(&r, 1000 + AG_LINK_EVERY_MS, AG_LINK_BURST, AG_LINK_EVERY_MS) && !ag_rate_take(&r, 1000 + AG_LINK_EVERY_MS, AG_LINK_BURST, AG_LINK_EVERY_MS));
+    got = 0;
+    for (long long t = 2000000; t < 2000000 + 60000; t += 10) got += ag_rate_take(&r, t, AG_NOTE_BURST, AG_NOTE_EVERY_MS);
+    CHECK(got <= AG_NOTE_BURST + 60000 / AG_NOTE_EVERY_MS + 1 && got >= 60000 / AG_NOTE_EVERY_MS);
+    CHECK(!ag_rate_take(NULL, 1, 1, 1) && !ag_rate_take(&r, 1, 0, 1));
+    r.at = 5000000; r.tokens = 0; CHECK(ag_rate_take(&r, 10, 2, 100));
+    /* a layout whose corner is near INT_MAX: refused without a signed overflow (UBSan) */
+    CHECK(!vm_layout_ok(2147483647, 0, 1, 1, 32767, 1) && !vm_layout_ok(0, 2147483647, 1, 1, 1, 32767) && vm_layout_ok(10, 0, 100, 100, 110, 100));
+    CHECK(vd_abs_map(5, 100, 2147483647, 100, 200) == 5);
+    /* apps mode: a guest alternating window lists every millisecond for 10 s gets the burst then 10 a second; program
+     * lists 3 then one per 2 s; icons a whole list's worth (LAG_WIN_MAX) at once */
+    { AgRate wr = { 0, 0 }, ar = { 0, 0 }, ir = { 0, 0 }; int nw = 0, na = 0, ni = 0;
+      for (long long t = 1; t <= 10000; t++) { nw += ag_rate_take(&wr, t, AG_WINLIST_BURST, AG_WINLIST_EVERY_MS); na += ag_rate_take(&ar, t, AG_APPLIST_BURST, AG_APPLIST_EVERY_MS); }
+      for (int i = 0; i < LAG_WIN_MAX; i++) ni += ag_rate_take(&ir, 5, AG_WINICON_BURST, AG_WINICON_EVERY_MS);
+      CHECK(nw <= AG_WINLIST_BURST + 10000 / AG_WINLIST_EVERY_MS + 1 && nw >= 10000 / AG_WINLIST_EVERY_MS);
+      CHECK(na <= AG_APPLIST_BURST + 10000 / AG_APPLIST_EVERY_MS + 1 && ni == LAG_WIN_MAX && AG_WINICON_BURST >= LAG_WIN_MAX); }
+    /* the guest's clipboard: a copy loop gets the burst, then 4 a second */
+    { AgRate cr = { 0, 0 }; int n = 0; for (long long t = 1; t <= 10000; t += 5) n += ag_rate_take(&cr, t, AG_CLIP_BURST, AG_CLIP_EVERY_MS);
+      CHECK(n >= 10000 / AG_CLIP_EVERY_MS && n <= AG_CLIP_BURST + 10000 / AG_CLIP_EVERY_MS + 1); }                                     /* the clock went back: a fresh bucket */
+
+    /* the hello's words */
+    const char *h = "lordos-guest 8 clipboard clipx shell links notify";
+    unsigned caps = ag_hello_caps((const uint8_t *)h + 13, strlen(h) - 13);
+    CHECK((caps & AG_HELLO_SHELL) && (caps & AG_HELLO_LINKS) && (caps & AG_HELLO_NOTIFY));
+    CHECK(!(ag_hello_caps((const uint8_t *)"shells linksx notif", 19) & (AG_HELLO_SHELL | AG_HELLO_LINKS | AG_HELLO_NOTIFY)));
+
+    /* the shell */
+    uint8_t s8[8];
+    uint32_t id = 0, by = 0; int c = 0, rw = 0, st = 0;
+    CHECK(!ag_shell_size_write(s8, 7, 120, 40) && !ag_shell_size_parse(s8, 8, &id, &c, &rw) && id == 7 && c == 120 && rw == 40);
+    CHECK(ag_shell_size_parse(s8, 7, NULL, NULL, NULL) == -1 && ag_shell_size_write(s8, 0, 80, 24) == -1);
+    CHECK(ag_shell_size_write(s8, 1, AG_SHELL_COLS_MAX + 1, 24) == -1 && ag_shell_size_write(s8, 1, 80, 0) == -1);
+    s8[4] = 0; s8[5] = 0; CHECK(ag_shell_size_parse(s8, 8, NULL, NULL, NULL) == -1);
+    ag_shell_pair_write(s8, 3, 4096); CHECK(!ag_shell_ack_parse(s8, 8, &id, &by) && id == 3 && by == 4096);
+    ag_shell_pair_write(s8, 3, 0); CHECK(ag_shell_ack_parse(s8, 8, NULL, NULL) == -1);
+    ag_shell_pair_write(s8, 3, AG_SHELL_WINDOW + 1); CHECK(ag_shell_ack_parse(s8, 8, NULL, NULL) == -1);
+    ag_shell_pair_write(s8, 0, 1); CHECK(ag_shell_ack_parse(s8, 8, NULL, NULL) == -1);
+    ag_shell_pair_write(s8, 3, (uint32_t)AG_SHELL_NOSTART); CHECK(!ag_shell_close_parse(s8, 8, &id, &st) && st == AG_SHELL_NOSTART);
+    ag_shell_pair_write(s8, 3, 256 + 9); CHECK(!ag_shell_close_parse(s8, 8, &id, &st) && st == 265);
+    ag_shell_pair_write(s8, 3, (uint32_t)-2); CHECK(ag_shell_close_parse(s8, 8, NULL, NULL) == -1);
+    ag_shell_pair_write(s8, 3, 512); CHECK(ag_shell_close_parse(s8, 8, NULL, NULL) == -1);
+    static uint8_t sd[4 + AG_SHELL_CHUNK + 1];
+    ag_shell_pair_write(sd, 9, 0);
+    const uint8_t *dp; uint32_t dn = 0;
+    CHECK(!ag_shell_data_parse(sd, 4 + AG_SHELL_CHUNK, &id, &dp, &dn) && dn == AG_SHELL_CHUNK && dp == sd + 4);
+    CHECK(ag_shell_data_parse(sd, 4 + AG_SHELL_CHUNK + 1, NULL, NULL, NULL) == -1 && ag_shell_data_parse(sd, 4, NULL, NULL, NULL) == -1);
+    sd[0] = 0; CHECK(ag_shell_data_parse(sd, 8, NULL, NULL, NULL) == -1);
+
+    /* random bytes never crash the parsers, and what they take is exactly what they promise */
+    uint8_t b[700];
+    uint32_t seed = 9001;
+    for (int it = 0; it < 80000; it++) {
+        size_t len = (seed = seed * 1103515245 + 12345) % (it % 4 ? 40 : 700);
+        for (size_t i = 0; i < len; i++) b[i] = (uint8_t)((seed = seed * 1103515245 + 12345) >> 16);
+        /* often printable, often a plausible start, so the deeper checks are reached */
+        if (it % 2) for (size_t i = 0; i < len; i++) b[i] = (uint8_t)(0x21 + b[i] % 94);
+        if (it % 3 == 0 && len > 8) memcpy(b, it % 6 ? "https://" : "http://a", 8);
+        if (it % 5 == 0 && len >= 4) { size_t t = (len - 4) / 2; b[0] = (uint8_t)t; b[1] = 0; b[2 + t] = (uint8_t)(len - 4 - t); b[3 + t] = (uint8_t)((len - 4 - t) >> 8); }
+        if (ag_link_ok(b, len)) {
+            CHECK(len >= 8 && len <= AG_LINK_MAX);
+            int all = 1;
+            for (size_t i = 0; i < len; i++) all &= b[i] > 0x20 && b[i] < 0x7f && !strchr("\"\\<>`'()!$* {}|^", b[i]);
+            CHECK(all);
+        }
+        {
+            char e2[700 * 3 + 1];
+            long el = ag_link_encode(b, len, e2, sizeof e2);
+            CHECK(el >= (long)len && (size_t)el <= len * 3);
+            int all = 1;
+            for (long i = 0; i < el; i++) all &= lk_char_ok((uint8_t)e2[i]);
+            CHECK(all);
+        }
+        if (!ag_note_parse(b, len, &ti, &tn, &bo, &bn)) {
+            CHECK(tn >= 1 && tn <= AG_NOTE_TITLE_MAX && bn <= AG_NOTE_BODY_MAX && 4u + tn + bn == len && lag_text_ok(ti, tn) && (!bn || lag_text_ok(bo, bn)));
+            uint8_t again[AG_NOTE_BYTES];
+            CHECK(ag_note_write(ti, tn, bo, bn, again, sizeof again) == len && !memcmp(again, b, len));
+        }
+        if (!ag_shell_size_parse(b, len, &id, &c, &rw)) CHECK(len == 8 && id && c >= 1 && c <= AG_SHELL_COLS_MAX && rw >= 1 && rw <= AG_SHELL_ROWS_MAX);
+        if (!ag_shell_ack_parse(b, len, &id, &by)) CHECK(len == 8 && id && by >= 1 && by <= AG_SHELL_WINDOW);
+        if (!ag_shell_close_parse(b, len, &id, &st)) CHECK(len == 8 && id && st >= AG_SHELL_NOSTART && st <= 511);
+        if (!ag_shell_data_parse(b, len, &id, &dp, &dn)) CHECK(len >= 5 && id && dn == len - 4 && dn <= AG_SHELL_CHUNK);
+    }
+}
+
+/* files sent from the guest (6.21, AGK_SEND_*): every frame exact, names one plain file name, flow control, fuzzed */
+static void test_guest_send(void) {
+    AgSendOffer o, g;
+    memset(&o, 0, sizeof o);
+    o.id = 7; o.size = 123456789; o.flags = AGSF_EXEC;
+    for (int i = 0; i < 32; i++) o.key[i] = (uint8_t)(i * 7 + 1);
+    snprintf(o.name, sizeof o.name, "%s", "report \xc3\xa9t\xc3\xa9.pdf");
+    uint8_t b[AG_SEND_OFFER_BYTES + 8];
+    size_t n = ag_send_offer_write(&o, b, sizeof b);
+    CHECK(n == 47 + strlen(o.name) && !ag_send_offer_parse(b, n, &g) && g.id == 7 && g.size == 123456789 && g.flags == AGSF_EXEC &&
+          !memcmp(g.key, o.key, 32) && !strcmp(g.name, o.name));
+    CHECK(ag_send_offer_parse(b, n - 1, NULL) == -1 && ag_send_offer_parse(b, n + 1, NULL) == -1);
+    b[12] = 2; CHECK(ag_send_offer_parse(b, n, NULL) == -1); b[12] = AGSF_EXEC;
+    b[0] = b[1] = b[2] = b[3] = 0; CHECK(ag_send_offer_parse(b, n, NULL) == -1);
+    /* names the host never takes: a path, a parent, controls, bidi tricks, empty, not UTF-8 */
+    static const char *const bad[] = { "a/b", "..", ".", "a\\b", "x\ny", "evil\xe2\x80\xae" "fdp.exe", "", "\xff\xfe", "tab\t" };
+    for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+        AgSendOffer x = o;
+        snprintf(x.name, sizeof x.name, "%s", bad[i]);
+        CHECK(!ag_send_offer_write(&x, b, sizeof b));
+        CHECK(!ag_send_name_ok((const uint8_t *)bad[i], strlen(bad[i])));
+    }
+    { AgSendOffer x = o; memset(x.name, 'a', AG_NAME_MAX); x.name[AG_NAME_MAX] = 0; CHECK(ag_send_offer_write(&x, b, sizeof b) == 47 + AG_NAME_MAX); }
+    { AgSendOffer x = o; x.size = AG_SEND_SIZE_MAX + 1; CHECK(!ag_send_offer_write(&x, b, sizeof b)); }
+    CHECK(ag_send_name_ok((const uint8_t *)".bashrc", 7) && ag_send_name_ok((const uint8_t *)"a..b", 4));
+
+    /* ACCEPT: a resume carries its prefix hash; a refusal carries nothing */
+    uint8_t a[AG_SEND_ACCEPT_BYTES], sha[32], got[32];
+    memset(sha, 0xab, sizeof sha);
+    uint32_t id; uint8_t st; uint64_t off;
+    CHECK(!ag_send_accept_write(a, 7, AGSA_OK, 4096, sha) && !ag_send_accept_parse(a, sizeof a, &id, &st, &off, got) && id == 7 && st == AGSA_OK && off == 4096 && !memcmp(got, sha, 32));
+    CHECK(!ag_send_accept_write(a, 7, AGSA_OK, 0, NULL) && !ag_send_accept_parse(a, sizeof a, &id, &st, &off, got) && off == 0);
+    CHECK(!ag_send_accept_write(a, 7, AGSA_SPACE, 0, NULL) && !ag_send_accept_parse(a, sizeof a, NULL, &st, NULL, NULL) && st == AGSA_SPACE);
+    CHECK(ag_send_accept_write(a, 7, AGSA_BUSY, 10, sha) == -1 && ag_send_accept_write(a, 7, AGSA_LAST + 1, 0, NULL) == -1);
+    ag_send_accept_write(a, 7, AGSA_OK, 0, NULL); a[20] = 1; CHECK(ag_send_accept_parse(a, sizeof a, NULL, NULL, NULL, NULL) == -1);
+    ag_send_accept_write(a, 7, AGSA_REFUSED, 0, NULL); a[6] = 1; CHECK(ag_send_accept_parse(a, sizeof a, NULL, NULL, NULL, NULL) == -1);
+    CHECK(ag_send_accept_parse(a, sizeof a - 1, NULL, NULL, NULL, NULL) == -1);
+
+    /* FROM / ACK, DATA, END, DONE */
+    uint8_t q[12];
+    CHECK(!ag_send_pos_write(q, 9, 1ULL << 33) && !ag_send_pos_parse(q, 12, &id, &off) && id == 9 && off == 1ULL << 33);
+    CHECK(ag_send_pos_write(q, 0, 1) == -1 && ag_send_pos_write(q, 1, AG_SEND_SIZE_MAX + 1) == -1 && ag_send_pos_parse(q, 11, NULL, NULL) == -1);
+    static uint8_t d[12 + AG_SEND_CHUNK + 1];
+    ag_send_data_head(d, 3, 100);
+    const uint8_t *dp; uint32_t dn;
+    CHECK(!ag_send_data_parse(d, 12 + AG_SEND_CHUNK, &id, &off, &dp, &dn) && id == 3 && off == 100 && dn == AG_SEND_CHUNK && dp == d + 12);
+    CHECK(ag_send_data_parse(d, 12 + AG_SEND_CHUNK + 1, NULL, NULL, NULL, NULL) == -1 && ag_send_data_parse(d, 12, NULL, NULL, NULL, NULL) == -1);
+    ag_send_data_head(d, 3, AG_SEND_SIZE_MAX); CHECK(ag_send_data_parse(d, 13, NULL, NULL, NULL, NULL) == -1);      /* past the largest file */
+    ag_send_data_head(d, 3, AG_SEND_SIZE_MAX - 1); CHECK(!ag_send_data_parse(d, 13, NULL, NULL, NULL, NULL));
+    ag_send_data_head(d, 3, ~0ULL); CHECK(ag_send_data_parse(d, 13, NULL, NULL, NULL, NULL) == -1);                /* no wrap */
+    uint8_t e[36];
+    CHECK(!ag_send_end_write(e, 4, sha) && !ag_send_end_parse(e, 36, &id, got) && id == 4 && !memcmp(got, sha, 32) && ag_send_end_parse(e, 35, NULL, NULL) == -1);
+    uint8_t dd[5], code;
+    CHECK(!ag_send_done_write(dd, 4, AGSD_BADHASH) && !ag_send_done_parse(dd, 5, &id, &code) && code == AGSD_BADHASH);
+    CHECK(ag_send_done_write(dd, 4, AGSD_LAST + 1) == -1); dd[4] = AGSD_LAST + 1; CHECK(ag_send_done_parse(dd, 5, NULL, NULL) == -1);
+
+    /* the window: never more than AG_SEND_WINDOW past the last ACK */
+    CHECK(ag_send_room(0, 0, AG_SEND_CHUNK) && ag_send_room(AG_SEND_WINDOW - AG_SEND_CHUNK, 0, AG_SEND_CHUNK) && !ag_send_room(AG_SEND_WINDOW - AG_SEND_CHUNK + 1, 0, AG_SEND_CHUNK));
+    CHECK(!ag_send_room(5, 6, 1) && ag_send_room(AG_SEND_WINDOW + 10, 10, 0));
+
+    /* the quarantine folder's names: nothing hidden, nothing a Windows or Linux file system refuses */
+    char rn[AG_NAME_MAX + 2];
+    CHECK(!ag_recv_name(".bashrc", rn, sizeof rn) && !strcmp(rn, "_bashrc"));
+    CHECK(!ag_recv_name("CON.txt", rn, sizeof rn) && !strcmp(rn, "_CON.txt"));
+    CHECK(!ag_recv_name("a:b?.exe", rn, sizeof rn) && !strcmp(rn, "a_b_.exe"));
+    CHECK(ag_recv_name("..", rn, sizeof rn) == -1 && ag_recv_name("x\xe2\x80\xae.txt", rn, sizeof rn) == -1);
+
+    /* random bytes: what the parsers take is exactly what they promise */
+    static uint8_t r[AG_SEND_OFFER_BYTES + 64];
+    uint32_t seed = 4242;
+    for (int it = 0; it < 80000; it++) {
+        size_t len = (seed = seed * 1103515245 + 12345) % (it % 3 ? 64 : sizeof r);
+        for (size_t i = 0; i < len; i++) r[i] = (uint8_t)((seed = seed * 1103515245 + 12345) >> 16);
+        if (it % 2 && len > 47) {                     /* a plausible offer: small flags, a name length that fits, printable */
+            r[12] &= 1; r[45] = (uint8_t)(len - 47); r[46] = 0;
+            for (size_t i = 47; i < len; i++) r[i] = (uint8_t)(0x20 + r[i] % 95);
+            r[9] = r[10] = r[11] = 0;
+        }
+        AgSendOffer x;
+        if (!ag_send_offer_parse(r, len, &x)) {
+            CHECK(x.id && x.size <= AG_SEND_SIZE_MAX && !(x.flags & ~AGSF_ALL) && strlen(x.name) >= 1 && strlen(x.name) <= AG_NAME_MAX && !strchr(x.name, '/'));
+            uint8_t again[AG_SEND_OFFER_BYTES];
+            CHECK(ag_send_offer_write(&x, again, sizeof again) == len && !memcmp(again, r, len));
+            char nm[AG_NAME_MAX + 2];
+            if (!ag_recv_name(x.name, nm, sizeof nm)) CHECK(nm[0] && nm[0] != '.' && !strchr(nm, '/') && !strchr(nm, '\\') && strlen(nm) <= AG_NAME_MAX);
+        }
+        if (!ag_send_accept_parse(r, len, &id, &st, &off, got)) CHECK(len == AG_SEND_ACCEPT_BYTES && id && st <= AGSA_LAST && off <= AG_SEND_SIZE_MAX);
+        if (!ag_send_pos_parse(r, len, &id, &off)) CHECK(len == 12 && id && off <= AG_SEND_SIZE_MAX);
+        if (!ag_send_data_parse(r, len, &id, &off, &dp, &dn)) CHECK(id && dn >= 1 && dn <= AG_SEND_CHUNK && off + dn <= AG_SEND_SIZE_MAX && dp == r + 12);
+        if (!ag_send_end_parse(r, len, &id, got)) CHECK(len == 36 && id);
+        if (!ag_send_done_parse(r, len, &id, &code)) CHECK(len == 5 && id && code <= AGSD_LAST);
+    }
+    CHECK(ag_hello_caps((const uint8_t *)"9 shell send links", 18) & AG_HELLO_SEND);
+}
+
+
+/* the quarantine folder (vmrecv.c, 6.21): made without following links, part files only plain files of ours, names never
+ * replace a file, kept files 0600 and marked, old parts trimmed */
+static void test_vmrecv(void) {
+    char base[] = "/tmp/vmrecv-test.XXXXXX", p[PATH_MAX], q[PATH_MAX], shown[PATH_MAX], part[VMRECV_PART_NAME], fin[256];
+    if (!mkdtemp(base)) { CHECK(0); return; }
+    snprintf(p, sizeof p, "%s/lib", base); mkdir(p, 0700);
+    snprintf(p, sizeof p, "%s/lib/Test VM.lordvm", base); mkdir(p, 0700);
+    int d = vmrecv_dir_open(p, shown, sizeof shown);
+    snprintf(q, sizeof q, "%s/lib/Received/Test VM", base);
+    struct stat st;
+    CHECK(d >= 0 && !strcmp(shown, q) && !stat(q, &st) && (st.st_mode & 0777) == 0700);
+    CHECK(vmrecv_dir_open("relative.lordvm", NULL, 0) == -1);
+    snprintf(q, sizeof q, "%s/lib/Other", base);
+    CHECK(vmrecv_dir_open(q, NULL, 0) == -1);                          /* not a machine folder */
+    /* Received, or the machine's folder in it, a link the guest or anyone planted: refused */
+    snprintf(q, sizeof q, "%s/lib2", base); mkdir(q, 0700);
+    snprintf(q, sizeof q, "%s/elsewhere", base); mkdir(q, 0700);
+    snprintf(p, sizeof p, "%s/lib2/Received", base); CHECK(!symlink(q, p));
+    snprintf(p, sizeof p, "%s/lib2/X.lordvm", base); mkdir(p, 0700);
+    CHECK(vmrecv_dir_open(p, NULL, 0) == -1);
+    snprintf(q, sizeof q, "%s/lib/Received/Y", base); CHECK(!symlink("/tmp", q));
+    snprintf(p, sizeof p, "%s/lib/Y.lordvm", base); mkdir(p, 0700);
+    CHECK(vmrecv_dir_open(p, NULL, 0) == -1);
+    if (d < 0) return;
+    /* a part: what came before is kept for a resume, unless it's longer than the file */
+    uint8_t key[32];
+    for (int i = 0; i < 32; i++) key[i] = (uint8_t)i;
+    uint64_t have = 9;
+    int status = -1;
+    int f = vmrecv_part_open(d, key, 20, part, &have, &status);
+    CHECK(f >= 0 && have == 0 && status == AGSA_OK && !strncmp(part, ".lordos-part-000102", 19) && strlen(part) == 13 + 64);
+    if (f >= 0) { CHECK(write(f, "0123456789", 10) == 10); close(f); }
+    f = vmrecv_part_open(d, key, 20, part, &have, &status);
+    CHECK(f >= 0 && have == 10);
+    if (f >= 0) close(f);
+    f = vmrecv_part_open(d, key, 5, part, &have, &status);
+    CHECK(f >= 0 && have == 0);
+    if (f >= 0) close(f);
+    /* a part that is a link or has another name (a hard link) is never written through */
+    uint8_t k2[32];
+    memset(k2, 0xee, sizeof k2);
+    char p2[VMRECV_PART_NAME];
+    int n = snprintf(p2, sizeof p2, ".lordos-part-");
+    for (int i = 0; i < 32; i++) n += snprintf(p2 + n, sizeof p2 - (size_t)n, "ee");
+    CHECK(!symlinkat("/etc/passwd", d, p2));
+    CHECK(vmrecv_part_open(d, k2, 20, part, &have, &status) == -1 && status == AGSA_BUSY);
+    unlinkat(d, p2, 0);
+    int t = openat(d, "victim", O_CREAT | O_WRONLY, 0600); if (t >= 0) close(t);
+    CHECK(!linkat(d, "victim", d, p2, 0));
+    CHECK(vmrecv_part_open(d, k2, 20, part, &have, &status) == -1);
+    unlinkat(d, p2, 0); unlinkat(d, "victim", 0);
+    /* no room: more than the file system has */
+    CHECK(vmrecv_part_open(d, k2, AG_SEND_SIZE_MAX, part, &have, &status) == -1 && status == AGSA_SPACE && faccessat(d, p2, F_OK, AT_SYMLINK_NOFOLLOW));
+    /* kept: 0600, marked, never replacing a file */
+    f = vmrecv_part_open(d, key, 4, part, &have, &status);
+    CHECK(f >= 0 && write(f, "data", 4) == 4 && !fchmod(f, 0755));
+    t = openat(d, "run me.sh", O_CREAT | O_WRONLY, 0600); if (t >= 0) close(t);
+    int marked = -1;
+    CHECK(!vmrecv_finish(d, f, part, "run me.sh", "Test VM", "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b", 4, fin, sizeof fin, &marked) && !strcmp(fin, "run me (2).sh"));
+    CHECK(!fstatat(d, fin, &st, 0) && (st.st_mode & 0777) == 0600 && st.st_size == 4);
+    char x[64];
+    ssize_t xl = fgetxattr(f, "user.lordos.from", x, sizeof x);
+    CHECK(!marked || (xl == 7 && !memcmp(x, "Test VM", 7)));
+    if (f >= 0) close(f);
+    /* a size that isn't the one offered: removed, not named */
+    f = vmrecv_part_open(d, key, 4, part, &have, &status);
+    CHECK(f >= 0 && write(f, "abc", 3) == 3);
+    CHECK(vmrecv_finish(d, f, part, "short.txt", "Test VM", "x", 4, fin, sizeof fin, &marked) == -1 && faccessat(d, part, F_OK, 0) && faccessat(d, "short.txt", F_OK, 0));
+    if (f >= 0) close(f);
+    /* another process swaps the part's name for a file of its own before it is named: the checked file gets the name */
+    f = vmrecv_part_open(d, key, 4, part, &have, &status);
+    CHECK(f >= 0 && write(f, "good", 4) == 4);
+    CHECK(!renameat(d, part, d, "moved-away"));
+    t = openat(d, part, O_CREAT | O_WRONLY | O_EXCL, 0600);
+    CHECK(t >= 0 && write(t, "evil", 4) == 4);
+    if (t >= 0) close(t);
+    CHECK(!vmrecv_finish(d, f, part, "swap.txt", "Test VM", "x", 4, fin, sizeof fin, &marked) && !strcmp(fin, "swap.txt"));
+    char got4[8] = "";
+    t = openat(d, "swap.txt", O_RDONLY);
+    CHECK(t >= 0 && read(t, got4, 4) == 4 && !memcmp(got4, "good", 4));
+    if (t >= 0) close(t);
+    CHECK(!faccessat(d, part, F_OK, 0));                                  /* the impostor stays where it was, unnamed */
+    unlinkat(d, part, 0); unlinkat(d, "moved-away", 0);
+    if (f >= 0) close(f);
+    /* parts nobody came back for: at most VMRECV_PARTS_MAX, old ones gone */
+    for (int i = 0; i < 12; i++) {
+        char nm[VMRECV_PART_NAME];
+        snprintf(nm, sizeof nm, ".lordos-part-%064d", i);
+        t = openat(d, nm, O_CREAT | O_WRONLY, 0600);
+        if (t >= 0) { struct timespec ts[2] = { { 1000000 + i, 0 }, { time(NULL) - (i == 0 ? 30 * 86400 : 100 - i), 0 } }; futimens(t, ts); close(t); }
+    }
+    vmrecv_parts_trim(d, NULL);
+    int left = 0;
+    for (int i = 0; i < 12; i++) { char nm[VMRECV_PART_NAME]; snprintf(nm, sizeof nm, ".lordos-part-%064d", i); left += !faccessat(d, nm, F_OK, 0); }
+    char nm0[VMRECV_PART_NAME], nm11[VMRECV_PART_NAME];
+    snprintf(nm0, sizeof nm0, ".lordos-part-%064d", 0);
+    snprintf(nm11, sizeof nm11, ".lordos-part-%064d", 11);
+    CHECK(left == VMRECV_PARTS_MAX - 1 && faccessat(d, nm0, F_OK, 0) && !faccessat(d, nm11, F_OK, 0));
+    close(d);
+    char cmd[PATH_MAX + 16];
+    snprintf(cmd, sizeof cmd, "rm -rf '%s'", base);
+    CHECK(system(cmd) == 0);
+}
+/* a host stop's steps (vmhoststop.h, 6.1): everything, SIGKILL included, inside logind's delay with a margin */
+static void test_host_stop_plan(void) {
+    VmHostStopPlan p = vm_host_stop_plan(45000);            /* LordOS's InhibitDelayMaxSec=45 */
+    CHECK(p.kill_at == 44000 && p.quit_at == 41000 && p.save_until == 33000);
+    CHECK(p.quit_at - p.save_until >= VM_HOST_ACPI_MIN_MS);
+    VmHostStopPlan d = vm_host_stop_plan(-1);               /* unknown (no logind, SIGTERM only): the shipped 45 s */
+    CHECK(d.kill_at == p.kill_at && d.quit_at == p.quit_at && d.save_until == p.save_until);
+    VmHostStopPlan o = vm_host_stop_plan(30000);            /* 0.8.9.5's 30 s, still in logind until it reloads */
+    CHECK(o.kill_at == 29000 && o.quit_at == 26000 && o.save_until == 18000);
+    /* the file and the default agree */
+    FILE *cf = fopen("../packaging/systemd/logind-lordos-machines.conf", "r");
+    int secs = -1;
+    if (cf) { char ln[256]; while (fgets(ln, sizeof ln, cf)) sscanf(ln, "InhibitDelayMaxSec=%d", &secs); fclose(cf); }
+    CHECK(!cf || secs * 1000 == VM_HOST_DELAY_DEFAULT_MS);
+    VmHostStopPlan s = vm_host_stop_plan(5000);             /* logind's own default, our drop-in missing: no save */
+    CHECK(s.kill_at == 4000 && s.quit_at == 1000 && s.save_until == 0);
+    VmHostStopPlan z = vm_host_stop_plan(0);
+    CHECK(z.kill_at == 500 && z.quit_at == 0 && z.save_until == 0);
+    VmHostStopPlan big = vm_host_stop_plan(3600000);        /* capped at 10 minutes */
+    CHECK(big.kill_at == 599000 && big.save_until == 599000 - VM_HOST_QUIT_MS - VM_HOST_ACPI_MIN_MS);
+    for (long long ms = 0; ms <= 120000; ms += 500) {
+        VmHostStopPlan q = vm_host_stop_plan(ms);
+        CHECK(q.save_until <= q.quit_at && q.quit_at <= q.kill_at);
+        CHECK(ms < 2000 || q.kill_at <= ms - VM_HOST_MARGIN_MS);
+        CHECK(!q.save_until || q.save_until >= VM_HOST_SAVE_MIN_MS);
+    }
+}
+
 int main(void) {
+    test_guest_links();
+    test_guest_send();
+    test_vmrecv();
     test_gvtwin();
+    test_perfwin();
     test_open_with();
     test_clip_on_demand();
     test_resolution();
@@ -2163,6 +3205,7 @@ int main(void) {
     test_agent();
     test_drop_names();
     test_host();
+    test_host_stop_plan();
     test_messages();
     test_qmp();
     test_keys();

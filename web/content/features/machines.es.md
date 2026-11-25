@@ -2,7 +2,7 @@
 
 **Máquinas** (Machines) corre otros sistemas en ventanas de tu escritorio de LordOS, a velocidad nativa con KVM donde el hardware lo permite. Salió en la **0.8.8.5** (alfa): tarjetas de descarga para Debian, Ubuntu, Fedora y Kali que comprueban las firmas de sus fabricantes y pueden instalar sin preguntas, instantáneas, clones, migración desde otras apps de virtualización y, desde la 0.8.8.7, carpetas compartidas.
 
-**Nuevo en la 0.8.9.5.** Todo lo que sigue llegó en la **0.8.9.5**, el último lanzamiento. Trae máquinas con Windows 11, las herramientas de LordOS para Windows, un portapapeles que solo se mueve cuando pegás, transferencias de archivos rápidas en los dos sentidos, el modo apps, sonido y micrófono, redes de verdad, 3D para máquinas Linux y la imagen a la velocidad completa del invitado.
+**Nuevo en la 0.8.9.5 y la 0.8.9.6.** Casi todo lo que sigue llegó en la **0.8.9.5**; la **0.8.9.6**, el último lanzamiento, suma máquinas cifradas, los dispositivos USB y la cámara de esta computadora, el grupo Whonix (Tor) y un aislamiento más estricto (abajo). Trae máquinas con Windows 11, las herramientas de LordOS para Windows, un portapapeles que solo se mueve cuando pegás, transferencias de archivos rápidas en los dos sentidos, el modo apps, sonido y micrófono, redes de verdad, 3D para máquinas Linux y la imagen a la velocidad completa del invitado.
 
 [[shot:0]]
 
@@ -96,12 +96,23 @@ El resto del escritorio recibió el mismo cuidado: Ajustes, la Tienda, Archivos 
 - **El modo apps, desde la barra de menús**: un ítem junto al reloj para cada máquina, cuyo menú funciona como el menú Inicio de la máquina, y un panel con sus ventanas abiertas y sus apps.
 - **Capturar el mouse** para juegos y programas 3D; ❖Esc o Ctrl+Alt lo sueltan.
 - **Una tarjeta gráfica real para una máquina**: una parte de una iGPU Intel (de Broadwell a Comet Lake) con GVT-g, con un controlador de arranque propio de LordOS para ella, escrito a partir de fuentes públicas.
-- **`machines` en la Terminal**: listar, arrancar, detener, tomar instantáneas, clonar y cambiar máquinas desde una terminal.
+- **`machines` en la Terminal**: listar, arrancar, detener, tomar instantáneas, clonar y cambiar máquinas desde una terminal. Desde la 0.8.9.6: ejecutar un programa en una máquina Linux, copiar archivos hacia ella y desde ella, leer sus registros, crear una máquina desde un archivo corto guardado con un proyecto, y un servidor MCP local para agentes de programación, solo en una máquina que permitiste en su Configurar.
+
+## Nuevo en la 0.8.9.6
+
+- **Máquinas cifradas**: cada disco, las variables del firmware y el TPM cifrados, con una clave guardada en tu llavero (Contraseñas la muestra como "Máquinas: <nombre>").
+- **Tus dispositivos USB y tu cámara en una máquina**, desde el menú Dispositivos de la ventana; vuelven cuando los elegís de nuevo, los desenchufás o detenés la máquina. Solo la persona frente a la computadora puede pasar uno, y los discos, las placas de red y los adaptadores Bluetooth necesitan un administrador. Probado con una cámara web real en un invitado real.
+- **Whonix (Tor)**: una puerta de enlace y una estación de trabajo hechas con las imágenes firmadas de Whonix, que arrancan y se detienen juntas, con la estación conectada solo a la puerta de enlace y nueve capas de aislamiento más. Probado en una PC: llegó a Tor, respondió un sitio onion y de la computadora no salió nada más que las conexiones de la puerta de enlace a Tor.
+- **Todas las pantallas**: una máquina en hasta cuatro de tus pantallas.
+- **Arrancar Linux directo**, **Lo que ve la máquina** (cada canal entre una máquina y tu computadora en una lista), **Vulkan para máquinas Linux**, **fijar los vCPU a núcleos**, un **perfil de rendimiento** dentro del invitado y **`machines migrate`**, que convierte el disco entero de otra PC en una máquina.
+- **Enviar a LordOS** y una **terminal dentro de la máquina** por el canal propio del agente del invitado, sin red; Instalar agente desde el disco LordOS Guest Tools para máquinas Linux que no lo tienen.
+- **Sesiones descartables** para cualquier máquina, Exportar, discos comprimidos e instantáneas que guardan los ajustes de la máquina y una nota.
+- **Un aislamiento más estricto**: el QEMU de cada máquina en sus propios espacios de nombres, ilegible para tus otros programas, con un filtro que permite solo las llamadas al sistema que necesita y sin que nada de lo que escribe pueda ejecutarse; cada máquina con su propia fila en el firewall.
 
 ## Qué se probó y qué no
 
 Comprobado en una PC de 64 bits con KVM, sobre todo con una herramienta de desarrollo que hace el papel del servidor gráfico de LordOS: la instalación desatendida de Windows 11 y sus herramientas (resolución, portapapeles en los dos sentidos, la lista de ventanas, los íconos y las acciones del modo apps), los números de la carpeta de transferencia de arriba, los tres modos de red nuevos contra una LAN real, el sonido y el micrófono por PipeWire, y el 3D con un invitado Ubuntu en una Radeon RX 580.
 
-**Todavía no:** el modo apps dibujando en un monitor real, todos los paneles de Configurar en pantalla, Windows en la Raspberry Pi, el 3D para máquinas con Windows sin una parte de GVT-g de Intel, dispositivos USB pasados a una máquina y arrastrar archivos fuera de una máquina.
+**Todavía no:** el modo apps dibujando en un monitor real, todos los paneles de Configurar en pantalla, instalar Windows en la Raspberry Pi (ahí corre emulado), el 3D para máquinas con Windows sin una parte de GVT-g de Intel y arrastrar archivos fuera de una máquina.
 
 El diseño completo, las reglas de seguridad y cada medición están en `docs/VIRTUALIZATION.md` y `docs/MACHINES-GPU.md`.

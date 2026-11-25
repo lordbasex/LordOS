@@ -168,6 +168,7 @@
   "pkg.why.multiarchPair": "{name} ilə eyni versiya",
   "gpu.roleSet": "Qrafik kartın istifadəsi saxlanıldı ({card}): tətbiq etmək üçün yenidən başladın",
   "vm.gvtReady": "Qrafik kart payı hazırdır ({name})",
+  "vm.usbReady": "USB cihazı hazırdır",
   "vm.gvtGone": "Qrafik kart payı silindi",
   "gpu.freqSet": "Qrafik kartın minimum tezliyi təyin edildi",
   "gpu.memlockSet": "Maşınların kilidləyə biləcəyi yaddaş saxlanıldı",

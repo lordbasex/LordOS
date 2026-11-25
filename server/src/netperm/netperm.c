@@ -27,6 +27,7 @@
 #include "netperm/npcompile.h"
 #include "netperm/npdiag.h"
 #include "netperm/npdns.h"
+#include "netperm/nplocal.h"
 #include "netperm/npload.h"
 #include "netperm/npproto.h"
 #include "fw/fwmap.h"
@@ -40,6 +41,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/bpf.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 #include <netinet/in.h>
 #include <pwd.h>
 #include <signal.h>
@@ -78,6 +81,7 @@ typedef struct {
     uint32_t idx;
     unsigned gen;                       /* generation of its installed nodes */
     int has_domains, seen;
+    int slice;                          /* the session's Machines slice (NP_A_SLICE): the machines' scopes are inside it */
     NpApp app_v;                        /* the last thing written to np_apps */
     uint64_t allowed, denied;           /* kernel counters */
     uint64_t blocked;                   /* bytes the packet filter dropped (np_counts) */
@@ -90,6 +94,7 @@ typedef struct {
     unsigned uid;
     char dir[64];
     int wd, seen;
+    int swd;                            /* the watch on its Machines slice (FW_VM_SLICE), -1 none */
     FwStore *store;
     Scope *sc;
     int nsc, cap;
@@ -128,7 +133,7 @@ static struct {
     int bpf_ok;
     char bpf_err[200];                  /* a code line (errcode.h): the firewall page shows it translated */
     int m_np_cfg, m_np_apps, m_np_union, m_np_lpm4, m_np_lpm6, m_np_seen, m_np_counts, m_np_events, m_np_snd, m_np_flows, m_np_bound;
-    int m_np_blk4, m_np_blk6, m_np_sysc;
+    int m_np_blk4, m_np_blk6, m_np_sysc, m_np_local;
     uint32_t next_blkset;
     long long blk_pass;
     struct { uint64_t cgid; int links[4], nlinks; uint64_t rx, tx; double rrx, rtx; } sys[3];   /* dns, time, network */
@@ -148,6 +153,10 @@ static struct {
     BpfRing ring;
     int cgfd;
     int ep, lfd, ifd, tfd, root_wd, dns_fd;
+    int addr_fd;                        /* rtnetlink, this computer's address and route changes (np_local) */
+    NpLocalKey local[NP_MAX_LOCAL];     /* what np_local holds */
+    NpCfg cfg;                          /* what np_cfg holds */
+    int nlocal;
     Session sess[MAX_SESS];
     int nsess;
     Client cl[MAX_CLIENTS];
@@ -272,6 +281,7 @@ static int map_fd(const char *name) {
     if (!strcmp(name, "np_blk4")) return G.m_np_blk4;
     if (!strcmp(name, "np_blk6")) return G.m_np_blk6;
     if (!strcmp(name, "np_sysc")) return G.m_np_sysc;
+    if (!strcmp(name, "np_local")) return G.m_np_local;
     return -1;
 }
 #endif
@@ -349,6 +359,7 @@ static void sync_scope(Session *s, Scope *sc) {
      * just joined a list is cut by the sweep after the change (sync_blk), so the per-packet filter
      * doesn't decide for every app because lists are on (it would cost every packet a decision) */
     if (s->lists) c.app.blk = s->blkset;
+    if (sc->slice) c.app.flags |= NP_A_SLICE;
     sc->app_v = c.app;
     if (bpfs_map_update(G.m_np_apps, &sc->cgid, &c.app, BPF_ANY)) logf_("np_apps: %s", strerror(errno));
     /* the counters' entry exists from the start: the accounting programs only add to existing
@@ -495,7 +506,9 @@ static void sync_union(Session *s) {
      * it back). A process escaped there is held by the PipeWire guard instead (its clients count
      * as restricted while restricted apps run); reading the card directly from there is the
      * residual risk (docs/FIREWALL.md). */
-    for (int k = 0; k < s->nsc; k++) u.flags |= s->sc[k].app_v.flags & ~NP_R_NO_MIC;
+    /* nor the Tor gateway's built-in restriction: it is about that machine's passt, and under user@ it would take UDP
+     * and the LAN from every process of the user while the gateway runs */
+    for (int k = 0; k < s->nsc; k++) u.flags |= s->sc[k].app_v.flags & ~(NP_R_NO_MIC | NP_R_TOR_UPLINK | NP_A_SLICE);
     if (u.flags) {
         u.trusted = 1;                  /* whatever the union doesn't restrict is allowed without notice */
         u.mode = NP_M_SILENT;
@@ -548,7 +561,7 @@ static void sync_user_scope(Session *s) {
 static int scope_app(const char *name, char *app) {
     if (!strcmp(name, "server")) { snprintf(app, FW_APP_MAX, "lordos"); return 0; }
     /* (0.8.5) LordOS's own components that use the network: lordos-net-<name>.scope → lordos:<name>;
-     * (0.8.8.6) a running machine's scope → lordos:machines, so several scopes can share one app */
+     * a running machine's scope → lordos:vm-<id>, compiled with the Machines component's rules too (npcompile.c) */
     return fw_scope_app(name, app, FW_APP_MAX);
 }
 
@@ -564,6 +577,60 @@ static int scope_of_app(const Session *s, uint64_t cgid, const char *app) {
     return 0;
 }
 
+/* One scope found in dfd (the session folder or its Machines slice): registered if new, marked seen. -1 out of memory */
+static int see_scope(Session *s, int dfd, const char *name, const char *app, int slice) {
+    uint64_t id = bpfs_cgroup_id(dfd, name);
+    if (!id) return 0;
+    Scope *sc = NULL;
+    for (int i = 0; i < s->nsc; i++) if (s->sc[i].cgid == id && !strcmp(s->sc[i].name, name)) sc = &s->sc[i];
+    if (!sc) {
+        if (s->nsc == s->cap) {
+            int nc = s->cap ? s->cap * 2 : 8;
+            Scope *ns = realloc(s->sc, (size_t)nc * sizeof *ns);
+            if (!ns) return -1;
+            s->sc = ns;
+            s->cap = nc;
+        }
+        sc = &s->sc[s->nsc++];
+        memset(sc, 0, sizeof *sc);
+        snprintf(sc->name, sizeof sc->name, "%s", name);
+        snprintf(sc->app, sizeof sc->app, "%s", app);
+        sc->cgid = id;
+        sc->slice = slice;
+        sc->idx = idx_of(s->uid, app);
+        sync_scope(s, sc);
+    }
+    sc->seen = 1;
+    return 0;
+}
+
+/* (docs/VIRTUALIZATION.md 3.7) The session's Machines slice: the slice itself is lordos:machines (what a machine's
+ * scope gets until it is registered here), and inside it only machines' scopes count (fw_vm_scope); nothing else in
+ * it is an app. lord-sessiond makes it root-owned, so a user process can't add a folder there. */
+static void scan_slice(Session *s, int dfd) {
+    if (see_scope(s, dfd, FW_VM_SLICE, "lordos:machines", 1)) return;
+    int vfd = openat(dfd, FW_VM_SLICE, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (vfd < 0) return;
+    {   /* the same folder gives the same watch back; a slice made again gets a new one */
+        char path[200];
+        snprintf(path, sizeof path, CG_ROOT "/" CG_SERVICE "/%s/" FW_VM_SLICE, s->dir);
+        int wd = inotify_add_watch(G.ifd, path, IN_CREATE | IN_DELETE | IN_ONLYDIR);
+        if (wd >= 0) s->swd = wd;
+    }
+    int d2 = dup(vfd);
+    DIR *d = d2 >= 0 ? fdopendir(d2) : NULL;
+    if (!d && d2 >= 0) close(d2);
+    struct dirent *e;
+    while (d && (e = readdir(d))) {
+        if (e->d_type != DT_DIR || e->d_name[0] == '.' || strlen(e->d_name) >= sizeof s->sc[0].name) continue;
+        char app[FW_APP_MAX];
+        if (fw_vm_scope(e->d_name, NULL, 0) || scope_app(e->d_name, app)) continue;
+        if (see_scope(s, vfd, e->d_name, app, 0)) break;
+    }
+    if (d) closedir(d);
+    close(vfd);
+}
+
 static void scan_session(Session *s) {
     char path[160];
     snprintf(path, sizeof path, CG_ROOT "/" CG_SERVICE "/%s", s->dir);
@@ -572,33 +639,21 @@ static void scan_session(Session *s) {
     DIR *d = fdopendir(dup(dfd));
     for (int i = 0; i < s->nsc; i++) s->sc[i].seen = 0;
     struct dirent *e;
+    int slice = 0;
     while (d && (e = readdir(d))) {
         if (e->d_type != DT_DIR || e->d_name[0] == '.' || strlen(e->d_name) >= sizeof s->sc[0].name) continue;
+        if (!strcmp(e->d_name, FW_VM_SLICE)) {     /* only lord-sessiond's (root-owned): never a folder a user made there */
+            struct stat vs;
+            slice = !fstatat(dfd, e->d_name, &vs, AT_SYMLINK_NOFOLLOW) && S_ISDIR(vs.st_mode) && vs.st_uid == 0;
+            continue;
+        }
         char app[FW_APP_MAX];
         if (scope_app(e->d_name, app)) continue;
-        uint64_t id = bpfs_cgroup_id(dfd, e->d_name);
-        if (!id) continue;
-        Scope *sc = NULL;
-        for (int i = 0; i < s->nsc; i++) if (s->sc[i].cgid == id && !strcmp(s->sc[i].name, e->d_name)) sc = &s->sc[i];
-        if (!sc) {
-            if (s->nsc == s->cap) {
-                int nc = s->cap ? s->cap * 2 : 8;
-                Scope *ns = realloc(s->sc, (size_t)nc * sizeof *ns);
-                if (!ns) break;
-                s->sc = ns;
-                s->cap = nc;
-            }
-            sc = &s->sc[s->nsc++];
-            memset(sc, 0, sizeof *sc);
-            snprintf(sc->name, sizeof sc->name, "%s", e->d_name);
-            snprintf(sc->app, sizeof sc->app, "%s", app);
-            sc->cgid = id;
-            sc->idx = idx_of(s->uid, app);
-            sync_scope(s, sc);
-        }
-        sc->seen = 1;
+        if (see_scope(s, dfd, e->d_name, app, 0)) break;
     }
     if (d) closedir(d);
+    if (slice) scan_slice(s, dfd);
+    else if (s->swd >= 0) { inotify_rm_watch(G.ifd, s->swd); s->swd = -1; }
     close(dfd);
     for (int i = 0; i < s->nsc;) {
         if (s->sc[i].seen) { i++; continue; }
@@ -619,6 +674,7 @@ static void drop_session(int k) {
     drop_user_links(s);
     if (s->user_cg) { bpfs_map_delete(G.m_np_union, &s->user_cg); bpfs_map_delete(G.m_np_counts, &s->user_cg); }
     if (s->wd >= 0) inotify_rm_watch(G.ifd, s->wd);
+    if (s->swd >= 0) inotify_rm_watch(G.ifd, s->swd);
     free(s->sc);
     fw_store_free(s->store);
     G.sess[k] = G.sess[--G.nsess];
@@ -681,6 +737,7 @@ static void scan_all(void) {
             s = &G.sess[G.nsess++];
             memset(s, 0, sizeof *s);
             s->uid = uid;
+            s->swd = -1;
             snprintf(s->dir, sizeof s->dir, "lordos-session-%u", uid);
             char path[160];
             snprintf(path, sizeof path, CG_ROOT "/" CG_SERVICE "/%s", s->dir);
@@ -1347,8 +1404,7 @@ static void push_counts(void) {
         j[w++] = '{';
         for (int k = 0; k < s->nsc; k++) {
             Scope *sc = &s->sc[k];
-            /* one entry per app: the scopes that share one (each running machine and the Machines
-             * downloads, all lordos:machines) are added together under the first */
+            /* one entry per app: scopes that share one are added together under the first */
             int first = 1;
             for (int p = 0; p < k && first; p++) first = s->sc[p].idx != sc->idx;
             if (!first) continue;
@@ -1445,7 +1501,7 @@ static int bpf_setup(void) {
 #define NP_MKMAP(n, t, k, v, m, f) G.m_##n = bpfs_map_create(t, k, v, m, f, #n);
     NP_MAPS(NP_MKMAP)
 #undef NP_MKMAP
-    if (G.m_np_blk4 < 0 || G.m_np_blk6 < 0 || G.m_np_sysc < 0 || G.m_np_bound < 0 || G.m_np_flows < 0 || G.m_np_snd < 0 || G.m_np_cfg < 0 || G.m_np_apps < 0 || G.m_np_union < 0 || G.m_np_lpm4 < 0 || G.m_np_lpm6 < 0 || G.m_np_seen < 0 || G.m_np_counts < 0 || G.m_np_events < 0) {
+    if (G.m_np_local < 0 || G.m_np_blk4 < 0 || G.m_np_blk6 < 0 || G.m_np_sysc < 0 || G.m_np_bound < 0 || G.m_np_flows < 0 || G.m_np_snd < 0 || G.m_np_cfg < 0 || G.m_np_apps < 0 || G.m_np_union < 0 || G.m_np_lpm4 < 0 || G.m_np_lpm6 < 0 || G.m_np_seen < 0 || G.m_np_counts < 0 || G.m_np_events < 0) {
         lerr_set(G.bpf_err, sizeof G.bpf_err, "fw.bpfMaps", "errno", lerr_errno(errno), NULL);
         return -1;
     }
@@ -1487,7 +1543,8 @@ static int bpf_setup(void) {
         G.progs[np++] = fd;
     }
     G.nprogs = np;
-    NpCfg cfg = { SCOPE_LEVEL, 1, USER_LEVEL, hidraw_major() };
+    NpCfg cfg = { SCOPE_LEVEL, 1, USER_LEVEL, hidraw_major(), 0 };
+    G.cfg = cfg;
     uint32_t zero = 0;
     if (bpfs_map_update(G.m_np_cfg, &zero, &cfg, BPF_ANY)) { lerr_set(G.bpf_err, sizeof G.bpf_err, "fw.bpfConfig", "errno", lerr_errno(errno), NULL); return -1; }
     logf_("%d BPF programs loaded (devices: %s, Bluetooth sockets: %s, traffic accounting: %s, hidraw major %u)", np, G.dev_ok ? "yes" : "no",
@@ -1528,6 +1585,50 @@ static void attach_service(void) {
     if (G.root_wd >= 0) inotify_rm_watch(G.ifd, G.root_wd);
     G.root_wd = inotify_add_watch(G.ifd, CG_ROOT "/" CG_SERVICE, IN_CREATE | IN_DELETE | IN_ONLYDIR);
     logf_("%d BPF programs attached to " CG_SERVICE " (scopes at level %d)", G.nlinks, SCOPE_LEVEL);
+}
+
+/* ---- this computer's own networks (np_local) ---------------------------------------------------
+ *
+ * (Whonix groups, docs/FIREWALL.md "The Tor gateway") The Tor gateway's built-in restriction never lets it reach this
+ * computer or another machine on one of its links, whatever range their addresses are in (a public IPv4 LAN, a routed
+ * /64): every interface address as a host and with its prefix, and every directly connected route, read with
+ * RTM_GETADDR and RTM_GETROUTE dumps over rtnetlink (netperm/nplocal.c; NETLINK_ROUTE, no AF_INET socket), go into the
+ * np_local trie at start, on every address or route change (RTMGRP_*_IFADDR, RTMGRP_*_ROUTE) and with the 5-second
+ * rescan. When they can't be read or don't fit, NpCfg.local_full makes the restriction deny every address (fail
+ * closed, logged). Only addresses and prefixes are taken from the answers. */
+
+static void sync_local(void) {
+    if (!G.bpf_ok) return;
+    static NpLocalKey now[NP_MAX_LOCAL];
+    int full = 0, n = np_host_addrs(now, NP_MAX_LOCAL, &full);
+    /* fail closed: networks that couldn't be read or didn't fit leave the Tor gateway with no address at all */
+    int closed = n < 0 || full;
+    if (n < 0) { logf_("this computer's networks: rtnetlink: %s: the Tor gateway's restriction denies every address", strerror(errno)); n = 0; }
+    else if (full && !G.cfg.local_full) logf_("this computer has more than %d networks: the Tor gateway's restriction denies every address", NP_MAX_LOCAL);
+    uint8_t one = 1;
+    for (int i = 0; i < n; i++) bpfs_map_update(G.m_np_local, &now[i], &one, BPF_ANY);
+    if (!closed || n) {
+        for (int i = 0; i < G.nlocal; i++) {
+            int keep = 0;
+            for (int k = 0; k < n && !keep; k++) keep = !memcmp(&now[k], &G.local[i], sizeof now[k]);
+            if (!keep) bpfs_map_delete(G.m_np_local, &G.local[i]);
+        }
+        memcpy(G.local, now, sizeof now[0] * (size_t)n);
+        G.nlocal = n;
+    }
+    if ((uint32_t)closed != G.cfg.local_full) {
+        G.cfg.local_full = (uint32_t)closed;
+        uint32_t zero = 0;
+        if (bpfs_map_update(G.m_np_cfg, &zero, &G.cfg, BPF_ANY)) logf_("np_cfg: %s", strerror(errno));
+    }
+}
+
+static int addr_watch_open(void) {
+    int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK, NETLINK_ROUTE);
+    if (fd < 0) return -1;
+    struct sockaddr_nl sa = { .nl_family = AF_NETLINK, .nl_groups = RTMGRP_IPV4_IFADDR | RTMGRP_IPV6_IFADDR | RTMGRP_IPV4_ROUTE | RTMGRP_IPV6_ROUTE };
+    if (bind(fd, (struct sockaddr *)&sa, sizeof sa)) { close(fd); return -1; }
+    return fd;
 }
 
 /* ---- main ------------------------------------------------------------------------------------ */
@@ -1603,6 +1704,9 @@ int main(int argc, char **argv) {
     G.sys_wd = inotify_add_watch(G.ifd, CG_ROOT "/system.slice", IN_CREATE | IN_ONLYDIR);
     attach_service();
     if (G.root_wd < 0) G.root_wd = inotify_add_watch(G.ifd, CG_ROOT "/" CG_SERVICE, IN_CREATE | IN_DELETE | IN_ONLYDIR);
+    G.addr_fd = G.bpf_ok ? addr_watch_open() : -1;
+    if (G.addr_fd >= 0) { ev.data.u64 = 6; epoll_ctl(G.ep, EPOLL_CTL_ADD, G.addr_fd, &ev); }
+    sync_local();
     scan_all();
     sweep((unsigned)-1);                /* what was opened while this service wasn't running, and the servers' ports */
     watch_dns();
@@ -1626,7 +1730,7 @@ int main(int argc, char **argv) {
                 attach_service();
                 sync_system();
                 if (G.dns) { npdns_tick(G.dns); watch_dns(); }
-                if (G.tick % 5 == 0) scan_all();    /* in case an inotify notice was lost */
+                if (G.tick % 5 == 0) { scan_all(); sync_local(); }   /* in case an inotify or address notice was lost */
                 if (G.tick % 30 == 0) {
                     dnsmap_expire(G.names, mono());
                     for (int s = 0; s < G.nsess; s++) if (G.sess[s].lists || G.sess[s].blkin.n) sync_blk(&G.sess[s]);
@@ -1637,6 +1741,11 @@ int main(int argc, char **argv) {
                 push_counts();
             } else if (t == 4) bpfs_ring_drain(&G.ring, on_event, NULL);
             else if (t == 5) { if (G.dns) npdns_ready(G.dns); watch_dns(); }
+            else if (t == 6) {
+                char buf[8192];
+                while (recv(G.addr_fd, buf, sizeof buf, 0) > 0) {}
+                sync_local();                       /* an address came or went: dump them all again */
+            }
             else if (t >= 1000) {
                 int fd = (int)(t - 1000);
                 for (int k = 0; k < G.ncl; k++) {

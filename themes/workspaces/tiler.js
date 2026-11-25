@@ -18,9 +18,10 @@
 // and an app that answers with another size (a minimum size, a character grid) keeps it and stays in its tile
 // (model/layouts.js judgeFrame); at most MOVES_PER_SEC moves per window and MAX_PASSES passes per second, whatever
 // changes the windows meanwhile: past that the pass waits a second.
-import { windows, locksChanged, activeDesktop, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore, wm, openDisplayApps } from '@lordos/sdk';
+import { windows, locksChanged, activeDesktop, desktopList, settings, launchApp, isProfileBrowser, profileChoice, noteLaunchedProfile, forgetLaunchedProfile, refreshBrowserProfiles, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore, wm, openDisplayApps } from '@lordos/sdk';
 import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget, slotStacks, shownIn, dropInto, slotAt, dropSlot, slotLimits, trimSlots } from './model/layouts.js';
 import { shownDisplays } from './model/geometry.js';
+import { addLaunch, claim, gone, pending as pendingOf, LAUNCH_MS } from './model/launches.js';
 import { activities, activityOf, updateActivity } from './state.js';
 
 const floating = new Set();          // window ids out of the tiles
@@ -31,14 +32,77 @@ const order = new Map();             // `${desk}|${dkey}` → the tiles' slots i
 const hints = new Map();             // window id → { dk, x, y, t }: where the person dropped it, as the target preview showed
 const slotAsks = new Map();          // window id → { dk, at }: put it in slot `at` of display dk (the layout flyout)
 const lastMin = new Map();
-// Where the next windows launched from a display go (its frame's + and Add window, its pinned apps, Search opened on
-// it): that display, whatever display the app's saved layout names and wherever there is free room. n windows, the
-// ones that weren't open at the time, within AIM_MS (a Linux app can take a while to show its first window).
-let aim = null;                      // { dk, n, before: Set of window ids, t }
-const AIM_MS = 30000;
-export function aimLaunch(display, n = 1) {
+// Where the windows launched from a display go (its frame's + and Add window, its quick launch, its pinned apps, Search
+// opened on it): that display and the activity in view at the launch, whatever display the app's saved layout names
+// or the app itself picks. A pending placement per launch, keyed by the launcher id its windows will carry, so another
+// app's window opening meanwhile doesn't take it, and an app that shows a picker first (Google Chrome's profiles) has
+// its real window follow the picker there (model/launches.js).
+let launches = [];
+const born = new Map();              // window id → when the tiler first saw it (the windows open now)
+export function aimLaunch(display, n = 1, keys = null, profile = null) {
   if (!display) return;
-  aim = { dk: keyOfDisplay(display), n: Math.max(1, n), before: new Set(windows.get().map((w) => w.id)), t: Date.now() };
+  const dk = keyOfDisplay(display), desk = activeDesktop.get(), now = Date.now();
+  const list = (Array.isArray(keys) ? keys : keys ? [keys] : []).filter((k) => typeof k === 'string' && k);
+  if (!list.length) { launches = addLaunch(launches, { key: '', desk, dk, n, now }); return; }
+  for (const key of list) launches = addLaunch(launches, { key, desk, dk, n: list.length === 1 ? n : 1, now, profile: list.length === 1 ? profile : null });
+}
+
+// Launch app `key` from display d of the activity in view, its windows aimed there. A Chromium-family browser with a
+// profile chosen for this activity (or, failing that, for this display's connector) opens that profile, through the
+// launcher's own profile path when lord-server has it (lord.apps.launchProfile, approved by the maintainer 2026-11-24;
+// docs/WORKSPACES.md "Browser profiles"); without it the browser opens as before and no profile is claimed.
+export function launchOn(d, key) {
+  if (!d || typeof key !== 'string' || !key) return false;
+  const can = isProfileBrowser(key) && typeof lord !== 'undefined' && typeof lord.apps?.launchProfile === 'function';
+  const dir = can ? profileChoice(key, activityOf(activeDesktop.get()).profiles, settings.get().browserProfiles, keyOfDisplay(d)) : null;
+  aimLaunch(d, 1, key, dir);
+  if (dir) {
+    refreshBrowserProfiles(key);      // on demand: the window's dot and name (read again only if the file changed)
+    try { if (lord.apps.launchProfile(key.slice('desktop:'.length), dir)) return true; } catch (e) { /* the plain launch below */ }
+  }
+  return launchApp(key);
+}
+// for the tests: forget every placement (a launch whose app never showed a window would otherwise wait LAUNCH_MS)
+export function forgetLaunches() { launches = []; }
+// for the tests: the placements still waiting
+export const pendingLaunches = () => pendingOf(launches, Date.now()).map((p) => ({ key: p.key, desk: p.desk, dk: p.dk, left: p.left }));
+// a window that may take a launch's place: an app's own window, not a dialog, a notice or a panel
+const placeable = (w) => !w.pip && !w.args?.skipTaskbar && tileable({ ...w, minimized: false, maximized: false, fullscreen: false });
+// it goes to the launch's display, and to the launch's activity if it opened on another one (the person switched
+// meanwhile); with a free layout there, to that display's middle
+function placeAt(w, p, disp, keys) {
+  home.set(w.id, p.dk);
+  if (p.profile) noteLaunchedProfile(w.id, p.profile);   // the profile LordOS launched it for (browserprofiles.js)
+  floating.delete(w.id);
+  applied.delete(w.id);
+  for (const [ok, st] of order) if (!ok.endsWith(`|${p.dk}`)) order.set(ok, st.map((x) => x.filter((id) => id !== w.id)));
+  if (p.desk && w.desktop !== p.desk && desktopList.get().includes(p.desk)) wm.moveToDesktop(w.id, p.desk);
+  const d = disp[keys.indexOf(p.dk)], f = wFrame(w);
+  if (d && layoutOf(p.desk ?? w.desktop, p.dk).layout === 'free' && keyOfDisplay(displayFor(f)) !== p.dk) {
+    const a = workAreaOf(d), fw = Math.min(f.w, a.w), fh = Math.min(f.h, a.h);
+    const to = { x: Math.round(a.x + (a.w - fw) / 2), y: Math.round(a.y + (a.h - fh) / 2), w: fw, h: fh };
+    setTimeout(() => wm.setFrame(w.id, to), 0);
+  }
+}
+// the windows that came and went since the last pass: new ones take a pending placement, a picker that closed arms
+// its placement again (model/launches.js)
+function followLaunches(all, disp, keys, now) {
+  const liveIds = new Set(all.map((w) => w.id));
+  const byId = new Map(all.map((w) => [w.id, w]));
+  for (const id of [...born.keys()]) {
+    if (liveIds.has(id)) continue;
+    born.delete(id);
+    forgetLaunchedProfile(id);            // a surface id may come back for another window
+    const { p, early } = gone(launches, id, now, born, (wid) => (byId.get(wid) ? launcherIdOf(byId.get(wid)) : ''), (wid) => floating.has(wid));
+    if (p && keys.includes(p.dk)) for (const wid of early) if (byId.get(wid)) placeAt(byId.get(wid), p, disp, keys);
+  }
+  for (const w of all) {
+    if (born.has(w.id)) continue;
+    born.set(w.id, now);
+    if (!launches.length || !placeable(w)) continue;
+    const p = claim(launches, w.id, launcherIdOf(w), now);
+    if (p && keys.includes(p.dk)) placeAt(w, p, disp, keys);
+  }
 }
 // The usual apps of a display opened from its suggestion (openUsual): their windows take the tiles in that order as
 // they arrive, whatever order the apps show in. dk → { desk, apps: launcher ids, t }
@@ -182,13 +246,16 @@ export function retile() {
   if (passes.length >= MAX_PASSES) { warnOnce(`more than ${MAX_PASSES} passes in a second; waiting`); schedule(1000); return; }
   passes.push(now);
   const desk = activeDesktop.get();
-  const all = windows.get();
+  let all = windows.get();
   const disp = displaysHere();
   if (!disp.length) return;
   const keys = disp.map(keyOfDisplay);
   const mk = mainKey();
   const meta = activityOf(desk);
   const saved = foldMissing(meta.layouts, keys, mk);
+  // new windows (on any activity) take the place they were launched for, before this activity's tiles are made
+  followLaunches(all, disp, keys, now);
+  all = windows.get();
   const live = new Set(all.map((w) => w.id));
   for (const id of [...applied.keys()]) if (!live.has(id)) { applied.delete(id); home.delete(id); floating.delete(id); moved.delete(id); }
   for (const id of [...lastMin.keys()]) if (!live.has(id)) lastMin.delete(id);
@@ -239,19 +306,6 @@ export function retile() {
     // a floating window belongs to the display it is on now (a new layout there takes it back)
     if (floating.has(w.id)) { home.set(w.id, keyOfDisplay(displayFor(wFrame(w)))); continue; }
     let dk = home.get(w.id);
-    if (!dk && aim && !aim.before.has(w.id) && now - aim.t < AIM_MS && keys.includes(aim.dk)) {
-      // launched from that display: it goes there (with a free layout, to its middle)
-      dk = aim.dk;
-      aim.before.add(w.id);
-      if (--aim.n <= 0) aim = null;
-      home.set(w.id, dk);
-      const d = disp[keys.indexOf(dk)], f = wFrame(w);
-      if (layoutOf(desk, dk).layout === 'free' && keyOfDisplay(displayFor(f)) !== dk) {
-        const a = workAreaOf(d), fw = Math.min(f.w, a.w), fh = Math.min(f.h, a.h);
-        const to = { x: Math.round(a.x + (a.w - fw) / 2), y: Math.round(a.y + (a.h - fh) / 2), w: fw, h: fh };
-        setTimeout(() => wm.setFrame(w.id, to), 0);
-      }
-    }
     if (!dk || !keys.includes(dk)) {
       dk = homeFor(launcherIdOf(w), saved, keys) || keyOfDisplay(displayFor(wFrame(w)));
       if (!keys.includes(dk)) dk = mk;
@@ -296,7 +350,7 @@ export function retile() {
     const freeLayout = cleanLayout(layout) === 'free';
     let { stacks, swapOut } = freeLayout ? { stacks: live.filter((id) => !isMin(id)).map((id) => [id]), swapOut: [] } : slotStacks(prevStacks, live, isMin, back, { min, max });
     const u = usual.get(dk);
-    if (u && (u.desk !== desk || now - u.t >= AIM_MS || now < u.t)) usual.delete(dk);
+    if (u && (u.desk !== desk || now - u.t >= LAUNCH_MS || now < u.t)) usual.delete(dk);
     else if (u && !freeLayout) {
       // the slots in the usual order (the free ones last); done once every app of it is here
       const rank = (st) => { const i = st.length ? u.apps.indexOf(keyOf(st[st.length - 1])) : -1; return i < 0 ? (st.length ? u.apps.length : u.apps.length + 1) : i; };
@@ -364,7 +418,7 @@ export function openUsual(desk, d, sug) {
     for (const w of windows.get()) if (w.desktop === desk && home.get(w.id) === dk) floating.delete(w.id);
   }
   usual.set(dk, { desk, apps, t: Date.now() });
-  aimLaunch(d, apps.length);
+  aimLaunch(d, 1, apps);
   openDisplayApps(apps);
   schedule();
 }

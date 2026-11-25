@@ -144,6 +144,27 @@ export function coveredIds(list, active, overview, frameOf, opaqueOf) {
   return out;
 }
 
+// None of the windows `ids` is on screen: each one missing, minimized, on a hidden desktop or wholly inside an opaque
+// window drawn over it (in stackOrder; frameOf and opaqueOf as for coveredIds). A full-screen or picture-in-picture
+// window of the list is on screen while its desktop shows (pip: always). Everything shows in the overview. Machines
+// takes a guest's picture less often then (server/src/vm/vmpace.h).
+export function outOfSight(list, active, overview, ids, frameOf, opaqueOf) {
+  const want = new Set(ids || []);
+  const inside = (a, b) => !!a && !!b && b.w > 0 && b.h > 0 && a.x <= b.x && a.y <= b.y && a.x + a.w >= b.x + b.w && a.y + a.h >= b.y + b.h;
+  const vis = stackOrder(visibleOn(list, active), list);
+  for (const w of list) {
+    if (!want.has(w.id) || windowHidden(w, active)) continue;
+    if (overview || w.fullscreen || w.pip) return false;
+    const i = vis.findIndex((x) => x.id === w.id);
+    if (i < 0) return false;
+    const r = frameOf(w);
+    let covered = false;
+    for (let j = i + 1; j < vis.length && !covered; j++) covered = opaqueOf(vis[j]) && inside(frameOf(vis[j]), r);
+    if (!covered) return false;
+  }
+  return true;
+}
+
 // A Linux app's own notification popup (docs/WAYLAND.md, "Notifications of Linux apps"). Chromium and
 // Electron draw their notifications themselves when they find no notification service on the session bus
 // (none there, no bus at all, or the feature turned off), each one an xdg toplevel with no app id, no

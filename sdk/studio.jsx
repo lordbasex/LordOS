@@ -3,21 +3,24 @@
 // screen if there is one, and the colours matched), Face Light, Auto Framing, Filters, Retouch, Mirror, Mic Mode
 // (Standard, Noise Reduction, Full Range) and "Every app": the "LordOS Studio" camera that browsers, OBS and every
 // other Linux app see once the Store's LordOS Studio Camera item (the lordos-studio-camera package, v4l2loopback) is
-// installed. It opens from the camera capture item by the clock (sdk/capturestatus.jsx) in every theme, in the same
-// panel and style. The effects reach every app that chose the "LordOS Studio" camera (lord.media.cameras(), device
+// installed. It opens from the capture item by the clock (sdk/capturestatus.jsx) in every theme, in the same panel and
+// style: "Video effects" while an app uses the camera, Mic Mode alone (MicModePanel, no preview) while one uses the
+// microphone. The LordOS Studio app (apps/studio, StudioWindow) shows the same controls in a window of their own, any
+// time, and shares the preview with the popover (one open of the camera). The effects reach every app that chose the "LordOS Studio" camera (sdk/cameras.js, device
 // "studio": the Camera app, isolated .lpk apps, go-link Desk; and /dev/video50 for Linux apps), all at once; lord-server
 // runs them in the sandboxed lord-studio helper. Each row's "›" opens its detail page in the same popover.
 // Plain logic: sdk/studiomodel.js. Settings: settings.studio, applied to lord-server at start and on every change.
 // The background catalog and its downloads: sdk/studiobg.js.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, Image, MediaView } from '@lordos/runtime';
 import { settings } from './settings.js';
-import { useStore } from './store.js';
+import { createStore, useStore } from './store.js';
 import { t, appName, direction } from './i18n.js';
 import { Toggle, Slider, Segmented, ScrollView } from './components.jsx';
 import { Layer } from './layers.js';
 import { FilePicker } from './filepicker.jsx';
 import { media } from './media.js';
+import { useCameras, camerasNow, onCameras } from './cameras.js';
 import { markDeviceUse } from './privacy.js';
 import { getApp, wm } from './windows.js';
 import { castAppName } from './screencast.jsx';
@@ -32,14 +35,22 @@ import {
 
 const has = () => typeof lord !== 'undefined' && !!lord.studio;
 const FILES = /\.(jpe?g|png|webp|mp4|webm|mkv|mov|m4v)$/i;
-const cameras = () => { try { return media.cameras(); } catch (e) { return []; } };
 
 // ---- settings → lord-server (the desktop's own process only: lord.studio exists nowhere else) ----
-let applied = null, appliedBg;
+// Runs on every settings change: when LordOS Studio's own settings are as last applied it stops there (2026-11-23,
+// docs/MAIN-THREAD.md: it listed the cameras on every settings write). The cameras come from sdk/cameras.js (listed on
+// a worker, again when one is plugged in or out); a chosen camera waits for the first list, and a new list applies
+// again (the chosen camera may have another /dev/video number now).
+let applied = null, appliedBg, appliedCfg = null;
 function apply(s) {
   if (!has()) return;
   const cfg = normalizeStudio(s.studio);
-  const server = serverConfig(cfg, cameras());
+  const ck = JSON.stringify(cfg);
+  if (ck === appliedCfg) return;
+  const cams = cfg.camera ? camerasNow() : [];
+  if (!cams) return;              // being listed: onCameras applies it
+  appliedCfg = ck;
+  const server = serverConfig(cfg, cams);
   const key = JSON.stringify(server);
   const bg = activeBackground(cfg);
   if (key === applied && bg === appliedBg) return;
@@ -53,6 +64,7 @@ function apply(s) {
 if (has()) {
   apply(settings.get());
   settings.subscribe(() => apply(settings.get()));
+  onCameras(() => { appliedCfg = null; apply(settings.get()); });
 }
 const update = (fn) => settings.set((s) => ({ ...s, studio: fn(normalizeStudio(s.studio)) }));
 const set = (patch) => update((c) => ({ ...c, ...patch }));
@@ -67,42 +79,51 @@ function useStatus() {
   return st;
 }
 
-// The preview: a native app's LordOS Studio source when one runs (no second open of the camera), else the popover's own,
-// closed when the popover closes: the frames of the loopback's writer while it runs (lord.studio.endPreview lets go of
-// them; it isn't ours to close), else a source of its own. The capture indicator shows the popover's own like any camera.
+// The preview: a native app's LordOS Studio source when one runs (no second open of the camera), else one of the
+// desktop's own, shared by every Studio view on screen (the capture popover and the LordOS Studio app's window) and
+// closed when the last of them goes: the frames of the loopback's writer while it runs (lord.studio.endPreview lets go
+// of them; it isn't ours to close), else a source of its own. The capture indicator shows it like any camera.
+const ownPreview = createStore({ id: null, err: null });
+let previewRefs = 0, previewOff = null, previewHub = false;
+function openPreview(status) {
+  if (ownPreview.get().id || !has() || !status?.available) return;
+  let id = null;
+  try {
+    const { width, height } = previewSize({ arch: typeof lord.sys?.arch === 'function' ? lord.sys.arch() : '', gpu: status.gpu !== false });
+    id = lord.studio.preview(width, height);
+  } catch (e) { ownPreview.set({ id: null, err: String(e?.code || e?.message || e) }); return; }
+  if (!id) return;
+  previewHub = id === status.hub || id === lord.studio.status()?.hub;
+  previewOff = media.on(id, (type, d) => {
+    if (type === 'error') ownPreview.set({ err: d?.message || 'busy' });
+    else if (type === 'closed' || (type === 'state' && d.state === 'failed')) ownPreview.set((p) => ({ ...p, err: p.err || 'busy' }));
+  });
+  markDeviceUse('studio', 'camera', true, id);
+  ownPreview.set({ id, err: null });
+}
+function closePreview() {
+  const { id } = ownPreview.get();
+  if (id) {
+    if (previewOff) previewOff();
+    if (previewHub) lord.studio.endPreview();
+    else media.close(id);
+    markDeviceUse('studio', 'camera', false);
+  }
+  previewOff = null;
+  previewHub = false;
+  ownPreview.set({ id: null, err: null });
+}
 function usePreview(status) {
   const shared = previewSource(status);
-  const [own, setOwn] = useState(null);
-  const [err, setErr] = useState(null);
-  const ref = useRef({ id: null, off: null, hub: false });
+  const own = useStore(ownPreview);
   useEffect(() => {
-    if (shared || ref.current.id || !has() || !status?.available) return;
-    let id = null;
-    try {
-      const { width, height } = previewSize({ arch: typeof lord.sys?.arch === 'function' ? lord.sys.arch() : '', gpu: status.gpu !== false });
-      id = lord.studio.preview(width, height);
-    } catch (e) { setErr(String(e?.code || e?.message || e)); return; }
-    ref.current.id = id;
-    ref.current.hub = id === status.hub || id === lord.studio.status()?.hub;
-    ref.current.off = media.on(id, (type, d) => {
-      if (type === 'error') setErr(d?.message || 'busy');
-      else if (type === 'closed' || (type === 'state' && d.state === 'failed')) setErr((e) => e || 'busy');
-    });
-    markDeviceUse('studio', 'camera', true, id);
-    setOwn(id);
-  }, [shared, status?.available]);
-  useEffect(() => () => {
-    const r = ref.current;
-    if (!r.id) return;
-    if (r.off) r.off();
-    if (r.hub) lord.studio.endPreview();
-    else media.close(r.id);
-    markDeviceUse('studio', 'camera', false);
-    r.id = null;
+    previewRefs++;
+    return () => { if (--previewRefs === 0) closePreview(); };
   }, []);
-  const id = shared || own;
+  useEffect(() => { if (!shared) openPreview(status); }, [shared, status?.available]);
+  const id = shared || own.id;
   useEffect(() => { if (id) media.view(id, { mirror: 1, fit: 'cover', background: 0xff000000 }); }, [id]);
-  return { id, err: shared ? null : err };
+  return { id, err: shared ? null : own.err };
 }
 
 function Chevron({ color }) {
@@ -162,14 +183,16 @@ const Link = ({ th, label, onClick }) => (
   </View>
 );
 
-function Preview({ th, status, pv }) {
+// big: the app's window, where the preview takes the room it has
+function Preview({ th, status, pv, big }) {
   const { id, err } = pv;
   const perf = perfLine(status);
   const msg = !status?.available ? t('studio.unavailable') : err ? (/noCamera/.test(err) ? t('studio.noCamera') : t('studio.busy')) : !id ? t('studio.starting') : null;
   return (
-    <View style={{ gap: 4 }}>
+    <View style={{ gap: 4, ...(big ? { flex: 1, minHeight: 0 } : null) }}>
       {/* the mouse's x means the same on screen whatever the language's direction (the eyedropper, later) */}
-      <View style={{ alignSelf: 'stretch', height: 166, borderRadius: 8, overflow: 'hidden', backgroundColor: '#000', direction: 'ltr', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ alignSelf: 'stretch', ...(big ? { flex: 1, minHeight: 180 } : { height: 166 }), borderRadius: 8, overflow: 'hidden', backgroundColor: '#000',
+        direction: 'ltr', alignItems: 'center', justifyContent: 'center' }}>
         {id && !err ? <MediaView media={id} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, objectFit: 'cover' }} /> : null}
         {msg ? <Text style={{ fontSize: 12, color: 'rgba(235,235,245,0.75)', textAlign: 'center', paddingHorizontal: 16 }}>{msg}</Text> : null}
       </View>
@@ -186,7 +209,7 @@ function EveryApp({ th, cfg, status }) {
       <View style={{ gap: 4 }}>
         <Row th={th} label={t('studio.everyApp')} detail={t('studio.notInstalled')} />
         <Hint th={th}>{t('studio.everyAppHint')}</Hint>
-        <Link th={th} label={t('studio.getCamera')} onClick={() => wm.open('store', { args: { page: 'suggested', nonce: Date.now() } })} />
+        <Link th={th} label={t('studio.getCamera')} onClick={() => wm.open('store', { args: { page: 'lordos', native: 'studioCamera', nonce: Date.now() } })} />
       </View>
     );
   }
@@ -220,24 +243,48 @@ function MicMode({ th, cfg }) {
       <Segmented small fill value={mode} onChange={choose}
         options={[['standard', t('studio.micStandard')], ['voice', t('studio.micVoice'), !can], ['wide', t('studio.micWide')]]} />
       <Hint th={th}>{note || (!can ? t('studio.micUnavailable') : t(`studio.micHint.${mode}`))}</Hint>
+      {/* a mode is the default microphone: what reaches an app depends on the microphone it records from */}
+      <Hint th={th}>{t('studio.micApps')}</Hint>
     </View>
   );
+}
+
+// Mic Mode's current name, for a row's detail
+export function useMicModeName() {
+  const s = useStore(settings);
+  const snd = useSound();
+  const mode = micModeOf(snd, normalizeStudio(s.studio));
+  return t(mode === 'voice' ? 'studio.micVoice' : mode === 'wide' ? 'studio.micWide' : 'studio.micStandard');
 }
 
 const linuxId = (a) => /^(desktop|flatpak):/.test(a);
 const userName = (a) => (a === 'studio' ? '' : linuxId(a) ? castAppName({ who: a }) : appName(getApp(a)) || a);
 
-function MainPage({ th, cfg, status, pv, go, onBack }) {
-  const cams = realCameras(cameras());
+// the camera it takes the picture from and who uses it
+function Source({ th, cfg, status, go }) {
+  const cams = realCameras(useCameras() || []);
   const cam = chosenCamera(cfg.camera, cams);
   const users = usersOf(status, userName, t('shell.cast.unknownApp'));
   return (
-    <View style={{ gap: 10 }}>
-      <Header th={th} title={t('studio.title')} onBack={onBack} />
-      <Preview th={th} status={status} pv={pv} />
+    <>
       <Row th={th} label={t('studio.title')} detail={cam ? cam.name : t('studio.noCamera')} onOpen={cams.length > 1 ? () => go('camera') : null} />
       <Row th={th} label={t('studio.inUse')} detail={users.length ? users.join(' · ') : t('studio.nobody')} />
-      <Sep th={th} />
+    </>
+  );
+}
+
+// wide: the app's window, whose other column has the preview, the camera and Every app
+function MainPage({ th, cfg, status, pv, go, onBack, onOpenApp, wide }) {
+  return (
+    <View style={{ gap: 10 }}>
+      {wide ? <Header th={th} title={t('studio.effects')} /> : (
+        <>
+          <Header th={th} title={t('studio.title')} onBack={onBack} />
+          <Preview th={th} status={status} pv={pv} />
+          <Source th={th} cfg={cfg} status={status} go={go} />
+          <Sep th={th} />
+        </>
+      )}
       <Row th={th} label={t('studio.portrait')} toggle={portraitOn(cfg)} onToggle={(v) => update((c) => withPortrait(c, v))} onOpen={() => go('portrait')} />
       <Row th={th} label={t('studio.background')} toggle={backgroundOn(cfg)} onToggle={(v) => update((c) => withBackground(c, v, lordosWallpapers))}
         onOpen={() => go('background')} />
@@ -248,15 +295,20 @@ function MainPage({ th, cfg, status, pv, go, onBack }) {
       <Row th={th} label={t('studio.mirror')} toggle={cfg.mirror} onToggle={(v) => set({ mirror: !!v })} />
       <Sep th={th} />
       <MicMode th={th} cfg={cfg} />
-      <Sep th={th} />
-      <EveryApp th={th} cfg={cfg} status={status} />
-      <Hint th={th}>{t('studio.howTo')}</Hint>
+      {wide ? null : (
+        <>
+          <Sep th={th} />
+          <EveryApp th={th} cfg={cfg} status={status} />
+          <Hint th={th}>{t('studio.howTo')}</Hint>
+          {onOpenApp && getApp('studio') ? <Link th={th} label={t('studio.openApp')} onClick={onOpenApp} /> : null}
+        </>
+      )}
     </View>
   );
 }
 
 function CameraPage({ th, cfg, go }) {
-  const cams = realCameras(cameras());
+  const cams = realCameras(useCameras() || []);
   const cur = chosenCamera(cfg.camera, cams);
   return (
     <View style={{ gap: 8 }}>
@@ -467,19 +519,84 @@ function CreditsPage({ th, cfg, go }) {
 
 // The popover's content; onBack: back to the capture panel it opened from. The preview lives as long as the popover,
 // whatever page shows, so the camera isn't opened again on the way back.
-export function StudioPanel({ th, room, onBack }) {
+const PAGES = () => ({ camera: CameraPage, portrait: PortraitPage, background: BackgroundPage, green: GreenPage, credits: CreditsPage, light: LightPage,
+  stage: StagePage, filters: FiltersPage, retouch: RetouchPage });
+
+export function StudioPanel({ th, room, onBack, onOpenApp }) {
   const s = useStore(settings);
   const cfg = normalizeStudio(s.studio);
   const status = useStatus();
   const pv = usePreview(status);
   const [page, go] = useState('main');
-  const P = { camera: CameraPage, portrait: PortraitPage, background: BackgroundPage, green: GreenPage, credits: CreditsPage, light: LightPage,
-    stage: StagePage, filters: FiltersPage, retouch: RetouchPage }[page];
+  const P = PAGES()[page];
   return (
     <View style={{ width: 320, padding: 12, maxHeight: room }}>
       <ScrollView style={{ flexShrink: 1 }}>
-        {P ? <P th={th} cfg={cfg} status={status} go={go} /> : <MainPage th={th} cfg={cfg} status={status} pv={pv} go={go} onBack={onBack} />}
+        {P ? <P th={th} cfg={cfg} status={status} go={go} /> : <MainPage th={th} cfg={cfg} status={status} pv={pv} go={go} onBack={onBack} onOpenApp={onOpenApp} />}
       </ScrollView>
+    </View>
+  );
+}
+
+// Opens the LordOS Studio app (apps/studio), or brings its window forward
+export const openStudioApp = () => wm.open('studio');
+
+// Mic Mode alone, for the capture panel while only a microphone is in use: no preview, so the camera never turns on
+// for it. The LordOS Studio app is a link away where Studio's video effects can work.
+export function MicModePanel({ th, room, onBack, onOpenApp }) {
+  const s = useStore(settings);
+  const cfg = normalizeStudio(s.studio);
+  return (
+    <View style={{ width: 320, padding: 12, maxHeight: room }}>
+      <ScrollView style={{ flexShrink: 1 }}>
+        <View style={{ gap: 10 }}>
+          <Header th={th} title={t('studio.name')} onBack={onBack} />
+          <MicMode th={th} cfg={cfg} />
+          {onOpenApp && studioAvailable() && getApp('studio') ? (
+            <>
+              <Sep th={th} />
+              <Link th={th} label={t('studio.openApp')} onClick={onOpenApp} />
+            </>
+          ) : null}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+// The LordOS Studio app's window (apps/studio): the preview large on one side with the camera, who uses it and Every
+// app; the effects and Mic Mode on the other, each row's detail page in place. The same settings and the same preview
+// as the capture popover.
+export function StudioWindow({ th }) {
+  const s = useStore(settings);
+  const cfg = normalizeStudio(s.studio);
+  const status = useStatus();
+  const pv = usePreview(status);
+  const [page, go] = useState('main');
+  const P = PAGES()[page];
+  if (status && !status.available) {
+    // lord-studio or its model is missing: Mic Mode still works (it is PipeWire's)
+    return (
+      <View style={{ flex: 1, padding: 24, gap: 16, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontSize: 15, fontWeight: 600, color: th.text, textAlign: 'center' }}>{t('studio.unavailable')}</Text>
+        <View style={{ width: 320 }}><MicMode th={th} cfg={cfg} /></View>
+      </View>
+    );
+  }
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', padding: 16, gap: 18, minHeight: 0 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 10 }}>
+        <Preview th={th} status={status} pv={pv} big />
+        <Source th={th} cfg={cfg} status={status} go={go} />
+        <Sep th={th} />
+        <EveryApp th={th} cfg={cfg} status={status} />
+        <Hint th={th}>{t('studio.howTo')}</Hint>
+      </View>
+      <View style={{ width: 320, minHeight: 0 }}>
+        <ScrollView style={{ flex: 1 }}>
+          {P ? <P th={th} cfg={cfg} status={status} go={go} /> : <MainPage th={th} cfg={cfg} status={status} pv={pv} go={go} wide />}
+        </ScrollView>
+      </View>
     </View>
   );
 }

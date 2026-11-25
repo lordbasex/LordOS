@@ -41,6 +41,8 @@
  * packages on a network that drops packets fails in about a minute instead of 60 × (addresses × 15 s + 30 s). */
 #define CONNECT_TOTAL_MS 20000
 #define DEAD_MAX 8
+/* a redirected request refused with 403 or 5xx: tried again from the original URL this many more times (get_one) */
+#define FRESH_MAX 2
 
 /* ---- dates ---- */
 
@@ -323,7 +325,7 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
      * about 4.2 KB (WinFsp, 2026-11-20): a header line may be up to 12 KB (the connection's buffer holds 16) */
     char url[2200], err[200] = "", line[12288];
     snprintf(url, sizeof url, "%s", it->url);
-    int was_tls = 0;
+    int was_tls = 0, fresh = 0;
     for (int redirects = 0;; redirects++) {
         char host[256], port[8];
         const char *path;
@@ -338,11 +340,14 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
     again:
         if (conn_open(c, host, port, tls, err, sizeof err)) break;
         /* '+' as %2B, as apt does: an S3 origin (lordos.org) reads a bare '+' as a space, so
-         * pool/rpi/k/kms++-utils/… would be a 404 */
+         * pool/rpi/k/kms++-utils/… would be a 404. Only in the path: a query is sent as it came (a '+' there already
+         * means a space, and a signed URL's query, such as GitHub's rscd=attachment%3B+filename%3D…, is the signer's) */
         char epath[3 * sizeof url];         /* every byte of the URL could be a '+' */
         size_t en = 0;
+        int query = 0;
         for (const char *q = path; *q; q++) {
-            if (*q == '+') { memcpy(epath + en, "%2B", 3); en += 3; }
+            if (*q == '?') query = 1;
+            if (*q == '+' && !query) { memcpy(epath + en, "%2B", 3); en += 3; }
             else epath[en++] = *q;
         }
         epath[en] = 0;
@@ -439,8 +444,24 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
         if (status == 416 && from) { from = 0; continue; }          /* the part is no use (the file changed): again */
         if (redirect && location_cut) { lerr_set(err, sizeof err, "pkg.http.badHeaders", NULL); break; }   /* never a cut URL */
         if (redirect && redirects < 5) {
-            if (location[0] == '/') snprintf(url, sizeof url, "%s://%s%s%s%s", tls ? "https" : "http", host, strcmp(port, defport) ? ":" : "", strcmp(port, defport) ? port : "", location);
-            else snprintf(url, sizeof url, "%s", location);
+            int ul = location[0] == '/'
+                ? snprintf(url, sizeof url, "%s://%s%s%s%s", tls ? "https" : "http", host, strcmp(port, defport) ? ":" : "", strcmp(port, defport) ? port : "", location)
+                : snprintf(url, sizeof url, "%s", location);
+            /* a resolved URL that doesn't fit is refused like a cut Location, never followed cut */
+            if (ul < 0 || ul >= (int)sizeof url) { lerr_set(err, sizeof err, "pkg.http.badHeaders", NULL); break; }
+            continue;
+        }
+        /* a signed URL an origin redirected to (GitHub's release downloads: release-assets.githubusercontent.com, a
+         * token valid for minutes) is refused now and then with a 403 or a 5xx that the next one isn't: from the
+         * original URL again for a freshly signed redirect, at most FRESH_MAX more times, after 0.5 s and then 1.5 s.
+         * Nothing was delivered yet, and every check above applies to the new chain as it did to the first. */
+        if (redirects > 0 && !deliver && (status == 403 || (status >= 500 && status <= 599)) && fresh < FRESH_MAX) {
+            struct timespec ts = { fresh ? 1 : 0, 500000000L };
+            fresh++;
+            while (nanosleep(&ts, &ts) && errno == EINTR) {}
+            snprintf(url, sizeof url, "%s", it->url);
+            was_tls = 0;
+            redirects = -1;                 /* 0 again after the loop's increment: up to 5 redirects for this chain too */
             continue;
         }
         if (status == 304) {

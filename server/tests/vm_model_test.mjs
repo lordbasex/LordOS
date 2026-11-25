@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
 const D = await import(path.join(here, '../../apps/machines/diag.js'));
-const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
+const { stateView, offers2d, restartsAgain, offHint, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetPlan, budgetLine, failCause, failActions, cardLights, isolationGaps, pipFrame, actualFrame, infoLines, canRun, sensorLines, searchMachines, sessionStarts, atLoginToggle, batteryNotice, awayStep, AWAY_SEC, changedSections, sectionsMatching, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -22,6 +22,19 @@ eq('running', stateView('running', 'none'), { key: 'running', tone: 'run', activ
 eq('paused', stateView('paused', 'user').key, 'paused');
 eq('crashed keeps why', stateView('crashed', 'out-of-memory'), { key: 'crashed', tone: 'bad', active: false, why: 'out-of-memory' });
 eq('crashed no why', stateView('crashed', 'none').why, 'qemu-failed');
+eq('QEMU 3D abort keeps its why', stateView('crashed', 'qemu-3d-crash'), { key: 'crashed', tone: 'bad', active: false, why: 'qemu-3d-crash' });
+eq('QEMU 3D abort, recorded as off', stateView('stopped', 'qemu-3d-crash').why, 'qemu-3d-crash');
+eq('2D offered after the 3D abort only', [offers2d('qemu-3d-crash'), offers2d('qemu-signal'), offers2d(null)], [true, false, false]);
+// the guest's own stop with 3D (QEMU issue 4918, vmlog_3d_abort_end): a shutdown reads as one, a restart starts again,
+// a stop nobody could name is off with its own hint and no error, an abort not tied to a stop keeps the error screen
+eq('3D abort at a shutdown: a plain stop', stateView('stopped', 'guest-shutdown').why, null);
+eq('3D abort at a stop LordOS asked for: a plain stop', stateView('stopped', 'host-shutdown').why, null);
+eq('3D abort, guest stop without tools: off, no error', stateView('stopped', 'qemu-3d-stop'), { key: 'stopped', tone: 'off', active: false, why: null });
+eq('3D abort, guest stop without tools: no 2D offer', offers2d(stateView('stopped', 'qemu-3d-stop').why), false);
+eq('restart again: stopped by a reset only', [restartsAgain('stopped', 'reset'), restartsAgain('crashed', 'qemu-3d-crash'), restartsAgain('stopped', 'qemu-3d-stop'),
+  restartsAgain('stopped', 'guest-shutdown'), restartsAgain('running', 'reset'), restartsAgain('stopped', 'installed')], [true, false, false, false, false, false]);
+eq('off hint after a guest stop without tools', [offHint('qemu-3d-stop'), offHint('guest-shutdown'), offHint(undefined)],
+  ['machines.win.stopped3dHint', 'machines.win.playHint', 'machines.win.playHint']);
 eq('stopped clean', stateView('stopped', 'guest-shutdown'), { key: 'stopped', tone: 'off', active: false, why: null });
 eq('stopped after forced', stateView('stopped', 'forced').why, 'forced');
 eq('start failed', stateView('stopped', 'start-failed').why, 'start-failed');
@@ -105,12 +118,125 @@ const pi8 = { memMaxMb: 6144 };
 eq('limit kvm', memLimit({ memoryMb: 1024, accel: 'kvm' }), 1408);
 eq('limit tcg', memLimit({ memoryMb: 1024, accel: 'tcg' }), 1664);
 const run = (dir, memoryMb, accel) => ({ dir, memoryMb, accel, state: 'running' });
-eq('alone always', budgetCheck([], { dir: 'a', memoryMb: 6144, accel: 'tcg' }, pi8).ok, true);
-eq('beside one fits', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 2048, accel: 'tcg' }, pi8), { ok: true, need: 2688, free: 3712 });
-eq('beside one, too big emulated', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 3200, accel: 'tcg' }, pi8).ok, false);
-eq('same with kvm fits', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 3200, accel: 'kvm' }, pi8).ok, true);
-eq('stopped ones do not count', budgetCheck([{ dir: 'b', memoryMb: 4096, accel: 'kvm', state: 'stopped' }], { dir: 'a', memoryMb: 4096, accel: 'kvm' }, pi8).ok, true);
-eq('itself does not count', budgetCheck([run('a', 4096, 'kvm')], { dir: 'a', memoryMb: 4096, accel: 'kvm' }, pi8).ok, true);
+// what the window offers when lord.vm.budget refuses a start (budgetPlan): less memory in 256 MB steps, or suspending a
+// machine that frees enough (the biggest first; never a graphics card's or a 3D one, never a stopped one)
+const me = { dir: 'a', memoryMb: 4096, accel: 'kvm' };
+const over = { ok: false, needMb: 4480, freeMb: 3000, usedMb: 3144, maxMb: 6144 };
+eq('plan when it fits', budgetPlan({ ok: true }, [], me), { lessMb: 0, suspend: [] });
+eq('plan: less memory', budgetPlan(over, [], me).lessMb, 2560);
+eq('plan: less is never more', budgetPlan({ ok: false, needMb: 1408, freeMb: 1300 }, [], { dir: 'a', memoryMb: 1024, accel: 'kvm' }).lessMb, 768);
+eq('plan: nothing under 512', budgetPlan({ ok: false, needMb: 4480, freeMb: 700 }, [], me).lessMb, 0);
+const others = [run('b', 2048, 'kvm'), { ...run('c', 1024, 'kvm') }, { ...run('d', 4096, 'kvm'), gpu: 'intel-whole' }, { ...run('e', 3072, 'kvm'), graphics: '3d' },
+  { dir: 'f', memoryMb: 8192, accel: 'kvm', state: 'stopped' }, { ...run('g', 2048, 'kvm'), state: 'paused', name: 'G' }, run('a', 4096, 'kvm')];
+// c (1408 MB) frees less than the 1480 MB missing
+eq('plan: who frees enough', budgetPlan(over, others, me).suspend.map((x) => x.dir), ['b', 'g']);
+eq('plan: their share', budgetPlan(over, others, me).suspend[1], { dir: 'g', name: 'G', mb: 2432 });
+eq('plan: too small to help', budgetPlan({ ok: false, needMb: 4480, freeMb: 1000 }, others, me).suspend.map((x) => x.dir), []);
+eq('budget line', budgetLine({ usedMb: 3144, maxMb: 6144, pressure: 12.5 }), { usedGb: 3.1, maxGb: 6, pressure: true });
+eq('budget line calm', budgetLine({ usedMb: 0, maxMb: 14160, pressure: -1 }).pressure, false);
+eq('budget line unknown', budgetLine({ maxMb: 0 }), null);
+
+// the failure page's cause and fixes (failCause, failActions)
+eq('cause: locked', failCause('start-failed', 'qemu-system-x86_64: -blockdev ...: Failed to get "write" lock\nIs another process using the image [/x/disk.qcow2]?'), 'locked');
+eq('cause: locked read', failCause('qemu-failed', 'Failed to get "shared" lock'), 'locked');
+eq('cause: missing disk', failCause('start-failed', "Could not open '/home/a/Machines/x.lordvm/disks/data1.qcow2': No such file or directory"), 'disk-missing');
+eq('cause: the reason otherwise', failCause('guest-panic', 'kernel panic'), 'guest-panic');
+eq('cause: no reason, no cause', failCause(null, 'Failed to get "write" lock'), null);
+eq('fixes: oom, less memory', failActions('out-of-memory', { memoryMb: 4096 }), [{ k: 'less', mb: 3072 }]);
+eq('fixes: oom with snapshots', failActions('out-of-memory', { memoryMb: 4096, snaps: 2 }).map((f) => f.k), ['less', 'snapshot']);
+eq('fixes: oom at the floor', failActions('out-of-memory', { memoryMb: 512 }), []);
+eq('fixes: panic, a snapshot', failActions('guest-panic', { memoryMb: 4096, snaps: 1 }), [{ k: 'snapshot' }]);
+eq('fixes: panic without one', failActions('guest-panic', { memoryMb: 4096 }), []);
+eq('fixes: locked, none', failActions('locked', { memoryMb: 4096, snaps: 3 }), []);
+eq('fixes: forced, none', failActions('forced', { memoryMb: 4096, snaps: 3 }), []);
+
+// the card's agent and disk lights (cardLights) and "Weaker isolation on this kernel" (isolationGaps)
+eq('lights: off machine', cardLights({ state: 'stopped' }, null), []);
+eq('lights: running, tools on, disk busy', cardLights({ state: 'running', agentState: 'connected' }, { disk: true }).map((l) => `${l.k}:${l.tone}:${l.key}`),
+  ['agent:on:machines.light.agent.connected', 'disk:on:machines.light.disk.busy']);
+eq('lights: waiting, idle', cardLights({ state: 'paused', agentState: 'waiting' }, { disk: false }).map((l) => l.tone), ['wait', 'off']);
+eq('lights: unknown agent word is off', cardLights({ state: 'running', agentState: '<b>' }, null)[0].key, 'machines.light.agent.off');
+eq('gaps: full sandbox', isolationGaps({ landlock: 6 }, { sandbox: 1 | 1024 | 8 }), []);
+eq('gaps: no landlock here', isolationGaps({ landlock: 0 }, null), ['landlock']);
+eq('gaps: running without landlock or namespaces', isolationGaps({ landlock: 6 }, { sandbox: 8 }), ['landlock', 'namespaces']);
+eq('gaps: no bits yet', isolationGaps({ landlock: 6 }, { sandbox: 0 }), []);
+eq('gaps: host unknown', isolationGaps(null, null), []);
+
+// Picture in Picture's frame, Actual Size and the Info menu (pipFrame, actualFrame, infoLines)
+const d1 = { x: 0, y: 0, w: 1920, h: 1080 };
+eq('pip: bottom end, the guest shape', pipFrame(d1, 1920, 1080), { x: 1496, y: 759, w: 400, h: 225 });
+eq('pip: right-to-left, bottom left', pipFrame(d1, 1920, 1080, true).x, 24);
+eq('pip: second display', pipFrame({ x: 1920, y: 0, w: 1280, h: 800 }, 1280, 800), { x: 2856, y: 504, w: 320, h: 200 });
+eq('pip: unknown shape is 16:10', pipFrame(d1, 0, 0).h, 250);
+eq('pip: never tiny', pipFrame({ x: 0, y: 0, w: 640, h: 480 }, 4000, 100), { x: 376, y: 249, w: 240, h: 135 });
+eq('pip: no display', pipFrame(null, 800, 600), null);
+eq('actual: fits', actualFrame(1280, 800, 48, { w: 1900, h: 1000 }), { w: 1280, h: 848 });
+eq('actual: clamped to the work area', actualFrame(2560, 1600, 48, { w: 1900, h: 1000 }), { w: 1900, h: 1000 });
+eq('actual: unknown', actualFrame(0, 0, 48, { w: 1900, h: 1000 }), null);
+eq('info: running', infoLines({ memoryMb: 4096 }, { cpu: 12.6, memBytes: 2147483648, disk: true }, []).map((l) => [l.key, l.vars]),
+  [['machines.info.cpu', { v: 13 }], ['machines.info.memory', { a: 2048, b: 4096 }], ['machines.light.disk.busy', {}], ['machines.info.isolated', {}]]);
+eq('info: weaker, no numbers yet', infoLines({ memoryMb: 4096 }, null, ['landlock']).map((l) => l.key), ['machines.info.weaker']);
+
+// What this computer can run (canRun) and its sensors (sensorLines)
+const pcHost = { arch: 'amd64', kvm: true, kvmDevice: true, no3d: '', nested: true };
+eq('run: amd64 PC', canRun(pcHost, { gvt: true }).map((r) => `${r.k.split('.').pop()}:${r.st}`),
+  ['native:native', 'other:slow', 'row:native', 'android:native', 'gpu:native', 'passthrough:limited', 'nested:native']);
+eq('run: the native row names the arch', canRun(pcHost)[0].vars, { arch: 'amd64' });
+eq('run: emulated arch is the other one', canRun(pcHost)[1].vars, { arch: 'arm64' });
+const piHost = { arch: 'arm64', kvm: true, kvmDevice: true, no3d: 'arch', nested: false };
+eq('run: Pi', canRun(piHost).map((r) => r.st), ['native', 'slow', 'no', 'no', 'limited', 'no', 'no']);
+eq('run: Pi notes', canRun(piHost).map((r) => r.note.split('.').slice(-2).join('.')),
+  ['note.native', 'note.amd64', 'run.noteArm', 'note.androidArm', 'no3d.arch', 'note.passthrough', 'note.nested']);
+eq('run: KVM off', canRun({ arch: 'amd64', kvm: false, kvmDevice: true, no3d: 'modules' }).map((r) => r.st).slice(0, 5), ['slow', 'slow', 'slow', 'slow', 'limited']);
+eq('run: KVM off note', canRun({ arch: 'amd64', kvm: false, kvmDevice: true })[0].note, 'machines.run.note.kvmOff');
+eq('run: no KVM at all', canRun({ arch: 'amd64', kvm: false, kvmDevice: false })[0].note, 'machines.run.note.noKvm');
+eq('run: an unknown 3D reason', canRun({ arch: 'amd64', kvm: true, no3d: 'zzz' })[4].note, 'machines.cfg.no3d.gpu');
+eq('run: no host', canRun(null), []);
+eq('sensors: all three', sensorLines({ tempC: 81, fanRpm: 3200, underVoltage: 1 }).map((l) => [l.key, l.warn]),
+  [['machines.run.temp', true], ['machines.run.fan', false], ['machines.run.powerLow', true]]);
+eq('sensors: none', sensorLines({ tempC: -1, fanRpm: -1, underVoltage: -1 }), []);
+eq('sensors: fine power', sensorLines({ tempC: 45, fanRpm: -1, underVoltage: 0 }).map((l) => l.key), ['machines.run.temp', 'machines.run.power']);
+
+// Machines and the rest of the system (ties.js): Search, start with the session, the battery notice, away
+const lib6 = [{ id: 'a', dir: '/m/Debian 13.lordvm', name: 'Debian 13', state: 'stopped' }, { id: 'b', dir: '/m/Win.lordvm', name: 'Work debian', state: 'running' },
+  { id: 'c', dir: '/m/G/gw.lordvm', name: 'Debian Gateway', state: 'stopped', groupDir: '/m/G.lordgroup' }, { id: 'd', dir: '/m/x.lordvm', name: 'x', error: 'newer', state: 'stopped' }];
+eq('search: every word, the start first', searchMachines(lib6, 'debian').map((r) => r.m.id), ['a', 'b']);
+eq('search: two words', searchMachines(lib6, 'debian 13').map((r) => r.m.id), ['a']);
+eq('search: none', searchMachines(lib6, '  '), []);
+eq('at login: off ones named, no group member, no unreadable', sessionStarts(lib6, ['a', 'b', 'c', 'd', 7]).map((m) => m.id), ['a']);
+eq('at login: nothing chosen', sessionStarts(lib6, null), []);
+eq('at login: toggle on', atLoginToggle(['a'], 'b', true), ['a', 'b']);
+eq('at login: toggle off', atLoginToggle(['a', 'b'], 'a', false), ['b']);
+eq('at login: no twice', atLoginToggle(['a'], 'a', true), ['a']);
+eq('at login: at most the max', atLoginToggle(['1', '2', '3', '4', '5', '6', '7', '8'], '9', true).length, 8);
+let bm = batteryNotice({ discharging: false }, lib6, {});
+eq('battery: on the charger', bm.notice, 0);
+bm = batteryNotice({ discharging: true }, lib6, bm.mem);
+eq('battery: unplugged with one running', bm.notice, 1);
+bm = batteryNotice({ discharging: true }, lib6, bm.mem);
+eq('battery: once per unplug', bm.notice, 0);
+bm = batteryNotice({ discharging: false }, lib6, bm.mem);
+bm = batteryNotice({ discharging: true }, [], bm.mem);
+eq('battery: none running, no notice', bm.notice, 0);
+bm = batteryNotice({ discharging: true }, lib6, bm.mem);
+eq('battery: one starts while on battery', bm.notice, 1);
+const metaA = (d) => (d === '/m/Win.lordvm' ? { autoPause: true } : {});
+eq('away: not yet', awayStep(AWAY_SEC - 1, lib6, metaA, new Set()), { pause: [], resume: [] });
+eq('away: pause the ones that chose it', awayStep(AWAY_SEC, lib6, metaA, new Set()).pause, ['/m/Win.lordvm']);
+eq('away: not twice', awayStep(AWAY_SEC, lib6, metaA, new Set(['/m/Win.lordvm'])).pause, []);
+const lib7 = lib6.map((m) => (m.id === 'b' ? { ...m, state: 'paused' } : m));
+eq('back: resume the ones it paused', awayStep(3, lib7, metaA, new Set(['/m/Win.lordvm'])).resume, ['/m/Win.lordvm']);
+eq('back: never one the person paused', awayStep(3, lib7, metaA, new Set()).resume, []);
+
+// Configure's sidebar: the sections with an unsaved change, and its search (changedSections, sectionsMatching)
+const cur0 = { name: 'A', vcpus: 2, memoryMb: 2048, ports: [] };
+const differs0 = (k, v) => JSON.stringify(v) !== JSON.stringify(cur0[k]);
+eq('dots: what changed', [...changedSections({ name: 'B', vcpus: 2, memoryMb: 4096, bogus: 1 }, differs0)].sort(), ['cpu', 'general']);
+eq('dots: nothing', [...changedSections({ name: 'A' }, differs0)], []);
+const titles = { general: 'General · Debian 13', cpu: 'CPU and memory · 2 CPU', network: 'Network · Shared' };
+eq('search: by summary', sectionsMatching(['general', 'cpu', 'network'], 'debian', (k) => titles[k]), ['general']);
+eq('search: two words', sectionsMatching(['general', 'cpu', 'network'], 'cpu memory', (k) => titles[k]), ['cpu']);
+eq('search: empty is all', sectionsMatching(['general', 'cpu'], '  ', (k) => titles[k]), ['general', 'cpu']);
 
 // the Control Center and the assistant
 eq('system from label', systemOf('Debian 13.1.0 amd64 n').id, 'debian');
@@ -123,6 +249,17 @@ eq('version none', versionOf('netinst.iso'), '');
 eq('arch arm', archOf('debian-13-nocloud-arm64.qcow2'), 'arm64');
 eq('arch x86', archOf('Fedora-Server-dvd-x86_64-41.iso'), 'amd64');
 eq('arch unknown', archOf('mysystem.iso'), '');
+// an ISO's architecture (lord.vm.isoInfo, vmiso.c): its boot files win over its name; the name when they don't say
+const { isoArch } = M;
+eq('arch from the boot files', isoArch({ label: 'alpine-virt 3.24.4 aarch64', arch: 'arm64', archFrom: 'boot', efiArchs: ['arm64'] }, 'mysystem.iso'), { arch: 'arm64', from: 'boot', other: '' });
+eq('boot files beat a wrong name', isoArch({ label: 'X', arch: 'amd64', archFrom: 'boot', efiArchs: ['amd64'] }, 'debian-arm64.iso'), { arch: 'amd64', from: 'boot', other: '' });
+eq('x86 BIOS only: amd64 from boot', isoArch({ label: '', arch: 'amd64', archFrom: 'boot', bios: true, efiArchs: [] }, 'x.iso'), { arch: 'amd64', from: 'boot', other: '' });
+eq('boot files silent: the name', isoArch({ label: 'MYDISC', arch: '', archFrom: '', efiArchs: [] }, 'Fedora-Server-dvd-x86_64-41.iso'), { arch: 'amd64', from: 'name', other: '' });
+eq('boot files silent: the label', isoArch({ label: 'Debian 13 arm64 n', arch: '', archFrom: '' }, 'disc.iso'), { arch: 'arm64', from: 'name', other: '' });
+eq('two architectures: the name picks one of them', isoArch({ arch: '', archFrom: '', efiArchs: ['amd64', 'arm64'] }, 'multi-arm64.iso'), { arch: 'arm64', from: 'name', other: '' });
+eq('nothing says', isoArch({ label: 'MYDISC', arch: '', archFrom: '' }, 'mysystem.iso'), { arch: '', from: '', other: '' });
+eq('riscv64: not one Machines runs', isoArch({ arch: 'riscv64', archFrom: 'boot', efiArchs: ['riscv64'] }, 'x-amd64.iso'), { arch: '', from: 'boot', other: 'riscv64' });
+eq('no info (not an ISO, or isoInfo null): the name', isoArch(null, 'ubuntu-24.04-desktop-arm64.iso'), { arch: 'arm64', from: 'name', other: '' });
 eq('name', suggestName({ name: 'Debian' }, '13', ['Debian 13']), 'Debian 13 2');
 // 5.6 on a Pi 5 (4 cores, 16 GB) and on a small VM (4 cores, 3.8 GB)
 const pi5 = { cpus: 4, vcpusRecommended: 3, ramMb: 16219, memMaxMb: 14171 }, small = { cpus: 4, vcpusRecommended: 3, ramMb: 3946, memMaxMb: 2922 };
@@ -202,7 +339,14 @@ eq('clipNeedsTool: not while waiting', M.clipNeedsTool({ state: 'waiting', caps:
 eq('clipNeedsTool: not with the clipboard off', M.clipNeedsTool({ state: 'connected', caps: 2048 }, {}), false);
 eq('an old helper without noclip still says install', agentLines({ state: 'connected', caps: 1 }, { clipboard: 'both' }).find((l) => l[0] === 'clipboard')[1], 'needsHelper');
 eq('linux guest resolution', agentLines({ state: 'connected', caps: 1, system: 'Ubuntu 26.04' }, {}).find((l) => l[0] === 'resolution')[1], 'works');
-eq('windows guest: no journal or awake lines (systemd\'s)', agentLines({ state: 'connected', caps: 1 | 2 | 4 | 16 | 64, system: 'Windows 11 Pro' }, {}).map((l) => l[0]).filter((x) => x === 'logs' || x === 'awake'), []);
+eq('windows guest: no awake line (systemd\'s); its logs are the event logs', agentLines({ state: 'connected', caps: 1 | 2 | 4 | 16 | 64, system: 'Windows 11 Pro' }, {}).filter((l) => l[0] === 'logs' || l[0] === 'awake'), [['logs', 'needsAgent']]);
+eq('windows guest with its event logs', agentLines({ state: 'connected', caps: 1 | 1048576, system: 'Windows 11 Pro' }, {}).find((l) => l[0] === 'logs')[1], 'works');
+// the agent's shell (6.18) and links and notifications from the guest (6.12)
+eq('agent shell with tools 8', agentLines({ state: 'connected', caps: 131072 }, {}).find((l) => l[0] === 'agentShell')[1], 'works');
+eq('agent shell without', [agentLines({ state: 'connected', caps: 1 }, {}).find((l) => l[0] === 'agentShell')[1], agentLines(null, {}).find((l) => l[0] === 'agentShell')[1]], ['needsTools', 'needsAgent']);
+eq('links and notifications off unless turned on', agentLines({ state: 'connected', caps: 262144 | 524288 }, {}).filter((l) => l[0] === 'links' || l[0] === 'notify').map((l) => l[1]), ['off', 'off']);
+eq('links and notifications on', agentLines({ state: 'connected', caps: 262144 }, { guestLinks: true, guestNotify: true }).filter((l) => l[0] === 'links' || l[0] === 'notify').map((l) => l[1]), ['works', 'needsTools']);
+eq('agent tone: red when lost or a failed install', [agentTone({ state: 'waiting', lost: true }, true), agentTone({ state: 'connected', install: 3 }, true), agentTone({ state: 'waiting', lost: true }, false)], ['bad', 'bad', 'off']);
 eq('linux guest keeps them', agentLines({ state: 'connected', caps: 16 | 64, system: 'Ubuntu 26.04' }, {}).filter((l) => l[0] === 'logs' || l[0] === 'awake').map((l) => l[1]), ['works', 'works']);
 eq('agent tone', [agentTone(null, false), agentTone({ state: 'waiting' }, true), agentTone({ state: 'connected' }, true)], ['off', 'pause', 'run']);
 eq('clip ways', [clipTo('both'), clipTo('from-guest'), clipFrom('from-guest'), clipFrom('off')], [true, false, true, false]);
@@ -253,6 +397,23 @@ eq('lib view defaults', M.libView(null), { view: 'grid', sort: 'name', show: 'al
 eq('lib view kept', M.libView({ view: 'list', sort: 'disk', show: 'linux' }), { view: 'list', sort: 'disk', show: 'linux' });
 eq('lib view: the old Off filter reads as all', M.libView({ show: 'off' }).show, 'all');
 eq('lib view junk', M.libView({ view: 'x', sort: 1, show: 'running' }), { view: 'grid', sort: 'name', show: 'running' });
+// the grid from the window's width (2026-11-23: one column in the first frames, the root not laid out yet)
+eq('lib grid 760', M.libGrid(760, false), { pad: 24, gap: 20, cols: 2, cardW: 346, picH: 166 });
+eq('lib grid 1280', M.libGrid(1280, false).cols, 3);
+eq('lib grid narrow', M.libGrid(560, true), { pad: 16, gap: 20, cols: 1, cardW: 528, picH: 253 });
+eq('lib grid unknown width', M.libGrid(0, false).cols, 1);
+eq('lib grid tiny picture floor', M.libGrid(200, true).picH, 120);
+// the first frame's placeholders (machinesSeen)
+eq('seen junk', M.libSeen({ count: 'x', shown: -2 }), { count: -1, shown: -1 });
+eq('skeleton never seen', M.skeletonPlan(null), { empty: false, cards: M.SKELETON_DEFAULT });
+eq('skeleton none last time: the empty library', M.skeletonPlan({ count: 0, shown: 0 }), { empty: true, cards: 0 });
+eq('skeleton as shown', M.skeletonPlan({ count: 5, shown: 3 }), { empty: false, cards: 3 });
+eq('skeleton count only', M.skeletonPlan({ count: 4 }), { empty: false, cards: 4 });
+eq('skeleton capped', M.skeletonPlan({ count: 40, shown: 40 }), { empty: false, cards: M.SKELETON_MAX });
+eq('skeleton chip left none', M.skeletonPlan({ count: 2, shown: 0 }), { empty: false, cards: 0 });
+eq('seen next: changed', M.seenNext(null, 2, 2, ''), { count: 2, shown: 2 });
+eq('seen next: same', M.seenNext({ count: 2, shown: 2 }, 2, 2, ''), null);
+eq('seen next: a search is never kept', M.seenNext({ count: 2, shown: 2 }, 2, 1, 'ubu'), null);
 const lib = [
   { name: 'Zeta', state: 'stopped', thumbTime: 50, diskBytes: 9, arch: 'amd64' },
   { name: 'Alpha', state: 'running', thumbTime: 10, diskBytes: 1, arch: 'amd64', meta: { osName: 'Ubuntu' } },
@@ -503,6 +664,35 @@ eq('near rect', [M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: -2, w: 11, 
 }
 }
 eq('popup', [M.isPopup({ owner: 5, topmost: true }), M.isPopup({ owner: 5, topmost: false }), M.isPopup({ owner: 0, topmost: true })], [true, false, false]);
+{
+  // a guest's popup: capped at 60 % × 70 % of the work area, always inside it (never over the menu bar or the Dock)
+  const work = { x: 0, y: 30, w: 1920, h: 1000 };
+  eq('popup cap', M.popupCap(work), { w: 1152, h: 700 });
+  eq('save delay', [M.saveDelay(0, 5000), M.saveDelay(5000, 5000), M.saveDelay(5000, 6500), M.saveDelay(5000, 7000), M.saveDelay(9000, 5000)], [0, 2000, 500, 0, 0]);
+  eq('popup: a menu that fits stays', M.popupRect({ x: 300, y: 200, w: 240, h: 400 }, work), { x: 300, y: 200, w: 240, h: 400 });
+  eq('popup: over the menu bar moves down', M.popupRect({ x: 300, y: 0, w: 240, h: 400 }, work), { x: 300, y: 30, w: 240, h: 400 });
+  eq('popup: past the end and the Dock moves in', M.popupRect({ x: 1800, y: 900, w: 240, h: 400 }, work), { x: 1680, y: 630, w: 240, h: 400 });
+  eq('popup: a whole-screen one is cut and kept inside', M.popupRect({ x: 0, y: 0, w: 1920, h: 1080 }, work), { x: 0, y: 30, w: 1152, h: 700 });
+  // fuzz-ish: anything the guest may send (x, y ±16384, up to 16384²) ends inside the work area and under the cap
+  let inside = true;
+  const vals = [-16384, -1, 0, 1, 15, 960, 1919, 16383, 16384];
+  const sizes = [1, 8, 640, 1152, 1153, 4096, 16384];
+  for (const x of vals) for (const y of vals) for (const w of sizes) for (const h of sizes) {
+    const r = M.popupRect({ x, y, w, h }, work);
+    if (!r || r.x < work.x || r.y < work.y || r.x + r.w > work.x + work.w || r.y + r.h > work.y + work.h || r.w > 1152 || r.h > 700 || r.w < 1 || r.h < 1) inside = false;
+  }
+  eq('popup: every place and size the guest may say stays inside, capped', inside, true);
+  eq('popup: no work area', [M.popupRect({ x: 0, y: 0, w: 5, h: 5 }, null), M.clampInto({ x: 0, y: 0, w: 5, h: 5 }, { x: 0, y: 0, w: 0, h: 9 })], [null, null]);
+  eq('clamp: NaN place', M.clampInto({ x: NaN, y: undefined, w: 10, h: 10 }, work), { x: 0, y: 30, w: 10, h: 10 });
+  // the crop of a cut popup: its first part, never squeezed
+  eq('crop: capped', [M.cropOf({ x: 5, y: 6, w: 300, h: 2000 }, { w: 200, h: 700 }), M.cropOf({ x: 5, y: 6, w: 300, h: 20 })], [[5, 6, 200, 700], [5, 6, 300, 20]]);
+  // its owner: one of the guest's windows here, shown at least POPUP_OWNER_MS
+  const have = new Map([[5, { winId: 9, shownAt: 1000 }], [6, { winId: 10, shownAt: 1000, popup: true }], [7, { winId: 11, shownAt: 1000, minimized: true }], [8, { winId: 0, shownAt: 1000 }], [12, { winId: 12 }]]);
+  const pw = (owner, now) => M.popupOwnerWait({ owner, topmost: true }, have, now);
+  eq('popup owner: shown long enough', pw(5, 1000 + M.POPUP_OWNER_MS), 0);
+  eq('popup owner: just shown waits', pw(5, 1100), M.POPUP_OWNER_MS - 100);
+  eq('popup owner: unknown, a popup, minimized, no window, never shown', [pw(99, 5000), pw(6, 5000), pw(7, 5000), pw(8, 5000), pw(12, 5000), pw(0, 5000)], [-1, -1, -1, -1, -1, -1]);
+}
 eq('instance', [M.guestInstance('ab12-cd', 4294967295), M.guestInstance('a/../b', 7)], ['ga-ab12-cd-4294967295', 'ga-ab-7']);
 {
   const W = (id, x, extra = {}) => ({ id, x, y: 10, w: 300, h: 200, minimized: false, ...extra });
@@ -700,12 +890,109 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   const fsm = await import('node:fs');
   const en = JSON.parse(fsm.readFileSync(path.join(here, '../../assets/locales/en/machines.json'), 'utf8'));
   const host = { kvm: false, kvmDevice: true };
-  const ids = new Set(M.reqRows(host, ['amd64', 'arm64'], ['swtpm', 'ovmf']).map(([k]) => k.split('.')[0]));
+  const ids = new Set([null, { windows: true, unattended: true }, { windows: false }].flatMap((sys) => M.reqRows(host, ['amd64', 'arm64'], ['swtpm', 'ovmf'], sys)).map(([k]) => k.split('.')[0]));
   eq('requirements: every id is known', [...ids].sort(), [...M.REQ_IDS].sort());
   for (const id of M.REQ_IDS) eq(`requirements: ${id} has req.row and req.use`, [typeof en[`req.row.${id}`], typeof en[`req.use.${id}`]], ['string', 'string']);
   eq('requirements: tpm only with amd64', M.reqRows(host, ['arm64'], []).some(([k]) => k === 'tpm'), false);
   eq('requirements: missing swtpm', M.reqRows(host, ['amd64'], ['swtpm']).find(([k]) => k === 'tpm')[1], 'missing');
   eq('library menu key', typeof en.libraryMenu, 'string');
+  // a chosen system's page (5.2): only what it needs, with the parts that aren't packages
+  const tools = { ...host, guestTools: { linux: true, windows: false } };
+  const lx = M.reqRows(tools, ['amd64'], [], { windows: false, unattended: true });
+  eq('requirements: a Linux system has no TPM row', lx.some(([k]) => k === 'tpm'), false);
+  eq('requirements: a Linux system has its tools and answers', [lx.find(([k]) => k === 'tools')[1], lx.find(([k]) => k === 'answers')[1]], ['ready', 'builtin']);
+  const win = M.reqRows(tools, ['amd64'], ['swtpm'], { windows: true, unattended: false });
+  eq('requirements: a virtio-win system: TPM, drivers, WinFsp, its tools', ['tpm', 'drivers', 'winfsp', 'toolsWin'].map((k) => (win.find(([x]) => x === k) || [])[1]), ['missing', 'download', 'download', 'missing']);
+  eq('requirements: no answers without an unattended install', win.some(([k]) => k === 'answers'), false);
+  for (const st of ['ready', 'missing', 'notAllowed', 'off', 'download', 'builtin']) eq(`requirements: status ${st} has a word`, typeof en[`req.st.${st}`], 'string');
+  eq('requirements: a system page has a title', typeof en['req.pageFor'], 'string');
+}
+
+// ---- "Guest can see" (8, 16): one list of every channel, its state, its switch ----
+{
+  const fsm = await import('node:fs');
+  const en = JSON.parse(fsm.readFileSync(path.join(here, '../../assets/locales/en/machines.json'), 'utf8'));
+  const m = { network: 'shared', ports: [{}], clipboard: 'to-guest', shares: [{ tag: 'a' }], transfer: true, agent: true, automation: false, guestFiles: true,
+    guestLinks: false, guestNotify: true, sound: true, microphone: false, graphics: '3d', agentState: 'connected' };
+  const rows = M.guestChannels(m, m, {});
+  const on = Object.fromEntries(rows.map((r) => [r.id, r.on]));
+  eq('see: the channels', rows.map((r) => r.id), ['network', 'display', 'input', 'sound', 'microphone', 'clipIn', 'clipOut', 'folders', 'transfer', 'agent', 'automation', 'files', 'links', 'notify']);
+  eq('see: states', [on.network, on.clipIn, on.clipOut, on.folders, on.transfer, on.agent, on.automation, on.files, on.links, on.notify, on.sound, on.microphone],
+    [true, true, false, true, true, true, false, true, false, true, true, false]);
+  eq('see: display kind', rows.find((r) => r.id === 'display').vars.kind, '3d');
+  for (const r of rows) eq(`see: ${r.id} has a label`, typeof en[`cfg.see.row.${r.id}`], 'string');
+  for (const k of ['2d', '3d', 'vgpu']) eq(`see: display ${k} words`, typeof en[`cfg.see.display.${k}`], 'string');
+  for (const k of ['connected', 'waiting', 'next']) eq(`see: live ${k} words`, typeof en[`cfg.see.live.${k}`], 'string');
+  // every row either has a switch, a section or is fixed
+  eq('see: every row can be changed or says where', rows.every((r) => r.key || r.section || r.fixed), true);
+  // live: the agent's state while running; a draft change says "at the next start"
+  const live = M.guestChannels({ ...m, transfer: false }, m, { running: true, agentState: 'connected' });
+  eq('see: live agent', live.find((r) => r.id === 'agent').live, 'connected');
+  eq('see: a changed switch waits for the next start', live.find((r) => r.id === 'transfer').live, 'next');
+  eq('see: agent waiting', M.guestChannels(m, m, { running: true, agentState: 'waiting' }).find((r) => r.id === 'agent').live, 'waiting');
+  eq('see: not running, no live state', M.guestChannels(m, m, {}).every((r) => r.live === ''), true);
+  // the agent off: its children are off and locked
+  const noag = M.guestChannels({ ...m, agent: false }, m, {});
+  eq('see: no agent, no automation, files, links, notes', ['automation', 'files', 'links', 'notify'].map((id) => { const r = noag.find((x) => x.id === id); return [r.on, r.locked]; }),
+    [[false, true], [false, true], [false, true], [false, true]]);
+  // anonymity: host-to-guest channels locked
+  const anon = M.guestChannels({ ...m, clipboard: 'off', shares: [], transfer: false, agent: false }, { ...m, profileLock: 'anonymity' }, {});
+  eq('see: anonymity locks the clipboard, folders, transfer, agent', ['clipIn', 'clipOut', 'folders', 'transfer', 'agent'].map((id) => anon.find((r) => r.id === id).locked), [true, true, true, true, true]);
+  // switches
+  eq('see: clipboard in off', M.channelSet('clipIn', false, { clipboard: 'both' }), { clipboard: 'from-guest' });
+  eq('see: clipboard out on', M.channelSet('clipOut', true, { clipboard: 'to-guest' }), { clipboard: 'both' });
+  eq('see: clipboard both off', M.channelSet('clipOut', false, { clipboard: 'from-guest' }), { clipboard: 'off' });
+  eq('see: network off is isolated', M.channelSet('network', false, { network: 'bridged' }), { network: 'isolated' });
+  eq('see: network on keeps its mode', M.channelSet('network', true, { network: 'hostonly' }), { network: 'hostonly' });
+  eq('see: network back on is shared', M.channelSet('network', true, { network: 'isolated' }), { network: 'shared' });
+  eq('see: files', M.channelSet('files', false, {}), { guestFiles: false });
+  eq('see: unknown', M.channelSet('display', true, {}), {});
+}
+
+// ---- Start Linux directly (6.1, schema 21): when the switch is refused ----
+{
+  const fsm = await import('node:fs');
+  const en = JSON.parse(fsm.readFileSync(path.join(here, '../../assets/locales/en/machines.json'), 'utf8'));
+  eq('kboot: a Linux machine', M.kbootBlocked({ firmware: 'uefi', secureBoot: false }), '');
+  eq('kboot: secure boot', M.kbootBlocked({ firmware: 'uefi', secureBoot: true }), 'secureBoot');
+  eq('kboot: BIOS ignores secureBoot', M.kbootBlocked({ firmware: 'bios', secureBoot: true }), '');
+  eq('kboot: virtio-win devices', M.kbootBlocked({ windowsDevices: true }), 'windows');
+  eq('kboot: encrypted', M.kbootBlocked({ encrypted: true }), 'encrypted');
+  eq('kboot: group member', M.kbootBlocked({ groupId: 'x' }), 'group');
+  for (const k of ['secureBoot', 'windows', 'encrypted', 'group']) eq(`kboot: why ${k} has words`, typeof en[`cfg.kboot.no.${k}`], 'string');
+  eq('kboot: draft fields in the boot section', [M.FIELD_SECTION.kernelBoot, M.FIELD_SECTION.cmdline], ['boot', 'boot']);
+}
+
+// ---- the LordOS Guest Tools disc (6.17, lordvm.c VAG_DISC): when the popover offers it, and what it shows ----
+{
+  const fsm = await import('node:fs');
+  const en = JSON.parse(fsm.readFileSync(path.join(here, '../../assets/locales/en/machines.json'), 'utf8'));
+  const C = M.AGENT_CAPS;
+  const cfg = { agent: true, clipboard: 'both' };
+  const waiting = { state: 'waiting', caps: 0 };
+  eq('disc: a running Linux machine with no agent answering → offered', M.discOffer(waiting, cfg, true, false), 'insert');
+  eq('disc: no state yet (just started) → offered', M.discOffer(undefined, cfg, true, false), 'insert');
+  eq('disc: the machine is off → nothing', M.discOffer(waiting, cfg, false, false), null);
+  eq('disc: an agent that answered earlier in this run and stopped (lost) → nothing: it is there', M.discOffer({ ...waiting, lost: true }, cfg, true, false), null);
+  eq('disc: the agent is off in Configure → nothing', M.discOffer(waiting, { agent: false }, true, false), null);
+  eq('disc: a protected (anonymity) machine → never', M.discOffer(waiting, cfg, true, true), null);
+  eq('disc: the disc is in the drive → the steps', M.discOffer({ state: 'waiting', caps: C.toolsDisc }, cfg, true, false), 'guide');
+  eq('disc: in the drive, but a protected machine → nothing', M.discOffer({ state: 'waiting', caps: C.toolsDisc }, cfg, true, true), null);
+  eq('disc: qemu-guest-agent answers with files and commands → Install goes through it', M.discOffer({ state: 'connected', caps: C.exec | C.files }, cfg, true, false), null);
+  eq('disc: qemu-guest-agent answers without guest-exec (a restricted agent) → offered', M.discOffer({ state: 'connected', caps: C.files }, cfg, true, false), 'insert');
+  eq('disc: a Windows guest → never (its own tools)', M.discOffer({ state: 'connected', caps: 0, system: 'Windows 11 Pro' }, cfg, true, false), null);
+  eq('disc: the toolsDisc bit is lord-vm\'s VAC_TOOLS_DISC', C.toolsDisc, 2097152);
+  const cmds = M.discCommands();
+  eq('disc: three lines (Debian/Ubuntu, others, by hand)', cmds.map((c) => c.key), ['debian', 'others', 'manual']);
+  eq('disc: every line names install.sh on the disc\'s label', cmds.every((c) => /\binstall\.sh$/.test(c.cmd) && (c.key === 'manual' || c.cmd.includes(`/${M.DISC_LABEL}/`))), true);
+  eq('disc: the label is mkguestiso\'s', M.DISC_LABEL, 'LORDOS_TOOLS');
+  eq('disc: no line carries a password or sudo -S', cmds.some((c) => /-S\b|passw/i.test(c.cmd)), false);
+  for (const k of ['debian', 'others', 'manual']) eq(`disc: en has agent.disc.${k}`, typeof en[`agent.disc.${k}`], 'string');
+  for (const k of ['discHint', 'discBtn', 'discErr', 'discTitle', 'discStep', 'discPassword', 'discCopy', 'discOut']) eq(`disc: en has agent.${k}`, typeof en[`agent.${k}`], 'string');
+  eq('disc: Copy only where the clipboard goes toward the guest and a helper takes it', [
+    M.discCanCopy({ caps: C.clipboard }, { clipboard: 'both' }), M.discCanCopy({ caps: C.clipboard }, { clipboard: 'to-guest' }),
+    M.discCanCopy({ caps: C.clipboard }, { clipboard: 'from-guest' }), M.discCanCopy({ caps: 0 }, { clipboard: 'both' }), M.discCanCopy(undefined, undefined),
+  ], [true, true, false, false, false]);
 }
 
 // ---- the LordOS tools: older than the ones shipped (the popover's Update, the bar's dot) ----
@@ -814,6 +1101,32 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   r = M.toolsAutoStep({ ...M.TOOLS_AUTO_IDLE, want: 'w8', tries: 3, told: 'w8', since: T0 }, { agent: ag('w7'), on: true, busy: false, now: T0 + SET }, S);
   eq('auto: a newer version shipped: tried again', [r.act, r.s.want, r.s.tries], ['install', 'w9', 1]);
   eq('auto: failed backoff stops after the last', M.toolsAutoFailed({ tries: M.TOOLS_TRIES }, 5).next, Infinity);
+  // a snapshot before the first attempt for a version, once; then the install; never while busy
+  r = step({ since: T0 }, ag('w7'), T0 + SET, { snap: true });
+  eq('auto: snapshot first', [r.act, r.s.snapped, r.s.tries], ['snapshot', 'w9', 0]);
+  eq('auto: busy taking it: waits', step(r.s, ag('w7'), T0 + SET + 1, { snap: true, busy: true }).act, null);
+  r = step(r.s, ag('w7'), T0 + SET + 2, { snap: true });
+  eq('auto: then the install', [r.act, r.s.tries], ['install', 1]);
+  const f = M.toolsAutoFailed(r.s, T0 + SET + 3);
+  eq('auto: a retry takes no second snapshot', step(f, ag('w7'), f.next, { snap: true }).act, 'install');
+  eq('auto: no snapshot when it can\'t have one', step({ since: T0 }, ag('w7'), T0 + SET, { snap: false }).act, 'install');
+  r = M.toolsAutoStep({ ...M.TOOLS_AUTO_IDLE, want: 'w8', snapped: 'w8', tries: 3, told: 'w8', since: T0 }, { agent: ag('w7'), on: true, busy: false, now: T0 + SET, snap: true }, S);
+  eq('auto: a newer version: a new snapshot', [r.act, r.s.snapped], ['snapshot', 'w9']);
+  eq('auto: off: no snapshot either', step({ since: T0 }, ag('w7'), T0 + SET, { snap: true, on: false }).act, 'notify');
+  eq('snap ok: a qcow2 machine', M.toolsSnapOk({ count: 3 }), true);
+  eq('snap ok: raw, disposable, 3D, full', [M.toolsSnapOk({ raw: true }), M.toolsSnapOk({ disposable: true }), M.toolsSnapOk({ gl: true }), M.toolsSnapOk({ count: 64, max: 64 })], [false, false, false, false]);
+}
+
+// ---- the Storage window's old snapshots and unused downloads (6.16) ----
+{
+  const sn = (tag, created) => ({ tag, name: tag, created });
+  eq('old snapshots: none or one', [M.oldSnapshots([]), M.oldSnapshots([sn('s1', '2026-11-01T00:00:00Z')]), M.oldSnapshots(null)], [[], [], []]);
+  eq('old snapshots: all but the newest', M.oldSnapshots([sn('s1', '2026-11-01T00:00:00Z'), sn('s2', '2026-11-03T00:00:00Z'), sn('s3', '2026-11-02T00:00:00Z')]).map((s) => s.tag), ['s1', 's3']);
+  eq('old snapshots: no times: the last listed is the newest', M.oldSnapshots([sn('s1'), sn('s2')]).map((s) => s.tag), ['s1']);
+  eq('old snapshots: junk skipped', M.oldSnapshots([sn('s1', '2026-11-01T00:00:00Z'), null, { name: 'x' }, sn('s2', '2026-11-02T00:00:00Z')]).map((s) => s.tag), ['s1']);
+  const im = (sha, o = {}) => ({ sha, size: 10, partial: false, users: [], running: [], ...o });
+  eq('unused downloads', M.unusedImages([im('a'), im('b', { users: ['M'] }), im('c', { partial: true }), im('d', { running: ['M'] }), null]).map((x) => x.sha), ['a']);
+  eq('unused downloads: none', M.unusedImages(undefined), []);
 }
 
 
@@ -942,6 +1255,152 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('front: the Terminal keeps the front', M.guestMayTakeFront({ app: 'terminal', args: null }, dir), false);
   eq('front: another machine keeps it', M.guestMayTakeFront({ app: 'machines', args: { machine: '/other.lordvm' } }, dir), false);
   eq('front: the library keeps it', M.guestMayTakeFront({ app: 'machines', args: null }, dir), false);
+}
+
+// renaming a machine (6.26): its windows follow it by id, Configure's line under the name, the folder offer, the job's word
+{
+  const id = '0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b', other = '1f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2c';
+  eq('rename: the machine window names its id', M.windowMachineId(`machines#vm-${id}`), id);
+  eq('rename: Configure, Snapshots, Logs too', [M.windowMachineId(`machines#cfg-${id}`), M.windowMachineId(`machines#snap-${id}`), M.windowMachineId(`machines#log-${id}`)], [id, id, id]);
+  eq('rename: not a machine window', [M.windowMachineId('machines'), M.windowMachineId('machines#storage'), M.windowMachineId('machines#vm-Debian'), M.windowMachineId(`files#vm-${id}`), M.windowMachineId(null)], [null, null, null, null, null]);
+  const lib = '/home/u/Machines';
+  const list = [{ dir: `${lib}/Win.lordvm`, id }, { dir: `${lib}/Deb.lordvm`, id: other }];
+  eq('rename: a folder still there stays', M.followDir(`${lib}/Win.lordvm`, id, list), `${lib}/Win.lordvm`);
+  eq('rename: a folder gone follows the id', M.followDir(`${lib}/Win (prueba).lordvm`, id, list), `${lib}/Win.lordvm`);
+  eq('rename: no machine with the id: kept', M.followDir(`${lib}/Gone.lordvm`, '2f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2d', list), `${lib}/Gone.lordvm`);
+  eq('rename: a Duplicate shares the id: never a guess', M.followDir(`${lib}/Old.lordvm`, id, [...list, { dir: `${lib}/Win 2.lordvm`, id }]), `${lib}/Old.lordvm`);
+  eq('rename: no id, no list', [M.followDir('/x.lordvm', null, list), M.followDir('/x.lordvm', id, null)], ['/x.lordvm', '/x.lordvm']);
+  const cur = 'Windows 11 Pro (prueba)';
+  eq('rename: the same name says nothing', M.renameNote({ moves: true, folder: 'x' }, { name: cur, current: cur }), { note: null, ok: true });
+  eq('rename: the folder will be', M.renameNote({ problem: null, moves: true, folder: 'Windows 11 Pro' }, { name: 'Windows 11 Pro', current: cur }),
+    { note: { tone: 'dim', key: 'machines.cfg.rn.folderWillBe', vars: { folder: 'Windows 11 Pro' } }, ok: true });
+  eq('rename: a folder that stays says nothing', M.renameNote({ problem: null, moves: false, folder: 'Win' }, { name: 'win', current: 'Win' }), { note: null, ok: true });
+  eq('rename: running, the folder later', M.renameNote({ problem: null, moves: true, folder: 'B' }, { name: 'B', current: 'A', running: true }),
+    { note: { tone: 'dim', key: 'machines.cfg.rn.running', vars: { folder: 'B' } }, ok: true });
+  eq('rename: running, the same folder', M.renameNote({ problem: null, moves: false, folder: 'A' }, { name: 'A!', current: 'A', running: true }).note.key, 'machines.cfg.rn.runningSame');
+  eq('rename: another machine has the name', M.renameNote({ problem: 'nameTaken', moves: true, folder: 'other', other: 'Other' }, { name: 'other', current: 'A' }),
+    { note: { tone: 'bad', key: 'machines.cfg.rn.nameTaken', vars: { name: 'Other', folder: 'other' } }, ok: false });
+  eq('rename: the folder is taken', M.renameNote({ problem: 'folderTaken', moves: true, folder: 'B' }, { name: 'B', current: 'A' }).note.key, 'machines.cfg.rn.folderTaken');
+  eq('rename: the transfer folder is taken', M.renameNote({ problem: 'transferTaken', moves: true, folder: 'B' }, { name: 'B', current: 'A', running: true }).ok, false);
+  eq('rename: a dot first, blank', [M.renameNote({}, { name: '.x', current: 'A' }).ok, M.renameNote({}, { name: '  ', current: 'A' }).note.key], [false, 'machines.cfg.rn.badName']);
+  eq('rename: no plan (no lord.vm)', M.renameNote(null, { name: 'B', current: 'A' }), { note: null, ok: true });
+  eq('rename: the folder offer while off', M.folderOffer({ problem: null, moves: true, folder: 'Win' }, false), { folder: 'Win' });
+  eq('rename: no offer running, taken or in line', [M.folderOffer({ moves: true, folder: 'W' }, true), M.folderOffer({ problem: 'folderTaken', moves: true, folder: 'W' }, false),
+    M.folderOffer({ problem: null, moves: false, folder: 'W' }, false), M.folderOffer(null, false)], [null, null, null, null]);
+  eq('rename: the job moved it', M.renameOutcome('lord-vm: note: x\n{"set":true,"name":"B","dir":"/l/B.lordvm","folder":"moved"}\n'),
+    { dir: '/l/B.lordvm', folder: 'moved', to: null, why: null, problem: null, name: 'B', other: null });
+  eq('rename: running, later', M.renameOutcome('{"renamed":true,"running":true,"name":"B","dir":"/l/A.lordvm","folder":"later","to":"B"}').to, 'B');
+  eq('rename: refused', M.renameOutcome('lord-vm: there\'s already a machine called "Other"\n{"renamed":false,"problem":"name-taken","name":"other","folder":"other","other":"Other"}').problem, 'name-taken');
+  eq('rename: kept, why', M.renameOutcome('{"set":true,"dir":"/l/A.lordvm","folder":"kept","why":"Permission denied"}').why, 'Permission denied');
+  eq('rename: no JSON', [M.renameOutcome(''), M.renameOutcome('lord-vm: boom'), M.renameOutcome('{"set":true,"vcpus":2}')], [{}, {}, {}]);
+}
+
+// ---- vCPU recommendation (cpu-usage.json from lord-vm, vcpuAdvice) ----
+{
+  const now = 1800000000;
+  // windows of 5 minutes: hours of them at `avg`/`peak` cores (cpu-usage.json keeps hundredths)
+  const run = (hours, vcpus, avg, peak, end = now) => Array.from({ length: Math.round(hours * 12) }, (_, i) => [end - i * 300, 300, vcpus, Math.round(avg * 100), Math.round(peak * 100)]);
+  const file = (ws) => JSON.stringify({ format: 1, windows: ws });
+  const pc = { cpus: 20, cores: 10, vcpusRecommended: 19 };
+  const W = (text) => M.cpuWindows(text);
+  eq('cpu file: read, in cores', W(file([[now, 300, 4, 37, 120]])), [{ t: now, secs: 300, vcpus: 4, avg: 0.37, peak: 1.2 }]);
+  eq('cpu file: not one', [W(''), W('{'), W('{"format":2,"windows":[]}'), W('{"format":1}')], [[], [], [], []]);
+  eq('cpu file: bad windows dropped', W(file([[now, 300, 4, 37], [now, 0, 4, 1, 1], [now, 300, 0, 1, 1], [now, 300, 2, 300, 1], [now, 300, 4, -1, 1], [now, 300, 4, 'x', 1], [now, 300, 4, 10, 5]])),
+    [{ t: now, secs: 300, vcpus: 4, avg: 0.1, peak: 0.1 }]);
+  // the maintainer's case: 10 vCPUs, Notepad in apps mode, 10–28 % of one core
+  const idle = W(file([...run(3, 10, 0.15, 0.28), ...run(3, 10, 0.2, 1.1, now - 3 * 3600)]));
+  const a = M.vcpuAdvice(idle, 10, pc, now);
+  eq('idle Windows guest: fewer', [a?.kind, a?.n, a?.vcpus, Math.round(a?.hours)], ['fewer', 2, 10, 6]);
+  eq('idle: its average', Math.round(a.avg * 100) / 100, 0.18);
+  eq('busy minutes set the count (95th percentile of the peaks / 60 %)', M.vcpuAdvice(W(file(run(4, 10, 0.5, 2.3))), 10, pc, now).n, 4);
+  eq('less than 2 h: nothing yet', M.vcpuAdvice(W(file(run(1.9, 10, 0.1, 0.2))), 10, pc, now), null);
+  eq('windows of another count are not this one\'s', M.vcpuAdvice(W(file(run(5, 8, 0.1, 0.2))), 10, pc, now), null);
+  eq('older than 30 days: not counted', M.vcpuAdvice(W(file(run(5, 10, 0.1, 0.2, now - 31 * 86400))), 10, pc, now), null);
+  eq('never under two', M.vcpuAdvice(W(file(run(3, 3, 0.05, 0.1))), 3, pc, now).n, 2);
+  eq('two already: nothing', M.vcpuAdvice(W(file(run(3, 2, 0.05, 0.1))), 2, pc, now), null);
+  eq('a middle use: nothing', M.vcpuAdvice(W(file(run(3, 4, 2, 3.5))), 4, pc, now), null);
+  // a busy spell now and then (a build) keeps its vCPUs: "low" is 95 % of the time, and "saturated" half of it
+  eq('busy 10 % of the time: nothing', M.vcpuAdvice(W(file([...run(2.7, 4, 0.2, 0.5), ...run(0.3, 4, 3.8, 4, now - 2.7 * 3600)])), 4, pc, now), null);
+  eq('busy 30 % of the time: nothing', M.vcpuAdvice(W(file([...run(2, 4, 0.2, 0.5), ...run(1, 4, 3.8, 4, now - 2 * 3600)])), 4, pc, now), null);
+  eq('busy 3 % of the time: fewer, enough for the rest', M.vcpuAdvice(W(file([...run(2.9, 8, 0.2, 0.5), ...run(0.1, 8, 7.8, 8, now - 2.9 * 3600)])), 8, pc, now)?.n, 2);
+  eq('saturated 60 % of the time: more', M.vcpuAdvice(W(file([...run(1.2, 4, 0.5, 1), ...run(1.8, 4, 3.6, 4, now - 1.2 * 3600)])), 4, pc, now)?.kind, 'more');
+  // saturated: half again, at most the computer less its reserve
+  const sat = M.vcpuAdvice(W(file(run(3, 4, 3.8, 4))), 4, pc, now);
+  eq('saturated: more', [sat?.kind, sat?.n], ['more', 6]);
+  eq('saturated 2: one more', M.vcpuAdvice(W(file(run(3, 2, 1.9, 2))), 2, pc, now).n, 3);
+  eq('saturated on a 4-CPU computer: up to 3', M.vcpuAdvice(W(file(run(3, 2, 1.9, 2))), 2, { cpus: 4, vcpusRecommended: 3 }, now).n, 3);
+  eq('saturated at the ceiling: nothing', M.vcpuAdvice(W(file(run(3, 3, 2.9, 3))), 3, { cpus: 4, vcpusRecommended: 3 }, now), null);
+  eq('ceiling: one in eight kept for the desktop', [M.vcpuCeiling({ cpus: 20, vcpusRecommended: 19 }), M.vcpuCeiling({ cpus: 8, vcpusRecommended: 7 }), M.vcpuCeiling({ cpus: 4, vcpusRecommended: 3 }), M.vcpuCeiling({ cpus: 1, vcpusRecommended: 1 })], [17, 7, 3, 1]);
+  eq('no windows, no count', [M.vcpuAdvice([], 4, pc, now), M.vcpuAdvice(null, 4, pc, now), M.vcpuAdvice(idle, 0, pc, now)], [null, null, null]);
+  // new machines' default for 'half': half the physical cores, six at most
+  eq('default vCPUs', [M.vcpuDefault({ cpus: 20, cores: 10 }), M.vcpuDefault({ cpus: 64, cores: 32 }), M.vcpuDefault({ cpus: 4, cores: 4 }), M.vcpuDefault({ cpus: 2, cores: 1 }), M.vcpuDefault({ cpus: 20, cores: 10 }, 3)], [5, 6, 2, 1, 3]);
+}
+
+// Logs (6.19): the journal's and the event logs' lines in local time, the guest's zone, the unit filter's key
+{
+  const D = await import(path.join(here, '../../apps/machines/diag.js'));
+  const j = D.journalLine('2026-11-24T05:00:07-0300 debian systemd[1]: Started Daily apt.', 60);
+  eq('journal line: local time from the guest\'s offset', [j.at, j.offset, j.unit], ['09:00:07', -180, 'systemd']);
+  const w = D.journalLine('2026-11-24T10:00:00+05:30 WIN11 Service-Control-Manager: warning: The service stopped.', 0);
+  eq('event log line', [w.at, w.offset, w.unit], ['04:30:00', 330, 'Service-Control-Manager']);
+  eq('a line without a time', D.journalLine('-- No entries --'), { at: '', offset: null, unit: '', body: '-- No entries --' });
+  eq('zone labels', [D.tzLabel(0), D.tzLabel(-180), D.tzLabel(330)], ['UTC', 'UTC−03:00', 'UTC+05:30']);
+  eq('guest zone differs', D.guestZone(['x', '2026-11-24T05:00:07-0300 h u: a'], 60), -180);
+  eq('guest zone the same', D.guestZone(['2026-11-24T05:00:07+0100 h u: a'], 60), null);
+  eq('Z is UTC', D.journalLine('2026-11-24T05:00:07Z h u: a', 0).at, '05:00:07');
+}
+
+// ---- the app's last parts (Machines to 100 %): Detect, drop, tags, templates, Scale, shape, device dots, Cleaner ----
+{
+  const { detectPlan, dropSource, tagsOf, parseTags, filterMachines, chipCounts, actionsOf, scaleFrame, shapeFrame, deviceDots, cableOffered, libView, SCALES } = M;
+  const C = await import(path.join(here, '../../apps/cleaner/vmspace.js'));
+  // Detect (over lord.vm.isoInfo's answer): the boot files decide; the name, then this computer, when they don't say
+  const deb = { label: 'Debian 13.2.0 amd64 n', arch: 'amd64', archFrom: 'boot', bios: true, efi: true, efiArchs: ['amd64'], windows: false };
+  eq('detect native', detectPlan(deb, 'debian-13.2.0-amd64-netinst.iso', 'amd64'), { arch: 'amd64', from: 'boot', starts: ['uefi', 'bios'], conflict: false, emulated: false, both: false, unknownArch: false, efi: ['amd64'] });
+  const arm = { label: 'LORDOS_LIVE', arch: 'arm64', archFrom: 'boot', bios: false, efi: true, efiArchs: ['arm64'] };
+  eq('detect arm64 disc on amd64: emulated', [detectPlan(arm, 'lordos.iso', 'amd64').arch, detectPlan(arm, 'lordos.iso', 'amd64').emulated], ['arm64', true]);
+  eq('detect: a name that lies', detectPlan(arm, 'something-amd64.iso', 'arm64').conflict, true);
+  const two = { label: '', arch: '', archFrom: '', bios: false, efi: true, efiArchs: ['amd64', 'arm64'] };
+  eq('detect: both architectures, the name picks', detectPlan(two, 'x-arm64.iso', 'amd64').arch, 'arm64');
+  eq('detect: both, no name: this computer', detectPlan(two, 'x.iso', 'arm64'), { arch: 'arm64', from: 'host', starts: ['uefi'], conflict: false, emulated: false, both: true, unknownArch: false, efi: ['amd64', 'arm64'] });
+  eq('detect: only riscv64', detectPlan({ label: '', arch: 'riscv64', archFrom: 'boot', efi: true, efiArchs: ['riscv64'] }, 'x.iso', 'amd64').unknownArch, true);
+  eq('detect: nothing read, from the name', detectPlan(null, 'ubuntu-24.04-live-server-arm64.iso', 'amd64'), { arch: 'arm64', from: 'name', starts: [], conflict: false, emulated: true, both: false, unknownArch: false, efi: [] });
+  eq('detect: junk efiArchs ignored', detectPlan({ arch: 'amd64', archFrom: 'boot', efi: true, efiArchs: [1, null, 'amd64'] }, 'x', 'amd64').efi, ['amd64']);
+  // drop
+  eq('drop', ['a.iso', 'b.QCOW2', 'c.raw', 'd.vmx', 'e.ova', 'config.pvs', 'f.txt', '', 'iso'].map(dropSource), ['iso', 'import', 'import', 'migrate', 'migrate', 'migrate', null, null, null]);
+  // tags
+  eq('tags cleaned', tagsOf([' work ', 'WORK', '#test', '', 'a\u0001b', 5, 'x'.repeat(25), 'w  x']), ['work', 'test', 'ab', 'w x']);
+  eq('tags at most 8', tagsOf(['1', '2', '3', '4', '5', '6', '7', '8', '9']).length, 8);
+  eq('tags typed', parseTags('work, tests,, work'), ['work', 'tests']);
+  eq('tags typed with an Arabic or a full-width comma', parseTags('a\u060cb\uff0cc\u3001d'), ['a', 'b', 'c', 'd']);
+  const lib = [{ name: 'Alpha', meta: { tags: ['Work'] }, state: 'stopped' }, { name: 'Beta', meta: { tags: ['home'], template: true }, state: 'stopped' }, { name: 'Gamma', state: 'running' }];
+  eq('search by tag text', filterMachines(lib, { query: 'wor' }).map((m) => m.name), ['Alpha']);
+  eq('search #tag exact', filterMachines(lib, { query: '#hom' }).map((m) => m.name), []);
+  eq('search #tag', filterMachines(lib, { query: '#home' }).map((m) => m.name), ['Beta']);
+  // templates
+  eq('templates chip', filterMachines(lib, { show: 'templates' }).map((m) => m.name), ['Beta']);
+  eq('templates counted', chipCounts(lib, '').templates, 1);
+  eq('templates kept in the view', libView({ show: 'templates' }).show, 'templates');
+  eq('a template does not start', [actionsOf(lib[1]).start, actionsOf(lib[0]).start], [false, true]);
+  eq('a running template can still be stopped', actionsOf({ ...lib[1], state: 'running' }).shutdown, true);
+  // Scale
+  const area = { x: 0, y: 0, w: 1920, h: 1040 };
+  eq('scale 50 %', scaleFrame(1280, 800, 0.5, 48, area), { w: 640, h: 448, fits: true });
+  eq('scale 200 % shrinks to fit', scaleFrame(1280, 800, 2, 48, area), { w: 1587, h: 1040, fits: false });
+  eq('scale unknown size', scaleFrame(0, 800, 1, 48, area), null);
+  eq('scales offered', SCALES, [0.5, 0.75, 1.25, 1.5, 2]);
+  // the guest's shape
+  eq('shape: taller box gets shorter', shapeFrame({ w: 1000, h: 900 }, { w: 1000, h: 852 }, 1600, 900, area), { w: 1000, h: 611 });
+  eq('shape: already right', shapeFrame({ w: 1000, h: 610 }, { w: 1000, h: 563 }, 1600, 900, area), null);
+  eq('shape: too tall for the area: narrower', shapeFrame({ w: 1800, h: 900 }, { w: 1800, h: 852 }, 1024, 1024, area), { w: 992, h: 1040 });
+  eq('shape: nothing known', shapeFrame(null, { w: 1, h: 1 }, 1, 1, area), null);
+  // device dots
+  eq('dots', deviceDots({ iso: '/x.iso', heard: true, mic: false, cableOut: false, network: 'shared', shares: 1, transfer: false }).map((d) => d.k), ['net', 'cd', 'sound', 'folders']);
+  eq('dots: a pulled cable, isolated has none', [deviceDots({ network: 'bridged', cableOut: true }).map((d) => d.k), deviceDots({ network: 'isolated' })], [['netOut'], []]);
+  eq('dots: USB and camera only from their backend', deviceDots({ caps: { usb: true, usbAttached: 2, camera: true, cameraOn: false } }).map((d) => d.k), ['usb']);
+  eq('cable offered', [cableOffered({ network: 'shared' }, true), cableOffered({ network: 'isolated' }, true), cableOffered({ network: 'shared', group: 'g' }, true), cableOffered({ network: 'hostonly' }, false)], [true, false, false, false]);
+  // Cleaner: a machine's space goes to Machines
+  eq('cleaner: machines space', ['/home/a/Machines', '/home/a/Machines/x.lordvm/disks', '/media/a/d/W.lordvm', '/home/a/Videos', '/home/a/MachinesOld', '/g.lordgroup/x'].map((p) => C.machinesSpace(p, '/home/a')), [true, true, true, false, false, true]);
 }
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);

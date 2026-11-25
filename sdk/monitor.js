@@ -273,23 +273,85 @@ function clearHistory() {
 
 // (0.8.8.6) The machines' names by id ({ id: name }), for Monitor → Network's Machines row (a running
 // machine's connections carry its id, "cgSub"). Read again at most every 2 s, and only when an id is new.
-let vmNames = { at: 0, map: {} };
-function machineNames(ids) {
-  const want = [...(ids || [])];
-  if (!want.length || want.every((id) => id in vmNames.map) || Date.now() - vmNames.at < 2000) return vmNames.map;
+// (Machines to 100 %) also each machine's forwarded ports (machineInfo), for its own firewall row, and the list of
+// machines (machineList) the firewall's rule list offers; a Tor gateway is left out of that list (its app is
+// lordos:tor-gateway, never lordos:vm-<id>).
+let vmNames = { at: 0, map: {}, info: {}, list: [] };
+function readMachines(force) {
+  if (!force && Date.now() - vmNames.at < 2000) return;
   vmNames.at = Date.now();
   try {
-    if (typeof lord === 'undefined' || !lord.vm || typeof lord.vm.list !== 'function') return vmNames.map;
-    const map = {};
-    for (const m of lord.vm.list() || []) if (m && typeof m.id === 'string' && typeof m.name === 'string') map[m.id] = m.name;
-    vmNames.map = map;
+    if (typeof lord === 'undefined' || !lord.vm || typeof lord.vm.list !== 'function') return;
+    const map = {}, info = {}, list = [];
+    for (const m of lord.vm.list() || []) {
+      if (!m || typeof m.id !== 'string' || typeof m.name !== 'string') continue;
+      map[m.id] = m.name;
+      info[m.id] = { name: m.name, network: typeof m.network === 'string' ? m.network : '', ports: Array.isArray(m.ports) ? m.ports : [], dir: typeof m.dir === 'string' ? m.dir : '' };
+      if (m.role !== 'gateway') list.push({ id: m.id, name: m.name });
+    }
+    vmNames = { at: vmNames.at, map, info, list };
   } catch (e) { /* keeps the last names */ }
+}
+function machineNames(ids) {
+  const want = [...(ids || [])];
+  if (!want.length || want.every((id) => id in vmNames.map)) return vmNames.map;
+  readMachines(false);
   return vmNames.map;
+}
+function machineInfo(id) {
+  if (!(id in vmNames.info)) readMachines(false);
+  return vmNames.info[id] || null;
+}
+function machineList() {
+  readMachines(false);
+  return vmNames.list;
+}
+
+// (0.8.9.6) Monitor → Processes' origin badges (docs/MONITOR.md, "Origin badges"): the package that owns each
+// executable, answered by lord-server's worker thread from dpkg's file lists (lord.monitor.exeOwners: a path not known
+// yet is asked about and comes back on a later call). ownerOf(exe): the package, '' for none, undefined while unknown.
+// askOwners(paths): asks about the ones not known (once a second at most, from the process list's redraw).
+const owners = new Map();
+let ownersAsked = 0;
+function askOwners(paths) {
+  if (!available() || typeof lord.monitor.exeOwners !== 'function') return;
+  const want = [...new Set(paths)].filter((p) => p && !owners.has(p)).slice(0, 512);
+  if (!want.length || Date.now() - ownersAsked < 900) return;
+  ownersAsked = Date.now();
+  try { for (const [k, v] of Object.entries(lord.monitor.exeOwners(want) || {})) owners.set(k, v); } catch (e) { /* an older lord-server */ }
+}
+// The repository a package comes from (the package index's label: "Debian", a vendor's), once per package; null when
+// no index lists it (installed from a file).
+const origins = new Map();
+function packageOrigin(pkg) {
+  if (!pkg) return null;
+  if (!origins.has(pkg)) {
+    let o = null;
+    try { o = typeof lord.pkg?.info === 'function' ? lord.pkg.info(pkg)?.origin || null : null; } catch (e) { o = null; }
+    origins.set(pkg, o);
+  }
+  return origins.get(pkg);
+}
+// An installed .lpk app's trust and signer (docs/SIGNING.md): { trust, signer } | null, once per app.
+const signers = new Map();
+function appSigner(id) {
+  if (!signers.has(id)) {
+    let s = null;
+    try { const st = lord.sign?.status?.(id); s = st && st.installed !== false ? { trust: st.trust || 'unsigned', signer: st.signer || null } : null; } catch (e) { s = null; }
+    signers.set(id, s);
+  }
+  return signers.get(id);
 }
 
 let infoCache = null;
 export const monitor = {
+  ownerOf: (exe) => owners.get(exe),
+  askOwners,
+  packageOrigin,
+  appSigner,
   machineNames,
+  machineInfo,
+  machineList,
   available,
   info: () => (infoCache ||= available() ? lord.monitor.info() : null),
   deviceUsers: () => [],                        // phase 2

@@ -19,7 +19,7 @@ int mcli_resolve(const char *const *names, int n, const char *q, int *out, int m
 /* `machines set` → lord-vm --set's options. args: the person's words after NAME. out gets the lord-vm words (pointers into
  * args or into store, NULL-terminated, at most max - 1); store holds converted values. 0 ok; else -1 with the option
  * (and value) at fault in *bad_opt / *bad_val (bad_val NULL: it needs a value or isn't known) */
-typedef struct { char v[24][24]; int n; } McliStore;
+typedef struct { char v[48][24]; int n; } McliStore;   /* at most one entry per option: room for apply's worst case */
 int mcli_set_args(int argc, char **args, char **out, int max, McliStore *store, const char **bad_opt, const char **bad_val);
 
 /* the folder name the Machines app gives a machine of that name (js_vm.c folder_name): letters, digits, ' ', '-', '_'
@@ -43,5 +43,97 @@ void mcli_json_str(FILE *f, const char *s);
 
 /* a byte count as people read it, "12.3 GB", "640 MB" (out: at least 16) */
 void mcli_bytes(double b, char *out, size_t n);
+
+/* ---- exec, cp, logs, mcp and apply (docs/VIRTUALIZATION.md 6.15, 6.24) ---- */
+
+/* `machines cp`'s side in a machine: "NAME:PATH" (NAME without '/', not empty; PATH "" means the guest's home, "~").
+ * 1 and name, *path filled; 0 a path on this computer (write ./a:b for a local name with a colon) */
+int mcli_cp_side(const char *arg, char *name, size_t nn, const char **path);
+
+/* cp of a folder (6.15): a path relative to the folder, as the guest's listing gives it (hostile): components of 1 to
+ * 255 bytes, never "." or "..", no leading or trailing '/', no control characters, at most MCLI_TREE_DEPTH deep and
+ * MCLI_TREE_PATH_MAX bytes */
+#define MCLI_TREE_DEPTH    32
+#define MCLI_TREE_PATH_MAX 3072
+#define MCLI_TREE_MAX      10000          /* files and folders in one copy */
+int mcli_rel_path_ok(const char *p);
+/* the guest's listing: entries "d PATH\0" and "f SIZE PATH\0" (find -printf). 1 an entry (e->path points into b),
+ * 0 the end, -1 anything else (the whole copy is refused) */
+typedef struct { int dir; unsigned long long size; const char *path; } McliTreeEnt;
+int mcli_tree_next(const char *b, size_t n, size_t *off, McliTreeEnt *e);
+
+/* n bytes as a JSON string (quotes included): every byte that isn't valid UTF-8 becomes U+FFFD, controls are escaped */
+#include <stdint.h>
+void mcli_json_bytes(FILE *f, const uint8_t *b, size_t n);
+
+/* what a guest wrote, made safe for a terminal: newlines and tabs kept, other controls, C1 controls and broken UTF-8
+ * each one '?'. Returns the length written (out NUL-terminated, cap ≥ 5) */
+size_t mcli_term_clean(const uint8_t *b, size_t n, char *out, size_t cap);
+
+/* a reproducible machine's file (`machines apply`, 6.24): a strict subset of TOML. An optional [machine] table first,
+ * then `key = value` lines (comments with #): name, arch, memory ("8G"), disk ("64G"), network, iso, graphics,
+ * clipboard (strings), cpus (1..64), agent (true/false), ports, shares (one-line lists of strings, as `machines set`'s
+ * --port and --share take them). Unknown or repeated keys, anything after a value, other value forms: refused, with
+ * the line (*line, 0 for the whole file) and why. The values are checked again by lord-vm. */
+#define MCLI_APPLY_MAX    (64 * 1024)
+#define MCLI_APPLY_STR    1100
+#define MCLI_APPLY_PORTS  32
+#define MCLI_APPLY_SHARES 4
+typedef struct {
+    char name[65], arch[24], memory[24], disk[24], network[24], graphics[24], clipboard[24], iso[1024];
+    int cpus, agent;                        /* -1: not given */
+    char ports[MCLI_APPLY_PORTS][48];
+    char shares[MCLI_APPLY_SHARES][1100];
+    int n_ports, n_shares, ports_set, shares_set;
+} McliApply;
+int mcli_apply_parse(const char *text, size_t n, McliApply *a, int *line, const char **why);
+
+/* the `machines set` arguments an apply file gives (for a machine just made, made = 1: the ones --create didn't take),
+ * cpus its --cpus value as text. At most MCLI_APPLY_ARGV entries with the closing NULL: 8 single settings, every port
+ * and every share, two entries each. Returns how many (so[k] = NULL), -1 if they wouldn't fit in cap (nothing beyond
+ * so[cap - 1] is ever written) */
+#define MCLI_APPLY_ARGV (2 * (8 + MCLI_APPLY_PORTS + MCLI_APPLY_SHARES) + 1)
+int mcli_apply_set_argv(const McliApply *a, int made, const char *cpus, char **so, int cap);
+
+/* a guest's terminal stream (`machines console`, `machines shell`) made safe for the person's terminal, as the app's
+ * Shell does it for its tabs: text, C0 controls, CSI and short escape sequences pass (colors, cursor, modes); OSC only for
+ * titles and colors (0, 1, 2, 4, 10..12, 104, 110..112), rebuilt as ESC ] ... BEL; every other OSC (52 the clipboard, 8
+ * links, 9 and 777 notifications, 7, 133, 1337 ...), DCS, SOS, PM, APC, CSI ... t (window operations) and the C1
+ * controls dropped; broken UTF-8 becomes '?'. A sequence may be split across reads: the state is kept between calls.
+ * out needs n + MCLI_VTF_SLACK bytes; returns how many were written */
+#define MCLI_VTF_BUF   1024
+#define MCLI_VTF_SLACK (MCLI_VTF_BUF + 16)
+typedef struct {
+    int st;                       /* where the parser is (mcli.c) */
+    int bad;                      /* the sequence being read is dropped at its end */
+    int esc;                      /* in a string: an ESC was just seen (ST or the start of a new escape) */
+    int need;                     /* UTF-8: continuation bytes still expected */
+    size_t n;                     /* bytes in buf */
+    uint8_t buf[MCLI_VTF_BUF];
+} McliVtf;
+void mcli_vtf_init(McliVtf *f);
+size_t mcli_vtf_feed(McliVtf *f, const uint8_t *in, size_t n, uint8_t *out, size_t cap);
+
+/* one MCP message (JSON-RPC 2.0, one per line, at most MCLI_RPC_MAX bytes): exactly the keys jsonrpc "2.0", method (1..64
+ * bytes), id (an integer or a string of at most 128 bytes; absent: a notification) and params (an object or array).
+ * 0 with r filled (id: its JSON text, to echo back; free with mcli_rpc_free), -1 refused */
+#include "../sec/json.h"
+#define MCLI_RPC_MAX (1 << 20)
+typedef struct { JDoc doc; const char *method; const JVal *params; int has_id; char id[800]; } McliRpc;
+int mcli_rpc_parse(const char *line, size_t n, McliRpc *r);
+void mcli_rpc_free(McliRpc *r);
+
+/* an MCP client names a machine of the library only: 1..300 bytes, no '/', no control characters, not ending .lordvm or
+ * .lordgroup (never a folder path: it could point at a machine.json outside the library). 1 yes */
+int mcli_mcp_name_ok(const char *q);
+
+/* what an apply file asks that crosses this computer's boundary (an ISO to read, forwarded ports, shared folders, a
+ * bridged or host-only network, the clipboard, the guest agent): their list, "; "-separated, in out; how many (each one
+ * needs the person's yes on their terminal) */
+int mcli_apply_risks(const McliApply *a, char *out, size_t n);
+
+/* an apply file's ISO, resolved: a .iso or .img file directly or deeper under one of roots (NULL-terminated: the
+ * person's Downloads folder, the Machines library). 1 yes */
+int mcli_iso_place_ok(const char *real, const char *const *roots);
 
 #endif

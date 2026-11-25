@@ -3,7 +3,7 @@
 // the categories, the collections; docs/FLATPAK.md, "The Store's home"; with Flathub's rankings when they are on, E10,
 // "Rankings from Flathub's API": ids only, shown with the catalog's names and icons) over the catalog as cards (Flathub's verified
 // apps unless the setting shows the rest), a category's subcategories, each app's page with what it declares and what LordOS changes before it is
-// installed, and the installed ones with Update and Remove. Chromium and Electron apps install like any other: their
+// installed, and (the second column's Installed, FlathubInstalled) the installed ones with Update, Remove and Open. Chromium and Electron apps install like any other: their
 // helpers' sub-sandboxes are served by LordOS (docs/FLATPAK.md, "Sub-sandboxes"). The jobs and state are
 // sdk/flathub.js's; the logic sdk/flathubmodel.js's.
 import { createElement as h, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,6 +15,7 @@ import { debian } from './debian.js';
 import { Card, CardGrid, Facts, Featured, GLYPH, Pill, Shelf, Tag, nameColor, tint } from './ui.js';
 import { MoreButton, usePaged } from './endless.js';
 import { DisplayToolkit } from './fhlook.js';
+import { SettingsPage, About as AboutText, Group, Row } from './sectionsettings.js';
 import { flathub as F } from '@lordos/sdk';
 
 const SHELF = 8;            // cards in a Discover or category shelf
@@ -134,15 +135,19 @@ function TurnOn() {
 
 // ---- the section's page ----
 
-function InstalledList({ onOpen }) {
+// The installed apps with Remove and Open (the section's Installed), those whose name or id has the search's words.
+function InstalledList({ onOpen, query = '' }) {
   const th = useTheme();
   const s = useStore(F.state);
-  if (!s.installed.length) return null;
+  const q = String(query || '').trim().toLowerCase();
+  const list = s.installed.map((x) => ({ x, a: F.catalogApp(x.id) || { id: x.id, name: x.id, summary: '', icon: '' } }))
+    .filter(({ x, a }) => !q || q.split(/\s+/).every((w) => `${a.name} ${x.id}`.toLowerCase().includes(w)));
+  if (!s.installed.length) return h(Line, { th }, t('store.installed.noneFlathub'));
+  if (!list.length) return h(Line, { th }, t('store.debian.none'));
   const busy = !!s.job;
   return h(View, { style: { marginBottom: spacing.xl } },
     h(Header, { th }, t('flathub.installedTitle', { count: s.installed.length })),
-    h(GroupBox, null, ...s.installed.map((x) => {
-      const a = F.catalogApp(x.id) || { id: x.id, name: x.id, summary: '', icon: '' };
+    h(GroupBox, null, ...list.map(({ x, a }) => {
       return h(View, { key: x.id, style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingVertical: spacing.s + 2 } },
         h(FlathubIcon, { a, size: 32 }),
         h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
@@ -247,23 +252,13 @@ export function FlathubPage({ query, onOpen, category = null, sub = null, coll =
   const openRef = useRef(onOpen);
   openRef.current = onOpen;
   const open = useCallback((id) => openRef.current(id), []);
-  const hidden = useMemo(() => (fh.prefs.showAll ? 0 : s.catalog.length - s.catalog.filter((a) => a.verified).length), [s.catalog, fh.prefs.showAll]);
+  void working;
   if (!fh.supported) return h(Line, { th }, t('flathub.notSupported'));
   if (!fh.on) return h(View, null, h(TurnOn));
+  // (2026-11-23) straight on the banner: what Flathub is, its switches, Refresh and Turn off are in its Settings
+  // (FlathubSettings, the second column's item under Installed); Refresh is also the title bar's update icon
   return h(View, null,
-    h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.45, maxWidth: 680, marginBottom: spacing.l, textAlign: 'start' } }, t('flathub.subtitle')),
-    h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.l } },
-      h(Toggle, { on: fh.prefs.showAll, onChange: (v) => F.setPrefs({ showAll: v }) }),
-      h(Text, { style: { flex: 1, minWidth: 0, fontSize: typeScale.callout, color: th.text, textAlign: 'start' } },
-        fh.prefs.showAll ? t('flathub.showAllOn') : t('flathub.showAllOff', { count: hidden })),
-      h(Button, { small: true, label: t('flathub.refresh'), busy: working, onClick: () => F.loadCatalog({ fetch: true }) }),
-      h(Button, { small: true, label: t('flathub.turnOff'), pending: true, onClick: F.turnOff })),
-    h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: -spacing.s, marginBottom: spacing.l } },
-      h(Toggle, { on: fh.prefs.rankings, onChange: F.setRankings }),
-      h(Text, { style: { flex: 1, minWidth: 0, fontSize: typeScale.callout, color: th.text, textAlign: 'start' } },
-        fh.prefs.rankings ? t('flathub.rankingsOn') : t('flathub.rankingsOff'))),
     h(JobProgress),
-    mode === 'home' || mode === 'search' ? h(InstalledList, { onOpen }) : null,
     s.loaded && mode === 'home' ? h(View, { style: { gap: 26, marginBottom: 26 } },
       h(Spotlight, { b: spot, onOpen: open }),
       h(CategoryTiles, { counts, onCategory }),
@@ -274,6 +269,47 @@ export function FlathubPage({ query, onOpen, category = null, sub = null, coll =
     s.loaded && !list.length ? h(Line, { th }, t('flathub.noResults')) : null,
     h(CardGrid, null, ...list.slice(0, limit).map((a) => h(FlathubCard, { key: a.id, a, onOpen: open }))),
     h(MoreButton, { left: list.length - limit, onMore: more }));
+}
+
+// The section's Installed (its second column's first item, 2026-11-23): Update all, then the installed apps with Remove
+// and Open. The shop (All, the categories) no longer lists them: its cards say Open for an installed app.
+export function FlathubInstalled({ query, onOpen }) {
+  const th = useTheme();
+  const fh = useFlathub();
+  const count = useStore(F.state, (x) => x.installed.length);
+  const job = useStore(F.state, (x) => !!x.job);
+  useEffect(() => { if (fh.on) { if (!F.state.get().loaded) F.loadCatalog(); F.refreshInstalled(); } }, [fh.on]);
+  useEffect(() => (fh.on ? F.watchInstalled() : undefined), [fh.on]);      // installs made elsewhere show too
+  if (!fh.supported) return h(Line, { th }, t('flathub.notSupported'));
+  if (!fh.on) return h(View, null, h(TurnOn));
+  return h(View, null,
+    count ? h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.l } },
+      h(Text, { style: { flex: 1, minWidth: 0, fontSize: typeScale.callout, color: th.textDim, textAlign: 'start' } }, t('flathub.updates.text', { count })),
+      h(Button, { small: true, label: t('flathub.updates.button'), disabled: job, onClick: () => F.updateAll() })) : null,
+    h(JobProgress),
+    h(InstalledList, { onOpen, query }));
+}
+
+// Flathub apps → Settings (2026-11-23, the second column's item under Installed): what Flathub is, the verified-only
+// switch (with how many apps it hides), Flathub's rankings, refreshing the catalog and turning Flathub off.
+export function FlathubSettings() {
+  const th = useTheme();
+  const fh = useFlathub();
+  const catalog = useStore(F.state, (x) => x.catalog);
+  const working = useStore(F.state, (x) => !!x.busy || !!x.job);
+  const hidden = useMemo(() => (fh.prefs.showAll ? 0 : catalog.length - catalog.filter((a) => a.verified).length), [catalog, fh.prefs.showAll]);
+  if (!fh.supported) return h(Line, { th }, t('flathub.notSupported'));
+  if (!fh.on) return h(View, null, h(AboutText, null, t('flathub.subtitle')), h(View, { style: { height: spacing.xl } }), h(TurnOn));
+  return h(SettingsPage, null,
+    h(AboutText, null, t('flathub.subtitle')),
+    h(JobProgress),
+    h(Group, null,
+      h(Row, { label: fh.prefs.showAll ? t('flathub.showAllOn') : t('flathub.showAllOff', { count: hidden }),
+        control: h(Toggle, { on: fh.prefs.showAll, onChange: (v) => F.setPrefs({ showAll: v }) }) }),
+      h(Row, { label: fh.prefs.rankings ? t('flathub.rankingsOn') : t('flathub.rankingsOff'), control: h(Toggle, { on: fh.prefs.rankings, onChange: F.setRankings }) })),
+    h(Group, null,
+      h(Row, { label: t('store.refresh.flathub'), control: h(Button, { small: true, label: t('flathub.refresh'), busy: working, onClick: () => F.loadCatalog({ fetch: true }) }) }),
+      h(Row, { label: t('store.settings.flathubOff'), control: h(Button, { small: true, label: t('flathub.turnOff'), pending: true, onClick: F.turnOff }) })));
 }
 
 // How many shown Flathub apps each category has (the Store's second column)

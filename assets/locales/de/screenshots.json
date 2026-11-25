@@ -10,8 +10,8 @@
   "timer": "Timer",
   "timerNone": "Keiner",
   "protectedNote": {
-    "one": "{count} geschütztes Fenster: Es erscheint in Aufnahmen schwarz",
-    "other": "{count} geschützte Fenster: Sie erscheinen in Aufnahmen schwarz"
+    "one": "{count} geschütztes Fenster: Es wird in Aufnahmen verdeckt",
+    "other": "{count} geschützte Fenster: Sie werden in Aufnahmen verdeckt"
   },
   "recent": "Zuletzt",
   "hintArea": "Ziehen, um einen Bereich auszuwählen · Leertaste: Fenster · C: Farbe kopieren · T: Text kopieren · Esc: abbrechen",

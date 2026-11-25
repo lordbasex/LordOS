@@ -73,7 +73,7 @@ O LordOS mira máquinas modestas. Algumas medições reais dos registros de test
 
 [[chart:memory-0891]]
 
-Esses números vêm de máquinas virtuais, de uma placa e do PC do mantenedor. Os relatórios de 24 máquinas reais, alguns com medições do LordBench, estão nos [relatórios de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). São um ponto de partida, não uma promessa para toda máquina.
+Esses números vêm de máquinas virtuais, de uma placa e do PC do mantenedor. Os relatórios de 26 máquinas reais, alguns com medições do LordBench, estão nos [relatórios de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). São um ponto de partida, não uma promessa para toda máquina.
 
 [[shot:2]]
 
@@ -107,7 +107,7 @@ Tudo na 0.8.7, menos os dois itens marcados 0.8.8.
 
 ## Novo na 0.8.9
 
-Lançado na 0.8.9 Beta, em 18 de novembro de 2026; o último lançamento é a 0.8.9.5 Beta (23 de novembro de 2026).
+Lançado na 0.8.9 Beta, em 18 de novembro de 2026; o último lançamento é a 0.8.9.6 Beta (25 de novembro de 2026).
 
 - **Escolha seu desktop.** Na primeira vez que uma conta nova entra num sistema instalado, o LordOS mostra o Lord Flow, o Lord Classic e o Lord Workspaces lado a lado, numa ordem aleatória e sem nenhum escolhido por você, deixa você experimentar ao vivo o que escolher e mostra onde mudar depois.
 - **Widgets de área de trabalho em todos os temas.** "Adicionar widget" no menu do fundo: um relógio (com ponteiro de segundos, se quiser), o clima da cidade que você escolhe numa lista que nunca sai do computador, um calendário, as baterias dos seus dispositivos, uma onda de som que segue a música, uma câmera ou um canal de TV, os limites do Claude Code e mais. Eles leem seus dados só enquanto você pode vê-los.
@@ -170,7 +170,7 @@ O compositor controla várias telas ao mesmo tempo, estendidas ou espelhadas, e 
 
 ## Limites honestos
 
-- **Placas NVIDIA foram verificadas numa só máquina.** A composição pela GPU funciona em gráficos Intel reais de 2010 (Ironlake) a 2019 (Whiskey Lake), Cherry Trail e Gemini Lake, e em cinco gerações da AMD, do TeraScale 2 (uma Radeon HD 5450) ao RDNA 4, entre as 24 máquinas dos [relatórios de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). Uma placa NVIDIA foi relatada, uma RTX 3060 com o driver proprietário da NVIDIA: ali o desktop funciona e é desenhado com a CPU, porque o LordOS não compõe com esse driver. O nouveau e o NVK do Mesa, que vêm incluídos, não foram testados em nenhuma placa NVIDIA, e ninguém relatou ainda gráficos integrados da AMD nem gráficos Intel mais novos que o Whiskey Lake (`docs/GPU.md`).
+- **Placas NVIDIA foram verificadas em apenas duas máquinas.** A composição pela GPU funciona em gráficos Intel reais de 2010 (Ironlake) a 2019 (Whiskey Lake), Cherry Trail, Braswell e Gemini Lake, e em cinco gerações da AMD, do TeraScale 2 (uma Radeon HD 5450) ao RDNA 4, entre as 26 máquinas dos [relatórios de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). Duas placas NVIDIA foram relatadas, ambas com o driver da NVIDIA: numa RTX 3060 com o driver proprietário o desktop funciona e é desenhado com a CPU, porque o LordOS não compõe com esse driver, e numa RTX 5070 Ti com os módulos de kernel abertos roda de forma fluida. O nouveau e o NVK do Mesa, que vêm incluídos, não foram testados em nenhuma placa NVIDIA, e ninguém relatou ainda gráficos integrados da AMD nem gráficos Intel mais novos que o Whiskey Lake (`docs/GPU.md`).
 - **O GPU drag, ligado por padrão na 0.8.7, está verificado só em V3D e SVGA3D.** Num Raspberry Pi 5, em arrastos reais, reduz pela metade a CPU da sessão sem carga e leva uma carga de memória de 29 para 35 quadros por segundo. Em qualquer outra GPU só o autoteste o protege, e `LORD_GPU_DRAG=0` o desliga (`docs/GPU.md`).
 - **Várias telas foram testadas com duas saídas virtuais e num PC com uma Radeon RX 580 e três monitores** (`docs/DISPLAYS.md`), a máquina em que o autor usa o LordOS todos os dias, instalado direto no computador desde novembro de 2026. Esse PC trouxe o tamanho do cursor por hardware e a tela de login na tela principal escolhida na 0.8.8.6, e na 0.8.8.7 a passagem que mantém os monitores DisplayPort acesos ao bloquear, sair e entrar na sessão. Além dele, [mais 21 máquinas da comunidade](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md) (9 relatórios de hardware e 12 máquinas citadas em outros issues) cobrem gráficos Intel (14) e AMD (mais 3: uma FirePro W6150M, uma RX 7800 XT com dois monitores de 120 Hz e uma RX 9060 XT), de notebooks a tablets x86; ninguém relatou uma placa NVIDIA ainda, e hubs DisplayPort não foram testados.
 - **O Raspberry Pi 5 só foi testado com um monitor HDMI.** Desde a 0.8.4.1 a imagem mostra a tela de login e o desktop num monitor HDMI desde o primeiro boot, e o LordBench o mediu assim; dois monitores e 4K ainda não foram testados na placa (`docs/RASPBERRY.md`).

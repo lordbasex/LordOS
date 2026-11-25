@@ -15,12 +15,14 @@
 // the Machines app opened with args.guestWin (index.jsx → GuestWindow), reading what useAppsMode publishes in `guests`.
 import {
   View, Text, MediaView, addListener, useAppWindow, useStore, createStore, wm, windows, mainDisplay, workArea, windowPixelIcons, windowChrome, t as tr,
-  useFilesDrop, FilesDropHint, notify,
+  useFilesDrop, FilesDropHint, notify, displayFor, workAreaOf,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { ClipAskBar } from './clipask.jsx';
 import { menus } from './ui.jsx';
-import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, iconsToAsk, AGENT_CAPS, copyLine, placeBatch, closeRefusedOf, launchStart, launchPending, launchPrune, closeStart, closePrune, guestKeys, guestMayTakeFront, anchorPoint, cropsStale, STALE_MS } from './model.js';
+import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, popupOwnerWait, popupRect, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, iconsToAsk, AGENT_CAPS, copyLine, placeBatch, closeRefusedOf, launchStart, launchPending, launchPrune, closeStart, closePrune, guestKeys, guestMayTakeFront, anchorPoint, cropsStale, STALE_MS } from './model.js';
+import { isProtectedMachine } from './meta.js';
+import { saveGuestApps } from './guestlaunch.js';
 
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
 // window (vmwindow.jsx) and its apps mode windows alike
@@ -58,7 +60,14 @@ function placeOf(x, w, sid, k, d, have) {
   // a window the person put elsewhere (another monitor) keeps its distance from the guest's; a menu goes with its owner
   const off = x.popup ? have?.get(w.owner)?.off : x.off;
   const r = offsetRect(toHostRect(w, k, d), off);
-  if (x.popup || off) return r;
+  if (x.popup) {
+    // a menu or a tooltip: capped and inside its display's work area (model.js popupRect); the rest of a longer one is
+    // cut (x.cap, in the guest's pixels: its crop), never drawn over the menu bar or the Dock
+    const p = popupRect(r, workAreaOf(displayFor(r)) || workArea()) || r;
+    x.cap = { w: Math.max(1, Math.floor(p.w / k)), h: Math.max(1, Math.floor(p.h / k)) };
+    return p;
+  }
+  if (off) return r;
   const fix = insideWork(r, insetOf(x.inset), workArea());
   if (!fix) return r;
   const g = toGuestRect(fix, k, d);
@@ -108,7 +117,13 @@ export function useAppsMode({ dir, sid, st, name, mid, home, on, ready, onLeave,
   }, [active, st?.w, st?.h, st?.media, name, st?.agent?.caps]);
   useEffect(() => {
     if (!active) return;
-    if (st.guestAppsSeq !== seen.current.a) { seen.current.a = st.guestAppsSeq; publish(dir, { apps: guestAppItems(lord.vm.guestApps(sid)) }); }
+    if (st.guestAppsSeq !== seen.current.a) {
+      seen.current.a = st.guestAppsSeq;
+      const apps = guestAppItems(lord.vm.guestApps(sid));
+      publish(dir, { apps });
+      // kept for the launcher while the machine is off (guestlaunch.js, 6.12)
+      saveGuestApps(dir, apps);
+    }
     const listed = st.windowsSeq !== seen.current.w;
     if (listed) { seen.current.w = st.windowsSeq; publish(dir, { listedAt: Date.now() }); sync(dir, sid, mid, name, lord.vm.windows(sid), st.w, st.h); }
     // icons: for every window that has none yet (one opened from a later list than its icon came with, as after a
@@ -149,20 +164,34 @@ function sync(dir, sid, mid, name, list, gw, gh) {
   // behind the window in front, which keeps the keyboard (model.js guestMayTakeFront: no focus stealing from a Terminal)
   const front = wm.focused();
   const keep = guestMayTakeFront(front ? wm.get(front) : null, dir) ? null : front;
-  // bottom first, so the guest's front window ends up in front here too
-  for (const w of [...plan.open].reverse()) {
+  // a protected machine's guest windows are protected from their first frame, as its own window (meta.js isProtectedMachine, the same question everywhere)
+  const prot = isProtectedMachine(dir, null, !!wm.get(guests.get()[dir]?.home)?.protected);
+  // bottom first, so the guest's front window ends up in front here too; popups after every window, as their owners must
+  // be here already (and shown for POPUP_OWNER_MS: model.js popupOwnerWait)
+  const now = Date.now();
+  let later = 0;
+  const order = [...plan.open].reverse();
+  for (const w of [...order.filter((v) => !isPopup(v)), ...order.filter(isPopup)]) {
     const instance = guestInstance(mid, w.id);
     const popup = isPopup(w);
+    if (popup) {
+      const wait = popupOwnerWait(w, have, now);
+      if (wait > 0) later = Math.max(later, wait);
+      if (wait !== 0) continue;               // its owner isn't one of the guest's windows shown here (long enough)
+    }
     // no LordOS frame around it (csd): the content is the guest's window, its own title bar included
     const x = { gid: w.id, winId: 0, rect: w, minimized: false, asked: null, inset: { l: 0, t: 0, r: 0, b: 0 }, popup };
     const r = placeOf(x, w, sid, k, d, have);
     const args = { guestWin: { dir, gid: w.id }, guest: { machine: name, mid, app: w.app || w.title, key: (w.app || '').toLowerCase() || String(w.id) }, csd: true };
-    const winId = popup ? wm.open('machines', { instance, frame: r, pip: r, args: { ...args, notice: true } })
-      : wm.open('machines', { instance, frame: frameAround(r, x.inset), args });
+    const winId = popup ? wm.open('machines', { instance, frame: r, pip: r, protected: prot, args: { ...args, notice: true } })
+      : wm.open('machines', { instance, frame: frameAround(r, x.inset), protected: prot, args });
     if (!winId) continue;
     x.winId = winId;
+    x.shownAt = now;
     have.set(w.id, x);
   }
+  // a popup held back for its owner's age: looked at again then, with the guest's list as it is by then
+  if (later > 0) setTimeout(() => { const g = guests.get()[dir]; if (g?.sid === sid && tracks.get(dir) === have) sync(dir, sid, mid, name, g.list, gw, gh); }, later + 20);
   for (const w of plan.minimize) {
     const x = have.get(w.id);
     if (!x) continue;
@@ -352,7 +381,7 @@ export function GuestWindow({ dir, gid }) {
     });
     return () => { ka(); kb(); km(); kc(); lord.vm.release(sid); buttons.current.clear(); anchor.current = null; };
   }, [focused, g?.sid]);
-  const at = (e) => (box.current && me && g?.gw ? cropPoint(e.x, e.y, lord.getLayout(box.current.id), cropOf(me), g.gw, g.gh) : null);
+  const at = (e) => (box.current && me && g?.gw ? cropPoint(e.x, e.y, lord.getLayout(box.current.id), cropOf(me, trackOf(dir).get(gid)?.cap), g.gw, g.gh) : null);
   // files dragged from Files onto this window (7.2.1): copied into the machine as any drop (transfer folder or agent's
   // way, SHA-256 checked), then the guest's tools hand them to this window: into the folder an Explorer window shows,
   // dropped on a window that takes files, or on the clipboard to paste. Only files, at most AG_PLACE_MAX at once
@@ -363,7 +392,7 @@ export function GuestWindow({ dir, gid }) {
       if (!s?.sid || !w || !files.length) return;
       if (!(s.caps & AGENT_CAPS.place)) { notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.apps.dropCant'), body: '', sound: false }); return; }
       const box0 = box.current ? lord.getLayout(box.current.id) : null;
-      const pt = (Number.isFinite(how?.x) && box0 && cropPoint(how.x, how.y, box0, cropOf(w), s.gw, s.gh)) || [w.x + Math.floor(w.w / 2), w.y + Math.floor(w.h / 2)];
+      const pt = (Number.isFinite(how?.x) && box0 && cropPoint(how.x, how.y, box0, cropOf(w, trackOf(dir).get(gid)?.cap), s.gw, s.gh)) || [w.x + Math.floor(w.w / 2), w.y + Math.floor(w.h / 2)];
       const plan = placeBatch(files, w.id, pt);
       if (plan.left) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.apps.dropMany', { count: plan.items.length }), body: '', sound: false });
       const refused = [];
@@ -385,7 +414,7 @@ export function GuestWindow({ dir, gid }) {
     // clipboard in waits a moment, as on the machine's window, so a right-click's Paste finds it there
     const fresh = !!g.touch?.();
     move(e);
-    if (!buttons.current.size && box.current && me) anchor.current = { box: lord.getLayout(box.current.id), crop: cropOf(me) };
+    if (!buttons.current.size && box.current && me) anchor.current = { box: lord.getLayout(box.current.id), crop: cropOf(me, trackOf(dir).get(gid)?.cap) };
     buttons.current.add(e.button);
     const sid = g.sid, b = e.button;
     if (fresh) { held.current = Date.now() + CLIP_HOLD_MS; setTimeout(() => lord.vm.button(sid, b, 1), CLIP_HOLD_MS); }
@@ -412,7 +441,7 @@ export function GuestWindow({ dir, gid }) {
   return (
     <View ref={box} {...drop.props} onMouseDown={down} onMouseMove={move} onWheel={onWheel}
       style={{ flex: 1, backgroundColor: '#000', ...(trackOf(dir).get(gid)?.popup || full(me, g) ? null : { borderRadius: 8, overflow: 'hidden' }) }}>
-      {g.media && !stale ? <MediaView media={g.media} crop={cropOf(me)} style={{ flex: 1 }} /> : null}
+      {g.media && !stale ? <MediaView media={g.media} crop={cropOf(me, trackOf(dir).get(gid)?.cap)} style={{ flex: 1 }} /> : null}
       {focused && g.ask ? <ClipAskBar ask={g.ask} onAnswer={(yes) => g.askAnswer?.(yes)} /> : null}
       {line ? (
         <View style={{ position: 'absolute', left: 8, right: 8, bottom: 8, alignItems: 'center', pointerEvents: 'none' }}>

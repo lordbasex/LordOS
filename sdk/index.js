@@ -7,13 +7,13 @@ import { locale, tOptional } from './i18n.js';
 import { cleanThemeMeta } from './thememeta.js';
 
 export { View, Text, Image, Terminal, Surface, MediaView, screen, addListener, useClock, system, layouts, getLayout, modifiers } from '@lordos/runtime';
-export { displays as screenDisplays, mainDisplay, displayAt, displayFor, mainBox } from '@lordos/runtime';
+export { displays as screenDisplays, mainDisplay, displayAt, displayFor, mainBox, holdKeyboard } from '@lordos/runtime';
 export { createStore, useStore } from './store.js';
 export { cleanThemeMeta, themeOptions, themeOptionValue, themeOptionPatch, themeAuthor } from './thememeta.js';   // theme.json's sketch and options (0.8.9)
 export { settings, useSettings, useTrackedSettings } from './settings.js';
 export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPreferredLanguages, CORE_LANGUAGES, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
-export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage } from './localename.js';   // glibc region names (installer, Settings)
+export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage, regionLanguageCode, regionLabel } from './localename.js';   // glibc region names (installer, Settings)
 export { LANGUAGE_NAMES } from './langnames.js';   // languages not translated yet (Settings → Language & Region)
 export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken, addMenuBarKeys } from './shortcuts.js';
 export { ContextMenu } from './contextmenu.jsx';
@@ -22,6 +22,17 @@ export { speak, stopSpeaking, pauseSpeaking, replaySpeaking, closePlayer, saveSp
 export { VOICE_LANGS, VOICES, voiceLabel, voicePackage, modelPackage, hasVoice, PREVIEWS_PACKAGE } from './voicecatalog.js';
 export { parseWav, levelDb, quietEnough, roomCheck, takeName, trimSilence, joinPhrases, phraseDone } from './voicerecmodel.js';
 export { scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName } from './voicemanager.js';
+// Sentinela, the process guard (docs/SENTINELA.md): its models, its rules and its session service
+export { LLM_MODELS, ENGINE_PACKAGE, llmModel, packagesForModel, llmPackageOk } from './llmcatalog.js';
+export { TRIGGERS, ACTIONS, SENTINELA_DEFAULTS, factLines, presentAlert, INVESTIGATE_ACTIONS, RISKS } from './sentinelamodel.js';
+export { VM_ACTIONS, vmWhy, vmFactLines } from './sentinelavm.js';
+export {
+  sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, runSentinelaAction, sentinelaOnBattery,
+  clearSentinelaAlerts, actionLabel as sentinelaActionLabel, installLlm, removeLlm, lumoReady, investigateProcess, translateWithLumo,
+  sentinelaBlocked, refreshBlocked, blockProgram, unblockProgram, runInvestigateAction,
+} from './sentinela.js';
+export { describeProgram, describeApp, saveLumoTranslation, translationKey } from './describe.js';
+export { ShieldGlyph } from './sentinelaglyph.js';
 import { resetShortcuts } from './shortcuts.js';
 export { AppSwitcher, openSwitcher, cycleAppWindows, switcherKeys, switcherGrabs, switcherHold } from './appswitcher.jsx';
 export { switcherPrefs, SWITCHER_DEFAULTS, validColor } from './switchermodel.js';
@@ -31,7 +42,7 @@ export { OskPanel, OskIcon, OskStatus, oskLift } from './osk.jsx';
 export { trackpad, useTrackpads, hasTouchpad, registerGestureActions, lastSwipe, TRACKPAD_DEFAULTS, trackpadConfig, setTrackpad } from './trackpad.js';
 export { ime, useIme } from './ime.js';
 export { wayland, x11SelfScale, setX11Scaling } from './wayland.js';
-export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, windowPixelIcons, LetterIcon, iconFromFile, webAppIcon, webProfileIcon, APP_CATEGORIES, appCategory } from './apps.js';
+export { useLauncherApps, launchApp, refreshApps, guestLauncherApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, windowPixelIcons, LetterIcon, iconFromFile, webAppIcon, webProfileIcon, APP_CATEGORIES, appCategory } from './apps.js';
 export { APP_GROUPS, launcherGroup, groupApps, startView, groupRows, groupKey, keepSelection } from './appgroupsmodel.js';   // Lord Classic's start menu by category
 // Web apps (docs/WEBAPPS.md): the registry through lord.webapps, profiles, the probe, the permission questions
 export { webApps, useWebApps, refreshWebApps, webAppsAvailable, webAppEntry, webRunning, launchWebApp, probeWebApp, installWebApp, webAppCall, webAppOfWindow, webAppMemory, webEngine,
@@ -60,7 +71,7 @@ export { shortcutsWho } from './kbinhibitmodel.js';
 export { perms, permsRev, requestPermission, markDeviceUse, useIndicators, PermissionPrompt, registerPrivacySection, privacySections, PERMISSIONS, onPermissionRevoked, micStart, micStop, micLevel, shortcutsWhoText } from './privacy.js';
 // the capture indicator by the clock (screen, camera, microphone): themes draw it as <PrivacyIndicators />
 export { PrivacyIndicators, CaptureGlyph, useCaptureRows } from './capturestatus.jsx';
-export { StudioPanel, studioAvailable } from './studio.jsx';
+export { StudioPanel, StudioWindow, MicModePanel, studioAvailable, openStudioApp } from './studio.jsx';
 export { captureRows, captureGlyph, captureSummary, rowStops } from './capturemodel.js';
 import { PermissionPrompt } from './privacy.js';
 import { Powerbox } from './powerbox.jsx';
@@ -72,7 +83,8 @@ export { archive } from './archive.js';
 export { print, queueName } from './print.js';
 export { emoji, Grid as EmojiGrid, ToneBar as EmojiToneBar } from './emoji.jsx';
 import { PrintDialog } from './printdialog.jsx';
-import { RestorePrompt, startSessionRestore, markThemeSwitch, logOut } from './sessionrestore.jsx';
+import { RestorePrompt, startSessionRestore, markThemeSwitch, unmarkThemeSwitch, logOut } from './sessionrestore.jsx';
+import { ThemeSwitchOverlay, showThemeSwitch, hideThemeSwitch, notifyThemeNotApplied } from './themeswitch.jsx';
 import { askPower, canPower } from './power.jsx';
 export { PowerDialog, powerAsk, POWER_SECONDS } from './power.jsx';
 import { EmojiPanel } from './emoji.jsx';
@@ -98,12 +110,17 @@ export { startDisplayApps, useQuickApps, useDisplaySuggestion, quietDisplayApps,
 export { registerWidgetKind, widgetKinds, widgetCatalog, addDeskWidget, removeDeskWidget, setDeskWidget, resizeDeskWidget, startDeskWidgets, deskWidgetSize, kindSizes, WidgetDropTarget, widgetDrag, deskWidgetsShown, widgetDisplayKey } from './deskwidgets.jsx';
 export { Markdown, markdownHeadings, parseMarkdown, parseInline, toggleTask } from './markdown.jsx';
 export {
-  dock, useDockEntries, dockActivate, dockMenu, registerDockMenu, registerDockActions, registerDockActivate, dockQuickActions, launcherIdOf, dockIdOf, dockIdOfWindow,
+  dock, useDockEntries, dockActivate, dockMenu, appWindowItems, registerDockMenu, registerDockActions, registerDockActivate, dockQuickActions, launcherIdOf, dockIdOf, dockIdOfWindow,
   launchDockItem, dockPrefs, DOCK_DEFAULTS, dockHideSettings, DOCK_HIDE_MODES, DOCK_SIZE_MIN, DOCK_SIZE_MAX, DOCK_MAGNIFY_MAX, dockBadgeMetrics, useDockCovered, quitApp, DOCK_LAUNCHER, useTrash, trashState, refreshTrash, openTrash, emptyTrash, trashMenu,
   dockDrag, dockPoof, beginDockDrag, registerDockTarget, dockDragJustEnded,
 } from './dock.js';
+export { cleanWindowLabel, WINDOW_LABEL_MAX } from './windowlistmodel.js';
+// Chromium-family browsers' profiles (sdk/browserprofilemodel.js): read from their Local State as untrusted data
+export { browserProfiles, refreshBrowserProfiles, windowProfile, noteLaunchedProfile, forgetLaunchedProfile, launchedProfiles } from './browserprofiles.js';
+export { BROWSERS as PROFILE_BROWSERS, isProfileBrowser, profileChoice, cleanProfileChoices, cleanDisplayProfiles } from './browserprofilemodel.js';
 export { sound, useSound, useSoundPeak, soundState, defaultSink, defaultSource, microphones, headsetMics } from './sound.js';
 export { nearbyDevices, lowEnergySide, btErrorKey } from './btlistmodel.js';   // Settings → Bluetooth's nearby list (issue #78)
+export { NO_SELECTION, clickSelect, keepShown } from './listmodel.js';   // a list's pointer selection (Shift range, Ctrl toggle), e.g. Backups' restore browser (#231)
 export { SoundOutputList, useSoundOutputs } from './soundoutputs.js';   // choosing the output by the volume (issue #58)
 export { monitor, useMonitor, monitorSamples, monitorProcesses, monitorConnections, monitorDevices, monitorDetail, MONITOR_HISTORY, diskTempHistory, DISK_TEMP_HISTORY, firewall, firewallState } from './monitor.js';
 export * as fwRule from './fwrule.js';            // checks what the user types for a firewall rule
@@ -112,7 +129,7 @@ export { packages, packageList, refreshPackages, packageFile, loadWasm } from '.
 import { refreshPackages, forgetGonePackaged, packageList as packageListOf } from './packages.js';
 export {
   windows, wm, openedAt, useWindows, configureWindows, getApp, listApps, isLiveSystem, appIdOf, workArea, workAreaOf, pointerWorkArea, appMenus, useAppMenus, windowTitle, windowMenuTitle, windowAccent, appRegistry, appMenuClick,
-  registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, isWindowLocked, moveGrab, SNAP_DWELL_MS, locksChanged, snapEnabled, SNAP_ZONES, useWindowHidden, activeDesktop, desktopList, desktopNames, renameDesktop, moveDesktop,
+  registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, isWindowLocked, moveGrab, SNAP_DWELL_MS, locksChanged, snapEnabled, SNAP_ZONES, useWindowHidden, windowsOutOfSight, useWindowsOutOfSight, activeDesktop, desktopList, desktopNames, renameDesktop, moveDesktop,
   keepWindowsInWorkAreas, pointerDisplay, windowChrome,
 } from './windows.js';
 // Desktops and the Overview (docs/DESKTOPS.md)
@@ -147,6 +164,7 @@ export { help } from './help.js';
 import { NotificationBanner } from './notify.js';
 import { startAlarms } from './alarms.js';
 import { startDiskWatch } from './diskwatch.js';
+import { startSentinela } from './sentinela.js';
 import { maybeStartTour } from './help.js';
 import { FirstStart, startFirstStart } from './firststart.jsx';
 import { liveStartWindow } from './livestart.js';
@@ -163,9 +181,11 @@ export {
 export { sortDrop, dropCount } from './filedrop.js';
 // Keyboard focus (sdk/focus.js): a highlighted item that skips separators, for lists that open from a focusable control
 export { menuStep } from './focusmodel.js';
+export { slowClick, DOUBLE_CLICK_MS, SLOW_CLICK_MAX_MS, SLOW_CLICK_SLOP } from './slowclick.js';   // the slow second click that renames in place (Files)
 import { FloatingWindows } from './components.jsx';
 // One stacking order for the desktop: <Layer name>, <Overlay anchor> (docs/LAYERS.md)
 export { LAYERS, Layer, Overlay, shellLayers } from './layers.js';
+export { useNavigateButtons, useVisitHistory, navFor, visitNote, visitStep } from './navbuttons.js';   // a mouse's back and forward buttons (#234)
 // where a small floating bar goes and comes back (the reading-aloud player's rule; Screenshots' toolbar uses it too)
 export { placePlayer as placeFloatingBar, rememberPlace as rememberFloatingBar } from './voiceplayermodel.js';
 import { Layer, enableShellLayers } from './layers.js';
@@ -174,8 +194,9 @@ export {
   Dropdown, Checkbox, RadioGroup, Tabs, Popover, Tooltip, ProgressBar, Disclosure, DisclosureGlyph,
 } from './controls.jsx';
 // (0.8.8.8) lists whose rows are chosen with the pointer and the keys: Shift ranges, Ctrl toggles, type-to-find
-export { List, Table } from './lists.jsx';
+export { List, Table, TABLE_HEAD, tableWindow } from './lists.jsx';
 export { media, useMedia, usePlayer, nowPlaying, useNowPlaying, linuxPlayers, useLinuxPlayers, NowPlayingTile, mediaFormatTime, thumbFor, useThumb, userDirs, openMarkup } from './media.js';
+export { useCameras, refreshCameras } from './cameras.js';   // the camera list, made on a worker, again on hotplug
 export * as imageEdit from './imageeditmodel.js';   // the image editor's math (crop presets, resize, redaction; issue #30)
 export { disks, useDisks, needsDiskFormats, openDiskFormats } from './disks.js';
 export { unmountedDisks, diskRelease, partMountable, partUnmountable } from './diskplaces.js';
@@ -212,7 +233,7 @@ import { startMail } from './mail.js';
 import { startReminders } from './calendar.js';
 // Settings' hardware pages (docs/SETTINGS.md): displays, Night Light, battery, Bluetooth, idle, clock
 export {
-  displays, useDisplays, applyDisplay, keepDisplay, revertDisplay, arrangeDisplay, setDisplayMirror, setMainDisplay, setCaptureAllDisplays, setAutoRotateDisplays, displayConfirm, DisplayGlyph, nightPrefs, NIGHT_DEFAULTS, nightWindow,
+  displays, useDisplays, applyDisplay, keepDisplay, revertDisplay, arrangeDisplay, setDisplayMirror, setMainDisplay, loginScreenScale, setLoginScreenScale, selfIsAdmin, setCaptureAllDisplays, setAutoRotateDisplays, displayConfirm, DisplayGlyph, nightPrefs, NIGHT_DEFAULTS, nightWindow,
   nightActive, nightAmount, setNightManual, previewNight, nightTick, sunTimes, battery, useBattery, BatteryGlyph, powerPrefs, POWER_DEFAULTS,
   powerProfiles, usePowerProfiles, onPowerProfileResult, bluetooth, useBluetooth, onBluetoothResult, setBluetoothPower, timedate, useTimedate, menuClock, clockPrefs,
   CLOCK_DEFAULTS, applyIdle,
@@ -224,10 +245,11 @@ import { startTray } from './trayitems.jsx';
 // Settings → Displays: numbering, Identify (a big number on each real display) and magnetic arrangement
 export { identifyDisplays, identifying as identifyingDisplays, IDENTIFY_MS } from './displaysui.jsx';
 import { DisplayIdentify } from './displaysui.jsx';
-export { displayNumbers, snapDisplay, resolveDrop, placementOk as displayPlacementOk, SNAP_PREVIEW_PX, scaleChoices, scaleTiles } from './displaylayout.js';
+export { displayNumbers, snapDisplay, resolveDrop, placementOk as displayPlacementOk, SNAP_PREVIEW_PX, scaleChoices, scaleTiles, loginScaleState } from './displaylayout.js';
 // Fans and cooling (lord-fand, docs/FANS.md): Settings → Cooling and Monitor → Cooling
 export { useFan, fanStatus, fanHistory, fanCase, fanControl, refreshFan, coolingVariant, heatColor, CoolingArt, GpuArt, FanCurveChart, formatTemp, FAN_HISTORY } from './cooling.jsx';
 export { DEFAULT_CATEGORIES, defaultFor, defaultInfo, setDefaultFor, resetDefaultFor, candidatesFor, defaultOpenerId, nativeOf } from './defaults.js';
+export { registerBundle, bundleFor } from './openwith.js';   // folders shown as one item (Machines' .lordvm)
 export { registerOpenProvider, registerOpenProviders, openProvidersFor, openHintsFor, suggestedProviderFor, defaultProviderFor, setDefaultProvider, openExtOf } from './openwith.js';   // "Open with" providers (machines; later LordBridge, Wine)
 // deactivated built-in apps (Store → Installed; docs/PACKAGES.md, "Deactivating LordOS apps")
 export { appsOff, isAppOff, useAppsOff } from './appsoff.js';
@@ -236,6 +258,7 @@ export { deactivateApp, activateApp, offerActivate } from './appsoffactions.js';
 import { startAppsOff } from './appsoffactions.js';
 // apps mode's guest side: inside a Machines guest, this desktop's windows go to the host one by one (guestwin.js)
 export { guestAppsMode } from './guestwin.js';
+export { guestLauncherItems, cleanGuestApps, sameGuestApps, launchAskStep, isGuestAppId } from './guestappsmodel.js';
 import { startGuestWin } from './guestwin.js';
 export { notifyPrefs, appNotifyPrefs, setAppNotifyPrefs, dndActive, NOTIFY_DEFAULTS } from './notify.js';
 
@@ -250,25 +273,39 @@ export const themes = {
     return { id: t.id, current: t.current, hidden: !!meta.hidden, name: tOptional(`shell.theme.${t.id}.name`) || meta.name || t.id,
       description: tOptional(`shell.theme.${t.id}.description`) || meta.description || '', ...cleanThemeMeta(meta),
       // it couldn't start in this session (lord-server went back to the one before): Settings → Appearance says why
-      failed: t.failed === true, failedWhy: typeof t.failedWhy === 'string' ? t.failedWhy : '' };
+      failed: t.failed === true, failedWhy: typeof t.failedWhy === 'string' ? t.failedWhy : '', failedCode: t.failedCode === true };
   }).filter((t) => !t.hidden),         // the login screen (themes/greeter) can't be chosen
   current: () => lord.themes.list().find((t) => t.current)?.id || null,
   // the current theme's entry (null on the login screen or without lord.themes)
   info: () => { try { return themes.list().find((t) => t.current) || null; } catch (e) { return null; } },
-  // Switches theme live: the server discards this JS context and loads the new one. The LordOS
-  // app windows that are open come back in the new theme (themeReopen, read once by startShell);
-  // Linux app windows stay connected and simply get the new theme's frame.
+  // Switches theme live, in the same session: lord-server checks the new theme's code first (the verified-code
+  // check), then discards this JS context and loads the new one behind a short "Changing the desktop style" overlay
+  // (themeswitch.jsx). The LordOS app windows that are open come back in the new theme (themeReopen, read once by
+  // startShell); Linux app windows stay connected and simply get the new theme's frame. false: it can't be switched
+  // to (refused or failed before): nothing changed, and a notification says so.
   use(id) {
+    const before = settings.get();
     let reopen = [];
     try {
       reopen = windowsStore.get().filter((w) => { const a = getAppOf(w.id); return a && !a.builtin; }).slice(-8)
         .map((w) => ({ app: w.app, id: w.id, args: w.args ? JSON.parse(JSON.stringify(w.args)) : null, minimized: !!w.minimized,
           frame: { x: w.x, y: w.y, w: w.w, h: w.h }, maximized: !!w.maximized, desk: indexOfDesktop(w.desktop) }));
     } catch (e) { reopen = []; }
+    let entry = null;
+    try { entry = themes.list().find((x) => x.id === id) || null; } catch (e) { entry = null; }
     markThemeSwitch();
     settings.set({ theme: id, themeReopen: reopen.length ? reopen : null, themeDesktops: desktopsForThemeSwitch() });
     lord.settings.save(JSON.stringify(settings.get(), null, 2));
-    return lord.themes.use(id);
+    showThemeSwitch(entry?.name || id);
+    if (lord.themes.use(id)) return true;
+    // not switched (lord-server answered before touching anything): the session goes on in this style
+    hideThemeSwitch();
+    settings.set({ theme: before.theme ?? null, themeReopen: before.themeReopen ?? null, themeDesktops: before.themeDesktops ?? null });
+    unmarkThemeSwitch();
+    lord.settings.save(JSON.stringify(settings.get(), null, 2));
+    try { entry = themes.list().find((x) => x.id === id) || entry; } catch (e) { /* keep the one read before */ }
+    notifyThemeNotApplied(entry || { id });
+    return false;
   },
 };
 
@@ -297,7 +334,17 @@ export function startShell(element) {
   startDesktops();
   const wanted = settings.get().theme;
   const current = themes.current();
-  if (wanted && current && wanted !== current && lord.themes.use(wanted)) return;
+  if (wanted && current && wanted !== current) {
+    if (lord.themes.use(wanted)) return;
+    // the chosen theme didn't start (it threw, or was refused at login) and lord-server kept this one: the choice
+    // goes back to the theme that runs, and the person is told why the style didn't change
+    let entry = null;
+    try { entry = themes.list().find((x) => x.id === wanted) || null; } catch (e) { entry = null; }
+    if (entry?.failed) {
+      settings.set({ theme: current });
+      notifyThemeNotApplied(entry);
+    }
+  }
   try { lord.input?.pointerAccent?.(null); } catch (e) { /* older server */ }   // LordOS's black arrow; a theme may tint it (setPointerAccent)
   refreshPackages();                    // after the theme's configureWindows
   startAppsOff();                       // deactivated apps open nothing; their background work stays off (appsoffactions.js)
@@ -321,6 +368,7 @@ export function startShell(element) {
   startHardware();                      // Night Light, idle timers, battery in the menu bar (hardware.jsx)
   startTray();                          // the tray icons of Linux apps next to the status items (trayitems.jsx)
   startDiskWatch();                     // notices when a disk gets too hot or its health gets worse
+  startSentinela();                     // the process guard, once the person turns it on (docs/SENTINELA.md)
   startVideo();                         // browser video without hardware decoding (video.js, docs/VIDEO.md)
   startBrowserFrame();                  // "Browsers: tabs in the title bar" left for Chromium to quit (browserframe.js)
   setTimeout(sweepUninstalledGrants, 5000); // a screen-share grant doesn't outlive its app (share.js)
@@ -388,7 +436,7 @@ function LocaleRoot({ children }) {
     at('modal', PrintDialog, RestorePrompt, FirstStart),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, CaptureCorner, DisplayIdentify, VoicePlayer),
     at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, ShotOverlay, WebAppAskPrompt, WebAppInspectPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
-    at('input', OskPanel, ImeOverlay));
+    at('input', OskPanel, ImeOverlay, ThemeSwitchOverlay));   // the style changing: over everything (themeswitch.jsx)
 }
 // the wallpaper slideshow (0.8.9; a theme turns it on in theme.json: sdk/thememeta.js)
 export { SlideshowWallpapers, slideSrc, slideshowPrefs, slideshowPatch, slideshowStop, slideshowCategories, SLIDESHOW_EVERY } from './slideshow.jsx';

@@ -14,6 +14,10 @@
   "never": "Encara no hi ha còpies",
   "next": "Següent: {when}",
   "lastError": "L’última còpia ha fallat: {error}",
+  "machinesBusy": {
+    "one": "{count} màquina estava en marxa: els seus discos en aquesta còpia són els de l’anterior",
+    "other": "{count} màquines estaven en marxa: els seus discos en aquesta còpia són els de l’anterior"
+  },
   "todayAt": "avui a les {time}",
   "now": "Fes una còpia ara",
   "pause": "Pausa",
@@ -77,6 +81,10 @@
   "delete": "Elimina la còpia",
   "restoreAll": "Restaura-ho tot",
   "restoreItem": "Restaura «{name}»",
+  "restoreSelected": "Restaura la selecció ({count})",
+  "restoringItem": "S'està restaurant {index} de {count}: {name}",
+  "restoreItemFailed": "No s'ha pogut restaurar «{name}»: {error}",
+  "restoreMoreFailed": "Altres sense restaurar: {count}",
   "restoreFolder": "Restaura aquesta carpeta",
   "restorePick": "Tria què vols restaurar",
   "restoreAllTitle": "Vols restaurar tota la carpeta personal?",

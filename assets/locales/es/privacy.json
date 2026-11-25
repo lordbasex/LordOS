@@ -65,5 +65,6 @@
   "ask.vr": "«{app}» quiere usar el visor de realidad virtual {headset}",
   "ask.vrNote": "Su pantalla pasa a ser solo de la app; LordOS nunca muestra tu escritorio ahí. Se le quita cuando la app se cierra, desconectás el visor o se bloquea la pantalla. Podés cambiarlo después en Ajustes → Privacidad.",
   "perm.vr": "Visores de realidad virtual",
-  "permHint.vr": "Apps que pueden manejar directamente la pantalla de un visor de realidad virtual. Solo se prestan visores, nunca tus monitores, y se les quitan cuando se bloquea la pantalla, cambiás de usuario o elegís Denegar."
+  "permHint.vr": "Apps que pueden manejar directamente la pantalla de un visor de realidad virtual. Solo se prestan visores, nunca tus monitores, y se les quitan cuando se bloquea la pantalla, cambiás de usuario o elegís Denegar.",
+  "protectedCapture": "Ventana protegida"
 }

@@ -258,6 +258,30 @@ with a featured banner, then the AI shelf and a shelf per category; an app's pag
 (version, size, category, distribution). The hardware suggestions moved to their own page, **For this
 computer** (below). Store → Installed shows each native LordOS app's own version.
 
+**The origins' shape (in development; the latest release is 0.8.9.5; asked by the maintainer on 2026-11-23).** Every
+package system's section (GNU/Linux apps (Debian), Flathub apps, Web apps (PWA), LordOS apps: one name each, in the
+sidebar, the titles, the search fields and Installed's filters) opens on its shop with nothing above it. Its second
+column is **Installed** (that system's installed apps), **Settings** (`apps/store/sectionsettings.js` and each system's
+own: what the system is, its switches, turning it off, the package lists' last check with Check for updates and the
+automatic check) and its **Categories**. The title bar has an update icon next to the search where there is something
+to fetch (Flathub's catalog; the package lists for GNU/Linux apps and LordOS apps), and the search field searches only
+that section ("Search Flathub apps"); Discover and Installed search every system, and the other Store pages send a
+search to Discover. Sections are `src:debian`, `src:flathub`, `src:web` and `src:lordos`, with `sub` null (the shop),
+a category, `installed` or `settings` (`apps/store/installedmodel.js`).
+
+**LordOS apps, LordOS's own store (in development; the latest release is 0.8.9.5).** Its shop lists LordOS's own
+installable apps and components as cards, from `assets/store/lordos-apps.json` (`apps/store/lordosmodel.js` reads and
+checks it: a known `kind`, an id, a package name, an `open` that is an app id or a Store page; a new native app is an
+entry and its two texts, `store.native.<id>.name` and `.summary`, in every language). Kinds: `deb` (a package of
+LordOS's repository: the usual package page, the plan and `pkg-install`), `catalog` (an `apt/catalog.json` item with its
+own page: Disk Formats, licenses first) and `settings` (installed from Settings: the voices). The first four:
+`lordos-studio-camera`, `lordos-disk-formats`, `lordos-web` and the `lordos-voice-*` models. Studio Camera stays a
+hardware suggestion in For this computer, and Disk Formats stays in Commercial; hardware drivers (NVIDIA and the rest)
+stay in For this computer only, and `lordos-rclone` and `lordos-hwdata` aren't offered (every install has them). Its
+Installed lists the installed items (View, Open) and the installed `.lpk` apps (trust, Restore, Share, Remove, Open);
+the `.lpk` files in the home folder are listed under the shop's cards. Store → Installed lists the items too, under
+the LordOS apps filter. Links open an item's page with `{ page: 'lordos', native: '<id>' }`.
+
 **Web apps in the Store (0.8.8.8).** The Web apps section lists the web app catalog
 (`assets/webapps/catalog.json`, 37 apps), and Discover shows a web apps banner and shelf after the AI
 shelf; search and each category's page show the matching web apps too. Every card has a "Web app" tag.

@@ -82,8 +82,25 @@ static void test_canon(void) {
     char vid[40];
     CHECK(!fw_vm_scope("app-lordos-lordos-vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope", vid, sizeof vid) &&
           !strcmp(vid, "0f8e2a6c-1b2d-4c3e-9a7b-112233445566"));
-    CHECK(!fw_scope_app("app-lordos-lordos-vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope", o, sizeof o) && !strcmp(o, "lordos:machines"));
+    /* (Machines to 100 %) each machine its own app, under the Machines component */
+    CHECK(!fw_scope_app("app-lordos-lordos-vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope", o, sizeof o) &&
+          !strcmp(o, "lordos:vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566"));
+    CHECK(fw_app_parent("lordos:vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566") && !strcmp(fw_app_parent("lordos:vm-0f8e"), FW_APP_MACHINES));
+    const char *notvm[] = { "lordos:vm-", "lordos:vm-ABC", "lordos:vm-0f8e2a6c-1b2d-4c3e-9a7b-1122334455667", "lordos:vm-0f8e/x",
+                            "lordos:machines", FW_APP_TOR_GATEWAY, "desktop:lordos:vm-0f8e", "xlordos:vm-0f8e", "lordos:vm-0f8e ", NULL };
+    for (int i = 0; notvm[i]; i++) CHECK(!fw_app_parent(notvm[i]));
+    CHECK(!fw_app_parent(NULL));
+    CHECK(!fw_vm_app("0f8e", o, sizeof o) && !strcmp(o, "lordos:vm-0f8e"));
+    CHECK(fw_vm_app("tor-0f8e", o, sizeof o) == -1 && fw_vm_app("", o, sizeof o) == -1 && fw_vm_app("0f8e", o, 8) == -1 && fw_vm_app(NULL, o, sizeof o) == -1);
     CHECK(!fw_scope_app("lordos-net-machines.scope", o, sizeof o) && !strcmp(o, "lordos:machines"));
+    /* (Whonix groups) a group's Tor gateway: its own app, its machine's id */
+    CHECK(!fw_vm_scope("app-lordos-lordos-vm-tor-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope", vid, sizeof vid) &&
+          !strcmp(vid, "0f8e2a6c-1b2d-4c3e-9a7b-112233445566"));
+    CHECK(fw_vm_scope_tor("app-lordos-lordos-vm-tor-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope") == 1);
+    CHECK(fw_vm_scope_tor("app-lordos-lordos-vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope") == 0);
+    CHECK(fw_vm_scope_tor("app-lordos-firefox.scope") == -1 && fw_vm_scope_tor("app-lordos-lordos-vm-tor-.scope") == -1);
+    CHECK(!fw_scope_app("app-lordos-lordos-vm-tor-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope", o, sizeof o) && !strcmp(o, FW_APP_TOR_GATEWAY));
+    CHECK(fw_scope_app("app-lordos-lordos-vm-tor-x.scope", o, sizeof o) == -1 && fw_scope_app("app-lordos-lordos-vm-torx-0f8e.scope", o, sizeof o) == -1);
     CHECK(!fw_scope_app("lordos-net-mail.scope", o, sizeof o) && !strcmp(o, "lordos:mail"));
     CHECK(!fw_scope_app("app-lordos-firefox.scope", o, sizeof o) && !strcmp(o, "desktop:firefox"));
     CHECK(!fw_scope_app("app-lordos-lpk-notes.scope", o, sizeof o) && !strcmp(o, "lpk:notes"));
@@ -370,6 +387,55 @@ static void test_precedence(void) {
     fw_app_forget(s, A);
     CHECK(fw_rule_count(s) == 0);
     CHECK(dec(s, A, "8.8.8.8", 80, NULL).reason == FW_BY_MODE);
+    fw_store_free(s);
+}
+
+/* (Machines to 100 %) a machine's own app never loosens what the Machines component decides */
+static void test_machine_inherits(void) {
+    FwStore *s = fw_store_new();
+    const char *VM = "lordos:vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566", *VM2 = "lordos:vm-aa";
+    fw_set_mode(s, FW_MODE_DENY);
+    /* nothing yet: the mode decides for both */
+    CHECK(dec(s, VM, "8.8.8.8", 443, NULL).verdict == FW_V_DENY);
+    /* a Machines rule decides for every machine */
+    uint32_t mid = add(s, FW_APP_MACHINES, FW_OUT, "internet", FW_ALLOW);
+    FwDecision d = dec(s, VM, "8.8.8.8", 443, NULL);
+    CHECK(d.verdict == FW_V_ALLOW && d.reason == FW_BY_RULE && d.rule_id == mid);
+    CHECK(dec(s, VM2, "8.8.8.8", 443, NULL).verdict == FW_V_ALLOW);
+    /* one machine's own deny of the same destination wins the tie (deny beats allow) and touches no other */
+    uint32_t vid = add(s, VM, FW_OUT, "internet", FW_DENY);
+    d = dec(s, VM, "8.8.8.8", 443, NULL);
+    CHECK(d.verdict == FW_V_DENY && d.rule_id == vid);
+    CHECK(dec(s, VM2, "8.8.8.8", 443, NULL).verdict == FW_V_ALLOW);
+    /* a Machines deny of the same destination beats a machine's allow of it */
+    FwStore *t = fw_store_new();
+    fw_set_mode(t, FW_MODE_SILENT);
+    add(t, VM, FW_OUT, "internet", FW_ALLOW);
+    uint32_t md = add(t, FW_APP_MACHINES, FW_OUT, "internet", FW_DENY);
+    d = dec(t, VM, "8.8.8.8", 443, NULL);
+    CHECK(d.verdict == FW_V_DENY && d.rule_id == md);
+    /* the Machines component's restrictions hold for every machine; trusting the machine doesn't lift them */
+    fw_set_restricted(t, FW_APP_MACHINES, FW_R_NO_INTERNET);
+    fw_set_trusted(t, VM, 1);
+    d = dec(t, VM, "1.1.1.1", 80, NULL);
+    CHECK(d.verdict == FW_V_DENY && d.reason == FW_BY_RESTRICTED && d.flag == FW_R_NO_INTERNET);
+    CHECK(fw_effective_restricted(t, VM) == FW_R_NO_INTERNET && fw_restricted(t, VM) == 0);
+    CHECK(fw_effective_trusted(t, VM) && !fw_effective_trusted(t, VM2));
+    /* inbound (a forwarded port): Machines' no-incoming holds for the machine */
+    fw_set_restricted(t, FW_APP_MACHINES, FW_R_NO_INCOMING);
+    FwQuery q = qry(VM, FW_IN, NULL, 2222, NULL);
+    CHECK(fw_decide(t, &q).verdict == FW_V_DENY);
+    /* the Tor gateway inherits nothing and keeps its built-in restriction */
+    fw_set_restricted(t, FW_APP_MACHINES, 0);
+    add(t, FW_APP_MACHINES, FW_OUT, "any", FW_ALLOW);
+    q = qry(FW_APP_TOR_GATEWAY, FW_OUT, "8.8.8.8", 53, NULL);
+    q.proto = FW_PROTO_UDP;
+    CHECK(fw_decide(t, &q).verdict == FW_V_DENY);
+    CHECK(fw_effective_restricted(t, FW_APP_TOR_GATEWAY) == FW_R_TOR_UPLINK);
+    /* an id that isn't a machine's never inherits (an app named like it is just an app) */
+    CHECK(!fw_app_parent("desktop:lordos-vm-aa") && fw_effective_restricted(t, "desktop:x") == 0);
+    CHECK(fw_effective_restricted(t, "bad id") == FW_R_NO_NETWORK);
+    fw_store_free(t);
     fw_store_free(s);
 }
 
@@ -750,6 +816,7 @@ int main(void) {
     test_deny_mode_and_lists();
     test_precedence();
     test_restricted();
+    test_machine_inherits();
     test_lifetimes();
     test_json();
     test_random();

@@ -65,5 +65,6 @@
   "ask.vr": "«{app}» vuole usare il visore VR {headset}",
   "ask.vrNote": "Il suo display passa alla sola app; LordOS non vi mostra mai la tua scrivania. Viene ripreso quando l’app si chiude, il visore viene scollegato o lo schermo si blocca. Puoi cambiarlo in seguito in Impostazioni → Privacy.",
   "perm.vr": "Visori VR",
-  "permHint.vr": "App che possono pilotare direttamente il display di un visore VR. Vengono prestati solo visori, mai i tuoi monitor, e vengono ripresi quando lo schermo si blocca, cambi utente o scegli Nega."
+  "permHint.vr": "App che possono pilotare direttamente il display di un visore VR. Vengono prestati solo visori, mai i tuoi monitor, e vengono ripresi quando lo schermo si blocca, cambi utente o scegli Nega.",
+  "protectedCapture": "Finestra protetta"
 }

@@ -8,7 +8,7 @@
 //
 // Keys go through lord.input.tap, which exists only in this process and the login screen's, down the
 // same path as a physical key. Nothing here keeps what is typed, offers suggestions or remembers
-// keys; the panel is `protected`, so it is black in screenshots, recordings and remote desktop.
+// keys; the panel is `protected`, so it is the protected fill in screenshots, recordings and remote desktop.
 import { addListener, displayFor, mainDisplay, onCommit, shellHasKeyboard } from '@lordos/runtime';
 import { createStore } from './store.js';
 import { settings } from './settings.js';

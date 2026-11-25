@@ -14,6 +14,10 @@
   "never": "Ainda não foi feita nenhuma cópia",
   "next": "Próxima: {when}",
   "lastError": "A última cópia falhou: {error}",
+  "machinesBusy": {
+    "one": "{count} máquina estava em execução: os discos dela nesta cópia são os da anterior",
+    "other": "{count} máquinas estavam em execução: os discos delas nesta cópia são os da anterior"
+  },
   "todayAt": "hoje às {time}",
   "now": "Copiar agora",
   "pause": "Pausar",
@@ -77,6 +81,10 @@
   "delete": "Apagar cópia",
   "restoreAll": "Restaurar tudo",
   "restoreItem": "Restaurar “{name}”",
+  "restoreSelected": "Restaurar seleção ({count})",
+  "restoringItem": "Restaurando {index} de {count}: {name}",
+  "restoreItemFailed": "Não foi possível restaurar “{name}”: {error}",
+  "restoreMoreFailed": "Outros não restaurados: {count}",
   "restoreFolder": "Restaurar esta pasta",
   "restorePick": "Escolha o que restaurar",
   "restoreAllTitle": "Restaurar toda a pasta pessoal?",

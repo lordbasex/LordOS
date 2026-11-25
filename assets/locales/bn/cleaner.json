@@ -464,5 +464,6 @@
   },
   "select.nothing": "কিছুই বেছে নেওয়া হয়নি",
   "activity.app": "অ্যাপ সরানো হয়েছে",
-  "activity.system": "সিস্টেম পরিষ্কার: {name}"
+  "activity.system": "সিস্টেম পরিষ্কার: {name}",
+  "map.machines": "মেশিনে জায়গা ফেরত নিন"
 }

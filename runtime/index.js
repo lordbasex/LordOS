@@ -256,9 +256,19 @@ function layerCount(container, d) {
   if (!container.layer) return;
   container.count = Math.max(0, (container.count || 0) + d);
 }
+// A shell menu that is open (the menu bar's, the Dock's, a right-click's) holds the keyboard too, wherever it lives:
+// the popover layer also keeps things that never take keys (desktop widgets, snap targets). Its keys are the menu's,
+// Escape included: none reaches a Linux app or a machine's guest (Machines asks wm.hasKeyboard at each key).
+let keyboardHolds = 0;
+export function holdKeyboard() {
+  let held = true;
+  keyboardHolds++;
+  layersCommitted();
+  return () => { if (!held) return; held = false; keyboardHolds--; layersCommitted(); };
+}
 function layersCommitted() {
-  let busy = false;
-  for (const [z, c] of layerNodes) if (KEYBOARD_LAYERS.has(z) && c.count > 0) { busy = true; break; }
+  let busy = keyboardHolds > 0;
+  if (!busy) for (const [z, c] of layerNodes) if (KEYBOARD_LAYERS.has(z) && c.count > 0) { busy = true; break; }
   if (busy === keyboardBusy) return;
   keyboardBusy = busy;
   for (const fn of keyboardWatchers) { try { fn(busy); } catch (e) { console.error(e); } }

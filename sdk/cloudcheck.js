@@ -1,6 +1,8 @@
 // cloudcheck.js — Check This Account (docs/CLOUD.md 19): one account's files checked end to end through its folder
 // in ~/Cloud with lord.fs and cloud.* only, and the report people can send to mark a provider verified. Pure: the
-// runner takes what it uses (env) so the tests run it against stand-ins (server/tests/cloud_model_test.mjs).
+// runner takes what it uses (env) so the tests run it against stand-ins (server/tests/cloud_model_test.mjs). Every
+// env.fs call that touches the account's folder is awaited: Settings gives it the calls that run off lord-server's
+// main thread (each is a call to the provider through rclone; reading the freed file back downloads it).
 //
 //   runCheck(account, env, onStep) → Promise<[{ id, result: 'pass'|'fail'|'skipped', ms, note }]>
 //   buildReport({ version, arch, rclone, kind, label, verified, ownApp, aboutFields, linksSupported, steps }) → text
@@ -60,13 +62,13 @@ export async function runCheck(acc, env, onStep = () => {}) {
     const got = await until(() => !!account().about, ABOUT_TIMEOUT);
     return got ? true : { skipped: true, note: 'noSpaceInfo' };
   });
-  if (!await run('list', () => { root = fs.list(acc.mount); return Array.isArray(root); })) { skipRest('folder'); return steps; }
+  if (!await run('list', async () => { root = await fs.list(acc.mount); return Array.isArray(root); })) { skipRest('folder'); return steps; }
   const f = checkFolder(account(), root, tag);
   folder = f.path; file = `${folder}/check.bin`;
-  if (!await run('folder', () => { fs.mkdir(folder); made = true; return !!fs.stat(folder).dir; })) { skipRest('write'); return steps; }
+  if (!await run('folder', async () => { await fs.mkdir(folder); made = true; return !!(await fs.stat(folder)).dir; })) { skipRest('write'); return steps; }
   const bytes = randomBytes(CHECK_SIZE, seed ^ 0x1234567);
   const want = hashBytes(bytes);
-  let wrote = await run('write', () => { fs.write(file, bytes.buffer); return fs.stat(file).size === CHECK_SIZE; });
+  let wrote = await run('write', async () => { await fs.write(file, bytes.buffer); return (await fs.stat(file)).size === CHECK_SIZE; });
   if (wrote) {
     const upOk = await run('up', async () => {
       const seen = { up: false };
@@ -91,8 +93,8 @@ export async function runCheck(acc, env, onStep = () => {}) {
         if (!ok) throw Object.assign(new Error(''), { code: `cloud.notFreed.${((last && last.skipped && last.skipped[0]) || {}).reason || 'unknown'}` });
         return true;
       });
-      await run('read', () => {
-        const got = hashBytes(new Uint8Array(fs.read(file, 'binary')));
+      await run('read', async () => {
+        const got = hashBytes(new Uint8Array(await fs.read(file, 'binary')));
         if (got !== want) throw Object.assign(new Error(''), { code: 'cloud.checkMismatch' });
         return true;
       });
@@ -117,20 +119,20 @@ export async function runCheck(acc, env, onStep = () => {}) {
       if (j) fs.forgetJob(job);
       if (!done || (j && j.failed)) throw Object.assign(new Error(''), { code: 'cloud.checkDeleteFailed' });
       try {
-        fs.trash(scratch);
+        await fs.trash(scratch);
         const t = (fs.trashList() || []).find((x) => x.original === scratch);
         if (t) fs.removeFromTrash(t.id);
       } catch (e) { /* the scratch copy is only in the home */ }
       let gone = false;
-      try { fs.stat(folder); } catch (e) { gone = true; }
+      try { await fs.stat(folder); } catch (e) { gone = true; }
       return gone;
     });
     // gone from a fresh listing of its parent, and nothing of it waiting to go up (another file of a busy account may)
     const parent = folder.slice(0, folder.lastIndexOf('/')), leaf = folder.slice(folder.lastIndexOf('/') + 1);
     if (okDel) {
-      await run('deleteUp', async () => (await until(() => {
+      await run('deleteUp', async () => (await until(async () => {
         const s = (cloud.status([folder]) || {})[folder];
-        return !(fs.list(parent) || []).some((e) => e.name === leaf) && !(s && s.st === 'up');
+        return !((await fs.list(parent)) || []).some((e) => e.name === leaf) && !(s && s.st === 'up');
       }, DELETE_TIMEOUT, 1000)) || (() => { throw Object.assign(new Error(''), { code: 'cloud.checkTimeout' }); })());
     } else skipRest('deleteUp');
   } else skipRest('delete');

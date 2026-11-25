@@ -81,7 +81,7 @@ static void command(int fd, char *line) {
     if (n >= 3 && !strcmp(verb, "ptr") && a >= 0 && b >= 0 && a < 16384 && b < 16384) { host.pointer((int)a, (int)b); reply(fd, "ok", -1); return; }
     if (n >= 3 && !strcmp(verb, "btn") && a >= 0 && a < 8 && (b == 0 || b == 1)) { host.button((int)a, (int)b); reply(fd, "ok", -1); return; }
     if (n >= 2 && !strcmp(verb, "wheel") && a >= -100 && a <= 100) { host.wheel((int)a); reply(fd, "ok", -1); return; }
-    if (n >= 3 && !strcmp(verb, "key") && (a == 29 || a == 42 || a == 56 || a == 125) && (b == 0 || b == 1) && host.key) {
+    if (n >= 3 && !strcmp(verb, "key") && a > 0 && a < 0x300 && (b == 0 || b == 1) && host.key) {
         host.key((int)a, (int)b);
         reply(fd, "ok", -1);
         return;
@@ -97,6 +97,17 @@ static void command(int fd, char *line) {
     }
     if (sscanf(line, "%15s %15s", verb, arg) == 2 && !strcmp(verb, "lease") && (!strcmp(arg, "plug") || !strcmp(arg, "unplug"))) {
         reply(fd, host.lease(!strcmp(arg, "plug")) ? "err lease" : "ok", -1);
+        return;
+    }
+    if (sscanf(line, "%15s %15s %ld", verb, arg, &a) >= 2 && !strcmp(verb, "frame") && host.frame &&
+        (!strcmp(arg, "output") || !strcmp(arg, "screenshot") || !strcmp(arg, "mirror") || !strcmp(arg, "portal") || !strcmp(arg, "window"))) {
+        reply(fd, host.frame(arg, a) ? "err frame" : "ok", -1);
+        return;
+    }
+    if (!strcmp(line, "painted") && host.painted) {
+        char r[40];
+        snprintf(r, sizeof r, "ok %lld", host.painted());
+        reply(fd, r, -1);
         return;
     }
     if (!strcmp(line, "xwl")) {

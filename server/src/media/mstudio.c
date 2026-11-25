@@ -74,7 +74,7 @@ static int dev_ok(const char *d) {
     return 1;
 }
 
-int mstudio_is_loopback_card(const char *card) { return card && !strcmp(card, STUDIO_LOOPBACK_CARD); }
+int mstudio_is_loopback_card(const char *card) { return studio_card_is_ours(card); }
 
 /* a V4L2 device that captures and streams, and isn't LordOS Studio's own loopback; name: its card (or NULL) */
 static int is_camera_named(const char *dev, char *name, size_t n) {
@@ -524,7 +524,11 @@ static void hub_scan(void) {
     use_send(json);
 }
 
+static int hub_off;
+void mstudio_hub_off(void) { hub_off = 1; }
+
 void mstudio_tick(void) {
+    if (hub_off) return;
     double t = now_s();
     if (t < hub.tick_at) return;
     hub.tick_at = t + 1.0;

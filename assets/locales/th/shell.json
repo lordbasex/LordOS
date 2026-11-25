@@ -579,9 +579,12 @@
   "ws.lock.on": "ล็อกหน้าต่างของจอนี้",
   "ws.lock.off": "ปลดล็อกหน้าต่างของจอนี้",
   "ws.lock.window": "ล็อกอยู่: ปลดล็อกจากแม่กุญแจในกรอบ",
-  "ws.minimized.label": "ย่อไว้",
-  "ws.minimized.title": "หน้าต่างที่ย่อไว้บนจอนี้: คลิกเพื่อเรียกกลับมา",
   "ws.slot.free": "พื้นที่ว่าง: เปิดแอปหรือเรียกหน้าต่างที่ย่อไว้กลับมา",
+  "ws.windows.title": "หน้าต่างของกิจกรรมนี้บนจอนี้ (มีเส้นใต้หน้าต่างที่ย่อไว้): คลิกเพื่อนำมาไว้ด้านหน้า คลิกขวาเพื่อดูหน้าต่างของแอปนั้น",
+  "ws.profile.ask": "ให้เบราว์เซอร์เลือก",
+  "ws.profile.open": "เปิดโปรไฟล์ {profile}",
+  "ws.profile.activity": "โปรไฟล์ที่กิจกรรมนี้เปิด",
+  "ws.profile.display": "โปรไฟล์ที่จอนี้เปิด ({display})",
   "ws.snapfly.title": "จัดวางหน้าต่าง",
   "ws.snapfly.halves": "ครึ่ง",
   "ws.snapfly.thirds": "สามส่วน",
@@ -965,5 +968,12 @@
   "capture.what.viaStudioPlain": "กล้องผ่าน LordOS Studio",
   "capture.what.effectsOn": "เปิดเอฟเฟกต์",
   "capture.what.effectsOff": "ไม่มีเอฟเฟกต์",
-  "shortcuts.captureWindow": "จับภาพหน้าต่าง"
+  "shortcuts.captureWindow": "จับภาพหน้าต่าง",
+  "themeSwitch.changing": "กำลังเปลี่ยนสไตล์เดสก์ท็อป…",
+  "themeSwitch.changingTo": "กำลังเปลี่ยนเป็น {name}…",
+  "themeSwitch.failedTitle": "ใช้ {name} ไม่ได้",
+  "themeSwitch.refusedBody": "โค้ดของธีมนี้ไม่ตรงกับสำเนาที่ลงนามของ LordOS จึงไม่ได้โหลด สไตล์เดสก์ท็อปของคุณยังคงเหมือนเดิม",
+  "themeSwitch.failedBody": "ธีมนี้ไม่เริ่มทำงาน สไตล์เดสก์ท็อปของคุณยังคงเหมือนเดิม",
+  "spotlight.section.machines": "เครื่องเสมือน",
+  "guestApps.inMachine": "ใน {machine}"
 }

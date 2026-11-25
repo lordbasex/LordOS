@@ -65,5 +65,6 @@
   "ask.vr": "„{app}” chce używać gogli VR {headset}",
   "ask.vrNote": "Ich ekran należy wtedy tylko do aplikacji; LordOS nigdy nie pokazuje tam twojego pulpitu. Zostaje odebrany, gdy aplikacja się zamknie, gogle zostaną odłączone lub ekran się zablokuje. Możesz to później zmienić w Ustawienia → Prywatność.",
   "perm.vr": "Gogle VR",
-  "permHint.vr": "Aplikacje, które mogą bezpośrednio sterować ekranem gogli VR. Wypożyczane są tylko gogle, nigdy twoje monitory, i są odbierane, gdy ekran się zablokuje, zmienisz użytkownika lub wybierzesz Odmów."
+  "permHint.vr": "Aplikacje, które mogą bezpośrednio sterować ekranem gogli VR. Wypożyczane są tylko gogle, nigdy twoje monitory, i są odbierane, gdy ekran się zablokuje, zmienisz użytkownika lub wybierzesz Odmów.",
+  "protectedCapture": "Chronione okno"
 }

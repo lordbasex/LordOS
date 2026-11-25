@@ -71,7 +71,7 @@ QJS_OBJ := $(patsubst %,build/qjs/%.o,quickjs libregexp libunicode cutils dtoa)
 
 # .lpk app isolation, permissions and signing (src/sec, see docs/PRIVACY.md and docs/SIGNING.md)
 # Monitor: metrics, connections and the country of an IP (src/monitor, see docs/MONITOR.md)
-MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
+MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/exeown.c src/monitor/describe.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
 # Media (src/media, docs/MEDIA.md): only the lord-server side. Only lord-media links FFmpeg.
 MEDIA_SRC := src/media/mstudio.c src/media/mstudiohub.c src/ui/js_studio.c src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
@@ -99,6 +99,7 @@ SRC += src/ui/js_guestwin.c
 SRC += src/ui/js_vmcli.c src/vm/vmcli.c
 # Machines' pictures the desktop's GPU can't import (an Intel GVT-g machine's Y-tiled dmabufs): read on their own render node
 SRC += src/gpu/dmaread.c
+SRC += src/remote/greeterscale.c
 SRC += src/wl/wlcolor.c src/wl/colorconv.c
 # Shell extras (src/wl/wlshell.h): xdg-toplevel-drag, xdg-toplevel-tag, xdg-system-bell, xdg-session-management,
 # ext-background-effect, one file each
@@ -221,7 +222,7 @@ ALL += build/lord-claude-status
 # builds and the service warns that it has no BPF. No libbpf or bcc.
 .DEFAULT_GOAL := all
 BPF ?= $(shell command -v clang >/dev/null 2>&1 && echo 1 || echo 0)
-NP_SRC := src/netperm/netperm.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/npdiag.c \
+NP_SRC := src/netperm/netperm.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/npdiag.c src/netperm/nplocal.c \
           src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/sec/json.c
 ALL += build/lord-netperm
 ifeq ($(BPF),1)
@@ -249,6 +250,21 @@ build/npverify-test: tests/npverify_test.c src/netperm/bpfsys.c $(wildcard src/n
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/npverify_test.c src/netperm/bpfsys.c
 	./$@ || { rm -f $@; exit 1; }
+# tests/np_torgw_test.c (Whonix groups): the Tor gateway's built-in restriction in the real kernel, as root, on a
+# throwaway cgroup of its own (never lordos.service or user@); without root it says it skipped. `run` holds the policy
+# around a command (tests/vm_gateway_fw.sh).
+test: build/np-torgw-test
+build/np-torgw-test: tests/np_torgw_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/nplocal.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h) $(NP_GEN)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/np_torgw_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/nplocal.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c
+	./$@ || { rm -f $@; exit 1; }
+# tests/np_slice_test.c (docs/VIRTUALIZATION.md 3.7): a machine's scope one level down in the machines' slice is decided
+# by its own entry (NP_A_SLICE), and by the slice's while it isn't registered; as root, on a throwaway cgroup
+test: build/np-slice-test
+build/np-slice-test: tests/np_slice_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h) $(NP_GEN)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/np_slice_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c
+	./$@ || { rm -f $@; exit 1; }
 endif
 test: build/npcompile-test
 build/npcompile-test: tests/npcompile_test.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h)
@@ -265,6 +281,13 @@ build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC) src/lordlog.c src/users/admingroups.c
 # lordos.service restarts with live sessions on systemd 258+: controllers off and limits back (src/sec/cgroup.c, #140)
+# tests/cgslice_test.c (docs/VIRTUALIZATION.md 3.7): lord-sessiond's placement of a machine's scope into the machines'
+# slice, on a throwaway tree of the real cgroupfs; as root (without root it says it skipped)
+test: build/cgslice-test
+build/cgslice-test: tests/cgslice_test.c src/sec/cgroup.c src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE '-DCG_NETPERM_PROCS="/run/lordos-slicetest/netperm.procs"' -o $@ tests/cgslice_test.c src/sec/cgroup.c
+	./$@ || { rm -f $@; exit 1; }
 test: build/cgroup-restart-test
 build/cgroup-restart-test: tests/cgroup_restart_test.c src/sec/cgroup.c src/sec/cgroup.h
 	@mkdir -p build
@@ -347,7 +370,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/popup-client build/wlperf-client build/syncobj-client build/wltiming-client build/syncobj-kernel-test build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/popup-client build/wlperf-client build/syncobj-client build/wltiming-client build/syncobj-kernel-test build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-guest-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -724,6 +747,13 @@ build/apps-actions-test: tests/apps_actions_test.c $(LAUNCH_CLI_SRC) src/apps.h 
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/apps_actions_test.c $(LAUNCH_CLI_SRC)
 	./$@ || { rm -f $@; exit 1; }
+# tests/apps_profile_test.c: lord.apps.launchProfile (approved 2026-11-24): the browser table, its system .desktop, the
+# profile folder its own Local State lists (hostile files refused), the one argv element built in C
+test: build/apps-profile-test
+build/apps-profile-test: tests/apps_profile_test.c $(LAUNCH_CLI_SRC) src/apps.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/apps_profile_test.c $(LAUNCH_CLI_SRC)
+	./$@ || { rm -f $@; exit 1; }
 # tests/iconfind_test.c: where an icon name's file is (src/iconfind.c): PNG, then SVG, then symbolic, over a made-up tree
 test: build/iconfind-test
 build/iconfind-test: tests/iconfind_test.c src/iconfind.c src/iconfind.h
@@ -811,17 +841,26 @@ build/backup-test: tests/backup_test.c src/backup/engine.c src/backup/crypt.c sr
 build/mmdb-test: tests/mmdb_test.c src/monitor/mmdb.c src/monitor/mmdb.h src/pkg/xz.c build/obj/ui/stb.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/mmdb_test.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o -lm
 # drawing time of the Monitor's vector map (not a test: it measures; see docs/MONITOR.md)
-build/map-bench: tests/map_bench.c src/monitor/map.c src/monitor/map.h src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/map_bench.c src/monitor/map.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
+build/map-bench: tests/map_bench.c src/monitor/map.c src/monitor/map.h src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/map_bench.c src/monitor/map.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
 # Monitor process actions (src/monitor/procctl.c): the protected list, stat parsing, a signal that
 # refuses a stale start time (PID reuse), TERM/KILL on a child, and the Get Info JSON
 test: build/procctl-test
 # one reading of Monitor → Network's sockets (tests/conn_dump.c), for checking conn.c by hand
-build/conn-dump: tests/conn_dump.c src/monitor/conn.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/conn_dump.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
-build/procctl-test: tests/procctl_test.c src/monitor/procctl.c src/monitor/procctl.h src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/procctl_test.c src/monitor/procctl.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
+build/conn-dump: tests/conn_dump.c src/monitor/conn.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/conn_dump.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
+build/procctl-test: tests/procctl_test.c src/monitor/procctl.c src/monitor/procctl.h src/monitor/exeown.c src/monitor/exeown.h src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/procctl_test.c src/monitor/procctl.c src/monitor/exeown.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
+# (0.8.9.6) Monitor → Get Info's description (src/monitor/describe.c): Debian's Description-md5, a package's description
+# and its translation, manual pages' NAME, a unit's Description=
+test: build/describe-test
+build/describe-test: tests/describe_test.c src/monitor/describe.c src/monitor/describe.h src/pkg/xz.c src/sec/json.c build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -fsanitize=address,undefined -fno-sanitize-recover=undefined -o $@ tests/describe_test.c src/monitor/describe.c src/pkg/xz.c src/sec/json.c build/obj/ui/stb.o -lm -lpthread
+	./$@ || { rm -f $@; exit 1; }
+# the same from the command line, for tests/describe_coverage.mjs (a test tool, never installed)
+build/describe-cli: tests/describe_cli.c src/monitor/describe.c src/monitor/describe.h src/monitor/exeown.c src/pkg/xz.c src/sec/json.c build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/describe_cli.c src/monitor/describe.c src/monitor/exeown.c src/pkg/xz.c src/sec/json.c build/obj/ui/stb.o -lm -lpthread
 # Monitor → Voltage (src/monitor/voltage.c): hwmon, batteries and adapters on fake sysfs trees, hostile values
 test: build/voltage-test
 build/voltage-test: tests/voltage_test.c src/monitor/voltage.c src/monitor/voltage.h src/hw/rpifw.c src/hw/rpifw.h
@@ -894,7 +933,7 @@ build/lordlog-test: tests/lordlog_test.c src/lordlog.c src/lordlog.h
 	    -o $@ tests/lordlog_test.c src/lordlog.c
 	./$@ || { rm -f $@; exit 1; }
 build/fsops-test: tests/fsops_test.c src/fsops.c src/fsops.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/fsops_test.c src/fsops.c -lpthread
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFSOPS_TEST -o $@ tests/fsops_test.c src/fsops.c -lpthread
 # lord.fs's Async calls (Files on Cloud and network folders): a slow file system never holds the caller (0.8.8.7)
 build/fsasync-test: tests/fsasync_test.c src/fsasync.c src/fsasync.h src/fsops.c src/fsops.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFSASYNC_TEST -o $@ tests/fsasync_test.c src/fsasync.c src/fsops.c -lpthread
@@ -1013,10 +1052,22 @@ build/moddrag-client: tests/moddrag_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/moddrag_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 build/moddrag-x11: tests/moddrag_x11.c
 	$(CC) $(CFLAGS) -D_GNU_SOURCE $(WARN) -std=c11 -o $@ tests/moddrag_x11.c -lxcb
+# a fullscreen window drawn in a desync subsurface, as Firefox (GitHub #232; tests/fsub_headless.sh)
+build/fsub-client: tests/fsub_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/fsub_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+test: build/fsub-client
+# an X11 app's menus (override-redirect and POPUP_MENU windows) shown, clicked and hidden (GitHub #209; tests/xpopup_headless.sh)
+build/xpopup-x11: tests/xpopup_x11.c
+	$(CC) $(CFLAGS) -D_GNU_SOURCE $(WARN) -std=c11 -o $@ tests/xpopup_x11.c -lxcb
 test: build/moddrag-client build/lord-server-test
 ifneq ($(wildcard /usr/include/xcb/xcb.h),)
-test: build/moddrag-x11
+test: build/moddrag-x11 build/xpopup-x11
 endif
+# An app that runs once, as a browser (tests/handoff_headless.sh, run by tests/run_suites.sh): a later launch hands over to
+# the copy running, which brings its window forward with a token of its own (xdgact.h xact_take_launch)
+build/handoff-client: tests/handoff_client.c $(CLIENT_GEN) build/gen/client/xdg-activation-v1-client-protocol.h build/gen/client/xdg-activation-v1-protocol.c
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/handoff_client.c $(filter build/gen/client/xdg-shell-protocol.c,$(CLIENT_GEN)) build/gen/client/xdg-activation-v1-protocol.c -lwayland-client
+test: build/handoff-client
 # Subsurface order and viewport crop/scale shown in pixels, for tools/wl-proof.mjs's screenshots (docs/wayland-proofs/)
 build/wlproof-client: tests/wlproof_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/wlproof_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
@@ -1178,6 +1229,14 @@ build/media-test: $(MEDIA_TEST_SRC) src/media/proto.h src/media/aring.h src/medi
 build/vt-dump: tests/vt_dump.c build/obj/term/vt.o build/obj/ui/stb.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $^ $(LDLIBS)
 
+# a Machines guest's terminal stream (term_create_fd) never acts on this computer: no clipboard (OSC 52), tmux control
+# mode, links or host-side events (docs/VIRTUALIZATION.md 6.18)
+TERM_GUEST_OBJ := build/obj/term/term.o build/obj/term/vt.o build/obj/ui/stb.o build/obj/term/hold.o build/obj/term/pastefilter.o \
+	build/obj/term/pty.o build/obj/term/tcapture.o build/obj/term/tsecret.o build/obj/term/termfill.o
+build/term-guest-test: tests/term_guest_test.c tests/term_guest_stubs.c src/sec/json.c $(TERM_GUEST_OBJ)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/term_guest_test.c tests/term_guest_stubs.c src/sec/json.c $(TERM_GUEST_OBJ) $(LDLIBS) -lm
+	./$@ || { rm -f $@; exit 1; }
+
 build/term-secret-test: tests/term_secret_test.c src/term/tsecret.c src/term/tcapture.c build/obj/term/vt.o build/obj/ui/stb.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_secret_test.c src/term/tsecret.c src/term/tcapture.c build/obj/term/vt.o build/obj/ui/stb.o $(LDLIBS)
 	./$@ || { rm -f $@; exit 1; }
@@ -1283,7 +1342,8 @@ all: build/lord-server-test
 SESSIOND_OBJ := build/obj/remote/sessiond.o build/obj/remote/sess.o build/obj/remote/monitor.o build/obj/remote/blackfb.o build/obj/remote/conn.o \
                 build/obj/remote/enc.o build/obj/remote/pages.o build/obj/sec/cgroup.o build/obj/remote/netsup.o build/obj/remote/cgsup.o \
                 build/obj/remote/rsec.o build/obj/remote/ipnet.o build/obj/remote/lockout.o build/obj/remote/rtcwire.o build/obj/remote/rtc.o \
-                build/obj/bench/boottest.o build/obj/lordlog.o build/obj/users/admingroups.o
+                build/obj/bench/boottest.o build/obj/lordlog.o build/obj/users/admingroups.o \
+                build/obj/remote/greeterscale.o build/obj/outputs.o
 # The remote desktop shows the screen only over WebRTC (docs/REMOTE.md, "Video (WebRTC)"): our own peer in
 # the bridge, on Debian's libsrtp2 and usrsctp (and OpenSSL's DTLS). lord-sessiond can't be built without
 # them (libsrtp2-dev, libusrsctp-dev).
@@ -1297,6 +1357,13 @@ endif
 build/obj/remote/pages.o: src/remote/login.html src/remote/client.html
 	@mkdir -p $(dir $@)
 	$(LD) -r -b binary -z noexecstack -o $@ src/remote/login.html src/remote/client.html
+# #242: the login screen's scale. lord-sessiond (root) parses the session's request with these: strict shapes, the
+# scale only from out_scale_valid; the fuzz part throws random and mutated messages, files and environments at them.
+test: build/greeterscale-test
+build/greeterscale-test: tests/greeterscale_test.c src/remote/greeterscale.c src/remote/greeterscale.h src/outputs.c src/outputs.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ tests/greeterscale_test.c src/remote/greeterscale.c src/outputs.c -lm
+	./$@ || { rm -f $@; exit 1; }
 # Root over SSH (advanced, src/remote/ssh_root.c): public key lines and fingerprints.
 test: build/ssh-root-test
 build/ssh-root-test: tests/ssh_root_test.c src/remote/ssh_root.c src/remote/ssh_root.h src/pkg/crypto.c
@@ -1311,7 +1378,7 @@ build/blackfb-test: tests/blackfb_test.c src/remote/blackfb.c src/remote/blackfb
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/blackfb_test.c src/remote/blackfb.c -Wl,--wrap=ioctl -Wl,--wrap=mmap -Wl,--wrap=munmap
 	./$@ || { rm -f $@; exit 1; }
 build/lord-sessiond: $(SESSIOND_OBJ)
-	$(CC) $(LDFLAGS) -o $@ $^ $(shell pkg-config --libs openssl) $(SESSIOND_LIBS) -lcrypt -lpthread
+	$(CC) $(LDFLAGS) -o $@ $^ $(shell pkg-config --libs openssl) $(SESSIOND_LIBS) -lcrypt -lpthread -lm
 
 # Version, channel and build of LordOS, shown in About and Settings → General (lord.version and
 # lord.system.info()). Version and channel come from ../package.json ("version" and "lordos": {"channel"}),
@@ -1500,3 +1567,9 @@ build/wallpaper-image-test: tests/wallpaper_image_test.c src/hw/wallpaper_image.
 	$(CC) $(CPPFLAGS) -O1 -g -w -std=gnu11 -fsanitize=address,undefined -fno-sanitize=shift -fno-sanitize-recover=all -o $@ tests/wallpaper_image_test.c src/hw/wallpaper_image.c src/ui/stb.c -lm
 	ASAN_OPTIONS=detect_leaks=0 ./$@ || { rm -f $@; exit 1; }
 test: build/wallpaper-image-test
+
+# a Wayland app that behaves like Google Chrome with profiles (a picker, then the browser window, a dialog told its parent
+# late), for Lord Workspaces' launch placement: tests/launchplace_headless.sh (tests/launchplace_client.c)
+test: build/launchplace-client build/lord-server-test
+build/launchplace-client: tests/launchplace_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/launchplace_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client

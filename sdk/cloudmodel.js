@@ -237,6 +237,24 @@ export function transfers(accounts, id = null) {
   return { down, up };
 }
 
+// #244: the panel's "Now moving" rows: each account's moving files (lord-server sends at most four per account, uploads
+// first, names already cleaned) with their whole percentage, in the panel's account order, filtered like Recent (only)
+// and capped at n; more is how many of the sent ones didn't fit.
+export const MOVING_NAME_MAX = 128;
+export function movingRows(accounts, only = [], n = 4) {
+  const ids = only || [];
+  const all = [];
+  for (const a of accounts || []) {
+    if (!a || isOff(a) || (ids.length && !ids.includes(a.id))) continue;
+    for (const m of Array.isArray(a.moving) ? a.moving : []) {
+      if (!m || typeof m.name !== 'string' || !m.name) continue;
+      const p = Number(m.pct);
+      all.push({ name: m.name.slice(0, MOVING_NAME_MAX), pct: Number.isFinite(p) ? Math.max(0, Math.min(100, Math.floor(p))) : 0, dir: m.up === true ? 'up' : 'down', account: a.id });
+    }
+  }
+  return { rows: all.slice(0, Math.max(0, n)), more: Math.max(0, all.length - Math.max(0, n)) };
+}
+
 // ---- the provider sheet (section 6.1) ----
 
 export const GROUPS = ['oauth', 'server', 'object'];      // crypt (an encrypted folder) shows with object storage, as in the mock

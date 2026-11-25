@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/xattr.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -41,6 +42,73 @@ static void wait_job(int id) {
         usleep(5000);
     }
     CHECK(!"the task did not finish");
+}
+
+/* #243: a Cloud account may still list a file it has just deleted, so the moved folder's rmdir reads ENOTEMPTY */
+extern int (*fsops_test_rmdir)(const char *);
+static char busy_dir[512];
+static int busy_left, busy_calls;
+static int busy_rmdir(const char *p) {
+    if (!strcmp(p, busy_dir)) { busy_calls++; if (busy_left != 0) { if (busy_left > 0) busy_left--; errno = ENOTEMPTY; return -1; } }
+    return rmdir(p);
+}
+/* a job's end: 1 = done, 0 = failed (its error in err), -1 = not done within ms */
+static int job_end(int id, int ms, char *err, size_t n) {
+    for (int k = 0; k < ms / 5; k++) {
+        for (int i = 0; i < FSJOB_MAX; i++) {
+            const FsJob *j = fsjob_get(i);
+            if (j && j->id == id && __atomic_load_n(&j->done, __ATOMIC_ACQUIRE)) {
+                int ok = !j->failed;
+                snprintf(err, n, "%s", j->error);
+                fsjob_forget(id);
+                return ok;
+            }
+        }
+        usleep(5000);
+    }
+    return -1;
+}
+static double now_s(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (double)t.tv_sec + t.tv_nsec / 1e9; }
+static void test_move_busy_folder(void) {
+    /* a cross-disk move (a tmpfs to the test home) whose source folder reads ENOTEMPTY once, then for good */
+    char src[512], dst[512], err[256], f[600];
+    snprintf(src, sizeof src, "/dev/shm/fsops-busy-%d", (int)getpid());
+    struct stat a, b;
+    mkdir(src, 0700);
+    if (lstat(src, &a) || lstat(H, &b) || a.st_dev == b.st_dev) { printf("fsops-test: busy-folder move skipped: needs /dev/shm on its own file system\n"); rmdir(src); return; }
+    snprintf(f, sizeof f, "%s/check.bin", src);
+    FILE *o = fopen(f, "w");
+    if (o) { fputs("1234", o); fclose(o); }
+    snprintf(dst, sizeof dst, "%s/check-scratch", H);
+    snprintf(busy_dir, sizeof busy_dir, "%s", src);
+    fsops_test_rmdir = busy_rmdir;
+    busy_left = 1; busy_calls = 0;
+    int id = fsjob_start(src, dst, 1, err, sizeof err);
+    CHECK(id > 0);
+    int r = job_end(id, 6000, err, sizeof err);
+    if (r != 1) fprintf(stderr, "busy move: %d %s\n", r, err);
+    CHECK(r == 1);                                   /* tried again: the move ends well (#243) */
+    CHECK(busy_calls == 2);
+    CHECK(lstat(src, &a) && errno == ENOENT);
+    CHECK(exists("check-scratch/check.bin"));
+    /* a folder that stays full: the move fails as before, after a bounded wait, and nothing else is touched */
+    mkdir(src, 0700);
+    o = fopen(f, "w");
+    if (o) { fputs("1234", o); fclose(o); }
+    snprintf(dst, sizeof dst, "%s/check-scratch2", H);
+    busy_left = -1; busy_calls = 0;
+    double t0 = now_s();
+    id = fsjob_start(src, dst, 1, err, sizeof err);
+    CHECK(id > 0);
+    r = job_end(id, 9000, err, sizeof err);
+    double took = now_s() - t0;
+    CHECK(r == 0 && !strncmp(err, "fs.moveRemoveFailed", 19));
+    CHECK(took < 5.5);                               /* at most ~5 s in all */
+    CHECK(busy_calls >= 2 && busy_calls <= 8);
+    CHECK(!lstat(src, &a) && S_ISDIR(a.st_mode));    /* the folder itself is left, only rmdir was tried again */
+    fsops_test_rmdir = rmdir;
+    rmdir(src);
+    /* the Trash never waits (it runs on the interface's thread): a refusal there is immediate */
 }
 
 static int trash_n;
@@ -103,9 +171,54 @@ static void test_mount_type(void) {
     CHECK(!fsops_cloud_path("/tmp") && !fsops_cloud_path("/"));                    /* this machine's own tree */
 }
 
+
+/* a file from a Machines guest (6.21): stat shows it, a copy keeps its marks, what comes out of a marked archive is marked,
+ * and an unmarked source marks nothing (needs a file system with user xattrs: /tmp's tmpfs has them) */
+static void test_marks(void) {
+    char d[64], src[96], plain[96], out[96], sub[128], f1[160], f2[160], lnk[160];
+    snprintf(d, sizeof d, "/tmp/fsops-marks-%d", (int)getpid());
+    mkdir(d, 0700);
+    snprintf(src, sizeof src, "%s/a.zip", d);
+    snprintf(plain, sizeof plain, "%s/b.zip", d);
+    snprintf(out, sizeof out, "%s/out", d);
+    snprintf(sub, sizeof sub, "%s/out/sub", d);
+    snprintf(f1, sizeof f1, "%s/out/run.sh", d);
+    snprintf(f2, sizeof f2, "%s/out/sub/setup.deb", d);
+    snprintf(lnk, sizeof lnk, "%s/out/link", d);
+    int fd = open(src, O_CREAT | O_WRONLY, 0600); if (fd >= 0) close(fd);
+    fd = open(plain, O_CREAT | O_WRONLY, 0600); if (fd >= 0) close(fd);
+    if (setxattr(src, "user.lordos.quarantine", "1", 1, 0)) { printf("fsops-test: no user xattrs on /tmp: marks skipped\n"); return; }
+    setxattr(src, "user.lordos.from", "Win VM", 6, 0);
+    FsStat s;
+    CHECK(!fsops_stat(src, 1, &s) && s.quarantine && !strcmp(s.from, "Win VM"));
+    CHECK(!fsops_stat(plain, 1, &s) && !s.quarantine && !s.from[0]);
+    setxattr(plain, "user.lordos.quarantine", "1", 1, 0);
+    setxattr(plain, "user.lordos.from", "a\nb", 3, 0);
+    CHECK(!fsops_stat(plain, 1, &s) && s.quarantine && !s.from[0]);          /* not plain text: not shown */
+    removexattr(plain, "user.lordos.quarantine"); removexattr(plain, "user.lordos.from");
+    mkdir(out, 0755); mkdir(sub, 0755);
+    fd = open(f1, O_CREAT | O_WRONLY, 0755); if (fd >= 0) close(fd);
+    fd = open(f2, O_CREAT | O_WRONLY, 0644); if (fd >= 0) close(fd);
+    CHECK(!symlink("/etc/hostname", lnk));
+    CHECK(fsops_inherit_marks(plain, out) == 0 && getxattr(f1, "user.lordos.quarantine", NULL, 0) < 0);
+    CHECK(fsops_inherit_marks(src, out) == 4);                              /* out, sub, run.sh, setup.deb; never the link */
+    char v[32];
+    ssize_t n = getxattr(f2, "user.lordos.from", v, sizeof v);
+    CHECK(n == 6 && !memcmp(v, "Win VM", 6) && getxattr(f1, "user.lordos.quarantine", NULL, 0) == 1 && getxattr(sub, "user.lordos.quarantine", NULL, 0) == 1);
+    CHECK(getxattr("/etc/hostname", "user.lordos.quarantine", NULL, 0) < 0);
+    /* a copy keeps them */
+    int in = open(f2, O_RDONLY), o = open(plain, O_WRONLY);
+    CHECK(in >= 0 && o >= 0 && !fsops_copy_marks(in, o) && getxattr(plain, "user.lordos.quarantine", NULL, 0) == 1);
+    if (in >= 0) close(in);
+    if (o >= 0) close(o);
+    char cmd[128];
+    snprintf(cmd, sizeof cmd, "rm -rf '%s'", d);
+    CHECK(system(cmd) == 0);
+}
 int main(void) {
     test_remote_child();
     test_mount_type();
+    test_marks();
     snprintf(H, sizeof H, "/tmp/fsops-test-%d", (int)getpid());
     mkdir(H, 0755);
     fsops_init(H, "nadie");
@@ -173,6 +286,10 @@ int main(void) {
     path(a, ".config/lordos/global-shortcuts.json");     /* the global shortcuts portal's decisions */
     CHECK(fsops_protected(a));
     path(a, ".config/lordos/global-shortcuts.json.tmp");
+    CHECK(fsops_protected(a));
+    path(a, ".config/lordos/sentinela/blocked.json");    /* (0.8.9.6) Sentinela's blocklist: only lord.sentinela.block/unblock */
+    CHECK(fsops_protected(a));
+    path(a, ".config/lordos/sentinela/blocked.json.new");
     CHECK(fsops_protected(a));
 
     /* a parent of a protected path can't be trashed, renamed, moved or restored over: that would take
@@ -294,6 +411,8 @@ int main(void) {
     CHECK(id > 0);
     wait_job(id);
     CHECK(!exists("copia") && exists("movida/sub/b.txt"));
+
+    test_move_busy_folder();
 
     /* Papelera */
     path(a, "movida");

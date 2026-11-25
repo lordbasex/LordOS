@@ -11,7 +11,7 @@
 // The row the keys move to comes into sight inside a ScrollView. The columns of a Table and the rows' contents follow
 // the reading direction (a row is laid out from the right in right to left).
 import { View, Text } from '@lordos/runtime';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useTheme } from './theme.js';
 import { useAppWindow } from './components.jsx';
 import { wm } from './windows.js';
@@ -23,7 +23,7 @@ const shown = (v) => typeof v === 'string' || typeof v === 'number';
 
 // The keys, the pointer and the anchor of one list. rows: the data; keyOf(row, i) its key; textOf(row) its text for
 // type-to-find.
-function useSelection({ rows, keyOf, textOf, selection, onSelectionChange, multiple, onActivate, rowHeight, box }) {
+function useSelection({ rows, keyOf, textOf, selection, onSelectionChange, multiple, onActivate, rowHeight, box, onRevealRow }) {
   const { id: winId } = useAppWindow();
   const keys = rows.map((r, i) => String(keyOf(r, i)));
   const sel = useRef(NO_SELECTION);
@@ -38,7 +38,7 @@ function useSelection({ rows, keyOf, textOf, selection, onSelectionChange, multi
   const [focused, setFocused] = useState(false);     // the keyboard focus is on it, with its ring
   useEffect(() => onFocusMove(() => setFocused(!!box.current && keyFocused() === box.current)), []);
   const latest = useRef(null);
-  latest.current = { rows, keys, onSelectionChange, onActivate, multiple, textOf };
+  latest.current = { rows, keys, onSelectionChange, onActivate, multiple, textOf, onRevealRow };
   const [, force] = useState(0);
 
   const apply = (next, reveal) => {
@@ -47,7 +47,11 @@ function useSelection({ rows, keyOf, textOf, selection, onSelectionChange, multi
     sel.current = next;
     if (changed) latest.current.onSelectionChange?.(next.selected, { lead: next.lead });
     else force((n) => n + 1);
-    if (reveal) revealNode(nodes.current.get(next.lead));
+    if (!reveal) return;
+    // a row not drawn (a windowed Table: out of sight) is brought into sight by its place
+    const n = nodes.current.get(next.lead), i = latest.current.keys.indexOf(next.lead);
+    if (n || !latest.current.onRevealRow || i < 0) revealNode(n);
+    else latest.current.onRevealRow(i);
   };
 
   // the rows that fit in the view (Page Up and Page Down): the list's own box, or the window's when the list is taller
@@ -149,14 +153,85 @@ const colBox = (c) => (c.flex ? { flex: c.flex, minWidth: 0 } : { width: c.width
 // (the header sorts it), dim (dimmer text) }]; rows: the data; rowKey(row, i) its key; renderCell(row, column,
 // { selected, color, dim }) draws one cell: a string or a number (drawn as text), or an element. sort ({ key, dir })
 // and onSort(key): the header of a sortable column sorts by it. textOf(row): its text for type-to-find (the first
-// column's text if left out). The rest as a List. The columns follow the reading direction.
+// column's text if left out). onRowEnter(row, e) and onRowLeave(row): the pointer comes onto a row and leaves it (a
+// row's hover summary). rowStyle(row): more style for a row (a greyed one). The rest as a List. The columns follow the
+// reading direction.
+// (0.8.9.6) A long table draws only the rows in sight: sight { top, height } is the part of the table on screen, in
+// pixels from its top edge (the ScrollView it is in tells its offset, onScroll), and only those rows, OVERSCAN more on
+// each side, are drawn, with empty space of the others' height around them (opening a group of 300 processes in
+// Monitor drew all of them at once and froze the desktop for a second). onRevealRow(i): the keys moved the selection
+// to row i, which isn't drawn: scroll it into sight. rowSig(row): a text that changes whenever the row's drawing
+// changes; with it a row whose text, selection and stripe are the same isn't drawn again.
+export const TABLE_HEAD = 28;
+export const OVERSCAN = 6;
+export const ROW_BUDGET = 4;
+// The rows to draw for a sight: [from, to), all of them without one.
+export function tableWindow(n, sight, rowHeight, overscan = OVERSCAN) {
+  if (!sight || !(sight.height > 0)) return [0, n];
+  const from = Math.max(0, Math.floor((sight.top - TABLE_HEAD) / rowHeight) - overscan);
+  const to = Math.min(n, Math.ceil((sight.top + sight.height - TABLE_HEAD) / rowHeight) + overscan);
+  return from >= to ? [Math.min(from, n), Math.min(from, n)] : [from, to];
+}
+
+// One row, drawn again only when its signature, selection, stripe or the columns change (with a rowSig).
+const rowSame = (a, b) => a.sig != null && a.sig === b.sig && a.on === b.on && a.lead === b.lead && a.odd === b.odd && a.cols === b.cols && a.t === b.t;
+const TableRow = memo(function TableRow({ live, r, i, on, lead, t, columns }) {
+  const L = live.current;
+  const col = rowColors(t, on, i, L.striped);
+  const rp = L.s.rowProps(r, i);
+  return (
+    <View {...rp} onContextMenu={L.onContextMenu ? (e) => { if (!on) rp.onMouseDown({ button: 0 }); live.current.onContextMenu(r, e); } : undefined}
+      onMouseEnter={L.onRowEnter ? (e) => live.current.onRowEnter(r, e) : undefined} onMouseLeave={L.onRowLeave ? () => live.current.onRowLeave(r) : undefined}
+      style={{ flexDirection: 'row', height: L.rowHeight, alignItems: 'center', paddingHorizontal: 10, backgroundColor: col.bg, ...leadEdge(t, lead), ...L.rowStyle?.(r) }}>
+      {columns.map((c) => {
+        const v = L.renderCell(r, c, { selected: on, color: col.fg, dim: col.dim });
+        return (
+          <View key={c.key} style={{ ...colBox(c), flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: c.num ? 'flex-end' : 'flex-start',
+            paddingHorizontal: 6, overflow: 'hidden' }}>
+            {shown(v) ? <Text style={{ fontSize: 12, color: c.dim ? col.dim : col.fg, whiteSpace: 'nowrap', textAlign: c.num ? 'end' : 'start' }}>{String(v)}</Text> : v}
+          </View>
+        );
+      })}
+    </View>
+  );
+}, (a, b) => rowSame(a, b));
+
 export function Table({ columns, rows, rowKey = (r, i) => i, renderCell, textOf, sort, onSort, selection, onSelectionChange, multiple = false,
-  onActivate, onContextMenu, rowHeight = 26, striped = true, focusable = true, style }) {
+  onActivate, onContextMenu, onRowEnter, onRowLeave, rowStyle, rowHeight = 26, striped = true, focusable = true, style, sight, onRevealRow, rowSig }) {
   const t = useTheme();
   const box = useRef(null);
   const first = columns[0];
   const text = textOf || ((r) => { const v = first ? renderCell(r, first, {}) : ''; return shown(v) ? String(v) : ''; });
-  const s = useSelection({ rows, keyOf: rowKey, textOf: text, selection, onSelectionChange, multiple, onActivate, rowHeight, box });
+  const s = useSelection({ rows, keyOf: rowKey, textOf: text, selection, onSelectionChange, multiple, onActivate, rowHeight, box, onRevealRow });
+  const live = useRef(null);
+  live.current = { s, renderCell, onContextMenu, onRowEnter, onRowLeave, rowStyle, rowHeight, striped };
+  // the columns as one value: a row is drawn again when they change
+  const cols = columns.map((c) => `${c.key}:${c.width || ''}:${c.flex || ''}`).join('|');
+  const [from, to] = tableWindow(rows.length, sight, rowHeight);
+  // With a sight, at most ROW_BUDGET rows not drawn before are drawn per pass, those in sight first; the others wait as
+  // empty rows of their height for the next pass (a moment later, after the input queued meanwhile), so opening a long
+  // group never holds the screen's thread for more than about a frame.
+  const drawn = useRef(new Set());
+  const [, nextPass] = useState(0);
+  const allow = new Set();
+  let waiting = false;
+  if (sight) {
+    const inSight = (i) => i * rowHeight + TABLE_HEAD >= sight.top - rowHeight && i * rowHeight + TABLE_HEAD <= sight.top + sight.height;
+    let budget = ROW_BUDGET;
+    for (const pass of [true, false]) {
+      for (let i = from; i < to; i++) {
+        const k = String(rowKey(rows[i], i));
+        if (allow.has(k) || inSight(i) !== pass) continue;
+        if (drawn.current.has(k) || budget-- > 0) allow.add(k); else waiting = true;
+      }
+    }
+  }
+  useEffect(() => {
+    drawn.current = allow;
+    if (!waiting) return undefined;
+    const id = setTimeout(() => nextPass((n) => n + 1), 0);
+    return () => clearTimeout(id);
+  });
   const head = t.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
   const arrow = (c) => (sort?.key === c.key ? (sort.dir > 0 ? ' ▲' : ' ▼') : '');
   return (
@@ -170,25 +245,17 @@ export function Table({ columns, rows, rowKey = (r, i) => i, renderCell, textOf,
           </View>
         ))}
       </View>
-      {rows.map((r, i) => {
-        const on = s.isSelected(i);
-        const col = rowColors(t, on, i, striped);
-        const rp = s.rowProps(r, i);
+      {from > 0 ? <View style={{ height: from * rowHeight, flexShrink: 0 }} /> : null}
+      {rows.slice(from, to).map((r, k) => {
+        const i = from + k;
+        const key = String(rowKey(r, i));
+        if (sight && !allow.has(key)) return <View key={key} style={{ height: rowHeight, flexShrink: 0 }} />;
         return (
-          <View key={String(rowKey(r, i))} {...rp} onContextMenu={onContextMenu ? (e) => { if (!on) rp.onMouseDown({ button: 0 }); onContextMenu(r, e); } : undefined}
-            style={{ flexDirection: 'row', height: rowHeight, alignItems: 'center', paddingHorizontal: 10, backgroundColor: col.bg, ...leadEdge(t, s.isLead(i)) }}>
-            {columns.map((c) => {
-              const v = renderCell(r, c, { selected: on, color: col.fg, dim: col.dim });
-              return (
-                <View key={c.key} style={{ ...colBox(c), flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: c.num ? 'flex-end' : 'flex-start',
-                  paddingHorizontal: 6, overflow: 'hidden' }}>
-                  {shown(v) ? <Text style={{ fontSize: 12, color: c.dim ? col.dim : col.fg, whiteSpace: 'nowrap', textAlign: c.num ? 'end' : 'start' }}>{String(v)}</Text> : v}
-                </View>
-              );
-            })}
-          </View>
+          <TableRow key={key} live={live} r={r} i={i} odd={striped ? i % 2 : 0} on={s.isSelected(i)} lead={s.isLead(i)} t={t}
+            columns={columns} cols={cols} sig={rowSig ? rowSig(r) : null} />
         );
       })}
+      {to < rows.length ? <View style={{ height: (rows.length - to) * rowHeight, flexShrink: 0 }} /> : null}
     </View>
   );
 }

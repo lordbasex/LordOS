@@ -6,7 +6,8 @@ device and phase 3's Mic Mode are still to verify on a VM.**
 The maintainer approved the whole plan and the exceptions E-S1 to E-S7 on 2026-11-22; E-S8 (ONNX Runtime linked) was
 **not** approved: D3 is our own C inference, and ONNX Runtime is only the dev machine's reference in tests. The name is
 "LordOS Studio" and the status item's label "Camera" (D6); D5 and D7 to D10 take this plan's recommendations. D4: the
-package is an optional Store item (approved 2026-11-22). Phases 4 and 5 (the portal, the app) are not built yet.
+package is an optional Store item (approved 2026-11-22). Phases 4 and 5 (the portal, the app) are not built yet;
+a first LordOS Studio app with the popover's controls, and Mic Mode from the capture item, are in development (11.6).
 Sections 3.3 and 11.3 have measured numbers.
 Facts are labelled the way `GO-LINK.md` does it:
 
@@ -100,8 +101,11 @@ Fedora already defaults Firefox to it. They also give a cleaner permission story
   the image. Until then, Studio offers only the LordOS ring there.
 - **Configuration, static and root-owned, shipped by an optional package `lordos-studio-camera`.** The module's
   options live in `/etc/modprobe.d/lordos-studio.conf`:
-  `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`
-  (the second device since 11.4: OBS Studio's own virtual camera, which LordOS never writes). The file
+  `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio,OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`
+  (the second device since 11.4: OBS Studio's own virtual camera, which LordOS never writes). The labels are **one**
+  quoted value: the kernel strips only the quotes around a whole value (`lib/cmdline.c` `next_arg`) and
+  `module_param_array` splits it at the commas. 0.8.9.5 shipped `card_label="LordOS Studio","OBS Virtual Camera"`,
+  which came up as `LordOS Studio"` and `"OBS Virtual Camera`; see 11.5. The file
   `/etc/modules-load.d/lordos-studio.conf` loads it at boot. There is **no runtime root action** to create or remove
   devices: `/dev/v4l2loopback`'s control ioctls stay unused. Installing and removing the package goes through the
   Store's existing package engine.
@@ -813,6 +817,57 @@ NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).
 - **To verify on a VM** (never on the maintainer's PC): OBS (Debian's and Flathub's) starting its virtual camera on
   `/dev/video49` with LordOS Studio's camera both off and on, Meet seeing both cameras, the update reloading the module
   when unused, and the whole MOK flow with Secure Boot on (OVMF with enrolled keys).
+
+### 11.5 Fix: the camera wasn't listed (2026-11-23, in development; the latest release is 0.8.9.5)
+
+- **Seen** on the maintainer's PC with 0.8.9.5 (v4l2loopback-dkms 0.15.0, a Logitech C930e): Chrome and Meet listed
+  only the real camera; no lord-studio ran; sysfs named `/dev/video50` `LordOS Studio"` and `/dev/video49`
+  `"OBS Virtual Camera`.
+- **Cause**: the quoting of 2.2's `card_label`. lord-server's `loopback_open` (and lord-studio's `stcam_hub`) require the
+  card "LordOS Studio", so the device counted as missing, the hub never started, nothing wrote the loopback and, with
+  `exclusive_caps=1`, it never advertised capture. The hub's rule (`studio_hub_wanted`) was not the cause: `on` is the
+  popover's "every app" switch, true by default (`sdk/studiomodel.js`), not the effects; with it on and no effect chosen
+  a reader gets the plain camera. With it off the device is not written, so apps don't list it, and a reader still
+  attached gets the off card (8.2): both stay as designed.
+- **Fix**: one quoted value in the package's file (2.2); its postinst reloads the module on an update from 0.8.9.5's
+  labels when the file is the package's and nothing holds the module, else at the next restart; and
+  `studio_card_is_ours()` (`mstudiohub.h`) accepts 0.8.9.5's label too, so the camera works after the update before the
+  restart (listed with the stray quote until then). Verified: Linux 6.12's `next_arg` and the comma split, run in user
+  space on both lines, give exactly sysfs's names for the old one and the clean labels for the new one; v4l2loopback
+  0.15.0 declares `module_param_array(card_label, charp, NULL, 0000)`. **To verify on a VM**: loading the module with the
+  new file (`v4l2-ctl --list-devices` showing both labels without quotes) and Meet listing "LordOS Studio".
+### 11.6 Ways in: the app and Mic Mode from the capture item (2026-11-23, in development; asked by the maintainer)
+
+The maintainer installed LordOS Studio Camera and found no app to open, and with Chrome using only the microphone the
+capture panel offered nothing of LordOS Studio (only "Turn off for this app" and the settings link).
+
+- **The LordOS Studio app** (`apps/studio`), a first step of 9.2: the popover's controls in a window of their own, not
+  yet the scenes, overlays, adjustments or recording of 9.2. One column has the preview (large), the camera, In use and
+  Every app with its Store link; the other the effects rows and Mic Mode, each row's page in place. It is
+  `StudioWindow` in `sdk/studio.jsx`, built from the popover's own parts (`Preview`, `Source`, `MainPage wide`, the
+  detail pages, `MicMode`, `EveryApp`), with the same `settings.studio`. It runs in the desktop's own process and uses
+  `lord.studio` (registered only there), like the popover: no new native call, no broker permission, and isolated apps
+  still never control LordOS Studio. It is listed in every theme's launcher, start menu and search only where
+  `lord.studio.status().available` is true: `apps/studio/index.jsx` exports `available()`, which
+  `tools/build-theme.mjs` passes on and `sdk/windows.js` `listApps` honours (an app without it is always listed).
+  Without lord-studio the window says "LordOS Studio is not available on this computer" and still offers Mic Mode.
+  It is deactivatable (`sdk/appsoffmodel.js`) and reopened by a restored session only when asked (`ASK_FIRST`), since
+  it turns the camera on.
+- **One preview.** The popover's preview source is now the desktop's, shared by every Studio view on screen with a
+  count and closed when the last one goes (`ownPreview` in `sdk/studio.jsx`), so the popover and the window never open
+  the camera twice. A native app's LordOS Studio source is still used first when one runs.
+- **Mic Mode from the capture item** (like Control Center's Mic Mode): while any app uses the microphone the panel
+  shows a "Mic Mode" row with the current mode; it opens `MicModePanel`, Mic Mode alone with no preview, so the camera
+  never turns on for it. With the camera in use "Video effects" shows as before, and both rows when both are in use.
+  Mic Mode needs only LordOS's sound client, not lord-studio, so the row doesn't wait for `studioAvailable()`. Both
+  pages link to the app ("Open LordOS Studio…").
+- **What Mic Mode reaches.** A mode sets the default microphone (section 7, `micPlan`): it reaches the apps that
+  record from the default microphone, LordOS's own and Linux apps alike; an app set to a particular microphone keeps
+  it. The line under Mic Mode now says so and names "LordOS Noise Reduction" to choose in such an app. Whether a
+  browser that already records follows the new default at once, and the sound in a Meet call, are still to verify on a
+  VM (11.3).
+- **Tests:** `server/tests/capture_studio_scene.mjs` (29 checks, `make test`); `tests/studio_headless.sh` with
+  `STUDIO_SCENE=mic` and `STUDIO_SCENE=app` for screenshots.
 
 ## 12. Risks
 

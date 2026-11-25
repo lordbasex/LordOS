@@ -579,9 +579,12 @@
   "ws.lock.on": "锁定此显示器的窗口",
   "ws.lock.off": "解锁此显示器的窗口",
   "ws.lock.window": "已锁定：用框架上的锁解锁",
-  "ws.minimized.label": "已最小化",
-  "ws.minimized.title": "此显示器上已最小化的窗口：点击即可恢复",
   "ws.slot.free": "空位：打开一个应用，或恢复已最小化的窗口",
+  "ws.windows.title": "此显示器上此活动的窗口（已最小化的下方有横线）：点按可将其置前；右键点按可查看该应用的窗口",
+  "ws.profile.ask": "由浏览器选择",
+  "ws.profile.open": "打开配置文件 {profile}",
+  "ws.profile.activity": "此活动打开的配置文件",
+  "ws.profile.display": "此显示器打开的配置文件（{display}）",
   "ws.snapfly.title": "排列窗口",
   "ws.snapfly.halves": "二等分",
   "ws.snapfly.thirds": "三等分",
@@ -965,5 +968,12 @@
   "capture.what.viaStudioPlain": "通过 LordOS Studio 的摄像头",
   "capture.what.effectsOn": "效果已开启",
   "capture.what.effectsOff": "无效果",
-  "shortcuts.captureWindow": "截取一个窗口"
+  "shortcuts.captureWindow": "截取一个窗口",
+  "themeSwitch.changing": "正在更改桌面风格…",
+  "themeSwitch.changingTo": "正在切换到 {name}…",
+  "themeSwitch.failedTitle": "无法应用 {name}",
+  "themeSwitch.refusedBody": "它的代码与 LordOS 的签名副本不一致，因此未加载。你的桌面风格保持不变。",
+  "themeSwitch.failedBody": "它没有启动。你的桌面风格保持不变。",
+  "spotlight.section.machines": "虚拟机",
+  "guestApps.inMachine": "在 {machine} 中"
 }

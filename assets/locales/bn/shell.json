@@ -586,9 +586,12 @@
   "ws.lock.on": "এই ডিসপ্লের উইন্ডো লক করুন",
   "ws.lock.off": "এই ডিসপ্লের উইন্ডো আনলক করুন",
   "ws.lock.window": "লক করা: ফ্রেমের তালা থেকে আনলক করুন",
-  "ws.minimized.label": "ছোট করা",
-  "ws.minimized.title": "এই ডিসপ্লেতে ছোট করা উইন্ডো: ফিরিয়ে আনতে একটিতে ক্লিক করুন",
   "ws.slot.free": "ফাঁকা জায়গা: একটি অ্যাপ খুলুন বা ছোট করা একটি ফিরিয়ে আনুন",
+  "ws.windows.title": "এই ডিসপ্লেতে এই কার্যকলাপের উইন্ডো (ছোট করা গুলোর নিচে একটি রেখা): সামনে আনতে একটিতে ক্লিক করুন; সেই অ্যাপের উইন্ডোর জন্য ডান-ক্লিক করুন",
+  "ws.profile.ask": "ব্রাউজারকে বেছে নিতে দিন",
+  "ws.profile.open": "{profile} প্রোফাইল খুলুন",
+  "ws.profile.activity": "এই কার্যকলাপ যে প্রোফাইল খোলে",
+  "ws.profile.display": "এই ডিসপ্লে যে প্রোফাইল খোলে ({display})",
   "ws.snapfly.title": "উইন্ডো সাজান",
   "ws.snapfly.halves": "অর্ধেক",
   "ws.snapfly.thirds": "তৃতীয়াংশ",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "LordOS Studio-র মাধ্যমে ক্যামেরা",
   "capture.what.effectsOn": "এফেক্ট চালু",
   "capture.what.effectsOff": "কোনো এফেক্ট নেই",
-  "shortcuts.captureWindow": "একটি উইন্ডোর স্ক্রিনশট"
+  "shortcuts.captureWindow": "একটি উইন্ডোর স্ক্রিনশট",
+  "themeSwitch.changing": "ডেস্কটপের স্টাইল বদলানো হচ্ছে…",
+  "themeSwitch.changingTo": "{name}-এ বদলানো হচ্ছে…",
+  "themeSwitch.failedTitle": "{name} প্রয়োগ করা যায়নি",
+  "themeSwitch.refusedBody": "এর কোড LordOS-এর স্বাক্ষরিত কপির সাথে মেলে না, তাই এটি লোড করা হয়নি। আপনার ডেস্কটপের স্টাইল আগের মতোই থাকবে।",
+  "themeSwitch.failedBody": "এটি চালু হয়নি। আপনার ডেস্কটপের স্টাইল আগের মতোই থাকবে।",
+  "spotlight.section.machines": "মেশিন",
+  "guestApps.inMachine": "{machine}-এ"
 }

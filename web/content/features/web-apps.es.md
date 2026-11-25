@@ -6,7 +6,7 @@ No es un cliente nativo de ningún servicio. **LordOS no cambia los sitios ni su
 
 [[shot:6]]
 
-Es nuevo en **LordOS 0.8.8.8**, publicada el 12 de noviembre de 2026; el último lanzamiento es la 0.8.9.5. Vive en un paquete opcional, `lordos-web`: sin él, el resto de LordOS funciona igual, y la Tienda lo instala por vos con tu primera app web.
+Es nuevo en **LordOS 0.8.8.8**, publicada el 12 de noviembre de 2026; el último lanzamiento es la 0.8.9.6. Vive en un paquete opcional, `lordos-web`: sin él, el resto de LordOS funciona igual, y la Tienda lo instala por vos con tu primera app web.
 
 [[figure:web-runtime]]
 
@@ -26,6 +26,10 @@ La columna del medio describe cómo funcionan en general esas apps, no un produc
 ## Cómo conseguir apps web: la sección Apps web de la Tienda
 
 La Tienda tiene una sección **Apps web**, un banner y un estante en Descubrir, y las apps web aparecen en la búsqueda y en su categoría. Cada tarjeta dice "App web", así las distinguís de las apps de LordOS y de las apps de Linux.
+
+La sección abre en su tienda: *Agregar desde una dirección* y el catálogo (desde la 0.8.9.6). Las apps web que instalaste están en **Instaladas**, arriba de todo en la segunda columna de la sección, sobre sus categorías, cada una con Ver más, Administrar y Abrir; Tienda → Instaladas también las muestra junto a todas las demás apps, con un filtro Apps web.
+
+Sus **Ajustes**, debajo de Instaladas, dicen qué es una app web, si el motor web de LordOS ya está instalado, y abren Ajustes → Apps web para los perfiles, permisos y espacio de cada app; el campo de búsqueda ("Buscar apps web") busca solo en el catálogo (desde la 0.8.9.6).
 
 [[shot:0]]
 

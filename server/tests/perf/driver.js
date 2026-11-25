@@ -63,6 +63,9 @@
     globalThis.__lordKey(code, 1, name, '', name, 0);
     globalThis.__lordKey(code, 0, name, '', name, 0);
   };
+  const SETTINGS_PAGES = ['general', 'appearance', 'wallpaper', 'dock', 'displays', 'network', 'bluetooth', 'sound', 'notifications',
+    'printers', 'clipboard', 'sharing', 'cloud', 'language', 'datetime', 'keyboard', 'trackpad', 'defaultapps', 'webapps', 'flatpak',
+    'ai', 'battery', 'power', 'cooling', 'firmware', 'gpus', 'privacy', 'users', 'updates', 'session'];
   const plans = {
     idle() { begin('idle'); for (let i = 0; i < 3; i++) step('idle', () => {}); end(); },
     settingsSet() {
@@ -96,6 +99,104 @@
         steps.splice(cursor + 1, 0, ...items.slice(0, 45).map((it) => ({ name: `pane ${it.text}`, scenario: 'Settings: every pane', fn: () => clickText('settings', it.text) })));
       });
       end();
+    },
+    // every Settings page opened by its id (apps/settings/index.jsx SECTIONS, also those its sidebar hides on this
+    // machine), each followed by a wait step: what opening it costs, and what it does in the 1.5 s after
+    settingsPanes() {
+      begin('Settings: open');
+      step('close the others', closeAll);
+      step('open', () => sdk.wm.open('settings', { args: { section: 'general', nonce: 1 } }));
+      step('wait', () => {});
+      end();
+      begin('Settings: each page by id');
+      let n = 2;
+      for (const id of SETTINGS_PAGES) {
+        step(`page ${id}`, () => sdk.wm.open('settings', { args: { section: id, nonce: n++ } }));
+        step(`after ${id}`, () => {});
+      }
+      end();
+    },
+    // Settings → Flatpak opened, left, and opened again (the maintainer's freeze, 2026-11-23): perf_headless.sh fills the
+    // test home's ~/.local/share/flatpak and ~/.var/app first, so measuring them takes a while
+    flatpak() {
+      begin('Settings → Flatpak');
+      step('close the others', closeAll);
+      step('open settings', () => sdk.wm.open('settings', { args: { section: 'general', nonce: 1 } }));
+      step('wait', () => {});
+      // what the page shows for the sizes (a size once measured; "calculating…" before)
+      const sizes = () => log({ flatpakSizes: labels(frameOf('settings') || { x: 0, y: 0, w: 0, h: 0 }).map((x) => x.text)
+        .filter((t) => /^[\d.,]+ ?[KMGT]?B\+?$|calculating/.test(t)) });
+      for (let i = 0; i < 2; i++) {
+        step(`open flatpak ${i}`, () => { sdk.wm.open('settings', { args: { section: 'flatpak', nonce: 10 + i * 2 } }); });
+        step('wait', sizes);
+        step('wait', sizes);
+        step('general', () => sdk.wm.open('settings', { args: { section: 'general', nonce: 11 + i * 2 } }));
+      }
+      end();
+    },
+    // Files → Get Info on a big folder, twice (2026-11-23): its size was lord.fs.du on the main thread, up to 900 ms.
+    // perf_headless.sh fills the test home first (PERF_FLATPAK_FILES files under ~/.local/share/flatpak and ~/.var/app);
+    // Files opens the home folder, and ❖I with nothing selected shows the folder open
+    filesInfo() {
+      begin('Files → Get Info on a big folder');
+      step('close the others', closeAll);
+      step('open files', () => sdk.wm.open('files', { args: { path: lord.fs.home() } }));
+      step('wait', () => {});
+      const sizes = () => log({ infoSizes: labels(frameOf('files') || { x: 0, y: 0, w: 0, h: 0 }).map((x) => x.text)
+        .filter((t) => /\d ?[KMGT]?B\+? · |calculating/.test(t)) });
+      const info = () => {          // Ctrl+I in the Files window (flag 2: Ctrl)
+        const w = sdk.windows.get().find((x) => x.id === 'files' || x.id.startsWith('files#'));
+        if (!w) return false;
+        sdk.wm.focus(w.id);
+        globalThis.__lordKey(23, 1, 'i', '', 'i', 2);
+        globalThis.__lordKey(23, 0, 'i', '', 'i', 2);
+        return true;
+      };
+      for (let i = 0; i < 2; i++) {
+        step(`open info ${i}`, info);
+        step('wait', sizes);
+        step('wait', sizes);
+        step('close info', info);
+      }
+      end();
+    },
+    // the camera list from a worker (sdk/cameras.js), then lord.media.cameras on the main thread, each timed after 4.5 s
+    // of nothing (a USB camera suspends after 2 s and wakes up to answer: the cost the Camera app's 3 s poll paid each
+    // time). Only VIDIOC_QUERYCAP: no camera is opened for a picture
+    cameraNatives() {
+      begin('Camera list');
+      for (let i = 0; i < 2; i++) {
+        step(`camerasAsync ${i}`, () => {
+          if (!sdk.refreshCameras || typeof lord.media.camerasAsync !== 'function') return false;
+          const t0 = lord.now();
+          sdk.refreshCameras().then((r) => log({ native: `refreshCameras answered (${r ? r.length : 'none'}) after`, ms: +(lord.now() - t0).toFixed(1) }));
+          log({ native: 'media.camerasAsync (the call)', ms: +(lord.now() - t0).toFixed(1) });
+          return true;
+        });
+        for (let k = 0; k < 3; k++) step('wait', () => {});
+        step(`media.cameras ${i}`, () => {
+          const t0 = lord.now();
+          const r = lord.media.cameras();
+          log({ native: `media.cameras (${r.length})`, ms: +(lord.now() - t0).toFixed(1) });
+        });
+        for (let k = 0; k < 3; k++) step('wait', () => {});
+      }
+      end();
+    },
+    // each native app opened alone (PERF_APPS, or the list below), then two quiet steps: the worst run on opening it and
+    // in the 3 s after; with PERF_MARK=1 and PERF_OUT the stall lines fall under each step. Not Camera and LordOS Studio:
+    // they would turn a real webcam on (cameraNatives times their list instead)
+    appsOpen() {
+      const apps = globalThis.PERF_APPS || ['files', 'store', 'mail', 'photos', 'player', 'notes', 'terminal', 'machines', 'monitor',
+        'recorder', 'imager', 'settings', 'calendar', 'contacts', 'editor', 'databases', 'passwords', 'logs', 'sysinfo', 'disks'];
+      for (const a of apps) {
+        begin(`open ${a}`);
+        step('close the others', closeAll);
+        step(`open ${a}`, () => { if (!sdk.getApp || sdk.getApp(a)) sdk.wm.open(a); });
+        step(`after ${a}`, () => {});
+        step(`after ${a} 2`, () => {});
+        end();
+      }
     },
     files() {
       begin('Files: open');
@@ -188,6 +289,33 @@
       });
       end();
     },
+    // the native calls Settings' pages make while rendering or for their buttons, each timed alone (read-only ones only;
+    // a call missing on this lord-server is noted). settings.set: one key, with whatever runs on every settings change.
+    settingsNatives() {
+      begin('Settings: native calls');
+      const home = lord.fs.home();
+      const zones = () => lord.time.zones();
+      const calls = [
+        ['pkg.available', () => lord.pkg.available()], ['pkg.upgrades', () => lord.pkg.upgrades()], ['pkg.lastUpdate', () => lord.pkg.lastUpdate()],
+        ['pkg.info flatpak', () => lord.pkg.info('flatpak', {})], ['pkg.plan remove flatpak', () => lord.pkg.plan({ remove: ['flatpak'] })],
+        ['time.zones', zones], ['time.zoneOffset x400', () => { const now = Math.floor(Date.now() / 1000); return zones().slice(0, 400).map((z) => lord.time.zoneOffset(z, now)); }],
+        ['net.interfaces', () => lord.net.interfaces()], ['net.routes', () => lord.net.routes()], ['net.dns', () => lord.net.dns()],
+        ['net.wifiKnown', () => lord.net.wifiKnown()], ['net.vpnList', () => lord.net.vpnList()], ['net.vpnTypes', () => lord.net.vpnTypes()],
+        ['users.list', () => lord.users.list()], ['power.history', () => lord.power.history()], ['power.buttons', () => lord.power.buttons()],
+        ['vm.gpus', () => lord.vm.gpus()], ['sysinfo.gpuReport', () => lord.sysinfo.gpuReport()], ['locale.available', () => lord.locale.available()],
+        ['media.cameras', () => lord.media.cameras()], ['webapps.running', () => lord.webapps.running()], ['apps.flatpak', () => lord.apps.flatpak('en')],
+        ['flatpak.available', () => lord.flatpak.available()], ['fs.du ~/.local/share/flatpak (sync)', () => lord.fs.du(`${home}/.local/share/flatpak`, 2000)],
+        ['system.info', () => lord.system.info()], ['fs.volumes', () => lord.fs.volumes()], ['fonts.list', () => lord.fonts && lord.fonts.list()],
+        ['settings.set (one key)', () => sdk.settings.set({ windowSnap: !sdk.settings.get().windowSnap })],
+      ];
+      for (const [name, fn] of calls) step(name, () => {
+        const t0 = lord.now();
+        let n = '';
+        try { const r = fn(); n = Array.isArray(r) ? ` (${r.length})` : ''; } catch (e) { n = ` (${e.message})`; }
+        log({ native: name + n, ms: +(lord.now() - t0).toFixed(1) });
+      });
+      end();
+    },
     // the Terminal while a program prints fast (`yes | head -c 50M`): the __lordTerm events and what React does for them
     // (docs/MAIN-THREAD.md); terminalBg: the same with another window in front (the tab marks activity)
     terminal() { termPlan(false); },
@@ -258,6 +386,7 @@
     if (s.begin) { log({ begin: s.begin, heap: heap() }); setTimeout(() => { last = lord.stats(1); next(); }, 300); return; }
     if (s.end) { log({ end: s.end, heap: heap() }); setTimeout(() => { last = lord.stats(1); next(); }, 300); return; }
     let ok = true;
+    if (globalThis.PERF_MARK) log({ at: s.name });
     try { ok = s.fn() !== false; } catch (e) { log({ error: String(e && e.message || e), step: s.name }); }
     setTimeout(() => {
       const now = lord.stats(1);

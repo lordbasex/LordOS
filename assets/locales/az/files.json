@@ -339,5 +339,8 @@
   "markupHint": "İşarələmə redaktorunda aç",
   "readOnly.title": "Fayllar “{name}” elementini dəyişə bilmir",
   "readOnly.outside": "Fayllar bu qovluğu yalnız göstərə bilər: o, ev qovluğunuzdan və disklərinizdən kənardadır. Onu dəyişmək üçün Terminaldan və ya başqa tətbiqdən istifadə edin.",
-  "readOnly.denied": "Bu qovluq yalnız oxunandır: icazələri onu dəyişməyinizə imkan vermir. Onu dəyişmək üçün Terminaldan və ya başqa tətbiqdən istifadə edin."
+  "readOnly.denied": "Bu qovluq yalnız oxunandır: icazələri onu dəyişməyinizə imkan vermir. Onu dəyişmək üçün Terminaldan və ya başqa tətbiqdən istifadə edin.",
+  "fromMachineNoRun": "“{name}” {machine} maşınından gəldi. Fayllar maşından gələn proqramları və quraşdırıcıları açmır: etibar edirsinizsə, Bununla aç seçimindən istifadə edin.",
+  "info.from": "Mənbə",
+  "info.fromMachine": "{machine} maşını"
 }

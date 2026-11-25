@@ -6,7 +6,7 @@
 // mouse. Reading one (a file, an import) keeps known fields only, checks every value (ranges, ports, enums, a shared
 // folder under the person's home), lists what it ignored, and fits it to this computer: never more than half of its
 // processors, never more memory than machines may use here, a graphics card only when one is set up for machines.
-import { NET_MODES, PORTS_MAX, portRule, portProblems, usesPorts, CLOSE_CHOICES, GPU_CHOICES, LIMITS } from './model.js';
+import { NET_MODES, PORTS_MAX, portRule, portProblems, usesPorts, CLOSE_CHOICES, GPU_CHOICES, LIMITS, vcpuDefault } from './model.js';
 import { CARD_COLORS, SYSTEM_KINDS, ID_RE, cleanText, validateSystem, logoOf } from './systems.js';
 
 export const PROFILE_FORMAT = 'lordos-machine-profile/1';
@@ -21,7 +21,8 @@ export const SUGGESTED_MAX = 8;
 export const DESC_MAX = 280;
 const SHARE_MAX = 512;
 
-// LordOS's five (the approved mock "Settings"): what each asks for; 'half' is half of this computer's processors
+// LordOS's five (the approved mock "Settings"): what each asks for; 'half' is half of this computer's physical cores, six
+// at most (model.js vcpuDefault)
 const BUILT = {
   productivity: { color: 'violet', kind: 'linux', cpus: 4, memoryMb: [8192, 1 / 3], diskGb: 64, graphics: '3d', gpu: '', network: 'shared',
     clipboard: 'both', transfer: true, appsMode: false, onClose: 'ask', mouse: 'auto', captureFullscreen: false },
@@ -271,7 +272,7 @@ export function writeProfile(p, systems = [], { withId = false } = {}) {
 export function onHost(p, host, opts = {}) {
   const r = p?.resources || {};
   const cap = cpuCap(host);
-  const vcpus = r.cpus === 'half' ? cap : Math.max(1, Math.min(cap, r.cpus | 0 || 1));
+  const vcpus = r.cpus === 'half' ? vcpuDefault(host, cap) : Math.max(1, Math.min(cap, r.cpus | 0 || 1));
   const memoryMb = Math.max(LIMITS.memMin, Math.min(memCap(host), r.memoryMb | 0 || 2048));
   return {
     vcpus, memoryMb, diskGb: Math.max(LIMITS.diskMin, Math.min(LIMITS.diskMax, r.diskGb | 0 || 32)),

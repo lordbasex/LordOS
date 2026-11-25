@@ -271,7 +271,87 @@ export function aiEngines(raw, apps = []) {
 
 // ---- the step ----
 
-export function createGpuState() { return { clients: new Map(), energy: new Map(), vms: new Map(), mono: 0 }; }
+export function createGpuState() { return { clients: new Map(), energy: new Map(), vms: new Map(), idle: new Map(), ai: new Map(), mono: 0 }; }
+
+// ---- the view's pieces (types, engines by category, NVIDIA's numbers, VRAM by type) ----
+
+export const ENGINE_CATS = ['3d', 'compute', 'video', 'encode', 'copy'];
+
+const pctOf = (v) => (num(v) != null && v >= 0 && v <= 100 ? v / 100 : null);
+
+// NVML's bus id "00000000:01:00.0" (or sysfs' "0000:01:00.0") as sysfs' slot, lowercase; null if it isn't one
+export function nvSlot(bus) {
+  const m = /^(?:0{0,4})([0-9a-fA-F]{4}):([0-9a-fA-F]{2}):([0-9a-fA-F]{2})\.([0-7])$/.exec(String(bus || ''));
+  return m ? `${m[1]}:${m[2]}:${m[3]}.${m[4]}`.toLowerCase() : null;
+}
+
+// a card's sysfs record with lord-nvgpu's values filled in where sysfs has none (the proprietary driver reports
+// nothing there). Every number is checked again: out of range is null.
+export function mergeNv(c, nv) {
+  const inR = (v, lo, hi) => (num(v) != null && v >= lo && v <= hi ? v : null);
+  const out = { ...c };
+  const u = nv.util || {};
+  if (out.busy == null) out.busy = inR(u.sm, 0, 100);
+  if (!(out.temps || []).length && inR(nv.temp, -40, 150) != null) out.temps = [{ label: '', c: nv.temp, crit: null }];
+  if (out.fanPct == null) out.fanPct = inR(nv.fan, 0, 100);
+  if (out.powerW == null) out.powerW = inR(nv.power, 0, 2000);
+  if (out.powerCapW == null) out.powerCapW = inR(nv.powerLimit, 1, 2000);
+  if (out.sclk == null) out.sclk = inR(nv.clk?.core, 0, 10000);
+  if (out.mclk == null) out.mclk = inR(nv.clk?.mem, 0, 50000);
+  const vt = inR(nv.vram?.total, 1, 2 ** 40), vu = inR(nv.vram?.used, 0, 2 ** 40);
+  if (out.vramTotal == null && vt != null) { out.vramTotal = vt; out.vramUsed = vu != null && vu <= vt ? vu : null; }
+  if (out.memBusy == null) out.memBusy = inR(u.mem, 0, 100);
+  return out;
+}
+
+// NVML's per-engine utilization as engine shares (named so engineCategory sorts them)
+export function nvEngines(nv) {
+  const u = nv?.util || {};
+  const out = {};
+  for (const [e, v] of [['gfx', u.sm], ['nvenc', u.enc], ['nvdec', u.dec]]) { const x = pctOf(v); if (x != null) out[e] = x; }
+  return out;
+}
+
+// engines summed by category, each 0..1: { '3d', compute, video, encode, copy }
+export function categoryShares(engines) {
+  const out = {};
+  for (const c of ENGINE_CATS) out[c] = 0;
+  for (const [e, v] of Object.entries(engines || {})) {
+    const c = engineCategory(e);
+    if (c in out && num(v) != null) out[c] = Math.min(1, out[c] + Math.max(0, v));
+  }
+  return out;
+}
+
+// what a process does on the GPU: 'compute' (its compute engines, or CUDA/HIP/OpenCL with no 3D), 'video' (decode or
+// encode most), else 'graphics'
+export function appType(g) {
+  const c = g.cats || {};
+  const comp = c.compute || 0, vid = (c.video || 0) + (c.encode || 0), gfx = (c['3d'] || 0) + (c.copy || 0);
+  if (comp > 0.005 && comp >= vid && comp >= gfx) return 'compute';
+  if (vid > 0.005 && vid > gfx) return 'video';
+  if (gfx > 0.005) return 'graphics';
+  const ids = (g.apis || []).map((a) => a.id);
+  if (ids.some((x) => x === 'cuda' || x === 'hip' || x === 'opencl') && !ids.some((x) => x === 'opengl' || x === 'opengles')) return 'compute';
+  if (ids.length && ids.every((x) => x === 'video' || x === 'encode')) return 'video';
+  return 'graphics';
+}
+
+// the card's own memory used by each type of process: { compute, graphics, video } bytes (integrated: system memory)
+export function memSplit(apps, slot, shared) {
+  const out = { compute: 0, graphics: 0, video: 0 };
+  for (const a of apps) {
+    const m = (a.mem || 0) + (shared ? a.sysMem || 0 : 0);
+    if (m > 0) out[a.type || 'graphics'] += m;
+  }
+  return out;
+}
+
+// PCIe generation from GT/s
+export function pcieGen(gts) {
+  const g = { 2.5: 1, 5: 2, 8: 3, 16: 4, 32: 5, 64: 6 }[num(gts)];
+  return g || null;
+}
 
 const appKeyOf = (p) => (p.self ? 'app:lordos' : p.app ? `app:${p.app}` : `name:${p.name || p.pid}`);
 
@@ -311,11 +391,34 @@ export function gpuStep(state, raw) {
     }
     for (const a of apiTags(p.libs, p.clients[0]?.driver)) if (!g.apis.some((x) => x.id === a.id)) g.apis.push(a);
   }
+  // lord-nvgpu's numbers (NVML, raw.nv): an NVIDIA process has no DRM fdinfo; its use comes keyed by pid and bus id
+  const nvCards = Array.isArray(raw.nv) ? raw.nv : [];
+  for (const nc of nvCards) {
+    const slot = nvSlot(nc?.bus);
+    if (!slot) continue;
+    for (const np of Array.isArray(nc.procs) ? nc.procs : []) {
+      if (!Number.isInteger(np?.pid) || np.pid <= 0) continue;
+      const p = procs.find((x) => x.pid === np.pid) || { pid: np.pid, name: String(np.pid), libs: [], clients: [] };
+      const key = appKeyOf(p);
+      let g = groups.get(key);
+      if (!g) groups.set(key, (g = { key, item: p, count: 0, pids: [], gpus: new Set(), engines: {}, cats: {}, total: 0, mem: null, sysMem: null, apis: [] }));
+      if (!g.pids.includes(np.pid)) { g.pids.push(np.pid); g.count++; }
+      g.gpus.add(slot);
+      const add = (e, v) => { const x = pctOf(v); if (x == null) return; g.engines[e] = Math.min(1, (g.engines[e] || 0) + x); const c = engineCategory(e); g.cats[c] = Math.min(1, (g.cats[c] || 0) + x); };
+      add('compute', np.sm);
+      add('nvenc', np.enc);
+      add('nvdec', np.dec);
+      if (num(np.mem) != null && np.mem >= 0) g.mem = (g.mem || 0) + np.mem;
+      if (!g.apis.some((x) => x.id === 'cuda') && (p.libs || []).some((l) => /^libcuda\.so/.test(l))) g.apis.push({ id: 'cuda', detail: '' });
+    }
+  }
   state.clients = nextClients;
-  const apps = [...groups.values()].map((g) => ({ ...g, gpus: [...g.gpus], total: Math.max(0, ...Object.values(g.engines)) }))
+  const apps = [...groups.values()].map((g) => ({ ...g, gpus: [...g.gpus], total: Math.max(0, ...Object.values(g.engines)), type: appType(g) }))
     .sort((a, b) => b.total - a.total || (b.mem || 0) + (b.sysMem || 0) - ((a.mem || 0) + (a.sysMem || 0)) || a.key.localeCompare(b.key));
   // cards
-  const cards = raw.cards.map((c) => {
+  const cards = raw.cards.map((c0) => {
+    const nv = nvCards.find((x) => nvSlot(x?.bus) === c0.slot) || null;
+    const c = nv ? mergeNv(c0, nv) : c0;
     const key = c.slot || c.card;
     let powerW = num(c.powerW);
     if (powerW == null && num(c.energyUj) != null) {
@@ -323,8 +426,21 @@ export function gpuStep(state, raw) {
       if (e && mono > e.mono && c.energyUj >= e.uj) powerW = (c.energyUj - e.uj) / ((mono - e.mono) * 1e3);
       state.energy.set(key, { mono, uj: c.energyUj });
     }
-    const est = perCard.get(c.slot) || (raw.cards.length === 1 ? perCard.get('') : null) || null;
+    let est = perCard.get(c.slot) || (raw.cards.length === 1 ? perCard.get('') : null) || null;
+    if (nv) est = { ...(est || {}), ...nvEngines(nv) };
     const busy = num(c.busy) != null ? c.busy / 100 : est && Object.keys(est).length ? Math.max(...Object.values(est)) : null;
+    const cardApps = apps.filter((a) => a.gpus.includes(c.slot) || (raw.cards.length === 1 && a.gpus.length));
+    const t0 = hottest(c);
+    const link = c.link && num(c.link.gts) != null ? { gen: pcieGen(c.link.gts), width: num(c.link.width) } : null;
+    const linkMax = c.linkMax && num(c.linkMax.gts) != null ? { gen: pcieGen(c.linkMax.gts), width: num(c.linkMax.width) } : null;
+    // RC6 (i915) and xe's render GT idle: how much of the last second the GPU slept
+    let idle = null;
+    const idleMs = num(c.rc6Ms) ?? num((c.gts || []).find((g) => g.kind === 'rc' || g.gt === 0)?.idleMs);
+    const pi = state.idle.get(key);
+    if (idleMs != null) {
+      if (pi && mono > pi.mono && idleMs >= pi.ms) idle = Math.max(0, Math.min(1, (idleMs - pi.ms) / (mono - pi.mono)));
+      state.idle.set(key, { mono, ms: idleMs });
+    }
     const t = hottest(c);
     const kind = gpuKind(c);
     return {
@@ -337,7 +453,16 @@ export function gpuStep(state, raw) {
       fan: fanState(c), powerW, powerCapW: num(c.powerCapW),
       sclk: num(c.sclk) ?? num(c.curMhz), sclkMax: num(c.sclkMax) ?? num(c.maxMhz), mclk: num(c.mclk), mclkMax: num(c.mclkMax),
       apis: gpuApis(c, caps),
-      apps: apps.filter((a) => a.gpus.includes(c.slot) || (raw.cards.length === 1 && a.gpus.length)).map((a) => a.key),
+      apps: cardApps.map((a) => a.key),
+      cats: categoryShares(est || {}),
+      memBusy: num(c.memBusy) != null ? c.memBusy / 100 : null,
+      tempCrit: t0 && num(t0.crit) != null ? t0.crit : null,
+      link, linkMax, idle, rp0: num(c.rp0Mhz),
+      memSplit: memSplit(cardApps, c.slot, kind === 'integrated' && !(num(c.vramTotal) > 0)),
+      nv: nv ? { computeMode: nv.computeMode ?? null, ecc: num(nv.ecc), cuda: typeof nv.cuda === 'string' ? nv.cuda : null, driver: typeof nv.driver === 'string' ? nv.driver : null } : null,
+      model: c.nvModel || null,
+      // another user's KFD process (ROCm: amdgpu cards only)
+      hidden: c.driver === 'amdgpu' ? (raw.hidden || []).filter((h) => Number.isInteger(h?.pid) && h.kind === 'kfd').map((h) => ({ pid: h.pid, name: String(h.name || ''), kind: h.kind })) : [],
     };
   });
   // virtual machines: their CPU (share of one core) and memory
@@ -355,14 +480,83 @@ export function gpuStep(state, raw) {
   return { t: raw.t, cards, apps, ai: aiEngines(raw, apps), vms: { count: (raw.vms || []).length, cpu: dtNs > 0 ? vcpu : null, rss: vrss }, caps };
 }
 
+// ---- AI on this computer ----
+
+// The libraries that tell a process runs a model (from gpustat.c's maps list)
+const AI_LIBS = [/^libcuda\.so/, /^libamdhip64/, /^libggml/, /^libllama/, /^libcudart/, /^libonnxruntime/, /^libtorch_cuda/];
+const RUNNERS = ['llama-server', 'llama-cli', 'ollama', 'ollama_llama_se', 'whisper-server', 'whisper-cli'];
+
+// The rows of "AI on this computer": [{ key, kind: 'voice'|'ocr'|'studio'|'sentinela'|'runner'|'app', pid, name, model,
+// where: 'gpu'|'cpu', apis, compute (0..1 of the GPU), vram (bytes), cpu (cores busy), rss, own, state }]
+//   view: gpuStep's; raw: lord.monitor.gpu()'s (ai entries with ticks); sentinela: lord.sentinela.state() or null.
+// Names come from the kernel (comm) and models from a process's own argv (base name only): a same-user process can call
+// itself anything, so a row only ever describes; it grants nothing.
+export function aiRows(state, view, raw, sentinela = null) {
+  if (!view) return [];
+  const out = [];
+  const hz = num(raw?.hz) || 100;
+  const mono = num(raw?.mono) || 0;
+  const next = new Map();
+  const cpuOf = (pid, ticks) => {
+    const p = state.ai.get(pid);
+    next.set(pid, { ticks, mono });
+    return p && mono > p.mono && ticks >= p.ticks ? (ticks - p.ticks) / hz / ((mono - p.mono) / 1000) : null;
+  };
+  const appOf = (pid) => (view.apps || []).find((a) => a.pids.includes(pid)) || null;
+  const used = new Set();
+  const sPid = Number.isInteger(sentinela?.pid) ? sentinela.pid : null;
+  for (const a of raw?.ai || []) {
+    if (!Number.isInteger(a?.pid) || a.state === 'Z') continue;
+    const cpu = num(a.ticks) != null ? cpuOf(a.pid, a.ticks) : null;
+    const app = appOf(a.pid);
+    let kind = null;
+    if (a.name === 'lord-tts') kind = 'voice';
+    else if (a.name === 'lord-ocr') kind = 'ocr';
+    else if (a.name === 'lord-studio') kind = 'studio';
+    else if (sPid != null && a.pid === sPid) kind = 'sentinela';
+    else if (RUNNERS.includes(a.name)) kind = 'runner';
+    if (!kind) continue;
+    used.add(a.pid);
+    const say = kind === 'voice' ? (raw.say || []).find((s) => s.pid === a.ppid) || null : null;
+    const gpu = !!(app && (app.total > 0.001 || (app.mem || 0) > 0)) || say?.backend === 'vulkan';
+    out.push({
+      key: `${kind}:${a.pid}`, kind, pid: a.pid, name: a.name, own: !!a.own, state: a.state,
+      model: kind === 'sentinela' ? String(sentinela.model || '') : String(a.model || ''),
+      lang: say?.lang || null, quality: say?.quality || null,
+      where: gpu ? 'gpu' : 'cpu', apis: app ? app.apis.map((x) => x.id) : say?.backend === 'vulkan' ? ['vulkan'] : [],
+      compute: app ? (app.cats.compute || app.total || 0) : null, vram: app ? app.mem : null, cpu, rss: num(a.rss),
+    });
+  }
+  // the user's own processes that map a model runtime and use a GPU
+  for (const p of raw?.list || []) {
+    if (used.has(p.pid) || !(p.libs || []).some((l) => AI_LIBS.some((re) => re.test(l)))) continue;
+    const app = appOf(p.pid);
+    if (!app) continue;
+    used.add(p.pid);
+    out.push({ key: `app:${p.pid}`, kind: 'app', pid: p.pid, name: p.name, own: true, state: 'S', model: String(p.model || ''), item: app.item,
+      where: 'gpu', apis: app.apis.map((x) => x.id), compute: app.cats.compute || app.total || 0, vram: app.mem, cpu: null, rss: null });
+  }
+  state.ai = next;
+  const rank = (r) => (r.where === 'gpu' ? 0 : 1);
+  return out.sort((a, b) => rank(a) - rank(b) || (b.compute || 0) - (a.compute || 0) || a.pid - b.pid);
+}
+
+// How many rows of rowH fit in height after a header of headH (at least min, at most max)
+export function rowsThatFit(height, rowH, headH = 0, min = 1, max = 64) {
+  if (!(height > 0) || !(rowH > 0)) return min;
+  return Math.max(min, Math.min(max, Math.floor((height - headH) / rowH)));
+}
+
 // ---- history and the Overview ----
 
 // One point per card per sample: { t, busy (0..100), temp, fan (0..100), rpm, vram, power, sclk }
 export function pushHistory(hist, view, cap = GPU_HISTORY) {
   const next = { ...hist };
   for (const c of view?.cards || []) {
+    const cats = c.cats || {};
     const pt = { t: view.t, busy: c.busy == null ? null : Math.round(c.busy * 1000) / 10, temp: c.temp, fan: c.fan?.pct ?? null, rpm: c.fan?.rpm ?? null,
-      vram: c.vram?.used ?? null, power: c.powerW, sclk: c.sclk };
+      vram: c.vram?.used ?? null, power: c.powerW, sclk: c.sclk,
+      eng: Object.fromEntries(ENGINE_CATS.map((k) => [k, Math.round((cats[k] || 0) * 1000) / 10])) };
     const old = next[c.key] || [];
     next[c.key] = old.length >= cap ? [...old.slice(old.length - cap + 1), pt] : [...old, pt];
   }

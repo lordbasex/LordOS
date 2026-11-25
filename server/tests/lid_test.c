@@ -235,6 +235,37 @@ int main(void) {
     check(display_lid_closed() == 0, "the old owner's signal is ignored");
     check(plan(&p) == 2, "both displays again");
 
+    /* #242: the login screen's scale, from lord-sessiond: only with --greeter, only on its connector, only if valid */
+    set_outputs(DRM_MODE_CONNECTOR_eDP, 1, 1, 0);
+    plan(&p);
+    int rec_panel = -1, rec_ext = -1;
+    for (int i = 0; i < p.n; i++) { if (p.o[i].conn == 40) rec_panel = p.o[i].scale; if (p.o[i].conn == 50) rec_ext = p.o[i].scale; }
+    check(rec_panel > 0 && rec_panel != 275 && rec_ext > 0 && rec_ext != 275, "both displays at their recommended scale");
+    setenv("LORD_MAIN_SCALE", "eDP-1:275", 1);
+    plan(&p);
+    for (int i = 0; i < p.n; i++) if (p.o[i].conn == 40) check(p.o[i].scale == rec_panel, "a desktop session ignores LORD_MAIN_SCALE");
+    display_set_greeter(1);
+    check(display_is_greeter(), "the login screen");
+    plan(&p);
+    for (int i = 0; i < p.n; i++) {
+        if (p.o[i].conn == 40) check(p.o[i].scale == 275, "the login screen opens the panel at the administrator's scale");
+        if (p.o[i].conn == 50) check(p.o[i].scale == rec_ext, "another display keeps its recommended scale");
+    }
+    const char *badenv[] = { "eDP-1:276", "eDP-1:0", "eDP-1 275", "eDP-1:275x", "eDP-11:275", ":275", "eDP-1:-275", "" };
+    for (size_t b = 0; b < sizeof badenv / sizeof badenv[0]; b++) {
+        setenv("LORD_MAIN_SCALE", badenv[b], 1);
+        plan(&p);
+        for (int i = 0; i < p.n; i++) if (p.o[i].conn == 40) check(p.o[i].scale == rec_panel, "a LORD_MAIN_SCALE that doesn't parse or match is ignored");
+    }
+    setenv("LORD_MAIN_SCALE", "HDMI-A-1:200", 1);
+    plan(&p);
+    for (int i = 0; i < p.n; i++) {
+        if (p.o[i].conn == 50) check(p.o[i].scale == 200, "the scale follows its connector");
+        if (p.o[i].conn == 40) check(p.o[i].scale == rec_panel, "and only that one");
+    }
+    display_set_greeter(0);
+    unsetenv("LORD_MAIN_SCALE");
+
     char dir[64];                       /* displays.json is only written on "Keep" */
     snprintf(dir, sizeof dir, "%s/.config/lordos", home);
     rmdir(dir);

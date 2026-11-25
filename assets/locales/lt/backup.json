@@ -14,6 +14,11 @@
   "never": "Atsarginių kopijų dar nėra",
   "next": "Kita: {when}",
   "lastError": "Paskutinė atsarginė kopija nepavyko: {error}",
+  "machinesBusy": {
+    "one": "{count} mašina veikė: jos diskai šioje kopijoje yra iš ankstesnės",
+    "few": "{count} mašinos veikė: jų diskai šioje kopijoje yra iš ankstesnės",
+    "other": "{count} mašinų veikė: jų diskai šioje kopijoje yra iš ankstesnės"
+  },
   "todayAt": "šiandien {time}",
   "now": "Kurti kopiją dabar",
   "pause": "Pristabdyti",
@@ -80,6 +85,10 @@
   "delete": "Ištrinti atsarginę kopiją",
   "restoreAll": "Atkurti viską",
   "restoreItem": "Atkurti „{name}“",
+  "restoreSelected": "Atkurti pasirinktus ({count})",
+  "restoringItem": "Atkuriama {index} iš {count}: {name}",
+  "restoreItemFailed": "Nepavyko atkurti „{name}“: {error}",
+  "restoreMoreFailed": "Kiti neatkurti: {count}",
   "restoreFolder": "Atkurti šį aplanką",
   "restorePick": "Pasirinkite, ką atkurti",
   "restoreAllTitle": "Atkurti visą namų aplanką?",

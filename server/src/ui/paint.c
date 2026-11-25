@@ -143,9 +143,11 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
     if (!plain) for (int i = 0; i < 4; i++) r4[i] = ex->r.rad[i] * k;
     if (!plain) rad = max4(r4);
     int corners_differ = !plain && (r4[1] != r4[0] || r4[2] != r4[0] || r4[3] != r4[0]);
-    if (paint_capture_mode && n->protect) {     /* ventana protegida: negra en cualquier captura */
-        if (corners_differ) canvas_rrect4(c, x, y, w, h, r4, 0xff000000u);
-        else canvas_rrect(c, x, y, w, h, rad, 0xff000000u);
+    /* a protected window, or a picture of a protected source (a protected machine's, lord.vm.protect) wherever it is shown:
+     * the neutral fill and the lock in every capture */
+    if (paint_capture_mode && (n->protect || (n->type == NODE_MEDIA && media_id_protected(n->term)))) {
+        float rr[4] = { rad, rad, rad, rad };
+        paint_protected_fill(c, x, y, w, h, corners_differ ? r4 : rr);
         return;
     }
     if (skip_until && n->id == skip_until) skip_reached = 1;
@@ -369,8 +371,8 @@ static TfLayer *tf_slot(int node, float kr) {
     return lru;
 }
 
+static int subtree_protected(const Node *n, int depth);
 static int tf_paint(Canvas *c, Node *n, float opacity) {
-    if (paint_capture_mode && n->protect) return 0;
     if (skip_until && !skip_reached) return 0;      /* the normal path knows how to skip */
     float sc = fmaxf(fabsf(n->s.ext->scale_x), fabsf(n->s.ext->scale_y));
     if (sc < 1e-3f) return 1;                       /* scale(0): nothing to paint */
@@ -408,7 +410,11 @@ static int tf_paint(Canvas *c, Node *n, float opacity) {
     e->used = ++tf_tick;
     e->used_at = tf_now_ms();
     float ox = (gx0 - pad) / kr, oy = (gy0 - pad) / kr;
-    if (!e->valid || live || cap_last || e->w != w || e->h != h || fabsf(e->ox - ox) > 0.01f || fabsf(e->oy - oy) > 0.01f) {
+    /* In a capture, a raster the screen's frames left in the cache holds a protected window's real pixels (a window
+     * scaled in the overview or by an effect, a protected node of its own transformed): a subtree with a protected node
+     * is always painted again here, in capture mode, and that raster is never kept (valid below). */
+    int cap_redo = paint_capture_mode && subtree_protected(n, 0);
+    if (!e->valid || live || cap_last || cap_redo || e->w != w || e->h != h || fabsf(e->ox - ox) > 0.01f || fabsf(e->oy - oy) > 0.01f) {
         /* a slot keeps its buffer for the next raster, but not a window-sized one for a 9x9 icon: the 16
          * slots held 57 MB of small rasters at rest (0.8.9.1) */
         if ((size_t)w * h > e->cap || e->cap > 4 * (size_t)w * h + 65536) {
@@ -2433,6 +2439,59 @@ void paint_root_full(Canvas *c, Node *root) {
 
 int paint_capture_mode;
 
+/* ---- what a protected window is in a capture (docs/PRIVACY.md "Protected windows") ----
+ * One opaque neutral fill in the node's own box and corners, and when there is room a small lock with the label the
+ * shell set in the person's language (lord.media.setProtectedLabel): the same in a screenshot, a recording, the remote
+ * desktop, a share and a portal still, whatever paints it (paint_node_body, tf_paint through a transform, wl.c for a
+ * protected Linux window's menus and its full screen). */
+static char protect_label[PAINT_PROTECT_LABEL_MAX + 1];
+
+void paint_set_protected_label(const char *s) {
+    size_t n = 0;
+    int cut = 0;
+    /* printable text only, cut on a character boundary */
+    for (size_t i = 0; s && s[i]; i++) {
+        unsigned char ch = (unsigned char)s[i];
+        if (ch < 0x20 || ch == 0x7f) continue;
+        if (n >= PAINT_PROTECT_LABEL_MAX) { cut = 1; break; }
+        protect_label[n++] = (char)ch;
+    }
+    if (cut) {                                      /* the last character whole, or not at all */
+        size_t p = n;
+        while (p > 0 && ((unsigned char)protect_label[p - 1] & 0xc0) == 0x80) p--;
+        if (p > 0) {
+            unsigned char l = (unsigned char)protect_label[p - 1];
+            size_t need = l >= 0xf0 ? 4 : l >= 0xe0 ? 3 : l >= 0xc0 ? 2 : 1;
+            if (n - (p - 1) < need) n = p - 1;
+        }
+    }
+    protect_label[n] = 0;
+}
+
+const char *paint_protected_label(void) { return protect_label; }
+
+void paint_protected_fill(Canvas *c, float x, float y, float w, float h, const float r4[4]) {
+    if (w <= 0 || h <= 0) return;
+    if (r4[1] != r4[0] || r4[2] != r4[0] || r4[3] != r4[0]) canvas_rrect4(c, x, y, w, h, r4, PAINT_PROTECT_FILL);
+    else canvas_rrect(c, x, y, w, h, r4[0], PAINT_PROTECT_FILL);
+    const float k = paint_view.k > 0 ? paint_view.k : 1;
+    if (w < 28 * k || h < 28 * k) return;           /* a password field: the fill alone */
+    int label = protect_label[0] && w >= 96 * k && h >= 64 * k;
+    float lh = label ? 18 * k : 0, gap = label ? 6 * k : 0;
+    float ih = 17 * k, iw = 14 * k;                  /* the lock: a shackle over a body */
+    float top = y + (h - (ih + gap + lh)) / 2, cx = x + w / 2;
+    Rect old = canvas_push_clip(c, x, y, w, h);
+    canvas_rrect_stroke(c, cx - 4.5f * k, top, 9 * k, 12 * k, 4.5f * k, 2 * k, PAINT_PROTECT_INK);
+    canvas_rrect(c, cx - iw / 2, top + 6 * k, iw, 11 * k, 2.5f * k, PAINT_PROTECT_INK);
+    canvas_rrect(c, cx - 1 * k, top + 9.5f * k, 2 * k, 4 * k, 1 * k, PAINT_PROTECT_FILL);   /* the keyhole */
+    if (label) {
+        text_paint_scale = k;
+        text_draw_ex(c, protect_label, 500, 12 * k, 0, x + 8 * k, top + ih + gap, w - 16 * k, TEXT_CENTER, 1, 1, 1, PAINT_PROTECT_INK);
+        text_paint_scale = 1;
+    }
+    canvas_set_clip(c, old);
+}
+
 void paint_capture(Canvas *c, Node *root) {
     if (!root) return;
     paint_capture_mode = 1;
@@ -2448,7 +2507,7 @@ static int in_tree(const Node *n, const Node *root) {
 }
 
 static int subtree_protected(const Node *n, int depth) {
-    if (n->protect) return 1;
+    if (n->protect || (n->type == NODE_MEDIA && media_id_protected(n->term))) return 1;
     if (depth > 4096) return 1;                     /* deeper than any real tree: treated as protected, never captured */
     for (const Node *k = n->first; k; k = k->next) if (subtree_protected(k, depth + 1)) return 1;
     return 0;

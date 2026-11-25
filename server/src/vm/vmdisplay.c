@@ -3,7 +3,16 @@
  * accept), and passes lord-server only the fixed messages of vmproto.h on fd 3. The compositor never parses
  * anything QEMU sends.
  *
- *   lord-vmdisplay <machine id>     fd 3: SOCK_SEQPACKET to lord-server; fd 4: the D-Bus connection to QEMU
+ *   lord-vmdisplay <machine id> [--heads N]
+ *                                   fd 3: SOCK_SEQPACKET to lord-server; fd 4: the D-Bus connection to QEMU. --heads N
+ *                                   (All Displays, docs/VIRTUALIZATION.md 5.4; 2..4): the virtio-gpu's outputs 0..N-1,
+ *                                   QEMU's Console_0..Console_N-1, each checked to be the graphic console of that output,
+ *                                   each with a listener of its own and its own channel to lord-server: output 0 on fd 3,
+ *                                   output k on fd 4 + k. QEMU's peer-to-peer D-Bus display serves one connection (a new
+ *                                   add_client takes its objects from the one before), so one helper serves every output.
+ *                                   Only output 0's channel carries the guest's sound and microphone; each output is asked
+ *                                   for its size at its corner of the desktop the outputs make (VD_LAYOUT). A closed
+ *                                   channel of another output only stops that output; output 0's ends the helper
  *   lord-vmdisplay --selftest       applies the sandbox, then tries what it must not be able to do (JSON line)
  *
  * Decisions (Phase 0, section 13.6):
@@ -22,6 +31,9 @@
  *   - Copy before forward: the damaged area goes from QEMU's buffer into the picture lord-server shared (sealed
  *     by lord-server against shrinking), at most VD_RATE times a second, and not again until lord-server said
  *     it read the last one (VD_FRAME_DONE) or 250 ms passed. lord-server never sees QEMU's live memory.
+ *   - Paced (VD_PACE, vmpace.h): lord-server says when a picture that keeps not changing (a vGPU's) or that no window
+ *     shows may be taken less often; the copy, the VD_FRAME and a held UpdateDMABUF's answer then wait for the interval.
+ *     Input to the guest ends an idle pace here at once.
  *   - It never makes a blocking call to QEMU after setup (QEMU calls the listener from its main loop): input goes
  *     out as method calls that expect no reply.
  *   - Sound (6.9, 6.20): an org.qemu.Display1.AudioOutListener on a third peer connection, registered before the
@@ -35,6 +47,10 @@
  *     helper never opens a device: the microphone is lord-server's stream, opened only after LordOS's permission. */
 #include "vmproto.h"
 #include "vmkeys.h"
+#include "vmpace.h"
+#include "vmdamage.h"
+
+_Static_assert(VMDMG_MAX == VD_FRAME_RECTS, "a frame's rectangles: vmdamage.h and vmproto.h agree");
 #include "../sec/sandbox.h"
 #include "../media/aring.h"
 
@@ -58,22 +74,28 @@
 
 #include <systemd/sd-bus.h>
 
-#define CH 3
+#define CH0 3
 #define DBUS_FD 4
 
 #define PIXMAN_x8r8g8b8 0x20020888u
 #define PIXMAN_a8r8g8b8 0x20028888u
 #define LISTENER_PATH "/org/qemu/Display1/Listener"
-#define CONSOLE_PATH  "/org/qemu/Display1/Console_0"
+#define HEADS_MAX     4                 /* machine.h VM_HEADS_MAX */
 #define ACK_WAIT_MS   250
 #define RESIZE_GAP_MS 100
 #define STATS_MS      5000
 
-static sd_bus *bus, *lbus, *abus, *ibus;
+static sd_bus *bus, *abus, *ibus;
 
 /* where the picture comes from */
 enum { SRC_NONE = 0, SRC_MAP, SRC_FB, SRC_DMABUF };
-static struct {
+/* one output of the display (one with a single display): everything below is per output. D is the one being served: set
+ * before its listener's calls are processed, its channel is read, or its turn of the loop runs */
+typedef struct {
+    int ch;                             /* its channel to lord-server; -1 closed (another output's window went) */
+    char path[40];                      /* QEMU's Console_<n> */
+    sd_bus *lb;                         /* its listener's connection (lbus) */
+    long long abs_asked_ms;
     int src;
     uint32_t w, h;
     /* SRC_MAP: QEMU's buffer */
@@ -87,11 +109,13 @@ static struct {
     size_t shm_len;
     uint32_t shm_w, shm_h;
     int want_w, want_h;         /* last VD_SIZE sent */
-    /* damage waiting to be copied */
-    int dirty, dx0, dy0, dx1, dy1;
+    /* damage waiting to be copied: a few rectangles (vmdamage.h), each its own VD_FRAME */
+    int dirty;
+    VmDamage dmg;
     int frame, acked;
     long long sent_ms, next_ms;
     int rate;
+    int pace_ms, pace_kind;             /* VD_PACE: the least time between pictures, and why (vmpace.h) */
     /* cursor and pointer */
     int ptr_pending, ptr_x, ptr_y, ptr_on;
     /* input */
@@ -114,7 +138,13 @@ static struct {
     long long upd_ms;
     int dmabufs;
     long upd_none;                      /* UpdateDMABUFs with no dmabuf picture to update */
-} D;
+} Head;
+static Head H[HEADS_MAX];
+static Head *Dp = &H[0];
+static int nheads = 1;
+#define D (*Dp)
+#define CONSOLE_PATH (D.path)
+#define lbus (D.lb)
 
 static long long now_ms(void) {
     struct timespec ts;
@@ -123,7 +153,19 @@ static long long now_ms(void) {
 }
 
 static void say(VdMsg m, int fd) {
-    if (vd_send(CH, &m, fd) && errno != EAGAIN) { /* lord-server gone: the loop sees the hangup */ }
+    if (D.ch < 0) return;
+    if (vd_send(D.ch, &m, fd) && errno != EAGAIN) { /* lord-server gone: the loop sees the hangup */ }
+}
+
+/* a string QEMU sent (a console's label, an error's message) as it goes in the session's log: one line of printable
+ * ASCII, anything else as '?', at most cap - 1 bytes; NULL as "?". QEMU is the guest's side: its words never write
+ * a line of their own, an escape sequence or a forged entry into the log (docs/VIRTUALIZATION.md 8) */
+static const char *qtext(const char *s, char *out, size_t cap) {
+    size_t n = 0;
+    if (!s) s = "?";
+    for (; *s && n + 1 < cap; s++) out[n++] = (unsigned char)*s >= 0x20 && (unsigned char)*s < 0x7f ? *s : '?';
+    out[n] = 0;
+    return out;
 }
 
 static void refuse(const char *what, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
@@ -190,11 +232,8 @@ static void drop_dmabuf(void) {
 }
 
 static void damage(int x, int y, int w, int h) {
-    if (!D.dirty) { D.dx0 = x; D.dy0 = y; D.dx1 = x + w; D.dy1 = y + h; D.dirty = 1; return; }
-    if (x < D.dx0) D.dx0 = x;
-    if (y < D.dy0) D.dy0 = y;
-    if (x + w > D.dx1) D.dx1 = x + w;
-    if (y + h > D.dy1) D.dy1 = y + h;
+    if (!D.dirty) { vmdmg_clear(&D.dmg); D.dirty = 1; }
+    vmdmg_add(&D.dmg, x, y, w, h);
 }
 
 /* ---- sound ---- */
@@ -479,7 +518,11 @@ static const sd_bus_vtable audio_in_vt[] = {
 static int au_registered(sd_bus_message *m, void *u, sd_bus_error *e) {
     (void)e;
     *(int *)u = sd_bus_message_is_method_error(m, NULL) ? 2 : 1;
-    if (*(int *)u == 2) fprintf(stderr, "lord-vmdisplay: Register*Listener: %s\n", sd_bus_message_get_error(m) ? sd_bus_message_get_error(m)->message : "?");
+    if (*(int *)u == 2) {
+        const sd_bus_error *er = sd_bus_message_get_error(m);
+        char t[128];
+        fprintf(stderr, "lord-vmdisplay: Register*Listener: %s\n", qtext(er ? er->message : NULL, t, sizeof t));
+    }
     return 0;
 }
 
@@ -508,8 +551,9 @@ static void new_size(uint32_t w, uint32_t h) {
     if (w != D.w || h != D.h) fprintf(stderr, "lord-vmdisplay %s: the guest's picture is %ux%u\n", me, w, h);
     D.w = w;
     D.h = h;
+    /* all of it, and only it: what was gathered for the old size goes */
+    vmdmg_clear(&D.dmg);
     damage(0, 0, (int)w, (int)h);
-    D.dx0 = D.dy0 = 0; D.dx1 = (int)w; D.dy1 = (int)h;
     if (D.shm && (D.shm_w != w || D.shm_h != h)) { munmap(D.shm, D.shm_len); D.shm = NULL; D.shm_len = 0; }
     if (!D.shm && (D.want_w != (int)w || D.want_h != (int)h)) {
         D.want_w = (int)w;
@@ -544,20 +588,25 @@ static int copy_damage(int x, int y, int w, int h) {
     return 0;
 }
 
+/* the damage goes out as one VD_FRAME per rectangle, all with the same frame number; f counts the rectangles still to
+ * come in this frame (0 on the last), so lord-server damages each one and answers the frame once (vmproto.h) */
 static void flush(long long now) {
     if (!D.dirty || !D.shm || D.src == SRC_NONE || D.shm_w != D.w || D.shm_h != D.h) return;
     if (!D.acked && now - D.sent_ms < ACK_WAIT_MS) return;
     if (now < D.next_ms) return;
-    int x0 = D.dx0 < 0 ? 0 : D.dx0, y0 = D.dy0 < 0 ? 0 : D.dy0;
-    int x1 = D.dx1 > (int)D.w ? (int)D.w : D.dx1, y1 = D.dy1 > (int)D.h ? (int)D.h : D.dy1;
     D.dirty = 0;
-    if (x1 <= x0 || y1 <= y0) return;
-    if (copy_damage(x0, y0, x1 - x0, y1 - y0)) return;
+    VmDamage d = D.dmg;
+    vmdmg_clear(&D.dmg);
+    vmdmg_clip(&d, (int)D.w, (int)D.h);
+    if (!d.n) return;
+    for (int i = 0; i < d.n; i++)
+        if (copy_damage(d.r[i].x0, d.r[i].y0, d.r[i].x1 - d.r[i].x0, d.r[i].y1 - d.r[i].y0)) return;
     D.frame++;
     D.acked = 0;
     D.sent_ms = now;
-    D.next_ms = now + 1000 / (D.rate ? D.rate : 60);
-    say(vd_msg(VD_FRAME, x0, y0, x1 - x0, y1 - y0, D.frame, 0), -1);
+    D.next_ms = now + vmpace_interval(D.rate, D.pace_ms);
+    for (int i = 0; i < d.n; i++)
+        say(vd_msg(VD_FRAME, d.r[i].x0, d.r[i].y0, d.r[i].x1 - d.r[i].x0, d.r[i].y1 - d.r[i].y0, D.frame, d.n - 1 - i), -1);
 }
 
 /* ---- validation ---- */
@@ -812,7 +861,8 @@ static void call_noreply(const char *iface, const char *method, const char *sig,
 static int on_ui_info(sd_bus_message *m, void *u, sd_bus_error *e) {
     (void)u; (void)e;
     const sd_bus_error *err = sd_bus_message_get_error(m);
-    if (err) fprintf(stderr, "lord-vmdisplay %s: QEMU refused the new size: %s\n", me, err->message ? err->message : err->name ? err->name : "?");
+    char t[128];
+    if (err) fprintf(stderr, "lord-vmdisplay %s: QEMU refused the new size: %s\n", me, qtext(err->message ? err->message : err->name, t, sizeof t));
     return 0;
 }
 
@@ -839,6 +889,11 @@ static void wheel(int steps, int up_button, int down_button) {
     }
 }
 
+/* All Displays: this output off for the guest (QEMU's ui_info with no size clears it from the enabled outputs) */
+static void output_off(void) {
+    call_noreply("org.qemu.Display1.Console", "SetUIInfo", "qqiiuu", (uint16_t)0, (uint16_t)0, 0, 0, (uint32_t)0, (uint32_t)0);
+}
+
 static void release_all(void) {
     for (int k = 0; k < 768; k++) if (D.keys[k]) key(k, 0);
     for (int b = 0; b < 16; b++) if (D.buttons[b]) button(b, 0);
@@ -846,17 +901,17 @@ static void release_all(void) {
 
 /* Mouse.IsAbsolute changes when the guest's tablet driver starts: asked again, without waiting, at most once a second
  * while the pointer moves */
-static long long abs_asked_ms;
 static int on_abs(sd_bus_message *m, void *u, sd_bus_error *e) {
-    (void)u; (void)e;
+    (void)e;
+    Head *h = u;                        /* the output that asked */
     int v = 0;
-    if (!sd_bus_message_is_method_error(m, NULL) && sd_bus_message_read(m, "v", "b", &v) >= 0) D.abs_mouse = v;
+    if (h && !sd_bus_message_is_method_error(m, NULL) && sd_bus_message_read(m, "v", "b", &v) >= 0) h->abs_mouse = v;
     return 0;
 }
 static void ask_abs(long long now) {
-    if (now - abs_asked_ms < (now < D.abs_fast_until ? 100 : 1000)) return;
-    abs_asked_ms = now;
-    sd_bus_call_method_async(bus, NULL, NULL, CONSOLE_PATH, "org.freedesktop.DBus.Properties", "Get", on_abs, NULL, "ss", "org.qemu.Display1.Mouse", "IsAbsolute");
+    if (now - D.abs_asked_ms < (now < D.abs_fast_until ? 100 : 1000)) return;
+    D.abs_asked_ms = now;
+    sd_bus_call_method_async(bus, NULL, NULL, CONSOLE_PATH, "org.freedesktop.DBus.Properties", "Get", on_abs, Dp, "ss", "org.qemu.Display1.Mouse", "IsAbsolute");
 }
 
 /* a picture point for the guest's tablet: onto the shown display of its whole desktop (VD_LAYOUT), or as it is */
@@ -905,8 +960,11 @@ static void send_input(long long now) {
         D.resize_ms = now;
         /* with an answer: QEMU says so when the display device can't be asked (a refusal used to go unseen) */
         fprintf(stderr, "lord-vmdisplay %s: the guest is asked for %dx%d\n", me, D.rw, D.rh);
+        /* one of several heads: at its corner in the desktop the heads make side by side (VD_LAYOUT, vm_layout_ok), which
+         * QEMU hands the guest as the output's suggested position */
+        int xo = nheads > 1 && D.layout[4] ? D.layout[0] : 0, yo = nheads > 1 && D.layout[4] ? D.layout[1] : 0;
         sd_bus_call_method_async(bus, NULL, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "SetUIInfo", on_ui_info, NULL, "qqiiuu",
-                                 (uint16_t)0, (uint16_t)0, 0, 0, (uint32_t)D.rw, (uint32_t)D.rh);
+                                 (uint16_t)0, (uint16_t)0, xo, yo, (uint32_t)D.rw, (uint32_t)D.rh);
     }
     if (D.ptr_pending) { D.ptr_pending = 0; say(vd_msg(VD_POINTER, D.ptr_x, D.ptr_y, D.ptr_on, 0, 0, 0), -1); }
 }
@@ -933,15 +991,30 @@ static void take_picture(int fd) {
 }
 
 /* 0 go on, 1 close */
+/* VD_PACE (vmpace.h): a shorter interval applies to the picture waiting now */
+static void pace_set(int ms, int kind) {
+    D.pace_ms = ms;
+    D.pace_kind = kind;
+    long long due = D.sent_ms + vmpace_interval(D.rate, ms);
+    if (due < D.next_ms) D.next_ms = due;
+}
+
+/* input to the guest ends an idle pace here and now: the picture it makes goes out at the display's rate */
+static void pace_input(void) {
+    if (D.pace_kind == VDP_IDLE) pace_set(0, VDP_NONE);
+}
+
 static int from_server(void) {
     for (int budget = 0; budget < VD_POLL_MAX; budget++) {
         VdMsg m;
         int fd = -1;
-        int r = vd_recv(CH, &m, &fd);
+        int r = D.ch < 0 ? -1 : vd_recv(D.ch, &m, &fd);
         if (r < 0) return 1;
         if (!r) return 0;
         if (!vd_msg_valid(&m, 1)) { if (fd >= 0) close(fd); refuse("message", "type %u from lord-server", m.type); continue; }
         if (m.type != VD_SHM && m.type != VD_AUDIO_REC && m.type != VD_AUDIO_OUT && m.type != VD_MIC && fd >= 0) { close(fd); fd = -1; }
+        /* the guest's sound and microphone are output 0's channel's only */
+        if (Dp != &H[0] && (m.type == VD_AUDIO_REC || m.type == VD_AUDIO_OUT || m.type == VD_MIC)) { if (fd >= 0) close(fd); refuse("message", "sound on another output's channel"); continue; }
         switch (m.type) {
         case VD_SHM: if (fd >= 0) take_picture(fd); break;
         case VD_AUDIO_REC: au_rec(m.a ? fd : -1); if (!m.a && fd >= 0) close(fd); break;
@@ -956,12 +1029,13 @@ static int from_server(void) {
             else { if (fd >= 0) close(fd); ring_drop(&A.mic); }
             break;
         case VD_FRAME_DONE: if (m.e == D.frame) D.acked = 1; break;
-        case VD_KEY: key(m.a, m.b); break;
-        case VD_MOTION: D.mx = m.a; D.my = m.b; D.motion_pending = 1; break;
-        case VD_BUTTON: send_motion(now_ms()); button(m.a, m.b); break;
-        case VD_WHEEL: send_motion(now_ms()); if (m.a) wheel(m.a, 3, 4); if (m.b) wheel(m.b, 8, 7); break;
+        case VD_KEY: pace_input(); key(m.a, m.b); break;
+        case VD_MOTION: pace_input(); D.mx = m.a; D.my = m.b; D.motion_pending = 1; break;
+        case VD_BUTTON: pace_input(); send_motion(now_ms()); button(m.a, m.b); break;
+        case VD_WHEEL: pace_input(); send_motion(now_ms()); if (m.a) wheel(m.a, 3, 4); if (m.b) wheel(m.b, 8, 7); break;
         case VD_REL:
             if (!D.capture) break;
+            pace_input();
             D.rdx = D.rdx + m.a > 65535 ? 65535 : D.rdx + m.a < -65535 ? -65535 : D.rdx + m.a;
             D.rdy = D.rdy + m.b > 65535 ? 65535 : D.rdy + m.b < -65535 ? -65535 : D.rdy + m.b;
             D.rel_pending = 1;
@@ -970,7 +1044,7 @@ static int from_server(void) {
             D.capture = m.a;
             D.rdx = D.rdy = 0; D.rel_pending = 0;
             D.abs_fast_until = now_ms() + 3000;
-            abs_asked_ms = 0;
+            D.abs_asked_ms = 0;
             fprintf(stderr, "lord-vmdisplay %s: the mouse is %s\n", me, m.a ? "captured (relative)" : "free (absolute)");
             break;
         case VD_LAYOUT:
@@ -981,6 +1055,7 @@ static int from_server(void) {
         case VD_RELEASE_ALL: release_all(); break;
         case VD_RESIZE: D.rw = m.a; D.rh = m.b; D.resize_pending = 1; break;
         case VD_RATE: D.rate = m.a; break;
+        case VD_PACE: pace_set(m.a, m.b); break;
         case VD_CLOSE: return 1;
         }
     }
@@ -1067,12 +1142,15 @@ static sd_bus *register_audio(const char *id, const char *method, const char *pa
         /* the console's listener and the other sound one too: QEMU asks them for their properties and answers nothing
          * else until it has them */
         while (!done && now_ms() < until) {
-            sd_bus *all[4] = { lbus, b, bus, abus };
-            for (int k = 0; k < 4; k++) if (all[k]) while (sd_bus_process(all[k], NULL) > 0) ;
+            sd_bus *all[3 + HEADS_MAX] = { b, bus, abus };
+            int na = 3;
+            for (int k = 0; k < nheads; k++) all[na++] = H[k].lb;
+            for (int k = 0; k < na; k++) if (all[k]) { if (k >= 3) Dp = &H[k - 3]; while (sd_bus_process(all[k], NULL) > 0) ; }
+            Dp = &H[0];
             if (done) break;
-            struct pollfd pf[4];
+            struct pollfd pf[3 + HEADS_MAX];
             int np = 0;
-            for (int k = 0; k < 4; k++) if (all[k]) pf[np++] = (struct pollfd){ sd_bus_get_fd(all[k]), (short)sd_bus_get_events(all[k]), 0 };
+            for (int k = 0; k < na; k++) if (all[k]) pf[np++] = (struct pollfd){ sd_bus_get_fd(all[k]), (short)sd_bus_get_events(all[k]), 0 };
             poll(pf, (nfds_t)np, 100);
         }
     }
@@ -1088,75 +1166,136 @@ int main(int argc, char **argv) {
     prctl(PR_SET_DUMPABLE, 0);
     signal(SIGPIPE, SIG_IGN);
     if (argc == 2 && !strcmp(argv[1], "--selftest")) return selftest();
-    if (argc != 2 || !uuid_ok(argv[1])) { fprintf(stderr, "usage: lord-vmdisplay <machine id>   (fd 3: lord-server, fd 4: QEMU's D-Bus display)\n"); return 2; }
+    if (argc == 4 && !strcmp(argv[2], "--heads")) nheads = vd_head_arg(argv[3], HEADS_MAX + 1);
+    if ((argc != 2 && argc != 4) || !uuid_ok(argv[1]) || (argc == 4 && nheads < 2)) {
+        fprintf(stderr, "usage: lord-vmdisplay <machine id> [--heads 2-%d]   (fd 3: lord-server, fd 4: QEMU's D-Bus display, fd 4+k: output k's channel)\n", HEADS_MAX);
+        return 2;
+    }
     me = argv[1];
-    if (!is_socket(CH, SOCK_SEQPACKET) || !is_socket(DBUS_FD, SOCK_STREAM)) { fprintf(stderr, "lord-vmdisplay: fd 3 must be a SOCK_SEQPACKET and fd 4 a stream socket\n"); return 2; }
-    fcntl(CH, F_SETFD, FD_CLOEXEC);
+    for (int k = 0; k < nheads; k++) {
+        H[k].ch = k ? DBUS_FD + k : CH0;
+        snprintf(H[k].path, sizeof H[k].path, "/org/qemu/Display1/Console_%d", k);
+        H[k].rate = 60;
+        H[k].acked = 1;
+        if (!is_socket(H[k].ch, SOCK_SEQPACKET)) { fprintf(stderr, "lord-vmdisplay: fd %d must be a SOCK_SEQPACKET\n", H[k].ch); return 2; }
+        fcntl(H[k].ch, F_SETFD, FD_CLOEXEC);
+    }
+    if (!is_socket(DBUS_FD, SOCK_STREAM)) { fprintf(stderr, "lord-vmdisplay: fd 4 must be a stream socket\n"); return 2; }
     fcntl(DBUS_FD, F_SETFD, FD_CLOEXEC);
     struct sigaction sa;
     memset(&sa, 0, sizeof sa);
     sa.sa_sigaction = on_sigbus;
     sa.sa_flags = SA_SIGINFO | SA_NODEFER;
     sigaction(SIGBUS, &sa, NULL);
-    D.rate = 60;
-    D.acked = 1;
 
     bus = p2p(DBUS_FD);
-    if (!bus) { say(vd_msg(VD_STATE, VDS_LOST, VDR_SETUP, 0, 0, 0, 0), -1); return 1; }
+    if (!bus) { for (int k = 0; k < nheads; k++) { Dp = &H[k]; say(vd_msg(VD_STATE, VDS_LOST, VDR_SETUP, 0, 0, 0, 0), -1); } return 1; }
     sd_bus_error e = SD_BUS_ERROR_NULL;
-    uint32_t cw = 0, ch = 0;
-    int absm = 0;
-    char *label = NULL;
-    if (sd_bus_get_property_string(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Label", &e, &label) < 0) {
-        fprintf(stderr, "lord-vmdisplay: QEMU's console isn't there: %s\n", e.message ? e.message : "?");
-        say(vd_msg(VD_STATE, VDS_LOST, VDR_SETUP, 0, 0, 0, 0), -1);
-        return 1;
+    uint32_t cws[HEADS_MAX] = { 0 }, chs[HEADS_MAX] = { 0 };
+    for (int k = 0; k < nheads; k++) {
+        Dp = &H[k];
+        uint32_t cw = 0, ch = 0;
+        int absm = 0;
+        char *label = NULL;
+        int good = sd_bus_get_property_string(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Label", &e, &label) >= 0;
+        char t[128];
+        if (!good) fprintf(stderr, "lord-vmdisplay: QEMU's console %d isn't there: %s\n", k, qtext(e.message, t, sizeof t));
+        sd_bus_error_free(&e);
+        if (good && nheads > 1) {
+            /* QEMU numbers its consoles itself: Console_k must be the graphic console of output k (the virtio-gpu's outputs
+             * come first: one display device, -nodefaults) */
+            uint32_t hh = 0xffffffffu;
+            char *type = NULL;
+            sd_bus_get_property_trivial(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Head", &e, 'u', &hh);
+            sd_bus_error_free(&e);
+            sd_bus_get_property_string(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Type", &e, &type);
+            sd_bus_error_free(&e);
+            good = hh == (uint32_t)k && type && !strcmp(type, "Graphic");
+            if (!good) fprintf(stderr, "lord-vmdisplay %s: console %d isn't the display's output %d\n", argv[1], k, k);
+            free(type);
+        }
+        if (!good) {
+            free(label);
+            for (int j = 0; j < nheads; j++) { Dp = &H[j]; say(vd_msg(VD_STATE, VDS_LOST, VDR_SETUP, 0, 0, 0, 0), -1); }
+            return 1;
+        }
+        sd_bus_get_property_trivial(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Width", &e, 'u', &cw);
+        sd_bus_error_free(&e);
+        sd_bus_get_property_trivial(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Height", &e, 'u', &ch);
+        sd_bus_error_free(&e);
+        if (sd_bus_get_property_trivial(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Mouse", "IsAbsolute", &e, 'b', &absm) < 0) absm = 0;
+        sd_bus_error_free(&e);
+        D.abs_mouse = absm;
+        cws[k] = cw; chs[k] = ch;
+        fprintf(stderr, "lord-vmdisplay %s: console %d \"%s\" %ux%u, mouse %s\n", argv[1], k, qtext(label ? label : "", t, 64), cw, ch, absm ? "absolute" : "relative");
+        free(label);
     }
-    sd_bus_error_free(&e);
-    sd_bus_get_property_trivial(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Width", &e, 'u', &cw);
-    sd_bus_error_free(&e);
-    sd_bus_get_property_trivial(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Height", &e, 'u', &ch);
-    sd_bus_error_free(&e);
-    if (sd_bus_get_property_trivial(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Mouse", "IsAbsolute", &e, 'b', &absm) < 0) absm = 0;
-    sd_bus_error_free(&e);
-    D.abs_mouse = absm;
-    int lv[2];
-    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, lv)) return 1;
-    lbus = p2p(lv[0]);
-    if (!lbus || sd_bus_add_object_vtable(lbus, NULL, LISTENER_PATH, "org.qemu.Display1.Listener", listener_vt, NULL) < 0 ||
-        sd_bus_add_object_vtable(lbus, NULL, LISTENER_PATH, "org.qemu.Display1.Listener.Unix.Map", map_vt, NULL) < 0) return 1;
-    sd_bus_message *rep = NULL;
-    if (sd_bus_call_method(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "RegisterListener", &e, &rep, "h", lv[1]) < 0) {
-        fprintf(stderr, "lord-vmdisplay: RegisterListener: %s\n", e.message ? e.message : "?");
-        say(vd_msg(VD_STATE, VDS_LOST, VDR_SETUP, 0, 0, 0, 0), -1);
-        return 1;
+    /* then a listener on each: QEMU asks a new listener for its properties before it answers anything else (one blocking
+     * call to it meanwhile would wait out D-Bus's timeout), so each is registered without waiting and every listener made
+     * so far is served until the answer comes (5 s at most) */
+    for (int k = 0; k < nheads; k++) {
+        Dp = &H[k];
+        int lv[2];
+        if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, lv)) return 1;
+        lbus = p2p(lv[0]);
+        if (!lbus || sd_bus_add_object_vtable(lbus, NULL, LISTENER_PATH, "org.qemu.Display1.Listener", listener_vt, NULL) < 0 ||
+            sd_bus_add_object_vtable(lbus, NULL, LISTENER_PATH, "org.qemu.Display1.Listener.Unix.Map", map_vt, NULL) < 0) return 1;
+        static int done;
+        done = 0;
+        sd_bus_slot *slot = NULL;
+        if (sd_bus_call_method_async(bus, &slot, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "RegisterListener", au_registered, &done, "h", lv[1]) >= 0) {
+            long long until = now_ms() + 5000;
+            while (!done && now_ms() < until) {
+                struct pollfd pf[1 + HEADS_MAX];
+                int np = 0;
+                while (sd_bus_process(bus, NULL) > 0) ;
+                for (int j = 0; j <= k; j++) { Dp = &H[j]; while (sd_bus_process(lbus, NULL) > 0) ; }
+                Dp = &H[k];
+                if (done) break;
+                pf[np++] = (struct pollfd){ sd_bus_get_fd(bus), (short)sd_bus_get_events(bus), 0 };
+                for (int j = 0; j <= k; j++) pf[np++] = (struct pollfd){ sd_bus_get_fd(H[j].lb), (short)sd_bus_get_events(H[j].lb), 0 };
+                poll(pf, (nfds_t)np, 100);
+            }
+        }
+        sd_bus_slot_unref(slot);
+        close(lv[1]);
+        if (done != 1) {
+            fprintf(stderr, "lord-vmdisplay: RegisterListener (console %d): %s\n", k, done ? "refused" : "no answer");
+            for (int j = 0; j < nheads; j++) { Dp = &H[j]; say(vd_msg(VD_STATE, VDS_LOST, VDR_SETUP, 0, 0, 0, 0), -1); }
+            return 1;
+        }
     }
-    sd_bus_message_unref(rep);
-    close(lv[1]);
+    Dp = &H[0];
     /* the guest's sound and microphone: a listener of each, on a connection of its own, if QEMU has an audio backend on
-     * this display */
+     * this display (output 0's channel) */
     abus = register_audio(argv[1], "RegisterOutListener", "/org/qemu/Display1/AudioOutListener", "org.qemu.Display1.AudioOutListener", audio_vt);
     ibus = register_audio(argv[1], "RegisterInListener", "/org/qemu/Display1/AudioInListener", "org.qemu.Display1.AudioInListener", audio_in_vt);
-    fprintf(stderr, "lord-vmdisplay %s: console \"%s\" %ux%u, mouse %s\n", argv[1], label ? label : "", cw, ch, absm ? "absolute" : "relative");
-    free(label);
 
     /* setup done: from here no files, no new sockets, no exec, threads only, in its own scope */
     char scope[80];
     snprintf(scope, sizeof scope, "lordos-vmdisplay-%s", argv[1]);
-    SandboxHelperCfg cfg = { .name = scope, .ro_paths = NULL, .extra_syscalls = (int[]){ -1 }, .allow_ioctl_classes = 0, .mem_max_mb = 512 };
+    /* each further output may hold a picture of its own (QEMU's map, a copy of an array scanout) */
+    SandboxHelperCfg cfg = { .name = scope, .ro_paths = NULL, .extra_syscalls = (int[]){ -1 }, .allow_ioctl_classes = 0, .mem_max_mb = 512 + 256 * (nheads - 1) };
     sandbox_apply_helper(&cfg);
-    say(vd_msg(VD_READY, (int)cw, (int)ch, absm, 0, 0, 0), -1);
-    say(vd_msg(VD_STATE, VDS_CONNECTED, VDR_NONE, 0, 0, 0, 0), -1);
-
-    D.stats_ms = now_ms();
+    for (int k = 0; k < nheads; k++) {
+        Dp = &H[k];
+        say(vd_msg(VD_READY, (int)cws[k], (int)chs[k], D.abs_mouse, 0, 0, 0), -1);
+        say(vd_msg(VD_STATE, VDS_CONNECTED, VDR_NONE, 0, 0, 0, 0), -1);
+        D.stats_ms = now_ms();
+    }
+    Dp = &H[0];
     int rc = 0;
     long long woke = now_ms();
     for (;;) {
-        int r;
-        while ((r = sd_bus_process(lbus, NULL)) > 0) ;
-        if (r < 0) { say(vd_msg(VD_STATE, VDS_LOST, VDR_QEMU_GONE, 0, 0, 0, 0), -1); break; }
-        while ((r = sd_bus_process(bus, NULL)) > 0) ;
-        if (r < 0) { say(vd_msg(VD_STATE, VDS_LOST, VDR_QEMU_GONE, 0, 0, 0, 0), -1); break; }
+        int r, lost = 0;
+        for (int k = 0; k < nheads && !lost; k++) {
+            Dp = &H[k];
+            while ((r = sd_bus_process(lbus, NULL)) > 0) ;
+            if (r < 0) lost = 1;
+        }
+        Dp = &H[0];
+        if (!lost) { while ((r = sd_bus_process(bus, NULL)) > 0) ; if (r < 0) lost = 1; }
+        if (lost) { for (int k = 0; k < nheads; k++) { Dp = &H[k]; say(vd_msg(VD_STATE, VDS_LOST, VDR_QEMU_GONE, 0, 0, 0, 0), -1); } Dp = &H[0]; break; }
         if (abus) {
             while ((r = sd_bus_process(abus, NULL)) > 0) ;
             if (r < 0) { fprintf(stderr, "lord-vmdisplay: the sound connection went away\n"); sd_bus_flush_close_unref(abus); abus = NULL; }
@@ -1167,49 +1306,80 @@ int main(int argc, char **argv) {
         }
         long long now = now_ms();
         if (A.rec.h) au_tick(now);
-        send_input(now);
-        flush(now);
-        /* QEMU's held UpdateDMABUF: once lord-server read the frame, when there's nowhere to send it, or after 250 ms */
-        if (D.upd && ((D.acked && !D.dirty) || !D.shm || now - D.upd_ms >= ACK_WAIT_MS)) answer_update();
-        if (D.stats_changed && now - D.stats_ms >= STATS_MS) {
-            say(vd_msg(VD_STATS, D.refused, D.updates, D.copies, (int)D.w, (int)D.h, D.frame), -1);
-            D.refused = D.updates = D.copies = 0;
-            D.stats_changed = 0;
-            D.stats_ms = now;
+        int to = -1;
+        for (int k = 0; k < nheads; k++) {
+            Dp = &H[k];
+            if (D.ch < 0) continue;
+            send_input(now);
+            flush(now);
+            /* QEMU's held UpdateDMABUF: once lord-server read the frame, when there's nowhere to send it, or after 250 ms */
+            if (D.upd && ((D.acked && !D.dirty) || !D.shm || now - D.upd_ms >= vmpace_hold_ms(D.pace_ms, ACK_WAIT_MS))) answer_update();
+            if (D.stats_changed && now - D.stats_ms >= STATS_MS) {
+                say(vd_msg(VD_STATS, D.refused, D.updates, D.copies, (int)D.w, (int)D.h, D.frame), -1);
+                D.refused = D.updates = D.copies = 0;
+                D.stats_changed = 0;
+                D.stats_ms = now;
+            }
+            if (D.updates) D.stats_changed = 1;
+            int tl = bus_timeout_ms(lbus);
+            if (tl >= 0 && (to < 0 || tl < to)) to = tl;
+            if (D.dirty && D.shm) {
+                long long wake = D.acked ? D.next_ms : D.sent_ms + ACK_WAIT_MS;
+                if (wake < D.next_ms) wake = D.next_ms;         /* paced longer than the wait for an answer (vmpace.h) */
+                int tf = wake <= now ? 0 : (int)(wake - now);
+                if (to < 0 || tf < to) to = tf;
+            }
+            if (D.upd) { int tu = (int)(D.upd_ms + vmpace_hold_ms(D.pace_ms, ACK_WAIT_MS) - now); if (tu < 0) tu = 0; if (to < 0 || tu < to) to = tu; }
+            if (D.resize_pending) { int tr = (int)(D.resize_ms + RESIZE_GAP_MS - now); if (tr < 0) tr = 0; if (to < 0 || tr < to) to = tr; }
+            if (D.stats_changed) { int ts = (int)(D.stats_ms + STATS_MS - now); if (ts < 0) ts = 0; if (to < 0 || ts < to) to = ts; }
+            if (now < D.abs_fast_until && (to < 0 || to > 100)) to = 100;     /* send_input asks IsAbsolute again meanwhile */
         }
-        if (D.updates) D.stats_changed = 1;
-        struct pollfd p[5] = {
-            { sd_bus_get_fd(lbus), (short)sd_bus_get_events(lbus), 0 },
-            { sd_bus_get_fd(bus), (short)sd_bus_get_events(bus), 0 },
-            { CH, POLLIN, 0 },
-            { abus ? sd_bus_get_fd(abus) : -1, abus ? (short)sd_bus_get_events(abus) : 0, 0 },
-            { ibus ? sd_bus_get_fd(ibus) : -1, ibus ? (short)sd_bus_get_events(ibus) : 0, 0 },
-        };
-        int to = bus_timeout_ms(lbus), t2 = bus_timeout_ms(bus);
+        Dp = &H[0];
+        /* every output's listener, the display's connection, every output's channel, the sound's two */
+        struct pollfd p[3 + 2 * HEADS_MAX];
+        int np = 0;
+        for (int k = 0; k < nheads; k++) p[np++] = (struct pollfd){ sd_bus_get_fd(H[k].lb), (short)sd_bus_get_events(H[k].lb), 0 };
+        int ch_at = np;
+        for (int k = 0; k < nheads; k++) p[np++] = (struct pollfd){ H[k].ch, H[k].ch >= 0 ? POLLIN : 0, 0 };
+        p[np++] = (struct pollfd){ sd_bus_get_fd(bus), (short)sd_bus_get_events(bus), 0 };
+        p[np++] = (struct pollfd){ abus ? sd_bus_get_fd(abus) : -1, abus ? (short)sd_bus_get_events(abus) : 0, 0 };
+        p[np++] = (struct pollfd){ ibus ? sd_bus_get_fd(ibus) : -1, ibus ? (short)sd_bus_get_events(ibus) : 0, 0 };
+        int t2 = bus_timeout_ms(bus);
         if (t2 >= 0 && (to < 0 || t2 < to)) to = t2;
         if (abus) { int t3 = bus_timeout_ms(abus); if (t3 >= 0 && (to < 0 || t3 < to)) to = t3; }
         if (ibus) { int t4 = bus_timeout_ms(ibus); if (t4 >= 0 && (to < 0 || t4 < to)) to = t4; }
         if (A.rec.h && (to < 0 || to > 20)) to = 20;         /* silence keeps time while a recording runs */
-        if (D.dirty && D.shm) {
-            long long wake = D.acked ? D.next_ms : D.sent_ms + ACK_WAIT_MS;
-            int tf = wake <= now ? 0 : (int)(wake - now);
-            if (to < 0 || tf < to) to = tf;
-        }
-        if (D.upd) { int tu = (int)(D.upd_ms + ACK_WAIT_MS - now); if (tu < 0) tu = 0; if (to < 0 || tu < to) to = tu; }
-        if (D.resize_pending) { int tr = (int)(D.resize_ms + RESIZE_GAP_MS - now); if (tr < 0) tr = 0; if (to < 0 || tr < to) to = tr; }
-        if (D.stats_changed) { int ts = (int)(D.stats_ms + STATS_MS - now); if (ts < 0) ts = 0; if (to < 0 || ts < to) to = ts; }
-        if (now < D.abs_fast_until && (to < 0 || to > 100)) to = 100;     /* send_input asks IsAbsolute again meanwhile */
         long long busy = now_ms() - woke;
         if (busy > T.busy_max) T.busy_max = busy;
         if (busy >= 200 && now - T.busy_told >= 10000) {
             T.busy_told = now;
             fprintf(stderr, "lord-vmdisplay %s: a turn of its loop took %lld ms (QEMU's calls waited meanwhile)\n", me, busy);
         }
-        if (poll(p, 5, to) < 0 && errno != EINTR) break;
+        if (poll(p, (nfds_t)np, to) < 0 && errno != EINTR) break;
         woke = now_ms();
-        if (p[2].revents & (POLLHUP | POLLERR) && !(p[2].revents & POLLIN)) break;
-        if (p[2].revents & POLLIN && from_server()) break;
+        int end = 0;
+        for (int k = 0; k < nheads && !end; k++) {
+            Dp = &H[k];
+            if (D.ch < 0) continue;
+            short re = p[ch_at + k].revents;
+            int gone = (re & (POLLHUP | POLLERR) && !(re & POLLIN)) || (re & POLLIN && from_server());
+            if (!gone) continue;
+            if (!k) { end = 1; break; }
+            /* another output's window went: that output alone stops (its keys and buttons let go, QEMU's held call answered,
+             * and the guest told the output is off, so its desktop shrinks back) */
+            fprintf(stderr, "lord-vmdisplay %s: output %d's window went\n", me, k);
+            release_all();
+            answer_update();
+            output_off();
+            close(D.ch);
+            D.ch = -1;
+            if (D.shm) { munmap(D.shm, D.shm_len); D.shm = NULL; D.shm_len = 0; }
+        }
+        Dp = &H[0];
+        if (end) break;
     }
+    for (int k = 1; k < nheads; k++) { Dp = &H[k]; release_all(); answer_update(); if (D.ch >= 0) output_off(); }
+    Dp = &H[0];
     release_all();
     answer_update();
     au_counts("end");

@@ -14,6 +14,10 @@
   "never": "No backups yet",
   "next": "Next: {when}",
   "lastError": "The last backup failed: {error}",
+  "machinesBusy": {
+    "one": "{count} machine was running: its disks in this backup are from the previous one",
+    "other": "{count} machines were running: their disks in this backup are from the previous one"
+  },
   "todayAt": "today at {time}",
   "now": "Back Up Now",
   "pause": "Pause",
@@ -77,6 +81,10 @@
   "delete": "Delete Backup",
   "restoreAll": "Restore All",
   "restoreItem": "Restore “{name}”",
+  "restoreSelected": "Restore Selected ({count})",
+  "restoringItem": "Restoring {index} of {count}: {name}",
+  "restoreItemFailed": "Couldn't restore “{name}”: {error}",
+  "restoreMoreFailed": "Others not restored: {count}",
   "restoreFolder": "Restore This Folder",
   "restorePick": "Choose what to restore",
   "restoreAllTitle": "Restore your whole home folder?",

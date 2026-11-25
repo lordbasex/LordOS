@@ -339,5 +339,8 @@
   "markupHint": "Öppna i markeringsredigeraren",
   "readOnly.title": "Filer kan inte ändra ”{name}”",
   "readOnly.outside": "Filer kan bara visa den här mappen: den ligger utanför din hemmapp och dina diskar. Använd Terminal eller en annan app för att ändra den.",
-  "readOnly.denied": "Den här mappen är skrivskyddad: dess behörigheter låter dig inte ändra den. Använd Terminal eller en annan app för att ändra den."
+  "readOnly.denied": "Den här mappen är skrivskyddad: dess behörigheter låter dig inte ändra den. Använd Terminal eller en annan app för att ändra den.",
+  "fromMachineNoRun": "”{name}” kom från maskinen {machine}. Filer öppnar inte program eller installationsprogram från en maskin: använd Öppna med om du litar på den.",
+  "info.from": "Från",
+  "info.fromMachine": "Maskinen {machine}"
 }

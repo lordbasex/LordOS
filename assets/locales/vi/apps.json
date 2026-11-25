@@ -35,5 +35,6 @@
   "sysinfo": "Thông tin hệ thống",
   "sysprobe": "Kiểm tra hộp cát",
   "terminal": "Terminal",
-  "databases": "Cơ sở dữ liệu"
+  "databases": "Cơ sở dữ liệu",
+  "studio": "LordOS Studio"
 }

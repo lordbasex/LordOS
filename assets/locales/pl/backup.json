@@ -14,6 +14,11 @@
   "never": "Brak kopii zapasowych",
   "next": "Następna: {when}",
   "lastError": "Ostatnia kopia nie powiodła się: {error}",
+  "machinesBusy": {
+    "one": "{count} maszyna była uruchomiona: jej dyski w tej kopii pochodzą z poprzedniej",
+    "few": "{count} maszyny były uruchomione: ich dyski w tej kopii pochodzą z poprzedniej",
+    "many": "{count} maszyn było uruchomionych: ich dyski w tej kopii pochodzą z poprzedniej"
+  },
   "todayAt": "dziś o {time}",
   "now": "Utwórz kopię teraz",
   "pause": "Wstrzymaj",
@@ -80,6 +85,10 @@
   "delete": "Usuń kopię zapasową",
   "restoreAll": "Przywróć wszystko",
   "restoreItem": "Przywróć „{name}”",
+  "restoreSelected": "Przywróć zaznaczone ({count})",
+  "restoringItem": "Przywracanie {index} z {count}: {name}",
+  "restoreItemFailed": "Nie udało się przywrócić „{name}”: {error}",
+  "restoreMoreFailed": "Inne nieprzywrócone: {count}",
   "restoreFolder": "Przywróć ten folder",
   "restorePick": "Wybierz, co przywrócić",
   "restoreAllTitle": "Przywrócić cały katalog domowy?",

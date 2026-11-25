@@ -586,9 +586,12 @@
   "ws.lock.on": "Bloca les finestres d'aquesta pantalla",
   "ws.lock.off": "Desbloca les finestres d'aquesta pantalla",
   "ws.lock.window": "Blocada: desbloca-la amb el cadenat del marc",
-  "ws.minimized.label": "Minimitzades",
-  "ws.minimized.title": "Finestres minimitzades en aquesta pantalla: feu-hi clic per recuperar-ne una",
   "ws.slot.free": "Espai lliure: obriu una app o recupereu-ne una de minimitzada",
+  "ws.windows.title": "Finestres d'aquesta activitat en aquesta pantalla (una línia sota les minimitzades): feu clic en una per portar-la al davant; clic dret per a les finestres d'aquella app",
+  "ws.profile.ask": "Que triï el navegador",
+  "ws.profile.open": "Obre el perfil {profile}",
+  "ws.profile.activity": "Perfil que obre aquesta activitat",
+  "ws.profile.display": "Perfil que obre aquesta pantalla ({display})",
   "ws.snapfly.title": "Encaixa la finestra",
   "ws.snapfly.halves": "Meitats",
   "ws.snapfly.thirds": "Terços",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "Càmera a través de LordOS Studio",
   "capture.what.effectsOn": "efectes activats",
   "capture.what.effectsOff": "sense efectes",
-  "shortcuts.captureWindow": "Captura d’una finestra"
+  "shortcuts.captureWindow": "Captura d’una finestra",
+  "themeSwitch.changing": "S’està canviant l’estil de l’escriptori…",
+  "themeSwitch.changingTo": "S’està canviant a {name}…",
+  "themeSwitch.failedTitle": "No s’ha pogut aplicar {name}",
+  "themeSwitch.refusedBody": "El seu codi no coincideix amb la còpia signada de LordOS, així que no s’ha carregat. L’estil de l’escriptori es manté com estava.",
+  "themeSwitch.failedBody": "No s’ha iniciat. L’estil de l’escriptori es manté com estava.",
+  "spotlight.section.machines": "Màquines",
+  "guestApps.inMachine": "A {machine}"
 }

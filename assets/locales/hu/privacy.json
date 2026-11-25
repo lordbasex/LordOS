@@ -65,5 +65,6 @@
   "ask.vr": "„{app}” használni szeretné a(z) {headset} VR-szemüveget",
   "ask.vrNote": "A kijelzője csak az alkalmazásé lesz; a LordOS ott soha nem mutatja az asztalodat. Visszaveszi, amikor az alkalmazás bezárul, kihúzod a szemüveget vagy zárolódik a képernyő. Ezt később a Beállítások → Adatvédelem alatt módosíthatod.",
   "perm.vr": "VR-szemüvegek",
-  "permHint.vr": "Alkalmazások, amelyek közvetlenül vezérelhetik egy VR-szemüveg kijelzőjét. Csak szemüvegeket ad kölcsön, a monitoraidat soha, és visszaveszi őket, amikor zárolódik a képernyő, felhasználót váltasz vagy a Tilt lehetőséget választod."
+  "permHint.vr": "Alkalmazások, amelyek közvetlenül vezérelhetik egy VR-szemüveg kijelzőjét. Csak szemüvegeket ad kölcsön, a monitoraidat soha, és visszaveszi őket, amikor zárolódik a képernyő, felhasználót váltasz vagy a Tilt lehetőséget választod.",
+  "protectedCapture": "Védett ablak"
 }

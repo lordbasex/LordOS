@@ -23,6 +23,7 @@
 #   /usr/bin/machines                     Machines from the terminal (docs/VIRTUALIZATION.md "From the terminal"): a link to
 #                                         /usr/lib/lordos/bin/machines, which runs the lord-vm next to it; its bash completion
 #                                         in /usr/share/bash-completion/completions/machines
+#   /usr/bin/lordvm                       the same program (docs/VIRTUALIZATION.md 6.15: lordvm exec, cp, logs, mcp, apply)
 #   /usr/bin/lordos-issue                 what a bug report needs, ready to paste (CONTRIBUTING.md)
 #   /usr/lib/lordos/lordos-dm-check       another display manager enabled next to lordos.service (#187): postinst warns
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
@@ -65,10 +66,21 @@
 #   /usr/lib/modules-load.d/lordos-drivetemp.conf    SATA disk temperatures (drivetemp) at boot
 #   /usr/lib/systemd/system/smartmontools.service.d/lordos.conf  Debian's smartd stays off
 #   /usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf  gnome-keyring without the Secret Service
-#   /usr/lib/systemd/logind.conf.d/lordos-machines.conf  a shutdown waits up to 30 s for Machines to save running machines
+#   /usr/lib/systemd/logind.conf.d/lordos-machines.conf  a shutdown waits up to 45 s for Machines to save running machines
+#   /usr/lib/tmpfiles.d/lordos-thp.conf  shared memory gets transparent huge pages where it asks for them (shmem_enabled
+#                                         advise): a machine with a shared folder gets 2 MB pages (docs/VIRTUALIZATION.md 3.7.2)
 #   /usr/lib/systemd/user/lordos-guest.service (+ default.target.wants), /usr/lib/udev/rules.d/71-lordos-guest.rules
 #                                         LordOS as a Machines guest: lordos-guest for the signed-in person, only where the
-#                                         machine's agent port org.lordos.agent exists (docs/VIRTUALIZATION.md 7.2)
+#                                         machine's agent port org.lordos.agent exists (docs/VIRTUALIZATION.md 7.2); the
+#                                         port is the guest's administrators' (sudo) too (LordOS's sessions aren't
+#                                         logind seats, 6.17; never video: F9, F13)
+#   /usr/lib/lordos/guest/lordos-guest-tools-<arch>.iso  the LordOS Guest Tools disc Machines puts in a Linux machine
+#                                         without qemu-guest-agent (docs/VIRTUALIZATION.md 6.17); its SHA-256 is lord-vm's
+#   /usr/share/applications/lordos-send-to-host.desktop, /usr/share/kio/servicemenus/lordos-send-to-host.desktop
+#                                         "Send to LordOS" in the file managers of a LordOS machine (docs/VIRTUALIZATION.md 6.21)
+#   /usr/lib/systemd/system-shutdown/lordos-guest  systemd-shutdown's hook: in a Machines guest, tells Machines whether
+#                                         it powers off or restarts (lordos-guest --stopping; "Graphics 3D"); elsewhere
+#                                         it ends at once
 #   /usr/lib/systemd/system-sleep/lordos-lid-wake  systemd-sleep's hook (root, pre/post only): on a laptop that goes
 #                                         to sleep with the lid open, the lid's ACPI wake source is off until it
 #                                         wakes (GitHub #172; src/hw/lidwake.h, docs/SETTINGS.md)
@@ -105,8 +117,8 @@ for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
          lord-stream:"libavcodec-dev libavformat-dev" lord-studio:"libavcodec-dev libavformat-dev" \
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
-         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-appstream:"" \
-         lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lord-pgpv:"" lordos-guest:""; do
+         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-nvgpu:"" lord-appstream:"" \
+         lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lord-vmunpack:"" lord-pgpv:"" lord-llm:"" lordos-guest:""; do
     b=${h%%:*}; need=${h#*:}
     [ -x "server/build/$b" ] && continue
     case " ${ALLOW_MISSING:-} " in *" $b "*) echo "mkdeb: leaving out $b (ALLOW_MISSING)" >&2; continue ;; esac
@@ -163,8 +175,10 @@ install -m 755 packaging/bin/lordos-dm-check "$L/lordos-dm-check"
 install -m 755 server/build/machines "$L/bin/machines"
 "$STRIP" --strip-unneeded "$L/bin/machines" 2>/dev/null || true
 ln -s ../lib/lordos/bin/machines "$PKG/usr/bin/machines"
+ln -s ../lib/lordos/bin/machines "$PKG/usr/bin/lordvm"
 install -d "$PKG/usr/share/bash-completion/completions"
 install -m 644 packaging/bash-completion/machines "$PKG/usr/share/bash-completion/completions/machines"
+ln -s machines "$PKG/usr/share/bash-completion/completions/lordvm"
 # the visual test bench: a plain Wayland client, launched like any Linux app
 [ -x server/build/lordos-testbench ] && {
     install -m 755 server/build/lordos-testbench "$PKG/usr/bin/lordos-testbench"
@@ -189,6 +203,9 @@ if [ -x server/build/lord-tts ]; then
     # audio.cpp's description of Kyutai's HD model folders (server/mk/tts.mk; lord-tts reads it, docs/VOICE.md)
     install -m 644 server/build/lib/tts/pocket_tts_dir.json "$L/lib/tts/pocket_tts_dir.json"
 fi
+# Sentinela's launcher (docs/SENTINELA.md): lord-server starts only the lord-llm next to it, which runs LordOS's
+# llama-server (the llama.cpp package, installed from Settings with a model) in its sandbox; libc only
+install -m 755 server/build/lord-llm "$L/bin/lord-llm"
 # isolated text recognition helper, Screenshots' "copy the text" (optional: make skips it without libtesseract-dev)
 [ -x server/build/lord-ocr ] && install -m 755 server/build/lord-ocr "$L/bin/lord-ocr"
 # DEBUG_SYMBOLS=1 (test packages): the symbols of lord-server and lord-sessiond, kept next to the package as
@@ -208,7 +225,7 @@ fi
 "$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lord-autoinstall" "$L/bin/lord-browser-prefs" "$L/bin/lordos-firstrun" "$PKG/usr/lib/systemd/system-sleep/lordos-lid-wake" 2>/dev/null || true
 [ -x "$L/bin/lord-doc" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-doc" 2>/dev/null || true; }
 [ -x "$L/bin/lord-ocr" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-ocr" 2>/dev/null || true; }
-"$STRIP" --strip-unneeded "$L/bin/lord-claude-status" "$L/bin/lord-say" 2>/dev/null || true
+"$STRIP" --strip-unneeded "$L/bin/lord-claude-status" "$L/bin/lord-say" "$L/bin/lord-llm" 2>/dev/null || true
 [ -x "$L/bin/lord-tts" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-tts" 2>/dev/null || true; }
 # lord-server only launches the lord-media in its own folder (media: video, photos, camera, recorder)
 [ -x server/build/lord-media ] && install -m 755 server/build/lord-media "$L/bin/lord-media"
@@ -250,6 +267,18 @@ for b in lord-vm lord-vmdisplay; do
     [ -x "server/build/$b" ] && install -m 755 "server/build/$b" "$L/bin/$b"
     [ -x "$L/bin/$b" ] && { "$STRIP" --strip-unneeded "$L/bin/$b" 2>/dev/null || true; }
 done
+# lord-vm-usb.so: preloaded by lord-vm into the QEMU of a machine with USB devices on, so that its libusb looks for no
+# device of its own (docs/VIRTUALIZATION.md 6.6; AGENTS.md "Machines' USB devices"); root's, 644, at this fixed path only
+if [ -f server/build/lord-vm-usb.so ]; then
+    install -D -m 644 server/build/lord-vm-usb.so "$L/lib/lord-vm-usb.so"
+    "$STRIP" --strip-unneeded "$L/lib/lord-vm-usb.so" 2>/dev/null || true
+fi
+# lordos-venus-shim.so: preloaded by lord-vm into the QEMU of a machine with Vulkan (venus), so virglrenderer takes the
+# render server's connection lord-vm made instead of forking one (docs/VIRTUALIZATION.md 3.3, 6.10); root's, 644, fixed path
+if [ -f server/build/lordos-venus-shim.so ]; then
+    install -D -m 644 server/build/lordos-venus-shim.so "$L/lib/lordos-venus-shim.so"
+    "$STRIP" --strip-unneeded "$L/lib/lordos-venus-shim.so" 2>/dev/null || true
+fi
 # lordos-guest (0.8.9 beta): the clipboard helper Machines copies into a guest of this architecture (Install Agent)
 if [ -x server/build/lordos-guest ]; then
     install -d "$L/guest"
@@ -262,6 +291,23 @@ if [ -x server/build/lordos-guest ]; then
     install -d "$PKG/usr/lib/systemd/user/default.target.wants"
     ln -sfn ../lordos-guest.service "$PKG/usr/lib/systemd/user/default.target.wants/lordos-guest.service"
     install -D -m 644 packaging/udev/71-lordos-guest.rules "$PKG/usr/lib/udev/rules.d/71-lordos-guest.rules"
+    install -D -m 755 packaging/systemd/lordos-guest-shutdown "$PKG/usr/lib/systemd/system-shutdown/lordos-guest"
+    # "Send to LordOS" (docs/VIRTUALIZATION.md 6.21): Open With for every file, and Dolphin's service menu; the helper by
+    # its packaged path, which isn't in PATH
+    install -d "$PKG/usr/share/applications" "$PKG/usr/share/kio/servicemenus"
+    sed 's|^Exec=lordos-guest |Exec=/usr/lib/lordos/guest/lordos-guest |' tools/guest/lordos-send-to-host.desktop >"$PKG/usr/share/applications/lordos-send-to-host.desktop"
+    chmod 644 "$PKG/usr/share/applications/lordos-send-to-host.desktop"
+    sed 's|^Exec=lordos-guest |Exec=/usr/lib/lordos/guest/lordos-guest |' tools/guest/lordos-send-to-host-kde.desktop >"$PKG/usr/share/kio/servicemenus/lordos-send-to-host.desktop"
+    chmod 755 "$PKG/usr/share/kio/servicemenus/lordos-send-to-host.desktop"
+fi
+# the LordOS Guest Tools disc (docs/VIRTUALIZATION.md 6.17): a read-only ISO with lordos-guest, install.sh and its
+# checksum, which Machines puts in the CD drive of a Linux machine without qemu-guest-agent. lord-vm attaches it only if
+# its SHA-256 is the one compiled into it (the same make built both), so it's copied as it is: never stripped or changed
+if [ -f server/build/lordos-guest-tools.iso ]; then
+    install -D -m 644 server/build/lordos-guest-tools.iso "$L/guest/lordos-guest-tools-${DEB_ARCH:-$(dpkg --print-architecture)}.iso"
+else
+    case " ${ALLOW_MISSING:-} " in *" lordos-guest-tools.iso "*) echo "mkdeb: leaving out lordos-guest-tools.iso (ALLOW_MISSING)" >&2 ;;
+    *) echo "missing server/build/lordos-guest-tools.iso (make -C server)" >&2; exit 1 ;; esac
 fi
 # lordos-guest-win.exe: the LordOS guest tools Machines installs into a Windows guest (x86-64), cross-built with mingw-w64
 # on the build machine (server/mk/vm.mk); an amd64 package without it can't give Windows guests their clipboard, display
@@ -289,6 +335,14 @@ fi
 # sandbox, on memfds lord-server hands it (docs/VIRTUALIZATION.md 5.6.1)
 [ -x server/build/lord-pgpv ] && install -m 755 server/build/lord-pgpv "$L/bin/lord-pgpv"
 [ -x "$L/bin/lord-pgpv" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-pgpv" 2>/dev/null || true; }
+# lord-nvgpu (approved 2026-11-24): Monitor → GPU's NVIDIA numbers, the only program that loads NVML, sandboxed;
+# lord-server starts it next to itself only while the GPU view is on screen (docs/MONITOR.md, "NVIDIA")
+[ -x server/build/lord-nvgpu ] && install -m 755 server/build/lord-nvgpu "$L/bin/lord-nvgpu"
+[ -x "$L/bin/lord-nvgpu" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-nvgpu" 2>/dev/null || true; }
+# lord-vmunpack (0.8.9, approved 2026-11-23): unpacks a machine group's verified archive (Whonix's KVM disks) in its
+# sandbox, from descriptors lord-vm hands it (docs/VIRTUALIZATION.md 19.6); next to lord-vm, which starts it
+[ -x server/build/lord-vmunpack ] && install -m 755 server/build/lord-vmunpack "$L/bin/lord-vmunpack"
+[ -x "$L/bin/lord-vmunpack" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-vmunpack" 2>/dev/null || true; }
 # lord-sftp (0.8.8.7): the Terminal's Files mode, SFTP over the tab's own ssh session, sandboxed (docs/TERMINAL.md)
 [ -x server/build/lord-sftp ] && install -m 755 server/build/lord-sftp "$L/bin/lord-sftp"
 [ -x "$L/bin/lord-sftp" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-sftp" 2>/dev/null || true; }
@@ -385,6 +439,9 @@ install -D -m 644 packaging/systemd/smartmontools-lordos.conf "$PKG/usr/lib/syst
 install -D -m 644 packaging/systemd/gnome-keyring-lordos.conf "$PKG/usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf"
 # Machines: a shutdown or restart waits up to 30 s for running machines to be saved (docs/VIRTUALIZATION.md 6.1)
 install -D -m 644 packaging/systemd/logind-lordos-machines.conf "$PKG/usr/lib/systemd/logind.conf.d/lordos-machines.conf"
+# Machines: shared memory (a machine with a shared folder or the transfer folder) gets 2 MB pages where it asks for them;
+# only "advise", so tmpfs and /dev/shm don't change (docs/VIRTUALIZATION.md 3.7.2; migration 011 applies it on upgrade)
+install -D -m 644 packaging/systemd/tmpfiles-lordos-thp.conf "$PKG/usr/lib/tmpfiles.d/lordos-thp.conf"
 # remote login (SSH) defaults, read only once openssh-server is installed (docs/REMOTE.md)
 install -D -m 644 tools/iso/rootfs/etc/ssh/sshd_config.d/10-lordos.conf "$PKG/etc/ssh/sshd_config.d/10-lordos.conf"
 # a process may only trace its own descendants: a restricted Linux app must not take over an
@@ -508,6 +565,12 @@ Files: usr/lib/lordos/assets/monitor/land.bin usr/lib/lordos/assets/locales/*/co
 License: public-domain
  Natural Earth (https://www.naturalearthdata.com).
 
+Files: usr/lib/lordos/assets/locales/*/languages.json
+Copyright: Unicode, Inc.
+License: Unicode-3.0
+ Language names from Unicode CLDR (https://cldr.unicode.org) through Node.js's ICU, written by
+ tools/gen-language-names.mjs. https://www.unicode.org/license.txt
+
 Files: third_party/quickjs/* third_party/stb/*
 License: MIT and public-domain
  QuickJS (MIT) and stb (public domain / MIT), compiled into lord-server.
@@ -567,7 +630,7 @@ Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
 Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$TTSDEPS$MEDIADEPS$CASTDEPS$RTCDEPS$MICROCODEDEPS
 Breaks: lordos-web (<< $VERSION)
-Recommends: pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS
+Recommends: qemu-guest-agent, pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS
 Section: x11
 Priority: optional
 Protected: yes

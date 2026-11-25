@@ -586,9 +586,12 @@
   "ws.lock.on": "Bu ekranın pəncərələrini kilidlə",
   "ws.lock.off": "Bu ekranın pəncərələrinin kilidini aç",
   "ws.lock.window": "Kilidlidir: çərçivədəki kilidlə açın",
-  "ws.minimized.label": "Kiçildilmiş",
-  "ws.minimized.title": "Bu ekranda kiçildilmiş pəncərələr: qaytarmaq üçün birinə klikləyin",
   "ws.slot.free": "Boş yer: tətbiq açın və ya kiçildilmiş birini qaytarın",
+  "ws.windows.title": "Bu fəaliyyətin bu ekrandakı pəncərələri (kiçildilmişlərin altında xətt): birini önə gətirmək üçün klikləyin; həmin tətbiqin pəncərələri üçün sağ klik",
+  "ws.profile.ask": "Brauzer seçsin",
+  "ws.profile.open": "{profile} profilini aç",
+  "ws.profile.activity": "Bu fəaliyyətin açdığı profil",
+  "ws.profile.display": "Bu ekranın açdığı profil ({display})",
   "ws.snapfly.title": "Pəncərəni yerləşdir",
   "ws.snapfly.halves": "Yarılar",
   "ws.snapfly.thirds": "Üçdə birlər",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "LordOS Studio vasitəsilə kamera",
   "capture.what.effectsOn": "effektlər açıqdır",
   "capture.what.effectsOff": "effektsiz",
-  "shortcuts.captureWindow": "Pəncərənin skrinşotu"
+  "shortcuts.captureWindow": "Pəncərənin skrinşotu",
+  "themeSwitch.changing": "İş masası üslubu dəyişdirilir…",
+  "themeSwitch.changingTo": "{name} üslubuna keçilir…",
+  "themeSwitch.failedTitle": "{name} tətbiq edilə bilmədi",
+  "themeSwitch.refusedBody": "Onun kodu LordOS-un imzalı nüsxəsi ilə uyğun gəlmir, ona görə yüklənmədi. İş masası üslubunuz olduğu kimi qalır.",
+  "themeSwitch.failedBody": "Başlamadı. İş masası üslubunuz olduğu kimi qalır.",
+  "spotlight.section.machines": "Virtual maşınlar",
+  "guestApps.inMachine": "{machine} daxilində"
 }

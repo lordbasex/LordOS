@@ -3,10 +3,12 @@
 // open files or other apps themselves; lord-server checks what they ask (sec/brokermail.c) and the
 // session does it here:
 //
-//   openFileWithApps(path, name)   the same rules as Files: our apps for documents, images and media,
+//   openFileWithApps(path, name, opts)   the same rules as Files: our apps for documents, images and media,
 //                                  the default app for the rest, otherwise reveal it in Files. Used by
 //                                  Mail in-process and, for the isolated Mail, on a cached attachment
-//                                  lord-server validated ("mailopen" broker event).
+//                                  lord-server validated ("mailopen" broker event). opts.reveal false: never
+//                                  Files (false when no app opens it); opts.single: Photos shows that image
+//                                  alone, not its folder's other pictures (a note's attachments, GitHub #238).
 //   revealPath(path)               Files on the folder that holds path
 //   openFolder(path)               Files on the folder itself (Machines' Open Transfer Folder)
 //   "launch" broker event          one of these apps opens another one with args (no paths).
@@ -15,6 +17,7 @@ import * as fs from './fs.js';
 import { defaultOpenerId, defaultFor, nativeOf } from './defaults.js';
 import { events as calendarEvents } from './calendar.js';
 import { books as addressBooks, contacts } from './contacts.js';
+import { runsCode } from './runscode.js';
 
 export const revealPath = (path) => wm.open('files', { new: true, args: { path: fs.parent(path), select: fs.basename(path), nonce: Date.now() } });
 export const openFolder = (path) => wm.open('files', { new: true, args: { path, nonce: Date.now() } });
@@ -42,10 +45,15 @@ export function openCalendarApp(at) {
   return true;
 }
 
-export function openFileWithApps(path, name) {
+export function openFileWithApps(path, name, opts = {}) {
   const n = String(name || path).toLowerCase();
+  // opts.untrusted: the file came from content (a note, a mail): a file that would run (by its shown name OR its real
+  // file name) never reaches any opener; it is shown in Files, or nothing when the caller asked for no reveal
+  if (opts.untrusted && (runsCode(n) || runsCode(String(path || '').split('/').pop()))) return opts.reveal === false ? false : revealPath(path);
   if (/\.pdf$/.test(n) && getApp('pdf')) return wm.open('pdf', { new: true, args: { path } });
-  if (/\.(png|jpe?g|gif|webp|bmp|heic|avif)$/.test(n) && getApp('photos')) return wm.open('photos', { new: true, args: { path } });
+  if (/\.(png|jpe?g|gif|webp|bmp|heic|heif|avif|tiff?)$/.test(n) && getApp('photos')) {
+    return wm.open('photos', { new: true, args: opts.single ? { path, single: true, nonce: Date.now() } : { path } });
+  }
   if (/\.(mp3|ogg|flac|wav|m4a|opus|mp4|mkv|webm|mov|avi)$/.test(n) && getApp('player')) return wm.open('player', { args: { path } });
   if (/\.(txt|md|csv|log|json|xml|ya?ml|c|h|js|py|sh)$/.test(n) && getApp('editor')) return wm.open('editor', { args: { path } });
   if (/\.ics$/.test(n) && getApp('calendar')) { calendarEvents.importFile(path).then(() => wm.open('calendar')).catch(() => revealPath(path)); return true; }
@@ -60,6 +68,7 @@ export function openFileWithApps(path, name) {
     if (def && lord.apps.launchWith(def.replace(/\.desktop$/, ''), path)) return true;
     if (lord.apps.launchWith('', path)) return true;
   } catch (e) { /* no default app */ }
+  if (opts.reveal === false) return false;
   return revealPath(path);
 }
 
@@ -68,7 +77,7 @@ const SYSTEM_APPS = ['mail', 'calendar', 'contacts', 'reminders'];
 if (typeof globalThis !== 'undefined') {
   globalThis.__lordSysOpen = (kind, data) => {
     if (!data) return;
-    if (kind === 'mailopen' && typeof data.path === 'string') openFileWithApps(data.path, data.name);
+    if (kind === 'mailopen' && typeof data.path === 'string') openFileWithApps(data.path, data.name, { untrusted: true });
     else if (kind === 'launch' && SYSTEM_APPS.includes(data.app) && getApp(data.app)) {
       const args = data.args && typeof data.args === 'object' ? data.args : {};
       wm.open(data.app, data.new ? { new: true, args } : { args });

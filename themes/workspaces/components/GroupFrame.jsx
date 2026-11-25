@@ -7,18 +7,20 @@
 // apps used most on that display (its quick launch) and, once per activity and display in a session, its usual apps
 // with their layout as a suggestion: one click opens them, nothing opens by itself (sdk/displayapps.js).
 import {
-  View, Text, Layer, addListener, useStore, windows, wm, windowTitle, windowIcon, desktopList, desktopName, displayFor, launchApp, useLauncherApps, deskWidgetsShown, widgetDisplayKey, t as tr,
-  useQuickApps, useDisplaySuggestion, quietDisplayApps,
+  View, Text, Layer, addListener, useStore, windows, wm, desktopList, desktopName, displayFor, launchApp, useLauncherApps, deskWidgetsShown, widgetDisplayKey, t as tr,
+  useQuickApps, useDisplaySuggestion, quietDisplayApps, browserProfiles, refreshBrowserProfiles, isProfileBrowser, profileChoice, settings,
 } from '@lordos/sdk';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { ActivityIcon, PlusGlyph, SaveGlyph, MoveGlyph, LockGlyph, LayoutMini, LAYOUT_CELLS } from '../glyphs.jsx';
 import { LAYOUTS, splitterAt, ratioFrom, TILE_GAP } from '../model/layouts.js';
-import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked, tiled, aimLaunch, openUsual } from '../tiler.js';
+import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked, tiled, aimLaunch, openUsual, launchOn } from '../tiler.js';
 import { Surface } from './Surface.jsx';
 import { FocusRing } from './BarButton.jsx';
+import { WindowsTray, AppIcon, listed, trayOrder, trayNodes } from './AppWindows.jsx';
+export { trayNodes };
 import { setCardItems } from '../barfocus.js';
-import { noteLaunch, groupHidden, activities, offered, markOffered } from '../state.js';
+import { noteLaunch, groupHidden, activities, offered, markOffered, activityOf } from '../state.js';
 
 const alpha = (hex, a) => `${hex}${Math.round(a * 255).toString(16).padStart(2, '0')}`;
 
@@ -98,11 +100,11 @@ const FrameBox = memo(function FrameBox({ t, f }) {
   );
 });
 
-// how many windows of this activity show on this display (a narrow selector: other windows' changes don't re-render)
-// The windows of this activity minimized on this display, as a string of ids (a narrow selector, like countOn). A
-// minimized window keeps its frame, so it stays on the display it was on and comes back there.
-const minimizedOn = (desk, d, hid) => (ws) => ws.filter((w) => w.desktop === desk && w.minimized && !w.pip && !hid.has(w.id) && tileable({ ...w, minimized: false, maximized: false })
-  && displayFor(w)?.id === d.id).map((w) => w.id).join('\n');
+// The windows of this activity on this display, open and minimized, as "id min" lines in the order they first showed (a
+// narrow selector, like countOn: other windows' changes don't re-render). A minimized window keeps its frame, so it
+// stays on the display it was on and comes back there.
+const windowsOn = (desk, d, hid) => (ws) => ws.filter((w) => listed(w, desk, hid) && tileable({ ...w, minimized: false, maximized: false, fullscreen: false })
+  && displayFor(w)?.id === d.id).sort((x, y) => trayOrder(x.id) - trayOrder(y.id)).map((w) => `${w.id} ${w.minimized ? 1 : 0}`).join('\n');
 // The icon of one activity in the frame header (in its colour), redrawn only when that activity's icon or colour changes.
 const HeaderIcon = memo(function HeaderIcon({ id, t, shown }) {
   const k = useStore(activities, (m) => (m[id] ? `${m[id].icon}|${m[id].color}` : 'spark|#7C5CFF'));
@@ -113,32 +115,6 @@ const HeaderIcon = memo(function HeaderIcon({ id, t, shown }) {
     </View>
   );
 });
-
-// where each display's tray is, for the minimize effect (index.jsx): display id → the tray's node
-export const trayNodes = new Map();
-
-// The minimized windows of a display, in its frame header: one icon each; a click brings the window back where it was.
-function MinimizedTray({ t, d, ids }) {
-  const ref = useRef(null);
-  useEffect(() => { if (ref.current) trayNodes.set(d.id, ref.current.id); return () => { if (trayNodes.get(d.id) === ref.current?.id) trayNodes.delete(d.id); }; });
-  const list = ids.map((id) => wm.get(id)).filter(Boolean);
-  return (
-    <View ref={ref} title={tr('shell.ws.minimized.title')} style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 4, borderRadius: 12,
-      backgroundColor: t.chipBg, display: list.length ? 'flex' : 'none' }}>
-      {list.length ? <Text style={{ fontSize: 11, color: t.textDim, paddingHorizontal: 4, whiteSpace: 'nowrap' }}>{tr('shell.ws.minimized.label')}</Text> : null}
-      {list.slice(0, 8).map((w) => {
-        const Icon = windowIcon(w);
-        return (
-          <View key={w.id} title={windowTitle(w)} onClick={() => wm.focus(w.id)}
-            style={{ width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center' }}>
-            {Icon ? <Icon size={18} /> : <View style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: t.textDim }} />}
-          </View>
-        );
-      })}
-      {list.length > 8 ? <Text style={{ fontSize: 11, color: t.textDim, paddingHorizontal: 4 }}>{`+${list.length - 8}`}</Text> : null}
-    </View>
-  );
-}
 
 // A button of the empty-activity card: filled in the accent (primary), outlined, or plain text; fid: its place in the
 // bars' keyboard (⌃F2, barfocus.js), where it draws the ring.
@@ -189,7 +165,21 @@ function UsualApps({ t, sug, fid, onOpen, onLater, onNever }) {
 }
 
 // The display's quick launch: the apps used most there, recent ones first (one click opens one, on this display).
-function QuickLaunch({ t, apps, fid, onLaunch }) {
+// A browser with a profile chosen for this activity (or this display) shows as "Chrome · Dev" and opens that profile
+// (tiler.js launchOn), once lord-server has the profile launch path.
+function QuickLaunch({ t, apps, fid, onLaunch, desk, dkey }) {
+  const profiles = useStore(browserProfiles);
+  const can = typeof lord !== 'undefined' && typeof lord.apps?.launchProfile === 'function';
+  const browsers = can ? apps.filter((a) => isProfileBrowser(a.id)).map((a) => a.id).join('|') : '';
+  // read only when the card shows a browser (one stat, the file again only if it changed): never on a draw
+  useEffect(() => { for (const k of browsers ? browsers.split('|') : []) refreshBrowserProfiles(k); }, [browsers]);
+  const label = (a) => {
+    if (!can || !isProfileBrowser(a.id)) return a.name;
+    const dir = profileChoice(a.id, activityOf(desk).profiles, settings.get().browserProfiles, dkey);
+    const p = dir ? (profiles[a.id] || []).find((x) => x.dir === dir) : null;
+    return p ? `${a.name} · ${p.name}` : a.name;
+  };
+  apps = apps.map((a) => ({ ...a, name: label(a) }));
   return (
     <View style={{ alignSelf: 'stretch', gap: 6, marginTop: 4 }}>
       <Text style={{ fontSize: 11, fontWeight: 600, color: t.textDim, textAlign: 'start', marginHorizontal: 4 }}>{tr('shell.ws.quick.title')}</Text>
@@ -217,8 +207,9 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
   const deskList = useStore(desktopList);
   const count = useStore(windows, countOn(desk, d));
   const hid = useStore(groupHidden);           // windows another group hid aren't in the tray (state.js, groups)
-  const minIds = useStore(windows, minimizedOn(desk, d, hid));
-  const minimized = minIds ? minIds.split('\n') : [];
+  const winLines = useStore(windows, windowsOn(desk, d, hid));
+  const here = winLines ? winLines.split('\n').map((l) => { const i = l.lastIndexOf(' '); return { id: l.slice(0, i), min: l.slice(i + 1) === '1' }; }) : [];
+  const minimized = here.filter((x) => x.min);
   const widgetsHere = useStore(deskWidgetsShown, (s) => (s[widgetDisplayKey(d)] || 0) > 0);
   // nothing open here: the free slots keep only their outlines (no "Free space" over the widgets or the card)
   const bare = count === 0 && !minimized.length;
@@ -261,7 +252,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
   const cardShown = !!showEmpty && empty;
   const showUsual = cardShown && ready && !wasOffered && !!sug && sug.apps.length > 0;
   const fid = `card:${dkey}`;
-  const launchHere = (a, e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(d); launchApp(a.id); };
+  const launchHere = (a, e) => { if (e) noteLaunch(e.x, e.y); launchOn(d, a.id); };
   const openTheUsual = (e) => {
     if (!sug) return;
     if (e) noteLaunch(e.x, e.y);
@@ -302,14 +293,12 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
         {pins.length ? (
           <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 3, borderRadius: 12, backgroundColor: t.chipBg }}>
             {pins.map((a) => (
-              <View key={a.id} title={a.name} onClick={(e) => { noteLaunch(e.x, e.y); aimLaunch(d); launchApp(a.id); }}
-                style={{ width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center' }}>
-                <a.Icon size={18} />
-              </View>
+              <AppIcon key={a.id} t={t} d={d} desk={desk} appKey={a.id} Icon={a.Icon} title={a.name} launchable
+                onClick={(e) => { noteLaunch(e.x, e.y); launchOn(d, a.id); }} />
             ))}
           </View>
         ) : null}
-        <MinimizedTray t={t} d={d} ids={minimized} />
+        <WindowsTray t={t} d={d} desk={desk} ids={here} />
         <View style={{ flex: 1 }} />
         <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 3, borderRadius: 12, backgroundColor: t.chipBg }}>
           {saved && !locked ? <Text style={{ fontSize: 11.5, color: t.textDim, whiteSpace: 'nowrap', paddingHorizontal: 6 }}>{tr('shell.ws.layout.saved')}</Text> : null}
@@ -360,10 +349,10 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
                 </CardButton>
               ) : null}
               {pins.length ? (
-                <CardButton t={t} label={tr('shell.ws.empty.openPins')} onClick={(e) => { noteLaunch(e.x, e.y); aimLaunch(d, pins.length); for (const a of pins) launchApp(a.id); }} />
+                <CardButton t={t} label={tr('shell.ws.empty.openPins')} onClick={(e) => { noteLaunch(e.x, e.y); aimLaunch(d, 1, pins.map((a) => a.id)); for (const a of pins) launchApp(a.id); }} />
               ) : null}
             </View>
-            {quick.length ? <QuickLaunch t={t} apps={quick} fid={`${fid}:q`} onLaunch={launchHere} /> : null}
+            {quick.length ? <QuickLaunch t={t} apps={quick} fid={`${fid}:q`} onLaunch={launchHere} desk={desk} dkey={dkey} /> : null}
           </Surface>
         </View>
       ) : null}

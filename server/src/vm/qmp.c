@@ -15,6 +15,7 @@
 int qmp_open(Qmp *q, int fd) {
     memset(q, 0, sizeof *q);
     q->fd = fd;
+    q->side_fd = -1;
     q->buf = malloc(QMP_LINE_MAX + 1);
     return q->buf ? 0 : -1;
 }
@@ -148,10 +149,17 @@ static int wait_for(Qmp *q, int want, long long deadline, char *err, size_t errl
         }
         long long left = deadline - now_ms();
         if (left <= 0) { snprintf(err, errlen, "QEMU's control socket didn't answer"); return -1; }
-        struct pollfd p = { q->fd, POLLIN, 0 };
-        if (poll(&p, 1, (int)left) < 0 && errno != EINTR) { snprintf(err, errlen, "poll: %s", strerror(errno)); return -1; }
+        struct pollfd p[2] = { { q->fd, POLLIN, 0 }, { q->side_fd, POLLIN, 0 } };
+        int np = q->side && q->side_fd >= 0 ? 2 : 1;
+        if (poll(p, (nfds_t)np, (int)left) < 0 && errno != EINTR) { snprintf(err, errlen, "poll: %s", strerror(errno)); return -1; }
+        if (np == 2 && p[1].revents && q->side(q->side_arg, err, errlen)) return -1;
         if (qmp_fill(q) < 0) { snprintf(err, errlen, "QEMU closed its control socket"); return -1; }
     }
+}
+
+int qmp_call(Qmp *q, const char *cmd, const char *args, int timeout_ms, char *err, size_t errlen) {
+    if (qmp_command(q, cmd, args, -1)) { snprintf(err, errlen, "can't write to QEMU's control socket"); return -1; }
+    return wait_for(q, QMP_MSG_RETURN, now_ms() + timeout_ms, err, errlen);
 }
 
 int qmp_handshake(Qmp *q, int timeout_ms, char *err, size_t errlen) {

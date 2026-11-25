@@ -16,6 +16,7 @@ typedef struct {
     char bin[128];                      /* program name from Exec (for the Monitor: process → app) */
     int user;                           /* from ~/.local/share/applications */
     int terminal;                       /* Terminal=true: it runs in a Terminal tab (apps_launch_terminal) */
+    int comment_l10n;                   /* (0.8.9.6) the Comment is in the language asked for (Comment[lang]) */
 } DesktopApp;
 
 /* Lists the apps visible to LordOS (Type=Application, no NoDisplay/Hidden, OnlyShowIn and
@@ -97,11 +98,23 @@ int apps_launch_action(const char *id, const char *action);
  * the launcher would, is exe (a resolved path); or, with flatpak_id, if it is "flatpak run" for that app id. hint
  * (a window's app_id, or NULL) only says which entries to look at first. out = "" if none runs it. */
 void apps_name_of_program(const char *exe, const char *flatpak_id, const char *hint, char *out, size_t n);
+/* Does a window with this app_id (xdg_toplevel.set_app_id, or an X11 WM_CLASS) name the listed app with this desktop
+ * id, as the shell matches them: the id itself, its StartupWMClass, or the last part of a reverse-DNS id, ignoring
+ * case. 1 or 0. What the app chose, never an identity: wl.c takes it only beside a launch LordOS made a moment ago
+ * (xact_take_launch). */
+int apps_window_names(const char *desktop_id, const char *app_id);
 /* The .desktop file of a listed system app (from /usr/share/applications, never the user's
  * ~/.local/share/applications: those are no package's), as the system sees it (without the test root),
  * for lord.pkg.ownerOfApp (which package brought it). The id is validated and looked up as the launcher
  * does; the caller never gives a path. 0 if found. */
 int apps_system_file(const char *id, char *out, size_t n);
+/* lord.apps.launchProfile (approved by the maintainer 2026-11-24): a Chromium-family browser of apps.c's fixed table,
+ * from its system .desktop only, with one argv element "--profile-directory=<profile>" built here; profile must
+ * pass apps_profile_name_ok and be a key of profile.info_cache in that browser's own Local State (no link, a regular
+ * file of at most 1 MiB, sec/json.c). 0 if the process started. */
+int apps_launch_profile(const char *id, const char *profile);
+/* "Default" or "Profile N" (1 to 9999, no leading zero): 1 or 0 */
+int apps_profile_name_ok(const char *profile);
 /* Why the last apps_launch/apps_launch_with refused, as an error code ("" = no specific reason). */
 const char *apps_last_error(void);
 

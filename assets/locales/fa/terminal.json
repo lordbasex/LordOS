@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "در «خروجی گرفته‌شده» نگه داشته می‌شود",
   "prefs.tr.would.highlight": "«{text}» را برجسته می‌کند",
   "prefs.tr.param": "پارامتر",
-  "prefs.tr.regexFirst": "اول عبارت باقاعده را بنویسید."
+  "prefs.tr.regexFirst": "اول عبارت باقاعده را بنویسید.",
+  "guest.badge": "مهمان",
+  "guest.title": "پوسته درون {machine}"
 }

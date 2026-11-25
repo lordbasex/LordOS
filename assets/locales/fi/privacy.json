@@ -65,5 +65,6 @@
   "ask.vr": "”{app}” haluaa käyttää VR-laseja {headset}",
   "ask.vrNote": "Niiden näyttö annetaan vain sovellukselle; LordOS ei koskaan näytä työpöytääsi siellä. Se otetaan takaisin, kun sovellus suljetaan, lasit irrotetaan tai näyttö lukitaan. Voit muuttaa tämän myöhemmin kohdassa Asetukset → Tietosuoja.",
   "perm.vr": "VR-lasit",
-  "permHint.vr": "Sovellukset, jotka saavat ohjata VR-lasien näyttöä suoraan. Lainaan annetaan vain laseja, ei koskaan näyttöjäsi, ja ne otetaan takaisin, kun näyttö lukitaan, vaihdat käyttäjää tai valitset Estä."
+  "permHint.vr": "Sovellukset, jotka saavat ohjata VR-lasien näyttöä suoraan. Lainaan annetaan vain laseja, ei koskaan näyttöjäsi, ja ne otetaan takaisin, kun näyttö lukitaan, vaihdat käyttäjää tai valitset Estä.",
+  "protectedCapture": "Suojattu ikkuna"
 }

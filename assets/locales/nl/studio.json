@@ -88,5 +88,8 @@
   "micHint.voice": "Verwijdert het geluid om je heen zodat alleen je stem te horen is. Klinkt je stem robotachtig, zet dan de ruisonderdrukking van de bel-app zelf uit.",
   "micHint.wide": "Je microfoon zonder enige bewerking: voor muziek en elk geluid in de ruimte.",
   "micUnavailable": "Ruisvermindering verschijnt nadat je je hebt afgemeld en weer aangemeld.",
-  "noMic": "Er is geen microfoon aangesloten."
+  "noMic": "Er is geen microfoon aangesloten.",
+  "effects": "Effecten",
+  "openApp": "LordOS Studio openen…",
+  "micApps": "De micmodus wijzigt de microfoon die apps standaard gebruiken. Een app die op een bepaalde microfoon is ingesteld, houdt die: kies daar ‘LordOS Noise Reduction’."
 }

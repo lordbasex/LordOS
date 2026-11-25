@@ -584,5 +584,7 @@
   "prefs.tr.would.capture": "išsaugoma pagautoje išvestyje",
   "prefs.tr.would.highlight": "paryškina „{text}“",
   "prefs.tr.param": "Parametras",
-  "prefs.tr.regexFirst": "Pirmiausia įveskite reguliariąją išraišką."
+  "prefs.tr.regexFirst": "Pirmiausia įveskite reguliariąją išraišką.",
+  "guest.badge": "SVEČIAS",
+  "guest.title": "Apvalkalas mašinoje {machine}"
 }

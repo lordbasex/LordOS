@@ -36,9 +36,19 @@ typedef struct {
     unsigned long long rss, st, pss;    /* pss: 0 when not read */
     unsigned user, name, cmd, exe, prot, sid;
 } MonProc;
-typedef struct { double t; long hz; int n; MonProc *rows; char *pool; } MonProcs;
+typedef struct { double t; long hz; int n; size_t bytes; MonProc *rows; char *pool; } MonProcs;   /* bytes: the whole block */
 MonProcs *mon_procs_take(uint64_t *seq);
 char *mon_conns_json(uint64_t *seq);
+/* Sentinela (docs/SENTINELA.md): with on, the thread builds the process list every 10 s whether the Monitor is open or
+ * not (with it open, a copy of the Monitor's own list); mon_procs_watched hands the latest over like mon_procs_take,
+ * without keeping the 4 Hz sampling awake. Off frees it. */
+void mon_watch_procs(int on);
+MonProcs *mon_procs_watched(uint64_t *seq);
+/* Sentinela's machine rules: with on (and the process list watched), each watched list also brings the running
+ * machines' network counts, {"t","ok","machines":{"<id>":{"socks","listen","peers","bytes"}}} (conn.c conn_machines);
+ * mon_machines_watched: the latest if newer than *seq (a copy), or NULL */
+void mon_watch_machines(int on);
+char *mon_machines_watched(uint64_t *seq);
 /* Get Info (procctl.c): the process whose details the thread builds once per second (pid 0: none)
  * and the latest JSON. start: its start time in ticks, so a reused PID shows as gone. */
 void mon_detail(int pid, unsigned long long start);
@@ -59,7 +69,8 @@ char *mon_voltage_json(uint64_t *seq);
 void mon_want_gpu(int on);
 char *mon_gpu_json(uint64_t *seq);
 /* The app scope a process runs in (app-lordos-<id>.scope and its lpk- and fp- kinds, docs/FIREWALL.md): 'd' (a .desktop
- * app), 'l' (an isolated app), 'f' (a Flatpak app) or 0 (none), and its id in id. mon_scope_parse reads it from the text
+ * app), 'l' (an isolated app), 'f' (a Flatpak app), 'n' (one of LordOS's components, lordos-net-<name>.scope: the
+ * Terminal's programs, Mail's connector) or 0 (none), and its id in id. mon_scope_parse reads it from the text
  * of /proc/<pid>/cgroup; mon_scope_of reads that file. The process list (mon_procs_take) carries each one, read by the
  * thread. */
 #define MON_SCOPE_MAX 160

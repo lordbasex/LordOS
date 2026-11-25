@@ -57,7 +57,7 @@ int mcli_resolve(const char *const *names, int n, const char *q, int *out, int m
 static const char *const PASS[] = {
     "name", "display", "bridge", "port", "ports", "share", "shares", "iso", "agent", "clipboard", "clipboard-ask",
     "graphics", "gpu", "boot-order", "boot-menu", "sound", "volume", "microphone", "sound-out", "sound-in", "pointer",
-    "transfer", "devices", "resolution", "nic-model", NULL,
+    "transfer", "devices", "resolution", "nic-model", "cpu-pin", "perf-profile", "capture-fullscreen", NULL,
 };
 
 static char *keep(McliStore *st, const char *fmt, long long v) {
@@ -84,10 +84,13 @@ int mcli_set_args(int argc, char **args, char **out, int max, McliStore *store, 
         if (strncmp(a, "--", 2) || !a[2]) return -1;
         /* --opt=value or --opt value */
         const char *eq = strchr(a, '='), *val;
-        char *opt;
-        if (eq) { opt = keep_s(store, a + 2, (size_t)(eq - a - 2)); val = eq + 1; }
-        else { opt = keep_s(store, a + 2, strlen(a + 2)); if (i + 1 >= argc) return -1; val = args[++i]; }
-        if (!opt) return -1;
+        char opt[24];                                   /* only compared: the store keeps values, one per option at most */
+        size_t ol = eq ? (size_t)(eq - a - 2) : strlen(a + 2);
+        if (ol + 1 > sizeof opt) return -1;
+        memcpy(opt, a + 2, ol);
+        opt[ol] = 0;
+        if (eq) val = eq + 1;
+        else { if (i + 1 >= argc) return -1; val = args[++i]; }
         *bad_val = val;
         if (k + 3 > max) return -1;
         if (!strcmp(opt, "memory")) {
@@ -114,7 +117,7 @@ int mcli_set_args(int argc, char **args, char **out, int max, McliStore *store, 
             int known = 0;
             for (int p = 0; PASS[p]; p++) if (!strcmp(opt, PASS[p])) known = 1;
             if (!known) { *bad_val = NULL; return -1; }
-            char *o = keep_s(store, a, eq ? (size_t)(eq - a) : strlen(a));
+            char *o = eq ? keep_s(store, a, (size_t)(eq - a)) : (char *)a;
             if (!o) return -1;
             out[k++] = o; out[k++] = (char *)val;
         }
@@ -141,7 +144,8 @@ void mcli_folder_name(const char *name, char *out, size_t n) {
 static const char *const STATES[] = { "stopped", "starting", "running", "paused", "stopping", "crashed", NULL };
 static const char *const REASONS[] = {
     "none", "guest-shutdown", "host-shutdown", "forced", "poweroff", "qemu-failed", "qemu-signal", "out-of-memory",
-    "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed", "installed", NULL,
+    "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed", "installed",
+    "qemu-3d-crash", "qemu-3d-stop", "session-full", NULL,
 };
 static int listed(const char *const *l, const char *s) { for (int i = 0; s && l[i]; i++) if (!strcmp(l[i], s)) return 1; return 0; }
 
@@ -227,4 +231,465 @@ void mcli_bytes(double b, char *out, size_t n) {
     if (b >= 1e12) snprintf(out, n, "%.1f TB", b / 1e12);
     else if (b >= 1e9) snprintf(out, n, "%.1f GB", b / 1e9);
     else snprintf(out, n, "%.0f MB", b / 1e6);
+}
+
+/* ---- exec, cp, logs, mcp and apply (docs/VIRTUALIZATION.md 6.15, 6.24) ---- */
+
+int mcli_cp_side(const char *arg, char *name, size_t nn, const char **path) {
+    const char *c = arg ? strchr(arg, ':') : NULL;
+    if (!c || c == arg || memchr(arg, '/', (size_t)(c - arg)) || (size_t)(c - arg) >= nn) return 0;
+    memcpy(name, arg, (size_t)(c - arg));
+    name[c - arg] = 0;
+    *path = c[1] ? c + 1 : "~";
+    return 1;
+}
+
+int mcli_rel_path_ok(const char *p) {
+    size_t n = p ? strlen(p) : 0;
+    if (!n || n > MCLI_TREE_PATH_MAX || p[0] == '/' || p[n - 1] == '/') return 0;
+    int depth = 1;
+    const char *c = p;
+    for (const char *s = p;; s++) {
+        if (*s == '/' || !*s) {
+            size_t l = (size_t)(s - c);
+            if (!l || l > 255 || (l == 1 && c[0] == '.') || (l == 2 && c[0] == '.' && c[1] == '.')) return 0;
+            if (!*s) break;
+            if (++depth > MCLI_TREE_DEPTH) return 0;
+            c = s + 1;
+            continue;
+        }
+        if ((unsigned char)*s < 0x20 || *s == 0x7f) return 0;
+        /* bidi controls (U+202A..U+202E, U+2066..U+2069) and line separators (U+2028, U+2029): a name that reads as another */
+        const unsigned char *u = (const unsigned char *)s;
+        if (u[0] == 0xe2 && ((u[1] == 0x80 && u[2] >= 0xa8 && u[2] <= 0xae) || (u[1] == 0x81 && u[2] >= 0xa6 && u[2] <= 0xa9))) return 0;
+    }
+    return 1;
+}
+
+int mcli_tree_next(const char *b, size_t n, size_t *off, McliTreeEnt *e) {
+    if (*off >= n) return 0;
+    const char *s = b + *off, *z = memchr(s, 0, n - *off);
+    if (!z) return -1;                                      /* cut: a last entry without its end */
+    size_t l = (size_t)(z - s);
+    *off += l + 1;
+    if (l < 3 || s[1] != ' ' || (s[0] != 'd' && s[0] != 'f')) return -1;
+    const char *p = s + 2;
+    e->dir = s[0] == 'd';
+    e->size = 0;
+    if (!e->dir) {
+        if (*p < '0' || *p > '9') return -1;
+        unsigned long long v = 0;
+        int k = 0;
+        while (*p >= '0' && *p <= '9') { if (++k > 15) return -1; v = v * 10 + (unsigned)(*p - '0'); p++; }
+        if (*p != ' ') return -1;
+        p++;
+        e->size = v;
+    }
+    if (!mcli_rel_path_ok(p)) return -1;
+    e->path = p;
+    return 1;
+}
+
+/* one UTF-8 character's length at p (1..4) when it is a valid one within n bytes, else 0 */
+static size_t utf8_len(const unsigned char *p, size_t n) {
+    unsigned c = p[0];
+    if (c < 0x80) return 1;
+    size_t k = c >= 0xc2 && c <= 0xdf ? 2 : c >= 0xe0 && c <= 0xef ? 3 : c >= 0xf0 && c <= 0xf4 ? 4 : 0;
+    if (!k || k > n) return 0;
+    for (size_t j = 1; j < k; j++) if ((p[j] & 0xc0) != 0x80) return 0;
+    if ((c == 0xe0 && p[1] < 0xa0) || (c == 0xed && p[1] > 0x9f) || (c == 0xf0 && p[1] < 0x90) || (c == 0xf4 && p[1] > 0x8f)) return 0;
+    return k;
+}
+
+void mcli_json_bytes(FILE *f, const uint8_t *b, size_t n) {
+    fputc('"', f);
+    for (size_t i = 0; i < n;) {
+        unsigned c = b[i];
+        if (c == '"' || c == '\\') { fputc('\\', f); fputc((int)c, f); i++; continue; }
+        if (c == '\n') { fputs("\\n", f); i++; continue; }
+        if (c == '\t') { fputs("\\t", f); i++; continue; }
+        if (c == '\r') { fputs("\\r", f); i++; continue; }
+        if (!c) { fputs("\\ufffd", f); i++; continue; }        /* NUL: many JSON readers refuse it */
+        if (c < 0x20 || c == 0x7f) { fprintf(f, "\\u%04x", c); i++; continue; }
+        size_t k = utf8_len(b + i, n - i);
+        if (!k) { fputs("\\ufffd", f); i++; continue; }
+        fwrite(b + i, 1, k, f);
+        i += k;
+    }
+    fputc('"', f);
+}
+
+size_t mcli_term_clean(const uint8_t *b, size_t n, char *out, size_t cap) {
+    size_t o = 0;
+    for (size_t i = 0; i < n && o + 4 < cap;) {
+        unsigned c = b[i];
+        if (c == '\n' || c == '\t') { out[o++] = (char)c; i++; continue; }
+        if (c < 0x20 || c == 0x7f) { out[o++] = '?'; i++; continue; }
+        size_t k = utf8_len(b + i, n - i);
+        /* C1 controls (U+0080..U+009F) act like escapes on some terminals */
+        if (!k) { out[o++] = '?'; i++; continue; }
+        if (k == 2 && c == 0xc2 && b[i + 1] < 0xa0) { out[o++] = '?'; i += 2; continue; }
+        memcpy(out + o, b + i, k);
+        o += k;
+        i += k;
+    }
+    out[o] = 0;
+    return o;
+}
+
+/* ---- a reproducible machine's file (6.24): a small, strict subset of TOML ---- */
+
+static const char *const APPLY_KEYS[] = { "name", "arch", "memory", "cpus", "disk", "network", "iso", "graphics", "agent", "clipboard", "ports", "shares", NULL };
+
+static int apply_string(const char **pp, const char *end, char *out, size_t cap) {
+    const char *p = *pp;
+    if (p >= end || *p != '"') return -1;
+    p++;
+    size_t o = 0;
+    while (p < end && *p != '"') {
+        unsigned char c = (unsigned char)*p;
+        if (c < 0x20 || c == 0x7f) return -1;
+        if (c == '\\') {
+            if (p + 1 >= end) return -1;
+            char e = p[1];
+            c = e == '"' ? '"' : e == '\\' ? '\\' : e == 't' ? '\t' : 0;
+            if (!c) return -1;
+            p += 2;
+        } else {
+            size_t k = utf8_len((const unsigned char *)p, (size_t)(end - p));
+            if (!k) return -1;
+            if (k > 1) {
+                if (o + k >= cap) return -1;
+                memcpy(out + o, p, k);
+                o += k; p += k;
+                continue;
+            }
+            p++;
+        }
+        if (o + 1 >= cap) return -1;
+        out[o++] = (char)c;
+    }
+    if (p >= end) return -1;
+    out[o] = 0;
+    *pp = p + 1;
+    return 0;
+}
+
+static const char *skip_ws(const char *p, const char *end) { while (p < end && (*p == ' ' || *p == '\t')) p++; return p; }
+
+int mcli_apply_parse(const char *text, size_t n, McliApply *a, int *line, const char **why) {
+    memset(a, 0, sizeof *a);
+    a->cpus = -1; a->agent = -1;
+    *line = 0;
+    *why = "";
+    if (!text || n > MCLI_APPLY_MAX) { *why = "the file is larger than 64 KB"; return -1; }
+    if (memchr(text, 0, n)) { *why = "the file holds a NUL byte"; return -1; }
+    unsigned seen = 0;
+    int table = 0;
+    const char *p = text, *end = text + n;
+    while (p < end) {
+        const char *e = memchr(p, '\n', (size_t)(end - p));
+        if (!e) e = end;
+        (*line)++;
+        const char *q = skip_ws(p, e), *le = e;
+        if (le > q && le[-1] == '\r') le--;
+        if (q < le && *q != '#') {
+            if (*q == '[') {
+                /* the one table this file may have, first */
+                if (table || seen || (size_t)(le - q) < 9 || memcmp(q, "[machine]", 9)) { *why = "only one [machine] table, before every key"; return -1; }
+                const char *t = skip_ws(q + 9, le);
+                if (t < le && *t != '#') { *why = "something after [machine]"; return -1; }
+                table = 1;
+            } else {
+                const char *k = q;
+                while (q < le && ((*q >= 'a' && *q <= 'z') || *q == '_')) q++;
+                size_t kl = (size_t)(q - k);
+                int ki = -1;
+                for (int i = 0; APPLY_KEYS[i]; i++) if (strlen(APPLY_KEYS[i]) == kl && !memcmp(APPLY_KEYS[i], k, kl)) ki = i;
+                if (ki < 0) { *why = "an unknown key"; return -1; }
+                if (seen & (1u << ki)) { *why = "a key given twice"; return -1; }
+                seen |= 1u << ki;
+                q = skip_ws(q, le);
+                if (q >= le || *q != '=') { *why = "a key without = and a value"; return -1; }
+                q = skip_ws(q + 1, le);
+                char sv[MCLI_APPLY_STR];
+                const char *key = APPLY_KEYS[ki];
+                if (!strcmp(key, "ports") || !strcmp(key, "shares")) {
+                    int ports = key[0] == 'p';
+                    if (q >= le || *q != '[') { *why = "a list in [ ]"; return -1; }
+                    q = skip_ws(q + 1, le);
+                    while (q < le && *q != ']') {
+                        if (apply_string(&q, le, sv, ports ? sizeof a->ports[0] : sizeof a->shares[0])) { *why = "a list of strings"; return -1; }
+                        if (ports ? a->n_ports >= MCLI_APPLY_PORTS : a->n_shares >= MCLI_APPLY_SHARES) { *why = "too many items"; return -1; }
+                        if (ports) snprintf(a->ports[a->n_ports++], sizeof a->ports[0], "%s", sv);
+                        else snprintf(a->shares[a->n_shares++], sizeof a->shares[0], "%s", sv);
+                        q = skip_ws(q, le);
+                        if (q < le && *q == ',') q = skip_ws(q + 1, le);
+                        else if (q < le && *q != ']') { *why = "items are separated by commas"; return -1; }
+                    }
+                    if (q >= le) { *why = "a list ends on its line with ]"; return -1; }
+                    q++;
+                    if (ports) a->ports_set = 1; else a->shares_set = 1;
+                } else if (!strcmp(key, "cpus")) {
+                    long v = 0;
+                    const char *d = q;
+                    while (q < le && *q >= '0' && *q <= '9' && q - d < 4) v = v * 10 + (*q++ - '0');
+                    if (q == d || (q - d > 1 && *d == '0') || v < 1 || v > 64 || (q < le && *q >= '0' && *q <= '9')) { *why = "cpus is a whole number from 1 to 64"; return -1; }
+                    a->cpus = (int)v;
+                } else if (!strcmp(key, "agent")) {
+                    if (le - q >= 4 && !memcmp(q, "true", 4)) { a->agent = 1; q += 4; }
+                    else if (le - q >= 5 && !memcmp(q, "false", 5)) { a->agent = 0; q += 5; }
+                    else { *why = "agent is true or false"; return -1; }
+                } else {
+                    if (apply_string(&q, le, sv, sizeof sv)) { *why = "a value in double quotes"; return -1; }
+                    char *dst = !strcmp(key, "name") ? a->name : !strcmp(key, "arch") ? a->arch : !strcmp(key, "memory") ? a->memory : !strcmp(key, "disk") ? a->disk :
+                                !strcmp(key, "network") ? a->network : !strcmp(key, "iso") ? a->iso : !strcmp(key, "graphics") ? a->graphics : a->clipboard;
+                    size_t cap = !strcmp(key, "iso") ? sizeof a->iso : !strcmp(key, "name") ? sizeof a->name : sizeof a->arch;
+                    if (!sv[0] || strlen(sv) >= cap) { *why = "a value that is empty or too long"; return -1; }
+                    memcpy(dst, sv, strlen(sv) + 1);
+                }
+                q = skip_ws(q, le);
+                if (q < le && *q != '#') { *why = "something after the value"; return -1; }
+            }
+        }
+        p = e < end ? e + 1 : end;
+    }
+    if (!a->name[0]) { *line = 0; *why = "name is missing"; return -1; }
+    *line = 0;
+    return 0;
+}
+
+/* ---- MCP (JSON-RPC 2.0, one message per line) ---- */
+
+int mcli_rpc_parse(const char *line, size_t n, McliRpc *r) {
+    memset(r, 0, sizeof *r);
+    if (!line || !n || n > MCLI_RPC_MAX) return -1;
+    if (json_parse(line, n, &r->doc, NULL, 0)) return -1;
+    const JVal *root = r->doc.root;
+    if (!root || root->type != J_OBJ) { json_free(&r->doc); return -1; }
+    const JVal *v = json_get(root, "jsonrpc"), *m = json_get(root, "method"), *id = json_get(root, "id"), *pa = json_get(root, "params");
+    if (!v || v->type != J_STR || strcmp(v->str, "2.0") || !m || m->type != J_STR || !m->str[0] || strlen(m->str) > 64 ||
+        (pa && pa->type != J_OBJ && pa->type != J_ARR) || (id && id->type != J_NUM && id->type != J_STR)) { json_free(&r->doc); return -1; }
+    if (id && id->type == J_STR && strlen(id->str) > 128) { json_free(&r->doc); return -1; }
+    if (id && id->type == J_NUM && (id->num != (double)(long long)id->num || id->num < -9e15 || id->num > 9e15)) { json_free(&r->doc); return -1; }
+    for (const JVal *k = root->kid; k; k = k->next)
+        if (strcmp(k->key, "jsonrpc") && strcmp(k->key, "method") && strcmp(k->key, "id") && strcmp(k->key, "params")) { json_free(&r->doc); return -1; }
+    r->method = m->str;
+    r->params = pa;
+    r->has_id = id != NULL;
+    if (id && id->type == J_NUM) snprintf(r->id, sizeof r->id, "%lld", (long long)id->num);
+    else if (id) {
+        FILE *f = fmemopen(r->id, sizeof r->id, "w");
+        if (!f) { json_free(&r->doc); return -1; }
+        mcli_json_str(f, id->str);
+        fclose(f);
+    }
+    return 0;
+}
+
+void mcli_rpc_free(McliRpc *r) { json_free(&r->doc); memset(r, 0, sizeof *r); }
+
+/* ---- the security review of 2026-11-24 ---- */
+
+int mcli_mcp_name_ok(const char *q) {
+    size_t n = q ? strlen(q) : 0;
+    if (!n || n > 300 || strchr(q, '/')) return 0;
+    for (const unsigned char *p = (const unsigned char *)q; *p; p++) if (*p < 0x20 || *p == 0x7f) return 0;
+    if ((n >= 7 && !strcasecmp(q + n - 7, ".lordvm")) || (n >= 10 && !strcasecmp(q + n - 10, ".lordgroup"))) return 0;
+    return strcmp(q, ".") && strcmp(q, "..");
+}
+
+static void risk_add(char *out, size_t n, size_t *o, int *k, const char *a, const char *b) {
+    int w = snprintf(out + *o, *o < n ? n - *o : 0, "%s%s%s", *k ? "; " : "", a, b ? b : "");
+    if (w > 0) *o = *o + (size_t)w < n ? *o + (size_t)w : n ? n - 1 : 0;
+    (*k)++;
+}
+
+int mcli_apply_risks(const McliApply *a, char *out, size_t n) {
+    int k = 0;
+    size_t o = 0;
+    if (n) out[0] = 0;
+    if (a->iso[0]) risk_add(out, n, &o, &k, "iso = ", a->iso);
+    for (int i = 0; i < a->n_ports; i++) risk_add(out, n, &o, &k, "port ", a->ports[i]);
+    for (int i = 0; i < a->n_shares; i++) risk_add(out, n, &o, &k, "share ", a->shares[i]);
+    if (a->network[0] && strcmp(a->network, "shared") && strcmp(a->network, "isolated")) risk_add(out, n, &o, &k, "network = ", a->network);
+    if (a->clipboard[0] && strcmp(a->clipboard, "off")) risk_add(out, n, &o, &k, "clipboard = ", a->clipboard);
+    if (a->agent == 1) risk_add(out, n, &o, &k, "agent = true", NULL);
+    return k;
+}
+
+int mcli_iso_place_ok(const char *real, const char *const *roots) {
+    size_t n = real ? strlen(real) : 0;
+    if (n < 6 || real[0] != '/' || (strcasecmp(real + n - 4, ".iso") && strcasecmp(real + n - 4, ".img"))) return 0;
+    if (strstr(real, "/../") || strstr(real, "/./")) return 0;
+    for (int i = 0; roots && roots[i]; i++) {
+        size_t r = strlen(roots[i]);
+        if (r > 1 && roots[i][0] == '/' && n > r + 1 && !strncmp(real, roots[i], r) && real[r] == '/') return 1;
+    }
+    return 0;
+}
+
+/* ---- apply's settings as `machines set` arguments (security review 2026-11-24, F8: sized from the parser's limits) ---- */
+
+/* mcli_set_args keeps at most one store entry per option: room for every option of apply's worst case */
+_Static_assert(sizeof ((McliStore *)0)->v / sizeof ((McliStore *)0)->v[0] >= 8 + MCLI_APPLY_PORTS + MCLI_APPLY_SHARES, "McliStore too small for apply");
+
+int mcli_apply_set_argv(const McliApply *a, int made, const char *cpus, char **so, int cap) {
+    int k = 0;
+#define PUT(o, v) do { if (k + 2 >= cap) return -1; so[k++] = (char *)(o); so[k++] = (char *)(v); } while (0)
+    if (cap < 1) return -1;
+    if (a->memory[0] && !made) PUT("--memory", a->memory);
+    if (a->cpus > 0 && !made) PUT("--cpus", cpus);
+    if (a->disk[0] && !made) PUT("--disk", a->disk);
+    if (a->network[0] && (!made || !strcmp(a->network, "bridged"))) PUT("--network", a->network);
+    if (a->graphics[0]) PUT("--graphics", a->graphics);
+    if (a->clipboard[0]) PUT("--clipboard", a->clipboard);
+    if (a->agent >= 0) PUT("--agent", a->agent ? "on" : "off");
+    if (a->iso[0] && !made) PUT("--iso", a->iso);
+    if (a->ports_set && !a->n_ports) PUT("--ports", "none");
+    for (int i = 0; i < a->n_ports && i < MCLI_APPLY_PORTS; i++) PUT("--port", a->ports[i]);
+    if (a->shares_set && !a->n_shares) PUT("--shares", "none");
+    for (int i = 0; i < a->n_shares && i < MCLI_APPLY_SHARES; i++) PUT("--share", a->shares[i]);
+#undef PUT
+    so[k] = NULL;
+    return k;
+}
+
+/* ---- a guest's terminal stream, filtered (security review 2026-11-24, F11) ---- */
+
+enum { VTF_GROUND, VTF_UTF8, VTF_ESC, VTF_CSI, VTF_OSC, VTF_STR };
+#define VTF_ESC_MAX 8
+#define VTF_CSI_MAX 64
+
+void mcli_vtf_init(McliVtf *f) { memset(f, 0, sizeof *f); }
+
+typedef struct { uint8_t *p; size_t n, cap; } VtfOut;
+static void vtf_put(VtfOut *o, const uint8_t *b, size_t n) {
+    if (o->n + n > o->cap) return;                /* never with the documented room; dropped rather than overrun */
+    memcpy(o->p + o->n, b, n);
+    o->n += n;
+}
+static void vtf_byte(VtfOut *o, uint8_t c) { vtf_put(o, &c, 1); }
+
+/* an OSC we let through: titles and colors only, its text valid UTF-8 without C0 or C1 controls */
+static int vtf_osc_ok(const uint8_t *b, size_t n) {
+    size_t i = 0;
+    int num = 0;
+    while (i < n && i < 4 && b[i] >= '0' && b[i] <= '9') num = num * 10 + (b[i++] - '0');
+    if (!i || (i < n && b[i] != ';')) return 0;
+    static const int OK[] = { 0, 1, 2, 4, 10, 11, 12, 104, 110, 111, 112 };
+    int known = 0;
+    for (size_t j = 0; j < sizeof OK / sizeof OK[0]; j++) if (OK[j] == num) known = 1;
+    if (!known) return 0;
+    while (i < n) {
+        if (b[i] < 0x20 || b[i] == 0x7f) return 0;
+        size_t k = utf8_len(b + i, n - i);
+        if (!k || (k == 2 && b[i] == 0xc2 && b[i + 1] < 0xa0)) return 0;
+        i += k;
+    }
+    return 1;
+}
+
+static void vtf_osc_end(McliVtf *f, VtfOut *o) {
+    if (!f->bad && vtf_osc_ok(f->buf, f->n)) {
+        vtf_put(o, (const uint8_t *)"\033]", 2);
+        vtf_put(o, f->buf, f->n);
+        vtf_byte(o, 0x07);
+    }
+    f->st = VTF_GROUND; f->n = 0; f->bad = 0; f->esc = 0;
+}
+
+static void vtf_to_esc(McliVtf *f) { f->st = VTF_ESC; f->buf[0] = 0x1b; f->n = 1; f->bad = 0; f->esc = 0; }
+
+/* a C1 control (U+0080..U+009F, as UTF-8 C2 xx): the introducers start what their 7-bit forms start, the rest is dropped */
+static void vtf_c1(McliVtf *f, uint8_t c) {
+    f->n = 0; f->bad = 0; f->esc = 0; f->st = VTF_GROUND;
+    if (c == 0x9b) { f->st = VTF_CSI; f->buf[0] = 0x1b; f->buf[1] = '['; f->n = 2; }
+    else if (c == 0x9d) f->st = VTF_OSC;
+    else if (c == 0x90 || c == 0x98 || c == 0x9e || c == 0x9f) f->st = VTF_STR;
+}
+
+size_t mcli_vtf_feed(McliVtf *f, const uint8_t *in, size_t n, uint8_t *out, size_t cap) {
+    VtfOut o = { out, 0, cap };
+    for (size_t i = 0; i < n;) {
+        uint8_t c = in[i];
+        switch (f->st) {
+        case VTF_GROUND:
+            i++;
+            if (c == 0x1b) vtf_to_esc(f);
+            else if (c < 0x80) { if (c) vtf_byte(&o, c); }
+            else if (c >= 0xc2 && c <= 0xf4) { f->st = VTF_UTF8; f->buf[0] = c; f->n = 1; f->need = c <= 0xdf ? 1 : c <= 0xef ? 2 : 3; }
+            else vtf_byte(&o, '?');
+            break;
+        case VTF_UTF8:
+            if ((c & 0xc0) != 0x80) { vtf_byte(&o, '?'); f->st = VTF_GROUND; f->n = 0; break; }   /* c again, as text */
+            i++;
+            f->buf[f->n++] = c;
+            if (--f->need) break;
+            if (f->n == 2 && f->buf[0] == 0xc2 && c < 0xa0) { vtf_c1(f, c); break; }
+            if (utf8_len(f->buf, f->n) == f->n) vtf_put(&o, f->buf, f->n);
+            else vtf_byte(&o, '?');
+            f->st = VTF_GROUND; f->n = 0;
+            break;
+        case VTF_ESC:
+            if (c == 0x1b) { i++; vtf_to_esc(f); break; }
+            if (c == 0x18 || c == 0x1a) { i++; f->st = VTF_GROUND; f->n = 0; break; }
+            if (c == 0x7f) { i++; break; }
+            if (c < 0x20 || c >= 0x80) { f->st = VTF_GROUND; f->n = 0; break; }                 /* c again */
+            i++;
+            if (f->n == 1 && c == '[') { f->st = VTF_CSI; f->buf[f->n++] = c; break; }
+            if (f->n == 1 && c == ']') { f->st = VTF_OSC; f->n = 0; break; }
+            if (f->n == 1 && (c == 'P' || c == 'X' || c == '^' || c == '_')) { f->st = VTF_STR; f->n = 0; break; }
+            if (f->n == 1 && c == '\\') { f->st = VTF_GROUND; f->n = 0; break; }                  /* a lone ST: nothing to end */
+            if (c < 0x30) { if (f->n < VTF_ESC_MAX) f->buf[f->n++] = c; else f->bad = 1; break; }
+            if (!f->bad) { vtf_put(&o, f->buf, f->n); vtf_byte(&o, c); }
+            f->st = VTF_GROUND; f->n = 0; f->bad = 0;
+            break;
+        case VTF_CSI:
+            if (c == 0x1b) { i++; vtf_to_esc(f); break; }
+            if (c == 0x18 || c == 0x1a) { i++; f->st = VTF_GROUND; f->n = 0; f->bad = 0; break; }
+            if (c == 0x7f) { i++; break; }
+            if (c >= 0x80) { f->st = VTF_GROUND; f->n = 0; f->bad = 0; break; }                   /* c again */
+            i++;
+            if (c < 0x20) { if (c) vtf_byte(&o, c); break; }    /* a terminal runs C0 controls inside a CSI too */
+            if (c < 0x40) {
+                if (c >= 0x30 && f->n > 2 && f->buf[f->n - 1] < 0x30) f->bad = 1;   /* a parameter after an intermediate */
+                if (f->n < VTF_CSI_MAX) f->buf[f->n++] = c; else f->bad = 1;
+                break;
+            }
+            if (!f->bad && c != 't') { vtf_put(&o, f->buf, f->n); vtf_byte(&o, c); }
+            f->st = VTF_GROUND; f->n = 0; f->bad = 0;
+            break;
+        case VTF_OSC:
+        case VTF_STR: {
+            int osc = f->st == VTF_OSC;
+            if (f->esc == 1) {
+                f->esc = 0;
+                if (c == '\\') { i++; if (osc) vtf_osc_end(f, &o); else { f->st = VTF_GROUND; f->n = 0; } break; }
+                vtf_to_esc(f);                                  /* the string ends unfinished, dropped; c again */
+                break;
+            }
+            if (f->esc == 2 && c == 0x9c) {                     /* C1 ST as UTF-8: C2 9C */
+                i++;
+                f->esc = 0;
+                if (osc) { if (f->n) f->n--; vtf_osc_end(f, &o); } else { f->st = VTF_GROUND; f->n = 0; }
+                break;
+            }
+            f->esc = 0;
+            i++;
+            if (c == 0x07) { if (osc) vtf_osc_end(f, &o); else { f->st = VTF_GROUND; f->n = 0; } break; }
+            if (c == 0x1b) { f->esc = 1; break; }
+            if (c == 0x18 || c == 0x1a) { f->st = VTF_GROUND; f->n = 0; f->bad = 0; break; }
+            if (c == 0xc2) f->esc = 2;
+            if (!osc) break;
+            if (c < 0x20 || c == 0x7f) f->bad = 1;
+            if (f->n < sizeof f->buf) f->buf[f->n++] = c; else f->bad = 1;
+            break;
+        }
+        default:
+            f->st = VTF_GROUND; f->n = 0;
+            break;
+        }
+    }
+    return o.n;
 }

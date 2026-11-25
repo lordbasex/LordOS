@@ -1,10 +1,12 @@
 // Pieces the Machines windows share: the state dot, the system marks, the three lights, bars, a context menu and the
 // surfaces of the Control Center (docs/VIRTUALIZATION.md, "The app"; the approved mocks, Main and Toolbar).
-import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, useSettings, useStore, LordOSLogo, t as tr } from '@lordos/sdk';
+import { View, Text, Image, Overlay, ScrollView, screen, addListener, useTheme, errorText, admin, useSettings, useStore, createStore, fs, useAppWindow, LordOSLogo, t as tr } from '@lordos/sdk';
 import { logoFor } from './logos.js';
 import { storeRev } from './store.js';
+import { readMeta, writeMeta } from './meta.js';
 import { COLOR_HEX } from './systems.js';
-import { bridgeArg, soundDevChoices, gvtGpu, gvtType, gvtArg, memlockFits } from './model.js';
+import { ensureKey } from './keyflow.js';
+import { bridgeArg, soundDevChoices, gvtGpu, gvtType, gvtArg, memlockFits, windowMachineId, followDir } from './model.js';
 import { useEffect, useRef, useState } from 'react';
 
 export const TONE = { run: '#30d158', pause: '#ff9f0a', off: '#8e8e93', busy: '#0a84ff', bad: '#ff453a' };
@@ -12,6 +14,30 @@ export const has = () => typeof lord !== 'undefined' && !!lord.vm;
 // why lord.vm refused a start or a change (it returned 0), or the fallback text: a writable shared folder that holds a
 // protected file (vm.shareProtected) is said as such
 export const vmRefusal = (fallback) => { const r = lord.vm.refusal ? lord.vm.refusal() : null; return r ? errorText(r) : fallback; };
+// a machine renamed with its folder (6.26): old folder → new, set by the window that renamed it, so its other windows
+// (its own, Snapshots, Logs, Configure) follow at once; a rename from elsewhere (the machines command) is found by the
+// machine's id within a few seconds (useMachineDir)
+export const movedDirs = createStore({});
+export const noteMoved = (from, to) => { if (from && to && from !== to) movedDirs.set((x) => ({ ...x, [from]: to })); };
+const movedTo = (map, dir) => { let d = dir; for (let i = 0; i < 8 && map[d]; i++) d = map[d]; return d; };
+// the folder a Machines window shows: its args' folder, or where that machine is now
+export function useMachineDir(dir) {
+  const { id: winId } = useAppWindow();
+  const moved = useStore(movedDirs);
+  const [found, setFound] = useState(null);
+  const want = movedTo(moved, dir);
+  useEffect(() => {
+    const mid = dir ? windowMachineId(winId) : null;
+    if (!mid || !has()) return undefined;
+    const look = () => {
+      try { fs.stat(`${want}/machine.json`); return; } catch (e) { /* gone: renamed? */ }
+      try { const d = followDir(want, mid, lord.vm.list()); setFound(d !== want ? d : null); } catch (e) { /* the list isn't there */ }
+    };
+    const timer = setInterval(look, 3000);
+    return () => clearInterval(timer);
+  }, [want, winId]);
+  return found || want;
+}
 export const gb = (mb) => (mb == null || !Number.isFinite(+mb) ? '—' : mb >= 1024 ? `${Math.round((mb / 1024) * 10) / 10} GB` : `${mb} MB`);
 export const bytes = (b) => (b == null || !Number.isFinite(+b) ? '—' : b >= 1e12 ? `${Math.round(b / 1e11) / 10} TB` : b >= 1e9 ? `${Math.round(b / 1e8) / 10} GB` : `${Math.round(b / 1e6)} MB`);
 export const gib = (b) => `${Math.round((b / 1073741824) * 10) / 10}`;
@@ -316,19 +342,23 @@ export const soundDevItems = (list, chosen, pick) => soundDevChoices(list, chose
 export const overlayRoot = { current: null };
 
 // A dialog over the window (the mocks' Clone and the snapshot sheets): title, body, actions on the right. Esc cancels.
-// An alert in hypervisaur's look (kit.jsx): the window dimmed behind, a rounded card with a hairline edge.
-export function Sheet({ title, children, actions, width = 560, onCancel }) {
+// An alert in hypervisaur's look (kit.jsx): the window dimmed behind, a rounded card with a hairline edge. It is never
+// taller than the window (the Control Center's first size is 760×500): the title and the buttons stay, and the body
+// between them scrolls when it doesn't fit. over: what covers the whole window above the sheet (the file picker of
+// Export… and Bring In), never squeezed inside its card.
+export function Sheet({ title, children, actions, width = 560, onCancel, over }) {
   const p = usePal();
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') onCancel?.(); }), [onCancel]);
   return (
-    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: 24,
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: 16,
       backgroundColor: p.dark ? 'rgba(0,0,0,0.5)' : 'rgba(30,30,40,0.28)' }}>
-      <View style={{ width, maxWidth: '100%', padding: 22, gap: 14, borderRadius: 16, backgroundColor: p.dark ? '#26262f' : '#f6f6f8',
+      <View style={{ width, maxWidth: '100%', maxHeight: '100%', padding: 22, gap: 14, borderRadius: 16, backgroundColor: p.dark ? '#26262f' : '#f6f6f8',
         border: `1px solid ${p.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`, boxShadow: '0 24px 64px rgba(0,0,0,0.55)' }}>
         <Text style={{ fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
-        {children}
+        <ScrollView style={{ flex: -1 }} contentStyle={{ gap: 14 }}>{children}</ScrollView>
         {actions?.length ? <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 4 }}>{actions}</View> : null}
       </View>
+      {over || null}
     </View>
   );
 }
@@ -360,11 +390,27 @@ export async function gvtUp(m) {
   await admin.run('vm-gvt-create', gvtArg(m, type), undefined, { quiet: true });
 }
 
-// Everything a start needs from the admin helper, in order: the bridged network, then the graphics card. Rejects with
-// the translated message to show
+// The vCPUs chosen from the recommendation while the machine ran (app.json nextVcpus, Configure's "Use N"): written
+// with lord-vm --set (a job) just before it starts. A suspended machine keeps them for the start after its next shutdown
+// (lord-vm refuses to change a saved machine's vCPUs); a refusal only leaves the count it had
+export async function vcpusUp(m) {
+  const want = m?.dir ? readMeta(m.dir).nextVcpus : 0;
+  if (!want || m.suspended) return;
+  if (want !== m.vcpus && typeof lord !== 'undefined' && lord.vm?.set) {
+    const id = lord.vm.set(m.dir, { vcpus: want });
+    if (id) await new Promise((done) => { const tick = () => { const r = lord.vm.job(id); if (!r || r.done) done(); else setTimeout(tick, 100); }; tick(); });
+  }
+  writeMeta(m.dir, { nextVcpus: undefined });
+}
+
+// Everything a start needs from the admin helper, in order: the vCPUs chosen while it ran, the bridged network, then the
+// graphics card. Rejects with the translated message to show
 export async function startPrep(m) {
+  // an encrypted machine's key first (docs/VIRTUALIZATION.md 8): from the keyring, unlocked by the person if it's locked
+  if (m?.encrypted) await ensureKey(m.dir, { id: m.keyId, name: m.name });
+  await vcpusUp(m);
   await bridgeUp(m).catch((e) => { throw new Error(tr('machines.win.bridgeFailed', { why: e.message })); });
   await gvtUp(m).catch((e) => { throw new Error(tr('machines.win.gvtFailed', { why: e.message })); });
 }
 // whether a start goes through startPrep first
-export const needsPrep = (m) => m?.network === 'bridged' || !!m?.gpu;
+export const needsPrep = (m) => !!m?.encrypted || m?.network === 'bridged' || !!m?.gpu || (!!m?.dir && !m.suspended && !!readMeta(m.dir).nextVcpus);

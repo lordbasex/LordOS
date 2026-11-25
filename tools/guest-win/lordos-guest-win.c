@@ -32,13 +32,16 @@
  *     is associated): a program runs, as the person, like a double click in Explorer. It answers AGK_OPENED;
  *   - files dropped on an apps mode window (AGK_PLACE, 7.2.1): each checked the same way; once a drop's batch is all
  *     there they go to the window they were dropped on, and nowhere else: moved into the folder an Explorer window shows,
- *     WM_DROPFILES to a window that takes dropped files, or the clipboard (CF_HDROP) for any other, to paste.
+ *     WM_DROPFILES to a window that takes dropped files, or the clipboard (CF_HDROP) for any other, to paste;
+ *   - the machine's performance profile (AGK_PERF, 7.1.4), only while the host holds the port and only what the person
+ *     may change: the High performance power plan, visual effects for the session, transparency; put back after.
  * It never runs anything the host names, and validates every frame (vmagent.c's parsers) before acting on it.
  *
  * The port can be held by one process at a time: the helper of the session at the computer's console takes it and
  * lets it go when another session becomes the console one (switch user, Remote Desktop), or when the person logs off.
  *
- *   lordos-guest-win.exe [--port PATH] [--log PATH] [--version] */
+ *   lordos-guest-win.exe [--port PATH] [--log PATH] [--version]
+ *   lordos-guest-win.exe --open-on-host URL | --notify-host TITLE [BODY] | --send-to-host FILE... */
 #define WIN32_LEAN_AND_MEAN
 #define COBJMACROS
 #define _WIN32_WINNT 0x0A00
@@ -58,6 +61,7 @@
 #include <servprov.h>
 #include <shlguid.h>
 #include <oleidl.h>
+#include <powrprof.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -84,11 +88,22 @@
  * the display configuration is asked twice at most per size, not every 250 ms; a size Windows changes by itself right
  * after (a monitor that reappears with a new EDID) is asked again, twice at most; apps mode's list follows a change of
  * the displays at once (the shown display's corner looked up for every list) */
-#define VERSION "w10"
-#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt extra tablet"
+/* w11 (2026-11-23): "perf": the machine's performance profile (AGK_PERF, docs/VIRTUALIZATION.md 7.1.4), as the person:
+ * the High performance power plan, visual effects and transparency at their minimum while the host holds the port, and
+ * everything put back after (AGK_PERFSTATE says what was done) */
+/* w12 (2026-11-24): "shell": the agent's shell (AGK_SHELL_*, docs/VIRTUALIZATION.md 6.18): PowerShell in a pseudo
+ * console, as the person and never elevated, with flow control both ways; "links notify": a program of the person's
+ * (`lordos-guest-win.exe --open-on-host URL`, `--notify-host TITLE [BODY]`, by WM_COPYDATA to this session's running
+ * tools) hands over a link or a notification for the host, passed on only while the host's hello says it takes them
+ * (6.12) */
+/* w13 (2026-11-24): "send": files go to the host ("Send to LordOS": the Send To menu's LordOS entry runs
+ * `lordos-guest-win.exe --send-to-host FILE...`), one at a time, with flow control and a resume after a lost port
+ * (AGK_SEND_*, docs/VIRTUALIZATION.md 6.21); the host keeps them in its quarantine folder */
+#define VERSION "w13"
+#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt extra tablet perf shell links notify send"
 
-enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED };
-enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS, T_MONS, T_TABLET };
+enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED, WM_APP_SHDATA, WM_APP_SHEOF, WM_APP_SHEXIT, WM_APP_SEND };
+enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS, T_MONS, T_TABLET, T_SEND };
 
 static HWND win;
 static wchar_t port_path[260] = L"\\\\.\\Global\\org.lordos.agent";
@@ -164,6 +179,9 @@ static wchar_t *to_utf16(const uint8_t *s, size_t n) {
 static HANDLE port = INVALID_HANDLE_VALUE, reader, stop_ev, wr_ev;
 static volatile LONG reader_gen;
 static int host_hello, host_clipx, host_elev;      /* host_elev: the host's hello says "elevated" (LAGW_ELEVATED) */
+static int host_links, host_notify;                 /* the host's hello says "links", "notify": the machine takes them */
+static int host_send;                               /* the host's hello says "send": this machine takes files (w13) */
+static void sx_release(void);
 
 /* the host's answers to this side's clipboard requests (AGK_CLIPDATA): handed over by the reader thread, since the
  * window's thread waits for them inside WM_RENDERFORMAT */
@@ -238,6 +256,8 @@ static DWORD WINAPI reader_main(LPVOID arg) {
 }
 
 static void apps_stop(void);
+static void shell_end(void);
+static void perf_restore(const char *why, int say);
 static int mons_sent;               /* the displays went to the host (AGK_DISPLAYS) since the port opened */
 static int tablet_mode, tablet_sent; /* how Windows maps the tablet (AG_TABLET_*, 0 not seen yet); said to the host */
 static int apps_on, apps_dirty, apps_force;   /* apps mode (below); apps_force: the next list goes even if the same */
@@ -249,11 +269,14 @@ static void port_close(const char *why) {
     CloseHandle(port);
     port = INVALID_HANDLE_VALUE;
     InterlockedIncrement(&reader_gen);
-    host_hello = host_clipx = host_elev = 0;
+    host_hello = host_clipx = host_elev = host_links = host_notify = host_send = 0;
+    sx_release();                       /* the file on its way stays first in the queue: offered again (a resume) */
+    shell_end();                        /* the host is gone: so is its shell */
     apps_stop();
     mons_sent = 0;
     tablet_sent = 0;
     SetEvent(ans_ev);                   /* a paste waiting for the host stops waiting */
+    perf_restore(why, 0);               /* the performance profile lasts only while the host holds the port */
 }
 
 static int send_frame(uint16_t kind, const uint8_t *p, uint32_t n);
@@ -2228,9 +2251,755 @@ static void open_done(OpenJob *j) {
     free(j);
 }
 
+/* ---- the performance profile (AGK_PERF, w11; docs/VIRTUALIZATION.md 7.1.4) ----
+ * Only what this person may change without elevation, nothing named by the host (one bit: on or off):
+ *   - the power plan: High performance (PowerSetActiveScheme, powrprof; a standard user may switch plans unless a
+ *     policy says otherwise; when Windows refuses, or the plan isn't there, the part is said refused);
+ *   - visual effects: the animations, fades, shadows and window contents while dragging that "Adjust for best
+ *     performance" turns off, set for this session only (SystemParametersInfo without SPIF_UPDATEINIFILE: the person's
+ *     profile keeps its own values);
+ *   - transparency (Personalize's EnableTransparency in the person's own registry).
+ * What was there before is kept in HKCU\Software\LordOS\GuestWin PerfSaved (a fixed record, read back checked) and put
+ * back when the host says off, when the port is let go (log off, another session at the console, exit) and when these
+ * tools start and find a record (a crash): a part goes back only while it is still what this side set, so a change the
+ * person made in between stays. Windows Search's indexing isn't paused: its service needs administrator rights, which
+ * these tools never have. */
+static const GUID PERF_HIGH = { 0x8c5e7fda, 0xe8bf, 0x4a96, { 0x9a, 0x85, 0xa6, 0xe2, 0x3a, 0x8c, 0x63, 0x5c } };  /* GUID_MIN_POWER_SAVINGS */
+#define PERF_KEY L"Software\\LordOS\\GuestWin"
+#define PERF_VAL L"PerfSaved"
+#define PERF_PERSONALIZE L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"
+#define PERF_MAGIC 0x3146504cu                  /* "LPF1" */
+typedef struct {
+    uint32_t magic, size;
+    uint32_t parts;                             /* AGPF_* this side changed and puts back */
+    uint32_t done;                              /* AGPF_* at their minimum (changed or already so) */
+    GUID scheme_was;                            /* the plan before (AGPF_POWER) */
+    uint32_t fx_was;                            /* bit i: effect FX[i] was on before and this side turned it off */
+    uint32_t transp_was, transp_had;            /* EnableTransparency before, and whether there was one */
+} PerfSaved;
+static PerfSaved perf;                          /* magic 0: nothing applied */
+enum { FX_BOOL, FX_UIPARAM, FX_ANIMINFO };
+static const struct { UINT get, set; int how; const char *name; } FX[] = {
+    { SPI_GETCLIENTAREAANIMATION, SPI_SETCLIENTAREAANIMATION, FX_BOOL, "animations inside windows" },
+    { SPI_GETANIMATION, SPI_SETANIMATION, FX_ANIMINFO, "minimize and maximize animation" },
+    { SPI_GETMENUANIMATION, SPI_SETMENUANIMATION, FX_BOOL, "menu animation" },
+    { SPI_GETCOMBOBOXANIMATION, SPI_SETCOMBOBOXANIMATION, FX_BOOL, "combo box animation" },
+    { SPI_GETLISTBOXSMOOTHSCROLLING, SPI_SETLISTBOXSMOOTHSCROLLING, FX_BOOL, "smooth list scrolling" },
+    { SPI_GETTOOLTIPANIMATION, SPI_SETTOOLTIPANIMATION, FX_BOOL, "tooltip animation" },
+    { SPI_GETSELECTIONFADE, SPI_SETSELECTIONFADE, FX_BOOL, "selection fade" },
+    { SPI_GETCURSORSHADOW, SPI_SETCURSORSHADOW, FX_BOOL, "pointer shadow" },
+    { SPI_GETDROPSHADOW, SPI_SETDROPSHADOW, FX_BOOL, "window shadows" },
+    { SPI_GETDRAGFULLWINDOWS, SPI_SETDRAGFULLWINDOWS, FX_UIPARAM, "window contents while dragging" },
+};
+#define FX_N ((int)(sizeof FX / sizeof FX[0]))
+
+/* 1 on, 0 off, -1 the system didn't say */
+static int fx_get(int i) {
+    if (FX[i].how == FX_ANIMINFO) {
+        ANIMATIONINFO ai = { sizeof ai, 0 };
+        return SystemParametersInfoW(FX[i].get, sizeof ai, &ai, 0) ? ai.iMinAnimate != 0 : -1;
+    }
+    BOOL v = FALSE;
+    return SystemParametersInfoW(FX[i].get, 0, &v, 0) ? v != 0 : -1;
+}
+/* this session only: no SPIF_UPDATEINIFILE */
+static int fx_set(int i, int on) {
+    if (FX[i].how == FX_ANIMINFO) {
+        ANIMATIONINFO ai = { sizeof ai, on };
+        return SystemParametersInfoW(FX[i].set, sizeof ai, &ai, SPIF_SENDCHANGE) ? 0 : -1;
+    }
+    if (FX[i].how == FX_UIPARAM) return SystemParametersInfoW(FX[i].set, (UINT)on, NULL, SPIF_SENDCHANGE) ? 0 : -1;
+    return SystemParametersInfoW(FX[i].set, 0, (PVOID)(INT_PTR)(on ? TRUE : FALSE), SPIF_SENDCHANGE) ? 0 : -1;
+}
+
+/* EnableTransparency: 1 there (*v its value), 0 not there */
+static int transp_get(DWORD *v) {
+    DWORD n = sizeof *v;
+    return RegGetValueW(HKEY_CURRENT_USER, PERF_PERSONALIZE, L"EnableTransparency", RRF_RT_REG_DWORD, NULL, v, &n) == ERROR_SUCCESS;
+}
+static void transp_changed(void) {
+    DWORD_PTR r;
+    SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, 0, (LPARAM)L"ImmersiveColorSet", SMTO_ABORTIFHUNG, 1000, &r);
+}
+
+static void perf_save(void) {
+    if (perf.magic) RegSetKeyValueW(HKEY_CURRENT_USER, PERF_KEY, PERF_VAL, REG_BINARY, &perf, sizeof perf);
+    else RegDeleteKeyValueW(HKEY_CURRENT_USER, PERF_KEY, PERF_VAL);
+}
+
+static void perf_say(int on, unsigned done, unsigned failed) {
+    uint8_t b[AG_PERFSTATE_BYTES];
+    if (port == INVALID_HANDLE_VALUE || !host_hello || ag_perfstate_write(b, on, done, failed)) return;
+    send_frame(AGK_PERFSTATE, b, sizeof b);
+}
+
+static void perf_apply(void) {
+    if (perf.magic) { lg("performance profile: already on"); perf_say(1, perf.done, 0); return; }
+    PerfSaved s;
+    memset(&s, 0, sizeof s);
+    s.magic = PERF_MAGIC;
+    s.size = sizeof s;
+    unsigned failed = 0;
+    /* the power plan */
+    GUID *cur = NULL;
+    DWORD e = PowerGetActiveScheme(NULL, &cur);
+    if (e == ERROR_SUCCESS && cur && IsEqualGUID(cur, &PERF_HIGH)) { s.done |= AGPF_POWER; lg("performance profile: the power plan is High performance already"); }
+    else if (e == ERROR_SUCCESS && cur) {
+        s.scheme_was = *cur;
+        e = PowerSetActiveScheme(NULL, &PERF_HIGH);
+        if (e == ERROR_SUCCESS) { s.parts |= AGPF_POWER; s.done |= AGPF_POWER; lg("performance profile: power plan set to High performance"); }
+        else { failed |= AGPF_POWER; lg("performance profile: Windows refused the High performance power plan (error %lu)", (unsigned long)e); }
+    } else { failed |= AGPF_POWER; lg("performance profile: the power plan can't be read (error %lu)", (unsigned long)e); }
+    if (cur) LocalFree(cur);
+    /* the visual effects, for this session */
+    int fx_bad = 0, fx_n = 0;
+    for (int i = 0; i < FX_N; i++) {
+        int on = fx_get(i);
+        if (on < 0) { fx_bad = 1; continue; }
+        if (!on) continue;
+        if (fx_set(i, 0)) { fx_bad = 1; lg("performance profile: %s not turned off (error %lu)", FX[i].name, (unsigned long)GetLastError()); continue; }
+        s.fx_was |= 1u << i;
+        fx_n++;
+    }
+    if (s.fx_was) s.parts |= AGPF_EFFECTS;
+    if (fx_bad) failed |= AGPF_EFFECTS; else s.done |= AGPF_EFFECTS;
+    lg("performance profile: %d visual effect%s turned off for this session", fx_n, fx_n == 1 ? "" : "s");
+    /* transparency */
+    DWORD tv = 1;
+    s.transp_had = (uint32_t)transp_get(&tv);
+    s.transp_was = tv;
+    if (s.transp_had && !tv) s.done |= AGPF_TRANSPARENCY;
+    else {
+        DWORD z = 0;
+        LSTATUS r = RegSetKeyValueW(HKEY_CURRENT_USER, PERF_PERSONALIZE, L"EnableTransparency", REG_DWORD, &z, sizeof z);
+        if (r == ERROR_SUCCESS) { s.parts |= AGPF_TRANSPARENCY; s.done |= AGPF_TRANSPARENCY; transp_changed(); lg("performance profile: transparency turned off"); }
+        else { failed |= AGPF_TRANSPARENCY; lg("performance profile: transparency not turned off (error %ld)", (long)r); }
+    }
+    perf = s;
+    perf_save();
+    perf_say(1, s.done, failed);
+}
+
+/* puts back what perf_apply changed, only where it is still what this side set */
+static void perf_restore(const char *why, int say) {
+    if (!perf.magic) { if (say) perf_say(0, 0, 0); return; }
+    unsigned done = 0, failed = 0;
+    if (perf.parts & AGPF_POWER) {
+        GUID *cur = NULL;
+        DWORD e = PowerGetActiveScheme(NULL, &cur);
+        if (e == ERROR_SUCCESS && cur && IsEqualGUID(cur, &PERF_HIGH)) {
+            e = PowerSetActiveScheme(NULL, &perf.scheme_was);
+            if (e == ERROR_SUCCESS) done |= AGPF_POWER;
+            else { failed |= AGPF_POWER; lg("performance profile: the earlier power plan wasn't put back (error %lu)", (unsigned long)e); }
+        } else done |= AGPF_POWER;              /* changed since: the person's choice stays */
+        if (cur) LocalFree(cur);
+    }
+    if (perf.parts & AGPF_EFFECTS) {
+        int bad = 0;
+        for (int i = 0; i < FX_N; i++)
+            if ((perf.fx_was & (1u << i)) && fx_get(i) == 0 && fx_set(i, 1)) bad = 1;
+        if (bad) failed |= AGPF_EFFECTS; else done |= AGPF_EFFECTS;
+    }
+    if (perf.parts & AGPF_TRANSPARENCY) {
+        DWORD tv = 1;
+        if (transp_get(&tv) && !tv) {
+            LSTATUS r = perf.transp_had ? RegSetKeyValueW(HKEY_CURRENT_USER, PERF_PERSONALIZE, L"EnableTransparency", REG_DWORD, &perf.transp_was, sizeof perf.transp_was)
+                                        : RegDeleteKeyValueW(HKEY_CURRENT_USER, PERF_PERSONALIZE, L"EnableTransparency");
+            if (r == ERROR_SUCCESS || r == ERROR_FILE_NOT_FOUND) { done |= AGPF_TRANSPARENCY; transp_changed(); }
+            else failed |= AGPF_TRANSPARENCY;
+        } else done |= AGPF_TRANSPARENCY;
+    }
+    lg("performance profile: put back (%s)%s", why, failed ? ", some parts refused" : "");
+    memset(&perf, 0, sizeof perf);
+    perf_save();
+    if (say) perf_say(0, done, failed);
+}
+
+/* at start: a record left by a run that didn't end (a crash, the process killed) is put back now */
+static void perf_recover(void) {
+    PerfSaved s;
+    DWORD n = sizeof s, type = 0;
+    memset(&s, 0, sizeof s);
+    LSTATUS r = RegGetValueW(HKEY_CURRENT_USER, PERF_KEY, PERF_VAL, RRF_RT_REG_BINARY, &type, &s, &n);
+    if (r == ERROR_FILE_NOT_FOUND) return;
+    if (r != ERROR_SUCCESS || n != sizeof s || s.magic != PERF_MAGIC || s.size != sizeof s || (s.parts & ~(uint32_t)AGPF_ALL) ||
+        (s.fx_was >> FX_N) || s.transp_had > 1) {
+        lg("performance profile: an unreadable record was dropped");
+        RegDeleteKeyValueW(HKEY_CURRENT_USER, PERF_KEY, PERF_VAL);
+        return;
+    }
+    s.done &= AGPF_ALL;
+    perf = s;
+    perf_restore("left by an earlier run", 0);
+}
+
+/* ---- the agent's shell (w12; docs/VIRTUALIZATION.md 6.18) ----
+ * PowerShell (%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo, a fixed path from the system's
+ * own folder; nothing from the host names a program, an argument, a folder or a variable) in a pseudo console, as the
+ * person these tools run as, in their profile folder. Never elevated: tools that run elevated open no shell. A reader
+ * thread hands what it writes to this window, at most AG_SHELL_WINDOW unacknowledged by the host; what the host types
+ * goes into a pipe as big as that window, acknowledged once written. */
+typedef HRESULT (WINAPI *CreatePCFn)(COORD, HANDLE, HANDLE, DWORD, void **);
+typedef HRESULT (WINAPI *ResizePCFn)(void *, COORD);
+typedef void (WINAPI *ClosePCFn)(void *);
+static struct {
+    void *pc;
+    HANDLE in_w, out_r, proc, reader, wait, room;
+    uint32_t id;
+    volatile LONG unacked;              /* sent to the host and not acknowledged */
+    LONG gen;
+    DWORD code;
+    int exited;
+} sh;
+typedef struct { LONG gen; DWORD n; uint8_t d[]; } ShChunk;
+
+static int token_elevated(void) {
+    HANDLE t;
+    TOKEN_ELEVATION e = { 0 };
+    DWORD n = 0;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &t)) return 1;
+    BOOL ok = GetTokenInformation(t, TokenElevation, &e, sizeof e, &n);
+    CloseHandle(t);
+    return !ok || e.TokenIsElevated;
+}
+
+static void sh_close_frame(uint32_t id, int status) {
+    uint8_t b[8];
+    ag_shell_pair_write(b, id, (uint32_t)status);
+    send_frame(AGK_SHELL_CLOSE, b, 8);
+}
+
+static DWORD WINAPI sh_reader(LPVOID arg) {
+    LONG gen = (LONG)(intptr_t)arg;
+    HANDLE r = sh.out_r;
+    for (;;) {
+        while (sh.unacked >= AG_SHELL_WINDOW) if (WaitForSingleObject(sh.room, 1000) == WAIT_FAILED) break;
+        DWORD room = AG_SHELL_WINDOW - (DWORD)sh.unacked;
+        if (room > AG_SHELL_CHUNK) room = AG_SHELL_CHUNK;
+        ShChunk *c = malloc(sizeof *c + room);
+        DWORD got = 0;
+        if (!c || !ReadFile(r, c->d, room, &got, NULL) || !got) { free(c); break; }
+        c->gen = gen;
+        c->n = got;
+        InterlockedExchangeAdd(&sh.unacked, (LONG)got);
+        if (!PostMessageW(win, WM_APP_SHDATA, 0, (LPARAM)c)) free(c);
+    }
+    PostMessageW(win, WM_APP_SHEOF, (WPARAM)gen, 0);
+    return 0;
+}
+
+static VOID CALLBACK sh_exited(PVOID arg, BOOLEAN timed) { (void)timed; PostMessageW(win, WM_APP_SHEXIT, (WPARAM)(intptr_t)arg, 0); }
+
+static ClosePCFn pc_close(void) { HMODULE k = GetModuleHandleW(L"kernel32.dll"); return k ? (ClosePCFn)(void *)GetProcAddress(k, "ClosePseudoConsole") : NULL; }
+
+static void shell_end(void) {
+    if (!sh.id && !sh.pc) return;
+    InterlockedIncrement(&sh.gen);
+    if (sh.wait) { UnregisterWaitEx(sh.wait, INVALID_HANDLE_VALUE); sh.wait = NULL; }
+    if (sh.proc && !sh.exited) TerminateProcess(sh.proc, 1);
+    ClosePCFn cl = pc_close();
+    if (sh.pc && cl) cl(sh.pc);          /* the reader's pipe breaks: it ends */
+    sh.pc = NULL;
+    if (sh.room) SetEvent(sh.room);
+    if (sh.reader) { WaitForSingleObject(sh.reader, 3000); CloseHandle(sh.reader); sh.reader = NULL; }
+    if (sh.in_w) { CloseHandle(sh.in_w); sh.in_w = NULL; }
+    if (sh.out_r) { CloseHandle(sh.out_r); sh.out_r = NULL; }
+    if (sh.proc) { CloseHandle(sh.proc); sh.proc = NULL; }
+    sh.id = 0;
+    sh.unacked = 0;
+    sh.exited = 0;
+}
+
+static void shell_open(uint32_t id, int cols, int rows) {
+    shell_end();
+    HMODULE k = GetModuleHandleW(L"kernel32.dll");
+    CreatePCFn create = k ? (CreatePCFn)(void *)GetProcAddress(k, "CreatePseudoConsole") : NULL;
+    if (token_elevated() || !create) { lg("shell: refused (%s)", create ? "these tools run elevated" : "no pseudo console on this Windows"); sh_close_frame(id, AG_SHELL_NOSTART); return; }
+    HANDLE in_r = NULL, in_w = NULL, out_r = NULL, out_w = NULL;
+    if (!CreatePipe(&in_r, &in_w, NULL, AG_SHELL_WINDOW) || !CreatePipe(&out_r, &out_w, NULL, 0)) {
+        if (in_r) { CloseHandle(in_r); CloseHandle(in_w); }
+        sh_close_frame(id, AG_SHELL_NOSTART);
+        return;
+    }
+    COORD sz = { (SHORT)cols, (SHORT)rows };
+    void *pc = NULL;
+    if (FAILED(create(sz, in_r, out_w, 0, &pc))) { CloseHandle(in_r); CloseHandle(in_w); CloseHandle(out_r); CloseHandle(out_w); sh_close_frame(id, AG_SHELL_NOSTART); return; }
+    CloseHandle(in_r);
+    CloseHandle(out_w);
+    STARTUPINFOEXW si;
+    memset(&si, 0, sizeof si);
+    si.StartupInfo.cb = sizeof si;
+    SIZE_T asz = 0;
+    InitializeProcThreadAttributeList(NULL, 1, 0, &asz);
+    si.lpAttributeList = malloc(asz);
+    wchar_t sys[MAX_PATH], cmd[MAX_PATH + 64], home[MAX_PATH] = L"";
+    UINT sl = GetSystemDirectoryW(sys, MAX_PATH);
+    PROCESS_INFORMATION pi;
+    memset(&pi, 0, sizeof pi);
+    wchar_t *prof = NULL;
+    if (SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_Profile, 0, NULL, &prof))) { wcsncpy(home, prof, MAX_PATH - 1); home[MAX_PATH - 1] = 0; CoTaskMemFree(prof); }
+    int ok = si.lpAttributeList && sl && sl < MAX_PATH &&
+             InitializeProcThreadAttributeList(si.lpAttributeList, 1, 0, &asz) &&
+             UpdateProcThreadAttribute(si.lpAttributeList, 0, 0x00020016 /* PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE */, pc, sizeof pc, NULL, NULL);
+    if (ok) {
+        _snwprintf(cmd, sizeof cmd / sizeof *cmd, L"\"%ls\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoLogo", sys);
+        cmd[sizeof cmd / sizeof *cmd - 1] = 0;
+        ok = CreateProcessW(NULL, cmd, NULL, NULL, FALSE, EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT, NULL,
+                            home[0] ? home : NULL, &si.StartupInfo, &pi);
+    }
+    if (si.lpAttributeList) { DeleteProcThreadAttributeList(si.lpAttributeList); free(si.lpAttributeList); }
+    if (!ok) {
+        lg("shell: PowerShell didn't start (%lu)", (unsigned long)GetLastError());
+        ClosePCFn cl = pc_close();
+        if (cl) cl(pc);
+        CloseHandle(in_w); CloseHandle(out_r);
+        sh_close_frame(id, AG_SHELL_NOSTART);
+        return;
+    }
+    CloseHandle(pi.hThread);
+    sh.pc = pc; sh.in_w = in_w; sh.out_r = out_r; sh.proc = pi.hProcess; sh.id = id; sh.unacked = 0; sh.exited = 0;
+    if (!sh.room) sh.room = CreateEventW(NULL, FALSE, FALSE, NULL);
+    LONG gen = InterlockedIncrement(&sh.gen);
+    sh.reader = CreateThread(NULL, 0, sh_reader, (LPVOID)(intptr_t)gen, 0, NULL);
+    RegisterWaitForSingleObject(&sh.wait, pi.hProcess, sh_exited, (PVOID)(intptr_t)gen, INFINITE, WT_EXECUTEONLYONCE);
+    lg("shell: PowerShell for the host (%dx%d)", cols, rows);
+}
+
+static void shell_frame(const Frame *f) {
+    uint32_t id;
+    int c, r;
+    if (f->kind == AGK_SHELL_OPEN) { if (!ag_shell_size_parse(f->data, f->len, &id, &c, &r)) shell_open(id, c, r); return; }
+    if (f->kind == AGK_SHELL_SIZE) {
+        HMODULE k = GetModuleHandleW(L"kernel32.dll");
+        ResizePCFn rs = k ? (ResizePCFn)(void *)GetProcAddress(k, "ResizePseudoConsole") : NULL;
+        COORD sz;
+        if (!ag_shell_size_parse(f->data, f->len, &id, &c, &r) && id == sh.id && sh.pc && rs) { sz.X = (SHORT)c; sz.Y = (SHORT)r; rs(sh.pc, sz); }
+        return;
+    }
+    if (f->kind == AGK_SHELL_CLOSE) { int st; if (!ag_shell_close_parse(f->data, f->len, &id, &st) && id == sh.id) shell_end(); return; }
+    if (f->kind == AGK_SHELL_ACK) {
+        uint32_t by;
+        if (ag_shell_ack_parse(f->data, f->len, &id, &by) || id != sh.id) return;
+        LONG now = InterlockedExchangeAdd(&sh.unacked, -(LONG)by) - (LONG)by;
+        if (now < 0) InterlockedExchange(&sh.unacked, 0);
+        SetEvent(sh.room);
+        return;
+    }
+    const uint8_t *d;
+    uint32_t dn;
+    if (ag_shell_data_parse(f->data, f->len, &id, &d, &dn) || id != sh.id || !sh.in_w) return;
+    DWORD w = 0;
+    if (WriteFile(sh.in_w, d, dn, &w, NULL) && w) {
+        uint8_t b[8];
+        ag_shell_pair_write(b, id, w);
+        send_frame(AGK_SHELL_ACK, b, 8);
+    }
+}
+
+/* ---- links and notifications for the host (w12; 6.12) ----
+ * `lordos-guest-win.exe --open-on-host URL` or `--notify-host TITLE [BODY]`: run by a program of the person's, it hands
+ * the running tools of this session one frame by WM_COPYDATA (dwData: AGK_LINK or AGK_NOTIFY), parsed here as lord-vm
+ * will, sent on only while the host's hello said it takes that kind. The exit status is a GSA-like code: 0 sent,
+ * 1 not connected, 2 malformed, 3 the machine doesn't take them */
+static LRESULT send_copydata(const COPYDATASTRUCT *cd);
+static LRESULT copydata(const COPYDATASTRUCT *cd) {
+    if (cd && cd->dwData == AGK_SEND_OFFER) return send_copydata(cd);
+    if (!cd || (cd->dwData != AGK_LINK && cd->dwData != AGK_NOTIFY) || !cd->lpData || cd->cbData > AG_NOTE_BYTES + AG_LINK_MAX) return 2;
+    const uint8_t *p = cd->lpData;
+    int link = cd->dwData == AGK_LINK;
+    if (link ? !ag_link_ok(p, cd->cbData) : ag_note_parse(p, cd->cbData, NULL, NULL, NULL, NULL)) return 2;
+    if (port == INVALID_HANDLE_VALUE || !host_hello) return 1;
+    if (!(link ? host_links : host_notify)) return 3;
+    return send_frame((uint16_t)cd->dwData, p, cd->cbData) ? 1 : 0;
+}
+
+/* UTF-16 to UTF-8, control characters as spaces, at most max bytes, cut on a character */
+static size_t note_utf8(const wchar_t *w, char *out, size_t max) {
+    char tmp[4096];
+    int n = WideCharToMultiByte(CP_UTF8, 0, w, -1, tmp, sizeof tmp, NULL, NULL);
+    if (n <= 0) { out[0] = 0; return 0; }
+    size_t l = strlen(tmp), o = 0;
+    for (size_t i = 0; i < l && o < max; i++) out[o++] = ((unsigned char)tmp[i] < 0x20 || tmp[i] == 0x7f) ? ' ' : tmp[i];
+    while (o && ((unsigned char)out[o - 1] & 0xc0) == 0x80) o--;
+    if (o && ((unsigned char)out[o - 1] & 0xc0) == 0xc0) o--;
+    out[o] = 0;
+    return o;
+}
+
+static int send_to_tools(const wchar_t *what, const wchar_t *a, const wchar_t *b) {
+    static uint8_t payload[AG_NOTE_BYTES + AG_LINK_MAX * 3 + 1];
+    size_t n = 0;
+    ULONG_PTR kind;
+    if (!wcscmp(what, L"--open-on-host")) {
+        char raw[AG_LINK_MAX * 2];
+        int rn = WideCharToMultiByte(CP_UTF8, 0, a, -1, raw, sizeof raw, NULL, NULL);
+        long l = rn > 1 ? ag_link_encode((const uint8_t *)raw, (size_t)rn - 1, (char *)payload, sizeof payload) : -1;
+        if (l <= 0 || !ag_link_ok(payload, (size_t)l)) return 2;
+        n = (size_t)l;
+        kind = AGK_LINK;
+    } else {
+        char t[AG_NOTE_TITLE_MAX + 1], bo[AG_NOTE_BODY_MAX + 1];
+        size_t tn = note_utf8(a, t, AG_NOTE_TITLE_MAX), bn = b ? note_utf8(b, bo, AG_NOTE_BODY_MAX) : 0;
+        if (!b) bo[0] = 0;
+        n = ag_note_write((const uint8_t *)t, tn, (const uint8_t *)bo, bn, payload, sizeof payload);
+        if (!n) return 2;
+        kind = AGK_NOTIFY;
+    }
+    HWND to = FindWindowW(L"LordOSGuestWin", L"LordOS guest tools");
+    if (!to) return 1;
+    COPYDATASTRUCT cd = { kind, (DWORD)n, payload };
+    DWORD_PTR res = 1;
+    if (!SendMessageTimeoutW(to, WM_COPYDATA, 0, (LPARAM)&cd, SMTO_ABORTIFHUNG, 5000, &res)) return 1;
+    return (int)res;
+}
+
+/* ---- files sent to this computer's host: "Send to LordOS" (w13; docs/VIRTUALIZATION.md 6.21, AGK_SEND_*) ----
+ * `lordos-guest-win.exe --send-to-host FILE...` (what the Send To menu's "LordOS" entry runs) hands the running tools of
+ * this session absolute paths by WM_COPYDATA (dwData AGK_SEND_OFFER, UTF-16 paths each NUL-terminated). They wait in a
+ * queue (SQ_MAX); one at a time is offered to the host, only while its hello says "send". Each file is opened once
+ * without following a link (FILE_FLAG_OPEN_REPARSE_POINT; a directory, reparse point or device is refused), read with
+ * FILE_SHARE_READ only, and streamed in AG_SEND_CHUNK pieces never more than AG_SEND_WINDOW past the host's last
+ * AGK_SEND_ACK, with its SHA-256 (BCrypt) at the end. Its resume key is the SHA-256 of its UTF-8 full path, size and
+ * last write time: after a lost port the same file is offered again with the same key, and when the host already has
+ * part of it, this side hashes that many of its own first bytes and goes on from there only when they match. The host
+ * decides where the file lands (its quarantine folder); nothing here takes a path, a name or a command from the host.
+ * The window's thread pumps at most SX_BURST pieces (or SX_HASH bytes of a resume's hash) per posted WM_APP_SEND, so
+ * the message loop keeps turning. */
+#define SQ_MAX   64
+#ifndef AGSD_LATER
+#define AGSD_LATER 5                    /* the host stopped it for now (its Machines window went): offered again later */
+#endif
+#define SX_RETRY_MS 5000                /* AGSA_BUSY, AGSD_LATER: the same file offered again this often... */
+#define SX_GIVEUP_MS (10ull * 60 * 1000) /* ...for at most this long */
+#define SX_BURST 16
+#define SX_HASH  (8u << 20)
+enum { SX_IDLE = 0, SX_OFFERED, SX_PREFIX, SX_DATA, SX_ENDED };
+static wchar_t *sq[SQ_MAX];             /* the paths waiting; sq[0] is the one on its way */
+static int sq_n;
+static struct {
+    int phase;
+    uint32_t id;
+    HANDLE f;
+    uint64_t size, sent, acked, prefix, hashed;
+    uint8_t want[32];                   /* the host's hash of its first `prefix` bytes (a resume) */
+    BCRYPT_HASH_HANDLE hh;
+    int posted;
+} sx = { SX_IDLE, 0, INVALID_HANDLE_VALUE, 0, 0, 0, 0, 0, { 0 }, NULL, 0 };
+static uint32_t sx_ids;
+static ULONGLONG sx_wait_since;         /* the host said "not now" for the first file in the queue since then (0 never) */
+static BCRYPT_ALG_HANDLE sx_alg;
+
+static void sx_post(void) { if (!sx.posted && PostMessageW(win, WM_APP_SEND, 0, 0)) sx.posted = 1; }
+
+/* the file on its way is let go (closed, its hash dropped); it stays first in the queue (a lost port: offered again) */
+static void sx_release(void) {
+    if (sx.f != INVALID_HANDLE_VALUE) CloseHandle(sx.f);
+    if (sx.hh) BCryptDestroyHash(sx.hh);
+    sx.f = INVALID_HANDLE_VALUE;
+    sx.hh = NULL;
+    sx.phase = SX_IDLE;
+    sx.id = 0;
+}
+
+/* the first file in the queue is done with (sent, refused or unreadable): the next one */
+static void sx_pop(void) {
+    sx_release();
+    if (!sq_n) return;
+    free(sq[0]);
+    sx_wait_since = 0;
+    memmove(sq, sq + 1, (size_t)(sq_n - 1) * sizeof *sq);
+    sq[--sq_n] = NULL;
+}
+
+static int sx_hash_new(void) {
+    if (sx.hh) { BCryptDestroyHash(sx.hh); sx.hh = NULL; }
+    if (!sx_alg && BCryptOpenAlgorithmProvider(&sx_alg, BCRYPT_SHA256_ALGORITHM, NULL, 0) < 0) { sx_alg = NULL; return -1; }
+    return BCryptCreateHash(sx_alg, &sx.hh, NULL, 0, NULL, 0, 0) < 0 ? -1 : 0;
+}
+
+static int sx_read_at(uint64_t off, uint8_t *buf, DWORD want, DWORD *got) {
+    LARGE_INTEGER li;
+    li.QuadPart = (LONGLONG)off;
+    *got = 0;
+    return SetFilePointerEx(sx.f, li, NULL, FILE_BEGIN) && ReadFile(sx.f, buf, want, got, NULL) ? 0 : -1;
+}
+
+/* a file a person may send: one that could be run here is said so (AGSF_EXEC), never kept runnable on the host */
+static int sx_exec_name(const wchar_t *n) {
+    static const wchar_t *const ext[] = { L".exe", L".msi", L".bat", L".cmd", L".ps1", L".com", L".scr", L".lnk" };
+    const wchar_t *dot = wcsrchr(n, L'.');
+    if (!dot) return 0;
+    for (size_t i = 0; i < sizeof ext / sizeof *ext; i++) if (!_wcsicmp(dot, ext[i])) return 1;
+    return 0;
+}
+
+/* the next file in the queue offered to the host, when nothing is on its way and the host takes files */
+static void sx_kick(void) {
+    while (sx.phase == SX_IDLE && sq_n && port != INVALID_HANDLE_VALUE && host_hello && host_send) {
+        const wchar_t *path = sq[0];
+        HANDLE h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+        BY_HANDLE_FILE_INFORMATION fi;
+        if (h == INVALID_HANDLE_VALUE) { lg("send: a file can't be opened (%lu): skipped", (unsigned long)GetLastError()); sx_pop(); continue; }
+        if (GetFileType(h) != FILE_TYPE_DISK || !GetFileInformationByHandle(h, &fi) ||
+            (fi.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DEVICE))) {
+            CloseHandle(h);
+            lg("send: not a plain file (a folder, a link or a device): skipped");
+            sx_pop();
+            continue;
+        }
+        uint64_t size = (uint64_t)fi.nFileSizeHigh << 32 | fi.nFileSizeLow;
+        const wchar_t *base = path;
+        for (const wchar_t *p = path; *p; p++) if (*p == L'\\' || *p == L'/') base = p + 1;
+        AgSendOffer o;
+        memset(&o, 0, sizeof o);
+        int nl = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, base, -1, o.name, sizeof o.name, NULL, NULL);
+        if (size > AG_SEND_SIZE_MAX || nl <= 1 || !ag_send_name_ok((const uint8_t *)o.name, (size_t)nl - 1)) {
+            CloseHandle(h);
+            lg("send: a file whose name or size the host doesn't take: skipped");
+            sx_pop();
+            continue;
+        }
+        /* the resume key: the full path (UTF-8), the size and the last write time */
+        int pl = 0;
+        char *pu = to_utf8(path, -1, &pl);
+        BCRYPT_HASH_HANDLE kh = NULL;
+        int keyed = pu && sx_hash_new() == 0;
+        if (keyed) {
+            uint8_t tail[16];
+            for (int i = 0; i < 8; i++) tail[i] = (uint8_t)(size >> (8 * i));
+            uint64_t ft = (uint64_t)fi.ftLastWriteTime.dwHighDateTime << 32 | fi.ftLastWriteTime.dwLowDateTime;
+            for (int i = 0; i < 8; i++) tail[8 + i] = (uint8_t)(ft >> (8 * i));
+            kh = sx.hh; sx.hh = NULL;
+            keyed = BCryptHashData(kh, (PUCHAR)pu, (ULONG)pl, 0) >= 0 && BCryptHashData(kh, tail, 16, 0) >= 0 && BCryptFinishHash(kh, o.key, 32, 0) >= 0;
+            BCryptDestroyHash(kh);
+        }
+        free(pu);
+        if (!keyed) { CloseHandle(h); lg("send: no hash: skipped"); sx_pop(); continue; }
+        if (!++sx_ids) sx_ids = 1;
+        o.id = sx_ids;
+        o.size = size;
+        o.flags = sx_exec_name(base) ? AGSF_EXEC : 0;
+        uint8_t b[AG_SEND_OFFER_BYTES];
+        size_t n = ag_send_offer_write(&o, b, sizeof b);
+        if (!n) { CloseHandle(h); sx_pop(); continue; }
+        sx.f = h;
+        sx.id = o.id;
+        sx.size = size;
+        sx.sent = sx.acked = sx.prefix = sx.hashed = 0;
+        sx.phase = SX_OFFERED;
+        lg("send: offering a file of %llu bytes to the host (%d waiting)", (unsigned long long)size, sq_n - 1);
+        if (send_frame(AGK_SEND_OFFER, b, (uint32_t)n)) return;     /* the port went: offered again when it's back */
+    }
+}
+
+/* where the data starts: from == the host's offset (the first bytes matched) or 0 (it starts again) */
+static void sx_from(uint64_t from) {
+    if (from == 0) { if (sx_hash_new()) { sx_pop(); sx_kick(); return; } sx.hashed = 0; }
+    uint8_t b[12];
+    ag_send_pos_write(b, sx.id, from);
+    sx.sent = sx.acked = from;
+    sx.phase = SX_DATA;
+    if (send_frame(AGK_SEND_FROM, b, 12)) return;
+    sx_post();
+}
+
+/* WM_APP_SEND: a bounded share of the work, then the loop turns again */
+static void sx_pump(void) {
+    sx.posted = 0;
+    if (port == INVALID_HANDLE_VALUE || sx.f == INVALID_HANDLE_VALUE) return;
+    static uint8_t buf[12 + AG_SEND_CHUNK];
+    if (sx.phase == SX_PREFIX) {
+        /* a resume: this side's own first bytes hashed, a share at a time, against what the host has */
+        uint64_t end = sx.hashed + SX_HASH < sx.prefix ? sx.hashed + SX_HASH : sx.prefix;
+        while (sx.hashed < end) {
+            DWORD want = end - sx.hashed > AG_SEND_CHUNK ? AG_SEND_CHUNK : (DWORD)(end - sx.hashed), got;
+            if (sx_read_at(sx.hashed, buf, want, &got) || !got || BCryptHashData(sx.hh, buf, got, 0) < 0) {
+                lg("send: the file couldn't be read: given up");
+                uint8_t d[5]; ag_send_done_write(d, sx.id, AGSD_FAILED); send_frame(AGK_SEND_DONE, d, 5);
+                sx_pop(); sx_kick(); return;
+            }
+            sx.hashed += got;
+        }
+        if (sx.hashed < sx.prefix) { sx_post(); return; }
+        /* the hash of the prefix from a copy of the running hash: the running one goes on from there */
+        BCRYPT_HASH_HANDLE dup = NULL;
+        uint8_t mine[32];
+        int same = BCryptDuplicateHash(sx.hh, &dup, NULL, 0, 0) >= 0 && BCryptFinishHash(dup, mine, 32, 0) >= 0 && !memcmp(mine, sx.want, 32);
+        if (dup) BCryptDestroyHash(dup);
+        lg("send: the host has %llu bytes of it: %s", (unsigned long long)sx.prefix, same ? "they match, going on" : "they differ, from the start");
+        sx_from(same ? sx.prefix : 0);
+        return;
+    }
+    if (sx.phase != SX_DATA) return;
+    for (int k = 0; k < SX_BURST && sx.sent < sx.size; k++) {
+        uint64_t left = sx.size - sx.sent;
+        DWORD want = left > AG_SEND_CHUNK ? AG_SEND_CHUNK : (DWORD)left, got;
+        if (!ag_send_room(sx.sent, sx.acked, want)) return;          /* the next ACK pumps again */
+        if (sx_read_at(sx.sent, buf + 12, want, &got) || !got || BCryptHashData(sx.hh, buf + 12, got, 0) < 0) {
+            lg("send: the file couldn't be read (or got shorter): given up");
+            uint8_t d[5]; ag_send_done_write(d, sx.id, AGSD_FAILED); send_frame(AGK_SEND_DONE, d, 5);
+            sx_pop(); sx_kick(); return;
+        }
+        ag_send_data_head(buf, sx.id, sx.sent);
+        if (send_frame(AGK_SEND_DATA, buf, 12 + got)) return;
+        sx.sent += got;
+    }
+    if (sx.sent < sx.size) { sx_post(); return; }
+    uint8_t sha[32], e[36];
+    if (BCryptFinishHash(sx.hh, sha, 32, 0) < 0) { sx_pop(); sx_kick(); return; }
+    BCryptDestroyHash(sx.hh);
+    sx.hh = NULL;
+    ag_send_end_write(e, sx.id, sha);
+    sx.phase = SX_ENDED;
+    send_frame(AGK_SEND_END, e, 36);
+}
+
+/* the host can't take the file now: it stays first in the queue and is offered again (same key: it resumes) */
+static void sx_later(const char *why) {
+    ULONGLONG now = GetTickCount64();
+    if (!sx_wait_since) sx_wait_since = now;
+    if (now - sx_wait_since > SX_GIVEUP_MS) { lg("send: %s for 10 minutes: the file is skipped", why); sx_pop(); sx_kick(); return; }
+    lg("send: %s: offered again in 5 s", why);
+    sx_release();
+    SetTimer(win, T_SEND, SX_RETRY_MS, NULL);
+}
+
+static void sx_frame(const Frame *f) {
+    uint32_t id;
+    if (f->kind == AGK_SEND_ACCEPT) {
+        uint8_t st, sha[32];
+        uint64_t off;
+        if (ag_send_accept_parse(f->data, f->len, &id, &st, &off, sha) || id != sx.id || sx.phase != SX_OFFERED) return;
+        /* busy, or no Machines window to show it now: the same file again in a while, for at most SX_GIVEUP_MS */
+        if (st == AGSA_BUSY) { sx_later("the host is busy"); return; }
+        if (st != AGSA_OK) {
+            static const char *const why[] = { "", "this machine doesn't take files", "", "no room on the host", "refused" };
+            lg("send: the host said no (%s): the file is skipped", why[st]);
+            sx_pop(); sx_kick(); return;
+        }
+        if (sx_hash_new()) { sx_pop(); sx_kick(); return; }
+        sx.hashed = 0;
+        /* a resume (a host's offset past this file's size can't be one: from the start) */
+        if (off && off <= sx.size) { sx.prefix = off; memcpy(sx.want, sha, 32); sx.phase = SX_PREFIX; sx_post(); return; }
+        sx_from(0);
+    } else if (f->kind == AGK_SEND_ACK) {
+        uint64_t off;
+        if (ag_send_pos_parse(f->data, f->len, &id, &off) || id != sx.id || (sx.phase != SX_DATA && sx.phase != SX_ENDED)) return;
+        if (off < sx.acked || off > sx.sent) { lg("send: an acknowledgement outside what was sent: ignored"); return; }
+        sx.acked = off;
+        if (sx.phase == SX_DATA) sx_post();
+    } else if (f->kind == AGK_SEND_DONE) {
+        uint8_t code;
+        if (ag_send_done_parse(f->data, f->len, &id, &code)) {
+            /* AGSD_LATER (5) is newer than an older vmagent.c's AGSD_LAST: the same exact 5 bytes otherwise */
+            if (f->len != 5 || f->data[4] != AGSD_LATER) return;
+            id = (uint32_t)f->data[0] | (uint32_t)f->data[1] << 8 | (uint32_t)f->data[2] << 16 | (uint32_t)f->data[3] << 24;
+            code = AGSD_LATER;
+        }
+        if (!id || id != sx.id || sx.phase == SX_IDLE) return;
+        if (code == AGSD_LATER) { sx_later("the host stopped it for now"); return; }
+        static const char *const what[] = { "kept on the host", "cancelled", "the hashes differ", "the host couldn't write it", "no room on the host" };
+        lg("send: %s", code < sizeof what / sizeof *what ? what[code] : "ended by the host");
+        sx_pop();
+        sx_kick();
+    }
+}
+
+/* WM_COPYDATA from `--send-to-host`: 1..SQ_MAX absolute paths, UTF-16, each NUL-terminated. 0 queued, 1 not connected
+ * (or the queue is full), 2 malformed, 3 the machine doesn't take files */
+static LRESULT send_copydata(const COPYDATASTRUCT *cd) {
+    if (!cd->lpData || !cd->cbData || cd->cbData > 65536 || cd->cbData % sizeof(wchar_t)) return 2;
+    const wchar_t *w = cd->lpData;
+    size_t n = cd->cbData / sizeof(wchar_t);
+    if (w[n - 1]) return 2;
+    const wchar_t *list[SQ_MAX];
+    int k = 0;
+    for (size_t i = 0; i < n;) {
+        size_t l = wcslen(w + i);
+        /* a drive's path (X:\...) or a share's (\\server\share\...), never the device namespaces \\.\ and \\?\ */
+        int drive = l >= 3 && ((w[i] >= L'A' && w[i] <= L'Z') || (w[i] >= L'a' && w[i] <= L'z')) && w[i + 1] == L':' && w[i + 2] == L'\\';
+        int unc = l >= 5 && w[i] == L'\\' && w[i + 1] == L'\\' && w[i + 2] != L'.' && w[i + 2] != L'?' && w[i + 2] != L'\\';
+        if (!l || l >= 32768 || k == SQ_MAX || (!drive && !unc)) return 2;
+        list[k++] = w + i;
+        i += l + 1;
+    }
+    if (port == INVALID_HANDLE_VALUE || !host_hello) return 1;
+    if (!host_send) return 3;
+    if (sq_n + k > SQ_MAX) return 1;
+    for (int i = 0; i < k; i++) {
+        int dup = 0;
+        for (int j = 0; j < sq_n && !dup; j++) dup = !_wcsicmp(sq[j], list[i]);
+        if (!dup && (sq[sq_n] = _wcsdup(list[i]))) sq_n++;
+    }
+    sx_kick();
+    return 0;
+}
+
+/* the command line: each FILE made a full path; folders are refused (2), the rest go in batches */
+static int send_files_to_tools(int argc, wchar_t **argv, int first) {
+    HWND to = FindWindowW(L"LordOSGuestWin", L"LordOS guest tools");
+    if (!to) return 1;
+    static wchar_t buf[32768];
+    int skipped = 0, worst = 0;
+    size_t n = 0;
+    int count = 0;
+    for (int i = first; i <= argc; i++) {
+        wchar_t full[32768];
+        DWORD fl = i < argc ? GetFullPathNameW(argv[i], 32768, full, NULL) : 0;
+        DWORD at = fl && fl < 32768 ? GetFileAttributesW(full) : INVALID_FILE_ATTRIBUTES;
+        int ok = i < argc && at != INVALID_FILE_ATTRIBUTES && !(at & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT));
+        if (i < argc && !ok) skipped = 1;
+        /* the batch so far goes when it's full, or at the end */
+        if ((i == argc || count == SQ_MAX || (ok && n + fl + 1 > sizeof buf / sizeof *buf)) && count) {
+            COPYDATASTRUCT cd = { AGK_SEND_OFFER, (DWORD)(n * sizeof(wchar_t)), buf };
+            DWORD_PTR res = 1;
+            if (!SendMessageTimeoutW(to, WM_COPYDATA, 0, (LPARAM)&cd, SMTO_ABORTIFHUNG, 5000, &res)) res = 1;
+            if ((int)res > worst) worst = (int)res;
+            n = 0; count = 0;
+        }
+        if (ok) { memcpy(buf + n, full, (fl + 1) * sizeof(wchar_t)); n += fl + 1; count++; }
+    }
+    return worst ? worst : skipped ? 2 : 0;
+}
+
+/* the Send To menu's "LordOS" entry (%APPDATA%\Microsoft\Windows\SendTo\LordOS.lnk): made, or made again when it points
+ * elsewhere; nothing else in that folder is touched, and a link or reparse point of that name is left alone */
+static void sendto_entry(void) {
+    wchar_t exe[MAX_PATH], lnk[MAX_PATH], *dir = NULL;
+    DWORD el = GetModuleFileNameW(NULL, exe, MAX_PATH);
+    if (!el || el >= MAX_PATH || FAILED(SHGetKnownFolderPath(&FOLDERID_SendTo, 0, NULL, &dir))) return;
+    _snwprintf(lnk, MAX_PATH, L"%ls\\LordOS.lnk", dir);
+    lnk[MAX_PATH - 1] = 0;
+    CoTaskMemFree(dir);
+    DWORD at = GetFileAttributesW(lnk);
+    if (at != INVALID_FILE_ATTRIBUTES && (at & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY))) { lg("send to: LordOS.lnk isn't a plain file: left alone"); return; }
+    IShellLinkW *sl = NULL;
+    IPersistFile *pf = NULL;
+    if (FAILED(CoCreateInstance(&CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, &IID_IShellLinkW, (void **)&sl))) return;
+    if (FAILED(IShellLinkW_QueryInterface(sl, &IID_IPersistFile, (void **)&pf))) { IShellLinkW_Release(sl); return; }
+    int fine = 0;
+    if (at != INVALID_FILE_ATTRIBUTES && SUCCEEDED(IPersistFile_Load(pf, lnk, STGM_READ))) {
+        wchar_t t[MAX_PATH], a[64];
+        fine = SUCCEEDED(IShellLinkW_GetPath(sl, t, MAX_PATH, NULL, SLGP_RAWPATH)) && !_wcsicmp(t, exe) &&
+               SUCCEEDED(IShellLinkW_GetArguments(sl, a, 64)) && !wcscmp(a, L"--send-to-host");
+    }
+    if (!fine) {
+        IShellLinkW_SetPath(sl, exe);
+        IShellLinkW_SetArguments(sl, L"--send-to-host");
+        IShellLinkW_SetIconLocation(sl, exe, 0);
+        IShellLinkW_SetDescription(sl, L"Send to LordOS");
+        lg("send to: %s", SUCCEEDED(IPersistFile_Save(pf, lnk, TRUE)) ? "the LordOS entry is there" : "the LordOS entry couldn't be written");
+    }
+    IPersistFile_Release(pf);
+    IShellLinkW_Release(sl);
+}
+
 /* ---- frames from the host ---- */
 static void on_frame(const Frame *f) {
     switch (f->kind) {
+    case AGK_SHELL_OPEN: case AGK_SHELL_SIZE: case AGK_SHELL_DATA: case AGK_SHELL_CLOSE: case AGK_SHELL_ACK:
+        if (host_hello) shell_frame(f);
+        break;
     case AGK_HELLO:
         if (f->len < 200) {
             char t[201];
@@ -2239,6 +3008,10 @@ static void on_frame(const Frame *f) {
             host_hello = 1;
             host_clipx = strstr(t, " clipx") != NULL;
             host_elev = strstr(t, " elevated") != NULL;
+            unsigned hc = ag_hello_caps(f->data, f->len);
+            host_links = (hc & AG_HELLO_LINKS) != 0;
+            host_notify = (hc & AG_HELLO_NOTIFY) != 0;
+            host_send = (hc & AG_HELLO_SEND) != 0;
             if (strstr(t, " ask")) say_hello();
             lg("host: %s", ag_utf8_ok(f->data, f->len) ? t : "(hello)");
             /* the displays, for the host's log (an older lord-vm skips the kind), and how the tablet maps */
@@ -2247,7 +3020,11 @@ static void on_frame(const Frame *f) {
             mon_get();
             tablet_sent = 0;
             tablet_say();
+            sx_kick();                  /* a file waiting (or one cut off by a lost port) goes now */
         }
+        break;
+    case AGK_SEND_ACCEPT: case AGK_SEND_ACK: case AGK_SEND_DONE:
+        if (host_hello) sx_frame(f);
         break;
     case AGK_CLIP:
         if (f->len && f->len <= AG_TEXT_MAX && ag_utf8_ok(f->data, f->len)) { AgClip c; memset(&c, 0, sizeof c); c.text = f->data; c.text_n = f->len; clip_put(&c); }
@@ -2289,6 +3066,12 @@ static void on_frame(const Frame *f) {
         say_hello();                    /* "extraoff" or not: Machines offers the other button */
         break;
     }
+    case AGK_PERF: {
+        int on;
+        if (!host_hello || ag_perf_parse(f->data, f->len, &on)) break;
+        if (on) perf_apply(); else perf_restore("the host turned it off", 1);
+        break;
+    }
     case LAG_APPS: {
         int on;
         if (lag_apps_parse(f->data, f->len, &on)) break;
@@ -2322,6 +3105,42 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
     }
     case WM_APP_OPENED: open_done((OpenJob *)lp); return 0;
+    case WM_APP_SEND: sx_pump(); return 0;
+    case WM_APP_SHDATA: {
+        ShChunk *c = (ShChunk *)lp;
+        if (c->gen == sh.gen && sh.id) {
+            uint8_t *b = malloc(4 + c->n);
+            if (b) {
+                uint8_t h8[8];
+                ag_shell_pair_write(h8, sh.id, 0);
+                memcpy(b, h8, 4);                       /* the id, then the data */
+                memcpy(b + 4, c->d, c->n);
+                send_frame(AGK_SHELL_DATA, b, 4 + c->n);
+                free(b);
+            }
+        }
+        free(c);
+        return 0;
+    }
+    case WM_APP_SHEXIT:
+        if ((LONG)wp == sh.gen && sh.proc) {
+            GetExitCodeProcess(sh.proc, &sh.code);
+            sh.exited = 1;
+            ClosePCFn cl = pc_close();
+            if (sh.pc && cl) cl(sh.pc);                 /* the rest of its output, then the reader's pipe breaks */
+            sh.pc = NULL;
+        }
+        return 0;
+    case WM_APP_SHEOF:
+        if ((LONG)wp == sh.gen && sh.id) {
+            uint32_t id = sh.id;
+            int st = sh.exited ? (sh.code > 255 ? 255 : (int)sh.code) : AG_SHELL_NOSTART;
+            shell_end();
+            sh_close_frame(id, st);
+            lg("shell: ended (%d)", st);
+        }
+        return 0;
+    case WM_COPYDATA: return copydata((const COPYDATASTRUCT *)lp);
     case WM_APP_LOST:
         if ((LONG)wp == reader_gen) { char w[64]; snprintf(w, sizeof w, "reading failed (error %lu)", (unsigned long)lp); port_close(w); }
         return 0;
@@ -2354,6 +3173,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         }
         else if (wp == T_APPS && apps_on && apps_dirty) { int f = apps_force; apps_dirty = apps_force = 0; send_windows(f); }
         else if (wp == T_TABLET) { KillTimer(h, T_TABLET); tablet_check(); }
+        else if (wp == T_SEND) { KillTimer(h, T_SEND); sx_kick(); }
         return 0;
     case WM_WTSSESSION_CHANGE:
         if (wp == WTS_CONSOLE_DISCONNECT || wp == WTS_REMOTE_CONNECT || wp == WTS_SESSION_LOCK) { if (!console_session()) port_close("the session left the console"); }
@@ -2388,6 +3208,9 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmd, int show) {
         if (!wcscmp(argv[i], L"--port") && i + 1 < argc) { wcsncpy(port_path, argv[++i], 259); port_path[259] = 0; }
         else if (!wcscmp(argv[i], L"--log") && i + 1 < argc) logf = _wfopen(argv[++i], L"a");
         else if (!wcscmp(argv[i], L"--version")) { MessageBoxW(NULL, L"lordos-guest-win " VERSION, L"LordOS", MB_OK); return 0; }
+        else if ((!wcscmp(argv[i], L"--open-on-host") && i + 2 == argc) || (!wcscmp(argv[i], L"--notify-host") && i + 1 < argc && i + 3 >= argc))
+            return send_to_tools(argv[i], argv[i + 1], i + 2 < argc ? argv[i + 2] : NULL);
+        else if (!wcscmp(argv[i], L"--send-to-host")) return i + 1 < argc ? send_files_to_tools(argc, argv, i + 1) : 2;
     }
     /* the log: %LOCALAPPDATA%\LordOS\lordos-guest-win.log, the person's own, started again past 256 KB */
     if (!logf) {
@@ -2435,6 +3258,8 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmd, int show) {
     if (!RegisterRawInputDevices(&rid, 1, sizeof rid)) lg("tablet: raw input refused (%lu): the host assumes the primary display", (unsigned long)GetLastError());
     WTSRegisterSessionNotification(win, NOTIFY_FOR_THIS_SESSION);
     lg("lordos-guest-win %s in session %lu", VERSION, my_session);
+    perf_recover();                     /* a performance profile an earlier run didn't put back */
+    sendto_entry();                     /* the Send To menu's "LordOS" entry (w13) */
     SetTimer(win, T_PORT, 2000, NULL);
     SetTimer(win, T_MONS, 3000, NULL);  /* the displays once the session settles: the primary, windows brought back */
     port_try_open();

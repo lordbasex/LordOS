@@ -10,7 +10,7 @@
   "timer": "定时",
   "timerNone": "无",
   "protectedNote": {
-    "other": "{count} 个受保护的窗口：在截图中显示为黑色"
+    "other": "{count} 个受保护的窗口：在截图中会被隐藏"
   },
   "recent": "最近",
   "hintArea": "拖移以选择区域 · 空格键：窗口 · C：复制颜色 · T：复制文字 · Esc：取消",

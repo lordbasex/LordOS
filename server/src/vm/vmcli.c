@@ -30,7 +30,8 @@ static int dir_ok(const char *p, size_t n) {
     while (p[b - 1] != '/') b--;
     const char *base = p + b;
     size_t bl = n - b;
-    return bl > 7 && !memcmp(base + bl - 7, ".lordvm", 7);
+    /* a machine's folder, or a machine group's (docs/VIRTUALIZATION.md 19.9; approved by the maintainer 2026-11-23) */
+    return (bl > 7 && !memcmp(base + bl - 7, ".lordvm", 7)) || (bl > 10 && !memcmp(base + bl - 10, ".lordgroup", 10));
 }
 
 int vmcli_req_parse(const char *buf, size_t n, VmCliReq *r) {

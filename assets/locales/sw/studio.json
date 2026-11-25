@@ -88,5 +88,8 @@
   "micHint.voice": "Huondoa kelele inayokuzunguka ili sauti yako tu isikike. Sauti yako ikisikika kama ya roboti, zima uzuiaji wa kelele wa programu ya simu yenyewe.",
   "micHint.wide": "Maikrofoni yako bila uchakataji wowote: kwa muziki na kila sauti chumbani.",
   "micUnavailable": "Kupunguza Kelele huonekana baada ya kutoka na kuingia tena.",
-  "noMic": "Hakuna maikrofoni iliyounganishwa."
+  "noMic": "Hakuna maikrofoni iliyounganishwa.",
+  "effects": "Madoido",
+  "openApp": "Fungua LordOS Studio…",
+  "micApps": "Hali ya Maikrofoni hubadilisha maikrofoni ambayo programu hutumia kwa chaguomsingi. Programu iliyowekwa kwenye maikrofoni fulani huibakiza: chagua “LordOS Noise Reduction” katika programu hiyo."
 }

@@ -88,5 +88,8 @@
   "micHint.voice": "Quita el ruido a tu alrededor para que solo se escuche tu voz. Si tu voz suena robótica, desactivá la supresión de ruido de la propia app de llamadas.",
   "micHint.wide": "Tu micrófono sin ningún procesamiento: para música y todos los sonidos de la sala.",
   "micUnavailable": "La Reducción de ruido aparece después de cerrar sesión y volver a entrar.",
-  "noMic": "No hay ningún micrófono conectado."
+  "noMic": "No hay ningún micrófono conectado.",
+  "effects": "Efectos",
+  "openApp": "Abrir LordOS Studio…",
+  "micApps": "El modo de micrófono cambia el micrófono que las apps usan por defecto. Una app configurada con un micrófono en particular lo mantiene: elegí «LordOS Noise Reduction» en esa app."
 }

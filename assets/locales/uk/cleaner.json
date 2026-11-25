@@ -482,5 +482,6 @@
   },
   "select.nothing": "Нічого не вибрано",
   "activity.app": "Програму вилучено",
-  "activity.system": "Очищення системи: {name}"
+  "activity.system": "Очищення системи: {name}",
+  "map.machines": "Звільнити в Машинах"
 }

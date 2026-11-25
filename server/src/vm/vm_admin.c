@@ -42,8 +42,10 @@ int vm_missing_packages(int arches, char *out, size_t n) {
     if (arches && !have("/usr/bin/passt")) add(out, n, &k, "passt");
     /* shared folders (6.7): one virtiofsd per folder, only for machines that share one */
     if (arches && !have("/usr/libexec/virtiofsd")) add(out, n, &k, "virtiofsd");
-    /* Windows 11 machines (4.3): a TPM 2.0 served by swtpm (amd64 for now) */
-    if ((arches & 2) && !have("/usr/bin/swtpm")) add(out, n, &k, "swtpm");
+    /* virtio-win guests (4.3): a TPM 2.0 served by swtpm, on both architectures */
+    if (arches && !have("/usr/bin/swtpm")) add(out, n, &k, "swtpm");
+    /* venus (6.10): virglrenderer's render server, which lord-vm starts for a machine with Vulkan (amd64: 3D is amd64's) */
+    if ((arches & 2) && !have("/usr/libexec/virgl_render_server")) add(out, n, &k, "virgl-server");
     return k;
 }
 

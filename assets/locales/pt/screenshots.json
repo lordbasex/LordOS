@@ -10,8 +10,8 @@
   "timer": "Temporizador",
   "timerNone": "Não",
   "protectedNote": {
-    "one": "{count} janela protegida: sai preta nas capturas",
-    "other": "{count} janelas protegidas: saem pretas nas capturas"
+    "one": "{count} janela protegida: fica oculta nas capturas",
+    "other": "{count} janelas protegidas: ficam ocultas nas capturas"
   },
   "recent": "Recentes",
   "hintArea": "Arraste para escolher uma área · Espaço: janela · C: copiar a cor · T: copiar texto · Esc: cancelar",

@@ -593,9 +593,12 @@
   "ws.lock.on": "Заблокировать окна этого экрана",
   "ws.lock.off": "Разблокировать окна этого экрана",
   "ws.lock.window": "Заблокировано: снимите замок в рамке",
-  "ws.minimized.label": "Свёрнутые",
-  "ws.minimized.title": "Свёрнутые окна этого экрана: нажмите, чтобы вернуть",
   "ws.slot.free": "Свободное место: откройте приложение или верните свёрнутое",
+  "ws.windows.title": "Окна этого занятия на этом экране (черта под свёрнутыми): щёлкните, чтобы вывести окно вперёд; правый щелчок — окна этого приложения",
+  "ws.profile.ask": "Пусть выберет браузер",
+  "ws.profile.open": "Открыть профиль {profile}",
+  "ws.profile.activity": "Профиль, который открывает это занятие",
+  "ws.profile.display": "Профиль, который открывает этот экран ({display})",
   "ws.snapfly.title": "Расположить окно",
   "ws.snapfly.halves": "Половины",
   "ws.snapfly.thirds": "Трети",
@@ -979,5 +982,12 @@
   "capture.what.viaStudioPlain": "Камера через LordOS Studio",
   "capture.what.effectsOn": "эффекты включены",
   "capture.what.effectsOff": "без эффектов",
-  "shortcuts.captureWindow": "Снимок окна"
+  "shortcuts.captureWindow": "Снимок окна",
+  "themeSwitch.changing": "Меняется стиль рабочего стола…",
+  "themeSwitch.changingTo": "Переключение на {name}…",
+  "themeSwitch.failedTitle": "Не удалось применить {name}",
+  "themeSwitch.refusedBody": "Его код не совпадает с подписанной копией LordOS, поэтому он не был загружен. Стиль рабочего стола остаётся прежним.",
+  "themeSwitch.failedBody": "Он не запустился. Стиль рабочего стола остаётся прежним.",
+  "spotlight.section.machines": "Машины",
+  "guestApps.inMachine": "В {machine}"
 }

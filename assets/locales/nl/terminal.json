@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "bewaard in Vastgelegde uitvoer",
   "prefs.tr.would.highlight": "markeert “{text}”",
   "prefs.tr.param": "Parameter",
-  "prefs.tr.regexFirst": "Schrijf eerst de reguliere expressie."
+  "prefs.tr.regexFirst": "Schrijf eerst de reguliere expressie.",
+  "guest.badge": "GAST",
+  "guest.title": "Shell in {machine}"
 }

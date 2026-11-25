@@ -20,6 +20,7 @@ modelo.
 | AMD Radeon RX 580 (Polaris, Ellesmere) | `amdgpu`, Mesa `radeonsi` | Área de trabalho composta na GPU, dois monitores DisplayPort, Vulkan (RADV) | ✓ Verificada | Equipe do LordOS |
 | Intel UHD Graphics 630 (Comet Lake) | `i915` com GVT-g | Compartilhada com Máquinas como GPU virtual (GVT-g), ao lado da RX 580 que desenha a área de trabalho | ✓ Verificada | Equipe do LordOS |
 | NVIDIA GeForce RTX 3060 (GA106) | `nvidia` (o driver proprietário) | A área de trabalho funciona, composta na CPU: o LordOS ainda não compõe sobre o driver proprietário da NVIDIA | ◐ Experimental | Um relatório da comunidade ([#171](https://github.com/lordbasex/LordOS/issues/171)) |
+| NVIDIA GeForce RTX 5070 Ti 16 GB (GB203) | `nvidia` 620.73.04 (os módulos de kernel abertos da NVIDIA) | A área de trabalho funciona, fluida, sem cortes nem falhas; o relatório não diz se foi composta na GPU ou na CPU. As bibliotecas do CUDA estavam instaladas e o llama.cpp rodou nela | ◐ Experimental | Um relatório da comunidade ([#235](https://github.com/lordbasex/LordOS/issues/235)) |
 
 Mais gráficos Intel e AMD rodam o LordOS nos
 [relatórios de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md) da comunidade; esta

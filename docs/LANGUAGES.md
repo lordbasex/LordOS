@@ -35,6 +35,12 @@ Português first and then the other languages LordOS ships.
 
 Everything is managed from **Settings → Language & Region** and **Settings → Keyboard**.
 
+The Region list names each glibc region by its language and its country in the interface language, "Basque · France
+(eu_FR)" (GitHub #239; `sdk/localename.js` `regionLabel`), so the regions of one country can be told apart. The
+country names are the `countries` catalog; the language names are the `languages` catalog, written for every interface
+language by `tools/gen-language-names.mjs` from Unicode CLDR (Node.js's ICU) for each language glibc has a region for.
+Run it again with the newest Node.js when a language is added.
+
 ## Screenshots (VM, real lord-server)
 
 | | |

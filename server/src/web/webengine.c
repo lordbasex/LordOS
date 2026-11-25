@@ -28,6 +28,7 @@
 #include "web.h"
 #include "webdl.h"
 #include "webwin.h"
+#include "webback.h"
 #include "weburl.h"
 #include "weboffline.h"
 #include "lord_version.h"           /* build/gen: LordOS's version, for the user agent */
@@ -641,8 +642,7 @@ int web_engine_start(Web *w) {
     webkit_settings_set_enable_site_specific_quirks(settings, FALSE);      /* the start address is the app's own */
     /* only started with --inspect while developer mode is on (webmain.c): the remote inspector may attach to the page */
     if (w->inspect_port) webkit_settings_set_enable_developer_extras(settings, TRUE);
-    WebKitWebViewBackend *backend = webkit_web_view_backend_new(wpe_view_backend_exportable_fdo_get_view_backend(w->exportable), NULL, NULL);
-    w->view = g_object_new(WEBKIT_TYPE_WEB_VIEW, "backend", backend, "web-context", w->context, "network-session", w->session, "settings", settings, NULL);
+    w->view = webback_view_new(w->back, w->context, w->session, settings);
     g_object_unref(settings);
     g_signal_connect(w->view, "decide-policy", G_CALLBACK(on_decide), w);
     g_signal_connect(w->view, "create", G_CALLBACK(on_create), w);

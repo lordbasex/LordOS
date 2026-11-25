@@ -192,3 +192,15 @@ function pickTiles(choices, value, rec, count) {
   }
   return picks.sort((a, b) => a - b);
 }
+
+// #242: Settings → Displays' "Use this scale on the login screen" for the display shown (cur: its connector and scale),
+// from lord.display.loginScale() (login: { connector, scale } | null). on: the login screen already uses exactly this
+// display's scale; other: the login screen's choice when it is another display or another scale (said in the hint);
+// can: only an administrator may change it (lord-sessiond checks it again as root) and only for a valid scale.
+export function loginScaleState(login, cur, admin) {
+  const conn = cur && typeof cur.connector === 'string' ? cur.connector : '';
+  const scale = cur && Number.isInteger(cur.scale) ? cur.scale : 0;
+  const l = login && typeof login.connector === 'string' && /^[A-Za-z0-9-]{1,31}$/.test(login.connector) && scaleValid(login.scale) ? login : null;
+  const on = !!l && l.connector === conn && l.scale === scale;
+  return { on, other: l && !on ? { connector: l.connector, scale: l.scale } : null, can: !!admin && !!conn && scaleValid(scale) };
+}

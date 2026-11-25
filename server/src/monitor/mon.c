@@ -15,6 +15,7 @@
 #include "disktemp.h"
 #include "voltage.h"
 #include "gpustat.h"
+#include "nvgpu.h"
 #include "../meminfo.h"
 
 #include <ctype.h>
@@ -138,6 +139,12 @@ static struct {
     uint64_t sseq, pseq, cseq, dseq, tseq, vseq, gseq;
     char home[PATH_MAX];                /* lord-say's status notes (gpustat.c) */
     int watch_disks;                    /* background disk temperatures (notifications), see below */
+    int watch_procs;                    /* Sentinela: the process list every WPROCS_MS, Monitor open or not */
+    MonProcs *wprocs;                   /* its latest list (mon_procs_watched hands it over) */
+    uint64_t wpseq;
+    int watch_machines;                 /* Sentinela's machine rules: per machine network counts with each list */
+    char *wmach;                        /* their latest JSON (conn_machines; mon_machines_watched hands a copy over) */
+    uint64_t wmseq;
     int detail_pid;                     /* Get Info: 0 = none */
     unsigned long long detail_start;
     char geo_path[PATH_MAX];
@@ -174,6 +181,7 @@ static unsigned temp_ticks;             /* samples since the last temperature re
 #define TEMP_EVERY 12                   /* 3 s at 4 samples per second */
 #define AWAKE_MS 60000                  /* a spinning disk counts as awake for 60 s after its last I/O */
 #define WATCH_MS 30000                  /* background disk temperatures: every 30 s */
+#define WPROCS_MS 10000                 /* Sentinela's process list: every 10 s */
 #define VOLT_MS 1900                     /* Monitor → Voltage: about every 2 s, only while it is on screen */
 
 /* Sensors: paths found at startup. */
@@ -541,11 +549,41 @@ char mon_scope_parse(const char *cgroup, char *id, size_t n) {
         const char *leaf = line + 3;
         for (const char *q = line + 3; q < line + ll; q++) if (*q == '/') leaf = q + 1;
         size_t l = (size_t)(line + ll - leaf);
+        /* one of LordOS's components (lordos-net-<name>.scope: the Terminal's programs, Mail's connector…), the
+         * firewall's lordos:<name> (fw_component_scope); a name of a-z, 0-9 and '-' */
+        if (l > 17 && !strncmp(leaf, "lordos-net-", 11) && !strncmp(leaf + l - 6, ".scope", 6)) {
+            size_t cl = l - 17;
+            if (cl >= 32 || cl + 1 > n) return 0;
+            for (size_t i = 0; i < cl; i++) {
+                char c = leaf[11 + i];
+                if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) return 0;
+            }
+            memcpy(id, leaf + 11, cl);
+            id[cl] = 0;
+            return 'n';
+        }
         if (l <= 17 || strncmp(leaf, "app-lordos-", 11) || strncmp(leaf + l - 6, ".scope", 6)) return 0;
         const char *b = leaf + 11;
         size_t bl = l - 17;
         char k = 'd';
-        if (bl > 4 && !strncmp(b, "lpk-", 4)) { k = 'l'; b += 4; bl -= 4; }
+        /* a machine's scope (app-lordos-lordos-vm-[tor-]<id>.scope) is one only where lord-sessiond made it, in the
+         * session's root-owned subtree (beside the server leaf or in lordos-machines.slice): anyone may name a scope so
+         * under user@ (systemd-run --user --scope), and Sentinela leaves a machine's CPU and memory to its machine rules,
+         * Monitor groups it as that machine (AGENTS.md: no exemption by unit name under user@) */
+        static const char SESS[] = "/system.slice/lordos.service/lordos-session-", VM[] = "lordos-vm-";
+        if (bl > sizeof VM - 1 && !strncmp(b, VM, sizeof VM - 1) && strncmp(line + 3, SESS, sizeof SESS - 1)) return 0;
+        /* an isolated .lpk app's scope (app-lordos-lpk-<id>.scope) likewise: Monitor gives it the verified seal and its
+         * signer, so it counts only right inside the session's root-owned subtree
+         * (/system.slice/lordos.service/lordos-session-<uid>/app-lordos-lpk-<id>.scope), where only lord-sessiond makes
+         * scopes and only for lord-server's own requests (cgroup_place_serve); one of that name under user@ is just a
+         * name (security finding F10). Without lord-sessiond (development) the app has no 'l' scope */
+        if (bl > 4 && !strncmp(b, "lpk-", 4)) {
+            const char *u = line + 3 + sizeof SESS - 1;
+            if (strncmp(line + 3, SESS, sizeof SESS - 1) || u >= leaf || *u < '0' || *u > '9') return 0;
+            while (u < leaf - 1 && *u >= '0' && *u <= '9') u++;
+            if (u != leaf - 1 || *u != '/') return 0;
+            k = 'l'; b += 4; bl -= 4;
+        }
         else if (bl > 3 && !strncmp(b, "fp-", 3)) { k = 'f'; b += 3; bl -= 3; }       /* a Flatpak app (docs/FLATPAK.md) */
         if (bl + 1 > n) return 0;
         memcpy(id, b, bl);
@@ -682,6 +720,7 @@ static MonProcs *procs_scan(void) {
     if (rows && !pool.bad) r = malloc(sizeof *r + sizeof *rows * (size_t)n + pool.n);
     if (r) {
         r->t = mon_wall_ms(); r->hz = hz; r->n = n;
+        r->bytes = sizeof *r + sizeof *rows * (size_t)n + pool.n;
         r->rows = (MonProc *)(r + 1);
         r->pool = (char *)(r->rows + n);
         if (n) memcpy(r->rows, rows, sizeof *rows * (size_t)n);
@@ -738,9 +777,30 @@ static int volt_probe(void) {
     return volt_any(&v);
 }
 
+/* Sentinela's process list (mon_procs_watched) */
+static void publish_wprocs(MonProcs *pl) {
+    if (!pl) return;
+    pthread_mutex_lock(&M.mu);
+    free(M.wprocs);
+    M.wprocs = pl;
+    M.wpseq++;
+    pthread_mutex_unlock(&M.mu);
+}
+
+/* With the watched process list, when Sentinela watches machines: their network counts (conn.c conn_machines) */
+static void publish_wmach(void) {
+    pthread_mutex_lock(&M.mu);
+    int on = M.watch_machines;
+    pthread_mutex_unlock(&M.mu);
+    if (!on) return;
+    Buf c = { 0 };
+    conn_machines(&c);
+    publish(&M.wmach, &M.wmseq, &c);
+}
+
 static void *worker(void *arg) {
     (void)arg;
-    double next_watch = 0, next_volt = 0;
+    double next_watch = 0, next_volt = 0, next_wprocs = 0;
     int volt_here = 0;
     Mmdb geo;
     int geo_open = 0, geo_tried = 0;
@@ -749,18 +809,34 @@ static void *worker(void *arg) {
         pthread_mutex_lock(&M.mu);
         int slept = 0;
         while (!(M.refs > 0 && mon_now_ms() - M.last_poll < IDLE_MS)) {
+            if (!slept) {                   /* nobody looks: lord-nvgpu stops (it starts again on the next tick) */
+                pthread_mutex_unlock(&M.mu);
+                nvgpu_suspend();
+                pthread_mutex_lock(&M.mu);
+            }
             slept = 1;
-            if (!M.watch_disks) { pthread_cond_wait(&M.cv, &M.mu); continue; }
-            /* nobody looks at the Monitor, but the session wants disk temperature notices:
-             * only the disk list and its sensors, every 30 s */
-            double left = next_watch - mon_now_ms();
-            if (left <= 0) {
+            if (!M.watch_disks && !M.watch_procs) { pthread_cond_wait(&M.cv, &M.mu); continue; }
+            /* nobody looks at the Monitor, but the session wants disk temperature notices (only the disk list and its
+             * sensors, every 30 s) or Sentinela watches the processes (the list, every WPROCS_MS) */
+            double now = mon_now_ms();
+            if (M.watch_disks && next_watch - now <= 0) {
                 pthread_mutex_unlock(&M.mu);
                 watch_pass();
                 next_watch = mon_now_ms() + WATCH_MS;
                 pthread_mutex_lock(&M.mu);
                 continue;
             }
+            if (M.watch_procs && next_wprocs - now <= 0) {
+                pthread_mutex_unlock(&M.mu);
+                publish_wprocs(procs_scan());
+                publish_wmach();
+                next_wprocs = mon_now_ms() + WPROCS_MS;
+                pthread_mutex_lock(&M.mu);
+                continue;
+            }
+            double left = 1e9;
+            if (M.watch_disks && next_watch - now < left) left = next_watch - now;
+            if (M.watch_procs && next_wprocs - now < left) left = next_wprocs - now;
             struct timespec ts;
             clock_gettime(CLOCK_REALTIME, &ts);
             long long ns = ts.tv_nsec + (long long)(left * 1e6);
@@ -768,13 +844,17 @@ static void *worker(void *arg) {
             ts.tv_nsec = (long)(ns % 1000000000LL);
             pthread_cond_timedwait(&M.cv, &M.mu, &ts);
         }
-        int wp = M.want_procs, wc = M.want_conns, wg = M.want_geo, wv = M.want_volt, wgpu = M.want_gpu, dpid = M.detail_pid;
+        int wp = M.want_procs, wc = M.want_conns, wg = M.want_geo, wv = M.want_volt, wgpu = M.want_gpu, dpid = M.detail_pid, wwp = M.watch_procs;
         unsigned long long dstart = M.detail_start;
         pthread_mutex_unlock(&M.mu);
         if (slept || !tick) {                       /* (re)start: no stale rates */
             memset(&prev, 0, sizeof prev);
-            npprev = 0;
-            pprev_t = 0;
+            /* the per-process baseline: Sentinela's background scans keep it fresh (at most 10 s old), and a list of
+             * zeros would break its "every sample of 5 minutes" rule each time the Monitor opens */
+            if (!wwp) {
+                npprev = 0;
+                pprev_t = 0;
+            }
             conn_reset();
             disk_info_scan();
             sensors_scan();
@@ -798,15 +878,34 @@ static void *worker(void *arg) {
         publish(&M.sample, &M.sseq, &b);
         if (temps) publish_temps();
         if (wv && t0 >= next_volt) { publish_volt(); next_volt = t0 + VOLT_MS; }
+        int wdone = 0;
         if (wp && tick % 4 == 0) {
             MonProcs *pl = procs_scan();
             if (pl) {
+                /* Sentinela's list too, when it is due: a copy of this one */
+                if (wwp && t0 >= next_wprocs) {
+                    MonProcs *cp = malloc(pl->bytes);
+                    if (cp) {
+                        memcpy(cp, pl, pl->bytes);
+                        cp->rows = (MonProc *)(cp + 1);
+                        cp->pool = (char *)(cp->rows + cp->n);
+                        publish_wprocs(cp);
+                        publish_wmach();
+                        next_wprocs = t0 + WPROCS_MS;
+                    }
+                    wdone = 1;
+                }
                 pthread_mutex_lock(&M.mu);
                 free(M.procs);
                 M.procs = pl;
                 M.pseq++;
                 pthread_mutex_unlock(&M.mu);
             }
+        }
+        if (wwp && !wdone && !wp && t0 >= next_wprocs) {
+            publish_wprocs(procs_scan());
+            publish_wmach();
+            next_wprocs = t0 + WPROCS_MS;
         }
         if (dpid > 0 && tick % 4 == 1) {
             /* Get Info: full details only for the user's own processes (the kernel decides what
@@ -819,11 +918,20 @@ static void *worker(void *arg) {
             proc_detail_json(&d, dpid, dstart, own, (int)getpid());
             publish(&M.detail, &M.dseq, &d);
         }
+        if (wgpu) nvgpu_poll();             /* never blocks: takes the helper's answer if one came */
         if (wgpu && tick % 4 == 3) {
             /* Monitor → GPU and the Overview's GPU card: the cards and the user's processes' DRM clients, once per second */
             static const char *const ids[] = { "/usr/share/misc/pci.ids", "/usr/share/hwdata/pci.ids" };
             const char *pci = access(ids[0], R_OK) ? ids[1] : ids[0];
             Buf g = { .p = gpu_json("", pci, (unsigned)getuid(), (int)getpid(), M.home) };
+            /* NVIDIA's numbers from lord-nvgpu's latest sample (nvgpu.c), spliced in before the closing brace */
+            static char nv[128 * 1024];
+            int nl = g.p ? nvgpu_json(nv, sizeof nv) : 0;
+            size_t gl = g.p ? strlen(g.p) : 0;
+            if (nl > 0 && gl > 1 && g.p[gl - 1] == '}') {
+                char *m = realloc(g.p, gl + (size_t)nl + 2);
+                if (m) { g.p = m; g.p[gl - 1] = ','; memcpy(g.p + gl, nv, (size_t)nl); g.p[gl + (size_t)nl] = '}'; g.p[gl + (size_t)nl + 1] = 0; }
+            }
             if (g.p) publish(&M.gpu, &M.gseq, &g);
         }
         if (wc && tick % 4 == 2) {
@@ -860,8 +968,11 @@ void mon_reset(void) {
     pthread_mutex_lock(&M.mu);
     M.refs = 0;
     M.want_procs = M.want_conns = M.want_geo = M.want_volt = M.want_gpu = 0;
+    nvgpu_want(0);
     M.detail_pid = 0;
     M.watch_disks = 0;
+    M.watch_procs = 0;
+    M.watch_machines = 0;
     pthread_mutex_unlock(&M.mu);
 }
 
@@ -892,6 +1003,39 @@ void mon_watch_disks(int on) {
     if (on) start_thread_locked();
     pthread_cond_signal(&M.cv);
     pthread_mutex_unlock(&M.mu);
+}
+
+void mon_watch_procs(int on) {
+    pthread_mutex_lock(&M.mu);
+    M.watch_procs = !!on;
+    if (on) start_thread_locked();
+    else { free(M.wprocs); M.wprocs = NULL; }
+    pthread_cond_signal(&M.cv);
+    pthread_mutex_unlock(&M.mu);
+}
+
+void mon_watch_machines(int on) {
+    pthread_mutex_lock(&M.mu);
+    M.watch_machines = !!on;
+    if (!on) { free(M.wmach); M.wmach = NULL; }
+    pthread_mutex_unlock(&M.mu);
+}
+
+char *mon_machines_watched(uint64_t *seq) {
+    pthread_mutex_lock(&M.mu);
+    char *r = NULL;
+    if (M.wmach && M.wmseq != *seq) { r = strdup(M.wmach); *seq = M.wmseq; }
+    pthread_mutex_unlock(&M.mu);
+    return r;
+}
+
+/* Like the temperatures, taking it does not keep the 4 Hz sampling awake. */
+MonProcs *mon_procs_watched(uint64_t *seq) {
+    pthread_mutex_lock(&M.mu);
+    MonProcs *r = NULL;
+    if (M.wprocs && M.wpseq != *seq) { r = M.wprocs; M.wprocs = NULL; *seq = M.wpseq; }
+    pthread_mutex_unlock(&M.mu);
+    return r;
 }
 
 /* Unlike take(), reading the temperatures does not keep the 4 Hz sampling awake. */
@@ -927,6 +1071,7 @@ void mon_want_gpu(int on) {
     pthread_mutex_lock(&M.mu);
     M.want_gpu = !!on;
     pthread_mutex_unlock(&M.mu);
+    nvgpu_want(on);                     /* lord-nvgpu runs only while the GPU view is on screen */
 }
 
 static char *take(char *slot, uint64_t have, uint64_t *seq) {

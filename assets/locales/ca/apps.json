@@ -35,5 +35,6 @@
   "sysinfo": "Informació del sistema",
   "sysprobe": "Prova de l’aïllament",
   "terminal": "Terminal",
-  "databases": "Bases de dades"
+  "databases": "Bases de dades",
+  "studio": "LordOS Studio"
 }

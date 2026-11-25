@@ -339,5 +339,8 @@
   "markupHint": "İşaretleme düzenleyicisinde aç",
   "readOnly.title": "Dosyalar “{name}” öğesini değiştiremez",
   "readOnly.outside": "Dosyalar bu klasörü yalnızca görüntüleyebilir: klasör, ana klasörünüzün ve disklerinizin dışında. Değiştirmek için Terminal'i veya başka bir uygulamayı kullanın.",
-  "readOnly.denied": "Bu klasör salt okunur: izinleri onu değiştirmenize izin vermiyor. Değiştirmek için Terminal'i veya başka bir uygulamayı kullanın."
+  "readOnly.denied": "Bu klasör salt okunur: izinleri onu değiştirmenize izin vermiyor. Değiştirmek için Terminal'i veya başka bir uygulamayı kullanın.",
+  "fromMachineNoRun": "“{name}” {machine} makinesinden geldi. Dosyalar bir makineden gelen programları veya yükleyicileri açmaz: güveniyorsanız Birlikte Aç'ı kullanın.",
+  "info.from": "Kaynak",
+  "info.fromMachine": "{machine} makinesi"
 }

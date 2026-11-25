@@ -4,6 +4,10 @@
  *
  *   Debian (preseed)       preseed.cfg inside the installer's initrd (a second cpio archive after the maker's one,
  *                          which the kernel unpacks too); no seed disk
+ *   Kali (kali)            the same preseed in the initrd, with Kali's own answers: its archive (http.kali.org/kali),
+ *                          no Debian security or updates services, its tasks (Xfce and the default tools, or only the
+ *                          standard system). The catalog's command line also loads Kali's own simple-cdd preseeds
+ *                          from the disc (profiles kali,offline), as the ISO's own "Automated install" entry does
  *   Ubuntu (autoinstall)   user-data and meta-data on a FAT seed disk labelled CIDATA (cloud-init's NoCloud)
  *   Fedora (kickstart)     ks.cfg on a FAT seed disk labelled OEMDRV
  *   LordOS (lordos)        lordos-auto.conf on a FAT seed disk labelled LORDOSAUTO: the live ISO's own unattended install
@@ -47,6 +51,7 @@ typedef struct {
     char initrd[128];
     char append[512];       /* the kernel command line; {label} is the ISO's volume label */
     int desktop;            /* install the system's own desktop (default 1) */
+    int kali;               /* VMU_PRESEED for Kali's installer (the spec's kind "kali") */
     /* LordOS only (VMU_LORDOS) */
     char lang[16];          /* the interface language: a LordOS locale id ("es", "zh-Hans"); "" → "en" */
     char disk[16];          /* the system disk's name in the guest (vda, sda): set by lord-vm, never from the spec */

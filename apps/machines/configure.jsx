@@ -1,23 +1,105 @@
 // Configure (the approved mock "Configure"): a sidebar of sections with a one-line summary each, and the section's
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
-// while the machine is off; what the app keeps (system, notes) is saved at once.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings } from '@lordos/sdk';
+// while the machine is off; what the app keeps (system, notes) is saved at once. The name is the exception (6.26): while
+// the machine runs it changes alone (`lord-vm --rename`), and its folders follow it once it's off.
+import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, ConfirmDialog, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber, firewall, netModel } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn } from './model.js';
-import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems } from './ui.jsx';
-import { readMeta, writeMeta } from './meta.js';
+import { changedSections, sectionsMatching, atLoginToggle, stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
+  portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice, parseTags, TAGS_MAX, usbAutoRows, guestChannels, channelSet, kbootBlocked } from './model.js';
+import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
+import { readMeta, writeMeta, readCpuUse } from './meta.js';
+import { COLOR_HEX } from './systems.js';
 import { defaultsOf } from './store.js';
-import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
+import { SideRow, PaneHeader, Pill, Section, Sym } from './kit.jsx';
 import { BUILTIN, builtinProfile, onHost } from './profiles.js';
+import { LOCKED_ROWS, sessionCapMb } from './group.js';
+import { disposableOf, disposableAllowed, disposableCapMb, encryptionNote } from './storagemodel.js';
+import { ExportSheet } from './vmkey.jsx';
 
 const SECTIONS = ['general', 'startup', 'cpu', 'display', 'network', 'sound', 'disks', 'sharing', 'agent', 'boot', 'security'];
 // each section's glyph (assets/machines/symbols)
 const ICONS = { general: 'general', startup: 'startup', cpu: 'cpu', display: 'display', network: 'network', sound: 'sound', disks: 'disks',
-  sharing: 'sharing', agent: 'agent', boot: 'boot', security: 'security' };
+  sharing: 'sharing', agent: 'agent', boot: 'boot', security: 'security', group: 'security' };
+// a machine group's member (docs/VIRTUALIZATION.md 19.8): the Group section first; its sharing, guest tools and network
+// are the anonymity profile's, shown off and locked with a short reason
+const GROUP_SECTIONS = ['group', 'general', 'cpu', 'display', 'network', 'disks', 'sharing', 'agent', 'security'];
+const LOCKED_SECTIONS = { sharing: ['clipboard', 'transfer', 'shares'], agent: ['agent', 'identity'], network: ['ports', 'uplink'] };
+
+// a locked row: its name, "Off" with a lock, and why (machines.group.lock.<k>, machines.group.why.<k>)
+function LockedRows({ keys }) {
+  const p = usePal();
+  return <Group>{keys.map((k, i) => (
+    <Row key={k} label={tr(`machines.group.lock.${k}`)} last={i === keys.length - 1} note={tr(`machines.group.why.${k}`)}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: 0.7 }}>
+        <Text style={{ fontSize: 13, color: p.dim }}>{tr('machines.group.lockedOff')}</Text>
+        <Sym name="security" size={14} color={p.dim} />
+      </View>
+    </Row>
+  ))}</Group>;
+}
+
+// the Group section: the member switcher, the disposable session, the order, the release, the locks
+function GroupPane({ group, m, onMember }) {
+  const p = usePal();
+  const [g, setG] = useState(null);
+  const [job, setJob] = useState(0);
+  const read = () => { try { setG((lord.vm.groups() || []).find((x) => x.dir === group) || null); } catch (e) { setG(null); } };
+  useEffect(() => { read(); const t = setInterval(read, 2000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    if (!job) return undefined;
+    const t = setInterval(() => { const r = lord.vm.job(job); if (!r || r.done) { setJob(0); read(); } }, 300);
+    return () => clearInterval(t);
+  }, [job]);
+  if (!g) return null;
+  const members = g.members || [];
+  const roleName = (r) => tr(`machines.group.role.${r}`);
+  const order = (k) => [...members].sort((a, b) => a[k] - b[k]).map((x) => roleName(x.role)).join(' → ');
+  return <>
+    <Group title={tr('machines.group.cfg.members')}>
+      <Row label={tr('machines.group.cfg.member')} last note={tr('machines.group.cfg.memberNote')}>
+        <Segmented value={m.role} options={members.map((x) => [x.role, roleName(x.role)])}
+          onChange={(r) => { const x = members.find((y) => y.role === r); if (x && x.dir !== m.dir) onMember?.(x.dir); }} />
+      </Row>
+    </Group>
+    <Group title={tr('machines.group.cfg.session')}>
+      <Row label={tr('machines.group.cfg.disposable')} last note={tr('machines.group.cfg.disposableNote', { cap: gb(sessionCapMb(m.role === 'workstation' ? m : { memoryMb: 2048 })) })}>
+        <Toggle on={!!g.disposable} busy={!!job} onChange={(on) => setJob(lord.vm.groupSet(g.dir, { disposable: on }))} />
+      </Row>
+    </Group>
+    <Group title={tr('machines.group.cfg.about')}>
+      <Row label={tr('machines.group.cfg.startOrder')} value={order('start')} />
+      <Row label={tr('machines.group.cfg.stopOrder')} value={order('stop')} />
+      <Row label={tr('machines.group.cfg.release')} value={g.release || '—'} last note={tr('machines.group.cfg.releaseNote')} />
+    </Group>
+    <Text style={{ fontSize: 12, fontWeight: 700, color: p.dim, textAlign: 'start' }}>{tr('machines.group.cfg.locked')}</Text>
+    <LockedRows keys={LOCKED_ROWS} />
+  </>;
+}
 
 // a group of rows on a rounded card, with a title above it when it has one
 function Group({ children, title }) { return <Section title={title}>{children}</Section>; }
+
+// "Guest can see" (docs/VIRTUALIZATION.md 8, 16): every channel between the machine and this computer in one list, each
+// with its state now and its switch (or a button to the section that holds it); model.js guestChannels
+function GuestCanSee({ rows, running, onSet, onShow }) {
+  const p = usePal();
+  return <Group title={tr('machines.cfg.see.title')}>
+    <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', paddingHorizontal: 14, paddingTop: 10 }}>{tr('machines.cfg.see.note')}</Text>
+    {rows.map((r, i) => {
+      const state = r.live ? tr(`machines.cfg.see.live.${r.live}`) : tr(r.on ? 'machines.cfg.on' : 'machines.cfg.off');
+      const detail = r.id === 'network'
+        ? [tr('machines.cfg.see.network', { mode: r.vars.mode === 'link' ? tr('machines.cfg.see.netLink') : tr(`machines.cfg.net.${r.vars.mode}`) }), r.vars.ports ? tr('machines.cfg.see.ports', { n: r.vars.ports }) : ''].filter(Boolean).join(' ')
+        : r.id === 'display' ? tr(`machines.cfg.see.display.${r.vars.kind}`) : r.id === 'folders' && r.vars.n ? tr('machines.cfg.see.folders', r.vars) : null;
+      return <Row key={r.id} label={tr(`machines.cfg.see.row.${r.id}`)} last={i === rows.length - 1} note={detail}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text style={{ fontSize: 12, color: r.live === 'next' ? '#ffc56e' : p.dim }}>{state}</Text>
+          {r.key ? <Off off={running || !!r.locked}><Toggle on={r.on} onChange={(x) => onSet(r.id, x)} /></Off>
+            : r.section ? <Btn label={tr('machines.cfg.see.show')} onClick={() => onShow(r.section)} style={{ height: 28 }} /> : null}
+        </View>
+      </Row>;
+    })}
+  </Group>;
+}
 function Row({ label, value, children, last, note }) {
   const p = usePal();
   return (
@@ -36,7 +118,7 @@ const Off = ({ off, children }) => <View style={{ opacity: off ? 0.45 : 1, point
 
 // Configure → Network (6.5): the mode, the wired card of a bridged machine, the forwarded ports of a shared or host-only
 // one. Everything here needs the machine off; lord-vm checks it all again (machine.c, vm_ports_check).
-function NetworkPane({ m, cur, set, running, offNote, host, issues }) {
+function NetworkPane({ m, cur, set, running, offNote, host, issues, onNewMac }) {
   const p = usePal();
   const cards = host?.cards || [];
   const mode = (x) => {
@@ -63,7 +145,16 @@ function NetworkPane({ m, cur, set, running, offNote, host, issues }) {
           </View></Off>
         </Row>
       ) : null}
-      <Row label={tr('machines.cfg.mac')} value={m.mac || '—'} last />
+      {/* a new address (5.5): lord-vm makes a random one of QEMU's 52:54:00 range, while the machine is off */}
+      <Row label={tr('machines.cfg.mac')} value={m.mac || '—'} note={tr('machines.cfg.macNote') + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.macNew')} disabled={running || !!m.suspended} onClick={onNewMac} /></View></Off>
+      </Row>
+      <Row label={tr('machines.cfg.firewall')} last note={tr(m.role === 'gateway' ? 'machines.cfg.firewallGateway'
+        : cur.network === 'bridged' ? 'machines.cfg.firewallBridged' : 'machines.cfg.firewallNote')}>
+        <View style={{ alignSelf: 'flex-start' }}>
+          <Btn label={tr('machines.cfg.firewallRules')} disabled={!firewallAppOf(m)} onClick={() => openFirewallRules(firewallAppOf(m))} />
+        </View>
+      </Row>
     </Group>
     {usesPorts(cur.network) ? (
       <Group title={tr('machines.cfg.ports')}>
@@ -95,22 +186,68 @@ function NetworkPane({ m, cur, set, running, offNote, host, issues }) {
   </>;
 }
 
+// (Machines to 100 %) the machine's own row in LordOS's firewall (fw/rules.h): "lordos:vm-<id>", the Machines rules
+// deciding for it too; a group's Tor gateway is "lordos:tor-gateway". Opens Settings → Privacy on its rules.
+const firewallAppOf = (m) => (m?.role === 'gateway' ? 'lordos:tor-gateway' : netModel.vmAppOf(m?.id));
+function openFirewallRules(app) {
+  if (!app) return;
+  firewall.focus.set(() => app);
+  wm.open('settings', { args: { section: 'privacy', nonce: Date.now() } });
+}
+
 // onClose: shown as a sheet over the library or the machine's window (kit.jsx), with Cancel and Done; without it, a
 // window of its own (args.configure) as before
-export function Configure({ dir, section: section0, onClose }) {
+// what a rename's job said, kept for the Configure that opens on the machine's new folder (this one goes with the old)
+let carried = null;
+// lord-vm's problem ('name-taken') as Configure's text key
+const PROBLEMS = { 'name-taken': 'nameTaken', 'folder-taken': 'folderTaken', 'transfer-taken': 'transferTaken' };
+const problemKey = (pr) => `machines.cfg.rn.${PROBLEMS[pr] || 'badName'}`;
+
+// The vCPU recommendation (docs/VIRTUALIZATION.md, "vCPU recommendation"): what the machine's vCPUs used over its runs
+// (lord-vm's cpu-usage.json) and the count suggested from it, with the reason. "Use N" writes it now when the machine is
+// off, or for its next start while it runs or is suspended (app.json nextVcpus, applied by startPrep); never by itself.
+function VcpuAdvice({ m, host, meta, later, busy, use, keep }) {
+  const p = usePal();
+  const adv = vcpuAdvice(readCpuUse(m.dir), m.vcpus, host);
+  const next = meta.nextVcpus && meta.nextVcpus !== m.vcpus ? meta.nextVcpus : 0;
+  if (!adv && !next) return null;
+  return (
+    <View style={{ gap: 8, alignItems: 'flex-start', padding: 14, borderRadius: 12, backgroundColor: p.card, border: `1px solid ${p.line}` }}>
+      {adv ? <>
+        <Text style={{ fontSize: 13, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr(`machines.cfg.vcpu.${adv.kind}`, { n: adv.n })}</Text>
+        <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>
+          {tr('machines.cfg.vcpu.why', { avg: formatNumber(adv.avg, 1), total: adv.vcpus, hours: formatNumber(Math.round(adv.hours)), peak: formatNumber(adv.peak, 1) })}
+          {' '}{tr(`machines.cfg.vcpu.${adv.kind}Note`)}</Text>
+      </> : null}
+      {next ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Text style={{ fontSize: 12, color: p.text, textAlign: 'start' }}>{tr('machines.cfg.vcpu.pending', { n: next })}</Text>
+        <Btn label={tr('machines.cfg.vcpu.keep', { n: m.vcpus })} onClick={keep} />
+      </View> : <Btn primary label={tr('machines.cfg.vcpu.use', { n: adv.n })} disabled={busy} onClick={() => use(adv.n)} />}
+      {!next && later ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.cfg.vcpu.later')}</Text> : null}
+    </View>
+  );
+}
+
+export function Configure({ dir, group, onMember, section: section0, onClose }) {
   const p = usePal();
   const { id: winId } = useAppWindow();
   const [m, setM] = useState(null);
   const [host] = useState(() => (has() ? lord.vm.host() : null));
   // the computer's graphics cards (lord.vm.gpus): a spare Intel iGPU shared with machines (docs/MACHINES-GPU.md, Mode A)
   const [gpus, setGpus] = useState(null);
-  const [sec, setSec] = useState(SECTIONS.includes(section0) ? section0 : 'general');
+  const SECS = group ? GROUP_SECTIONS : SECTIONS;
+  const [sec, setSec] = useState(SECS.includes(section0) ? section0 : group ? 'group' : 'general');
   const [draft, setDraft] = useState({});
   const [meta, setMeta] = useState(() => readMeta(dir));
+  const [tagText, setTagText] = useState(() => (readMeta(dir).tags || []).join(', '));
+  const [newDiskGb, setNewDiskGb] = useState(32);
   const [job, setJob] = useState(0);
-  const [msg, setMsg] = useState(null);
+  const [msg, setMsg] = useState(() => { const c = carried && carried.dir === dir ? carried.msg : null; carried = null; return c; });
   const [picking, setPicking] = useState(false);
+  const [askAuto, setAskAuto] = useState(false);
   const [pickShare, setPickShare] = useState(false);
+  const [pickKernel, setPickKernel] = useState('');      // 'kernel' | 'initrd' while Start Linux directly's file picker is open
+  const [exporting, setExporting] = useState(false);
   const [disk, setDisk] = useState(null);
   const [sndDraft, setSndDraft] = useState({});
   const sndSt = useSound();                          // the outputs and inputs, as Settings → Sound lists them
@@ -135,31 +272,55 @@ export function Configure({ dir, section: section0, onClose }) {
       if (!r || !r.done) return;
       setJob(0);
       setSndDraft({});
-      if (r.ok) { setDraft({}); setMsg({ ok: true, text: tr('machines.cfg.saved') }); if (closing && onClose) onClose(); }
+      // a new name (6.26): where its folder went, or why it stayed
+      const out = renameOutcome(r.out);
+      if (r.ok) {
+        setDraft({});
+        const text = out.folder === 'moved' ? tr('machines.cfg.rn.moved', { folder: folderOf(out.dir) }) + (out.why ? ` ${tr('machines.cfg.rn.note', { why: out.why })}` : '')
+          : out.folder === 'kept' ? tr('machines.cfg.rn.kept', { why: out.why || '' })
+          : out.folder === 'later' ? tr('machines.cfg.rn.later', { folder: out.to || '' }) : tr('machines.cfg.saved');
+        setMsg({ ok: out.folder !== 'kept', text });
+        if (closing && onClose) onClose();
+        if (out.folder === 'moved' && out.dir && out.dir !== dir) { carried = { dir: out.dir, msg: { ok: true, text } }; noteMoved(dir, out.dir); return; }
+      } else if (out.problem) { setClosing(false); setMsg({ ok: false, text: tr(problemKey(out.problem), { name: out.other || out.name || '', folder: out.folder || '' }) }); }
       else { setClosing(false); setMsg({ ok: false, text: r.out.trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || r.out.trim() }); }
       load();
     }, 300);
     return () => clearInterval(timer);
   }, [job]);
+  const [find, setFind] = useState('');        // the sidebar's search (a hook: before the return below)
   if (!m) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg }}><Text style={{ color: p.dim }}>{tr('machines.win.gone')}</Text></View>;
 
   const running = stateView(m.state).active;
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
-    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, ...draft };
+    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off', cpuModel: m.cpuModel || 'host',
+    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, automation: !!m.automation, guestFiles: m.guestFiles !== false, vulkan: !!m.vulkan,
+    kernelBoot: !!m.kernelBoot, cmdline: m.kernelCmdline || '', ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'automation' ? !!m.automation : k === 'guestFiles' ? m.guestFiles !== false : k === 'cpuPin' ? m.cpuPin || 'off' : k === 'cpuModel' ? m.cpuModel || 'host' : k === 'kernelBoot' ? !!m.kernelBoot : k === 'cmdline' ? m.kernelCmdline || '' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
   const dirty = Object.keys(draft).some((k) => differs(k, draft[k]));
+  // the sidebar: a dot on each section with a change not saved yet, and its search
+  const changed = changedSections(draft, differs);
+  const secTitle = (k) => tr(k === 'group' ? 'machines.group.cfg.title' : `machines.cfg.sec.title.${k}`);
+  // the name (6.26): what the draft's name would do (lord.vm.renamePlan reads the library), and while it's off whether
+  // its folder still says another name
+  const plan = has() && typeof lord.vm.renamePlan === 'function' && cur.name !== m.name ? lord.vm.renamePlan(dir, cur.name) : null;
+  const rn = renameNote(plan, { name: cur.name, current: m.name, running });
+  const offer = !running && !dirty && has() && typeof lord.vm.renamePlan === 'function' ? folderOffer(lord.vm.renamePlan(dir, m.name), running) : null;
+  // while it runs only the name may change, alone
+  const onlyName = Object.keys(draft).every((k) => k === 'name' || !differs(k, draft[k]));
   const save = (patch) => {
     const change = patch || Object.fromEntries(Object.entries(draft).filter(([k, val]) => differs(k, val)));
     if (!Object.keys(change).length) return;
-    const id = lord.vm.set(dir, change);
+    if (!rn.ok && 'name' in change) { setMsg({ ok: false, text: tr(rn.note.key, rn.note.vars) }); return; }
+    const id = running && 'name' in change ? lord.vm.rename(dir, change.name) : lord.vm.set(dir, change);
     if (!id) setMsg({ ok: false, text: vmRefusal(tr('machines.cfg.refused')) }); else { setJob(id); setMsg({ ok: true, text: tr('machines.cfg.saving') }); }
   };
   // sound (6.9): lord.vm.sound applies it to a running machine now, or writes it with lord-vm --set (a job) when it's off
@@ -185,6 +346,9 @@ export function Configure({ dir, section: section0, onClose }) {
     cpu: tr('machines.cfg.sum.cpu', { n: m.vcpus, mem: gb(m.memoryMb) }),
     display: m.display === 'window' ? (m.resolution && m.resolution !== 'follow' ? m.resolution.replace('x', ' × ') : tr('machines.cfg.sum.display')) + (m.graphics === '3d' ? `, ${tr('machines.cfg.graphics3d')}` : '') + (m.gpu ? `, ${tr('machines.cfg.sum.gpu')}` : '') : tr('machines.cfg.sum.noDisplay'),
     network: (() => {
+      // a group's member (19.5): the workstation's private link, the gateway's Tor-only way out
+      if (m.role === 'workstation' && m.groupDir) return tr('machines.whonix.d.link');
+      if (m.role === 'gateway' && m.groupDir) return tr('machines.whonix.d.internetSub');
       const ns = netSummary(m);
       return [tr(`machines.cfg.net.${ns.mode}`), ns.card || null, ns.ports ? tr('machines.cfg.sum.ports', { n: ns.ports }) : null].filter(Boolean).join(', ');
     })(),
@@ -205,10 +369,18 @@ export function Configure({ dir, section: section0, onClose }) {
   const offNote = running ? tr('machines.cfg.needsOff') : null;
 
   let pane = null;
-  if (sec === 'general') pane = <>
+  // the anonymity profile (19.5): these sections are locked, shown as such
+  const locked = m.profileLock === 'anonymity';
+  // this computer's USB devices, for the names of the auto-connect rules (6.6)
+  const usbDevs = sec === 'sound' && typeof lord.vm?.usbDevices === 'function' ? lord.vm.usbDevices() : [];
+  summary.group = tr('machines.group.cfg.summary', { role: tr(`machines.group.role.${m.role || 'workstation'}`) });
+  if (locked && LOCKED_SECTIONS[sec]) pane = <LockedRows keys={LOCKED_SECTIONS[sec]} />;
+  else if (sec === 'group') pane = <GroupPane group={group} m={m} onMember={onMember} />;
+  else if (sec === 'general') pane = <>
     <Group>
-      <Row label={tr('machines.new.name')} note={offNote}>
-        <Off off={running}><TextInput value={cur.name} onChange={(x) => set({ name: x })} /></Off>
+      <Row label={tr('machines.new.name')}>
+        <TextInput value={cur.name} onChange={(x) => set({ name: x })} />
+        {rn.note ? <Text style={{ fontSize: 12, color: rn.note.tone === 'bad' ? '#ff453a' : p.dim, textAlign: 'start', lineHeight: 1.4 }}>{tr(rn.note.key, rn.note.vars)}</Text> : null}
       </Row>
       <Row label={tr('machines.cfg.system')}>
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
@@ -216,6 +388,25 @@ export function Configure({ dir, section: section0, onClose }) {
           <View style={{ flex: 1 }}><TextInput value={meta.osName || ''} placeholder={tr('machines.cfg.systemPlaceholder')}
             onChange={(x) => { writeMeta(dir, { osName: x }); setMeta(readMeta(dir)); }} /></View>
         </View>
+      </Row>
+      {/* the card's icon: the system's mark, or a color of its own with the name's first letter (app.json color) */}
+      <Row label={tr('machines.cfg.icon')} note={tr('machines.cfg.iconNote')}>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <View title={tr('machines.cfg.iconSystem')} onClick={() => { writeMeta(dir, { color: undefined }); setMeta(readMeta(dir)); }}
+            style={{ borderRadius: 9, padding: 2, border: `2px solid ${!meta.color ? p.accent : 'transparent'}` }}>
+            <OsMark id={meta.os || systemOf(meta.osName, m.name).id} size={28} />
+          </View>
+          {Object.keys(COLOR_HEX).map((c) => (
+            <View key={c} title={tr(`machines.set.color.${c}`)} onClick={() => { writeMeta(dir, { color: c }); setMeta(readMeta(dir)); }}
+              style={{ borderRadius: 9, padding: 2, border: `2px solid ${meta.color === c ? p.accent : 'transparent'}` }}>
+              <OsMark id="other" color={c} letter={m.name} size={28} />
+            </View>
+          ))}
+        </View>
+      </Row>
+      <Row label={tr('machines.cfg.tags')} note={tr('machines.cfg.tagsNote', { n: TAGS_MAX })}>
+        <TextInput value={tagText} placeholder={tr('machines.cfg.tagsPlaceholder')}
+          onChange={(x) => { setTagText(x); writeMeta(dir, { tags: parseTags(x) }); setMeta(readMeta(dir)); }} />
       </Row>
       <Row label={tr('machines.cfg.profile')} note={tr('machines.cfg.profileNote') + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><MenuBtn label={prof ? tr(`machines.as.profile.${prof}`) : tr('machines.cfg.profileCustom')}
@@ -228,9 +419,10 @@ export function Configure({ dir, section: section0, onClose }) {
       {m.imported ? <Row label={tr('machines.cfg.importedFrom')} note={tr('machines.cfg.importedNote')}>
         <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{meta.importedFrom || '—'}</Text>
       </Row> : null}
-      <Row label={tr('machines.cfg.folder')} last>
+      <Row label={tr('machines.cfg.folder')} last note={offer ? tr('machines.cfg.rn.offer', { folder: offer.folder }) : null}>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
           <Text style={{ flex: 1, fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{dir}</Text>
+          {offer ? <Btn label={tr('machines.cfg.rn.renameFolder')} disabled={!!job} onClick={() => save({ name: m.name })} /> : null}
           <Btn label={tr('machines.cmd.showInFiles')} onClick={() => revealPath(dir)} />
         </View>
       </Row>
@@ -245,9 +437,20 @@ export function Configure({ dir, section: section0, onClose }) {
         <Segmented small value={closeChoice(meta)} onChange={(x) => { writeMeta(dir, { onClose: x }); setMeta(readMeta(dir)); }}
           options={CLOSE_CHOICES.map((k) => [k, tr(`machines.cfg.close.${k}`)])} />
       </Row>
-      <Row label={tr('machines.cfg.keepAwake')} last note={tr('machines.cfg.keepAwakeNote')}>
+      <Row label={tr('machines.cfg.keepAwake')} note={tr('machines.cfg.keepAwakeNote')}>
         <Toggle on={meta.keepAwake !== false} onChange={(x) => { writeMeta(dir, { keepAwake: x }); setMeta(readMeta(dir)); }} />
       </Row>
+      {/* 6.14: in settings.json (apps can't write it), by the machine's id; a group's members start with their group */}
+      {m.groupDir ? null : <Row label={tr('machines.cfg.atLogin')} note={tr('machines.cfg.atLoginNote')}>
+        <Toggle on={(settings.get().machinesAtLogin || []).includes(m.id)} onChange={(x) => { settings.set({ machinesAtLogin: atLoginToggle(settings.get().machinesAtLogin, m.id, x) }); setMeta(readMeta(dir)); }} />
+      </Row>}
+      <Row label={tr('machines.cfg.autoPause')} last={!meta.guestApps?.length} note={tr('machines.cfg.autoPauseNote')}>
+        <Toggle on={meta.autoPause === true} onChange={(x) => { writeMeta(dir, { autoPause: x }); setMeta(readMeta(dir)); }} />
+      </Row>
+      {/* the guest's apps in the launcher while the machine is off (6.12, guestlaunch.js): once apps mode listed them */}
+      {meta.guestApps?.length ? <Row label={tr('machines.cfg.launcherApps')} last note={tr('machines.cfg.launcherAppsNote', { count: meta.guestApps.length })}>
+        <Toggle on={meta.launcherApps !== false} onChange={(x) => { writeMeta(dir, { launcherApps: x }); setMeta(readMeta(dir)); }} />
+      </Row> : null}
     </Group>
     {m.suspended ? <Group><Row label={tr('machines.cfg.saved')} value={bytes(m.stateBytes || 0)} last note={tr('machines.cfg.savedNote')} /></Group> : null}
   </>;
@@ -274,6 +477,22 @@ export function Configure({ dir, section: section0, onClose }) {
           </View></Off>
         </Row>
       </Group>
+      {/* vCPU pinning (machine.json cpu_pin, docs/VIRTUALIZATION.md 3.7.1): lord-vm gives each vCPU a core of its own,
+          away from the desktop's; a machine without a choice shows what this computer gives it */}
+      <Group>
+        <Row label={tr('machines.cfg.pin')} note={[tr('machines.cfg.pinNote'), offNote].filter(Boolean).join(' ')}>
+          <Off off={running}><Segmented small value={cur.cpuPin} onChange={(x) => set({ cpuPin: x })}
+            options={[['off', tr('machines.cfg.off')], ['auto', tr('machines.cfg.pinAuto')]]} /></Off>
+        </Row>
+        {/* the processor the guest sees (machine.json cpu_model, schema 16): this computer's, or a fixed x86-64-v2 one that is
+            the same on every amd64 computer (KVM machines on amd64 only) */}
+        {m.arch === 'amd64' && !emulated ? <Row label={tr('machines.cfg.cpuModel')} note={[tr(`machines.cfg.cpuModelNote.${cur.cpuModel}`), offNote].filter(Boolean).join(' ')}>
+          <Off off={running}><Segmented small value={cur.cpuModel} onChange={(x) => set({ cpuModel: x })}
+            options={[['host', tr('machines.cfg.cpuHost')], ['compatible', tr('machines.cfg.cpuCompat')]]} /></Off>
+        </Row> : null}
+        {/* huge pages are lord-vm's own choice, never a switch (3.7.2): said here */}
+        <Row label={tr('machines.cfg.hugePages')} value={tr('machines.cfg.hugePagesAuto')} last note={tr('machines.cfg.hugePagesNote')} />
+      </Group>
       <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>
         {tr('machines.cfg.cpuNote', { limit: gb(memLimit({ ...m, ...cur })), max: gb(memMax0) })}{offNote ? ` ${offNote}` : ''}</Text>
       {memlock ? <View style={{ gap: 8, alignItems: 'flex-start' }}>
@@ -282,6 +501,9 @@ export function Configure({ dir, section: section0, onClose }) {
         <Btn label={tr('machines.cfg.memlockChange')} onClick={() => wm.open('settings', { args: { section: 'gpus', nonce: Date.now() } })} />
       </View> : null}
       {cur.vcpus > (host?.vcpusRecommended || 99) ? <Text style={{ fontSize: 12, color: '#ff9f0a', textAlign: 'start' }}>{tr('machines.new.warn.vcpus', { n: host.vcpusRecommended })}</Text> : null}
+      <VcpuAdvice m={m} host={host} meta={meta} later={running || !!m.suspended} busy={!!job}
+        use={(n) => { if (running || m.suspended) { writeMeta(dir, { nextVcpus: n }); setMeta(readMeta(dir)); } else { setDraft((d) => { const { vcpus, ...rest } = d; return rest; }); save({ vcpus: n }); } }}
+        keep={() => { writeMeta(dir, { nextVcpus: undefined }); setMeta(readMeta(dir)); }} />
     </>;
   } else if (sec === 'display') {
     // 3D (6.10): Linux machines on a computer that can give it; a machine that has it can always go back to 2D
@@ -323,9 +545,14 @@ export function Configure({ dir, section: section0, onClose }) {
             ...resolutions(screen.width, screen.height, null).map(([w, h]) => ({ label: `${w} × ${h}`, checked: cur.resolution === `${w}x${h}`, onClick: () => set({ resolution: `${w}x${h}` }) }))]} /></Off>
       </Row>
       <Row label={tr('machines.cfg.graphics')} last={!m.windowsDevices && !gpuRow} note={note}>
-        <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set(x === '3d' ? { graphics: x, gpu: '' } : { graphics: x })}
+        <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set(x === '3d' ? { graphics: x, gpu: '' } : { graphics: x, vulkan: false })}
           options={[['2d', tr('machines.cfg.graphics2d')], ['3d', tr('machines.cfg.graphics3d'), !!why3d && cur.graphics !== '3d']]} /></Off>
       </Row>
+      {/* Vulkan through venus (6.10, machine.json "vulkan"): with 3D only; lord-vm gives it when this computer can and says
+          why not in the machine's log */}
+      {cur.graphics === '3d' ? <Row label={tr('machines.cfg.vulkan')} note={[tr('machines.cfg.vulkanNote'), offNote].filter(Boolean).join(' ')}>
+        <Off off={running}><Toggle on={!!cur.vulkan} onChange={(x) => set({ vulkan: x })} /></Off>
+      </Row> : null}
       {/* who draws a Windows guest's pointer (7.1.2): LordOS, from the shape the guest hands over (no round trip through
           the guest for each move), or its display driver, into the picture; applied by the guest tools at the next start.
           Not with an Intel graphics card: HWCursor is the virtio driver's, and Intel's puts the pointer on the vGPU's cursor
@@ -344,7 +571,7 @@ export function Configure({ dir, section: section0, onClose }) {
     </Group>
   </>;
   }
-  else if (sec === 'network') pane = <NetworkPane m={m} cur={cur} set={set} running={running} offNote={offNote} host={host} issues={portIssues} />;
+  else if (sec === 'network') pane = <NetworkPane m={m} cur={cur} set={set} running={running} offNote={offNote} host={host} issues={portIssues} onNewMac={() => { if (!job) save({ newMac: true }); }} />;
   else if (sec === 'sound') {
     // host-side choices (6.9): saved at once, and a running machine's window applies them at once too
     const snd = { ...soundOf(m), ...soundDevs(m), ...sndDraft };
@@ -379,6 +606,19 @@ export function Configure({ dir, section: section0, onClose }) {
         <Row label={tr('machines.cfg.keyboard')} value={tr('machines.cfg.keyboardValue')} />
         <Row label={tr('machines.cfg.pointer')} value={tr('machines.cfg.pointerValue')} last note={tr('machines.cfg.pointerNote')} />
       </Group>
+      {/* host USB devices (6.6): the machine's USB controller (a device of the guest: with it off) and the devices that
+          connect by themselves; never for a machine locked for anonymity */}
+      {locked ? null : <Group>
+        <Row label={tr('machines.usb.controller')} note={tr('machines.usb.controllerNote') + (offNote ? ` ${offNote}` : '')} last={!(m.usbAuto || []).length}>
+          <Off off={running}><Toggle on={!!m.usb} onChange={(x) => { if (!running && !job) save({ usb: x }); }} /></Off>
+        </Row>
+        {usbAutoRows(m.usbAuto, usbDevs).map((r, i, all) => (
+          <Row key={r.rule} label={tr('machines.usb.autoRow', { name: r.name })} last={i === all.length - 1} note={i === all.length - 1 ? tr('machines.usb.autoNote') + (offNote ? ` ${offNote}` : '') : null}>
+            <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.usb.autoRemove')} disabled={running || !!job}
+              onClick={() => save({ usbAuto: (m.usbAuto || []).filter((x) => x !== r.rule) })} /></View></Off>
+          </Row>
+        ))}
+      </Group>}
     </>;
   }
   else if (sec === 'disks') pane = <>
@@ -387,13 +627,41 @@ export function Configure({ dir, section: section0, onClose }) {
         <Off off={running}><Stepper value={cur.diskGb} min={m.diskGb} max={2048} width={72} format={(x) => `${x} GB`} onChange={(x) => set({ diskGb: x })} /></Off>
       </Row>
     </Group>
-    {m.dataDisks ? <Group><Row label={tr('machines.cfg.dataDisks')} value={String(m.dataDisks)} last /></Group> : null}
+    {/* data disks: one more, empty (lord-vm --add-disk), while the machine is off and has no snapshot to go back to */}
+    <Group><Row label={tr('machines.cfg.dataDisks')} value={String(m.dataDisks || 0)} last note={tr('machines.cfg.addDiskNote', { n: 4 }) + (offNote ? ` ${offNote}` : '')}>
+      <Off off={running}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Stepper value={newDiskGb} min={1} max={2048} width={72} format={(x) => `${x} GB`} onChange={setNewDiskGb} />
+        <Btn label={tr('machines.cfg.addDisk')} disabled={running || !!m.suspended || !!job || (m.dataDisks || 0) >= 4 || !!m.base} onClick={() => save({ addDiskGb: newDiskGb })} />
+      </View></Off>
+    </Row></Group>
     {m.imported || m.devices === 'compat' ? <Group>
       {/* an imported machine starts on devices every system has drivers for; the fast ones need the guest's drivers first */}
-      <Row label={tr('machines.cfg.devices')} value={m.devices === 'compat' ? tr('machines.cfg.devCompat', { nic: m.nicModel }) : tr('machines.cfg.devFast')} last
+      <Row label={tr('machines.cfg.devices')} value={m.devices === 'compat' ? tr(m.arch === 'arm64' ? 'machines.cfg.devCompatArm' : 'machines.cfg.devCompat', { nic: m.nicModel }) : tr('machines.cfg.devFast')} last
         note={(m.devices === 'compat' ? tr('machines.cfg.devCompatNote') : tr('machines.cfg.devFastNote')) + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={m.devices === 'compat' ? tr('machines.cfg.devToFast') : tr('machines.cfg.devToCompat')} disabled={running || !!job}
           onClick={() => save(m.devices === 'compat' ? { devices: 'virtio', nicModel: 'virtio' } : { devices: 'compat', nicModel: 'e1000e' })} /></View></Off>
+      </Row>
+    </Group> : null}
+    {/* storage (docs/VIRTUALIZATION.md 6.2, 6.4, 3.6): the disks' format, a disposable session, Backups, Export */}
+    <Group>
+      <Row label={tr('machines.cfg.st.format')} value={m.diskFormat === 'raw' ? tr('machines.cfg.st.raw') : tr('machines.cfg.st.qcow2')}
+        note={tr(m.diskFormat === 'raw' ? 'machines.cfg.st.rawNote' : 'machines.cfg.st.qcow2Note')} />
+      {disposableAllowed(m) ? (
+        <Row label={tr('machines.cfg.st.disposable')} note={tr(`machines.cfg.st.disposableNote.${disposableOf(m)}`, { mem: gb(disposableCapMb(m)) }) + (offNote ? ` ${offNote}` : '')}>
+          <Off off={running}><Segmented options={[['off', tr('machines.cfg.st.dispOff')], ['memory', tr('machines.cfg.st.dispMemory')], ['disk', tr('machines.cfg.st.dispDisk')]]}
+            value={disposableOf(m)} onChange={(x) => { if (!running && !job && x !== disposableOf(m)) save({ disposable: x }); }} /></Off>
+        </Row>
+      ) : null}
+      <Row label={tr('machines.cfg.st.backup')} note={tr(m.backup === false ? 'machines.cfg.st.backupOffNote' : 'machines.cfg.st.backupNote')}>
+        <Off off={running}><Toggle on={m.backup !== false} onChange={(x) => { if (!job && !running) save({ backup: x }); }} /></Off>
+      </Row>
+      <Row label={tr('machines.cfg.st.export')} note={tr('machines.cfg.st.exportNote')} last>
+        <View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.st.exportBtn')} disabled={running || !!job || !!m.group} onClick={() => setExporting(true)} /></View>
+      </Row>
+    </Group>
+    {m.firmwareChanged ? <Group>
+      <Row label={tr('machines.cfg.st.firmware')} note={tr('machines.cfg.st.firmwareNote')} last>
+        <View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.st.firmwareUse')} disabled={running || !!job} onClick={() => save({ firmwareUpdate: true })} /></View>
       </Row>
     </Group> : null}
     <Group>
@@ -431,6 +699,21 @@ export function Configure({ dir, section: section0, onClose }) {
         </Row>
       ) : null}
     </Group>
+    {/* links and notifications from the guest (6.12, machine.json guest_links, guest_notify): off unless turned on here;
+        a link opens only when the person clicks Open in the bar, a notification shows as from the machine */}
+    <Group>
+      <Row label={tr('machines.cfg.guestLinks')} note={tr('machines.cfg.guestLinksNote') + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><Toggle on={cur.guestLinks} onChange={(x) => set({ guestLinks: x, ...(x ? { agent: true } : {}) })} /></Off>
+      </Row>
+      <Row label={tr('machines.cfg.guestNotify')} note={tr('machines.cfg.guestNotifyNote') + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><Toggle on={cur.guestNotify} onChange={(x) => set({ guestNotify: x, ...(x ? { agent: true } : {}) })} /></Off>
+      </Row>
+      {/* files the machine sends (6.21, machine.json guest_files): on unless turned off here; they land in its quarantine
+          folder (<library>/Received/<machine>), marked as from it, never runnable */}
+      <Row label={tr('machines.cfg.guestFiles')} note={tr('machines.cfg.guestFilesNote') + (offNote ? ` ${offNote}` : '')} last>
+        <Off off={running}><Toggle on={cur.guestFiles} onChange={(x) => set({ guestFiles: x })} /></Off>
+      </Row>
+    </Group>
     <Group>
       <Row label={tr('machines.cfg.shares')} note={tr('machines.cfg.sharesNote') + (offNote ? ` ${offNote}` : '')} last={!cur.shares.length}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.shareAdd')} disabled={running || !!job || cur.shares.length >= 4} onClick={() => setPickShare(true)} /></View></Off>
@@ -450,6 +733,9 @@ export function Configure({ dir, section: section0, onClose }) {
         </Row>
       ))}
     </Group>
+    {/* printers (5.5): the guest prints to the network's printers with its own driver-free IPP; this computer's printing
+        service is never opened to a guest (no machine network reaches this computer's services) */}
+    <Group><Row label={tr('machines.cfg.printers')} value={tr('machines.cfg.printersValue')} last note={tr('machines.cfg.printersNote')} /></Group>
   </>;
   else if (sec === 'agent') pane = <>
     <Group>
@@ -457,6 +743,20 @@ export function Configure({ dir, section: section0, onClose }) {
         <Off off={running}><Toggle on={!!cur.agent} onChange={(x) => set({ agent: x, ...(!x ? { clipboard: 'off' } : {}) })} /></Off>
       </Row>
       <Row label={tr('machines.cfg.agentInstall')} note={tr('machines.cfg.agentInstallNote')} />
+      {/* the guest's performance profile (7.1.4, machine.json perf_profile): applied by the LordOS tools for Windows (w11;
+          Windows Search through lord-vm's fixed script) or the Linux clipboard helper (7) while the machine runs, put
+          back after; off by default */}
+      <Row label={tr('machines.cfg.perfProfile')} note={[tr(m.windowsDevices ? 'machines.win.perfProfileNote' : 'machines.cfg.perfProfileNote'), offNote].filter(Boolean).join(' ')}>
+        <Off off={running}><Toggle on={cur.perfProfile} onChange={(x) => set({ perfProfile: x })} /></Off>
+      </Row>
+      {/* automation (6.15, machine.json automation): `machines exec`, `machines cp` and the MCP server may run programs in
+          the guest as its signed-in person, through qemu-guest-agent; off by default, asked before it goes on, never for
+          the anonymity profile (that section is locked) */}
+      <Row label={tr('machines.cfg.automation')} note={[tr('machines.cfg.automationNote'), offNote].filter(Boolean).join(' ')}>
+        <Off off={running || !cur.agent}><Toggle on={!!cur.automation} onChange={(x) => (x ? setAskAuto(true) : set({ automation: false }))} /></Off>
+      </Row>
+      {askAuto ? <ConfirmDialog title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
+        cancelLabel={tr('machines.cancel')} onOk={() => { setAskAuto(false); set({ automation: true }); }} onCancel={() => setAskAuto(false)} /> : null}
       {/* the LordOS tools brought up to date by themselves (model.js toolsAutoStep): app.json, at once, also while it runs */}
       <Row label={tr('machines.cfg.toolsAuto')} last note={tr('machines.cfg.toolsAutoNote')}>
         <Toggle on={toolsAutoOn(meta, defaultsOf(settings.get().machinesDefaults))} onChange={(x) => { writeMeta(dir, { toolsAuto: x }); setMeta(readMeta(dir)); }} />
@@ -494,23 +794,64 @@ export function Configure({ dir, section: section0, onClose }) {
         <Off off={running}><Toggle on={cur.bootMenu} onChange={(x) => set({ bootMenu: x })} /></Off>
       </Row>
     </Group>
+    {/* Start Linux directly (6.1, machine.json kernel_boot, schema 23): the kernel, initrd and command line kept in the
+        machine's disks/boot (lord-vm copies the chosen files in) instead of the boot loader on its disk; refused with
+        Secure Boot, the virtio-win devices, encryption and for a group's member (model.js kbootBlocked) */}
+    {(() => {
+      const why = kbootBlocked(m);
+      const ready = !!m.kernelFile && !!String(cur.cmdline || '').trim();
+      return <Group title={tr('machines.cfg.kboot.title')}>
+        <Row label={tr('machines.cfg.kboot.on')} note={[tr(why ? `machines.cfg.kboot.no.${why}` : 'machines.cfg.kboot.note'), offNote].filter(Boolean).join(' ')}>
+          <Off off={running || !!why || (!ready && !cur.kernelBoot)}><Toggle on={cur.kernelBoot} onChange={(x) => set({ kernelBoot: x })} /></Off>
+        </Row>
+        {why ? null : <>
+          <Row label={tr('machines.cfg.kboot.kernel')} value={tr(m.kernelFile ? 'machines.cfg.kboot.kept' : 'machines.cfg.kboot.none')}>
+            <View style={{ flexDirection: 'row' }}><Btn label={tr('machines.cfg.kboot.choose')} disabled={!!job} onClick={() => setPickKernel('kernel')} style={{ height: 28 }} /></View>
+          </Row>
+          <Row label={tr('machines.cfg.kboot.initrd')} value={tr(m.initrdFile ? 'machines.cfg.kboot.kept' : 'machines.cfg.kboot.none')}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Btn label={tr('machines.cfg.kboot.choose')} disabled={!!job} onClick={() => setPickKernel('initrd')} style={{ height: 28 }} />
+              {m.initrdFile ? <Btn label={tr('machines.cfg.kboot.remove')} disabled={!!job} onClick={() => save({ initrd: 'none' })} style={{ height: 28 }} /> : null}
+            </View>
+          </Row>
+          <Row label={tr('machines.cfg.kboot.cmdline')} last note={tr('machines.cfg.kboot.how', { name: m.name })}>
+            <View style={{ flex: 1, minWidth: 200 }}><TextInput value={cur.cmdline} placeholder="root=/dev/vda1 ro quiet" onChange={(x) => set({ cmdline: x.slice(0, 1023) })} /></View>
+          </Row>
+        </>}
+      </Group>;
+    })()}
   </>;
-  else if (sec === 'security') pane = <Group>
+  else if (sec === 'security') pane = <><GuestCanSee rows={guestChannels(cur, m, { running, agentState: m.agentState })} running={running} cur={cur}
+    onSet={(id, on) => (id === 'automation' && on ? setAskAuto(true) : set(channelSet(id, on, cur)))} onShow={setSec} />
+  {askAuto ? <ConfirmDialog title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
+    cancelLabel={tr('machines.cancel')} onOk={() => { setAskAuto(false); set({ automation: true }); }} onCancel={() => setAskAuto(false)} /> : null}
+  <Group>
+    {/* encrypted machines (8): whole (disks, UEFI variables, TPM, snapshots' memory), the key in Passwords; host swap */}
+    <Row label={tr('machines.cfg.sec.encryption')} value={tr(m.encrypted ? 'machines.cfg.sec.encYes' : 'machines.cfg.sec.encNo')}
+      note={tr(`machines.cfg.secNote.enc.${encryptionNote(m)}`, { name: m.name })} />
+    <Row label={tr('machines.cfg.sec.swap')} note={tr('machines.cfg.secNote.swap')} last />
+  </Group><Group>
     {['sandbox', 'files', 'network', 'limits', 'display', 'secrets'].map((k, i, a) => {
       // the network's line follows the mode: passt listening on the forwarded ports, or the bridged card's device
-      const note = k !== 'network' ? k : m.network === 'bridged' ? 'networkBridged' : usesPorts(m.network) && m.ports?.length ? 'networkPorts' : k;
-      return <Row key={k} label={tr(`machines.cfg.sec.${k}`)} last={i === a.length - 1} note={tr(`machines.cfg.secNote.${note}`, { limit: gb(memLimit(m)) })} />;
+      // the sandbox's line says what this kernel can't give ("Weaker isolation on this kernel", 3.3)
+      const note = k === 'sandbox' ? (isolationGaps(host, null).includes('landlock') ? 'sandboxWeak' : k)
+        : k !== 'network' ? k : m.network === 'bridged' ? 'networkBridged' : usesPorts(m.network) && m.ports?.length ? 'networkPorts' : k;
+      // a guest on passt is decided by LordOS's firewall as its own app, with the Machines rules too
+      const fw = k === 'network' && m.network !== 'bridged' && m.network !== 'isolated' ? ` ${tr('machines.cfg.secNote.firewall')}` : '';
+      return <Row key={k} label={tr(`machines.cfg.sec.${k}`)} last={i === a.length - 1} note={tr(`machines.cfg.secNote.${note}`, { limit: gb(memLimit(m)) }) + fw} />;
     })}
-  </Group>;
+  </Group></>;
 
-  const savable = ['general', 'cpu', 'display', 'network', 'disks', 'sharing', 'agent', 'boot'].includes(sec);
+  const savable = ['general', 'cpu', 'display', 'network', 'disks', 'sharing', 'agent', 'boot', 'security'].includes(sec);
   const list = (
     <View style={{ width: 250, ...(side.narrow ? { flex: 1 } : null), paddingHorizontal: 10, paddingVertical: 12, gap: 2,
       backgroundColor: p.dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)', borderEndWidth: 1, borderColor: p.line }}>
       <Text style={{ marginHorizontal: 10, marginBottom: 6, fontSize: 12, fontWeight: 700, color: p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{m.name}</Text>
+      {/* the sidebar's search (5.5): sections whose title or summary has every word */}
+      <TextInput value={find} onChange={setFind} placeholder={tr('machines.cfg.search')} onCancel={() => setFind('')} style={{ marginHorizontal: 4, marginBottom: 6 }} />
       <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 2 }}>
-        {SECTIONS.map((k) => <SideRow key={k} icon={ICONS[k]} title={tr(`machines.cfg.sec.title.${k}`)} detail={summary[k]} selected={sec === k}
-          onClick={() => { setSec(k); if (side.narrow) side.close(); }} />)}
+        {sectionsMatching(SECS, find, (k) => `${secTitle(k)} ${summary[k] || ''}`).map((k) => <SideRow key={k} icon={ICONS[k]} title={secTitle(k)} detail={summary[k]} selected={sec === k}
+          dot={changed.has(k) ? tr('machines.cfg.unsaved') : ''} onClick={() => { setSec(k); if (side.narrow) side.close(); }} />)}
       </ScrollView>
     </View>
   );
@@ -519,7 +860,8 @@ export function Configure({ dir, section: section0, onClose }) {
   const done = () => {
     if (!dirty) { onClose(); return; }
     if (netBad) return;
-    if (running) { setMsg({ ok: false, text: tr('machines.cfg.runningBanner') }); return; }
+    if (running && !onlyName) { setMsg({ ok: false, text: tr('machines.cfg.runningBanner') }); return; }
+    if (!rn.ok) { setMsg({ ok: false, text: tr(rn.note.key, rn.note.vars) }); return; }
     setClosing(true); save();
   };
   return (
@@ -529,21 +871,21 @@ export function Configure({ dir, section: section0, onClose }) {
         {side.narrow ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <SidebarToggle shown={side.shown} onClick={side.toggle} />
-            <View style={{ flex: 1, minWidth: 0 }}><PaneHeader icon={ICONS[sec]} title={tr(`machines.cfg.sec.title.${sec}`)} detail={summary[sec]} /></View>
+            <View style={{ flex: 1, minWidth: 0 }}><PaneHeader icon={ICONS[sec]} title={tr(sec === 'group' ? 'machines.group.cfg.title' : `machines.cfg.sec.title.${sec}`)} detail={summary[sec]} /></View>
           </View>
-        ) : <PaneHeader icon={ICONS[sec]} title={tr(`machines.cfg.sec.title.${sec}`)} detail={summary[sec]} />}
+        ) : <PaneHeader icon={ICONS[sec]} title={tr(sec === 'group' ? 'machines.group.cfg.title' : `machines.cfg.sec.title.${sec}`)} detail={summary[sec]} />}
         {running ? <View style={{ padding: 10, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.cfg.runningBanner')}</Text></View> : null}
         <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 14 }}>{pane}</ScrollView>
         {msg ? <Text style={{ fontSize: 13, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text> : null}
         {onClose ? (
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
             <Pill label={tr('machines.cancel')} disabled={!!job} onClick={() => { setDraft({}); setMsg(null); onClose(); }} />
-            <Pill primary label={tr('machines.cfg.done')} disabled={!!job || (dirty && netBad)} onClick={done} />
+            <Pill primary label={tr('machines.cfg.done')} disabled={!!job || (dirty && (netBad || !rn.ok))} onClick={done} />
           </View>
         ) : savable || dirty ? (
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
             <Pill label={tr('machines.cancel')} disabled={!dirty || !!job} onClick={() => { setDraft({}); setMsg(null); }} />
-            <Pill primary label={tr('machines.cfg.save')} disabled={!dirty || running || !!job || netBad} onClick={() => save()} />
+            <Pill primary label={tr('machines.cfg.save')} disabled={!dirty || (running && !onlyName) || !!job || netBad || !rn.ok} onClick={() => save()} />
           </View>
         ) : null}
       </View>
@@ -554,6 +896,9 @@ export function Configure({ dir, section: section0, onClose }) {
           if (!path || cur.shares.some((y) => y.path === path)) return;
           set({ shares: [...cur.shares, { tag: shareTag(path.split('/').pop(), [...cur.shares.map((y) => y.tag), 'LordOS']), path, writable: false }] });
         }} /> : null}
+      {exporting ? <ExportSheet m={m} running={running} onClose={() => setExporting(false)} /> : null}
+      {pickKernel ? <FilePicker title={tr(`machines.cfg.kboot.${pickKernel}`)} onClose={() => setPickKernel('')}
+        onPick={(x) => { const f = Array.isArray(x) ? x[0] : x; const k = pickKernel; setPickKernel(''); if (f) save({ [k]: f }); }} /> : null}
       {picking ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPicking(false)}
         onPick={(x) => { setPicking(false); save({ iso: Array.isArray(x) ? x[0] : x }); }} /> : null}
       {side.narrow && side.shown ? <SidebarOverlay width={260} onClose={side.close}>{list}</SidebarOverlay> : null}

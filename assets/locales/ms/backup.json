@@ -14,6 +14,9 @@
   "never": "Belum ada sandaran",
   "next": "Seterusnya: {when}",
   "lastError": "Sandaran terakhir gagal: {error}",
+  "machinesBusy": {
+    "other": "{count} mesin sedang berjalan: cakeranya dalam sandaran ini adalah daripada sandaran sebelumnya"
+  },
   "todayAt": "hari ini pada {time}",
   "now": "Sandarkan Sekarang",
   "pause": "Jeda",
@@ -74,6 +77,10 @@
   "delete": "Padam Sandaran",
   "restoreAll": "Pulihkan Semua",
   "restoreItem": "Pulihkan “{name}”",
+  "restoreSelected": "Pulihkan Pilihan ({count})",
+  "restoringItem": "Memulihkan {index} daripada {count}: {name}",
+  "restoreItemFailed": "Tidak dapat memulihkan “{name}”: {error}",
+  "restoreMoreFailed": "Lain-lain tidak dipulihkan: {count}",
   "restoreFolder": "Pulihkan Folder Ini",
   "restorePick": "Pilih apa yang hendak dipulihkan",
   "restoreAllTitle": "Pulihkan seluruh folder rumah anda?",

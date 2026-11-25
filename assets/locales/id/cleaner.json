@@ -446,5 +446,6 @@
   },
   "select.nothing": "Tidak ada yang dipilih",
   "activity.app": "Aplikasi dihapus",
-  "activity.system": "Pembersihan sistem: {name}"
+  "activity.system": "Pembersihan sistem: {name}",
+  "map.machines": "Kosongkan di Mesin Virtual"
 }

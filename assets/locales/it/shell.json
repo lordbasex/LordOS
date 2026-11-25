@@ -586,9 +586,12 @@
   "ws.lock.on": "Blocca le finestre di questo schermo",
   "ws.lock.off": "Sblocca le finestre di questo schermo",
   "ws.lock.window": "Bloccata: sbloccala dal lucchetto della cornice",
-  "ws.minimized.label": "Ridotte",
-  "ws.minimized.title": "Finestre ridotte a icona su questo schermo: fai clic su una per riaprirla",
   "ws.slot.free": "Spazio libero: apri un'app o riporta una finestra ridotta",
+  "ws.windows.title": "Finestre di questa attività su questo schermo (una linea sotto quelle ridotte a icona): fai clic su una per portarla in primo piano; clic destro per le finestre di quell'app",
+  "ws.profile.ask": "Lascia scegliere al browser",
+  "ws.profile.open": "Apri il profilo {profile}",
+  "ws.profile.activity": "Profilo che apre questa attività",
+  "ws.profile.display": "Profilo che apre questo schermo ({display})",
   "ws.snapfly.title": "Disponi finestra",
   "ws.snapfly.halves": "Metà",
   "ws.snapfly.thirds": "Terzi",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "Fotocamera tramite LordOS Studio",
   "capture.what.effectsOn": "effetti attivi",
   "capture.what.effectsOff": "senza effetti",
-  "shortcuts.captureWindow": "Istantanea di una finestra"
+  "shortcuts.captureWindow": "Istantanea di una finestra",
+  "themeSwitch.changing": "Cambio dello stile della scrivania…",
+  "themeSwitch.changingTo": "Passaggio a {name}…",
+  "themeSwitch.failedTitle": "Impossibile applicare {name}",
+  "themeSwitch.refusedBody": "Il suo codice non corrisponde alla copia firmata di LordOS, quindi non è stato caricato. Lo stile della scrivania resta com’era.",
+  "themeSwitch.failedBody": "Non si è avviato. Lo stile della scrivania resta com’era.",
+  "spotlight.section.machines": "Macchine",
+  "guestApps.inMachine": "In {machine}"
 }

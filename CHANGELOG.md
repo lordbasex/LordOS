@@ -10,6 +10,2416 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.9.6-beta] - 2026-11-25
+
+### Added
+- **Monitor → GPU, redrawn after the mockup the maintainer approved on 2026-11-24** (`docs/MONITOR.md`, "GPU", "The 0.8.9.6 layout"). `apps/monitor/GpuView.jsx`: a chip per GPU (vendor
+  dot, name, three-minute load sparkline, load, temperature, VRAM) and, with two or more GPUs, a One / Side-by-side
+  switch; the card's header with tiles for Load, Temperature (with `temp*_crit`), Power (of `power1_cap`, or
+  `power1_max` on Intel), Fan or Idle (RC6, from i915's `power/rc6_residency_ms` or xe's `gtidle`), Core clock (of the
+  DPM top or `gt_RP0_freq_mhz`), Memory clock and PCIe link ("Gen3 ×16", "of Gen4 ×16" when slower than the slot);
+  utilization by engine (3D, Compute, Video decode, Video encode, Copy) with a 180-sample chart; graphics memory split
+  by the type of process (compute, graphics, video) and free, amdgpu's `mem_busy_percent` and a VRAM chart; the
+  processes using the GPU (App / process, PID, Type, GPU % with a per-engine bar, 3D, Comp, Dec, Enc, Copy, VRAM, GTT,
+  API), with another user's ROCm (KFD) process as a "Hidden" row (pid and name only); and "AI on this computer": model
+  runners (`llama-server`, `llama-cli`, `ollama`, `whisper-*`) with the model's base name from their own `-m`/`--model`,
+  Sentinela's engine (by the pid `lord.sentinela.state()` reports, CPU only), LordOS Voice, LordOS Studio and any of
+  the user's processes mapping a model runtime (`libcuda`, `libamdhip64`, `libggml*`, `libllama`, …) that use the GPU.
+  From a 1100×600 window the tab fits with no scrolling (the table and the AI list show the rows their measured boxes
+  hold, then "+N more"); smaller windows scroll. Light, dark and right to left. The fan by hand and the installed APIs
+  moved behind "Fan and APIs" under the card's name. All 61 new strings in every language.
+- **Monitor → GPU reads less** (`server/src/monitor/gpustat.c`): `/proc` is walked every 5 s (`GPU_RESCAN_MS`) instead
+  of every second; the processes holding a `/dev/dri`, `/dev/kfd` or `/dev/nvidia*` fd are kept with those fds, and each
+  second only their `fdinfo` and `stat` are read again (about 0.45 ms on the RX 580 PC with 8 GPU processes, cards about
+  0.4 ms; it was 15 ms with about 600 processes). A kept process whose start time changed (pid reused) is dropped at
+  once. New fields: PCIe link, `mem_busy_percent`, `temp*_crit`, `power1_max`, i915 RC6 and RP0, xe per-GT frequencies
+  and idle, NVIDIA's `/proc/driver/nvidia/gpus/<slot>/information` (Model and Video BIOS), per-process KFD VRAM, SDMA
+  time and CU occupancy (own processes; gpu id → PCI slot through the KFD topology), `/dev/nvidia<N>` holders, and the
+  base name of a process's `-m` model. Never `pcie_bw`, never debugfs. `gpumodel.js` merges lord-nvgpu's `"nv"` (which
+  `mon.c` splices into the sample) into the cards by PCI bus id and into the process rows by pid, range-checked again. Tests: `build/gpustat-test` (fake i915/xe/NVIDIA/KFD trees, malformed link, topology, information and argv,
+  cache, pid reuse, another user; ASan/UBSan clean), `tests/gpu_model_test.mjs` (categories, types, memory split,
+  PCIe generation, RC6 idle, hidden rows, canned and hostile NVML numbers, AI rows, rows that fit), and screenshots with
+  made-up data from `server/tests/gpu_headless.sh`.
+- **Files: F2 renames** the selected item too, like Enter and the slow
+  second click on its name.
+- **Files: a slow second click on the selected item's name renames it in place**. As in the reference desktop's file manager: with one item selected, a second click on its name (not the
+  icon) at least the double-click interval and at most 1.5 s after the first, within 4 px of it, with the left button
+  and no modifier key, opens the same rename field as Enter or the menu's Rename, once the double-click interval has
+  passed after that click with no other press. A real double click still opens, a drag (the item, or the rubber band of
+  #233) still drags, a click that only brought the window forward doesn't count (the first click must land on a window
+  that already had the focus), and a key, a double click or the window losing the focus cancels a rename that is
+  waiting. Never in a read-only folder (no notice pops up for a click), the Trash, an archive, Applications, the Network
+  page or on a mount point. Icon, list and column views. The timing rule is one pure SDK module, `sdk/slowclick.js`
+  (`slowClick`, `DOUBLE_CLICK_MS` = the runtime's 450 ms, there is no setting for it; `SLOW_CLICK_MAX_MS`,
+  `SLOW_CLICK_SLOP`), for any view that shows files; none of the four desktops (Lord Flow, Lord Classic, Lord
+  Workspaces, Lord Celeste) shows files on the desktop, so Files is its only user. Tests:
+  `server/tests/slowclick_test.mjs` (35 cases: double click vs slow click, too late, drag, moved pointer, modifiers,
+  other buttons, two items selected, the icon, an item that can't be renamed, a focus click, cancel, right to left; in
+  `make test`) and the headless scene `tests/app_scene_headless.sh files_slowrename_scene` (the three views, a real
+  rename on disk, and each case that must not rename, with screenshots in the four desktops and in Arabic). Enter and
+  the menu's Rename are unchanged.
+- **The slow-rename scene passes in all four desktops and runs in `make test-full`**. Its two failures (Lord Classic's "a first click that only focused the window" case, Lord Workspaces'
+  column view) were in the scene, not in Files or the themes: lord-server hands a freed node's id out again, and
+  `lord.destroy` frees a whole subtree while the scene's `pre.js` only heard about its root, so a name kept from a
+  closed window (the Editor the double-click case opens, an earlier Files window) stayed attached to an id now reused in
+  another window, and the scene clicked that node instead of the file: in Lord Classic a node in the Calculator (so the
+  click focused the Calculator, which the scene then papered over by focusing Files itself), in Lord Workspaces a 16 px
+  node away from the column. `pre.js` now forgets an id when `lord.createNode` hands it out again and a child once it
+  is removed; the driver's workaround is gone and "the first click brings Files forward" is a check of its own.
+  `tests/run_suites.sh full` runs the scene in Lord Flow, Lord Classic, Lord Workspaces and Lord Celeste (about a
+  minute each, headless, no hardware).
+- **Lord Workspaces: each display's bar shows every window of the activity; launched windows land where they were
+  launched; Chrome's Save as is LordOS's dialog**.
+  - The frame header's tray (each display's bar) lists the activity's windows on that display, **open and minimized**,
+    in the order they opened, a short line under a minimized one and no "Minimized" label; a click brings an open
+    window forward or a minimized one back into the slot it kept (`themes/workspaces/components/AppWindows.jsx`).
+  - An app's icon (a window's, a pinned app's, an app in Search's grid) lists that app's windows in the activity on
+    hover (two or more) and right click, with New window opened on that display. The rows are the Dock's
+    (`appWindowItems`, `sdk/dock.js`); a title is cleaned to one plain line (`sdk/windowlistmodel.js`: control and
+    bidi-override characters dropped, 80 characters), so a window can't draw a second line or reorder its label to
+    pass for another.
+  - Launch placements keyed by the app (`themes/workspaces/model/launches.js`): a window launched from a display's
+    "+", Add window, Used most on this display, its pinned or usual apps or Search goes to that display **and that
+    activity**, into its layout slot, even if another activity is in view when it comes; another app's window no longer
+    takes the launch. Google Chrome's profile picker takes the place, and when it closes the browser window that follows
+    goes to the same display, activity and slot (both orders; at most 3 re-arms, 9 placements, 30 s / 20 s).
+  - Dialogs told their parent late (X11 `WM_TRANSIENT_FOR` read after the map, xdg-foreign) go over the parent, on its
+    display and activity, at the size they asked for (`sdk/dialogmodel.js lateParentFrame`, every theme).
+  - `org.freedesktop.portal.FileChooser` says **version 3** (was 2): Chromium and Google Chrome use LordOS's file
+    dialog for Open and Save as, over the window that asked (xdg-foreign) or on the display of the window in front,
+    never centered across all displays; the app's globs with classes (Chromium's `*.[pP][dD][fF]`) are matched by a
+    linear matcher, never a RegExp (`sdk/portalfilemodel.js`). No new privilege: any app could already call it, and the
+    answer still goes only to the caller. Checked with Google Chrome 158 in a headless session
+    (`server/tests/chrome_portal_headless.sh`, opt-in): Ctrl+S showed LordOS's dialog and the file was saved.
+  - **Browser profiles** (`sdk/browserprofilemodel.js`, `sdk/browserprofiles.js`): Chrome, Chromium, Brave and Edge
+    profiles read from the browser's own `Local State` as untrusted data (1 MiB, no link, `JSON.parse`, 32 profiles,
+    folder names only of the form `Default`/`Profile N`, names cleaned), on demand only and again only when its mtime
+    or size changed. An activity keeps the profile a browser opens there, each display by connector as the fallback for
+    every theme (`settings.browserProfiles`); the icon menu offers Open profile and both choices, and Used most on this
+    display shows "Chrome · Dev". The launch, `lord.apps.launchProfile` (approved by the maintainer 2026-11-24;
+    `apps_launch_profile` in `server/src/apps.c`): a fixed browser table in C, the system `.desktop` only, a profile
+    folder the browser's own `Local State` lists (`O_NOFOLLOW`, regular, <= 1 MiB, `sec/json.c`), one argv element
+    `--profile-directory=<profile>` built in C; desktop session only, not in the broker (`build/apps-profile-test`:
+    the argv, bad names, unlisted folders, a hostile `Local State` — not JSON, wrong shape, duplicate keys, oversize, a
+    link, a FIFO — a browser outside the table, a user `.desktop`). Chrome names no profile in its window titles on
+    Linux and gives every profile one app_id, so a window's profile (its colour dot on the bar icon, its name in the
+    window lists) is known only for a window LordOS launched for that profile.
+  - ❖` cycles the windows of the app in front within the activity (checked in the scene; listed in Settings →
+    Keyboard).
+  - Tests: `server/tests/launchplace_headless.sh` (in `make test`, en and ar: a headless `lord-server-test`, the real
+    launcher and `build/launchplace-client`, a fake Chrome with a profile picker and a late-parent dialog, screenshots),
+    `browser_profiles_test.mjs`, `portal_file_model_test.mjs`, `dialog_model_test.mjs`, `workspaces_model_test.mjs`
+    (launches, labels), `workspaces_scene.mjs` (the bar, the icon menu, the picker flow over three displays, profiles,
+    ❖`), `portal-cast-test` (versions, a Chrome-style SaveFile). Strings in all 35 languages; docs/WORKSPACES.md.
+- **Backups restores several files and folders at once (GitHub #231 follow-up)**. The restore browser picks rows as Files does: a click picks one, Shift a range from the last one,
+  Ctrl (or ⌘) adds or takes one out; Restore then reads "Restore Selected (N)" and sends them together
+  (`apps/backup/model.js` `restoreTarget`, the SDK's `clickSelect`). `lord.backup.restore(id, [rel, …])` takes up to 64
+  paths; the list is checked whole before anything is queued (`bk_restore_list_valid`: every item a safe relative path,
+  "everything" only alone) and each item is then restored by the same `bk_restore` a single restore uses, with every
+  check it makes (nothing outside the snapshot or through a link in it, nothing outside lord.fs's roots, protected
+  folders skipped), one after the other in the backup thread (`bk_restore_list`). An item inside another listed folder
+  is restored once, with it. While it runs the window says "Restoring 2 of 5: name"; afterwards each item that failed is
+  named with its own error (up to 8, then a count), and the rest are reported as restored
+  (`status().restore.count/index/current/failed`). The thread also no longer returned without its lock when a locked
+  encrypted destination refused a restore. Tests: `build/backup-test` (lists, nesting, a bad item beside good ones, links
+  out of the backup, protected folders, refusals, cancel), `tests/backup_model_test.mjs`, and the
+  `backup_restore_scene` (Shift and Ctrl picks, the list sent, progress and per-item errors).
+- **Monitor → GPU shows NVIDIA cards' own numbers** (approved by the
+  maintainer on 2026-11-24). NVIDIA's proprietary driver has no fdinfo stats or hwmon, so the GPU view had almost
+  nothing for it. The new sandboxed helper `lord-nvgpu` (`server/src/monitor/nvgpu_main.c`) is the only program that
+  loads NVIDIA's NVML: `dlopen` of `libnvidia-ml.so.1` only from the fixed system library folders, folder and file
+  root's and not writable by others, `RTLD_NOW | RTLD_LOCAL`, no `LD_LIBRARY_PATH` (empty environment). After
+  `nvmlInit` it applies `sandbox_apply_helper`: no network or new sockets, no exec, Landlock read-only on the driver's
+  `/proc` and `/sys` files, `/dev/nvidiactl` and `/dev/nvidia<N>` only, and ioctls only of NVIDIA's type `'F'` (new
+  `SANDBOX_IOCTL_NVIDIA`). It answers lord-server over a socketpair with fixed-size records, numbers only (the driver
+  version as digits and dots). `server/src/monitor/nvgpu.c` starts it only while the GPU tab or the Overview is on
+  screen and a `0x10de` device is bound to `nvidia`, at most one, with a 2–60 s restart backoff, asks once a second
+  without ever blocking the Monitor's thread, range-checks every field (percent 0–100, −50…150 °C, ≤ 1 PiB, ≤ 64 GPUs
+  and 256 processes) and keeps only processes owned by the session user. `lord.monitor.gpu()` gains `nv: [...]`
+  (utilization of SM, memory, encoder and decoder, temperature, fan, power and limit, clocks, VRAM, CUDA and driver
+  versions, compute mode, ECC and per-process memory and utilization). `lord-server` never links NVML and never runs
+  `nvidia-smi`. Tests: `build/nvgpu-test` (ASan/UBSan; 120 000-case parser fuzz; the helper end to end with a
+  test-only fake NVML giving canned, hostile, failing and hanging answers; a sandbox probe that it can't open a socket,
+  exec or write). Not yet verified on NVIDIA hardware (docs/MONITOR.md, "NVIDIA").
+- **A mouse's Back and Forward buttons work in LordOS's own apps (GitHub #234)**. They reached the desktop as buttons 3 and 4 and were dropped, so that no title bar, button or slider
+  took them as a press (#159); only Linux apps (Firefox, Chromium) used them. `runtime/events.js` still keeps them from
+  onMouseDown, onClick and the pointer listeners, and now turns the press into a `navigate` event ('back' or
+  'forward') for the window under the pointer: `onNavigate` along the nodes under it, then `addListener('navigate')`.
+  The SDK's `useNavigateButtons(fn)` gives it to the app whose window is under the pointer (never to another window or
+  when the pointer is outside every window; an isolated app's process holds one window), and `useVisitHistory(place,
+  go)` walks a window's own history of places (`sdk/navbuttons.js`, the pure rules in `sdk/navmodel.js`). Files walks
+  its folder history (as ⌥← and ⌥→), the Store leaves an app's page and Forward opens it again, Mail in one-pane mode
+  goes back to the list and forward to the message, Settings walks the sections and Help the articles shown in that
+  window. Linux apps get the raw buttons from lord-server as before. `navbuttons-test` checks the runtime's dispatch,
+  which window takes it, the history and each app's wiring.
+- **Notes: attachments open alone, a + New Note button, inserting from the reading view, the sticky note's emoji
+  picker, and links that can't reach out** (GitHub #238; docs/NOTES.md).
+  - **An attachment opens by itself.** A click on a note's attachment opened Files on the note's folder (with `nota.md`
+    and every other attachment in it). Now a text file opens alone in Text Editor and anything else in its default app,
+    Photos showing only that picture (`openFileWithApps(path, name, { reveal: false, single: true })`, new options in
+    `sdk/sysopen.js`; Photos' `args.single`); when no app opens it, nothing opens. Names are kept safe for the folder
+    and the link (no slashes, control or direction-override characters; spaces and parentheses percent-encoded, so
+    "my report (v2).pdf" is a working link), and a folder or a link is not attached.
+  - **New Note is a +** beside the search field, with "New Note" as its tooltip (the ✎ read as "edit"); the empty
+    state keeps its New Note button and loses the hint that pointed at the ✎.
+  - **Inserting is editing.** In the reading view, ⊕ Emoji…, Image…, Attachment… and a drop from Files open the editor
+    first and insert at its caret (before, they changed the note behind the reading view); the sticky note's 😀 did so
+    already.
+  - **Image types.** Only PNG and JPEG are drawn in a note (lord-server's decoder, `server/src/ui/stb.c`, reads only
+    those); GIF, WebP, BMP, HEIC, HEIF, AVIF and TIFF are attachments that open in Photos, and Image… now lists them.
+  - **The sticky note on the desktop (widget mode).** Its emoji picker (308 px) was drawn inside the note (260 px
+    wide, `overflow: hidden`): cut off, its Close button out of reach, and in the paper's dark-on-dark colours, so
+    category names were unreadable; and opening it switched the note back to reading. It is now drawn in the popover
+    layer beside the note, inside the screen, in the desktop's colours, and the note stays in editing until it closes.
+    Checked end to end in Lord Flow, Lord Classic, Lord Workspaces and Celeste: added from the Add widget catalog and
+    from the window's On Desktop, typed into, emoji, moved, resized, pinned in front, and after a restart in the same
+    place and still pinned.
+  - **Links can't reach out (security).** A note is untrusted markdown (written by hand, pasted, synced), so Notes now
+    opens or draws only the note's own files by plain name, real files (not links) other than `nota.md`
+    (`apps/notes/links.js`, `attachmentPath`, `noteImageSrc`): `file://`, `javascript:`, `data:` and other schemes,
+    absolute paths (before, any path in the home folder opened), `~`, `..` (encoded or not), a link planted in the
+    note's folder and remote images are neither opened nor fetched; the SDK's `<Markdown>` takes a `resolveImage`
+    for this. A note folder or `nota.md` that is a link, a `nota.md` over 8 MB and a folder name that could leave
+    `~/Notes` are not loaded or written; a header edited by hand is read within bounds; titles drop control and
+    direction-override characters; Duplicate no longer copies links or folders; the list's preview shows a link's
+    words, not its address.
+  - **Tests.** `tests/notes_store_test.mjs` (104 checks over a real temporary home: the format's round trip, titles,
+    geometry, attachments with `../`, slashes, control and direction-override characters, brackets, a 3 GB file, a
+    folder and a link; 27 hostile link forms; links planted in the folder; every write inside `~/Notes`), and
+    `tests/app_scene_headless.sh notes_scene` (a headless lord-server with real pointer and key events and screenshots:
+    the window, search, the reading view, what each link opens, ⊕ from the reading view, + New Note, Duplicate, Delete,
+    On Desktop, and the sticky note from the catalog through a restart), run in the four desktops and in Arabic.
+- **Files: rubber-band selection** (GitHub #233). A drag that starts on
+  the empty space of the icon or list view draws a translucent rectangle in the accent colour and selects every card or
+  row it touches; Shift adds them to what was selected, Ctrl (⌘) toggles them, and with no modifier it starts afresh. Near
+  the view's top or bottom edge the view scrolls by itself, faster the closer the pointer is, and the rectangle follows
+  (cards that scroll out of sight stay selected). A press on a card or row still selects and drags it, and a click on the
+  empty space without a drag still clears the selection, as before. The rectangle is tested against the boxes the layout
+  gave each card and row (`lord.getLayout`, in the scrolled content's own space, so scrolling doesn't move them), never a
+  hit test per node; it is physical left and top in every language, so right to left needs no flip. The selection
+  changes at most once per frame (`frameGate`) and only when the set under the rectangle changes, and the rectangle is
+  its own small node with its own store, so a drag across a big folder repaints only the cards that change. The rules
+  are pure (`apps/files/marquee.js`, `tests/files_marquee_test.mjs`, 52 checks: corners, touching, mirrored boxes,
+  modifiers, autoscroll, one update per frame); the views use them through `apps/files/marqueeview.jsx`; the SDK's
+  ScrollView now also hands its viewport (`scrollRef.current.outer`). Checked in a headless lord-server with real
+  pointer and key events (`tests/app_scene_headless.sh files_marquee_scene`, 11 checks with screenshots, in English
+  and Arabic): a 2×2 drag selects 4, Shift adds the next 2, Ctrl toggles 3, a click clears, the list view takes the 5 rows
+  it crosses, and in a folder of 400 files the view scrolls while the pointer rests at the bottom edge.
+- **Displays: the login and lock screens can use the desktop's scale, set by an administrator** ([#242](https://github.com/lordbasex/LordOS/issues/242); docs/DISPLAYS.md "The login screen's
+  scale", docs/SESSIONS.md). The login screen opened every display at its recommended scale, so a 15.6" 1080p laptop
+  jumped from 125 % at login or lock to 100 % on a desktop set to 100 %. Settings → Displays has **Use this scale on the
+  login screen** under the scale. It is a setting of the computer: **only an administrator can change it**, its hint
+  says it applies to every user of this computer, others see it dimmed with "Only an administrator can change it", and
+  the hint names the login screen's current choice when it is another display or scale. Two administrators who want
+  different scales overwrite each other (the last one wins).
+  - **How:** `lord.display.setLoginScale(connector, scale)` sends `{"a":"display","scaleOn":"<connector>","scale":<pct>}`
+    on the monitor channel (the main display's message, extended; no new admin action). `lord-sessiond` takes it only from
+    the session being shown, parses the whole message strictly (`gscale_from_msg`, `server/src/remote/greeterscale.c`),
+    and checks as root, from the user it started that session for, never from the message, that the user is an
+    administrator (`is_admin`: the sudo, admin or wheel group, as for Restart with other sessions open). One request every
+    2 s at most, dropped before parsing or logging. It keeps `/var/lib/lordos/greeter-scale` (`<connector> <pct>`, root's,
+    0644, `.new` with `O_EXCL | O_NOFOLLOW` then rename, only in a `/var/lib/lordos` of root's that no one else can write;
+    read back only as a small regular file of root's that parses) and starts the login screen with
+    `LORD_MAIN_SCALE=<connector>:<pct>`. lord-server applies it only with `--greeter`, only to the display on that
+    connector and only when the display has no saved scale; the lock screen is the same login screen. Settings reads the
+    file back (`lord.display.loginScale()`). Four new texts in all 35 languages.
+  - **Tests:** `build/greeterscale-test` (new, in `make test`, ASan and UBSan; 1,082 checks): forged fields (a `user`),
+    other orders, spaces, trailing data, truncation, signs, leading zeros, huge numbers, decimals, connectors with quotes,
+    slashes, new lines, UTF-8 or 32 characters, every scale from -5 to 1000 against `out_scale_valid`, and 200,000
+    random and mutated inputs, everything accepted valid and exactly what lord-server sends; `lid-test` (43 checks) for
+    `display_plan` with `LORD_MAIN_SCALE`; `display_layout_test.mjs` (48) for the switch. Not yet checked on the VM with
+    a screenshot.
+- **Cloud: the Cloud menu shows each file moving now with its percentage** ([#244](https://github.com/lordbasex/LordOS/issues/244); docs/CLOUD.md section 11). The panel by the clock has a
+  **Moving now** list between the accounts and Recent: an up or down arrow, the file's name and its percentage on the end
+  side (the left in right-to-left languages), at most four files, then "and N more"; it follows the accounts chosen for
+  Recent, as Settings' account tile already showed the first file.
+  - lord-server already read rclone's `transferring[]` but sent only totals; each account in the state now has a bounded
+    `moving` list (at most 4 entries, uploads first, `{ name, pct, up }`). The name is only the file's last path part,
+    with control characters, bidi marks and overrides (U+061C, U+200E/F, U+202A–U+202E, U+2066–U+2069, U+FEFF) and broken
+    or overlong UTF-8 dropped, at most 127 bytes cut at a character boundary (`cloud_moving_name`); the percentage is a
+    whole 0–100 (`cloud_moving_pct`). The state compared to decide a push rounds it down to steps of 5, so a slow transfer
+    adds at most 20 pushes, still at most two a second.
+  - `movingRows` in `sdk/cloudmodel.js` checks the list again (names, clamped percentages, accounts turned off left out);
+    the dev mock moves it. Three new texts in all 35 languages (each language's own percent format).
+  - Tests: `cloud-test` (2,457 checks) cleans names (controls, a right-to-left override that makes `exe` read as `pdf`,
+    isolates, overlong forms, surrogates, a Hebrew name kept, cuts never halfway through a character) and checks the list
+    in the state (cap, order, a name with nothing printable left out, totals still counting every file);
+    `cloud_model_test.mjs` 347 checks.
+- **Voice: French, German, Italian and Dutch.** Reading aloud, `say`,
+  Live Speech and Personal Voice now speak seven languages: French ([#215](https://github.com/lordbasex/LordOS/issues/215),
+  approved by the maintainer on 2026-11-22), German, Italian and Dutch join Spanish, English and Portuguese. See
+  `docs/VOICE.md`, phase 4.
+  - **Models**, Kyutai's Pocket TTS as before (CC-BY-4.0), each language in two qualities: **HD** is Kyutai's 24-layer
+    model (`french_24l`, `german_24l`, `italian_24l`, `dutch_24l`, 672 MB each); **Standard** is audio.cpp's Q8_0 GGUF
+    for French, German and Italian (128–129 MB) and, as audio.cpp publishes no Dutch GGUF, Kyutai's own 6-layer Dutch
+    model (`dutch`, 220 MB), read as a folder like the HD ones (`models/nl/standard/`). The same 23 voices speak every
+    language (Daan in French's and Dutch's standard models too); each new language's own voice is Kyutai's voice of it:
+    Estelle, Juergen, Giovanni and Daan. They come as signed `lordos-voice-fr*`, `-de*`, `-it*` and `-nl*` packages from
+    LordOS's APT repository, built by `tools/voice/fetch-voices.sh` and `tools/voice/mkdeb-voice.mjs` from
+    `sdk/voicecatalog.js` as the others; the previews package gets a sample of every voice in each new language.
+  - **Numbers written out as words** for the four, as for Spanish and Portuguese (`say_normalize()`,
+    `server/src/tts/saytext.c`): cardinals (French soixante-dix, soixante et onze, quatre-vingts, quatre-vingt-onze;
+    German einundzwanzig, zweitausendsechsundzwanzig; Italian ventuno, ventitré, centottanta, duemilaventisei; Dutch
+    eenentwintig, tweeëntwintig, tweeduizend zesentwintig), German and Dutch years in hundreds (1987
+    neunzehnhundertsiebenundachtzig), decimals, percentages, ordinals (1er, 2e, 21e; am 3. Mai, der 1. Platz; 1º, 11º;
+    1e, 2de, 8ste), times (quatorze heures trente, 14h30, 14 h 30; vierzehn Uhr dreißig, 14.30 Uhr; quattordici e
+    trenta; veertien uur dertig), dates (premier mai, am fünfzehnten November, primo maggio), money (vingt-cinq euros
+    cinquante, un million d'euros, eine Million Euro, una sterlina), degrees, ranges and symbols, and common
+    abbreviations (M., Mme, p. ex., etc.; z. B., d. h., usw., Nr.; Sig., Dott., ecc.; bijv., d.w.z., enz., t/m).
+  - **Telling the language:** `say_language` weighs common words of all seven and the letters only one or two use; the
+    curly apostrophe splits French words. lord-server's closed list of languages (`speak_lang_ok`, `speak.c`, and
+    `lord.voice`'s `lang`) has the four new ones, so a French, German, Italian or Dutch interface is the fallback for a
+    text too short to tell.
+  - **lord-tts:** its closed list of folder models (`DIR_LANGUAGES`, `server/src/doc/h_tts.c`) has the four HD models and
+    Dutch's standard one; it applies Kyutai's own text replacements for them (French `:` and `;` to a comma, German `;`
+    and the em dash). No new helper, library, host or permission: the same sandboxed lord-tts and the same signed
+    repository.
+  - **Settings → AI → Voice:** the language is now a pop-up with the seven (a segmented control didn't fit them in
+    every interface language); the four names are translated into all 35 interface languages. Monitor → GPU names the
+    new languages too.
+  - **Tests:** `saytext_test.c` goes from 267 to 541 checks (French 86, German 70, Italian 59, Dutch 46, and 13 that
+    tell the languages apart); `voicecatalog_test.mjs` 30; `tts_test.sh` says a sentence with numbers, a time and a date
+    in each new language, HD and standard, where its models are installed (all passed on the CPU and the GPU).
+    `fetch-voices.sh` now refuses a file Hugging Face publishes no SHA-256 for. `make-previews.sh` keeps its temporary
+    home next to the source folder: with the source on another filesystem than `/tmp`, its copy of the models failed
+    halfway and the samples were made with the installed system models instead (or not at all for a new language).
+  - **Merged for the next release (2026-11-24)** on top of 0.8.9.5-beta's integration; `saytext_test.c` had a French
+    case whose `\x99est` escape swallowed the `e` (a compiler warning, a wrong test string), now split. The 191 packages
+    of the four languages and the seven-language previews (`2026.11.24`, 6.15 GB: each language's Standard model
+    122–209 MB, HD 642 MB, 22–23 voices of each quality) were built from the files fetched on 2026-11-22, unsigned and
+    unpublished until they are signed on the maintainer's signing machine. `tts_test.sh` passes with them (HD and Standard in all four, on the CPU).
+
+- **Machines: checked for real, and what that found** (docs/VIRTUALIZATION.md
+  6.5, 6.7, 6.14, 6.16, 6.17, 6.19).
+  - **Monitor names a machine's own disk and network numbers.** A running machine's row in Processes says
+    "Disk 2.0 MB/s · Network ↓ 3.0 KB/s ↑ 1.0 KB/s": its QEMU's cgroup I/O read every 2 s (`lord.vm.stats`, never in a
+    draw) and what the firewall counts for the machine's scope; a part not measured is left out, never shown as 0
+    (`apps/monitor/vmiomodel.js`, `monitor_vmio_test.mjs`, the grouped Processes scene).
+  - **A lost guest agent says so.** When qemu-guest-agent stops answering in a running machine, the red light's popover
+    now says "The agent stopped answering" and that it comes back by itself, instead of telling the person to install it
+    and offering the Guest Tools disc (all 35 languages).
+  - **Checked on real systems:** Bridged end to end on a scratch dummy interface (`tests/vm_bridge_dummy.sh`, 23 checks:
+    the real wired-card check refuses the dummy; the macvtap, its alias and `/dev/tapN`, the guest's MAC and traffic, the
+    cable pulled and back, unbridge refused while running and done after); the Storage window's figures on btrfs, btrfs
+    with zstd compression and XFS (`storage-fs.sh`); shared folders and the transfer folder in a real KVM guest on the PC
+    and on the Raspberry Pi 5 (`tests/vm_share_boot.sh`, 14 checks each); the machine window's bar and menus, a guest's link
+    and notification, Send to LordOS and its panel, the agent's shell pane and Terminal tab, the agent's red light, in a
+    headless session with a real Debian 13 guest (`flows.py`, 41 checks); "What this computer can run" on the Pi with its
+    own facts and sensors; a virtio-win guest's tools (the evaluation install), PowerShell, links, Send to LordOS, transfer drive, event logs and
+    apps mode through `win-agent.py`.
+
+- **Machines: Start Linux directly, Guest can see, each system's requirements, migrate another PC** (docs/VIRTUALIZATION.md 5.2, 6.1, 6.11, 8).
+  - **Start Linux directly.** Configure → Boot keeps a kernel, an initial RAM disk and a command line with an installed
+    Linux machine and starts them instead of the boot loader on its disk (no firmware menu, no countdown): `machine.json`
+    schema 23 `kernel_boot`, the files copied into the machine's `disks/boot` by `lord-vm --set --kernel --initrd
+    --cmdline --kernel-boot` all or nothing (regular files only, sizes capped, the kernel's start checked for the
+    machine's architecture, the command line printable and one argument of QEMU's), the kernel at boot index 0. Refused
+    with Secure Boot, the virtio-win devices, an encrypted machine and a group's member; a clone keeps it, an export
+    leaves it off. The guest's own kernel comes out of it with `machines cp`.
+  - **Guest can see.** Configure → Security lists every channel between a machine and this computer in one place: the
+    network and its forwarded ports, the screen, keyboard and mouse, sound, the microphone, the clipboard each way, shared
+    folders, the transfer folder, the guest agent, Automation, files, links and notifications from the machine; each with
+    its state, what it does now while the machine runs, and its switch or a button to its section.
+  - **What a system needs.** The assistant's What's Missing opens the chosen system's own requirements: only its parts,
+    with its drivers and WinFsp downloaded at Create, the LordOS guest tools and an unattended install's answers.
+  - **`machines migrate`.** Another PC's whole disk becomes a machine: over the network through the person's own SSH (the
+    old PC needs only its SSH server, or a live USB; `--sudo` reads a root-only disk with that PC's sudo), or a disk
+    connected here. The size comes first and is checked, the copy is written sparse, then imported with the compatible
+    devices. Checked with a Raspberry Pi 5 as the old PC: 20 GB in 190 s, booted.
+- **Machines: Vulkan for Linux guests (venus)** (docs/VIRTUALIZATION.md 6.10,
+  3.3). Configure → Display → Vulkan, with Graphics 3D (machine.json schema 22, "vulkan"; lord-vm --set --vulkan). The guest's
+  Vulkan apps draw with this computer's GPU through virglrenderer's render server, which lord-vm starts in a jail of its own (a
+  pid namespace, Landlock, a seccomp allowlist with a listener, one exec, only the start's library mappings); QEMU gets the
+  connection through a small preloaded library and never forks or execs. Given only where the host can map the GPU's memory
+  into the guest (RADV and NVK need Linux 6.13; a discrete GPU with an Intel processor, Linux 6.16 and QEMU 11), else the log says
+  why. Checked with a Vulkan compute shader in a Debian 13 guest on an Intel UHD 630. The render server comes from Debian's
+  `virgl-server`, which Machines' setup installs.
+- **Machines: a smoother picture, Part 1 steps 4 and 5** (docs/MACHINES-GPU.md). A machine's picture changes
+  reach lord-server as up to 8 rectangles a frame instead of one box over all of them, each damaged on its own; a 2D picture
+  is a GPU texture when the desktop composes on the GPU (only the changed rectangles uploaded, the frame presented without a UI
+  paint), and on the CPU path a scaled picture's copy is remade only where it changed.
+- **Machines: snapshots keep the settings, take notes, and come before a tools update** (docs/VIRTUALIZATION.md 6.2). Each snapshot keeps `machine.json` as it was (`snapshots/<tag>.json`; a
+  running machine's hardware as it started); going back puts that hardware back (processors, memory, devices, cards,
+  graphics, displays, TPM, agent channels, MAC) and keeps every other choice; a disk added since refuses going back
+  before anything changes. A note of the person's own per snapshot (Add Note…, or with the new snapshot; at most 1000
+  bytes, no control or bidi characters). When the LordOS tools bring themselves up to date, a snapshot with the
+  machine's memory comes first, once per run and version. No file system freeze, decided: a snapshot is taken off or with
+  its memory, so a freeze adds nothing. `tests/vm_snap_store_test.sh` (real QEMU/KVM, 21 checks).
+- **Machines: Reclaim space can compress the disk** (6.4). *Compress the disk too* in the sheet
+  (`lord-vm --compact DIR --compress`, `qemu-img convert -c`): 96 MB became 380 KB in the test, checked, read back and
+  booted; refused for an encrypted machine.
+- **Machines: the Storage window deletes old snapshots and removes unused downloads** (6.16). Delete Old
+  Snapshots (every one but the newest) and Remove Unused (every download no machine uses), each after a question with
+  the figure; figures read from compressed extents are marked "about"; raw and data disks are counted (they were left
+  out). `tools/vm/e2e/machines/storage-fs.sh` runs the storage flow on scratch btrfs, compressed btrfs and XFS (needs
+  sudo for the mounts).
+- **Machines: the disposable session's switch in the machine window and on the card** (6.2). Actions →
+  Disposable Session and the card's menu turn it on (in memory) or off with the machine off; the card says so.
+- **Machines: an imported machine's other network cards are connected** (6.22). Each extra card gets its
+  own passt in the first card's mode, on a network of its own (10.0.3.0/24, 10.0.4.0/24…), with no forwarded ports;
+  checked under KVM in Shared and Host only (`tests/vm_nic_boot.sh`, `tests/vm_nic_e2e.sh`).
+- **`machines cp` copies folders, and the MCP server says what this computer can run** (6.15). Folders
+  both ways as `cp -r`; links are never followed; a guest's listing is parsed as hostile and refused whole (before
+  anything is made) when it names a protected path, `..`, a control or bidi character, or goes too deep. The MCP tool
+  `requirements`. `tools/vm/e2e/machines/exec-guest.sh` runs `tests/vm_exec_e2e.sh` against a throwaway Debian 13
+  machine (38 of 38).
+- **Machines: real runs of sound, recording and card models** (docs/VIRTUALIZATION.md 6.9, 6.20, 6.22). `tests/vm_sound_e2e.sh`: a headless lord-server in its own namespaces with only
+  this account's pulse socket mounted in, a guest playing a tone and recording its microphone: the speakers' PipeWire
+  stream named after the machine, the microphone closed without LordOS's permission and open with it (the guest heard the
+  maintainer's webcam microphone), a screenshot at the guest's size and an H.264 and AAC recording carrying the guest's tone
+  even with the speakers at volume 0. `tests/vm_nic_e2e.sh`: every card model booted; seven reach the internet, PCnet gets
+  its address and then only receive errors (QEMU 10.0's PCnet with Linux 6.12, documented); an import's extra cards are
+  there with their MACs, and now each on a network of its own (below).
+- **Machines: this computer's USB devices in a machine, and the camera** (docs/VIRTUALIZATION.md 6.6 and 6.9; approved by the maintainer on 2026-11-24, AGENTS.md "Machines' USB devices").
+  - The machine window's **Devices** menu lists this computer's USB devices; one picked goes into the running machine
+    whole (QEMU's `usb-host` on the machine's xHCI controller) and back to this computer's drivers when it is picked again,
+    when it is unplugged, or when the machine stops. One machine holds a device at a time, a machine at most 8.
+  - A new closed admin action, `vm-usb-allow "<machine id> <bus> <address> <vvvv>:<pppp>"` (anyone at the seat; storage, network
+    cards and Bluetooth adapters only for administrators): it finds the device again in sysfs, refuses a hub or root hub, a device whose keyboard or mouse a
+    process holds (the session's own), a disk this computer has mounted, uses as swap or under another block device, opens
+    `/dev/bus/usb/BBB/DDD`, checks it by its device number and sysfs again, and answers with the **descriptor**
+    (`admin_ok_fd`: SCM_RIGHTS on the helper's socket; `admin_dispatch` now reads with `recvmsg`). The node's owner, mode and
+    access list never change; nothing is written. lord-server keeps a descriptor only for a request it sent itself
+    (`js_vm_admin_reply`), hands it to the machine's lord-vm (a new request, `VM_USB`) and closes its copy; lord-vm checks it
+    again (`vmusb_fd_ok`) and gives it to QEMU through `add-fd` and `hostdevice=/dev/fdset/N`, so QEMU opens no path.
+  - QEMU's sandbox: Landlock unchanged. `lord-vm-usb.so` (`/usr/lib/lordos/lib`, new) is preloaded into the QEMU of a machine
+    with USB on and only sets libusb's default to `LIBUSB_OPTION_NO_DEVICE_DISCOVERY`, so libusb never looks at the
+    computer's other devices; the usb-host module is loaded during QEMU's start (`device-list-properties`), while
+    executable mappings are still allowed. The allowlist gains, only for such a machine, usbfs's ioctls (`'U'`) and the
+    rows `timerfd_create`, `timerfd_settime`, `timerfd_gettime` (rule `USB`): nothing else was called through a webcam's
+    capture in learn mode.
+  - machine.json schema 21: `usb` (the machine's USB controller, `qemu-xhci` on slot 0x15; new and imported machines have it,
+    an older one gets it in Configure → Sound and input with the machine off) and `usb_auto` (up to 8 `vendor:product[:serial]`
+    rules, "Connect … automatically" in the Devices menu while it runs, `VM_USB a = 2/3`, Remove in Configure, `lord-vm
+    --set --usb on|off --usb-auto RULE…|none`). A matching device goes in by itself, once while it stays plugged in, never
+    asking for a permission and never a disk (picked by hand only); an exported machine's rules are dropped at its import. Never for a machine locked for anonymity: refused by machine.json's check, lord-server and
+    lord-vm.
+  - **The camera** goes in the same way, as a USB device: a device with a video interface needs LordOS's camera permission
+    for Machines and one with sound the microphone's (checked in C; the app asks with the system prompt the first time;
+    taken away, the device leaves the machine within a second); the capture indicator shows the camera for "Machines —
+    <name>". Measured with the maintainer's own Logitech C930e (he allowed it): a Debian 13 guest saw it as
+    "Logitech Webcam C930e" (`/dev/video0`) and captured 30 frames of 640×480 YUYV at about 13 frames a second; out again,
+    uvcvideo and snd-usb-audio took it back on this computer.
+  - `lord.vm.usbDevices()`, `usbAttach(id, bus, dev)`, `usbDetach`, `usbAuto`; the poll's `usb` (`devices`, `busy`,
+    `controller`, `locked`, `err`, `auto`); the list's `usb` and `usbAuto`. 24 new strings in all 35 languages.
+  - Tests: `build/vmusb-test` (a made-up sysfs: listing, every refusal, the request, rule and line parsers with 200 000
+    random inputs, the descriptor check; ASan, UBSan), `tests/vm_usb_model_test.mjs` (the menu's rows, rules, indicator,
+    permissions), `tests/vm_usb_e2e.sh` (root, a real device, a real guest: vm-usb-allow → lord-vm → QEMU → the guest, and a
+    lord-server started as root in a private mount namespace driving `lord.vm` through the real admin helper), and
+    `build/vm-usb-cli` (vm-usb-allow as the helper runs it, for manual checks). lordvm-dev gains `usb-in`, `usb-out`,
+    `usb-auto`, `usb-noauto`.
+- **Machines checked on real hardware.** The Whonix group's release gate
+  ran on a PC in a headless session: Tor reached, an onion site answered, nothing left the computer but the Gateway's
+  connections to Tor relays, Start Gateway, the group's stop order, Start Fresh and a disposable session. Fixed on the
+  way: after Start Fresh the Workstation's old window stayed open, and the next start of the group then said it didn't
+  start. Also checked: the "Weaker isolation" notice on a kernel without Landlock, real updates of QEMU and of the UEFI
+  firmware under existing machines, a machine on hugetlb pages under the seccomp allowlist, the guest performance profile
+  in a real Linux guest, and the performance targets measured on a PC and a Raspberry Pi 5 (docs/VIRTUALIZATION.md 9).
+- **Machines: files from the machine, a file copy panel, the guest's own notifications, its apps before it runs** (docs/VIRTUALIZATION.md 6.12, 6.18, 6.21).
+  - **Send to LordOS.** A file chosen in the machine (Linux: the file manager's Send to LordOS, or `lordos-guest
+    --send-to-host FILE…`; virtio-win guests: Send To → LordOS) is copied to this computer over the guest agent's own
+    channel, one at a time, with flow control (never more than 4 MiB in flight) and resume after a lost connection (the
+    machine goes on only from a start whose SHA-256 matches what arrived), and is kept only when the whole file's SHA-256
+    is the machine's.
+  - **The quarantine folder.** Every file from a machine lands in `~/Machines/Received/<machine>/`, never anywhere the
+    machine names: folders made without following a link and never shared with other accounts, names made safe (nothing
+    arrives hidden, nothing is replaced: "name (2).ext"), the file 0600 (never executable) and marked as from that machine.
+    Files shows where it came from in Get Info and never opens a program, installer, package or desktop entry from a
+    machine with a double click (Open With still does); the marks follow copies and everything extracted from an archive
+    that came from a machine. At least 1 GiB stays free; at most 8 unfinished files are kept for a resume, none older than
+    7 days. Configure → Sharing → **Files from the machine** turns it off (machine.json schema 20, `guest_files`); a
+    machine locked for anonymity never takes files.
+  - **The file copy panel** along the bottom of the machine's window: every file on its way in (drops) or out, with its
+    size, a bar, the speed, the time left and **Cancel** (a drop can now be cancelled too), Show in Files, Open Received
+    Folder, and a received file dragged onto a folder in Files is copied there. It replaces the one progress line.
+  - **The machine's own notifications** (Linux guests, with Notifications from the machine on): the guest desktop's
+    notifications come too, as plain text marked "From ‹machine›", read by the LordOS tools as the person from that
+    person's own session bus, one kind of message only.
+  - **The machine's apps in the launcher before it runs**: the apps of a machine that has used apps mode are in the
+    launcher, the Classic start menu and search with the machine's mark; choosing one starts the machine and opens the app
+    in apps mode, only when the machine itself still lists it. Configure → General → "Its apps in the launcher".
+  - **The agent's shell in a Terminal tab**: Open in Terminal moves the machine's shell into a Terminal tab, titled and
+    marked as the machine's.
+  - **The LordOS tools 10 (Linux) and w13**; Machines updates older tools by itself. The Linux tools now write every frame
+    whole (a virtio-serial port takes at most 32 KiB a call: a large clipboard picture could be cut before).
+  - Tests: `vm-test` (the new frames, fuzzed with 80 000 random frames, the quarantine folder against links, hard links,
+    collisions and sizes, schema 20), `guest_send_test.sh`, `guest-dbus-test` (the notification monitor's parser),
+    `fsops-test` (the marks), `vm_xfer_test.mjs`, `guest_apps_test.mjs`, and a real Debian 13 KVM guest.
+- **Machines: All Displays** (docs/VIRTUALIZATION.md 5.4). View → All
+  Displays shows a machine across this computer's displays: one output of its virtio-gpu per display (up to four), each full
+  screen at that display's size, beside the others; the machine's own window keeps the first, and each further window's
+  top edge has Back to One Display. A machine with fewer outputs gets them while it's off (machine.json schema 19,
+  "heads"; lord-vm --set --heads). One lord-vmdisplay serves every output on a channel of its own (QEMU's peer-to-peer
+  display serves one connection), and an output whose window goes is turned off for the guest. Not for a machine with a
+  graphics card, apps mode or a protected machine (the anonymity profile keeps one display: the guest never learns this
+  computer's displays). Checked with a real KVM guest (tests/vm_multihead.sh) and a headless scene.
+- **Machines: each machine its own firewall row** (docs/FIREWALL.md, docs/VIRTUALIZATION.md 6.5). A
+  running machine's traffic is the firewall app `lordos:vm-<id>`, named after the machine in Monitor, with its forwarded
+  ports listed as its incoming lines; Settings' rule and restriction lists offer each machine, and Configure → Network
+  opens its rules. Every machine still inherits the Machines rules, restrictions and trust (`lordos:machines`), decided as
+  one list with the usual precedence; lord-netperm compiles the same union. The Tor gateway keeps its own row and
+  inherits nothing.
+- **Machines: one parent for every machine** (docs/VIRTUALIZATION.md 3.7).
+  lord-sessiond places each machine's scope in its session's `lordos-machines.slice` (root-owned, made on the first
+  machine) with a fixed `cpu.weight` 50 and `io.weight` 50: half of one app's, a twentieth of the compositor's. Under load,
+  the machines together yield to the desktop and the apps; idle cores and an idle disk are still theirs. Each machine keeps
+  its own memory and CPU limit. lord-netperm's programs look one level down into the slice, so each machine keeps its own
+  firewall policy (the Machines rules while a just-started one isn't registered). Monitor, the process owner, the battery
+  history and Sentinela's scope check find machines there and in the old place. lordos.service restarts with live
+  sessions keep the slice's limits. lord-sessiond uses the slice only while the running lord-netperm is the installed
+  one, so a half-restarted update never leaves a machine without a firewall.
+- **Machines: the app's last parts** (docs/VIRTUALIZATION.md 5.1, 5.2,
+  5.3, 5.5, 6.14).
+  - **New Machine: Detect.** An installer disc chosen or dropped on the assistant gets a step of its own: what its
+    label and boot files say, which system it is, which processors it starts on, and, before anything is made, when it
+    would run emulated on this computer or when its name and its boot files disagree.
+  - **New Machine: drop, place, Fresh install.** Drop an installer disc, a disk image or another app's machine anywhere
+    on the first step. The Name step says where the machine goes and how much space is free there. After an
+    unattended install, the machine takes a "Fresh install" snapshot before its first start (on by default).
+  - **Templates.** Make Template keeps a machine as it is; its card says Template, the library has a Templates chip,
+    and New Machine from Template makes a copy to use.
+  - **Configure.** A machine's icon color and tags (the library's search finds them, `#tag` exactly); the processor
+    the guest sees (this computer's, or Compatible: the same on every computer, so a machine keeps working when it
+    moves); Add Disk (one more empty data disk); a new network card address; huge pages shown as automatic; where the
+    guest prints. `machine.json` schema 18 adds `cpu_model`.
+  - **The machine's window.** View → Scale (50 % to 200 %); with a fixed resolution the window keeps the guest's shape
+    after a resize; a dot on the bar for each device the guest can use now; Devices → Network pulls or plugs in the
+    network cable while the machine runs, and Devices → Folders.
+  - **Cleaner** sends a machine's space to Machines' Storage window (Reclaim in Machines) instead of offering its files.
+  - **Decided:** no memory ballooning (the guest would decide what it gives back, and it is one more device a guest
+    talks to); no network speed limit; this computer's printing service is never opened to a machine; machines stay in
+    the Machines library; the capture release keys stay fixed.
+- **Machines: programs, files, logs and an MCP server from the terminal, per machine with the person's consent**
+  (docs/VIRTUALIZATION.md 6.15 and 6.24). `/usr/bin/lordvm` is a second link
+  to the `machines` command, which gains:
+  - `machines exec NAME [--timeout S] -- PROGRAM ARGS…`: runs a program in a Linux machine as the person signed in to it
+    (never as root), in their home folder, with this terminal's input (up to 1 MB), and gives back its output and its exit
+    status (124: its time ran out, 125: it couldn't run). It goes only through the machine's own lord-vm (a new request,
+    `VM_EXEC`, a sealed memfd on lord-vm's socket, which only the person's processes reach) and qemu-guest-agent: two fixed
+    scripts, one as root that only finds the signed-in person, one as that person that runs the program under
+    `timeout`; the program, its arguments and its input are data, never script text. Output is cut at 128 KB and errors
+    at 32 KB in the guest, parsed as hostile, and shown on a terminal with control characters as `?`.
+  - `machines cp [--force] FILE NAME:PATH` and the other way: files checked by SHA-256 at the end, written under a
+    temporary name and renamed without replacing (unless `--force`); on this computer only the person's files under
+    lord.fs's rules (never a protected path), checked on the opened descriptor; a size claimed beyond the free space is
+    refused, and Ctrl+C removes the half-copied file.
+  - `machines logs NAME [--serial|--machine] [--follow]`, `machines console NAME` (the serial console, Ctrl+] leaves),
+    `machines shell NAME` (the agent's shell as the signed-in person, sized to the terminal),
+    `machines import SRC NAME` (another app's machine, as Migrate does), `machines start NAME --no-window --snapshot TAG`
+    (from a snapshot with memory).
+  - `machines apply FILE`: a machine made or changed from a short TOML file kept beside a project. The file is untrusted:
+    an ISO, ports, shared folders, a bridged or host-only network, the clipboard and the agent it asks for are listed and
+    need the person's yes on their terminal (no terminal, no change), and its ISO must be in Downloads or the Machines
+    library.
+  - `machines mcp`: a local MCP server (JSON-RPC over standard input and output, strictly parsed) with `list_machines`,
+    `machine_status`, `start_machine`, `stop_machine`, `wait_until_ready`, `run_command`, `get_logs` and
+    `clone_machine`; only a machine of the library named by its name or id, nothing destructive.
+  - **Consent per machine**: `machine.json` schema 17 adds `"automation"`, off by default, turned on in Configure → Guest
+    agent → Automation after a question (5 new texts in all 35 languages); `machines set` can't set it; the anonymity
+    profile refuses it. lord-vm reads it again at each request and writes each program (never its arguments) in its log;
+    the command also writes `log/automation.log`. 28 new terminal texts in all 35 languages.
+  - `machines set` now passes `--cpu-pin`, `--perf-profile` and `--capture-fullscreen` to lord-vm, and the bash
+    completion knows them and the new commands (also for `lordvm`).
+  - Tests: `build/vmexec-test` (formats, limits, the guest scripts under `/bin/sh`, fuzz), `build/mcli-test` (cp sides,
+    terminal cleaning, the TOML subset, the MCP envelope and names, the apply file's boundary list, fuzz), schema 17 in
+    `build/vm-test` and `build/vmgroup-test`, `tests/vm_exec_e2e.sh` (28 checks, run on 2026-11-24 in a real Ubuntu
+    26.04.1 machine made by the Ubuntu card on the dev PC). Not built: `exec` in
+    virtio-win guests, folders in `cp`, packages and `rebuild` in `apply`, creating a machine from a card through MCP.
+- **Machines: Kali installs without questions, and every card was run end to end**. Kali gets its own
+  unattended install (Debian's preseed with Kali's archive and tasks: Xfce and the default tools). Fedora Workstation
+  installed by its card now starts its graphical login, and Fedora without the desktop installs again (Fedora 45 renamed
+  its smallest environment). On arm64 the installers of Debian, Ubuntu, Fedora and Kali show on the machine's screen
+  instead of only on its serial port (`console=tty0 acpi=nospcr` per architecture in the catalog). lord-vm builds with no
+  warning on arm64. On 2026-11-24 every card was run from its verified download to the installed system's login on amd64
+  (Fedora 45 Workstation, Ubuntu 26.04.1 server, Kali 2026.3, LordOS 0.8.9) and on the Raspberry Pi 5 (Debian 13.8, Fedora
+  45 and Kali consoles, LordOS); the arm64 desktops and Ubuntu arm64 didn't fit on the Pi's disk.
+- **Machines: an ISO's architecture from its boot files** (docs/VIRTUALIZATION.md 5.2). A new reader
+  (`server/src/vm/vmiso.c`, bounded reads through one descriptor) finds the UEFI boot loaders in the ISO 9660, UDF and El
+  Torito trees and reads their PE headers; install discs are known by their `sources/install.*`; the name or label decide
+  only when the boot files say nothing, and the summary card says which. An `.iso` dropped on "Use an ISO" picks it.
+  Tests: `build/vmiso-test` (images built byte by byte, hostile ones, a fuzz pass), 9 new `isoArch` checks.
+- **Machines: virtio-win guests on arm64** (4.3.2): `virt` with GICv3, secure boot (AAVMF), a TPM on
+  `tpm-tis-device`, USB CD/DVD drives, ramfb, the ARM64 drivers in the unattended answer and the maker's 38 published
+  Arm64 ISO hashes pinned. On a computer whose GIC is version 2, such as the Raspberry Pi 5, KVM can't run it: the
+  machine is Emulated and the card says so. `swtpm` comes with `vm-enable` on arm64 too. Checked on the Pi 5 under TCG
+  with an Alpine ISO; an install of the guest itself is not yet checked. 7 new texts in all 35 languages.
+- **Machines: a machine group's Delete, Rename and Repair** (docs/VIRTUALIZATION.md 19.7–19.9). The
+  group's card menu gains Rename… (the group, its members' names and its folder, with the group off; also `machines rename
+  GROUP NEW`), Delete… (for good: every member's lock held, the folder renamed out of sight, checked and removed by
+  descriptors without following links, then each base nothing else names) and Repair… on a damaged group (a base missing
+  or changed made again from the verified archive through the sandboxed `lord-vmunpack`, a missing member made again from
+  its base). Start Fresh now remakes a missing or changed base instead of refusing, fetching the archive again when it is
+  gone (refused unless its SHA-512 is the recorded one). While the Gateway is off, the Workstation's window says "No
+  network: the Gateway is off" with Start Gateway; the card offers Shut Down the Gateway when it runs alone. Fixed: creating
+  a group from the app was refused (the image store's file name never matched the catalog's pattern), and a base already
+  in `.shared` was reused without checking it. 34 new texts in all 35 languages. Tests: `vmgroup-test`,
+  `tests/vm_group_manage.sh` (37 checks), `tests/machines_group_manage_headless.sh` (20, a headless lord-server in its own
+  namespaces), `vm_group_ui_test.mjs`, `vm_group_model_test.mjs`.
+- **Machines: encrypted machines, disposable sessions for any machine, raw disks, Export, consistent backups** (docs/VIRTUALIZATION.md 3.5, 3.6, 6.2, 6.4, 6.14, 8, 19.7). `machine.json`
+  schema 16 adds `disposable`, `encrypted`, `disk_format` and `backup`.
+  - **Encrypted machines.** "Encrypt this machine" in the New Machine assistant's review. Every disk, the UEFI
+    variables and a disposable session's layers are qcow2 with LUKS, the TPM's state is swtpm's own encrypted state,
+    and a snapshot's memory is written inside the encrypted disk. The key is 32 random bytes made by lord-server and
+    kept in your keyring before the machine is made; Passwords shows it as "Machines: <name>", the machine's recovery
+    key. lord-server reads it back itself (JS only ever sees whether it's ready), holds it for two minutes in locked
+    memory, forgets it when the screen locks, and gives it to lord-vm on a pipe; QEMU, qemu-img and swtpm read it from a
+    pipe too, never from an argument, the environment or a file. With the keyring locked, the system's unlock prompt
+    opens; for a machine from another computer, its recovery key is typed in a window of its own that is never
+    captured. No card picture, snapshot picture, serial log or guest journal of an encrypted machine is kept. Suspend
+    is refused for it (it would write the memory to a file); a snapshot with memory works. Configure → Security says
+    where the key is, and that this computer's swap can still hold a machine's memory.
+  - **Encrypted machine groups** (isolation layer 5 of the Whonix card, approved 2026-11-23): "Encrypt the machines'
+    disks" on the card; each member's disk is encrypted under the group's key, the verified public base images aren't.
+    Start Fresh and the workstation's disposable session keep it encrypted.
+  - **Disposable sessions for any machine.** Configure → Disks → Disposable session: Off, In memory or On disk. Each
+    start begins from the disks as they are and everything changed is thrown away at shutdown: a layer over every disk
+    and the UEFI variables, in memory (capped at the machine's memory, the machine pauses when full) or in unnamed files
+    that go with QEMU even after a crash; the TPM's state is a copy in memory. Snapshots and Suspend are refused while
+    one runs.
+  - **Raw disks**: a machine whose disks are plain files (`lord-vm --create --disk-format raw`): the fastest, with no
+    snapshots, linked clones or encryption. Never a disk or partition of this computer.
+  - **Export** (the library's ··· and Configure → Disks): a whole machine as a `.lordvm` folder with a list of
+    checksums (an encrypted machine's stays encrypted), or as an OVA for other apps (the disks as VMDK, an OVF
+    description and its checksums). **Bring In an Exported Machine…** checks every file against the list before
+    copying, refuses anything extra, a link or a changed byte, asks for the recovery key of an encrypted machine, and
+    turns off everything the file asks of this computer (forwarded ports, shared folders, clipboard, microphone,
+    agent…), to be turned on again by you.
+  - **The UEFI firmware a machine was made with is kept in its folder**, and used after a firmware update, until
+    Configure → Disks → "Use This Computer's Firmware".
+  - **Backups and machines**: a machine is copied while it's off, holding it so it can't start half way; a running
+    machine's disks are taken from the previous backup; its temporary files are left out; Configure → Disks →
+    "Include in Backups" leaves a machine out. Backups says how many machines were running.
+  - Tests: `vm_storage_test.sh` (real QEMU and KVM: keys, a write kept or thrown away, swtpm's encrypted state, export
+    and import, hostile exports, an encrypted group, the kept firmware, raw disks), `vmexport-test`, `vmkeysrv-test`,
+    `backup-machines-test` (ASan and UBSan) and `vm_storage_model_test.mjs`.
+- **Machines: Install Agent without qemu-guest-agent, the LordOS Guest Tools disc**. A Linux machine whose system has no qemu-guest-agent (Debian's own images, LordOS 0.8.9, most desktop
+  installs) stayed on "Waiting for the agent" with nothing to click. Its agent popover now offers **Install Agent from
+  Disc**: lord-vm puts the LordOS Guest Tools disc in the machine's CD drive (read-only, only its own copy, whose SHA-256
+  is compiled into it; never in a machine locked for anonymity, a non-Linux guest, or while the drive has a disc),
+  the popover shows the line to run in the machine, and lord-vm takes the disc out by itself once the agent answers.
+  - **The disc** (`/usr/lib/lordos/guest/lordos-guest-tools-<arch>.iso`, volume `LORDOS_TOOLS`) is made at build time by
+    our own ISO 9660 writer (`tools/guest/mkguestiso.c`, the same bytes for the same files): `install.sh`, `lordos-guest`
+    for the package's architecture, its SHA-256, the architecture and a README.
+  - **`install.sh`** asks for the administrator's password with the machine's own prompt (`pkexec` with a desktop polkit
+    agent, else `sudo`, `doas` or `su`): Machines never sees or types it. As root it checks the processor and the
+    helper's checksum, copies `lordos-guest` with its udev rule, user unit (an XDG autostart entry without systemd) and
+    shutdown hook, installs `qemu-guest-agent` with the system's own package manager (`apt-get`, `dnf`, `yum`, `zypper`,
+    `pacman`, `apk`) and starts it (systemd or OpenRC), installs `xclip` and `wl-clipboard` best effort, and starts the
+    helper for the person who ran it. `install.sh --plan` says what it would do and changes nothing.
+  - Checked on a real Debian 13 guest under KVM with lord-vm: no agent, the disc in, `install.sh` run on the guest's
+    console, qemu-guest-agent connected 17 to 31 s later (two runs), the disc out by itself one second after, then Install through
+    qemu-guest-agent on the same guest (`server/tests/vm_guest_tools_e2e.sh`); `guesttools-test` reads the image back
+    with lord-vm's own ISO reader and checks its hash and the writer's refusals; `guest_tools_install_test.sh` checks
+    `install.sh`'s choices on 18 kinds of system; shellcheck is clean.
+- **Monitor: Get Info says what a program is**. A **Description** line
+  between the command line and the tabs, in the grouped and the plain view, from what the computer already has and
+  never the network: LordOS's own programs and the kernel's threads, the app's manifest or `.desktop`/Flatpak
+  `Comment` (the person's language when it has one), the well-known system programs (systemd, (sd-pam), dbus, PipeWire,
+  WirePlumber, the portals…), the program's manual page (a translated page first, read without running `man`), the
+  service's `Description=`, and the package's description from dpkg's database, in the person's language when apt has
+  Debian's translation (matched by `Description-md5`). lord-server reads them in a worker thread
+  (`server/src/monitor/describe.c`, `lord.monitor.describe`); one SDK function gives the same text to anyone
+  (`sdk/describe.js`: `describeProgram`, `describeApp`). An English-only text says so and offers **Translate with Lumo**
+  while Sentinela is on (kept per language). On the development machine 616 of 647 processes were described, 176 of
+  them in Spanish for free. Every LordOS app and `lord-*` program must have an English description:
+  `tools/desc-check.mjs`, run by `tools/i18n-check.mjs`. `lord.apps.linux`/`flatpak` now say whether the `Comment` is in
+  the language asked (`commentLocal`).
+- **Sentinela: Investigate with Lumo** (in development; approved by the maintainer on 2026-11-24). A program Get Info
+  can't describe shows **Unknown** and, with Sentinela on and a local model installed, **Investigate with Lumo**: on that
+  click only, for the person's own process, the local model reads the facts Sentinela already sees (name, path, package
+  or none, parents, how it started, CPU, memory, socket counts) and, read by lord-server and fenced as data between two
+  markers with a random nonce, the program's script text (at most 64 KB read, 6000 bytes sent; opened by descriptor,
+  no links, a regular file the user or root owns, only when it is that interpreter's script) or a binary's metadata (ELF
+  type, size, SHA-256, loaded libraries, a sample of its strings) (`server/src/llm/evidence.c`). It answers in the
+  person's language what it does, why it probably runs, a risk and one action of a closed list, checked strictly; the
+  actions (End, Pause, Block its network, Blocklist) run only on the person's click.
+- **Sentinela: a blocklist** (in development; approved 2026-11-24). **Blocklist** puts a program (by its file's SHA-256,
+  a script by the script's, optionally with its package) on `~/.config/lordos/sentinela/blocked.json`, which only
+  lord-server writes (protected from apps and `lord.fs`), and ends it; from then on a thread of lord-server's ends it
+  with SIGKILL through a pidfd within about half a second whenever it starts in the person's account, under any name
+  (`server/src/llm/blockwatch.c`). LordOS's own programs, an interpreter itself and the system's core programs can't be
+  blocked. Settings → AI → Sentinela lists the programs with **Remove**. Stopping a program before it runs, and for every
+  user, would need a root part (fanotify `FAN_OPEN_EXEC_PERM`): proposed in docs/SENTINELA.md, not built.
+- **Machines: a shell inside the machine, links and notifications from it, and more of the logs** (docs/VIRTUALIZATION.md 6.12, 6.17, 6.18, 6.19).
+  - **The agent's shell.** The Shell pane of a machine's window shows a shell inside the guest as the person signed in
+    there, over the guest agent's own channel (no network, no SSH, works with Isolated network), with a switch to the
+    serial console and New Shell. Linux guests: that person's own login shell in a pty; virtio-win guests: PowerShell in a
+    pseudo console. Never root or an administrator, never a program named by this computer; one shell at a time; flow
+    control both ways keeps memory flat whatever the shell writes. The terminal is titled with the machine's name and
+    marked, so it can't be taken for this computer's.
+  - **A guest's terminal stays text** (the agent's shell and the serial console): what a guest writes can no longer
+    set this computer's clipboard (OSC 52 and OSC 1337 Copy did, past the clipboard's gate and a clipboard set to Off),
+    start tmux's control mode, make links, or raise a title, notification, password prompt or any other terminal event
+    on this computer.
+  - **Links from the machine** (off by default, Configure → Sharing): a program in the guest can ask to open a web
+    link here (`lordos-guest --open-on-host URL`). Only http and https, no user name before the host, only the
+    characters a browser gets as one argument; at most 3 at once, then one per 5 s; only while the machine's window is
+    in front; one at a time. It waits in a bar over the machine's picture with the whole link and opens in the browser
+    only when the person clicks Open, which works only after the bar has been seen for a moment.
+  - **Notifications from the machine** (off by default): `lordos-guest --notify-host TITLE [BODY]` shows a
+    notification marked "From ‹machine›", plain text without control or direction characters, at most 5 at once, then
+    one per 3 s, with no actions.
+  - **The agent light turns red** when the guest agent stopped answering while the guest runs, or installing the
+    LordOS tools failed. The agent's popover lists the shell, links and notifications.
+  - **Logs:** a virtio-win guest's event logs (System and Application, through
+    the guest agent every 10 s, one fixed script); a filter by unit or source (click it); the guest's times in this
+    computer's local time, with the guest's own zone named when it differs.
+  - **The LordOS tools 9 (Linux) and w12** bring the shell and the links and notifications; Machines updates older
+    tools by itself. machine.json schema 15 adds `guest_links` and `guest_notify`; a machine locked for anonymity
+    (Whonix) refuses both.
+  - Tests: `vm-test` (the new frames' parsers, fuzzed with 80 000 random frames, the link encoder, the rate limit,
+    schema 15), `vmgroup-test` (the anonymity lock), `guest_shell_test.sh` (the shell's pty, size, exit status, 2 MB
+    with late acknowledgements never past its window, the host's close, the helper's socket), `vm_model_test.mjs`
+    (the agent's lines, the red light, the logs' times and zones).
+- **Machines: the app and its ties to the system** (docs/VIRTUALIZATION.md
+  3.3, 3.7, 5.1, 5.3, 5.4, 5.5, 5.7, 6.1, 6.14).
+  - **One resource budget for every start.** lord-server checks it on the window's start, Start Without Window,
+    `machines start` (through the session and without one) and a group's members: the memory the library's running
+    machines hold (each with QEMU's share, a disposable session's too) plus the new one must fit in what this computer
+    lets machines use. The window offers Suspend ‹another machine› or Start with less memory; the library's status line
+    shows the memory for machines and warns "Short of memory" under memory pressure.
+  - **The failure page** names a locked disk and a missing disk from QEMU's own words, and offers Start with less memory
+    after running out and Go Back to a Snapshot.
+  - **"Weaker isolation on this kernel"**: on a kernel without Landlock the library says so, Configure → Security says
+    what applies instead, and a running machine's Info menu reads what its sandbox really applied.
+  - **The library's cards** have agent and disk lights, with words; **Pause All** on the toolbar while on battery.
+  - **The machine window**: a View menu (Window, Full Screen, Apps, Picture in Picture, Actual Size), an Info menu (CPU,
+    memory, disk, the sandbox) and Start in Full Screen. Picture in Picture is a small floating view that takes no input
+    for the guest, never for a protected machine.
+  - **What this computer can run**, for amd64 and arm64, from what the computer reports, with its temperature, fan and a
+    Raspberry Pi's power supply while machines run; in the Machine menu and on the first-run page.
+  - **Configure**: a search over the sections and a dot on each section with an unsaved change; Startup and shutdown has
+    Start with the session and Pause while I'm away (after 10 minutes without input; resumed on the next).
+  - **The rest of the system**: Search finds machines; Files shows a machine's folder as one item that opens it; Backups
+    leave out a running machine's disks and saved session (they wouldn't be a consistent copy); Cleaner never offers a
+    machine's files; Monitor's machine row has Show Machine; a notice with Pause All when the computer leaves the charger
+    while machines run; Store → Updates warns before a QEMU update while machines are suspended.
+  - Fixed on the way: the Whonix group's Start Fresh dialog counted its snapshots as none.
+- **Machines: machine groups and Whonix, first part**. The parts under the
+  Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
+  workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the
+  gateway. Built so far: the download, its checks and unpacking, the group, the link between its two machines, and the
+  `machines` command; the assistant's card, the library's group card, Configure's group view and Start Fresh come next.
+  - **The catalog entry** `whonix` (its card came with the second part, below): Whonix's signing key pinned
+    (`packaging/keys/machines/whonix-derivative.asc`, primary key `916B 8D99 C38E AF5E 8ADC 7A2A 8D66 066A 2EEA CCDA`,
+    compared on 2026-11-23 with Whonix's signing key page and keys.openpgp.org). The catalog learned SHA-512 lists, a
+    detached signature named after its list (`.asc`), the newest release folder whose list verifies with a floor no
+    download goes below (18.2.4.3), and an archive's members and size caps.
+  - **The admin actions** `vm-image-list` and `vm-image-get` take such an entry: the release folders' listing, then the
+    release's SHA-512 list and its OpenPGP signature checked with the pinned key, then the archive. A release below the
+    catalog's floor or below the newest one ever verified (kept root-side) is refused, and a list's or an archive's name
+    must give the very release of its folder. The archive downloads under a temporary name and becomes
+    `images/<sha512>.tar.xz` only after the whole file's SHA-512 matched the list's; a file at that name that isn't in
+    that verified state is thrown away. Root hashes it and never reads its contents. `vm-image-cancel` and
+    `vm-image-remove` take the longer names.
+  - **`lord-vmunpack`**, a new sandboxed helper started by `lord-vm`: it reads the verified archive on a descriptor and
+    writes exactly the two disks into two descriptors, with no files, network or exec (`sandbox_apply_helper`, 320 MB),
+    linking only libc and LordOS's own xz decoder, which got a streaming mode (`xzs_*`: CRC32 and CRC64 checked block by
+    block, the index checked against the blocks, at most a 256 MiB dictionary, nothing after the stream's end). Its tar
+    reader takes plain and old-GNU sparse members only, with names that match the catalog's patterns, each role once,
+    ascending sparse maps inside their size, and the catalog's caps (128 GiB a disk, 24 GiB of data); holes stay holes.
+    On Whonix 18.2.4.3 LXQt (1.9 GB): 104 s, 11 MB of memory, both disks byte for byte GNU tar's.
+  - **`lord-vm --group-create`** hashes the archive again, unpacks it with `lord-vmunpack`, checks each disk with the jailed
+    `qemu-img info` (no backing file, no data file, a virtual size within the cap), writes read-only bases in
+    `~/Machines/.shared` with the jailed `qemu-img convert` (dropping the 100 GiB of preallocated metadata: 2.85 GiB and
+    3.59 GiB) and makes `<name>.lordgroup/` with its `group.json` and the two machines as linked clones of the bases.
+  - **`group.json`** (schema 1: members, roles, start and stop order, the image and its bases) and **`machine.json` schema
+    14** for members: `group`, `role`, the `link` network (one card on the group's link and nothing else),
+    `"uplink": "tor"` (the gateway's passt with no DNS forwarding and no ports), `link_mac`, `profile_lock` and `timers`.
+    The anonymity lock refuses the agent, clipboard, transfer and shared folders, ports, 3D, graphics cards, the
+    microphone, SMBIOS strings, disk serials and the performance profile, with no override. A locked member gets private
+    4 KB memory (no hugetlb, transparent huge pages off for its QEMU, no KSM), no VMware port, no HPET, a generation id, Whonix's clock devices as libvirt
+    gives them (checked in libvirt 11.3's source), no sound card on the gateway and an output-only one on the
+    workstation, no first-boot credentials, no suspend and no card picture on disk.
+  - **The internal link**: a new control message, `VM_LINK`. lord-server makes one `socketpair` per pairing and hands one
+    end to each member's `lord-vm`, which checks it (a connected AF_UNIX stream socket of this account) and puts it on the
+    card's QEMU hub, taking the previous one off. The two QEMUs exchange frames directly; nothing on the host reads them,
+    no other process can reach them, QEMU's sandbox is unchanged. A member started anew is linked again by the session
+    within 2 s; with the gateway off the workstation has no network at all.
+  - **Groups in Machines and the `machines` command**: `lord.vm.list()` lists the members with their group and role,
+    `lord.vm.groups()` the groups, `lord.vm.link()` makes a group's link; the model's `groupPlan` starts the gateway first
+    and the workstation once it runs, and stops them the other way round. `machines list` shows a group's row,
+    `machines start Whonix [--no-window]` and `open` go through the session (whose channel now takes a `.lordgroup`
+    folder), `stop` and `poweroff` act in stop order, `status --json` describes the group.
+  - **Checked on the dev host, headless**: the gateway's eth0 at slot 0x2 (passt) and eth1 at 0x18 (the link), the
+    workstation's only card at 0x2 with its only route through 10.152.152.10, Tor's own check answering `"IsTor":true`
+    from the workstation, no network for it with the gateway off, the link swapped three times during a download without
+    breaking it, and the session relinking a restarted gateway. Then still open (solved in the second part, below): neither Whonix member powers off on ACPI's
+    power button (checked with the unchanged images: forced off after 120 s), so a group's Shut Down ends as a forced
+    power-off for now.
+- **Machines: machine groups and Whonix, second part** (docs/VIRTUALIZATION.md
+  19.0, "Built in G3–G4"). What the first part left, on the decisions the maintainer took on 2026-11-23:
+  - **The New Machine card "Whonix (Tor)"** with a "Group · 2 machines" badge, only with KVM on amd64. Choosing it finds
+    the newest Whonix release whose signed SHA-512 list verifies, never older than the catalog's floor. A new step,
+    **About Whonix**, shows the diagram (Internet, Gateway, private link, Workstation), what is locked off, the random
+    identity of each group, what it doesn't protect against (malware on this computer, an escape from a machine,
+    fingerprinting, timing attacks on Tor, Tor being visible to the network provider) and a **Disposable session**
+    switch. **Download and Create** downloads the archive, checks it, makes the group and starts it (the Gateway first).
+  - **One library card per group**: the group's mark, a "Tor" chip with the Gateway's dot, "Group of 2 machines", and a
+    menu with Start the Group, Show Workstation, Show Gateway, Shut Down the Group (Workstation, then Gateway), Force Off
+    Both, Group Snapshot…, Configure…, Disposable Session, Logs, Show in Files and **Destroy and Start Fresh…**. Its
+    confirm dialog resets only the Workstation by default; "Also reset the Gateway" warns that Tor's entry guards go
+    with it. The group's start checks the memory of both machines (and the disposable session's) at once.
+  - **Start Fresh** (`lord-vm --group-fresh`, `machines fresh NAME [--gateway] [--yes]`): with the group off, the
+    Workstation (and the Gateway when asked) goes back to its verified base, checked by SHA-256, with a new machine id and
+    new network addresses; its files, snapshots, logs and usage history go. The other machine is untouched.
+  - **The disposable session in memory** (isolation layer 6): the Workstation's changes live in a memory file handed to
+    QEMU, over its system disk opened read-only; nothing of the session is written to a file of this computer, and it is
+    gone at power-off. It may hold as much as the Workstation's memory (2 GB by default); when it is full the Workstation
+    pauses and says so. Snapshots are refused during a session.
+  - **Configure for a group**: a Group section (which machine, the disposable session, the start and stop order, the
+    Whonix release) and every anonymity setting shown off with a lock and a one-line reason.
+  - **Shut Down works**: both Whonix machines ignored the power button (the desktop's power manager holds logind's
+    power-key lock, and on the Workstation kloak, Whonix's keystroke anonymizer, grabs the power button itself). Machines
+    now sends Ctrl+Alt+F2, then kloak's own Right Shift+Esc, then the power button, so each guest shuts down cleanly,
+    Tor included, in seconds (the group in 8 s on the dev host) instead of being forced off after 2 minutes. No agent and
+    no change to Whonix's images.
+  - **`machines --member gateway|workstation`** for `start`, `stop`, `poweroff`, `status` and `open` on a group.
+  - **Storage** shows a group's verified download, with whether it is still needed; a group's read-only bases are never
+    offered for removal (they were counted as unused before).
+  - Both machines' windows and their apps-mode windows are protected in every capture of the screen from the first frame.
+  - Tests: `vm_group_ui_test.mjs`, `vm_whonix_xml_test.sh` (each machine's QEMU and passt arguments against Whonix's own
+    XML), and `vm_group_link.sh` now checks the shutdown, the disposable session leaving nothing on disk, and Start Fresh.
+    Every new text is in all 35 languages.
+- **Firewall: the Tor gateway of a machine group has its own identity and a rule built in** (isolation layer 4 of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23;
+  docs/FIREWALL.md "The Tor gateway"). The gateway member of a Whonix group (the one with `"uplink": "tor"`) now runs in
+  `app-lordos-lordos-vm-tor-<id>.scope`, which the firewall and Monitor read as the app `lordos:tor-gateway`, shown as its
+  own row ("Tor gateway · <name>") in Monitor and Settings, in every language; other machines stay `lordos:machines`.
+  - **lord-netperm enforces a built-in restriction for it** (`FW_R_TOR_UPLINK`, bit 12, outside what `firewall.json`
+    can set or clear), checked before any rule, so the owner's rules can only take more away: only outgoing TCP to
+    internet addresses. Refused: anything incoming; UDP, ICMP and raw sockets (`cgroup/sock_create` refuses them before
+    they exist; the gateway's passt needs none and still carries Tor); every LAN, private, CGNAT, link-local, ULA,
+    multicast, broadcast, loopback or unknown address, the special and documentation IPv4 ranges (192.0.0/24,
+    192.0.2/24, 198.18/15, 198.51.100/24, 203.0.113/24, 240/4) and every IPv6 range that carries an IPv4 inside
+    (IPv4-compatible and IPv4-mapped, NAT64 `64:ff9b::/96` and `64:ff9b:1::/48`, Teredo, 6to4) plus `2001:db8::/32`;
+    remote ports 53 and 853 (DNS over TCP and TLS).
+  - **Never this computer or its links:** a new trie `np_local` holds this computer's interface addresses with their
+    prefixes and its directly connected routes (never a default route or a VPN's 0/1 and 128/1), read by lord-netperm
+    over rtnetlink (`RTM_GETADDR`, `RTM_GETROUTE`, `netperm/nplocal.c`) at start, on every address or route change and
+    every 5 seconds; for the gateway they count as LAN even when public (a public-address LAN, a routed /64). When they
+    can't be read or don't fit (1024), the gateway is refused every address until they fit (fail closed, logged).
+  - The restriction is left out of the `user@` union (as "no microphone" is): it would otherwise take UDP and the LAN
+    from every process of the person while a gateway runs.
+  - Tests: `npcompile-test` (the gateway against `fw_decide`, fixed cases and random rounds), `fw-rules-test` and
+    `vmwatch-test` (the new scope name), `np-torgw-test` (as root: the real programs on a throwaway cgroup of its own:
+    UDP, ICMP, TCP 53/853, LAN, loopback, the special and IPv4-carrying IPv6 ranges, this computer's addresses and
+    networks and binds refused, TCP 443 connects, everything refused when `np_local` is full; and its netlink parser) and
+    `tests/vm_gateway_fw.sh` (a Whonix group under that policy: Tor works, the gateway's UDP DNS, TCP 53 and LAN
+    connections don't).
+- **Protected windows, everywhere a picture leaves** (approved by the maintainer on
+  2026-11-23 as isolation layer 8 of the Whonix group, docs/VIRTUALIZATION.md 19.5, and useful for any window). A
+  protected window shows normally on the display and never appears in anything that captures the screen
+  (docs/PRIVACY.md, "Protected windows").
+  - **What a capture shows:** an opaque neutral fill (`PAINT_PROTECT_FILL`) with a small lock and "Protected window" in
+    the person's language (new `privacy.protectedCapture` in all 35 languages, set by the shell through the new
+    `lord.media.setProtectedLabel`), in the window's exact box and corners, the title bar included: partly covered,
+    moved, scaled by the overview, rotated, on any display, on the CPU and GPU paint paths. Up to 0.8.9.5 it was black,
+    and only the content was hidden. A protected Linux full screen is now the fill on its own display only (it cleared
+    every display of a capture of them all).
+  - **One rule at the lowest point:** every picture of the screen that leaves lord-server is painted in capture mode
+    (`paint_capture`, `paint_capture_until`, `paint_capture_node`; `paint_protected_fill` in `ui/paint.c`) or is a copy of
+    one (`media_composed`). Covered: screenshots and `lord.media.screenshot`, a window alone (still refused), screen
+    recording, the remote desktop, the screen-sharing API, the ScreenCast portal (screen and window) and its chooser's
+    thumbnails, the Screenshot and PickColor portals, Wayland popups and full screen.
+  - **Fixed:** a capture through a transform the screen had already rasterized (the overview's scale, an effect, a
+    protected node's own rotation) reused that cached raster, real pixels included: a screenshot or a remote frame taken
+    during the overview showed the protected window. `tf_paint` now paints such a subtree again in capture mode and
+    never keeps that raster.
+  - **The GPU's read-back** for remote viewers is never sent while a protected node is on screen (before, the frame
+    painted right after a protected window opened could go out before the session moved to the CPU path).
+  - **A media source's own pixels** leave only through `media_src_exportable` (`media/capture.c`): `lord.media.saveImage`,
+    `copyImage`, `pixels`, `ocr`, `crop`, `resize` and `rotate` refuse a source shown inside a protected window
+    (`media.protectedWindow`), and so do Remote Desk's card picture and every picture of a machine.
+  - **API:** `wm.open(app, { protected: true })`, or `"protected": true` in a native app's manifest, opens the window
+    protected from its first frame and locked (`wm.setProtected(id, false)` can't undo it); `wm.setProtected(id, on,
+    { lock })`. The flag is on the window's frame (`WindowShell`) and content (`AppHost`). Linux apps can't set it: no
+    Wayland or X11 protocol asks for it, and no client is trusted with it (`sdk/protectmodel.js`).
+  - **Machines:** a machine with the anonymity profile (`machineProtected`: machine.json `profile_lock`, app.json
+    `profile`, a Whonix group) opens its window and its apps-mode windows protected; `lord.vm.protect(session)` (new,
+    one way) refuses its card picture (`lord.vm.snapshot`; the old `thumb.png` is removed), screenshot, recording (one
+    running stops) and snapshot picture, the window doesn't offer Screenshot or Record and stops taking card pictures,
+    and the library card shows no `thumb.png` for it. Every call site asks one helper (`isProtectedMachine`, meta.js:
+    the `lord.vm.list()` entry and app.json together, or the machine's own window already protected), so the window,
+    its apps-mode windows and the card can't disagree.
+  - **Defense in depth:** in a capture, a picture whose source is marked protected (a protected machine's, whatever
+    window shows it) is the fill too, counts as a protected node for the remote desktop and keeps its window from being
+    captured alone.
+  - **Tests:** `engine-test` `test_protected_transform_cache`, `test_protected_label`, `test_protected_media` and `test_protected_fuzz` (300 random
+    scenes through every capture function at four display scales, both paint paths, the drag layer and a blurred panel:
+    no protected pixel may reach any capture); `tests/protected_headless.sh` (a headless `lord-server-test` with Lord
+    Flow: Calculator opened protected is drawn on the display and is the fill in the screenshot, the remote frame, the
+    portal still and its window share, Notes beside it captured exactly; new test hook `frame`, only in
+    `lord-server-test`); `tests/protect_model_test.mjs`.
+- **Sentinela watches the virtual machines** (in development; approved by the maintainer
+  2026-11-23 as layer 9 of the anonymity group's isolation, docs/SENTINELA.md "Machines", docs/VIRTUALIZATION.md 6.28).
+  Still off by default and local only. Every 10 s it reads what Machines already exposes (`lord.vm.list()`,
+  `lord.vm.stats(dir)`) and per-machine socket counts from the Monitor's thread.
+  - **Always alerted, without the model, and they can't be turned off:** a machine's QEMU moved out of its own cgroup
+    scope (its limits no longer apply); a QEMU sandbox missing Landlock (files or network), seccomp, no_new_privs or its
+    cgroup, from the bits lord-vm applied and from the kernel's own `/proc/<pid>/status`; the Workstation of an
+    anonymity group with any way to the network besides its link (another network setting, forwarded ports, a bridge,
+    a live passt, a socket of its own). Each fires once per QEMU and finding and stays on screen until the person acts.
+  - **New toggles** in Settings → AI → Sentinela: a machine using far more CPU or memory than its own usual (after half
+    an hour of history: 10 minutes at 60 % of its vCPUs and 40 points above its usual; 1.5× its usual memory and
+    512 MB more); a machine that keeps crashing (3 unexpected ends in 15 minutes); for an anonymity group, a Gateway
+    whose traffic (8×) or remote addresses (3×) jump far above its own pattern, any unexpected end of a member, 3
+    restarts in 10 minutes and a CPU pegged at 90 % for 15 minutes. These may ask the local model, which gets only the
+    machine's name (as a quoted field), role, settings and the rule's numbers; its answer can't silence an alert.
+  - **Actions**, each only from the person's click: Open the machine (its window when it runs, the library otherwise),
+    Show in Monitor, Pause or Resume, Shut down.
+  - **Under the hood:** `lord.vm.stats` asks the machine's own lord-vm over its socket (as `lord-vm --status`) and
+    trusts the answer only from the person's installed `lord-vm` (the kernel's `SO_PEERCRED`, `/proc/<pid>/exe`) whose
+    child is that QEMU; `run.json` is only a hint. It adds `verified`, `qemuPid`, `sandbox`, `cgMode`, the kernel's
+    `seccomp` and `noNewPrivs`, `scope` (exactly the session's machine scope or below it, never a lookalike path) and
+    `passt`. A machine that looks running but can't be verified twice in a row is itself a sandbox alert; `lord.monitor.watchMachines`/`machinesWatched` give each running
+    machine's sockets, remote addresses and TCP bytes as counts only (`conn_machines`), never an address. A machine's
+    QEMU is no longer judged by the process CPU and memory rules (the machine rules compare it with its own usual).
+  - Tests: `build/vmwatch-test` (exact scope paths against lookalikes, the installed-program check, a stand-in lord-vm
+    answering, silent or half), `tests/sentinela_vm_test.mjs` (every rule on synthetic machine stats, an unverified
+    engine, baselines, the summary's bounds and an
+    injected name, the action mapping), and machine cases in the Sentinela notification and Settings scenes. Strings in
+    all 35 languages.
+- **Machines: QEMU in its own namespaces, and non-dumpable** (approved by
+  the maintainer 2026-11-23; docs/VIRTUALIZATION.md 3.3, which promised both). Every machine's QEMU now starts in its own
+  user, mount, ipc, uts and net namespaces, and the kernel makes it non-dumpable at exec, so the person's other programs,
+  which run as the same user, can no longer read the guest's memory, keys or typing.
+  - **Why it was needed**: Yama (`ptrace_scope` 1 on Debian 13) stops a same-user program from attaching to QEMU, but
+    not from reading `/proc/<qemu>/environ`, `maps`, `smaps` or opening `/proc/<qemu>/fd/N` (read access): a machine
+    with a shared folder keeps its RAM in a memfd that could be reopened that way.
+  - **Non-dumpable without a new root piece**: `execve` makes a process dumpable again unless its binary or its ELF
+    interpreter is unreadable (the kernel's `would_dump`). In QEMU's own mount namespace the dynamic loader is a copy with
+    mode `0100` mounted over the loader's path (`vmsandbox.c` `private_loader`: made in lord-vm's private runtime folder
+    and unlinked once mounted, a write lease proves nobody else holds it open, then its inode and bytes are checked), so
+    QEMU is non-dumpable from its first instruction. The kernel then ties QEMU's memory to the first user namespace where
+    the copy's owner and group are both mapped; QEMU's namespace maps the person's uid only, never a group, so that is
+    the computer's own, where only root may ptrace. A namespace the person owns would have let their programs back in:
+    the user namespace alone doesn't block same-user readers (measured: `environ` readable with it and without the
+    private loader). `/proc/<qemu>/` files become root's; `status`, `stat`, `comm`, `cmdline` and `cgroup` stay readable,
+    so the vCPU use, vCPU pinning, Monitor and root's `vm-memlock` checks keep working. lord-vm checks it after exec
+    (`vm_nondumpable`) and says it in the log and in `lord-vm --status --json` (`"nondumpable"`).
+  - **Cost** (measured on the amd64 PC, Debian 13 guest, 5 starts each after a warm-up): fork to QEMU's exec 5 ms
+    against 1 ms, QMP ready 135 ms against 115 ms (spread 43–172 ms either way), boot to login 18.5 s against 18.3 s,
+    QEMU's RSS 409 MB against 404 MB (within the spread), plus a 225 KB tmpfs copy of the loader per running machine.
+    Nothing per frame or per guest exit.
+  - **The namespaces**: the user namespace is made once at lord-vm's start, while lord-vm is still dumpable (a
+    non-dumpable process can't write its own `uid_map`), by a short-lived child that maps the person's uid, and kept as a
+    descriptor (`vm_userns_open`). QEMU's child joins it and makes the mount, ipc, uts and net namespaces
+    (`vm_ns_enter`) before its Landlock and seccomp. QEMU has no capability after exec, an unconfigured loopback for a
+    network (its sockets are the ones lord-vm passed), and stays lord-vm's plain child. Landlock's rule for QEMU's own
+    `/proc` folder now goes through `/proc/self`. Where the kernel refuses user namespaces, QEMU runs as before and the
+    machine's log says so (`"namespaces":0`).
+  - **No pid namespace**: QEMU's D-Bus display couldn't authenticate lord-vmdisplay from inside one (measured: "Unexpected
+    line 'NEGOTIATE_UNIX_FD' while in WaitingForAuth state", no picture, no keyboard): GLib 2.84 refuses peer
+    credentials whose pid is 0, which is how a process outside the namespace looks from inside. Reproduced with a plain
+    GDBus server under `unshare --user --map-user --pid`; uid-only mapping without a pid namespace authenticates. So a
+    compromised QEMU can still name the person's processes: signals stay refused (Landlock's signal scope), `setpriority`
+    and `sched_setaffinity` too (QEMU's own `resourcecontrol=deny`), but reading or setting another process's limits
+    with `prlimit` is left to the seccomp allowlist.
+  - **Monitor and pinning with a root-owned `/proc` folder**: other machines' QEMUs are recognised by the real uid in
+    their `status` (`vmpin_taken`), not by the owner of their `/proc` folder; Monitor's GPU view does the same for the
+    machines' GPU use (`gpustat.c`). Monitor's process list shows QEMU under root, as it already showed lord-vm.
+  - **Tests**: `vm-jail-probe` (in `make -C server test`) goes through lord-vm's own steps and then runs a program as
+    QEMU would run, through the dynamic loader under `/usr`: from inside it can't signal, ptrace or read the memory of a
+    sibling process, can't list `/proc` or read another's, can't read `~/.ssh`, the home folder, `/etc` or a file beside
+    its disks, can't write in `/tmp`, make a socket, a user namespace or a process; from outside (the probe's own
+    ancestor, which Yama alone lets in) its environment, memory, maps, descriptors and root aren't readable and `ptrace`
+    and `process_vm_readv` are refused. `vm-jail-probe --before` runs the old jail for comparison: 9 of those checks fail
+    there. `tests/vm_isolation.sh` checks the status fields, the refused reads, `PTRACE_SEIZE` and `process_vm_readv` on
+    a real machine; it no longer lists QEMU's descriptors, which the person's programs can't any more.
+- **Web apps: lord-web on WPEPlatform, WPE WebKit's new API** (issue #142, maintainer's decision 2026-11-23). Everything lord-web does with WebKit's frames and input now goes
+  through one small interface, `server/src/web/webback.h`, with two implementations, one of them built:
+  - `webback_platform.c`, on **WPEPlatform** (WPE WebKit 2.50 and later; LordOS will ship its own build of wpewebkit
+    2.54 for Debian 13 with both APIs on). lord-web brings its own platform (a `WPEDisplay`, `WPEView`, `WPEToplevel`
+    and `WPEScreen` of its own) instead of WPEPlatform's Wayland one, so it keeps its window and hands lord-server its
+    frames itself, exactly as before: a `WPEBufferDMABuf` becomes a `wl_buffer` of the window with no copy (the
+    formats and modifiers offered to WebKit are the ones lord-server announces, and its DRM device is lord-server's
+    GPU, read from EGL), a `WPEBufferSHM` is copied into one of the window's `wl_shm` buffers (the CPU path, `LORD_GPU=0`).
+    Keys (the compositor's keymap through WPEPlatform's xkb keymap), the pointer, the wheel and touchpad, touch,
+    focus, size, fractional scale, the page's cursor (by its CSS name, now exact instead of guessed from the hovered
+    element), the clipboard (WPEPlatform's `WPEClipboard`, which keeps UTF-8 as UTF-8) and the screen's size and
+    refresh rate all reach WebKit as `WPEEvent`s and WPEPlatform calls. The input method stays lord-web's
+    text-input-v3 context, now shared by both backends.
+  - `webback_legacy.c`: the libwpe + wpebackend-fdo code lord-web had, moved behind the interface unchanged, so
+    Debian 13's WPE WebKit 2.48 keeps building and working exactly as before.
+  - `mk/web.mk` picks the backend: WPEPlatform when `pkg-config` finds `wpe-platform-2.0`, else legacy;
+    `LORD_WEB_BACKEND=legacy|platform` forces one (an error when its packages are missing). When lord-web is skipped
+    the build now says why: which packages are missing for each backend, or that `WEB=0` was given. Switching backend
+    rebuilds lord-web; `tools/iso/mkdeb-web.sh` writes the Depends of the backend that was built (no `libwpe`,
+    `wpebackend-fdo` or `libwayland-server` for WPEPlatform); lord-web's log names the backend and WebKit's version.
+  - Isolation: nothing was added to lord-web's sandbox. With WPEPlatform lord-web no longer runs wpebackend-fdo's
+    nested Wayland compositor (no `libwayland-server`, no socket pair for frames: frames come over WebKit's own IPC);
+    the web process opens the GPU's render node with GBM where the legacy one opened it through EGL (WebKit's sandbox
+    exposes `/dev/dri` in both); the `WPE_*` variables WPEPlatform reads were already dropped (docs/WEBAPPS.md, "The
+    view's backend").
+  - New test, `build/web-backend-test` (`tests/web_backend_test.c`, in `make -C server test`): the backend alone,
+    headless, with a throwaway HOME and WebKit's sandbox: a local page's pixels in the frame, a click and keys reaching
+    the page's listeners and the next frame, the wheel, a resize, scale 2 (`devicePixelRatio`, the frame's size, a click
+    at the same CSS position) and hidden then visible. It passes on the legacy backend with Debian 13's 2.48.3 and on
+    both backends with Debian sid's 2.54.3; lord-web also showed a page in a window of a headless weston on 2.54.3 with
+    both backends, by shared memory and by dmabuf. Still to check on LordOS's 2.54 backport and the VM: every web app
+    feature, before the backport ships.
+- **WPE WebKit 2.54 with WPEPlatform for Debian 13, built by LordOS**. Maintainer's decisions of 2026-11-23 and 2026-11-24, for lord-web's move to WebKit's new API
+  ([#142](https://github.com/lordbasex/LordOS/issues/142)). Debian 13's `wpewebkit` 2.48 is built without WPEPlatform,
+  so LordOS rebuilds Debian's own 2.54.3-1 source package for trixie as `2.54.3-1~lordos13+2`
+  ([docs/WPEWEBKIT.md](docs/WPEWEBKIT.md)), to be published in the LordOS APT repository with its exact source.
+  - **`tools/pkg/build-wpewebkit.sh <debian-version> [revision]`** does it all from a version, in clean trixie chroots
+    made by `mmdebstrap` (trixie, trixie-updates and trixie-security only): fetches Debian's source package (pool or
+    snapshot.debian.org), checks the `.dsc` with `dscverify` against `debian-keyring` (signed by Alberto Garcia, every
+    checksum) and the release tarball's signature against the two pinned WebKit release keys (and that wpewebkit.org's
+    signature is the same file as Debian's), applies LordOS's changes, installs the build dependencies from trixie,
+    builds the source package and every binary package with `dpkg-buildpackage -sa` as an unprivileged user, runs
+    lintian, then installs the result in a second chroot and tests it. `TMPFS=<size>` builds in RAM, `TEST_ONLY=1`
+    repeats the test, `ARCH=arm64` builds arm64 on an amd64 machine under qemu-user.
+  - **Changes to Debian's packaging, and only these** (`tools/pkg/wpewebkit-chroot.sh`): WPEPlatform's headless and
+    Wayland backends and the legacy libwpe API turned on explicitly (upstream defaults, written out so a changed default
+    stops the build); **WPEPlatform's DRM backend off** (maintainer, 2026-11-24), so WebKit links no `libinput` or
+    `libudev`, with its 9 symbols taken out of Debian's symbols file; `Maintainer: LordOS` (Debian's WebKit team
+    credited in the changelog and `debian/copyright`); and the changelog entry, dated one second after Debian's so a
+    rebuild gives the same source package. Every build dependency of 2.54.3-1 is in trixie (clang 19).
+  - **The test** (in a second clean chroot, as the root of its own mount namespace, `tools/pkg/wpewebkit-pivot.sh`,
+    since the kernel refuses user namespaces in a chroot and WebKit's bubblewrap sandbox needs them): `pkg-config`
+    finds `wpe-webkit-2.0`, `wpe-platform-2.0` with `-headless` and `-wayland`, `wpe-1.0` and `wpebackend-fdo-1.0`, and
+    not `wpe-platform-drm-2.0`; `readelf -d` shows no `libinput`/`libudev`; SONAME and exported symbols against
+    trixie's 2.48; the copyright files; a WPEPlatform headless program renders a page into a buffer with the sandbox
+    on; and lord-web is built from the LordOS tree on both view backends (`LORD_WEB_BACKEND=platform` and `legacy`),
+    with no warnings, then its `web-backend-test` and probe test run on each.
+  - **Result on amd64** (`+2`, 2026-11-24): `libwpewebkit-2.0-1`, `libwpewebkit-2.0-dev`, `wpewebkit-webdriver` and
+    `libwpewebkit-doc`, Debian's split unchanged (WPEPlatform is inside `libWPEWebKit-2.0.so.1`, no new package). Same
+    SONAME as trixie's 2.48 (`libWPEWebKit-2.0.so.1`), none of its 930 exported symbols removed (1345, 415 added), so it
+    upgrades trixie's package in place for `cog`, `gstreamer1.0-wpe` and lord-web. No `libinput`, no `libudev` (`+1`,
+    built with the DRM backend and never published, had both). `web-backend-test` prints `ok platform (WPE WebKit
+    2.54.3)` and `ok legacy (WPE WebKit 2.54.3)`, the probe test passes on both (peak 298 and 296 MB PSS).
+    `dpkg-buildpackage` took 26 to 41 minutes on 20 cores over seven builds. lintian: no errors, 5 warnings, all
+    Debian's own (Standards-Version newer than trixie's lintian, no source `Priority`, devhelp files of WPEPlatform's
+    docs). arm64 built under qemu-user in 11.7 h (same packages, the source package byte for byte amd64's, 0 errors and 5 warnings in lintian); its static checks pass there, while running WebKit (headless render, lord-web's tests) needs the Pi 5, since bubblewrap can't make user namespaces under qemu-user (docs/WPEWEBKIT.md, "arm64"). Not yet run on the VM, not published.
+  - **The source next to the binaries** (WebKit is LGPL-2.1+ and BSD): the build outputs the complete Debian source
+    package (`.dsc`, upstream `.orig.tar.xz` and its `.asc`, LordOS's `.debian.tar.xz`); each binary package ships
+    Debian's `debian/copyright`. **`tools/release/apt-repo.sh` takes source packages**: `build` accepts a `.dsc`,
+    checks every file it names by size and SHA-256, copies them append-only to `pool/main/source/<prefix>/<source>/`,
+    indexes them with `apt-ftparchive sources` in `dists/stable/main/source/Sources` (signed through `Release`), and
+    refuses a `~lordos<n>+<m>` `.deb` whose `.dsc` isn't in the pool; `publish` uploads them with the right types and
+    writes `lordos-src.sources`, a `deb-src` stanza for `apt-get source` (LordOS systems keep `lordos.sources`, `deb`
+    only). For tests only, `LORDOS_APT_TEST_KEYRING` with `LORDOS_APT_OFFLINE=1` signs a scratch tree with a throwaway
+    key (`publish` and `verify` refuse it). Checked that way: the `.debs` alone, a tampered `.debian.tar.xz` (other size;
+    same size, other hash) and a changed `.dsc` for a published version are refused; Debian's `apt` reads the tree and
+    `apt-get source --download-only wpewebkit` gets the build's exact files. Nothing was uploaded or signed with the real
+    key. `tools/release/image-sources.sh` lists a package LordOS rebuilt (version `~lordos<n>+<m>`) with origin
+    `lordos` and its `.dsc` in `lordos.org/apt/pool/main/source/`. Docs: WPEWEBKIT.md (new), RELEASING.md ("WPE
+    WebKit (LordOS's backport)"), ARCHITECTURE.md's dependency row, SOURCE-OFFER.md, WEBAPPS.md, ROADMAP.md (#142).
+- **Machines: QEMU's seccomp filter is an allowlist** (approved by the
+  maintainer 2026-11-23 as isolation layer 3, for every machine; docs/VIRTUALIZATION.md 3.3). Our filter on QEMU used to
+  refuse a list of dangerous calls and allow the rest; now it allows only the calls QEMU was measured to make, checks the
+  arguments where it matters, and stops QEMU on anything else, naming the call.
+  - **The table** (`server/src/vm/vmsyscalls.h`, built into BPF by `vmseccomp.c`): one row per call with its rule, per
+    architecture (amd64 96 rows, arm64 92); a row the other kernel doesn't have doesn't compile there. The program is a
+    binary search on the call's number (about eight comparisons, 400–422 instructions), applied before the exec by
+    `vm_jail_qemu`, so it covers QEMU from its first instruction; QEMU's own `-sandbox` still stacks on top.
+  - **How it was measured**: the test build's learn-all mode (`LORDVM_TEST_SECCOMP=learn-all`, `lord-vm-testpaths` only)
+    sends every call that isn't a hot one to lord-vm, which logs it once and lets it go on. Debian 13's QEMU 1:10.0.13 ran
+    that way on: amd64 KVM and TCG with 2D; KVM with 3D on an AMD (radeonsi) and an Intel (i915) render node; a machine with
+    a TPM (swtpm), secure boot, Hyper-V enlightenments, a USB tablet and SATA discs at its installer; SeaBIOS with the
+    compatible devices at Ubuntu's installer; arm64 KVM and amd64 TCG on the Pi 5. Each through boot, resize, keys,
+    clipboard, sound and microphone, a shared folder (virtiofsd), the agent channels, a snapshot with memory and its
+    revert, reset, suspend to a file and resume, a CD changed while running, passt restarted, shutdown and poweroff, with
+    an `aio=native` direct disk on its I/O thread and vCPU pinning. About fifty rows of the first draft were never called and went
+    (`mbind`, `mlock*`, `msync`, `membarrier`, `timerfd_*`, `dup`, `flock`, `fsync`, `kill`, `sigaltstack`, …); a few
+    that weren't seen stay with the reason beside them (the vDSO's clock fallback, the event loop's epoll past 64
+    descriptors, glibc's `mremap`, `restart_syscall` after the vCPU kick, Mesa's `sched_yield`, GIO's `shutdown`).
+  - **Argument rules**: `ioctl` only on five fixed requests (`BLKSSZGET` and `XFS_IOC_DIOINFO` from the block layer;
+    `TCGETS`, `TIOCGWINSZ`, `FIONREAD` from GLib) and on the request types of the machine's own devices: KVM's on a KVM
+    machine; DRM's, sync_file's and dma-buf's on a 3D or vGPU machine; VFIO's on a vGPU machine; TUN's (200 and up) with a
+    bridged tap; never `TIOCSTI`. `clone` makes threads only (`clone3` ENOSYS, glibc falls back). Without TCG (whose code
+    buffer must be writable and executable) every `PROT_EXEC` in `mmap` or `mprotect` reaches lord-vm, which lets through
+    only the loader's kind (a private, read-only file mapping; arm64 with BTI: `PROT_EXEC|PROT_BTI`) and only until QEMU's
+    QMP handshake, once its libraries, modules and Mesa's drivers are loaded; after it any executable memory stops QEMU,
+    a memfd or a file of its disks included (`MFD_NOEXEC_SEAL` doesn't stop `mmap` with `PROT_EXEC`: measured).
+    `memfd_create` never takes `MFD_EXEC`. Not stopped: what happens during the start itself, and, in the kill fallback
+    without a listener (never on Debian 13's kernel), a private executable mapping of a file QEMU wrote. `prctl` only the five options
+    measured, and `PR_SET_DUMPABLE` refused, so QEMU can't make itself dumpable again. `prlimit64` only on itself (closing
+    what the namespaces work left open: QEMU could read or set another of the person's processes' limits), `tgkill` only
+    its own threads, no `kill`. `seccomp` never with a listener. One exec only: `execve` isn't a row and every
+    `execveat` reaches lord-vm, which lets through only the first, from the child it forked, before QEMU runs
+    (`vm_sc_exec_once`), and stops QEMU at any later one (a descriptor number proves nothing once QEMU runs: it can close
+    it and reuse the number). Landlock's execute right now goes only to QEMU's binary and its loader, no longer to all of
+    `/usr`. Without a listener `execveat` passes only on lord-vm's descriptor number, so only QEMU itself could run again,
+    until QEMU's own `spawn=deny` is up. Both were found by the security review of this change. Refused and never run: `socket` (EACCES), `io_uring_*` (EPERM, still not
+    approved), `kcmp` (EPERM, Mesa copes).
+  - **A stop is named**: the default action is `SECCOMP_RET_USER_NOTIF`, and lord-vm holds the filter's listener (it comes
+    back over the start's status socket; the child closes its copy before the exec, since QEMU holding it could answer for
+    its own calls). lord-vm kills QEMU before the call runs and writes the call to the log and `blocked by the sandbox:
+    <call>` to the failure page; were lord-vm gone the call fails with ENOSYS, never runs. Where the kernel refuses a
+    listener the rows run with kill as the default. `lord-vm --status --json` adds `"seccomp_allowlist"` and
+    `"seccomp_named"`. The enforced runs found one call the learn runs had missed, on the Intel 3D machine after two
+    minutes of use (`SYNC_IOC_MERGE`, Mesa merging fences): QEMU stopped with exactly that name, and sync_file and dma-buf
+    requests joined DRM's for 3D machines.
+  - **No switch for people**: only the test build reads `LORDVM_TEST_SECCOMP` (`learn`, `learn-all`, and `drop:<name>`,
+    which leaves one row out to see the stop named).
+  - **Cost** (amd64 PC, 5 alternating starts each against 0.8.9.5's denylist): fork to exec 1–2 ms either way, QMP ready
+    99–128 ms against 97–133 ms, boot to the serial login 12.06–12.39 s against 12.09–12.59 s, QEMU's RSS within the
+    spread. Per call (medians on one CPU): `read` 120.5 ns against 121.9 ns, `getppid` 101.9 against 100.8, a checked
+    ioctl 169.9 against 170.0; the kernel's cache skips the program for calls allowed whatever their arguments.
+  - **Tests**: `vmseccomp-test` (new, in `make -C server test`) builds both architectures' tables (the other one against
+    its own kernel header), checks that the dangerous calls (`ptrace`, `process_vm_*`, `kexec_*`, `bpf`,
+    `perf_event_open`, `userfaultfd`, mounts, `setns`, `unshare`, keys, modules, `execve`, `kill`, …) are absent or
+    refused, and runs the program in a small BPF interpreter for all 128 combinations of the machine's options: every row
+    reaches its rule, every other number the default, and each argument rule (about 570,000 checks), and lord-vm's
+    one-exec decision. `vm-jail-probe` now
+    also runs 28 forbidden calls each in a jailed probe of its own (a second `execveat` under lord-vm's old descriptor
+    number, anonymous or shared executable memory, code written into a memfd or into one of its disks and mapped to run
+    after the start, `mprotect` to executable (BTI's form too) and `MFD_EXEC` among them): each reaches the listener named before it runs and the
+    probe dies by SIGKILL; without a listener the same calls die by SIGSYS; threads, `eventfd`, executable memory that
+    isn't writable and TCG's writable and executable memory keep working; without a listener another binary under the
+    exec descriptor's number is refused by Landlock; the probe holds no listener and can't make
+    itself dumpable. `tests/vm_isolation.sh` checks the new status fields and, with the test build next to lord-vm, that
+    a left-out row stops QEMU with the call named.
+  - **Also run enforced**: a Whonix group (gateway and workstation linked, Tor reached, the gateway restarted and linked
+    again) through `tests/vm_group_link.sh`.
+  - **Not run under it yet**: an Intel vGPU (GVT-g), a bridged tap and hugetlb memory: their calls were read in QEMU's
+    source (VFIO's and TUN's request types are in the rules).
+- **Machines: nothing QEMU writes can run** (approved by the maintainer
+  2026-11-24; docs/VIRTUALIZATION.md 3.3). In QEMU's own mount namespace the machine's `disks/` folder is now bound over
+  itself and that bind remounted `noexec,nosuid,nodev` (`vmsandbox.c` `noexec_bind`, from `vm_ns_setup`, after the
+  private loader is mounted and only once the user namespace is joined). The kernel then refuses to run a file there
+  (EACCES) or to map one executable (`mmap` or `mprotect` with `PROT_EXEC`: EPERM), whatever seccomp lets through.
+  - **Why**: without a listener (the seccomp allowlist's kill fallback, never on Debian 13's kernel) the allowlist lets
+    the loader's kind of mapping (private, read-only, executable) through at any time, so a compromised QEMU could write
+    code into one of its disk files and map it to run. That half of the gap is closed; a memfd it wrote is still the
+    other half (no mount covers memfds), as before.
+  - **Also**: `/dev/shm`, `/tmp`, `/var/tmp` and `$XDG_RUNTIME_DIR` get the same remount there. QEMU's Landlock already
+    keeps it from writing them; they count only on a kernel without Landlock. These binds and the loader's are the only
+    mounts in QEMU's namespace. The loader's bind, a mount of its own made before them, keeps exec. What the outer mount
+    had stays (read-only stays read-only, atime flags are kept).
+  - **Nothing QEMU uses changes**: qcow2 and raw disks, the NVRAM and snapshots with memory are read and written as
+    before; swtpm, virtiofsd and passt run outside QEMU's namespaces, and the suspend file, a disposable session's memfd
+    and guest memory (a memfd, hugetlb or not) reach QEMU as descriptors.
+  - **If it fails** QEMU still runs, and its log says which folder and why (`lord-vm: QEMU's disks folder couldn't be
+    made noexec in its mount namespace (...)`); Landlock and seccomp still hold. The log's sandbox line says
+    `noexec-disks=1` and `lord-vm --status --json` adds `"noexec_disks"`.
+  - **Tests**: `vm-jail-probe` checks from inside the jail that `disks/` and the temporary folders are `noexec`, `nosuid`
+    and `nodev`, then, with the allowlist in its kill fallback (no listener), writes a real program into a file of
+    `disks/` and can neither map it executable (EPERM; with the remount left out, the same probe maps it) nor run it
+    under lord-vm's descriptor number (EACCES). The probe's own copy moved out of `disks/` (it is read as a machine's ISO
+    is). `tests/vm_isolation.sh` checks `"noexec_disks":1`. Real machines started with it on the amd64 PC: a Debian 13
+    guest with 2D graphics and one with UEFI and a TPM (swtpm), each through boot to login, keys, a snapshot with memory
+    and its revert, reset, suspend to a file and resume, and shutdown; a LordOS live machine with 3D graphics (virgl).
+- **Machines: vCPU pinning**. Configure → CPU & memory → *Pin cores*, Off or
+  Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
+  threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores
+  and SMT siblings (docs/VIRTUALIZATION.md 3.7.1).
+  - **How.** `lord-vm` does it to its own child with `sched_setaffinity`: no root, no new privilege, no admin action.
+    Right after QEMU starts (paused) and before lord-vm's own Landlock it reads the topology from
+    `/sys/devices/system/cpu` (package, core and SMT siblings; capacity from `cpu_capacity`, the hybrid `cpu_core` /
+    `cpu_atom` lists or the maximum frequency, so P and E cores are told apart on any vendor), takes the CPUs QEMU may
+    use from its affinity (the cgroup's cpuset is respected), notes the cores other machines' vCPUs already hold, and
+    keeps `/proc/<qemu>/task` open. QEMU's `query-cpus-fast` names the vCPU threads; a thread id that isn't QEMU's own
+    is refused. Asked again after each reset and resume, set again when the threads changed.
+  - **The choice** (`server/src/vm/vmpin.c`): the desktop keeps 1 physical core (2 from 6 cores), with its siblings,
+    the lowest-numbered P cores (E cores when that would leave the machine fewer than 2 P cores); the others are ranked
+    P before E, faster first; one vCPU per physical core, then the siblings; more vCPUs than those CPUs, or fewer than
+    3 cores, and nothing is pinned. QEMU's other threads get the CPUs no vCPU uses, without the vCPUs' siblings and
+    other machines' cores while some are left. A second machine started meanwhile takes other cores.
+  - **Default**, measured on a 10-core, 20-thread desktop with a desktop-like load on the host (6 threads, each a 60 Hz
+    frame of 6 ms) and a CPU loop on every vCPU of a scratch guest, 4 alternated runs each: with 8 vCPUs pinning cut
+    the host's frame p99 from 15.2 to 9.9 ms and its frames over 16.7 ms from 1.7 % to 0.12 %, and the guest ran 2.7 %
+    faster; with 4 vCPUs the p99 went from 7.5 to 6.1 ms with the guest 0.6 % slower and steadier; with 2 vCPUs the
+    guest was 1.7 % slower. So a machine without a choice of its own gets Automatic with 4 vCPUs or more on a computer
+    with 8 physical cores or more, and Off otherwise; Configure shows which.
+  - `machine.json` schema 13: `"cpu_pin": "off" | "auto"`, written only when chosen; a file without it reads as before
+    (the machine's default), and an older file is upgraded on its next write as with every schema. `lord-vm --set DIR --cpu-pin off|auto|default`; `lord.vm.set(dir, { cpuPin })`, and
+    `lord.vm.list()` gives `cpuPin` (what the machine gets) and `cpuPinChosen`. Texts in all 35 languages.
+  - Tests: `build/vmpin-test` (in `make test`, under ASan and UBSan): the choice on invented computers (SMT, hybrid
+    6P+8E and 2P+8E, big.LITTLE, two packages, 2-, 4- and 6-core hosts, restricted cpusets, cores held by another
+    machine), the sysfs reader over invented trees (offline CPUs, malformed lists) and setting it on the test's own
+    threads; `vm-test` for schema 13. Checked with KVM on scratch machines: `taskset` shows each `CPU n/KVM` thread on
+    its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
+
+### Fixed
+- **Lord Workspaces: a minimized window's line sits centred under its icon, and a quick right click no longer gets
+  the hover list on top of its menu**. Found in the desktop e2e pass on
+  the test VM (ws147). The short line under a minimized window's icon in each display's bar was drawn at the icon
+  button's left edge: lord-server places an absolute child without `left`/`right` at the start of its parent (as CSS
+  does), not where the parent's `alignItems` would put it, so it now has `left: 8` ((28 − 12) / 2). And a right click
+  on an app's icon within the 450 ms the hover list waits for (or on an activity's pill, whose summary waits the same)
+  opened the menu and then let the waiting list come up over it: the click and the right click cleared the shown list
+  but not the timer. Both now cancel the timer too (`peekCancel` in `components/AppWindows.jsx` and
+  `components/TopBar.jsx`). Checked on the VM with screendumps.
+- **Machines: `vm-usb-allow` serves only the person at the computer (Claude Security F1 and F3)**. The root admin action that opens a host USB device read and write for a machine was `A_ANYONE`
+  and never checked that the asking session was the one on the monitor, so a non-administrator's session in the
+  background (fast user switching) or reached through the remote desktop could take a webcam, a microphone, a smart-card
+  reader or a key the person at the seat was using, by hand or through a machine's usb_auto rule. The helper now refuses
+  (`vm.usbNotAtSeat`, logged to admin.log) unless the session user is the one lord-sessiond has on the monitor, read as root
+  from lord-sessiond's own record and never from the request (`server/src/remote/seat.c` `seat_user_is_active`):
+  `/run/lordos/status.json` owned by root, a regular file opened with `O_NOFOLLOW` and not group- or world-writable, the pid
+  it names a running `lord-sessiond` (`/proc/<pid>/exe`), and the last `"monitor"` key (after the lists a stranger's text
+  can reach, such as a name typed on the login screen) exactly that user. The login screen or a locked screen in front, no
+  lord-sessiond, or a file left by one that died all mean "no". The action stays closed and keeps every earlier check.
+  lord-server no longer tries usb_auto rules while its session isn't on the screen (`display_on_monitor`) and tries them
+  when it is back. The new message is in all 35 languages. Tests: `vmusb-test` gains the seat cases (the user on the
+  monitor may; a background or remote user, the login screen, a dead or foreign pid, a file another user owns, a
+  world-writable file, a symlink, no file, a forged `monitor` key earlier in the file, names that aren't user names, a cut
+  file, and random input under ASan).
+- **Test and developer scripts no longer work in shared, fixed `/var/tmp` folders (Claude Security F6, F7, F12, F14,
+  F15, F16)**. Nothing here ships, but these scripts run as root or as the
+  developer, and another local account could create their fixed folders first and swap files in them.
+  `server/tests/cgslice_test.c` (root) keeps its socket in `/run/lordos-slicetest`, a folder only root can make and that
+  the test checks is a real folder of root's (0711, not a link), and its scratch files and the stand-in `lord-netperm`
+  in a fresh `mkdtemp` folder (0700), opened `O_EXCL|O_NOFOLLOW`, copied without a shell; its `CG_NETPERM_PROCS` is now
+  `/run/lordos-slicetest/netperm.procs`. `server/tests/vm_slice.sh` (root) works in a fresh root-owned `mktemp -d`
+  folder: the scripts root runs and the stand-in `lord-netperm` stay root's, only `home/` and `out/` belong to the test
+  user, and the QEMU pid read back from `out/` must be a number. `tools/vm/e2e/machines/storage-fs.sh` makes its work
+  folder with `mktemp -d` (or takes `MH_FS_WORK` only if it is an existing folder of the user and not a link) and
+  loop-mounts the images `nosuid,nodev`. The Machines harness (`mh.py`, `ns-run.sh`, `targets.py`, `kernel-boot.py`,
+  `boot-matrix.py`, `images.py`) uses `MH_SCRATCH` and `MH_IMAGES` only when they are real folders of the user (made
+  0700, set to 0700, refused if someone else's or a link); `ns_prefix` passes the paths to `sh -c` as positional
+  parameters instead of splicing them into the script; `mh.py stop`, `js`, `ui` and `shot` accept a session folder from
+  `.cli-session.json` only if it is a direct private child of `MH_SCRATCH`, and `stop` ends the recorded process group
+  only if it is a `lord-server` of this account leading its own group; `reap` skips folders and processes that are not
+  this account's. Checked: `sudo build/cgslice-test` 28/28 (and it refuses a link at `/run/lordos-slicetest`), `serve`
+  mode, `mh.py start`/`js`/`stop`/`reap` with a real headless session, a forged state file and a hostile folder name.
+- **Security (F9, F13): a LordOS Machines guest's agent port is its administrators', not every desktop account's** (`docs/VIRTUALIZATION.md` 6.17 "LordOS as a guest"). The guest end of
+  `org.lordos.agent` was `GROUP="video", MODE="0660"` in the `lordos` package's `71-lordos-guest.rules`, in the Guest
+  Tools disc's `install.sh` and in Install Agent's `INSTALL_SH` (`lordvm.c`) on LordOS guests. Every LordOS desktop
+  account is in `video`, and the port opens only once, so a standard account that opened it first (at boot with
+  lingering, by SSH, or in a restart gap of the main user's `lordos-guest`) became the guest's agent: it received the
+  host's clipboard, the files dropped on the machine and Machines' Shell, a login shell of its own in which the host's
+  person might type a `sudo` password. The three rules now say `GROUP="sudo"`: only the guest's administrators, who can
+  already do anything in it, may open the port; elsewhere logind's `uaccess` still applies. A guest used only from a
+  standard account has no agent. New migration `013-0.8.9.6-guest-agent-admins.sh` (root, idempotent): rewrites
+  `/etc/udev/rules.d/71-lordos-guest.rules` only when it is exactly the old `video` line (written by an earlier disc or
+  Install Agent; it overrides the package's rule), and, only where the port exists, reloads and triggers udev, stops
+  `lordos-guest` for each signed-in person who isn't an administrator and restarts it for each administrator. Another
+  program of a standard account that already holds the port keeps it until it closes it or the machine restarts. Tests:
+  `migration_guest_port_test.sh` (now migrations 012 and 013: six more fake trees, run twice under `sh -eu`, and a check
+  that no rule gives the port to `video`).
+- **Security (F10): Monitor's "Verified … signed by" seal no longer stands on a scope name** (`docs/MONITOR.md`, origin badges). Monitor gave the pink LordOS-app seal and the app's signer to
+  any process whose cgroup leaf read `app-lordos-lpk-<id>.scope`, a name any program of the person can pick
+  (`systemd-run --user --scope --unit=app-lordos-lpk-<id> ./payload`). Now `mon_scope_parse` (`mon.c`) counts such a scope
+  only right inside the session's root-owned subtree (`/system.slice/lordos.service/lordos-session-<uid>/`), where only
+  lord-sessiond makes scopes and only for lord-server's requests (`cgroup_place_serve`: the peer in the session's server
+  leaf, its executable in the root-owned bindir), as it already did for machines' scopes; the same name under `user@`,
+  deeper in the subtree or anywhere else is no app. And `originOf` (`apps/monitor/procgroupmodel.js`) gives the seal only
+  when the process's executable is also one an app's process can have (`lordosAppExe`): the `lordos` package's
+  `lord-server` (its owner from dpkg's database, not its name) or a file in the app's own root-owned package folder
+  `/usr/lib/lordos-apps/<id>/` (its companion); otherwise the process is badged by its executable (a program in the home
+  folder shows the orange "unpackaged" pill). Without lord-sessiond (development) isolated apps have no app scope in
+  Monitor. Tests: `procctl-test` (nine scope paths: the subtree, `user@`, the server leaf, the machines' slice, a bad
+  session name), `monitor_procgroup_test.mjs` (the app, updated on disk, its companion, and seven F10 cases: a home
+  program, a Debian program, a `lord-server` the `lordos` package doesn't own, another app's folder, a path out of the
+  folder, an unknown owner, an unreadable executable).
+- **The `machines` command no longer lets a guest drive the host terminal, and `machines apply` no longer overflows
+  its stack (Claude Security review of 2026-11-24: F2, F8, F11)**.
+  - **F2 (MEDIUM): the guest agent's error text is cleaned.** `machines exec` and `machines cp` printed lord-vm's
+    refusal as it came, and that text can carry a hostile qemu-guest-agent's own error (`qemu-guest-agent refused:
+    ...`, where `\u001b` decodes to a raw ESC). A compromised guest could write the host clipboard with OSC 52 or fake
+    the visible output. `exec_refused` now passes the text through `mcli_term_clean` (controls, C1 controls and broken
+    UTF-8 become `?`), as the command's stdout, stderr and `cp` errors already were; so do the console's and shell's
+    refusals and every lord-vm reason (`why_of`) the command prints (`server/src/cli/machines.c`).
+  - **F8 (LOW): `machines apply`'s argument array is sized from the parser's limits.** An apply file may give 32
+    ports, 4 shares and 8 single settings, up to 88 arguments plus the closing NULL, but `cmd_apply` filled a
+    `char *so[80]` on the stack without a bound: up to 9 pointers past its end. The arguments are now built by
+    `mcli_apply_set_argv` (`server/src/cli/mcli.c`) into `so[MCLI_APPLY_ARGV]` (`2 * (8 + MCLI_APPLY_PORTS +
+    MCLI_APPLY_SHARES) + 1`), every store is bound-checked and the file is refused ("too many settings") rather than
+    overrun. `mcli_set_args` now keeps at most one store entry per option (the option name is compared from a local
+    buffer, `--opt value` is passed as given), so the worst case also goes through `machines set` whole instead of
+    being refused at the 25th port; `_Static_assert`s tie `cmd_set`'s `out[96]` and `McliStore` to those limits.
+  - **F11 (LOW): `machines console` and `machines shell` filter the guest's stream.** The bytes went straight to the
+    person's terminal, so a guest could set the host clipboard with OSC 52 whatever the machine's clipboard setting,
+    and make links, notifications and prompt marks, which the app's Shell blocks with `no_clip_set`. A new streaming
+    filter, `mcli_vtf_feed` (`server/src/cli/mcli.c`), is a small state machine kept between reads, so a sequence
+    split across reads is handled the same as a whole one. Text, C0 controls, CSI and short escape sequences pass
+    (colors, cursor movement, the alternate screen, bracketed paste and mouse modes keep working); OSC passes only for
+    titles and colors (0, 1, 2, 4, 10..12, 104, 110..112), rebuilt as `ESC ] ... BEL` and only when its text is valid
+    UTF-8 without controls; every other OSC (52, 8, 9, 7, 133, 777, 1337 ...), DCS, SOS, PM, APC, `CSI ... t` window
+    operations and the C1 controls (their UTF-8 forms; C1 CSI becomes `ESC [`) are dropped; CAN and SUB abort a
+    sequence, an ESC inside a string ends it unfinished (dropped), an OSC longer than 1 KB is dropped whole, and
+    broken UTF-8 becomes `?`.
+  - Tests (`build/mcli-test`, under ASan and UBSan): `test_apply_argv` parses the worst-case apply file (every
+    setting, 32 ports, 4 shares), checks it fills `MCLI_APPLY_ARGV` exactly with canaries past the end untouched, is
+    refused at every smaller size without a write at or past the cap, and converts whole through `mcli_set_args`;
+    `test_vtf` checks colors, cursor, modes, titles and colors pass, and that OSC 52 (BEL, ST and C1 forms), a terminal's
+    Copy and File, links, notifications, cwd, prompt marks, DCS (DECRQSS, sixel, tmux pass-through), SOS, PM, APC,
+    window operations and C1 controls are dropped, every case fed at every split size from 1 byte to whole, plus a
+    fuzz pass of 4000 random streams that checks the output is the same however the input is split and never holds
+    a disallowed OSC, a DCS/SOS/PM/APC introducer or a C1 control.
+- **An encrypted machine's key can no longer be read by the person's other programs while it is handed over**
+  (Claude Security F4 of 2026-11-24, MEDIUM; `server/src/vm/vmkeysrv.c`,
+  `server/src/vm/lordvm.c`). The disk-encryption key went from lord-server to lord-vm, and from lord-vm to QEMU,
+  `qemu-img` and swtpm, in anonymous pipes held by dumpable processes; any program of the same user could reopen such
+  a pipe through `/proc/<pid>/fd/N` (read access, which Yama's scope 1 doesn't restrict), stopping the holder with
+  SIGSTOP if needed, and read the 64 hex digits. Now lord-server hands the key over on an AF_UNIX socketpair, which
+  `/proc` can't reopen (ENXIO); lord-vm makes QEMU's user namespace and then goes non-dumpable as soon as it reads
+  `--key-fd`; and QEMU, `qemu-img` and swtpm each run in QEMU's namespaces with the private loader, their pipe empty
+  until they have exec'd and lord-vm has checked that the kernel made them non-dumpable (`key_give`, after an exec
+  sync). A reader that isn't non-dumpable gets no key and the start, create, clone, export or snapshot fails with a
+  message, instead of exposing the key. `tests/vmkeysrv_test.c` reopens the key's descriptor from another process
+  (refused, ENXIO), shows a plain pipe being read that way, and a non-dumpable holder's pipe refused (both ends);
+  `tests/vm_storage_test.sh` (real QEMU/KVM: encrypted create, start with swtpm, snapshots, clone, export, import and
+  an encrypted group) and `tests/vm_snap_store_test.sh` pass with the new hand-off.
+- **lord-web: a hostile shared-memory frame size can no longer overflow lord-web's heap** (Claude Security F5 of 2026-11-24, MEDIUM; `server/src/web/webwin.c`, `webshm.c`,
+  `webback_platform.c`, new `webframe.h`). The frame copy had stopped clamping each row to the destination, and a
+  width just above 2^30 from a compromised WebKit web process wrapped `w * 4` in `int`, so lord-web mapped one page and
+  then copied gigabytes into it. Both backends now check every shared-memory frame with `webframe_shm_ok` (sides
+  1..16384, stride at least `w * 4` and at most `INT32_MAX`, all in 64 bits, and stride × height within the buffer's
+  size on the WPEPlatform path); lord-web's own buffer refuses such sides too; and `webframe_copy` copies at most the
+  smaller width, stride and height of the two buffers and never more rows than the destination's size holds.
+  `tests/webapp_test.c` adds the report's dimensions (0x40000400 × 1), `INT_MAX` sides, strides under the width, a
+  one-byte-short buffer and copies with hostile sizes checked against a guard area.
+- **Settings → Language & Region → Region names each region's language (GitHub #239 follow-up)**. A row named only its country, so the five regions of France (Breton, Catalan, Basque,
+  French and Occitan) all read "France · xx_FR", and Basque was picked by mistake. Each row now reads "Basque · France
+  (eu_FR)", with the language and the country in the interface language, sorted by that name, and a search by either
+  finds it (`sdk/localename.js` `regionLabel`). The names come from Unicode CLDR through Node.js's ICU,
+  written by `tools/gen-language-names.mjs` into a new `languages` catalog in all 35 languages (195 glibc languages).
+  Tests: `tests/localename_test.mjs` and the headless `settings_region_scene` (screenshots of the list).
+- **Check This Account no longer fails its delete step on pCloud (GitHub #243 follow-up)**. The check moves its own folder out of the account, and the move's last step removed the
+  emptied folder at once; pCloud still lists a file it has just deleted for a moment, so that rmdir said "not empty"
+  and the step failed (`cloud.checkDeleteFailed`). A move between disks now tries only that folder's rmdir again on
+  ENOTEMPTY, with a short backoff and at most 4.5 s in all, on the copy job's own thread (`server/src/fsops.c`
+  `rm_tree_patient`); nothing is walked or deleted again, and a folder that really holds something still fails.
+  The Trash and the interface's thread never wait. Test: `build/fsops-test` (a folder that reads ENOTEMPTY once, and
+  one that always does).
+- **Screenshots' Options menu opens above the bar the first time (GitHub #237)**. The floating bar sits just above the Dock, and on its first open the menu was laid out downward, cut
+  to the little room above the Dock, and moved up only at the next render. A Popover chose its side from its own
+  height before it had been laid out (zero) and from its height cut to the room below; it is now drawn invisible until
+  it has been laid out, a popover cut to its room counts as not fitting there, and it is shown once it is on its side
+  (`sdk/controls.jsx` `Popover`, which every popover of the SDK uses). Test: the headless `screenshots_menu_scene`
+  (the menu's box on every frame of the first open, and a screenshot).
+- **A note's or a mail's attachment never runs a program** (#238 follow-up, automated security review).
+  Opening an attachment that its default Linux app would run (a `.desktop` launcher, an AppImage, a program run
+  under Wine, a `.jar`, a script, an installer package; by name or by its detected type) now shows it in Files instead;
+  documents, pictures, media and text still open in LordOS's own apps (`sdk/runscode.js`, `openFileWithApps`'
+  `untrusted`; `tests/sysopen_untrusted_test.mjs`).
+- **A fullscreen video in Firefox no longer repaints the desktop under it at every frame (#232)**. Firefox draws its page in a subsurface of its window that commits on its own. Since
+  0.8.9.5-beta such a commit repaints its own box in a window, but in a fullscreen window it still repainted all of the
+  window's place in the desktop below, which the fullscreen window covers, and on the GPU path painted that part of the
+  desktop again and uploaded it at every frame of the video; a window only presented the new frame. That matches the
+  report (YouTube 1080p on an RX 7800 XT: about 7 % GPU use in a window, 17 % fullscreen at 60 Hz, 25 % at 120 Hz). Now a
+  fullscreen window's subsurface repaints its own box within its display on the CPU path, and on the GPU path presenting
+  again is enough, as for the fullscreen window's own commits; a subsurface that moved or changed size, or a window of
+  another size scaled to the display, still repaints it whole (`wl.c` `damage_sub`, the new `fs_sig`).
+  `tests/fsub_client.c` (`tests/fsub_headless.sh`, in `run_suites.sh`) counts the pixels repainted through a new test
+  hook of `lord-server-test` (`painted`, only in that build): 256,000 a frame before (the window's place), 15,416 after
+  (the subsurface's box), with every frame checked against a full repaint (`LORD_PAINT_VERIFY=1`). Not yet measured on
+  a GPU: Firefox's page still can't go to the display by direct scanout, which takes a fullscreen window without
+  subsurfaces.
+- **Menus of X11 apps open again (#209; also the menus of #212 and #213)**.
+  Since 0.8.9-beta no menu, dropdown, right-click menu or tooltip of an app running under Xwayland appeared: LibreOffice,
+  Qt apps with `QT_QPA_PLATFORM=xcb` or without Qt's Wayland plugin (MuseScore 3, AppImages), GTK apps with
+  `GDK_BACKEND=x11`, Java and Electron apps such as the Arduino IDE. The menu bar item lit up and nothing opened. The fix
+  for GTK 4 popovers (#159) made a commit on a popup with no `xdg_popup` return before mapping it, and an X11 menu never
+  has one (X places and sizes it), so it never reached the screen; an X11 app's drag icon was hidden the same way. Only
+  Wayland popups take that early return now (`wl.c` `surface_commit_role`). `tests/xpopup_x11.c`
+  (`tests/xpopup_headless.sh`, in `run_suites.sh`) maps an override-redirect menu and a `POPUP_MENU` window under
+  Xwayland against a headless `lord-server-test` and reads the screen: shown where X put it, clickable, gone once
+  unmapped; it failed before the fix. FeatherPad's File menu with `QT_QPA_PLATFORM=xcb` checked on the CPU and GPU
+  paths, and with Qt's Wayland plugin.
+- **The live ISO finds MediaTek Wi-Fi cards such as the MT7921 (#227)**.
+  The card's driver (`mt7921e`) bound, but its firmware wasn't on the ISO, so no Wi-Fi interface appeared and Settings →
+  Network said the computer had no Wi-Fi adapter. Debian moved MediaTek's firmware out of `firmware-misc-nonfree` into
+  `firmware-mediatek`, which `firmware-misc-nonfree` only Recommends, and the ISO is built without Recommends. Both ISOs
+  now carry `firmware-mediatek`, and `firmware-intel-graphics` for the same reason (i915 asked for its DMC firmware and
+  turned runtime power management off without it). `tests/iso_firmware_test.mjs` checks that every Wi-Fi, network and
+  graphics package of the Store's missing-firmware map is on the ISO, except the two left out on purpose
+  (`firmware-libertas`, `firmware-nvidia-graphics`; the Store still offers them when the kernel asks).
+- **A check mark or any text that comes and goes in a box of its own size wasn't redrawn: Screenshots' Options menu kept
+  its old checks while open (GitHub #237)**. Choosing 5 Seconds saved it,
+  but the check stayed on None until the menu was closed and opened again. React adds and removes a Text's text node
+  (`{on ? '✓' : ''}`) instead of setting it to '', and in a Text of a fixed width neither changed the Text's box; the
+  text node has no box of its own, so nothing was damaged and the partial repaint left the old pixels (a full repaint,
+  as a screenshot makes, showed the right ones). Reproduced in a headless lord-server with the real Lord Flow, both with
+  one damage box and several. Now a text node coming into a Text or leaving it marks that Text, and the Texts around
+  it, for repaint (`text_child_changed` in `server/src/ui/node.c`); `engine-test` `test_text_child_damage` moves a
+  check mark between three fixed-width Texts and compares each partial repaint with a full one, and the Screenshots
+  toolbar scene checks the check follows the choice while the menu stays open.
+- **Backups: a file's icon looked like an empty check box, and a long name pushed the Restore button's label out at
+  both ends (GitHub #231)**. The restore list drew a file as a bare
+  outline, which read as a check box that never checked; it is now a page with lines. The Restore "<name>" button is
+  held to 260 px, and its label overflowed and was cut on both sides ("estore “lordos-rclone…"); every SDK `Button`'s
+  label now ends with "…" inside the button when the button is held narrower than it (`sdk/components.jsx`). New
+  `backup-restore-scene`. Choosing several files or folders to restore at once is a feature request, not in this fix.
+- **Cloud: empty files and empty folders stayed "coming down" in a folder kept on this computer (GitHub #240)**. With In Sync with This Computer (Keep on This Computer), a 0-byte file, an
+  empty folder and a folder holding only 0-byte files kept the down arrow for ever, on Google Drive and Filen alike.
+  rclone keeps no copy of an empty file and no folder for an empty one in its cache (no `vfsMeta` entry, checked with
+  rclone's own mount), and a kept path without one read as "still coming". Now a kept path with nothing in the cache is
+  "kept" once the keeper's pass has read its kept entry whole, and "coming down" only while that pass is still running
+  (`CloudLive.busy`, `cloud_file_status` in `cloud_pure.c`); the keeper no longer opens an empty file on every pass,
+  which marked the whole kept entry as coming down each time (`fetch_tree` in `cloud_files.c`). A file added in the
+  cloud since the last pass shows kept until the next one (every 5 minutes, or at once on a provider's change notice).
+  `cloud-test` checks both cases. rclone's own lines for a mount ("vfs cache: detected external removal of cache file")
+  still can't name the account: rclone doesn't say which mount they come from (#183).
+- **Machines: a global security pass over how the new pieces work together** (docs/VIRTUALIZATION.md 3.6, 6.2, 7.2, 8; docs/SENTINELA.md "Machines"). Each item had been reviewed alone;
+  this pass looked at the chains between them, with a hostile guest, a hostile program of the same account and hostile
+  downloads or exports in mind.
+  - **An encrypted machine's or a disposable session's memory is never saved at the computer's stop.** The computer's
+    shutdown, a logout and lord-server going away (SIGTERM, logind's PrepareForShutdown) saved a running machine with
+    `begin_suspend` without the checks the person's own Suspend has: an encrypted machine's whole memory, its decrypted
+    disk cache included, went to `suspend.state` in the clear, and a disposable session's memory was kept and resumed at the
+    next start over a fresh layer. `begin_suspend` is now the one gate for every way: encrypted, disposable, locked for
+    anonymity, 3D or a graphics card shut the machine down instead, and a state file on such a machine is never resumed.
+    `vm_storage_test.sh` sends lord-vm SIGTERM for an encrypted machine and both disposable kinds and checks no state is written.
+  - **An imported export keeps no guest links, notifications or automation.** A hostile `.lordvm` export could turn on
+    `guest_links`, `guest_notify` and `automation`; they came back to life as soon as the person turned the agent on here.
+    The import now clears them with the rest of the guest's boundary settings (the hostile-export test sets them and
+    `usb_auto` too).
+  - **A program can't pass for a machine in Monitor and Sentinela.** A machine's scope (`app-lordos-lordos-vm-*`) counted
+    by its name alone, so any program could run in a scope of that name under the person's own systemd and escape
+    Sentinela's CPU and memory checks, which leave a machine to its machine rules. It now counts only in the session's
+    root-owned subtree (`monitor/mon.c`, `procctl-test`).
+  - **A guest's menus stay menus.** In apps mode a guest's popup (owned, on top) was drawn at whatever place and size the
+    guest said, frameless, above the menu bar and the Dock: a guest could cover the whole screen with a fake prompt. A popup
+    is now cut to 60 % × 70 % of its display's work area, kept inside that work area, and shown only for an owner window
+    shown here for 300 ms (`model.js` `popupRect`, `popupOwnerWait`; `vm_model_test.mjs` with every place and size a guest
+    may send).
+  - **Rate limits for what a guest sends in a loop.** The guest's clipboard (each copy a memfd for lord-server and, for a
+    picture, a re-encode in lord-media: a copy loop held gigabytes) is held to 4 at once, then one per 250 ms. Apps mode's
+    window lists (8, then one per 100 ms), program lists (3, then one per 2 s; the latest waits its turn) and icons (64,
+    then one per 50 ms) too, and the same list isn't sent twice; the guest's programs are written into `app.json` at most
+    once per 2 s (an SD card on the Pi).
+  - **Machine groups:** the `qemu-img` that reads a downloaded archive's disks and makes the shared base never gets the
+    group's encryption key; a workstation whose disposable session has no base refuses to start (its disk would have been
+    writable).
+  - **Hardening:** a guest layout's corner near the largest integer no longer overflows (`vm_layout_ok`, `vd_abs_map`);
+    `agent-fuzz` now also fuzzes file offers, file names, PNG headers, HTML and the clipboard's cleaning (`ag_clip_clean`,
+    moved out of `lordvm.c`), which found `ag_drop_name` reading before its buffer for an output smaller than a file's
+    extension (never with lord-vm's own sizes).
+- **A test's lord-server never drives LordOS Studio's camera for apps**. A headless session started
+  by a test (`--timeout`, or the test hooks of `lord-server-test`) also started the loopback's lord-studio on the
+  computer's real `/dev/video50`, which the person's own session may be feeding to a video call; it now leaves the
+  loopback alone (`mstudio_hub_off`). `tests/theme_switch_headless.sh` waits for the log lines it checks instead of
+  fixed sleeps, and its Wayland client lasts as long as the session: both failed on a loaded computer.
+- **Escape that closes a menu no longer reaches the app or machine behind it**. Closing a menu-bar, Dock or right-click menu with Escape also sent Escape to the window in front: a
+  Linux app, or the guest of a machine in Machines (found while checking Machines' window menus). A shell menu now
+  holds the keyboard while it shows, like search and system prompts do (`holdKeyboard()` in `@lordos/runtime`, used by
+  the Lord Flow and Lord Classic menus, which Celeste and Workspaces share; docs/LAYERS.md); its keys, arrows and
+  Escape included, are the menu's. `server/tests/vm_keys_scene.mjs` checks it (17 checks).
+- **Machines: lord-vm keeps no dead client.** A client of a machine that shut its reading side but kept its socket never
+  hung up, so lord-vm kept it for the whole run and refused every broadcast to it again ("message 71 not delivered" in a
+  loop); the first refused send now marks it and the next turn of the loop drops it (`tests/vm_client_gone.sh`).
+- **Machines: a virtio-win guest's event logs without lord-vm's own noise.** qemu-guest-agent logs each `guest-exec` lord-vm
+  runs to read the logs, so two thirds of such a guest's log in a 45-minute run were those lines; its informational
+  lines are left out now (its warnings and errors stay).
+- **Tests: `make -C server test` rebuilds `build/lord-vm-testpaths`**, so the group and storage suites never run a stale
+  one.
+- **Machines: `machines cp` out of a machine refused every file over 128 KB** ("the machine gave a strange answer"): a
+  whole 128 KB piece was taken for one too long.
+- **Machines: a command that went away filled its machine's `lord-vm.log`** with the same "not delivered" line several
+  times a second; now said once per client.
+- **Machines: what the display engine and the guest helper take from the other side is fuzzed, and three faults it found
+  are fixed** (docs/VIRTUALIZATION.md 8, 12).
+  - **The session's log took QEMU's words raw.** A console's label and the text of QEMU's refusals (a sound listener
+    refused, a new size refused, a missing console) went into the log as QEMU sent them, so a QEMU taken over by its
+    guest could write new lines, escape sequences or a forged entry there. They now go in as one line of printable ASCII,
+    at most 127 bytes.
+  - **An X display could hold the guest helper for ever.** While it set up its connection, `lordos-guest` waited 2 s for
+    each reply, but the wait started again after every event in between, so a display that kept sending events and never
+    the reply kept the helper from serving the host at all. The whole setup now has one 3 s limit.
+  - **A `DISPLAY` of the form `unix:/path` was never reached** by the guest helper's clipboard on demand; it is now
+    that socket.
+- **Machines: a machine with an Intel graphics card (GVT-g vGPU) hung at every start** since QEMU's seccomp allowlist: the
+  starting child asked Landlock's version after its jail, a call the allowlist sends to lord-vm, which wasn't listening yet.
+  Found by the first run of a vGPU machine under the allowlist (a Debian 13 guest on a scratch vGPU, 2026-11-24).
+- **`machines cp` out of a machine works again for files over 128 KB**: a check meant to refuse a guest
+  answer that doesn't fit took every full 128 KB piece for one, so such a copy failed with "a strange answer".
+- **Sentinela: a false "weaker sandbox" alert on every running machine** (in development). lord-vm is non-dumpable since
+  QEMU's namespaces, so lord-server could no longer read which program a machine's engine runs and never counted one as
+  checked. lord-server now keeps a pidfd of every lord-vm it starts (a machine started without a window sends its own) and
+  checks the machine's socket against it; after lord-server restarts, a running engine is checked again only when the
+  kernel places it in the machine's own scope. A mismatch still raises the alert. Checked live on a real KVM machine.
+- **Machines: an arm64 machine with the compatible devices now boots** (docs/VIRTUALIZATION.md 6.22, 12). Its disks were SATA, and the arm64 UEFI firmware (AAVMF) has no SATA driver, so it
+  stopped at the firmware's shell; every import of another app's arm64 machine starts on these devices. On arm64 they are
+  now NVMe disks (one controller each, the disk's own serial kept) and a USB CD/DVD that can still be changed while it runs:
+  what the firmware starts from and what arm64 guests without virtio drivers carry. Configure and the import's plan say
+  "NVMe" there (two new texts, in every language). Booted on a Raspberry Pi 5 with KVM and emulated, and emulated on a PC.
+- **Machines: the Clone sheet's buttons were cut off** at the Control Center's first size (760×500), and the file pickers
+  of Export and Bring In were drawn inside their sheets, a few lines tall. A sheet is now never taller than its window (its
+  title and buttons stay, its body scrolls), and the pickers cover the window. Every sheet and dialog of the library checked
+  at that size (`server/tests/machines_sheets_headless.sh`).
+- **Machines: a machine started right after a large import timed out**. `qemu-img convert` leaves the
+  disk in the page cache, and QEMU's first open of it with `O_DIRECT` waited behind gigabytes of writeback past its 20 s
+  to answer QMP. The import now writes the converted disk out (`fsync`) before putting it in place. Found while checking
+  a migration from a 20 GB whole-disk image of a Linux PC (docs/VIRTUALIZATION.md 6.11), which now imports and boots.
+
+- **Machines: a shared folder that stops working while the machine runs is said in its window**: when a folder's virtiofsd ended (killed, crashed), the folder was gone from the guest
+  until the next start and only lord-vm's log said it. lord-vm now tells the machine's window (`VMN_SHARE_LOST`), whose
+  notice bar says "The transfer folder stopped working in this machine…" or "The shared folder “TAG” stopped working…",
+  in every language. Found by the new agent kill tests.
+- **Machines: the bare-metal release gates refused every real PC** (`tools/vm/bare-metal-gates.sh`): `systemd-detect-virt`
+  prints `none` and exits 1 on bare metal, and the script added a second `none`, so its check read "this is a virtual
+  machine (none none)". It reads the program's own words now; the gates then ran on the i9 PC for the first time (Tests).
+  The leak gate's "no zombie processes" looked at every process of the computer, so another program's child that was a
+  zombie for a moment failed it on a desktop in use; it looks at lord-vm's, QEMU's, passt's, virtiofsd's and swtpm's.
+  Its results file names passt's version from its package when passt prints none.
+- **Machines: lord-vm builds on arm64 without warnings again**: three paths of a machine group (a member's base, its disks
+  and log folders) were cut silently when too long, which gcc on the Pi warned about; they are refused instead.
+- **Machines: LordOS 0.8.9 inside a machine waited for the agent forever**. Nothing in that LordOS
+  spoke to Machines: it had neither qemu-guest-agent nor `lordos-guest.service` (the "opened, closed" in the log at
+  start is the UEFI firmware's own virtio-serial driver, not the system). 0.8.9.5 added the service, but its udev rule
+  (`uaccess`) gives the agent port only to the person at a logind seat, and LordOS's own sessions aren't logind seats, so
+  the helper couldn't open it either; and it had no clipboard on a LordOS desktop. Now the rule gives the port to the
+  `video` group too (every LordOS desktop user is in it), the `lordos` package recommends `qemu-guest-agent`, migration
+  012 applies the rule and starts the helper right after the update (only inside a Machines guest whose agent is on), and
+  `lordos-guest` 9 takes the clipboard's text from the guest's own lord-server (`lordos-guestwin.sock` says `clipboard`;
+  only the program that holds the agent port and passes it along gets it, never a secret; the helper is non-dumpable). A 0.8.9 guest gets it by updating LordOS inside
+  the machine, or right away with the disc above.
+- **Monitor: opening a large group in Processes no longer freezes the desktop**. Expanding the Terminal's group with about 240 programs stopped the pointer for about a second, and the
+  list's once-a-second redraw did it again while the group stayed open: the table drew every row at once (about 12 800
+  nodes). The SDK's `Table` now draws only the rows in sight plus a margin of six (`sight`, told by the tab's
+  ScrollView), at most four new rows per pass with those in sight first, and keeps a row whose drawn values didn't
+  change (`rowSig`); a row the keys move to is scrolled into sight by its place. Measured in a headless lord-server
+  over a made-up Terminal of 240 programs (`server/tests/monitor_freeze_headless.sh`, the main thread's longest run):
+  opening 1547 ms → about 20 ms, a redraw with the group open 1110 ms → about 17 ms. The order of the rows is the same.
+  New test `tests/monitor_freeze_scene.mjs` in `make test` (a 300-program group: the first pass within 16 ms).
+- **Machines: two machines starting at the same moment no longer collide on a shared folder's socket**: the socket lord-vm
+  hands virtiofsd was `<runtime>/lordos-vm/fs<N>.sock`, the same name for every machine, so a second start unlinked and
+  re-made the first's (found while starting six test machines at once: "socket: Address already in use", then "can't
+  reach virtiofsd"). It is now named after the machine's id.
+- **Downloads: a GitHub release file refused now and then with a 403 is asked for again**. Reported by the maintainer: Machines → New machine → the LordOS 0.8.9 card said "Couldn't
+  download the list of images: the server answered 403". `vm-image-list` downloads the release's `SHA256SUMS` and
+  `SHA256SUMS.sig` from `github.com/…/releases/download/…`, which answers 302 to a signed URL of about 950 bytes on
+  `release-assets.githubusercontent.com` (an Azure SAS plus a JWT valid for 5 minutes).
+  - **What was found.** The same requests from a root harness over `fetch_batch_in` and the installed `lord-tls` were
+    refused intermittently (2 of about 10 in one burst, then 24 of 24 fine). Afterwards none could be reproduced: 200 of
+    200 and a burst of 300 with the old client, and 360 requests from a script with the signed URL's '+' sent as it
+    came, as %2B, or as %2B only in the path, on kept-alive and on new connections, all answered 200. So the CDN
+    accepts either spelling, and the refusals are the CDN's own transient ones, not a difference in our request.
+  - **The change** (`server/src/pkg/http.c` `get_one`). A request that a redirect led to and that is refused with 403
+    or a 5xx starts again from the original URL, for a freshly signed redirect, at most twice more, after 0.5 s and
+    then 1.5 s. A refusal without a redirect (an origin's own answer), a 404 and every other status are reported as
+    before; nothing was written yet when it starts again; and every check applies to each new chain as to the first
+    (https never back to http, `public_only` on every host, 5 redirects per chain, a cut `Location` refused). It
+    applies to every `fetch_batch` user: packages, Machines' images and lists, Flathub, wallpapers.
+  - The '+' → %2B of the request line (for S3 paths such as `kms++-utils`) now applies to the path only: a query goes
+    as it came, as a browser or curl sends it, since a '+' there already means a space and a signed URL's query is the
+    signer's.
+  - **Tests:** `build/http-retry-test` (new, in `make test`), against a small HTTP server on loopback: '+' in the
+    path as %2B and in the query as it came, also in a redirect's; a 403 after a redirect twice, then saved, with three
+    requests to the original URL and a new signed URL each time, after 2 s; a 503 once; always 403: one try and two
+    more, then the 403 reported; a 404 after a redirect and a 403 without one not asked again; a redirect loop still
+    stops after 5.
+- **Machines: the LordOS card reads its signed image list from lordos.org** (maintainer's decision 2026-11-23). GitHub's release downloads sometimes answer 403 on their signed
+  redirect, and the card then could not read `SHA256SUMS` or `SHA256SUMS.sig` at all.
+  - **What changed.** The `lordos` entry of `assets/machines/systems.json` has a `list` for each architecture,
+    `{ "dir": "https://lordos.org/releases/v0.8.9-beta/", "sums": "SHA256SUMS.txt", "signature": "SHA256SUMS.sig" }`:
+    a copy of the release's signed list on the site (same bytes; `.txt` because CloudFront serves an extensionless
+    path as a pretty-URL page). `vm-image-list` (`server/src/vm/vmimage_admin.c`) tries the sources
+    `vmcat_list_source` gives in order, the copy first, then the GitHub release's `SHA256SUMS` and `SHA256SUMS.sig`,
+    and keeps the first list whose signature verifies; when both fail, the answer is GitHub's error. The ISO itself
+    still downloads from GitHub (`dir`).
+  - **Trust is unchanged.** Both lists are checked with the same release key compiled into LordOS before any hash in
+    them is believed; a wrong or stale file on the site fails its signature and the GitHub list is read instead. The
+    root-side parser (`server/src/vm/vmcatalog.c`) accepts a `list` only on an entry signed with `lordos-release` and
+    a fixed `sums`, only under `https://lordos.org/releases/<tag>/`, with plain names for both files; any other
+    `list` refuses the whole entry.
+  - **Release process.** `tools/release/publish-lists.sh <tag> <release-dir>` (new, optional) verifies
+    `SHA256SUMS.sig` with `tools/release/lordos-release.pub.pem`, uploads `SHA256SUMS` as
+    `releases/<tag>/SHA256SUMS.txt` and `SHA256SUMS.sig` to the site's bucket (`text/plain`, `no-cache`; the account
+    from `tools/web/aws-env.sh`), invalidates `/releases/*` and compares what the site serves. `docs/RELEASING.md`
+    step 9 runs it for every release, and step 1 moves `list.dir` with the card's tag. `tools/web/deploy.sh` no
+    longer deletes `releases/` on the site (its `--delete` sync excludes it, like `apt/` and `keys/`).
+  - **Tests.** `vmcatalog-test`: the real entry's copy has the tag of its folder, lordos.org is tried first, GitHub
+    second and nothing third, other entries keep only their own folder, and a `list` on another host (including
+    `lordos.org.evil.example`), outside `releases/`, over http, with `..` or a query, with a path for a name, without
+    a name, on a maker's entry or on a `sumsPattern` entry is refused. `vm_catalog_test.mjs`: both architectures'
+    copies, the same tag as the ISO folder, an extension on the list, GitHub kept as the fallback, and only LordOS's
+    entry has one. Docs: `docs/VIRTUALIZATION.md` 3.9 ("The LordOS card"), `docs/RELEASING.md`.
+- **Machines: the library draws its machines' place from the first frame, with placeholders until they are read**.
+  Reported by the maintainer: opened again (after logging back
+  in), the library with the New machine card, an Ubuntu machine and a guest of the other system took 1 to 2 seconds to
+  look right.
+  - **What made it slow.** Not the reads: on a headless `lord-server-test` with two machines every `lord.vm` call the
+    library makes (host, list, stats, gpus) took 0 to 3 ms. Two things in the library itself: its first frame had no
+    list yet and drew the empty library (the "No machines yet" page, which also read `lord.system.info`), and its grid's
+    columns came from the root's measured layout, which isn't there in the first frames, so the cards were drawn one
+    per row, the New machine card across the whole window, until the next 1.5 s poll drew them again in two or three
+    columns. At login, with the session's other windows starting, both lasted longer.
+  - **Now.** The grid's columns come from the window's width in the window store (`useWindowWidth`), known from the
+    first frame (`libGrid` in `apps/machines/model.js`). Until the first read is in, the library draws placeholders in
+    the view the person left it in (the settings' `machinesView`, read synchronously): in the grid, the real New
+    machine card and cards of the real size (picture, name, numbers line, ··· button); in the list, the real New
+    machine row and rows of the real height and columns; the chips' row and the status line as muted shapes of their
+    size, so nothing moves when the machines replace them. As many placeholders as cards were shown the last time (a
+    new setting, `machinesSeen: { count, shown }`, written only when it changes, never for a search; at most 6, 2 when
+    never seen); a library that was empty the last time shows the empty library at once. The blocks pulse slowly in
+    the theme's muted colors and are still with Reduce motion; they carry an accessible label, "Loading machines…"
+    (`machines.lib.loading`, in every language).
+  - **Checked** with `server/tests/vm_model_test.mjs` (the grid, the placeholders' count and when it is kept) and on a
+    headless `lord-server-test` with a private home and two scratch machines: screenshots 30, 150, 600 and 2000 ms
+    after opening show the two-column grid from the first one (before: one column until the 1.5 s poll), and, with the
+    first read held back 1.2 s in a test-only build, the grid and list placeholders lined up with the cards and rows
+    that replace them.
+- **Launching an app that is already running brings its window forward, even when it runs once and takes the launch
+  over (Google Chrome).** Seen on the maintainer's PC (2026-11-23): session restore started Chrome at login and its
+  window (1024×758) went away; launching Chrome again from the launcher logged "Opening in existing browser session"
+  and no window appeared on any display, while the Chrome process kept running.
+  - **What happened.** The window was Chrome's profile chooser (four profiles, "Show on startup"), and session restore
+    gave it the saved place of a Chrome window, which was on another activity (desktop 2) than the one in view, so it
+    was open but out of sight. Launching Chrome again ran a new `google-chrome` that handed its command line to the
+    running process and exited without using the `XDG_ACTIVATION_TOKEN` LordOS gave it. The running process then asked
+    for a token of its own, with no input serial, no surface and no app id, and activated the profile chooser with it.
+    That request is not granted (Chrome didn't have the keyboard and named no click or key), so the window was only
+    marked as wanting attention, on a desktop not in view: nothing showed. Reproduced with Google Chrome 158, a
+    throwaway profile with two profiles and Lord Workspaces on a headless `lord-server-test`; the Wayland log shows
+    `get_activation_token`, `commit` and `activate` from the old process 60 ms after the launch, and "activate:
+    attention". The old process's Wayland connection was never cut, and Chrome was not windowless (its GPU process and
+    renderers run under its zygote).
+  - **The fix** (`server/src/wl/xdgact.c` `xact_take_launch`, `server/src/wl/wl.c` `tok_commit` and `launch_was_for`,
+    `server/src/apps.c` `apps_window_names`): an app's ungranted token request is granted once when LordOS issued a
+    launch token for that app at most 10 s earlier (`XACT_HANDOFF_MS`) and it is still unused; that launch token is
+    used up, so one launch grants once. "For that app": a Flatpak app by the identity lord-server checked itself; any
+    other by a window it already shows whose `app_id` names the launched `.desktop` entry (the Dock's match: the id,
+    its `StartupWMClass`, or the last part of a reverse-DNS id). Never Xwayland, an isolated LordOS app or a client of
+    another sandbox's security context. With the grant the theme focuses the window and brings its desktop into view
+    (`wm.focus`), in every theme. A handoff with no launch from LordOS still only asks for attention. With the fix,
+    Chrome 158 relaunched on the same headless session switches to activity 2 with the profile chooser in front.
+  - A copy that runs with no window (Chrome kept alive by its background apps) and maps a new one on a launch already
+    worked: checked with Chrome's `--keep-alive-for-test`, and now in the test below.
+  - Tests: `build/xdgact-test` (the launch's token used once, only for the app it names, only within 10 s, never an
+    app's own token, an ungranted one or one naming no app, the newest of two launches first);
+    `server/tests/handoff_headless.sh` with `server/tests/handoff_client.c` (new, in `make test`), an app that runs
+    once as Chrome does, on a headless `lord-server` in Lord Flow and Lord Workspaces: session restore puts it on
+    desktop 2 while desktop 1 shows; launched again, desktop 2 comes into view with its window in front (this check
+    fails without the fix: "events attention, desktop 1 shown"); the same handoff run without a launch stays
+    "attention"; a copy that closed its last window maps a new one in front. Not yet checked with the maintainer's
+    Chrome on his PC.
+  - `docs/WAYLAND.md` ("Activation": a launch the copy already running took over).
+- **Machines: a restart or shutdown of the computer handles a running machine at once, and inside logind's delay.**
+  Seen on the maintainer's PC (2026-11-23): with a guest machine running (an Intel GVT-g vGPU, started paused),
+  `reboot` waited the whole 30 s ("Delay lock is active (… lord-vm) but inhibitor timeout is reached"), lord-vm only
+  then logged *the computer is shutting down*, and systemd's last kill took QEMU and its VFIO device down hard (a
+  suspect for the restarts that stayed on the boot splash that week).
+  - **The cause** (`server/src/vm/lordvm.c`, the main loop): lord-vm polled the system bus with the events
+    `sd_bus_get_events()` asked for and called `sd_bus_process()` only when poll said the descriptor was ready. The
+    synchronous AddMatch and Inhibit calls at the start read the bus's NameAcquired into sd-bus's own queue; while that
+    queue isn't empty sd-bus leaves POLLIN out (and its timeout says "now", which the loop ignored), so the descriptor
+    was polled for nothing and PrepareForShutdown sat unread until the bus hung up at the end of the shutdown.
+  - **The fix**: the bus code moved to `server/src/vm/vmlogind.c` (new), which dispatches what's queued before every
+    poll and adds sd-bus's own deadline to the loop's. PrepareForShutdown is handled in under a millisecond.
+  - **The whole stop fits in logind's delay** (`server/src/vm/vmhoststop.h`, new): lord-vm reads logind's
+    `InhibitDelayMaxUSec` (30 s with LordOS's drop-in) and plans the stop from it: a save to disk until +18 s, the
+    guest's own shutdown (ACPI or the agent) until +26 s, then QEMU is told to quit (a clean exit: disks flushed, VFIO
+    closed), and SIGKILL at +29 s; the delay inhibitor is let go as soon as QEMU is gone, before logind gives up on it.
+    Before, a save could take 30 s and the shutdown another 30 + 5, past the delay. A machine with a vGPU or 3D
+    graphics goes straight to the guest's shutdown (a paused one is resumed first, as before); a machine started
+    paused that never ran is turned off at once (nothing to save, and a firmware that only starts then ignores the
+    power button). SIGTERM (the session ending) and lord-server going away follow the same plan.
+  - **Tests**: `build/vmlogind-test` (new, in `make test`) runs vmlogind.c against a fake logind on a private
+    dbus-daemon: PrepareForShutdown(true) handled within 250 ms (0 ms measured; the old dispatch on a second
+    connection didn't see it in 1.5 s), PrepareForShutdown(false) ignored, the delay inhibitor seen released, the bus
+    going away. `vm-test` checks the plan for 0 to 120 s delays. With a fake logind and a scratch machine, the real
+    lord-vm saved the machine 278 ms after PrepareForShutdown and let go of the inhibitor (the old binary reacted only
+    when the bus went away, 46 s later); with an 8 s delay (no time to save) the guest got the power button and QEMU
+    quit at +4.0 s; a never-run paused machine was off in 124 ms.
+  - **The delay is now 45 s** (was 30 s; chosen by the maintainer on 2026-11-23), so a machine that can't be saved
+    (a graphics card, 3D graphics) gives its guest's own ACPI shutdown until +41 s instead of +26 s. The plan scales
+    with it: a save until +33 s, QEMU's quit at +41 s, SIGKILL at +44 s (`vmhoststop.h`, whose default when logind
+    can't be read is now 45 s too). `packaging/systemd/logind-lordos-machines.conf` is in `/usr/lib` (not a
+    conffile), so dpkg replaces it; the new migration `010-0.8.9.6-machines-shutdown-delay` reloads logind so the
+    restart right after the upgrade already gets 45 s (lord-vm plans from logind's live value either way). `vm-test`
+    checks 45 and 30 s exactly and that the shipped file and lord-vm's default agree.
+- **Machines: a guest's own shutdown or restart with Graphics 3D behaves like one, instead of a crash screen.** QEMU
+  10.0.13 still aborts at every shutdown and restart of a guest on Debian's kernel 6.12.117 or later with 3D (QEMU issue
+  4918, see the entry below about the unattended install); until now every such stop showed the error screen with
+  **Use 2D Graphics and Start**. lord-vm now names the end by what it knew just before the abort
+  (`vmlog_3d_abort_end`, `server/src/vm/vmlog.c`):
+  - **A stop asked from LordOS** (Shut Down, closing the window, the computer's own stop) reads as a normal stop.
+  - **The guest says what it does.** The LordOS tools for Linux (`lordos-guest` 6, `tools/guest/lordos-guest.c`) have
+    a systemd-shutdown hook (`/usr/lib/systemd/system-shutdown/lordos-guest` in the `lordos` package for LordOS guests,
+    `lordos-guest-local` written by Install Agent in other guests): at the guest's last step, once its services have
+    stopped and its file systems are read-only, it runs `lordos-guest --stopping poweroff|halt|reboot|kexec`, which
+    sends the new frame `AGK_STOPPING` (kind 22, one byte: power off or restart) on `org.lordos.agent` and waits at
+    most 1.5 s for lord-vm's echo. It works with nobody signed in. Tools with the hook say `stopping` in their hello.
+    Anywhere else (no agent port) the hook ends at once.
+  - **What it becomes.** A power off: `stopped` (`guest-shutdown`), no error. A restart, once the guest had run 30 s:
+    `stopped` (`reset`), and the machine's window starts it again with the same settings, 3D kept (the rule a machine
+    with a graphics card already had, now `restartsAgain` in `apps/machines/model.js`). A restart that aborts again
+    within 30 s of its start gets the error screen, so a restart loop can't go on. Nothing said and no tools that would
+    say, after 30 s: the new reason `qemu-3d-stop`, off with no error screen and never restarted, and the off card says
+    the guest shut down or restarted and to start it if it was restarting (`machines.win.stopped3dHint`, new). An abort
+    not tied to a stop (tools that would say said nothing, or right after the start) keeps `qemu-3d-crash`, the error
+    screen and the 2D button; its text no longer says the guest had finished (`machines.fix.qemu-3d-crash`, rewritten).
+    Both texts are in all 35 languages.
+  - **The disks** are still checked at the next start (`qemu-img check -r leaks`, as after a crash): run.json keeps code
+    6 for these stops.
+  - **Not covered:** a machine started from the `machines` command or kept running with its window closed isn't started
+    again after a restart (the window does it); guests without systemd or with older tools get the "nothing said"
+    rules until Machines updates their tools (it does by itself: `TOOLS_SHIPPED` is now Linux 6).
+  - **Tests:** `build/vmlog-test` (every combination of the rules), `build/vm-test` (the frame, the verbs, the hello
+    word), `tests/guest_stop_test.sh` (new, in `make test`: the frame, the echo, 1.5 s without one, no port, a bad
+    verb, against a fake lord-vm on a socket), `tests/vm_model_test.mjs` (the reasons, the restart, the hint). A
+    scratch run of the real lord-vm with a fake QEMU that speaks QMP, sends the frame on the agent's port, prints QEMU's
+    assertion line and aborts gave all eight cases the rules expect (restart said after 32 s → `reset`; power off said
+    → `guest-shutdown`; restart said after 3 s → `qemu-3d-crash`; nothing said without tools after 32 s →
+    `qemu-3d-stop`; nothing said with tools → `qemu-3d-crash`; Shut Down asked → `host-shutdown`; …), with lord-vm's
+    echo received each time and the disk check at each next start. Not yet checked with a real 6.12.117 guest with 3D.
+### Changed
+- **Machines: QEMU's render node by descriptor** (docs/VIRTUALIZATION.md 3.3): lord-vm opens and checks the GPU's
+  render node, QEMU reopens that descriptor (`rendernode=/proc/self/fd/N`) and its Landlock rule is made from it, so the
+  device checked is the only one QEMU may open.
+- **Machines: an installer disc is read out of the desktop's process** (docs/VIRTUALIZATION.md 5.2). The
+  disc a person chooses is untrusted; its boot files are now read by `lord-vm --iso-probe` in seccomp strict mode (it can
+  only read the mapped file and write one fixed 64-byte answer), and lord-server only checks that answer. Same results
+  on real discs.
+
+- **Machines: a guest's picture is taken less often when it doesn't change or no window shows it**. Seen on the maintainer's PC: a guest on an Intel GVT-g vGPU in apps mode with a
+  static window kept lord-server at ~28 % of a core and QEMU at 10–28 %, because QEMU's vfio display hands over the whole
+  picture on every refresh (~33 a second) whether anything changed or not, and each one was copied and compared on the
+  iGPU and went back and forth through lord-vmdisplay.
+  - **Idle:** after 30 unchanged frames in a row (about a second) the picture is taken 100 ms apart. QEMU's console waits
+    for each answer lord-vmdisplay holds, so its vfio display isn't queried meanwhile either. The first changed frame
+    ends it, and so does the first key, click, wheel step or pointer motion sent to the guest, at once, in lord-vmdisplay.
+  - **Hidden:** when neither the machine's window nor any of its apps mode windows is on screen (minimized, on another
+    desktop or wholly under an opaque window), lord-server reads none of its frames and a 2D or vGPU picture is taken
+    500 ms apart; shown again, the next frame is read whole. A recording of the machine is never paced.
+  - **Every picture** is taken at most once per refresh of the display, the dmabuf paths included. A Linux 3D (virgl)
+    picture is never held longer (the guest's GPU work waits on it); hidden, it is only not read.
+  - **How:** `VD_PACE` (lord-server → lord-vmdisplay; `server/src/vm/vmpace.h`, checked by `vd_msg_valid`),
+    `lord.vm.shown(sid, on)` (`server/src/ui/js_vm.c`), `outOfSight` in `sdk/desktopmodel.js` and
+    `useWindowsOutOfSight` / `windowsOutOfSight` in the SDK, used by `apps/machines/vmwindow.jsx`; `lord.vm.poll` also
+    reports `picReads`, `picSame`, `picSkipped` and `pace`.
+  - **Measured:** with QEMU's vfio refresh imitated (`build/vmdisplay-test`), pictures handed over in 2 s went from 67 to
+    21 idle and 5 hidden; a key after idle brings the next one in 0 ms. A 2D guest's frames read while minimized halved
+    (40 → 20 in 10 s); lord-vmdisplay sleeps through a long interval (a first version spun at 50 % of a core while
+    minimized; `vmdisplay-test` checks its CPU now).
+  - Tests: `build/vmpace-test` (the rules, the message check), `build/vmdisplay-test` (rates, holds inside QEMU's 1 s,
+    input ending idle, the helper's CPU while paced), `desktop-model-test` (`outOfSight`). docs/MACHINES-GPU.md "Pacing a
+    machine's picture", docs/VIRTUALIZATION.md.
+  - **The machine window's own reads:** the window read its machine's state (`lord.vm.poll`) every 16 ms for as long as
+    the machine ran, hidden or not, and each read woke lord-server's loop: ~60 wakes a second. Measured on the
+    maintainer's PC with a temporary loop trace: ~70 timer wakes a second with a guest running, visible or minimized,
+    against ~14 without it, all from this timer. It now reads every 100 ms (50 ms while a resize settles, the machine
+    starts or stops, or the window closes), every 500 ms while no window shows the guest, and at once when one shows it
+    again (`apps/machines/vmwindow.jsx`). With the timer gone, lord-server's main thread spent ~2.5 % of a core with
+    that guest on screen or minimized.
+
+- **Machines: a guest's memory uses 2 MB hugetlb pages when the administrator reserved enough of them**. lord-vm reads `/proc/meminfo` at start: when all of the machine's memory fits in free, unreserved 2 MB
+  hugetlb pages (`vm.nr_hugepages`), QEMU gets `memory-backend-memfd,hugetlb=on,hugetlbsize=2M,prealloc=on` (shared when
+  the machine has a shared folder or the transfer folder), allocated whole at start; otherwise the memory is backed as
+  before, never a failed start. The session log says which (`memory: …`). Nothing changes on a computer without
+  reserved pages, and no system setting is touched (`server/src/vm/vmmem.h`, `lordvm.c` `mem_backing`).
+  - **Found:** a machine without a shared folder already gets transparent huge pages (QEMU asks for them on all guest
+    memory; a running 2 GB guest had 1.94 GB in 2 MB pages), but the transfer folder is on by default and makes the
+    memory a shared memfd, which gets 4 KB pages only while `/sys/kernel/mm/transparent_hugepage/shmem_enabled` is
+    `never` (the kernel's default). **Measured** with the same QEMU memory options: dependent random reads over 1 GB
+    took 76 ns with host huge pages against 112 ns with the shared memfd (guest huge pages; 111 against 153 ns with guest
+    4 KB pages), and touching new memory took a third longer. Fixed by the next entry.
+  - Tests: `build/vmmem-test` (`/proc/meminfo`'s fields, hugetlb only when it all fits).
+
+- **Machines: a machine with a shared folder or the transfer folder gets 2 MB pages too** (the system
+  setting approved by the maintainer on 2026-11-23). Two changes, each useless without the other:
+  - The `lordos` package sets `/sys/kernel/mm/transparent_hugepage/shmem_enabled` to `advise`
+    (`/usr/lib/tmpfiles.d/lordos-thp.conf`, applied at every boot; migration `011-0.8.9.6-shmem-huge-pages.sh` applies
+    it at once on an upgrade, only from `never`, the kernel's default, so a value an administrator chose stays). Only
+    shared memory that asks for huge pages gets them, which QEMU does for a guest's memory; tmpfs and `/dev/shm` don't
+    change. A file of the same name in `/etc/tmpfiles.d` keeps another value. Kernels without transparent huge pages
+    (the Pi 5's) skip it.
+  - lord-vm gives such a machine `memory-backend-ram,share=on` instead of `memory-backend-memfd,share=on`. QEMU maps a
+    `memory-backend-memfd` only 4 KB aligned, so it never got a 2 MB page whatever the setting (**measured**: 10 MB of
+    huge pages with `advise`); QEMU 10.0 backs shared RAM with a memfd of its own, mapped 2 MB aligned, and virtiofsd
+    still gets its descriptor. A state saved with the old backend loads with the new one. The session log now says
+    which pages shared memory gets (`memory: shared (shared folders), 2 MB transparent huge pages (shmem_enabled
+    advise)`) (`server/src/vm/vmmem.h` `vmmem_object`, `vmmem_shmem_huge`).
+  - **Measured** (a 2 GB guest doing 20 million dependent reads over a 1 GB random cycle, 5 rounds interleaved): with
+    the transfer folder, 93 ns a read before and 75 ns now, the same as a machine without a shared folder (74 ns);
+    touching and shuffling 1 GB took 1.00 s before and 0.52 s now. docs/VIRTUALIZATION.md 3.7.2.
+  - Tests: `build/vmmem-test` (the backend's `-object`, `shmem_enabled`'s value read).
+
+- **Machines: a machine's disks get an I/O thread of their own and bypass the host's cache on ext4 and XFS**. The system disk and the data disks (virtio-blk) are served by one QEMU I/O thread instead of its main
+  loop (which also runs the display, QMP and the other devices). On ext4 and XFS, when the file takes `O_DIRECT`, the
+  disk files are opened with `cache.direct` and Linux native AIO, so the guest's data isn't cached twice; elsewhere
+  (btrfs, tmpfs, a network file system) as before. Discard stays on; io_uring stays off (QEMU's seccomp filter refuses
+  it). Snapshots with memory (take, revert while running, delete) checked with both. A guest's device set is unchanged,
+  so installs need no other drivers (`lordvm.c` `blockdev_disk`, `disk_direct`, `virtio_disks`; docs/VIRTUALIZATION.md
+  6.4.1).
+  - **Measured** (NVMe, ext4; a guest reading and writing its disk with `O_DIRECT`, the same `-blockdev` options): the
+    I/O thread alone took 4 KB random reads from 59.5k to 104k IOPS one at a time and from 190k to 250k four at a time,
+    and random writes from 55k to 93k; bypassing the host's cache took sequential writes from 1.59 to 2.0–2.6 GB/s
+    and reads of data not in the host's cache from 1.62 to 2.46–2.53 GB/s. Random requests then go to the disk (14k
+    IOPS one at a time, 60k four at a time on that NVMe) where a working set still in the host's memory was served from
+    it before.
+  - **Kept after measuring real work** (asked by the maintainer, who felt no difference): a Debian guest (4 vCPUs,
+    4 GB) booted, unpacked the Linux sources (86,618 files), installed 456 packages, built part of the kernel, wrote,
+    read at random and copied a 6 GB file, 4 runs with the host's cache and 4 without, alternating. Without it:
+    unpacking 13 % faster, installing 6 %, writing 6 GB 43 %, the build the same, boot 0.2–0.3 s slower (4–6 %) and
+    the copy 4 % slower; random 4 KB reads of data in the host's cache but not the guest's were 5× faster with it (74k
+    against 14.7k IOPS one at a time). With it, the host kept 15.9 GB of that guest's disk in its page cache, four times
+    the guest's memory. So `cache.direct` stays for every disk on ext4 and XFS, with no rule by size or memory
+    (docs/VIRTUALIZATION.md 6.4.1, "Host cache or not").
+- **Machines: a snapshot that was taken, gone back to or deleted no longer adds "failed:" to the machine's log.** The
+  log line meant for a failure followed every success but a deletion (`lordvm.c` `snap_end`).
+
+- **Store → LordOS apps is LordOS's own store** (asked by the maintainer on 2026-11-23: "we are going to build a store
+  of native apps the person can install, like the other package systems'"). The section opens on a shop of LordOS's
+  own installable apps and components, as cards (icon, name, "LordOS component", summary, Get / Open / View), each
+  with its page. It starts with four: **LordOS Studio Camera** (`lordos-studio-camera`, the "LordOS Studio" camera for
+  every app), **Disk Formats** (`lordos-disk-formats`), the **LordOS Web Runtime** (`lordos-web`) and **LordOS
+  Voices** (the `lordos-voice-*` models). Nothing installs differently: a package of LordOS's repository opens the
+  usual package page (the plan, then `pkg-install` through LordOS's package engine; with the item's own icon, name and
+  summary, and Open once it is in), Disk Formats keeps its page with every driver's license first, and the voices'
+  page sends you to Settings → AI, where each voice is heard before it is downloaded. Open shows the LordOS Studio app, Disks,
+  the Web apps section or Settings → AI. The catalog is data, `assets/store/lordos-apps.json` (read by
+  `apps/store/lordosmodel.js`, drawn by `apps/store/lordospages.js`): a future native app is one entry and its two
+  texts. What moved and what stayed: Studio Camera was only a hardware suggestion (Store → For this computer, when a
+  camera is found) and stays there too; Disk Formats stays in Commercial too (its formats are other makers'); the Web
+  Runtime was installed only by the first web app, which still does it; the voices were only in Settings → AI, which
+  still installs them. The NVIDIA driver and the other hardware drivers stay in For this computer; `lordos-rclone`
+  and `lordos-hwdata` are part of every install and aren't offered. LordOS Studio's "Get it in the Store…" link and
+  Files' and Disks' "get Disk Formats" now open the item's page in LordOS apps (`{ page: 'lordos', native: '<id>' }`).
+- **LordOS apps → Installed** (the top of its second column): LordOS's own items installed here, with View (their page,
+  where Remove is) and Open, and the installed `.lpk` apps as before (trust, Modified by you, Restore, Share my
+  version, Remove, Open). The `.lpk` packages found in the home folder, Downloads and Desktop are listed under the
+  shop's cards. With fewer than six items the column has no categories (Installed, Settings, All); each item already
+  names one for when it does. The general **Store → Installed** lists LordOS's installed items too ("LordOS
+  component", with View and Open) under its **LordOS apps** filter, and its sidebar count includes them.
+- **Every package system's section has the same shape, and a cleaner shop** (asked by the maintainer on 2026-11-23).
+  The second column is now **Installed**, **Settings**, then **Categories**. What sat above each shop moved into its
+  Settings, so the shop opens straight on its banner or its cards: Flathub's description, "Only apps verified by
+  Flathub" (with how many it hides), Flathub's rankings, Refresh and Turn off (`FlathubSettings`); the web apps'
+  description, whether LordOS's web engine is installed yet, and Settings → Web apps for profiles, permissions and space
+  (`WebSettings`); GNU/Linux apps (Debian): what they are, the package lists' last check with Check for updates, and
+  the automatic check (the same preference as Updates; `DebianSettings`); LordOS apps: what the section and `.lpk`
+  packages are, and the package lists its items come from (`LordOSSettings`; all in `apps/store/sectionsettings.js`
+  except Flathub's and the web apps'). "Add from an address" is an action and stays at the top of the web apps' shop.
+- **An update icon in the section's title bar**, next to the search (↻, with a tooltip and a screen reader label:
+  `ToolbarButton` takes `accessibilityLabel`, and an icon-only one says its tooltip): Flathub's refreshes its catalog,
+  GNU/Linux apps' and LordOS apps' fetch the package lists (an administrator's action, as before); the web apps have
+  nothing to fetch and show none.
+- **Each section searches only its own apps**, and its field says so ("Search Flathub apps", "Search GNU/Linux apps",
+  "Search web apps", "Search LordOS apps"); typed in a section's Settings, the search goes to its shop. The Store's own
+  pages search every system with "Search apps": Discover (now with LordOS's own items as a shelf of their own) and
+  Installed; on Updates, For this computer and the Picked by LordOS pages a search opens Discover's. Choosing another
+  page in the sidebar clears the search. The Store opened with `{ page, search }` searches that section.
+- **One name per package system everywhere** (sidebar, titles, search fields, Installed filters): **GNU/Linux apps
+  (Debian)** (was "Linux apps (Debian)"), **Flathub apps** (was "Flathub"), **Web apps (PWA)** and **LordOS apps**.
+  The sidebar is 250 points wide by default (was 230) so the longest name fits; it can still be dragged.
+- New texts in all 35 languages: the four items' names and summaries, the LordOS apps pages, Settings, the four
+  search fields, the update icon's two labels and the Settings pages (28 keys); `store.src.debian` and
+  `store.page.flathub` changed in every language.
+- **Store: each package system's shop first, its installed apps under Installed** (asked by the maintainer on
+  2026-11-23). Linux apps (Debian), Flathub and Web apps (PWA) open on their shop: Flathub's home with its
+  collections and categories, the web apps' "Add from an address" and catalog, Debian's Discover. Each one's second
+  column now starts with **Installed**, with how many of that system's apps are installed, and its **Categories**
+  below it (All, then each category), the way the Store's own sidebar has Installed among its pages; in a narrow
+  window the same choices are chips, Installed first. Installed shows only that system's installed apps with their
+  usual actions and the toolbar's search: Flathub's with Update Flathub apps, Remove and Open (and the job's
+  progress); the web apps with See more, Manage and Open; Debian's Linux apps with Remove (through the plan sheet)
+  and Open. With none, it says where to find them. The shops no longer list the installed apps above their catalog
+  (an installed app's card says Open). The title says where you are ("Flathub · Installed").
+  `apps/store/origincol.js` (the column and the chips), `FlathubInstalled` (`apps/store/flathubpages.js`),
+  `WebInstalled` (`apps/store/webapps.js`). Links can open an origin's Installed with `{ page: 'src:flathub', sub:
+  'installed' }`.
+- **Store → Installed lists every installed app, whatever its package system**, each marked with it (LordOS app,
+  Linux app, Flatpak app, Web app, as before), and its filters are now chips with counts: All, LordOS apps, Linux
+  apps (Debian), Flathub, Web apps (PWA), each only when it has apps, and Deactivated (was a two-way switch, All or
+  Deactivated). `apps/store/installedmodel.js`; the `filter` argument also takes `lordos`, `debian`, `flathub` and
+  `web`.
+- Three new texts (`store.installed.noneDebian`, `noneFlathub`, `noneWeb`), in all 35 languages.
+
+### Removed
+- **Machines: the Android card**. The maintainer removed it on 2026-11-24:
+  it added nothing. Gone: its entry in `assets/machines/systems.json` (the pinned Bliss OS 16.9.7 ISO), the assistant's
+  "archived image" notice under a download (`catalog.js` `noticeOf`, `machines.dl.notice.archived` in all 35
+  languages), its tests in `vm_catalog_test.mjs` and `vmcatalog-test` (the pinned-card path is now tested with a made-up
+  entry and virtio-win's pin), and its descriptions in docs/VIRTUALIZATION.md (4.2 says it was removed), the roadmap,
+  the paper and its validation table. A person's own Android ISO chosen from a file is still named as such. amd64 now
+  shows six cards, arm64 five.
+
+### Documentation
+- **Roadmap: choosing what a provider's mail, calendars and contacts account syncs** ([#241](https://github.com/lordbasex/LordOS/issues/241); not started). `docs/ROADMAP.md`, "Next release after 0.8.9.5": setup asks
+  for Mail, Calendars (which ones) and Contacts; a per-collection `subscribed` flag in `lord-maild` (`pim.c`, `dav.c`)
+  with a migration of `pim/colls` that reads old lines as subscribed; labels by what is synced ("<provider> – Calendar",
+  "<provider> – Contacts"); Mail's sidebar shows the account only when it carries mail.
+
+- **Hardware reports: #245, #230 and the graphics card report #235 (`docs/HARDWARE-REPORT.md`, updated 2026-11-24).** #245 adds an Acer Aspire R3-131T laptop with an Intel Celeron
+  N3050 (Braswell) and 2 GB of memory, booting from eMMC on 0.8.9.5-beta: every row works (GPU, display, storage,
+  network, Wi-Fi, Bluetooth, audio, power, isolation; suspend unchecked), five browser pages used about 1.3 GB, and
+  the Fn brightness keys do nothing (listed as open). #230 is the third report of #105's ASUS K72F, a fresh install on
+  0.8.9.5-beta: all works again; MuseScore and Arduino install more easily but their menus still fail (#209), and
+  network computers shown in Files don't open while a Kubuntu session on the same machine reaches them (listed as
+  open). #235 is the first graphics card report and the first RTX 50 card: an RTX 5070 Ti 16 GB on NVIDIA's open
+  kernel modules 620.73.04 draws a smooth desktop (the report, made from the command line, doesn't say how it was
+  composed), CUDA's userspace is there and llama.cpp ran on it, a long context limited only by the card's free memory.
+  Its report also shows the `nouveau` module loaded next to `nvidia`, holding no device: the report tool reads
+  `/sys/module/nouveau` correctly, so this is the system's state, and whether NVIDIA's packages keep `nouveau` out of
+  that kernel's initramfs is now an open question in `docs/NVIDIA-PLAN.md` (A.4). A new section, "Graphics card
+  reports", holds such reports. The counts are now 26 physical machines (12 with a hardware report's data, 12 named in
+  other issues, 1 graphics card report), 27 people, 15 Intel, 5 AMD and 2 NVIDIA GPUs, 19 Intel CPUs and 15 laptops,
+  with the comparison tables, what works, the open problems, the untested combinations and the thanks updated. The
+  paper (en, es, pt, §3.2, §3.5, §10.2 and §10.3, mirrored in `docs/PAPER.md`), the "Own desktop" feature page, the
+  FAQ's release, graphics and NVIDIA answers and the draft "Tested graphics cards" page (`web/content/hardware/gpus.*`,
+  still unpublished) follow, as do `docs/GPU.md`, `docs/SESSIONS.md`, `docs/BENCHMARK.md` and `docs/PAPER-VALIDATION.md`.
+
+- **Machines: design for machine groups and a Whonix (Tor) card** (`docs/VIRTUALIZATION.md` section 19, planned, nothing
+  built; asked by the maintainer on 2026-11-23). Whonix-Gateway and Whonix-Workstation as one library card, started
+  Gateway first and stopped Workstation first, with the members reachable from the card's menu and one name for the
+  `machines` command. The Workstation's only network is a socketpair to the Gateway made by lord-server and handed to
+  both `lord-vm`s (`VM_LINK`), so QEMU's sandbox doesn't change and no other process can reach the link (Whonix's own
+  KVM files use UDP on 127.0.0.1). An anonymity profile: no clipboard, transfer folder, shared folders, guest agent,
+  microphone, 3D, suspend or thumbnails; no huge pages or KSM; random UUID and MACs per group with QEMU's stock SMBIOS;
+  the Gateway's passt without DNS forwarding. Whonix 18.2.4.3's official KVM archive verified with its SHA-512 list and
+  that list's OpenPGP signature (key `916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA`), unpacked (old-GNU sparse tar in xz)
+  by a proposed sandboxed helper `lord-vmunpack`, and turned into read-only bases by the jailed `qemu-img`. Start Fresh
+  (the Workstation only by default, to keep Tor's entry guards) and a disposable session. The threat model, QEMU
+  arguments per member, tests, a phased plan, the security exceptions that need approval and the open decisions are
+  listed. The status checklist gains the item at 0 % (area B 76 % → 70 %, total still 66 %).
+- **Machines: `docs/VIRTUALIZATION.md` audited against the code** (asked by the maintainer on 2026-11-23: "the source
+  code is the absolute truth"). A new "Status checklist" near the top lists every feature the design describes, each
+  with its mark (done, done but not checked on real hardware, partial, not built), a percentage and the file that
+  implements it, in 14 weighted areas; the Machines app scores **66 %** overall (engine 82 %, getting a system in
+  76 %, the app 74 %, snapshots and storage 54 %, network 83 %, devices 56 %, host integration 68 %, graphics 46 %,
+  guest tools 75 %, command line 50 %, system ties 50 %, security 70 %, performance 7 %, tests 56 %). The six
+  performance items being worked on (unchanged frames and hidden displays, huge pages, a vCPU recommendation, the disk
+  path with an iothread, io_uring and O_DIRECT, a guest-side profile, vCPU pinning) are listed as planned. Statements
+  the code contradicts were fixed: the admin actions (no `vm-usb-allow` or usbredir exists; the real list is named),
+  the cgroup scope name, Landlock's writable folder (`disks/` only), our seccomp filter (a built denylist, not "to
+  test"), the files on disk, the schema (12), the credentials' descriptors, the New Machine steps (five, automatic
+  virtio-win guest setup on by default), the machine window's menus, Configure's sections, Host only (passt on 127.0.0.1) and
+  Bridged (a macvtap with `vhost=off`), what a snapshot holds, live linked clones (the source must be off), the agent's
+  state light, Install Agent (through qemu-guest-agent, no disc), tool updates (automatic), the Shell (the serial
+  console), the Logs window, file copy (drops only), edition selection in virtio-win guests (by image name with the KMS client key),
+  virtio-win guests on arm64 (not built), the packaging (inside `lordos`, QEMU installed on demand), the tests that run, and the
+  open questions the code has settled. Features the doc didn't describe were added. `docs/MACHINES-GPU.md`: no longer
+  called a plan; Settings → Graphics cards offers only Machines (shared), and its admin actions are built.
+- **Machines: the status checklist audited again** (against `965a10f6e`, after the six performance items landed). Every
+  row was checked against the code again, not only the changed ones: 108 rows now, the total **66 % → 68 %** (engine
+  77 %, getting a system in 75 %, the app 75 %, snapshots and storage 56 %, network 80 %, devices 56 %, host integration
+  68 %, graphics 46 %, guest tools 75 %, command line 48 %, system ties 52 %, security 72 %, performance 7 → 79 %, tests
+  55 %). The six performance items are rated as built (pacing, hugetlb pages, the vCPU recommendation, the disk path, the
+  guest profile for virtio-win guests, pinning). Ratings the code didn't support went down (the resource budget is checked
+  only by the window, "Guest can see" is notes on the sandbox, the sandbox has no user namespace, recording has no test,
+  ISO recognition reads only the volume label, `machines set` misses three options) and ratings the code beat went up (the
+  failure page's nine causes, the requirements check before the download, Configure, the storage window, compaction,
+  Monitor, GPU-scaled dmabuf pictures). Rows added for claims or code that had none. False statements fixed: section 8's
+  "everything shared is off in every profile" (four of the five profiles turn the clipboard on) and `vm-state-size` as an
+  admin action (also in 3); section 9's "none of the performance items is in the code"; the note that dmabuf pictures are
+  still copied; 3.3's user namespace and "Weaker isolation" notice (not built); schema 13 in 3.9; the tests that run (12).
+  The "How the score is made" section shows the arithmetic, and the same table is in `docs/machines-checklist.json`
+  (items, areas with weight and score, total) for tools.
+- **Machines: the status checklist audited a third time** (against `bb5baab62`, after QEMU's namespaces and seccomp
+  allowlist, the machine groups with the Whonix (Tor) card, the guests' performance profile for Linux and the search
+  indexer, shared memory's huge pages, the disk cache measurement, the LordOS list from lordos.org, protected windows and
+  Sentinela's watch of the machines landed). Every changed row was rated again and the others spot-checked: 111 rows,
+  the total **68 % → 69 % (68.94)** (engine 78 %, getting a system in 76 %, the app 75 %, snapshots and storage 60 %,
+  network 80 %, devices 56 %, host integration 68 %, graphics 46 %, guest tools 75 %, command line 48 %, system ties
+  61 %, security 74 %, performance 86 %, tests 55 %). The table, the Σ line and `docs/machines-checklist.json` disagreed
+  (67.52, 67.16 and the rows' own 67.88: the Whonix row had been raised without recomputing); all three now come from
+  the rows in one pass, and the JSON's areas also carry their item count and mean. Disposable sessions are rated 25 %:
+  only the Whonix Workstation's session in memory exists, not the feature for any machine. The Whonix row went 85 → 80 %
+  (no Delete, Rename or Repair of a group, no Start Gateway bar, no remaking a base). Rows added: Sentinela's watch of the
+  machines and protected windows. False statements fixed: section 9 said the search pause and the Linux side of the
+  performance profile weren't built; 13.8 called our seccomp filter a denylist; 19.7 said Start Fresh writes
+  `operation.json` and makes a changed base again from the archive (it refuses one); 19.9's failure table now says which
+  rows are built; 12 lists the new tests and the sandbox probe that now exists; the tools' `perf` was in fact checked in a
+  running guest.
+
+### Tests
+- Machines: `server/tests/vm_usb_e2e.sh` passes again with the seat check (Claude Security F1, F3).
+  Part B's headless lord-server runs with the development-only `LORD_IDLE_HEADLESS=1` (as `tests/lock_e2e.sh` does), so
+  it counts as the session on the screen and the usb_auto rule connects the device at the next start; without it the
+  rule was skipped (lord-server runs usb_auto only on the screen) and "the rule connects it at the next start" failed.
+  Root's vm-usb-allow still checks lord-sessiond's record. The "no process holds the node" checks no longer race the
+  script: after each MARK the shell makes `~/.usbe2e-ack-<what>` in the scratch home and `tests/vm_usb_e2e.js` waits for
+  it before the device goes into QEMU (a fixed 1.5 s wait was shorter than the shell's poll plus its own 1 s pause, so
+  QEMU already held the node when the shell looked). Run on the RX 580 PC on 2026-11-25 with a Logitech C930e that
+  nothing was using (hub 05e3:0608 for the refusals): 38 passed, 0 failed, including the guest capturing 30 frames of
+  640x480. `vm-usb-cli` as `nobody`, as `glk1` (an account not on the monitor) and as root answers `ERR vm.usbNotAtSeat`.
+- Machines: `tools/vm/e2e/machines/storage-fs.sh` with `MKFS_ROOT` (btrfs-progs and xfsprogs
+  unpacked with `apt-get download` + `dpkg -x`, not installed) runs mkfs with `MKFS_ROOT`'s library folders on
+  `LD_LIBRARY_PATH`, so the unpacked `libinih1` and `liburcu8t64` are found; before, mkfs.btrfs and mkfs.xfs failed to
+  start on a computer without those libraries. Only mkfs gets that path. Run on the RX 580 PC on 2026-11-25: btrfs,
+  compressed btrfs and XFS each mounted `nosuid,nodev`, 22 passed, 0 failed. `server/tests/vm_slice.sh` (private
+  `mktemp` folders) 12 passed, 0 failed.
+- Machines: `vmkboot-test` (direct kernel boot's checks, ASan and UBSan, a random pass), schema 21 in
+  `vm-test`, the requirements, Guest can see and Start Linux directly in `vm_model_test.mjs`;
+  `tools/vm/e2e/machines/kernel-boot.py` (real QEMU/KVM: a guest's kernel taken out with `machines cp`, started directly
+  with UEFI and BIOS, a clone, the switch off, the refusals) and `server/tests/machines_see_headless.sh` (screenshots of
+  Guest can see, Start Linux directly and both Requirements pages).
+
+- **Machines: three fuzz harnesses for the guest's side** (docs/VIRTUALIZATION.md 8, 12), in
+  `make -C server test`, each built with ASan and UBSan and checked by taking a bounds check out on purpose (it failed).
+  `vmdisplay-fuzz` plays a hostile QEMU against lord-vmdisplay in its own sandbox: about 12,000 seeded calls a run on the
+  display listener, its shared-memory interface and both sound listeners, with edge values, wrong signatures, pipes and
+  short or shrunk descriptors, and hostile console properties; every call must be answered, none past QEMU's 1 s, and the
+  log must stay clean. `guest-fuzz` plays the host, the guest's own lord-server, an X display, the system and session
+  buses and local programs against `lordos-guest` at once, as a user namespace's root (where it opens no shell), and
+  checks every frame it sends the host with the host's own parsers. `agent-fuzz-test` mutates well-formed payloads of
+  every frame kind of the agent's channel, both ends (500,000 checks), and cuts a stream of frames anywhere.
+  `guest-dbus-test` gained a mutation pass over well-formed D-Bus messages.
+
+- **Two tests made steady on a busy computer**. `webreg-test`'s stand-in web runtime wrote the files the
+  test reads in place, so a loaded computer let the test read an empty one: it now writes them whole and renames them, and
+  each wait for one may last 10 s (it ends as soon as the file is there; its content is still checked). `wlperf`'s frame rate
+  check shared its lord-server with the paint check, which repaints every frame a second time: with a load of about 24 it
+  measured 41–44 frame callbacks a second (45 needed), 57 without it. The subsurface and damage checks now get a lord-server
+  of their own with the paint check; the bound is unchanged.
+- **Machines: the boot matrix's compatible-devices rows** `tcg-compat` and `other-tcg-compat-<arch>`, and two rows of the
+  QEMU arguments test (the compatible devices on arm64, and with a data disk).
+- **Machines: an end-to-end harness, a boot matrix and kill tests** (`tools/vm/e2e/machines/`, its README says how other
+  tests use it; docs/VIRTUALIZATION.md 12).
+  - **The harness** (`mh.py`): a real headless session, `build/lord-server-test` with the real default theme, started in
+    its own user and mount namespaces (an empty folder over the person's home, a tmpfs over their runtime folder, a
+    private `HOME` and `XDG_RUNTIME_DIR` under `/var/tmp/lordos-m100-e2e/`), so it never sees the person's files, machines
+    or session, with an empty Machines library. Pointer, buttons, wheel and keys go in through the test hooks, which call
+    the remote desktop's own injection (`remote.sock` itself takes only root's connections); pictures come from the hooks'
+    `frame output`. A test-only `probe.js` keeps lord-server's node tree on the JS side (it wraps the `lord.*` node calls,
+    nothing in the runtime changes), so a test finds a text or an icon where it is drawn, shown and on top (not under a
+    sheet, a menu or a question), and clicks it there. Commands run in the session through the bench's `driver.js`, now
+    with the probe and the SDK in scope. `build-e2e.mjs --out FILE` writes the bundle outside the tree (a development
+    build loads a theme outside the LordOS folder unchecked, so nothing in it is replaced). `ns-run.sh` runs any command in
+    the same kind of namespaces (lord-vm, the release gates).
+  - **The guests** (`images.py`): Debian 13's nocloud image, SHA-512 checked against Debian's list, and one made from it
+    once under KVM with qemu-guest-agent, a person's account, root on the serial console and `MH-READY` written there at
+    each boot; the 90-day evaluation of the catalog's `windows` card and virtio-win from their makers' servers with the
+    SHA-256 the catalog pins (8.2 GB and 0.7 GB, both matched on 2026-11-24). Cached in `/var/tmp/lordos-m100-images`, read only.
+  - **The flows** (`flows.py`, `run.py`, `make -C server e2e-machines`): the empty library; the New Machine assistant
+    from Import a machine through the file picker, the Light profile, a typed name and the review to Create and Start,
+    the guest's boot and its picture in the machine's window; Shut Down; Configure (network, the guest agent); a start
+    from the card; the agent's popover and Install Clipboard Helper; the clipboard both ways (lordos-guest and xclip on the guest's Xvfb
+    display); a file dragged from Files onto the machine's window;
+    the kill tests; Snapshots (take, go back, delete); Clone; the storage figures; a machine group's card. Each step checks
+    the texts on screen and what landed on disk or in lord-vm, and keeps a screenshot. `make e2e-machines` skips cleanly
+    without KVM or the network and isn't part of `make test`.
+  - **Agent kill tests** (the `kills` flow): qemu-guest-agent killed in the guest (the app sees it go, then come back by
+    itself when it starts again), passt killed (the network back by itself, measured), the transfer folder's virtiofsd
+    killed (the machine keeps running and its window says so, below) and lord-vm itself killed (the library says its
+    supervisor ended; a new start recovers it and the log says what it recovered).
+  - **The boot matrix** (`boot-matrix.py`, `make -C server e2e-machines-matrix`): the prepared guest under each setting
+    this computer can run, KVM and TCG, OVMF/AAVMF and SeaBIOS, a TPM, Secure Boot with a TPM, the compatible devices, 3D
+    on each render node, the other architecture emulated: seconds to `MH-READY`, to the agent, a clean Shut Down, the
+    disk's size.
+  - **The virtio-win install test** (`run.py windows`): the evaluation and the pinned virtio-win given to
+    `lord.vm.create` as the assistant's evaluation card gives them, started from the library card, installed without
+    questions, done when lord-vm says the install is done and the LordOS guest tools (`lordos-guest-win`) say hello.
+  - **The settings → QEMU arguments table** (`server/tests/vm_qemu_args_test.py`, in `make test`, skipped without KVM):
+    12 rows (defaults, BIOS without a display on an isolated network, host only, TCG, CPU and memory, compatible devices,
+    the `windows` card's template (Secure Boot, TPM, Hyper-V, local clock), the agent on and off, boot order and menu, a shared folder and the transfer folder, 3D), each
+    a throwaway machine started paused and its logged command line checked for what the setting adds and must not.
+  - **`make -C server e2e-machines-gates`**: the three release gates with this build's lord-vm and the cached image,
+    through `ns-run.sh`.
+  - **Run on the i9 PC on 2026-11-24**: the flows 57 of 57; the release gates on its bare metal for the first time
+    (isolation 72, integrity 45, recovery 40, leaks 10 passed); the boot matrix's 9 rows, 3D on both the RX 580 and the
+    UHD 630; the virtio-win install test 9 of 9 (installed unattended in 25.9 minutes, the guest tools' hello from the
+    installed system). On the Pi 5: arm64 under KVM and emulated boot; an arm64 machine with the compatible devices
+    doesn't (its firmware has no SATA driver: stops at the UEFI shell), recorded in docs/VIRTUALIZATION.md 12.
+
+- **Sentinela** (`docs/SENTINELA.md`): `build/llm-engine-test` runs a stand-in engine in lord-llm's real sandbox and
+  checks that TCP, UDP, IPv6, netlink and packet sockets, Unix datagrams, `connect`, reading `/etc` or `/home`, writing
+  `/tmp`, exec, signals outside and namespaces are all refused, that it has its own network namespace and reads the
+  model only through its descriptor, the socket 0600 in a 0700 folder, idling, refused models and texts, and the facts
+  of a process; signals to its parent or its own child refused, its own threads allowed; test builds of lord-llm
+  without Landlock's scoping or with a refused rule start no engine; `tests/sentinela_model_test.mjs` (rules, summary without secrets, 16 malformed or injected answers
+  refused); `tests/sentinela_notify_scene.mjs` (a triggered rule makes a desktop notification with the right actions,
+  End from the notification, battery, Do Not Disturb, "It's mine"); `tests/sentinela_settings_scene.mjs` (off by
+  default, the model download through `pkg-install`); `tests/sentinela_real_e2e.sh` (one real analysis, by hand).
+
+- `server/tests/store_lordos_test.mjs` (26 checks, in `make test`): the shipped catalog as the shop reads it, what a
+  hand-edited entry may not do (unknown kinds, a package or app id that isn't one, a settings entry with nothing to
+  open), installed items, the cards' action, no categories below six entries, the search (accents and case ignored)
+  and that every entry has its name and summary in every language. `store_installed_test.mjs` (27 checks) counts an
+  installed LordOS item as LordOS's and knows Settings; `store_origin_scene.mjs` (18 checks) has Settings under
+  Installed, in the column and the chips, and the short column (Installed, Settings, All).
+- `STORE_SCENE=lordos server/tests/store_rankings_headless.sh OUT_DIR default es` (`tests/store_scene/lordos.js`) shoots
+  Flathub's clean shop, its Settings and its own search, GNU/Linux apps → Settings, the web apps' shop and Settings,
+  LordOS apps' shop, its Installed, LordOS Studio Camera's page, the general Installed with its LordOS apps filter and
+  Discover's search over every system, and logs each section's column order, update icon and search placeholder.
+  Checked in Spanish, dark, on 2026-11-23 (the items installed on that machine). Not yet on a real display or the VM.
+- `server/tests/store_installed_test.mjs` (23 checks: each entry's system, the filters and what each keeps) and
+  `server/tests/store_origin_scene.mjs` (13 checks: Installed first with its count, then Categories, All and the
+  categories with apps; choosing Installed selects it; the narrow chips; the filter chips), both in `make test`.
+- `STORE_SCENE=installed server/tests/store_rankings_headless.sh OUT_DIR [theme] [language]` (with `STORE_MODE=light`
+  for the light appearance) shoots Flathub's shop and Installed, the web apps' shop and Installed, Debian's Installed
+  and the general Installed with its Flathub and Web apps filters in a headless lord-server (`tests/store_scene/installed.js`;
+  `pre.js` seeds two Flatpak and two web apps and installs nothing). Checked in Spanish, light and dark, on 2026-11-23,
+  and the second column in Arabic (right to left). Not yet on a real display or the VM.
+
+### Fixed
+
+- **LordOS Studio's camera now appears in Chrome, Chromium, Meet and every other app** (`lordos-studio-camera`).
+  0.8.9.5's `/etc/modprobe.d/lordos-studio.conf` gave the two devices' labels as `card_label="LordOS
+  Studio","OBS Virtual Camera"`. The kernel strips only the quotes around a whole value (`lib/cmdline.c`
+  `next_arg`) and v4l2loopback's `module_param_array` then splits it at the comma, so the devices came up as
+  `LordOS Studio"` (`/dev/video50`) and `"OBS Virtual Camera` (`/dev/video49`). lord-server checks the card before it
+  starts the session's lord-studio on the loopback, didn't recognise its own device, and never started it. With
+  `exclusive_caps=1` a loopback advertises capture only while something writes it, so no app could list "LordOS
+  Studio" (found on the maintainer's PC with a Logitech C930e: Meet listed only the real camera).
+  - The package now writes `card_label="LordOS Studio,OBS Virtual Camera"`, one quoted value. The conffile is
+    replaced on the update like any unmodified conffile (the package engine runs dpkg with `--force-confold`, which
+    keeps only files the person edited). Checked against v4l2loopback 0.15.0's source (`module_param_array(card_label,
+    charp, …)`) and Linux 6.12's `next_arg`, whose parsing gives exactly the stray quotes seen in sysfs for the old line
+    and the two clean labels for the new one.
+  - Its postinst loads the module again on an update from 0.8.9.5's labels, as it already did on an update from the
+    one-device file, only when the file is the package's own and nothing holds the devices (refcnt 0, and `modprobe -r`
+    itself refuses a module in use). Otherwise the new labels apply at the next restart.
+  - lord-server and lord-studio accept 0.8.9.5's label (`LordOS Studio"`) as theirs too
+    (`studio_card_is_ours()` in `server/src/media/mstudiohub.h`), so the camera works right after the update even
+    before the module is loaded again: apps then list it with the stray quote until the restart. OBS's device, either
+    way it is labelled, is still never ours.
+  - Tests: `build/studio-hub-test` (the label, 0.8.9.5's label, OBS's device both ways, near misses),
+    `tests/studio_package_test.sh` (one quoted value, no `","`; the postinst reloads from 0.8.9.5's labels when unused,
+    leaves them when in use or when the person kept 0.8.9.5's file).
+
+- **Files → Get Info, the Store's web-app pages, Imager's cache size, the Camera app and LordOS Studio no longer
+  stop the desktop while they measure a folder or list the cameras** (the follow-up to the Settings fix below, from
+  the same audit; `docs/MAIN-THREAD.md`, "Other apps").
+  - **Files → Get Info** measured a folder with `lord.fs.du` on lord-server's main thread, up to 900 ms on a big
+    folder. It now uses `fs.duAsync` (at most 3 s, on a worker): the size says "calculating…" until the answer comes, and
+    an answer for an item the card no longer shows is dropped (`apps/files/panels.jsx`). Headless, the home folder
+    with 200 000 files: opening the card 146–189 ms → 8–11 ms, and no `fs.du` on the main thread.
+  - **The Store's page of an installed web app** measured each profile's data with `lord.fs.du` (up to 300 ms per
+    profile) on every visit; now `fs.duAsync`, "calculating…" until it answers, and an answer for another app or
+    another set of profiles is dropped (`apps/store/webdetail.js`).
+  - **Imager → Options** measured the download cache with `lord.fs.du`; on LordOS `platform.cacheSize()` is now a
+    promise from `fs.duAsync` (the desktop app keeps its number), and the dialog says "calculating…" until it answers.
+  - **The Camera app listed the cameras every 3 s** (`lord.media.cameras` opens every `/dev/video*`: 62–68 ms each time
+    here with one webcam, which suspends after 2 s and wakes up to answer), and **LordOS Studio's panel listed them on
+    every render**. The list now comes from `sdk/cameras.js` (`useCameras`, `refreshCameras`): made on one of the
+    `fsasync.c` workers by the new `lord.media.camerasAsync()` (the same code as `lord.media.cameras`, run through the
+    new `fsasync_submit_fn`; LordOS Studio's own entry is made on the main thread and handed over), when a picker shows,
+    and again when a camera is plugged in or out: lord-server now follows the kernel's `video4linux` uevents on the
+    socket it already had for displays and batteries (`server/src/hw/uevent.c` `UEV_VIDEO`, `__lordHw('cameras')`), and
+    lists twice (after 0.3 s and 2 s, as udev gives access after the kernel's event). Nothing polls. On the main thread:
+    62–68 ms → under 0.3 ms per listing. LordOS Studio also applies its configuration again when the list changes (a
+    camera plugged back in may have another `/dev/video` number). No new permission, helper or root action: the same
+    `open` and `VIDIOC_QUERYCAP` lord-server already made, on another thread.
+  - **A copy or move to or from a Cloud account or a network share** looked up both names (`lstat`) on the main thread
+    before the job started; a name that isn't there is a question to the server. On those mounts the two checks now
+    run first on the job's thread, with the same refusals as the job's error, and nothing removed (`fsjob_start`,
+    `job_main` in `server/src/fsops.c`). Local copies keep their immediate answer. The destination folder's path is
+    still resolved (`realpath`) on the main thread before the job, guarded by the existing check for a share that
+    stopped answering.
+  - **The other native apps, opened one by one headless** (Files, Store, Mail, Photos, Player, Notes, Terminal,
+    Machines, Monitor, Voice Recorder, Imager, Settings, Calendar, Contacts, Editor, Databases, Passwords, Logs, System
+    Information, Disks): no native call over 50 ms on opening any of them; what remains over 50 ms is React building the
+    Store's first page (~195 ms) and System Information's (45–79 ms). The table is in `docs/MAIN-THREAD.md`.
+  - Tests: `server/tests/files_info_nofreeze.sh` (in `make test`, about 30 s) opens Get Info twice on a home folder of
+    100 000 files in a headless lord-server and fails on a `call fs.du` stall line, a card that never shows the size,
+    or an opening over 250 ms; it fails on the code before this fix. `tests/perf_headless.sh` has the plans
+    `filesInfo`, `cameraNatives` (the camera list both ways, each after the camera suspended) and `appsOpen` (each
+    native app alone; `PERF_APPS`). `build/uevent-test` covers `video4linux`, `build/fsasync-test` `fsasync_submit_fn`.
+### Added
+
+- **A performance profile per machine, applied inside a guest by the LordOS guest tools**. Approved by the maintainer on 2026-11-23 (Machines performance, item 5). Configure → Guest
+  agent → **Performance profile**, shown for every guest (the guest tools w11, the Linux helper 7), off by default (machine.json
+  `perf_profile`, schema 13, written only when on; `lord-vm --set DIR --perf-profile on|off`; `lord.vm.set`
+  `perfProfile`). Details in `docs/VIRTUALIZATION.md` 7.1.4.
+  - **How it gets there.** Tools that say `perf` in their hello (guest tools w11) get one frame after every hello:
+    `AGK_PERF` (kind 23), exactly one byte, 1 on or 0 off, so tools that kept the profile from an earlier run put
+    the guest's own settings back. They answer `AGK_PERFSTATE` (kind 24, exactly 3 bytes: on, the parts done and the
+    parts the system refused, each within `AGPF_ALL`, never a part in both), which lord-vm parses with
+    `ag_perfstate_parse` and only logs ("the guest's performance profile is on (applied: power plan visual effects
+    transparency; refused: nothing)"). Nothing else comes from the host: no command, path or value.
+  - **What the tools do, as the signed-in person and nothing more:** the High performance power plan
+    (`PowerSetActiveScheme`, powrprof; a standard user may switch plans unless a policy says otherwise), the visual
+    effects "Adjust for best performance" turns off (animations in and of windows, menus, combo boxes, tooltips,
+    smooth list scrolling, selection fade, pointer and window shadows, window contents while dragging) for this
+    session only (`SystemParametersInfo` without `SPIF_UPDATEINIFILE`), and transparency (`EnableTransparency` in
+    the person's own registry). What was there before is kept in `HKCU\Software\LordOS\GuestWin` `PerfSaved` and
+    put back when the host says off, when the tools let the port go (log off, another session at the console, exit),
+    and when they start after a crash; a part goes back only while it is still what the tools set.
+  - **The search indexer of a guest of the other system** (approved by the maintainer on 2026-11-23): its service
+    needs administrator rights, which the tools never have, so lord-vm runs one more fixed script as the system's own
+    account through qemu-guest-agent, once per run when the tools say `perf`, like the pointer's script. Two
+    compile-time constants (`PERFWIN_SEARCH_ON`, `PERFWIN_SEARCH_OFF`, `server/src/vm/vmperfwin.c`); only the
+    on/off bit picks one, nothing from the guest, the person, JS or machine.json goes in. On: when the indexer's
+    service (`WSearch`) starts automatically (delayed or not), that start type is kept in a fixed machine-wide
+    registry value (`HKLM\SOFTWARE\LordOS\GuestWin` `WSearchStartWas`, 2 or 18), the service is set to start
+    manually (`sc.exe config WSearch start= demand`) and stopped; one already manual or disabled is left as it is.
+    Off (the next start with the profile off): with a value kept and the service still manual, the start type goes
+    back (`auto` or `delayed-auto`) and the service is started; a start type changed in between stays; the value
+    goes either way. A named mutex keeps two runs apart. The script prints one line (`on|off <start type>
+    <service>`) that lord-vm reads with the strict `perfwin_parse` and only logs ("performance profile: … set to
+    start manually (its automatic start kept to put back), stopped").
+  - **Linux guests** (approved by the maintainer on 2026-11-23; the clipboard helper `lordos-guest` 7, which says
+    `perf` in its hello): the helper speaks D-Bus itself (`tools/guest/dbusmin.c`: a Unix socket only, EXTERNAL
+    authentication, method calls built from its own constants, every reply checked before a value is read) and starts
+    no new program. On the system bus only, power-profiles-daemon's `ActiveProfile`
+    (`org.freedesktop.UPower.PowerProfiles`, else the older `net.hadess.PowerProfiles`) to `performance`, which polkit
+    lets the active session switch. On the session bus only, GNOME's `org.gnome.desktop.interface`
+    `enable-animations` to false: read through the desktop portal's Settings (`ReadOne`, else `Read`), written
+    through dconf's own service (`ca.desrt.dconf.Writer.Change`, the path GSettings takes; the change set is built
+    byte for byte as GLib builds it). Another desktop (KDE and the rest) is reported refused. What was there before
+    is kept in `~/.local/state/lordos-guest/perf` (a fixed text record, read back strictly) and put back on `AGK_PERF`
+    0, when the port goes, when the helper ends (SIGTERM, SIGINT, SIGHUP; it used to die at once) and at its next
+    start after a crash, each part only while it is still what the helper set; a part that couldn't be put back
+    stays in the record for the next start. The parts go to the host in `AGK_PERFSTATE` (`POWER`, `EFFECTS`), which
+    lord-vm logs as "power profile" and "animations". Configure's switch now shows for every guest, with its own
+    note for Linux guests (`machines.cfg.perfProfile`, `machines.cfg.perfProfileNote`, in all 35 languages; the
+    other system's note also says its search indexer pauses). The helper's version is 7, so Machines offers the
+    update (`TOOLS_SHIPPED.linux`).
+  - **Tests:** `build/vm-test` (machine.json schema 13: true, false, wrong types, below 13, the round trip; `AGK_PERF`
+    and every one of the 16 777 216 three-byte `AGK_PERFSTATE` payloads against the rule; the `perf` hello word; both
+    search scripts are constants without a format or an argument; every `on|off <start type> <service>` line, 100 of
+    them, against the rule written out again, and malformed ones), `build/guest-dbus-test` (the calls the helper
+    builds, every reply prefix and single-byte change, variants nested too deep, errors, big-endian replies, dconf's
+    change set against GLib's own bytes, the record's strict reading), `tests/guest_perf_test.sh` (in `make test`:
+    two private dbus-daemons, the real dconf-service for a temporary home, stand-ins for power-profiles-daemon and the
+    portal; on, off, the port going, SIGTERM, a run killed with the profile on put back at the next start, a part
+    changed in between, a refused profile, the older bus name, the portal's older `Read`, KDE, no buses),
+    `tests/vm_model_test.mjs` (the shipped guest tools are w11 and 7). The guest tools build with mingw-w64 with no
+    warning and import only system DLLs (powrprof added). The tools' part was checked in the maintainer's guest on
+    2026-11-23 ("performance profile is on (applied: power plan visual effects transparency; refused: nothing)"); the
+    search script and the Linux helper's part are not yet checked in a running guest.
+- **Machines suggests a vCPU count from what a machine really uses**. Approved by the maintainer on 2026-11-23, after his guest with 10 vCPUs idled at 10 to 28 % of one
+  core in apps mode with a text editor. Details in `docs/VIRTUALIZATION.md` 6.27.
+  - **Measured by lord-vm**: the CPU time of QEMU's vCPU threads (`CPU <n>/KVM`), read once a minute while the machine
+    runs from their `/proc/<qemu>/task/<tid>/stat` files, opened before lord-vm's own Landlock and re-read with `pread`
+    (no Landlock rule added). A rolling summary goes to `<machine>/cpu-usage.json`: one entry per 5 minutes of running
+    time with the vCPU count, the average and the busiest minute, at most 24 h of running time and 30 days
+    (`server/src/vm/vmcpu.c`).
+  - **The suggestion** (`apps/machines/model.js` `vcpuAdvice`), after 2 h of running time at the current count: fewer
+    when 95 % of the time it used under 30 % of its vCPUs (enough for its busy minutes at about 60 %, never under 2);
+    more when half the time it used 85 % or over (half again, up to the computer's processors less one in eight for the
+    desktop). Configure → CPU & memory shows it with the reason ("over its last 6 h of running time it used 0.2 of its
+    10 vCPU on average, and 1.1 in its busiest minutes") and **Use N**: at once when the machine is off, at its next
+    start while it runs or is suspended. The library's card and row say "Suggested: N vCPU". Nothing changes by itself.
+  - **New machines get fewer vCPUs by default**: the profiles that asked for "half" (Development, Games, Design) now give
+    half of the computer's physical cores, 6 at most, instead of half its threads (5 instead of 10 on a 10-core,
+    20-thread PC). `lord.vm.host()` gains `cores`.
+  - Texts in all 35 languages (Machines settings' "half" note updated to say cores, 6 at most).
+  - Tests: `build/vmcpu-test` (new, in `make -C server test`), `tests/vm_model_test.mjs`, `tests/vm_profiles_test.mjs`.
+
+- **Renaming a machine renames its folder and its transfer folder too**. Asked by the maintainer on 2026-11-23: a guest machine renamed in Configure → General kept its folder
+  `~/Machines/<old name>.lordvm` and its transfer folder `~/Machines/Transfer/<old name>`, which Files kept showing
+  under the old name. Details in `docs/VIRTUALIZATION.md` 6.26.
+  - **With the machine off** the name, then the folder `<name>.lordvm` (named as a new machine's is, `vm_folder_name`)
+    and the transfer folder `Transfer/<name>` with its owner record, each moved with `renameat2(RENAME_NOREPLACE)`, so
+    nothing is ever overwritten. A folder that can't move keeps its name and the new name is still saved, with the
+    reason said. A name whose folder would read the same once made safe (`Ubuntu (dev)` and `Ubuntu [dev]`) keeps the
+    folder.
+  - **Nothing else needs rewriting**: the disks, the UEFI variables, the TPM's state, the snapshots (inside the qcow2
+    files, named in `snapshots.json`), a saved session (`suspend.json` has no paths), `run.json` and the logs are all
+    found from wherever the folder is; a linked clone's frozen base stays in `~/Machines/.shared`; the runtime socket
+    is named by the machine's id; the transfer folder's tag in the guest is always `LordOS`. Only an ISO or a drivers'
+    disc kept inside the folder is a path in `machine.json`, and it is rewritten. The app's `app.json` (system, notes,
+    apps mode, profile) is inside the folder and moves with it.
+  - **Refused, with nothing changed**: a name another machine of the library has (ASCII case ignored, as the machines
+    command finds them), a folder `<name>.lordvm` or `Transfer/<name>` that already exists (case ignored), a name
+    starting with a dot, and what a name never was allowed to have (control characters, `/`, more than 64 bytes).
+  - **While the machine runs** only the name changes: the machine's own lord-vm writes it (new request `VM_RENAME`,
+    since it holds the machine's lock), and the folders keep their names. Once it's off, Configure → General shows
+    **Rename Folder** under Folder (and `machines rename NAME NAME` does the same); renaming the folder of a running
+    machine from under QEMU, virtiofsd and the open windows is never done.
+  - **Its windows follow it**: the machine's window, Configure, Snapshots and Logs know the machine by its id, so they
+    show it again under its new folder (at once after a rename in Configure, within three seconds after one from the
+    terminal); a window that only follows never starts the machine.
+  - **A transfer folder left behind** (a folder renamed by hand in Files, or a rename stopped between its two steps)
+    joins its machine at the next start (`vm_transfer_adopt`): only one folder owned by the machine's id whose own
+    machine folder is gone, never one a Duplicate (same id) still has, never one put aside as `(old YYYY-MM-DD)`.
+  - **Configure → General**: the name can be changed while the machine runs; under it, "Its folder and its transfer
+    folder will be called …", or why the name can't be used, before Save.
+  - **`machines rename NAME NEW_NAME`** (NAME can also be the machine's id now, for every command): the same checks and
+    the same `lord-vm --rename`, exit 1 when a name or folder is taken, 2 for a name that can't be one. `lord-vm --set
+    --name` renames the folders the same way. Bash completion knows `rename`.
+  - Texts in all 35 languages (`machines.cfg.rn.*`, the command's `help.rename`, `renamed…`, `folderTaken`,
+    `transferTaken`, `badNewName`), and `help.name` says a machine's id works too.
+  - **Tests**: `build/vm-test` (the folder a name gives, the names a rename takes, `vm_rename_plan` on a scratch library,
+    `vm_transfer_adopt` with a Duplicate, a folder put aside and two candidates), `tests/vm_model_test.mjs` (the
+    windows' id, `followDir`, Configure's line, the folder offer, the job's outcome) and `tests/vm_rename.sh` (in `make
+    test`): a throwaway machine with a snapshot, a transfer folder and an apps-mode `app.json` renamed while off, the
+    refusals, found by its id; with KVM, started from its new folder, renamed while running, stopped, its folders
+    renamed and started again.
+
+- **Monitor → Processes: Grouped, a steady list, who started each process, origin badges, filters and rolling
+  statistics**. Asked by the maintainer: a browser shows as
+  twenty rows, and ending it meant ending each one. Details in `docs/MONITOR.md` ("Grouped view" to "Rolling
+  statistics").
+  - **Grouped** (next to Mine | All, combined with either, remembered): one row per app with an arrow that opens its
+    processes, showing the app's icon and name, total % CPU, memory (proportional, so shared pages count once),
+    threads, number of processes and user. Groups come from the app's root-owned scope (a Linux app, an isolated app,
+    a Flatpak app, a web app, a machine, and now LordOS's components: the Terminal's programs are one "Terminal"
+    group), else LordOS itself, else the process tree (trees of the same program together). A browser's zygotes,
+    renderers and double-forked crash reporter stay in its group. Pure logic in `apps/monitor/procgroupmodel.js`.
+  - **Quit All** on a group (the selected row's button, the toolbar, Delete, or the right-click menu with Force Quit
+    All…) lists the processes the group had when it was chosen and signals only those that are still the same process
+    (PID and start time): a PID reused meanwhile is skipped and counted, protected processes are never signalled. After
+    three seconds it offers Force Quit for the ones still open. It uses the same paths as one process (lord-server for
+    the user's own, the root helper's existing `proc-signal` for an administrator): no new privilege, no
+    `cgroup.kill`. LordOS's and the kernel's groups can't be ended as a group. A child row has its own ✕ and a menu with
+    Quit…, Force Quit… (new for single processes too) and Get Info.
+  - **A hover summary** on a group row, taken when it opens: the number of processes, the busiest and the largest child
+    (name and PID), and the last minute's CPU and memory with sparklines. Information only.
+  - **A steady list**: while the pointer is over the table, a menu or a sheet is open, and for two seconds after, the
+    order is held; values update in place, new processes go at the end of their group, exited ones stay greyed as
+    "ended" until it is released, and an "Order paused" note shows. The selection follows the process (PID and start
+    time), never a row number.
+  - **Who started it**: each child row shows its chain of ancestors dimmed ("Terminal › bash › claude › sh"; each link
+    selects that process), and Get Info → Statistics shows it as "Started by" with the apps' icons.
+  - **Origin badges**, each on a checkable fact and with a tooltip saying why: a blue verified seal for LordOS itself
+    (the executable belongs to the `lordos` package), a pink one for LordOS apps (an isolated app's scope, with its
+    signer), and small labels for Flatpak (app id), a package with its repository's name (Debian or a vendor's;
+    "installed from a file" when no index lists it), Web app (its site), Machine (its name), Unpackaged (no package
+    owns the executable) and Restart (the executable was replaced on disk). The seals are our own drawing
+    (`apps/monitor/seal.js`). Package ownership comes from dpkg's own file lists, read by a worker thread in
+    lord-server and cached (`server/src/monitor/exeown.c`, `lord.monitor.exeOwners`); it never blocks the screen.
+  - **Filters**: chips by origin (System, LordOS apps, Flatpak, Debian, Web apps, Machines, Unpackaged) and a Program
+    picker, combined with Mine | All, Grouped and the search; remembered with the sort.
+  - **Sorting by every column**, including the number of processes in the grouped view; groups sort by their totals
+    and their processes by the same column; remembered.
+  - **Rolling statistics** (`apps/monitor/procstatsmodel.js`): for every process (by PID and start time, so a restart
+    starts over) and group, the average and peak CPU and memory over 1, 5 and 15 minutes and the CPU's 95th percentile
+    over the last minute, from the process list Monitor already gets once a second; O(1) per sample and bounded (a ring
+    of 60 samples and 15 one-minute buckets per series, dropped 15 minutes after the process is gone). A Statistics
+    picker (Off, 1, 5, 15 min) adds four sortable columns; Get Info shows all three windows and the sparklines.
+  - lord-server reads LordOS's component scopes (`lordos-net-<name>.scope`) for the process list as `lordos:<name>`
+    (`mon_scope_parse`), the identity the firewall already used; the SDK's `Table` gained `onRowEnter`, `onRowLeave`
+    and `rowStyle`.
+  - Strings in all 35 languages. Tests: `tests/monitor_procgroup_test.mjs` (87 checks), `tests/monitor_grouped_scene.mjs`
+    (22 checks), `build/procctl-test` (the owner lookup and the component scopes); screenshots with
+    `tests/monitor_headless.sh` (a made-up list, nothing signalled).
+- **Sentinela, the process guard (phase 1; in development).** Approved by the maintainer
+  on 2026-11-23 with three new pieces: llama-server as a local model engine in its own sandbox, Qwen3 models shipped as
+  signed packages checked by SHA-256, and the service that reads the Monitor's process data. Off by default: Settings →
+  AI has two pages now, Voice and Sentinela (`apps/settings/Sentinela.jsx`). Design, privacy and the sandbox in
+  `docs/SENTINELA.md`.
+  - **Rules over the Monitor's own data.** With Sentinela on, the Monitor's thread builds the process list every 10 s
+    whether the Monitor is open or not (`lord.monitor.watchProcs`/`procsWatched`, `mon_watch_procs`; with the Monitor
+    open, a copy of its own list). `sdk/sentinelamodel.js` watches only the person's own processes, never lord-server
+    or protected ones: CPU at 80 % of a core or more in every sample of 5 minutes; memory up 256 MB and by half again
+    in 10 minutes, steadily (a spike is not a leak); a name like a kernel thread or a system daemon on a program
+    outside the system folders; a program deleted or replaced after it started, outside the system folders (package
+    updates are not news); a new entry in `~/.config/autostart`. Each fires at most once an hour per process; each
+    can be turned off. The network trigger (a program from no package reaching a new server) is shown as "coming
+    soon": it needs per-process connection records.
+  - **Facts, not contents.** When a rule fires, lord-server reads in its own thread (`lord.sentinela.facts`,
+    `server/src/llm/facts.c`) the program, whether it was deleted, the package whose dpkg list has that path (and its
+    /usr-merged twin), where it lives and up to six parents. The model's summary (`buildSummary`, at most 2000
+    characters) has names, paths with the home folder as `~` and the user name hidden, packages and numbers; never a
+    command line's arguments, the environment, a file's contents, a window's text or a password.
+  - **The local model, sandboxed.** lord-server starts `lord-llm` (new, `server/src/llm/launcher.c`, libc only) from
+    its own folder with no arguments and three descriptors (the model, its 0700 runtime folder, the engine's file).
+    lord-llm lowers itself (nice 15, batch scheduling, idle I/O, `lordos-sentinela.scope` with 2 cores and the model's
+    size plus 1.5 GB), then `llmjail_apply`: its own user and network namespace (no interface at all), Landlock (`/usr`
+    readable, only the engine and the loader executable, the model readable, only a socket in its folder; TCP denied;
+    abstract sockets and signals scoped) and seccomp (only `AF_UNIX` stream sockets, no `connect`, no `io_uring`, no
+    exec but the engine's descriptor, no namespaces, ptrace, mounts, BPF or keys), and runs LordOS's `llama-server`
+    (the `llama.cpp` package, 0.7.0) on the CPU with fixed arguments, listening only on `engine.sock` (0600). It starts
+    when an analysis is needed and stops 2 minutes after its last answer or when Sentinela is turned off. The sandbox
+    fails closed: without Landlock ABI 6 (files, TCP and scoping) or any rule the engine depends on, lord-llm exits
+    before running anything and Sentinela keeps its rule alerts. Signals reach only the engine itself (seccomp: `kill`,
+    `tgkill` and `rt_*sigqueueinfo` only with its own pid; no `tkill` or pidfds).
+    `lord.sentinela` (`server/src/ui/js_sentinela.c`, desktop context only) queues jobs for the engine's thread; the
+    request's parameters and its JSON schema are fixed in C.
+  - **The answer is untrusted.** `parseVerdict` accepts only `{verdict, reason, action}` with a verdict of
+    `normal`/`suspicious`/`dangerous`, a reason of at most 400 characters and an action of the closed list (End and
+    block its network, Pause, Limit, See in Monitor, It's mine); anything else is discarded and the alert keeps the
+    rule's own words. The model only suggests; nothing runs without the person's click. It can't silence an alert
+    either: a rule's alert is always notified, the model's verdict only adds its reason and may raise it, and a
+    "normal" verdict keeps the rule's words with a note that Lumo saw nothing unusual. Every value taken from the process
+    (name, paths, packages, parents) goes into the summary as a bounded JSON string, so it can't leave its field.
+  - **A desktop notification**, like any other system alert: banner, sound, Do Not Disturb and the notification
+    history, with the model's reason (or the rule's), "What Lumo analyzed" and up to three actions that work from the
+    notification itself; a click opens the alert in Settings with every action, Resume after Pause, and the facts. On
+    battery, without a model or without the engine: alerts with the rule's explanation, no analysis. "It's mine" is kept
+    per program and package in `settings.json`; the last 50 alerts in `~/.local/share/lordos/sentinela/alerts.json`.
+  - **Actions:** `lord.monitor.signal` also takes `STOP`, `CONT` and `LOWER` (nice 19 and idle I/O on every thread,
+    `proc_lower`), with the same checks as `TERM` (the user's own, unprotected process, the same start time). End and
+    block its network sets the app's `no-network` restriction first when the process belongs to an app.
+  - **Models:** `sdk/llmcatalog.js` lists Qwen3 1.7B (1.28 GB, recommended) and Qwen3 4B (2.5 GB), Q4_K_M from
+    `ggml-org`, Apache-2.0, with their SHA-256. `tools/llm/fetch-models.sh` downloads and checks them,
+    `tools/llm/mkdeb-llm.mjs` builds `lordos-llm-<id>` (`/usr/share/lordos/llm/<id>.gguf`). Settings installs the
+    engine and a model with `pkg-install` from the signed repository, with its progress; not published yet.
+  - **Measured** on the development PC with a fake two-thread miner: Qwen3 1.7B answered in Spanish in 8.5–11.4 s with
+    the engine cold (it starts in about 1 s) and 7.5–9 s warm, on 2 CPU threads (about 17 tokens/s).
+  - New strings in every language (`sentinela.json`, `errors.llm.*`, `errors.sentinela.blockFailed`).
+
+- **LordOS Studio is an app, and the capture item reaches it with the microphone too.** Until now LordOS Studio's
+  controls opened only from the capture item by the clock, and only while an app used the camera.
+  - **The LordOS Studio app** (`apps/studio`, new; in the launcher, the start menu and search of Lord Flow, Lord
+    Classic, Lord Workspaces and Celeste, category Audio & video): the camera's live preview large on one side with the
+    camera it uses, who uses it and Every app (with "Get it in the Store…" for LordOS Studio Camera when that isn't
+    installed); Portrait, Background, Face Light, Auto Framing, Filters, Retouch, Mirror and Mic Mode on the other, each
+    row's page opening in place. The controls are the popover's own (`sdk/studio.jsx` `StudioWindow`, the same
+    `settings.studio`), so the window, the popover and every app that chose the "LordOS Studio" camera agree. It runs
+    in the desktop's own process like Settings and uses the desktop-only `lord.studio`: no new native call and no new
+    broker permission. It is listed only where LordOS Studio can work (`lord.studio.status().available`: lord-studio
+    and its model installed); an app may now export `available()` for that (`tools/build-theme.mjs`,
+    `sdk/windows.js` `listApps`). It can be deactivated in Store → Installed, and a session reopens it only when asked
+    (it turns the camera on). Its icon is our own drawing (a lens under a studio light).
+  - **One preview for every Studio view.** The popover and the app's window share the desktop's own preview source,
+    opened once and closed when the last view goes, so the camera is never opened twice for them.
+  - **Mic Mode from the capture item.** While an app uses the microphone, the panel shows a **Mic Mode** row with the
+    current mode (Standard, Noise Reduction or Full Range); it opens Mic Mode alone in the same popover, with no camera
+    preview, so the camera never turns on for it. While an app uses the camera, "Video effects" shows as before (and
+    Mic Mode too when the microphone is also in use). Both pages link to the LordOS Studio app.
+  - **What Mic Mode reaches, said plainly.** A mode sets the default microphone (Noise Reduction is the "LordOS Noise
+    Reduction" microphone), so it reaches the apps that record from the default microphone; an app set to a particular
+    microphone keeps it, and the new line under Mic Mode says to choose "LordOS Noise Reduction" in that app. Mic Mode
+    in a browser call is still to be tried on real hardware.
+  - **Text** in all 35 languages (`studio.effects`, `studio.openApp`, `studio.micApps`; `apps.studio`).
+  - **Tests:** `tests/capture_studio_scene.mjs` (new, 29 checks, in `make test`): the microphone alone shows the Mic
+    Mode entry and no Video effects, Mic Mode opens without asking for a preview, says which apps it reaches and makes
+    Noise Reduction the default microphone, Back returns; the camera shows Video effects with its preview as before;
+    the app's window renders the effects, Mic Mode, the camera and the Store link; the app is listed only with LordOS
+    Studio installed. `tests/studio_headless.sh` takes `STUDIO_SCENE=mic` and `STUDIO_SCENE=app` for screenshots.
+
+- **Changing the desktop style keeps the session.** Choosing Lord Flow, Lord Classic, Lord Workspaces or Lord Celeste
+  in Settings → Appearance or in the first-start chooser switches live again and never ends the session. Since
+  0.8.9.5 a switch tore the running theme down before it knew whether the new one could run: when the verified-code
+  check refused the new bundle, or the new theme threw while starting, `lord-server` read the running theme's file
+  again, and if that file had changed under the session (a package update) it was refused too and only the recovery
+  screen was left, whose one button is Log Out (`switch_theme` in `server/src/main.c`, from 2e2bc506; before that
+  commit the same case crashed `lord-server`, which also ended the session). Now:
+  - `lord.themes.use` reads and verifies the new bundle while the running theme still runs (`js_theme_prepare` in
+    `server/src/ui/js.c`). A refused or unreadable bundle is answered with `false` at once: nothing is discarded, the
+    choice goes back to the theme in use, the session-restore marker is put back, and a notification says the style
+    couldn't be applied and why (refused by the verified-code check, or didn't start), in every language. The check
+    itself is unchanged: the switch runs exactly the bytes that were checked (`js_init_prepared`).
+  - If the new theme throws while it starts, the theme that was running starts again from the bytes verified when it
+    was loaded (`js_init_previous`), never from its file on disk; its `startShell()` puts the choice back and shows
+    the same notification. The recovery screen is only for a theme that can't be run at all.
+  - While the style changes, a short overlay dims the desktop with a ring and "Changing to ‹name›…"
+    (`sdk/themeswitch.jsx`); `lord-server` draws two more frames after the switch is accepted (300 ms at most) so it
+    is on screen while the new theme loads behind it, and the new theme's first frame replaces it.
+  - `lord-server` no longer crashes when a theme starts in a session without Wayland (the background-blur
+    capabilities were sent to a list that was never set up, `server/src/wl/bgeffect.c`).
+  - Tests: `server/tests/theme_switch_headless.sh` now switches round the four desktops in one headless session
+    through the SDK's `themes.use` (driver in `server/tests/theme_switch_scene.mjs`), with Settings and Files open and
+    a Wayland client drawing: the process stays up, each desktop runs with both apps back, the overlay is up at each
+    switch, the client stays connected, and a theme that can't be switched to answers `false` and leaves the choice
+    alone. Its two older cases now check that a refused theme never stops the running one and that a failed switch
+    comes back to the running theme instead of the recovery screen.
+- **Machines: an unattended install with Graphics 3D no longer ends with QEMU aborted.** On an RX 580 with Debian 13's
+  QEMU 10.0.13, installing LordOS 0.8.9 in a machine with 3D stopped about 45 s in with
+  `ui/dbus-listener.c:511: dbus_scanout_texture: Assertion 'tex_id' failed` (signal 6), at the installer's restart. The
+  cause is QEMU's: when a guest resets its virtio-gpu-gl from a vCPU, `virtio_gpu_gl_reset()` resets the scanouts in that
+  thread, the "display output is not active" surface gets texture 0 (no GL context there), and the D-Bus display asserts
+  (QEMU issue 4918, open; not fixed in 11.1.3 or master). Linux guests with Debian's kernel 6.12.117 or later do that reset on
+  every shutdown and restart (`virtio_dev_shutdown`). An unattended install's start now always has 2D graphics (the
+  installer is a text console; `vm_gl_refusal`), and the installed system's first start has the machine's 3D again. A 3D
+  machine whose guest still hits it at a shutdown or restart now ends as `qemu-3d-crash` instead of a bare QEMU crash
+  (lord-vm recognises QEMU's line, `vmlog_qemu_3d_abort`): its window says what happened, that the disk is safe, and offers
+  **Use 2D Graphics and Start**, in every language. `docs/VIRTUALIZATION.md` (3.2 and 6.10) has the code path and the
+  upstream status. Tests: `build/vmlog-test`, `build/vm-test`, `tests/vm_model_test.mjs`.
+
+- **Opening Settings → Flatpak froze the whole desktop for up to 2 seconds; no Settings page waits on the disk or a
+  camera any more** (maintainer, 2026-11-23: the pointer stopped until the page showed). Every Settings page was then
+  opened one by one in a headless session and timed with the stall detector (`docs/MAIN-THREAD.md`, "Settings, page by
+  page").
+  - **Settings → Flatpak** measured `~/.local/share/flatpak` and `~/.var/app` with `lord.fs.du` on lord-server's main
+    thread, allowed up to 2 s, on every visit: hundreds of thousands of files once a few apps and their runtimes are
+    installed. The sizes are now measured by the new `lord.fs.duAsync(path, ms)` (`server/src/fsasync.c`, `FSA_DU`: the
+    same path checks and walk as `lord.fs.du`, on one of the workers `lord.fs.listAsync` already uses, at most 10 s,
+    never into another filesystem nor on a cloud or network mount) through `fs.duAsync` (`sdk/fs.js`); the rows say
+    "calculating…" until the answer comes, and the answer is kept for 30 s, so going back to the page shows it at once.
+    Headless with 200 000 files: opening the page 148–154 ms → 14–23 ms.
+  - **Every switch in Settings (and every other settings change) paused the desktop for 60–70 ms on a computer with
+    webcams**: LordOS Studio applied its configuration on each settings write and listed the cameras each time
+    (`lord.media.cameras` opens every `/dev/video*`). It now stops when its own settings are as last applied, and lists
+    the cameras only when one was chosen (`sdk/studio.jsx`): `settings.set` of one key 65 ms → 0.3 ms with two webcams.
+  - **Settings → Web apps** measured each profile's data with `lord.fs.du` (up to 300 ms per profile, every 30 s while
+    the page shows); now `fs.duAsync`.
+  - **Settings → Cloud → Check This Account** listed, created, read and removed files in the account's folder (a
+    FUSE mount: each a call to the provider) on the main thread, and reading the freed file back downloaded it there.
+    The check now uses `fs.listAsync`, `statAsync`, `mkdirAsync` and `trashAsync`, and writes and reads its file through
+    a scratch file in `~/.cache` and a copy job (`sdk/cloudcheck.js` awaits every call; `cloud_model_test.mjs` runs it
+    with calls that answer later). Not measured headless: it needs a real cloud account.
+  - **Settings → Language** listed Downloads and the home folder for language packs on every render of the page, and
+    **Network → VPN → Add** seven folders when the sheet opened; both now with `fs.listAsync`, once.
+  - Tests: `server/tests/settings_nofreeze.sh` (in `make test`) opens Settings → Flatpak twice in a headless
+    lord-server with 200 000 files in the test home and fails on a `call fs.du` stall line, a page that never shows a
+    size, or an opening over 250 ms; it fails on the code before this fix. `fsasync-test` covers `FSA_DU`.
+    `tests/perf_headless.sh` has the plans `settingsPanes` (every page by id), `flatpak` and `settingsNatives` (the
+    native calls Settings makes, each timed alone), `PERF_FLATPAK_FILES` and `PERF_MARK` (step marks for the stall
+    lines).
+
 ## [0.8.9.5-beta] - 2026-11-23
 
 An update of the package through the Store and `apt`, with no new images. Linux apps: every Wayland global LordOS
@@ -10669,7 +13079,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.5-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6-beta...HEAD
+[0.8.9.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.5-beta...v0.8.9.6-beta
 [0.8.9.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.4-beta...v0.8.9.5-beta
 [0.8.9.4-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.3-beta...v0.8.9.4-beta
 [0.8.9.3-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.2-beta...v0.8.9.3-beta

@@ -1,5 +1,5 @@
 /* portalshot.c — the pictures of the Screenshot portal (ui/portal.c; approved by the maintainer 2026-11-22): what the
- * person picked in LordOS's chooser, painted as a screen share paints it (cast_still: protected windows black), encoded
+ * person picked in LordOS's chooser, painted as a screen share paints it (cast_still: protected windows as the fill), encoded
  * to PNG by lord-media into the file the shell named (in the home folder, never over an existing file), and the color
  * under a point for PickColor. Kept out of portal.c so the portal's bus tests need no compositor. */
 #include "portal.h"

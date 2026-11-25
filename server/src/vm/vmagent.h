@@ -14,7 +14,8 @@
  *                            noclip: a helper whose guest has no clipboard tool, said instead of "clipboard clipx"; a
  *                            helper says hello again when that changes; pointer: the Windows tools are new enough for
  *                            lord-vm to set the display driver's hardware pointer, docs/VIRTUALIZATION.md 7.1.2; gvt:
- *                            new enough for lord-vm to install Intel's driver for a GVT-g vGPU, vmgvtwin.h); the
+ *                            new enough for lord-vm to install Intel's driver for a GVT-g vGPU, vmgvtwin.h; perf:
+ *                            they apply the performance profile, AGK_PERF); the
  *                            host answers with its own hello
  *   AGK_CLIP   both ways     the clipboard's text, UTF-8; only in the directions the machine allows (machine.json)
  *   AGK_CLIPX  both ways     the clipboard in up to three forms at once (capability "clipx" in both hellos): parts of
@@ -70,6 +71,8 @@
  *                            (printable ASCII, e.g. \\.\DISPLAY1); nothing after the last. Sent at hello and when
  *                            the guest's display configuration changes. Apps mode's rectangles (LAG_WINDOWS,
  *                            LAG_WINACT, AGK_PLACE) are relative to the shown display's top left corner.
+ *   AGK_STOPPING both ways  u8 AG_STOP_*: the guest powers off or restarts now; the host's echo says it was read
+ *                            (below; capability "stopping" in the hello: the guest's shutdown hook is installed).
  *   AGK_TABLET guest → host  u8 mode (AG_TABLET_PRIMARY or AG_TABLET_DESKTOP, below): how the guest maps the absolute
  *                            tablet with several displays; lord-vm uses it for where clicks land (ag_tablet_layout).
  *
@@ -221,6 +224,197 @@ int ag_tablet_parse(const uint8_t *p, size_t n, int *mode);
  * the primary, or the only one: the picture is all the tablet covers), 2 none either, but the tablet can't reach the
  * shown display at all (another display is the primary: the tools make the shown one primary again). 0 a layout. */
 int ag_tablet_layout(const AgDisplay *d, int n, int shown, int mode, int L[6]);
+/* AGK_STOPPING guest → host: exactly 1 byte, the guest's system is about to power off (AG_STOP_POWEROFF: poweroff or
+ * halt) or restart (AG_STOP_REBOOT: reboot or kexec). Sent by `lordos-guest --stopping <verb>`, which systemd-shutdown
+ * runs from /usr/lib/systemd/system-shutdown/ with its verb once every service has stopped and the file systems are
+ * read-only, just before the reboot(2) whose device shutdown resets virtio-gpu (QEMU issue 4918, docs/VIRTUALIZATION.md
+ * "Graphics 3D"); no hello first (a fresh open of the port, the helper's own run is over by then). host → guest: the
+ * same byte back once lord-vm has read it; the guest waits for it at most AG_STOP_WAIT_MS. lord-vm uses it only to name
+ * the end of a run whose QEMU then aborted on that reset (a restart Machines starts again, or a shutdown); a guest's
+ * tools whose hook is installed say "stopping" in their hello. 0 well formed */
+enum { AGK_STOPPING = 22 };
+enum { AG_STOP_POWEROFF = 1, AG_STOP_REBOOT = 2 };
+#define AG_STOP_WAIT_MS 1500
+int ag_stopping_parse(const uint8_t *p, size_t n, int *mode);
+/* systemd-shutdown's verb as AG_STOP_*: "poweroff" and "halt" AG_STOP_POWEROFF, "reboot" and "kexec" AG_STOP_REBOOT,
+ * anything else (NULL too) 0 */
+int ag_stop_verb(const char *verb);
+/* The guest's performance profile (docs/VIRTUALIZATION.md 7.1.4; machine.json perf_profile; tools w11, "perf" in their
+ * hello). AGK_PERF host → guest: exactly 1 byte, 1 on, 0 off; lord-vm sends it after each hello of tools that said
+ * "perf". With it on, the Windows tools, as the person and with nothing else from the host, switch the guest to the
+ * High performance power plan and turn its visual effects (animations, shadows, fades, window contents while dragging)
+ * and transparency to the minimum; they keep what was there before in the person's own registry and put it back when
+ * the host says 0, when they let the port go (log off, another session at the console, exit) and when they start
+ * after a crash. AGK_PERFSTATE guest → host, the outcome, for lord-vm's log only: exactly 3 bytes, u8 on (0 or 1), u8
+ * the AGPF_* parts done (applied, or put back when off), u8 the parts the system refused; never a part in both. 0 well
+ * formed */
+enum { AGK_PERF = 23, AGK_PERFSTATE = 24 };
+enum { AGPF_POWER = 1, AGPF_EFFECTS = 2, AGPF_TRANSPARENCY = 4, AGPF_ALL = 7 };
+#define AG_PERFSTATE_BYTES 3
+int ag_perf_parse(const uint8_t *p, size_t n, int *on);
+int ag_perfstate_parse(const uint8_t *p, size_t n, int *on, unsigned *done, unsigned *failed);
+int ag_perfstate_write(uint8_t out[AG_PERFSTATE_BYTES], int on, unsigned done, unsigned failed);
+
+/* Guest → host links and notifications (docs/VIRTUALIZATION.md 6.12; tools 8 and w12, "links" and "notify" in their
+ * hello). The guest is hostile: neither ever runs anything on this computer by itself.
+ *   AGK_LINK guest → host: a link a program in the guest (or the person, `lordos-guest --open-on-host`) wants opened on
+ *     this computer: 1..AG_LINK_MAX bytes, exactly what ag_link_ok takes, nothing else. lord-vm passes it on only while
+ *     machine.json "guest_links" is on, at most AG_LINK_BURST at once and one per AG_LINK_EVERY_MS after; lord-server
+ *     shows it in a bar over the machine ("‹machine› wants to open ‹link›" [Ignore] [Open]) only while the machine is
+ *     in use, one at a time (another one while the bar shows is dropped, never swapped in under the person's pointer),
+ *     and opens it in this computer's browser only when the person clicks Open.
+ *   AGK_NOTIFY guest → host: a notification: u16 title length (1..AG_NOTE_TITLE_MAX) + title, u16 body length
+ *     (0..AG_NOTE_BODY_MAX) + body, exactly that; UTF-8 without control characters or bidi overrides (ag_note_text_ok).
+ *     Passed on only while machine.json "guest_notify" is on, at most AG_NOTE_BURST at once and one per
+ *     AG_NOTE_EVERY_MS after; shown by lord-server as from the machine (its name first, Machines' icon), with no action,
+ *     never with the host's privileges.
+ * Neither exists for a machine with the anonymity profile (its agent is off, and machine.json refuses both). */
+enum { AGK_LINK = 25, AGK_NOTIFY = 26 };
+#define AG_LINK_MAX        2048
+#define AG_NOTE_TITLE_MAX  120
+#define AG_NOTE_BODY_MAX   600
+#define AG_NOTE_BYTES      (4 + AG_NOTE_TITLE_MAX + AG_NOTE_BODY_MAX)
+#define AG_LINK_BURST      3
+#define AG_LINK_EVERY_MS   5000
+/* the guest's clipboard (AGK_CLIP, AGK_CLIPX): each one becomes a memfd for lord-server and, for a picture, a re-encode
+ * in lord-media; a guest that copies in a loop is held to a burst, then one per interval (a person copies far slower) */
+#define AG_CLIP_BURST      4
+#define AG_CLIP_EVERY_MS   250
+/* apps mode's lists (LAG_WINDOWS, LAG_APPLIST) and icons (LAG_WINICON): each one is a memfd for lord-server, and a window
+ * list opens and closes LordOS windows; a guest that alternates them is held to a burst, then one per interval. A list
+ * that comes too soon waits (the latest wins) and goes once the interval allows; an icon that comes too soon is dropped
+ * (a guest sends each window's icon once: the burst covers a whole list's, LAG_WIN_MAX). One the same as the last sent
+ * isn't sent again. */
+#define AG_WINLIST_BURST    8
+#define AG_WINLIST_EVERY_MS 100
+#define AG_APPLIST_BURST    3
+#define AG_APPLIST_EVERY_MS 2000
+#define AG_WINICON_BURST    64
+#define AG_WINICON_EVERY_MS 50
+#define AG_NOTE_BURST      5
+#define AG_NOTE_EVERY_MS   3000
+/* 1 when p is a link this computer may offer to open: letters, digits and - . _ ~ : / ? # [ ] @ & = + , ; % only (what
+ * the launcher passes to a browser as one argument: no space, quote, backslash, parenthesis, < > { } | ^ `), every '%'
+ * followed by two hex digits; http:// or https:// (scheme in any case) + a host of letters, digits, '.' and '-' (labels
+ * not empty, not starting or ending with '-') or a bracketed IPv6 address, an optional :port (1..65535), then nothing
+ * or '/', '?' or '#' and the rest; never a user name or password before the host ('@' in the authority: a spoofing
+ * trick). No other scheme (mailto, file, javascript, data…) */
+int ag_link_ok(const uint8_t *p, size_t n);
+/* the guest's tools: a link as typed, with every byte outside that set (and a '%' not followed by two hex digits)
+ * percent-encoded, so "https://x.org/a (b)" becomes "https://x.org/a%20%28b%29". Its length (out NUL-terminated), -1
+ * when it doesn't fit cap. It doesn't make a link valid: ag_link_ok still decides */
+long ag_link_encode(const uint8_t *in, size_t n, char *out, size_t cap);
+/* text of a notification: lag_text_ok, and none of the bidi controls U+200E, U+200F, U+202A..U+202E, U+2066..U+2069
+ * (they could make it read as the host's own words). 1 yes */
+int ag_note_text_ok(const uint8_t *p, size_t n);
+/* AGK_NOTIFY: 0 well formed (exact length, both texts ag_note_text_ok); pointers into the payload */
+int ag_note_parse(const uint8_t *p, size_t n, const uint8_t **title, uint16_t *tn, const uint8_t **body, uint16_t *bn);
+/* bytes written (≤ AG_NOTE_BYTES), 0 when they aren't a notification ag_note_parse would take or don't fit */
+size_t ag_note_write(const uint8_t *title, size_t tn, const uint8_t *body, size_t bn, uint8_t *out, size_t cap);
+/* A token bucket: at most `burst` at once, then one per `every_ms`. 1 allowed now (and counted), 0 not */
+typedef struct { long long at; int tokens; } AgRate;
+int ag_rate_take(AgRate *r, long long now_ms, int burst, int every_ms);
+
+/* The agent's shell (docs/VIRTUALIZATION.md 6.18; tools 8 and w12, "shell" in their hello): a terminal inside the guest,
+ * over this channel (no network, no SSH), as the person signed in at the guest's display, never root or an
+ * administrator: the tools start that person's own login shell (Linux: their passwd entry's shell, else /bin/sh, in a
+ * new pty; Windows: PowerShell in a pseudo console), never a program, argument or path the host names. Only the host
+ * opens one; one at a time.
+ *   AGK_SHELL_OPEN host → guest: u32 id (≥ 1, a new one per shell), u16 columns, u16 rows; exactly 8 bytes
+ *   AGK_SHELL_SIZE host → guest: the same layout: the terminal's new size
+ *   AGK_SHELL_DATA both ways: u32 id, then 1..AG_SHELL_CHUNK bytes (what was typed; what the shell wrote)
+ *   AGK_SHELL_ACK  both ways: u32 id, u32 bytes (1..AG_SHELL_WINDOW): that many bytes of DATA were delivered (written to
+ *     the pty, or to lord-server's terminal). Flow control: a side never has more than AG_SHELL_WINDOW bytes of DATA
+ *     sent and not acknowledged; lord-vm ends a shell whose guest breaks that, or acknowledges more than it sent
+ *   AGK_SHELL_CLOSE both ways: u32 id, i32 status; exactly 8 bytes. host → guest: end it (status 0); guest → host: it
+ *     ended (the shell's exit status 0..255, 256 + a signal, or AG_SHELL_NOSTART: it couldn't start) */
+enum { AGK_SHELL_OPEN = 27, AGK_SHELL_DATA = 28, AGK_SHELL_SIZE = 29, AGK_SHELL_CLOSE = 30, AGK_SHELL_ACK = 31 };
+#define AG_SHELL_CHUNK    16384
+#define AG_SHELL_WINDOW   (256 * 1024)
+#define AG_SHELL_COLS_MAX 1000
+#define AG_SHELL_ROWS_MAX 500
+#define AG_SHELL_NOSTART  (-1)
+/* AGK_SHELL_OPEN and AGK_SHELL_SIZE: 0 well formed (id ≥ 1, columns 1..AG_SHELL_COLS_MAX, rows 1..AG_SHELL_ROWS_MAX) */
+int ag_shell_size_parse(const uint8_t *p, size_t n, uint32_t *id, int *cols, int *rows);
+int ag_shell_size_write(uint8_t out[8], uint32_t id, int cols, int rows);
+/* AGK_SHELL_DATA: 0 well formed (id ≥ 1, 1..AG_SHELL_CHUNK bytes; *data points into the payload) */
+int ag_shell_data_parse(const uint8_t *p, size_t n, uint32_t *id, const uint8_t **data, uint32_t *dn);
+/* AGK_SHELL_ACK: 0 well formed (id ≥ 1, 1..AG_SHELL_WINDOW) */
+int ag_shell_ack_parse(const uint8_t *p, size_t n, uint32_t *id, uint32_t *bytes);
+void ag_shell_pair_write(uint8_t out[8], uint32_t id, uint32_t v);      /* ACK and CLOSE: u32 id, u32 (or i32) value */
+/* AGK_SHELL_CLOSE: 0 well formed (id ≥ 1, status AG_SHELL_NOSTART..511) */
+int ag_shell_close_parse(const uint8_t *p, size_t n, uint32_t *id, int *status);
+
+/* Files sent from the guest to this computer (docs/VIRTUALIZATION.md 6.21: "Send to LordOS"; tools 9 and w13, "send" in
+ * their hello, the host's hello says "send" while machine.json takes them). Only the guest offers; one file at a time;
+ * every file lands in this computer's quarantine folder for that machine (<library>/Received/<machine>), never anywhere
+ * the guest names, marked as from that machine and never executable. The guest is hostile: every frame is parsed exactly,
+ * a name is one plain file name, and lord-vm never has more than AG_SEND_WINDOW bytes in flight.
+ *   AGK_SEND_OFFER guest → host: u32 id (≥ 1, the guest's own), u64 size (≤ AG_SEND_SIZE_MAX), u8 flags (AGSF_*, nothing
+ *     else), 32 bytes key (the guest's resume key: the same file offered again after a lost connection gives the same key,
+ *     opaque to the host), u16 name length (1..AG_NAME_MAX) + the file's name (ag_send_name_ok); exactly that.
+ *   AGK_SEND_ACCEPT host → guest: u32 id, u8 status (AGSA_*), u64 offset, 32 bytes: the SHA-256 of the offset bytes the host
+ *     already has of this key (a resume; zeros with offset 0); exactly AG_SEND_ACCEPT_BYTES. Any status but AGSA_OK has
+ *     offset 0 and zeros.
+ *   AGK_SEND_FROM guest → host: u32 id, u64 offset: where the data starts: the accept's offset when the guest's file starts
+ *     with those very bytes (their SHA-256 matched), else 0 (the host starts the file again). Exactly 12 bytes.
+ *   AGK_SEND_DATA guest → host: u32 id, u64 offset (exactly the next byte the host expects), 1..AG_SEND_CHUNK bytes.
+ *   AGK_SEND_ACK host → guest: u32 id, u64 offset: every byte before it is written on this computer. The guest never has
+ *     more than AG_SEND_WINDOW bytes sent past the last ACK; lord-vm ends a transfer whose guest does.
+ *   AGK_SEND_END guest → host: u32 id, 32 bytes: the SHA-256 of the whole file, sent once all of its size went; exactly
+ *     36 bytes. The host keeps the file only when its own SHA-256 of what it wrote is the same.
+ *   AGK_SEND_DONE both ways: u32 id, u8 code (AGSD_*); exactly 5 bytes. host → guest: the outcome; guest → host: it gives
+ *     up (the file couldn't be read, the person cancelled it). */
+#define AG_NAME_MAX 180                            /* a file name's bytes (ag_drop_name, below) */
+enum { AGK_SEND_OFFER = 32, AGK_SEND_ACCEPT = 33, AGK_SEND_FROM = 34, AGK_SEND_DATA = 35, AGK_SEND_ACK = 36, AGK_SEND_END = 37,
+       AGK_SEND_DONE = 38 };
+#define AG_SEND_CHUNK        65536
+#define AG_SEND_WINDOW       (4u << 20)
+#define AG_SEND_SIZE_MAX     (1ULL << 40)          /* 1 TiB */
+#define AG_SEND_OFFER_MIN    (4 + 8 + 1 + 32 + 2 + 1)
+#define AG_SEND_OFFER_BYTES  (4 + 8 + 1 + 32 + 2 + AG_NAME_MAX)
+#define AG_SEND_ACCEPT_BYTES (4 + 1 + 8 + 32)
+#define AG_SEND_OFFER_BURST  8                     /* offers: at most 8 at once, then one per 2 s */
+#define AG_SEND_OFFER_EVERY_MS 2000
+/* AGSF_EXEC: the file could be run in the guest (an x bit, an .exe): said to the person, never kept on this computer */
+enum { AGSF_EXEC = 1, AGSF_ALL = 1 };
+/* AGK_SEND_ACCEPT's status: taken (from offset); this machine doesn't take files (Configure, Sharing); not now (another
+ * file is on its way, or no Machines window is there to show it: offer it again later); no room on this computer; refused
+ * (too many offers, a name or size this computer won't take) */
+enum { AGSA_OK = 0, AGSA_OFF = 1, AGSA_BUSY = 2, AGSA_SPACE = 3, AGSA_REFUSED = 4, AGSA_LAST = AGSA_REFUSED };
+/* AGK_SEND_DONE's code: kept; cancelled (by the person on either side); the SHA-256 differs; this computer couldn't write
+ * it, or the guest couldn't read it; no room left; later (host → guest: this computer stopped it for now, its Machines
+ * window went: what came is kept, offer the same file again later and it goes on from there) */
+enum { AGSD_OK = 0, AGSD_CANCELLED = 1, AGSD_BADHASH = 2, AGSD_FAILED = 3, AGSD_SPACE = 4, AGSD_LATER = 5, AGSD_LAST = AGSD_LATER };
+typedef struct { uint32_t id; uint64_t size; uint8_t flags; uint8_t key[32]; char name[AG_NAME_MAX + 1]; } AgSendOffer;
+/* a file name from the guest this computer may take as one: 1..AG_NAME_MAX bytes, ag_note_text_ok (UTF-8, no control or
+ * bidi characters), no '/' or '\\', not "." or "..". 1 yes */
+int ag_send_name_ok(const uint8_t *p, size_t n);
+/* AGK_SEND_OFFER: 0 well formed (exact length; id ≥ 1, size ≤ AG_SEND_SIZE_MAX, flags within AGSF_ALL, the name
+ * ag_send_name_ok), the name copied NUL-terminated */
+int ag_send_offer_parse(const uint8_t *p, size_t n, AgSendOffer *o);
+size_t ag_send_offer_write(const AgSendOffer *o, uint8_t *out, size_t cap);   /* bytes, 0 not one the parser takes */
+/* AGK_SEND_ACCEPT: 0 well formed (id ≥ 1, a known status, offset ≤ AG_SEND_SIZE_MAX, offset 0 and zeros unless AGSA_OK) */
+int ag_send_accept_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t *status, uint64_t *offset, uint8_t sha[32]);
+int ag_send_accept_write(uint8_t out[AG_SEND_ACCEPT_BYTES], uint32_t id, uint8_t status, uint64_t offset, const uint8_t sha[32]);
+/* AGK_SEND_FROM and AGK_SEND_ACK: u32 id (≥ 1), u64 offset (≤ AG_SEND_SIZE_MAX); 0 well formed */
+int ag_send_pos_parse(const uint8_t *p, size_t n, uint32_t *id, uint64_t *offset);
+int ag_send_pos_write(uint8_t out[12], uint32_t id, uint64_t offset);
+/* AGK_SEND_DATA: 0 well formed (id ≥ 1, offset + bytes ≤ AG_SEND_SIZE_MAX, 1..AG_SEND_CHUNK bytes; *data into the payload) */
+int ag_send_data_parse(const uint8_t *p, size_t n, uint32_t *id, uint64_t *offset, const uint8_t **data, uint32_t *dn);
+void ag_send_data_head(uint8_t out[12], uint32_t id, uint64_t offset);   /* then the bytes */
+/* AGK_SEND_END: 0 well formed (exactly 36 bytes, id ≥ 1) */
+int ag_send_end_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t sha[32]);
+int ag_send_end_write(uint8_t out[36], uint32_t id, const uint8_t sha[32]);
+/* AGK_SEND_DONE: 0 well formed (exactly 5 bytes, id ≥ 1, a known code) */
+int ag_send_done_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t *code);
+int ag_send_done_write(uint8_t out[5], uint32_t id, uint8_t code);
+/* the name a received file gets in the quarantine folder: ag_drop_name's rules (safe on Linux and Windows file systems),
+ * and a leading '.' becomes '_' (nothing hidden), bidi controls refused. 0 ok, -1 nothing usable */
+int ag_recv_name(const char *in, char *out, size_t cap);
+/* the guest tools' side of flow control, pure so it is tested here: may `n` more bytes go, with `sent` the next offset
+ * to send and `acked` the last ACK's offset? 1 yes */
+int ag_send_room(uint64_t sent, uint64_t acked, uint32_t n);
 
 /* apps mode: limits, the VM_AGENT_STATE b bit (vmproto.h's VAC_* go up to VAC_DISPLAY, 128), flags, actions */
 #define LAG_CAP_WINDOWS 256u
@@ -276,6 +470,10 @@ int ag_png_check(const uint8_t *p, size_t n, uint32_t *w, uint32_t *h);
 /* HTML from the other side, made harmless: formatting tags and their text only (see the top of vmagent.c). Returns the
  * output's length (≤ cap - 1, NUL-terminated), or -1 if it doesn't fit. Input must be valid UTF-8. */
 long ag_html_sanitize(const char *in, size_t n, char *out, size_t cap);
+/* A clipboard in AGK_CLIPX's layout, from either side, made safe to pass on: text that is UTF-8, HTML sanitized (from
+ * UTF-8), a PNG whose header is sane. The kept parts again in that layout in *out (malloc'd, *on bytes); what kept in
+ * what (for the log). 0 something is left, -1 nothing usable. Not thread-safe (one static buffer) */
+int ag_clip_clean(const uint8_t *in, size_t n, uint8_t **out, size_t *on, char *what, size_t wn);
 
 typedef struct { uint16_t kind, chan; const uint8_t *data; uint32_t len; } AgFrame;
 
@@ -294,7 +492,6 @@ long ag_b64_decode(const char *in, size_t n, uint8_t *out, size_t cap);
  * become '_'; leading spaces and trailing spaces and dots go; "." and ".." are refused; a DOS device name (CON, PRN,
  * AUX, NUL, COM1-9, LPT1-9, with any extension) gets a '_' in front; at most AG_NAME_MAX bytes, cut on a character
  * boundary with its extension (up to 16 bytes) kept. 0 ok (out NUL-terminated), -1 nothing usable. */
-#define AG_NAME_MAX 180
 int ag_drop_name(const char *in, char *out, size_t cap);
 /* qemu-guest-agent's guest-exec output (out-data) as text for the log or the person: base64-decoded, every byte that
  * isn't printable ASCII or part of valid UTF-8 replaced by '?', line ends as spaces, trimmed; at most cap - 1 bytes. */
@@ -312,7 +509,8 @@ int ag_drop_staging_ok(const char *p, int windows);
 #define LAG_APPNAME_MAX LAG_APP_MAX
 /* the hello's capability words as bits (ag_hello_caps); LAG_CAP_WINDOWS is the VM_AGENT_STATE bit, not one of these */
 enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8, AG_HELLO_CLIPREQ = 16, AG_HELLO_OPEN = 32, AG_HELLO_PLACE = 64,
-       AG_HELLO_POINTER = 128, AG_HELLO_GVT = 256, AG_HELLO_EXTRA = 512, AG_HELLO_EXTRAOFF = 1024 };
+       AG_HELLO_POINTER = 128, AG_HELLO_GVT = 256, AG_HELLO_EXTRA = 512, AG_HELLO_EXTRAOFF = 1024, AG_HELLO_STOPPING = 2048,
+       AG_HELLO_PERF = 4096, AG_HELLO_SHELL = 8192, AG_HELLO_LINKS = 16384, AG_HELLO_NOTIFY = 32768, AG_HELLO_SEND = 65536 };
 typedef struct { uint32_t id, flags, owner, pid; int32_t x, y, w, h; char title[LAG_TITLE_MAX + 1], app[LAG_APP_MAX + 1]; } LagWinEntry;
 typedef struct { uint32_t serial; int n; LagWinEntry w[LAG_WIN_MAX]; } LagWinList;
 typedef struct { char name[LAG_NAME_MAX + 1], token[LAG_TOKEN_MAX + 1]; } LagAppEntry;

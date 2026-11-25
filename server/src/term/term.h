@@ -119,6 +119,9 @@ typedef struct Term {
     uint8_t *tabs;
     int g[2], gl;               /* character sets: 0 ASCII, 1 DEC graphics */
     int cursor_shape;           /* DECSCUSR: 0 = the profile's */
+    int no_clip_set;            /* a machine's console or agent shell (term_create_fd): what the guest writes may not set
+                                 * this computer's clipboard (OSC 52, iTerm's Copy), which only Machines' clipboard gate
+                                 * may (docs/VIRTUALIZATION.md 6.8) */
     /* keys with modifiers that legacy encoding can't tell apart (Shift+Enter is a plain CR there), as the
      * program asks: the kitty keyboard protocol's flag 1, "disambiguate", a stack per screen (CSI > u
      * pushes, CSI < u pops, CSI = u sets, CSI ? u asks), and xterm's modifyOtherKeys (CSI > 4 ; n m) */

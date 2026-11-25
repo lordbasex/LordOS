@@ -42,6 +42,9 @@ const char *proc_protected(int pid, int session_pid);
  * success or an error code (errcode.h): proc.gone, proc.protected<Reason>, proc.denied,
  * proc.failed. */
 const char *proc_signal(int pid, unsigned long long start, int sig, int session_pid);
+/* (Sentinela) Also SIGSTOP and SIGCONT through proc_signal; proc_lower gives every thread of pid nice 19 and idle I/O,
+ * with the same checks. NULL on success or an error code as above. */
+const char *proc_lower(int pid, unsigned long long start, int session_pid);
 
 /* Get Info as JSON for pid, if it still started at `start` ({"pid":…,"gone":true} otherwise).
  * full: also what only the owner or root can read (smaps_rollup, exe, cwd, open files and

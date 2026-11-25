@@ -25,20 +25,22 @@ function useRunning() {
   return running;
 }
 
-// Each profile's data (bounded: lord.fs.du stops after 300 ms and says so). Measured again whenever a profile is
-// added or removed or starts running (M.sizesKey): a profile added during the visit has no folder until its first
-// start, and measuring only once showed it as "none yet" while in use. Also every 30 s while the page is open.
+// Each profile's data, measured on one of lord-server's workers (fs.duAsync, at most 5 s, and says when it stopped):
+// a browser profile's cache holds thousands of files, and lord.fs.du here kept the pointer still for up to 300 ms per
+// profile, every 30 s (2026-11-23). Measured again whenever a profile is added or removed or starts running
+// (M.sizesKey): a profile added during the visit has no folder until its first start, and measuring only once showed it
+// as "none yet" while in use. Also every 30 s while the page is open. Until the first answer the last ones stay.
 function useSizes(entry, running) {
   const [sizes, setSizes] = useState({});
   const [tick, setTick] = useState(0);
   useEffect(() => { const id = setInterval(() => setTick((n) => n + 1), 30000); return () => clearInterval(id); }, []);
   const key = M.sizesKey(entry, running);
   useEffect(() => {
-    const out = {};
-    for (const p of entry.profiles) {
-      try { out[p.id] = fs.du(`${fs.home()}/${M.dataDir(entry.id, p.id)}`, 300); } catch (e) { out[p.id] = null; }
-    }
-    setSizes(out);
+    let live = true;
+    const home = fs.home();
+    Promise.all(entry.profiles.map((p) => fs.duAsync(`${home}/${M.dataDir(entry.id, p.id)}`, 5000).then((r) => [p.id, r], () => [p.id, null])))
+      .then((pairs) => { if (live) setSizes(Object.fromEntries(pairs)); });
+    return () => { live = false; };
   }, [entry.id, key, tick]);
   return sizes;
 }

@@ -14,6 +14,10 @@
   "never": "Még nincs mentés",
   "next": "Következő: {when}",
   "lastError": "Az utolsó mentés sikertelen: {error}",
+  "machinesBusy": {
+    "one": "{count} gép futott: a lemezei ebben a mentésben az előzőből származnak",
+    "other": "{count} gép futott: a lemezeik ebben a mentésben az előzőből származnak"
+  },
   "todayAt": "ma {time}-kor",
   "now": "Mentés most",
   "pause": "Szüneteltetés",
@@ -77,6 +81,10 @@
   "delete": "Mentés törlése",
   "restoreAll": "Minden visszaállítása",
   "restoreItem": "„{name}” visszaállítása",
+  "restoreSelected": "Kijelöltek visszaállítása ({count})",
+  "restoringItem": "Visszaállítás: {index}/{count}: {name}",
+  "restoreItemFailed": "„{name}” visszaállítása nem sikerült: {error}",
+  "restoreMoreFailed": "További nem visszaállított elemek: {count}",
   "restoreFolder": "Mappa visszaállítása",
   "restorePick": "Válassza ki, mit állít vissza",
   "restoreAllTitle": "Visszaállítja a teljes saját mappáját?",

@@ -205,6 +205,7 @@ struct Surf {
     int cursor_hx, cursor_hy, p_hx, p_hy;   /* cursor role: hotspot */
     int dnd_x, dnd_y, p_dnd_x, p_dnd_y;     /* drag icon role: where it goes from the pointer (attach and offset add up) */
     unsigned hole_sig;          /* GPU path: shape of the hole the UI left last time */
+    unsigned fs_sig;            /* CPU path: its shape when the fullscreen copy last drew it (blit_tree_r) */
     struct wl_list sent_feedback;   /* presentation: already in a frame, flip pending */
     int fs_saved_w, fs_saved_h;     /* size before fullscreen */
     uint32_t conf_serial, acked_serial;   /* xdg_surface: the last configure sent, the last one acked */
@@ -537,10 +538,14 @@ static void damage_node_ex(Surf *s, int whole) {
 static void damage_node(Surf *s) { damage_node_ex(s, 0); }
 
 static void popup_box_damage(Surf *s);
+static void fs_box(float *x, float *y, float *sx, float *sy);
 /* A subsurface changed on its own: a commit of a desync one (GTK 3 maps Firefox's <select> lists and its tooltips as
  * desync subsurfaces of the window), or it came, moved, was unmapped or destroyed (whole). The window's own last damage
  * (damage_box) says nothing of it: such a list stayed on screen after it closed and the next one never showed. Its own
- * box when it has the shape it was painted with; else (whole, new, moved, resized, unmapped) all of the window. */
+ * box when it has the shape it was painted with; else (whole, new, moved, resized, unmapped) all of the window.
+ * A fullscreen window's too, within its display: Firefox draws its page in a desync subsurface, and each frame of a
+ * fullscreen video repainted all of the window's place in the desktop under it (uploaded again on the GPU path), where
+ * the same video in a window only presented the new frame (GitHub #232; tests/fsub_client.c). */
 static void damage_sub(Surf *s, int whole) {
     Surf *root = s;
     while (root->role == R_SUB && root->parent) root = root->parent;
@@ -548,16 +553,26 @@ static void damage_sub(Surf *s, int whole) {
     if (root->role == R_POPUP) { popup_box_damage(root); return; }
     Node *n = root->node ? node_get(root->node) : NULL;
     float x, y;
-    if (whole || root->role != R_TOPLEVEL || root == fs_surf || root->tf_drawn || !n || n->has_tf || !s->content ||
-        s->lw <= 0 || s->lh <= 0 || hole_sig(s) != s->hole_sig || !origin(s, &x, &y)) {
+    /* fullscreen: only at its own size (fs_box scales a window of another size), and on the CPU path with the shape
+     * the fullscreen copy last drew it with; the GPU path draws the fullscreen window whole at every present */
+    int fs = root == fs_surf, same = hole_sig(s) == s->hole_sig;
+    if (fs) {
+        float bx, by, ksx = 0, ksy = 0;
+        fs_box(&bx, &by, &ksx, &ksy);
+        same = ksx == 1.0f && ksy == 1.0f && (gpu_active() || hole_sig(s) == s->fs_sig);
+    }
+    if (whole || root->role != R_TOPLEVEL || root->tf_drawn || !n || n->has_tf || !s->content ||
+        s->lw <= 0 || s->lh <= 0 || !same || !origin(s, &x, &y)) {
         damage_node_ex(root, 1);
         return;
     }
+    Box lim = n->prev_box;                      /* where the window is; fullscreen, its display */
+    if (fs) { float fx, fy, fw, fh; fs_rect(&fx, &fy, &fw, &fh); lim = (Box){ fx, fy, fx + fw, fy + fh }; }
     Box b = { floorf(x) - 2, floorf(y) - 2, ceilf(x + (float)s->lw) + 2, ceilf(y + (float)s->lh) + 2 };
-    if (b.x0 < n->prev_box.x0) b.x0 = n->prev_box.x0;
-    if (b.y0 < n->prev_box.y0) b.y0 = n->prev_box.y0;
-    if (b.x1 > n->prev_box.x1) b.x1 = n->prev_box.x1;
-    if (b.y1 > n->prev_box.y1) b.y1 = n->prev_box.y1;
+    if (b.x0 < lim.x0) b.x0 = lim.x0;
+    if (b.y0 < lim.y0) b.y0 = lim.y0;
+    if (b.x1 > lim.x1) b.x1 = lim.x1;
+    if (b.y1 > lim.y1) b.y1 = lim.y1;
     if (b.x1 <= b.x0 || b.y1 <= b.y0) return;   /* outside the window: not shown */
     if (content_on) content_note(b);
     if (gpu_active()) { new_on(surf_keys(root)); return; }
@@ -2730,9 +2745,29 @@ static void tok_surface(struct wl_client *c, struct wl_resource *r, struct wl_re
     Surf *s = surface ? wl_resource_get_user_data(surface) : NULL;
     if (q) q->surf = s ? s->id : -1;
 }
+static const char *client_identity(struct wl_client *c);
+/* Was the launch with this id (xact_take_launch: a .desktop id from apps.c, a Flatpak id from its launcher) for the
+ * asking client? A Flatpak app by the identity lord-server checked itself (its .flatpak-info or security context); any
+ * other app by a window it already shows whose app_id names that entry (apps_window_names), the same match that puts
+ * its windows under the app in the Dock. Never for Xwayland (it speaks for every X11 app), an isolated LordOS app, or a
+ * client of another sandbox's security context. Only beside a launch the person made, never alone: any app could set
+ * any app_id, but one that did could already take the front by opening a new window. */
+static int launch_was_for(const char *id, void *ctx) {
+    struct wl_client *c = ctx;
+    if (!c || c == xwl_client || app_of_client(c)) return 0;
+    const char *who = client_identity(c);
+    if (!strncmp(who, "flatpak:", 8)) return !strcmp(who + 8, id);
+    if (secctx_of(c)) return 0;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (s && s->client == c && s->role == R_TOPLEVEL && s->mapped && !s->xw && apps_window_names(id, s->app_id)) return 1;
+    }
+    return 0;
+}
 /* Granted when the asking app has the keyboard (and the surface it names, if any, is that window or one of its
- * menus), or the serial it names is a click or key LordOS sent it a moment ago; otherwise the token exists but only
- * asks for attention. The grant ends when the keyboard leaves that app (wl_set_focus) or after XACT_CLIENT_MS. */
+ * menus), or the serial it names is a click or key LordOS sent it a moment ago, or the person just launched it and
+ * this copy took the launch over (launch_was_for); otherwise the token exists but only asks for attention. The grant
+ * ends when the keyboard leaves that app (wl_set_focus) or after XACT_CLIENT_MS. */
 static void tok_commit(struct wl_client *c, struct wl_resource *r) {
     ActReq *q = wl_resource_get_user_data(r);
     if (q->committed) { wl_resource_post_error(r, XDG_ACTIVATION_TOKEN_V1_ERROR_ALREADY_USED, "token already committed"); return; }
@@ -2741,6 +2776,11 @@ static void tok_commit(struct wl_client *c, struct wl_resource *r) {
     Surf *asker = q->surf > 0 ? find(q->surf) : NULL;
     int focused = key_focus && key_focus->client == c && (!q->surf || (asker && toplevel_of(asker) == key_focus));
     int granted = focused || (q->has_serial && xact_serial_recent(q->serial, c, now));
+    /* the person launched this app a moment ago and the copy already running took the launch over: Google Chrome's
+     * process hands its command line to the running one and exits without using the launch's token, and the running
+     * one asks here with no keyboard and no input to bring back the window it already had (its profile chooser, a
+     * window on a desktop not in view). That launch's unused token grants this request instead, once. */
+    if (!granted) granted = xact_take_launch(now, XACT_HANDOFF_MS, launch_was_for, c);
     const char *t = xact_issue_for(now, XACT_CLIENT_MS, granted, q->app_id, c);
     xdg_activation_token_v1_send_done(r, t ? t : "none");
 }
@@ -4387,8 +4427,10 @@ static void surface_commit_role(Surf *s) {
         damage_node(s);
         if (s->mapped) popups_follow(s);        /* reactive menus (xdg_positioner.set_reactive) */
     } else if (s->role == R_POPUP) {
-        if (!s->popup || !s->xdg) return;   /* its popup is gone (closed): unmapped until a new one is made */
-        if (!s->sent_configure) {
+        /* its xdg_popup is gone (closed): unmapped until a new one is made. An X11 menu or tooltip (xpop) never has
+         * one: X placed and sized it, and returning here left every X app's menu invisible (GitHub #209) */
+        if (!s->xpop && (!s->popup || !s->xdg)) return;
+        if (!s->sent_configure && !s->xpop) {
             xdg_popup_send_configure(s->popup, s->pop_x, s->pop_y, s->conf_w, s->conf_h);
             xdg_configure(s);
             s->sent_configure = 1;
@@ -4653,7 +4695,8 @@ void wl_paint_popups(Canvas *c) {
         if (!origin(popups[i], &x, &y)) continue;
         Surf *top = toplevel_of(popups[i]);
         if (paint_capture_mode && top && node_protected(top->node)) {   /* menu of a protected window */
-            canvas_rrect(c, PVX(x), PVY(y), popups[i]->lw * paint_view.k, popups[i]->lh * paint_view.k, 0, 0xff000000u);
+            static const float r0[4] = { 0, 0, 0, 0 };
+            paint_protected_fill(c, PVX(x), PVY(y), popups[i]->lw * paint_view.k, popups[i]->lh * paint_view.k, r0);
             continue;
         }
         paint_tree(c, popups[i], x, y, 1, (Rect){ -65536, -65536, 65536, 65536 });
@@ -4822,6 +4865,7 @@ static void blit_tree(Canvas *c, Surf *s, float x, float y, float sxk, float syk
 static void blit_tree_r(Canvas *c, Surf *s, float x, float y, float sxk, float syk) {
     for (int i = 0; i < s->nbelow; i++)
         blit_tree(c, s->kids[i], x + s->kids[i]->sx * sxk, y + s->kids[i]->sy * syk, sxk, syk);
+    s->fs_sig = hole_sig(s);                    /* the shape it was drawn with (damage_sub) */
     if (s->content) {
         uint32_t *tmp = s->px ? NULL : capture_readback(s);      /* a GPU app in a screenshot */
         if (tmp) s->px = tmp;
@@ -4834,11 +4878,6 @@ static void blit_tree_r(Canvas *c, Surf *s, float x, float y, float sxk, float s
 
 /* CPU path: fullscreen and its menus are copied over the already built frame. */
 void wl_paint_fullscreen(Canvas *out) {
-    if (paint_capture_mode && fs_surf && fs_surf->content && node_protected(fs_surf->node)) {
-        canvas_set_clip(out, (Rect){ 0, 0, out->w, out->h });
-        canvas_clear(out, 0x000000);                /* protected fullscreen: black in the capture */
-        return;
-    }
     if (!fs_surf || !fs_surf->content) return;
     float x, y, sx, sy, fx, fy, fw, fh;
     fs_box(&x, &y, &sx, &sy);
@@ -4846,6 +4885,16 @@ void wl_paint_fullscreen(Canvas *out) {
     /* only on the display it covers (a mirror shows the same rect) */
     double vx1 = paint_view.x + (out->w - paint_view.dx) / paint_view.k, vy1 = paint_view.y + (out->h - paint_view.dy) / paint_view.k;
     if (fx >= vx1 || fy >= vy1 || fx + fw <= paint_view.x || fy + fh <= paint_view.y) return;
+    if (paint_capture_mode && node_protected(fs_surf->node)) {
+        /* a protected window in full screen: the protected fill over the display it covers, its menus with it; the
+         * other displays of a capture of them all keep their own picture */
+        static const float r0[4] = { 0, 0, 0, 0 };
+        Rect oc = out->clip;
+        canvas_set_clip(out, (Rect){ 0, 0, out->w, out->h });
+        paint_protected_fill(out, PVX(fx), PVY(fy), fw * paint_view.k, fh * paint_view.k, r0);
+        canvas_set_clip(out, oc);
+        return;
+    }
     Rect oc = out->clip;
     canvas_set_clip(out, rect_and(oc, (Rect){ (int)floorf(PVX(fx)), (int)floorf(PVY(fy)), (int)ceilf(PVX(fx + fw)), (int)ceilf(PVY(fy + fh)) }));
     blit_tree(out, fs_surf, x, y, sx, sy);

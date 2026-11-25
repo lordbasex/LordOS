@@ -586,9 +586,12 @@
   "ws.lock.on": "Bloquear las ventanas de este monitor",
   "ws.lock.off": "Desbloquear las ventanas de este monitor",
   "ws.lock.window": "Bloqueada: se desbloquea con el candado del marco",
-  "ws.minimized.label": "Minimizadas",
-  "ws.minimized.title": "Ventanas minimizadas en este monitor: hacé clic en una para traerla de vuelta",
   "ws.slot.free": "Espacio libre: abrí una app o traé una minimizada",
+  "ws.windows.title": "Ventanas de esta actividad en este monitor (una línea debajo de las minimizadas): hacé clic en una para traerla al frente; clic derecho para las ventanas de esa app",
+  "ws.profile.ask": "Que elija el navegador",
+  "ws.profile.open": "Abrir el perfil {profile}",
+  "ws.profile.activity": "Perfil que abre esta actividad",
+  "ws.profile.display": "Perfil que abre este monitor ({display})",
   "ws.snapfly.title": "Acomodar ventana",
   "ws.snapfly.halves": "Mitades",
   "ws.snapfly.thirds": "Tercios",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "Cámara a través de LordOS Studio",
   "capture.what.effectsOn": "efectos activados",
   "capture.what.effectsOff": "sin efectos",
-  "shortcuts.captureWindow": "Captura de una ventana"
+  "shortcuts.captureWindow": "Captura de una ventana",
+  "themeSwitch.changing": "Cambiando el estilo del escritorio…",
+  "themeSwitch.changingTo": "Cambiando a {name}…",
+  "themeSwitch.failedTitle": "No se pudo aplicar {name}",
+  "themeSwitch.refusedBody": "Su código no coincide con la copia firmada de LordOS, así que no se cargó. Tu estilo de escritorio sigue como estaba.",
+  "themeSwitch.failedBody": "No arrancó. Tu estilo de escritorio sigue como estaba.",
+  "spotlight.section.machines": "Máquinas",
+  "guestApps.inMachine": "En {machine}"
 }

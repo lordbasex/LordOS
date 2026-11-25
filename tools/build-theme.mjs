@@ -33,9 +33,11 @@ const appsPlugin = {
       const iso = ids.map((id) => JSON.parse(fs.readFileSync(path.join(dir, id, 'manifest.json'), 'utf8')).process === 'isolated');
       // every app in apps/ is a system app (system: true): part of LordOS, verified with it and never
       // removable from the Store (docs/SIGNING.md, "Verified system code")
+      // an app that exports available() (apps/studio) is listed only where it returns true (sdk/windows.js listApps)
+      const avail = ids.map((id) => /export\s+(?:const|function)\s+available\b/.test(fs.readFileSync(path.join(dir, id, 'index.jsx'), 'utf8')));
       const list = ids.map((_, i) => (iso[i]
         ? `{ ...M${i}, system: true, isolated: true, Component: isolatedApp(M${i}.id, A${i}.default), Icon: A${i}.Icon }`
-        : `{ ...M${i}, system: true, Component: A${i}.default, Icon: A${i}.Icon }`)).join(',\n  ');
+        : `{ ...M${i}, system: true, Component: A${i}.default, Icon: A${i}.Icon${avail[i] ? `, available: A${i}.available` : ''} }`)).join(',\n  ');
       const head = iso.some(Boolean) ? `import { isolatedApp } from ${JSON.stringify(path.join(root, 'sdk', 'packages.js'))};\n` : '';
       return { contents: `${head}${lines.join('\n')}\nexport const apps = [\n  ${list}\n];\n`, resolveDir: root, loader: 'js' };
     });

@@ -4,27 +4,36 @@
 // (Actions, Devices). In full screen the bar floats at the top edge. When the machine fails to start or stops with an
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
-  View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath, openFolder,
+  View, Text, Image, MediaView, Segmented, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath, openFolder,
   inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, admin, t as tr, useSound, microphones,
-  hasTextFocus, settings,
+  hasTextFocus, settings, useWindowsOutOfSight, displayFor, workAreaOf, direction,
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending } from './model.js';
-import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
+import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending, discOffer, discCommands, discCanCopy, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered, usbRows, usbCamLive, usbMicLive, usbNeedsPerm, toolsSnapOk } from './model.js';
+import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS, launchGuest } from './appsmode.jsx';
+import { launchAsks, dropLaunchAsk } from './guestlaunch.js';
+import { launchAskStep } from '../../sdk/guestappsmodel.js';
 import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
-import { readMeta, writeMeta } from './meta.js';
+import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
+import { disposableOf, disposableAllowed, disposableToggle } from './storagemodel.js';
 import { defaultsOf } from './store.js';
 import { ClipAskBar } from './clipask.jsx';
+import { gatewayBar, gatewayOf } from './group.js';
+import { TransfersPanel } from './transfers.jsx';
+import { xferStep, xferShown, xferNextExpiry } from './xfer.js';
 import { KeysBtn, sendKeysItems } from './keys.jsx';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, startPrep, needsPrep, soundDevItems } from './ui.jsx';
 import { openLogs, openSnapshots, playAsks, openAsks } from './library.jsx';
 import { opensOf, openStep, withoutAsks, askStale } from './openwith.js';
 import { Configure } from './configure.jsx';
+import { useAllDisplays } from './alldisplays.jsx';
 import { Sheet, Pill } from './kit.jsx';
 import { captureOffer, captureStep, captureEndedByServer, captureLabelKey, CAPTURE_IDLE, CAPTURE_NOTICE_MS } from './capture.js';
 
 const BAR = 48;
+// how often the Info menu's numbers are read
+const INFO_MS = 2000;
 // the window widths the machine's bar needs: all of it with the name and state, and compact (5.3)
 const TOOLS_WIDE = 920, TOOLS_COMPACT = 660;
 const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.now());
@@ -33,9 +42,9 @@ const THUMB_MS = 5000;
 const toolsRuns = new Map();
 // what changes the screen (frames don't: the media node repaints by itself)
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
-const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.tools}.${g.install}.${g.transfer}` : '');
+const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.tools}.${g.install}.${g.transfer}.${g.discMessage}` : '');
 const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}.${x.output}.${x.input}` : '');
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq', 'closeRefusedSeq', 'captured', 'captureEnds'].every((k) => a[k] === b[k])
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq', 'closeRefusedSeq', 'captured', 'captureEnds', 'shell', 'guestLinkSeq', 'guestNotesSeq'].every((k) => a[k] === b[k]) && a.agent?.lost === b.agent?.lost
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent) && sndKey(a.sound) === sndKey(b.sound);
 
 // the agent's state, first on the bar (mock "Session", 6.17): a light, and a popover with what it said and what works
@@ -45,7 +54,8 @@ function AgentButton({ ctl }) {
   const g = ctl.st?.agent, cfg = ctl.cfg || {};
   // off while the machine is: nothing to wait for
   const tone = ctl.a.start ? 'off' : agentTone(g, cfg.agent);
-  const label = !cfg.agent ? tr('machines.agent.off') : g?.state === 'connected' ? tr('machines.agent.connected') : ctl.a.start ? tr('machines.agent.idle') : tr('machines.agent.waiting');
+  const label = !cfg.agent ? tr('machines.agent.off') : g?.state === 'connected' ? tr('machines.agent.connected') : ctl.a.start ? tr('machines.agent.idle')
+    : g?.lost ? tr('machines.agent.lost') : tr('machines.agent.waiting');
   // the guest's LordOS tools are older than the ones this LordOS ships: a dot, and Update in the popover
   const old = toolsOutdated(g);
   return (
@@ -86,12 +96,12 @@ function AgentPop({ ctl, onClose }) {
       <View style={{ padding: 16, gap: 8, borderRadius: 16, backgroundColor: bg, border: `1px solid ${edge}`, boxShadow: '0 18px 44px rgba(0,0,0,0.45)' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <StateDot tone={tone} size={10} />
-          <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.off') : on ? tr('machines.agent.connected') : tr('machines.agent.waiting')}</Text>
+          <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.off') : on ? tr('machines.agent.connected') : g?.lost ? tr('machines.agent.lost') : tr('machines.agent.waiting')}</Text>
         </View>
         {/* the system and qemu-guest-agent's version, then the LordOS tools' own line: up to date, or which version
             this LordOS brings (and whether it's on its way) */}
         {on ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{[g.system, tr('machines.agent.version', { v: g.version })].filter(Boolean).join(' · ')}</Text>
-          : <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.offHint') : ctl.st?.state === 'running' ? tr('machines.agent.installHint') : tr('machines.agent.bootHint')}</Text>}
+          : <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.offHint') : g?.lost ? tr('machines.agent.lostHint') : ctl.st?.state === 'running' ? tr('machines.agent.installHint') : tr('machines.agent.bootHint')}</Text>}
         {on && tl ? <Text style={{ fontSize: 12, fontWeight: tl.key === 'old' ? 600 : 400, color: tl.key === 'old' ? '#0a84ff' : p.dim, textAlign: 'start' }}>
           {tl.key === 'old' ? tr(g.install === 1 ? 'machines.agent.toolsUpdating' : 'machines.agent.toolsOld', { have: tl.have, want: tl.want })
             : tr(tl.key === 'current' ? 'machines.agent.toolsCurrent' : 'machines.agent.toolsVersion', { v: tl.have })}</Text> : null}
@@ -114,6 +124,9 @@ function AgentPop({ ctl, onClose }) {
               ? <Pill label={ctl.xfer.state === 'settingUp' ? tr('machines.tb.transferSettingUp') : tr('machines.tb.transferSetup')} disabled={ctl.xfer.state === 'settingUp'} onClick={ctl.xfer.setup} /> : null}
           </View>
         ) : null}
+        {/* a Linux guest without qemu-guest-agent (or one that doesn't let Install copy files): the LordOS Guest Tools
+            disc, and once it is in, what to run in the machine (model.js discOffer) */}
+        <DiscPanel ctl={ctl} g={g} cfg={cfg} mode={discOffer(g, cfg, ctl.st?.state === 'running', ctl.prot)} />
         {/* a second display in the guest that LordOS doesn't show (not on a PCI adapter): the tools turn it off when the
             person says so, and back on */}
         {on && (g.caps & AGENT_CAPS.extra) ? (
@@ -146,6 +159,55 @@ function AgentPop({ ctl, onClose }) {
           </>;
         })() : null}
       </View>
+    </View>
+  );
+}
+
+// The bar's device dots (5.3, deviceDots): one small dot per device the guest can use now, a pulled cable in amber;
+// the dots together carry one tooltip that names each, so color is never the only sign
+const DOT_COLOR = { net: '#7be3a4', netOut: '#ff9f0a', cd: '#7cc4e8', sound: '#7be3a4', mic: '#ff9f0a', folders: '#7be3a4', usb: '#7cc4e8', camera: '#ff9f0a' };
+function DeviceDots({ dots }) {
+  const label = dots.map((d) => tr(`machines.dot.${d.k}`)).join(' · ');
+  return (
+    <View title={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 2, height: 28 }}>
+      {dots.map((d) => <View key={d.k} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: DOT_COLOR[d.k] || '#aaa' }} />)}
+    </View>
+  );
+}
+
+// The LordOS Guest Tools disc (docs/VIRTUALIZATION.md 6.17): 'insert' offers it; 'guide' says what to run in the machine,
+// whose own prompt asks for the password (nothing is typed into the guest from here). The commands are shown to be
+// typed; Copy only where the machine's clipboard can take them (discCanCopy). lord-vm takes the disc out by itself once
+// the agent answers; "Take the Disc Out" does it now.
+function DiscPanel({ ctl, g, cfg, mode }) {
+  const p = usePal();
+  if (!mode) return null;
+  if (mode === 'insert') {
+    return (
+      <View style={{ gap: 6 }}>
+        <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.discHint')}</Text>
+        <View style={{ flexDirection: 'row' }}><Pill primary label={tr('machines.agent.discBtn')} onClick={() => lord.vm.agent(ctl.sid, 'disc')} /></View>
+        {g?.discMessage ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr('machines.agent.discErr', { text: g.discMessage })}</Text> : null}
+      </View>
+    );
+  }
+  const copy = discCanCopy(g, cfg);
+  return (
+    <View style={{ gap: 6, padding: 10, borderRadius: 12, backgroundColor: p.dark ? 'rgba(10,132,255,0.12)' : 'rgba(10,132,255,0.08)' }}>
+      <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.agent.discTitle')}</Text>
+      <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.discStep')}</Text>
+      {discCommands().map(({ key, cmd }) => (
+        <View key={key} style={{ gap: 2 }}>
+          <Text style={{ fontSize: 11, color: p.dim, textAlign: 'start' }}>{tr(`machines.agent.disc.${key}`)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ flex: 1, fontFamily: 'monospace', fontSize: 12, color: p.text, textAlign: 'left', direction: 'ltr' }}>{cmd}</Text>
+            {copy ? <Pill label={tr('machines.agent.discCopy')} onClick={() => clipboard.set(cmd)} /> : null}
+          </View>
+        </View>
+      ))}
+      <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.discPassword')}</Text>
+      <View style={{ flexDirection: 'row' }}><Pill label={tr('machines.agent.discOut')} onClick={() => lord.vm.agent(ctl.sid, 'discOut')} /></View>
+      {g?.discMessage ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr('machines.agent.discErr', { text: g.discMessage })}</Text> : null}
     </View>
   );
 }
@@ -216,6 +278,8 @@ function Tools({ ctl, floating, compact, tiny, apps }) {
       {/* Keys: held keys, the guest's combinations, single keys and the on-screen keyboard (keys.jsx) */}
       <KeysBtn ctl={ctl} />
       <IconMenuBtn sym="eject" label={tr('machines.tb.devices')} items={ctl.devices} />
+      {/* a dot for each device the guest can use now (5.3), its words in the tooltip */}
+      {ctl.dots?.length && !compact ? <DeviceDots dots={ctl.dots} /> : null}
       {/* the machine's sound (6.9): its menu mutes it or turns it back on and picks the output and input; the microphone
           shows while the guest hears it */}
       <IconMenuBtn sym={ctl.heard ? 'sound' : 'sound-off'} label={tr('machines.tb.sound')} items={ctl.soundMenu} />
@@ -227,9 +291,9 @@ function Tools({ ctl, floating, compact, tiny, apps }) {
     {tiny && !ctl.rec ? null : <BarGroup>
       {!floating ? <IconBtn sym="terminal" label={tr('machines.tb.shell')} on={ctl.shell} disabled={!ctl.shell && !ctl.a.reset} onClick={ctl.toggleShell} /> : null}
       <IconBtn sym="logs" label={tr('machines.cmd.logs')} onClick={ctl.logs} />
-      <IconBtn sym="snapshot" label={tr('machines.tb.screenshot')} disabled={!a.keys} onClick={ctl.screenshot} />
+      <IconBtn sym="snapshot" label={tr('machines.tb.screenshot')} disabled={!a.keys || ctl.prot} onClick={ctl.screenshot} />
       {ctl.rec ? <IconBtn sym="stop" danger label={tr('machines.tb.recording', { t: ctl.recTime })} onClick={ctl.record} />
-        : <IconBtn sym="record" color="#ff453a" label={tr('machines.tb.record')} disabled={!a.keys} onClick={ctl.record} />}
+        : <IconBtn sym="record" color="#ff453a" label={tr('machines.tb.record')} disabled={!a.keys || ctl.prot} onClick={ctl.record} />}
     </BarGroup>}
     {ctl.rec ? <Text style={{ fontSize: 12, fontWeight: 600, color: '#ff6b6b', marginLeft: 4 }}>{ctl.recTime}</Text> : null}
     {compact ? null : <BarSep />}
@@ -339,22 +403,28 @@ function OffView({ dir, name, title, hint, label, onPlay, picture }) {
   );
 }
 
-// BootFailed: why, a likely fix, Start Again, Settings, and the machine's log
-function Failed({ name, v, st, log, onStart, onSettings, onAnyway, onDiscard }) {
+// BootFailed: why (a cause QEMU's own words name, model.js failCause), a fix that fits it (start with less memory, go
+// back to a snapshot: failActions), Start Again, Settings, and the machine's log
+function Failed({ name, v, st, log, fixes, onStart, onSettings, onAnyway, onDiscard, onUse2d, onLess, onSnapshot, busy }) {
   const p = usePal();
   const neverRan = v.why === 'start-failed';
+  const cause = failCause(v.why, log);
   const lines = (log || '').split('\n').filter(Boolean).slice(-60);
   const bad = (l) => /fail|error|refus|crash|exited|killed|cannot|can't|panic/i.test(l);
   return (
     <View style={{ position: 'absolute', left: 0, right: 0, top: BAR, bottom: 0, padding: 22, gap: 12, backgroundColor: p.bg }}>
       <Text style={{ fontSize: 22, fontWeight: 700, color: p.text, textAlign: 'start' }}>{neverRan ? tr('machines.fail.didntStart', { name }) : tr('machines.fail.stopped', { name })}</Text>
-      <Text style={{ fontSize: 14, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr(`machines.why.${v.why}`)} {neverRan ? tr('machines.fail.diskSafe') : ''}</Text>
+      <Text style={{ fontSize: 14, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr(`machines.why.${cause}`)} {neverRan ? tr('machines.fail.diskSafe') : ''}</Text>
       <View style={{ paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, backgroundColor: p.badBg }}>
-        <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{`${tr('machines.fail.likely')} ${tr(`machines.fix.${v.why}`, { code: st?.code })}`}</Text>
+        <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{`${tr('machines.fail.likely')} ${tr(`machines.fix.${cause}`, { code: st?.code })}`}</Text>
         {st?.detail ? <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start', direction: 'ltr' }}>{st.detail}</Text> : null}
       </View>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Btn big primary label={tr('machines.fail.startAgain')} onClick={onStart} />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {offers2d(v.why) ? <Btn big primary label={tr('machines.fail.use2d')} disabled={busy} onClick={onUse2d} /> : null}
+        {(fixes || []).map((f) => (f.k === 'less'
+          ? <Btn key="less" big primary label={tr('machines.budget.less', { mb: f.mb })} disabled={busy} onClick={() => onLess(f.mb)} />
+          : <Btn key="snap" big label={tr('machines.fail.snapshot')} disabled={busy} onClick={onSnapshot} />))}
+        <Btn big primary={!offers2d(v.why) && !(fixes || []).some((f) => f.k === 'less')} label={tr('machines.fail.startAgain')} disabled={busy} onClick={onStart} />
         {v.why === 'resume-failed' ? <>
           <Btn big label={tr('machines.fail.resumeAnyway')} onClick={onAnyway} />
           <Btn big danger label={tr('machines.fail.discardState')} onClick={onDiscard} />
@@ -403,12 +473,36 @@ function AppsController({ name, g, onLeave, ctl }) {
   );
 }
 
+// Picture in Picture's one control (5.4): the machine's name and "Back to Window", shown while the pointer is over the
+// view; a double click on the picture does the same. Nothing else: the view takes no keys and no pointer for the guest.
+function PipBack({ name, onBack }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <View onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-start', padding: 8 }}>
+      {hover ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, height: 30, borderRadius: 15, alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.62)' }}>
+          <Text style={{ fontSize: 12, fontWeight: 600, color: '#f2f2f5', whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: 200, textAlign: 'start' }}>{name}</Text>
+          <View onMouseDown={(e) => { e.stopPropagation?.(); onBack(); }} title={tr('machines.view.pipBack')}
+            style={{ height: 22, paddingHorizontal: 10, borderRadius: 11, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)' }}>
+            <Text style={{ fontSize: 12, color: '#fff', whiteSpace: 'nowrap' }}>{tr('machines.view.pipBack')}</Text>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 // machines whose bridged network the admin helper is making now (dir): one start at a time, whatever remounts
 const bridging = new Set();
+// how long a start waits for a machine suspended to make room for it (3.7)
+const BUDGET_WAIT_MS = 120000;
 
-export function MachineWindow({ dir, name: name0, loadvm }) {
+export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const p = usePal();
-  const { id: winId, focused } = useAppWindow();
+  const { id: winId, focused, mode } = useAppWindow();
+  // Picture in Picture (5.4): the picture only, floating; no input reaches the guest from it
+  const pip = mode === 'pip';
   // full screen moves the app in the tree and remounts it: the session belongs to the window
   const [sid, setSid] = useWindowState('vm.sid', 0);
   const [st, setSt] = useWindowState('vm.state', null);
@@ -419,6 +513,13 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const [gpu, setGpu] = useWindowState('vm.gpu', () => (has() ? lord.vm.list().find((x) => x.dir === dir)?.gpu || '' : ''));
   const gpuRef = useRef(gpu);
   gpuRef.current = gpu;
+  // a protected machine (the anonymity profile, model.js machineProtected): its window is protected and locked (a neutral
+  // fill in every capture of the screen), and lord.vm.protect keeps its picture from leaving as a picture of its own
+  const [prot] = useWindowState('vm.prot', () => has() && isProtectedMachine(dir));
+  const protRef = useRef(prot);
+  protRef.current = prot;
+  useEffect(() => { if (prot) wm.setProtected(winId, true, { lock: true }); }, [prot, winId]);
+  useEffect(() => { if (prot && sid) lord.vm.protect(sid); }, [prot, sid]);
   const [closing, setClosing] = useWindowState('vm.closing', false);   // false, 'shutdown' or 'suspend'
   const [askClose, setAskClose] = useWindowState('vm.ask', false);
   const [always, setAlways] = useState(false);
@@ -440,6 +541,22 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const [shell, setShell] = useWindowState('vm.shell', false);
   const [cfgSheet, setCfgSheet] = useState(null);     // Configure as a sheet over the machine's picture
   const [shellKeys, setShellKeys] = useState(false);
+  // which shell the pane shows: the agent's (the signed-in person's own shell in the guest, 6.18, with the LordOS tools 8
+  // or w12) or the serial console; the agent's when the tools have it, unless the person picked the console
+  const [shellSrc, setShellSrc] = useWindowState('vm.shellSrc', 'agent');
+  const agentShell = !!(st?.agent?.state === 'connected' && st.agent.caps & AGENT_CAPS.shell);
+  const shellUse = shellSrc === 'agent' && agentShell ? 'agent' : 'serial';
+  // the agent's shell moved to a Terminal tab ("Open in Terminal", 6.18): { sid, win } while that window shows it; the
+  // pane then says so instead of a second view of the same session (two views would fight over its size)
+  const [inTerm, setInTerm] = useWindowState('vm.shellInTerm', null);
+  const termWins = useStore(windows, (ws) => (inTerm ? ws.some((w) => w.id === inTerm.win) : false));
+  const shellElsewhere = !!(inTerm && termWins && shellUse === 'agent' && st?.shell && st.shell === inTerm.sid);
+  const shellTerm = shellUse === 'agent' ? (shellElsewhere ? 0 : st?.shell) : st?.console;
+  const shellToTerminal = () => {
+    if (!st?.shell) return;
+    const win = wm.open('terminal', { new: true, args: { guestShell: { sid: st.shell, machine: name } } });
+    if (win != null) { setInTerm({ sid: st.shell, win }); setShellKeys(false); }
+  };
   // the clipboard's "ask before each paste" bar (model.js clipAsk*): while it shows, the keyboard is the bar's
   const [askSt, setAskSt] = useState(clipAskEmpty);
   const askKind = clipAskShown(askSt);
@@ -453,6 +570,10 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const [stuck, setStuck] = useState(false);
   // files dropped on the window, on their way into the guest (lord.vm.files): the ones still copying
   const [copies, setCopies] = useState([]);
+  // the file copy panel (6.21, transfers.jsx): drops on their way into the guest and files the guest sends, as rows
+  const [xfers, setXfers] = useState([]);
+  const recvSeen = useRef(-1);
+  const onReceived = useRef(null);
   const filesSeen = useRef(-1);
   const onFiles = useRef(null);
   const buttons = useRef(new Set());
@@ -468,6 +589,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const closingRef = useRef(closing);
   closingRef.current = closing;
   const followRef = useRef(follow);
+  const shapeRef = useRef(false);
   followRef.current = follow;
   overlayRoot.current = root.current;
 
@@ -491,10 +613,13 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     setName(m.name); setIso(m.iso || '');
     setLog('');
     const active = stateView(m.state, m.reason).active;
-    if (!active) {
-      const b = budgetCheck(lord.vm.list(), m, lord.vm.host());
-      if (!b.ok) { setErr(tr('machines.win.noMemory', { need: b.need, free: b.free })); return; }
+    // the resource budget (3.7): lord-server decides it for every start (lord.vm.budget, the same check lord.vm.start
+    // makes); when it doesn't fit, the window offers to suspend a running machine or to start with less memory
+    if (!active && lord.vm.budget) {
+      const b = lord.vm.budget(dir);
+      if (b && !b.ok) { setOver({ b, m, plan: budgetPlan(b, lord.vm.list(), m), waiting: '' }); return; }
     }
+    setOver(null);
     // a bridged machine's network first (6.5): Starting meanwhile, then the start, once
     setGpu(m.gpu || '');
     if (!active && needsPrep(m)) {
@@ -506,6 +631,43 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         (e) => { bridging.delete(dir); setStarting(false); setErr(e.message); });
     } else startNow.current(active, opts);
   };
+  const beginRef = useRef(begin);
+  beginRef.current = begin;
+  // a start the budget refused: { b, m, plan, waiting } (waiting: the name of the machine being suspended for it)
+  const [over, setOver] = useState(null);
+  useEffect(() => {
+    if (!over?.waiting) return undefined;
+    // the start goes on once the suspend freed enough; a suspend that fails or takes longer than BUDGET_WAIT_MS says so
+    const until = Date.now() + BUDGET_WAIT_MS;
+    const timer = setInterval(() => {
+      const b = lord.vm.budget(dir);
+      if (b?.ok) { clearInterval(timer); setOver(null); beginRef.current(); } else if (Date.now() > until) { clearInterval(timer); setOver(null); setErr(tr('machines.budget.stillShort', { name: over.waiting })); }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [over?.waiting]);
+  const suspendFor = (x) => { lord.vm.stop(x.dir, 'suspend'); setOver({ ...over, waiting: x.name }); };
+  const startWith = (mb) => {
+    const id = has() ? lord.vm.set(dir, { memoryMb: mb }) : 0;
+    setOver(null);
+    if (!id) setErr(vmRefusal(tr('machines.cfg.refused'))); else setTo2d(id);
+  };
+  // QEMU's 3D display aborted (why 'qemu-3d-crash', QEMU issue 4918): Graphics 2D for this machine (lord-vm --set, a
+  // job), then it starts again; Start with less memory (the budget, the failure page) is the same kind of change
+  const [to2d, setTo2d] = useState(0);
+  useEffect(() => {
+    if (!to2d) return undefined;
+    const timer = setInterval(() => {
+      const r = lord.vm.job(to2d);
+      if (!r || !r.done) return;
+      setTo2d(0);
+      if (r.ok) beginRef.current(); else setErr(tr('machines.cfg.refused'));
+    }, 300);
+    return () => clearInterval(timer);
+  }, [to2d]);
+  const use2d = () => {
+    const id = has() ? lord.vm.set(dir, { graphics: '2d' }) : 0;
+    if (!id) setErr(vmRefusal(tr('machines.cfg.refused'))); else setTo2d(id);
+  };
   // Play on the library's card while this window is open: the machine starts if it's off here
   const asked = useStore(playAsks, (x) => x[dir] || 0);
   const askedSeen = useRef(asked);
@@ -515,17 +677,36 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     if (playStarts(sid, starting || bridging.has(dir), closing) && !askClose) { setErr(''); begin(); }
   }, [asked]);
   // a window opened to go back to a snapshot (with memory, the machine off) starts from it
-  useEffect(() => { if (!sid && !st && !err) begin(loadvm ? { loadvm } : undefined); }, []);
+  // (not when the machine was renamed with its folder and this window only follows it there)
+  useEffect(() => { if (!followed && !sid && !st && !err) begin(loadvm ? { loadvm } : undefined); }, []);
   const stRef = useRef(st);
   stRef.current = st;
   // the window went away (not a remount): let go of the machine; one this window started is shut down by lord-vm
   useEffect(() => () => { if (sid && !windows.get().some((w) => w.id === winId)) lord.vm.close(sid); }, [sid]);
 
+  // How often the machine's state is read: lord.vm.poll is cheap, but every read wakes lord-server's loop. 50 ms while
+  // something is quick to change (a resize being settled, starting, stopping, closing), 100 ms otherwise, 500 ms while no
+  // window shows the guest (minimized, another desktop, covered); shown again, at once. It was 16 ms: 60 wakes a second
+  // for as long as a machine ran, hidden or not.
+  const hiddenRef = useRef(false);
+  const kickRef = useRef(null);
   useEffect(() => {
     if (!sid) return undefined;
-    const timer = setInterval(() => {
+    let timer = 0, gone = false;
+    const next = (q) => {
+      if (gone) return;
+      const z = sized.current;
+      const busy = !q || z.want || q.state !== 'running' || closingRef.current;
+      timer = setTimeout(tick, hiddenRef.current ? (q ? 500 : 100) : busy ? 50 : 100);
+    };
+    const tick = () => {
+      timer = 0;
       const q = lord.vm.poll(sid);
-      if (!q) return;
+      if (!q) { next(null); return; }
+      if (pollOnce(q) !== false) next(q);
+    };
+    kickRef.current = () => { if (timer) { clearTimeout(timer); tick(); } };
+    const pollOnce = (q) => {
       setSt((prev) => (same(prev, q) ? prev : q));
       snapJobs.current = snapJobs.current.filter((j) => { const r = lord.vm.job(j); if (r?.done && !r.ok) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.snap.failed'), body: r.out.trim().split('\n').pop() || '', sound: false }); return r && !r.done; });
       if (q.cd === 2 || q.cd === 3) setCdWant((w) => { if (w !== null) { if (q.cd === 2) setIso(w); else setCdErr(q.cdMessage || '?'); } return null; });
@@ -538,31 +719,73 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         else if (!z.want || z.want[0] !== want[0] || z.want[1] !== want[1]) { z.want = want; z.at = now(); }
         else if (now() - z.at > 400) { lord.vm.resize(sid, want[0], want[1]); z.last = want; z.want = null; z.asked = want; z.askedAt = now(); }
       }
+      // a fixed resolution: after the person resized the window (the frame the same for 400 ms), it takes the guest's
+      // shape again, keeping its width (shapeFrame); tried once per frame size, so a window that can't go there isn't fought.
+      // Only the person's resize starts it (the frame changed, and not to the size set here): a guest that keeps changing
+      // its own display size never moves this window
+      if (q.display === 'up' && box.current && shapeRef.current && q.w > 0 && q.h > 0) {
+        const w0 = windows.get().find((x) => x.id === winId);
+        const f0 = w0 ? wm.frame(w0) : null, b0 = lord.getLayout(box.current.id);
+        const key = f0 ? `${f0.w}x${f0.h}` : '';
+        if (key && z.shapeKey === undefined) z.shapeKey = key;                 // the frame it opened with: not a resize
+        else if (key && key !== z.shapeKey) { z.shapeKey = key; z.shapeAt = now(); z.shapeDone = key === z.shapeSet; }
+        else if (key && !z.shapeDone && now() - z.shapeAt > 400) {
+          z.shapeDone = true;
+          const s = shapeFrame(f0, { w: b0[2], h: b0[3] }, q.w, q.h, workAreaOf(displayFor(f0)));
+          if (s) { z.shapeSet = `${s.w}x${s.h}`; wm.resize(winId, s.w, s.h); }
+        }
+      }
       // asked for a size the guest didn't take (Follow the window): the resolution menu says so
       const stuckNow = q.display === 'up' && followRef.current && !appsRef.current && followStuck(z.asked, [q.w, q.h], z.askedAt, now());
       setStuck((x) => (x === stuckNow ? x : stuckNow));
       if (q.filesSeq !== filesSeen.current || (q.ended && filesSeen.current !== -2)) { filesSeen.current = q.ended ? -2 : q.filesSeq; onFiles.current?.(lord.vm.files(sid)); }
+      if (q.receivedSeq !== recvSeen.current || (q.ended && recvSeen.current !== -2)) { recvSeen.current = q.ended ? -2 : q.receivedSeq; onReceived.current?.(lord.vm.received(sid)); }
       // the card picture in the library, every few seconds while it runs
       // only while the guest's system is up (its agent answers, when it has one): never its firmware, boot or shutdown
       // screens, which a card would otherwise keep
       const sysUp = !cfgRef.current?.agent || q.agent?.state === 'connected';
-      if (q.display === 'up' && q.state === 'running' && sysUp && !closingRef.current && now() - z.thumb > THUMB_MS) { z.thumb = now(); lord.vm.snapshot(sid); }
+      // (never a protected machine's: no picture of it stays on disk)
+      if (!protRef.current && q.display === 'up' && q.state === 'running' && sysUp && !closingRef.current && now() - z.thumb > THUMB_MS) { z.thumb = now(); lord.vm.snapshot(sid); }
       if (q.ended) {
         lord.vm.close(sid);
         setSid(0);
         toolsRuns.delete(dir);                     // the run ended: the tools' automatic update starts over next time
-        if (closingRef.current) { setClosing(false); wm.close(winId, true); return; }
+        if (closingRef.current) { setClosing(false); wm.close(winId, true); return false; }
         // an unattended install ended with the installer's restart: lord-vm took the installer and the seed disk away,
         // so starting again is the installed system (3.9, "Unattended install")
-        if (q.state === 'stopped' && q.reason === 'installed') { setTimeout(() => begin(), 300); return; }
-        // a machine with an Intel graphics card restarted: QEMU ends on a guest reset (a reset crashes a GVT-g guest), so
-        // Machines starts it again (docs/MACHINES-GPU.md, Mode A)
-        if (q.state === 'stopped' && q.reason === 'reset' && cfgRef.current?.gpu) { setTimeout(() => begin(), 300); return; }
+        // With "Fresh install" asked in the assistant (app.json freshSnap), the machine, off and installed, gets that
+        // snapshot first (5.2), once.
+        if (q.state === 'stopped' && q.reason === 'installed') {
+          if (!readMeta(dir).freshSnap) { setTimeout(() => begin(), 300); return false; }
+          writeMeta(dir, { freshSnap: false });
+          const r = lord.vm.snapTake(dir, tr('machines.snap.fresh'));
+          const wait = () => { const j = r?.job ? lord.vm.job(r.job) : null; if (j && !j.done) { setTimeout(wait, 400); return; } begin(); };
+          setTimeout(wait, 300);
+          return false;
+        }
+        // the guest restarted and QEMU couldn't do it in place, so Machines starts it again: a machine with an Intel
+        // graphics card (a reset crashes a GVT-g guest, so QEMU ends on one; docs/MACHINES-GPU.md, Mode A), or one with
+        // 3D graphics whose QEMU aborted at the guest's restart (QEMU issue 4918; lord-vm says 'reset' only when the
+        // guest's tools said it restarts)
+        if (restartsAgain(q.state, q.reason)) { setTimeout(() => begin(), 300); return false; }
         if (q.state !== 'stopped' || !['guest-shutdown', 'host-shutdown', 'poweroff', 'installed'].includes(q.reason)) setLog(lord.vm.log(dir, 'vm', 16384));
+        return false;
       }
-    }, 16);
-    return () => clearInterval(timer);
+      return true;
+    };
+    timer = setTimeout(tick, 0);
+    return () => { gone = true; kickRef.current = null; if (timer) clearTimeout(timer); };
   }, [sid]);
+
+  // whether any window shows the guest's picture (this one, or one of its apps mode windows): when none does, lord-server
+  // stops reading its frames and takes them less often (server/src/vm/vmpace.h); shown again, at once
+  const sightIds = useStore(windows, (ws) => [winId, ...ws.filter((w) => w.args?.guestWin?.dir === dir).map((w) => w.id)].join('\n'));
+  const outOfSight = useWindowsOutOfSight(sightIds.split('\n'));
+  useEffect(() => {
+    hiddenRef.current = outOfSight;
+    if (sid && typeof lord.vm.shown === 'function') lord.vm.shown(sid, !outOfSight);
+    if (!outOfSight) kickRef.current?.();      // shown again: its state at once, then the visible pace
+  }, [sid, outOfSight]);
 
   // Closing the window (5.3): Suspend, Shut Down or Keep Running, asked unless the machine's Configure says which. A
   // shutdown resumes a paused machine first, so it can hear the power button; Keep Running tells lord-vm to stay when
@@ -588,8 +811,34 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     return false;
   }), [winId]);
 
-  // lord-vm's notices (VM_NOTICE): the network going and coming back (6.5), a Clone's new identity (6.3); the good news
-  // goes away by itself
+  // a Whonix group's Workstation (docs/VIRTUALIZATION.md 19.8, 19.9): while its Gateway is down it has no network at all
+  // (the link is a pulled cable), and a bar says so with Start Gateway; the session links the two once both run
+  const inGroup = /\.lordgroup\/[^/]+\.lordvm$/.test(dir);
+  const [gwBar, setGwBar] = useState(null);           // { bar: null | 'off' | 'starting', gw }
+  const [gwAsked, setGwAsked] = useState(0);
+  useEffect(() => {
+    if (!inGroup || !has()) return undefined;
+    const look = () => {
+      try {
+        const list = lord.vm.list();
+        const ws = list.find((x) => x.dir === dir), gw = gatewayOf(ws, list);
+        const bar = gatewayBar(ws, gw);
+        setGwBar((o) => (o?.bar === bar && o?.gw?.state === gw?.state ? o : { bar, gw }));
+      } catch (e) { /* the list isn't there: no bar */ }
+    };
+    look();
+    const timer = setInterval(look, 2000);
+    return () => clearInterval(timer);
+  }, [dir, gwAsked]);
+  const startGateway = () => {
+    const gw = gwBar?.gw;
+    if (!gw) return;
+    setGwBar({ bar: 'starting', gw });
+    startPrep(gw).then(() => { lord.vm.startDetached(gw.dir); setGwAsked((n) => n + 1); }, () => setGwAsked((n) => n + 1));
+  };
+
+  // lord-vm's notices (VM_NOTICE): the network going and coming back (6.5), a Clone's new identity (6.3), a shared folder
+  // gone because its virtiofsd ended (6.7: back at the next start); the good news goes away by itself
   const [noticeGone, setNoticeGone] = useState(0);
   useEffect(() => {
     if (!st?.noticeSeq || !['network-back', 'identity'].includes(st.notice)) return undefined;
@@ -601,6 +850,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const noticeText = !st?.notice ? '' : st.notice === 'recovered' ? tr('machines.win.recovered')
     : st.notice === 'network-back' ? tr('machines.win.netBack', { s: (Math.max(0, st.noticeCode || 0) / 1000).toFixed(1) })
     : st.notice === 'identity' ? tr(st.noticeCode === 1 ? 'machines.win.identityName' : 'machines.win.identityDone')
+    : st.notice === 'share-lost' ? (st.noticeCode === 1 ? tr('machines.win.transferLost') : tr('machines.win.shareLost', { folder: st.noticeText || '' }))
     : /reconnecting/.test(st.noticeText || '') ? tr('machines.win.netReconnecting') : tr('machines.win.netLost');
   const v = startPhase(sid, st, starting) === 'starting' && st ? stateView('starting') : stateView(st?.state, st?.reason);
   const a0 = actionsFor(sid ? st?.state : 'stopped');
@@ -608,12 +858,14 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   useEffect(() => { wm.setTitle(winId, windowTitle(name || dir, err ? tr('machines.state.crashed') : tr(`machines.state.${v.key}`))); }, [name, v.key, err]);
 
   // keyboard while in front; everything held is let go of on blur
-  const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing && !askClose && !(shell && shellKeys) && !pickCd && !appsRef.current && !askKind;
+  const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing && !askClose && !(shell && shellKeys) && !pickCd && !appsRef.current && !askKind && !pip;
   // the console's stream, asked for once the pane is open on a running machine
-  useEffect(() => { if (shell && sid && !st?.console && (st?.state === 'running' || st?.state === 'paused')) lord.vm.console(sid); }, [shell, sid, st?.state, !!st?.console]);
+  useEffect(() => { if (shell && shellUse === 'serial' && sid && !st?.console && (st?.state === 'running' || st?.state === 'paused')) lord.vm.console(sid); }, [shell, shellUse, sid, st?.state, !!st?.console]);
+  // the agent's shell, asked for once the pane shows it (its size follows the terminal by itself)
+  useEffect(() => { if (shell && shellUse === 'agent' && sid && !st?.shell && st?.state === 'running') lord.vm.shell(sid, 100, 14); }, [shell, shellUse, sid, st?.state, !!st?.shell]);
   useEffect(() => {
-    if (!shell || !shellKeys || !focused || !st?.console) return undefined;
-    const id = st.console;
+    if (!shell || !shellKeys || !focused || !shellTerm) return undefined;
+    const id = shellTerm;
     return addListener('keydown', (e) => {
       // the session's every key reaches this listener: only the ones typed while this window has the keyboard, now
       if (menus.open > 0 || !wm.hasKeyboard(winId)) return;
@@ -623,7 +875,18 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       e.preventDefault?.();                      // Tab goes to the machine, not to the window's buttons (sdk/focus.js)
       term.key(id, key, e.char || '', base, e.mods & 7);
     });
-  }, [shell, shellKeys, focused, st?.console]);
+  }, [shell, shellKeys, focused, shellTerm]);
+  // notifications from the guest (6.12, Configure's switch): shown as from the machine, its name first, never more
+  // than lord-vm and lord-server let through
+  useEffect(() => {
+    if (!sid || !st?.guestNotesSeq) return;
+    for (const n of lord.vm.guestNotes(sid) || []) notify({ app: 'machines', label: tr('machines.note.from', { name: name || '' }), title: n.title, body: n.body, sound: false });
+  }, [sid, st?.guestNotesSeq]);
+  // a link from the guest (6.12): a bar the person answers; Open works only after the bar has been seen a moment
+  const linkSeq = st?.guestLinkSeq || 0;
+  const [linkReady, setLinkReady] = useState(0);
+  useEffect(() => { if (!linkSeq) return undefined; const t = setTimeout(() => setLinkReady(linkSeq), 800); return () => clearTimeout(t); }, [linkSeq]);
+  const linkAnswer = (open) => { if (sid && linkSeq) lord.vm.guestLinkAnswer(sid, linkSeq, open); };
   useEffect(() => {
     if (!live || !focused) { if (sid) { lord.vm.release(sid); buttons.current.clear(); } dropLatched(); return undefined; }
     // a key pressed while one of the window's menus is open is the menu's, down and up (Esc closes it)
@@ -678,10 +941,33 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     wheel.current = rest;
     if (n) lord.vm.wheel(sid, n, 0);
   };
-  const cmd = (c) => { if (sid) { if (c === 'shutdown' && st?.state === 'running' && (!cfgRef.current?.agent || st?.agent?.state === 'connected')) lord.vm.snapshot(sid); lord.vm.cmd(sid, c); } };
+  const cmd = (c) => { if (sid) { if (!prot && c === 'shutdown' && st?.state === 'running' && (!cfgRef.current?.agent || st?.agent?.state === 'connected')) lord.vm.snapshot(sid); lord.vm.cmd(sid, c); } };
   const sendCombo = (codes) => { if (sid) keysTo(sid, comboSend(codes, latchRef.current)); };
   const cad = () => sendCombo(CTRL_ALT_DEL);
   const full = useStore(windows, (ws) => !!ws.find((w) => w.id === winId)?.fullscreen);
+  // the Info menu's numbers (model.js infoLines): two stats reads INFO_MS apart, while it runs
+  const [infoU, setInfoU] = useState(null);
+  const infoPrev = useRef(null);
+  const running = !!sid && (st?.state === 'running' || st?.state === 'paused');
+  // All Displays (5.4, alldisplays.jsx): one output of the guest's display full screen on each of this computer's displays
+  const ad = useAllDisplays({ sid, dir, name, winId, st, prot, appsOn, begin });
+  useEffect(() => {
+    if (!running || !has()) { setInfoU(null); infoPrev.current = null; return undefined; }
+    const timer = setInterval(() => {
+      const s2 = lord.vm.stats(dir) || {};
+      setInfoU(usage(infoPrev.current, s2, cfgRef.current?.vcpus || 1));
+      infoPrev.current = s2.at ? s2 : null;
+    }, INFO_MS);
+    return () => clearInterval(timer);
+  }, [running]);
+  const [host] = useState(() => (has() ? lord.vm.host() : null));
+  const gaps = isolationGaps(host, st);
+  // View: Picture in Picture on the window's display, Actual Size (the guest's pixels, while the resolution is fixed)
+  const myFrame = () => { const w = windows.get().find((x) => x.id === winId); return w ? wm.frame(w) : null; };
+  const toPip = () => { if (protRef.current) return; const f0 = myFrame(); const f = f0 && pipFrame(displayFor(f0), st?.w, st?.h, direction() === 'rtl'); if (f) wm.setPip(winId, f); };
+  const fromPip = () => wm.setPip(winId, null);
+  const actual = () => { const f0 = myFrame(); const f = f0 && actualFrame(st?.w, st?.h, BAR, workAreaOf(displayFor(f0))); if (f) wm.resize(winId, f.w, f.h); };
+  const scaleTo = (k) => { const f0 = myFrame(); const f = f0 && scaleFrame(st?.w, st?.h, k, BAR, workAreaOf(displayFor(f0))); if (f) wm.resize(winId, f.w, f.h); };
   const m0 = { dir, name, id: winId.split('#vm-')[1] };
   const shot = () => {
     const path = sid ? lord.vm.screenshot(sid) : '';
@@ -723,7 +1009,28 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // guest's picture is re-encoded on this side before any app sees it
   const cfgRef = useRef({});
   const [cfg, setCfg] = useState({});
-  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch }); } }, [sid, st?.state]);
+  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch, guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, guestFiles: m.guestFiles !== false, network: m.network, group: m.group || '', disposable: m.disposable || 'off' }); } }, [sid, st?.state]);
+  // the disposable session's switch (6.2, Actions): lord-vm --set while the machine is off, then shown as saved
+  const [dispJob, setDispJob] = useState(null);         // { job, to }
+  useEffect(() => {
+    if (!dispJob) return undefined;
+    const timer = setInterval(() => {
+      const r = lord.vm.job(dispJob.job);
+      if (!r || !r.done) return;
+      if (r.ok) setCfg((c) => ({ ...c, disposable: dispJob.to }));
+      setDispJob(null);
+    }, 300);
+    return () => clearInterval(timer);
+  }, [dispJob]);
+  const dispSwitch = () => {
+    const to = disposableToggle(cfg);
+    const job = lord.vm.set(dir, { disposable: to });
+    if (job) setDispJob({ job, to });
+  };
+  const cableOk = cableOffered(cfg, running);
+  const cableOut = !!st?.cableOut;
+  // shape keeping (5.3): windowed, the resolution fixed, nothing else deciding the frame
+  shapeRef.current = !full && !pip && !appsOn && !follow;
   // "Capture mouse" (capture.js, docs/VIRTUALIZATION.md 6.25): lord-server locks the pointer inside the picture and the
   // guest gets relative motion; ❖Esc or Ctrl+Alt (lord-server's, before any app), focus loss, apps mode or the machine
   // stopping give it back. The state belongs to the window: full screen rebuilds it, and the lock moves to the new picture
@@ -872,6 +1179,42 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // the capture indicator names the machine: "Machines — Windows 11 Pro"
   const micWho = name || '';
   useEffect(() => { markDeviceUse('machines', 'microphone', micOn, null, micWho); return micOn ? () => markDeviceUse('machines', 'microphone', false, null, micWho) : undefined; }, [micOn, micWho]);
+  // host USB devices (6.6): this computer's list (sysfs, read again every 2 s while the machine runs), what the machine
+  // holds (st.usb), the capture indicator for a camera or a device with sound given to it, and the last refusal shown
+  const [usbList, setUsbList] = useState([]);
+  const [usbErr, setUsbErr] = useState('');
+  const usbOn = !!sid && (st?.state === 'running' || st?.state === 'paused');
+  useEffect(() => {
+    if (!usbOn || !has() || typeof lord.vm.usbDevices !== 'function') return undefined;
+    const read = () => { try { setUsbList(lord.vm.usbDevices()); } catch (e) { /* */ } };
+    read();
+    const t = setInterval(read, 2000);
+    return () => clearInterval(t);
+  }, [usbOn]);
+  const usbView = usbRows(usbList, st?.usb, sid);
+  const usbCam = usbCamLive(st?.usb), usbMic = usbMicLive(st?.usb);
+  // the bar's USB and camera dots (deviceDots): this machine's devices now
+  const caps = { usb: !!st?.usb?.controller, usbAttached: (st?.usb?.devices || []).length, camera: true, cameraOn: usbCam };
+  useEffect(() => { markDeviceUse('machines', 'camera', usbCam, null, micWho); return usbCam ? () => markDeviceUse('machines', 'camera', false, null, micWho) : undefined; }, [usbCam, micWho]);
+  useEffect(() => { if (usbMic && !micOn) { markDeviceUse('machines', 'microphone', true, null, `${micWho} USB`); return () => markDeviceUse('machines', 'microphone', false, null, `${micWho} USB`); } return undefined; }, [usbMic, micOn, micWho]);
+  const usbErrs = st?.usb?.errs || 0;
+  const usbErrSeen = useRef(0);
+  useEffect(() => { if (usbErrs > usbErrSeen.current && st?.usb?.err) setUsbErr(st.usb.err); usbErrSeen.current = usbErrs; }, [usbErrs]);
+  // a device in or out; a camera or a device with sound first asks for LordOS's permission (the system prompt, once)
+  const usbToggle = async (r) => {
+    setUsbErr('');
+    if (r.on) { lord.vm.usbDetach(sid, r.bus, r.dev); return; }
+    let why = lord.vm.usbAttach(sid, r.bus, r.dev);
+    for (let k = 0; k < 2 && usbNeedsPerm(why); k++) {
+      if (!(await requestPermission('machines', usbNeedsPerm(why)))) break;
+      why = lord.vm.usbAttach(sid, r.bus, r.dev);
+    }
+  };
+  const usbItems = usbView.state === 'locked' ? [{ label: tr('errors.vm.usbLocked'), disabled: true }]
+    : usbView.state === 'nocontroller' ? [{ label: tr('machines.usb.noController'), onClick: () => setCfgSheet({ section: 'sound' }) }]
+    : usbView.state === 'empty' ? [{ label: tr('machines.usb.none'), disabled: true }]
+    : [...usbView.rows.map((r) => ({ label: r.name, checked: r.on, disabled: (!!r.why && !r.on) || !!st?.usb?.busy, hint: r.why && !r.on ? tr(`errors.${r.why}`) : '', onClick: () => usbToggle(r) })),
+      ...usbView.rows.filter((r) => r.on || r.auto).map((r) => ({ label: tr('machines.usb.auto', { name: r.name }), checked: r.auto, onClick: () => lord.vm.usbAuto(sid, r.autoRule, !r.auto) }))];
   // Files dragged from Files onto the picture (6.x): copied into the guest's Downloads by its agent, one at a time in
   // lord-vm; a line under the picture while they go, a notice when they're there. Only into the guest: nothing comes
   // out by dragging (a shared folder does that)
@@ -920,6 +1263,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   onFiles.current = (list) => {
     if (!Array.isArray(list)) return;
     setCopies(list.filter((f) => f.state === 'copying'));
+    setXfers((x) => xferStep(x, { drops: list.filter((f) => !f.open && !f.place) }, Date.now()));
     // files opened from Files' "Open with": the program's window comes up as its own (apps mode), or this one in front
     const opened = list.filter((f) => f.open && f.state === 'done'), notOpened = list.filter((f) => f.open && f.state === 'failed');
     for (const f of [...opened, ...notOpened]) opening.current.delete(f.id);
@@ -943,6 +1287,24 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     for (const f of failed) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.drop.failed', { machine: name, name: f.name }), body: f.message, sound: false });
   };
   const line = copyLine(copies);
+  // files the guest sends ("Send to LordOS", 6.21): kept in the machine's quarantine folder; a notification when one is
+  onReceived.current = (list) => {
+    if (!Array.isArray(list)) return;
+    setXfers((x) => xferStep(x, { recvs: list }, Date.now()));
+    for (const r of list.filter((f) => f.state === 'done')) {
+      notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.xfer.arrived', { name: r.name, machine: name }), body: tr('machines.xfer.arrivedBody'), sound: false,
+        actions: [{ id: 'show', label: tr('machines.xfer.show'), run: () => revealPath(r.path) }] });
+    }
+  };
+  const shownX = xferShown(xfers);
+  // a finished row goes after its time: looked at again then
+  useEffect(() => {
+    const ms = xferNextExpiry(xfers);
+    if (ms < 0) return undefined;
+    const tm = setTimeout(() => setXfers((x) => xferShown(x)), ms + 50);
+    return () => clearTimeout(tm);
+  }, [xfers]);
+  const cancelX = (r) => { if (!sid) return; if (r.dir === 'out') lord.vm.receiveCancel(sid, r.id); else lord.vm.fileCancel(sid, r.id); };
   // Files' "Open with" this machine (7.3; openwith.js): the files asked for wait here until the machine runs and its
   // guest tools can open them, then go in as drops with { open }; once one is open, apps mode (when the guest has it)
   const asks = useStore(openAsks, (x) => x[dir] || null);
@@ -983,8 +1345,10 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // button, only while nothing is on its way; off or given up, a notification with Update. Its state lives for the
   // machine's run (toolsRuns), so the window closed and opened again doesn't try again.
   const toolsBusy = useRef(false);
+  const toolsSnapJob = useRef(0);          // the snapshot before an update (model.js toolsAutoStep 'snapshot'), while it's taken
+  if (toolsSnapJob.current && lord.vm.job(toolsSnapJob.current)?.done !== false) toolsSnapJob.current = 0;
   const gl = guests.get()[dir];
-  toolsBusy.current = copies.length > 0 || opening.current.size > 0 || !!asks || xferBusy.current || xstate === 'settingUp' || st?.agent?.transfer === 1
+  toolsBusy.current = !!toolsSnapJob.current || copies.length > 0 || opening.current.size > 0 || !!asks || xferBusy.current || xstate === 'settingUp' || st?.agent?.transfer === 1
     || Object.values(gl?.launches || {}).some((e) => launchPending(e, gl.list, Date.now()));
   useEffect(() => {
     if (!sid) return undefined;
@@ -999,8 +1363,14 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       const q = stRef.current;
       if (!q || q.ended || q.state !== 'running' || closingRef.current) return;
       const t0 = Date.now();
-      const r = toolsAutoStep(toolsRuns.get(dir), { agent: q.agent, on: toolsAutoOn(readMeta(dir), defaultsOf(settings.get().machinesDefaults)), busy: toolsBusy.current, now: t0 });
+      if (toolsSnapJob.current && lord.vm.job(toolsSnapJob.current)?.done !== false) toolsSnapJob.current = 0;
+      const sn = lord.vm.snaps(dir);
+      const c0 = cfgRef.current || {};
+      const snap = toolsSnapOk({ raw: c0.diskFormat === 'raw', disposable: !!c0.disposable && c0.disposable !== 'off', gl: c0.graphics === '3d' || !!c0.gpu, count: sn?.list?.length, max: sn?.max });
+      const r = toolsAutoStep(toolsRuns.get(dir), { agent: q.agent, on: toolsAutoOn(readMeta(dir), defaultsOf(settings.get().machinesDefaults)), busy: toolsBusy.current || !!toolsSnapJob.current, now: t0, snap });
       let s = r.s, why = r.act === 'notify' ? r.why : null;
+      // a snapshot first, with the machine's memory; the install waits until it's done (or refused: it goes on anyway)
+      if (r.act === 'snapshot') { const t = lord.vm.snapTake(dir, tr('machines.snap.beforeTools', { version: s.snapped }), sid); toolsSnapJob.current = t?.job || 0; }
       // lord-server didn't take it (the session is going away): a failed attempt
       if (r.act === 'install' && !lord.vm.agent(sid, 'update')) {
         s = toolsAutoFailed(s, t0);
@@ -1035,6 +1405,27 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   }, [appsActive, appsActive && shell]);
   const gApps = useStore(guests, (x) => x[dir] || null);
   const gRunning = runningKey(runningWindows(gApps?.list));
+  // a guest app chosen in the launcher while the machine was off (guestlaunch.js, 6.12): this window started the machine;
+  // apps mode goes on, and the app opens once the guest's own fresh list holds that very token (never anything else)
+  const lask = useStore(launchAsks, (x) => x[dir] || null);
+  useEffect(() => { if (lask && !appsOn) setApps(true); }, [lask]);
+  useEffect(() => () => dropLaunchAsk(dir), []);          // the window closed: the launch isn't waited for any more
+  useEffect(() => {
+    if (!lask) return undefined;
+    const check = () => {
+      // the guest's tools answered and can't list windows (no apps mode in this guest): no use waiting
+      const cant = st?.agent?.state === 'connected' && appsBlockedRef.current === 'needsTools';
+      const step = cant ? 'timeout' : launchAskStep(lask, appsActive ? gApps?.apps : [], Date.now());
+      if (step === 'wait') return;
+      dropLaunchAsk(dir);
+      if (step === 'launch') { launchGuest(dir, { token: lask.token, name: lask.name }); return; }
+      notify({ app: 'machines', label: tr('machines.title'), title: tr(step === 'missing' ? 'machines.launcher.missing' : 'machines.launcher.timeout', { app: lask.name, machine: name }),
+        body: tr(step === 'missing' ? 'machines.launcher.missingBody' : 'machines.launcher.timeoutBody'), sound: false });
+    };
+    check();
+    const t2 = setInterval(check, 5000);
+    return () => clearInterval(t2);
+  }, [lask, appsActive, gApps?.apps, st?.agent?.state, st?.agent?.caps]);
   // why it can't be on: the agent, or a guest whose helper can't list its windows (it needs LordOS or Windows inside)
   const appsWhy = appsBlocked === 'needsTools' ? tr('machines.win.appsNeedsTools') : appsBlocked ? tr('machines.apps.needsAgent') : '';
   const appsLabel = appsOn ? tr('machines.apps.leave') : appsWhy || tr('machines.apps.enter');
@@ -1074,6 +1465,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     configure: (section) => setCfgSheet({ section }),
     begin: () => begin(),
     screenshot: shot,
+    prot,     // a protected machine: no screenshot or recording of its picture (lord.vm.protect refuses them too)
     power: [
       { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
       { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy || noSuspend(st, gpu), onClick: () => cmd('suspend') },
@@ -1090,7 +1482,21 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       { label: tr('machines.tb.sound'), checked: heard, onClick: toggleSound },
       { label: tr('machines.cfg.microphone'), checked: snd.microphone, onClick: () => soundTo({ microphone: !snd.microphone }) },
       { label: tr('machines.tb.soundSettings'), onClick: () => setCfgSheet({ section: 'sound' }) },
+      '-',
+      // the network (5.3): its mode, the cable while it runs (VM_NETCABLE), its settings
+      { label: tr('machines.dev.network', { mode: tr(`machines.cfg.net.${cfg.network || 'shared'}`) }), disabled: true },
+      { label: tr('machines.dev.cable'), checked: cableOk && !cableOut, disabled: !cableOk, hint: !cableOk && running ? tr('machines.dev.cableNo') : '',
+        onClick: () => { if (sid) lord.vm.netCable(sid, cableOut); } },
+      { label: tr('machines.dev.networkSettings'), onClick: () => setCfgSheet({ section: 'network' }) },
+      '-',
+      { label: (cfg.shares || []).length ? tr('machines.tb.foldersN', { n: cfg.shares.length }) : tr('machines.tb.folders'), disabled: true },
+      { label: tr('machines.dev.folderSettings'), onClick: () => setCfgSheet({ section: 'sharing' }) },
+      // this computer's USB devices and its camera (6.6, 6.9): each one in or out of the machine, and its rule
+      '-',
+      { label: tr('machines.usb.title'), disabled: true },
+      ...usbItems,
     ],
+    dots: deviceDots({ iso, heard, mic: micOn, cableOut, network: cfg.network, shares: (cfg.shares || []).length, transfer: cfg.transfer, caps }),
   };
   useEffect(() => {
     wm.setMenus(winId, [
@@ -1106,11 +1512,13 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         '-',
         { label: tr('machines.snap.takeNow'), disabled: !sid || busy || noSuspend(st, gpu) || !(st?.state === 'running' || st?.state === 'paused'), onClick: snapNow },
         { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m0) },
+        ...(disposableAllowed(cfg) ? [{ label: tr('machines.disp.switch'), checked: disposableOf(cfg) !== 'off', disabled: running || !!dispJob || !!(st && !st.ended && st.state && st.state !== 'off' && st.state !== 'crashed'),
+          hint: running ? tr('machines.disp.whenOff') : '', onClick: dispSwitch }] : []),
         '-',
         { label: tr('machines.tb.transferOpen'), disabled: !cfg.transfer, onClick: xferOpen },
         ...(xstate === 'setup' ? [{ label: tr('machines.tb.transferSetup'), onClick: xferSetup }] : []),
         '-',
-        { label: tr('machines.tb.screenshot'), disabled: !a.keys, onClick: shot },
+        { label: tr('machines.tb.screenshot'), disabled: !a.keys || prot, onClick: shot },
         { label: full ? tr('machines.cmd.exitFullscreen') : tr('machines.cmd.fullscreen'), onClick: () => wm.setFullscreen(winId, !full) },
         { label: tr('machines.tb.capture'), checked: capOn, disabled: !capOffer.offered, hint: capOffer.why === 'apps' ? tr('machines.tb.captureApps') : '', onClick: () => capDo({ type: 'toggle' }) },
         { label: tr('machines.cmd.logs'), onClick: () => openLogs(m0) },
@@ -1119,9 +1527,26 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         { label: tr('machines.apps.mode'), checked: appsOn, disabled: !!appsBlocked && !appsOn, hint: !appsOn ? appsWhy : '', onClick: () => setApps(!appsOn) },
       ] },
       { label: tr('machines.menu.devices'), items: ctl.devices.filter((x) => x !== '-') },
+      { label: tr('machines.lib.view'), items: [
+        { label: tr('machines.view.window'), checked: !full && !pip && !appsOn, onClick: () => { if (appsOn) setApps(false); if (full) wm.setFullscreen(winId, false); if (pip) fromPip(); } },
+        { label: tr('machines.cmd.fullscreen'), checked: full, onClick: () => wm.setFullscreen(winId, !full) },
+        { label: tr('machines.apps.mode'), checked: appsOn, disabled: !!appsBlocked && !appsOn, hint: !appsOn ? appsWhy : '', onClick: () => setApps(!appsOn) },
+        { label: tr('machines.view.pip'), checked: pip, disabled: !running || appsOn || prot, hint: prot ? tr('machines.view.pipProtected') : '', onClick: () => (pip ? fromPip() : toPip()) },
+        ad.item,
+        '-',
+        { label: tr('machines.view.actual'), disabled: !running || follow || full || pip || !st?.w, hint: follow ? tr('machines.view.actualFollow') : '', onClick: actual },
+        { label: tr('machines.view.scale'), disabled: !running || follow || full || pip || !st?.w, hint: follow ? tr('machines.view.actualFollow') : '',
+          submenu: SCALES.map((k) => ({ label: tr('machines.view.scaleN', { n: Math.round(k * 100) }), onClick: () => scaleTo(k) })) },
+      ] },
+      { label: tr('machines.menu.info'), items: [
+        ...infoLines(cfgRef.current, infoU, gaps).map((l) => ({ label: tr(l.key, l.vars), disabled: true })),
+        ...(gaps.length ? gaps.map((g) => ({ label: tr(`machines.weak.${g}`), disabled: true })) : []),
+        '-',
+        { label: tr('machines.info.configure'), onClick: () => setCfgSheet({}) },
+      ] },
       ...(appsActive ? [{ label: tr('machines.apps.menu'), items: appsMenuItems(gApps) }] : []),
     ]);
-  }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps, gRunning, cfg.transfer, xstate, capOn, capOffer.offered, focused, keys.windows]);
+  }, [st?.state, full, pip, follow, st?.w, st?.h, infoU, gaps.join(), iso, sid, cdWant, heard, snd.microphone, cableOut, cableOk, cfg.network, (cfg.shares || []).length, caps?.usb, caps?.camera, appsOn, appsBlocked, appsActive, gApps?.apps, gRunning, cfg.transfer, xstate, capOn, capOffer.offered, focused, keys.windows, ad.on, ad.item.disabled, ad.item.hint]);
   // Esc in the controller leaves apps mode (in a guest's window, Esc is the guest's); in its search field, Esc is the
   // field's (it clears the search first)
   useEffect(() => (appsActive && focused && !askClose ? addListener('keydown', (e) => { if (e.key === 'Escape' && !menus.open && !hasTextFocus()) setApps(false); }) : undefined), [appsActive, focused, askClose]);
@@ -1131,6 +1556,13 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   let card = null;
   let failed = null;
   if (err) card = <Card title={tr('machines.win.problem')} text={err} actions={[<Btn key="r" primary label={tr('machines.win.tryAgain')} onClick={() => { setErr(''); begin(); }} />]} />;
+  else if (over) card = <Card width={560} title={tr('machines.budget.title', { name: over.m.name })}
+    text={over.waiting ? tr('machines.budget.waiting', { name: over.waiting }) : tr('machines.budget.text', { need: over.b.needMb, free: over.b.freeMb })}
+    actions={over.waiting ? [<Btn key="c" label={tr('machines.cancel')} onClick={() => setOver(null)} />] : [
+      <Btn key="c" label={tr('machines.cancel')} onClick={() => setOver(null)} />,
+      ...over.plan.suspend.map((x) => <Btn key={x.dir} label={tr('machines.budget.suspend', { name: x.name })} onClick={() => suspendFor(x)} />),
+      over.plan.lessMb ? <Btn key="l" primary label={tr('machines.budget.less', { mb: over.plan.lessMb })} onClick={() => startWith(over.plan.lessMb)} /> : null,
+    ].filter(Boolean)} />;
   else if (askClose) card = <Card width={560} title={tr('machines.close.title', { name })} text={tr('machines.close.text') + (gpu ? ` ${tr('machines.close.noGpuSuspend')}` : noSuspend(st) ? ` ${tr('machines.close.no3dSuspend')}` : '')}
     extra={<View style={{ gap: 8, marginTop: 4 }}>
       {/* a copy into the machine still going: said here, where the person decides (the copy line itself is hidden under a card) */}
@@ -1146,10 +1578,18 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   else if (closing === 'suspend') card = <Card title={tr('machines.job.suspend', { name })} text={tr('machines.job.wait')} />;
   else if (closing) card = <Card title={tr('machines.win.shuttingDown', { name })} text={tr('machines.win.shuttingDownHint')} actions={[<Btn key="f" danger label={tr('machines.cmd.poweroff')} onClick={() => cmd('poweroff')} />]} />;
   else if (startPhase(sid, st, starting) === 'off') {
-    if (v.why) failed = <Failed name={name} v={v} st={st} log={log || [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n')} onStart={() => begin()} onSettings={() => setCfgSheet({})}
-      onAnyway={() => begin({ resumeAnyway: true })} onDiscard={() => begin({ discardState: true })} />;
+    if (v.why) {
+      const flog = log || [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n');
+      const m0 = has() ? lord.vm.list().find((x) => x.dir === dir) : null;
+      let snaps = 0;
+      try { snaps = has() ? (lord.vm.snaps(dir)?.list || []).length : 0; } catch (e) { snaps = 0; }
+      const fixes = failActions(failCause(v.why, flog), { memoryMb: m0?.memoryMb || 0, snaps });
+      failed = <Failed name={name} v={v} st={st} log={flog} fixes={fixes} onStart={() => begin()} onSettings={() => setCfgSheet({})}
+        onUse2d={use2d} busy={!!to2d} onAnyway={() => begin({ resumeAnyway: true })} onDiscard={() => begin({ discardState: true })}
+        onLess={startWith} onSnapshot={() => m0 && openSnapshots(m0)} />;
+    }
     else if (v.key === 'suspended') card = <OffView picture dir={dir} name={name} title={tr('machines.state.suspended')} hint={tr('machines.win.suspendedHint')} label={tr('machines.cmd.resume')} onPlay={() => begin()} />;
-    else card = <OffView dir={dir} name={name} title={tr(`machines.state.${v.key}`)} hint={tr('machines.win.playHint')} label={tr('machines.start')} onPlay={() => begin()} />;
+    else card = <OffView dir={dir} name={name} title={tr(`machines.state.${v.key}`)} hint={tr(offHint(st?.reason))} label={tr('machines.start')} onPlay={() => begin()} />;
   } else if (startPhase(sid, st, starting) === 'starting' || st.state === 'starting' || (st.display !== 'up' && st.display !== 'none' && st.display !== 'lost' && (st.state === 'running' || st.state === 'paused'))) {
     card = <Card title={tr('machines.win.starting', { name })} text={tr('machines.win.startingHint')} />;
   } else if (st.display === 'lost') {
@@ -1160,7 +1600,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   return (
     <View ref={root} {...drop.props} style={{ flex: 1, backgroundColor: '#000' }}>
       {appsActive ? <AppsController name={name} g={gApps} onLeave={() => setApps(false)} ctl={ctl} />
-        : <View ref={box} onMouseDown={(e) => { setShellKeys(false); down(e, sendClipRef.current(true)); }} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
+        : <View ref={box} onMouseDown={(e) => { setShellKeys(false); down(e, sendClipRef.current(true)); }} onDoubleClick={pip ? fromPip : undefined} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full || pip ? 0 : BAR }}>
           {st?.media && st.display === 'up' ? <MediaView media={st.media} style={{ flex: 1 }} /> : null}
         </View>}
       {shell && !full ? (
@@ -1169,35 +1609,64 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
             <View style={{ paddingHorizontal: 6, height: 18, borderRadius: 4, justifyContent: 'center', backgroundColor: '#3a2a5c' }}>
               <Text style={{ fontSize: 11, fontWeight: 700, color: '#d9c9ff' }}>{tr('machines.shell.badge')}</Text>
             </View>
-            <Text style={{ flex: 1, fontSize: 12, color: '#c9c9d1', textAlign: 'start' }}>{tr('machines.shell.title', { name })}</Text>
+            <Text style={{ flex: 1, fontSize: 12, color: '#c9c9d1', textAlign: 'start' }}>{tr(shellUse === 'agent' ? 'machines.shell.agentTitle' : 'machines.shell.title', { name })}</Text>
+            {agentShell ? <Segmented small value={shellUse} onChange={(x) => setShellSrc(x)} options={[['agent', tr('machines.shell.agent')], ['serial', tr('machines.shell.serial')]]} /> : null}
+            {shellUse === 'agent' && st?.shell ? <Btn label={tr('machines.shell.new')} onClick={() => lord.vm.shell(sid, 100, 14)} style={{ height: 20, paddingHorizontal: 8 }} /> : null}
+            {shellUse === 'agent' && st?.shell && !shellElsewhere ? <Btn label={tr('machines.shell.toTerminal')} onClick={shellToTerminal} style={{ height: 20, paddingHorizontal: 8 }} /> : null}
             <Text style={{ fontSize: 11, color: '#8a8a94' }}>{shellKeys ? tr('machines.shell.keysHere') : tr('machines.shell.clickHere')}</Text>
             <Btn label="×" onClick={() => { setShell(false); setShellKeys(false); }} style={{ height: 20, paddingHorizontal: 8 }} />
           </View>
-          {st?.console ? <Terminal ref={shellRef} session={st.console} style={{ flex: 1 }} />
+          {shellElsewhere ? <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 12, color: '#8a8a94' }}>{tr('machines.shell.inTerminal')}</Text>
+              <Btn label={tr('machines.shell.showTerminal')} onClick={() => wm.focus(inTerm.win)} style={{ height: 22, paddingHorizontal: 10 }} />
+            </View>
+            : shellTerm ? <Terminal ref={shellRef} session={shellTerm} style={{ flex: 1 }} />
             : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, color: '#8a8a94' }}>{a.reset ? tr('machines.shell.connecting') : tr('machines.shell.off')}</Text></View>}
+        </View>
+      ) : null}
+      {linkSeq && st?.guestLink?.url ? (
+        <View style={{ position: 'absolute', top: BAR + 12, left: 0, right: 0, alignItems: 'center' }}>
+          <View style={{ maxWidth: 560, marginHorizontal: 16, padding: 12, gap: 8, borderRadius: 12, backgroundColor: p.dark ? '#2c2c33' : '#fbfbfd', border: `1px solid ${p.line}`, boxShadow: '0 12px 32px rgba(0,0,0,0.4)' }}>
+            <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.link.ask', { name: name || '' })}</Text>
+            <Text style={{ fontSize: 12, fontFamily: 'monospace', color: p.text, direction: 'ltr', textAlign: 'left', maxHeight: 54, overflow: 'hidden', wordBreak: 'break-all' }}>{st.guestLink.url}</Text>
+            <Text style={{ fontSize: 11, color: p.dim, textAlign: 'start' }}>{tr('machines.link.hint')}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+              <Btn label={tr('machines.link.ignore')} onClick={() => linkAnswer(false)} />
+              <Btn primary label={tr('machines.link.open')} disabled={linkReady !== linkSeq} onClick={() => linkAnswer(true)} />
+            </View>
+          </View>
         </View>
       ) : null}
       {st?.state === 'paused' && !card ? (
         <View style={{ position: 'absolute', top: BAR + 12, left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ paddingHorizontal: 12, height: 26, borderRadius: 13, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)' }}>
-            <Text style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{tr('machines.state.paused')}</Text>
+            <Text style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{tr(st.reason === 'session-full' ? 'machines.group.sessionFull' : 'machines.state.paused')}</Text>
           </View>
         </View>
       ) : null}
       {card}
       {failed}
       {!card && !failed && !appsActive ? <ClipAskBar ask={askBar} onAnswer={askAnswer} top={(full ? 0 : BAR) + 12} /> : null}
-      {!card && !failed && ((noticeOn && noticeText) || cdErr) ? (
+      {!card && !failed && gwBar?.bar ? (
+        <View style={{ position: 'absolute', left: 0, right: 0, top: (full ? 0 : BAR) + 12, alignItems: 'center' }}>
+          <View style={{ maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)', border: '1px solid rgba(255,154,154,0.5)' }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: gwBar.bar === 'starting' ? '#ffd60a' : '#ff9a9a' }} />
+            <Text style={{ flexShrink: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{tr(gwBar.bar === 'starting' ? 'machines.group.gatewayStarting' : 'machines.group.noGateway')}</Text>
+            {gwBar.bar === 'off' ? <Btn label={tr('machines.group.startGateway')} onClick={startGateway} style={{ height: 28 }} /> : null}
+          </View>
+        </View>
+      ) : null}
+      {!card && !failed && ((noticeOn && noticeText) || cdErr || usbErr) ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 16, alignItems: 'center' }}>
           <View style={{ maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
-            <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{cdErr ? tr('machines.tb.cdFailed', { why: cdErr }) : noticeText}</Text>
-            {cdErr ? <Btn label={tr('machines.ok')} onClick={() => setCdErr('')} style={{ height: 28 }} />
+            <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{cdErr ? tr('machines.tb.cdFailed', { why: cdErr }) : usbErr ? tr('machines.usb.failed', { why: tr(`errors.${usbErr}`) }) : noticeText}</Text>
+            {cdErr || usbErr ? <Btn label={tr('machines.ok')} onClick={() => { setCdErr(''); setUsbErr(''); }} style={{ height: 28 }} />
               : ['network-back', 'identity'].includes(st.notice) ? <Btn label={tr('machines.ok')} onClick={() => setNoticeGone(st.noticeSeq)} style={{ height: 28 }} />
               : <Btn label={tr('machines.cmd.logs')} onClick={() => openLogs(m0)} style={{ height: 28 }} />}
           </View>
         </View>
       ) : null}
-      {asks && !line && !card && !failed ? (
+      {asks && !line && !shownX.length && !card && !failed ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 64, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ maxWidth: 560, minWidth: 260, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
             <Text style={{ fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>
@@ -1206,7 +1675,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
           </View>
         </View>
       ) : null}
-      {line && !card && !failed ? (
+      {shownX.length && !card && !failed ? <TransfersPanel rows={shownX} machine={name} onCancel={cancelX} bottom={52} /> : null}
+      {line && !shownX.length && !card && !failed ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 64, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ maxWidth: 560, minWidth: 260, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
             <Text style={{ fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>
@@ -1231,7 +1701,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         </View>
       ) : null}
       {/* captured, the pointer can't reach the floating bar (and the guest's pointer at the top edge mustn't open it) */}
-      {appsActive || (full && capOn) ? null : full ? <FloatingBar ctl={ctl} name={name} /> : <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }}><Header ctl={ctl} name={name} /></View>}
+      {pip ? <PipBack name={name} onBack={fromPip} />
+        : appsActive || (full && capOn) ? null : full ? <FloatingBar ctl={ctl} name={name} /> : <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }}><Header ctl={ctl} name={name} /></View>}
       {cfgSheet ? <Sheet width={1000} height={700} modal onClose={() => setCfgSheet(null)}>
         <Configure dir={dir} section={cfgSheet.section} onClose={() => setCfgSheet(null)} />
       </Sheet> : null}

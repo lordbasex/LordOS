@@ -214,6 +214,100 @@ static void signatures(const char *cat, size_t n, const char *fx, const char *kd
 
 static const char *const SHA = "a7ef94ac2fb9a7fec454552abd629b7cc9d5155c886165a45649f5ce6167e355";
 
+/* the Whonix group's entry (docs/VIRTUALIZATION.md 19.6): SHA-512 lists with a detached .asc beside each, the newest
+ * release folder above a floor, the archive's members; and the real 18.2.4.3 list and signature (2026-11-04, Whonix's
+ * RSA signing subkey 6E97…3C48, SHA-512, a critical creation time, Sequoia's salt notation) through pkg/pgp.c */
+static const char *const WSHA = "e57c79cb137f941a4f5341d841c1da8866182ebc9115acb17e21aed883c72c1566e3ef4e1078a07b018f41f60182db050cbcd931235051f0d7e90c0005fa5354";
+static const char *const WFILE = "Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz";
+static void whonix(const char *cat, size_t n, const char *fx, const char *kd) {
+    VmCatEntry e;
+    char why[200], list[VMCAT_URL + 200], sig[VMCAT_URL + 200];
+    T("whonix: found", !vmcat_find(cat, n, "whonix", "amd64", &e));
+    T("whonix: no arm64 image", vmcat_find(cat, n, "whonix", "arm64", &e) != 0);
+    vmcat_find(cat, n, "whonix", "amd64", &e);
+    T("whonix: a group of SHA-512 lists, signed beside each", e.group && e.hash == VMCAT_SHA512 && !strcmp(e.sig_suffix, ".asc") && e.sig_type == VMCAT_SIG_DETACHED &&
+      !strcmp(e.group_kind, "whonix") && !strcmp(e.edition, "LXQt") && e.nfprs == 1 && !strcmp(e.fprs[0], "916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA"));
+    T("whonix: caps", e.max_apparent == 128ull << 30 && e.max_data == 24ull << 30 && e.max_bytes == 4096ull << 20);
+    T("whonix: the members' names", vmcat_match(e.member_re[0], "Whonix-Gateway-LXQt-18.2.4.3.Intel_AMD64.qcow2") &&
+      vmcat_match(e.member_re[1], "Whonix-Workstation-LXQt-18.2.4.3.Intel_AMD64.qcow2") && !vmcat_match(e.member_re[0], "Whonix-Workstation-LXQt-18.2.4.3.Intel_AMD64.qcow2") &&
+      !vmcat_match(e.member_re[0], "Whonix-Gateway-CLI-18.2.4.3.Intel_AMD64.qcow2") && !vmcat_match(e.member_re[1], "../Whonix-Workstation-LXQt-18.2.4.3.Intel_AMD64.qcow2") &&
+      !vmcat_match(e.member_re[0], "Whonix-Gateway.xml"));
+    T("whonix: the archive's name, not its list or torrent", vmcat_match(e.file_re, WFILE) && !vmcat_match(e.file_re, "Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.torrent") &&
+      !vmcat_match(e.file_re, "Whonix-CLI-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz") && vmcat_match(e.sums_re, "Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.sha512sums"));
+    /* releases: the floor, the pattern, the folder */
+    T("whonix: releases at and above the floor", vmcat_release_ok(&e, "18.2.4.3") && vmcat_release_ok(&e, "18.2.10.0") && vmcat_release_ok(&e, "19.0.0.1"));
+    T("whonix: releases below the floor or not a release", !vmcat_release_ok(&e, "18.2.4.2") && !vmcat_release_ok(&e, "18.2.1.9") && !vmcat_release_ok(&e, "17.4.4.6") &&
+      !vmcat_release_ok(&e, "18.2.4") && !vmcat_release_ok(&e, "../18.2.4.3") && !vmcat_release_ok(&e, "18.2.4.3/") && !vmcat_release_ok(&e, "18.2.4.3a"));
+    T("whonix: release order", vmcat_release_cmp("18.2.10.0", "18.2.9.9") > 0 && vmcat_release_cmp("18.2.4.3", "18.2.4.3") == 0 && vmcat_release_cmp("9.0.0.0", "18.0.0.0") < 0);
+    T("whonix: the release's folder", !vmcat_release_dir(&e, "18.2.4.3") && !strcmp(e.dir, "https://download.whonix.org/libvirt/18.2.4.3/") && !strcmp(e.file_dir, e.dir));
+    T("whonix: the list's signature is its name plus .asc", !vmcat_list_source(&e, "Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.sha512sums", 0, list, sig, sizeof list) &&
+      !strcmp(list, "https://download.whonix.org/libvirt/18.2.4.3/Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.sha512sums") &&
+      !strcmp(sig, "https://download.whonix.org/libvirt/18.2.4.3/Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.sha512sums.asc") &&
+      vmcat_list_source(&e, "x.sha512sums", 1, list, sig, sizeof list) != 0);
+    {
+        char rel[32];
+        T("whonix: the release a list names", !vmcat_release_in(&e, "Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.sha512sums", rel, sizeof rel) && !strcmp(rel, "18.2.4.3"));
+        T("whonix: the release an archive names", !vmcat_release_in(&e, WFILE, rel, sizeof rel) && !strcmp(rel, "18.2.4.3"));
+        T("whonix: a name with no release", vmcat_release_in(&e, "Whonix-LXQt.Intel_AMD64.qcow2.libvirt.xz", rel, sizeof rel) != 0);
+        T("whonix: a name with two releases", vmcat_release_in(&e, "Whonix-18.2.4.3-18.2.4.4.libvirt.xz", rel, sizeof rel) != 0);
+        T("whonix: a part of a longer number isn't a release", vmcat_release_in(&e, "Whonix-118.2.4.3.5.xz", rel, sizeof rel) != 0);
+        T("whonix: not a plain name", vmcat_release_in(&e, "../Whonix-LXQt-18.2.4.3.xz", rel, sizeof rel) != 0);
+    }
+    T("whonix: SHA-512 hashes", vmcat_hash_ok(&e, WSHA) && !vmcat_hash_ok(&e, SHA) && !vmcat_hash_ok(&e, "e57c"));
+    /* the real list and signature */
+    size_t ln = 0, sn = 0, kn = 0;
+    char *sums = load(fx, "whonix.sums", &ln), *asc = load(fx, "whonix.asc", &sn), *keys = load(kd, e.keys, &kn);
+    T("whonix: fixtures and key file", sums && asc && keys);
+    if (!sums || !asc || !keys) { free(sums); free(asc); free(keys); return; }
+    int r = verify(&e, keys, kn, sums, ln, asc, sn, NOW, why, sizeof why);
+    T("whonix: the published 18.2.4.3 list verifies with Whonix's key", r == 1);
+    if (r != 1) printf("      %s\n", why);
+    T("whonix: the archive's line is in it", vmcat_sums_has(sums, ln, WFILE, WSHA));
+    char up[129];
+    for (int i = 0; i < 128; i++) up[i] = (char)toupper((unsigned char)WSHA[i]);
+    up[128] = 0;
+    T("whonix: any case", vmcat_sums_has(sums, ln, WFILE, up));
+    T("whonix: another name or a SHA-256 isn't", !vmcat_sums_has(sums, ln, "Whonix-CLI-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz", WSHA) &&
+      !vmcat_sums_has(sums, ln, WFILE, SHA));
+    char *ch = malloc(ln + 1);
+    memcpy(ch, sums, ln + 1);
+    ch[5] = ch[5] == '0' ? '1' : '0';
+    T("whonix: a changed hash is refused", verify(&e, keys, kn, ch, ln, asc, sn, NOW, why, sizeof why) == -1);
+    T("whonix: no signature is unsigned", verify(&e, keys, kn, sums, ln, NULL, 0, NOW, why, sizeof why) == 0);
+    T("whonix: before its creation time it isn't valid", verify(&e, keys, kn, sums, ln, asc, sn, 1700000000LL, why, sizeof why) == -1);
+    /* another key pinned: refused */
+    VmCatEntry o = e;
+    memcpy(o.fprs[0], "827C8569F2518CC677FECA1AED65462EC8D5E4C5", 41);
+    T("whonix: another pinned fingerprint is refused", verify(&o, keys, kn, sums, ln, asc, sn, NOW, why, sizeof why) == -1);
+    free(ch); free(sums); free(asc); free(keys);
+    /* bad group entries */
+    static const char *const badg[] = {
+        /* a group needs SHA-512 */
+        "{\"systems\":[{\"id\":\"w\",\"kind\":\"group\",\"group\":\"whonix\",\"edition\":\"LXQt\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"archive\":{\"format\":\"tar.xz\",\"members\":{\"gateway\":\"^a$\",\"workstation\":\"^b$\"},\"maxApparentGb\":128,\"maxDataGb\":24},\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* a suffix and a name */
+        "{\"systems\":[{\"id\":\"w\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\",\"name\":\"x.asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* a suffix that is a path */
+        "{\"systems\":[{\"id\":\"w\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\"/../x\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* an unknown hash */
+        "{\"systems\":[{\"id\":\"w\",\"hash\":\"md5\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* releases and a dir */
+        "{\"systems\":[{\"id\":\"w\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"releases\":{\"dir\":\"https://d.example/\",\"pattern\":\"^[0-9.]+$\",\"floor\":\"1.0\"},\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* a floor its own pattern refuses */
+        "{\"systems\":[{\"id\":\"w\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"arch\":{\"amd64\":{\"releases\":{\"dir\":\"https://d.example/\",\"pattern\":\"^[0-9]+$\",\"floor\":\"1.0\"},\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* a data cap above the apparent one */
+        "{\"systems\":[{\"id\":\"w\",\"kind\":\"group\",\"group\":\"whonix\",\"edition\":\"LXQt\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"archive\":{\"format\":\"tar.xz\",\"members\":{\"gateway\":\"^a$\",\"workstation\":\"^b$\"},\"maxApparentGb\":12,\"maxDataGb\":24},\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* an unknown group kind */
+        "{\"systems\":[{\"id\":\"w\",\"kind\":\"group\",\"group\":\"qubes\",\"edition\":\"LXQt\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"archive\":{\"format\":\"tar.xz\",\"members\":{\"gateway\":\"^a$\",\"workstation\":\"^b$\"},\"maxApparentGb\":128,\"maxDataGb\":24},\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* a member role that doesn't exist */
+        "{\"systems\":[{\"id\":\"w\",\"kind\":\"group\",\"group\":\"whonix\",\"edition\":\"LXQt\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"archive\":{\"format\":\"tar.xz\",\"members\":{\"gateway\":\"^a$\",\"workstation\":\"^b$\",\"router\":\"^c$\"},\"maxApparentGb\":128,\"maxDataGb\":24},\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+    };
+    for (size_t i = 0; i < sizeof badg / sizeof badg[0]; i++) {
+        char lab[48];
+        snprintf(lab, sizeof lab, "whonix: bad entry %zu refused", i);
+        T(lab, vmcat_find(badg[i], strlen(badg[i]), "w", "amd64", &e) != 0);
+    }
+}
+
 int main(int argc, char **argv) {
     size_t n = 0;
     char *cat = argc > 1 ? slurp(argv[1], &n) : NULL;
@@ -279,20 +373,37 @@ int main(int argc, char **argv) {
           vmcat_match(e.file_re, arches[a][0] == 'a' && arches[a][1] == 'm' ? "lordos-live-0.8.10.1-amd64.iso" : "lordos-live-0.8.10.1-arm64.iso"));
         snprintf(lab, sizeof lab, "lordos %s: a size limit", arches[a]);
         T(lab, e.max_bytes >= (2ull << 30) && e.max_bytes <= (8ull << 30));
+        /* its signed list read first from lordos.org (the same tag), then from the release on GitHub; the ISO from GitHub */
+        const char *tag = e.dir + 54;                        /* "v…/" */
+        char want[VMCAT_URL], lu[VMCAT_URL + 160], su[VMCAT_URL + 160], u2[VMCAT_URL + 160], s2[VMCAT_URL + 160];
+        snprintf(want, sizeof want, "https://lordos.org/releases/%.300s", tag);
+        snprintf(lab, sizeof lab, "lordos %s: the list's copy on lordos.org, same tag", arches[a]);
+        T(lab, !strcmp(e.list_dir, want) && !strcmp(e.list_sums, "SHA256SUMS.txt") && !strcmp(e.list_sig, "SHA256SUMS.sig"));
+        snprintf(lab, sizeof lab, "lordos %s: lordos.org first, GitHub second, nothing third", arches[a]);
+        T(lab, !vmcat_list_source(&e, "SHA256SUMS", 0, lu, su, sizeof lu) && !strncmp(lu, want, strlen(want)) && !strcmp(lu + strlen(want), "SHA256SUMS.txt") &&
+          !strncmp(su, want, strlen(want)) && !strcmp(su + strlen(want), "SHA256SUMS.sig") &&
+          !vmcat_list_source(&e, "SHA256SUMS", 1, u2, s2, sizeof u2) && !strncmp(u2, e.dir, strlen(e.dir)) && !strcmp(u2 + strlen(e.dir), "SHA256SUMS") &&
+          !strncmp(s2, e.dir, strlen(e.dir)) && !strcmp(s2 + strlen(e.dir), "SHA256SUMS.sig") && vmcat_list_source(&e, "SHA256SUMS", 2, u2, s2, sizeof u2));
     }
-    /* Android (docs/VIRTUALIZATION.md 4.2): one pinned ISO for amd64, none for arm64; the helper keeps only that name and hash */
-    T("android: pinned, one ISO", !vmcat_find(cat, n, "android", "amd64", &e) && e.npins == 1 && !e.dir[0] &&
-      !strcmp(e.pin[0].name, "Bliss-v16.9.7-x86_64-OFFICIAL-foss-20241011.iso") && e.pin[0].bytes == 2342518784ull && e.max_bytes == 2342518784ull &&
-      !strncmp(e.pin[0].url, "https://downloads.sourceforge.net/project/blissos-x86/", 54));
-    T("android: its hash only", vmcat_pin_find(&e, e.pin[0].name, "735cb962ec6bd92b62eb82a812831a38d79a0dfdf12b7973d2d0f7ab001ba68e") == 0 &&
-      vmcat_pin_find(&e, e.pin[0].name, SHA) < 0 && vmcat_pin_find(&e, "other.iso", "735cb962ec6bd92b62eb82a812831a38d79a0dfdf12b7973d2d0f7ab001ba68e") < 0);
-    T("android: no arm64 image", vmcat_find(cat, n, "android", "arm64", &e));
+    /* a pinned file (virtio-win's ISO, docs/VIRTUALIZATION.md 4.3): no maker's list; the helper keeps only that name and hash */
+    T("virtio-win: pinned, one ISO", !vmcat_find(cat, n, "virtio-win", "amd64", &e) && e.npins == 1 && !e.dir[0] &&
+      !strcmp(e.pin[0].name, "virtio-win-0.1.271.iso") && e.pin[0].bytes == 726501376ull && e.max_bytes == 726501376ull &&
+      !strncmp(e.pin[0].url, "https://fedorapeople.org/", 25));
+    T("virtio-win: its hash only", vmcat_pin_find(&e, e.pin[0].name, "bbe6166ad86a490caefad438fef8aa494926cb0a1b37fa1212925cfd81656429") == 0 &&
+      vmcat_pin_find(&e, e.pin[0].name, SHA) < 0 && vmcat_pin_find(&e, "other.iso", "bbe6166ad86a490caefad438fef8aa494926cb0a1b37fa1212925cfd81656429") < 0);
     T("unknown id", vmcat_find(cat, n, "nothing", "amd64", &e));
     T("unknown arch", vmcat_find(cat, n, "debian", "riscv64", &e));
     T("fedora: its list's name", !vmcat_find(cat, n, "fedora", "amd64", &e) && vmcat_match(e.sums_re, "Fedora-Workstation-45-1.4-x86_64-CHECKSUM") &&
       !vmcat_match(e.sums_re, "Fedora-Workstation-Live-45-1.4.x86_64.iso") && !vmcat_match(e.sums_re, "Fedora-Workstation-45-1.4-aarch64-CHECKSUM"));
     T("fedora: images from the mirrors", !strncmp(e.file_dir, "https://download.fedoraproject.org/", 35));
     T("debian: SHA256SUMS", !vmcat_find(cat, n, "debian", "arm64", &e) && !strcmp(e.sums, "SHA256SUMS") && !e.sums_re[0]);
+    {
+        char lu[VMCAT_URL + 160], su[VMCAT_URL + 160];
+        T("debian: its own folder only, no copy elsewhere", !e.list_dir[0] && !vmcat_list_source(&e, "SHA256SUMS", 0, lu, su, sizeof lu) &&
+          !strcmp(lu, "https://cdimage.debian.org/debian-cd/current/arm64/iso-cd/SHA256SUMS") &&
+          !strcmp(su, "https://cdimage.debian.org/debian-cd/current/arm64/iso-cd/SHA256SUMS.sign") && vmcat_list_source(&e, "SHA256SUMS", 1, lu, su, sizeof lu));
+        T("debian: a list name that isn't plain", vmcat_list_source(&e, "../SHA256SUMS", 0, lu, su, sizeof lu));
+    }
     T("debian: not the edu or mac image", !vmcat_match(e.file_re, "debian-edu-13.7.0-arm64-netinst.iso") && !vmcat_match(e.file_re, "debian-mac-13.7.0-amd64-netinst.iso"));
     T("ubuntu: 26.04 and 26.04.1", !vmcat_find(cat, n, "ubuntu", "amd64", &e) && vmcat_match(e.file_re, "ubuntu-26.04-desktop-amd64.iso") &&
       vmcat_match(e.file_re, "ubuntu-26.04.1-desktop-amd64.iso") && !vmcat_match(e.file_re, "ubuntu-26.04.1-live-server-amd64.iso"));
@@ -386,6 +497,54 @@ int main(int argc, char **argv) {
     const char *goodl = "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"lordos-release\",\"name\":\"SHA256SUMS.sig\"},\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"SHA256SUMS\",\"file\":\"^a\\\\.iso$\",\"maxMb\":10}}}]}";
     T("good LordOS release entry", !vmcat_find(goodl, strlen(goodl), "x", "amd64", &e) && e.sig_type == VMCAT_SIG_LORDOS && !strcmp(e.sig_name, "SHA256SUMS.sig") &&
       !e.keys[0] && !e.nfprs);
+    T("good LordOS release entry: no copy of its list", !e.list_dir[0]);
+
+    /* "list": LordOS's signed list also on lordos.org, tried first; the release folder is the fallback (vmcat_list_source) */
+    {
+#define LE(sig, list) "{\"systems\":[{\"id\":\"x\",\"signature\":" sig ",\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"SHA256SUMS\"," list "\"file\":\"^a\\\\.iso$\",\"maxMb\":10}}}]}"
+#define LR "{\"type\":\"lordos-release\",\"name\":\"SHA256SUMS.sig\"}"
+        const char *gl = LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1.2.3-beta/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},");
+        char lu[VMCAT_URL + 160], su[VMCAT_URL + 160];
+        T("list copy: found", !vmcat_find(gl, strlen(gl), "x", "amd64", &e) && !strcmp(e.list_dir, "https://lordos.org/releases/v1.2.3-beta/") &&
+          !strcmp(e.list_sums, "SHA256SUMS.txt") && !strcmp(e.list_sig, "SHA256SUMS.sig") && !strcmp(e.dir, "https://a.example/r/") && !strcmp(e.file_dir, e.dir));
+        T("list copy: first", !vmcat_list_source(&e, "SHA256SUMS", 0, lu, su, sizeof lu) && !strcmp(lu, "https://lordos.org/releases/v1.2.3-beta/SHA256SUMS.txt") &&
+          !strcmp(su, "https://lordos.org/releases/v1.2.3-beta/SHA256SUMS.sig"));
+        T("list copy: the folder's list as the fallback", !vmcat_list_source(&e, "SHA256SUMS", 1, lu, su, sizeof lu) && !strcmp(lu, "https://a.example/r/SHA256SUMS") &&
+          !strcmp(su, "https://a.example/r/SHA256SUMS.sig"));
+        T("list copy: then nothing", vmcat_list_source(&e, "SHA256SUMS", 2, lu, su, sizeof lu) && vmcat_list_source(&e, "SHA256SUMS", -1, lu, su, sizeof lu));
+        T("list copy: only for the entry's own list name", !vmcat_list_source(&e, "OTHER", 0, lu, su, sizeof lu) && !strcmp(lu, "https://a.example/r/OTHER") &&
+          vmcat_list_source(&e, "OTHER", 1, lu, su, sizeof lu));
+        T("list copy: a buffer too small", vmcat_list_source(&e, "SHA256SUMS", 0, lu, su, 20));
+        static const char *const badlist[] = {
+            /* not LordOS's release signature */
+            "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"detached\",\"name\":\"S.sig\"},\"keys\":\"k.asc\",\"fingerprints\":[\"DF9B9C49EAA9298432589D76DA87E80D6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"list\":{\"dir\":\"https://lordos.org/releases/v1/\",\"sums\":\"S.txt\",\"signature\":\"S.sig\"},\"file\":\"^a$\",\"maxMb\":10}}}]}",
+            /* another host, or not under releases/ */
+            LE(LR, "\"list\":{\"dir\":\"https://evil.example/releases/v1/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org.evil.example/releases/v1/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/v1/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"http://lordos.org/releases/v1/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/../v1/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1/?a/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            /* names that aren't plain, or missing */
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1/\",\"sums\":\"../SHA256SUMS\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"a/SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1/\",\"sums\":\"SHA256SUMS.txt\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1/\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":\"https://lordos.org/releases/v1/\","),
+            /* a list found in the folder's listing (sumsPattern) has no fixed name to copy */
+            "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"lordos-release\",\"name\":\"S.sig\"},\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sumsPattern\":\"^S$\",\"list\":{\"dir\":\"https://lordos.org/releases/v1/\",\"sums\":\"S.txt\",\"signature\":\"S.sig\"},\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        };
+        for (size_t i = 0; i < sizeof badlist / sizeof badlist[0]; i++) {
+            char lab[48];
+            snprintf(lab, sizeof lab, "bad list copy %zu refused", i);
+            T(lab, vmcat_find(badlist[i], strlen(badlist[i]), "x", "amd64", &e) && !e.dir[0] && !e.list_dir[0]);
+        }
+#undef LE
+#undef LR
+    }
 
     /* pinned entries (Windows' evaluation, virtio-win): the catalog names each file, its URL, hash and size */
     {
@@ -418,6 +577,7 @@ int main(int argc, char **argv) {
     }
 
     if (argc > 3) signatures(cat, n, argv[2], argv[3]); else T("signature fixtures given", 0);
+    if (argc > 3) whonix(cat, n, argv[2], argv[3]);
 
     printf("== vmcatalog-test: %d passed, %d failed\n", pass, fail);
     return fail != 0;

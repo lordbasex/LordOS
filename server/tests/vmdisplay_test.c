@@ -13,6 +13,7 @@
  *     the click where the pointer is.
  * No QEMU, no KVM, no GPU: a memfd stands in for the dmabuf. Exits 1 on the first failure. */
 #include "../src/vm/vmproto.h"
+#include "../src/vm/vmpace.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -180,12 +181,23 @@ static const sd_bus_vtable audio_vt[] = {
 /* ---- "lord-server" ---- */
 
 static int ready, ack_frames = 1, frames_seen, dmabufs_seen;
+/* lord-server's picture as the helper writes it (the last VD_SHM), and the VD_FRAME rectangles seen */
+static uint8_t *shm_map;
+static size_t shm_len;
+static int shm_w;
+static struct { int x, y, w, h, e, f; } rects[256];
+static int nrects;
 static long long shm_hold_until;        /* a slow lord-server: the picture for a new size comes only after this */
 static int shm_want_w, shm_want_h;
 
 static void send_shm(int w, int h) {
     int fd = memfd_create("vmdisplay-test-shm", MFD_CLOEXEC | MFD_ALLOW_SEALING);
     if (fd < 0 || ftruncate(fd, (off_t)w * h * 4) || fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW)) { perror("memfd"); exit(1); }
+    if (shm_map) munmap(shm_map, shm_len);
+    shm_len = (size_t)w * h * 4;
+    shm_map = mmap(NULL, shm_len, PROT_READ, MAP_SHARED, fd, 0);
+    if (shm_map == MAP_FAILED) { perror("mmap"); exit(1); }
+    shm_w = w;
     VdMsg m = vd_msg(VD_SHM, 0, 0, 0, 0, 0, 0);
     vd_send(srv, &m, fd);
     close(fd);
@@ -207,7 +219,8 @@ static void from_helper(void) {
             if (now_ms() >= shm_hold_until) { send_shm(m.a, m.b); shm_want_w = shm_want_h = 0; }
             break;
         case VD_FRAME:
-            frames_seen++;
+            if (!m.f) frames_seen++;
+            if (nrects < 256) { rects[nrects].x = m.a; rects[nrects].y = m.b; rects[nrects].w = m.c; rects[nrects].h = m.d; rects[nrects].e = m.e; rects[nrects].f = m.f; nrects++; }
             if (ack_frames) { VdMsg a = vd_msg(VD_FRAME_DONE, 0, 0, 0, 0, m.e, 0); vd_send(srv, &a, -1); }
             break;
         }
@@ -268,6 +281,22 @@ static Call *listener_call(const char *method, const char *sig, ...) {
     if (r < 0) { fprintf(stderr, "mock QEMU: %s: %s\n", method, strerror(-r)); exit(1); }
     return c;
 }
+static Call *map_call(const char *method, const char *sig, ...) {
+    if (ncalls >= (int)(sizeof calls / sizeof *calls)) return NULL;
+    Call *c = &calls[ncalls++];
+    memset(c, 0, sizeof *c);
+    sd_bus_message *m = NULL;
+    int r = sd_bus_message_new_method_call(L, &m, NULL, LISTENER, "org.qemu.Display1.Listener.Unix.Map", method);
+    va_list ap;
+    va_start(ap, sig);
+    if (r >= 0) r = sd_bus_message_appendv(m, sig, ap);
+    va_end(ap);
+    c->sent = now_ms();
+    if (r >= 0) r = sd_bus_call_async(L, NULL, m, on_answer, c, (uint64_t)QEMU_TIMEOUT_MS * 1000);
+    sd_bus_message_unref(m);
+    if (r < 0) { fprintf(stderr, "mock QEMU: %s: %s\n", method, strerror(-r)); exit(1); }
+    return c;
+}
 static void scanout(uint32_t w, uint32_t h) {
     int fd = memfd_create("vmdisplay-test-dmabuf", MFD_CLOEXEC);
     if (fd < 0 || ftruncate(fd, (off_t)w * h * 4)) { perror("memfd"); exit(1); }
@@ -283,6 +312,21 @@ static long long worst(int from, int *unanswered) {
         if (calls[i].answered - calls[i].sent > w) w = calls[i].answered - calls[i].sent;
     }
     return w;
+}
+
+/* a process's CPU time so far, in ms (utime + stime) */
+static long long cpu_of(pid_t pid) {
+    char path[64], buf[1024];
+    snprintf(path, sizeof path, "/proc/%d/stat", (int)pid);
+    FILE *f = fopen(path, "r");
+    if (!f) return -1;
+    size_t n = fread(buf, 1, sizeof buf - 1, f);
+    fclose(f);
+    buf[n] = 0;
+    char *p = strrchr(buf, ')');
+    unsigned long ut = 0, st = 0;
+    if (!p || sscanf(p + 2, "%*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu", &ut, &st) != 2) return -1;
+    return (long long)(ut + st) * 1000 / sysconf(_SC_CLK_TCK);
 }
 
 static int find(const char *what, int a, int from) {
@@ -366,6 +410,109 @@ int main(int argc, char **argv) {
     w = worst(c0, &un);
     check(!un && w < 250, "200 updates at once with input arriving: worst answer %lld ms", w);
     pump(200);
+
+    /* ---- pacing (VD_PACE, vmpace.h): QEMU as its vfio display does it, the console blocked until each answer, then the
+     * next update at its next 30 ms refresh. Frames handed to lord-server in 2 s, unpaced, idle and hidden; the
+     * answers always inside QEMU's 1 s; input ends idle at once ---- */
+    {
+        int rates[3];
+        long long cpu[3];
+        const int kinds[3][2] = { { 0, VDP_NONE }, { VMPACE_IDLE_MS, VDP_IDLE }, { VMPACE_HIDDEN_MS, VDP_HIDDEN } };
+        for (int k = 0; k < 3; k++) {
+            tell(VD_PACE, kinds[k][0], kinds[k][1]);
+            /* hidden, lord-server doesn't paint, so it never acknowledges a 2D frame: the helper goes on after 250 ms */
+            ack_frames = kinds[k][1] != VDP_HIDDEN;
+            pump(600);                           /* what the last pace held goes out first */
+            int f0 = frames_seen;
+            long long u0 = cpu_of(pid);
+            c0 = ncalls;
+            Call *open = NULL;
+            long long end = now_ms() + 2000, next = 0;
+            while (now_ms() < end) {
+                /* hidden: damage keeps coming while a frame waits (as a 2D picture's UpdateMap does) */
+                if ((!open || open->answered || kinds[k][1] == VDP_HIDDEN) && now_ms() >= next) { open = listener_call("UpdateDMABUF", "iiii", 0, 0, 1920, 1080); next = now_ms() + 30; }
+                pump(5);
+            }
+            pump(1000);
+            rates[k] = frames_seen - f0;
+            cpu[k] = cpu_of(pid) - u0;
+            ack_frames = 1;
+            w = worst(c0, &un);
+            check(!un && w < QEMU_TIMEOUT_MS - 50, "paced %d ms: worst answer %lld ms", kinds[k][0], w);
+        }
+        check(rates[0] >= 50 && rates[1] <= 22 && rates[1] >= 12 && rates[2] <= 5 && rates[2] >= 2,
+              "frames in 2 s: %d unpaced, %d idle (%d ms), %d hidden (%d ms)", rates[0], rates[1], VMPACE_IDLE_MS, rates[2], VMPACE_HIDDEN_MS);
+        /* paced longer than the 250 ms it waits for an answer, it sleeps until the interval ends (it once spun there) */
+        check(cpu[1] < 200 && cpu[2] < 200, "the helper's CPU in 3 s: %lld ms unpaced, %lld ms idle, %lld ms hidden", cpu[0], cpu[1], cpu[2]);
+        /* idle: a key ends it in the helper, without lord-server: the held update goes out at once */
+        tell(VD_PACE, VMPACE_IDLE_MS, VDP_IDLE);
+        pump(300);
+        Call *c = listener_call("UpdateDMABUF", "iiii", 0, 0, 1920, 1080);     /* goes out: the interval starts */
+        while (!c->answered) pump(2);
+        c = listener_call("UpdateDMABUF", "iiii", 0, 0, 1920, 1080);           /* held for the interval */
+        pump(20);
+        check(!c->answered, "idle: the next update is held for the interval");
+        long long t0 = now_ms();
+        tell(VD_KEY, 30, 1);
+        tell(VD_KEY, 30, 0);
+        while (!c->answered && now_ms() - t0 < 1000) pump(2);
+        check(c->answered && c->answered - t0 >= 0 && c->answered - t0 < 40, "idle: input brings the next picture at once (%lld ms)", c->answered ? c->answered - t0 : -1);
+        tell(VD_PACE, 0, VDP_NONE);
+        pump(200);
+    }
+
+    /* ---- a 2D picture (ScanoutMap, UpdateMap): a clock in one corner and a square in the other go to lord-server as
+     * two rectangles of one frame, each copied, nothing between them (MACHINES-GPU.md Part 1 step 4) ---- */
+    {
+        const int W2 = 800, H2 = 600;
+        int qfd = memfd_create("vmdisplay-test-map", MFD_CLOEXEC);
+        if (qfd < 0 || ftruncate(qfd, (off_t)W2 * H2 * 4)) { perror("memfd"); return 1; }
+        uint32_t *q32 = mmap(NULL, (size_t)W2 * H2 * 4, PROT_READ | PROT_WRITE, MAP_SHARED, qfd, 0);
+        if (q32 == MAP_FAILED) { perror("mmap"); return 1; }
+        for (int i = 0; i < W2 * H2; i++) q32[i] = 0x00101010u;
+        map_call("ScanoutMap", "huuuuu", qfd, 0u, (uint32_t)W2, (uint32_t)H2, (uint32_t)W2 * 4, 0x20020888u);
+        close(qfd);
+        for (long long t = now_ms() + 2000; (!shm_map || shm_w != W2) && now_ms() < t;) pump(10);
+        pump(400);                              /* the first, whole frame */
+        /* lord-server is still reading the frame before (no answer): the changes that come meanwhile go out together */
+        ack_frames = 0;
+        map_call("UpdateMap", "iiii", 0, 0, 1, 1);
+        for (long long t = now_ms() + 500; !rects[nrects ? nrects - 1 : 0].w && now_ms() < t;) pump(5);
+        pump(20);
+        int r0 = nrects;
+        for (int y = 560; y < 580; y++) for (int x = 700; x < 760; x++) q32[y * W2 + x] = 0x00ff0000u;     /* the clock */
+        for (int y = 100; y < 164; y++) for (int x = 50; x < 114; x++) q32[y * W2 + x] = 0x0000ff00u;      /* the square */
+        map_call("UpdateMap", "iiii", 700, 560, 60, 20);
+        map_call("UpdateMap", "iiii", 50, 100, 64, 64);
+        for (long long t = now_ms() + 1000; nrects - r0 < 2 && now_ms() < t;) pump(5);
+        pump(100);
+        ack_frames = 1;
+        int n = nrects - r0, same = n == 2 && rects[r0].e == rects[r0 + 1].e, fs = n == 2 && rects[r0].f == 1 && rects[r0 + 1].f == 0;
+        long area = 0;
+        for (int i = r0; i < nrects; i++) area += (long)rects[i].w * rects[i].h;
+        check(n == 2 && same && fs, "two far changes: %d rectangles in one frame (f counts down to 0)", n);
+        check(area == 60 * 20 + 64 * 64, "only their pixels: %ld, not the box over both (%d)", area, (760 - 50) * (580 - 100));
+        const uint32_t *s32 = (const uint32_t *)shm_map;
+        check(shm_map && s32[570 * W2 + 730] == 0x00ff0000u && s32[130 * W2 + 80] == 0x0000ff00u && s32[300 * W2 + 400] == 0x00101010u,
+              "both copied into lord-server's picture");
+        /* nine far changes: never more than VD_FRAME_RECTS rectangles, and every change still there */
+        ack_frames = 0;
+        map_call("UpdateMap", "iiii", 0, 0, 1, 1);
+        pump(300);
+        r0 = nrects;
+        for (int k = 0; k < 9; k++) {
+            int x = 10 + k * 85, y = 10 + (k % 3) * 200;
+            for (int yy = y; yy < y + 8; yy++) for (int xx = x; xx < x + 8; xx++) q32[yy * W2 + xx] = 0x000000ffu;
+            map_call("UpdateMap", "iiii", x, y, 8, 8);
+        }
+        for (long long t = now_ms() + 1000; (nrects == r0 || rects[nrects - 1].f) && now_ms() < t;) pump(5);
+        pump(100);
+        ack_frames = 1;
+        int ok9 = 1;
+        for (int k = 0; k < 9; k++) ok9 &= s32[(14 + (k % 3) * 200) * W2 + 14 + k * 85] == 0x000000ffu;
+        check(nrects - r0 >= 1 && nrects - r0 <= VD_FRAME_RECTS && ok9, "nine changes: %d rectangles (at most %d), all nine copied", nrects - r0, VD_FRAME_RECTS);
+        munmap(q32, (size_t)W2 * H2 * 4);
+    }
 
     /* ---- buttons, the mouse free: the tablet, absolute ---- */
     is_abs = 1;

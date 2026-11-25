@@ -137,6 +137,9 @@ extern char sd_cursor_env[24];
 /* "LORD_MAIN_DISPLAY=<connector>" for the login screen: the main display last chosen in a session shown on
  * the monitor (kept in /var/lib/lordos/main-display), or empty */
 extern char sd_main_display[64];
+/* "LORD_MAIN_SCALE=<connector>:<pct>" for the login screen (#242): the scale an administrator chose for it in Settings →
+ * Displays (kept in /var/lib/lordos/greeter-scale, greeterscale.h), or empty */
+extern char sd_main_scale[64];
 #define SD_TUNE_N 4
 extern char sd_tune_env[SD_TUNE_N][32]; /* the service's LORD_GPU_SCISSOR, LORD_GPU_DRAG, LORD_PIPELINE, LORD_GPU_VERIFY for user sessions */
 extern int sd_input_debug;              /* LORD_INPUT_DEBUG=1 for user sessions (keylag.h) */

@@ -1,10 +1,10 @@
-// Settings → AI: reading aloud (docs/VOICE.md). Voice: on or off, the ❖Esc shortcut, the small player (settings.voice,
+// Settings → AI: two pages, Voice and Sentinela (Sentinela.jsx, docs/SENTINELA.md). Voice is reading aloud (docs/VOICE.md). Voice: on or off, the ❖Esc shortcut, the small player (settings.voice,
 // sdk/voice.js) and where speech is made (voice.json's backend). Per language: the standard and HD models and the
 // voices (sdk/voicecatalog.js), each heard from its recorded sample before downloading it, downloaded and removed as
 // signed lordos-voice-* packages (sdk/voicemanager.js), the one used chosen; and the person's own voices, recorded
 // with the microphone or taken from a file, cloned by the model (CloneSheet).
 import {
-  View, Text, Button, Toggle, Segmented, TextInput, Layer, FilePicker, useTheme, useLocale, useSettings, useStore, useAppWindow,
+  View, Text, Button, Toggle, Segmented, Dropdown, TextInput, Layer, FilePicker, useTheme, useLocale, useSettings, useStore, useAppWindow,
   wm, media, formatBytes, spacing, typeScale, VOICE_DEFAULTS, speakAvailable, previewVoice, tryVoice, player as voicePlayer,
   VOICE_LANGS, VOICES, voiceLabel, voicePackage, modelPackage, hasVoice, PREVIEWS_PACKAGE, scanVoices, installVoices, removeVoices,
   packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName, takeName, errorText, fs,
@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, Note } from './ui.jsx';
 import { PersonalVoiceSheet } from './PersonalVoice.jsx';
+import { SentinelaSettings } from './Sentinela.jsx';
 
 const BACKENDS = ['auto', 'cpu', 'gpu'];
 const QUALITIES = ['auto', 'standard', 'hd'];
@@ -20,7 +21,25 @@ const size = (mb) => formatBytes(mb * 1e6);
 const hasPreviews = () => [`${fs.home()}/.local/share/lordos/voice`, '/usr/share/lordos/voice']
   .some((root) => { try { return !!fs.stat(`${root}/previews/es/lola.wav`); } catch (e) { return false; } });
 
-export function AISettings() {
+// the page shown last survives the section being left; another app opens one with { section: 'ai', page: 'sentinela' }
+let lastPage = 'voice';
+
+export function AISettings({ page, alert }) {
+  const { t: tr } = useLocale();
+  const [view, setView] = useState(() => (page === 'sentinela' || page === 'voice' ? page : lastPage));
+  useEffect(() => { if (page === 'sentinela' || page === 'voice') { lastPage = page; setView(page); } }, [page, alert]);
+  const pick = (v) => { lastPage = v; setView(v); };
+  return (
+    <Stack>
+      <View style={{ alignItems: 'flex-start' }}>
+        <Segmented value={view} onChange={pick} options={[['voice', tr('settings.ai.voice')], ['sentinela', tr('sentinela.name')]]} />
+      </View>
+      {view === 'sentinela' ? <SentinelaSettings alertId={alert} /> : <VoiceSettings />}
+    </Stack>
+  );
+}
+
+function VoiceSettings() {
   const { t: tr, lang: uiLang } = useLocale();
   const th = useTheme();
   const [s, set] = useSettings();
@@ -66,7 +85,7 @@ export function AISettings() {
         {busyLabel(key) ? <Text style={{ fontSize: typeScale.caption, color: th.textDim }}>{busyLabel(key)}</Text>
           : on ? <Button small destructive label={tr('settings.ai.remove')} disabled={!!job}
             onClick={() => remove(key, [modelPackage(lang, q === 'hd'),
-              ...VOICES.filter((x) => hasVoice(x.id, q === 'hd') && st.voices[q].has(x.id)).map((x) => voicePackage(lang, x.id, q === 'hd'))])} />
+              ...VOICES.filter((x) => hasVoice(x.id, q === 'hd', lang) && st.voices[q].has(x.id)).map((x) => voicePackage(lang, x.id, q === 'hd'))])} />
             : <Button small label={tr('settings.ai.download')} disabled={!!job} onClick={() => install(key, packagesFor(lang, L.own, q === 'hd', scan))} />}
       </SettingRow>
     );
@@ -120,7 +139,8 @@ export function AISettings() {
       </Section>
 
       <View style={{ alignItems: 'flex-start' }}>
-        <Segmented value={lang} onChange={setLang} options={VOICE_LANGS.map((l) => [l.id, tr(`settings.ai.lang.${l.id}`)])} />
+        {/* seven languages don't fit a segmented control in every interface language: a pop-up */}
+        <Dropdown value={lang} onChange={setLang} width={220} options={VOICE_LANGS.map((l) => [l.id, tr(`settings.ai.lang.${l.id}`)])} />
       </View>
 
       <Section title={tr('settings.ai.models')} footer={tr('settings.ai.modelsFooter')}>
@@ -135,7 +155,7 @@ export function AISettings() {
               : <Button small label={tr('settings.ai.download')} disabled={!!job} onClick={() => install('previews', [PREVIEWS_PACKAGE])} />}
           </SettingRow>
         ) : null}
-        {VOICES.filter((x) => hasVoice(x.id, hd)).map(voiceRow)}
+        {VOICES.filter((x) => hasVoice(x.id, hd, lang)).map(voiceRow)}
       </Section>
 
       <Section title={tr('settings.ai.own')} footer={tr('settings.ai.ownFooter')}>

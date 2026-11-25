@@ -6,7 +6,7 @@
 import {
   View, Text, Image, ScrollView, Segmented, Toolbar, typeScale, useTheme, useLocale, useStore, useSettings, useAppWindow,
   useMonitor, monitor, monitorSamples, monitorProcesses, formatBytes, formatNumber, LordOSLogo, iconFromFile, getApp, appName,
-  Dropdown, useNarrow, useBattery, useDevices,
+  Dropdown, useNarrow, useBattery, useDevices, useWindowWidth, useWindowHeight,
 } from '@lordos/sdk';
 import { registerDockActions } from '@lordos/sdk';
 import * as sdk from '@lordos/sdk';
@@ -22,10 +22,11 @@ import { FirewallPrivacy } from './Firewall.jsx';
 import { FirewallRulesPrivacy } from './FwRules.jsx';
 import { CoolingTab } from './Cooling.jsx';
 import { DevicesTab, BatteryTab } from './Devices.jsx';
-import { ProcessesTab, ProcessLayers } from './Processes.jsx';
+import { ProcessesTab, ProcessLayers, procScroll, noteSight } from './Processes.jsx';
 import { DisksTab } from './DisksTab.jsx';
 import { VoltageTab } from './Voltage.jsx';
-import { GpuTab, OverviewGpu, OverviewAiVms } from './Gpu.jsx';
+import { OverviewGpu, OverviewAiVms } from './Gpu.jsx';
+import { GpuTab } from './GpuView.jsx';
 
 export function Icon({ size }) { return <MonitorIcon size={size} />; }
 
@@ -325,7 +326,7 @@ function MemTop() {
   const procs = useStore(monitorProcesses);
   const top = useMemo(() => memTop(procs?.list, 8), [procs]);
   if (!top.length) return null;
-  const label = (p) => (p.app === 'lordos' ? tr('monitor.lordos') : isolatedAppOf(p) ? appName(isolatedAppOf(p)) : p.appName || p.name);
+  const label = (p) => (p.app === 'lordos' ? tr('monitor.lordos') : isolatedAppOf(p) ? appName(isolatedAppOf(p)) : componentName(tr, p.app) || p.appName || p.name);
   return (
     <Card icon="memory" title={tr('monitor.memTop')}>
       {top.map((g) => (
@@ -386,6 +387,13 @@ export function Cell({ col, children, color, bold }) {
 // An isolated LordOS app (its own process and scope, "lpk:<id>"): a package or a built-in app such
 // as Mail or Passwords; the process is shown with the app's name and icon.
 export const isolatedAppOf = (item) => (typeof item?.app === 'string' && item.app.startsWith('lpk:') ? getApp(item.app.slice(4)) : null);
+// (0.8.9.6) one of LordOS's components (lordos:terminal, lordos:mail…: the process runs in its lordos-net-<name>.scope)
+export const componentName = (tr, app) => {
+  const vm = sdk.netModel?.vmIdOf?.(app);
+  if (vm) return sdk.netModel.componentLabel(tr, app, monitor.machineNames([vm]));
+  const c = sdk.netModel?.COMPONENTS?.[app];
+  return c ? tr(c.label) : null;
+};
 
 // (0.8.5) LordOS's own components: the built-in app's icon (Mail, Store, Terminal) or a glyph
 function ComponentGlyph({ comp, size }) {
@@ -399,15 +407,19 @@ function ComponentGlyph({ comp, size }) {
   );
 }
 
+const letterIcons = new Map();
 export function AppGlyph({ item, size = 16 }) {
   if (item.app === 'lordos') return <LordOSLogo size={size} />;
-  const comp = sdk.netModel?.COMPONENTS?.[item.app];
+  const comp = sdk.netModel?.componentOf?.(item.app);
   if (comp) return <ComponentGlyph comp={comp} size={size} />;
   if (item.app === 'remote-desktop') return <RemoteGlyph size={size} />;
   const iso = isolatedAppOf(item);
   if (iso?.Icon) return <iso.Icon size={size} />;
   if (item.appIcon) return <Image src={item.appIcon} style={{ width: size, height: size, objectFit: 'contain' }} />;
-  const Ico = iconFromFile(null, item.appName || item.name || '?');
+  // one component per name: a new one on every redraw would draw the letter again (a list of hundreds of processes)
+  const name = item.appName || item.name || '?';
+  let Ico = letterIcons.get(name);
+  if (!Ico) { if (letterIcons.size > 2000) letterIcons.clear(); letterIcons.set(name, (Ico = iconFromFile(null, name))); }
   return <Ico size={size} />;
 }
 
@@ -416,6 +428,8 @@ export function AppGlyph({ item, size = 16 }) {
 let lastTab = 'overview';
 // a small window (a Lord Workspaces tile): below TABS_AT the tabs become a pop-up menu and the pages lose some margin
 const TABS_AT = 900;
+// the GPU tab fits without scrolling from this window size up (GpuView.jsx)
+const GPU_FIT_W = 1100, GPU_FIT_H = 600;
 
 // Each tab subscribes to what it shows, at the rate it needs: the chart tabs on every sample (4 per
 // second in front, 1 in the background); Processes and Network, once per second. The window itself
@@ -467,6 +481,8 @@ export default function Monitor() {
   const [settings] = useSettings();
   const prefs = settings.monitor || {};
   const narrow = useNarrow(TABS_AT);
+  const winW = useWindowWidth(), winH = useWindowHeight();
+  const gpuFit = winW >= GPU_FIT_W && winH >= GPU_FIT_H;
   const [tab, setTabState] = useState(lastTab);
   const setTab = (v) => { lastTab = v; setTabState(v); };
   useEffect(() => { if (args?.tab) setTab(args.tab); }, [args?.tab, args?.nonce]);
@@ -511,9 +527,14 @@ export default function Monitor() {
       ) : view === 'network' ? (
         <Network prefs={prefs} />
       ) : view === 'gpu' ? (
-        <ScrollView resetKey="gpu" style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><GpuTab /></View>
-        </ScrollView>
+        // (0.8.9.6) at about 1100×600 and up the GPU tab fits the window with no scrolling; smaller, it scrolls
+        gpuFit ? (
+          <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 16, paddingVertical: 12 }}><GpuTab fit /></View>
+        ) : (
+          <ScrollView resetKey="gpu" style={{ flex: 1 }}>
+            <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><GpuTab /></View>
+          </ScrollView>
+        )
       ) : view === 'voltage' ? (
         <ScrollView resetKey="voltage" style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><VoltageTab /></View>
@@ -527,7 +548,7 @@ export default function Monitor() {
           <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><CoolingTab /></View>
         </ScrollView>
       ) : view === 'processes' ? (
-        <ScrollView resetKey="processes" style={{ flex: 1 }}>
+        <ScrollView resetKey="processes" style={{ flex: 1 }} scrollRef={procScroll} onScroll={noteSight}>
           <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><ProcessesTab /></View>
         </ScrollView>
       ) : (

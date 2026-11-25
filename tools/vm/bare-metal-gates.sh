@@ -40,7 +40,9 @@ die() { echo "can't run the gates: $*"; rm -rf "$R"; exit 2; }   # $R is only th
 # ---- is this PC fit to run them ----
 [ "$(id -u)" = 0 ] && die "run as your normal user, not root"
 [ "$(uname -m)" = x86_64 ] || die "this is $(uname -m): the bare-metal gates are for amd64 (the Pi has its own run, 3.9)"
-virt=$(systemd-detect-virt 2>/dev/null || echo none)
+# systemd-detect-virt prints "none" and exits 1 on bare metal: its words only (a second "none" refused every real PC)
+virt=$(systemd-detect-virt 2>/dev/null | head -1)
+[ -n "$virt" ] || virt=none
 # GATES_ALLOW_VM=1: a dry run of this script on a virtual machine (its results are nested numbers, not bare metal)
 [ "$virt" = none ] || [ "${GATES_ALLOW_VM:-}" = 1 ] || die "this is a virtual machine ($virt): the nested numbers are already in 3.9; run it on the PC itself"
 grep -qwE 'vmx|svm' /proc/cpuinfo || die "the CPU offers no VT-x or AMD-V (or it is off in the firmware settings)"
@@ -78,7 +80,9 @@ fi
     echo "memory:    $(awk '/MemTotal/ { printf "%.1f GB", $2 / 1048576 }' /proc/meminfo)"
     echo "disk:      $(df -PT "$R" | awk 'NR == 2 { print $2 }') on $(df -P "$R" | awk 'NR == 2 { print $1 }')"
     echo "qemu:      $(qemu-system-x86_64 --version | head -1)"
-    echo "passt:     $(passt --version 2>&1 | head -1)"
+    # Debian's passt prints no version without a terminal: its package's then
+    pv=$(passt --version 2>&1 | head -1); [ -n "$pv" ] || pv="passt $(dpkg-query -W -f '${Version}' passt 2>/dev/null)"
+    echo "passt:     $pv"
     echo "lord-vm:   $BIN/lord-vm, sha256 $(sha256sum "$BIN/lord-vm" | cut -d' ' -f1)"
     echo "guest:     $(basename "$IMG"), sha256 $(sha256sum "$IMG" | cut -d' ' -f1)"
 } >"$OUT"

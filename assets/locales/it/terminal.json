@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "conservata in Output catturato",
   "prefs.tr.would.highlight": "evidenzia “{text}”",
   "prefs.tr.param": "Parametro",
-  "prefs.tr.regexFirst": "Scrivi prima l’espressione regolare."
+  "prefs.tr.regexFirst": "Scrivi prima l’espressione regolare.",
+  "guest.badge": "MACCHINA",
+  "guest.title": "Shell dentro {machine}"
 }

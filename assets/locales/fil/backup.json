@@ -14,6 +14,10 @@
   "never": "Wala pang mga backup",
   "next": "Susunod: {when}",
   "lastError": "Nabigo ang huling backup: {error}",
+  "machinesBusy": {
+    "one": "{count} makina ang tumatakbo: ang mga disk nito sa backup na ito ay mula sa nauna",
+    "other": "{count} na makina ang tumatakbo: ang mga disk nila sa backup na ito ay mula sa nauna"
+  },
   "todayAt": "ngayong araw nang {time}",
   "now": "Mag-backup Ngayon",
   "pause": "I-pause",
@@ -77,6 +81,10 @@
   "delete": "Burahin ang Backup",
   "restoreAll": "I-restore Lahat",
   "restoreItem": "I-restore ang “{name}”",
+  "restoreSelected": "I-restore ang mga napili ({count})",
+  "restoringItem": "Nire-restore ang {index} sa {count}: {name}",
+  "restoreItemFailed": "Hindi ma-restore ang “{name}”: {error}",
+  "restoreMoreFailed": "Iba pang hindi na-restore: {count}",
   "restoreFolder": "I-restore ang Folder na Ito",
   "restorePick": "Piliin kung ano ang ire-restore",
   "restoreAllTitle": "I-restore ang buong home folder mo?",

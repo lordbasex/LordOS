@@ -14,6 +14,10 @@
   "never": "هنوز پشتیبانی وجود ندارد",
   "next": "بعدی: {when}",
   "lastError": "آخرین پشتیبان‌گیری ناموفق بود: {error}",
+  "machinesBusy": {
+    "one": "{count} ماشین مجازی در حال اجرا بود: دیسک‌های آن در این پشتیبان از پشتیبان قبلی است",
+    "other": "{count} ماشین مجازی در حال اجرا بودند: دیسک‌های آن‌ها در این پشتیبان از پشتیبان قبلی است"
+  },
   "todayAt": "امروز ساعت {time}",
   "now": "پشتیبان‌گیری اکنون",
   "pause": "توقف",
@@ -77,6 +81,10 @@
   "delete": "حذف پشتیبان",
   "restoreAll": "بازیابی همه",
   "restoreItem": "بازیابی «{name}»",
+  "restoreSelected": "بازیابی موارد انتخاب‌شده ({count})",
+  "restoringItem": "در حال بازیابی {index} از {count}: {name}",
+  "restoreItemFailed": "بازیابی «{name}» ممکن نشد: {error}",
+  "restoreMoreFailed": "موارد دیگرِ بازیابی‌نشده: {count}",
   "restoreFolder": "بازیابی این پوشه",
   "restorePick": "انتخاب آنچه بازیابی شود",
   "restoreAllTitle": "کل پوشهٔ خانه بازیابی شود؟",

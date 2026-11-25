@@ -586,9 +586,12 @@
   "ws.lock.on": "قفل کردن پنجره‌های این نمایشگر",
   "ws.lock.off": "باز کردن قفل پنجره‌های این نمایشگر",
   "ws.lock.window": "قفل است: با قفل قاب باز کنید",
-  "ws.minimized.label": "کوچک‌شده",
-  "ws.minimized.title": "پنجره‌های کوچک‌شده در این نمایشگر: برای برگرداندن روی یکی کلیک کنید",
   "ws.slot.free": "فضای خالی: برنامه‌ای باز کنید یا یک پنجرهٔ کوچک‌شده را برگردانید",
+  "ws.windows.title": "پنجره‌های این فعالیت در این نمایشگر (خطی زیر پنجره‌های کوچک‌شده): برای آوردن یکی به جلو کلیک کنید؛ برای پنجره‌های آن برنامه کلیک راست کنید",
+  "ws.profile.ask": "بگذارید مرورگر انتخاب کند",
+  "ws.profile.open": "باز کردن نمایه {profile}",
+  "ws.profile.activity": "نمایه‌ای که این فعالیت باز می‌کند",
+  "ws.profile.display": "نمایه‌ای که این نمایشگر باز می‌کند ({display})",
   "ws.snapfly.title": "چیدن پنجره",
   "ws.snapfly.halves": "نیمه‌ها",
   "ws.snapfly.thirds": "یک‌سوم‌ها",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "دوربین از طریق LordOS Studio",
   "capture.what.effectsOn": "جلوه‌ها روشن",
   "capture.what.effectsOff": "بدون جلوه",
-  "shortcuts.captureWindow": "عکس از یک پنجره"
+  "shortcuts.captureWindow": "عکس از یک پنجره",
+  "themeSwitch.changing": "در حال تغییر سبک میز کار…",
+  "themeSwitch.changingTo": "در حال تغییر به {name}…",
+  "themeSwitch.failedTitle": "{name} اعمال نشد",
+  "themeSwitch.refusedBody": "کد آن با نسخهٔ امضاشدهٔ LordOS مطابقت ندارد، پس بارگذاری نشد. سبک میز کار شما همان‌طور که بود می‌ماند.",
+  "themeSwitch.failedBody": "اجرا نشد. سبک میز کار شما همان‌طور که بود می‌ماند.",
+  "spotlight.section.machines": "ماشین‌های مجازی",
+  "guestApps.inMachine": "در {machine}"
 }

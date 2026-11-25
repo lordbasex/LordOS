@@ -579,9 +579,12 @@
   "ws.lock.on": "このディスプレイのウィンドウをロック",
   "ws.lock.off": "このディスプレイのウィンドウのロックを解除",
   "ws.lock.window": "ロック中：フレームの錠前で解除します",
-  "ws.minimized.label": "最小化",
-  "ws.minimized.title": "このディスプレイで最小化したウィンドウ：クリックすると元に戻ります",
   "ws.slot.free": "空きスペース：アプリを開くか、最小化したウィンドウを戻します",
+  "ws.windows.title": "このディスプレイにあるこのアクティビティのウインドウ（最小化したものは下に線）：クリックで前面に、右クリックでそのアプリのウインドウ一覧",
+  "ws.profile.ask": "ブラウザに任せる",
+  "ws.profile.open": "プロファイル {profile} を開く",
+  "ws.profile.activity": "このアクティビティで開くプロファイル",
+  "ws.profile.display": "このディスプレイで開くプロファイル（{display}）",
   "ws.snapfly.title": "ウィンドウを配置",
   "ws.snapfly.halves": "2分割",
   "ws.snapfly.thirds": "3分割",
@@ -965,5 +968,12 @@
   "capture.what.viaStudioPlain": "LordOS Studio 経由のカメラ",
   "capture.what.effectsOn": "エフェクトオン",
   "capture.what.effectsOff": "エフェクトなし",
-  "shortcuts.captureWindow": "ウインドウのスクリーンショット"
+  "shortcuts.captureWindow": "ウインドウのスクリーンショット",
+  "themeSwitch.changing": "デスクトップのスタイルを変更しています…",
+  "themeSwitch.changingTo": "{name} に変更しています…",
+  "themeSwitch.failedTitle": "{name} を適用できませんでした",
+  "themeSwitch.refusedBody": "コードが LordOS の署名済みのコピーと一致しないため、読み込まれませんでした。デスクトップのスタイルは元のままです。",
+  "themeSwitch.failedBody": "起動しませんでした。デスクトップのスタイルは元のままです。",
+  "spotlight.section.machines": "仮想マシン",
+  "guestApps.inMachine": "{machine} 内"
 }

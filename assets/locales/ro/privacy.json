@@ -65,5 +65,6 @@
   "ask.vr": "„{app}” vrea să folosească ochelarii VR {headset}",
   "ask.vrNote": "Ecranul lor revine doar aplicației; LordOS nu îți arată niciodată desktopul acolo. Este luat înapoi când aplicația se închide, ochelarii sunt deconectați sau ecranul se blochează. Poți schimba asta mai târziu în Setări → Confidențialitate.",
   "perm.vr": "Ochelari VR",
-  "permHint.vr": "Aplicații care pot controla direct ecranul ochelarilor VR. Sunt împrumutați doar ochelari, niciodată monitoarele tale, și sunt luați înapoi când ecranul se blochează, schimbi utilizatorul sau alegi Refuză."
+  "permHint.vr": "Aplicații care pot controla direct ecranul ochelarilor VR. Sunt împrumutați doar ochelari, niciodată monitoarele tale, și sunt luați înapoi când ecranul se blochează, schimbi utilizatorul sau alegi Refuză.",
+  "protectedCapture": "Fereastră protejată"
 }

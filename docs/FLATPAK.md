@@ -467,7 +467,7 @@ callers are Linux apps outside Flatpak; none of them identifies a Flatpak app ye
 | Interface | Status | What it does in LordOS |
 |---|---|---|
 | `org.freedesktop.portal.Settings` | served (0.8.6) | dark or light mode, accent, contrast, title bar buttons, GTK 3 theme, fonts and their antialiasing (since 0.8.9.5, "Fonts" below); `SettingChanged` live |
-| `org.freedesktop.portal.FileChooser` | served (version 2) | `OpenFile`, `SaveFile`: the shell's own file dialog, the answer only to the app that asked |
+| `org.freedesktop.portal.FileChooser` | served (version 3 in development; 2 until 0.8.9.5-beta) | `OpenFile`, `SaveFile`: the shell's own file dialog, the answer only to the app that asked |
 | `org.freedesktop.portal.OpenURI` | served (version 3; 0.8.8.8) | `OpenURI` (http and https to the default browser, only an address every URL parser reads the same way: printable ASCII, no backslash, no user info, no `%` in the host, a numeric host only as a dotted IPv4, so the question names the host the browser goes to; a `file://` address like `OpenFile`), `OpenFile` and `OpenDirectory` with the file as an fd, used only for its name: it must still name the same file, inside the home folder or the user's disks, outside `fsops_protected`, and opening never takes an executable or a `.desktop` file. Its device, inode and type are kept and checked again right before it opens (`portalcheck.c`), so a file swapped while the question was up is refused. Opened the way LordOS opens everything else (`sdk/sysopen.js`); an app that is not the one with the keyboard (the bus's pid against the focused Wayland client's, or the same app scope) makes the person confirm it first |
 | `org.freedesktop.portal.Inhibit` | served (version 1; 0.8.8.8) | `Inhibit` with the idle or suspend flag counts as the compositor's idle inhibition (`wl_idle_inhibited()`, the screen-off, lock and sleep timers); released by `Request.Close` or when the caller leaves the bus. Logout and user-switch flags are accepted and do nothing; no `CreateMonitor` |
 | `org.freedesktop.portal.GlobalShortcuts` | served (version 1; 0.8.8.8) | `CreateSession`, `BindShortcuts`, `ListShortcuts`; `Activated` and `Deactivated` (press and release, for push-to-talk) and `ShortcutsChanged`, sent only to the connection that opened the session and only while it is bound. Nothing is bound until the person answers LordOS's own sheet; never a ❖ combination or a key LordOS keeps; a bound key goes only to that app. Decisions kept per app scope in `~/.config/lordos/global-shortcuts.json` (`fsops_protected`), changed or forgotten in Settings → Keyboard ([SHORTCUTS.md](SHORTCUTS.md), "Linux apps' global shortcuts") |
@@ -691,6 +691,29 @@ above, so nothing about where data comes from changed:
   `lord.flatpak.catalog()` gives it as `updated` (seconds). The model ignores a date before 2000, more than a day in
   the future or not a whole number. On the catalog of 2026-11-22 every one of the 3381 x86-64 apps has one.
 
+### Settings in the section's second column (in development; the latest release is 0.8.9.5)
+
+Asked by the maintainer on 2026-11-23: the shop opens straight on its banner. The section's description, **Only apps
+verified by Flathub** (with how many it hides), Flathub's rankings, **Refresh** and **Turn off** moved to **Settings**,
+the second column's item under Installed (`FlathubSettings` in `apps/store/flathubpages.js`). Refresh is also the ↻ icon
+in the title bar, next to the search, whose field says "Search Flathub apps" and searches only Flathub's catalog; the
+section is called **Flathub apps** in the sidebar, the titles and Installed's filter. Installed no longer repeats the
+description.
+
+### Installed in the section's second column (in development; the latest release is 0.8.9.5)
+
+The maintainer asked on 2026-11-23 that each package system's section open on its shop and keep its installed apps
+apart, the way the Store's own sidebar has Installed among its pages. The section's second column now starts with
+**Installed** (with how many Flathub apps are installed), then **Categories** (All, the home above, and each
+category). Installed shows the Flathub subtitle, **Update Flathub apps** (`F.updateAll`, the same job as Store →
+Updates), the job's progress and the installed apps with **Remove** and **Open**, filtered by the toolbar's search
+(name or id); with none, it says where to find them. The home and the search no longer list the installed apps
+above the catalog (an installed app's card says **Open**). `FlathubInstalled` in `apps/store/flathubpages.js`; the
+column is `apps/store/origincol.js` (`tests/store_origin_scene.mjs`). The general Store → Installed lists the Flatpak
+apps with every other installed app and has a **Flathub** filter (`apps/store/installedmodel.js`,
+`tests/store_installed_test.mjs`). Screenshots: `STORE_SCENE=installed tests/store_rankings_headless.sh OUT_DIR`
+(`tests/store_scene/installed.js`; it seeds two Flatpak apps and two web apps, installs nothing).
+
 ### Rankings from Flathub's API (E10, approved by the maintainer on 2026-11-22; since 0.8.9.5)
 
 Bazaar's Popular, Trending, Recently added and the app of the day/week come from Flathub's web API
@@ -868,7 +891,8 @@ library.
    file. Masks per E5. x86-64 only.
 2. Catalog: `update --appstream`, the sandboxed parser, a Flathub section in Discover and search,
    app pages with declared permissions and LordOS's changes.
-3. Install, uninstall, update for user installations; Flathub in Store → Installed and Updates.
+3. Install, uninstall, update for user installations; Flathub in Store → Installed (with a Flathub filter), in the
+   Flathub section's own Installed (since 2026-11-23) and in Updates.
 4. The launch path (E1) with the scope and view (E2), the never-granted table, LordOS's restrictions
    mapped as above; Dock, search, launcher grid and "Open with".
 5. Firewall, Monitor, Settings → Privacy for `flatpak:<id>` and `lordos:flathub`.

@@ -100,7 +100,8 @@ export function Button({ label, onClick, primary, style, small, plain, disabled,
         justifyContent: 'center', alignItems: 'center', backgroundColor: bg, ...border,
         opacity: disabled ? 0.4 : waiting ? 0.75 : hover && !plain ? 0.85 : 1 }, style]}>
       {waiting ? <Spinner size={small ? 10 : 12} color={fg} /> : icon ? <Text style={{ fontSize: small ? 12 : 14, color: fg }}>{icon}</Text> : null}
-      {label != null && label !== '' ? <Text style={{ fontSize: small ? 12 : 13, fontWeight: 500, color: fg, whiteSpace: 'nowrap' }}>{label}</Text> : null}
+      {/* a button held narrower than its label (maxWidth) ends it with "…" instead of cutting both ends (GitHub #231) */}
+      {label != null && label !== '' ? <Text style={{ fontSize: small ? 12 : 13, fontWeight: 500, color: fg, whiteSpace: 'nowrap', flexShrink: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</Text> : null}
     </View>
   );
 }
@@ -328,7 +329,8 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter, r
     if (Math.round(to) !== Math.round(y)) scrolled();
     setOffset(Math.max(0, v));
   };
-  if (scrollRef) scrollRef.current = { scrollTo: jump, offset: () => y, inner };
+  // outer: the viewport (Files' rubber band scrolls by itself near its edges, apps/files/marqueeview.jsx)
+  if (scrollRef) scrollRef.current = { scrollTo: jump, offset: () => y, inner, outer };
   // onScroll(y, view): the offset after it changed (what is in sight, for lazy contents)
   const scrolledTo = useRef(onScroll);
   scrolledTo.current = onScroll;
@@ -532,7 +534,7 @@ function FieldMenu({ anchor, at, items, onClose }) {
 }
 
 // onKeyDown(e) optional: return true if the key was already handled (e.g. Shift+Enter).
-// secure: password field (shows •, does not go through the input method and cannot be copied; protected: black in every
+// secure: password field (shows •, does not go through the input method and cannot be copied; protected: the protected fill in every
 // capture, recording, remote desktop and share). An eye at its end shows the
 // text until the field loses focus (passwordfieldmodel.js); it stays a password field meanwhile: no history, no input
 // method, nothing copied. eye: false leaves the eye out (an app with its own Show). While it has focus with Caps Lock
@@ -812,7 +814,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     </View>
   ) : null;
   return (
-    // a password field is protected (wm.setProtected's node flag): lord-server paints it black in every capture of the
+    // a password field is protected (wm.setProtected's node flag): lord-server paints it as the protected fill in every capture of the
     // screen or an area, recordings, the remote desktop and shared screens, and refuses its window captured alone
     // (paint_capture_until); the maintainer's rule: a password is never captured (GitHub #219 follow-up)
     <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble} onClick={onClick} onContextMenu={onMenu}
@@ -1326,7 +1328,7 @@ export const AppHost = memo(function AppHost({ id, focused: asked }) {
   const C = app ? app.Component : null;
   const body = useMemo(() => (app ? <AppBoundary id={id} app={app.id} name={app.name || app.id}><C /></AppBoundary> : null), [id, app, C]);
   if (!app) return null;
-  // the content goes in its own node: `protected` paints it black in screenshots (wm.setProtected)
+  // the content goes in its own node: `protected` paints it as the protected fill in every capture (wm.setProtected)
   return (
     <AppWindowContext.Provider value={value}>
       <AppFocusContext.Provider value={!!focused}>

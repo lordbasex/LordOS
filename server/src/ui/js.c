@@ -21,6 +21,7 @@
 #include "js_mail.h"
 #include "js_sql.h"
 #include "js_weather.h"
+#include "js_sentinela.h"
 #include "js_studio.h"
 #include "js_webapps.h"
 #include "js_sftp.h"
@@ -840,29 +841,87 @@ static void session_context(void) {
     js_help_register(ctx, lord);       /* lord.help (Help) and lord.time.zoneOffset (Clock, tzif.c) */
     js_hw_register(ctx, lord);         /* lord.display/power/bt/mime/timedate (Settings, src/hw) */
     js_voice_register(ctx, lord);      /* lord.voice: reading text aloud through lord-say (tts/speak.c, docs/VOICE.md) */
+    js_sentinela_register(ctx, lord);  /* lord.sentinela: Sentinela's local model engine (llm/engine.c, docs/SENTINELA.md) */
     prof_wrap_obj(ctx, lord, "", 0);   /* every lord.<ns>.* call timed (the stall detector) */
     JS_SetPropertyStr(ctx, g, "lord", lord);
     JS_FreeValue(ctx, g);
 }
 
-int js_init(const char *bundle_path) {
+/* The running theme's bytes, as the verified-code check passed them when it was loaded: a theme switch whose new
+ * theme throws at its start comes back to exactly this code (js_init_previous), never to the file on disk, which a
+ * package update may have replaced meanwhile (and the manifest that would verify it may not be in use). And the
+ * bytes of the theme lord.themes.use asked for, verified when it was asked (js_theme_prepare): a refused theme is
+ * known before the running one is discarded, and what runs is what was checked. */
+static struct { char *src; size_t len; char path[1024]; } theme_run, theme_next;
+
+static void set_theme_dir(const char *bundle_path) {
     char dir[1024];
     snprintf(dir, sizeof dir, "%s", bundle_path);
     snprintf(ui.theme_dir, sizeof ui.theme_dir, "%s", dirname(dir));
+}
 
-    size_t len = 0;
-    int refused = 0;
+/* A new session context running src (not freed here): 0 if it started. */
+static int run_theme(const char *bundle_path, const char *src, size_t len) {
+    set_theme_dir(bundle_path);
     last_error[0] = 0;
-    char *src = load_code(bundle_path, &len, &refused);
-    if (!src) return refused ? JS_REFUSED : -1;
-
     session_context();
     double t0 = now_ms();
     int r = eval(prelude, sizeof prelude - 1, "<prelude>");
     if (!r) r = eval(src, len, bundle_path);
     fprintf(stderr, "js: theme %s loaded in %.1f ms (%zu KB)\n", bundle_path, now_ms() - t0, len / 1024);
-    free(src);
     return r;
+}
+
+/* src (owned) started: it is the running theme's code from now on */
+static void keep_running(const char *bundle_path, char *src, size_t len) {
+    if (theme_run.src != src) free(theme_run.src);
+    theme_run.src = src;
+    theme_run.len = len;
+    snprintf(theme_run.path, sizeof theme_run.path, "%s", bundle_path);
+}
+
+int js_init(const char *bundle_path) {
+    set_theme_dir(bundle_path);
+    size_t len = 0;
+    int refused = 0;
+    last_error[0] = 0;
+    char *src = load_code(bundle_path, &len, &refused);
+    if (!src) return refused ? JS_REFUSED : -1;
+    int r = run_theme(bundle_path, src, len);
+    if (r) free(src);
+    else keep_running(bundle_path, src, len);
+    return r;
+}
+
+int js_theme_prepare(const char *bundle_path) {
+    free(theme_next.src);
+    theme_next.src = NULL;
+    theme_next.path[0] = 0;
+    size_t len = 0;
+    int refused = 0;
+    char *src = load_code(bundle_path, &len, &refused);
+    if (!src) return refused ? JS_REFUSED : -1;
+    theme_next.src = src;
+    theme_next.len = len;
+    snprintf(theme_next.path, sizeof theme_next.path, "%s", bundle_path);
+    return 0;
+}
+
+int js_init_prepared(const char *bundle_path) {
+    if (!theme_next.src || strcmp(theme_next.path, bundle_path)) return js_init(bundle_path);
+    char *src = theme_next.src;
+    size_t len = theme_next.len;
+    theme_next.src = NULL;
+    theme_next.path[0] = 0;
+    int r = run_theme(bundle_path, src, len);
+    if (r) free(src);
+    else keep_running(bundle_path, src, len);
+    return r;
+}
+
+int js_init_previous(const char *bundle_path) {
+    if (!theme_run.src || strcmp(theme_run.path, bundle_path)) return js_init(bundle_path);
+    return run_theme(bundle_path, theme_run.src, theme_run.len);
 }
 
 /* ---- the recovery screen ----
@@ -1357,6 +1416,7 @@ void js_hw_event(const char *kind, const char *json) {
 
 /* Privileged helper responses: kind = LOG | OK | ERR. */
 void js_admin_event(int id, const char *kind, const char *text) {
+    if (js_vm_admin_reply(id, kind, text)) return;      /* Machines' vm-usb-allow: its descriptor is lord-vm's, not JS's */
     if (!ctx) return;
     if (!ctx) return;
     JSValueConst args[3] = { JS_NewInt32(ctx, id), JS_NewString(ctx, kind), JS_NewString(ctx, text) };

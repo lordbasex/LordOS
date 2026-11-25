@@ -3,7 +3,8 @@
 // engines, virtual machines, history and the Overview's pick. Run by tests/run_suites.sh (needs node).
 import {
   gpuName, gpuKind, fanState, engineCategory, dedupeClients, clientMem, engineShares, gpuApis, apiTags, mesaVersion, nvidiaVersion,
-  aiEngines, createGpuState, gpuStep, pushHistory, mainCard, topApp, GIB,
+  aiEngines, createGpuState, gpuStep, pushHistory, mainCard, topApp, GIB, nvSlot, mergeNv, nvEngines, categoryShares, appType, memSplit, pcieGen,
+  aiRows, rowsThatFit,
 } from '../../apps/monitor/gpumodel.js';
 
 let n = 0, bad = 0;
@@ -141,11 +142,70 @@ eq('self', gpuStep(createGpuState(), { ...raw1, list: [{ ...proc(10, 0), self: t
 let h = {};
 for (let i = 0; i < 5; i++) h = pushHistory(h, { t: i, cards: [{ key: 'k', busy: 0.123, temp: 50, fan: { pct: 20, rpm: 700 }, vram: { used: 1 }, powerW: 20, sclk: 300 }] }, 3);
 eq('history capped', h.k.map((p) => p.t), [2, 3, 4]);
-eq('a point', h.k[0], { t: 2, busy: 12.3, temp: 50, fan: 20, rpm: 700, vram: 1, power: 20, sclk: 300 });
+eq('a point', h.k[0], { t: 2, busy: 12.3, temp: 50, fan: 20, rpm: 700, vram: 1, power: 20, sclk: 300, eng: { '3d': 0, compute: 0, video: 0, encode: 0, copy: 0 } });
 const two = { cards: [{ key: 'a', kind: 'integrated', render: true, apps: [] }, { key: 'b', kind: 'discrete', render: true, apps: ['x'] }, { key: 'c', kind: 'display', apps: [] }], apps: [{ key: 'x', total: 0.3, mem: 1 }] };
 eq('main card', [mainCard(two).main.key, mainCard(two).more], ['b', 1]);
 eq('top app', topApp(two, two.cards[1]).key, 'x');
 eq('no cards', mainCard({ cards: [] }), { main: null, more: 0 });
+
+// ---- the new view: engines by category, types, memory split, link, idle, NVIDIA, AI ----
+eq('categories', categoryShares({ gfx: 0.2, compute: 0.5, comp_1: 0.6, dec: 0.1, enc: 0.15, sdma: 0.03, weird: 1 }), { '3d': 0.2, compute: 1, video: 0.1, encode: 0.15, copy: 0.03 });
+eq('types', [appType({ cats: { compute: 0.7, '3d': 0.1 } }), appType({ cats: { video: 0.1, encode: 0.05, '3d': 0.02 } }), appType({ cats: { '3d': 0.09 } }),
+  appType({ cats: {}, apis: [{ id: 'cuda' }] }), appType({ cats: {}, apis: [{ id: 'cuda' }, { id: 'opengl' }] }), appType({ cats: {}, apis: [{ id: 'video' }] })],
+  ['compute', 'video', 'graphics', 'compute', 'graphics', 'video']);
+eq('split', memSplit([{ type: 'compute', mem: 5 }, { type: 'graphics', mem: 2, sysMem: 9 }, { type: 'video', mem: 1 }, { mem: 3 }], 's', false), { compute: 5, graphics: 5, video: 1 });
+eq('split shared', memSplit([{ type: 'graphics', mem: 0, sysMem: 9 }], 's', true), { compute: 0, graphics: 9, video: 0 });
+eq('pcie gens', [pcieGen(2.5), pcieGen(8), pcieGen(16), pcieGen(7), pcieGen(null)], [1, 3, 4, null, null]);
+eq('nv slots', [nvSlot('00000000:01:00.0'), nvSlot('0000:0A:00.0'), nvSlot('../../x'), nvSlot('00000000:01:00.9'), nvSlot(null)], ['0000:01:00.0', '0000:0a:00.0', null, null, null]);
+// lord-nvgpu's canned and hostile numbers
+const nvCard = { ...rx580, driver: 'nvidia', vendor: '10de', slot: '0000:01:00.0', busy: null, vramTotal: null, vramUsed: null, temps: [], fanRpm: null, fanMax: null, fanPct: null, powerW: null, powerCapW: null, sclk: null, mclk: null, sclkMax: null, mclkMax: null };
+const nvGood = { bus: '00000000:01:00.0', util: { sm: 71, mem: 38, enc: 14, dec: 12 }, temp: 66, fan: 45, power: 180, powerLimit: 220, clk: { core: 1800, mem: 7000 },
+  vram: { used: 5 * GIB, total: 12 * GIB }, cuda: '12.4', driver: '550.54.14', computeMode: 'default', ecc: 0,
+  procs: [{ pid: 10, mem: 4 * GIB, sm: 70, enc: 0, dec: 0 }, { pid: 77, mem: GIB, sm: 1, enc: 14, dec: 12 }] };
+const mg = mergeNv(nvCard, nvGood);
+eq('merged', [mg.busy, mg.temps[0].c, mg.fanPct, mg.powerW, mg.powerCapW, mg.sclk, mg.mclk, mg.vramUsed, mg.vramTotal, mg.memBusy], [71, 66, 45, 180, 220, 1800, 7000, 5 * GIB, 12 * GIB, 38]);
+const hostile = { bus: '00000000:01:00.0', util: { sm: 500, mem: -3, enc: 'x', dec: 1e9 }, temp: 9999, fan: -1, power: 1e12, powerLimit: 0, clk: { core: NaN, mem: Infinity },
+  vram: { used: 13 * GIB, total: 12 * GIB }, procs: [{ pid: -1, mem: 1, sm: 1 }, { pid: 1.5, sm: 2 }, { pid: '10' }, null, { pid: 10, mem: -5, sm: 900, enc: 50 }] };
+const mh = mergeNv(nvCard, hostile);
+eq('hostile merged', [mh.busy, mh.temps.length, mh.fanPct, mh.powerW, mh.powerCapW, mh.sclk, mh.mclk, mh.vramUsed, mh.vramTotal, mh.memBusy], [null, 0, null, null, null, null, null, null, 12 * GIB, null]);
+eq('nv engines', [nvEngines(nvGood), nvEngines(hostile)], [{ gfx: 0.71, nvenc: 0.14, nvdec: 0.12 }, {}]);
+const stn = createGpuState();
+const vn = gpuStep(stn, { ...raw1, cards: [nvCard], list: [{ ...proc(10, 0), libs: ['libcuda.so.1'], clients: [] }], nv: [nvGood] });
+const nvApp = vn.apps.find((a) => a.pids.includes(10));
+eq('nv process', [nvApp.type, Math.round(nvApp.total * 100), nvApp.mem, nvApp.apis.map((a) => a.id), vn.cards[0].busy, vn.cards[0].apps.length], ['compute', 70, 4 * GIB, ['cuda'], 0.71, 2]);
+eq('nv video process', vn.apps.find((a) => a.pids.includes(77)).type, 'video');
+eq('nv card cats', vn.cards[0].cats, { '3d': 0.71, compute: 0, video: 0.12, encode: 0.14, copy: 0 });
+const vh = gpuStep(createGpuState(), { ...raw1, cards: [nvCard], list: [], nv: [hostile, { bus: 'garbage', procs: [{ pid: 5, sm: 50 }] }, null, 7] });
+eq('hostile nv', [vh.apps.map((a) => a.pids), Math.round(vh.apps[0].total * 100), vh.apps[0].mem, vh.cards[0].busy], [[[10]], 50, null, null]);
+eq('no nv', gpuStep(createGpuState(), { ...raw1, nv: 'x' }).cards.length, 1);
+// link, idle (RC6), hidden rows, memory busy
+const sti = createGpuState();
+const ic = { ...intel, driver: 'amdgpu', slot: '0000:00:02.0', link: { gts: 8, width: 16 }, linkMax: { gts: 16, width: 16 }, rc6Ms: 1000, memBusy: 38, temps: [{ label: 'edge', c: 70, crit: 94 }] };
+gpuStep(sti, { ...raw1, mono: 1000, cards: [ic], list: [] });
+const vi2 = gpuStep(sti, { ...raw1, mono: 2000, cards: [{ ...ic, rc6Ms: 1910 }], list: [], hidden: [{ pid: 1044, name: 'ollama', kind: 'kfd' }, { pid: 'x' }] });
+eq('link idle hidden', [vi2.cards[0].link, vi2.cards[0].linkMax, vi2.cards[0].idle, vi2.cards[0].memBusy, vi2.cards[0].tempCrit, vi2.cards[0].hidden],
+  [{ gen: 3, width: 16 }, { gen: 4, width: 16 }, 0.91, 0.38, 94, [{ pid: 1044, name: 'ollama', kind: 'kfd' }]]);
+// AI rows: a runner with its model (from argv), Sentinela by its pid, the voice with lord-say's note, an app mapping libcuda
+const sta = createGpuState();
+const rawAi2 = (mono, t) => ({ ...raw1, mono, hz: 100, cards: [nvCard], nv: [nvGood],
+  list: [{ ...proc(10, 0), name: 'llama-server', model: 'Qwen3-8B-Q4_K_M.gguf', libs: ['libggml-vulkan.so'], clients: [] }, { ...proc(77, 0), name: 'python3', model: '', libs: ['libcuda.so.1'], clients: [] }],
+  ai: [{ pid: 10, ppid: 1, name: 'llama-server', state: 'R', own: true, ticks: 100 + t, rss: GIB, model: 'Qwen3-8B-Q4_K_M.gguf' },
+    { pid: 20, ppid: 1, name: 'llama-server', state: 'S', own: true, ticks: 50 + 2 * t, rss: 3 * GIB, model: '3' },
+    { pid: 30, ppid: 31, name: 'lord-tts', state: 'S', own: true, ticks: 5, rss: 1, model: '' }, { pid: 31, ppid: 1, name: 'lord-say', state: 'S', own: true, ticks: 1, rss: 1, model: '' },
+    { pid: 40, ppid: 1, name: 'lord-studio', state: 'S', own: true, ticks: 9 + t / 5, rss: 1, model: '' }, { pid: 50, ppid: 1, name: 'bash', state: 'S', own: true, ticks: 1, rss: 1 },
+    { pid: 60, ppid: 1, name: 'ollama', state: 'Z', own: false, ticks: 1, rss: 1 }],
+  say: [{ pid: 31, state: 'S', backend: 'vulkan', quality: 'hd', lang: 'es', mode: 'speak' }] });
+let va = gpuStep(sta, rawAi2(1000, 0));
+aiRows(sta, va, rawAi2(1000, 0), { pid: 20, model: 'qwen3-4b' });
+const r2 = rawAi2(2000, 100);
+va = gpuStep(sta, r2);
+const rows = aiRows(sta, va, r2, { pid: 20, model: 'qwen3-4b' });
+eq('ai kinds', rows.map((r) => `${r.kind}:${r.pid}:${r.where}`), ['runner:10:gpu', 'app:77:gpu', 'voice:30:gpu', 'sentinela:20:cpu', 'studio:40:cpu']);
+eq('ai runner', [rows[0].model, Math.round(rows[0].compute * 100), rows[0].vram, rows[0].cpu], ['Qwen3-8B-Q4_K_M.gguf', 70, 4 * GIB, 1]);
+eq('ai sentinela', [rows[3].model, rows[3].cpu, rows[3].rss], ['qwen3-4b', 2, 3 * GIB]);
+eq('ai voice', [rows[2].lang, rows[2].quality, rows[2].apis], ['es', 'hd', ['vulkan']]);
+eq('no view', aiRows(createGpuState(), null, null), []);
+eq('rows that fit', [rowsThatFit(300, 23, 30), rowsThatFit(10, 23, 30), rowsThatFit(5000, 23, 0, 1, 12), rowsThatFit(NaN, 23)], [11, 1, 12, 1]);
 
 console.log(`gpu-model-test: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

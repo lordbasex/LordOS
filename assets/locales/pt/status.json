@@ -168,6 +168,7 @@
   "pkg.why.multiarchPair": "A mesma versão que {name}",
   "gpu.roleSet": "Uso da placa de vídeo salvo ({card}): reinicie para aplicar",
   "vm.gvtReady": "Parte da placa de vídeo pronta ({name})",
+  "vm.usbReady": "Dispositivo USB pronto",
   "vm.gvtGone": "Parte da placa de vídeo removida",
   "gpu.freqSet": "Frequência mínima da placa de vídeo definida",
   "gpu.memlockSet": "Memória que as máquinas podem bloquear salva",

@@ -579,9 +579,12 @@
   "ws.lock.on": "鎖定此顯示器的視窗",
   "ws.lock.off": "解鎖此顯示器的視窗",
   "ws.lock.window": "已鎖定：用框架上的鎖解鎖",
-  "ws.minimized.label": "已最小化",
-  "ws.minimized.title": "此顯示器上已最小化的視窗：點一下即可還原",
   "ws.slot.free": "空位：開啟一個應用程式，或還原已最小化的視窗",
+  "ws.windows.title": "此顯示器上此活動的視窗（已縮到最小的下方有橫線）：按一下可將其移到最前；按右鍵可查看該應用程式的視窗",
+  "ws.profile.ask": "由瀏覽器選擇",
+  "ws.profile.open": "開啟設定檔 {profile}",
+  "ws.profile.activity": "此活動開啟的設定檔",
+  "ws.profile.display": "此顯示器開啟的設定檔（{display}）",
   "ws.snapfly.title": "排列視窗",
   "ws.snapfly.halves": "二等分",
   "ws.snapfly.thirds": "三等分",
@@ -965,5 +968,12 @@
   "capture.what.viaStudioPlain": "透過 LordOS Studio 的相機",
   "capture.what.effectsOn": "效果已開啟",
   "capture.what.effectsOff": "無效果",
-  "shortcuts.captureWindow": "擷取一個視窗"
+  "shortcuts.captureWindow": "擷取一個視窗",
+  "themeSwitch.changing": "正在變更桌面風格…",
+  "themeSwitch.changingTo": "正在切換到 {name}…",
+  "themeSwitch.failedTitle": "無法套用 {name}",
+  "themeSwitch.refusedBody": "它的程式碼與 LordOS 的簽署副本不一致，因此未載入。你的桌面風格維持不變。",
+  "themeSwitch.failedBody": "它沒有啟動。你的桌面風格維持不變。",
+  "spotlight.section.machines": "虛擬機器",
+  "guestApps.inMachine": "在 {machine} 中"
 }

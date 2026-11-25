@@ -14,6 +14,9 @@
   "never": "尚無備份",
   "next": "下次：{when}",
   "lastError": "上次備份失敗：{error}",
+  "machinesBusy": {
+    "other": "{count} 台虛擬機器正在執行：此備份中它們的磁碟來自上一份備份"
+  },
   "todayAt": "今天 {time}",
   "now": "立即備份",
   "pause": "暫停",
@@ -74,6 +77,10 @@
   "delete": "刪除備份",
   "restoreAll": "全部還原",
   "restoreItem": "還原「{name}」",
+  "restoreSelected": "回復所選項目 ({count})",
+  "restoringItem": "正在回復 {index}/{count}：{name}",
+  "restoreItemFailed": "無法回復「{name}」：{error}",
+  "restoreMoreFailed": "其他未回復的項目：{count}",
   "restoreFolder": "還原此資料夾",
   "restorePick": "選擇要還原的項目",
   "restoreAllTitle": "要還原整個個人資料夾嗎？",

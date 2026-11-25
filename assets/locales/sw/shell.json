@@ -586,9 +586,12 @@
   "ws.lock.on": "Funga madirisha ya skrini hii",
   "ws.lock.off": "Fungua madirisha ya skrini hii",
   "ws.lock.window": "Imefungwa: fungua kwa kufuli kwenye fremu",
-  "ws.minimized.label": "Zilizopunguzwa",
-  "ws.minimized.title": "Madirisha yaliyopunguzwa kwenye skrini hii: bofya moja kuirudisha",
   "ws.slot.free": "Nafasi wazi: fungua programu au rudisha iliyopunguzwa",
+  "ws.windows.title": "Madirisha ya shughuli hii kwenye skrini hii (mstari chini ya yaliyopunguzwa): bofya moja kulileta mbele; bofya kulia kwa madirisha ya programu hiyo",
+  "ws.profile.ask": "Acha kivinjari kichague",
+  "ws.profile.open": "Fungua wasifu {profile}",
+  "ws.profile.activity": "Wasifu ambao shughuli hii inafungua",
+  "ws.profile.display": "Wasifu ambao skrini hii inafungua ({display})",
   "ws.snapfly.title": "Panga dirisha",
   "ws.snapfly.halves": "Nusu",
   "ws.snapfly.thirds": "Theluthi",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "Kamera kupitia LordOS Studio",
   "capture.what.effectsOn": "madoido yamewashwa",
   "capture.what.effectsOff": "bila madoido",
-  "shortcuts.captureWindow": "Picha ya dirisha"
+  "shortcuts.captureWindow": "Picha ya dirisha",
+  "themeSwitch.changing": "Inabadilisha mtindo wa eneo-kazi…",
+  "themeSwitch.changingTo": "Inabadilisha kuwa {name}…",
+  "themeSwitch.failedTitle": "{name} haikuweza kutumika",
+  "themeSwitch.refusedBody": "Msimbo wake haulingani na nakala iliyotiwa sahihi ya LordOS, kwa hivyo haukupakiwa. Mtindo wa eneo-kazi lako unabaki kama ulivyokuwa.",
+  "themeSwitch.failedBody": "Haikuanza. Mtindo wa eneo-kazi lako unabaki kama ulivyokuwa.",
+  "spotlight.section.machines": "Mashine",
+  "guestApps.inMachine": "Ndani ya {machine}"
 }

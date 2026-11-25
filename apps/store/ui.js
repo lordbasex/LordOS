@@ -9,7 +9,7 @@ const CARD_HEIGHT = 148;     // two lines of summary and the foot, so the action
 
 // Sidebar glyphs: monochrome symbols drawn in the accent color (docs/DESIGN.md, "Icons").
 export const GLYPH = {
-  discover: '✦', suggested: '◫', installed: '▣', updates: '↻', lordos: '◆', ai: '✧', commercial: '★', remote: '⇄', suites: '❖', webapps: '◎', flathub: '⬡', debian: '◉', wine: '◇', android: '▢',
+  discover: '✦', suggested: '◫', installed: '▣', updates: '↻', lordos: '◆', ai: '✧', commercial: '★', remote: '⇄', suites: '❖', webapps: '◎', flathub: '⬡', debian: '◉', wine: '◇', android: '▢', settings: '⚙',
   AudioVideo: '♪', Development: '⌘', Education: 'ⓘ', Game: '♟', Graphics: '◐', Network: '⇄', Office: '▤',
   Science: '⚛', System: '⚙', Utility: '⚒',
 };

@@ -5,9 +5,9 @@
 import { BatterySettings } from './Battery.jsx';
 import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
-  reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Slider, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
+  reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Slider, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useVisitHistory, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop, displayWallpaperKey, displayLabel, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
-  restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionCountry,
+  restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionLabel, compareNames,
   useSidebar, SidebarToggle, SidebarOverlay, battery, deviceList,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -490,18 +490,18 @@ function LanguageRegion() {
   };
 
   const now = new Date();
-  // the country by the code, as in the installer ("Australia · en_AU"), so a search by country finds it (#53)
-  const regionItems = [...new Map(locales.map((l) => [shortLocale(l.name), l])).values()].map((l) => {
-    const r = shortLocale(l.name), cc = regionCountry(r), name = cc ? tOptional(`countries.${cc}`) : '';
-    return [r, name ? `${name} · ${r}` : r, l.generated ? '✓' : ''];
-  });
+  // the language and the country by the code ("Basque · France (eu_FR)", #239), so a search by either finds it (#53),
+  // sorted by that label: a language's regions stay together
+  const regionItems = [...new Map(locales.map((l) => [shortLocale(l.name), l])).values()]
+    .map((l) => { const r = shortLocale(l.name); return [r, regionLabel(r, tOptional), l.generated ? '✓' : '']; })
+    .sort((a, b) => compareNames(a[1], b[1]));
   const dim = { fontSize: typeScale.body, color: t.textDim, textAlign: 'end' };
   const langName = langs.find((l) => l.id === lang)?.name || lang;
   return (
     <Stack>
       <PreferredLanguages langs={langs} onPrimary={primaryChanged} />
       <Section title={tr('settings.region.title')} footer={tr('settings.region.hint')}>
-        <SettingRow label={regionName || '—'}>
+        <SettingRow label={regionName ? regionLabel(regionName, tOptional) : '—'}>
           <Button small label={tr('settings.change')} onClick={() => setShowRegions(!showRegions)} />
         </SettingRow>
         {showRegions && <SearchList items={regionItems} value={regionName} placeholder={tr('settings.region.search')}
@@ -643,13 +643,20 @@ function AddLanguage({ langs, have, onAdd }) {
   );
 }
 
-// LordOS language pack (built by tools/i18n-pack.mjs): lordos-lang-<id>.json in Downloads.
+// LordOS language pack (built by tools/i18n-pack.mjs): lordos-lang-<id>.json in Downloads. The folders are listed off
+// the main thread, once per visit (they were listed on every render of the page, with every file in them).
+const PACK_DIRS = ['Descargas', 'Downloads', '.'];
 function PackImport({ onDone }) {
   const { t: tr } = useLocale();
-  const found = [];
-  for (const d of ['Descargas', 'Downloads', '.']) {
-    try { for (const e of fs.list(d)) if (/^lordos-lang-[\w-]+\.json$/.test(e.name)) found.push(d === '.' ? e.name : `${d}/${e.name}`); } catch (e) { /* does not exist */ }
-  }
+  const [found, setFound] = useState([]);
+  useEffect(() => {
+    let live = true;
+    const home = fs.home();
+    Promise.all(PACK_DIRS.map((d) => fs.listAsync(d === '.' ? home : `${home}/${d}`).then((list) => list
+      .filter((e) => /^lordos-lang-[\w-]+\.json$/.test(e.name)).map((e) => (d === '.' ? e.name : `${d}/${e.name}`)), () => [])))
+      .then((lists) => { if (live) setFound(lists.flat()); });
+    return () => { live = false; };
+  }, []);
   if (!found.length) return null;
   const install = (p) => {
     try {
@@ -913,6 +920,7 @@ export default function Settings() {
   const [query, setQuery] = useState('');
   const side = useSidebar(SIDE_AT);
   const setSection = (s) => { lastSection = s; setSectionState(s); if (side.narrow) side.close(); };
+  useVisitHistory(section, (s) => { lastSection = s; setSectionState(s); });   // the mouse's back and forward buttons (#234)
   // 'themes' (the old Themes page, links from older help) now opens Appearance
   useEffect(() => { const sec = args?.section === 'themes' ? 'appearance' : args?.section; if (sec && SECTIONS.some(([id]) => id === sec)) setSection(sec); }, [args?.nonce]);
   const [, Body] = SECTIONS.find(([id]) => id === section) || SECTIONS[0];
@@ -963,7 +971,8 @@ export default function Settings() {
           <View style={{ paddingHorizontal: pad, paddingTop: side.narrow ? spacing.l : spacing.xl, alignItems: 'center' }}>
             {/* Cloud's account page has two columns: it takes a wider column on wide windows */}
             <View style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : 680 }}>
-              <Body page={section === 'network' || section === 'cloud' ? args?.page : undefined} />
+              <Body page={section === 'network' || section === 'cloud' || section === 'ai' ? args?.page : undefined}
+                alert={section === 'ai' ? args?.alert : undefined} />
             </View>
           </View>
         </ScrollView>

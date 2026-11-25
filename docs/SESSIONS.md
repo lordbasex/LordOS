@@ -246,6 +246,11 @@ an admin helper. Its runtime is in `/run/lordos/greeter` and its home in
   - the keyboard, if the system has several (`/etc/default/keyboard`);
   - Restart and Shut Down. If there are open sessions, they ask for confirmation.
 - A wrong password shakes the field. After many attempts, it asks you to wait.
+- **Its scale (#242, in development after 0.8.9.5-beta):** each display opens at its recommended scale, except the one
+  an administrator chose in Settings → Displays → "Use this scale on the login screen", which opens at that scale for
+  every user (`/var/lib/lordos/greeter-scale`, `LORD_MAIN_SCALE`; only an administrator's session may change it, checked
+  by lord-sessiond as root; see `docs/DISPLAYS.md`, "The login screen's scale"). The lock screen is this same login
+  screen, so it follows too.
 - **Several displays (0.8.5):** the clock, the user and the password field go on the main display
   (the wallpaper still covers every display), instead of being laid out over the whole desktop and
   cut at the seam between two displays; they follow a display plugged in or out while the screen
@@ -447,8 +452,9 @@ validated again when it is read, the same rules (`server/tests/session_model_tes
 **The marker.** `sessionSaved.clean` is false from the moment a session starts. It turns true in `flushSession()`
 (`session.quit`, Search's Log Out, the power dialog before it asks lord-sessiond; a refusal undoes it) or in
 `__lordBeforeExit`, which `main.c` calls after the main loop. A session that never gets there leaves it false,
-and that is what "unclean" means. Switching theme is not an end: the marker says `'theme'` and `themeReopen`
-does the work.
+and that is what "unclean" means. Switching theme is not an end, and never logs out (it happens live in the same
+session, `docs/THEMES-GUIDE.md` "Switching"): the marker says `'theme'` and `themeReopen` does the work; a switch
+that `lord.themes.use` refuses puts the marker back to false (`unmarkThemeSwitch`) and the session goes on.
 
 Worker threads start before `main.c` blocks `SIGTERM`, so a signal used to end the process on one of them
 without leaving the loop (seen on VM 125: gone in under 300 ms, nothing written). A handler now forwards it to
@@ -666,10 +672,11 @@ session. Everything that changes something goes through closed `admin.c` actions
   cycle with several real monitors was exercised on one PC with a Radeon RX 580 (amdgpu) and three monitors:
   it brought 0.8.8.6's login screen on the chosen main display and 0.8.8.7's hand-off with a black frame and
   CLOSEFB, so DisplayPort monitors keep their signal across lock, logout and login. Sessions on real hardware are
-  known from 24 machines ([HARDWARE-REPORT.md](HARDWARE-REPORT.md)): Intel graphics from Ironlake to Whiskey Lake,
-  Cherry Trail and Gemini Lake, five AMD generations (TeraScale 2 to RDNA 4), laptop panels, four laptops with an
-  external monitor, two monitors at 120 Hz (RX 7800 XT) and one NVIDIA RTX 3060 on the proprietary driver, drawn with
-  the CPU. Untested: nouveau and NVK, AMD integrated graphics, Intel newer than Whiskey Lake, DisplayPort MST hubs.
+  known from 26 machines ([HARDWARE-REPORT.md](HARDWARE-REPORT.md)): Intel graphics from Ironlake to Whiskey Lake,
+  Cherry Trail, Braswell and Gemini Lake, five AMD generations (TeraScale 2 to RDNA 4), laptop panels, four laptops
+  with an external monitor, two monitors at 120 Hz (RX 7800 XT), an NVIDIA RTX 3060 on the proprietary driver, drawn
+  with the CPU, and an RTX 5070 Ti on NVIDIA's open kernel modules. Untested: nouveau and NVK, AMD integrated graphics,
+  Intel newer than Whiskey Lake, DisplayPort MST hubs.
 - **Text consoles:** Ctrl+Alt+F2 doesn't switch consoles while LordOS is running, as before.
 - **Choosing the avatar image:** today it's a hand-typed path; the file picker is missing.
 - **Testing with more real cards:** in the VMs the GPU is tested only with `LORD_GPU=1` and llvmpipe; on

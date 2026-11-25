@@ -3,9 +3,12 @@
 # screenshots: the real theme bundle with tests/studio_scene/pre.js before it (made-up cameras, the preview a still of
 # build/studio-test's output: no real camera is ever opened) and driver.js after it (an app "uses" the camera so the
 # capture item by the clock shows, then the item, "Video effects" and Background are clicked, a screenshot after each).
+# STUDIO_SCENE=mic: an app uses only the microphone, then the item and Mic Mode; STUDIO_SCENE=app: the LordOS Studio
+# app's window, then its Portrait page (tests/studio_scene/driver.js).
 # A test tool: not part of `make test`, never installed. From server/, after `npm run build`, `make` and
 # `make build/studio-test`:
-#   tests/studio_headless.sh OUT_DIR [theme] [language] [WxH]     → OUT_DIR/<theme>-<language>-1.png … -3.png
+#   [STUDIO_SCENE=effects|mic|app] tests/studio_headless.sh OUT_DIR [theme] [language] [WxH]
+#                                                   → OUT_DIR/<theme>-<language>[-<scene>]-1.png …
 cd "$(dirname "$0")/.." || exit 1
 OUT=${1:?usage: tests/studio_headless.sh OUT_DIR [theme] [language] [WxH]}
 THEME=${2:-default}
@@ -31,8 +34,11 @@ cp -r "$ROOT/themes/$THEME" "$T"
 STUDIO_TEST_OUT="$D/out" ./build/studio-test >/dev/null 2>&1
 ffmpeg -v error -y -i "$D/out/f04-blur.ppm" "$D/home/studio-still.png" || exit 1
 # the labels the driver clicks, in the scene's language
-LABELS=$(node -e "const s=require('$ROOT/assets/locales/$LANGID/studio.json');process.stdout.write(JSON.stringify([s.open,s.background]))")
-{ printf "globalThis.STUDIO_STILL = '%s';\nglobalThis.STUDIO_OPEN = %s[0];\nglobalThis.STUDIO_BG = %s[1];\n" "$D/home/studio-still.png" "$LABELS" "$LABELS"
+SCENE=${STUDIO_SCENE:-effects}
+case "$SCENE" in effects) TAG= ;; mic|app) TAG="-$SCENE" ;; *) echo "STUDIO_SCENE: effects, mic or app"; exit 2 ;; esac
+LABELS=$(node -e "const s=require('$ROOT/assets/locales/$LANGID/studio.json');process.stdout.write(JSON.stringify([s.open,s.background,s.mic,s.portrait]))")
+{ printf "globalThis.STUDIO_STILL = '%s';\nglobalThis.STUDIO_SCENE = '%s';\n" "$D/home/studio-still.png" "$SCENE"
+  printf "globalThis.STUDIO_OPEN = %s[0];\nglobalThis.STUDIO_BG = %s[1];\nglobalThis.STUDIO_MIC = %s[2];\nglobalThis.STUDIO_PORTRAIT = %s[3];\n" "$LABELS" "$LABELS" "$LABELS" "$LABELS"
   cat tests/studio_scene/pre.js "$ROOT/themes/$THEME/theme.bundle.js" tests/studio_scene/driver.js; } >"$T/theme.bundle.js"
 node tests/perf/manifest.mjs "$ROOT" "themes/zstudio/$THEME/theme.bundle.js" || exit 1
 chmod 700 "$D"
@@ -45,5 +51,5 @@ P=$!
 for i in $(seq 1 120); do grep -aq 'STUDIO-SCENE done' "$D/home/.cache/lordos/shell.log" 2>/dev/null && break; sleep 0.5; done
 sleep 2
 grep -ah 'STUDIO-SCENE' "$D/home/.cache/lordos/shell.log" 2>/dev/null | sed 's/.*STUDIO-SCENE/ /'
-for k in 1 2 3; do [ -f "$D/home/shot-$k.png" ] && cp "$D/home/shot-$k.png" "$OUT/$THEME-$LANGID-$k.png"; done
-ls "$OUT"/"$THEME-$LANGID"-*.png 2>/dev/null
+for k in 1 2 3; do [ -f "$D/home/shot-$k.png" ] && cp "$D/home/shot-$k.png" "$OUT/$THEME-$LANGID$TAG-$k.png"; done
+ls "$OUT"/"$THEME-$LANGID$TAG"-*.png 2>/dev/null

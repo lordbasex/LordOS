@@ -42,6 +42,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [WAYLAND.md](WAYLAND.md) | Linux apps (GTK, Qt, browsers) on our Wayland compositor; its point-by-point conformance scores are in [wayland-conformance.json](wayland-conformance.json) (`tools/wl-conformance.mjs`) |
 | [SYNCOBJ-PLAN.md](SYNCOBJ-PLAN.md) | Plan for explicit sync (`linux-drm-syncobj-v1`): approved, built and released in 0.8.9.5 |
 | [WEBAPPS.md](WEBAPPS.md) | Web apps and PWAs: the LordOS Web Runtime (`lord-web`, WPE WebKit), profiles, isolation (0.8.8.8) |
+| [WPEWEBKIT.md](WPEWEBKIT.md) | LordOS's backport of WPE WebKit 2.54 with WPEPlatform to Debian 13: build, verification, source offer, security rebuilds |
 | [WINDOWS.md](WINDOWS.md) | Moving and resizing windows, the Window menu, cursors |
 | [DISPLAYS.md](DISPLAYS.md) | Several displays and HiDPI |
 | [GPU.md](GPU.md) | GPU composition, dmabuf and the CPU path |
@@ -99,6 +100,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [CLOUD.md](CLOUD.md) | Cloud: the person's cloud storage accounts (rclone) in Files, Settings and Backups (0.8.8.5) |
 | [DATABASES.md](DATABASES.md) | Databases, the MySQL / MariaDB client: connections, structure, content, queries, import and export |
 | [VOICE.md](VOICE.md) | Text to speech without the internet (`lord-tts`): voice packages, reading aloud from the desktop |
+| [SENTINELA.md](SENTINELA.md) | Sentinela, the process guard: rules over the Monitor's process list, a local model (llama-server in its sandbox, no network) that explains alerts; in development |
 | [MONITOR.md](MONITOR.md) | Monitor: usage, processes, network map and connections, firewall, disk health, cooling |
 | [SYSTEM.md](SYSTEM.md) | Disks, Backups, Logs, Clock and Help |
 | [CLEANER.md](CLEANER.md) | Cleaner: storage and maintenance |

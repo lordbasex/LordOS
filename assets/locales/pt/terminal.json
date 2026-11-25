@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "guardado em Saída capturada",
   "prefs.tr.would.highlight": "destaca “{text}”",
   "prefs.tr.param": "Parâmetro",
-  "prefs.tr.regexFirst": "Escreva primeiro a expressão regular."
+  "prefs.tr.regexFirst": "Escreva primeiro a expressão regular.",
+  "guest.badge": "MÁQUINA",
+  "guest.title": "Shell dentro de {machine}"
 }

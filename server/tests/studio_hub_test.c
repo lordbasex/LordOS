@@ -42,6 +42,14 @@ static void test_show(void) {
     CHECK(!studio_hub_wanted(0, 1, 1, 0, 0), "off, nobody");
     CHECK(studio_hub_wanted(0, 1, 1, 1, 0), "off, a reader: the off card until it lets go");
     CHECK(studio_hub_wanted(0, 1, 1, -1, 1), "off, no event, an opener");
+    /* the device's card: ours, or the label 0.8.9.5's package left (its quotes split at the comma); never OBS's, either
+     * way it came up, nor a near miss. Not recognising it kept lord-studio from running at all, so no app listed it. */
+    CHECK(studio_card_is_ours("LordOS Studio"), "the label");
+    CHECK(studio_card_is_ours("LordOS Studio\""), "0.8.9.5's label until the module is loaded again");
+    CHECK(!studio_card_is_ours("OBS Virtual Camera") && !studio_card_is_ours("\"OBS Virtual Camera"), "OBS's device, either way");
+    CHECK(!studio_card_is_ours("\"LordOS Studio") && !studio_card_is_ours("LordOS Studio\"\"") && !studio_card_is_ours("LordOS Studi"),
+          "near misses");
+    CHECK(!studio_card_is_ours("LordOS Studio 2") && !studio_card_is_ours("") && !studio_card_is_ours(NULL), "others, empty, none");
 }
 
 static void test_scan(void) {

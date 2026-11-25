@@ -1,20 +1,26 @@
-// Store: LordOS apps (.lpk packages, no root) and Debian apps (our own package engine,
-// server/src/pkg; install and remove go through the administration helper).
+// Store: LordOS apps (LordOS's own store: its installable apps and components, lordospages.js, and .lpk packages, no
+// root) and Debian apps (our own package engine, server/src/pkg; install and remove go through the administration
+// helper).
 import {
-  View, Text, Image, useTheme, useLocale, useAppWindow, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
+  View, Text, Image, useTheme, useLocale, useAppWindow, useNavigateButtons, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
-  Segmented, admin, canDeactivate, deactivateApp, activateApp, webAppEntry, settings, addListener,
-  suggestions, unseenSuggestions, refreshSuggestions, useSidebar, SidebarToggle, SidebarOverlay,
+  admin, canDeactivate, deactivateApp, activateApp, webAppEntry, settings, addListener,
+  useWebApps, suggestions, unseenSuggestions, refreshSuggestions, useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AiDetail, AiDiscover, AiPage, CatalogCategory, CatalogResults, catalogApp, catalogApps, catalogCategoryCounts, searchCatalog } from './ai.js';
 import { matches } from './search.js';
 import { CATS, debian, useDebian } from './debian.js';
 import { GLYPH } from './ui.js';
+import { isMine, isSettings, installedFilters, filterInstalled, filterOk, systemOf } from './installedmodel.js';
+import { DebianSettings, LordOSSettings, refreshLists } from './sectionsettings.js';
+import { FilterChips, OriginChips, OriginColumn } from './origincol.js';
+import { NativeDetail, NativeResults, NativeShop, nativeHits, nativeItem, nativeRows, openNative, useNative } from './lordospages.js';
+import { nameKey, nativeCats } from './lordosmodel.js';
 import { EndsContext, MoreButton, makeEnds, usePaged } from './endless.js';
-import { WebAppsPage, WebCategory, WebDiscover, WebResults, webCatalog, webHits, webCategoryCounts } from './webapps.js';
+import { WebAppsPage, WebCategory, WebDiscover, WebInstalled, WebResults, WebSettings, webCatalog, webHits, webCategoryCounts } from './webapps.js';
 import { WebAppDetail } from './webdetail.js';
-import { FlathubDetail, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub, useFlathubCounts, useFlathubTotal } from './flathubpages.js';
+import { FlathubDetail, FlathubInstalled, FlathubPage, FlathubSettings, FlathubResults, FlathubUpdates, removeInstalled, useFlathub, useFlathubCounts, useFlathubTotal } from './flathubpages.js';
 import { flathub } from '@lordos/sdk';
 
 // The user's Downloads folder relative to home ("Downloads/"), from xdg-user-dirs; without it, the
@@ -205,32 +211,56 @@ function InstallFile({ path, onDone }) {
   );
 }
 
-function LordOSPage({ query }) {
+// Apps LordOS's .lpk part, under the shop's cards: what .lpk packages are, the one being installed and the packages found
+// in the home folder (Downloads, Desktop and the top level).
+function LpkFiles() {
   const t = useTheme();
   const { t: tr } = useLocale();
-  const list = useStore(packageList);
   const [files, setFiles] = useState(() => findPackageFiles().filter((f) => /\.lpk$/i.test(f.name)));
   const [pick, setPick] = useState(null);
+  return (
+    <View style={{ marginTop: spacing.xl }}>
+      <Text style={{ fontSize: 17, fontWeight: 700, color: t.text, marginBottom: spacing.xs, textAlign: 'start' }}>{tr('store.lordos.lpkTitle')}</Text>
+      <Text style={{ fontSize: typeScale.callout, color: t.textDim, lineHeight: 1.45, maxWidth: 680, marginBottom: spacing.l, textAlign: 'start' }}>{tr('store.lordos.subtitle')}</Text>
+      {pick && <InstallFile path={pick} onDone={(cancel) => { if (cancel) setPick(null); setFiles(findPackageFiles().filter((f) => /\.lpk$/i.test(f.name))); }} />}
+      <List title={tr('store.lordos.filesTitle')} count={files.length || null} empty={tr('store.lordos.noFiles')}>
+        {files.map((f) => (
+          <AppRow key={f.path} icon={<Icon size={32} />} name={f.name} detail={`${f.path.replace(fs.home(), '~')} · ${formatBytes(f.size)}`}>
+            <Button small label={tr('store.install')} onClick={() => setPick(f.path)} />
+          </AppRow>
+        ))}
+      </List>
+    </View>
+  );
+}
+
+// Apps LordOS → Installed (the top of its second column): LordOS's own items once installed (View opens their page,
+// where Remove is; Open what they open) and the installed .lpk apps, with their trust, Remove and Open.
+function LordOSInstalled({ query, onOpen, go }) {
+  const { t: tr } = useLocale();
+  const list = useStore(packageList);
+  const { items, installed } = useNative();
   const [msg, setMsg] = useState(null);
+  const rows = nativeRows(items, installed).filter((a) => matches(query, [a.name, a.native.id, a.native.package], [a.comment]));
   const shown = list.filter((p) => matches(query, [p.name, p.id], [p.description]));
   return (
     <View>
-      <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.45, maxWidth: 680, marginBottom: spacing.xl, textAlign: 'start' }}>{tr('store.lordos.subtitle')}</Text>
-      {pick && <InstallFile path={pick} onDone={(cancel) => { if (cancel) setPick(null); setFiles(findPackageFiles().filter((f) => /\.lpk$/i.test(f.name))); }} />}
+      <debian.Progress />
       <Message msg={msg} />
-      <List title={tr('store.lordos.installedTitle')} count={shown.length || null} empty={tr('store.lordos.none')}>
+      <List title={tr('store.lordos.catalogTitle')} count={rows.length || null} empty={tr('store.lordos.noneNative')}>
+        {rows.map((a) => (
+          <AppRow key={a.id} icon={<a.Icon size={40} />} name={a.name} detail={a.comment} extra={tr('store.kind.native')}>
+            <Button small label={tr('store.ai.view')} onClick={() => onOpen(a.native.id)} />
+            {a.native.open ? <Button small label={tr('store.open')} onClick={() => openNative(a.native, go)} /> : null}
+          </AppRow>
+        ))}
+      </List>
+      <List title={tr('store.lordos.lpkTitle')} count={shown.length || null} empty={tr('store.lordos.noneLpk')}>
         {shown.map((p) => (
           <AppRow key={p.id} icon={<p.Icon size={40} />} name={p.name} detail={p.description} extra={tr('store.version', { version: p.version })}
             below={<PkgManage pkg={p} onMsg={setMsg} />}>
             {!p.packaged && <Button small label={tr('store.remove')} onClick={() => { packages.remove(p.id); setMsg({ ok: true, text: tr('store.lordos.removed', { name: p.name }) }); }} />}
             <Button small label={tr('store.open')} onClick={() => launchApp(p.id)} />
-          </AppRow>
-        ))}
-      </List>
-      <List title={tr('store.lordos.filesTitle')} count={files.length || null} empty={tr('store.lordos.noFiles')}>
-        {files.map((f) => (
-          <AppRow key={f.path} icon={<Icon size={32} />} name={f.name} detail={`${f.path.replace(fs.home(), '~')} · ${formatBytes(f.size)}`}>
-            <Button small label={tr('store.install')} onClick={() => setPick(f.path)} />
           </AppRow>
         ))}
       </List>
@@ -281,25 +311,31 @@ function PkgManage({ pkg, onMsg }) {
 }
 const pkgManifest = (pkg) => ({ name: pkg.name, description: pkg.description, icon: 'icon.png', size: pkg.size, minSize: pkg.minSize, permissions: pkg.permissions });
 
-// ---- installed apps (all of them: LordOS, packages and Linux) ----
+// ---- installed apps (all of them: LordOS, packages, Linux, Flatpak and web apps) ----
 
-// Every installed app. A LordOS app LordOS can do without is deactivated here, and activated again
-// (sdk/appsoffactions.js; the core keeps "System app — part of LordOS"); a Linux app a Debian package
-// brought is removed after its plan (debian.RemoveSheet). "Deactivated" lists the apps turned off.
-function InstalledPage({ query, filter: initial }) {
+// Every installed app, whatever its package system, each marked with it (its kind line), with a filter per system
+// that has apps (installedmodel.js): All, LordOS apps, Linux apps (Debian), Flathub, Web apps, Deactivated. A LordOS
+// app LordOS can do without is deactivated here, and activated again (sdk/appsoffactions.js; the core keeps "System
+// app — part of LordOS"); a Linux app a Debian package brought is removed after its plan (debian.RemoveSheet).
+// `only`: one system's apps and no filters (Linux apps (Debian) → Installed, in its second column).
+// LordOS's own items once installed are rows too (kind "native", lordospages.js): View opens their page (onNative).
+function InstalledPage({ query, filter: initial, only = null, empty = null, onNative = null, go = null }) {
   const t = useTheme();
   const { t: tr } = useLocale();
-  const apps = useLauncherApps({ all: true });
-  const [filter, setFilter] = useState(initial === 'off' ? 'off' : 'all');
+  const launcherAll = useLauncherApps({ all: true });
+  const nat = useNative();
+  const natKey = [...nat.installed].join();
+  const apps = useMemo(() => [...launcherAll, ...nativeRows(nat.items, nat.installed)], [launcherAll, natKey]);
+  const [filter, setFilter] = useState(() => filterOk(initial));
   const [removing, setRemoving] = useState(null);
   const [msg, setMsg] = useState(null);
-  useEffect(() => { if (initial === 'off') setFilter('off'); }, [initial]);
+  useEffect(() => { if (initial) setFilter(filterOk(initial)); }, [initial]);
   useStore(debian.state);
   const fhJob = useStore(flathub.state, (st) => st.job);
-  const offCount = apps.filter((a) => a.off).length;
-  const shown = apps.filter((a) => (filter === 'off' ? a.off : true) && matches(query, [a.name, a.id, a.genericName], [a.comment]));
+  const mine = only ? apps.filter((a) => systemOf(a) === only) : apps;
+  const shown = filterInstalled(mine, only ? 'all' : filter).filter((a) => matches(query, [a.name, a.id, a.genericName], [a.comment]));
   // hundreds of apps with Debian's and Flathub's: a page of rows at a time as the list is scrolled (endless.js)
-  const { limit, more } = usePaged(shown.length, `${filter}|${query}`);
+  const { limit, more } = usePaged(shown.length, `${only}|${filter}|${query}`);
   // the kind, and a LordOS app's or package's own version (manifest "version")
   const kind = (a) => (a.version && a.kind !== 'linux' ? tr('store.kindVersion', { kind: tr(`store.kind.${a.kind}`), v: a.version }) : tr(`store.kind.${a.kind}`));
   const builtin = (a) => a.kind === 'lordos' && isSystemApp(a.id);
@@ -310,13 +346,10 @@ function InstalledPage({ query, filter: initial }) {
   const activate = (a) => { activateApp(a.id); setMsg({ ok: true, text: tr('store.off.activated', { name: a.name }) }); };
   return (
     <View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.l }}>
-        <Segmented small appearance="neutral" value={filter} onChange={setFilter}
-          options={[['all', tr('store.off.filterAll')], ['off', offCount ? tr('store.off.filterOffCount', { count: offCount }) : tr('store.off.filterOff')]]} />
-      </View>
+      {only ? null : <FilterChips value={filter} filters={installedFilters(apps, filter)} onChange={setFilter} />}
       <debian.Progress />
       <Message msg={msg} />
-      <List count={null} empty={filter === 'off' ? tr('store.off.none') : tr('store.debian.none')}>
+      <List count={null} empty={!only && filter === 'off' ? tr('store.off.none') : query.trim() || !empty ? tr('store.debian.none') : empty}>
         {shown.slice(0, limit).map((a) => (
           <AppRow key={a.id} icon={<View style={{ opacity: a.off ? 0.45 : 1 }}><a.Icon size={32} /></View>} name={a.name} detail={a.comment || a.genericName || ''}
             extra={a.off ? `${kind(a)} · ${tr('store.off.badge')}` : kind(a)}
@@ -331,7 +364,9 @@ function InstalledPage({ query, filter: initial }) {
               onClick={() => setRemoving(removing === a.id ? null : a.id)} />}
             {a.kind === 'flatpak' && flathub.available() && <Button small label={tr('store.remove')} disabled={!!fhJob}
               onClick={() => !fhJob && removeInstalled(a).then((ok) => setMsg(ok ? { ok: true, text: tr('flathub.msg.uninstallDone', { name: a.name }) } : flathub.state.get().msg))} />}
-            {!a.off && <Button small label={tr('store.open')} onClick={() => launchApp(a.id)} />}
+            {a.native && onNative && <Button small label={tr('store.ai.view')} onClick={() => onNative(a.native.id)} />}
+            {a.native ? (a.native.open && <Button small label={tr('store.open')} onClick={() => openNative(a.native, go)} />)
+              : !a.off && <Button small label={tr('store.open')} onClick={() => launchApp(a.id)} />}
           </AppRow>
         ))}
       </List>
@@ -342,13 +377,14 @@ function InstalledPage({ query, filter: initial }) {
 
 // ---- window ----
 
-// Where the window is: a page ('discover', 'installed', 'updates', 'ai', 'lordos', …) or an origin ('src:debian', 'src:flathub',
-// 'src:web') with `sub`, its category in the second column (null: all of it)
-// and, over it, an app page (`app`: a Debian package; `ai`: true for a catalog app; `web`: true for a web app, its id).
+// Where the window is: a page ('discover', 'installed', 'updates', 'ai', …) or an origin ('src:lordos', 'src:debian',
+// 'src:flathub', 'src:web') with `sub`, its category in the second column (null: all of it; MINE: its Installed)
+// and, over it, an app page (`app`: a Debian package; `ai`: true for a catalog app; `web`: true for a web app, its id;
+// `native`: true for one of Apps LordOS's own items, its id).
 // Back returns to the page.
 // a small window (a Lord Workspaces tile): below SIDE_AT the pages and categories hide behind a toolbar button
 const SIDE_AT = 720;
-const SIDE_W = 230, SIDE_MIN = 190, SIDE_MAX = 380;
+const SIDE_W = 250, SIDE_MIN = 190, SIDE_MAX = 380;      // 250 (2026-11-23): "Apps de GNU/Linux (Debian)" whole at the default width
 const PAGE_GLYPH = { flathub: GLYPH.flathub, suites: GLYPH.suites, remote: GLYPH.remote, commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, webapps: GLYPH.webapps, lordos: GLYPH.lordos };
 
 export default function Store() {
@@ -361,6 +397,12 @@ export default function Store() {
   const [fhSub, setFhSub] = useState(null);
   const [fhColl, setFhColl] = useState(null);
   const [app, setApp] = useState(null);
+  // the mouse's back and forward buttons (GitHub #234): back leaves an app's page, forward opens the one just left
+  const leftApp = useRef(null);
+  useNavigateButtons((d) => {
+    if (d === 'back' && app) { leftApp.current = app; setApp(null); }
+    else if (d === 'forward' && !app && leftApp.current) { setApp(leftApp.current); leftApp.current = null; }
+  });
   const [query, setQuery] = useState('');
   const [file, setFile] = useState(null);
   const deb = useDebian();
@@ -372,6 +414,7 @@ export default function Store() {
     setApp(null);
     if (p === 'flathub') p = 'src:flathub';
     else if (p === 'webapps') p = 'src:web';
+    else if (p === 'lordos') p = 'src:lordos';
     else if (p.startsWith('cat:')) { c = p.slice(4); p = 'src:debian'; }
     setPage(p); setSub(c); setFhSub(null); setFhColl(null);
   };
@@ -405,10 +448,12 @@ export default function Store() {
   }, [app]);
   useEffect(() => {
     if (args?.install) setFile(args.install);
-    if (args?.page) go(args.page);
+    if (args?.page) go(args.page, args.sub || null);
     if (args?.app) openAi(args.app);
+    if (args?.native) openNativeItem(args.native);
     if (args?.webapp) openWeb(args.webapp);
-    if (args?.search) { setQuery(args.search); go('discover'); }       // from Search
+    // from Search (Discover, every system); with a page, that section's own search
+    if (args?.search) { setQuery(args.search); if (!args.page) go('discover'); }
   }, [args?.nonce]);
   const sug = useStore(suggestions);
   useEffect(() => { refreshSuggestions(); }, []);                  // the hardware may have changed since the last look
@@ -423,24 +468,71 @@ export default function Store() {
   const fhCounts = useFlathubCounts();
   const webCounts = useMemo(() => webCategoryCounts(), []);
   // an origin's second column: All, then its categories with how many apps each has
-  const subCounts = src === 'debian' ? counts : src === 'flathub' ? fhCounts : src === 'web' ? webCounts : null;
+  const nat = useNative();
+  const natCats = useMemo(() => nativeCats(nat.items), [nat.items]);
+  const subCounts = src === 'debian' ? counts : src === 'flathub' ? fhCounts : src === 'web' ? webCounts : src === 'lordos' ? natCats.counts : null;
+  const subCats = src === 'lordos' ? natCats.cats : CATS;
   // All: how many apps the origin shows (a Flathub app may be in several categories, so not the categories' sum)
   const fhTotal = useFlathubTotal();
-  const subTotal = src === 'flathub' ? fhTotal : subCounts ? CATS.reduce((a, c) => a + (subCounts[c] || 0), 0) : 0;
+  const subTotal = src === 'flathub' ? fhTotal : src === 'lordos' ? nat.items.length : subCounts ? CATS.reduce((a, c) => a + (subCounts[c] || 0), 0) : 0;
+  // how many of the origin's apps are installed (its second column's Installed)
+  const fhInstalled = useStore(flathub.state, (st) => st.installed.length);
+  const webInstalled = useWebApps().length;
+  const allApps = useLauncherApps({ all: true });
+  const debInstalled = useMemo(() => allApps.filter((a) => systemOf(a) === 'debian').length, [allApps]);
+  const lpkInstalled = useStore(packageList).length;
+  const mineCount = src === 'flathub' ? fhInstalled : src === 'web' ? webInstalled : src === 'debian' ? debInstalled : src === 'lordos' ? nat.installed.size + lpkInstalled : 0;
   const remember = () => { if (!app) listAt.current = { key: listKey, y: scroll.current?.offset() || 0 }; };
   const openDeb = (name) => { remember(); setApp({ name, ai: false }); };
   const openAi = (name) => { remember(); setApp({ name, ai: true }); };
   const openWeb = (id) => { remember(); setApp({ name: id, web: true }); };
   const openFlathub = (id) => { remember(); setApp({ name: id, flathub: true }); };
-  const srcTitle = { debian: tr('store.src.debian'), flathub: tr('store.page.flathub'), web: tr('store.page.webapps') };
-  const pageTitle = src ? [srcTitle[src], sub ? tr(`store.cat.${sub}`) : null, src === 'flathub' && sub && fhSub ? tr(`flathub.sub.${fhSub}`) : null,
+  function openNativeItem(id) { if (!nativeItem(id)) return; remember(); setApp({ name: id, native: true }); }
+  const srcTitle = { lordos: tr('store.page.lordos'), debian: tr('store.src.debian'), flathub: tr('store.page.flathub'), web: tr('store.page.webapps') };
+  const pageTitle = src ? [srcTitle[src], isMine(sub) ? tr('store.page.installed') : isSettings(sub) ? tr('store.sub.settings') : sub ? tr(src === 'lordos' ? `store.native.cat.${sub}` : `store.cat.${sub}`) : null, src === 'flathub' && sub && fhSub ? tr(`flathub.sub.${fhSub}`) : null,
     src === 'flathub' && !sub && fhColl ? tr(`flathub.coll.${fhColl}`) : null].filter(Boolean).join(' · ') : tr(`store.page.${page}`);
-  const appTitle = app && (app.flathub ? flathub.catalogApp(app.name)?.name : app.web ? webCatalog().find((a) => a.id === app.name)?.name || webAppEntry(app.name)?.name
+  const appTitle = app && (app.native ? tr(nameKey(nativeItem(app.name))) : app.flathub ? flathub.catalogApp(app.name)?.name : app.web ? webCatalog().find((a) => a.id === app.name)?.name || webAppEntry(app.name)?.name
     : app.ai ? catalogApp(app.name)?.name : (lord.pkg?.info?.(app.name, {})?.app?.name)) || app?.name;
-  const searchable = !app && page !== 'updates' && page !== 'suggested';
-  const onSearch = (v) => { setQuery(v); if (v && !searchable) go('discover'); };
+  // (2026-11-23) inside a package system's section the search is that system's (its shop: typed in its Installed it
+  // narrows that list, in its Settings it goes to the shop); on the Store's own pages it searches every system, and the
+  // pages that don't list apps by a search (Updates, For this computer, the picks) send it to Discover
+  const searchable = !app && (src ? !isSettings(sub) : ['discover', 'installed'].includes(page));
+  const onSearch = (v) => {
+    setQuery(v);
+    if (!v) return;
+    if (src && isSettings(sub)) pickSub(null);
+    else if (!src && !searchable) go('discover');
+  };
+  const fhWorking = useStore(flathub.state, (x) => !!x.busy || !!x.job);
+  const debJob = useStore(debian.state, (x) => !!x.job);
+  // the section's update icon, next to its search: Flathub's catalog; the package lists (Debian's and LordOS's own items
+  // come from them); web apps have nothing to fetch
+  const refresh = !src || app ? null
+    : src === 'flathub' ? (fh.on ? { title: tr('store.refresh.flathub'), busy: fhWorking, run: () => flathub.loadCatalog({ fetch: true }) } : null)
+    : src === 'debian' || src === 'lordos' ? (debian.available() ? { title: tr('store.refresh.lists'), busy: debJob || !admin.available(), run: refreshLists } : null)
+    : null;
   let body;
-  if (app) body = app.flathub ? <FlathubDetail id={app.name} /> : app.web ? <WebAppDetail id={app.name} /> : app.ai ? <AiDetail pkg={app.name} /> : <debian.Details name={app.name} />;
+  if (app) body = app.native ? <NativeDetail id={app.name} go={go} /> : app.flathub ? <FlathubDetail id={app.name} /> : app.web ? <WebAppDetail id={app.name} /> : app.ai ? <AiDetail pkg={app.name} /> : <debian.Details name={app.name} />;
+  else if (src && isSettings(sub)) {
+    // the section's Settings (under Installed in its second column): what sat above its shop until 2026-11-23
+    body = src === 'flathub' ? <FlathubSettings /> : src === 'web' ? <WebSettings /> : src === 'lordos' ? <LordOSSettings /> : <DebianSettings />;
+  }
+  else if (src && isMine(sub)) {
+    // the origin's own installed apps, with their usual actions (Installed, at the top of its second column)
+    body = src === 'lordos' ? <LordOSInstalled query={query} onOpen={openNativeItem} go={go} />
+      : src === 'flathub' ? <FlathubInstalled query={query} onOpen={openFlathub} />
+      : src === 'web' ? <WebInstalled query={query} onOpen={openWeb} />
+      : <InstalledPage query={query} only="debian" empty={tr('store.installed.noneDebian')} />;
+  }
+  else if (src === 'lordos') {
+    // LordOS's own store: its items' cards, then the .lpk packages found in the home folder
+    body = (
+      <View>
+        <NativeShop query={query} cat={sub} onOpen={openNativeItem} go={go} />
+        {sub ? null : <LpkFiles />}
+      </View>
+    );
+  }
   else if (src === 'debian') {
     body = sub ? (
       <View style={{ gap: 26 }}>
@@ -460,13 +552,15 @@ export default function Store() {
     const hits = query.trim() ? searchCatalog(catalogApps(), query) : [];
     const web = query.trim() ? webHits(query) : 0;
     const fhHits = query.trim() && fh.on ? flathub.state.get().catalog.length : 0;
+    const natHits = nativeHits(query);
     const top = !query.trim() ? (
       <View style={{ gap: 26 }}>
         <AiDiscover onOpen={openAi} onOpenDeb={openDeb} onMore={() => go('ai')} />
         <WebDiscover onOpen={openWeb} onMore={() => go('webapps')} />
       </View>
-    ) : hits.length || web || fhHits ? (
+    ) : hits.length || web || fhHits || natHits ? (
       <View style={{ gap: 26 }}>
+        {natHits ? <NativeResults query={query} onOpen={openNativeItem} go={go} /> : null}
         {hits.length ? <CatalogResults query={query} onOpen={openAi} /> : null}
         {web ? <WebResults query={query} onOpen={openWeb} /> : null}
         {fhHits ? <FlathubResults query={query} onOpen={openFlathub} onMore={() => go('flathub')} /> : null}
@@ -479,11 +573,11 @@ export default function Store() {
   else if (page === 'commercial') body = <AiPage section="commercial" query={query} onOpen={openAi} onPage={go} />;
   else if (page === 'remote') body = <AiPage section="remote" query={query} onOpen={openAi} />;
   else if (page === 'suites') body = <AiPage section="suites" query={query} onOpen={openAi} />;
-  else if (page === 'lordos') body = <LordOSPage query={query} />;
-  else if (page === 'installed') body = <InstalledPage query={query} filter={args?.filter} />;
+  else if (page === 'installed') body = <InstalledPage query={query} filter={args?.filter} onNative={openNativeItem} go={go} />;
   else body = <View><FlathubUpdates /><debian.Updates /></View>;
   const item = (id, label, detail, glyph) => (
-    <SidebarItem key={id} icon={glyph} label={label} detail={detail || null} selected={!app && page === id} onClick={() => { go(id); if (side.narrow) side.close(); }} />
+    <SidebarItem key={id} icon={glyph} label={label} detail={detail || null} selected={!app && page === id}
+      onClick={() => { if (id !== page) setQuery(''); go(id); if (side.narrow) side.close(); }} />
   );
   const sidebar = (
       // above the column after it: its edge handle reaches 3 px over that column, which would otherwise take the press
@@ -494,13 +588,13 @@ export default function Store() {
           <SectionTitle>{tr('store.section.store')}</SectionTitle>
           {item('discover', tr('store.page.discover'), null, PAGE_GLYPH.discover)}
           {item('suggested', tr('store.page.suggested'), unseen, PAGE_GLYPH.suggested)}
-          {item('installed', tr('store.page.installed'), launcher.length, PAGE_GLYPH.installed)}
+          {item('installed', tr('store.page.installed'), launcher.length + nat.installed.size, PAGE_GLYPH.installed)}
           {item('updates', tr('store.page.updates'), deb.upgrades?.length, PAGE_GLYPH.updates)}
           <SectionTitle>{tr('store.section.origin')}</SectionTitle>
           {item('src:debian', tr('store.src.debian'), null, GLYPH.debian)}
           {fh.supported ? item('src:flathub', tr('store.page.flathub'), null, PAGE_GLYPH.flathub) : null}
           {item('src:web', tr('store.page.webapps'), webCatalog().length, PAGE_GLYPH.webapps)}
-          {item('lordos', tr('store.page.lordos'), null, PAGE_GLYPH.lordos)}
+          {item('src:lordos', tr('store.page.lordos'), null, PAGE_GLYPH.lordos)}
           {/* what comes later, said as such and not clickable */}
           <View style={{ opacity: 0.45 }}><SidebarItem icon={GLYPH.wine} label={tr('store.src.wine')} detail={tr('store.soon')} /></View>
           <View style={{ opacity: 0.45 }}><SidebarItem icon={GLYPH.android} label={tr('store.src.android')} detail={tr('store.soon')} /></View>
@@ -517,19 +611,7 @@ export default function Store() {
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
       {side.narrow ? null : sidebar}
-      {subCounts && !app && !side.narrow ? (
-        <View style={{ width: 190, backgroundColor: t.sidebarBg }}>
-          <Hairline edge="end" />
-          <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 4 }}>
-            <SectionTitle>{tr('store.section.categories')}</SectionTitle>
-            <SidebarItem label={tr('store.sub.all')} detail={subTotal || null} selected={!sub} onClick={() => pickSub(null)} />
-            {CATS.filter((c) => subCounts[c]).map((c) => (
-              <SidebarItem key={c} icon={GLYPH[c]} label={tr(`store.cat.${c}`)} detail={subCounts[c]} selected={sub === c} onClick={() => pickSub(c)} />
-            ))}
-            <View style={{ height: 12 }} />
-          </ScrollView>
-        </View>
-      ) : null}
+      {subCounts && !app && !side.narrow ? <OriginColumn sub={sub} cats={subCats} counts={subCounts} total={subTotal} mine={mineCount} onPick={pickSub} /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Toolbar>
           {side.narrow ? <SidebarToggle small shown={side.shown} onClick={side.toggle} /> : null}
@@ -537,20 +619,12 @@ export default function Store() {
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{app ? appTitle : pageTitle}</Text>
           </View>
-          {!app ? <SearchField value={query} onChange={onSearch} placeholder={tr('store.search')} width={side.narrow ? 150 : 200} /> : null}
+          {refresh ? <ToolbarButton icon={GLYPH.updates} small title={refresh.title} accessibilityLabel={refresh.title} disabled={refresh.busy} onClick={refresh.run} /> : null}
+          {!app ? <SearchField value={query} onChange={onSearch} placeholder={src ? tr(`store.search.in.${src}`) : tr('store.search')} width={side.narrow ? 150 : 200} /> : null}
         </Toolbar>
         <EndsContext.Provider value={ends}>
-        <ScrollView scrollRef={scroll} onScroll={ends.check} resetKey={app ? `app:${app.flathub ? 'flathub' : app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: side.narrow ? 14 : 20 }}>
-          {subCounts && !app && side.narrow ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-              {[null, ...CATS.filter((c) => subCounts[c])].map((c) => (
-                <View key={c || 'all'} onClick={() => pickSub(c)} style={{ height: 26, paddingHorizontal: 12, borderRadius: 13, justifyContent: 'center',
-                  backgroundColor: sub === c ? t.accent : t.hover }}>
-                  <Text style={{ fontSize: 12, fontWeight: 600, color: sub === c ? '#fff' : t.text }}>{c ? tr(`store.cat.${c}`) : tr('store.sub.all')}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
+        <ScrollView scrollRef={scroll} onScroll={ends.check} resetKey={app ? `app:${app.native ? 'native' : app.flathub ? 'flathub' : app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: side.narrow ? 14 : 20 }}>
+          {subCounts && !app && side.narrow ? <OriginChips sub={sub} cats={subCats} counts={subCounts} onPick={pickSub} /> : null}
           {file && <InstallFile path={file} onDone={(cancel) => cancel && setFile(null)} />}
           {body}
           <View style={{ height: 24 }} />

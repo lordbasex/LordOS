@@ -65,5 +65,6 @@
   "ask.vr": "“{app}” {headset} VR başlığını kullanmak istiyor",
   "ask.vrNote": "Ekranı yalnızca uygulamaya verilir; LordOS orada asla masaüstünüzü göstermez. Uygulama kapandığında, başlık çıkarıldığında veya ekran kilitlendiğinde geri alınır. Bunu daha sonra Ayarlar → Gizlilik bölümünden değiştirebilirsiniz.",
   "perm.vr": "VR başlıkları",
-  "permHint.vr": "Bir VR başlığının ekranını doğrudan sürebilen uygulamalar. Yalnızca başlıklar ödünç verilir, monitörleriniz asla; ekran kilitlendiğinde, kullanıcı değiştirdiğinizde veya Reddet’i seçtiğinizde geri alınır."
+  "permHint.vr": "Bir VR başlığının ekranını doğrudan sürebilen uygulamalar. Yalnızca başlıklar ödünç verilir, monitörleriniz asla; ekran kilitlendiğinde, kullanıcı değiştirdiğinizde veya Reddet’i seçtiğinizde geri alınır.",
+  "protectedCapture": "Korumalı pencere"
 }

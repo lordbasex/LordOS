@@ -13,6 +13,8 @@
 #include <strings.h>
 
 #define MAX_IMAGE_MB (64ull * 1024)          /* 64 GiB: far above any installer */
+/* the only place a list may be mirrored ("list"): LordOS's own site, for LordOS's own signed releases */
+#define LIST_MIRROR "https://lordos.org/releases/"
 
 static const JVal *get(const JVal *o, const char *k) {
     if (!o || o->type != J_OBJ) return NULL;
@@ -67,6 +69,89 @@ int vmcat_sha_ok(const char *s) {
     return 1;
 }
 
+int vmcat_hash_ok(const VmCatEntry *e, const char *s) {
+    size_t want = e && e->hash == VMCAT_SHA512 ? 128 : 64;
+    if (!s || strlen(s) != want) return 0;
+    for (; *s; s++) if (!isxdigit((unsigned char)*s)) return 0;
+    return 1;
+}
+
+int vmcat_release_cmp(const char *a, const char *b) {
+    while (*a || *b) {
+        unsigned long x = 0, y = 0;
+        int dx = 0, dy = 0;
+        while (*a >= '0' && *a <= '9' && dx < 9) { x = x * 10 + (unsigned long)(*a++ - '0'); dx++; }
+        while (*b >= '0' && *b <= '9' && dy < 9) { y = y * 10 + (unsigned long)(*b++ - '0'); dy++; }
+        if (x != y) return x < y ? -1 : 1;
+        if (*a == '.') a++; else if (*a) return 0;
+        if (*b == '.') b++; else if (*b) return 0;
+    }
+    return 0;
+}
+
+int vmcat_release_ok(const VmCatEntry *e, const char *rel) {
+    if (!e || !e->rel_dir[0] || !rel || strlen(rel) > 31 || !vmcat_match(e->rel_re, rel)) return 0;
+    for (const char *p = rel; *p; p++) if (!((*p >= '0' && *p <= '9') || *p == '.')) return 0;
+    return vmcat_release_cmp(rel, e->rel_floor) >= 0;
+}
+
+int vmcat_release_in(const VmCatEntry *e, const char *name, char *out, size_t n) {
+    if (!e || !e->rel_dir[0] || !vmcat_name_ok(name) || !out || n < 2) return -1;
+    char found[32] = "";
+    for (const char *p = name; *p; p++) {
+        if (!(*p >= '0' && *p <= '9') || (p > name && ((p[-1] >= '0' && p[-1] <= '9') || p[-1] == '.'))) continue;
+        size_t k = 0, dots = 0;
+        while ((p[k] >= '0' && p[k] <= '9') || (p[k] == '.' && p[k + 1] >= '0' && p[k + 1] <= '9')) dots += p[k++] == '.';
+        char run[32];
+        if (!dots || k >= sizeof run) { p += k ? k - 1 : 0; continue; }
+        memcpy(run, p, k);
+        run[k] = 0;
+        p += k - 1;
+        if (!vmcat_match(e->rel_re, run)) continue;
+        if (found[0] && strcmp(found, run)) return -1;          /* two different releases in one name */
+        memcpy(found, run, k + 1);
+    }
+    if (!found[0] || strlen(found) >= n) return -1;
+    memcpy(out, found, strlen(found) + 1);
+    return 0;
+}
+
+int vmcat_release_dir(VmCatEntry *e, const char *rel) {
+    if (!vmcat_release_ok(e, rel)) return -1;
+    if (snprintf(e->dir, sizeof e->dir, "%s%s/", e->rel_dir, rel) >= (int)sizeof e->dir) return -1;
+    memcpy(e->file_dir, e->dir, sizeof e->dir);
+    return 0;
+}
+
+/* "kind": "group" and its "archive" (19.6): the members' patterns and the caps lord-vmunpack applies */
+static int parse_group(const JVal *s, VmCatEntry *e) {
+    const char *gk = str(s, "group"), *ed = str(s, "edition");
+    const JVal *ar = get(s, "archive"), *ms = get(ar, "members"), *ma = get(ar, "maxApparentGb"), *md = get(ar, "maxDataGb");
+    const char *fmt = str(ar, "format"), *gw = str(ms, "gateway"), *ws = str(ms, "workstation");
+    if (!gk || strcmp(gk, "whonix") || !ed || !ed[0] || strlen(ed) >= sizeof e->edition || !fmt || strcmp(fmt, "tar.xz") || !re_ok(gw) || !re_ok(ws) ||
+        !ma || ma->type != J_NUM || ma->num < 1 || ma->num > 1024 || !md || md->type != J_NUM || md->num < 1 || md->num > ma->num) return -1;
+    for (const char *p = ed; *p; p++) if (!isalnum((unsigned char)*p)) return -1;
+    for (const JVal *k = ms->kid; k; k = k->next) if (strcmp(k->key, "gateway") && strcmp(k->key, "workstation")) return -1;
+    e->group = 1;
+    snprintf(e->group_kind, sizeof e->group_kind, "%s", gk);
+    snprintf(e->edition, sizeof e->edition, "%s", ed);
+    snprintf(e->member_re[0], sizeof e->member_re[0], "%s", gw);
+    snprintf(e->member_re[1], sizeof e->member_re[1], "%s", ws);
+    e->max_apparent = (unsigned long long)ma->num << 30;
+    e->max_data = (unsigned long long)md->num << 30;
+    static const char *const roles[2] = { "gateway", "workstation" };
+    for (int i = 0; i < 2; i++) {
+        const JVal *m = get(get(s, "machine"), roles[i]), *v = get(m, "vcpus"), *mb = get(m, "memoryMb");
+        e->member_vcpus[i] = 1;
+        e->member_mem_mb[i] = 2048;
+        if (v && (v->type != J_NUM || v->num < 1 || v->num > 64)) return -1;
+        if (mb && (mb->type != J_NUM || mb->num < 768 || mb->num > 65536)) return -1;
+        if (v) e->member_vcpus[i] = (int)v->num;
+        if (mb) e->member_mem_mb[i] = (int)mb->num;
+    }
+    return 0;
+}
+
 int vmcat_find(const char *json, size_t n, const char *id, const char *arch, VmCatEntry *e) {
     if (!json || !id || !arch || !e || (strcmp(arch, "amd64") && strcmp(arch, "arm64"))) return -1;
     memset(e, 0, sizeof *e);
@@ -103,8 +188,23 @@ int vmcat_find(const char *json, size_t n, const char *id, const char *arch, VmC
             break;
         }
         const char *dir = str(a, "dir"), *fdir = str(a, "fileDir"), *sums = str(a, "sums"), *sre = str(a, "sumsPattern"), *fre = str(a, "file");
-        const JVal *mx = get(a, "maxMb");
+        const JVal *mx = get(a, "maxMb"), *rel = get(a, "releases");
+        if (rel) {
+            /* the newest verified release folder under releases.dir, never older than releases.floor (vmcatalog.h) */
+            const char *rd = str(rel, "dir"), *rp = str(rel, "pattern"), *rf = str(rel, "floor");
+            if (dir || fdir || !dir_ok(rd) || !re_ok(rp) || !rf || !vmcat_match(rp, rf) || strlen(rf) >= sizeof e->rel_floor) break;
+            snprintf(e->rel_dir, sizeof e->rel_dir, "%s", rd);
+            snprintf(e->rel_re, sizeof e->rel_re, "%s", rp);
+            snprintf(e->rel_floor, sizeof e->rel_floor, "%s", rf);
+            dir = rd;                                /* until a release is chosen (vmcat_release_dir): the folder of releases */
+        }
         if (!a || !dir_ok(dir) || (fdir && !dir_ok(fdir)) || !re_ok(fre) || !mx || mx->type != J_NUM || mx->num < 1 || mx->num > (double)MAX_IMAGE_MB) break;
+        const char *hs = str(s, "hash");
+        if (get(s, "hash") && (!hs || (strcmp(hs, "sha256") && strcmp(hs, "sha512")))) break;
+        e->hash = hs && !strcmp(hs, "sha512") ? VMCAT_SHA512 : VMCAT_SHA256;
+        const char *kd = str(s, "kind");
+        if (kd && !strcmp(kd, "group") && parse_group(s, e)) break;
+        if (e->group && (e->hash != VMCAT_SHA512 || !sre)) break;   /* a group's archive: a SHA-512 list found by its pattern */
         if (!!sums == !!sre || (sums && (!vmcat_name_ok(sums) || strlen(sums) >= sizeof e->sums)) || (sre && !re_ok(sre))) break;
         /* the list's signature: every entry has one, with its key file and at least one pinned fingerprint; LordOS's own
          * releases are signed with the LordOS release key, compiled into LordOS, so that entry names no key file */
@@ -116,9 +216,14 @@ int vmcat_find(const char *json, size_t n, const char *id, const char *arch, VmC
             snprintf(e->sig_name, sizeof e->sig_name, "%s", sn);
         } else if (!st || !kf || !vmcat_name_ok(kf) || strlen(kf) >= sizeof e->keys || !fl || fl->type != J_ARR) break;
         else if (!strcmp(st, "detached")) {
-            if (!sn || !vmcat_name_ok(sn) || strlen(sn) >= sizeof e->sig_name) break;
+            /* a fixed name, or the list's own name plus a suffix (".asc": Whonix signs each list beside it) */
+            const char *sx = str(sg, "suffix");
+            if (!!sn == !!sx) break;
+            if (sn && (!vmcat_name_ok(sn) || strlen(sn) >= sizeof e->sig_name)) break;
+            if (sx && (strlen(sx) < 2 || strlen(sx) >= sizeof e->sig_suffix || sx[0] != '.' || !vmcat_name_ok(sx + 1))) break;
             e->sig_type = VMCAT_SIG_DETACHED;
-            snprintf(e->sig_name, sizeof e->sig_name, "%s", sn);
+            snprintf(e->sig_name, sizeof e->sig_name, "%s", sn ? sn : "");
+            snprintf(e->sig_suffix, sizeof e->sig_suffix, "%s", sx ? sx : "");
         } else if (!strcmp(st, "clearsigned") && !sn) e->sig_type = VMCAT_SIG_CLEAR;
         else break;
         int bad = 0;
@@ -131,6 +236,18 @@ int vmcat_find(const char *json, size_t n, const char *id, const char *arch, VmC
             e->fprs[e->nfprs++][40] = 0;
         }
         if (bad || (!e->nfprs && e->sig_type != VMCAT_SIG_LORDOS)) break;
+        /* the list mirrored on lordos.org (vmcatalog.h): only for a LordOS release with a fixed list name, only under
+         * LIST_MIRROR, and with all three names */
+        const JVal *lm = get(a, "list");
+        if (lm) {
+            const char *ld = str(lm, "dir"), *ls = str(lm, "sums"), *lg = str(lm, "signature");
+            if (lm->type != J_OBJ || e->sig_type != VMCAT_SIG_LORDOS || !sums || !dir_ok(ld) || strncmp(ld, LIST_MIRROR, strlen(LIST_MIRROR)) ||
+                strlen(ld) <= strlen(LIST_MIRROR) || !ls || !vmcat_name_ok(ls) || strlen(ls) >= sizeof e->list_sums ||
+                !lg || !vmcat_name_ok(lg) || strlen(lg) >= sizeof e->list_sig) break;
+            snprintf(e->list_dir, sizeof e->list_dir, "%s", ld);
+            snprintf(e->list_sums, sizeof e->list_sums, "%s", ls);
+            snprintf(e->list_sig, sizeof e->list_sig, "%s", lg);
+        }
         snprintf(e->keys, sizeof e->keys, "%s", kf ? kf : "");
         snprintf(e->dir, sizeof e->dir, "%s", dir);
         snprintf(e->file_dir, sizeof e->file_dir, "%s", fdir ? fdir : dir);
@@ -146,14 +263,30 @@ int vmcat_find(const char *json, size_t n, const char *id, const char *arch, VmC
     return rc;
 }
 
-/* one line, without its end (\n, \r\n) */
+int vmcat_list_source(const VmCatEntry *e, const char *name, int i, char *list, char *sig, size_t n) {
+    if (!e || !list || !sig || !n || !vmcat_name_ok(name) || i < 0) return -1;
+    list[0] = sig[0] = 0;
+    int mirror = e->list_dir[0] && e->sums[0] && !strcmp(name, e->sums);
+    if (mirror && i == 0) {
+        if (snprintf(list, n, "%s%s", e->list_dir, e->list_sums) >= (int)n || snprintf(sig, n, "%s%s", e->list_dir, e->list_sig) >= (int)n) return -1;
+        return 0;
+    }
+    if (i != mirror || !e->dir[0]) return -1;
+    if (snprintf(list, n, "%s%s", e->dir, name) >= (int)n) return -1;
+    if (e->sig_suffix[0]) { if (snprintf(sig, n, "%s%s%s", e->dir, name, e->sig_suffix) >= (int)n) return -1; }
+    else if ((e->sig_type == VMCAT_SIG_DETACHED || e->sig_type == VMCAT_SIG_LORDOS) && snprintf(sig, n, "%s%s", e->dir, e->sig_name) >= (int)n) return -1;
+    return 0;
+}
+
+/* one line, without its end (\n, \r\n); sha is 64 or 128 hex digits (SHA-256 or SHA-512) */
 static int line_has(const char *l, size_t n, const char *name, const char *sha) {
-    size_t nl = strlen(name);
+    size_t nl = strlen(name), hl = strlen(sha);
+    const char *bsd = hl == 128 ? "SHA512 (" : "SHA256 (";
     /* GNU: <hash>  <name> | <hash> *<name> */
-    if (n == 64 + 2 + nl && !strncasecmp(l, sha, 64) && l[64] == ' ' && (l[65] == ' ' || l[65] == '*') && !memcmp(l + 66, name, nl)) return 1;
+    if (n == hl + 2 + nl && !strncasecmp(l, sha, hl) && l[hl] == ' ' && (l[hl + 1] == ' ' || l[hl + 1] == '*') && !memcmp(l + hl + 2, name, nl)) return 1;
     /* BSD: SHA256 (<name>) = <hash> */
-    if (n == 8 + nl + 4 + 64 && !memcmp(l, "SHA256 (", 8) && !memcmp(l + 8, name, nl) && !memcmp(l + 8 + nl, ") = ", 4) &&
-        !strncasecmp(l + 12 + nl, sha, 64)) return 1;
+    if (n == 8 + nl + 4 + hl && !memcmp(l, bsd, 8) && !memcmp(l + 8, name, nl) && !memcmp(l + 8 + nl, ") = ", 4) &&
+        !strncasecmp(l + 12 + nl, sha, hl)) return 1;
     return 0;
 }
 
@@ -164,7 +297,8 @@ int vmcat_pin_find(const VmCatEntry *e, const char *name, const char *sha) {
 }
 
 int vmcat_sums_has(const char *sums, size_t n, const char *name, const char *sha) {
-    if (!sums || !vmcat_name_ok(name) || !vmcat_sha_ok(sha)) return 0;
+    VmCatEntry e512 = { .hash = VMCAT_SHA512 };
+    if (!sums || !vmcat_name_ok(name) || (!vmcat_sha_ok(sha) && !vmcat_hash_ok(&e512, sha))) return 0;
     for (size_t i = 0; i < n;) {
         const char *nl = memchr(sums + i, '\n', n - i);
         size_t end = nl ? (size_t)(nl - sums) : n, len = end - i;

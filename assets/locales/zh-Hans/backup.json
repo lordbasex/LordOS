@@ -14,6 +14,9 @@
   "never": "尚无备份",
   "next": "下次：{when}",
   "lastError": "上次备份失败：{error}",
+  "machinesBusy": {
+    "other": "{count} 台虚拟机正在运行：此备份中它们的磁盘来自上一次备份"
+  },
   "todayAt": "今天 {time}",
   "now": "立即备份",
   "pause": "暂停",
@@ -74,6 +77,10 @@
   "delete": "删除备份",
   "restoreAll": "全部恢复",
   "restoreItem": "恢复“{name}”",
+  "restoreSelected": "恢复所选项目 ({count})",
+  "restoringItem": "正在恢复 {index}/{count}：{name}",
+  "restoreItemFailed": "无法恢复“{name}”：{error}",
+  "restoreMoreFailed": "其他未恢复的项目：{count}",
   "restoreFolder": "恢复此文件夹",
   "restorePick": "选择要恢复的内容",
   "restoreAllTitle": "要恢复整个个人文件夹吗？",

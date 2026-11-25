@@ -14,6 +14,10 @@
   "never": "Henüz yedek yok",
   "next": "Sonraki: {when}",
   "lastError": "Son yedekleme başarısız oldu: {error}",
+  "machinesBusy": {
+    "one": "{count} makine çalışıyordu: bu yedekteki diskleri bir öncekinden alındı",
+    "other": "{count} makine çalışıyordu: bu yedekteki diskleri bir öncekinden alındı"
+  },
   "todayAt": "bugün {time}",
   "now": "Şimdi Yedekle",
   "pause": "Duraklat",
@@ -77,6 +81,10 @@
   "delete": "Yedeği Sil",
   "restoreAll": "Tümünü Geri Yükle",
   "restoreItem": "“{name}” öğesini geri yükle",
+  "restoreSelected": "Seçilenleri Geri Yükle ({count})",
+  "restoringItem": "Geri yükleniyor {index}/{count}: {name}",
+  "restoreItemFailed": "“{name}” geri yüklenemedi: {error}",
+  "restoreMoreFailed": "Geri yüklenemeyen diğerleri: {count}",
   "restoreFolder": "Bu Klasörü Geri Yükle",
   "restorePick": "Neyin geri yükleneceğini seçin",
   "restoreAllTitle": "Ana klasörünüzün tamamı geri yüklensin mi?",

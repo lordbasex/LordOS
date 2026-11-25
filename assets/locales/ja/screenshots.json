@@ -10,7 +10,7 @@
   "timer": "タイマー",
   "timerNone": "なし",
   "protectedNote": {
-    "other": "保護されたウインドウ {count} 個：キャプチャでは黒く表示されます"
+    "other": "保護されたウインドウ {count} 個：キャプチャでは隠されます"
   },
   "recent": "最近の項目",
   "hintArea": "ドラッグして範囲を選択 · Space：ウインドウ · C：色をコピー · T：テキストをコピー · Esc：キャンセル",

@@ -29,6 +29,8 @@ import { createStore, useStore } from './store.js';
 import { useWindows, wm, windowMenuTitle, windowAccent, appIdOf, getApp, windows, setDisplayAssignment, isLiveSystem, activeDesktop, onActiveDesktop } from './windows.js';
 import { pickWindow } from './desktopmodel.js';
 import { desktopSuffix } from './desktops.js';
+import { cleanWindowLabel } from './windowlistmodel.js';
+import { windowProfile } from './browserprofiles.js';
 import { screen, onScreenChange, displayFor } from '@lordos/runtime';
 import { useLauncherApps, launchApp, windowLinuxApp, shortAppName, windowAppName, LetterIcon, windowIcon } from './apps.js';
 import { t, locale } from './i18n.js';
@@ -61,6 +63,7 @@ const classify = (id) => { const a = getApp(id); return !a || a.builtin ? null :
 // A launcher app object or any id → its typed Dock id (null if it can't be pinned).
 export function dockIdOf(x) {
   if (x && typeof x === 'object') {
+    if (x.kind === 'machine') return null;          // a machine's guest app (sdk/guestappsmodel.js): never pinned
     if (x.kind === 'linux') return x.desktopId ? `desktop:${x.desktopId}` : null;
     if (x.kind === 'web' || x.kind === 'flatpak') return toTypedId(x.id);
     return toTypedId(x.package ? `lpk:${x.id}` : `app:${x.id}`);
@@ -339,22 +342,32 @@ export function dockQuickActions(e) {
 
 // ---- the menu ----
 
+// One menu item per window of an app, the most recent first (the Dock's window list; Lord Workspaces' bar reuses it):
+// its title as the app set it, cleaned for a one-line label (sdk/windowlistmodel.js: no control or bidi-override
+// characters, at most WINDOW_LABEL_MAX), the window in front checked, a web app's profile colour as a dot and its unread
+// count, "–" for a minimized one. A click brings that window forward (wm.focus restores a minimized one).
+export function appWindowItems(wins, name = '', top = wm.focused()) {
+  return [...wins].reverse().map((w) => {
+    // a web app's window: "<title> — <profile>", the profile's color as a dot and its own unread count
+    const own = parseWindowAppId(w.args?.appId || '');
+    const count = own && w.args?.web && webPrefs(settings.get(), own.app).badge ? badgeLabel(badgeTotal(webBadges.get(), own.app, own.profile)) : '';
+    const hint = [count, w.minimized ? '–' : ''].filter(Boolean).join(' ');
+    // a browser window LordOS launched for a profile: that profile's name and colour (sdk/browserprofiles.js)
+    const prof = windowProfile(w, launcherIdOf(w));
+    const title = cleanWindowLabel(windowMenuTitle(w)) || name;
+    return { id: w.id, label: `${prof ? `${title} · ${prof.name}` : title}${desktopSuffix(w)}`, checked: w.id === top, dot: windowAccent(w) || prof?.color || null, hint, minimized: !!w.minimized,
+      onClick: () => wm.focus(w.id) };
+  });
+}
+
+
 export function dockMenu(e, opts = {}) {
   if (e.launcher) return [{ label: t('shell.dock.open'), onClick: () => e.onOpen?.() }];
   const top = wm.focused();
   const items = [];
   const quick = dockQuickActions(e);
   if (quick.length) items.push(...quick, '-');
-  if (e.windows.length) {
-    for (const w of [...e.windows].reverse()) {
-      // a web app's window: "<title> — <profile>", the profile's color as a dot and its own unread count
-      const own = parseWindowAppId(w.args?.appId || '');
-      const count = own && w.args?.web && webPrefs(settings.get(), own.app).badge ? badgeLabel(badgeTotal(webBadges.get(), own.app, own.profile)) : '';
-      const hint = [count, w.minimized ? '–' : ''].filter(Boolean).join(' ');
-      items.push({ label: `${windowMenuTitle(w) || e.name}${desktopSuffix(w)}`, checked: w.id === top, dot: windowAccent(w), hint, onClick: () => wm.focus(w.id) });
-    }
-    items.push('-');
-  }
+  if (e.windows.length) items.push(...appWindowItems(e.windows, e.name, top), '-');
   const p = parseDockId(e.id);
   const appKey = p && p.kind === 'app' ? p.key : null;
   const custom = appKey && menuProviders.get(appKey) ? menuProviders.get(appKey)(e) : null;

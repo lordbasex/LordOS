@@ -204,6 +204,12 @@ EOF
     # (0.8.8.9) the Chromium-based browsers' initial preferences (src/pkg/browserprefs.c) and migration 009
     run "browserprefs-test" build/browserprefs-test
     run "migration 009 chromium-family" sh tests/migration_chromium_family_test.sh
+    # (0.8.9.6) shared memory's huge pages for Machines: shmem_enabled never -> advise, nothing else (docs/VIRTUALIZATION.md 3.7.2)
+    run "migration 011 shmem-huge-pages" sh tests/migration_shmem_huge_test.sh
+    # (0.8.9.6) LordOS as a Machines guest: the agent port for the video group, lordos-guest started after the update
+    run "migrations 012, 013 guest-agent port" sh tests/migration_guest_port_test.sh
+    # the LordOS Guest Tools disc's installer: its choices per package manager, init system and prompt (tools/guest/install.sh)
+    run "guest-tools install.sh (--plan)" sh tests/guest_tools_install_test.sh
     # fastfetch / neofetch fall back to lordos-fetch; the real package wins (packaging/fallback-bin)
     run "fetch-fallback (fastfetch, neofetch)" sh tests/fetch_fallback_test.sh
     run "mmdb-test" build/mmdb-test
@@ -220,6 +226,7 @@ EOF
     if have node; then run "remotecert-test (sdk/remotecert.js)" node tests/remotecert_test.mjs; fi
     if have node; then run "remotedesk-test (sdk/remotedeskmodel.js)" node tests/remotedesk_test.mjs; fi
     if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
+    if have node; then run "protect-model-test (sdk/protectmodel.js, Machines' protected machines)" node tests/protect_model_test.mjs; fi
     run "spectrum-test" build/spectrum-test
     if have node; then run "soundwave-model-test (sdk/soundwavemodel.js, widgetgrid.js pins)" node tests/soundwave_model_test.mjs; fi
     if have node; then run "statusplace-test (sdk/statusplace.js)" node tests/statusplace_test.mjs; fi
@@ -232,9 +239,16 @@ EOF
     if have node; then run "mem-figure-test (sdk/memfigure.js)" node tests/mem_figure_test.mjs; fi
     if have node; then run "openwith-model-test (sdk/openwithmodel.js, Files' Open with providers)" node tests/openwith_model_test.mjs; fi
     if have node; then run "vm-openwith-test (apps/machines/openwith.js, a machine in Open with)" node tests/vm_openwith_test.mjs; fi
+    if have node; then run "vm-xfer-test (apps/machines/xfer.js, apps/files/quarantine.js: the file copy panel, files from a machine)" node tests/vm_xfer_test.mjs; fi
+    if have node; then run "guest-apps-test (sdk/guestappsmodel.js, guest apps in the launcher)" node tests/guest_apps_test.mjs; fi
     if have node; then run "theme-gallery-test (sdk/themegallery.js, Settings → Appearance)" node tests/theme_gallery_test.mjs; fi
     if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
+    if have node; then run "iso-firmware-test (tools/iso/build.sh firmware list vs the Store map, #227)" node tests/iso_firmware_test.mjs; fi
     if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
+    if have node; then run "vm-group-model-test (apps/machines/model.js groupPlan: a machine group's start and stop order, its link)" node tests/vm_group_model_test.mjs; fi
+    if have node; then run "vm-storage-model-test (apps/machines/storagemodel.js: key steps, recovery key, disposable, Export)" node tests/vm_storage_model_test.mjs; fi
+    if have node; then run "vm-usb-model-test (apps/machines/model.js: host USB devices' menu rows, rules, indicator, permissions)" node tests/vm_usb_model_test.mjs; fi
+    if have node; then run "vm-group-ui-test (apps/machines/group.js and catalog.js: a group's one card, its menu, Start Fresh, its budget, the Whonix card)" node tests/vm_group_ui_test.mjs; fi
     if have node; then run "vm-profiles-test (apps/machines/profiles.js, systems.js: .lordprofile import, your systems, PNG logos, library chips)" node tests/vm_profiles_test.mjs; fi
     if have node; then run "photos-places-test (apps/photos/places.js)" node tests/photos_places_test.mjs; fi
     if have node; then run "photos-trash-test (apps/photos/trash.js)" node tests/photos_trash_test.mjs; fi
@@ -252,6 +266,20 @@ EOF
     if have node; then run "diskplaces-test (sdk/diskplaces.js, #122)" node tests/diskplaces_test.mjs; fi
     if have node; then run "jsx-undeclared-test (every JSX component is declared, #174)" node tests/jsx_undeclared_test.mjs; fi
     if have node; then run "greeter-inbox-test (themes/greeter/inbox.js, #172)" node tests/greeter_inbox_test.mjs; fi
+    # Settings → Flatpak with 200 000 files to measure: never on the main thread (the 2 s freeze of 2026-11-23)
+    sh tests/settings_nofreeze.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "settings-nofreeze (tests/settings_nofreeze.sh, headless lord-server: Settings → Flatpak)" ;;
+        77) skip "settings-nofreeze" "build/lord-server, node and the default theme (make, npm run build)" ;;
+        *) bad "settings-nofreeze (tests/settings_nofreeze.sh, headless lord-server: Settings → Flatpak)" ;;
+    esac
+    # Files → Get Info on a folder of 100 000 files: its size never on the main thread (2026-11-23)
+    sh tests/files_info_nofreeze.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "files-info-nofreeze (tests/files_info_nofreeze.sh, headless lord-server: Files → Get Info)" ;;
+        77) skip "files-info-nofreeze" "build/lord-server, node and the default theme (make, npm run build)" ;;
+        *) bad "files-info-nofreeze (tests/files_info_nofreeze.sh, headless lord-server: Files → Get Info)" ;;
+    esac
     # a popup opened again on the same wl_surface, as GTK 4's popovers, against a headless lord-server (#159)
     sh tests/popup_headless.sh >"$T/out" 2>&1
     case $? in
@@ -265,6 +293,63 @@ EOF
         0) ok "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test: off, move, resize, lock, shortcuts)" ;;
         77) skip "moddrag" "build/lord-server-test and the default theme (make, npm run build)" ;;
         *) bad "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test)"; cat "$T/out" ;;
+    esac
+    # (#232) a fullscreen window's desync subsurface (Firefox's page) repaints its own box, checked against a full repaint
+    sh tests/fsub_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "fsub (tests/fsub_client.c, headless lord-server-test: a fullscreen window's subsurface repaints its box, #232)" ;;
+        77) skip "fsub" "build/lord-server-test and the default theme (make, npm run build)" ;;
+        *) bad "fsub (tests/fsub_client.c, headless lord-server-test, #232)"; cat "$T/out" ;;
+    esac
+    # (#209) an X11 app's menus: an override-redirect and a POPUP_MENU window shown where X put them, clicked, hidden
+    sh tests/xpopup_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "xpopup (tests/xpopup_x11.c, headless lord-server-test + Xwayland: X11 menus shown, clicked, hidden, #209)" ;;
+        77) skip "xpopup" "build/lord-server-test, build/xpopup-x11 (libxcb1-dev), Xwayland and the default theme (make, npm run build)" ;;
+        *) bad "xpopup (tests/xpopup_x11.c, headless lord-server-test + Xwayland, #209)"; cat "$T/out" ;;
+    esac
+    # a Whonix group's members (docs/VIRTUALIZATION.md 19.5): each one's QEMU and passt arguments against Whonix's own
+    # libvirt XML of the pinned release; started paused from two empty disks, nothing boots
+    bash tests/vm_whonix_xml_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-whonix-xml (tests/vm_whonix_xml_test.sh: the members' QEMU arguments against Whonix's XML)" ;;
+        77) skip "vm-whonix-xml" "KVM, QEMU, qemu-img, passt, unshare and python3" ;;
+        *) bad "vm-whonix-xml (tests/vm_whonix_xml_test.sh)"; cat "$T/out" ;;
+    esac
+    # Machines' settings → QEMU arguments as a table (docs/VIRTUALIZATION.md 12): a throwaway machine per row, started
+    # paused (nothing boots), its logged command line checked for what each setting adds and must not
+    python3 -I tests/vm_qemu_args_test.py >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-qemu-args (tests/vm_qemu_args_test.py: $(grep -c '^ok:' "$T/out") rows of settings against QEMU's arguments)" ;;
+        77) skip "vm-qemu-args" "KVM, QEMU, qemu-img, passt, unshare and python3" ;;
+        *) bad "vm-qemu-args (tests/vm_qemu_args_test.py)"; cat "$T/out" ;;
+    esac
+    # protected windows (docs/PRIVACY.md): drawn on the display, the protected fill in a screenshot, the remote desktop's
+    # and recording's frame, the Screenshot portal's still and a window shared alone; the other window captured as shown
+    sh tests/protected_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "protected-windows (tests/protected_headless.sh, headless lord-server-test: output, screenshot, mirror, portal, window share)" ;;
+        77) skip "protected-windows" "build/lord-server-test, python3 and node with esbuild (make, npm install)" ;;
+        *) bad "protected-windows (tests/protected_headless.sh, headless lord-server-test)"; cat "$T/out" ;;
+    esac
+    # Lord Workspaces: a window launched from a display's bar lands on that display, in that activity and its slot, even
+    # after a profile picker and with another activity in view; a dialog told its parent late goes over it; the bar
+    # marks a minimized window (themes/workspaces/model/launches.js; left to right and right to left)
+    for lp in en ar; do
+        mkdir -p -m 700 "$T/launchplace"; LAUNCHPLACE_LANG=$lp LAUNCHPLACE_DIR="$T/launchplace" sh tests/launchplace_headless.sh >"$T/out" 2>&1
+        case $? in
+            0) ok "launch-placement-$lp (tests/launchplace_headless.sh, headless lord-server-test, a fake Chrome with a profile picker)" ;;
+            77) skip "launch-placement-$lp" "build/lord-server-test, build/launchplace-client, python3 and node with esbuild" ;;
+            *) bad "launch-placement-$lp (tests/launchplace_headless.sh)"; cat "$T/out" ;;
+        esac
+    done
+    # launching an app that already runs (a browser's single instance) shows its window, even on a desktop not in view,
+    # and a copy running with no window shows a new one (the 2026-11-23 Google Chrome case)
+    sh tests/handoff_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "handoff (tests/handoff_client.c, headless lord-server: relaunch of a running app, Lord Flow and Lord Workspaces)" ;;
+        77) skip "handoff" "build/lord-server, build/handoff-client and the default theme (make, npm run build)" ;;
+        *) bad "handoff (tests/handoff_client.c, headless lord-server: relaunch of a running app)"; cat "$T/out" ;;
     esac
     # surfaces made children of themselves or of their descendants: refused, lord-server goes on
     sh tests/popup_headless.sh cycle-client >"$T/out" 2>&1
@@ -349,12 +434,99 @@ EOF
         77) skip "machines-cli" "build/lord-server, build/machines, build/lord-vm, KVM, QEMU and the default theme (make, npm run build)" ;;
         *) bad "machines-cli (tests/machinescli_headless.sh, headless lord-server, a throwaway machine)" ;;
     esac
+    # a machine group (Whonix) through a headless lord-server: start order, the link, Tor only through the gateway, no
+    # network with the gateway off, relinked after its restart (tests/vm_group_link.sh; its disks are WHONIX_GW and
+    # WHONIX_WS, docs/VIRTUALIZATION.md 19.0, and several minutes)
+    bash tests/vm_group_link.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-group-link (tests/vm_group_link.sh, headless lord-server, a Whonix group)" ;;
+        77) skip "vm-group-link" "WHONIX_GW and WHONIX_WS (Whonix's disks with a serial shell), KVM, QEMU, unshare and the default theme" ;;
+        *) bad "vm-group-link (tests/vm_group_link.sh, headless lord-server, a Whonix group)"; tail -20 "$T/out" ;;
+    esac
+    # machines shell and console against a stand-in lord-vm (tests/machines_shell_test.sh)
+    bash tests/machines_shell_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "machines-shell (tests/machines_shell_test.sh, machines shell and console against a stand-in lord-vm)" ;;
+        77) skip "machines-shell" "build/machines, cc and python3" ;;
+        *) bad "machines-shell (tests/machines_shell_test.sh, machines shell and console against a stand-in lord-vm)"; tail -20 "$T/out" ;;
+    esac
+    # machines exec, cp, logs and mcp against a real running Linux machine with automation on (tests/vm_exec_e2e.sh;
+    # VM_EXEC_NAME and VM_EXEC_USER, in a private HOME and namespaces)
+    bash tests/vm_exec_e2e.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-exec-e2e (tests/vm_exec_e2e.sh, machines exec, cp, logs and mcp in a real guest)" ;;
+        77) skip "vm-exec-e2e" "VM_EXEC_NAME and VM_EXEC_USER (a running Linux machine with automation on), build/machines and python3" ;;
+        *) bad "vm-exec-e2e (tests/vm_exec_e2e.sh, machines exec, cp, logs and mcp in a real guest)"; tail -20 "$T/out" ;;
+    esac
+    # a machine group's Delete, Rename and Repair, and a base made again from the verified archive, on throwaway groups
+    # made from a fixture archive (tests/vm_group_manage.sh; docs/VIRTUALIZATION.md 19.7-19.9)
+    bash tests/vm_group_manage.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-group-manage (tests/vm_group_manage.sh, lord-vm --group-delete/rename/repair/fresh on throwaway groups)" ;;
+        77) skip "vm-group-manage" "build/lord-vm-testpaths, build/lord-vmunpack, build/machines, qemu-img, qemu-io, xz, tar, python3 and /dev/kvm" ;;
+        *) bad "vm-group-manage (tests/vm_group_manage.sh, lord-vm --group-delete/rename/repair/fresh on throwaway groups)"; tail -20 "$T/out" ;;
+    esac
+    # the same through Machines' own calls in a headless lord-server, in its own namespaces (lord.vm.groups,
+    # groupRenamePlan, groupRename, groupRepair, groupDelete; tests/machines_group_manage_headless.sh)
+    bash tests/machines_group_manage_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "machines-group-manage (tests/machines_group_manage_headless.sh, headless lord-server, throwaway groups)" ;;
+        77) skip "machines-group-manage" "build/lord-server, lord-vm, lord-vm-testpaths, lord-vmunpack, the default theme, /dev/kvm, unshare and an installed catalog and image store to mount over" ;;
+        *) bad "machines-group-manage (tests/machines_group_manage_headless.sh, headless lord-server, throwaway groups)"; tail -20 "$T/out" ;;
+    esac
+    # Machines' storage under real QEMU/KVM (tests/vm_storage_test.sh): encrypted machines, both disposable sessions,
+    # snapshot, clone, Export (.lordvm and OVA), the import of an export (tampered and hostile), raw disks
+    bash tests/vm_storage_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-storage (tests/vm_storage_test.sh, encryption, disposable sessions, Export, raw disks)" ;;
+        77) skip "vm-storage" "build/lord-vm, KVM, QEMU (qemu-img, qemu-io), swtpm, OVMF and python3" ;;
+        *) bad "vm-storage (tests/vm_storage_test.sh, encryption, disposable sessions, Export, raw disks)"; tail -20 "$T/out" ;;
+    esac
+    # snapshots' kept settings (put back, a disk added refused, a running machine's hardware) and Reclaim space's
+    # compression (tests/vm_snap_store_test.sh), real lord-vm, qemu-img and QEMU/KVM
+    bash tests/vm_snap_store_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-snap-store (tests/vm_snap_store_test.sh, snapshots' settings, compression)" ;;
+        77) skip "vm-snap-store" "build/lord-vm, KVM, QEMU (qemu-img, qemu-io), OVMF and python3" ;;
+        *) bad "vm-snap-store (tests/vm_snap_store_test.sh, snapshots' settings, compression)"; tail -20 "$T/out" ;;
+    esac
     # lordos-guest's clipboard tool (xclip, wl-clipboard, none: the hello says "noclip"), stub tools and a socket port
     sh tests/guest_clip_test.sh >"$T/out" 2>&1
     case $? in
         0) ok "guest-clip (tests/guest_clip_test.sh, lordos-guest's clipboard tools)" ;;
         77) skip "guest-clip" "build/lordos-guest and python3" ;;
         *) bad "guest-clip (tests/guest_clip_test.sh, lordos-guest's clipboard tools)" ;;
+    esac
+    # lordos-guest --stopping: the guest's shutdown hook says power off or restart, waits for lord-vm's echo (QEMU issue 4918)
+    sh tests/guest_stop_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guest-stop (tests/guest_stop_test.sh, lordos-guest's shutdown notice)" ;;
+        77) skip "guest-stop" "build/lordos-guest and python3" ;;
+        *) bad "guest-stop (tests/guest_stop_test.sh, lordos-guest's shutdown notice)" ;;
+    esac
+    # lordos-guest 8: the agent's shell (pty, size, exit status, flow control, the host's close) and links and
+    # notifications for the host through its local socket (6.12, 6.18)
+    sh tests/guest_shell_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guest-shell (tests/guest_shell_test.sh, lordos-guest's agent shell, links and notifications)" ;;
+        77) skip "guest-shell" "build/lordos-guest and python3" ;;
+        *) bad "guest-shell (tests/guest_shell_test.sh, lordos-guest's agent shell, links and notifications)" ;;
+    esac
+    # lordos-guest 9: "Send to LordOS" (6.21): the offer, flow control (it stops at the window), a resume after a lost
+    # connection, a prefix that differs, "not now" and "off"
+    sh tests/guest_send_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guest-send (tests/guest_send_test.sh, lordos-guest's Send to LordOS)" ;;
+        77) skip "guest-send" "build/lordos-guest and python3" ;;
+        *) bad "guest-send (tests/guest_send_test.sh, lordos-guest's Send to LordOS)" ;;
+    esac
+    # lordos-guest's performance profile on private buses: the real dconf-service, stand-ins for power-profiles-daemon
+    # and the portal (tests/guest_perf_mock.py)
+    sh tests/guest_perf_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guest-perf (tests/guest_perf_test.sh, lordos-guest's performance profile over D-Bus)" ;;
+        77) skip "guest-perf" "build/lordos-guest, python3 with gi, dbus-daemon, dconf-service and gsettings" ;;
+        *) bad "guest-perf (tests/guest_perf_test.sh, lordos-guest's performance profile over D-Bus)" ;;
     esac
     # a getter that destroys the node lord.setProp / lord.setStyle are writing (Claude Security, 0.8.9)
     sh tests/js_getter_destroy.sh >"$T/out" 2>&1
@@ -404,9 +576,17 @@ EOF
     if have node; then run "vm-catalog-test (apps/machines/catalog.js)" node tests/vm_catalog_test.mjs; fi
     if have node; then run "vm-windows-test (apps/machines/windows.js)" node tests/vm_windows_test.mjs; fi
     if have node; then run "vm-capture-test (apps/machines/capture.js, Capture mouse)" node tests/vm_capture_test.mjs; fi
+    if have node; then run "vm-alldisplays-test (apps/machines/alldisplays.js, All Displays)" node tests/vm_alldisplays_test.mjs; fi
     # Machines: crafted images the import must refuse (needs qemu-img and this computer's qemu-system)
     if have qemu-img && { have qemu-system-x86_64 || have qemu-system-aarch64; } && [ -x build/lord-vm ]; then run "vm-import-test" sh tests/vm_import_test.sh build
     else skip "vm-import-test" "qemu-img, qemu-system"; fi
+    # Machines: renaming a throwaway machine (folder, transfer folder, snapshot, app.json; refusals; running with KVM)
+    sh tests/vm_rename.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-rename (tests/vm_rename.sh, lord-vm --rename and machines rename on throwaway machines)" ;;
+        77) skip "vm-rename" "build/lord-vm, build/machines, qemu-img and python3" ;;
+        *) bad "vm-rename (tests/vm_rename.sh, lord-vm --rename and machines rename on throwaway machines)" ;;
+    esac
     if have node; then run "screenshots-model-test (apps/screenshots)" node tests/screenshots_model_test.mjs; fi
     # the Screenshots toolbar (❖⇧5): options kept and read back, modes, keys, Save to, the remembered selection's handles
     if have node; then run "screenshots-toolbar-model-test (apps/screenshots/toolbarmodel.js)" node tests/screenshots_toolbar_model_test.mjs; fi
@@ -445,6 +625,12 @@ EOF
     if have node; then run "widget-feed-test (sdk/widgetfeedmodel.js)" node tests/widget_feed_test.mjs; else skip "widget-feed-test" node; fi
     if have node; then run "devices-model-test (sdk/devicesmodel.js)" node tests/devices_model_test.mjs; else skip "devices-model-test" node; fi
     if have node; then run "battery-policy-test (sdk/batterypolicy.js)" node tests/battery_policy_test.mjs; else skip "battery-policy-test" node; fi
+    if have node; then run "sentinela-model-test (sdk/sentinelamodel.js, sdk/llmcatalog.js)" node tests/sentinela_model_test.mjs; else skip "sentinela-model-test" node; fi
+    if have node; then run "sentinela-vm-test (sdk/sentinelavm.js: the machine rules)" node tests/sentinela_vm_test.mjs; else skip "sentinela-vm-test" node; fi
+    # (0.8.9.6) Investigate with Lumo: the facts, the strict answer, the evidence, a translation fenced as data
+    if have node; then run "sentinela-investigate-test (sdk/sentinelamodel.js: Investigate and Translate with Lumo)" node --no-warnings tests/sentinela_investigate_test.mjs; else skip "sentinela-investigate-test" node; fi
+    # (0.8.9.6) Get Info's description: the sources' order, the language and the fallback to English
+    if have node; then run "describe-model-test (sdk/describemodel.js)" node --no-warnings tests/describe_model_test.mjs; else skip "describe-model-test" node; fi
     if have node; then run "avatar-model-test (apps/settings/avatarmodel.js)" node tests/avatar_model_test.mjs; else skip "avatar-model-test" node; fi
     if have node; then run "weather-model-test (sdk/weathermodel.js)" node tests/weather_model_test.mjs; else skip "weather-model-test" node; fi
     if have node; then run "vpn-model-test (sdk/vpnmodel.js)" node tests/vpn_model_test.mjs; else skip "vpn-model-test" node; fi
@@ -551,6 +737,12 @@ EOF
     # the column view: what is picked in a deeper column is selected, Select All takes its column (apps/files/colview.js, GitHub #100, #170)
     if have node; then run "files-colview-test (apps/files/colview.js)" node tests/files_colview_test.mjs
     else skip "files-colview-test" "node"; fi
+    # the rubber band: the rectangle, which cards and rows it touches, Shift and Ctrl, autoscroll, right to left, one update per frame (apps/files/marquee.js, GitHub #233)
+    if have node; then run "files-marquee-test (apps/files/marquee.js)" node tests/files_marquee_test.mjs
+    else skip "files-marquee-test" "node"; fi
+    # the slow second click that renames in place: double click, too late, drag, moved pointer, modifiers, selection, focus (sdk/slowclick.js)
+    if have node; then run "slowclick-test (sdk/slowclick.js)" node tests/slowclick_test.mjs
+    else skip "slowclick-test" "node"; fi
     # color tags and comments: the last tag and an emptied comment are removed (apps/files/tags.js, GitHub #181)
     if have node; then run "files-tags-test (apps/files/tags.js)" node tests/files_tags_test.mjs
     else skip "files-tags-test" "node"; fi
@@ -578,6 +770,12 @@ EOF
     # (0.8.8.8) a Linux app's OpenURI request: web addresses, files, and asking when the app is not in front (sdk/portalopenmodel.js)
     if have node; then run "portal-open-model-test (sdk/portalopenmodel.js)" node tests/portal_open_model_test.mjs
     else skip "portal-open-model-test" "node"; fi
+    # the FileChooser portal's dialog: the app's glob filters (Chromium's "*.[pP][dD][fF]") and where it goes (sdk/portalfilemodel.js)
+    if have node; then run "portal-file-model-test (sdk/portalfilemodel.js)" node tests/portal_file_model_test.mjs
+    else skip "portal-file-model-test" "node"; fi
+    # a Chromium-family browser's profiles from its own Local State (untrusted) and the profile an activity or display picks
+    if have node; then run "browser-profiles-test (sdk/browserprofilemodel.js)" node tests/browser_profiles_test.mjs
+    else skip "browser-profiles-test" "node"; fi
     # (0.8.8.8) a Linux app's global shortcuts: the sheet's rows, the combination a key names, what is refused (sdk/globalshortcutsmodel.js)
     if have node; then run "global-shortcuts-model-test (sdk/globalshortcutsmodel.js)" node tests/global_shortcuts_model_test.mjs
     else skip "global-shortcuts-model-test" "node"; fi
@@ -602,6 +800,12 @@ EOF
     # (0.8.8.6) Monitor → Memory: the processes grouped by app (apps/monitor/memtop.js)
     if have node; then run "monitor-memtop-test (apps/monitor/memtop.js)" node tests/monitor_memtop_test.mjs
     else skip "monitor-memtop-test" "node"; fi
+    # (0.8.9.6) Monitor → Processes: Grouped, the steady list, who started it and the origin badges (apps/monitor/procgroupmodel.js)
+    if have node; then run "monitor-procgroup-test (apps/monitor/procgroupmodel.js, seal.js)" node tests/monitor_procgroup_test.mjs
+    else skip "monitor-procgroup-test" "node"; fi
+    # (Machines to 100 %) a running machine's own disk and network numbers on its row (apps/monitor/vmiomodel.js)
+    if have node; then run "monitor-vmio-test (apps/monitor/vmiomodel.js)" node tests/monitor_vmio_test.mjs
+    else skip "monitor-vmio-test" "node"; fi
     # (0.8.6) LordBench's model (apps/sysinfo/perf.js): references, verdicts, comparisons
     if have node; then run "sysinfo-perf-test (apps/sysinfo/perf.js)" node tests/sysinfo_perf_test.mjs
     else skip "sysinfo-perf-test" "node"; fi
@@ -615,6 +819,12 @@ EOF
     # (0.8.8.4, #37) the Store's search (apps/store/search.js): words in any order, joined or apart, accents, keywords
     if have node; then run "store-search-test (apps/store/search.js)" node tests/store_search_test.mjs
     else skip "store-search-test" "node"; fi
+    # (after 0.8.9.5) the Store's installed apps by package system (apps/store/installedmodel.js): the filters, the systems
+    if have node; then run "store-installed-test (apps/store/installedmodel.js)" node tests/store_installed_test.mjs
+    else skip "store-installed-test" "node"; fi
+    # (after 0.8.9.5) Store → Apps LordOS, LordOS's own store (apps/store/lordosmodel.js, assets/store/lordos-apps.json)
+    if have node; then run "store-lordos-test (apps/store/lordosmodel.js)" node tests/store_lordos_test.mjs
+    else skip "store-lordos-test" "node"; fi
     # (0.8.7) what the live ISO opens by itself, the "Check this computer" boot entry and the menu's height
     if have node; then run "livestart-test (sdk/livestart.js, the ISO's boot menu)" node tests/livestart_test.mjs
     else skip "livestart-test" "node"; fi
@@ -624,6 +834,8 @@ EOF
     # (0.8.6) runtime/index.js's skip of unchanged styles sends the same lord.* calls as without it
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "runtime-props-test (runtime/index.js)" node tests/runtime_props_test.mjs
+        # (#234) a mouse's back and forward buttons: a navigate event for the native window under the pointer
+        run "navbuttons-test (runtime/events.js, sdk/navmodel.js)" node tests/navbuttons_test.mjs
     else skip "runtime-props-test" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.3, #20) ScrollView's resetKey: a new page starts at the top, the same one keeps its place
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
@@ -642,6 +854,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "textfield-menu-test (sdk/components.jsx TextInput, TextArea)" node tests/textfield_menu_test.mjs
     else skip "textfield-menu-test" "node and the repository's node_modules (npm install)"; fi
+    # (#238) Notes' storage over a real temporary home: the format, titles, geometry, attachments (odd names, links,
+    # folders, a huge file) and what a link or image may reach (file://, javascript:, absolute paths, ..); writes stay in ~/Notes
+    if have node && [ -d ../node_modules/esbuild ]; then run "notes-store-test (apps/notes/store.js, links.js)" node tests/notes_store_test.mjs
+    else skip "notes-store-test" "node and the repository's node_modules (npm install)"; fi
+    if have node; then run "sysopen-untrusted-test (sdk/runscode.js: attachments that would run never reach a Linux app)" node tests/sysopen_untrusted_test.mjs; else skip "sysopen-untrusted-test" node; fi
     # (0.8.8.8, #117) Notes: Edit and Format menus and the editor's right-click menu send the editor's own keys
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "notes-editor-scene (apps/notes/NoteEditor.jsx, editmenu.js)" node tests/textfield_menu_test.mjs notes_editor_scene.mjs
@@ -653,6 +870,8 @@ EOF
         run "screenshots-toolbar-scene (apps/screenshots/toolbar.jsx)" node tests/textfield_menu_test.mjs screenshots_toolbar_scene.mjs
         # (#200) Backups: Choose… for the destination (no Cloud folder) and the exclusions (inside home), typing still works
         run "backup-pickers-scene (apps/backup/index.jsx, FilePicker cloud={false})" node tests/textfield_menu_test.mjs backup_pickers_scene.mjs
+        # (#231) Backups' restore browser: a file's icon isn't an empty check box, a long name ends with … on Restore
+        run "backup-restore-scene (apps/backup/index.jsx, sdk Button)" node tests/textfield_menu_test.mjs backup_restore_scene.mjs
     else skip "notes-editor-scene" "node and the repository's node_modules (npm install)"; fi
     # a password TextInput: the eye shows it and keeps the focus, copies nothing, hides on blur; ⇪ follows Caps Lock
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
@@ -675,6 +894,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "screencast-scene (sdk/screencast.jsx)" node tests/textfield_menu_test.mjs screencast_scene.mjs
     else skip "screencast-scene" "node and the repository's node_modules (npm install)"; fi
+    # LordOS Studio's ways in: the capture panel's Mic Mode entry with the microphone only (no preview), Video effects
+    # with the camera, the LordOS Studio app's window and its launcher listing (sdk/capturestatus.jsx, sdk/studio.jsx)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "capture-studio-scene (sdk/capturestatus.jsx, sdk/studio.jsx, apps/studio)" node tests/textfield_menu_test.mjs capture_studio_scene.mjs
+    else skip "capture-studio-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) the Store's "Add from an address" sheet: https only, the origin lord-web read, Install sends no URL
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "webapps-sheet-scene (apps/store/addweb.js)" node tests/textfield_menu_test.mjs webapps_sheet_scene.mjs
@@ -687,6 +911,9 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "store-trademark-scene (apps/store/trademark.js)" node tests/textfield_menu_test.mjs store_trademark_scene.mjs
         run "battery-settings-scene (apps/settings/Battery.jsx)" node tests/textfield_menu_test.mjs battery_settings_scene.mjs
+        # Sentinela (docs/SENTINELA.md): a rule's desktop notification with the closed actions, and its Settings page
+        run "sentinela-notify-scene (sdk/sentinela.js)" node tests/textfield_menu_test.mjs sentinela_notify_scene.mjs
+        run "sentinela-settings-scene (apps/settings/Sentinela.jsx)" node tests/textfield_menu_test.mjs sentinela_settings_scene.mjs
     else skip "store-trademark-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.9.5) the Store's long lists load their next page near the end of the scroll
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
@@ -696,6 +923,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "store-card-scene (apps/store/ui.js)" node tests/textfield_menu_test.mjs store_card_scene.mjs
     else skip "store-card-scene" "node and the repository's node_modules (npm install)"; fi
+    # (after 0.8.9.5) an origin's second column: Installed first, then its categories; the general Installed page's filters
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "store-origin-scene (apps/store/origincol.js)" node tests/textfield_menu_test.mjs store_origin_scene.mjs
+    else skip "store-origin-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) Tab between the SDK's controls, the focus ring, Space and Enter, the arrows, a press that ends the focus (sdk/focus.js)
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "focus-scene-test (sdk/focus.js, sdk/components.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs
@@ -735,6 +966,20 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-colview-scene (apps/files/views.jsx ColumnView)" node tests/menubar_test.mjs files_colview_scene.mjs
     else skip "files-colview-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6) Monitor → Processes grouped: the groups, a hover summary, Quit All on a snapshot, a child's Quit, the badges,
+    # the chain and the held order
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "monitor-grouped-scene (apps/monitor/Processes.jsx)" node tests/menubar_test.mjs monitor_grouped_scene.mjs
+    else skip "monitor-grouped-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6) Monitor → Processes: opening a group of 300 programs draws only the rows in sight, a few per pass, within
+    # a frame (the desktop froze for a second), and a redraw keeps the rows whose values didn't change
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "monitor-freeze-scene (sdk/lists.jsx Table sight, apps/monitor/Processes.jsx)" node tests/menubar_test.mjs monitor_freeze_scene.mjs
+    else skip "monitor-freeze-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6) Get Info's Description and Investigate with Lumo: only on the click, the closed actions, Blocklist asks first
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "monitor-describe-scene (apps/monitor/Describe.jsx)" node tests/menubar_test.mjs monitor_describe_scene.mjs
+    else skip "monitor-describe-scene" "node and the repository's node_modules (npm install)"; fi
     # (#218) Files: dragging in a folder of 2000 files draws only the ghost and the drop highlights, never the whole window
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-drag-scene (apps/files/dnd.jsx)" node tests/menubar_test.mjs files_drag_scene.mjs
@@ -787,6 +1032,11 @@ EOF
     if [ -x build/lord-web ] && have python3 && have bwrap && have xdg-dbus-proxy; then
         run "web-probe-test (lord-web --probe)" python3 -I tests/web_probe_test.py build/lord-web
     else skip "web-probe-test" "wpe-webkit-2.0 (build/lord-web), bubblewrap, xdg-dbus-proxy and python3"; fi
+    # (in development) lord-web's view backend alone (src/web/webback.h, legacy or WPEPlatform, the one mk/web.mk built):
+    # a local page's pixels, a click, keys and the wheel reaching its listeners, a resize, scale 2, hidden and shown
+    if [ -x build/web-backend-test ] && have bwrap && have xdg-dbus-proxy; then
+        run "web-backend-test ($(cat build/gen/web_backend 2>/dev/null) backend)" build/web-backend-test
+    else skip "web-backend-test" "wpe-webkit-2.0 (build/web-backend-test), bubblewrap and xdg-dbus-proxy"; fi
     # (0.8.8.6) Claude Code in the Terminal's footer: the status line bridge and the footer's model
     run "claude-bridge-test (lord-claude-status)" sh tests/claude_bridge_test.sh
     if have node; then run "terminal-claude-test (apps/terminal/claude.js)" node tests/terminal_claude_test.mjs
@@ -870,6 +1120,16 @@ EOF
             ln -sf "$(cd "$(dirname "$f")" && pwd)/$(basename "$f")" "$T/fonts/$(basename "$f")"; done
         run "hb_compare.py (HarfBuzz)" python3 tests/hb_compare.py "$T/fonts" build/shape-test
     else skip "hb_compare.py" "python3 with uharfbuzz (pip install uharfbuzz) and fonts-noto-core/fonts-noto-cjk"; fi
+    # Files' slow second click that renames in place (sdk/slowclick.js), driven as a mouse in a headless lord-server, in
+    # every desktop: the icon, list and column views, and the clicks that must not rename (about a minute each)
+    for th in default classic workspaces celeste; do
+        SCENE_TIMEOUT=300 sh tests/app_scene_headless.sh files_slowrename_scene "$T/scene" "$th" >"$T/out" 2>&1
+        case $? in
+            0) ok "files-slowrename-scene $th (tests/files_slowrename_scene, headless lord-server)" ;;
+            77) skip "files-slowrename-scene $th" "build/lord-server and themes/$th/theme.bundle.js (make, npm run build)" ;;
+            *) bad "files-slowrename-scene $th (tests/files_slowrename_scene, headless lord-server)" ;;
+        esac
+    done
 }
 
 case $mode in

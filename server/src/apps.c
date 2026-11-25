@@ -28,7 +28,9 @@
  *
  * Every launch carries an xdg-activation token (XDG_ACTIVATION_TOKEN, wl/xdgact.c): the new window, or
  * the window of the copy already running that the new process hands the link or file to (a browser),
- * comes to the front, because the person asked for it. */
+ * comes to the front, because the person asked for it. A copy that takes the launch over without the token
+ * (Google Chrome asks for one of its own) is granted once by that unused launch token (wl/xdgact.h
+ * xact_take_launch, wl.c launch_was_for, apps_window_names below). */
 #include "apps.h"
 #include "lordlog.h"
 #include "iconfind.h"
@@ -46,6 +48,7 @@
 #include "fpspawner.h"
 #include "fplend.h"
 #include "sec/pathcanon.h"
+#include "sec/json.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -234,6 +237,7 @@ static int parse_desktop(const char *file, const char *lang, Entry *e) {
     free(line);
     fclose(f);
     unescape(e->a.name); unescape(e->a.name_c); unescape(e->a.generic); unescape(e->a.comment);
+    e->a.comment_l10n = e->ranks[2] >= 2;
     for (int i = 0; i < e->nact; i++) unescape(e->act[i].label);
     snprintf(e->a.file, sizeof e->a.file, "%s", file);
     return 0;
@@ -719,8 +723,8 @@ static FilesPlan *view_plan(const char *cwd) {
 static char last_error[64];
 const char *apps_last_error(void) { return last_error; }
 
-static int launch(const char *id, const char *file, const char *action);
-int apps_launch(const char *id) { return launch(id, NULL, NULL); }
+static int launch(const char *id, const char *file, const char *action, const char *extra);
+int apps_launch(const char *id) { return launch(id, NULL, NULL, NULL); }
 
 /* A desktop action of the entry that may run: listed in its Actions= key, with a valid name, a
  * label and an Exec line. NULL otherwise. */
@@ -824,7 +828,7 @@ int apps_launch_terminal(const char *id, char *token, size_t n) {
 int apps_launch_action(const char *id, const char *action) {
     last_error[0] = 0;
     if (!action || !valid_action(action)) return -1;
-    return launch(id, NULL, action);
+    return launch(id, NULL, action, NULL);
 }
 
 /* ---- which entry runs a program (a name to show, never a decision) ---- */
@@ -886,6 +890,12 @@ void apps_name_of_program(const char *exe, const char *flatpak_id, const char *h
     free(buf);
 }
 
+int apps_window_names(const char *desktop_id, const char *app_id) {
+    if (!app_id || !app_id[0]) return 0;
+    const DesktopApp *a = find_app(desktop_id);
+    return a && entry_hinted(a, app_id);
+}
+
 /* Opening a file with an app: only an app that declares MimeType (accepts files), a real
  * path inside the home folder or /media/$USER (fsops_allowed), a regular file or folder,
  * and only if its Exec has a file code: the path goes as ONE argument. */
@@ -903,7 +913,7 @@ int apps_launch_with(const char *id, const char *path) {
         def[strlen(def) - 8] = 0;                       /* without ".desktop" */
         id = def;
     }
-    return launch(id, real, NULL);
+    return launch(id, real, NULL, NULL);
 }
 
 /* ---- Flatpak apps (docs/FLATPAK.md; AGENTS.md "Flatpak as an app source", E1 and E2) ----
@@ -1332,7 +1342,7 @@ int apps_launch_uri(const char *id, const char *uri) {
         char mime[32];
         snprintf(mime, sizeof mime, "x-scheme-handler/%s", schemes[i]);
         if (!a || !list_has(a->mime, mime)) return -1;
-        return launch(id, uri, NULL);
+        return launch(id, uri, NULL, NULL);
     }
     return -1;
 }
@@ -1553,11 +1563,14 @@ int apps_launch_view_main(void) {
     return 127;
 }
 
-static int launch(const char *id, const char *file, const char *action) {
+/* extra: one more argv element after the Exec line's (apps_launch_profile's --profile-directory=, built here), or NULL */
+static int launch(const char *id, const char *file, const char *action, const char *extra) {
     last_error[0] = 0;
     if (file && action) return -1;
+    if (extra && (file || action)) return -1;
     const DesktopApp *a = find_app(id);
     if (!a) return -1;
+    if (extra && a->user) return -1;       /* the profile argument only ever goes to a system .desktop's Exec */
     /* the file is read again: what counts is what it says now */
     Entry *e = malloc(sizeof *e);
     char *buf = malloc(4096);
@@ -1571,7 +1584,10 @@ static int launch(const char *id, const char *file, const char *action) {
         const Action *act = entry_action(e, action);
         if (act) exec = act->exec; else ok = 0;
     }
-    ok = ok && split_exec(exec, e, argv, buf, 4096, file, &used) > 0 && (!file || used) && !find_program(argv[0], a->user, prog, sizeof prog);
+    int argc = ok ? split_exec(exec, e, argv, buf, 4096, file, &used) : 0;
+    ok = ok && argc > 0 && (!file || used) && !find_program(argv[0], a->user, prog, sizeof prog);
+    /* split_exec leaves room (MAX_ARGS - 3): the one extra element, then the end */
+    if (ok && extra) { argv[argc++] = (char *)extra; argv[argc] = NULL; }
     char cwd[PATH_MAX] = "";
     if (ok && e->path[0] == '/') snprintf(cwd, sizeof cwd, "%s", e->path);
     free(e);
@@ -1652,4 +1668,76 @@ static int launch(const char *id, const char *file, const char *action) {
     if (pid < 0) return -1;
     waitpid(pid, NULL, 0);
     return 0;
+}
+
+/* ---- lord.apps.launchProfile (approved by the maintainer 2026-11-24; docs/WORKSPACES.md "Browser profiles") ----
+ * A Chromium-family browser opened in one of its own profiles: the plain launcher plus ONE argv element,
+ * "--profile-directory=<profile>", built here. Only the browsers of this fixed table, only from their system
+ * .desktop (never ~/.local/share/applications), and only a profile folder of the browser's own form that its own
+ * Local State lists (profile.info_cache). The Local State is the browser's file, writable by anything that runs as the
+ * person: it is read without following a link, as a regular file of at most PROFILE_STATE_MAX bytes, parsed strictly
+ * (sec/json.c), and only its keys are compared; nothing in it becomes an argument or a path. */
+#define PROFILE_STATE_MAX (1024 * 1024)
+static const struct { const char *id, *state; } profile_browsers[] = {
+    { "google-chrome", ".config/google-chrome/Local State" },
+    { "google-chrome-beta", ".config/google-chrome-beta/Local State" },
+    { "chromium", ".config/chromium/Local State" },
+    { "brave-browser", ".config/BraveSoftware/Brave-Browser/Local State" },
+    { "microsoft-edge", ".config/microsoft-edge/Local State" },
+};
+
+/* ^(Default|Profile [1-9][0-9]{0,3})$ */
+int apps_profile_name_ok(const char *p) {
+    if (!p) return 0;
+    if (!strcmp(p, "Default")) return 1;
+    if (strncmp(p, "Profile ", 8) || p[8] < '1' || p[8] > '9') return 0;
+    int digits = 1;
+    for (const char *q = p + 9; *q; q++, digits++) if (*q < '0' || *q > '9' || digits >= 4) return 0;
+    return 1;
+}
+
+/* 1 when the browser's Local State lists that profile folder */
+static int profile_listed(const char *rel, const char *profile) {
+    const char *home = getenv("HOME");
+    if (!home || home[0] != '/') return 0;
+    char path[PATH_MAX];
+    if ((size_t)snprintf(path, sizeof path, "%s/%s", home, rel) >= sizeof path) return 0;
+    int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (fd < 0) return 0;
+    struct stat st;
+    if (fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > PROFILE_STATE_MAX) { close(fd); return 0; }
+    size_t len = (size_t)st.st_size;
+    char *text = malloc(len + 1);
+    size_t got = 0;
+    while (text && got < len) {
+        ssize_t r = read(fd, text + got, len - got);
+        if (r <= 0) break;
+        got += (size_t)r;
+    }
+    close(fd);
+    if (!text || got != len) { free(text); return 0; }
+    text[len] = 0;
+    JDoc doc;
+    int found = 0;
+    if (!json_parse(text, len, &doc, NULL, 0)) {
+        const JVal *cache = json_get(json_get(doc.root, "profile"), "info_cache");
+        if (cache && cache->type == J_OBJ)
+            for (const JVal *k = cache->kid; k && !found; k = k->next) found = k->key && !strcmp(k->key, profile) && k->type == J_OBJ;
+        json_free(&doc);
+    }
+    free(text);
+    return found;
+}
+
+int apps_launch_profile(const char *id, const char *profile) {
+    last_error[0] = 0;
+    if (!id || !apps_profile_name_ok(profile)) return -1;
+    const char *rel = NULL;
+    for (size_t i = 0; i < sizeof profile_browsers / sizeof profile_browsers[0]; i++)
+        if (!strcmp(profile_browsers[i].id, id)) rel = profile_browsers[i].state;
+    char sys[PATH_MAX];
+    if (!rel || apps_system_file(id, sys, sizeof sys) || !profile_listed(rel, profile)) return -1;
+    char arg[64];
+    snprintf(arg, sizeof arg, "--profile-directory=%s", profile);
+    return launch(id, NULL, NULL, arg);
 }

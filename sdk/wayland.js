@@ -9,7 +9,7 @@
 import { createElement as h, Fragment } from 'react';
 import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard, displayFor, screen, onScreenChange } from '@lordos/runtime';
 import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, overviewShowing, workAreaOf, isWindowLocked, windowLocks } from './windows.js';
-import { followParents, overParent } from './dialogmodel.js';
+import { followParents, overParent, lateParentFrame } from './dialogmodel.js';
 import { tiledEdges } from './snap.js';
 import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, coveredIds, isNoticeWindow, noticeFrame, NOTICE_MAX_W, NOTICE_MAX_H, ownLayer, layerName } from './desktopmodel.js';
 import { desktopOfSurface } from './desktops.js';
@@ -102,6 +102,8 @@ addListener('pointermove', (e) => { if (tdrag) followDrag(e.x, e.y); });
 // a Linux app's drag of files released over LordOS: who claimed it at the release (wayland.takeDrop) gets the
 // paths once lord-server has read them ('filesdrop' on window 0)
 let dropTaker = null;
+// when each Linux window showed and where: a dialog told its parent late goes over it (case 'parent')
+const mappedAt = new Map();
 // The icon a Linux window set for itself (xdg-toplevel-icon), re-encoded by lord-server: kept per window, shown only when
 // its app has no installed icon (sdk/apps.js windowIcon: the installed app's icon always wins)
 function windowOwnIcon(sid, id) {
@@ -179,6 +181,9 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
         args,
         desktop: owner ? owner.desktop : saved?.desktop ?? desktopOfSurface(sid),    // restored, or still open across a theme switch
       });
+      // when it showed and the size it asked for (not a remembered frame of its app's): a dialog told its parent late
+      mappedAt.set(id, { t: Date.now(), frame: { w, h: hh } });
+      if (mappedAt.size > 256) mappedAt.delete(mappedAt.keys().next().value);
       if (restored) { if (restored.max) wm.toggleMaximize(id); } else saved?.then(id);
       // always on top or kept below: what an X11 app asked for (_NET_WM_STATE_ABOVE / _BELOW), or the layer the
       // window had before a theme switch
@@ -186,21 +191,30 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       if (kept?.maximized) wm.toggleMaximize(id);
       // app .lpk aislada: su nombre (del manifest) en vez del id
       { const pkg = d.appId ? getApp(d.appId) : null; wm.setTitle(id, pkg && (pkg.package || pkg.isolated) && (!d.title || d.title === d.appId) ? (pkg.isolated ? appName(pkg) : pkg.name) : (d.title || args.tagDescription || d.appId || null)); }
-      // a built-in isolated app that asks for it (manifest "protected": Passwords) is black in captures
+      // a built-in isolated app that asks for it (manifest "protected": Passwords) is the protected fill in captures
       if (d.appId && getApp(d.appId)?.isolated && getApp(d.appId)?.protected) wm.setProtected(id, true);
       wm.setCloseGuard(id, () => { lord.wayland.close(sid); return false; });   // la app decide cuándo cierra
       windowOwnIcon(sid, id);
       if (d.appId && (getApp(d.appId)?.package || getApp(d.appId)?.isolated)) setTimeout(() => applyAppMenus(d.appId), 0);   // menús de la app aislada (ya mapeada)
       break;
     }
-    case 'unmap': if (win) wm.close(id, true); if (windowPixelIcons.get()[id]) windowOwnIcon(-1, id); break;
+    case 'unmap': mappedAt.delete(id); if (win) wm.close(id, true); if (windowPixelIcons.get()[id]) windowOwnIcon(-1, id); break;
     case 'icon': windowOwnIcon(sid, id); break;       // xdg_toplevel_icon_manager_v1.set_icon, committed (X11: _NET_WM_ICON)
     case 'taskbar': if (win) wm.setArgs(id, { skipTaskbar: !!d.skip }); break;   // X11 _NET_WM_STATE_SKIP_TASKBAR changed
     case 'pager': if (win) wm.setArgs(id, { skipPager: !!d.skip }); break;       // X11 _NET_WM_STATE_SKIP_PAGER changed
     // X11 _NET_WM_STATE_ABOVE / _BELOW changed: its layer (it never takes the keyboard by it, desktopmodel.js stackOrder)
     case 'layer': if (win) wm.setLayer(id, layerName(d.layer)); break;
     // the window it belongs to changed, or it became modal or not (xdg-foreign, xdg-dialog-v1)
-    case 'parent': if (win) wm.setArgs(id, { parent: d.parent ? idOf(d.parent) : null, modal: !!d.parent && !!d.modal, dialog: win.args?.dialog || !!d.parent }); break;
+    case 'parent': {
+      if (!win) break;
+      wm.setArgs(id, { parent: d.parent ? idOf(d.parent) : null, modal: !!d.parent && !!d.modal, dialog: win.args?.dialog || !!d.parent });
+      // told only after it showed (X11's WM_TRANSIENT_FOR read late, a GTK dialog's xdg-foreign parent): over its parent
+      // now, on the parent's display and desktop, unless the person already moved it (dialogmodel.js lateParentFrame)
+      const owner = d.parent ? wm.get(idOf(d.parent)) : null;
+      const to = owner ? lateParentFrame(wm.get(id), wm.frame(owner), mappedAt.get(id), Date.now(), workAreaOf(displayFor(owner))) : null;
+      if (to) { if (owner.desktop !== undefined && wm.get(id)?.desktop !== owner.desktop) wm.moveToDesktop(id, owner.desktop); wm.setFrame(id, to); }
+      break;
+    }
     case 'title': {                      // an isolated app keeps its name when the title is just its id
       if (!win) break;
       // a window taken for a notification popup that names itself is a normal window after all

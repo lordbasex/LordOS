@@ -65,5 +65,6 @@
   "ask.vr": "„{app}“ möchte die VR-Brille {headset} verwenden",
   "ask.vrNote": "Ihr Display gehört dann allein der App; LordOS zeigt dort nie deinen Schreibtisch. Es wird zurückgenommen, wenn die App schließt, die Brille abgesteckt wird oder der Bildschirm sich sperrt. Du kannst das später unter Einstellungen → Datenschutz ändern.",
   "perm.vr": "VR-Brillen",
-  "permHint.vr": "Apps, die das Display einer VR-Brille direkt ansteuern dürfen. Verliehen werden nur Brillen, nie deine Monitore, und sie werden zurückgenommen, wenn sich der Bildschirm sperrt, du den Benutzer wechselst oder Verweigern wählst."
+  "permHint.vr": "Apps, die das Display einer VR-Brille direkt ansteuern dürfen. Verliehen werden nur Brillen, nie deine Monitore, und sie werden zurückgenommen, wenn sich der Bildschirm sperrt, du den Benutzer wechselst oder Verweigern wählst.",
+  "protectedCapture": "Geschütztes Fenster"
 }

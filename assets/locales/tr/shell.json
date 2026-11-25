@@ -586,9 +586,12 @@
   "ws.lock.on": "Bu ekranın pencerelerini kilitle",
   "ws.lock.off": "Bu ekranın pencerelerinin kilidini aç",
   "ws.lock.window": "Kilitli: çerçevedeki asma kilitle açın",
-  "ws.minimized.label": "Simge durumunda",
-  "ws.minimized.title": "Bu ekranda simge durumundaki pencereler: geri getirmek için tıklayın",
   "ws.slot.free": "Boş alan: bir uygulama açın veya simge durumundakini geri getirin",
+  "ws.windows.title": "Bu etkinliğin bu ekrandaki pencereleri (simge durumundakilerin altında çizgi): öne getirmek için birine tıklayın; o uygulamanın pencereleri için sağ tıklayın",
+  "ws.profile.ask": "Tarayıcı seçsin",
+  "ws.profile.open": "{profile} profilini aç",
+  "ws.profile.activity": "Bu etkinliğin açtığı profil",
+  "ws.profile.display": "Bu ekranın açtığı profil ({display})",
   "ws.snapfly.title": "Pencereyi yerleştir",
   "ws.snapfly.halves": "Yarımlar",
   "ws.snapfly.thirds": "Üçte birler",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "LordOS Studio üzerinden kamera",
   "capture.what.effectsOn": "efektler açık",
   "capture.what.effectsOff": "efekt yok",
-  "shortcuts.captureWindow": "Bir pencerenin ekran görüntüsü"
+  "shortcuts.captureWindow": "Bir pencerenin ekran görüntüsü",
+  "themeSwitch.changing": "Masaüstü stili değiştiriliyor…",
+  "themeSwitch.changingTo": "{name} stiline geçiliyor…",
+  "themeSwitch.failedTitle": "{name} uygulanamadı",
+  "themeSwitch.refusedBody": "Kodu LordOS’un imzalı kopyasıyla eşleşmiyor, bu yüzden yüklenmedi. Masaüstü stiliniz olduğu gibi kalıyor.",
+  "themeSwitch.failedBody": "Başlamadı. Masaüstü stiliniz olduğu gibi kalıyor.",
+  "spotlight.section.machines": "Sanal Makineler",
+  "guestApps.inMachine": "{machine} içinde"
 }

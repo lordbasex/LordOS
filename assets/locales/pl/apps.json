@@ -35,5 +35,6 @@
   "sysinfo": "Informacje o systemie",
   "sysprobe": "Test piaskownicy",
   "terminal": "Terminal",
-  "databases": "Bazy danych"
+  "databases": "Bazy danych",
+  "studio": "LordOS Studio"
 }

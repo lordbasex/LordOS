@@ -1,10 +1,14 @@
 // backup.js — Backups (lord.backup, see server/src/backup and docs/SYSTEM.md).
 //
 //   const st = useBackup()            live status: { state, progress, last, next, dest, … }
+//                                     last.machinesBusy / machinesBusyNames: machines that were running, whose disks in that
+//                                     backup are the previous one's; last.machinesLeftOut: machines with "backup": false
 //   backup.config() / backup.configure({ dest, interval, pauseOnBattery, exclude })
 //   backup.runNow() / pause(on) / cancel()
 //   backup.list() → [{ id, time }]    backup.ls(id, rel) → [{ name, dir, link, size, mtime }]
-//   backup.restore(id, rel, { replace, suffix })   ('' = everything; result in status.restore)
+//   backup.restore(id, rel, { replace, suffix })   ('' = everything; result in status.restore); rel may be a list of up
+//                                     to 64 files and folders (#231): status.restore.index/count/current while it runs,
+//                                     .failed [{ rel, error }] after
 //   backup.unlock(pass, create) / backup.lock()     encrypted backups (result in status.unlock)
 //
 // A lord-server thread at the lowest priority does the copying; the status is pushed

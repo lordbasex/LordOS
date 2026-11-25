@@ -87,7 +87,15 @@ int wl_draws_meet(Rect r) {
     }
     return 0;
 }
-void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)r; (void)op; }
+/* a media node: nothing, except source PROT_MEDIA_ID, which paints a protected machine's picture (red, as the protected
+ * tests' secret) for test_protected_media; media_id_protected says whether that source is marked protected */
+enum { PROT_MEDIA_ID = 4242 };
+static int prot_media_marked;
+void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) {
+    (void)node; (void)r;
+    if (id == PROT_MEDIA_ID) canvas_rrect(c, x, y, w, h, 0, ((uint32_t)(op * 255 + 0.5f) << 24) | 0xd01010);
+}
+int media_id_protected(int id) { return id == PROT_MEDIA_ID && prot_media_marked; }
 void media_paint_note(Canvas *c, int id, int node, float x, float y, float w, float h, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)op; }
 int media_cover_node(float x0, float y0, float x1, float y1) { (void)x0; (void)y0; (void)x1; (void)y1; return 0; }
 int gpu_active(void) { return test_gpu; }
@@ -676,8 +684,10 @@ static void test_capture_until(void) {
 
 /* Protected windows (wm.setProtected: the vault, a password prompt, the lock screen's fields, "Protect front window") with
  * Screenshots' screen permission allowed by default (GitHub #219, approved 2026-11-22): nothing about the capture changed
- * for them. In a capture of the whole screen (and so of an area, a crop of it) the protected window is black and what
- * covers it still shows; asked for alone (the window capture) it is refused with nothing painted. */
+ * for them. In a capture of the whole screen (and so of an area, a crop of it) the protected window is the protected
+ * fill (opaque, neutral, a lock when it has room; black before 2026-11-23) and what covers it still shows; asked for
+ * alone (the window capture) it is refused with nothing painted. */
+#define PROT_RGB (PAINT_PROTECT_FILL & 0xffffff)
 static void test_capture_protected(void) {
     ui_reset();
     Node *root = view(NULL);
@@ -696,7 +706,7 @@ static void test_capture_protected(void) {
     Canvas c;
     canvas_init(&c, px, 160, 100, 160);
     paint_capture(&c, root);
-    CHECK((px[30 * 160 + 80] & 0xffffff) == 0x000000, "the whole screen: the protected content is black: %06x", px[30 * 160 + 80]);
+    CHECK((px[30 * 160 + 80] & 0xffffff) == PROT_RGB, "the whole screen: the protected content is the fill: %06x", px[30 * 160 + 80]);
     CHECK((px[60 * 160 + 130] & 0xffffff) == 0xff0000, "a window above it still shows: %06x", px[60 * 160 + 130]);
     CHECK((px[20 * 160 + 20] & 0xffffff) == 0x00ffff, "another window is captured: %06x", px[20 * 160 + 20]);
     CHECK(!paint_capture_mode, "capture mode is over");
@@ -728,12 +738,299 @@ static void test_capture_protected(void) {
     CHECK(pix(30, 25) == 0xff00ff, "on screen the prompt shows: %06x", pix(30, 25));
     memset(px, 0, 160 * 100 * 4);
     paint_capture(&c, root);
-    CHECK((px[25 * 160 + 30] & 0xffffff) == 0x000000 && (px[50 * 160 + 40] & 0xffffff) == 0x000000,
-          "the prompt and its field are black: %06x %06x", px[25 * 160 + 30], px[50 * 160 + 40]);
-    CHECK((px[35 * 160 + 10] & 0xffffff) == 0x000000, "the password field in the window is black: %06x", px[35 * 160 + 10]);
+    CHECK((px[25 * 160 + 30] & 0xffffff) == PROT_RGB && (px[50 * 160 + 40] & 0xffffff) == PROT_RGB,
+          "the prompt and its field are the fill: %06x %06x", px[25 * 160 + 30], px[50 * 160 + 40]);
+    CHECK((px[35 * 160 + 10] & 0xffffff) == PROT_RGB, "the password field in the window is the fill: %06x", px[35 * 160 + 10]);
     CHECK((px[5 * 160 + 5] & 0xffffff) == 0x00ffff, "the rest of that window is captured: %06x", px[5 * 160 + 5]);
     CHECK(paint_capture_until(&c, root, other->id, NULL, 0) == -1, "a window holding a password field is refused alone");
     free(px);
+}
+
+/* ---- protected windows: the capture paths never get their pixels (docs/PRIVACY.md "Protected windows") ----
+ * Every picture of the screen that leaves lord-server is painted in capture mode by one of paint_capture (screenshots,
+ * the recording's and remote desktop's copy, a shared screen, the Screenshot portal), paint_capture_until (a window
+ * alone, Screenshots) or paint_capture_node (a shared window). The window's own content here is red (r well above g
+ * and b) and nothing else in the scene is: every other colour, the fill and its lock have r <= g, so any blend of them
+ * keeps r <= g, and a pixel with r > g is a protected pixel that leaked. */
+static int leak_px(uint32_t p) {
+    int r = (p >> 16) & 255, g = (p >> 8) & 255;
+    return r > g + 6;
+}
+static int leaks(const uint32_t *px, int w, int h) {
+    int n = 0;
+    for (int i = 0; i < w * h; i++) n += leak_px(px[i]);
+    return n;
+}
+static uint32_t prng_s;
+static uint32_t prng(void) { prng_s = prng_s * 1664525u + 1013904223u; return prng_s >> 8; }
+static float pfrand(float a, float b) { return a + (b - a) * (float)(prng() % 10001) / 10000.0f; }
+
+/* A protected window under a transform the screen's frames already rasterized (the overview's scale, an effect, its own
+ * rotation): the cached raster holds the real pixels, and a capture must paint the subtree again (tf_paint, 2026-11-23:
+ * before that the overview's raster went into screenshots and the remote desktop as it was). */
+static void test_protected_transform_cache(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xffffffff);
+    Node *ov = view(root);                              /* the overview: every window scaled */
+    ss(ov, "position", "absolute");
+    sn(ov, "left", 0); sn(ov, "top", 0); sn(ov, "width", 200); sn(ov, "height", 120);
+    sn(ov, "scaleX", 0.7); sn(ov, "scaleY", 0.7);
+    Node *win = box_in(ov, 20, 10, 120, 90, 0xffd01010);   /* the protected window: red */
+    box_in(win, 10, 30, 60, 30, 0xffff2020);
+    win->protect = 1;
+    Node *other = box_in(ov, 150, 40, 40, 40, 0xff2060ff);
+    render(root, 200, 120);
+    render(root, 200, 120);                             /* twice: the raster is cached and valid */
+    CHECK(leaks(fb, 200, 120) > 100, "on the screen the protected window shows through the transform");
+    uint32_t *px = calloc(200 * 120, 4);
+    Canvas c;
+    canvas_init(&c, px, 200, 120, 200);
+    paint_capture(&c, root);
+    CHECK(!leaks(px, 200, 120), "a capture through a cached transform: %d protected pixels leaked", leaks(px, 200, 120));
+    int fill = 0;
+    for (int i = 0; i < 200 * 120; i++) fill += (px[i] & 0xffffff) == PROT_RGB;
+    CHECK(fill > 2000, "the fill is there, scaled with the window: %d px", fill);
+    memset(px, 0, 200 * 120 * 4);
+    CHECK(paint_capture_node(&c, root, other->id, NULL, 0) == 1 && !leaks(px, 200, 120), "a window shared alone beside it");
+    memset(px, 0, 200 * 120 * 4);
+    paint_capture_node(&c, root, win->id, NULL, 0);     /* the protected window shared alone: the fill only */
+    CHECK(!leaks(px, 200, 120), "the protected window shared alone: %d leaked", leaks(px, 200, 120));
+    /* its own rotation, cached, and an ancestor's opacity */
+    sn(ov, "scaleX", 1); sn(ov, "scaleY", 1);
+    sn(win, "rotate", 12);
+    sn(ov, "opacity", 0.8);
+    render(root, 200, 120);
+    render(root, 200, 120);
+    memset(px, 0, 200 * 120 * 4);
+    paint_capture(&c, root);
+    CHECK(!leaks(px, 200, 120), "a rotated protected window: %d leaked", leaks(px, 200, 120));
+    render(root, 200, 120);
+    CHECK(leaks(fb, 200, 120) > 100, "and the screen's next frame shows it again (the capture's raster was not kept)");
+    free(px);
+}
+
+/* Defense in depth (2026-11-23 review): a protected source's picture (a machine with the anonymity profile, lord.vm.protect)
+ * is the fill in every capture even inside a window nobody protected, through a cached transform too; the window holding
+ * it is refused alone; before it is marked, it is captured as any picture. */
+static void test_protected_media(void) {
+    ui_reset();
+    prot_media_marked = 0;
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xffffffff);
+    Node *ov = view(root);
+    ss(ov, "position", "absolute");
+    sn(ov, "left", 0); sn(ov, "top", 0); sn(ov, "width", 240); sn(ov, "height", 140);
+    Node *win = box_in(ov, 20, 10, 160, 110, 0xff2060ff);           /* an ordinary window (not protected): blue */
+    Node *pic = node_new(NODE_MEDIA);                                /* the machine's picture in it */
+    node_append(win, pic);
+    ss(pic, "position", "absolute");
+    sn(pic, "left", 10); sn(pic, "top", 20); sn(pic, "width", 140); sn(pic, "height", 80);
+    pic->term = PROT_MEDIA_ID;
+    render(root, 240, 140);
+    uint32_t *px = calloc(240 * 140, 4);
+    Canvas c;
+    canvas_init(&c, px, 240, 140, 240);
+    paint_capture(&c, root);
+    CHECK(leaks(px, 240, 140) > 1000, "an unmarked picture is captured as any picture");
+    CHECK(paint_capture_until(&c, root, win->id, NULL, 0) == 1, "and its window alone too");
+    prot_media_marked = 1;
+    render(root, 240, 140);
+    CHECK(leaks(fb, 240, 140) > 1000, "marked: the screen still shows it");
+    memset(px, 0, 240 * 140 * 4);
+    paint_capture(&c, root);
+    int fill = 0;
+    for (int i = 0; i < 240 * 140; i++) fill += (px[i] & 0xffffff) == PROT_RGB;
+    CHECK(!leaks(px, 240, 140) && fill > 5000, "marked: the fill in a capture of the screen (%d leaked, %d fill)", leaks(px, 240, 140), fill);
+    CHECK((px[60 * 240 + 25] & 0xffffff) == 0x2060ff, "the unprotected window around it is captured: %06x", px[60 * 240 + 25]);
+    CHECK(paint_node_protected(win), "the window holding it counts as protected");
+    for (int i = 0; i < 240 * 140; i++) px[i] = 0xff123456u;
+    CHECK(paint_capture_until(&c, root, win->id, NULL, 0) == -1, "its window alone is refused");
+    memset(px, 0, 240 * 140 * 4);
+    paint_capture_node(&c, root, win->id, NULL, 0);
+    CHECK(!leaks(px, 240, 140), "its window shared alone: %d leaked", leaks(px, 240, 140));
+    sn(ov, "scaleX", 0.7); sn(ov, "scaleY", 0.7);                   /* the overview, its raster cached */
+    render(root, 240, 140);
+    render(root, 240, 140);
+    memset(px, 0, 240 * 140 * 4);
+    paint_capture(&c, root);
+    CHECK(!leaks(px, 240, 140), "through a cached transform: %d leaked", leaks(px, 240, 140));
+    prot_media_marked = 0;
+    free(px);
+}
+
+/* The lock and the label: drawn in the ink colour inside a protected box that has room, never outside it. */
+static void test_protected_label(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xffffffff);
+    Node *win = box_in(root, 20, 20, 260, 160, 0xffd01010);
+    sn(win, "borderRadius", 12);
+    win->protect = 1;
+    render(root, 300, 200);
+    uint32_t *px = calloc(300 * 200, 4);
+    Canvas c;
+    canvas_init(&c, px, 300, 200, 300);
+    paint_set_protected_label("Protected window");
+    CHECK(!strcmp(paint_protected_label(), "Protected window"), "the label is kept");
+    paint_capture(&c, root);
+    int ink = 0, labelrows = 0;
+    for (int y = 0; y < 200; y++) {
+        int row = 0;
+        for (int x = 0; x < 300; x++) {
+            uint32_t p = px[y * 300 + x] & 0xffffff;
+            int lit = ((p >> 8) & 255) > 0x50 && p != 0xffffff;
+            if (lit && (x < 20 || x >= 280 || y < 20 || y >= 180)) ink = -100000;   /* never outside the window */
+            ink += lit;
+            row += lit && x >= 40 && x < 260;
+        }
+        if (row && y > 98 && y < 170) labelrows++;      /* the lock ends at 96.5, the label starts at 102.5 */
+    }
+    CHECK(ink > 60, "the lock and label are drawn: %d px", ink);
+    CHECK(labelrows >= 5, "the label is under the lock: %d rows", labelrows);
+    CHECK(!leaks(px, 300, 200), "the label leaks nothing");
+    CHECK((px[25 * 300 + 30] & 0xffffff) == PROT_RGB, "the corner is the fill: %06x", px[25 * 300 + 30]);
+    /* no label set: the lock alone */
+    paint_set_protected_label("");
+    memset(px, 0, 300 * 200 * 4);
+    paint_capture(&c, root);
+    int rows = 0;
+    for (int y = 112; y < 170; y++) for (int x = 40; x < 260; x++) if ((((px[y * 300 + x]) >> 8) & 255) > 0x50 && (px[y * 300 + x] & 0xffffff) != 0xffffff) { rows++; break; }
+    CHECK(rows == 0, "without a label only the lock: %d rows below it", rows);
+    /* control characters are dropped and a long label is cut on a character boundary */
+    char lng[300];
+    for (int i = 0; i < 149; i++) { lng[2 * i] = (char)0xc3; lng[2 * i + 1] = (char)0xa9; }
+    lng[298] = 0;
+    paint_set_protected_label(lng);
+    size_t ln = strlen(paint_protected_label());
+    CHECK(ln <= PAINT_PROTECT_LABEL_MAX && ln % 2 == 0, "a long label cut whole: %zu bytes", ln);
+    paint_set_protected_label("保護されたウインドウ");
+    CHECK(!strcmp(paint_protected_label(), "保護されたウインドウ"), "a label that fits stays whole: %s", paint_protected_label());
+    paint_set_protected_label("a\nb\x01" "c");
+    CHECK(!strcmp(paint_protected_label(), "abc"), "control characters dropped: %s", paint_protected_label());
+    paint_set_protected_label("Protected window");
+    free(px);
+}
+
+/* The fuzz: windows at random places and sizes, overlapping, some with radius; the protected one (its frame or only its
+ * content) somewhere in the stack, maybe scaled, rotated, half transparent, under the overview's scale, under a blurred
+ * panel, while being dragged on the GPU's layer; painted on the CPU path and the GPU path (the screen's caches filled
+ * first) and then captured whole at several display scales and offsets, each other window alone (shared) and each
+ * window as Screenshots' "until". No capture may hold a protected pixel; the screen must show them. */
+static int pf_run(int seed, int *seen_fill) {
+    enum { W = 320, H = 200 };
+    prng_s = (uint32_t)seed * 2654435761u + 7;
+    ui_reset();
+    paint_blur_cache_reset();
+    paint_nviews = 1;
+    paint_views[0] = (PaintViewBox){ { 0, 0, W, H }, 0, 0, 1, 0, 0, 0 };
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xffffffff);
+    Node *ov = view(root);
+    ss(ov, "position", "absolute");
+    sn(ov, "left", 0); sn(ov, "top", 0); sn(ov, "width", W); sn(ov, "height", H);
+    if (prng() % 3 == 0) { float k = pfrand(0.5f, 0.95f); sn(ov, "scaleX", k); sn(ov, "scaleY", k); }
+    static const uint32_t pal[] = { 0xff2060ff, 0xff20c040, 0xff40c0c0, 0xff808080, 0xfff0f0f0 };
+    int nwin = 3 + (int)(prng() % 4), pi = (int)(prng() % (unsigned)nwin);
+    Node *wins[8], *prot = NULL, *content = NULL;
+    for (int i = 0; i < nwin; i++) {
+        float w = pfrand(40, 200), h = pfrand(30, 150), x = pfrand(-30, W - 20), y = pfrand(-20, H - 20);
+        if (i == pi) {
+            Node *f = box_in(ov, x, y, w, h, 0xff2060ff);              /* the frame: blue title bar row */
+            sn(f, "borderRadius", (float)(prng() % 16));
+            ss(f, "overflow", "hidden");
+            Node *bar = box_in(f, 0, 0, w, 16, 0xff2060ff);
+            (void)bar;
+            content = box_in(f, 0, 16, w, h - 16, 0xffd01010);          /* the secret: red */
+            box_in(content, pfrand(0, w / 2), pfrand(0, h / 2), pfrand(8, w / 2), pfrand(6, h / 2), 0xffff3020);
+            Node *tx = text(content, "secret 4111 1111", 13);
+            sn(tx, "color", 0xffe00000);
+            if (prng() % 3 == 0) { float k = pfrand(0.6f, 1.2f); sn(f, "scaleX", k); sn(f, "scaleY", k); }
+            if (prng() % 4 == 0) sn(f, "rotate", pfrand(-20, 20));
+            if (prng() % 3 == 0) sn(f, "opacity", pfrand(0.35f, 1));
+            prot = prng() % 3 ? f : content;                              /* the window (WindowShell) or its content (AppHost) */
+            prot->protect = 1;
+            wins[i] = f;
+        } else {
+            wins[i] = box_in(ov, x, y, w, h, pal[prng() % 5]);
+            if (prng() % 2) sn(wins[i], "borderRadius", (float)(prng() % 20));
+            if (prng() % 4 == 0) sn(wins[i], "opacity", pfrand(0.4f, 1));
+        }
+    }
+    Node *panel = NULL;
+    if (prng() % 2) {                                    /* a blurred panel over part of the screen (a menu, the Dock) */
+        Node *l = layer_node(root, 50, W, H);
+        panel = box_in(l, pfrand(0, W / 2), pfrand(0, H / 2), pfrand(60, 200), pfrand(40, 120), 0x60ffffff);
+        sn(panel, "backdropBlur", 10);
+        sn(panel, "borderRadius", 12);
+        ss(panel, "overflow", "hidden");
+    }
+    /* the screen: the CPU path, then the GPU path (holes, its caches), maybe while the window is dragged */
+    paint_blur_cache_on = 1;
+    render(root, W, H);
+    render(root, W, H);
+    int screen = leaks(fb, W, H);
+    test_gpu = 1;
+    int drag = prng() % 3 == 0;
+    if (drag) paint_layer_begin(wins[pi]->id, 0);
+    render(root, W, H);
+    render(root, W, H);
+    if (drag) paint_layer_end();
+    test_gpu = (int)(prng() % 2);                        /* the capture itself on either path */
+    uint32_t *px = calloc((size_t)W * 2 * H * 2, 4);
+    Canvas c;
+    int bad = 0;
+    static const float ks[] = { 1, 1.25f, 1.5f, 2 };
+    for (int v = 0; v < 4; v++) {                        /* displays: scale and where each one starts */
+        float k = ks[v], vx = v == 3 ? pfrand(0, W / 2) : 0, vy = v == 3 ? pfrand(0, H / 2) : 0;
+        int cw = (int)((W - vx) * k), ch = (int)((H - vy) * k);
+        canvas_init(&c, px, cw, ch, cw);
+        memset(px, 0, (size_t)cw * ch * 4);
+        PaintView keep = paint_view;
+        paint_view = (PaintView){ vx, vy, k, 0, 0, -1 };
+        paint_capture(&c, root);
+        paint_view = keep;
+        int l = leaks(px, cw, ch);
+        if (l) { bad++; printf("  seed %d: whole screen at %.2fx (%g, %g): %d px leaked\n", seed, k, vx, vy, l); }
+        for (int i = 0; i < cw * ch; i++) *seen_fill += (px[i] & 0xffffff) == PROT_RGB;
+    }
+    canvas_init(&c, px, W, H, W);
+    for (int i = 0; i < nwin; i++) {
+        memset(px, 0, (size_t)W * H * 4);
+        int r = paint_capture_until(&c, root, wins[i]->id, NULL, 0);
+        int l = leaks(px, W, H);
+        if (l) { bad++; printf("  seed %d: until window %d (%d): %d px leaked\n", seed, i, r, l); }
+        if (i == pi && r != -1) { bad++; printf("  seed %d: the protected window alone was not refused (%d)\n", seed, r); }
+        memset(px, 0, (size_t)W * H * 4);
+        paint_capture_node(&c, root, wins[i]->id, NULL, 0);
+        l = leaks(px, W, H);
+        if (l) { bad++; printf("  seed %d: window %d shared alone: %d px leaked\n", seed, i, l); }
+    }
+    test_gpu = 0;
+    paint_blur_cache_on = 0;
+    CHECK(!paint_capture_mode, "capture mode is over (seed %d)", seed);
+    /* the screen's next frame is the real one again */
+    render(root, W, H);
+    if (screen && !leaks(fb, W, H)) { bad++; printf("  seed %d: the screen lost the window after a capture\n", seed); }
+    free(px);
+    (void)panel;
+    return bad;
+}
+
+static void test_protected_fuzz(void) {
+    int seeds = getenv("PF_SEEDS") ? atoi(getenv("PF_SEEDS")) : 300, failed = 0, fill = 0;
+    for (int seed = 0; seed < seeds; seed++) {
+        if (getenv("PF_ONLY") && atoi(getenv("PF_ONLY")) != seed) continue;
+        int bad = pf_run(seed, &fill);
+        failed += bad != 0;
+        CHECK(!bad, "protected window fuzz seed %d: %d captures leaked", seed, bad);
+    }
+    CHECK(fill > 0, "the fill was seen in the captures");
+    printf("protected window fuzz: %d seeds, %d failed, %d fill pixels captured\n", seeds, failed, fill);
 }
 
 /* A node's id goes to the next node once it is destroyed; its serial never does (node_ref, what a shared window holds
@@ -970,6 +1267,48 @@ static Node *mk_window(Node *root, float x, float y, float w, float h) {
     box_in(win, 0, 0, w, 28, 0xff505052);                /* title bar */
     box_in(win, 8, 36, w - 16, h - 44, 0xff1e1e1e);      /* content */
     return win;
+}
+
+/* GitHub #237: a Text whose content comes and goes as a node of its own (React's {on ? '✓' : ''}: the text child is
+ * created and removed, not set to ''), in a box of a fixed size. Neither the new child nor the removed one changed the
+ * Text's box, and a RAW node has no box of its own, so nothing was damaged: Screenshots' Options menu kept its old
+ * check marks on the screen until it was drawn whole again. */
+static void test_text_child_damage(void) {
+    enum { W = 200, H = 120 };
+    paint_multi_damage = 1;
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xff1c1c1e);
+    Node *t[3];
+    for (int i = 0; i < 3; i++) {
+        t[i] = node_new(NODE_TEXT);
+        node_append(root, t[i]);
+        ss(t[i], "position", "absolute");
+        sn(t[i], "left", 20);
+        sn(t[i], "top", 20 + i * 30);
+        sn(t[i], "width", 16);
+        sn(t[i], "height", 20);
+        sn(t[i], "fontSize", 16);
+        sn(t[i], "color", 0xffffffff);
+    }
+    Node *r = node_new(NODE_RAW);
+    node_set_text(r, "M");
+    node_append(t[0], r);
+    render(root, W, H);
+    for (int step = 0; step < 4; step++) {
+        Node *from = t[step % 3], *to = t[(step + 1) % 3];
+        node_destroy(from->first);                  /* the check leaves one row… */
+        Node *c = node_new(NODE_RAW);
+        node_set_text(c, "M");
+        if (step % 2) node_insert_before(to, c, to->first); else node_append(to, c);   /* …and comes to the next */
+        layout_root(root, W, H);
+        int n = 0, where = 0;
+        float area = 0;
+        CHECK(paint_partial(root, W, H, &n, &area) >= 0, "step %d: the damage is not one box or more", step);
+        int worst = full_differs(root, W, H, &where);
+        CHECK(worst <= 1, "step %d: a text child added or removed isn't repainted (differs by %d at %d,%d)", step, worst, where % W, where / W);
+    }
 }
 
 static void test_minimize_damage(void) {
@@ -4048,9 +4387,14 @@ int main(int argc, char **argv) {
     test_layers();
     test_capture_until();
     test_capture_protected();
+    test_protected_transform_cache();
+    test_protected_label();
+    test_protected_media();
+    test_protected_fuzz();
     test_node_ref();
     test_backdrop_band();
     test_multi_damage();
+    test_text_child_damage();
     test_minimize_damage();
     test_hidden_blur_damage();
     test_gscissor_unit();

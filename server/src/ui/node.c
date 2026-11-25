@@ -187,10 +187,20 @@ void node_restyled(Node *n, const Style *before, const StyleExt *ext_before) {
     }
 }
 
+/* A text node (RAW) came into a Text or left it: the Text's content changed although its box may not have (a check
+ * mark of a fixed width, React's {on ? '✓' : ''} which adds and removes the text node). A RAW node has no box of its
+ * own for damage_subtree, so the Text and the Texts around it are repainted (GitHub #237) */
+static void text_child_changed(Node *p, const Node *c) {
+    if (c->type != NODE_RAW) return;
+    p->paint_dirty = 1;
+    for (Node *a = p->parent; a && a->type == NODE_TEXT; a = a->parent) a->paint_dirty = 1;
+}
+
 void node_detach(Node *c) {
     Node *p = c->parent;
     if (!p) return;
     damage_subtree(c);
+    text_child_changed(p, c);
     if (c->prev) c->prev->next = c->next; else p->first = c->next;
     if (c->next) c->next->prev = c->prev; else p->last = c->prev;
     c->parent = c->prev = c->next = NULL;
@@ -212,6 +222,7 @@ void node_append(Node *p, Node *c) {
     c->prev = p->last;
     if (p->last) p->last->next = c; else p->first = c;
     p->last = c;
+    text_child_changed(p, c);
     invalidate_measure(p);
 }
 
@@ -224,6 +235,7 @@ void node_insert_before(Node *p, Node *c, Node *before) {
     c->prev = before->prev;
     if (before->prev) before->prev->next = c; else p->first = c;
     before->prev = c;
+    text_child_changed(p, c);
     invalidate_measure(p);
 }
 

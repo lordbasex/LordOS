@@ -586,9 +586,12 @@
   "ws.lock.on": "Заключване на прозорците на този екран",
   "ws.lock.off": "Отключване на прозорците на този екран",
   "ws.lock.window": "Заключен: отключете с катинара в рамката",
-  "ws.minimized.label": "Минимизирани",
-  "ws.minimized.title": "Минимизирани прозорци на този екран: щракнете върху един, за да го върнете",
   "ws.slot.free": "Свободно място: отворете приложение или върнете минимизирано",
+  "ws.windows.title": "Прозорци на тази дейност на този екран (линия под минимизираните): щракнете върху един, за да го изведете отпред; десен бутон за прозорците на приложението",
+  "ws.profile.ask": "Нека браузърът избере",
+  "ws.profile.open": "Отваряне на профила {profile}",
+  "ws.profile.activity": "Профил, който тази дейност отваря",
+  "ws.profile.display": "Профил, който този екран отваря ({display})",
   "ws.snapfly.title": "Подреждане на прозореца",
   "ws.snapfly.halves": "Половини",
   "ws.snapfly.thirds": "Трети",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "Камера чрез LordOS Studio",
   "capture.what.effectsOn": "ефектите са включени",
   "capture.what.effectsOff": "без ефекти",
-  "shortcuts.captureWindow": "Снимка на прозорец"
+  "shortcuts.captureWindow": "Снимка на прозорец",
+  "themeSwitch.changing": "Стилът на работния плот се променя…",
+  "themeSwitch.changingTo": "Превключване към {name}…",
+  "themeSwitch.failedTitle": "{name} не можа да бъде приложен",
+  "themeSwitch.refusedBody": "Кодът му не съвпада с подписаното копие на LordOS, затова не беше зареден. Стилът на работния плот остава какъвто беше.",
+  "themeSwitch.failedBody": "Не стартира. Стилът на работния плот остава какъвто беше.",
+  "spotlight.section.machines": "Машини",
+  "guestApps.inMachine": "В {machine}"
 }

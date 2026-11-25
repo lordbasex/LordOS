@@ -14,6 +14,10 @@
   "never": "Hələ ehtiyat nüsxə yoxdur",
   "next": "Növbəti: {when}",
   "lastError": "Son ehtiyat nüsxə alınmadı: {error}",
+  "machinesBusy": {
+    "one": "{count} maşın işləyirdi: bu ehtiyat nüsxədəki diskləri əvvəlkindən götürülüb",
+    "other": "{count} maşın işləyirdi: bu ehtiyat nüsxədəki diskləri əvvəlkindən götürülüb"
+  },
   "todayAt": "bu gün {time}",
   "now": "İndi ehtiyat nüsxə çıxar",
   "pause": "Fasilə ver",
@@ -77,6 +81,10 @@
   "delete": "Ehtiyat nüsxəni sil",
   "restoreAll": "Hamısını bərpa et",
   "restoreItem": "“{name}” bərpa et",
+  "restoreSelected": "Seçilənləri bərpa et ({count})",
+  "restoringItem": "Bərpa olunur {index}/{count}: {name}",
+  "restoreItemFailed": "“{name}” bərpa edilmədi: {error}",
+  "restoreMoreFailed": "Bərpa edilməyən digərləri: {count}",
   "restoreFolder": "Bu qovluğu bərpa et",
   "restorePick": "Nəyi bərpa edəcəyinizi seçin",
   "restoreAllTitle": "Bütün ev qovluğunuz bərpa edilsin?",

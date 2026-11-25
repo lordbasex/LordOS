@@ -22,28 +22,26 @@ const eq = (name, got, want) => {
 const H = (c) => c.repeat(64);
 
 // ---- the cards ----
-eq('amd64 cards, LordOS first', systemsFor(CAT, 'amd64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali', 'windows', 'android']);
-// no installable Android ISO exists for arm64 (4.2): no card there
-eq('arm64 cards', systemsFor(CAT, 'arm64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali']);
-// ---- Android (4.2): one ISO pinned by the catalog, no maker's list ----
+eq('amd64 cards, LordOS first', systemsFor(CAT, 'amd64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali', 'windows']);
+eq('arm64 cards (with the virtio-win guest from its maker\'s Arm64 ISO, 4.3.2)', systemsFor(CAT, 'arm64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali', 'windows']);
+// ---- a pinned card (an ISO whose maker signs no list): the catalog pins its one file and hash ----
 {
-  const card = systemsFor(CAT, 'amd64').find((s) => s.id === 'android');
-  eq('android: a pinned card, not a listed one', [card.kind, card.pinned, card.listed, card.name, card.release], ['iso', true, false, 'Android', '13']);
-  eq('families: a Linux profile never suggests Android', systemsFor(CAT, 'amd64').map((s) => s.family).slice(1), ['linux', 'linux', 'linux', 'linux', 'windows', 'android']);
-  const img = C.pinnedImage(entryOf(CAT, 'android', 'amd64'));
-  eq('android: the FOSS edition, its hash and size', [/^Bliss-v16\.9\.7-x86_64-OFFICIAL-foss-\d{8}\.iso$/.test(img.name), img.sha, img.size, img.pinned],
-    [true, '735cb962ec6bd92b62eb82a812831a38d79a0dfdf12b7973d2d0f7ab001ba68e', 2342518784, true]);
-  eq('android: never Google\'s apps', CAT.systems.some((s) => Object.values(s.arch || {}).some((a) => (a.pinned || []).some((f) => /gapps/i.test(f.name)))), false);
-  eq('android: pickImage takes the pin, whatever the text', pickImage(entryOf(CAT, 'android', 'amd64'), `${H('a')}  other.iso\n`).sha, img.sha);
-  eq('android: no list to read', entryOf(CAT, 'android', 'amd64').sums, undefined);
+  const PIN = { systems: [{ id: 'pinned-os', name: 'Pinned', release: '1', kind: 'iso', family: 'other', machine: { vcpus: 4, memoryMb: 4096, diskGb: 32, graphics: '3d' },
+    arch: { amd64: { pinned: [{ name: 'pinned-1.iso', url: 'https://example.org/pinned-1.iso', sha256: H('c'), bytes: 1000 }], approxMb: 1 } } }] };
+  const card = systemsFor(PIN, 'amd64').find((s) => s.id === 'pinned-os');
+  eq('pinned: a pinned card, not a listed one', [card.kind, card.pinned, card.listed, card.family], ['iso', true, false, 'other']);
+  eq('pinned: no card on another architecture', systemsFor(PIN, 'arm64').length, 0);
+  eq('families: the real cards', systemsFor(CAT, 'amd64').map((s) => s.family).slice(1), ['linux', 'linux', 'linux', 'linux', 'windows']);
+  const img = C.pinnedImage(entryOf(PIN, 'pinned-os', 'amd64'));
+  eq('pinned: its hash and size', [img.name, img.sha, img.size, img.pinned], ['pinned-1.iso', H('c'), 1000, true]);
+  eq('pinned: pickImage takes the pin, whatever the text', pickImage(entryOf(PIN, 'pinned-os', 'amd64'), `${H('a')}  other.iso\n`).sha, img.sha);
+  eq('pinned: no list to read', entryOf(PIN, 'pinned-os', 'amd64').sums, undefined);
   const host = { cpus: 16, memMaxMb: 30000 };
-  eq('android: its own machine, whatever the profile', C.cardSize(CAT, 'android', { vcpus: 8, memoryMb: 16384, diskGb: 128, gfx: '2d', network: 'shared' }, host),
+  eq('machine: its own, whatever the profile', C.cardSize(PIN, 'pinned-os', { vcpus: 8, memoryMb: 16384, diskGb: 128, gfx: '2d', network: 'shared' }, host),
     { vcpus: 4, memoryMb: 4096, diskGb: 32, gfx: '3d', network: 'shared' });
-  eq('android: fitted to a small computer', C.cardSize(CAT, 'android', { vcpus: 2, memoryMb: 2048, diskGb: 40, gfx: '2d' }, { cpus: 2, memMaxMb: 3000 }),
+  eq('machine: fitted to a small computer', C.cardSize(PIN, 'pinned-os', { vcpus: 2, memoryMb: 2048, diskGb: 40, gfx: '2d' }, { cpus: 2, memMaxMb: 3000 }),
     { vcpus: 2, memoryMb: 2816, diskGb: 32, gfx: '3d' });
   eq('a card without a machine keeps the profile\'s', C.cardSize(CAT, 'debian', { vcpus: 8 }, host), { vcpus: 8 });
-  eq('android: the archived notice', C.noticeOf(CAT, 'android'), { key: 'archived', maker: 'Bliss OS', date: '2024-10-11' });
-  eq('no notice for Debian', C.noticeOf(CAT, 'debian'), null);
   eq('a pin must be one https ISO', [C.pinnedImage({ pinned: [{ name: 'a.iso', url: 'http://x/a.iso', sha256: H('a'), bytes: 1 }] }),
     C.pinnedImage({ pinned: [{ name: 'a.msi', url: 'https://x/a.msi', sha256: H('a'), bytes: 1 }] }),
     C.pinnedImage({ pinned: [{ name: 'a.iso', url: 'https://x/a.iso', sha256: H('a'), bytes: 1 }, { name: 'b.iso', url: 'https://x/b.iso', sha256: H('b'), bytes: 1 }] }),
@@ -56,7 +54,9 @@ eq('Debian 13', [card('debian').name, card('debian').release], ['Debian', '13'])
 eq('every entry has its hash source and date', CAT.systems.every((s) => s.hashSource && /^\d{4}-\d\d-\d\d$/.test(s.checked)), true);
 // a pinned entry (Windows' evaluation, virtio-win; vmcatalog.h) names its files itself; every other entry has a folder
 const pinnedOf = (s) => Object.values(s.arch).some((a) => Array.isArray(a.pinned));
-eq('every folder is https', CAT.systems.filter((s) => !pinnedOf(s)).every((s) => Object.values(s.arch).every((a) => /^https:\/\/[^/]+\/.*\/$/.test(a.dir) && (!a.fileDir || /^https:\/\//.test(a.fileDir)))), true);
+// (an entry with "releases" has the folder of its release folders instead: Whonix, docs/VIRTUALIZATION.md 19.6)
+eq('every folder is https', CAT.systems.filter((s) => !pinnedOf(s)).every((s) => Object.values(s.arch).every((a) => /^https:\/\/[^/]+\/.*\/$/.test(a.releases ? a.releases.dir : a.dir) && (!a.fileDir || /^https:\/\//.test(a.fileDir)))), true);
+eq('the Whonix group is no card without the host\'s KVM (vm_group_ui_test.mjs)', card('whonix'), undefined);
 for (const s of CAT.systems.filter(pinnedOf)) {
   const files = Object.values(s.arch).flatMap((a) => a.pinned || []);
   eq(`${s.id}: pinned files`, [files.length > 0, files.every((f) => /^https:\/\/[^/\s"<>\\]+\/\S+$/.test(f.url) && /^[0-9a-f]{64}$/.test(f.sha256) && Number.isInteger(f.bytes) && f.bytes > 0 &&
@@ -130,7 +130,14 @@ eq('lordos: the card', [card('lordos').name, card('lordos').kind, card('lordos',
 eq('lordos: the release key, no key file', [LOS.signature, LOS.keys, LOS.fingerprints], [{ type: 'lordos-release', name: 'SHA256SUMS.sig' }, undefined, undefined]);
 const tagOf = (dir) => (/\/releases\/download\/(v[0-9]+(?:\.[0-9]+){2,3}(?:-[a-z0-9.]+)?)\/$/.exec(dir) || [])[1] || '';
 eq('lordos: one pinned release tag for both', [!!tagOf(LOS.arch.amd64.dir), tagOf(LOS.arch.amd64.dir) === tagOf(LOS.arch.arm64.dir), LOS.arch.amd64.dir.startsWith('https://github.com/lordbasex/LordOS/releases/download/')], [true, true, true]);
-eq('lordos: the card says the tag\'s version', tagOf(LOS.arch.amd64.dir).replace(/^v/, '').replace(/-.*$/, ''), LOS.release);
+// the signed list is read first from its copy on lordos.org (GitHub's release downloads sometimes answer 403), the same
+// tag as the ISO folder, with an extension (CloudFront serves extensionless paths as pages); GitHub's list is the fallback
+eq('lordos: the list from lordos.org, same tag, GitHub kept as fallback', ['amd64', 'arm64'].map((a) => {
+  const x = LOS.arch[a], l = x.list || {};
+  return [l.dir === `https://lordos.org/releases/${tagOf(x.dir)}/`, l.sums, l.signature, x.sums, /\.[a-z]+$/.test(l.sums || '')];
+}), [[true, 'SHA256SUMS.txt', 'SHA256SUMS.sig', 'SHA256SUMS', true], [true, 'SHA256SUMS.txt', 'SHA256SUMS.sig', 'SHA256SUMS', true]]);
+eq('lordos: only LordOS mirrors its list', CAT.systems.filter((s) => Object.values(s.arch || {}).some((a) => a?.list)).map((s) => s.id), ['lordos']);
+eq('lordos: the card says the tag\'s version',tagOf(LOS.arch.amd64.dir).replace(/^v/, '').replace(/-.*$/, ''), LOS.release);
 // the site's list of current images (web/content/downloads.json) is never newer than the release the card names: the release
 // process moves the tag (docs/RELEASING.md, step 1), so a release with new ISOs and an old card fails here
 const DL = JSON.parse(fs.readFileSync(path.join(here, '../../web/content/downloads.json'), 'utf8')).downloads;
@@ -174,10 +181,19 @@ eq('bar without downloads', M.storageBar(st).map((b) => b.key), ['machines', 'is
 // ---- unattended installs ----
 eq('hidden entries have no card', systemsFor(CAT, 'amd64').some((s) => s.id.includes('-')), false);
 eq('unattended: debian', unattendedOf(CAT, 'debian', 'amd64'), { kind: 'preseed', image: 'debian', kernel: 'install.amd/vmlinuz', initrd: 'install.amd/initrd.gz', append: 'auto=true priority=critical --- quiet', release: '13' });
+// the installers on the machine's screen on arm64: the firmware's ACPI SPCR table makes the serial port the kernel's
+// console there (seen on the Pi 5: Debian's and Kali's installers only on the serial port), so arm64 has its own line
+for (const id of ['debian', 'ubuntu', 'fedora', 'kali']) {
+  eq(`unattended: ${id} arm64 on the screen`, / console=tty0 acpi=nospcr /.test(unattendedOf(CAT, id, 'arm64')?.append), true);
+  eq(`unattended: ${id} amd64 as its maker boots it`, /console=|acpi=/.test(unattendedOf(CAT, id, 'amd64')?.append), false);
+}
+eq('unattended: an architecture\'s own line', unattendedOf({ systems: [{ id: 'x', unattended: { kind: 'preseed', append: 'a', arch: { amd64: { kernel: 'k', initrd: 'i' }, arm64: { kernel: 'k', initrd: 'i', append: 'b' } } }, arch: { amd64: { file: '^x$' }, arm64: { file: '^x$' } } }] }, 'x', 'arm64')?.append, 'b');
 eq('unattended: debian arm64', unattendedOf(CAT, 'debian', 'arm64')?.kernel, 'install.a64/vmlinuz');
 eq('unattended: ubuntu from the server image', [unattendedOf(CAT, 'ubuntu', 'amd64')?.kind, unattendedOf(CAT, 'ubuntu', 'amd64')?.image], ['autoinstall', 'ubuntu-server']);
 eq('unattended: fedora from the network installer', [unattendedOf(CAT, 'fedora', 'arm64')?.kind, unattendedOf(CAT, 'fedora', 'arm64')?.image, unattendedOf(CAT, 'fedora', 'amd64')?.append.includes('{label}')], ['kickstart', 'fedora-netinst', true]);
-eq('unattended: none for kali', unattendedOf(CAT, 'kali', 'amd64'), null);
+eq('unattended: kali, a preseed from its own disc', unattendedOf(CAT, 'kali', 'amd64'), { kind: 'kali', image: 'kali', kernel: 'install.amd/vmlinuz', initrd: 'install.amd/initrd.gz',
+  append: 'net.ifnames=0 preseed/file=/cdrom/simple-cdd/default.preseed simple-cdd/profiles=kali,offline desktop=xfce auto=true priority=critical --- quiet', release: '2026' });
+eq('unattended: kali arm64', unattendedOf(CAT, 'kali', 'arm64')?.kernel, 'install.a64/vmlinuz');
 eq('unattended: an unknown kind is none', unattendedOf({ systems: [{ id: 'x', unattended: { kind: 'other', arch: { amd64: { kernel: 'k', initrd: 'i' } } }, arch: { amd64: { file: '^x$' } } }] }, 'x', 'amd64'), null);
 eq('ubuntu server image in the signed list', pickImage(entryOf(CAT, 'ubuntu-server', 'amd64'), fs.readFileSync(path.join(here, 'vmimage/ubuntu-amd64.sums'), 'utf8'))?.name, 'ubuntu-26.04.1-live-server-amd64.iso');
 eq('ubuntu arm64 server image, not largemem', pickImage(entryOf(CAT, 'ubuntu-server', 'arm64'), fs.readFileSync(path.join(here, 'vmimage/ubuntu-arm64.sums'), 'utf8'))?.name, 'ubuntu-26.04.1-live-server-arm64.iso');

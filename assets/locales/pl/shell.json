@@ -593,9 +593,12 @@
   "ws.lock.on": "Zablokuj okna tego ekranu",
   "ws.lock.off": "Odblokuj okna tego ekranu",
   "ws.lock.window": "Zablokowane: odblokuj kłódką w ramce",
-  "ws.minimized.label": "Zminimalizowane",
-  "ws.minimized.title": "Zminimalizowane okna na tym ekranie: kliknij, aby przywrócić",
   "ws.slot.free": "Wolne miejsce: otwórz aplikację lub przywróć zminimalizowaną",
+  "ws.windows.title": "Okna tej aktywności na tym ekranie (kreska pod zminimalizowanymi): kliknij, aby przenieść okno na wierzch; prawy przycisk pokazuje okna tej aplikacji",
+  "ws.profile.ask": "Niech wybierze przeglądarka",
+  "ws.profile.open": "Otwórz profil {profile}",
+  "ws.profile.activity": "Profil otwierany przez tę aktywność",
+  "ws.profile.display": "Profil otwierany na tym ekranie ({display})",
   "ws.snapfly.title": "Rozmieść okno",
   "ws.snapfly.halves": "Połowy",
   "ws.snapfly.thirds": "Trzecie",
@@ -979,5 +982,12 @@
   "capture.what.viaStudioPlain": "Kamera przez LordOS Studio",
   "capture.what.effectsOn": "efekty włączone",
   "capture.what.effectsOff": "bez efektów",
-  "shortcuts.captureWindow": "Zrzut okna"
+  "shortcuts.captureWindow": "Zrzut okna",
+  "themeSwitch.changing": "Zmiana stylu pulpitu…",
+  "themeSwitch.changingTo": "Przełączanie na {name}…",
+  "themeSwitch.failedTitle": "Nie udało się zastosować {name}",
+  "themeSwitch.refusedBody": "Jego kod nie zgadza się z podpisaną kopią LordOS, więc nie został wczytany. Styl pulpitu pozostaje bez zmian.",
+  "themeSwitch.failedBody": "Nie uruchomił się. Styl pulpitu pozostaje bez zmian.",
+  "spotlight.section.machines": "Maszyny",
+  "guestApps.inMachine": "W {machine}"
 }

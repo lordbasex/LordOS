@@ -11,8 +11,9 @@ import { appName, t } from './i18n.js';
 import { webAppOfWindow } from './webapps.js';
 import { webWindowTitles, profileHex } from './webappsmodel.js';
 import { SNAP_ZONES, snapRect, zoneAt, snapNext, dwellZone, SNAP_DWELL_MS, snapAllowed } from './snap.js';
+import { protectOnOpen, protectOnReopen, protectPatch } from './protectmodel.js';
 import { settings } from './settings.js';
-import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, keyboardWindow, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo, cleanLayer } from './desktopmodel.js';
+import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, keyboardWindow, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo, cleanLayer, outOfSight } from './desktopmodel.js';
 
 export { SNAP_ZONES, snapRect };
 
@@ -221,7 +222,10 @@ export const isLiveSystem = () => {
   if (live === null) { try { const i = lord.system.info(); live = !!(i.live || i.firstAccount); } catch (e) { live = false; } }
   return live;
 };
-export const listApps = () => [...registry.values()].filter((a) => !a.builtin && !a.hidden && (!a.live || isLiveSystem()));
+// An app may export available() (apps/studio: LordOS Studio installed): false keeps it out of the launcher and search on
+// this computer.
+const availableHere = (a) => { if (typeof a.available !== 'function') return true; try { return !!a.available(); } catch (e) { return false; } };
+export const listApps = () => [...registry.values()].filter((a) => !a.builtin && !a.hidden && (!a.live || isLiveSystem()) && availableHere(a));
 export const workArea = (d) => workAreaOf(d);
 
 function place(appId, count, frame) {
@@ -399,6 +403,10 @@ export const wm = {
   //       doesn't take the front or the keyboard from the desktop in view).
   //       { pip: { x, y, w, h } } a new window that opens floating (wm.setPip): it never takes the front
   //       or the keyboard (a Linux app's own notification popup, sdk/wayland.js).
+  //       { protected: true } a protected window from its first frame (as the app's manifest "protected": true): it
+  //       looks normal on the screen and is a neutral fill with a lock in every capture (screenshots, recordings,
+  //       the remote desktop, sharing); locked, so wm.setProtected can't turn it off (sdk/protectmodel.js).
+  //       An open window given it becomes protected; it never becomes less protected by opening again.
   // Returns the window id.
   open(appId, opts = {}) {
     if (!registry.has(appId)) {
@@ -418,9 +426,11 @@ export const wm = {
     if (globalThis.__lordTiming && typeof lord !== 'undefined' && lord.now) openedAt.set(id, lord.now());
     const desktop = desktopList.get().includes(opts.desktop) ? opts.desktop : activeDesktop.get();
     showDesktopOf(id);                                 // already open: its desktop comes into view
+    const app = registry.get(appId);
     windows.set((ws) => (ws.some((w) => w.id === id)
-      ? raise(ws, id).map((w) => (w.id === id && args ? { ...w, args } : w))
-      : [...ws, { id, app: appId, title: null, args, desktop, ...place(appId, ws.length, opts.frame), ...(opts.pip ? { pip: { ...opts.pip } } : null) }]));
+      ? raise(ws, id).map((w) => (w.id !== id ? w : { ...w, ...(args ? { args } : null), ...protectOnReopen(w, opts, app) }))
+      : [...ws, { id, app: appId, title: null, args, desktop, ...place(appId, ws.length, opts.frame), ...(opts.pip ? { pip: { ...opts.pip } } : null),
+        ...protectOnOpen(opts, app) }]));
     return id;
   },
   // Closes the window; if the app set a guard and it returns false, it doesn't close.
@@ -536,10 +546,13 @@ export const wm = {
   // the launcher, a sheet, a system prompt) has the keyboard (desktopmodel.js keyboardWindow). A key listener is the
   // whole session's, so whatever sends keys out of LordOS (Machines' guest) asks this at each key.
   hasKeyboard: (id) => id != null && keyboardWindow(windows.get(), activeDesktop.get(), typeof shellHasKeyboard === 'function' && shellHasKeyboard()) === id,
-  // Protected window (capture protection): it looks normal on screen, but
-  // comes out black in screenshots, recordings and remote desktop (docs/MEDIA.md). Used, for
-  // example, by a password app.
-  setProtected: (id, on = true) => patch(id, { protected: !!on }),
+  // Protected window (capture protection, docs/PRIVACY.md "Protected windows"): it looks normal on the screen, and is an
+  // opaque neutral fill with a lock in every capture: screenshots, recordings, the remote desktop, screen sharing,
+  // portal stills. A window opened protected (wm.open's `protected`, a manifest's "protected") stays so.
+  setProtected: (id, on = true, { lock = false } = {}) => windows.set((ws) => ws.map((w) => {
+    const p = w.id === id ? protectPatch(w, on, lock) : null;
+    return p ? { ...w, ...p } : w;
+  })),
   // the app asked to come forward without the person asking (xdg-activation): the Dock and the taskbar
   // mark it until it is brought to the front
   setAttention: (id, on = true) => patch(id, { attention: !!on }),
@@ -639,6 +652,18 @@ export function useWindows() {
 export function useWindowHidden(id) {
   const desktop = useStore(activeDesktop);
   return useStore(windows, (ws) => windowHidden(ws.find((w) => w.id === id), desktop));
+}
+
+// None of these windows is on screen (desktopmodel.js outOfSight): minimized, on a hidden desktop or wholly under an
+// opaque window. Opaque as for the Linux windows' pacing (wayland.js): a web app's window, or a LordOS window whose app
+// isn't transparent.
+const opaqueWindow = (w) => !!w.args?.web || (!w.args?.surface && !getApp(w.id)?.transparent);
+export const windowsOutOfSight = (ids, list = windows.get()) => outOfSight(list, activeDesktop.get(), overviewShowing.get(), ids, (w) => wm.frame(w), opaqueWindow);
+export function useWindowsOutOfSight(ids) {
+  const desktop = useStore(activeDesktop);
+  const overview = useStore(overviewShowing);
+  const key = (ids || []).join('\n');
+  return useStore(windows, (ws) => outOfSight(ws, desktop, overview, key ? key.split('\n') : [], (w) => wm.frame(w), opaqueWindow));
 }
 
 // ---- menus of an isolated app: serialize to the broker and receive the clicks ----

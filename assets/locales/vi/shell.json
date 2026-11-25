@@ -579,9 +579,12 @@
   "ws.lock.on": "Khóa các cửa sổ của màn hình này",
   "ws.lock.off": "Mở khóa các cửa sổ của màn hình này",
   "ws.lock.window": "Đã khóa: mở khóa bằng ổ khóa trên khung",
-  "ws.minimized.label": "Đã thu nhỏ",
-  "ws.minimized.title": "Cửa sổ đã thu nhỏ trên màn hình này: nhấp để mở lại",
   "ws.slot.free": "Chỗ trống: mở một ứng dụng hoặc đưa cửa sổ đã thu nhỏ trở lại",
+  "ws.windows.title": "Cửa sổ của hoạt động này trên màn hình này (có gạch dưới cửa sổ đã thu nhỏ): bấm để đưa lên trước; bấm chuột phải để xem các cửa sổ của ứng dụng đó",
+  "ws.profile.ask": "Để trình duyệt chọn",
+  "ws.profile.open": "Mở hồ sơ {profile}",
+  "ws.profile.activity": "Hồ sơ mà hoạt động này mở",
+  "ws.profile.display": "Hồ sơ mà màn hình này mở ({display})",
   "ws.snapfly.title": "Sắp xếp cửa sổ",
   "ws.snapfly.halves": "Nửa",
   "ws.snapfly.thirds": "Một phần ba",
@@ -965,5 +968,12 @@
   "capture.what.viaStudioPlain": "Camera qua LordOS Studio",
   "capture.what.effectsOn": "đang bật hiệu ứng",
   "capture.what.effectsOff": "không hiệu ứng",
-  "shortcuts.captureWindow": "Chụp một cửa sổ"
+  "shortcuts.captureWindow": "Chụp một cửa sổ",
+  "themeSwitch.changing": "Đang đổi kiểu màn hình nền…",
+  "themeSwitch.changingTo": "Đang chuyển sang {name}…",
+  "themeSwitch.failedTitle": "Không thể áp dụng {name}",
+  "themeSwitch.refusedBody": "Mã của nó không khớp với bản sao đã ký của LordOS nên không được tải. Kiểu màn hình nền của bạn vẫn giữ nguyên.",
+  "themeSwitch.failedBody": "Nó không khởi động được. Kiểu màn hình nền của bạn vẫn giữ nguyên.",
+  "spotlight.section.machines": "Máy ảo",
+  "guestApps.inMachine": "Trong {machine}"
 }

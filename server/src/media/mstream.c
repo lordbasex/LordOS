@@ -1,6 +1,6 @@
 /* mstream.c — the remote desktop's video on the session side (docs/REMOTE.md, "Video (WebRTC)").
  *
- * The session renders once; the frame the remote desktop sees (protected windows in black, from
+ * The session renders once; the frame the remote desktop sees (protected windows as the protected fill, from
  * media_composed or the GPU's read-back) feeds one live encoder per codec in use: lord-media in
  * MK_STREAM mode, through a sealed memfd of 3 slots, as for the screen recording. Every viewer of this
  * session gets the same encoded frames (remote/mirror.c sends them to each bridge); only the

@@ -6,7 +6,7 @@ It is not a native client of any service. **LordOS doesn't change the sites or t
 
 [[shot:6]]
 
-It is new in **LordOS 0.8.8.8**, released on 12 November 2026; the latest release is 0.8.9.5. It lives in an optional package, `lordos-web`: without it the rest of LordOS works the same, and the Store installs it for you with your first web app.
+It is new in **LordOS 0.8.8.8**, released on 12 November 2026; the latest release is 0.8.9.6. It lives in an optional package, `lordos-web`: without it the rest of LordOS works the same, and the Store installs it for you with your first web app.
 
 [[figure:web-runtime]]
 
@@ -26,6 +26,10 @@ The middle column describes how such apps work in general, not any one product; 
 ## Getting web apps: the Store's Web apps section
 
 The Store has a **Web apps** section, a banner and a shelf in Discover, and web apps in search and in their category. Every card says "Web app", so you can tell them from LordOS apps and Linux apps.
+
+The section opens on its shop: *Add from an address* and the catalog (since 0.8.9.6). The web apps you installed are under **Installed**, at the top of the section's second column above its categories, each with See more, Manage and Open; Store → Installed also lists them with every other app, with a Web apps filter.
+
+Its **Settings**, under Installed, say what a web app is, whether LordOS's web engine is installed yet, and open Settings → Web apps for each app's profiles, permissions and space; the search field ("Search web apps") searches only the catalog (since 0.8.9.6).
 
 [[shot:0]]
 

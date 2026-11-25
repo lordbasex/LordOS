@@ -91,5 +91,6 @@
   },
   "pickAddress": "Bu tətbiq üçün icazə vermək və ya bloklamaq üçün ünvan seçin.",
   "recent": "son bağlantı",
-  "recentDenied": "bu yaxınlarda qadağan edildi"
+  "recentDenied": "bu yaxınlarda qadağan edildi",
+  "machineInherits": "Maşınlar qaydaları bu maşın üçün də qərar verir. Öz qaydaları onlara əlavə olunur: hər ikisi bağlantıya uyğun gələndə daha dəqiq olan qərar verir, Blokla isə İcazə ver-dən güclüdür."
 }

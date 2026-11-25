@@ -78,8 +78,19 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   **sort** by name (natural: «2» before «10»), kind, date or size. Folders go first. Recents and
   the Trash go by date.
 - **Selection:** click, ❖/Ctrl+click, ⇧+click (range), ❖A, and typing the start of a name.
-- **Rename in place** (Enter): the name is selected and what you type replaces it
-  (`TextInput selectAll`, new in the SDK). Tags follow the file.
+- **Rename in place** (Enter or F2): the name is selected and what you type replaces it
+  (`TextInput selectAll`, new in the SDK). Tags follow the file. A **slow second click** on the name of the selected
+  item starts it too (in the icon, list and column views): the item is already the only one selected, the second click
+  lands on its name (not the icon) at least the double-click interval (450 ms, the runtime's; there is no setting for
+  it) and at most 1.5 s after the first, within 4 px of it, with the left button and no modifier key, and no other
+  press follows within the double-click interval (a double click still opens). A drag (the item, or the rubber band)
+  never renames, and neither does a click that only brought the window forward: the first click must land on an
+  already focused window. Only what Rename changes without a notice: never in a read-only folder, the Trash, an
+  archive, Applications, the Network page or on a mount point. A key, a double click or the window losing the focus
+  cancels a rename that is waiting. The timing rule is the SDK's `sdk/slowclick.js` (pure; `server/tests/slowclick_test.mjs`)
+  for every view that shows files; LordOS's desktops (Lord Flow, Lord Classic, Lord Workspaces, Lord Celeste) don't
+  show files on the desktop, so Files is its only user today. Headless scene: `tests/app_scene_headless.sh
+  files_slowrename_scene`.
 - **Copy, cut and paste files:** Files keeps its own list (a cut moves only between Files windows) and
   also puts the paths on the session clipboard as Linux file managers do (`text/uri-list`,
   `x-special/gnome-copied-files`, the paths as text), so they paste in a Linux file manager, a chat or an
@@ -360,8 +371,13 @@ says so (`lord.fs.mounts()`: the mount table's `fuse.*`, `cifs`, `smb3`, `nfs*`,
 resolution and checks as the synchronous calls, and answer through `__lordFsReply`. `apps/files/remotedirs.js` keeps
 each folder's last listing (shown while a new one comes), lists a folder once at a time, and hides items while a delete
 or a move to the Trash runs until a new listing says whether they are gone. A move inside such a mount renames on the
-copy job's thread. Still on the interface's thread there: the path checks and `lstat`s `lord.fs.copy` makes before starting a job, a
-thumbnail of a file already downloaded, Quick Preview's text, and Go to Folder.
+copy job's thread, and so are the `lstat`s of both names a copy or move checks first (since 2026-11-23: a name that isn't
+there is a question to the server; the refusals come as the job's error). Still on the interface's thread there: the
+resolution of the destination folder's path that `lord.fs.copy` makes before starting a job, a thumbnail of a file already
+downloaded, Quick Preview's text, and Go to Folder. Since 2026-11-23 the same workers also measure a folder's size
+(`lord.fs.duAsync(path, ms)`, `FSA_DU`: `lord.fs.du`'s checks and walk, at most 10 s, never on a cloud or network mount),
+which Settings → Flatpak and Web apps, Get Info, the Store's web-app pages and Imager's cache size use instead of
+`lord.fs.du` (`docs/MAIN-THREAD.md`).
 
 **The traffic of a mounted share isn't in the firewall.** The kernel's client opens its own sockets, outside any
 app's cgroup, and reconnects from a kernel thread, so it can't be a firewall app as `ROADMAP.md` first said.
@@ -450,7 +466,7 @@ on VM 116 with the development stand-in for `lord.cloud` (`sdk/cloudmock.js`, `"
 | Ctrl + / Ctrl − / Ctrl 0, Ctrl + wheel | Zoom in / out / actual size (icons and list) |
 | ❖[ / ❖] / ❖↑ | Back / forward / enclosing folder |
 | ❖↓ or double click | Open |
-| Enter | Rename |
+| Enter or F2, or a slow second click on the selected name | Rename |
 | ❖⇧N | New folder |
 | ❖D | Duplicate |
 | ❖C / ❖X / Ctrl+V | Copy / cut / paste files (also with Ctrl) |

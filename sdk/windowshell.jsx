@@ -83,7 +83,9 @@ export function WindowShell({ win, style, children, onMouseDown, resizable = tru
     // brings its window forward, so the keyboard follows (a Linux window in front kept it while a Settings sheet was typed into)
     <View ref={wm.frameRef(win.id, m)} lordWin={win.id} onMouseDownCapture={tv ? undefined : onMouseDown}
       style={{ position: 'absolute', left: geo.x - m, top: geo.y - m, width: geo.w + 2 * m, height: geo.h + 2 * m, display: here && (!win.minimized || tv || leaving) ? 'flex' : 'none', ...(tv ? { pointerEvents: 'box-none' } : null) }}>
-      <View ref={inner.current} style={{ position: 'absolute', left: m, top: m, right: m, bottom: m, ...style, ...place }}>
+      {/* protected (wm.setProtected, wm.open's `protected`): the whole window, its title bar included, is the protected fill
+          in every capture, in its exact box and corners, through the overview's scale and the theme's effects */}
+      <View ref={inner.current} protected={!!win.protected} style={{ position: 'absolute', left: m, top: m, right: m, bottom: m, ...style, ...place }}>
         {tv ? h(OverviewPlaceholder, { win, scale: tv.scale }) : null}
         {children}
         {tv ? h(OverviewCover, { id: win.id, scale: tv.scale, radius: win.maximized ? 0 : 8 }) : null}

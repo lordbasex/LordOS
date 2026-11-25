@@ -13,6 +13,7 @@
 #include "vmagent.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -398,6 +399,7 @@ int ag_drop_name(const char *in, char *out, size_t cap) {
     size_t un = k - a;
     int dev = dos_device(u, un);
     size_t lim = AG_NAME_MAX < cap - 1 ? AG_NAME_MAX : cap - 1;
+    if (dev && lim < 2) return -1;
     if (dev) lim--;
     size_t o = 0;
     if (dev) out[o++] = '_';
@@ -407,6 +409,7 @@ int ag_drop_name(const char *in, char *out, size_t cap) {
         const char *dot = NULL;
         for (size_t i = un; i > 1; i--) if (u[i - 1] == '.') { dot = u + i - 1; break; }
         size_t en = dot && (size_t)(u + un - dot) <= 16 ? (size_t)(u + un - dot) : 0;
+        if (en >= lim) en = 0;                              /* a small out: the start only (never lim - en below zero) */
         size_t head = char_start(u, lim - en);
         while (head > 0 && u[head - 1] == ' ') head--;
         if (!head) return -1;
@@ -590,9 +593,44 @@ int ag_tablet_layout(const AgDisplay *d, int n, int shown, int mode, int L[6]) {
     return 2;
 }
 
+int ag_stopping_parse(const uint8_t *p, size_t n, int *mode) {
+    if (!p || n != 1 || (p[0] != AG_STOP_POWEROFF && p[0] != AG_STOP_REBOOT)) return -1;
+    if (mode) *mode = p[0];
+    return 0;
+}
+
+int ag_stop_verb(const char *verb) {
+    if (!verb) return 0;
+    if (!strcmp(verb, "poweroff") || !strcmp(verb, "halt")) return AG_STOP_POWEROFF;
+    if (!strcmp(verb, "reboot") || !strcmp(verb, "kexec")) return AG_STOP_REBOOT;
+    return 0;
+}
+
 int ag_extra_parse(const uint8_t *p, size_t n, int *off) {
     if (!p || n != 1 || p[0] > 1) return -1;
     if (off) *off = p[0];
+    return 0;
+}
+
+int ag_perf_parse(const uint8_t *p, size_t n, int *on) {
+    if (!p || n != 1 || p[0] > 1) return -1;
+    if (on) *on = p[0];
+    return 0;
+}
+
+int ag_perfstate_parse(const uint8_t *p, size_t n, int *on, unsigned *done, unsigned *failed) {
+    if (!p || n != AG_PERFSTATE_BYTES || p[0] > 1 || (p[1] & ~AGPF_ALL) || (p[2] & ~AGPF_ALL) || (p[1] & p[2])) return -1;
+    if (on) *on = p[0];
+    if (done) *done = p[1];
+    if (failed) *failed = p[2];
+    return 0;
+}
+
+int ag_perfstate_write(uint8_t out[AG_PERFSTATE_BYTES], int on, unsigned done, unsigned failed) {
+    if (!out || (on != 0 && on != 1) || (done & ~(unsigned)AGPF_ALL) || (failed & ~(unsigned)AGPF_ALL) || (done & failed)) return -1;
+    out[0] = (uint8_t)on;
+    out[1] = (uint8_t)done;
+    out[2] = (uint8_t)failed;
     return 0;
 }
 
@@ -901,6 +939,12 @@ unsigned ag_hello_caps(const uint8_t *p, size_t n) {
         else if (l == 3 && !memcmp(p + s0, "gvt", 3)) caps |= AG_HELLO_GVT;
         else if (l == 5 && !memcmp(p + s0, "extra", 5)) caps |= AG_HELLO_EXTRA;
         else if (l == 8 && !memcmp(p + s0, "extraoff", 8)) caps |= AG_HELLO_EXTRAOFF;
+        else if (l == 8 && !memcmp(p + s0, "stopping", 8)) caps |= AG_HELLO_STOPPING;
+        else if (l == 4 && !memcmp(p + s0, "perf", 4)) caps |= AG_HELLO_PERF;
+        else if (l == 5 && !memcmp(p + s0, "shell", 5)) caps |= AG_HELLO_SHELL;
+        else if (l == 5 && !memcmp(p + s0, "links", 5)) caps |= AG_HELLO_LINKS;
+        else if (l == 6 && !memcmp(p + s0, "notify", 6)) caps |= AG_HELLO_NOTIFY;
+        else if (l == 4 && !memcmp(p + s0, "send", 4)) caps |= AG_HELLO_SEND;
     }
     return caps;
 }
@@ -1040,5 +1084,351 @@ size_t lag_applist_write(const LagAppList *l, uint8_t *out, size_t cap) {
 
 int lag_applist_has(const LagAppList *l, const char *token) {
     for (int i = 0; i < l->n; i++) if (!strcmp(l->a[i].token, token)) return 1;
+    return 0;
+}
+
+/* ---- guest → host links and notifications (6.12) ---- */
+
+static int lk_hex(uint8_t c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); }
+static int lk_alnum(uint8_t c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+/* RFC 3986's unreserved and reserved characters and '%', less ! $ ' ( ) *: the set this computer's launcher passes to a
+ * browser (apps.c apps_launch_uri); the guest's tools percent-encode the rest (ag_link_encode) */
+static const char LK_CHARS[] = "-._~:/?#[]@&=+,;%";
+static int lk_uri_char(uint8_t c) { return lk_alnum(c) || (c && strchr(LK_CHARS, c)); }
+static int lk_prefix(const uint8_t *p, size_t n, const char *s) {
+    size_t l = strlen(s);
+    if (n < l) return 0;
+    for (size_t i = 0; i < l; i++) {
+        uint8_t c = p[i];
+        if (c >= 'A' && c <= 'Z') c = (uint8_t)(c - 'A' + 'a');
+        if (c != (uint8_t)s[i]) return 0;
+    }
+    return 1;
+}
+
+int ag_link_ok(const uint8_t *p, size_t n) {
+    if (!p || !n || n > AG_LINK_MAX) return 0;
+    for (size_t i = 0; i < n; i++) {
+        if (p[i] < 0x21 || p[i] > 0x7e || !lk_uri_char(p[i])) return 0;
+        if (p[i] == '%' && (i + 2 >= n || !lk_hex(p[i + 1]) || !lk_hex(p[i + 2]))) return 0;
+    }
+    size_t s;
+    if (lk_prefix(p, n, "https://")) s = 8;
+    else if (lk_prefix(p, n, "http://")) s = 7;
+    else return 0;
+    size_t e = s;
+    while (e < n && p[e] != '/' && p[e] != '?' && p[e] != '#') e++;
+    /* the authority p[s..e): host[:port], never user:password@ */
+    if (e == s) return 0;
+    for (size_t i = s; i < e; i++) if (p[i] == '@') return 0;
+    size_t he = e;                              /* the host's end */
+    if (p[s] == '[') {
+        size_t c = s + 1;
+        while (c < e && p[c] != ']') { if (!lk_hex(p[c]) && p[c] != ':' && p[c] != '.') return 0; c++; }
+        if (c >= e || c == s + 1) return 0;
+        he = c + 1;
+        if (he < e && p[he] != ':') return 0;
+    } else {
+        for (size_t i = s; i < e; i++) if (p[i] == ':') { he = i; break; }
+        if (he == s) return 0;
+        /* labels of letters, digits and '-' (xn-- included), none empty, none starting or ending with '-' */
+        size_t ls = s;
+        for (size_t i = s; i < he; i++) {
+            uint8_t c = p[i];
+            if (c == '.') { if (i == ls || p[i - 1] == '-') return 0; ls = i + 1; }
+            else if (c == '-') { if (i == ls) return 0; }
+            else if (!lk_alnum(c)) return 0;
+        }
+        if (ls == he || p[he - 1] == '-') return 0;
+    }
+    if (he < e) {                               /* :port */
+        size_t d = he + 1;
+        if (d >= e || e - d > 5) return 0;
+        unsigned v = 0;
+        for (size_t i = d; i < e; i++) { if (p[i] < '0' || p[i] > '9') return 0; v = v * 10 + (unsigned)(p[i] - '0'); }
+        if (!v || v > 65535) return 0;
+    }
+    return 1;
+}
+
+long ag_link_encode(const uint8_t *in, size_t n, char *out, size_t cap) {
+    static const char hx[] = "0123456789ABCDEF";
+    size_t o = 0;
+    if (!in || !out || !cap) return -1;
+    for (size_t i = 0; i < n; i++) {
+        uint8_t c = in[i];
+        int keep = lk_uri_char(c) && (c != '%' || (i + 2 < n && lk_hex(in[i + 1]) && lk_hex(in[i + 2])));
+        if (keep) { if (o + 1 >= cap) return -1; out[o++] = (char)c; }
+        else { if (o + 3 >= cap) return -1; out[o++] = '%'; out[o++] = hx[c >> 4]; out[o++] = hx[c & 15]; }
+    }
+    out[o] = 0;
+    return (long)o;
+}
+
+int ag_note_text_ok(const uint8_t *p, size_t n) {
+    if (!lag_text_ok(p, n)) return 0;
+    for (size_t i = 0; i + 2 < n; i++) {
+        if (p[i] != 0xe2) continue;
+        uint8_t b = p[i + 1], c = p[i + 2];
+        if (b == 0x80 && (c == 0x8e || c == 0x8f || (c >= 0xaa && c <= 0xae))) return 0;     /* U+200E, U+200F, U+202A..E */
+        if (b == 0x81 && c >= 0xa6 && c <= 0xa9) return 0;                                    /* U+2066..U+2069 */
+    }
+    return 1;
+}
+
+int ag_note_parse(const uint8_t *p, size_t n, const uint8_t **title, uint16_t *tn, const uint8_t **body, uint16_t *bn) {
+    if (!p || n < 4 || n > AG_NOTE_BYTES) return -1;
+    size_t t = (size_t)p[0] | (size_t)p[1] << 8;
+    if (!t || t > AG_NOTE_TITLE_MAX || 2 + t + 2 > n) return -1;
+    size_t b = (size_t)p[2 + t] | (size_t)p[3 + t] << 8;
+    if (b > AG_NOTE_BODY_MAX || 4 + t + b != n) return -1;
+    if (!ag_note_text_ok(p + 2, t) || (b && !ag_note_text_ok(p + 4 + t, b))) return -1;
+    if (title) *title = p + 2;
+    if (tn) *tn = (uint16_t)t;
+    if (body) *body = p + 4 + t;
+    if (bn) *bn = (uint16_t)b;
+    return 0;
+}
+
+size_t ag_note_write(const uint8_t *title, size_t tn, const uint8_t *body, size_t bn, uint8_t *out, size_t cap) {
+    if (!title || !out || !tn || tn > AG_NOTE_TITLE_MAX || bn > AG_NOTE_BODY_MAX || (bn && !body) || 4 + tn + bn > cap) return 0;
+    if (!ag_note_text_ok(title, tn) || (bn && !ag_note_text_ok(body, bn))) return 0;
+    out[0] = (uint8_t)tn; out[1] = (uint8_t)(tn >> 8);
+    memcpy(out + 2, title, tn);
+    out[2 + tn] = (uint8_t)bn; out[3 + tn] = (uint8_t)(bn >> 8);
+    if (bn) memcpy(out + 4 + tn, body, bn);
+    return 4 + tn + bn;
+}
+
+int ag_rate_take(AgRate *r, long long now, int burst, int every_ms) {
+    if (!r || burst < 1 || every_ms < 1) return 0;
+    if (!r->at || now < r->at) { r->at = now; r->tokens = burst; }
+    long long gained = (now - r->at) / every_ms;
+    if (gained > 0) {
+        if (gained >= burst - r->tokens) { r->tokens = burst; r->at = now; }
+        else { r->tokens += (int)gained; r->at += gained * every_ms; }
+    }
+    if (r->tokens <= 0) return 0;
+    r->tokens--;
+    return 1;
+}
+
+/* ---- the agent's shell (6.18) ---- */
+
+static void sh_wr32(uint8_t *o, uint32_t v) { o[0] = (uint8_t)v; o[1] = (uint8_t)(v >> 8); o[2] = (uint8_t)(v >> 16); o[3] = (uint8_t)(v >> 24); }
+
+int ag_shell_size_parse(const uint8_t *p, size_t n, uint32_t *id, int *cols, int *rows) {
+    if (!p || n != 8) return -1;
+    uint32_t i = le32(p);
+    int c = p[4] | p[5] << 8, r = p[6] | p[7] << 8;
+    if (!i || c < 1 || c > AG_SHELL_COLS_MAX || r < 1 || r > AG_SHELL_ROWS_MAX) return -1;
+    if (id) *id = i;
+    if (cols) *cols = c;
+    if (rows) *rows = r;
+    return 0;
+}
+
+int ag_shell_size_write(uint8_t out[8], uint32_t id, int cols, int rows) {
+    if (!out || !id || cols < 1 || cols > AG_SHELL_COLS_MAX || rows < 1 || rows > AG_SHELL_ROWS_MAX) return -1;
+    sh_wr32(out, id);
+    out[4] = (uint8_t)cols; out[5] = (uint8_t)(cols >> 8);
+    out[6] = (uint8_t)rows; out[7] = (uint8_t)(rows >> 8);
+    return 0;
+}
+
+int ag_shell_data_parse(const uint8_t *p, size_t n, uint32_t *id, const uint8_t **data, uint32_t *dn) {
+    if (!p || n < 5 || n > 4 + AG_SHELL_CHUNK) return -1;
+    uint32_t i = le32(p);
+    if (!i) return -1;
+    if (id) *id = i;
+    if (data) *data = p + 4;
+    if (dn) *dn = (uint32_t)(n - 4);
+    return 0;
+}
+
+int ag_shell_ack_parse(const uint8_t *p, size_t n, uint32_t *id, uint32_t *bytes) {
+    if (!p || n != 8) return -1;
+    uint32_t i = le32(p), b = le32(p + 4);
+    if (!i || !b || b > AG_SHELL_WINDOW) return -1;
+    if (id) *id = i;
+    if (bytes) *bytes = b;
+    return 0;
+}
+
+void ag_shell_pair_write(uint8_t out[8], uint32_t id, uint32_t v) { sh_wr32(out, id); sh_wr32(out + 4, v); }
+
+int ag_shell_close_parse(const uint8_t *p, size_t n, uint32_t *id, int *status) {
+    if (!p || n != 8) return -1;
+    uint32_t i = le32(p);
+    int32_t s = (int32_t)le32(p + 4);
+    if (!i || s < AG_SHELL_NOSTART || s > 511) return -1;
+    if (id) *id = i;
+    if (status) *status = s;
+    return 0;
+}
+
+/* ---- files sent from the guest (6.21, AGK_SEND_*) ---- */
+
+static uint64_t le64(const uint8_t *p) { return (uint64_t)le32(p) | (uint64_t)le32(p + 4) << 32; }
+static void wr64(uint8_t *o, uint64_t v) { sh_wr32(o, (uint32_t)v); sh_wr32(o + 4, (uint32_t)(v >> 32)); }
+
+int ag_send_name_ok(const uint8_t *p, size_t n) {
+    if (!p || !n || n > AG_NAME_MAX || !ag_note_text_ok(p, n)) return 0;
+    if ((n == 1 && p[0] == '.') || (n == 2 && p[0] == '.' && p[1] == '.')) return 0;
+    for (size_t i = 0; i < n; i++) if (p[i] == '/' || p[i] == '\\') return 0;
+    return 1;
+}
+
+int ag_send_offer_parse(const uint8_t *p, size_t n, AgSendOffer *o) {
+    if (!p || n < AG_SEND_OFFER_MIN || n > AG_SEND_OFFER_BYTES) return -1;
+    uint32_t id = le32(p);
+    uint64_t size = le64(p + 4);
+    uint8_t flags = p[12];
+    size_t nl = (size_t)p[45] | (size_t)p[46] << 8;
+    if (!id || size > AG_SEND_SIZE_MAX || (flags & ~AGSF_ALL) || 47 + nl != n || !ag_send_name_ok(p + 47, nl)) return -1;
+    if (o) {
+        o->id = id; o->size = size; o->flags = flags;
+        memcpy(o->key, p + 13, 32);
+        memcpy(o->name, p + 47, nl);
+        o->name[nl] = 0;
+    }
+    return 0;
+}
+
+size_t ag_send_offer_write(const AgSendOffer *o, uint8_t *out, size_t cap) {
+    if (!o || !out) return 0;
+    size_t nl = strnlen(o->name, AG_NAME_MAX + 1);
+    if (!o->id || o->size > AG_SEND_SIZE_MAX || (o->flags & ~AGSF_ALL) || !ag_send_name_ok((const uint8_t *)o->name, nl) || 47 + nl > cap) return 0;
+    sh_wr32(out, o->id);
+    wr64(out + 4, o->size);
+    out[12] = o->flags;
+    memcpy(out + 13, o->key, 32);
+    out[45] = (uint8_t)nl; out[46] = (uint8_t)(nl >> 8);
+    memcpy(out + 47, o->name, nl);
+    return 47 + nl;
+}
+
+static int all_zero(const uint8_t *p, size_t n) { for (size_t i = 0; i < n; i++) if (p[i]) return 0; return 1; }
+
+int ag_send_accept_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t *status, uint64_t *offset, uint8_t sha[32]) {
+    if (!p || n != AG_SEND_ACCEPT_BYTES) return -1;
+    uint32_t i = le32(p);
+    uint8_t st = p[4];
+    uint64_t off = le64(p + 5);
+    if (!i || st > AGSA_LAST || off > AG_SEND_SIZE_MAX || (st != AGSA_OK && (off || !all_zero(p + 13, 32))) || (!off && !all_zero(p + 13, 32))) return -1;
+    if (id) *id = i;
+    if (status) *status = st;
+    if (offset) *offset = off;
+    if (sha) memcpy(sha, p + 13, 32);
+    return 0;
+}
+
+int ag_send_accept_write(uint8_t out[AG_SEND_ACCEPT_BYTES], uint32_t id, uint8_t status, uint64_t offset, const uint8_t sha[32]) {
+    if (!out || !id || status > AGSA_LAST || offset > AG_SEND_SIZE_MAX || (status != AGSA_OK && offset) || (offset && !sha)) return -1;
+    sh_wr32(out, id);
+    out[4] = status;
+    wr64(out + 5, offset);
+    if (offset) memcpy(out + 13, sha, 32); else memset(out + 13, 0, 32);
+    return ag_send_accept_parse(out, AG_SEND_ACCEPT_BYTES, NULL, NULL, NULL, NULL);
+}
+
+int ag_send_pos_parse(const uint8_t *p, size_t n, uint32_t *id, uint64_t *offset) {
+    if (!p || n != 12) return -1;
+    uint32_t i = le32(p);
+    uint64_t off = le64(p + 4);
+    if (!i || off > AG_SEND_SIZE_MAX) return -1;
+    if (id) *id = i;
+    if (offset) *offset = off;
+    return 0;
+}
+
+int ag_send_pos_write(uint8_t out[12], uint32_t id, uint64_t offset) {
+    if (!out || !id || offset > AG_SEND_SIZE_MAX) return -1;
+    sh_wr32(out, id);
+    wr64(out + 4, offset);
+    return 0;
+}
+
+int ag_send_data_parse(const uint8_t *p, size_t n, uint32_t *id, uint64_t *offset, const uint8_t **data, uint32_t *dn) {
+    if (!p || n < 13 || n > 12 + AG_SEND_CHUNK) return -1;
+    uint32_t i = le32(p);
+    uint64_t off = le64(p + 4);
+    if (!i || off > AG_SEND_SIZE_MAX || n - 12 > AG_SEND_SIZE_MAX - off) return -1;
+    if (id) *id = i;
+    if (offset) *offset = off;
+    if (data) *data = p + 12;
+    if (dn) *dn = (uint32_t)(n - 12);
+    return 0;
+}
+
+void ag_send_data_head(uint8_t out[12], uint32_t id, uint64_t offset) { sh_wr32(out, id); wr64(out + 4, offset); }
+
+int ag_send_end_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t sha[32]) {
+    if (!p || n != 36 || !le32(p)) return -1;
+    if (id) *id = le32(p);
+    if (sha) memcpy(sha, p + 4, 32);
+    return 0;
+}
+
+int ag_send_end_write(uint8_t out[36], uint32_t id, const uint8_t sha[32]) {
+    if (!out || !id || !sha) return -1;
+    sh_wr32(out, id);
+    memcpy(out + 4, sha, 32);
+    return 0;
+}
+
+int ag_send_done_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t *code) {
+    if (!p || n != 5 || !le32(p) || p[4] > AGSD_LAST) return -1;
+    if (id) *id = le32(p);
+    if (code) *code = p[4];
+    return 0;
+}
+
+int ag_send_done_write(uint8_t out[5], uint32_t id, uint8_t code) {
+    if (!out || !id || code > AGSD_LAST) return -1;
+    sh_wr32(out, id);
+    out[4] = code;
+    return 0;
+}
+
+int ag_recv_name(const char *in, char *out, size_t cap) {
+    if (!in || !out || cap < 2) return -1;
+    size_t n = strnlen(in, 4097);
+    if (n > 4096 || !ag_note_text_ok((const uint8_t *)in, n)) return -1;
+    if (ag_drop_name(in, out, cap)) return -1;
+    if (out[0] == '.') out[0] = '_';
+    return 0;
+}
+
+int ag_send_room(uint64_t sent, uint64_t acked, uint32_t n) {
+    if (sent < acked || n > AG_SEND_WINDOW) return 0;
+    return sent - acked + n <= AG_SEND_WINDOW;
+}
+
+/* A clipboard in AGK_CLIPX's layout, from either side, made safe to pass on: text that is UTF-8, HTML sanitized (from
+ * UTF-8), a PNG whose header is sane (lord-server re-encodes it in lord-media's sandbox before anything decodes it for
+ * real). The kept parts again in that layout, in *out (malloc); 0 something is left, -1 nothing usable. */
+int ag_clip_clean(const uint8_t *in, size_t n, uint8_t **out, size_t *on, char *what, size_t wn) {
+    AgClip c, k;
+    memset(&k, 0, sizeof k);
+    if (ag_clipx_parse(in, n, &c)) { snprintf(what, wn, "malformed"); return -1; }
+    static char html[AG_TEXT_MAX + 1];
+    uint32_t w = 0, h = 0;
+    if (c.text && ag_utf8_ok(c.text, c.text_n)) { k.text = c.text; k.text_n = c.text_n; }
+    if (c.html && ag_utf8_ok(c.html, c.html_n)) {
+        long hn = ag_html_sanitize((const char *)c.html, c.html_n, html, sizeof html);
+        if (hn > 0) { k.html = (const uint8_t *)html; k.html_n = (uint32_t)hn; }
+    }
+    if (c.png && !ag_png_check(c.png, c.png_n, &w, &h)) { k.png = c.png; k.png_n = c.png_n; }
+    snprintf(what, wn, "%s%s%s", k.text ? "text " : "", k.html ? "html " : "", k.png ? "png " : "");
+    if (k.png) { size_t l = strlen(what); snprintf(what + l, wn - l, "%ux%u ", w, h); }
+    if (c.html && !k.html) { size_t l = strlen(what); snprintf(what + l, wn - l, "(html dropped) "); }
+    if (c.png && !k.png) { size_t l = strlen(what); snprintf(what + l, wn - l, "(picture refused) "); }
+    size_t sz = ag_clipx_size(&k);
+    if (!sz) { snprintf(what, wn, "nothing usable"); return -1; }
+    *out = malloc(sz);
+    if (!*out) return -1;
+    ag_clipx_write(&k, *out);
+    *on = sz;
     return 0;
 }

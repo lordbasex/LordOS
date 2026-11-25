@@ -939,26 +939,102 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 - [x] **Raspberry Pi with 0.8.9.1** in the same report (2026-11-19): Lord Flow 113 MB and 6.2 % of one core, as 0.8.9;
   Lord Workspaces, measured on the Pi for the first time, 99 MB and 0.06 %.
 
-## Next release after 0.8.9.5
+## Next release after 0.8.9.6
 
-- [ ] **Voice in French, German, Italian and Dutch** ([#215](https://github.com/lordbasex/LordOS/issues/215),
-  maintainer's decision 2026-11-23: moved out of 0.8.9.5 so it can close). The code is done on branch
-  `feat/voice-languages` (89f59f25): Standard and HD models from Kyutai (Dutch Standard is Kyutai's own 6-layer
-  `dutch` model, since audio.cpp publishes no Dutch GGUF), own voices Estelle, Juergen, Giovanni and Daan, number,
-  date and time reading in each language (274 new `saytext_test` checks), and a pop-up language picker in Settings →
-  AI → Voice. Left before it ships: download the models (`tools/voice/fetch-voices.sh`), make the previews
-  (`make-previews.sh`, the previews package now covers seven languages), build the `lordos-voice-*` packages
-  (`mkdeb-voice.mjs`), sign and publish them on the maintainer's Mac (`tools/release/apt-repo.sh`), then merge the
-  branch and add `fr`, `de`, `it`, `nl` to the closed lists in AGENTS.md (lord-tts, `lord.voice`). Also a whisper
-  round trip for the four languages, as was done for Spanish and Portuguese.
+- [ ] **Sentinela, phase 1** (approved by the maintainer on 2026-11-23; `docs/SENTINELA.md`; branch `feat/sentinela`).
+  Done in code: the rules over the Monitor's process list every 10 s (high CPU for 5 minutes, memory that keeps
+  growing, a program imitating a system one, a program deleted or replaced after it started, a new autostart entry),
+  a desktop notification with the closed actions, the local model through `lord-llm` (llama-server in a user and
+  network namespace, Landlock and seccomp, a 0600 Unix socket, 2 cores, stopped after 2 minutes idle), the answer
+  checked against a fixed schema, Settings → AI → Sentinela. Left before it ships: build, sign and publish
+  `lordos-llm-qwen3-1.7b` and `lordos-llm-qwen3-4b` (`tools/llm/fetch-models.sh`, `mkdeb-llm.mjs`,
+  `tools/release/apt-repo.sh` on the maintainer's Mac); the AGENTS.md entries; a check on the VM with a real
+  screenshot (a notification and the Settings page) and on a Raspberry Pi. Later: the network trigger (per-process
+  connections), packaged programs checked against dpkg's checksums, cancelling a model download (needs a root-side
+  cancel for `pkg-install`), the engine on the GPU, the "Live statistics" board.
+- [ ] **Icons and files on the desktop** (maintainer, 2026-11-24; not started). Today the desktop holds widgets only, in
+  every desktop style. Plan: files and folders of `~/Desktop` (and optional app launchers and mounted volumes) shown as
+  icons on each display, in every theme through one SDK piece (per-display positions keyed by connector, grid snap,
+  RTL), with the same selection rules as Files (click, Shift/Ctrl, rubber band `apps/files/marquee.js`), drag and drop
+  to and from Files and apps, the context menu, and renaming by Enter, F2 or the slow second click on the name
+  (`sdk/slowclick.js`, already shared). Widgets stay above or beside them. Security: the folder is the user's own; a
+  `.desktop` file shown there never runs without the same trust check as the launcher; nothing outside `~/Desktop` is
+  written.
+- [ ] **iCloud: choose what to sync** ([#241](https://github.com/lordbasex/LordOS/issues/241); on the roadmap, not
+  started). Today adding an iCloud account in Mail syncs every calendar and every address book it finds and adds an
+  "iCloud – Calendar & Contacts" row to Mail's sidebar even when it carries no mail. Plan:
+  - **Setup asks what to sync:** Mail (IMAP), Calendars and Contacts, each on or off; with Calendars on, the calendars
+    the server lists (CalDAV discovery already reads them) as a checklist, all checked by default, so only the chosen
+    ones sync. The same choices later from the account's sheet in Mail, Calendar and Contacts.
+  - **A per-collection `subscribed` flag** in `lord-maild` (`server/src/mail/pim.c`, `dav.c`): kept in `pim/colls`, an
+    unsubscribed collection is listed (so it can be turned on again) but never fetched or shown, and its cached items
+    are dropped. The `pim/colls` line gains a field, so a **migration** reads the old line as subscribed (every
+    collection syncs as today) and the old format stays readable; `mail-test` cases for the old and new lines and for a
+    discovery answer with collections added or removed on the server.
+  - **Labels by what is synced:** "iCloud – Calendar" when only calendars sync, "iCloud – Contacts" when only contacts,
+    "iCloud – Calendar & Contacts" when both; **Mail's sidebar shows the account only when it carries mail** (IMAP on).
+    Texts in all 35 languages; the same rule for any CalDAV/CardDAV account, not only iCloud.
+  - Tests: the setup's model and the label rule as node tests; a scene with an account that has mail off; checked on
+    the VM against a CalDAV server with several calendars before it is marked done.
 - [ ] **The five X11 items at 100 % but not "complete"** (`docs/WAYLAND.md`, "Conformance"): `ewmh.wm_pid`, `xdnd`,
   `xwayland.hidpi`, `xwayland.cursor` and `xwayland.security` need tests written for each that cover every point, so
   all 28 X11 items are complete as the 48 Wayland globals are.
-- [ ] **Menus ([#209](https://github.com/lordbasex/LordOS/issues/209)) and Thunderbird's drag and drop
-  ([#188](https://github.com/lordbasex/LordOS/issues/188))**: not reproduced yet; reproduce each on the VM or the
-  reporter's setup, then fix.
+- [ ] **Thunderbird's drag and drop ([#188](https://github.com/lordbasex/LordOS/issues/188))**: not reproduced yet;
+  reproduce it on the VM or the reporter's setup, then fix. (The menus of [#209](https://github.com/lordbasex/LordOS/issues/209)
+  were fixed in 0.8.9.6.)
 - [ ] **Moving and resizing a window with the keyboard only** (every theme, from the Window menu: arrows move or
   resize, Enter keeps, Esc goes back), for people who can't use a pointer.
+
+## Release 0.8.9.6 (released 2026-11-25)
+
+An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.6-beta"); no new images.
+
+- [x] **Monitor → GPU, redrawn** (`MONITOR.md`, "GPU"): a chip per GPU, load, temperature, power, fan or RC6 idle,
+  clocks and the PCIe link, use per engine over three minutes, memory by kind of process, the processes on the GPU and
+  "AI on this computer"; `/proc` walked every 5 s (about 0.45 ms a second on the RX 580 PC). **NVIDIA through
+  `lord-nvgpu`** (approved 2026-11-24): the sandboxed helper that alone loads NVML, numbers only. Left: run it on NVIDIA
+  hardware and check its sandbox there with `strace` (in development).
+- [x] **Lord Workspaces' bar** (`WORKSPACES.md`): open and minimized windows of the activity on each display, launches
+  that land on the display, activity and slot they came from (Chrome's profile picker included), late-parent dialogs
+  over their parent, browser profiles for Chrome, Chromium, Brave and Edge with `lord.apps.launchProfile` (approved
+  2026-11-24), ❖` through an app's windows, and the FileChooser portal at version 3 so Chromium-family browsers use
+  LordOS's dialog for Open and Save as. Left: a screenshot on real monitors.
+- [x] **Files**: rename by a slow second click or F2 (`sdk/slowclick.js`), rubber-band selection
+  ([#233](https://github.com/lordbasex/LordOS/issues/233)).
+- [x] **Voice in French, German, Italian and Dutch** ([#215](https://github.com/lordbasex/LordOS/issues/215)): Standard
+  and HD models, the voices Estelle, Juergen, Giovanni and Daan, numbers, dates and times read in each language, a pop-up
+  language picker; the `lordos-voice-*` packages of version `2026.11.24` and the seven-language previews, signed and
+  published by the maintainer with the release. Left: a whisper.cpp round trip for the four languages.
+- [x] **The login and lock screens at the desktop's scale, set by an administrator**
+  ([#242](https://github.com/lordbasex/LordOS/issues/242); `DISPLAYS.md`). Left: a screenshot on the VM.
+- [x] **Notes** ([#238](https://github.com/lordbasex/LordOS/issues/238)): attachments open alone and never run a
+  program, + New Note, inserting from the reading view, the sticky note's emoji picker, links that can't reach out.
+- [x] **A mouse's Back and Forward buttons in LordOS's own apps** ([#234](https://github.com/lordbasex/LordOS/issues/234)).
+- [x] **Cloud**: each file moving now with its percentage ([#244](https://github.com/lordbasex/LordOS/issues/244)), empty
+  files and folders no longer "coming down" ([#240](https://github.com/lordbasex/LordOS/issues/240)), Check This Account
+  on pCloud (#243). **Backups** restores several files and folders at once
+  ([#231](https://github.com/lordbasex/LordOS/issues/231)).
+- [x] **Machines toward its full checklist** (`VIRTUALIZATION.md`): encrypted machines, disposable sessions for any
+  machine, raw disks and Export; this computer's USB devices and camera (`vm-usb-allow`, only the person at the seat);
+  machine groups and the Whonix (Tor) card with its isolation layers; All Displays; each machine its own firewall row;
+  Start Linux directly, Guest can see, `machines migrate`; Vulkan for Linux guests; vCPU pinning and a guest performance
+  profile; Send to LordOS, the agent's shell and the Guest Tools disc; QEMU in its own namespaces and non-dumpable, a
+  seccomp allowlist, nothing it writes executable; every card run to the installed login on amd64 and the Raspberry Pi 5.
+- [x] **The Store**: each origin's shop first with its own Installed and Settings, Store → Installed across every
+  package system, LordOS apps as LordOS's own store.
+- [x] **lord-web on WPEPlatform with LordOS's WPE WebKit 2.54 for Debian 13**
+  ([#142](https://github.com/lordbasex/LordOS/issues/142); `WPEWEBKIT.md`): the backend interface and LordOS's rebuild of
+  Debian's 2.54.3 with WPEPlatform (no DRM backend, no `libinput`/`libudev`), its source next to the binaries in the
+  APT repository. Left: running WebKit on arm64 on the Raspberry Pi 5 (in development), and every web app feature on
+  the VM (below, "lord-web on the new WPE API").
+- [x] **The Claude Security review of 2026-11-24, all 16 findings fixed**: `vm-usb-allow` at the seat only (F1, F3), the
+  `machines` command's guest text and `apply` (F2, F8, F11), the encrypted machine's key hand-off (F4), `lord-web`'s
+  shared-memory frames (F5), the test scripts' `/var/tmp` folders (F6, F7, F12, F14, F15, F16), a LordOS guest's agent
+  port for its administrators (F9, F13, migration 013) and Monitor's signed seal (F10).
+- [x] **From GitHub reports**: menus of X11 apps ([#209](https://github.com/lordbasex/LordOS/issues/209)), a fullscreen
+  video in Firefox ([#232](https://github.com/lordbasex/LordOS/issues/232)), Screenshots' Options menu
+  ([#237](https://github.com/lordbasex/LordOS/issues/237)), region names ([#239](https://github.com/lordbasex/LordOS/issues/239)),
+  MediaTek Wi-Fi on the live ISO ([#227](https://github.com/lordbasex/LordOS/issues/227), with the next ISO).
 
 ## Release 0.8.9.5 (released 2026-11-23)
 
@@ -985,7 +1061,7 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   Not yet tried on real hardware: the virtual camera in browsers and OBS, the MOK flow, Mic Mode in a real Meet call,
   the Raspberry Pi.
 - [x] **Machines** (`VIRTUALIZATION.md`, `MACHINES-GPU.md`): Windows 11 machines with an unattended install and the
-  LordOS tools for Windows, apps mode with its status item and controller panel, a LordOS card and an Android 13 card,
+  LordOS tools for Windows, apps mode with its status item and controller panel, a LordOS card,
   sound and microphone, forwarded ports and Bridged and Host-only networks, 3D for Linux machines, Intel GVT-g with
   LordOS's own GOP option ROM, the Keys panel, Capture mouse, the `machines` command, a transfer folder, the clipboard
   on demand, and a picture at the guest's full rate.
@@ -1048,10 +1124,19 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   per-card in Settings → Displays, with the NVIDIA opt-in driver (docs/NVIDIA-PLAN.md) and with AMD/Intel hybrids.
   Large; after the 0.8.9.x series.
 - [ ] **lord-web on the new WPE API (WPEPlatform)** ([#142](https://github.com/lordbasex/LordOS/issues/142), maintainer's
-  decision 2026-11-15: it will be done, before 1.0). The legacy API lord-web uses (libwpe, wpebackend-fdo) is deprecated
-  upstream and already missing on some distributions; Debian 13 keeps it for its whole life. Rewrite `webwin.c` on
-  WPEPlatform keeping our buffer path (dmabuf, shm), input, IME, clipboard, drag and drop and fractional scale, and
-  re-test every web app feature on the VM. Watch trixie's wpewebkit security updates until then. With it comes real
+  decision 2026-11-15: it will be done, before 1.0; 2026-11-23: on LordOS's own wpewebkit 2.54 backport for Debian 13
+  with both APIs on). The legacy API lord-web uses (libwpe, wpebackend-fdo) is deprecated upstream and already missing
+  on some distributions; Debian 13 keeps it for its whole life. **Done (0.8.9.6):** the backend interface
+  (`server/src/web/webback.h`) with the legacy code behind it unchanged and a WPEPlatform backend of lord-web's own
+  (`webback_platform.c`: our buffer path, dmabuf and shm, input, scale, cursor, clipboard, screen; the IME and drag and
+  drop are lord-web's own on both), `mk/web.mk` choosing it, and `build/web-backend-test` passing on both backends
+  (Debian 13's 2.48.3 and sid's 2.54.3) plus lord-web in a headless weston on 2.54.3 (shm and dmabuf), and LordOS's own
+  2.54.3 build for Debian 13 (`2.54.3-1~lordos13+2`), with which both backends pass `web-backend-test` and the probe test
+  on amd64. **Left:** run WebKit from the arm64 build on the Raspberry Pi 5 (in development); the backport packages are built by `tools/pkg/build-wpewebkit.sh` and published with their source in the LordOS APT
+  repository ([WPEWEBKIT.md](WPEWEBKIT.md); from then on LordOS rebuilds them for every WebKit security release); then re-test every web app feature on the VM and the PC (keys and IME with a
+  real input method, touch, the clipboard both ways, drops, the context menu, downloads, notifications, the developer
+  tools, fractional scale on a real output), ship lordos-web built on WPEPlatform with the backport, and drop the
+  legacy backend once no supported LordOS has 2.48. Watch trixie's wpewebkit security updates until then. With it comes real
   dark mode for web apps (maintainer, 2026-11-15): set `prefers-color-scheme` through the new API so CSS `@media`
   rules follow too, then bring back each app's Appearance (Light and Dark), held back until then (`WEBSCHEME_PER_APP`
   in `server/src/web/webscheme.h`, `COLOR_SCHEMES_AVAILABLE` in `sdk/webappsmodel.js`, `webAppearanceItem` in the app
@@ -1183,6 +1268,10 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   *Can't be done as written:* the mount's traffic as a firewall app (the kernel's client has no cgroup of an app).
   *Not built:* IPv6.
 
+- [x] **Voice, phase 4 — more languages** (`VOICE.md`; French approved on 2026-11-22,
+  [#215](https://github.com/lordbasex/LordOS/issues/215)): French, German, Italian and Dutch, released in 0.8.9.6
+  (models, voices, numbers written out as words, Settings → AI → Voice); left: a whisper.cpp round trip like Spanish's. LordOS's own
+  voice is phase 5.
 - [x] **Flatpak and Flathub — approved 2026-11-19, phase 1 released in 0.8.9.4 (2026-11-20)** (`FLATPAK.md`; the seven exceptions E1–E7
   in `AGENTS.md`). Phase 1, x86-64 only: a Flathub switch in the Store (installs `flatpak` without Recommends, masks
   its root helper and portal), the `verified` catalog through a sandboxed parser, install/update/remove per user, the
@@ -1502,7 +1591,7 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   - **Control Center** with the list of VMs and their live thumbnail, state, start, pause,
     suspend and shut down;
   - **Installation Assistant**: cards for downloading popular guest systems,
-    Ubuntu, Debian, Fedora, Android, «Install from an ISO file», «Migrate from another PC»;
+    Ubuntu, Debian, Fedora, «Install from an ISO file», «Migrate from another PC»;
   - **VM window** with its bar (Actions, Devices: USB, CD, folders, network, sound) and
     the **Window, Full Screen, Seamless and Picture in Picture** modes;
   - **Configuration** on one screen, its sections down the side with a summary of each: General, Options (startup and shutdown,
@@ -1530,9 +1619,8 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   - another architecture (arm64 on a PC, amd64 on the Pi) through TCG emulation: it works, but 5–20×
     slower;
   - later, a lightweight engine of our own only for Linux guests (like crosvm/Firecracker).
-- [ ] **Android:** only as a machine in Machines (maintainer's decision 2026-11-22): the Android 13 card (Bliss OS
-  16.9.7 FOSS, amd64 only) shipped in 0.8.9.5; a newer image and arm64 are open question 6 of `VIRTUALIZATION.md`.
-  No Android container in LordOS: Android apps in the Store are for the separate LordBridge project (`LORDBRIDGE.md`).
+- [ ] **Android:** no Android container in LordOS: Android apps in the Store are for the separate LordBridge project
+  (`LORDBRIDGE.md`).
 - [ ] **Firewall, ask mode** (an alert on the first connection attempt, like a per-app network monitor).
 - [ ] **Accessibility:** screen reader, zoom, high contrast.
 - [ ] Full **demo video** (installation + tour, English voice-over with Spanish

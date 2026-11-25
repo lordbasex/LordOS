@@ -35,5 +35,6 @@
   "sysinfo": "系统信息",
   "sysprobe": "沙盒测试",
   "terminal": "终端",
-  "databases": "数据库"
+  "databases": "数据库",
+  "studio": "LordOS Studio"
 }

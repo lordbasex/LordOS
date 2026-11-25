@@ -265,8 +265,12 @@ static const char introspect_xml[] =
 /* ---- org.freedesktop.portal.FileChooser ----
  * For apps that have no file dialog of their own and ask the desktop for one. The shell draws it
  * (hw event "portal-file", sdk/filepicker.jsx) and answers with lord.portal.chosen. The answer goes
- * only to the app that asked, on the Request object it was given. It says version 2 on purpose: the
- * browsers want 3 before they leave their own dialog, so they keep it. */
+ * only to the app that asked, on the Request object it was given. It says version 3 (OpenFile's "directory", which
+ * the dialog's folder mode serves): Chromium and Google Chrome want 3 before they leave their own GTK dialog
+ * (select_file_dialog_linux_portal.cc kXdgPortalRequiredVersion), so their Open and Save as dialogs are this one,
+ * over the window that asked (its xdg-foreign handle) or on the display in front. Until 0.8.9.5 it said 2 so the
+ * browsers kept theirs; the maintainer asked for the system dialog in Chrome (2026-11-24). Nothing new is reachable:
+ * any app could already call it, and the answer still goes only to the caller. */
 #define FC_IFACE  "org.freedesktop.portal.FileChooser"
 #define REQ_IFACE "org.freedesktop.portal.Request"
 #define MAX_PICKS 8
@@ -1761,7 +1765,7 @@ int portal_cast_thumb(int id, const CastSource *src) {
 /* ---- org.freedesktop.portal.Screenshot (approved by the maintainer 2026-11-22) ----
  * For apps that take screenshots (Flameshot, ksnip): the same chooser as ScreenCast, always interactive whatever the app
  * asks (hw event "portal-shot", sdk/screencast.jsx): a screen, a window or an area the person drags, or Cancel; the
- * picture is painted as a share is (protected windows black), written as a new PNG in the person's Screenshots folder
+ * picture is painted as a share is (protected windows as the fill), written as a new PNG in the person's Screenshots folder
  * (the shell names it) and, for a Flatpak app, lent into its running view (fplend.h) so it gets exactly that file. The
  * indicator says the app took a screenshot (hw event "portal-shot-taken"). PickColor: the person clicks a point; the app
  * gets that pixel's color. The same gate as ScreenCast: an app with "no screen capture" is refused, an unknown program
@@ -2014,7 +2018,7 @@ static void request_close(const DMsg *m) {
 
 /* the version property of each interface served here */
 static int version_of(const char *iface) {
-    return !strcmp(iface, IFACE) || !strcmp(iface, FC_IFACE) ? 2 : !strcmp(iface, OU_IFACE) ? 3
+    return !strcmp(iface, IFACE) ? 2 : !strcmp(iface, FC_IFACE) || !strcmp(iface, OU_IFACE) ? 3
          : !strcmp(iface, INH_IFACE) || !strcmp(iface, GS_IFACE) ? 1 : !strcmp(iface, SC_IFACE) ? SC_VERSION
          : !strcmp(iface, SHOT_IFACE) ? SHOT_VERSION : -1;
 }

@@ -23,9 +23,9 @@
     {
       "file": "docs/flatpak-store-flathub.png",
       "caption": {
-        "en": "Store → Flathub: the apps you installed from Flathub, with Update and Remove, and the catalog. By default only the apps Flathub verified as published by their own developers.",
-        "es": "Tienda → Flathub: las apps que instalaste desde Flathub, con Actualizar y Quitar, y el catálogo. De entrada, solo las apps que Flathub verificó como publicadas por sus propios desarrolladores.",
-        "pt": "Loja → Flathub: os apps que você instalou do Flathub, com Atualizar e Remover, e o catálogo. Por padrão, só os apps que o Flathub verificou como publicados pelos próprios desenvolvedores."
+        "en": "Store → Flathub: the apps you installed from Flathub, with Update and Remove, and the catalog. By default only the apps Flathub verified as published by their own developers. (0.8.9.5; since 0.8.9.6 the installed apps are in the section's own Installed.)",
+        "es": "Tienda → Flathub: las apps que instalaste desde Flathub, con Actualizar y Quitar, y el catálogo. De entrada, solo las apps que Flathub verificó como publicadas por sus propios desarrolladores. (0.8.9.5; desde la 0.8.9.6 las apps instaladas están en la Instaladas propia de la sección.)",
+        "pt": "Loja → Flathub: os apps que você instalou do Flathub, com Atualizar e Remover, e o catálogo. Por padrão, só os apps que o Flathub verificou como publicados pelos próprios desenvolvedores. (0.8.9.5; desde a 0.8.9.6 os apps instalados ficam no Instalados próprio da seção.)"
       }
     },
     {

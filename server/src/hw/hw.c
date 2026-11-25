@@ -137,6 +137,7 @@ void hw_dispatch(const struct pollfd *p, int n) {
             if (m & UEV_DRM) display_hotplug();
             if (m & UEV_POWER) { power_changed(); hidpp_kick(); }   /* a Logitech device woke up: ask lord-hidpp again */
             if (m & UEV_BACKLIGHT) display_hotplug();      /* the list carries the backlight */
+            if (m & UEV_VIDEO) hw_emit("cameras", "{}");   /* a camera came or went: sdk/cameras.js lists them again */
         } else if (p[i].fd == sysbus_fd()) sysbus_dispatch();
         else if (p[i].fd == notifyd_fd()) notifyd_dispatch();
         else if (p[i].fd == mpris_fd()) mpris_dispatch();

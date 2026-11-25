@@ -14,16 +14,17 @@ size_t say_clean(char *s, size_t len);
  * Returns 0 when nothing but space is left. */
 size_t say_next(const char *s, size_t len, size_t max, size_t *skip);
 
-/* The language of s[0..len) among the ones LordOS has voices for, "es", "en" or "pt", from its most common words
- * and the letters only one of them uses (the first 4000 bytes). With too little to tell, the fallback (when it is one
- * of the three; English otherwise). */
+/* The language of s[0..len) among the ones LordOS has voices for, "es", "en", "pt", "fr", "de", "it" or "nl", from its
+ * most common words and the letters only one or two of them use (the first 4000 bytes). With too little to tell, the
+ * fallback (when it is one of them; English otherwise). */
 const char *say_language(const char *s, size_t len, const char *fallback);
 
-/* Spanish and Portuguese only (lang "es" or "pt"; any other language comes back as it is): numbers, decimals,
- * percentages, ordinals, times, dates, money, degrees and the symbols # @ & + = written out as words, since their
- * Pocket TTS models never learned to read digits (docs/VOICE.md, "Text normalization"). Portuguese is Brazilian's.
- * region is the user's ("es_AR", "pt_BR", NULL when unknown): "$" is read as pesos in a country whose peso is written
- * "$" (AR, MX, CL, CO, UY, DO, CU), as dollars anywhere else; US$, U$S and USD are always dollars, R$ reais.
+/* Spanish, Portuguese, French, German, Italian and Dutch (lang "es", "pt", "fr", "de", "it" or "nl"; any other
+ * language, English among them, comes back as it is): numbers, decimals, percentages, ordinals, times, dates, money,
+ * degrees, the symbols # @ & + = and (fr, de, it, nl) common abbreviations written out as words, since their Pocket
+ * TTS models never learned to read digits (docs/VOICE.md, "Text normalization"). Portuguese is Brazilian's, French
+ * France's. region is the user's ("es_AR", "pt_BR", NULL when unknown): "$" is read as pesos in a country whose peso is
+ * written "$" (AR, MX, CL, CO, UY, DO, CU), as dollars anywhere else; US$, U$S and USD are always dollars, R$ reais.
  * A new NUL-terminated string, *outlen its length; NULL when out of memory. */
 char *say_normalize(const char *s, size_t len, const char *lang, const char *region, size_t *outlen);
 

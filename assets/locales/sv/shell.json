@@ -586,9 +586,12 @@
   "ws.lock.on": "Lås den här skärmens fönster",
   "ws.lock.off": "Lås upp den här skärmens fönster",
   "ws.lock.window": "Låst: lås upp med hänglåset i ramen",
-  "ws.minimized.label": "Minimerade",
-  "ws.minimized.title": "Minimerade fönster på den här skärmen: klicka för att ta tillbaka",
   "ws.slot.free": "Ledigt utrymme: öppna en app eller ta tillbaka en minimerad",
+  "ws.windows.title": "Fönster i den här aktiviteten på den här skärmen (ett streck under minimerade): klicka för att ta fram ett; högerklicka för appens fönster",
+  "ws.profile.ask": "Låt webbläsaren välja",
+  "ws.profile.open": "Öppna profilen {profile}",
+  "ws.profile.activity": "Profil som den här aktiviteten öppnar",
+  "ws.profile.display": "Profil som den här skärmen öppnar ({display})",
   "ws.snapfly.title": "Placera fönster",
   "ws.snapfly.halves": "Halvor",
   "ws.snapfly.thirds": "Tredjedelar",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "Kamera via LordOS Studio",
   "capture.what.effectsOn": "effekter på",
   "capture.what.effectsOff": "inga effekter",
-  "shortcuts.captureWindow": "Skärmdump av ett fönster"
+  "shortcuts.captureWindow": "Skärmdump av ett fönster",
+  "themeSwitch.changing": "Skrivbordsstilen byts…",
+  "themeSwitch.changingTo": "Byter till {name}…",
+  "themeSwitch.failedTitle": "{name} kunde inte tillämpas",
+  "themeSwitch.refusedBody": "Dess kod stämmer inte med den signerade kopian av LordOS, så den lästes inte in. Din skrivbordsstil förblir som den var.",
+  "themeSwitch.failedBody": "Den startade inte. Din skrivbordsstil förblir som den var.",
+  "spotlight.section.machines": "Maskiner",
+  "guestApps.inMachine": "I {machine}"
 }

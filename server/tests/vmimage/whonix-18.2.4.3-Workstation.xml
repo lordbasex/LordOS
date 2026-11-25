@@ -1,0 +1,105 @@
+<domain type='kvm'>
+  <name>Whonix-Workstation</name>
+  <description>Do not change any settings if you do not understand the consequences! Learn more: https://www.whonix.org/wiki/KVM#XML_Settings</description>
+
+  <genid/>
+
+  <memory dumpCore='off' unit='GB'>2</memory>
+  <currentMemory unit='GB'>2</currentMemory>
+  <memoryBacking>
+    <allocation mode='ondemand'/>
+    <discard/>
+    <nosharepages/>
+  </memoryBacking>
+
+  <vcpu placement='static' cpuset='1'>1</vcpu>
+  <cpu mode='host-passthrough'/>
+
+  <os>
+    <type machine='q35'>hvm</type>
+    <boot dev='hd'/>
+    <bootmenu enable='yes'/>
+  </os>
+
+  <features>
+    <acpi/>
+    <hap/>
+    <pvspinlock state='on'/>
+    <pmu state='off'/>
+    <vmport state='off'/>
+  </features>
+
+  <clock offset='utc'>
+    <timer name='rtc' present='no'/>
+    <timer name='kvmclock' present='no'/>
+    <timer name='pit' present='no'/>
+    <timer name='hpet' present='no'/>
+    <timer name='hypervclock' present='no'/>
+  </clock>
+
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>restart</on_crash>
+
+  <pm>
+    <suspend-to-mem enabled='no'/>
+    <suspend-to-disk enabled='no'/>
+  </pm>
+
+  <devices>
+    <disk type="volume" device="disk">
+      <driver name="qemu" type="qcow2"/>
+      <source pool="default" volume="Whonix-Workstation.qcow2"/>
+      <target dev="vda" bus="virtio"/>
+    </disk>
+
+    <interface type='udp'>
+      <source address='127.0.0.1' port='6688'>
+        <local address='127.0.0.1' port='5577'/>
+      </source>
+      <model type="virtio"/>
+    </interface>
+
+    <controller type='virtio-serial' index='0'/>
+
+    <serial type='pty'>
+      <target port='0'/>
+    </serial>
+
+    <console type='pty'>
+      <target type='serial' port='0'/>
+    </console>
+
+    <channel type='spicevmc'>
+      <target type='virtio' name='com.redhat.spice.0'/>
+      <address type='virtio-serial' controller='0' bus='0' port='1'/>
+    </channel>
+
+    <!-- Graphics settings -->
+    <graphics type='spice' autoport='yes'>
+      <listen type='none'/>
+      <clipboard copypaste='no'/>
+      <filetransfer enable='no'/>
+      <gl enable='no'/>
+    </graphics>
+
+    <!-- Video settings -->
+    <video>
+      <model type='virtio' heads='1' primary='yes'>
+        <acceleration accel3d='no'/>
+      </model>
+    </video>
+
+    <sound model='ich9'>
+      <codec type='output'/>
+    </sound>
+
+    <memballoon model='none'/>
+
+    <rng model='virtio'>
+      <rate bytes='1024' period='1000'/>
+      <backend model='random'>/dev/random</backend>
+    </rng>
+  </devices>
+
+</domain>

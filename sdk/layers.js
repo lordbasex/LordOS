@@ -101,7 +101,7 @@ export function Overlay({ anchor, children, onClose, layer = 'popover' }) {
   const o = shell ? [0, 0] : boxOf(target) || [0, 0];
   return createPortal(h(View, {
     ref: box,
-    protected: !!win?.protected,         // a protected window's list stays black in screenshots
+    protected: !!win?.protected,         // a protected window's list stays the protected fill in screenshots
     style: { position: 'absolute', left: r[0] - o[0], top: r[1] - o[1], width: r[2], height: r[3], pointerEvents: 'box-none', direction: direction() },
   }, children), target);
 }

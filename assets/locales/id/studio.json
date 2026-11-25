@@ -88,5 +88,8 @@
   "micHint.voice": "Menghilangkan kebisingan di sekitar Anda sehingga hanya suara Anda yang terdengar. Jika suara Anda terdengar seperti robot, matikan peredam bising milik aplikasi panggilan itu sendiri.",
   "micHint.wide": "Mikrofon Anda tanpa pemrosesan sama sekali: untuk musik dan setiap suara di ruangan.",
   "micUnavailable": "Pengurangan Bising muncul setelah Anda keluar lalu masuk kembali.",
-  "noMic": "Tidak ada mikrofon yang terhubung."
+  "noMic": "Tidak ada mikrofon yang terhubung.",
+  "effects": "Efek",
+  "openApp": "Buka LordOS Studio…",
+  "micApps": "Mode Mikrofon mengubah mikrofon yang dipakai aplikasi secara default. Aplikasi yang diatur ke mikrofon tertentu tetap memakainya: pilih “LordOS Noise Reduction” di aplikasi itu."
 }

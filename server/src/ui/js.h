@@ -8,6 +8,13 @@ int    js_init(const char *bundle_path);
 /* js_init/js_init_app return JS_REFUSED when the code was refused by the verified-code check
  * (sec/codesig.h): the caller falls back to another theme or to js_init_recovery(). */
 #define JS_REFUSED (-2)
+/* A theme switch (lord.themes.use, main.c switch_theme). js_theme_prepare reads and verifies the bundle asked for
+ * while the running theme still runs: 0, JS_REFUSED (the verified-code check refused it) or -1 (unreadable).
+ * js_init_prepared starts a new context with those same bytes (js_init if none were prepared for that path).
+ * js_init_previous starts the theme that was running again from the bytes verified when it was loaded. */
+int    js_theme_prepare(const char *bundle_path);
+int    js_init_prepared(const char *bundle_path);
+int    js_init_previous(const char *bundle_path);
 /* The last exception js_init's code threw (its message and the first lines of its stack), or "" */
 const char *js_init_error(void);
 int    js_init_app(const char *host_bundle, const char *app_id);   /* lord-server --app <id> */

@@ -35,5 +35,6 @@
   "sysinfo": "ข้อมูลระบบ",
   "sysprobe": "ทดสอบแซนด์บ็อกซ์",
   "terminal": "เทอร์มินัล",
-  "databases": "ฐานข้อมูล"
+  "databases": "ฐานข้อมูล",
+  "studio": "LordOS Studio"
 }

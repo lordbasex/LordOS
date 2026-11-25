@@ -586,9 +586,12 @@
   "ws.lock.on": "इस डिस्प्ले की विंडो लॉक करें",
   "ws.lock.off": "इस डिस्प्ले की विंडो अनलॉक करें",
   "ws.lock.window": "लॉक है: फ़्रेम के ताले से अनलॉक करें",
-  "ws.minimized.label": "छोटी की गई",
-  "ws.minimized.title": "इस डिस्प्ले पर छोटी की गई विंडो: वापस लाने के लिए एक पर क्लिक करें",
   "ws.slot.free": "खाली जगह: कोई ऐप खोलें या छोटी की गई विंडो वापस लाएँ",
+  "ws.windows.title": "इस डिस्प्ले पर इस गतिविधि की विंडो (छोटी की गई विंडो के नीचे एक रेखा): किसी को आगे लाने के लिए क्लिक करें; उस ऐप की विंडो के लिए राइट-क्लिक करें",
+  "ws.profile.ask": "ब्राउज़र को चुनने दें",
+  "ws.profile.open": "{profile} प्रोफ़ाइल खोलें",
+  "ws.profile.activity": "यह गतिविधि जो प्रोफ़ाइल खोलती है",
+  "ws.profile.display": "यह डिस्प्ले जो प्रोफ़ाइल खोलता है ({display})",
   "ws.snapfly.title": "विंडो सजाएँ",
   "ws.snapfly.halves": "आधे",
   "ws.snapfly.thirds": "तिहाई",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "LordOS Studio के ज़रिए कैमरा",
   "capture.what.effectsOn": "इफ़ेक्ट चालू",
   "capture.what.effectsOff": "कोई इफ़ेक्ट नहीं",
-  "shortcuts.captureWindow": "एक विंडो का स्क्रीनशॉट"
+  "shortcuts.captureWindow": "एक विंडो का स्क्रीनशॉट",
+  "themeSwitch.changing": "डेस्कटॉप की शैली बदली जा रही है…",
+  "themeSwitch.changingTo": "{name} पर बदला जा रहा है…",
+  "themeSwitch.failedTitle": "{name} लागू नहीं हो सका",
+  "themeSwitch.refusedBody": "इसका कोड LordOS की हस्ताक्षरित प्रति से मेल नहीं खाता, इसलिए इसे लोड नहीं किया गया। आपके डेस्कटॉप की शैली पहले जैसी ही रहेगी।",
+  "themeSwitch.failedBody": "यह शुरू नहीं हुआ। आपके डेस्कटॉप की शैली पहले जैसी ही रहेगी।",
+  "spotlight.section.machines": "वर्चुअल मशीनें",
+  "guestApps.inMachine": "{machine} में"
 }

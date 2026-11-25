@@ -87,5 +87,6 @@
   },
   "pickAddress": "Pilih alamat untuk membenarkan atau menyekatnya bagi apl ini.",
   "recent": "sambungan terkini",
-  "recentDenied": "ditolak baru-baru ini"
+  "recentDenied": "ditolak baru-baru ini",
+  "machineInherits": "Peraturan Mesin juga memutuskan untuk mesin ini. Peraturannya sendiri ditambah: apabila kedua-duanya sepadan dengan sambungan, yang lebih khusus memutuskan, dan Sekat mengatasi Benarkan."
 }

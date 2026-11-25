@@ -70,16 +70,27 @@ and **Apply**. A theme that couldn't start in this session (lord-server went bac
 `ui.theme_failed` and `ui.theme_failed_why`, read by `lord.themes.list` as `failed` and `failedWhy`)
 says "Couldn't start — back on ‹the theme in use›" with **Report**, which opens the GitHub bug form in
 the browser with the theme's id and the error filled in; nothing is sent until the person submits it
-there. Switching discards the JavaScript context and
-loads the new bundle (`themes.use` in `sdk/index.js`, `lord.themes.use` in `server/src/ui/js_sys.c`,
-`switch_theme` in `server/src/main.c`): the LordOS app windows that were open (up to 8) reopen in
-the new theme with their frames, and Linux windows stay connected and get the new frame. The
-choice is stored as `theme` in `~/.config/lordos/settings.json`.
+there. Switching happens live, in the same session: it never logs out. `lord.themes.use`
+(`server/src/ui/js_sys.c`) first reads the new bundle through the verified-code check while the running theme still
+runs (`js_theme_prepare` in `server/src/ui/js.c`); a refused or unreadable bundle is answered with `false` at once,
+nothing is discarded, the choice goes back to the theme in use and a notification says the style couldn't be applied
+(`sdk/themeswitch.jsx`). When it is accepted, `themes.use` (`sdk/index.js`) puts up a short overlay over the whole
+desktop ("Changing to ‹name›…", with a ring), `lord-server` draws two more frames so it is on screen, and then
+`switch_theme` (`server/src/main.c`) discards the JavaScript context and starts the new one from exactly the bytes
+that were checked (`js_init_prepared`); the new theme's first frame replaces the overlay. The LordOS app windows that
+were open (up to 8) reopen in the new theme with their frames, and Linux windows stay connected and get the new frame.
+If the new theme throws while it starts, `lord-server` starts the theme that was running again from the bytes
+verified when it was loaded (`js_init_previous`), not from its file, which a package update may have replaced under
+the session; its `startShell()` puts the choice back and shows the same notification. The choice is stored as
+`theme` in `~/.config/lordos/settings.json`. `server/tests/theme_switch_headless.sh` switches round the four desktops
+in one headless session with a Wayland client connected.
 
 How a session starts: `lord-sessiond` always starts `lord-server` with
 `--theme <LordOS folder>/themes/default/theme.bundle.js` (`server/src/remote/sessiond.c`,
-`sess.c`); the default theme's `startShell()` sees that the user chose another one and switches to
-it at once. If the chosen theme can't be loaded, the session stays on the theme it came from.
+`sess.c`), and `lord-server` starts the theme the user chose instead (`chosen_theme` in `server/src/main.c` reads
+`theme` from the settings), so no theme is loaded only to switch; if the default one did start anyway, its
+`startShell()` switches to the chosen one. If the chosen theme can't be loaded, the session starts in the default
+theme (then Lord Classic, then the recovery screen) and its `startShell()` puts the choice back and says why.
 
 ## 2. Anatomy of a theme
 
@@ -509,11 +520,11 @@ bundle:
 
 So on an installed release system, copying a theme into `/usr/lib/lordos/themes/<id>/` (which needs
 root anyway) makes it **appear** in Settings → Appearance → Desktop style (the list only looks for a
-readable `theme.bundle.js`), but choosing it does nothing visible except a notice: the switch is
-refused, `lord-server` reloads the theme it was on (`switch_theme`), the session shows the sticky
-notification "This LordOS component was modified and was not loaded" naming the file
-(`sdk/codesig.js`), and choosing it again in that session does nothing (`ui.theme_failed`). Because `theme` was already
-saved in the settings, the same happens once at every login. **Do not** try to make it load by
+readable `theme.bundle.js`), but choosing it does nothing visible except a notice: `lord.themes.use` refuses it
+before the running theme is touched (`js_theme_prepare`), the session goes on in the theme it was on, the choice is
+put back, and the notifications say the style couldn't be applied and "This LordOS component was modified and was
+not loaded" naming the file (`sdk/codesig.js`); choosing it again in that session does nothing (`ui.theme_failed`).
+**Do not** try to make it load by
 regenerating the installed manifest: on a release build an unsigned or changed manifest invalidates
 all of LordOS's code and leaves only the recovery screen.
 

@@ -21,10 +21,23 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). 15: guest_links, guest_notify (6.12). 16: disposable, encrypted, backup, disk_format (storage: 6.2, 6.4, 8). 17: automation (6.15, `machines exec` and `cp`). 18: cpu_model (5.5). 19: heads (5.4, All Displays). 20: guest_files (6.21). 21: usb, usb_auto (6.6). 22: vulkan (6.10, venus). 23: kernel_boot (direct kernel boot, 6.1). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 12
+#define VM_SCHEMA 23
+/* direct kernel boot's files, in the machine's disks/ folder (QEMU's Landlock reads only there): copied in by lord-vm --set
+ * --kernel/--initrd/--cmdline, never a link to the person's file */
+#define VM_KBOOT_DIR     "boot"
+#define VM_KBOOT_KERNEL  "boot/vmlinuz"
+#define VM_KBOOT_INITRD  "boot/initrd"
+#define VM_KBOOT_CMDLINE "boot/cmdline"
+#define VM_KBOOT_KERNEL_MAX (128L << 20)     /* a kernel image: Debian's are 8-12 MB */
+#define VM_KBOOT_INITRD_MAX (1024L << 20)    /* an initrd: Debian's 30-80 MB; dracut's "hostonly=no" a few hundred */
+#define VM_KBOOT_CMDLINE_MAX 1023            /* printable ASCII; x86's COMMAND_LINE_SIZE is 2048 */
+/* the most displays (virtio-gpu outputs) a machine may have: "heads" (schema 19) */
+#define VM_HEADS_MAX 4
+#define VM_USB_AUTO     8               /* schema 21: auto-connect rules (usb_auto) */
+#define VM_USB_RULE_MAX 73              /* "vvvv:pppp:" and a serial of up to 63 */
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -33,8 +46,25 @@ enum { VM_DISPLAY_WINDOW = 0, VM_DISPLAY_NONE };
 /* the machine's network (6.5): shared (passt, out only, plus the forwarded ports), isolated (no card's backend), bridged
  * (a macvtap on one of this computer's wired cards: the guest is another device on that network, by its DHCP), host-only
  * (passt whose sockets are bound to 127.0.0.1: the guest reaches this computer and nothing else) */
-enum { VM_NET_SHARED = 0, VM_NET_ISOLATED, VM_NET_BRIDGED, VM_NET_HOSTONLY };
-extern const char *const VM_NET_NAMES[];   /* "shared", "isolated", "bridged", "hostonly" */
+enum { VM_NET_SHARED = 0, VM_NET_ISOLATED, VM_NET_BRIDGED, VM_NET_HOSTONLY, VM_NET_LINK };
+extern const char *const VM_NET_NAMES[];   /* "shared", "isolated", "bridged", "hostonly", "link" */
+/* schema 14, machine groups (docs/VIRTUALIZATION.md 19): "link" (a group's workstation only) is one card wired to nothing
+ * but the group's internal link (VM_LINK): no passt, no host route. A member's role in its group, its profile lock and the
+ * clock devices its kind asks for */
+enum { VM_ROLE_NONE = 0, VM_ROLE_GATEWAY, VM_ROLE_WORKSTATION, VM_ROLE_COUNT };
+extern const char *const VM_ROLE_NAMES[];  /* "", "gateway", "workstation" */
+enum { VM_LOCK_NONE = 0, VM_LOCK_ANONYMITY };
+extern const char *const VM_LOCK_NAMES[];  /* "", "anonymity" */
+enum { VM_TIMERS_DEFAULT = 0, VM_TIMERS_WHONIX_GATEWAY, VM_TIMERS_WHONIX_WORKSTATION };
+extern const char *const VM_TIMERS_NAMES[];   /* "", "whonix-gateway", "whonix-workstation" */
+/* schema 16, a disposable session (docs/VIRTUALIZATION.md 6.2): every writable disk, the UEFI variables and the TPM state
+ * get a temporary layer at each start, thrown away when QEMU ends: in memory (a memfd, capped at the machine's memory and
+ * counted in its limit) or on this computer's disk (an unlinked file in disks/, which nothing names after QEMU ends) */
+enum { VM_DISP_OFF = 0, VM_DISP_MEMORY, VM_DISP_DISK };
+extern const char *const VM_DISP_NAMES[];  /* "", "memory", "disk" */
+/* the internal link's card: the workstation's only card is in slot 0x2 (its eth0), the gateway's at 0x18 (its eth1, after
+ * passt's card in 0x2); each on a QEMU hub of its own so that its backend can come and go (19.3) */
+#define VM_LINK_SLOT_GATEWAY 0x18
 /* forwarded ports (6.5): a port of this computer that passt opens and forwards to one of the guest's */
 enum { VM_PROTO_TCP = 0, VM_PROTO_UDP };
 enum { VM_OPEN_LOCAL = 0, VM_OPEN_LAN };    /* "this-computer" binds 127.0.0.1, "lan" 0.0.0.0 */
@@ -57,6 +87,11 @@ extern const char *const VM_DEV_NAMES[];   /* "virtio", "compat", "windows" */
 enum { VM_NIC_VIRTIO = 0, VM_NIC_E1000E, VM_NIC_E1000, VM_NIC_E1000_82545EM, VM_NIC_E1000_82544GC, VM_NIC_VMXNET3, VM_NIC_RTL8139, VM_NIC_PCNET, VM_NIC_COUNT };
 extern const char *const VM_NIC_MODELS[VM_NIC_COUNT + 1];   /* "virtio", "e1000e", ... (machine.json's names) */
 enum { VM_RTC_UTC = 0, VM_RTC_LOCAL };
+/* vCPU pinning (schema 13): this computer's default, off, or auto (lord-vm picks the cores, vmpin.c) */
+enum { VM_PIN_DEFAULT = 0, VM_PIN_OFF, VM_PIN_AUTO };
+enum { VM_CPU_HOST = 0, VM_CPU_COMPAT };
+extern const char *const VM_CPU_NAMES[];  /* "host", "compatible" */
+extern const char *const VM_PIN_NAMES[];   /* "", "off", "auto" */
 /* the guest's graphics (schema 5): 2D, a virtio GPU whose picture QEMU draws in shared memory; 3D, virgl (virtio-vga-gl),
  * which opens the host GPU's render node from QEMU's sandbox: Linux guests only (no device set "windows") */
 enum { VM_GFX_2D = 0, VM_GFX_3D };
@@ -176,6 +211,70 @@ typedef struct {
     /* schema 12: "Capture mouse" (docs/VIRTUALIZATION.md 6.25): "capture_fullscreen": true, the window captures the mouse
      * when it goes full screen (written only then; missing: no) */
     int capture_fullscreen;
+    /* schema 13: the guest's performance profile (docs/VIRTUALIZATION.md 7.1.4): "perf_profile": true, lord-vm asks the
+     * guest tools that say "perf" to apply it (AGK_PERF) while the machine runs (written only then; missing: no) */
+    int perf_profile;
+    /* schema 13: vCPU pinning (docs/VIRTUALIZATION.md 3.7.1): "cpu_pin": "off" | "auto", written only when chosen; missing
+     * is this computer's default for the machine (vmpin_default_on) */
+    int cpu_pin;                        /* VM_PIN_* */
+    /* schema 15: guest → host links and notifications (docs/VIRTUALIZATION.md 6.12), off unless chosen (written only
+     * when on): "guest_links": true, a link the guest's tools send is offered in a bar the person must click;
+     * "guest_notify": true, the guest's notifications are shown as from the machine, rate-limited */
+    int guest_links, guest_notify;
+    /* schema 19: the guest's displays (docs/VIRTUALIZATION.md 5.4, All Displays): the virtio-gpu's outputs, 1 (missing) to
+     * VM_HEADS_MAX; written only when more than one. Hardware the guest sees: changed only while the machine is off */
+    int heads;
+    /* schema 18: the processor the guest sees (docs/VIRTUALIZATION.md 5.5, Configure → CPU and memory), written only when
+     * chosen: "cpu_model": "compatible", a fixed x86-64-v2 model (amd64 with KVM only: the guest moves between computers and
+     * keeps working after this one's processor changes); missing: "host", this computer's own processor */
+    int cpu_model;                      /* VM_CPU_HOST, VM_CPU_COMPAT */
+    /* schema 20: files sent from the guest (docs/VIRTUALIZATION.md 6.21, "Send to LordOS"): taken into the machine's
+     * quarantine folder unless "guest_files": false (written only then); a machine locked for anonymity never takes them */
+    int guest_files_off;
+    /* schema 23: direct kernel boot of an installed Linux guest (docs/VIRTUALIZATION.md 6.1, "Start Linux directly"):
+     * "kernel_boot": true (written only then) starts the kernel, initrd and command line kept in disks/boot/ (VM_KBOOT_*)
+     * instead of the boot loader on the disk; never with secure boot, the virtio-win devices, encryption or a group */
+    int kernel_boot;
+    /* schema 14: a member of a machine group (docs/VIRTUALIZATION.md 19.4), written only for members. group: the group's
+     * id (group.json "id"); role: VM_ROLE_*; uplink_tor: the gateway's passt has no DNS forwarding and no forwarded ports
+     * ("uplink": "tor", with network "shared"); link_mac: the gateway's second card, on the internal link; profile_lock:
+     * VM_LOCK_ANONYMITY refuses every host-to-guest channel (19.5: no agent, clipboard, transfer, shares, ports, 3D, vGPU,
+     * microphone) in vm_machine_check, so --set and Configure can't turn one on; timers: VM_TIMERS_* (19.5, "Time") */
+    char group[37];
+    int role;
+    int uplink_tor;
+    char link_mac[18];
+    int profile_lock;
+    int timers;
+    /* schema 16: storage (docs/VIRTUALIZATION.md 6.2, 6.4, 8), each written only when it differs from a new machine.
+     * disposable: VM_DISP_* ("disposable": "memory" | "disk"); never on a group's member (its group.json has the switch).
+     * encrypted: "encrypted": true, every disk and the UEFI variables are qcow2 with LUKS and the TPM state is swtpm's
+     * encrypted state, all under one key that lives in the session keyring (owner "machines", service "machines:<id>"),
+     * handed to lord-vm on a descriptor and to QEMU and qemu-img through a pipe (never a file, an argument or the
+     * environment). raw: "disk_format": "raw", disks/system.raw and data-N.raw, plain files (fastest, no snapshots, no
+     * encryption, no linked clone). no_backup: "backup": false, Backups leaves the folder out */
+    int disposable;
+    int encrypted;
+    int raw;
+    int no_backup;
+    /* schema 17: the person's consent to automation (docs/VIRTUALIZATION.md 6.15, "lordvm and the agent"): "automation": true
+     * lets `machines exec`, `machines cp` and the MCP server's run_command run programs in the guest, as its signed-in
+     * person, through lord-vm (VM_EXEC); written only then, missing: no. Never with VM_LOCK_ANONYMITY */
+    int automation;
+    /* schema 21: host USB devices that go into the machine by themselves while it runs (docs/VIRTUALIZATION.md 6.6):
+     * "usb_auto": ["046d:0843", "0781:5581:4C530001"], each vendor:product (four lowercase hex digits each) and maybe the
+     * device's serial (1 to 63 of [A-Za-z0-9._-]); at most VM_USB_AUTO, no two the same (vm_usb_rule_valid). Lord-server
+     * connects a device that matches while the machine runs (lord.vm.usbAttach's checks, the admin helper's vm-usb-allow);
+     * never with VM_LOCK_ANONYMITY */
+    char usb_auto[VM_USB_AUTO][VM_USB_RULE_MAX + 1];
+    int n_usb_auto;
+    /* schema 21: "usb": true, the machine has a USB controller for this computer's devices (6.6): a qemu-xhci of its own on
+     * slot 0x15 (the compatible and Windows devices in a window use their xHCI). A device of the guest, so it changes only
+     * with no saved state. Never with VM_LOCK_ANONYMITY */
+    int usb;
+    /* schema 22: Vulkan for a 3D machine's guest through venus (docs/VIRTUALIZATION.md 6.10, "venus"): "vulkan": true, only
+     * with graphics "3d"; written only then, missing: no. Never with VM_LOCK_ANONYMITY (no 3D there at all) */
+    int vulkan;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -185,6 +284,9 @@ typedef struct {
     int cpus;
     long ram_mb;
     int kvm;                            /* /dev/kvm can be opened */
+    int gicv3;                          /* arm64: the interrupt controller is GICv3 (or v4), so KVM can give a guest a GICv3;
+                                         * the Raspberry Pi 5's GIC-400 is GICv2 (measured: "KVM does not support GICv3
+                                         * emulation") */
 } VmHost;
 
 enum {
@@ -218,6 +320,33 @@ int vm_transfer_claim(const char *dir, const char *id, char *out, size_t n, char
 /* the machine goes (to the Trash): its transfer folder, when it's this machine's, moves aside as above. 0 moved, 1 there
  * was none of this machine's, -1 it couldn't be moved */
 int vm_transfer_aside(const char *dir, const char *id, char *moved, size_t mn);
+/* this machine's transfer folder under another name, left behind when its machine folder was renamed (by hand, or by a
+ * rename that stopped between its two steps): one <library>/Transfer/<x> whose owner record holds `id`, whose
+ * <library>/<x>.lordvm is gone (a Duplicate shares the id: its folder is still there) and that isn't a folder put aside
+ * ("<x> (old YYYY-MM-DD)"), moved to dir's transfer path with its record when that path is free. Exactly one such folder,
+ * never a guess. 0 moved (its old name in from), 1 nothing to move, -1 the move failed. vm_transfer_claim calls it first */
+int vm_transfer_adopt(const char *dir, const char *id, char *from, size_t fn);
+
+/* Renaming a machine (docs/VIRTUALIZATION.md 6.26): its name, and its folder <library>/<folder>.lordvm and transfer folder
+ * <library>/Transfer/<folder> with it, while it's off. */
+/* the folder a name gives (as a new machine gets it): letters, digits, ' ', '-', '_' and '.' (not first), anything else
+ * one '-', at most 48 bytes, none of ' ', '-', '.' at the end; "Machine" when nothing is left. out: at least 64 bytes */
+void vm_folder_name(const char *name, char *out, size_t n);
+/* a name a machine may be renamed to: vm_name_valid (1 to VM_NAME_MAX bytes of UTF-8, no control characters, no '/' or
+ * '\\', not only spaces) and not starting with '.' */
+int vm_rename_name_ok(const char *s);
+enum { VM_RN_OK = 0, VM_RN_BAD_NAME, VM_RN_NAME_TAKEN, VM_RN_FOLDER_TAKEN, VM_RN_TRANSFER_TAKEN, VM_RN_NOT_MACHINE };
+typedef struct {
+    int problem;                        /* VM_RN_* */
+    int moves;                          /* the folder gets a new name (its name, made safe, says something else now) */
+    char folder[256];                   /* the folder's name then, without .lordvm (the same as now when !moves) */
+    char other[VM_NAME_MAX + 1];        /* VM_RN_NAME_TAKEN: the other machine's name */
+} VmRenamePlan;
+/* what renaming the machine in dir (<library>/<x>.lordvm) to name would do, read from the library as it is: refused
+ * (problem) for a bad name, another machine of the library with that name (ASCII case ignored), or, when the folder moves,
+ * anything in the library called <folder>.lordvm or a folder <library>/Transfer/<folder> other than its own (case ignored
+ * both). Returns problem. Read-only: lord-vm checks it again under the machine's lock */
+int vm_rename_plan(const char *dir, const char *name, VmRenamePlan *p);
 
 /* a sound device's name as machine.json keeps it (sound_out, sound_in): 1 to VM_SOUND_DEV_MAX printable ASCII characters
  * other than space (a PipeWire node.name such as "alsa_output.pci-0000_00_1f.3.analog-stereo"); 1 valid */
@@ -277,9 +406,36 @@ long vm_mem_limit_mb(const VmMachine *m);
 /* Resource budget (3.7): does a machine of `want_mb` fit beside running machines using `running_mb` in total
  * (each as vm_mem_limit_mb)? 1 yes. */
 int vm_budget_fits(const VmHost *h, long running_mb, long want_mb);
+/* Resource budget (3.7), what every start path asks (js_vm.c budget_refusal: the window, startDetached, `machines start`,
+ * a group's members): the memory the library's active machines hold, each as vm_mem_limit_mb, the folder `exclude`
+ * (same device and inode) left out. Active is what run.json says (starting, running, paused, stopping) when
+ * alive(its lord-vm's pid) agrees; a machine whose supervisor died holds nothing. The library's top level and a machine
+ * group's members one level down (<name>.lordgroup/<member>.lordvm), at most 256 machines; symbolic links are never
+ * followed. extra (may be NULL) adds a machine's own share beside its limit (vm_group_session_mb: a disposable session).
+ * *n: how many were counted. A run.json or machine.json that can't be read counts nothing. */
+/* A machine folder whose run.json says it is active (starting, running, paused, stopping) with its lord-vm alive
+ * (alive(pid); NULL: run.json alone): 1, else 0. run.json is read with O_NOFOLLOW, at most 2 KB. */
+int vm_dir_active(const char *dir, int (*alive)(long pid));
+/* Backups (docs/VIRTUALIZATION.md 6.14): a path relative to the home folder that is a machine's disks folder or saved
+ * session ("<...>.lordvm/disks" or "<...>.lordvm/suspend.state", a machine at any depth, a group's members included):
+ * the length of its machine folder's part ("<...>.lordvm"), else 0. Backups holds those back while the machine runs:
+ * a disk QEMU is writing isn't a consistent copy. */
+size_t vm_backup_hold(const char *rel);
+long vm_budget_used_mb(const char *lib, const char *exclude, int (*alive)(long pid), long (*extra)(const char *dir, const VmMachine *m), int *n);
+/* Graphics 3D (virgl) for this start, the part that needs no probe of the host's files: why a machine that asks for 3D
+ * starts with 2D graphics instead, or NULL (lord-vm then checks QEMU's GL modules and the render node). An unattended
+ * install's start (installing: lord-vm's disks/unattended) is always 2D: the installer is a text console, and QEMU
+ * 10.0-11.1 with -display dbus,gl=on aborts when the guest resets virtio-gpu-gl, which the installed kernel (Debian's
+ * 6.12.117 and later: virtio_dev_shutdown) does at the installer's restart (docs/VIRTUALIZATION.md, "Graphics 3D") */
+const char *vm_gl_refusal(const VmMachine *m, int host_arch, int installing);
 
 /* reads this computer: arch, CPUs online, RAM, /dev/kvm access */
 void vm_host_probe(VmHost *h);
+/* 1 when an interrupts table (/proc/interrupts) names a GICv3 or GICv4 controller, 0 when not, -1 when unreadable; read
+ * in bounded chunks, at most 8 MB */
+int vm_gicv3_in(const char *path);
+/* its physical cores (each core's first thread in /sys/devices/system/cpu), at most cpus; cpus when it can't tell */
+int vm_host_cores(int cpus);
 
 /* An image to import: its format from its first bytes and its name, never QEMU's probing (a crafted qcow2 can name
  * a backing file or an external data file, and the import would copy that file into the new disk; a raw file can
@@ -298,8 +454,16 @@ int vm_qcow2_overlay(const uint8_t *head, size_t n, char *err, size_t errlen);
 /* a base path machine.json may name: absolute, plain, in a ".shared" folder, a .qcow2 */
 int vm_base_valid(const char *s);
 
+/* the disks' file extension: "raw" for a raw machine, else "qcow2" (disks/system.<ext>, data-N.<ext>) */
+const char *vm_disk_ext(const VmMachine *m);
+/* a key lord-vm accepts for an encrypted machine: exactly 64 lowercase hex digits (32 random bytes made by lord-server;
+ * shown to the person as the machine's recovery key, which brings an exported machine in on another computer) */
+int vm_key_valid(const char *k, size_t n);
+
 const char *vm_arch_name(int arch);     /* "arm64", "amd64" */
 int vm_uuid_valid(const char *s);
+/* an auto-connect rule of usb_auto (schema 18): "vvvv:pppp" or "vvvv:pppp:serial" */
+int vm_usb_rule_valid(const char *s);
 int vm_mac_valid(const char *s);      /* lowercase aa:bb:cc:dd:ee:ff, unicast, not all zero */
 int vm_smbios_valid(const char *s);   /* printable ASCII, at most VM_SMBIOS_MAX bytes */
 int vm_serial_valid(const char *s);   /* letters, digits, '-', '_', '.', at most VM_SERIAL_MAX */

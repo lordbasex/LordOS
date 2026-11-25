@@ -52,6 +52,7 @@ static NpRes kernel(const NpCompiled *c, int dir, int proto, int fam, const uint
     if (fam == 6 && !memcmp(in, mapped, 12)) { fam = 4; memcpy(addr, in + 12, 4); }
     else if (fam) memcpy(addr, in, fam == 4 ? 4 : 16);
     int lan = fam == 4 ? np_is_lan4(addr) : fam == 6 ? np_is_lan6(addr) : -1;
+    if ((c->app.flags & NP_R_TOR_UPLINK) && fam && np_tor_special(fam, addr)) lan = 1;   /* np.bpf.c tor_lan */
     const NpList *l = NULL;
     if (fam == 4 && c->app.has4) l = lpm(c, 4, addr);
     if (fam == 6 && c->app.has6) l = lpm(c, 6, addr);
@@ -323,7 +324,10 @@ static const char *const IPS[] = { "10.1.2.3", "10.1.2.4", "10.1.9.9", "10.9.9.9
                                    "2001:db8:1::5", "2001:db8:1::6", "2001:db8:2::1", "fe80::1", "2a00::1",
                                    "::ffff:10.1.2.3", "::ffff:8.8.8.8", "::1" };
 #define NIPS (int)(sizeof IPS / sizeof IPS[0])
-static const char *const APPS[] = { "lordos", "desktop:a", "desktop:b", "lpk:c" };
+/* (Machines to 100 %) a machine's app inherits the Machines component's rules, restrictions and trust: both here, so the
+ * random rounds compare the merged compile against fw_decide */
+static const char *const APPS[] = { "lordos", "desktop:a", "desktop:b", "lpk:c", FW_APP_TOR_GATEWAY, FW_APP_MACHINES,
+                                    "lordos:vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566" };
 #define NAPPS (int)(sizeof APPS / sizeof APPS[0])
 
 static void random_rule(FwStore *s, const char *app) {
@@ -461,7 +465,101 @@ static void device_cases(void) {
     dnsmap_free(names);
 }
 
+/* (Whonix groups) the Tor gateway's built-in restriction: decided before every rule, the same in both */
+static void tor_cases(void) {
+    FwStore *s = fw_store_new();
+    DnsMap *names = dnsmap_new(0);
+    long long now = 1000;
+    const char *app = FW_APP_TOR_GATEWAY;
+    char o[FW_APP_MAX];
+    CHECK(!fw_scope_app("app-lordos-lordos-vm-tor-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope", o, sizeof o) && !strcmp(o, app));
+    CHECK(fw_builtin_restricted(app) == FW_R_TOR_UPLINK && !fw_builtin_restricted("lordos:machines"));
+    CHECK(!(FW_R_TOR_UPLINK & FW_R_ALL) && fw_set_restricted(s, app, FW_R_TOR_UPLINK));   /* never from firewall.json */
+    /* the owner's allow rules can't loosen it; a deny still takes more away */
+    add(s, mk(app, FW_OUT, "any", FW_ALLOW));
+    add(s, mk(app, FW_IN, "any", FW_ALLOW));
+    add(s, mk(app, FW_OUT, "lan", FW_ALLOW));
+    add(s, mk(app, FW_OUT, "192.168.1.0/24", FW_ALLOW));
+    uint32_t deny = add(s, mk(app, FW_OUT, "9.9.9.9", FW_DENY));
+    fw_set_trusted(s, app, 1);
+    NpCompiled c = compile(s, app, names, now);
+    CHECK((c.app.flags & NP_R_TOR_UPLINK) && c.app.can_deny);
+    struct { const char *ip; FwDir dir; FwProto proto; int port; int deny; } k[] = {
+        { "1.1.1.1", FW_OUT, FW_PROTO_UDP, 53, 1 },       /* DNS over UDP */
+        { "1.1.1.1", FW_OUT, FW_PROTO_TCP, 53, 1 },       /* DNS over TCP */
+        { "1.1.1.1", FW_OUT, FW_PROTO_TCP, 853, 1 },      /* DNS over TLS */
+        { "1.1.1.1", FW_OUT, FW_PROTO_UDP, 443, 1 },      /* QUIC: any UDP */
+        { "192.168.1.1", FW_OUT, FW_PROTO_TCP, 443, 1 },  /* RFC 1918 */
+        { "10.0.2.2", FW_OUT, FW_PROTO_TCP, 9001, 1 },
+        { "172.17.0.1", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "100.64.0.1", FW_OUT, FW_PROTO_TCP, 443, 1 },   /* CGNAT */
+        { "169.254.1.1", FW_OUT, FW_PROTO_TCP, 443, 1 },  /* link-local */
+        { "127.0.0.1", FW_OUT, FW_PROTO_TCP, 9050, 1 },   /* loopback */
+        { "::1", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "fd00::1", FW_OUT, FW_PROTO_TCP, 443, 1 },      /* ULA */
+        { "fe80::1", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "224.0.0.251", FW_OUT, FW_PROTO_UDP, 5353, 1 }, /* multicast */
+        { "8.8.8.8", FW_IN, FW_PROTO_TCP, 9001, 1 },      /* nothing incoming */
+        { "8.8.8.8", FW_OUT, FW_PROTO_TCP, 443, 0 },      /* a Tor relay's ports */
+        { "8.8.8.8", FW_OUT, FW_PROTO_TCP, 9001, 0 },
+        { "2a00::1", FW_OUT, FW_PROTO_TCP, 9001, 0 },
+        { "9.9.9.9", FW_OUT, FW_PROTO_TCP, 443, 1 },      /* the owner's own deny */
+        /* special, shared and documentation IPv4 (np_tor_special) */
+        { "100.127.255.1", FW_OUT, FW_PROTO_TCP, 443, 1 },  /* CGNAT's end */
+        { "192.0.0.8", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "192.0.2.1", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "198.18.0.1", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "198.19.255.1", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "198.51.100.7", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "203.0.113.10", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "240.0.0.1", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "255.255.255.255", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "0.1.2.3", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "239.1.1.1", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        /* IPv6 carrying an IPv4 inside, and IPv6's special ranges */
+        { "::ffff:192.168.1.1", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "::ffff:8.8.8.8", FW_OUT, FW_PROTO_TCP, 443, 0 },     /* mapped: decided as its IPv4 (public) */
+        { "::192.168.1.1", FW_OUT, FW_PROTO_TCP, 443, 1 },      /* IPv4-compatible */
+        { "::8.8.8.8", FW_OUT, FW_PROTO_TCP, 443, 1 },
+        { "64:ff9b::c0a8:101", FW_OUT, FW_PROTO_TCP, 443, 1 },  /* NAT64 to 192.168.1.1 */
+        { "64:ff9b::808:808", FW_OUT, FW_PROTO_TCP, 443, 1 },   /* NAT64 even to a public one */
+        { "64:ff9b:1::1", FW_OUT, FW_PROTO_TCP, 443, 1 },       /* local-use NAT64 */
+        { "2001:0:4136:e378::1", FW_OUT, FW_PROTO_TCP, 443, 1 },/* Teredo */
+        { "2002:c0a8:101::1", FW_OUT, FW_PROTO_TCP, 443, 1 },   /* 6to4 */
+        { "2001:db8::1", FW_OUT, FW_PROTO_TCP, 443, 1 },        /* documentation */
+        { "100::1", FW_OUT, FW_PROTO_TCP, 443, 1 },             /* discard */
+        { "2001:4860:4860::8888", FW_OUT, FW_PROTO_TCP, 443, 0 },/* a public IPv6: allowed */
+        { "2003::1", FW_OUT, FW_PROTO_TCP, 9001, 0 },
+        { "64:ff9a::1", FW_OUT, FW_PROTO_TCP, 443, 0 },
+    };
+    for (size_t i = 0; i < sizeof k / sizeof k[0]; i++) {
+        uint8_t a[16];
+        int fam = ip(k[i].ip, a);
+        FwDecision ref;
+        NpRes got;
+        CHECK(same(s, names, &c, app, k[i].dir, k[i].proto, fam, a, (uint16_t)k[i].port, now, &ref, &got));
+        if ((got.verdict == NP_V_DENY) != k[i].deny) fprintf(stderr, "tor gateway: %s %d: %d\n", k[i].ip, k[i].port, got.verdict);
+        CHECK((got.verdict == NP_V_DENY) == k[i].deny);
+        if (k[i].deny && i != 18) CHECK(got.reason == NP_BY_RESTRICTED && got.flag == NP_R_TOR_UPLINK);
+        if (i == 18) CHECK(got.reason == NP_BY_RULE && got.rule_id == deny);
+    }
+    /* an unknown address (bind to any) and a protocol that isn't TCP or UDP (ICMP): denied */
+    NpRes r;
+    np_decide(&c.app, NULL, NP_D_OUT, NP_P_TCP, 443, -1, 0, 0, &r);
+    CHECK(r.verdict == NP_V_DENY && r.flag == NP_R_TOR_UPLINK);
+    np_decide(&c.app, NULL, NP_D_OUT, NP_P_OTHER, 0, 0, 0, 0, &r);
+    CHECK(r.verdict == NP_V_DENY && r.flag == NP_R_TOR_UPLINK);
+    np_compiled_free(&c);
+    /* another machine keeps Machines' own policy */
+    c = compile(s, "lordos:machines", names, now);
+    CHECK(!(c.app.flags & NP_R_TOR_UPLINK));
+    np_compiled_free(&c);
+    dnsmap_free(names);
+    fw_store_free(s);
+}
+
 int main(void) {
+    tor_cases();
     device_cases();
     fixed_cases();
     dns_sources();

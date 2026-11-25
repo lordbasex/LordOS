@@ -15,9 +15,11 @@ const TINT = {
   vm: ['#5e8cff', '#3757d8'], gpu: ['#6fcf5b', '#2f9a3b'], board: ['#e2557a', '#b12c55'], printer: ['#8e8e93', '#5f5f66'],
   scanner: ['#8e8e93', '#5f5f66'], wifi: ['#36a3ff', '#1463d6'], bluetooth: ['#4f7dff', '#2448c9'], network: ['#2fb5a5', '#16867a'],
   graphics: ['#6fcf5b', '#2f9a3b'], camera: ['#ff9f43', '#e0662a'], other: ['#a07cff', '#6a45d6'], package: ['#a07cff', '#6a45d6'],
+  disk: ['#8e9bb0', '#55627a'], web: ['#5e5ce6', '#3a38b8'], voice: ['#bf5af2', '#8a2fc0'],
 };
 
-function Glyph({ kind, size: s = 40 }) {
+// (also Apps LordOS's cards, apps/store/lordospages.js: camera, disk, web, voice)
+export function Glyph({ kind, size: s = 40 }) {
   const [a, b] = TINT[kind] || TINT.package;
   const w = '#fff';
   const box = (style) => h(View, { style: { position: 'absolute', ...style } });
@@ -53,6 +55,17 @@ function Glyph({ kind, size: s = 40 }) {
       parts = [box({ left: 7, top: 13, width: 18, height: 14, borderRadius: 3, backgroundColor: w }),
         box({ left: 26, top: 16, width: 7, height: 8, borderTopRightRadius: 1, borderBottomRightRadius: 1, backgroundColor: w })];
       break;
+    case 'disk':                        // a drive: its case, a slot and the light
+      parts = [box({ left: 8, top: 12, width: 24, height: 16, borderRadius: 3, border: `2px solid ${w}` }),
+        box({ left: 12, top: 19, width: 10, height: 2, backgroundColor: w }), box({ left: 25, top: 18, width: 4, height: 4, borderRadius: 2, backgroundColor: w })];
+      break;
+    case 'web':                         // a globe: the circle, its equator and a meridian
+      parts = [box({ left: 9, top: 9, width: 22, height: 22, borderRadius: 11, border: `2px solid ${w}` }),
+        box({ left: 10, top: 19, width: 20, height: 2, backgroundColor: w }), box({ left: 15, top: 10, width: 10, height: 20, borderRadius: 5, border: `2px solid ${w}` })];
+      break;
+    case 'voice':                       // a sound wave: five bars
+      parts = [[9, 6], [14, 12], [19, 18], [24, 12], [29, 6]].map(([x, hh]) => box({ left: x, top: 20 - hh / 2, width: 3, height: hh, borderRadius: 1.5, backgroundColor: w }));
+      break;
     case 'network':
       parts = [box({ left: 8, top: 14, width: 24, height: 12, borderRadius: 2, border: `2px solid ${w}` }),
         ...[12, 17, 22, 27].map((x) => box({ left: x - 1, top: 18, width: 3, height: 4, backgroundColor: w }))];
@@ -60,8 +73,10 @@ function Glyph({ kind, size: s = 40 }) {
     default:                            // a box
       parts = [box({ left: 10, top: 12, width: 20, height: 18, borderRadius: 3, border: `2px solid ${w}` }), box({ left: 10, top: 18, width: 20, height: 2, backgroundColor: w })];
   }
-  return h(View, { style: { width: s, height: s, borderRadius: s * 0.24, background: `linear-gradient(180deg, ${a}, ${b})`, flexShrink: 0 } },
-    ...parts.map((p, i) => (p.key ? p : { ...p, key: i })));
+  const keyed = parts.map((p, i) => (p.key ? p : { ...p, key: i }));
+  // the parts are drawn on a 40 px tile; another size scales them
+  return h(View, { style: { width: s, height: s, borderRadius: s * 0.24, background: `linear-gradient(180deg, ${a}, ${b})`, flexShrink: 0, direction: 'ltr' } },
+    ...(s === 40 ? keyed : [h(View, { key: 'k', style: { width: 40, height: 40, transform: `scale(${s / 40})`, transformOrigin: 'left top' } }, ...keyed)]));
 }
 
 // ---- Secure Boot: enrolling DKMS's signing key (dkms-mok-enroll, server/src/hw/mok_admin.h) ----

@@ -15,7 +15,10 @@
 //   ---
 //   # Groceries
 //   - [ ] yerba mate
-import { createStore, fs, screen, registerWidgetType, setWidgets } from '@lordos/sdk';
+import { createStore, fs, screen, registerWidgetType, setWidgets, workArea } from '@lordos/sdk';
+import { linkTarget, safeAttachName, attachmentRef, linkLabel, imageKind, isImage } from './links.js';
+
+export { isImage };
 
 export const DIR = 'Notes';
 const OLD_DIR = 'Notas'; // before 0.7.0: moved to ~/Notes on first run (see ensureDir)
@@ -51,13 +54,28 @@ export function serialize(n) {
   return `---\n${head}\n---\n${n.body}`;
 }
 
-// Title: the first line with text, without the markdown marks.
+// Title: the first line with text, without the markdown marks. Control characters and direction overrides are left
+// out (a title is shown in the list and written in the note's header, GitHub #238).
 export function titleOf(body) {
-  const line = body.split('\n').find((l) => l.trim() && !/^(`{3,}|---)/.test(l.trim())) || '';
-  return line.replace(/^\s*(#{1,6}\s+|>\s*|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, '').replace(/[*_`~]|!\[[^\]]*\]\([^)]*\)/g, '').trim().slice(0, 60);
+  const line = String(body).split('\n').find((l) => l.trim() && !/^(`{3,}|---)/.test(l.trim())) || '';
+  return line.replace(/^\s*(#{1,6}\s+|>\s*|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, '').replace(/[*_`~]|!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').replace(/[\u202a-\u202e\u2066-\u2069]/g, '').trim().slice(0, 60);
 }
 
-export const folder = (slug) => `${DIR}/${slug}`;
+// A note's place and size from its header, inside sane bounds (a header edited by hand may say anything)
+const num = (v, def, lo, hi) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : def);
+export function geometryOf(meta) {
+  return { x: num(meta.x, 80, -2000, 20000), y: num(meta.y, 80, 0, 20000), w: num(meta.w, 260, 160, 4000), h: num(meta.h, 240, 110, 4000) };
+}
+
+// a note's folder name: one plain name (what newSlug makes, or a folder made by hand), never a way out of ~/Notes
+export const validSlug = (slug) => typeof slug === 'string' && !!slug && slug.length <= 200 && slug !== '.' && slug !== '..'
+  && !slug.startsWith('.') && !/[/\\\u0000-\u001f\u007f]/.test(slug);
+const MAX_NOTE = 8 * 1024 * 1024;       // a nota.md larger than this is not a note (it would be read into memory)
+export const folder = (slug) => {
+  if (!validSlug(slug)) throw new Error('notes: bad note folder');
+  return `${DIR}/${slug}`;
+};
 export const absFolder = (slug) => `${fs.home()}/${DIR}/${slug}`;
 
 const exists = (p) => { try { return !!fs.stat(p); } catch (e) { return false; } };
@@ -83,13 +101,21 @@ export function loadNotes() {
   let dirs = [];
   try { dirs = fs.list(DIR).filter((e) => e.dir); } catch (e) { dirs = []; }
   for (const d of dirs) {
+    // a note is a real folder with a real nota.md: a link (to a folder or a file elsewhere) is not followed, so a note
+    // never reads or writes outside ~/Notes (GitHub #238)
+    if (d.link || !validSlug(d.name)) continue;
     let txt = null;
-    try { txt = fs.read(`${DIR}/${d.name}/nota.md`); } catch (e) { continue; }
+    try {
+      const st = fs.stat(`${DIR}/${d.name}/nota.md`);
+      if (!st || st.link || st.dir || st.size > MAX_NOTE) continue;
+      txt = fs.read(`${DIR}/${d.name}/nota.md`);
+    } catch (e) { continue; }
     const { meta, body } = parseNote(txt);
+    const when = (v) => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? v : new Date(d.mtime).toISOString());
     list.push({
-      slug: d.name, body, title: meta.title || titleOf(body), color: COLORS.includes(meta.color) ? meta.color : 'yellow',
-      x: meta.x ?? 80, y: meta.y ?? 80, w: meta.w ?? 260, h: meta.h ?? 240, desktop: !!meta.desktop, pinned: !!meta.pinned,
-      created: meta.created || new Date(d.mtime).toISOString(), updated: meta.updated || new Date(d.mtime).toISOString(),
+      slug: d.name, body, title: typeof meta.title === 'string' && meta.title ? titleOf(meta.title) : titleOf(body), color: COLORS.includes(meta.color) ? meta.color : 'yellow',
+      ...geometryOf(meta), desktop: meta.desktop === true, pinned: meta.pinned === true,
+      created: when(meta.created), updated: when(meta.updated),
     });
   }
   list.sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
@@ -138,7 +164,11 @@ export function createNote({ body = '', color = 'yellow', desktop = false, x, y 
   try { fs.mkdir(folder(slug)); } catch (e) { return null; }
   const now = new Date().toISOString();
   const count = notesStore.get().list.filter((n) => n.desktop).length;
-  const n = { slug, body, title: titleOf(body), color, x: x ?? 140 + (count % 6) * 30, y: y ?? 90 + (count % 6) * 30, w: 260, h: 240,
+  // a new note's place: inside the desktop's work area (Lord Workspaces' top bar and side rail covered the note's bar)
+  let area = null;
+  try { area = typeof workArea === 'function' ? workArea() : null; } catch (e) { area = null; }
+  const ax = area && Number.isFinite(area.x) ? area.x : 0, ay = area && Number.isFinite(area.y) ? area.y : 0;
+  const n = { slug, body, title: titleOf(body), color, x: x ?? ax + 80 + (count % 6) * 30, y: y ?? ay + 40 + (count % 6) * 30, w: 260, h: 240,
     desktop, pinned: false, created: now, updated: now };
   patchList((list) => [n, ...list]);
   writeNow(slug);
@@ -151,7 +181,7 @@ export function duplicateNote(slug) {
   const copy = createNote({ body: n.body, color: n.color, desktop: n.desktop, x: n.x + 30, y: n.y + 30 });
   // attachments: copied next to it (in the background)
   try {
-    for (const e of fs.list(folder(slug))) if (e.name !== 'nota.md') fs.copy(`${folder(slug)}/${e.name}`, `${folder(copy)}/${e.name}`);
+    for (const e of fs.list(folder(slug))) if (e.name !== 'nota.md' && !e.link && !e.dir) fs.copy(`${folder(slug)}/${e.name}`, `${folder(copy)}/${e.name}`);
   } catch (e) { /* no attachments */ }
   return copy;
 }
@@ -174,27 +204,47 @@ export function deleteNote(slug) {
 
 function freeName(slug, name) {
   let names;
-  try { names = new Set(fs.list(folder(slug)).map((e) => e.name)); } catch (e) { names = new Set(); }
-  const dot = name.lastIndexOf('.');
-  const base = dot > 0 ? name.slice(0, dot) : name, ext = dot > 0 ? name.slice(dot) : '';
-  let out = name.replace(/[/\\]/g, '_'), i = 2;
-  while (names.has(out)) out = `${base}-${i++}${ext}`;
+  try { names = new Set(fs.list(folder(slug), { hidden: true }).map((e) => e.name)); } catch (e) { names = new Set(); }
+  const clean = safeAttachName(name);
+  const dot = clean.lastIndexOf('.');
+  const base = dot > 0 ? clean.slice(0, dot) : clean, ext = dot > 0 ? clean.slice(dot) : '';
+  let out = clean, i = 2;
+  while (names.has(out) || out === 'nota.md') out = `${base}-${i++}${ext}`;
   return out;
 }
 
-const IMG = /\.(png|jpe?g)$/i;
-export const isImage = (name) => IMG.test(name);
+// The markdown that shows an attachment: an image drawn in the note (PNG and JPEG, what lord-server draws) or a 📎
+// link; its name is encoded so spaces and parentheses don't end the link (links.js)
+export const attachmentMarkdown = (name) => (isImage(name) ? `![${linkLabel(name)}](${attachmentRef(name)})` : `[📎 ${linkLabel(name)}](${attachmentRef(name)})`);
 
-// Copies a file from the home folder into the note and returns the markdown that shows it.
+// Copies a file from the home folder (or a mounted disk) into the note and returns the markdown that shows it. A
+// folder or a link is not attached (a link would point out of the note's folder); the copy runs in the background.
 export function attachFile(slug, path) {
-  const rel = path.replace(`${fs.home()}/`, '');
-  const name = freeName(slug, rel.split('/').pop());
+  let st = null;
+  try { st = fs.stat(path); } catch (e) { st = null; }
+  if (!st || st.dir || st.link) return null;
+  const name = freeName(slug, String(path).split('/').pop());
   const dst = `${folder(slug)}/${name}`;
-  try {
-    if (fs.copy) fs.copy(rel, dst);
-    else fs.write(dst, fs.read(rel, { binary: true }));
-  } catch (e) { return null; }
-  return isImage(name) ? `![${name}](${name})` : `[📎 ${name}](${name})`;
+  try { fs.copy(path, dst); } catch (e) { return null; }
+  return attachmentMarkdown(name);
+}
+
+// Where a link or an image of the note points, if it may be opened or drawn: one of its own files, a real file (not
+// a link or a folder), never nota.md itself. null otherwise.
+export function attachmentPath(slug, url) {
+  const t = linkTarget(url);
+  if (t.kind !== 'file' || t.name === 'nota.md' || !validSlug(slug)) return null;
+  const p = `${absFolder(slug)}/${t.name}`;
+  let st = null;
+  try { st = fs.stat(p); } catch (e) { st = null; }
+  if (!st || st.dir || st.link) return null;
+  return { path: p, name: t.name, size: st.size };
+}
+
+// an image the note draws: only its own PNG and JPEG files (no other folder, no address on the network)
+export function noteImageSrc(slug, url) {
+  const a = attachmentPath(slug, url);
+  return a && imageKind(a.name) === 'inline' ? a.path : null;
 }
 
 // The clipboard image (copied in any app) as the note's image-N.png.

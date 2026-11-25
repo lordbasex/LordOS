@@ -586,9 +586,12 @@
   "ws.lock.on": "اس ڈسپلے کی ونڈوز لاک کریں",
   "ws.lock.off": "اس ڈسپلے کی ونڈوز ان لاک کریں",
   "ws.lock.window": "لاک ہے: فریم کے تالے سے ان لاک کریں",
-  "ws.minimized.label": "چھوٹی کی گئی",
-  "ws.minimized.title": "اس ڈسپلے پر چھوٹی کی گئی ونڈوز: واپس لانے کے لیے کسی پر کلک کریں",
   "ws.slot.free": "خالی جگہ: کوئی ایپ کھولیں یا چھوٹی کی گئی واپس لائیں",
+  "ws.windows.title": "اس ڈسپلے پر اس سرگرمی کی ونڈوز (چھوٹی کی گئی ونڈوز کے نیچے لکیر): کسی کو آگے لانے کے لیے کلک کریں؛ اس ایپ کی ونڈوز کے لیے رائٹ کلک کریں",
+  "ws.profile.ask": "براؤزر کو چننے دیں",
+  "ws.profile.open": "پروفائل {profile} کھولیں",
+  "ws.profile.activity": "یہ سرگرمی جو پروفائل کھولتی ہے",
+  "ws.profile.display": "یہ ڈسپلے جو پروفائل کھولتا ہے ({display})",
   "ws.snapfly.title": "ونڈو ترتیب دیں",
   "ws.snapfly.halves": "آدھے",
   "ws.snapfly.thirds": "تہائی",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "LordOS Studio کے ذریعے کیمرا",
   "capture.what.effectsOn": "اثرات آن",
   "capture.what.effectsOff": "کوئی اثر نہیں",
-  "shortcuts.captureWindow": "ایک ونڈو کا اسکرین شاٹ"
+  "shortcuts.captureWindow": "ایک ونڈو کا اسکرین شاٹ",
+  "themeSwitch.changing": "ڈیسک ٹاپ کا انداز بدلا جا رہا ہے…",
+  "themeSwitch.changingTo": "{name} پر بدلا جا رہا ہے…",
+  "themeSwitch.failedTitle": "{name} لاگو نہیں ہو سکا",
+  "themeSwitch.refusedBody": "اس کا کوڈ LordOS کی دستخط شدہ نقل سے میل نہیں کھاتا، اس لیے اسے لوڈ نہیں کیا گیا۔ آپ کے ڈیسک ٹاپ کا انداز پہلے جیسا ہی رہے گا۔",
+  "themeSwitch.failedBody": "یہ شروع نہیں ہوا۔ آپ کے ڈیسک ٹاپ کا انداز پہلے جیسا ہی رہے گا۔",
+  "spotlight.section.machines": "ورچوئل مشینیں",
+  "guestApps.inMachine": "{machine} میں"
 }

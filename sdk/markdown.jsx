@@ -5,6 +5,9 @@
 //   fitWidth (optional): width is the exact width of the column (lays list items out at it)
 //   breaks (optional): a single line break inside a paragraph is kept as a line break, as typed (Notes, so the
 //     reading view breaks where the editor does; GitHub #169). Without it, plain markdown: the lines are joined.
+//   resolveImage (optional): (target) → the file to draw, or null to show [alt] instead. Without it an image is a file
+//     relative to base (never an address with a scheme). Notes passes one that allows only the note's own PNG and JPEG
+//     files (GitHub #238).
 //   markdownHeadings(text) → [{ level, text, id, line }]   (for a table of contents)
 //
 // Blocks: headings, paragraphs, quotes, lists (with levels), numbered lists, checkboxes (- [ ] / - [x]),
@@ -147,13 +150,15 @@ export const stripInline = (s) => parseInline(s).map((x) => x.text || x.alt || '
 
 const join = (base, p) => (p.startsWith('/') ? p : `${base}/${p}`.replace(/\/+/g, '/'));
 
-function Inline({ text, size, color, weight = 400, width, base, onLink, emoji, mono }) {
+function Inline({ text, size, color, weight = 400, width, base, onLink, emoji, mono, resolveImage }) {
   const t = useTheme();
   const segs = parseInline(text, {}, emoji);
   const out = [];
   segs.forEach((sg, si) => {
     if (sg.image) {
-      const src = /^[a-z]+:/i.test(sg.image) ? null : join(base || '', sg.image);
+      let src = null;
+      if (resolveImage) { try { src = resolveImage(sg.image) || null; } catch (e) { src = null; } }
+      else src = /^[a-z]+:/i.test(sg.image) ? null : join(base || '', sg.image);
       if (!src) { out.push(<Text key={`i${si}`} style={{ fontSize: size, color: t.textDim }}>{`[${sg.alt || sg.image}]`}</Text>); return; }
       const nat = typeof lord.image !== 'undefined' ? lord.image.size(src) : null;
       const max = Math.max(40, (width || 400) - 8);
@@ -192,8 +197,8 @@ const H_SIZE = [0, 22, 18, 16, 14, 13, 13];
 
 function Block({ b, props }) {
   const t = useTheme();
-  const { size = 14, color = t.text, width, base, onLink, onToggleTask, onHeadingRef, emoji, fitWidth } = props;
-  const inl = (text, extra = {}) => <Inline text={text} size={size} color={color} width={width} base={base} onLink={onLink} emoji={emoji} {...extra} />;
+  const { size = 14, color = t.text, width, base, onLink, onToggleTask, onHeadingRef, emoji, fitWidth, resolveImage } = props;
+  const inl = (text, extra = {}) => <Inline text={text} size={size} color={color} width={width} base={base} onLink={onLink} emoji={emoji} resolveImage={resolveImage} {...extra} />;
   switch (b.type) {
     case 'heading':
       return (

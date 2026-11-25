@@ -6,6 +6,7 @@
 #include "modes.h"
 #include "night.h"
 #include "../sec/json.h"
+#include "../remote/greeterscale.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -53,6 +54,7 @@ static struct {
     int orient;                         /* the accelerometer's rotation added to the built-in panel's */
     AccelFilter af;
     int lid;                            /* logind's LidClosed (hw/lid.c): the built-in panel may leave the plan */
+    int greeter;                        /* lord-server --greeter: LORD_MAIN_SCALE may apply (#242) */
 } D = { .kelvin = NIGHT_K_MAX, .auto_pref = -1 };
 
 static void apply_tint_all(void);
@@ -215,6 +217,19 @@ static int store(void) {
     return 0;
 }
 
+void display_set_greeter(int on) { D.greeter = !!on; }
+int  display_is_greeter(void) { return D.greeter; }
+
+/* #242: the login screen's scale for the display on connector conn, from lord-sessiond (LORD_MAIN_SCALE=<conn>:<pct>,
+ * chosen by an administrator); 0 when it isn't the login screen, isn't that display, or the value doesn't parse */
+static int greeter_scale(const char *conn) {
+    if (!D.greeter) return 0;
+    char c[GSCALE_CONN_MAX + 1];
+    int pct;
+    if (gscale_parse_env(getenv(GSCALE_ENV), c, sizeof c, &pct) || strcmp(c, conn)) return 0;
+    return pct;
+}
+
 void display_init(const DisplayHost *h) {
     D.host = h;
     const char *home = getenv("HOME");
@@ -306,6 +321,7 @@ int display_plan(const KmsOutput *o, int n, DisplayPlan *p) {
         d->mm_h = (int)(d->rot & 1 ? k->mm_w : k->mm_h);
         d->recommended = out_scale_recommended(pw, ph, d->mm_w, d->mm_h);
         d->scale = f && out_scale_valid(f->scale) ? f->scale : d->recommended;
+        if (!(f && out_scale_valid(f->scale)) && greeter_scale(d->connector)) d->scale = greeter_scale(d->connector);   /* #242 */
         d->v = out_view(0, 0, pw, ph, d->scale);
         r[j] = (ORect){ f && f->placed ? f->x : 0, f && f->placed ? f->y : 0, d->v.w, d->v.h };
         placed[j] = j == 0 || (f && f->placed);

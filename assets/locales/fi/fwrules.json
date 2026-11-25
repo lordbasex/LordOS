@@ -91,5 +91,6 @@
   },
   "pickAddress": "Valitse osoite salliaksesi tai estääksesi sen tältä sovellukselta.",
   "recent": "viimeaikainen yhteys",
-  "recentDenied": "äskettäin estetty"
+  "recentDenied": "äskettäin estetty",
+  "machineInherits": "Koneiden säännöt päättävät myös tästä koneesta. Sen omat säännöt lisätään niihin: kun molemmat osuvat yhteyteen, tarkempi päättää, ja Estä voittaa Salli."
 }

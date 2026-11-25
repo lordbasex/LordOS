@@ -1,20 +1,22 @@
 {
-  "note": "The systems the New Machine assistant offers to download (docs/VIRTUALIZATION.md 4.1 and 3.9, \"The Linux download cards\"). Read by the app (apps/machines/catalog.js, bundled) and by the admin helper as root (server/src/vm/vmcatalog.c, from /usr/lib/lordos/assets/machines/systems.json): JS names an entry and an architecture, never a URL. An entry names a release, not a file: 'dir' is the maker's folder for it, 'sums' the maker's own SHA-256 list in that folder (or 'sumsPattern', the list's name to look for in the folder's listing when the name changes per build), and 'file' the image's name as an extended regular expression; the newest matching name in the list is taken, and the download must have the SHA-256 the list gives for it, or it is thrown away. 'fileDir' is where the image itself is fetched when it isn't 'dir' (a mirror redirector). 'approxMb' is only what the card says before the list is read; 'maxMb' is the most a download may be. Before any hash in a list is trusted, the list's OpenPGP signature is checked (vmcatalog.c, pkg/pgp.c): 'signature' is how the maker signs it ('detached', a file named 'name' in the same folder, 'clearsigned', the list itself, or 'lordos-release', LordOS's own releases: the detached Ed25519 signature 'name' checked with the LordOS release key compiled into LordOS, so that entry has no 'keys' or 'fingerprints'), 'keys' the maker's key file, pinned in the package (packaging/keys/machines, installed in /usr/lib/lordos/assets/machines/keys), and 'fingerprints' the primary keys of that file that may sign; a list that isn't signed, or whose signature doesn't verify with them, is refused. 'keySource' says where the key was fetched, 'fingerprintChecked' where its fingerprint was compared, over https, with the one the maker publishes. 'hashSource' says where each hash comes from; 'checked' is when the entry was last tried. An ISO whose maker signs no list (Android, docs/VIRTUALIZATION.md 4.2) is 'pinned' instead: one file, its address and the SHA-256 checked against a download, pinned in this signed file; 'machine' is what its card asks for whatever the profile (vcpus, memoryMb, diskGb, graphics), 'notice' the key of a line the assistant shows under it (machines.dl.notice.<key>, with 'maker' and 'imageDate'), 'status' why it is what it is. 'unattended' says how the card installs without questions (vmunattend.h): the answer file's kind, the installer's kernel and initrd in the ISO for each architecture, the kernel command line ({label}: the ISO's volume label), and 'image', another entry whose image that install boots instead (a server or network installer), marked 'hidden' so it has no card; kind 'lordos' is the live ISO's own unattended install (docs/UNATTENDED.md: lordos-auto.conf on a LORDOSAUTO seed disk). 'defaults' is the least a new machine of that card gets (processors, memory, disk) and the graphics it asks for, over the chosen profile. Order is the cards' order.",
+  "note": "The systems the New Machine assistant offers to download (docs/VIRTUALIZATION.md 4.1 and 3.9, \"The Linux download cards\"). Read by the app (apps/machines/catalog.js, bundled) and by the admin helper as root (server/src/vm/vmcatalog.c, from /usr/lib/lordos/assets/machines/systems.json): JS names an entry and an architecture, never a URL. An entry names a release, not a file: 'dir' is the maker's folder for it, 'sums' the maker's own SHA-256 list in that folder (or 'sumsPattern', the list's name to look for in the folder's listing when the name changes per build), and 'file' the image's name as an extended regular expression; the newest matching name in the list is taken, and the download must have the SHA-256 the list gives for it, or it is thrown away. 'fileDir' is where the image itself is fetched when it isn't 'dir' (a mirror redirector). 'list' (LordOS's own releases only, a 'lordos-release' signature and a fixed 'sums') is a copy of that signed list and its signature on lordos.org/releases/<tag>/, read first because GitHub's release downloads sometimes answer 403 on their signed redirect; the list in 'dir' is the fallback, both checked with the same compiled-in release key, and the image still comes from 'dir'. 'approxMb' is only what the card says before the list is read; 'maxMb' is the most a download may be. Before any hash in a list is trusted, the list's OpenPGP signature is checked (vmcatalog.c, pkg/pgp.c): 'signature' is how the maker signs it ('detached', a file named 'name' in the same folder, 'clearsigned', the list itself, or 'lordos-release', LordOS's own releases: the detached Ed25519 signature 'name' checked with the LordOS release key compiled into LordOS, so that entry has no 'keys' or 'fingerprints'), 'keys' the maker's key file, pinned in the package (packaging/keys/machines, installed in /usr/lib/lordos/assets/machines/keys), and 'fingerprints' the primary keys of that file that may sign; a list that isn't signed, or whose signature doesn't verify with them, is refused. 'keySource' says where the key was fetched, 'fingerprintChecked' where its fingerprint was compared, over https, with the one the maker publishes. 'hashSource' says where each hash comes from; 'checked' is when the entry was last tried. A file whose maker signs no list is 'pinned' instead: one file, its address and the SHA-256 checked against a download, pinned in this signed file; 'machine' is what its card asks for whatever the profile (vcpus, memoryMb, diskGb, graphics). 'unattended' says how the card installs without questions (vmunattend.h): the answer file's kind, the installer's kernel and initrd in the ISO for each architecture, the kernel command line ({label}: the ISO's volume label; an architecture's own 'append' replaces it there: on arm64 'console=tty0 acpi=nospcr' puts the installer on the machine's screen, where the firmware's ACPI serial port table would make the serial port the kernel's console), and 'image', another entry whose image that install boots instead (a server or network installer), marked 'hidden' so it has no card; kind 'lordos' is the live ISO's own unattended install (docs/UNATTENDED.md: lordos-auto.conf on a LORDOSAUTO seed disk). 'defaults' is the least a new machine of that card gets (processors, memory, disk) and the graphics it asks for, over the chosen profile. Order is the cards' order.",
   "systems": [
     {
       "id": "lordos", "name": "LordOS", "release": "0.8.9", "kind": "iso",
       "homepage": "https://lordos.org/",
-      "hashSource": "SHA256SUMS published with the LordOS release on GitHub (the live ISOs, not the OVA), its signature SHA256SUMS.sig (base64 Ed25519) checked with the LordOS release key compiled into LordOS (docs/SIGNING.md, \"Release files\"; the LordOS Imager's own check). The folder names a pinned release tag, moved to each new release that ships ISOs by the release process (docs/RELEASING.md, step 1); pre-releases (\"-beta\" tags) are what exists today",
+      "hashSource": "SHA256SUMS published with the LordOS release (the live ISOs, not the OVA), read from its copy on lordos.org (releases/<tag>/SHA256SUMS.txt and SHA256SUMS.sig, uploaded by the release process) and, if that fails, from the release on GitHub; its signature SHA256SUMS.sig (base64 Ed25519) checked with the LordOS release key compiled into LordOS (docs/SIGNING.md, \"Release files\"; the LordOS Imager's own check). The folder names a pinned release tag, moved to each new release that ships ISOs by the release process with its lordos.org copy (docs/RELEASING.md, step 1); pre-releases (\"-beta\" tags) are what exists today",
       "signature": { "type": "lordos-release", "name": "SHA256SUMS.sig" },
-      "checked": "2026-11-22",
+      "checked": "2026-11-23",
       "defaults": { "vcpus": 4, "memoryMb": 4096, "diskGb": 32, "graphics": "3d" },
       "unattended": { "kind": "lordos", "append": "boot=live components loglevel=3 nosplash lordos.auto=1 console=tty1",
                       "arch": { "amd64": { "kernel": "live/vmlinuz", "initrd": "live/initrd.img" },
                                 "arm64": { "kernel": "live/vmlinuz", "initrd": "live/initrd.img" } } },
       "arch": {
         "amd64": { "dir": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9-beta/", "sums": "SHA256SUMS",
+                   "list": { "dir": "https://lordos.org/releases/v0.8.9-beta/", "sums": "SHA256SUMS.txt", "signature": "SHA256SUMS.sig" },
                    "file": "^lordos-live-[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?-amd64\\.iso$", "approxMb": 1135, "maxMb": 4096 },
         "arm64": { "dir": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9-beta/", "sums": "SHA256SUMS",
+                   "list": { "dir": "https://lordos.org/releases/v0.8.9-beta/", "sums": "SHA256SUMS.txt", "signature": "SHA256SUMS.sig" },
                    "file": "^lordos-live-[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?-arm64\\.iso$", "approxMb": 1062, "maxMb": 4096 }
       }
     },
@@ -29,7 +31,8 @@
       "checked": "2026-11-06",
       "unattended": { "kind": "preseed", "append": "auto=true priority=critical --- quiet",
                       "arch": { "amd64": { "kernel": "install.amd/vmlinuz", "initrd": "install.amd/initrd.gz" },
-                                "arm64": { "kernel": "install.a64/vmlinuz", "initrd": "install.a64/initrd.gz" } } },
+                                "arm64": { "kernel": "install.a64/vmlinuz", "initrd": "install.a64/initrd.gz",
+                                           "append": "auto=true priority=critical console=tty0 acpi=nospcr --- quiet" } } },
       "arch": {
         "amd64": { "dir": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/", "sums": "SHA256SUMS",
                    "file": "^debian-13\\.[0-9]+\\.[0-9]+-amd64-netinst\\.iso$", "approxMb": 760, "maxMb": 2048 },
@@ -48,7 +51,8 @@
       "checked": "2026-11-06",
       "unattended": { "kind": "autoinstall", "image": "ubuntu-server", "append": "autoinstall ---",
                       "arch": { "amd64": { "kernel": "casper/vmlinuz", "initrd": "casper/initrd" },
-                                "arm64": { "kernel": "casper/vmlinuz", "initrd": "casper/initrd" } } },
+                                "arm64": { "kernel": "casper/vmlinuz", "initrd": "casper/initrd",
+                                           "append": "autoinstall console=tty0 acpi=nospcr ---" } } },
       "arch": {
         "amd64": { "dir": "https://releases.ubuntu.com/26.04/", "sums": "SHA256SUMS",
                    "file": "^ubuntu-26\\.04(\\.[0-9]+)?-desktop-amd64\\.iso$", "approxMb": 6180, "maxMb": 10240 },
@@ -68,7 +72,8 @@
       "unattended": { "kind": "kickstart", "image": "fedora-netinst",
                       "append": "inst.stage2=hd:LABEL={label} inst.ks=hd:LABEL=OEMDRV:/ks.cfg quiet",
                       "arch": { "amd64": { "kernel": "images/pxeboot/vmlinuz", "initrd": "images/pxeboot/initrd.img" },
-                                "arm64": { "kernel": "images/pxeboot/vmlinuz", "initrd": "images/pxeboot/initrd.img" } } },
+                                "arm64": { "kernel": "images/pxeboot/vmlinuz", "initrd": "images/pxeboot/initrd.img",
+                                           "append": "inst.stage2=hd:LABEL={label} inst.ks=hd:LABEL=OEMDRV:/ks.cfg console=tty0 acpi=nospcr quiet" } } },
       "arch": {
         "amd64": { "dir": "https://dl.fedoraproject.org/pub/fedora/linux/releases/45/Workstation/x86_64/iso/",
                    "fileDir": "https://download.fedoraproject.org/pub/fedora/linux/releases/45/Workstation/x86_64/iso/",
@@ -88,7 +93,12 @@
       "fingerprints": ["827C8569F2518CC677FECA1AED65462EC8D5E4C5"],
       "keySource": "https://archive.kali.org/archive-key.asc, fetched 2026-11-06 (expires 2028-04-17)",
       "fingerprintChecked": "https://www.kali.org/docs/introduction/download-official-kali-linux-images/, 2026-11-06 (Kali Linux Archive Automatic Signing Key (2025))",
-      "checked": "2026-11-06",
+      "checked": "2026-11-24",
+      "unattended": { "kind": "kali",
+                      "append": "net.ifnames=0 preseed/file=/cdrom/simple-cdd/default.preseed simple-cdd/profiles=kali,offline desktop=xfce auto=true priority=critical --- quiet",
+                      "arch": { "amd64": { "kernel": "install.amd/vmlinuz", "initrd": "install.amd/initrd.gz" },
+                                "arm64": { "kernel": "install.a64/vmlinuz", "initrd": "install.a64/initrd.gz",
+                                           "append": "net.ifnames=0 preseed/file=/cdrom/simple-cdd/default.preseed simple-cdd/profiles=kali,offline desktop=xfce auto=true priority=critical console=tty0 acpi=nospcr --- quiet" } } },
       "arch": {
         "amd64": { "dir": "https://cdimage.kali.org/current/", "sums": "SHA256SUMS",
                    "file": "^kali-linux-2026\\.[0-9]+[a-z]?-installer-amd64\\.iso$", "approxMb": 4810, "maxMb": 10240 },
@@ -97,12 +107,32 @@
       }
     },
     {
+      "id": "whonix", "name": "Whonix", "release": "18", "kind": "group", "group": "whonix", "edition": "LXQt",
+      "homepage": "https://www.whonix.org/wiki/KVM",
+      "hashSource": "the .sha512sums list Whonix publishes next to the KVM archive in each release folder of download.whonix.org/libvirt, its OpenPGP signature .sha512sums.asc checked with Whonix's signing key; the newest release folder whose list verifies, never older than releases.floor (docs/VIRTUALIZATION.md 19.6)",
+      "signature": { "type": "detached", "suffix": ".asc" }, "keys": "whonix-derivative.asc", "hash": "sha512",
+      "fingerprints": ["916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA"],
+      "keySource": "https://www.whonix.org/keys/derivative.asc, fetched 2026-11-23 (no expiry; signing subkey 6E979B28A6F37C43BE30AFA1CB8D50BB77BB3C48)",
+      "fingerprintChecked": "https://www.whonix.org/wiki/Main/Project_Signing_Key, 2026-11-23 (Patrick Schleizer; also keys.openpgp.org by fingerprint)",
+      "checked": "2026-11-23",
+      "archive": { "format": "tar.xz",
+                   "members": { "gateway": "^Whonix-Gateway-LXQt-[0-9]+(\\.[0-9]+){3}\\.Intel_AMD64\\.qcow2$",
+                                "workstation": "^Whonix-Workstation-LXQt-[0-9]+(\\.[0-9]+){3}\\.Intel_AMD64\\.qcow2$" },
+                   "maxApparentGb": 128, "maxDataGb": 24 },
+      "machine": { "gateway": { "vcpus": 1, "memoryMb": 2048 }, "workstation": { "vcpus": 1, "memoryMb": 2048 } },
+      "arch": {
+        "amd64": { "releases": { "dir": "https://download.whonix.org/libvirt/", "pattern": "^[0-9]+(\\.[0-9]+){3}$", "floor": "18.2.4.3" },
+                   "sumsPattern": "^Whonix-LXQt-[0-9]+(\\.[0-9]+){3}\\.Intel_AMD64\\.qcow2\\.libvirt\\.xz\\.sha512sums$",
+                   "file": "^Whonix-LXQt-[0-9]+(\\.[0-9]+){3}\\.Intel_AMD64\\.qcow2\\.libvirt\\.xz$", "approxMb": 1867, "maxMb": 4096 }
+      }
+    },
+    {
       "id": "windows",
       "name": "Windows",
       "release": "11",
       "kind": "windows",
       "homepage": "https://www.microsoft.com/software-download/windows11",
-      "hashSource": "The SHA-256 of each language's ISO as Microsoft publishes it on its download page (www.microsoft.com/software-download/windows11, \"Verify your download\"), read 2026-11-20; Microsoft signs no list, so these hashes are pinned here, in LordOS's signed package. The evaluation's hashes: Microsoft's KB5130867 (aka.ms/VerifyWindowsISO), read 2026-11-20; the Spanish one checked against a download the same day.",
+      "hashSource": "The SHA-256 of each language's ISO as Microsoft publishes it on its download page (www.microsoft.com/software-download/windows11, \"Verify your download\"), read 2026-11-20; Microsoft signs no list, so these hashes are pinned here, in LordOS's signed package. The evaluation's hashes: Microsoft's KB5130867 (aka.ms/VerifyWindowsISO), read 2026-11-20; the Spanish one checked against a download the same day. arm64: the SHA-256 of each language's ISO as Microsoft publishes it on its Arm64 page (www.microsoft.com/software-download/windows11arm64, \"Verify your download\", Version 26H2), read 2026-11-24; there is no Arm64 evaluation.",
       "license": "Windows is licensed by Microsoft to the person. Machines doesn't ship, host or activate it: the person downloads it from Microsoft's own page (the full version, activated with their own product key) or Machines downloads Microsoft's 90-day evaluation from Microsoft's own server. No activation tools.",
       "checked": "2026-11-20",
       "editions": [
@@ -353,29 +383,203 @@
             }
           ],
           "approxEvalMb": 7850
-        }
-      }
-    },
-    {
-      "id": "android", "name": "Android", "release": "13", "kind": "iso", "family": "android",
-      "maker": "Bliss OS", "edition": "Bliss OS 16.9.7, FOSS edition (no Google apps)", "imageDate": "2024-10-11", "notice": "archived",
-      "homepage": "https://blissos.org",
-      "hashSource": "Bliss OS signs no list: the project's own Bliss-v16.9.7-x86_64-OFFICIAL-foss-20241011.iso.sha256, next to the ISO in its SourceForge folder (blissos-x86/Official/BlissOS16/FOSS/Generic), read 2026-11-22; the ISO downloaded the same day has that SHA-256, and its MD5 is the one SourceForge recorded at the upload (RSS of the folder, 2024-10-12). Pinned here, in LordOS's signed package.",
-      "license": "Free software: AOSP (Apache-2.0) and the Linux kernel (GPL-2.0), with the hardware firmware Linux distributions ship. The FOSS edition carries no Google apps; Bliss OS's GApps edition is not offered (Google's apps are not free software).",
-      "status": "Bliss OS paused its public images (blissos.org/status, as of August 2026): this is its last Android 13 image for PCs, with no further security updates. arm64 has no installable Android ISO (LineageOS's virtio targets build one for x86_64 only, and nobody publishes it), so the card is amd64-only (docs/VIRTUALIZATION.md 4.2).",
-      "machine": { "vcpus": 4, "memoryMb": 4096, "diskGb": 32, "graphics": "3d" },
-      "checked": "2026-11-22",
-      "arch": {
-        "amd64": {
-          "pinned": [
+        },
+        "arm64": {
+          "page": "https://www.microsoft.com/software-download/windows11arm64",
+          "version": "26H2",
+          "approxMb": 6900,
+          "isos": [
             {
-              "name": "Bliss-v16.9.7-x86_64-OFFICIAL-foss-20241011.iso",
-              "url": "https://downloads.sourceforge.net/project/blissos-x86/Official/BlissOS16/FOSS/Generic/Bliss-v16.9.7-x86_64-OFFICIAL-foss-20241011.iso",
-              "sha256": "735cb962ec6bd92b62eb82a812831a38d79a0dfdf12b7973d2d0f7ab001ba68e",
-              "bytes": 2342518784
+              "lang": "ar-SA",
+              "label": "Arabic",
+              "sha256": "92775cad76e5b90b6bc0d2f7ada982b5e399cbb59bfa797320872016927848dd"
+            },
+            {
+              "lang": "bg-BG",
+              "label": "Bulgarian",
+              "sha256": "a56988dae9be80f1d5737e5f5066260110ed175b02f5ed849ca5baa99321cc1b"
+            },
+            {
+              "lang": "cs-CZ",
+              "label": "Czech",
+              "sha256": "a299c5b56a5fe93996f4c4ebd390338e00c1208e94f04f14085dc05fec262f06"
+            },
+            {
+              "lang": "da-DK",
+              "label": "Danish",
+              "sha256": "0df64fa738e25beacdf844d9b74dac7f67345f5003b23787f6ae87e3451bfbf1"
+            },
+            {
+              "lang": "de-DE",
+              "label": "German",
+              "sha256": "10cb224a54aee8022ed250da75b00cc8e614b0336d975100a0f80dbbc38ecdc2"
+            },
+            {
+              "lang": "el-GR",
+              "label": "Greek",
+              "sha256": "390042887ee2fbe34ac831c64e71d9057eb82cd98f989ac585ecf719e7f27f1b"
+            },
+            {
+              "lang": "en-GB",
+              "label": "English International",
+              "sha256": "500bcb6f272b7c455156470ea06816f558f13b885723f84ee9eab7534c7dee61"
+            },
+            {
+              "lang": "en-US",
+              "label": "English",
+              "sha256": "8992f2d2cfd2fa647e579e9eb31fc21f34da8333c29b6170fde17d2ed6623e9c"
+            },
+            {
+              "lang": "es-ES",
+              "label": "Spanish",
+              "sha256": "dbf606ceb4ce1390f9f21ad1d96331848bc6b701cbab0012785881a1a1c0ec63"
+            },
+            {
+              "lang": "es-MX",
+              "label": "Spanish (Mexico)",
+              "sha256": "23d5d42e8cd37fe1bacc37920eaa1ab0bb044aae0d41eeeb6a77e82a8ca9a483"
+            },
+            {
+              "lang": "et-EE",
+              "label": "Estonian",
+              "sha256": "f2b835d2894afe3160b53f2cfc58daed95dab80d677596f0a69544fbae17dd05"
+            },
+            {
+              "lang": "fi-FI",
+              "label": "Finnish",
+              "sha256": "0bf586cf3de2d8abdfc998b5a5270f3f5bc9586f7342aab7b0e3d1c212ae730b"
+            },
+            {
+              "lang": "fr-CA",
+              "label": "French Canadian",
+              "sha256": "595a083f8b63efec1fc2cd5e7875d88c1c7e71d7b34369c3bc359e8a7ce666bf"
+            },
+            {
+              "lang": "fr-FR",
+              "label": "French",
+              "sha256": "d086fb0bc1574188e8533a7422b55a3fe3bc39d0e48da0e895dec3f370e472df"
+            },
+            {
+              "lang": "he-IL",
+              "label": "Hebrew",
+              "sha256": "bbf9f2284fe7559ea8bdf960851a80231eada3aa7e740958948b79ab01d23478"
+            },
+            {
+              "lang": "hr-HR",
+              "label": "Croatian",
+              "sha256": "78b7388ea549c3440cc48c7c427cb1c118ec40408a914b6a98d4684c6dee138e"
+            },
+            {
+              "lang": "hu-HU",
+              "label": "Hungarian",
+              "sha256": "c511b047920a571e5d58d983e5ea3cc6811e20bb9cd6d255b73e85da88fd5bab"
+            },
+            {
+              "lang": "it-IT",
+              "label": "Italian",
+              "sha256": "de651996af788d7f55b8d11bfa45d5b20e22013687ea2c37f3325a8cd4d7c5e5"
+            },
+            {
+              "lang": "ja-JP",
+              "label": "Japanese",
+              "sha256": "8618e995c48fb6bb4d32c8cdf0e4b280473640736071c53943789f93a03bdd51"
+            },
+            {
+              "lang": "ko-KR",
+              "label": "Korean",
+              "sha256": "833e132e94335a7eecc2b3bb6ba9e16b199413504049cc19743752f402fb9cf7"
+            },
+            {
+              "lang": "lt-LT",
+              "label": "Lithuanian",
+              "sha256": "635899ea6901e7c9ce1c42e629d2e6daaff71128ed9d03c63b7dc0999805d613"
+            },
+            {
+              "lang": "lv-LV",
+              "label": "Latvian",
+              "sha256": "94aba682d5d3a1cba7f7a096a0e2a2b7a203513e75dd184ac4daf3a36b36f273"
+            },
+            {
+              "lang": "nb-NO",
+              "label": "Norwegian",
+              "sha256": "2c85ad913811599893b510a8278bd64cd6a0c1e1238582a57cc81fb28f7a76a3"
+            },
+            {
+              "lang": "nl-NL",
+              "label": "Dutch",
+              "sha256": "554267a82102284894e874625c6e8c5fde0850c9a998d16dc25db968b9b2d575"
+            },
+            {
+              "lang": "pl-PL",
+              "label": "Polish",
+              "sha256": "6d9b301e9009fe9191a75dc537ce7d648649c3f991511105a89822bc19aed933"
+            },
+            {
+              "lang": "pt-BR",
+              "label": "Brazilian Portuguese",
+              "sha256": "48eec10eaff055a62a1516ce83e103dfdbe72a4aaf12a221e99ecb29caa3fb77"
+            },
+            {
+              "lang": "pt-PT",
+              "label": "Portuguese",
+              "sha256": "8f9e526b24bdb89c4ee6bb550d8e42fee08fd9f657e4941a8f89fea77ca9be17"
+            },
+            {
+              "lang": "ro-RO",
+              "label": "Romanian",
+              "sha256": "deba3aa801c8eb6c6d354d124a62a4ce8f7c1e52d0c081fd132d0fa5e9017a0e"
+            },
+            {
+              "lang": "ru-RU",
+              "label": "Russian",
+              "sha256": "311879b09b0a990082bf4e47a1533bf994bc5379d9a41e4d386e5202df2719a1"
+            },
+            {
+              "lang": "sk-SK",
+              "label": "Slovak",
+              "sha256": "7fe3233a5162bd73f38ff378b824ca466a949354002d09fe47aa9aee2ab67d10"
+            },
+            {
+              "lang": "sl-SI",
+              "label": "Slovenian",
+              "sha256": "2178f38d5571b706770c932399f8a6139b58edb537872a0d9973ce7297a9eb6d"
+            },
+            {
+              "lang": "sr-Latn-RS",
+              "label": "Serbian Latin",
+              "sha256": "e9994bbd05440cd2fa2db846710119cf33a5aa2afd4ff71834d22a52cab5ffa6"
+            },
+            {
+              "lang": "sv-SE",
+              "label": "Swedish",
+              "sha256": "0d706bc138c9cd287c30d316fe9e623c5f700d085c430cb5329c8c4a1745e9bf"
+            },
+            {
+              "lang": "th-TH",
+              "label": "Thai",
+              "sha256": "768e8ce3bc0a5fe1d8102063791f056d52d073d2c3f1a6d47c40c5dc9f5f6560"
+            },
+            {
+              "lang": "tr-TR",
+              "label": "Turkish",
+              "sha256": "13eeab6c3df650a8a219c2266f0768ba8583f8eede5d62eebf2caee641ce747e"
+            },
+            {
+              "lang": "uk-UA",
+              "label": "Ukrainian",
+              "sha256": "99b00684f0fff80c64e305a5559d6bf30356b17303bd8e7ffb379cde9e7d23e7"
+            },
+            {
+              "lang": "zh-CN",
+              "label": "Chinese Simplified",
+              "sha256": "cd573df724862300895d0f5d0836e663756d22cc4e964c752efdc05b4fc09e8b"
+            },
+            {
+              "lang": "zh-TW",
+              "label": "Chinese Traditional",
+              "sha256": "c0486202732b8d91918ff83e014d52d936a37cac65b80f5b34023aa188f25c6e"
             }
-          ],
-          "approxMb": 2234
+          ]
         }
       }
     },
@@ -386,11 +590,22 @@
       "kind": "drivers",
       "hidden": true,
       "homepage": "https://github.com/virtio-win/virtio-win-pkg-scripts",
-      "hashSource": "virtio-win publishes no hash for its ISO (only MD5s of its RPMs): this SHA-256 is of the ISO downloaded from the project's own folder on 2026-11-20, pinned here. 0.1.271 is the release reported to install Windows 11 on arm64 as well (RHEL-114121).",
+      "hashSource": "virtio-win publishes no hash for its ISO (only MD5s of its RPMs): this SHA-256 is of the ISO downloaded from the project's own folder on 2026-11-20, pinned here. 0.1.271 is the release reported to install Windows 11 on arm64 as well (RHEL-114121). The same ISO serves arm64: its <driver>\\w11\\ARM64 folders (viostor, NetKVM, vioscsi, viogpudo, vioinput, vioserial, viorng, Balloon), read from the pinned ISO 2026-11-24; it has no guest tools installer for Arm, only the x86-64 guest agent.",
       "license": "The drivers are BSD-licensed, qxldod Apache-2.0, the rest GPLv2 (virtio-win.spec); the signed binaries are Red Hat's, downloaded from the project's own folder.",
       "checked": "2026-11-20",
       "arch": {
         "amd64": {
+          "pinned": [
+            {
+              "name": "virtio-win-0.1.271.iso",
+              "url": "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.271-1/virtio-win-0.1.271.iso",
+              "sha256": "bbe6166ad86a490caefad438fef8aa494926cb0a1b37fa1212925cfd81656429",
+              "bytes": 726501376
+            }
+          ],
+          "approxMb": 693
+        },
+        "arm64": {
           "pinned": [
             {
               "name": "virtio-win-0.1.271.iso",

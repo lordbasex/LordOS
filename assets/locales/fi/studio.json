@@ -88,5 +88,8 @@
   "micHint.voice": "Poistaa ympäristösi melun, jotta vain äänesi kuuluu. Jos äänesi kuulostaa robottimaiselta, poista puhelusovelluksen oma kohinanvaimennus käytöstä.",
   "micHint.wide": "Mikrofonisi ilman mitään käsittelyä: musiikille ja kaikille huoneen äänille.",
   "micUnavailable": "Melunvaimennus tulee näkyviin, kun kirjaudut ulos ja takaisin sisään.",
-  "noMic": "Mikrofonia ei ole liitetty."
+  "noMic": "Mikrofonia ei ole liitetty.",
+  "effects": "Tehosteet",
+  "openApp": "Avaa LordOS Studio…",
+  "micApps": "Mikrofonitila vaihtaa mikrofonin, jota sovellukset käyttävät oletuksena. Tiettyyn mikrofoniin asetettu sovellus pitää sen: valitse siinä ”LordOS Noise Reduction”."
 }

@@ -33,6 +33,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/xattr.h>
 #include <time.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -104,6 +105,7 @@ static const char *const protect[] = { "/.local/share/applications", "/.config/a
                                            "/.local/share/lordos/web",      /* Web apps' data, cookies and caches, per profile: only lord-web */
                                            "/.local/share/flatpak",         /* Flatpak installations, the trusted keys, overrides and exports: only `flatpak` run by the Store (docs/FLATPAK.md, E6) */
                                            "/.config/lordos/wl-sessions",   /* Linux apps' window sessions (xdg-session-management): only lord-server (src/wl/xsstore.h) */
+                                           "/.config/lordos/sentinela",     /* (0.8.9.6) Sentinela's blocklist (programs ended whenever they start): only lord.sentinela.block/unblock (src/llm/blockwatch.h) */
                                            NULL };
 
 void fsops_protect_file(int slot, const char *real) {
@@ -208,15 +210,50 @@ int fsops_rename(const char *from, const char *to, char *err, size_t errlen) {
 
 /* ---- deleting a tree (only used by cross-disk move and the trash) ---- */
 
+#ifdef FSOPS_TEST
+int (*fsops_test_rmdir)(const char *) = rmdir;     /* tests/fsops_test.c: a folder a provider still lists as full */
+#define RMDIR(p) fsops_test_rmdir(p)
+#else
+#define RMDIR(p) rmdir(p)
+#endif
+
+/* The wait a cross-disk move's removal may spend on a folder that reads ENOTEMPTY (GitHub #243): a Cloud account
+ * (pCloud) can still list a file it has just deleted, for a moment, so the folder's rmdir fails although everything in
+ * it is gone. Only that rmdir is tried again, with a short backoff, never a new walk of the folder: nothing that wasn't
+ * moved is ever deleted, and a folder that really has something in it still fails, after the budget. Per thread: only
+ * a copy job's own thread sets it (rm_tree_patient); the Trash and the interface's thread never wait. */
+#define RM_PATIENCE_MS 4500
+static _Thread_local int rm_wait_ms;
+static int rm_dir(const char *p) {
+    int delay = 100;
+    for (;;) {
+        if (!RMDIR(p)) return 0;
+        if (errno != ENOTEMPTY || rm_wait_ms <= 0) return -1;
+        int d = delay < rm_wait_ms ? delay : rm_wait_ms;
+        struct timespec ts = { d / 1000, (long)(d % 1000) * 1000000L };
+        while (nanosleep(&ts, &ts) && errno == EINTR) {}
+        rm_wait_ms -= d;
+        delay *= 2;
+    }
+}
 static int rm_cb(const char *p, const struct stat *st, int flag, struct FTW *f) {
     (void)st; (void)f;
-    return flag == FTW_DP ? rmdir(p) : unlink(p);
+    return flag == FTW_DP ? rm_dir(p) : unlink(p);
 }
 static int rm_tree(const char *p) {
     struct stat st;
     if (lstat(p, &st)) return errno == ENOENT ? 0 : -1;
     if (!S_ISDIR(st.st_mode)) return unlink(p);
     return nftw(p, rm_cb, 32, FTW_DEPTH | FTW_PHYS);
+}
+/* rm_tree for a move's source, on the job's thread: a folder may read ENOTEMPTY for up to RM_PATIENCE_MS in all */
+static int rm_tree_patient(const char *p) {
+    rm_wait_ms = RM_PATIENCE_MS;
+    int r = rm_tree(p);
+    int e = errno;
+    rm_wait_ms = 0;
+    errno = e;
+    return r;
 }
 
 /* ---- copy / move ---- */
@@ -263,6 +300,7 @@ static int copy_file(const char *s, const char *d, const struct stat *st, FsJob 
     if (j->cancel) ok = 0;
     if (ok) {
         fchmod(out, st->st_mode & 07777);
+        fsops_copy_marks(in, out);             /* a file from a Machines guest stays marked as one (6.21) */
         struct timespec ts[2] = { st->st_atim, st->st_mtim };
         futimens(out, ts);
     }
@@ -308,6 +346,22 @@ static int copy_tree(const char *s, const char *d, FsJob *j, int depth) {
 
 static void *job_main(void *arg) {
     FsJob *j = arg;
+    if (j->check) {
+        /* fsjob_start's two lstat calls, here for a Cloud account or a network share: a name that isn't there is a
+         * question to its server (rclone asks the provider), which the interface's thread never waits for (2026-11-23).
+         * The same refusals, as the job's error; nothing was written, so nothing is removed */
+        struct stat st;
+        const char *code = NULL;
+        int e = 0;
+        if (lstat(j->src, &st)) e = errno;
+        else if (!lstat(j->dst, &st)) code = "fs.exists";
+        if (e || code) {
+            if (code) seterr(j->error, sizeof j->error, code); else seterrno(j->error, sizeof j->error, e);
+            j->failed = 1;
+            __atomic_store_n(&j->done, 1, __ATOMIC_RELEASE);
+            return NULL;
+        }
+    }
     if (j->try_rename) {
         if (!rename(j->src, j->dst)) { __atomic_store_n(&j->done, 1, __ATOMIC_RELEASE); return NULL; }   /* same disk */
         if (errno != EXDEV) {
@@ -323,7 +377,7 @@ static void *job_main(void *arg) {
         seterrno(j->error, sizeof j->error, errno);
         rm_tree(j->dst);                                /* no half-done copies */
         j->failed = 1;
-    } else if (j->move && rm_tree(j->src)) {
+    } else if (j->move && rm_tree_patient(j->src)) {
         lerr_set(j->error, sizeof j->error, "fs.moveRemoveFailed", "errno", lerr_errno(errno), NULL);
         j->failed = 1;
     }
@@ -334,8 +388,11 @@ static void *job_main(void *arg) {
 int fsjob_start(const char *src, const char *dst, int move, char *err, size_t errlen) {
     struct stat st;
     if ((move && fsops_protected_below(src)) || fsops_protected_below(dst)) { seterr(err, errlen, "fs.protected"); return -1; }
-    if (lstat(src, &st)) { seterrno(err, errlen, errno); return -1; }
-    if (!lstat(dst, &st)) { seterr(err, errlen, "fs.exists"); return -1; }
+    /* a Cloud account or a network share (from the mount table, without touching the paths): the lstat calls go to
+     * the job's thread (job_main), so a missing name's lookup never waits on the server here */
+    int remote = fsops_remote_path(src) || fsops_remote_path(dst);
+    if (!remote && lstat(src, &st)) { seterrno(err, errlen, errno); return -1; }
+    if (!remote && !lstat(dst, &st)) { seterr(err, errlen, "fs.exists"); return -1; }
     size_t n = strlen(src);
     if (!strncmp(dst, src, n) && dst[n] == '/') { seterr(err, errlen, "fs.copyIntoItself"); return -1; }
     FsJob *j = NULL;
@@ -349,7 +406,8 @@ int fsjob_start(const char *src, const char *dst, int move, char *err, size_t er
     pathf(j->dst, sizeof j->dst, "%s", dst);
     /* a move inside a Cloud account or a network share is a call to its server (rclone moves the file there): the
      * rename goes to the job's thread, so the interface's never waits for it (0.8.8.7) */
-    j->try_rename = move && (fsops_remote_path(src) || fsops_remote_path(dst));
+    j->try_rename = move && remote;
+    j->check = remote;
     if (move && !j->try_rename && rename(src, dst) == 0) { j->done = 1; return j->id; }   /* same disk: instant */
     if (move && !j->try_rename && errno != EXDEV) { int e = errno; j->used = 0; seterrno(err, errlen, e); return -1; }
     pthread_t t;
@@ -656,8 +714,9 @@ int fstrash_empty(void) {
 
 /* ---- bounded walks ---- */
 
-static FsDu *du_out;
-static double du_deadline;
+/* per thread: lord.fs.du walks on the interface's thread, lord.fs.duAsync on fsasync.c's workers (nftw has no user data) */
+static _Thread_local FsDu *du_out;
+static _Thread_local double du_deadline;
 static int du_cb(const char *p, const struct stat *st, int flag, struct FTW *f) {
     (void)p; (void)f;
     if (flag == FTW_D) du_out->dirs++;
@@ -1153,6 +1212,58 @@ int fsops_list(const char *dir, int max, FsListFn fn, void *ud) {
     return i;
 }
 
+/* the marks a file from a Machines guest carries (vm/vmrecv.c): kept when Files copies it, so a copy is still one */
+static const char *const MARKS[] = { "user.lordos.quarantine", "user.lordos.from", "user.lordos.machine", "user.xdg.origin.url" };
+int fsops_copy_marks(int in, int out) {
+    char v[256];
+    ssize_t n = fgetxattr(in, MARKS[0], v, sizeof v);
+    if (n <= 0) return 0;
+    for (size_t i = 0; i < sizeof MARKS / sizeof *MARKS; i++) {
+        n = fgetxattr(in, MARKS[i], v, sizeof v);
+        if (n > 0 && fsetxattr(out, MARKS[i], v, (size_t)n, 0)) return -1;
+    }
+    return 0;
+}
+
+static char mark_v[4][256];
+static ssize_t mark_n[4];
+static int mark_count;
+static int mark_one(const char *p, const struct stat *st, int flag, struct FTW *f) {
+    (void)f;
+    if (flag != FTW_F && flag != FTW_D && flag != FTW_DP) return 0;
+    if (!S_ISREG(st->st_mode) && !S_ISDIR(st->st_mode)) return 0;
+    int fd = open(p, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | (S_ISDIR(st->st_mode) ? O_DIRECTORY : 0));
+    if (fd < 0) return 0;
+    int ok = 1;
+    for (int i = 0; i < 4; i++) if (mark_n[i] > 0 && fsetxattr(fd, MARKS[i], mark_v[i], (size_t)mark_n[i], 0)) ok = 0;
+    close(fd);
+    mark_count += ok;
+    return 0;
+}
+int fsops_inherit_marks(const char *src, const char *dest) {
+    int in = open(src, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (in < 0) return 0;
+    for (int i = 0; i < 4; i++) mark_n[i] = fgetxattr(in, MARKS[i], mark_v[i], sizeof mark_v[i]);
+    close(in);
+    if (mark_n[0] <= 0) return 0;
+    struct stat st;
+    if (lstat(dest, &st)) return -1;
+    mark_count = 0;
+    nftw(dest, mark_one, 16, FTW_PHYS | FTW_MOUNT);
+    return mark_count;
+}
+
+/* a mark's text shown as it is: printable, no control or bidi characters (anyone who can write the file can set it) */
+static int mark_plain(const char *s, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)s[i];
+        if (c < 0x20 || c == 0x7f) return 0;
+        if (c == 0xe2 && i + 2 < n && (((unsigned char)s[i + 1] == 0x80 && ((unsigned char)s[i + 2] == 0x8e || (unsigned char)s[i + 2] == 0x8f ||
+            ((unsigned char)s[i + 2] >= 0xaa && (unsigned char)s[i + 2] <= 0xae))) || ((unsigned char)s[i + 1] == 0x81 && (unsigned char)s[i + 2] >= 0xa6 && (unsigned char)s[i + 2] <= 0xa9))) return 0;
+    }
+    return 1;
+}
+
 int fsops_stat(const char *target, int writable_root, FsStat *o) {
     struct statx sx;
     memset(o, 0, sizeof *o);
@@ -1169,6 +1280,16 @@ int fsops_stat(const char *target, int writable_root, FsStat *o) {
     }
     o->mode = sx.stx_mode & 07777;
     o->size = (double)sx.stx_size;
+    if (!o->link && !o->dir) {
+        char q[8];
+        ssize_t qn = lgetxattr(target, "user.lordos.quarantine", q, sizeof q);
+        o->quarantine = qn > 0;
+        if (o->quarantine) {
+            ssize_t fn = lgetxattr(target, "user.lordos.from", o->from, sizeof o->from - 1);
+            o->from[fn > 0 ? fn : 0] = 0;
+            if (fn > 0 && !mark_plain(o->from, (size_t)fn)) o->from[0] = 0;
+        }
+    }
     fsops_user_name(sx.stx_uid, o->user, sizeof o->user);
     fsops_group_name(sx.stx_gid, o->group, sizeof o->group);
 #define TS(f) ((double)sx.f.tv_sec * 1000 + sx.f.tv_nsec / 1e6)

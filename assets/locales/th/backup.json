@@ -14,6 +14,9 @@
   "never": "ยังไม่มีข้อมูลสำรอง",
   "next": "ครั้งถัดไป: {when}",
   "lastError": "การสำรองข้อมูลล่าสุดล้มเหลว: {error}",
+  "machinesBusy": {
+    "other": "เครื่องเสมือน {count} เครื่องกำลังทำงานอยู่: ดิสก์ของเครื่องเหล่านี้ในข้อมูลสำรองนี้มาจากชุดก่อนหน้า"
+  },
   "todayAt": "วันนี้ เวลา {time}",
   "now": "สำรองข้อมูลเดี๋ยวนี้",
   "pause": "หยุดชั่วคราว",
@@ -74,6 +77,10 @@
   "delete": "ลบข้อมูลสำรอง",
   "restoreAll": "กู้คืนทั้งหมด",
   "restoreItem": "กู้คืน “{name}”",
+  "restoreSelected": "กู้คืนรายการที่เลือก ({count})",
+  "restoringItem": "กำลังกู้คืน {index} จาก {count}: {name}",
+  "restoreItemFailed": "กู้คืน “{name}” ไม่ได้: {error}",
+  "restoreMoreFailed": "รายการอื่นที่ไม่ได้กู้คืน: {count}",
   "restoreFolder": "กู้คืนโฟลเดอร์นี้",
   "restorePick": "เลือกสิ่งที่จะกู้คืน",
   "restoreAllTitle": "กู้คืนโฟลเดอร์โฮมทั้งหมดหรือไม่",

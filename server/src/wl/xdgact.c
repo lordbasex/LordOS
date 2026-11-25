@@ -6,7 +6,10 @@
  * link opened in the browser already running). Any other token, a stale one or one used twice only
  * marks the window as wanting attention (wl.c). The rules are KWin's and Mutter's: tokens are random,
  * short-lived and work once, and one an app asked for remembers that app and stops granting as soon as
- * the keyboard leaves it, so an app cannot ask while in front and use it later to steal the front. No Wayland types here, so the launcher and its tests link it alone. */
+ * the keyboard leaves it, so an app cannot ask while in front and use it later to steal the front. One more reason
+ * LordOS knows of: the person launched an app and the copy already running took the launch over (xact_take_launch),
+ * so that copy's own request, which names no input, grants once in place of the launch's unused token. No Wayland
+ * types here, so the launcher and its tests link it alone. */
 #include "xdgact.h"
 
 #include <errno.h>
@@ -100,6 +103,20 @@ int xact_take(const char *token, double now_ms, char *app_id, size_t n) {
         return r;
     }
     return XACT_UNKNOWN;
+}
+
+int xact_take_launch(double now_ms, int within_ms, int (*is_app)(const char *app_id, void *ctx), void *ctx) {
+    if (!is_app || within_ms <= 0) return 0;
+    Tok *best = NULL;
+    for (int i = 0; i < XACT_MAX; i++) {
+        Tok *t = &toks[i];
+        if (!t->token[0] || t->owner || !t->granted || !t->app_id[0] || t->expires <= now_ms) continue;
+        if (t->issued > now_ms || now_ms - t->issued > within_ms || (best && best->issued >= t->issued)) continue;
+        if (is_app(t->app_id, ctx)) best = t;
+    }
+    if (!best) return 0;
+    memset(best, 0, sizeof *best);      /* once: the launch's own token no longer works either */
+    return 1;
 }
 
 void xact_note_serial(uint32_t serial, const void *client, double now_ms) {

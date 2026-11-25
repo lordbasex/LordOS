@@ -51,8 +51,9 @@ The releases page is the project's public changelog: every release is documented
    **Machines' LordOS card** (since 0.8.9.5): when this release ships new live ISOs, point the `lordos`
    entry of `assets/machines/systems.json` at it in the same commit: both `dir` folders
    (`https://github.com/lordbasex/LordOS/releases/download/v<version>/`), `release` (the version without its suffix),
-   `approxMb` (each ISO's size in MiB, from the build), and `checked`. Its `SHA256SUMS` and `SHA256SUMS.sig` are the
-   ones step 5 writes, so nothing else changes. A release without ISOs leaves it alone. `vm_catalog_test.mjs` fails
+   `approxMb` (each ISO's size in MiB, from the build), and `checked`, and both `list.dir` folders
+   (`https://lordos.org/releases/v<version>/`, the copy of the signed list Machines reads first; step 9 uploads it).
+   Its `SHA256SUMS` and `SHA256SUMS.sig` are the ones step 5 writes, so nothing else changes. A release without ISOs leaves it alone. `vm_catalog_test.mjs` fails
    once `web/content/downloads.json` names an ISO newer than the card's tag ([VIRTUALIZATION.md](VIRTUALIZATION.md),
    3.9, "The LordOS card").
 
@@ -168,6 +169,34 @@ The releases page is the project's public changelog: every release is documented
    Leave out `--prerelease` only for a version without a suffix. The Debian installer
    (`install.sh`) finds betas too: `releases/latest` skips pre-releases, so it falls back to the
    newest release of any kind ([INSTALL-DEBIAN.md](INSTALL-DEBIAN.md)).
+
+   **The signed list on lordos.org** (every release; Machines' LordOS card reads it there first, because GitHub's
+   release downloads sometimes answer 403 on their signed redirect: [VIRTUALIZATION.md](VIRTUALIZATION.md), 3.9, "The
+   LordOS card"). On the maintainer's Mac:
+
+   ```sh
+   tools/release/publish-lists.sh v<version> <release-dir>
+   ```
+
+   It checks `SHA256SUMS.sig` against `tools/release/lordos-release.pub.pem` first and uploads nothing if it doesn't
+   verify, then copies `SHA256SUMS` as `releases/v<version>/SHA256SUMS.txt` and `SHA256SUMS.sig` as
+   `releases/v<version>/SHA256SUMS.sig` into the site's bucket (`text/plain; charset=utf-8`, `no-cache`; the profile,
+   bucket and distribution from `tools/web/aws-env.sh`, like `deploy.sh`), invalidates `/releases/*` and compares
+   what the site serves with the release's files. By hand it is the same:
+
+   ```sh
+   aws s3 cp <release-dir>/SHA256SUMS s3://<site bucket>/releases/v<version>/SHA256SUMS.txt \
+       --cache-control no-cache --content-type "text/plain; charset=utf-8"
+   aws s3 cp <release-dir>/SHA256SUMS.sig s3://<site bucket>/releases/v<version>/SHA256SUMS.sig \
+       --cache-control no-cache --content-type "text/plain; charset=utf-8"
+   aws cloudfront create-invalidation --distribution-id <distribution> --paths "/releases/*"
+   ```
+
+   The list needs its `.txt`: CloudFront serves an extensionless path as a pretty-URL page (a 404). `deploy.sh` never
+   deletes `releases/`, so older tags stay for the installed systems whose card still names them. When the card's
+   pinned tag moves (step 1), its `list.dir` moves with it, and this upload must be done before that build ships; if
+   it is missing or wrong, the card falls back to the GitHub list (same signature, same key), so it is never a
+   security problem, only the 403 workaround lost.
 10. **Check:** download from the release page and run the verification commands from the notes;
    run `curl -fsSL https://lordos.org/install.sh | sh` on a clean Debian 13; update the website if
    it names the current version.
@@ -267,6 +296,31 @@ tools/voice/make-previews.sh <dir>            # the recorded samples, with serve
 node tools/voice/mkdeb-voice.mjs <dir> <out> <YYYY.MM.DD>
 tools/release/apt-repo.sh build staging <out>/*.deb      # then live, as for any package
 ```
+
+## WPE WebKit (LordOS's backport)
+
+(In development; [WPEWEBKIT.md](WPEWEBKIT.md).) LordOS's own build of Debian's `wpewebkit` for trixie, with
+WPEPlatform. Published when a WebKit security release or a Debian upload needs it, not with every release, and
+**always with its source package**: the binaries are LGPL-2.1+/BSD, and `apt-repo.sh` refuses a `~lordos` rebuild
+whose `.dsc` isn't in the pool.
+
+```sh
+tools/pkg/build-wpewebkit.sh <debian-version> [lordos-revision]        # amd64 (TMPFS=64G on the 20-core machine)
+ARCH=arm64 tools/pkg/build-wpewebkit.sh <debian-version> [revision]    # arm64 under qemu-user, or natively on the Pi 5
+# read out/lintian-summary.txt and out/test/report.txt for both, then (W = the work folder, V = the version):
+tools/release/apt-repo.sh build staging $W/amd64/out/*_amd64.deb $W/amd64/out/*_all.deb $W/arm64/out/*_arm64.deb \
+    $W/amd64/out/wpewebkit_$V.dsc                                      # not the -dbgsym packages
+tools/release/apt-repo.sh publish staging && tools/release/apt-repo.sh verify staging
+# lord-web on the VM with the staging repository (both backends), then the same three commands with live
+```
+
+The `.dsc` goes in once (both architectures share it): `apt-repo.sh` checks every file it names (the upstream
+`.orig.tar.xz` and its `.asc`, LordOS's `.debian.tar.xz`) against its SHA-256 before copying them to
+`pool/main/source/w/wpewebkit/`, indexes them in `dists/stable/main/source/Sources`, and `publish` adds
+`lordos-src.sources` (a `deb-src` stanza for `apt-get source`; systems keep the `deb` one the `lordos` package installs).
+The pool is append-only: a changed source needs a new revision (`… <debian-version> 2`). A test of the whole path with
+a throwaway key and no upload: `LORDOS_APT_OFFLINE=1 LORDOS_APT_TEST_KEYRING=<pub.gpg> LORDOS_APT_GNUPGHOME=<home>
+LORDOS_APT_DIR=<scratch> tools/release/apt-repo.sh build staging …` (publish and verify refuse that key).
 
 ## A newer hardware snapshot between releases
 

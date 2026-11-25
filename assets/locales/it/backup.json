@@ -14,6 +14,10 @@
   "never": "Ancora nessun backup",
   "next": "Prossimo: {when}",
   "lastError": "L’ultimo backup non è riuscito: {error}",
+  "machinesBusy": {
+    "one": "{count} macchina era in esecuzione: i suoi dischi in questo backup sono quelli del precedente",
+    "other": "{count} macchine erano in esecuzione: i loro dischi in questo backup sono quelli del precedente"
+  },
   "todayAt": "oggi alle {time}",
   "now": "Esegui backup ora",
   "pause": "Pausa",
@@ -77,6 +81,10 @@
   "delete": "Elimina backup",
   "restoreAll": "Ripristina tutto",
   "restoreItem": "Ripristina «{name}»",
+  "restoreSelected": "Ripristina selezionati ({count})",
+  "restoringItem": "Ripristino di {index} su {count}: {name}",
+  "restoreItemFailed": "Impossibile ripristinare «{name}»: {error}",
+  "restoreMoreFailed": "Altri non ripristinati: {count}",
   "restoreFolder": "Ripristina questa cartella",
   "restorePick": "Scegli cosa ripristinare",
   "restoreAllTitle": "Ripristinare l’intera cartella home?",

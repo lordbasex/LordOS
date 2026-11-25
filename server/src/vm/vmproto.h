@@ -48,8 +48,9 @@
  *                   by itself because the tools are older than the ones shipped, said in the log), VAG_TRANSFER (the
  *                   transfer folder, 6.7.1: a Linux guest mounts it again; a Windows guest gets WinFsp: one descriptor, its
  *                   installer, which lord-server opened in the machines' image store, text = its SHA-256 (64 hex), checked
- *                   again here and in the guest with its signature, installed by msiexec as SYSTEM from a private folder)
- *                   → VM_REPLY
+ *                   again here and in the guest with its signature, installed by msiexec as SYSTEM from a private folder),
+ *                   VAG_DISC (b = 1: the LordOS Guest Tools disc into the CD drive, for a Linux guest without a usable
+ *                   qemu-guest-agent; b = 0: out; see below) → VM_REPLY
  *     VM_CLIP       the host's clipboard for the guest: one descriptor, a memfd of a bytes (at most VM_CLIP_MAX); b =
  *                   VCF_TEXT: UTF-8 text; VCF_CLIPX: text, HTML and/or a PNG in AGK_CLIPX's layout (vmagent.h), checked
  *                   and sanitized again here. Sent on only when machine.json's clipboard allows to-guest and
@@ -96,6 +97,20 @@
  *                   d = 1: text = "OUT\tIN", the output and input (machine.json sound_out, sound_in: a node.name each, or
  *                   empty for the default; vm_sound_dev_valid), d = 0: they stay as they are.
  *                   They change nothing in QEMU: lord-server applies them itself (6.9) → VM_REPLY
+ *     VM_NETCABLE   the network card's cable while the machine runs (the window's Devices → Network, 5.3): a = 1 plugged,
+ *                   0 pulled (QMP set_link on the first card's backend, nic0). Only for the shared, host-only and bridged
+ *                   networks, never a machine group's member; nothing is written, a new run starts plugged → VM_REPLY
+ *     VM_RENAME     the machine's name while it runs (lord-vm --rename, 6.26): text = the new name (vm_rename_name_ok);
+ *                   lord-vm holds the lock, so it writes machine.json. Only the name: the folders keep theirs until a
+ *                   rename with the machine off → VM_REPLY
+ *     VM_LINK       a machine group's internal link (docs/VIRTUALIZATION.md 19.3; approved by the maintainer 2026-11-23): a = 1
+ *                   with one descriptor, one end of a socketpair(AF_UNIX, SOCK_STREAM) lord-server made for the group's
+ *                   two members; a = 0 without one, the cable is pulled. text = the group's id, which must be machine.json's
+ *                   "group"; only a member whose card is on the link (a workstation, or a gateway's second card) takes
+ *                   it. lord-vm checks the descriptor (SO_DOMAIN AF_UNIX, SO_TYPE SOCK_STREAM, the peer's SO_PEERCRED uid
+ *                   its own), hands it to QEMU (QMP getfd) and puts it on the link's hub (netdev_add socket + hubport),
+ *                   taking the previous one off (netdev_del). The frames go QEMU to QEMU; nothing on the host reads them.
+ *                   → VM_REPLY once QEMU took it
  *     VM_APPS       apps mode (7.2): a = 1 on, 0 off; sent on to the guest's helper (LAG_APPS) only when the machine's
  *                   agent is on and the helper said "windows" (LAG_CAP_WINDOWS) → VM_REPLY
  *     VM_WINACT     a window of the guest: a = its id (as the guest named it), b = LAGA_* (focus, close, minimize,
@@ -105,8 +120,37 @@
  *                   query-mice, then human-monitor-command "mouse_set N" with the USB or virtio mouse lord-vm adds beside
  *                   the tablet); a = 0, the absolute tablet again. lord-vm checks every second while the machine runs that
  *                   the one wanted is still the active one (a guest's driver that starts later takes it) → VM_REPLY
+ *     VM_EXEC       a program in the guest for the person (docs/VIRTUALIZATION.md 6.15; vmexec.h): one descriptor, a sealed
+ *                   memfd with the request (the program, its arguments, its input, a timeout). Only for a machine whose
+ *                   machine.json says "automation": true (never with the anonymity profile), running, with qemu-guest-agent's
+ *                   guest-exec, and a Linux guest; one at a time. lord-vm runs two fixed scripts through guest-exec (as root:
+ *                   find the person; as the person: the program under timeout(1)), writes each request in the machine's
+ *                   log, and answers VM_EXEC_DONE, or VM_REPLY with why not
  *     VM_LAUNCH     a = an app's place in the guest's list, b = that list's generation (VM_WINDATA c): lord-vm sends the
  *                   guest that app's token from its own copy of the list; refused when the list changed since → VM_REPLY
+ *     VM_SHELL      the agent's shell (6.18; only when the guest's tools said "shell", VAC_SHELL): a = VSH_OPEN, b = columns
+ *                   (1..1000), c = rows (1..500) → VM_SHELL_FD with one descriptor: a stream to a new shell in the guest, as
+ *                   the person signed in there (AGK_SHELL_OPEN; one at a time, a new one ends the old); what's written to
+ *                   it is typed into the shell, what the shell writes comes out; it ends (EOF) when the shell does.
+ *                   a = VSH_SIZE, b, c: the terminal's new size (AGK_SHELL_SIZE). a = VSH_CLOSE: end it
+ *     VM_USB        a host USB device (6.6; AGENTS.md "Machines' USB devices"): a = 1 with one descriptor, the device's
+ *                   /dev/bus/usb node the admin helper's vm-usb-allow opened (lord-server never opens it); text = "BUS DEV
+ *                   VVVV:PPPP" (vmusb_line_parse). lord-vm takes it only when it is a usb_device node of that bus and address
+ *                   opened for reading and writing (vmusb_fd_ok), the machine runs or is paused, isn't locked for anonymity,
+ *                   holds fewer than 8 and not that one: QMP add-fd into fdset 120 + slot, then device_add usb-host on xhci.0
+ *                   with hostdevice=/dev/fdset/N (QEMU never opens a path; libusb in QEMU looks for no other device, see
+ *                   vmusbshim.c) → VM_REPLY once QEMU took it or why not. a = 0 without one: that device out (device_del;
+ *                   its fdset removed once QEMU says DEVICE_DELETED) → VM_REPLY. a = 2 / 3: text = an auto-connect rule
+ *                   (VVVV:PPPP[:SERIAL], vm_usb_rule_valid) added to / taken from machine.json's usb_auto while it runs (lord-vm
+ *                   holds the lock, so it writes the file) → VM_REPLY
+ *     VM_RECV       the answer to a VM_RECV_OFFER (6.21): a = the transfer's id, b = AGSA_* (vmagent.h; 0: taken); with 0,
+ *                   one descriptor: the quarantine folder's part file for it, which lord-server opened (O_RDWR, without
+ *                   following a link, a regular file of this account with one link) and which may already hold the
+ *                   start of this very file from an earlier, interrupted offer (a resume: lord-vm hashes what is there
+ *                   and offers the guest to go on from it). lord-vm writes only through that descriptor, never a path
+ *     VM_RECV_CANCEL a = a transfer's id: the person cancelled it (the guest is told, AGK_SEND_DONE cancelled)
+ *     VM_FILE_CANCEL a = a VM_FILE's seq: the person cancelled that drop (a waiting one is dropped at once; the one being
+ *                   copied stops at its next step) → that VM_FILE's VM_REPLY, VME_DENIED "cancelled"
  *   from lord-vm (events and replies)
  *     VM_REPLY      seq of the request; a = VME_* (0 ok); text = reason in English, for the log
  *     VM_STATE      a = VS_*, b = VR_* (why), c = QEMU's exit status or signal, d = QEMU's pid; text = detail.
@@ -138,6 +182,22 @@
  *     VM_WINREFUSED apps mode: the guest couldn't do an action to one of its windows (LAG_WINREFUSED, parsed by lord-vm):
  *                   a = the window's id, b = LAGA_* (1..5), c = LAGR_* (1 it runs as administrator, 2 the system refused).
  *                   Sent to every client
+ *     VM_SHELL_FD   seq of the VM_SHELL; the shell's stream (above)
+ *     VM_GUEST_NOTE a link or a notification from the guest (6.12): a sealed memfd of a bytes (≤ VM_GUEST_NOTE_MAX), b =
+ *                   AGK_LINK (the link, ag_link_ok) or AGK_NOTIFY (ag_note_parse's layout), checked and written again by
+ *                   lord-vm, only while machine.json allows that kind and within its rate (vmagent.h); lord-server checks
+ *                   it again, offers a link only in a bar the person clicks, and shows a notification as from the machine
+ *     VM_EXEC_DONE  seq of the VM_EXEC; a = the program's exit status (0..255, 124: its time ran out), b = VMX_F_*; one
+ *                   descriptor, a sealed memfd in vmexec.h's answer layout (its output and errors, cut at their caps). Sent
+ *                   to the client that asked only
+ *     VM_USB_STATE  a = how many host USB devices the machine holds (0..8); text = their lines ("BUS DEV VVVV:PPPP"), tab
+ *                   separated. Sent to every client on each change and after VM_STATUS
+ *     VM_RECV_OFFER a file the guest's tools offer to send to this computer (6.21, AGK_SEND_OFFER, already parsed): a sealed
+ *                   memfd of a bytes (≤ VM_RECV_OFFER_MAX) in AGK_SEND_OFFER's layout, b = the transfer's id (lord-vm's
+ *                   counter). Only while machine.json takes files from the guest, at most one at a time, within the
+ *                   offers' rate. lord-server answers VM_RECV within 10 s, else the guest is told no
+ *     VM_RECV_STATE a = the transfer's id, b = VRS_*, c = KiB written so far, d = AGSD_* with VRS_FAILED. Sent every 250 ms
+ *                   while it runs, and at its end: VRS_DONE once every byte is written and its SHA-256 is the guest's
  *     VM_JOB        progress of a long request: a = VJ_* (suspend, resume, snapshot), b = VJS_* (running, done,
  *                   failed), c = percent (0..100, -1 unknown), text = detail
  *     VM_NOTICE     something the person should know that isn't a state: a = VMN_* (VMN_NET_LOST: passt ended while
@@ -145,7 +205,9 @@
  *                   until it starts again; VMN_NET_BACK: a new passt is attached, b = milliseconds without network;
  *                   VMN_RECOVERED: an interrupted operation was finished or rolled back at this start; VMN_IDENTITY: a
  *                   Clone's guest got its own hostname and machine-id; b = 1: a Windows guest's computer name, from its next
- *                   restart), b = detail number (a signal or exit status),
+ *                   restart; VMN_SHARE_LOST: a shared folder's virtiofsd ended while the machine runs, so the folder is
+ *                   gone from the guest until it starts again, b = 1 for the transfer folder, 0 for one of the person's,
+ *                   text = its tag), b = detail number (a signal or exit status),
  *                   text = detail.
  *                   Sent to every client, and again to one that connects later (VM_STATUS)
  *
@@ -159,8 +221,10 @@
  *   VD_SHM. The helper writes 32-bit pixels, B, G, R, X bytes in memory (x8r8g8b8 little endian; alpha is not
  *   meaningful, treat it as opaque), stride width × 4. It never hands lord-server QEMU's own memory: it copies
  *   the damaged area from QEMU's buffer into this one, at most VD_RATE times a second.
- *   VD_FRAME a, b, c, d = damage x, y, w, h (inside the picture), e = frame number. lord-server reads the picture
- *   (uploads it) and answers VD_FRAME_DONE e = that frame number; the helper doesn't write the picture again
+ *   VD_FRAME a, b, c, d = damage x, y, w, h (inside the picture), e = frame number, f = how many more rectangles of
+ *   the same frame follow (0..VD_FRAME_RECTS - 1; 0 on the last): a frame is up to VD_FRAME_RECTS of them, sent one
+ *   after the other (vmdamage.h; MACHINES-GPU.md Part 1 step 4). lord-server reads the picture (uploads each
+ *   rectangle) and answers VD_FRAME_DONE e = that frame number; the helper doesn't write the picture again
  *   until then (no tearing), or until 250 ms passed with no answer.
  *   VD_CURSOR a, b = width, height (1..256), c, d = hotspot; one descriptor: a memfd sealed against writing,
  *   shrinking and growing (check with vm_cursor_check), width × height × 4 bytes of B, G, R, A (straight alpha).
@@ -192,6 +256,13 @@
  *   key and button held (window lost focus). VD_RESIZE a, b = the window's size in pixels: the guest is asked
  *   to use it (Console.SetUIInfo), at most every 100 ms. VD_RATE a = the display's refresh rate (1..240; 60 by
  *   default). VD_CLOSE: the helper exits.
+ *   VD_PACE a = the least time between two pictures in ms (1..VD_PACE_MAX_MS; 0 with b = VDP_NONE: the display's rate
+ *   only), b = VDP_IDLE (the picture hasn't changed for a while: the first key, button, wheel or motion sent to the
+ *   guest ends it at once, in the helper itself) or VDP_HIDDEN (no window shows the picture; lord-server ends it when
+ *   one does). The helper copies and forwards at most one picture per interval, and an UpdateDMABUF QEMU waits on is
+ *   answered no sooner: QEMU's console stays blocked meanwhile (graphic_hw_gl_block), so a vGPU's vfio display isn't
+ *   queried again either. lord-server sends it for 2D pictures and for an Intel vGPU's, never for a Linux 3D (virgl)
+ *   picture, whose held answer would hold the guest's own GPU work (vm/vmpace.h).
  *
  *   Sound (6.9, 6.20): QEMU's audio goes to the helper as org.qemu.Display1.AudioOutListener calls on a second peer
  *   connection. VD_AUDIO_REC a = 1 with one descriptor: a recording started; the descriptor is a ring of aring.h
@@ -230,24 +301,42 @@
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
-    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE,
-    VM_REQ_LAST = VM_CAPTURE,
+    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_SHELL, VM_EXEC, VM_NETCABLE,
+    VM_RECV, VM_RECV_CANCEL, VM_FILE_CANCEL,
+    VM_USB,
+    VM_REQ_LAST = VM_USB,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
     VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT,
+    VM_SHELL_FD, VM_GUEST_NOTE, VM_EXEC_DONE, VM_RECV_OFFER, VM_RECV_STATE, VM_USB_STATE,
 };
+/* VM_RECV_STATE b: a file from the guest is being written; kept (lord-server names it); given up (d: AGSD_*); the guest's
+ * connection went with it unfinished (lord-server keeps what came, for the guest's next offer of the same file) */
+enum { VRS_RUNNING = 1, VRS_DONE, VRS_FAILED, VRS_PAUSED, VRS_LAST = VRS_PAUSED };
+/* the largest VM_RECV_OFFER: an AGK_SEND_OFFER payload (vmagent.h), written again by lord-vm */
+#define VM_RECV_OFFER_MAX 256
+/* VM_SHELL a */
+enum { VSH_CLOSE = 0, VSH_OPEN = 1, VSH_SIZE = 2 };
+/* the largest VM_GUEST_NOTE: a link or a notification, in its agent frame's layout (vmagent.h) */
+#define VM_GUEST_NOTE_MAX 2048
 /* VM_CLIP_DENY c: why. BACKGROUND: the machine wasn't in use (its window not in front, nor a few seconds after);
  * STALE: the host's clipboard changed since that offer, or the offer isn't the last; NONE: that form isn't there now
  * (or it's a secret); DECLINED: the person said no (ask mode), or didn't answer in time */
 enum { VCD_BACKGROUND = 1, VCD_STALE, VCD_NONE, VCD_DECLINED, VCD_LAST = VCD_DECLINED };
 /* VM_NOTICE a */
-enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_NET_BACK, VMN_IDENTITY, VMN_COUNT };
+enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_NET_BACK, VMN_IDENTITY, VMN_SHARE_LOST, VMN_COUNT };
 /* VM_JOB a, b */
 enum { VJ_NONE = 0, VJ_SUSPEND, VJ_RESUME, VJ_SNAPSHOT, VJ_REVERT, VJ_DELETE, VJ_COUNT };
 enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };
 /* VM_AGENT a, VM_AGENT_STATE a and b */
 /* VAG_EXTRA_OFF / VAG_EXTRA_ON: the guest tools turn off (and back on) a display of the guest that isn't on a PCI
  * adapter while the one the picture shows is (AGK_EXTRA; VAC_EXTRA, VAC_EXTRA_OFF say when each is offered) */
-enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL, VAG_TRANSFER, VAG_EXTRA_OFF, VAG_EXTRA_ON };
+/* VAG_DISC (b = 1 in, 0 out): the LordOS Guest Tools disc (6.17) for a Linux guest without a usable qemu-guest-agent:
+ * lord-vm puts its own copy (/usr/lib/lordos/guest/lordos-guest-tools-<arch>.iso, opened at the start, its SHA-256 the
+ * one compiled in) in the machine's CD drive in place of what was there, and takes it out once the guest agent answers
+ * (qemu-guest-agent connects or lordos-guest says hello) or when asked. Never in a machine locked for anonymity. The
+ * person runs its install.sh in the guest, which asks for the password with the guest's own prompt. Refused while the drive
+ * holds another disc (a live system runs from it) */
+enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL, VAG_TRANSFER, VAG_EXTRA_OFF, VAG_EXTRA_ON, VAG_DISC };
 enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
 /* 256: LAG_CAP_WINDOWS (vmagent.h), the guest's helper does apps mode.
  * VAC_TRANSFER: the guest has the transfer folder (6.7.1) mounted (Linux: /mnt/LordOS; Windows: VirtioFsSvc runs);
@@ -258,10 +347,17 @@ enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
  * VAC_OPEN: the guest's tools said "open": a dropped file can be opened there (VM_FILE a = 1, AGK_OPEN);
  * VAC_PLACE: they said "place": files dropped on an apps mode window go to that window (VM_FILE a = 2, AGK_PLACE);
  * VAC_EXTRA: the guest has a display that isn't on a PCI adapter besides the PCI one the picture shows, and its tools
- * can turn it off (VAG_EXTRA_OFF); VAC_EXTRA_OFF: they turned one off and can turn it back on (VAG_EXTRA_ON) */
+ * can turn it off (VAG_EXTRA_OFF); VAC_EXTRA_OFF: they turned one off and can turn it back on (VAG_EXTRA_ON);
+ * VAC_SHELL: the tools said "shell": the agent's shell (VM_SHELL, 6.18); VAC_LINKS, VAC_NOTIFY: they said "links",
+ * "notify" and machine.json allows them: links and notifications from the guest (VM_GUEST_NOTE, 6.12);
+ * VAC_EVENTLOG: a Windows guest's event logs come through qemu-guest-agent (6.19);
+ * VAC_TOOLS_DISC: the LordOS Guest Tools disc is in the machine's drive (VAG_DISC), waiting for the guest agent;
+ * VAC_SEND: the tools said "send" and machine.json takes files from the guest: "Send to LordOS" lands in its quarantine
+ * folder (VM_RECV_OFFER, 6.21) */
 enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
        VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024, VAC_CLIP_NOTOOL = 2048, VAC_CLIP_LAZY = 4096, VAC_OPEN = 8192,
-       VAC_PLACE = 16384, VAC_EXTRA = 32768, VAC_EXTRA_OFF = 65536, VAC_ALL = 131071 };
+       VAC_PLACE = 16384, VAC_EXTRA = 32768, VAC_EXTRA_OFF = 65536, VAC_SHELL = 131072, VAC_LINKS = 262144, VAC_NOTIFY = 524288,
+       VAC_EVENTLOG = 1048576, VAC_TOOLS_DISC = 2097152, VAC_SEND = 4194304, VAC_ALL = 8388607 };
 /* how long a VM_FILE with a = 1 waits for the guest tools' AGK_OPENED after the copy (a program may ask for consent) */
 #define AG_OPEN_WAIT_MS 120000
 #define VM_WINDATA_MAX (1u << 20)
@@ -291,6 +387,9 @@ enum {
     VR_SUSPENDED,           /* VM_SUSPEND: the memory is in suspend.state, the next start resumes from it */
     VR_RESUME_FAILED,       /* the saved state couldn't be loaded (text says why); it's kept: try again or discard */
     VR_INSTALLED,           /* an unattended install's first start ended with the installer's restart (vmunattend.h) */
+    VR_QEMU_3D_ABORT,       /* QEMU aborted on its known 3D bug when the guest reset virtio-gpu-gl (vmlog_qemu_3d_abort) */
+    VR_QEMU_3D_STOP,        /* the same abort, most likely the guest's own shutdown or restart (no tools to say which; vmlog_3d_abort_end) */
+    VR_SESSION_FULL,        /* a disposable session (docs/VIRTUALIZATION.md 19.7) filled its memory: the guest is paused */
     VR_COUNT
 };
 /* VM_REPLY codes */
@@ -303,6 +402,11 @@ enum {
     VMS_NO_NEW_PRIVS = 32, VMS_KVM_FD = 64, VMS_SUPERVISOR_LANDLOCK = 128, VMS_PDEATHSIG = 256,
     VMS_RENDER_NODE = 512,  /* 3D graphics: QEMU may open the GPU's render node (only a Linux machine with graphics "3d");
                              * such a machine can't be suspended or snapshotted with its memory (virgl can't be migrated) */
+    VMS_NAMESPACES = 1024,  /* QEMU in its own user, mount, ipc, uts and net namespaces (vmsandbox.h) */
+    VMS_NONDUMPABLE = 2048, /* QEMU non-dumpable, checked after exec: the person's programs can't read its memory */
+    VMS_SECCOMP_ALLOWLIST = 4096, /* our seccomp on QEMU is the allowlist (vmseccomp.h) */
+    VMS_SECCOMP_NAMED = 8192,     /* lord-vm holds its listener: a call it stops is named in the log and failure page */
+    VMS_NOEXEC_DISKS = 16384,     /* in QEMU's mount namespace its disks folder is noexec: nothing written there runs */
 };
 /* VM_INFO d: cgroups */
 enum {
@@ -325,8 +429,12 @@ typedef struct {
 enum {
     VD_READY = 1, VD_SIZE, VD_FRAME, VD_CURSOR, VD_POINTER, VD_STATE, VD_STATS, VD_DMABUF, VD_GUEST_AUDIO,   /* helper → server */
     VD_SHM = 64, VD_FRAME_DONE, VD_KEY, VD_MOTION, VD_BUTTON, VD_WHEEL, VD_RELEASE_ALL,       /* server → helper */
-    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC, VD_AUDIO_OUT, VD_MIC, VD_REL, VD_CAPTURE, VD_LAYOUT,
+    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC, VD_AUDIO_OUT, VD_MIC, VD_REL, VD_CAPTURE, VD_LAYOUT, VD_PACE,
 };
+/* VD_PACE b: why the pictures are spaced out (vm/vmpace.h) */
+enum { VDP_NONE = 0, VDP_IDLE = 1, VDP_HIDDEN = 2 };
+/* the longest VD_PACE: QEMU gives each listener call 1 s, and a held UpdateDMABUF must be answered well before */
+#define VD_PACE_MAX_MS 900
 /* VD_GUEST_AUDIO a: which of the guest's streams */
 enum { VDG_OUT = 0, VDG_IN = 1 };
 /* the most the helper keeps in the speakers' ring ahead of lord-server's reading (VD_AUDIO_OUT) */
@@ -349,6 +457,7 @@ typedef struct {
 #define VD_MAX_CURSOR   256
 #define VD_REL_MAX      8192        /* VD_REL: the most one message moves, each way */
 #define VD_POLL_MAX     256         /* messages lord-server takes per poll, as Remote Desk */
+#define VD_FRAME_RECTS  8           /* rectangles in one frame at most (VMDMG_MAX, vmdamage.h) */
 /* VD_DMABUF */
 #define VD_DMABUF_FLIP        0x40000000    /* in c: the first row in memory is the picture's bottom */
 #define VD_DMABUF_STRIDE_MAX  (VD_MAX_DIM * 4 * 2)
@@ -418,7 +527,7 @@ static inline int vd_recv(int sock, VdMsg *m, int *fd) { return vm_recv_raw(sock
 static inline int vm_layout_ok(int ox, int oy, int sw, int sh, int dw, int dh) {
     if (!ox && !oy && !sw && !sh && !dw && !dh) return 1;
     return ox >= 0 && oy >= 0 && sw >= 1 && sh >= 1 && dw >= 1 && dh >= 1 && sw <= 32767 && sh <= 32767 && dw <= 32767 && dh <= 32767 &&
-           ox + sw <= dw && oy + sh <= dh;
+           (int64_t)ox + sw <= dw && (int64_t)oy + sh <= dh;
 }
 /* the position to give QEMU's Mouse.SetAbsPosition (which scales by the picture's size, pic) for the picture's point p
  * (one axis), so that a tablet the guest spreads over its whole desktop (desk) lands on the shown display's pixel (that
@@ -428,10 +537,34 @@ static inline int vd_abs_map(int p, int pic, int off, int shown, int desk) {
     if (pic <= 0) return 0;
     if (p < 0) p = 0;
     if (p >= pic) p = pic - 1;
-    if (desk <= 0 || shown <= 0 || off < 0 || off + shown > desk) return p;
+    if (desk <= 0 || shown <= 0 || off < 0 || (int64_t)off + shown > desk) return p;
     long long g = off + (long long)p * shown / pic;               /* the guest desktop's pixel */
     long long q = ((2 * g + 1) * pic) / (2LL * desk);
     return q < 0 ? 0 : q >= pic ? pic - 1 : (int)q;
+}
+/* All Displays (docs/VIRTUALIZATION.md 5.4): one digit 0..max-1 (lord-vmdisplay's --heads, given max = VM_HEADS_MAX + 1); -1 anything else */
+static inline int vd_head_arg(const char *s, int max) {
+    if (!s || s[0] < '0' || s[0] > '9' || s[1]) return -1;
+    int h = s[0] - '0';
+    return h < max ? h : -1;
+}
+/* The guest's desktop as the heads make it: n heads (2..8) side by side from the left in their order, tops aligned, each
+ * w[i] × h[i] (320..VD_MAX_DIM). L gets head k's layout as VD_LAYOUT takes it: its corner, its size, the desktop's size.
+ * 0 ok; -1 when the sizes or k are out of range, or the desktop would be wider than vm_layout_ok allows (L all 0) */
+static inline int vm_heads_layout(int n, const int *w, const int *h, int k, int L[6]) {
+    for (int i = 0; i < 6; i++) L[i] = 0;
+    if (n < 2 || n > 8 || k < 0 || k >= n || !w || !h) return -1;
+    long long x = 0, dw = 0, dh = 0;
+    for (int i = 0; i < n; i++) {
+        if (w[i] < 320 || h[i] < 200 || w[i] > 32767 || h[i] > 32767) return -1;
+        if (i == k) x = dw;
+        dw += w[i];
+        if (h[i] > dh) dh = h[i];
+    }
+    if (dw > 32767) return -1;
+    if (!vm_layout_ok((int)x, 0, w[k], h[k], (int)dw, (int)dh)) return -1;
+    L[0] = (int)x; L[1] = 0; L[2] = w[k]; L[3] = h[k]; L[4] = (int)dw; L[5] = (int)dh;
+    return 0;
 }
 static inline VmMsg vm_msg(uint16_t type, uint32_t seq, int a, int b, int c, int d, const char *text) {
     VmMsg m;
@@ -453,7 +586,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     if (m->version != VM_PROTO_VERSION) return 0;
     if (to_vm) return m->type >= VM_STATUS && m->type <= VM_REQ_LAST && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600)) &&
                       (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE)) &&
-                      (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_EXTRA_ON)) &&
+                      (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_DISC)) &&
                       (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX) &&
                                               m->c >= 0 && (!m->c || (m->b == VCF_CLIPX && m->d >= 1 && m->d <= 3)))) &&
                       (m->type != VM_CLIP_OFFER || (m->a > 0 && m->b >= 1 && m->b <= 7 && (m->c == 0 || m->c == 1))) &&
@@ -465,8 +598,15 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_DISPLAY_SIZE || (m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM)) &&
                       (m->type != VM_APPS || m->a == 0 || m->a == 1) &&
                       (m->type != VM_CAPTURE || m->a == 0 || m->a == 1) &&
+                      (m->type != VM_RENAME || m->text[0]) &&
+                      (m->type != VM_NETCABLE || m->a == 0 || m->a == 1) &&
+                      (m->type != VM_LINK || ((m->a == 0 || m->a == 1) && strnlen(m->text, VM_TEXT_MAX) == 36)) &&
                       (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&
-                      (m->type != VM_LAUNCH || (m->a >= 0 && m->a < 256 && m->b > 0));
+                      (m->type != VM_SHELL || (m->a == VSH_CLOSE || ((m->a == VSH_OPEN || m->a == VSH_SIZE) && m->b >= 1 && m->b <= 1000 && m->c >= 1 && m->c <= 500))) &&
+                      (m->type != VM_LAUNCH || (m->a >= 0 && m->a < 256 && m->b > 0)) &&
+                      (m->type != VM_USB || (m->a >= 0 && m->a <= 3 && m->text[0])) &&
+                      (m->type != VM_RECV || (m->a > 0 && m->b >= 0 && m->b <= 4)) &&
+                      (m->type != VM_RECV_CANCEL || m->a > 0) && (m->type != VM_FILE_CANCEL || m->a > 0);
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
     case VM_STATE: return m->a >= 0 && m->a < VS_COUNT && m->b >= 0 && m->b < VR_COUNT;
@@ -483,6 +623,14 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_GUEST_LAYOUT: return vm_layout_ok(m->a, m->b, (m->c >> 16) & 0xffff, m->c & 0xffff, (m->d >> 16) & 0xffff, m->d & 0xffff) &&
                                  m->c >= 0 && m->d >= 0;
     case VM_WINREFUSED: return m->a != 0 && m->b >= 1 && m->b <= 5 && (m->c == 1 || m->c == 2) && m->d == 0;
+    case VM_SHELL_FD: return 1;
+    /* a: bytes in the sealed memfd; b: AGK_LINK (25) or AGK_NOTIFY (26), vmagent.h */
+    case VM_GUEST_NOTE: return m->a > 0 && m->a <= VM_GUEST_NOTE_MAX && (m->b == 25 || m->b == 26);
+    /* a: bytes in the sealed memfd, b: the transfer's id; a: the id, b: VRS_*, c: KiB written, d: AGSD_* (0..5) */
+    case VM_RECV_OFFER: return m->a > 0 && m->a <= VM_RECV_OFFER_MAX && m->b > 0;
+    case VM_RECV_STATE: return m->a > 0 && m->b >= VRS_RUNNING && m->b <= VRS_LAST && m->c >= 0 && m->d >= 0 && m->d <= 5;
+    case VM_EXEC_DONE: return m->a >= 0 && m->a <= 255 && m->b >= 0 && m->b <= 7;
+    case VM_USB_STATE: return m->a >= 0 && m->a <= 8;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
     }
@@ -500,6 +648,7 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
     case VD_WHEEL: return m->a >= -32 && m->a <= 32 && m->b >= -32 && m->b <= 32;
     case VD_RESIZE: return m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VD_RATE: return m->a >= 1 && m->a <= 240;
+    case VD_PACE: return m->a >= 0 && m->a <= VD_PACE_MAX_MS && m->b >= VDP_NONE && m->b <= VDP_HIDDEN && (m->a > 0) == (m->b != VDP_NONE);
     case VD_REL: return m->a >= -VD_REL_MAX && m->a <= VD_REL_MAX && m->b >= -VD_REL_MAX && m->b <= VD_REL_MAX;
     case VD_CAPTURE: return m->a == 0 || m->a == 1;
     case VD_LAYOUT: return vm_layout_ok(m->a, m->b, m->c, m->d, m->e, m->f);
@@ -510,7 +659,7 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
     case VD_READY: return 1;
     case VD_SIZE: return m->a > 0 && m->b > 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM &&
                          (uint64_t)m->a * (uint64_t)m->b * 4 <= VD_MAX_BYTES;
-    case VD_FRAME: return m->a >= 0 && m->b >= 0 && m->c > 0 && m->d > 0;
+    case VD_FRAME: return m->a >= 0 && m->b >= 0 && m->c > 0 && m->d > 0 && m->f >= 0 && m->f < VD_FRAME_RECTS;
     case VD_CURSOR: return m->a > 0 && m->b > 0 && m->a <= VD_MAX_CURSOR && m->b <= VD_MAX_CURSOR &&
                            m->c >= 0 && m->d >= 0 && m->c < m->a && m->d < m->b;
     case VD_POINTER: return m->c == 0 || m->c == 1;

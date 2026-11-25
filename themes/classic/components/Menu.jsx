@@ -10,7 +10,7 @@
 // click in its menu as inside (the start menu), or it unmounts the menu before the row's click lands.
 // The menu stays inside the display of the point it opens at (a jump list near the edge of one taskbar must not
 // spill onto the next display).
-import { View, Text, Layer, ScrollView, addListener, takeTextFocus, releaseTextFocus, focusToken, restoreFocus, textFocusOwner, direction, displayAt,
+import { View, Text, Layer, ScrollView, addListener, takeTextFocus, releaseTextFocus, focusToken, restoreFocus, textFocusOwner, direction, displayAt, holdKeyboard,
   selectable, stepIndex, edgeIndex, menuAction, typeAhead, matchIndex } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -28,6 +28,8 @@ export function flatten(items) {
 }
 
 export function Menu({ t, items: raw, x, y, above, onClose, width = 240, boxRef, keys = false, onStep }) {
+  // while it shows, its keys are the menu's: Escape closes it and never reaches the app or machine behind (runtime holdKeyboard)
+  useEffect(() => holdKeyboard(), []);
   const items = flatten(raw);
   const ref = useRef(null);
   const [active, setActive] = useState(() => (keys ? edgeIndex(items) : -1));

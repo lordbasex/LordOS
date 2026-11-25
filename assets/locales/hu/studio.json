@@ -88,5 +88,8 @@
   "micHint.voice": "Eltávolítja a körülötted lévő zajt, hogy csak a hangod hallatsszon. Ha a hangod robotszerű, kapcsold ki a hívóalkalmazás saját zajszűrését.",
   "micHint.wide": "A mikrofonod mindenféle feldolgozás nélkül: zenéhez és a szoba minden hangjához.",
   "micUnavailable": "A zajcsökkentés azután jelenik meg, hogy kijelentkeztél és újra bejelentkeztél.",
-  "noMic": "Nincs csatlakoztatva mikrofon."
+  "noMic": "Nincs csatlakoztatva mikrofon.",
+  "effects": "Effektusok",
+  "openApp": "LordOS Studio megnyitása…",
+  "micApps": "A mikrofon mód azt a mikrofont változtatja meg, amelyet az alkalmazások alapértelmezetten használnak. Egy adott mikrofonra állított alkalmazás megtartja azt: válassza abban a „LordOS Noise Reduction” lehetőséget."
 }

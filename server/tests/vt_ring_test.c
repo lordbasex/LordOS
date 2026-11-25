@@ -1,10 +1,12 @@
 /* vt_ring_test.c — (0.8.9.1) the terminal's history ring grows as it fills (vt.c buf_grow, Buffer.max): every line
- * stays in order across growth, a cleared history (ESC [ 3 J) and a reflow, and the ring never passes its limit. */
+ * stays in order across growth, a cleared history (ESC [ 3 J) and a reflow, and the ring never passes its limit. Also
+ * (2026-11-24): a Machines guest's terminal (no_clip_set) can't set the clipboard with OSC 52 or iTerm's Copy. */
 #include "term/term.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-void term_set_clipboard(const char *s, size_t n) { (void)s; (void)n; }
+static int clip_sets;
+void term_set_clipboard(const char *s, size_t n) { (void)s; (void)n; clip_sets++; }
 static int check(Term *t, long long abs, int want) {
     Line *l = vt_abs_line(t, abs); char b[16] = {0};
     if (!l) return printf("missing %lld\n", abs), 1;
@@ -36,5 +38,16 @@ int main(void) {
     (void)base;
     bad += t.main.cap > t.main.max;
     vt_free(&t);
+    /* a Machines guest's console or agent shell (term_create_fd sets no_clip_set): OSC 52 and iTerm's Copy never set this
+     * computer's clipboard; an ordinary terminal's still do */
+    static Term g;
+    if (vt_init(&g, 40, 10, 100, &p)) return 1;
+    const char *osc = "\033]52;c;aGk=\007\033]1337;Copy=:aGk=\007";
+    vt_write(&g, (const uint8_t *)osc, strlen(osc));
+    int ordinary = clip_sets;
+    g.no_clip_set = 1;
+    vt_write(&g, (const uint8_t *)osc, strlen(osc));
+    if (ordinary != 2 || clip_sets != 2) { printf("guest clipboard: %d then %d sets (want 2, 2)\n", ordinary, clip_sets); bad++; }
+    vt_free(&g);
     printf("vt-ring-test: %s\n", bad ? "FAIL" : "ok"); return bad;
 }

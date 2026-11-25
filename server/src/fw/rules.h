@@ -65,6 +65,11 @@ enum {
     FW_R_NO_NOTIFICATIONS = 1u << 10,
     FW_R_NO_CLIPBOARD     = 1u << 11,   /* no reading the clipboard */
     FW_R_ALL              = (1u << 12) - 1,
+    /* (Whonix groups, docs/FIREWALL.md "The Tor gateway") built in, never in firewall.json or FW_R_ALL: the app
+     * FW_APP_TOR_GATEWAY always has it (fw_builtin_restricted). Only outgoing TCP to internet addresses, never to
+     * remote port 53 or 853: no incoming, no UDP, no LAN, private, link-local, loopback or unknown address. Decided
+     * right after FW_R_NO_NETWORK, before any rule, so the owner's rules can only take more away. */
+    FW_R_TOR_UPLINK       = 1u << 12,
 };
 
 typedef struct {
@@ -129,13 +134,42 @@ int fw_component_ok(const char *name);
 int fw_component_scope(const char *scope, char *app, size_t n);
 /* (0.8.8.6) A running virtual machine's scope, "app-lordos-lordos-vm-<id>.scope" (vm/lordvm.c; the id is
  * the machine's lowercase UUID, and the prefix is reserved: sec/cgroup.h app_scope_reserved). Its QEMU and
- * passt make the guest's sockets, so the guest's traffic is the Machines component's, lordos:machines,
- * with the same rules as the image downloads (lordos-net-machines.scope). 0 and the machine's id in id
+ * passt make the guest's sockets; (Machines to 100 %) its firewall app is that machine's own, "lordos:vm-<id>"
+ * (fw_vm_app), which inherits the Machines component's rules (fw_app_parent): the rules of the image downloads
+ * (lordos-net-machines.scope, lordos:machines) still decide for every guest. 0 and the machine's id in id
  * (optional, n bytes) if scope is one, -1 otherwise. */
 #define FW_VM_SCOPE_PREFIX "app-lordos-lordos-vm-"
+/* (docs/VIRTUALIZATION.md 3.7) Since 0.8.9.6 lord-sessiond places the machines' scopes one level down, in the session's
+ * root-owned "lordos-machines.slice" (the same name as CG_MACHINES_SLICE in sec/cgroup.h): one parent for all of them,
+ * with a lower CPU and I/O weight than the rest of the session. A machine started before the update stays directly in
+ * the session folder until it stops; both places are read. */
+#define FW_VM_SLICE "lordos-machines.slice"
 int fw_vm_scope(const char *scope, char *id, size_t n);
+/* (Whonix groups) A machine group's Tor gateway runs in "app-lordos-lordos-vm-tor-<id>.scope" (vm/lordvm.c, the member
+ * with uplink "tor"): firewall app FW_APP_TOR_GATEWAY, with FW_R_TOR_UPLINK built in. fw_vm_scope accepts it too (the
+ * id without "tor-"); fw_vm_scope_tor says which form it is: 1 the gateway's, 0 another machine's, -1 not a machine's. */
+#define FW_VMTOR_SCOPE_PREFIX "app-lordos-lordos-vm-tor-"
+#define FW_APP_TOR_GATEWAY "lordos:tor-gateway"
+int fw_vm_scope_tor(const char *scope);
+/* The restrictions an app always has whatever firewall.json says: FW_R_TOR_UPLINK for FW_APP_TOR_GATEWAY, else 0 */
+uint32_t fw_builtin_restricted(const char *app);
+/* FW_R_TOR_UPLINK's own test: 1 if it denies (dir, proto, lan as fw_decide computes it: 1 LAN, 0 internet, -1 unknown,
+ * remote port) */
+int fw_tor_uplink_denies(FwDir dir, FwProto proto, int lan, unsigned port);
+/* (Machines to 100 %) Each machine is its own firewall app, "lordos:vm-<id>" (the id of its scope, a lowercase UUID),
+ * so Monitor and the rules name it. It never stands alone: FW_APP_MACHINES ("lordos:machines", the Machines component
+ * and its downloads) is its parent. What decides for a machine (fw_decide, lord-netperm's compile) is the parent's rules
+ * and the machine's own together, with the same precedence (more specific wins, deny on a tie), the restrictions of
+ * both (fw_effective_restricted), and trust from either (fw_effective_trusted; trust only decides what no rule or
+ * restriction of either app decides). The Tor gateway keeps its own app and inherits nothing. */
+#define FW_APP_MACHINES "lordos:machines"
+#define FW_APP_VM_PREFIX "lordos:vm-"
+/* FW_APP_MACHINES if app is "lordos:vm-<id>" with an id of 1 to 36 of [0-9a-f-], else NULL */
+const char *fw_app_parent(const char *app);
+/* "lordos:vm-<id>" for a machine's id (fw_vm_scope's form). 0 ok, -1 not one. */
+int fw_vm_app(const char *id, char *app, size_t n);
 /* The firewall app of a session scope, the one translation lord-netperm and Monitor share:
- * lordos-net-<name>.scope → lordos:<name>, a machine's scope → lordos:machines,
+ * lordos-net-<name>.scope → lordos:<name>, a machine's scope → lordos:vm-<id> (the gateway's: lordos:tor-gateway),
  * app-lordos-lpk-<id>.scope → lpk:<id>, app-lordos-<id>.scope → desktop:<id>. 0 ok, -1 otherwise. */
 int fw_scope_app(const char *scope, char *app, size_t n);
 
@@ -172,6 +206,10 @@ int      fw_set_trusted(FwStore *s, const char *app, int on);
 int      fw_is_trusted(const FwStore *s, const char *app);
 int      fw_set_restricted(FwStore *s, const char *app, uint32_t flags);  /* 0 = remove it */
 uint32_t fw_restricted(const FwStore *s, const char *app);
+/* What decides: the app's own restrictions | its parent's (fw_app_parent) | the built-in ones (fw_builtin_restricted);
+ * trusted if the app or its parent is. */
+uint32_t fw_effective_restricted(const FwStore *s, const char *app);
+int      fw_effective_trusted(const FwStore *s, const char *app);
 int      fw_blocks(const FwStore *s, const char *app, uint32_t flag);     /* restricted in flag? */
 /* Walks the apps with state; cb returns != 0 to stop. */
 void     fw_app_each(const FwStore *s, int (*cb)(void *u, const char *app, int trusted, uint32_t flags), void *u);

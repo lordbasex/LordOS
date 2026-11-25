@@ -3,6 +3,7 @@
 #include "../sec/json.h"
 #include "../doc/wire.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -10,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/random.h>
 #include <dirent.h>
 #include <sys/stat.h>
@@ -29,6 +31,16 @@ static int fail(char *err, size_t n, int code, const char *fmt, ...) {
 }
 
 const char *vm_arch_name(int arch) { return arch == VM_ARCH_ARM64 ? "arm64" : arch == VM_ARCH_AMD64 ? "amd64" : "?"; }
+
+int vm_usb_rule_valid(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    if (n < 9 || n > VM_USB_RULE_MAX || s[4] != ':') return 0;
+    for (int i = 0; i < 9; i++) if (i != 4 && !((s[i] >= '0' && s[i] <= '9') || (s[i] >= 'a' && s[i] <= 'f'))) return 0;
+    if (n == 9) return 1;
+    if (s[9] != ':' || n == 10) return 0;
+    for (const char *p = s + 10; *p; p++) if (!isalnum((unsigned char)*p) && *p != '.' && *p != '_' && *p != '-') return 0;
+    return 1;
+}
 
 int vm_uuid_valid(const char *s) {
     if (!s || strlen(s) != 36) return 0;
@@ -80,6 +92,7 @@ int vm_serial_valid(const char *s) {
     return 1;
 }
 
+const char *const VM_CPU_NAMES[] = { "host", "compatible", NULL };
 const char *const VM_NIC_MODELS[VM_NIC_COUNT + 1] = { "virtio", "e1000e", "e1000", "e1000-82545em", "e1000-82544gc", "vmxnet3", "rtl8139", "pcnet", NULL };
 
 /* 1..64 bytes of valid UTF-8, no control characters, no '/' or '\\', not only spaces */
@@ -246,6 +259,127 @@ static int xfer_aside(const char *xp, char *moved, size_t mn) {
     return -1;
 }
 
+/* "<name> (old YYYY-MM-DD)" or "<name> (old YYYY-MM-DD) N": a folder xfer_aside put aside, never taken back by itself */
+static int xfer_aside_name(const char *s) {
+    const char *o = strstr(s, " (old ");
+    if (!o) return 0;
+    for (const char *q; (q = strstr(o + 1, " (old "));) o = q;
+    const char *d = o + 6;
+    for (int i = 0; i < 10; i++) if (i == 4 || i == 7 ? d[i] != '-' : d[i] < '0' || d[i] > '9') return 0;
+    if (d[10] != ')') return 0;
+    const char *t = d + 11;
+    if (!*t) return 1;
+    if (*t++ != ' ' || !*t) return 0;
+    for (; *t; t++) if (*t < '0' || *t > '9') return 0;
+    return 1;
+}
+
+int vm_transfer_adopt(const char *dir, const char *id, char *from, size_t fn) {
+    if (from && fn) from[0] = 0;
+    char want[PATH_MAX], top[PATH_MAX], lib[PATH_MAX];
+    if (!vm_uuid_valid(id) || vm_transfer_path(dir, want, sizeof want)) return -1;
+    snprintf(top, sizeof top, "%s", want);
+    char *sl = strrchr(top, '/');
+    if (!sl) return -1;
+    *sl = 0;
+    const char *wname = want + (sl + 1 - top);
+    snprintf(lib, sizeof lib, "%s", top);
+    if (!(sl = strrchr(lib, '/'))) return -1;
+    *sl = 0;
+    struct stat st;
+    if (!lstat(want, &st) || errno != ENOENT) return 1;          /* there already (or can't tell): nothing to take */
+    DIR *d = opendir(top);
+    if (!d) return 1;
+    char found[NAME_MAX + 1] = "";
+    int n = 0;
+    for (struct dirent *e; (e = readdir(d));) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] != '.' || l < 10 || strcmp(e->d_name + l - 8, ".machine")) continue;
+        char x[NAME_MAX + 1], p[PATH_MAX + 2 * NAME_MAX], who[37];
+        snprintf(x, sizeof x, "%.*s", (int)(l - 9), e->d_name + 1);
+        if (!x[0] || x[0] == '.' || !strcmp(x, wname) || xfer_aside_name(x)) continue;
+        snprintf(p, sizeof p, "%s/%s", top, e->d_name);
+        if (xfer_owner_read(p, who) || strcmp(who, id)) continue;
+        snprintf(p, sizeof p, "%s/%s", top, x);
+        if (lstat(p, &st) || !S_ISDIR(st.st_mode) || st.st_uid != geteuid()) continue;
+        /* its machine folder still there: that machine's (a Duplicate keeps the id), not one that moved */
+        snprintf(p, sizeof p, "%s/%s.lordvm", lib, x);
+        if (!lstat(p, &st) || errno != ENOENT) continue;
+        snprintf(found, sizeof found, "%s", x);
+        n++;
+    }
+    closedir(d);
+    if (n != 1) return 1;                                       /* none, or more than one: never a guess */
+    char a[PATH_MAX + NAME_MAX + 2], oa[PATH_MAX], ow[PATH_MAX];
+    snprintf(a, sizeof a, "%s/%s", top, found);
+    if (xfer_owner_of(a, oa, sizeof oa) || xfer_owner_of(want, ow, sizeof ow)) return -1;
+    if (renameat2(AT_FDCWD, a, AT_FDCWD, want, RENAME_NOREPLACE)) return -1;
+    if (rename(oa, ow)) { if (rename(want, a)) {} return -1; }
+    if (from && fn) snprintf(from, fn, "%s", found);
+    return 0;
+}
+
+void vm_folder_name(const char *name, char *out, size_t n) {
+    size_t o = 0;
+    for (const unsigned char *p = (const unsigned char *)name; *p && o + 1 < n && o < 48; p++) {
+        int ok = (*p >= '0' && *p <= '9') || ((*p | 32) >= 'a' && (*p | 32) <= 'z') || *p == ' ' || *p == '-' || *p == '_' || (*p == '.' && o);
+        if (*p >= 0x80) { while ((p[1] & 0xc0) == 0x80) p++; ok = 0; }
+        char ch = ok ? (char)*p : '-';
+        if (ch == '-' && o && out[o - 1] == '-') continue;
+        out[o++] = ch;
+    }
+    while (o && (out[o - 1] == ' ' || out[o - 1] == '-' || out[o - 1] == '.')) o--;
+    out[o] = 0;
+    if (!o) snprintf(out, n, "Machine");
+}
+
+int vm_rename_name_ok(const char *s) { return vm_name_valid(s) && s[0] != '.'; }
+
+int vm_rename_plan(const char *dir, const char *name, VmRenamePlan *p) {
+    memset(p, 0, sizeof *p);
+    char xp[PATH_MAX], lib[PATH_MAX], cur[NAME_MAX + 1];
+    if (!vm_rename_name_ok(name)) return p->problem = VM_RN_BAD_NAME;
+    if (vm_transfer_path(dir, xp, sizeof xp)) return p->problem = VM_RN_NOT_MACHINE;
+    size_t l = strlen(dir);
+    while (l > 1 && dir[l - 1] == '/') l--;
+    const char *b = memrchr(dir, '/', l);
+    snprintf(lib, sizeof lib, "%.*s", (int)(b - dir), dir);
+    snprintf(cur, sizeof cur, "%.*s", (int)(dir + l - (b + 1) - 7), b + 1);
+    /* the folder's name: kept while it already says the same (the same characters once made safe) */
+    char now[64];
+    vm_folder_name(cur, now, sizeof now);
+    vm_folder_name(name, p->folder, sizeof p->folder);
+    p->moves = strcmp(now, p->folder) != 0;
+    if (!p->moves) snprintf(p->folder, sizeof p->folder, "%s", cur);
+    DIR *d = opendir(lib);
+    if (!d) return p->problem = VM_RN_NOT_MACHINE;
+    char want[sizeof p->folder + 8];
+    snprintf(want, sizeof want, "%s.lordvm", p->folder);
+    for (struct dirent *e; (e = readdir(d));) {
+        size_t el = strlen(e->d_name);
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..") || (el == l - (size_t)(b + 1 - dir) && !strncmp(e->d_name, b + 1, el))) continue;
+        if (p->moves && !p->problem && !strcasecmp(e->d_name, want)) p->problem = VM_RN_FOLDER_TAKEN;
+        if (e->d_name[0] == '.' || el < 8 || strcmp(e->d_name + el - 7, ".lordvm")) continue;
+        /* another machine called the same, ASCII case ignored (the machines command finds machines that way) */
+        char od[PATH_MAX + NAME_MAX + 2];
+        snprintf(od, sizeof od, "%s/%s", lib, e->d_name);
+        VmMachine *o = malloc(sizeof *o);
+        if (o && vm_machine_load(od, o, NULL, 0) == VM_OK && !strcasecmp(o->name, name)) { snprintf(p->other, sizeof p->other, "%s", o->name); p->problem = VM_RN_NAME_TAKEN; }
+        free(o);
+        if (p->problem == VM_RN_NAME_TAKEN) break;
+    }
+    closedir(d);
+    if (p->problem || !p->moves) return p->problem;
+    /* its transfer folder follows: a folder of the new name there must be its own already (or none) */
+    char top[PATH_MAX + 16];
+    snprintf(top, sizeof top, "%s/" VM_XFER_DIR, lib);
+    if ((d = opendir(top))) {
+        for (struct dirent *e; (e = readdir(d));) if (e->d_name[0] != '.' && strcmp(e->d_name, cur) && !strcasecmp(e->d_name, p->folder)) p->problem = VM_RN_TRANSFER_TAKEN;
+        closedir(d);
+    }
+    return p->problem;
+}
+
 int vm_transfer_claim(const char *dir, const char *id, char *out, size_t n, char *moved, size_t mn) {
     if (moved && mn) moved[0] = 0;
     if (!vm_uuid_valid(id) || vm_transfer_path(dir, out, n)) return -1;
@@ -258,6 +392,9 @@ int vm_transfer_claim(const char *dir, const char *id, char *out, size_t n, char
     if (mkdir(top, 0700) && errno != EEXIST) return -1;
     if (lstat(top, &st) || !S_ISDIR(st.st_mode) || st.st_uid != geteuid()) return -1;
     if (xfer_owner_of(out, op, sizeof op)) return -1;
+    /* none of that name: this machine's own folder from before its folder was renamed (by hand, or a rename that stopped
+     * half-way) comes along */
+    vm_transfer_adopt(dir, id, NULL, 0);
     if (!lstat(out, &st)) {
         int mine = S_ISDIR(st.st_mode) && st.st_uid == geteuid();
         int owner = !xfer_owner_read(op, who);
@@ -389,6 +526,56 @@ int vm_bridge_ifname(const char *id, char out[VM_IFNAME_MAX + 1]) {
     return 0;
 }
 
+/* schema 14: a machine group's member (docs/VIRTUALIZATION.md 19.4, 19.5) */
+static int check_member(const VmMachine *m, char *err, size_t n) {
+    int member = m->group[0] != 0;
+    if (m->role < VM_ROLE_NONE || m->role >= VM_ROLE_COUNT || m->profile_lock < VM_LOCK_NONE || m->profile_lock > VM_LOCK_ANONYMITY ||
+        m->timers < VM_TIMERS_DEFAULT || m->timers > VM_TIMERS_WHONIX_WORKSTATION || (m->uplink_tor & ~1))
+        return fail(err, n, VM_E_RANGE, "role, uplink, profile_lock or timers");
+    if (m->schema < 14 && (member || m->role || m->uplink_tor || m->link_mac[0] || m->profile_lock || m->timers || m->network == VM_NET_LINK))
+        return fail(err, n, VM_E_FIELD, "group, role, uplink, link_mac, profile_lock, timers and the link network need schema 14");
+    if (!member) {
+        if (m->role || m->uplink_tor || m->link_mac[0] || m->profile_lock || m->timers || m->network == VM_NET_LINK)
+            return fail(err, n, VM_E_RANGE, "role, uplink, link_mac, profile_lock, timers and the link network are a group member's");
+        return VM_OK;
+    }
+    if (!vm_uuid_valid(m->group)) return fail(err, n, VM_E_RANGE, "group must be the group's id (a lowercase UUID)");
+    if (m->role == VM_ROLE_NONE) return fail(err, n, VM_E_RANGE, "a group's member has a role");
+    if (m->arch != VM_ARCH_AMD64 || m->accel != VM_ACCEL_KVM) return fail(err, n, VM_E_RANGE, "a group's members are amd64 machines with KVM");
+    if (m->role == VM_ROLE_GATEWAY) {
+        /* the way out (passt, its eth0) and the internal link (its eth1) */
+        if (m->network != VM_NET_SHARED) return fail(err, n, VM_E_RANGE, "a gateway's network is shared");
+        if (!vm_mac_valid(m->link_mac) || !strcmp(m->link_mac, m->mac)) return fail(err, n, VM_E_RANGE, "a gateway's link_mac is a MAC address of its own");
+        if (m->timers == VM_TIMERS_WHONIX_WORKSTATION) return fail(err, n, VM_E_RANGE, "timers: a workstation's on a gateway");
+    } else {
+        /* the link and nothing else */
+        if (m->network != VM_NET_LINK) return fail(err, n, VM_E_RANGE, "a workstation's network is the link");
+        if (m->link_mac[0] || m->uplink_tor) return fail(err, n, VM_E_RANGE, "link_mac and uplink are a gateway's");
+        if (m->timers == VM_TIMERS_WHONIX_GATEWAY) return fail(err, n, VM_E_RANGE, "timers: a gateway's on a workstation");
+    }
+    if (m->n_extra_macs || m->bridge[0]) return fail(err, n, VM_E_RANGE, "a group's member has no other network cards");
+    if (m->uplink_tor && m->n_ports) return fail(err, n, VM_E_RANGE, "a Tor gateway forwards no ports");
+    if (m->profile_lock == VM_LOCK_ANONYMITY) {
+        /* 19.5: nothing of this computer goes into the guests; locked, with no override (the maintainer's decision) */
+        if (m->agent) return fail(err, n, VM_E_RANGE, "locked for anonymity: the guest agent");
+        if (m->clipboard != VM_CLIP_OFF || m->clipboard_ask) return fail(err, n, VM_E_RANGE, "locked for anonymity: the clipboard");
+        if (m->transfer) return fail(err, n, VM_E_RANGE, "locked for anonymity: the transfer folder");
+        if (m->n_shares) return fail(err, n, VM_E_RANGE, "locked for anonymity: shared folders");
+        if (m->n_ports) return fail(err, n, VM_E_RANGE, "locked for anonymity: forwarded ports");
+        if (m->graphics != VM_GFX_2D || m->vgpu) return fail(err, n, VM_E_RANGE, "locked for anonymity: 3D graphics and graphics cards");
+        if (m->microphone) return fail(err, n, VM_E_RANGE, "locked for anonymity: the microphone");
+        if (m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] || m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0])
+            return fail(err, n, VM_E_RANGE, "locked for anonymity: SMBIOS strings and disk serials");
+        if (m->perf_profile) return fail(err, n, VM_E_RANGE, "locked for anonymity: the guest's performance profile (it needs the agent)");
+        if (m->guest_links || m->guest_notify) return fail(err, n, VM_E_RANGE, "locked for anonymity: links and notifications from the guest");
+        /* All Displays would tell the guest how many displays this computer has, and their sizes */
+        if (m->heads > 1) return fail(err, n, VM_E_RANGE, "locked for anonymity: several displays");
+        if (m->automation) return fail(err, n, VM_E_RANGE, "locked for anonymity: automation");
+        if (m->n_usb_auto || m->usb) return fail(err, n, VM_E_RANGE, "locked for anonymity: USB devices");
+    }
+    return VM_OK;
+}
+
 int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 1 || m->schema > VM_SCHEMA) return fail(err, n, m->schema > VM_SCHEMA ? VM_E_NEWER : VM_E_SCHEMA, "schema %d", m->schema);
     if (!vm_uuid_valid(m->id)) return fail(err, n, VM_E_RANGE, "id is not a lowercase UUID");
@@ -407,7 +594,7 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
         for (int i = 0; i < 64; i++) { char c = m->firmware_sha256[i]; if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return fail(err, n, VM_E_RANGE, "firmware_sha256"); }
     } else if (m->firmware_code[0] || m->firmware_sha256[0]) return fail(err, n, VM_E_RANGE, "a bios machine has no firmware_code");
     if (m->display != VM_DISPLAY_WINDOW && m->display != VM_DISPLAY_NONE) return fail(err, n, VM_E_RANGE, "display");
-    if (m->network < VM_NET_SHARED || m->network > VM_NET_HOSTONLY) return fail(err, n, VM_E_RANGE, "network");
+    if (m->network < VM_NET_SHARED || m->network > VM_NET_LINK) return fail(err, n, VM_E_RANGE, "network");
     if (m->bridge[0] && !vm_ifname_valid(m->bridge)) return fail(err, n, VM_E_RANGE, "bridge must be a network interface's name");
     if (m->network == VM_NET_BRIDGED && !m->bridge[0]) return fail(err, n, VM_E_RANGE, "a bridged machine names the wired card it joins (bridge)");
     if (vm_ports_check(m->ports, m->n_ports, m->network, err, n)) return VM_E_RANGE;
@@ -455,10 +642,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 4 && m->n_shares) return fail(err, n, VM_E_FIELD, "shares need schema 4");
     if (m->drivers[0] && !path_valid(m->drivers)) return fail(err, n, VM_E_RANGE, "drivers must be an absolute path without '..', ',' or control characters");
     if (m->schema < 5 && (m->devices == VM_DEV_WINDOWS || m->drivers[0])) return fail(err, n, VM_E_FIELD, "the windows devices and drivers need schema 5");
-    if ((m->devices == VM_DEV_WINDOWS || m->drivers[0]) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "the windows devices are for amd64 machines for now");
     if ((m->secure_boot | m->tpm | m->hyperv) & ~1) return fail(err, n, VM_E_RANGE, "secure_boot, tpm and hyperv are true or false");
     if (m->schema < 5 && (m->secure_boot || m->tpm || m->hyperv)) return fail(err, n, VM_E_FIELD, "secure_boot, tpm and hyperv need schema 5");
-    if ((m->secure_boot || m->tpm || m->hyperv) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "secure boot, TPM and Hyper-V are for amd64 machines for now");
+    /* arm64 (4.3): secure boot (AAVMF), a TPM (tpm-tis-device) and the windows devices; Hyper-V's enlightenments are x86's */
+    if (m->hyperv && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "Hyper-V enlightenments are for amd64 machines");
     if (m->secure_boot && m->firmware != VM_FW_UEFI) return fail(err, n, VM_E_RANGE, "secure boot needs UEFI");
     if (m->graphics != VM_GFX_2D && m->graphics != VM_GFX_3D) return fail(err, n, VM_E_RANGE, "graphics");
     if ((m->res_w || m->res_h) && !vm_resolution_ok(m->res_w, m->res_h)) return fail(err, n, VM_E_RANGE, "resolution must be 640x480 to 7680x4320, even numbers");
@@ -488,13 +675,59 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 10 && m->pointer_guest) return fail(err, n, VM_E_FIELD, "pointer needs schema 10");
     if (m->capture_fullscreen & ~1) return fail(err, n, VM_E_RANGE, "capture_fullscreen is true or false");
     if (m->schema < 12 && m->capture_fullscreen) return fail(err, n, VM_E_FIELD, "capture_fullscreen needs schema 12");
+    if (m->perf_profile & ~1) return fail(err, n, VM_E_RANGE, "perf_profile is true or false");
+    if (m->schema < 13 && m->perf_profile) return fail(err, n, VM_E_FIELD, "perf_profile needs schema 13");
+    if ((m->guest_links & ~1) || (m->guest_notify & ~1)) return fail(err, n, VM_E_RANGE, "guest_links and guest_notify are true or false");
+    if (m->schema < 15 && (m->guest_links || m->guest_notify)) return fail(err, n, VM_E_FIELD, "guest_links and guest_notify need schema 15");
+    if (m->automation & ~1) return fail(err, n, VM_E_RANGE, "automation is true or false");
+    if (m->schema < 17 && m->automation) return fail(err, n, VM_E_FIELD, "automation needs schema 17");
+    if (m->cpu_model < VM_CPU_HOST || m->cpu_model > VM_CPU_COMPAT) return fail(err, n, VM_E_RANGE, "cpu_model is host or compatible");
+    if (m->schema < 18 && m->cpu_model) return fail(err, n, VM_E_FIELD, "cpu_model needs schema 18");
+    if (m->cpu_model == VM_CPU_COMPAT && (m->arch != VM_ARCH_AMD64 || m->accel != VM_ACCEL_KVM)) return fail(err, n, VM_E_RANGE, "a compatible processor is for amd64 machines with KVM");
+    if (m->heads < 0 || m->heads > VM_HEADS_MAX) return fail(err, n, VM_E_RANGE, "heads is 1 to %d", VM_HEADS_MAX);   /* 0: one, as a VmMachine made before the key */
+    if (m->schema < 19 && m->heads > 1) return fail(err, n, VM_E_FIELD, "heads needs schema 19");
+    /* one picture per output needs virtio-gpu's own: not an Intel vGPU's, and only on a machine with a window */
+    if (m->heads > 1 && (m->vgpu || m->display != VM_DISPLAY_WINDOW)) return fail(err, n, VM_E_RANGE, "several displays need virtio graphics and a window");
+    if (m->guest_files_off & ~1) return fail(err, n, VM_E_RANGE, "guest_files is true or false");
+    if (m->schema < 20 && m->guest_files_off) return fail(err, n, VM_E_FIELD, "guest_files needs schema 20");
+    if (m->n_usb_auto < 0 || m->n_usb_auto > VM_USB_AUTO) return fail(err, n, VM_E_RANGE, "at most %d usb_auto rules", VM_USB_AUTO);
+    if (m->schema < 21 && m->n_usb_auto) return fail(err, n, VM_E_FIELD, "usb_auto needs schema 21");
+    if (m->usb & ~1) return fail(err, n, VM_E_RANGE, "usb is true or false");
+    if (m->schema < 21 && m->usb) return fail(err, n, VM_E_FIELD, "usb needs schema 21");
+    for (int i = 0; i < m->n_usb_auto; i++) {
+        if (!vm_usb_rule_valid(m->usb_auto[i])) return fail(err, n, VM_E_RANGE, "usb_auto: vendor:product[:serial], lowercase hex");
+        for (int k = 0; k < i; k++) if (!strcmp(m->usb_auto[i], m->usb_auto[k])) return fail(err, n, VM_E_RANGE, "usb_auto: the same rule twice");
+    }
+    if (m->vulkan & ~1) return fail(err, n, VM_E_RANGE, "vulkan is true or false");
+    if (m->schema < 22 && m->vulkan) return fail(err, n, VM_E_FIELD, "vulkan needs schema 22");
+    if (m->vulkan && m->graphics != VM_GFX_3D) return fail(err, n, VM_E_RANGE, "vulkan needs graphics 3d");
+    if (m->kernel_boot & ~1) return fail(err, n, VM_E_RANGE, "kernel_boot is true or false");
+    if (m->schema < 23 && m->kernel_boot) return fail(err, n, VM_E_FIELD, "kernel_boot needs schema 23");
+    /* a directly started kernel skips the boot loader: secure boot's chain would be skipped too (refused, not weakened);
+     * the virtio-win devices are another system's; an encrypted machine's boot files would lie on the disk in the clear;
+     * a group's member keeps its anonymity profile's boot */
+    if (m->kernel_boot && m->firmware == VM_FW_UEFI && m->secure_boot) return fail(err, n, VM_E_RANGE, "a kernel started directly skips secure boot: turn one of them off");
+    if (m->kernel_boot && m->devices == VM_DEV_WINDOWS) return fail(err, n, VM_E_RANGE, "a kernel started directly is for Linux guests");
+    if (m->kernel_boot && m->encrypted) return fail(err, n, VM_E_RANGE, "an encrypted machine's kernel and initrd would be kept in the clear: it starts from its disk");
+    if (m->kernel_boot && m->group[0]) return fail(err, n, VM_E_RANGE, "a group's member starts from its disk");
+    if (m->cpu_pin < VM_PIN_DEFAULT || m->cpu_pin > VM_PIN_AUTO) return fail(err, n, VM_E_RANGE, "cpu_pin is off or auto");
+    if (m->schema < 13 && m->cpu_pin) return fail(err, n, VM_E_FIELD, "cpu_pin needs schema 13");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
     for (int i = 0; m->transfer && i < m->n_shares; i++)
         if (!strcmp(m->share_tag[i], VM_XFER_TAG)) return fail(err, n, VM_E_RANGE, "shares: the tag " VM_XFER_TAG " is the transfer folder's");
     if (m->schema < 3 && (m->devices || m->nic_model || m->n_extra_macs || m->cpu_sockets || m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] ||
                           m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0] || m->n_data || m->rtc))
         return fail(err, n, VM_E_FIELD, "devices, nic_model, extra_nics, cpu topology, smbios, serials, data_disks and rtc need schema 3");
-    return VM_OK;
+    if (m->disposable < VM_DISP_OFF || m->disposable > VM_DISP_DISK) return fail(err, n, VM_E_RANGE, "disposable is memory or disk");
+    if ((m->encrypted & ~1) || (m->raw & ~1) || (m->no_backup & ~1)) return fail(err, n, VM_E_RANGE, "encrypted, disk_format and backup");
+    if (m->schema < 16 && (m->disposable || m->encrypted || m->raw || m->no_backup)) return fail(err, n, VM_E_FIELD, "disposable, encrypted, disk_format and backup need schema 16");
+    /* raw disks (6.4): a plain file, so no snapshots, no LUKS layer and no overlay on a shared base */
+    if (m->raw && m->encrypted) return fail(err, n, VM_E_RANGE, "a raw disk can't be encrypted (qcow2 can)");
+    if (m->raw && m->base[0]) return fail(err, n, VM_E_RANGE, "a linked clone's disk is qcow2");
+    /* a group's member: its group.json holds the disposable switch (19.7) */
+    if (m->group[0] && m->disposable) return fail(err, n, VM_E_RANGE, "a group's member has its group's disposable session");
+    if (m->group[0] && m->raw) return fail(err, n, VM_E_RANGE, "a group's member's disk is qcow2");
+    return check_member(m, err, n);
 }
 
 int vm_vcpus_recommended(const VmHost *h) { return h->cpus > 1 ? h->cpus - 1 : 1; }
@@ -508,11 +741,112 @@ int vm_budget_fits(const VmHost *h, long running_mb, long want_mb) {
     return running_mb >= 0 && want_mb > 0 && running_mb + want_mb <= h->ram_mb - floor;
 }
 
+int vm_dir_active(const char *dir, int (*alive)(long pid)) {
+    char p[VM_PATH_MAX + 32], buf[2048];
+    if (!dir || (size_t)snprintf(p, sizeof p, "%s/run.json", dir) >= sizeof p) return 0;
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return 0;
+    struct stat rs;
+    ssize_t k = !fstat(fd, &rs) && S_ISREG(rs.st_mode) ? read(fd, buf, sizeof buf - 1) : -1;
+    close(fd);
+    if (k <= 0) return 0;
+    JDoc d;
+    if (json_parse(buf, (size_t)k, &d, NULL, 0)) return 0;
+    const char *s = json_str(d.root, "state");
+    double pd = json_num(d.root, "pid", 0);
+    int on = s && (!strcmp(s, "starting") || !strcmp(s, "running") || !strcmp(s, "paused") || !strcmp(s, "stopping"));
+    long pid = pd >= 1 && pd <= 4194304 ? (long)pd : 0;
+    json_free(&d);
+    return on && pid && (!alive || alive(pid));
+}
+
+size_t vm_backup_hold(const char *rel) {
+    if (!rel) return 0;
+    size_t n = strlen(rel);
+    static const char *const tails[] = { ".lordvm/disks", ".lordvm/suspend.state" };
+    for (int i = 0; i < 2; i++) {
+        size_t t = strlen(tails[i]);
+        if (n <= t || strcmp(rel + n - t, tails[i])) continue;
+        size_t dirlen = n - t + 7;                          /* up to and with ".lordvm" */
+        /* a name before ".lordvm": the folder's own name isn't empty and doesn't start with '.' */
+        size_t b = n - t;
+        while (b > 0 && rel[b - 1] != '/') b--;
+        if (b == n - t || rel[b] == '.') return 0;
+        return dirlen;
+    }
+    return 0;
+}
+
+/* one machine folder for vm_budget_used_mb: its limit when it is active, else 0 */
+static long budget_one(const char *dir, const struct stat *ex, int (*alive)(long), long (*extra)(const char *, const VmMachine *), int *n) {
+    struct stat st;
+    if (lstat(dir, &st) || !S_ISDIR(st.st_mode)) return 0;
+    if (ex && st.st_dev == ex->st_dev && st.st_ino == ex->st_ino) return 0;
+    if (!vm_dir_active(dir, alive)) return 0;
+    VmMachine m;
+    if (vm_machine_load(dir, &m, NULL, 0)) return 0;
+    (*n)++;
+    long x = extra ? extra(dir, &m) : 0;
+    return vm_mem_limit_mb(&m) + (x > 0 && x <= VM_MEM_MAX_MB ? x : 0);
+}
+
+static int budget_suffix(const char *s, size_t l, const char *suf) {
+    size_t k = strlen(suf);
+    return l > k && !strcmp(s + l - k, suf);
+}
+
+long vm_budget_used_mb(const char *lib, const char *exclude, int (*alive)(long pid), long (*extra)(const char *dir, const VmMachine *m), int *n) {
+    int cnt = 0, *pn = n ? n : &cnt;
+    *pn = 0;
+    struct stat ex;
+    int have_ex = exclude && !stat(exclude, &ex);
+    DIR *d = lib ? opendir(lib) : NULL;
+    if (!d) return 0;
+    long sum = 0;
+    int seen = 0;
+    struct dirent *e;
+    while ((e = readdir(d)) && seen < 256) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] == '.') continue;
+        char dir[VM_PATH_MAX + 260];
+        if ((size_t)snprintf(dir, sizeof dir, "%s/%s", lib, e->d_name) >= sizeof dir) continue;
+        if (budget_suffix(e->d_name, l, ".lordvm")) { seen++; sum += budget_one(dir, have_ex ? &ex : NULL, alive, extra, pn); continue; }
+        if (!budget_suffix(e->d_name, l, ".lordgroup")) continue;
+        struct stat gs;
+        if (lstat(dir, &gs) || !S_ISDIR(gs.st_mode)) continue;
+        DIR *g = opendir(dir);
+        if (!g) continue;
+        struct dirent *f;
+        while ((f = readdir(g)) && seen < 256) {
+            size_t fl = strlen(f->d_name);
+            if (f->d_name[0] == '.' || !budget_suffix(f->d_name, fl, ".lordvm")) continue;
+            char md[VM_PATH_MAX + 520];
+            if ((size_t)snprintf(md, sizeof md, "%s/%s", dir, f->d_name) >= sizeof md) continue;
+            seen++;
+            sum += budget_one(md, have_ex ? &ex : NULL, alive, extra, pn);
+        }
+        closedir(g);
+    }
+    closedir(d);
+    return sum;
+}
+
+const char *vm_gl_refusal(const VmMachine *m, int host_arch, int installing) {
+    if (m->devices == VM_DEV_WINDOWS) return "3D graphics are for Linux machines";
+    if (m->display != VM_DISPLAY_WINDOW) return "the machine has no display";
+    if (m->arch != VM_ARCH_AMD64 || host_arch != VM_ARCH_AMD64) return "3D graphics are for amd64 machines on amd64 computers for now";
+    if (installing) return "this start installs the system, a text console (and QEMU's 3D display aborts at the installer's restart): 3D comes at the next start";
+    return NULL;
+}
+
 int vm_machine_check_host(const VmMachine *m, const VmHost *h, char *err, size_t n, char *warn, size_t wn) {
     if (warn && wn) warn[0] = 0;
     if (m->accel == VM_ACCEL_KVM) {
         if (h->arch != m->arch) return fail(err, n, VM_E_HOST, "KVM runs %s machines on a %s computer only; use emulation (tcg)", vm_arch_name(m->arch), vm_arch_name(m->arch));
         if (!h->kvm) return fail(err, n, VM_E_HOST, "this computer's /dev/kvm can't be opened (virtualization off, or the user isn't allowed)");
+        /* the windows devices on arm64 ask for a GICv3 (build_qemu_args); KVM gives one only on a GICv3 host */
+        if (m->arch == VM_ARCH_ARM64 && m->devices == VM_DEV_WINDOWS && !h->gicv3)
+            return fail(err, n, VM_E_HOST, "this computer's interrupt controller is GICv2, and KVM can't give the windows devices the GICv3 they need here; use emulation (tcg)");
     }
     if (m->vcpus > h->cpus) return fail(err, n, VM_E_HOST, "%d vCPUs, this computer has %d", m->vcpus, h->cpus);
     long mx = vm_mem_max_mb(h);
@@ -529,7 +863,9 @@ static const char *const KEYS[] = {
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
-    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", NULL,
+    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation", "cpu_model", "heads",
+    "guest_files", "usb_auto", "usb", "vulkan", "kernel_boot", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -562,13 +898,24 @@ static const char *const ARCHS[] = { "arm64", "amd64", NULL };
 static const char *const ACCELS[] = { "kvm", "tcg", NULL };
 static const char *const FWS[] = { "uefi", "bios", NULL };
 static const char *const DISPLAYS[] = { "window", "none", NULL };
-static const char *const NETS[] = { "shared", "isolated", "bridged", "hostonly", NULL };
-const char *const VM_NET_NAMES[] = { "shared", "isolated", "bridged", "hostonly", NULL };
+static const char *const NETS[] = { "shared", "isolated", "bridged", "hostonly", "link", NULL };
+const char *const VM_NET_NAMES[] = { "shared", "isolated", "bridged", "hostonly", "link", NULL };
+const char *const VM_ROLE_NAMES[] = { "", "gateway", "workstation", NULL };
+const char *const VM_LOCK_NAMES[] = { "", "anonymity", NULL };
+const char *const VM_TIMERS_NAMES[] = { "", "whonix-gateway", "whonix-workstation", NULL };
 
 static const char *const CLIPS[] = { "off", "to-guest", "from-guest", "both", NULL };
 static const char *const DEVS[] = { "virtio", "compat", "windows", NULL };
 const char *const VM_DEV_NAMES[] = { "virtio", "compat", "windows", NULL };
 const char *const VM_VGPU_NAMES[] = { "", "intel-whole", "intel-shared", NULL };
+const char *const VM_PIN_NAMES[] = { "", "off", "auto", NULL };
+const char *const VM_DISP_NAMES[] = { "", "memory", "disk", NULL };
+const char *vm_disk_ext(const VmMachine *m) { return m->raw ? "raw" : "qcow2"; }
+int vm_key_valid(const char *k, size_t n) {
+    if (n != 64) return 0;
+    for (size_t i = 0; i < n; i++) if (!((k[i] >= '0' && k[i] <= '9') || (k[i] >= 'a' && k[i] <= 'f'))) return 0;
+    return 1;
+}
 const char *const VM_BOOT_NAMES[] = { "disk", "cd", "network", NULL };
 
 int vm_boot_parse(const char *s, int order[VM_BOOT_DEVS]) {
@@ -797,6 +1144,95 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         const JVal *cf = json_get(o, "capture_fullscreen");
         if (cf && cf->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "capture_fullscreen must be true or false"); goto out; }
         m->capture_fullscreen = cf ? json_bool(o, "capture_fullscreen", 0) : 0;
+        /* schema 13: missing means the guest's performance profile is off */
+        const JVal *pp = json_get(o, "perf_profile");
+        if (pp && pp->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "perf_profile must be true or false"); goto out; }
+        m->perf_profile = pp ? json_bool(o, "perf_profile", 0) : 0;
+        /* schema 15: missing means off */
+        const JVal *gl = json_get(o, "guest_links"), *gn = json_get(o, "guest_notify");
+        if ((gl && gl->type != J_BOOL) || (gn && gn->type != J_BOOL)) { r = fail(err, n, VM_E_FIELD, "guest_links and guest_notify must be true or false"); goto out; }
+        m->guest_links = gl ? json_bool(o, "guest_links", 0) : 0;
+        m->guest_notify = gn ? json_bool(o, "guest_notify", 0) : 0;
+        /* schema 17: missing means no automation (6.15) */
+        const JVal *au = json_get(o, "automation");
+        if (au && au->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "automation must be true or false"); goto out; }
+        m->automation = au ? json_bool(o, "automation", 0) : 0;
+        /* schema 18: missing means this computer's processor */
+        char cpum[16];
+        if ((r = get_str(o, "cpu_model", cpum, sizeof cpum, 0, err, n))) goto out;
+        m->cpu_model = VM_CPU_HOST;
+        if (cpum[0] && !strcmp(cpum, "compatible")) m->cpu_model = VM_CPU_COMPAT;
+        else if (cpum[0] && strcmp(cpum, "host")) { r = fail(err, n, VM_E_RANGE, "cpu_model is host or compatible"); goto out; }
+        /* schema 19: missing means one display */
+        m->heads = 1;
+        if ((r = get_opt_int(o, "heads", &m->heads, err, n))) goto out;
+        if (json_get(o, "heads") && m->heads < 1) { r = fail(err, n, VM_E_RANGE, "heads is 1 to %d", VM_HEADS_MAX); goto out; }
+        /* schema 20: missing means files from the guest are taken */
+        const JVal *gf = json_get(o, "guest_files");
+        if (gf && gf->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "guest_files must be true or false"); goto out; }
+        m->guest_files_off = gf ? !json_bool(o, "guest_files", 1) : 0;
+        /* schema 21: missing means no USB controller and no rule (6.6) */
+        const JVal *uc = json_get(o, "usb");
+        if (uc && uc->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "usb must be true or false"); goto out; }
+        m->usb = uc ? json_bool(o, "usb", 0) : 0;
+        const JVal *ua = json_get(o, "usb_auto");
+        if (ua) {
+            if (ua->type != J_ARR) { r = fail(err, n, VM_E_FIELD, "usb_auto must be a list"); goto out; }
+            if (ua->len > VM_USB_AUTO) { r = fail(err, n, VM_E_RANGE, "at most %d usb_auto rules", VM_USB_AUTO); goto out; }
+            for (const JVal *e = ua->kid; e; e = e->next) {
+                if (e->type != J_STR || e->len > VM_USB_RULE_MAX || strlen(e->str) != e->len || !vm_usb_rule_valid(e->str)) {
+                    r = fail(err, n, VM_E_RANGE, "usb_auto: vendor:product[:serial], lowercase hex");
+                    goto out;
+                }
+                snprintf(m->usb_auto[m->n_usb_auto++], sizeof m->usb_auto[0], "%s", e->str);
+            }
+        }
+        /* schema 22: missing means no Vulkan (venus, 6.10) */
+        const JVal *vk = json_get(o, "vulkan");
+        if (vk && vk->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "vulkan must be true or false"); goto out; }
+        m->vulkan = vk ? json_bool(o, "vulkan", 0) : 0;
+        /* schema 23: missing means the boot loader on the disk */
+        const JVal *kb = json_get(o, "kernel_boot");
+        if (kb && kb->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "kernel_boot must be true or false"); goto out; }
+        m->kernel_boot = kb ? json_bool(o, "kernel_boot", 0) : 0;
+        /* schema 13: missing means this computer's default (vmpin_default_on) */
+        char pin[8];
+        if ((r = get_str(o, "cpu_pin", pin, sizeof pin, 0, err, n))) goto out;
+        m->cpu_pin = VM_PIN_DEFAULT;
+        if (pin[0]) {
+            for (int i = 1; VM_PIN_NAMES[i]; i++) if (!strcmp(pin, VM_PIN_NAMES[i])) m->cpu_pin = i;
+            if (!m->cpu_pin) { r = fail(err, n, VM_E_RANGE, "cpu_pin is off or auto"); goto out; }
+        }
+        /* schema 14: a machine group's member (19.4); missing: not a member */
+        char role[16], up[8], lock[16], tim[24];
+        if ((r = get_str(o, "group", m->group, sizeof m->group, 0, err, n)) || (r = get_str(o, "role", role, sizeof role, 0, err, n)) ||
+            (r = get_str(o, "uplink", up, sizeof up, 0, err, n)) || (r = get_str(o, "link_mac", m->link_mac, sizeof m->link_mac, 0, err, n)) ||
+            (r = get_str(o, "profile_lock", lock, sizeof lock, 0, err, n)) || (r = get_str(o, "timers", tim, sizeof tim, 0, err, n))) goto out;
+        const char *const *lists[] = { VM_ROLE_NAMES, VM_LOCK_NAMES, VM_TIMERS_NAMES };
+        const char *vals[] = { role, lock, tim };
+        int *dst[] = { &m->role, &m->profile_lock, &m->timers };
+        for (int k = 0; k < 3; k++) {
+            *dst[k] = 0;
+            if (!vals[k][0]) continue;
+            for (int i = 1; lists[k][i]; i++) if (!strcmp(vals[k], lists[k][i])) *dst[k] = i;
+            if (!*dst[k]) { r = fail(err, n, VM_E_RANGE, "role, profile_lock or timers: an unknown value"); goto out; }
+        }
+        if (up[0] && strcmp(up, "tor")) { r = fail(err, n, VM_E_RANGE, "uplink is tor"); goto out; }
+        m->uplink_tor = up[0] != 0;
+        /* schema 16: storage; missing: as a new machine (persistent, not encrypted, qcow2, backed up) */
+        char disp[8], fmt[8];
+        if ((r = get_str(o, "disposable", disp, sizeof disp, 0, err, n)) || (r = get_str(o, "disk_format", fmt, sizeof fmt, 0, err, n))) goto out;
+        m->disposable = VM_DISP_OFF;
+        if (disp[0]) {
+            for (int i = 1; VM_DISP_NAMES[i]; i++) if (!strcmp(disp, VM_DISP_NAMES[i])) m->disposable = i;
+            if (!m->disposable) { r = fail(err, n, VM_E_RANGE, "disposable is memory or disk"); goto out; }
+        }
+        if (fmt[0] && strcmp(fmt, "raw") && strcmp(fmt, "qcow2")) { r = fail(err, n, VM_E_RANGE, "disk_format is qcow2 or raw"); goto out; }
+        m->raw = !strcmp(fmt, "raw");
+        const JVal *en = json_get(o, "encrypted"), *bk = json_get(o, "backup");
+        if ((en && en->type != J_BOOL) || (bk && bk->type != J_BOOL)) { r = fail(err, n, VM_E_FIELD, "encrypted and backup are true or false"); goto out; }
+        m->encrypted = en ? json_bool(o, "encrypted", 0) : 0;
+        m->no_backup = bk ? !json_bool(o, "backup", 1) : 0;
     }
     r = vm_machine_check(m, err, n);
 out:
@@ -891,6 +1327,36 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 10 && m->pointer_guest) jb_raw(&b, ",\n  \"pointer\": \"guest\"");
     if (m->schema >= 11 && m->vgpu) { jb_raw(&b, ",\n  \"gpu\": "); jb_str(&b, VM_VGPU_NAMES[m->vgpu]); }
     if (m->schema >= 12 && m->capture_fullscreen) jb_raw(&b, ",\n  \"capture_fullscreen\": true");
+    if (m->schema >= 13 && m->perf_profile) jb_raw(&b, ",\n  \"perf_profile\": true");
+    if (m->schema >= 15 && m->guest_links) jb_raw(&b, ",\n  \"guest_links\": true");
+    if (m->schema >= 15 && m->guest_notify) jb_raw(&b, ",\n  \"guest_notify\": true");
+    if (m->schema >= 17 && m->automation) jb_raw(&b, ",\n  \"automation\": true");
+    if (m->schema >= 18 && m->cpu_model == VM_CPU_COMPAT) jb_raw(&b, ",\n  \"cpu_model\": \"compatible\"");
+    if (m->schema >= 19 && m->heads > 1) jb_printf(&b, ",\n  \"heads\": %d", m->heads);
+    if (m->schema >= 20 && m->guest_files_off) jb_raw(&b, ",\n  \"guest_files\": false");
+    if (m->schema >= 21 && m->usb) jb_raw(&b, ",\n  \"usb\": true");
+    if (m->schema >= 21 && m->n_usb_auto) {
+        jb_raw(&b, ",\n  \"usb_auto\": [");
+        for (int i = 0; i < m->n_usb_auto; i++) { if (i) jb_raw(&b, ", "); jb_str(&b, m->usb_auto[i]); }
+        jb_raw(&b, "]");
+    }
+    if (m->schema >= 22 && m->vulkan) jb_raw(&b, ",\n  \"vulkan\": true");
+    if (m->schema >= 23 && m->kernel_boot) jb_raw(&b, ",\n  \"kernel_boot\": true");
+    if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
+    if (m->schema >= 14 && m->group[0]) {
+        jb_raw(&b, ",\n  \"group\": "); jb_str(&b, m->group);
+        jb_raw(&b, ",\n  \"role\": "); jb_str(&b, VM_ROLE_NAMES[m->role]);
+        if (m->uplink_tor) jb_raw(&b, ",\n  \"uplink\": \"tor\"");
+        if (m->link_mac[0]) { jb_raw(&b, ",\n  \"link_mac\": "); jb_str(&b, m->link_mac); }
+        if (m->profile_lock) { jb_raw(&b, ",\n  \"profile_lock\": "); jb_str(&b, VM_LOCK_NAMES[m->profile_lock]); }
+        if (m->timers) { jb_raw(&b, ",\n  \"timers\": "); jb_str(&b, VM_TIMERS_NAMES[m->timers]); }
+    }
+    if (m->schema >= 16) {
+        if (m->disposable) { jb_raw(&b, ",\n  \"disposable\": "); jb_str(&b, VM_DISP_NAMES[m->disposable]); }
+        if (m->encrypted) jb_raw(&b, ",\n  \"encrypted\": true");
+        if (m->raw) jb_raw(&b, ",\n  \"disk_format\": \"raw\"");
+        if (m->no_backup) jb_raw(&b, ",\n  \"backup\": false");
+    }
     if (m->schema >= 8 && m->sound_out[0]) { jb_raw(&b, ",\n  \"sound_out\": "); jb_str(&b, m->sound_out); }
     if (m->schema >= 8 && m->sound_in[0]) { jb_raw(&b, ",\n  \"sound_in\": "); jb_str(&b, m->sound_in); }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
@@ -901,7 +1367,7 @@ char *vm_machine_json(const VmMachine *m) {
 }
 
 static char *read_small(const char *path, size_t max, size_t *len) {
-    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);   /* a FIFO named machine.json never blocks the caller */
     if (fd < 0) return NULL;
     struct stat st;
     if (fstat(fd, &st) || !S_ISREG(st.st_mode) || (size_t)st.st_size > max) { close(fd); errno = EFBIG; return NULL; }
@@ -1034,6 +1500,24 @@ void vm_machine_defaults(VmMachine *m, const VmHost *h, int arch) {
     memcpy(m->updated, m->created, sizeof m->updated);
 }
 
+int vm_host_cores(int cpus) {
+    int n = 0, seen = 0;
+    for (int i = 0; i < 4096 && seen < cpus; i++) {
+        char p[96], buf[64];
+        snprintf(p, sizeof p, "/sys/devices/system/cpu/cpu%d/topology/thread_siblings_list", i);
+        int fd = open(p, O_RDONLY | O_CLOEXEC);
+        if (fd < 0) continue;
+        ssize_t k = read(fd, buf, sizeof buf - 1);
+        close(fd);
+        if (k <= 0) continue;
+        buf[k] = 0;
+        seen++;
+        /* a core is counted once, at its first thread ("0,10", "0-1") */
+        if (atoi(buf) == i) n++;
+    }
+    return n > 0 && n <= cpus ? n : cpus;
+}
+
 void vm_host_probe(VmHost *h) {
     struct utsname u;
     h->arch = -1;
@@ -1048,6 +1532,30 @@ void vm_host_probe(VmHost *h) {
     int fd = open("/dev/kvm", O_RDWR | O_CLOEXEC);
     h->kvm = fd >= 0;
     if (fd >= 0) close(fd);
+    h->gicv3 = h->arch == VM_ARCH_ARM64 && vm_gicv3_in("/proc/interrupts") == 1;
+}
+
+int vm_gicv3_in(const char *path) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return -1;
+    char b[65536 + 8];
+    size_t keep = 0, total = 0;
+    int found = 0;
+    while (!found && total < (8u << 20)) {
+        ssize_t k = read(fd, b + keep, sizeof b - 1 - keep);
+        if (k < 0 && errno == EINTR) continue;
+        if (k <= 0) break;
+        total += (size_t)k;
+        size_t len = keep + (size_t)k;
+        b[len] = 0;
+        for (size_t i = 0; i < len; i++) if (!b[i]) b[i] = ' ';
+        if (strstr(b, "GICv3") || strstr(b, "GICv4")) found = 1;
+        /* a name cut between two reads: the last 5 bytes go first in the next */
+        keep = len < 5 ? len : 5;
+        memmove(b, b + len - keep, keep);
+    }
+    close(fd);
+    return found;
 }
 
 /* ---- images (vm_image_kind) ---- */

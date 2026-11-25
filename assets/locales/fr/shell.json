@@ -586,9 +586,12 @@
   "ws.lock.on": "Verrouiller les fenêtres de cet écran",
   "ws.lock.off": "Déverrouiller les fenêtres de cet écran",
   "ws.lock.window": "Verrouillée : déverrouillez-la avec le cadenas du cadre",
-  "ws.minimized.label": "Réduites",
-  "ws.minimized.title": "Fenêtres réduites sur cet écran : cliquez sur l'une pour la ramener",
   "ws.slot.free": "Espace libre : ouvrez une app ou ramenez une fenêtre réduite",
+  "ws.windows.title": "Fenêtres de cette activité sur cet écran (un trait sous celles réduites) : cliquez sur l'une pour la mettre au premier plan ; clic droit pour les fenêtres de cette app",
+  "ws.profile.ask": "Laisser le navigateur choisir",
+  "ws.profile.open": "Ouvrir le profil {profile}",
+  "ws.profile.activity": "Profil qu'ouvre cette activité",
+  "ws.profile.display": "Profil qu'ouvre cet écran ({display})",
   "ws.snapfly.title": "Ancrer la fenêtre",
   "ws.snapfly.halves": "Moitiés",
   "ws.snapfly.thirds": "Tiers",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "Caméra via LordOS Studio",
   "capture.what.effectsOn": "effets activés",
   "capture.what.effectsOff": "sans effets",
-  "shortcuts.captureWindow": "Capture d’une fenêtre"
+  "shortcuts.captureWindow": "Capture d’une fenêtre",
+  "themeSwitch.changing": "Changement du style du bureau…",
+  "themeSwitch.changingTo": "Passage à {name}…",
+  "themeSwitch.failedTitle": "Impossible d’appliquer {name}",
+  "themeSwitch.refusedBody": "Son code ne correspond pas à la copie signée de LordOS, il n’a donc pas été chargé. Le style de votre bureau reste tel qu’il était.",
+  "themeSwitch.failedBody": "Il n’a pas démarré. Le style de votre bureau reste tel qu’il était.",
+  "spotlight.section.machines": "Machines",
+  "guestApps.inMachine": "Dans {machine}"
 }

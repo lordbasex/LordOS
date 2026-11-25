@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "محفوظ کیے گئے آؤٹ پٹ میں رکھا جاتا ہے",
   "prefs.tr.would.highlight": "“{text}” کو نمایاں کرتا ہے",
   "prefs.tr.param": "پیرامیٹر",
-  "prefs.tr.regexFirst": "پہلے ریگولر ایکسپریشن لکھیں۔"
+  "prefs.tr.regexFirst": "پہلے ریگولر ایکسپریشن لکھیں۔",
+  "guest.badge": "مہمان",
+  "guest.title": "{machine} کے اندر شیل"
 }

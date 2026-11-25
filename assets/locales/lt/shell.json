@@ -593,9 +593,12 @@
   "ws.lock.on": "Užrakinti šio ekrano langus",
   "ws.lock.off": "Atrakinti šio ekrano langus",
   "ws.lock.window": "Užrakinta: atrakinkite rėmelio spynele",
-  "ws.minimized.label": "Sumažinti",
-  "ws.minimized.title": "Šiame ekrane sumažinti langai: spustelėkite, kad grąžintumėte",
   "ws.slot.free": "Laisva vieta: atidarykite programą arba grąžinkite sumažintą",
+  "ws.windows.title": "Šios veiklos langai šiame ekrane (po sumažintais – linija): spustelėkite, kad iškeltumėte į priekį; dešiniuoju – tos programos langai",
+  "ws.profile.ask": "Tegul renkasi naršyklė",
+  "ws.profile.open": "Atverti profilį {profile}",
+  "ws.profile.activity": "Profilis, kurį atveria ši veikla",
+  "ws.profile.display": "Profilis, kurį atveria šis ekranas ({display})",
   "ws.snapfly.title": "Išdėstyti langą",
   "ws.snapfly.halves": "Pusės",
   "ws.snapfly.thirds": "Trečdaliai",
@@ -979,5 +982,12 @@
   "capture.what.viaStudioPlain": "Kamera per LordOS Studio",
   "capture.what.effectsOn": "efektai įjungti",
   "capture.what.effectsOff": "be efektų",
-  "shortcuts.captureWindow": "Lango ekrano kopija"
+  "shortcuts.captureWindow": "Lango ekrano kopija",
+  "themeSwitch.changing": "Keičiamas darbalaukio stilius…",
+  "themeSwitch.changingTo": "Keičiama į {name}…",
+  "themeSwitch.failedTitle": "Nepavyko pritaikyti {name}",
+  "themeSwitch.refusedBody": "Jo kodas nesutampa su pasirašyta LordOS kopija, todėl jis nebuvo įkeltas. Darbalaukio stilius lieka toks, koks buvo.",
+  "themeSwitch.failedBody": "Jis nepasileido. Darbalaukio stilius lieka toks, koks buvo.",
+  "spotlight.section.machines": "Virtualios mašinos",
+  "guestApps.inMachine": "Mašinoje {machine}"
 }

@@ -11,7 +11,8 @@
 // tests/clipboard_snippets_scene.mjs (the clipboard's Snippets tab, GitHub #205),
 // tests/notes_editor_scene.mjs (Notes' Edit menu and right-click menu, GitHub #117), tests/notes_breaks_scene.mjs (Notes'
 // reading view keeps the typed line breaks, GitHub #169), tests/screenshots_newcapture_scene.mjs (New Screenshot in the
-// markup editor, GitHub #166), tests/screenshots_toolbar_scene.mjs (the Screenshots toolbar and its Options menu). A scene with a tests/<scene>_sdk.js next to it gets that file as '@lordos/sdk': the few SDK modules it needs,
+// markup editor, GitHub #166), tests/screenshots_toolbar_scene.mjs (the Screenshots toolbar and its Options menu),
+// tests/store_origin_scene.mjs (an origin's second column in the Store: Installed first, then its categories). A scene with a tests/<scene>_sdk.js next to it gets that file as '@lordos/sdk': the few SDK modules it needs,
 // not the whole desktop.
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';

@@ -18,6 +18,7 @@
 #include "../hw/sleeplock.h"
 #include "../hw/logindlock.h"
 #include "js_sys.h"
+#include "js.h"
 #include "../cloud/cloud.h"
 #include "js_err.h"
 #include "../termconf.h"
@@ -498,6 +499,7 @@ static JSValue f_themes_list(JSContext *c, JSValueConst this_val, int argc, JSVa
         if (theme_blocked(bundle)) {
             JS_SetPropertyStr(c, o, "failed", JS_TRUE);
             JS_SetPropertyStr(c, o, "failedWhy", JS_NewString(c, ui.theme_failed_why));
+            JS_SetPropertyStr(c, o, "failedCode", JS_NewBool(c, ui.theme_failed_code));   /* the verified-code check */
         }
         JS_SetPropertyUint32(c, arr, i++, o);
         free(json);
@@ -517,6 +519,19 @@ static JSValue f_themes_use(JSContext *c, JSValueConst this_val, int argc, JSVal
         snprintf(bundle, sizeof bundle, "%s/%s/theme.bundle.js", root, id);
         ok = access(bundle, R_OK) == 0 && strlen(bundle) < sizeof ui.theme_request &&
              !theme_blocked(bundle);
+        /* read and verified now, while this theme still runs (js.c js_theme_prepare): a bundle the verified-code check
+         * refuses is answered here with false and the session goes on in this theme, untouched; the switch itself
+         * (main.c switch_theme) runs exactly the bytes checked here */
+        int r = ok ? js_theme_prepare(bundle) : 0;
+        if (r) {
+            ok = 0;
+            snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", bundle);
+            snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", r == JS_REFUSED ? "refused by the verified-code check (sec/codesig.c)"
+                     : "its file could not be read");
+            ui.theme_failed_code = r == JS_REFUSED;
+            ui.theme_failed_gen = codesig_generation();
+            fprintf(stderr, "lord-server: theme %s not switched to (%s): the session stays in this one\n", bundle, ui.theme_failed_why);
+        }
         if (ok) snprintf(ui.theme_request, sizeof ui.theme_request, "%s", bundle);
     }
     JS_FreeCString(c, id);
@@ -1389,6 +1404,20 @@ static JSValue f_fs_trash_empty(JSContext *c, JSValueConst this_val, int argc, J
 }
 
 /* lord.fs.stat(path) → { name, path, dir, link, target, size, mode, user, group, mtime, atime, ctime, btime } */
+/* inheritMarks(from, to): a file a Machines guest sent (6.21) that is an archive: what was extracted from it (to, a file or a
+ * folder in the person's own places) gets its quarantine marks too. Only ever adds the marks; → how many were marked */
+static JSValue f_fs_inherit_marks(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2) return JS_NewInt32(c, 0);
+    const char *a = JS_ToCString(c, argv[0]), *b = JS_ToCString(c, argv[1]);
+    char ra[PATH_MAX], rb[PATH_MAX];
+    int n = 0;
+    if (a && b && realpath(a, ra) && realpath(b, rb) && fsops_allowed(rb)) n = fsops_inherit_marks(ra, rb);
+    if (a) JS_FreeCString(c, a);
+    if (b) JS_FreeCString(c, b);
+    return JS_NewInt32(c, n);
+}
+
 static JSValue f_fs_stat(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     const char *p = JS_ToCString(c, argv[0]);
@@ -1417,6 +1446,8 @@ static JSValue f_fs_stat(JSContext *c, JSValueConst this_val, int argc, JSValueC
     JS_SetPropertyStr(c, o, "ctime", JS_NewFloat64(c, s.ctime));
     if (s.has_btime) JS_SetPropertyStr(c, o, "btime", JS_NewFloat64(c, s.btime));
     JS_SetPropertyStr(c, o, "writable", JS_NewBool(c, s.writable));
+    /* a file a Machines guest sent (6.21): Files says where it came from and never opens a runnable one by itself */
+    if (s.quarantine) { JS_SetPropertyStr(c, o, "quarantine", JS_TRUE); JS_SetPropertyStr(c, o, "fromMachine", JS_NewString(c, s.from)); }
     return o;
 }
 
@@ -1534,8 +1565,9 @@ static JSValue f_fs_volumes(JSContext *c, JSValueConst this_val, int argc, JSVal
 }
 
 /* ---- lord.fs: the calls that may wait on a slow file system, off this thread (fsasync.c) ----
- * listAsync(path) / statAsync(path) / trashAsync(path) / freeAsync(path) / mkdirAsync(path) / renameAsync(from, to)
- * → req; the answer comes as __lordFsReply(req, { entries } | { stat } | { ok } | { total, free } | { error: code line }).
+ * listAsync(path) / statAsync(path) / trashAsync(path) / freeAsync(path) / mkdirAsync(path) / renameAsync(from, to) /
+ * duAsync(path, ms) → req; the answer comes as __lordFsReply(req, { entries } | { stat } | { ok } | { total, free } |
+ * { size, files, dirs, complete, remote } | { error: code line }).
  * The worker resolves and checks the paths with the same fsops.c functions as list / stat / trash / free / mkdir /
  * rename above. */
 static JSValue fs_async(JSContext *c, JSValueConst arg, int op) {
@@ -1552,6 +1584,20 @@ static JSValue f_fs_stat_async(JSContext *c, JSValueConst t, int argc, JSValueCo
 static JSValue f_fs_trash_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; return fs_async(c, argv[0], FSA_TRASH); }
 static JSValue f_fs_free_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; return fs_async(c, argv[0], FSA_FREE); }
 static JSValue f_fs_mkdir_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; return fs_async(c, argv[0], FSA_MKDIR); }
+/* duAsync(path, ms) → req; { size, files, dirs, complete, remote } as lord.fs.du, walked on a worker for at most ms
+ * (FSA_DU_MAX_MS) */
+static JSValue f_fs_du_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    double ms = 0;
+    if (argc > 1 && JS_IsNumber(argv[1])) JS_ToFloat64(c, &ms, argv[1]);
+    const char *p = JS_ToCString(c, argv[0]);
+    if (!p) return JS_EXCEPTION;
+    char err[256] = "";
+    int req = fsasync_submit_du(p, ms, err, sizeof err);
+    JS_FreeCString(c, p);
+    if (req < 0) return js_throw_line(c, err);
+    return JS_NewInt32(c, req);
+}
 static JSValue f_fs_rename_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     const char *a = JS_ToCString(c, argv[0]), *b = JS_ToCString(c, argv[1]);
@@ -1586,6 +1632,7 @@ static const JSCFunctionListEntry fs_funcs[] = {
     JS_CFUNC_DEF("statAsync", 1, f_fs_stat_async),
     JS_CFUNC_DEF("trashAsync", 1, f_fs_trash_async),
     JS_CFUNC_DEF("freeAsync", 1, f_fs_free_async),
+    JS_CFUNC_DEF("duAsync", 2, f_fs_du_async),
     JS_CFUNC_DEF("mkdirAsync", 1, f_fs_mkdir_async),
     JS_CFUNC_DEF("renameAsync", 2, f_fs_rename_async),
     JS_CFUNC_DEF("mounts", 0, f_fs_mounts),
@@ -1604,7 +1651,7 @@ static const JSCFunctionListEntry fs_funcs[] = {
     JS_CFUNC_DEF("restore", 1, f_fs_restore),
     JS_CFUNC_DEF("removeFromTrash", 1, f_fs_trash_remove),
     JS_CFUNC_DEF("emptyTrash", 0, f_fs_trash_empty),
-    JS_CFUNC_DEF("stat", 1, f_fs_stat),
+    JS_CFUNC_DEF("stat", 1, f_fs_stat), JS_CFUNC_DEF("inheritMarks", 2, f_fs_inherit_marks),
     JS_CFUNC_DEF("du", 2, f_fs_du),
     JS_CFUNC_DEF("free", 1, f_fs_free),
     JS_CFUNC_DEF("search", 3, f_fs_search),
@@ -1999,6 +2046,7 @@ static JSValue f_apps_linux(JSContext *c, JSValueConst this_val, int argc, JSVal
         JS_SetPropertyStr(c, o, "nameC", JS_NewString(c, a->name_c));
         JS_SetPropertyStr(c, o, "genericName", JS_NewString(c, a->generic));
         JS_SetPropertyStr(c, o, "comment", JS_NewString(c, a->comment));
+        JS_SetPropertyStr(c, o, "commentLocal", JS_NewBool(c, a->comment_l10n));
         JS_SetPropertyStr(c, o, "keywords", JS_NewString(c, a->keywords));
         JS_SetPropertyStr(c, o, "categories", JS_NewString(c, a->categories));
         JS_SetPropertyStr(c, o, "wmClass", JS_NewString(c, a->wmclass));
@@ -2069,6 +2117,21 @@ static JSValue f_apps_launch_action(JSContext *c, JSValueConst this_val, int arg
     int ok = id && act && apps_launch_action(id, act) == 0;
     if (id) JS_FreeCString(c, id);
     if (act) JS_FreeCString(c, act);
+    return JS_NewBool(c, ok);
+}
+
+/* lord.apps.launchProfile(id, profile) (approved by the maintainer 2026-11-24): a Chromium-family browser opened in
+ * one of its own profiles (apps.c apps_launch_profile: the fixed browser table, its system .desktop, a profile folder its
+ * own Local State lists, one argv element built in C). The desktop session only: never in an isolated app (no broker
+ * entry), never in the greeter. */
+static JSValue f_apps_launch_profile(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) return JS_FALSE;
+    const char *id = JS_ToCString(c, argv[0]);
+    const char *prof = JS_ToCString(c, argv[1]);
+    int ok = id && prof && apps_launch_profile(id, prof) == 0;
+    if (id) JS_FreeCString(c, id);
+    if (prof) JS_FreeCString(c, prof);
     return JS_NewBool(c, ok);
 }
 
@@ -2343,6 +2406,7 @@ static JSValue f_apps_flatpak(JSContext *c, JSValueConst this_val, int argc, JSV
         JS_SetPropertyStr(c, o, "name", JS_NewString(c, a->name));
         JS_SetPropertyStr(c, o, "nameC", JS_NewString(c, a->name_c));
         JS_SetPropertyStr(c, o, "comment", JS_NewString(c, a->comment));
+        JS_SetPropertyStr(c, o, "commentLocal", JS_NewBool(c, a->comment_l10n));
         JS_SetPropertyStr(c, o, "keywords", JS_NewString(c, a->keywords));
         JS_SetPropertyStr(c, o, "categories", JS_NewString(c, a->categories));
         JS_SetPropertyStr(c, o, "wmClass", JS_NewString(c, a->wmclass));
@@ -2669,6 +2733,7 @@ static const JSCFunctionListEntry apps_funcs[] = {
     JS_CFUNC_DEF("launchUri", 2, f_apps_launch_uri),
     JS_CFUNC_DEF("actions", 2, f_apps_actions),
     JS_CFUNC_DEF("launchAction", 2, f_apps_launch_action),
+    JS_CFUNC_DEF("launchProfile", 2, f_apps_launch_profile),
     JS_CFUNC_DEF("lastError", 0, f_apps_last_error),
     JS_CFUNC_DEF("packages", 0, f_apps_packages),
     JS_CFUNC_DEF("inspectPackage", 1, f_apps_inspect),

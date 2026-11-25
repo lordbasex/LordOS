@@ -10,12 +10,25 @@
 # nothing is seeded and lord-fetch asks flathub.org (only the home is shot, and the cache files are printed).
 # A test tool: not part of `make test`, never installed. From server/, after `npm run build` and `make`:
 #   tests/store_rankings_headless.sh OUT_DIR [theme] [language] [WxH] [live]  → OUT_DIR/<theme>-<language>-1.png …
+# With STORE_SCENE=installed the driver is tests/store_scene/installed.js instead (each origin's shop and its Installed,
+# and the general Installed page with its filters), with a few installed Flatpak and web apps seeded by pre.js
+# (STORE_SEED_INSTALLED); STORE_MODE=light shoots it in the light appearance (dark otherwise, the default) →
+# OUT_DIR/<theme>-<language>-installed-<mode>-1.png …
+# With STORE_SCENE=lordos the driver is tests/store_scene/lordos.js: each section's shop with its update icon and own
+# search, its Settings (Flathub, GNU/Linux apps (Debian), Web apps), LordOS apps' shop, its Installed, LordOS Studio
+# Camera's page, the general Installed page's LordOS apps filter and Discover's search over every system, with this
+# machine's own installed items and the same seeded Flatpak and web apps → OUT_DIR/<theme>-<language>-lordos-<mode>-1.png …
 cd "$(dirname "$0")/.." || exit 1
 OUT=${1:?usage: tests/store_rankings_headless.sh OUT_DIR [theme] [language] [WxH] [live]}
 THEME=${2:-default}
 LANGID=${3:-en}
 SIZE=${4:-1600x900}
 LIVE=${5:-}
+SCENE=${STORE_SCENE:-rankings}
+MODE=${STORE_MODE:-dark}
+case "$SCENE" in rankings) DRIVER=driver.js; TAG= ;; installed) DRIVER=installed.js; TAG="-installed-$MODE" ;;
+    lordos) DRIVER=lordos.js; TAG="-lordos-$MODE" ;;
+    *) echo "STORE_SCENE: rankings, installed or lordos"; exit 2 ;; esac
 ROOT=$(cd .. && pwd)
 [ -x build/lord-server ] && [ -x build/lord-appstream ] && [ -x build/lord-fetch ] && [ -f "$ROOT/themes/$THEME/theme.bundle.js" ] ||
     { echo "needs build/lord-server, build/lord-appstream, build/lord-fetch and themes/$THEME/theme.bundle.js"; exit 77; }
@@ -63,11 +76,12 @@ for (const [k, ids] of Object.entries(lists))
 fi
 { [ -n "$FIXTURE" ] && printf 'globalThis.STORE_FIXTURE = %s;\n' "$(cat "$FIXTURE")"
   [ "$LIVE" = live ] && printf 'globalThis.STORE_LIVE = true;\n'
-  cat tests/store_scene/pre.js "$ROOT/themes/$THEME/theme.bundle.js" tests/store_scene/driver.js; } >"$T/theme.bundle.js"
+  { [ "$SCENE" = installed ] || [ "$SCENE" = lordos ]; } && printf 'globalThis.STORE_SEED_INSTALLED = true;\n'
+  cat tests/store_scene/pre.js "$ROOT/themes/$THEME/theme.bundle.js" "tests/store_scene/$DRIVER"; } >"$T/theme.bundle.js"
 node tests/perf/manifest.mjs "$ROOT" "themes/zstore/$THEME/theme.bundle.js" || exit 1
 chmod 700 "$D"
 # Flathub on, its appstream fresh (no `flatpak update --appstream` in the scene)
-printf '{"schema": 9, "desktopChosen": true, "language": "%s", "flathub": {"on": true, "appstreamAt": %s000}}\n' "$LANGID" "$(date +%s)" >"$D/home/.config/lordos/settings.json"
+printf '{"schema": 9, "desktopChosen": true, "mode": "%s", "language": "%s", "flathub": {"on": true, "appstreamAt": %s000}}\n' "$MODE" "$LANGID" "$(date +%s)" >"$D/home/.config/lordos/settings.json"
 printf '{ "version": 1, "apps": { "screenshots": { "screen": { "state": "allow", "when": 1 } } } }\n' >"$D/home/.config/lordos/permisos.json"
 env -u WAYLAND_DISPLAY -u DISPLAY -u LORD_SESSIOND -u LORDOS_SESSIOND -u DBUS_SESSION_BUS_ADDRESS \
     XDG_RUNTIME_DIR="$D" HOME="$D/home" LORD_GPU=0 LANG=en_US.UTF-8 LORD_HEADLESS_DRAW=1 \
@@ -79,5 +93,5 @@ grep -ah 'STORE-SCENE' "$D/home/.cache/lordos/shell.log" 2>/dev/null | sed 's/.*
 if [ "$LIVE" = live ]; then
     for f in "$D"/home/.cache/lordos/flathub/*.json; do [ -f "$f" ] && echo "cache $(basename "$f"): $(head -c 160 "$f")"; done
 fi
-for k in $(seq 1 9); do [ -f "$D/home/shot-$k.png" ] && cp "$D/home/shot-$k.png" "$OUT/$THEME-$LANGID${LIVE:+-live}-$k.png"; done
-ls "$OUT"/"$THEME-$LANGID${LIVE:+-live}"-*.png 2>/dev/null
+for k in $(seq 1 19); do [ -f "$D/home/shot-$k.png" ] && cp "$D/home/shot-$k.png" "$OUT/$THEME-$LANGID${LIVE:+-live}$TAG-$k.png"; done
+ls "$OUT"/"$THEME-$LANGID${LIVE:+-live}$TAG"-*.png 2>/dev/null

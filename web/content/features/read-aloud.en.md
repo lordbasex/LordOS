@@ -17,7 +17,7 @@ Think of a reader who sits next to you and only ever reads what you point at. Th
 - **Live Speech** (❖⇧Esc): a box where you type, press Enter, and it is said with your chosen voice. Recent phrases stay below, in memory only, to be said again. It helps anyone who can't or would rather not speak.
 - **The `say` command** in a terminal: `say "Hello"`, `echo text | say`, `say -f notes.txt -o notes.wav`, `say -v <voice>`, `say --voices`.
 
-The language (Spanish, English or Portuguese) is told from the text itself; when it can't be, the interface's language is used.
+The language (Spanish, English, Portuguese, French, German, Italian or Dutch) is told from the text itself; when it can't be, the interface's language is used.
 
 ## Voices you choose
 
@@ -52,7 +52,7 @@ Measured on one PC, an Intel i9-10900 with a Radeon RX 580: about 10 seconds of 
 
 ## Honest limits
 
-- **Three languages:** Spanish, English and Portuguese.
+- **Seven languages:** Spanish, English and Portuguese, and, since 0.8.9.6, French, German, Italian and Dutch: the same two qualities and 23 voices, with numbers, dates, times and money read in each language's own words.
 - **You download a model first.** Until then, Speech says that no voice is installed.
 - **Not tested on the Raspberry Pi** (its processor's code paths and the Pi 5's graphics driver).
 - **It reads what you select; it is not a screen reader.** A screen reader, zoom and high contrast are still on the roadmap.

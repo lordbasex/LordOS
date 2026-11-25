@@ -27,7 +27,9 @@
 # raspberrypi (Raspberry Pi's archive; LordOS's own copy of the source when tools/release/rpi-mirror.list pins
 # it), lordos (built by LordOS from this repository at the release tag; the Raspberry Pi kernel from
 # Raspberry Pi's tree at a fixed commit plus tools/rpi/build-kernel.sh, pointing at LordOS's copy of the tree,
-# .config and script in lordos.org/apt/pool/rpi/source/ when a "tarball" line pins it) or vendor (an upstream binary
+# .config and script in lordos.org/apt/pool/rpi/source/ when a "tarball" line pins it; a Debian package LordOS
+# rebuilds, version ~lordos<n>+<m> such as WPE WebKit, pointing at its .dsc in lordos.org/apt/pool/main/source/,
+# docs/WPEWEBKIT.md) or vendor (an upstream binary
 # repackaged by LordOS, with its upstream source). Lines starting with # are comments.
 #
 # Environment: LORDOS_TAG (the release tag; default v<lordos version>-<channel>, the channel from this
@@ -210,6 +212,9 @@ RPI_POOL = "https://archive.raspberrypi.com/debian/pool/main/{}/{}/"
 # LordOS's copy: the pool has no folder listings, so the link is a file in it (the .dsc, which `dget` takes,
 # or the kernel's SOURCE, which lists its files); "+" must be %2B there (the storage reads "+" as a space)
 RPI_MIRROR = "https://lordos.org/apt/pool/rpi/source/{}/{}/{}"
+# Debian packages LordOS rebuilds (version ~lordos13+N: WPE WebKit, tools/pkg/build-wpewebkit.sh, docs/WPEWEBKIT.md):
+# the exact source package is published next to the binaries, the .dsc in pool/main/source/<prefix>/<source>/
+LORDOS_SRC = "https://lordos.org/apt/pool/main/source/{}/{}/{}"
 # the LordOS Raspberry Pi kernel's source commit by upstream version, when no SOURCE file is given
 # (docs/RASPBERRY.md, "The LordOS kernel": every revision of 6.18.57 is commit 2341883150378...)
 KNOWN_KERNELS = {"6.18.57": ("https://github.com/raspberrypi/linux.git", "rpi-6.18.y",
@@ -300,6 +305,12 @@ def classify(p):
                 f"{', commit ' + commit if commit else ''}); configured and built by tools/rpi/build-kernel.sh "
                 f"at {tag_url}; the complete configuration is /boot/config-{rel} in the image"
                 + ("; LordOS keeps this source: the tree at that commit, the .config and the build script" if kept else ""))
+    if re.search(r"~lordos\d+\+\d+$", sver) and not src.startswith("lordos"):
+        prefix = src[:4] if src.startswith("lib") and len(src) > 3 else src[0]
+        return ("lordos", LORDOS_SRC.format(prefix, q(src), q(f"{src}_{sver.split(':', 1)[-1]}.dsc")),
+                "Debian's source package rebuilt for Debian 13 by LordOS (tools/pkg/, docs/WPEWEBKIT.md); this exact source "
+                "(the .dsc and the files it lists, in the same folder) is kept by LordOS; the license is "
+                "/usr/share/doc/<package>/copyright in the image")
     if p["maint"].startswith("LordOS ") or name.startswith("lordos"):
         if name == "lordos-rclone":
             up = re.sub(r"-[^-]*$", "", p["ver"])

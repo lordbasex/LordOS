@@ -65,5 +65,6 @@
   "ask.vr": "«{app}» quer usar o headset de realidade virtual {headset}",
   "ask.vrNote": "A tela dele passa a ser só do app; o LordOS nunca mostra sua área de trabalho ali. Ela é retomada quando o app fecha, o headset é desconectado ou a tela é bloqueada. Você pode mudar isso depois em Ajustes → Privacidade.",
   "perm.vr": "Headsets de realidade virtual",
-  "permHint.vr": "Apps que podem controlar diretamente a tela de um headset de realidade virtual. Só headsets são emprestados, nunca seus monitores, e são retomados quando a tela é bloqueada, você troca de usuário ou escolhe Negar."
+  "permHint.vr": "Apps que podem controlar diretamente a tela de um headset de realidade virtual. Só headsets são emprestados, nunca seus monitores, e são retomados quando a tela é bloqueada, você troca de usuário ou escolhe Negar.",
+  "protectedCapture": "Janela protegida"
 }

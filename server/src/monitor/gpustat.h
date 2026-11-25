@@ -10,6 +10,13 @@
  *    drm-driver, drm-pdev, drm-client-id, drm-engine-*, drm-engine-capacity-*, drm-cycles-*, drm-total-cycles-*,
  *    drm-memory-*, drm-total-*, drm-resident-*, drm-shared-*). Raw counters only: rates are made in JS
  *    (apps/monitor/gpumodel.js), which also dedupes clients shared between processes.
+ *    Also each card's PCIe link (current_link_speed/width, max_link_speed/width), amdgpu's mem_busy_percent, the
+ *    sensors' temp*_crit, power1_max when there is no power1_cap, i915's gt_RP0_freq_mhz and power/rc6_residency_ms,
+ *    xe's tile<T>/gt<G>/freq0 and gtidle/idle_residency_ms per GT, and NVIDIA's /proc/driver/nvidia/gpus/<slot>/information
+ *    (Model and Video BIOS only). Never pcie_bw (it stalls the card for a second) and never debugfs.
+ *  - /sys/class/kfd/kfd/proc/<pid>/ (ROCm's KFD): vram_<gpu>, sdma_<gpu>, stats_<gpu>/cu_occupancy of the user's own
+ *    processes, the gpu id mapped to its PCI slot through /sys/class/kfd/kfd/topology; another user's KFD process is
+ *    listed in "hidden" by pid and name only. /dev/nvidia<N> holders among the user's own processes (which minors).
  *  - /proc/<pid>/stat of every process, for LordOS's AI helpers (lord-tts, lord-ocr, lord-say) and the virtual
  *    machines (qemu-system-*, the user's own), and lord-say's status note (~/.cache/lordos/say/<pid>, written by
  *    say.c: the backend, quality and language it chose).
@@ -44,7 +51,11 @@ typedef struct {
     GpuMem mem[GPU_REGIONS]; int nmem;
 } GpuClient;
 
-typedef struct { char label[16]; int mc; } GpuTemp;
+typedef struct { char label[16]; int mc, crit_mc; } GpuTemp;   /* crit_mc: temp*_crit, -1 */
+
+/* xe: one GT of a tile (tileT/gtG/freq0 and gtidle) */
+typedef struct { int tile, gt, act, cur, max, rp0; long long idle_ms; char kind[4]; } GpuGt;   /* kind: "rc" (render), "mc" (media), "" */
+#define GPU_GTS 4
 
 typedef struct {
     char card[12], driver[GPU_NAME], slot[GPU_NAME], vendor[8], device[8];
@@ -58,6 +69,13 @@ typedef struct {
     long long power_uw, cap_uw, energy_uj;   /* -1 */
     int sclk_mhz, mclk_mhz, sclk_max, mclk_max;   /* -1 */
     int cur_mhz, max_mhz;               /* i915/xe: the GPU's actual and top frequency, -1 */
+    int mem_busy;                       /* amdgpu mem_busy_percent, -1 */
+    int link_speed, link_width, link_max_speed, link_max_width;   /* PCIe: speed in tenths of GT/s ("8.0 GT/s" = 80), lanes; -1 */
+    int rp0_mhz;                        /* i915 gt_RP0_freq_mhz, -1 */
+    long long rc6_ms;                   /* i915 power/rc6_residency_ms (a counter: idle time), -1 */
+    GpuGt gt[GPU_GTS];                  /* xe */
+    int ngt;
+    char nv_model[64], nv_vbios[24];    /* nvidia: /proc/driver/nvidia/gpus/<slot>/information, "" */
 } GpuCard;
 
 /* lord-say's status note: "lord-say 1 <vulkan|cpu> <hd|standard> <language> <speak|save>\n" */
@@ -74,14 +92,31 @@ int gpu_say_parse(const char *text, GpuSay *s);
  * libOpenCL*, libcuda*, *_drv_video.so, ...): their base names, deduplicated, at most max. Their count. */
 int gpu_maps_libs(const char *text, size_t len, char out[][64], int max);
 
+/* The PCIe link speed file ("8.0 GT/s PCIe", "16 GT/s", "Unknown"): tenths of GT/s, -1 */
+int gpu_link_speed(const char *text);
+/* A process's argv (NUL-separated, len bytes): the BASE NAME of the model given with -m/--model (also --model=x), only
+ * [A-Za-z0-9._+-], at most out_n-1 characters; "" if none. Never the path. */
+void gpu_argv_model(const char *argv, size_t len, char *out, size_t out_n);
+/* One line of /proc/driver/nvidia/gpus/<slot>/information: "Model: \t NVIDIA ...": the value (printable ASCII) */
+void gpu_nv_info(const char *text, GpuCard *g);
+/* Tests: forget the cached list of processes holding a GPU (the next gpu_json rescans /proc at once) */
+void gpu_cache_reset(void);
+
 /* The cards under root ("" = this machine); pci_ids: the name list's path or NULL. Returns how many. */
 int gpu_cards_read(const char *root, const char *pci_ids, GpuCard *out, int max);
 
 /* The whole picture as malloc'd JSON (NULL without memory):
- *   {"t","mono","hz","cards":[…],"list":[{pid,ppid,name,cmd,exe,self,clients:[…]}],
- *    "ai":[{pid,ppid,name,state,own}],"say":[{pid,state,backend,quality,lang,mode}],"vms":[{pid,ticks,rss}]}
+ *   {"t","mono","hz","cards":[…],"list":[{pid,ppid,name,cmd,exe,self,model,libs,clients:[…],kfd:[…],nvDev:[minors]}],
+ *    "hidden":[{pid,name,kind}],"ai":[{pid,ppid,name,state,own,ticks,rss,model}],"say":[…],"vms":[{pid,ticks,rss}],
+ *    "caps":{…}}  (mon.c splices lord-nvgpu's "nv" in after this, monitor/nvgpu.h)
  * root: "" for the real /proc and /sys; uid: the user's (only their processes' fds are read); self: lord-server's pid;
- * home: where lord-say's notes are (NULL: none). */
+ * home: where lord-say's notes are (NULL: none).
+ *
+ * Cost: /proc is walked (every process's stat, the user's processes' fd folders) only every GPU_RESCAN_MS; the
+ * processes found holding a DRM, KFD or NVIDIA device are kept with the fds, and each call re-reads only those fds'
+ * fdinfo (and the stat of the few processes kept), so a call between rescans costs well under a millisecond. A
+ * process kept whose start time changed (pid reused) is dropped at once. */
+#define GPU_RESCAN_MS 5000
 char *gpu_json(const char *root, const char *pci_ids, unsigned uid, int self, const char *home);
 
 #endif

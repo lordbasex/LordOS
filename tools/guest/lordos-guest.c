@@ -26,20 +26,59 @@
  * systemd the display's variables can arrive after the service started: they're read from the user's manager
  * (systemctl --user show-environment) while they're missing.
  *
+ * The clipboard on a guest that runs LordOS (tools 9): its lord-server has no data-control protocol and offers its X
+ * selection only to a focused X window, so neither wl-paste nor xclip can follow it. When lord-server's endpoint
+ * (below) says "clipboard" in its hello, that is the tool: its AGK_CLIP frames are the clipboard's text, and text from
+ * the host goes to it as AGK_CLIP (text only: the hello to the host has no "clipx" then). No X connection is made on
+ * such a desktop (it would start Xwayland for nothing).
+ *
  * Apps mode (7.2) on a guest that runs LordOS: the guest's own lord-server lists its windows on a local socket of the
  * signed-in person ($XDG_RUNTIME_DIR/lordos-guestwin.sock, server/src/ui/js_guestwin.c). While that socket answers,
  * the hello says "windows" too, and frames are relayed both ways, each checked with vmagent.c's parsers and written
  * again: the windows, their icons and the launcher's app list toward the host; apps mode on or off, an action on a
  * listed window and the launch of a listed app toward lord-server (which checks them again). Nothing here runs an app.
  *
- *   lordos-guest [--port PATH] [--windows PATH] [--once]
+ * The guest's shutdown (docs/VIRTUALIZATION.md "Graphics 3D"): systemd-shutdown runs every program in
+ * /usr/lib/systemd/system-shutdown/ with poweroff, halt, reboot or kexec once all services have stopped and the file
+ * systems are read-only. The hook there (packaging/systemd/lordos-guest-shutdown, or the one Install Agent writes)
+ * runs `lordos-guest --stopping <verb>`, as root: it opens the port (free again: this helper's own run has ended),
+ * sends AGK_STOPPING (vmagent.h) and waits up to AG_STOP_WAIT_MS for lord-vm's echo, then the guest goes on. No port
+ * (a computer that isn't a Machines guest, or its agent is off): it ends at once. The hello says "stopping" while such
+ * a hook is installed, so Machines knows a shutdown or restart would have been said.
+ *
+ * The machine's performance profile (docs/VIRTUALIZATION.md 7.1.4, tools 7, "perf" in the hello; perf.h): on AGK_PERF
+ * this side, as the person and with its own D-Bus client (no program started), sets power-profiles-daemon's profile to
+ * performance on the system bus and turns GNOME's animations off on the session bus, keeps what was there before and
+ * puts it back on AGK_PERF 0, when the port goes, when it ends (SIGTERM, SIGINT, SIGHUP) and at the next start after a
+ * crash. It answers AGK_PERFSTATE. Built without it (-DLG_NO_PERF), the hello doesn't say "perf".
+ *
+ * The agent's shell, and links and notifications for the host (tools 8, "shell links notify" in the hello; gshell.h):
+ * the host opens a shell here as the person (their own login shell in a pty, never root, nothing named by the host);
+ * the person's programs hand this helper a link or a notification over $XDG_RUNTIME_DIR/lordos-guest.sock, which goes
+ * on only when the host's hello says the machine takes them.
+ *
+ * Tools 10 ("send" in the hello; gsend.h, gnotes.h): "Send to LordOS" (`lordos-guest --send-to-host FILE...`, the file
+ * manager's entry lordos-send-to-host.desktop) sends files to the host's quarantine folder for this machine, one at a time,
+ * with flow control and resume; and while the host takes notifications, the person's own desktop notifications go on too.
+ *
+ *   lordos-guest [--port PATH] [--windows PATH] [--once] [--system-bus PATH] [--session-bus PATH]
+ *   lordos-guest [--port PATH] --stopping poweroff|halt|reboot|kexec
+ *   lordos-guest --open-on-host URL | --notify-host TITLE [BODY] | --send-to-host FILE...
  *     --port: the agent's port (a character device; a Unix socket path for tests); --windows: lord-server's socket
- *     (default $XDG_RUNTIME_DIR/lordos-guestwin.sock); --once: one look at the clipboard and the port, for tests */
+ *     (default $XDG_RUNTIME_DIR/lordos-guestwin.sock); --once: one look at the clipboard and the port, for tests;
+ *     --system-bus, --session-bus: other buses' sockets for the performance profile, for tests;
+ *     --stopping: say the guest powers off or restarts now (above) and end */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 #include "../../server/src/vm/vmagent.h"
 #include "x11clip.h"
+#include "gshell.h"
+#include "gsend.h"
+#include "gnotes.h"
+#ifndef LG_NO_PERF
+#include "perf.h"
+#endif
 
 #include <errno.h>
 #include <fcntl.h>
@@ -48,6 +87,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
@@ -56,7 +96,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define VERSION "5"
+#define VERSION "10"
 #define PORT "/dev/virtio-ports/org.lordos.agent"
 #define CLIP_MAX AG_TEXT_MAX
 
@@ -112,8 +152,8 @@ static long run(char *const argv[], const uint8_t *in, size_t in_n, uint8_t *out
 }
 
 /* ---- the clipboard's tools: which ones this guest has, in the order they're tried ---- */
-enum { T_WL = 1, T_XCLIP = 2 };
-static int tools[2], tool_n;            /* tool_n 0: none (the hello says "noclip") */
+enum { T_WL = 1, T_XCLIP = 2, T_LORD = 3 };
+static int tools[3], tool_n;            /* tool_n 0: none (the hello says "noclip") */
 static long long tool_look_at;          /* when to look for them again (0: at once) */
 static char tool_said[160];             /* what the journal was told last */
 
@@ -164,9 +204,21 @@ static void session_env(void) {
     }
 }
 
+/* the guest's own lord-server (a LordOS desktop): its endpoint is connected and its hello said "clipboard"; its text */
+static int wfd = -1;
+static int srv_clip;
+static uint8_t *srv_text;
+static size_t srv_text_n;
+
 /* looks for the tools; 1 when whether there is one changed (the hello has to be said again) */
 static int pick_tools(void) {
     int had = tool_n > 0;
+    if (wfd >= 0 && srv_clip) {
+        tool_n = 0;
+        tools[tool_n++] = T_LORD;
+        if (strcmp(tool_said, "clipboard through LordOS (lord-server)")) { fprintf(stderr, "lordos-guest: clipboard through LordOS (lord-server)\n"); snprintf(tool_said, sizeof tool_said, "%s", "clipboard through LordOS (lord-server)"); }
+        return had != 1;
+    }
     session_env();
     int x = in_path("xclip"), w = in_path("wl-paste") && in_path("wl-copy");
     const char *desk = env_set("XDG_CURRENT_DESKTOP");
@@ -195,6 +247,12 @@ static long clip_read_type(const char *type, uint8_t *out, size_t cap) {
     int text = !strcmp(type, "text");
     long n = -1;
     for (int i = 0; i < tool_n && n < 0; i++) {
+        if (tools[i] == T_LORD) {
+            if (!text) continue;
+            n = srv_text_n <= cap ? (long)srv_text_n : -1;
+            if (n > 0) memcpy(out, srv_text, srv_text_n);
+            continue;
+        }
         char *a[] = { "wl-paste", "-n", "-t", text ? "text/plain;charset=utf-8" : (char *)type, NULL };
         char *x[] = { "xclip", "-o", "-selection", "clipboard", "-t", text ? "UTF8_STRING" : (char *)type, NULL };
         n = tool_ran(run(tools[i] == T_WL ? a : x, NULL, 0, out, cap));
@@ -207,6 +265,7 @@ static long clip_read(uint8_t *out, size_t cap) { return clip_read_type("text", 
 static long clip_types(char *out, size_t cap) {
     long n = -1;
     for (int i = 0; i < tool_n && n < 0; i++) {
+        if (tools[i] == T_LORD) { n = snprintf(out, cap, "%s", srv_text_n ? "UTF8_STRING\n" : ""); continue; }
         char *a[] = { "wl-paste", "-l", NULL };
         char *x[] = { "xclip", "-o", "-selection", "clipboard", "-t", "TARGETS", NULL };
         n = tool_ran(run(tools[i] == T_WL ? a : x, NULL, 0, (uint8_t *)out, cap - 1));
@@ -221,9 +280,17 @@ static int has_type(const char *types, const char *t) {
     return 0;
 }
 
+static int send_frame(int fd, uint16_t kind, const uint8_t *p, uint32_t n);
 static int clip_write_type(const char *type, const uint8_t *p, size_t n) {
     int text = !strcmp(type, "text");
     for (int i = 0; i < tool_n; i++) {
+        if (tools[i] == T_LORD) {
+            if (!text || n > AG_TEXT_MAX || wfd < 0 || send_frame(wfd, AGK_CLIP, p, (uint32_t)n)) continue;
+            /* what lord-server now has (it doesn't echo it back) */
+            uint8_t *nt = realloc(srv_text, n ? n : 1);
+            if (nt) { srv_text = nt; memcpy(srv_text, p, n); srv_text_n = n; }
+            return 0;
+        }
         char *a[] = { "wl-copy", "--type", text ? "text/plain;charset=utf-8" : (char *)type, NULL };
         char *x[] = { "xclip", "-i", "-selection", "clipboard", "-t", text ? "UTF8_STRING" : (char *)type, NULL };
         if (tool_ran(run(tools[i] == T_WL ? a : x, p, n, NULL, 0)) >= 0) return 0;
@@ -232,17 +299,48 @@ static int clip_write_type(const char *type, const uint8_t *p, size_t n) {
 }
 static int clip_write(const uint8_t *p, size_t n) { return clip_write_type("text", p, n); }
 
+/* the whole frame, however the port takes it: a virtio-serial port writes at most 32 KiB per call (virtio_console), so
+ * a frame is written in a loop and never left half sent */
 static int send_frame(int fd, uint16_t kind, const uint8_t *p, uint32_t n) {
     uint8_t h[AG_HEAD];
     ag_frame_head(h, kind, 0, n);
-    struct iovec io[2] = { { h, AG_HEAD }, { (void *)p, n } };
-    return writev(fd, io, n ? 2 : 1) == (ssize_t)(AG_HEAD + n) ? 0 : -1;
+    size_t total = AG_HEAD + (size_t)n, done = 0;
+    while (done < total) {
+        struct iovec io[2];
+        int k = 0;
+        if (done < AG_HEAD) { io[k++] = (struct iovec){ h + done, AG_HEAD - done }; if (n) io[k++] = (struct iovec){ (void *)p, n }; }
+        else io[k++] = (struct iovec){ (void *)(p + (done - AG_HEAD)), total - done };
+        ssize_t w = writev(fd, io, k);
+        if (w < 0 && errno == EINTR) continue;
+        if (w < 0 && errno == EAGAIN) { struct pollfd q = { fd, POLLOUT, 0 }; if (poll(&q, 1, 2000) <= 0) return -1; continue; }
+        if (w <= 0) return -1;
+        done += (size_t)w;
+    }
+    return 0;
+}
+/* the hello to lord-server, with the agent port's descriptor alongside (SCM_RIGHTS): lord-server gives its clipboard
+ * only to the program that holds the port, and it can't look at this one's descriptors (it is non-dumpable) */
+static int send_hello_with_port(int sock, const char *me, int port_fd) {
+    uint8_t h[AG_HEAD];
+    size_t n = strlen(me);
+    ag_frame_head(h, AGK_HELLO, 0, (uint32_t)n);
+    struct iovec io[2] = { { h, AG_HEAD }, { (void *)me, n } };
+    union { struct cmsghdr c; char b[CMSG_SPACE(sizeof(int))]; } u;
+    struct msghdr m = { .msg_iov = io, .msg_iovlen = 2 };
+    if (port_fd >= 0) {
+        memset(&u, 0, sizeof u);
+        m.msg_control = u.b; m.msg_controllen = sizeof u.b;
+        struct cmsghdr *c = CMSG_FIRSTHDR(&m);
+        c->cmsg_level = SOL_SOCKET; c->cmsg_type = SCM_RIGHTS; c->cmsg_len = CMSG_LEN(sizeof(int));
+        memcpy(CMSG_DATA(c), &port_fd, sizeof(int));
+    }
+    return sendmsg(sock, &m, MSG_NOSIGNAL) == (ssize_t)(AG_HEAD + n) ? 0 : -1;
 }
 
 /* ---- apps mode: the relay to the guest's own lord-server ---- */
 
-#define WIN_BUF (AG_HEAD + LAG_APPLIST_BYTES + 1024)
-static int wfd = -1;                    /* lord-server's endpoint, or -1 */
+/* frames from lord-server: the app list, or the clipboard's text (AG_TEXT_MAX), whichever is larger */
+#define WIN_BUF (AG_HEAD + (LAG_APPLIST_BYTES > AG_TEXT_MAX ? LAG_APPLIST_BYTES : AG_TEXT_MAX) + 1024)
 static uint8_t *win_in, *win_tmp;
 static size_t win_n;
 static LagAppList *app_list;            /* the launcher's apps lord-server listed: the only tokens sent on */
@@ -258,11 +356,26 @@ static int unix_connect(const char *path) {
     return s;
 }
 
+/* the shutdown hooks that run `lordos-guest --stopping` (the package's, Install Agent's): one there and executable */
+static const char *const STOP_HOOKS[] = { "/usr/lib/systemd/system-shutdown/lordos-guest",
+                                          "/usr/lib/systemd/system-shutdown/lordos-guest-local", NULL };
+static int stop_hook(void) {
+    for (int i = 0; STOP_HOOKS[i]; i++) if (!access(STOP_HOOKS[i], X_OK)) return 1;
+    return 0;
+}
+
 static void say_hello(int fd) {
-    char h[96];
+    char h[160];
+#ifndef LG_NO_PERF
+    static const char perf_word[] = " perf";
+#else
+    static const char perf_word[] = "";
+#endif
     /* "noclip": the helper is there but the guest has no clipboard tool (Machines says what to install) */
-    snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s%s", tool_n ? " clipboard clipx" : " noclip", tool_n && xc_fd() >= 0 ? " clipreq" : "",
-             wfd >= 0 ? " windows" : "");
+    int lord = tool_n && tools[0] == T_LORD;          /* lord-server's clipboard: text only, no X offer */
+    snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s%s%s%s shell%s", !tool_n ? " noclip" : lord ? " clipboard" : " clipboard clipx",
+             tool_n && !lord && xc_fd() >= 0 ? " clipreq" : "",
+             wfd >= 0 ? " windows" : "", stop_hook() ? " stopping" : "", perf_word, gshell_listen_fd() >= 0 ? " links notify send" : "");
     send_frame(fd, AGK_HELLO, (const uint8_t *)h, (uint32_t)strlen(h));
 }
 
@@ -272,6 +385,7 @@ static void win_close(int port_fd) {
     wfd = -1;
     win_n = 0;
     if (app_list) app_list->n = 0;
+    if (srv_clip) { srv_clip = 0; srv_text_n = 0; pick_tools(); }      /* back to the guest's own tools, if any */
     if (port_fd >= 0) say_hello(port_fd);          /* no "windows" any more */
 }
 
@@ -307,6 +421,16 @@ static int from_server(int port_fd) {
         if (used < 0 || (!used && win_n == WIN_BUF)) return -1;
         if (!used) break;
         size_t n = 0;
+        if (f.kind == AGK_HELLO && f.len < 200 && !srv_clip && (ag_hello_caps(f.data, f.len) & AG_HELLO_CLIPBOARD)) {
+            /* lord-server holds the clipboard: it is the tool from now on; no X connection on this desktop */
+            srv_clip = 1;
+            xc_close();
+            pick_tools();
+            if (port_fd >= 0) say_hello(port_fd);
+        } else if (f.kind == AGK_CLIP && srv_clip && f.len <= AG_TEXT_MAX && ag_utf8_ok(f.data, f.len)) {
+            uint8_t *nt = realloc(srv_text, f.len ? f.len : 1);
+            if (nt) { srv_text = nt; memcpy(srv_text, f.data, f.len); srv_text_n = f.len; }
+        }
         if (f.kind == LAG_WINDOWS && !lag_winlist_read(f.data, f.len, win_list)) n = lag_windows_write(win_list, win_tmp, WIN_BUF);
         else if (f.kind == LAG_WINICON) {
             uint32_t id; uint16_t w, h; const uint8_t *px;
@@ -326,20 +450,94 @@ static int open_port(const char *port) {
     return open(port, O_RDWR | O_CLOEXEC | O_NOCTTY);
 }
 
+/* --stopping: AGK_STOPPING, then lord-vm's echo for at most AG_STOP_WAIT_MS. Always 0 once the verb is one (the
+ * guest's shutdown never waits on this beyond that), 2 when it isn't */
+static int say_stopping(const char *port, const char *verb) {
+    int mode = ag_stop_verb(verb);
+    if (!mode) { fprintf(stderr, "lordos-guest: --stopping takes poweroff, halt, reboot or kexec\n"); return 2; }
+    int fd = open_port(port);
+    if (fd < 0) return 0;                       /* no agent port: not a Machines guest, or its agent is off */
+    fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);     /* never stuck in a write: the shutdown goes on */
+    uint8_t b = (uint8_t)mode, in[AG_HEAD + 64];
+    size_t have = 0;
+    if (send_frame(fd, AGK_STOPPING, &b, 1)) { close(fd); return 0; }
+    long long end = now_ms() + AG_STOP_WAIT_MS;
+    for (;;) {
+        long long left = end - now_ms();
+        struct pollfd p = { fd, POLLIN, 0 };
+        if (left <= 0 || poll(&p, 1, (int)left) <= 0) break;
+        ssize_t r = read(fd, in + have, sizeof in - have);
+        if (r <= 0) { if (r < 0 && errno == EINTR) continue; break; }
+        have += (size_t)r;
+        int done = 0;
+        for (;;) {
+            AgFrame f;
+            int used = ag_frame_next(in, have, &f);
+            if (used < 0 || (!used && have == sizeof in)) { have = 0; break; }   /* a big frame of something else: dropped */
+            if (!used) break;
+            int m;
+            if (f.kind == AGK_STOPPING && !ag_stopping_parse(f.data, f.len, &m) && m == mode) done = 1;
+            memmove(in, in + used, have - (size_t)used);
+            have -= (size_t)used;
+        }
+        if (done) break;
+    }
+    close(fd);
+    return 0;
+}
+
+#ifndef LG_NO_PERF
+/* the performance profile: applied or put back, and the outcome said to the host (fd < 0: only done) */
+static void perf_do(int fd, int on) {
+    unsigned done, failed;
+    uint8_t b[AG_PERFSTATE_BYTES];
+    perf_set(on, &done, &failed);
+    if (fd >= 0 && !ag_perfstate_write(b, on, done, failed)) send_frame(fd, AGK_PERFSTATE, b, sizeof b);
+}
+#endif
+
+/* SIGTERM (the session's end), SIGINT, SIGHUP: the profile is put back before the helper ends */
+static volatile sig_atomic_t ending;
+static void on_end(int sig) { (void)sig; ending = 1; }
+
 int main(int argc, char **argv) {
     const char *port = PORT;
     char wpath[256] = "";
     const char *rt = getenv("XDG_RUNTIME_DIR");
     if (rt && rt[0] == '/') snprintf(wpath, sizeof wpath, "%s/lordos-guestwin.sock", rt);
     int once = 0;
+    const char *stopping = NULL, *sys_bus = NULL, *ses_bus = NULL;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--port") && i + 1 < argc) port = argv[++i];
         else if (!strcmp(argv[i], "--windows") && i + 1 < argc) snprintf(wpath, sizeof wpath, "%s", argv[++i]);
         else if (!strcmp(argv[i], "--once")) once = 1;
+        else if (!strcmp(argv[i], "--stopping") && i + 1 < argc) stopping = argv[++i];
+        else if (!strcmp(argv[i], "--system-bus") && i + 1 < argc) sys_bus = argv[++i];
+        else if (!strcmp(argv[i], "--session-bus") && i + 1 < argc) ses_bus = argv[++i];
         else if (!strcmp(argv[i], "--version")) { printf("lordos-guest %s\n", VERSION); return 0; }
-        else { fprintf(stderr, "usage: lordos-guest [--port PATH] [--windows PATH] [--once]\n"); return 2; }
+        else if (!strcmp(argv[i], "--open-on-host") && i + 1 < argc && i + 2 == argc) return gshell_cli(argv[i], argv[i + 1], NULL);
+        else if (!strcmp(argv[i], "--notify-host") && i + 1 < argc && i + 3 >= argc) return gshell_cli(argv[i], argv[i + 1], i + 2 < argc ? argv[i + 2] : NULL);
+        else if (!strcmp(argv[i], "--send-to-host") && i + 1 < argc) return gsend_cli(argc - i - 1, argv + i + 1);
+        else { fprintf(stderr, "usage: lordos-guest [--port PATH] [--windows PATH] [--once] [--system-bus PATH] [--session-bus PATH] | [--port PATH] --stopping VERB | --open-on-host URL | --notify-host TITLE [BODY] | --send-to-host FILE...\n"); return 2; }
     }
     signal(SIGPIPE, SIG_IGN);
+    /* non-dumpable: another program of the same person can't attach to this one (ptrace) or open its descriptors in
+     * /proc to reach the agent port or the clipboard it carries */
+    prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
+    if (stopping) return say_stopping(port, stopping);
+    /* without SA_RESTART: a wait in poll or sleep ends at the signal */
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_handler = on_end;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGHUP, &sa, NULL);
+#ifndef LG_NO_PERF
+    perf_buses(sys_bus, ses_bus);
+#else
+    (void)sys_bus; (void)ses_bus;
+#endif
     win_in = malloc(WIN_BUF); win_tmp = malloc(WIN_BUF); app_list = calloc(1, sizeof *app_list); win_list = calloc(1, sizeof *win_list);
     if (!win_in || !win_tmp || !app_list || !win_list) return 1;
     long long win_try = 0;
@@ -353,28 +551,57 @@ int main(int argc, char **argv) {
     long long asked_at[4] = { 0 };          /* a request to the host per form, waiting since then (0 none) */
     long long next_look = 0, png_look = 0;
     pick_tools();
-    xc_open();
+#ifndef LG_NO_PERF
+    perf_recover();                     /* an earlier run that ended badly left the profile on */
+#endif
+    struct stat wst;
+    int lord_desk = wpath[0] && !stat(wpath, &wst) && S_ISSOCK(wst.st_mode);
+    if (!lord_desk) xc_open();          /* a LordOS desktop: lord-server's own clipboard instead (it would start Xwayland) */
+    if (!once) gshell_listen();
+    unsigned host_caps = 0;                 /* the host's hello: "links", "notify" while the machine takes them */
     tool_look_at = now_ms() + 30000;
     for (;;) {
+        if (ending) {
+            gshell_end();
+#ifndef LG_NO_PERF
+            if (perf_active()) perf_do(fd, 0);
+#endif
+            return 0;
+        }
+#ifndef LG_NO_PERF
+        /* the port went (the host's lord-vm is gone): the profile lasts only while the host holds it */
+        if (fd < 0 && perf_active()) perf_do(-1, 0);
+#endif
+        if (fd < 0 && gshell_fd() >= 0) gshell_end();             /* the host is gone: so is its shell */
+        if (fd < 0) { gsend_port_lost(); gnotes_want(0, NULL); }
         if (fd < 0) {
             fd = open_port(port);
             if (fd < 0) { if (once) { perror(port); return 1; } sleep(3); continue; }
             say_hello(fd);
             have = 0;
             host_clipx = host_clipreq = 0;
+            host_caps = 0;
         }
+        gshell_expire();
+        gnotes_want((host_caps & AG_HELLO_NOTIFY) != 0, ses_bus);
+        int send_wait = gsend_pump(fd);
         long long now = now_ms();
         /* lord-server's endpoint: tried every 3 s while it isn't there; the hello says "windows" while it is */
         if (wfd < 0 && wpath[0] && now >= win_try) {
             win_try = now + 3000;
             wfd = unix_connect(wpath);
-            if (wfd >= 0) { win_n = 0; say_hello(fd); }
+            if (wfd >= 0) {
+                static const char me[] = "lordos-guest " VERSION " clipboard";     /* lord-server's clipboard, if it gives it */
+                win_n = 0;
+                send_hello_with_port(wfd, me, fd);
+                say_hello(fd);
+            }
         }
         /* the tools again every 30 s, or at once after one couldn't be started; the hello again when that changed */
         if (now >= tool_look_at) {
             tool_look_at = now + 30000;
             int had_x = xc_fd() >= 0;
-            if (xc_fd() < 0) xc_open();
+            if (xc_fd() < 0 && !srv_clip && !(wpath[0] && !stat(wpath, &wst) && S_ISSOCK(wst.st_mode))) xc_open();
             if (pick_tools() || had_x != (xc_fd() >= 0)) say_hello(fd);
         }
         /* a program pastes the host's offer: that form asked of the host, once; no answer in time is a refusal */
@@ -438,12 +665,21 @@ int main(int argc, char **argv) {
             if (once) return 0;
         }
         int xfd0 = xc_fd();
-        struct pollfd pp[3] = { { fd, POLLIN, 0 }, { wfd, POLLIN, 0 }, { xfd0, POLLIN, 0 } };
+        struct pollfd pp[10] = { { fd, POLLIN, 0 }, { wfd, POLLIN, 0 }, { xfd0, POLLIN, 0 },
+                                { gshell_fd(), (short)((gshell_can_read() ? POLLIN : 0) | (gshell_wants_out() ? POLLOUT : 0)), 0 },
+                                { gshell_listen_fd(), POLLIN, 0 } };
+        for (int i = 0; i < 4; i++) pp[5 + i] = (struct pollfd){ gshell_client_fd(i), POLLIN, 0 };
+        pp[9] = (struct pollfd){ gnotes_fd(), POLLIN, 0 };
         long long until = next_look - now_ms();
         if (until > 250) until = 250;          /* the requests' time limits */
-        int r = poll(pp, 3, (int)(until > 0 ? until : 0));
+        if (send_wait >= 0 && send_wait < until) until = send_wait;      /* a file on its way */
+        int r = poll(pp, 10, (int)(until > 0 ? until : 0));
         if (r < 0 && errno != EINTR) { close(fd); fd = -1; continue; }
         if (r <= 0) continue;
+        if (pp[3].fd >= 0 && pp[3].revents) gshell_pump(fd, pp[3].revents);
+        if (pp[4].fd >= 0 && (pp[4].revents & POLLIN)) gshell_accept();
+        if (pp[9].fd >= 0 && pp[9].revents) gnotes_read(fd);
+        for (int i = 0; i < 4; i++) if (pp[5 + i].fd >= 0 && pp[5 + i].revents) gshell_client(i, fd, host_caps);
         if (xfd0 >= 0 && (pp[2].revents & (POLLIN | POLLHUP | POLLERR)) && xc_read() < 0) say_hello(fd);
         if (wfd >= 0 && (pp[1].revents & (POLLIN | POLLHUP | POLLERR))) {
             int w = from_server(fd);
@@ -464,10 +700,19 @@ int main(int argc, char **argv) {
             if (f.kind == AGK_HELLO) {
                 host_clipx = f.len < 200 && memmem(f.data, f.len, " clipx", 6) != NULL;
                 host_clipreq = f.len < 200 && (ag_hello_caps(f.data, f.len) & AG_HELLO_CLIPREQ);
+                host_caps = f.len < 200 ? ag_hello_caps(f.data, f.len) : 0;
+                gsend_host(fd, (host_caps & AG_HELLO_SEND) != 0);
                 /* a new lord-vm (after a resume) asks once: the hello again */
                 if (f.len < 200 && memmem(f.data, f.len, " ask", 4)) say_hello(fd);
             }
             if (f.kind == LAG_APPS || f.kind == LAG_WINACT || f.kind == LAG_LAUNCH) to_server(&f);
+            gshell_frame(fd, f.kind, f.data, f.len);
+            gsend_frame(fd, f.kind, f.data, f.len);
+#ifndef LG_NO_PERF
+            int perf_on;
+            /* the desktop's name (XDG_CURRENT_DESKTOP) may still be on its way from the user's manager */
+            if (f.kind == AGK_PERF && !ag_perf_parse(f.data, f.len, &perf_on)) { session_env(); perf_do(fd, perf_on); }
+#endif
             uint32_t g;
             uint8_t forms, flags, form, status;
             const uint8_t *d;

@@ -12,7 +12,7 @@
 // The rules are saved by lord-server (lord.fw); this screen writes no files.
 import {
   View, Text, Button, Segmented, ScrollView, GroupBox, useTheme, useLocale, useStore, useLauncherApps, firewall, firewallState, fwRule,
-  spacing, typeScale, formatDate, formatTime, netModel, DisclosureGlyph,
+  spacing, typeScale, formatDate, formatTime, netModel, DisclosureGlyph, monitor,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { RuleSheet, destKind, RED, GREEN } from './RuleSheet.jsx';
@@ -36,7 +36,11 @@ function useAppIndex() {
 // (0.8.5) LordOS's own components with their own scope take rules too (Mail, Store, Printers, Terminal, Blocklists)
 const { COMPONENTS } = netModel;
 const COMPONENT_IDS = Object.keys(COMPONENTS).filter((id) => id.startsWith('lordos:') && !COMPONENTS[id].system);
-export const appLabelOf = (tr, apps, id) => (id === 'lordos' ? tr('monitor.lordos') : COMPONENTS[id] ? tr(COMPONENTS[id].label) : apps.get(id)?.name || id.replace(/^(desktop|lpk|flatpak):/, ''));
+// (Machines to 100 %) each machine is its own app, "lordos:vm-<id>", named after the machine
+export const appLabelOf = (tr, apps, id) => (id === 'lordos' ? tr('monitor.lordos')
+  : netModel.vmIdOf(id) ? netModel.componentLabel(tr, id, monitor.machineNames([netModel.vmIdOf(id)]))
+    : COMPONENTS[id] ? tr(COMPONENTS[id].label) : apps.get(id)?.name || id.replace(/^(desktop|lpk|flatpak):/, ''));
+const machineIds = () => monitor.machineList().map((m) => netModel.vmAppOf(m.id)).filter(Boolean);
 
 function AppIcon({ a, size = 24 }) {
   const t = useTheme();
@@ -112,6 +116,7 @@ function AppRules({ id, apps, open, onToggle }) {
       {open && (
         <View style={{ gap: spacing.m, paddingBottom: spacing.m, paddingInlineStart: 32 }}>
           {!can ? <Text style={{ fontSize: typeScale.caption, color: '#ff9f0a', lineHeight: 1.35, textAlign: 'start' }}>{tr('fwrules.notEnforceable')}</Text> : null}
+          {netModel.vmIdOf(id) ? <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{tr('fwrules.machineInherits')}</Text> : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m }}>
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('fwrules.default')}</Text>
@@ -153,7 +158,7 @@ function AddApp({ apps, exclude, onPick }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [open, setOpen] = useState(false);
-  const choices = ['lordos', ...COMPONENT_IDS, ...apps.keys()].filter((id) => !exclude.has(id));
+  const choices = ['lordos', ...COMPONENT_IDS, ...machineIds(), ...apps.keys()].filter((id) => !exclude.has(id));
   return (
     <View style={{ gap: spacing.s, paddingVertical: spacing.s }}>
       <View style={{ flexDirection: 'row' }}>

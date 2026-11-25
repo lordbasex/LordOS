@@ -489,6 +489,177 @@ protected list, a stale start time refused while the process survives, TERM and 
 children, the session and PID 1 refused, and the Get Info JSON (a pipe and a listening TCP socket
 among the open files; no private parts when not the owner; "gone" for another start time).
 
+### Grouped view (0.8.9.6, in development)
+
+**Grouped**, next to Mine | All (and combined with either), shows one row per app with an arrow that opens its
+processes (→ and ← or Enter, or the arrow). The choice is kept in `settings.monitor.procGrouped`. The groups
+(`apps/monitor/procgroupmodel.js`, pure) are one user's each, and every process is in exactly one:
+
+1. **The kernel's threads** (`prot` `kernel`): one group.
+2. **An app's scope**, read by lord-server from `/proc/<pid>/cgroup` (`p.app`): a Linux app's
+   `app-lordos-<id>.scope`, an isolated app's `lpk-`, a Flatpak app's `fp-`, a web app's
+   `app-lordos-lordos-web-<app>.scope`, a machine's `app-lordos-lordos-vm-<id>.scope`, and (new) one of LordOS's
+   components, `lordos-net-<name>.scope` (`lordos:<name>`: the Terminal's programs are one "Terminal" group, Mail's
+   connector its own). The scope is root-owned and inherited, so a browser's zygotes, renderers, GPU process and its
+   double-forked crash reporter (reparented to PID 1) all stay in the browser's group.
+3. **LordOS** itself (the session's lord-server, its helpers, any `lord-*` program): one group per user.
+4. Otherwise **the process tree**: the top ancestor below a boundary (PID 1, the kernel, a service manager,
+   LordOS, another app's scope, another user), and trees whose top process is the same program are one group
+   (several runs of the same program, orphans of the same executable).
+
+A group row shows the app's icon and name, its origin badge, the total % CPU, its memory (each process's
+proportional memory where lord-server read it, so a shared page counts once: the same number as Memory → "Using
+the most memory"), the total threads, the number of processes and the user. Hovering it shows, after a moment, a
+summary taken when it opens: the number of processes, the child using the most CPU and the one using the most memory
+(name and PID), and the last minute's statistics with two sparklines. It is information only: it holds no buttons.
+
+The search matches a group's name or any of its processes; a group that matched only through some processes opens
+with just those. Every column sorts (click again to reverse), the groups by their totals and the processes inside by
+the same column; the order is kept in `settings.monitor.procSort`.
+
+**Quit All** (the selected group row's button, the toolbar's ⓧ, Delete, or the right-click menu's Quit All… and
+Force Quit All…) works on a snapshot: the sheet lists the processes the group had when it was chosen, each by PID
+and start time. Running it signals, one by one and through the same paths as a single process
+(`lord.monitor.signal` for the user's own, the root helper's `proc-signal` for an administrator), only those that
+are still the same process: a PID now used by another process is skipped and the sheet says how many; protected
+processes are never signalled. It then waits: when all have exited it closes, and after three seconds it offers
+Force Quit for the ones still open. No new privilege: `cgroup.kill` is not used, since the scopes are root-owned.
+LordOS's and the kernel's groups can't be ended as a group (their members still can, one by one, under the usual
+rules). A child row has its own ⓧ, Quit… and Force Quit… in its menu, and Get Info.
+
+### Descriptions (0.8.9.6, in development)
+
+Get Info (grouped and flat views) shows **Description** between the command line and the Memory / Statistics / Files
+tabs: what the program is, from what the computer already has, local and cheap, never running a program and never
+going to the network. One SDK function gives it to anyone who asks (`sdk/describe.js`, `describeProgram(p)` and
+`describeApp(item)`; the order and the language rules are `sdk/describemodel.js`, pure and tested); only Monitor uses
+it so far, and the Store's cards, Settings → Apps and the Dock's and launcher's tooltips can show the same text.
+
+The sources, in order (the first one in the person's language wins; with none in it, the first one, in English):
+
+1. **Kernel threads** (`prot: kernel` only, never a program that takes a kernel thread's name) and **LordOS's own
+   programs** (every `lord-*` built or shipped), from `sdk/programdesc.json`, in English.
+2. **The app**: an isolated LordOS app's manifest `description`; a web app's; a Linux or Flatpak app's `.desktop`
+   `Comment` (the `Comment[lang]` when it has one: `lord.apps.linux(lang)` now says so, `commentLocal`).
+3. **Well-known programs** of the system (systemd, (sd-pam), dbus, PipeWire, WirePlumber, the portals, polkit, udisks,
+   cron, sshd, shells, compilers, browsers…), by the executable's file name and only for a program in a system folder,
+   from `sdk/programdesc.json`, in English.
+4. **The manual page's one line** (what `whatis` shows), read by lord-server without running anything
+   (`server/src/monitor/describe.c`): `/usr/share/man/<lang>/man{1,8,6}/<name>.<n>[.gz]` first (Debian's translated
+   pages: `es`, `pt_BR`, `zh_CN`…), then `/usr/share/man`; root's files only, at most 2 MB (8 MB decompressed), the
+   first section's text after " - ", `man` and `mdoc` pages, one `.so` followed.
+5. **The service's `Description=`** for a process in a systemd unit (its cgroup), from the system's and the user's
+   unit folders.
+6. **The package's description** from dpkg's database (`/var/lib/dpkg/status`), in the person's language when apt
+   already has Debian's translation (`/var/lib/apt/lists/*_i18n_Translation-<code>`, the entry whose `Description-md5`
+   is the MD5 of the installed English description, so a translation of another version is never shown). When the main
+   text is another source's, the package's line is shown under it ("From the package coreutils: …").
+
+lord-server reads 4–6 in a worker thread and caches them (512 answers; a package's again when dpkg's database
+changes): `lord.monitor.describe(kind, arg, lang)` answers at once from the cache or `null` while it reads, and the
+sheet asks again a moment later. A text that exists only in English says so and, while Sentinela is on, offers
+**Translate with Lumo** (the local model, kept per language in `~/.cache/lordos/descriptions/<lang>.json`; see
+docs/SENTINELA.md). Nothing known: **Unknown**, and **Investigate with Lumo** for the person's own processes with
+Sentinela on and a local model installed, or a short note how to turn it on (docs/SENTINELA.md, "Investigate").
+
+Every LordOS app and program must have an English description: `tools/desc-check.mjs` (run by `tools/i18n-check.mjs`)
+fails when an `apps/<id>/manifest.json` has none or a `lord-*` the Makefiles build or `tools/iso/mkdeb.sh` ships has no
+entry. Coverage measured on the development machine (Debian 13, Spanish interface, 647 processes, `tests/describe_coverage.mjs`
+with `build/describe-cli`): 616 described (95 %): 316 kernel threads, 211 by their manual page, 50 well-known programs, 17
+by their package, 16 of LordOS's, 6 by their service; 176 of them in Spanish for free (translated manual pages and
+Debian's translations), the rest in English with "Translate with Lumo"; the 31 unknown were programs of no package in
+the home folder or a build folder, and other users' processes whose program can't be read. Tests: `build/describe-test` (MD5, a package and its translation, the
+language codes, `man` and `mdoc` summaries, a translated page first, a page not root's refused, a unit and a template),
+`tests/describe_model_test.mjs` (the order, the language and the fallback, Lumo's kept translations, pending, unknown),
+`tests/monitor_describe_scene.mjs`.
+
+### A long group opens without a freeze (0.8.9.6, in development)
+
+Opening the Terminal's group with about 240 programs froze the desktop for a second, and again on every redraw while
+it stayed open: the table drew every row of the group at once (about 12 800 nodes, each row with its icon, badge,
+chain and cells), and the process list redraws the tab once a second. Measured in a headless lord-server over a
+made-up Terminal of 240 programs (`tests/monitor_freeze_headless.sh`, the main thread's longest run from
+`lord.stats(1)`, on a development machine with a load average of about 20): opening went from 1547 ms to about 20 ms,
+a redraw with the group open from 1110 ms to about 17 ms, closing from 185 ms to about 16 ms (the numbers vary with
+the machine's load; all of it was JavaScript, layout and paint stayed under 60 ms in total).
+
+- **Only the rows in sight are drawn** (`sdk/lists.jsx` `Table`, `sight`): the tab's ScrollView tells its offset
+  (`procSight`, in steps of 104 px), the table draws the rows in sight and six more on each side, and empty space of
+  the others' height around them. The keys still move through every row: one not drawn is scrolled into sight by its
+  place (`onRevealRow`).
+- **A few new rows per pass** (`ROW_BUDGET`, 4): rows not drawn before are drawn four at a time, those in sight
+  first, the others waiting a moment as empty rows, so a pass stays within about a frame and the pointer's input is
+  handled between passes.
+- **A redraw keeps unchanged rows** (`rowSig`): each row's text (name, values, badge, chain, statistics) is one
+  string; a row whose string, selection and stripe are the same isn't drawn again.
+- A process's letter icon is one component per name (a new one on every redraw drew every icon again), and the
+  language's description (`meta.json`) is looked up once even when a language has none.
+
+The order is the same as before (the held order and the sort don't change). `tests/monitor_freeze_scene.mjs` (in
+`make test`) opens a group of 300 programs: the first pass draws at most four rows within 16 ms, then only the rows
+in sight and the margin, a redraw makes few nodes, and scrolling to the end draws the last rows.
+
+### A steady list (0.8.9.6, in development)
+
+While the pointer is over the table, a menu or a sheet is open, and for two seconds after the pointer leaves, the
+order is held (`holdOrder`, `holdGroups`): the values change in place, a new process goes at the end of its group (a
+new group at the end), and one that exited stays greyed, marked "ended", until the order is released. A small
+"Order paused" note shows meanwhile. Choosing another sort, filter or search applies at once. The selection is the
+process (PID and start time) or the group, never a row number, so it stays on the same process as rows move.
+
+### Who started it (0.8.9.6, in development)
+
+A process's chain of ancestors (`chainOf`): its parents from the same process list, up to the session's lord-server
+(named after the component the chain runs in: "Terminal › bash › claude › sh › sleep"), PID 1, a service manager or
+lord-sessiond. Each link is known by PID and start time, and a cached chain is made again when one of its processes
+changes. A child row shows it dimmed after its name (each link selects that process); Get Info → Statistics shows it
+in full as "Started by", with the apps' icons, each link opening that process.
+
+### Origin badges (0.8.9.6, in development)
+
+Each process and group carries a badge that stands on a fact LordOS can check, never on a name, with a tooltip
+saying why:
+
+| Badge | When |
+|---|---|
+| Blue verified seal: LordOS | the executable belongs to the `lordos` package (or a `lordos-*` one) |
+| Pink verified seal: LordOS app | an isolated `.lpk` app, with its signer (`lord.sign.status`): its scope `app-lordos-lpk-<id>` right inside the session's root-owned subtree (`/system.slice/lordos.service/lordos-session-<uid>/`, made only by lord-sessiond for lord-server; `mon_scope_parse`), and its executable the `lordos` package's `lord-server` (`lord-server --app <id>`) or a file of its own package folder `/usr/lib/lordos-apps/<id>/` (its companion). A scope of that name under `user@` is just a name any program of the person can pick (security finding F10): such a process is badged by its executable |
+| Flatpak | a Flatpak app's scope, with its app id |
+| Package (the repository's name, such as "Debian" or a vendor's) | another installed package owns the executable; the repository is the package index's label (`lord.pkg.info`); "installed from a file" when no index lists it |
+| Web app | a web app's scope, with its site |
+| Machine | a machine's QEMU and passt, with the machine's name |
+| Unpackaged | no installed package owns the executable (the home folder, an unpackaged `/opt`, an AppImage) |
+| Restart | the executable was replaced on disk while it runs (`(deleted)`): an update that needs a restart |
+
+The seals are our own drawing (`apps/monitor/seal.js`: eight rounded scallops and a check mark, as pixels). The
+owner comes from `lord.monitor.exeOwners(paths)` (`server/src/monitor/exeown.c`): dpkg's own file lists
+(`/var/lib/dpkg/info/*.list`, world-readable), read by a worker thread once for all the queued paths and cached
+(1024 paths); a lookup never blocks the screen, and an answer not in yet just shows no badge. The cache is looked
+at again when dpkg changes a list. Another user's process whose executable can't be read has no badge. Not shown
+yet: whether a Flatpak app is verified on Flathub (the Store's catalog isn't in the session).
+
+**Filters**: chips for System, LordOS apps, Flatpak, Debian, Web apps, Machines and Unpackaged (none chosen: all;
+grouped, a group's badge counts) and a **Program** picker that shows one group's processes; they combine with Mine
+| All, Grouped and the search, and are kept in `settings.monitor.procFilter`.
+
+### Rolling statistics (0.8.9.6, in development)
+
+`apps/monitor/procstatsmodel.js` keeps, for every process (PID and start time: a restart with the same PID starts
+over) and every group, the average and the peak of its CPU and memory over the last 1, 5 and 15 minutes and the
+95th percentile of its CPU over the last minute, from the process list lord-server builds once a second while
+Monitor shows Processes or Memory. A sample is O(1) per series: a ring of the last 60 samples with running sums,
+and a ring of 15 one-minute buckets with their sums and maximums; a series not fed for 15 minutes is dropped. The
+**Statistics** picker (Off, 1, 5 or 15 min, kept in `settings.monitor.procStats`) adds four sortable columns (CPU
+average and peak, memory average and peak over that window); a group's hover summary and Get Info → Statistics show
+the numbers and the last minute as sparklines.
+
+Tests: `tests/monitor_procgroup_test.mjs` (grouping with a browser's helpers, a Flatpak scope, a web app, orphans,
+another user; search, sort, the held order, the summary, Quit All's snapshot and a reused PID, the chain, the
+badges with made-up owners, the filters, the seal, the rolling statistics) and `tests/monitor_grouped_scene.mjs`
+(the tab over a made-up list: Grouped, the summary, Quit All skipping a reused PID, a child's Quit, the held order,
+the statistics' columns), in `make -C server test`; `build/procctl-test` covers `exeown.c` and the component
+scopes. Screenshots: `tests/monitor_headless.sh OUT_DIR default es` (a made-up list; nothing is signalled).
+
 ## Voltage (0.8.7)
 
 The first card draws the machine's board, a small single-board computer on the Pi and a motherboard elsewhere, with the way from the power input to the processor in the color of the power state: green, amber or red. It is our own drawing, with no maker's marks, and it doesn't move.
@@ -634,6 +805,127 @@ machine: the tab and the Overview open with no errors, and `lord.monitor.gpu()` 
 on screen. Not yet seen: a screenshot (the headless session's `remote.sock` takes only root), Intel, NVIDIA, a
 Raspberry Pi, a VM with virtio-gpu, lord-tts actually running on the GPU.
 
+### The 0.8.9.6 layout (in development; approved by the maintainer on 2026-11-24)
+
+The tab was redrawn after the mockup the maintainer approved (`/var/tmp/lordos-gpu-mock/`, the single-GPU "One" view
+is the reference). `apps/monitor/GpuView.jsx` draws it; `Gpu.jsx` keeps the sampler (`useGpu`), the fan by hand and the
+APIs card (both behind "Fan and APIs" under the card's name) and the Overview's lines.
+
+- **GPU chips**: one per card (vendor dot, short name, a three-minute load sparkline, load, temperature, VRAM). A click
+  picks the card. With two or more cards a **One / Side by side** switch shows the first two cards in two columns
+  (compact header, engines chart with the categories in its title, memory bar, a process table of App, Type, GPU, VRAM
+  and API).
+- **Header**: the vendor's color, the name, `driver · Mesa <version> (or NVIDIA's driver) · PCI slot · VRAM`, and tiles:
+  Load, Temperature (sensor and `temp*_crit` when the driver gives it), Power (of the cap; `power1_max` when there is no
+  `power1_cap`), Fan (RPM and %) or, with no fan, **Idle (RC6)** (i915 `power/rc6_residency_ms`, xe's render GT
+  `gtidle/idle_residency_ms`: the share of the last second the GPU slept), Core clock (of the DPM top, or i915's
+  `gt_RP0_freq_mhz`), Memory clock, **PCIe link** (`current_link_speed`/`width` as "Gen3 ×16", "of Gen4 ×16" when the
+  link runs below `max_link_*`). An integrated GPU's "Unknown" link is left out. `pcie_bw` is never read (it stalls
+  the card for a second) and debugfs is never read.
+- **Utilization by engine**: 3D, Compute, Video decode, Video encode, Copy (`engineCategory`), each summed over the
+  user's processes' clients this second, with a 180-sample chart (one per second, three minutes).
+- **Graphics memory**: VRAM used of total and GTT; a bar split by the type of process holding it (compute, graphics,
+  video; what no process of the user accounts for is counted as graphics) and free; amdgpu's `mem_busy_percent` as
+  "Memory controller busy"; a VRAM history chart. An integrated GPU shows the system memory its processes hold.
+- **Processes using the GPU**: App / process, PID, Type (Compute when its compute engines lead, or it maps CUDA, HIP
+  or OpenCL with no OpenGL; Video when decode/encode lead; else Graphics), GPU % with a bar split by engine, 3D, Comp,
+  Dec, Enc, Copy, VRAM, GTT and API. **Hidden** rows: another user's process that holds `/dev/kfd` (its pid is a folder
+  name in `/sys/class/kfd/kfd/proc`, world-readable): pid and name only, "its use is counted in the card total, not per
+  process". Shown on amdgpu cards only.
+- **AI on this computer**: one row per engine: the model runners (`llama-server`, `llama-cli`, `ollama`, `whisper-*`)
+  with the model's base name from their own `-m`/`--model` argument ("(from argv -m)"); Sentinela's engine, recognized
+  by the pid `lord.sentinela.state()` gives (with its model; "CPU only by design"); LordOS Voice (lord-say's note);
+  LordOS Studio; and any of the user's processes that map a model runtime (`libcuda`, `libamdhip64`, `libggml*`,
+  `libllama`, `libcudart`, `libonnxruntime`, `libtorch_cuda`) and use the GPU. "On this GPU" rows show the compute
+  share and VRAM; CPU rows show CPU (from `/proc/<pid>/stat` ticks) and RAM. A name or a model only ever labels a row:
+  a process of the same user can call itself anything and map any library, so nothing is trusted or granted because
+  of it, and the model is the base name only, `[A-Za-z0-9._+-]`, never a path and never cut.
+- **Size**: from a window of 1100×600 (the default is 1180×700) everything fits without scrolling; the table and the AI
+  list show the rows their boxes have room for (measured after each draw), with "+N more". Smaller windows scroll as
+  before. Light and dark follow the mockup's colors; right-to-left mirrors the layout (charts stay left to right).
+
+**Cost.** `gpu_json` used to walk all of `/proc` every second (15 ms with about 600 processes). Now the walk (every
+process's `stat`, the user's processes' fd folders) runs every 5 s (`GPU_RESCAN_MS`): it keeps the processes holding a
+`/dev/dri`, `/dev/kfd` or `/dev/nvidia*` fd with those fd numbers, the AI engines and machines. Each second only those
+fds' `fdinfo` and those processes' `stat` are read again: about 0.45 ms on the RX 580 PC with 8 GPU processes, plus
+about 0.4 ms for the two cards' sysfs. A kept process whose start time changed (pid reused) is dropped at once; a new
+process shows within 5 s. The reading is on the Monitor's thread, never during a draw.
+
+**New per card and per process (gpustat.c):** PCIe link, `mem_busy_percent`, `temp*_crit`, `power1_max`, i915
+`gt_RP0_freq_mhz` and `power/rc6_residency_ms`, xe `tile<T>/gt<G>/freq0/{act,cur,max,rp0}_freq` and
+`gtidle/{name,idle_residency_ms}` per GT, NVIDIA's `/proc/driver/nvidia/gpus/<slot>/information` (Model and Video BIOS
+only); ROCm's KFD per process (`/sys/class/kfd/kfd/proc/<pid>/vram_<gpu>`, `sdma_<gpu>`, `stats_<gpu>/cu_occupancy`, the
+gpu id mapped to its PCI slot through `topology/nodes/*/gpu_id` and `properties`' `domain` and `location_id`) for the
+user's own processes; which `/dev/nvidia<N>` minors a process of the user holds. `build/gpustat-test` covers each with
+fake trees and malformed files (link speeds, topology, information, argv), the cache, pid reuse and another user.
+
+**NVIDIA (lord-nvgpu).** The proprietary driver has no DRM fdinfo or sysfs sensors; its numbers come from the
+sandboxed `lord-nvgpu` (below, "NVIDIA"), which `mon.c` splices into the sample as `"nv"`. `gpumodel.js` merges each
+entry into the card with the same PCI slot (only where sysfs has nothing) and its processes into the rows by pid,
+checking every number's range again (`mergeNv`, `nvEngines`, `nvSlot`; `gpu_model_test.mjs` with canned and hostile
+values). Without the helper there is no `"nv"` and nothing changes. Not tested on NVIDIA hardware yet.
+
+**Screenshots** with made-up data: `server/tests/gpu_headless.sh OUT [theme] [language] [WxH] [dark|light]` (the scene
+in `tests/gpu_scene/`).
+### NVIDIA (in development)
+
+NVIDIA's proprietary driver has no fdinfo usage stats, no hwmon and no `gpu_busy_percent`, so the cards above show
+almost nothing for it. Its numbers come from NVIDIA's NVML, through a sandboxed helper (approved by the maintainer
+on 2026-11-24; AGENTS.md, `lord-nvgpu`). `lord-server` never links or loads NVML and never runs `nvidia-smi`.
+
+- **When.** `monitor/nvgpu.c` starts `lord-nvgpu` (installed next to `lord-server`) only while
+  `lord.monitor.wantGpu(true)` is in force (the GPU tab or the Overview on screen) and a PCI device of vendor `0x10de`
+  is bound to the `nvidia` driver (checked at most every 30 s). At most one helper; it is killed when the view goes
+  away (`wantGpu(false)`), when the Monitor's thread goes idle, and when lord-server dies (`PR_SET_PDEATHSIG`).
+  A helper that exits, sends something malformed or doesn't answer within 5 s (15 s for the first sample, while
+  NVML initializes) is killed and started again after 2, 4, 8 … 60 s.
+- **The helper** (`monitor/nvgpu_main.c`): no arguments, an empty environment, fd 3 a `SOCK_SEQPACKET` socketpair,
+  fds 0–2 `/dev/null`, every other fd closed, `no_new_privs`. It `dlopen`s only `libnvidia-ml.so.1` from
+  `/usr/lib/x86_64-linux-gnu`, `/usr/lib/aarch64-linux-gnu`, `/usr/lib64` or `/usr/lib`, after checking that the
+  folder and each parent, and the real file behind the symlink (in one of those folders), belong to root and aren't
+  writable by group or others; `RTLD_NOW | RTLD_LOCAL`. Then `nvmlInit_v2`, the device handles and one warm-up sample,
+  and only then `sandbox_apply_helper` (scope `lordos-nvgpu`, 256 MB): no network or new sockets, no exec, threads
+  only, Landlock read-only on `/proc/driver/nvidia`, `/sys/bus/pci/devices`, `/sys/devices` and the library folders,
+  read/write/ioctl only on `/dev/nvidiactl` and `/dev/nvidia<N>`, and `ioctl` only of NVIDIA's type `'F'` (0x46,
+  `NV_IOCTL_MAGIC` in the open kernel modules' `nv-ioctl-numbers.h`; `SANDBOX_IOCTL_NVIDIA`). The sandbox goes on
+  after init because NVML's init opens the device nodes by path, may read driver files that can't be listed without
+  the hardware and asks `nvidia-persistenced`; no input reaches the helper before it (no arguments, no environment).
+- **The wire** (`monitor/nvproto.h`): lord-server sends one byte per sample, at most once a second; the helper
+  answers with one message of fixed-size records: a header (CUDA version as a number, the driver version as at most
+  31 digits and dots), one record per GPU (PCI address as numbers, utilization of SM, memory, encoder and decoder,
+  temperature, fan, power and its limit in mW, core and memory clocks, VRAM used and total, compute mode as a number,
+  ECC on/off) and one per process (GPU index, pid, memory, SM/encoder/decoder share from NVML's latest sample).
+  Numbers only.
+- **The checks** (`nvgpu_parse`): exact size for the counts, at most 64 GPUs and 256 processes; percentages 0–100,
+  temperature −50…150 °C, clocks ≤ 100 000 MHz, power ≤ 10 kW, sizes ≤ 1 PiB, compute mode 0–3, ECC 0/1, the PCI
+  address in range, the driver string NUL-terminated digits and dots; anything else becomes `null`. A process is kept
+  only if its GPU index exists, its pid is 1…4 194 304 and `/proc/<pid>` belongs to the session user, checked when
+  the sample arrives (at most 256 `stat`s per sample). Nothing is ever read from the helper on the JS thread:
+  `nvgpu_poll()` runs on the Monitor's thread with non-blocking `recv`/`send`, and `nvgpu_json()` copies the latest
+  checked sample.
+- **What JS gets.** `lord.monitor.gpu()` gains `nv: [{ bus, util: { sm, mem, enc, dec }, temp, fan, power,
+  powerLimit, clk: { core, mem }, vram: { used, total }, cuda, driver, computeMode, ecc, procs: [{ pid, mem, sm, enc,
+  dec }] }]` (power in watts, clocks in MHz, memory in bytes, temperature in °C, the rest percent; `null` when not
+  reported; `computeMode` one of `default`, `exclusiveThread`, `prohibited`, `exclusiveProcess`). Without an NVIDIA
+  card, a helper or a sample, `nv` is absent.
+- **Tested** (`build/nvgpu-test`, ASan and UBSan): hand-made messages (canned, out of range, bad sizes and headers,
+  the largest one); 120 000 mutated messages, every parsed one giving valid JSON within range; the helper end to end
+  with a fake NVML (`tests/nvgpu_fake_nvml.c`, test-only `build/lord-nvgpu-test --lib`): canned values, hostile
+  values (a billion GPUs and processes, out-of-range numbers, a driver string with no NUL, root's and impossible
+  pids), every call failing, init failing, a call that hangs (killed and restarted, `nvgpu_poll` never blocked more
+  than 100 ms), and `wantGpu(false)` killing it; and the sandbox: after it, the helper can't create a socket, exec,
+  write a file, read `/etc` or do a tty ioctl. The installed `lord-nvgpu` has no `--lib` or `--probe`.
+- **Not yet verified on NVIDIA hardware:** the exact files NVML reads after init (Landlock might need another
+  read-only path), that every NVML ioctl after init is of type `'F'` (strace shows `_IOC(..., 0x46, ...)` for the RM
+  escapes; `/dev/nvidia-uvm`, whose ioctls aren't, is not allowed and NVML shouldn't need it), the 256 MB cap,
+  per-process utilization on consumer cards, and `nvidia-persistenced`'s absence. To check on an NVIDIA machine:
+  (1) open Monitor → GPU and compare `nv` (`lord.monitor.gpu()`) with `nvidia-smi -q`; (2) run the helper by hand
+  under strace, with fd 3 a seqpacket socket and one request:
+  `python3 -c 'import socket,subprocess,os;a,b=socket.socketpair(socket.AF_UNIX,socket.SOCK_SEQPACKET);os.dup2(b.fileno(),3);p=subprocess.Popen(["strace","-f","-o","/tmp/nv.trace","/usr/lib/lordos/bin/lord-nvgpu"],pass_fds=(3,));a.send(b"s");print(len(a.recv(20000)));a.send(b"s");print(len(a.recv(20000)))'`
+  — two answers of the same size mean the sandboxed sampling works; in `/tmp/nv.trace`, after the `seccomp` line,
+  look for `EACCES` (a path Landlock refused) and `EPERM` (an ioctl type or syscall refused), and check every
+  `ioctl` is `_IOC(..., 0x46, ...)`.
+
 ## Disk temperature and health (0.8.2)
 
 ![Monitor → Disks, dark](disks-monitor-dark.png) ![Monitor → Disks, light](disks-monitor-light.png)
@@ -754,14 +1046,15 @@ server/tests/mmdb_test.c, server/tests/map_bench.c   reader test and map benchma
 | `history({ from, step, n, app })` | the traffic history in `n` buckets (see "Traffic history"), or `null` |
 | `netTotals()` | (0.8.5) `{ t, rx, tx }`: the machine's byte counters now (every interface but `lo`), without the sampling thread (the menu bar item) |
 | `historyEnable(on)` / `historyClear()` | the "Keep a traffic history" setting; deletes the history |
+| `exeOwners([path, …])` | (0.8.9.6, in development) `{ path: package \| "" }`: the installed package that owns each executable, `""` for none; a path not known yet is left out and asked about (`monitor/exeown.c`, a worker thread over dpkg's file lists; at most 512 absolute paths, no control characters). Only reads world-readable files |
 
 Each disk in `sample().disk.disks` carries the same fields (`sensor`: `"nvme"`, `"drivetemp"` or
 `null`; `temp` in °C or `null`; `tempT`: when it was read; `tempIdle`: a spinning disk at rest, not
 read; `awake`: I/O in the last minute).
 
-No function takes paths or commands: the only arguments are booleans, a language code (letters,
-digits, `-` and `_`, up to 15), a PID with its start time (integers), `'TERM'` or `'KILL'`, and the
-history's integers and app id (`[A-Za-z0-9._:@+~/-]`, up to 127).
+No function takes commands, and only `exeOwners` takes paths (looked up in dpkg's lists, never opened): the other
+arguments are booleans, a language code (letters, digits, `-` and `_`, up to 15), a PID with its start time
+(integers), `'TERM'` or `'KILL'`, and the history's integers and app id (`[A-Za-z0-9._:@+~/-]`, up to 127).
 `lord-server` runs nothing for the Monitor.
 
 ### Sampling without slowing the screen

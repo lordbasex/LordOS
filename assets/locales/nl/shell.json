@@ -586,9 +586,12 @@
   "ws.lock.on": "Vensters van dit scherm vergrendelen",
   "ws.lock.off": "Vensters van dit scherm ontgrendelen",
   "ws.lock.window": "Vergrendeld: ontgrendel met het slotje in het kader",
-  "ws.minimized.label": "Geminimaliseerd",
-  "ws.minimized.title": "Geminimaliseerde vensters op dit scherm: klik er een aan om hem terug te halen",
   "ws.slot.free": "Vrije ruimte: open een app of haal een geminimaliseerd venster terug",
+  "ws.windows.title": "Vensters van deze activiteit op dit scherm (een streep onder geminimaliseerde): klik om er een naar voren te halen; rechtsklik voor de vensters van die app",
+  "ws.profile.ask": "De browser laten kiezen",
+  "ws.profile.open": "Profiel {profile} openen",
+  "ws.profile.activity": "Profiel dat deze activiteit opent",
+  "ws.profile.display": "Profiel dat dit scherm opent ({display})",
   "ws.snapfly.title": "Venster plaatsen",
   "ws.snapfly.halves": "Helften",
   "ws.snapfly.thirds": "Derden",
@@ -972,5 +975,12 @@
   "capture.what.viaStudioPlain": "Camera via LordOS Studio",
   "capture.what.effectsOn": "effecten aan",
   "capture.what.effectsOff": "geen effecten",
-  "shortcuts.captureWindow": "Schermafbeelding van een venster"
+  "shortcuts.captureWindow": "Schermafbeelding van een venster",
+  "themeSwitch.changing": "Bureaubladstijl wordt gewijzigd…",
+  "themeSwitch.changingTo": "Overschakelen naar {name}…",
+  "themeSwitch.failedTitle": "{name} kon niet worden toegepast",
+  "themeSwitch.refusedBody": "De code komt niet overeen met de ondertekende kopie van LordOS en is dus niet geladen. Je bureaubladstijl blijft zoals hij was.",
+  "themeSwitch.failedBody": "Hij is niet gestart. Je bureaubladstijl blijft zoals hij was.",
+  "spotlight.section.machines": "Machines",
+  "guestApps.inMachine": "In {machine}"
 }

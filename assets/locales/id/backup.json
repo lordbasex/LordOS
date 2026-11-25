@@ -14,6 +14,9 @@
   "never": "Belum ada cadangan",
   "next": "Berikutnya: {when}",
   "lastError": "Pencadangan terakhir gagal: {error}",
+  "machinesBusy": {
+    "other": "{count} mesin sedang berjalan: disknya di cadangan ini berasal dari cadangan sebelumnya"
+  },
   "todayAt": "hari ini pukul {time}",
   "now": "Cadangkan Sekarang",
   "pause": "Jeda",
@@ -74,6 +77,10 @@
   "delete": "Hapus Cadangan",
   "restoreAll": "Pulihkan Semua",
   "restoreItem": "Pulihkan “{name}”",
+  "restoreSelected": "Pulihkan yang Dipilih ({count})",
+  "restoringItem": "Memulihkan {index} dari {count}: {name}",
+  "restoreItemFailed": "Tidak dapat memulihkan “{name}”: {error}",
+  "restoreMoreFailed": "Lainnya tidak dipulihkan: {count}",
   "restoreFolder": "Pulihkan Folder Ini",
   "restorePick": "Pilih yang akan dipulihkan",
   "restoreAllTitle": "Pulihkan seluruh folder rumah Anda?",

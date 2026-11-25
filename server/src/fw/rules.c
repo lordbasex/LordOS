@@ -16,6 +16,7 @@
 #endif
 #include "fw/rules.h"
 #include "fw/fwmap.h"
+#include "netperm/np_shared.h"   /* np_tor_special: the Tor gateway's special ranges, the same as the kernel's */
 #include "sec/json.h"
 
 #include <arpa/inet.h>
@@ -91,10 +92,43 @@ int fw_component_scope(const char *scope, char *app, size_t n) {
     return w < 0 || (size_t)w >= n ? -1 : 0;
 }
 
+int fw_vm_scope_tor(const char *scope) {
+    if (fw_vm_scope(scope, NULL, 0)) return -1;
+    return !strncmp(scope, FW_VMTOR_SCOPE_PREFIX, sizeof FW_VMTOR_SCOPE_PREFIX - 1);
+}
+
+uint32_t fw_builtin_restricted(const char *app) { return app && !strcmp(app, FW_APP_TOR_GATEWAY) ? FW_R_TOR_UPLINK : 0; }
+
+int fw_tor_uplink_denies(FwDir dir, FwProto proto, int lan, unsigned port) {
+    return dir != FW_OUT || proto != FW_PROTO_TCP || lan != 0 || port == 53 || port == 853;
+}
+
+static int vm_id_ok(const char *id, size_t l) {
+    if (!l || l > 36) return 0;
+    for (size_t i = 0; i < l; i++) {
+        char c = id[i];
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || c == '-')) return 0;
+    }
+    return 1;
+}
+
+const char *fw_app_parent(const char *app) {
+    size_t pl = sizeof FW_APP_VM_PREFIX - 1;
+    if (!app || strncmp(app, FW_APP_VM_PREFIX, pl)) return NULL;
+    return vm_id_ok(app + pl, strnlen(app + pl, 37)) && !app[pl + strnlen(app + pl, 37)] ? FW_APP_MACHINES : NULL;
+}
+
+int fw_vm_app(const char *id, char *app, size_t n) {
+    if (!id || !app || !vm_id_ok(id, strnlen(id, 37)) || id[strnlen(id, 37)]) return -1;
+    int w = snprintf(app, n, "%s%s", FW_APP_VM_PREFIX, id);
+    return w < 0 || (size_t)w >= n ? -1 : 0;
+}
+
 int fw_vm_scope(const char *scope, char *id, size_t n) {
-    static const size_t pl = sizeof FW_VM_SCOPE_PREFIX - 1;
+    size_t pl = sizeof FW_VM_SCOPE_PREFIX - 1;
     size_t l = scope ? strnlen(scope, 128) : 0;
-    if (l <= pl + 6 || l >= 128 || strncmp(scope, FW_VM_SCOPE_PREFIX, pl) || strcmp(scope + l - 6, ".scope")) return -1;
+    if (l > pl + 4 && !strncmp(scope, FW_VMTOR_SCOPE_PREFIX, sizeof FW_VMTOR_SCOPE_PREFIX - 1)) pl = sizeof FW_VMTOR_SCOPE_PREFIX - 1;
+    if (l <= pl + 6 || l >= 128 || strncmp(scope, FW_VM_SCOPE_PREFIX, sizeof FW_VM_SCOPE_PREFIX - 1) || strcmp(scope + l - 6, ".scope")) return -1;
     size_t il = l - pl - 6;
     if (il > 36) return -1;
     for (size_t i = 0; i < il; i++) {
@@ -114,7 +148,9 @@ int fw_scope_app(const char *scope, char *app, size_t n) {
     if (!l || l >= FW_APP_MAX || !app || !n) return -1;
     if (!strncmp(scope, "lordos-net-", 11)) return fw_component_scope(scope, app, n);
     if (!fw_vm_scope(scope, NULL, 0)) {
-        int w = snprintf(app, n, "lordos:machines");
+        char id[40];
+        if (fw_vm_scope_tor(scope) != 1) return fw_vm_scope(scope, id, sizeof id) ? -1 : fw_vm_app(id, app, n);
+        int w = snprintf(app, n, "%s", FW_APP_TOR_GATEWAY);
         return w < 0 || (size_t)w >= n ? -1 : 0;
     }
     if (l < 18 || strncmp(scope, "app-lordos-", 11) || strcmp(scope + l - 6, ".scope")) return -1;
@@ -655,6 +691,20 @@ uint32_t fw_restricted(const FwStore *s, const char *app) {
     return a ? a->restricted : 0;
 }
 
+uint32_t fw_effective_restricted(const FwStore *s, const char *app) {
+    char c[FW_APP_MAX];
+    if (!app || fw_app_canon(app, c, sizeof c)) return FW_R_NO_NETWORK;          /* no valid app: no */
+    const char *parent = fw_app_parent(c);
+    return fw_restricted(s, c) | (parent ? fw_restricted(s, parent) : 0) | fw_builtin_restricted(c);
+}
+
+int fw_effective_trusted(const FwStore *s, const char *app) {
+    char c[FW_APP_MAX];
+    if (!app || fw_app_canon(app, c, sizeof c)) return 0;
+    const char *parent = fw_app_parent(c);
+    return fw_is_trusted(s, c) || (parent && fw_is_trusted(s, parent));
+}
+
 int fw_blocks(const FwStore *s, const char *app, uint32_t flag) { return (fw_restricted(s, app) & flag) != 0; }
 
 void fw_app_each(const FwStore *s, int (*cb)(void *u, const char *app, int trusted, uint32_t flags), void *u) {
@@ -704,11 +754,43 @@ static void consider(Pick *p, RNode *list, int dst) {
     }
 }
 
+/* Every rule of a that applies to q, into p */
+static void pick_rules(Pick *p, App *a, const FwQuery *q, int fam, const uint8_t *addr, int lan) {
+    for (int h = 0; h < q->nhosts && q->hosts; h++) {
+        char name[FW_NAME_MAX];
+        if (!q->hosts[h] || strnlen(q->hosts[h], FW_NAME_MAX + 1) > FW_NAME_MAX || norm_domain(q->hosts[h], name)) continue;
+        int nl = labels(name);
+        if (a->exact.n) consider(p, fwmap_get(&a->exact, name, strlen(name)), SC_EXACT + nl);
+        if (a->wild.n) {
+            /* labels from right to left: each suffix of the name, from the longest to the TLD */
+            for (const char *sfx = name; sfx; nl--) {
+                consider(p, fwmap_get(&a->wild, sfx, strlen(sfx)), SC_WILD + nl);
+                sfx = strchr(sfx, '.');
+                if (sfx) sfx++;
+            }
+        }
+    }
+    if (fam) {
+        int bits = fam == 4 ? 32 : 128;
+        TNode *t = a->trie[fam == 6];
+        for (int i = 0; t; i++) {
+            consider(p, t->head, SC_CIDR + i);
+            if (i == bits) break;
+            t = t->kid[bit_at(addr, i)];
+        }
+    }
+    if (lan == 1) consider(p, a->lan, SC_NET);
+    else if (lan == 0) consider(p, a->inet, SC_NET);
+    consider(p, a->any, SC_ANY);
+}
+
 FwDecision fw_decide(FwStore *s, const FwQuery *q) {
     FwDecision d = { FW_V_DENY, FW_BY_RESTRICTED, 0, FW_R_NO_NETWORK, 0 };
     char c[FW_APP_MAX];
     if (!s || !q || fw_app_canon(q->app, c, sizeof c)) return d;   /* no valid app: no */
     App *a = app_get(s, c);
+    const char *parent = fw_app_parent(c);
+    App *pa = parent ? app_get(s, parent) : NULL;   /* a machine's: the Machines component's rules too */
 
     int fam = q->fam;
     uint8_t addr[16] = { 0 };
@@ -720,44 +802,22 @@ FwDecision fw_decide(FwStore *s, const FwQuery *q) {
     int lan = fam ? fw_addr_is_lan(fam, addr) : -1;   /* -1: unknown address */
 
     /* 1. restrictions */
-    uint32_t rf = a ? a->restricted : 0;
+    uint32_t rf = (a ? a->restricted : 0) | (pa ? pa->restricted : 0);
     uint32_t hit = 0;
+    rf |= fw_builtin_restricted(c);
     if (rf & FW_R_NO_NETWORK) hit = FW_R_NO_NETWORK;
+    else if ((rf & FW_R_TOR_UPLINK) && fw_tor_uplink_denies(q->dir, q->proto, fam && np_tor_special(fam, addr) ? 1 : lan, q->port)) hit = FW_R_TOR_UPLINK;
     else if (q->dir == FW_IN && (rf & FW_R_NO_INCOMING)) hit = FW_R_NO_INCOMING;
     else if ((rf & FW_R_NO_INTERNET) && lan != 1) hit = FW_R_NO_INTERNET;   /* unknown: internet */
     else if ((rf & FW_R_NO_LAN) && lan == 1) hit = FW_R_NO_LAN;
     if (hit) { d.flag = hit; d.record = 1; return d; }
     d.flag = 0;
 
-    /* 2. explicit rules */
-    if (a && a->nrules) {
+    /* 2. explicit rules (a machine's own and the Machines component's, as one list) */
+    if ((a && a->nrules) || (pa && pa->nrules)) {
         Pick p = { q, NULL, 0, 0, 0 };
-        for (int h = 0; h < q->nhosts && q->hosts; h++) {
-            char name[FW_NAME_MAX];
-            if (!q->hosts[h] || strnlen(q->hosts[h], FW_NAME_MAX + 1) > FW_NAME_MAX || norm_domain(q->hosts[h], name)) continue;
-            int nl = labels(name);
-            if (a->exact.n) consider(&p, fwmap_get(&a->exact, name, strlen(name)), SC_EXACT + nl);
-            if (a->wild.n) {
-                /* labels from right to left: each suffix of the name, from the longest to the TLD */
-                for (const char *sfx = name; sfx; nl--) {
-                    consider(&p, fwmap_get(&a->wild, sfx, strlen(sfx)), SC_WILD + nl);
-                    sfx = strchr(sfx, '.');
-                    if (sfx) sfx++;
-                }
-            }
-        }
-        if (fam) {
-            int bits = fam == 4 ? 32 : 128;
-            TNode *t = a->trie[fam == 6];
-            for (int i = 0; t; i++) {
-                consider(&p, t->head, SC_CIDR + i);
-                if (i == bits) break;
-                t = t->kid[bit_at(addr, i)];
-            }
-        }
-        if (lan == 1) consider(&p, a->lan, SC_NET);
-        else if (lan == 0) consider(&p, a->inet, SC_NET);
-        consider(&p, a->any, SC_ANY);
+        if (a && a->nrules) pick_rules(&p, a, q, fam, addr, lan);
+        if (pa && pa->nrules) pick_rules(&p, pa, q, fam, addr, lan);
         if (p.best && (p.dst >= SC_CIDR || !q->listed)) {
             d.verdict = p.best->r.action == FW_DENY ? FW_V_DENY : FW_V_ALLOW;
             d.reason = FW_BY_RULE;
@@ -771,7 +831,7 @@ FwDecision fw_decide(FwStore *s, const FwQuery *q) {
     if (q->listed) { d.verdict = FW_V_DENY; d.reason = FW_BY_LIST; d.record = 1; return d; }
 
     /* 3. trusted */
-    if (a && a->trusted) { d.verdict = FW_V_ALLOW; d.reason = FW_BY_TRUSTED; return d; }
+    if ((a && a->trusted) || (pa && pa->trusted)) { d.verdict = FW_V_ALLOW; d.reason = FW_BY_TRUSTED; return d; }
 
     /* 4. mode */
     d.reason = FW_BY_MODE;

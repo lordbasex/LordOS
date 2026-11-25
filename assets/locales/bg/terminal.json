@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "запазва се в Записан изход",
   "prefs.tr.would.highlight": "осветява „{text}“",
   "prefs.tr.param": "Параметър",
-  "prefs.tr.regexFirst": "Първо напишете регулярния израз."
+  "prefs.tr.regexFirst": "Първо напишете регулярния израз.",
+  "guest.badge": "ГОСТ",
+  "guest.title": "Обвивка в {machine}"
 }

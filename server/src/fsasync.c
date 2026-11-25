@@ -1,5 +1,5 @@
-/* fsasync.c — lord.fs.listAsync / statAsync / trashAsync / freeAsync / mkdirAsync / renameAsync: the calls Files makes on a folder that may be
- * slow to answer (a Cloud account mounted by rclone, a Connect to Server or SMB/NFS share), run on worker threads.
+/* fsasync.c — lord.fs.listAsync / statAsync / trashAsync / freeAsync / mkdirAsync / renameAsync / duAsync: the calls Files makes on a folder that may be
+ * slow to answer (duAsync: a folder's size, for Settings → Flatpak and Web Apps: a walk of hundreds of thousands of files) (a Cloud account mounted by rclone, a Connect to Server or SMB/NFS share), run on worker threads.
  *
  * lord-server is one thread for input, layout, painting and JS. A readdir, stat or rename on a FUSE mount waits for the
  * daemon behind it (rclone asks the provider; while it deletes or lists a folder the kernel also holds that folder's
@@ -10,8 +10,10 @@
  * Security: the request carries the path exactly as JS gave it. The worker resolves it with the same fsops.c functions
  * the synchronous lord.fs calls use (fsops_resolve_readable / _target / _stat: the roots, the pseudo-filesystems, the
  * protected folders, a share that stopped answering), then fstrash_put adds its own checks (fsops_protected_below).
- * Nothing new is reachable: the operations are a closed list (list, stat, free, and three writes lord.fs already had:
- * move to the Trash, new folder, rename), each the synchronous call's own checks and code on another thread. */
+ * Nothing new is reachable: the operations are a closed list (list, stat, free, du, and three writes lord.fs already had:
+ * move to the Trash, new folder, rename), each the synchronous call's own checks and code on another thread.
+ * FSA_FN runs a function of lord-server's own that a native call names in C (lord.media.camerasAsync: the camera list
+ * lord.media.cameras makes), never one chosen from JS: the same code as the synchronous call, on another thread. */
 #include "fsasync.h"
 #include "fsops.h"
 #include "errcode.h"
@@ -33,7 +35,7 @@
 void (*fsasync_test_hook)(int op, const char *path);
 #endif
 
-typedef struct Req { int req, op; char *path, *path2, *json; struct Req *next; } Req;
+typedef struct Req { int req, op; double ms; char *path, *path2, *json; FsaFn fn; struct Req *next; } Req;
 
 static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
@@ -220,17 +222,34 @@ static char *op_rename(const char *from, const char *to) {
     return strdup("{\"ok\":true}");
 }
 
-static char *run(int op, const char *path, const char *path2) {
+/* as lord.fs.du: a readable folder's size, never walked into another filesystem, and not at all on a cloud or network
+ * mount (its server could keep a worker for minutes; Cloud asks the provider instead) */
+static char *op_du(const char *path, double ms) {
+    char real[PATH_MAX];
+    int down = 0;
+    if (fsops_resolve_readable(path, real, &down)) return path_error(-1, down, NULL);
+    FsDu d = { 0 };
+    int remote = fsops_remote_path(real);
+    if (!remote) fs_du(real, ms, &d);
+    char b[200];
+    snprintf(b, sizeof b, "{\"size\":%.17g,\"files\":%ld,\"dirs\":%ld,\"complete\":%s,\"remote\":%s}", d.size, d.files, d.dirs,
+             d.complete ? "true" : "false", remote ? "true" : "false");
+    return strdup(b);
+}
+
+static char *run(int op, const char *path, const char *path2, double ms, FsaFn fn) {
 #ifdef FSASYNC_TEST
     if (fsasync_test_hook) fsasync_test_hook(op, path);
 #endif
     switch (op) {
+    case FSA_FN: return fn ? fn(path) : error_json("sys.badArgument");
     case FSA_LIST: return op_list(path);
     case FSA_STAT: return op_stat(path);
     case FSA_TRASH: return op_trash(path);
     case FSA_FREE: return op_free(path);
     case FSA_MKDIR: return op_mkdir(path);
     case FSA_RENAME: return path2 ? op_rename(path, path2) : error_json("sys.badArgument");
+    case FSA_DU: return op_du(path, ms);
     default: return error_json("sys.badArgument");
     }
 }
@@ -247,7 +266,7 @@ static void *worker(void *arg) {
         if (!todo) todo_tail = NULL;
         ntodo--;
         pthread_mutex_unlock(&mu);
-        r->json = run(r->op, r->path, r->path2);
+        r->json = run(r->op, r->path, r->path2, r->ms, r->fn);
         r->next = NULL;
         pthread_mutex_lock(&mu);
         if (done_tail) done_tail->next = r; else done = r;
@@ -275,14 +294,38 @@ static int spawn(void) {
     return e ? -1 : 0;
 }
 
-int fsasync_submit(int op, const char *path, char *err, size_t errlen) { return fsasync_submit2(op, path, NULL, err, errlen); }
+static int submit(int op, const char *path, const char *path2, double ms, char *err, size_t errlen);
+static int enqueue(int op, const char *path, const char *path2, double ms, FsaFn fn, char *err, size_t errlen);
 
+int fsasync_submit(int op, const char *path, char *err, size_t errlen) {
+    return op == FSA_DU ? fsasync_submit_du(path, 0, err, errlen) : submit(op, path, NULL, 0, err, errlen);
+}
 int fsasync_submit2(int op, const char *path, const char *path2, char *err, size_t errlen) {
-    if (op < FSA_LIST || op > FSA_RENAME || !path || !path[0] || strlen(path) >= PATH_MAX ||
+    if (op == FSA_DU) { lerr_set(err, errlen, "sys.badArgument", NULL); return -1; }
+    return submit(op, path, path2, 0, err, errlen);
+}
+
+int fsasync_submit_du(const char *path, double ms, char *err, size_t errlen) {
+    if (!(ms > 0)) ms = 800;                        /* lord.fs.du's own default */
+    if (ms > FSA_DU_MAX_MS) ms = FSA_DU_MAX_MS;
+    return submit(FSA_DU, path, NULL, ms, err, errlen);
+}
+
+int fsasync_submit_fn(FsaFn fn, const char *arg, char *err, size_t errlen) {
+    if (!fn || !arg || strlen(arg) >= PATH_MAX) { lerr_set(err, errlen, "sys.badArgument", NULL); return -1; }
+    return enqueue(FSA_FN, arg, NULL, 0, fn, err, errlen);
+}
+
+static int submit(int op, const char *path, const char *path2, double ms, char *err, size_t errlen) {
+    if (op < FSA_LIST || op > FSA_DU || !path || !path[0] || strlen(path) >= PATH_MAX ||
         (op == FSA_RENAME) != (path2 != NULL) || (path2 && (!path2[0] || strlen(path2) >= PATH_MAX))) {
         lerr_set(err, errlen, "sys.badArgument", NULL);
         return -1;
     }
+    return enqueue(op, path, path2, ms, NULL, err, errlen);
+}
+
+static int enqueue(int op, const char *path, const char *path2, double ms, FsaFn fn, char *err, size_t errlen) {
     pthread_mutex_lock(&mu);
     if (efd < 0) efd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (efd < 0) { pthread_mutex_unlock(&mu); lerr_set(err, errlen, "sys.errno", "errno", lerr_errno(errno), NULL); return -1; }
@@ -300,6 +343,8 @@ int fsasync_submit2(int op, const char *path, const char *path2, char *err, size
     if (ntodo + 1 > nidle && nthreads < FSA_THREADS && !spawn()) nthreads++;
     if (!nthreads) { free(r->path); free(r->path2); free(r); pthread_mutex_unlock(&mu); lerr_set(err, errlen, "sys.errno", "errno", lerr_errno(EAGAIN), NULL); return -1; }
     r->op = op;
+    r->ms = ms;
+    r->fn = fn;
     r->req = next_req++;
     if (next_req <= 0) next_req = 1;
     if (todo_tail) todo_tail->next = r; else todo = r;

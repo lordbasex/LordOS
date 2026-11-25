@@ -72,6 +72,15 @@
  *   gpu-memlock-cap "<MB|default>"                  "Memory machines may lock" (all together): writes /etc/lordos/gpu-memlock.conf
  *              (cap_mb=<MB>, 2048 to total - 2048) or removes it (default: total - max(4 GB, 25 %), down to a GB)
  *              Answers gpu.memlockSet                                                                          admin
+ *   vm-usb-allow    "<machine id> <bus> <address> <vvvv>:<pppp>"   a host USB device for a running machine (6.6; AGENTS.md
+ *              "Machines' USB devices", approved by the maintainer on 2026-11-24): the device at that bus and address
+ *              (sysfs, /sys/bus/usb/devices) must still have that vendor and product; never a hub or a root hub
+ *              (vm.usbHub), a device with an input node (keyboard, mouse) any process holds open (vm.usbInputInUse), a
+ *              device with a disk this computer has mounted, uses as swap or under another block device (vm.usbMounted), or
+ *              storage, a network card or a Bluetooth adapter for someone who isn't an administrator (vm.usbAdminOnly). Opens /dev/bus/usb/BBB/DDD read and
+ *              write, checks it by its device number and sysfs again, and answers vm.usbReady with the descriptor
+ *              (admin_ok_fd, SCM_RIGHTS): the node's owner, mode and access list never change and nothing is written.
+ *              lord-server hands it to that machine's lord-vm and closes its own copy                         anyone
  * At the helper's start and end (vm_net_sweep, vm_gvt_sweep) the caller's macvtaps that no process holds are removed; a restart takes
  * them all (they are never written to disk).
  * The downloads run in lordos-net-machines.scope (firewall app lordos:machines), with the Store's downloader
@@ -99,6 +108,7 @@ void vm_act_gvt_remove(const AdminReq *r, const char *arg, size_t len);
 void vm_act_gpu_min_freq(const AdminReq *r, const char *arg, size_t len);
 void vm_act_memlock(const AdminReq *r, const char *arg, size_t len);
 void vm_act_gpu_memlock_cap(const AdminReq *r, const char *arg, size_t len);
+void vm_act_usb_allow(const AdminReq *r, const char *arg, size_t len);
 /* removes uid's vGPUs no process holds; the iGPU's minimum frequency back when none is left */
 void vm_gvt_sweep(uid_t uid);
 
@@ -121,6 +131,7 @@ int vm_missing_packages(int arches, char *out, size_t n);
     { "vm-gvt-remove", vm_act_gvt_remove, A_ANYONE }, \
     { "gpu-min-freq", vm_act_gpu_min_freq, A_ANYONE }, \
     { "vm-memlock", vm_act_memlock, A_ANYONE }, \
-    { "gpu-memlock-cap", vm_act_gpu_memlock_cap, 0 },
+    { "gpu-memlock-cap", vm_act_gpu_memlock_cap, 0 }, \
+    { "vm-usb-allow", vm_act_usb_allow, A_ANYONE },
 
 #endif

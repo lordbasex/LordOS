@@ -28,7 +28,7 @@ import { settings } from './settings.js';
 import { useTheme } from './theme.js';
 import { t, formatDate, formatTime, weekdayName, appName } from './i18n.js';
 import { monitor } from './monitor.js';
-import { COMPONENTS } from './netmodel.js';
+import { componentLabel } from './netmodel.js';
 import { notify, dismissNotification } from './notify.js';
 import { linuxAppFor, flatpakAppFor, shortAppName, windowAppName } from './apps.js';
 import { admin } from './admin.js';
@@ -56,6 +56,7 @@ import { castAskerName, shotFreeName, shotStamp } from './screencastmodel.js';
 import { mkdir as fsMkdir, stat as fsStat } from './fs.js';
 import { linuxCapture, studioUse } from './privacy.js';
 import { studioUseOf } from './studiomodel.js';
+import { camerasChanged } from './cameras.js';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -235,6 +236,20 @@ export function setMainDisplay(conn) {
   const ok = lord.display.setMain(conn);
   if (ok) setTimeout(() => lord.display.save(conn), 0);
   return ok;
+}
+// #242: the login screen's scale. loginScreenScale() → { connector, scale } | null (lord-sessiond's file, read by
+// lord-server); setLoginScreenScale(connector, scale) only asks: lord-sessiond takes it from the session on the monitor
+// and only when its user is an administrator (checked as root), and it applies to every user of the computer. 0 goes
+// back to the recommended scale.
+export function loginScreenScale() {
+  try { return has('display') && lord.display.loginScale ? lord.display.loginScale() : null; } catch (e) { return null; }
+}
+export function setLoginScreenScale(connector, scale) {
+  return has('display') && lord.display.setLoginScale ? lord.display.setLoginScale(String(connector || ''), scale | 0) : false;
+}
+// whether this session's user is an administrator (the same list lord-sessiond checks: lord.users, admingroups.c)
+export function selfIsAdmin() {
+  try { return !!((typeof lord.users !== 'undefined' ? lord.users.list().users : []) || []).find((u) => u.self)?.admin; } catch (e) { return false; }
 }
 export function setCaptureAllDisplays(on) { return has('display') && lord.display.setCaptureAll ? lord.display.setCaptureAll(on) : false; }
 // Settings → Displays, "Rotate automatically": the built-in panel follows the accelerometer (lord-server
@@ -491,7 +506,7 @@ function castAsker(p) {
       const app = appName(getApp('machines')) || t('machines.title');
       return m ? t('shell.capture.appDetail', { app, detail: m }) : app;
     },
-    lordos: (id) => (id === 'lordos' ? t('monitor.lordos') : COMPONENTS[id] ? t(COMPONENTS[id].label) : ''),
+    lordos: (id) => (id === 'lordos' ? t('monitor.lordos') : componentLabel(t, id) || ''),
   });
 }
 // a Screenshot portal request's picture: a new file in the person's Screenshots folder, named as the Screenshots app
@@ -536,7 +551,7 @@ export function PolkitPrompt() {
       : p.local ? t('passwords.polkit.typeHere') : t('passwords.polkit.noKeyboard');
   return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 100002 } },
-  // the whole prompt is protected: black in every capture, recording, remote desktop and share (the dots count the keys)
+  // the whole prompt is protected: the protected fill in every capture, recording, remote desktop and share (the dots count the keys)
   h(View, { protected: true, style: { width: 420, padding: 18, gap: 10, borderRadius: 14, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`,
     boxShadow: '0 20px 60px rgba(0,0,0,0.5)' } },
   h(Text, { style: { fontSize: 15, fontWeight: 700, color: th.text } }, t('passwords.polkit.title', { app: asker(p) })),
@@ -812,6 +827,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'sni': case 'sni-gone': case 'sni-menu': trayEvent(kind, data); break;   // Linux apps' tray icons (trayitems.jsx)
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }
     case 'mpris': linuxPlayersChanged(data); break;
+    case 'cameras': camerasChanged(); break;              // a camera plugged in or out (kernel uevents: sdk/cameras.js)
     default: break;
   }
 };

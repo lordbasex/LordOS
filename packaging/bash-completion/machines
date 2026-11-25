@@ -1,4 +1,4 @@
-# bash completion for machines (LordOS's Machines from the terminal; server/src/cli/machines.c)
+# bash completion for machines and lordvm, the same program (LordOS's Machines from the terminal; server/src/cli/machines.c)
 # installed as /usr/share/bash-completion/completions/machines by tools/iso/mkdeb.sh
 _machines() {
     local cur prev cmd
@@ -7,13 +7,15 @@ _machines() {
     cmd=${COMP_WORDS[1]}
     local IFS=$'\n'
     if [ "$COMP_CWORD" -eq 1 ]; then
-        COMPREPLY=($(compgen -W $'list\nstatus\nstart\nopen\nstop\npoweroff\npause\nresume\nsuspend\nreset\nsnapshot\nclone\nset\nhelp' -- "$cur"))
+        COMPREPLY=($(compgen -W $'list\nstatus\nstart\nopen\nstop\npoweroff\npause\nresume\nsuspend\nreset\nsnapshot\nclone\nrename\nset\nexec\ncp\nlogs\nconsole\nshell\nmcp\napply\nhelp' -- "$cur"))
         return
     fi
     if [ "$COMP_CWORD" -eq 2 ]; then
         case $cmd in
             list) COMPREPLY=($(compgen -W '--json' -- "$cur")) ;;
-            help) ;;
+            help|mcp) ;;
+            apply) COMPREPLY=($(compgen -f -- "$cur")) ;;
+            cp) COMPREPLY=($(compgen -f -- "$cur")) ;;
             *)
                 # machine names, quoted for the shell (names may have spaces)
                 local n names=()
@@ -27,7 +29,9 @@ _machines() {
     fi
     case $cmd in
         status) COMPREPLY=($(compgen -W '--json' -- "$cur")) ;;
-        start) COMPREPLY=($(compgen -W '--no-window' -- "$cur")) ;;
+        logs) COMPREPLY=($(compgen -W $'--serial\n--machine\n--follow\n--lines' -- "$cur")) ;;
+        cp) COMPREPLY=($(compgen -f -- "$cur")) ;;
+        start) COMPREPLY=($(compgen -W $'--no-window\n--snapshot' -- "$cur")) ;;
         snapshot) [ "$COMP_CWORD" -eq 3 ] && COMPREPLY=($(compgen -W $'list\ntake\nrevert\ndelete' -- "$cur")) ;;
         clone) [ "$COMP_CWORD" -ge 4 ] && COMPREPLY=($(compgen -W $'--duplicate\n--keep-identity' -- "$cur")) ;;
         set)
@@ -38,12 +42,13 @@ _machines() {
                 --gpu) COMPREPLY=($(compgen -W $'none\nintel-whole\nintel-shared' -- "$cur")) ;;
                 --display) COMPREPLY=($(compgen -W $'window\nnone' -- "$cur")) ;;
                 --pointer) COMPREPLY=($(compgen -W $'lordos\nguest' -- "$cur")) ;;
+                --cpu-pin) COMPREPLY=($(compgen -W $'off\nauto\ndefault' -- "$cur")) ;;
                 --iso) COMPREPLY=($(compgen -f -- "$cur")) ;;
-                --clipboard-ask|--boot-menu|--sound|--microphone|--agent|--transfer) COMPREPLY=($(compgen -W $'on\noff' -- "$cur")) ;;
+                --clipboard-ask|--boot-menu|--sound|--microphone|--agent|--transfer|--perf-profile|--capture-fullscreen) COMPREPLY=($(compgen -W $'on\noff' -- "$cur")) ;;
                 --memory|--cpus|--disk|--name|--bridge|--port|--share|--volume|--boot-order|--resolution|--sound-out|--sound-in|--nic-model|--devices|--ports|--shares) ;;
-                *) COMPREPLY=($(compgen -W $'--memory\n--cpus\n--disk\n--name\n--network\n--bridge\n--clipboard\n--clipboard-ask\n--graphics\n--gpu\n--iso\n--display\n--port\n--ports\n--share\n--shares\n--sound\n--volume\n--microphone\n--sound-out\n--sound-in\n--agent\n--transfer\n--boot-order\n--boot-menu\n--resolution\n--pointer\n--devices\n--nic-model' -- "$cur")) ;;
+                *) COMPREPLY=($(compgen -W $'--memory\n--cpus\n--disk\n--name\n--network\n--bridge\n--clipboard\n--clipboard-ask\n--graphics\n--gpu\n--iso\n--display\n--port\n--ports\n--share\n--shares\n--sound\n--volume\n--microphone\n--sound-out\n--sound-in\n--agent\n--transfer\n--boot-order\n--boot-menu\n--resolution\n--pointer\n--devices\n--nic-model\n--cpu-pin\n--perf-profile\n--capture-fullscreen' -- "$cur")) ;;
             esac
             ;;
     esac
 }
-complete -F _machines machines
+complete -F _machines machines lordvm

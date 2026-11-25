@@ -14,6 +14,9 @@
   "never": "Chưa có bản sao lưu nào",
   "next": "Lần tới: {when}",
   "lastError": "Lần sao lưu gần nhất thất bại: {error}",
+  "machinesBusy": {
+    "other": "{count} máy ảo đang chạy: ổ đĩa của chúng trong bản sao lưu này là từ bản trước"
+  },
   "todayAt": "hôm nay lúc {time}",
   "now": "Sao lưu ngay",
   "pause": "Tạm dừng",
@@ -74,6 +77,10 @@
   "delete": "Xóa bản sao lưu",
   "restoreAll": "Khôi phục tất cả",
   "restoreItem": "Khôi phục “{name}”",
+  "restoreSelected": "Khôi phục mục đã chọn ({count})",
+  "restoringItem": "Đang khôi phục {index}/{count}: {name}",
+  "restoreItemFailed": "Không thể khôi phục “{name}”: {error}",
+  "restoreMoreFailed": "Mục khác chưa khôi phục: {count}",
   "restoreFolder": "Khôi phục thư mục này",
   "restorePick": "Chọn nội dung cần khôi phục",
   "restoreAllTitle": "Khôi phục toàn bộ thư mục nhà?",
