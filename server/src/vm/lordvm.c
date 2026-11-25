@@ -5332,11 +5332,13 @@ static void on_qga_reply(const JVal *root, int ok) {
  * package manager when xclip isn't there (xclip and wl-clipboard: apt-get, dnf, zypper or pacman); then the helper
  * started again in each signed-in desktop session (uid ≥ 1000 with graphical-session.target active), so the new one
  * runs now instead of at the next sign-in. lordos-guest looks for the tool every 30 s too. In a LordOS guest (/usr/lib/lordos)
- * the rule also gives the port to the video group and the unit hangs on default.target, as the lordos package's own do
- * (lord-sessiond's sessions aren't logind seats and don't reach graphical-session.target: docs/VIRTUALIZATION.md 6.17) */
+ * the rule also gives the port to the guest's administrators (the sudo group; never one every desktop account is in: the
+ * holder gets the host's shell, clipboard and dropped files, security findings F9, F13) and the unit hangs on
+ * default.target, as the lordos package's own do (lord-sessiond's sessions aren't logind seats and don't reach
+ * graphical-session.target: docs/VIRTUALIZATION.md 6.17) */
 static const char INSTALL_SH[] =
     "set -e; mv -f /usr/local/bin/.lordos-guest.new /usr/local/bin/lordos-guest; chmod 755 /usr/local/bin/lordos-guest; "
-    "l=''; t=graphical-session.target; [ -d /usr/lib/lordos ] && { l=', GROUP=\"video\", MODE=\"0660\"'; t=default.target; }; "
+    "l=''; t=graphical-session.target; [ -d /usr/lib/lordos ] && { l=', GROUP=\"sudo\", MODE=\"0660\"'; t=default.target; }; "
     "printf '%s%s\\n' 'SUBSYSTEM==\"virtio-ports\", ATTR{name}==\"org.lordos.agent\", TAG+=\"uaccess\"' \"$l\" > /etc/udev/rules.d/71-lordos-guest.rules; "
     "mkdir -p /etc/systemd/user; printf '%s\\n' '[Unit]' 'Description=LordOS Machines clipboard' 'After=graphical-session.target' "
     "'[Service]' 'ExecStart=/usr/local/bin/lordos-guest' 'Restart=on-failure' 'RestartSec=3' '[Install]' \"WantedBy=$t\" "

@@ -72,7 +72,8 @@
 #   /usr/lib/systemd/user/lordos-guest.service (+ default.target.wants), /usr/lib/udev/rules.d/71-lordos-guest.rules
 #                                         LordOS as a Machines guest: lordos-guest for the signed-in person, only where the
 #                                         machine's agent port org.lordos.agent exists (docs/VIRTUALIZATION.md 7.2); the
-#                                         port is the video group's too (LordOS's sessions aren't logind seats, 6.17)
+#                                         port is the guest's administrators' (sudo) too (LordOS's sessions aren't
+#                                         logind seats, 6.17; never video: F9, F13)
 #   /usr/lib/lordos/guest/lordos-guest-tools-<arch>.iso  the LordOS Guest Tools disc Machines puts in a Linux machine
 #                                         without qemu-guest-agent (docs/VIRTUALIZATION.md 6.17); its SHA-256 is lord-vm's
 #   /usr/share/applications/lordos-send-to-host.desktop, /usr/share/kio/servicemenus/lordos-send-to-host.desktop

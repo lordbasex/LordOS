@@ -241,7 +241,11 @@ export function chainCache() {
 // ---- where a process comes from: the origin badges ----
 // Each badge stands on a fact LordOS can check, never on a name:
 //   'system'     the executable belongs to the lordos package (or one of LordOS's own lordos-* packages);
-//   'lordos'     a LordOS app: an isolated .lpk app (its scope app-lordos-lpk-<id>; facts.signer: who signed it);
+//   'lordos'     a LordOS app: an isolated .lpk app (its scope app-lordos-lpk-<id>; facts.signer: who signed it). The
+//                scope counts only in the session's root-owned subtree (mon.c mon_scope_parse), and the executable must
+//                be one an app's process can have: the lordos package's lord-server (`lord-server --app <id>`) or the
+//                app's own companion in its root-owned package folder (/usr/lib/lordos-apps/<id>/). Else the process is
+//                badged by its executable like any other (lordosAppExe; security finding F10);
 //   'flatpak'    a Flatpak app (its scope app-lordos-fp-<id>);
 //   'webapp'     a web app (lord-web and WebKit in app-lordos-lordos-web-<app>; facts.webapp(app): its site);
 //   'machine'    a machine's QEMU and passt (app-lordos-lordos-vm-<id>; facts.machine(id): its name);
@@ -254,12 +258,31 @@ export const ORIGINS = ['system', 'lordos', 'flatpak', 'deb', 'webapp', 'machine
 const DELETED = ' (deleted)';
 export const exePath = (exe) => (String(exe || '').endsWith(DELETED) ? String(exe).slice(0, -DELETED.length) : String(exe || ''));
 export const isLordOSPackage = (pkg) => pkg === 'lordos' || /^lordos-[a-z0-9.+-]+$/.test(pkg || '');
+// The package folder of the installed .lpk apps (server/src/sec/pkgapp.h PKGAPP_ROOT): root-owned, checked at load.
+export const LPK_APPS_ROOT = '/usr/lib/lordos-apps/';
+const LPK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+// Whether exe may be the process of the isolated app <id>: the lordos package's lord-server (facts.owner says so, from
+// dpkg's root-owned database; the name alone proves nothing), or a file inside the app's own package folder (its
+// companion). undefined while the owner isn't known yet. A process of the same person can name its scope after an app,
+// never replace these root-owned files.
+export function lordosAppExe(exe, id, facts = {}) {
+  if (!exe || !LPK_ID.test(id) || id.includes('..')) return false;
+  if (exe.startsWith(`${LPK_APPS_ROOT}${id}/`) && !exe.includes('/../') && !exe.includes('/./')) return true;
+  if (!/\/lord-server$/.test(exe)) return false;
+  const pkg = facts.owner?.(exe);
+  return pkg === undefined || pkg === null ? undefined : pkg === 'lordos';
+}
 export function originOf(p, facts = {}) {
   if (!p || p.prot === 'kernel') return null;
   const updated = String(p.exe || '').endsWith(DELETED);
   const app = p.app || '';
   let m;
-  if ((m = /^lpk:(.+)$/.exec(app))) return { kind: 'lordos', id: m[1], signer: facts.signer?.(m[1]) || null, updated };
+  if ((m = /^lpk:(.+)$/.exec(app))) {
+    const ok = lordosAppExe(exePath(p.exe), m[1], facts);
+    if (ok === undefined) return null;
+    if (ok) return { kind: 'lordos', id: m[1], signer: facts.signer?.(m[1]) || null, updated };
+    // not an app's executable: no seal and no signer, only what its executable is
+  }
   if ((m = /^flatpak:(.+)$/.exec(app))) return { kind: 'flatpak', id: m[1], updated };
   if ((m = /^desktop:lordos-vm-(?:tor-)?(.+)$/.exec(app))) return { kind: 'machine', id: m[1], name: facts.machine?.(m[1]) || null, updated };
   if ((m = /^desktop:lordos-web-(.+)$/.exec(app))) return { kind: 'webapp', id: m[1], site: facts.webapp?.(m[1]) || null, updated };

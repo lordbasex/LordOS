@@ -572,7 +572,18 @@ char mon_scope_parse(const char *cgroup, char *id, size_t n) {
          * Monitor groups it as that machine (AGENTS.md: no exemption by unit name under user@) */
         static const char SESS[] = "/system.slice/lordos.service/lordos-session-", VM[] = "lordos-vm-";
         if (bl > sizeof VM - 1 && !strncmp(b, VM, sizeof VM - 1) && strncmp(line + 3, SESS, sizeof SESS - 1)) return 0;
-        if (bl > 4 && !strncmp(b, "lpk-", 4)) { k = 'l'; b += 4; bl -= 4; }
+        /* an isolated .lpk app's scope (app-lordos-lpk-<id>.scope) likewise: Monitor gives it the verified seal and its
+         * signer, so it counts only right inside the session's root-owned subtree
+         * (/system.slice/lordos.service/lordos-session-<uid>/app-lordos-lpk-<id>.scope), where only lord-sessiond makes
+         * scopes and only for lord-server's own requests (cgroup_place_serve); one of that name under user@ is just a
+         * name (security finding F10). Without lord-sessiond (development) the app has no 'l' scope */
+        if (bl > 4 && !strncmp(b, "lpk-", 4)) {
+            const char *u = line + 3 + sizeof SESS - 1;
+            if (strncmp(line + 3, SESS, sizeof SESS - 1) || u >= leaf || *u < '0' || *u > '9') return 0;
+            while (u < leaf - 1 && *u >= '0' && *u <= '9') u++;
+            if (u != leaf - 1 || *u != '/') return 0;
+            k = 'l'; b += 4; bl -= 4;
+        }
         else if (bl > 3 && !strncmp(b, "fp-", 3)) { k = 'f'; b += 3; bl -= 3; }       /* a Flatpak app (docs/FLATPAK.md) */
         if (bl + 1 > n) return 0;
         memcpy(id, b, bl);

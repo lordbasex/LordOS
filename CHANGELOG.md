@@ -1173,6 +1173,38 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   only if it is a `lord-server` of this account leading its own group; `reap` skips folders and processes that are not
   this account's. Checked: `sudo build/cgslice-test` 28/28 (and it refuses a link at `/run/lordos-slicetest`), `serve`
   mode, `mh.py start`/`js`/`stop`/`reap` with a real headless session, a forged state file and a hostile folder name.
+- **Security (F9, F13): a LordOS Machines guest's agent port is its administrators', not every desktop account's** (in
+  development; latest release 0.8.9.5-beta; `docs/VIRTUALIZATION.md` 6.17 "LordOS as a guest"). The guest end of
+  `org.lordos.agent` was `GROUP="video", MODE="0660"` in the `lordos` package's `71-lordos-guest.rules`, in the Guest
+  Tools disc's `install.sh` and in Install Agent's `INSTALL_SH` (`lordvm.c`) on LordOS guests. Every LordOS desktop
+  account is in `video`, and the port opens only once, so a standard account that opened it first (at boot with
+  lingering, by SSH, or in a restart gap of the main user's `lordos-guest`) became the guest's agent: it received the
+  host's clipboard, the files dropped on the machine and Machines' Shell, a login shell of its own in which the host's
+  person might type a `sudo` password. The three rules now say `GROUP="sudo"`: only the guest's administrators, who can
+  already do anything in it, may open the port; elsewhere logind's `uaccess` still applies. A guest used only from a
+  standard account has no agent. New migration `013-0.8.9.6-guest-agent-admins.sh` (root, idempotent): rewrites
+  `/etc/udev/rules.d/71-lordos-guest.rules` only when it is exactly the old `video` line (written by an earlier disc or
+  Install Agent; it overrides the package's rule), and, only where the port exists, reloads and triggers udev, stops
+  `lordos-guest` for each signed-in person who isn't an administrator and restarts it for each administrator. Another
+  program of a standard account that already holds the port keeps it until it closes it or the machine restarts. Tests:
+  `migration_guest_port_test.sh` (now migrations 012 and 013: six more fake trees, run twice under `sh -eu`, and a check
+  that no rule gives the port to `video`).
+- **Security (F10): Monitor's "Verified … signed by" seal no longer stands on a scope name** (in development; latest
+  release 0.8.9.5-beta; `docs/MONITOR.md`, origin badges). Monitor gave the pink LordOS-app seal and the app's signer to
+  any process whose cgroup leaf read `app-lordos-lpk-<id>.scope`, a name any program of the person can pick
+  (`systemd-run --user --scope --unit=app-lordos-lpk-<id> ./payload`). Now `mon_scope_parse` (`mon.c`) counts such a scope
+  only right inside the session's root-owned subtree (`/system.slice/lordos.service/lordos-session-<uid>/`), where only
+  lord-sessiond makes scopes and only for lord-server's requests (`cgroup_place_serve`: the peer in the session's server
+  leaf, its executable in the root-owned bindir), as it already did for machines' scopes; the same name under `user@`,
+  deeper in the subtree or anywhere else is no app. And `originOf` (`apps/monitor/procgroupmodel.js`) gives the seal only
+  when the process's executable is also one an app's process can have (`lordosAppExe`): the `lordos` package's
+  `lord-server` (its owner from dpkg's database, not its name) or a file in the app's own root-owned package folder
+  `/usr/lib/lordos-apps/<id>/` (its companion); otherwise the process is badged by its executable (a program in the home
+  folder shows the orange "unpackaged" pill). Without lord-sessiond (development) isolated apps have no app scope in
+  Monitor. Tests: `procctl-test` (nine scope paths: the subtree, `user@`, the server leaf, the machines' slice, a bad
+  session name), `monitor_procgroup_test.mjs` (the app, updated on disk, its companion, and seven F10 cases: a home
+  program, a Debian program, a `lord-server` the `lordos` package doesn't own, another app's folder, a path out of the
+  folder, an unknown owner, an unreadable executable).
 - **Settings → Language & Region → Region names each region's language (GitHub #239 follow-up)** (in development;
   latest release 0.8.9.5-beta). A row named only its country, so the five regions of France (Breton, Catalan, Basque,
   French and Occitan) all read "France · xx_FR", and Basque was picked by mistake. Each row now reads "Basque · France

@@ -6,7 +6,7 @@
 import {
   groupKeys, buildGroups, filterGroups, sortGroups, sortProcs, holdOrder, holdGroups, isPaused, groupSummary, snapshotOf, planStop,
   stillRunning, flattenRows, procKey, rowKeyOf, HOLD_MS, chainOf, chainCache, originOf, groupOriginOf, passesFilter, programChoices, exePath,
-  isLordOSPackage,
+  isLordOSPackage, lordosAppExe, LPK_APPS_ROOT,
 } from '../../apps/monitor/procgroupmodel.js';
 import { sealAt, sealPixels } from '../../apps/monitor/seal.js';
 import { statsStore, SECS, MINS } from '../../apps/monitor/procstatsmodel.js';
@@ -195,7 +195,8 @@ tp2.set(901, { ...tp.get(901), st: tp.get(901).st + 1 });       // the PID now b
 eq('a link whose PID was reused: the chain is made again', chainFor(tp.get(903), tp2) === c1, false);
 
 // ---- origin badges ----
-const own = { '/usr/lib/lordos/lord-server': 'lordos', '/usr/lib/lordos/lord-web': 'lordos-web', '/opt/google/chrome/chrome': 'google-chrome-stable',
+const own = { '/usr/lib/lordos/lord-server': 'lordos', '/usr/lib/lordos/bin/lord-server': 'lordos', '/usr/local/bin/lord-server': '',
+  '/home/alex/.cache/lord-server': '', '/usr/lib/lordos-apps/org.example.notes/bin/companion': '', '/usr/lib/lordos/lord-web': 'lordos-web', '/opt/google/chrome/chrome': 'google-chrome-stable',
   '/usr/bin/bash': 'bash', '/home/alex/bin/tool': '' };
 const facts = {
   owner: (exe) => own[exe], origin: (pkg) => ({ 'google-chrome-stable': 'Google LLC', bash: 'Debian' })[pkg] || null,
@@ -208,7 +209,29 @@ eq('LordOS itself: its executable belongs to the lordos package', O(originOf(P(1
 eq('one of LordOS\'s own lordos-* packages', O(originOf(P(1, 0, 'lord-web', { exe: '/usr/lib/lordos/lord-web' }), facts)), ['system', 'lordos-web', null, false]);
 eq('never by name: a lord-* program no package owns is unpackaged', O(originOf(P(1, 0, 'lord-server', { exe: '/home/alex/bin/tool' }), facts)),
   ['unpackaged', '/home/alex/bin/tool', null, false]);
-eq('a LordOS app (.lpk): its scope, with its signer', O(originOf(P(1, 0, 'lord-server', { app: 'lpk:org.example.notes' }), facts)), ['lordos', 'org.example.notes', 'Example', false]);
+eq('a LordOS app (.lpk): its scope and the lordos package\'s lord-server, with its signer',
+  O(originOf(P(1, 0, 'lord-server', { app: 'lpk:org.example.notes', exe: '/usr/lib/lordos/bin/lord-server' }), facts)), ['lordos', 'org.example.notes', 'Example', false]);
+eq('a LordOS app updated on disk: still the app, with a restart notice',
+  O(originOf(P(1, 0, 'lord-server', { app: 'lpk:org.example.notes', exe: '/usr/lib/lordos/bin/lord-server (deleted)' }), facts)), ['lordos', 'org.example.notes', 'Example', true]);
+eq('a LordOS app\'s companion: its scope and a file of its own package folder',
+  O(originOf(P(1, 0, 'companion', { app: 'lpk:org.example.notes', exe: '/usr/lib/lordos-apps/org.example.notes/bin/companion' }), facts)), ['lordos', 'org.example.notes', 'Example', false]);
+// F10: a process of the same person can name its scope app-lordos-lpk-<id>; it gets no seal and no signer
+eq('F10: an app\'s scope name on a program in the home folder: unpackaged, no seal, no signer',
+  O(originOf(P(1, 0, 'payload', { app: 'lpk:org.example.notes', exe: '/home/alex/bin/tool' }), facts)), ['unpackaged', '/home/alex/bin/tool', null, false]);
+eq('F10: an app\'s scope name on a Debian program: its package, not the app',
+  O(originOf(P(1, 0, 'bash', { app: 'lpk:org.example.notes' }), facts)), ['deb', 'bash', 'Debian', false]);
+eq('F10: a program named lord-server that the lordos package doesn\'t own',
+  [O(originOf(P(1, 0, 'lord-server', { app: 'lpk:org.example.notes', exe: '/home/alex/.cache/lord-server' }), facts)),
+    O(originOf(P(1, 0, 'lord-server', { app: 'lpk:org.example.notes', exe: '/usr/local/bin/lord-server' }), facts))],
+  [['unpackaged', '/home/alex/.cache/lord-server', null, false], ['unpackaged', '/usr/local/bin/lord-server', null, false]]);
+eq('F10: another app\'s package folder, or a way out of it, is not this app\'s companion',
+  [lordosAppExe('/usr/lib/lordos-apps/org.other.app/bin/x', 'org.example.notes', facts), lordosAppExe('/usr/lib/lordos-apps/org.example.notes/../../../../home/alex/x', 'org.example.notes', facts),
+    lordosAppExe('/usr/lib/lordos-apps/org.example.notes.evil/x', 'org.example.notes', facts), lordosAppExe('/usr/lib/lordos-apps/../x', '..', facts)],
+  [false, false, false, false]);
+eq('F10: the app\'s executable without its owner known yet: no badge (as for any process)',
+  originOf(P(1, 0, 'lord-server', { app: 'lpk:org.example.notes', exe: '/usr/lib/lordos/bin/lord-server-unknown/lord-server' }), facts), null);
+eq('F10: an unreadable executable in an app\'s scope: no badge', originOf(P(1, 0, 'x', { app: 'lpk:org.example.notes', exe: '' }), facts), null);
+eq('the .lpk package folder is pkgapp.h\'s', LPK_APPS_ROOT, '/usr/lib/lordos-apps/');
 eq('a Flatpak app: its scope', O(originOf(P(1, 0, 'gimp', { app: 'flatpak:org.gimp.GIMP', exe: '/app/bin/gimp' }), facts)), ['flatpak', 'org.gimp.GIMP', null, false]);
 eq('a web app: its scope and site', O(originOf(P(1, 0, 'WebKitWebProces', { app: 'desktop:lordos-web-calendar' }), facts)), ['webapp', 'calendar', 'calendar.example.org', false]);
 eq('a machine: its scope and name', O(originOf(P(1, 0, 'qemu-system-x86', { app: 'desktop:lordos-vm-abc' }), facts)), ['machine', 'abc', 'Ubuntu', false]);

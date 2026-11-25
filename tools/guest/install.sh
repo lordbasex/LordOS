@@ -113,10 +113,11 @@ if ! { cp "$here/lguest" /usr/local/bin/.lordos-guest.new && chmod 755 /usr/loca
         mv -f /usr/local/bin/.lordos-guest.new /usr/local/bin/lordos-guest; }; then
     die "lordos-guest couldn't be copied to /usr/local/bin"
 fi
-# the seat's person may open the port (logind's uaccess). LordOS's own sessions aren't logind seats: there the desktop's
-# users are in the video group (as for the screen), so the port is that group's too
+# the seat's person may open the port (logind's uaccess). LordOS's own sessions aren't logind seats: there the port is
+# the guest's administrators' (the sudo group), never a group every desktop account is in: its holder gets the host's
+# shell, clipboard and dropped files (security findings F9, F13; packaging/udev/71-lordos-guest.rules)
 rule='SUBSYSTEM=="virtio-ports", ATTR{name}=="org.lordos.agent", TAG+="uaccess"'
-[ "$lordos" = 1 ] && rule="$rule"', GROUP="video", MODE="0660"'
+[ "$lordos" = 1 ] && rule="$rule"', GROUP="sudo", MODE="0660"'
 install -d -m 755 /etc/udev/rules.d
 printf '%s\n' "$rule" > /etc/udev/rules.d/71-lordos-guest.rules
 udevadm control --reload >/dev/null 2>&1 || true

@@ -1,6 +1,7 @@
 # 0.8.9.6: LordOS as a Machines guest gets its agent working after the update (docs/VIRTUALIZATION.md 6.17, "LordOS as a
-# guest"). The package's 71-lordos-guest.rules now gives the agent port (org.lordos.agent) to the video group as well
-# as to logind's uaccess (LordOS's own sessions aren't logind seats, so before this nobody could open it and Machines
+# guest"). The package's 71-lordos-guest.rules now gives the agent port (org.lordos.agent) to a group (the guest's
+# administrators, sudo: migration 013-0.8.9.6-guest-agent-admins.sh, security findings F9, F13) as well as to logind's
+# uaccess (LordOS's own sessions aren't logind seats, so before this nobody could open it and Machines
 # waited for the agent forever), and lordos-guest.service may be new to this system. Only inside a Machines guest whose
 # agent is on (the port exists): udev reads the rule again and applies it to the port now, and each signed-in person's
 # user manager reads its units again and starts lordos-guest, so the update doesn't wait for a restart. qemu-guest-agent
