@@ -641,8 +641,8 @@ compositing is the GPU's work, and the CPU only uploads what changed in the UI.
   driver, composed on the CPU (#171), and an RTX 5070 Ti on the open kernel modules, smooth, its composition not in
   the report (#235). Mesa's nouveau and NVK are included and untested; NVIDIA's driver is not supported for GPU
   composition. Real AMD and Intel cards compose on the GPU on every reported machine: an RX 580
-  every day since 2026-11-07, a FirePro W6150M, an RX 7800 XT, an RX 9060 XT and 15 Intel GPUs from Ironlake to
-  Whiskey Lake (`HARDWARE-REPORT.md`, "By GPU vendor").
+  every day since 2026-11-07, a FirePro W6150M, an RX 7800 XT, an RX 9060 XT and 16 Intel GPUs from Ironlake to
+  Whiskey Lake and a Raptor Lake Iris Xe (#249) (`HARDWARE-REPORT.md`, "By GPU vendor").
 - **Importing a GPU dmabuf via EGL:** virtio-gpu doesn't accept dmabufs from another source, so in
   the VM that import fails (`EGL_BAD_ALLOC`) and udmabufs are mapped.
 - **Direct scanout:** in the VM it fails for the same reason. The code is there and falls back to
@@ -703,7 +703,7 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
 - PBO uploads or a linear canvas. Moved to 0.8.7 (2026-10-30); not done in it.
 - Test on an NVIDIA card with nouveau or NVK, and GPU composition on NVIDIA's driver (two reports on that driver,
   `HARDWARE-REPORT.md`), on AMD integrated graphics (APUs) and on Intel
-  graphics newer than Whiskey Lake.
+  graphics between Whiskey Lake and Raptor Lake (one Raptor Lake Iris Xe composes, #249) and newer.
 - UI blur that includes app content (GPU pass).
 - Direct scanout of non-fullscreen windows (overlay planes).
 - Tearing control (`wp_tearing_control`) and VRR. (`linux-drm-syncobj`, explicit sync: built 2026-11-22, see
