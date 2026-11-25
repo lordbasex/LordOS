@@ -33,6 +33,22 @@ const base = (v) => { const m = /^(\d+\.\d+\.\d+(?:\.\d+)?)/.exec(String(v || ''
 const cmpVer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 4; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
 const cpuShort = (s) => String(s || '').replace(/\(R\)|\(TM\)|\bCPU\b|\bProcessor\b/g, '').replace(/\s+/g, ' ').trim();
 const VERSION_RE = /^\d+\.\d+\.\d+(\.\d+)?$/;
+// Report text shown as a name: control characters (C0, DEL, C1) and bidi marks/overrides/isolates dropped,
+// spaces collapsed, at most `max` characters. The site escapes it as HTML on top of this.
+const NAME_MAX = 64;
+export const plainName = (v, max = NAME_MAX) => {
+  const t = String(v || '').replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return [...t].length > max ? `${[...t].slice(0, max - 1).join('').trimEnd()}…` : t;
+};
+// What firmware writes when the maker left a DMI field empty: not a name.
+const DMI_PLACEHOLDER = /^(to be filled by o\.?e\.?m\.?|default string|not applicable|none|n\/a|o\.?e\.?m\.?|system (manufacturer|product name)|base board (manufacturer|product name)|unknown|x\.x+)$/i;
+// The motherboard (SMBIOS board vendor + name) of a report: '' unless the board has a real name.
+export function boardLabel(machine) {
+  const m = machine || {};
+  const clean = (v) => { const t = plainName(v); return DMI_PLACEHOLDER.test(t) ? '' : t; };
+  const name = clean(m.boardName);
+  return name ? plainName([clean(m.boardVendor), name].filter(Boolean).join(' ')) : '';
+}
 
 // Reads and validates every report of a folder: [{ file, report, issue, fixedIn }], sorted by file name.
 export function readReports(dir, schema = loadSchema()) {
@@ -92,7 +108,7 @@ export function buildModel(entries) {
     if (desk['desk.fps']) perf.push({ cat: 'desktop', id: 'desk.fps', unit: 'fps', value: desk['desk.fps'].value });
     const m = {
       id: file.replace(/\.json$/, ''), source: report.source, issue, lordos: report.lordos, live: report.live,
-      name: machineLabel(report), kind: reportKind(report), arch: (s.cpu && s.cpu.arch) || '',
+      name: plainName(machineLabel(report)), board: boardLabel(s.machine), kind: reportKind(report), arch: (s.cpu && s.cpu.arch) || '',
       cpu: cpuShort(s.cpu && s.cpu.model), threads: (s.cpu && s.cpu.threads) || 0,
       memGB: s.memory && s.memory.totalKB ? Math.round(s.memory.totalKB / 1048576) : null,
       gpu: g ? [g.vendor, g.device].filter(Boolean).join(' ') || g.driver : '', driver: g ? g.driver : '',
@@ -110,12 +126,14 @@ export function buildModel(entries) {
       gpus.set(key, e);
     }
     for (const [id, c] of Object.entries(compat)) {
-      if (c.state === 'limits' || c.state === 'no') problems.push({ machine: m.name, kind: m.kind, id, state: c.state, note: c.note, lordos: report.lordos, fixedIn: fixedIn[id] || null, source: report.source, issue });
+      if (c.state === 'limits' || c.state === 'no') problems.push({ machine: m.name, board: m.board, kind: m.kind, id, state: c.state, note: c.note, lordos: report.lordos, fixedIn: fixedIn[id] || null, source: report.source, issue });
     }
   }
   const order = { reference: 0, community: 1 };
-  // a machine whose firmware gives no vendor or product (name '') goes after the named ones of its source
-  machines.sort((a, b) => order[a.source] - order[b.source] || !a.name - !b.name || a.name.localeCompare(b.name));
+  // a machine whose firmware gives no vendor or product (name '') is sorted by its motherboard, after the
+  // named ones of its source; one with neither goes last
+  const rank = (m) => (m.name ? 0 : m.board ? 1 : 2);
+  machines.sort((a, b) => order[a.source] - order[b.source] || rank(a) - rank(b) || (a.name || a.board).localeCompare(b.name || b.board));
   return { machines, gpus: [...gpus.values()].sort((a, b) => a.name.localeCompare(b.name)), problems };
 }
 
@@ -127,11 +145,14 @@ export function renderSections(model, t, esc, issueUrl) {
   const src = (m) => (m.source === 'reference'
     ? `<span class="hw-ref">${esc(t.reference)}</span>`
     : m.issue ? `<a href="${esc(issueUrl(m.issue))}" rel="noopener">#${m.issue}</a>` : '');
-  // a machine with no vendor or product in its firmware: "Unnamed laptop" and the like, by its kind
-  const label = (name, kind) => name || (t.unnamed && (t.unnamed[kind] || t.unnamed.computer)) || kind;
+  // a machine with no vendor or product in its firmware: its motherboard, "ASUS X570 (motherboard)", or else
+  // "Unnamed laptop" and the like, by its kind
+  const label = (name, kind, board) => name
+    || (board && t.motherboard && t.motherboard.includes('{board}') ? t.motherboard.replace('{board}', () => board) : '')
+    || (t.unnamed && (t.unnamed[kind] || t.unnamed.computer)) || kind;
   const fmt = (v) => (v >= 100 ? Math.round(v).toLocaleString('en-US') : String(Math.round(v * 10) / 10));
   const machines = model.machines.map((m) => `<article class="hw-card">
-<h3>${esc(label(m.name, m.kind))}</h3>
+<h3>${esc(label(m.name, m.kind, m.board))}</h3>
 <p class="hw-meta">${esc((t.kind && t.kind[m.kind]) || m.kind)} · ${esc(m.arch)} · LordOS ${esc(m.lordos)}${m.live ? ` · ${esc(t.live)}` : ''} · ${src(m)}</p>
 <dl class="hw-dl">
 <dt>${esc(t.cpu)}</dt><dd>${esc(m.cpu)}${m.threads ? ` (${m.threads} ${esc(t.threads)})` : ''}</dd>
@@ -148,7 +169,7 @@ ${m.perf.length ? `<p class="hw-perf">${m.perf.map((p) => `<span>${esc((t.perf &
     const s = k && t.notes && (t.notes[k] || t.notes[k.replace(/-(\w)/g, (_, c) => c.toUpperCase())]);
     return s ? ` ${esc(s)}` : '';
   };
-  const probRows = model.problems.map((p) => `<tr><td>${esc(label(p.machine, p.kind))}</td><td>${comp(p.id)}</td><td>${st(p.state)}${note(p.note)}</td><td>${esc(p.lordos)}</td><td>${p.fixedIn ? esc(p.fixedIn) : '—'}</td></tr>`).join('\n');
+  const probRows = model.problems.map((p) => `<tr><td>${esc(label(p.machine, p.kind, p.board))}</td><td>${comp(p.id)}</td><td>${st(p.state)}${note(p.note)}</td><td>${esc(p.lordos)}</td><td>${p.fixedIn ? esc(p.fixedIn) : '—'}</td></tr>`).join('\n');
   return {
     machines,
     gpus: `<div class="hw-table"><table><thead><tr><th>${esc(t.gpu)}</th><th>${esc(t.driver)}</th><th>${esc(t.stateHead)}</th><th>${esc(t.versions)}</th></tr></thead><tbody>${gpuRows}</tbody></table></div>`,
