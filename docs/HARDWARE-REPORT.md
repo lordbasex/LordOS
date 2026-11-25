@@ -89,7 +89,13 @@ says "reported as desktop".
 
 Since 0.8.9.5 every computer can send a graphics card report (Settings → Graphics cards → Send a compatibility report,
 or `lordos-issue --gpu`; `docs/NVIDIA-PLAN.md`, Part 0). It names the cards and drivers but not the machine, so a
-machine that only sent this report counts in the comparison for its card alone.
+machine that only sent this report counts in the comparison for its card alone. Since 0.8.9.6.1 (in development)
+`lordos-issue --gpu` (not Settings: lord-server doesn't probe cards for it) also gives each card's display engine, read
+without root through the kernel's DRM interface on the nodes the user may open (`server/src/sysreport/drmprobe.c`):
+explicit sync (`DRM_CAP_SYNCOBJ`, `DRM_CAP_SYNCOBJ_TIMELINE`), atomic modesetting, the planes by type, the primary
+plane's scanout formats and modifiers (`IN_FORMATS`), framebuffer modifiers, PRIME, and whether a VR headset could be
+leased (connectors marked `non-desktop`). `lordos-sysreport report` has the same as a "Display engine" table and a
+`drm` object per GPU in its JSON.
 
 | Issue | Card | Driver | LordOS | Result |
 |---|---|---|---|---|
