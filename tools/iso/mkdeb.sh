@@ -28,9 +28,9 @@
 #   /usr/lib/lordos/lordos-dm-check       another display manager enabled next to lordos.service (#187): postinst warns
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
 #   /usr/share/applications/lordos-testbench.desktop   its launcher entry
-#   /usr/lib/lordos/toolkit-audit/        the harnesses of `lordos-testbench --toolkits` (tools/toolkit-audit/: small
-#                                         Python 3 windows per toolkit; each runs only if that toolkit's bindings are
-#                                         already installed, so no GTK, Qt or binding is a dependency)
+#   /usr/lib/lordos/toolkit-audit/        the harnesses of `lordos-testbench --toolkits` (tools/toolkit-audit/*.py, not
+#                                         the *_test.py: small Python 3 windows per toolkit; each runs only if that
+#                                         toolkit's bindings are already installed, so no GTK, Qt or binding is a dependency)
 #   /usr/lib/lordos/themes/<theme>/       theme.json, theme.bundle.js and their resources (greeter: the
 #                                         login screen)
 #   /usr/lib/lordos/firmware/lordos-gvt-gop.rom  the GVT-g GOP option ROM Machines gives a vGPU (amd64; firmware/gvt-gop)
@@ -39,7 +39,6 @@
 #   /usr/lib/lordos/code-manifest.json    SHA-256 of every bundle LordOS runs as its own code, and
 #   /usr/lib/lordos/code-manifest.sig     its Ed25519 signature (release key; docs/SIGNING.md)
 #   /usr/lib/lordos/lordos-live-prep      live preparation (grub language, folders)
-#   /usr/lib/lordos/toolkit-audit/*.py    lordos-testbench --toolkits' harnesses (GTK, Qt); run only with bindings already installed
 #   /usr/lib/systemd/system/lordos.service  lord-sessiond on tty1
 #   /usr/lib/systemd/system/lordos-text-login.service  a login prompt on tty1 in text mode (docs/SESSIONS.md)
 #   /etc/grub.d/11_lordos_text            the boot menu's "LordOS (text mode)" entry
@@ -190,12 +189,6 @@ ln -s machines "$PKG/usr/share/bash-completion/completions/lordvm"
     install -d "$PKG/usr/share/applications"
     install -m 644 packaging/desktop/lordos-testbench.desktop "$PKG/usr/share/applications/lordos-testbench.desktop"
 }
-# the toolkit harnesses (GTK 3/4, Qt 5/6, ...) that `lordos-testbench --toolkits` runs; they import their bindings
-# only when present, so nothing is added to Depends or Recommends. New files, no migration.
-install -d "$L/toolkit-audit"
-for f in tools/toolkit-audit/*.py; do
-    [ -f "$f" ] && install -m 755 "$f" "$L/toolkit-audit/$(basename "$f")"
-done
 # isolated PDF and archive helper (optional: make skips it without libpoppler-glib-dev/libarchive-dev);
 # lord-server only launches the lord-doc in its own folder
 [ -x server/build/lord-doc ] && install -m 755 server/build/lord-doc "$L/bin/lord-doc"
@@ -420,10 +413,14 @@ if [ "${REQUIRE_SIGNED_CODE:-0}" = 1 ] && [ -d .git ]; then node tools/app-versi
     tail -20 "$PKG/code-check.log" >&2; echo "the staged system code does not match code-manifest.json" >&2; exit 1; }
 tail -1 "$PKG/code-check.log"; rm -f "$PKG/code-check.log"
 install -m 755 tools/iso/rootfs/usr/lib/lordos/lordos-live-prep "$L/lordos-live-prep"
-# lordos-testbench --toolkits: one small harness per GUI toolkit (docs/WAYLAND.md). They use only bindings that are
-# already installed (python3-gi, PyQt5, PyQt6) and report "not installed" otherwise: no Depends, nothing pulled in.
+# lordos-testbench --toolkits: one small Python 3 harness per GUI toolkit (docs/TOOLKIT-AUDIT.md). x11.py needs only
+# the standard library; the GTK and Qt ones use only bindings that are already installed (python3-gi, PyQt5, PyQt6)
+# and report "not installed" otherwise: no Depends, nothing pulled in. New files, no migration.
 install -d "$L/toolkit-audit"
-for f in tools/toolkit-audit/*.py; do [ -f "$f" ] && install -m 755 "$f" "$L/toolkit-audit/"; done
+for f in tools/toolkit-audit/*.py; do
+    case "$f" in *_test.py) continue ;; esac
+    install -m 755 "$f" "$L/toolkit-audit/${f##*/}"
+done
 # updates in place (docs/UPDATES.md): the repository, its key, the migrations and the restart notice
 install -D -m 644 packaging/apt/lordos.sources "$L/apt/lordos.sources"
 install -D -m 644 packaging/keys/lordos-archive-keyring.gpg "$PKG/usr/share/keyrings/lordos-archive-keyring.gpg"
