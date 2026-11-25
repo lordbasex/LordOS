@@ -12,7 +12,7 @@
 import {
   View, Text, TextInput, useStore, desktopList, desktopNames, desktopName, activeDesktop, renameDesktop, switchDesktop, formatTime, formatDate,
   StatusItems, PrivacyIndicators, clockPrefs, weekdayName, useSound, defaultSink, sound, Slider, SoundOutputList, addListener, t as tr, createStore, Layer, windows, windowTitle, windowIcon,
-  getApp, appName, wm, useLauncherApps,
+  getApp, appName, wm, useLauncherApps, direction,
 } from '@lordos/sdk';
 import { activitySummary } from '../model/activities.js';
 import { Fragment, memo, useEffect, useRef, useState } from 'react';
@@ -23,6 +23,7 @@ import { Menu } from '../../classic/components/Menu.jsx';
 import { ActivityIcon, PlusGlyph, SpeakerGlyph, BellGlyph } from '../glyphs.jsx';
 import { activities, renaming, deleting, newActivity, noteLaunch, showGroup, addGroup, renameGroup, removeGroup } from '../state.js';
 import { MAX_ACTIVITIES, MAX_GROUPS } from '../model/activities.js';
+import { stripCompact, stripRoom, BAND_GAP } from '../model/topband.js';
 
 const H = 44;
 // One timer for the clock, woken at each minute's turn (each second's only with Settings → Date & Time → Show seconds):
@@ -48,8 +49,23 @@ function clockTicker(read) {
 const dayOf = (d) => { const c = clockPrefs(); return c.date === 'none' ? '' : c.date === 'weekday' ? weekdayName(d.getDay()) : formatDate(d, 'short'); };
 export const clock = clockTicker((d) => `${dayOf(d)}\u0000${formatTime(d, { seconds: !!clockPrefs().seconds })}`);
 
+// The status cluster's width as laid out (model/topband.js: the strip gets the rest of the band). Measured after the
+// cluster renders and after the clock's text changes (a longer date or time widens it); 0 until then.
+const clusterW = createStore(0);
+let clusterNode = null;
+function measureCluster() {
+  nextFrame(() => {
+    let b = null;
+    try { b = clusterNode && lord.getLayout(clusterNode.id); } catch (e) { return; }
+    const w = b && b[2] > 0 ? Math.ceil(b[2]) : 0;
+    if (w && w !== clusterW.get()) clusterW.set(w);
+  });
+}
+const textW = (s, size, weight) => (typeof lord !== 'undefined' && lord.measureText ? lord.measureText(String(s), size, weight) : String(s).length * size * 0.55);
+
 const Clock = memo(function Clock({ t }) {
   const [day, time] = useStore(clock).split('\u0000');
+  useEffect(measureCluster, [day, time]);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       {day ? <Text style={{ fontSize: 11.5, color: t.textDim, whiteSpace: 'nowrap' }}>{day}</Text> : null}
@@ -219,13 +235,23 @@ function pillRefFor(map, id) {
   return refFns.get(id);
 }
 
-export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
+// band: the top band's rectangle. The strip sits at the band's start (TopBand), its width its content's, at most the
+// room the status cluster leaves (it is clipped past that, never drawn over the cluster).
+export const ActivityStrip = memo(function ActivityStrip({ t, band, onEdit }) {
   const list = useStore(desktopList);
   const active = useStore(activeDesktop);
   const meta = useStore(activities);
   const names = useStore(desktopNames);
-  // the room the names need (pills of about 130 px, the "+ New" button and the position) against the strip's width
-  const compact = rect.w < list.length * 130 + 260;
+  const cw = useStore(clusterW);
+  const at = list.indexOf(active) + 1;
+  // the widths the names, "+ New" and the position need (in this language) against the room the cluster leaves
+  const groups = meta[active]?.groups?.length || 0;
+  const compact = stripCompact(stripRoom(band.w, cw || STATUS_W), {
+    names: list.map((id) => textW(desktopName(id), 12.5, 600)), active: at - 1,
+    newW: textW(tr('shell.ws.activity.newShort'), 12.5, 500),
+    posW: textW(tr('shell.ws.activity.position', { n: at, total: list.length, max: MAX_ACTIVITIES }), 11, 400),
+    extra: groups ? (groups + 1) * 100 + 30 : 0,
+  });
   const [menu, setMenu] = useState(null);
   // the accent under the pill in view: it glides to the next one on a switch (motion.js, left and width only, inside
   // this small surface), the pill's own fill until it has been measured once
@@ -241,7 +267,10 @@ export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
       let box, sbox;
       try { box = lord.getLayout(p.id); sbox = lord.getLayout(sn.id); } catch (e) { return; }
       if (!box || !sbox || box[2] <= 0) return;
-      const next = { x: box[0] - sbox[0], w: box[2] };
+      // x: from the strip's start edge (its right one in a right-to-left language, where adding a pill or a longer name
+      // moves every pill's left edge but not its distance from the start)
+      const rtl = direction() === 'rtl';
+      const next = { x: rtl ? sbox[0] + sbox[2] - (box[0] + box[2]) : box[0] - sbox[0], w: box[2], rtl };
       const was = last.current;
       last.current = next;
       setPos(next);
@@ -250,16 +279,15 @@ export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
       if (was && g && (was.x !== next.x || was.w !== next.w)) {
         // after the windows' slide (sdk/desktops.js, 170 ms): in the same frames the two changes would be repainted as one
         // box spanning both (the engine's single damage box), several times the pixels of each alone
-        tween(g.id, { translateX: [was.x - next.x, 0], scaleX: [was.w / next.w, 1] }, { ms: 180, delay: 150, ease: EASE.back });
+        tween(g.id, { translateX: [(was.x - next.x) * (rtl ? -1 : 1), 0], scaleX: [was.w / next.w, 1] }, { ms: 180, delay: 150, ease: EASE.back });
       }
     });
     return () => cancelFrame(raf);
   }, [active, list.length, names, compact]);
-  const at = list.indexOf(active) + 1;
   const full = list.length >= MAX_ACTIVITIES;
   return (
-    <Surface ref={strip} t={t} radius={H / 2} style={{ position: 'absolute', left: rect.x, top: rect.y, height: H, maxWidth: rect.w, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 4 }}>
-      {pos ? <View ref={glider} style={{ position: 'absolute', left: pos.x, top: (H - BAR_ITEM) / 2 - 1, width: pos.w, height: BAR_ITEM, borderRadius: BAR_ITEM / 2, backgroundColor: t.accent, pointerEvents: 'none', transformOrigin: 'left center' }} /> : null}
+    <Surface ref={strip} t={t} radius={H / 2} style={{ height: H, flexShrink: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 4 }}>
+      {pos ? <View ref={glider} style={{ position: 'absolute', insetInlineStart: pos.x, top: (H - BAR_ITEM) / 2 - 1, width: pos.w, height: BAR_ITEM, borderRadius: BAR_ITEM / 2, backgroundColor: t.accent, pointerEvents: 'none', transformOrigin: pos.rtl ? 'right center' : 'left center' }} /> : null}
       {list.map((id) => (
         <Fragment key={id}>
           <Pill t={t} id={id} active={id === active} glide={!!pos} name={desktopName(id)} meta={meta[id] || { icon: 'spark', color: t.accent }}
@@ -296,11 +324,13 @@ function Volume({ t, onClick }) {
   );
 }
 
-// rect: the top band; screenW: the whole screen's width (the cluster is placed by its end edge, its width is its content)
-export const StatusCluster = memo(function StatusCluster({ t, rect, rtl, screenW, unread, onControl, onNotif, onVolume, notifRef }) {
+// At the band's end (TopBand), its width its content's: it never shrinks, the strip makes room
+export const StatusCluster = memo(function StatusCluster({ t, unread, onControl, onNotif, onVolume, notifRef }) {
+  const self = useRef(null);
+  useEffect(() => { clusterNode = self.current; measureCluster(); });
+  useEffect(() => () => { if (clusterNode === self.current) clusterNode = null; }, []);
   return (
-    <Surface t={t} radius={H / 2} style={{ position: 'absolute', top: rect.y, height: H, ...(rtl ? { left: rect.x } : { right: screenW - (rect.x + rect.w) }),
-      flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 4 }}>
+    <Surface ref={self} t={t} radius={H / 2} style={{ height: H, flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 4 }}>
       <PrivacyIndicators />
       <View style={{ paddingHorizontal: 4 }}><StatusItems color={t.iconFg} height={BAR_ITEM} /></View>
       <BarSeparator t={t} />
@@ -313,8 +343,19 @@ export const StatusCluster = memo(function StatusCluster({ t, rect, rtl, screenW
   );
 });
 
-// room the activity strip leaves for the status cluster
+// the status cluster's width until it has been measured
 export const STATUS_W = 330;
+
+// The top band (rect, the main display's): one row with the activity strip at its start and the status cluster at its
+// end, mirrored in a right-to-left language. It takes no clicks itself (the desktop between the two stays clickable).
+export function TopBand({ rect, children }) {
+  return (
+    <View style={{ position: 'absolute', left: rect.x, top: rect.y, width: rect.w, height: H, flexDirection: 'row', alignItems: 'center',
+      justifyContent: 'space-between', gap: BAND_GAP, pointerEvents: 'box-none' }}>
+      {children}
+    </View>
+  );
+}
 
 // The volume's own panel (the speaker in the status cluster), where the notifications open: the output's level with a
 // slider and mute, the outputs to choose from when there are several, and Settings → Sound.
