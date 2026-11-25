@@ -10,6 +10,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Documentation
+- The paper (en, es, pt) and `docs/PAPER-VALIDATION.md`: since 0.8.9.6.1 the arm64 `lordos-web` package is built against
+  LordOS's WPE WebKit 2.54 (WPEPlatform), like amd64's, and depends on `libwpewebkit-2.0-1 (>= 2.54)`; `web-backend-test`
+  passed with the platform backend on the Raspberry Pi 5 at the release build.
+
 ## [0.8.9.6.1-beta] - 2026-11-25
 
 An update of the package through the Store and `apt`, with no new images. Monitor → GPU says why it couldn't read an
