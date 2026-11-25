@@ -11,6 +11,32 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Fixed
+- **An X11 window that asked for fullscreen before its first frame stayed at its own size** (found by the toolkit
+  audit, docs/TOOLKIT-AUDIT.md). The window manager wrote `_NET_WM_STATE_FULLSCREEN` but never resized the window:
+  `enter_fullscreen()` (server/src/wl/wl.c) set the display's size in `conf_w`/`conf_h`, the first commit then mapped
+  the surface and overwrote them with the window's own size, and the next `x_configure()` sent that size to X while the
+  window stayed presented fullscreen (`wl_paint()` skips the fullscreen surface, so nothing corrected it). The theme
+  wasn't told either: `fullscreen` was emitted only for a mapped surface and the map event didn't carry the state. Now
+  a window whose first frame comes while it is fullscreen keeps the display's size (`map_fullscreen()`: a configure is
+  sent again if that frame is another size), the theme gets the window at its normal size, the one it comes back to
+  (an X window's own size when it was attached, kept in `own_w`/`own_h` because nothing had configured it yet), with
+  `"fullscreen": true` in the map event and a `fullscreen` event right after it, and leaving fullscreen gives it that
+  size back. A commit of another size while a window is fullscreen is no longer taken for a resize of its own
+  (`geometry`) and no longer overwrites the fullscreen size; that covers an `xdg_toplevel.set_fullscreen` sent before
+  the first commit too. After a live theme switch a fullscreen window is announced as fullscreen again
+  (`wl_remap_all`).
+- **Lord Classic and Lord Workspaces shrank Linux windows by their menu strip's 26 px.** Both give every Linux window
+  a menu strip (its Edit menu with Speech, `sdk/voice.js` `useMenusWithSpeech`, on by default), but `sdk/wayland.js`
+  sized the frame with `windowChrome().h` only, never `.menu`: on map, on the app's own resize and for a window the app
+  restored. So the app got 26 px less than it asked for, every fullscreen exit took 26 px more (400, 374, 348 on the
+  X11 harness) and window memory kept the smaller size. The frame is now the content plus the borders, the title bar
+  and, when the window shows a strip, the strip: `chromeInset(chrome, csd, strip)` in `sdk/shellxmodel.js`, with
+  `strip` from the new `menusWithSpeech(wid, menus, win)` in `sdk/voice.js` (what `useMenusWithSpeech` shows, read
+  once), on map, on `geometry`, for a restored window and for a window following a drag (xdg-toplevel-drag). Celeste,
+  which draws the same strip, now declares it in its chrome (`menu: MENU_H`), and the on-screen keyboard counts a
+  Linux window's strip when it places itself under the caret (`sdk/osk.js`). Places window memory already saved
+  smaller are kept as they are: a saved frame is the outer frame and can't be told apart from a size the person chose,
+  so no per-user migration; with the fix they no longer shrink.
 - The desktop froze for a moment after every window move and every copy on computers with a spinning hard disk
   (#250: an HP ProBook 440 G3 with a Core i3-6100U and a SATA HDD logged 80–650 ms in `call settings.save` and
   56–360 ms in `call clipboard.saveStore`, the window drag dropping to 13–18 FPS). Both calls wrote their file on
@@ -26,6 +52,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   before. No new permission: the paths are lord-server's own, never one JS names.
 
 ### Tests
+- `build/x11-conformance-client wm` (tools/wl-conformance.mjs): `fullscreen_before_map`, a window with
+  `_NET_WM_STATE_FULLSCREEN` set before its map is 1280x800 and stays so, `fullscreen_before_map_remove`, out of
+  fullscreen it is 320x240 again, and the driver's `fullscreen_before_map_reaches_theme`, the theme got the window at
+  its own size with `"fullscreen": true` and a `fullscreen` event. The first and the last failed before the fix
+  (320x240; not told). `server/tests/shellx_model_test.mjs`: `chromeInset` with and without a strip, for a window with
+  its own frame and in Lord Flow, the content's size kept over three resizes, and a restored frame with the strip.
 - `build/bgsave-test` (in `make -C server test`): with a test hook standing in for a slow disk, a save returns at once
   while a write is held, saves made meanwhile collapse into the newest, `bgsave_flush` waits for it, a durable write
   after a queued one wins, the clipboard's files are 0600 with nothing left behind (also when the write fails), and a

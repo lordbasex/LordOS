@@ -278,7 +278,7 @@ Two real runs of `lordos-testbench --toolkits` from `feat/ta-report`, with this 
   - Earlier runs also failed `x11-xwayland fullscreen` 2 times in 12 (a compositor bug, below) and `gtk3-x11
     clipboard` once (CopyQ, installed on that VM, took the clipboard).
 
-**Compositor and shell bugs these runs found** (to fix separately):
+**Compositor and shell bugs these runs found** (the first two fixed in development, `fix/ta-bugs`; see below):
 
 - **An X11 window that asks for fullscreen before its first frame stays at its own size.** The window manager
   writes `_NET_WM_STATE_FULLSCREEN` but the window is never resized. `enter_fullscreen()` (server/src/wl/wl.c:3887)
@@ -293,6 +293,16 @@ Two real runs of `lordos-testbench --toolkits` from `feat/ta-report`, with this 
   (line 231) and for a restored window (line 312), never `windowChrome().menu`. The app gets 26 px less than it
   asked for, every fullscreen exit takes another 26 px (400, 374, 348 on the X11 harness), and window memory keeps
   the smaller size for the next start (322, 296).
+- **Fixed.** lord-server keeps the display's size for a window whose first frame comes while it is fullscreen
+  (`map_fullscreen()` in wl.c: X's own size goes to the map event as its normal size, the one it returns to, and a
+  commit while fullscreen never overwrites `conf_w`/`conf_h`), and tells the theme at map (`"fullscreen": true` in
+  the map event and a `fullscreen` event, also after a theme switch). The same holds for an
+  `xdg_toplevel.set_fullscreen` before the first commit. `sdk/wayland.js` sizes a Linux window's frame with the menu
+  strip when the theme has one (`chromeInset(chrome, csd, strip)`, `sdk/voice.js` `menusWithSpeech`) on map, on the
+  app's own resize, for a restored window and for a toplevel drag, and Celeste now declares its strip too. With both,
+  the X11 harness passes `fullscreen` (on 1280x800, off 600x400) three runs in a row in Lord Flow, Lord Classic,
+  Lord Workspaces and Celeste on the headless test server; Lord Workspaces failed it before. Sizes window memory
+  already saved smaller stay as they are (they can't be told from a size the person chose) and no longer shrink.
 - **Smaller:** the keyboard comes back to a window 60 to 75 ms after one of its child toplevels closes (VM 127). A
   Qt 6 popup the app opens in that gap is closed by Qt when the focus arrives (the harness now waits for it, as a
   person does).
