@@ -11,6 +11,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Fixed
+- **With a moving wallpaper the desktop's right-click menu never opened** (found testing 0.8.9.6.2). The video is drawn
+  over the still wallpaper, whose node takes the desktop's clicks (its menu, in every theme), and the video's node took
+  them first. The moving picture and its poster are now `pointerEvents: 'none'` (`sdk/motion.jsx`): clicks reach the
+  desktop as with a still wallpaper.
 - **A moving wallpaper on several displays: every display's copy moves, and none spills over another** (found testing
   0.8.9.6.2 on three 1920×1080 monitors). Settings → Wallpaper → a moving wallpaper for all displays plays one video per
   file (one hardware decoder, `sdk/motion.jsx`) and each display draws it in its own `<MediaView>`. lord-server's media
