@@ -58,6 +58,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `make test`) and the headless scene `tests/app_scene_headless.sh files_slowrename_scene` (the three views, a real
   rename on disk, and each case that must not rename, with screenshots in the four desktops and in Arabic). Enter and
   the menu's Rename are unchanged.
+- **The slow-rename scene passes in all four desktops and runs in `make test-full`** (in development; latest release
+  0.8.9.5-beta). Its two failures (Lord Classic's "a first click that only focused the window" case, Lord Workspaces'
+  column view) were in the scene, not in Files or the themes: lord-server hands a freed node's id out again, and
+  `lord.destroy` frees a whole subtree while the scene's `pre.js` only heard about its root, so a name kept from a
+  closed window (the Editor the double-click case opens, an earlier Files window) stayed attached to an id now reused in
+  another window, and the scene clicked that node instead of the file: in Lord Classic a node in the Calculator (so the
+  click focused the Calculator, which the scene then papered over by focusing Files itself), in Lord Workspaces a 16 px
+  node away from the column. `pre.js` now forgets an id when `lord.createNode` hands it out again and a child once it
+  is removed; the driver's workaround is gone and "the first click brings Files forward" is a check of its own.
+  `tests/run_suites.sh full` runs the scene in Lord Flow, Lord Classic, Lord Workspaces and Lord Celeste (about a
+  minute each, headless, no hardware).
 - **Lord Workspaces: each display's bar shows every window of the activity; launched windows land where they were
   launched; Chrome's Save as is LordOS's dialog** (in development; latest release 0.8.9.5-beta).
   - The frame header's tray (each display's bar) lists the activity's windows on that display, **open and minimized**,
@@ -1244,7 +1255,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - Tests (`build/mcli-test`, under ASan and UBSan): `test_apply_argv` parses the worst-case apply file (every
     setting, 32 ports, 4 shares), checks it fills `MCLI_APPLY_ARGV` exactly with canaries past the end untouched, is
     refused at every smaller size without a write at or past the cap, and converts whole through `mcli_set_args`;
-    `test_vtf` checks colors, cursor, modes, titles and colors pass, and that OSC 52 (BEL, ST and C1 forms), iTerm
+    `test_vtf` checks colors, cursor, modes, titles and colors pass, and that OSC 52 (BEL, ST and C1 forms), a terminal's
     Copy and File, links, notifications, cwd, prompt marks, DCS (DECRQSS, sixel, tmux pass-through), SOS, PM, APC,
     window operations and C1 controls are dropped, every case fed at every split size from 1 byte to whole, plus a
     fuzz pass of 4000 random streams that checks the output is the same however the input is split and never holds

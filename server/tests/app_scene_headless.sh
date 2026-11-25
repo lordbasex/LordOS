@@ -7,7 +7,8 @@
 # (Settings → Region names each region's language, #239).
 # The driver prints lines starting with "APP-SCENE" in the shell log; each check says "done" or "missing", and the exit
 # status is 1 when one is missing. Nothing outside the temporary home is read or written (never the person's own notes).
-# A test tool: not part of `make test`, never installed. From server/, after `npm run build` and `make`:
+# A test tool, never installed; not part of `make test` (`make test-full` runs files_slowrename_scene in every
+# desktop). From server/, after `npm run build` and `make`:
 #   tests/app_scene_headless.sh SCENE OUT_DIR [theme] [language] [dark|light] [restart]
 #     → OUT_DIR/<scene>-<theme>-<language>-<mode>-1.png …
 #   SCENE_TIMEOUT (seconds, default 170): how long the server runs, for a longer scene.

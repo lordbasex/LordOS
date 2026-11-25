@@ -1120,6 +1120,16 @@ EOF
             ln -sf "$(cd "$(dirname "$f")" && pwd)/$(basename "$f")" "$T/fonts/$(basename "$f")"; done
         run "hb_compare.py (HarfBuzz)" python3 tests/hb_compare.py "$T/fonts" build/shape-test
     else skip "hb_compare.py" "python3 with uharfbuzz (pip install uharfbuzz) and fonts-noto-core/fonts-noto-cjk"; fi
+    # Files' slow second click that renames in place (sdk/slowclick.js), driven as a mouse in a headless lord-server, in
+    # every desktop: the icon, list and column views, and the clicks that must not rename (about a minute each)
+    for th in default classic workspaces celeste; do
+        SCENE_TIMEOUT=300 sh tests/app_scene_headless.sh files_slowrename_scene "$T/scene" "$th" >"$T/out" 2>&1
+        case $? in
+            0) ok "files-slowrename-scene $th (tests/files_slowrename_scene, headless lord-server)" ;;
+            77) skip "files-slowrename-scene $th" "build/lord-server and themes/$th/theme.bundle.js (make, npm run build)" ;;
+            *) bad "files-slowrename-scene $th (tests/files_slowrename_scene, headless lord-server)" ;;
+        esac
+    done
 }
 
 case $mode in
