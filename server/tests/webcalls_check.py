@@ -1,0 +1,333 @@
+#!/usr/bin/env python3
+"""webcalls_check.py — web apps' calls and Chrome identity on the real engine (docs/WEBAPPS.md, "Calls").
+
+    python3 -I tests/webcalls_check.py build/webcalls-check [--webrtc]
+
+Serves pages on 127.0.0.1 (a secure context, as Chrome and WebKit treat loopback) and loads each in
+build/webcalls-check (tests/webcalls_check.c: a WebKit view set up as lord-web sets up a Chrome profile):
+
+  identity   the request headers and the page's navigator values against what Chrome 158 on Linux sent and answered
+             (captured 2026-11-25): Sec-CH-UA, -Mobile and -Platform on the first request, the high-entropy hints
+             only after the site's Accept-CH, navigator.userAgentData (toJSON, getHighEntropyValues), navigator.vendor;
+             the functions read as native code; getUserMedia's failure (a device that can't exist: no real microphone
+             is opened) in the call log by its name
+  isolation  SharedArrayBuffer: never on a page that isn't cross-origin isolated; with --webrtc (an engine built with
+             LordOS's patch) present on one served with COOP same-origin and COEP require-corp, in the same run
+  loopback   (--webrtc) two RTCPeerConnections in one page exchange audio (a WebAudio oscillator) and video (an
+             animated canvas): both connect, frames and audio arrive, and the codecs are Opus and VP8, then Opus and
+             H.264 (the receiver's codec preferences); the call log shows the connection, its states and codecs
+
+Without --webrtc (an engine without WebRTC, Debian's or LordOS's build before +3) the WebRTC checks are reported as
+"not built" and the rest must pass. Prints one line per check and exits 1 on the first failure."""
+import http.server
+import json
+import os
+import socketserver
+import subprocess
+import sys
+import tempfile
+import threading
+
+CHECK = sys.argv[1] if len(sys.argv) > 1 else "build/webcalls-check"
+WEBRTC = "--webrtc" in sys.argv
+MAJOR = None
+
+ACCEPT_CH = ("Sec-CH-UA-Full-Version-List, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, "
+             "Sec-CH-UA-Model, Sec-CH-UA-WoW64, Sec-CH-UA-Form-Factors")
+
+UA_PAGE = b"""<!doctype html><title>ua</title><script>
+(async () => {
+  const d = navigator.userAgentData;
+  const o = { ua: navigator.userAgent, vendor: navigator.vendor, platform: navigator.platform, secure: isSecureContext,
+    uad: d ? d.toJSON() : null,
+    he: d ? await d.getHighEntropyValues(['architecture','bitness','model','platformVersion','fullVersionList','uaFullVersion','wow64','formFactors']) : null,
+    heSome: d ? await d.getHighEntropyValues(['bitness']) : null,
+    heNone: d ? await d.getHighEntropyValues([]) : null,
+    noArg: d ? await d.getHighEntropyValues().then(() => 'resolved', e => e.name) : null,
+    tag: d ? Object.prototype.toString.call(d) : null,
+    native: d ? [String(Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgentData').get), String(d.getHighEntropyValues),
+                 String(Function.prototype.toString), String(window.RTCPeerConnection || '')] : null,
+    sameBrands: d ? d.brands === d.brands && Object.isFrozen(d.brands) : null,
+    construct: (() => { try { new NavigatorUAData(); return 'constructed'; } catch (e) { return e.name; } })(),
+    api: { RTCPeerConnection: typeof RTCPeerConnection, SharedArrayBuffer: typeof SharedArrayBuffer, Atomics: typeof Atomics,
+           crossOriginIsolated: self.crossOriginIsolated, RTCRtpScriptTransform: typeof RTCRtpScriptTransform,
+           MediaStreamTrackProcessor: typeof MediaStreamTrackProcessor, MediaStreamTrackGenerator: typeof MediaStreamTrackGenerator,
+           VideoEncoder: typeof VideoEncoder, AudioEncoder: typeof AudioEncoder, AudioWorkletNode: typeof AudioWorkletNode,
+           WebTransport: typeof WebTransport, getDisplayMedia: typeof (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia),
+           setSinkId: typeof HTMLMediaElement.prototype.setSinkId,
+           insertableStreams: typeof RTCRtpSender !== 'undefined' && 'createEncodedStreams' in RTCRtpSender.prototype,
+           codecsAudio: window.RTCRtpSender ? RTCRtpSender.getCapabilities('audio').codecs.map(c => c.mimeType) : null,
+           codecsVideo: window.RTCRtpSender ? [...new Set(RTCRtpSender.getCapabilities('video').codecs.map(c => c.mimeType))] : null } };
+  // a device that can't exist: the request fails by its name and no real microphone is opened
+  try { await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: 'lordos-no-such-device' } } }); } catch (e) { o.gum = e.name; }
+  await fetch('/report/ua', { method: 'POST', body: JSON.stringify(o) });
+  document.title = 'done';
+})();
+</script>"""
+
+SAB_PAGE = b"""<!doctype html><title>sab</title><script>
+fetch(location.pathname.replace('/page/', '/report/'), { method: 'POST', body: JSON.stringify({
+  sab: typeof SharedArrayBuffer, coi: self.crossOriginIsolated, atomics: typeof Atomics })
+}).then(() => { document.title = 'done'; });
+</script>"""
+
+LOOPBACK_PAGE = b"""<!doctype html><title>loopback</title><canvas id=c width=320 height=240></canvas><script>
+async function call(prefer) {
+  const r = { prefer };
+  const ac = new AudioContext();
+  const osc = ac.createOscillator(); osc.frequency.value = 440;
+  const dst = ac.createMediaStreamDestination(); osc.connect(dst); osc.start();
+  const c = document.getElementById('c'), g = c.getContext('2d');
+  let n = 0;
+  const tick = setInterval(() => { g.fillStyle = `hsl(${(n++ * 7) % 360} 80% 50%)`; g.fillRect(0, 0, 320, 240); }, 33);
+  const vs = c.captureStream(30);
+  const a = new RTCPeerConnection(), b = new RTCPeerConnection();
+  a.onicecandidate = e => e.candidate && b.addIceCandidate(e.candidate);
+  b.onicecandidate = e => e.candidate && a.addIceCandidate(e.candidate);
+  const got = { audio: false, video: false };
+  b.ontrack = e => { got[e.track.kind] = true; };
+  a.addTrack(dst.stream.getAudioTracks()[0], dst.stream);
+  a.addTrack(vs.getVideoTracks()[0], vs);
+  const offer = await a.createOffer(); await a.setLocalDescription(offer); await b.setRemoteDescription(offer);
+  if (prefer) for (const t of b.getTransceivers()) {
+    if (t.receiver.track.kind !== 'video' || !t.setCodecPreferences) continue;
+    const cs = RTCRtpReceiver.getCapabilities('video').codecs;
+    t.setCodecPreferences(cs.filter(x => x.mimeType === prefer).concat(cs.filter(x => x.mimeType !== prefer)));
+  }
+  const answer = await b.createAnswer(); await b.setLocalDescription(answer); await a.setRemoteDescription(answer);
+  const t0 = performance.now();
+  while ((a.connectionState !== 'connected' || b.connectionState !== 'connected') && performance.now() - t0 < 15000) {
+    if (a.connectionState === 'failed' || b.connectionState === 'failed') break;
+    await new Promise(f => setTimeout(f, 100));
+  }
+  r.connectMs = Math.round(performance.now() - t0);
+  r.a = a.connectionState; r.b = b.connectionState; r.ice = b.iceConnectionState;
+  await new Promise(f => setTimeout(f, 4000));
+  const s = await b.getStats(), codecs = {};
+  s.forEach(x => { if (x.type === 'codec') codecs[x.id] = x.mimeType; });
+  s.forEach(x => {
+    if (x.type !== 'inbound-rtp') return;
+    if (x.kind === 'video') Object.assign(r, { videoCodec: codecs[x.codecId], framesDecoded: x.framesDecoded, width: x.frameWidth, height: x.frameHeight, fps: x.framesPerSecond, videoBytes: x.bytesReceived });
+    if (x.kind === 'audio') Object.assign(r, { audioCodec: codecs[x.codecId], audioPackets: x.packetsReceived, audioSamples: x.totalSamplesReceived, audioBytes: x.bytesReceived });
+  });
+  s.forEach(x => { if (x.type === 'local-candidate') r.local = (r.local || []).concat(x.candidateType + '/' + x.protocol); });
+  r.tracks = got;
+  clearInterval(tick); a.close(); b.close(); ac.close();
+  return r;
+}
+(async () => {
+  const out = {};
+  for (const p of ['video/VP8', 'video/H264']) {
+    try { out[p] = await call(p); } catch (e) { out[p] = { error: e.name + ': ' + e.message }; }
+  }
+  await fetch('/report/loopback', { method: 'POST', body: JSON.stringify(out) });
+  document.title = 'done';
+})();
+</script>"""
+
+reports = {}
+requests = []
+
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def page(self, body, extra=()):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        for k, v in extra:
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        requests.append((self.path, {k.lower(): v for k, v in self.headers.items()}))
+        if self.path == "/page/ua":
+            self.page(UA_PAGE, [("Accept-CH", ACCEPT_CH)])
+        elif self.path == "/page/coi":
+            self.page(SAB_PAGE, [("Cross-Origin-Opener-Policy", "same-origin"), ("Cross-Origin-Embedder-Policy", "require-corp")])
+        elif self.path == "/page/plain":
+            self.page(SAB_PAGE)
+        elif self.path == "/page/loopback":
+            self.page(LOOPBACK_PAGE)
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length", "0"))
+        requests.append((self.path, {k.lower(): v for k, v in self.headers.items()}))
+        reports[self.path] = json.loads(self.rfile.read(n) or b"null")
+        self.send_response(204)
+        self.end_headers()
+
+
+class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
+
+
+def fail(msg):
+    print("FAIL", msg)
+    sys.exit(1)
+
+
+def ok(msg):
+    print("ok  ", msg)
+
+
+def run(path, secs=40):
+    env = dict(os.environ)
+    home = tempfile.mkdtemp(prefix="webcalls-home-")
+    env.update(HOME=home, XDG_CACHE_HOME=home + "/.cache", XDG_DATA_HOME=home + "/.local/share", XDG_CONFIG_HOME=home + "/.config")
+    p = subprocess.run([CHECK, "http://127.0.0.1:%d%s" % (port, path), str(secs)], env=env, capture_output=True, text=True, timeout=secs + 30)
+    lines = p.stdout.splitlines()
+    if p.returncode != 0:
+        print(p.stdout + p.stderr)
+        fail("%s: the page didn't finish" % path)
+    return [l for l in lines if l.startswith("webcall: ")], lines
+
+
+def brands(major, full):
+    """Chromium's GREASE brand list, worked out independently of webua.c"""
+    chars = " (:-./);=?_"
+    grease = ("Not%sA%sBrand" % (chars[major % 11], chars[(major + 1) % 11]), ["8", "99", "24"][major % 3])
+    order = [(0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0)][major % 6]
+    v = full if full else str(major)
+    gv = grease[1] + ".0.0.0" if full else grease[1]
+    out = [None] * 3
+    out[order[0]] = (grease[0], gv)
+    out[order[1]] = ("Chromium", v)
+    out[order[2]] = ("Google Chrome", v)
+    return out
+
+
+def header_of(bl):
+    return ", ".join('"%s";v="%s"' % b for b in bl)
+
+
+srv = Server(("127.0.0.1", 0), Handler)
+port = srv.server_address[1]
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+# ---- identity ----
+calls, out = run("/page/ua")
+engine = next((l for l in out if l.startswith("engine: ")), "engine: ?")
+print(engine)
+r = reports.get("/report/ua") or fail("no report from the identity page")
+ua = r["ua"]
+if "Chrome/" not in ua or "LordOS" in ua:
+    fail("the user agent isn't Chrome's: " + ua)
+MAJOR = int(ua.split("Chrome/")[1].split(".")[0])
+full = r["he"]["uaFullVersion"] if r.get("he") else None
+if not full or not full.startswith("%d." % MAJOR):
+    fail("uaFullVersion %r doesn't match the string's major %d" % (full, MAJOR))
+low = brands(MAJOR, None)
+hi = brands(MAJOR, full)
+nav = [h for p, h in requests if p == "/page/ua"][0]
+want_low = {"sec-ch-ua": header_of(low), "sec-ch-ua-mobile": "?0", "sec-ch-ua-platform": '"Linux"'}
+for k, v in want_low.items():
+    if nav.get(k) != v:
+        fail("first request: %s is %r, want %r" % (k, nav.get(k), v))
+if any(k.startswith("sec-ch-ua-") and k not in want_low for k in nav):
+    fail("first request carries a high-entropy hint before the site asked: %s" % sorted(nav))
+ok("first request: Sec-CH-UA %s, Mobile ?0, Platform \"Linux\", nothing else" % nav["sec-ch-ua"])
+rep = [h for p, h in requests if p == "/report/ua"][0]
+arch = {"x86_64": "x86", "aarch64": "arm"}.get(os.uname().machine, "")
+want_hi = dict(want_low)
+want_hi.update({"sec-ch-ua-full-version-list": header_of(hi), "sec-ch-ua-platform-version": '""', "sec-ch-ua-arch": '"%s"' % arch,
+                "sec-ch-ua-bitness": '"64"', "sec-ch-ua-model": '""', "sec-ch-ua-wow64": "?0", "sec-ch-ua-form-factors": '"Desktop"'})
+for k, v in want_hi.items():
+    if rep.get(k) != v:
+        fail("after Accept-CH: %s is %r, want %r" % (k, rep.get(k), v))
+if "sec-ch-ua-full-version" in rep:
+    fail("Sec-CH-UA-Full-Version sent though the site didn't ask for it")
+ok("after Accept-CH: the seven high-entropy hints the site asked for, Chrome's values (arch %s)" % arch)
+want_uad = {"brands": [{"brand": b, "version": v} for b, v in low], "mobile": False, "platform": "Linux"}
+if r["uad"] != want_uad:
+    fail("userAgentData.toJSON() %r, want %r" % (r["uad"], want_uad))
+want_he = {"architecture": arch, "bitness": "64", "brands": want_uad["brands"], "formFactors": ["Desktop"],
+           "fullVersionList": [{"brand": b, "version": v} for b, v in hi], "mobile": False, "model": "", "platform": "Linux",
+           "platformVersion": "", "uaFullVersion": full, "wow64": False}
+if r["he"] != want_he or list(r["he"].keys()) != list(want_he.keys()):
+    fail("getHighEntropyValues %r, want %r (in this order)" % (r["he"], want_he))
+if r["heSome"] != {"bitness": "64", "brands": want_uad["brands"], "mobile": False, "platform": "Linux"}:
+    fail("getHighEntropyValues(['bitness']) %r" % r["heSome"])
+if r["heNone"] != want_uad or r["noArg"] != "TypeError" or r["tag"] != "[object NavigatorUAData]" or not r["sameBrands"] or r["construct"] != "TypeError":
+    fail("userAgentData's shape: %r" % {k: r[k] for k in ("heNone", "noArg", "tag", "sameBrands", "construct")})
+if r["vendor"] != "Google Inc.":
+    fail("navigator.vendor %r" % r["vendor"])
+want_native = ["function get userAgentData() { [native code] }", "function getHighEntropyValues() { [native code] }",
+               "function toString() { [native code] }"]
+if r["native"][:3] != want_native:
+    fail("functions don't read as native: %r" % r["native"])
+if r["api"]["RTCPeerConnection"] == "function" and "[native code]" not in r["native"][3]:
+    fail("RTCPeerConnection doesn't read as native: %r" % r["native"][3])
+ok("navigator.userAgentData as Chrome's (toJSON, getHighEntropyValues in a dictionary's order, frozen brands, not "
+   "constructible, native-looking), navigator.vendor \"Google Inc.\" (navigator.platform %r)" % r["platform"])
+if r.get("gum") is None or not any(("getUserMedia audio: failed: %s" % r["gum"]) in c for c in calls):
+    fail("getUserMedia's failure (%r) not in the call log: %r" % (r.get("gum"), calls))
+envline = [c for c in calls if c.startswith("webcall: page: ")]
+if not envline:
+    fail("no 'page:' line in the call log: %r" % calls)
+if not any(c.startswith("webcall: client hints asked by http://127.0.0.1:") for c in calls) and \
+   not any("client hints asked by an address" in c for c in calls):
+    fail("the Client Hints the site asked for aren't in the call log: %r" % calls)
+ok("call log: " + " | ".join(c[len("webcall: "):] for c in calls))
+api = r["api"]
+print("     APIs:", json.dumps(api, sort_keys=True))
+
+# ---- isolation ----
+run("/page/plain")
+plain = reports.get("/report/plain") or fail("no report from the plain page")
+if plain["sab"] != "undefined" or plain["coi"]:
+    fail("SharedArrayBuffer on a page that isn't cross-origin isolated: %r" % plain)
+run("/page/coi")
+coi = reports.get("/report/coi") or fail("no report from the isolated page")
+if not coi["coi"]:
+    fail("COOP+COEP page isn't cross-origin isolated: %r" % coi)
+if WEBRTC and coi["sab"] != "function":
+    fail("no SharedArrayBuffer on the cross-origin-isolated page: %r" % coi)
+ok("SharedArrayBuffer: %s on the cross-origin-isolated page, undefined on the plain one (Atomics %s)" % (coi["sab"], coi["atomics"]))
+run("/page/plain")
+again = reports["/report/plain"]
+if again["sab"] != "undefined":
+    fail("SharedArrayBuffer leaked to a plain page after an isolated one: %r" % again)
+ok("a plain page after the isolated one still has no SharedArrayBuffer")
+
+# ---- loopback ----
+if api["RTCPeerConnection"] != "function":
+    if WEBRTC:
+        fail("RTCPeerConnection is %s: this WebKit has no WebRTC" % api["RTCPeerConnection"])
+    print("skip WebRTC loopback: not built in this WebKit (RTCPeerConnection %s)" % api["RTCPeerConnection"])
+    sys.exit(0)
+calls, out = run("/page/loopback", 90)
+lb = reports.get("/report/loopback") or fail("no report from the loopback page")
+print("     loopback:", json.dumps(lb, sort_keys=True))
+for want, res in (("video/VP8", lb.get("video/VP8")), ("video/H264", lb.get("video/H264"))):
+    if not res or res.get("error"):
+        fail("%s: %r" % (want, res))
+    if res["a"] != "connected" or res["b"] != "connected":
+        fail("%s: not connected (%s / %s, ICE %s; local candidates %s)" % (want, res["a"], res["b"], res.get("ice"), res.get("local")))
+    if not res["tracks"]["audio"] or not res["tracks"]["video"]:
+        fail("%s: tracks %r" % (want, res["tracks"]))
+    if (res.get("framesDecoded") or 0) < 10 or not res.get("width"):
+        fail("%s: no video frames: %r" % (want, res))
+    if (res.get("audioPackets") or 0) < 10:
+        fail("%s: no audio: %r" % (want, res))
+    if res.get("audioCodec") != "audio/opus":
+        fail("%s: audio codec %r" % (want, res.get("audioCodec")))
+    if res.get("videoCodec") != want:
+        fail("video codec %r, the receiver preferred %s" % (res.get("videoCodec"), want))
+    ok("loopback %s: connected in %d ms, %s + %s, %d frames %dx%d at %.0f fps, %d audio packets" % (
+        want, res["connectMs"], res["audioCodec"], res["videoCodec"], res["framesDecoded"], res["width"], res["height"],
+        res.get("fps") or 0, res["audioPackets"]))
+need = ["peer connection 1 created", "peer connection 1: connection connected", "peer connection 2: connection connected"]
+for n in need:
+    if not any(n in c for c in calls):
+        fail("call log lacks %r: %r" % (n, calls))
+for c in calls:
+    for bad in ("candidate:", "a=", "127.0.0.1", "ufrag", "fingerprint"):
+        if bad in c:
+            fail("call log line with %r: %s" % (bad, c))
+ok("call log: %d lines, no SDP, candidate or address: %s" % (len(calls), " | ".join(c[len("webcall: "):] for c in calls[:12])))

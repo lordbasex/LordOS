@@ -506,7 +506,7 @@ static void test_user_agent(void) {
      * (no LordOS token: a messaging site reads the last token and refused Chrome's string with it) */
     char want[256];
     snprintf(want, sizeof want, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%d.0.0.0 Safari/537.36", WEBPAGE_CHROME_MAJOR);
-    CHECK(!strcmp(want, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36") || WEBPAGE_CHROME_MAJOR != 157,
+    CHECK(!strcmp(want, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36") || WEBPAGE_CHROME_MAJOR != 158,
           "chrome: Chrome's own string");
     const char *machines[] = { "x86_64", "aarch64", "armv7l", "x86 64; evil)", NULL };
     const char *versions[] = { "0.8.8.9", "0.9.0~rc1", "1.0 (evil)", NULL };

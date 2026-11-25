@@ -167,6 +167,7 @@ void web_set_user_agent(Web *w, int kind) {
     if (!ua[0]) return;
     w->user_agent = kind;
     webkit_settings_set_user_agent(webkit_web_view_get_settings(w->view), ua);
+    webhints_identity(w);               /* Chrome's Client Hints and navigator.userAgentData follow the identity */
     /* navigator.userAgent stays what the document started with: load the page again (only the app's own: another
      * site in the window, a sign-in half done, is left alone and gets the new one with its next load) */
     if (!w->outside) web_reload(w);
@@ -291,7 +292,7 @@ double web_now_ms(void) {
 }
 
 void web_state_save(Web *w) {
-    char path[PATH_MAX + 16], text[128];
+    char path[PATH_MAX + 16], text[WEBPAGE_STATE_MAX];
     size_t n = webpage_state_write(&w->state, text, sizeof text);
     if (snprintf(path, sizeof path, "%s/state.json", w->profile_dir) >= (int)sizeof path || !n) return;
     if (webreg_write_file(path, text, n)) fprintf(stderr, "lord-web: %s: %s\n", path, strerror(errno));
@@ -351,6 +352,8 @@ static gboolean on_decide(WebKitWebView *v, WebKitPolicyDecision *dec, WebKitPol
     Web *w = d;
     if (type == WEBKIT_POLICY_DECISION_TYPE_RESPONSE) {
         WebKitResponsePolicyDecision *r = WEBKIT_RESPONSE_POLICY_DECISION(dec);
+        /* the site's Accept-CH, for the Client Hints of a profile that is Chrome (webhints.c) */
+        if (webkit_response_policy_decision_is_main_frame_main_resource(r)) webhints_response(w, webkit_response_policy_decision_get_response(r));
         if (webkit_response_policy_decision_is_main_frame_main_resource(r) && !webkit_response_policy_decision_is_mime_type_supported(r)) {
             webkit_policy_decision_download(dec);
             return TRUE;
@@ -388,13 +391,14 @@ static WebKitWebView *on_create(WebKitWebView *v, WebKitNavigationAction *a, gpo
 
 /* ---- permissions ---- */
 
-typedef struct { WebKitPermissionRequest *req; int kinds[2], n, i, allowed; } Pending;
+typedef struct { WebKitPermissionRequest *req; int kinds[2], n, i, allowed, asked; } Pending;
 
 static void ask_next(Web *w, Pending *p);
 
 static void asked(Web *w, int kind, const char *answer, void *data) {
     (void)kind;
     Pending *p = data;
+    p->asked = 1;
     if (strcmp(answer, "allow") && strcmp(answer, "once")) p->allowed = 0;
     p->i++;
     ask_next(w, p);
@@ -411,6 +415,7 @@ static void ask_next(Web *w, Pending *p) {
     /* again before each question and the answer: the page may have left the scope while lord-server asked */
     if (p->allowed && !page_is_app(w)) p->allowed = 0;
     if (p->allowed && p->i < p->n) { webbus_ask(w, p->kinds[p->i], asked, p); return; }
+    webcalls_permission(w, p->kinds, p->n, p->allowed, p->asked ? "asked" : "the app's setting");
     if (p->allowed) webkit_permission_request_allow(p->req);
     else webkit_permission_request_deny(p->req);
     g_object_unref(p->req);
@@ -634,6 +639,7 @@ static void notification_permissions(Web *w) {
 
 int web_engine_start(Web *w) {
     w->context = web_context_new();
+    webhints_context(w);                /* before any web process starts: the Client Hints extension */
     notification_permissions(w);
     w->session = web_session_new(w);
     if (!w->session) return -1;
@@ -665,6 +671,8 @@ int web_engine_start(Web *w) {
     webxfer_init(w);
     webselect_init(w);
     webdark_init(w);
+    webhints_view(w);
+    webcalls_init(w);
     g_signal_connect(w->session, "download-started", G_CALLBACK(on_download), w);
     webkit_web_view_load_uri(w->view, w->app.start_url);
     return 0;

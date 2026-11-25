@@ -1068,6 +1068,12 @@ EOF
     if [ -x build/web-backend-test ] && have bwrap && have xdg-dbus-proxy; then
         run "web-backend-test ($(cat build/gen/web_backend 2>/dev/null) backend)" build/web-backend-test
     else skip "web-backend-test" "wpe-webkit-2.0 (build/web-backend-test), bubblewrap and xdg-dbus-proxy"; fi
+    # (in development, docs/WEBAPPS.md "Calls") a Chrome profile's Client Hints and navigator.userAgentData against
+    # Chrome's own, SharedArrayBuffer only when cross-origin isolated, the call log; with an engine that has WebRTC, two
+    # peer connections in one page exchanging audio and video (Opus with VP8, then H.264). WPEPlatform only
+    if [ -x build/webcalls-check ] && have python3 && have bwrap && have xdg-dbus-proxy; then
+        run "webcalls-check (Client Hints, userAgentData, call log, WebRTC loopback)" python3 -I tests/webcalls_check.py build/webcalls-check
+    else skip "webcalls-check" "WPEPlatform (build/webcalls-check), bubblewrap, xdg-dbus-proxy and python3"; fi
     # (0.8.8.6) Claude Code in the Terminal's footer: the status line bridge and the footer's model
     run "claude-bridge-test (lord-claude-status)" sh tests/claude_bridge_test.sh
     if have node; then run "terminal-claude-test (apps/terminal/claude.js)" node tests/terminal_claude_test.mjs

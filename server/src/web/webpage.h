@@ -6,6 +6,8 @@
 
 #include <stddef.h>
 
+#include "webua.h"
+
 #define WEBPAGE_BADGE_MAX 9999
 /* The unread count a title announces: "(3) Chat" → 3, "(99+) Chat" → 99. N is 1..9999 without a leading zero, the
  * ")" is followed by a space or ends the title; anything else (no count, "(0)", "(12345)", "(3)Chat") is 0. */
@@ -27,8 +29,12 @@ int  webpage_title_badge(const char *title);
  *                 Safari/605.1.15 LordOS/<version>": WebKit's own (frozen) tokens and LordOS's; a machine that isn't
  *                 [A-Za-z0-9_] is left out ("(X11; Linux)").
  * The majors are the current stable releases; RELEASING.md bumps them each release. 0, or -1 for an unknown kind or
- * when out is too short. */
-#define WEBPAGE_CHROME_MAJOR  157
+ * when out is too short.
+ * Chrome's full version is the one place for its version: the string's major, the Client Hints and
+ * navigator.userAgentData (webua.h) all come from it, so they never disagree. It must be the current stable Chrome's
+ * (an old version is a fingerprint of its own): RELEASING.md takes it from Chrome's stable channel each release. */
+#define WEBPAGE_CHROME_FULL   "158.0.8127.36"
+#define WEBPAGE_CHROME_MAJOR  158
 #define WEBPAGE_EDGE_MAJOR    158
 #define WEBPAGE_FIREFOX_MAJOR 160
 int  webpage_user_agent(int kind, const char *machine, const char *version, char *out, size_t n);
@@ -48,9 +54,13 @@ int  webpage_sound_suppress(int mode, int learned, int silent, double last_audio
 /* 1 when audio started at audio_ms, next to a notification at note_ms, teaches "the page plays its own sound" */
 int  webpage_sound_learns(int mode, double note_ms, double audio_ms);
 
-/* The profile's state file (<profile>/state.json, lord-web's own: { "ownSound": true|false }). Unknown keys are
- * ignored, anything unreadable is the defaults. */
-typedef struct { int own_sound; } WebPageState;
+/* The profile's state file (<profile>/state.json, lord-web's own: { "ownSound": true|false, "clientHints":
+ * { "<origin>": ["sec-ch-ua-arch", ...] } }). clientHints: the high-entropy Client Hints each site asked for with
+ * Accept-CH (webua.h), kept as Chrome keeps them; an origin that isn't https (or http on localhost), a name that isn't
+ * one of webua's or more than WEBUA_SITES origins are left out. Unknown keys are ignored, anything unreadable is the
+ * defaults. At most WEBPAGE_STATE_MAX bytes. */
+#define WEBPAGE_STATE_MAX 16384
+typedef struct { int own_sound; WebUaSites hints; } WebPageState;
 void   webpage_state_parse(const char *json, size_t len, WebPageState *s);
 size_t webpage_state_write(const WebPageState *s, char *out, size_t n);
 

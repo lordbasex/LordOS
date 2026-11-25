@@ -120,6 +120,23 @@ void web_menu_chosen(Web *w, int item, const char *link, const char *image);
 void web_context_menu(Web *w, unsigned at, const char *link, const char *image);
 void web_state_save(Web *w);
 
+/* webhints.c: Chrome's Client Hints and navigator.userAgentData for a profile that identifies as Chrome (webua.h) */
+void webhints_context(Web *w);                           /* the web process extension, before any web process starts */
+void webhints_view(Web *w);                              /* navigator.userAgentData's script, when the identity is Chrome */
+void webhints_identity(Web *w);                          /* the identity changed (SetUserAgent): script and extension follow */
+void webhints_response(Web *w, WebKitURIResponse *r);    /* a main frame's response: its Accept-CH */
+/* the pieces, for tests/webcalls_check.c too: the extension's data, the userAgentData script, the extension's folder */
+GVariant *webhints_variant(int chrome, const char *machine, const WebUaSites *sites);
+WebKitUserScript *webhints_script_new(const char *machine);
+int webhints_ext_dir(char *out, size_t n);
+
+/* webcalls.c: the call log (webcall.h) */
+void webcalls_init(Web *w);                              /* webcall.js, its bridge and the message handler */
+/* the same on any view: on_message(WebKitUserContentManager *, JSCValue *, data) gets each report (a JSON string) */
+int  webcalls_add_scripts(WebKitUserContentManager *ucm, GCallback on_message, gpointer data);
+/* a camera, microphone or screen permission answered (kinds: WEBREG_PERM_*), how: "asked" or "the app's setting" */
+void webcalls_permission(Web *w, const int *kinds, int n, int allowed, const char *how);
+
 /* webxfer.c */
 void webxfer_init(Web *w);                               /* the clipboard script and its message handler */
 int  webxfer_in_scope(Web *w, const char *href);         /* href, the main frame's committed document and the view's address are in the app's scope, and the window isn't outside it */
