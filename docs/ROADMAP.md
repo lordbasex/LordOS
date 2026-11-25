@@ -941,6 +941,30 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 
 ## Next release after 0.8.9.6
 
+- [ ] **Desktop icons in every theme** (approved by the maintainer on 2026-11-25; design `docs/drafts/DESKTOP-ICONS.md`,
+  being built on branch `feat/desktop-icons`). The Desktop folder's files, optional places and app launchers on the
+  desktop of Flow, Classic, Workspaces and Celeste, with Files' selection, rename, menus and Trash, drag and drop with
+  Files and Linux apps (a Thunderbird message dropped on the desktop is saved as `.eml`: the last case of #188), and the
+  read-only `lord.fs.watch`. No new exception.
+- [ ] **Remote desktop (5673): improvements 2 to 5** (`docs/drafts/REMOTE-5673-OPTIMIZATION.md`; improvement 1, VA-API on the
+  compositor's GPU, one frame in flight, rate and colour, ships in 0.8.9.6.1):
+  2. RTP `playout-delay` (min 0, max 0) so Chrome and Edge hold no frames: 15–60 ms less click-to-pixel.
+  3. GPU path: read back only the damaged region, asynchronously (fence fd), instead of a whole-frame `glReadPixels`.
+  4. Damage into the encoder: convert only the changed rects to YUV, x264 `mb_info`.
+  5. Packet pacing, round-trip time from receiver reports, and a cap on keyframe size.
+  Decisions still open there: D1 (dmabuf + sync_file fds into lord-media for zero copy), D3 (a GPU capture mode for
+  protected windows), D4 (Constrained High profile), D5 (libva directly), D6 (display picker for 5673).
+- [ ] **Lord Desk** (`lordos-desk`; name chosen by the maintainer on 2026-11-25; design `docs/drafts/NATIVE-REMOTE-APP.md`).
+  A native, LordOS-exclusive remote-desktop app on the go-link Desk network (signalhub, TURN, 9-digit codes, links),
+  100 % compatible with the go-link Desk clients (iOS, iPadOS, Android, web viewer) unchanged; UI in the style of
+  Machines; shares the capture and encode pipeline with 5673. Plan: grow `server/src/remote/rtc.c` into a shared
+  `server/src/rtc/` (full ICE agent, SDP offer, data channels, TWCC), a sandboxed network helper `lord-desk-net`,
+  picture/sound/input through the screen-sharing API. Decisions to take before code: the WebRTC stack (own, libjuice
+  only as a fallback), the helper and its AGENTS.md entries, the screen-share prompt, unattended access and the
+  device key, the go-link attribution text, and the end of the `go-link-desk-lordos` port (import its `device.json`).
+  Depends on 5673 improvements 1 and 3. To do first, in go-link's repository: push `feat/lordos-app` and
+  `feat/lordos-build`, which exist only on the maintainer's machine.
+
 - [ ] **Sentinela, phase 1** (approved by the maintainer on 2026-11-23; `docs/SENTINELA.md`; branch `feat/sentinela`).
   Done in code: the rules over the Monitor's process list every 10 s (high CPU for 5 minutes, memory that keeps
   growing, a program imitating a system one, a program deleted or replaced after it started, a new autostart entry),
