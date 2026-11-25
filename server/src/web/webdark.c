@@ -15,6 +15,7 @@
  * itself sees, and nothing goes from the page to lord-web or lord-server. */
 #include "web.h"
 #include "webscheme_js.h"                /* build/gen, from webscheme.js (mk/web.mk) */
+#include "webback.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,6 +46,7 @@ static void add_script(Web *w) {
 
 void webdark_init(Web *w) {
     w->loading = 1;                     /* the first load starts right after this */
+    webback_set_dark(w->back, w->scheme == WEBSCHEME_DARK);       /* WPEPlatform: CSS sees it too */
     set_background(w);
     guint8 r[WEBSCHEME_KEY_LEN / 2];
     if (getrandom(r, sizeof r, 0) != (ssize_t)sizeof r) return;      /* no key, no script: the page sees light */
@@ -55,6 +57,7 @@ void webdark_init(Web *w) {
 void web_set_scheme(Web *w, int scheme) {
     if (!webscheme_name(scheme) || scheme == w->scheme || !w->view) return;
     w->scheme = scheme;
+    webback_set_dark(w->back, scheme == WEBSCHEME_DARK);
     set_background(w);
     add_script(w);
     char *call = w->scheme_key[0] ? webscheme_call(w->scheme_key, scheme) : NULL;

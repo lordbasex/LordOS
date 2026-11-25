@@ -200,7 +200,6 @@
   "appearance.lightHint": "Laman sentiasa diberitahu cerah, walau apa pun mod LordOS.",
   "appearance.darkHint": "Laman sentiasa diberitahu gelap, walau apa pun mod LordOS.",
   "appearance.footer": "Hanya pilihan cerah atau gelap yang dibaca oleh laman berubah; LordOS tidak pernah mengubah laman itu sendiri. Sesetengah laman kekal cerah juga, dan laman yang mempunyai tetapan tema sendiri mengikut tetapan itu.",
-  "appearance.later": "Cerah dan gelap bagi setiap apl tiba bersama enjin web baharu LordOS (WPEPlatform), yang sedang kami pindah. Buat masa ini setiap apl web mengikut mod LordOS, dan tapak yang ada tetapan temanya sendiri (contohnya WhatsApp) mengekalkannya.",
   "identity.title": "Identiti pelayar",
   "identity.label": "Kenal pasti sebagai",
   "identity.chrome": "Chrome di Linux",

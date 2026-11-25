@@ -296,10 +296,10 @@ eq('notification keys', [M.notifyKey('chat'), M.notifyKey('../x'), M.appOfNotify
 eq('appearance', [M.colorSchemeOf({}), M.colorSchemeOf({ colorScheme: 'dark' }), M.colorSchemeOf({ colorScheme: 'light' }), M.colorSchemeOf({ colorScheme: 'Dark' }),
   M.colorSchemeOf({ colorScheme: 'system' }), M.colorSchemeOf(null)], ['auto', 'dark', 'light', 'auto', 'auto', 'auto']);
 eq('appearance choices', M.COLOR_SCHEMES, ['auto', 'light', 'dark']);
-// until WPEPlatform only auto can be chosen, and a stored light or dark is shown as auto (the value stays stored)
-eq('appearance available', M.COLOR_SCHEMES_AVAILABLE, ['auto']);
+// since 0.8.9.6.2 (lord-web on WPEPlatform) all three can be chosen, and a stored light or dark shows as itself
+eq('appearance available', M.COLOR_SCHEMES_AVAILABLE, ['auto', 'light', 'dark']);
 eq('appearance shown', [M.shownColorScheme({}), M.shownColorScheme({ colorScheme: 'dark' }), M.shownColorScheme({ colorScheme: 'light' }),
-  M.shownColorScheme({ colorScheme: 'system' }), M.shownColorScheme(null)], ['auto', 'auto', 'auto', 'auto', 'auto']);
+  M.shownColorScheme({ colorScheme: 'system' }), M.shownColorScheme(null)], ['auto', 'dark', 'light', 'auto', 'auto']);
 
 // ---- browser identity (a profile's registry userAgent) ----
 const ua = { id: 'chat', profiles: [{ id: 'personal', name: 'P' }, { id: 'work', name: 'W', userAgent: 'firefox' }, { id: 'x', name: 'X', userAgent: 'lordos' },

@@ -232,6 +232,20 @@ WebBack *webback_new(const WebBackConfig *cfg, const WebBackSink *sink, void *sd
     return b;
 }
 
+int webback_native_scheme(void) { return 1; }
+
+/* WPE_SETTING_DARK_MODE on the display's settings: WebKit answers prefers-color-scheme with it, for CSS and matchMedia
+ * alike, in every view of this display (lord-web has one), and a change reaches open pages at once */
+void webback_set_dark(WebBack *b, int dark) {
+    WPESettings *s = b && b->display ? wpe_display_get_settings(b->display) : NULL;
+    if (!s) return;
+    GError *err = NULL;
+    if (!wpe_settings_set_boolean(s, WPE_SETTING_DARK_MODE, dark ? TRUE : FALSE, WPE_SETTINGS_SOURCE_APPLICATION, &err)) {
+        fprintf(stderr, "lord-web: dark mode setting: %s\n", err ? err->message : "refused");
+        g_clear_error(&err);
+    }
+}
+
 WebKitWebView *webback_view_new(WebBack *b, WebKitWebContext *context, WebKitNetworkSession *session, WebKitSettings *settings) {
     WebKitWebView *v = g_object_new(WEBKIT_TYPE_WEB_VIEW, "display", b->display, "web-context", context, "network-session", session, "settings", settings, NULL);
     if (!v) return NULL;

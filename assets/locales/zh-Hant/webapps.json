@@ -200,7 +200,6 @@
   "appearance.lightHint": "無論 LordOS 處於哪種模式，一律告訴網站使用淺色。",
   "appearance.darkHint": "無論 LordOS 處於哪種模式，一律告訴網站使用深色。",
   "appearance.footer": "只會改變網站讀取的淺色或深色偏好；LordOS 從不修改網站本身。有些網站仍會維持淺色，而有自己主題設定的網站會依照該設定。",
-  "appearance.later": "依應用程式設定淺色和深色將隨 LordOS 正在遷移的新網頁引擎（WPEPlatform）推出。目前每個網頁應用程式都跟隨 LordOS 的模式，而有自己主題設定的網站（例如 WhatsApp）會保留其設定。",
   "identity.title": "瀏覽器識別",
   "identity.label": "識別為",
   "identity.chrome": "Linux 上的 Chrome",

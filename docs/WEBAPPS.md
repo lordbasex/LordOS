@@ -71,8 +71,8 @@ LordOS's compositor, with WebKit's sandbox running. For one account it used abou
   either (a page that plays its own sound still does).
 - `colorScheme` (optional, `"auto"` when missing, written only when it isn't): the app's Appearance, the light or dark
   preference its pages are told. `"auto"` follows the desktop's mode, `"light"` and `"dark"` always say that one
-  ("Light and dark", below). Until the move to WPEPlatform, `"light"` and `"dark"` are kept and written back but read
-  as `"auto"` ("Each app's Appearance", below).
+  ("Light and dark", below). Before 0.8.9.6.2 (lord-web on WPEPlatform), `"light"` and `"dark"` were kept but read as
+  `"auto"` ("Each app's Appearance", below).
 - A profile's `userAgent` (optional, `"chrome"` when missing, written only when it isn't): its Browser identity, the
   browser its pages are told it is: `"chrome"`, `"edge"`, `"firefox"` or `"lordos"` ("Browser identity",
   below). `"experimental"` (removed, 2026-11-15) is still accepted and read as `"chrome"`, so an older file loads; the
@@ -365,25 +365,22 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     process) in the main frame, which passes it to same-origin frames; a frame of another origin gets it with its next
     load. The script has no privileges and no message handler: a page that calls the hook only changes what it sees
     itself, and nothing goes from the page to lord-web or lord-server.
-  - **Each app's Appearance** (`colorScheme` in the registry; 0.8.8.9): **held back until
-    WPEPlatform** (maintainer's decision, 2026-11-15). WPE 2.48's legacy API can't set `prefers-color-scheme` for CSS,
-    so a site that picks its theme with CSS (WhatsApp, for example) never saw the choice, and it only half worked.
-    For now: Settings → Web Apps shows Appearance with Automatic selected and Light and Dark unavailable, with a note
-    that they arrive with the new engine (`webapps.appearance.later`); the app menu has no Appearance submenu; and
-    lord-server reads a stored `light` or `dark` as Automatic (`WEBSCHEME_PER_APP 0` in `webscheme.h`, so
-    `webscheme_for_app` gives the desktop's word), without rewriting the file: the key is still parsed, accepted by
-    `lord.webapps.setColorScheme` and written back. `sdk/webappsmodel.js` has `COLOR_SCHEMES_AVAILABLE` (`['auto']`)
-    and `shownColorScheme`. To bring it back: `WEBSCHEME_PER_APP 1`, add `'light'` and `'dark'` to
-    `COLOR_SCHEMES_AVAILABLE`, and put `webAppearanceItem` back in `appMenuItems` (docs/ROADMAP.md, the WPEPlatform
-    item). As designed, for then: Automatic (the default), Light or Dark, per app (every profile of it). lord-server picks the word it sends each app
+  - **Each app's Appearance** (`colorScheme` in the registry; built in 0.8.8.9, held back until WPEPlatform and on
+    since 0.8.9.6.2). lord-web on WPEPlatform (WPE 2.54) sets `WPE_SETTING_DARK_MODE` on its display with the word
+    lord-server sends (`webback_set_dark`, called from `webdark.c` at start and on every `SetColorScheme`), so CSS
+    `@media (prefers-color-scheme)` rules follow it as well as `matchMedia`; a site with its own theme setting
+    (WhatsApp, for example) still follows that setting. Settings → Web Apps offers Automatic, Light and Dark, and the
+    app menu has the Appearance submenu (`webAppearanceItem`). `WEBSCHEME_PER_APP` is 1 in `webscheme.h` and
+    `COLOR_SCHEMES_AVAILABLE` lists all three. A lord-web built on the legacy API (WPE 2.48, `webback_set_dark` does
+    nothing there) only has webscheme.js's matchMedia answer. As designed, for then: Automatic (the default), Light or Dark, per app (every profile of it). lord-server picks the word it sends each app
     (`webscheme_for_app`: the app's own for Light or Dark, else the desktop's), in the environment at start, in
     `SetColorScheme` when the desktop's mode changes and when a lord-web's bus name appears. lord-web reads nothing
     new: it applies the word it gets exactly as before, so the script, the `change` events and the dark background
     while loading all follow the app's choice, and the page's content is never changed. Changing it
     (`lord.webapps.setColorScheme(app, value)`, desktop only, not in the broker) writes the registry and sends
     `SetColorScheme` with the new word to each running profile of the app (`webask_app_scheme`), so **open windows
-    follow at once**; a page that only reads the scheme at load sees it on its next load. The same limit holds: Dark
-    reaches scripts that ask `matchMedia`, not CSS-only `@media` rules. Where: Settings → Web Apps, the app's page
+    follow at once**; a page that only reads the scheme at load sees it on its next load. On WPEPlatform it reaches
+    CSS `@media` rules too; on the legacy API only scripts that ask `matchMedia`. Where: Settings → Web Apps, the app's page
     (Appearance, a three-way choice with a hint for each), and in Lord Flow the app menu of the web app's window
     (Appearance ▸ Automatic, Light, Dark, the current one checked). Lord Classic flattens submenus, so there it is only
     in Settings. Tests: `build/webreg-test` (the start environment, `webmgr_scheme_of`), `build/webapp-test` (the key

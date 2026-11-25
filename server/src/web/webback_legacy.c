@@ -92,6 +92,9 @@ WebBack *webback_new(const WebBackConfig *cfg, const WebBackSink *sink, void *sd
     return b;
 }
 
+int webback_native_scheme(void) { return 0; }
+void webback_set_dark(WebBack *b, int dark) { (void)b; (void)dark; }   /* 2.48: no setting; webscheme.js only */
+
 WebKitWebView *webback_view_new(WebBack *b, WebKitWebContext *context, WebKitNetworkSession *session, WebKitSettings *settings) {
     WebKitWebViewBackend *backend = webkit_web_view_backend_new(b->backend, NULL, NULL);
     return g_object_new(WEBKIT_TYPE_WEB_VIEW, "backend", backend, "web-context", context, "network-session", session, "settings", settings, NULL);

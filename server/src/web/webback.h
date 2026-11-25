@@ -103,6 +103,11 @@ void webback_set_size(WebBack *b, int w, int h);
 void webback_set_scale(WebBack *b, double scale);
 void webback_set_visible(WebBack *b, int visible);   /* mapped, configured and not suspended: WebKit paints */
 void webback_set_focused(WebBack *b, int focused);
+/* The pages' prefers-color-scheme, CSS included, where the backend can set it (WPEPlatform's WPE_SETTING_DARK_MODE):
+ * webback_native_scheme() is 1 there, 0 on the legacy API (2.48 has no such setting; webscheme.js's matchMedia answer
+ * is all a page gets). dark: 1 dark, 0 light. */
+int  webback_native_scheme(void);
+void webback_set_dark(WebBack *b, int dark);
 void webback_set_title(WebBack *b, const char *title); /* the toplevel's, for backends that keep one */
 /* the output the window is on: its size (logical pixels) and refresh rate (mHz), 0 when unknown; platform only */
 void webback_set_screen(WebBack *b, int w, int h, int refresh_mhz);

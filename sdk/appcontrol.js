@@ -74,8 +74,7 @@ export function webHelpItems(winId) {
 }
 
 // A web app's Appearance (Automatic, Light, Dark): the light or dark preference its pages are told; open windows follow
-// at once (lord.webapps.setColorScheme). The same choice as in Settings → Web apps. Not in the app menu until
-// WPEPlatform brings light and dark per app (webappsmodel.js, COLOR_SCHEMES_AVAILABLE); kept for then.
+// at once (lord.webapps.setColorScheme). The same choice as in Settings → Web apps; in the app menu since 0.8.9.6.2.
 export function webAppearanceItem(winId) {
   const web = webAppOfWindow(wm.get(winId));
   if (!web) return null;
@@ -119,12 +118,13 @@ export function appMenuItems(winId) {
   const g = appGroup(winId);
   if (!g) return [];
   const settingsItem = appSettingsItem(winId);
-  // the Appearance submenu (webAppearanceItem) comes back with WPEPlatform
+  const appearance = webAppearanceItem(winId);      // a web app's Light / Dark (0.8.9.6.2: lord-web on WPEPlatform)
   const identity = webUserAgentItem(winId);
   return [
     { label: t('shell.app.about', { app: g.name }), onClick: () => wm.open('appabout', { new: true, args: { key: g.key, win: winId } }) },
     '-',
     { label: t('shell.app.settings'), hint: '❖,', disabled: !settingsItem, onClick: () => settingsItem?.onClick() },
+    ...(appearance ? [appearance] : []),
     ...(identity ? [identity] : []),
     '-',
     { label: t('shell.app.hide', { app: g.name }), hint: '❖H', onClick: () => hideApp(winId) },

@@ -10,6 +10,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Changed
+- **Web apps: Light and Dark per app are back, and now they reach the pages' CSS.** lord-web runs on WPEPlatform (WPE
+  WebKit 2.54) since 0.8.9.6, whose display settings have `WPE_SETTING_DARK_MODE`: lord-web now sets it at start and on
+  every `SetColorScheme` (`webback_set_dark` in `server/src/web/webback_platform.c`, called from `webdark.c`; a no-op
+  on the legacy API). WebKit answers `prefers-color-scheme` with it for CSS `@media` rules as well as `matchMedia`, so a
+  site that picks its theme with CSS follows the app's Appearance. With that, the per-app choice held back since
+  2026-11-15 is on again: `WEBSCHEME_PER_APP` is 1 (`webscheme.h`), Settings → Web Apps → Appearance offers
+  Automatic, Light and Dark (`COLOR_SCHEMES_AVAILABLE`), the note saying they would come with the new engine is gone
+  (`webapps.appearance.later`, removed from the 35 languages), and the web app's app menu has the Appearance submenu
+  again (`webAppearanceItem`). A site with its own theme setting (WhatsApp, for example) still follows that setting.
+  Tests: `build/webapp-test` and `build/webreg-test` with `WEBSCHEME_PER_APP` 1, `tests/webapps_model_test.mjs`.
+
 ### Fixed
 - **Machines stopped with "Machines ran into a problem" after choosing Whonix (Tor) and pressing Continue.** The new
   machine assistant (apps/machines/assistant.jsx) returned the Whonix group's pages (`GroupFlow`), and the migrate page,
