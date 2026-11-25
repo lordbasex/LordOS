@@ -1,0 +1,530 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-11-14",
+  "source": "community",
+  "lordos": "0.8.8.8-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "Apple Inc.",
+      "product": "MacBookPro12,1",
+      "version": "1.0",
+      "boardVendor": "Apple Inc.",
+      "boardName": "Mac-E43C1C25D4880AD6",
+      "chassis": "laptop",
+      "model": "",
+      "biosVendor": "Apple Inc.",
+      "biosVersion": "489.0.0.0.0",
+      "biosDate": "10/07/2023",
+      "firmware": "uefi",
+      "secureBoot": null,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "Intel(R) Core(TM) i5-5257U CPU @ 2.70GHz",
+      "vendor": "GenuineIntel",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 2,
+      "threads": 4,
+      "minMHz": 500,
+      "maxMHz": 3100,
+      "governor": "schedutil",
+      "l1dKB": 32,
+      "l1iKB": 32,
+      "l2KB": 256,
+      "l3KB": 3072
+    },
+    "memory": {
+      "totalKB": 8038612,
+      "swapKB": 2097148,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "8086",
+        "deviceId": "162b",
+        "vendor": "Intel Corporation",
+        "device": "Iris Graphics 6100",
+        "driver": "i915",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 5,
+        "connected": 1
+      }
+    ],
+    "displays": [
+      {
+        "connector": "eDP-1",
+        "enabled": true,
+        "name": "Color LCD",
+        "manufacturer": "APP",
+        "product": "a02a",
+        "year": 2014,
+        "widthCm": 29,
+        "heightCm": 18,
+        "diagonalTenths": 134,
+        "nativeWidth": 2560,
+        "nativeHeight": 1600,
+        "mode": "2560x1600"
+      }
+    ],
+    "storage": [
+      {
+        "model": "Samsung SSD 970 EVO Plus 500GB",
+        "vendor": "",
+        "bytes": 500107862016,
+        "rotational": false,
+        "removable": false,
+        "transport": "nvme",
+        "link": "5.0 GT/s PCIe x4"
+      }
+    ],
+    "pci": [
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "1604",
+        "vendor": "Intel Corporation",
+        "device": "Broadwell-U Host Bridge -OPI",
+        "driver": "bdw_uncore"
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "8086",
+        "deviceId": "162b",
+        "vendor": "Intel Corporation",
+        "device": "Iris Graphics 6100",
+        "driver": "i915"
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "8086",
+        "deviceId": "160c",
+        "vendor": "Intel Corporation",
+        "device": "Broadwell-U Audio Controller",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "9cb1",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP USB xHCI Controller",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "080102",
+        "className": "DMA controller",
+        "vendorId": "8086",
+        "deviceId": "9ce0",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP Serial IO DMA Controller",
+        "driver": "dw_dmac_pci"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "9ce6",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP Serial IO GSPI Controller #1",
+        "driver": "pxa2xx_spi_pci"
+      },
+      {
+        "class": "078000",
+        "className": "Communication controller",
+        "vendorId": "8086",
+        "deviceId": "9cba",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP MEI Controller #1",
+        "driver": "mei_me"
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "8086",
+        "deviceId": "9ca0",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP High Definition Audio Controller",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "9c90",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP PCI Express Root Port #1",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "9c92",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP PCI Express Root Port #2",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "9c94",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP PCI Express Root Port #3",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "9c98",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP PCI Express Root Port #5",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "9c9a",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP PCI Express Root Port #6",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060100",
+        "className": "ISA bridge",
+        "vendorId": "8086",
+        "deviceId": "9cc3",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP LPC Controller",
+        "driver": "lpc_ich"
+      },
+      {
+        "class": "0c0500",
+        "className": "SMBus",
+        "vendorId": "8086",
+        "deviceId": "9ca2",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP SMBus Controller",
+        "driver": "i801_smbus"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "9ca4",
+        "vendor": "Intel Corporation",
+        "device": "Wildcat Point-LP Thermal Management Controller",
+        "driver": "intel_pch_thermal"
+      },
+      {
+        "class": "048000",
+        "className": "Multimedia controller",
+        "vendorId": "14e4",
+        "deviceId": "1570",
+        "vendor": "Broadcom Inc. and subsidiaries",
+        "device": "720p FaceTime HD Camera",
+        "driver": ""
+      },
+      {
+        "class": "028000",
+        "className": "Network controller",
+        "vendorId": "14e4",
+        "deviceId": "43ba",
+        "vendor": "Broadcom Inc. and subsidiaries",
+        "device": "BCM43602 802.11ac Wireless LAN SoC",
+        "driver": "brcmfmac"
+      },
+      {
+        "class": "010802",
+        "className": "Non-Volatile memory controller",
+        "vendorId": "144d",
+        "deviceId": "a808",
+        "vendor": "Samsung Electronics Co Ltd",
+        "device": "NVMe SSD Controller SM981/PM981/PM983",
+        "driver": "nvme"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "156d",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 Bridge [Falcon Ridge 4C 2013]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "156d",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 Bridge [Falcon Ridge 4C 2013]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "156d",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 Bridge [Falcon Ridge 4C 2013]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "156d",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 Bridge [Falcon Ridge 4C 2013]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "156d",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 Bridge [Falcon Ridge 4C 2013]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "156d",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 Bridge [Falcon Ridge 4C 2013]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "088000",
+        "className": "System peripheral",
+        "vendorId": "8086",
+        "deviceId": "156c",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 NHI [Falcon Ridge 4C 2013]",
+        "driver": "thunderbolt"
+      }
+    ],
+    "usb": [
+      {
+        "vendorId": "05ac",
+        "productId": "8290",
+        "vendor": "",
+        "product": "",
+        "class": "ef",
+        "speedMbps": 12,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "05ac",
+        "productId": "0273",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 12,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "05ac",
+        "productId": "8406",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 5000,
+        "driver": "usb-storage"
+      }
+    ],
+    "network": [
+      {
+        "kind": "wifi",
+        "driver": "brcmfmac",
+        "up": true,
+        "speedMbps": null
+      }
+    ],
+    "audio": [
+      "HDA Intel HDMI",
+      "HDA Intel PCH"
+    ],
+    "bluetooth": [
+      {
+        "driver": "btusb"
+      }
+    ],
+    "power": [
+      {
+        "kind": "ac",
+        "vendor": "",
+        "model": "",
+        "technology": "",
+        "status": "",
+        "capacity": null,
+        "health": null,
+        "online": 1
+      },
+      {
+        "kind": "battery",
+        "vendor": "DP",
+        "model": "bq20z451",
+        "technology": "Li-ion",
+        "status": "Full",
+        "capacity": 82,
+        "health": 82,
+        "online": null
+      }
+    ],
+    "thermal": [
+      {
+        "sensor": "pch_wildcat_point",
+        "milliC": 61500,
+        "fans": 0
+      },
+      {
+        "sensor": "BAT0",
+        "milliC": 31300,
+        "fans": 0
+      },
+      {
+        "sensor": "x86_pkg_temp",
+        "milliC": 61000,
+        "fans": 0
+      },
+      {
+        "sensor": "nvme",
+        "milliC": 41850,
+        "fans": 0
+      },
+      {
+        "sensor": "ADP1",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "pch_wildcat_point",
+        "milliC": 61500,
+        "fans": 0
+      },
+      {
+        "sensor": "BAT0",
+        "milliC": 31300,
+        "fans": 0
+      },
+      {
+        "sensor": "coretemp",
+        "milliC": 61000,
+        "fans": 0
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.117+deb13-amd64",
+      "lordos": "0.8.8.8-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,tomoyo,bpf,ipe,ima,evm",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false,
+      "bootMedium": "internal",
+      "bootLinkMbps": null,
+      "bootToRam": false,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_SECCOMP_FILTER": "y",
+        "CONFIG_USER_NS": "y",
+        "CONFIG_BPF_SYSCALL": "y",
+        "CONFIG_BPF_JIT": "y",
+        "CONFIG_CGROUP_BPF": "y",
+        "CONFIG_BPF_LSM": "y",
+        "CONFIG_INET_DIAG_DESTROY": "y",
+        "CONFIG_INET_UDP_DIAG": "m",
+        "CONFIG_MEMCG": "y",
+        "CONFIG_PSI": "y",
+        "CONFIG_ZRAM": "m",
+        "CONFIG_DRM": "m",
+        "CONFIG_UHID": "m"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": true
+      }
+    },
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) Iris(R) Graphics 6100 (BDW GT3)",
+      "dmabuf": true,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "works",
+      "note": "gpuComposes"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "works",
+      "note": "batteryHealth"
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": null,
+  "desktop": null
+}

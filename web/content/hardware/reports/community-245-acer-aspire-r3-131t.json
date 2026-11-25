@@ -1,0 +1,644 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-11-24",
+  "source": "community",
+  "lordos": "0.8.9.5-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "Acer",
+      "product": "Aspire R3-131T",
+      "version": "V1.09",
+      "boardVendor": "Acer",
+      "boardName": "Aspire R3-131T",
+      "chassis": "laptop",
+      "model": "",
+      "biosVendor": "Insyde Corp.",
+      "biosVersion": "V1.09",
+      "biosDate": "07/21/2015",
+      "firmware": "uefi",
+      "secureBoot": false,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "Intel(R) Celeron(R) CPU  N3050  @ 1.60GHz",
+      "vendor": "GenuineIntel",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 2,
+      "threads": 2,
+      "minMHz": 480,
+      "maxMHz": 2160,
+      "governor": "schedutil",
+      "l1dKB": 24,
+      "l1iKB": 32,
+      "l2KB": 1024,
+      "l3KB": 0
+    },
+    "memory": {
+      "totalKB": 1842088,
+      "swapKB": 4194300,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "8086",
+        "deviceId": "22b1",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Integrated Graphics Controller",
+        "driver": "i915",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 5,
+        "connected": 1
+      }
+    ],
+    "displays": [
+      {
+        "connector": "eDP-1",
+        "enabled": true,
+        "name": "",
+        "manufacturer": "AUO",
+        "product": "105c",
+        "year": 2014,
+        "widthCm": 26,
+        "heightCm": 14,
+        "diagonalTenths": 116,
+        "nativeWidth": 1366,
+        "nativeHeight": 768,
+        "mode": "1366x768"
+      }
+    ],
+    "storage": [
+      {
+        "model": "",
+        "vendor": "",
+        "bytes": 31272730624,
+        "rotational": false,
+        "removable": false,
+        "transport": "mmc",
+        "link": ""
+      }
+    ],
+    "pci": [
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "2280",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series SoC Transaction Register",
+        "driver": "iosf_mbi_pci"
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "8086",
+        "deviceId": "22b1",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Integrated Graphics Controller",
+        "driver": "i915"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "22dc",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series Power Management Controller",
+        "driver": "proc_thermal"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "22b5",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series USB xHCI Controller",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "108000",
+        "className": "Encryption controller",
+        "vendorId": "8086",
+        "deviceId": "2298",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series Trusted Execution Engine",
+        "driver": "mei_txe"
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "8086",
+        "deviceId": "2284",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series High Definition Audio Controller",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "22c8",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series PCI Express Port #1",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "22ca",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series PCI Express Port #2",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060100",
+        "className": "ISA bridge",
+        "vendorId": "8086",
+        "deviceId": "229c",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series PCU",
+        "driver": "lpc_ich"
+      },
+      {
+        "class": "0c0500",
+        "className": "SMBus",
+        "vendorId": "8086",
+        "deviceId": "2292",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx SMBus Controller",
+        "driver": "i801_smbus"
+      },
+      {
+        "class": "020000",
+        "className": "Ethernet controller",
+        "vendorId": "10ec",
+        "deviceId": "8168",
+        "vendor": "Realtek Semiconductor Co., Ltd.",
+        "device": "RTL8111/8168/8211/8411 PCI Express Gigabit Ethernet Controller",
+        "driver": "r8169"
+      },
+      {
+        "class": "028000",
+        "className": "Network controller",
+        "vendorId": "8086",
+        "deviceId": "3165",
+        "vendor": "Intel Corporation",
+        "device": "Wireless 3165",
+        "driver": "iwlwifi"
+      }
+    ],
+    "usb": [
+      {
+        "vendorId": "04f2",
+        "productId": "b520",
+        "vendor": "",
+        "product": "",
+        "class": "ef",
+        "speedMbps": 480,
+        "driver": "uvcvideo"
+      },
+      {
+        "vendorId": "2386",
+        "productId": "0401",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 12,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "8087",
+        "productId": "0a2a",
+        "vendor": "",
+        "product": "",
+        "class": "e0",
+        "speedMbps": 12,
+        "driver": "btusb"
+      }
+    ],
+    "network": [
+      {
+        "kind": "ethernet",
+        "driver": "r8169",
+        "up": false,
+        "speedMbps": null
+      },
+      {
+        "kind": "wifi",
+        "driver": "iwlwifi",
+        "up": true,
+        "speedMbps": null
+      }
+    ],
+    "audio": [
+      "HDA Intel PCH"
+    ],
+    "bluetooth": [
+      {
+        "driver": "btusb"
+      }
+    ],
+    "power": [
+      {
+        "kind": "ac",
+        "vendor": "",
+        "model": "",
+        "technology": "",
+        "status": "",
+        "capacity": null,
+        "health": null,
+        "online": 0
+      },
+      {
+        "kind": "battery",
+        "vendor": "SANYO",
+        "model": "AC14B3K",
+        "technology": "Li-ion",
+        "status": "Discharging",
+        "capacity": 93,
+        "health": 76,
+        "online": null
+      }
+    ],
+    "thermal": [
+      {
+        "sensor": "acpitz",
+        "milliC": 43000,
+        "fans": 0
+      },
+      {
+        "sensor": "INT3400 Thermal",
+        "milliC": 20000,
+        "fans": 0
+      },
+      {
+        "sensor": "STR3",
+        "milliC": 28050,
+        "fans": 0
+      },
+      {
+        "sensor": "STR1",
+        "milliC": 30050,
+        "fans": 0
+      },
+      {
+        "sensor": "B0DB",
+        "milliC": 35000,
+        "fans": 0
+      },
+      {
+        "sensor": "soc_dts0",
+        "milliC": 31000,
+        "fans": 0
+      },
+      {
+        "sensor": "soc_dts1",
+        "milliC": 30000,
+        "fans": 0
+      },
+      {
+        "sensor": "iwlwifi_1",
+        "milliC": 27000,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 35000,
+        "fans": 0
+      },
+      {
+        "sensor": "BAT0",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "ADP1",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "soc_dts0",
+        "milliC": 31000,
+        "fans": 0
+      },
+      {
+        "sensor": "soc_dts1",
+        "milliC": 30000,
+        "fans": 0
+      },
+      {
+        "sensor": "coretemp",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "iwlwifi_1",
+        "milliC": 28000,
+        "fans": 0
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.118+deb13-amd64",
+      "lordos": "0.8.9.5-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,tomoyo,bpf,ipe,ima,evm",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false,
+      "bootMedium": "emmc",
+      "bootLinkMbps": null,
+      "bootToRam": false,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_SECCOMP_FILTER": "y",
+        "CONFIG_USER_NS": "y",
+        "CONFIG_BPF_SYSCALL": "y",
+        "CONFIG_BPF_JIT": "y",
+        "CONFIG_CGROUP_BPF": "y",
+        "CONFIG_BPF_LSM": "y",
+        "CONFIG_INET_DIAG_DESTROY": "y",
+        "CONFIG_INET_UDP_DIAG": "m",
+        "CONFIG_MEMCG": "y",
+        "CONFIG_PSI": "y",
+        "CONFIG_ZRAM": "m",
+        "CONFIG_DRM": "m",
+        "CONFIG_UHID": "m"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": true
+      }
+    },
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) HD Graphics 400 (BSW)",
+      "dmabuf": true,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "works",
+      "note": "gpuComposes"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "works",
+      "note": "batteryHealth"
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": {
+    "lordbench": 1,
+    "mode": "quick",
+    "seconds": 52,
+    "status": "stopped",
+    "stopReason": "thermal",
+    "lordos": "0.8.9.5-beta",
+    "kernel": "6.12.118+deb13-amd64",
+    "arch": "x86_64",
+    "live": false,
+    "threads": 2,
+    "cpus": 2,
+    "quiet": {
+      "quiet": true,
+      "busyPct": 1.1,
+      "waitedS": 10
+    },
+    "before": {
+      "tempC": 45,
+      "zone": "B0DB",
+      "passiveC": 51,
+      "criticalC": 90,
+      "freqMHz": 1752,
+      "freqMaxMHz": 2160,
+      "governor": "schedutil",
+      "power": "battery",
+      "batteryPct": 93
+    },
+    "after": {
+      "tempC": 50,
+      "zone": "coretemp",
+      "passiveC": 51,
+      "criticalC": 90,
+      "freqMHz": 1493,
+      "freqMaxMHz": 2160,
+      "governor": "schedutil",
+      "power": "battery",
+      "batteryPct": 93
+    },
+    "storage": {
+      "kind": "none",
+      "mb": 0
+    },
+    "gpuKind": "hardware",
+    "sandbox": 63,
+    "sandboxTries": [
+      {
+        "id": "helperSocket",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperInet",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperExec",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperFork",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperNewFile",
+        "denied": true,
+        "errno": 13
+      },
+      {
+        "id": "helperRead",
+        "denied": true,
+        "errno": 13
+      }
+    ],
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) HD Graphics 400 (BSW)",
+      "displays": [
+        {
+          "connector": "eDP-1",
+          "builtin": true,
+          "mode": {
+            "w": 1366,
+            "h": 768,
+            "refresh": 60046
+          },
+          "scale": 100,
+          "rotation": 0
+        }
+      ]
+    },
+    "results": {
+      "cpu.sha256.1": {
+        "value": 53.7808,
+        "spread": 0.2775,
+        "unit": "MB/s"
+      },
+      "cpu.sha256.n": {
+        "value": 106.702,
+        "spread": 1.954,
+        "unit": "MB/s"
+      },
+      "cpu.matmul.1": {
+        "value": 0.868726,
+        "spread": 0.04255,
+        "unit": "GFLOP/s"
+      },
+      "cpu.matmul.n": {
+        "value": 1.76317,
+        "spread": 0.03913,
+        "unit": "GFLOP/s"
+      },
+      "cpu.xz.1": {
+        "value": 35.7708,
+        "spread": 2.001,
+        "unit": "MB/s"
+      },
+      "cpu.xz.n": {
+        "value": 71.4087,
+        "spread": 1.541,
+        "unit": "MB/s"
+      },
+      "cpu.js.1": {
+        "value": 15.0297,
+        "spread": 0.1075,
+        "unit": "runs/s"
+      },
+      "cpu.js.n": {
+        "value": 29.8814,
+        "spread": 0.5237,
+        "unit": "runs/s"
+      },
+      "cpu.ui.1": {
+        "value": 11.8588,
+        "spread": 0.2079,
+        "unit": "fps"
+      },
+      "cpu.ui.n": {
+        "value": 11.8432,
+        "spread": 0.1507,
+        "unit": "fps"
+      },
+      "cpu.shape.1": {
+        "value": 256.757,
+        "spread": 10.93,
+        "unit": "runs/s"
+      },
+      "cpu.shape.n": {
+        "value": 513.078,
+        "spread": 11.3,
+        "unit": "runs/s"
+      },
+      "mem.copy": {
+        "value": 4.02985,
+        "spread": 0.06612,
+        "unit": "GB/s"
+      },
+      "mem.triad": {
+        "value": 4.36856,
+        "spread": 0.1512,
+        "unit": "GB/s"
+      },
+      "mem.latency": {
+        "value": 144.088,
+        "spread": 0.3795,
+        "unit": "ns",
+        "lowerBetter": true
+      },
+      "gpu.scene": {
+        "value": 152.14,
+        "spread": 45.23,
+        "unit": "fps"
+      },
+      "gpu.fill": {
+        "value": 644.869,
+        "spread": 32.11,
+        "unit": "Mpx/s"
+      },
+      "gpu.upload": {
+        "value": 1325.76,
+        "spread": 24.52,
+        "unit": "MB/s"
+      },
+      "gpu.layers": {
+        "value": 36.5302,
+        "spread": 0.3682,
+        "unit": "fps"
+      }
+    },
+    "skipped": {
+      "disk.seqwrite": "mode",
+      "disk.seqread": "mode",
+      "disk.random4k": "mode",
+      "sustained.start": "mode",
+      "sustained.end": "mode"
+    }
+  },
+  "desktop": null
+}

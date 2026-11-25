@@ -30,6 +30,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   release and NVIDIA answers follow, as do `docs/GPU.md`, `docs/SESSIONS.md`, `docs/BENCHMARK.md` and
   `docs/PAPER-VALIDATION.md`.
 
+### Hardware
+- The tested-hardware snapshot of 2026-11-25 was published: 16 reports (`lordos-hwdata` 2026.11.25, APT staging and
+  live). The 14 community reports labelled `report:valid` (#42, #105, #129, #135, #136, #137, #155, #156, #212, #221,
+  #224, #230, #245, #249) are in `web/content/hardware/reports/`, each byte for byte as attached after
+  `tools/hwreport/validate.mjs` passed it, plus the two reference machines; 102 device entries. #224's file was made on
+  0.8.8.9-beta although its form names 0.8.9.4-beta, so its rows count for 0.8.8.9. `hwreport_test.mjs` expects them.
+
 ## [0.8.9.6.1-beta] - 2026-11-25
 
 An update of the package through the Store and `apt`, with no new images. Monitor → GPU says why it couldn't read an

@@ -1,0 +1,820 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-11-12",
+  "source": "community",
+  "lordos": "0.8.8.8-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "Apple Inc.",
+      "product": "MacBookPro11,4",
+      "version": "1.0",
+      "boardVendor": "Apple Inc.",
+      "boardName": "Mac-06F11FD93F0323C5",
+      "chassis": "laptop",
+      "model": "",
+      "biosVendor": "Apple Inc.",
+      "biosVersion": "489.0.0.0.0",
+      "biosDate": "10/07/2023",
+      "firmware": "uefi",
+      "secureBoot": null,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "Intel(R) Core(TM) i7-4770HQ CPU @ 2.20GHz",
+      "vendor": "GenuineIntel",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 4,
+      "threads": 8,
+      "minMHz": 800,
+      "maxMHz": 3400,
+      "governor": "schedutil",
+      "l1dKB": 32,
+      "l1iKB": 32,
+      "l2KB": 256,
+      "l3KB": 6144
+    },
+    "memory": {
+      "totalKB": 16255960,
+      "swapKB": 0,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "8086",
+        "deviceId": "0d26",
+        "vendor": "Intel Corporation",
+        "device": "Crystal Well Integrated Graphics Controller",
+        "driver": "i915",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 6,
+        "connected": 2
+      }
+    ],
+    "displays": [
+      {
+        "connector": "HDMI-A-3",
+        "enabled": true,
+        "name": "LG HDR WQHD",
+        "manufacturer": "GSM",
+        "product": "772e",
+        "year": 2020,
+        "widthCm": 80,
+        "heightCm": 34,
+        "diagonalTenths": 342,
+        "nativeWidth": 3440,
+        "nativeHeight": 1440,
+        "mode": "3840x2160"
+      },
+      {
+        "connector": "eDP-1",
+        "enabled": true,
+        "name": "Color LCD",
+        "manufacturer": "APP",
+        "product": "a02f",
+        "year": 2015,
+        "widthCm": 33,
+        "heightCm": 21,
+        "diagonalTenths": 154,
+        "nativeWidth": 2880,
+        "nativeHeight": 1800,
+        "mode": "2880x1800"
+      }
+    ],
+    "storage": [
+      {
+        "model": "APPLE SSD SM0512",
+        "vendor": "ATA",
+        "bytes": 500277790720,
+        "rotational": false,
+        "removable": false,
+        "transport": "sata",
+        "link": ""
+      }
+    ],
+    "pci": [
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "0d04",
+        "vendor": "Intel Corporation",
+        "device": "Crystal Well DRAM Controller",
+        "driver": ""
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "0d01",
+        "vendor": "Intel Corporation",
+        "device": "Crystal Well PCI Express x16 Controller",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "0d05",
+        "vendor": "Intel Corporation",
+        "device": "Crystal Well PCI Express x8 Controller",
+        "driver": "pcieport"
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "8086",
+        "deviceId": "0d26",
+        "vendor": "Intel Corporation",
+        "device": "Crystal Well Integrated Graphics Controller",
+        "driver": "i915"
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "8086",
+        "deviceId": "0d0c",
+        "vendor": "Intel Corporation",
+        "device": "Crystal Well HD Audio Controller",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "8c31",
+        "vendor": "Intel Corporation",
+        "device": "8 Series/C220 Series Chipset Family USB xHCI",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "078000",
+        "className": "Communication controller",
+        "vendorId": "8086",
+        "deviceId": "8c3a",
+        "vendor": "Intel Corporation",
+        "device": "8 Series/C220 Series Chipset Family MEI Controller #1",
+        "driver": "mei_me"
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "8086",
+        "deviceId": "8c20",
+        "vendor": "Intel Corporation",
+        "device": "8 Series/C220 Series Chipset High Definition Audio Controller",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "8c10",
+        "vendor": "Intel Corporation",
+        "device": "8 Series/C220 Series Chipset Family PCI Express Root Port #1",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "8c14",
+        "vendor": "Intel Corporation",
+        "device": "8 Series/C220 Series Chipset Family PCI Express Root Port #3",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "8c16",
+        "vendor": "Intel Corporation",
+        "device": "8 Series/C220 Series Chipset Family PCI Express Root Port #4",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060100",
+        "className": "ISA bridge",
+        "vendorId": "8086",
+        "deviceId": "8c4b",
+        "vendor": "Intel Corporation",
+        "device": "HM87 Express LPC Controller",
+        "driver": "lpc_ich"
+      },
+      {
+        "class": "0c0500",
+        "className": "SMBus",
+        "vendorId": "8086",
+        "deviceId": "8c22",
+        "vendor": "Intel Corporation",
+        "device": "8 Series/C220 Series Chipset Family SMBus Controller",
+        "driver": "i801_smbus"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "8c24",
+        "vendor": "Intel Corporation",
+        "device": "8 Series Chipset Family Thermal Management Controller",
+        "driver": "intel_pch_thermal"
+      },
+      {
+        "class": "010601",
+        "className": "SATA controller",
+        "vendorId": "144d",
+        "deviceId": "a801",
+        "vendor": "Samsung Electronics Co Ltd",
+        "device": "S4LN058A01[SSUBX] AHCI SSD Controller (Apple slot)",
+        "driver": "ahci"
+      },
+      {
+        "class": "028000",
+        "className": "Network controller",
+        "vendorId": "14e4",
+        "deviceId": "43ba",
+        "vendor": "Broadcom Inc. and subsidiaries",
+        "device": "BCM43602 802.11ac Wireless LAN SoC",
+        "driver": "brcmfmac"
+      },
+      {
+        "class": "048000",
+        "className": "Multimedia controller",
+        "vendorId": "14e4",
+        "deviceId": "1570",
+        "vendor": "Broadcom Inc. and subsidiaries",
+        "device": "720p FaceTime HD Camera",
+        "driver": ""
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "156d",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 Bridge [Falcon Ridge 4C 2013]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "156d",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 Bridge [Falcon Ridge 4C 2013]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "156d",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 Bridge [Falcon Ridge 4C 2013]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "156d",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 Bridge [Falcon Ridge 4C 2013]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "156d",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 Bridge [Falcon Ridge 4C 2013]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "156d",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 Bridge [Falcon Ridge 4C 2013]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "088000",
+        "className": "System peripheral",
+        "vendorId": "8086",
+        "deviceId": "156c",
+        "vendor": "Intel Corporation",
+        "device": "DSL5520 Thunderbolt 2 NHI [Falcon Ridge 4C 2013]",
+        "driver": "thunderbolt"
+      }
+    ],
+    "usb": [
+      {
+        "vendorId": "05ac",
+        "productId": "0274",
+        "vendor": "Apple, Inc.",
+        "product": "",
+        "class": "00",
+        "speedMbps": 12,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "05ac",
+        "productId": "1006",
+        "vendor": "Apple, Inc.",
+        "product": "Hub in Aluminum Keyboard",
+        "class": "09",
+        "speedMbps": 480,
+        "driver": "hub"
+      },
+      {
+        "vendorId": "05ac",
+        "productId": "0220",
+        "vendor": "Apple, Inc.",
+        "product": "Aluminum Keyboard (ANSI)",
+        "class": "00",
+        "speedMbps": 1,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "05ac",
+        "productId": "8290",
+        "vendor": "Apple, Inc.",
+        "product": "Bluetooth Host Controller",
+        "class": "ef",
+        "speedMbps": 12,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "05ac",
+        "productId": "8406",
+        "vendor": "Apple, Inc.",
+        "product": "Internal Memory Card Reader",
+        "class": "00",
+        "speedMbps": 5000,
+        "driver": "usb-storage"
+      }
+    ],
+    "network": [
+      {
+        "kind": "virtual",
+        "driver": "",
+        "up": false,
+        "speedMbps": null
+      },
+      {
+        "kind": "wifi",
+        "driver": "brcmfmac",
+        "up": true,
+        "speedMbps": null
+      }
+    ],
+    "audio": [
+      "HDA Intel HDMI",
+      "HDA Intel PCH"
+    ],
+    "bluetooth": [
+      {
+        "driver": "btusb"
+      }
+    ],
+    "power": [
+      {
+        "kind": "ac",
+        "vendor": "",
+        "model": "",
+        "technology": "",
+        "status": "",
+        "capacity": null,
+        "health": null,
+        "online": 1
+      },
+      {
+        "kind": "battery",
+        "vendor": "SNSYIY",
+        "model": "A1494",
+        "technology": "Li-ion",
+        "status": "Full",
+        "capacity": 83,
+        "health": 111,
+        "online": null
+      }
+    ],
+    "thermal": [
+      {
+        "sensor": "pch_haswell",
+        "milliC": 55500,
+        "fans": 0
+      },
+      {
+        "sensor": "BAT0",
+        "milliC": 29500,
+        "fans": 0
+      },
+      {
+        "sensor": "x86_pkg_temp",
+        "milliC": 74000,
+        "fans": 0
+      },
+      {
+        "sensor": "drivetemp",
+        "milliC": 33000,
+        "fans": 0
+      },
+      {
+        "sensor": "ADP1",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "pch_haswell",
+        "milliC": 55500,
+        "fans": 0
+      },
+      {
+        "sensor": "BAT0",
+        "milliC": 29500,
+        "fans": 0
+      },
+      {
+        "sensor": "coretemp",
+        "milliC": 74000,
+        "fans": 0
+      },
+      {
+        "sensor": "hidpp_battery_0",
+        "milliC": null,
+        "fans": 0
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.116+deb13-amd64",
+      "lordos": "0.8.8.8-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,tomoyo,bpf,ipe,ima,evm",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false,
+      "bootMedium": "internal",
+      "bootLinkMbps": null,
+      "bootToRam": false,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_SECCOMP_FILTER": "y",
+        "CONFIG_USER_NS": "y",
+        "CONFIG_BPF_SYSCALL": "y",
+        "CONFIG_BPF_JIT": "y",
+        "CONFIG_CGROUP_BPF": "y",
+        "CONFIG_BPF_LSM": "y",
+        "CONFIG_INET_DIAG_DESTROY": "y",
+        "CONFIG_INET_UDP_DIAG": "m",
+        "CONFIG_MEMCG": "y",
+        "CONFIG_PSI": "y",
+        "CONFIG_ZRAM": "m",
+        "CONFIG_DRM": "m",
+        "CONFIG_UHID": "m"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": true
+      }
+    },
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) Iris(R) Pro Graphics P5200 (HSW GT3)",
+      "dmabuf": true,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "works",
+      "note": "gpuComposes"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "works",
+      "note": "batteryHealth"
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": {
+    "lordbench": 1,
+    "mode": "quick",
+    "seconds": 12,
+    "status": "stopped",
+    "stopReason": "thermal",
+    "lordos": "0.8.8.8-beta",
+    "kernel": "6.12.116+deb13-amd64",
+    "arch": "x86_64",
+    "live": false,
+    "threads": 8,
+    "cpus": 8,
+    "quiet": {
+      "quiet": true,
+      "busyPct": 3.3,
+      "waitedS": 10
+    },
+    "before": {
+      "tempC": 66,
+      "zone": "coretemp",
+      "passiveC": 84,
+      "criticalC": 100,
+      "throttleEvents": 0,
+      "freqMHz": 1648,
+      "freqMaxMHz": 3400,
+      "governor": "schedutil",
+      "power": "mains",
+      "batteryPct": 83
+    },
+    "after": {
+      "tempC": 81,
+      "zone": "x86_pkg_temp",
+      "passiveC": 84,
+      "criticalC": 100,
+      "throttleEvents": 0,
+      "freqMHz": 3193,
+      "freqMaxMHz": 3400,
+      "governor": "schedutil",
+      "power": "mains",
+      "batteryPct": 83
+    },
+    "storage": {
+      "kind": "none",
+      "mb": 0
+    },
+    "gpuKind": "",
+    "sandbox": 0,
+    "sandboxTries": [
+      {
+        "id": "helperSocket",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperInet",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperExec",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperFork",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperNewFile",
+        "denied": true,
+        "errno": 13
+      },
+      {
+        "id": "helperRead",
+        "denied": true,
+        "errno": 13
+      }
+    ],
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) Iris(R) Pro Graphics P5200 (HSW GT3)",
+      "displays": [
+        {
+          "connector": "eDP-1",
+          "builtin": true,
+          "mode": {
+            "w": 2880,
+            "h": 1800,
+            "refresh": 59990
+          },
+          "scale": 200,
+          "rotation": 0
+        },
+        {
+          "connector": "HDMI-A-3",
+          "builtin": false,
+          "mode": {
+            "w": 3440,
+            "h": 1440,
+            "refresh": 49987
+          },
+          "scale": 100,
+          "rotation": 0
+        }
+      ]
+    },
+    "results": {
+      "cpu.sha256.1": {
+        "value": 190.682,
+        "spread": 11.89,
+        "unit": "MB/s"
+      }
+    },
+    "skipped": {}
+  },
+  "desktop": {
+    "lordbench": 1,
+    "mode": "desktop",
+    "seconds": 24,
+    "status": "stopped",
+    "stopReason": "thermal",
+    "lordos": "0.8.8.8-beta",
+    "kernel": "6.12.116+deb13-amd64",
+    "arch": "x86_64",
+    "live": false,
+    "threads": 8,
+    "cpus": 8,
+    "quiet": {
+      "quiet": true,
+      "busyPct": 1.6,
+      "waitedS": 10
+    },
+    "before": {
+      "tempC": 52,
+      "zone": "x86_pkg_temp",
+      "passiveC": 84,
+      "criticalC": 100,
+      "throttleEvents": 120070,
+      "freqMHz": 2258,
+      "freqMaxMHz": 3400,
+      "governor": "schedutil",
+      "power": "mains",
+      "batteryPct": 83
+    },
+    "after": {
+      "tempC": 84,
+      "zone": "x86_pkg_temp",
+      "passiveC": 84,
+      "criticalC": 100,
+      "throttleEvents": 120070,
+      "freqMHz": 3198,
+      "freqMaxMHz": 3400,
+      "governor": "schedutil",
+      "power": "mains",
+      "batteryPct": 83
+    },
+    "storage": {
+      "kind": "none",
+      "mb": 0
+    },
+    "gpuKind": "",
+    "sandbox": 0,
+    "sandboxTries": [
+      {
+        "id": "helperSocket",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperInet",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperExec",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperFork",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperNewFile",
+        "denied": true,
+        "errno": 13
+      },
+      {
+        "id": "helperRead",
+        "denied": true,
+        "errno": 13
+      }
+    ],
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) Iris(R) Pro Graphics P5200 (HSW GT3)",
+      "displays": [
+        {
+          "connector": "eDP-1",
+          "builtin": true,
+          "mode": {
+            "w": 2880,
+            "h": 1800,
+            "refresh": 59990
+          },
+          "scale": 200,
+          "rotation": 0
+        },
+        {
+          "connector": "HDMI-A-3",
+          "builtin": false,
+          "mode": {
+            "w": 3440,
+            "h": 1440,
+            "refresh": 49987
+          },
+          "scale": 100,
+          "rotation": 0
+        }
+      ]
+    },
+    "results": {
+      "comp.fps": {
+        "value": 47.6482,
+        "spread": 0,
+        "unit": "fps"
+      },
+      "comp.p50": {
+        "value": 0.458115,
+        "spread": 0,
+        "unit": "ms",
+        "lowerBetter": true
+      },
+      "comp.p99": {
+        "value": 21.2706,
+        "spread": 0,
+        "unit": "ms",
+        "lowerBetter": true
+      },
+      "comp.missed": {
+        "value": 3.9749,
+        "spread": 0,
+        "lowerBetter": true
+      },
+      "comp.in50": {
+        "value": 211.99,
+        "spread": 0,
+        "unit": "ms",
+        "lowerBetter": true
+      },
+      "comp.in99": {
+        "value": 523.668,
+        "spread": 0,
+        "unit": "ms",
+        "lowerBetter": true
+      }
+    },
+    "skipped": {},
+    "frames": {
+      "budgetMs": 20,
+      "gapMaxMs": 80.1
+    }
+  }
+}

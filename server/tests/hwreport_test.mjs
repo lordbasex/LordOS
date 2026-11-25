@@ -232,14 +232,20 @@ ok('form version: no note when they agree', !commentBody(checkReport(laptop, sch
 
 // ---- the catalogue (catalog.mjs) ----
 const entries = readReports(REPORTS_DIR, schema);
-eq('the accepted reports', entries.map((e) => [e.file, e.report.source, e.issue]), [['community-42-dell-latitude-7480.json', 'community', 42], ['reference-pi5-16gb.json', 'reference', null], ['reference-vm116.json', 'reference', null]]);
+const ACCEPTED = [[105, 'asus-k72f'], [129, 'hp-elitebook-840-g6'], [135, 'teclast-x98pro'], [136, 'apple-macbookpro11-4'], [137, 'hampoo-p02bd6'],
+  [155, 'apple-macbookpro12-1'], [156, 'asus-rog-strix-x570-e'], [212, 'asus-k72f'], [221, 'asus-f1a55-m-lx'], [224, 'gigabyte-b760m-c'], [230, 'asus-k72f'],
+  [245, 'acer-aspire-r3-131t'], [249, 'huawei-crefg-xx'], [42, 'dell-latitude-7480']];
+eq('the accepted reports', entries.map((e) => [e.file, e.report.source, e.issue]),
+  [...ACCEPTED.map(([n, slug]) => [`community-${n}-${slug}.json`, 'community', n]), ['reference-pi5-16gb.json', 'reference', null], ['reference-vm116.json', 'reference', null]]);
 const snap = buildSnapshot(entries);
 eq('the snapshot shipped is the one the reports give', fs.readFileSync(SNAPSHOT_FILE, 'utf8'), snapshotText(snap));
-eq('snapshot header', [snap.format, snap.version, snap.generated, snap.reports], ['lordos-hwsnapshot', 1, '2026-11-06', 3]);
+eq('snapshot header', [snap.format, snap.version, snap.generated, snap.reports], ['lordos-hwsnapshot', 1, '2026-11-25', 16]);
 ok('snapshot entries add up', snap.devices.every((d) => d.works + d.limits + d.no === d.reports && d.references <= d.reports && /^\d+\.\d+\.\d+(\.\d+)?$/.test(d.lordos)));
 ok('the snapshot is deterministic', snapshotText(buildSnapshot(readReports(REPORTS_DIR, schema))) === snapshotText(snap));
 eq('the virtio GPU is "works with limits" on VM 116', snap.devices.find((d) => d.key === 'pci:1af4:1050'), { key: 'pci:1af4:1050', component: 'gpu', name: 'Red Hat, Inc. Virtio 1.0 GPU', lordos: '0.8.5', works: 0, limits: 1, no: 0, reports: 1, references: 1 });
 eq('the first community report (#42) counts as community, not reference', snap.devices.find((d) => d.key === 'pci:8086:5916'), { key: 'pci:8086:5916', component: 'gpu', name: 'Intel Corporation HD Graphics 620', lordos: '0.8.8.4', works: 1, limits: 0, no: 0, reports: 1, references: 0 });
+eq('#249: Iris Xe on Raptor Lake-P works on 0.8.9.6', snap.devices.filter((d) => d.key === 'pci:8086:a7a0'), [{ key: 'pci:8086:a7a0', component: 'gpu', name: 'Intel Corporation Raptor Lake-P [Iris Xe Graphics]', lordos: '0.8.9.6', works: 1, limits: 0, no: 0, reports: 1, references: 0 }]);
+eq('one machine reported on three versions keeps one row per version', snap.devices.filter((d) => d.key === 'machine:ASUSTeK Computer Inc.|K72F' && d.component === 'display').map((d) => [d.lordos, d.works, d.reports]), [['0.8.8.7', 1, 1], ['0.8.9.2', 1, 1], ['0.8.9.5', 1, 1]]);
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hwreport-test-'));
 try {
   fs.writeFileSync(path.join(tmp, 'a.json'), JSON.stringify(laptop));
@@ -255,8 +261,14 @@ try {
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 const model = buildModel(entries);
 eq('the page model', model.machines.map((m) => [m.name, m.kind, m.source, m.perf.map((p) => p.cat)]),
-  [['QEMU Standard PC (Q35 + ICH9, 2009)', 'vm', 'reference', ['cpu', 'memory', 'gpu', 'storage']], ['Raspberry Pi 5 Model B Rev 1.1', 'board', 'reference', ['cpu', 'memory', 'gpu', 'storage']], ['Dell Inc. Latitude 7480', 'laptop', 'community', []]]);
-eq('problems listed', model.problems.map((p) => [p.id, p.state, p.note]), [['power', 'limits', 'batteryWorn'], ['gpu', 'limits', 'cpu.software']]);
+  [['QEMU Standard PC (Q35 + ICH9, 2009)', 'vm', 'reference', ['cpu', 'memory', 'gpu', 'storage']], ['Raspberry Pi 5 Model B Rev 1.1', 'board', 'reference', ['cpu', 'memory', 'gpu', 'storage']],
+    ['', 'desktop', 'community', ['cpu', 'memory', 'gpu']], ['', 'desktop', 'community', []], ['Acer Aspire R3-131T', 'laptop', 'community', ['cpu', 'memory', 'gpu']],
+    ['Apple Inc. MacBookPro11,4', 'laptop', 'community', []], ['Apple Inc. MacBookPro12,1', 'laptop', 'community', []],
+    ['ASUSTeK Computer Inc. K72F', 'laptop', 'community', []], ['ASUSTeK Computer Inc. K72F', 'laptop', 'community', []], ['ASUSTeK Computer Inc. K72F', 'laptop', 'community', []],
+    ['Dell Inc. Latitude 7480', 'laptop', 'community', []], ['Gigabyte Technology Co., Ltd. B760M C', 'desktop', 'community', []], ['Hampoo P02BD6_HI-122LP', 'desktop', 'community', []],
+    ['HP HP EliteBook 840 G6', 'laptop', 'community', []], ['HUAWEI CREFG-XX', 'laptop', 'community', []], ['TECLAST X98Pro', 'desktop', 'community', []]]);
+eq('problems listed', model.problems.map((p) => [p.id, p.state, p.note]),
+  [['power', 'limits', 'batteryWorn'], ['gpu', 'limits', 'cpu.rotated'], ['gpu', 'limits', 'cpu.no-context'], ['power', 'limits', 'batteryWorn'], ['gpu', 'limits', 'cpu.software']]);
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const html = renderSections({ ...model, machines: [{ ...model.machines[0], name: '<img src=x onerror=alert(1)>' }] }, { reference: 'Reference', state: { works: 'Works' } }, esc, (k) => `https://github.com/x/issues/${k}`);
 ok('the page sections escape report text', !html.machines.includes('<img') && html.machines.includes('&lt;img'));

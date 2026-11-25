@@ -1,0 +1,554 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-11-25",
+  "source": "community",
+  "lordos": "0.8.9.6-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "HUAWEI",
+      "product": "CREFG-XX",
+      "version": "M1010",
+      "boardVendor": "HUAWEI",
+      "boardName": "CREFG-XX-PCB",
+      "chassis": "laptop",
+      "model": "",
+      "biosVendor": "HUAWEI",
+      "biosVersion": "1.10",
+      "biosDate": "10/21/2025",
+      "firmware": "uefi",
+      "secureBoot": false,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "13th Gen Intel(R) Core(TM) i9-13900H",
+      "vendor": "GenuineIntel",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 14,
+      "threads": 20,
+      "minMHz": 400,
+      "maxMHz": 5200,
+      "governor": "powersave",
+      "l1dKB": 48,
+      "l1iKB": 32,
+      "l2KB": 1280,
+      "l3KB": 24576
+    },
+    "memory": {
+      "totalKB": 16096892,
+      "swapKB": 4194300,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "8086",
+        "deviceId": "a7a0",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake-P [Iris Xe Graphics]",
+        "driver": "i915",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 5,
+        "connected": 1
+      }
+    ],
+    "displays": [
+      {
+        "connector": "eDP-1",
+        "enabled": true,
+        "name": "",
+        "manufacturer": "BOE",
+        "product": "0bb0",
+        "year": 2023,
+        "widthCm": 34,
+        "heightCm": 23,
+        "diagonalTenths": 162,
+        "nativeWidth": 2520,
+        "nativeHeight": 1680,
+        "mode": "2520x1680"
+      }
+    ],
+    "storage": [
+      {
+        "model": "321JN1024GB",
+        "vendor": "",
+        "bytes": 1024209543168,
+        "rotational": false,
+        "removable": false,
+        "transport": "nvme",
+        "link": "16.0 GT/s PCIe x4"
+      }
+    ],
+    "pci": [
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "a706",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake-P 6p+8e cores Host Bridge/DRAM Controller",
+        "driver": "igen6_edac"
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "8086",
+        "deviceId": "a7a0",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake-P [Iris Xe Graphics]",
+        "driver": "i915"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "a71d",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake Dynamic Platform and Thermal Framework Processor Participant",
+        "driver": "proc_thermal_pci"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "a74d",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake PCIe 4.0 Graphics Port",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "a76e",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake-P Thunderbolt 4 PCI Express Root Port #0",
+        "driver": "pcieport"
+      },
+      {
+        "class": "088000",
+        "className": "System peripheral",
+        "vendorId": "8086",
+        "deviceId": "a74f",
+        "vendor": "Intel Corporation",
+        "device": "GNA Scoring Accelerator module",
+        "driver": ""
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "a77d",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake Crashlog and Telemetry",
+        "driver": "intel_vsec"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "a71e",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake-P Thunderbolt 4 USB Controller",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "0c0340",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "a73e",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake-P Thunderbolt 4 NHI #0",
+        "driver": "thunderbolt"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "51ed",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake PCH USB 3.2 xHCI Host Controller",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "050000",
+        "className": "RAM memory",
+        "vendorId": "8086",
+        "deviceId": "51ef",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake PCH Shared SRAM",
+        "driver": ""
+      },
+      {
+        "class": "028000",
+        "className": "Network controller",
+        "vendorId": "8086",
+        "deviceId": "51f1",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake PCH CNVi WiFi",
+        "driver": "iwlwifi"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "51e8",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake PCH Serial IO I2C Controller #0",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "51e9",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake PCH Serial IO I2C Controller #1",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "078000",
+        "className": "Communication controller",
+        "vendorId": "8086",
+        "deviceId": "51e0",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake PCH HECI Controller",
+        "driver": "mei_me"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "51c5",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake-P Serial IO I2C Controller #0",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "51c6",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake-P Serial IO I2C Controller #1",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "078000",
+        "className": "Communication controller",
+        "vendorId": "8086",
+        "deviceId": "51a8",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake PCH UART #0",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "51aa",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake SPI Controller",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "060100",
+        "className": "ISA bridge",
+        "vendorId": "8086",
+        "deviceId": "519d",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake LPC/eSPI Controller",
+        "driver": ""
+      },
+      {
+        "class": "040100",
+        "className": "Multimedia audio controller",
+        "vendorId": "8086",
+        "deviceId": "51ca",
+        "vendor": "Intel Corporation",
+        "device": "Raptor Lake-P/U/H cAVS",
+        "driver": "sof-audio-pci-intel-tgl"
+      },
+      {
+        "class": "0c0500",
+        "className": "SMBus",
+        "vendorId": "8086",
+        "deviceId": "51a3",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake PCH-P SMBus Host Controller",
+        "driver": "i801_smbus"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "51a4",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake-P PCH SPI Controller",
+        "driver": ""
+      },
+      {
+        "class": "010802",
+        "className": "Non-Volatile memory controller",
+        "vendorId": "1987",
+        "deviceId": "5021",
+        "vendor": "Phison Electronics Corporation",
+        "device": "PS5021-E21 PCIe4 NVMe Controller (DRAM-less)",
+        "driver": "nvme"
+      }
+    ],
+    "usb": [
+      {
+        "vendorId": "8087",
+        "productId": "0033",
+        "vendor": "",
+        "product": "",
+        "class": "e0",
+        "speedMbps": 12,
+        "driver": "btusb"
+      },
+      {
+        "vendorId": "3277",
+        "productId": "0004",
+        "vendor": "",
+        "product": "",
+        "class": "ef",
+        "speedMbps": 480,
+        "driver": "uvcvideo"
+      }
+    ],
+    "network": [
+      {
+        "kind": "virtual",
+        "driver": "",
+        "up": false,
+        "speedMbps": null
+      },
+      {
+        "kind": "virtual",
+        "driver": "",
+        "up": false,
+        "speedMbps": null
+      },
+      {
+        "kind": "wifi",
+        "driver": "iwlwifi",
+        "up": true,
+        "speedMbps": null
+      }
+    ],
+    "audio": [
+      "sof-hda-dsp"
+    ],
+    "bluetooth": [
+      {
+        "driver": "btusb"
+      }
+    ],
+    "power": [
+      {
+        "kind": "ac",
+        "vendor": "",
+        "model": "",
+        "technology": "",
+        "status": "",
+        "capacity": null,
+        "health": null,
+        "online": 0
+      },
+      {
+        "kind": "battery",
+        "vendor": "Sunwoda-H",
+        "model": "HB9790T7ECW-32T",
+        "technology": "Li-ion",
+        "status": "Discharging",
+        "capacity": 74,
+        "health": 85,
+        "online": null
+      }
+    ],
+    "thermal": [
+      {
+        "sensor": "acpitz",
+        "milliC": 27800,
+        "fans": 0
+      },
+      {
+        "sensor": "INT3400 Thermal",
+        "milliC": 20000,
+        "fans": 0
+      },
+      {
+        "sensor": "SEN0",
+        "milliC": 43050,
+        "fans": 0
+      },
+      {
+        "sensor": "TCPU",
+        "milliC": 42050,
+        "fans": 0
+      },
+      {
+        "sensor": "TCPU_PCI",
+        "milliC": 42000,
+        "fans": 0
+      },
+      {
+        "sensor": "SEN1",
+        "milliC": 35350,
+        "fans": 0
+      },
+      {
+        "sensor": "SEN2",
+        "milliC": 27050,
+        "fans": 0
+      },
+      {
+        "sensor": "SEN3",
+        "milliC": 32950,
+        "fans": 0
+      },
+      {
+        "sensor": "iwlwifi_1",
+        "milliC": 25000,
+        "fans": 0
+      },
+      {
+        "sensor": "SEN4",
+        "milliC": 33050,
+        "fans": 0
+      },
+      {
+        "sensor": "SEN5",
+        "milliC": 24450,
+        "fans": 0
+      },
+      {
+        "sensor": "x86_pkg_temp",
+        "milliC": 42000,
+        "fans": 0
+      },
+      {
+        "sensor": "SEN6",
+        "milliC": 24750,
+        "fans": 0
+      },
+      {
+        "sensor": "SEN8",
+        "milliC": 36950,
+        "fans": 0
+      },
+      {
+        "sensor": "SEN9",
+        "milliC": 37250,
+        "fans": 0
+      },
+      {
+        "sensor": "SEND",
+        "milliC": 21950,
+        "fans": 0
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.118+deb13-amd64",
+      "lordos": "0.8.9.6-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,tomoyo,bpf,ipe,ima,evm",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false,
+      "bootMedium": "internal",
+      "bootLinkMbps": null,
+      "bootToRam": false,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_SECCOMP_FILTER": "y",
+        "CONFIG_USER_NS": "y",
+        "CONFIG_BPF_SYSCALL": "y",
+        "CONFIG_BPF_JIT": "y",
+        "CONFIG_CGROUP_BPF": "y",
+        "CONFIG_BPF_LSM": "y",
+        "CONFIG_INET_DIAG_DESTROY": "y",
+        "CONFIG_INET_UDP_DIAG": "m",
+        "CONFIG_MEMCG": "y",
+        "CONFIG_PSI": "y",
+        "CONFIG_ZRAM": "m",
+        "CONFIG_DRM": "m",
+        "CONFIG_UHID": "m"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": true
+      }
+    },
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) Iris(R) Xe Graphics (RPL-P)",
+      "dmabuf": true,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "works",
+      "note": "gpuComposes"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "works",
+      "note": "batteryHealth"
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": null,
+  "desktop": null
+}

@@ -1,0 +1,1061 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-11-15",
+  "source": "community",
+  "lordos": "0.8.8.8-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "",
+      "product": "",
+      "version": "System Version",
+      "boardVendor": "ASUSTeK COMPUTER INC.",
+      "boardName": "ROG STRIX X570-E GAMING",
+      "chassis": "desktop",
+      "model": "",
+      "biosVendor": "American Megatrends Inc.",
+      "biosVersion": "5031",
+      "biosDate": "01/13/2025",
+      "firmware": "uefi",
+      "secureBoot": false,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "AMD Ryzen 7 5700X 8-Core Processor",
+      "vendor": "AuthenticAMD",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 8,
+      "threads": 16,
+      "minMHz": 550,
+      "maxMHz": 4663,
+      "governor": "powersave",
+      "l1dKB": 32,
+      "l1iKB": 32,
+      "l2KB": 512,
+      "l3KB": 32768
+    },
+    "memory": {
+      "totalKB": 32774328,
+      "swapKB": 2097148,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "1002",
+        "deviceId": "7590",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Navi 44 [RX 9060 XT]",
+        "driver": "amdgpu",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 3,
+        "connected": 1
+      },
+      {
+        "bus": "pci",
+        "vendorId": "1002",
+        "deviceId": "7590",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Navi 44 [RX 9060 XT]",
+        "driver": "amdgpu",
+        "bootVga": false,
+        "renderNode": true,
+        "connectors": 3,
+        "connected": 0
+      }
+    ],
+    "displays": [
+      {
+        "connector": "HDMI-A-2",
+        "enabled": true,
+        "name": "273ELH",
+        "manufacturer": "PHL",
+        "product": "c07d",
+        "year": 2014,
+        "widthCm": 60,
+        "heightCm": 34,
+        "diagonalTenths": 272,
+        "nativeWidth": 1920,
+        "nativeHeight": 1080,
+        "mode": "1920x1080"
+      }
+    ],
+    "storage": [
+      {
+        "model": "PUSKILL 1TB",
+        "vendor": "",
+        "bytes": 1000204886016,
+        "rotational": false,
+        "removable": false,
+        "transport": "nvme",
+        "link": "8.0 GT/s PCIe x4"
+      },
+      {
+        "model": "Hitachi HDS5C302",
+        "vendor": "ATA",
+        "bytes": 2000398934016,
+        "rotational": true,
+        "removable": false,
+        "transport": "sata",
+        "link": ""
+      },
+      {
+        "model": "Emtec X150 240GB",
+        "vendor": "ATA",
+        "bytes": 240057409536,
+        "rotational": false,
+        "removable": false,
+        "transport": "sata",
+        "link": ""
+      }
+    ],
+    "pci": [
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1480",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse Root Complex",
+        "driver": ""
+      },
+      {
+        "class": "080600",
+        "className": "IOMMU",
+        "vendorId": "1022",
+        "deviceId": "1481",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse IOMMU",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1482",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse PCIe Dummy Host Bridge",
+        "driver": ""
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "1483",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse GPP Bridge",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "1483",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse GPP Bridge",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1482",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse PCIe Dummy Host Bridge",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1482",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse PCIe Dummy Host Bridge",
+        "driver": ""
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "1483",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse GPP Bridge",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "1483",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse GPP Bridge",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1482",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse PCIe Dummy Host Bridge",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1482",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse PCIe Dummy Host Bridge",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1482",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse PCIe Dummy Host Bridge",
+        "driver": ""
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "1484",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse Internal PCIe GPP Bridge 0 to bus[E:B]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1482",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse PCIe Dummy Host Bridge",
+        "driver": ""
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "1484",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse Internal PCIe GPP Bridge 0 to bus[E:B]",
+        "driver": "pcieport"
+      },
+      {
+        "class": "0c0500",
+        "className": "SMBus",
+        "vendorId": "1022",
+        "deviceId": "790b",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH SMBus Controller",
+        "driver": "piix4_smbus"
+      },
+      {
+        "class": "060100",
+        "className": "ISA bridge",
+        "vendorId": "1022",
+        "deviceId": "790e",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH LPC Bridge",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1440",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse/Vermeer Data Fabric: Device 18h; Function 0",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1441",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse/Vermeer Data Fabric: Device 18h; Function 1",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1442",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse/Vermeer Data Fabric: Device 18h; Function 2",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1443",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse/Vermeer Data Fabric: Device 18h; Function 3",
+        "driver": "k10temp"
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1444",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse/Vermeer Data Fabric: Device 18h; Function 4",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1445",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse/Vermeer Data Fabric: Device 18h; Function 5",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1446",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse/Vermeer Data Fabric: Device 18h; Function 6",
+        "driver": ""
+      },
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "1022",
+        "deviceId": "1447",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse/Vermeer Data Fabric: Device 18h; Function 7",
+        "driver": ""
+      },
+      {
+        "class": "010802",
+        "className": "Non-Volatile memory controller",
+        "vendorId": "4321",
+        "deviceId": "2263",
+        "vendor": "Tata Power Strategic Electronics Division",
+        "device": "",
+        "driver": "nvme"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "57ad",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse Switch Upstream",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "57a3",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse PCIe GPP Bridge",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "57a3",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse PCIe GPP Bridge",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "57a3",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse PCIe GPP Bridge",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "57a4",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse PCIe GPP Bridge",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "57a4",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse PCIe GPP Bridge",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1022",
+        "deviceId": "57a4",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse PCIe GPP Bridge",
+        "driver": "pcieport"
+      },
+      {
+        "class": "028000",
+        "className": "Network controller",
+        "vendorId": "8086",
+        "deviceId": "2723",
+        "vendor": "Intel Corporation",
+        "device": "Wi-Fi 6 AX200",
+        "driver": "iwlwifi"
+      },
+      {
+        "class": "020000",
+        "className": "Ethernet controller",
+        "vendorId": "10ec",
+        "deviceId": "8125",
+        "vendor": "Realtek Semiconductor Co., Ltd.",
+        "device": "RTL8125 2.5GbE Controller",
+        "driver": "r8169"
+      },
+      {
+        "class": "020000",
+        "className": "Ethernet controller",
+        "vendorId": "8086",
+        "deviceId": "1539",
+        "vendor": "Intel Corporation",
+        "device": "I211 Gigabit Network Connection",
+        "driver": "igb"
+      },
+      {
+        "class": "130000",
+        "className": "Non-Essential Instrumentation",
+        "vendorId": "1022",
+        "deviceId": "1485",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse Reserved SPP",
+        "driver": ""
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "1022",
+        "deviceId": "149c",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse USB 3.0 Host Controller",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "1022",
+        "deviceId": "149c",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse USB 3.0 Host Controller",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "010601",
+        "className": "SATA controller",
+        "vendorId": "1022",
+        "deviceId": "7901",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH SATA Controller [AHCI mode]",
+        "driver": "ahci"
+      },
+      {
+        "class": "010601",
+        "className": "SATA controller",
+        "vendorId": "1022",
+        "deviceId": "7901",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "FCH SATA Controller [AHCI mode]",
+        "driver": "ahci"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1002",
+        "deviceId": "1478",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Navi 10 XL Upstream Port of PCI Express Switch",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1002",
+        "deviceId": "1479",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Navi 10 XL Downstream Port of PCI Express Switch",
+        "driver": "pcieport"
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "1002",
+        "deviceId": "7590",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Navi 44 [RX 9060 XT]",
+        "driver": "amdgpu"
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "1002",
+        "deviceId": "ab40",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Navi 48 HDMI/DP Audio Controller",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1002",
+        "deviceId": "1478",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Navi 10 XL Upstream Port of PCI Express Switch",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "1002",
+        "deviceId": "1479",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Navi 10 XL Downstream Port of PCI Express Switch",
+        "driver": "pcieport"
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "1002",
+        "deviceId": "7590",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Navi 44 [RX 9060 XT]",
+        "driver": "amdgpu"
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "1002",
+        "deviceId": "ab40",
+        "vendor": "Advanced Micro Devices, Inc. [AMD/ATI]",
+        "device": "Navi 48 HDMI/DP Audio Controller",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "130000",
+        "className": "Non-Essential Instrumentation",
+        "vendorId": "1022",
+        "deviceId": "148a",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse PCIe Dummy Function",
+        "driver": ""
+      },
+      {
+        "class": "130000",
+        "className": "Non-Essential Instrumentation",
+        "vendorId": "1022",
+        "deviceId": "1485",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse Reserved SPP",
+        "driver": ""
+      },
+      {
+        "class": "108000",
+        "className": "Encryption controller",
+        "vendorId": "1022",
+        "deviceId": "1486",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse Cryptographic Coprocessor PSPCPP",
+        "driver": "ccp"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "1022",
+        "deviceId": "149c",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Matisse USB 3.0 Host Controller",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "1022",
+        "deviceId": "1487",
+        "vendor": "Advanced Micro Devices, Inc. [AMD]",
+        "device": "Starship/Matisse HD Audio Controller",
+        "driver": "snd_hda_intel"
+      }
+    ],
+    "usb": [
+      {
+        "vendorId": "3151",
+        "productId": "3022",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 12,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "062a",
+        "productId": "261c",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 12,
+        "driver": "usbhid"
+      },
+      {
+        "vendorId": "05e3",
+        "productId": "0610",
+        "vendor": "",
+        "product": "",
+        "class": "09",
+        "speedMbps": 480,
+        "driver": "hub"
+      },
+      {
+        "vendorId": "8087",
+        "productId": "0029",
+        "vendor": "",
+        "product": "",
+        "class": "e0",
+        "speedMbps": 12,
+        "driver": "btusb"
+      },
+      {
+        "vendorId": "0b05",
+        "productId": "18f3",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 12,
+        "driver": ""
+      },
+      {
+        "vendorId": "32e6",
+        "productId": "9221",
+        "vendor": "",
+        "product": "",
+        "class": "ef",
+        "speedMbps": 480,
+        "driver": "uvcvideo"
+      },
+      {
+        "vendorId": "04b8",
+        "productId": "11af",
+        "vendor": "",
+        "product": "",
+        "class": "00",
+        "speedMbps": 480,
+        "driver": ""
+      }
+    ],
+    "network": [
+      {
+        "kind": "ethernet",
+        "driver": "r8169",
+        "up": true,
+        "speedMbps": 1000
+      },
+      {
+        "kind": "ethernet",
+        "driver": "igb",
+        "up": false,
+        "speedMbps": null
+      },
+      {
+        "kind": "wifi",
+        "driver": "iwlwifi",
+        "up": true,
+        "speedMbps": null
+      }
+    ],
+    "audio": [
+      "USB Camera USB Camera",
+      "HDA ATI HDMI",
+      "HDA ATI HDMI",
+      "HD-Audio Generic"
+    ],
+    "bluetooth": [
+      {
+        "driver": "btusb"
+      }
+    ],
+    "power": [],
+    "thermal": [
+      {
+        "sensor": "iwlwifi_1",
+        "milliC": 41000,
+        "fans": 0
+      },
+      {
+        "sensor": "nvme",
+        "milliC": 39850,
+        "fans": 0
+      },
+      {
+        "sensor": "amdgpu",
+        "milliC": 37000,
+        "fans": 1
+      },
+      {
+        "sensor": "amdgpu",
+        "milliC": 33000,
+        "fans": 1
+      },
+      {
+        "sensor": "drivetemp",
+        "milliC": 32000,
+        "fans": 0
+      },
+      {
+        "sensor": "drivetemp",
+        "milliC": 46000,
+        "fans": 0
+      },
+      {
+        "sensor": "k10temp",
+        "milliC": 46500,
+        "fans": 0
+      },
+      {
+        "sensor": "asusec",
+        "milliC": 58000,
+        "fans": 1
+      },
+      {
+        "sensor": "asus",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "iwlwifi_1",
+        "milliC": 41000,
+        "fans": 0
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.117+deb13-amd64",
+      "lordos": "0.8.8.8-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,tomoyo,bpf,ipe,ima,evm",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false,
+      "bootMedium": "internal",
+      "bootLinkMbps": null,
+      "bootToRam": false,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_SECCOMP_FILTER": "y",
+        "CONFIG_USER_NS": "y",
+        "CONFIG_BPF_SYSCALL": "y",
+        "CONFIG_BPF_JIT": "y",
+        "CONFIG_CGROUP_BPF": "y",
+        "CONFIG_BPF_LSM": "y",
+        "CONFIG_INET_DIAG_DESTROY": "y",
+        "CONFIG_INET_UDP_DIAG": "m",
+        "CONFIG_MEMCG": "y",
+        "CONFIG_PSI": "y",
+        "CONFIG_ZRAM": "m",
+        "CONFIG_DRM": "m",
+        "CONFIG_UHID": "m"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": true
+      }
+    },
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "AMD Radeon Graphics (radeonsi, gfx1200, ACO, DRM 3.61, 6.12.117+deb13-amd64)",
+      "dmabuf": true,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "works",
+      "note": "gpuComposes"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "absent",
+      "note": null
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": {
+    "lordbench": 1,
+    "mode": "quick",
+    "seconds": 43,
+    "status": "done",
+    "stopReason": "",
+    "lordos": "0.8.8.8-beta",
+    "kernel": "6.12.117+deb13-amd64",
+    "arch": "x86_64",
+    "live": false,
+    "threads": 16,
+    "cpus": 16,
+    "quiet": {
+      "quiet": true,
+      "busyPct": 6,
+      "waitedS": 10
+    },
+    "before": {
+      "tempC": 46.8,
+      "zone": "k10temp",
+      "freqMHz": 2537,
+      "freqMaxMHz": 4663,
+      "governor": "powersave",
+      "power": "unknown"
+    },
+    "after": {
+      "tempC": 60,
+      "zone": "k10temp",
+      "freqMHz": 3556,
+      "freqMaxMHz": 4663,
+      "governor": "powersave",
+      "power": "unknown"
+    },
+    "storage": {
+      "kind": "none",
+      "mb": 0
+    },
+    "gpuKind": "hardware",
+    "sandbox": 63,
+    "sandboxTries": [
+      {
+        "id": "helperSocket",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperInet",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperExec",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperFork",
+        "denied": true,
+        "errno": 1
+      },
+      {
+        "id": "helperNewFile",
+        "denied": true,
+        "errno": 13
+      },
+      {
+        "id": "helperRead",
+        "denied": true,
+        "errno": 13
+      }
+    ],
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "AMD Radeon Graphics (radeonsi, gfx1200, ACO, DRM 3.61, 6.12.117+deb13-amd64)",
+      "displays": [
+        {
+          "connector": "HDMI-A-2",
+          "builtin": false,
+          "mode": {
+            "w": 1920,
+            "h": 1080,
+            "refresh": 60000
+          },
+          "scale": 100,
+          "rotation": 0
+        }
+      ]
+    },
+    "results": {
+      "cpu.sha256.1": {
+        "value": 321.308,
+        "spread": 16.57,
+        "unit": "MB/s"
+      },
+      "cpu.sha256.n": {
+        "value": 2372.95,
+        "spread": 7.427,
+        "unit": "MB/s"
+      },
+      "cpu.matmul.1": {
+        "value": 7.18427,
+        "spread": 0.04532,
+        "unit": "GFLOP/s"
+      },
+      "cpu.matmul.n": {
+        "value": 41.4114,
+        "spread": 1.735,
+        "unit": "GFLOP/s"
+      },
+      "cpu.xz.1": {
+        "value": 122.826,
+        "spread": 10.02,
+        "unit": "MB/s"
+      },
+      "cpu.xz.n": {
+        "value": 1214.63,
+        "spread": 10.27,
+        "unit": "MB/s"
+      },
+      "cpu.js.1": {
+        "value": 115.738,
+        "spread": 1.988,
+        "unit": "runs/s"
+      },
+      "cpu.js.n": {
+        "value": 772.108,
+        "spread": 2.924,
+        "unit": "runs/s"
+      },
+      "cpu.ui.1": {
+        "value": 88.3907,
+        "spread": 0.7434,
+        "unit": "fps"
+      },
+      "cpu.ui.n": {
+        "value": 95.9677,
+        "spread": 6.829,
+        "unit": "fps"
+      },
+      "cpu.shape.1": {
+        "value": 1401.74,
+        "spread": 29.2,
+        "unit": "runs/s"
+      },
+      "cpu.shape.n": {
+        "value": 11536.7,
+        "spread": 68.01,
+        "unit": "runs/s"
+      },
+      "mem.copy": {
+        "value": 38.727,
+        "spread": 0.6672,
+        "unit": "GB/s"
+      },
+      "mem.triad": {
+        "value": 33.5831,
+        "spread": 5.254,
+        "unit": "GB/s"
+      },
+      "mem.latency": {
+        "value": 84.3812,
+        "spread": 1.918,
+        "unit": "ns",
+        "lowerBetter": true
+      },
+      "gpu.scene": {
+        "value": 11865.3,
+        "spread": 87.66,
+        "unit": "fps"
+      },
+      "gpu.fill": {
+        "value": 56037,
+        "spread": 9365,
+        "unit": "Mpx/s"
+      },
+      "gpu.upload": {
+        "value": 7431.61,
+        "spread": 122.2,
+        "unit": "MB/s"
+      },
+      "gpu.layers": {
+        "value": 2349.47,
+        "spread": 10.47,
+        "unit": "fps"
+      },
+      "video.h264.1080": {
+        "value": 961.283,
+        "spread": 36.42,
+        "unit": "fps"
+      },
+      "video.enc.h264": {
+        "value": 222.007,
+        "spread": 22.18,
+        "unit": "fps"
+      }
+    },
+    "skipped": {
+      "disk.seqwrite": "mode",
+      "disk.seqread": "mode",
+      "disk.random4k": "mode",
+      "sustained.start": "mode",
+      "sustained.end": "mode",
+      "video.hevc.1080": "mode",
+      "video.vp9.1080": "mode",
+      "video.av1.1080": "mode",
+      "video.h264.2160": "mode",
+      "video.hevc.2160": "mode",
+      "video.enc.vp8": "mode"
+    }
+  },
+  "desktop": null
+}

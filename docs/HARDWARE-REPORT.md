@@ -18,7 +18,10 @@ file and opens GitHub's form; the person attaches the file and submits it with t
 the FAQ "How do I share how LordOS runs on my computer?"). The hardware-report workflow (`tools/hwreport/validate.mjs`)
 checks the file and labels the issue (`report:valid` or `report:missing`, `kind:*`, `gpu:*`, `cpu:*`, `boot:*`). A
 report a maintainer accepts goes to `web/content/hardware/reports/` and from there to lordos.org/hardware and the signed
-snapshot System Information's Compatibility panel reads (`tools/hwreport/catalog.mjs`); so far that is #42.
+snapshot System Information's Compatibility panel reads (`tools/hwreport/catalog.mjs`); so far that is every
+`report:valid` report: #42, #105, #129, #135, #136, #137, #155, #156, #212, #221, #224, #230, #245 and #249 (14
+reports from 13 machines: #105, #212 and #230 are the same ASUS K72F on three versions), in the `lordos-hwdata`
+2026.11.25 snapshot.
 
 The report has no serial numbers, MAC or IP addresses, host, user or network names, or paths, and this page adds none.
 

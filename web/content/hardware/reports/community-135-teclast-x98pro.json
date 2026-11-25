@@ -1,0 +1,352 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-11-12",
+  "source": "community",
+  "lordos": "0.8.8.7-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "TECLAST",
+      "product": "X98Pro",
+      "version": "",
+      "boardVendor": "TECLAST",
+      "boardName": "Cherry Trail Tablet",
+      "chassis": "desktop",
+      "model": "",
+      "biosVendor": "American Megatrends Inc.",
+      "biosVersion": "5.011",
+      "biosDate": "10/28/2015",
+      "firmware": "uefi",
+      "secureBoot": false,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "Intel(R) Atom(TM) x5-Z8500  CPU @ 1.44GHz",
+      "vendor": "GenuineIntel",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 4,
+      "threads": 4,
+      "minMHz": 480,
+      "maxMHz": 2240,
+      "governor": "schedutil",
+      "l1dKB": 24,
+      "l1iKB": 32,
+      "l2KB": 1024,
+      "l3KB": 0
+    },
+    "memory": {
+      "totalKB": 3912612,
+      "swapKB": 4194300,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "8086",
+        "deviceId": "22b0",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Integrated Graphics Controller",
+        "driver": "i915",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 3,
+        "connected": 1
+      }
+    ],
+    "displays": [
+      {
+        "connector": "eDP-1",
+        "enabled": true,
+        "name": "Color LCD",
+        "manufacturer": "ETC",
+        "product": "0000",
+        "year": 2012,
+        "widthCm": 15,
+        "heightCm": 20,
+        "diagonalTenths": 98,
+        "nativeWidth": 1536,
+        "nativeHeight": 2048,
+        "mode": "1536x2048"
+      }
+    ],
+    "storage": [
+      {
+        "model": "",
+        "vendor": "",
+        "bytes": 62537072640,
+        "rotational": false,
+        "removable": false,
+        "transport": "mmc",
+        "link": ""
+      }
+    ],
+    "pci": [
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "2280",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series SoC Transaction Register",
+        "driver": "iosf_mbi_pci"
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "8086",
+        "deviceId": "22b0",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Integrated Graphics Controller",
+        "driver": "i915"
+      },
+      {
+        "class": "048000",
+        "className": "Multimedia controller",
+        "vendorId": "8086",
+        "deviceId": "22b8",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series Imaging Unit",
+        "driver": "intel_atomisp2_pm"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "22dc",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series Power Management Controller",
+        "driver": "proc_thermal"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "22b5",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series USB xHCI Controller",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "0c03fe",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "22b7",
+        "vendor": "Intel Corporation",
+        "device": "",
+        "driver": "dwc3-pci"
+      },
+      {
+        "class": "108000",
+        "className": "Encryption controller",
+        "vendorId": "8086",
+        "deviceId": "2298",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series Trusted Execution Engine",
+        "driver": "mei_txe"
+      },
+      {
+        "class": "060100",
+        "className": "ISA bridge",
+        "vendorId": "8086",
+        "deviceId": "229c",
+        "vendor": "Intel Corporation",
+        "device": "Atom/Celeron/Pentium Processor x5-E8000/J3xxx/N3xxx Series PCU",
+        "driver": "lpc_ich"
+      }
+    ],
+    "usb": [],
+    "network": [
+      {
+        "kind": "wifi",
+        "driver": "rtl8723bs",
+        "up": true,
+        "speedMbps": null
+      }
+    ],
+    "audio": [
+      "Intel HDMI/DP LPE Audio",
+      "chtrt5645"
+    ],
+    "bluetooth": [
+      {
+        "driver": "hci_uart_h5"
+      }
+    ],
+    "power": [
+      {
+        "kind": "battery",
+        "vendor": "Intel SR 1",
+        "model": "SR Real Battery",
+        "technology": "Li-ion",
+        "status": "Discharging",
+        "capacity": 92,
+        "health": 100,
+        "online": null
+      }
+    ],
+    "thermal": [
+      {
+        "sensor": "acpitz",
+        "milliC": 0,
+        "fans": 0
+      },
+      {
+        "sensor": "INT3400 Thermal",
+        "milliC": 20000,
+        "fans": 0
+      },
+      {
+        "sensor": "STR0",
+        "fans": 0
+      },
+      {
+        "sensor": "STR3",
+        "fans": 0
+      },
+      {
+        "sensor": "STR2",
+        "fans": 0
+      },
+      {
+        "sensor": "PNIT",
+        "milliC": 44000,
+        "fans": 0
+      },
+      {
+        "sensor": "soc_dts0",
+        "milliC": 46000,
+        "fans": 0
+      },
+      {
+        "sensor": "soc_dts1",
+        "milliC": 45000,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 0,
+        "fans": 0
+      },
+      {
+        "sensor": "BATC",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "soc_dts0",
+        "milliC": 46000,
+        "fans": 0
+      },
+      {
+        "sensor": "soc_dts1",
+        "milliC": 45000,
+        "fans": 0
+      },
+      {
+        "sensor": "coretemp",
+        "milliC": null,
+        "fans": 0
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.116+deb13-amd64",
+      "lordos": "0.8.8.7-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,tomoyo,bpf,ipe,ima,evm",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false,
+      "bootMedium": "emmc",
+      "bootLinkMbps": null,
+      "bootToRam": false,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_SECCOMP_FILTER": "y",
+        "CONFIG_USER_NS": "y",
+        "CONFIG_BPF_SYSCALL": "y",
+        "CONFIG_BPF_JIT": "y",
+        "CONFIG_CGROUP_BPF": "y",
+        "CONFIG_BPF_LSM": "y",
+        "CONFIG_INET_DIAG_DESTROY": "y",
+        "CONFIG_INET_UDP_DIAG": "m",
+        "CONFIG_MEMCG": "y",
+        "CONFIG_PSI": "y",
+        "CONFIG_ZRAM": "m",
+        "CONFIG_DRM": "m",
+        "CONFIG_UHID": "m"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": true
+      }
+    },
+    "session": {
+      "composition": "rotated",
+      "gpuInit": "",
+      "renderer": "",
+      "dmabuf": false,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "limits",
+      "note": "cpu.rotated"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "works",
+      "note": "batteryHealth"
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": null,
+  "desktop": null
+}

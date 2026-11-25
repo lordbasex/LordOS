@@ -3,6 +3,19 @@
   "reports": {
     "reference-vm116.json": { "issue": null, "fixedIn": {} },
     "reference-pi5-16gb.json": { "issue": null, "fixedIn": {} },
-    "community-42-dell-latitude-7480.json": { "issue": 42, "fixedIn": {} }
+    "community-42-dell-latitude-7480.json": { "issue": 42, "fixedIn": {} },
+    "community-105-asus-k72f.json": { "issue": 105, "fixedIn": {} },
+    "community-129-hp-elitebook-840-g6.json": { "issue": 129, "fixedIn": {} },
+    "community-135-teclast-x98pro.json": { "issue": 135, "fixedIn": {} },
+    "community-136-apple-macbookpro11-4.json": { "issue": 136, "fixedIn": {} },
+    "community-137-hampoo-p02bd6.json": { "issue": 137, "fixedIn": {} },
+    "community-155-apple-macbookpro12-1.json": { "issue": 155, "fixedIn": {} },
+    "community-156-asus-rog-strix-x570-e.json": { "issue": 156, "fixedIn": {} },
+    "community-212-asus-k72f.json": { "issue": 212, "fixedIn": {} },
+    "community-221-asus-f1a55-m-lx.json": { "issue": 221, "fixedIn": {} },
+    "community-224-gigabyte-b760m-c.json": { "issue": 224, "fixedIn": {} },
+    "community-230-asus-k72f.json": { "issue": 230, "fixedIn": {} },
+    "community-245-acer-aspire-r3-131t.json": { "issue": 245, "fixedIn": {} },
+    "community-249-huawei-crefg-xx.json": { "issue": 249, "fixedIn": {} }
   }
 }
