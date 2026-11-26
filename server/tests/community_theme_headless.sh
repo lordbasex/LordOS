@@ -11,8 +11,11 @@
 #              requestAnimationFrame, a store subscription, an effect and a ref (a bound restricted native handed to
 #              LordOS's code each time: nodes 101…109), and from a theme store's get React reads later (110); on its own
 #              node it works; forged elements (a host element, LordOS's raw component, a context's Provider holding a
-#              host element; in children and in another prop) never hand it a raw node; a forged app registry is never
+#              host element; in children, another prop, a nested object, an iterable, a lazy element, a thenable or a store's
+#              value) never hand it a raw node; a forged app registry is never
 #              used; wm has no setArgs, setProtected, setMenus, setPip, scriptMove or setCloseGuard
+#   forger     its own component returns a forged host element: the host guard refuses it (its element wasn't made by
+#              LordOS's React), the theme is taken off
 #   throws     throws while it starts: the session goes back to LordOS's theme, it is marked failed with the error
 #   nostart    never calls startShell: the same
 #   untrusted  okminimal not confirmed by the person: never run
@@ -57,7 +60,7 @@ if record okminimal | grep -q '"failed":""'; then echo "ok   okminimal is not ma
 session probe probe 40 --unchecked
 has "probe starts" "community theme probe started"
 hasnt "probe: nothing it tried was allowed" "CT .* ALLOWED"
-for c in direct term.create fs.write own-realm-function host-function-constructor host-proto-change promise; do has "probe: $c refused" "CT $c refused"; done
+for c in direct settings-in-place term.create fs.write own-realm-function host-function-constructor host-proto-change promise; do has "probe: $c refused" "CT $c refused"; done
 has "probe: lord.term, lord.fs, lord.admin and lord.perms don't exist in its realm" "CT lord.term undefined lord.fs undefined lord.admin undefined globalThis.lord.perms undefined"
 for n in 101 102 103 104 105 106 107 108 109; do has "probe: setStyle on node $n refused" "lord.setStyle refused (node $n is not"; done
 has "probe: its timers and animation frames ran" "CT raf ran"
@@ -68,6 +71,10 @@ has "probe: forged elements were rendered (and cleaned)" "CT forged elements don
 hasnt "probe: a forged app registry is never used" "forged app RENDERED"
 has "probe: a forged app doesn't open" "CT forged app opens false"
 has "probe: wm has no setArgs, setProtected, setMenus, setPip, scriptMove or setCloseGuard" "CT wm.setArgs undefined wm.setProtected undefined wm.setMenus undefined wm.setPip undefined wm.scriptMove undefined wm.setCloseGuard undefined"
+
+session forger forger 40 --unchecked
+hasnt "forger: its forged host element never got a raw node" "RAW NODE"
+if record forger | grep -q 'View, Text and Image'; then echo "ok   forger: refused by the host guard and taken off"; else echo "FAIL forger: $(record forger)"; R=1; fi
 
 session throws throws 40
 has "throws: the session goes back to LordOS's theme" "the theme failed, going back to"

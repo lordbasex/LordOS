@@ -1,0 +1,2 @@
+{ "name": "Forger", "description": "A test fixture: renders a forged host element itself.",
+  "community": true, "author": "LordOS tests", "license": "MIT", "version": "1.0.0" }

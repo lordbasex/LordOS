@@ -664,7 +664,9 @@ translations, lock the session, and **read** the models its `theme.json` declare
 Without a capability the SDK's hook gives a neutral value (no battery, no players). Never: the terminal, files,
 administrator actions, permission answers, packages, the keyring, the clipboard, network settings, switching themes or
 changing Wi-Fi, Bluetooth, the volume, the brightness or what plays. Refs and events give the theme a handle
-`{ id, type }`, never LordOS's node objects; its key listeners hear keys only while the keyboard is the shell's (its
+`{ id, type }`, never LordOS's node objects; LordOS's data (windows, settings, stores) arrives as frozen copies;
+whatever the theme hands back (props at any depth, arguments, what its callbacks return) is sanitized, and a host
+node whose element LordOS's own React didn't make is refused (a forged React element never becomes a node); its key listeners hear keys only while the keyboard is the shell's (its
 launcher, its menus, no window focused) and never while a system prompt is up; its shortcuts need ❖, ⌃ or ⌥;
 `settings` is read whole but written only for its own options (`themeOptions[<id>]`) and `mode`, `accent`, `effects`,
 `dock…`, `menuBar…`, `taskbar…`. A refused call throws `theme.notAllowed` and is logged as

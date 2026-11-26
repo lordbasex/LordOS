@@ -131,7 +131,7 @@ static const struct { const char *name; unsigned cap; int policy; } rules[] = {
     { "keyboard.current", 0, JST_ALLOW }, { "keyboard.list", 0, JST_ALLOW },
     { "input.pointerAccent", 0, JST_ALLOW },
     /* the session: lock and the 60 s power confirmations the SDK draws (sdk/power.jsx) */
-    { "session.lock", 0, JST_ALLOW }, { "session.managed", 0, JST_ALLOW }, { "session.onMonitor", 0, JST_ALLOW },
+    { "session.lock", 0, JST_ALLOW }, { "quit", 0, JST_ALLOW }, { "session.managed", 0, JST_ALLOW }, { "session.onMonitor", 0, JST_ALLOW },
     { "session.status", 0, JST_ALLOW },
     /* capabilities: read access to a system model */
     { "net.status", TS_CAP_WIFI, JST_ALLOW }, { "net.interfaces", TS_CAP_WIFI, JST_ALLOW },

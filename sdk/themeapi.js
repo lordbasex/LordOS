@@ -71,10 +71,31 @@ function eventToTheme(e) {
   return Object.freeze(o);
 }
 const looksLikeEvent = (v) => v !== null && typeof v === 'object' && ('target' in v || 'currentTarget' in v) && !Array.isArray(v);
+// LordOS's data as the theme sees it: plain objects and arrays as frozen copies (made once per object), so the theme
+// can't change a window, a setting or a store's state in place (a window's `protected`, the theme setting); nodes as
+// handles; functions, elements and other objects as they are
+const snapshots = new WeakMap();
+const originals = new WeakMap();      // a frozen copy → LordOS's object it was made from
+function snapshot(v, depth = 0) {
+  if (v === null || typeof v !== 'object') return v;
+  if (isInstance(v)) return handleOf(v);
+  if (isElement(v) || depth > 8) return v;
+  const proto = Object.getPrototypeOf(v);
+  const arr = Array.isArray(v);
+  if (!arr && proto !== Object.prototype && proto !== null) return v;
+  let c = snapshots.get(v);
+  if (c) return c;
+  c = arr ? v.map((x) => snapshot(x, depth + 1)) : {};
+  if (!arr) for (const k of Object.keys(v)) c[k] = snapshot(v[k], depth + 1);
+  Object.freeze(c);
+  snapshots.set(v, c);
+  originals.set(c, v);
+  return c;
+}
 function toTheme(v) {
   if (isInstance(v)) return handleOf(v);
   if (looksLikeEvent(v)) return eventToTheme(v);
-  return v;
+  return snapshot(v);
 }
 
 // a callback of the theme's, called by LordOS's code: its arguments sanitized (one wrapper per function, so its
@@ -84,7 +105,7 @@ function wrapCallback(fn) {
   if (typeof fn !== 'function') return fn;
   let w = callbacks.get(fn);
   if (!w) {
-    w = (...a) => themeCallSafe(fn, ...a.map(toTheme));
+    w = (...a) => sanitizeIn(themeCallSafe(fn, ...a.map(toTheme)));
     callbacks.set(fn, w);
   }
   return w;
@@ -108,21 +129,61 @@ function wrapRef(r) {
 // Provider, memo, forwardRef or Suspense) is made again with sanitized props, so nothing reaches a host node unwrapped.
 const ELEMENT = Symbol.for('react.transitional.element');
 const isElement = (v) => v !== null && typeof v === 'object' && v.$$typeof === ELEMENT;
-function cleanNode(c, depth = 0) {
-  if (depth > 32) return null;
-  if (Array.isArray(c)) return c.map((x) => cleanNode(x, depth + 1));
-  if (!isElement(c)) return c;
-  const ty = c.type;
-  if (typeof ty === 'string') {
-    console.error('community theme: a host element was dropped (use View, Text and Image from @lordos/sdk)');
-    return null;
+// A node the theme hands LordOS (children, a label, a render result): an allowlist. Primitives stay; arrays and other
+// iterables become arrays (bounded); an element is kept when it is the facade's or plainly the theme's own component,
+// made again with sanitized props otherwise, and dropped when it is a host element; everything else (thenables, lazy
+// objects, contexts, portals, plain objects) is dropped. The host guard (guardHost) is the backstop behind it.
+const NODE_MAX = 5000;
+function cleanNode(c, depth = 0, budget = { n: 0 }) {
+  if (++budget.n > NODE_MAX || depth > 32) return null;
+  if (c === null || c === undefined || typeof c === 'string' || typeof c === 'number' || typeof c === 'boolean') return c;
+  if (typeof c !== 'object') return null;
+  if (isElement(c)) {
+    const ty = c.type;
+    if (typeof ty === 'string') {
+      console.error('community theme: a host element was dropped (use View, Text and Image from @lordos/sdk)');
+      return null;
+    }
+    if (typeof ty === 'function' && (facadeTypes.has(ty) || realmOf(ty) === 2)) return c;
+    const props = { ...themeProps(c.props, false, depth + 1) };
+    if (c.key != null) props.key = String(c.key);
+    return Object.freeze(h(typeof ty === 'function' ? typeFor(ty) : ty, props));
   }
-  if (typeof ty === 'function' && (facadeTypes.has(ty) || realmOf(ty) === 2)) return c;
-  const props = { ...themeProps(c.props, false, depth + 1) };
-  if (c.key != null) props.key = c.key;
-  return Object.freeze(h(typeof ty === 'function' ? typeFor(ty) : ty, props));
+  let list = null;
+  if (Array.isArray(c)) list = c;
+  else if (typeof c[Symbol.iterator] === 'function' && Object.prototype.toString.call(c) !== '[object String]') {
+    try { list = []; for (const x of c) { list.push(x); if (list.length > NODE_MAX) break; } } catch (e) { list = null; }
+  }
+  return list ? list.map((x) => cleanNode(x, depth + 1, budget)) : null;
 }
 const cleanChildren = (c) => cleanNode(c, 0);
+
+// Any other value crossing from the theme's realm into LordOS's code (a prop, an argument, what a callback or a store
+// returns): primitives stay; a function becomes a wrapper called through lord.themeCall; a handle becomes its node
+// again; a ref object stays live; an element or an iterable goes through cleanNode; a plain object or array is copied
+// key by key (bounded in depth and count); a date is copied; anything else is dropped.
+const VALUE_MAX = 20000;
+function sanitizeIn(v, depth = 0, budget = { n: 0 }) {
+  if (++budget.n > VALUE_MAX || depth > 16) return undefined;
+  if (v === null || v === undefined || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint') return v;
+  if (typeof v === 'function') return wrapCallback(v);
+  if (typeof v !== 'object') return undefined;
+  if (instances.has(v)) return instances.get(v);
+  if (isElement(v)) return cleanNode(v, depth);
+  if (Array.isArray(v)) return v.slice(0, VALUE_MAX).map((x) => sanitizeIn(x, depth + 1, budget));
+  const tag = Object.prototype.toString.call(v);
+  if (tag === '[object Date]') return new Date(Date.prototype.getTime.call(v));
+  if (tag !== '[object Object]') return typeof v[Symbol.iterator] === 'function' ? cleanNode(v, depth) : undefined;
+  if (originals.has(v)) return originals.get(v);    // a frozen copy of LordOS's data, given back as it was
+  const keys = Object.keys(v);
+  if (keys.length === 1 && keys[0] === 'current') return refFromTheme(v);
+  const o = {};
+  for (const k of keys) {
+    if (k === '__proto__') continue;
+    o[k] = sanitizeIn(v[k], depth + 1, budget);
+  }
+  return o;
+}
 
 // props a theme never sets on a node (another app's terminal, window, video, pixels or a node's protection)
 const BLOCKED_PROPS = new Set(['session', 'surface', 'media', 'crop', 'pixels', 'wave', 'dangerouslySetInnerHTML']);
@@ -138,9 +199,8 @@ function themeProps(p, host, depth = 0) {
     if (BLOCKED_PROPS.has(k) || k === 'lordThemeOwned') continue;
     if (k === 'ref') o.ref = wrapRef(v);
     else if (k === 'src' && host) { if (srcOk(v)) o.src = v; }
-    else if (typeof v === 'function') o[k] = wrapCallback(v);
-    else if (isElement(v) || Array.isArray(v)) o[k] = cleanNode(v, depth);
-    else o[k] = v;
+    else if (k === 'children') o.children = cleanNode(v, depth);
+    else o[k] = sanitizeIn(v, depth);
   }
   if (host) o.lordThemeOwned = THEME_OWNED;     // a prop React copies (it drops symbol keys); its value can't be forged
   return o;
@@ -215,7 +275,7 @@ const themeReact = () => Object.freeze({
 
 // ---- read-only stores ----
 const views = new WeakMap();
-function readOnly(store, map = (x) => x) {
+function readOnly(store, map = (x) => snapshot(x)) {
   if (!store || typeof store.get !== 'function') return store;
   let v = views.get(store);
   if (!v) {
@@ -236,18 +296,18 @@ function storeFromTheme(s) {
   let w = themeStores.get(s);
   if (!w) {
     w = Object.freeze({
-      get: () => themeCallSafe(s.get),
+      get: () => sanitizeIn(themeCallSafe(s.get)),
       subscribe: (fn) => { const off = themeCallSafe(s.subscribe, () => { fn(); }); return () => { if (typeof off === 'function') themeCallSafe(off); }; },
     });
     themeStores.set(s, w);
   }
   return w;
 }
-const themeUseStore = (s, sel) => SDK.useStore(storeFromTheme(s), sel ? wrapCallback(sel) : undefined);
+const themeUseStore = (s, sel) => snapshot(SDK.useStore(storeFromTheme(s), sel ? wrapCallback(sel) : undefined));
 function themeCreateStore(initial) {
   const st = SDK.createStore(initial);
   const v = Object.freeze({
-    get: () => st.get(),
+    get: () => snapshot(st.get()),
     set: (p) => st.set(typeof p === 'function' ? (x) => themeCall(p, x) : p),
     subscribe: (fn) => st.subscribe(wrapCallback(fn)),
   });
@@ -260,7 +320,7 @@ const noteData = (n) => (n && typeof n === 'object' ? Object.freeze({
   id: n.id, app: n.app, title: n.title, body: n.body, time: n.time, icon: typeof n.icon === 'string' ? n.icon : undefined,
   urgency: n.urgency, sticky: !!n.sticky, read: !!n.read,
 }) : n);
-const notesData = (l) => (Array.isArray(l) ? l.map(noteData) : []);
+const notesData = (l) => (Array.isArray(l) ? Object.freeze(l.map(noteData)) : []);
 
 // ---- settings: read everything, write only the theme's own options and a few appearance keys ----
 const WRITABLE = /^(mode|accent|effects|reduceTransparency|dock[A-Z][A-Za-z]*|menuBar[A-Za-z]*|taskbar[A-Za-z]*)$/;
@@ -290,8 +350,8 @@ function themeHoldKeyboard() {
 function keysForTheme() {
   const top = keyboardLayer();
   if (top && top.layer >= LAYERS.system) return false;          // a system prompt has the keyboard
-  if (themeHolds > 0) return true;                                // its own menu or launcher holds it
-  if (top && top.layer === LAYERS.overlay) return true;           // its launcher
+  if (themeHolds > 0) return true;                                // its own menu or launcher holds it (holdKeyboard)
+  if (top) return false;                                          // LordOS's search, a sheet: not the theme's
   return SDK.wm.focused() == null;                                // no window has the keyboard
 }
 const POINTER_TYPES = new Set(['pointerdown', 'pointerup', 'pointermove']);
@@ -412,7 +472,7 @@ const NEUTRAL = { useBluetooth: () => null, useSound: () => ({ sinks: [], source
 
 function exportValue(name, v) {
   if (typeof v === 'function' && /^[A-Z]/.test(name)) { const W = wrapComponent(v, name); facadeTypes.add(W); return W; }
-  if (typeof v === 'function') return (...a) => toTheme(v(...a.map(fromTheme).map((x) => (typeof x === 'function' ? wrapCallback(x) : isElement(x) || Array.isArray(x) ? cleanNode(x) : x))));
+  if (typeof v === 'function') return (...a) => toTheme(v(...a.map((x) => sanitizeIn(x))));
   return v;
 }
 
@@ -440,9 +500,10 @@ export function makeThemeSdk({ id, caps }) {
     restart: () => SDK.session.restart(), shutdown: () => SDK.session.shutdown(), managed: () => SDK.session.managed() });
   sdk.spotlight = Object.freeze({ toggle: (d) => SDK.spotlight.toggle(d), open: (d) => SDK.spotlight.open?.(d), close: () => SDK.spotlight.close?.() });
   sdk.keyboard = Object.freeze({ label: (x) => SDK.keyboard.label(x), active: () => SDK.keyboard.active(), next: () => SDK.keyboard.next() });
-  sdk.settings = Object.freeze({ get: () => SDK.settings.get(), subscribe: (fn) => SDK.settings.subscribe(wrapCallback(fn)), set: (p) => settingsPatch(id, p) });
-  sdk.useSettings = () => [SDK.useStore(SDK.settings), (p) => settingsPatch(id, p)];
-  sdk.useTrackedSettings = () => { const [s] = SDK.useTrackedSettings(); return [s, (p) => settingsPatch(id, p)]; };
+  sdk.settings = Object.freeze({ get: () => snapshot(SDK.settings.get()), subscribe: (fn) => SDK.settings.subscribe(wrapCallback(fn)), set: (p) => settingsPatch(id, p) });
+  const setSettings = (p) => settingsPatch(id, p);
+  sdk.useSettings = () => [SDK.useStore(SDK.settings, snapshot), setSettings];
+  sdk.useTrackedSettings = sdk.useSettings;
   sdk.useStore = themeUseStore;
   sdk.createStore = themeCreateStore;
   sdk.locale = readOnly(SDK.locale);
@@ -498,7 +559,9 @@ export function runThemeShell() {
 
 // React's host guard: a host node whose nearest component is the theme's own function was forged by the theme (it
 // renders View, Text and Image from the SDK, never a host element itself)
-function guardHost(_type, _props, fiber) {
+function guardHost(_type, props, fiber) {
+  // the backstop: every host node's element was made by LordOS's own React (runtime/react-made.cjs records them)
+  if (!React.lordMadeProps || !React.lordMadeProps(props)) throw new TypeError('a community theme draws with View, Text and Image from @lordos/sdk');
   for (let f = fiber && fiber.return; f; f = f.return) {
     const t = f.type;
     const fn = typeof t === 'function' ? t : t && typeof t === 'object' ? (t.render || t.type) : null;

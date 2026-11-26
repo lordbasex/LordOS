@@ -25,8 +25,16 @@ const forgedRaw = { $$typeof: EL, type: apps[0].Icon, key: null, ref: null, prop
 // a store whose get is a bound restricted native: React reads it later
 const evilStore = { get: set.bind(null, 110, 'opacity', 0), subscribe: () => () => {} };
 const own = createStore(1);
+// more ways in: an iterable that yields a forged host element, a lazy element, a thenable, a plain object holding one,
+// and a theme store whose value is one (rendered as a child)
+const iterable = { [Symbol.iterator]: function* () { yield forgedHost('iterable'); } };
+const lazy = { $$typeof: Symbol.for('react.lazy'), _payload: null, _init: () => forgedHost('lazy') };
+const thenable = { then: (r) => r(forgedHost('thenable')) };
+const elementStore = { get: () => forgedHost('store value'), subscribe: () => () => {} };
+function StoreChild() { const v = useStore(elementStore); return <View>{v}</View>; }
 
 tryIt('direct', () => set(101, 'opacity', 0));
+tryIt('settings-in-place', () => { settings.get().theme = 'probe-was-here'; });
 out(`lord.term ${typeof lord.term} lord.fs ${typeof lord.fs} lord.admin ${typeof lord.admin} globalThis.lord.perms ${typeof globalThis.lord.perms}`);
 tryIt('term.create', () => lord.term.create());
 tryIt('fs.write', () => lord.fs.write('/tmp/ct-probe', 'x'));
@@ -57,6 +65,10 @@ function App() {
         <View>{forgedHost('child')}{forgedProvider}{forgedRaw}</View>
         <Button label={forgedHost('prop')} onClick={() => {}} />
         <Stores />
+        <View>{iterable}</View>
+        <View>{[lazy, thenable]}</View>
+        <View extra={{ nested: [forgedHost('nested object')] }} />
+        <StoreChild />
       </View>
     </ThemeProvider>
   );
