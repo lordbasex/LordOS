@@ -1203,8 +1203,9 @@ export default function Files() {
     label: id === 'computer' ? computerName() : tr(`files.place.${id}`),
   }));
   const skinActions = useRef({});
-  // the actions read the current render's state through this ref: the object a skin holds stays the same
-  skinActions.current.now = {
+  // the actions read the current render's state through this ref: the object a skin holds stays the same (made only
+  // while a theme skins Files)
+  if (skinned) skinActions.current.now = {
     back: goBack, forward: goForward, up: goUp,
     goPlace: (id) => { const l = placeLoc(id); if (l) navigate(l); },
     goCrumb: (i) => { if (crumbs[i]) navigate(crumbs[i].loc); },
@@ -1247,7 +1248,7 @@ export default function Files() {
     search: (q) => setQuery(String(q || '')),
     newWindow: () => wm.open('files', { new: true }),
   };
-  if (!skinActions.current.stable) {
+  if (skinned && !skinActions.current.stable) {
     const stable = {};
     for (const k of Object.keys(skinActions.current.now)) stable[k] = (...args) => skinActions.current.now[k](...args);
     skinActions.current.stable = Object.freeze(stable);
