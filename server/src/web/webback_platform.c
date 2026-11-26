@@ -247,7 +247,7 @@ void webback_set_dark(WebBack *b, int dark) {
 }
 
 WebKitWebView *webback_view_new(WebBack *b, WebKitWebContext *context, WebKitNetworkSession *session, WebKitSettings *settings) {
-    WebKitWebView *v = g_object_new(WEBKIT_TYPE_WEB_VIEW, "display", b->display, "web-context", context, "network-session", session, "settings", settings, NULL);
+    WebKitWebView *v = g_object_new(WEBKIT_TYPE_WEB_VIEW, "display", b->display, "web-context", context, "network-session", session, "settings", settings, "website-policies", webback_policies(), NULL);
     if (!v) return NULL;
     b->view = g_object_ref(webkit_web_view_get_wpe_view(v));   /* kept until webback_free, after the WebKitWebView's last unref */
     LordWebToplevel *t = g_object_new(LORD_TYPE_WEB_TOPLEVEL, "display", b->display, "max-views", 1, NULL);

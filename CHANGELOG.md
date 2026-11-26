@@ -11,6 +11,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Fixed
+- **Web apps played no sound of their own without a click first:** a messaging web app's incoming-call ringtone and
+  new-message sound were silent. WebKit's default autoplay policy allows only muted media until the person interacts;
+  lord-web now gives every web app's view `WEBKIT_AUTOPLAY_ALLOW`, as Chrome does for installed apps (`webback_policies`).
 - **A machine's apps no longer mix with this computer's in the app launcher unless you turn it on** (the maintainer's
   decision while testing 0.8.9.6.2: a machine that was off filled the launcher with its apps). Since 0.8.9.6 a
   machine that had listed its apps in apps mode put them in the launcher and search while off, marked with its name.

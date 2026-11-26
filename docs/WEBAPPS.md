@@ -709,6 +709,11 @@ shell sends it (it never shows it as a button), and lord-web calls `webkit_notif
 own `onclick` runs (a messaging app opens that chat), and then brings the window forward with the activation token
 LordOS sent. WebKit 2.48 gives neither a notification's image (the sender's photo) nor its `silent` option.
 
+**Autoplay** (`webback_policies`, webback.h): every web app's view allows autoplay with sound
+(`WEBKIT_AUTOPLAY_ALLOW`), as Chrome does for an installed app. A messaging app's ringtone and new-message sound start
+from the network, never from a click, and WebKit's default (`WEBKIT_AUTOPLAY_ALLOW_WITHOUT_SOUND`) kept them silent:
+calls rang with no sound and messages arrived quietly. Found by the maintainer on 2026-11-26.
+
 LordOS's sound (`notifySound`, `webpage_sound_suppress`): with `"auto"`, lord-web watches WebKit's
 `is-playing-audio`. A page that starts audio less than 1.5 s before or after one of its notifications plays its own
 sound: that notification (when it came first) and every later one go with the `suppress-sound` hint, so LordOS

@@ -136,4 +136,12 @@ void webback_pb_write_text(WebBack *b, const char *text, size_t len);
 /* main(), before anything of WebKit's: legacy loads wpebackend-fdo (wpe_loader_init); platform nothing */
 void webback_process_init(void);
 
+/* The view's website policies: autoplay with sound allowed. A web app is installed by the person, as an installed PWA is
+ * in Chrome, which lets it play sound without a click first: a messaging app's ringtone and new-message sound start
+ * from the network, never from a gesture, and WebKit's default (WEBKIT_AUTOPLAY_ALLOW_WITHOUT_SOUND) kept them silent.
+ * The view takes its own reference (a construct property), so a new object each call. */
+static inline WebKitWebsitePolicies *webback_policies(void) {
+    return webkit_website_policies_new_with_policies("autoplay", WEBKIT_AUTOPLAY_ALLOW, NULL);
+}
+
 #endif
