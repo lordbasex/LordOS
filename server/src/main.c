@@ -54,6 +54,7 @@
 #include <sys/resource.h>
 #include "term/term.h"
 #include "ui/js.h"
+#include "ui/js_theme.h"
 #include "ui/js_input.h"
 #include "ui/ui.h"
 #include "wl/wl.h"
@@ -1326,6 +1327,9 @@ static void vt_signal(Server *s) {
 }
 
 /* Ctrl and Alt as the kernel has them on one keyboard right now (EVIOCGKEY); 0 when it can't be asked */
+/* the community themes' watchdog (community_watch, below): Ctrl+Alt+Shift+Backspace sets rescue */
+static struct { double since; int healthy; volatile int rescue; char prev[1024]; } cw;
+
 static int zap_held(int fd, int *ctrl, int *alt) {
     unsigned char keys[KEY_MAX / 8 + 1];
     memset(keys, 0, sizeof keys);
@@ -1405,6 +1409,16 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         /* Ctrl+Alt+Backspace ends the session at once. The modifiers are tracked from every keyboard and a release can
          * be lost (another console, a keyboard that sleeps or reconnects), so the kernel is asked whether Ctrl and Alt
          * are really held on this keyboard: a stale state must never end a session on a lone Backspace. */
+        /* Ctrl+Alt+Shift+Backspace: back to Lord Flow, whatever theme runs (a community theme can't take this key: it is
+         * handled here, before any JavaScript; community_watch does the switch) */
+        if (ev->code == KEY_BACKSPACE && ev->value == 1 && s->ctrl && s->alt && s->shift && !s->greeter) {
+            int ctrl = 0, alt = 0;
+            if (zap_held(d->fd, &ctrl, &alt) && ctrl && alt) {
+                fprintf(stderr, "lord-server: Ctrl+Alt+Shift+Backspace on %s: restoring Lord Flow\n", d->name);
+                cw.rescue = 1;
+            }
+            break;
+        }
         if (ev->code == KEY_BACKSPACE && ev->value == 1 && s->ctrl && s->alt) {
             int ctrl = 0, alt = 0;
             if (zap_held(d->fd, &ctrl, &alt) && ctrl && alt) {
@@ -2743,6 +2757,10 @@ static void chosen_theme(const char *asked, char *out, size_t n) {
         snprintf(root, sizeof root, "%s", dirname(a));   /* .../themes */
         size_t bl = ok ? (size_t)snprintf(b, sizeof b, "%s/%s/theme.bundle.js", root, id) : 0;
         if (ok && bl < n && !access(b, R_OK)) memcpy(out, b, bl + 1);
+        /* (0.8.9.6.2) a community theme the person installed from a file (js_theme.c): unless it already ended too many
+         * sessions in a row (then it is marked failed and the session starts in the theme asked for) */
+        else if (ok && !jst_bundle_path(id, b, sizeof b) && strlen(b) < n && !access(b, R_OK) && !jst_session_starting(id))
+            memcpy(out, b, strlen(b) + 1);
         json_free(&doc);
     }
     free(text);
@@ -2757,7 +2775,16 @@ static int start_theme(const char *theme, int greeter, char *used, size_t n) {
     snprintf(used, n, "%s", theme);
     int r = js_init(theme);
     if (r == 0) return 0;
-    if (r != JS_REFUSED && codesig_state() != CODE_INVALID) return -1;
+    char cid[32];
+    int community = jst_is_user_bundle(theme, cid, sizeof cid);
+    if (community) {                    /* a community theme that didn't start: marked failed, the session goes on in ours */
+        const char *why = js_init_error();
+        snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", theme);
+        snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", why[0] ? why : "the theme's code did not load (see the log)");
+        ui.theme_failed_code = 0;
+        jst_mark_failed(cid, ui.theme_failed_why);
+    }
+    if (!community && r != JS_REFUSED && codesig_state() != CODE_INVALID) return -1;
     if (r == JS_REFUSED) {              /* lord.themes.use won't go back to it */
         snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", theme);
         snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "refused by the verified-code check (sec/codesig.c)");
@@ -2771,6 +2798,7 @@ static int start_theme(const char *theme, int greeter, char *used, size_t n) {
         snprintf(root, sizeof root, "%s", d);
         snprintf(tmp, sizeof tmp, "%s", root);
         snprintf(root, sizeof root, "%s", dirname(tmp));   /* .../themes */
+        if (jst_system_themes()[0]) snprintf(root, sizeof root, "%s", jst_system_themes());
         static const char *const fallback[] = { "default", "classic" };
         for (size_t i = 0; i < sizeof fallback / sizeof fallback[0]; i++) {
             char alt[sizeof ui.theme_request];
@@ -2860,6 +2888,69 @@ static int check_code(int argc, char **argv) {
     return bad ? 1 : 0;
 }
 
+/* ---- the community themes' watchdog (js_theme.c; docs/THEMES-GUIDE.md, "Community themes") ----
+ * A community theme that throws at its start, draws nothing within COMMUNITY_FIRST_MS, has its tree die (React's
+ * uncaught error), or stalls the desktop until the main-loop watchdog stops it is taken off: it is marked failed in its
+ * install record (with why, for Settings → Appearance's Report), and the theme that ran before it comes back (Lord
+ * Flow when there was none). One that ends COMMUNITY_CRASHES sessions in a row is not started again (chosen_theme).
+ * Ctrl+Alt+Shift+Backspace always restores Lord Flow, whatever theme runs (on_input, before any JavaScript). */
+#define COMMUNITY_FIRST_MS 6000
+#define COMMUNITY_HEALTHY_MS 60000
+
+static void default_bundle(char *out, size_t n) {
+    snprintf(out, n, "%s/default/theme.bundle.js", jst_system_themes());
+}
+
+static void community_watch_start(const char *current, double now) {
+    cw.since = now;
+    cw.healthy = 0;
+    default_bundle(cw.prev, sizeof cw.prev);
+    (void)current;
+}
+
+static void community_watch_switched(const char *before, const char *now_running, double now) {
+    cw.since = now;
+    cw.healthy = 0;
+    char id[32];
+    /* the theme to come back to: the one before, unless it is the failed one */
+    if (strcmp(before, ui.theme_failed)) snprintf(cw.prev, sizeof cw.prev, "%s", before);
+    if (jst_is_user_bundle(now_running, id, sizeof id)) jst_session_starting(id);
+}
+
+static void community_back(const char *current, const char *why, int persist) {
+    char id[32];
+    snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", current);
+    snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", why);
+    ui.theme_failed_code = 0;
+    if (persist && jst_is_user_bundle(current, id, sizeof id)) jst_mark_failed(id, why);
+    char back[sizeof ui.theme_request];
+    snprintf(back, sizeof back, "%s", cw.prev);
+    if (!back[0] || !strcmp(back, current) || access(back, R_OK)) default_bundle(back, sizeof back);
+    fprintf(stderr, "lord-server: theme %s taken off (%s): back to %s\n", current, why, back);
+    snprintf(ui.theme_request, sizeof ui.theme_request, "%s", back);
+}
+
+static void community_watch(const char *current, double now) {
+    if (cw.rescue) {                    /* Ctrl+Alt+Shift+Backspace: Lord Flow, whatever runs */
+        cw.rescue = 0;
+        char def[sizeof ui.theme_request];
+        default_bundle(def, sizeof def);
+        if (strcmp(current, def) && !access(def, R_OK)) {
+            snprintf(cw.prev, sizeof cw.prev, "%s", def);
+            community_back(current, "restored with Ctrl+Alt+Shift+Backspace", 1);
+        }
+        return;
+    }
+    if (!js_community_theme() || ui.theme_request[0]) return;
+    char id[32];
+    if (!jst_is_user_bundle(current, id, sizeof id)) return;
+    const char *why = jst_failure();
+    if (!why && !jst_started() && now - cw.since > COMMUNITY_FIRST_MS) why = "it drew nothing within 6 seconds";
+    if (!why && jst_stopped()) why = "it stalled the desktop and the watchdog stopped it";
+    if (why) { community_back(current, why, 1); return; }
+    if (!cw.healthy && now - cw.since > COMMUNITY_HEALTHY_MS) { cw.healthy = 1; jst_session_healthy(id); }
+}
+
 static unsigned renders_done;          /* frames drawn: a theme switch waits for two (its overlay on screen) */
 
 /* 0 if the requested theme is running; -1 if it failed and `current` (the last one that loaded) was put
@@ -2886,6 +2977,8 @@ static int switch_theme(const char *current) {
                  : why[0] ? why : "the theme's code did not load (see the log)");
         ui.theme_failed_code = r == JS_REFUSED;
         ui.theme_failed_gen = codesig_generation();
+        char cid[32];
+        if (jst_is_user_bundle(path, cid, sizeof cid)) jst_mark_failed(cid, ui.theme_failed_why);   /* kept for Report */
         js_shutdown();
         ui_reset();
         /* the theme that was running, from the bytes verified when it loaded: not its file again, which a package
@@ -3252,6 +3345,16 @@ int main(int argc, char **argv) {
     char current[sizeof ui.theme_request];
     svgicon_enable();                       /* SVG icons drawn by lord-media (media/svgicon.c); never in app mode */
     char first[sizeof ui.theme_request];
+    {   /* the system's themes folder: the one holding the theme asked for (community themes live in the person's) */
+        char a[PATH_MAX], r[PATH_MAX];
+        if (realpath(theme, r)) {
+            snprintf(a, sizeof a, "%s", r);
+            char *d = dirname(a);
+            snprintf(r, sizeof r, "%s", d);
+            snprintf(a, sizeof a, "%s", dirname(r));
+            jst_set_system_themes(a);
+        }
+    }
     if (s.greeter) snprintf(first, sizeof first, "%s", theme);
     else chosen_theme(theme, first, sizeof first);
     if (ok) ok = start_theme(first, s.greeter, current, sizeof current) == 0;
@@ -3305,7 +3408,9 @@ int main(int argc, char **argv) {
     /* the watchdog (wdog.h): a stall of this loop never leaves the desktop frozen at real time */
     wdog_start();
     wdog_busy(mono_ns());
+    community_watch_start(current, now_ms());
     while (!s.quit && !ui.quit_requested) {
+        if (!s.greeter) community_watch(current, now_ms());
         if (ui.theme_request[0]) {
             /* two frames first (or 300 ms when none is drawn): the shell's "changing the desktop style" overlay (sdk
              * themeswitch.jsx) gets on screen, and stays there while the new theme loads behind it */
@@ -3317,8 +3422,11 @@ int main(int argc, char **argv) {
                 char next[sizeof current];
                 snprintf(next, sizeof next, "%s", ui.theme_request);
                 wdog_expect(1);                 /* a theme loads for a second or more by design */
+                char before[sizeof current];
+                snprintf(before, sizeof before, "%s", current);
                 if (!switch_theme(current)) snprintf(current, sizeof current, "%s", next);
                 wdog_expect(0);
+                if (strcmp(before, current)) community_watch_switched(before, current, now_ms());
             }
         }
         {   /* a pointer lock started, ended, or its owner moved the pointer image it shows (pointerlock.h) */

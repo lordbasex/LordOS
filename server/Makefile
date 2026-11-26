@@ -90,6 +90,8 @@ SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/studio_bg_admin.c
 DOC_SRC := src/doc/doc.c src/doc/wire.c src/ui/js_doc.c src/print/ipp.c src/print/phttp.c src/print/mdns.c src/print/cups.c \
            src/print/escl.c src/print/print.c src/ui/js_print.c
 SRC += $(DOC_SRC)
+# (0.8.9.6.2) community themes: the per-user folder and the theme realm (docs/THEMES-GUIDE.md, "Community themes")
+SRC += src/ui/themestore.c src/ui/js_theme.c
 # Per-app firewall (src/fw, docs/FIREWALL.md): rules, decision and names learned from DNS
 FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/fwsub.c src/ui/js_fw.c src/sec/netconn.c src/media/streamurl.c src/fetch/weather.c src/fetch/wxsvc.c src/fetch/fetchspawn.c src/fetch/flathub.c src/fetch/fhsvc.c src/fetch/geocities.c src/ui/js_weather.c
 SRC += $(FW_SRC)

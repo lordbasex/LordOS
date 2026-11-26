@@ -6950,6 +6950,26 @@ static void build_backtrace(JSContext *ctx, JSValueConst error_obj,
    buffer). Unlike evaluating "new Error().stack" it runs no JavaScript and
    makes no JS value, so the interrupt handler can call it at any point of
    the interpreter. Returns the length written. */
+/* LordOS patch: is a bytecode function whose realm is `realm` on the stack? Every frame is looked at, so a native
+   function called from a trusted one called from the realm's code still sees it. */
+int JS_StackHasRealm(JSContext *ctx, JSContext *realm)
+{
+    JSStackFrame *sf;
+
+    if (!realm)
+        return 0;
+    for(sf = ctx->rt->current_stack_frame; sf != NULL; sf = sf->prev_frame) {
+        JSObject *p;
+        if (JS_VALUE_GET_TAG(sf->cur_func) != JS_TAG_OBJECT)
+            continue;
+        p = JS_VALUE_GET_OBJ(sf->cur_func);
+        if (js_class_has_bytecode(p->class_id) &&
+            p->u.func.function_bytecode->realm == realm)
+            return 1;
+    }
+    return 0;
+}
+
 int JS_GetStackText(JSContext *ctx, char *buf, int size, int max_frames)
 {
     JSStackFrame *sf;
@@ -18906,6 +18926,22 @@ static JSContext *JS_GetFunctionRealm(JSContext *ctx, JSValueConst func_obj)
         break;
     }
     return realm;
+}
+
+/* LordOS patch: 1 when func_obj's code belongs to `realm` (a community theme's, server/src/ui/js_theme.c). A proxy
+   always answers 1: its traps may be anyone's code. */
+int JS_IsFunctionOfRealm(JSContext *ctx, JSValueConst func_obj, JSContext *realm)
+{
+    JSObject *p;
+
+    if (!realm || JS_VALUE_GET_TAG(func_obj) != JS_TAG_OBJECT)
+        return 0;
+    p = JS_VALUE_GET_OBJ(func_obj);
+    if (p->class_id == JS_CLASS_PROXY)
+        return 1;
+    if (p->class_id == JS_CLASS_BOUND_FUNCTION)
+        return JS_IsFunctionOfRealm(ctx, p->u.bound_function->func_obj, realm);
+    return JS_GetFunctionRealm(ctx, func_obj) == realm;
 }
 
 static JSValue js_create_from_ctor(JSContext *ctx, JSValueConst ctor,

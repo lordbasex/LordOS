@@ -38,6 +38,8 @@
 #include "js_vmcli.h"
 #include "js_broker.h"
 #include "js_wasm.h"
+#include "js_theme.h"
+#include "themestore.h"
 #include "../media/svgicon.h"
 #include "js_net.h"
 #include "js_media.h"
@@ -256,9 +258,20 @@ static void js_run_end(const char *what, const char *detail) {
 void js_stall_begin(void) { js_run_begin(); }
 void js_stall_end(const char *what) { js_run_end(what, NULL); }
 
-/* lord.<ns>.<fn>(): the native call, timed; data[0] the real function, data[1] its name ("pkg.apps") */
+/* lord.<ns>.<fn>(): the native call, timed; data[0] the real function, data[1] its name ("pkg.apps"), data[2] its
+ * policy for a community theme (js_theme.c): with the theme's code on the stack, a call its policy refuses throws */
 static JSValue prof_call(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *data) {
     (void)magic;
+    if (jst_active()) {
+        int32_t pol = JST_DENY;
+        JS_ToInt32(c, &pol, data[2]);
+        if (pol != JST_ALLOW && jst_on_stack(c)) {
+            const char *n = JS_ToCString(c, data[1]);
+            int r = jst_check(c, pol, n ? n : "?", argc, argv);
+            if (n) JS_FreeCString(c, n);
+            if (r) return JS_EXCEPTION;
+        }
+    }
     double t0 = now_ms();
     JSValue r = JS_Call(c, data[0], this_val, argc, argv);
     double ms = now_ms() - t0;
@@ -272,7 +285,8 @@ static JSValue prof_call(JSContext *c, JSValueConst this_val, int argc, JSValueC
 }
 
 /* Every function of every lord.<ns> object (and one level below: lord.settings.x, lord.fs.trash.y) is replaced by a
- * timed one with the same length. Done once the native API is complete, before any JavaScript runs. */
+ * timed one with the same length. Done once the native API is complete, before any JavaScript runs. In a community
+ * theme's session (js_theme.c) the functions of lord itself (setStyle, createNode…) are wrapped too, for the guard. */
 static void prof_wrap_obj(JSContext *c, JSValueConst obj, const char *prefix, int level) {
     JSPropertyEnum *props = NULL;
     uint32_t n = 0;
@@ -285,13 +299,13 @@ static void prof_wrap_obj(JSContext *c, JSValueConst obj, const char *prefix, in
         const char *key = JS_AtomToCString(c, props[i].atom);
         char name[96];
         snprintf(name, sizeof name, "%s%s%s", prefix, prefix[0] ? "." : "", key ? key : "?");
-        if (data_prop && JS_IsFunction(c, d.value) && level > 0) {
+        if (data_prop && JS_IsFunction(c, d.value) && (level > 0 || jst_active())) {
             int len = 0;
             JSValue l = JS_GetPropertyStr(c, d.value, "length");
             JS_ToInt32(c, &len, l);
             JS_FreeValue(c, l);
-            JSValue data[2] = { d.value, JS_NewString(c, name) };
-            JSValue w = JS_NewCFunctionData(c, prof_call, len, 0, 2, data);
+            JSValue data[3] = { d.value, JS_NewString(c, name), JS_NewInt32(c, jst_policy(name)) };
+            JSValue w = JS_NewCFunctionData(c, prof_call, len, 0, 3, data);
             JS_FreeValue(c, data[1]);
             JS_DefinePropertyValue(c, obj, props[i].atom, w, d.flags & (JS_PROP_WRITABLE | JS_PROP_ENUMERABLE | JS_PROP_CONFIGURABLE));
         } else if (data_prop && JS_IsObject(d.value) && !JS_IsFunction(c, d.value) && !JS_IsArray(c, d.value) && level < 2) {
@@ -768,6 +782,7 @@ static int on_interrupt(JSRuntime *r, void *opaque) {
         return 0;
     }
     if (w == 2) fprintf(stderr, "lord-server: watchdog: the JavaScript task stopped (its stack follows)\n");
+    if (w == 2) jst_note_stop();        /* a community theme then goes back to the one before (main.c community_watch) */
     return w == 2;
 }
 
@@ -843,7 +858,8 @@ static void session_context(void) {
     js_hw_register(ctx, lord);         /* lord.display/power/bt/mime/timedate (Settings, src/hw) */
     js_voice_register(ctx, lord);      /* lord.voice: reading text aloud through lord-say (tts/speak.c, docs/VOICE.md) */
     js_sentinela_register(ctx, lord);  /* lord.sentinela: Sentinela's local model engine (llm/engine.c, docs/SENTINELA.md) */
-    prof_wrap_obj(ctx, lord, "", 0);   /* every lord.<ns>.* call timed (the stall detector) */
+    if (jst_active()) jst_register_main(ctx, lord);    /* a community theme's session: its host's natives (js_theme.c) */
+    prof_wrap_obj(ctx, lord, "", 0);   /* every lord.<ns>.* call timed (the stall detector) and guarded (js_theme.c) */
     JS_SetPropertyStr(ctx, g, "lord", lord);
     JS_FreeValue(ctx, g);
 }
@@ -853,7 +869,100 @@ static void session_context(void) {
  * package update may have replaced meanwhile (and the manifest that would verify it may not be in use). And the
  * bytes of the theme lord.themes.use asked for, verified when it was asked (js_theme_prepare): a refused theme is
  * known before the running one is discarded, and what runs is what was checked. */
-static struct { char *src; size_t len; char path[1024]; } theme_run, theme_next;
+/* A community theme (js_theme.c): the theme host's bytes (LordOS's own code, through the verified-code check) run in
+ * the session's realm, and the theme's own code, read from the per-user folder and checked against the SHA-256 its
+ * install record keeps, runs in a second realm with a restricted `lord`. */
+typedef struct { char *code; size_t len; unsigned caps; char id[32]; } Community;
+static struct { char *src; size_t len; char path[1024]; Community cm; } theme_run, theme_next;
+
+static void community_free(Community *cm) { free(cm->code); memset(cm, 0, sizeof *cm); }
+
+static void host_path(char *b, size_t n) { snprintf(b, n, "%s/theme-host.bundle.js", js_sys_assets()); }
+
+/* the bytes to run for bundle_path: a bundle of LordOS's own code, or for a community theme the host's (and cm) */
+static char *load_theme(const char *bundle_path, size_t *len, int *refused, Community *cm) {
+    char id[32], why[256];
+    memset(cm, 0, sizeof *cm);
+    if (!jst_is_user_bundle(bundle_path, id, sizeof id)) return load_code(bundle_path, len, refused);
+    *refused = 0;
+    cm->code = jst_load_code(id, &cm->len, &cm->caps, why, sizeof why);
+    if (!cm->code) {
+        fprintf(stderr, "js: community theme %s not loaded: %s\n", id, why);
+        snprintf(last_error, sizeof last_error, "%s", why);
+        return NULL;
+    }
+    char hp[1024];
+    codesig_init(js_sys_assets());
+    host_path(hp, sizeof hp);
+    char *src = load_code(hp, len, refused);
+    if (!src) { community_free(cm); return NULL; }
+    snprintf(cm->id, sizeof cm->id, "%s", id);
+    return src;
+}
+
+/* the theme's realm: a restricted lord, the globals the host made for it and its SDK; then its code */
+static int start_community(const Community *cm) {
+    static const char *const lord_names[] = { "getLayout", "setStyle", "measureText", "now", "log", NULL };
+    JSValue g = JS_GetGlobalObject(ctx);
+    JSValue host = JS_GetPropertyStr(ctx, g, "__lordThemeHost");
+    JSValue prep = JS_GetPropertyStr(ctx, host, "prepare");
+    JSValue caps = JS_NewArray(ctx);
+    uint32_t k = 0;
+    for (unsigned b = 1; b <= (1u << 15); b <<= 1) {
+        if ((cm->caps & b) && ts_cap_name(b)) JS_SetPropertyUint32(ctx, caps, k++, JS_NewString(ctx, ts_cap_name(b)));
+    }
+    JSValue args[2] = { JS_NewString(ctx, cm->id), caps };
+    JSValue made = JS_IsFunction(ctx, prep) ? JS_Call(ctx, prep, host, 2, args) : JS_ThrowTypeError(ctx, "no theme host");
+    JS_FreeValue(ctx, args[0]);
+    JS_FreeValue(ctx, args[1]);
+    JS_FreeValue(ctx, prep);
+    int r = -1;
+    if (JS_IsException(made)) { dump_exception(ctx); goto out; }
+    JSContext *t = JS_NewContext(rt);
+    if (!t) goto out;
+    JSValue tg = JS_GetGlobalObject(t);
+    /* the theme's own lord: the guarded natives a theme may use on its own nodes (js_theme.c) */
+    JSValue lord = JS_GetPropertyStr(ctx, g, "lord");
+    JSValue rl = JS_NewObject(t);
+    for (int i = 0; lord_names[i]; i++) JS_SetPropertyStr(t, rl, lord_names[i], JS_GetPropertyStr(ctx, lord, lord_names[i]));
+    JS_SetPropertyStr(t, rl, "version", JS_NewString(t, LORD_VERSION));
+    JS_FreeValue(ctx, lord);
+    JS_SetPropertyStr(t, tg, "lord", rl);
+    /* the host's globals for it (console, timers, animation frames: its own wrappers) and its SDK */
+    JSValue glob = JS_GetPropertyStr(ctx, made, "globals");
+    JSPropertyEnum *pe = NULL;
+    uint32_t pn = 0;
+    if (JS_IsObject(glob) && !JS_GetOwnPropertyNames(ctx, &pe, &pn, glob, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY)) {
+        for (uint32_t i = 0; i < pn; i++) {
+            JS_SetProperty(t, tg, pe[i].atom, JS_GetProperty(ctx, glob, pe[i].atom));
+            JS_FreeAtom(ctx, pe[i].atom);
+        }
+        js_free(ctx, pe);
+    }
+    JS_FreeValue(ctx, glob);
+    JS_SetPropertyStr(t, tg, "__lordThemeSdk", JS_GetPropertyStr(ctx, made, "sdk"));
+    JS_FreeValue(t, tg);
+    /* from here LordOS's realm is locked down (its built-ins frozen, no code from text): sdk/themeapi.js */
+    JSValue lock = JS_GetPropertyStr(ctx, host, "lockdown");
+    JSValue lr = JS_IsFunction(ctx, lock) ? JS_Call(ctx, lock, host, 0, NULL) : JS_ThrowTypeError(ctx, "no lockdown");
+    JS_FreeValue(ctx, lock);
+    if (JS_IsException(lr)) { dump_exception(ctx); JS_FreeContext(t); goto out; }
+    JS_FreeValue(ctx, lr);
+    jst_set_realm(t);
+    char name[64];
+    snprintf(name, sizeof name, "<theme:%s>", cm->id);
+    JSValue v = JS_Eval(t, cm->code, cm->len, name, JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_STRICT);
+    r = JS_IsException(v) ? -1 : 0;
+    if (r) dump_exception(t);
+    JS_FreeValue(t, v);
+    drain_jobs();
+    if (!r) fprintf(stderr, "js: community theme %s started (capabilities %#x)\n", cm->id, cm->caps);
+out:
+    JS_FreeValue(ctx, made);
+    JS_FreeValue(ctx, host);
+    JS_FreeValue(ctx, g);
+    return r;
+}
 
 static void set_theme_dir(const char *bundle_path) {
     char dir[1024];
@@ -862,22 +971,29 @@ static void set_theme_dir(const char *bundle_path) {
 }
 
 /* A new session context running src (not freed here): 0 if it started. */
-static int run_theme(const char *bundle_path, const char *src, size_t len) {
+static int run_theme(const char *bundle_path, const char *src, size_t len, const Community *cm) {
     set_theme_dir(bundle_path);
     last_error[0] = 0;
+    int community = cm && cm->code;
+    if (community) jst_begin(cm->caps);
     session_context();
     double t0 = now_ms();
+    char hp[1024];
+    host_path(hp, sizeof hp);
     int r = eval(prelude, sizeof prelude - 1, "<prelude>");
-    if (!r) r = eval(src, len, bundle_path);
+    if (!r) r = eval(src, len, community ? hp : bundle_path);
+    if (!r && community) r = start_community(cm);
     fprintf(stderr, "js: theme %s loaded in %.1f ms (%zu KB)\n", bundle_path, now_ms() - t0, len / 1024);
     return r;
 }
 
 /* src (owned) started: it is the running theme's code from now on */
-static void keep_running(const char *bundle_path, char *src, size_t len) {
+static void keep_running(const char *bundle_path, char *src, size_t len, Community *cm) {
     if (theme_run.src != src) free(theme_run.src);
+    if (theme_run.cm.code != cm->code) community_free(&theme_run.cm);
     theme_run.src = src;
     theme_run.len = len;
+    theme_run.cm = *cm;
     snprintf(theme_run.path, sizeof theme_run.path, "%s", bundle_path);
 }
 
@@ -886,24 +1002,28 @@ int js_init(const char *bundle_path) {
     size_t len = 0;
     int refused = 0;
     last_error[0] = 0;
-    char *src = load_code(bundle_path, &len, &refused);
+    Community cm;
+    char *src = load_theme(bundle_path, &len, &refused, &cm);
     if (!src) return refused ? JS_REFUSED : -1;
-    int r = run_theme(bundle_path, src, len);
-    if (r) free(src);
-    else keep_running(bundle_path, src, len);
+    int r = run_theme(bundle_path, src, len, &cm);
+    if (r) { free(src); community_free(&cm); }
+    else keep_running(bundle_path, src, len, &cm);
     return r;
 }
 
 int js_theme_prepare(const char *bundle_path) {
     free(theme_next.src);
+    community_free(&theme_next.cm);
     theme_next.src = NULL;
     theme_next.path[0] = 0;
     size_t len = 0;
     int refused = 0;
-    char *src = load_code(bundle_path, &len, &refused);
+    Community cm;
+    char *src = load_theme(bundle_path, &len, &refused, &cm);
     if (!src) return refused ? JS_REFUSED : -1;
     theme_next.src = src;
     theme_next.len = len;
+    theme_next.cm = cm;
     snprintf(theme_next.path, sizeof theme_next.path, "%s", bundle_path);
     return 0;
 }
@@ -912,18 +1032,22 @@ int js_init_prepared(const char *bundle_path) {
     if (!theme_next.src || strcmp(theme_next.path, bundle_path)) return js_init(bundle_path);
     char *src = theme_next.src;
     size_t len = theme_next.len;
+    Community cm = theme_next.cm;
+    memset(&theme_next.cm, 0, sizeof theme_next.cm);
     theme_next.src = NULL;
     theme_next.path[0] = 0;
-    int r = run_theme(bundle_path, src, len);
-    if (r) free(src);
-    else keep_running(bundle_path, src, len);
+    int r = run_theme(bundle_path, src, len, &cm);
+    if (r) { free(src); community_free(&cm); }
+    else keep_running(bundle_path, src, len, &cm);
     return r;
 }
 
 int js_init_previous(const char *bundle_path) {
     if (!theme_run.src || strcmp(theme_run.path, bundle_path)) return js_init(bundle_path);
-    return run_theme(bundle_path, theme_run.src, theme_run.len);
+    return run_theme(bundle_path, theme_run.src, theme_run.len, &theme_run.cm);
 }
+
+int js_community_theme(void) { return jst_active(); }
 
 /* ---- the recovery screen ----
  * When the theme (or the login screen, or an isolated app's code) was refused, lord-server shows
@@ -1084,6 +1208,8 @@ void js_shutdown(void) {
     stall.depth = 0;
     if (ctx && hot_rt == rt) for (int i = 0; i < HOT_N; i++) JS_FreeAtom(ctx, hot_atom[i]);
     hot_rt = NULL;
+    if (jst_realm()) { JSContext *t = jst_realm(); jst_set_realm(NULL); JS_FreeContext(t); }
+    jst_set_realm(NULL);
     if (ctx) JS_FreeContext(ctx);
     if (rt) JS_FreeRuntime(rt);
     ctx = NULL;

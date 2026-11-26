@@ -446,6 +446,11 @@ void JS_ComputeMemoryUsage(JSRuntime *rt, JSMemoryUsage *s);
 size_t JS_GetMallocSize(JSRuntime *rt); /* LordOS patch */
 /* LordOS patch: the running JS stack as text, without running JavaScript (interrupt handlers) */
 int JS_GetStackText(JSContext *ctx, char *buf, int size, int max_frames);
+/* LordOS patch: 1 when a bytecode function of `realm` is anywhere on the running JS stack (a community theme's code,
+   server/src/ui/js_theme.c), without running JavaScript */
+int JS_StackHasRealm(JSContext *ctx, JSContext *realm);
+/* LordOS patch: 1 when a function's code belongs to `realm` (a proxy always counts) */
+int JS_IsFunctionOfRealm(JSContext *ctx, JSValueConst func_obj, JSContext *realm);
 void JS_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSRuntime *rt);
 
 /* atom support */

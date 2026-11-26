@@ -106,6 +106,7 @@ typedef struct Node {
     float *crop;                /* NODE_MEDIA: the part of the source's picture it shows (x, y, w, h in picture pixels;
                                  * NULL the whole picture): Machines' apps mode, one window of the guest (media/mview.c) */
     uint8_t protect;            /* protected window: the protected fill in every capture (media/capture.c) */
+    uint8_t theme_own;          /* made by a community theme's View, Text or Image (js_theme.c): the only nodes it may restyle */
     uint8_t rtl;                /* effective direction (computed in layout) */
     uint8_t own_tf, has_tf;     /* it has a scale/rotate; it or an ancestor has one (tf is set) */
     uint8_t layout_ok, layout_rtl;  /* its subtree is laid out for its current w × h and direction */
