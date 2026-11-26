@@ -1613,3 +1613,12 @@ test: build/wallpaper-image-test
 test: build/launchplace-client build/lord-server-test
 build/launchplace-client: tests/launchplace_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/launchplace_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+
+# (0.8.9.6.2) Community themes (docs/THEMES-GUIDE.md "Community themes"): LordOS's QuickJS patches the guard of every
+# lord.* call stands on (a theme's code on the stack, its jobs, its bound and native functions), and the per-user
+# themes folder (the helper's answer read strictly, the staging folder, the install record)
+test: build/realm-taint-test build/themestore-test
+build/realm-taint-test: tests/realm_taint_test.c $(QJS_OBJ)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/realm_taint_test.c $(QJS_OBJ) -lm -lpthread
+	./$@ || { rm -f $@; exit 1; }

@@ -40,6 +40,8 @@ int jst_on_stack(JSContext *c);
 /* With the theme's code on the stack: 0 when the call may go on, -1 (an exception thrown) when not. */
 int jst_check(JSContext *c, int policy, const char *name, int argc, JSValueConst *argv);
 
+/* the theme realm's lord: its own natives, always under the policy (main is LordOS's realm, main_lord its lord) */
+JSValue jst_theme_lord(JSContext *t, JSContext *main, JSValueConst main_lord);
 /* the main realm's extra natives in a community session: lord.themeRealmFn, lord.themeOwn, lord.themes.started/fail */
 void jst_register_main(JSContext *c, JSValue lord);
 

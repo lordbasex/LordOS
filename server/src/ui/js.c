@@ -902,7 +902,6 @@ static char *load_theme(const char *bundle_path, size_t *len, int *refused, Comm
 
 /* the theme's realm: a restricted lord, the globals the host made for it and its SDK; then its code */
 static int start_community(const Community *cm) {
-    static const char *const lord_names[] = { "getLayout", "setStyle", "measureText", "now", "log", NULL };
     JSValue g = JS_GetGlobalObject(ctx);
     JSValue host = JS_GetPropertyStr(ctx, g, "__lordThemeHost");
     JSValue prep = JS_GetPropertyStr(ctx, host, "prepare");
@@ -921,10 +920,9 @@ static int start_community(const Community *cm) {
     JSContext *t = JS_NewContext(rt);
     if (!t) goto out;
     JSValue tg = JS_GetGlobalObject(t);
-    /* the theme's own lord: the guarded natives a theme may use on its own nodes (js_theme.c) */
+    /* the theme's own lord: natives of its realm that always apply its policy (js_theme.c jst_theme_lord) */
     JSValue lord = JS_GetPropertyStr(ctx, g, "lord");
-    JSValue rl = JS_NewObject(t);
-    for (int i = 0; lord_names[i]; i++) JS_SetPropertyStr(t, rl, lord_names[i], JS_GetPropertyStr(ctx, lord, lord_names[i]));
+    JSValue rl = jst_theme_lord(t, ctx, lord);
     JS_SetPropertyStr(t, rl, "version", JS_NewString(t, LORD_VERSION));
     JS_FreeValue(ctx, lord);
     JS_SetPropertyStr(t, tg, "lord", rl);
@@ -956,6 +954,15 @@ static int start_community(const Community *cm) {
     if (r) dump_exception(t);
     JS_FreeValue(t, v);
     drain_jobs();
+    if (!r) {                           /* the shell, started by LordOS's code with the element the theme gave */
+        JSValue run = JS_GetPropertyStr(ctx, host, "run");
+        JSValue ran = JS_IsFunction(ctx, run) ? JS_Call(ctx, run, host, 0, NULL) : JS_ThrowTypeError(ctx, "no theme host");
+        JS_FreeValue(ctx, run);
+        if (JS_IsException(ran)) { dump_exception(ctx); r = -1; }
+        else if (!JS_ToBool(ctx, ran)) { snprintf(last_error, sizeof last_error, "the theme never called startShell()"); r = -1; }
+        JS_FreeValue(ctx, ran);
+        drain_jobs();
+    }
     if (!r) fprintf(stderr, "js: community theme %s started (capabilities %#x)\n", cm->id, cm->caps);
 out:
     JS_FreeValue(ctx, made);

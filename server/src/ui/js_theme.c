@@ -86,6 +86,9 @@ void jst_begin(unsigned caps) {
     S.failure[0] = 0;
 }
 void jst_set_realm(JSContext *realm) {
+    /* its jobs, and the calls made on its behalf, run tainted (QuickJS patch, JS_StackHasRealm) */
+    if (realm) JS_SetUntrustedRealm(JS_GetRuntime(realm), realm);
+    else if (S.realm) JS_SetUntrustedRealm(JS_GetRuntime(S.realm), NULL);
     S.realm = realm;
     if (!realm) S.active = 0;
 }
@@ -104,6 +107,9 @@ const char *jst_failure(void) { return S.failure[0] ? S.failure : NULL; }
  * network's settings, theme switching, the session's power. Capabilities give read access only (approved list,
  * 2026-11-26): no setter of Wi-Fi, Bluetooth, sound, brightness or media is here. */
 static const struct { const char *name; unsigned cap; int policy; } rules[] = {
+    /* the host's own natives (jst_register_main): never in the theme's realm, and called by the facade on its behalf */
+    { "themeRealmFn", 0, JST_ALLOW }, { "themeCall", 0, JST_ALLOW }, { "themeOwn", 0, JST_ALLOW },
+    { "themes.started", 0, JST_ALLOW }, { "themes.fail", 0, JST_ALLOW },
     /* drawing and measuring its own nodes */
     { "getLayout", 0, JST_ALLOW }, { "now", 0, JST_ALLOW }, { "log", 0, JST_ALLOW }, { "measureText", 0, JST_ALLOW },
     { "stats", 0, JST_ALLOW }, { "setStyle", 0, JST_NODE }, { "setProp", 0, JST_NODE }, { "setText", 0, JST_NODE },
@@ -112,7 +118,7 @@ static const struct { const char *name; unsigned cap; int policy; } rules[] = {
     { "locale.catalog", 0, JST_ALLOW }, { "locale.languages", 0, JST_ALLOW },
     { "time.", 0, JST_ALLOW }, { "system.info", 0, JST_ALLOW }, { "system.seen", 0, JST_ALLOW },
     { "system.load", 0, JST_ALLOW }, { "system.cpuTimes", 0, JST_ALLOW },
-    { "themes.list", 0, JST_ALLOW },
+    { "themes.list", 0, JST_ALLOW }, { "studio.status", 0, JST_ALLOW }, { "guestwin.active", 0, JST_ALLOW },
     /* windows: moving and resizing in C, focus, the work areas, Linux windows' frames */
     { "wm.", 0, JST_ALLOW }, { "wayland.focus", 0, JST_ALLOW }, { "wayland.close", 0, JST_ALLOW },
     { "wayland.state", 0, JST_ALLOW }, { "wayland.workAreas", 0, JST_ALLOW }, { "wayland.hasKeyboard", 0, JST_ALLOW },
@@ -173,24 +179,73 @@ static void refused(const char *name, const char *why) {
 
 int jst_on_stack(JSContext *c) { return S.active && S.realm && JS_StackHasRealm(c, S.realm); }
 
-int jst_check(JSContext *c, int policy, const char *name, int argc, JSValueConst *argv) {
-    if (!S.active || policy == JST_ALLOW || !S.realm || !JS_StackHasRealm(c, S.realm)) return 0;
+static int check(JSContext *c, int policy, const char *name, int argc, JSValueConst *argv, int force) {
+    if (!S.active || policy == JST_ALLOW || !S.realm) return 0;
+    if (!force && !JS_StackHasRealm(c, S.realm)) return 0;
     if (policy == JST_NODE) {
         int32_t id = -1;
         Node *n = argc > 0 && !JS_ToInt32(c, &id, argv[0]) ? node_get(id) : NULL;
         if (n && n->theme_own && !(n->protect) && !(!strcmp(name, "setProp") && (argc < 2 || prop_blocked(c, argv[1])))) return 0;
-        refused(name, "not one of the theme's own nodes");
+        char why[64];
+        snprintf(why, sizeof why, "node %d is not one of the theme's own", (int)id);
+        refused(name, why);
     } else refused(name, "not available to community themes");
     JS_ThrowTypeError(c, "lord.%s is not available to community themes", name);
     return -1;
 }
 
+int jst_check(JSContext *c, int policy, const char *name, int argc, JSValueConst *argv) {
+    return check(c, policy, name, argc, argv, 0);
+}
+
+/* ---- the theme's own lord ----
+ * Natives of the theme's realm, each holding (out of JavaScript's reach) LordOS's guarded function and its name. They
+ * always apply the policy, whatever the stack: a theme that hands one to a timer, a promise, a bound function or a
+ * callback LordOS calls later gets the same answer as when it calls it itself. */
+static JSValue theme_native(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *data) {
+    (void)this_val; (void)magic;
+    const char *name = JS_ToCString(c, data[1]);
+    int pol = name ? jst_policy(name) : JST_DENY;
+    int r = check(c, pol, name ? name : "?", argc, argv, 1);
+    if (name) JS_FreeCString(c, name);
+    if (r) return JS_EXCEPTION;
+    JS_RealmTaint(JS_GetRuntime(c), 1);
+    JSValue v = JS_Call(c, data[0], JS_UNDEFINED, argc, argv);
+    JS_RealmTaint(JS_GetRuntime(c), -1);
+    return v;
+}
+
+JSValue jst_theme_lord(JSContext *t, JSContext *main, JSValueConst main_lord) {
+    static const char *const names[] = { "getLayout", "setStyle", "measureText", "now", "log", NULL };
+    JSValue o = JS_NewObject(t);
+    for (int i = 0; names[i]; i++) {
+        JSValue f = JS_GetPropertyStr(main, main_lord, names[i]);
+        if (!JS_IsFunction(main, f)) { JS_FreeValue(main, f); continue; }
+        JSValue data[2] = { f, JS_NewString(t, names[i]) };
+        JS_SetPropertyStr(t, o, names[i], JS_NewCFunctionData(t, theme_native, 3, 0, 2, data));
+        JS_FreeValue(t, data[1]);
+        JS_FreeValue(main, f);
+    }
+    return o;
+}
+
 /* ---- the main realm's natives in a community session ---- */
 
-/* lord.themeRealmFn(f): f is the theme's code (React's host guard and the SDK's facade ask) */
+/* lord.themeRealmFn(f): 2 the theme's own function, 1 anything that can't be told to be LordOS's code (a native of the
+ * theme's realm, a bound function, a proxy), 0 LordOS's (React's host guard and the SDK's facade ask) */
 static JSValue f_realm_fn(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
-    return JS_NewBool(c, argc > 0 && S.realm && JS_IsFunctionOfRealm(c, argv[0], S.realm));
+    return JS_NewInt32(c, argc > 0 && S.realm ? JS_IsFunctionOfRealm(c, argv[0], S.realm) : 0);
+}
+/* lord.themeCall(f, ...args): LordOS's code calls something the theme gave it (a callback, a timer, an effect): the call
+ * runs tainted, so every native it reaches is under the theme's policy even with no frame of the theme's on the stack */
+static JSValue f_theme_call(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1 || !JS_IsFunction(c, argv[0])) return JS_UNDEFINED;
+    JS_RealmTaint(JS_GetRuntime(c), 1);
+    JSValue v = JS_Call(c, argv[0], JS_UNDEFINED, argc - 1, argv + 1);
+    JS_RealmTaint(JS_GetRuntime(c), -1);
+    return v;
 }
 /* lord.themeOwn(id): this node is one of the theme's own (made by the facade's View, Text or Image) */
 static JSValue f_theme_own(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -221,6 +276,7 @@ static JSValue f_fail(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 void jst_register_main(JSContext *c, JSValue lord) {
     JS_SetPropertyStr(c, lord, "themeRealmFn", JS_NewCFunction(c, f_realm_fn, "themeRealmFn", 1));
     JS_SetPropertyStr(c, lord, "themeOwn", JS_NewCFunction(c, f_theme_own, "themeOwn", 1));
+    JS_SetPropertyStr(c, lord, "themeCall", JS_NewCFunction(c, f_theme_call, "themeCall", 1));
     JSValue th = JS_GetPropertyStr(c, lord, "themes");
     if (JS_IsObject(th)) {
         JS_SetPropertyStr(c, th, "started", JS_NewCFunction(c, f_started, "started", 0));

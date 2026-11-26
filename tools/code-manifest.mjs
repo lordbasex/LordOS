@@ -31,6 +31,7 @@ export function codeFiles(dir) {
   const list = (rel) => { try { return fs.readdirSync(path.join(dir, rel)).sort(); } catch { return []; } };
   for (const t of list('themes')) add(`themes/${t}/theme.bundle.js`);
   add('assets/app-host.bundle.js');
+  add('assets/theme-host.bundle.js');   // (0.8.9.6.2) the host of a community theme (runtime/theme-host.js)
   for (const a of list('assets/sysapps')) add(`assets/sysapps/${a}/app.js`);
   // byte order, as lord-server compares paths with strcmp
   return out.sort((a, b) => (Buffer.compare(Buffer.from(a), Buffer.from(b))));

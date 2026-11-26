@@ -449,8 +449,11 @@ int JS_GetStackText(JSContext *ctx, char *buf, int size, int max_frames);
 /* LordOS patch: 1 when a bytecode function of `realm` is anywhere on the running JS stack (a community theme's code,
    server/src/ui/js_theme.c), without running JavaScript */
 int JS_StackHasRealm(JSContext *ctx, JSContext *realm);
-/* LordOS patch: 1 when a function's code belongs to `realm` (a proxy always counts) */
+/* LordOS patch: 2 a bytecode function of `realm`, 1 untrusted (a native of it, bound, proxy, native with data), 0 trusted */
 int JS_IsFunctionOfRealm(JSContext *ctx, JSValueConst func_obj, JSContext *realm);
+/* LordOS patch: the untrusted realm whose jobs run tainted, and calls made on its behalf (+1 before, -1 after) */
+void JS_SetUntrustedRealm(JSRuntime *rt, JSContext *realm);
+void JS_RealmTaint(JSRuntime *rt, int delta);
 void JS_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSRuntime *rt);
 
 /* atom support */

@@ -152,6 +152,17 @@ const treeLinks = () => ({ host: null, first: null, last: null, prev: null, next
 // Priority of the update in progress (React 19 sets it and queries it here).
 let updatePriority = NoEventPriority;
 
+// ---- community themes (sdk/themeapi.js, docs/THEMES-GUIDE.md "Community themes") ----
+// THEME_OWNED, as the value of the prop lordThemeOwned, marks the props of a node a community theme's View, Text or Image made: lord-server then lets the
+// theme restyle that node, and no other (lord.themeOwn, server/src/ui/js_theme.c). The host guard is called before
+// every host node is made, with React's fiber: the facade refuses a node the theme's own function rendered itself.
+// Neither exists for LordOS's own themes.
+export const THEME_OWNED = Symbol('lordos.themeOwned');
+let hostGuard = null;
+export function setHostGuard(fn) { if (!hostGuard) hostGuard = fn; }
+let rootError = null;
+export function setRootErrorHandler(fn) { if (!rootError) rootError = fn; }
+
 // react-reconciler 0.34 host interface (React 19), mutation mode like React Native.
 const host = {
   rendererPackageName: '@lordos/runtime',
@@ -166,8 +177,10 @@ const host = {
   supportsMicrotasks: true,
   scheduleMicrotask: (fn) => queueMicrotask(fn),
 
-  createInstance(type, props) {
+  createInstance(type, props, _root, _ctx, fiber) {
+    if (hostGuard) hostGuard(type, props, fiber);
     const inst = { id: lord.createNode(type), type, props, style: {}, parent: null, ...treeLinks() };
+    if (hostGuard && props.lordThemeOwned === THEME_OWNED) lord.themeOwn(inst.id);
     register(inst);
     ops.created++;
     ops.last = inst;
@@ -338,7 +351,10 @@ export function render(element) {
   lord.setStyle(rootId, 'height', screen.height);
   lord.setRoot(rootId);
   const container = { id: rootId, isContainer: true, ...treeLinks() };
-  const report = (kind) => (e) => console.error(`react (${kind}):`, e?.message ? `${e.message}\n${e.stack || ''}` : e);
+  const report = (kind) => (e) => {
+    console.error(`react (${kind}):`, e?.message ? `${e.message}\n${e.stack || ''}` : e);
+    if (kind === 'error' && rootError) rootError(e);
+  };
   // React 19: uncaught errors, errors caught by a boundary, and recoverable ones, separately
   const root = reconciler.createContainer(container, ConcurrentRoot, null, false, null, 'lord',
     report('error'), report('capturado'), report('recuperable'), null);

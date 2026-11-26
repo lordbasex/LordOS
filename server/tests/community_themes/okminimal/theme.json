@@ -1,0 +1,2 @@
+{ "name": "Test Minimal", "description": "LordOS's minimal example as a community theme (a test fixture).",
+  "community": true, "author": "LordOS tests", "license": "MIT", "version": "1.0.0", "capabilities": ["battery"] }
