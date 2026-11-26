@@ -608,6 +608,7 @@ Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one ski
 | Logs | `sidebar` (list pane: the journal sources and the log files by group), `toolbar` (command bar: Live, Export) | the reading, the filters and the export's file dialog | `logs_skin_scene.mjs` (12 checks) |
 | System Information | `toolbar` (command bar: the six tabs and Refresh) | every tab's content, the checks, the benchmark and the report | `sysinfo_skin_scene.mjs` (9 checks) |
 | Backups | `toolbar` (command bar: the Snapshots and Settings tabs) | the backups, restoring and every setting | `backup_skin_scene.mjs` (9 checks) |
+| PDF Viewer | `toolbar` (command bar: the sidebar, zoom, rotate, the four tools, invert, print; disabled with no document; the page in the title) | the pages, the annotations, the search, the password and printing | `pdf_skin_scene.mjs` (10 checks) |
 <!-- shared-shape apps -->
 
 A region drawn in the SDK's floating layer (Screenshots' capture bar, a picture-in-picture window) is outside the theme's
