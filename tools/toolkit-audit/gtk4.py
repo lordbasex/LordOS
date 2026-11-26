@@ -34,6 +34,10 @@ IDS = ('map', 'size', 'scale', 'theme', 'backend', 'decoration', 'first_frame', 
 REQ_W, REQ_H = 600, 400
 SHOW = '--show' in sys.argv[1:] or os.environ.get('LORDOS_TOOLKIT_AUDIT_SHOW') == '1'
 DEADLINE_MS = 14600 if SHOW else 4600   # everything still pending then is reported as a timeout, and the harness exits
+# A first frame later than 1 s is the toolkit's own start (GTK 4 compiling its shaders on a cold cache, 2.5 to 3 s on
+# a software renderer, while the compositor had answered in a few ms): that much more time, up to LATE_MAX_MS, so the
+# checks after it are still measured. The orchestrator kills at 8 s (20 s).
+LATE_MAX_MS = 2400
 HOLD_MS = 900 if SHOW else 0            # show mode: how long a step stays on screen once decided
 SAMPLE = 'LordOS-audit-0123'
 
@@ -117,6 +121,16 @@ class Audit:
         if not SHOW:
             return fn
         return lambda *_: GLib.timeout_add(max(1, HOLD_MS if ms is None else ms), lambda: fn() and False) and False
+
+    def deadline(self):
+        ff = self.checks.get('first_frame', {}).get('ms')
+        return DEADLINE_MS + (min(LATE_MAX_MS, ff - 1000) if isinstance(ff, int) and ff > 1000 else 0)
+
+    def on_deadline(self, *_):
+        if not self.done and ms() < self.deadline():
+            GLib.timeout_add(max(1, self.deadline() - ms()), self.on_deadline)
+            return False
+        return self.finish()
 
     def finish(self, *_):
         if self.done:
@@ -536,7 +550,7 @@ class Audit:
     def run(self):
         self.steps = [self.step_static, self.step_theme, self.step_menu, self.step_combo, self.step_tooltip,
                       self.step_text, self.step_fullscreen, self.step_clipboard, self.step_dnd]
-        GLib.timeout_add(max(1, DEADLINE_MS - ms()), self.finish)
+        GLib.timeout_add(max(1, DEADLINE_MS - ms()), self.on_deadline)
         self.win.present()
         self.loop.run()
         self.win.destroy()
