@@ -14,10 +14,11 @@ At the top the 3D Lumo (`sdk/mascot.js`) and the chain of its five pieces, each 
 | Brain | the language model (`lordos-llm-*` + the llama.cpp engine, `sdk/llmcatalog.js`) | ✓ with a model and the engine installed |
 | Voice | reading aloud (`lordos-voice-*`, [VOICE.md](VOICE.md)) | ✓ with a language's model installed |
 | Eyes | text recognition (Tesseract in the confined `lord-ocr` helper) | ✓ with Tesseract's English data |
-| Hands | doing things in LordOS with your permission (the agent) | **coming soon** |
+| Hands | doing things in LordOS with your permission: the agent's tools ([HANDS.md](HANDS.md): `lordos-mcp`, `org.lordos.Hands1`) | ✓ part of LordOS; on only when the person turns it on for a session |
 
 Lumo waves when every piece that exists today is installed and sleeps while one you could download is missing.
-**Talk to Lumo** stays disabled, with a "coming soon" line, until the Ear and the agent exist.
+**Talk to Lumo** stays disabled, with a "coming soon" line, until the Ear exists (Lumo's own agent loop comes later and uses
+the Hands' tools).
 
 ## One brain, many functions
 

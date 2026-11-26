@@ -76,10 +76,13 @@ function TrustSheet({ e, onDone }) {
   const { t: tr } = useLocale();
   return (
     <Sheet>
+      {/* handsDeny: an AI agent never reads or answers this for the person (docs/HANDS.md) */}
+      <View handsDeny style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
       <ConfirmDialog cautious title={tr('settings.style.trustTitle')}
         detail={`${tr('settings.style.trustDetail', { name: e.name, author: e.author || tr('settings.style.unknownAuthor') })} ${tr('settings.style.trustCaps', { list: capsText(tr, e.caps) })}`}
         okLabel={tr('settings.style.trustOk')} onCancel={() => onDone(false)}
         onOk={() => onDone(themes.trust(e.id))} />
+      </View>
     </Sheet>
   );
 }

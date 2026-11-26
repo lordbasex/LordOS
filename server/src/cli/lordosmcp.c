@@ -378,19 +378,30 @@ static char *record(const JVal *a) {
         return text_result(t, 0);
     }
     if (!strcmp(act, "export")) {
-        const char *path = str_arg(a, "path");
-        size_t l = path ? strlen(path) : 0;
-        if (!path || path[0] != '/' || l < 5 || strcmp(path + l - 4, ".gif") || strstr(path, "/../")) return text_result("path must be absolute and end in .gif.", 1);
+        /* the GIF back as content, or saved under one name in ~/Pictures/LordOS QA: never a path the agent picks */
+        const char *name = str_arg(a, "name");
+        if (name && !mcp_export_name_ok(name)) return text_result("name must be a bare file name ending in .gif (letters, digits, spaces, . _ -), no folders.", 1);
         if (!nframes) return text_result("nothing recorded.", 1);
         size_t n = 0;
         uint8_t *gif = mcp_gif(frames, nframes, 60, &n);
         if (!gif) return text_result("the GIF could not be made.", 1);
-        int fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0644);
-        int ok = fd >= 0 && write(fd, gif, n) == (ssize_t)n;
-        if (fd >= 0) close(fd);
+        if (!name) {
+            char *b64 = mcp_base64(gif, n);
+            free(gif);
+            Str o = { 0 };
+            s_add(&o, "{\"content\":[{\"type\":\"image\",\"mimeType\":\"image/gif\",\"data\":\"");
+            s_add(&o, b64 ? b64 : "");
+            s_fmt(&o, "\"},{\"type\":\"text\",\"text\":\"%d frames\"}]}", nframes);
+            free(b64);
+            return o.oom ? NULL : o.p;
+        }
+        const char *home = getenv("HOME");
+        char where[PATH_MAX + 128], t[PATH_MAX + 192];
+        int ok = !mcp_write_export(home, name, gif, n, where, sizeof where);
+        int e = errno;
         free(gif);
-        char t[PATH_MAX + 64];
-        snprintf(t, sizeof t, ok ? "wrote %s (%d frames)" : "could not write %s (it must not exist yet)", path, nframes);
+        if (ok) snprintf(t, sizeof t, "wrote %s (%d frames)", where, nframes);
+        else snprintf(t, sizeof t, "could not write ~/%s/%s: %s", MCP_EXPORT_DIR, name, e == EEXIST ? "a file with that name exists" : strerror(e));
         return text_result(t, !ok);
     }
     return text_result("action must be start, stop or export.", 1);

@@ -30,6 +30,15 @@ typedef struct { uint8_t *rgb; int w, h; } McpFrame;
  * malloc'd, its size in *len; NULL on failure */
 uint8_t *mcp_gif(const McpFrame *f, int n, int delay_cs, size_t *len);
 
+/* A recording's export: a bare file name (letters, digits, space, . _ -, 1 to 100 bytes, ending in .gif, not starting
+ * with a dot), never a path. 1 ok. */
+int mcp_export_name_ok(const char *name);
+/* writes d as a NEW file name in <home>/Pictures/LordOS QA (each folder made if missing and opened O_DIRECTORY |
+ * O_NOFOLLOW, the file O_CREAT | O_EXCL | O_NOFOLLOW, 0600): the only place lordos-mcp writes. 0 with its path in out,
+ * -1 (errno) otherwise. */
+int mcp_write_export(const char *home, const char *name, const uint8_t *d, size_t n, char *out, size_t on);
+#define MCP_EXPORT_DIR "Pictures/LordOS QA"
+
 /* MCP's JSON text helpers: a string quoted for JSON (malloc'd) */
 char *mcp_quote(const char *s);
 

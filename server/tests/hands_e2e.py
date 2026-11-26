@@ -32,7 +32,9 @@ def check(ok, name):
 
 class Agent:
     def __init__(self, app):
-        env = dict(os.environ, LORDOS_MCP_SERVER=LS, LORDOS_MCP_TEST_HOOKS='1')
+        # lordos-mcp's own HOME (where an export is saved) is a temporary folder: the person's is never written
+        self.home = tempfile.mkdtemp(prefix='hands-e2e-')
+        env = dict(os.environ, LORDOS_MCP_SERVER=LS, LORDOS_MCP_TEST_HOOKS='1', HOME=self.home)
         env.pop('DBUS_SESSION_BUS_ADDRESS', None)
         self.p = subprocess.Popen([MCP, '--headless', app], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True, bufsize=1)
         self.dir = None
@@ -54,11 +56,11 @@ class Agent:
         self.p.stdin.flush()
         return json.loads(self.p.stdout.readline())
 
-    def call(self, name, **args):
-        return self.req('tools/call', {'name': name, 'arguments': args})['result']
+    def call(self, tool, **args):
+        return self.req('tools/call', {'name': tool, 'arguments': args})['result']
 
-    def text(self, name, **args):
-        r = self.call(name, **args)
+    def text(self, tool, **args):
+        r = self.call(tool, **args)
         t = '\n'.join(c.get('text', '') for c in r['content'] if c['type'] == 'text')
         return ('ERROR: ' if r.get('isError') else '') + t
 
@@ -83,6 +85,8 @@ class Agent:
             self.p.wait(15)
         except Exception:
             self.p.kill()
+        import shutil
+        shutil.rmtree(self.home, ignore_errors=True)
 
 
 def ref(text, pattern):
@@ -162,17 +166,23 @@ def notes_import():
         t = a.text('read_window', window_id='notes')
         check('Shopping list' in t and 'Bread' in t, 'the note exists, with its text')
         a.text('record', action='stop')
-        gif = os.path.join(a.dir, 'qa.gif')
-        out = a.text('record', action='export', path=gif)
-        ok = os.path.exists(gif) and open(gif, 'rb').read(6) == b'GIF89a'
+        r = a.call('record', action='export')
+        data = next((base64.b64decode(c['data']) for c in r['content'] if c['type'] == 'image'), b'')
+        out = f'{len(data)} bytes'
+        ok = data[:6] == b'GIF89a'
         try:
+            import io
             from PIL import Image
-            im = Image.open(gif)
+            im = Image.open(io.BytesIO(data))
             ok = ok and im.n_frames >= 5
             im.seek(im.n_frames - 1)
             im.convert('RGB')
         except ImportError:
             pass
+        w = a.text('record', action='export', name='../escape.gif')
+        check(w.startswith('ERROR'), 'an export never takes a path')
+        w = a.text('record', action='export', name='notes-import.gif')
+        check(os.path.exists(os.path.join(a.home, 'Pictures/LordOS QA/notes-import.gif')), f'saved only in ~/Pictures/LordOS QA ({w})')
         check(ok, f'a recording exported as a GIF ({out})')
         log = a.text('read_app_log', app='notes')
         check(not log.startswith('ERROR'), 'read_app_log answers')

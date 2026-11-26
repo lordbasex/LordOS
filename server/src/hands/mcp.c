@@ -3,7 +3,11 @@
 #include "hands.h"
 #include "../sec/json.h"
 
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -34,8 +38,8 @@ static const char TOOLS[] =
 "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"ref\":{\"type\":\"string\"},\"value\":{\"type\":[\"string\",\"boolean\",\"number\"]}},\"required\":[\"ref\",\"value\"]}},"
 "{\"name\":\"read_app_log\",\"description\":\"Read an app's own log lines (its log file, a web app's, or its lines of the shell's log), optionally only those holding a pattern.\","
 "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"app\":{\"type\":\"string\"},\"pattern\":{\"type\":\"string\"},\"max_lines\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":400}},\"required\":[\"app\"]}},"
-"{\"name\":\"record\",\"description\":\"Record what you do as an animated GIF for a QA report: start, then every action adds a frame; stop; export writes the GIF to path (absolute, .gif).\","
-"\"inputSchema\":{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"enum\":[\"start\",\"stop\",\"export\"]},\"path\":{\"type\":\"string\"}},\"required\":[\"action\"]}}"
+"{\"name\":\"record\",\"description\":\"Record what you do as an animated GIF for a QA report: start, then every action adds a frame; stop; export returns the GIF, or with name (a bare file name ending in .gif, no folders) saves it as a new file in ~/Pictures/LordOS QA, the only place lordos-mcp writes.\","
+"\"inputSchema\":{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"enum\":[\"start\",\"stop\",\"export\"]},\"name\":{\"type\":\"string\"}},\"required\":[\"action\"]}}"
 "]}";
 
 const char *mcp_tools_json(void) { return TOOLS; }
@@ -113,6 +117,49 @@ char *mcp_quote(const char *s) {
     o[k++] = '"';
     o[k] = 0;
     return o;
+}
+
+/* ---- the export ---- */
+
+int mcp_export_name_ok(const char *name) {
+    size_t n = name ? strlen(name) : 0;
+    if (n < 5 || n > 100 || name[0] == '.' || name[0] == ' ' || strcmp(name + n - 4, ".gif")) return 0;
+    for (size_t i = 0; i < n; i++) {
+        char c = name[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == ' ' || c == '.' || c == '_' || c == '-')) return 0;
+    }
+    return !strstr(name, "..");
+}
+
+/* a folder under dirfd, made when missing, opened without following a link */
+static int sub(int dirfd, const char *name) {
+    if (mkdirat(dirfd, name, 0700) && errno != EEXIST) return -1;
+    return openat(dirfd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+}
+
+int mcp_write_export(const char *home, const char *name, const uint8_t *d, size_t n, char *out, size_t on) {
+    if (out && on) out[0] = 0;
+    if (!home || home[0] != '/' || !mcp_export_name_ok(name)) { errno = EINVAL; return -1; }
+    int h = open(home, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    int pics = h >= 0 ? sub(h, "Pictures") : -1;
+    int qa = pics >= 0 ? sub(pics, "LordOS QA") : -1;
+    int e = errno;
+    if (h >= 0) close(h);
+    if (pics >= 0) close(pics);
+    if (qa < 0) { errno = e; return -1; }
+    int fd = openat(qa, name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+    e = errno;
+    close(qa);
+    if (fd < 0) { errno = e; return -1; }
+    size_t done = 0;
+    while (done < n) {
+        ssize_t w = write(fd, d + done, n - done);
+        if (w <= 0) { e = errno; close(fd); errno = e ? e : EIO; return -1; }
+        done += (size_t)w;
+    }
+    if (close(fd)) return -1;
+    if (out && on) snprintf(out, on, "%s/%s/%s", home, MCP_EXPORT_DIR, name);
+    return 0;
 }
 
 /* ---- GIF89a ---- */

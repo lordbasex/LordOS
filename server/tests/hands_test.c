@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -513,6 +514,35 @@ static void mcp(void) {
     uint8_t *g = mcp_gif(f, 2, 50, &n);
     CHECK(g && n > 800 && !memcmp(g, "GIF89a", 6) && g[n - 1] == 0x3b, "a GIF of two frames");
     free(g);
+    /* the export: a bare name in ~/Pictures/LordOS QA only, a new file, never through a link */
+    CHECK(mcp_export_name_ok("qa run 1.gif") && !mcp_export_name_ok("../x.gif") && !mcp_export_name_ok("a/b.gif") &&
+          !mcp_export_name_ok(".hidden.gif") && !mcp_export_name_ok("x.desktop") && !mcp_export_name_ok("/tmp/x.gif") &&
+          !mcp_export_name_ok("a..gif"), "export names");
+    char home[] = "/tmp/hands-export-XXXXXX", path[PATH_MAX + 128], sneaky[PATH_MAX];
+    if (mkdtemp(home)) {
+        CHECK(!mcp_write_export(home, "run.gif", (const uint8_t *)"GIF89a", 6, path, sizeof path) && strstr(path, "/Pictures/LordOS QA/run.gif"),
+              "written in ~/Pictures/LordOS QA: %s", path);
+        CHECK(mcp_write_export(home, "run.gif", (const uint8_t *)"x", 1, path, sizeof path) == -1, "never over an existing file");
+        CHECK(mcp_write_export(home, "../../x.gif", (const uint8_t *)"x", 1, path, sizeof path) == -1, "never a path");
+        snprintf(sneaky, sizeof sneaky, "%s/Pictures/LordOS QA/link.gif", home);
+        CHECK(!symlink("/tmp/hands-export-target.gif", sneaky) && mcp_write_export(home, "link.gif", (const uint8_t *)"x", 1, path, sizeof path) == -1 &&
+              access("/tmp/hands-export-target.gif", F_OK), "never through a link");
+        unlink(sneaky);
+        snprintf(sneaky, sizeof sneaky, "%s/Pictures/LordOS QA/run.gif", home);
+        unlink(sneaky);
+        snprintf(sneaky, sizeof sneaky, "%s/Pictures/LordOS QA", home);
+        rmdir(sneaky);
+        /* the folder itself a link (to ~/.config/autostart, say): refused */
+        char target[PATH_MAX];
+        snprintf(target, sizeof target, "%s/elsewhere", home);
+        mkdir(target, 0700);
+        CHECK(!symlink(target, sneaky) && mcp_write_export(home, "x.gif", (const uint8_t *)"x", 1, path, sizeof path) == -1, "never into a linked folder");
+        unlink(sneaky);
+        rmdir(target);
+        snprintf(sneaky, sizeof sneaky, "%s/Pictures", home);
+        rmdir(sneaky);
+        rmdir(home);
+    }
     char *q = mcp_quote("a\"b\n\x01");
     CHECK(q && !strcmp(q, "\"a\\\"b\\n\\u0001\""), "JSON quoting [%s]", q ? q : "");
     free(q);

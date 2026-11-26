@@ -27,6 +27,9 @@
 #   /usr/bin/lumo                         ✨ AI Writing from the terminal (docs/AI.md "Writing from the terminal"; awaiting the
 #                                         maintainer's approval): a link to /usr/lib/lordos/bin/lumo, which asks the
 #                                         session's lord-server over the session bus (org.lordos.Writing1)
+#   /usr/bin/lordos-mcp                   Hands (docs/HANDS.md; approved by the maintainer on 2026-11-26): the MCP server that lets
+#                                         an AI agent (Claude Code, Lumo) use the desktop through org.lordos.Hands1; a link to
+#                                         /usr/lib/lordos/bin/lordos-mcp, next to lord-server for its --headless QA desktop
 #   /usr/bin/lordos-issue                 what a bug report needs, ready to paste (CONTRIBUTING.md)
 #   /usr/lib/lordos/lordos-dm-check       another display manager enabled next to lordos.service (#187): postinst warns
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
@@ -116,6 +119,7 @@ fi
 [ -x server/build/lordos-sysreport ] || { echo "missing server/build/lordos-sysreport (make -C server)" >&2; exit 1; }
 [ -x server/build/machines ] || { echo "missing server/build/machines (make -C server)" >&2; exit 1; }
 [ -x server/build/lumo ] || { echo "missing server/build/lumo (make -C server)" >&2; exit 1; }
+[ -x server/build/lordos-mcp ] || { echo "missing server/build/lordos-mcp (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-sessiond ] || { echo "missing server/build/lord-sessiond (make -C server, with libssl-dev, libsrtp2-dev and libusrsctp-dev)" >&2; exit 1; }
 # The helpers make builds only when their -dev packages are installed (docs/VM-SETUP.md). A package without one of
 # them loses a feature with no error anywhere (0.8.8.6 shipped without lord-media: Screenshots saved and copied
@@ -191,6 +195,10 @@ ln -s machines "$PKG/usr/share/bash-completion/completions/lordvm"
 install -m 755 server/build/lumo "$L/bin/lumo"
 "$STRIP" --strip-unneeded "$L/bin/lumo" 2>/dev/null || true
 ln -s ../lib/lordos/bin/lumo "$PKG/usr/bin/lumo"
+# Hands: next to lord-server, which its --headless QA desktop starts (with ../themes and ../assets)
+install -m 755 server/build/lordos-mcp "$L/bin/lordos-mcp"
+"$STRIP" --strip-unneeded "$L/bin/lordos-mcp" 2>/dev/null || true
+ln -s ../lib/lordos/bin/lordos-mcp "$PKG/usr/bin/lordos-mcp"
 # the visual test bench: a plain Wayland client, launched like any Linux app
 [ -x server/build/lordos-testbench ] && {
     install -m 755 server/build/lordos-testbench "$PKG/usr/bin/lordos-testbench"
