@@ -3,6 +3,7 @@
 #include "webinspect.h"
 #include "webscheme.h"
 #include "websearch.h"
+#include "webmem.h"
 #include "../sec/json.h"
 #include "../lordlog.h"
 
@@ -191,6 +192,9 @@ static pid_t spawn(char *const argv[], int chan, const char *logname, int s) {
 
 /* ---- the processes ---- */
 
+/* used: 0 free, KID_RUNNING, or KID_ENDING (killed, not reaped yet: a process stuck in the kernel; reap() waits for it,
+ * and it is no longer the app's process) */
+enum { KID_RUNNING = 1, KID_ENDING = 2 };
 typedef struct { int used, inspect; pid_t pid; char app[WEBREG_ID_MAX + 1], profile[WEBREG_ID_MAX + 1]; } Kid;
 static Kid kids[WEB_MAX_RUNNING];
 
@@ -209,34 +213,56 @@ void webmgr_reap(void) { reap(); }
 
 static Kid *kid_of(const char *app, const char *profile) {
     for (int i = 0; i < WEB_MAX_RUNNING; i++)
-        if (kids[i].used && !strcmp(kids[i].app, app) && !strcmp(kids[i].profile, profile)) return &kids[i];
+        if (kids[i].used == KID_RUNNING && !strcmp(kids[i].app, app) && !strcmp(kids[i].profile, profile)) return &kids[i];
     return NULL;
 }
 
-/* Ends a process and its WebKit processes (its own session): TERM, up to 2 s, then KILL. */
+static void pause_ms(long ms) {
+    struct timespec ts = { ms / 1000, (ms % 1000) * 1000000 };
+    nanosleep(&ts, NULL);
+}
+
+/* Ends a process and its WebKit processes: TERM to its own session's group (spawn's setsid: WebKit's processes are in
+ * it), up to 2 s, then KILL; then KILL to each process that was under it before and still is the same process (pid
+ * and start time), in case one left the group. Only a process of the kids table: one lord-server started. A process
+ * that won't go even then (stuck in the kernel) is left to reap() and no longer counts as the app's. */
 static void end_kid(Kid *k) {
+    pid_t under[WEBMEM_MAX_PROCS];
+    unsigned long long since[WEBMEM_MAX_PROCS];
+    int n = webmem_descendants("/proc", k->pid, under, WEBMEM_MAX_PROCS);
+    for (int i = 0; i < n; i++) since[i] = webmem_start_time("/proc", under[i]);
     kill(-k->pid, SIGTERM);
     double t0 = now_ms();
-    int st;
-    while (waitpid(k->pid, &st, WNOHANG) == 0) {
-        if (now_ms() - t0 > 2000) { kill(-k->pid, SIGKILL); waitpid(k->pid, &st, 0); break; }
-        struct timespec ts = { 0, 20 * 1000000 };
-        nanosleep(&ts, NULL);
+    int st, gone = 0;
+    while (!gone) {
+        pid_t r = waitpid(k->pid, &st, WNOHANG);
+        if (r == k->pid || (r < 0 && errno == ECHILD)) { gone = 1; break; }
+        if (now_ms() - t0 > 2000) break;
+        pause_ms(20);
     }
-    k->used = 0;
+    if (!gone) {
+        kill(-k->pid, SIGKILL);
+        for (double t1 = now_ms(); !gone && now_ms() - t1 < 1000; pause_ms(10)) {
+            pid_t r = waitpid(k->pid, &st, WNOHANG);
+            gone = r == k->pid || (r < 0 && errno == ECHILD);
+        }
+    }
+    for (int i = 0; i < n; i++)
+        if (since[i] && webmem_start_time("/proc", under[i]) == since[i]) kill(under[i], SIGKILL);
+    k->used = gone ? 0 : KID_ENDING;
 }
 
 static void end_app(const char *app, const char *profile) {
     reap();
     for (int i = 0; i < WEB_MAX_RUNNING; i++)
-        if (kids[i].used && !strcmp(kids[i].app, app) && (!profile || !strcmp(kids[i].profile, profile))) end_kid(&kids[i]);
+        if (kids[i].used == KID_RUNNING && !strcmp(kids[i].app, app) && (!profile || !strcmp(kids[i].profile, profile))) end_kid(&kids[i]);
 }
 
 int webmgr_running(WebRunning *out, int max) {
     reap();
     int n = 0;
     for (int i = 0; i < WEB_MAX_RUNNING && n < max; i++) {
-        if (!kids[i].used) continue;
+        if (kids[i].used != KID_RUNNING) continue;
         snprintf(out[n].app, sizeof out[n].app, "%s", kids[i].app);
         snprintf(out[n].profile, sizeof out[n].profile, "%s", kids[i].profile);
         out[n].pid = kids[i].pid;
@@ -265,7 +291,7 @@ int webmgr_owner(pid_t pid, char *app, char *profile) {
     reap();
     for (int depth = 0; pid > 1 && depth < 8; depth++) {
         for (int i = 0; i < WEB_MAX_RUNNING; i++)
-            if (kids[i].used && kids[i].pid == pid) {
+            if (kids[i].used == KID_RUNNING && kids[i].pid == pid) {
                 snprintf(app, WEBREG_ID_MAX + 1, "%s", kids[i].app);
                 snprintf(profile, WEBREG_ID_MAX + 1, "%s", kids[i].profile);
                 return 0;
@@ -883,7 +909,7 @@ static const char *start(const char *app, const char *profile, int inspect, int 
     snprintf(logname, sizeof logname, "%s-%s", app, profile);
     pid_t pid = spawn(argv, -1, logname, s);
     if (pid < 0) return "webapps.startFailed";
-    k->used = 1;
+    k->used = KID_RUNNING;
     k->inspect = inspect;
     k->pid = pid;
     snprintf(k->app, sizeof k->app, "%s", app);
@@ -917,7 +943,7 @@ const char *webmgr_set_developer(int on) {
     if (!on) {
         /* off now: the windows that have developer tools lose them (and close) */
         reap();
-        for (int i = 0; i < WEB_MAX_RUNNING; i++) if (kids[i].used && kids[i].inspect) end_kid(&kids[i]);
+        for (int i = 0; i < WEB_MAX_RUNNING; i++) if (kids[i].used == KID_RUNNING && kids[i].inspect) end_kid(&kids[i]);
     }
     return NULL;
 }
@@ -962,4 +988,48 @@ const char *webmgr_inspect(const char *app, const char *profile, int *already) {
     if (k) end_kid(k);                              /* WPE 2.48 turns its inspector on only as the process starts */
     int raised = 0;
     return start(app, profile, 1, &raised);
+}
+
+/* ---- force quit and restart (docs/WEBAPPS.md, "When a web app stops answering") ---- */
+
+const char *webmgr_quit(const char *app, const char *profile, int *was) {
+    *was = 0;
+    if (!webreg_id_ok(app) || !webreg_id_ok(profile)) return "webapps.badId";
+    reap();
+    Kid *k = kid_of(app, profile);
+    if (!k) return NULL;
+    *was = 1;
+    end_kid(k);
+    return NULL;
+}
+
+const char *webmgr_restart(const char *app, const char *profile, int *was) {
+    *was = 0;
+    if (!webreg_id_ok(app) || !webreg_id_ok(profile)) return "webapps.badId";
+    WebApp *a;
+    const char *e = with_app(app, &a);              /* the app and profile are there before anything ends */
+    if (e) return e;
+    int known = webreg_profile_index(a, profile) >= 0;
+    free(a);
+    if (!known) return "webapps.noProfile";
+    if (!webmgr_available()) return "webapps.noRuntime";
+    reap();
+    Kid *k = kid_of(app, profile);
+    /* with developer tools on it starts with them again, only while developer mode still is */
+    int inspect = k && k->inspect && webmgr_developer();
+    if (k) { *was = 1; end_kid(k); }
+    int raised = 0;
+    return start(app, profile, inspect, &raised);
+}
+
+int webmgr_restart_all(void) {
+    WebRunning r[WEB_MAX_RUNNING];
+    int n = webmgr_running(r, WEB_MAX_RUNNING), done = 0;
+    for (int i = 0; i < n; i++) {
+        int was = 0;
+        const char *e = webmgr_restart(r[i].app, r[i].profile, &was);
+        if (e) fprintf(stderr, "webapps: %s/%s not restarted: %s\n", r[i].app, r[i].profile, e);
+        else done++;
+    }
+    return done;
 }

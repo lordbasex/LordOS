@@ -21,6 +21,13 @@ typedef struct {
  * smaps_rollup cannot be read. */
 int webmem_tree(const char *proc, pid_t pid, WebMem *out);
 
+/* pid's descendants under proc (not pid itself), breadth first, at most max (and WEBMEM_MAX_PROCS): their count. For
+ * ending a lord-web with every WebKit process under it (web/webmgr.c), whatever session or group they are in. */
+int webmem_descendants(const char *proc, pid_t pid, pid_t *out, int max);
+/* pid's start time (field 22 of its stat: clock ticks since boot), 0 when it can't be read: with the pid it names one
+ * process, never another that got the same pid later. */
+unsigned long long webmem_start_time(const char *proc, pid_t pid);
+
 /* The "Pss:" line of a smaps_rollup text, in kB; -1 when there is none. */
 long long webmem_pss_line(const char *text);
 

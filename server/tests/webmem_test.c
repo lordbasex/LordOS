@@ -80,6 +80,24 @@ int main(void) {
     CHECK(m.procs + m.unreadable <= WEBMEM_MAX_PROCS && m.procs == WEBMEM_MAX_PROCS, "bounded: %d", m.procs);
     CHECK(m.pss_kb == 1000 + 10LL * (WEBMEM_MAX_PROCS - 1), "bounded sum %lld", m.pss_kb);
 
+    /* the processes to end with a lord-web (webmgr.c): its descendants, never itself, its parent or a sibling */
+    pid_t ds[WEBMEM_MAX_PROCS];
+    int dn = webmem_descendants(root, 100, ds, WEBMEM_MAX_PROCS);
+    int has[5] = { 0 };
+    for (int i = 0; i < dn; i++) for (int k = 0; k < 5; k++) if (ds[i] == (pid_t[]){ 101, 102, 103, 104, 100 }[k]) has[k] = 1;
+    CHECK(dn == 4 && has[0] && has[1] && has[2] && has[3] && !has[4], "the descendants of 100: %d", dn);
+    for (int i = 0; i < dn; i++) CHECK(ds[i] != 50 && ds[i] != 200 && ds[i] != 201 && ds[i] != 300, "not another's: %d", (int)ds[i]);
+    CHECK(webmem_descendants(root, 102, ds, WEBMEM_MAX_PROCS) == 0, "a leaf has none");
+    CHECK(webmem_descendants(root, 1, ds, WEBMEM_MAX_PROCS) == 0 && webmem_descendants(root, 999, ds, WEBMEM_MAX_PROCS) == 0, "init, or not there");
+    CHECK(webmem_descendants(root, 100, ds, 2) == 2, "at most max");
+    CHECK(webmem_descendants(root, 400, ds, WEBMEM_MAX_PROCS) == WEBMEM_MAX_PROCS, "bounded");
+    /* a start time: field 22 of a full stat line, a name with spaces and parentheses; none when it can't be read */
+    put("103/stat", "103 (WebKit Network (x) )) S 100 100 100 0 -1 4194560 100 0 0 0 5 6 0 0 20 0 9 0 7654321 1000 50\n");
+    CHECK(webmem_start_time(root, 103) == 7654321ULL, "start time %llu", webmem_start_time(root, 103));
+    CHECK(webmem_start_time(root, 101) == 0, "a short stat line: none");
+    CHECK(webmem_start_time(root, 999) == 0 && webmem_start_time(root, 1) == 0, "no process, or init");
+    CHECK(webmem_start_time("/proc", getpid()) > 0, "this process's own");
+
     /* the line parser */
     CHECK(webmem_pss_line("Rss: 10 kB\nPss: 7 kB\n") == 7, "Pss");
     CHECK(webmem_pss_line("Pss_Anon: 3 kB\nPss: 9 kB\n") == 9, "Pss_Anon is not the Pss: line");

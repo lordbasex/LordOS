@@ -220,9 +220,15 @@ void web_inspect_watch(Web *w) {
 /* ---- one process per app and profile ---- */
 
 /* Show(token): anyone may (a second start of the app does); Edit(command), SetColorScheme("light" | "dark") and
- * SetUserAgent("chrome" | "edge" | "firefox" | "lordos"): only lord-server, checked by pid (webbus.c) */
+ * SetUserAgent("chrome" | "edge" | "firefox" | "lordos"): only lord-server, checked by pid (webbus.c). Ping() → "ok" or
+ * "page": anyone may; answered from this main loop, so an answer says lord-web isn't hung (lord-server's watch,
+ * ui/webalive.c); "page" says a ping of the page is late (webhang.c), which lord-web handles itself. */
 static void show_call(GDBusConnection *c, const char *sender, const char *path, const char *iface, const char *method, GVariant *p, GDBusMethodInvocation *inv, gpointer d) {
     (void)c; (void)path; (void)iface;
+    if (!strcmp(method, "Ping")) {
+        g_dbus_method_invocation_return_value(inv, g_variant_new("(s)", web_hang_word()));
+        return;
+    }
     if (!strcmp(method, "Show")) {
         const char *token = NULL;
         g_variant_get(p, "(&s)", &token);
@@ -259,6 +265,7 @@ static void show_call(GDBusConnection *c, const char *sender, const char *path, 
 }
 static const GDBusInterfaceVTable show_vt = { show_call, NULL, NULL, { 0 } };
 static const char SHOW_XML[] = "<node><interface name='" SHOW_IFACE "'><method name='Show'><arg type='s' direction='in'/></method>"
+                               "<method name='Ping'><arg type='s' direction='out'/></method>"
                                "<method name='Edit'><arg type='s' direction='in'/></method>"
                                "<method name='SetColorScheme'><arg type='s' direction='in'/></method>"
                                "<method name='SetUserAgent'><arg type='s' direction='in'/></method></interface></node>";

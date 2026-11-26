@@ -4,6 +4,7 @@
 #include "../src/ui/portal.h"
 #include "../src/ui/gshort.h"
 #include "../src/ui/webask.h"
+#include "../src/ui/webalive.h"
 #include "../src/wl/keygrab.h"
 #include "../src/vault/dbus.h"
 #include <linux/input-event-codes.h>
@@ -47,6 +48,9 @@ int portal_shot_pixel(const CastSource *src, int x, int y, double rgb[3]) { (voi
 void webask_attach(DConn *c) { (void)c; }
 void webask_call(DConn *c, const DMsg *m) { (void)c; (void)m; }
 int webask_reply(DConn *c, const DMsg *m) { (void)c; (void)m; return 0; }
+void webalive_attach(DConn *c) { (void)c; }
+void webalive_lost(void) {}
+int webalive_reply(const DMsg *m) { (void)m; return 0; }
 void webask_gone(const char *name) { (void)name; }
 void webask_appeared(const char *name) { (void)name; }
 void webask_lost(void) {}

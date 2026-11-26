@@ -275,6 +275,8 @@ void web_reload(Web *w) {
 
 void web_show(Web *w, const char *token) {
     if (w->win) webwin_show(w->win, token);
+    /* the window maps only with a frame from the web process: a page that hangs would show nothing, so it must answer */
+    web_hang_urgent(w);
     if (w->offline_uri && w->offline_page) { w->offline_failures = 0; offline_retry(w); }
 }
 
@@ -525,6 +527,13 @@ static void on_crash(WebKitWebView *v, WebKitWebProcessTerminationReason why, gp
     Web *w = d;
     static gint64 last;
     gint64 now = g_get_monotonic_time();
+    if (web_hang_take(w)) {
+        /* ended by webhang.c because the page didn't answer: the page again in a new web process, and the person is told */
+        w->offline_retrying = 0;
+        web_reload(w);
+        webbus_notify_text(w, weblang("hang.reloaded"), "");
+        return;
+    }
     fprintf(stderr, "lord-web: the web process ended (%s)\n", why == WEBKIT_WEB_PROCESS_CRASHED ? "crashed" : why == WEBKIT_WEB_PROCESS_EXCEEDED_MEMORY_LIMIT ? "memory limit" : "terminated");
     if (why == WEBKIT_WEB_PROCESS_TERMINATED_BY_API || (last && now - last < CRASH_WINDOW_US)) { web_quit(w, 1); return; }
     last = now;
@@ -657,6 +666,7 @@ int web_engine_start(Web *w) {
     g_signal_connect(w->view, "notify::uri", G_CALLBACK(on_uri), w);
     g_signal_connect(w->view, "close", G_CALLBACK(on_close), w);
     g_signal_connect(w->view, "web-process-terminated", G_CALLBACK(on_crash), w);
+    web_hang_start(w);
     g_signal_connect(w->view, "notify::is-playing-audio", G_CALLBACK(on_audio), w);
     g_signal_connect(w->view, "load-changed", G_CALLBACK(on_load), w);
     g_signal_connect(w->view, "load-failed", G_CALLBACK(on_load_failed), w);

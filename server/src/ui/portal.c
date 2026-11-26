@@ -14,6 +14,7 @@
 #include "portalcheck.h"
 #include "gshort.h"
 #include "webask.h"
+#include "webalive.h"
 #include "../hw/hw.h"
 #include "../hw/jbuf.h"
 #include "../fsops.h"
@@ -1922,6 +1923,7 @@ void portal_color_chosen(int id, const CastSource *src, int x, int y) {
 
 /* ---- the bus: who asked, and who left ---- */
 static void on_reply(const DMsg *m) {
+    if (webalive_reply(m)) return;          /* a lord-web's answer to lord-server's Ping (webalive.h) */
     if (!m->sender || strcmp(m->sender, "org.freedesktop.DBus")) return;
     if (webask_reply(&conn, m)) return;
     for (int i = 0; i < ngsess; i++) {
@@ -2160,6 +2162,7 @@ int portal_start(void) {
     up = 1;
     csm_init(&csm);
     webask_attach(&conn);                   /* lord-server's own calls to web apps (Show) */
+    webalive_attach(&conn);                 /* and their Ping: a lord-web that stopped answering is started again */
     if (!only_web)
         fprintf(stderr, "portal: Settings, FileChooser, OpenURI, Inhibit, GlobalShortcuts, ScreenCast and Screenshot on the session bus%s\n",
                 ss ? ", and " SS_NAME : " (" SS_NAME " is another program's)");
@@ -2181,6 +2184,7 @@ void portal_dispatch(void) {
         up = 0;
         nholds = 0;                         /* nobody can let them go any more */
         webask_lost();
+        webalive_lost();
         while (nopens) open_drop(nopens - 1, 1);
         while (ngsess) gsess_drop(ngsess - 1);  /* no app can get a shortcut any more */
         nheld = 0;

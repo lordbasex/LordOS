@@ -40,6 +40,7 @@
 #include "webscheme.h"
 #include "webinspect.h"
 #include "webguard.h"
+#include "webwatch.h"
 
 #include <limits.h>
 #include <sys/types.h>
@@ -205,6 +206,13 @@ void webbus_edit(Web *w, const char *sender, int cmd);
 void webbus_scheme(Web *w, const char *sender, int scheme);
 /* org.lordos.WebApp1.SetUserAgent(chrome|edge|firefox|lordos) from sender: the same check, then web_set_user_agent */
 void webbus_user_agent(Web *w, const char *sender, int kind);
+
+/* webhang.c: the page's watch (docs/WEBAPPS.md, "When a web app stops answering"; webwatch.h's WEBWATCH_PAGE) */
+void web_hang_start(Web *w);                             /* after the view is made: the ping every 15 s */
+void web_hang_urgent(Web *w);                            /* the window is shown: a ping now, with the short wait */
+int  web_hang_take(Web *w);                              /* web-process-terminated: 1 when lord-web ended it (a hang) */
+const char *web_hang_word(void);                         /* Ping's answer: "ok", or "page" while a page ping is late */
+void web_hang_set_limits(WebWatchLimits lim);            /* tests/webhang_check.c: shorter than WEBWATCH_PAGE */
 
 /* webtray.c */
 WebTray *webtray_new(Web *w);

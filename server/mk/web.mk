@@ -41,9 +41,9 @@ endif
 # the language of its own words, an app that is offline (weboffline.h: which load errors are the network's, the retry's delay, its page),
 # the gate in front of the developer tools (webguard.h: the request head, Host, Origin, the one-time address and the cookie)
 WEB_PURE_SRC := src/web/webargs.c src/web/webreg.c src/web/weburl.c src/web/webmanifest.c src/web/webdl.c src/web/webaxis.c src/web/webpage.c \
-                src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/websearch.c src/web/webscheme.c src/web/webinspect.c src/web/webguard.c src/web/webua.c src/web/webcall.c src/spellang.c src/sec/json.c
+                src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/websearch.c src/web/webscheme.c src/web/webinspect.c src/web/webguard.c src/web/webua.c src/web/webcall.c src/web/webwatch.c src/spellang.c src/sec/json.c
 WEB_PURE_HDR := src/web/webargs.h src/web/webreg.h src/web/weburl.h src/web/webmanifest.h src/web/webdl.h src/web/webaxis.h src/web/webpage.h \
-                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/websearch.h src/web/webscheme.h src/web/webinspect.h src/web/webguard.h src/web/weblangid.h src/web/weboffline.h src/web/webframe.h src/web/webua.h src/web/webcall.h src/spellang.h src/sec/json.h
+                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/websearch.h src/web/webscheme.h src/web/webinspect.h src/web/webguard.h src/web/weblangid.h src/web/weboffline.h src/web/webframe.h src/web/webua.h src/web/webcall.h src/web/webwatch.h src/spellang.h src/sec/json.h
 
 # Chrome's Client Hints and navigator.userAgentData from one table (webua.h), the call log's lines (webcall.h)
 test: build/webua-test
@@ -80,7 +80,7 @@ else
 WEB_BACK_SRC := src/web/webback_legacy.c src/web/webshm.c
 endif
 WEB_SRC := src/web/webmain.c src/web/webengine.c src/web/webwin.c $(WEB_BACK_SRC) src/web/webbus.c src/web/webtray.c src/web/webprobe.c \
-           src/web/weblang.c src/web/webxfer.c src/web/webselect.c src/web/webdark.c src/web/webproxy.c src/web/webhints.c src/web/webcalls.c src/web/webmenu.c $(WEB_PURE_SRC) src/sec/cgroup.c src/sec/sandbox.c
+           src/web/weblang.c src/web/webxfer.c src/web/webselect.c src/web/webdark.c src/web/webproxy.c src/web/webhints.c src/web/webcalls.c src/web/webmenu.c src/web/webhang.c $(WEB_PURE_SRC) src/sec/cgroup.c src/sec/sandbox.c
 WEB_HDR := src/web/web.h src/web/webwin.h src/web/webback.h src/web/webshm.h $(WEB_PURE_HDR) src/sec/cgroup.h src/sec/sandbox.h
 
 # WebKit's headers are not ours: -isystem, so -Wall -Wextra apply to lord-web's own code only
@@ -132,6 +132,14 @@ build/webcalls-check: tests/webcalls_check.c src/web/webhints.c src/web/webcalls
 	$(CC) $(CPPFLAGS) $(WEB_CFLAGS) $(patsubst -I%,-isystem %,$(shell pkg-config --cflags wpe-platform-headless-2.0)) $(CFLAGS) $(WARN) -std=c11 \
 	    -o $@ tests/webcalls_check.c src/web/webhints.c src/web/webcalls.c $(WEB_PURE_SRC) $(WEB_LIBS) $(shell pkg-config --libs wpe-platform-headless-2.0) -lm
 test: build/webcalls-check
+
+# lord-web's watch over its page (src/web/webhang.c) on the real engine, headless: a page that answers is left alone, one
+# that hangs has its web process ended and a new one works (tests/webhang_check.c, run by tests/run_suites.sh)
+build/webhang-check: tests/webhang_check.c src/web/webhang.c src/web/webwatch.c src/web/webwatch.h src/web/web.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(WEB_CFLAGS) $(patsubst -I%,-isystem %,$(shell pkg-config --cflags wpe-platform-headless-2.0)) $(CFLAGS) $(WARN) -std=c11 \
+	    -o $@ tests/webhang_check.c src/web/webhang.c src/web/webwatch.c $(WEB_LIBS) $(shell pkg-config --libs wpe-platform-headless-2.0) -lm
+test: build/webhang-check
 endif
 
 # what the context menu takes from WebKit, headless (tests/web_menu_check.c): spelling suggestions with the dictionaries

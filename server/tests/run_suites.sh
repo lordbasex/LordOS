@@ -207,6 +207,8 @@ EOF
     else skip "portal-gs-test" "dbus-run-session"; fi
     if have dbus-run-session; then run "portal-cast-test (ScreenCast restore token, Screenshot, FileChooser lending)" dbus-run-session -- build/portal-cast-test
     else skip "portal-cast-test" "dbus-run-session"; fi
+    if have dbus-run-session; then run "webalive-test (a web app that hangs is started again, over a private bus)" dbus-run-session -- build/webalive-test
+    else skip "webalive-test" "dbus-run-session"; fi
     run "fsasync-test" build/fsasync-test
     run "bgsave-test (#250: saves off the interface's thread)" build/bgsave-test
     run "fswatch-test" build/fswatch-test
@@ -1096,6 +1098,9 @@ EOF
     if [ -x build/webcalls-check ] && have python3 && have bwrap && have xdg-dbus-proxy; then
         run "webcalls-check (Client Hints, userAgentData, call log, WebRTC loopback)" python3 -I tests/webcalls_check.py build/webcalls-check
     else skip "webcalls-check" "WPEPlatform (build/webcalls-check), bubblewrap, xdg-dbus-proxy and python3"; fi
+    if [ -x build/webhang-check ] && have bwrap && have xdg-dbus-proxy; then
+        for m in fine hang urgent; do run "webhang-check $m (a page that stops answering gets a new web process)" build/webhang-check $m; done
+    else skip "webhang-check" "WPEPlatform (build/webhang-check), bubblewrap and xdg-dbus-proxy"; fi
     # (0.8.8.6) Claude Code in the Terminal's footer: the status line bridge and the footer's model
     run "claude-bridge-test (lord-claude-status)" sh tests/claude_bridge_test.sh
     if have node; then run "terminal-claude-test (apps/terminal/claude.js)" node tests/terminal_claude_test.mjs

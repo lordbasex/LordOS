@@ -39,7 +39,12 @@
  *   icons()                             { [app]: path } of the cached icons (list() and get() already use them)
  *   badges()                            [{ app, profile, count }]: the unread counts lord-web set (SetBadge, webask.c)
  *   launch(app, profile)                → 'started' or 'running' (lord-server then asks it to show its window)
+ *                                       (and a ping: one that doesn't answer within 5 s is started again, webalive.h)
  *   running()                           [{ app, profile, pid, inspect }] (inspect: started with developer tools on)
+ *   quit(app, profile)                  Force Quit: that profile's lord-web ended (its group and the WebKit processes
+ *                                       under it); → true when it ran. Only a process lord-server started
+ *   restart(app, profile)               → 'restarted' or 'started': ended when it runs, then started again
+ *   restartAll()                        → how many: every running lord-web restarted (Restart web apps engine)
  *   memory(app)                         null when none of its profiles runs; else { kb, processes, unreadable,
  *                                       profiles: [{ profile, kb, processes }] }: the Pss of each running lord-web of
  *                                       the app and of its WebKit processes (web/webmem.c; read-only, bounded)
@@ -61,6 +66,7 @@
 #include "js_err.h"
 #include "js_sys.h"
 #include "webask.h"
+#include "webalive.h"
 #include "webicon.h"
 #include "../hw/notifyd.h"
 #include "../sec/json.h"
@@ -560,10 +566,44 @@ static JSValue f_launch(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         snprintf(wid, sizeof wid, "lordos-web.%s.%s", app, prof);
         const char *tk = xact_issue(xact_now(), XACT_LAUNCH_MS, 1, wid);
         if (webask_show(app, prof, tk)) fprintf(stderr, "webapps: %s/%s is running but the session bus is not there to show it\n", app, prof);
+        /* and it must answer within 5 s: a lord-web that hangs shows nothing, so it is started again (webalive.h) */
+        webalive_urgent(app, prof);
     }
     JS_FreeCString(c, app);
     JS_FreeCString(c, prof);
     return done(c, err, JS_NewString(c, raised ? "running" : "started"));
+}
+
+/* Force Quit and Restart (Settings → Web apps, the window's menu; the shell asked the person first): only the lord-web
+ * lord-server started for that app and profile (webmgr's table), never a pid from JS */
+static JSValue f_quit(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *app = arg_str(c, argc, argv, 0), *prof = arg_str(c, argc, argv, 1);
+    int was = 0;
+    const char *err = !app || !prof ? "sys.badArgument" : webmgr_quit(app, prof, &was);
+    if (!err && was) fprintf(stderr, "webapps: %s/%s force quit\n", app, prof);
+    JS_FreeCString(c, app);
+    JS_FreeCString(c, prof);
+    return done(c, err, JS_NewBool(c, was));
+}
+
+static JSValue f_restart(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *app = arg_str(c, argc, argv, 0), *prof = arg_str(c, argc, argv, 1);
+    int was = 0;
+    const char *err = !app || !prof ? "sys.badArgument" : webmgr_restart(app, prof, &was);
+    if (!err) fprintf(stderr, "webapps: %s/%s %s by the person\n", app, prof, was ? "restarted" : "started");
+    JS_FreeCString(c, app);
+    JS_FreeCString(c, prof);
+    return done(c, err, JS_NewString(c, was ? "restarted" : "started"));
+}
+
+/* Settings → Web apps → Restart web apps engine: every running lord-web, ended and started again */
+static JSValue f_restart_all(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    int n = webmgr_restart_all();
+    fprintf(stderr, "webapps: engine restarted by the person: %d app windows\n", n);
+    return JS_NewInt32(c, n);
 }
 
 static JSValue f_running(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -740,6 +780,9 @@ static const JSCFunctionListEntry webapps_funcs[] = {
     JS_CFUNC_DEF("badges", 0, f_badges),
     JS_CFUNC_DEF("launch", 2, f_launch),
     JS_CFUNC_DEF("running", 0, f_running),
+    JS_CFUNC_DEF("quit", 2, f_quit),
+    JS_CFUNC_DEF("restart", 2, f_restart),
+    JS_CFUNC_DEF("restartAll", 0, f_restart_all),
     JS_CFUNC_DEF("memory", 1, f_memory),
     JS_CFUNC_DEF("owner", 1, f_owner),
     JS_CFUNC_DEF("answer", 2, f_answer),

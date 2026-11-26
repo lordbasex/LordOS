@@ -78,6 +78,7 @@
 #include "media/media.h"
 #include "media/svgicon.h"
 #include "web/webmgr.h"
+#include "ui/webalive.h"
 #include "app/app.h"
 #include "app/apphost_bc.h"
 #include "sec/broker.h"
@@ -3429,6 +3430,9 @@ int main(int argc, char **argv) {
         if (mrd >= 0 && (delay < 0 || mrd < delay)) delay = mrd;
         media_reap();                       /* a stopped lord-media: not left a zombie */
         webmgr_reap();                      /* nor a lord-web that ended */
+        webalive_tick(now_ms());            /* and one that stopped answering is started again (ui/webalive.h) */
+        double wad = webalive_timeout(now_ms());
+        if (wad >= 0 && (delay < 0 || wad < delay)) delay = wad;
         double zd = media_reap_timeout();
         if (zd >= 0 && (delay < 0 || zd < delay)) delay = zd;
         /* sin monitor y sin nadie mirando no se dibuja (al conectarse alguien llega un cuadro entero) */

@@ -75,6 +75,16 @@ int  webmgr_running(WebRunning *out, int max);  /* the live processes (the ended
 /* The app and profile of the lord-web process that pid is, or descends from; 0 found, -1 not one of ours. */
 int  webmgr_owner(pid_t pid, char *app, char *profile);
 
+/* Force quit and restart (docs/WEBAPPS.md, "When a web app stops answering"): Settings → Web apps, the window's menu,
+ * and ui/webalive.c when a lord-web stops answering its ping. Only a lord-web this lord-server started for that app and
+ * profile (the kids table), never a pid from JS: its process group gets TERM, then KILL after 2 s, then each WebKit
+ * process that was under it and is still the same process (pid and start time, webmem.h) gets KILL.
+ * webmgr_quit: *was = 1 when it ran. webmgr_restart: ends it when it runs (*was = 1), then starts it again (with
+ * developer tools again only while developer mode is on). webmgr_restart_all: every running one; how many started again. */
+const char *webmgr_quit(const char *app, const char *profile, int *was);
+const char *webmgr_restart(const char *app, const char *profile, int *was);
+int  webmgr_restart_all(void);
+
 /* Developer mode (Settings → Web Apps): 1 on, 0 off (no file, or one that isn't valid). Turning it off ends every
  * lord-web started with --inspect. */
 int  webmgr_developer(void);
