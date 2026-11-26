@@ -2,7 +2,8 @@
 // selection to openWriting's panel and gets the final text back only through onReplace, after the person's click;
 // apps never reach the model (lord.writing exists only in the desktop's own context). The prompts are fixed in
 // lord-server (server/src/llm/writing.c); the model's answer is plain text (writingmodel.js cleanOutput), shown as it
-// streams in and inserted only on Replace. Off by default: Settings → AI → Writing (settings.writing.on).
+// streams in and inserted only on Replace. On whenever a model is installed, unless the person turned it off in
+// Settings → AI → Writing (settings.writing.on === false, never turned back on by itself; writingmodel.js writingEnabled).
 import { useEffect, useRef, useState } from 'react';
 import { View, Text } from '@lordos/runtime';
 import { useTheme } from './theme.js';
@@ -10,22 +11,24 @@ import { t as tr, tOptional, locale } from './i18n.js';
 import { settings } from './settings.js';
 import { Overlay } from './layers.js';
 import { Button, Spinner, ScrollView, takeTextFocus, releaseTextFocus, focusToken, restoreFocus, textFocusOwner } from './components.jsx';
-import { writingModel, writingStart, writingStep, canReplace, translateTargets, writingMenuItem, tooLong, offersWriting } from './writingmodel.js';
+import { writingModel, writingEnabled, writingStart, writingStep, canReplace, translateTargets, writingMenuItem, tooLong, offersWriting } from './writingmodel.js';
 import { spellLangs } from './spell.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.writing && typeof lord.writing.start === 'function' ? lord.writing : null);
 const engine = () => (typeof lord !== 'undefined' && lord.sentinela) || null;
 
-export const writingOn = () => !!(settings.get().writing || {}).on;
+// the person's choice (Settings → AI → Writing): true, false, or null when never made; on by default with a model
+export const writingChoice = () => { const w = settings.get().writing || {}; return typeof w.on === 'boolean' ? w.on : null; };
+export const writingOn = () => writingChoice() !== false;
 export function setWritingOn(on) { settings.set((s) => ({ ...s, writing: { ...(s.writing || {}), on: !!on } })); }
 
 // the model to write with, or null (Writing off, no engine, no model); checked when a menu opens
 export function writingReady() {
-  if (!api() || !writingOn()) return null;
+  if (!api()) return null;
   const e = engine();
   let available = false, models = [];
   try { available = !!e?.available(); models = e?.models() || []; } catch (err) { available = false; }
-  return writingModel({ on: true, available, models, chosen: (settings.get().sentinela || {}).model });
+  return writingModel({ on: writingEnabled(writingChoice(), models.length > 0), available, models, chosen: (settings.get().sentinela || {}).model });
 }
 
 // The ✨ AI row for a field's menu, or null when it isn't offered. open(action, target) opens the panel.

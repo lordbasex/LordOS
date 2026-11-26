@@ -3,7 +3,7 @@
 // answer made plain text, and the panel's flow against a fake lord.writing (streamed, then Replace only on the click,
 // only where the selection still is). node server/tests/writing_model_test.mjs
 import {
-  WRITE_ACTIONS, WRITE_MAX_CHARS, TRANSLATE_LANGS, writingModel, offersWriting, tooLong, translateTargets, writingMenuItem, cleanOutput,
+  writingEnabled, WRITE_ACTIONS, WRITE_MAX_CHARS, TRANSLATE_LANGS, writingModel, offersWriting, tooLong, translateTargets, writingMenuItem, cleanOutput,
   writingStart, writingStep, canReplace, stillThere, forField,
 } from '../../sdk/writingmodel.js';
 import { readdirSync } from 'node:fs';
@@ -16,7 +16,11 @@ const eq = (name, a, b) => {
 };
 
 // ---- when ----
-eq('off by default: no model', writingModel({ on: false, available: true, models: [{ id: 'qwen3-1.7b' }], chosen: 'qwen3-1.7b' }), null);
+eq('on by default once a model is installed', writingEnabled(null, true), true);
+eq('hidden without a model, whatever the choice', [writingEnabled(null, false), writingEnabled(true, false)], [false, false]);
+eq('an explicit off stays off, a new model included', writingEnabled(false, true), false);
+eq('an explicit on', writingEnabled(true, true), true);
+eq('off (the person\'s choice): no model', writingModel({ on: false, available: true, models: [{ id: 'qwen3-1.7b' }], chosen: 'qwen3-1.7b' }), null);
 eq('no engine', writingModel({ on: true, available: false, models: [{ id: 'qwen3-1.7b' }] }), null);
 eq('no model', writingModel({ on: true, available: true, models: [] }), null);
 eq('the model chosen for Lumo', writingModel({ on: true, available: true, models: [{ id: 'qwen3-1.7b' }, { id: 'qwen3-4b' }], chosen: 'qwen3-4b' }), 'qwen3-4b');

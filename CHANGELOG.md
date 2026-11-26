@@ -42,7 +42,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **✨ AI on selected text: Writing** (`server/src/llm/writing.c`, `sdk/writing.jsx`, `sdk/writingmodel.js`; in
   development, approved by the maintainer on 2026-11-26; `docs/AI.md`, "Writing"). With text selected, the right-click
   menu offers ✨ AI ▸ Correct spelling and grammar, Improve writing, Make it shorter and Translate to (a list of
-  languages). Off by default (Settings → AI → Writing, a new function card), shown only with a model installed; it uses
+  languages). On whenever a model is installed, unless the person turns it off in Settings → AI → Writing (a new
+  function card; an explicit off is kept for good, never turned back on by a new model); without a model it is off. It uses
   Sentinela's local llama-server in its sandbox, nothing goes online. It runs in the shell: the app only hands over
   the selection and gets the final text back if the person clicks **Replace** in the panel, which shows the answer as
   it streams, with **Copy** and **Discard**. The prompts are fixed in C per action, the text is fenced with a random

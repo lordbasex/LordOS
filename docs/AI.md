@@ -34,8 +34,11 @@ Approved by the maintainer on 2026-11-26. With text selected in a LordOS text fi
 Mail's body), the right-click menu shows **✨ AI ▸ Correct spelling and grammar · Improve writing · Make it shorter ·
 Translate to** (the interface language, the spelling languages, then English, Spanish, Portuguese, French, German,
 Italian, Chinese, Japanese). Its function card is **Writing** in "What Lumo can do" (read only), with its own page
-(`{ section: 'ai', page: 'writing' }`): off by default (`settings.writing.on`), like Sentinela; the menu shows it only
-with Writing on, the engine installed and a model (the one chosen for Lumo, else the first installed).
+(`{ section: 'ai', page: 'writing' }`): **on whenever a model is installed** (on a system that has one and right after
+installing one); the person can turn it off there, and that choice is kept (`settings.writing.on === false` is never
+turned back on, a new model included; `sdk/writingmodel.js` `writingEnabled`: a default that depends on a model being
+present, not a migration). Without a model it is off and the menu shows nothing. It uses the model chosen for Lumo,
+else the first installed.
 
 - **It runs in the shell, never in the app.** `lord.writing` (`server/src/ui/js_sentinela.c`) exists only in the
   desktop's own JS context; an isolated app's broker has none. The SDK's field hands the selection to the shell's

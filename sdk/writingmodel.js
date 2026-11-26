@@ -21,6 +21,10 @@ export function writingModel({ on, available, models, chosen }) {
   return ids.includes(chosen) ? chosen : ids[0] || null;
 }
 
+// Writing is on whenever a model is installed, unless the person turned it off (settings.writing.on === false, kept
+// for good: an explicit off is never turned back on, a new model included); choice: true, false or null (never chosen)
+export const writingEnabled = (choice, hasModel) => !!hasModel && choice !== false;
+
 // whether a field's menu shows ✨ AI: never in a password field, only with something selected and a model ready
 export const offersWriting = ({ secure, selected, ready, allowed = true }) => !secure && allowed && !!ready && !!String(selected || '').trim();
 export const tooLong = (text) => [...String(text || '')].length > WRITE_MAX_CHARS;

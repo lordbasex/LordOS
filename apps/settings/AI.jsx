@@ -21,7 +21,7 @@ import {
   VOICE_DEFAULTS, speakAvailable, previewVoice, tryVoice, player as voicePlayer, VOICE_LANGS, voiceLabel, voicePackage, modelPackage, hasVoice,
   PREVIEWS_PACKAGE, scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName,
   takeName, errorText, fs, LLM_MODELS, packagesForModel, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, installLlm,
-  removeLlm, lumoReady, translateWithLumo, ENGINE_PACKAGE, writingOn, setWritingOn,
+  removeLlm, lumoReady, translateWithLumo, ENGINE_PACKAGE, writingChoice, writingEnabled, setWritingOn,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -648,7 +648,8 @@ function WritingPage({ ready, onBrain }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   useStore(settings);
-  const on = writingOn();
+  // on with a model unless turned off; the switch writes the person's choice, kept for good
+  const on = writingEnabled(writingChoice(), ready);
   return (
     <View style={{ gap: 14 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, border: `1px solid ${t.separator}`, backgroundColor: t.control }}>
@@ -882,7 +883,7 @@ export function AISettings({ alert }) {
           <View style={{ gap: 10 }}>
             <Head title={tr('settings.aiStore.functions')} sub={tr('settings.aiStore.functionsSub')} />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
-              {FUNCTIONS.map((f) => <FunctionCard key={f.id} f={f} w={fn.w} on={f.id === 'sentinela' ? p.on : f.id === 'writing' ? writingOn() : false} onOpen={f.ready ? () => setView(f.id) : null} />)}
+              {FUNCTIONS.map((f) => <FunctionCard key={f.id} f={f} w={fn.w} on={f.id === 'sentinela' ? p.on : f.id === 'writing' ? writingEnabled(writingChoice(), installedLlm.size > 0) : false} onOpen={f.ready ? () => setView(f.id) : null} />)}
             </View>
           </View>
         ) : null}
