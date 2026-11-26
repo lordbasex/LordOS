@@ -1110,6 +1110,12 @@ EOF
 
 full() {
     echo "== slow and environment-dependent suites (tests/run_suites.sh full)"
+    # (docs/WEBAPPS.md "Cameras") a web app's camera inside WebKit's sandbox: every capture device listed, each opened for
+    # a few frames, and the capture indicator's "camera-use" while it is held. Opens this computer's real cameras for a
+    # few seconds, so only here; without a camera it says so
+    if [ -x build/webcalls-check ] && [ -x build/camuse-check ] && have python3 && have bwrap && have xdg-dbus-proxy; then
+        run "webcam-check (a web app's camera in WebKit's sandbox, the capture indicator)" python3 -I tests/webcam_check.py build/webcalls-check build/camuse-check
+    else skip "webcam-check" "WPEPlatform (build/webcalls-check), build/camuse-check, bubblewrap, xdg-dbus-proxy and python3"; fi
     # media helper: a generated WAV (one second of a 440 Hz tone), probe, waveform and its confinement
     if [ -x build/lord-media ] && have python3; then
         python3 -I - "$T/tone.wav" <<'EOF'

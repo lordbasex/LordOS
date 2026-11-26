@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <unistd.h>
 
 static int reading(int readers, int scanned) { return readers > 0 || (readers < 0 && scanned > 0); }
@@ -41,8 +42,9 @@ static pid_t parent_of(int dirfd) {
     return p ? (pid_t)strtol(p + 6, NULL, 10) : -1;
 }
 
-/* the process has an fd on rdev: readlink first (cheap), stat only when the name could be a video device */
-static int holds(int dirfd, dev_t rdev) {
+/* the process has an fd on a character device that is rdev, or (rdev 0) of major maj and not skip: readlink first
+ * (cheap), stat only when the name could be a device */
+static int holds_dev(int dirfd, dev_t rdev, unsigned maj, dev_t skip) {
     int fdd = openat(dirfd, "fd", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if (fdd < 0) return 0;
     DIR *d = fdopendir(fdd);
@@ -57,11 +59,14 @@ static int holds(int dirfd, dev_t rdev) {
         t[n] = 0;
         if (strncmp(t, "/dev/", 5)) continue;
         struct stat st;
-        if (fstatat(fdd, e->d_name, &st, 0) == 0 && S_ISCHR(st.st_mode) && st.st_rdev == rdev) hit = 1;
+        if (fstatat(fdd, e->d_name, &st, 0) || !S_ISCHR(st.st_mode)) continue;
+        if (rdev ? st.st_rdev == rdev : major(st.st_rdev) == maj && st.st_rdev != skip) hit = 1;
     }
     closedir(d);
     return hit;
 }
+
+static int holds(int dirfd, dev_t rdev) { return holds_dev(dirfd, rdev, 0, 0); }
 
 int studio_scan_readers(const char *proc, dev_t rdev, pid_t self, uid_t uid, pid_t *out, int max) {
     DIR *d = opendir(proc);
@@ -175,4 +180,53 @@ int studio_bg_path_ok(const char *path) {
         return !strcmp(n + 64, ".jpg") || !strcmp(n + 64, ".mp4") ? 0 : -1;
     }
     return path[0] == '/' ? 0 : -1;
+}
+
+int camera_scan_holders(const char *proc, unsigned maj, dev_t skip, pid_t self, uid_t uid, pid_t *out, int max) {
+    DIR *d = opendir(proc);
+    if (!d) return 0;
+    int n = 0;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        if (!numeric(e->d_name)) continue;
+        pid_t pid = (pid_t)strtol(e->d_name, NULL, 10);
+        if (pid <= 0 || pid == self) continue;
+        int pd = openat(dirfd(d), e->d_name, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (pd < 0) continue;
+        struct stat st;
+        if (fstat(pd, &st) == 0 && st.st_uid == uid && parent_of(pd) != self && holds_dev(pd, 0, maj, skip)) {
+            if (n < max && out) out[n] = pid;
+            n++;
+        }
+        close(pd);
+    }
+    closedir(d);
+    return n;
+}
+
+int camera_use_format(const char *apps, size_t stride, int n, char *out, size_t cap) {
+    size_t at = 0;
+    int w = snprintf(out, cap, "{\"apps\":[");
+    if (w < 0 || (size_t)w >= cap) return -1;
+    at = (size_t)w;
+    int written = 0;
+    for (int i = 0; i < n; i++) {
+        const char *a = apps + (size_t)i * stride;
+        if (strnlen(a, stride) >= stride || !plain(a)) a = "";
+        /* each app once; every program LordOS can't name is one "" */
+        int dup = 0;
+        for (int j = 0; j < i && !dup; j++) {
+            const char *b = apps + (size_t)j * stride;
+            if (strnlen(b, stride) >= stride || !plain(b)) b = "";
+            dup = !strcmp(a, b);
+        }
+        if (dup) continue;
+        w = snprintf(out + at, cap - at, "%s\"%s\"", written ? "," : "", a);
+        if (w < 0 || (size_t)w >= cap - at) return -1;
+        at += (size_t)w;
+        written++;
+    }
+    w = snprintf(out + at, cap - at, "]}");
+    if (w < 0 || (size_t)w >= cap - at) return -1;
+    return 0;
 }

@@ -58,8 +58,9 @@ import { globalShortcutsEvent } from './globalshortcuts.jsx';
 import { castEvent, castNames, unknownAppName } from './screencast.jsx';
 import { castAskerName, shotFreeName, shotStamp } from './screencastmodel.js';
 import { mkdir as fsMkdir, stat as fsStat } from './fs.js';
-import { linuxCapture, studioUse } from './privacy.js';
+import { linuxCapture, studioUse, cameraUse } from './privacy.js';
 import { studioUseOf } from './studiomodel.js';
+import { cameraUseOf } from './capturemodel.js';
 import { camerasChanged } from './cameras.js';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
@@ -877,6 +878,7 @@ globalThis.__lordHw = (kind, data) => {
     // what Linux apps capture through PipeWire (server/src/sec/pwguard.c): the capture indicator (capturestatus.jsx)
     case 'capture-use': linuxCapture.set(captureUseList(data)); break;
     case 'studio-use': studioUse.set(studioUseOf(data)); break;          // LordOS Studio's camera device (capturestatus.jsx)
+    case 'camera-use': cameraUse.set(cameraUseOf(data)); break;          // a camera opened directly: a web app (capturestatus.jsx)
     case 'webapps-ask': case 'webapps-ask-gone': webAskEvent(kind, data); break;
     case 'webapps-badge': webBadgeEvent(data); break;
     case 'webapps-menu': case 'webapps-menu-gone': webMenuEvent(kind, data); break;

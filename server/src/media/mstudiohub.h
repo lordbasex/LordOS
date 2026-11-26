@@ -55,6 +55,17 @@ int studio_hub_wanted(int on, int available, int device, int readers, int scanne
  * use the shell already shows). pids out, at most max. Returns how many there are. */
 int studio_scan_readers(const char *proc, dev_t rdev, pid_t self, uid_t uid, pid_t *out, int max);
 
+/* The capture indicator's camera rows for what reads a camera directly, not through LordOS or PipeWire (docs/WEBAPPS.md,
+ * "Cameras": a web app's web process opens the video4linux device itself; so does a Linux app using V4L2): the processes
+ * under proc with an fd on a character device of major maj (video4linux's, 81) other than skip (LordOS Studio's
+ * loopback, whose readers studio_scan_readers names with the camera behind it; 0: none). The same uid only, never self
+ * nor self's children (lord-media reading a camera for a LordOS app, which the shell already shows). pids out, at most
+ * max; returns how many there are. Only to show them, never for a decision. */
+int camera_scan_holders(const char *proc, unsigned maj, dev_t skip, pid_t self, uid_t uid, pid_t *out, int max);
+/* hw event "camera-use": {"apps":["desktop:…", ""]}, each app once, an id that isn't plain JSON text (or doesn't fit
+ * stride) becomes "" (a program LordOS can't name). 0, or -1 when it doesn't fit cap (refused, never cut). */
+int camera_use_format(const char *apps, size_t stride, int n, char *out, size_t cap);
+
 /* The indicator's event ("studio-use"): {"apps":["desktop:chromium",""],"camera":"…","effects":true}; apps: n ids of
  * fixed width stride ("" an app LordOS can't name); duplicates said once; an id that isn't plain is said as ""; the
  * camera's name is escaped. -1 when it doesn't fit. */

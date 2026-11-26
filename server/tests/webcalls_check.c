@@ -9,7 +9,8 @@
  * navigator.userAgentData script (webhints_script_new) and the call log's scripts and bridge (webcalls_add_scripts),
  * whose lines it prints as lord-web writes them ("webcall: ..."). WebRTC and getUserMedia on, a camera or microphone
  * request allowed (the pages use no real device: a canvas and WebAudio; WEBCALLS_MOCK_CAPTURE=1 gives WebKit's mock camera
- * and microphone instead, for tests/webcalls_jitsi.py). With a throwaway HOME and WebKit's sandbox on.
+ * and microphone instead, for tests/webcalls_jitsi.py; tests/webcam_check.py opens a real camera). The cameras' udev
+ * entries in WebKit's sandbox as lord-web adds them (webcalls_sandbox_cameras). With a throwaway HOME and WebKit's sandbox on.
  * It ends when the page's title becomes "done" (exit 0, the title printed) or after seconds (exit 1). */
 #include "../src/web/web.h"
 #include "../src/web/webcall.h"
@@ -89,6 +90,7 @@ int main(int argc, char **argv) {
     char dir[PATH_MAX];
     if (webhints_ext_dir(dir, sizeof dir)) { fprintf(stderr, "no lord-web-ext/lord-web-ext.so next to this program\n"); return 2; }
     ctx = webkit_web_context_new();
+    printf("cameras: %d in the web process's sandbox\n", webcalls_sandbox_cameras(ctx));   /* as lord-web, before any web process */
     webkit_web_context_set_web_process_extensions_directory(ctx, dir);
     g_signal_connect(ctx, "initialize-web-process-extensions", G_CALLBACK(on_init_ext), NULL);
     WebKitNetworkSession *session = webkit_network_session_new_ephemeral();

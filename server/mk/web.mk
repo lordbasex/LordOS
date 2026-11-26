@@ -41,9 +41,9 @@ endif
 # the language of its own words, an app that is offline (weboffline.h: which load errors are the network's, the retry's delay, its page),
 # the gate in front of the developer tools (webguard.h: the request head, Host, Origin, the one-time address and the cookie)
 WEB_PURE_SRC := src/web/webargs.c src/web/webreg.c src/web/weburl.c src/web/webmanifest.c src/web/webdl.c src/web/webaxis.c src/web/webpage.c \
-                src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/websearch.c src/web/webscheme.c src/web/webinspect.c src/web/webguard.c src/web/webua.c src/web/webcall.c src/web/webwatch.c src/spellang.c src/sec/json.c
+                src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/websearch.c src/web/webscheme.c src/web/webinspect.c src/web/webguard.c src/web/webua.c src/web/webcall.c src/web/webcam.c src/web/webwatch.c src/spellang.c src/sec/json.c
 WEB_PURE_HDR := src/web/webargs.h src/web/webreg.h src/web/weburl.h src/web/webmanifest.h src/web/webdl.h src/web/webaxis.h src/web/webpage.h \
-                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/websearch.h src/web/webscheme.h src/web/webinspect.h src/web/webguard.h src/web/weblangid.h src/web/weboffline.h src/web/webframe.h src/web/webua.h src/web/webcall.h src/web/webwatch.h src/spellang.h src/sec/json.h
+                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/websearch.h src/web/webscheme.h src/web/webinspect.h src/web/webguard.h src/web/weblangid.h src/web/weboffline.h src/web/webframe.h src/web/webua.h src/web/webcall.h src/web/webcam.h src/web/webwatch.h src/spellang.h src/sec/json.h
 
 # Chrome's Client Hints and navigator.userAgentData from one table (webua.h), the call log's lines (webcall.h)
 test: build/webua-test
@@ -132,6 +132,12 @@ build/webcalls-check: tests/webcalls_check.c src/web/webhints.c src/web/webcalls
 	$(CC) $(CPPFLAGS) $(WEB_CFLAGS) $(patsubst -I%,-isystem %,$(shell pkg-config --cflags wpe-platform-headless-2.0)) $(CFLAGS) $(WARN) -std=c11 \
 	    -o $@ tests/webcalls_check.c src/web/webhints.c src/web/webcalls.c $(WEB_PURE_SRC) $(WEB_LIBS) $(shell pkg-config --libs wpe-platform-headless-2.0) -lm
 test: build/webcalls-check
+
+# the capture indicator's camera rows (src/hw/camuse.c) on the real /dev/video* nodes, for tests/webcam_check.py
+build/camuse-check: tests/camuse_check.c src/hw/camuse.c src/hw/camuse.h src/media/mstudiohub.c src/media/mstudiohub.h src/sec/appid.c src/sec/appid.h src/fw/rules.c src/fw/fwmap.c src/sec/json.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/camuse_check.c src/hw/camuse.c src/media/mstudiohub.c src/sec/appid.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c
+test: build/camuse-check
 
 # lord-web's watch over its page (src/web/webhang.c) on the real engine, headless: a page that answers is left alone, one
 # that hangs has its web process ended and a new one works (tests/webhang_check.c, run by tests/run_suites.sh)

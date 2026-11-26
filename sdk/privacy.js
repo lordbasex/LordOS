@@ -168,6 +168,9 @@ export const linuxCapture = createStore([]);     // [{ app, name, sys, exe, mic,
 // the Linux apps reading LordOS Studio's camera device (hw event "studio-use", server/src/media/mstudio.c):
 // { apps: [id], camera, effects } (sdk/studiomodel.js studioUseOf)
 export const studioUse = createStore({ apps: [], camera: '', effects: false });
+// what opens a camera itself (a web app's web process, a Linux app using V4L2), from the kernel (hw event "camera-use",
+// server/src/hw/camuse.c): [id] (sdk/capturemodel.js cameraUseOf)
+export const cameraUse = createStore([]);
 
 // media: a native app's camera source (lord.media), so the indicator can show what it sees. detail: what of the app
 // uses it, when an app has several (Machines: the machine's name, "Machines — Windows 11 Pro"); each detail is its own
