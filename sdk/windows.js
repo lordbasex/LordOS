@@ -13,6 +13,7 @@ import { webWindowTitles, profileHex } from './webappsmodel.js';
 import { SNAP_ZONES, snapRect, zoneAt, snapNext, dwellZone, SNAP_DWELL_MS, snapAllowed } from './snap.js';
 import { protectOnOpen, protectOnReopen, protectPatch } from './protectmodel.js';
 import { settings } from './settings.js';
+import { packAppIcon } from './appskins.jsx';
 import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, keyboardWindow, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo, cleanLayer, outOfSight } from './desktopmodel.js';
 
 export { SNAP_ZONES, snapRect };
@@ -24,6 +25,8 @@ let packageApps = [];
 // Changes when an app is installed or removed (to redraw the app launcher).
 export const appRegistry = createStore(0);
 const rebuild = () => {
+  // a style pack's app icons (appskins.jsx): each native app's icon draws the pack's when it has one
+  for (const a of themeApps) if (a && a.Icon && !a.Icon.__packed) a.Icon = packAppIcon(a.id, a.Icon);
   registry = new Map([...themeApps, ...packageApps, ...builtins].map((a) => [a.id, a]));
   appRegistry.set((v) => v + 1);
 };

@@ -31,7 +31,7 @@ static const char *const E_DIRECTION[] = {"inherit", "ltr", "rtl", NULL};
 static const char *const E_FIT[]      = {"fill", "cover", "contain", NULL};
 static const char *const E_WSPACE[]   = {"normal", "nowrap", NULL};
 static const char *const E_WRAP[]     = {"nowrap", "wrap", NULL};
-static const char *const E_FAMILY[]   = {"sans-serif", "monospace", "brand", NULL};
+static const char *const E_FAMILY[]   = {"sans-serif", "monospace", "brand", "theme", NULL};
 static const char *const E_CURSOR[]   = {CURSOR_CSS_NAMES, NULL};
 static const char *const E_TOVERFLOW[] = {"clip", "ellipsis", NULL};
 

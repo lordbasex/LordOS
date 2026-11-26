@@ -93,15 +93,17 @@ static struct {
     int spec_pending, spec_again;
     Spectrum spec;
     int debug;                          /* LORD_SND_DEBUG=1: every packet to stderr */
-    int samples_uploaded, uploading, play_after;   /* bits: pop, notify, error, chime, ping, drop */
+    int samples_uploaded, uploading, play_after;   /* bits: pop, notify, error, chime, ping, drop, startup, trash */
+    int scheme_stale;                   /* bits: a theme's sound changed while that sample was being uploaded */
     char last_error[128];
 } S = { .fd = -1, .timer = -1, .meter_source = PA_INVALID_INDEX, .meter_channel = PA_INVALID_INDEX,
         .spec_kind = -1, .spec_index = PA_INVALID_INDEX, .spec_source = PA_INVALID_INDEX,
         .spec_direct = PA_INVALID_INDEX, .spec_channel = PA_INVALID_INDEX };
 
 static void disconnect(const char *why);
-#define SAMPLES 6                           /* the system sounds: pop, notify, error, chime, ping, drop */
+#define SAMPLES 8                           /* the system sounds: pop, notify, error, chime, ping, drop, startup, trash */
 static void upload_data(int which, uint32_t channel);
+static void scheme_settle(int which);
 static int play_sample(int which);
 static void spec_refresh(void);
 static void spec_close(void);
@@ -428,6 +430,7 @@ static int try_connect(void) {
     S.info_pending = 0;
     memset(S.pend, 0, sizeof S.pend);
     S.samples_uploaded = S.uploading = S.play_after = 0;
+    for (int i = 0; i < SAMPLES; i++) scheme_settle(i);
     S.meter_channel = PA_INVALID_INDEX;
     S.meter_pending = 0;
     S.spec_channel = S.spec_source = S.spec_direct = PA_INVALID_INDEX;
@@ -545,6 +548,7 @@ static void on_reply(Pending p, TsIn *t) {
         (void)len;
         if (t->err || p.arg >= SAMPLES) break;
         upload_data((int)p.arg, ch);
+        scheme_settle((int)p.arg);
         break;
     }
     default: break;
@@ -1127,12 +1131,44 @@ const Spectrum *snd_spectrum_now(void) {
 
 /* ---- system sounds ---- */
 
-static const char *const sample_names[SAMPLES] = { "lordos-pop", "lordos-notify", "lordos-error", "lordos-chime", "lordos-ping", "lordos-drop" };
+static const char *const sample_names[SAMPLES] = { "lordos-pop", "lordos-notify", "lordos-error", "lordos-chime", "lordos-ping", "lordos-drop",
+                                                    "lordos-startup", "lordos-trash" };
+enum { SAMPLE_NOTIFY = 1, SAMPLE_ERROR = 2, SAMPLE_STARTUP = 6, SAMPLE_TRASH = 7 };
+
+/* A theme's sound scheme (snd_set_scheme): short tunes of plain notes, synthesized here like LordOS's own sounds, so a
+ * theme brings no audio file for lord-server to parse. `cur` is what synth() plays; `want` waits while the sample is
+ * being uploaded (synth runs twice for one upload: once for its size, once for its data, and both must agree). */
+typedef struct { float f[SND_SCHEME_NOTES], ms[SND_SCHEME_NOTES]; int n; } Tune;
+static Tune scheme_cur[SAMPLES], scheme_want[SAMPLES];
+static int startup_played;              /* the startup sound plays once per lord-server, not on every theme switch */
 
 #define SR 44100
 
 /* Synthesizes the sound: sines with an envelope (short attack, exponential decay). s16le mono. */
+static int16_t *synth_tune(const Tune *tn, uint32_t *bytes) {
+    int n = 0;
+    for (int k = 0; k < tn->n; k++) n += (int)(tn->ms[k] / 1000.0 * SR);
+    if (n <= 0) n = 1;
+    int16_t *s = calloc((size_t)n, 2);
+    if (!s) return NULL;
+    int at = 0;
+    for (int k = 0; k < tn->n; k++) {
+        int len = (int)(tn->ms[k] / 1000.0 * SR);
+        double f = tn->f[k], dur = tn->ms[k] / 1000.0;
+        for (int i = 0; i < len && at + i < n; i++) {
+            if (f <= 0) continue;                   /* a rest */
+            double tt = (double)i / SR, env = (1 - exp(-tt * 900)) * exp(-tt * 3.2 / dur);
+            double v = sin(2 * M_PI * f * tt) * 0.8 + sin(4 * M_PI * f * tt) * 0.12;
+            s[at + i] = (int16_t)(v * env * 0.45 * 32767);
+        }
+        at += len;
+    }
+    *bytes = (uint32_t)n * 2;
+    return s;
+}
+
 static int16_t *synth(int which, uint32_t *bytes) {
+    if (scheme_cur[which].n > 0) return synth_tune(&scheme_cur[which], bytes);
     static const struct { double f1, f2, dur, split; } tone[SAMPLES] = {
         { 880, 0, 0.07, 0 },                        /* pop: a short tap */
         { 1046.5, 1568, 0.32, 0.12 },               /* notify: C6 → G6 */
@@ -1140,6 +1176,8 @@ static int16_t *synth(int which, uint32_t *bytes) {
         { 783.99, 1174.66, 0.42, 0.14 },            /* chime: G5 → D6, a softer rise (a notification sound to choose) */
         { 1318.51, 0, 0.36, 0 },                    /* ping: one high E6 */
         { 1567.98, 1046.5, 0.30, 0.10 },            /* drop: G6 → C6, falling */
+        { 0, 0, 0.01, 0 },                          /* startup and trash: silent unless a theme brings them */
+        { 0, 0, 0.01, 0 },
     };
     int n = (int)(tone[which].dur * SR);
     int16_t *s = malloc((size_t)n * 2);
@@ -1188,6 +1226,35 @@ static int play_sample(int which) {
     return cmd_send(&t, tag, R_ACK, PA_CMD_PLAY_SAMPLE, 0);
 }
 
+/* after an upload ends: a sound the theme changed meanwhile is uploaded again the next time it plays */
+static void scheme_settle(int which) {
+    if (!(S.scheme_stale & 1 << which)) return;
+    S.scheme_stale &= ~(1 << which);
+    scheme_cur[which] = scheme_want[which];
+    S.samples_uploaded &= ~(1 << which);
+}
+
+int snd_set_scheme(const char *name, const float *freq, const float *ms, int n) {
+    int which = !strcmp(name, "startup") ? SAMPLE_STARTUP : !strcmp(name, "notify") ? SAMPLE_NOTIFY
+              : !strcmp(name, "error") ? SAMPLE_ERROR : !strcmp(name, "emptyTrash") ? SAMPLE_TRASH : -1;
+    if (which < 0 || n < 0 || n > SND_SCHEME_NOTES) return -1;
+    Tune tn = { .n = n };
+    float total = 0;
+    for (int k = 0; k < n; k++) {
+        if (!(freq[k] == 0 || (freq[k] >= 60 && freq[k] <= 5000)) || !(ms[k] >= 10 && ms[k] <= 1000)) return -1;
+        tn.f[k] = freq[k];
+        tn.ms[k] = ms[k];
+        total += ms[k];
+    }
+    if (total > SND_SCHEME_MAX_MS) return -1;
+    if (!memcmp(&tn, &scheme_want[which], sizeof tn) && !(S.uploading & 1 << which)) return 0;
+    scheme_want[which] = tn;
+    if (S.uploading & 1 << which) { S.scheme_stale |= 1 << which; return 0; }
+    scheme_cur[which] = tn;
+    S.samples_uploaded &= ~(1 << which);
+    return 0;
+}
+
 int snd_play(const char *name) {
     int which = -1;
     if (!strcmp(name, "pop")) which = 0;
@@ -1196,7 +1263,11 @@ int snd_play(const char *name) {
     else if (!strcmp(name, "chime")) which = 3;
     else if (!strcmp(name, "ping")) which = 4;
     else if (!strcmp(name, "drop")) which = 5;
+    else if (!strcmp(name, "startup")) which = SAMPLE_STARTUP;
+    else if (!strcmp(name, "emptyTrash")) which = SAMPLE_TRASH;
     if (which < 0 || !S.connected) return -1;
+    if ((which == SAMPLE_STARTUP || which == SAMPLE_TRASH) && !scheme_cur[which].n) return -1;   /* only a theme's */
+    if (which == SAMPLE_STARTUP) { if (startup_played) return 0; startup_played = 1; }
     if (S.samples_uploaded & 1 << which) return play_sample(which);
     S.play_after |= 1 << which;
     if (S.uploading & 1 << which) return 0;

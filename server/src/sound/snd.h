@@ -34,6 +34,13 @@ int snd_move(int kind, uint32_t index, uint32_t device);                /* SND_I
 int snd_set_profile(uint32_t card, const char *profile);                /* a Bluetooth card's profile (state "cards") */
 int snd_meter(uint32_t source);         /* peak meter of an input; 0xffffffff turns it off */
 int snd_play(const char *name);
+/* A theme's sound scheme (0.8.9.6.2, docs/THEMES-GUIDE.md "Style packs"): "startup", "notify", "error" or "emptyTrash"
+ * played as up to SND_SCHEME_NOTES plain notes (freq in Hz, 60–5000, or 0 for a rest; ms 10–1000 each, at most
+ * SND_SCHEME_MAX_MS in all), synthesized like LordOS's own sounds. n = 0 puts LordOS's sound back ("startup" and
+ * "emptyTrash" have none of their own). -1 for a bad name or note. "startup" plays at most once per lord-server. */
+#define SND_SCHEME_NOTES 8
+#define SND_SCHEME_MAX_MS 2500
+int snd_set_scheme(const char *name, const float *freq, const float *ms, int n);
 /* The sound wave widget's spectrum (spectrum.h): kind SND_SINK (the desktop: what an output plays),
  * SND_INPUT (one app playing, by its index) or SND_SOURCE (a microphone); index 0xffffffff = the
  * default output or input. kind -1 turns it off. The state says what is on ("spectrum"). */

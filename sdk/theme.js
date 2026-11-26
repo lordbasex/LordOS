@@ -32,7 +32,26 @@ export const DEFAULT_TOKENS = {
   buttonBorder: false,    // Button: a 1 px border around neutral buttons
   popupBg: null,          // menus and tooltips; null = a light or dark surface for the mode
   focusRing: null,        // the ring around the control the keyboard is on (sdk/focus.js); null = the accent
+  // Richer tokens (a style pack's look, docs/THEMES-GUIDE.md "Richer tokens"): plain JSON, null = LordOS's flat look.
+  toolbarBg: null,        // the apps' toolbars: a colour or a 'linear-gradient(…)' (a toolbar "texture")
+  buttonBg: null,         // neutral buttons: a colour or a gradient instead of `control`
+  bevel: null,            // { light, dark }: neutral buttons drawn raised (light top and start edges, dark bottom and end);
+                          // pressed ones (an active toolbar button) sunken
+  stateBorders: null,     // { normal, hover, pressed, disabled }: the border of buttons and toolbar buttons per state
 };
+
+// The border of a button in a state from stateBorders (null: none), and the four sides of a bevel.
+export function stateBorder(t, state) {
+  const b = t && t.stateBorders;
+  const c = b && (b[state] || (state === 'pressed' ? b.hover : null) || (state !== 'disabled' ? b.normal : null));
+  return c ? { border: `1px solid ${c}` } : null;
+}
+export function bevelStyle(t, pressed) {
+  const b = t && t.bevel;
+  if (!b || !b.light || !b.dark) return null;
+  const hi = pressed ? b.dark : b.light, lo = pressed ? b.light : b.dark;
+  return { borderWidth: 1, borderTopColor: hi, borderLeftColor: hi, borderBottomColor: lo, borderRightColor: lo };
+}
 
 // The surface of menus, tooltips and popovers for a theme (popupBg, or one for the mode).
 export const popupBg = (t) => t.popupBg || (t.mode === 'dark' ? '#2c2c31' : '#ffffff');

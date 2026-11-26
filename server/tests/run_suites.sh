@@ -818,6 +818,8 @@ EOF
     # (0.8.8.8) Linux apps' tray icons: which show, a dbusmenu layout as the SDK's menu, where it opens (sdk/traymodel.js)
     if have node; then run "tray-model-test (sdk/traymodel.js)" node tests/tray_model_test.mjs
     else skip "tray-model-test" "node"; fi
+    # (0.8.9.6.2) style packs and app skins: the checks, the switches per part, Files' view model (docs/THEMES-GUIDE.md)
+    if have node; then run "appskin-test (sdk/appskinmodel.js, apps/files/skinmodel.js)" node tests/appskin_test.mjs; fi
     # (0.8.8.8) SVG icons of Linux apps: PNG as it is, SVG at the size shown, symbolic ones in the bar's color (sdk/iconsrc.js)
     if have node; then run "iconsrc-test (sdk/iconsrc.js)" node tests/iconsrc_test.mjs
     else skip "iconsrc-test" "node"; fi
@@ -1017,6 +1019,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "monitor-describe-scene (apps/monitor/Describe.jsx)" node tests/menubar_test.mjs monitor_describe_scene.mjs
     else skip "monitor-describe-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Files with every region a theme may draw replaced by a stub: the actions go through Files' own checks
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "files-skin-scene (apps/files regions, sdk/appskins.jsx)" node tests/menubar_test.mjs files_skin_scene.mjs
+    else skip "files-skin-scene" "node and the repository's node_modules (npm install)"; fi
     # (#218) Files: dragging in a folder of 2000 files draws only the ghost and the drop highlights, never the whole window
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-drag-scene (apps/files/dnd.jsx)" node tests/menubar_test.mjs files_drag_scene.mjs

@@ -53,7 +53,8 @@ export const trash = (path) => lord.fs.trash(path);
 export const trashList = () => lord.fs.trashList();          // [{ id, name, original, deleted, dir, size }]
 export const restore = (id) => lord.fs.restore(id);
 export const removeFromTrash = (id) => lord.fs.removeFromTrash(id);
-export const emptyTrash = () => lord.fs.emptyTrash();
+// a style pack's "empty trash" tune plays after it (appskins.jsx; lord-server plays nothing when the theme has none)
+export const emptyTrash = () => { const r = lord.fs.emptyTrash(); try { lord.sound?.play?.('emptyTrash'); } catch (e) { /* no sound */ } return r; };
 
 // Info: { name, path, dir, link, target, size, mode, user, group, mtime, atime, ctime, btime, writable, protected }
 // protected: it is, or lies in, a folder lord.fs never writes (autostart, the apps' launchers, settings…), links followed.
