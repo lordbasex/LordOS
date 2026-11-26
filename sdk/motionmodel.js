@@ -52,6 +52,12 @@ export function motionFpsCap({ cap, batteryMode = 'pause', battery }) {
 // Settings' motionCacheMb: one of MOTION_CACHE_MB (1 GB when never set)
 export const motionCacheMb = (v) => (MOTION_CACHE_MB.includes(v) ? v : 1024);
 
+// Is this display's desktop fully hidden by a window? rects: the windows on it, not minimized (the slideshow's rule;
+// moving wallpapers ask lord-server instead, per view).
+export function displayCovered(display, rects) {
+  return rects.some((r) => r.x <= display.x && r.y <= display.y && r.x + r.w >= display.x + display.w && r.y + r.h >= display.y + display.h);
+}
+
 // An added video: a duration up to 10 s in a format this machine plays in hardware.
 export const MAX_SECONDS = 10;
 export function userVideoProblem(info, codecs) {

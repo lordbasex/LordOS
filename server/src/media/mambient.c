@@ -126,9 +126,10 @@ static void helper_set(MediaSrc *s, int on) {
 
 /* the frame format this player should send now (MM_FORMAT) */
 static int want_format(MediaSrc *s) {
-    if (!gpu_active()) return MF_BGRA;
+    /* moving wallpapers only for now: a Player window drawn below the UI would lose its rounded corners' clip */
+    if (!gpu_active() || !s->amb) return MF_BGRA;
     if (env_off("LORD_MEDIA_NV12")) return MF_BGRA;
-    if (s->amb && !s->dma_refused && !env_off("LORD_MEDIA_DMABUF") && s->box_w > 0) return MF_DMABUF;
+    if (!s->dma_refused && !env_off("LORD_MEDIA_DMABUF") && s->box_w > 0) return MF_DMABUF;
     return MF_NV12;
 }
 
@@ -388,8 +389,9 @@ void media_dma_frame(MediaSrc *s, const MediaMsg *m, const char *payload, int *f
         off_t e = lseek(fds[i], 0, SEEK_END);
         size[i] = e > 0 ? (int64_t)e : 0;
     }
-    /* never larger than the box asked (MM_SIZE), a quarter more for the rounding of a video's own size */
-    int bw = s->box_w > 0 ? s->box_w + s->box_w / 4 + 16 : 0, bh = s->box_h > 0 ? s->box_h + s->box_h / 4 + 16 : 0;
+    /* never more than twice the box asked (MM_SIZE) a side: the GPU draws it down to the box (a 4K video on a 1080p
+     * display is a 2 × 2 average, no shimmer), a cost that stays bounded */
+    int bw = s->box_w > 0 ? 2 * s->box_w + 16 : 0, bh = s->box_h > 0 ? 2 * s->box_h + 16 : 0;
     if (mp_dma_check(payload, m->len, nfds, size, bw, bh, gpu_dmabuf_plane_ok)) { dma_refuse(s, "description"); return; }
     MpDma d;
     memcpy(&d, payload, sizeof d);
@@ -401,13 +403,22 @@ void media_dma_frame(MediaSrc *s, const MediaMsg *m, const char *payload, int *f
     if (!y) { dma_refuse(s, "import"); return; }
     int matrix = (int)(d.colors & 0xff), full = (d.colors & MC_FULL) != 0;
     if (s->amb->state == AC_PLAY) { gpu_yuv_free(y); return; }
-    int r = gpu_yuv_convert(y, &s->vtex, matrix, full);
-    if (!r) cache_frame(s, y, m->v[0], (int)d.w, (int)d.h, matrix, full);
+    /* shown at most at the box's size, the picture's proportions kept, even sides */
+    int tw = (int)d.w, th = (int)d.h;
+    if (s->box_w > 0 && s->box_h > 0 && (tw > s->box_w || th > s->box_h)) {
+        double k = fmin((double)s->box_w / tw, (double)s->box_h / th);
+        tw = (int)lround(tw * k) & ~1;
+        th = (int)lround(th * k) & ~1;
+        if (tw < 2) tw = 2;
+        if (th < 2) th = 2;
+    }
+    int r = gpu_yuv_convert_to(y, &s->vtex, tw, th, matrix, full);
+    if (!r && tw == (int)d.w && th == (int)d.h) cache_frame(s, y, m->v[0], tw, th, matrix, full);
     gpu_yuv_free(y);                    /* GL keeps what its queued draws need */
     if (r) { dma_refuse(s, "draw"); return; }
     if (!s->nv) { s->nv = 1; if (s->map) { munmap(s->map, s->map_len); s->map = NULL; s->map_len = 0; } }
     s->nv_slot = -1;
-    nv_show(s, (int)d.w, (int)d.h, m->v[0]);
+    nv_show(s, tw, th, m->v[0]);
 }
 
 /* ---- a moving wallpaper's player ---- */

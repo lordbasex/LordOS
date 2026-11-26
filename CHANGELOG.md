@@ -74,6 +74,49 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   settles a request. Found while testing the 0.8.9.6.2 gallery. Test: `server/tests/admin_js_test.mjs`.
 
 ### Changed
+- **Moving wallpapers cost a fraction of what they did** (docs/MOVING-WALLPAPERS.md). Measured by the maintainer with
+  0.8.9.6.2 on an i9-10900 with a Radeon RX 580 and three 1920×1080 monitors showing one 1080p moving wallpaper:
+  lord-server ~184 % of a core, lord-media ~58 %. Each frame was read back from the GPU, converted to BGRA on the CPU,
+  copied into every display's canvas, the blurs over it repainted and the whole display uploaded again. Now, while the
+  GPU composes:
+  - **Zero-copy**: lord-media exports the VA-API surface (`vaExportSurfaceHandle`, read-only, separate R8/GR88 layers,
+    or R16/GR1616 for 10 bits) and sends the dmabufs over its own socket (`MM_DMAFRAME`, `MpDma`); lord-server checks
+    them as hostile input (only dmabuf fds, sizes from `lseek`, `mp_dma_check`'s closed rules, the driver's own
+    modifiers, a flood cut off; any refusal sends that player back to the memfd ring for good, logged once) and imports
+    them with `EGL_EXT_image_dma_buf_import`. lord-media holds each frame sent until lord-server acknowledged one two
+    numbers later. No new sandbox rule: the player already had the DRM and dma-buf ioctl classes.
+  - **NV12 instead of BGRA** where zero-copy can't be used (a picture over twice the box a side, a driver that can't export): the decoder's 4:2:0 planes in the same sealed memfd ring (`MF_NV12`, 1.5 bytes a
+    pixel, no RGB conversion in lord-media, never larger than the video), its layout from `mp_ring_layout` on both
+    sides. lord-server converts either on the GPU with the video's matrix (BT.601/709/2020, limited or full range) into
+    one texture that every display's view draws below the UI (`server/src/media/mambient.c`, `gpu_yuv_*` in
+    `gpu.c`): a new frame is a present of the displays that show it, not a repaint. The Dock's and the menu bar's blur
+    still blur the video: only the strips under a blurred node keep the frame's CPU pixels (converted, `nv12.c`, or read
+    back row by row) and are repainted. The CPU path (GPU=0) asks BGRA exactly as before.
+  - **Per-display pause, from the compositor**: each display's view is hidden when the opaque nodes over it cover its
+    whole area together (`paint_node_hidden`, `ui/rectsub.h`), a Linux app is fullscreen on that display
+    (`wl_fullscreen_box`) or the screen is off; a hidden view isn't presented, and the decoder pauses only when no view
+    shows. After 10 s with none (a fullscreen game), lord-media is ended and the loop cache freed, both back at the same
+    place when a view shows. 0.8.9.6.2 paused only when one window covered a whole display, and paused every display for
+    a fullscreen window on one of them.
+  - **The loop cache in GPU memory** (the maintainer's idea): after one whole pass the loop's frames stay on the GPU,
+    packed as NV12 (1.5 bytes a pixel, copied on the GPU, never read back), and the loop plays from there at the clip's
+    own timestamps with lord-media paused. One cache per player for every display; within Settings → Wallpaper → GPU
+    memory for loops (Off, 256 MB, 512 MB, 1 GB by default, 2 GB), at most half the card's VRAM and what's free past a
+    headroom (amdgpu's `mem_info_vram_*` through `gpu_cards_read`), a sixteenth of the RAM (at most 1 GB) on integrated
+    GPUs. Dropped on a size or scale change, a raised frame rate, a lost GPU context, memory pressure or 10 s hidden.
+    A 1080p30 8 s loop takes 705 MB; a 4K one doesn't fit 1 GB and plays as before.
+  - **Settings → Wallpaper → Frame rate** (Video's own, 30 fps, 15 fps; `MM_FPSCAP`: lord-media skips the frames before
+    reading them back) and **On battery** (Pause, the default; Lower frame rate, 15 fps and a pause at 20 % or less;
+    Keep playing), applied as soon as the power source changes. New settings `motionFpsCap`, `motionBattery`,
+    `motionCacheMb` with defaults (new keys, no migration); ten new texts in the 35 languages.
+  Measured on the same PC with `build/motion-bench` (lord-media as lord-server launches it, lord-server's per-frame work
+  on a surfaceless context of the RX 580, a 1080p30 HEVC loop; the machine busy with a WebKit build): lord-media 21.3 %
+  → 6.1 % (NV12) → 1.0 % (zero-copy) → 0.1 % (cache, paused); lord-server's frame work for three displays 19.6 % → 0.8 %
+  → 0.5 % → 0.2 %, at 30 frames a second throughout. The full three-monitor session is still to be measured.
+  Tests: `build/mloop-test` (new, in `make test`: the cache's budget, recording and playback, the pause and stop rule,
+  the cap, covered views, malformed rings and zero-copy descriptions with a 200 000-case fuzz, the NV12 matrices),
+  `build/motion-bench check` (the shaders against the CPU on a real GPU), `server/tests/motion_model_test.mjs` (battery
+  mode, cap, cache setting), `build/engine-test` (damage) and `build/mview-test` unchanged and passing.
 - **Web apps: Light and Dark per app are back, and now they reach the pages' CSS.** lord-web runs on WPEPlatform (WPE
   WebKit 2.54) since 0.8.9.6, whose display settings have `WPE_SETTING_DARK_MODE`: lord-web now sets it at start and on
   every `SetColorScheme` (`webback_set_dark` in `server/src/web/webback_platform.c`, called from `webdark.c`; a no-op

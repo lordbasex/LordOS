@@ -172,6 +172,11 @@ build/mloop-test: tests/mloop_test.c src/media/mloop.c src/media/mloop.h src/med
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=gnu11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
 	    -o $@ tests/mloop_test.c src/media/mloop.c src/media/nv12.c src/media/proto.c -lm
 	./$@ || { rm -f $@; exit 1; }
+# moving wallpapers measured on the GPU with no screen (tests/motion_bench.c; docs/MOVING-WALLPAPERS.md): not in make test
+build/motion-bench: tests/motion_bench.c src/gpu/gpu.c src/gpu/gscissor.c src/kms.c src/canvas.c src/par.c src/media/nv12.c src/media/proto.c src/media/mloop.c src/gpu/gpu.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/motion_bench.c src/gpu/gpu.c src/gpu/gscissor.c src/kms.c src/canvas.c src/par.c \
+	    src/media/nv12.c src/media/proto.c src/media/mloop.c $(LDLIBS)
 # how a media node draws its picture (src/media/mview.c), the rest of media stubbed
 test: build/mview-test
 build/mview-test: tests/mview_test.c src/media/mview.c src/canvas.c src/media/media_int.h src/canvas.h

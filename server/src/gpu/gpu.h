@@ -60,6 +60,9 @@ typedef struct GpuYuv GpuYuv;
 GpuYuv *gpu_yuv_upload(GpuYuv *t, const uint8_t *y, int ystride, const uint8_t *uv, int uvstride, int w, int h);
 /* src into *dst (made, or remade at src's size, as needed): 0 ok, -1 failed (*dst is then left as it was) */
 int     gpu_yuv_convert(const GpuYuv *src, GpuTex **dst, int matrix, int full);
+/* the same, drawn smaller (w × h, at most src's): a zero-copy frame larger than its box, filtered by the GPU (2:1 is a
+ * 2 × 2 average) */
+int     gpu_yuv_convert_to(const GpuYuv *src, GpuTex **dst, int w, int h, int matrix, int full);
 int     gpu_yuv_current(const GpuYuv *t);
 long    gpu_yuv_bytes(const GpuYuv *t);     /* what its planes hold in GPU memory (w × h × 1.5) */
 void    gpu_yuv_free(GpuYuv *t);
@@ -78,6 +81,9 @@ int      gpu_pack_current(const GpuPack *k);
 long     gpu_pack_bytes(const GpuPack *k);
 void     gpu_pack_free(GpuPack *k);
 int      gpu_pack_ready(void);
+/* tests and benchmarks only: a surfaceless context on a render node (never lord-server's) */
+int      gpu_init_offscreen(int render_fd);
+void     gpu_offscreen_finish(void);
 
 /* GPU context lifetime. Each gpu_init that succeeds starts a new context ("generation"); a
  * texture made in an earlier one is stale: its GL name and EGLImage died with that context, so it

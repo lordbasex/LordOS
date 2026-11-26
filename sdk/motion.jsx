@@ -10,10 +10,9 @@ import { media } from './media.js';
 import { settings, useSettings } from './settings.js';
 import { createStore, useStore } from './store.js';
 import { admin } from './admin.js';
-import { windows } from './windows.js';
 import { battery } from './hardware.jsx';
 import { userWallpaperName, refreshStillFiles } from './wallpapers.js';
-import { displayCovered, motionCodecs, nextRandom, pauseReason, pickVariant } from './motionmodel.js';
+import { motionCacheMb, motionCodecs, motionFpsCap, nextRandom, pauseReason, pickVariant } from './motionmodel.js';
 import { motionCatalog } from './wallpapergallery.js';
 
 const STORE = '/var/lib/lordos/wallpapers';
@@ -108,30 +107,39 @@ function randomFor(ids) {
 const players = new Map();                // path → { id, refs, views, paused }
 let lastInput = Date.now(), cpu = null, busy = 0, ticking = 0;
 
+// What JS alone decides (Reduce motion, idle, battery, a busy CPU) and the settings lord-server applies: which display's
+// view shows is lord-server's (media/mambient.c), per display, so a covered or fullscreen monitor pauses only its own
+// copy and the player pauses when no copy shows (docs/MOVING-WALLPAPERS.md).
+const ambientOptions = (s, bat) => ({
+  fpsCap: motionFpsCap({ cap: s.motionFpsCap, batteryMode: s.motionBattery, battery: bat }),
+  cacheMb: motionCacheMb(s.motionCacheMb),
+});
+
 function evaluate() {
   const s = settings.get();
-  const ws = windows.get();
-  const live = ws.filter((w) => !w.minimized);
+  const bat = battery.get();
   let b = false;
   try {
     const [t, i] = lord.system.cpuTimes();
     if (cpu) { const dt = t - cpu[0]; const load = dt > 0 ? 1 - (i - cpu[1]) / dt : 0; busy = load > 0.85 ? busy + 1 : 0; b = busy >= 2; }
     cpu = [t, i];
   } catch (e) { /* no reading: not busy */ }
+  const opts = ambientOptions(s, bat);
   for (const p of players.values()) {
-    const rects = live.map((w) => ({ x: w.x, y: w.y, w: w.w, h: w.h }));
-    const covered = p.views.size > 0 && [...p.views.values()].every((d) => displayCovered(d, rects));
-    const why = pauseReason({ reduceMotion: s.reduceMotion, idleSec: (Date.now() - lastInput) / 1000, battery: battery.get(),
-      covered, fullscreen: live.some((w) => w.fullscreen), busy: b });
+    const why = pauseReason({ reduceMotion: s.reduceMotion, idleSec: (Date.now() - lastInput) / 1000, battery: bat,
+      batteryMode: s.motionBattery || 'pause', busy: b });
     if (!!why !== p.paused) { p.paused = !!why; media.control(p.id, why ? 'pause' : 'play'); }
+    if (opts.fpsCap !== p.fpsCap) { p.fpsCap = opts.fpsCap; media.control(p.id, 'fpsCap', opts.fpsCap); }
+    if (opts.cacheMb !== p.cacheMb) { p.cacheMb = opts.cacheMb; media.control(p.id, 'cacheMb', opts.cacheMb); }
   }
 }
 
 function startTicking() {
   if (ticking) return;
   ticking = setInterval(evaluate, 5000);
-  windows.subscribe(() => { if (players.size) evaluate(); });
   settings.subscribe(() => { if (players.size) evaluate(); });
+  // the power source changes: applied at once (On battery: pause, lower the frame rate or keep playing)
+  battery.subscribe(() => { if (players.size) evaluate(); });
   const seen = () => { const was = Date.now() - lastInput > 300000; lastInput = Date.now(); if (was) evaluate(); };
   addListener('keydown', seen);
   addListener('pointerdown', seen);
@@ -149,9 +157,11 @@ function acquire(file, rate, key, display, onLost) {
   if (!p) {
     let id = 0;
     motionBusy.set(true);
-    try { id = media.play('wallpaper', file, { loop: true, audio: 0, hwOnly: 1, rate, appName: 'LordOS' }); } catch (e) { motionBusy.set(false); return null; }
+    const opts = ambientOptions(settings.get(), battery.get());
+    // ambient: lord-server pauses it where no display shows it, stops it after a while unseen and keeps its loop on the GPU
+    try { id = media.play('wallpaper', file, { loop: true, audio: 0, hwOnly: 1, rate, appName: 'LordOS', ambient: 1, ...opts }); } catch (e) { motionBusy.set(false); return null; }
     if (!id) { motionBusy.set(false); return null; }
-    p = { id, tag, views: new Map(), paused: false, playing: createStore(false) };
+    p = { id, tag, views: new Map(), paused: false, playing: createStore(false), ...opts };
     media.on(id, (type, d) => {
       if (type === 'state' && d.state === 'playing') { p.playing.set(true); motionBusy.set(false); }
       else if (type === 'error' || type === 'closed') { p.playing.set(false); if (players.get(tag) === p) { players.delete(tag); p.onLost?.(); } }

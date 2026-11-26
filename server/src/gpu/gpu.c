@@ -43,6 +43,7 @@ int  gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h) { (void)t; (void)
 int  gpu_tex_read_rows(const GpuTex *t, uint8_t *px, int y, int h, int flip) { (void)t; (void)px; (void)y; (void)h; (void)flip; return -1; }
 GpuYuv *gpu_yuv_upload(GpuYuv *t, const uint8_t *y, int ys, const uint8_t *uv, int uvs, int w, int h) { (void)t; (void)y; (void)ys; (void)uv; (void)uvs; (void)w; (void)h; return NULL; }
 int  gpu_yuv_convert(const GpuYuv *src, GpuTex **dst, int matrix, int full) { (void)src; (void)dst; (void)matrix; (void)full; return -1; }
+int  gpu_yuv_convert_to(const GpuYuv *src, GpuTex **dst, int w, int h, int matrix, int full) { (void)src; (void)dst; (void)w; (void)h; (void)matrix; (void)full; return -1; }
 int  gpu_yuv_current(const GpuYuv *t) { (void)t; return 0; }
 long gpu_yuv_bytes(const GpuYuv *t) { (void)t; return 0; }
 void gpu_yuv_free(GpuYuv *t) { (void)t; }
@@ -54,6 +55,8 @@ int  gpu_pack_current(const GpuPack *k) { (void)k; return 0; }
 long gpu_pack_bytes(const GpuPack *k) { (void)k; return 0; }
 void gpu_pack_free(GpuPack *k) { (void)k; }
 int  gpu_pack_ready(void) { return 0; }
+int  gpu_init_offscreen(int render_fd) { (void)render_fd; return -1; }
+void gpu_offscreen_finish(void) {}
 int  gpu_add_output(Kms *k) { (void)k; return -1; }
 int  gpu_frame(int out, const Canvas *s, Rect d, void (*f)(int)) { (void)out; (void)s; (void)d; (void)f; return -1; }
 int  gpu_gdrag_ready(int out) { (void)out; return 0; }
@@ -596,6 +599,44 @@ fail:
     gpu_shutdown();
     return -1;
 }
+
+/* Tests and benchmarks only (build/motion-bench, docs/MOVING-WALLPAPERS.md "Measurements"): a context on a render node
+ * with no display and no surface (EGL_KHR_surfaceless_context), so the NV12 programs, the zero-copy import and the loop
+ * cache's packing run on the real GPU without touching a screen. Never called by lord-server. */
+int gpu_init_offscreen(int render_fd) {
+    G.gbm = gbm_create_device(render_fd);
+    if (!G.gbm) return -1;
+    PFNEGLGETPLATFORMDISPLAYEXTPROC get_display = (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
+    G.dpy = get_display ? get_display(EGL_PLATFORM_GBM_KHR, G.gbm, NULL) : eglGetDisplay((EGLNativeDisplayType)G.gbm);
+    EGLint maj, min;
+    if (G.dpy == EGL_NO_DISPLAY || !eglInitialize(G.dpy, &maj, &min)) return -1;
+    const char *exts = eglQueryString(G.dpy, EGL_EXTENSIONS);
+    if (!has_ext(exts, "EGL_KHR_surfaceless_context")) return -1;
+    eglBindAPI(EGL_OPENGL_ES_API);
+    static const EGLint ctx_attr[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+    G.ctx = eglCreateContext(G.dpy, EGL_NO_CONFIG_KHR, EGL_NO_CONTEXT, ctx_attr);
+    if (G.ctx == EGL_NO_CONTEXT || !eglMakeCurrent(G.dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, G.ctx)) return -1;
+    const char *rend = (const char *)glGetString(GL_RENDERER), *gl_exts = (const char *)glGetString(GL_EXTENSIONS);
+    snprintf(G.renderer, sizeof G.renderer, "%s", rend ? rend : "?");
+    G.bgra = has_ext(gl_exts, "GL_EXT_texture_format_BGRA8888");
+    G.have_external = has_ext(gl_exts, "GL_OES_EGL_image_external");
+    G.unpack_sub = has_ext(gl_exts, "GL_EXT_unpack_subimage");
+    if (make_prog(0, fs_2d) || (G.have_external && make_prog(1, fs_ext))) return -1;
+    if (has_ext(exts, "EGL_EXT_image_dma_buf_import")) {
+        G.create_image = (PFNEGLCREATEIMAGEKHRPROC)eglGetProcAddress("eglCreateImageKHR");
+        G.destroy_image = (PFNEGLDESTROYIMAGEKHRPROC)eglGetProcAddress("eglDestroyImageKHR");
+        G.image_target = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)eglGetProcAddress("glEGLImageTargetTexture2DOES");
+    }
+    if (has_ext(exts, "EGL_EXT_image_dma_buf_import_modifiers")) {
+        G.query_formats = (PFNEGLQUERYDMABUFFORMATSEXTPROC)eglGetProcAddress("eglQueryDmaBufFormatsEXT");
+        G.query_modifiers = (PFNEGLQUERYDMABUFMODIFIERSEXTPROC)eglGetProcAddress("eglQueryDmaBufModifiersEXT");
+    }
+    G.gen = ++last_gen;
+    G.on = 1;
+    return 0;
+}
+/* the offscreen context's work done (a benchmark's frame): glFinish */
+void gpu_offscreen_finish(void) { if (G.on) glFinish(); }
 
 void gpu_shutdown(void) {
     int was_on = G.on;
@@ -1155,11 +1196,15 @@ static void bind_plane(int unit, GLuint id, int ext) {
 }
 
 int gpu_yuv_convert(const GpuYuv *src, GpuTex **dst, int matrix, int full) {
-    if (!dst || !gpu_yuv_current(src) || !ctx_current()) return -1;
+    return src ? gpu_yuv_convert_to(src, dst, src->w, src->h, matrix, full) : -1;
+}
+
+int gpu_yuv_convert_to(const GpuYuv *src, GpuTex **dst, int w, int h, int matrix, int full) {
+    if (!dst || !gpu_yuv_current(src) || !ctx_current() || w < 1 || h < 1 || w > src->w || h > src->h) return -1;
     GLuint p = yuv_program(YP_CONV, src->ext);
     if (!p) return -1;
     while (glGetError() != GL_NO_ERROR) {}
-    GpuTex *t = rgba_target(dst, src->w, src->h);
+    GpuTex *t = rgba_target(dst, w, h);
     if (!t) return -1;
     float m4[16];
     matrix4(matrix, full, m4);

@@ -130,8 +130,8 @@ static int frame_colors(const AVFrame *f) {
  * The VA-API surface itself goes to lord-server: exported read-only as separate layers (Y as R8, U-V as GR88; R16 and
  * GR1616 for 10 bits) and sent as dmabuf fds with an MpDma description (MM_DMAFRAME). The decoder must not write the
  * surface again while lord-server may still draw it: each frame sent is held (its AVFrame keeps the surface out of the
- * pool) until lord-server has acknowledged a frame two numbers later. Only when the picture isn't larger than the box
- * (a quarter more): a larger one is scaled here into the NV12 ring, as is anything that can't be exported. */
+ * pool) until lord-server has acknowledged a frame two numbers later. Only when the picture is at most twice the box a
+ * side (the GPU draws it down): a larger one is scaled here into the NV12 ring, as is anything that can't be exported. */
 #define DMA_HELD 6
 static struct { AVFrame *f; uint32_t id; } held[DMA_HELD];
 static uint32_t dma_seq;
@@ -147,7 +147,7 @@ static int frame_colors(const AVFrame *f);
 /* 0 sent, 1 dropped (lord-server behind), -1 can't (use the ring) */
 static int dma_present(AVFrame *f, int64_t pts) {
     if (dma_broken || f->format != AV_PIX_FMT_VAAPI || !f->hw_frames_ctx || (f->width & 1) || (f->height & 1)) return -1;
-    if (O.box_w <= 0 || f->width > O.box_w + O.box_w / 4 || f->height > O.box_h + O.box_h / 4) return -1;
+    if (O.box_w <= 0 || f->width > 2 * O.box_w || f->height > 2 * O.box_h) return -1;      /* lord-server's limit (mambient.c) */
     int slot = -1;
     for (int i = 0; i < DMA_HELD && slot < 0; i++) if (!held[i].f) slot = i;
     if (slot < 0) return 1;

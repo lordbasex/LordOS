@@ -52,6 +52,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [DEVICES.md](DEVICES.md) | The battery of the computer and of mice, keyboards and headphones; lord-hidpp |
 | [BATTERY.md](BATTERY.md) | Settings → Battery and Monitor → Battery: charge control, history, condition |
 | [WALLPAPERS.md](WALLPAPERS.md) | Moving wallpapers on the desktop and the login screen |
+| [MOVING-WALLPAPERS.md](MOVING-WALLPAPERS.md) | How moving wallpapers stay cheap: per-display pause, NV12, zero-copy, the GPU loop cache, measurements, comparison |
 | [ON-SCREEN-KEYBOARD.md](ON-SCREEN-KEYBOARD.md) | The on-screen keyboard, for a computer with no physical keyboard |
 | [THEMES-GUIDE.md](THEMES-GUIDE.md) | How to build a LordOS appearance (theme): anatomy, tokens, frames, building, verified code, testing |
 | [THEMES-PLAN.md](THEMES-PLAN.md) | Plan: many appearances, community themes from a file, a theme store with review and signing |
