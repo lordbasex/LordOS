@@ -112,6 +112,29 @@ static const char *answer(const char *req) {
     return "{\\\"verdict\\\":\\\"dangerous\\\",\\\"reason\\\":\\\"Unpackaged program in the home folder using all the CPU: looks like a miner.\\\",\\\"action\\\":\\\"end_block\\\"}";
 }
 
+/* (0.8.9.6.2) a writing request ("stream":true): the answer as llama-server streams it, chunked server-sent events, a
+ * little at a time; the text depends on the request (and only fenced text counts) */
+static void stream(int c, const char *req) {
+    const char *parts3[3] = { "The text", " with", " mistakes." };
+    const char *es[2] = { "Hola", " mundo" };
+    const char **parts = parts3;
+    int n = 3, slow = 0;
+    if (strstr(req, "into Spanish")) { parts = es; n = 2; }
+    if (strstr(req, "STUB_SLOW")) slow = 1;
+    if (!strstr(req, "<<<TEXT ") || !strstr(req, "<<<END-TEXT ")) { parts3[0] = "UNFENCED"; n = 1; }
+    const char *head = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+    if (write(c, head, strlen(head)) < 0) return;
+    for (int i = 0; i < (slow ? 400 : n); i++) {
+        char ev[512], ch[600];
+        snprintf(ev, sizeof ev, "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"%s\"}}]}\n\n", slow ? "x" : parts[i]);
+        int k = snprintf(ch, sizeof ch, "%zx\r\n%s\r\n", strlen(ev), ev);
+        if (write(c, ch, (size_t)k) < 0) return;
+        usleep(slow ? 20000 : 60000);
+    }
+    const char *end = "e\r\ndata: [DONE]\n\n\r\n0\r\n\r\n";
+    if (write(c, end, strlen(end)) < 0) { /* the client left */ }
+}
+
 static void serve(int c) {
     static char req[262144];
     size_t n = 0;
@@ -128,6 +151,7 @@ static void serve(int c) {
         if (n - (size_t)(e + 4 - req) >= want) break;
     }
     req[n] = 0;
+    if (!strncmp(req, "POST /v1/chat/completions", 25) && strstr(req, "\"stream\":true")) { stream(c, req); close(c); return; }
     char body[16384];
     if (!strncmp(req, "GET /health", 11)) snprintf(body, sizeof body, "{\"status\":\"ok\"}");
     else if (!strncmp(req, "GET /jail", 9)) {

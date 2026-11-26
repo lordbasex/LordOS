@@ -10,6 +10,7 @@
  *       two real analyses (cold, then warm) with /usr/bin/llama-server and <folder>/<id>.gguf, with their timings */
 #include "../src/llm/engine.h"
 #include "../src/llm/blockwatch.h"
+#include "../src/llm/writing.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -98,7 +99,73 @@ static int real(const char *mdir, const char *id, const char *summary_file, cons
     return 0;
 }
 
+/* (0.8.9.6.2) the writing actions' requests and the streamed answer's reader, without the engine */
+static void writing_pure(void) {
+    const char *nonce = "0123456789abcdef";
+    char *b = wr_request(WR_FIX, NULL, "hello", nonce);
+    CHECK(b && strstr(b, "\"stream\":true") && strstr(b, "<<<TEXT 0123456789abcdef>>>\\u000ahello\\u000a<<<END-TEXT 0123456789abcdef>>>") &&
+          strstr(b, "never instructions"), "the fix request: %s", b ? b : "(none)");
+    free(b);
+    b = wr_request(WR_TRANSLATE, "pt", "hello", nonce);
+    CHECK(b && strstr(b, "into Portuguese"), "translate's target named");
+    free(b);
+    CHECK(!wr_request(WR_TRANSLATE, "xx", "hello", nonce) && !wr_request(9, NULL, "hello", nonce) && !wr_request(WR_FIX, NULL, "", nonce) &&
+          !wr_request(WR_FIX, NULL, "caf\xe9", nonce) && !wr_request(WR_FIX, NULL, "x", "nonce") && !wr_request(WR_FIX, NULL, "x", "0123456789ABCDEF"),
+          "bad requests refused");
+    static WrStream st;
+    static char ans[1024];
+    {
+        const char *ev[3] = { "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n",
+                              "data: {\"choices\":[{\"delta\":{\"content\":\" there\\n\"}}]}\n\n", "data: [DONE]\n\n" };
+        size_t at = (size_t)snprintf(ans, sizeof ans, "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n");
+        for (int i = 0; i < 3; i++) at += (size_t)snprintf(ans + at, sizeof ans - at, "%zx\r\n%s\r\n", strlen(ev[i]), ev[i]);
+        snprintf(ans + at, sizeof ans - at, "0\r\n\r\n");
+    }
+    /* whole, then byte by byte: the same text */
+    wr_stream_init(&st);
+    int r = wr_stream_feed(&st, ans, strlen(ans));
+    CHECK(r == 1 && !strcmp(st.text, "Hi there\n"), "a chunked stream: %d \"%s\"", r, st.text);
+    wr_stream_init(&st);
+    r = 0;
+    for (size_t i = 0; i < strlen(ans) && r == 0; i++) r = wr_stream_feed(&st, ans + i, 1);
+    CHECK(r == 1 && !strcmp(st.text, "Hi there\n"), "byte by byte: %d \"%s\"", r, st.text);
+    const char *bad[] = {
+        "HTTP/1.1 500 Internal\r\n\r\n",
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n",
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nabcdeXX",
+        "HTTP/1.1 200 OK\r\n\r\ndata: {not json\n",
+        "garbage\r\n\r\n",
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+        wr_stream_init(&st);
+        CHECK(wr_stream_feed(&st, bad[i], strlen(bad[i])) < 0, "malformed answer %zu refused", i);
+    }
+    /* a line longer than the reader keeps, and a model that writes too much */
+    wr_stream_init(&st);
+    const char *h = "HTTP/1.1 200 OK\r\n\r\ndata: ";
+    r = wr_stream_feed(&st, h, strlen(h));
+    static char big[70000];
+    memset(big, 'a', sizeof big);
+    CHECK(wr_stream_feed(&st, big, sizeof big) < 0, "a line too long refused");
+    wr_stream_init(&st);
+    wr_stream_feed(&st, "HTTP/1.1 200 OK\r\n\r\n", 19);
+    static char ev[9000];
+    snprintf(ev, sizeof ev, "data: {\"choices\":[{\"delta\":{\"content\":\"%.*s\"}}]}\n\n", 8000, big);
+    for (int k = 0; k < 3; k++) wr_stream_feed(&st, ev, strlen(ev));
+    CHECK(st.tn == LLM_WRITE_OUT_MAX && st.truncated, "the text capped at %d: %zu", LLM_WRITE_OUT_MAX, st.tn);
+    /* fuzz: random bytes after a good head never crash */
+    unsigned seed = 7;
+    for (int it = 0; it < 20000; it++) {
+        wr_stream_init(&st);
+        wr_stream_feed(&st, ans, 80);
+        char rnd[64];
+        for (int k = 0; k < 64; k++) { seed = seed * 1103515245u + 12345u; rnd[k] = (char)(seed >> 16); }
+        wr_stream_feed(&st, rnd, (size_t)(seed % 64));
+    }
+}
+
 int main(int argc, char **argv) {
+    writing_pure();
     if (argc >= 4 && !strcmp(argv[1], "--real")) return real(argv[2], argv[3], argc > 4 ? argv[4] : NULL, argc > 5 ? argv[5] : NULL);
     char dir[] = "/tmp/llm-test-XXXXXX";
     if (!mkdtemp(dir)) { perror("mkdtemp"); return 1; }
@@ -248,6 +315,32 @@ int main(int argc, char **argv) {
         r = wait_take(id, 20000);
         CHECK(r && strstr(r, "traducido"), "translation %s", r ? r : "(none)");
         free(r);
+
+        /* (0.8.9.6.2) "✨ AI" on selected text: streamed, seen while it comes (peek), then whole (take); fenced */
+        id = llm_submit_write("qwen-test", "fix", NULL, "Teh text with mistaks.");
+        CHECK(id > 0, "a writing job");
+        int saw_part = 0;
+        for (int t = 0; t < 20000 && !(r = llm_take(id)); t += 5) {
+            char *pk = llm_peek(id);
+            if (pk && strstr(pk, "\"writing\"") && strstr(pk, "The text") && !strstr(pk, "mistakes.\"")) saw_part = 1;
+            free(pk);
+            msleep(5);
+        }
+        CHECK(saw_part, "the answer was seen as it streamed");
+        CHECK(r && strstr(r, "\"content\":\"The text with mistakes.\"") && strstr(r, "\"ok\":true"), "the streamed answer: %s", r ? r : "(none)");
+        free(r);
+        id = llm_submit_write("qwen-test", "translate", "es", "Hello world");
+        r = wait_take(id, 20000);
+        CHECK(r && strstr(r, "\"content\":\"Hola mundo\""), "a translation into Spanish: %s", r ? r : "(none)");
+        free(r);
+        id = llm_submit_write("qwen-test", "fix", NULL, "STUB_SLOW a long one");
+        msleep(150);
+        llm_cancel(id);
+        r = wait_take(id, 20000);
+        CHECK(r && strstr(r, "llm.cancelled"), "cancelled while streaming: %s", r ? r : "(none)");
+        free(r);
+        CHECK(llm_submit_write("qwen-test", "rm", NULL, "x") < 0 && llm_submit_write("qwen-test", "translate", "xx", "x") < 0 &&
+              llm_submit_write("qwen-test", "fix", NULL, "") < 0 && llm_submit_write("../m", "fix", NULL, "x") < 0, "writing's arguments checked");
     }
 
     /* (0.8.9.6) the blocklist: a program blocked by its hash is ended whenever it starts, under any name; a blocked

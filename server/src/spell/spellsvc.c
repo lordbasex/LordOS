@@ -77,7 +77,7 @@ void spell_set_paths(const char *dict_dir, const char *helper, const char *words
 static int installed_in(const char *dir, SpellTag *out, int max) {
     char t[SPELL_INSTALLED_MAX][SPELLANG_TAG_MAX];
     int n = spellang_installed(dir, t, max < SPELL_INSTALLED_MAX ? max : SPELL_INSTALLED_MAX), k = 0;
-    for (int i = 0; i < n; i++) if (spell_tag_ok(t[i])) snprintf(out[k++], SPELL_TAG_MAX, "%s", t[i]);
+    for (int i = 0; i < n; i++) { t[i][SPELLANG_TAG_MAX - 1] = 0; if (spell_tag_ok(t[i])) memcpy(out[k++], t[i], strlen(t[i]) + 1); }
     return k;
 }
 
@@ -473,7 +473,7 @@ int spell_defaults(const char *locale, SpellTag *out) {
     for (int i = 0; i < n; i++) list[i] = inst[i];
     char pick[SPELLANG_MAX][SPELLANG_TAG_MAX];
     int k = spellang_choose(locale, list, n, pick, SPELLANG_MAX);
-    for (int i = 0; i < k; i++) snprintf(out[i], SPELL_TAG_MAX, "%s", pick[i]);
+    for (int i = 0; i < k; i++) { pick[i][SPELL_TAG_MAX - 1] = 0; memcpy(out[i], pick[i], strlen(pick[i]) + 1); }
     return k;
 }
 

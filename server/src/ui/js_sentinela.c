@@ -18,11 +18,19 @@
  *   blockEvents()                  what the blocklist ended since the last call: [{ id, name, pid, at }]
  *   take(id)                       the job's result once (an object, see engine.h) or null while it runs
  *   state()                        { state: 'off'|'starting'|'ready'|'busy', model, pid, idleMs, queued }
- *   stop()                         stops the engine now and drops what is queued */
+ *   stop()                         stops the engine now and drops what is queued
+ *
+ * lord.writing (0.8.9.6.2, docs/AI.md "Writing"): "✨ AI" on selected text, for the shell's text fields only.
+ *   start(model, action, target, text)  a job id: action "fix" | "improve" | "shorter" | "translate" (target: an
+ *                                  interface language), the text at most 16,000 bytes; the prompts are fixed in C
+ *   peek(id)                       { state: 'queued'|'starting'|'writing', text } while it runs, else null
+ *   take(id)                       { ok, content, truncated } or { ok: false, error } once
+ *   cancel(id)                     drops it or stops the answer being streamed */
 #include "js_sentinela.h"
 #include "js_err.h"
 #include "../llm/engine.h"
 #include "../llm/blockwatch.h"
+#include "../llm/writing.h"
 
 #include <errno.h>
 #include <math.h>
@@ -167,6 +175,43 @@ static JSValue f_stop(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     return JS_TRUE;
 }
 
+static JSValue w_start(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 4) return js_throw_code(c, "sys.badArgument", NULL);
+    const char *model = str_arg(c, argv[0], 48), *action = str_arg(c, argv[1], 16), *text = str_arg(c, argv[3], LLM_WRITE_MAX);
+    const char *target = JS_IsString(argv[2]) ? str_arg(c, argv[2], 15) : NULL;
+    int id = model && action && text ? llm_submit_write(model, action, target ? target : "", text) : (errno = EINVAL, -1);
+    int e = errno;
+    if (model) JS_FreeCString(c, model);
+    if (action) JS_FreeCString(c, action);
+    if (target) JS_FreeCString(c, target);
+    if (text) JS_FreeCString(c, text);
+    if (id < 0) return js_throw_code(c, e == EBUSY ? "llm.busy" : "sys.badArgument", NULL);
+    return JS_NewInt32(c, id);
+}
+
+static JSValue w_peek(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    int id;
+    if (argc < 1 || JS_ToInt32(c, &id, argv[0])) return JS_NULL;
+    return parsed(c, llm_peek(id), "<writing.peek>");
+}
+
+static JSValue w_cancel(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    int id;
+    if (argc < 1 || JS_ToInt32(c, &id, argv[0])) return JS_FALSE;
+    llm_cancel(id);
+    return JS_TRUE;
+}
+
+static const JSCFunctionListEntry wfuncs[] = {
+    JS_CFUNC_DEF("start", 4, w_start),
+    JS_CFUNC_DEF("peek", 1, w_peek),
+    JS_CFUNC_DEF("take", 1, f_take),
+    JS_CFUNC_DEF("cancel", 1, w_cancel),
+};
+
 static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("available", 0, f_available),
     JS_CFUNC_DEF("models", 0, f_models),
@@ -190,4 +235,7 @@ void js_sentinela_register(JSContext *c, JSValue lord) {
     JSValue o = JS_NewObject(c);
     JS_SetPropertyFunctionList(c, o, funcs, sizeof funcs / sizeof funcs[0]);
     JS_SetPropertyStr(c, lord, "sentinela", o);
+    JSValue w = JS_NewObject(c);
+    JS_SetPropertyFunctionList(c, w, wfuncs, sizeof wfuncs / sizeof wfuncs[0]);
+    JS_SetPropertyStr(c, lord, "writing", w);
 }
