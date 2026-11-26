@@ -1,0 +1,2 @@
+{ "name": "Quitter", "description": "A test fixture: breaks, then logs out by itself.",
+  "community": true, "author": "LordOS tests", "license": "MIT", "version": "1.0.0" }

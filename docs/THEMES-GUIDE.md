@@ -687,7 +687,8 @@ can't do and what it may read; only the person's answer there lets it run (lord-
 record, which `lord.fs` can't write). A **watchdog** (`community_watch` in `server/src/main.c`) takes a community theme
 off when it throws at start, never calls `startShell`, draws nothing within 6 seconds, has its React tree die, stalls
 the desktop until the main-loop watchdog stops it, or was running when two sessions in a row ended abnormally (a
-lord-server that died; logging out, shutting down, restarting or switching user is never counted, however short): the previous style comes back and
+lord-server that died; logging out, shutting down, restarting or switching user from LordOS is never counted, however
+short, while a logout the theme's own code asks for keeps the count until the theme has run a healthy minute): the previous style comes back and
 Settings shows "Couldn't start" with Report, **Try Again** and **Remove**. **Ctrl+Alt+Shift+Backspace** always
 restores Lord Flow.
 

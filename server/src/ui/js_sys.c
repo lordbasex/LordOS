@@ -1053,8 +1053,11 @@ static JSValue f_time_reload(JSContext *c, JSValueConst this_val, int argc, JSVa
 /* ---- miscellaneous ---- */
 
 static JSValue f_quit(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
-    (void)c; (void)this_val; (void)argc; (void)argv;
+    (void)this_val; (void)argc; (void)argv;
     ui.quit_requested = 1;
+    /* a community theme logging out by itself (its code on the stack, or a call made for it): its crash count stays
+     * (main.c clears it only for ends the person caused outside the theme's reach) */
+    if (jst_on_stack(c)) ui.quit_by_theme = 1;
     return JS_UNDEFINED;
 }
 

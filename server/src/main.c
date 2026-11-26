@@ -3838,11 +3838,13 @@ int main(int argc, char **argv) {
      * desktop for seconds */
     wdog_stop();                          /* closing the apps below may take seconds by design */
     if (ui.quit_requested) fprintf(stderr, "lord-server: the theme asked to log out\n");
-    {   /* the session ended as the person (or lord-sessiond: log out, shut down, restart, switch user) asked: never a
-         * crash of a community theme, however short it was (only a lord-server that died, a JS fatal or the watchdog
-         * counts: chosen_theme's count is cleared here) */
+    {   /* the session ended as the person asked, from outside a community theme's reach: lord-sessiond's SIGTERM (log
+         * out, shut down, restart, switch user), the physical Ctrl+Alt+Backspace, the end of a --timeout, or LordOS's own
+         * code asking to log out (a confirmation the theme can't answer): never a crash of the theme, however short. A
+         * lord.quit the theme's own code made (ui.quit_by_theme), a lord-server that died, a JS fatal or the watchdog
+         * keep the count (main.c community_watch, chosen_theme) */
         char cid[32];
-        if (!s.greeter && jst_is_user_bundle(current, cid, sizeof cid)) jst_session_ended(cid);
+        if (!s.greeter && !ui.quit_by_theme && jst_is_user_bundle(current, cid, sizeof cid)) jst_session_ended(cid);
     }
     if (ui.quit_requested && !s.headless) mirror_session("{\"a\":\"logout\"}");
     js_before_exit();                     /* what is open goes to settings.json, marked clean */

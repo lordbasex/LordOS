@@ -149,6 +149,7 @@ typedef struct {
     Box dlast;                      /* ui.damage as damage_add left it: if it differs, it was set directly */
     double damage_px;               /* pixels repainted in the last frame */
     int quit_requested;             /* lord.quit() */
+    int quit_by_theme;              /* lord.quit() from a community theme's code (js_theme.c): not the person's end */
     uint8_t rtl;                    /* interface direction (Arabic, Hebrew… language) */
     char theme_request[1024];       /* lord.themes.use(): bundle to load */
     char theme_failed[1024];        /* last bundle that failed to load */

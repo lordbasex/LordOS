@@ -6,6 +6,7 @@
 #   okminimal  the minimal example as a community theme: it starts in its own realm and draws (no watchdog), and
 #              nothing it does through the SDK is refused; a session that ends normally is no crash, two killed under
 #              it in a row (kill -9) keep it off the next one
+#   quitter    breaks, then calls session.quit itself: its own logout never clears its crash count
 #   probe      (installed unchecked) every way to reach past its policy: lord.term/fs/admin don't exist in its realm,
 #              code from text gives nothing, LordOS's built-ins are frozen, and lord.setStyle on a node not its own is
 #              refused directly, from Promise.then, queueMicrotask, setTimeout (bound and with arguments),
@@ -83,6 +84,10 @@ env -u WAYLAND_DISPLAY -u DISPLAY -u LORD_SESSIOND -u LORDOS_SESSIOND -u DBUS_SE
 L=$(cat "$S/server.log" "$S/home/.cache/lordos/"*.log 2>/dev/null)
 hasnt "okminimal: not started the third time" "community theme okminimal started"
 if record okminimal | grep -q 'ended 2 times in a row'; then echo "ok   okminimal: two killed sessions in a row keep it off the next one"; else echo "FAIL okminimal after two kills: $(record okminimal)"; R=1; fi
+
+session quitter quitter 40 --unchecked
+has "quitter: it logged out by itself" "CT quitter logs out"
+if record quitter | grep -q '"crashes":1'; then echo "ok   quitter: its own logout doesn't clear its crash count"; else echo "FAIL quitter: $(record quitter)"; R=1; fi
 
 session probe probe 40 --unchecked
 has "probe starts" "community theme probe started"
