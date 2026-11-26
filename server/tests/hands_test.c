@@ -13,6 +13,7 @@
  * Never touches the session's bus. */
 #include "hands/hands.h"
 #include "hands/handsimg.h"
+#include "hands/handsmark.h"
 #include "ui/handsbus.h"
 #include "vault/dbus.h"
 
@@ -141,16 +142,22 @@ static void policy(void) {
     hands_init(&host);
     HandsReq r = { .call = HANDS_C_READ };
     int why = 0;
-    CHECK(hands_hello(":1.1", "Claude Code", "/usr/bin/lordos-mcp") == HANDS_E_OFF, "off until turned on");
+    CHECK(hands_hello(":1.1", "Claude Code", "/usr/bin/lordos-mcp", 0) == HANDS_E_OFF, "off until turned on");
     hands_serve(1, NULL, 0);
-    CHECK(hands_hello(":1.1", "Claude Code", "/usr/bin/lordos-mcp") == HANDS_E_ASKING, "the prompt");
+    CHECK(hands_hello(":1.1", "Claude Code", "/usr/bin/lordos-mcp", 1) == HANDS_E_ASKING, "the prompt");
     CHECK(strstr(last_event, "\"exe\":\"/usr/bin/lordos-mcp\"") && strstr(last_event, "\"bus\":\":1.1\""), "the prompt shows the verified program: %s", last_event);
+    CHECK(strstr(last_event, "\"system\":true"), "a system program says so");
     CHECK(call(":1.1", &r, &why) == HANDS_E_ASKING, "nothing before the answer");
     hands_answer(":1.1", 1);
     CHECK(call(":1.1", &r, &why) == HANDS_OK, "granted: read");
     /* identity: the grant is the connection's, never the name's */
-    CHECK(hands_hello(":1.2", "Claude Code", "/tmp/evil") == HANDS_E_ASKING, "another connection with the same name asks again");
+    CHECK(hands_hello(":1.2", "Claude Code", "/tmp/evil", 0) == HANDS_E_ASKING, "another connection with the same name asks again");
     CHECK(call(":1.2", &r, &why) == HANDS_E_ASKING, "and gets nothing meanwhile");
+    {
+        char *st = hands_status_json();
+        CHECK(st && strstr(st, "\"exe\":\"/tmp/evil\",\"system\":false"), "a program outside root's folders is not a system one: %s", st ? st : "");
+        free(st);
+    }
     hands_answer("Claude Code", 1);
     CHECK(call(":1.2", &r, &why) == HANDS_E_ASKING, "an answer by name grants nothing");
     hands_answer(":1.2", 0);
@@ -233,12 +240,12 @@ static void policy(void) {
     /* Stop, a new connection, the panic key */
     hands_stop("stop");
     CHECK(call(":1.1", &r, &why) == HANDS_E_STOPPED, "stopped");
-    CHECK(hands_hello(":1.1", "Claude Code", "") == HANDS_E_STOPPED, "a stopped connection stays stopped");
-    CHECK(hands_hello(":1.3", "Claude Code", "") == HANDS_E_ASKING, "a new connection asks again");
+    CHECK(hands_hello(":1.1", "Claude Code", "", 0) == HANDS_E_STOPPED, "a stopped connection stays stopped");
+    CHECK(hands_hello(":1.3", "Claude Code", "", 0) == HANDS_E_ASKING, "a new connection asks again");
     hands_panic();
     CHECK(!hands_on() && call(":1.3", &r, &why) == HANDS_E_OFF, "the panic key turns Hands off");
     hands_qa(1);
-    CHECK(hands_hello(":1.4", "QA", "") == HANDS_OK, "the QA desktop grants with no prompt");
+    CHECK(hands_hello(":1.4", "QA", "", 0) == HANDS_OK, "the QA desktop grants with no prompt");
     hands_qa(0);
     hands_lost();
 }
@@ -255,7 +262,7 @@ static void fuzz(void) {
     hands_init(&host);
     hands_serve(1, NULL, 0);
     hands_qa(1);
-    hands_hello(":9.9", "Fuzz", "");
+    hands_hello(":9.9", "Fuzz", "", 0);
     for (int it = 0; it < 20000; it++) {
         seed = seed * 1103515245u + 12345u;
         const char *mem = members[(seed >> 8) % (sizeof members / sizeof members[0])];
@@ -303,13 +310,14 @@ static void fuzz(void) {
 
 /* ---- on a private bus ---- */
 
+static char status_path[PATH_MAX];
 static void stand_in(const char *addr, int ready) {
     setenv("DBUS_SESSION_BUS_ADDRESS", addr, 1);
     hands_init(&host);
     hands_serve(1, NULL, 0);
     DConn c;
     int fd = dbus_connect_session();
-    if (fd < 0 || dbus_open(&c, fd, 3000)) _exit(1);
+    if (fd < 0 || dbus_open_fds(&c, fd, 3000)) _exit(1);      /* as the portal's: ProcessFD comes as an fd */
     DBuf b;
     dw_init(&b);
     dw_str(&b, HANDS_BUS_NAME);
@@ -328,6 +336,10 @@ static void stand_in(const char *addr, int ready) {
             if ((m.type == DBUS_RETURN || m.type == DBUS_ERROR) && m.reply_serial) handsbus_reply(&c, &m);
             else if (m.type == DBUS_CALL && m.path && !strcmp(m.path, HANDS_BUS_PATH)) handsbus_call(&c, &m);
             dbus_msg_free(&m);
+            char *st = hands_status_json();
+            FILE *f = st ? fopen(status_path, "w") : NULL;
+            if (f) { fputs(st, f); fclose(f); }
+            free(st);
         }
         if (r < 0 || dbus_flush(&c) < 0) _exit(0);
         struct timespec ts = { 0, 5000000 };
@@ -350,7 +362,9 @@ static void bus_round(const char *dir, int delta, int *rc, char *state, size_t n
     snprintf(conf, sizeof conf, "%s/bus.conf", dir);
     snprintf(sock, sizeof sock, "%s/bus", dir);
     snprintf(addr, sizeof addr, "unix:path=%s", sock);
+    snprintf(status_path, sizeof status_path, "%s/status.json", dir);
     unlink(sock);
+    unlink(status_path);
     FILE *f = fopen(conf, "w");
     if (!f) return;
     fprintf(f, "<!DOCTYPE busconfig PUBLIC \"-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN\" "
@@ -404,24 +418,107 @@ static void on_bus(void) {
     char state[64] = "", err[128] = "";
     bus_round(dir, 0, &rc, state, sizeof state, err, sizeof err);
     CHECK(rc == 1 && !strcmp(state, "asking"), "the same user: Hello answered (the prompt): rc %d [%s] %s", rc, state, err);
+    /* the program that opened the connection, from its pidfd: this test itself, in the build folder (no system one) */
+    char self[PATH_MAX], st[2048] = "";
+    ssize_t l = readlink("/proc/self/exe", self, sizeof self - 1);
+    if (l > 0) self[l] = 0;
+    FILE *f = fopen(status_path, "r");
+    if (f) { size_t k = fread(st, 1, sizeof st - 1, f); st[k] = 0; fclose(f); }
+    unlink(status_path);
+    char want[PATH_MAX + 32];
+    snprintf(want, sizeof want, "\"exe\":\"%s\",\"system\":false", self);
+    if (strstr(st, "\"exe\":\"\"")) printf("hands-test: this dbus-daemon gives no ProcessFD: the program stays unknown\n");
+    else CHECK(strstr(st, want) != NULL, "the caller's program through its pidfd: %s", st);
     state[0] = err[0] = 0;
     bus_round(dir, 1, &rc, state, sizeof state, err, sizeof err);
     CHECK(rc == 0 && !strcmp(err, HANDS_ERR_ACCESS), "another user refused before anything runs: rc %d [%s]", rc, err);
-    char exe[HANDS_EXE_MAX], self[PATH_MAX];
-    handsbus_exe_of((uint32_t)getpid(), exe, sizeof exe);
-    ssize_t l = readlink("/proc/self/exe", self, sizeof self - 1);
-    if (l > 0) self[l] = 0;
-    CHECK(l > 0 && !strcmp(exe, self), "the caller's program, verified: [%s]", exe);
-    handsbus_exe_of(0x7ffffff0u, exe, sizeof exe);
-    CHECK(!exe[0], "no program for a process that isn't there");
     rmdir(dir);
 }
+
+/* the program of a pidfd: this process, a system program, a deleted one, one that ended */
+static pid_t spawn(const char *path, int *pidfd) {
+    pid_t p = fork();
+    if (!p) { execl(path, "sleep", "30", (char *)NULL); _exit(127); }
+    struct timespec ts = { 0, 100000000 };
+    nanosleep(&ts, NULL);
+    *pidfd = (int)syscall(SYS_pidfd_open, p, 0);
+    return p;
+}
+static void pidfds(void) {
+    char exe[HANDS_EXE_MAX], self[PATH_MAX];
+    int sys = 1;
+    int me = (int)syscall(SYS_pidfd_open, getpid(), 0);
+    ssize_t l = readlink("/proc/self/exe", self, sizeof self - 1);
+    if (l > 0) self[l] = 0;
+    CHECK(me >= 0 && !handsbus_exe_of_pidfd(me, exe, sizeof exe, &sys) && !strcmp(exe, self) && !sys, "this test's program, not a system one: [%s]", exe);
+    close(me);
+    if (!access("/usr/bin/sleep", X_OK)) {
+        int fd = -1;
+        pid_t p = spawn("/usr/bin/sleep", &fd);
+        CHECK(fd >= 0 && !handsbus_exe_of_pidfd(fd, exe, sizeof exe, &sys) && sys, "/usr/bin/sleep is a system program: [%s] %d", exe, sys);
+        kill(p, SIGKILL);
+        waitpid(p, NULL, 0);
+        CHECK(handsbus_exe_of_pidfd(fd, exe, sizeof exe, &sys) == -1 && !exe[0], "a process that ended has no program (never a pid reused)");
+        close(fd);
+        char dir[] = "/tmp/hands-exe-XXXXXX", copy[PATH_MAX];
+        if (mkdtemp(dir)) {
+            snprintf(copy, sizeof copy, "%s/sleep", dir);
+            int in = open("/usr/bin/sleep", O_RDONLY), out = open(copy, O_WRONLY | O_CREAT | O_TRUNC, 0700);
+            char buf[65536];
+            ssize_t k;
+            while (in >= 0 && out >= 0 && (k = read(in, buf, sizeof buf)) > 0) if (write(out, buf, (size_t)k) != k) break;
+            if (in >= 0) close(in);
+            if (out >= 0) close(out);
+            p = spawn(copy, &fd);
+            unlink(copy);
+            CHECK(fd >= 0 && handsbus_exe_of_pidfd(fd, exe, sizeof exe, &sys) == -2, "a deleted program refused");
+            kill(p, SIGKILL);
+            waitpid(p, NULL, 0);
+            close(fd);
+            rmdir(dir);
+        }
+    }
+    CHECK(handsbus_exe_of_pidfd(-1, exe, sizeof exe, &sys) == -1, "no pidfd, no program");
+}
+
+/* the screenshot's marks: fail closed */
+static Node nodes[1200];
+static Node *get(int id) { return id > 0 && id < 1200 ? &nodes[id] : NULL; }
+static void add(Node *p, Node *c) { c->parent = p; if (p->last) { p->last->next = c; c->prev = p->last; } else p->first = c; p->last = c; }
+static void marks(void) {
+    for (int i = 0; i < 1200; i++) { memset(&nodes[i], 0, sizeof nodes[i]); nodes[i].id = i; }
+    Node *root = &nodes[1], *base = &nodes[2], *sys = &nodes[3];
+    add(root, base);
+    add(root, sys);
+    sys->s.z_index = 100;
+    add(sys, &nodes[4]);                    /* a prompt */
+    add(base, &nodes[5]);
+    add(&nodes[5], &nodes[6]);
+    nodes[6].hands_deny = 1;                /* Settings → AI → Hands */
+    add(base, &nodes[7]);                   /* another app's window */
+    int marked[HANDS_MARK_MAX + HANDS_BLACK_MAX], n = 0, black[] = { 7 };
+    CHECK(!hands_mark_nodes(root, get, black, 1, marked, 8, &n) && n == 3 && nodes[4].protect && nodes[6].protect && nodes[7].protect && !nodes[5].protect,
+          "the prompt, the denied node and the other window marked: %d", n);
+    hands_unmark_nodes(get, marked, n);
+    CHECK(!nodes[4].protect && !nodes[6].protect && !nodes[7].protect, "and put back");
+    int unknown[] = { 5000 };
+    CHECK(hands_mark_nodes(root, get, unknown, 1, marked, 8, &n) == -1 && !nodes[4].protect, "a window that can't be found to black out: refused");
+    /* more prompts than room: nothing stays marked, the capture is refused */
+    for (int i = 100; i < 1100; i++) add(sys, &nodes[i]);
+    CHECK(hands_mark_nodes(root, get, black, 1, marked, HANDS_MARK_MAX, &n) == -1 && n == 0, "too many to hide: refused");
+    int any = 0;
+    for (int i = 0; i < 1200; i++) any |= nodes[i].protect;
+    CHECK(!any, "and every mark undone");
+}
+
 
 int main(void) {
     pure();
     policy();
     fuzz();
     on_bus();
+    pidfds();
+    marks();
     printf("hands-test: %d passed, %d failed\n", passes, fails);
     return fails ? 1 : 0;
 }

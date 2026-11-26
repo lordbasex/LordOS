@@ -202,14 +202,16 @@ int  hands_qa_mode(void);
 /* the agent's input is being delivered now (lord.hands.injecting) and how many events it has sent */
 int  hands_injecting(void);
 unsigned long hands_ai_events(void);
-/* {"on","qa","allow":[…],"clients":[{"bus","name","exe","kind","state","actions"}],"events"} for the shell */
+/* {"on","qa","allow":[…],"clients":[{"bus","name","exe","system","kind","state","actions"}],"events"} for the shell */
 char *hands_status_json(void);
 
 /* ---- a bus client (handsbus.c) ---- */
 
-/* the client named itself; exe is what the bus vouched for ("" unknown): HANDS_OK granted, HANDS_E_ASKING (a prompt
+/* the client named itself; exe is the program that opened the connection ("" unknown), sys hands_exe_system: HANDS_OK granted, HANDS_E_ASKING (a prompt
  * is up), or an error */
-int  hands_hello(const char *bus, const char *name, const char *exe);
+int  hands_hello(const char *bus, const char *name, const char *exe, int sys);
+/* exe is root's and in root's folders, nobody else's to write (the prompt's "system program") */
+int  hands_exe_system(const char *path);
 void hands_gone(const char *bus);           /* left the bus */
 void hands_lost(void);                      /* the bus went away */
 /* 0 when that client may act now (on, granted, not stopped, not throttled for this kind); else HANDS_E_* */

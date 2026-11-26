@@ -185,13 +185,17 @@ int handsbus_parse(const DMsg *m, HandsReq *r) {
 
 typedef struct {
     char name[64];
-    int st;                         /* 0 free, 1 asking the bus its uid, 4 its pid, 2 same user, 3 another user */
-    char exe[HANDS_EXE_MAX];        /* the program the bus vouched for (its pid's /proc/<pid>/exe), "" unknown */
+    int st;                         /* 0 free, 1 asking the bus, 2 same user, 3 refused (another user, a deleted program) */
+    char exe[HANDS_EXE_MAX];        /* the program that opened the connection (read through its pidfd), "" unknown */
+    int sys;                        /* exe and every folder above it are root's and nobody else's to write */
+    int pidfd;                      /* the bus's ProcessFD of the connection's process, -1 none; checked at each call */
+    const char *why;                /* why refused */
     uint32_t ask;
     DMsg pend;
     int has_pend;
 } Caller;
 static Caller callers[HANDSBUS_CALLERS];
+static uint32_t ask_bus(DConn *c, const char *member, const char *sender);
 
 static const char *err_name(int rc) {
     switch (rc) {
@@ -222,7 +226,7 @@ static void serve(DConn *c, const DMsg *m) {
     dw_init(&b);
     if (r.call == HANDS_C_HELLO) {
         Caller *k = caller_of(m->sender);
-        int rc = hands_hello(m->sender, r.text, k ? k->exe : "");
+        int rc = hands_hello(m->sender, r.text, k ? k->exe : "", k ? k->sys : 0);
         if (rc == HANDS_OK || rc == HANDS_E_ASKING) {
             dw_str(&b, rc == HANDS_OK ? "granted" : "asking");
             dbus_reply(c, m, "s", &b);
@@ -258,7 +262,9 @@ static Caller *caller_of(const char *name) {
 
 static void caller_drop(Caller *k) {
     if (k->has_pend) dbus_msg_free(&k->pend);
+    if (k->st && k->pidfd >= 0) close(k->pidfd);
     memset(k, 0, sizeof *k);
+    k->pidfd = -1;
 }
 
 void handsbus_call(DConn *c, const DMsg *m) {
@@ -276,19 +282,17 @@ void handsbus_call(DConn *c, const DMsg *m) {
         return;
     }
     Caller *k = caller_of(m->sender);
+    /* the process that opened the connection still lives (its pidfd, not a pid that may have been reused) */
+    if (k && k->st == 2 && k->pidfd >= 0 && syscall(SYS_pidfd_send_signal, k->pidfd, 0, NULL, 0)) { k->st = 3; k->why = "program gone"; }
     if (k && k->st == 2) { serve(c, m); return; }
-    if (k && k->st == 3) { dbus_error(c, m, HANDS_ERR_ACCESS, "another user"); return; }
+    if (k && k->st == 3) { dbus_error(c, m, HANDS_ERR_ACCESS, k->why ? k->why : "refused"); return; }
     if (k) { dbus_error(c, m, HANDS_ERR_BUSY, "one call at a time"); return; }   /* still asking the bus */
     for (int i = 0; i < HANDSBUS_CALLERS && !k; i++) if (!callers[i].st) k = &callers[i];
     if (!k) { dbus_error(c, m, HANDS_ERR_BUSY, "too many callers"); return; }
-    /* the caller's uid, from the bus, before its first call is served */
-    DBuf b;
-    dw_init(&b);
-    dw_str(&b, m->sender);
-    DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/DBus", .iface = "org.freedesktop.DBus",
-               .member = "GetConnectionUnixUser", .dest = "org.freedesktop.DBus", .sig = "s" };
-    uint32_t serial = dbus_send(c, &h, &b);
-    dw_free(&b);
+    /* the caller's uid and process, from the bus (GetConnectionCredentials: UnixUserID, ProcessFD), before its first call */
+    memset(k, 0, sizeof *k);
+    k->pidfd = -1;
+    uint32_t serial = ask_bus(c, "GetConnectionCredentials", m->sender);
     if (!serial || dbus_msg_parse(m->raw, m->raw_len, &k->pend)) { dbus_error(c, m, HANDS_ERR_FAILED, "no answer from the bus"); return; }
     k->has_pend = 1;
     k->st = 1;
@@ -296,21 +300,30 @@ void handsbus_call(DConn *c, const DMsg *m) {
     snprintf(k->name, sizeof k->name, "%s", m->sender);
 }
 
-/* the executable of pid, only while that very process lives (a pidfd held across the read): "" otherwise */
-void handsbus_exe_of(uint32_t pid, char *out, size_t n) {
+/* The program of the process a pidfd holds: its pid from the pidfd's fdinfo, /proc/<pid>/exe read, then the pidfd asked
+ * whether that very process still lives (a pid reused meanwhile would leave the pidfd dead). 0 with the path in out and
+ * *sys (hands_exe_system), -1 unknown, -2 a deleted program (refused: it can't be shown for what it is). */
+int handsbus_exe_of_pidfd(int pidfd, char *out, size_t n, int *sys) {
     out[0] = 0;
-    if (!pid || pid > (uint32_t)INT_MAX || n < 2) return;
-    int pfd = (int)syscall(SYS_pidfd_open, (pid_t)pid, 0);
-    if (pfd < 0) return;
+    *sys = 0;
+    if (pidfd < 0 || n < 2) return -1;
+    char p[64], line[256];
+    snprintf(p, sizeof p, "/proc/self/fdinfo/%d", pidfd);
+    FILE *f = fopen(p, "re");
+    long pid = 0;
+    while (f && fgets(line, sizeof line, f)) if (!strncmp(line, "Pid:", 4)) pid = strtol(line + 4, NULL, 10);
+    if (f) fclose(f);
+    if (pid <= 0 || pid > INT_MAX) return -1;
     char link[64], exe[PATH_MAX];
-    snprintf(link, sizeof link, "/proc/%u/exe", pid);
+    snprintf(link, sizeof link, "/proc/%ld/exe", pid);
     ssize_t l = readlink(link, exe, sizeof exe - 1);
-    /* still the same process after the read: a pid reused meanwhile has a dead pidfd */
-    if (l > 0 && (size_t)l < n && syscall(SYS_pidfd_send_signal, pfd, 0, NULL, 0) == 0) {
-        exe[l] = 0;
-        if (exe[0] == '/' && hands_text_ok(exe, (size_t)l, n - 1, 0)) snprintf(out, n, "%s", exe);
-    }
-    close(pfd);
+    if (l <= 0 || syscall(SYS_pidfd_send_signal, pidfd, 0, NULL, 0)) return -1;
+    exe[l] = 0;
+    if (l > 10 && !strcmp(exe + l - 10, " (deleted)")) return -2;
+    if (exe[0] != '/' || (size_t)l >= n || !hands_text_ok(exe, (size_t)l, n - 1, 0)) return -1;
+    snprintf(out, n, "%s", exe);
+    *sys = hands_exe_system(exe);
+    return 0;
 }
 
 static uint32_t ask_bus(DConn *c, const char *member, const char *sender) {
@@ -324,26 +337,45 @@ static uint32_t ask_bus(DConn *c, const char *member, const char *sender) {
     return serial;
 }
 
+/* GetConnectionCredentials' a{sv}: UnixUserID (u), ProcessFD (h: dup'd into *pidfd), the rest skipped */
+static void credentials(const DMsg *m, uint32_t *uid, int *pidfd) {
+    *uid = (uint32_t)-1;
+    *pidfd = -1;
+    if (m->type != DBUS_RETURN || !m->sig || strcmp(m->sig, "a{sv}")) return;
+    DRd r;
+    dr_init(&r, m);
+    size_t end = dr_arr(&r, 8);
+    while (!r.err && dr_more(&r, end)) {
+        dr_struct(&r);
+        const char *key = dr_str(&r, NULL), *vs = dr_variant(&r);
+        if (r.err || !key || !vs) break;
+        if (!strcmp(key, "UnixUserID") && !strcmp(vs, "u")) *uid = dr_u32(&r);
+        else if (!strcmp(key, "ProcessFD") && !strcmp(vs, "h")) {
+            uint32_t i = dr_u32(&r);
+            if (!r.err && i < (uint32_t)m->n_fds && m->fds[i] >= 0 && *pidfd < 0) *pidfd = fcntl(m->fds[i], F_DUPFD_CLOEXEC, 3);
+        } else dr_skip(&r, vs);
+    }
+    if (r.err) { *uid = (uint32_t)-1; if (*pidfd >= 0) close(*pidfd); *pidfd = -1; }
+}
+
 int handsbus_reply(DConn *c, const DMsg *m) {
     for (int i = 0; i < HANDSBUS_CALLERS; i++) {
         Caller *k = &callers[i];
-        if ((k->st != 1 && k->st != 4) || k->ask != m->reply_serial) continue;
-        uint32_t v = (uint32_t)-1;
-        if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u")) { DRd r; dr_init(&r, m); v = dr_u32(&r); if (r.err) v = (uint32_t)-1; }
-        if (k->st == 1) {
-            if (v == (uint32_t)getuid()) {
-                /* the same user: now which program it is, for the prompt (GetConnectionUnixProcessID) */
-                uint32_t serial = ask_bus(c, "GetConnectionUnixProcessID", k->name);
-                if (serial) { k->st = 4; k->ask = serial; return 1; }
-                k->st = 2;
-            } else k->st = 3;
-        } else {
-            handsbus_exe_of(v == (uint32_t)-1 ? 0 : v, k->exe, sizeof k->exe);
-            k->st = 2;
+        if (k->st != 1 || k->ask != m->reply_serial) continue;
+        uint32_t uid;
+        int pidfd;
+        credentials(m, &uid, &pidfd);
+        k->pidfd = pidfd;
+        if (uid != (uint32_t)getuid()) { k->st = 3; k->why = "another user"; }
+        else {
+            /* the program, through the pidfd only: a bus without ProcessFD leaves it unknown, never a pid's guess */
+            int e = handsbus_exe_of_pidfd(pidfd, k->exe, sizeof k->exe, &k->sys);
+            if (e == -2) { k->st = 3; k->why = "program deleted"; }
+            else k->st = 2;
         }
         if (k->has_pend) {
             if (k->st == 2) serve(c, &k->pend);
-            else dbus_error(c, &k->pend, HANDS_ERR_ACCESS, "another user");
+            else dbus_error(c, &k->pend, HANDS_ERR_ACCESS, k->why ? k->why : "refused");
             dbus_msg_free(&k->pend);
             k->has_pend = 0;
         }

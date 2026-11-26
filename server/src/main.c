@@ -113,6 +113,7 @@
 #include "nofile.h"
 #include "hands/hands.h"
 #include "hands/handsimg.h"
+#include "hands/handsmark.h"
 #include "ui/js_hands.h"
 
 #include <ctype.h>
@@ -942,8 +943,7 @@ static int share_restricted(const char *id) { return restrict_blocks(id, FW_R_NO
  * hit test, js_key, the Wayland apps), never /dev/uinput or evdev. hands.c decided the call may happen; these say where
  * a point or a key would land and refuse the places an agent never reaches. */
 
-/* the system band (sdk/layers.js: system 100, agent 105, input 110, capture 120) */
-#define HANDS_SYSTEM_Z 100
+/* the system band (sdk/layers.js: system 100, agent 105, input 110, capture 120): HANDS_SYSTEM_Z, handsmark.h */
 static int hands_node_place(const Node *n) {
     if (pkagent_blocks_injected(1)) return HANDS_WHY_PROMPT;   /* an authentication prompt takes only real keys and clicks */
     for (const Node *a = n; a; a = a->parent) {
@@ -1091,45 +1091,24 @@ static int hands_type(const char *t, size_t n) {
     if (labels) kb_labels_end();
     return 0;
 }
-/* what a capture by an agent leaves out: every surface of the system band and every handsDeny node is painted as the
- * protected fill for the length of the capture (paint.c, as a protected window), then put back as it was */
-#define HANDS_MARK_MAX 512
-static int hands_marked[HANDS_MARK_MAX], hands_nmarked;
-static void hands_mark(Node *n, int depth) {
-    if (!n || depth > 4096 || hands_nmarked >= HANDS_MARK_MAX) return;
-    if (n->hands_deny && !n->protect) { n->protect = 1; hands_marked[hands_nmarked++] = n->id; return; }
-    for (Node *k = n->first; k; k = k->next) hands_mark(k, depth + 1);
-}
-static void hands_mark_capture(int on) {
-    if (!on) {
-        for (int i = 0; i < hands_nmarked; i++) { Node *n = node_get(hands_marked[i]); if (n) n->protect = 0; }
-        hands_nmarked = 0;
-        return;
-    }
-    hands_nmarked = 0;
-    for (Node *l = ui.root ? ui.root->first : NULL; l; l = l->next) {
-        if (l->s.z_index >= HANDS_SYSTEM_Z) {
-            for (Node *k = l->first; k && hands_nmarked < HANDS_MARK_MAX; k = k->next)
-                if (!k->protect) { k->protect = 1; hands_marked[hands_nmarked++] = k->id; }
-        } else hands_mark(l, 0);
-    }
-}
+/* what a capture by an agent leaves out (hands/handsmark.c): the system band, handsDeny nodes, other apps' windows with
+ * an allowlist, marked for the capture and put back; when they can't all be marked, there is no capture (fail closed) */
+static int hands_marked[HANDS_MARK_MAX + HANDS_BLACK_MAX], hands_nmarked;
+static Node *hands_node_get(int id) { return node_get(id); }
 static uint8_t *hands_shot(int kind, uint32_t display, int node, double x, double y, double w, double h, int maxdim,
                            const int *black, int nblack, size_t *len, int *iw, int *ih, char *meta, size_t metan) {
     *len = 0;
     MediaSrc *m = NULL;
     double lx = 0, ly = 0, lw = remote_server->W, lh = remote_server->H;
-    hands_mark_capture(1);
-    /* with an allowlist: every other app's window too (hands.c blackout) */
-    for (int i = 0; i < nblack && hands_nmarked < HANDS_MARK_MAX; i++) {
-        Node *b = node_get(black[i]);
-        if (b && !b->protect) { b->protect = 1; hands_marked[hands_nmarked++] = b->id; }
+    if (hands_mark_nodes(ui.root, hands_node_get, black, nblack, hands_marked, (int)(sizeof hands_marked / sizeof hands_marked[0]), &hands_nmarked)) {
+        fprintf(stderr, "lord-server: Hands: a screenshot refused: not everything it must hide could be hidden\n");
+        return NULL;
     }
     if (kind == HANDS_SHOT_DISPLAY) {
         const DisplayPlan *plan = display_current();
         const DisplayOut *o = NULL;
         for (int i = 0; i < plan->n && !o; i++) if (display ? plan->o[i].conn == display : i == plan->main) o = &plan->o[i];
-        if (display && !o) { hands_mark_capture(0); return NULL; }
+        if (display && !o) { hands_unmark_nodes(hands_node_get, hands_marked, hands_nmarked); hands_nmarked = 0; return NULL; }
         if (o) { lx = o->v.x; ly = o->v.y; lw = o->v.w; lh = o->v.h; }
         m = media_screenshot("hands", 0, 0, 0, 0, o ? o->conn : 0, 0, NULL, 0, NULL);
     } else if (kind == HANDS_SHOT_WINDOW) {
@@ -1139,7 +1118,8 @@ static uint8_t *hands_shot(int kind, uint32_t display, int node, double x, doubl
         lx = x; ly = y; lw = w; lh = h;
         m = media_screenshot("hands", (int)x, (int)y, (int)w, (int)h, 0, 0, NULL, 0, NULL);
     }
-    hands_mark_capture(0);
+    hands_unmark_nodes(hands_node_get, hands_marked, hands_nmarked);
+    hands_nmarked = 0;
     if (!m || !m->px) { if (m) media_src_close(m); return NULL; }
     hands_fit(m->w, m->h, maxdim, kind == HANDS_SHOT_REGION, iw, ih);
     uint8_t *rgb = hands_scale_rgb(m->px, m->w, m->w, m->h, *iw, *ih);
