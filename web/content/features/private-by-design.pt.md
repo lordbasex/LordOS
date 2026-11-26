@@ -102,6 +102,20 @@ Uma janela pode ser marcada como protegida. A de Senhas é. Nas capturas de tela
 
 [[shot:5]]
 
+## Um agente de IA no seu desktop, com a sua permissão (em desenvolvimento)
+
+Em desenvolvimento depois da 0.8.9.6.1 (a versão mais recente é a 0.8.9.6.1): **Mãos** deixa um agente de IA como o Claude Code usar o desktop do LordOS como o Claude in Chrome usa um navegador. Ele se conecta pelo `lordos-mcp` (`claude mcp add lordos-mcp -- lordos-mcp`), que fala com o `org.lordos.Hands1` do `lord-server` no barramento de sessão. Em vez de adivinhar pelos pixels, o agente lê a árvore da interface do próprio LordOS: cada botão, campo, menu e linha com o seu papel, nome, estado e uma `ref` estável. Ele pode listar as janelas, abrir apps e arquivos, clicar, digitar, rolar, tirar capturas, definir o valor de um campo, ler o log de um app e gravar um GIF. Nenhuma ferramenta executa código, e os seus cliques e teclas passam pelo próprio caminho de entrada do `lord-server`, nunca pelo `/dev/uinput`.
+
+- **Desligado até você ligar**, em Ajustes → Inteligência artificial → Mãos, só para esta sessão.
+- **Cada programa pergunta antes.** Um aviso do sistema mostra o nome e o caminho do programa que ele informa, marcados como não verificados, com Esta sessão ou Negar. Só o seu mouse e o seu teclado reais o respondem.
+- **Você vê e para.** Enquanto um agente trabalha, cada tela mostra "Claude Code está usando o seu computador" com Parar; **Ctrl+Alt+Esc** para todos os agentes e desliga o Mãos. Bloquear a tela também o para, e quando você mexe no mouse ou no teclado o agente espera 3 segundos.
+- **Lista opcional** ("Só estes apps"), limites de ritmo e um log do que ele fez em palavras fechadas, nunca o seu texto.
+- **Nunca ao seu alcance:** os avisos de permissão, do chaveiro, de senha e de administrador, os campos de senha, as janelas protegidas, Ajustes → Inteligência artificial → Mãos, as confirmações destrutivas, as páginas da Loja, Privacidade, Usuários, Atualizações e Firewall, a tela de bloqueio e a de login. As capturas as mostram em preto.
+- **O que ele não pode prometer:** os programas que rodam como você são uma só fronteira de confiança em qualquer desktop; o LordOS não diz distinguir um Claude Code real de um programa que diz ser um, e por isso mostra o nome como informado e pergunta a você.
+- **Teste um app sem tocar no seu desktop:** `lordos-mcp --headless notes` inicia um desktop privado que ninguém vê, com arquivos de exemplo, apagado ao terminar.
+
+Ele é verificado pelo `build/hands-test` (91 verificações), pelo `hands_model_test.mjs` (49) e por um teste de ponta a ponta com 33 verificações num desktop sem tela (importar um arquivo no Notas, um aviso de permissão recusado, o Parar do aviso, o diálogo de confiança de um tema recusado).
+
 ## Limites honestos
 
 - **Os apps Linux não têm sandbox por padrão.** Para eles valem as regras de rede, a atribuição e as restrições que você definir; as restrições não cobrem a área de transferência, o Bluetooth através do BlueZ no barramento do sistema, o barramento do sistema em geral nem programas iniciados fora do lançador de apps.
@@ -121,3 +135,4 @@ Uma janela pode ser marcada como protegida. A de Senhas é. Nas capturas de tela
 - [sdk/privacy.js](https://github.com/lordbasex/LordOS/blob/main/sdk/privacy.js) e [sdk/powerbox.jsx](https://github.com/lordbasex/LordOS/blob/main/sdk/powerbox.jsx): avisos e o diálogo de arquivos
 - [server/tests/sandbox_test.c](https://github.com/lordbasex/LordOS/blob/main/server/tests/sandbox_test.c) e [tests/lpk-evil](https://github.com/lordbasex/LordOS/tree/main/tests/lpk-evil): os testes
 - [docs/PRIVACY.md](https://github.com/lordbasex/LordOS/blob/main/docs/PRIVACY.md)
+- [docs/HANDS.md](https://github.com/lordbasex/LordOS/blob/main/docs/HANDS.md): o projeto do Mãos (um agente de IA no desktop, em desenvolvimento)

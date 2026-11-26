@@ -102,6 +102,20 @@ A window can be marked protected. Passwords is. In LordOS screenshots, screen re
 
 [[shot:5]]
 
+## An AI agent on your desktop, with your permission (in development)
+
+In development after 0.8.9.6.1 (the latest release is 0.8.9.6.1): **Hands** lets an AI agent such as Claude Code use the LordOS desktop the way Claude in Chrome uses a browser. It connects through `lordos-mcp` (`claude mcp add lordos-mcp -- lordos-mcp`), which talks to `lord-server`'s `org.lordos.Hands1` on the session bus. Instead of guessing from pixels, the agent reads LordOS's own UI tree: each button, field, menu and row with its role, name, state and a stable `ref`. It can list windows, open apps and files, click, type, scroll, take screenshots, set a field's value, read an app's log and record a GIF. No tool runs code, and its clicks and keys go through `lord-server`'s own input path, never `/dev/uinput`.
+
+- **Off until you turn it on**, in Settings → AI → Hands, for this session only.
+- **Each program asks first.** A system prompt shows the name and program path it reports, marked as not verified, with This session or Deny. Only your real mouse and keyboard answer it.
+- **You see it and stop it.** While an agent works, every display shows "Claude Code is using your computer" with Stop; **Ctrl+Alt+Esc** stops every agent and turns Hands off. Locking the screen stops it too, and when you touch the mouse or keyboard the agent waits 3 seconds.
+- **Optional allowlist** ("Only these apps"), rate limits, and a log of what it did in closed words, never your text.
+- **Never within reach:** permission, keyring, password and administrator prompts, password fields, protected windows, Settings → AI → Hands itself, destructive confirmations, the Store, Privacy, Users, Updates and Firewall pages, the lock screen and the login screen. Screenshots show them black.
+- **What it can't promise:** programs running as you are one trust boundary on any desktop; LordOS doesn't claim to tell a real Claude Code from a program that says it is one, which is why it shows the name as reported and asks you.
+- **Test an app without touching your desktop:** `lordos-mcp --headless notes` starts a private desktop nobody sees, with sample files, deleted when it ends.
+
+It is checked by `build/hands-test` (91 checks), `hands_model_test.mjs` (49) and an end-to-end test with 33 checks on a headless desktop (importing a file in Notes, a permission prompt refused, the banner's Stop, a theme's trust dialog refused).
+
 ## Honest limits
 
 - **Linux apps are not sandboxed by default.** Network rules, attribution and the restrictions you set apply to them; the restrictions don't cover the clipboard, Bluetooth through BlueZ on the system bus, the system bus in general, or programs started outside the app launcher.
@@ -121,3 +135,4 @@ A window can be marked protected. Passwords is. In LordOS screenshots, screen re
 - [sdk/privacy.js](https://github.com/lordbasex/LordOS/blob/main/sdk/privacy.js) and [sdk/powerbox.jsx](https://github.com/lordbasex/LordOS/blob/main/sdk/powerbox.jsx): prompts and the file dialog
 - [server/tests/sandbox_test.c](https://github.com/lordbasex/LordOS/blob/main/server/tests/sandbox_test.c) and [tests/lpk-evil](https://github.com/lordbasex/LordOS/tree/main/tests/lpk-evil): the tests
 - [docs/PRIVACY.md](https://github.com/lordbasex/LordOS/blob/main/docs/PRIVACY.md)
+- [docs/HANDS.md](https://github.com/lordbasex/LordOS/blob/main/docs/HANDS.md): the Hands design (an AI agent on the desktop, in development)

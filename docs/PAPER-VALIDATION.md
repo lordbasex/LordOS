@@ -372,6 +372,19 @@ pre-release that never shipped. The paper marked all of it "0.8.9, in developmen
 | 6.7 | The person's dictionary is enchant's word lists shared with lord-web, written only by lord-server (0600, unknown lines kept) | Test (`build/spell-test`: a word WebKit learned is read, the files are 0600) | Holds in the test; sharing with a running lord-web not checked on screen |
 | 6.7 | ✨ AI: fixed prompts in C, the selection fenced with a nonce, the streamed answer read strictly and shown as plain text, applied only on Replace, never in password fields, on when a model is installed unless turned off (kept) | Test (`build/llm-engine-test`, `writing_model_test.mjs`, `spell_scene` with a fake model) | Holds in the tests; **Untested** with a real Qwen3 model |
 
+## In development after 0.8.9.6.1: Hands, an AI agent uses the desktop (the paper's edition of 2026-11-26)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 2.2, 6.7, 9 | `lordos-mcp` is an MCP server over stdio that links only libc (and vendored stb_image) and calls lord-server's `org.lordos.Hands1`; its tools mirror Claude in Chrome's, none runs code, and a recording is saved only under a bare name as a new file in `~/Pictures/LordOS QA` | Test (`build/hands-test`: lordos-mcp's tools, errors, coordinates, GIF and export; `tests/hands_e2e.py`: the GIF saved only under a bare name in a temporary HOME) | Holds in the tests |
+| 6.7 | `Hands1`'s methods are closed and typed, every argument checked in C before the policy, and only the same uid is served | Test (`build/hands-test`: a fuzz of every method's arguments, the uid check on a private `dbus-daemon`, the pidfd) | Holds |
+| 6.7 | `read_window` gives roles, names, stable `ref_N`, states, values and boxes; never a password's value, never a system-layer or `handsDeny` node | Test (`tests/hands_model_test.mjs`, 49 checks) | Holds |
+| 6.7 | Off until the person turns it on for the session; one system-layer prompt per connection that only real input answers, naming the client as reported, not verified; the banner with Stop; Ctrl+Alt+Esc; the person's input pauses the agent for 3 s; the allowlist; rate limits | Test (`build/hands-test`, 91 checks under ASan and UBSan: the policy against a fake host, the prompt per connection, Stop, the panic key, the person's input, allowlisted screenshots; `hands_model_test.mjs`: no "verified" claim; `tests/hands_e2e.py`: the banner on the display and the person's Stop ending the agent) | Holds in the tests |
+| 6.7 | Never reachable: the system layer, password fields, protected windows, `handsDeny` nodes (Settings → AI → Hands, the theme-trust sheet), destructive confirmations and the listed pages; screenshots mark them and fail closed | Test (`build/hands-test`: the system layer, a covered ref, set-value's and the keys' gate, the screenshot's marks failing closed; `tests/hands_e2e.py`: a click and a key aimed at a permission prompt refused and the prompt black in screenshots, Enter and a click on a community theme's trust dialog refused and the theme left untrusted) | Holds in the tests |
+| 6.7 | The agent's input goes through lord-server's own input path, never `/dev/uinput`, ydotool or evdev | Test (`tests/hands_e2e.py`: Notes' File → Import… of a fixture file through `lordos-mcp --headless`, the note exists); Design (`docs/HANDS.md`, "The input path") | Holds headless |
+| 6.7 | QA mode: `lordos-mcp --headless APP` runs a private headless desktop with a demo home; `--hands-qa` only with `--headless`; the folder is deleted on exit | Test (`tests/hands_e2e.py`, 33 checks, run by `make test` when the themes are built) | Holds headless |
+| 6.7 | Programs of the same user are one trust boundary: a client's name and path are shown as reported, not verified | Design (`docs/HANDS.md`, "Threat model"; `AGENTS.md`) | Design |
+
 ## In development after 0.8.9.6.1: the Brain on the GPU (the paper's edition of 2026-11-26; awaiting approval)
 
 | § | Claim | How | State |
