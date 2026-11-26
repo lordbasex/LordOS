@@ -364,6 +364,7 @@ MediaSrc *media_src_new(int kind, const char *app) {
         s->kind = kind;
         s->sock = s->in_fd = -1;
         s->cur_slot = -1;
+        s->nv_slot = -1;
         snprintf(s->app, sizeof s->app, "%s", app ? app : "");
         media_view_reset(s);
         return s;
@@ -478,6 +479,7 @@ int media_node_cursor(int id, const uint32_t **px, int *w, int *h, int *hx, int 
 }
 
 static void unmap_pixels(MediaSrc *s) {
+    media_nv_free(s);
     if (s->map) munmap(s->map, s->map_len);
     s->map = NULL;
     s->map_len = 0;
@@ -500,6 +502,8 @@ static void drop_helper(MediaSrc *s, int grace) {
     bury(s->pid, grace);
     s->pid = 0;
 }
+
+void media_helper_stop(MediaSrc *s) { drop_helper(s, 2000); }
 
 void media_src_close(MediaSrc *s) {
     if (!s || !s->used) return;
@@ -533,7 +537,7 @@ static const char *state_name(int st) {
 }
 
 /* Helper's shared memory: it has to be sealed against shrinking and be large enough. */
-static uint8_t *map_sealed(int fd, size_t need) {
+uint8_t *media_map_sealed(int fd, size_t need) {
     struct stat st;
     int seals = fcntl(fd, F_GET_SEALS);
     if (need == 0 || fstat(fd, &st) || (size_t)st.st_size < need || seals < 0 || !(seals & F_SEAL_SHRINK)) {
@@ -602,9 +606,13 @@ static void on_src_msg(MediaSrc *s, const MediaMsg *m, int *fds) {
         break;
     case MM_RING: {
         int64_t w = m->v[1], h = m->v[2], slots = m->v[3];
+        /* NV12 (mambient.c): only from a lord-media player; the layout from proto.c's rules, never the helper's sizes */
+        if (m->v[4] != MF_BGRA) { if (s->nv_capable) media_nv_ring(s, m, fds[0]); break; }
+        if (m->v[5] != 0) break;
         if (fds[0] < 0 || w < 1 || h < 1 || w > MP_MAX_DIM || h > MP_MAX_DIM || slots < 1 || slots > MP_RING_SLOTS) break;
+        if (s->nv) media_nv_reset(s);
         size_t need = (size_t)w * (size_t)h * 4 * (size_t)slots;
-        uint8_t *map = map_sealed(fds[0], need);
+        uint8_t *map = media_map_sealed(fds[0], need);
         if (!map) break;
         if (s->map) munmap(s->map, s->map_len);
         s->map = map;
@@ -618,6 +626,12 @@ static void on_src_msg(MediaSrc *s, const MediaMsg *m, int *fds) {
     }
     case MM_FRAME: {
         int gen = (int)(m->id >> 8), slot = (int)(m->id & 0xff);
+        if (s->nv_map && gen == s->ring_gen) {
+            if (slot >= s->nv_ring.slots) break;
+            mp_sendv(s->sock, MM_ACK, m->id, 0, 0, 0, 0);
+            media_nv_frame(s, slot, m->v[0]);
+            break;
+        }
         if (!s->map || gen != s->ring_gen || slot >= s->ring_slots) break;
         s->cur_slot = slot;
         s->w = s->ring_w;
@@ -625,9 +639,13 @@ static void on_src_msg(MediaSrc *s, const MediaMsg *m, int *fds) {
         s->frame_seq++;
         s->pos = m->v[0];
         mp_sendv(s->sock, MM_ACK, m->id, 0, 0, 0, 0);
+        if (s->nv_capable) media_src_format_check(s);      /* the GPU came (back): NV12 from the next frame */
         media_src_damage(s);
         break;
     }
+    case MM_DMAFRAME:
+        if (s->nv_capable) media_dma_frame(s, m, payload, fds);
+        break;
     case MM_POS:
         s->pos = m->v[0];
         s->dur = m->v[1];
@@ -799,7 +817,7 @@ static void job_finish(Job *j, int status, int fd) {
         if (s && s->kind == SK_IMAGE && (s->job == j->id || s->job == 0)) {
             int w = 0, h = 0;
             sscanf(payload, "{\"width\":%d,\"height\":%d", &w, &h);
-            uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= MP_MAX_DIM && h <= MP_MAX_DIM) ? map_sealed(fd, (size_t)w * h * 4) : NULL;
+            uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= MP_MAX_DIM && h <= MP_MAX_DIM) ? media_map_sealed(fd, (size_t)w * h * 4) : NULL;
             if (map) {
                 s->map = map;
                 s->map_len = (size_t)w * h * 4;
@@ -820,7 +838,7 @@ static void job_finish(Job *j, int status, int fd) {
     case JP_SVG: {
         int w = 0, h = 0;
         sscanf(payload, "{\"width\":%d,\"height\":%d", &w, &h);
-        uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= 256 && h <= 256) ? map_sealed(fd, (size_t)w * h * 4) : NULL;
+        uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= 256 && h <= 256) ? media_map_sealed(fd, (size_t)w * h * 4) : NULL;
         svgicon_done(j->params, w, h, (const uint32_t *)map);      /* premultiplied BGRA is the images' ARGB */
         if (map) munmap(map, (size_t)w * h * 4);
         break;
@@ -828,7 +846,7 @@ static void job_finish(Job *j, int status, int fd) {
     case JP_PIXELS: {
         int w = 0, h = 0;
         sscanf(payload, "{\"width\":%d,\"height\":%d", &w, &h);
-        uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= 1024 && h <= 1024) ? map_sealed(fd, (size_t)w * h * 4) : NULL;
+        uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= 1024 && h <= 1024) ? media_map_sealed(fd, (size_t)w * h * 4) : NULL;
         if (map) {
             int slot = 0;
             for (int i = 1; i < 16; i++) if (pix[i].at < pix[slot].at) slot = i;

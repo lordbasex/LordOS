@@ -16,6 +16,7 @@
 #include "gpu.h"
 #include "gscissor.h"
 #include "../outputs.h"
+#include "../media/nv12.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,11 +35,25 @@ GpuTex *gpu_tex_pixels(GpuTex *t, const uint32_t *px, int w, int h, int opaque) 
 GpuTex *gpu_tex_pixels_rect(GpuTex *t, const uint32_t *px, int w, int h, int opaque, Rect r) { (void)t; (void)px; (void)w; (void)h; (void)opaque; (void)r; return NULL; }
 GpuTex *gpu_tex_dmabuf(const GpuDmabuf *d) { (void)d; return NULL; }
 void gpu_tex_free(GpuTex *t) { (void)t; }
+int  gpu_tex_width(const GpuTex *t) { (void)t; return 0; }
 int  gpu_tex_current(const GpuTex *t) { (void)t; return 0; }
 unsigned gpu_generation(void) { return 0; }
 void gpu_set_hooks(void (*lost)(void), void (*changed)(void)) { (void)lost; (void)changed; }
 int  gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h) { (void)t; (void)px; (void)w; (void)h; return -1; }
 int  gpu_tex_read_rows(const GpuTex *t, uint8_t *px, int y, int h, int flip) { (void)t; (void)px; (void)y; (void)h; (void)flip; return -1; }
+GpuYuv *gpu_yuv_upload(GpuYuv *t, const uint8_t *y, int ys, const uint8_t *uv, int uvs, int w, int h) { (void)t; (void)y; (void)ys; (void)uv; (void)uvs; (void)w; (void)h; return NULL; }
+int  gpu_yuv_convert(const GpuYuv *src, GpuTex **dst, int matrix, int full) { (void)src; (void)dst; (void)matrix; (void)full; return -1; }
+int  gpu_yuv_current(const GpuYuv *t) { (void)t; return 0; }
+long gpu_yuv_bytes(const GpuYuv *t) { (void)t; return 0; }
+void gpu_yuv_free(GpuYuv *t) { (void)t; }
+GpuYuv *gpu_yuv_import(const GpuDmabuf *y, const GpuDmabuf *uv) { (void)y; (void)uv; return NULL; }
+int  gpu_dmabuf_plane_ok(uint32_t fourcc, uint64_t modifier) { (void)fourcc; (void)modifier; return 0; }
+GpuPack *gpu_yuv_pack(const GpuYuv *src) { (void)src; return NULL; }
+int  gpu_pack_convert(const GpuPack *k, GpuTex **dst, int matrix, int full) { (void)k; (void)dst; (void)matrix; (void)full; return -1; }
+int  gpu_pack_current(const GpuPack *k) { (void)k; return 0; }
+long gpu_pack_bytes(const GpuPack *k) { (void)k; return 0; }
+void gpu_pack_free(GpuPack *k) { (void)k; }
+int  gpu_pack_ready(void) { return 0; }
 int  gpu_add_output(Kms *k) { (void)k; return -1; }
 int  gpu_frame(int out, const Canvas *s, Rect d, void (*f)(int)) { (void)out; (void)s; (void)d; (void)f; return -1; }
 int  gpu_gdrag_ready(int out) { (void)out; return 0; }
@@ -764,6 +779,8 @@ static EGLImageKHR import_image(const GpuDmabuf *d, int with_mod) {
     return G.create_image(G.dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, NULL, attr);
 }
 
+int gpu_tex_width(const GpuTex *t) { return t ? t->w : 0; }
+
 void gpu_tex_free(GpuTex *t) {
     if (!t) return;
     if (G.on && t->gen == G.gen) {          /* a stale one's GL name may now be someone else's */
@@ -879,6 +896,357 @@ int gpu_tex_read_rows(const GpuTex *t, uint8_t *px, int y, int h, int flip) {
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return ok ? 0 : -1;
+}
+
+/* ---- NV12 frames (gpu.h gpu_yuv_*, gpu_pack_*) ----
+ * Sources: two planes as textures, either uploaded from lord-media's memfd (LUMINANCE and LUMINANCE_ALPHA, sampler2D)
+ * or imported from its dmabuf (R8 and GR88 EGLImages, external textures: zero-copy). Programs, made at first use:
+ *   conv[e]   the planes → an RGBA texture with the video's matrix (e: external)
+ *   pky[e]    the Y plane packed four samples a texel into an RGBA8 texture (w/4 × h): the loop cache's own copy
+ *   pkuv[e]   the U, V plane packed two pairs a texel (w/4 × h/2): 1.5 bytes a pixel in all, as NV12
+ *   unpk      a packed frame → RGBA (the loop cache's playback)
+ * GLES2 can't render into one- or two-byte textures, hence the packing; texel positions need highp (else no cache). */
+
+struct GpuYuv {
+    GLuint ty, tuv;
+    GpuTex *ey, *euv;                   /* imported planes (external): owned, freed with it */
+    int w, h, ext;
+    unsigned gen;
+};
+
+struct GpuPack {
+    GLuint ty, tuv;
+    int w, h, tw;                       /* tw: the packed width, ceil(w / 4) */
+    unsigned gen;
+};
+
+#define YUV_HEAD(ext) (ext ? "#extension GL_OES_EGL_image_external : require\n#define SAMP samplerExternalOES\n#define UVS(t) (t).rg\n" \
+                           : "#define SAMP sampler2D\n#define UVS(t) (t).ra\n")
+static const char *fs_conv =
+    "precision mediump float; varying vec2 v_uv; uniform SAMP u_y; uniform SAMP u_uv; uniform mat4 u_m;\n"
+    "void main() { vec4 q = vec4(texture2D(u_y, v_uv).r, UVS(texture2D(u_uv, v_uv)), 1.0);\n"
+    "  gl_FragColor = vec4(clamp((u_m * q).rgb, 0.0, 1.0), 1.0); }\n";
+static const char *vs_hp =
+    "attribute vec2 a_pos; attribute vec2 a_uv; varying highp vec2 v_uv;\n"
+    "void main() { v_uv = a_uv; gl_Position = vec4(a_pos, 0.0, 1.0); }\n";
+/* u_size: the source plane's size in texels; v_uv * u_out: the packed texel being written (its centre) */
+static const char *fs_pky =
+    "#ifndef GL_FRAGMENT_PRECISION_HIGH\n#error no highp\n#endif\nprecision highp float; varying highp vec2 v_uv;\n"
+    "uniform SAMP u_t; uniform vec2 u_size; uniform vec2 u_out;\n"
+    "float at(float x, float y) { return texture2D(u_t, vec2((min(x, u_size.x - 1.0) + 0.5) / u_size.x, (y + 0.5) / u_size.y)).r; }\n"
+    "void main() { vec2 p = floor(v_uv * u_out); float x = p.x * 4.0;\n"
+    "  gl_FragColor = vec4(at(x, p.y), at(x + 1.0, p.y), at(x + 2.0, p.y), at(x + 3.0, p.y)); }\n";
+static const char *fs_pkuv =
+    "#ifndef GL_FRAGMENT_PRECISION_HIGH\n#error no highp\n#endif\nprecision highp float; varying highp vec2 v_uv;\n"
+    "uniform SAMP u_t; uniform vec2 u_size; uniform vec2 u_out;\n"
+    "vec2 at(float x, float y) { return UVS(texture2D(u_t, vec2((min(x, u_size.x - 1.0) + 0.5) / u_size.x, (y + 0.5) / u_size.y))); }\n"
+    "void main() { vec2 p = floor(v_uv * u_out); float x = p.x * 2.0;\n"
+    "  gl_FragColor = vec4(at(x, p.y), at(x + 1.0, p.y)); }\n";
+/* u_px: the frame's size; packed textures u_y (tw × h) and u_uv (tw × h/2), chroma nearest */
+static const char *fs_unpk =
+    "#ifndef GL_FRAGMENT_PRECISION_HIGH\n#error no highp\n#endif\nprecision highp float; varying highp vec2 v_uv;\n"
+    "uniform sampler2D u_y; uniform sampler2D u_uv; uniform vec2 u_px; uniform float u_tw; uniform mat4 u_m;\n"
+    "void main() { vec2 p = floor(v_uv * u_px);\n"
+    "  float ix = floor(p.x / 4.0), k = p.x - ix * 4.0;\n"
+    "  vec4 y4 = texture2D(u_y, vec2((ix + 0.5) / u_tw, (p.y + 0.5) / u_px.y));\n"
+    "  float y = k < 0.5 ? y4.r : k < 1.5 ? y4.g : k < 2.5 ? y4.b : y4.a;\n"
+    "  float cx = floor(p.x / 2.0), jx = floor(cx / 2.0), j = cx - jx * 2.0;\n"
+    "  vec4 c4 = texture2D(u_uv, vec2((jx + 0.5) / u_tw, (floor(p.y / 2.0) + 0.5) / floor(u_px.y / 2.0)));\n"
+    "  vec2 c = j < 0.5 ? c4.rg : c4.ba;\n"
+    "  gl_FragColor = vec4(clamp((u_m * vec4(y, c, 1.0)).rgb, 0.0, 1.0), 1.0); }\n";
+
+enum { YP_CONV = 0, YP_PKY = 2, YP_PKUV = 4, YP_UNPK = 6, YP_N = 7 };
+static struct { GLuint p[YP_N]; int tried[YP_N]; unsigned gen; } YP;
+
+static GLuint yuv_program(int which, int ext) {
+    int i = which == YP_UNPK ? YP_UNPK : which + (ext ? 1 : 0);
+    if (YP.gen != G.gen) { memset(&YP, 0, sizeof YP); YP.gen = G.gen; }
+    if (YP.p[i] || YP.tried[i]) return YP.p[i];
+    YP.tried[i] = 1;
+    if (ext && !G.have_external) return 0;
+    const char *body = which == YP_CONV ? fs_conv : which == YP_PKY ? fs_pky : which == YP_PKUV ? fs_pkuv : fs_unpk;
+    const char *head = which == YP_UNPK ? "" : YUV_HEAD(ext);
+    /* #extension first, then the body (the #error lines stay preprocessor lines) */
+    size_t nh = strlen(head), nb = strlen(body);
+    char *src = malloc(nh + nb + 1);
+    if (!src) return 0;
+    memcpy(src, head, nh);
+    memcpy(src + nh, body, nb + 1);
+    GLuint v = compile(GL_VERTEX_SHADER, which == YP_CONV ? vs_src : vs_hp), f = compile(GL_FRAGMENT_SHADER, src);
+    free(src);
+    if (!v || !f) { if (v) glDeleteShader(v); if (f) glDeleteShader(f); return 0; }
+    GLuint p = glCreateProgram();
+    glAttachShader(p, v);
+    glAttachShader(p, f);
+    glBindAttribLocation(p, 0, "a_pos");
+    glBindAttribLocation(p, 1, "a_uv");
+    glLinkProgram(p);
+    glDeleteShader(v);
+    glDeleteShader(f);
+    GLint ok = 0;
+    glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    if (!ok) { glDeleteProgram(p); return 0; }
+    YP.p[i] = p;
+    return p;
+}
+
+/* the context current on some output's surface (gpu_tex_read_rows does the same): frames come between paints */
+static int ctx_current(void) {
+    if (!G.on) return 0;
+    if (eglGetCurrentContext() == G.ctx) return 1;
+    for (int i = 0; i < OUT_MAX; i++) if (G.out[i].used && eglMakeCurrent(G.dpy, G.out[i].surf, G.out[i].surf, G.ctx)) return 1;
+    return 0;
+}
+
+int gpu_yuv_current(const GpuYuv *t) { return t && G.on && t->gen == G.gen; }
+long gpu_yuv_bytes(const GpuYuv *t) { return t ? (long)t->w * t->h + (long)t->w * (t->h / 2) : 0; }
+
+void gpu_yuv_free(GpuYuv *t) {
+    if (!t) return;
+    if (t->ext) { gpu_tex_free(t->ey); gpu_tex_free(t->euv); }
+    else if (G.on && t->gen == G.gen && ctx_current()) { glDeleteTextures(1, &t->ty); glDeleteTextures(1, &t->tuv); }
+    free(t);
+}
+
+/* rows of a plane (bpr bytes of pixels a row, stride bytes apart) into the bound texture */
+static void plane_up(GLenum fmt, int tw, int th, int bpr, const uint8_t *px, int stride, int fresh) {
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    if (stride == bpr || G.unpack_sub) {
+        if (stride != bpr) glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride / (bpr / tw));
+        if (fresh) glTexImage2D(GL_TEXTURE_2D, 0, fmt, tw, th, 0, fmt, GL_UNSIGNED_BYTE, px);
+        else glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, tw, th, fmt, GL_UNSIGNED_BYTE, px);
+        if (stride != bpr) glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
+    } else {
+        if (fresh) glTexImage2D(GL_TEXTURE_2D, 0, fmt, tw, th, 0, fmt, GL_UNSIGNED_BYTE, NULL);
+        for (int y = 0; y < th; y++) glTexSubImage2D(GL_TEXTURE_2D, 0, 0, y, tw, 1, fmt, GL_UNSIGNED_BYTE, px + (size_t)y * stride);
+    }
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+}
+
+GpuYuv *gpu_yuv_upload(GpuYuv *t, const uint8_t *y, int ystride, const uint8_t *uv, int uvstride, int w, int h) {
+    if (!G.on || !y || !uv || w < 2 || h < 2 || (w & 1) || (h & 1) || w > 8192 || h > 8192 || ystride < w || uvstride < w) return t;
+    if (!ctx_current()) return t;
+    if (t && (t->gen != G.gen || t->ext)) { gpu_yuv_free(t); t = NULL; }
+    int fresh = !t || t->w != w || t->h != h;
+    if (!t) {
+        t = calloc(1, sizeof *t);
+        if (!t) return NULL;
+        glGenTextures(1, &t->ty);
+        glGenTextures(1, &t->tuv);
+        t->gen = G.gen;
+        for (int i = 0; i < 2; i++) { glBindTexture(GL_TEXTURE_2D, i ? t->tuv : t->ty); tex_params(GL_TEXTURE_2D); }
+    }
+    while (glGetError() != GL_NO_ERROR) {}
+    glBindTexture(GL_TEXTURE_2D, t->ty);
+    plane_up(GL_LUMINANCE, w, h, w, y, ystride, fresh);
+    glBindTexture(GL_TEXTURE_2D, t->tuv);
+    plane_up(GL_LUMINANCE_ALPHA, w / 2, h / 2, w, uv, uvstride, fresh);
+    t->w = w;
+    t->h = h;
+    if (glGetError() != GL_NO_ERROR) { gpu_yuv_free(t); return NULL; }
+    return t;
+}
+
+GpuYuv *gpu_yuv_import(const GpuDmabuf *y, const GpuDmabuf *uv) {
+    if (!G.on || !y || !uv || !G.have_external || !ctx_current()) return NULL;
+    if (y->width < 2 || y->height < 2 || (y->width & 1) || (y->height & 1) || uv->width != y->width / 2 || uv->height != y->height / 2) return NULL;
+    GpuTex *a = gpu_tex_dmabuf(y);
+    GpuTex *b = a ? gpu_tex_dmabuf(uv) : NULL;
+    GpuYuv *t = b ? calloc(1, sizeof *t) : NULL;
+    if (!t) { gpu_tex_free(a); gpu_tex_free(b); return NULL; }
+    t->ey = a;
+    t->euv = b;
+    t->ty = a->id;
+    t->tuv = b->id;
+    t->ext = 1;
+    t->w = y->width;
+    t->h = y->height;
+    t->gen = G.gen;
+    return t;
+}
+
+static int yuv_modifier_known(uint32_t fourcc, uint64_t mod) {
+    if (!G.create_image) return 0;
+    if (!G.query_modifiers) return mod == DRM_FORMAT_MOD_INVALID || mod == DRM_FORMAT_MOD_LINEAR;
+    EGLuint64KHR mods[128];
+    EGLBoolean ext[128];
+    EGLint nm = 0;
+    if (!G.query_modifiers(G.dpy, (EGLint)fourcc, 128, mods, ext, &nm)) return 0;
+    if (mod == DRM_FORMAT_MOD_INVALID) return 1;            /* implicit: the driver's own layout */
+    for (int i = 0; i < nm; i++) if (mods[i] == mod) return 1;
+    return 0;
+}
+
+int gpu_dmabuf_plane_ok(uint32_t fourcc, uint64_t modifier) {
+    if (!G.on || !G.create_image || !G.have_external) return 0;
+    if (fourcc != DRM_FORMAT_R8 && fourcc != DRM_FORMAT_GR88 && fourcc != DRM_FORMAT_R16 && fourcc != DRM_FORMAT_GR1616) return 0;
+    typedef struct { uint32_t f; uint64_t m; int ok; unsigned gen; } Memo;
+    static Memo memo[16];
+    for (int i = 0; i < 16; i++) if (memo[i].gen == G.gen && memo[i].f == fourcc && memo[i].m == modifier) return memo[i].ok;
+    int ok = yuv_modifier_known(fourcc, modifier);
+    static int at;
+    memo[at] = (Memo){ fourcc, modifier, ok, G.gen };
+    at = (at + 1) % 16;
+    return ok;
+}
+
+static void quad_full(void) {
+    static const GLfloat v[] = { -1, -1, 0, 0,  1, -1, 1, 0,  -1, 1, 0, 1,  1, 1, 1, 1 };
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, v);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, v + 2);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
+static GLuint yfbo;
+static unsigned yfbo_gen;
+
+/* draws with the bound program into tex (w × h); 0 ok */
+static int fbo_draw(GLuint tex, int w, int h) {
+    if (yfbo_gen != G.gen || !yfbo) { glGenFramebuffers(1, &yfbo); yfbo_gen = G.gen; }
+    glBindFramebuffer(GL_FRAMEBUFFER, yfbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+    int ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    if (ok) {
+        glViewport(0, 0, w, h);
+        glDisable(GL_BLEND);
+        glDisable(GL_SCISSOR_TEST);
+        quad_full();
+        glEnable(GL_BLEND);
+    }
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    return ok && glGetError() == GL_NO_ERROR ? 0 : -1;
+}
+
+/* *dst made or kept as an RGBA texture of w × h */
+static GpuTex *rgba_target(GpuTex **dst, int w, int h) {
+    GpuTex *t = *dst;
+    if (t && (t->external || t->gen != G.gen)) { gpu_tex_free(t); t = NULL; *dst = NULL; }
+    int fresh = !t;
+    if (!t) {
+        t = calloc(1, sizeof *t);
+        if (!t) return NULL;
+        glGenTextures(1, &t->id);
+        glBindTexture(GL_TEXTURE_2D, t->id);
+        tex_params(GL_TEXTURE_2D);
+        t->gen = G.gen;
+    } else glBindTexture(GL_TEXTURE_2D, t->id);
+    if (fresh || t->w != w || t->h != h) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    t->w = w;
+    t->h = h;
+    t->opaque = 1;
+    t->swap = 0;
+    *dst = t;
+    return t;
+}
+
+static void matrix4(int matrix, int full, float m4[16]) {
+    float m[12];
+    nv12_matrix(matrix, full, m);
+    /* column-major: (u_m · q).c = Σ_k m[c][k] q[k] */
+    for (int c = 0; c < 4; c++) for (int k = 0; k < 4; k++) m4[k * 4 + c] = c < 3 ? m[c * 4 + k] : (k == 3 ? 1.0f : 0.0f);
+}
+
+static void bind_plane(int unit, GLuint id, int ext) {
+    glActiveTexture(GL_TEXTURE0 + unit);
+    glBindTexture(ext ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D, id);
+}
+
+int gpu_yuv_convert(const GpuYuv *src, GpuTex **dst, int matrix, int full) {
+    if (!dst || !gpu_yuv_current(src) || !ctx_current()) return -1;
+    GLuint p = yuv_program(YP_CONV, src->ext);
+    if (!p) return -1;
+    while (glGetError() != GL_NO_ERROR) {}
+    GpuTex *t = rgba_target(dst, src->w, src->h);
+    if (!t) return -1;
+    float m4[16];
+    matrix4(matrix, full, m4);
+    glUseProgram(p);
+    bind_plane(1, src->tuv, src->ext);
+    bind_plane(0, src->ty, src->ext);
+    glUniform1i(glGetUniformLocation(p, "u_y"), 0);
+    glUniform1i(glGetUniformLocation(p, "u_uv"), 1);
+    glUniformMatrix4fv(glGetUniformLocation(p, "u_m"), 1, GL_FALSE, m4);
+    int r = fbo_draw(t->id, t->w, t->h);
+    glActiveTexture(GL_TEXTURE0);
+    return r;
+}
+
+int gpu_pack_current(const GpuPack *k) { return k && G.on && k->gen == G.gen; }
+long gpu_pack_bytes(const GpuPack *k) { return k ? (long)k->tw * 4 * k->h + (long)k->tw * 4 * (k->h / 2) : 0; }
+
+void gpu_pack_free(GpuPack *k) {
+    if (!k) return;
+    if (G.on && k->gen == G.gen && ctx_current()) { glDeleteTextures(1, &k->ty); glDeleteTextures(1, &k->tuv); }
+    free(k);
+}
+
+GpuPack *gpu_yuv_pack(const GpuYuv *src) {
+    if (!gpu_yuv_current(src) || !ctx_current()) return NULL;
+    GLuint py = yuv_program(YP_PKY, src->ext), puv = yuv_program(YP_PKUV, src->ext);
+    if (!py || !puv) return NULL;
+    GpuPack *k = calloc(1, sizeof *k);
+    if (!k) return NULL;
+    k->w = src->w;
+    k->h = src->h;
+    k->tw = (src->w + 3) / 4;
+    k->gen = G.gen;
+    while (glGetError() != GL_NO_ERROR) {}
+    glGenTextures(1, &k->ty);
+    glGenTextures(1, &k->tuv);
+    int hh[2] = { k->h, k->h / 2 };
+    GLuint ids[2] = { k->ty, k->tuv };
+    for (int i = 0; i < 2; i++) {
+        glBindTexture(GL_TEXTURE_2D, ids[i]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, k->tw, hh[i], 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    }
+    int bad = glGetError() != GL_NO_ERROR;    /* out of GPU memory, among others */
+    GLuint pr[2] = { py, puv };
+    GLuint srcs[2] = { src->ty, src->tuv };
+    float size[2][2] = { { (float)src->w, (float)src->h }, { (float)(src->w / 2), (float)(src->h / 2) } };
+    for (int i = 0; i < 2 && !bad; i++) {
+        glUseProgram(pr[i]);
+        bind_plane(0, srcs[i], src->ext);
+        glUniform1i(glGetUniformLocation(pr[i], "u_t"), 0);
+        glUniform2f(glGetUniformLocation(pr[i], "u_size"), size[i][0], size[i][1]);
+        glUniform2f(glGetUniformLocation(pr[i], "u_out"), (float)k->tw, (float)hh[i]);
+        if (fbo_draw(ids[i], k->tw, hh[i])) bad = 1;
+    }
+    if (bad) { gpu_pack_free(k); return NULL; }
+    return k;
+}
+
+int gpu_pack_convert(const GpuPack *k, GpuTex **dst, int matrix, int full) {
+    if (!dst || !gpu_pack_current(k) || !ctx_current()) return -1;
+    GLuint p = yuv_program(YP_UNPK, 0);
+    if (!p) return -1;
+    while (glGetError() != GL_NO_ERROR) {}
+    GpuTex *t = rgba_target(dst, k->w, k->h);
+    if (!t) return -1;
+    float m4[16];
+    matrix4(matrix, full, m4);
+    glUseProgram(p);
+    bind_plane(1, k->tuv, 0);
+    bind_plane(0, k->ty, 0);
+    glUniform1i(glGetUniformLocation(p, "u_y"), 0);
+    glUniform1i(glGetUniformLocation(p, "u_uv"), 1);
+    glUniform2f(glGetUniformLocation(p, "u_px"), (float)k->w, (float)k->h);
+    glUniform1f(glGetUniformLocation(p, "u_tw"), (float)k->tw);
+    glUniformMatrix4fv(glGetUniformLocation(p, "u_m"), 1, GL_FALSE, m4);
+    int r = fbo_draw(t->id, t->w, t->h);
+    glActiveTexture(GL_TEXTURE0);
+    return r;
+}
+
+int gpu_pack_ready(void) {
+    if (!G.on || !ctx_current()) return 0;
+    return yuv_program(YP_PKY, 0) && yuv_program(YP_PKUV, 0) && yuv_program(YP_UNPK, 0);
 }
 
 /* ---- drawing ---- */

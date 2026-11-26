@@ -4931,6 +4931,11 @@ void wl_paint_fullscreen(Canvas *out) {
 }
 
 int wl_fullscreen_active(void) { return fs_surf && fs_surf->content; }
+int wl_fullscreen_box(float *x, float *y, float *w, float *h) {
+    if (!fs_surf || !fs_surf->content) return 0;
+    fs_rect(x, y, w, h);
+    return 1;
+}
 static int timing_due(void);
 static int waits_frame(Surf *s);
 static void timing_refreshed(Surf *s);

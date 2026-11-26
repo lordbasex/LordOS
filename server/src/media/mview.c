@@ -137,6 +137,37 @@ static void paint_crop(Canvas *c, MediaSrc *s, int node, const float *r, float x
     canvas_set_clip(c, old);
 }
 
+/* An NV12 source drawn by the GPU below the UI (a moving wallpaper): the nodes with a backdrop blur over this view (the
+ * Dock, the menu bar, a menu) read the canvas, where the picture is a hole. There, and only there, the frame's own
+ * pixels are painted (the rows converted on demand, mambient.c), so they blur the video as before; each new frame
+ * damages those strips alone (media_src_present's caller). x, y, w, h: the node's box in canvas pixels; (dx, dy) and
+ * sc: where and how large the picture is drawn. */
+static void nv_blur_strips(Canvas *c, MediaSrc *s, const Node *nd, float x, float y, float w, float h, float dx, float dy,
+                           float sc, int sw, int sh, float op) {
+    Box b[MEDIA_BLUR_MAX];
+    int nb = paint_blurs_over(nd, b, MEDIA_BLUR_MAX);
+    media_src_blur_note(s, nd->id, b, nb);
+    if (!nb || nd->w <= 0 || nd->h <= 0 || sc <= 0) return;
+    float kx = w / nd->w, ky = h / nd->h;
+    for (int i = 0; i < nb; i++) {
+        float px0 = x + (b[i].x0 - nd->ax) * kx, py0 = y + (b[i].y0 - nd->ay) * ky;
+        float px1 = x + (b[i].x1 - nd->ax) * kx, py1 = y + (b[i].y1 - nd->ay) * ky;
+        Rect keep = canvas_push_clip(c, px0, py0, px1 - px0, py1 - py0);
+        if (c->clip.x1 > c->clip.x0 && c->clip.y1 > c->clip.y0) {
+            /* the picture's rows that clip reaches, one more each side for the filter */
+            int r0 = (int)floorf((c->clip.y0 - dy) / sc) - 1, r1 = (int)ceilf((c->clip.y1 - dy) / sc) + 1;
+            if (r0 < 0) r0 = 0;
+            if (r1 > sh) r1 = sh;
+            const uint32_t *px = r1 > r0 ? media_src_rows(s, r0, r1) : NULL;
+            if (px) {
+                if (fabsf(sc - 1) < 0.001f) canvas_blit(c, px, sw, sh, (int)lroundf(dx), (int)lroundf(dy), 0, op, 1);
+                else canvas_blit_scaled(c, px, sw, sw, sh, 0, 0, (float)sw, (float)sh, dx, dy, sw * sc, sh * sc, op, 1);
+            }
+        }
+        canvas_set_clip(c, keep);
+    }
+}
+
 void media_paint(Canvas *c, int handle, int node, float x, float y, float w, float h, float radius, float op) {
     MediaSrc *s = media_src_get(handle);
     if (!s || w < 1 || h < 1) return;
@@ -155,7 +186,12 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     if ((s->kind == SK_PLAYER || s->kind == SK_CAMERA) && s->sock >= 0 && (hw != s->sent_w || hh != s->sent_h)) {
         int rw = (s->view.rot % 180) ? hh : hw, rh = (s->view.rot % 180) ? hw : hh;
         if (s->view.zoom > 0 || s->view.fit) { rw = 0; rh = 0; }      /* with zoom: original size */
-        if (rw > 0 && mp_sendv(s->sock, MM_SIZE, 0, rw, rh, 0, 0) == 0) { s->sent_w = hw; s->sent_h = hh; }
+        if (rw > 0 && mp_sendv(s->sock, MM_SIZE, 0, rw, rh, 0, 0) == 0) {
+            if (s->amb && s->sent_w > 0) media_ambient_box(s);     /* a moving wallpaper's loop cache is of the old size */
+            s->sent_w = hw;
+            s->sent_h = hh;
+            if (s->nv_capable) media_src_format_check(s);        /* zero-copy needs the box known */
+        }
     }
     Rect old = canvas_push_clip(c, x, y, w, h);
     int sw, sh;
@@ -207,6 +243,8 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
         if (fabsf(sc - 1) < 0.001f) { gx = roundf(dx); gy = roundf(dy); }
         if (wl_paint_media(c, s->id, node, x, y, w, h, gx, gy, dw, dh, 0, 0, (float)sw, (float)sh, op)) {
             s->gpu_drawn = 1;
+            /* an NV12 video (a moving wallpaper): under a blurred Dock or menu bar the CPU's pixels stay, so they blur it */
+            if (s->nv && nd) nv_blur_strips(c, s, nd, x, y, w, h, gx, gy, sc, sw, sh, op);
             canvas_set_clip(c, old);
             return;
         }

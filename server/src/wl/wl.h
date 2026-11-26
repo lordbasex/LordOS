@@ -130,6 +130,7 @@ int  wl_gpu_layers_empty(void);             /* no app window, fullscreen or menu
 void wl_gpu_draw_layer(int layer);          /* 0 = windows (below the UI), 1 = menus and fullscreen */
 void wl_paint_fullscreen(Canvas *out);      /* CPU path: the fullscreen window over the frame */
 int  wl_fullscreen_active(void);
+int  wl_fullscreen_box(float *x, float *y, float *w, float *h);  /* the display a fullscreen Linux window covers (logical px); 0 none */
 /* Sharing a screen or a window (cast/cast.c): while on, the boxes of the windows and menus whose content changed are
  * kept (logical px), also on the GPU path, where an app's new frame is only a texture and no UI damage. take: their
  * box since the last take, 0 if none. */

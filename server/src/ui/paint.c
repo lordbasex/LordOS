@@ -4,6 +4,7 @@
 #include "../wl/wl.h"
 #include "../media/media.h"
 #include "wave.h"
+#include "rectsub.h"
 #include "grab.h"
 #include "../gpu/gpu.h"
 
@@ -2132,6 +2133,80 @@ int paint_node_covered(const Node *target) {
     int seen = 0, found = 0;
     cover_after(root, target, d, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, &seen, &found);
     return seen && found;
+}
+
+/* Whether node target's box is wholly hidden behind the union of opaque nodes painted after it (paint_node_hidden): the
+ * walk of cover_after, but each cover takes its part away from what is left of the box (rectsub.h), so two windows side
+ * by side, or a window and the menu bar, hide it together. A moving wallpaper's view asks it (media/mambient.c). */
+static void hidden_after(Node *n, const Node *target, Box clip, int *seen, RsLeft *left) {
+    if (rs_empty(left) || left->over) return;
+    if (n == target) { *seen = 1; return; }
+    const Style *s = &n->s;
+    if (n->type == NODE_RAW || s->display_none || s->opacity < 0.999f || n->own_tf || n->has_tf) {
+        if (!*seen && n->type != NODE_RAW && !s->display_none) {
+            Node *kids[MAX_KIDS];
+            int k = node_children_ordered(n, kids, MAX_KIDS);
+            Box none = { 0, 0, 0, 0 };
+            for (int i = 0; i < k && !*seen; i++) hidden_after(kids[i], target, none, seen, left);
+        }
+        return;
+    }
+    Box box = box_and((Box){ n->ax, n->ay, n->ax + n->w, n->ay + n->h }, clip);
+    if (*seen && (s->bg >> 24) == 0xff && !s->has_gradient && s->backdrop_blur < 1) {
+        float k = s->radius * 0.3f;
+        rs_sub(left, (RsBox){ box.x0 + k, box.y0 + k, box.x1 - k, box.y1 - k });
+        if (rs_empty(left)) return;
+    }
+    if (n->type == NODE_TEXT) return;
+    Box inner = s->overflow_hidden ? box : clip;
+    float rr = node_edges_plain(n) ? s->radius : max4(s->ext->r.rad);
+    if (s->overflow_hidden && rr > 0) inner = (Box){ inner.x0 + rr, inner.y0 + rr, inner.x1 - rr, inner.y1 - rr };
+    Node *kids[MAX_KIDS];
+    int k = node_children_ordered(n, kids, MAX_KIDS);
+    for (int i = 0; i < k && !rs_empty(left); i++) hidden_after(kids[i], target, inner, seen, left);
+}
+
+int paint_node_hidden(const Node *target) {
+    Node *root = ui.root;
+    if (!root || !target || target == root) return 0;
+    Box d = { floorf(target->ax), floorf(target->ay), ceilf(target->ax + target->w), ceilf(target->ay + target->h) };
+    if (d.x1 <= d.x0 || d.y1 <= d.y0) return 1;                 /* no box at all: nothing of it shows */
+    for (const Node *p = target; p; p = p->parent) if (p->s.display_none || p->s.opacity <= 0.004f) return 1;
+    static RsLeft left;
+    rs_start(&left, (RsBox){ d.x0, d.y0, d.x1, d.y1 });
+    int seen = 0;
+    hidden_after(root, target, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, &seen, &left);
+    return seen && rs_empty(&left);
+}
+
+/* The nodes with a backdrop blur painted over target (after it in paint order) that meet its box: each one's box and the
+ * margin its blur reads (blur_near), cut to target's box, at most max. A moving wallpaper drawn by the GPU below the UI
+ * keeps the CPU's pixels there, so the Dock and the menu bar still blur it (media/mview.c). Their count (≤ max). */
+static void blurs_after(Node *n, const Node *target, Box d, int *seen, Box *out, int max, int *k) {
+    if (n->type == NODE_RAW || n->s.display_none || *k >= max) return;
+    if (n == target) { *seen = 1; return; }
+    if (*seen && n->s.backdrop_blur >= 1 && n->s.opacity > 0.004f) {
+        Box b = n->prev_box;
+        if (b.x1 <= b.x0 || b.y1 <= b.y0) b = (Box){ n->ax, n->ay, n->ax + n->w, n->ay + n->h };
+        if (b.x1 > b.x0 && b.y1 > b.y0 && box_meets(b, d)) {
+            Box near = blur_near(n);
+            Box c = box_and(box_or(near, b), d);
+            if (c.x1 > c.x0 && c.y1 > c.y0) out[(*k)++] = (Box){ floorf(c.x0), floorf(c.y0), ceilf(c.x1), ceilf(c.y1) };
+        }
+    }
+    Node *kids[MAX_KIDS];
+    int nk = node_children_ordered(n, kids, MAX_KIDS);
+    for (int i = 0; i < nk && *k < max; i++) blurs_after(kids[i], target, d, seen, out, max, k);
+}
+
+int paint_blurs_over(const Node *target, Box *out, int max) {
+    Node *root = ui.root;
+    if (!root || !target || max <= 0) return 0;
+    Box d = { floorf(target->ax), floorf(target->ay), ceilf(target->ax + target->w), ceilf(target->ay + target->h) };
+    if (d.x1 <= d.x0 || d.y1 <= d.y0) return 0;
+    int seen = 0, k = 0;
+    blurs_after(root, target, d, &seen, out, max, &k);
+    return k;
 }
 
 static int opaque_cover_node(Node *root) {

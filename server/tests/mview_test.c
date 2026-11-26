@@ -23,6 +23,12 @@ int wl_paint_media(Canvas *c, int sid, int node, float bx, float by, float bw, f
     return 0;
 }
 void media_src_need_cpu(MediaSrc *s) { (void)s; }
+/* NV12 sources (mambient.c, mviews.c, paint.c): not part of these checks */
+int paint_blurs_over(const Node *n, Box *out, int max) { (void)n; (void)out; (void)max; return 0; }
+void media_src_blur_note(MediaSrc *s, int node, const void *boxes, int n) { (void)s; (void)node; (void)boxes; (void)n; }
+const uint32_t *media_src_rows(MediaSrc *s, int y0, int y1) { (void)s; (void)y0; (void)y1; return NULL; }
+void media_ambient_box(MediaSrc *s) { (void)s; }
+void media_src_format_check(MediaSrc *s) { (void)s; }
 void media_src_tex_fresh(MediaSrc *s) { (void)s; }
 void media_src_view_note(MediaSrc *s, int node, int bw, int bh) { (void)s; (void)node; (void)bw; (void)bh; }
 void media_src_view_drop(MediaSrc *s, int node) { if (s->node == node) s->node = 0; }

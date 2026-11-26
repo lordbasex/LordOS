@@ -38,9 +38,14 @@ void media_paint_note(Canvas *c, int handle, int node, float x, float y, float w
 /* GPU path: the texture a media source's picture is now (wl.c draws it below the UI), NULL if none; *flip: its first
  * row is the picture's bottom */
 struct GpuTex *media_gpu_tex(int id, int *flip);
-/* GPU path: a picture drawn by the GPU changed and nothing else did: the box (logical px) of the displays to present
- * again, since the last take; 0 if none (main.c) */
-int  media_present_take(float *x0, float *y0, float *x1, float *y1);
+/* GPU path: a picture drawn by the GPU changed and nothing else did: the boxes (logical px: x0, y0, x1, y1) of the nodes
+ * to present again since the last take, at most max; how many (main.c) */
+int  media_present_take(float (*b)[4], int max);
+/* Moving wallpapers (mambient.c): which views are visible, their pause, stop and GPU loop cache. unseen: nothing is
+ * drawn (the screen is off, the session is away). Called on every pass of the main loop; media_ambient_due: ms until
+ * it wants to run again (the loop cache's next frame), -1 none. */
+void media_ambient_tick(int unseen);
+double media_ambient_due(void);
 int  media_present_pending(void);
 
 /* The pointer of a source that brings its own (a Machines guest): b, g, r, a bytes with straight alpha, w × h,

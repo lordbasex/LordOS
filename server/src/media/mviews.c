@@ -14,6 +14,7 @@
 #include "../ui/ui.h"
 
 #include <math.h>
+#include <string.h>
 
 /* a plain node in view_nodes still shows all of this source? (pruned when it died, shows another one or a part) */
 static Node *plain_node(MediaSrc *s, int i) {
@@ -169,44 +170,78 @@ void media_src_damage(MediaSrc *s) {
     ui.dirty = 1;
 }
 
-/* ---- a GPU picture's new frame: its nodes presented again (main.c) ---- */
+/* ---- a GPU picture's new frame: its nodes presented again (main.c) ----
+ * One box per node shown (not one box around them all): three displays side by side with one view hidden (covered,
+ * a fullscreen game) compose only the two that show it. */
+#define PRESENT_MAX 32
+static Box present_box[PRESENT_MAX];
+static int present_n, present_over;
 
-static Box present_box;
-static int present_on;
-
-static void box_grow(Box *b, int *k, Box c) {
-    if (!*k) *b = c;
-    else { b->x0 = fminf(b->x0, c.x0); b->y0 = fminf(b->y0, c.y0); b->x1 = fmaxf(b->x1, c.x1); b->y1 = fmaxf(b->y1, c.y1); }
-    *k = 1;
+static void present_add(Box c) {
+    for (int i = 0; i < present_n; i++) {
+        Box *b = &present_box[i];
+        if (c.x0 >= b->x0 && c.y0 >= b->y0 && c.x1 <= b->x1 && c.y1 <= b->y1) return;
+    }
+    if (present_n < PRESENT_MAX) present_box[present_n++] = c;
+    else present_over = 1;
 }
 
 void media_src_present(MediaSrc *s) {
-    Box b = { 0, 0, 0, 0 };
     int k = 0;
     for (int i = 0; i < MEDIA_VIEW_NODES; i++) {
         Node *n = plain_node(s, i);
-        if (n && n->prev_box.x1 > n->prev_box.x0) box_grow(&b, &k, n->prev_box);
+        if (n && n->prev_box.x1 > n->prev_box.x0 && !s->view_hidden[i]) { present_add(n->prev_box); k++; }
     }
-    if (s->views_over) box_grow(&b, &k, (Box){ 0, 0, 16384, 16384 });
+    if (s->views_over) { present_add((Box){ 0, 0, 16384, 16384 }); k++; }
     for (int i = 0; i < MEDIA_CROP_NODES; i++) {
         Node *c = crop_node(s, i);
-        if (c && c->prev_box.x1 > c->prev_box.x0) box_grow(&b, &k, c->prev_box);
+        if (c && c->prev_box.x1 > c->prev_box.x0) { present_add(c->prev_box); k++; }
     }
-    if (!k) { s->painted_seq = s->frame_seq; return; }      /* not shown anywhere: nothing to present */
-    int on = present_on;
-    box_grow(&present_box, &on, b);
-    present_on = 1;
-    /* the frame counts as read: the present that follows draws the texture it is in (js_vm_painted acknowledges it) */
+    /* the frame counts as read: the present that follows draws the texture it is in (js_vm_painted acknowledges it);
+     * not shown anywhere: nothing to present */
+    (void)k;
     s->painted_seq = s->frame_seq;
 }
 
-int media_present_pending(void) { return present_on; }
+int media_present_pending(void) { return present_n > 0 || present_over; }
 
-int media_present_take(float *x0, float *y0, float *x1, float *y1) {
-    if (!present_on) return 0;
-    *x0 = present_box.x0; *y0 = present_box.y0; *x1 = present_box.x1; *y1 = present_box.y1;
-    present_on = 0;
-    return 1;
+int media_present_take(float (*b)[4], int max) {
+    int n = 0;
+    if (present_over && max > 0) { b[0][0] = 0; b[0][1] = 0; b[0][2] = 16384; b[0][3] = 16384; n = 1; }
+    else for (int i = 0; i < present_n && n < max; i++) { b[n][0] = present_box[i].x0; b[n][1] = present_box[i].y0; b[n][2] = present_box[i].x1; b[n][3] = present_box[i].y1; n++; }
+    present_n = 0;
+    present_over = 0;
+    return n;
+}
+
+/* ---- NV12 sources (mambient.c): the views and the blurred strips over them ---- */
+
+Node *media_src_view_at(MediaSrc *s, int i) { return s && i >= 0 && i < MEDIA_VIEW_NODES ? plain_node(s, i) : NULL; }
+
+void media_src_blur_note(MediaSrc *s, int node, const void *boxes, int n) {
+    const Box *b = boxes;
+    int k = 0;
+    for (int i = 0; i < s->nblur; i++)               /* this node's strips go, the others' stay (other views) */
+        if (s->blur_node[i] != node && node_get(s->blur_node[i])) {
+            memcpy(s->blur_box[k], s->blur_box[i], sizeof s->blur_box[0]);
+            s->blur_node[k++] = s->blur_node[i];
+        }
+    for (int i = 0; i < n && k < MEDIA_BLUR_MAX * 2; i++) {
+        s->blur_box[k][0] = b[i].x0; s->blur_box[k][1] = b[i].y0; s->blur_box[k][2] = b[i].x1; s->blur_box[k][3] = b[i].y1;
+        s->blur_node[k++] = node;
+    }
+    s->nblur = k;
+}
+
+void media_src_blur_damage(MediaSrc *s) {
+    for (int i = 0; i < s->nblur; i++) {
+        int hidden = 0, live = 0;
+        for (int v = 0; v < MEDIA_VIEW_NODES; v++)
+            if (s->view_nodes[v] == s->blur_node[i] && plain_node(s, v)) { live = 1; hidden = s->view_hidden[v]; }
+        if (!live || hidden) continue;
+        damage_add((Box){ s->blur_box[i][0], s->blur_box[i][1], s->blur_box[i][2], s->blur_box[i][3] });
+        ui.dirty = 1;
+    }
 }
 
 /* The frame of a video or of the camera covers its whole box (the bands are painted opaque): if everything

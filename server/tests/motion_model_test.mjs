@@ -1,5 +1,5 @@
 // motion_model_test.mjs — moving wallpapers without a screen (sdk/motionmodel.js).
-import { motionCodecs, pickVariant, pauseReason, displayCovered, userVideoProblem, nextRandom } from '../../sdk/motionmodel.js';
+import { motionCodecs, pickVariant, pauseReason, motionFpsCap, motionCacheMb, userVideoProblem, nextRandom } from '../../sdk/motionmodel.js';
 
 let ok = 0, bad = 0;
 const eq = (name, a, b) => {
@@ -27,19 +27,31 @@ eq('no matching format', pickVariant({ variants: [item.variants[2]] }, ['hevc'],
 const base = { idleSec: 0 };
 eq('plays', pauseReason(base), null);
 eq('reduce motion', pauseReason({ ...base, reduceMotion: true }), 'reduceMotion');
-eq('screen off', pauseReason({ ...base, screenOff: true }), 'screenOff');
-eq('fullscreen', pauseReason({ ...base, fullscreen: true }), 'fullscreen');
-eq('covered', pauseReason({ ...base, covered: true }), 'covered');
 eq('idle', pauseReason({ ...base, idleSec: 300 }), 'idle');
-eq('battery low', pauseReason({ ...base, battery: { discharging: true, percent: 20 } }), 'battery');
-eq('battery charging', pauseReason({ ...base, battery: { discharging: false, percent: 5 } }), null);
 eq('load', pauseReason({ ...base, busy: true }), 'busy');
-
-const d = { x: 0, y: 0, w: 1920, h: 1080 };
-eq('full window', displayCovered(d, [{ x: 0, y: 0, w: 1920, h: 1080 }]), true);
-eq('bigger window', displayCovered(d, [{ x: -5, y: -5, w: 2000, h: 1200 }]), true);
-eq('smaller window', displayCovered(d, [{ x: 0, y: 30, w: 1920, h: 1050 }]), false);
-eq('another display', displayCovered(d, [{ x: 1920, y: 0, w: 1920, h: 1080 }]), false);
+// covered, fullscreen and a dark screen are lord-server's, per display (server/tests/mloop_test.c): never a global pause
+eq('fullscreen is not a JS reason', pauseReason({ ...base, fullscreen: true, covered: true, screenOff: true }), null);
+// battery: Pause (the default), Lower frame rate, Keep playing
+const bat = (percent, discharging = true) => ({ discharging, percent });
+eq('battery pauses by default', pauseReason({ ...base, battery: bat(90) }), 'battery');
+eq('battery charging', pauseReason({ ...base, battery: bat(5, false) }), null);
+eq('no battery', pauseReason({ ...base, battery: null }), null);
+eq('lower: plays on battery', pauseReason({ ...base, battery: bat(90), batteryMode: 'lower' }), null);
+eq('lower: pauses at 20 %', pauseReason({ ...base, battery: bat(20), batteryMode: 'lower' }), 'battery');
+eq('keep: never for the battery', pauseReason({ ...base, battery: bat(3), batteryMode: 'keep' }), null);
+// the frame-rate cap
+eq('own rate', motionFpsCap({ cap: 0 }), 0);
+eq('30', motionFpsCap({ cap: 30 }), 30);
+eq('15', motionFpsCap({ cap: 15 }), 15);
+eq('unknown cap', motionFpsCap({ cap: 60 }), 0);
+eq('lower on battery', motionFpsCap({ cap: 0, batteryMode: 'lower', battery: bat(80) }), 15);
+eq('lower on battery, 30', motionFpsCap({ cap: 30, batteryMode: 'lower', battery: bat(80) }), 15);
+eq('lower plugged in', motionFpsCap({ cap: 0, batteryMode: 'lower', battery: bat(80, false) }), 0);
+eq('pause mode leaves the cap', motionFpsCap({ cap: 30, batteryMode: 'pause', battery: bat(80) }), 30);
+eq('cache default', motionCacheMb(undefined), 1024);
+eq('cache off', motionCacheMb(0), 0);
+eq('cache 2 GB', motionCacheMb(2048), 2048);
+eq('cache odd', motionCacheMb(333), 1024);
 
 eq('short hevc', userVideoProblem({ duration: 8, codec: 'hevc' }, ['hevc']), null);
 eq('long', userVideoProblem({ duration: 11, codec: 'hevc' }, ['hevc']), 'tooLong');
