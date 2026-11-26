@@ -186,6 +186,13 @@ export function matchesQuery(e, query, label = (x) => x.name || '', capName = (c
   const hay = foldText([label(e), e.id, e.source, e.cap, capName(e.cap)].join(' '));
   return words.every((w) => hay.includes(w));
 }
+// The functions ("What Lumo can do") a search finds, by their name and description in the person's language (and
+// their id): Sentinela, Writing… name(f), desc(f) → text. Every word of the query must be in one of them.
+export function matchFunctions(list, query, name = (f) => f.id, desc = () => '') {
+  const words = foldText(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  return (list || []).filter((f) => { const hay = foldText([name(f), desc(f), f.id].join(' ')); return words.every((w) => hay.includes(w)); });
+}
 export const matchesFilter = (e, f) => f === 'all' || (f === 'installed' ? e.state === 'installed' : e.cap === f);
 export const filterEntries = (list, { filter = 'all', query = '', label, capName } = {}) =>
   (list || []).filter((e) => matchesFilter(e, filter) && matchesQuery(e, query, label, capName));

@@ -4,7 +4,7 @@
 import {
   CAPS, PIECES, FUNCTIONS, LEVELS, EAR_MODELS, IMAGE_MODELS, OCR_LANGS, OCR_BASE, AI_FILTERS, ocrPackageOk, tessCodes, ocrLangs, brainEntries,
   voiceEntries, voicePage, eyeEntries, earEntries, imageEntries, pieceReady, lumoState, matchesQuery, filterEntries, filterCounts, groupByCap,
-  capCard, modelBytes, sortForPage, CAP_COLOR, CAP_ICON,
+  capCard, modelBytes, sortForPage, CAP_COLOR, CAP_ICON, matchFunctions,
 } from '../../sdk/aistore.js';
 import { LLM_MODELS } from '../../sdk/llmcatalog.js';
 import { VOICE_LANGS } from '../../sdk/voicecatalog.js';
@@ -134,5 +134,15 @@ eq('space: the folders measured', modelBytes({ voiceSys: 100, voiceUser: 20, llm
 eq('space: unmeasured and bad values count 0', modelBytes({ a: NaN, b: -5, c: undefined, d: 7 }), 7);
 eq('space: nothing measured yet', modelBytes(null), 0);
 
+// a search finds the functions by their translated name and description (the maintainer searched «Escritura»)
+const esName = { writing: 'Escritura', sentinela: 'Sentinela', notes: 'Notas' };
+const esDesc = { writing: '«Corregí este texto»: corregir, mejorar o traducir', sentinela: 'Vigila los procesos' };
+const fnIds = (q) => matchFunctions(FUNCTIONS, q, (f) => esName[f.id] || f.id, (f) => esDesc[f.id] || '').map((f) => f.id);
+eq('«Escritura» finds Writing', fnIds('Escritura'), ['writing']);
+eq('accents and case don\'t matter', fnIds('escritura'), ['writing']);
+eq('by its description', fnIds('traducir'), ['writing']);
+eq('Sentinela by name', fnIds('sentinela'), ['sentinela']);
+eq('no query: none listed as results', fnIds('  '), []);
+eq('no match', fnIds('whisper'), []);
 console.log(`ai-store-test: ${ok} passed, ${bad} failed`);
 process.exit(bad ? 1 : 0);

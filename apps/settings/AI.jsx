@@ -25,7 +25,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
-  CAPS, CAP_COLOR, CAP_ICON, FUNCTIONS, LEVELS, AI_FILTERS, TESSDATA, ocrPackageOk, tessCodes, ocrLangs, brainEntries, voiceEntries,
+  CAPS, CAP_COLOR, CAP_ICON, FUNCTIONS, matchFunctions, LEVELS, AI_FILTERS, TESSDATA, ocrPackageOk, tessCodes, ocrLangs, brainEntries, voiceEntries,
   eyeEntries, earEntries, imageEntries, lumoState, filterEntries, filterCounts, groupByCap, capCard, modelBytes, sortForPage, voicePage,
 } from '../../sdk/aistore.js';
 import { Stack, Section, SettingRow, Note, Actions, tint } from './ui.jsx';
@@ -230,12 +230,15 @@ function LumoHero({ st, width }) {
 
 // ---- what Lumo can do: the one brain's functions ----
 
+const fnName = (f, tr) => (f.id === 'sentinela' ? tr('sentinela.name') : f.id === 'writing' ? tr('writing.name') : tr(`settings.aiStore.fn.${f.id}`));
+const fnExample = (f, tr) => (f.id === 'writing' ? tr('writing.example') : tr(`settings.aiStore.fnExample.${f.id}`));
+
 function FunctionCard({ f, w, on, onOpen }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [hover, setHover] = useState(false);
   const level = LEVELS[f.level];
-  const name = f.id === 'sentinela' ? tr('sentinela.name') : f.id === 'writing' ? tr('writing.name') : tr(`settings.aiStore.fn.${f.id}`);
+  const name = fnName(f, tr);
   return (
     <View focusable={!!onOpen} onClick={onOpen} onKeyDown={(ev) => { if (onOpen && (ev.key === 'Enter' || ev.key === ' ')) onOpen(); }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
@@ -245,7 +248,7 @@ function FunctionCard({ f, w, on, onOpen }) {
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{name}</Text>
         <Tag tone={level === 'read' ? 'ok' : level === 'admin' ? 'warn' : undefined} label={tr(`settings.aiStore.level.${level}`)} />
       </View>
-      <Text style={{ height: 30, overflow: 'hidden', fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{f.id === 'writing' ? tr('writing.example') : tr(`settings.aiStore.fnExample.${f.id}`)}</Text>
+      <Text style={{ height: 30, overflow: 'hidden', fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{fnExample(f, tr)}</Text>
       {f.ready ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text style={{ flex: 1, fontSize: typeScale.caption, fontWeight: 600, color: on ? tint.ok : t.textDim, textAlign: 'start' }}>{tr(on ? 'settings.aiStore.fnOn' : 'settings.aiStore.fnOff')}</Text>
@@ -871,6 +874,8 @@ export function AISettings({ alert }) {
     const fn = columns(avail, FN_CARD);
     const caps = columns(avail, 170);
     const plain = !query.trim() && filter === 'all';
+    // a search finds functions too (Sentinela, Writing…), by their name and description in the person's language
+    const fnFound = filter === 'all' ? matchFunctions(FUNCTIONS, query, (f) => fnName(f, tr), (f) => fnExample(f, tr)) : [];
     body = (
       <View style={{ gap: 20 }}>
         <LumoHero st={lumo} width={width} />
@@ -879,11 +884,11 @@ export function AISettings({ alert }) {
           <Chips value={filter} onChange={setFilter}
             options={AI_FILTERS.map((f) => [f, f === 'all' || f === 'installed' ? tr(`settings.aiStore.filter.${f}`) : capName(f), counts[f]])} />
         </View>
-        {plain ? (
+        {plain || fnFound.length ? (
           <View style={{ gap: 10 }}>
             <Head title={tr('settings.aiStore.functions')} sub={tr('settings.aiStore.functionsSub')} />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
-              {FUNCTIONS.map((f) => <FunctionCard key={f.id} f={f} w={fn.w} on={f.id === 'sentinela' ? p.on : f.id === 'writing' ? writingEnabled(writingChoice(), installedLlm.size > 0) : false} onOpen={f.ready ? () => setView(f.id) : null} />)}
+              {(plain ? FUNCTIONS : fnFound).map((f) => <FunctionCard key={f.id} f={f} w={fn.w} on={f.id === 'sentinela' ? p.on : f.id === 'writing' ? writingEnabled(writingChoice(), installedLlm.size > 0) : false} onOpen={f.ready ? () => setView(f.id) : null} />)}
             </View>
           </View>
         ) : null}
@@ -895,7 +900,7 @@ export function AISettings({ alert }) {
             </View>
           </View>
         ) : null}
-        {!groups.length ? (
+        {!groups.length && !fnFound.length ? (
           <Text style={{ paddingVertical: spacing.xl, fontSize: typeScale.callout, color: t.textDim, textAlign: 'center' }}>{tr('settings.aiStore.noMatch', { query: query.trim() })}</Text>
         ) : groups.map(([c, es]) => {
           const cut = query.trim() || filter !== 'all' ? es.length : perRow;
