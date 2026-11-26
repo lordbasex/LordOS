@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "آن برنامه در فهرست مسدودها نیست.",
   "sentinela.noAppNetwork": "این فرایند برنامهٔ مستقلی ندارد که بتوان شبکه‌اش را مسدود کرد.",
   "sys.failed": "مشکلی پیش آمد.",
-  "sys.unsupported": "این نسخهٔ LordOS نمی‌تواند این کار را انجام دهد."
+  "sys.unsupported": "این نسخهٔ LordOS نمی‌تواند این کار را انجام دهد.",
+  "theme.notAllowed": "{call} برای پوسته‌های جامعه در دسترس نیست",
+  "theme.noHost": "بخش LordOS سبک میز کار وجود ندارد"
 }

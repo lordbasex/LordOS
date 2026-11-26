@@ -229,6 +229,9 @@ typedef enum {
 typedef enum OPCodeEnum OPCodeEnum;
 
 struct JSRuntime {
+    /* LordOS patch: the untrusted realm (a community theme's) and how many calls run on its behalf */
+    JSContext *lordos_untrusted;
+    int lordos_taint;
     JSMallocFunctions mf;
     JSMallocState malloc_state;
     const char *rt_info;
@@ -1758,6 +1761,61 @@ BOOL JS_IsJobPending(JSRuntime *rt)
 
 /* return < 0 if exception, 0 if no job pending, 1 if a job was
    executed successfully. the context of the job is stored in '*pctx' */
+/* LordOS patch: see JS_ExecutePendingJob */
+static int lordos_fn_untrusted(JSRuntime *rt, JSValueConst f)
+{
+    int depth = 0;
+    JSObject *p;
+
+    while (depth++ < 64) {
+        if (JS_VALUE_GET_TAG(f) != JS_TAG_OBJECT)
+            return 0;
+        p = JS_VALUE_GET_OBJ(f);
+        switch (p->class_id) {
+        case JS_CLASS_BOUND_FUNCTION:
+            return 1;
+        case JS_CLASS_PROXY:
+            return 1;
+        case JS_CLASS_C_FUNCTION:
+        case JS_CLASS_C_FUNCTION_DATA:
+            return 1;
+        case JS_CLASS_BYTECODE_FUNCTION:
+        case JS_CLASS_GENERATOR_FUNCTION:
+        case JS_CLASS_ASYNC_FUNCTION:
+        case JS_CLASS_ASYNC_GENERATOR_FUNCTION:
+            return p->u.func.function_bytecode->realm == rt->lordos_untrusted;
+        default:
+            return 0;       /* promise and async internals, plain objects */
+        }
+    }
+    return 1;
+}
+
+static int lordos_job_untrusted(JSRuntime *rt, JSJobEntry *e)
+{
+    int i;
+
+    if (!rt->lordos_untrusted)
+        return 0;
+    if (e->ctx == rt->lordos_untrusted)
+        return 1;
+    for (i = 0; i < e->argc; i++)
+        if (JS_IsFunction(e->ctx, e->argv[i]) && lordos_fn_untrusted(rt, e->argv[i]))
+            return 1;
+    return 0;
+}
+
+void JS_SetUntrustedRealm(JSRuntime *rt, JSContext *realm)
+{
+    rt->lordos_untrusted = realm;
+    rt->lordos_taint = 0;
+}
+
+void JS_RealmTaint(JSRuntime *rt, int delta)
+{
+    rt->lordos_taint += delta;
+}
+
 int JS_ExecutePendingJob(JSRuntime *rt, JSContext **pctx)
 {
     JSContext *ctx;
@@ -1774,7 +1832,14 @@ int JS_ExecutePendingJob(JSRuntime *rt, JSContext **pctx)
     e = list_entry(rt->job_list.next, JSJobEntry, link);
     list_del(&e->link);
     ctx = e->ctx;
-    res = e->job_func(e->ctx, e->argc, (JSValueConst *)e->argv);
+    {
+        /* LordOS patch: a job of the untrusted realm, or one that calls a function that is not a trusted realm's
+           bytecode (a native, a bound or proxied function), runs tainted: JS_StackHasRealm answers 1 meanwhile */
+        int taint = lordos_job_untrusted(rt, e);
+        rt->lordos_taint += taint;
+        res = e->job_func(e->ctx, e->argc, (JSValueConst *)e->argv);
+        rt->lordos_taint -= taint;
+    }
     for(i = 0; i < e->argc; i++)
         JS_FreeValue(ctx, e->argv[i]);
     if (JS_IsException(res))
@@ -6950,6 +7015,32 @@ static void build_backtrace(JSContext *ctx, JSValueConst error_obj,
    buffer). Unlike evaluating "new Error().stack" it runs no JavaScript and
    makes no JS value, so the interrupt handler can call it at any point of
    the interpreter. Returns the length written. */
+/* LordOS patch: is code of `realm` on the stack (a bytecode function or a native of that realm), or does a call run
+   on its behalf (JS_RealmTaint, or a job JS_ExecutePendingJob found untrusted)? Every frame is looked at, so a native
+   called from a trusted function called from the realm's code still sees it. */
+int JS_StackHasRealm(JSContext *ctx, JSContext *realm)
+{
+    JSStackFrame *sf;
+
+    if (!realm)
+        return 0;
+    if (ctx->rt->lordos_untrusted == realm && ctx->rt->lordos_taint > 0)
+        return 1;
+    for(sf = ctx->rt->current_stack_frame; sf != NULL; sf = sf->prev_frame) {
+        JSObject *p;
+        if (JS_VALUE_GET_TAG(sf->cur_func) != JS_TAG_OBJECT)
+            continue;
+        p = JS_VALUE_GET_OBJ(sf->cur_func);
+        if (js_class_has_bytecode(p->class_id) &&
+            p->u.func.function_bytecode->realm == realm)
+            return 1;
+        /* a native of the realm (its own built-ins: Reflect.apply, Function.prototype.call…) counts as its code */
+        if (p->class_id == JS_CLASS_C_FUNCTION && p->u.cfunc.realm == realm)
+            return 1;
+    }
+    return 0;
+}
+
 int JS_GetStackText(JSContext *ctx, char *buf, int size, int max_frames)
 {
     JSStackFrame *sf;
@@ -18906,6 +18997,35 @@ static JSContext *JS_GetFunctionRealm(JSContext *ctx, JSValueConst func_obj)
         break;
     }
     return realm;
+}
+
+/* LordOS patch: whose code a function is, for `realm` (a community theme's, server/src/ui/js_theme.c): 2 a bytecode
+   function of `realm`, 1 anything else that can't be told to be trusted code (a native of `realm`, a bound function, a
+   proxy, a native with data), 0 a bytecode function or a plain native of another realm. Agrees with JS_StackHasRealm
+   and with the jobs JS_ExecutePendingJob taints. */
+int JS_IsFunctionOfRealm(JSContext *ctx, JSValueConst func_obj, JSContext *realm)
+{
+    JSObject *p;
+
+    (void)ctx;
+    if (!realm || JS_VALUE_GET_TAG(func_obj) != JS_TAG_OBJECT)
+        return 0;
+    p = JS_VALUE_GET_OBJ(func_obj);
+    switch (p->class_id) {
+    case JS_CLASS_PROXY:
+    case JS_CLASS_BOUND_FUNCTION:
+    case JS_CLASS_C_FUNCTION_DATA:
+        return 1;
+    case JS_CLASS_C_FUNCTION:
+        return p->u.cfunc.realm == realm;
+    case JS_CLASS_BYTECODE_FUNCTION:
+    case JS_CLASS_GENERATOR_FUNCTION:
+    case JS_CLASS_ASYNC_FUNCTION:
+    case JS_CLASS_ASYNC_GENERATOR_FUNCTION:
+        return p->u.func.function_bytecode->realm == realm ? 2 : 0;
+    default:
+        return 0;
+    }
 }
 
 static JSValue js_create_from_ctor(JSContext *ctx, JSValueConst ctor,

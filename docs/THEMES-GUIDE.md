@@ -9,10 +9,11 @@ Read first, if you can: [`themes/README.md`](../themes/README.md) (the short ref
 events and the supported style subset), [DESIGN.md](DESIGN.md) (tokens and the shared controls),
 [LAYERS.md](LAYERS.md) (stacking order) and [WINDOWS.md](WINDOWS.md) (moving and resizing).
 
-> **Today a theme only runs on a development build of LordOS.** A release build loads only JavaScript
-> that is listed in LordOS's signed code manifest, and a theme you build yourself is not in it. See
-> [Verified code](#verified-code-what-happens-to-a-theme-that-lordos-did-not-sign) for exactly what happens and what
-> would be needed.
+> **A theme you make runs on a normal LordOS as a community theme** (in development after 0.8.9.6.2): package its
+> source as a `.zip` and install it from Settings → Appearance → Install from a File… LordOS checks it, builds it
+> itself and runs it with a restricted API ([Community themes](#6-community-themes-installed-from-a-file)). Copying a
+> built bundle next to LordOS's own themes still only works on a development build
+> ([Verified code](#verified-code-what-happens-to-a-theme-that-lordos-did-not-sign)).
 
 ## 1. What a theme is
 
@@ -547,7 +548,7 @@ is run only when the state is "development" (a development build with no manifes
 one), logged as `code: … loaded unchecked (outside …, development build)`; otherwise it is refused
 with "not part of LordOS's system code".
 
-**Third-party themes can't run on release builds today.** That is deliberate for now: a theme is not
+**A bundle built elsewhere can't run on release builds.** That is deliberate: a bundle in LordOS's folder is not
 sandboxed. It runs inside `lord-server`, in the same JavaScript context as every native app, with
 the whole `lord.*` API of the session (files, the terminal, the network, administrator requests),
 and it sees the desktop's keyboard and pointer input. It also carries its own copy of the SDK,
@@ -556,14 +557,16 @@ including the code that shows the permission prompts and records the answers (`l
 them would need, at least: a theme package format and a separate, user-confirmed trust decision
 (signed like `.lpk` packages, [SIGNING.md](SIGNING.md), not the LordOS release key), a place for
 user-installed themes that the code check knows about, and probably a narrower API for theme code
-than what built-in code gets. None of that exists yet.
+than what built-in code gets. Since 0.8.9.6.2 (in development) that exists for themes installed from a source `.zip`:
+see [Community themes](#6-community-themes-installed-from-a-file).
 
 ## 4. Installing and testing
 
 **Where themes live.** Installed: `/usr/lib/lordos/themes/<id>/` (`theme.json`, `theme.bundle.js`,
 `assets/`), next to `/usr/lib/lordos/code-manifest.json`; the development VMs also use
 `/usr/local/lib/lordos` ([VM-SETUP.md](VM-SETUP.md), step 22). The list of themes is the folder that
-holds the running theme's folder (`themes_root` in `js_sys.c`); there is no per-user themes folder.
+holds LordOS's themes (`themes_root` in `js_sys.c`), plus the community themes the person installed from a file in
+`~/.local/share/lordos/themes/` ([Community themes](#6-community-themes-installed-from-a-file)).
 
 **Trying one in a development session** (a development build of `lord-server`, see the table
 above):
@@ -641,3 +644,86 @@ To share a theme with LordOS, open an issue with the **"New desktop style"** for
 `.zip` and its SHA-256, the provenance of every idea, piece of code or art, and the check report. The
 [lordos-theme-kit](https://github.com/lordbasex/lordos-theme-kit) plugin for Claude Code (`/lordos-theme publish`)
 fills in every section.
+
+## 6. Community themes installed from a file
+
+(0.8.9.6.2, in development; approved by the maintainer on 2026-11-26. The plan: [THEMES-PLAN.md](THEMES-PLAN.md) stage
+2; AGENTS.md "Community themes".) A theme someone else made runs on a normal LordOS without being "a program with full
+access". Five pieces make that so.
+
+**1. Install from a source `.zip`.** Settings → Appearance → **Install from a File…** takes the archive
+lordos-theme-kit's `/lordos-theme package` makes: one folder named after the theme's id (`[A-Za-z0-9_-]`, at most 26
+characters) holding `theme.json`, `index.jsx` and its other `.js`/`.jsx` files, `.json` data, `assets/` images (PNG,
+JPEG), `locales/<language>.json`, `LICENSE` and text files. The sandboxed helper **lord-themec**
+(`server/src/themec/`: no files, no network, no exec) reads it strictly — any `..`, absolute name, link, device, second
+folder, duplicate, encryption, Zip64, oversized entry or wrong CRC refuses the whole archive — then runs LordOS's theme
+compiler (`tools/themec/themec.js`) in a QuickJS of its own: the kit's static checks and the build. Settings lists what
+was refused, with the file and line. LordOS never runs a bundle from the archive: it **builds `theme.js` itself**.
+An id that one of LordOS's themes has is refused.
+
+**2. The static checks** (the kit's `check.mjs`, on the files in memory): the manifest (`name`, `description`,
+`"community": true`, `author`, `license`, `version`, `capabilities`); allowed file types and sizes; imports only of
+`react`, `@lordos/sdk`, `@lordos/apps` and its own files; no `eval`, `Function`, dynamic `import()`, `require`,
+`globalThis`/`window`, names starting with `__`, `constructor`/`__proto__` tricks, `Reflect`, `Proxy`, `Symbol.for`,
+`fetch` and friends, remote URLs, obfuscation or minified lines; no `lord.*` beyond the theme's own five functions; no
+host elements (`<view>`); every visible text through `t()` (keys of its own namespace `theme-<id>` must be in
+`locales/en.json`). Run `/lordos-theme check` before packaging: it is the same list.
+
+**3. A restricted `lord.*`.** The theme's code runs in a **second JavaScript realm** of the session
+(`server/src/ui/js.c` `start_community`). Its global has only:
+
+| | |
+|---|---|
+| `lord` | `getLayout`, `setStyle` (its own nodes only), `measureText`, `now`, `log`, `version` |
+| timers | `setTimeout`, `setInterval`, `requestAnimationFrame`, `queueMicrotask`, `console`, `performance.now` |
+| imports | `react` (its own `createElement`, hooks, `memo`, context…), `@lordos/sdk` (an allowlist, `sdk/themeapi.js`), `@lordos/apps` |
+
+LordOS's code — React, the SDK, every app and the system layer, the signed **theme host**
+`assets/theme-host.bundle.js` — keeps the full API in the first realm, which is frozen before the theme's first line
+(no built-in can be changed and no code made from text). lord-server checks **every native call** made while the
+theme's code runs or runs for it (its timers, promises, callbacks, effects, stores and bound functions:
+`server/src/ui/js_theme.c`): a theme may manage windows, launch apps through the shell, read text, pictures and
+translations, lock the session, and **read** the models its `theme.json` declares:
+
+```json
+{ "capabilities": ["wifi", "bluetooth", "sound", "battery", "brightness", "media", "notifications"] }
+```
+
+`notifications` (approved by the maintainer on 2026-11-26) gives a notification centre the history as read-only plain
+data: titles, bodies, apps and times, never their actions, and no dismissing or clearing.
+Without a capability the SDK's hook gives a neutral value (no battery, no players). Never: the terminal, files,
+administrator actions, permission answers, packages, the keyring, the clipboard, network settings, switching themes or
+changing Wi-Fi, Bluetooth, the volume, the brightness or what plays. Refs and events give the theme a handle
+`{ id, type }`, never LordOS's node objects; LordOS's data (windows, settings, stores) arrives as frozen copies;
+whatever the theme hands back (props at any depth, arguments, what its callbacks return) is copied by an allowlist,
+always as the theme's own code (a getter, a Proxy or an iterator in it runs under the theme's policy), and a host
+node whose element LordOS's own React didn't make is refused (a forged React element never becomes a node); its key listeners hear keys only while the keyboard is the shell's (its
+launcher, its menus, no window focused) and never while a system prompt is up; its shortcuts need ❖, ⌃ or ⌥;
+`settings` is read whole but written only for its own options (`themeOptions[<id>]`) and `mode`, `accent`, `effects`,
+`dock…`, `menuBar…`, `taskbar…`. A refused call throws `theme.notAllowed` and is logged as
+`community theme: lord.<name> refused` in the compositor log.
+
+**4. The system layer.** Permission, keyring and administrator prompts, the file chooser and the other system surfaces
+are drawn by LordOS in the `system` layer; notification banners and the privacy pill in `notification`, above every
+layer a theme can draw in (`dock`, `menubar`, `overlay`, `popover`, `modal`, `tooltip`, `drag`). A community theme
+can't dismiss a banner or run its actions (a notification centre reads plain data with the `notifications`
+capability), and with one the privacy pill is always in each display's corner. The lock and login screens are the
+greeter's, another process.
+
+**5. Trust and recovery.** The first time, Settings asks: **"This theme isn't from LordOS"**, with the author, what it
+can't do and what it may read; only the person's answer there lets it run (lord-server keeps it in the theme's install
+record, which `lord.fs` can't write). A **watchdog** (`community_watch` in `server/src/main.c`) takes a community theme
+off when it throws at start, never calls `startShell`, draws nothing within 6 seconds, has its React tree die, stalls
+the desktop until the main-loop watchdog stops it, or was running when two sessions in a row ended abnormally (a
+lord-server that died; logging out, shutting down, restarting or switching user from LordOS is never counted, however
+short, while a logout the theme's own code asks for keeps the count until the theme has run a healthy minute, and a
+Restart… or Shut Down… countdown the theme starts never confirms by itself: only the person's click or key does): the previous style comes back and
+Settings shows "Couldn't start" with Report, **Try Again** and **Remove**. **Ctrl+Alt+Shift+Backspace** always
+restores Lord Flow.
+
+**Where it lives:** `~/.local/share/lordos/themes/<id>/` (`theme.json`, the built `theme.js`, `assets/`, `locales/`,
+`install.json`), written only by lord-server (`server/src/ui/themestore.c`). Its texts are the catalog `theme-<id>`
+(`lord.locale.catalog` reads `locales/<language>.json` there).
+
+**Tests:** `build/realm-taint-test`, `build/themestore-test`, `tests/themec_test.mjs` and
+`tests/community_theme_headless.sh` (`make -C server test-full`), whose probe fixture tries every way past the policy.

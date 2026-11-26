@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "Aquest programa no és a la llista de bloqueig.",
   "sentinela.noAppNetwork": "Aquest procés no té cap aplicació pròpia la xarxa de la qual es pugui bloquejar.",
   "sys.failed": "Alguna cosa ha anat malament.",
-  "sys.unsupported": "Aquesta versió de LordOS no pot fer això."
+  "sys.unsupported": "Aquesta versió de LordOS no pot fer això.",
+  "theme.notAllowed": "{call} no està disponible per als temes de la comunitat",
+  "theme.noHost": "Falta la part de LordOS de l'estil d'escriptori"
 }

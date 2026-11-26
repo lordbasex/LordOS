@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "Ohjelma ei ole estolistalla.",
   "sentinela.noAppNetwork": "Tällä prosessilla ei ole omaa sovellusta, jonka verkon voisi estää.",
   "sys.failed": "Jokin meni vikaan.",
-  "sys.unsupported": "Tämä LordOS-versio ei osaa tehdä sitä."
+  "sys.unsupported": "Tämä LordOS-versio ei osaa tehdä sitä.",
+  "theme.notAllowed": "{call} ei ole yhteisön teemojen käytettävissä",
+  "theme.noHost": "Työpöytätyylin LordOS-osa puuttuu"
 }

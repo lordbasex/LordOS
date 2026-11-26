@@ -965,5 +965,7 @@
   "sentinela.notBlocked": "그 프로그램은 차단 목록에 없습니다.",
   "sentinela.noAppNetwork": "이 프로세스에는 네트워크를 차단할 수 있는 자체 앱이 없습니다.",
   "sys.failed": "문제가 발생했습니다.",
-  "sys.unsupported": "이 버전의 LordOS에서는 할 수 없습니다."
+  "sys.unsupported": "이 버전의 LordOS에서는 할 수 없습니다.",
+  "theme.notAllowed": "{call}은(는) 커뮤니티 테마에서 사용할 수 없습니다",
+  "theme.noHost": "데스크톱 스타일의 LordOS 부분이 없습니다"
 }

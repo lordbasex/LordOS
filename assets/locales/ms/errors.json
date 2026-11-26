@@ -965,5 +965,7 @@
   "sentinela.notBlocked": "Program itu tiada dalam senarai sekatan.",
   "sentinela.noAppNetwork": "Proses ini tiada apl sendiri yang rangkaiannya boleh disekat.",
   "sys.failed": "Sesuatu tidak kena.",
-  "sys.unsupported": "Versi LordOS ini tidak dapat melakukannya."
+  "sys.unsupported": "Versi LordOS ini tidak dapat melakukannya.",
+  "theme.notAllowed": "{call} tidak tersedia untuk tema komuniti",
+  "theme.noHost": "Bahagian LordOS gaya desktop tiada"
 }

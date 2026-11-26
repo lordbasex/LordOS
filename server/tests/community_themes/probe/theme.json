@@ -1,0 +1,2 @@
+{ "name": "Probe", "description": "A test fixture: tries to reach past a community theme's policy in every way it can.",
+  "community": true, "author": "LordOS tests", "license": "MIT", "version": "1.0.0" }

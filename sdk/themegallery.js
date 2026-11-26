@@ -24,6 +24,8 @@ export function galleryEntry(t, { lordosVersion = '' } = {}) {
     options: Array.isArray(t.options) ? t.options : [], sketch: t.sketch || null,
     // (0.8.9.6.2) theme.json's minLordOS, and the release it needs when this one is older ('' when it runs here)
     minLordOS: typeof t.minLordOS === 'string' ? t.minLordOS : '', needsLordOS: themeNeedsNewer(t, lordosVersion),
+    // (0.8.9.6.2) installed from a file: confirmed by the person or not yet, and what it may read
+    user: t.user === true, trusted: t.user === true ? t.trusted === true : true, caps: Array.isArray(t.caps) ? t.caps : [],
   };
 }
 

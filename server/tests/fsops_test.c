@@ -260,6 +260,11 @@ int main(void) {
     }
     path(a, ".local/share/applications/x.desktop");
     CHECK(fsops_protected(a));
+    /* community themes: the code LordOS built and its install record (ui/themestore.c) */
+    path(a, ".local/share/lordos/themes/aurora/theme.js");
+    CHECK(fsops_protected(a));
+    path(a, ".local/share/lordos/themes");
+    CHECK(fsops_protected(a));
     /* web apps: the registry lord-web starts from, and each profile's data (docs/WEBAPPS.md) */
     path(a, ".config/lordos/web/apps/chat.json");
     CHECK(fsops_protected(a));

@@ -967,5 +967,7 @@
   "sentinela.notBlocked": "Acel program nu este în lista de blocare.",
   "sentinela.noAppNetwork": "Acest proces nu are o aplicație proprie a cărei rețea să poată fi blocată.",
   "sys.failed": "Ceva nu a mers bine.",
-  "sys.unsupported": "Această versiune de LordOS nu poate face asta."
+  "sys.unsupported": "Această versiune de LordOS nu poate face asta.",
+  "theme.notAllowed": "{call} nu este disponibil pentru temele comunității",
+  "theme.noHost": "Lipsește partea LordOS a stilului de desktop"
 }

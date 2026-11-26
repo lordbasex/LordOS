@@ -90,6 +90,8 @@ SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/studio_bg_admin.c
 DOC_SRC := src/doc/doc.c src/doc/wire.c src/ui/js_doc.c src/print/ipp.c src/print/phttp.c src/print/mdns.c src/print/cups.c \
            src/print/escl.c src/print/print.c src/ui/js_print.c
 SRC += $(DOC_SRC)
+# (0.8.9.6.2) community themes: the per-user folder and the theme realm (docs/THEMES-GUIDE.md, "Community themes")
+SRC += src/ui/themestore.c src/ui/js_theme.c
 # Per-app firewall (src/fw, docs/FIREWALL.md): rules, decision and names learned from DNS
 FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/fwsub.c src/ui/js_fw.c src/sec/netconn.c src/media/streamurl.c src/fetch/weather.c src/fetch/wxsvc.c src/fetch/fetchspawn.c src/fetch/flathub.c src/fetch/fhsvc.c src/fetch/geocities.c src/ui/js_weather.c
 SRC += $(FW_SRC)
@@ -1621,3 +1623,35 @@ test: build/wallpaper-image-test
 test: build/launchplace-client build/lord-server-test
 build/launchplace-client: tests/launchplace_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/launchplace_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+
+# (0.8.9.6.2) Community themes (docs/THEMES-GUIDE.md "Community themes"): LordOS's QuickJS patches the guard of every
+# lord.* call stands on (a theme's code on the stack, its jobs, its bound and native functions), and the per-user
+# themes folder (the helper's answer read strictly, the staging folder, the install record)
+test: build/realm-taint-test build/themestore-test
+build/realm-taint-test: tests/realm_taint_test.c $(QJS_OBJ)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/realm_taint_test.c $(QJS_OBJ) -lm -lpthread
+	./$@ || { rm -f $@; exit 1; }
+
+# lord-themec: a community theme's .zip checked and built in the helpers' sandbox (src/themec, ui/js_theme.c;
+# AGENTS.md "lord-themec"). LordOS's own code and libc only: the zip reader, stb_image's zlib decoder, QuickJS and the
+# theme compiler (tools/themec/themec.js) compiled in.
+LORD_THEMEC_SRC := src/themec/lordthemec.c src/themec/zipread.c src/themec/stbzlib.c src/sec/sandbox.c src/sec/cgroup.c src/sec/json.c
+build/gen/themec_js.h: ../tools/themec/themec.js
+	@mkdir -p build/gen
+	{ echo '/* generated from tools/themec/themec.js (Makefile) */'; echo 'static const unsigned char themec_js[] = {'; \
+	  od -An -v -tx1 $< | sed 's/\([0-9a-f][0-9a-f]\)/0x\1,/g'; echo '0x00 };'; } > $@
+build/lord-themec: $(LORD_THEMEC_SRC) src/themec/zipread.h src/sec/sandbox.h build/gen/themec_js.h $(QJS_OBJ)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ $(LORD_THEMEC_SRC) $(QJS_OBJ) -lm -lpthread
+	chmod g-w $@
+all: build/lord-themec
+build/themestore-test: tests/themestore_test.c src/ui/themestore.c src/ui/themestore.h src/themec/zipread.c src/themec/stbzlib.c src/sec/json.c src/pkg/crypto.c build/lord-themec
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/themestore_test.c src/ui/themestore.c src/themec/zipread.c src/themec/stbzlib.c src/sec/json.c src/pkg/crypto.c
+	./$@ build/lord-themec || { rm -f $@; exit 1; }
+# a community theme in a headless session: its realm, the guard of every lord.* call, forged elements, the watchdog
+test-full: community-theme-headless
+community-theme-headless: build/lord-server
+	tests/community_theme_headless.sh; r=$$?; [ $$r -eq 0 ] || [ $$r -eq 77 ]
+.PHONY: community-theme-headless

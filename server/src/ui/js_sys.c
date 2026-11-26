@@ -19,6 +19,8 @@
 #include "../hw/sleeplock.h"
 #include "../hw/logindlock.h"
 #include "js_sys.h"
+#include "js_theme.h"
+#include "themestore.h"
 #include "js.h"
 #include "../cloud/cloud.h"
 #include "js_err.h"
@@ -465,7 +467,9 @@ static int valid_id(const char *s) {
     return 1;
 }
 
+/* the system's themes folder: main.c's (a community theme's own folder is in the per-user one, js_theme.c) */
 static void themes_root(char *out, size_t size) {
+    if (jst_system_themes()[0]) { snprintf(out, size, "%s", jst_system_themes()); return; }
     char tmp[sizeof ui.theme_dir];
     snprintf(tmp, sizeof tmp, "%s", ui.theme_dir);
     snprintf(out, size, "%s", dirname(tmp));
@@ -513,6 +517,10 @@ static JSValue f_themes_list(JSContext *c, JSValueConst this_val, int argc, JSVa
         free(json);
     }
     closedir(d);
+    /* (0.8.9.6.2) the community themes the person installed from a file (js_theme.c) */
+    char running[sizeof ui.theme_dir + 16];
+    snprintf(running, sizeof running, "%s/theme.js", ui.theme_dir);
+    jst_list(c, arr, &i, running);
     return arr;
 }
 
@@ -525,17 +533,24 @@ static JSValue f_themes_use(JSContext *c, JSValueConst this_val, int argc, JSVal
         char root[PATH_MAX], bundle[PATH_MAX * 2];
         themes_root(root, sizeof root);
         snprintf(bundle, sizeof bundle, "%s/%s/theme.bundle.js", root, id);
-        ok = access(bundle, R_OK) == 0 && strlen(bundle) < sizeof ui.theme_request &&
+        /* not one of LordOS's: a community theme installed from a file (an official one always wins the id) */
+        if (access(bundle, R_OK) && jst_bundle_path(id, bundle, sizeof bundle)) bundle[0] = 0;
+        ok = bundle[0] && access(bundle, R_OK) == 0 && strlen(bundle) < sizeof ui.theme_request &&
              !theme_blocked(bundle);
         /* read and verified now, while this theme still runs (js.c js_theme_prepare): a bundle the verified-code check
          * refuses is answered here with false and the session goes on in this theme, untouched; the switch itself
-         * (main.c switch_theme) runs exactly the bytes checked here */
+         * (main.c switch_theme) runs exactly the bytes checked here. A community theme must be confirmed, not failed,
+         * and its code must still be what LordOS built (its install record's SHA-256). */
+        /* a community theme: one more start in its crash count (cleared when the session ends normally, main.c); one
+         * that ended COMMUNITY_CRASHES sessions in a row is marked failed here and refused just below */
+        char cid[32];
+        if (ok && jst_is_user_bundle(bundle, cid, sizeof cid)) jst_session_starting(cid);
         int r = ok ? js_theme_prepare(bundle) : 0;
         if (r) {
             ok = 0;
             snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", bundle);
             snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", r == JS_REFUSED ? "refused by the verified-code check (sec/codesig.c)"
-                     : "its file could not be read");
+                     : js_init_error()[0] ? js_init_error() : "its file could not be read");
             ui.theme_failed_code = r == JS_REFUSED;
             ui.theme_failed_gen = codesig_generation();
             fprintf(stderr, "lord-server: theme %s not switched to (%s): the session stays in this one\n", bundle, ui.theme_failed_why);
@@ -770,6 +785,16 @@ static JSValue f_locale_catalog(JSContext *c, JSValueConst this_val, int argc, J
             size_t len;
             char *txt = read_small(path, 1 << 20, &len);
             if (txt) { r = JS_NewStringLen(c, txt, len); free(txt); }
+        }
+        /* (0.8.9.6.2) a community theme's own texts, "theme-<id>": locales/<language>.json in its installed folder */
+        if (JS_IsNull(r) && !strncmp(ns, "theme-", 6) && jst_root()[0]) {
+            char path[PATH_MAX * 2];
+            size_t len;
+            if (ts_valid_id(ns + 6) && (size_t)snprintf(path, sizeof path, "%s/%s/locales/%s.json", jst_root(), ns + 6, lang) < sizeof path) {
+                struct stat st;
+                char *txt = !lstat(path, &st) && S_ISREG(st.st_mode) ? read_small(path, 1 << 20, &len) : NULL;
+                if (txt) { r = JS_NewStringLen(c, txt, len); free(txt); }
+            }
         }
         /* strings of an app installed as a package: locales/<language>.json inside it */
         if (JS_IsNull(r) && lpk_valid_id(ns) && !lpk_reserved(ns)) {
@@ -1028,8 +1053,11 @@ static JSValue f_time_reload(JSContext *c, JSValueConst this_val, int argc, JSVa
 /* ---- miscellaneous ---- */
 
 static JSValue f_quit(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
-    (void)c; (void)this_val; (void)argc; (void)argv;
+    (void)this_val; (void)argc; (void)argv;
     ui.quit_requested = 1;
+    /* a community theme logging out by itself (its code on the stack, or a call made for it): its crash count stays
+     * (main.c clears it only for ends the person caused outside the theme's reach) */
+    if (jst_on_stack(c)) ui.quit_by_theme = 1;
     return JS_UNDEFINED;
 }
 
@@ -2881,6 +2909,11 @@ void js_sys_register(JSContext *c, JSValue lord) {
     add_object(c, lord, "system", system_funcs, sizeof system_funcs / sizeof system_funcs[0]);
     add_object(c, lord, "settings", settings_funcs, sizeof settings_funcs / sizeof settings_funcs[0]);
     add_object(c, lord, "themes", themes_funcs, sizeof themes_funcs / sizeof themes_funcs[0]);
+    {
+        JSValue th = JS_GetPropertyStr(c, lord, "themes");
+        if (!greeter_mode) jst_register_themes(c, th);       /* install from a file, confirm, retry, remove (js_theme.c) */
+        JS_FreeValue(c, th);
+    }
     add_object(c, lord, "fonts", fonts_funcs, sizeof fonts_funcs / sizeof fonts_funcs[0]);
     add_object(c, lord, "admin", admin_funcs, sizeof admin_funcs / sizeof admin_funcs[0]);
     add_object(c, lord, "locale", locale_funcs, sizeof locale_funcs / sizeof locale_funcs[0]);

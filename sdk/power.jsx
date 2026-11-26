@@ -19,6 +19,7 @@ import { windows } from './windows.js';
 import { windowAppName } from './apps.js';
 import { remote } from './remote.js';
 import { flushSession, resumeSession } from './sessionrestore.jsx';
+import { countdownEnds } from './powermodel.js';
 
 export const POWER_SECONDS = 60;
 // null, or { action: 'reboot'|'poweroff', until (ms), state: 'ask'|'sent'|'denied'|'unavailable' }
@@ -29,9 +30,10 @@ export const powerAsk = createStore(null);
 export const canPower = () => typeof lord.session !== 'undefined' && typeof lord.session.power === 'function' && lord.session.managed()
   && (typeof lord.session.onMonitor !== 'function' || lord.session.onMonitor());
 
-export function askPower(action) {
+// opts.byTheme: a community theme's code asked (sdk/themeapi.js): the countdown cancels instead of confirming
+export function askPower(action, opts) {
   if (action !== 'reboot' && action !== 'poweroff') return;
-  powerAsk.set({ action, until: Date.now() + POWER_SECONDS * 1000, state: 'ask' });
+  powerAsk.set({ action, until: Date.now() + POWER_SECONDS * 1000, state: 'ask', byTheme: !!(opts && opts.byTheme) });
 }
 
 // lord-sessiond's answers reach the session through the login screen's channel (RP_GREETER_IN);
@@ -96,7 +98,10 @@ export function PowerDialog() {
   useEffect(() => {
     if (!counting) return undefined;
     const id = setInterval(() => {
-      if (Date.now() >= powerAsk.get()?.until) { clearInterval(id); confirm(); } else tick((n) => n + 1);
+      if (Date.now() >= powerAsk.get()?.until) {
+        clearInterval(id);
+        if (countdownEnds(powerAsk.get()) === 'cancel') { console.log('power: the countdown a community theme started ran out: cancelled'); cancel(); } else confirm();
+      } else tick((n) => n + 1);
     }, 250);
     return () => clearInterval(id);
   }, [counting, ask?.until]);

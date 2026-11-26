@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "یہ پروگرام بلاک لسٹ میں نہیں ہے۔",
   "sentinela.noAppNetwork": "اس پروسیس کی اپنی کوئی ایپ نہیں جس کا نیٹ ورک بلاک کیا جا سکے۔",
   "sys.failed": "کچھ غلط ہو گیا۔",
-  "sys.unsupported": "LordOS کا یہ ورژن ایسا نہیں کر سکتا۔"
+  "sys.unsupported": "LordOS کا یہ ورژن ایسا نہیں کر سکتا۔",
+  "theme.notAllowed": "{call} کمیونٹی تھیمز کے لیے دستیاب نہیں ہے",
+  "theme.noHost": "ڈیسک ٹاپ اسٹائل کا LordOS حصہ موجود نہیں"
 }

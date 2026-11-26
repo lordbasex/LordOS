@@ -965,5 +965,7 @@
   "sentinela.notBlocked": "โปรแกรมนั้นไม่อยู่ในรายการบล็อก",
   "sentinela.noAppNetwork": "โปรเซสนี้ไม่มีแอปของตัวเองที่สามารถบล็อกเครือข่ายได้",
   "sys.failed": "เกิดข้อผิดพลาดบางอย่าง",
-  "sys.unsupported": "LordOS เวอร์ชันนี้ทำสิ่งนั้นไม่ได้"
+  "sys.unsupported": "LordOS เวอร์ชันนี้ทำสิ่งนั้นไม่ได้",
+  "theme.notAllowed": "{call} ใช้กับธีมจากชุมชนไม่ได้",
+  "theme.noHost": "ส่วนของ LordOS ในสไตล์เดสก์ท็อปหายไป"
 }

@@ -163,6 +163,47 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   package use an id starting with `theme-` (`lpk_reserved`), so no package can supply a theme's texts. Test:
   `server/tests/theme_gallery_test.mjs`.
 
+- **Community desktop styles install from a file, with a security piece of their own** (part 2 of the community themes
+  plan, approved by the maintainer on 2026-11-26; docs/THEMES-GUIDE.md "Community themes", docs/THEMES-PLAN.md stage 2).
+  - **Settings → Appearance → Install from a File…** takes a theme's source `.zip` (the one lordos-theme-kit's
+    `/lordos-theme package` makes). A new sandboxed helper, **lord-themec**, reads the archive strictly (no `..`,
+    absolute names, links, devices, duplicates, encryption, Zip64 or oversized entries; images must be the image their
+    name says; text must be UTF-8), runs the kit's static checks and **builds the theme's code itself** with LordOS's
+    own compiler (`tools/themec/themec.js`: JSX and modules, no dependencies). What it refuses is listed with file and
+    line. lord-server installs what it built into `~/.local/share/lordos/themes/<id>/`, through a staging folder, with
+    an install record of its own (the code's SHA-256, the author, the capabilities); `lord.fs` can't write there.
+  - **A one-time confirmation** names the author: "This theme isn't from LordOS…", with what it can't do and what it
+    may read. A theme is run only after it, and only while its code is still what LordOS built.
+  - **A restricted `lord.*`:** the theme runs in a second JavaScript realm with five functions of its own (layout,
+    styling its own nodes, measuring text, the time, the log) and a facade of the SDK; LordOS's code (the SDK, the apps,
+    the system layer) keeps the full API in its realm, which is frozen before the theme's first line. Every native call
+    made while the theme's code is running, or for it (its timers, promises, callbacks, effects, stores, bound
+    functions), is checked in lord-server against its policy: windows, launching apps, and read access to the models
+    its `theme.json` declares in `"capabilities"` (`wifi`, `bluetooth`, `sound`, `battery`, `brightness`, `media`,
+    `notifications`). Never the terminal, files, administrator actions, permission answers, packages, the keyring, the
+    clipboard, or the raw keys of other windows. LordOS's own themes keep the full API.
+  - **The system layer is out of a theme's reach:** notification banners and the privacy pill moved above every layer a
+    theme draws in (`notification` is now 95, above tooltips and drag images; for all themes), prompts stay in the
+    system layer, a community theme can't dismiss banners or run their actions, and with one the privacy pill is always
+    in each display's corner.
+  - **A watchdog:** a community theme that throws at its start, never starts its shell, draws nothing within 6 seconds,
+    has its tree die, stalls the desktop until the watchdog stops it, or ends two sessions in a row is taken off; the
+    previous style comes back, and the theme is marked failed with the error for Report, with Try Again and Remove.
+  - **Ctrl+Alt+Shift+Backspace always restores Lord Flow**, whatever style runs (handled before any JavaScript;
+    Ctrl+Alt+Backspace alone still ends the session).
+
+### Tests
+- `build/realm-taint-test` (LordOS's QuickJS patches: a theme's code on the stack, its jobs, bound and native
+  functions, the realm of a function), `build/themestore-test` (ASan/UBSan: 10 bad archives, lord-themec on the fixture
+  and on eval, `lord.term.create`, `lord.fs.write`, `new Function`, `globalThis`, another package, a host element, a
+  remote URL, a constructor trick and `import()`; the install, a changed or linked `theme.js`, 7 malformed answers),
+  `tests/themec_test.mjs` (the compiler and 20+ refusals), `fsops-test` (the new deny-list folder) and
+  `tests/community_theme_headless.sh` (`make test-full`): a minimal community theme runs with nothing refused; a probe
+  fixture's every bypass is refused (directly, from `Promise.then`, `queueMicrotask`, `setTimeout`, animation frames,
+  a store subscription, an effect, a ref and a store's `get`; forged host elements, LordOS's raw components and a
+  context's Provider in children and props; a forged app registry; `wm`'s mutators); a theme that throws or never
+  starts is marked failed; an unconfirmed one never runs.
+
 ### Fixed
 - **A web app's tray icon and notifications kept LordOS's letter tile** after its real icon was fetched (WhatsApp's "W"
   next to the clock): lord-web read only the registry's icon. It now prefers the site's own icon from

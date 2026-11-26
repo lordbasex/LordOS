@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "O proqram bloklama siyahısında deyil.",
   "sentinela.noAppNetwork": "Bu prosesin şəbəkəsi bloklana bilən öz tətbiqi yoxdur.",
   "sys.failed": "Nəsə səhv getdi.",
-  "sys.unsupported": "LordOS-un bu versiyası bunu edə bilmir."
+  "sys.unsupported": "LordOS-un bu versiyası bunu edə bilmir.",
+  "theme.notAllowed": "{call} icma mövzuları üçün əlçatan deyil",
+  "theme.noHost": "Masaüstü üslubunun LordOS hissəsi yoxdur"
 }

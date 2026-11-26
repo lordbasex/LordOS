@@ -6,6 +6,7 @@ __pycache__/
 node_modules/
 themes/*/theme.bundle.js
 assets/app-host.bundle.js
+assets/theme-host.bundle.js
 *.iso
 *.img
 *.img.xz
