@@ -54,6 +54,16 @@ int  webpage_sound_suppress(int mode, int learned, int silent, double last_audio
 /* 1 when audio started at audio_ms, next to a notification at note_ms, teaches "the page plays its own sound" */
 int  webpage_sound_learns(int mode, double note_ms, double audio_ms);
 
+/* The log line (without "notify: " and the newline) for one notification the page posted, into out: its length, 0 when
+ * it doesn't fit. "page tag <hash8|none> silent <yes|no|unknown> renotify <yes|no|unknown> shown|replaced". Never the
+ * title, body, icon or an address: the tag (a messaging app's chat id, often a phone number) only as 8 hex digits of a
+ * hash keyed with salt, a random number lord-web picks at start and never writes, so a line can be matched with the
+ * next one of the same run but not turned back into the tag. silent and renotify: 1, 0, or -1 when WebKit doesn't say
+ * (WPE 2.54's WebKitNotification tells neither). replaced: the notification took the place of one with the same tag. */
+size_t webpage_notify_line(const char *tag, unsigned long long salt, int silent, int renotify, int replaced, char *out, size_t n);
+/* the 8 hex digits above (tag non-empty) */
+void   webpage_tag_hash(const char *tag, unsigned long long salt, char out[9]);
+
 /* The profile's state file (<profile>/state.json, lord-web's own: { "ownSound": true|false, "clientHints":
  * { "<origin>": ["sec-ch-ua-arch", ...] } }). clientHints: the high-entropy Client Hints each site asked for with
  * Accept-CH (webua.h), kept as Chrome keeps them; an origin that isn't https (or http on localhost), a name that isn't

@@ -184,6 +184,7 @@
   "settings.iconTile": "LordOS の文字タイル（サイトのアイコンはアプリを開いたときに取得されます）",
   "settings.iconRefresh": "アイコンを更新",
   "settings.iconRefreshing": "更新しています…",
+  "settings.iconUpdated": "サイトからアイコンを更新しました",
   "sound.auto": "自動",
   "sound.app": "アプリのサウンド",
   "sound.system": "LordOS のサウンド",

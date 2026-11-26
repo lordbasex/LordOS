@@ -283,6 +283,8 @@ static char socket_name[64];
 static struct wl_list pointers, keyboards, data_devices, outputs;
 
 static Surf *pointer_focus, *key_focus;
+static int prev_focus_id;               /* the window that had the keyboard before key_focus (0: LordOS had it) */
+static void key_focus_gone(Surf *s);
 static int buttons_held;
 static float last_x, last_y, press_x, press_y;     /* where it was pressed: base for move/resize */
 static uint32_t mods_sent[4];
@@ -2045,7 +2047,7 @@ static void surface_gone(struct wl_resource *r) {
     s->tm = NULL;
     if (s->xw) { xwm_surface_gone(s->xw); s->xw = NULL; }
     if (pointer_focus == s) { pointer_focus = NULL; buttons_held = 0; }
-    if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
+    key_focus_gone(s);
     dnd_surface_gone(s);
     unmap_popup(s);
     if (s->role == R_TOPLEVEL && s->mapped) emit(s, "unmap", "{}");
@@ -2962,6 +2964,9 @@ static Source *selection;           /* source of the app owning the selection, o
 /* Bumped whenever the selection changes: an offer is only good for the selection it was made for,
  * and only while its client has the keyboard (an app can't keep an old offer to read later copies). */
 static unsigned clip_offer_gen = 1;
+/* bumped by every new selection (an app's, an X app's, LordOS's own), not when its source goes: a text read still
+ * coming from an app that copied and quit is kept, one from a selection replaced since is dropped (reader_ready) */
+static unsigned clip_sel_gen = 1;
 /* nofiles: an isolated or sandboxed app's selection offered to lord-web, without its file lists (dndg_file_mime) */
 typedef struct { Source *src; unsigned gen; int nofiles; } OfferRef;
 static unsigned clip_seen;          /* LordOS clipboard generation already offered */
@@ -3077,7 +3082,7 @@ static void files_adopt(ClipFiles *f) {
 typedef struct {
     int fd, image, sensitive, primary, html, html_only, files, files_only, full /* cut short */, from /* URIL_FROM_* */;
     pid_t pid;
-    unsigned offer;
+    unsigned offer, sel;
     struct wl_event_source *ev;
     char *buf;
     size_t len, cap;
@@ -3165,6 +3170,11 @@ static int reader_ready(int fd, uint32_t mask, void *data) {
             if (uril_accept(f.src, t, strlen(t), f.list, f.len)) files_adopt(&f);
         } else if (f.list) { free(clip_files_pend.list); clip_files_pend = f; clip_files_pend_offer = rd->offer; f.list = NULL; }
         free(f.list);
+    } else if (rd->sel != clip_sel_gen) {
+        /* an older selection's text or image that came after a newer copy (an X app's, LordOS's own, another Wayland
+         * app's): dropped, as the HTML, files and primary readers are. It overwrote the newer copy, and the X window
+         * manager then took the X CLIPBOARD back from the X app that had just copied: that app pasted "another text"
+         * (the toolkit audit's gtk3-x11 clipboard check, docs/TOOLKIT-AUDIT.md) */
     } else if (rd->len && rd->image) {
         if (rd->len > 8 && !memcmp(rd->buf, "\x89PNG\r\n\x1a\n", 8)) {
             store_png((unsigned char *)rd->buf, rd->len);
@@ -3206,6 +3216,7 @@ static void read_beside(Source *s, const char *mime, int files, const Reader *ma
     rd->from = main->from;
     snprintf(rd->name, sizeof rd->name, "%s", main->name);
     rd->offer = clip_offer_gen;
+    rd->sel = clip_sel_gen;
     rd->ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, reader_ready, rd);
     if (!rd->ev) { close(p[0]); free(rd); }
 }
@@ -3249,6 +3260,7 @@ static void read_selection(Source *s) {
     rd->from = client_from(cl);
     for (int i = 0; i < s->nmimes; i++) if (!strcmp(s->mimes[i], "x-kde-passwordManagerHint")) rd->sensitive = 1;
     rd->offer = clip_offer_gen;
+    rd->sel = clip_sel_gen;
     rd->ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, reader_ready, rd);
     if (!rd->ev) { close(p[0]); free(rd); return; }
     /* rich text and files: their text/html and file list too, beside the text (not for an image, nor a secret) */
@@ -3450,6 +3462,7 @@ int wl_clip_use_image(const char *path) {
     if (!buf || got != (size_t)st.st_size) { free(buf); return -1; }
     if (selection) { wl_data_source_send_cancelled(selection->res); selection = NULL; }
     clip_offer_gen++;
+    clip_sel_gen++;
     store_png(buf, got);
     snprintf(clip_img_origin, sizeof clip_img_origin, "lordos");
     clip_img_sensitive = 0;
@@ -3477,6 +3490,7 @@ static void dev_set_selection(struct wl_client *c, struct wl_resource *r, struct
     if (selection && selection != s) wl_data_source_send_cancelled(selection->res);
     selection = s;
     clip_offer_gen++;
+    clip_sel_gen++;
     if (s) read_selection(s);
     offer_to_focus();                   /* the new selection, to the client with the keyboard (the owner, usually) */
 }
@@ -3964,7 +3978,7 @@ static void top_gone(struct wl_resource *r) {
     s->mapped = 0;
     s->top = NULL;
     orphan_dialogs(s);
-    if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
+    key_focus_gone(s);
 }
 
 /* ---- xdg_popup ---- */
@@ -5230,6 +5244,18 @@ static void pointer_enter(Surf *s, float lx, float ly) {
 
 static void dismiss_popups(void) {
     for (int i = npopups - 1; i >= 0; i--) if (popups[i]->popup) xdg_popup_send_popup_done(popups[i]->popup);
+}
+/* The window a popup belongs to: the first of its parents that isn't a popup (a dialog's menu is the dialog's) */
+static Surf *popup_owner(Surf *p) {
+    while (p && p->role == R_POPUP) p = p->parent;
+    return p;
+}
+/* The keyboard moved to keep: every menu goes but keep's own. A popup the window opened just before the keyboard
+ * reached it (the focus comes back a few frames after a dialog or another app's window closes) stays open: Qt's
+ * combo box list was closed at once on a real desktop (docs/TOOLKIT-AUDIT.md). */
+static void dismiss_popups_but(Surf *keep) {
+    for (int i = npopups - 1; i >= 0; i--)
+        if (popups[i]->popup && (!keep || popup_owner(popups[i]) != keep)) xdg_popup_send_popup_done(popups[i]->popup);
 }
 
 /* The surface under the pointer, a button held or not: menus first, then fullscreen, then the window the UI's
@@ -7239,6 +7265,29 @@ static void text_field_report(int on, int x, int y, int w, int h) {
     emit(key_focus, "textinput", "{\"on\":%s,\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d}", on ? "true" : "false", x, y, w, h);
 }
 
+/* The window with the keyboard went away (closed, or its role or Xwayland window gone): the keyboard goes back at once
+ * to the window that had it just before, as the theme will decide a frame or more later (sdk/wayland.js sync, after
+ * the "unmap" event). In that gap an app whose dialog or second window had just closed opened a menu or a tooltip,
+ * and the keyboard arriving then made Qt close it: Qt 6's tooltip and Qt 5's combo box list on the toolkit audit
+ * (docs/TOOLKIT-AUDIT.md). Only when the keyboard came from that window: from LordOS (a LordOS window, the shell) it
+ * stays with nobody until the theme says, so keys typed into a LordOS window never reach another app meanwhile.
+ * The theme still decides: its focus call that follows is the same window (nothing changes) or another one. */
+static void focus_back(void *data) {
+    (void)data;
+    int id = prev_focus_id;
+    prev_focus_id = 0;
+    Surf *p = id ? find(id) : NULL;
+    if (key_focus || !p || !p->mapped || p->parked || p->xmin || (!p->top && !p->xw)) return;
+    wl_set_focus(id);
+}
+static void key_focus_gone(Surf *s) {
+    if (s->id == prev_focus_id) prev_focus_id = 0;
+    if (key_focus != s) return;
+    key_focus = NULL;
+    wl_textinput_gone();
+    if (prev_focus_id && loop) wl_event_loop_add_idle(loop, focus_back, NULL);   /* after this surface is gone */
+}
+
 void wl_set_focus(int id) {
     if (!dpy) return;
     Surf *s = id ? find(id) : NULL;
@@ -7247,12 +7296,13 @@ void wl_set_focus(int id) {
     if (s && modal_over(s)) s = modal_over(s);         /* under a modal dialog: the keys are the dialog's */
     if (fs_takes_keys(s)) s = fs_surf;     /* a window under a fullscreen one never has the keys (fsfocus.h) */
     if (s == key_focus) return;
+    prev_focus_id = key_focus ? key_focus->id : 0;
     struct wl_resource *kb;
     if (key_focus) {
         FOR_CLIENT(&keyboards, key_focus->client, kb) wl_keyboard_send_leave(kb, wl_display_next_serial(dpy), key_focus->res);
         key_focus->activated = 0;
         send_toplevel_configure(key_focus);
-        dismiss_popups();
+        dismiss_popups_but(s);
     }
     wl_textinput_focus(NULL, NULL);                    /* the field's "off" goes to the window that had it */
     key_focus = s;
@@ -7598,6 +7648,7 @@ void wl_flush(void) {
         clip_is_image = 0;
         if (selection) { wl_data_source_send_cancelled(selection->res); selection = NULL; }
         clip_offer_gen++;
+        clip_sel_gen++;
         offer_to_focus();
     }
     xwm_tick();                         /* X11: clipboard changes, pending requests */
@@ -7832,7 +7883,7 @@ void wlx_detach(int sid) {
     if (!s) return;
     if (s->role == R_TOPLEVEL && s->mapped) emit(s, "unmap", "{}");
     if (s->role == R_POPUP) unmap_popup(s);
-    if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
+    key_focus_gone(s);
     if (pointer_focus == s) { pointer_focus = NULL; buttons_held = 0; }
     if (fs_surf == s) { fs_surf = NULL; damage_add((Box){ 0, 0, ui.width, ui.height }); }
     if (s->node) damage_node(s);
@@ -8040,6 +8091,7 @@ void wlx_clip_png(const unsigned char *png, size_t n, const char *origin) {
     if (n < 8 || memcmp(png, "\x89PNG\r\n\x1a\n", 8)) return;
     if (selection) { wl_data_source_send_cancelled(selection->res); selection = NULL; }
     clip_offer_gen++;
+    clip_sel_gen++;
     store_png(png, n);
     snprintf(clip_img_origin, sizeof clip_img_origin, "%s", origin && origin[0] ? origin : "x11");
     clip_img_sensitive = 0;

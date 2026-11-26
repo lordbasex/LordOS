@@ -36,12 +36,20 @@ Nine combinations, in this order:
 | `qt6-wayland`, `qt6-xcb` | `qt6.py` (PyQt6) | `QT_QPA_PLATFORM=wayland` / `xcb` |
 | `x11-xwayland` | `x11.py` (the X11 core protocol by hand, standard library only) | none |
 
-**No new dependency.** LordOS depends on no toolkit and no binding. Before a harness runs, a quick import probe
-(`python3 -I -c "import gi; gi.require_version('Gtk', '4.0')"`, `import PyQt5.QtCore, PyQt5.QtWidgets`, ...) checks
-that its bindings are already installed; otherwise the row says **not installed**. Nothing is ever installed. A
-harness that reports `{"installed": false}` (for example PyQt5 without `qtwayland5`'s plugin) is not installed too.
-`x11.py` needs only Python 3, so it always runs where there is an X display. No libX11, python3-xlib or xprop is
-used: LordOS links no X11 library (docs/ARCHITECTURE.md).
+**Shipped with LordOS** (in development after 0.8.9.6.1, asked for by the maintainer on 2026-11-26). The bindings the
+harnesses need come with LordOS: `python3-gi`, `gir1.2-gtk-3.0`, `gir1.2-gtk-4.0`, `python3-pyqt5`, `python3-pyqt6`,
+`qtwayland5` and `qt6-wayland`, with `qgnomeplatform-qt5` and `qgnomeplatform-qt6` (Qt's platform theme, below). They
+are in the ISO and the Raspberry Pi image (`PKGS_TOOLKITS` in `tools/iso/build.sh` and `tools/rpi/build-img.sh`; every
+one is in trixie for amd64 and arm64) and Recommends of the `lordos` package (`TOOLKITRECS` in `tools/iso/mkdeb.sh`),
+so an installed system gets them with the Store's update, which installs the Recommends a new version adds.
+`server/tests/toolkit_pkgs_test.mjs` keeps the three lists in step. The cost, from the trixie index's dependency
+closure without Recommends (how the images install): **+142 MiB installed on the ISO** (51 packages: 126 MiB for the
+bindings, which bring Qt 5, PyQt and the GObject typelibs; 16 MiB more for QGnomePlatform and adwaita-qt) and **+272 MiB
+on the Raspberry Pi image** (114 packages; it had no GTK 3 or Qt before). The import probe still runs first (a person may
+remove a package; a Recommends can be left out): a toolkit whose bindings are missing says **not installed**, and
+nothing is ever installed by the audit. A harness that reports `{"installed": false}` (for example PyQt5 without
+`qtwayland5`'s plugin) is not installed too. `x11.py` needs only Python 3, so it always runs where there is an X
+display. No libX11, python3-xlib or xprop is used: LordOS links no X11 library (docs/ARCHITECTURE.md).
 
 **How a harness runs** (`server/src/testbench/tkrun.c`):
 
@@ -58,9 +66,11 @@ used: LordOS links no X11 library (docs/ARCHITECTURE.md).
   backend variable, `WAYLAND_DEBUG=1`, `GTK_A11Y=none`, `NO_AT_BRIDGE=1` and `PYTHONDONTWRITEBYTECODE=1`, and
   `GSETTINGS_BACKEND=keyfile`, what lord-server gives every app it starts (`ui/portal.c`; the caller's own value only
   when it is `keyfile`, `dconf` or `memory`). Without it GTK 3 read dconf's defaults instead of LordOS's theme and
-  dark mode, and its theme check failed for nothing. Nothing else from the caller's environment passes (no
+  dark mode, and its theme check failed for nothing. Likewise `QT_QPA_PLATFORMTHEME=gnome` (`wl/toolkitenv.h`), or the
+  caller's own when it is a plain plugin name (lower-case letters and digits, under 32 bytes). Nothing else from the caller's environment passes (no
   `LD_PRELOAD`, no `PYTHONPATH`, no `GDK_BACKEND` of its own).
-- A harness exits by itself within 5 s. At **8 s** its whole process group is killed. When it exits, whatever it
+- A harness exits by itself within 5 s (GTK 4's: up to 2.4 s more when its own first frame came later than 1 s, the
+  time it spent compiling its shaders on a cold cache). At **8 s** its whole process group is killed. When it exits, whatever it
   left in its group is killed as well. In show mode (below) it exits within 15 s and is killed at **20 s**.
 - `LORDOS_TOOLKIT_AUDIT_DIR` (an absolute folder) replaces `/usr/lib/lordos/toolkit-audit` for development.
 
@@ -334,6 +344,69 @@ ASan and UBSan. It covers:
 The harnesses have their own checks (`tools/toolkit-audit/x11_test.py` against Xvfb, fast and in show mode). The report side is tested by
 `server/tests/hwreport_test.mjs` and `build/hwsnap-test` (docs/HARDWARE-REPORT.md).
 
+## Measured: every combination at 100 % (in development, 2026-11-26)
+
+The latest release is 0.8.9.6.1; this is in development (`fix/toolkit-100`).
+
+**Before**, on the maintainer's own desktop (Debian 13, RX 580, lord-server 0.8.9.6.1+ws158, its live session), two
+runs a few minutes apart:
+
+| Combination | Run 1 | Run 2 | What failed |
+|---|---|---|---|
+| `gtk3-wayland`, `gtk4-wayland`, `gtk4-x11`, `x11-xwayland` | 100 % | 100 % | |
+| `gtk3-x11` | 95.8 % | 83.3 % | `theme` (toolkit light, portal dark); run 2 also `clipboard` ("another text came back") |
+| `qt5-wayland` | 88.8 % | 88.8 % | `theme` (palette light); `combo` ("closed at once") |
+| `qt5-xcb` | 95.8 % | 95.8 % | `theme` |
+| `qt6-wayland` | 90.9 % | 95.4 % | `theme` ("qt unknown, palette light"); run 1 `combo`, run 2 `tooltip` ("did not map in 1 s") |
+| `qt6-xcb` | 96.2 % | 96.2 % | `theme` |
+
+The same failures came back on a headless `build/lord-server-test --headless 1280x800 --test-hooks` once it had what a
+session has and a test server lacks: a private session bus (`dbus-daemon --session`, so lord-server serves the portal
+and the theme check compares something), the first start's screens skipped (`welcomeShown`: the Help window opening
+mid-run took the keyboard), and the server's environment cleared (`env -i`: an inherited `LORDOS_SESSIOND` sent its
+Xwayland scope to the live session's lord-sessiond, which refused it). Run as `lordos-testbench --toolkits` with this
+tree's harnesses, ten times on each of three fresh servers: the `theme` failures every time, and about one run in
+five lost a Qt popup, a GTK clipboard check on X11 or GTK 4's budget.
+
+**The causes, all on LordOS's side, and the fixes:**
+
+- `theme` on `gtk3-x11`: GTK 3 on X11 reads only XSETTINGS, and nobody served them. The X window manager is now the
+  XSETTINGS manager (`Net/ThemeName`, `Net/IconThemeName`, `Gtk/DecorationLayout`, `Gtk/FontName`; docs/WAYLAND.md,
+  "XSETTINGS").
+- `theme` on the four Qt rows: Qt 5 has no colour scheme, and Qt 6.8's own `gnome` and generic platform themes don't
+  read the portal's (checked: with `XDG_CURRENT_DESKTOP=GNOME` Qt 6 never asked the portal). Tried with the trixie
+  packages unpacked into a scratch folder: `xdgdesktopportal` and `gtk3` fix Qt 6 only (Qt 5.15's give no palette);
+  QGnomePlatform (`gnome`) fixes both, palette and colour scheme. lord-server now gives apps
+  `QT_QPA_PLATFORMTHEME=gnome` and LordOS ships `qgnomeplatform-qt5/-qt6` (above, and docs/WAYLAND.md, "Qt").
+- `combo` on `qt5-wayland`, `combo` and `tooltip` on `qt6-wayland`: the `WAYLAND_DEBUG` log of a failed run shows the
+  harness's clipboard window closing, Qt opening the tooltip 120 ms later, and the keyboard coming back to the main
+  window 132 ms after the close, at which Qt destroys the popup. The keyboard came back only when the theme decided (its
+  `unmap` handling, a frame or more later, slower under load); lord-server now gives it back in the same loop iteration
+  to the window that had it just before (`focus_back`, wl.c; never when it came from LordOS), and a keyboard change no
+  longer dismisses the newly focused window's own menus.
+- `clipboard` on `gtk3-x11` ("another text came back") and `gtk4-x11` ("no offer", found headless): with
+  `LORD_XWM_DEBUG=1`, the window manager offered LordOS's selection to X again at the same millisecond the app took the
+  CLIPBOARD (the focus came back after fullscreen), at CurrentTime, so the app's copy was replaced; giving it up at
+  CurrentTime could clear it as well. Now at the selection's last-change time from XFixes, which the X server ignores
+  when the app took it since. And a Wayland app's selection still being read when a newer copy came landed afterwards
+  and overwrote it (the next X focus then gave X that older text); that read is now dropped.
+- `clipboard` and `dnd` timeouts on `gtk4-wayland` on a cold cache: GTK 4 spends 2.5 to 3 s compiling its shaders
+  before its first frame on a software renderer (the log: lord-server's configure 5 ms after the commit, the frame
+  callback 21 ms after the first buffer). A harness's budget, not LordOS: GTK 4's deadline now moves by that time.
+
+**After**, headless with the same runner and every fix (`QT_QPA_PLATFORMTHEME=gnome` with QGnomePlatform from the
+unpacked trixie packages): **every combination at 100 % in 30 of 30 runs** (ten on each of three fresh servers), and in
+160 more runs of the GTK 3 and GTK 4 harnesses on both backends in the audit's order (40 rounds), where the X clipboard
+race had shown. `make -C server wl-conformance` stays at 48 of 48 protocols complete, mean 100 %, X11 mean 100 %
+(as recorded on 2026-11-23). Its headless server now has a private session bus and the welcome already seen
+(`tools/wl-conformance.mjs`), so its toolkit section measures the theme too: on the author's PC, without
+QGnomePlatform installed, GTK 3, GTK 4 and the plain X11 window score 100 % and the four Qt rows fail only `theme`, as
+they should there.
+
+Still to see on a real session: the maintainer's desktop once the `lordos` package with these fixes and its new
+Recommends is installed, the Qt rows with the real `qgnomeplatform` packages (headless they came from a scratch folder),
+and a GPU session's timing (headless ran on the CPU path).
+
 ## Measured (in development, 2026-11-25)
 
 Two real runs of `lordos-testbench --toolkits` from `feat/ta-report`, with this tree's harnesses
@@ -360,10 +433,11 @@ Two real runs of `lordos-testbench --toolkits` from `feat/ta-report`, with this 
 - **VM 127** (0.8.9.6+ws148, Lord Flow, dark mode; GTK 3.24.49, GTK 4.18.6, Qt 5.15.15, Qt 6.8.2, Xwayland 24.1.6),
   three identical runs. No crash, timeout or protocol error, and no protocol error attributed to any of the 28
   globals the toolkits bound. The failures are what an app of that toolkit really gets on LordOS:
-  - `theme` on `gtk3-x11`: GTK 3 on X11 reads only XSETTINGS, which LordOS doesn't serve (docs/WAYLAND.md), so it
-    stays light. GTK 3 on Wayland and GTK 4 on both follow dark mode.
+  - `theme` on `gtk3-x11`: GTK 3 on X11 reads only XSETTINGS, which LordOS didn't serve then (served since
+    2026-11-26, above), so it stayed light. GTK 3 on Wayland and GTK 4 on both follow dark mode.
   - `theme` on Qt 5 and Qt 6: neither follows the portal without a platform theme (Qt 5 has no colour scheme at all,
-    and Debian's Qt 6 portal theme isn't installed), so their palette stays light. A toolkit limitation.
+    and Debian's Qt 6 portal theme isn't installed), so their palette stays light. Fixed 2026-11-26 with
+    QGnomePlatform (above).
   - `size` on `gtk3-wayland`: LordOS's window memory. The harness's window (`gtk3.py`) was remembered from earlier
     runs made while GTK 3 still had Adwaita's taller title bar, so its frame came back 6 px taller. With a new app
     id it is 600x400. A person whose saved size differs sees the same, by design.
@@ -395,7 +469,7 @@ Two real runs of `lordos-testbench --toolkits` from `feat/ta-report`, with this 
   the X11 harness passes `fullscreen` (on 1280x800, off 600x400) three runs in a row in Lord Flow, Lord Classic,
   Lord Workspaces and Celeste on the headless test server; Lord Workspaces failed it before. Sizes window memory
   already saved smaller stay as they are (they can't be told from a size the person chose) and no longer shrink.
-- **Smaller:** the keyboard comes back to a window 60 to 75 ms after one of its child toplevels closes (VM 127). A
+- **Smaller (fixed 2026-11-26, above):** the keyboard comes back to a window 60 to 75 ms after one of its child toplevels closes (VM 127). A
   Qt 6 popup the app opens in that gap is closed by Qt when the focus arrives (the harness now waits for it, as a
   person does).
 

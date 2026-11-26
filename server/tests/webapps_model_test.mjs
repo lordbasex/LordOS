@@ -256,6 +256,9 @@ eq('a notification\'s icon: only the app\'s own files', [
   M.webIconPathOk('/home/u/.config/lordos/web/icons/chat.png', 'chat', 'relative'),
   M.webIconPathOk('/home/u/.config/lordos/web/icons/chat.png', '../x', H)],
   [true, true, true, false, false, false, false, false, false]);
+eq('why the site\'s icon was not kept: a closed code, never the page\'s text', [M.siteIconError({ code: 'webapps.noIcon' }), M.siteIconError({ ok: false, error: 'web.probe.iconType' }),
+  M.siteIconError('webapps.iconOrigin'), M.siteIconError({ error: 'https://evil.example/x' }), M.siteIconError({ error: 'web.probe.<b>' }), M.siteIconError(null)],
+  ['webapps.noIcon', 'web.probe.iconType', 'webapps.iconOrigin', 'webapps.probeFailed', 'webapps.probeFailed', 'webapps.probeFailed']);
 eq('when to fetch the site\'s icon', [M.wantsSiteIcon({ available: true, cached: false, tried: false }), M.wantsSiteIcon({ available: false, cached: false, tried: false }),
   M.wantsSiteIcon({ available: true, cached: true, tried: false }), M.wantsSiteIcon({ available: true, cached: false, tried: true })], [true, false, false, false]);
 

@@ -186,6 +186,7 @@
   "settings.iconTile": "LordOS की अक्षर टाइल (ऐप खुलने पर साइट का आइकन लाया जाता है)",
   "settings.iconRefresh": "आइकन रीफ़्रेश करें",
   "settings.iconRefreshing": "रीफ़्रेश हो रहा है…",
+  "settings.iconUpdated": "साइट से आइकन अपडेट हुआ",
   "sound.auto": "स्वचालित",
   "sound.app": "ऐप की",
   "sound.system": "LordOS की",

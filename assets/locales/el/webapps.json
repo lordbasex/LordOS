@@ -186,6 +186,7 @@
   "settings.iconTile": "Το πλακίδιο με γράμμα του LordOS (το εικονίδιο του ιστότοπου λαμβάνεται όταν ανοίγει η εφαρμογή)",
   "settings.iconRefresh": "Ανανέωση εικονιδίου",
   "settings.iconRefreshing": "Ανανέωση…",
+  "settings.iconUpdated": "Το εικονίδιο ενημερώθηκε από τον ιστότοπο",
   "sound.auto": "Αυτόματα",
   "sound.app": "Της εφαρμογής",
   "sound.system": "Του LordOS",

@@ -5,8 +5,9 @@
  *                           window, reads the page's web app manifest from a script in an isolated world (the page's
  *                           own scripts can't see or change it), and answers one JSON line on fd 3
  *                           (webmanifest_answer, checked against the address WebKit really loaded), then exits.
- *   lord-web --probe-icon   fd 3 gives one line, an icon address the first step listed. lord-web downloads it into a
- *                           temporary folder (removed after) and answers on fd 3 one JSON line,
+ *   lord-web --probe-icon   fd 3 gives one line, an icon address the first step listed. lord-web opens it as a page
+ *                           (the same view, session and Chrome identity, every hop checked), turns the answer into a
+ *                           download into a temporary folder (removed after) and answers on fd 3 one JSON line,
  *                           {"ok":true,"type":"image/png"|"image/svg+xml","size":N}, then exactly N bytes; or
  *                           {"ok":false,"error":"<code>"}. At most WEBICON_MAX bytes, a PNG or an SVG only.
  *
@@ -37,33 +38,42 @@
 #define PROBE_DEADLINE_S 18
 #define SETTLE_MS 1200                  /* after the load: time for a page that adds its manifest link from a script */
 
+/* The manifest: the page's <link rel="manifest">, else the first of a few addresses on the page's own origin where
+ * sites keep it (a signed-out page may not link it: WhatsApp's sign-in page has no link, its manifest is at
+ * /data/manifest.json). Only the page's own origin, and only an answer that stayed on it. */
 static const char PROBE_JS[] =
     "const abs = (u, base) => { try { const x = new URL(u, base); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : null; } catch (e) { return null; } };\n"
     "const str = (v) => typeof v === 'string' ? v.slice(0, 512) : '';\n"
     "const icons = (list, base) => Array.isArray(list) ? list.slice(0, 32).filter(i => i && typeof i === 'object')\n"
-    "  .map(i => ({ src: abs(str(i.src), base), sizes: str(i.sizes), type: str(i.type) })).filter(i => i.src) : [];\n"
+    "  .map(i => ({ src: abs(str(i.src), base), sizes: str(i.sizes), type: str(i.type), purpose: str(i.purpose) })).filter(i => i.src) : [];\n"
     "const out = { title: str(document.title), metaThemeColor: null, manifest: null, linkIcons: [] };\n"
     "const meta = document.querySelector('meta[name=\"theme-color\"]');\n"
     "if (meta) out.metaThemeColor = str(meta.getAttribute('content'));\n"
-    "for (const l of document.querySelectorAll('link[rel~=\"icon\"], link[rel=\"apple-touch-icon\"]'))\n"
-    "  if (out.linkIcons.length < 32) out.linkIcons.push({ src: abs(l.href, document.baseURI), sizes: str(l.getAttribute('sizes')), type: str(l.getAttribute('type')) });\n"
+    "for (const l of document.querySelectorAll('link[rel~=\"icon\"], link[rel~=\"apple-touch-icon\"], link[rel~=\"apple-touch-icon-precomposed\"]'))\n"
+    "  if (out.linkIcons.length < 32) out.linkIcons.push({ src: abs(l.href, document.baseURI), sizes: str(l.getAttribute('sizes')), type: str(l.getAttribute('type')), purpose: '' });\n"
     "out.linkIcons = out.linkIcons.filter(i => i.src);\n"
-    "const link = document.querySelector('link[rel~=\"manifest\"]');\n"
-    "if (link && link.href) {\n"
+    "const read = async (href, credentials, own) => {\n"
     "  try {\n"
-    "    const r = await fetch(link.href, { credentials: link.crossOrigin === 'use-credentials' ? 'include' : 'same-origin' });\n"
-    "    const text = r.ok ? await r.text() : '';\n"
-    "    if (text && text.length <= 131072) {\n"
-    "      const m = JSON.parse(text);\n"
-    "      const base = r.url || link.href;\n"
-    "      if (m && typeof m === 'object' && !Array.isArray(m)) out.manifest = {\n"
-    "        name: str(m.name), short_name: str(m.short_name),\n"
-    "        start_url: typeof m.start_url === 'string' ? abs(m.start_url, base) : null,\n"
-    "        scope: typeof m.scope === 'string' ? abs(m.scope, base) : null,\n"
-    "        theme_color: typeof m.theme_color === 'string' ? str(m.theme_color) : null,\n"
-    "        icons: icons(m.icons, base) };\n"
-    "    }\n"
-    "  } catch (e) { }\n"
+    "    const r = await fetch(href, { credentials });\n"
+    "    const base = r.url || href;\n"
+    "    if (!r.ok || (own && new URL(base).origin !== location.origin)) return null;\n"
+    "    const text = await r.text();\n"
+    "    if (!text || text.length > 131072) return null;\n"
+    "    const m = JSON.parse(text);\n"
+    "    if (!m || typeof m !== 'object' || Array.isArray(m) || (own && !Array.isArray(m.icons) && typeof m.name !== 'string')) return null;\n"
+    "    return { name: str(m.name), short_name: str(m.short_name),\n"
+    "      start_url: typeof m.start_url === 'string' ? abs(m.start_url, base) : null,\n"
+    "      scope: typeof m.scope === 'string' ? abs(m.scope, base) : null,\n"
+    "      theme_color: typeof m.theme_color === 'string' ? str(m.theme_color) : null,\n"
+    "      icons: icons(m.icons, base) };\n"
+    "  } catch (e) { return null; }\n"
+    "};\n"
+    "const link = document.querySelector('link[rel~=\"manifest\"]');\n"
+    "if (link && link.href) out.manifest = await read(link.href, link.crossOrigin === 'use-credentials' ? 'include' : 'same-origin', false);\n"
+    "else if (location.protocol === 'https:' || location.protocol === 'http:') {\n"
+    "  const found = await Promise.all(['/manifest.webmanifest', '/manifest.json', '/site.webmanifest', '/data/manifest.json']\n"
+    "    .map(p => read(new URL(p, location.origin).href, 'same-origin', true)));\n"
+    "  out.manifest = found.find(m => m) || null;\n"
     "}\n"
     "return JSON.stringify(out);\n";
 
@@ -80,6 +90,7 @@ static int write_all(int fd, const void *p, size_t n) {
 }
 
 static int answered;
+static int icon_mode;                   /* --probe-icon: the page's own answer is the icon, downloaded */
 /* the address asked for, and the last main-frame address allowed on the way (redirects and navigations) */
 static char typed[WEBARGS_LINE_MAX + 1], current[WEBURL_MAX + 1];
 static int seen_public = 1;             /* a hop so far was public (or unknown): every next one must be public */
@@ -270,6 +281,15 @@ static gboolean on_decide(WebKitWebView *v, WebKitPolicyDecision *dec, WebKitPol
     }
     if (type == WEBKIT_POLICY_DECISION_TYPE_RESPONSE) {
         WebKitResponsePolicyDecision *r = WEBKIT_RESPONSE_POLICY_DECISION(dec);
+        if (icon_mode) {
+            /* --probe-icon: the icon's answer becomes the download (icon_started); an error page is no icon */
+            WebKitURIResponse *resp = webkit_response_policy_decision_get_response(r);
+            guint st = resp ? webkit_uri_response_get_status_code(resp) : 0;
+            if (!webkit_response_policy_decision_is_main_frame_main_resource(r)) { webkit_policy_decision_ignore(dec); return TRUE; }
+            if (st < 200 || st > 299) { webkit_policy_decision_ignore(dec); answer_error(d, "web.probe.load"); return TRUE; }
+            webkit_policy_decision_download(dec);
+            return TRUE;
+        }
         if (!webkit_response_policy_decision_is_mime_type_supported(r)) { webkit_policy_decision_ignore(dec); return TRUE; }
     }
     return FALSE;
@@ -290,15 +310,13 @@ static void headless_frame(void *d, const WebFrame *f) {
 }
 static const WebBackSink headless = { headless_frame, NULL };
 
-int webprobe_run(Web *w) {
-    char url[WEBARGS_LINE_MAX + 1];
-    w->loop = g_main_loop_new(NULL, FALSE);
-    if (read_request(url, sizeof url)) { answer_error(w, "web.probe.request"); return 0; }
-    typed_set(url);
-    snprintf(current, sizeof current, "%s", url);
+/* both steps: a view without a window in an ephemeral session (nothing written to disk), with the Chrome identity,
+ * so the site answers the probe as it answers the app (a site may refuse an icon to a request that isn't a
+ * browser's: WhatsApp's answers 400 to WebKit's own identity) */
+static int headless_view(Web *w) {
     setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
     WebBackConfig cfg = { .width = 1280, .height = 800, .scale = 1 };
-    if (!(w->back = webback_new(&cfg, &headless, w))) { answer_error(w, "web.probe.load"); return 1; }
+    if (!(w->back = webback_new(&cfg, &headless, w))) return -1;
     w->context = web_context_new();
     w->session = webkit_network_session_new_ephemeral();
     WebKitSettings *settings = web_settings_new(WEBREG_UA_CHROME);
@@ -308,11 +326,21 @@ int webprobe_run(Web *w) {
     w->view = webback_view_new(w->back, w->context, w->session, settings);
     g_object_unref(settings);
     webback_set_visible(w->back, 1);
+    g_signal_connect(w->view, "permission-request", G_CALLBACK(deny_all), w);
+    return 0;
+}
+
+int webprobe_run(Web *w) {
+    char url[WEBARGS_LINE_MAX + 1];
+    w->loop = g_main_loop_new(NULL, FALSE);
+    if (read_request(url, sizeof url)) { answer_error(w, "web.probe.request"); return 0; }
+    typed_set(url);
+    snprintf(current, sizeof current, "%s", url);
+    if (headless_view(w)) { answer_error(w, "web.probe.load"); return 1; }
     g_signal_connect(w->view, "load-changed", G_CALLBACK(on_load), w);
     g_signal_connect(w->view, "load-failed", G_CALLBACK(on_load_failed), w);
     g_signal_connect(w->view, "load-failed-with-tls-errors", G_CALLBACK(on_tls), w);
     g_signal_connect(w->view, "decide-policy", G_CALLBACK(on_decide), w);
-    g_signal_connect(w->view, "permission-request", G_CALLBACK(deny_all), w);
     g_timeout_add_seconds(PROBE_DEADLINE_S, deadline, w);
     webkit_web_view_load_uri(w->view, url);
     g_main_loop_run(w->loop);
@@ -390,6 +418,19 @@ static void icon_done(WebKitDownload *dl, gpointer d) {
     web_quit(w, 0);
 }
 
+static WebKitDownload *icon_dl;
+
+/* the icon's answer, turned into a download by on_decide: only the first one, into the temporary folder */
+static void icon_started(WebKitNetworkSession *s, WebKitDownload *dl, gpointer d) {
+    (void)s;
+    if (icon_dl) { webkit_download_cancel(dl); return; }
+    icon_dl = g_object_ref(dl);
+    g_signal_connect(dl, "decide-destination", G_CALLBACK(icon_destination), d);
+    g_signal_connect(dl, "received-data", G_CALLBACK(icon_data), d);
+    g_signal_connect(dl, "failed", G_CALLBACK(icon_failed), d);
+    g_signal_connect(dl, "finished", G_CALLBACK(icon_done), d);
+}
+
 int webprobe_icon_run(Web *w) {
     char url[WEBARGS_LINE_MAX + 1];
     w->loop = g_main_loop_new(NULL, FALSE);
@@ -398,16 +439,20 @@ int webprobe_icon_run(Web *w) {
     const char *rt = getenv("XDG_RUNTIME_DIR");
     snprintf(tmpdir, sizeof tmpdir, "%s/lordos-web-icon.XXXXXX", rt && rt[0] == '/' ? rt : "/tmp");
     if (!mkdtemp(tmpdir)) { tmpdir[0] = 0; answer_error(w, "web.probe.load"); return 1; }
-    w->context = web_context_new();
-    w->session = webkit_network_session_new_ephemeral();
-    WebKitDownload *dl = webkit_network_session_download_uri(w->session, url);
-    g_signal_connect(dl, "decide-destination", G_CALLBACK(icon_destination), w);
-    g_signal_connect(dl, "received-data", G_CALLBACK(icon_data), w);
-    g_signal_connect(dl, "failed", G_CALLBACK(icon_failed), w);
-    g_signal_connect(dl, "finished", G_CALLBACK(icon_done), w);
+    /* the icon is opened as a page is, with the Chrome identity and a browser's request (a download started by
+     * WebKit itself goes out with WebKit's own identity and fetch metadata, and WhatsApp's server answers that with
+     * 400), and its answer becomes a download (on_decide); every hop is checked as the page's are */
+    icon_mode = 1;
+    snprintf(current, sizeof current, "%s", url);
+    if (headless_view(w)) { tmp_clean(); answer_error(w, "web.probe.load"); return 1; }
+    g_signal_connect(w->session, "download-started", G_CALLBACK(icon_started), w);
+    g_signal_connect(w->view, "load-failed", G_CALLBACK(on_load_failed), w);
+    g_signal_connect(w->view, "load-failed-with-tls-errors", G_CALLBACK(on_tls), w);
+    g_signal_connect(w->view, "decide-policy", G_CALLBACK(on_decide), w);
     g_timeout_add_seconds(PROBE_DEADLINE_S, deadline, w);
+    webkit_web_view_load_uri(w->view, url);
     g_main_loop_run(w->loop);
-    g_object_unref(dl);
+    if (icon_dl) g_object_unref(icon_dl);
     tmp_clean();
     return w->exit_code;
 }

@@ -186,6 +186,7 @@
   "settings.iconTile": "Плочката с буква на LordOS (иконата на сайта се изтегля при отваряне на приложението)",
   "settings.iconRefresh": "Обнови иконата",
   "settings.iconRefreshing": "Обновяване…",
+  "settings.iconUpdated": "Иконата е обновена от сайта",
   "sound.auto": "Автоматично",
   "sound.app": "На приложението",
   "sound.system": "На LordOS",

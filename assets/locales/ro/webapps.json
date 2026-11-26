@@ -188,6 +188,7 @@
   "settings.iconTile": "Pătratul cu literă al LordOS (pictograma site-ului este preluată când se deschide aplicația)",
   "settings.iconRefresh": "Reîmprospătează pictograma",
   "settings.iconRefreshing": "Se reîmprospătează…",
+  "settings.iconUpdated": "Pictograma a fost actualizată de pe site",
   "sound.auto": "Automat",
   "sound.app": "Al aplicației",
   "sound.system": "Al LordOS",

@@ -186,6 +186,7 @@
   "settings.iconTile": "LordOS bokstavsruta (webbplatsens ikon hämtas när appen öppnas)",
   "settings.iconRefresh": "Uppdatera ikonen",
   "settings.iconRefreshing": "Uppdaterar…",
+  "settings.iconUpdated": "Ikonen uppdaterades från webbplatsen",
   "sound.auto": "Automatiskt",
   "sound.app": "Appens",
   "sound.system": "LordOS",

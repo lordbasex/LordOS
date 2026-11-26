@@ -574,16 +574,21 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
 `lord.webapps.probe(url)` starts `lord-web --probe` with the address on fd 3 (one line, at most 2 KB, `https:` only):
 
 - It loads the page in a throwaway profile (a temporary folder, removed after), without a window.
-- It reads the page's web app manifest (`<link rel="manifest">`) and the icons it lists.
+- It reads the page's web app manifest (`<link rel="manifest">`, else one kept at a usual address of the page's own
+  origin) and the icons it lists, and the page's own icons.
 - It answers one JSON line on fd 3: `{ "ok", "name", "startUrl", "scope", "origin", "themeColor", "icons": [{ "src",
-  "sizes", "type" }], "manifest": true|false }`, then exits.
+  "sizes", "type", "purpose" }], "manifest": true|false }`, then exits.
 - It is given 20 s; lord-server kills it after that.
 
 Nothing is installed by a probe. The person sees the real origin and confirms. Then lord-server writes the registry
 file and saves the icon, chosen and fetched by `lord-web --probe-icon` as a second step, into the registry folder,
-after checking it is a PNG or an SVG of at most 1 MB. lord-server chooses it from the answer's `icons`: the largest PNG
-up to 512 px, else the smallest one above, else an SVG (`https:` only). The second step starts right after the first
-(the sheet then shows the icon), and has its own 20 s.
+after checking it is a PNG or an SVG of at most 1 MB. lord-server ranks the answer's `icons` (`https:` only): PNGs
+(the largest up to 512 px, else the smallest above), then SVGs, then the same two for icons that are only
+`maskable`; a `monochrome`-only icon is never taken. An icon is a PNG or an SVG by its type (`image/png`,
+`image/svg+xml`, or `image/svg` as WhatsApp writes it) or, without one, by its extension, and an address that ends in
+another image's extension (`.webp`, `.ico`, `.jpg`, `.gif`, `.avif`, …) is skipped whatever its type says (WhatsApp's
+manifest labels WebP files `image/png`). The second step tries the best three in that order until one really is a
+PNG or an SVG; it starts right after the first (the sheet then shows the icon), and all its tries share one 20 s.
 
 How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `webargs.c`):
 
@@ -593,11 +598,15 @@ How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `weba
 - **`--probe`** loads the page in an ephemeral network session (nothing written to disk) with WebKit's sandbox, no
   window (its frames are given back at once), no permission, no new window, no download. 1.2 s after the load it runs a
   script in an isolated world (the page's scripts can't see or change it) that reads the `<link rel="manifest">`, the
-  `theme-color` meta, the title and the `<link rel="icon">`s, and fetches the manifest with the page's credentials
-  rules. lord-web then checks it all against the address WebKit really loaded (after redirects): the origin is the
+  `theme-color` meta, the title, the `<link rel="icon">`s and apple-touch-icons, and fetches the manifest with the
+  page's credentials rules. A page that links no manifest (WhatsApp's sign-in page, where a signed-out probe ends)
+  gets one looked for on its own origin at `/manifest.webmanifest`, `/manifest.json`, `/site.webmanifest` and
+  `/data/manifest.json` (WhatsApp's): the first that answers 2xx, stayed on the page's origin and is a JSON object with
+  `icons` or `name`. lord-web then checks it all against the address WebKit really loaded (after redirects): the origin is the
   loaded page's, a `start_url` on another origin becomes the page itself, a `scope` that doesn't hold the start address
   becomes the start address's folder, the name is cleaned (no control characters, spaces folded, at most 128 bytes),
-  colors become `#rrggbb`, at most 16 icons with `https:` addresses. Without a manifest the icons are the page's.
+  colors become `#rrggbb`, at most 16 icons with `https:` addresses: the manifest's first, then the page's own, each
+  with its `purpose` when it has one.
 - **Where it may go:** the probe keeps the request's scheme and place. A redirect or a navigation of the page from
   `https:` to `http:`, or from a public host to this computer or a local network (localhost and `*.localhost`,
   `*.local`, 127/8, 0/8, 10/8, 100.64/10, 172.16/12, 192.168/16, 169.254/16, `::1`, fc00::/7, fe80::/10, IPv4 written
@@ -617,7 +626,11 @@ How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `weba
   the probe only (an installed app never goes through it), which runs in WebKit's sandbox, in an empty ephemeral
   session with none of the person's cookies or credentials, and reads only a manifest and an icon. Pinning the
   address at connect time (a proxy of lord-web's own for the probe's network session) is not done yet.
-- **`--probe-icon`** takes one icon address the same way, downloads it into a temporary folder (removed after) and
+- **`--probe-icon`** takes one icon address the same way and opens it as a page is, in a view without a window, with
+  the same ephemeral session, sandbox and Chrome identity as `--probe` and every hop checked the same way; the
+  answer, when it is 2xx, becomes a download (anything else is `web.probe.load`). A download WebKit starts by itself
+  goes out with WebKit's own identity and fetch metadata, and WhatsApp's server answers that with 400. It downloads
+  the icon into a temporary folder (removed after) and
   answers `{"ok":true,"type":"image/png"|"image/svg+xml","size":N}` and a newline, then exactly N bytes. A PNG needs its
   signature and an `IHDR` chunk; an SVG is text whose first element is `<svg>`. Anything else is
   `web.probe.iconType`; over 1 MB, `web.probe.iconTooBig` (the download is stopped there).
@@ -760,6 +773,43 @@ sound: that notification (when it came first) and every later one go with the `s
 doesn't play a second sound. lord-web remembers it for the profile (`state.json`, `"ownSound": true`), so after the
 first time nothing waits or guesses. notifyd passes `suppress-sound` to the shell, which then shows the banner
 silently.
+
+**The notification log** (`webpage_notify_line`, `webbus.c`): each notification the page hands lord-web writes one
+line to the app's log (`/var/log/lordos/users/<user>/web/<app>-<profile>.log`), in the call log's budget of 60 lines a
+minute (`webcall_log_as`, shared with `webcall:`):
+
+    notify: page tag 3f9a0c17 silent unknown renotify unknown shown
+
+Never the title, the body, the icon or an address. The tag (a messaging app's chat id, often a phone number) is only 8
+hex digits of a hash keyed with a random number lord-web picks at start and never writes: two lines of the same run can
+be matched, a line can't be turned back into the tag, and the next run gives other digits. `none` when there is no
+tag. `replaced` when it took the place of one with the same tag (lord-web's own replace, or WebKit withdrawing the old
+one less than a second before). `silent` and `renotify` are `unknown`: WPE 2.54's `WebKitNotification` tells neither.
+With it, "the sound played but no banner" can be told apart: no `notify:` line means the page never posted one.
+
+**A service worker's notifications** (`registration.showNotification`, a "persistent" notification). WebKit 2.54's
+GLib port doesn't give them to the view: `WebKitNotificationProvider::show` gets no page for them (its "pageless"
+branch, `UIProcess/API/glib/WebKitNotificationProvider.cpp`), and sends them itself to `org.freedesktop.Notifications`
+(`UIProcess/Notifications/glib/NotificationService.cpp`). In LordOS that is notifyd, which still files it under the
+web app by lord-web's process, with `notifyd_plain` on its text, and WebKit replaces a same-tag one itself. A click
+reaches WebKit (`ActionInvoked`), which fires `notificationclick` in the service worker. What that path lacks: no
+`suppress-sound` (LordOS's sound can double the page's), no `silent`, and the window doesn't come forward, because
+GLib's WebKit doesn't implement `clients.focus()` or `clients.openWindow()` from a service worker
+(`focusFromServiceWorker`), and lord-web never sees these notifications, so they get no `notify:` line either.
+lord-web sets GLib's application name to the app's (`g_set_application_name`, webmain.c): before, WebKit sent
+`[Invalid UTF-8]` as the app name and GLib logged a critical for each one.
+
+A messaging web app checked on 2026-11-26 (its bundle as cached by lord-web) uses this path only when
+`Notification.maxActions` is at least 1, which WebKit 2.54 doesn't implement, so its message notifications are page
+notifications; its app log since 2026-11-11 has none of the criticals the service-worker path writes.
+
+Follow-up, not built: a WebKit patch for the backport (`+4.2` or later, `tools/pkg/wpewebkit-chroot.sh`): when a
+pageless notification arrives, `WebKitNotificationProvider` looks for a view of the same network session whose page
+has the notification's origin and emits that view's `show-notification`, keeping the D-Bus path when there is none.
+lord-web's own path would then apply unchanged (`notify:` line, sound rule, tag replace, the window brought forward on
+click), and `webkit_notification_clicked` and `webkit_notification_close` would reach the service worker as
+`notificationclick` and `notificationclose` through the service-worker notification manager, as they do now from
+D-Bus. A page-side shim was set aside: it can't fire `notificationclick` and doesn't see what the worker shows itself.
 
 ## Calls (in development; approved by the maintainer on 2026-11-25)
 
@@ -991,11 +1041,23 @@ probe's (`$XDG_RUNTIME_DIR/lordos-web-probe/`), checked again as a PNG or an SVG
 `~/.cache/lordos/web/icons/<app>.png|svg` (`ui/webicon.c`: the name is the app id and the kind, nothing from the site;
 the folder is in `fsops_protected`). `list()` and `get()` give it as `iconPath` (with `siteIcon: true`), so the Dock,
 the launcher, the switcher and Settings use it; `icons()` lists the cache for the Store. Errors: `webapps.iconOrigin`,
-`webapps.noIcon` and the probe's.
+`webapps.noIcon` and the probe's: when no icon was usable, lord-server passes on the runtime's code for the last one
+tried (`iconError`, a `web.probe.…` code).
 
 - **When:** the Store's cards ask for it lazily (`wantSiteIcon`), one probe at a time, never twice in a session for an
   app that failed; an installed catalog app without one gets it when it is launched (never blocking the launch);
-  Settings → Web Apps → Refresh icon fetches it again. Without lord-web the letter tile stays.
+  Settings → Web Apps → Refresh icon fetches it again: a spinner while the probe runs, then "Icon updated from the site"
+  and the new icon, or the reason there is none (`webapps.iconOrigin`, `webapps.noIcon`, the probe's code,
+  `webapps.noRuntime`); it never fails silently (`siteIconStatus` in `sdk/webapps.js`). Each failure, from Settings or
+  from the Store's lazy fetch, is one line in `shell.log`: `js: [warn] webapps: the site's icon of <app> was not kept:
+  <code>`, the app's id and a closed code, never an address from the page. lord-server's compositor log has one line
+  per refused icon (`webapps: probe <n>: icon <i> of <k> refused: <code>`), without its address. Without lord-web the
+  letter tile stays.
+- **WhatsApp** (2026-11-26): the signed-out probe ends on `/login/`, which links no manifest; its manifest is found at
+  a usual address (`/manifest.json`), and its 512 px PNG is fetched with the Chrome identity.
+  `tests/web_probe_test.py` keeps a local fixture of that pattern (a redirect, no manifest link, a WebP shortcut icon,
+  WebPs labelled PNG, a maskable `image/svg` SVG, strict CSP, COOP, COEP and Document-Isolation-Policy headers, and 400
+  to a request that isn't Chrome's).
 - An address-added app's icon is still the one saved in the registry when it was added; uninstalling it removes its
   cached icon too (a catalog app's stays for the Store's card).
 

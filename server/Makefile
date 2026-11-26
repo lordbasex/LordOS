@@ -318,6 +318,12 @@ build/toolkitenv-test: tests/toolkitenv_test.c src/wl/toolkitenv.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/toolkitenv_test.c
 	./$@ || { rm -f $@; exit 1; }
+# XSETTINGS for GTK 3 on X11: the property the X window manager serves (src/wl/xsettings.h, docs/TOOLKIT-AUDIT.md)
+test: build/xsettings-test
+build/xsettings-test: tests/xsettings_test.c src/wl/xsettings.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -fsanitize=address,undefined -o $@ tests/xsettings_test.c
+	./$@ || { rm -f $@; exit 1; }
 test: build/ptrlock-test
 build/ptrlock-test: tests/ptrlock_test.c src/wl/ptrlock.h src/testbench/lockkey.h
 	@mkdir -p build
@@ -383,7 +389,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/popup-client build/wlperf-client build/syncobj-client build/wltiming-client build/syncobj-kernel-test build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-guest-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/bgsave-test build/fswatch-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/popup-client build/focusback-client build/wlperf-client build/syncobj-client build/wltiming-client build/syncobj-kernel-test build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-guest-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/bgsave-test build/fswatch-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -1073,6 +1079,10 @@ build/shellx-client: tests/shellx_client.c $(CLIENT_GEN) $(SHELLX_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/shellx_client.c $(filter build/gen/client/xdg-shell-protocol.c,$(CLIENT_GEN)) $(filter %.c,$(SHELLX_GEN)) -lwayland-client
 build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# The keyboard back at once after a window closes, a menu opened then kept, a late read of an older copy dropped
+# (tests/focusback_client.c, docs/TOOLKIT-AUDIT.md; tests/run_suites.sh runs it against a headless lord-server)
+build/focusback-client: tests/focusback_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/focusback_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # ❖ + drag anywhere in a Linux window (GitHub #219): a Wayland app and an X11 app (Xwayland) against build/lord-server-test's
 # test hooks (tests/moddrag_headless.sh, run by tests/run_suites.sh); the X client only where libxcb's headers are
 build/moddrag-client: tests/moddrag_client.c $(CLIENT_GEN)

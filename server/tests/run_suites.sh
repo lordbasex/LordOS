@@ -260,6 +260,7 @@ EOF
     if have node; then run "guest-apps-test (sdk/guestappsmodel.js, guest apps in the launcher)" node tests/guest_apps_test.mjs; fi
     if have node; then run "theme-gallery-test (sdk/themegallery.js, Settings → Appearance)" node tests/theme_gallery_test.mjs; fi
     if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
+    if have node; then run "toolkit-pkgs-test (the toolkit audit's bindings and Qt theme in both images and the Recommends)" node tests/toolkit_pkgs_test.mjs; fi
     if have node; then run "iso-firmware-test (tools/iso/build.sh firmware list vs the Store map, #227)" node tests/iso_firmware_test.mjs; fi
     if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
     if have node; then run "vm-group-model-test (apps/machines/model.js groupPlan: a machine group's start and stop order, its link)" node tests/vm_group_model_test.mjs; fi
@@ -303,6 +304,13 @@ EOF
         0) ok "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
         77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
+    esac
+    # the keyboard back at once after a window closes, a menu opened then kept, a late older copy dropped (toolkit audit)
+    sh tests/popup_headless.sh focusback-client >"$T/out" 2>&1
+    case $? in
+        0) ok "focus-back (tests/focusback_client.c, headless lord-server: keyboard, menu, clipboard)" ;;
+        77) skip "focus-back" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "focus-back (tests/focusback_client.c, headless lord-server: keyboard, menu, clipboard)" ;;
     esac
     # (#219) Move and resize with: Off (the default) takes no press; ❖ + drag moves and resizes a Wayland and an X11 window
     sh tests/moddrag_headless.sh >"$T/out" 2>&1
@@ -944,6 +952,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "webapps-get-scene (apps/store/getweb.js)" node tests/textfield_menu_test.mjs webapps_get_scene.mjs
     else skip "webapps-get-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Settings → Web apps → Refresh icon: busy, then the icon or the reason, one closed log line per failure
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "webapps-icon-settings-scene (apps/settings/WebApps.jsx)" node tests/textfield_menu_test.mjs webapps_icon_settings_scene.mjs
+    else skip "webapps-icon-settings-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.9) the trademark notice of the Store's Web apps section and of each web app's page
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "store-trademark-scene (apps/store/trademark.js)" node tests/textfield_menu_test.mjs store_trademark_scene.mjs

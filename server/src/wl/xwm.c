@@ -38,6 +38,7 @@
 #include "urilist.h"
 #include "dndgate.h"
 #include "xwscale.h"
+#include "xsettings.h"
 #include "wl.h"
 #include "../cursor.h"
 #include "../term/term.h"
@@ -88,7 +89,8 @@ enum { XA_PRIMARY = 1, XA_ATOM = 4, XA_CARDINAL = 6, XA_RESOURCE_MANAGER = 23, X
     X(NET_WM_STATE_SKIP_TASKBAR, "_NET_WM_STATE_SKIP_TASKBAR") X(NET_WM_STATE_SKIP_PAGER, "_NET_WM_STATE_SKIP_PAGER") \
     X(NET_WM_WINDOW_TYPE_UTILITY, "_NET_WM_WINDOW_TYPE_UTILITY") X(NET_WM_WINDOW_TYPE_TOOLBAR, "_NET_WM_WINDOW_TYPE_TOOLBAR") \
     X(NET_CLIENT_LIST_STACKING, "_NET_CLIENT_LIST_STACKING") X(NET_WM_ICON, "_NET_WM_ICON") \
-    X(NET_REQUEST_FRAME_EXTENTS, "_NET_REQUEST_FRAME_EXTENTS") X(NET_WORKAREA, "_NET_WORKAREA") X(NET_CLOSE_WINDOW, "_NET_CLOSE_WINDOW")
+    X(NET_REQUEST_FRAME_EXTENTS, "_NET_REQUEST_FRAME_EXTENTS") X(NET_WORKAREA, "_NET_WORKAREA") X(NET_CLOSE_WINDOW, "_NET_CLOSE_WINDOW") \
+    X(XSETTINGS_S0, "_XSETTINGS_S0") X(XSETTINGS_SETTINGS, "_XSETTINGS_SETTINGS") X(MANAGER, "MANAGER")
 
 #define AE(id, name) A_##id,
 enum { ATOM_LIST(AE) A_COUNT };
@@ -139,6 +141,7 @@ typedef struct Xfer {
 enum { SEL_CLIP, SEL_PRIM, NSEL };
 typedef struct {
     int owned;                          /* the window manager owns it in X (LordOS's selection) */
+    uint32_t changed;                   /* the X server's last-change time of it (XFixes), 0 before the first */
     unsigned owned_gen;
     unsigned x_gen;                     /* LordOS generation that belongs to an X app's copy */
     int stage;                          /* import: 0 idle, 1 TARGETS, 2 data, 3 INCR chunks */
@@ -158,6 +161,7 @@ static struct {
     int setup_done, init_left, ready, debug;
     XSetup su;
     uint32_t seq, id_next, wmwin, dndwin, cursor;     /* dndwin: the drop proxy for X apps' drags (XDND) */
+    uint32_t xswin;                     /* owns _XSETTINGS_S0 and holds _XSETTINGS_SETTINGS (xsettings_publish) */
     uint8_t xfixes_op, xfixes_ev, render_op, composite_op, xres_op;
     struct wl_event_source *idle;       /* fires IDLE_MS after the last X window is gone */
     Pend pend[NPEND];
@@ -224,11 +228,12 @@ static void set_focus(uint32_t win) {
     xo_end(&X.out);
 }
 
-static void set_owner(uint32_t owner, uint32_t selection) {
+static void set_owner_at(uint32_t owner, uint32_t selection, uint32_t time) {
     req(X_SetSelectionOwner, 0);
-    xo_u32(&X.out, owner); xo_u32(&X.out, selection); xo_u32(&X.out, 0);
+    xo_u32(&X.out, owner); xo_u32(&X.out, selection); xo_u32(&X.out, time);
     xo_end(&X.out);
 }
+static void set_owner(uint32_t owner, uint32_t selection) { set_owner_at(owner, selection, 0); }
 
 static void convert(uint32_t selection, uint32_t target, uint32_t prop, uint32_t time) {
     req(X_ConvertSelection, 0);
@@ -636,19 +641,25 @@ static int lord_has(int k) {
 }
 
 /* LordOS's selection is offered to X only while an X window has the keyboard, and only if it is
- * newer than what an X app copied. */
+ * newer than what an X app copied.
+ * Taken and given up at the selection's last-change time as XFixes last told it, never at CurrentTime: the X server
+ * ignores the request when an X app took the selection since then (ICCCM). At CurrentTime, LordOS's offer that went
+ * out while the focus came back (after fullscreen, a second window) replaced an X app's copy made a moment before, and
+ * giving it up cleared that copy: the app pasted LordOS's older text, or nothing (the toolkit audit's gtk3-x11 and
+ * gtk4-x11 clipboard checks, docs/TOOLKIT-AUDIT.md). */
 static void clip_sync(void) {
     for (int k = 0; k < NSEL; k++) {
         Sel *s = &X.sel[k];
         unsigned g = lord_gen(k);
         if (X.focus && lord_has(k) && g != s->x_gen) {
             if (!s->owned || s->owned_gen != g) {
-                set_owner(X.wmwin, sel_atom(k));
+                set_owner_at(X.wmwin, sel_atom(k), s->changed);
                 s->owned = 1;
                 s->owned_gen = g;
+                if (X.debug) fprintf(stderr, "xwm: %s offered to X (LordOS's selection)\n", k ? "PRIMARY" : "CLIPBOARD");
             }
         } else if (s->owned && (!X.focus || !lord_has(k))) {
-            set_owner(0, sel_atom(k));
+            set_owner_at(0, sel_atom(k), s->changed);
             s->owned = 0;
         }
     }
@@ -742,9 +753,12 @@ static void sel_owner_changed(const uint8_t *p) {
     uint32_t owner = x11_get32(p + 8), selection = x11_get32(p + 12);
     if (selection == AT(XdndSelection)) { dnd_owner(owner); return; }
     int k = sel_index(selection);
-    if (k < 0 || owner == X.wmwin) return;
+    if (k < 0) return;
     Sel *s = &X.sel[k];
+    s->changed = x11_get32(p + 20);                         /* selection-timestamp: its last-change time */
+    if (owner == X.wmwin) return;
     s->owned = 0;
+    if (X.debug) fprintf(stderr, "xwm: %s owner 0x%x\n", k ? "PRIMARY" : "CLIPBOARD", owner);
     if (!owner) { s->x_gen = 0; return; }                  /* the X app that had it is gone */
     s->x_gen = lord_gen(k);
     sel_start(k, owner);
@@ -1893,6 +1907,60 @@ static void pictfmt_reply(const uint8_t *r, size_t n, uint32_t a, uint32_t b) {
     flush();
 }
 
+/* ---- XSETTINGS (xsettings.h): what GTK 3 on X11 reads for the theme, the title bar buttons, the font and icons ----
+ * The values come from the portal (ui/portal.c, portal_gtk_values, through js_wm.c) and are kept across Xwayland
+ * restarts; every change gets a new serial, and GTK, which watches the property, follows it live. */
+static struct { char theme[64], buttons[64], font[64], icons[64]; uint32_t serial; int set; } XS;
+
+static void xsettings_publish(void) {
+    if (!X.xswin || !XS.set) return;
+    XsString v[] = { { "Net/ThemeName", XS.theme }, { "Net/IconThemeName", XS.icons },
+                     { "Gtk/DecorationLayout", XS.buttons }, { "Gtk/FontName", XS.font } };
+    uint8_t buf[1024];
+    size_t n = xsettings_build(buf, sizeof buf, XS.serial, v, (int)(sizeof v / sizeof v[0]));
+    if (n) change_prop(X.xswin, AT(XSETTINGS_SETTINGS), AT(XSETTINGS_SETTINGS), 8, buf, (uint32_t)n);
+}
+
+void xwm_xsettings(const char *theme, const char *buttons, const char *font, const char *icons) {
+    char t[64], b[64], f[64], i[64];
+    snprintf(t, sizeof t, "%s", theme ? theme : "");
+    snprintf(b, sizeof b, "%s", buttons ? buttons : "");
+    snprintf(f, sizeof f, "%s", font ? font : "");
+    snprintf(i, sizeof i, "%s", icons ? icons : "");
+    if (XS.set && !strcmp(t, XS.theme) && !strcmp(b, XS.buttons) && !strcmp(f, XS.font) && !strcmp(i, XS.icons)) return;
+    memcpy(XS.theme, t, sizeof t); memcpy(XS.buttons, b, sizeof b); memcpy(XS.font, f, sizeof f); memcpy(XS.icons, i, sizeof i);
+    XS.serial++;
+    XS.set = 1;
+    if (X.fd >= 0 && X.ready) { xsettings_publish(); flush(); }
+}
+
+/* The settings manager: a window of its own owns _XSETTINGS_S0 (screen 0, Xwayland's only one) and holds the
+ * property, and a MANAGER message on the root tells the clients already running (the specification's handshake). */
+static void xsettings_start(void) {
+    uint32_t root = X.su.root;
+    X.xswin = new_id();
+    req(X_CreateWindow, 0);
+    xo_u32(&X.out, X.xswin); xo_u32(&X.out, root);
+    xo_u16(&X.out, (uint16_t)-100); xo_u16(&X.out, (uint16_t)-100); xo_u16(&X.out, 1); xo_u16(&X.out, 1);
+    xo_u16(&X.out, 0); xo_u16(&X.out, 2);                   /* InputOnly */
+    xo_u32(&X.out, 0);
+    xo_u32(&X.out, XCW_OverrideRedirect);
+    xo_u32(&X.out, 1);
+    xo_end(&X.out);
+    xsettings_publish();
+    set_owner(X.xswin, AT(XSETTINGS_S0));
+    uint8_t ev[32] = { X_ClientMessage, 32 };
+    put32(ev + 4, root);
+    put32(ev + 8, AT(MANAGER));
+    put32(ev + 12, 0);                                      /* CurrentTime */
+    put32(ev + 16, AT(XSETTINGS_S0));
+    put32(ev + 20, X.xswin);
+    req(X_SendEvent, 0);
+    xo_u32(&X.out, root); xo_u32(&X.out, XM_StructureNotify);
+    xo_bytes(&X.out, ev, 32);
+    xo_end(&X.out);
+}
+
 static void init_done(void) {
     uint32_t root = X.su.root;
     /* the window manager: every top-level window's map and configure requests come to us */
@@ -1968,6 +2036,7 @@ static void init_done(void) {
         xo_u32(&X.out, root); xo_u8(&X.out, 1); xo_pad(&X.out, 3);
         xo_end(&X.out);
     } else fprintf(stderr, "xwm: no Composite extension: X11 windows can't be shown\n");
+    xsettings_start();                      /* before WM_S0: the first X app already finds the settings */
     /* owning WM_S0 tells Xwayland the window manager is ready: only then it accepts X apps */
     set_owner(X.wmwin, AT(WM_S0));
     X.ready = 1;

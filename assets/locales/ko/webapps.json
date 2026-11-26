@@ -184,6 +184,7 @@
   "settings.iconTile": "LordOS 글자 타일(앱을 열 때 사이트 아이콘을 가져옴)",
   "settings.iconRefresh": "아이콘 새로 고침",
   "settings.iconRefreshing": "새로 고치는 중…",
+  "settings.iconUpdated": "사이트에서 아이콘을 업데이트했습니다",
   "sound.auto": "자동",
   "sound.app": "앱 소리",
   "sound.system": "LordOS 소리",

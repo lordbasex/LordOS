@@ -21,10 +21,12 @@
  * Every call is asynchronous: nothing here waits for another program. */
 #include "web.h"
 #include "webwin.h"
+#include "webcall.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/random.h>
 
 #define NOTIFY_NAME  "org.freedesktop.Notifications"
 #define NOTIFY_PATH  "/org/freedesktop/Notifications"
@@ -38,6 +40,12 @@
 typedef struct { guint32 id; WebKitNotification *n; char token[256]; } Note;
 static Note notes[MAX_NOTES];
 static Web *web;
+/* the notify: log line's tag hash (webpage_notify_line): keyed with this, picked at start and never written */
+static unsigned long long tag_salt;
+/* the last page notification WebKit withdrew (its tag's hash) and when: one with the same tag right after replaced it */
+#define REPLACE_MS 1000.0
+static char closed_tag[9];
+static double closed_ms = -1;
 
 static Note *note_by_id(guint32 id) {
     for (int i = 0; i < MAX_NOTES; i++) if (notes[i].id == id && notes[i].n) return &notes[i];
@@ -81,6 +89,7 @@ static void on_notify_signal(GDBusConnection *c, const char *sender, const char 
 void webbus_init(Web *w) {
     web = w;
     GError *e = NULL;
+    if (getrandom(&tag_salt, sizeof tag_salt, 0) != (ssize_t)sizeof tag_salt) tag_salt = (unsigned long long)g_get_monotonic_time() ^ (unsigned long long)getpid() << 32;
     w->bus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &e);
     if (!w->bus) {
         fprintf(stderr, "lord-web: no session bus (%s): no notifications, portals or permission dialogs\n", e ? e->message : "?");
@@ -96,6 +105,8 @@ typedef struct { WebKitNotification *n; int inspect; } NotifyCall;
 
 static void on_page_closed(WebKitNotification *n, gpointer d) {
     (void)d;
+    const char *tag = webkit_notification_get_tag(n);
+    if (tag && tag[0]) { webpage_tag_hash(tag, tag_salt, closed_tag); closed_ms = web_now_ms(); }
     for (int i = 0; i < MAX_NOTES; i++) if (notes[i].n == n) {
         if (web->bus) g_dbus_connection_call(web->bus, NOTIFY_NAME, NOTIFY_PATH, NOTIFY_NAME, "CloseNotification", g_variant_new("(u)", notes[i].id),
                                              NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, NULL, NULL);
@@ -152,8 +163,18 @@ void webbus_notify(Web *w, WebKitNotification *n) {
         const char *t = notes[i].n ? webkit_notification_get_tag(notes[i].n) : NULL;
         if (t && !strcmp(t, tag)) { replaces = notes[i].id; note_drop(&notes[i]); break; }
     }
-    /* WebKit 2.48 doesn't tell a notification's "silent" option: 0 */
+    /* WebKit (2.48 to 2.54) doesn't tell a notification's "silent" option: 0 */
     double now = web_now_ms();
+    /* one line in the app's log, without any of its text (webpage_notify_line); "replaced" also when WebKit withdrew
+     * the one with the same tag just before (it does so itself, before showing the new one) */
+    int replaced = replaces != 0;
+    if (!replaced && tag && tag[0] && closed_ms >= 0 && now - closed_ms <= REPLACE_MS) {
+        char h[9];
+        webpage_tag_hash(tag, tag_salt, h);
+        replaced = !strcmp(h, closed_tag);
+    }
+    char line[128];
+    if (webpage_notify_line(tag, tag_salt, -1, -1, replaced, line, sizeof line)) webcall_log_as("notify", line);
     int quiet = webpage_sound_suppress(w->app.notify_sound, w->state.own_sound, 0, w->audio_ms, now);
     if (!w->state.own_sound && webpage_sound_learns(w->app.notify_sound, now, w->audio_ms)) {
         w->state.own_sound = 1;                     /* the page started its sound just before: it has its own */

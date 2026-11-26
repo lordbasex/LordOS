@@ -394,6 +394,7 @@ typedef struct {
     size_t icon_len;
     int icon_kind;                  /* 1 PNG, 2 SVG */
     char icon_path[PATH_MAX];
+    char icon_error[48];            /* the last icon's code (web.probe.…) when none was usable, else "" */
 } Probe;
 
 static pthread_mutex_t pmu = PTHREAD_MUTEX_INITIALIZER;
@@ -469,6 +470,7 @@ static char *answer_json(const Probe *pr, const char *err) {
     put_str(out, cap, &o, "origin", pr->p.origin);
     put_str(out, cap, &o, "themeColor", pr->p.theme_color);
     put_str(out, cap, &o, "iconPath", pr->icon_path);
+    if (!pr->icon_path[0] && pr->icon_error[0]) put_str(out, cap, &o, "iconError", pr->icon_error);
     if (o + 2 < cap) { out[o++] = '}'; out[o] = 0; }
     return out;
 }
@@ -517,29 +519,44 @@ static void end_step(pid_t pid, int fd, int grace_ms) {
     }
 }
 
-/* The second step: lord-web --probe-icon with the icon the first one chose; its header line
- * {"ok":true,"type","size"} and then exactly size bytes. A bad or missing icon only means no icon. */
-static void probe_icon(Probe *pr, Rd *r, char *line) {
+/* The second step: lord-web --probe-icon with one of the icons the first one chose; its header line
+ * {"ok":true,"type","size"} and then exactly size bytes. 1 when it gave a PNG or an SVG (kept in pr), else 0 with the
+ * runtime's code (web.probe.…) in why, or "". */
+static int probe_icon_one(Probe *pr, const char *url, double deadline, Rd *r, char *line, char *why, size_t wn) {
     int fd = -1;
-    pid_t pid = start_step("--probe-icon", pr->p.icon_url, &fd);
-    if (pid < 0) return;
+    why[0] = 0;
+    pid_t pid = start_step("--probe-icon", url, &fd);
+    if (pid < 0) return 0;
     r->fd = fd;
     r->n = 0;
-    r->deadline = now_ms() + WEB_PROBE_MS;
+    r->deadline = deadline;
     size_t size = 0;
     int svg = 0, ok = 0;
-    char why[48];
     int l = rd_line(r, line, 4096);
-    int h = l >= 0 ? webreg_icon_header(line, (size_t)l, &size, &svg, why, sizeof why) : -1;
+    int h = l >= 0 ? webreg_icon_header(line, (size_t)l, &size, &svg, why, wn) : -1;
     if (h == 1 && (pr->icon = malloc(size))) {
         if (!rd_bytes(r, pr->icon, size) && webreg_icon_kind(pr->icon, size) == (svg ? 2 : 1)) {
             pr->icon_kind = svg ? 2 : 1;
             pr->icon_len = size;
             probe_icon_file(pr);
             ok = 1;
-        } else { free(pr->icon); pr->icon = NULL; }
-    } else if (h == 0) fprintf(stderr, "webapps: no icon from %s: %s\n", pr->p.icon_url, why[0] ? why : "refused");
+        } else { free(pr->icon); pr->icon = NULL; snprintf(why, wn, "web.probe.iconType"); }
+    } else if (h < 0 && !why[0]) snprintf(why, wn, "%s", now_ms() >= deadline ? "web.probe.timeout" : "web.probe.load");
     end_step(pid, fd, ok ? 1000 : 0);
+    return ok;
+}
+
+/* The icons the first step chose, best first, until one is a PNG or an SVG: a site may label a WebP "image/png", or
+ * serve its best icon from an address that fails. All of them share one step's time (WEB_PROBE_MS). The log gets one
+ * line per failure, with closed words only (the page's addresses never go there). */
+static void probe_icon(Probe *pr, Rd *r, char *line) {
+    double deadline = now_ms() + WEB_PROBE_MS;
+    char why[48] = "";
+    for (int i = 0; i < pr->p.icons && now_ms() < deadline; i++) {
+        if (probe_icon_one(pr, pr->p.icon_url[i], deadline, r, line, why, sizeof why)) { pr->icon_error[0] = 0; return; }
+        snprintf(pr->icon_error, sizeof pr->icon_error, "%s", webreg_probe_code_ok(why) ? why : "web.probe.load");
+        fprintf(stderr, "webapps: probe %d: icon %d of %d refused: %s\n", pr->id, i + 1, pr->p.icons, pr->icon_error);
+    }
 }
 
 static void *probe_thread(void *arg) {
@@ -561,7 +578,7 @@ static void *probe_thread(void *arg) {
     }
     end_step(pr.pid, pr.fd, err ? 0 : 1000);
     pr.fd = -1;
-    if (!err && r && line && pr.p.icon_url[0]) probe_icon(&pr, r, line);
+    if (!err && r && line && pr.p.icons) probe_icon(&pr, r, line);
     free(line);
     free(r);
     char *json = answer_json(&pr, err);

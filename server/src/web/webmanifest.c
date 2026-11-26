@@ -75,20 +75,25 @@ static void clean_token(const char *s, char out[64]) {
     memcpy(out, s, l + 1);
 }
 
-static int put_icons(Out *w, const JVal *list) {
-    int count = 0;
+/* the icons of list after the count already written, up to WEBMANIFEST_ICONS in all; the new count */
+static int put_icons(Out *w, const JVal *list, int count) {
     for (const JVal *i = list && list->type == J_ARR ? list->kid : NULL; i && count < WEBMANIFEST_ICONS; i = i->next) {
         const char *src = json_str(i, "src");
         if (!src || !weburl_app_ok(src)) continue;
-        char sizes[64], type[64];
+        char sizes[64], type[64], purpose[64];
         clean_token(json_str(i, "sizes"), sizes);
         clean_token(json_str(i, "type"), type);
+        clean_token(json_str(i, "purpose"), purpose);
         put(w, count ? ",{\"src\":" : "{\"src\":");
         putq(w, src);
         put(w, ",\"sizes\":");
         putq(w, sizes);
         put(w, ",\"type\":");
         putq(w, type);
+        if (purpose[0]) {
+            put(w, ",\"purpose\":");
+            putq(w, purpose);
+        }
         put(w, "}");
         count++;
     }
@@ -151,7 +156,8 @@ int webmanifest_answer(const char *doc_url, const char *page, size_t len, char *
     put(&w, ",\"themeColor\":");
     if (has_color) putq(&w, color); else put(&w, "null");
     put(&w, ",\"icons\":[");
-    if (!put_icons(&w, m ? json_get(m, "icons") : NULL)) put_icons(&w, json_get(root, "linkIcons"));
+    /* the manifest's first, then the page's own: lord-server ranks them and tries the best few (webreg_probe_parse) */
+    put_icons(&w, json_get(root, "linkIcons"), put_icons(&w, m ? json_get(m, "icons") : NULL, 0));
     put(&w, "],\"manifest\":");
     put(&w, m ? "true}" : "false}");
     json_free(&d);

@@ -466,6 +466,20 @@ static void test_env(void) {
         CHECK(tk_env(&o, combo("gtk3-wayland"), buf, sizeof buf, env, 48) > 0 && has_var(env, "GSETTINGS_BACKEND=keyfile"));
         o.env = in;
     }
+    /* Qt's platform theme: lord-server's (QGnomePlatform), or the caller's own when it is a plain plugin name */
+    CHECK(tk_env(&o, combo("qt6-wayland"), buf, sizeof buf, env, 48) > 0 && has_var(env, "QT_QPA_PLATFORMTHEME=gnome"));
+    {
+        char *in5[] = { "HOME=/home/x", rt, "WAYLAND_DISPLAY=wayland-1", "QT_QPA_PLATFORMTHEME=qt5ct", NULL };
+        char *in6[] = { "HOME=/home/x", rt, "WAYLAND_DISPLAY=wayland-1", "QT_QPA_PLATFORMTHEME=../../tmp/x", NULL };
+        char *in7[] = { "HOME=/home/x", rt, "WAYLAND_DISPLAY=wayland-1", "QT_QPA_PLATFORMTHEME=gtk3:qt5ct", NULL };
+        o.env = in5;
+        CHECK(tk_env(&o, combo("qt5-wayland"), buf, sizeof buf, env, 48) > 0 && has_var(env, "QT_QPA_PLATFORMTHEME=qt5ct"));
+        o.env = in6;
+        CHECK(tk_env(&o, combo("qt5-wayland"), buf, sizeof buf, env, 48) > 0 && has_var(env, "QT_QPA_PLATFORMTHEME=gnome"));
+        o.env = in7;
+        CHECK(tk_env(&o, combo("qt5-wayland"), buf, sizeof buf, env, 48) > 0 && has_var(env, "QT_QPA_PLATFORMTHEME=gnome"));
+        o.env = in;
+    }
     n = tk_env(&o, combo("qt5-xcb"), buf, sizeof buf, env, 48);
     CHECK(n > 0 && has_var(env, "DISPLAY=:7") && has_var(env, xa) && has_var(env, "QT_QPA_PLATFORM=xcb") && !has_key(env, "WAYLAND_DISPLAY"));
     n = tk_env(&o, combo("x11-xwayland"), buf, sizeof buf, env, 48);

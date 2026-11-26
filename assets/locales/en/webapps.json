@@ -186,6 +186,7 @@
   "settings.iconTile": "LordOS’s letter tile (the site’s icon is fetched when the app opens)",
   "settings.iconRefresh": "Refresh icon",
   "settings.iconRefreshing": "Refreshing…",
+  "settings.iconUpdated": "Icon updated from the site",
   "sound.auto": "Automatic",
   "sound.app": "The app’s",
   "sound.system": "LordOS’s",

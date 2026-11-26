@@ -49,7 +49,7 @@ export { useLauncherApps, launchApp, refreshApps, guestLauncherApps, isLinuxApp,
 export { APP_GROUPS, launcherGroup, groupApps, startView, groupRows, groupKey, keepSelection } from './appgroupsmodel.js';   // Lord Classic's start menu by category
 // Web apps (docs/WEBAPPS.md): the registry through lord.webapps, profiles, the probe, the permission questions
 export { webApps, useWebApps, refreshWebApps, webAppsAvailable, webAppEntry, webRunning, launchWebApp, probeWebApp, installWebApp, webAppCall, webAppOfWindow, webAppMemory, webEngine,
-  webBadges, siteIcons, wantSiteIcon, refreshSiteIcon, siteIconBusy, webDeveloper, setWebDeveloperMode, webSearchEngine, setWebSearchEngine } from './webapps.js';
+  webBadges, siteIcons, wantSiteIcon, refreshSiteIcon, siteIconBusy, siteIconStatus, webDeveloper, setWebDeveloperMode, webSearchEngine, setWebSearchEngine } from './webapps.js';
 export * as notifyTones from './notifytones.js';
 export * as webAppsModel from './webappsmodel.js';
 export * as flathubModel from './flathubmodel.js';

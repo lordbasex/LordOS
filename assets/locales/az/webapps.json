@@ -186,6 +186,7 @@
   "settings.iconTile": "LordOS hərf plitəsi (saytın ikonu tətbiq açılanda alınır)",
   "settings.iconRefresh": "İkonu yenilə",
   "settings.iconRefreshing": "Yenilənir…",
+  "settings.iconUpdated": "İkona saytdan yeniləndi",
   "sound.auto": "Avtomatik",
   "sound.app": "Tətbiqin",
   "sound.system": "LordOS-un",

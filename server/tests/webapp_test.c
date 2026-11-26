@@ -303,7 +303,14 @@ static void test_manifest(void) {
     CHECK(strstr(out, "\"ok\":true") && strstr(out, "\"name\":\"Chat App\"") && strstr(out, "\"startUrl\":\"https://web.example.com/app/?src=pwa\"")
           && strstr(out, "\"scope\":\"https://web.example.com/app/\"") && strstr(out, "\"origin\":\"https://web.example.com\"")
           && strstr(out, "\"themeColor\":\"#25d366\"") && strstr(out, "\"manifest\":true"), "fields: %s", out);
-    CHECK(strstr(out, "192.png") && strstr(out, "cdn.example.net/512.png") && !strstr(out, "data:") && !strstr(out, "favicon"), "icons: %s", out);
+    /* the manifest's icons, then the page's own after them (lord-server ranks them all) */
+    const char *i192 = strstr(out, "192.png"), *fav = strstr(out, "favicon.ico");
+    CHECK(i192 && strstr(out, "cdn.example.net/512.png") && !strstr(out, "data:") && fav && fav > i192, "icons: %s", out);
+    /* an icon's purpose goes along (cleaned like sizes and type) */
+    const char *purp = "{\"title\":\"P\",\"manifest\":{\"icons\":[{\"src\":\"https://p.example/m.svg\",\"type\":\"image/svg\",\"purpose\":\"maskable\"},"
+                       "{\"src\":\"https://p.example/x.png\",\"purpose\":\"any\\u0001\"}]}}";
+    CHECK(!webmanifest_answer("https://p.example/", purp, strlen(purp), out, sizeof out) && strstr(out, "\"type\":\"image/svg\",\"purpose\":\"maskable\"}")
+          && strstr(out, "x.png\",\"sizes\":\"\",\"type\":\"\"}"), "purpose: %s", out);
 
     /* a manifest pointing elsewhere: the page's own address and folder instead */
     const char *evil =
@@ -1379,6 +1386,26 @@ static void test_spellang(void) {
     CHECK(spellang_installed("/nonexistent-dir", NULL, 0) == 0, "no folder");
 }
 
+/* the notify: log line (webpage_notify_line): no text of the notification, the tag only as a keyed hash */
+static void test_notify_line(void) {
+    char out[128], a[9], b[9], c[9];
+    CHECK(webpage_notify_line("5491100000000@c.us", 42, -1, -1, 0, out, sizeof out) > 0, "line made");
+    CHECK(!strncmp(out, "page tag ", 9) && strlen(out) == strlen("page tag 00000000 silent unknown renotify unknown shown"), "shape: %s", out);
+    CHECK(!strstr(out, "549") && !strstr(out, "c.us"), "the tag itself never: %s", out);
+    for (const char *p = out + 9; p < out + 17; p++) CHECK((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f'), "8 hex digits: %s", out);
+    webpage_tag_hash("chat-1", 42, a);
+    webpage_tag_hash("chat-1", 42, b);
+    webpage_tag_hash("chat-1", 43, c);
+    CHECK(!strcmp(a, b), "the same tag and salt: the same hash");
+    CHECK(strcmp(a, c), "another salt (another run): another hash");
+    webpage_tag_hash("chat-2", 42, c);
+    CHECK(strcmp(a, c), "another tag: another hash");
+    CHECK(webpage_notify_line(NULL, 42, 1, 0, 1, out, sizeof out) && !strcmp(out, "page tag none silent yes renotify no replaced"), "no tag: %s", out);
+    CHECK(webpage_notify_line("", 42, 0, 1, 0, out, sizeof out) && !strcmp(out, "page tag none silent no renotify yes shown"), "empty tag: %s", out);
+    CHECK(!webpage_notify_line("t", 42, 0, 0, 0, out, 20) && !out[0], "too small: nothing");
+    CHECK(!webpage_notify_line("t", 42, 0, 0, 0, NULL, 0), "no buffer");
+}
+
 int main(void) {
     test_frame();
     test_guard();
@@ -1394,6 +1421,7 @@ int main(void) {
     test_scope_limits();
     test_user_agent();
     test_sound();
+    test_notify_line();
     test_drop();
     test_clip();
     test_registry_options();
