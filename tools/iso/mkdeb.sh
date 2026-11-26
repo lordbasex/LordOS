@@ -121,7 +121,7 @@ for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
          lord-stream:"libavcodec-dev libavformat-dev" lord-studio:"libavcodec-dev libavformat-dev" \
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
-         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-nvgpu:"" lord-appstream:"" \
+         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-nvgpu:"" lord-spell:"" lord-appstream:"" \
          lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lord-vmunpack:"" lord-pgpv:"" lord-llm:"" lordos-guest:""; do
     b=${h%%:*}; need=${h#*:}
     [ -x "server/build/$b" ] && continue
@@ -346,6 +346,10 @@ fi
 # lord-server starts it next to itself only while the GPU view is on screen (docs/MONITOR.md, "NVIDIA")
 [ -x server/build/lord-nvgpu ] && install -m 755 server/build/lord-nvgpu "$L/bin/lord-nvgpu"
 [ -x "$L/bin/lord-nvgpu" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-nvgpu" 2>/dev/null || true; }
+# lord-spell (approved 2026-11-26): the spell checker, the only program that loads Hunspell (dlopen'd from the system's
+# library folders), sandboxed; lord-server starts it next to itself with the dictionaries as descriptors (docs/SPELLING.md)
+[ -x server/build/lord-spell ] && install -m 755 server/build/lord-spell "$L/bin/lord-spell"
+[ -x "$L/bin/lord-spell" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-spell" 2>/dev/null || true; }
 # lord-vmunpack (0.8.9, approved 2026-11-23): unpacks a machine group's verified archive (Whonix's KVM disks) in its
 # sandbox, from descriptors lord-vm hands it (docs/VIRTUALIZATION.md 19.6); next to lord-vm, which starts it
 [ -x server/build/lord-vmunpack ] && install -m 755 server/build/lord-vmunpack "$L/bin/lord-vmunpack"
@@ -616,6 +620,8 @@ if [ -x "$L/bin/lord-doc" ]; then DOCDEPS=", libpoppler-glib8t64, libarchive13t6
 # (the "fast" data, ~2 MB each) are Recommends
 OCRDEPS=""; OCRRECS=""
 if [ -x "$L/bin/lord-ocr" ]; then OCRDEPS=", libtesseract5, tesseract-ocr-eng"; OCRRECS=", tesseract-ocr-spa, tesseract-ocr-por, tesseract-ocr-fra, tesseract-ocr-ita"; fi
+# the spell checker (docs/SPELLING.md): Hunspell's library for lord-spell and the images' three dictionaries
+[ -x "$L/bin/lord-spell" ] && OCRRECS="$OCRRECS, libhunspell-1.7-0, hunspell-en-us, hunspell-es, hunspell-pt-br"
 # lord-tts: Vulkan's loader (the GPU is optional, the CPU always works), OpenMP and the C++ runtime
 TTSDEPS=""
 if [ -x "$L/bin/lord-tts" ]; then TTSDEPS=", libvulkan1, libgomp1, libstdc++6"; fi

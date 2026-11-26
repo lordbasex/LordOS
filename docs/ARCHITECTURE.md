@@ -113,6 +113,7 @@ Besides the kernel and libc, only these are allowed:
 | Poppler (`libpoppler-glib`) and libarchive | PDF and archives (M9, approved by the user). **Only `lord-doc` links them**, the sandboxed helper; Poppler brings cairo, FreeType and fontconfig, which `lord-doc` also uses for font samples and for building PDFs. Never `lord-server` (`DOCUMENTS.md`) | system |
 | `clang` (build time only) | the BPF programs of `lord-netperm` (`np.bpf.c`, `clang -target bpf`); they are embedded in the binary. Without clang (`BPF=0`) the service runs without BPF. Neither libbpf nor bcc is used | build machine |
 | NVIDIA's NVML (`libnvidia-ml.so.1`, part of NVIDIA's proprietary driver; not shipped by LordOS) | Monitor → GPU's numbers for NVIDIA cards (in development, approved by the maintainer on 2026-11-24). **Only `lord-nvgpu` loads it** (`dlopen`, only from the fixed root-owned system library folders, `RTLD_NOW \| RTLD_LOCAL`), the sandboxed helper `server/src/monitor/nvgpu_main.c`; never linked into or loaded by `lord-server`, and `nvidia-smi` is never run (`MONITOR.md`, "NVIDIA") | system, when NVIDIA's driver is installed |
+| Hunspell (`libhunspell-1.7.so.0`, Debian's `libhunspell-1.7-0`) and its dictionaries (`hunspell-*`) | Spell checking in LordOS's own text fields (in development, approved by the maintainer on 2026-11-26). **Only `lord-spell` loads it** (`dlopen`, only from the fixed root-owned system library folders, `RTLD_NOW \| RTLD_LOCAL`), the sandboxed helper `server/src/spell/lordspell.c`; the dictionaries (`/usr/share/hunspell`) reach it as descriptors lord-server opened. Never linked into or loaded by `lord-server`. The images ship `hunspell-en-us`, `hunspell-es` and `hunspell-pt-br`; others install from Settings → Keyboard (`SPELLING.md`) | system |
 | Monocypher 4.0.2 | XChaCha20-Poly1305, Argon2id/Argon2d, BLAKE2b, ChaCha20 for the Passwords vault and the KeePass importer (approved by the user; CC0/BSD-2, one C file). **Only `lord-vault` links it**; its official test vectors run in `make test` (`PASSWORDS.md`) | vendored |
 | nanosvg (commit `239e102`) | SVG icons of Linux apps (0.8.8.8): the tray's symbolic icons and apps that only ship SVG, parsed and rasterized with hard limits on size, elements, nesting, shapes and points (approved by the maintainer on 2026-11-10; zlib, two headers, `third_party/nanosvg/README.md`). **Only `lord-media` links it**, in its sandbox, on an fd lord-server opened (`helper/lm_svg.c`, `MW_SVG`); never `lord-server` (`MEDIA.md`, "SVG icons") | vendored |
 | EFF word list, 10k common passwords | passphrase generator and the offline "breached" check (CC BY 3.0 US / MIT), embedded in `lord-vault` | `third_party/wordlists` |
@@ -218,6 +219,12 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
   engine (audio.cpp and ggml), each `lord-doc`'s helper loop built with its one library and the only binary that links
   it. Same rules as `lord-doc` (fixed path, no arguments, `sandbox_apply_helper`): `lord-ocr` gets the cropped pixels in
   a sealed memfd and reads only `/usr`; `lord-tts` gets the models folder as an fd. See `VOICE.md`.
+- **`lord-spell`** (in development, approved 2026-11-26): the spell checker. lord-server (`spell/spellsvc.c`) starts it
+  from the fixed path next to it with no arguments, an empty environment, a socketpair on fd 0 and the chosen
+  dictionaries' `.aff` and `.dic` (opened read-only from `/usr/share/hunspell`) on fds 3…; it dlopens Hunspell, loads
+  them, closes every other descriptor and applies `sandbox_apply_helper` before answering. Strict length-capped frames
+  both ways (`spell/spellproto.c`): words in, a verdict or at most 8 suggestions out. The person's dictionary is
+  written by lord-server, never by the helper. See `SPELLING.md`.
 - **`lord-say`** (0.8.8.6): reads text aloud for the desktop and is the `say` command. It holds no speech code and
   starts `lord-tts`; lord-server starts it from the fixed path next to it with fixed arguments, in its own process
   group, with the text on a sealed memfd, never in its arguments. See `VOICE.md`.

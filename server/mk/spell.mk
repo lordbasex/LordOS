@@ -18,16 +18,16 @@ all: build/lord-spell
 
 # Tests only, never installed: a helper that tries what its sandbox must refuse after loading (and answers only when
 # all of it was refused), and one that answers a check with a malformed frame.
-build/lord-spell-probe: $(LORD_SPELL_SRC) $(SPELL_HDR)
+build/lord-spellprobe-test: $(LORD_SPELL_SRC) $(SPELL_HDR)
 	$(CC) $(CPPFLAGS) -DSPELL_PROBE $(CFLAGS) $(WARN) -std=gnu11 -o $@ $(LORD_SPELL_SRC) -ldl -lpthread
 	chmod g-w $@
-build/lord-spell-evil: $(LORD_SPELL_SRC) $(SPELL_HDR)
+build/lord-spellevil-test: $(LORD_SPELL_SRC) $(SPELL_HDR)
 	$(CC) $(CPPFLAGS) -DSPELL_EVIL $(CFLAGS) $(WARN) -std=gnu11 -o $@ $(LORD_SPELL_SRC) -ldl -lpthread
 	chmod g-w $@
 # the frames' parser fuzzed (ASan, UBSan), the person's dictionary, and the service end to end with the real helper,
 # Hunspell and small dictionaries made by the test
 test: build/spell-test
 SPELL_TEST_SRC := tests/spell_proto_test.c src/spell/spellproto.c src/spell/spelldict.c src/spell/spellsvc.c src/spellang.c src/sec/json.c
-build/spell-test: $(SPELL_TEST_SRC) $(SPELL_HDR) build/lord-spell build/lord-spell-probe build/lord-spell-evil
+build/spell-test: $(SPELL_TEST_SRC) $(SPELL_HDR) build/lord-spell build/lord-spellprobe-test build/lord-spellevil-test
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -fsanitize=address,undefined -fno-sanitize-recover=undefined -o $@ $(SPELL_TEST_SRC) -lpthread
-	./$@ build/lord-spell build/lord-spell-probe build/lord-spell-evil || { rm -f $@; exit 1; }
+	./$@ build/lord-spell build/lord-spellprobe-test build/lord-spellevil-test || { rm -f $@; exit 1; }

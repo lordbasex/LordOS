@@ -1,7 +1,7 @@
 /* spell_proto_test.c — build/spell-test (make test; docs/SPELLING.md "Tests"): lord-spell's frames and the person's
  * dictionary, then the service end to end with the real helper, Hunspell and small dictionaries made here.
  *
- *   ./build/spell-test build/lord-spell build/lord-spell-probe build/lord-spell-evil
+ *   ./build/spell-test build/lord-spell build/lord-spellprobe-test build/lord-spellevil-test
  *
  * 1. Words and tags: what may be asked about and what may come back (control characters, spaces, punctuation, bad
  *    UTF-8, overlong forms, surrogates, too long).
@@ -9,7 +9,7 @@
  * 3. The person's dictionary file: comments, blank lines, duplicates, invalid words dropped; written and read back.
  * 4. The service with lord-spell: a UTF-8 and a Latin-1 dictionary, words checked in two languages, suggestions, words
  *    that are not words never sent, the person's dictionary written 0600; the sandbox refusing files, sockets and exec
- *    (lord-spell-probe answers only when all of it was refused); a helper whose answer is malformed is killed and the
+ *    (lord-spellprobe-test answers only when all of it was refused); a helper whose answer is malformed is killed and the
  *    job fails. Without libhunspell the end-to-end part prints "skipped: needs libhunspell". */
 #include "../src/spell/spellproto.h"
 #include "../src/spell/spellsvc.h"
