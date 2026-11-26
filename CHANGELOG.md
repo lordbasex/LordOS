@@ -11,6 +11,44 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Spell checking in LordOS's own text fields** (`lord-spell`, `server/src/spell/`, `sdk/spell.js`, `sdk/spellmodel.js`;
+  in development, approved by the maintainer on 2026-11-26; `docs/SPELLING.md`). Misspelled words get a wavy red
+  underline as you type in any `TextInput` or `TextArea`, Notes and Mail's body; a right click on one starts the
+  field's menu with up to 8 suggestions, **Add to dictionary** and **Ignore**.
+  - **`lord-spell`**, a new sandboxed helper, is the only program that loads Hunspell (`libhunspell-1.7.so.0`,
+    dlopen'd only from the root-owned system library folders); lord-server never links or loads it. lord-server opens
+    the chosen dictionaries (`/usr/share/hunspell`) and hands them over as descriptors; the helper loads them, closes
+    everything else and takes `sandbox_apply_helper` (no files, network, sockets or exec) before it reads a word.
+    Strict length-capped frames both ways (`spellproto.c`): up to 64 words of 64 bytes → one bit each, or one word →
+    at most 8 suggestions; a malformed frame or no answer in 4 s and it is killed. UTF-8 and Latin-1 dictionaries.
+  - **Which words:** links, addresses, paths, code, words with digits, abbreviations and one letter are left alone; a
+    word is checked only when a dictionary in use is written in its script, so Arabic or Hebrew text without a
+    dictionary stays clean; the word being typed waits until the caret leaves it; new words are asked about 350 ms
+    after the last key, in batches.
+  - **The line** is the engine's new `wavyColor` style (`paint.c` `paint_wavy`): a 3 px node per word painted as one
+    alpha mask, so a line coming or going damages only its own box (`build/engine-test`'s damage fuzz passes).
+  - **Opt-out:** `spellCheck={false}`; password fields are never checked; the search field and LordOS's address,
+    host, user, path, port, key and URL fields opt out. The Terminal and Text Editor are not checked.
+  - **Languages** (Settings → Keyboard → Spelling: languages): at most 4 installed dictionaries; with none chosen,
+    `server/src/spellang.h`'s rule shared with lord-web (copied unchanged from `feat/web-context-menu`): the
+    interface language with its region first, then English. **More languages** installs Debian 13's `hunspell-*`
+    dictionaries through `pkg-install` (a closed list of 28 packages). The images and the `lordos` package's
+    Recommends add `libhunspell-1.7-0`, `hunspell-en-us`, `hunspell-es` and `hunspell-pt-br`.
+  - **One personal dictionary with the web apps:** enchant's word lists (`~/.config/enchant/<tag>.dic`), the files
+    lord-web's WebKit learns into, written only by lord-server (0600, renamed into place, unknown lines kept).
+  - Tests: `build/spell-test` (parser fuzz of 400,000 payloads, ASan and UBSan, a sandbox probe build that answers only
+    when files, sockets and exec are refused, a malformed-answer build, the person's dictionary, the system's es_ES);
+    `server/tests/spell_model_test.mjs`; `server/tests/spell_scene` (headless screenshots in light and dark).
+- **✨ AI on selected text: Writing** (`server/src/llm/writing.c`, `sdk/writing.jsx`, `sdk/writingmodel.js`; in
+  development, approved by the maintainer on 2026-11-26; `docs/AI.md`, "Writing"). With text selected, the right-click
+  menu offers ✨ AI ▸ Correct spelling and grammar, Improve writing, Make it shorter and Translate to (a list of
+  languages). Off by default (Settings → AI → Writing, a new function card), shown only with a model installed; it uses
+  Sentinela's local llama-server in its sandbox, nothing goes online. It runs in the shell: the app only hands over
+  the selection and gets the final text back if the person clicks **Replace** in the panel, which shows the answer as
+  it streams, with **Copy** and **Discard**. The prompts are fixed in C per action, the text is fenced with a random
+  nonce, the answer is read strictly (chunked server-sent events, at most 16 KB) and shown as plain text. Never in a
+  password field; at most 4,000 characters. Tests: `build/llm-engine-test` (requests, streams, fuzz, a streamed job
+  through the fake engine, cancel), `server/tests/writing_model_test.mjs`, `spell_scene`.
 - **A "New desktop style" issue form for sharing a community theme** (`.github/ISSUE_TEMPLATE/new-desktop-style.yml`,
   from the lordos-theme-kit proposals, approved 2026-11-26). It has the sections the kit's `/lordos-theme publish`
   writes: name and id, description, version, licence and the LordOS release it was made for, screenshots (light, dark,

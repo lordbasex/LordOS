@@ -1133,6 +1133,19 @@
             "es": "Sí, con Voz personal en Ajustes → Inteligencia artificial → Voz (0.8.8.6). Te pide el consentimiento antes de grabar, comprueba que el ambiente esté lo bastante silencioso, y después leés seis frases cortas o hablás libremente de 15 a 30 segundos; alrededor de un minuto después tu voz puede leer en todos los idiomas. También podés partir de un archivo de audio (WAV, MP3, M4A, OGG, Opus o FLAC). La grabación queda en tu cuenta en este equipo y nunca se sube a ningún lado.",
             "pt": "Sim, com a Voz pessoal em Ajustes → Inteligência artificial → Voz (0.8.8.6). Ela pede seu consentimento antes de gravar, confere se o ambiente está silencioso o bastante, e depois você lê seis frases curtas ou fala livremente de 15 a 30 segundos; cerca de um minuto depois sua voz pode ler em todos os idiomas. Você também pode partir de um arquivo de áudio (WAV, MP3, M4A, OGG, Opus ou FLAC). A gravação fica na sua conta neste computador e nunca é enviada."
           }
+        },
+        {
+          "id": "spell-check",
+          "q": {
+            "en": "Does LordOS check spelling? Can AI fix my text?",
+            "es": "¿LordOS corrige la ortografía? ¿La IA puede arreglar mi texto?",
+            "pt": "O LordOS corrige a ortografia? A IA pode corrigir meu texto?"
+          },
+          "a": {
+            "en": "In development (the latest release is 0.8.9.6.1): LordOS's own text fields underline misspelled words with a wavy red line, and a right click offers suggestions, Add to dictionary and Ignore. It checks on your computer with Hunspell in a sandboxed helper (lord-spell), in your interface language and English by default (Settings → Keyboard), and shares your dictionary with the web apps. With text selected, ✨ AI can correct, improve, shorten or translate it with the local model, off by default (Settings → AI → Writing): the answer appears in a panel and your text changes only when you click Replace. Nothing goes online, and neither is offered in password fields.",
+            "es": "En desarrollo (la última versión es la 0.8.9.6.1): los campos de texto propios de LordOS subrayan las palabras mal escritas con una línea roja ondulada, y el clic derecho ofrece sugerencias, Agregar al diccionario e Ignorar. Se revisa en tu computadora con Hunspell dentro de un ayudante aislado (lord-spell), en el idioma de la interfaz e inglés por defecto (Ajustes → Teclado), y tu diccionario es el mismo que usan las apps web. Con texto seleccionado, ✨ IA puede corregirlo, mejorarlo, acortarlo o traducirlo con el modelo local, apagada por defecto (Ajustes → IA → Escritura): la respuesta aparece en un panel y tu texto cambia solo cuando hacés clic en Reemplazar. Nada sale a internet, y ninguna de las dos se ofrece en campos de contraseña.",
+            "pt": "Em desenvolvimento (a versão mais recente é a 0.8.9.6.1): os campos de texto do próprio LordOS sublinham as palavras com erro com uma linha vermelha ondulada, e o clique direito oferece sugestões, Adicionar ao dicionário e Ignorar. A verificação é feita no seu computador com o Hunspell em um auxiliar isolado (lord-spell), no idioma da interface e em inglês por padrão (Ajustes → Teclado), e o seu dicionário é o mesmo dos apps web. Com texto selecionado, ✨ IA pode corrigir, melhorar, encurtar ou traduzir com o modelo local, desligada por padrão (Ajustes → IA → Escrita): a resposta aparece em um painel e o seu texto só muda quando você clica em Substituir. Nada vai para a internet, e nenhuma das duas é oferecida em campos de senha."
+          }
         }
       ]
     },
