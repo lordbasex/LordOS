@@ -20,6 +20,7 @@
  *   sendFile(id, path[, { open }]) → request id: a dropped file into the guest's Downloads (guest agent); with open, the
  *             guest tools then open it there (Files' "Open with", 7.3); files(id) → how they went */
 #include "js_vm.h"
+#include "js.h"
 #include "js_secret.h"
 #include "../media/media_int.h"
 #include "../media/aring.h"
@@ -32,6 +33,7 @@
 #include "../vm/vm_admin.h"
 #include "../vm/vmthumb.h"
 #include "../vm/vmops.h"
+#include "../vm/vmlistcache.h"
 #include "../vm/logclean.h"
 #include "../vm/vmagent.h"
 #include "../vm/vmrecv.h"
@@ -396,6 +398,23 @@ static JSValue f_gpus(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 
 /* ---- the library ---- */
 
+/* lord.vm.list's cache, and the library's change events (vm/vmlistcache.h) */
+static VmListCache lcache = { .fd = -1, .dirty = 1 };
+static double lc_now(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
+}
+/* an active machine's lord-vm is still there (run_state's own check) */
+static int lc_alive(long pid) {
+    char cp[64], comm[32] = "";
+    snprintf(cp, sizeof cp, "/proc/%ld/comm", pid);
+    int cf = pid > 0 ? open(cp, O_RDONLY | O_CLOEXEC) : -1;
+    ssize_t k = cf >= 0 ? read(cf, comm, sizeof comm - 1) : -1;
+    if (cf >= 0) close(cf);
+    return k > 0 && !strncmp(comm, "lord-vm", 7);
+}
+
 /* run.json, read as lord-vm writes it; a state that says "active" with no lord-vm behind it is a machine whose
  * supervisor died: lord-vm recovers it at the next start, the list says so now */
 static void run_state(const char *dir, JSContext *c, JSValue o) {
@@ -430,7 +449,7 @@ static void run_state(const char *dir, JSContext *c, JSValue o) {
                 if (cf >= 0) close(cf);
                 if (k > 0) comm[k] = 0;
                 if (k <= 0 || strncmp(comm, "lord-vm", 7)) { snprintf(st, sizeof st, "stopped"); snprintf(rs, sizeof rs, "supervisor-lost"); }
-                else set_int(c, o, "vmPid", pid);     /* its lord-vm: a group's link is made again when it changes (19.3) */
+                else { set_int(c, o, "vmPid", pid); vmlc_pid(&lcache, pid); }   /* its lord-vm: a group's link is made again when it changes (19.3) */
             }
             json_free(&d);
         }
@@ -526,33 +545,12 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         set_str(c, o, "diskFormat", m.raw ? "raw" : "qcow2");
         JS_SetPropertyStr(c, o, "backup", JS_NewBool(c, !m.no_backup));
         {
-            /* the UEFI code this machine was made with is no longer the system's (3.6): it starts with its kept copy */
-            char sum[65];
+            /* the UEFI code this machine was made with is no longer the system's (3.6): it starts with its kept copy.
+             * Each system file is hashed once per version (vmlistcache.c), never once per machine and list */
             int changed = 0;
             if (m.firmware == VM_FW_UEFI) {
-                int ffd = open(m.firmware_code, O_RDONLY | O_CLOEXEC);
-                struct stat fst;
-                /* hashing 4 MB on every list would cost: the kept copy's presence and the system file's size and time
-                 * are cached per machine id in a tiny table */
-                static struct { char id[37]; long long size, mtime; int changed; } fwc[16];
-                if (ffd >= 0 && !fstat(ffd, &fst)) {
-                    int hit = -1;
-                    for (int q = 0; q < 16; q++) if (!strcmp(fwc[q].id, m.id)) hit = q;
-                    if (hit >= 0 && fwc[hit].size == (long long)fst.st_size && fwc[hit].mtime == (long long)fst.st_mtime) changed = fwc[hit].changed;
-                    else {
-                        Sha256 h;
-                        uint8_t dg[32], buf[65536];
-                        ssize_t r;
-                        sha256_init(&h);
-                        while ((r = read(ffd, buf, sizeof buf)) > 0) sha256_update(&h, buf, (size_t)r);
-                        sha256_final(&h, dg);
-                        for (int q = 0; q < 32; q++) snprintf(sum + 2 * q, 3, "%02x", dg[q]);
-                        changed = strcmp(sum, m.firmware_sha256) != 0;
-                        int slot = hit >= 0 ? hit : (int)(m.id[0] % 16);
-                        snprintf(fwc[slot].id, sizeof fwc[slot].id, "%s", m.id);
-                        fwc[slot].size = (long long)fst.st_size; fwc[slot].mtime = (long long)fst.st_mtime; fwc[slot].changed = changed;
-                    }
-                }
+                int ffd = open(m.firmware_code, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+                changed = vmlc_firmware_changed(ffd, m.firmware_sha256) == 1;
                 if (ffd >= 0) close(ffd);
             }
             JS_SetPropertyStr(c, o, "firmwareChanged", JS_NewBool(c, changed));
@@ -673,12 +671,9 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
     return o;
 }
 
-static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc; (void)argv;
-    reap_orphans();
+/* the library read now (lcache's watches set on the way: each folder before it is read) */
+static JSValue list_read(JSContext *c, const char *lib) {
     JSValue arr = JS_NewArray(c);
-    char lib[PATH_MAX];
-    if (library(lib, sizeof lib, 0)) return arr;
     DIR *d = opendir(lib);
     if (!d) return arr;
     uint32_t n = 0;
@@ -693,12 +688,16 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             char gdir[PATH_MAX + 260];
             VmGroup g;
             snprintf(gdir, sizeof gdir, "%s/%s", lib, e->d_name);
-            if (lstat(gdir, &st) || !S_ISDIR(st.st_mode) || !vm_group_dir_ok(gdir) || vm_group_load(gdir, &g, NULL, 0)) continue;
+            if (lstat(gdir, &st) || !S_ISDIR(st.st_mode)) continue;
+            vmlc_watch(&lcache, gdir);
+            if (!vm_group_dir_ok(gdir) || vm_group_load(gdir, &g, NULL, 0)) continue;
             for (int i = 0; i < g.n && n < 256; i++) {
                 char mj[PATH_MAX + 540];
                 snprintf(dir, sizeof dir, "%s/%s", gdir, g.m[i].dir);
                 snprintf(mj, sizeof mj, "%s/machine.json", dir);
-                if (lstat(dir, &st) || !S_ISDIR(st.st_mode) || access(mj, F_OK)) continue;
+                if (lstat(dir, &st) || !S_ISDIR(st.st_mode)) continue;
+                vmlc_watch(&lcache, dir);
+                if (access(mj, F_OK)) continue;
                 char folder[VMG_DIR_MAX + 1];
                 snprintf(folder, sizeof folder, "%.*s", (int)(strlen(g.m[i].dir) - 7), g.m[i].dir);
                 JSValue o = list_one(c, dir, folder, gdir, &g, i, &gvt_running);
@@ -709,6 +708,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         if (e->d_name[0] == '.' || l < 8 || strcmp(e->d_name + l - 7, ".lordvm")) continue;
         snprintf(dir, sizeof dir, "%s/%s", lib, e->d_name);
         if (lstat(dir, &st) || !S_ISDIR(st.st_mode)) continue;
+        vmlc_watch(&lcache, dir);
         char mj[PATH_MAX + 540];
         snprintf(mj, sizeof mj, "%s/machine.json", dir);
         if (access(mj, F_OK)) continue;          /* being created (lord-vm --create writes it last) */
@@ -721,6 +721,53 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     gvt_freq(gvt_running > 0);
     return arr;
 }
+
+/* list() → the library's machines (list_one each). Given from lcache while nothing changed (docs/VIRTUALIZATION.md,
+ * "The list's cache"): a JSON parse of the kept list, well under a millisecond, where reading the folders costs a few
+ * hundred microseconds per machine. A new array each time: the callers add their own fields to its objects */
+static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    reap_orphans();
+    char lib[PATH_MAX];
+    if (library(lib, sizeof lib, 0)) return JS_NewArray(c);
+    size_t len = 0;
+    const char *kept = vmlc_get(&lcache, lib, lc_now(), lc_alive, &len);
+    if (kept) {
+        JSValue v = JS_ParseJSON(c, kept, len, "<vm.list>");
+        if (!JS_IsException(v)) return v;
+        JS_FreeValue(c, JS_GetException(c));
+    }
+    vmlc_begin(&lcache, lib);
+    JSValue arr = list_read(c, lib);
+    JSValue js = JS_JSONStringify(c, arr, JS_UNDEFINED, JS_UNDEFINED);
+    size_t jl = 0;
+    const char *j = JS_IsString(js) ? JS_ToCStringLen(c, &jl, js) : NULL;
+    if (j) { vmlc_store(&lcache, j, jl, lc_now()); JS_FreeCString(c, j); }
+    else JS_FreeValue(c, JS_GetException(c));
+    JS_FreeValue(c, js);
+    return arr;
+}
+
+/* listVersion() → a number that moves when the library changed (an event that matters, a list that differs);
+ * listWatch() → 1 when lord-server watches the library (then __lordVm('library') comes with every change and the shell
+ * reads the list only then: sdk/vmlibrary.js), 0 when there is no library (~/Machines not made yet), -1 when it can't
+ * watch it (no inotify watch left): the shell reads it now and then */
+static JSValue f_list_version(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    vmlc_drain(&lcache);
+    return JS_NewFloat64(c, (double)lcache.gen);
+}
+static JSValue f_list_watch(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    char lib[PATH_MAX];
+    if (library(lib, sizeof lib, 0)) return JS_NewInt32(c, 0);
+    if (strcmp(lcache.lib, lib) || lcache.fd < 0 || lcache.broken) {
+        vmlc_begin(&lcache, lib);
+        lcache.dirty = 1;                   /* watched now, nothing kept yet */
+    }
+    return JS_NewInt32(c, lcache.fd >= 0 && !lcache.broken ? 1 : -1);
+}
+
 
 /* groups() → [{ dir, id, name, kind, members: [{ role, dir, start, stop, primary }], disposable, freshGateway, release,
  * error }]: the library's machine groups (docs/VIRTUALIZATION.md 19.2), read with vm_group_load; error "newer" or
@@ -4049,10 +4096,15 @@ static void ack(Sess *s) {
  * for the Machines app's poll every 16 ms, and the acknowledgement came at the poll after the next one: a guest
  * drawing 60 frames a second was shown at 31 (docs/MACHINES-GPU.md, Part 1). A 3D picture's dmabuf waiting for its
  * fence is polled too (it becomes readable when the GPU is done with it). */
-static int vm_poll_sess[2 * MAX_SESS];
+static int vm_poll_sess[2 * MAX_SESS + 1];
 
 int js_vm_pollfds(struct pollfd *p, int max) {
     int n = 0;
+    /* the library's watches (lcache): a change is the shell's __lordVm('library') */
+    if (lcache.fd >= 0 && n < max) {
+        vm_poll_sess[n] = -1;
+        p[n++] = (struct pollfd){ lcache.fd, POLLIN, 0 };
+    }
     for (int i = 0; i < MAX_SESS && n < max; i++) {
         Sess *s = &sess[i];
         if (!s->used || s->vd < 0) continue;
@@ -4073,8 +4125,12 @@ int js_vm_pollfds(struct pollfd *p, int max) {
 
 void js_vm_dispatch(const struct pollfd *p, int n) {
     int done[MAX_SESS] = { 0 };
-    for (int k = 0; k < n && k < 2 * MAX_SESS; k++) {
+    for (int k = 0; k < n && k < 2 * MAX_SESS + 1; k++) {
         int i = vm_poll_sess[k];
+        if (i < 0) {
+            if (p[k].revents && vmlc_drain(&lcache)) js_vm_library_event();
+            continue;
+        }
         if (!p[k].revents || done[i]) continue;
         Sess *s = &sess[i];
         if (!s->used || s->vd < 0) continue;
@@ -6513,7 +6569,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("keyState", 2, f_key_state), JS_CFUNC_DEF("keyNew", 1, f_key_new), JS_CFUNC_DEF("keyCopy", 1, f_key_copy),
     JS_CFUNC_DEF("keyEnter", 3, f_key_enter), JS_CFUNC_DEF("export", 2, f_export), JS_CFUNC_DEF("exportInfo", 1, f_export_info),
     JS_CFUNC_DEF("importExport", 1, f_import_export),
-    JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("groups", 0, f_groups), JS_CFUNC_DEF("link", 2, f_link), JS_CFUNC_DEF("groupCreate", 1, f_group_create), JS_CFUNC_DEF("groupFresh", 2, f_group_fresh), JS_CFUNC_DEF("groupSet", 2, f_group_set), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
+    JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("listVersion", 0, f_list_version), JS_CFUNC_DEF("listWatch", 0, f_list_watch), JS_CFUNC_DEF("groups", 0, f_groups), JS_CFUNC_DEF("link", 2, f_link), JS_CFUNC_DEF("groupCreate", 1, f_group_create), JS_CFUNC_DEF("groupFresh", 2, f_group_fresh), JS_CFUNC_DEF("groupSet", 2, f_group_set), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("groupDelete", 1, f_group_delete), JS_CFUNC_DEF("groupRename", 2, f_group_rename), JS_CFUNC_DEF("groupRenamePlan", 2, f_group_rename_plan), JS_CFUNC_DEF("groupRepair", 1, f_group_repair),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),

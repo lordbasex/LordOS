@@ -80,8 +80,8 @@ else
 WEB_BACK_SRC := src/web/webback_legacy.c src/web/webshm.c
 endif
 WEB_SRC := src/web/webmain.c src/web/webengine.c src/web/webwin.c $(WEB_BACK_SRC) src/web/webbus.c src/web/webtray.c src/web/webprobe.c \
-           src/web/weblang.c src/web/webxfer.c src/web/webselect.c src/web/webdark.c src/web/webproxy.c src/web/webhints.c src/web/webcalls.c src/web/webmenu.c src/web/webhang.c $(WEB_PURE_SRC) src/sec/cgroup.c src/sec/sandbox.c
-WEB_HDR := src/web/web.h src/web/webwin.h src/web/webback.h src/web/webshm.h $(WEB_PURE_HDR) src/sec/cgroup.h src/sec/sandbox.h
+           src/web/weblang.c src/web/webxfer.c src/web/webselect.c src/web/webdark.c src/web/webproxy.c src/web/webhints.c src/web/webcalls.c src/web/webmenu.c src/web/webhang.c $(WEB_PURE_SRC) src/sec/cgroup.c src/sec/sandbox.c src/lordlog.c
+WEB_HDR := src/web/web.h src/web/webwin.h src/web/webback.h src/web/webshm.h $(WEB_PURE_HDR) src/sec/cgroup.h src/sec/sandbox.h src/lordlog.h
 
 # WebKit's headers are not ours: -isystem, so -Wall -Wextra apply to lord-web's own code only
 WEB_CFLAGS := $(patsubst -I%,-isystem %,$(shell pkg-config --cflags $(WEB_PKGS)))

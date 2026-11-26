@@ -38,12 +38,15 @@ typedef struct {
     int in_flight_urgent;    /* the ping in flight has the urgent wait */
     int want_urgent;         /* the person asked for the app: ping now, with the urgent wait */
     int misses;              /* periodic pings not answered, in a row */
+    double quiet_since;      /* when the oldest ping still not answered went (0: every ping was answered) */
+    double hung_for;         /* set with a HUNG verdict: ms from that ping to the verdict (the log's "for N.N s") */
 } WebWatch;
 
 enum { WEBWATCH_WAIT = 0, WEBWATCH_PING = 1, WEBWATCH_HUNG = 2 };
 
 void webwatch_init(WebWatch *w, WebWatchLimits lim, double now);
-/* What to do now: WAIT, PING (send one, then webwatch_sent) or HUNG (restart it: the watch starts over by itself). */
+/* What to do now: WAIT, PING (send one, then webwatch_sent) or HUNG (restart it: the watch starts over by itself, with
+ * hung_for saying how long it had been silent). */
 int  webwatch_step(WebWatch *w, double now);
 void webwatch_sent(WebWatch *w, uint32_t serial, double now);
 /* The answer to the ping in flight (any answer: lord-web said it is there). 1 if serial was that ping. */

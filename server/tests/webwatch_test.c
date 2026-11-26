@@ -2,8 +2,9 @@
  * after the start, an answer clears the misses, two periodic misses in a row are a hang but one isn't, an urgent ping
  * (the person asked for the app) is a hang after one short wait, nothing is decided in the start's grace, a ping already
  * in flight becomes urgent, "nobody owns the name" counts at once after the grace and not during it, a late answer is
- * ignored, the watcher's own stall restarts the wait, and webwatch_next says when the next step matters. Both limit
- * sets (lord-server's of a process, lord-web's of a page).
+ * ignored, the watcher's own stall restarts the wait, webwatch_next says when the next step matters, and a verdict says
+ * how long it had been silent (hung_for, from the first ping not answered). Both limit sets (lord-server's of a process,
+ * lord-web's of a page).
  *
  *   make -C server build/webwatch-test        (also in `make test`) */
 #include "../src/web/webwatch.h"
@@ -165,7 +166,44 @@ static void test_stall(void) {
     CHECK(w.started >= 10000 - WEBWATCH_STALL_MS - 1, "the grace moved: %g", w.started);
 }
 
+/* how long it was silent at the verdict: from the first ping not answered, an answer starting it over */
+static void test_hung_for(void) {
+    WebWatchLimits L = WEBWATCH_PAGE;
+    WebWatch w;
+    webwatch_init(&w, L, 0);
+    double t = L.grace + 10;
+    w.last_step = t;
+    w.last_ping = t - L.period;
+    CHECK(webwatch_step(&w, t) == WEBWATCH_PING, "hung_for: due");
+    webwatch_sent(&w, 40, t);
+    CHECK(webwatch_answer(&w, 40, t + 20) && w.quiet_since == 0, "an answer: not silent");
+    double first = 0;
+    int r = WEBWATCH_WAIT;
+    for (t += 100; t < L.grace + 10 * L.period && r != WEBWATCH_HUNG; t += 100) {
+        r = webwatch_step(&w, t);
+        if (r == WEBWATCH_PING) { webwatch_sent(&w, 41, t); if (!first) first = t; }
+    }
+    t -= 100;
+    CHECK(r == WEBWATCH_HUNG, "hung_for: hung");
+    CHECK(first > 0 && w.hung_for > 0 && w.hung_for >= t - first - 1 && w.hung_for <= t - first + 1,
+          "silent from the first ping not answered: %g ms (first %g, verdict %g)", w.hung_for, first, t);
+    CHECK(w.hung_for >= L.period + L.wait - 200, "two misses are at least a period and a wait: %g", w.hung_for);
+    CHECK(w.quiet_since == 0 && w.sent == 0, "the new watch starts quiet");
+    /* the watcher's own stall doesn't count as their silence */
+    webwatch_init(&w, L, 0);
+    t = L.grace + 10;
+    w.last_step = t;
+    webwatch_urgent(&w);
+    CHECK(webwatch_step(&w, t) == WEBWATCH_PING, "hung_for: urgent ping");
+    webwatch_sent(&w, 42, t);
+    t += 60000;
+    CHECK(webwatch_step(&w, t) == WEBWATCH_WAIT, "a stall waits again");
+    for (; webwatch_step(&w, t) != WEBWATCH_HUNG && t < 200000; t += 100) {}
+    CHECK(w.hung_for > L.urgent - 200 && w.hung_for < L.urgent + 3000, "the stall left out: %g ms", w.hung_for);
+}
+
 int main(void) {
+    test_hung_for();
     test_limits("process", WEBWATCH_PROCESS);
     test_limits("page", WEBWATCH_PAGE);
     test_absent();

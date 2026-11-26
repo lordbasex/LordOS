@@ -18,6 +18,7 @@ int webwatch_step(WebWatch *w, double now) {
     if (gap > WEBWATCH_STALL_MS) {
         /* the watcher didn't run: what it waited for waits again, the grace included */
         if (w->sent > 0) w->sent += gap;
+        if (w->quiet_since > 0) w->quiet_since += gap;
         w->last_ping += gap;
         if (now - gap - w->started < w->lim.grace) w->started += gap;
     }
@@ -32,7 +33,9 @@ int webwatch_step(WebWatch *w, double now) {
         if (now - w->started < w->lim.grace) { w->misses = 0; return WEBWATCH_WAIT; }
         w->misses++;
         if (urgent || w->misses >= w->lim.misses) {
+            double quiet = w->quiet_since > 0 ? now - w->quiet_since : 0;
             webwatch_init(w, w->lim, now);
+            w->hung_for = quiet;
             return WEBWATCH_HUNG;
         }
     }
@@ -42,6 +45,7 @@ int webwatch_step(WebWatch *w, double now) {
 
 void webwatch_sent(WebWatch *w, uint32_t serial, double now) {
     w->sent = now > 0 ? now : 1e-3;
+    if (!(w->quiet_since > 0)) w->quiet_since = w->sent;
     w->serial = serial ? serial : 1;
     w->last_ping = now;
     w->in_flight_urgent = w->want_urgent;
@@ -55,6 +59,7 @@ int webwatch_answer(WebWatch *w, uint32_t serial, double now) {
     w->serial = 0;
     w->in_flight_urgent = 0;
     w->misses = 0;
+    w->quiet_since = 0;
     return 1;
 }
 

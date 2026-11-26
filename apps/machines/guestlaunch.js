@@ -6,7 +6,7 @@
 // budget, a bridged network's or a vGPU's preparation), turn apps mode on and, once the guest's own fresh list holds that
 // exact token, launch it there (launchGuest: lord.vm.launch sends nothing but a token the guest listed). Nothing on this
 // computer runs a guest's token or name.
-import { createStore, guestLauncherApps, guestLauncherItems, cleanGuestApps, sameGuestApps, appsOff } from '@lordos/sdk';
+import { createStore, guestLauncherApps, guestLauncherItems, cleanGuestApps, sameGuestApps, appsOff, vmMachines } from '@lordos/sdk';
 import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
 import { stateView, unreadableOf, saveDelay } from './model.js';
 
@@ -43,11 +43,12 @@ let opener = null;           // library.jsx's openMachine, given at the start (n
 const keyOf = (l) => l.map((a) => `${a.id}\t${a.name}\t${a.machine}`).join('\n');
 let lastKey = '';
 
+// from the shell's list (sdk/vmlibrary.js vmMachines), never a list of its own: read again only when the library changed
+// (apps mode's saved list is app.json in the machine's folder, a change too)
 export function refreshGuestLauncher() {
   let items = [];
   if (has() && !appsOff().includes('machines')) {
-    let list = [];
-    try { list = lord.vm.list() || []; } catch (e) { list = []; }
+    const list = vmMachines.get();
     items = guestLauncherItems(list, readMeta, {
       active: (m) => stateView(m.state, m.reason).active,
       locked: (m) => !!unreadableOf(m) || isProtectedMachine(m.dir, m),
@@ -72,10 +73,10 @@ export function launchFromLauncher(it) {
 
 export const dropLaunchAsk = (dir) => launchAsks.set((x) => { if (!x[dir]) return x; const n = { ...x }; delete n[dir]; return n; });
 
-let timer = null;
+let unsub = null;
 export function startGuestLauncher(openMachine) {
   opener = openMachine;
-  if (timer) return;
+  if (unsub) return;
   refreshGuestLauncher();
-  timer = setInterval(refreshGuestLauncher, 3000);
+  unsub = vmMachines.subscribe(refreshGuestLauncher);
 }

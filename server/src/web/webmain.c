@@ -23,6 +23,7 @@
 #include "../sec/cgroup.h"
 #include "../ui/webicon.h"
 #include "../sec/sandbox.h"
+#include "../lordlog.h"
 
 #include <errno.h>
 #include <execinfo.h>
@@ -436,6 +437,15 @@ int main(int argc, char **argv) {
     static Web web;
     Web *w = &web;
     if (webargs_parse(argc, argv, &w->args) == WEBARGS_BAD) { usage(); return 2; }
+    {
+        /* its log (web/<app>-<profile>.log or web/probe.log, opened by webmgr.c as this stderr) gets a time, a level and
+         * a subsystem on every line, WebKit's processes' lines too: a lord-log child stamps them (lordlog.h). Before any
+         * thread; a stderr that isn't that file (a terminal) is left as it is */
+        char name[2 * WEBREG_ID_MAX + 2];
+        if (w->args.mode == WEBARGS_APP) snprintf(name, sizeof name, "%s-%s", w->args.app, w->args.profile);
+        else snprintf(name, sizeof name, "probe");
+        lordlog_stamp_start("web", name, "webkit");
+    }
     w->server_pid = getppid();          /* lord-server forks and execs lord-web itself (web/webmgr.c) */
     if (clean_env()) return 2;
     const char *home = getenv("HOME");

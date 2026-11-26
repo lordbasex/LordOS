@@ -18,8 +18,9 @@
  * Lines that LordOS writes itself carry a timestamp, a level and a subsystem:
  *     2026-11-11T12:43:56.123-03:00 INFO  xwayland: started on :0
  * They are stamped by a small "lord-log" process that reads the program's stderr through a pipe, so a
- * crash loses nothing that was already written. Output of other programs (a Linux app, Xwayland,
- * rclone, WebKit) is theirs, written as is, between stamped start lines.
+ * crash loses nothing that was already written. lord-web's log is stamped the same way, WebKit's
+ * own lines in it included (lordlog_stamp_start). Output of other programs (a Linux app, Xwayland,
+ * rclone) is theirs, written as is, between stamped start lines.
  *
  * Rotation: /etc/logrotate.d/lordos rotates only the root daemons' files directly in /var/log/lordos
  * (daily, 7 copies, compressed, copytruncate). Root never rotates inside users/<user>: logrotate works
@@ -112,5 +113,12 @@ int lordlog_journal_fd(void);
  * them) and checks the cap after every MB, so an app writing in a loop can't grow the file past
  * about LORDLOG_CAP + 1 MB between the minute's scans. 0, or -1 (nothing changed). */
 int lordlog_app_start(const char *sub, const char *name);
+
+/* The same for a program of ours whose stderr is <dir>/<sub>/<name>.log (lord-web: web/<app>-<profile>.log, opened by
+ * webmgr.c), before any thread starts: the lord-log child stamps each line (time, level, subsystem) instead of copying
+ * it, "lord-web: …" as lord-web's and the lines of the programs it starts (WebKit's processes, GLib, GStreamer), which
+ * share that stderr, under dflt ("webkit"). Lines are cut at 8 KB; the child only reads the pipe and appends to the
+ * file, and drains it until every writer is gone, so a crash's last lines are kept. 0, or -1 (nothing changed). */
+int lordlog_stamp_start(const char *sub, const char *name, const char *dflt);
 
 #endif

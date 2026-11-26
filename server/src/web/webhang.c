@@ -9,8 +9,10 @@
  * loaded again in a new web process and a notification says so. lord-web itself, its window, its tray icon and the
  * profile stay; a lord-web that hangs as a whole is lord-server's to restart (ui/webalive.c, org.lordos.WebApp1.Ping).
  *
- * Log lines, closed words only: "lord-web: the page did not answer: its web process restarted",
- * "lord-web: WebKit says the page stopped responding", "lord-web: the page responds again". */
+ * Log lines, closed words only (each stamped with its time by lord-web's lord-log child, lordlog_stamp_start):
+ * "lord-web: the page did not answer for N.N s: its web process restarted" (from the first ping it left unanswered),
+ * "lord-web: WebKit says the page stopped responding", "lord-web: the page responds again after N.N s" (since WebKit
+ * said so). */
 #include "web.h"
 #include "webwatch.h"
 
@@ -23,6 +25,7 @@ static guint timer;
 static guint32 gen;
 static int ours;                    /* the web process was ended here: the next termination is ours */
 static int said_unresponsive;
+static double unresponsive_at;      /* when WebKit said the page stopped responding (mono ms) */
 
 static double mono_ms(void) { return (double)g_get_monotonic_time() / 1000.0; }
 
@@ -44,8 +47,11 @@ static void on_answer(GObject *o, GAsyncResult *res, gpointer d) {
     webwatch_answer(&watch, GPOINTER_TO_UINT(d), mono_ms());
 }
 
-static void restart_page(Web *w) {
-    fprintf(stderr, "lord-web: the page did not answer: its web process restarted\n");
+static void restart_page(Web *w, double now) {
+    /* silent since the first ping it left unanswered, or since WebKit said so if that came first */
+    double quiet = watch.hung_for;
+    if (said_unresponsive && unresponsive_at > 0 && now - unresponsive_at > quiet) quiet = now - unresponsive_at;
+    fprintf(stderr, "lord-web: the page did not answer for %.1f s: its web process restarted\n", quiet / 1000.0);
     ours = 1;
     webkit_web_view_terminate_web_process(w->view);
 }
@@ -62,7 +68,7 @@ static gboolean tick(gpointer d) {
         webwatch_sent(&watch, gen, now);
         break;
     case WEBWATCH_HUNG:
-        restart_page(w);
+        restart_page(w, now);
         break;
     default:
         break;
@@ -83,12 +89,15 @@ static void on_responsive(WebKitWebView *v, GParamSpec *ps, gpointer d) {
     (void)ps;
     Web *w = d;
     if (!webkit_web_view_get_is_web_process_responsive(v)) {
-        if (!said_unresponsive) fprintf(stderr, "lord-web: WebKit says the page stopped responding\n");
+        if (!said_unresponsive) {
+            fprintf(stderr, "lord-web: WebKit says the page stopped responding\n");
+            unresponsive_at = mono_ms();
+        }
         said_unresponsive = 1;
         webwatch_urgent(&watch);
         schedule(w);
     } else if (said_unresponsive) {
-        fprintf(stderr, "lord-web: the page responds again\n");
+        fprintf(stderr, "lord-web: the page responds again after %.1f s\n", (mono_ms() - unresponsive_at) / 1000.0);
         said_unresponsive = 0;
     }
 }

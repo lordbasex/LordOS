@@ -1562,6 +1562,14 @@ void js_fswatch_dispatch(double now) {
 
 /* Network (net/state.c): something changed in links, addresses or routes → __lordNet("link"|"addr"|"route"). */
 /* Disks (disk/disk.c): something was mounted, unmounted, plugged in or changed → __lordDisks(what). */
+void js_vm_library_event(void) {
+    if (!ctx) return;
+    JSValueConst arg = JS_NewString(ctx, "library");
+    JS_FreeValue(ctx, call_global("__lordVm", 1, &arg));
+    JS_FreeValue(ctx, arg);
+    drain_jobs();
+}
+
 void js_disk_event(const char *what) {
     if (!ctx) return;
     if (!ctx) return;
