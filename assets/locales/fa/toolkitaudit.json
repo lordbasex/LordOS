@@ -1,6 +1,6 @@
 {
   "title": "جعبه‌ابزارهای لینوکس در این میزکار",
-  "usage": "کاربرد: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "کاربرد: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "ترکیب ناشناخته: {id}. شناخته‌شده‌ها: {list}",
   "running": "در حال آزمودن {combo}...",
   "col.combo": "ترکیب",
@@ -27,5 +27,6 @@
   "matrix": "اشیای سراسری Wayland که هر جعبه‌ابزار متصل کرد (نسخه؛ ! خطای پروتکل؛ - متصل نشده):",
   "saved": "برای lordos-issue ذخیره شد: {path}",
   "notSaved": "نتیجه در ~/.cache/lordos ذخیره نشد.",
-  "root": "ممیزی جعبه‌ابزارها با root اجرا نمی‌شود: lordos-testbench --toolkits را با کاربر خودتان در پایانهٔ LordOS اجرا کنید."
+  "root": "ممیزی جعبه‌ابزارها با root اجرا نمی‌شود: lordos-testbench --toolkits را با کاربر خودتان در پایانهٔ LordOS اجرا کنید.",
+  "pressEnter": "برای بستن Enter را فشار دهید."
 }

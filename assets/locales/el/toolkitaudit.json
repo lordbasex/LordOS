@@ -1,6 +1,6 @@
 {
   "title": "Εργαλειοθήκες Linux σε αυτή την επιφάνεια εργασίας",
-  "usage": "Χρήση: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Χρήση: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Άγνωστος συνδυασμός: {id}. Γνωστοί: {list}",
   "running": "Δοκιμή {combo}...",
   "col.combo": "Συνδυασμός",
@@ -27,5 +27,6 @@
   "matrix": "Καθολικά αντικείμενα Wayland που δέσμευσε κάθε εργαλειοθήκη (έκδοση; ! σφάλμα πρωτοκόλλου; - μη δεσμευμένο):",
   "saved": "Αποθηκεύτηκε για το lordos-issue: {path}",
   "notSaved": "Το αποτέλεσμα δεν αποθηκεύτηκε στο ~/.cache/lordos.",
-  "root": "Ο έλεγχος εργαλειοθηκών δεν εκτελείται ως root: εκτελέστε το lordos-testbench --toolkits με τον δικό σας χρήστη, στο Τερματικό του LordOS."
+  "root": "Ο έλεγχος εργαλειοθηκών δεν εκτελείται ως root: εκτελέστε το lordos-testbench --toolkits με τον δικό σας χρήστη, στο Τερματικό του LordOS.",
+  "pressEnter": "Πατήστε Enter για κλείσιμο."
 }

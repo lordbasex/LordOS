@@ -1,6 +1,6 @@
 {
   "title": "Bu masaüstündeki Linux araç takımları",
-  "usage": "Kullanım: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Kullanım: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Bilinmeyen birleşim: {id}. Bilinenler: {list}",
   "running": "{combo} sınanıyor...",
   "col.combo": "Birleşim",
@@ -27,5 +27,6 @@
   "matrix": "Her araç takımının bağladığı Wayland globalleri (sürüm; ! protokol hatası; - bağlanmadı):",
   "saved": "lordos-issue için kaydedildi: {path}",
   "notSaved": "Sonuç ~/.cache/lordos içine kaydedilemedi.",
-  "root": "Araç takımı denetimi root olarak çalışmaz: lordos-testbench --toolkits komutunu kendi kullanıcınızla, LordOS Terminali'nde çalıştırın."
+  "root": "Araç takımı denetimi root olarak çalışmaz: lordos-testbench --toolkits komutunu kendi kullanıcınızla, LordOS Terminali'nde çalıştırın.",
+  "pressEnter": "Kapatmak için Enter tuşuna basın."
 }

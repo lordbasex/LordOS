@@ -1,6 +1,6 @@
 {
   "title": "Linux-toolkits op dit bureaublad",
-  "usage": "Gebruik: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Gebruik: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Onbekende combinatie: {id}. Bekend: {list}",
   "running": "{combo} testen...",
   "col.combo": "Combinatie",
@@ -27,5 +27,6 @@
   "matrix": "Wayland-globals die elke toolkit heeft gebonden (versie; ! protocolfout; - niet gebonden):",
   "saved": "Opgeslagen voor lordos-issue: {path}",
   "notSaved": "Het resultaat kon niet worden opgeslagen in ~/.cache/lordos.",
-  "root": "De toolkit-controle draait niet als root: voer lordos-testbench --toolkits uit als jezelf, in de LordOS-terminal."
+  "root": "De toolkit-controle draait niet als root: voer lordos-testbench --toolkits uit als jezelf, in de LordOS-terminal.",
+  "pressEnter": "Druk op Enter om te sluiten."
 }

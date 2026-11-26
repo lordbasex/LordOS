@@ -1,6 +1,6 @@
 {
   "title": "Bu masaüstündə Linux alət dəstləri",
-  "usage": "İstifadə: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "İstifadə: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Naməlum birləşmə: {id}. Məlum olanlar: {list}",
   "running": "{combo} sınaqdan keçirilir...",
   "col.combo": "Birləşmə",
@@ -27,5 +27,6 @@
   "matrix": "Hər alət dəstinin bağladığı Wayland qlobalları (versiya; ! protokol xətası; - bağlanmayıb):",
   "saved": "lordos-issue üçün saxlanıldı: {path}",
   "notSaved": "Nəticə ~/.cache/lordos qovluğunda saxlanıla bilmədi.",
-  "root": "Toolkit auditi root kimi işləmir: lordos-testbench --toolkits əmrini öz istifadəçinizlə, LordOS Terminalında işə salın."
+  "root": "Toolkit auditi root kimi işləmir: lordos-testbench --toolkits əmrini öz istifadəçinizlə, LordOS Terminalında işə salın.",
+  "pressEnter": "Bağlamaq üçün Enter düyməsini basın."
 }

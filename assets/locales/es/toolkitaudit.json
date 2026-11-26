@@ -1,6 +1,6 @@
 {
   "title": "Toolkits de Linux en este escritorio",
-  "usage": "Uso: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Uso: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Combinación desconocida: {id}. Conocidas: {list}",
   "running": "Probando {combo}...",
   "col.combo": "Combinación",
@@ -27,5 +27,6 @@
   "matrix": "Globales de Wayland que usó cada toolkit (versión; ! error de protocolo; - sin usar):",
   "saved": "Guardado para lordos-issue: {path}",
   "notSaved": "No se pudo guardar el resultado en ~/.cache/lordos.",
-  "root": "La auditoría de toolkits no se ejecuta como root: ejecutá lordos-testbench --toolkits con tu usuario, en la Terminal de LordOS."
+  "root": "La auditoría de toolkits no se ejecuta como root: ejecutá lordos-testbench --toolkits con tu usuario, en la Terminal de LordOS.",
+  "pressEnter": "Pulsá Enter para cerrar."
 }

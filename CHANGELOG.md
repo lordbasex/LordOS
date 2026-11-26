@@ -48,6 +48,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `server/tests/theme_gallery_test.mjs`.
 
 ### Fixed
+- **Toolkit Audit from the launcher closed before its table could be read.** The entry runs in a Terminal window
+  (`Terminal=true`), which closed as soon as `lordos-testbench --toolkits` ended. It now runs
+  `--toolkits --show --wait`: each check shows as it is decided, and the new `--wait` asks "Press Enter to close" (all
+  35 languages) when stdin is a terminal, so scripts and `lordos-issue` never block.
 - **A machine's apps no longer mix with this computer's in the app launcher unless you turn it on** (the maintainer's
   decision while testing 0.8.9.6.2: a machine that was off filled the launcher with its apps). Since 0.8.9.6 a
   machine that had listed its apps in apps mode put them in the launcher and search while off, marked with its name.

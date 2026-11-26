@@ -1,6 +1,6 @@
 {
   "title": "이 데스크톱의 Linux 툴킷",
-  "usage": "사용법: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "사용법: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "알 수 없는 조합: {id}. 알려진 조합: {list}",
   "running": "{combo} 테스트 중...",
   "col.combo": "조합",
@@ -27,5 +27,6 @@
   "matrix": "각 툴킷이 바인딩한 Wayland 전역 객체 (버전; ! 프로토콜 오류; - 바인딩 안 함):",
   "saved": "lordos-issue용으로 저장함: {path}",
   "notSaved": "결과를 ~/.cache/lordos에 저장할 수 없습니다.",
-  "root": "툴킷 점검은 root로 실행되지 않습니다. LordOS 터미널에서 본인 계정으로 lordos-testbench --toolkits를 실행하세요."
+  "root": "툴킷 점검은 root로 실행되지 않습니다. LordOS 터미널에서 본인 계정으로 lordos-testbench --toolkits를 실행하세요.",
+  "pressEnter": "닫으려면 Enter 키를 누르세요."
 }

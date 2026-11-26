@@ -1,6 +1,6 @@
 {
   "title": "Linuxin käyttöliittymäkirjastot tällä työpöydällä",
-  "usage": "Käyttö: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Käyttö: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Tuntematon yhdistelmä: {id}. Tunnetut: {list}",
   "running": "Testataan {combo}...",
   "col.combo": "Yhdistelmä",
@@ -27,5 +27,6 @@
   "matrix": "Waylandin globaalit, jotka kukin kirjasto sitoi (versio; ! protokollavirhe; - ei sidottu):",
   "saved": "Tallennettu lordos-issuea varten: {path}",
   "notSaved": "Tulosta ei voitu tallentaa kansioon ~/.cache/lordos.",
-  "root": "Työkalupakkien tarkistus ei toimi root-käyttäjänä: suorita lordos-testbench --toolkits omana käyttäjänäsi LordOS-päätteessä."
+  "root": "Työkalupakkien tarkistus ei toimi root-käyttäjänä: suorita lordos-testbench --toolkits omana käyttäjänäsi LordOS-päätteessä.",
+  "pressEnter": "Sulje painamalla Enter."
 }

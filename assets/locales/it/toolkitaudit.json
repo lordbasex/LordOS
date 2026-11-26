@@ -1,6 +1,6 @@
 {
   "title": "Toolkit Linux su questo desktop",
-  "usage": "Uso: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Uso: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Combinazione sconosciuta: {id}. Note: {list}",
   "running": "Verifica di {combo}...",
   "col.combo": "Combinazione",
@@ -27,5 +27,6 @@
   "matrix": "Globali Wayland usati da ogni toolkit (versione; ! errore di protocollo; - non usato):",
   "saved": "Salvato per lordos-issue: {path}",
   "notSaved": "Impossibile salvare il risultato in ~/.cache/lordos.",
-  "root": "La verifica dei toolkit non si esegue come root: avvia lordos-testbench --toolkits con il tuo utente, nel Terminale di LordOS."
+  "root": "La verifica dei toolkit non si esegue come root: avvia lordos-testbench --toolkits con il tuo utente, nel Terminale di LordOS.",
+  "pressEnter": "Premi Invio per chiudere."
 }

@@ -1,6 +1,6 @@
 {
   "title": "Toolkit-uri Linux pe acest desktop",
-  "usage": "Utilizare: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Utilizare: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Combinație necunoscută: {id}. Cunoscute: {list}",
   "running": "Se testează {combo}...",
   "col.combo": "Combinație",
@@ -27,5 +27,6 @@
   "matrix": "Globalele Wayland folosite de fiecare toolkit (versiune; ! eroare de protocol; - nefolosit):",
   "saved": "Salvat pentru lordos-issue: {path}",
   "notSaved": "Rezultatul nu a putut fi salvat în ~/.cache/lordos.",
-  "root": "Auditul toolkit-urilor nu rulează ca root: rulați lordos-testbench --toolkits cu utilizatorul dumneavoastră, în Terminalul LordOS."
+  "root": "Auditul toolkit-urilor nu rulează ca root: rulați lordos-testbench --toolkits cu utilizatorul dumneavoastră, în Terminalul LordOS.",
+  "pressEnter": "Apăsați Enter pentru a închide."
 }

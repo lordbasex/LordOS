@@ -1,6 +1,6 @@
 {
   "title": "このデスクトップでの Linux ツールキット",
-  "usage": "使い方: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "使い方: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "不明な組み合わせ: {id}。既知: {list}",
   "running": "{combo} をテスト中...",
   "col.combo": "組み合わせ",
@@ -27,5 +27,6 @@
   "matrix": "各ツールキットがバインドした Wayland グローバル (バージョン; ! プロトコルエラー; - 未バインド):",
   "saved": "lordos-issue 用に保存しました: {path}",
   "notSaved": "結果を ~/.cache/lordos に保存できませんでした。",
-  "root": "ツールキット監査は root では実行されません。LordOS ターミナルで自分のユーザーとして lordos-testbench --toolkits を実行してください。"
+  "root": "ツールキット監査は root では実行されません。LordOS ターミナルで自分のユーザーとして lordos-testbench --toolkits を実行してください。",
+  "pressEnter": "Enter キーを押すと閉じます。"
 }

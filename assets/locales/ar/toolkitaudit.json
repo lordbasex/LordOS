@@ -1,6 +1,6 @@
 {
   "title": "مجموعات أدوات لينكس على سطح المكتب هذا",
-  "usage": "الاستخدام: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "الاستخدام: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "تركيبة غير معروفة: {id}. المعروفة: {list}",
   "running": "جارٍ اختبار {combo}...",
   "col.combo": "التركيبة",
@@ -27,5 +27,6 @@
   "matrix": "كائنات Wayland العامة التي ربطتها كل مجموعة أدوات (الإصدار؛ ! خطأ بروتوكول؛ - غير مربوط):",
   "saved": "حُفظ من أجل lordos-issue: {path}",
   "notSaved": "تعذّر حفظ النتيجة في ~/.cache/lordos.",
-  "root": "لا يعمل تدقيق مجموعات الأدوات بصلاحيات root: شغّل lordos-testbench --toolkits بحسابك، في طرفية LordOS."
+  "root": "لا يعمل تدقيق مجموعات الأدوات بصلاحيات root: شغّل lordos-testbench --toolkits بحسابك، في طرفية LordOS.",
+  "pressEnter": "اضغط Enter للإغلاق."
 }
