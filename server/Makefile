@@ -1622,3 +1622,21 @@ build/realm-taint-test: tests/realm_taint_test.c $(QJS_OBJ)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/realm_taint_test.c $(QJS_OBJ) -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
+
+# lord-themec: a community theme's .zip checked and built in the helpers' sandbox (src/themec, ui/js_theme.c;
+# AGENTS.md "lord-themec"). LordOS's own code and libc only: the zip reader, stb_image's zlib decoder, QuickJS and the
+# theme compiler (tools/themec/themec.js) compiled in.
+LORD_THEMEC_SRC := src/themec/lordthemec.c src/themec/zipread.c src/themec/stbzlib.c src/sec/sandbox.c src/sec/cgroup.c src/sec/json.c
+build/gen/themec_js.h: ../tools/themec/themec.js
+	@mkdir -p build/gen
+	{ echo '/* generated from tools/themec/themec.js (Makefile) */'; echo 'static const unsigned char themec_js[] = {'; \
+	  od -An -v -tx1 $< | sed 's/\([0-9a-f][0-9a-f]\)/0x\1,/g'; echo '0x00 };'; } > $@
+build/lord-themec: $(LORD_THEMEC_SRC) src/themec/zipread.h src/sec/sandbox.h build/gen/themec_js.h $(QJS_OBJ)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ $(LORD_THEMEC_SRC) $(QJS_OBJ) -lm -lpthread
+	chmod g-w $@
+all: build/lord-themec
+build/themestore-test: tests/themestore_test.c src/ui/themestore.c src/ui/themestore.h src/themec/zipread.c src/themec/stbzlib.c src/sec/json.c src/pkg/crypto.c build/lord-themec
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/themestore_test.c src/ui/themestore.c src/themec/zipread.c src/themec/stbzlib.c src/sec/json.c src/pkg/crypto.c
+	./$@ build/lord-themec || { rm -f $@; exit 1; }
