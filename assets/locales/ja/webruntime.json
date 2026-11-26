@@ -12,5 +12,9 @@
   "inspect.title": "デベロッパツールがオンです",
   "inspect.body": "ブラウザで開きました。このウインドウを閉じるまで有効です。",
   "inspect.open": "ブラウザで開く",
-  "inspect.failed": "デベロッパツールを開始できませんでした"
+  "inspect.failed": "デベロッパツールを開始できませんでした",
+  "save.image": "画像を保存",
+  "save.video": "動画を保存",
+  "save.audio": "音声を保存",
+  "hang.reloaded": "ページが応答しなかったため再読み込みしました"
 }

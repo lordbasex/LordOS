@@ -66,6 +66,12 @@ PKGS_FIRMWARE="firmware-amd-graphics firmware-misc-nonfree firmware-iwlwifi firm
 PKGS_GPU="libgl1-mesa-dri libegl1 libgles2 libgbm1 mesa-vulkan-drivers mesa-utils vulkan-tools glmark2-es2-wayland"
 # preinstalled browsers (Linux apps; they draw their own bar with LordOS's window buttons, see docs/WAYLAND.md)
 PKGS_APPS="foot featherpad qt6-wayland chromium firefox-esr"
+# The toolkit audit (lordos-testbench --toolkits, docs/TOOLKIT-AUDIT.md) and every Python GTK or Qt app: the GTK 3 and
+# GTK 4 bindings and typelibs, PyQt5 and PyQt6, and Qt's Wayland plugins (without them a Qt app falls back to X11).
+# qgnomeplatform-qt5/-qt6: the Qt platform theme lord-server names (QT_QPA_PLATFORMTHEME=gnome, server/src/wl/toolkitenv.h),
+# with which Qt 5 and Qt 6 apps follow LordOS's dark mode. Also Recommends of the lordos package (tools/iso/mkdeb.sh).
+PKGS_TOOLKITS="python3-gi gir1.2-gtk-3.0 gir1.2-gtk-4.0 python3-pyqt5 python3-pyqt6 qtwayland5 qt6-wayland
+ qgnomeplatform-qt5 qgnomeplatform-qt6"
 # the disk installer (server/src/install): partition, format, copy and grub (UEFI and BIOS on amd64, UEFI on
 # arm64). efibootmgr and os-prober are for installing in free space: the boot entry and the other system's menu entry
 PKGS_INSTALLER="gdisk dosfstools e2fsprogs squashfs-tools util-linux grub-common grub2-common efibootmgr os-prober $PKGS_GRUB"
@@ -130,7 +136,7 @@ in_ch() { chroot "$CH" env DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 PATH=/usr
 echo "== paquetes"
 in_ch apt-get update -q > "$WORK/apt.log" 2>&1
 # shellcheck disable=SC2086
-in_ch apt-get install -y -q --no-install-recommends $PKGS_BASE $PKGS_TOOLS $PKGS_LORDOS $PKGS_FIRMWARE $PKGS_MICROCODE $PKGS_GPU $PKGS_APPS $PKGS_INSTALLER $PKGS_SPLASH $PKGS_VM $PKGS_SSH \
+in_ch apt-get install -y -q --no-install-recommends $PKGS_BASE $PKGS_TOOLS $PKGS_LORDOS $PKGS_FIRMWARE $PKGS_MICROCODE $PKGS_GPU $PKGS_APPS $PKGS_TOOLKITS $PKGS_INSTALLER $PKGS_SPLASH $PKGS_VM $PKGS_SSH \
     >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
 cp "$DEB" "$CH/tmp/lordos.deb"
 cp "$HWDEB" "$CH/tmp/lordos-hwdata.deb"

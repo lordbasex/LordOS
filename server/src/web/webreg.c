@@ -515,34 +515,82 @@ static long icon_px(const char *sizes) {
     return best;
 }
 
-static int ends_ci(const char *s, const char *tail) {
-    size_t n = strcspn(s, "?#"), t = strlen(tail);
-    return n >= t && !strncasecmp(s + n - t, tail, t);
+/* what an icon is, by a word: its type, or the extension of its address's path */
+enum { ICON_UNKNOWN, ICON_PNG, ICON_SVG, ICON_OTHER };
+
+static int icon_by_type(const char *type) {
+    if (!type || !type[0]) return ICON_UNKNOWN;
+    if (!strcasecmp(type, "image/png")) return ICON_PNG;
+    if (!strcasecmp(type, "image/svg+xml") || !strcasecmp(type, "image/svg")) return ICON_SVG;
+    return ICON_OTHER;
 }
 
-/* the icon --probe-icon fetches: a PNG of the largest size up to 512 (else the smallest above), else an SVG */
+static int icon_by_ext(const char *src) {
+    static const char *const other[] = { "webp", "ico", "jpg", "jpeg", "gif", "avif", "bmp", "jxl", "heic", "tif", "tiff", NULL };
+    const char *rest = strstr(src, "://");
+    rest = rest ? rest + 3 : src;
+    size_t n = strcspn(rest, "?#");
+    const char *path = memchr(rest, '/', n);
+    if (!path) return ICON_UNKNOWN;
+    size_t pn = n - (size_t)(path - rest);
+    const char *dot = NULL;
+    for (size_t i = pn; i > 0 && path[i - 1] != '/'; i--) if (path[i - 1] == '.') { dot = path + i; break; }
+    if (!dot) return ICON_UNKNOWN;
+    size_t en = pn - (size_t)(dot - path);
+    if (en == 3 && !strncasecmp(dot, "png", 3)) return ICON_PNG;
+    if (en == 3 && !strncasecmp(dot, "svg", 3)) return ICON_SVG;
+    for (int i = 0; other[i]; i++) if (strlen(other[i]) == en && !strncasecmp(dot, other[i], en)) return ICON_OTHER;
+    return ICON_UNKNOWN;
+}
+
+/* has the space-separated list this word? */
+static int has_word(const char *list, const char *word) {
+    size_t w = strlen(word);
+    for (const char *s = list ? list : ""; *s;) {
+        s += strspn(s, " \t");
+        size_t n = strcspn(s, " \t");
+        if (n == w && !strncasecmp(s, word, w)) return 1;
+        s += n;
+    }
+    return 0;
+}
+
+#define PICK_MAX 64
+
+/* the icons --probe-icon tries, best first (webreg.h, webreg_probe_parse) */
 static void pick_icon(const JVal *icons, WebProbe *p) {
-    long best_png = -1, best_svg = -1;
-    int png_big = 0;
+    struct { const char *src; long rank; } c[PICK_MAX];
+    int n = 0;
     WebUrl pu, iu;
     int page_public = !weburl_parse(p->origin, &pu) && weburl_host_class(&pu) == WEBURL_PUBLIC;
-    for (const JVal *i = icons && icons->type == J_ARR ? icons->kid : NULL; i; i = i->next) {
-        const char *src = i->type == J_OBJ ? json_str(i, "src") : NULL, *type = i->type == J_OBJ ? json_str(i, "type") : NULL;
+    for (const JVal *i = icons && icons->type == J_ARR ? icons->kid : NULL; i && n < PICK_MAX; i = i->next) {
+        const char *src = i->type == J_OBJ ? json_str(i, "src") : NULL;
         if (!src || strlen(src) > WEBREG_URL_MAX || strncmp(src, "https://", 8) || webreg_url_origin(src, NULL, 0)) continue;
         /* a public page never sends --probe-icon to this computer or a local network */
         if (weburl_parse(src, &iu) || (page_public && weburl_host_class(&iu) != WEBURL_PUBLIC)) continue;
-        int png = type && type[0] ? !strcmp(type, "image/png") : ends_ci(src, ".png");
-        int svg = type && type[0] ? !strcmp(type, "image/svg+xml") : ends_ci(src, ".svg");
+        int by_type = icon_by_type(json_str(i, "type")), by_ext = icon_by_ext(src);
+        if (by_type == ICON_OTHER || by_ext == ICON_OTHER || (by_type && by_ext && by_type != by_ext)) continue;
+        int kind = by_type ? by_type : by_ext;
+        if (!kind) continue;
+        const char *purpose = json_str(i, "purpose");
+        int any = !purpose || !purpose[strspn(purpose, " \t")] || has_word(purpose, "any");
+        if (!any && !has_word(purpose, "maskable")) continue;        /* monochrome only: a silhouette, not the app's icon */
         long px = icon_px(json_str(i, "sizes"));
-        if (png) {
-            int big = px > 512;
-            /* up to 512: the larger the better; above it only when nothing fits, then the smaller the better */
-            int better = best_png < 0 || (png_big && !big) || (!png_big && !big && px > best_png) || (png_big && big && px < best_png);
-            if (better) { best_png = px; png_big = big; memcpy(p->icon_url, src, strlen(src) + 1); }
-        } else if (svg && best_png < 0 && best_svg < 0) {
-            best_svg = 0;
-            memcpy(p->icon_url, src, strlen(src) + 1);
-        }
+        if (px > 99999) px = 99999;
+        /* up to 512 px the larger the better; above it only after those, the smaller the better */
+        long size_rank = kind == ICON_PNG ? (px <= 512 ? 100000 + px : 100000 - px) : 0;
+        int tier = (any ? 0 : 2) + (kind == ICON_SVG);
+        c[n].src = src;
+        c[n].rank = (long)(3 - tier) * 1000000 + size_rank;
+        n++;
+    }
+    /* best first; equals keep the page's order */
+    for (int k = 0; k < WEBREG_PROBE_ICONS && p->icons < n; k++) {
+        int best = -1;
+        for (int j = 0; j < n; j++) if (c[j].src && (best < 0 || c[j].rank > c[best].rank)) best = j;
+        if (best < 0) break;
+        snprintf(p->icon_url[p->icons++], WEBREG_URL_MAX + 1, "%s", c[best].src);
+        c[best].src = NULL;
     }
 }
 

@@ -256,6 +256,9 @@ eq('a notification\'s icon: only the app\'s own files', [
   M.webIconPathOk('/home/u/.config/lordos/web/icons/chat.png', 'chat', 'relative'),
   M.webIconPathOk('/home/u/.config/lordos/web/icons/chat.png', '../x', H)],
   [true, true, true, false, false, false, false, false, false]);
+eq('why the site\'s icon was not kept: a closed code, never the page\'s text', [M.siteIconError({ code: 'webapps.noIcon' }), M.siteIconError({ ok: false, error: 'web.probe.iconType' }),
+  M.siteIconError('webapps.iconOrigin'), M.siteIconError({ error: 'https://evil.example/x' }), M.siteIconError({ error: 'web.probe.<b>' }), M.siteIconError(null)],
+  ['webapps.noIcon', 'web.probe.iconType', 'webapps.iconOrigin', 'webapps.probeFailed', 'webapps.probeFailed', 'webapps.probeFailed']);
 eq('when to fetch the site\'s icon', [M.wantsSiteIcon({ available: true, cached: false, tried: false }), M.wantsSiteIcon({ available: false, cached: false, tried: false }),
   M.wantsSiteIcon({ available: true, cached: true, tried: false }), M.wantsSiteIcon({ available: true, cached: false, tried: true })], [true, false, false, false]);
 
@@ -347,6 +350,24 @@ const ran = [];
   eq('inspect: already on', [on.checked, on.disabled], [true, true]);
   eq('inspect: running not a list', M.inspectItem(web, true, null, 'I', ask).checked, false);
 }
+{
+  const asked = [];
+  const ask = (q) => asked.push(q);
+  const web = { app: 'chat', profile: 'work' };
+  const labels = { restart: 'R', quit: 'Q' };
+  eq('restart: not a web app window', M.restartItems(null, [{ app: 'chat', profile: 'work' }], labels, ask), []);
+  eq('restart: not running', M.restartItems(web, [{ app: 'chat', profile: 'personal' }], labels, ask), []);
+  eq('restart: running not a list', M.restartItems(web, null, labels, ask), []);
+  const items = M.restartItems(web, [{ app: 'chat', profile: 'work', pid: 3 }], labels, ask);
+  eq('restart: Restart and Force Quit', items.map((i) => i.label), ['R', 'Q']);
+  items.forEach((i) => i.onClick());
+  eq('restart: each asks first, nothing else', asked, [{ app: 'chat', profile: 'work', kind: 'restart' }, { app: 'chat', profile: 'work', kind: 'quit' }]);
+  const entry = { id: 'chat', name: 'Chat', profiles: [{ id: 'personal', name: 'Personal' }, { id: 'work', name: 'Work' }] };
+  const tr = (k, v) => `${k}:${v.app}/${v.profile}`;
+  eq('a name with its profile', M.appProfileName(entry, 'work', tr), 'webapps.windowName:Chat/Work');
+  eq('one profile: the app\'s name', M.appProfileName({ ...entry, profiles: [entry.profiles[0]] }, 'personal', tr), 'Chat');
+  eq('no entry: the id', M.appProfileName(null, 'work', tr), 'work');
+}
 const edit = M.webEditItems((c) => `L:${c}`, (c) => ran.push(c));
 eq('the Edit menu', edit.map((i) => (i === '-' ? '-' : `${i.label} ${i.hint}`)),
   ['L:undo Ctrl+Z', 'L:redo Ctrl+Shift+Z', '-', 'L:cut Ctrl+X', 'L:copy Ctrl+C', 'L:paste Ctrl+V', '-', 'L:selectAll Ctrl+A']);
@@ -360,11 +381,44 @@ eq('a pick names the item', picked, ['openLink']);
 eq('unknown names and repeats are left out', M.webMenuItems(['selectAll', 'rm -rf', 'selectAll', 'copyImage', null], (x) => x, () => {}).map((i) => (i === '-' ? '-' : i.id)),
   ['selectAll', '-', 'copyImage']);
 eq('nothing', [M.webMenuItems(null, (x) => x, () => {}), M.webMenuItems([], (x) => x, () => {})], [[], []]);
+{
+  // each context lord-web builds (server/src/web/webedit.c webmenu_items), as the shell shows it
+  const L = (n, v) => (v ? `${n}(${v.text})` : n);
+  const rows = (m, shell) => M.webMenuItems(m, L, () => {}, shell).map((i) => (i === '-' ? '-' : `${i.label}${i.hint ? ` [${i.hint}]` : ''}${i.checked ? ' ✓' : ''}`));
+  const sp = { speech: () => ({ label: 'SPEECH', submenu: [] }), developer: true, emoji: () => {}, inspect: () => {} };
+  eq('selected text: Copy, a link to it, Search with its words isolated, Speech, Inspect',
+    rows({ items: ['copy', 'copyHighlight', 'search', 'speech', 'inspect'], text: 'hola mundo' }, sp),
+    ['copy [Ctrl+C]', 'copyHighlight', 'search(⁨hola mundo⁩)', '-', 'SPEECH', '-', 'inspect']);
+  eq('Inspect only with developer mode, Speech only when reading aloud is on',
+    rows({ items: ['copy', 'search', 'speech', 'inspect'], text: 'x' }, { speech: () => null, developer: false }), ['copy [Ctrl+C]', 'search(⁨x⁩)']);
+  eq('a search without its words is left out', rows({ items: ['copy', 'search'] }), ['copy [Ctrl+C]']);
+  eq('a text field: WebKit\'s suggestions first, then the editing rows with their keys, Emoji',
+    rows({ items: ['spell1', 'spell2', 'ignoreSpelling', 'learnSpelling', 'undo', 'redo', 'paste', 'pastePlain', 'selectAll', 'emoji', 'inspect'], guesses: ['error', 'terror'] }, sp),
+    ['⁨error⁩', '⁨terror⁩', '-', 'ignoreSpelling', 'learnSpelling', '-', 'undo [Ctrl+Z]', 'redo [Ctrl+Shift+Z]', '-', 'paste [Ctrl+V]',
+      'pastePlain [Ctrl+Shift+V]', 'selectAll [Ctrl+A]', '-', 'emoji [❖.]', '-', 'inspect']);
+  eq('a suggestion without its word is left out', rows({ items: ['spell1', 'spell2', 'undo'], guesses: ['ok'] }), ['⁨ok⁩', '-', 'undo [Ctrl+Z]']);
+  eq('a video: Loop and Show Controls checked as they are',
+    rows({ items: ['pause', 'mute', 'loop', 'controls', 'saveVideo'], checked: ['controls'] }),
+    ['pause', 'mute', 'loop', 'controls ✓', 'saveVideo']);
+  eq('the page itself', rows({ items: ['back', 'reload', 'selectAll'] }), ['back [Alt+←]', 'reload [Ctrl+R]', '-', 'selectAll [Ctrl+A]']);
+  eq('an image', rows({ items: ['openImage', 'saveImage', 'copyImage', 'copyImageAddress'] }), ['openImage', 'saveImage', 'copyImage', 'copyImageAddress']);
+  const answers = [];
+  let ran = 0;
+  const own = M.webMenuItems({ items: ['emoji', 'inspect'] }, L, (x) => answers.push(x), { developer: true, emoji: () => { ran++; }, inspect: () => { ran++; } });
+  own.filter((i) => i !== '-').forEach((i) => i.onClick());
+  eq('the shell\'s own items answer lord-web "" and run here', [answers, ran], [['', ''], 2]);
+  eq('search engines: a closed list, Google by default', [M.SEARCH_ENGINES, M.searchEngineOf('duckduckgo'), M.searchEngineOf('evil.example'), M.searchEngineOf(undefined)],
+    [['google', 'duckduckgo', 'bing', 'startpage'], 'duckduckgo', 'google', 'google']);
+}
 const cSrc = fs.readFileSync(path.join(root, 'server/src/web/webedit.c'), 'utf8');
 eq('the menu\'s names are lord-server\'s', M.WEB_MENU_ITEMS.every((x) => cSrc.includes(`"${x}"`)) && M.WEB_EDIT_ROWS.filter((r) => r !== '-').every((r) => cSrc.includes(`"${r[0]}"`)), true);
 for (const lang of langs) {
   const sh = JSON.parse(fs.readFileSync(path.join(root, `assets/locales/${lang}/shell.json`), 'utf8'));
-  const missing = [...M.WEB_MENU_ITEMS, 'undo', 'redo'].filter((k) => !sh[`edit.${k}`]);
+  // the rows the shell labels from shell.edit.* (not the suggestions, Speech's own submenu or Inspect's webapps words)
+  const missing = M.WEB_MENU_ITEMS.filter((k) => !/^spell\d$/.test(k) && !M.WEB_MENU_SHELL.includes(k) || k === 'emoji').filter((k) => !sh[`edit.${k}`]);
+  const wa = JSON.parse(fs.readFileSync(path.join(root, `assets/locales/${lang}/webapps.json`), 'utf8'));
+  missing.push(...M.SEARCH_ENGINES.filter((k) => !wa[`search.${k}`]).map((k) => `search.${k}`));
+  if (!String(sh['edit.search'] || '').includes('{text}')) missing.push('edit.search {text}');
   eq(`edit words in ${lang}`, missing, []);
 }
 

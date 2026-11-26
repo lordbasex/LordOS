@@ -16,7 +16,9 @@
 //                 (<GlobalShortcutsPrompt />, globalshortcuts.jsx)
 //   web apps      a web app's page asks for the camera, the microphone, the screen, the location or notifications
 //                 and its registry entry says "ask" (org.lordos.WebApps1.Ask, <WebAppAskPrompt />, webapps.js); and
-//                 "Turn on developer tools for this window?" before Inspect (<WebAppInspectPrompt />)
+//                 "Turn on developer tools for this window?" before Inspect (<WebAppInspectPrompt />); "Restart …?" and
+//                 "Force quit …?" from the Window menu (<WebAppRestartPrompt />); and a notification when lord-server
+//                 restarted one that stopped answering ("webapps-restarted")
 //   timedate      NTP state from timedated (read-only)
 //   menuClock(d)  the menu bar clock with the format chosen in Settings → Date & Time
 //
@@ -38,7 +40,9 @@ import { devicesFrom, fractionOf, toneOf as deviceTone } from './devicesmodel.js
 import { batteryStep, batteryPrefs } from './batterypolicy.js';
 import { TextInput, Toggle } from './components.jsx';
 import { dialogStack, dialogKey, keyOwner } from './dialogkeys.js';
-import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent, webMenu, webMenuEvent, answerWebMenu, webInspectAsk, answerWebInspect } from './webapps.js';
+import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent, webMenu, webMenuEvent, answerWebMenu, webInspectAsk, answerWebInspect, webDeveloper, webRestartAsk, answerWebRestart, webRestartedTitle } from './webapps.js';
+import { speechMenu } from './voice.js';
+import { toggleEmojiPanel } from './emoji.jsx';
 import { ContextMenu } from './contextmenu.jsx';
 import { profileOf, notifyKey, playsSystemSound, webIconPathOk, windowLabel, webMenuItems } from './webappsmodel.js';
 import { webProfileIcon, iconFromFile } from './apps.js';
@@ -772,15 +776,68 @@ export function WebAppInspectPrompt() {
     h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('ok') } }, h(DialogButton, { label: t('webapps.inspect.turnOn'), primary: true, th, onClick: () => answerWebInspect(true) })))));
 }
 
+// ---- Restart… and Force Quit… from a web app's Window menu (docs/WEBAPPS.md, "When a web app stops answering") ----
+//
+// Asked every time, Cancel first: the window closes (and, for Restart, opens again), and a call or an upload in
+// progress ends. Only the confirm reaches lord-server (lord.webapps.restart or lord.webapps.quit).
+export function WebAppRestartPrompt() {
+  const q = useStore(webRestartAsk);
+  const th = useSystemTokens();
+  const [focus, setFocus] = useState('cancel');
+  const token = useRef({}).current;
+  const owner = useStore(dialogStack, (l) => keyOwner(l) === token);
+  const latest = useRef(null);
+  latest.current = { q, focus };
+  useEffect(() => {
+    if (!q) return undefined;
+    setFocus('cancel');
+    dialogStack.open(token, null, true);
+    return () => dialogStack.close(token);
+  }, [q]);
+  useEffect(() => addListener('keydown', (e) => {
+    const cur = latest.current;
+    if (!cur.q || dialogStack.owner() !== token) return;
+    const r = dialogKey(e, { destructive: true, focus: cur.focus });
+    if (r) dialogStack.take(e);
+    if (r?.focus) setFocus(r.focus);
+    else if (r?.press) answerWebRestart(r.press === 'ok');
+  }), []);
+  if (!q) return null;
+  const entry = webAppEntry(q.app);
+  const prof = profileOf(entry, q.profile);
+  const app = entry ? (entry.profiles.length > 1 && prof ? t('webapps.windowName', { app: entry.name, profile: prof.name }) : entry.name) : q.app;
+  const quit = q.kind === 'quit';
+  const ring = (which) => (owner && focus === which ? { boxShadow: `0 0 0 2px ${th.accent}` } : null);
+  return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 100000 } },
+  h(View, { style: { marginTop: 90, width: 400, borderRadius: 14, padding: 22, gap: 10, alignItems: 'center', backgroundColor: th.windowBg,
+    border: `1px solid ${th.separator}`, boxShadow: '0 20px 60px rgba(0,0,0,0.45)' } },
+  h(Text, { style: { fontSize: 14, fontWeight: 700, color: th.text, textAlign: 'center', lineHeight: 1.4 } }, t(quit ? 'webapps.quit.title' : 'webapps.restart.title', { app })),
+  h(Text, { style: { fontSize: 12, color: th.text, textAlign: 'center', lineHeight: 1.4 } }, t(quit ? 'webapps.quit.detail' : 'webapps.restart.detail')),
+  h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 8, alignSelf: 'stretch' } },
+    h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('cancel') } }, h(DialogButton, { label: t('webapps.settings.cancel'), onClick: () => answerWebRestart(false), th })),
+    h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('ok') } }, h(DialogButton, { label: t(quit ? 'webapps.quit.ok' : 'webapps.restart.ok'), primary: true, th, onClick: () => answerWebRestart(true) })))));
+}
+
 // ---- A right click in a web app's page (org.lordos.WebApps1.Menu, server/src/ui/webask.c) ----
 //
 // lord-server checked that the menu comes from that app's lord-web and that its items are names from the closed list
-// (Cut, Copy, Paste, Select All, Copy Link Address, Open Link in Browser, Copy Image): the words are LordOS's, never
-// the page's. The menu opens at the pointer; the chosen item (or "" when it closes) goes back to lord-web.
+// (sdk/webappsmodel.js WEB_MENU_ITEMS): the words are LordOS's. The only page text is the selection's few words in
+// "Search the web for “…”" and WebKit's spelling suggestions, both cleaned by lord-web and again by lord-server. The
+// menu opens at the pointer; the chosen item (or "" when it closes) goes back to lord-web. Emoji, Speech and Inspect
+// are the shell's own: Speech reads the selection lord-web made the session's primary selection (sdk/voice.js), and
+// Inspect shows only while developer mode is on, with the Window menu's question first.
 export function WebAppMenu() {
   const m = useStore(webMenu);
+  const developer = useStore(webDeveloper);
   if (!m) return null;
-  const items = webMenuItems(m.items, (n) => t(`shell.edit.${n}`), (n) => answerWebMenu(n, m));
+  const later = (fn) => setTimeout(fn, 0);
+  const items = webMenuItems(m, (n, vars) => (n === 'inspect' ? t('webapps.inspect.menu') : t(`shell.edit.${n}`, vars)), (n) => answerWebMenu(n, m), {
+    developer,
+    speech: () => speechMenu(null),
+    emoji: () => later(toggleEmojiPanel),
+    inspect: () => later(() => webInspectAsk.set({ app: m.app, profile: m.profile })),
+  });
   if (!items.length) return null;
   const all = { w: screen.width, h: screen.height };
   // a press anywhere else closes it and goes no further (not into the page), as a browser's menu does
@@ -823,6 +880,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'webapps-ask': case 'webapps-ask-gone': webAskEvent(kind, data); break;
     case 'webapps-badge': webBadgeEvent(data); break;
     case 'webapps-menu': case 'webapps-menu-gone': webMenuEvent(kind, data); break;
+    case 'webapps-restarted': { const title = webRestartedTitle(data); if (title) notify({ app: 'settings', title }); break; }
     case 'notify': linuxNotify(data); break;
     case 'sni': case 'sni-gone': case 'sni-menu': trayEvent(kind, data); break;   // Linux apps' tray icons (trayitems.jsx)
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }

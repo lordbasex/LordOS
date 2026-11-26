@@ -207,6 +207,8 @@ EOF
     else skip "portal-gs-test" "dbus-run-session"; fi
     if have dbus-run-session; then run "portal-cast-test (ScreenCast restore token, Screenshot, FileChooser lending)" dbus-run-session -- build/portal-cast-test
     else skip "portal-cast-test" "dbus-run-session"; fi
+    if have dbus-run-session; then run "webalive-test (a web app that hangs is started again, over a private bus)" dbus-run-session -- build/webalive-test
+    else skip "webalive-test" "dbus-run-session"; fi
     run "fsasync-test" build/fsasync-test
     run "bgsave-test (#250: saves off the interface's thread)" build/bgsave-test
     run "fswatch-test" build/fswatch-test
@@ -260,6 +262,7 @@ EOF
     if have node; then run "guest-apps-test (sdk/guestappsmodel.js, guest apps in the launcher)" node tests/guest_apps_test.mjs; fi
     if have node; then run "theme-gallery-test (sdk/themegallery.js, Settings → Appearance)" node tests/theme_gallery_test.mjs; fi
     if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
+    if have node; then run "toolkit-pkgs-test (the toolkit audit's bindings and Qt theme in both images and the Recommends)" node tests/toolkit_pkgs_test.mjs; fi
     if have node; then run "iso-firmware-test (tools/iso/build.sh firmware list vs the Store map, #227)" node tests/iso_firmware_test.mjs; fi
     if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
     if have node; then run "vm-group-model-test (apps/machines/model.js groupPlan: a machine group's start and stop order, its link)" node tests/vm_group_model_test.mjs; fi
@@ -303,6 +306,13 @@ EOF
         0) ok "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
         77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
+    esac
+    # the keyboard back at once after a window closes, a menu opened then kept, a late older copy dropped (toolkit audit)
+    sh tests/popup_headless.sh focusback-client >"$T/out" 2>&1
+    case $? in
+        0) ok "focus-back (tests/focusback_client.c, headless lord-server: keyboard, menu, clipboard)" ;;
+        77) skip "focus-back" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "focus-back (tests/focusback_client.c, headless lord-server: keyboard, menu, clipboard)" ;;
     esac
     # (#219) Move and resize with: Off (the default) takes no press; ❖ + drag moves and resizes a Wayland and an X11 window
     sh tests/moddrag_headless.sh >"$T/out" 2>&1
@@ -946,6 +956,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "webapps-get-scene (apps/store/getweb.js)" node tests/textfield_menu_test.mjs webapps_get_scene.mjs
     else skip "webapps-get-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Settings → Web apps → Refresh icon: busy, then the icon or the reason, one closed log line per failure
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "webapps-icon-settings-scene (apps/settings/WebApps.jsx)" node tests/textfield_menu_test.mjs webapps_icon_settings_scene.mjs
+        run "webapps-restart-settings-scene (Restart, Force Quit, Restart web apps engine)" node tests/textfield_menu_test.mjs webapps_restart_settings_scene.mjs
+    else skip "webapps-icon-settings-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.9) the trademark notice of the Store's Web apps section and of each web app's page
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "store-trademark-scene (apps/store/trademark.js)" node tests/textfield_menu_test.mjs store_trademark_scene.mjs
@@ -1076,6 +1091,19 @@ EOF
     if [ -x build/web-backend-test ] && have bwrap && have xdg-dbus-proxy; then
         run "web-backend-test ($(cat build/gen/web_backend 2>/dev/null) backend)" build/web-backend-test
     else skip "web-backend-test" "wpe-webkit-2.0 (build/web-backend-test), bubblewrap and xdg-dbus-proxy"; fi
+    # the context menu's spelling suggestions from WebKit (docs/WEBAPPS.md, "Spelling"), WPEPlatform only
+    if [ -x build/web-menu-check ] && have bwrap && have xdg-dbus-proxy && ls /usr/share/hunspell/*.dic >/dev/null 2>&1; then
+        run "web-menu-check (spelling suggestions in the context menu)" build/web-menu-check
+    else skip "web-menu-check" "WPEPlatform (build/web-menu-check), bubblewrap, xdg-dbus-proxy and a hunspell dictionary"; fi
+    # (in development, docs/WEBAPPS.md "Calls") a Chrome profile's Client Hints and navigator.userAgentData against
+    # Chrome's own, SharedArrayBuffer only when cross-origin isolated, the call log; with an engine that has WebRTC, two
+    # peer connections in one page exchanging audio and video (Opus with VP8, then H.264). WPEPlatform only
+    if [ -x build/webcalls-check ] && have python3 && have bwrap && have xdg-dbus-proxy; then
+        run "webcalls-check (Client Hints, userAgentData, call log, WebRTC loopback)" python3 -I tests/webcalls_check.py build/webcalls-check
+    else skip "webcalls-check" "WPEPlatform (build/webcalls-check), bubblewrap, xdg-dbus-proxy and python3"; fi
+    if [ -x build/webhang-check ] && have bwrap && have xdg-dbus-proxy; then
+        for m in fine hang urgent; do run "webhang-check $m (a page that stops answering gets a new web process)" build/webhang-check $m; done
+    else skip "webhang-check" "WPEPlatform (build/webhang-check), bubblewrap and xdg-dbus-proxy"; fi
     # (0.8.8.6) Claude Code in the Terminal's footer: the status line bridge and the footer's model
     run "claude-bridge-test (lord-claude-status)" sh tests/claude_bridge_test.sh
     if have node; then run "terminal-claude-test (apps/terminal/claude.js)" node tests/terminal_claude_test.mjs

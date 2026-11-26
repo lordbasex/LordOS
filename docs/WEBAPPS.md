@@ -166,7 +166,8 @@ Only lord-server starts `lord-web`:
 `lord-web` reads its app's registry file itself, read-only, and refuses to start on any mismatch. A second launch of a
 running app and profile raises its window instead: lord-server knows its process, starts nothing, issues an
 xdg-activation token and calls `Show(token)` on that lord-web (below); lord-web activates its window with it, or maps it
-again when it was hidden in the background. The shell does not focus it on its own.
+again when it was hidden in the background. The shell does not focus it on its own. That launch also pings it: one that
+doesn't answer within 5 s is started again ("When a web app stops answering", below).
 
 The window's `xdg_toplevel` app id is `lordos-web.<app>.<profile>`. lord-server maps that prefix to the registry
 entry, so the Dock and the window switcher show the app's name, its icon and the profile name. The title is the page's
@@ -323,18 +324,58 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     rich text editor) undoes; a plain text field can't, from the menu or the keys. What Copy or Cut put in WebKit's pasteboard is offered to the
     session at once (the window may not have the keyboard while the menu is open). The commands are a closed list
     (`webedit.c`), checked on both sides.
-  - **The context menu:** WPE 2.48 never asks its embedder for a menu (the view's `context-menu` signal doesn't
-    come) and, once a right click's default asked WebKit for one, the view took no more mouse input. So the same
-    isolated script prevents the default of every trusted `contextmenu` event and, when the page's own listeners
-    (on the element or the document) left it alone, tells lord-web what is under the pointer: an editable field, a
-    selection, a link's address, an image's. lord-web takes it only right after a click in the window and asks
-    lord-server for LordOS's own menu: `org.lordos.WebApps1.Menu(app, profile, items) → item`, the items being names
-    from the closed list (`cut`, `copy`, `paste`, `selectAll`, `copyLink`, `openLink`, `copyImage`), never text.
-    lord-server checks them and the caller's pid as for Ask, and the shell shows the menu at the pointer with its own
-    words (a press anywhere else closes it and goes no further). Copy Link Address offers the link's address as text;
-    Open Link in Browser goes to OpenURI (web, mail and phone links only); Copy Image reads the image with the page's
-    origin in lord-web's isolated world (made a PNG unless it is a PNG or a JPEG, at most 32 MB) and offers it as an
-    image.
+  - **The context menu** (in development; `webmenu.c`, `webedit.c`, `websearch.c`, `webselect.c`; like Chrome's): a
+    right click the page's own listeners (on the element or the document) left alone is reported by the same isolated
+    script with what is under the pointer: an editable field, the selection (its text, at most 16384 characters, never
+    a password field's), a link's address, an image's, and, in the top frame, a video or audio element with its state
+    (paused, muted, loop, controls, an http(s) source). The script prevents the event's default everywhere except in a
+    text field on WPEPlatform (2.54), where WebKit then asks for its own menu ("Spelling", below); on WPE 2.48, which
+    never asks and took no more mouse input once asked, it is always prevented. lord-web takes the report only right
+    after a click in the window and asks lord-server for LordOS's own menu:
+    `org.lordos.WebApps1.Menu(app, profile, items, checked, text, guesses) → item` (the older `(app, profile, items)`
+    is still taken). The items are names from a closed list (`webedit.c`), never text; `checked` marks Loop and Show
+    Controls; `text` is the selection's few words for the search item and `guesses` WebKit's spelling suggestions,
+    the only page-derived strings in a menu: lord-web cleans them and lord-server cleans them again
+    (`websearch_snippet`: control characters, bidi embeddings, overrides and isolates and invalid UTF-8 removed,
+    whitespace made single spaces, at most 30 characters and an ellipsis) and refuses a menu whose search item has no
+    words or whose suggestions don't match its items. The shell shows the menu at the pointer with its own words,
+    the page's words in their own direction (an isolate), each row with its key; a press anywhere else closes it. The
+    items, by what is under the pointer:
+    - **a text field:** WebKit's spelling suggestions, Ignore Spelling and Add to Dictionary (when the word is
+      misspelled), Undo (Ctrl+Z), Redo (Ctrl+Shift+Z), Cut (Ctrl+X) and Copy (Ctrl+C) with a selection, Paste
+      (Ctrl+V), Paste as Plain Text (Ctrl+Shift+V: the session's text only, never its HTML, files or image), Select
+      All (Ctrl+A) and Emoji (❖., LordOS's emoji picker, which pastes into the field);
+    - **selected text:** Copy (outside a field), Copy Link to Highlight (outside a field, on an http(s) page in the
+      top frame: the page's address with a `#:~:text=` fragment, the whole text up to 80 characters, else its first
+      and last four words), Search the Web for “…” and Speech ▸;
+    - **a link:** Open Link in Browser (OpenURI: web, mail and phone links only), Copy Link Address;
+    - **an image:** Open Image in Browser and Copy Image Address (an http(s) address only), Save Image As…, Copy
+      Image (read with the page's origin in lord-web's isolated world, made a PNG unless it is a PNG or a JPEG, at
+      most 32 MB, offered as an image);
+    - **a video or audio:** Play or Pause, Mute or Unmute, Loop and Show Controls (checked when on), run on that
+      element by the isolated script; Save Video As… or Save Audio As… for an http(s) source (not a stream the page
+      feeds it, such as a `blob:` from Media Source);
+    - **the page itself:** Back and Forward (when the view can; Alt+← and Alt+→), Reload (Ctrl+R) and Select All;
+    - and **Inspect** last, only while developer mode is on, with the same question as the Window menu's
+      ("Developer tools").
+    **Search the Web** opens the person's browser through OpenURI at the engine chosen in Settings → Web Apps →
+    Search the web (Google by default, as Chrome; DuckDuckGo, Bing or Startpage: a closed list, kept in
+    `~/.config/lordos/web/search.json` as `{"engine":"…"}`, written only by `lord.webapps.setSearchEngine` and read by
+    lord-web when the item is chosen). The address is the engine's fixed search address with the selected text, up
+    to 512 bytes, percent-encoded as its one parameter: nothing else of the page goes with it.
+    **Save Image As… and Save Video As…** ask where with LordOS's save dialog (the FileChooser portal's `SaveFile`,
+    which asks before replacing a file); the chosen file must be in the home folder, outside hidden folders and not a
+    `*.desktop` launcher, also once its folder's links are resolved (`webdl_target_ok`). An http(s) or `data:`
+    address then goes through the page's own download path into that file; an image the page made itself (`blob:`)
+    is read as for Copy Image and written there. A notification says when it is done, as for any download.
+    **Speech ▸** is LordOS's own (Start Speaking ❖Esc, Stop Speaking, Save as Audio…, `docs/VOICE.md`): lord-web makes
+    the person's selection the session's **primary selection** once it settles (300 ms after its last change, right
+    after a click or key in the window, at most 256 KB, never a password field's; the right-clicked selection too), as
+    a browser on Linux does, and lord-server reads that one aloud or saves it, as for any Linux app; JS never sees it.
+    The same makes ❖Esc and Edit → Speech read a web app's selection, and a middle click paste it in another app.
+    Emoji, Speech and Inspect run in the shell, which answers lord-web "" for them.
+    Left out: **Print…** (WPE has no print operation and `webkit_web_view_save` makes only MHTML, so there is no PDF
+    to print: no dead item), **Translate** (LordOS has no translator) and **Cast**.
   - **The app menu and Help:** Settings… opens Settings → Web Apps on that app; in Lord Flow, Browser identity (Chrome on
     Linux, Edge on Linux, Firefox on Linux, LordOS (WebKit)) the window's profile's `userAgent` ("Browser identity", below); Help starts with "<app> on the Web",
     the app's origin in the browser.
@@ -418,9 +459,38 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   system's identity), picked from a closed list in Settings (never typed), in this order. `<version>` is always
   `LORD_VERSION`, the installed LordOS's, never written by hand.
   - `chrome`, **Chrome on Linux**, the default (a profile without the key):
-    `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36`,
+    `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36`,
     exactly what desktop Chrome on Linux sends, nothing added. Chrome's reduced user agent says `Linux x86_64` on
-    every Linux, an ARM one too, so this string is the same on `aarch64`.
+    every Linux, an ARM one too, so this string is the same on `aarch64`. Since the calls work (in development,
+    "Calls" below) Chrome is also Chrome in the two other places sites look, from the same table
+    (`webua.h`, `webua.c`; Chrome's whole version `WEBPAGE_CHROME_FULL`, `158.0.8127.36`, next to the string's major in
+    `webpage.h`): the **User-Agent Client Hints** on the page's requests and **`navigator.userAgentData`**. Both are
+    exactly what Chrome 158 on Linux sent and answered on 2026-11-25 (a throwaway profile against a local echo server):
+    - every request to a secure origin (https, or http on localhost) carries `Sec-CH-UA: "Chromium";v="158",
+      "Not.A/Brand";v="24", "Google Chrome";v="158"`, `Sec-CH-UA-Mobile: ?0` and `Sec-CH-UA-Platform: "Linux"`. The
+      third brand ("GREASE") and the order change with each major, worked out as Chromium does
+      (`webua_brands`; checked for 120, 124 and 158);
+    - after the app's own site sends `Accept-CH` (read on the main frame's responses inside the app's scope and on its
+      origin only, `webcall_hints_site`, kept in the profile's `state.json`, `clientHints`, as Chrome keeps it; another
+      site's, a sign-in's or a redirect's, is neither kept nor logged, so no trail of other sites is written), that
+      site's own requests also carry the ones it named:
+      `Sec-CH-UA-Full-Version-List` (`"Chromium";v="158.0.8127.36", "Not.A/Brand";v="24.0.0.0", "Google
+      Chrome";v="158.0.8127.36"`), `-Full-Version`, `-Platform-Version` (`""`), `-Arch` (`"x86"`; `"arm"` on
+      `aarch64`), `-Bitness` (`"64"`), `-Model` (`""`), `-WoW64` (`?0`), `-Form-Factors` (`"Desktop"`). Another site's
+      requests from that page carry only the first three (no Permissions-Policy delegation, a limit);
+    - `navigator.userAgentData` in a secure context (brands, `mobile` false, `platform` "Linux", `getHighEntropyValues()`
+      with the same values in a dictionary's order, `toJSON()`), the `NavigatorUAData` interface (not constructible), and
+      `navigator.vendor` "Google Inc." (WebKit says "Apple Computer, Inc."). `navigator.platform` stays WebKit's
+      ("Linux x86_64" on a PC, as Chrome; "Linux aarch64" on a Pi). Not in workers: the script reaches frames only.
+    The headers come from **`lord-web-ext.so`** (`webext.c`), WebKit's web process extension, because no API of the
+    UI process can add a header to every request: WebKit loads it only from `lord-web-ext/` next to lord-web
+    (`/usr/lib/lordos/bin/lord-web-ext/`, a folder lord-web names itself from `/proc/self/exe`), inside the web process's
+    sandbox, and it only adds those headers in `send-request`, from what lord-web tells it (Chrome or not, the machine,
+    each site's hint bits, all checked again there). The script is `webua.js`, in the page's world with no privileges
+    and no message handler (`webhints.c`); its functions read as native code, as Chrome's do. Other identities get
+    neither (Firefox sends no hints; Edge's own brands and LordOS's are not made up), and switching identity adds or
+    removes both at once. Checked by `build/webua-test` (the table, GREASE, every header, Accept-CH, the state file)
+    and `tests/webcalls_check.py` (the real engine against Chrome 158's captured headers and values).
   - `edge`, **Edge on Linux**: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)
     Chrome/158.0.0.0 Safari/537.36 Edg/158.0.0.0`, what desktop Edge on Linux sends, without LordOS's token. For the
     office, mail and team chat sites of Edge's own maker, which expect it.
@@ -505,16 +575,21 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
 `lord.webapps.probe(url)` starts `lord-web --probe` with the address on fd 3 (one line, at most 2 KB, `https:` only):
 
 - It loads the page in a throwaway profile (a temporary folder, removed after), without a window.
-- It reads the page's web app manifest (`<link rel="manifest">`) and the icons it lists.
+- It reads the page's web app manifest (`<link rel="manifest">`, else one kept at a usual address of the page's own
+  origin) and the icons it lists, and the page's own icons.
 - It answers one JSON line on fd 3: `{ "ok", "name", "startUrl", "scope", "origin", "themeColor", "icons": [{ "src",
-  "sizes", "type" }], "manifest": true|false }`, then exits.
+  "sizes", "type", "purpose" }], "manifest": true|false }`, then exits.
 - It is given 20 s; lord-server kills it after that.
 
 Nothing is installed by a probe. The person sees the real origin and confirms. Then lord-server writes the registry
 file and saves the icon, chosen and fetched by `lord-web --probe-icon` as a second step, into the registry folder,
-after checking it is a PNG or an SVG of at most 1 MB. lord-server chooses it from the answer's `icons`: the largest PNG
-up to 512 px, else the smallest one above, else an SVG (`https:` only). The second step starts right after the first
-(the sheet then shows the icon), and has its own 20 s.
+after checking it is a PNG or an SVG of at most 1 MB. lord-server ranks the answer's `icons` (`https:` only): PNGs
+(the largest up to 512 px, else the smallest above), then SVGs, then the same two for icons that are only
+`maskable`; a `monochrome`-only icon is never taken. An icon is a PNG or an SVG by its type (`image/png`,
+`image/svg+xml`, or `image/svg` as WhatsApp writes it) or, without one, by its extension, and an address that ends in
+another image's extension (`.webp`, `.ico`, `.jpg`, `.gif`, `.avif`, …) is skipped whatever its type says (WhatsApp's
+manifest labels WebP files `image/png`). The second step tries the best three in that order until one really is a
+PNG or an SVG; it starts right after the first (the sheet then shows the icon), and all its tries share one 20 s.
 
 How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `webargs.c`):
 
@@ -524,11 +599,15 @@ How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `weba
 - **`--probe`** loads the page in an ephemeral network session (nothing written to disk) with WebKit's sandbox, no
   window (its frames are given back at once), no permission, no new window, no download. 1.2 s after the load it runs a
   script in an isolated world (the page's scripts can't see or change it) that reads the `<link rel="manifest">`, the
-  `theme-color` meta, the title and the `<link rel="icon">`s, and fetches the manifest with the page's credentials
-  rules. lord-web then checks it all against the address WebKit really loaded (after redirects): the origin is the
+  `theme-color` meta, the title, the `<link rel="icon">`s and apple-touch-icons, and fetches the manifest with the
+  page's credentials rules. A page that links no manifest (WhatsApp's sign-in page, where a signed-out probe ends)
+  gets one looked for on its own origin at `/manifest.webmanifest`, `/manifest.json`, `/site.webmanifest` and
+  `/data/manifest.json` (WhatsApp's): the first that answers 2xx, stayed on the page's origin and is a JSON object with
+  `icons` or `name`. lord-web then checks it all against the address WebKit really loaded (after redirects): the origin is the
   loaded page's, a `start_url` on another origin becomes the page itself, a `scope` that doesn't hold the start address
   becomes the start address's folder, the name is cleaned (no control characters, spaces folded, at most 128 bytes),
-  colors become `#rrggbb`, at most 16 icons with `https:` addresses. Without a manifest the icons are the page's.
+  colors become `#rrggbb`, at most 16 icons with `https:` addresses: the manifest's first, then the page's own, each
+  with its `purpose` when it has one.
 - **Where it may go:** the probe keeps the request's scheme and place. A redirect or a navigation of the page from
   `https:` to `http:`, or from a public host to this computer or a local network (localhost and `*.localhost`,
   `*.local`, 127/8, 0/8, 10/8, 100.64/10, 172.16/12, 192.168/16, 169.254/16, `::1`, fc00::/7, fe80::/10, IPv4 written
@@ -548,7 +627,11 @@ How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `weba
   the probe only (an installed app never goes through it), which runs in WebKit's sandbox, in an empty ephemeral
   session with none of the person's cookies or credentials, and reads only a manifest and an icon. Pinning the
   address at connect time (a proxy of lord-web's own for the probe's network session) is not done yet.
-- **`--probe-icon`** takes one icon address the same way, downloads it into a temporary folder (removed after) and
+- **`--probe-icon`** takes one icon address the same way and opens it as a page is, in a view without a window, with
+  the same ephemeral session, sandbox and Chrome identity as `--probe` and every hop checked the same way; the
+  answer, when it is 2xx, becomes a download (anything else is `web.probe.load`). A download WebKit starts by itself
+  goes out with WebKit's own identity and fetch metadata, and WhatsApp's server answers that with 400. It downloads
+  the icon into a temporary folder (removed after) and
   answers `{"ok":true,"type":"image/png"|"image/svg+xml","size":N}` and a newline, then exactly N bytes. A PNG needs its
   signature and an `IHDR` chunk; an SVG is text whose first element is `<svg>`. Anything else is
   `web.probe.iconType`; over 1 MB, `web.probe.iconTooBig` (the download is stopped there).
@@ -680,6 +763,11 @@ shell sends it (it never shows it as a button), and lord-web calls `webkit_notif
 own `onclick` runs (a messaging app opens that chat), and then brings the window forward with the activation token
 LordOS sent. WebKit 2.48 gives neither a notification's image (the sender's photo) nor its `silent` option.
 
+**Autoplay** (`webback_policies`, webback.h): every web app's view allows autoplay with sound
+(`WEBKIT_AUTOPLAY_ALLOW`), as Chrome does for an installed app. A messaging app's ringtone and new-message sound start
+from the network, never from a click, and WebKit's default (`WEBKIT_AUTOPLAY_ALLOW_WITHOUT_SOUND`) kept them silent:
+calls rang with no sound and messages arrived quietly. Found by the maintainer on 2026-11-26.
+
 LordOS's sound (`notifySound`, `webpage_sound_suppress`): with `"auto"`, lord-web watches WebKit's
 `is-playing-audio`. A page that starts audio less than 1.5 s before or after one of its notifications plays its own
 sound: that notification (when it came first) and every later one go with the `suppress-sound` hint, so LordOS
@@ -687,15 +775,175 @@ doesn't play a second sound. lord-web remembers it for the profile (`state.json`
 first time nothing waits or guesses. notifyd passes `suppress-sound` to the shell, which then shows the banner
 silently.
 
+**The notification log** (`webpage_notify_line`, `webbus.c`): each notification the page hands lord-web writes one
+line to the app's log (`/var/log/lordos/users/<user>/web/<app>-<profile>.log`), in the call log's budget of 60 lines a
+minute (`webcall_log_as`, shared with `webcall:`):
+
+    notify: page tag 3f9a0c17 silent unknown renotify unknown shown
+
+Never the title, the body, the icon or an address. The tag (a messaging app's chat id, often a phone number) is only 8
+hex digits of a hash keyed with a random number lord-web picks at start and never writes: two lines of the same run can
+be matched, a line can't be turned back into the tag, and the next run gives other digits. `none` when there is no
+tag. `replaced` when it took the place of one with the same tag (lord-web's own replace, or WebKit withdrawing the old
+one less than a second before). `silent` and `renotify` are `unknown`: WPE 2.54's `WebKitNotification` tells neither.
+With it, "the sound played but no banner" can be told apart: no `notify:` line means the page never posted one.
+
+**A service worker's notifications** (`registration.showNotification`, a "persistent" notification). WebKit 2.54's
+GLib port doesn't give them to the view: `WebKitNotificationProvider::show` gets no page for them (its "pageless"
+branch, `UIProcess/API/glib/WebKitNotificationProvider.cpp`), and sends them itself to `org.freedesktop.Notifications`
+(`UIProcess/Notifications/glib/NotificationService.cpp`). In LordOS that is notifyd, which still files it under the
+web app by lord-web's process, with `notifyd_plain` on its text, and WebKit replaces a same-tag one itself. A click
+reaches WebKit (`ActionInvoked`), which fires `notificationclick` in the service worker. What that path lacks: no
+`suppress-sound` (LordOS's sound can double the page's), no `silent`, and the window doesn't come forward, because
+GLib's WebKit doesn't implement `clients.focus()` or `clients.openWindow()` from a service worker
+(`focusFromServiceWorker`), and lord-web never sees these notifications, so they get no `notify:` line either.
+lord-web sets GLib's application name to the app's (`g_set_application_name`, webmain.c): before, WebKit sent
+`[Invalid UTF-8]` as the app name and GLib logged a critical for each one.
+
+A messaging web app checked on 2026-11-26 (its bundle as cached by lord-web) uses this path only when
+`Notification.maxActions` is at least 1, which WebKit 2.54 doesn't implement, so its message notifications are page
+notifications; its app log since 2026-11-11 has none of the criticals the service-worker path writes.
+
+Follow-up, not built: a WebKit patch for the backport (`+4.2` or later, `tools/pkg/wpewebkit-chroot.sh`): when a
+pageless notification arrives, `WebKitNotificationProvider` looks for a view of the same network session whose page
+has the notification's origin and emits that view's `show-notification`, keeping the D-Bus path when there is none.
+lord-web's own path would then apply unchanged (`notify:` line, sound rule, tag replace, the window brought forward on
+click), and `webkit_notification_clicked` and `webkit_notification_close` would reach the service worker as
+`notificationclick` and `notificationclose` through the service-worker notification manager, as they do now from
+D-Bus. A page-side shim was set aside: it can't fire `notificationclick` and doesn't see what the worker shows itself.
+
+## Calls (in development; approved by the maintainer on 2026-11-25)
+
+Voice and video calls in web apps (a messaging web app first, also video meeting sites), for the release after
+0.8.9.6.2. What a call needs, and where each piece is:
+
+- **WebRTC in the engine.** Debian builds WPE WebKit without WebRTC, so `RTCPeerConnection` didn't exist. LordOS's
+  build `2.54.3-1~lordos13+3` turns it on with WebKit's GStreamer backend (GStreamer 1.26's `webrtcbin`; ICE by libnice,
+  `gstreamer1.0-nice`; DTLS, SRTP and SCTP from plugins-bad; Opus, VP8, H.264 through OpenH264) ([WPEWEBKIT.md](WPEWEBKIT.md)).
+  `lordos-web` depends on `gstreamer1.0-nice`. Checked 2026-11-25 on amd64 (`tests/webcalls_check.py` in the build's test
+  chroot, WebKit's sandbox on): `RTCPeerConnection`, `RTCRtpSender.getCapabilities` and `RTCRtpScriptTransform` exist;
+  the engine offers audio `opus`, `PCMU`, `PCMA`, `telephone-event` and video `H264`, `VP8`, `VP9` (Chrome 158 also has
+  `red`, `G722`, `CN`, `AV1`, `rtx`, `ulpfec`); `createEncodedStreams`, `MediaStreamTrackProcessor`/`Generator`,
+  `WebTransport` and `setSinkId` don't exist (Chrome has them).
+- **SharedArrayBuffer when the site is cross-origin isolated.** A messaging web app checks, before it offers calls,
+  `SharedArrayBuffer`, `Atomics` and `RTCPeerConnection` (its own gating code, read 2026-11-25), and its page is served
+  with COOP `same-origin` and COEP `require-corp`. WPE never had SharedArrayBuffer: WebKit gives such a page a web
+  process of its own but only its Cocoa ports turned SharedArrayBuffer on there. LordOS's build does the same on Linux
+  (`lordos-sharedarraybuffer-coi.patch`), so SharedArrayBuffer exists only in cross-origin-isolated pages, as in
+  Chrome and Safari (Spectre: never for a page that isn't isolated). lord-web drops `JSC_*` from its environment, so
+  nothing turns it on for every page.
+- **Chrome's identity, all of it** ("Browser identity" above): the site reads the User-Agent string, the Client Hints
+  and `navigator.userAgentData`, and treats a WebKit it recognises differently (another code path for calls); with the
+  Chrome identity all three say Chrome 158 on Linux, from one table.
+- **Microphone and camera** ("Permissions" above): the page's `getUserMedia` reaches lord-web as WebKit's permission
+  request and is answered from the registry or by LordOS's own prompt (`Ask`, lord-server's dialog), once per app,
+  revocable in Settings → Web Apps (Camera, Microphone, Screen). The page lists devices (`enumerateDevices`, with
+  names) only once one of them is allowed, and chooses among them with its own picker; LordOS Studio's virtual camera
+  is one of them when it is on. WebKit captures the microphone through PulseAudio (pipewire-pulse) from its sandboxed
+  web process, which the capture indicator already shows under the web app (PRIVACY.md); the camera WebKit opens through
+  V4L2 (`/dev/video*`, which WebKit's sandbox binds for the web process), which the indicator doesn't see
+  (PRIVACY.md, "Not covered"): lord-web logs WebKit's own capture state (`capture: camera on`) and a way for it to tell
+  the indicator is proposed for the maintainer's review (a new lord-web → lord-server method, not built).
+- **The network: ICE in WebKit's network process (librice, `+4`).** WebKit's web process has no network of its own
+  (bubblewrap's `--unshare-net`, unchanged). With `+3` WebKit's GStreamer backend ran ICE (libnice) inside it, saw only
+  the sandbox's loopback interface, ignored it and gathered no candidate at all, so nothing connected. The maintainer
+  chose librice on 2026-11-25: with `-DUSE_LIBRICE=ON` WebCore's ICE agent speaks librice's protocol and every ICE
+  socket (UDP, and TCP for ICE-TCP and TURN over TCP/TLS) is opened by WebKit's **network process**, which already has
+  the network for every page load and runs in lord-web's firewall scope like the rest of the app; the web process keeps
+  none. LordOS builds librice for Debian 13 ([WPEWEBKIT.md](WPEWEBKIT.md), "librice"). Checked 2026-11-25 on amd64 in
+  the build's test chroot with WebKit's sandbox on (`tests/webcalls_check.py --webrtc`): the two peer connections of
+  one page gather host candidates (4 UDP, 8 TCP) and connect in 300 to 400 ms, with Opus and VP8 (215 to 221 audio
+  packets, 64 to 67 frames of 320×240 in 4 s), and again with Opus and H.264; the audio comes from WebKit's mock
+  microphone (`WEBCALLS_MOCK_CAPTURE=1`, test only), the video from a canvas.
+- **Received video and hardware decoders.** WebKit's GStreamer backend asks its registry scanner whether a hardware
+  decoder handles a received video codec. When one does, it leaves the track encoded and decodes it only in the
+  playback pipeline of the `<video>` element that shows it; otherwise it decodes it at once in software. On a PC with an
+  AMD or Intel GPU and Mesa's VA-API driver, H.264 goes to `vah264dec` (gst-plugins-bad's `va` plugin), which opens the
+  GPU's render node inside WebKit's sandboxed web process (WebKit's bubblewrap gives it `/dev/dri`) and decodes there;
+  VP8 and VP9 on an RX 580, which has no hardware decoder for them, go to `vp8dec` and `vp9dec`; without a GPU, H.264
+  goes to `openh264dec`. A track that no element plays therefore decodes nothing on such a PC, and its `inbound-rtp`
+  stats have no `framesDecoded` until an element plays it; every call page shows its video, so calls are unaffected.
+  lord-web sets nothing here: forcing early decoding (`WEBKIT_GST_WEBRTC_FORCE_EARLY_VIDEO_DECODING=1`) would decode
+  tracks nobody shows, and lowering the VA decoders' rank would give up the GPU that works. Checked 2026-11-26 on the
+  maintainer's PC (RX 580, `+4.1` installed): `tests/webcalls_check.py --webrtc` plays the received video in a `<video>`
+  element and requires frames shown there (`requestVideoFrameCallback`) as well as decoded, for VP8, VP9 and H.264: 59
+  frames of 320×240 shown each in 4 s, H.264 through `vah264dec`; the same with `LIBGL_ALWAYS_SOFTWARE=1` (lord-web's
+  shared-memory mode) and with `/dev/dri` hidden (H.264 through `openh264dec`, as in the build's test chroot).
+- **TURN URLs with `?transport=`.** WebKit 2.54's `RTCPeerConnection` refused every TURN server URL with a query (an
+  inverted check), and sites hand out `turn:host:443?transport=tcp` (RFC 7065): a video meeting site's page threw
+  `SyntaxError` when it created its connection. `lordos-turn-transport-query.patch` (`+4`) accepts exactly
+  `transport=udp` and `transport=tcp`, which the ICE agent reads; `tests/webcalls_check.py` checks both and that another
+  query is still refused.
+- **Against Chrome, and where calls stop today** (2026-11-26, amd64, `+4` in the build's test chroot with WebKit's sandbox
+  on, Chrome 158 headless on the same machine with its fake camera and microphone; `tests/webcalls_pair.py`, a
+  signaling server of its own, and `tests/webcalls_jitsi.py`, by hand):
+  - **lord-web's engine offers, one transport (`bundlePolicy: 'max-bundle'`): works.** Connected in 201 ms over
+    host/UDP; both directions carry audio and video: lord-web's engine received 552 Opus packets and 221 H.264 frames of
+    640×480 and sent 772 and 300 in 15 s; its call log said `connection connected`, `out audio audio/OPUS`, `out video
+    video/H264 640x480 30 fps`, `in video …`, `in audio …`.
+  - **It offers with WebKit's default (`balanced`, a transport per media):** video flows both ways (about 690 frames of
+    640×480 each way) but the audio transport never connects, so neither side hears and both stay `connecting`.
+  - **Chrome offers, lord-web's engine answers:** the answer picks PCMU instead of the Opus Chrome offered first, video
+    doesn't flow and Chrome receives nothing. WebKit names Opus `OPUS` in its own capabilities; the answer's matching of
+    the offer's `opus` is the first suspect.
+  - **A public video meeting server (Jitsi Meet, through its video bridge, which offers):** the page joins, ICE
+    connects, but the bridge re-offers about 4 times a second (a renegotiation loop: 242 offers in 55 s) and DTLS never
+    finishes (WebKit's DTLS client hello goes out six times with no answer), so no media either way. TURN through librice
+    fails too (`LongTermClientAuthError { reason: UnsupportedFeature }`: WebKit asks librice for TURN's anonymous-username
+    feature as required). Two headless Chromes through the same server, the same way, exchange 720p VP9 and Opus both ways.
+  - So a call works today when the page offers with one transport; the answering side, several transports and the
+    bridge's renegotiation are WebKit GStreamer WebRTC bugs still to fix (or to take from a newer WebKit) before a
+    messaging web app's calls can be expected to work. Not yet tried with the messaging app itself (it needs the
+    maintainer's account).
+- **The call log** (`webcall.h`, `webcall.c`, `webcalls.c`, `webcall.js`): lines starting `webcall: ` in the app's log
+  (`web/<app>-<profile>.log` in the user's log folder, docs/SYSTEM.md "Log files"; the Logs app and `lordos-issue` show
+  it), always on, at most 60 a minute. They say what the page has for calls, each peer connection, its ICE gathering,
+  ICE connection, connection and signaling states, once connected (and every 5 minutes) the codec, size and frame rate
+  of each direction and the kinds of ICE candidates in use, errors by name and the call that failed, `getUserMedia` and
+  `getDisplayMedia` (what, the result, the error's name, each device as a closed word: `built-in`, `usb`,
+  `bluetooth`, `virtual`, `lordos-studio`, `other`), the permission answers, WebKit's capture state, and the Client
+  Hints the app's own site asked for. Never SDP, ICE candidates, addresses, ports, tokens, ids, phone numbers, device
+  labels, other sites' addresses or anything said in the call: the page-side script sends only fixed fields, and
+  `webcall_line` checks each against a closed list or pattern again and drops the rest. Example:
+
+  ```
+  webcall: page: crossOriginIsolated yes, SharedArrayBuffer yes, Atomics yes, RTCPeerConnection yes, getUserMedia yes
+  webcall: client hints asked by the app: sec-ch-ua-full-version-list, sec-ch-ua-arch, sec-ch-ua-bitness
+  webcall: permission microphone: allowed (asked)
+  webcall: getUserMedia audio: granted (audio usb)
+  webcall: capture: microphone on
+  webcall: peer connection 1 created
+  webcall: peer connection 1: ice-gathering gathering
+  webcall: peer connection 1: ice-connection checking
+  webcall: peer connection 1: connection failed
+  ```
+
+  The page-side script (`webcall.js`, the app's main frame, the page's world) only watches: `RTCPeerConnection` stays
+  the engine's (a proxy that constructs the same object; `instanceof`, statics and `constructor` unchanged), its
+  methods are the engine's called through, every function reads as native code, and nothing is added that the engine
+  lacks. It reports through a DOM event with a name random per process to a bridge in lord-web's own isolated world
+  (`lordos-web-call`), the only world with the `lordosCall` message handler: the page never sees a
+  `webkit.messageHandlers` of lord-web's.
+- **Tests:** `build/webua-test` (the line for each kind of report, what is dropped: an address, SDP, a candidate, an
+  unknown kind or word, a label; the device words; the rate; only the app's own site's Client Hints kept),
+  `tests/webcalls_check.py` with `build/webcalls-check` (the real engine, headless, WebKit's sandbox on: Chrome's
+  identity, SharedArrayBuffer only when isolated, and with `--webrtc` the loopback below), also run by
+  `tools/pkg/wpewebkit-chroot.sh`'s test on the WebRTC build.
+
 ## What `lord-web` uses of the session (like any Linux app)
 
 - **Files:** WebKit's file chooser goes through the FileChooser portal. Downloads go to the XDG Downloads folder only,
-  with a notification when done.
+  with a notification when done; the context menu's Save Image As… and Save Video As… ask with the portal's
+  `SaveFile` and go to the file the person chose (in the home folder, not hidden, not a launcher).
 - **Notifications:** `org.freedesktop.Notifications` (`notifyd`). A click tells the page, then opens that app's window.
 - **Links outside `scope`:** OpenURI, so they open in the person's browser.
 - **Screen sharing:** the ScreenCast portal (`docs/WAYLAND.md`).
 - **Background:** a StatusNotifierItem tray icon with Open and Quit when `background` and `tray` are on.
-- **The clipboard and the keyboard:** a normal Wayland client.
+- **The clipboard and the keyboard:** a normal Wayland client; the person's page selection is also the session's
+  primary selection (`zwp_primary_selection_v1`), which LordOS's Speech reads aloud.
+- **Search the web:** OpenURI with the chosen engine's address (Settings → Web Apps).
+- **Spelling:** WebKit's checker with enchant and the installed hunspell dictionaries (`spellang.h`); Add to
+  Dictionary writes the person's enchant word list.
 
 ## Isolation
 
@@ -726,7 +974,8 @@ silently.
     with an unknown key, a wrong type, a bad id or address, a scope that isn't a prefix of `startUrl` or not on
     `origin`, or an app or profile that isn't the one asked for (`webargs.c`, `webreg.c`, `weburl.c`, tested by
     `tests/webapp_test.c`); and when `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS` is set. It drops the variables that
-    point WebKit or GStreamer at other code (`WEBKIT_*`, `WPE_*`, `GST_PLUGIN*`, `GIO_EXTRA_MODULES`, `LD_PRELOAD`…).
+    point WebKit or GStreamer at other code (`WEBKIT_*`, `WPE_*`, `GST_PLUGIN*`, `GIO_EXTRA_MODULES`, `LD_PRELOAD`…)
+    and JavaScriptCore's options (`JSC_*`: `JSC_useSharedArrayBuffer` would give every page SharedArrayBuffer, "Calls").
 - **What a page never gets:** no `lord.*`, no broker, no script injected with privileges. The one script of lord-web's
   a page can see is the clipboard's `write` and `writeText` that WPE lacks, and what it hands over reaches the
   session only right after the person's own key or click in the window. The files of a drop are only the ones the
@@ -807,11 +1056,23 @@ probe's (`$XDG_RUNTIME_DIR/lordos-web-probe/`), checked again as a PNG or an SVG
 `~/.cache/lordos/web/icons/<app>.png|svg` (`ui/webicon.c`: the name is the app id and the kind, nothing from the site;
 the folder is in `fsops_protected`). `list()` and `get()` give it as `iconPath` (with `siteIcon: true`), so the Dock,
 the launcher, the switcher and Settings use it; `icons()` lists the cache for the Store. Errors: `webapps.iconOrigin`,
-`webapps.noIcon` and the probe's.
+`webapps.noIcon` and the probe's: when no icon was usable, lord-server passes on the runtime's code for the last one
+tried (`iconError`, a `web.probe.…` code).
 
 - **When:** the Store's cards ask for it lazily (`wantSiteIcon`), one probe at a time, never twice in a session for an
   app that failed; an installed catalog app without one gets it when it is launched (never blocking the launch);
-  Settings → Web Apps → Refresh icon fetches it again. Without lord-web the letter tile stays.
+  Settings → Web Apps → Refresh icon fetches it again: a spinner while the probe runs, then "Icon updated from the site"
+  and the new icon, or the reason there is none (`webapps.iconOrigin`, `webapps.noIcon`, the probe's code,
+  `webapps.noRuntime`); it never fails silently (`siteIconStatus` in `sdk/webapps.js`). Each failure, from Settings or
+  from the Store's lazy fetch, is one line in `shell.log`: `js: [warn] webapps: the site's icon of <app> was not kept:
+  <code>`, the app's id and a closed code, never an address from the page. lord-server's compositor log has one line
+  per refused icon (`webapps: probe <n>: icon <i> of <k> refused: <code>`), without its address. Without lord-web the
+  letter tile stays.
+- **WhatsApp** (2026-11-26): the signed-out probe ends on `/login/`, which links no manifest; its manifest is found at
+  a usual address (`/manifest.json`), and its 512 px PNG is fetched with the Chrome identity.
+  `tests/web_probe_test.py` keeps a local fixture of that pattern (a redirect, no manifest link, a WebP shortcut icon,
+  WebPs labelled PNG, a maskable `image/svg` SVG, strict CSP, COOP, COEP and Document-Isolation-Policy headers, and 400
+  to a request that isn't Chrome's).
 - An address-added app's icon is still the one saved in the registry when it was added; uninstalling it removes its
   cached icon too (a catalog app's stays for the Store's card).
 
@@ -862,6 +1123,24 @@ Notification sound and, when LordOS's sound plays, which one.
 - **Each profile's data** in Settings → Web Apps is measured again when a profile is added or starts running and every
   30 s: before, a profile added during the visit showed "none yet" until Settings was opened again, because its folder
   only exists after its first start.
+
+## Spelling (in development)
+
+lord-web turns on WebKit's own spell checker (`webkit_web_context_set_spell_checking_enabled`; WebKit checks with
+enchant and hunspell's dictionaries) in every text field of the page, underlining misspelled words as the person
+types. The languages come from one small model (`server/src/spellang.h`), the one LordOS's own text fields will share:
+the interface language's dictionary (the locale's region first, es_AR for es_AR.UTF-8, then the language's usual
+one, es_ES, pt_BR, en_US…, then any installed region) and English's, only dictionaries that are installed
+(`/usr/share/hunspell/<tag>.dic` with its `.aff`). Without one, spelling stays off and lord-web's log says so. The
+`lordos-web` package recommends `hunspell-en-us`, `hunspell-es` and `hunspell-pt-br`.
+
+WebKit's suggestions reach LordOS's context menu only on WPEPlatform (2.54): there the page script leaves a right
+click in a text field to WebKit, which asks for its own menu (the view's `context-menu`); lord-web keeps its spelling
+suggestions (at most five), Ignore Spelling and Learn Spelling (shown as Add to Dictionary, the person's enchant word
+list) and shows nothing of WebKit's. The page script's report and WebKit's request come in either order, so a text
+field's report waits for WebKit's at most 300 ms. A suggestion chosen in LordOS's menu runs WebKit's own item, which
+replaces the word. `tests/web_menu_check.c` checks this on the real engine, headless: the suggestions, the word
+replaced after the menu, and the view still taking clicks (WPE 2.48 didn't).
 
 ## Developer tools (0.8.8.9)
 
@@ -998,6 +1277,55 @@ When the app's own page (an address inside its `scope`) can't load for lack of n
 - **While hidden:** an app in the background keeps trying, so it is connected again (and its notifications come) by
   the time the network is back.
 
+## When a web app stops answering (in development)
+
+Reported on 2026-11-26: after the engine hung, opening WhatsApp from the launcher did nothing. A launch of an app that
+runs only asks its lord-web to show its window (`Show`, no answer wanted), and a window hidden in the background maps
+again only with a new frame from the web process. A `lord-web` whose main loop is stuck never handles `Show`; a web
+process that is stuck never sends that frame. Either way nothing appeared, nothing noticed, and the profile's lock and
+lord-server's table kept a new process from starting. Now both sides keep watch, by the same rules
+(`server/src/web/webwatch.c`, `tests/webwatch_test.c`):
+
+| | lord-server watches each `lord-web` (`ui/webalive.c`) | `lord-web` watches its page (`web/webhang.c`) |
+|---|---|---|
+| Ping | `org.lordos.WebApp1.Ping() → s` on the app's bus name, answered from lord-web's main loop (`"ok"`, or `"page"` while a page ping is late) | `"0"` evaluated in a script world of lord-web's own (`lordos-watch`; the page's globals are never touched), answered by the web process's main thread |
+| Every | 15 s | 15 s |
+| A miss | no answer in 10 s; two in a row are a hang | no answer in 15 s; two in a row are a hang |
+| At once | when the person asks for the app while it runs (launcher, Dock: `lord.webapps.launch` answering `running`): one ping, 5 s | when the window is shown (`Show`, the tray) and when WebKit says the page stopped responding (`is-web-process-responsive`): one ping, 8 s |
+| Grace after the start | 20 s | 45 s (and again after each new web process) |
+| A hang | the process is ended and started again, and the shell shows "WhatsApp wasn't responding and was restarted" (the `webapps-restarted` event) | `webkit_web_view_terminate_web_process`; `web-process-terminated` then says it was lord-web's own, so the app's page loads again in a new web process (not counted as a crash) and a notification says "The page wasn't responding and was loaded again" |
+
+- **What counts as an answer:** any reply. An older `lord-web` without `Ping` answers `UnknownMethod`: it is there (an
+  update while apps run doesn't restart them). The bus saying nobody owns the name (`ServiceUnknown`,
+  `NameHasNoOwner`) counts as no answer once the grace is over: a launch couldn't reach it either. The bus's own
+  `NoReply` decides nothing; lord-server's wait does.
+- **Not the watcher's silence:** when the watcher itself didn't run for 3 s (lord-server busy, the computer asleep),
+  the wait in progress and the grace start again.
+- **Not in a loop:** at most 3 automatic restarts of one app and profile in 10 minutes; after that it is left alone and
+  logged, unless the person asks for it (a launch, the Dock) while it hangs.
+- **Ending it** (`webmgr.c`, `end_kid`): only a `lord-web` of lord-server's own table, never a pid from JS. Its process
+  group (its own session: `spawn` calls `setsid`, and WebKit's processes are in it) gets `SIGTERM`, then `SIGKILL`
+  after 2 s; then each process that was under it before (`webmem_descendants`) and is still the same process (pid and
+  start time, `webmem_start_time`) gets `SIGKILL`, in case one left the group. The app's scope is shared by all its
+  profiles, so it is never killed whole. A process that won't go even then (stuck in the kernel) no longer counts as
+  the app's and is reaped when it ends.
+- **By hand** (both ask first; only the confirm reaches lord-server):
+  - Settings → Web apps → *app*: **Restart** and **Force Quit** on each running profile (`lord.webapps.restart`,
+    `lord.webapps.quit`);
+  - Settings → Web apps → **Restart web apps engine**: every running web app ended and started again
+    (`lord.webapps.restartAll`);
+  - the Window menu of a web app's window: **Restart…** and **Force Quit…** (`<WebAppRestartPrompt />`).
+  A restart starts it with developer tools again only while developer mode is on.
+- **Log lines, closed words only** (no address, no page text): lord-server's `webapps: <app>/<profile> did not answer:
+  restarted`, `… restarted 3 times in 10 minutes, left alone`, `… force quit`, `… restarted by the person`,
+  `webapps: engine restarted by the person: <n> app windows`; lord-web's `lord-web: the page did not answer: its web
+  process restarted`, `lord-web: WebKit says the page stopped responding`, `lord-web: the page responds again`.
+- **Tests:** `build/webwatch-test` (the rules on a made-up clock), `build/webmem-test` (the processes under a lord-web,
+  start times), `build/webalive-test` under `dbus-run-session` (a stand-in lord-web, `tests/webalive_fake.c`, that stops
+  answering: restarted with the child that left its group, the urgent ping, `UnknownMethod`, the limit, Force Quit,
+  Restart and Restart all), `build/webhang-check fine|hang|urgent` (a page whose script never returns, on the real
+  engine headless: a new web process that works) and `tests/webapps_restart_settings_scene.mjs` (Settings).
+
 ## Not in the first version
 
 - Web push while the app is closed: WPE has no push service outside Apple's platforms, so the tray keeps the app
@@ -1006,4 +1334,4 @@ When the app's own page (an address inside its `scope`) can't load for lack of n
 - Dark mode through CSS alone: pages that choose their colors only with `@media (prefers-color-scheme)` rules stay
   light (WPE 2.48 has no API for the scheme; "Light and dark" above). Scripts that ask `matchMedia` follow the desktop.
   For the same reason Light and Dark per app are held back until the move to WPEPlatform.
-- WhatsApp Web's calls: they depend on WPE's WebRTC and on the service. Still to check.
+- Calls: in development ("Calls" above).

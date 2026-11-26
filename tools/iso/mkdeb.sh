@@ -649,6 +649,10 @@ RCLONEDEPS=", lordos-rclone (>= 1.75.2)"
 # Recommends (non-free-firmware, like the microcode above): the Store's update
 # brings the Recommends a new version adds, and one the sources don't have doesn't stop it (server/src/pkg/resolve.c)
 FIRMWARERECS=", firmware-mediatek"
+# The toolkit audit's bindings (lordos-testbench --toolkits, docs/TOOLKIT-AUDIT.md) and Qt's platform theme
+# (QT_QPA_PLATFORMTHEME=gnome, server/src/wl/toolkitenv.h), the same as the images' PKGS_TOOLKITS: an installed
+# system gets them with the Store's update, which installs the Recommends a new version adds
+TOOLKITRECS=", python3-gi, gir1.2-gtk-3.0, gir1.2-gtk-4.0, python3-pyqt5, python3-pyqt6, qtwayland5, qt6-wayland, qgnomeplatform-qt5, qgnomeplatform-qt6"
 # Intel graphics firmware (i915/xe DMC, GuC, HuC), split out of firmware-misc-nonfree the same way: amd64 only
 [ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ] && FIRMWARERECS="$FIRMWARERECS, firmware-intel-graphics"
 SIZE=$(du -sk "$PKG/usr" | awk '{s += $1} END {print s}')
@@ -660,7 +664,7 @@ Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
 Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$TTSDEPS$MEDIADEPS$CASTDEPS$RTCDEPS
 Breaks: lordos-web (<< $VERSION)
-Recommends: qemu-guest-agent, pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS$MICROCODERECS$FIRMWARERECS
+Recommends: qemu-guest-agent, pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, bind9-dnsutils, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS$MICROCODERECS$FIRMWARERECS$TOOLKITRECS
 Section: x11
 Priority: optional
 Protected: yes

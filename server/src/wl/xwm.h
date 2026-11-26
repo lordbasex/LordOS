@@ -37,7 +37,10 @@ void xwm_resize(XWin *w, int width, int height);   /* the theme's frame gave it 
 void xwm_set_state(XWin *w, int maximized, int fullscreen, int minimized);
 void xwm_focus(XWin *w);                       /* NULL: a LordOS or Wayland window has the keyboard */
 void xwm_close(XWin *w);
-void xwm_tick(void);                           /* once per loop (wl_flush): clipboard changes, output */
+void xwm_tick(void);
+/* XSETTINGS for GTK 3 on X11 (xsettings.h): the GTK theme, title bar buttons, font and icon theme the portal gives
+ * GTK on Wayland. Kept until Xwayland starts, and served live from then on. */
+void xwm_xsettings(const char *theme, const char *buttons, const char *font, const char *icons);                           /* once per loop (wl_flush): clipboard changes, output */
 /* Drag and drop with X apps (XDND, see xwm.c). Actions are wl_data_device_manager's bits (1 copy, 2 move, 4 ask).
  * A drag of LordOS's Files or of a Wayland app over an X window: xwm is its XDND source. mimes: its types;
  * x, y: the pointer (logical; xwm turns them into the X root's X pixels, xwscale.h); want: the action asked for. */

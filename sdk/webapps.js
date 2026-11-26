@@ -17,17 +17,28 @@
 //   webBadges (store) · webBadgeEvent(data)    the unread counts lord-web set (SetBadge): { [app]: { [profile]: n } }
 //   siteIcons (store) · wantSiteIcon(app) · refreshSiteIcon(app)   the site's own icon, fetched one at a time with the
 //                                  probe (lord.webapps.fetchIcon) and kept in ~/.cache/lordos/web/icons/
+//   siteIconStatus (store)         { [app]: { state: 'busy' | 'ok' | 'error', error } }: the last fetch of each app's
+//                                  icon (Settings → Web apps shows it); each failure is one line in the shell's log
 //   webDeveloper (store) · setWebDeveloperMode(on)   Settings → Web Apps → Developer mode (off by default)
+//   webSearchEngine (store) · setWebSearchEngine(name)   Settings → Web Apps → Search the web with (Google by default):
+//                                  the engine of the page context menu's "Search the web for “…”"
 //   webInspectItem(w)              the Window menu's Inspect (developer tools) for a web app's window while developer
 //                                  mode is on, else null; it asks first (webInspectAsk, <WebAppInspectPrompt />)
 //   webInspectAsk (store) · answerWebInspect(yes)   then lord.webapps.inspect starts that window again with WebKit's
 //                                  inspector on 127.0.0.1, which lord-web opens in the person's browser
+//   restartWebApp(app, profile) · quitWebApp(app, profile) · restartWebEngine()   Restart, Force Quit and Restart web
+//                                  apps engine (Settings → Web apps, the Window menu; the caller asks the person first):
+//                                  only the lord-web lord-server started for that app and profile. Throw the server's error
+//   webRestartItems(w)             the Window menu's Restart… and Force Quit… for a web app's window; they ask first
+//                                  (webRestartAsk, <WebAppRestartPrompt />), then answerWebRestart(yes) does it
+//   webRestartedTitle(data)        lord-server restarted an app that stopped answering (ui/webalive.c, the
+//                                  "webapps-restarted" event): the notification's words (hardware.jsx shows it)
 //
 // Only lord-server starts lord-web, with an app and a profile from the registry; nothing here names a URL to
 // open or a program to run.
 import { createStore, useStore } from './store.js';
 import { useEffect } from 'react';
-import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, webEditItems, inspectItem, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
+import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, siteIconError, webEditItems, inspectItem, restartItems, appProfileName, searchEngineOf, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
 import { t } from './i18n.js';
 
 const has = () => typeof lord !== 'undefined' && typeof lord.webapps === 'object' && lord.webapps !== null;
@@ -37,8 +48,11 @@ export const webAsks = createStore([]);
 export const webBadges = createStore({});
 export const webMenu = createStore(null);
 export const siteIcons = createStore({});
+export const siteIconStatus = createStore({});
 export const webDeveloper = createStore(false);
+export const webSearchEngine = createStore('google');
 export const webInspectAsk = createStore(null);
+export const webRestartAsk = createStore(null);
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -148,21 +162,32 @@ function readIcons() {
   try { const m = has() && typeof lord.webapps.icons === 'function' ? lord.webapps.icons() : null; if (m && typeof m === 'object') siteIcons.set(m); } catch (e) { /* an older server */ }
 }
 
+function iconStatus(app, state, error) {
+  siteIconStatus.set({ ...siteIconStatus.get(), [app]: error ? { state, error } : { state } });
+  // one line in the shell's log per failure: the app's id and a closed code, never an address from the page
+  if (error) console.warn(`webapps: the site's icon of ${app} was not kept: ${error}`);
+}
+
 function pump() {
   if (busy || !queue.length) return;
   const app = queue.shift();
   let id = 0;
-  try { id = lord.webapps.fetchIcon(app); } catch (e) { id = 0; }
-  if (!id) { pump(); return; }
+  try { id = lord.webapps.fetchIcon(app); } catch (e) { iconStatus(app, 'error', siteIconError(e)); }
+  if (!id) {
+    if (siteIconStatus.get()[app]?.state === 'busy') iconStatus(app, 'error', 'webapps.probeFailed');
+    pump();
+    return;
+  }
   busy = app;
   const t0 = Date.now();
   const timer = setInterval(() => {
     let r = null;
-    try { r = lord.webapps.iconResult(app); } catch (e) { r = { done: true, ok: false }; }
+    try { r = lord.webapps.iconResult(app); } catch (e) { r = { done: true, ok: false, error: siteIconError(e) }; }
     if (!r && Date.now() - t0 < 45000) return;
     clearInterval(timer);
     busy = null;
-    if (r && r.ok) { readIcons(); refreshWebApps(); }
+    if (r && r.ok) { iconStatus(app, 'ok'); readIcons(); refreshWebApps(); }
+    else iconStatus(app, 'error', r ? siteIconError(r) : 'webapps.probeTimeout');
     pump();
   }, 500);
 }
@@ -171,14 +196,15 @@ function enqueue(app, force) {
   if (!has() || typeof lord.webapps.fetchIcon !== 'function' || busy === app || queue.includes(app)) return;
   const cached = !!siteIcons.get()[app];
   if (!force && !wantsSiteIcon({ available: webAppsAvailable(), cached, tried: tried.has(app) })) return;
-  if (force && !webAppsAvailable()) return;
+  if (force && !webAppsAvailable()) { iconStatus(app, 'error', 'webapps.noRuntime'); return; }
   tried.add(app);
+  iconStatus(app, 'busy');
   queue.push(app);
   pump();
 }
 // The Store's cards and an app's launch: fetched once when lord-web is there and nothing is cached yet.
 export const wantSiteIcon = (app) => enqueue(app, false);
-// Settings → Web apps → Refresh icon: fetched again now.
+// Settings → Web apps → Refresh icon: fetched again now (siteIconStatus says how it went).
 export const refreshSiteIcon = (app) => enqueue(app, true);
 export const siteIconBusy = (app) => busy === app || queue.includes(app);
 
@@ -228,6 +254,19 @@ export function setWebDeveloperMode(on) {
   try { lord.webapps.setDeveloperMode(!!on); } finally { readDeveloperMode(); }
 }
 
+// ---- Search the web (docs/WEBAPPS.md, "Editing") ----
+
+function readSearchEngine() {
+  let v = 'google';
+  try { if (has() && typeof lord.webapps.searchEngine === 'function') v = lord.webapps.searchEngine(); } catch (e) { v = 'google'; }
+  webSearchEngine.set(searchEngineOf(v));
+}
+
+// Settings → Web Apps → Search the web with: one of SEARCH_ENGINES (lord-server checks it again and keeps it)
+export function setWebSearchEngine(name) {
+  try { lord.webapps.setSearchEngine(searchEngineOf(name)); } finally { readSearchEngine(); }
+}
+
 // The Window menu's Inspect (developer tools) for a window of a lord-web we started, only while developer mode is on;
 // checked while that window has them (they end when it closes).
 export function webInspectItem(w) {
@@ -243,6 +282,52 @@ export function answerWebInspect(yes) {
   webInspectAsk.set(null);
   if (!q || !yes) return;
   try { lord.webapps.inspect(q.app, q.profile); } catch (e) { console.error('inspect:', e.code || e); }
+}
+
+// ---- Restart and Force Quit (docs/WEBAPPS.md, "When a web app stops answering") ----
+
+const hasCall = (name) => has() && typeof lord.webapps[name] === 'function';
+
+// That profile's window ended and started again: 'restarted' (or 'started' when it wasn't running).
+export function restartWebApp(app, profile) {
+  if (!hasCall('restart')) throw Object.assign(new Error('unavailable'), { code: 'webapps.noRuntime' });
+  return lord.webapps.restart(app, profile);
+}
+
+// That profile's window ended without saving: true when it was running.
+export function quitWebApp(app, profile) {
+  if (!hasCall('quit')) throw Object.assign(new Error('unavailable'), { code: 'webapps.noRuntime' });
+  return lord.webapps.quit(app, profile);
+}
+
+// Every running web app ended and started again: how many.
+export function restartWebEngine() {
+  if (!hasCall('restartAll')) throw Object.assign(new Error('unavailable'), { code: 'webapps.noRuntime' });
+  return lord.webapps.restartAll();
+}
+
+// The Window menu's Restart… and Force Quit… for a window of a lord-web we started; each asks first.
+export function webRestartItems(w) {
+  const web = w?.args?.web;
+  if (!web || !hasCall('restart')) return [];
+  return restartItems(web, webRunning(), { restart: t('webapps.restart.menu'), quit: t('webapps.quit.menu') }, (q) => webRestartAsk.set(q));
+}
+
+// The person's answer to "Restart …?" or "Force quit …?": only a yes reaches lord-server.
+export function answerWebRestart(yes) {
+  const q = webRestartAsk.get();
+  webRestartAsk.set(null);
+  if (!q || !yes) return;
+  try { if (q.kind === 'quit') quitWebApp(q.app, q.profile); else restartWebApp(q.app, q.profile); } catch (e) { console.error('restart:', e.code || e); }
+}
+
+// lord-server found an app that stopped answering and started it again (the "webapps-restarted" event): what the
+// notification says, or null for an event that names no app.
+export function webRestartedTitle(data) {
+  if (!data || typeof data.app !== 'string') return null;
+  if (!webAppEntry(data.app)) refreshWebApps();
+  const name = appProfileName(webAppEntry(data.app), data.profile, t);
+  return t('webapps.restarted', { app: name || data.app });
 }
 
 // A page's right click: shown at the pointer by <WebAppMenu /> (hardware.jsx); one at a time.
@@ -268,6 +353,7 @@ if (has()) {
   refreshWebApps();
   readIcons();
   readDeveloperMode();
+  readSearchEngine();
   try {
     const list = typeof lord.webapps.badges === 'function' ? lord.webapps.badges() : [];
     if (Array.isArray(list)) webBadges.set(list.reduce(badgeReducer, {}));

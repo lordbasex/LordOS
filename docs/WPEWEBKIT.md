@@ -72,6 +72,24 @@ backends with no warnings, `web-backend-test` prints `ok platform (WPE WebKit 2.
 `+1`, `tools/release/image-sources.sh` run on the test chroot listed `wpewebkit` with origin `lordos` (176 other source
 packages `debian`). Not checked yet: lord-web's windows on the VM with these packages.
 
+Results of `+3` on amd64 (2026-11-25; WebRTC and the SharedArrayBuffer patch, `out/test/report.txt` and
+`out/test/webcalls.txt`): every check of `+2` above passes again (pkg-config, no DRM backend, no `libinput`/`libudev`,
+SONAME, 930 of 930 symbols kept, 1345 exported, the headless render, lord-web on both backends); the library links
+`libgstwebrtc-1.0`; lintian 0 errors, 5 warnings. `tests/webcalls_check.py` (in the test chroot, sandbox on): Chrome's
+Client Hints and `navigator.userAgentData` equal Chrome 158's; SharedArrayBuffer is a function on a page served with
+COOP and COEP and undefined on a plain page, before and after it; `RTCPeerConnection` exists; the loopback call gathers
+no ICE candidate because the web process has no network (WEBAPPS.md, "Calls"). The build was interrupted by a desktop
+session restart at step 8428 of 8967 and finished in the same tmpfs tree (`dpkg-buildpackage -b -nc`, then
+`dpkg-genchanges -sa`); the source package was made before the interruption. arm64: not built yet; the same command
+with `ARCH=arm64` (below), then the test stage on the Pi 5.
+
+Results of `+4` on amd64 (2026-11-26; librice `0.4.3-1~lordos13+1` from `EXTRA_DEBS`): `dpkg-buildpackage` 1730 s
+(16 jobs); lintian 0 errors; `libWPEWebKit-2.0.so.1` links `librice-proto` and `librice-io`; every check of `+3` passes,
+and `tests/webcalls_check.py --webrtc` now connects the loopback call: host candidates (4 UDP, 8 TCP) gathered by the
+network process, connected in 300 to 400 ms, Opus with VP8 and Opus with H.264, about 215 audio packets and 63 frames
+each in 4 s; TURN URLs with `?transport=` accepted. Against Chrome and a public meeting server: WEBAPPS.md, "Calls".
+Not published; arm64 not built yet.
+
 Output, in `$LORDOS_WPE_WORK/<version>/out/` (default `/var/tmp/lordos-wpewebkit`; on the maintainer's build machine
 `/mnt/HD08TB/build/wpewebkit`): the `.deb`s, the **source package** (`wpewebkit_<version>.dsc`,
 `wpewebkit_<upstream>.orig.tar.xz`, `wpewebkit_<upstream>.orig.tar.xz.asc`, `wpewebkit_<version>.debian.tar.xz`),
@@ -86,6 +104,10 @@ All in `backport()` of `tools/pkg/wpewebkit-chroot.sh`; a change that stops appl
 |---|---|
 | `debian/rules`: `-DENABLE_WPE_PLATFORM=ON`, `-DENABLE_WPE_PLATFORM_HEADLESS=ON`, `-DENABLE_WPE_PLATFORM_WAYLAND=ON`, `-DENABLE_WPE_LEGACY_API=ON` | Upstream's defaults in 2.54 already, but written out: a release that changes a default must fail here, not ship without WPEPlatform or without the legacy API |
 | `debian/rules`: `-DENABLE_WPE_PLATFORM_DRM=OFF`; `debian/libwpewebkit-2.0-1.symbols`: the DRM backend's 9 symbols removed (`wpe_display_drm_*`, `wpe_{screen,toplevel,view}_drm_get_type`) | Maintainer's decision, 2026-11-24: WPEPlatform's DRM backend (WebKit driving a screen itself) is the only part that links `libinput` and `libudev`, which LordOS's dependency policy keeps out; lord-web has its own `WPEDisplay` on the compositor and never uses it. Without it those symbols aren't in the library, and `dpkg-gensymbols` stops the build unless the symbols file says so. WPEPlatform's core DRM device API (`wpe_drm_device_*`, for dmabuf) stays |
+| `debian/rules`: `-DENABLE_MEDIA_STREAM=ON`, `-DENABLE_WEB_RTC=ON`, `-DUSE_GSTREAMER_WEBRTC=ON`, `-DUSE_LIBRICE=OFF`; `debian/control`: Build-Depends `libssl-dev`, and `libwpewebkit-2.0-1` Recommends `gstreamer1.0-nice`, `gstreamer1.0-plugins-bad`, `-good`, `-base` (`+3`) | Maintainer's decision, 2026-11-25: voice and video calls in web apps ([WEBAPPS.md](WEBAPPS.md), "Calls"). WebKit's GStreamer WebRTC backend (GStreamer 1.26's `webrtcbin`, not Google's libwebrtc); its only new build dependency is OpenSSL 3 (WebCore links `libcrypto` for SFrame); ICE (libnice), DTLS, SRTP, SCTP, RTP, Opus, VP8 and H.264 (OpenH264) are GStreamer elements loaded at run time. librice, the ICE agent WebKit can run in its network process, isn't in Debian 13, so it stays off: ICE runs in the web process (see "WebRTC and the web process's network" below) |
+| `debian/rules`: `-DUSE_LIBRICE=ON`; `debian/control`: Build-Depends `librice-dev (>= 0.4.3)` (`+4`) | ICE in WebKit's network process ("librice" below): the web process keeps no network, and calls connect |
+| `debian/patches/lordos-turn-transport-query.patch` (`+4`) | WebKit's `RTCPeerConnection` refused every TURN URL with a query (an inverted check: `query()` has no `?`, so `find("?transport=")` is `notFound`, which is true); sites hand out `turn:host:443?transport=tcp`. Now exactly `transport=udp` and `transport=tcp` are accepted, which the ICE agent reads; another query is still a `SyntaxError` |
+| `debian/patches/lordos-sharedarraybuffer-coi.patch` (`+3`) | SharedArrayBuffer only in a web process made for cross-origin-isolated documents (COOP `same-origin` + COEP `require-corp`): WebKit already gives such a document a process of its own (`CrossOriginMode::Isolated`, `WebProcessProxy::shouldEnableSharedArrayBuffer()`), but only its Cocoa launcher turned SharedArrayBuffer on there; the patch does the same in the GLib launcher (`JSC_useSharedArrayBuffer=1` in that process's environment only, removed from every other's). Before it WPE never had SharedArrayBuffer, and a messaging web app requires it for calls. Checked by `tests/webcalls_check.py`: a plain page never has it, before or after an isolated one in the same view |
 | `debian/control`: `Maintainer: LordOS`, `Uploaders` removed | Bugs in this build come to LordOS, not to Debian. Debian's WebKit team stays credited in the changelog and `debian/copyright` (not as `XSBC-Original-Maintainer`: Debian's lintian doesn't know that field) |
 | `debian/changelog`: entry `<version>~lordos13+<n>` for `trixie`, dated one second after the Debian entry it follows | The backport's version, below Debian's own. A fixed date (later than Debian's, as lintian requires) is the build's `SOURCE_DATE_EPOCH`, so building the same version again gives the same `.debian.tar.xz` |
 
@@ -93,7 +115,7 @@ Nothing else changes: every build dependency of 2.54.3-1 is in trixie (clang 19 
 `clang`, libsoup 3, GLib 2.84, GStreamer 1.26, libjxl, libavif, libwebp, HarfBuzz, libgbm, libwayland,
 wayland-protocols; `libinput-dev` stays a build dependency, unused without the DRM backend), and no feature had to be
 turned off for trixie: apart from the DRM backend, with the same build dependencies and cmake options as Debian unstable, the features are unstable's
-(no Manette gamepads, no WebRTC, no encrypted media, as there). WOFF2 web fonts come from FreeType now (Debian dropped
+(no Manette gamepads, no WebRTC, no encrypted media, as there; WebRTC is on since `+3`, above). WOFF2 web fonts come from FreeType now (Debian dropped
 `libwoff-dev` in 2.54.0-1: trixie's FreeType 2.13, built with Brotli, decodes WOFF2 itself). The `clang-22 [armhf]` build dependency can't be met on
 trixie, but LordOS doesn't build armhf.
 
@@ -125,6 +147,42 @@ Measured by the test against trixie's `libwpewebkit-2.0-1` 2.48.3-1 (`+2`, 2026-
   (`libwayland-client`, `libwayland-egl`, `libwayland-server`, `libxkbcommon`), `libatk-bridge`, `libenchant`,
   `libhyphen` and `libgpg-error`; gone: `libwoff2dec` (FreeType decodes WOFF2), Flite and `libgsttranscoder`.
   `libgbm` and `libdrm` were already there in 2.48. Only lord-web loads WebKit; `lord-server` links none of them.
+
+## librice (since `+4`)
+
+WebRTC's ICE (finding a network path between the two sides of a call) needs sockets. WebKit's web process has no
+network in its sandbox (bubblewrap's `--unshare-net`), so with `+3` ICE ran there and found nothing. WebKit's answer
+is librice: with `-DUSE_LIBRICE=ON`, WebCore's ICE agent speaks librice's sans-I/O protocol (`rice-proto`) and every
+socket lives in WebKit's **network process** (`rice-io`), which has the network already; the web process keeps none.
+Approved by the maintainer on 2026-11-25. Debian has no librice, so LordOS builds it:
+
+- `tools/pkg/build-librice.sh [revision]` makes `librice 0.4.3-1~lordos13+<revision>` (`librice0`: `librice-proto.so.0`
+  and `librice-io.so.0`; `librice-dev`: `rice/rice-proto.h`, `rice/rice-io.h`, `rice-proto.pc`, `rice-io.pc`). WebKit
+  2.54 asks for 0.4.2 or later; 0.4.3 is upstream's latest (2026-05-11, Rust 1.85, Debian 13's). `ARCH=arm64` as for
+  WebKit.
+- **Sources, all pinned** in `tools/pkg/librice.sums`: upstream's tag tarball (github.com/ystreet/librice `v0.4.3`);
+  the **vendored crates** (`librice_0.4.3.orig-vendor.tar.xz`: the 291 crates upstream's `Cargo.lock` names, fetched by
+  `cargo vendor --locked` in a chroot, so cargo checks each against the lock file's checksum, then packed
+  reproducibly: made twice on 2026-11-25, the same SHA-256 both times); and cbindgen 0.29.2 with its 72 crates
+  (`librice_0.4.3.orig-cbindgen.tar.xz`; its `.crate` against crates.io's checksum). Only the vendoring step uses the
+  network; the package build runs cargo `--frozen --offline`. Prebuilt binaries in the vendored crates (other systems'
+  import libraries, test fixtures: 398 and 10 files) are removed, so the source package has none.
+- **cbindgen 0.29**: Debian 13's `cargo-c` carries cbindgen 0.27, which doesn't read Rust 2024's `#[unsafe(no_mangle)]`
+  and writes empty headers; the package builds cbindgen 0.29.2 from the third tarball and writes both headers with it
+  (`debian/headers.sh`, keeping the version defines cargo-c adds). It is never installed.
+- `rice-proto` is built `--no-default-features --features capi,openssl`: TURN over TLS through the system's OpenSSL,
+  not a second TLS stack (rustls, aws-lc). `librice-proto.so.0` links `libssl.so.3` and `libcrypto.so.3`, which
+  `libWPEWebKit-2.0.so.1` already links since `+3`.
+- **Licences:** MIT or Apache-2.0 (librice); the vendored crates' own (each crate's `Cargo.toml` → a `debian/copyright`
+  stanza, generated; texts from SPDX's list in `tools/pkg/librice/licenses/` or Debian's common licences). The source
+  package (`.dsc`, the three orig tarballs, `.debian.tar.xz`) is published next to the binaries exactly as WebKit's
+  (below).
+- **Test** (`librice-chroot.sh test`, a clean trixie chroot): the packages install, `pkg-config` gives 0.4.3 for both,
+  and `tools/pkg/librice-test.c` builds against both and runs: `rice_version` 0.4.3 as the header says, an agent with a
+  stream, a UDP socket bound on the loopback by `rice-io`. Result 2026-11-25 (amd64): passes; lintian 0 errors.
+- WPE `+4` Build-Depends on `librice-dev (>= 0.4.3)` and, through its shared libraries, depends on `librice0`;
+  `build-wpewebkit.sh` takes them with `EXTRA_DEBS=<librice's out/>` (installed before the build dependencies and in the
+  test chroot). Publish librice (binaries and source) before or with `+4`.
 
 ## Licence and the source next to the binaries
 

@@ -198,6 +198,9 @@ Every place with text has **Speech** (`sdk/voice.js`, `speechMenu`):
   nothing is selected (Text Editor, Notes). The right-click menu is the SDK's (`sdk/contextmenu.jsx`, with submenus).
 - **A Linux app** (Firefox, foot…) gets an **Edit** menu with Speech in the menu bar (Lord Classic: in its window's
   menu strip), as its own menus aren't the desktop's (`useMenusWithSpeech`). It reads the app's **primary selection**.
+- **A web app** (`lord-web`, in development) is such a Linux app: it makes the page's selection the primary selection
+  (never a password field's), so Edit → Speech, ❖Esc and its right-click menu's Speech ▸ read it the same way
+  (`docs/WEBAPPS.md`, "Editing"). With nothing selected there is nothing to read: the page's whole text is not read.
 - **❖Esc** reads what the window in front has selected; pressed again while reading, it stops (`sdk/shortcuts.js`).
 - **The player** (`sdk/voiceplayer.jsx`): a small pill with the voice's wave, ↻ read again, ⏸/▶ pause and go on,
   ■ stop (it stays, to read again), ✕ stop and close. Drag it by its grip anywhere, to any display: the next reading

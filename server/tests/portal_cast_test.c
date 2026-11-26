@@ -4,6 +4,7 @@
  * pictures (portalshot.c) and the lending (fplend.c). Run by tests/run_suites.sh under dbus-run-session. */
 #include "../src/ui/portal.h"
 #include "../src/ui/webask.h"
+#include "../src/ui/webalive.h"
 #include "../src/vault/dbus.h"
 #include "../src/fplend.h"
 #include "../src/cast/castproto.h"
@@ -75,6 +76,9 @@ int fplend_lend(unsigned pid, const char *path, int kind, char *out, size_t n) {
 void webask_attach(DConn *c) { (void)c; }
 void webask_call(DConn *c, const DMsg *m) { (void)c; (void)m; }
 int webask_reply(DConn *c, const DMsg *m) { (void)c; (void)m; return 0; }
+void webalive_attach(DConn *c) { (void)c; }
+void webalive_lost(void) {}
+int webalive_reply(const DMsg *m) { (void)m; return 0; }
 void webask_gone(const char *name) { (void)name; }
 void webask_appeared(const char *name) { (void)name; }
 void webask_lost(void) {}

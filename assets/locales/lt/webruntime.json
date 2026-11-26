@@ -12,5 +12,9 @@
   "inspect.title": "Kūrėjo įrankiai įjungti",
   "inspect.body": "Jie atsidarė jūsų naršyklėje ir veiks, kol uždarysite šį langą.",
   "inspect.open": "Atidaryti naršyklėje",
-  "inspect.failed": "Nepavyko paleisti kūrėjo įrankių"
+  "inspect.failed": "Nepavyko paleisti kūrėjo įrankių",
+  "save.image": "Įrašyti paveikslėlį",
+  "save.video": "Įrašyti vaizdo įrašą",
+  "save.audio": "Įrašyti garso įrašą",
+  "hang.reloaded": "Puslapis neatsakė, todėl buvo įkeltas iš naujo"
 }

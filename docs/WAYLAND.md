@@ -839,8 +839,8 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
 - **Where the session can't reach** (0.8.8.6, #52). Debian's default `button-layout` is
   `appmenu:close`: a lone close button on the right, which is what an app shows when it reads neither
   the keyfile nor the portal: one restricted to «no access to your files» (its view has no
-  `~/.config/glib-2.0` and no session bus), one started outside the session, or one on X11 (Xwayland),
-  where GTK reads only XSETTINGS, which LordOS doesn't serve. The `lordos` package now ships
+  `~/.config/glib-2.0` and no session bus), or one started outside the session. (GTK 3 on X11, which reads only
+  XSETTINGS, follows the session since the window manager serves it: see "XSETTINGS" below.) The `lordos` package now ships
   `/usr/share/glib-2.0/schemas/90_lordos.gschema.override` (GLib's dpkg trigger compiles it) and
   `/etc/gtk-3.0/settings.ini` and `/etc/gtk-4.0/settings.ini` (`gtk-decoration-layout`), both with
   Lord Flow's `close,minimize,maximize:`. They are defaults only: a value stored by the user or the
@@ -848,6 +848,18 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   follow a theme change to Lord Classic live. `server/tests/gtk_defaults_test.mjs` compiles the
   override next to Debian's schema and checks that it, `settings.ini`, `sdk/theme.js` and `portal.c`
   agree.
+- **XSETTINGS** (in development after 0.8.9.6.1). GTK 3 on X11 (Xwayland) reads neither the portal nor GSettings,
+  only XSETTINGS, so it stayed light on a dark desktop. LordOS's X window manager (`server/src/wl/xwm.c`) now owns
+  `_XSETTINGS_S0` with a window of its own and serves `Net/ThemeName`, `Net/IconThemeName`, `Gtk/DecorationLayout` and
+  `Gtk/FontName`, the values the portal gives GTK on Wayland (`portal_gtk_values`), set before the first X app is let in
+  and changed live with a new serial (GTK watches the property). `server/src/wl/xsettings.h` builds the property;
+  `build/xsettings-test` decodes it the way GTK does.
+- **Qt** (in development after 0.8.9.6.1). Qt 5 has no colour scheme, and Qt 6.8's own `gnome` and generic platform
+  themes don't read the portal's, so Qt apps drew light on a dark desktop. lord-server gives the apps it starts
+  `QT_QPA_PLATFORMTHEME=gnome` (`server/src/wl/toolkitenv.h`; a value the person set is kept), which is QGnomePlatform
+  (`qgnomeplatform-qt5`, `qgnomeplatform-qt6`, Recommends of the `lordos` package and in both images): an Adwaita
+  palette and style that follow LordOS's dark mode from the portal and GSettings. Without the package Qt uses its own
+  `gnome` theme, as before.
 - **Qt/KDE.** They use the theme's frame (xdg-decoration). Qt 6 also reads `color-scheme` from the
   portal; not tested.
 - **The JS.** The SDK's `ThemeProvider` sends mode, accent and buttons with `lord.portal.set` when
@@ -1058,9 +1070,9 @@ size, but blurry. Now, as in KWin's "apps scale themselves", **the X11 apps scal
   that scale.
 - **The apps are told** with `Xft.dpi` (96 × scale, 192 at 200 %) in the root window's
   `RESOURCE_MANAGER`, set before the window manager lets the first app in. Xft text (xterm with
-  `-fa`), Qt, Chromium and Electron, and Tk read it. LordOS serves no XSETTINGS and sets no `GDK_SCALE` or
-  `QT_SCALE_FACTOR` (neither KWin nor GNOME does; they would change Wayland apps too), so an app that
-  reads neither (core-font xterm, Java/Swing, GTK 3 on X11) looks small.
+  `-fa`), Qt, Chromium and Electron, and Tk read it. LordOS's XSETTINGS (below) carry no `Xft/DPI` or
+  `Gdk/WindowScalingFactor`, and it sets no `GDK_SCALE` or `QT_SCALE_FACTOR` (neither KWin nor GNOME does; they would
+  change Wayland apps too), so an app that reads none of them (core-font xterm, Java/Swing, GTK 3 on X11) looks small.
 - **Settings → Displays → X11 apps**: «Scale themselves (sharp)», the default, or «Scaled by LordOS
   (blurry)», the old behaviour (`settings.x11Scaling`, `'self'` | `'lordos'`; `sdk/wayland.js` sends it with
   `lord.wayland.x11SelfScale(on)`). The row shows only where Xwayland is installed. A change of the

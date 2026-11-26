@@ -65,7 +65,9 @@ static int clean_env(void) {
         fprintf(stderr, "lord-web: WebKit's sandbox is never turned off\n");
         return -1;
     }
-    static const char *const drop[] = { "WEBKIT_", "WPE_", "GST_PLUGIN", "GST_REGISTRY", "GIO_EXTRA_MODULES", "GIO_MODULE_DIR", "LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", NULL };
+    /* JSC_*: JavaScriptCore options (JSC_useSharedArrayBuffer would hand SharedArrayBuffer to every page, not only the
+     * cross-origin-isolated ones WebKit turns it on for itself) */
+    static const char *const drop[] = { "WEBKIT_", "WPE_", "JSC_", "GST_PLUGIN", "GST_REGISTRY", "GIO_EXTRA_MODULES", "GIO_MODULE_DIR", "LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", NULL };
     for (int again = 1; again;) {
         again = 0;
         for (char **e = environ; e && *e; e++) {
@@ -218,9 +220,15 @@ void web_inspect_watch(Web *w) {
 /* ---- one process per app and profile ---- */
 
 /* Show(token): anyone may (a second start of the app does); Edit(command), SetColorScheme("light" | "dark") and
- * SetUserAgent("chrome" | "edge" | "firefox" | "lordos"): only lord-server, checked by pid (webbus.c) */
+ * SetUserAgent("chrome" | "edge" | "firefox" | "lordos"): only lord-server, checked by pid (webbus.c). Ping() → "ok" or
+ * "page": anyone may; answered from this main loop, so an answer says lord-web isn't hung (lord-server's watch,
+ * ui/webalive.c); "page" says a ping of the page is late (webhang.c), which lord-web handles itself. */
 static void show_call(GDBusConnection *c, const char *sender, const char *path, const char *iface, const char *method, GVariant *p, GDBusMethodInvocation *inv, gpointer d) {
     (void)c; (void)path; (void)iface;
+    if (!strcmp(method, "Ping")) {
+        g_dbus_method_invocation_return_value(inv, g_variant_new("(s)", web_hang_word()));
+        return;
+    }
     if (!strcmp(method, "Show")) {
         const char *token = NULL;
         g_variant_get(p, "(&s)", &token);
@@ -257,6 +265,7 @@ static void show_call(GDBusConnection *c, const char *sender, const char *path, 
 }
 static const GDBusInterfaceVTable show_vt = { show_call, NULL, NULL, { 0 } };
 static const char SHOW_XML[] = "<node><interface name='" SHOW_IFACE "'><method name='Show'><arg type='s' direction='in'/></method>"
+                               "<method name='Ping'><arg type='s' direction='out'/></method>"
                                "<method name='Edit'><arg type='s' direction='in'/></method>"
                                "<method name='SetColorScheme'><arg type='s' direction='in'/></method>"
                                "<method name='SetUserAgent'><arg type='s' direction='in'/></method></interface></node>";
@@ -330,7 +339,7 @@ static int run_app(Web *w) {
     char state[PATH_MAX + 16];
     size_t slen = 0;
     snprintf(state, sizeof state, "%s/state.json", w->profile_dir);
-    char *stext = webreg_read_file(state, 4096, &slen);
+    char *stext = webreg_read_file(state, WEBPAGE_STATE_MAX, &slen);
     webpage_state_parse(stext, stext ? slen : 0, &w->state);
     free(stext);
     w->audio_ms = w->note_ms = -1;
@@ -351,6 +360,11 @@ static int run_app(Web *w) {
     if (isolate(scope)) return 1;
 
     weblang_init();
+    /* the app's name for what WebKit sends the notification server itself: a service worker's notification
+     * (registration.showNotification) goes there from WebKit, not through the view's "show-notification"
+     * (docs/WEBAPPS.md, "Notifications"). Without a name GLib's is NULL: WebKit's Notify carried "[Invalid UTF-8]" and
+     * GLib logged a critical for each one. The registry's name is checked UTF-8 already; anything else gets the program's name. */
+    g_set_application_name(w->app.name[0] && g_utf8_validate(w->app.name, -1, NULL) ? w->app.name : "lord-web");
     w->loop = g_main_loop_new(NULL, FALSE);
     webbus_init(w);
     WebWin *win = webwin_new(w);

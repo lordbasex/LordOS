@@ -22,6 +22,7 @@
 #include "grab.h"
 #include "portal.h"
 #include "webask.h"
+#include "../wl/xwm.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -143,6 +144,9 @@ static JSValue f_portal_set(JSContext *c, JSValueConst t, int argc, JSValueConst
     int has_buttons = get_word(c, argv[0], "buttons", buttons, sizeof buttons, "abcdefghijklmnopqrstuvwxyz,:");
     portal_set(dark, rgb, has_name ? name : NULL, has_buttons ? buttons : NULL);
     webask_scheme(dark);                    /* web apps' prefers-color-scheme (web/webscheme.h) */
+    const char *th, *bl, *fo, *ic;          /* GTK 3 on X11 (Xwayland) reads the same through XSETTINGS */
+    portal_gtk_values(&th, &bl, &fo, &ic);
+    xwm_xsettings(th, bl, fo, ic);
     return JS_TRUE;
 }
 

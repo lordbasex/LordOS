@@ -26,6 +26,12 @@
  * own menu from here (webengine.c, web_context_menu). The message handler exists only in this isolated world: the page's scripts can't post to it,
  * and lord-web takes a message only right after the person's own click or key in the window.
  *
+ * The report also carries the selected text (at most 16384 characters: Search the web, Copy Link to Highlight), and,
+ * in the top frame, the video or audio element under the pointer with its state; the script keeps a weak reference
+ * to that element for the menu's Play, Pause, Mute, Loop and Show Controls (webselect_media). Once the person's
+ * selection settles (300 ms after its last change) the script reports it too, never a password field's, and lord-web
+ * makes it the session's primary selection (webwin_set_primary): LordOS's Speech reads that one aloud.
+ *
  * And Ctrl+C (Ctrl+Insert) and Ctrl+A outside an editable field: WPE's WebEditorClient runs its key bindings only
  * where the page can be edited (handleKeyboardEvent returns when !canEdit()), so text the page shows could be
  * selected but never copied from the keyboard. The script reports the key (not prevented by the page) and lord-web
@@ -41,17 +47,20 @@
  * lord-web, which offers it to the session only right after the person's own key or click in the window. */
 #include "web.h"
 #include "webwin.h"
+#include "websearch.h"
 #include "../sec/json.h"
 
 #include <string.h>
 
 #define SELECT_WORLD "lordos-web-select"
+#define WEBSELECT_PRIMARY_MAX (256 * 1024)   /* bytes of the page's selection offered as the primary selection */
 
 static const char SELECT_JS[] =
     "(() => {\n"
     "  if (globalThis.__lordosSelect) return;\n"
     "  globalThis.__lordosSelect = true;\n"
     "  const TEXT_TYPES = ['', 'text', 'search', 'url', 'tel', 'email', 'password'];\n"
+    "  const TEXT_MAX = 16384, PRIMARY_MAX = 65536;   // the menu's selection (websearch.h); the primary selection\n"
     "  const fieldOf = (t) => (t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && TEXT_TYPES.includes(t.type))) ? t : null;\n"
     "  // where a browser drags rather than selects (a link, an image, a draggable element), or nothing selects\n"
     "  const blocked = (t) => { if (t.closest('a[href], img, [draggable=\"true\"]')) return true; const cs = getComputedStyle(t); return (cs.webkitUserSelect || cs.userSelect) === 'none'; };\n"
@@ -148,15 +157,45 @@ static const char SELECT_JS[] =
     "  if (h) addEventListener('contextmenu', (e) => {\n"
     "    if (!e.isTrusted) return;\n"
     "    const mine = !e.defaultPrevented;\n"
-    "    e.preventDefault();\n"
     "    const t = e.target instanceof Element ? e.target : e.target && e.target.parentElement;\n"
+    "    const f = t && fieldOf(t);\n"
+    "    const editable = !!t && !!(f ? !f.readOnly && !f.disabled : t.isContentEditable);\n"
+    "    // in a text field WebKit 2.54 (WPEPlatform) may ask for its own menu: lord-web takes its spelling items from it\n"
+    "    if (!(mine && editable && LORD_WK_MENU)) e.preventDefault();\n"
     "    if (!mine || !t) return;\n"
-    "    const f = fieldOf(t);\n"
-    "    const editable = !!(f ? !f.readOnly && !f.disabled : t.isContentEditable);\n"
-    "    const selection = f ? f.selectionEnd > f.selectionStart && f.type !== 'password' : String(getSelection() || '').length > 0;\n"
+    "    const sel = f ? (f.type === 'password' ? '' : f.value.slice(f.selectionStart, f.selectionEnd)) : String(getSelection() || '');\n"
     "    const a = t.closest('a[href]'), img = t.closest('img');\n"
-    "    h.postMessage(JSON.stringify({ editable, selection, link: a ? a.href : '', image: img ? (img.currentSrc || img.src || '') : '' }));\n"
+    "    // a video or audio element, in the top frame only (lord-web runs Play, Mute, Loop… there): kept for them\n"
+    "    const med = window === window.top ? t.closest('video, audio') : null;\n"
+    "    menuMedia = med ? new WeakRef(med) : null;\n"
+    "    const media = med ? { paused: med.paused, muted: med.muted, loop: med.loop, controls: med.controls, src: String(med.currentSrc || ''), video: med instanceof HTMLVideoElement } : null;\n"
+    "    h.postMessage(JSON.stringify({ editable, selection: sel.length > 0, text: sel.slice(0, TEXT_MAX), cut: sel.length > TEXT_MAX, top: window === window.top,\n"
+    "      link: a ? a.href : '', image: img ? (img.currentSrc || img.src || '') : '', media }));\n"
     "  });\n"
+    "  // the context menu's Play, Pause, Mute, Unmute, Loop and Show Controls, on the element it was opened on\n"
+    "  let menuMedia = null;\n"
+    "  if (h && window === window.top) globalThis.__lordosMediaDo = (what) => {\n"
+    "    const m = menuMedia && menuMedia.deref();\n"
+    "    if (!m || !m.isConnected) return;\n"
+    "    if (what === 'play') { const p = m.play(); if (p && p.catch) p.catch(() => {}); }\n"
+    "    else if (what === 'pause') m.pause();\n"
+    "    else if (what === 'mute' || what === 'unmute') m.muted = what === 'mute';\n"
+    "    else if (what === 'loop') m.loop = !m.loop;\n"
+    "    else if (what === 'controls') m.controls = !m.controls;\n"
+    "  };\n"
+    "  // the person's selection, once it settles, as the session's primary selection (what LordOS's Speech reads and a\n"
+    "  // middle click pastes); never a password field's\n"
+    "  const selected = () => {\n"
+    "    const e = document.activeElement, f = e && fieldOf(e);\n"
+    "    if (f) return f.type === 'password' ? '' : f.value.slice(f.selectionStart, f.selectionEnd);\n"
+    "    return String(getSelection() || '');\n"
+    "  };\n"
+    "  let primaryTimer = 0;\n"
+    "  const primary = () => {\n"
+    "    clearTimeout(primaryTimer);\n"
+    "    primaryTimer = setTimeout(() => { const s = selected(); if (s.trim()) h.postMessage(JSON.stringify({ primary: s.slice(0, PRIMARY_MAX) })); }, 300);\n"
+    "  };\n"
+    "  if (h) { document.addEventListener('selectionchange', primary); addEventListener('select', primary, true); }\n"
     "  // Ctrl+C, Ctrl+Insert and Ctrl+A outside an editable field: WPE's key bindings run only where the page can be\n"
     "  // edited, so a message's text couldn't be copied from the keyboard; lord-web runs the command (after the page's\n"
     "  // own listeners, unless one prevented the key)\n"
@@ -196,10 +235,10 @@ static const char SELECT_JS[] =
     "  if (ch && window === window.top) { addEventListener('copy', onCopy, true); addEventListener('cut', onCopy, true); }\n"
     "})();\n";
 
-#define MENU_MSG_MAX (64 * 1024)
+#define MENU_MSG_MAX (512 * 1024)     /* a primary selection of 64K characters, as JSON */
 
-/* the script's report of a right click, { editable, selection, link, image }, or of a key, { key: copy|selectAll },
- * as JSON text */
+/* the script's report of a right click, { editable, selection, text, cut, top, link, image, media }, of a key,
+ * { key: copy|selectAll }, or of the person's selection once it settled, { primary }, as JSON text */
 static void on_menu_msg(WebKitUserContentManager *m, JSCValue *v, gpointer d) {
     (void)m;
     Web *w = d;
@@ -209,19 +248,37 @@ static void on_menu_msg(WebKitUserContentManager *m, JSCValue *v, gpointer d) {
     size_t n = s ? strlen(s) : 0;
     if (!s || n > MENU_MSG_MAX || json_parse(s, n, &doc, NULL, 0)) { g_free(s); return; }
     const JVal *r = doc.root;
-    unsigned at = 0;
-    const char *link = NULL, *image = NULL;
     const char *key = r && r->type == J_OBJ ? json_str(r, "key") : NULL;
+    const char *prim = r && r->type == J_OBJ ? json_str(r, "primary") : NULL;
     if (key) {
         if (!strcmp(key, "copy")) web_edit(w, WEBEDIT_COPY);
         else if (!strcmp(key, "selectAll")) web_edit(w, WEBEDIT_SELECT_ALL);
+    } else if (prim) {
+        if (strlen(prim) <= WEBSELECT_PRIMARY_MAX) webwin_set_primary(w->win, prim);
     } else if (r && r->type == J_OBJ) {
+        WebMenuAt a = { 0 };
         const JVal *e = json_get(r, "editable"), *sel = json_get(r, "selection"), *l = json_get(r, "link"), *i = json_get(r, "image");
-        if (e && e->type == J_BOOL && e->num) at |= WEBMENU_AT_EDITABLE;
-        if (sel && sel->type == J_BOOL && sel->num) at |= WEBMENU_AT_SELECTION;
-        if (l && l->type == J_STR && l->str[0]) link = l->str;
-        if (i && i->type == J_STR && i->str[0]) image = i->str;
-        web_context_menu(w, at, link, image);
+        const JVal *cut = json_get(r, "cut"), *top = json_get(r, "top"), *md = json_get(r, "media");
+        if (e && e->type == J_BOOL && e->num) a.at |= WEBMENU_AT_EDITABLE;
+        if (sel && sel->type == J_BOOL && sel->num) a.at |= WEBMENU_AT_SELECTION;
+        if (l && l->type == J_STR && l->str[0]) a.link = l->str;
+        if (i && i->type == J_STR && i->str[0]) a.image = i->str;
+        a.text = json_str(r, "text");
+        a.text_cut = (cut && cut->type == J_BOOL && cut->num) || (a.text && strlen(a.text) > WEBSEARCH_SELECTION_MAX);
+        /* a selection in a frame: no link to it from the top page's address */
+        if (!(top && top->type == J_BOOL && top->num)) a.text_cut = 1;
+        if (md && md->type == J_OBJ) {
+            static const struct { const char *k; unsigned bit; } flags[] = {
+                { "paused", WEBMENU_AT_PAUSED }, { "muted", WEBMENU_AT_MUTED }, { "loop", WEBMENU_AT_LOOP }, { "controls", WEBMENU_AT_CONTROLS },
+                { "video", WEBMENU_AT_VIDEO } };
+            a.at |= WEBMENU_AT_MEDIA;
+            for (size_t k = 0; k < sizeof flags / sizeof flags[0]; k++) {
+                const JVal *f = json_get(md, flags[k].k);
+                if (f && f->type == J_BOOL && f->num) a.at |= flags[k].bit;
+            }
+            a.media = json_str(md, "src");
+        }
+        web_context_menu(w, &a);
     }
     json_free(&doc);
     g_free(s);
@@ -251,6 +308,17 @@ static void on_copy_msg(WebKitUserContentManager *m, JSCValue *v, gpointer d) {
     json_free(&doc);
 }
 
+void webselect_media(Web *w, const char *what) {
+    static const char *const ok[] = { "play", "pause", "mute", "unmute", "loop", "controls" };
+    char js[96];
+    if (!w->view || !what) return;
+    for (size_t i = 0; i < sizeof ok / sizeof ok[0]; i++)
+        if (!strcmp(ok[i], what)) {
+            snprintf(js, sizeof js, "globalThis.__lordosMediaDo && __lordosMediaDo('%s')", ok[i]);
+            webkit_web_view_evaluate_javascript(w->view, js, -1, SELECT_WORLD, NULL, NULL, NULL, NULL);
+        }
+}
+
 void webselect_init(Web *w) {
     WebKitUserContentManager *ucm = webkit_web_view_get_user_content_manager(w->view);
     if (!ucm) return;
@@ -258,8 +326,12 @@ void webselect_init(Web *w) {
         g_signal_connect(ucm, "script-message-received::lordosCopy", G_CALLBACK(on_copy_msg), w);
     if (webkit_user_content_manager_register_script_message_handler(ucm, "lordosMenu", SELECT_WORLD))
         g_signal_connect(ucm, "script-message-received::lordosMenu", G_CALLBACK(on_menu_msg), w);
-    WebKitUserScript *s = webkit_user_script_new_for_world(SELECT_JS, WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START,
+    /* WebKit asks for its own menu (its spelling items) only on WPEPlatform; 2.48's WPE port, once asked, takes no
+     * more mouse input, so there the default is always prevented */
+    char *js = g_strdup_printf("var LORD_WK_MENU = %s;\n%s", web_menu_webkit_asks() ? "true" : "false", SELECT_JS);
+    WebKitUserScript *s = webkit_user_script_new_for_world(js, WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START,
                                                            SELECT_WORLD, NULL, NULL);
+    g_free(js);
     webkit_user_content_manager_add_script(ucm, s);
     webkit_user_script_unref(s);
 }
