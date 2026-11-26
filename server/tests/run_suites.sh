@@ -1119,6 +1119,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "recorder-skin-scene (apps/recorder regions)" node tests/menubar_test.mjs recorder_skin_scene.mjs
     else skip "recorder-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Camera with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "camera-skin-scene (apps/camera regions)" node tests/menubar_test.mjs camera_skin_scene.mjs
+    else skip "camera-skin-scene" "node and the repository's node_modules (npm install)"; fi
     # (#218) Files: dragging in a folder of 2000 files draws only the ghost and the drop highlights, never the whole window
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-drag-scene (apps/files/dnd.jsx)" node tests/menubar_test.mjs files_drag_scene.mjs
