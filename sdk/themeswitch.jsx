@@ -21,7 +21,8 @@ export function hideThemeSwitch() { switching.set(null); }
 export function notifyThemeNotApplied(entry) {
   const name = entry?.name || entry?.id || '';
   notify({ app: 'settings', title: t('shell.themeSwitch.failedTitle', { name }),
-    body: t(entry?.failedCode ? 'shell.themeSwitch.refusedBody' : 'shell.themeSwitch.failedBody') });
+    body: entry?.needsLordOS ? t('shell.themeSwitch.needsLordOSBody', { version: entry.needsLordOS })
+      : t(entry?.failedCode ? 'shell.themeSwitch.refusedBody' : 'shell.themeSwitch.failedBody') });
 }
 
 export function ThemeSwitchOverlay() {

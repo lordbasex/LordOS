@@ -1,6 +1,7 @@
 // theme_gallery_test.mjs — Settings → Appearance's gallery (sdk/themegallery.js) and the theme.json fields it shows
-// (sdk/thememeta.js: community, author, license, version). Run: node tests/theme_gallery_test.mjs
-import { cleanThemeMeta, themeAuthor } from '../../sdk/thememeta.js';
+// (sdk/thememeta.js: community, author, license, version, and (0.8.9.6.2) minLordOS and a community theme's own
+// translated labels, namespace theme-<id>). Run: node tests/theme_gallery_test.mjs
+import { cleanThemeMeta, themeAuthor, lordosAtLeast, themeNeedsNewer, themeNamespace, themeText, themeLabel, THEME_TEXT_MAX } from '../../sdk/thememeta.js';
 import { galleryEntry, foldText, matchesQuery, filterGallery, filterCounts, sortGallery, gridStep, gridColumns, themeIssueUrl, GALLERY_FILTERS } from '../../sdk/themegallery.js';
 import { ISSUE_URL_MAX } from '../../sdk/cloudcheck.js';
 
@@ -18,6 +19,45 @@ eq('author pending is unknown', [themeAuthor('author pending'), themeAuthor('Aut
 eq('author with controls or bidi overrides', [themeAuthor('a‮b'), themeAuthor('a\nb'), themeAuthor('x'.repeat(81))], ['', '', '']);
 eq('junk license and version', [cleanThemeMeta({ license: 'MIT; rm -rf' }).license, cleanThemeMeta({ version: 'v1' }).version, cleanThemeMeta({ version: '1.2.3.4.5' }).version], ['', '', '']);
 eq('community must be true', [cleanThemeMeta({ community: 'yes' }).community, cleanThemeMeta({}).community], [false, false]);
+
+// ---- minLordOS (0.8.9.6.2): the oldest LordOS release a theme runs on ----
+eq('minLordOS kept', [cleanThemeMeta({ minLordOS: '0.8.9.6.2' }).minLordOS, cleanThemeMeta({ minLordOS: '1.0' }).minLordOS, cleanThemeMeta({}).minLordOS], ['0.8.9.6.2', '1.0', '']);
+eq('minLordOS junk dropped', ['latest', '0.8.9.6.2-beta', '1', 'v1.0', '0.8.9.6.2 ', ' 0.9', '1.2.3.4.5.6.7', '123456.1', '1..2', 5, null, ['0.9']]
+  .map((v) => cleanThemeMeta({ minLordOS: v }).minLordOS), ['', '', '', '', '', '', '', '', '', '', '', '']);
+eq('lordosAtLeast', [lordosAtLeast('0.8.9.6.2', '0.8.9.6.2'), lordosAtLeast('0.8.9.6.1+ws155', '0.8.9.6.2'), lordosAtLeast('0.8.10', '0.8.9.6.2'),
+  lordosAtLeast('0.8.9', '0.8.9.0'), lordosAtLeast('0.8.9', '0.8.9.1'), lordosAtLeast('0.9.0-beta', '0.9'), lordosAtLeast('1.0', '0.99.99')],
+  [true, false, true, true, false, true, true]);
+eq('lordosAtLeast: no or invalid minimum, unknown release', [lordosAtLeast('0.8.9', ''), lordosAtLeast('0.8.9', 'latest'), lordosAtLeast('', '9.9'),
+  lordosAtLeast('dev', '9.9'), lordosAtLeast(undefined, '9.9')], [true, true, true, true, true]);
+eq('themeNeedsNewer', [themeNeedsNewer({ minLordOS: '0.8.9.6.2' }, '0.8.9.6.1'), themeNeedsNewer({ minLordOS: '0.8.9.6.2' }, '0.8.9.6.2'),
+  themeNeedsNewer({}, '0.1'), themeNeedsNewer(null, '0.1')], ['0.8.9.6.2', '', '', '']);
+const needs = galleryEntry({ id: 'aurora', community: true, minLordOS: '0.9.1' }, { lordosVersion: '0.9.0' });
+eq('gallery entry needs a newer LordOS', [needs.minLordOS, needs.needsLordOS], ['0.9.1', '0.9.1']);
+eq('gallery entry runs here', galleryEntry({ id: 'aurora', minLordOS: '0.9.0' }, { lordosVersion: '0.9.0' }).needsLordOS, '');
+
+// ---- a community theme's own texts (0.8.9.6.2): namespace theme-<id>, never another theme's ----
+eq('namespace', [themeNamespace('aurora'), themeNamespace('a'.repeat(26)), themeNamespace('a'.repeat(27)), themeNamespace('x.y'), themeNamespace('../x'), themeNamespace('')],
+  ['theme-aurora', `theme-${'a'.repeat(26)}`, '', '', '', '']);
+const own = { options: [
+  { key: 'glass', label: 'theme-aurora.opt.glass', hint: 'theme-aurora.opt.glassHint', toggle: true },
+  { key: 'bar', label: 'theme-aurora.opt.bar', choices: [['top', 'theme-aurora.bar.top'], ['bottom', 'shell.x.bottom'], ['side', 'theme-other.bar.side']] },
+  { key: 'stolen', label: 'theme-other.opt.x', toggle: true },
+  { key: 'prefix', label: 'theme-aurora2.opt.x', toggle: true },
+  { key: 'long', label: `theme-aurora.${'x'.repeat(81)}`, toggle: true },
+  { key: 'dots', label: 'theme-aurora.', toggle: true },
+  { key: 'hintOther', label: 'shell.ok', hint: 'theme-other.h', toggle: true },
+] };
+const kept = cleanThemeMeta(own, 'aurora').options;
+eq('own labels kept', kept.map((o) => o.key), ['glass', 'bar', 'hintOther']);
+eq('own hint and choices kept, another theme\'s dropped', [kept[0].hint, kept[1].choices, kept[2].hint], ['theme-aurora.opt.glassHint', [['top', 'theme-aurora.bar.top'], ['bottom', 'shell.x.bottom']], undefined]);
+eq('own labels dropped for another id', cleanThemeMeta(own, 'other').options.map((o) => o.key), ['stolen', 'hintOther']);
+eq('own labels dropped without an id', cleanThemeMeta(own).options.map((o) => o.key), ['hintOther']);
+eq('shell labels still work', cleanThemeMeta({ options: [{ key: 'a', label: 'shell.a', toggle: true }] }, 'aurora').options.length, 1);
+eq('themeText', [themeText('  Glass\n  bar ', 20), themeText('a‮b', 20), themeText('x'.repeat(30), 10), themeText(5, 10), themeText('😀'.repeat(5), 3)],
+  ['Glass bar', 'a b', `${'x'.repeat(9)}…`, '', '😀😀…']);
+const fake = (k) => ({ 'theme-aurora.opt.glass': `Glass${'!'.repeat(100)}`, 'shell.long': 'L'.repeat(100), 'theme-aurora.h': 'a\nb' })[k] ?? k;
+eq('themeLabel cuts a theme\'s own text, never LordOS\'s', [[...themeLabel(fake, 'theme-aurora.opt.glass')].length, themeLabel(fake, 'shell.long').length, themeLabel(fake, 'theme-aurora.h', 'hint')],
+  [THEME_TEXT_MAX.label, 100, 'a b']);
 
 // ---- entries ----
 const raw = [

@@ -978,6 +978,7 @@
   "themeSwitch.failedTitle": "ใช้ {name} ไม่ได้",
   "themeSwitch.refusedBody": "โค้ดของธีมนี้ไม่ตรงกับสำเนาที่ลงนามของ LordOS จึงไม่ได้โหลด สไตล์เดสก์ท็อปของคุณยังคงเหมือนเดิม",
   "themeSwitch.failedBody": "ธีมนี้ไม่เริ่มทำงาน สไตล์เดสก์ท็อปของคุณยังคงเหมือนเดิม",
+  "themeSwitch.needsLordOSBody": "ธีมนี้ต้องใช้ LordOS {version} ขึ้นไป สไตล์เดสก์ท็อปของคุณยังคงเหมือนเดิม",
   "spotlight.section.machines": "เครื่องเสมือน",
   "guestApps.inMachine": "ใน {machine}"
 }

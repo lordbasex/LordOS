@@ -985,6 +985,7 @@
   "themeSwitch.failedTitle": "Hindi mailapat ang {name}",
   "themeSwitch.refusedBody": "Hindi tugma ang code nito sa nilagdaang kopya ng LordOS, kaya hindi ito na-load. Mananatili ang istilo ng desktop mo gaya ng dati.",
   "themeSwitch.failedBody": "Hindi ito nagsimula. Mananatili ang istilo ng desktop mo gaya ng dati.",
+  "themeSwitch.needsLordOSBody": "Kailangan nito ang LordOS {version} o mas bago. Mananatili ang istilo ng desktop mo gaya ng dati.",
   "spotlight.section.machines": "Mga Makina",
   "guestApps.inMachine": "Sa {machine}"
 }

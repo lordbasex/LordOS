@@ -985,6 +985,7 @@
   "themeSwitch.failedTitle": "{name} لاگو نہیں ہو سکا",
   "themeSwitch.refusedBody": "اس کا کوڈ LordOS کی دستخط شدہ نقل سے میل نہیں کھاتا، اس لیے اسے لوڈ نہیں کیا گیا۔ آپ کے ڈیسک ٹاپ کا انداز پہلے جیسا ہی رہے گا۔",
   "themeSwitch.failedBody": "یہ شروع نہیں ہوا۔ آپ کے ڈیسک ٹاپ کا انداز پہلے جیسا ہی رہے گا۔",
+  "themeSwitch.needsLordOSBody": "اسے LordOS {version} یا اس کے بعد کا ورژن درکار ہے۔ آپ کے ڈیسک ٹاپ کا انداز پہلے جیسا ہی رہے گا۔",
   "spotlight.section.machines": "ورچوئل مشینیں",
   "guestApps.inMachine": "{machine} میں"
 }

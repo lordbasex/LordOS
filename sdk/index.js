@@ -4,12 +4,15 @@ import { render, onScreenChange } from '@lordos/runtime';
 import { settings } from './settings.js';
 import { createStore, useStore } from './store.js';
 import { locale, tOptional } from './i18n.js';
-import { cleanThemeMeta } from './thememeta.js';
+import { cleanThemeMeta, themeNamespace, themeText, themeNeedsNewer, THEME_TEXT_MAX } from './thememeta.js';
+import { lordosVersion as lordosVersionOf } from './system.js';
 
 export { View, Text, Image, Terminal, Surface, MediaView, screen, addListener, useClock, system, layouts, getLayout, modifiers } from '@lordos/runtime';
 export { displays as screenDisplays, mainDisplay, displayAt, displayFor, mainBox, holdKeyboard } from '@lordos/runtime';
 export { createStore, useStore } from './store.js';
 export { cleanThemeMeta, themeOptions, themeOptionValue, themeOptionPatch, themeAuthor } from './thememeta.js';   // theme.json's sketch and options (0.8.9)
+// (0.8.9.6.2) a community theme's own texts (theme-<id>) and the release it needs (minLordOS)
+export { themeNamespace, themeText, themeLabel, lordosAtLeast, themeNeedsNewer, THEME_TEXT_MAX } from './thememeta.js';
 export { settings, useSettings, useTrackedSettings } from './settings.js';
 export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPreferredLanguages, CORE_LANGUAGES, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
@@ -268,10 +271,14 @@ export const themes = {
   list: () => lord.themes.list().map((t) => {
     let meta = {};
     try { meta = t.meta ? JSON.parse(t.meta) : {}; } catch (e) { /* invalid theme.json */ }
-    // translated name and description (shell.theme.<id>.*) or those from theme.json
+    // translated name and description: LordOS's own (shell.theme.<id>.*), then (0.8.9.6.2) the theme's own namespace
+    // (theme-<id>.theme.name/description, a community theme's locales), then theme.json; a theme's texts go through
+    // themeText (one line, no control or bidi-override characters, a fixed length)
     // (0.8.9) sketch, options and desktopArrows: what Settings shows for a theme it doesn't know by id (sdk/thememeta.js)
-    return { id: t.id, current: t.current, hidden: !!meta.hidden, name: tOptional(`shell.theme.${t.id}.name`) || meta.name || t.id,
-      description: tOptional(`shell.theme.${t.id}.description`) || meta.description || '', ...cleanThemeMeta(meta),
+    const ns = themeNamespace(t.id);
+    const own = (k, max) => themeText((ns && tOptional(`${ns}.theme.${k}`)) || meta[k], max);
+    return { id: t.id, current: t.current, hidden: !!meta.hidden, name: tOptional(`shell.theme.${t.id}.name`) || own('name', THEME_TEXT_MAX.name) || t.id,
+      description: tOptional(`shell.theme.${t.id}.description`) || own('description', THEME_TEXT_MAX.description), ...cleanThemeMeta(meta, t.id),
       // it couldn't start in this session (lord-server went back to the one before): Settings → Appearance says why
       failed: t.failed === true, failedWhy: typeof t.failedWhy === 'string' ? t.failedWhy : '', failedCode: t.failedCode === true };
   }).filter((t) => !t.hidden),         // the login screen (themes/greeter) can't be chosen
@@ -293,6 +300,12 @@ export const themes = {
     } catch (e) { reopen = []; }
     let entry = null;
     try { entry = themes.list().find((x) => x.id === id) || null; } catch (e) { entry = null; }
+    // (0.8.9.6.2) a theme whose theme.json asks for a newer LordOS (minLordOS) isn't loaded: nothing changes, and a
+    // notification says which release it needs (Settings shows the same instead of Apply)
+    let release = '';
+    try { release = lordosVersionOf().version; } catch (e) { release = ''; }
+    const needs = themeNeedsNewer(entry, release);
+    if (needs) { notifyThemeNotApplied({ ...entry, needsLordOS: needs }); return false; }
     markThemeSwitch();
     settings.set({ theme: id, themeReopen: reopen.length ? reopen : null, themeDesktops: desktopsForThemeSwitch() });
     lord.settings.save(JSON.stringify(settings.get(), null, 2));

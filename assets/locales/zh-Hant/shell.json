@@ -978,6 +978,7 @@
   "themeSwitch.failedTitle": "無法套用 {name}",
   "themeSwitch.refusedBody": "它的程式碼與 LordOS 的簽署副本不一致，因此未載入。你的桌面風格維持不變。",
   "themeSwitch.failedBody": "它沒有啟動。你的桌面風格維持不變。",
+  "themeSwitch.needsLordOSBody": "它需要 LordOS {version} 或更新版本。你的桌面風格維持不變。",
   "spotlight.section.machines": "虛擬機器",
   "guestApps.inMachine": "在 {machine} 中"
 }
