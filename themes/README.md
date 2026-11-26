@@ -4,11 +4,46 @@ A theme is a React app that draws **the whole desktop**: wallpaper, bars, dock o
 and window frames. Apps (`apps/`) go inside those windows and adapt to the theme's colors on
 their own. `lord-server` runs the theme with QuickJS and paints it with its C engine.
 
-| Theme | Style |
-|---|---|
-| `default` | Lord Flow: menu bar, dock with magnification, app launcher, Control Center |
-| `classic` | Lord Classic: a centered taskbar, start menu with search, tray with quick settings and notifications, window snapping and the SDK's Overview (0.8.3) |
-| `workspaces` | Lord Workspaces (in development): activities with their own apps and layouts, a Context Spine, tiling per display, Search and a Control Center, three effects styles (Opaque, Translucent, Crystal); see [`docs/WORKSPACES.md`](../docs/WORKSPACES.md) |
+| Folder (id) | Theme | Style |
+|---|---|---|
+| `default` | Flow | menu bar, dock with magnification, app launcher, Control Center |
+| `classic` | Classic | a centered taskbar, start menu with search, tray with quick settings and notifications, window snapping and the SDK's Overview (0.8.3) |
+| `workspaces` | Workspaces | activities with their own apps and layouts, a Context Spine, tiling per display, Search and a Control Center, three effects styles (Opaque, Translucent, Crystal); see [`docs/WORKSPACES.md`](../docs/WORKSPACES.md) |
+| `celeste` | Celeste | a frame around each display, a bar on its thick side and drawers that slide out of its edges |
+| `luna` | Luna (in development) | a tribute to the desktops of 2001, with its own style pack and app skins |
+| `greeter` | (the login screen) | not a desktop style; part of LordOS, never synced |
+
+Themes have names of their own, never "Lord …" (`tools/brand-check.mjs` refuses one), and each `theme.json` names
+its author (`author`, `email`, `organization`). The ids (the folder names) never change: settings store them.
+
+## Where the official themes come from: LordOS-themes
+
+The five desktop styles above are developed in their own repository,
+[lordbasex/LordOS-themes](https://github.com/lordbasex/LordOS-themes), the way the wallpapers are in LordOS-wallpapers.
+This tree keeps a **vendored snapshot** of one pinned commit of it (not a git submodule), so `npm run build`, the .deb,
+the ISO and the Raspberry Pi image build offline from here, as before:
+
+- `upstream.json`: the pin (repository, commit, tag when there is one, and the SHA-256 of that commit's catalog).
+- `catalog.json`: that commit's `catalog.json`, copied verbatim (as `assets/wallpapers/motion.json` is the
+  wallpapers'): id, folder, name, author, email, organization, version, minLordOS, the verified star, and the size and
+  SHA-256 of every source file, doc and screenshot.
+- `<id>/`: each theme's source, exactly the catalog's files (LordOS-themes' `flow/` is the id `default`). Its README,
+  LICENSE, PROVENANCE and screenshots stay in LordOS-themes.
+
+`tools/themes-sync.mjs`:
+
+```sh
+node tools/themes-sync.mjs                                   # offline check (also in make test): <id>/ is the pinned snapshot
+node tools/themes-sync.mjs --from ../LordOS-themes --ref <commit-or-tag>   # take another commit or tag from a local clone
+node tools/themes-sync.mjs --export ../LordOS-themes         # copy changes made here back to a clone, for a commit there
+```
+
+`--from` reads the clone only with `git cat-file` and `git ls-tree` (no network, nothing run from it), checks every
+file's size and SHA-256 against that commit's catalog and refuses a commit with a file the catalog doesn't list;
+nothing is written unless all of it holds. Then it moves the pin. A change to an official theme is made in
+LordOS-themes first (its `CONTRIBUTING.md`), then synced here: `make test` fails while `<id>/` differs from the pin.
+The bundles are built by `tools/build-theme.mjs` and listed in the code manifest exactly as before; they are signed on
+the maintainer's machine (`tools/release/`) with the rest of LordOS's code.
 
 ```sh
 npm install           # once (React + esbuild)
