@@ -8,7 +8,10 @@
  *   2. Landlock: read-only /usr (no execute), the loader's file and the engine's own file executable, the model
  *      (an fd) readable, /sys/devices/system/cpu readable, /dev/null and /dev/urandom; in the runtime folder (an fd)
  *      only creating and removing a socket; TCP bind and connect denied (ABI 4); abstract unix sockets and signals
- *      scoped to itself (ABI 6);
+ *      scoped to itself (ABI 6). Only with a GPU backend (0.8.9.6.2): Vulkan opens the render nodes /dev/dri/renderD*
+ *      (read, write, their ioctls), lists /dev/dri and reads the parts of /sys the Vulkan loader and Mesa use to find
+ *      the card, never /dev/dri/card* (the display); CUDA opens /dev/nvidiactl, /dev/nvidia<N>, /dev/nvidia-uvm and
+ *      reads /proc/driver/nvidia and those parts of /sys;
  *   3. seccomp (all threads): socket only AF_UNIX SOCK_STREAM, never connect, no io_uring (it would bypass the socket
  *      filter), no new namespaces, no ptrace or reading other processes' memory, no mounts, no BPF, no keys, no
  *      modules; execve never, execveat only of the descriptor LLMJAIL_ENGINE_FD with AT_EMPTY_PATH; signals only to
@@ -25,9 +28,15 @@
 
 enum { LJ_USERNS = 1, LJ_NETNS = 2, LJ_LANDLOCK_FS = 4, LJ_LANDLOCK_NET = 8, LJ_LANDLOCK_SCOPE = 16, LJ_SECCOMP = 32, LJ_NOPRIV = 64 };
 
+/* (0.8.9.6.2) where the engine computes: the processor only, or a GPU through one of ggml's backend modules (llama.cpp
+ * loads libggml-vulkan.so / libggml-cuda.so from /usr/lib/llama.cpp only when their runtime is there). lord-server
+ * chooses (engine.c) and tells lord-llm through LORD_LLM_BACKEND, a closed word; anything else is the processor. */
+enum { LLMJAIL_CPU = 0, LLMJAIL_VULKAN = 1, LLMJAIL_CUDA = 2 };
+
 typedef struct {
     int model_fd, dir_fd, engine_fd;
     int need_netns;             /* 1: fail when the network namespace can't be made (tests); 0: go on with the rest */
+    int backend;                /* LLMJAIL_*: the GPU devices are reachable only for that backend (llmjail_apply) */
 } LlmJailCfg;
 
 /* Applies the three layers. Returns the mask of what is on (LJ_*), or -1 when Landlock (all of files, TCP and scoping:
@@ -36,7 +45,11 @@ typedef struct {
  * reported in the mask (unprivileged user namespaces may be off). Doesn't allocate. */
 int llmjail_apply(const LlmJailCfg *cfg);
 
-/* The fixed argument list lord-llm runs the engine with (no caller argument ever reaches it). */
-extern const char *const LLMJAIL_ARGV[];
+/* The fixed argument lists lord-llm runs the engine with (no caller argument ever reaches it), one per backend:
+ * the processor (-ngl 0 -dev none), the first Vulkan device or the first CUDA device with as many layers as fit in its
+ * free memory (-ngl auto, llama.cpp's --fit, which keeps 1 GB of the card free). */
+extern const char *const *const LLMJAIL_ARGVS[3];
+/* "cpu", "vulkan" or "cuda" → LLMJAIL_*; NULL or anything else → -1 */
+int llmjail_backend(const char *word);
 
 #endif

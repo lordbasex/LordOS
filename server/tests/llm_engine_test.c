@@ -7,7 +7,8 @@
  * facts of a process (package from dpkg's lists, the /usr merge, where it lives, its parents).
  *   build/llm-engine-test                     the checks above
  *   build/llm-engine-test --real <models folder> <id> [summary file] [system file]
- *       two real analyses (cold, then warm) with /usr/bin/llama-server and <folder>/<id>.gguf, with their timings */
+ *       two real analyses (cold, then warm) with /usr/bin/llama-server and <folder>/<id>.gguf, with their timings and
+ *       the engine's state (where it ran); LLM_BACKEND=auto|cpu|gpu chooses where */
 #include "../src/llm/engine.h"
 #include "../src/llm/blockwatch.h"
 #include "../src/llm/writing.h"
@@ -73,6 +74,8 @@ static int real(const char *mdir, const char *id, const char *summary_file, cons
     snprintf(launcher, sizeof launcher, "%.*s/lord-llm", (int)(strrchr(self, '/') - self), self);
     setenv("XDG_RUNTIME_DIR", rt, 1);
     llm_set_paths(mdir, NULL, launcher, NULL);
+    /* LLM_BACKEND=auto|cpu|gpu: where it computes (the default is auto, as in a session) */
+    if (getenv("LLM_BACKEND") && llm_set_backend(getenv("LLM_BACKEND"))) { printf("LLM_BACKEND: auto, cpu or gpu\n"); return 1; }
     char summary[LLM_USER_MAX + 1] = "Trigger: high CPU for 5 minutes.\nProcess: \"kworkerd\"; program ~/.cache/x/kworkerd, not installed by any package, in the home folder.\nStarted by: bash < sh < cron.\nCPU: 5-minute average 197% (2 cores), peak 199%.\nMemory: 310 MB, steady.\nThreads: 4.";
     char system[LLM_SYSTEM_MAX + 1] = "You are Sentinela, LordOS's local process guard. You read a summary of one process and answer only JSON: "
                          "verdict (normal, suspicious or dangerous), reason (one or two short sentences in Spanish, plain words) and "
@@ -91,6 +94,9 @@ static int real(const char *mdir, const char *id, const char *summary_file, cons
     r = wait_take(jid, 300000);
     printf("warm answer %s\nwall %.0f ms\n", r ? r : "(none)", now_ms() - t0);
     free(r);
+    char *st = llm_state_json();
+    printf("state %s\n", st ? st : "(none)");
+    free(st);
     llm_stop();
     msleep(1500);
     /* the runtime folder is empty once the engine stopped (its socket removed) */
@@ -164,6 +170,146 @@ static void writing_pure(void) {
     }
 }
 
+/* a fake model with words for the fake engine (llm_fake_engine.c): FAIL_GPU, NO_VRAM, OOM_GPU, HOSTILE_NAME */
+static void fake_model(const char *mdir, const char *id, const char *words) {
+    char p[PATH_MAX];
+    snprintf(p, sizeof p, "%s/%s.gguf", mdir, id);
+    FILE *f = fopen(p, "w");
+    fputs("GGUF", f);
+    for (int i = 0; i < 64; i++) fputc(0, f);
+    fputs(words, f);
+    for (int i = 0; i < 2048; i++) fputc(0, f);
+    fclose(f);
+    chmod(p, 0644);
+}
+
+static char *analyze_state(const char *model, char *jail, size_t jn, const char *sock) {
+    int id = llm_submit_analyze(model, "system", "Process: miner");
+    char *r = wait_take(id, 20000);
+    CHECK(r && strstr(r, "\"ok\":true"), "%s: answered on the next backend: %s", model, r ? r : "(none)");
+    free(r);
+    if (jail) { jail[0] = 0; get(sock, "/jail", jail, jn); }
+    return llm_state_json();
+}
+
+/* (0.8.9.6.2) where the engine computes: a GPU when its module and device are there (a fake device folder whose nodes
+ * are links to /dev/null, a character device), its devices reachable in the sandbox only then and never card0, the
+ * device's name and layers read from the log (a hostile name cleaned), the processor when chosen, and the fallbacks:
+ * a GPU that fails to start, has no room, or runs out of memory in the middle of an answer */
+static void gpu_cases(const char *dir, const char *mdir, const char *gdir, const char *fdev, const char *sock) {
+    (void)dir;
+    char p[PATH_MAX], jail[8192];
+    mkdir(fdev, 0755);
+    snprintf(p, sizeof p, "%s/dri", fdev);
+    mkdir(p, 0755);
+    snprintf(p, sizeof p, "%s/dri/renderD128", fdev);
+    if (symlink("/dev/null", p)) { /* checked by the state below */ }
+    snprintf(p, sizeof p, "%s/libggml-vulkan.so", gdir);
+    write_file(p, "ELF");
+    chmod(p, 0644);
+    fake_model(mdir, "gpu-ok", "");
+    fake_model(mdir, "gpu-fail", "FAIL_GPU");
+    fake_model(mdir, "gpu-novram", "NO_VRAM");
+    fake_model(mdir, "gpu-oom", "OOM_GPU");
+    fake_model(mdir, "gpu-hostile", "HOSTILE_NAME");
+    int real_render = 0;
+    for (int i = 128; i < 192; i++) { char q[40]; snprintf(q, sizeof q, "/dev/dri/renderD%d", i); if (!access(q, F_OK)) real_render = 1; }
+
+    CHECK(llm_set_backend("bogus") < 0 && llm_set_backend("") < 0 && llm_set_backend(NULL) < 0, "a mode of the closed list only");
+#if defined(__aarch64__)
+    llm_set_backend("gpu");                        /* "auto" keeps the processor on arm64 */
+#else
+    llm_set_backend("auto");
+#endif
+    char *st = analyze_state("gpu-ok", jail, sizeof jail, sock);
+    CHECK(st && strstr(st, "\"gpus\":{\"vulkan\":true,\"cuda\":false}") && strstr(st, "\"backend\":\"vulkan\"") &&
+          strstr(st, "\"device\":\"Fake GPU 9000\"") && strstr(st, "\"layers\":5,\"layersTotal\":5") && strstr(st, "\"fallback\":null"),
+          "vulkan: %s", st ? st : "");
+    free(st);
+    CHECK(strstr(jail, "\"dev\":\"Vulkan0\""), "vulkan's arguments: %s", jail);
+    CHECK(strstr(jail, "\"card_node\":\"denied\"") && strstr(jail, "\"nvidia_node\":\"denied\""), "vulkan: never the display's node or NVIDIA's");
+    if (real_render) CHECK(strstr(jail, "\"render_node\":\"ALLOWED\"") && strstr(jail, "\"render_ioctl\":\"ALLOWED\""), "vulkan: the render node and its ioctls");
+    else printf("skipped: needs a render node (/dev/dri/renderD*) to open it in the sandbox\n");
+    /* the sandbox's other refusals hold with a GPU too */
+    static const char *const denied[] = { "tcp4", "connect_unix", "read_etc", "read_home", "write_tmp", "exec_sh", "signal_parent", "unshare", NULL };
+    for (const char *const *d = denied; *d; d++) {
+        char want[64];
+        snprintf(want, sizeof want, "\"%s\":\"denied\"", *d);
+        CHECK(strstr(jail, want), "vulkan: %s must be denied", *d);
+    }
+
+    /* the processor when chosen: the engine restarts, with no GPU device */
+    CHECK(!llm_set_backend("cpu"), "cpu");
+    st = analyze_state("gpu-ok", jail, sizeof jail, sock);
+    CHECK(st && strstr(st, "\"mode\":\"cpu\"") && strstr(st, "\"backend\":\"cpu\"") && strstr(st, "\"device\":null"), "cpu: %s", st ? st : "");
+    free(st);
+    CHECK(strstr(jail, "\"dev\":\"none\"") && strstr(jail, "\"render_node\":\"denied\"") && strstr(jail, "\"render_ioctl\":\"denied\""),
+          "cpu: no render node: %s", jail);
+
+    /* a GPU that can't start the engine: the processor, and why */
+    llm_set_backend("gpu");
+    st = analyze_state("gpu-fail", NULL, 0, sock);
+    CHECK(st && strstr(st, "\"backend\":\"cpu\"") && strstr(st, "\"fallback\":\"start\""), "a failed start: %s", st ? st : "");
+    free(st);
+    /* given up on until the choice changes: the next model too runs on the processor */
+    st = analyze_state("gpu-ok", NULL, 0, sock);
+    CHECK(st && strstr(st, "\"backend\":\"cpu\""), "given up on: %s", st ? st : "");
+    free(st);
+    llm_set_backend("cpu");
+    llm_set_backend("gpu");
+    st = analyze_state("gpu-novram", NULL, 0, sock);
+    CHECK(st && strstr(st, "\"backend\":\"cpu\"") && strstr(st, "\"fallback\":\"memory\""), "no layer fits: %s", st ? st : "");
+    free(st);
+    llm_set_backend("cpu");
+    llm_set_backend("gpu");
+    st = analyze_state("gpu-oom", NULL, 0, sock);
+    CHECK(st && strstr(st, "\"backend\":\"cpu\"") && strstr(st, "\"fallback\":\"memory\""), "out of memory mid-answer: %s", st ? st : "");
+    free(st);
+    /* a streamed answer too */
+    llm_set_backend("cpu");
+    llm_set_backend("gpu");
+    int id = llm_submit_write("gpu-oom", "fix", NULL, "The text with mistake.");
+    char *r = wait_take(id, 20000);
+    CHECK(r && strstr(r, "\"ok\":true") && strstr(r, "mistakes."), "a streamed answer after the GPU ran out of memory: %s", r ? r : "(none)");
+    free(r);
+    /* a hostile name in the log: printable, no quote, backslash or escape, and the state still parses as one string */
+    llm_set_backend("cpu");
+    llm_set_backend("gpu");
+    st = analyze_state("gpu-hostile", NULL, 0, sock);
+    CHECK(st && strstr(st, "\"device\":\"EvilGPUx [31mred\"") && !strchr(st, 0x1b) && !strchr(st, 0x07), "a hostile device name: %s", st ? st : "");
+    free(st);
+
+    /* CUDA first when its module and NVIDIA's control node are there */
+    snprintf(p, sizeof p, "%s/libggml-cuda.so", gdir);
+    write_file(p, "ELF");
+    chmod(p, 0644);
+    snprintf(p, sizeof p, "%s/nvidiactl", fdev);
+    if (symlink("/dev/null", p)) { /* checked below */ }
+    llm_set_backend("cpu");
+    llm_set_backend("gpu");
+    st = analyze_state("gpu-ok", jail, sizeof jail, sock);
+    CHECK(st && strstr(st, "\"cuda\":true") && strstr(st, "\"backend\":\"cuda\"") && strstr(st, "\"device\":\"Fake CUDA 7000\""), "cuda: %s", st ? st : "");
+    free(st);
+    CHECK(strstr(jail, "\"dev\":\"CUDA0\"") && strstr(jail, "\"render_node\":\"denied\"") && strstr(jail, "\"card_node\":\"denied\""),
+          "cuda: its own nodes only: %s", jail);
+    /* CUDA failing: Vulkan next */
+    llm_set_backend("cpu");
+    llm_set_backend("gpu");
+    snprintf(p, sizeof p, "%s/libggml-cuda.so", gdir);
+    chmod(p, 0666);                                 /* writable by others: not loaded, not offered */
+    st = analyze_state("gpu-ok", NULL, 0, sock);
+    CHECK(st && strstr(st, "\"cuda\":false") && strstr(st, "\"backend\":\"vulkan\""), "a module writable by others is not used: %s", st ? st : "");
+    free(st);
+    unlink(p);
+
+    /* back to the processor for the rest */
+    snprintf(p, sizeof p, "%s/libggml-vulkan.so", gdir);
+    unlink(p);
+    llm_set_backend("auto");
+    llm_stop();
+    msleep(300);
+}
+
 int main(int argc, char **argv) {
     writing_pure();
     if (argc >= 4 && !strcmp(argv[1], "--real")) return real(argv[2], argv[3], argc > 4 ? argv[4] : NULL, argc > 5 ? argv[5] : NULL);
@@ -194,6 +340,12 @@ int main(int argc, char **argv) {
     setenv("XDG_RUNTIME_DIR", rt, 1);
     llm_set_paths(mdir, fake, launcher, info);
     llm_set_idle_ms(1500);
+    /* (0.8.9.6.2) no GPU module in an empty folder: the processor, whatever this computer has */
+    char gdir[300], fdev[300];
+    snprintf(gdir, sizeof gdir, "%s/ggml", dir);
+    snprintf(fdev, sizeof fdev, "%s/dev", dir);
+    mkdir(gdir, 0755);
+    llm_set_gpu_paths(gdir, fdev);
 
     /* ids and the list */
     CHECK(llm_model_id_ok("qwen3-1.7b"), "plain id");
@@ -252,6 +404,8 @@ int main(int argc, char **argv) {
     r = wait_take(id, 20000);
     CHECK(r && strstr(r, "rm -rf"), "injected text returned verbatim as content %s", r ? r : "");
     free(r);
+
+    gpu_cases(dir, mdir, gdir, fdev, sock);
 
     /* (0.8.9.6) "Investigate with Lumo": a script's text fenced as data with a nonce, code given inline, a binary's
      * metadata, a script reached through a link (not read: the interpreter's metadata instead), a reused PID */

@@ -128,6 +128,10 @@ validate() {
         jq -e --arg id "$id" '.apps[] | select(.id == $id) | (.keywords // []) | type == "array" and length <= 12 and
             all(.[]; type == "string" and length >= 2 and length <= 40 and (explode | all(. >= 32)) and (test("[\\\\\"<>]") | not))' "$CAT" >/dev/null \
             || die "$id: keywords must be at most 12 strings of 2 to 40 characters"
+        # optional build image of a recipe (0.8.9.6.2): the default one, or "nvidia-cuda" (amd64 only)
+        case "$(jf "$id" '.source.image // empty')" in ""|nvidia-cuda) ;; *) die "$id: unknown source.image" ;; esac
+        [ -z "$(jf "$id" '.source.image // empty')" ] || [ "$(jf "$id" '.arches | join(",")')" = amd64 ] || die "$id: the nvidia-cuda image is amd64 only"
+        case "$(jf "$id" '.section // empty')" in ""|commercial|remote|suites|addon) ;; *) die "$id: unknown section" ;; esac
         # optional Store categories (0.8.8.9: the Debian category pages also list the app, Steam in Games)
         for c in $(jf "$id" '(.categories // [])[]'); do
             case "$c" in AudioVideo|Development|Education|Game|Graphics|Network|Office|Science|System|Utility) ;; *) die "$id: unknown category $c" ;; esac
@@ -417,11 +421,36 @@ do_deb() {
 
 build_image() {
     a=$1; img=$BUILD_IMAGE-$a
+    if ! docker image inspect "$img" >/dev/null 2>&1; then
+        say "  building the $img container"
+        printf '%s\n' 'FROM debian:trixie' \
+            'RUN apt-get update -q && apt-get install -y -q --no-install-recommends build-essential cmake ninja-build pkg-config libssl-dev libsdl2-dev libvulkan-dev glslc spirv-headers dpkg-dev xz-utils zstd file jq ca-certificates && rm -rf /var/lib/apt/lists/*' |
+            docker build -q --platform "linux/$a" -t "$img" - >/dev/null || die "could not build the $img container"
+    fi
+    [ "${2:-}" = nvidia-cuda ] && cuda_image "$a"
+    return 0
+}
+
+# (0.8.9.6.2) the image of a recipe with "image": "nvidia-cuda" (llama.cpp's CUDA backend): the build image plus NVIDIA's
+# CUDA repository for Debian 13, its key pinned by fingerprint (apt/keys/nvidia-cuda.asc, checked here before Docker
+# sees it), and CUDA's compiler and development files. amd64 only. Sets img.
+CUDA_IMAGE=lordos-catalog-build:trixie-cuda13-5-v1
+CUDA_FPR=02182E60104FCDC26EAE1B8597A5D4CB8793F200
+cuda_image() {
+    a=$1; base=$img; img=$CUDA_IMAGE-$a
+    [ "$a" = amd64 ] || die "the nvidia-cuda image is amd64 only"
     docker image inspect "$img" >/dev/null 2>&1 && return 0
-    say "  building the $img container"
-    printf '%s\n' 'FROM debian:trixie' \
-        'RUN apt-get update -q && apt-get install -y -q --no-install-recommends build-essential cmake ninja-build pkg-config libssl-dev libsdl2-dev libvulkan-dev glslc spirv-headers dpkg-dev xz-utils zstd file jq ca-certificates && rm -rf /var/lib/apt/lists/*' |
-        docker build -q --platform "linux/$a" -t "$img" - >/dev/null || die "could not build the $img container"
+    k=$ROOT/apt/keys/nvidia-cuda.asc
+    f=$(gpg --show-keys --with-colons "$k" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')
+    [ "$f" = "$CUDA_FPR" ] || die "apt/keys/nvidia-cuda.asc is not NVIDIA's Debian 13 key $CUDA_FPR"
+    ctx=$(mktemp -d)
+    gpg --dearmor < "$k" > "$ctx/cuda-archive-keyring.gpg" || die "cannot read apt/keys/nvidia-cuda.asc"
+    printf '%s\n' "FROM $base" 'COPY cuda-archive-keyring.gpg /usr/share/keyrings/cuda-archive-keyring.gpg' \
+        'RUN echo "deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/ /" > /etc/apt/sources.list.d/cuda.list && apt-get update -q && apt-get install -y -q --no-install-recommends cuda-nvcc-13-5 cuda-cudart-dev-13-5 libcublas-dev-13-5 patchelf binutils && rm -rf /var/lib/apt/lists/*' \
+        > "$ctx/Dockerfile"
+    say "  building the $img container (NVIDIA's CUDA 13.5)"
+    docker build -q --platform "linux/$a" -t "$img" "$ctx" >/dev/null || { rm -rf "$ctx"; die "could not build the $img container"; }
+    rm -rf "$ctx"
 }
 
 cosign_verify() {
@@ -487,7 +516,7 @@ do_recipe() {
             printf '%s\n' "$name" > "$in/ARCHIVE"
         fi
         jq --arg id "$id" '.apps[] | select(.id == $id)' "$CAT" > "$in/app.json"
-        build_image "$a"
+        build_image "$a" "$(jf "$id" '.source.image // empty')"
         # parallel jobs: all CPUs for the native architecture; 3 under emulation, where the compilers
         # use several times the memory (16 jobs ran an 8 GB Docker VM out of memory on llama.cpp's
         # Vulkan shaders). LORDOS_CATALOG_JOBS overrides.
@@ -499,7 +528,7 @@ do_recipe() {
             -e HOME=/tmp -e PKG="$pkg" -e VERSION="$ver" -e UPSTREAM_VERSION="$up" -e ARCH="$a" \
             -e SOURCE_DATE_EPOCH="$(jf "$id" .source.source_date_epoch)" -e JOBS="$jobs" \
             -v "$ROOT/apt/recipes:/recipes:ro" -v "$in:/in:ro" -v "$out:/out" \
-            "$BUILD_IMAGE-$a" sh -eu "/recipes/$recipe/build.sh" >&2 || die "$id: recipe $recipe failed for $a"
+            "$img" sh -eu "/recipes/$recipe/build.sh" >&2 || die "$id: recipe $recipe failed for $a"
         ls "$out"/*.deb >/dev/null 2>&1 || die "$id: recipe $recipe produced no .deb for $a"
         for f in "$out"/*.deb; do
             p=$(deb_field "$f" Package)

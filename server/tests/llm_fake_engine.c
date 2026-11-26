@@ -5,7 +5,12 @@
  * model through /proc/self/fd/3, binds --host's unix socket in its working directory and answers like llama-server:
  *   GET /health                  {"status":"ok"}
  *   POST /v1/chat/completions    a chat completion whose content depends on the user text (see answer())
- *   GET /jail                    {"checks":{name: "denied" | "ALLOWED"}, "model": "GGUF" or "", "netns": N}
+ *   GET /jail                    {"checks":{name: "denied" | "ALLOWED"}, "model": "GGUF" or "", "netns": N, "dev": "-dev's value"}
+ * (0.8.9.6.2) With a GPU's -dev (Vulkan0, CUDA0) it also tries the GPU's devices (a render node and its DRM ioctl, the
+ * display node card0, NVIDIA's control node) and writes llama.cpp's log lines about the device and its layers to stderr
+ * (lord-server reads them); words in the model file make it fail like a GPU can: FAIL_GPU (exits at start), NO_VRAM (no
+ * layer fits), OOM_GPU (the first answer runs out of the card's memory), HOSTILE_NAME (a device name with quotes,
+ * backslashes and escapes).
  */
 #include <errno.h>
 #include <fcntl.h>
@@ -15,8 +20,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <dirent.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
@@ -24,6 +31,9 @@
 
 static char report[4096];
 static size_t rn;
+static const char *dev = "";            /* -dev's value */
+static char modeltext[4097];             /* the model file's first 4 KB */
+static int oom_once;
 
 static void note(const char *name, int allowed) {
     rn += (size_t)snprintf(report + rn, sizeof report - rn, "%s\"%s\":\"%s\"", rn > 1 ? "," : "", name, allowed ? "ALLOWED" : "denied");
@@ -83,6 +93,27 @@ static void checks(void) {
     note("tgkill_self", syscall(SYS_tgkill, getpid(), (pid_t)syscall(SYS_gettid), 0) == 0);
     note("kill_self", kill(getpid(), 0) == 0);
     note("unshare", unshare(CLONE_NEWNS) == 0);
+    /* (0.8.9.6.2) the GPU's devices: a render node (and DRM_IOCTL_VERSION on it), the display's card0, NVIDIA's node */
+    char rnode[64] = "";
+    DIR *dd = opendir("/dev/dri");
+    for (struct dirent *de; dd && (de = readdir(dd));)
+        if (!strncmp(de->d_name, "renderD", 7) && !rnode[0]) snprintf(rnode, sizeof rnode, "/dev/dri/%.32s", de->d_name);
+    if (dd) closedir(dd);
+    if (!rnode[0]) snprintf(rnode, sizeof rnode, "/dev/dri/renderD128");
+    f = open(rnode, O_RDWR | O_CLOEXEC);
+    note("render_node", f >= 0);
+    if (f >= 0) {
+        struct { int major, minor, patch; size_t nl; char *name; size_t dl; char *date; size_t sl; char *desc; } v = { 0 };
+        int r = ioctl(f, 0xC0406400 /* DRM_IOCTL_VERSION */, &v);
+        note("render_ioctl", r == 0 || (errno != EACCES && errno != EPERM));
+        close(f);
+    } else note("render_ioctl", 0);
+    f = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    note("card_node", f >= 0);
+    if (f >= 0) close(f);
+    f = open("/dev/nvidiactl", O_RDWR | O_CLOEXEC);
+    note("nvidia_node", f >= 0);
+    if (f >= 0) close(f);
     rn += (size_t)snprintf(report + rn, sizeof report - rn, "}");
 }
 
@@ -151,6 +182,14 @@ static void serve(int c) {
         if (n - (size_t)(e + 4 - req) >= want) break;
     }
     req[n] = 0;
+    if (!strncmp(req, "POST /v1/chat/completions", 25) && strstr(modeltext, "OOM_GPU") && strncmp(dev, "none", 4) && !oom_once++) {
+        /* the card runs out of memory: said in the log, a 500, and the engine ends */
+        fprintf(stderr, "ggml_vulkan: Device memory allocation of size 268435456 failed: ErrorOutOfDeviceMemory\n");
+        const char *e500 = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}";
+        if (write(c, e500, strlen(e500)) < 0) { /* the client left */ }
+        close(c);
+        _exit(1);
+    }
     if (!strncmp(req, "POST /v1/chat/completions", 25) && strstr(req, "\"stream\":true")) { stream(c, req); close(c); return; }
     char body[16384];
     if (!strncmp(req, "GET /health", 11)) snprintf(body, sizeof body, "{\"status\":\"ok\"}");
@@ -160,7 +199,8 @@ static void serve(int c) {
         if (m >= 0) { ssize_t k = read(m, model, 4); model[k > 0 ? k : 0] = 0; close(m); }
         struct stat ns;
         stat("/proc/self/ns/net", &ns);
-        snprintf(body, sizeof body, "{\"checks\":%s,\"model\":\"%s\",\"netns\":%llu}", report, model, (unsigned long long)ns.st_ino);
+        snprintf(body, sizeof body, "{\"checks\":%s,\"model\":\"%s\",\"netns\":%llu,\"dev\":\"%.16s\"}", report, model,
+                 (unsigned long long)ns.st_ino, dev);
     } else if (!strncmp(req, "POST /v1/chat/completions", 25))
         snprintf(body, sizeof body, "{\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"%s\"}}],"
                  "\"usage\":{\"completion_tokens\":24}}", answer(req));
@@ -173,9 +213,24 @@ static void serve(int c) {
 
 int main(int argc, char **argv) {
     const char *host = NULL;
-    for (int i = 1; i + 1 < argc; i++) if (!strcmp(argv[i], "--host")) host = argv[i + 1];
+    for (int i = 1; i + 1 < argc; i++) {
+        if (!strcmp(argv[i], "--host")) host = argv[i + 1];
+        if (!strcmp(argv[i], "-dev")) dev = argv[i + 1];
+    }
     if (!host) return 2;
+    int m = open("/proc/self/fd/3", O_RDONLY | O_CLOEXEC);
+    if (m >= 0) { ssize_t k = read(m, modeltext, sizeof modeltext - 1); modeltext[k > 0 ? k : 0] = 0; close(m); }
+    /* "GGUF" then zeros: the words come after them */
+    for (size_t i = 0; i + 1 < sizeof modeltext; i++) if (!modeltext[i]) modeltext[i] = ' ';
     checks();
+    /* a GPU: llama.cpp's log lines (verbosity 4) about the device and its layers */
+    int gpu = !strcmp(dev, "Vulkan0") || !strcmp(dev, "CUDA0");
+    if (gpu && strstr(modeltext, "FAIL_GPU")) { fprintf(stderr, "ggml_vulkan: no device\nerror: invalid device: %s\n", dev); return 1; }
+    if (gpu) {
+        const char *name = strstr(modeltext, "HOSTILE_NAME") ? "Evil\"GPU\\x \x1b[31mred\x07 (X)" : !strcmp(dev, "CUDA0") ? "Fake CUDA 7000" : "Fake GPU 9000 (FAKE)";
+        fprintf(stderr, "0.00.70 I llama_prepare_model_devices: using device %s (%s) (0000:01:00.0) - 100 MiB free\n", dev, name);
+        fprintf(stderr, "0.01.07 I load_tensors: offloaded %s layers to GPU\n", strstr(modeltext, "NO_VRAM") ? "0/5" : "5/5");
+    }
     int s = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     struct sockaddr_un a = { .sun_family = AF_UNIX };
     snprintf(a.sun_path, sizeof a.sun_path, "%s", host);

@@ -50,6 +50,18 @@
     const any = textId(t('foot.privacy')) || textId(t('cap.img'));
     if (any) { const b = box(any); for (let i = 0; i < 30; i++) { ev('wheel', any, b[0] + 5, b[1] + 5, 3); await sleep(40); } }
     await sleep(800);
+    // (0.8.9.6.2) where they run: the Brain's Automatic / Processor / Graphics card and what the engine uses
+    {
+      const hint = textId(t('foot.brainHint'));
+      if (hint) { const b = box(hint); for (let i = 0; i < 40; i++) { ev('wheel', hint, b[0] + 5, b[1] + 5, -3); await sleep(30); } }
+      await sleep(600);
+      const foot = shownTexts();
+      const whereLine = foot.find((s) => /^(Brain|Cerebro|Cérebro|الدماغ)/.test(s) && s !== t('cap.brain')) || '';
+      step('the Brain\'s choice and where it runs', foot.includes(t('foot.brainHint')) && foot.filter((s) => s === sdk.t('settings.ai.backend.gpu')).length >= 2 && !!whereLine, whereLine);
+      await shot('where they run');
+      if (hint) { const b = box(hint); for (let i = 0; i < 40; i++) { ev('wheel', hint, b[0] + 5, b[1] + 5, 3); await sleep(30); } }
+      await sleep(400);
+    }
     const search = textId(t('search'));
     if (search) { click(search); await sleep(300); click(search); }
     await sleep(600);

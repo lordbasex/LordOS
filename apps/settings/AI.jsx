@@ -20,13 +20,14 @@ import {
   tOptional, useSettings, useStore, useAppWindow, useKeyboard, direction, wm, media, admin, formatBytes, spacing, typeScale, settings,
   VOICE_DEFAULTS, speakAvailable, previewVoice, tryVoice, player as voicePlayer, VOICE_LANGS, voiceLabel, voicePackage, modelPackage, hasVoice,
   PREVIEWS_PACKAGE, scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName,
-  takeName, errorText, fs, LLM_MODELS, packagesForModel, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, installLlm,
+  takeName, errorText, fs, LLM_MODELS, packagesForModel, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, installLlm, setBrainBackend,
   removeLlm, lumoReady, translateWithLumo, ENGINE_PACKAGE, writingChoice, writingEnabled, setWritingOn,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
   CAPS, CAP_COLOR, CAP_ICON, FUNCTIONS, matchFunctions, llmFunctions, llmTryReady, LEVELS, AI_FILTERS, TESSDATA, ocrPackageOk, tessCodes, ocrLangs, brainEntries, voiceEntries,
   eyeEntries, earEntries, imageEntries, lumoState, filterEntries, filterCounts, groupByCap, capCard, modelBytes, sortForPage, voicePage,
+  BRAIN_BACKENDS, brainBackend, brainWhere,
 } from '../../sdk/aistore.js';
 import { Stack, Section, SettingRow, Note, Actions, tint } from './ui.jsx';
 import { PersonalVoiceSheet } from './PersonalVoice.jsx';
@@ -616,6 +617,15 @@ function Footer({ ctx, width }) {
   const { t: tr } = useLocale();
   const { w } = columns(width, 240);
   const used = modelBytes(ctx.sizes);
+  // (0.8.9.6.2) where the Brain computes: the choice, and what the engine used (or will use)
+  useStore(settings);
+  const eng = useStore(sentinelaEngine) || {};
+  const brainMode = brainBackend(settings.get());
+  const where = brainWhere(eng.state, brainMode);
+  useEffect(() => {
+    const id = setInterval(() => refreshSentinelaEngine(), 5000);
+    return () => clearInterval(id);
+  }, []);
   const box = (title, children) => (
     <View style={{ width: w, padding: 14, gap: 8, borderRadius: 12, border: `1px solid ${t.separator}`, backgroundColor: t.control }}>
       <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{title}</Text>
@@ -640,7 +650,13 @@ function Footer({ ctx, width }) {
             <Segmented small value={BACKENDS.includes(ctx.conf.backend) ? ctx.conf.backend : 'auto'} onChange={(b) => ctx.saveConf({ backend: b })}
               options={BACKENDS.map((b) => [b, tr(`settings.ai.backend.${b}`)])} />
           </View>
-          {line(tr('settings.aiStore.foot.brainCpu'))}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, flexWrap: 'wrap' }}>
+            <Text style={{ fontSize: typeScale.caption, color: t.text }}>{tr('settings.aiStore.cap.brain')}</Text>
+            <Segmented small value={brainMode} onChange={(b) => setBrainBackend(b)}
+              options={BRAIN_BACKENDS.map((b) => [b, tr(`settings.ai.backend.${b}`)])} />
+          </View>
+          {line(tr(`settings.aiStore.foot.${where.key}`, where.vars))}
+          {line(tr('settings.aiStore.foot.brainHint'))}
           {line(tr('settings.aiStore.foot.eyeCpu'))}
         </>
       ))}

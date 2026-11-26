@@ -7,9 +7,11 @@
  *   - low priority: nice 15, SCHED_BATCH, idle I/O; its own cgroup scope lordos-sentinela.scope with at most two
  *     cores and a memory cap of the model's size plus 1.5 GB (without a delegated cgroup, an address-space limit);
  *   - umask 0177 and the runtime folder as its working directory, so the socket is engine.sock there, mode 0600;
- *   - llmjail_apply (namespaces, Landlock, seccomp), stdin and stdout /dev/null, stderr /dev/null too unless
- *     LORD_LLM_LOG is set by lord-server's own environment;
- *   - execveat(5, "", fixed arguments, a minimal environment).
+ *   - llmjail_apply (namespaces, Landlock, seccomp), stdin and stdout /dev/null; stderr is what lord-server gave it
+ *     (a pipe it reads the engine's startup lines from: which GPU, how many layers; engine.c);
+ *   - execveat(5, "", the fixed arguments of the backend LORD_LLM_BACKEND names, a minimal environment).
+ * (0.8.9.6.2) LORD_LLM_BACKEND is "cpu", "vulkan" or "cuda" (lord-server's choice, engine.c); anything else, or none,
+ * is the processor. Only that backend's GPU devices are reachable in the sandbox (llmjail.c).
  * Exit codes before the exec: 2 bad descriptors, 3 the sandbox could not be applied, 4 the exec failed. */
 #include "llmjail.h"
 #include "../sec/cgroup.h"
@@ -46,11 +48,17 @@ int main(int argc, char **argv) {
     struct sched_param sp = { 0 };
     sched_setscheduler(0, SCHED_BATCH, &sp);
     syscall(SYS_ioprio_set, 1 /* IOPRIO_WHO_PROCESS */, 0, 3 << 13 /* IOPRIO_CLASS_IDLE */);
+    int backend = llmjail_backend(getenv("LORD_LLM_BACKEND"));
+    if (backend < 0) backend = LLMJAIL_CPU;
     long model_mb = (long)(m.st_size >> 20);
     CgroupLimits lim = { .mem_high_mb = model_mb + 1280, .mem_max_mb = model_mb + 1536, .cpu_percent = 200 };
     if (cgroup_enter("lordos-sentinela.scope", &lim)) {
-        struct rlimit as = { (rlim_t)(model_mb + 4096) << 20, (rlim_t)(model_mb + 4096) << 20 };
-        setrlimit(RLIMIT_AS, &as);
+        /* without a cgroup, an address-space limit; a GPU driver maps the card's memory and reserves address space of
+         * its own (CUDA's unified memory reserves far more than any limit), so the limit is the processor's only */
+        if (backend == LLMJAIL_CPU) {
+            struct rlimit as = { (rlim_t)(model_mb + 4096) << 20, (rlim_t)(model_mb + 4096) << 20 };
+            setrlimit(RLIMIT_AS, &as);
+        }
     }
     struct rlimit core = { 0, 0 }, files = { 256, 256 };
     setrlimit(RLIMIT_CORE, &core);
@@ -61,19 +69,17 @@ int main(int argc, char **argv) {
     unlinkat(LLMJAIL_DIR_FD, "engine.sock", 0);           /* a previous engine's, if it was killed */
     int null = open("/dev/null", O_RDWR | O_CLOEXEC);
     if (null < 0) return fail(3, "/dev/null");
-    const char *log = getenv("LORD_LLM_LOG");
-    int keep_log = log && !strcmp(log, "1");
 
-    LlmJailCfg cfg = { .model_fd = LLMJAIL_MODEL_FD, .dir_fd = LLMJAIL_DIR_FD, .engine_fd = LLMJAIL_ENGINE_FD };
+    LlmJailCfg cfg = { .model_fd = LLMJAIL_MODEL_FD, .dir_fd = LLMJAIL_DIR_FD, .engine_fd = LLMJAIL_ENGINE_FD, .backend = backend };
     int mask = llmjail_apply(&cfg);
     if (mask < 0) return fail(3, "sandbox");
-    if (keep_log) fprintf(stderr, "lord-llm: sandbox 0x%x\n", (unsigned)mask);
+    fprintf(stderr, "lord-llm: sandbox 0x%x backend %d\n", (unsigned)mask, backend);
     fcntl(LLMJAIL_DIR_FD, F_SETFD, FD_CLOEXEC);
     fcntl(LLMJAIL_ENGINE_FD, F_SETFD, FD_CLOEXEC);
     dup2(null, 0);
     dup2(null, 1);
-    if (!keep_log) dup2(null, 2);
-    char *envp[] = { "PATH=/usr/bin:/bin", "LANG=C.UTF-8", "HOME=/nonexistent", NULL };
-    syscall(SYS_execveat, LLMJAIL_ENGINE_FD, "", (char *const *)LLMJAIL_ARGV, envp, AT_EMPTY_PATH);
+    /* Mesa's shader cache would be written in the home folder, which the sandbox doesn't reach: off, said once */
+    char *envp[] = { "PATH=/usr/bin:/bin", "LANG=C.UTF-8", "HOME=/nonexistent", "MESA_SHADER_CACHE_DISABLE=true", NULL };
+    syscall(SYS_execveat, LLMJAIL_ENGINE_FD, "", (char *const *)LLMJAIL_ARGVS[backend], envp, AT_EMPTY_PATH);
     return fail(4, "exec");
 }

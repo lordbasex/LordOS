@@ -4,7 +4,7 @@
 import {
   CAPS, PIECES, FUNCTIONS, LEVELS, EAR_MODELS, IMAGE_MODELS, OCR_LANGS, OCR_BASE, AI_FILTERS, ocrPackageOk, tessCodes, ocrLangs, brainEntries,
   voiceEntries, voicePage, eyeEntries, earEntries, imageEntries, pieceReady, lumoState, matchesQuery, filterEntries, filterCounts, groupByCap,
-  capCard, modelBytes, sortForPage, CAP_COLOR, CAP_ICON, matchFunctions, llmFunctions, llmTryReady,
+  capCard, modelBytes, sortForPage, CAP_COLOR, CAP_ICON, matchFunctions, llmFunctions, llmTryReady, BRAIN_BACKENDS, brainBackend, brainWhere,
 } from '../../sdk/aistore.js';
 import { LLM_MODELS } from '../../sdk/llmcatalog.js';
 import { VOICE_LANGS } from '../../sdk/voicecatalog.js';
@@ -150,5 +150,19 @@ eq('tried with Writing on by default', llmTryReady({ installed: true, engine: tr
 eq('tried with Sentinela on and Writing off', llmTryReady({ installed: true, engine: true, sentinelaOn: true, writingChoice: false }), true);
 eq('not with both off', llmTryReady({ installed: true, engine: true, sentinelaOn: false, writingChoice: false }), false);
 eq('not without the model or the engine', [llmTryReady({ installed: false, engine: true, writingChoice: null }), llmTryReady({ installed: true, engine: false, writingChoice: null })], [false, false]);
+// (0.8.9.6.2) where the Brain computes
+eq('the choices', BRAIN_BACKENDS, ['auto', 'cpu', 'gpu']);
+eq('auto by default', [brainBackend({}), brainBackend(null), brainBackend({ brain: { backend: 'tpu' } }), brainBackend({ brain: { backend: 'gpu' } })], ['auto', 'auto', 'auto', 'gpu']);
+const vk = { backend: 'vulkan', device: 'AMD Radeon RX 580 Series', layers: 29, layersTotal: 29, gpus: { vulkan: true, cuda: false } };
+eq('on the GPU, every layer', brainWhere(vk, 'auto'), { key: 'brainGpu', vars: { api: 'Vulkan', device: 'AMD Radeon RX 580 Series' } });
+eq('on the GPU, some layers', brainWhere({ ...vk, layers: 20 }, 'gpu'), { key: 'brainGpuPart', vars: { api: 'Vulkan', device: 'AMD Radeon RX 580 Series', layers: 20, total: 29 } });
+eq('CUDA without a name', brainWhere({ backend: 'cuda', device: null, layers: 0, layersTotal: 0 }, 'auto'), { key: 'brainGpu', vars: { api: 'CUDA', device: 'CUDA' } });
+eq('nonsense layers ignored', brainWhere({ ...vk, layers: 99, layersTotal: 29 }, 'auto').key, 'brainGpuPart');
+eq('processor chosen', brainWhere({ backend: 'cpu', fallback: null, gpus: { vulkan: true } }, 'cpu').key, 'brainCpuChosen');
+eq('fallbacks say why', ['start', 'memory', 'untested', 'none', null].map((f) => brainWhere({ backend: 'cpu', fallback: f }, 'auto').key),
+  ['brainCpuStart', 'brainCpuMemory', 'brainCpuUntested', 'brainCpuNoGpu', 'brainCpu']);
+eq('not run yet: the GPU it will use', brainWhere({ backend: null, gpus: { vulkan: true, cuda: true } }, 'auto'), { key: 'brainGpuReady', vars: { api: 'CUDA' } });
+eq('not run yet, no GPU', brainWhere({ backend: null, gpus: { vulkan: false, cuda: false } }, 'gpu').key, 'brainCpuNoGpu');
+eq('no engine state at all', brainWhere(null, 'auto').key, 'brainCpuNoGpu');
 console.log(`ai-store-test: ${ok} passed, ${bad} failed`);
 process.exit(bad ? 1 : 0);
