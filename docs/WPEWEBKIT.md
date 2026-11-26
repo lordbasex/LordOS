@@ -90,6 +90,20 @@ network process, connected in 300 to 400 ms, Opus with VP8 and Opus with H.264, 
 each in 4 s; TURN URLs with `?transport=` accepted. Against Chrome and a public meeting server: WEBAPPS.md, "Calls".
 Not published; arm64 not built yet.
 
+Results of `+4.2` on amd64 (2026-11-26; `+4.1` plus `lordos-sw-notifications.patch`, librice `0.4.3-1~lordos13+1`
+from `EXTRA_DEBS`, built from a `git archive` snapshot of `feat/web-calls`): `dpkg-buildpackage` 1775 s (16 jobs);
+lintian 0 errors, 6 warnings; `libwpewebkit-2.0-1` 32.7 MB as `+4.1`; 930 of 930 symbols of 2.48 kept, 1345 exported
+(the patch adds no symbol). Every check of `+4.1` passes again (pkg-config, no DRM backend, no `libinput`/`libudev`,
+the headless render, lord-web on both backends with its backend and probe tests, Chrome's identity, SharedArrayBuffer,
+Document-Isolation-Policy, the loopback call with Opus + VP8 and Opus + H.264). `tests/webcalls_check.py --swnotify`
+(test stage run again with `TEST_ONLY=1` from a later snapshot, the same packages): a page's service worker shows two
+notifications with one tag; both reach the view's `show-notification` with their title, body (UTF-8) and tag, the
+first is closed when the second replaces it, and nothing reaches D-Bus; `webkit_notification_clicked` on the second
+reaches the worker's `notificationclick` (title, body, `data`, 1 window client), whose `clients.focus()` resolves and
+the view emits `lordos-focus-from-service-worker`; with the page gone to another origin first (no view of the worker's
+origin), the worker's notification goes to D-Bus as before (`Notify` with the app's name) and the server's
+`ActionInvoked` click reaches the worker's `notificationclick`. Not published; arm64 not built yet.
+
 Output, in `$LORDOS_WPE_WORK/<version>/out/` (default `/var/tmp/lordos-wpewebkit`; on the maintainer's build machine
 `/mnt/HD08TB/build/wpewebkit`): the `.deb`s, the **source package** (`wpewebkit_<version>.dsc`,
 `wpewebkit_<upstream>.orig.tar.xz`, `wpewebkit_<upstream>.orig.tar.xz.asc`, `wpewebkit_<version>.debian.tar.xz`),
@@ -109,6 +123,7 @@ All in `backport()` of `tools/pkg/wpewebkit-chroot.sh`; a change that stops appl
 | `debian/patches/lordos-turn-transport-query.patch` (`+4`) | WebKit's `RTCPeerConnection` refused every TURN URL with a query (an inverted check: `query()` has no `?`, so `find("?transport=")` is `notFound`, which is true); sites hand out `turn:host:443?transport=tcp`. Now exactly `transport=udp` and `transport=tcp` are accepted, which the ICE agent reads; another query is still a `SyntaxError` |
 | `debian/patches/lordos-sharedarraybuffer-coi.patch` (`+3`) | SharedArrayBuffer only in a web process made for cross-origin-isolated documents (COOP `same-origin` + COEP `require-corp`): WebKit already gives such a document a process of its own (`CrossOriginMode::Isolated`, `WebProcessProxy::shouldEnableSharedArrayBuffer()`), but only its Cocoa launcher turned SharedArrayBuffer on there; the patch does the same in the GLib launcher (`JSC_useSharedArrayBuffer=1` in that process's environment only, removed from every other's). Before it WPE never had SharedArrayBuffer, and a messaging web app requires it for calls. Checked by `tests/webcalls_check.py`: a plain page never has it, before or after an isolated one in the same view |
 | `debian/patches/lordos-document-isolation-policy.patch` (`+4.1`) | A messaging web app makes its page cross-origin isolated with **Document-Isolation-Policy** (DIP), which WebKit doesn't implement, next to COOP `same-origin-allow-popups`: without it the page had no SharedArrayBuffer and offered no calls. A document with DIP `isolate-and-require-corp` (or `-credentialless`), an enforced COEP `require-corp` and COOP `unsafe-none` or `same-origin-allow-popups` gets WebKit's own isolation, as if its COOP were `same-origin`. "Document-Isolation-Policy (since `+4.1`)" below |
+| `debian/patches/lordos-sw-notifications.patch` (`+4.2`) | A service worker's notification (`registration.showNotification`, which messaging and chat web apps use) has no page, so WebKit's GLib port sent it to `org.freedesktop.Notifications` itself and lord-web never saw it: no LordOS sound rule, no `silent`, no window brought forward on a click. It now goes to the `show-notification` signal of a view of the worker's network session whose page has the worker's origin, like a page's notification; with no such view, D-Bus as before. A worker's `clients.focus()` emits the view's `lordos-focus-from-service-worker`. "Service-worker notifications (since `+4.2`)" below |
 | `debian/control`: `Maintainer: LordOS`, `Uploaders` removed | Bugs in this build come to LordOS, not to Debian. Debian's WebKit team stays credited in the changelog and `debian/copyright` (not as `XSBC-Original-Maintainer`: Debian's lintian doesn't know that field) |
 | `debian/changelog`: entry `<version>~lordos13+<n>` for `trixie`, dated one second after the Debian entry it follows | The backport's version, below Debian's own. A fixed date (later than Debian's, as lintian requires) is the build's `SOURCE_DATE_EPOCH`, so building the same version again gives the same `.debian.tar.xz` |
 
@@ -284,6 +299,55 @@ call log's page line ends `DIP isolate-and-require-corp`; COOP `same-origin-allo
 without COEP, are not isolated and have no SharedArrayBuffer in the page or its worker; a plain page afterwards still
 has none. lord-web's page line now ends `, DIP <word>`: `none`, `isolate-and-require-corp`,
 `isolate-and-credentialless` or `other` (`webcall_dip_word`, from the main frame's response, never the header's text).
+
+## Service-worker notifications (since `+4.2`)
+
+**The problem.** A web app can show a notification two ways: `new Notification()` from its page, or
+`registration.showNotification()` from its service worker (a "persistent" notification; chat and messaging web apps
+use it, some only when `Notification.maxActions` is at least 1, which WebKit 2.54 doesn't implement). WebKit hands the
+first to the view (`WebKitWebView::show-notification`), which lord-web takes: its sanitizing, its tag replace, LordOS's
+sound rule (`suppress-sound`), the window brought forward on a click, a `notify:` log line. The second reaches
+`WebKitNotificationProvider::show()` with no page (WebKitWebContext's static provider for the service workers'
+`WebNotificationManagerProxy`), which sent it to `org.freedesktop.Notifications` itself from lord-web's process
+(`NotificationService`): no `suppress-sound`, `silent` ignored, nothing of lord-web's. And GLib's WebKit didn't
+implement `focusFromServiceWorker`, so a worker's `clients.focus()` in its `notificationclick` did nothing visible.
+
+**The patch** (`lordos-sw-notifications.patch`, `Source/WebKit/UIProcess/API/glib/`):
+- `WebKitWebContext.cpp` keeps every web view of every context in creation order (added and removed where each
+  context already registers its views). `webkitWebContextGetWebViewForServiceWorkerNotification(sessionID, origin)`
+  returns a view whose page is open, of the same network session (website data store) as the worker, and whose
+  current URL has the worker's origin (`SecurityOriginData`, as WebKit's own `WebProcessProxy::forWebPagesWithOrigin`
+  compares), a visible one first; none for an opaque origin.
+- `WebKitNotificationProvider::show()`: a persistent notification with no page goes to that view's
+  `show-notification`, exactly as a page's notification (the same `WebKitNotification` object). The application's
+  `webkit_notification_clicked()` reaches the worker as `notificationclick` and `webkit_notification_close()` as
+  `notificationclose`, through the service workers' `WebNotificationManagerProxy` to the network process, as a D-Bus
+  click did. With no such view, or when no handler takes it (returns `FALSE`), WebKit's D-Bus notification as before.
+  A tag now replaces only a notification of the **same origin** (the service workers' provider holds every origin's;
+  before, any notification with the tag in that provider); a notification the handler refused leaves the provider's
+  map, so a later one with its tag can't close it.
+- `WebKitUIClient.cpp` implements `focusFromServiceWorker`: the view emits **`lordos-focus-from-service-worker`**
+  (LordOS's, not WebKit's API: no symbol, a signal an application finds with `g_signal_lookup`), and WebKit answers the
+  worker at once, as before, rather than waiting for the view to become visible. WebKit allows `clients.focus()` only
+  while the worker handles a user gesture (`ServiceWorkersUserGestureEnabled`, on by default: `notificationclick`), so
+  a worker can't bring a window forward on its own. lord-web brings its window forward on it (`web_show`), as on a
+  click on a page's notification.
+- Not done: `clients.openWindow()` from a worker. In WebKit it goes to `WebsiteDataStoreClient`, which the GLib port
+  doesn't have at all (a new client and API); in lord-web a click already brings the app's one window forward, and the
+  worker can still `navigate()` that window's client.
+
+What it means for lord-web: no change is needed for the notification itself, its `show-notification` handler
+(`webbus_notify`) applies to both kinds. The same sanitizing, tag replace, sound rule and `notify:` line, and the window
+comes forward on a click. A service-worker notification shown while the app's window is closed and lord-web runs in
+the background still has a view (the hidden one), so it goes through lord-web too; one shown with no lord-web view of
+its origin left (the view navigated to a sign-in on another site) still goes over D-Bus.
+
+**Checked** by `server/tests/webcalls_check.py --swnotify` (the build's test, WebKit's sandbox on, a session bus of its
+own from `dbus-run-session` with `webcalls-check`'s own notification server on it, `dbus-daemon` in the test chroot):
+the view's `show-notification` with title, body and tag, a same-tag replace, the click reaching `notificationclick`,
+`clients.focus()` and its signal, and the D-Bus fallback with its click (results of `+4.2` above). On `+4.1` the same
+worker's notifications went to D-Bus even with the page open, with `[Invalid UTF-8]` as the app name unless the
+application sets one (`g_set_application_name`).
 
 ## librice (since `+4`)
 
