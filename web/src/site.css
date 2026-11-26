@@ -178,9 +178,9 @@ body:has(.nav-cb:checked){overflow:hidden}
 .lg-f1{animation-delay:-.6s}.lg-f2{animation-delay:-1.3s}.lg-f3{animation-delay:-.9s}.lg-f4{animation-delay:-1.8s}.lg-f5{animation-delay:-.3s}.lg-f6{animation-delay:-2.2s}
 @keyframes lg-wave{from{transform:skewY(0) scaleX(1)}to{transform:skewY(-5deg) scaleX(.95)}}
 .lg-stick{fill:#8B6B4A}.lg-edge-r{stroke:rgba(0,0,0,.12);stroke-width:.8}
-.lg-ar{transform-origin:100% 50%;animation-duration:1.6s}
-.lg-hand{transform-box:view-box;transform-origin:272px 320px;animation:lg-hold 1.6s ease-in-out infinite alternate}
-@keyframes lg-hold{from{transform:rotate(-7deg)}to{transform:rotate(5deg)}}
+.lg-ar{transform-origin:0 50%;animation-duration:1.6s}
+.lg-hand{transform-box:view-box;transform-origin:412px 352px;animation:lg-hold 2.4s ease-in-out infinite alternate}
+@keyframes lg-hold{from{transform:rotate(-3deg)}to{transform:rotate(2deg)}}
 @media (prefers-reduced-motion:reduce){.lg-flag,.lg-hand{animation:none}}
 .lg-p{margin:0 0 16px;max-width:760px;font-size:17px;line-height:1.65;color:var(--muted)}
 .lg-p a{color:var(--brand)}

@@ -189,10 +189,17 @@ export function SearchField(props) { return h(TextInput, props); }
 
 // ---- brand ----
 
+// The same 3D renders as the OS (sdk/mascot.js, tools/gen-mascot.py); the browser picks by its own pixel ratio:
+// the 128 px render up to 128 px, the 256 px one on a 2x screen (build-web.mjs copies both).
 const POSES = new Set(['wave', 'shield', 'celebrate', 'confused', 'sleep', 'run']);
 export function Lumo({ pose = 'confused', size = 96, alt, style }) {
   const p = POSES.has(pose) ? pose : 'confused';
-  return h(Image, { src: `asset:mascot/lumo-${p}-256.png`, alt: alt || t(`mascot.${p}`), style: [{ width: size, height: size }, style] });
+  const one = size <= 128 ? 128 : 256;
+  return h('img', {
+    src: src(`asset:mascot/lumo-${p}-${one}.png`), srcSet: `${src(`asset:mascot/lumo-${p}-${one}.png`)} 1x, ${src(`asset:mascot/lumo-${p}-256.png`)} 2x`,
+    alt: alt || t(`mascot.${p}`), draggable: false,
+    style: css([{ width: size, height: size }, style], { display: 'block', objectFit: 'contain', flexShrink: 0 }),
+  });
 }
 export function LordOSLogo({ size = 64 }) {
   return h(Image, { src: 'asset:icons/lordos-icon-128.png', alt: 'LordOS', style: { width: size, height: size, borderRadius: size * 0.22, boxShadow: '0 2px 6px rgba(0,0,0,0.3)' } });

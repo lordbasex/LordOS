@@ -170,6 +170,10 @@ EOF
         skip "thbrk_compare.sh" "libthai-dev and python3"
     fi
 
+    # Lumo's runtime renders (assets/mascot, what sdk/mascot.js draws) are the ones the 3D masters give (tools/gen-mascot.py)
+    if ! have python3 || ! python3 -c 'import PIL, numpy' 2>/dev/null; then skip "gen-mascot --check" "python3 with Pillow and NumPy"
+    else run "gen-mascot --check (assets/mascot)" python3 -I ../tools/gen-mascot.py --check; fi
+
     run "sound-test" build/sound-test
     # lordos-issue's parsers of untrusted text (packaging/bin/lordos-issue): the WAYLAND_DEBUG scrubbing, the programs on the
     # Wayland and X11 sockets, lordos-testbench --globals' summary, --app with a fake program (tests/data/lordos-issue)
