@@ -1,5 +1,6 @@
 /* hands.c — Hands' state and policy (see hands.h, docs/HANDS.md) */
 #include "hands.h"
+#include "handsmotion.h"
 #include "../sec/json.h"
 
 #include <linux/input-event-codes.h>
@@ -18,7 +19,7 @@ const char *hands_why_word(int why) { return why >= 0 && why < HANDS_WHY_COUNT ?
 
 static const char *const CALL[HANDS_C_COUNT] = {
     "hello", "status", "windows", "read", "find", "pointer", "scroll", "key", "type", "set-value", "screenshot",
-    "open-app", "open-path", "close-window", "app-log",
+    "open-app", "open-path", "close-window", "app-log", "mode",
 };
 const char *hands_call_word(int call) { return call >= 0 && call < HANDS_C_COUNT ? CALL[call] : "call"; }
 
@@ -36,6 +37,15 @@ int hands_direction(const char *s) {
     for (int i = 1; s && i < 5; i++) if (!strcmp(s, D[i])) return i;
     return HANDS_DIR_NONE;
 }
+
+static const char *const MODE[] = { "default", "human", "machine" };
+int hands_mode_of(const char *s) {
+    if (!s) return -1;
+    if (!s[0]) return HANDS_MODE_DEFAULT;
+    for (int i = 0; i < 3; i++) if (!strcmp(s, MODE[i])) return i;
+    return -1;
+}
+const char *hands_mode_word(int mode) { return mode >= 0 && mode <= HANDS_MODE_MACHINE ? MODE[mode] : "default"; }
 
 static const char *const KIND[] = { "other", "claude", "lumo" };
 const char *hands_kind_word(int kind) { return kind >= 0 && kind <= HANDS_K_LUMO ? KIND[kind] : "other"; }
@@ -265,6 +275,7 @@ int hands_native_guard(const char *name) {
         "fw.setList", "fw.addList", "fw.removeList", "fw.setAppRule", "fw.setTrusted", "fw.setRestricted", "fw.setMode",
         "fw.addRule", "fw.removeRule", "fw.updateRule", "sentinela.block", "sentinela.unblock",
         "themes.trust", "themes.remove", "sign.share", "sign.restore", "share.answer", "hands.serve", "hands.answer",
+        "hands.motion", "hands.cursor",
         "session.power",
     };
     if (!name) return HANDS_G_NONE;
@@ -362,8 +373,26 @@ static const char *const CSW[] = { "free", "asking", "granted", "denied", "stopp
 typedef struct {
     char bus[64], name[HANDS_NAME_MAX + 1], exe[HANDS_EXE_MAX];
     int kind, st;
+    int mode;                           /* SetMode: HANDS_MODE_DEFAULT follows the desktop's */
     unsigned long actions;
 } Client;
+
+/* A human-mode action in progress (one at a time: there is one agent cursor). Its request is a copy (its text owned);
+ * every step goes through the same gate as a machine-mode action, at the moment it happens. */
+enum { PH_GLIDE = 1, PH_HOVER, PH_DRAG, PH_SCROLL, PH_TYPE };
+typedef struct {
+    int on;
+    char bus[64];
+    HandsReq r;
+    char *text;                         /* r.text, owned */
+    int phase;
+    double t0, next;
+    HandsGlide g;
+    double tx, ty, width;               /* the target */
+    int steps[HANDS_SCROLL_STEPS], nsteps, step;
+    size_t off, chars;                  /* typing */
+    int held;                           /* a drag's button is down */
+} Plan;
 
 static struct {
     const HandsHost *h;
@@ -378,9 +407,26 @@ static struct {
     unsigned long seq, agent_seq, press_seq;   /* which came last: the agent's input or the person's click or key */
     unsigned long events;
     HandsBucket input, shot, read, hello;
+    int motion, reduce;                 /* Settings → AI → Hands → Agent motion; reduce motion */
+    double cx, cy;                      /* the agent cursor */
+    int cur_shown;
+    double fbox[4];                     /* the field the keys go to (the shell's focus), w 0 unknown */
+    HandsDone done;
+    uint32_t seed;
+    Plan P;
 } S;
 
+static void plan_end(int rc, int why, const char *out, int reply);
+static void cur(int what, double x, double y, double w, double h);
+
 void hands_init(const HandsHost *h) { S.h = h; }
+void hands_on_done(HandsDone fn) { S.done = fn; }
+void hands_motion(int mode, int reduce) {
+    S.motion = mode == HANDS_MODE_MACHINE ? HANDS_MODE_MACHINE : HANDS_MODE_HUMAN;
+    S.reduce = !!reduce;
+}
+int hands_motion_default(void) { return S.qa ? HANDS_MODE_MACHINE : S.motion == HANDS_MODE_MACHINE ? HANDS_MODE_MACHINE : HANDS_MODE_HUMAN; }
+int hands_acting(void) { return S.P.on; }
 const HandsHost *hands_host(void) { return S.h; }
 int hands_on(void) { return S.on; }
 int hands_qa_mode(void) { return S.qa; }
@@ -443,8 +489,8 @@ char *hands_status_json(void) {
         jb_s(&b, a);
         jb_s(&b, "}");
     }
-    char e[48];
-    snprintf(e, sizeof e, "],\"events\":%lu}", S.events);
+    char e[96];
+    snprintf(e, sizeof e, "],\"motion\":\"%s\",\"events\":%lu}", hands_mode_word(hands_motion_default()), S.events);
     jb_s(&b, e);
     return jb_take(&b);
 }
@@ -496,6 +542,8 @@ void hands_answer(const char *bus, int allow) {
 
 void hands_stop(const char *why_word) {
     (void)why_word;
+    if (S.P.on) plan_end(HANDS_E_STOPPED, 0, NULL, 1);
+    cur(HANDS_CUR_HIDE, 0, 0, 0, 0);
     for (int i = 0; i < HANDS_CLIENTS; i++) if (S.c[i].st != CS_FREE) S.c[i].st = CS_STOPPED;
     /* a stopped connection never acts again: the next one asks again */
     if (S.h && S.h->event) {
@@ -517,6 +565,8 @@ void hands_person_input(void) {
     if (S.injecting) return;
     S.person = now();
     S.person_seen = 1;
+    /* the person's own input wins at once: an agent's glide, drag, scroll or typing in progress stops where it is */
+    if (S.P.on && !S.qa) plan_end(HANDS_E_ACTIVE, 0, NULL, 1);
 }
 
 void hands_qa(int on) {
@@ -552,12 +602,16 @@ int hands_hello(const char *bus, const char *name, const char *exe) {
 void hands_gone(const char *bus) {
     Client *k = client_of(bus);
     if (!k) return;
+    if (S.P.on && !strcmp(S.P.bus, bus)) plan_end(HANDS_E_STOPPED, 0, NULL, 0);     /* no one to answer */
     memset(k, 0, sizeof *k);
+    if (!hands_active()) cur(HANDS_CUR_HIDE, 0, 0, 0, 0);
     tell();
 }
 
 void hands_lost(void) {
+    if (S.P.on) plan_end(HANDS_E_STOPPED, 0, NULL, 0);
     memset(S.c, 0, sizeof S.c);
+    cur(HANDS_CUR_HIDE, 0, 0, 0, 0);
     tell();
 }
 
@@ -687,7 +741,37 @@ typedef struct {
     int secure;                 /* the ref is a secret field (the shell's resolve) */
     int pointer;                /* the pointer moves: refused while a pointer lock holds it */
     int node;                   /* out: the node hit */
+    double bw, bh;              /* out: the ref's box (a glide's target size), 0 a bare point */
 } Gate;
+
+/* the agent cursor: where it is, and what the person sees of an action (HANDS_CUR_*) */
+static void cur(int what, double x, double y, double w, double h) {
+    if (!S.h || !S.h->cursor) return;
+    if (what == HANDS_CUR_HIDE) {
+        if (!S.cur_shown) return;
+        S.cur_shown = 0;
+    } else {
+        if (what != HANDS_CUR_PULSE) { S.cx = x; S.cy = y; }
+        S.cur_shown = 1;
+    }
+    S.h->cursor(what, x, y, w, h);
+}
+/* where the cursor rests while it types: inside the field's end (its box from the shell's focus), else where it is */
+static void type_spot(double *x, double *y) {
+    if (S.fbox[2] >= 4 && S.fbox[3] >= 4) {
+        double in = S.fbox[2] > 40 ? 14 : S.fbox[2] / 3;
+        *x = S.fbox[0] + S.fbox[2] - in;
+        *y = S.fbox[1] + S.fbox[3] * 0.7;
+    } else { *x = S.cx; *y = S.cy; }
+}
+static void pulse(void) {
+    double x, y;
+    type_spot(&x, &y);
+    /* never shown yet and no field known: it appears where the person's pointer is, not in a corner */
+    if (!S.cur_shown && !(S.fbox[2] >= 4) && !(S.h->pointer_at && S.h->pointer_at(&x, &y))) return;
+    if ((!S.P.on || !S.cur_shown) && (x != S.cx || y != S.cy || !S.cur_shown)) cur(HANDS_CUR_MOVE, x, y, 0, 0);
+    cur(HANDS_CUR_PULSE, S.fbox[0], S.fbox[1], S.fbox[2], S.fbox[3]);
+}
 
 static int gate(int kind, Gate *g, int *why) {
     if (kind == GATE_KEYS) {
@@ -701,6 +785,13 @@ static int gate(int kind, Gate *g, int *why) {
         int r = ask("focus", &a, &d, why);
         if (r) return r;
         int secure = json_bool(d.root, "secure", 0), denied = json_bool(d.root, "denied", 0), ok = json_bool(d.root, "allowed", 1);
+        /* the field's box: where the agent cursor rests and pulses while it types (only a box, never what is in it) */
+        const JVal *fb = json_get(d.root, "box");
+        memset(S.fbox, 0, sizeof S.fbox);
+        if (fb && fb->type == J_ARR && fb->len == 4) {
+            int i = 0;
+            for (const JVal *v = fb->kid; v && i < 4; v = v->next, i++) S.fbox[i] = v->type == J_NUM && v->num > -1e6 && v->num < 1e6 ? v->num : 0;
+        }
         /* the field and the node with the keyboard focus, checked here too (the system band, protected, handsDeny and
          * every node they are in): the shell's word is not the only one */
         int nw = 0;
@@ -740,7 +831,10 @@ static int gate(int kind, Gate *g, int *why) {
 static int gate_ref(const char *ref, int pointer, Gate *g, int *why) {
     memset(g, 0, sizeof *g);
     g->pointer = pointer;
-    int rc = resolve(ref, &g->ref_node, &g->x, &g->y, NULL, &g->secure, why);
+    double box[4] = { 0 };
+    int rc = resolve(ref, &g->ref_node, &g->x, &g->y, box, &g->secure, why);
+    g->bw = box[2];
+    g->bh = box[3];
     return rc ? rc : gate(GATE_POINT, g, why);
 }
 static int gate_xy(double x, double y, int pointer, Gate *g, int *why) {
@@ -781,6 +875,11 @@ static int do_pointer(const HandsReq *r, char **out, int *why) {
     S.last_agent = now();
     S.agent_seq = ++S.seq;
     S.events += (unsigned long)n;
+    /* what the person sees: in human mode a ripple where it clicks (the cursor is already there), in machine mode a
+     * flash where it landed */
+    if (r->action == HANDS_P_DRAG) cur(S.P.on ? HANDS_CUR_MOVE : HANDS_CUR_FLASH, r->x2, r->y2, 0, 0);
+    else if (r->action == HANDS_P_HOVER) cur(S.P.on ? HANDS_CUR_MOVE : HANDS_CUR_FLASH, x, y, 0, 0);
+    else cur(S.P.on ? HANDS_CUR_CLICK : HANDS_CUR_FLASH, x, y, 0, 0);
     Jb o = { 0 };
     jb_s(&o, "{\"x\":");
     jb_num(&o, x);
@@ -806,6 +905,7 @@ static int do_scroll(const HandsReq *r, int *why) {
     S.last_agent = now();
     S.agent_seq = ++S.seq;
     S.events += 2;
+    cur(S.P.on ? HANDS_CUR_MOVE : HANDS_CUR_FLASH, x, y, 0, 0);
     return HANDS_OK;
 }
 
@@ -825,6 +925,7 @@ static int do_key(const HandsReq *r, int *why) {
     for (int k = 0; k < rep && !rc; k++)
         for (int i = 0; i < n && !rc; i++) {
             if ((rc = gate(GATE_KEYS, NULL, why))) break;
+            pulse();
             if (hands_paste_chord(&c[i]) && S.h->clip_sensitive && S.h->clip_sensitive()) { *why = HANDS_WHY_SENSITIVE_CLIP; rc = HANDS_E_REFUSED; break; }
             S.injecting = 1;
             int kr = S.h->key(&c[i]);
@@ -845,6 +946,7 @@ static int do_key(const HandsReq *r, int *why) {
 static int do_type(const HandsReq *r, int *why) {
     int rc = gate(GATE_KEYS, NULL, why);
     if (rc) return rc;
+    pulse();
     const char *t = r->text;
     size_t n = r->text_len;
     for (size_t off = 0; off < n && !rc;) {
@@ -896,11 +998,14 @@ static int do_setvalue(const HandsReq *r, int *why) {
     if (rc) return rc;
     json_free(&d);
     S.events++;
+    cur(S.P.on ? HANDS_CUR_CLICK : HANDS_CUR_FLASH, g.x, g.y, 0, 0);
     return HANDS_OK;
 }
 
-/* With an allowlist a screenshot shows only allowed apps: a window of one, or a region entirely inside one allowed
- * window (never judged by its centre alone); every window of another app is blacked out in it as the system band is. */
+/* With an allowlist a screenshot shows only allowed apps: a window of one, or a region that shows some of one (a window,
+ * or a menu, popover or sheet tied to it by handsWin); everything else in it (other apps' windows, the Dock, the
+ * wallpaper) is painted black as the system band is, so the region's rules are the screenshot's: what can't be shown is
+ * black, never a refusal of what can. */
 static int blackout(int *nodes, int max, int *n, int *why) {
     *n = 0;
     if (!S.nallow) return HANDS_OK;
@@ -923,6 +1028,7 @@ static int blackout(int *nodes, int max, int *n, int *why) {
 static int do_shot(const HandsReq *r, char **out, uint8_t **png, size_t *len, int *why) {
     int node = 0, rc;
     double x = r->x, y = r->y, w = r->w, h = r->h;
+    int also[8], nalso = 0;
     if (r->shot == HANDS_SHOT_WINDOW) {
         Jb a = { 0 };
         jb_s(&a, "{\"window\":");
@@ -937,13 +1043,21 @@ static int do_shot(const HandsReq *r, char **out, uint8_t **png, size_t *len, in
         y = json_num(d.root, "y", 0);
         w = json_num(d.root, "w", 0);
         h = json_num(d.root, "h", 0);
+        /* its sheets (Settings → Wallpaper's sheet, a file dialog: wm.addSheet), painted over it as Screenshots does */
+        const JVal *sl = json_get(d.root, "sheets");
+        for (const JVal *v = sl && sl->type == J_ARR ? sl->kid : NULL; v && nalso < 8; v = v->next)
+            if (v->type == J_NUM && v->num > 0 && v->num < 1e9) also[nalso++] = (int)v->num;
         json_free(&d);
         if (node <= 0 || w < 1 || h < 1) return HANDS_E_NOTFOUND;
         if (S.h->node_place && (rc = S.h->node_place(node))) { *why = rc; return HANDS_E_REFUSED; }
     } else if (r->shot == HANDS_SHOT_REGION) {
         int W = 0, H = 0;
         S.h->size(&W, &H);
-        if (w < 1 || h < 1 || x < 0 || y < 0 || x + w > W || y + h > H) { *why = HANDS_WHY_OUTSIDE; return HANDS_E_REFUSED; }
+        /* the part on the desktop: what lies off it is not there to show (a zoom at the edge of a window that runs off the
+         * screen); refused only when nothing of it is on the desktop */
+        double x0 = x < 0 ? 0 : x, y0 = y < 0 ? 0 : y, x1 = x + w > W ? W : x + w, y1 = y + h > H ? H : y + h;
+        if (!(w >= 1 && h >= 1) || !(x1 - x0 >= 1) || !(y1 - y0 >= 1)) { *why = HANDS_WHY_OUTSIDE; return HANDS_E_REFUSED; }
+        x = x0; y = y0; w = x1 - x0; h = y1 - y0;
         if (S.nallow) {
             char t[160];
             Jb a = { 0 };
@@ -953,9 +1067,9 @@ static int do_shot(const HandsReq *r, char **out, uint8_t **png, size_t *len, in
             jb_s(&a, "}");
             JDoc d;
             if ((rc = ask("region", &a, &d, why))) return rc;
-            int inside = json_bool(d.root, "inside", 0);
+            int shows = json_bool(d.root, "shows", 0);
             json_free(&d);
-            if (!inside) { *why = HANDS_WHY_ALLOWLIST; return HANDS_E_REFUSED; }
+            if (!shows) { *why = HANDS_WHY_ALLOWLIST; return HANDS_E_REFUSED; }
         }
     } else if (S.nallow) {
         /* with an allowlist, the whole screen is no window's: only a window or a region of one */
@@ -967,10 +1081,271 @@ static int do_shot(const HandsReq *r, char **out, uint8_t **png, size_t *len, in
     if ((rc = blackout(black, HANDS_BLACK_MAX, &nblack, why))) return rc;
     char meta[256] = "";
     int iw = 0, ih = 0;
-    *png = S.h->shot(r->shot, r->display, node, x, y, w, h, r->maxdim, black, nblack, len, &iw, &ih, meta, sizeof meta);
+    *png = S.h->shot(r->shot, r->display, node, x, y, w, h, r->maxdim, black, nblack, also, nalso, len, &iw, &ih, meta, sizeof meta);
     if (!*png) return HANDS_E_FAILED;
     *out = strdup(meta[0] ? meta : "{}");
     return HANDS_OK;
+}
+
+/* ---- human mode: an action over the next frames (handsmotion.h, docs/HANDS.md "The agent's cursor") ----
+ * The cursor glides to the target, hovers, then the action happens through the same do_* path as machine mode, with
+ * every gate checked again at that moment (the glide itself injects nothing: only the cursor moves). A drag's moves,
+ * a scroll's steps and each typed character are gated as they happen. The person's input, Stop, the panic key, the
+ * lock and the switch end it at once (plan_end). */
+
+static int mode_of(const char *bus) {
+    Client *k = client_of(bus);
+    int m = k ? k->mode : HANDS_MODE_DEFAULT;
+    return m ? m : hands_motion_default();
+}
+
+/* where a glide starts: the agent cursor, else the person's pointer, else the middle of the desktop */
+static void glide_from(double *x, double *y) {
+    if (S.cur_shown) { *x = S.cx; *y = S.cy; return; }
+    if (S.h->pointer_at && S.h->pointer_at(x, y)) return;
+    int W = 0, H = 0;
+    S.h->size(&W, &H);
+    *x = W / 2.0;
+    *y = H / 2.0;
+}
+
+static void plan_glide(double tx, double ty, double width) {
+    double fx, fy;
+    glide_from(&fx, &fy);
+    S.P.tx = tx;
+    S.P.ty = ty;
+    S.P.width = width;
+    hands_glide_make(&S.P.g, fx, fy, tx, ty, width, S.reduce, &S.seed);
+    S.P.t0 = now();
+    S.P.phase = PH_GLIDE;
+    cur(HANDS_CUR_MOVE, fx, fy, 0, 0);
+}
+
+/* a pending action ends: its answer through the done callback (when reply), its copy freed; a drag's button still down
+ * is let go where the cursor is */
+static void plan_end(int rc, int why, const char *out, int reply) {
+    if (!S.P.on) return;
+    if (S.P.held) {
+        S.injecting = 1;
+        S.h->button(0, 0);
+        S.injecting = 0;
+        S.P.held = 0;
+        S.last_agent = now();
+        S.agent_seq = ++S.seq;
+    }
+    char bus[64];
+    memcpy(bus, S.P.bus, sizeof bus);
+    int call = S.P.r.call, action = S.P.r.action;
+    free(S.P.text);
+    memset(&S.P, 0, sizeof S.P);
+    Client *k = client_of(bus);
+    if (!rc && k) { k->actions++; tell(); }
+    log_call(k ? k->kind : HANDS_K_OTHER, call, action, rc, why);
+    if (reply && S.done) S.done(bus, call, rc, why, out);
+}
+
+static void wheel_of(int dir, int k, int *dx, int *dy) {
+    *dx = dir == HANDS_DIR_LEFT ? -k : dir == HANDS_DIR_RIGHT ? k : 0;
+    *dy = dir == HANDS_DIR_UP ? k : dir == HANDS_DIR_DOWN ? -k : 0;
+}
+
+/* the target again, through the whole gate, now (it may have moved, been covered or become protected meanwhile) */
+static int regate(int pointer, Gate *g, int *why) {
+    int rc = S.P.r.ref[0] ? gate_ref(S.P.r.ref, pointer, g, why) : gate_xy(S.P.tx, S.P.ty, pointer, g, why);
+    if (!rc && (g->x != S.cx || g->y != S.cy)) cur(HANDS_CUR_MOVE, g->x, g->y, 0, 0);
+    return rc;
+}
+
+static size_t utf8_chars(const char *t, size_t n) {
+    size_t c = 0;
+    for (size_t i = 0; i < n; i++) if (((unsigned char)t[i] & 0xc0) != 0x80) c++;
+    return c;
+}
+
+static int plan_start(const char *bus, const HandsReq *r, int *why) {
+    Gate g, e;
+    int rc;
+    memset(&g, 0, sizeof g);
+    switch (r->call) {
+    case HANDS_C_POINTER:
+        if (r->action == HANDS_P_MIDDLE && S.h->clip_sensitive && S.h->clip_sensitive()) { *why = HANDS_WHY_SENSITIVE_CLIP; return HANDS_E_REFUSED; }
+        rc = r->ref[0] ? gate_ref(r->ref, 1, &g, why) : gate_xy(r->x, r->y, 1, &g, why);
+        if (!rc && r->action == HANDS_P_DRAG) rc = gate_xy(r->x2, r->y2, 1, &e, why);
+        break;
+    case HANDS_C_SCROLL: rc = r->ref[0] ? gate_ref(r->ref, 1, &g, why) : gate_xy(r->x, r->y, 1, &g, why); break;
+    case HANDS_C_SETVALUE: rc = gate_ref(r->ref, 0, &g, why); break;
+    case HANDS_C_TYPE: rc = gate(GATE_KEYS, NULL, why); type_spot(&g.x, &g.y); break;
+    default: return HANDS_E_ARGS;
+    }
+    if (rc) return rc;
+    memset(&S.P, 0, sizeof S.P);
+    S.P.r = *r;
+    if (r->text) {
+        S.P.text = malloc(r->text_len + 1);
+        if (!S.P.text) return HANDS_E_FAILED;
+        memcpy(S.P.text, r->text, r->text_len);
+        S.P.text[r->text_len] = 0;
+    }
+    S.P.r.text = S.P.text;
+    snprintf(S.P.bus, sizeof S.P.bus, "%s", bus);
+    S.P.on = 1;
+    if (!S.seed) S.seed = (uint32_t)now() ^ 0x9e3779b9u;
+    S.P.chars = r->call == HANDS_C_TYPE ? utf8_chars(r->text, r->text_len) : 0;
+    double width = g.bw >= 1 && g.bh >= 1 ? (g.bw < g.bh ? g.bw : g.bh) : 24;
+    if (r->call == HANDS_C_TYPE && !(S.fbox[2] >= 4)) { S.P.phase = PH_TYPE; S.P.next = now(); return HANDS_E_PENDING; }
+    plan_glide(g.x, g.y, width);
+    return HANDS_E_PENDING;
+}
+
+/* the hover is over: the action itself */
+static void plan_act(double t) {
+    int why = 0, rc;
+    char *out = NULL;
+    Gate g, e;
+    switch (S.P.r.call) {
+    case HANDS_C_POINTER:
+        if (S.P.r.action == HANDS_P_DRAG) {
+            if ((rc = regate(1, &g, &why)) || (rc = gate_xy(S.P.r.x2, S.P.r.y2, 1, &e, &why))) { plan_end(rc, why, NULL, 1); return; }
+            S.injecting = 1;
+            S.h->move(g.x, g.y);
+            S.h->button(0, 1);
+            S.injecting = 0;
+            S.P.held = 1;
+            S.P.tx = g.x;                       /* where it began: a drop the end refuses goes back there */
+            S.P.ty = g.y;
+            S.last_agent = now();
+            S.agent_seq = ++S.seq;
+            S.events += 2;
+            hands_glide_make(&S.P.g, g.x, g.y, S.P.r.x2, S.P.r.y2, 24, S.reduce, &S.seed);
+            S.P.t0 = t;
+            S.P.phase = PH_DRAG;
+            return;
+        }
+        rc = do_pointer(&S.P.r, &out, &why);
+        plan_end(rc, why, out, 1);
+        free(out);
+        return;
+    case HANDS_C_SCROLL:
+        S.P.nsteps = hands_scroll_steps(S.P.r.amount < 1 ? 3 : S.P.r.amount, S.P.steps);
+        S.P.step = 0;
+        S.P.phase = PH_SCROLL;
+        S.P.next = t;
+        return;
+    case HANDS_C_SETVALUE:
+        rc = do_setvalue(&S.P.r, &why);
+        plan_end(rc, why, NULL, 1);
+        return;
+    default:
+        plan_end(HANDS_E_ARGS, 0, NULL, 1);
+    }
+}
+
+void hands_tick(void) {
+    if (!S.P.on || !S.h) return;
+    Client *k = client_of(S.P.bus);
+    if (!S.on || !k || k->st != CS_GRANTED) { plan_end(HANDS_E_STOPPED, 0, NULL, 1); return; }
+    double t = now(), x, y;
+    int why = 0, rc;
+    Gate g;
+    switch (S.P.phase) {
+    case PH_GLIDE:
+        if (!hands_glide_at(&S.P.g, t - S.P.t0, &x, &y)) { cur(HANDS_CUR_MOVE, x, y, 0, 0); return; }
+        cur(HANDS_CUR_MOVE, x, y, 0, 0);
+        if (S.P.r.call == HANDS_C_TYPE) { S.P.phase = PH_TYPE; S.P.next = t; return; }
+        /* the pointer over the target (a person's hover: its highlight shows), gated, then a short pause */
+        if (S.P.r.call != HANDS_C_SETVALUE) {
+            if ((rc = regate(1, &g, &why))) { plan_end(rc, why, NULL, 1); return; }
+            S.injecting = 1;
+            S.h->move(g.x, g.y);
+            S.injecting = 0;
+            S.last_agent = now();
+            S.agent_seq = ++S.seq;
+            S.events++;
+        }
+        if (S.P.r.call == HANDS_C_POINTER && S.P.r.action == HANDS_P_HOVER) {
+            char *out = NULL;
+            rc = do_pointer(&S.P.r, &out, &why);
+            plan_end(rc, why, out, 1);
+            free(out);
+            return;
+        }
+        S.P.phase = PH_HOVER;
+        S.P.next = t + hands_hover_ms(S.reduce, &S.seed);
+        return;
+    case PH_HOVER:
+        if (t >= S.P.next) plan_act(t);
+        return;
+    case PH_DRAG: {
+        int arrived = hands_glide_at(&S.P.g, t - S.P.t0, &x, &y);
+        if (arrived && (rc = gate_xy(S.P.r.x2, S.P.r.y2, 1, &g, &why))) {
+            /* the drop's place is refused now: let go where the drag began (allowed when it began) */
+            x = S.P.tx;
+            y = S.P.ty;
+        } else rc = 0;
+        S.injecting = 1;
+        S.h->move(x, y);
+        S.injecting = 0;
+        S.last_agent = now();
+        S.agent_seq = ++S.seq;
+        S.events++;
+        cur(HANDS_CUR_MOVE, x, y, 0, 0);
+        if (!arrived) return;
+        char out[96];
+        snprintf(out, sizeof out, "{\"x\":%.2f,\"y\":%.2f}", x, y);
+        plan_end(rc, why, rc ? NULL : out, 1);     /* releases the button */
+        return;
+    }
+    case PH_SCROLL: {
+        if (t < S.P.next) return;
+        if ((rc = regate(1, &g, &why))) { plan_end(rc, why, NULL, 1); return; }
+        int dx, dy;
+        wheel_of(S.P.r.dir, S.P.steps[S.P.step], &dx, &dy);
+        S.injecting = 1;
+        S.h->move(g.x, g.y);
+        S.h->wheel(dx, dy);
+        S.injecting = 0;
+        S.last_agent = now();
+        S.agent_seq = ++S.seq;
+        S.events += 2;
+        if (++S.P.step >= S.P.nsteps) { plan_end(HANDS_OK, 0, NULL, 1); return; }
+        S.P.next = t + (S.reduce ? 30 : HANDS_SCROLL_STEP);
+        return;
+    }
+    case PH_TYPE: {
+        if (t < S.P.next) return;
+        const char *s = S.P.text ? S.P.text : "";
+        size_t n = S.P.r.text_len, off = S.P.off;
+        if (off >= n) { plan_end(HANDS_OK, 0, NULL, 1); return; }
+        /* the whole key gate before every character: a Tab, a dialog or a click may have moved the keys meanwhile */
+        if ((rc = gate(GATE_KEYS, NULL, &why))) { plan_end(rc, why, NULL, 1); return; }
+        pulse();
+        size_t l = 1;
+        while (off + l < n && ((unsigned char)s[off + l] & 0xc0) == 0x80) l++;
+        int w = 0;
+        S.injecting = 1;
+        if (s[off] == '\n' || s[off] == '\t') {
+            HandsChord c = { 0 };
+            c.code = s[off] == '\n' ? KEY_ENTER : KEY_TAB;
+            S.h->key(&c);
+        } else w = S.h->type(s + off, l);
+        S.injecting = 0;
+        S.last_agent = now();
+        S.agent_seq = ++S.seq;
+        S.events++;
+        if (w) { plan_end(HANDS_E_REFUSED, w, NULL, 1); return; }
+        S.P.off = off + l;
+        if (S.P.off >= n) { plan_end(HANDS_OK, 0, NULL, 1); return; }
+        S.P.next = t + hands_type_ms((unsigned char)s[off], S.P.chars, &S.seed);
+        return;
+    }
+    }
+}
+
+double hands_timeout(void) {
+    if (!S.P.on) return -1;
+    if (S.P.phase == PH_GLIDE || S.P.phase == PH_DRAG) return 8;     /* a frame (the loop paints at the display's pace) */
+    double d = S.P.next - now();
+    return d < 0 ? 0 : d;
 }
 
 int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, size_t *png_len, int *why) {
@@ -983,6 +1358,15 @@ int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, si
     int rc = hands_may(bus, r->call);
     if (rc) {
         if (rc != HANDS_E_RATE) log_call(kind, r->call, r->action, rc, 0);
+        return rc;
+    }
+    /* one action at a time: there is one agent cursor (another client's input waits for it) */
+    if (S.P.on && is_input(r->call)) { log_call(kind, r->call, r->action, HANDS_E_BUSY, 0); return HANDS_E_BUSY; }
+    if ((r->call == HANDS_C_POINTER || r->call == HANDS_C_SCROLL || r->call == HANDS_C_TYPE || r->call == HANDS_C_SETVALUE) &&
+        mode_of(bus) == HANDS_MODE_HUMAN) {
+        rc = plan_start(bus, r, why);
+        if (rc == HANDS_E_PENDING) return rc;
+        log_call(kind, r->call, r->action, rc, *why);
         return rc;
     }
     Jb a = { 0 };
@@ -1074,6 +1458,15 @@ int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, si
         allow_json(&a);
         jb_s(&a, "}");
         rc = shell_pass("log", &a, out, why);
+        break;
+    }
+    case HANDS_C_MODE: {
+        /* the connection's own motion (lordos-mcp's hands_mode, a call's mode): default follows the desktop's */
+        if (k) k->mode = r->mode;
+        char t[96];
+        snprintf(t, sizeof t, "{\"mode\":\"%s\",\"effective\":\"%s\"}", hands_mode_word(r->mode), hands_mode_word(mode_of(bus)));
+        *out = strdup(t);
+        rc = *out ? HANDS_OK : HANDS_E_FAILED;
         break;
     }
     default: rc = HANDS_E_ARGS;

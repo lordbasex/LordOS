@@ -114,6 +114,7 @@
 #include "hands/hands.h"
 #include "hands/handsimg.h"
 #include "hands/handsmark.h"
+#include "hands/handscur.h"
 #include "ui/js_hands.h"
 
 #include <ctype.h>
@@ -352,8 +353,26 @@ static int out_rects(const Server *s, ORect *r, int *idx) {
 }
 /* where the pointer's image is drawn: at the pointer, or where a pointer lock's owner shows it (pointerlock.h: a
  * machine's guest pointer, inside its picture; the pointer itself stays put) */
+/* Hands (docs/HANDS.md "The agent's cursor"): an agent's input goes through the pointer's own path, but the person's
+ * pointer stays where they left it. The first agent move keeps the person's position; their pointer's image is drawn
+ * there while the agent holds the pointer, and their next pointer input of their own (a move, a button, a wheel, a
+ * remote viewer's) takes it back from there (hands_reclaim). */
+static int hands_borrowed, hands_px, hands_py;
 static void cursor_at(const Server *s, int *x, int *y) {
-    if (!ptrlock_cursor(x, y)) { *x = s->cx; *y = s->cy; }
+    if (!ptrlock_cursor(x, y)) {
+        *x = hands_borrowed ? hands_px : s->cx;
+        *y = hands_borrowed ? hands_py : s->cy;
+    }
+}
+static void hands_reclaim(Server *s) {
+    if (!hands_borrowed) return;
+    hands_borrowed = 0;
+    s->cx = hands_px;
+    s->cy = hands_py;
+    s->lx = s->cx;
+    s->ly = s->cy;
+    s->moved = 1;
+    s->cursor_dirty = 1;
 }
 /* the display under the pointer's image (-1 headless or none) */
 static int out_at_pointer(const Server *s) {
@@ -699,6 +718,7 @@ static void remote_settle(Server *s) {
 static void remote_pointer(int fx, int fy) {
     Server *s = remote_server;
     hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
+    hands_reclaim(s);
     double lx, ly;                          /* frame pixels of the feed → logical */
     out_to_logical(&feed_out(s)->v, fx, fy, &lx, &ly);
     int x = (int)lround(lx), y = (int)lround(ly);
@@ -722,6 +742,7 @@ static void remote_pointer(int fx, int fy) {
 static void remote_button(int button, int down) {
     Server *s = remote_server;
     hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
+    hands_reclaim(s);
     if (down) hands_person_press();
     if (ptrlock_button(button, down)) return;
     if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
@@ -731,6 +752,7 @@ static void remote_button(int button, int down) {
 static void remote_wheel(int steps) {
     Server *s = remote_server;
     hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
+    hands_reclaim(s);
     if (ptrlock_wheel(steps, 0)) return;
     s->wheel += steps;
     remote_settle(s);
@@ -997,6 +1019,7 @@ static void hands_size(int *w, int *h) { *w = remote_server->W; *h = remote_serv
 static int hands_pointer_locked(void) { return ptrlock_active() || wl_pointer_locked(); }
 static void hands_move(double x, double y) {
     Server *s = remote_server;
+    if (!hands_borrowed) { hands_borrowed = 1; hands_px = s->cx; hands_py = s->cy; }    /* the person's, kept */
     int ix = (int)lround(x), iy = (int)lround(y);
     if (ix != s->cx || iy != s->cy) {
         s->rdx += ix - s->cx;
@@ -1102,7 +1125,7 @@ static int hands_type(const char *t, size_t n) {
 static int hands_marked[HANDS_MARK_MAX + HANDS_BLACK_MAX], hands_nmarked;
 static Node *hands_node_get(int id) { return node_get(id); }
 static uint8_t *hands_shot(int kind, uint32_t display, int node, double x, double y, double w, double h, int maxdim,
-                           const int *black, int nblack, size_t *len, int *iw, int *ih, char *meta, size_t metan) {
+                           const int *black, int nblack, const int *also, int nalso, size_t *len, int *iw, int *ih, char *meta, size_t metan) {
     *len = 0;
     MediaSrc *m = NULL;
     double lx = 0, ly = 0, lw = remote_server->W, lh = remote_server->H;
@@ -1110,20 +1133,31 @@ static uint8_t *hands_shot(int kind, uint32_t display, int node, double x, doubl
         fprintf(stderr, "lord-server: Hands: a screenshot refused: not everything it must hide could be hidden\n");
         return NULL;
     }
+    /* an agent's capture: the marks black, its own cursor left out, a window refused only when it is itself protected */
+    paint_hands_capture = 1;
+    paint_hands_cursor = handscur_root();
+    if (kind != HANDS_SHOT_DISPLAY) {
+        /* the part of the desktop it really shows (a window partly off the screen): what lordos-mcp maps points with */
+        double W = remote_server->W, H = remote_server->H, x0 = fmax(0, floor(x)), y0 = fmax(0, floor(y));
+        double x1 = fmin(W, floor(x) + floor(w)), y1 = fmin(H, floor(y) + floor(h));
+        if (x1 - x0 < 1 || y1 - y0 < 1) { paint_hands_capture = 0; hands_unmark_nodes(hands_node_get, hands_marked, hands_nmarked); hands_nmarked = 0; return NULL; }
+        x = x0; y = y0; w = x1 - x0; h = y1 - y0;
+    }
     if (kind == HANDS_SHOT_DISPLAY) {
         const DisplayPlan *plan = display_current();
         const DisplayOut *o = NULL;
         for (int i = 0; i < plan->n && !o; i++) if (display ? plan->o[i].conn == display : i == plan->main) o = &plan->o[i];
-        if (display && !o) { hands_unmark_nodes(hands_node_get, hands_marked, hands_nmarked); hands_nmarked = 0; return NULL; }
+        if (display && !o) { paint_hands_capture = 0; hands_unmark_nodes(hands_node_get, hands_marked, hands_nmarked); hands_nmarked = 0; return NULL; }
         if (o) { lx = o->v.x; ly = o->v.y; lw = o->v.w; lh = o->v.h; }
         m = media_screenshot("hands", 0, 0, 0, 0, o ? o->conn : 0, 0, NULL, 0, NULL);
     } else if (kind == HANDS_SHOT_WINDOW) {
         lx = x; ly = y; lw = w; lh = h;
-        m = media_screenshot("hands", (int)x, (int)y, (int)w, (int)h, 0, node, NULL, 0, NULL);
+        m = media_screenshot("hands", (int)x, (int)y, (int)w, (int)h, 0, node, also, nalso < PAINT_ALSO_MAX ? nalso : PAINT_ALSO_MAX, NULL);
     } else {
         lx = x; ly = y; lw = w; lh = h;
         m = media_screenshot("hands", (int)x, (int)y, (int)w, (int)h, 0, 0, NULL, 0, NULL);
     }
+    paint_hands_capture = 0;
     hands_unmark_nodes(hands_node_get, hands_marked, hands_nmarked);
     hands_nmarked = 0;
     if (!m || !m->px) { if (m) media_src_close(m); return NULL; }
@@ -1138,9 +1172,17 @@ static uint8_t *hands_shot(int kind, uint32_t display, int node, double x, doubl
 static char *hands_shell(const char *op, const char *json) { return js_hands_call(op, json); }
 static double hands_now(void) { return now_ms(); }
 static int hands_clip_sensitive(void) { return term_clipboard_sensitive(); }
+static void hands_cursor_ev(int what, double x, double y, double w, double h) { handscur_event(what, x, y, w, h, now_ms()); }
+static int hands_pointer_at(double *x, double *y) {
+    const Server *s = remote_server;
+    *x = hands_borrowed ? hands_px : s->cx;
+    *y = hands_borrowed ? hands_py : s->cy;
+    return 1;
+}
 static const HandsHost hands_host_impl = {
     hands_shell, js_hands_event, hands_size, hands_pointer_locked, hands_place, hands_same_target, hands_node_place_id, hands_keys_place,
     hands_move, hands_button, hands_wheel, hands_key, hands_type, hands_shot, hands_now, hands_clip_sensitive,
+    hands_cursor_ev, hands_pointer_at,
 };
 
 static void remote_greeter(const char *json) { js_greeter_event(json); }
@@ -1562,6 +1604,8 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         display_input(now_ms());
         hands_person_input();               /* the person's own input wins: an agent waits (hands.h) */
         if (ev->type == EV_KEY && ev->value == 1) hands_person_press();   /* a real click or key: theirs again (not motion) */
+        /* their pointer, back where they left it (after hands_person_input: an agent's drag let go where it was) */
+        if (ev->type != EV_KEY || ev->code >= BTN_MISC) hands_reclaim(s);
     }
     if (s->debug && ev->type != EV_SYN)
         fprintf(stderr, "ev %s type=%u code=%u value=%d\n", d->name, ev->type, ev->code, ev->value);
@@ -1788,6 +1832,7 @@ static void tablet_gone(Server *s, const InputDevice *d) {
 /* the UI's repainted pixels, summed (render_ui) and taken by the test hooks' "painted" */
 static long long test_painted_px;
 static long long test_painted(void) { long long n = test_painted_px; test_painted_px = 0; return n; }
+static void test_where(int *x, int *y) { cursor_at(remote_server, x, y); }
 #endif
 
 #ifdef LORD_TEST_HOOKS
@@ -3575,7 +3620,7 @@ int main(int argc, char **argv) {
     if (ok && !s.greeter && share_start(&share_host)) fprintf(stderr, "lord-server: no screen-sharing API (socket)\n");
 #ifdef LORD_TEST_HOOKS
     static const TestHooks test_host = { test_pointer, remote_button, remote_wheel, test_tablet, test_tablet_event, wl_test_xwl, drmlease_fake_card, test_key,
-                                         test_frame, test_painted };
+                                         test_frame, test_painted, test_where };
     if (ok && test_hooks && testhooks_start(&test_host)) fprintf(stderr, "lord-server: no test hooks socket\n");
 #endif
     char current[sizeof ui.theme_request];
@@ -3733,6 +3778,14 @@ int main(int argc, char **argv) {
         double td = term_timeout(now);
         if (td >= 0 && (delay < 0 || td < delay)) delay = td;
         tp_tick(now);                       /* touchpad: tocar, arrastrar, inercia (tp/tp.c) */
+        {   /* Hands' human mode: a glide, a drag, a scroll's steps, typing; the agent cursor's ripple and fade (handscur.h) */
+            hands_tick();
+            handscur_keep(hands_acting());
+            handscur_tick(now_ms());
+            double hd = hands_timeout(), cd = handscur_timeout(now_ms());
+            if (hd >= 0 && (delay < 0 || hd < delay)) delay = hd;
+            if (cd >= 0 && (delay < 0 || cd < delay)) delay = cd;
+        }
         if (ptrlock_waiting() && (delay < 0 || delay > 50)) delay = 50;     /* a pointer lock whose node went away */
         /* shake to find it: the cursor grows and shrinks back (a new size serial redraws it below) */
         cursor_set_boost(cursor_shake() ? shake_level(&pointer_shake, now) : 0);

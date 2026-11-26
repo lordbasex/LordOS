@@ -146,6 +146,7 @@ static void paint_wavy(Canvas *c, float x, float y, float w, float h, float k, u
 
 static void paint_node_body(Canvas *c, Node *n, float opacity) {
     if (n->type == NODE_RAW || n->s.display_none) return;
+    if (paint_hands_capture && paint_capture_mode && n->id == paint_hands_cursor) return;    /* the agent's own cursor */
     if (layer_paint(c, n, opacity)) return;
     if (n->own_tf && n->id != tf_self && tf_paint(c, n, opacity)) return;
     const Style *s = &n->s;
@@ -171,6 +172,12 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
     int corners_differ = !plain && (r4[1] != r4[0] || r4[2] != r4[0] || r4[3] != r4[0]);
     /* a protected window, or a picture of a protected source (a protected machine's, lord.vm.protect) wherever it is shown:
      * the neutral fill and the lock in every capture */
+    /* an AI agent's screenshot: what it must not see is solid black, its whole box (no rounded corners that would make a
+     * blacked-out switch look like a dark one) */
+    if (paint_capture_mode && n->hands_black) {
+        canvas_rrect(c, floorf(x), floorf(y), ceilf(x + w) - floorf(x), ceilf(y + h) - floorf(y), 0, 0xff000000u);
+        return;
+    }
     if (paint_capture_mode && (n->protect || (n->type == NODE_MEDIA && media_id_protected(n->term)))) {
         float rr[4] = { rad, rad, rad, rad };
         paint_protected_fill(c, x, y, w, h, corners_differ ? r4 : rr);
@@ -2608,23 +2615,35 @@ static int in_tree(const Node *n, const Node *root) {
     return 0;
 }
 
-static int subtree_protected(const Node *n, int depth) {
-    if (n->protect || (n->type == NODE_MEDIA && media_id_protected(n->term))) return 1;
+/* a protected node in n's subtree; with marks, a node an agent's screenshot blacks out too (a cached raster of it must be
+ * painted again: tf_paint) */
+static int subtree_hidden(const Node *n, int depth, int marks) {
+    if (n->protect || (marks && n->hands_black) || (n->type == NODE_MEDIA && media_id_protected(n->term))) return 1;
     if (depth > 4096) return 1;                     /* deeper than any real tree: treated as protected, never captured */
-    for (const Node *k = n->first; k; k = k->next) if (subtree_protected(k, depth + 1)) return 1;
+    for (const Node *k = n->first; k; k = k->next) if (subtree_hidden(k, depth + 1, marks)) return 1;
     return 0;
 }
+static int subtree_protected(const Node *n, int depth) { return subtree_hidden(n, depth, 1); }
+
+int paint_hands_capture, paint_hands_cursor;
 
 int paint_node_protected(const Node *n) {
     if (!n) return 0;
     for (const Node *a = n->parent; a; a = a->parent) if (a->protect) return 1;
-    return subtree_protected(n, 0);
+    return subtree_hidden(n, 0, 0);
 }
 
 int paint_capture_until(Canvas *c, Node *root, int last, const int *also, int n) {
     if (!root || last <= 0) return 0;
     Node *w = node_get(last);
-    if (w && in_tree(w, root) && paint_node_protected(w)) return -1;    /* a protected window alone: refused */
+    /* a protected window alone: refused (an agent's capture: only when the window itself or what holds it is protected;
+     * what is protected inside it is painted as the protected fill) */
+    int refuse = 0;
+    if (w && in_tree(w, root)) {
+        if (!paint_hands_capture) refuse = paint_node_protected(w);
+        else for (const Node *a = w; a && !refuse; a = a->parent) refuse = a->protect;
+    }
+    if (refuse) return -1;
     paint_capture_mode = 1;
     cap_last = last;
     cap_done = 0;

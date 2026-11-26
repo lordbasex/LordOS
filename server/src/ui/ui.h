@@ -112,6 +112,7 @@ typedef struct Node {
     uint8_t protect;            /* protected window: the protected fill in every capture (media/capture.c) */
     uint8_t theme_own;          /* made by a community theme's View, Text or Image (js_theme.c): the only nodes it may restyle */
     uint8_t hands_deny;         /* handsDeny: an AI agent never reads, clicks or sees it (hands/hands.h; Settings → AI → Hands) */
+    uint8_t hands_black;        /* black in the AI agent's screenshot being taken now (hands/handsmark.c sets and clears it) */
     uint8_t rtl;                /* effective direction (computed in layout) */
     uint8_t own_tf, has_tf;     /* it has a scale/rotate; it or an ancestor has one (tf is set) */
     uint8_t layout_ok, layout_rtl;  /* its subtree is laid out for its current w × h and direction */
@@ -431,6 +432,11 @@ Node *hit_test(Node *root, float x, float y);
  * the screen that leaves the compositor is painted in this mode or is a copy of one that was (docs/PRIVACY.md
  * "Protected windows"): this is the one place where a protected window's pixels are left out. */
 extern int paint_capture_mode;
+/* An AI agent's screenshot (main.c hands_shot, docs/HANDS.md): the nodes handsmark.c marked (hands_black) are painted
+ * solid black over their whole box, the agent's own cursor (this node id) is left out, and a window captured alone is
+ * refused only when the window itself (or what holds it) is protected: a protected node inside it is painted as the
+ * protected fill, like everything an agent mustn't see, instead of refusing the whole window. */
+extern int paint_hands_capture, paint_hands_cursor;
 /* A protected window in a capture: opaque and neutral (r = g = b), never the window's own pixels; a lock and the label in
  * the ink colour when the box has room. */
 #define PAINT_PROTECT_FILL 0xff2e2e2eu

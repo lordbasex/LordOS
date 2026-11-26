@@ -10,7 +10,13 @@
 #   3. the banner shows on the display while the agent is connected, and the person's click on its Stop (through the test
 #      hooks, as a real pointer) stops the agent: its next call is refused as stopped;
 #   4. a community theme's trust dialog (Settings → Appearance, an untrusted theme): Enter while it has the keyboard and a
-#      click on it are refused, and the theme stays untrusted.
+#      click on it are refused, and the theme stays untrusted;
+#   5. every capture path blacks out handsDeny nodes: Monitor's Network tab (its firewall rule switches) as a window and as
+#      the display, both pure black where the switches are, and the window's capture no longer fails;
+#   6. a window that runs off the screen: its screenshot says the part on the desktop, and a zoom at its edge works;
+#      a wallpaper's sheet (Settings → Wallpaper) is in the window's screenshot and a zoom over it works;
+#   7. the agent's cursor in human mode: it shows on the display while it glides and where it clicks, never in the agent's
+#      own screenshot, and the click lands.
 # Exit 0 passed, 1 failed, 77 skipped (no theme bundle or binaries).
 import base64, json, os, re, shutil, socket, subprocess, sys, tempfile, time, zlib
 
@@ -302,6 +308,153 @@ def trust_dialog():
         a.close()
 
 
+def px(rows, x, y):
+    return tuple(rows[y][x * 3:x * 3 + 3])
+
+
+def capture_paths():
+    print('5. handsDeny is black in every capture path')
+    a = Agent('monitor')
+    try:
+        t = a.text('find', window_id='monitor', query='Network')
+        a.text('computer', action='left_click', ref=ref(t, r'tab "Network"'))
+        time.sleep(1.5)
+        t = a.text('read_window', window_id='monitor')
+        m = re.search(r'clickable "Machines[^"]*" \[ref_\d+\] @(\d+),(\d+) (\d+)x(\d+)', t)
+        check(m is not None, 'the Network tab\'s first row')
+        rx, ry, rw, rh = (int(v) for v in m.groups()) if m else (32, 230, 314, 40)
+        sx, sy = rx + rw - 21, ry + 20                       # its Rule switch (handsDeny)
+        r = a.call('computer', action='screenshot', target='window:monitor')
+        check(not r.get('isError'), 'a window holding handsDeny nodes is captured (no "The action failed.")')
+        img = next((base64.b64decode(c['data']) for c in r['content'] if c['type'] == 'image'), None)
+        meta = next((c['text'] for c in r['content'] if c['type'] == 'text'), '')
+        mm = re.search(r'area at \((\d+), (\d+)\)', meta)
+        if img and mm:
+            w, h, rows = png_rgb(img)
+            ox, oy = int(mm.group(1)), int(mm.group(2))
+            check(px(rows, sx - ox, sy - oy) == (0, 0, 0), f'the rule switch is black in the window\'s capture {px(rows, sx - ox, sy - oy)}')
+        w, h, rows = png_rgb(a.png())
+        check(px(rows, sx, sy) == (0, 0, 0) and px(rows, sx - 9, sy - 4) == (0, 0, 0), f'and in the display\'s {px(rows, sx, sy)}')
+        check(px(rows, rx + 80, sy) != (0, 0, 0), 'the rest of the row shows')
+    finally:
+        a.close()
+
+
+def zoom_edges():
+    print('6. a window off the screen\'s edge, a sheet: screenshots and zooms')
+    a = Agent('settings')
+    try:
+        w = json.loads(a.text('windows_context'))['windows'][0]
+        c = a.text('computer', action='left_click_drag', start_coordinate=[w['x'] + w['w'] // 2, w['y'] + 16],
+                   coordinate=[w['x'] + w['w'] // 2 + 420, w['y'] + 16])
+        time.sleep(0.8)
+        w = json.loads(a.text('windows_context'))['windows'][0]
+        check(w['x'] + w['w'] > 1280, f'the window runs off the right edge ({c}; x {w["x"]} w {w["w"]})')
+        r = a.call('computer', action='screenshot', target='window:settings')
+        meta = next((c['text'] for c in r['content'] if c['type'] == 'text'), '')
+        mm = re.search(r'(\d+)x(\d+) image of the desktop area at \((\d+), (\d+)\), (\d+)x(\d+) points', meta)
+        check(mm is not None and int(mm.group(3)) + int(mm.group(5)) <= 1280, f'its screenshot is the part on the desktop ({meta[:80]})')
+        if mm:
+            iw, ih = int(mm.group(1)), int(mm.group(2))
+            z = a.call('computer', action='zoom', region=[iw - 200, 40, iw, 240])
+            check(not z.get('isError'), 'a zoom at its right edge works: ' + next((c['text'] for c in z['content'] if c['type'] == 'text'), '')[:60])
+            z = a.call('computer', action='zoom', region=[iw - 100, 40, iw + 300, 240])
+            check(not z.get('isError'), 'a zoom running past the edge: the part on the desktop')
+        a.text('computer', action='left_click_drag', start_coordinate=[w['x'] + 200, w['y'] + 16], coordinate=[w['x'] - 220, w['y'] + 16])
+        time.sleep(0.8)
+        t = a.text('find', window_id='settings', query='Wallpaper')
+        a.text('computer', action='left_click', ref=ref(t, r'row "[^"]*Wallpaper"'))
+        time.sleep(1.2)
+        t = a.text('find', window_id='settings', query='Abstract')
+        a.text('computer', action='left_click', ref=ref(t, r'clickable "Abstract'))
+        time.sleep(1.2)
+        a.text('computer', action='scroll', coordinate=[690, 500], scroll_direction='down', scroll_amount=5)
+        time.sleep(0.8)
+        t = a.text('find', window_id='settings', query='Autumn lake')
+        a.text('computer', action='left_click', ref=ref(t, r'clickable "[^"]*Autumn lake'))
+        time.sleep(1.5)
+        t = a.text('read_window', window_id='settings')
+        check('Download and use' in t or 'Use on desktop' in t, 'a wallpaper\'s sheet is open')
+        r = a.call('computer', action='screenshot', target='window:settings')
+        img = next((base64.b64decode(c['data']) for c in r['content'] if c['type'] == 'image'), None)
+        meta = next((c['text'] for c in r['content'] if c['type'] == 'text'), '')
+        mm = re.search(r'area at \((\d+), (\d+)\)', meta)
+        m2 = re.search(r'button "Download and use[^"]*" \[ref_\d+\] @(\d+),(\d+) (\d+)x(\d+)', t)
+        if img and mm and m2:
+            w2, h2, rows = png_rgb(img)
+            bx, by = int(m2.group(1)) + 8 - int(mm.group(1)), int(m2.group(2)) + int(m2.group(4)) // 2 - int(mm.group(2))
+            p = px(rows, bx, by)
+            check(p[2] > 200 and p[0] < 80, f'the sheet is in the window\'s screenshot (its blue button {p})')
+            ox, oy = int(m2.group(1)) - int(mm.group(1)), int(m2.group(2)) - int(mm.group(2))
+            z = a.call('computer', action='zoom', region=[max(0, ox - 100), max(0, oy - 80), ox + 200, oy + 80])
+            check(not z.get('isError'), 'a zoom over the sheet works')
+        else:
+            check(False, 'the sheet in the window\'s screenshot')
+    finally:
+        a.close()
+
+
+def agent_cursor():
+    print('7. the agent\'s cursor in human mode')
+    a = Agent('monitor')
+    try:
+        check('"effective":"human"' in a.text('hands_mode', mode='human'), 'hands_mode human')
+        a.hook('ptr 900 650')                                # the person's pointer, somewhere else
+        t = a.text('find', window_id='monitor', query='Processes')
+        m = re.search(r'tab "Processes" \[(ref_\d+)\][^@\n]*@(\d+),(\d+) (\d+)x(\d+)', t)
+        check(m is not None, 'a tab to click')
+        tx, ty = int(m.group(2)) + int(m.group(4)) // 2, int(m.group(3)) + int(m.group(5)) // 2
+        import threading
+        a.hook('frame output')
+        w, h, d = ppm(os.path.join(a.dir, 'lordos-test-frame-output.ppm'))
+        def violet(x0, y0, x1, y1):
+            n = 0
+            for y in range(max(0, y0), min(h, y1)):
+                for x in range(max(0, x0), min(w, x1)):
+                    p = d[(y * w + x) * 3:(y * w + x) * 3 + 3]
+                    if 120 < p[0] < 165 and 70 < p[1] < 115 and p[2] > 215:
+                        n += 1
+            return n
+        base_all, base_near = violet(0, 60, w, h), violet(tx - 10, ty - 10, tx + 140, ty + 60)
+        res = {}
+        th = threading.Thread(target=lambda: res.setdefault('c', a.text('computer', action='left_click', ref=m.group(1))))
+        t0 = time.time()
+        th.start()
+        time.sleep(0.15)
+        a.hook('frame output')
+        th.join()
+        took = time.time() - t0
+        w, h, d = ppm(os.path.join(a.dir, 'lordos-test-frame-output.ppm'))
+        mid = violet(0, 60, w, h) - base_all
+        check(mid > 40, f'the cursor on the display while it glides ({mid} more violet pixels)')
+        check(took >= 0.3, f'the click came after the glide ({took:.2f} s)')
+        check(not res.get('c', '').startswith('ERROR'), f'the click landed ({res.get("c")})')
+        a.hook('frame output')
+        w, h, d = ppm(os.path.join(a.dir, 'lordos-test-frame-output.ppm'))
+        near = violet(tx - 10, ty - 10, tx + 140, ty + 60) - base_near
+        check(near > 40, f'it rests where it clicked ({near})')
+        sw, sh, rows = png_rgb(a.png())
+        cnt = 0
+        for y in range(max(0, ty - 10), min(sh, ty + 60)):
+            for x in range(max(0, tx - 10), min(sw, tx + 140)):
+                p = rows[y][x * 3:x * 3 + 3]
+                if 120 < p[0] < 165 and 70 < p[1] < 115 and p[2] > 215:
+                    cnt += 1
+        check(cnt < 10, f'the agent\'s own screenshot never shows it ({cnt})')
+        t = a.text('read_window', window_id='monitor', filter='interactive')
+        check(re.search(r'tab "Processes" \[ref_\d+\] \{selected\}', t) is not None, 'Processes is the tab shown')
+        check('reported' not in t, 'the cursor\'s label is not in the agent\'s tree')
+        check(a.hook('where') == 'ok 900 650', f'the person\'s pointer never moved ({a.hook("where")})')
+        time.sleep(3.2)                                      # (the person's move above pauses an agent for 3 s)
+        k = a.text('computer', action='left_click', ref=m.group(1), mode='machine')
+        check(not k.startswith('ERROR'), 'one call in machine mode')
+        check(a.hook('where') == 'ok 900 650', 'nor for a machine-mode click')
+        a.hook('ptr 905 650')                                # the person moves: their pointer from where they left it
+        check(a.hook('where') == 'ok 905 650', 'the person\'s next move takes it from where they left it')
+    finally:
+        a.close()
+
+
 def main():
     if not (os.access(MCP, os.X_OK) and os.access(LS, os.X_OK) and os.path.exists(os.path.join(ROOT, 'themes/default/theme.bundle.js'))
             and os.access('/usr/bin/dbus-daemon', os.X_OK) and shutil.which('node')):
@@ -312,6 +465,9 @@ def main():
     permission_prompt()
     banner_stop()
     trust_dialog()
+    capture_paths()
+    zoom_edges()
+    agent_cursor()
     print(f'hands-e2e: {passes} passed, {fails} failed')
     return 1 if fails else 0
 

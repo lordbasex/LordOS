@@ -25,8 +25,8 @@ export { spellVersion, spellOn, spellLangs, spellInstalled, spellDefaults, spell
 export { SPELL_PACKAGES, spellPackageOk, packageInstalled, toggleLang, spellLanguages, spellWords, badRanges } from './spellmodel.js';
 export { useEditorSpell, EditorSquiggles, squiggleColorFor, spellHitAt, editorMenuRows } from './editorextras.jsx';
 // Hands: an AI agent using the desktop through lordos-mcp (docs/HANDS.md)
-export { handsStatus, handsStopped, setHandsOn, setHandsAllow, handsAllowSaved, stopHands, answerHands, refreshHands } from './hands.jsx';
-import { HandsPrompt, HandsBanner } from './hands.jsx';
+export { handsStatus, handsStopped, setHandsOn, setHandsAllow, handsAllowSaved, handsMotionSaved, setHandsMotion, stopHands, answerHands, refreshHands } from './hands.jsx';
+import { HandsPrompt, HandsBanner, HandsCursor } from './hands.jsx';
 export { WritingPanel, writingReady, writingOn, writingChoice, setWritingOn, writingMenuFor } from './writing.jsx';
 export { writingEnabled } from './writingmodel.js';
 export { liveSpeech } from './livespeech.jsx';
@@ -485,7 +485,7 @@ function LocaleRoot({ children }) {
     at('modal', PrintDialog, RestorePrompt, FirstStart),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, CaptureCorner, DisplayIdentify, VoicePlayer),
     at('system', HandsPrompt, PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, ShotOverlay, WebAppAskPrompt, WebAppInspectPrompt, WebAppRestartPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
-    at('agent', HandsBanner),
+    at('agent', HandsBanner, HandsCursor),
     at('input', OskPanel, ImeOverlay, ThemeSwitchOverlay));   // the style changing: over everything (themeswitch.jsx)
 }
 // the wallpaper slideshow (0.8.9; a theme turns it on in theme.json: sdk/thememeta.js)

@@ -11,8 +11,12 @@
  *
  * It runs as the person and links only libc: it never reads the screen, injects input or opens anything itself. Every
  * tool is one or two calls to lord-server, which checks everything (hands/hands.c). Tools: windows_context, open_app,
- * open_path, close_window, read_window, find, computer, set_value, read_app_log, record (src/hands/mcp.c has their
- * schemas). There is no tool that runs code. */
+ * open_path, close_window, read_window, find, computer, set_value, read_app_log, record, hands_mode (src/hands/mcp.c has
+ * their schemas). There is no tool that runs code.
+ *
+ * How the agent's cursor moves (docs/HANDS.md "The agent's cursor"): human or machine, the session's (hands_mode,
+ * --mode) or one call's (computer's and set_value's mode), set on lord-server with SetMode before an action when it
+ * differs from what lord-server has for this connection. */
 #include "../hands/hands.h"
 #include "../hands/mcp.h"
 #include "../hands/mcpimg.h"
@@ -78,6 +82,8 @@ static void out_line(const char *json) {
 
 static DConn bus;
 static int bus_up, granted, hello_done;
+static int session_mode = HANDS_MODE_DEFAULT;   /* hands_mode, --mode */
+static int srv_mode = HANDS_MODE_DEFAULT;       /* what lord-server has for this connection */
 static char client_name[64] = "MCP client";
 static McpShot last_shot;
 
@@ -98,7 +104,7 @@ static int call(const char *member, const char *sig, const DBuf *body, DMsg *m) 
     if (!s) return -1;
     memset(m, 0, sizeof *m);
     int r = dbus_wait_reply(&bus, s, m, CALL_MS);
-    if (r < 0) { dbus_close(&bus); bus_up = 0; hello_done = granted = 0; }
+    if (r < 0) { dbus_close(&bus); bus_up = 0; hello_done = granted = 0; srv_mode = HANDS_MODE_DEFAULT; }
     return r;
 }
 
@@ -158,6 +164,27 @@ static int call_s(const char *member, const char *sig, const DBuf *body, char **
     if (!*out) *out = strdup("");
     dbus_msg_free(&m);
     return 1;
+}
+
+/* the connection's mode on lord-server: want, set with SetMode when it differs (1 done, 0 an error in why) */
+static int use_mode(int want, char *why, size_t n) {
+    if (want == srv_mode) return 1;
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, hands_mode_word(want));
+    char *out = NULL;
+    int ok = call_s("SetMode", "s", &b, &out, why, n);
+    dw_free(&b);
+    free(out);
+    if (ok) srv_mode = want;
+    return ok;
+}
+/* a call's mode argument: its mode, the session's when absent; -1 not a mode */
+static int mode_arg(const JVal *a) {
+    const char *m = a ? json_str(a, "mode") : NULL;
+    if (!m) return session_mode;
+    int k = hands_mode_of(m);
+    return k < 0 ? -1 : k == HANDS_MODE_DEFAULT ? session_mode : k;
 }
 
 /* ---- the recording ---- */
@@ -303,6 +330,9 @@ static char *computer(const JVal *a) {
         return screenshot("region", x0, y0, x1 - x0, y1 - y0, 1024, 0);
     }
     if (ready(why, sizeof why)) return text_result(why, 1);
+    int mode = mode_arg(a);
+    if (mode < 0) return text_result("mode must be human or machine.", 1);
+    if (!use_mode(mode, why, sizeof why)) return text_result(why, 1);
     DBuf b;
     dw_init(&b);
     const char *member = NULL, *sig = NULL;
@@ -362,6 +392,10 @@ static char *set_value(const JVal *a) {
     const char *val = v->type == J_STR ? v->str : v->type == J_BOOL ? (v->num ? "true" : "false") : NULL;
     if (v->type == J_NUM) { snprintf(num, sizeof num, "%g", v->num); val = num; }
     if (!val) return text_result("value must be a string, a boolean or a number.", 1);
+    int mode = mode_arg(a);
+    if (mode < 0) return text_result("mode must be human or machine.", 1);
+    char why[256];
+    if (ready(why, sizeof why) || !use_mode(mode, why, sizeof why)) return text_result(why, 1);
     char *r = tool_simple("SetValue", ref, "s", val, 0);
     rec_frame();
     return r;
@@ -464,6 +498,24 @@ static char *tools_call(const JVal *params) {
         return tool_simple("AppLog", app, "su", p ? p : "", mx >= 1 && mx <= HANDS_LOG_MAX ? (unsigned)mx : 100);
     }
     if (!strcmp(name, "record")) return record(a);
+    if (!strcmp(name, "hands_mode")) {
+        const char *m = str_arg(a, "mode");
+        int k = m ? hands_mode_of(m) : -1;
+        if (k < 0 || !m[0]) return text_result("mode must be human, machine or default.", 1);
+        char why[256];
+        if (ready(why, sizeof why)) return text_result(why, 1);
+        session_mode = k;
+        DBuf b;
+        dw_init(&b);
+        dw_str(&b, hands_mode_word(k));
+        char *out = NULL;
+        int ok = call_s("SetMode", "s", &b, &out, why, sizeof why);
+        dw_free(&b);
+        if (ok) srv_mode = k;
+        char *r = text_result(ok ? (out && out[0] ? out : "done") : why, !ok);
+        free(out);
+        return r;
+    }
     return text_result("unknown tool.", 1);
 }
 
@@ -677,10 +729,12 @@ static volatile sig_atomic_t stop_now;
 static void on_stop(int s) { (void)s; stop_now = 1; }
 
 static void usage(FILE *f) {
-    fprintf(f, "usage: lordos-mcp [--headless APP]\n"
+    fprintf(f, "usage: lordos-mcp [--headless APP] [--mode human|machine]\n"
                "  An MCP server (stdio) for AI agents to use the LordOS desktop (docs/HANDS.md).\n"
                "  claude mcp add lordos-mcp -- lordos-mcp\n"
-               "  --headless APP   a private desktop for QA with APP open (notes, files, …); nothing of yours is touched\n");
+               "  --headless APP   a private desktop for QA with APP open (notes, files, …); nothing of yours is touched\n"
+               "  --mode MODE      how the agent's cursor moves this session: human (glides, hovers, types at a person's pace;\n"
+               "                   the live desktop's default) or machine (at once; the --headless default)\n");
 }
 
 int main(int argc, char **argv) {
@@ -691,6 +745,7 @@ int main(int argc, char **argv) {
     const char *headless = NULL;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--headless") && i + 1 < argc && hands_name_ok(argv[i + 1])) headless = argv[++i];
+        else if (!strcmp(argv[i], "--mode") && i + 1 < argc && hands_mode_of(argv[i + 1]) > 0) session_mode = hands_mode_of(argv[++i]);
         else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) { usage(stdout); return 0; }
         else if (!strcmp(argv[i], "--version")) { puts("lordos-mcp (LordOS)"); return 0; }
         else { usage(stderr); return 2; }

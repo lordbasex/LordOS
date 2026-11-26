@@ -9,8 +9,8 @@
 //   target {node}                    whether what is at that node belongs to an allowed app
 //   focus                            whether the keys would go to a password field, a denied node, an allowed app
 //   setvalue {ref, value}            form_input: the control's own setter (handsSetValue), never a password field
-//   window {window}                  a window's frame node and box (a screenshot of it)
-//   region {x, y, w, h}              whether a region lies inside one allowed window
+//   window {window}                  a window's frame node, box and sheets (a screenshot of it)
+//   region {x, y, w, h}              whether a region shows some of an allowed window or a surface tied to one
 //   blackout                         the nodes an allowlisted screenshot paints black (other apps' windows, the Dock…)
 //   open {app}, openPath {path}, close {window}, log {app, pattern, max}
 // Each op gets the allowlist ("allow") from lord-server and applies it. The tree never holds the system band, a
@@ -22,10 +22,14 @@
 //                     session / Deny. One prompt per connection, answered only by the person's real input.
 //   <HandsBanner />   in the agent layer (105, above every layer a theme draws in), on every display while an agent is
 //                     connected: "<client> is using your computer" and Stop. Ctrl+Alt+Esc stops every agent too.
+//   <HandsCursor />   the agent's own cursor (docs/HANDS.md "The agent's cursor"): a violet arrow labelled with the name
+//                     the client gave, "· reported", in a layer of its own below the system band (99.5), built once out
+//                     of React's sight; lord-server moves it from C (server/src/hands/handscur.h). It also tells
+//                     lord-server Settings → AI → Hands → Agent motion and reduce motion.
 // Settings → AI → Hands turns it on for this session (lord.hands.serve; nothing on disk turns it on) and keeps the
 // allowlist the person chose in settings.hands.allow.
-import { createElement as h, Fragment } from 'react';
-import { View, Text, screen, hostRoots, instanceOf } from '@lordos/runtime';
+import { createElement as h, Fragment, useEffect } from 'react';
+import { View, Text, screen, hostRoots, instanceOf, overlayTree } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { t, appName } from './i18n.js';
 import { settings } from './settings.js';
@@ -62,6 +66,13 @@ export function setHandsAllow(list) {
   settings.set((s) => ({ ...s, hands: { ...(s.hands || {}), allow } }));
   const st = handsStatus.get();
   if (st.on) setHandsOn(true, allow);
+}
+// Settings → AI → Hands → Agent motion: 'human' (the default on the live desktop) or 'machine'; kept with the person's
+// settings (HandsCursor tells lord-server; a client's own choice, lordos-mcp's hands_mode, wins for that client)
+export const handsMotionSaved = () => ((settings.get().hands || {}).motion === 'machine' ? 'machine' : 'human');
+export function setHandsMotion(m) {
+  const motion = m === 'machine' ? 'machine' : 'human';
+  settings.set((s) => ({ ...s, hands: { ...(s.hands || {}), motion } }));
 }
 export function stopHands() { const a = api(); if (a) { try { a.stop(); } catch (e) { /* gone */ } } refreshHands(); }
 export function answerHands(bus, yes) { const a = api(); if (a) { try { a.answer(bus, !!yes); } catch (e) { /* gone */ } } refreshHands(); }
@@ -205,7 +216,10 @@ const OPS = {
       dialog = !dn || dn.deleted || deniedOrProtected(dn);
       dialogNode = dn && !dn.deleted && typeof dn.id === 'number' ? dn.id : 0;
     }
-    return { secure, nodes, dialog, dialogNode, allowed: !(Array.isArray(a.allow) && a.allow.length) || (!!f && allowed(a.allow, appOfId(f))) };
+    // the field's box only (where the agent cursor rests and pulses while it types), never what is in it
+    const fb = box && !box.deleted ? boxOf(box) : null;
+    return { secure, nodes, dialog, dialogNode, box: fb ? fb.slice(0, 4) : null,
+      allowed: !(Array.isArray(a.allow) && a.allow.length) || (!!f && allowed(a.allow, appOfId(f))) };
   },
   setvalue(a) {
     const n = refs.nodeOf(a.ref);
@@ -225,16 +239,20 @@ const OPS = {
     if (!allowed(a.allow, appOfWindow(w))) return { error: 'allowlist' };
     const node = wm.frameNode(id);
     const b = node ? boxOf({ id: node }) : null;
-    return b ? { node, x: b[0], y: b[1], w: b[2], h: b[3] } : { error: 'not-found' };
+    // its sheets (a modal of its own: Settings → Wallpaper's sheet, a file dialog), painted over it as Screenshots does
+    const sheets = (wm.sheetNodes ? wm.sheetNodes(id) : []).filter((n) => typeof n === 'number' && n > 0).slice(0, 8);
+    return b ? { node, x: b[0], y: b[1], w: b[2], h: b[3], sheets } : { error: 'not-found' };
   },
+  // with an allowlist: the region shows some of an allowed window, or of a menu, popover or sheet tied to one (handsWin);
+  // everything else in it is painted black (blackout), as in a window's screenshot
   region(a) {
-    const inside = windows.get().some((w) => {
+    const meets = (b) => !!b && a.x < b[0] + b[2] && a.x + a.w > b[0] && a.y < b[1] + b[3] && a.y + a.h > b[1];
+    const shows = windows.get().some((w) => {
       if (w.minimized || !allowed(a.allow, appOfWindow(w))) return false;
       const node = wm.frameNode(w.id);
-      const b = node ? boxOf({ id: node }) : null;
-      return !!b && a.x >= b[0] && a.y >= b[1] && a.x + a.w <= b[0] + b[2] && a.y + a.h <= b[1] + b[3];
-    });
-    return { inside };
+      return meets(node ? boxOf({ id: node }) : null);
+    }) || tiedSurfaces(a.allow).some((n) => meets(boxOf(n)));
+    return { shows };
   },
   // fail closed: everything is black but the allowed windows and the menus, popovers and sheets tied to one of them
   blackout(a) {
@@ -295,6 +313,19 @@ globalThis.__lordHands = (op, json) => {
   try { return JSON.stringify(fn(a || {})); } catch (e) { console.error('hands:', e?.message || e); return JSON.stringify({ error: 'failed' }); }
 };
 
+// the shell surfaces tied to an allowed window (handsWin: its sheets, menus and popovers), below the system band
+function tiedSurfaces(allow) {
+  const out = [];
+  const walk = (n, d) => {
+    if (!n || d > 4096 || out.length > 64) return;
+    const w = own(n.props, 'handsWin');
+    if (typeof w === 'string' && allowed(allow, appOfId(w)) && n.id) { out.push(n); return; }
+    for (let c = n.first; c; c = c.next) walk(c, d + 1);
+  };
+  for (const r of hostRoots()) if (r.z > 0 && r.z < SYSTEM_Z) walk(r.node, 0);
+  return out;
+}
+
 // ---- what the person sees ----
 
 const clientName = (c) => (c && c.name) || t('hands.client.unknown');
@@ -343,6 +374,54 @@ export function HandsBanner() {
   h(Text, { style: { fontSize: 11, color: 'rgba(255,255,255,0.8)', whiteSpace: 'nowrap' } }, t('hands.banner.panic')),
   h(View, { onClick: stopHands, style: { paddingHorizontal: 12, height: 24, borderRadius: 12, justifyContent: 'center', backgroundColor: '#fff' } },
     h(Text, { style: { fontSize: 12, fontWeight: 700, color: '#6b21a8' } }, t('hands.banner.stop'))))));
+}
+
+// The agent's cursor: built once, out of React's sight, then only lord-server moves it. Violet arrow (a rounded tip at the
+// point), a ripple ring and the client's name "· reported" (as the prompt says: what the program calls itself, not
+// verified). The name comes from lord-server, cleaned there (printable, no bidi or control characters, 40 bytes at most)
+// and is cut again here.
+export const HANDS_CURSOR_Z = 99.5;                      // server/src/hands/handscur.h HANDSCUR_Z
+const TIP = 24, VIOLET = '#8b5cf6';
+let cursorNodes = null;
+function buildCursor() {
+  if (cursorNodes || typeof lord === 'undefined' || !lord.hands || typeof lord.hands.cursor !== 'function') return cursorNodes;
+  let ring = 0, text = 0;
+  const root = overlayTree(HANDS_CURSOR_Z, { left: -1000, top: -1000, width: 240, height: 72, display: 'none', direction: 'ltr' }, (el, r) => {
+    ring = el('view', { position: 'absolute', left: TIP - 5, top: TIP - 5, width: 10, height: 10, borderRadius: 5, border: `2px solid ${VIOLET}`, opacity: 0 }, r);
+    // the arrow: a teardrop whose sharp corner is the point
+    el('view', { position: 'absolute', left: TIP, top: TIP, width: 17, height: 17, backgroundColor: VIOLET, border: '2px solid #ffffff',
+      borderTopLeftRadius: 1, borderTopRightRadius: 9, borderBottomRightRadius: 9, borderBottomLeftRadius: 9, boxShadow: '0 2px 6px rgba(0,0,0,0.45)' }, r);
+    const pill = el('view', { position: 'absolute', left: TIP + 14, top: TIP + 19, height: 18, paddingHorizontal: 7, borderRadius: 9, justifyContent: 'center',
+      backgroundColor: VIOLET, boxShadow: '0 2px 6px rgba(0,0,0,0.35)' }, r);
+    const tx = el('text', { fontSize: 11, fontWeight: 600, color: '#ffffff', whiteSpace: 'nowrap' }, pill);
+    text = lord.createNode('raw');
+    lord.appendChild(tx, text);
+  });
+  if (!root) return null;
+  let ok = false;
+  try { ok = lord.hands.cursor(root, ring) === true; } catch (e) { ok = false; }
+  cursorNodes = ok ? { root, ring, text, label: null } : null;
+  return cursorNodes;
+}
+const cut = (str, n) => (str.length > n ? `${str.slice(0, n - 1)}…` : str);
+export function HandsCursor() {
+  const st = useStore(handsStatus);
+  const motion = useStore(settings, (s) => `${(s.hands || {}).motion === 'machine' ? 'machine' : 'human'}|${!!s.reduceMotion}`);
+  useEffect(() => {
+    const a = api();
+    const [m, r] = motion.split('|');
+    if (a && typeof a.motion === 'function') { try { a.motion(m, r === 'true'); } catch (e) { /* refused while an agent acts */ } }
+  }, [motion]);
+  const granted = (st.clients || []).filter((c) => c.state === 'granted');
+  const who = cut([...new Set(granted.map(clientName))].join(', '), 48);
+  const label = t('hands.cursor.label', { client: who });
+  useEffect(() => {
+    const c = buildCursor();
+    if (!c || c.label === label) return;
+    c.label = label;
+    try { lord.setText(c.text, label); } catch (e) { /* gone */ }
+  }, [label, granted.length]);
+  return null;
 }
 
 refreshHands();

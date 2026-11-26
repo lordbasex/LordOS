@@ -31,6 +31,7 @@ static const char introspect[] =
     "<method name='OpenPath'><arg type='s' direction='in'/><arg type='s' direction='out'/></method>"
     "<method name='CloseWindow'><arg type='s' direction='in'/><arg type='s' direction='out'/></method>"
     "<method name='AppLog'><arg type='s' direction='in'/><arg type='s' direction='in'/><arg type='u' direction='in'/><arg type='s' direction='out'/></method>"
+    "<method name='SetMode'><arg type='s' direction='in'/><arg type='s' direction='out'/></method>"
     "</interface></node>";
 
 /* ---- the arguments ---- */
@@ -41,6 +42,7 @@ static const struct { const char *member, *sig; int call; } METHODS[] = {
     { "Scroll", "siisu", HANDS_C_SCROLL }, { "Key", "su", HANDS_C_KEY }, { "Type", "s", HANDS_C_TYPE },
     { "SetValue", "ss", HANDS_C_SETVALUE }, { "Screenshot", "siiiiu", HANDS_C_SHOT }, { "OpenApp", "s", HANDS_C_OPENAPP },
     { "OpenPath", "s", HANDS_C_OPENPATH }, { "CloseWindow", "s", HANDS_C_CLOSE }, { "AppLog", "ssu", HANDS_C_APPLOG },
+    { "SetMode", "s", HANDS_C_MODE },
 };
 
 #define COORD_MAX 65536
@@ -177,6 +179,10 @@ int handsbus_parse(const DMsg *m, HandsReq *r) {
         r->text_len = len;
         r->amount = u ? (int)u : 100;
         return 0;
+    case HANDS_C_MODE:
+        s1 = dr_str(&d, NULL);
+        if (d.err || (r->mode = hands_mode_of(s1)) < 0) return -1;
+        return 0;
     }
     return -1;
 }
@@ -212,6 +218,38 @@ static const char *err_name(int rc) {
     }
 }
 
+/* A human-mode action answers later (hands.h HANDS_E_PENDING): its call kept here until hands.c's done callback. One at a
+ * time, as hands.c runs one. */
+static struct { int on; DConn *c; DMsg m; } pend;
+
+static void answer(DConn *c, const DMsg *m, int call, int rc, int why, const char *out, const uint8_t *png, size_t plen) {
+    DBuf b;
+    dw_init(&b);
+    if (rc) dbus_error(c, m, err_name(rc), rc == HANDS_E_REFUSED ? hands_why_word(why) : hands_call_word(call));
+    else if (call == HANDS_C_SHOT) {
+        dw_bytes(&b, png, plen);
+        dw_str(&b, out ? out : "{}");
+        dbus_reply(c, m, "ays", &b);
+    } else if (call == HANDS_C_SCROLL || call == HANDS_C_KEY || call == HANDS_C_TYPE || call == HANDS_C_SETVALUE) {
+        dbus_reply(c, m, NULL, NULL);
+    } else {
+        dw_str(&b, out ? out : "{}");
+        dbus_reply(c, m, "s", &b);
+    }
+    dw_free(&b);
+}
+
+static void pend_drop(void) {
+    if (pend.on) dbus_msg_free(&pend.m);
+    memset(&pend, 0, sizeof pend);
+}
+
+static void done(const char *bus, int call, int rc, int why, const char *out) {
+    if (!pend.on || !pend.m.sender || strcmp(pend.m.sender, bus)) return;
+    answer(pend.c, &pend.m, call, rc, why, out, NULL, 0);
+    pend_drop();
+}
+
 static Caller *caller_of(const char *name);
 static void serve(DConn *c, const DMsg *m) {
     HandsReq r;
@@ -233,23 +271,21 @@ static void serve(DConn *c, const DMsg *m) {
         dw_free(&b);
         return;
     }
+    dw_free(&b);
     char *out = NULL;
     uint8_t *png = NULL;
     size_t plen = 0;
     int why = 0;
+    hands_on_done(done);
     int rc = hands_call(m->sender, &r, &out, &png, &plen, &why);
-    if (rc) dbus_error(c, m, err_name(rc), rc == HANDS_E_REFUSED ? hands_why_word(why) : hands_call_word(r.call));
-    else if (r.call == HANDS_C_SHOT) {
-        dw_bytes(&b, png, plen);
-        dw_str(&b, out ? out : "{}");
-        dbus_reply(c, m, "ays", &b);
-    } else if (r.call == HANDS_C_SCROLL || r.call == HANDS_C_KEY || r.call == HANDS_C_TYPE || r.call == HANDS_C_SETVALUE) {
-        dbus_reply(c, m, NULL, NULL);
-    } else {
-        dw_str(&b, out ? out : "{}");
-        dbus_reply(c, m, "s", &b);
-    }
-    dw_free(&b);
+    if (rc == HANDS_E_PENDING) {
+        /* answered when the cursor arrives and the action is done (done above); hands.c copied what it needs */
+        pend_drop();
+        if (dbus_msg_parse(m->raw, m->raw_len, &pend.m)) {
+            hands_stop("failed");               /* can't answer it later: nothing of it may go on */
+            dbus_error(c, m, HANDS_ERR_FAILED, hands_call_word(r.call));
+        } else { pend.on = 1; pend.c = c; }
+    } else answer(c, m, r.call, rc, why, out, png, plen);
     free(out);
     free(png);
 }
@@ -424,10 +460,12 @@ int handsbus_reply(DConn *c, const DMsg *m) {
 void handsbus_gone(const char *name) {
     Caller *k = caller_of(name);
     if (k) caller_drop(k);
+    if (pend.on && pend.m.sender && !strcmp(pend.m.sender, name)) pend_drop();
     hands_gone(name);
 }
 
 void handsbus_lost(void) {
     for (int i = 0; i < HANDSBUS_CALLERS; i++) caller_drop(&callers[i]);
+    pend_drop();
     hands_lost();
 }

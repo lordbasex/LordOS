@@ -320,6 +320,23 @@ export function layerContainer(z) {
   }
   return c;
 }
+// A node tree out of React's sight, straight on the root at zIndex z (not a layer: no content count, never in
+// hostRoots, so Hands' reader never sees it): Hands' agent cursor (sdk/handscursor.js), which lord-server moves from C.
+// make(el) builds it: el(type, style, parent) → id. Returns the root's id, 0 before render.
+export function overlayTree(z, style, make) {
+  if (!rootNode) return 0;
+  const el = (type, st, parent) => {
+    const id = lord.createNode(type);
+    applyStyle(id, {}, normalize(st || {}));
+    if (parent) lord.appendChild(parent, id);
+    return id;
+  };
+  const root = el('view', { ...style, position: 'absolute', pointerEvents: 'none', zIndex: z });
+  make(el, root);
+  lord.appendChild(rootNode, root);
+  return root;
+}
+
 // ---- the keyboard focus ring (sdk/focus.js) ----
 // A node of its own, out of React's sight, appended to the focused one: a 2 px line of `color` 1 px outside its box,
 // with its corners rounded to follow the node's own (inside the box of a node that clips what it holds, a ScrollView).
