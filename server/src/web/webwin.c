@@ -714,6 +714,7 @@ void webwin_hide(WebWin *win) {
 }
 
 int webwin_visible(WebWin *win) { return win->shown; }
+int webwin_focused(WebWin *win) { return win->focused; }
 
 void webwin_set_title(WebWin *win, const char *title) {
     snprintf(win->title, sizeof win->title, "%s", title && title[0] ? title : win->w->app.name);
@@ -1403,6 +1404,7 @@ static void kb_enter(void *d, struct wl_keyboard *k, uint32_t serial, struct wl_
     webback_set_focused(win->back, 1);
     if (!win->pb_timer) win->pb_timer = g_timeout_add(400, pb_watch, win);
     if (win->ime && win->ime->enabled) ime_send_state(win->ime);
+    web_menu_ai_focused(win->w);        /* ✨ AI's Replace waits for the keyboard (webmenu.c) */
 }
 static void kb_leave(void *d, struct wl_keyboard *k, uint32_t serial, struct wl_surface *s) {
     (void)k; (void)serial; (void)s;

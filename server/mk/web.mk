@@ -157,6 +157,15 @@ build/web-menu-check: tests/web_menu_check.c $(WEB_BACK_SRC) src/web/webback.h s
 test: build/web-menu-check
 endif
 
+# ✨ AI's Replace in a page, headless (tests/web_ai_replace_check.c): lord-web's scripts (webedit.c) on a textarea, a
+# contenteditable box and a Lexical-like editor, and their refusals; WPEPlatform only (run by tests/run_suites.sh)
+ifeq ($(LORD_WEB_BACKEND),platform)
+build/web-ai-replace-check: tests/web_ai_replace_check.c $(WEB_BACK_SRC) src/web/webback.h src/web/webedit.c src/web/webedit.h build/gen/web_backend
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(WEB_CFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/web_ai_replace_check.c $(WEB_BACK_SRC) src/web/webedit.c $(WEB_LIBS) -lm
+test: build/web-ai-replace-check
+endif
+
 # the backend alone, headless (tests/web_backend_test.c): a local page rendered and its pixels checked, a key and a
 # click that reach the page's listeners, a resize and a scale; run by tests/run_suites.sh (WebKit's sandbox: bwrap)
 build/web-backend-test: tests/web_backend_test.c $(WEB_BACK_SRC) src/web/webback.h src/web/webshm.h src/web/webframe.h src/web/webaxis.h build/gen/web_backend

@@ -2,7 +2,8 @@
 // region for (/usr/share/i18n/SUPPORTED), in each interface language, from Unicode CLDR through Node.js's ICU
 // (Intl.DisplayNames). Settings → Language & Region → Region names each row's language with it ("Basque · France
 // (eu_FR)", #239; sdk/localename.js regionLabel). A name CLDR lacks in a language falls back to the English one; a
-// code CLDR doesn't know at all is left out (the row then shows only its country and code).
+// code CLDR doesn't know at all is left out (the row then shows only its country and code). LordOS's interface
+// languages with a script ("zh-Hans", "zh-Hant") are named too, for ✨ AI's "Translate to" (sdk/writing.jsx).
 //
 //   node tools/gen-language-names.mjs [path/to/SUPPORTED]
 //
@@ -25,6 +26,8 @@ if (fs.existsSync(supported)) {
   console.error(`gen-language-names: no ${supported} and no ${enFile}`);
   process.exit(1);
 }
+// and LordOS's own interface languages with a script ("zh-Hans", "zh-Hant"): ✨ AI's "Translate to" names them
+codes.push(...fs.readdirSync(dir).filter((l) => l.includes('-') && fs.existsSync(path.join(dir, l, 'meta.json'))));
 codes = [...new Set(codes)].sort();
 
 const nameIn = (lang, code) => {

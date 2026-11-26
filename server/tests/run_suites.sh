@@ -1095,6 +1095,9 @@ EOF
     if [ -x build/web-menu-check ] && have bwrap && have xdg-dbus-proxy && ls /usr/share/hunspell/*.dic >/dev/null 2>&1; then
         run "web-menu-check (spelling suggestions in the context menu)" build/web-menu-check
     else skip "web-menu-check" "WPEPlatform (build/web-menu-check), bubblewrap, xdg-dbus-proxy and a hunspell dictionary"; fi
+    if [ -x build/web-ai-replace-check ] && have bwrap && have xdg-dbus-proxy; then
+        run "web-ai-replace-check (✨ AI's Replace in a textarea, a contenteditable box and a Lexical-like editor)" build/web-ai-replace-check
+    else skip "web-ai-replace-check" "WPEPlatform (build/web-ai-replace-check), bubblewrap and xdg-dbus-proxy"; fi
     # (in development, docs/WEBAPPS.md "Calls") a Chrome profile's Client Hints and navigator.userAgentData against
     # Chrome's own, SharedArrayBuffer only when cross-origin isolated, the call log; with an engine that has WebRTC, two
     # peer connections in one page exchanging audio and video (Opus with VP8, then H.264). WPEPlatform only

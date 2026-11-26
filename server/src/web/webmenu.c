@@ -27,9 +27,11 @@
  * ✨ AI (docs/AI.md "Writing"): with a selection that isn't cut (never a password field's: the page script reports
  * none), the menu also carries the selection, cleaned (webai_clean, at most 4,000 characters), for the shell's own
  * Writing panel; lord-web keeps the selection as it was. The shell's Replace comes back as WriteReplace(text)
- * (only from lord-server, checked by pid): the text goes in through WebKit's InsertText only when the field that had
- * that selection is still focused, still an editable field that isn't a password, and still has exactly that
- * selection (web_menu_ai_replace). */
+ * (only from lord-server, checked by pid). It waits until this window has the keyboard back (the shell's panel held
+ * it), then the text goes in as a paste would (webedit.h WEBAI_REPLACE_JS: document.execCommand("insertText"), so the
+ * page's own editor, WhatsApp's Lexical among them, takes it), only when the field the menu marked is still focused,
+ * still an editable field that isn't a password, and still has exactly that selection (web_menu_ai_replace); a
+ * refusal is logged with one word of a closed list (webai_refusal). */
 #include "web.h"
 #include "webwin.h"
 #include "webdl.h"
@@ -253,50 +255,77 @@ static char *ai_orig;               /* the selection as the page had it, when th
 
 static void ai_forget(void) { if (ai_orig) { memset(ai_orig, 0, strlen(ai_orig)); g_free(ai_orig); ai_orig = NULL; } }
 
-/* in the page script's world: the focused field is a text field (not a password) or editable content, the window has
- * the focus, and its selection is exactly the one the menu had; then the text goes in as typed ("done"), or "ok" when
- * the page's insertText did nothing (WebKit's own InsertText then), else "no" */
-static const char AI_CHECK[] =
-    "const a = document.activeElement;\n"
-    "if (!a || !document.hasFocus()) return 'no';\n"
-    "const TEXT = ['', 'text', 'search', 'url', 'tel', 'email'];\n"
-    "let sel = null;\n"
-    "if (a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && TEXT.includes(a.type))) {\n"
-    "  if (a.readOnly || a.disabled) return 'no';\n"
-    "  sel = a.value.slice(a.selectionStart, a.selectionEnd);\n"
-    "} else if (a.isContentEditable) sel = String(getSelection() || '');\n"
-    "if (sel === null || sel !== orig || !sel) return 'no';\n"
-    "return document.execCommand('insertText', false, text) ? 'done' : 'ok';\n";
+/* Replace waits for the keyboard: while the shell's panel is open the window has lost it (the compositor gives the
+ * keys to LordOS), and WebKit then treats the page as unfocused. The panel closes on Replace and the keyboard comes
+ * back to this window; the text goes in then (web_menu_ai_focused), or is dropped after AI_FOCUS_WAIT_MS. */
+#define AI_FOCUS_WAIT_MS 3000
+static char *ai_pending;            /* the text Replace brought, waiting for the keyboard */
+static guint ai_wait;
 
 typedef struct { Web *w; char *text; } AiCall;
+
+static void ai_wipe(char **t) { if (*t) { memset(*t, 0, strlen(*t)); g_free(*t); *t = NULL; } }
 
 static void on_ai_check(GObject *o, GAsyncResult *res, gpointer d) {
     AiCall *ac = d;
     GError *e = NULL;
     JSCValue *v = webkit_web_view_call_async_javascript_function_finish(WEBKIT_WEB_VIEW(o), res, &e);
     char *r = v && jsc_value_is_string(v) ? jsc_value_to_string(v) : NULL;
-    if (r && !strcmp(r, "ok") && ac->w->view) webkit_web_view_execute_editing_command_with_argument(ac->w->view, "InsertText", ac->text);
-    if (!r || (strcmp(r, "ok") && strcmp(r, "done"))) web_note("✨ AI's Replace refused: the field lost the focus or its selection changed");
+    const char *why = webai_refusal(r);
+    if (r && !strcmp(r, "fallback") && ac->w->view) {
+        /* the page's editor took nothing from the paste-like insertion: WebKit's own InsertText, as typing */
+        webkit_web_view_execute_editing_command_with_argument(ac->w->view, "InsertText", ac->text);
+        web_note("✨ AI's Replace: inserted as typing (fallback)");
+    } else if (why) web_note("✨ AI's Replace refused: %s (%s)", r && strlen(r) < 24 ? r : "no-answer", why);
     g_free(r);
     if (v) g_object_unref(v);
     g_clear_error(&e);
-    memset(ac->text, 0, strlen(ac->text));
-    g_free(ac->text);
+    ai_wipe(&ac->text);
     g_free(ac);
+}
+
+static void ai_run(Web *w, char *text, char *orig) {
+    GVariantDict args;
+    g_variant_dict_init(&args, NULL);
+    g_variant_dict_insert(&args, "orig", "s", orig);
+    g_variant_dict_insert(&args, "text", "s", text);
+    AiCall *ac = g_new0(AiCall, 1);
+    ac->w = w;
+    ac->text = text;
+    webkit_web_view_call_async_javascript_function(w->view, WEBAI_REPLACE_JS, -1, g_variant_dict_end(&args), WEBSELECT_WORLD, NULL, NULL, on_ai_check, ac);
+}
+
+static void ai_wait_stop(void) { if (ai_wait) { g_source_remove(ai_wait); ai_wait = 0; } }
+
+static gboolean ai_wait_over(gpointer d) {
+    (void)d;
+    ai_wait = 0;
+    ai_wipe(&ai_pending);
+    ai_forget();
+    web_note("✨ AI's Replace refused: no-focus (%s)", webai_refusal("no-focus"));
+    return G_SOURCE_REMOVE;
+}
+
+void web_menu_ai_focused(Web *w) {
+    if (!ai_pending) return;
+    ai_wait_stop();
+    char *text = ai_pending, *orig = ai_orig;
+    ai_pending = NULL;
+    ai_orig = NULL;                 /* one Replace per menu */
+    if (!w->view || !orig) { ai_wipe(&text); ai_wipe(&orig); web_note("✨ AI's Replace refused: no-menu (%s)", webai_refusal("no-menu")); return; }
+    ai_run(w, text, orig);
+    ai_wipe(&orig);
 }
 
 void web_menu_ai_replace(Web *w, const char *text) {
     char *clean = g_malloc(WEBAI_MAX + 1);
-    if (!w->view || !ai_orig || webai_clean(text, clean)) { g_free(clean); web_note("✨ AI's Replace refused: nothing to replace"); return; }
-    GVariantDict args;
-    g_variant_dict_init(&args, NULL);
-    g_variant_dict_insert(&args, "orig", "s", ai_orig);
-    g_variant_dict_insert(&args, "text", "s", clean);
-    AiCall *ac = g_new0(AiCall, 1);
-    ac->w = w;
-    ac->text = clean;
-    ai_forget();                    /* one Replace per menu */
-    webkit_web_view_call_async_javascript_function(w->view, AI_CHECK, -1, g_variant_dict_end(&args), WEBSELECT_WORLD, NULL, NULL, on_ai_check, ac);
+    if (!w->view || !ai_orig) { g_free(clean); web_note("✨ AI's Replace refused: no-menu (%s)", webai_refusal("no-menu")); return; }
+    if (webai_clean(text, clean)) { g_free(clean); web_note("✨ AI's Replace refused: bad-text (%s)", webai_refusal("bad-text")); return; }
+    ai_wait_stop();
+    ai_wipe(&ai_pending);
+    ai_pending = clean;
+    if (w->win && webwin_focused(w->win)) web_menu_ai_focused(w);
+    else ai_wait = g_timeout_add(AI_FOCUS_WAIT_MS, ai_wait_over, NULL);
 }
 
 /* ---- the menu ---- */
@@ -407,8 +436,14 @@ static void show(Web *w, const WebMenuAt *a) {
     char *ai = g_malloc(WEBAI_MAX + 1);
     ai[0] = 0;
     ai_forget();
+    ai_wait_stop();                 /* a Replace still waiting for the keyboard was for the last menu */
+    ai_wipe(&ai_pending);
     if (text && !a->text_cut && webai_clean(text, ai)) ai[0] = 0;
-    if (ai[0] && (at & WEBMENU_AT_EDITABLE)) ai_orig = g_strdup(text);
+    if (ai[0] && (at & WEBMENU_AT_EDITABLE)) {
+        ai_orig = g_strdup(text);
+        /* the field it is in, for Replace (WEBAI_MARK_JS): the focused one, as the page reported this right click */
+        if (w->view) webkit_web_view_call_async_javascript_function(w->view, WEBAI_MARK_JS, -1, NULL, WEBSELECT_WORLD, NULL, NULL, NULL, NULL);
+    }
     MenuCall *mc = g_new0(MenuCall, 1);
     mc->w = w;
     /* WebKit's spelling items of this right click (a text field's), taken over */

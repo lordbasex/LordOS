@@ -14,6 +14,8 @@ void webwin_attach(WebWin *win);
 void webwin_show(WebWin *win, const char *activation_token);
 void webwin_hide(WebWin *win);
 int webwin_visible(WebWin *win);
+/* the window has the keyboard (the compositor's enter, not yet its leave) */
+int webwin_focused(WebWin *win);
 void webwin_set_title(WebWin *win, const char *title);
 void webwin_set_cursor_hint(WebWin *win, int link, int text);
 /* the person pressed a key, clicked or touched the window less than a few seconds ago and it has the keyboard: what a
