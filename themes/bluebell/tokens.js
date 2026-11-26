@@ -95,6 +95,11 @@ export function makeTheme({ mode, accent }) {
     listHead: dark ? 'linear-gradient(180deg, #343a44, #2b3038)' : 'linear-gradient(180deg, #ffffff, #ebeadb)',
     selectBg: dark ? '#2f5aa8' : '#316ac5',
     selectText: '#ffffff',
+    // the start menu (components/StartMenu.jsx)
+    startPanel: dark ? '#23272e' : '#ffffff',
+    startLeft: dark ? '#23272e' : '#ffffff',
+    startRight: dark ? '#1f2b40' : '#d3e5fa',
+    startPlaceText: dark ? '#cfe0ff' : '#0a246a',
   };
 }
 

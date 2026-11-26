@@ -57,6 +57,8 @@
     const start = textId(sdk.t('shell.bluebell.start'));
     if (start) click(start);
     await sleep(1200);
+    step('start menu: the two columns and the footer', !!textId('Alex Demo') && !!textId(sdk.t('files.place.documents')) && !!textId(sdk.t('shell.menu.logout'))
+      && !!textId(sdk.t('shell.menu.shutdown')) && !!textId(sdk.t('shell.classic.allApps')));
     await shot('start-menu');
     globalThis.__lordKey(1, 1, 'Escape', '', '', 0); globalThis.__lordKey(1, 0, 'Escape', '', '', 0);
     await sleep(600);
@@ -87,6 +89,10 @@
     await shot('files-own-layout');
     sdk.settings.set({ themeParts: { ...(sdk.settings.get().themeParts || {}), layouts: true } });
     await sleep(500);
+    // the demo identity is the only one on screen (pre.js)
+    const R = globalThis.__sceneReal || {};
+    const leaks = shownTexts().filter((x) => [R.user, R.fullName, R.hostname].some((v) => v && v.length > 2 && x.includes(v)));
+    step('privacy: no real account or host name on screen', !leaks.length && lord.system.info().hostname === 'demo-pc', leaks.slice(0, 3).length ? 'leaked' : '');
     log('done');
   })();
 })();

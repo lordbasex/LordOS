@@ -249,7 +249,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Sounds, Font, App layouts; `settings.themeParts`), so someone can keep a theme's frames and use LordOS's icons.
   - **Lord Bluebell** (`themes/bluebell`), the demo: a tribute to the desktops of 2001 with glossy blue title bars with
     rounded tops, a green start button with our own bluebell mark on a blue taskbar, quick launch and a button per
-    window, an original sky when no picture is chosen, light and dark; its pack has our own folder, page and round-arrow
+    window, a two-column start menu of that era (the person's picture and name in a blue header, pinned apps and "All
+    apps ▸" in a white column, Documents, Pictures, Music, the computer, the network, Settings, Help and Search in a
+    light-blue one, and Log Out and Shut Down… in the footer, LordOS's own session actions), an original sky when no picture is chosen, light and dark; its pack has our own folder, page and round-arrow
     icons, white pointers with a black outline, four short tunes and DejaVu Sans; and Files is that era's explorer
     (Back/Forward/Up, Search, Views, an address bar with Go, the task pane with "File and Folder Tasks", "Other Places"
     and "Details", icons or details, a plain status bar and context menu), and Settings a control panel of that era (a
@@ -258,7 +260,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `shell.bluebell.start`). Tests: `server/tests/appskin_test.mjs` (60 checks), `server/tests/files_skin_scene.mjs`
     (Files with every region a stub: 31 checks), `server/tests/settings_skin_scene.mjs` (Settings with both regions
     stubbed: 17 checks; all three in `make test`) and `server/tests/bluebell_scene` (screenshots,
-    `app_scene_headless.sh bluebell_scene OUT bluebell en light|dark`).
+    `app_scene_headless.sh bluebell_scene OUT bluebell en light|dark`; it runs with a demo account and computer name, and
+    checks that the real ones appear nowhere on screen).
 - **Settings → Wallpaper is a gallery, with three new collections of still pictures: Abstract, Epic and Anime.** The
   approved redesign (apps/settings/WallpaperGallery.jsx) reorganises the page; nothing it had goes away.
   - *What shows now*, at the top: a large picture with its name, collection and license, and three controls: **For**

@@ -7,7 +7,7 @@
 //   components/Taskbar.jsx the green start button, quick launch, a button per window, the tray and the clock
 //   skins/files.jsx        Files as that era's explorer: toolbar, address bar with Go, the task pane, icons or details
 //
-// The start menu, quick settings and menus are Lord Classic's own components with this theme's tokens. The style pack
+// Quick settings and menus are Lord Classic's own components with this theme's tokens; the start menu is its own. The style pack
 // below gives the icons, white pointers with a black outline, a sound scheme of plain notes and an installed font
 // (DejaVu Sans, of fonts-dejavu-core, which LordOS recommends): each part can be turned off in Settings → Appearance.
 import {
@@ -21,7 +21,7 @@ import { useEffect, useRef, useState, Fragment } from 'react';
 import { makeTheme, sky } from './tokens.js';
 import { Window, TITLE_H, MENU_H, EDGE } from './components/Window.jsx';
 import { Taskbar, BAR_H } from './components/Taskbar.jsx';
-import { StartMenu, startBox } from '../classic/components/StartMenu.jsx';
+import { StartMenu } from './components/StartMenu.jsx';
 import { QuickSettings } from '../classic/components/QuickSettings.jsx';
 import { Menu } from '../classic/components/Menu.jsx';
 import { fileIcons, toolbarIcons, appIcons } from './glyphs.jsx';
@@ -98,7 +98,6 @@ function App() {
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { setPanel(null); setDesk(null); } }), []);
   const pd = panel ? bars.find((d) => d.id === panel.display) : null;
   const isOnBar = (x, y) => bars.some((m) => x >= m.x && x < m.x + m.w && y >= m.y + m.h - BAR_H && y < m.y + m.h);
-  const box = pd ? (() => { const b = startBox('bottom', 'start', pd); return { ...b, width: Math.min(b.width, 520), top: b.top + 12 }; })() : null;
   const dark = s.mode === 'dark';
   return (
     <ThemeProvider tokens={t}>
@@ -121,7 +120,7 @@ function App() {
             </View>
           ))}
         </Layer>
-        {panel?.name === 'start' && pd && <Layer name="overlay"><StartMenu key={pd.id} t={t} box={box} onClose={() => setPanel(null)} isOnBar={isOnBar} /></Layer>}
+        {panel?.name === 'start' && pd && <Layer name="overlay"><StartMenu key={pd.id} t={t} font={font} display={pd} barH={BAR_H} onClose={() => setPanel(null)} /></Layer>}
         {panel?.name === 'quick' && pd && (
           <Layer name="popover">
             <QuickSettings key={pd.id} t={t} at={{ pos: { left: pd.x + pd.w - 372, bottom: screen.height - (pd.y + pd.h - BAR_H - 8) }, top: pd.y + pd.h - BAR_H - 8 - 420, left: pd.x + pd.w - 372, height: 420 }}
