@@ -143,6 +143,7 @@ function AboutBanner({ model }) {
 }
 
 export const appSkins = {
+  fonts: { sidebar: SearchPane },
   characters: { toolbar: CommandBar, sidebar: (p) => <ListPane {...p} width={180} /> },
   help: { sidebar: SearchPane },
   about: { banner: AboutBanner },

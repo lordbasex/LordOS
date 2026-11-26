@@ -604,6 +604,7 @@ Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one ski
 | About | `banner` (`{ version, build, code, codeNote, tagline, rows: [{ label, value }] }`; one action, `systemReport()`) | every number it reads and the rest of the window | `about_skin_scene.mjs` (8 checks) |
 | Help | `sidebar` (list pane with the search: the tour and the articles by section, or the search's results) | the articles and the tour | `help_skin_scene.mjs` (9 checks) |
 | Characters | `toolbar` (command bar: the emoji and symbols tabs), `sidebar` (list pane: the emoji groups or the symbol blocks) | the grid, the search, the skin tones and the copying | `characters_skin_scene.mjs` (12 checks) |
+| Fonts | `sidebar` (list pane with the search: the collections and the families) | the samples, installing and removing | `fonts_skin_scene.mjs` (9 checks) |
 <!-- shared-shape apps -->
 
 A region drawn in the SDK's floating layer (Screenshots' capture bar, a picture-in-picture window) is outside the theme's
