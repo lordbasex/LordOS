@@ -28,7 +28,7 @@ build/lord-llm-abi5: $(LLM_LAUNCHER_SRC) src/llm/llmjail.h src/sec/cgroup.h
 build/lord-llm-norule: $(LLM_LAUNCHER_SRC) src/llm/llmjail.h src/sec/cgroup.h
 	$(CC) $(CPPFLAGS) -DLLMJAIL_FAIL_MODEL_RULE $(CFLAGS) $(WARN) -std=c11 -o $@ $(LLM_LAUNCHER_SRC)
 	chmod g-w $@
-LLM_TEST_SRC := tests/llm_engine_test.c src/llm/engine.c src/llm/writing.c src/llm/facts.c src/llm/evidence.c src/llm/blockwatch.c src/sec/json.c src/pkg/crypto.c
+LLM_TEST_SRC := tests/llm_engine_test.c src/llm/llmjail.c src/llm/engine.c src/llm/writing.c src/llm/facts.c src/llm/evidence.c src/llm/blockwatch.c src/sec/json.c src/pkg/crypto.c
 build/llm-engine-test: $(LLM_TEST_SRC) src/llm/writing.h src/llm/blockwatch.h src/llm/engine.h src/llm/llmjail.h src/sec/json.h build/lord-llm build/llm-fake-engine build/lord-llm-abi5 build/lord-llm-norule
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ $(LLM_TEST_SRC) -lpthread
 	./$@ || { rm -f $@; exit 1; }

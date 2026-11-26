@@ -26,7 +26,8 @@
 #endif
 
 /* the engine's arguments: the model through its descriptor, the socket in the runtime folder (the working directory),
- * two threads, a 4096-token context, one request at a time, no web interface, no prompt cache in RAM, no network for
+ * the processor's threads (-t and -tb: the "2" here is replaced by the person's count, llmjail_argv), two HTTP
+ * threads, a 4096-token context, one request at a time, no web interface, no prompt cache in RAM, no network for
  * downloads, no thinking (the answer is a short JSON); then where it computes: the processor only (no GPU), or the first
  * Vulkan or CUDA device with the layers that fit in its free memory (-ngl auto: llama.cpp's --fit, on by default, keeps
  * a 1 GB margin and leaves the rest of the layers on the processor) */
@@ -37,6 +38,31 @@ static const char *const argv_cpu[] = { LJ_COMMON, "-ngl", "0", "-dev", "none", 
 static const char *const argv_vulkan[] = { LJ_COMMON, "-ngl", "auto", "-dev", "Vulkan0", "-lv", "4", NULL };
 static const char *const argv_cuda[] = { LJ_COMMON, "-ngl", "auto", "-dev", "CUDA0", "-lv", "4", NULL };
 const char *const *const LLMJAIL_ARGVS[3] = { argv_cpu, argv_vulkan, argv_cuda };
+
+int llmjail_threads_parse(const char *s, int cpus) {
+    if (!s || !*s || strlen(s) > 3) return -1;
+    int n = 0;
+    for (const char *p = s; *p; p++) {
+        if (*p < '0' || *p > '9') return -1;
+        n = n * 10 + (*p - '0');
+    }
+    if (s[0] == '0' || n < 1 || n > cpus || n > LLMJAIL_THREADS_MAX) return -1;
+    return n;
+}
+
+int llmjail_argv(int backend, int threads, char *buf, size_t bufn, const char **out, size_t max) {
+    if (backend < 0 || backend > LLMJAIL_CUDA || threads < 1 || threads > LLMJAIL_THREADS_MAX || bufn < 4) return -1;
+    snprintf(buf, bufn, "%d", threads);
+    const char *const *a = LLMJAIL_ARGVS[backend];
+    size_t n = 0;
+    for (size_t i = 0; a[i]; i++) {
+        if (n + 1 >= max) return -1;
+        /* the value after -t and -tb (never --threads-http's) */
+        out[n++] = i > 0 && (!strcmp(a[i - 1], "-t") || !strcmp(a[i - 1], "-tb")) ? buf : a[i];
+    }
+    out[n] = NULL;
+    return 0;
+}
 
 int llmjail_backend(const char *word) {
     if (!word) return -1;

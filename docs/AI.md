@@ -121,10 +121,28 @@ trixie and sid contents, 2026-11-26).
 
 ### The engine's threads
 
-The engine runs with `-t 2 -tb 2` (`llmjail.c`) inside a cgroup capped at two cores (`launcher.c`, `cpu_percent =
-200`), Sentinela's low-priority design. More threads only help with the cap raised too; that is `feat/llm-gpu`'s
-files and a decision for the maintainer. Measured with `build/writing-real-check` (16 jobs, Qwen3 1.7B, an i9-10900,
-no cgroup, load ≈ 2): 2 threads 106 s (6.1 s a job), 4 threads 61 s (3.4 s), 8 threads 41 s (2.0 s).
+The Brain's processor threads are the person's (asked by the maintainer on 2026-11-26): **Settings → AI → Where they
+run → "Procesador: núcleos para el Cerebro"**, a slider under the Brain's Automático / Procesador / Placa de video, from
+**Automático (N)** (half the online cores, at least 1, at most 16: 10 on a 20-thread i9-10900, 4 on a Raspberry Pi 5)
+to every online core, with the hint that more cores answer faster but load the computer more. It counts on the
+processor and for the layers a GPU couldn't take (a partial offload); with every layer on the card it barely matters.
+
+- **The setting**: `settings.brain.cpuThreads`, 0 automatic (the default; anything that isn't a whole number ≥ 0 reads
+  as 0), else a count. `setBrainThreads` → `lord.sentinela.threads(n)` → `llm_set_threads` (`engine.c`), sent once the
+  slider rests (700 ms; at start at once). A count above the cores is clamped to them (a setting made on a bigger
+  computer); the state (`lord.sentinela.state()`) gives `cpus`, `threadsAuto`, `threads` (the next start's) and
+  `runThreads` (the running engine's).
+- **lord-llm** gets the count in one more environment word, `LORD_LLM_THREADS=<n>`, and checks it on its side
+  (`llmjail_threads_parse`): digits only, no sign, space or leading zero, 1..its online cores (at most 64, the most
+  lord-sessiond writes in `cpu.max`); anything else exits 2 before the sandbox, none at all is automatic. The engine's
+  `-t` and `-tb` are that count (`llmjail_argv`: the backend's fixed list with only those two values written in;
+  `--threads-http` stays 2) and `lordos-sentinela.scope`'s `cpu.max` is 100 % per thread (`launcher.c`). Nice 15,
+  `SCHED_BATCH` and idle I/O stay, so the desktop still comes first.
+- **A change** restarts an idle engine at once (same model and backend, by the engine's thread; its idle time keeps
+  counting from its last answer) and a busy one at its next job; the same effective count restarts nothing.
+- Measured with `build/writing-real-check` (16 jobs, Qwen3 1.7B, an i9-10900, no cgroup, load ≈ 2): 2 threads 106 s
+  (6.1 s a job), 4 threads 61 s (3.4 s), 8 threads 41 s (2.0 s). Before 0.8.9.6.2 the engine always ran with
+  `-t 2 -tb 2` in a scope of two cores.
 
 ## Capabilities
 
@@ -152,7 +170,8 @@ works, and its actions.
 
 The space the models take (measured on disk: `/usr/share/lordos/voice`, `~/.local/share/lordos/voice`,
 `/usr/share/lordos/llm`, Tesseract's `tessdata`), where they run (the Voice's real Auto / CPU / GPU setting from
-`voice.json`; the Brain's own Auto / CPU / GPU, below, with what the engine really used; Vision on the processor) and the
+`voice.json`; the Brain's own Auto / CPU / GPU, below, with what the engine really used, and its processor cores ("The
+engine's threads"); Vision on the processor) and the
 privacy note: no model uses the network.
 
 ## The Brain on the GPU (in development, awaiting the maintainer's approval)
@@ -197,7 +216,7 @@ reason (chosen, no usable card, the card couldn't start it, the card ran out of 
 Intel Core i9-10900 (10 cores), AMD Radeon RX 580 8 GB (RADV, Mesa 25.0.7), Debian 13, LordOS's llama.cpp 0.7.0
 (b11669). `llama-bench -p 512 -n 128 -r 3`, tokens per second (prompt reading / generating):
 
-| Model | Processor, 2 threads (the engine's setting) | Processor, 8 threads | RX 580, Vulkan (every layer) |
+| Model | Processor, 2 threads (the engine's setting until the cores slider) | Processor, 8 threads | RX 580, Vulkan (every layer) |
 |---|---|---|---|
 | Qwen3 1.7B Q4_K_M | 72.7 / 20.1 | 259.8 / 25.0 | **1038.4 / 110.4** |
 | Qwen3 4B Q4_K_M | 29.4 / 8.2 | 95.3 / 9.8 | **422.6 / 51.8** |

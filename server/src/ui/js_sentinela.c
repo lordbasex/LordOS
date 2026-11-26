@@ -18,10 +18,13 @@
  *   blockEvents()                  what the blocklist ended since the last call: [{ id, name, pid, at }]
  *   take(id)                       the job's result once (an object, see engine.h) or null while it runs
  *   state()                        { state: 'off'|'starting'|'ready'|'busy', model, pid, idleMs, queued, (0.8.9.6.2) mode,
- *                                  gpus: { vulkan, cuda }, backend, device, layers, layersTotal, fallback } (engine.h)
+ *                                  gpus: { vulkan, cuda }, backend, device, layers, layersTotal, fallback, cpus,
+ *                                  threadsAuto, threads, runThreads } (engine.h)
  *   stop()                         stops the engine now and drops what is queued
  *   backend(mode)                  (0.8.9.6.2) where the engine computes: 'auto' | 'cpu' | 'gpu' (Settings → AI); true,
  *                                  or throws sys.badArgument
+ *   threads(n)                     (0.8.9.6.2) the engine's processor threads: 0 automatic, else 1..cpus (more is
+ *                                  clamped; Settings → AI); true, or throws sys.badArgument
  *
  * lord.writing (0.8.9.6.2, docs/AI.md "Writing"): "✨ AI" on selected text, for the shell's text fields only.
  *   start(model, action, target, text)  a job id: action "fix" | "improve" | "shorter" | "translate" (target: an
@@ -189,6 +192,15 @@ static JSValue f_backend(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return JS_TRUE;
 }
 
+static JSValue f_threads(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    double d;
+    if (argc < 1 || !JS_IsNumber(argv[0]) || JS_ToFloat64(c, &d, argv[0]) || d != d || d < 0 || d > 4096 || d != (int)d)
+        return js_throw_code(c, "sys.badArgument", NULL);
+    if (llm_set_threads((int)d)) return js_throw_code(c, "sys.badArgument", NULL);
+    return JS_TRUE;
+}
+
 static JSValue w_start(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 4) return js_throw_code(c, "sys.badArgument", NULL);
@@ -252,6 +264,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("state", 0, f_state),
     JS_CFUNC_DEF("stop", 0, f_stop),
     JS_CFUNC_DEF("backend", 1, f_backend),
+    JS_CFUNC_DEF("threads", 1, f_threads),
 };
 
 void js_sentinela_register(JSContext *c, JSValue lord) {

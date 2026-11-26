@@ -4,7 +4,9 @@
  * socket 0600 in a 0700 folder and no TCP port, every network and file escape refused inside (TCP, UDP, IPv6, netlink,
  * packet, unix datagram, connect, /etc, /home, /tmp, exec, a signal outside, namespaces), its own network namespace,
  * the model read through its descriptor, the engine stopped after it idles, a missing model, bad arguments, and the
- * facts of a process (package from dpkg's lists, the /usr merge, where it lives, its parents).
+ * facts of a process (package from dpkg's lists, the /usr merge, where it lives, its parents), and (0.8.9.6.2) the
+ * engine's processor threads: "automatic", the clamping, the argument list per value, lord-llm refusing a bad count, an
+ * idle engine restarted with the new one.
  *   build/llm-engine-test                     the checks above
  *   build/llm-engine-test --real <models folder> <id> [summary file] [system file]
  *       two real analyses (cold, then warm) with /usr/bin/llama-server and <folder>/<id>.gguf, with their timings and
@@ -12,6 +14,7 @@
 #include "../src/llm/engine.h"
 #include "../src/llm/blockwatch.h"
 #include "../src/llm/writing.h"
+#include "../src/llm/llmjail.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -212,6 +215,146 @@ static char *analyze_state(const char *model, char *jail, size_t jn, const char 
     return llm_state_json();
 }
 
+/* (0.8.9.6.2) the Brain's cores: the pure parts (automatic, clamping, LORD_LLM_THREADS's check, the argument lists) */
+static void threads_pure(void) {
+    CHECK(llmjail_threads_auto(1) == 1 && llmjail_threads_auto(2) == 1 && llmjail_threads_auto(3) == 1 && llmjail_threads_auto(8) == 4 &&
+          llmjail_threads_auto(20) == 10 && llmjail_threads_auto(32) == 16 && llmjail_threads_auto(64) == 16, "automatic: half, 1..16");
+    CHECK(llmjail_threads_for(0, 8) == 4 && llmjail_threads_for(0, 1) == 1 && llmjail_threads_for(3, 8) == 3 && llmjail_threads_for(8, 8) == 8,
+          "a setting in range is used");
+    CHECK(llmjail_threads_for(9, 8) == 8 && llmjail_threads_for(1000, 4) == 4 && llmjail_threads_for(100, 200) == LLMJAIL_THREADS_MAX &&
+          llmjail_threads_for(5, 0) == 1 && llmjail_threads_for(-1, 8) == -1, "clamped to the cores (and to 64)");
+    int cpus = llmjail_cpus();
+    CHECK(cpus >= 1 && cpus <= LLMJAIL_THREADS_MAX && cpus == (sysconf(_SC_NPROCESSORS_ONLN) > 64 ? 64 : (int)sysconf(_SC_NPROCESSORS_ONLN)),
+          "online cores %d", cpus);
+    CHECK(llmjail_threads_parse("4", 8) == 4 && llmjail_threads_parse("1", 8) == 1 && llmjail_threads_parse("8", 8) == 8 &&
+          llmjail_threads_parse("16", 16) == 16, "a plain count in 1..cores");
+    static const char *const bad[] = { "0", "9", "04", "+4", "-1", " 4", "4 ", "4\n", "", "abc", "4a", "0x4", "1000", "65", NULL };
+    for (const char *const *b = bad; *b; b++) CHECK(llmjail_threads_parse(*b, *b[0] == '6' ? 100 : 8) == -1, "LORD_LLM_THREADS \"%s\" refused", *b);
+    CHECK(llmjail_threads_parse(NULL, 8) == -1, "no value refused by the parser");
+    static const char *const devs[3] = { "none", "Vulkan0", "CUDA0" };
+    static const int counts[] = { 1, 2, 4, 7, 16, 64 };
+    for (int be = 0; be < 3; be++) {
+        for (size_t c = 0; c < sizeof counts / sizeof counts[0]; c++) {
+            char buf[8], want[8];
+            const char *a[LLMJAIL_ARGV_MAX];
+            snprintf(want, sizeof want, "%d", counts[c]);
+            int ok = !llmjail_argv(be, counts[c], buf, sizeof buf, a, LLMJAIL_ARGV_MAX);
+            int t = 0, tb = 0, http = 0, dev = 0, n = 0, same = ok;
+            for (; ok && a[n]; n++) {
+                if (a[n + 1] && !strcmp(a[n], "-t")) t = !strcmp(a[n + 1], want);
+                if (a[n + 1] && !strcmp(a[n], "-tb")) tb = !strcmp(a[n + 1], want);
+                if (a[n + 1] && !strcmp(a[n], "--threads-http")) http = !strcmp(a[n + 1], "2");
+                if (a[n + 1] && !strcmp(a[n], "-dev")) dev = !strcmp(a[n + 1], devs[be]);
+                /* everything else as the fixed list */
+                if (a[n] != buf && (!LLMJAIL_ARGVS[be][n] || strcmp(a[n], LLMJAIL_ARGVS[be][n]))) same = 0;
+            }
+            CHECK(ok && t && tb && http && dev && same && !LLMJAIL_ARGVS[be][n] && !strcmp(a[0], "llama-server"),
+                  "backend %d, %d threads: -t %s -tb %s, the rest fixed", be, counts[c], want, want);
+        }
+    }
+    char buf[8];
+    const char *a[LLMJAIL_ARGV_MAX];
+    CHECK(llmjail_argv(0, 0, buf, sizeof buf, a, LLMJAIL_ARGV_MAX) && llmjail_argv(0, 65, buf, sizeof buf, a, LLMJAIL_ARGV_MAX) &&
+          llmjail_argv(3, 2, buf, sizeof buf, a, LLMJAIL_ARGV_MAX) && llmjail_argv(-1, 2, buf, sizeof buf, a, LLMJAIL_ARGV_MAX) &&
+          llmjail_argv(0, 2, buf, sizeof buf, a, 4) && llmjail_argv(0, 2, buf, 2, a, LLMJAIL_ARGV_MAX), "argv: bad count, backend or room refused");
+}
+
+/* lord-llm itself: a LORD_LLM_THREADS that isn't a plain count in 1..its cores stops it before anything (exit 2) */
+static void threads_launcher(const char *launcher, const char *model, const char *rtdir, const char *engine) {
+    char over[16];
+    snprintf(over, sizeof over, "%d", llmjail_cpus() + 1);
+    const char *bad[] = { "0", "-1", "abc", " 2", "2 ", "02", "999999", over, "", NULL };
+    for (const char *const *b = bad; *b; b++) {
+        int perr[2];
+        if (pipe(perr)) return;
+        pid_t k = fork();
+        if (k == 0) {
+            /* the pipe's ends may be 3 and 4: stderr first, everything above 5 before the dup2s */
+            if (dup2(perr[1], 2) < 0) _exit(99);
+            close(perr[0]);
+            close(perr[1]);
+            int m = fcntl(open(model, O_RDONLY), F_DUPFD, 10), d = fcntl(open(rtdir, O_RDONLY | O_DIRECTORY), F_DUPFD, 10),
+                e = fcntl(open(engine, O_PATH), F_DUPFD, 10);
+            if (m < 0 || d < 0 || e < 0 || dup2(m, 3) < 0 || dup2(d, 4) < 0 || dup2(e, 5) < 0) _exit(99);
+            char env[64];
+            snprintf(env, sizeof env, "LORD_LLM_THREADS=%s", *b);
+            char *envp[] = { "LORD_LLM_BACKEND=cpu", env, NULL };
+            char *argv[] = { "lord-llm", NULL };
+            execve(launcher, argv, envp);
+            _exit(98);
+        }
+        close(perr[1]);
+        char out[256] = "";
+        ssize_t n = read(perr[0], out, sizeof out - 1);
+        out[n > 0 ? n : 0] = 0;
+        close(perr[0]);
+        int st = 0;
+        waitpid(k, &st, 0);
+        CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 2 && strstr(out, "bad thread count"), "lord-llm refuses LORD_LLM_THREADS=\"%s\" (%d: %s)", *b,
+              WIFEXITED(st) ? WEXITSTATUS(st) : -1, out);
+    }
+}
+
+static int state_int(const char *st, const char *key) {
+    char k[40];
+    snprintf(k, sizeof k, "\"%s\":", key);
+    const char *p = st ? strstr(st, k) : NULL;
+    return p ? atoi(p + strlen(k)) : -1;
+}
+
+/* the engine started with the person's count (-t, -tb), the automatic one, a clamped one; an idle engine restarted
+ * with a new count without a job; the same effective count restarts nothing */
+static void threads_engine(const char *sock) {
+    char jail[8192], want[64];
+    int cpus = llmjail_cpus(), aut = llmjail_threads_auto(cpus);
+    CHECK(llm_set_threads(-1) < 0 && errno == EINVAL, "a negative count refused");
+    char *st = analyze_state("qwen-test", jail, sizeof jail, sock);
+    snprintf(want, sizeof want, "\"t\":\"%d\",\"tb\":\"%d\"", aut, aut);
+    CHECK(strstr(jail, want), "automatic: %s (%s)", want, jail);
+    CHECK(state_int(st, "cpus") == cpus && state_int(st, "threadsAuto") == aut && state_int(st, "threads") == aut && state_int(st, "runThreads") == aut,
+          "state: cores, automatic, next and running counts %s", st ? st : "");
+    free(st);
+    CHECK(!llm_set_threads(1), "one thread");
+    st = analyze_state("qwen-test", jail, sizeof jail, sock);
+    CHECK(strstr(jail, "\"t\":\"1\",\"tb\":\"1\"") && state_int(st, "runThreads") == 1, "one thread: %s", jail);
+    free(st);
+    CHECK(!llm_set_threads(cpus + 50), "more than the cores");
+    st = analyze_state("qwen-test", jail, sizeof jail, sock);
+    snprintf(want, sizeof want, "\"t\":\"%d\",\"tb\":\"%d\"", cpus, cpus);
+    CHECK(strstr(jail, want) && state_int(st, "threads") == cpus && state_int(st, "runThreads") == cpus, "clamped to %d cores: %s", cpus, jail);
+    /* idle and ready: a new count restarts it now, with no job */
+    int pid0 = state_int(st, "pid");
+    free(st);
+    if (cpus >= 2) {
+        int next = cpus == 2 ? 1 : 2;
+        CHECK(!llm_set_threads(next), "%d threads", next);
+        int pid1 = -1, run = -1;
+        for (int i = 0; i < 400; i++) {
+            st = llm_state_json();
+            pid1 = state_int(st, "pid");
+            run = state_int(st, "runThreads");
+            int ready = st && strstr(st, "\"state\":\"ready\"");
+            free(st);
+            if (ready && pid1 > 0 && pid1 != pid0 && run == next) break;
+            msleep(25);
+        }
+        CHECK(pid1 > 0 && pid1 != pid0 && run == next, "an idle engine restarted with %d threads (pid %d → %d, running %d)", next, pid0, pid1, run);
+        jail[0] = 0;
+        get(sock, "/jail", jail, sizeof jail);
+        snprintf(want, sizeof want, "\"t\":\"%d\",\"tb\":\"%d\"", next, next);
+        CHECK(strstr(jail, want), "the restarted engine's arguments: %s", jail);
+        /* the same effective count (above the cores again equals the cores only when next == cores): no restart */
+        CHECK(!llm_set_threads(next), "the same count");
+        msleep(400);
+        st = llm_state_json();
+        CHECK(state_int(st, "pid") == pid1, "the same count restarts nothing %s", st ? st : "");
+        free(st);
+    } else printf("skipped: needs 2 cores to restart the engine with another count\n");
+    llm_set_threads(0);
+    llm_stop();
+    msleep(300);
+}
+
 /* (0.8.9.6.2) where the engine computes: a GPU when its module and device are there (a fake device folder whose nodes
  * are links to /dev/null, a character device), its devices reachable in the sandbox only then and never card0, the
  * device's name and layers read from the log (a hostile name cleaned), the processor when chosen, and the fallbacks:
@@ -332,6 +475,7 @@ static void gpu_cases(const char *dir, const char *mdir, const char *gdir, const
 
 int main(int argc, char **argv) {
     writing_pure();
+    threads_pure();
     if (argc >= 4 && !strcmp(argv[1], "--real")) return real(argv[2], argv[3], argc > 4 ? argv[4] : NULL, argc > 5 ? argv[5] : NULL);
     char dir[] = "/tmp/llm-test-XXXXXX";
     if (!mkdtemp(dir)) { perror("mkdtemp"); return 1; }
@@ -426,6 +570,12 @@ int main(int argc, char **argv) {
     free(r);
 
     gpu_cases(dir, mdir, gdir, fdev, sock);
+    threads_engine(sock);
+    {
+        char mp[PATH_MAX + 32];
+        snprintf(mp, sizeof mp, "%s/qwen-test.gguf", mdir);
+        threads_launcher(launcher, mp, llmdir, fake);
+    }
 
     /* (0.8.9.6) "Investigate with Lumo": a script's text fenced as data with a nonce, code given inline, a binary's
      * metadata, a script reached through a link (not read: the interpreter's metadata instead), a reused PID */

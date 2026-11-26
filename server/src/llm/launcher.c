@@ -4,15 +4,18 @@
  * (llmjail.h): the model at 3 (read-only), the runtime folder at 4 ($XDG_RUNTIME_DIR/lordos/llm, the user's, 0700)
  * and the engine's executable at 5 (/usr/bin/llama-server, O_PATH). It never gets a path. In order:
  *   - checks the descriptors (a regular file, the user's 0700 folder, a regular executable owned by root);
- *   - low priority: nice 15, SCHED_BATCH, idle I/O; its own cgroup scope lordos-sentinela.scope with at most two
- *     cores and a memory cap of the model's size plus 1.5 GB (without a delegated cgroup, an address-space limit);
+ *   - low priority: nice 15, SCHED_BATCH, idle I/O; its own cgroup scope lordos-sentinela.scope with at most as many
+ *     cores as the engine's threads (LORD_LLM_THREADS) and a memory cap of the model's size plus 1.5 GB (without a delegated cgroup, an address-space limit);
  *   - umask 0177 and the runtime folder as its working directory, so the socket is engine.sock there, mode 0600;
  *   - llmjail_apply (namespaces, Landlock, seccomp), stdin and stdout /dev/null; stderr is what lord-server gave it
  *     (a pipe it reads the engine's startup lines from: which GPU, how many layers; engine.c);
  *   - execveat(5, "", the fixed arguments of the backend LORD_LLM_BACKEND names, a minimal environment).
  * (0.8.9.6.2) LORD_LLM_BACKEND is "cpu", "vulkan" or "cuda" (lord-server's choice, engine.c); anything else, or none,
  * is the processor. Only that backend's GPU devices are reachable in the sandbox (llmjail.c).
- * Exit codes before the exec: 2 bad descriptors, 3 the sandbox could not be applied, 4 the exec failed. */
+ * (0.8.9.6.2) LORD_LLM_THREADS is the engine's processor threads (Settings → AI, the Brain's cores): a plain decimal
+ * in 1..the online cores, checked here (llmjail_threads_parse); any other value refuses to start (exit 2). None at all
+ * is "automatic", half the cores (llmjail_threads_auto). -t, -tb and the scope's cpu.max follow it.
+ * Exit codes before the exec: 2 bad descriptors or thread count, 3 the sandbox could not be applied, 4 the exec failed. */
 #include "llmjail.h"
 #include "../sec/cgroup.h"
 
@@ -50,8 +53,15 @@ int main(int argc, char **argv) {
     syscall(SYS_ioprio_set, 1 /* IOPRIO_WHO_PROCESS */, 0, 3 << 13 /* IOPRIO_CLASS_IDLE */);
     int backend = llmjail_backend(getenv("LORD_LLM_BACKEND"));
     if (backend < 0) backend = LLMJAIL_CPU;
+    int cpus = llmjail_cpus();
+    const char *tw = getenv("LORD_LLM_THREADS");
+    int threads = tw ? llmjail_threads_parse(tw, cpus) : llmjail_threads_auto(cpus);
+    if (threads < 1) { errno = EINVAL; return fail(2, "bad thread count"); }
+    char tbuf[8];
+    const char *args[LLMJAIL_ARGV_MAX];
+    if (llmjail_argv(backend, threads, tbuf, sizeof tbuf, args, LLMJAIL_ARGV_MAX)) { errno = EINVAL; return fail(2, "arguments"); }
     long model_mb = (long)(m.st_size >> 20);
-    CgroupLimits lim = { .mem_high_mb = model_mb + 1280, .mem_max_mb = model_mb + 1536, .cpu_percent = 200 };
+    CgroupLimits lim = { .mem_high_mb = model_mb + 1280, .mem_max_mb = model_mb + 1536, .cpu_percent = 100 * threads };
     if (cgroup_enter("lordos-sentinela.scope", &lim)) {
         /* without a cgroup, an address-space limit; a GPU driver maps the card's memory and reserves address space of
          * its own (CUDA's unified memory reserves far more than any limit), so the limit is the processor's only */
@@ -73,13 +83,13 @@ int main(int argc, char **argv) {
     LlmJailCfg cfg = { .model_fd = LLMJAIL_MODEL_FD, .dir_fd = LLMJAIL_DIR_FD, .engine_fd = LLMJAIL_ENGINE_FD, .backend = backend };
     int mask = llmjail_apply(&cfg);
     if (mask < 0) return fail(3, "sandbox");
-    fprintf(stderr, "lord-llm: sandbox 0x%x backend %d\n", (unsigned)mask, backend);
+    fprintf(stderr, "lord-llm: sandbox 0x%x backend %d threads %d\n", (unsigned)mask, backend, threads);
     fcntl(LLMJAIL_DIR_FD, F_SETFD, FD_CLOEXEC);
     fcntl(LLMJAIL_ENGINE_FD, F_SETFD, FD_CLOEXEC);
     dup2(null, 0);
     dup2(null, 1);
     /* Mesa's shader cache would be written in the home folder, which the sandbox doesn't reach: off, said once */
     char *envp[] = { "PATH=/usr/bin:/bin", "LANG=C.UTF-8", "HOME=/nonexistent", "MESA_SHADER_CACHE_DISABLE=true", NULL };
-    syscall(SYS_execveat, LLMJAIL_ENGINE_FD, "", (char *const *)LLMJAIL_ARGVS[backend], envp, AT_EMPTY_PATH);
+    syscall(SYS_execveat, LLMJAIL_ENGINE_FD, "", (char *const *)args, envp, AT_EMPTY_PATH);
     return fail(4, "exec");
 }

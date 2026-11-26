@@ -237,6 +237,23 @@ export const brainBackend = (s) => {
   return BRAIN_BACKENDS.includes(b) ? b : 'auto';
 };
 
+// the Brain's processor cores, settings.brain.cpuThreads: 0 automatic (half the cores, 1..16), else a count; the engine
+// clamps it to the online cores (engine.h llm_set_threads). Anything else reads as automatic.
+export const brainThreads = (s) => {
+  const n = s && s.brain && s.brain.cpuThreads;
+  return Number.isInteger(n) && n >= 0 && n <= 4096 ? n : 0;
+};
+export const brainThreadsAuto = (cpus) => Math.max(1, Math.min(16, Math.floor(cpus / 2)));
+// The slider under the Brain's choice, from the engine's state (cpus: the online cores, at most 64): null when the
+// engine can't say; else { max, value } (0..cores, 0 automatic) and the label { key, vars } of settings.aiStore.foot.*
+export function brainCores(setting, state) {
+  const cpus = state && Number.isInteger(state.cpus) && state.cpus > 0 ? Math.min(state.cpus, 64) : 0;
+  if (!cpus) return null;
+  const value = Math.min(Number.isInteger(setting) && setting > 0 ? setting : 0, cpus);
+  const label = value ? { key: 'brainCoresN', vars: { n: value } } : { key: 'brainCoresAuto', vars: { n: brainThreadsAuto(cpus) } };
+  return { max: cpus, value, label };
+}
+
 const API_NAME = { vulkan: 'Vulkan', cuda: 'CUDA' };
 // The line under the choice, from the engine's state (lord.sentinela.state(), engine.h): { key, vars } of
 // settings.aiStore.foot.*. What the engine used last this session when it has run; before that, what it will use.

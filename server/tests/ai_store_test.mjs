@@ -4,7 +4,7 @@
 import {
   CAPS, PIECES, FUNCTIONS, LEVELS, EAR_MODELS, IMAGE_MODELS, OCR_LANGS, OCR_BASE, AI_FILTERS, ocrPackageOk, tessCodes, ocrLangs, brainEntries,
   voiceEntries, voicePage, eyeEntries, earEntries, imageEntries, pieceReady, lumoState, matchesQuery, filterEntries, filterCounts, groupByCap,
-  capCard, modelBytes, sortForPage, CAP_COLOR, CAP_ICON, matchFunctions, llmFunctions, llmTryReady, BRAIN_BACKENDS, brainBackend, brainWhere,
+  capCard, modelBytes, sortForPage, CAP_COLOR, CAP_ICON, matchFunctions, llmFunctions, llmTryReady, BRAIN_BACKENDS, brainBackend, brainWhere, brainThreads, brainThreadsAuto, brainCores,
 } from '../../sdk/aistore.js';
 import { LLM_MODELS } from '../../sdk/llmcatalog.js';
 import { VOICE_LANGS } from '../../sdk/voicecatalog.js';
@@ -163,6 +163,15 @@ eq('processor chosen', brainWhere({ backend: 'cpu', fallback: null, gpus: { vulk
 eq('fallbacks say why', ['start', 'memory', 'untested', 'none', null].map((f) => brainWhere({ backend: 'cpu', fallback: f }, 'auto').key),
   ['brainCpuStart', 'brainCpuMemory', 'brainCpuUntested', 'brainCpuNoGpu', 'brainCpu']);
 eq('not run yet: the GPU it will use', brainWhere({ backend: null, gpus: { vulkan: true, cuda: true } }, 'auto'), { key: 'brainGpuReady', vars: { api: 'CUDA' } });
+// (0.8.9.6.2) the Brain's processor cores: 0 automatic (half the cores, 1..16), else a count clamped to the cores
+eq('cores: automatic by default', [brainThreads({}), brainThreads(null), brainThreads({ brain: { cpuThreads: -2 } }), brainThreads({ brain: { cpuThreads: 2.5 } }),
+  brainThreads({ brain: { cpuThreads: '4' } }), brainThreads({ brain: { cpuThreads: 6 } })], [0, 0, 0, 0, 0, 6]);
+eq('automatic is half, 1..16', [1, 2, 3, 8, 20, 32, 64].map(brainThreadsAuto), [1, 1, 1, 4, 10, 16, 16]);
+eq('no slider without the engine\'s cores', [brainCores(0, null), brainCores(0, {}), brainCores(4, { cpus: 0 })], [null, null, null]);
+eq('the slider: automatic', brainCores(0, { cpus: 20 }), { max: 20, value: 0, label: { key: 'brainCoresAuto', vars: { n: 10 } } });
+eq('the slider: a count', brainCores(4, { cpus: 20 }), { max: 20, value: 4, label: { key: 'brainCoresN', vars: { n: 4 } } });
+eq('the slider: clamped to the cores', brainCores(32, { cpus: 8 }), { max: 8, value: 8, label: { key: 'brainCoresN', vars: { n: 8 } } });
+eq('the slider: at most 64', brainCores(0, { cpus: 128 }).max, 64);
 eq('not run yet, no GPU', brainWhere({ backend: null, gpus: { vulkan: false, cuda: false } }, 'gpu').key, 'brainCpuNoGpu');
 eq('no engine state at all', brainWhere(null, 'auto').key, 'brainCpuNoGpu');
 console.log(`ai-store-test: ${ok} passed, ${bad} failed`);

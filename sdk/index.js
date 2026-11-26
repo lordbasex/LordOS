@@ -41,7 +41,7 @@ export { VM_ACTIONS, vmWhy, vmFactLines } from './sentinelavm.js';
 export {
   sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, runSentinelaAction, sentinelaOnBattery,
   clearSentinelaAlerts, actionLabel as sentinelaActionLabel, installLlm, removeLlm, lumoReady, investigateProcess, translateWithLumo,
-  sentinelaBlocked, refreshBlocked, blockProgram, unblockProgram, runInvestigateAction, setBrainBackend,
+  sentinelaBlocked, refreshBlocked, blockProgram, unblockProgram, runInvestigateAction, setBrainBackend, setBrainThreads,
 } from './sentinela.js';
 export { describeProgram, describeApp, saveLumoTranslation, translationKey } from './describe.js';
 export { ShieldGlyph } from './sentinelaglyph.js';

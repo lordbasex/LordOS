@@ -5,7 +5,8 @@
  * model through /proc/self/fd/3, binds --host's unix socket in its working directory and answers like llama-server:
  *   GET /health                  {"status":"ok"}
  *   POST /v1/chat/completions    a chat completion whose content depends on the user text (see answer())
- *   GET /jail                    {"checks":{name: "denied" | "ALLOWED"}, "model": "GGUF" or "", "netns": N, "dev": "-dev's value"}
+ *   GET /jail                    {"checks":{name: "denied" | "ALLOWED"}, "model": "GGUF" or "", "netns": N, "dev": "-dev's value",
+ *                                "t": "-t's value", "tb": "-tb's value"}
  * (0.8.9.6.2) With a GPU's -dev (Vulkan0, CUDA0) it also tries the GPU's devices (a render node and its DRM ioctl, the
  * display node card0, NVIDIA's control node) and writes llama.cpp's log lines about the device and its layers to stderr
  * (lord-server reads them); words in the model file make it fail like a GPU can: FAIL_GPU (exits at start), NO_VRAM (no
@@ -32,6 +33,7 @@
 static char report[4096];
 static size_t rn;
 static const char *dev = "";            /* -dev's value */
+static const char *th = "", *thb = "";  /* (0.8.9.6.2) -t's and -tb's values */
 static char modeltext[4097];             /* the model file's first 4 KB */
 static int oom_once;
 
@@ -199,8 +201,8 @@ static void serve(int c) {
         if (m >= 0) { ssize_t k = read(m, model, 4); model[k > 0 ? k : 0] = 0; close(m); }
         struct stat ns;
         stat("/proc/self/ns/net", &ns);
-        snprintf(body, sizeof body, "{\"checks\":%s,\"model\":\"%s\",\"netns\":%llu,\"dev\":\"%.16s\"}", report, model,
-                 (unsigned long long)ns.st_ino, dev);
+        snprintf(body, sizeof body, "{\"checks\":%s,\"model\":\"%s\",\"netns\":%llu,\"dev\":\"%.16s\",\"t\":\"%.4s\",\"tb\":\"%.4s\"}",
+                 report, model, (unsigned long long)ns.st_ino, dev, th, thb);
     } else if (!strncmp(req, "POST /v1/chat/completions", 25))
         snprintf(body, sizeof body, "{\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"%s\"}}],"
                  "\"usage\":{\"completion_tokens\":24}}", answer(req));
@@ -216,6 +218,8 @@ int main(int argc, char **argv) {
     for (int i = 1; i + 1 < argc; i++) {
         if (!strcmp(argv[i], "--host")) host = argv[i + 1];
         if (!strcmp(argv[i], "-dev")) dev = argv[i + 1];
+        if (!strcmp(argv[i], "-t")) th = argv[i + 1];
+        if (!strcmp(argv[i], "-tb")) thb = argv[i + 1];
     }
     if (!host) return 2;
     int m = open("/proc/self/fd/3", O_RDONLY | O_CLOEXEC);

@@ -57,6 +57,10 @@
       await sleep(600);
       const foot = shownTexts();
       const whereLine = foot.find((s) => /^(Brain|Cerebro|Cérebro|الدماغ)/.test(s) && s !== t('cap.brain')) || '';
+      // (0.8.9.6.2) the Brain's cores: the slider's label and its hint, "Automatic (N)" or a count
+      const [pre, post] = t('foot.brainCoresAuto', { n: '@' }).split('@');
+      const coresLabel = foot.find((s) => s.startsWith(pre) && s.endsWith(post) && /^\d+$/.test(s.slice(pre.length, s.length - post.length))) || '';
+      step('the Brain\'s cores', foot.includes(t('foot.brainCores')) && foot.includes(t('foot.brainCoresHint')) && !!coresLabel, coresLabel);
       step('the Brain\'s choice and where it runs', foot.includes(t('foot.brainHint')) && foot.filter((s) => s === sdk.t('settings.ai.backend.gpu')).length >= 2 && !!whereLine, whereLine);
       await shot('where they run');
       if (hint) { const b = box(hint); for (let i = 0; i < 40; i++) { ev('wheel', hint, b[0] + 5, b[1] + 5, 3); await sleep(30); } }

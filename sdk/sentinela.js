@@ -34,7 +34,7 @@ import { LANGUAGE_NAMES } from './langnames.js';
 import { ShieldGlyph } from './sentinelaglyph.js';
 import { admin } from './admin.js';
 import { llmPackageOk } from './llmcatalog.js';
-import { brainBackend } from './aistore.js';
+import { brainBackend, brainThreads } from './aistore.js';
 import {
   SENTINELA_DEFAULTS, TRIGGER_DEFAULTS, createTracker, buildSummary, systemPrompt, parseVerdict, ignoreMatch, ruleAction, factLines,
   placeOf, clean, presentAlert, buildInvestigation, investigateSystemPrompt, parseInvestigation, evidenceOf, translateSystemPrompt,
@@ -74,6 +74,28 @@ function syncBrainBackend() {
   const m = brainBackend(settings.get());
   if (m === brainMode) return;
   try { a.backend(m); brainMode = m; } catch (e) { /* an older server: the processor only */ }
+}
+// (0.8.9.6.2) the Brain's processor cores (settings.brain.cpuThreads, 0 automatic; Settings → AI), told to lord-server
+// once the slider rests (each new count restarts an idle engine: engine.h llm_set_threads); at start at once
+let brainThreadsSent = null;
+let threadsTimer = null;
+function syncBrainThreads() {
+  const a = api();
+  if (!a || typeof a.threads !== 'function') return;
+  if (brainThreads(settings.get()) === brainThreadsSent) return;
+  if (threadsTimer) clearTimeout(threadsTimer);
+  threadsTimer = setTimeout(() => {
+    threadsTimer = null;
+    const n = brainThreads(settings.get());
+    if (n === brainThreadsSent) return;
+    try { a.threads(n); brainThreadsSent = n; } catch (e) { /* an older server: two threads */ }
+    refreshSentinelaEngine();
+  }, brainThreadsSent === null ? 0 : 700);
+}
+export function setBrainThreads(n) {
+  const v = Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+  settings.set((s) => ({ ...s, brain: { ...(s.brain || {}), cpuThreads: v } }));
+  syncBrainThreads();
 }
 export function setBrainBackend(mode) {
   settings.set((s) => ({ ...s, brain: { ...(s.brain || {}), backend: mode } }));
@@ -428,6 +450,8 @@ export function startSentinela() {
   started = true;
   syncBrainBackend();
   settings.subscribe(syncBrainBackend);
+  syncBrainThreads();
+  settings.subscribe(syncBrainThreads);
   loadAlerts();
   refreshBlocked();
   sentinelaTick();
