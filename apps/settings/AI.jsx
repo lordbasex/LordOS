@@ -20,14 +20,14 @@ import {
   tOptional, useSettings, useStore, useAppWindow, useKeyboard, direction, wm, media, admin, formatBytes, spacing, typeScale, settings,
   VOICE_DEFAULTS, speakAvailable, previewVoice, tryVoice, player as voicePlayer, VOICE_LANGS, voiceLabel, voicePackage, modelPackage, hasVoice,
   PREVIEWS_PACKAGE, scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName,
-  takeName, errorText, fs, LLM_MODELS, packagesForModel, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, installLlm, setBrainBackend,
+  takeName, errorText, fs, LLM_MODELS, packagesForModel, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, installLlm, setBrainBackend, setBrainThreads, Slider,
   removeLlm, lumoReady, translateWithLumo, ENGINE_PACKAGE, writingChoice, writingEnabled, setWritingOn,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
   CAPS, CAP_COLOR, CAP_ICON, FUNCTIONS, matchFunctions, llmFunctions, llmTryReady, LEVELS, AI_FILTERS, TESSDATA, ocrPackageOk, tessCodes, ocrLangs, brainEntries, voiceEntries,
   eyeEntries, earEntries, imageEntries, lumoState, filterEntries, filterCounts, groupByCap, capCard, modelBytes, sortForPage, voicePage,
-  BRAIN_BACKENDS, brainBackend, brainWhere,
+  BRAIN_BACKENDS, brainBackend, brainWhere, brainThreads, brainCores,
 } from '../../sdk/aistore.js';
 import { Stack, Section, SettingRow, Note, Actions, tint } from './ui.jsx';
 import { PersonalVoiceSheet } from './PersonalVoice.jsx';
@@ -622,6 +622,8 @@ function Footer({ ctx, width }) {
   const eng = useStore(sentinelaEngine) || {};
   const brainMode = brainBackend(settings.get());
   const where = brainWhere(eng.state, brainMode);
+  // (0.8.9.6.2) the Brain's processor cores: 0 (automatic) .. the online cores
+  const cores = brainCores(brainThreads(settings.get()), eng.state);
   useEffect(() => {
     const id = setInterval(() => refreshSentinelaEngine(), 5000);
     return () => clearInterval(id);
@@ -655,6 +657,15 @@ function Footer({ ctx, width }) {
             <Segmented small value={brainMode} onChange={(b) => setBrainBackend(b)}
               options={BRAIN_BACKENDS.map((b) => [b, tr(`settings.ai.backend.${b}`)])} />
           </View>
+          {cores ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, flexWrap: 'wrap' }}>
+              <Text style={{ fontSize: typeScale.caption, color: t.text }}>{tr('settings.aiStore.foot.brainCores')}</Text>
+              <Slider value={cores.value} min={0} max={cores.max} step={1} width={Math.max(100, Math.min(180, w - 60))} track="rgba(0,0,0,0.22)"
+                onChange={(v) => { const n = Math.round(v); if (n !== cores.value) setBrainThreads(n); }} />
+              <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{tr(`settings.aiStore.foot.${cores.label.key}`, cores.label.vars)}</Text>
+            </View>
+          ) : null}
+          {cores ? line(tr('settings.aiStore.foot.brainCoresHint')) : null}
           {line(tr(`settings.aiStore.foot.${where.key}`, where.vars))}
           {line(tr('settings.aiStore.foot.brainHint'))}
           {line(tr('settings.aiStore.foot.eyeCpu'))}

@@ -1240,8 +1240,9 @@ export function Stepper({ value, onChange, min = -Infinity, max = Infinity, step
 
 // Horizontal slider (drag or click on the bar). It runs from the start edge: min is on the right in right to left.
 // A Tab stop: ← → (swapped in right to left) and ↓ ↑ move it by step (a twentieth of the range unless given), Page Down
-// and Page Up by a tenth, Home and End to the ends. The wheel over it moves it by step too.
-export function Slider({ value, onChange, min = 0, max = 1, width = 160, step, focusable = true }) {
+// and Page Up by a tenth, Home and End to the ends. The wheel over it moves it by step too. track: the bar's color when
+// t.control wouldn't show (a slider on a box that is t.control itself).
+export function Slider({ value, onChange, min = 0, max = 1, width = 160, step, focusable = true, track }) {
   const t = useTheme();
   const rtl = direction() === 'rtl';
   const w = useWheelStep();
@@ -1271,7 +1272,7 @@ export function Slider({ value, onChange, min = 0, max = 1, width = 160, step, f
     <View ref={ref} onMouseDown={(e) => { drag.current = true; at(e.x); }} focusable={focusable} onKeyDown={onKey}
       onFocus={w.onFocus} onBlur={w.onBlur} onWheel={(e) => w.wheel(e, { value, min, max, step: step || (max - min) / 20 }, onChange)}
       style={{ width, height: 20, borderRadius: 10, justifyContent: 'center', direction: 'ltr' }}>
-      <View style={{ height: 4, borderRadius: 2, backgroundColor: t.control }}>
+      <View style={{ height: 4, borderRadius: 2, backgroundColor: track || t.control }}>
         <View style={{ width: Math.max(0, f * width), height: 4, borderRadius: 2, backgroundColor: t.accent, ...(rtl ? { marginLeft: Math.max(0, (1 - f) * width) } : null) }} />
       </View>
       <View style={{ position: 'absolute', left: (rtl ? 1 - f : f) * (width - 16), top: 2, width: 16, height: 16, borderRadius: 8,

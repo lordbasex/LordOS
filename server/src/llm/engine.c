@@ -61,6 +61,9 @@ static struct {
     int failed[3];
     int fallback;
     char ggml_dir[PATH_MAX], dev_dir[PATH_MAX];
+    /* (0.8.9.6.2) the processor threads: the person's setting (0 automatic), the running (or last) engine's count, and
+     * a restart asked for while the engine was idle (llm_set_threads) */
+    int threads_set, run_threads, restart_now;
 } E = { .mu = PTHREAD_MUTEX_INITIALIZER, .cv = PTHREAD_COND_INITIALIZER, .pid = -1, .dirfd = -1, .state = "off",
         .idle_ms = LLM_IDLE_MS, .model_dir = LLM_MODEL_DIR, .engine = LLM_ENGINE, .dpkg_info = "/var/lib/dpkg/info",
         .ggml_dir = LLM_GGML_DIR, .dev_dir = "/dev" };
@@ -105,6 +108,21 @@ int llm_set_backend(const char *mode) {
         E.mode_gen++;                       /* the running engine is restarted at the next job */
         memset(E.failed, 0, sizeof E.failed);
         E.fallback = FB_NONE_YET;
+    }
+    pthread_mutex_unlock(&E.mu);
+    return 0;
+}
+
+int llm_set_threads(int n) {
+    if (n < 0) { errno = EINVAL; return -1; }
+    int cpus = llmjail_cpus();
+    pthread_mutex_lock(&E.mu);
+    int was = llmjail_threads_for(E.threads_set, cpus), now = llmjail_threads_for(n, cpus);
+    E.threads_set = n;
+    if (was != now) {
+        E.mode_gen++;                       /* a running engine is restarted at its next job */
+        /* an idle one now, by the engine's thread (a busy one finishes its job first) */
+        if (E.pid > 0 && !E.nq && !strcmp(E.state, "ready")) { E.restart_now = 1; pthread_cond_signal(&E.cv); }
     }
     pthread_mutex_unlock(&E.mu);
     return 0;
@@ -523,11 +541,18 @@ static int spawn_engine(const char *model, int backend, char **err) {
     posix_spawnattr_setsigdefault(&at, &all);
     posix_spawnattr_setpgroup(&at, 0);
     posix_spawnattr_setflags(&at, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETPGROUP);
-    char *envp[4];
+    char *envp[5];
     int ne = 0;
     if (getenv("LORDOS_SESSIOND")) envp[ne++] = "LORDOS_SESSIOND=1";      /* cgroup_enter asks lord-sessiond */
     static const char *const be_env[3] = { "LORD_LLM_BACKEND=cpu", "LORD_LLM_BACKEND=vulkan", "LORD_LLM_BACKEND=cuda" };
     envp[ne++] = (char *)be_env[backend];
+    /* the processor threads, a number lord-llm checks again (1..its online cores) */
+    pthread_mutex_lock(&E.mu);
+    int threads = llmjail_threads_for(E.threads_set, llmjail_cpus());
+    pthread_mutex_unlock(&E.mu);
+    char th_env[32];
+    snprintf(th_env, sizeof th_env, "LORD_LLM_THREADS=%d", threads);
+    envp[ne++] = th_env;
     envp[ne] = NULL;
     char *argv[] = { "lord-llm", NULL };
     pid_t pid;
@@ -544,6 +569,7 @@ static int spawn_engine(const char *model, int backend, char **err) {
     E.dirfd = dfd;
     snprintf(E.model, sizeof E.model, "%s", model);
     E.backend = backend;
+    E.run_threads = threads;
     E.has_run = 1;
     E.run_gen = E.mode_gen;
     E.device[0] = 0;
@@ -720,6 +746,14 @@ static int gpu_gave_up(void) {
     for (int i = 0; i < 10 && !dead; i++) {
         dead = waitpid(pid, NULL, WNOHANG) == pid;
         if (!dead) { struct timespec ts = { 0, 50 * 1000000L }; nanosleep(&ts, NULL); }
+    }
+    /* the out-of-memory line comes through the log's reader, which may lag the death: a moment more for it */
+    for (int i = 0; i < 10 && !oom; i++) {
+        pthread_mutex_lock(&E.mu);
+        oom = E.oom;
+        pthread_mutex_unlock(&E.mu);
+        if (!oom && dead) { struct timespec ts = { 0, 25 * 1000000L }; nanosleep(&ts, NULL); }
+        else break;
     }
     if (!dead && !oom) return 0;
     if (dead) {
@@ -905,6 +939,22 @@ static void *worker(void *arg) {
     for (;;) {
         pthread_mutex_lock(&E.mu);
         while (!E.nq) {
+            /* (0.8.9.6.2) the thread count changed while the engine was idle: started again with the new one now, so
+             * the next job doesn't wait for it; its idle time keeps counting from its last answer */
+            if (E.restart_now) {
+                E.restart_now = 0;
+                if (E.pid > 0 && !E.stop_now && !strcmp(E.state, "ready") && E.run_gen != E.mode_gen && E.model[0]) {
+                    Job rj = { .kind = J_ANALYZE };
+                    snprintf(rj.model, sizeof rj.model, "%s", E.model);
+                    double used = E.last_used, started = 0;
+                    pthread_mutex_unlock(&E.mu);
+                    char *e = ensure_engine(&rj, &started);
+                    pthread_mutex_lock(&E.mu);
+                    if (e) free(e);                 /* "off" now: the next job tries again */
+                    else { E.state = "ready"; E.last_used = used; }
+                    continue;
+                }
+            }
             if (E.stop_now || (E.pid > 0 && now_ms() - E.last_used > E.idle_ms && !strcmp(E.state, "ready"))) {
                 E.stop_now = 0;
                 pthread_mutex_unlock(&E.mu);
@@ -1088,26 +1138,28 @@ char *llm_take(int id) {
 }
 
 char *llm_state_json(void) {
-    int gv = gpu_avail(LLMJAIL_VULKAN), gc = gpu_avail(LLMJAIL_CUDA);
-    char *o = malloc(768);
+    int gv = gpu_avail(LLMJAIL_VULKAN), gc = gpu_avail(LLMJAIL_CUDA), cpus = llmjail_cpus();
+    char *o = malloc(1024);
     if (!o) return NULL;
     pthread_mutex_lock(&E.mu);
     double idle = E.pid > 0 && E.last_used > 0 ? now_ms() - E.last_used : 0;
     int n;
-    if (E.model[0]) n = snprintf(o, 768, "{\"state\":\"%s\",\"model\":\"%s\",\"pid\":%d,\"idleMs\":%.0f,\"queued\":%d", E.state, E.model, (int)E.pid, idle, E.nq);
-    else n = snprintf(o, 768, "{\"state\":\"%s\",\"model\":null,\"pid\":%d,\"idleMs\":0,\"queued\":%d", E.state, (int)E.pid, E.nq);
-    n += snprintf(o + n, 768 - (size_t)n, ",\"mode\":\"%s\",\"gpus\":{\"vulkan\":%s,\"cuda\":%s}", MODE_WORD[E.mode],
+    if (E.model[0]) n = snprintf(o, 1024, "{\"state\":\"%s\",\"model\":\"%s\",\"pid\":%d,\"idleMs\":%.0f,\"queued\":%d", E.state, E.model, (int)E.pid, idle, E.nq);
+    else n = snprintf(o, 1024, "{\"state\":\"%s\",\"model\":null,\"pid\":%d,\"idleMs\":0,\"queued\":%d", E.state, (int)E.pid, E.nq);
+    n += snprintf(o + n, 1024 - (size_t)n, ",\"mode\":\"%s\",\"gpus\":{\"vulkan\":%s,\"cuda\":%s}", MODE_WORD[E.mode],
                   gv ? "true" : "false", gc ? "true" : "false");
+    n += snprintf(o + n, 1024 - (size_t)n, ",\"cpus\":%d,\"threadsAuto\":%d,\"threads\":%d,\"runThreads\":%d", cpus,
+                  llmjail_threads_auto(cpus), llmjail_threads_for(E.threads_set, cpus), E.has_run ? E.run_threads : 0);
     if (E.has_run) {
-        n += snprintf(o + n, 768 - (size_t)n, ",\"backend\":\"%s\",\"device\":", BACKEND_WORD[E.backend]);
-        if (E.backend != LLMJAIL_CPU && E.device[0]) n += (int)json_quote(o + n, 768 - (size_t)n, E.device);
-        else n += snprintf(o + n, 768 - (size_t)n, "null");
-        n += snprintf(o + n, 768 - (size_t)n, ",\"layers\":%d,\"layersTotal\":%d", E.layers, E.layers_total);
+        n += snprintf(o + n, 1024 - (size_t)n, ",\"backend\":\"%s\",\"device\":", BACKEND_WORD[E.backend]);
+        if (E.backend != LLMJAIL_CPU && E.device[0]) n += (int)json_quote(o + n, 1024 - (size_t)n, E.device);
+        else n += snprintf(o + n, 1024 - (size_t)n, "null");
+        n += snprintf(o + n, 1024 - (size_t)n, ",\"layers\":%d,\"layersTotal\":%d", E.layers, E.layers_total);
     } else {
-        n += snprintf(o + n, 768 - (size_t)n, ",\"backend\":null,\"device\":null,\"layers\":0,\"layersTotal\":0");
+        n += snprintf(o + n, 1024 - (size_t)n, ",\"backend\":null,\"device\":null,\"layers\":0,\"layersTotal\":0");
     }
-    if (E.fallback) snprintf(o + n, 768 - (size_t)n, ",\"fallback\":\"%s\"}", FALLBACK_WORD[E.fallback]);
-    else snprintf(o + n, 768 - (size_t)n, ",\"fallback\":null}");
+    if (E.fallback) snprintf(o + n, 1024 - (size_t)n, ",\"fallback\":\"%s\"}", FALLBACK_WORD[E.fallback]);
+    else snprintf(o + n, 1024 - (size_t)n, ",\"fallback\":null}");
     pthread_mutex_unlock(&E.mu);
     return o;
 }

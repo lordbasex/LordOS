@@ -11,6 +11,29 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **How many processor cores the Brain uses** (asked and approved by the maintainer on 2026-11-26; docs/AI.md "The
+  engine's threads"). The engine always ran with `-t 2 -tb 2` in a cgroup of two cores; on an i9-10900 with Qwen3 1.7B
+  a Writing job takes 6.1 s on 2 threads, 3.4 s on 4 and 2.0 s on 8.
+  - **Settings → AI → "Where they run"**: a slider *Processor: cores for the Brain* under the Brain's Automatic /
+    Processor / Graphics card, from *Automatic (N)* (half the online cores, at least 1, at most 16) to every online
+    core, with the hint that more cores answer faster but load the computer more. It counts on the processor and for
+    the layers a GPU couldn't take. `settings.brain.cpuThreads` (0 automatic, the default; nothing to migrate),
+    `setBrainThreads` → the new `lord.sentinela.threads(n)` → `llm_set_threads`, sent once the slider rests. In all 35
+    languages (`settings.aiStore.foot.brainCores*`). `brainCores` and `brainThreads` in `sdk/aistore.js`; `Slider`
+    takes an optional `track` color (its bar was invisible on a box of the control color).
+  - **lord-llm** gets the count as one more environment word, `LORD_LLM_THREADS=<n>`, and checks it itself: digits only,
+    1..its online cores (at most 64, lord-sessiond's `cpu.max` cap); anything else exits 2 with no engine. `-t` and
+    `-tb` are that count (the backend's fixed argument list with only those two values written in, `llmjail_argv`) and
+    `lordos-sentinela.scope`'s `cpu.max` is 100 % per thread. Low priority (nice 15, `SCHED_BATCH`, idle I/O) stays.
+  - **A change** restarts an idle engine at once with the same model and backend and a busy one at its next job; the
+    same effective count restarts nothing. The engine's state adds `cpus`, `threadsAuto`, `threads` and `runThreads`.
+  - **Tests**: `build/llm-engine-test` checks automatic and the clamping, the argument list for every backend and count,
+    lord-llm refusing nine bad values, the engine started with 1, automatic and too many threads (clamped), and an idle
+    engine restarted with a new count without a job; `ai_store_test.mjs` the setting and the slider; the
+    `settings_ai_scene` the slider and its hint.
+  - **Fixed** on the way: a GPU engine that ran out of memory and died at once could be reported as "couldn't start"
+    instead of "ran out of memory" when the log's reader lagged its death (`gpu_gave_up` now waits a moment for it;
+    `llm-engine-test` failed about one run in three under load).
 - **The Brain (the local language model of Sentinela and Writing) on the graphics card** (in development, asked by the
   maintainer on 2026-11-26; the new device access is **awaiting the maintainer's approval**, AGENTS.md; docs/AI.md
   "The Brain on the GPU"). Until now the engine ran on the processor only (`-ngl 0 -dev none`).

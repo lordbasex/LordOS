@@ -118,7 +118,7 @@ minimal environment and three descriptors, never a path:
 - fd 5: `/usr/bin/llama-server` opened `O_PATH`, owned by root, not writable by others.
 
 lord-llm checks them, closes everything else, lowers itself (nice 15, `SCHED_BATCH`, idle I/O), enters
-`lordos-sentinela.scope` (cgroup: at most 2 cores, memory at most the model's size plus 1.5 GB; without a delegated
+`lordos-sentinela.scope` (cgroup: at most as many cores as the engine's threads, memory at most the model's size plus 1.5 GB; without a delegated
 cgroup, an address-space limit of the model's size plus 4 GB), sets `umask 0177`, moves into the runtime folder and
 applies `llmjail_apply` (`server/src/llm/llmjail.c`):
 
@@ -148,9 +148,11 @@ applies `llmjail_apply` (`server/src/llm/llmjail.c`):
    `rt_tgsigqueueinfo` only with its own pid (the filter is built in lord-llm, whose pid the engine keeps), no `tkill`,
    `pidfd_open` or `pidfd_send_signal`. Fails closed too.
 
-Then it `execveat`s the engine with fixed arguments: `-m /proc/self/fd/3 --host engine.sock -t 2 -tb 2
+Then it `execveat`s the engine with fixed arguments: `-m /proc/self/fd/3 --host engine.sock -t N -tb N
 --threads-http 2 -c 4096 -np 1 --no-webui --no-slots -cram 0 --offline --reasoning off --no-warmup`, then `-ngl 0 -dev
-none` on the processor, or (0.8.9.6.2) `-ngl auto -dev Vulkan0 -lv 4` / `-ngl auto -dev CUDA0 -lv 4` on a GPU. Its
+none` on the processor, or (0.8.9.6.2) `-ngl auto -dev Vulkan0 -lv 4` / `-ngl auto -dev CUDA0 -lv 4` on a GPU. N is
+`LORD_LLM_THREADS` (0.8.9.6.2, the person's count from Settings → AI, checked by lord-llm: 1..the online cores, else
+it exits 2; [AI.md](AI.md) "The engine's threads"). Its
 stderr is a pipe lord-server reads (the device and the layers it used, out-of-memory lines); with `LORD_LLM_LOG=1` in
 lord-server's environment every line is copied to lord-server's own log.
 The engine's socket is `engine.sock` in the 0700 folder, mode 0600. lord-server connects through
@@ -160,8 +162,9 @@ model's text (at most 4 KB).
 
 The same engine serves Writing (✨ AI on selected text, and the `lumo` command through lord-server's
 `org.lordos.Writing1`; [AI.md](AI.md) "Writing"): one queue, one job at a time, its prompts fixed in
-`server/src/llm/writing.c`. Two threads in a cgroup of two cores keep it in the background while the person works; on
-a busy 20-thread machine a correction of one sentence takes 5–8 s with the 1.7B model and 15–20 s with the 4B one.
+`server/src/llm/writing.c`. Its threads in a cgroup of as many cores, at low priority, keep it in the background
+while the person works; with the old fixed two threads, on a busy 20-thread machine a correction of one sentence took
+5–8 s with the 1.7B model and 15–20 s with the 4B one.
 
 The engine starts when an analysis is needed (about 1 s for the 1.7B model from a warm disk), and is stopped 2 minutes
 after its last answer (`LLM_IDLE_MS`) or when Sentinela is turned off, giving its memory back.
@@ -340,7 +343,8 @@ fanotify capability (`CAP_SYS_ADMIN`), the per-user list protocol, and the fail-
 ## Limits
 
 - Analyses only when a rule fires; at most 4 events handled per 10-second tick; the engine queue holds 8 jobs.
-- The engine: 2 threads, low priority, the memory cap above.
+- The engine: the person's processor threads (Settings → AI, "Procesador: núcleos para el Cerebro"; automatic = half
+  the cores, 1..16), low priority, the memory cap above.
 - On battery: alerts without analysis.
 - Measured on the development PC (8 cores, the CPU only, 2 threads, while the fake miner used 2 cores): Qwen3 1.7B
   answered in 8.5–11.4 s cold (engine start about 1 s) and 7.5–9 s warm, about 17 tokens/s generating and 70 tokens/s

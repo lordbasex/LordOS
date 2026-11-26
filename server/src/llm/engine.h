@@ -67,8 +67,11 @@ char *llm_evidence(int pid, unsigned long long start, char **block);
 char *llm_take(int id);
 /* {"state":"off|starting|ready|busy","model":"…"|null,"pid":N,"idleMs":N,"queued":N,
  *  (0.8.9.6.2) "mode":"auto|cpu|gpu","gpus":{"vulkan":b,"cuda":b},"backend":"cpu|vulkan|cuda"|null,"device":"…"|null,
- *  "layers":N,"layersTotal":N,"fallback":"start|memory|untested|none"|null} (malloc'd): backend, device and layers are
- * the running engine's, or the last one's this session; fallback says why the last start didn't use a GPU it could have */
+ *  "layers":N,"layersTotal":N,"fallback":"start|memory|untested|none"|null,
+ *  "cpus":N,"threadsAuto":N,"threads":N,"runThreads":N} (malloc'd): backend, device, layers and runThreads are the
+ * running engine's, or the last one's this session (runThreads 0 before any); fallback says why the last start didn't
+ * use a GPU it could have; cpus the online cores (the most the Brain's cores can be), threadsAuto what "automatic" is
+ * here, threads what the next start uses */
 char *llm_state_json(void);
 /* (0.8.9.6.2) Where the engine computes (Settings → AI, "Where they run"): "auto" (CUDA, else Vulkan, else the
  * processor; on arm64 the processor unless CUDA), "cpu", or "gpu" (CUDA, else Vulkan, else the processor). A GPU that
@@ -76,6 +79,11 @@ char *llm_state_json(void);
  * the job runs again on the next one, the processor last. Returns 0, or -1 for another word. A change restarts the
  * engine at its next job. */
 int llm_set_backend(const char *mode);
+/* (0.8.9.6.2) The engine's processor threads (Settings → AI, "Where they run": the Brain's cores, settings.brain.cpuThreads):
+ * 0 automatic (half the online cores, 1..16), else that many, at most the online cores (more is clamped). Its -t, -tb
+ * and its cgroup's cpu.max follow it (lord-llm, llmjail.h). A change restarts an idle engine now, a busy one at its
+ * next job. Returns 0, or -1 (EINVAL) when negative. */
+int llm_set_threads(int n);
 /* Stops the engine now (Sentinela turned off). */
 void llm_stop(void);
 
