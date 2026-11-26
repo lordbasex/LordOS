@@ -407,6 +407,10 @@ ln -s /usr/share/backgrounds/lordos "$L/assets/wallpapers"
 # each isolated app's process (lord-server --app) loads its runtime from here
 [ -f assets/app-host.bundle.js ] || { echo "missing assets/app-host.bundle.js (npm run build)" >&2; exit 1; }
 install -m 644 assets/app-host.bundle.js "$L/assets/app-host.bundle.js"
+# (0.8.9.6.2) the host of a community theme (runtime/theme-host.js, in the code manifest): LordOS's code that runs a
+# community theme's restricted realm; without it the code check refuses the package
+[ -f assets/theme-host.bundle.js ] || { echo "missing assets/theme-host.bundle.js (npm run build)" >&2; exit 1; }
+install -m 644 assets/theme-host.bundle.js "$L/assets/theme-host.bundle.js"
 # system apps that run as their own sandboxed process (manifest "process": "isolated"; e.g. Passwords)
 [ -d assets/sysapps ] && cp -r assets/sysapps "$L/assets/"
 # verified system code (docs/SIGNING.md): the manifest of every bundle above and, for a release, its
