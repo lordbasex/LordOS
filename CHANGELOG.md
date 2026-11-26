@@ -11,6 +11,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **The toolkit bindings ship with LordOS, and Qt follows dark mode** (asked for by the maintainer on 2026-11-26).
+  `python3-gi`, `gir1.2-gtk-3.0`, `gir1.2-gtk-4.0`, `python3-pyqt5`, `python3-pyqt6`, `qtwayland5`, `qt6-wayland`,
+  `qgnomeplatform-qt5` and `qgnomeplatform-qt6` (all in trixie for amd64 and arm64) are in the ISO and the Raspberry Pi
+  image (`PKGS_TOOLKITS`) and Recommends of the `lordos` package (`TOOLKITRECS`), so the Store's update brings them to
+  installed systems and `lordos-testbench --toolkits` no longer shows "not installed" on a fresh system. Measured from
+  the trixie index (dependency closure, without Recommends): +142 MiB installed on the ISO (51 packages; 16 MiB of it
+  QGnomePlatform), +272 MiB on the Raspberry Pi image (114 packages; it had no GTK 3 or Qt). lord-server gives the apps
+  it starts `QT_QPA_PLATFORMTHEME=gnome` (`server/src/wl/toolkitenv.h`; a value the person set is kept): QGnomePlatform's
+  Adwaita palette follows LordOS's dark mode from the portal and GSettings, live. Qt 5 has no colour scheme and Qt 6.8's
+  own `gnome` and generic themes don't read the portal's, so Qt apps drew light on a dark desktop; without the package
+  Qt falls back to its own `gnome` theme, as before. The audit's harnesses get the same variable (`tkrun.c`). Tests:
+  `server/tests/toolkit_pkgs_test.mjs` (the three lists, the theme and docs/VM-SETUP.md in step), `toolkitenv-test`,
+  `toolkit-audit-test`.
+- **XSETTINGS for X11 apps: GTK 3 on Xwayland follows LordOS's dark mode, title bar buttons, font and icons.** GTK 3 on
+  X11 reads only XSETTINGS, which LordOS didn't serve, so it stayed light (the audit's `gtk3-x11` theme check). The X
+  window manager now owns `_XSETTINGS_S0` with a window of its own and serves `Net/ThemeName`, `Net/IconThemeName`,
+  `Gtk/DecorationLayout` and `Gtk/FontName`, the values the portal gives GTK on Wayland (`portal_gtk_values`), before
+  the first X app is let in and live with a new serial on every change (`server/src/wl/xsettings.h`, `xwm.c`). Test:
+  `build/xsettings-test` decodes the property the way GTK does (every padding, odd and oversized entries, a full buffer).
 - **A "New desktop style" issue form for sharing a community theme** (`.github/ISSUE_TEMPLATE/new-desktop-style.yml`,
   from the lordos-theme-kit proposals, approved 2026-11-26). It has the sections the kit's `/lordos-theme publish`
   writes: name and id, description, version, licence and the LordOS release it was made for, screenshots (light, dark,
@@ -48,6 +67,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `server/tests/theme_gallery_test.mjs`.
 
 ### Fixed
+- **A menu, combo list or tooltip opened right after another window of the app closed was closed at once** (Qt 5's
+  combo list "closed at once" and Qt 6's tooltip and popups "did not map in 1 s" in the toolkit audit on a real
+  desktop, reproduced headless). When the window with the keyboard went away, the keyboard came back only when the
+  theme decided, a frame or more later (60 to 130 ms), and Qt closes a popup when the keyboard arrives. lord-server now
+  gives it back in the same loop iteration to the window that had it just before (`focus_back` in `wl.c`), only when it
+  came from a window: from a LordOS window or the shell it waits for the theme, so keys never reach another app
+  meanwhile. A keyboard change also dismisses every menu but the newly focused window's own (`dismiss_popups_but`).
+- **An X app's copy was replaced by an older text, or lost.** Two races between the clipboard bridge and an X app's own
+  copy (the audit's `gtk3-x11` "another text came back" and `gtk4-x11` "no offer"): a Wayland app's selection that was
+  still being read when a newer copy came (an X app's, LordOS's own) landed afterwards and overwrote it, and the X window
+  manager then took the X CLIPBOARD back from the app that had just copied (now a read of a replaced selection is
+  dropped, `clip_sel_gen`); and the window manager took and gave up CLIPBOARD and PRIMARY at CurrentTime when the focus
+  came back (after fullscreen, a second window), which replaced or cleared an X app's copy made a moment before (now at
+  the selection's last-change time from XFixes, which the X server ignores when an app took it since). Test:
+  `tests/focusback_client.c` (run by `make test` through `tests/popup_headless.sh`, which now skips the first start's
+  screens) checks the keyboard, the menu and the late older copy; the last fails on the old compositor.
+- **GTK 4's audit harness ran out of time on a cold cache.** GTK 4 compiles its shaders before its first frame (2.5 to
+  3 s on a software renderer, while lord-server answered in a few ms), and the 4.6 s budget ended before the clipboard
+  check. Its deadline now moves by the first frame's time beyond 1 s, at most 2.4 s, under the 8 s kill.
 - **Toolkit Audit from the launcher closed before its table could be read.** The entry runs in a Terminal window
   (`Terminal=true`), which closed as soon as `lordos-testbench --toolkits` ended. It now runs
   `--toolkits --show --wait`: each check shows as it is decided, and the new `--wait` asks "Press Enter to close" (all
