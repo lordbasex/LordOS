@@ -13,6 +13,12 @@ build/webcalls-check (tests/webcalls_check.c: a WebKit view set up as lord-web s
              is opened) in the call log by its name
   isolation  SharedArrayBuffer: never on a page that isn't cross-origin isolated; with --webrtc (an engine built with
              LordOS's patch) present on one served with COOP same-origin and COEP require-corp, in the same run
+  DIP        a page served with exactly a messaging web app's headers (COEP require-corp, COOP same-origin-allow-popups,
+             Document-Isolation-Policy isolate-and-require-corp, Origin-Agent-Cluster ?1): with --dip (an engine with
+             lordos-document-isolation-policy.patch, +4.1) cross-origin isolated, SharedArrayBuffer in the page and in a
+             dedicated worker, a SharedArrayBuffer shared with that worker, "DIP isolate-and-require-corp" in the call
+             log's page line; on any engine: a cross-origin script without CORP still blocked there (one with CORP
+             loads), and COOP same-origin-allow-popups with COEP, or DIP without COEP, still not isolated
   loopback   (--webrtc) two RTCPeerConnections in one page exchange audio (a WebAudio oscillator) and video (an
              animated canvas): both connect, frames and audio arrive, and the codecs are Opus and VP8, then Opus and
              H.264 (the receiver's codec preferences); the call log shows the connection, its states and codecs
@@ -36,6 +42,7 @@ WEBRTC = "--webrtc" in sys.argv
 # as that known block, not a failure; anything else (a candidate gathered and still no connection, no frames, a
 # wrong codec) still fails.
 NO_NETWORK_KNOWN = "--no-network-known" in sys.argv
+DIP = "--dip" in sys.argv
 MAJOR = None
 
 ACCEPT_CH = ("Sec-CH-UA-Full-Version-List, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, "
@@ -79,6 +86,47 @@ fetch(location.pathname.replace('/page/', '/report/'), { method: 'POST', body: J
   sab: typeof SharedArrayBuffer, coi: self.crossOriginIsolated, atomics: typeof Atomics })
 }).then(() => { document.title = 'done'; });
 </script>"""
+
+# a dedicated worker (served with COEP require-corp, as a site that is isolated serves its workers), a
+# SharedArrayBuffer handed to it and written there, and two cross-origin scripts (another port: another origin), one
+# without Cross-Origin-Resource-Policy (COEP must block it) and one with CORP cross-origin (it loads)
+DIP_PAGE = b"""<!doctype html><title>dip</title><script>
+(async () => {
+  const name = location.pathname.replace('/page/', '');
+  const o = { sab: typeof SharedArrayBuffer, coi: self.crossOriginIsolated, atomics: typeof Atomics };
+  try {
+    const w = new Worker('/worker.js');
+    o.worker = await new Promise(res => {
+      w.onmessage = e => res(e.data);
+      w.onerror = e => res({ error: 'worker error' });
+      if (typeof SharedArrayBuffer === 'function') {
+        const sab = new SharedArrayBuffer(16);
+        o.shared = 'sent';
+        w.postMessage(sab);
+        setTimeout(() => { o.sharedValue = new Int32Array(sab)[0]; }, 500);
+      } else w.postMessage(null);
+      setTimeout(() => res({ error: 'timeout' }), 5000);
+    });
+    await new Promise(f => setTimeout(f, 700));
+  } catch (e) { o.worker = { error: e.name }; }
+  const load = src => new Promise(res => { const s = document.createElement('script'); s.src = src;
+    s.onload = () => res('loaded'); s.onerror = () => res('blocked'); document.head.appendChild(s); setTimeout(() => res('timeout'), 5000); });
+  o.noCorp = await load(XORIGIN + '/res/nocorp.js');
+  o.withCorp = await load(XORIGIN + '/res/corp.js');
+  await fetch('/report/' + name, { method: 'POST', body: JSON.stringify(o) });
+  document.title = 'done';
+})();
+</script>"""
+
+WORKER_JS = b"""self.onmessage = e => {
+  let wrote = false;
+  if (e.data && typeof SharedArrayBuffer === 'function' && e.data instanceof SharedArrayBuffer) { Atomics.store(new Int32Array(e.data), 0, 42); wrote = true; }
+  postMessage({ sab: typeof SharedArrayBuffer, coi: self.crossOriginIsolated, wrote });
+};"""
+
+# the headers a messaging web app's document is served with (captured from Chrome, 2026-11-26)
+DIP_HEADERS = [("Cross-Origin-Embedder-Policy", "require-corp"), ("Cross-Origin-Opener-Policy", "same-origin-allow-popups"),
+               ("Document-Isolation-Policy", "isolate-and-require-corp"), ("Origin-Agent-Cluster", "?1")]
 
 LOOPBACK_PAGE = b"""<!doctype html><title>loopback</title><canvas id=c width=320 height=240></canvas><script>
 async function call(prefer) {
@@ -169,6 +217,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.page(SAB_PAGE)
         elif self.path == "/page/loopback":
             self.page(LOOPBACK_PAGE)
+        elif self.path == "/page/dip":
+            self.page(DIP_PAGE.replace(b"XORIGIN", b"'http://127.0.0.1:%d'" % xport), DIP_HEADERS)
+        elif self.path == "/page/soap":
+            self.page(DIP_PAGE.replace(b"XORIGIN", b"'http://127.0.0.1:%d'" % xport),
+                      [("Cross-Origin-Embedder-Policy", "require-corp"), ("Cross-Origin-Opener-Policy", "same-origin-allow-popups")])
+        elif self.path == "/page/dipnocoep":
+            self.page(DIP_PAGE.replace(b"XORIGIN", b"'http://127.0.0.1:%d'" % xport),
+                      [("Cross-Origin-Opener-Policy", "same-origin-allow-popups"), ("Document-Isolation-Policy", "isolate-and-require-corp")])
+        elif self.path == "/worker.js":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/javascript")
+            self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+            self.end_headers()
+            self.wfile.write(WORKER_JS)
         else:
             self.send_response(404)
             self.end_headers()
@@ -183,6 +245,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
+
+
+class XHandler(http.server.BaseHTTPRequestHandler):
+    """the other origin: two scripts, one without CORP and one with CORP cross-origin"""
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        if self.path not in ("/res/nocorp.js", "/res/corp.js"):
+            self.send_response(404)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/javascript")
+        if self.path == "/res/corp.js":
+            self.send_header("Cross-Origin-Resource-Policy", "cross-origin")
+        self.end_headers()
+        self.wfile.write(b"window.__x = 1;")
 
 
 def fail(msg):
@@ -229,6 +309,9 @@ def header_of(bl):
 srv = Server(("127.0.0.1", 0), Handler)
 port = srv.server_address[1]
 threading.Thread(target=srv.serve_forever, daemon=True).start()
+xsrv = Server(("127.0.0.1", 0), XHandler)
+xport = xsrv.server_address[1]
+threading.Thread(target=xsrv.serve_forever, daemon=True).start()
 
 # ---- identity ----
 calls, out = run("/page/ua")
@@ -317,6 +400,38 @@ again = reports["/report/plain"]
 if again["sab"] != "undefined":
     fail("SharedArrayBuffer leaked to a plain page after an isolated one: %r" % again)
 ok("a plain page after the isolated one still has no SharedArrayBuffer")
+
+# ---- Document-Isolation-Policy ----
+calls, _ = run("/page/dip")
+d = reports.get("/report/dip") or fail("no report from the DIP page")
+print("     DIP page:", json.dumps(d, sort_keys=True))
+if d.get("noCorp") != "blocked" or d.get("withCorp") != "loaded":
+    fail("DIP page: a cross-origin script without CORP %s, with CORP %s (want blocked, loaded)" % (d.get("noCorp"), d.get("withCorp")))
+ok("DIP page: a cross-origin script without CORP blocked, one with CORP cross-origin loaded (COEP require-corp enforced)")
+pl = [c for c in calls if c.startswith("webcall: page: ")]
+if not pl or not pl[0].endswith(", DIP isolate-and-require-corp"):
+    fail("the call log's page line lacks 'DIP isolate-and-require-corp': %r" % pl)
+wk = d.get("worker") or {}
+if DIP:
+    if not d["coi"] or d["sab"] != "function":
+        fail("the DIP page isn't cross-origin isolated (lordos-document-isolation-policy.patch): %r" % d)
+    if wk.get("sab") != "function" or not wk.get("wrote") or d.get("sharedValue") != 42:
+        fail("the DIP page's dedicated worker: %r, shared value %r (want SharedArrayBuffer there and 42 written)" % (wk, d.get("sharedValue")))
+    ok("DIP page (COOP same-origin-allow-popups, COEP require-corp, DIP isolate-and-require-corp): crossOriginIsolated, "
+       "SharedArrayBuffer in the page and its worker (worker crossOriginIsolated %s), 42 written there through a shared buffer" % wk.get("coi"))
+else:
+    print("     DIP page without --dip: crossOriginIsolated %s, SharedArrayBuffer %s (an engine without the DIP patch isn't isolated)" % (d["coi"], d["sab"]))
+ok("call log: " + pl[0][len("webcall: "):])
+for name, what in (("soap", "COOP same-origin-allow-popups with COEP, no DIP"), ("dipnocoep", "DIP without COEP")):
+    run("/page/" + name)
+    r2 = reports.get("/report/" + name) or fail("no report from /page/" + name)
+    if r2["coi"] or r2["sab"] != "undefined" or (r2.get("worker") or {}).get("sab") not in ("undefined", None):
+        fail("%s is cross-origin isolated or has SharedArrayBuffer: %r" % (what, r2))
+    ok("%s: not cross-origin isolated, no SharedArrayBuffer in the page or its worker" % what)
+run("/page/plain")
+if reports["/report/plain"]["sab"] != "undefined":
+    fail("SharedArrayBuffer leaked to a plain page after the DIP one: %r" % reports["/report/plain"])
+ok("a plain page after the DIP ones still has no SharedArrayBuffer")
 
 # ---- loopback ----
 if api["RTCPeerConnection"] != "function":

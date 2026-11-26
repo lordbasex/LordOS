@@ -31,6 +31,7 @@
 #include "webback.h"
 #include "weburl.h"
 #include "weboffline.h"
+#include "webcall.h"
 #include "lord_version.h"           /* build/gen: LordOS's version, for the user agent */
 
 #include <sys/utsname.h>
@@ -353,7 +354,13 @@ static gboolean on_decide(WebKitWebView *v, WebKitPolicyDecision *dec, WebKitPol
     if (type == WEBKIT_POLICY_DECISION_TYPE_RESPONSE) {
         WebKitResponsePolicyDecision *r = WEBKIT_RESPONSE_POLICY_DECISION(dec);
         /* the site's Accept-CH, for the Client Hints of a profile that is Chrome (webhints.c) */
-        if (webkit_response_policy_decision_is_main_frame_main_resource(r)) webhints_response(w, webkit_response_policy_decision_get_response(r));
+        if (webkit_response_policy_decision_is_main_frame_main_resource(r)) {
+            WebKitURIResponse *resp = webkit_response_policy_decision_get_response(r);
+            webhints_response(w, resp);
+            /* the document's Document-Isolation-Policy, in closed words, for the call log's "page:" line (webcall.h) */
+            SoupMessageHeaders *h = resp ? webkit_uri_response_get_http_headers(resp) : NULL;
+            webcall_set_dip(h ? soup_message_headers_get_one(h, "Document-Isolation-Policy") : NULL);
+        }
         if (webkit_response_policy_decision_is_main_frame_main_resource(r) && !webkit_response_policy_decision_is_mime_type_supported(r)) {
             webkit_policy_decision_download(dec);
             return TRUE;

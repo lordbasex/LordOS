@@ -165,7 +165,16 @@ static void line_is(const char *json, const char *want) {
 
 static void test_call_log(void) {
     line_is("{\"k\":\"env\",\"coi\":true,\"sab\":false,\"atomics\":true,\"rtc\":true,\"gum\":true}",
-            "page: crossOriginIsolated yes, SharedArrayBuffer no, Atomics yes, RTCPeerConnection yes, getUserMedia yes");
+            "page: crossOriginIsolated yes, SharedArrayBuffer no, Atomics yes, RTCPeerConnection yes, getUserMedia yes, DIP none");
+    /* Document-Isolation-Policy in closed words only, never the header's own text */
+    CHECK(!strcmp(webcall_dip_word(NULL), "none") && !strcmp(webcall_dip_word(""), "none") && !strcmp(webcall_dip_word("none"), "none"), "DIP none");
+    CHECK(!strcmp(webcall_dip_word(" isolate-and-require-corp ; report-to=\"x\""), "isolate-and-require-corp"), "DIP require-corp");
+    CHECK(!strcmp(webcall_dip_word("isolate-and-credentialless"), "isolate-and-credentialless"), "DIP credentialless");
+    CHECK(!strcmp(webcall_dip_word("isolate-and-require-corpX"), "other") && !strcmp(webcall_dip_word("<script>"), "other"), "DIP other");
+    webcall_set_dip("isolate-and-require-corp");
+    line_is("{\"k\":\"env\",\"coi\":true,\"sab\":true,\"atomics\":true,\"rtc\":true,\"gum\":true}",
+            "page: crossOriginIsolated yes, SharedArrayBuffer yes, Atomics yes, RTCPeerConnection yes, getUserMedia yes, DIP isolate-and-require-corp");
+    webcall_set_dip(NULL);
     line_is("{\"k\":\"pc\",\"id\":1,\"ev\":\"created\"}", "peer connection 1 created");
     line_is("{\"k\":\"state\",\"id\":1,\"what\":\"connection\",\"state\":\"connected\"}", "peer connection 1: connection connected");
     line_is("{\"k\":\"state\",\"id\":2,\"what\":\"ice-connection\",\"state\":\"failed\"}", "peer connection 2: ice-connection failed");

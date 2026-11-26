@@ -85,6 +85,21 @@ static int has_usb_id(const char *s) {
     return 0;
 }
 
+const char *webcall_dip_word(const char *h) {
+    if (!h) return "none";
+    while (*h == ' ' || *h == '\t') h++;
+    size_t n = strcspn(h, ";");
+    while (n && (h[n - 1] == ' ' || h[n - 1] == '\t')) n--;
+    static const char *const words[] = { "none", "isolate-and-require-corp", "isolate-and-credentialless", NULL };
+    if (!n) return "none";
+    for (int i = 0; words[i]; i++) if (strlen(words[i]) == n && !strncmp(h, words[i], n)) return words[i];
+    return "other";
+}
+
+static const char *dip_word = "none";
+
+void webcall_set_dip(const char *header) { dip_word = webcall_dip_word(header); }
+
 const char *webcall_device_class(const char *op, const char *label) {
     if (op && !strcmp(op, "getDisplayMedia")) return "screen";
     if (!label || !label[0]) return "unnamed";
@@ -109,8 +124,8 @@ size_t webcall_line(const char *json, size_t len, char *out, size_t n) {
     if (!strcmp(k, "env")) {
         int coi = flag(o, "coi"), sab = flag(o, "sab"), at = flag(o, "atomics"), rtc = flag(o, "rtc"), gum = flag(o, "gum");
         if (coi < 0 || sab < 0 || at < 0 || rtc < 0 || gum < 0) goto done;
-        r = out_fmt(out, n, "page: crossOriginIsolated %s, SharedArrayBuffer %s, Atomics %s, RTCPeerConnection %s, getUserMedia %s",
-                    coi ? "yes" : "no", sab ? "yes" : "no", at ? "yes" : "no", rtc ? "yes" : "no", gum ? "yes" : "no");
+        r = out_fmt(out, n, "page: crossOriginIsolated %s, SharedArrayBuffer %s, Atomics %s, RTCPeerConnection %s, getUserMedia %s, DIP %s",
+                    coi ? "yes" : "no", sab ? "yes" : "no", at ? "yes" : "no", rtc ? "yes" : "no", gum ? "yes" : "no", dip_word);
     } else if (!strcmp(k, "pc")) {
         const char *ev = json_str(o, "ev");
         if (num(o, "id", 1, 10000, &id) || !in_list(ev, EVENTS)) goto done;

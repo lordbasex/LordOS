@@ -46,7 +46,8 @@ DVER=${1:?usage: build-wpewebkit.sh <debian-version, e.g. 2.54.3-1> [lordos-revi
 REV=${2:-1}
 case "$DVER" in *[!0-9.a-z+~-]*|*-*-*|[!0-9]*) echo "build-wpewebkit.sh: bad Debian version $DVER" >&2; exit 1 ;; esac
 case "$DVER" in *-*) ;; *) echo "build-wpewebkit.sh: $DVER has no Debian revision (2.54.3-1)" >&2; exit 1 ;; esac
-case "$REV" in *[!0-9]*|'') echo "build-wpewebkit.sh: the LordOS revision is a number" >&2; exit 1 ;; esac
+# a number, or number.number for a revision between two others (4.1 sorts after +4 and before +5)
+case "$REV" in *[!0-9.]*|''|.*|*.|*.*.*) echo "build-wpewebkit.sh: the LordOS revision is a number (or n.m)" >&2; exit 1 ;; esac
 UP=${DVER%-*}
 NEWVER="$DVER~lordos13+$REV"
 HERE=$(cd "$(dirname "$0")" && pwd)

@@ -51,6 +51,7 @@ static gboolean on_decide(WebKitWebView *v, WebKitPolicyDecision *dec, WebKitPol
     WebKitURIResponse *resp = webkit_response_policy_decision_get_response(r);
     char origin[256];
     SoupMessageHeaders *h = webkit_uri_response_get_http_headers(resp);
+    webcall_set_dip(h ? soup_message_headers_get_one(h, "Document-Isolation-Policy") : NULL);     /* as webengine.c does */
     const char *ach = h ? soup_message_headers_get_list(h, "Accept-CH") : NULL;
     if (ach && !webua_origin(webkit_uri_response_get_uri(resp), origin, sizeof origin) && webua_sites_set(&sites, origin, webua_accept_ch(ach))) {
         char line[700];

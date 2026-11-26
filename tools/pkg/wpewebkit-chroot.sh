@@ -137,6 +137,65 @@ Last-Update: 2026-11-26
                      return Exception { ExceptionCode::InvalidAccessError, "TURN/TURNS server requires both username and credential"_s };
 PATCH
     echo lordos-turn-transport-query.patch >> debian/patches/series
+    #    Document-Isolation-Policy (+4.1): a messaging web app makes itself cross-origin isolated with DIP
+    #    "isolate-and-require-corp" and COEP require-corp next to COOP same-origin-allow-popups, which Chrome honours and
+    #    WebKit doesn't know, so it had no SharedArrayBuffer and offered no calls. Such a document (DIP isolate-and-*, an
+    #    enforced COEP require-corp, COOP unsafe-none or same-origin-allow-popups) is treated as COOP same-origin + COEP:
+    #    WebKit's own isolation, an isolated browsing context group in a web process of its own (docs/WPEWEBKIT.md)
+    cat > debian/patches/lordos-document-isolation-policy.patch <<'PATCH'
+Description: Document-Isolation-Policy makes a COEP require-corp document cross-origin isolated
+ WebKit doesn't implement Document-Isolation-Policy, so a site that relies on it for cross-origin isolation (DIP
+ isolate-and-require-corp with COOP same-origin-allow-popups) never gets SharedArrayBuffer. A response with DIP
+ isolate-and-require-corp or isolate-and-credentialless, an enforced COEP of require-corp and COOP unsafe-none or
+ same-origin-allow-popups gets the effective COOP same-origin + COEP: WebKit's own cross-origin isolation, a new
+ isolated browsing context group in a web process of its own. Its COOP only becomes stricter (popups to other
+ origins lose their opener); COEP and CORP enforcement of subresources is unchanged.
+Author: LordOS <lord.basex@gmail.com>
+Forwarded: no
+Last-Update: 2026-11-26
+
+--- a/Source/WebCore/loader/CrossOriginOpenerPolicy.cpp
++++ b/Source/WebCore/loader/CrossOriginOpenerPolicy.cpp
+@@ -208,6 +208,18 @@
+     return newCOOPEnforcementResult;
+ }
+ 
++// LordOS: Document-Isolation-Policy (https://github.com/explainers-by-googlers/document-isolation-policy), which
++// WebKit doesn't implement: true when the response asks for its document to be isolated ("isolate-and-require-corp" or
++// "isolate-and-credentialless"; "none", a report-only header or anything else is not).
++static bool documentIsolationPolicyIsolates(const ResourceResponse& response)
++{
++    auto parsed = RFC8941::parseItemStructuredFieldValue(response.httpHeaderField("Document-Isolation-Policy"_s));
++    if (!parsed)
++        return false;
++    auto* token = std::get_if<RFC8941::Token>(&parsed->first);
++    return token && (token->string() == "isolate-and-require-corp"_s || token->string() == "isolate-and-credentialless"_s);
++}
++
+ // https://html.spec.whatwg.org/multipage/origin.html#obtain-coop
+ CrossOriginOpenerPolicy obtainCrossOriginOpenerPolicy(const ResourceResponse& response)
+ {
+@@ -247,6 +259,18 @@
+ 
+     parseCOOP(HTTPHeaderName::CrossOriginOpenerPolicy, policy.value, policy.reportingEndpoint);
+     parseCOOP(HTTPHeaderName::CrossOriginOpenerPolicyReportOnly, policy.reportOnlyValue, policy.reportOnlyReportingEndpoint);
++
++    // LordOS: a document that asks for isolation with Document-Isolation-Policy and is itself served with an enforced
++    // COEP of require-corp (WebKit's only enforcing COEP: "credentialless" isn't implemented, so it never qualifies)
++    // is treated as COOP same-origin + COEP, WebKit's own cross-origin isolation: the navigation switches to a new,
++    // isolated browsing context group in a web process of its own (CrossOriginMode::Isolated, the only process where
++    // SharedArrayBuffer and high-precision timers exist), and crossOriginIsolated is true. Only from "unsafe-none" and
++    // "same-origin-allow-popups": both become stricter (popups to other origins lose their opener, as under COOP
++    // same-origin), which is what keeps every other origin out of that process now that WebKit has no per-document
++    // agent clusters. COEP and CORP checks of subresources are unchanged; the report-only COOP is untouched.
++    if ((policy.value == CrossOriginOpenerPolicyValue::UnsafeNone || policy.value == CrossOriginOpenerPolicyValue::SameOriginAllowPopups)
++        && documentIsolationPolicyIsolates(response) && ensureCOEP().value == CrossOriginEmbedderPolicyValue::RequireCORP)
++        policy.value = CrossOriginOpenerPolicyValue::SameOriginPlusCOEP;
+     return policy;
+ }
+ 
+PATCH
+    echo lordos-document-isolation-policy.patch >> debian/patches/series
     #    The DRM backend's own API (WPEDisplayDRM, WPEScreenDRM, WPEToplevelDRM, WPEViewDRM: wpe_display_drm_* and the
     #    _get_type of the others) isn't in the library then, so it leaves Debian's symbols file too; WPEPlatform's core
     #    DRM device API (wpe_drm_device_*, used for dmabuf) stays
@@ -160,6 +219,7 @@ PATCH
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "lordos-turn-transport-query.patch: TURN URLs with ?transport=udp or ?transport=tcp are accepted."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "ICE with librice (USE_LIBRICE) in the network process, so the web process keeps no network; Build-Depends on librice-dev (LordOS's package)."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "lordos-sharedarraybuffer-coi.patch: SharedArrayBuffer in cross-origin-isolated web processes only, as on Cocoa."
+    DEBEMAIL=$DEBEMAIL_LORDOS dch --append "lordos-document-isolation-policy.patch: Document-Isolation-Policy with COEP require-corp gives WebKit's cross-origin isolation (COOP same-origin + COEP)."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Maintainer: LordOS (the packaging is the Debian WebKit Maintainers')."
     sed -i "0,/^ -- /s/^\( -- .*>  \).*$/\1$debdate/" debian/changelog
     [ "$(dpkg-parsechangelog -S Date)" = "$debdate" ] || die "could not date the changelog entry"
@@ -292,15 +352,16 @@ lordweb_check() {
     # WebRTC (maintainer's decision, 2026-11-25): on WPEPlatform, the call checks against this engine: Chrome's identity,
     # SharedArrayBuffer only when cross-origin isolated (lordos-sharedarraybuffer-coi.patch), and two peer connections in
     # one page exchanging audio and video (Opus, VP8 and H.264), with WebKit's sandbox on (ICE in the network process,
-    # librice: the loopback must connect)
+    # librice: the loopback must connect), and a page with a messaging web app's Document-Isolation-Policy headers
+    # cross-origin isolated (lordos-document-isolation-policy.patch, --dip)
     if [ -z "${EMULATED:-}" ]; then
         runuser -u tester -- make -C /build/src/server -j"$(nproc)" LORD_WEB_BACKEND=platform build/webcalls-check > "$out/webcalls-build.log" 2>&1 ||
             { tail -n 30 "$out/webcalls-build.log"; die "webcalls-check does not build"; }
         ! grep -E 'warning:' "$out/webcalls-build.log" || die "webcalls-check builds with warnings"
-        (cd /build/src/server && runuser -u tester -- env HOME=/home/tester XDG_RUNTIME_DIR=/tmp timeout 600 python3 -I tests/webcalls_check.py build/webcalls-check --webrtc) \
+        (cd /build/src/server && runuser -u tester -- env HOME=/home/tester XDG_RUNTIME_DIR=/tmp timeout 600 python3 -I tests/webcalls_check.py build/webcalls-check --webrtc --dip) \
             > "$out/webcalls.txt" 2>&1 || { cat "$out/webcalls.txt"; die "webcalls_check failed"; }
         cat "$out/webcalls.txt" >> "$out/report.txt"
-        echo "WebRTC: webcalls_check passes (identity, SharedArrayBuffer, loopback call)" | tee -a "$out/report.txt"
+        echo "WebRTC: webcalls_check passes (identity, SharedArrayBuffer, Document-Isolation-Policy, loopback call)" | tee -a "$out/report.txt"
     fi
 }
 
