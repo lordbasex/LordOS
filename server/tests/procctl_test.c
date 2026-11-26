@@ -114,7 +114,7 @@ int main(void) {
             if (r < 0) r = exeown_lookup("/opt/google/chrome/chrome", pkg, sizeof pkg);
             if (r2 < 0) r2 = exeown_lookup("/home/u/bin/tool", NULL, 0);
         }
-        CHECK(r == 1 && STREQ(pkg, "google-chrome-stable"));
+        CHECK(r == 1 && !strcmp(pkg, "google-chrome-stable"));
         CHECK(r2 == 0);
         char cmd[300];
         snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
