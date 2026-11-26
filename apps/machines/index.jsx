@@ -82,7 +82,7 @@ export const isLibraryKey = (e) => !!e && !!e.meta && !e.ctrl && !e.alt && (e.ba
 // only the main window gets the header (a machine's screen, a console or a sheet window is drawn as before)
 export default function App() {
   const { args } = useAppWindow();
-  if (args && Object.keys(args).length) return <MachinesMain />;
+  if (args && Object.keys(args).some((k) => k !== 'nonce')) return <MachinesMain />;
   return <SkinHeader app="machines" title={appName(getApp('machines'))}><MachinesMain /></SkinHeader>;
 }
 

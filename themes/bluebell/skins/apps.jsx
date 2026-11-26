@@ -147,7 +147,7 @@ function AboutBanner({ model }) {
 function QuitList({ model }) {
   return (
     <View style={{ flex: 1 }}>
-      <ListPane model={model} width={undefined} style={{ flex: 1 }} />
+      <ListPane model={model} width="100%" style={{ flex: 1 }} />
       <CommandBar model={{ title: model.error || '', commands: model.commands, actions: { command: model.actions.command } }} />
     </View>
   );

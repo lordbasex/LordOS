@@ -36,7 +36,7 @@ export function Icon({ size: s }) {
 // only the main window gets the header (a machine's screen, a console or a sheet window is drawn as before)
 export default function App() {
   const { args } = useAppWindow();
-  if (args && Object.keys(args).length) return <DatabasesMain />;
+  if (args && Object.keys(args).some((k) => k !== 'nonce')) return <DatabasesMain />;
   return <SkinHeader app="databases" title={appName(getApp('databases'))}><DatabasesMain /></SkinHeader>;
 }
 

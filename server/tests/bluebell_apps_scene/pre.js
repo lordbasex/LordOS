@@ -15,7 +15,33 @@
   const sys = lord.system;
   const real = sys.info.bind(sys);
   try { const r = real(); globalThis.__sceneReal = { user: String(r.user || ''), fullName: String(r.fullName || ''), hostname: String(r.hostname || '') }; } catch (e) { globalThis.__sceneReal = {}; }
-  const demo = () => ({ ...real(), user: 'demo', fullName: 'Alex Demo', hostname: 'demo-pc', cpu: 'Demo CPU @ 2.0GHz', machine: 'Demo PC' });
+  const demo = () => ({ ...real(), user: 'demo', fullName: 'Alex Demo', hostname: 'demo-pc', cpu: 'Demo CPU @ 2.0GHz', machine: 'Demo PC', memTotalKB: 16 * 1024 * 1024, memAvailableKB: 9 * 1024 * 1024 });
+  // System Information's report: the machine, the processor, the graphics, the memory and the drives are demo ones (the
+  // real names, serials and addresses are kept only for the driver's check)
+  try {
+    const si = lord.sysinfo;
+    if (si && typeof si.report === 'function') {
+      const rr = si.report() || {};
+      const keep = [];
+      const walk = (o, d) => { if (!o || d > 5) return; if (typeof o === 'string') { if (o.length > 5) keep.push(o); return; } if (typeof o === 'object') for (const v of Object.values(o)) walk(v, d + 1); };
+      // what identifies this one computer: serial numbers, UUIDs, hardware (MAC) addresses, the machine's own product name
+      const pick = (o, keys) => (o ? keys.map((k) => o[k]) : []);
+      walk([...pick(rr.machine, ['serial', 'uuid', 'product', 'boardSerial', 'chassisSerial']), ...(rr.storage || []).flatMap((x) => pick(x, ['serial', 'wwn', 'uuid'])),
+        ...(rr.network || []).flatMap((x) => pick(x, ['mac', 'address', 'permAddress'])), ...(rr.gpus || []).flatMap((x) => pick(x, ['serial', 'uuid']))], 0);
+      globalThis.__sceneReal.hardware = keep.filter((v) => !/^(true|false|unknown|desktop|laptop|connected|disconnected|amdgpu|i915|nvidia|nouveau|radeon|ext4|vfat|btrfs|ethernet|wifi|loopback)$/i.test(v));
+      const demoReport = () => {
+        const r = si.report() || {};
+        return { ...r, machine: { ...(r.machine || {}), vendor: 'Demo', product: 'Demo PC', version: '', serial: '', board: 'Demo board', bios: 'Demo BIOS' },
+          cpu: { ...(r.cpu || {}), model: 'Demo CPU @ 2.0GHz' },
+          gpus: (r.gpus || []).slice(0, 1).map((g) => ({ ...g, name: 'Demo Graphics', vendor: 'Demo', product: 'Demo Graphics', device: 'Demo Graphics', model: 'Demo Graphics', pciId: '', serial: '' })),
+          memory: { ...(r.memory || {}), totalKB: 16 * 1024 * 1024, modules: [] },
+          storage: [{ name: 'sda', model: 'Demo SSD 512', size: 512e9, bytes: 512e9, kind: 'ssd', transport: 'sata', serial: 'DEMO0001' }],
+          displays: (r.displays || []).map((d, i) => ({ ...d, name: `Demo Display ${i + 1}`, serial: '', edidSerial: '', vendor: 'Demo', product: '' })),
+          network: [], usb: [], pci: [], peripherals: [] };
+      };
+      try { lord.sysinfo = new Proxy(si, { get: (o, k) => (k === 'report' ? demoReport : o[k]) }); } catch (e) { /* stays real */ }
+    }
+  } catch (e) { /* no report */ }
   try { sys.info = demo; } catch (e) { /* below */ }
   if (sys.info !== demo) { try { Object.defineProperty(sys, 'info', { value: demo, configurable: true, writable: true }); } catch (e) { /* stays real */ } }
   // the computer's disks (models, serial numbers, labels) are its own: the scenes show two demo disks, and the real
@@ -38,6 +64,16 @@
       try { lord.disks = fake; } catch (e) { /* stays real */ }
     }
   } catch (e) { /* no disks */ }
+  // the system journal and LordOS's log files hold user names, paths and commands: the scenes show none
+  try {
+    const L = lord.logs;
+    if (L) lord.logs = new Proxy(L, { get: (o, k) => (k === 'files' ? () => [] : k === 'take' ? () => [] : k === 'tail' ? () => '' : o[k]) });
+  } catch (e) { /* stays real */ }
+  // Monitor's processor name and the home location its map would use
+  try {
+    const M = lord.monitor;
+    if (M && typeof M.info === 'function') lord.monitor = new Proxy(M, { get: (o, k) => (k === 'info' ? () => ({ ...(o.info() || {}), cpuModel: 'Demo CPU @ 2.0GHz', geo: null, home: null }) : o[k]) });
+  } catch (e) { /* stays real */ }
   // the time zone says where someone lives: the Clock shows a neutral one
   try { if (lord.time) lord.time.zone = () => 'Etc/UTC'; } catch (e) { /* stays real */ }
 })();
