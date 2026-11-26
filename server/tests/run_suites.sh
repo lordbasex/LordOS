@@ -957,6 +957,7 @@ EOF
     # (0.8.9.6.2) Settings → Web apps → Refresh icon: busy, then the icon or the reason, one closed log line per failure
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "webapps-icon-settings-scene (apps/settings/WebApps.jsx)" node tests/textfield_menu_test.mjs webapps_icon_settings_scene.mjs
+        run "webapps-restart-settings-scene (Restart, Force Quit, Restart web apps engine)" node tests/textfield_menu_test.mjs webapps_restart_settings_scene.mjs
     else skip "webapps-icon-settings-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.9) the trademark notice of the Store's Web apps section and of each web app's page
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then

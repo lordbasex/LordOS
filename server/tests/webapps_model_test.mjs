@@ -350,6 +350,24 @@ const ran = [];
   eq('inspect: already on', [on.checked, on.disabled], [true, true]);
   eq('inspect: running not a list', M.inspectItem(web, true, null, 'I', ask).checked, false);
 }
+{
+  const asked = [];
+  const ask = (q) => asked.push(q);
+  const web = { app: 'chat', profile: 'work' };
+  const labels = { restart: 'R', quit: 'Q' };
+  eq('restart: not a web app window', M.restartItems(null, [{ app: 'chat', profile: 'work' }], labels, ask), []);
+  eq('restart: not running', M.restartItems(web, [{ app: 'chat', profile: 'personal' }], labels, ask), []);
+  eq('restart: running not a list', M.restartItems(web, null, labels, ask), []);
+  const items = M.restartItems(web, [{ app: 'chat', profile: 'work', pid: 3 }], labels, ask);
+  eq('restart: Restart and Force Quit', items.map((i) => i.label), ['R', 'Q']);
+  items.forEach((i) => i.onClick());
+  eq('restart: each asks first, nothing else', asked, [{ app: 'chat', profile: 'work', kind: 'restart' }, { app: 'chat', profile: 'work', kind: 'quit' }]);
+  const entry = { id: 'chat', name: 'Chat', profiles: [{ id: 'personal', name: 'Personal' }, { id: 'work', name: 'Work' }] };
+  const tr = (k, v) => `${k}:${v.app}/${v.profile}`;
+  eq('a name with its profile', M.appProfileName(entry, 'work', tr), 'webapps.windowName:Chat/Work');
+  eq('one profile: the app\'s name', M.appProfileName({ ...entry, profiles: [entry.profiles[0]] }, 'personal', tr), 'Chat');
+  eq('no entry: the id', M.appProfileName(null, 'work', tr), 'work');
+}
 const edit = M.webEditItems((c) => `L:${c}`, (c) => ran.push(c));
 eq('the Edit menu', edit.map((i) => (i === '-' ? '-' : `${i.label} ${i.hint}`)),
   ['L:undo Ctrl+Z', 'L:redo Ctrl+Shift+Z', '-', 'L:cut Ctrl+X', 'L:copy Ctrl+C', 'L:paste Ctrl+V', '-', 'L:selectAll Ctrl+A']);

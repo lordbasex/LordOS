@@ -13,7 +13,7 @@
  *     LORDOS_WEB=1 (and LORDOS_SESSIOND=1 under lord-sessiond, so lord-web refuses to run without its scope), and
  *     LORDOS_WEB_SCHEME=light|dark once the theme has told the desktop's mode (webscheme.h).
  *     One process per app and profile; a second launch only says it is running (the shell
- *     raises its window).
+ *     raises its window, and ui/webalive.c checks it still answers).
  *   - Developer tools (docs/WEBAPPS.md, "Developer tools"; webinspect.h): developer mode is one switch,
  *     ~/.config/lordos/web/developer.json, written only here. webmgr_inspect ends that app and profile's lord-web and
  *     starts it again as "lord-web --app <app> --profile <profile> --inspect", only while the switch is on (lord-web

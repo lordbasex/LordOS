@@ -18,7 +18,7 @@ export { errorText } from '../../sdk/errors.js';
 export * as webAppsModel from '../../sdk/webappsmodel.js';
 export {
   useWebApps, webAppsAvailable, webAppCall, launchWebApp, webRunning, refreshSiteIcon, siteIconStatus, webBadges, webDeveloper,
-  setWebDeveloperMode, webSearchEngine, setWebSearchEngine,
+  setWebDeveloperMode, webSearchEngine, setWebSearchEngine, restartWebApp, quitWebApp, restartWebEngine,
 } from '../../sdk/webapps.js';
 const Icon = ({ size }) => h(View, { style: { width: size, height: size } });
 export const webAppIcon = () => Icon;

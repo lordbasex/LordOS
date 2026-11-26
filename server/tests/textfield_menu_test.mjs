@@ -5,7 +5,7 @@
 // with esbuild (as the theme is built) over a stub `lord` that keeps the node tree, its texts and a clipboard, runs
 // it, and reads its checks. Needs node and the repository's node_modules (esbuild, react, react-reconciler).
 // An argument names another scene over the same stub: tests/password_field_scene.mjs (the eye and the Caps Lock hint),
-// tests/screencast_scene.mjs (the ScreenCast chooser), tests/webapps_get_scene.mjs (Get of a web app, the engine first),
+// tests/screencast_scene.mjs (the ScreenCast chooser), tests/webapps_get_scene.mjs (Get of a web app, the engine first), tests/webapps_restart_settings_scene.mjs (Settings → Web apps: Restart, Force Quit, the engine),
 // tests/webapps_sheet_scene.mjs (the Store's "Add from an address"
 // sheet), tests/store_trademark_scene.mjs (the trademark notice of the Store's web apps),tests/theme_portal_scene.mjs (only the theme's ThemeProvider sets the portal's colors),
 // tests/clipboard_snippets_scene.mjs (the clipboard's Snippets tab, GitHub #205),
