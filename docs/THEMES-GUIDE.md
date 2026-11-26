@@ -618,6 +618,24 @@ only one of `SKIN_COMMANDS` (`newTab`, `newWindow`, `copy`, `paste`, `find`, `sp
 writes to a session or reads its text. `server/tests/terminal_skin_scene.mjs` runs the Terminal with every region stubbed
 and checks that nothing a skin does reaches a session (in `make test`).
 
+#### Text Editor
+
+| Region | Where | The Text Editor's own | The skin's `model` |
+|---|---|---|---|
+| `toolbar` | above the tabs | none | the view model below |
+| `tabBar` | the top of the text | the open files' tabs | the view model |
+| `statusBar` | the bottom | line and column, cursors, selection, a message, language, indent, line ends | the view model |
+| `contextMenu` | over the text | the clipboard and Speech | `{ x, y, items, close, bounds }`, as in Files |
+
+The view model (`apps/editor/skinmodel.js`, `editorViewModel`): `tabs: [{ key, name, dirty, active, index }]`,
+`status: { line, col, cursors, selected, language, indent, eol, message: { text, ok } | null }`, `commands: [{ id,
+label }]` and `actions`: `selectTab(key)`, `closeTab(key)` (a tab with unsaved changes still asks), `menu(event)` (the
+editor's own menu at the event's place) and `command(id)`, which runs only one of `SKIN_COMMANDS` (`new`, `open`,
+`openFolder`, `save`, `saveAs`, `close`, `print`, `undo`, `redo`, `cut`, `copy`, `paste`, `selectAll`, `find`, `findNext`,
+`gotoLine`, `gotoFile`, `language`, `toggleProject`) as its menu item does. **The text is never a skin's:** the model
+carries no document text, and the project tree, the find bar and every dialog stay the editor's.
+`server/tests/editor_skin_scene.mjs` runs it with every region stubbed (in `make test`).
+
 ## 3. Building it
 
 `npm install` once (React, the reconciler and esbuild), then:

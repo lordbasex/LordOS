@@ -14,6 +14,7 @@ export const APP_REGIONS = {
   files: ['toolbar', 'addressBar', 'sidebar', 'itemView', 'statusBar', 'contextMenu'],
   settings: ['sidebar', 'home'],
   terminal: ['tabBar', 'statusBar', 'contextMenu'],
+  editor: ['toolbar', 'tabBar', 'statusBar', 'contextMenu'],
 };
 
 // The parts of a style a person can turn off one by one.

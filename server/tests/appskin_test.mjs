@@ -13,6 +13,7 @@ const M = await import(path.join(root, 'sdk/appskinmodel.js'));
 const F = await import(path.join(root, 'apps/files/skinmodel.js'));
 const S = await import(path.join(root, 'apps/settings/skinmodel.js'));
 const T = await import(path.join(root, 'apps/terminal/skinmodel.js'));
+const E = await import(path.join(root, 'apps/editor/skinmodel.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -137,6 +138,15 @@ eq('terminal: commands are the closed list', tvm.commands.map((c) => c.id), T.SK
 eq('terminal: a command on the list', T.skinCommand('copy'), 'copy');
 eq('terminal: one that is not', T.skinCommand('write'), null);
 ok('terminal: no command writes to a session', !T.SKIN_COMMANDS.some((c) => /write|type|send|paste[A-Z]|run/.test(c)));
+
+// ---- the Text Editor's view model ----
+eq('editor regions', M.APP_REGIONS.editor, ['toolbar', 'tabBar', 'statusBar', 'contextMenu']);
+const evm = E.editorViewModel({ tabs: [{ id: 1, name: 'a.txt', dirty: true, active: true, text: 'secret' }],
+  status: { line: 3, col: 7.9, cursors: 1, selected: 0, language: 'JS', indent: '2', eol: 'weird', message: { text: 'Saved', ok: true, extra: 1 } }, label: (id) => id }, { command: fn });
+eq('editor: tabs carry no text', Object.keys(evm.tabs[0]), ['key', 'name', 'dirty', 'active', 'index']);
+eq('editor: status', [evm.status.line, evm.status.col, evm.status.eol, evm.status.message], [3, 7, 'LF', { text: 'Saved', ok: true }]);
+eq('editor: commands are the closed list', evm.commands.map((c) => c.id), E.SKIN_COMMANDS);
+eq('editor: one that is not', E.skinCommand('insert'), null);
 
 console.log(`appskin-test: ${n} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);

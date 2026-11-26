@@ -28,6 +28,7 @@ import { fileIcons, toolbarIcons, appIcons } from './glyphs.jsx';
 import { filesSkin } from './skins/files.jsx';
 import { settingsSkin } from './skins/settings.jsx';
 import { terminalSkin } from './skins/terminal.jsx';
+import { editorSkin } from './skins/editor.jsx';
 
 // ---- the style pack and the app skins (before startShell) ----
 registerStylePack({
@@ -42,7 +43,7 @@ registerStylePack({
   },
   fonts: { family: 'DejaVu Sans' },
 });
-registerAppSkins({ files: filesSkin, settings: settingsSkin, terminal: terminalSkin });
+registerAppSkins({ files: filesSkin, settings: settingsSkin, terminal: terminalSkin, editor: editorSkin });
 
 const areaFn = (d) => {
   const a = { x: d.x, y: d.y, w: d.w, h: d.h };

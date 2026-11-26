@@ -97,6 +97,14 @@
     await sleep(1200);
     step('Terminal: the command row', !!textId(sdk.t('terminal.action.newTab')) && !!textId(sdk.t('terminal.action.find')));
     await shot('terminal');
+    // the Text Editor: the command row, the tabs and the status panels
+    sdk.wm.open('editor', { new: true, args: { path: `${home}/Documents/notes.md` } });
+    await sleep(2500);
+    const ew = win('editor');
+    if (ew) sdk.wm.setFrame?.(ew.id, { x: 260, y: 60, w: 760, h: 480 });
+    await sleep(1200);
+    step('Text Editor: the command row and the status', !!textId(sdk.t('editor.cmd.save')) && !!textId('LF'));
+    await shot('editor');
     // the demo identity is the only one on screen (pre.js)
     const R = globalThis.__sceneReal || {};
     // what React shows, and what every terminal session's screen shows (its prompt is the shell's)
