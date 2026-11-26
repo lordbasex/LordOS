@@ -3,3 +3,7 @@
 export { View, Text } from '@lordos/runtime';
 export { useTheme } from '../../sdk/theme.js';
 export { StudioWindow, studioAvailable } from '../../sdk/studio.jsx';
+// (0.8.9.6.2) apps/studio wraps its window in SkinHeader (app skins, sdk/appskins.jsx); with no skin it draws the window as is
+export { SkinHeader } from '../../sdk/appskins.jsx';
+export const appName = () => '';
+export const getApp = () => null;
