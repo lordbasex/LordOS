@@ -30,6 +30,7 @@
     ['disks', {}, (sdk) => sdk.t('disks.title')],
     ['about', {}, 'LordOS'],
     ['help', {}, (sdk) => sdk.t('help.tour.open')],
+    ['characters', {}, (sdk) => sdk.t('characters.tab.symbols')],
   ];
   (async () => {
     await sleep(2500);

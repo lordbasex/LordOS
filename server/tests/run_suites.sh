@@ -1079,6 +1079,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "help-skin-scene (apps/help regions)" node tests/menubar_test.mjs help_skin_scene.mjs
     else skip "help-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Characters with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "characters-skin-scene (apps/characters regions)" node tests/menubar_test.mjs characters_skin_scene.mjs
+    else skip "characters-skin-scene" "node and the repository's node_modules (npm install)"; fi
     # (#218) Files: dragging in a folder of 2000 files draws only the ghost and the drop highlights, never the whole window
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-drag-scene (apps/files/dnd.jsx)" node tests/menubar_test.mjs files_drag_scene.mjs

@@ -26,6 +26,7 @@ export const APP_REGIONS = {
   disks: ['sidebar'],
   about: ['banner'],
   help: ['sidebar'],
+  characters: ['toolbar', 'sidebar'],
 };
 
 // The parts of a style a person can turn off one by one.
