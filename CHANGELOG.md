@@ -251,6 +251,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     model never carries the document's text.
     The **Store** has two: `sidebar` and `toolbar` (`apps/store/skinmodel.js`); a skin chooses a page, goes back, searches
     and refreshes, and every install stays the Store's.
+    Most other apps use two shared shapes (`commandBar` and `listPane` in `sdk/appskinmodel.js`): a command bar of the app's
+    own commands and a list pane of its places or items; Bluebell draws both once (`skins/common.jsx`). Apps with them:
+    **Notes** (`sidebar`, `toolbar`; the list carries titles and dates, never a note's text) <!-- shared-shape apps -->.
   - **Settings → Appearance → From this style**: a switch for each part the style in use brings (Icons, Pointer colors,
     Sounds, Font, App layouts; `settings.themeParts`), so someone can keep a theme's frames and use LordOS's icons.
   - **Bluebell** (`themes/bluebell`), the demo: a tribute to the desktops of 2001 with glossy blue title bars with

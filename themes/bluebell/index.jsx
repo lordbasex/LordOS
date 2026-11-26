@@ -30,6 +30,7 @@ import { settingsSkin } from './skins/settings.jsx';
 import { terminalSkin } from './skins/terminal.jsx';
 import { editorSkin } from './skins/editor.jsx';
 import { storeSkin } from './skins/store.jsx';
+import { appSkins } from './skins/apps.jsx';
 
 // ---- the style pack and the app skins (before startShell) ----
 registerStylePack({
@@ -44,7 +45,7 @@ registerStylePack({
   },
   fonts: { family: 'DejaVu Sans' },
 });
-registerAppSkins({ files: filesSkin, settings: settingsSkin, terminal: terminalSkin, editor: editorSkin, store: storeSkin });
+registerAppSkins({ files: filesSkin, settings: settingsSkin, terminal: terminalSkin, editor: editorSkin, store: storeSkin, ...appSkins });
 
 const areaFn = (d) => {
   const a = { x: d.x, y: d.y, w: d.w, h: d.h };

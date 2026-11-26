@@ -16,6 +16,7 @@ export const APP_REGIONS = {
   terminal: ['tabBar', 'statusBar', 'contextMenu'],
   editor: ['toolbar', 'tabBar', 'statusBar', 'contextMenu'],
   store: ['sidebar', 'toolbar'],
+  notes: ['sidebar', 'toolbar'],
 };
 
 // The parts of a style a person can turn off one by one.
@@ -157,3 +158,25 @@ export function freezeModel(m, depth = 0) {
 }
 // React elements and Sets/Maps are left alone (React owns the first; the others can't be frozen usefully)
 const isNodeLike = (v) => (v.$$typeof !== undefined) || v instanceof Set || v instanceof Map;
+
+// ---- two shapes most apps share (0.8.9.6.2) ----
+// A command bar (an app's `toolbar` region): the app's title for the place shown and a closed list of its own commands,
+// each { id, label, disabled, active }; the skin asks with actions.command(id), and the app runs only an id on its list
+// and not disabled. A list pane (a `sidebar` region): the places or items the app's own sidebar lists, each { key, label,
+// detail, selected, group }; the skin asks with actions.select(key). Both are plain data: the app builds them from what
+// its own regions show, and a skin learns nothing more (docs/THEMES-GUIDE.md, "App skins → the shared shapes").
+export function commandBar(s) {
+  const cmds = (s.commands || []).filter((c) => c && typeof c.id === 'string').map((c) => ({ id: c.id, label: String(c.label || ''), disabled: !!c.disabled, active: !!c.active,
+    ...(c.group ? { group: String(c.group) } : null) }));
+  return { title: String(s.title || ''), commands: cmds };
+}
+// The command a skin asked for, if the bar offers it now (on the list and not disabled), else null.
+export function pickCommand(bar, id) {
+  const c = bar && bar.commands.find((x) => x.id === id);
+  return c && !c.disabled ? c.id : null;
+}
+export function listPane(s) {
+  return { title: String(s.title || ''), items: (s.items || []).filter((x) => x && x.key != null).map((x) => ({ key: String(x.key), label: String(x.label || ''),
+    detail: x.detail == null ? '' : String(x.detail), selected: !!x.selected, ...(x.group ? { group: String(x.group) } : null) })) };
+}
+export const pickItem = (pane, key) => (pane && pane.items.some((x) => x.key === String(key)) ? String(key) : null);

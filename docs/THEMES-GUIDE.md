@@ -581,6 +581,25 @@ The view model (`apps/files/skinmodel.js`, `filesViewModel`):
   across renders; each call runs what the current render offers, exactly as Files' own button would (a new folder in a
   folder Files only browses shows Files' read-only notice; Move to Trash in a cloud folder asks first).
 
+#### The shared shapes, and the apps that use them
+
+Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one skin component can draw them all:
+
+- **A command bar** (`commandBar`): `{ title, commands: [{ id, label, disabled, active, group }], actions: { command(id) } }`.
+  The app lists only its own commands for the place shown; `command(id)` runs one only while it is on that list and not
+  disabled (`pickCommand`), exactly as the app's own button or menu item does.
+- **A list pane** (`listPane`): `{ title, items: [{ key, label, detail, selected, group }], actions: { select(key) } }`;
+  `select(key)` opens only a listed item (`pickItem`).
+
+| App | Regions (shape) | What stays the app's | Stub scene |
+|---|---|---|---|
+| Notes | `sidebar` (list pane with the search: titles and dates only), `toolbar` (command bar) | the note, its text and editor, every dialog | `notes_skin_scene.mjs` (14 checks) |
+<!-- shared-shape apps -->
+
+`server/tests/app_skin_helpers.js` gives each scene the common checks (the stubs drawn, the model frozen, a command not on
+the list refused, layouts off, no React errors); `server/tests/bluebell_apps_scene` screenshots Bluebell's skin of each
+(`tests/app_scene_headless.sh bluebell_apps_scene OUT bluebell en light|dark`).
+
 **Isolated apps can't be skinned this way.** Mail, Calendar, Contacts, Passwords and Reminders run as their own processes
 (`"process": "isolated"`), where the theme's code never runs: they receive the tokens (richer ones included, as JSON
 through the broker), never a pack's components or a skin. Skinning them would need a declarative, data-only form of

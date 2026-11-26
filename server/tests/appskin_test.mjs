@@ -26,7 +26,7 @@ const ok = (name, v) => eq(name, !!v, true);
 
 // ---- skins ----
 const A = () => null, B = () => null;
-const skins = M.cleanSkins({ files: { toolbar: A, sidebar: 'x', nope: B, itemView: B }, notes: { toolbar: A }, files2: null });
+const skins = M.cleanSkins({ files: { toolbar: A, sidebar: 'x', nope: B, itemView: B }, nosuchapp: { toolbar: A }, files2: null });
 eq('only known apps and regions, only components', Object.keys(skins), ['files']);
 eq('files keeps toolbar and itemView', Object.keys(skins.files), ['toolbar', 'itemView']);
 eq('no skins from junk', M.cleanSkins('x'), {});
@@ -155,6 +155,19 @@ const svm2 = ST.storeViewModel({ pages: [{ id: 'discover', label: 'D', group: 's
   page: 'updates', title: 'U', inApp: false, query: 'x', searchHint: 'h', refresh: { title: 'R', busy: false, run: fn } }, { go: fn });
 eq('store: pages', svm2.pages.map((p) => [p.id, p.count, p.selected, p.soon]), [['discover', 0, false, false], ['updates', 3, true, false], ['wine', 0, false, true]]);
 eq('store: refresh carries no function', Object.keys(svm2.refresh), ['title', 'busy']);
+
+// ---- the shared shapes ----
+const bar = M.commandBar({ title: 'T', commands: [{ id: 'a', label: 'A', run: fn }, { id: 'b', label: 'B', disabled: true }, null, { label: 'no id' }] });
+eq('commandBar: plain commands', bar.commands.map((c) => Object.keys(c).join()), ['id,label,disabled,active', 'id,label,disabled,active']);
+eq('pickCommand: on the list', M.pickCommand(bar, 'a'), 'a');
+eq('pickCommand: disabled', M.pickCommand(bar, 'b'), null);
+eq('pickCommand: not on the list', M.pickCommand(bar, 'c'), null);
+const pane = M.listPane({ title: 'P', items: [{ key: 1, label: 'one', detail: 2, selected: 1, body: 'secret' }, { label: 'no key' }] });
+eq('listPane: items', pane.items, [{ key: '1', label: 'one', detail: '2', selected: true }]);
+eq('pickItem', [M.pickItem(pane, 1), M.pickItem(pane, '2')], ['1', null]);
+const N = await import(path.join(root, 'apps/notes/skinmodel.js'));
+const nm = N.notesModels({ notes: [{ slug: 's', title: 'T', date: 'd', selected: true }], query: '', title: 'T', mode: 'edit', onDesktop: false, has: false }, (k) => k, {});
+eq('notes: without a note only New', nm.bar.commands.map((c) => c.id), ['new']);
 
 console.log(`appskin-test: ${n} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);

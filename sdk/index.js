@@ -464,5 +464,5 @@ export { DesktopStyleThumb, SketchThumb, knownStyleTheme } from './stylethumb.js
 // or null for LordOS's black arrow. Only the default pointer changes. startShell puts the black one back for every theme.
 // Style packs and app skins (part 4 of the community-themes plan, docs/THEMES-GUIDE.md "Style packs" and "App skins")
 export { registerStylePack, registerAppSkins, useStylePack, useStyleParts, stylePack, PackIcon, usePackHas, useSkin, useSkinned, SkinRegion, useThemeFont, applyPack } from './appskins.jsx';
-export { APP_REGIONS, STYLE_PARTS, SOUND_EVENTS, TOOLBAR_ICONS, partOn, partPatch, packParts } from './appskinmodel.js';
+export { APP_REGIONS, STYLE_PARTS, SOUND_EVENTS, TOOLBAR_ICONS, partOn, partPatch, packParts, commandBar, pickCommand, listPane, pickItem } from './appskinmodel.js';
 export const setPointerAccent = (color) => { try { return !!lord.input?.pointerAccent?.(color || null); } catch (e) { return false; } };
