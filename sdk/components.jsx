@@ -104,6 +104,7 @@ export function Button({ label, onClick, primary, style, small, plain, disabled,
   const press = disabled || waiting ? undefined : pending ? (e) => { run(e); } : onClick;
   return (
     <View onClick={press} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      accessibilityRole="button" accessibilityState={{ disabled: !!disabled, busy: !!waiting }}
       focusable={focusable && !disabled}
       style={[{ height: small ? 22 : 28, paddingHorizontal: small ? 10 : 14, borderRadius: small ? t.controlRadiusSmall : t.controlRadius, flexDirection: 'row', gap: 6,
         justifyContent: 'center', alignItems: 'center', backgroundColor: bg, ...border, ...rich,
@@ -148,7 +149,9 @@ export function Toggle({ on, onChange, small, focusable = true, busy = false, pe
   };
   const w = small ? 36 : 42, h = small ? 20 : 24, k = h - 4;
   return (
-    <View onClick={flip} focusable={focusable} style={{ width: w, height: h, borderRadius: h / 2, direction: 'ltr',
+    <View onClick={flip} focusable={focusable} accessibilityRole="switch" accessibilityState={{ checked: !!shown }}
+      handsSetValue={(v) => { const want = /^(1|true|on|yes)$/i.test(String(v)); if (want !== !!on) flip(); }}
+      style={{ width: w, height: h, borderRadius: h / 2, direction: 'ltr',
       backgroundColor: shown ? t.accent : t.control, opacity: waiting ? 0.7 : 1 }}>
       <View style={{ position: 'absolute', top: 2, left: shown ? w - k - 2 : 2, width: k, height: k, borderRadius: k / 2,
         backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
@@ -174,11 +177,13 @@ export function Segmented({ options, value, onChange, appearance = 'accent', sma
     return true;
   };
   return (
-    <View focusable={focusable && options.length > 0} onKeyDown={onKey} style={[{ flexDirection: 'row', backgroundColor: t.control, borderRadius: small ? t.controlRadiusSmall : t.controlRadius + 1, padding: 2 }, style]}>
+    <View focusable={focusable && options.length > 0} onKeyDown={onKey} accessibilityRole="tablist"
+      style={[{ flexDirection: 'row', backgroundColor: t.control, borderRadius: small ? t.controlRadiusSmall : t.controlRadius + 1, padding: 2 }, style]}>
       {options.map(([v, label, disabled]) => {
         const on = value === v;
         return (
-          <View key={v} onClick={disabled ? undefined : () => onChange(v)} style={{ paddingHorizontal: small ? 10 : 14, height: small ? 18 : 24, borderRadius: Math.max(2, (small ? t.controlRadiusSmall : t.controlRadius) - 1),
+          <View key={v} onClick={disabled ? undefined : () => onChange(v)} accessibilityRole="tab" accessibilityState={{ selected: on, disabled: !!disabled }}
+            style={{ paddingHorizontal: small ? 10 : 14, height: small ? 18 : 24, borderRadius: Math.max(2, (small ? t.controlRadiusSmall : t.controlRadius) - 1),
             justifyContent: 'center', alignItems: 'center', flexGrow: fill ? 1 : 0, opacity: disabled ? 0.4 : 1,
             backgroundColor: on ? (neutral ? raised : t.accent) : 'transparent',
             boxShadow: on && neutral ? '0 1px 2px rgba(0,0,0,0.18)' : 'none' }}>
@@ -201,6 +206,7 @@ export function SidebarItem({ label, selected, onClick, icon, detail, indent = 0
   const sel = t.mode === 'dark' ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)';
   return (
     <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      accessibilityRole="row" accessibilityState={{ selected: !!selected }}
       style={{ height: 28, paddingLeft: 10 + indent * 14, paddingRight: 10, borderRadius: t.controlRadiusSmall, flexDirection: 'row', alignItems: 'center', gap: 8,
         backgroundColor: filled ? t.accent : selected ? sel : hover ? t.hover : 'transparent' }}>
       {selected && ind ? <View style={{ position: 'absolute', insetInlineStart: 0, top: 8, width: 3, height: 12, borderRadius: 2, backgroundColor: t.accent }} /> : null}
@@ -482,6 +488,9 @@ export function releaseTextFocus(token, onChange) {
   if (focused === token) setFocus(null);
 }
 export const textFocusOwner = () => focused;
+// the box (host instance) of the TextInput or TextArea with the keys, null for none or an app's own field: Hands asks
+// whether the keys would go to a password field (sdk/hands.jsx)
+export const textFocusBox = () => (focused === null ? null : boxes.get(focused)?.current || null);
 // For panels that take the keyboard for a moment (Search, clipboard): remember the focused
 // field, give focus back on close and paste the clipboard into it as if it were Ctrl+V.
 export const focusToken = () => focused;
@@ -872,6 +881,10 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     // (paint_capture_until); the maintainer's rule: a password is never captured (GitHub #219 follow-up)
     <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble} onClick={onClick} onContextMenu={onMenu}
       focusable focusRing={false} onFocus={onKeyFocus} protected={!!secure}
+      // Hands (docs/HANDS.md): a text field with its placeholder as its name and its value, never a password's
+      accessibilityRole="textfield" accessibilityLabel={placeholder || undefined} accessibilityState={{ secure: !!secure }}
+      accessibilityValue={secure ? undefined : value || ''}
+      handsSetValue={secure ? undefined : (v) => { latest.current.onChange?.(String(v)); return true; }}
       style={[{ height: Math.max(28, size + 15), paddingHorizontal: 10, borderRadius: t.controlRadius, flexDirection: 'row', alignItems: 'center',
         // the cursor goes to the logical end: on the left if the text is Arabic or Hebrew
         direction: secure ? 'ltr' : value ? textDirection(value) : 'inherit',
@@ -1145,6 +1158,8 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   return (
     <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble} onClick={onClick} onContextMenu={onMenu}
       focusable focusRing={false} onFocus={onKeyFocus}
+      accessibilityRole="textarea" accessibilityLabel={placeholder || undefined} accessibilityValue={value || ''}
+      handsSetValue={(v) => { onChange?.(String(v)); return true; }}
       style={[{ minHeight: minRows * lineH + 2 * pad, padding: pad, borderRadius: t.controlRadius, direction: 'ltr',
         backgroundColor: t.inputBg, border: `1px solid ${isFocused && t.inputFocus !== 'underline' ? t.accent : t.separator}`, overflow: 'hidden' }, style]}>
       {isFocused && t.inputFocus === 'underline' ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, backgroundColor: t.accent, pointerEvents: 'none' }} /> : null}
@@ -1269,6 +1284,8 @@ export function Slider({ value, onChange, min = 0, max = 1, width = 160, step, f
   const f = (value - min) / (max - min || 1);
   return (
     <View ref={ref} onMouseDown={(e) => { drag.current = true; at(e.x); }} focusable={focusable} onKeyDown={onKey}
+      accessibilityRole="slider" accessibilityValue={String(Math.round(value * 1000) / 1000)}
+      handsSetValue={(v) => { const n = Number(v); if (!Number.isFinite(n)) return false; onChange(Math.max(min, Math.min(max, n))); return true; }}
       onFocus={w.onFocus} onBlur={w.onBlur} onWheel={(e) => w.wheel(e, { value, min, max, step: step || (max - min) / 20 }, onChange)}
       style={{ width, height: 20, borderRadius: 10, justifyContent: 'center', direction: 'ltr' }}>
       <View style={{ height: 4, borderRadius: 2, backgroundColor: t.control }}>

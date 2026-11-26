@@ -598,6 +598,8 @@ export const wm = {
   // marked node, maximized, or no button held): the theme can continue with its own JS drag.
   // edges as in xdg_toplevel.resize: 1 top, 2 bottom, 4 left, 8 right (5 = top-left…).
   frameRef,
+  // the native node of a window's frame (its WindowShell), or 0: Hands' reader and screenshots (sdk/hands.jsx)
+  frameNode: (id) => frameNodes.get(id)?.node || 0,
   beginMove: (id) => beginGrab(id, 0),
   // ends a move or resize of this window still under way, where it is (minimizing it: GitHub #189)
   cancelGrab: (id) => {

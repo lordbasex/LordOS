@@ -59,7 +59,7 @@ function MenuBox({ items, left, top, width, active, onRow, onPick, onMove, onEnt
         }
         const on = active === i && !it.disabled;
         return (
-          <View key={i} onMouseEnter={() => onRow(i)}
+          <View key={i} onMouseEnter={() => onRow(i)} accessibilityRole="menuitem" accessibilityState={{ disabled: !!it.disabled, checked: !!it.checked }}
             onClick={() => { if (!it.disabled) onPick(i); }}
             style={{ height: ITEM_H, marginHorizontal: 5, paddingHorizontal: 9, borderRadius: 5, flexDirection: 'row', alignItems: 'center', backgroundColor: on ? t.accent : 'transparent' }}>
             <Text style={{ width: 16, fontSize: 11, color: on ? '#fff' : t.text }}>{it.checked ? '✓' : ''}</Text>

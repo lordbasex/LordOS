@@ -24,6 +24,9 @@ export { ContextMenu } from './contextmenu.jsx';
 export { spellVersion, spellOn, spellLangs, spellInstalled, spellDefaults, spellRanges, useSpellRanges, spellSuggest, spellAddWord, spellRemoveWord, spellWordsList, spellIgnore } from './spell.js';
 export { SPELL_PACKAGES, spellPackageOk, packageInstalled, toggleLang, spellLanguages, spellWords, badRanges } from './spellmodel.js';
 export { useEditorSpell, EditorSquiggles, squiggleColorFor, spellHitAt, editorMenuRows } from './editorextras.jsx';
+// Hands: an AI agent using the desktop through lordos-mcp (docs/HANDS.md)
+export { handsStatus, handsStopped, setHandsOn, setHandsAllow, handsAllowSaved, stopHands, answerHands, refreshHands } from './hands.jsx';
+import { HandsPrompt, HandsBanner } from './hands.jsx';
 export { WritingPanel, writingReady, writingOn, writingChoice, setWritingOn, writingMenuFor } from './writing.jsx';
 export { writingEnabled } from './writingmodel.js';
 export { liveSpeech } from './livespeech.jsx';
@@ -481,7 +484,8 @@ function LocaleRoot({ children }) {
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt, FirstStart),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, CaptureCorner, DisplayIdentify, VoicePlayer),
-    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, ShotOverlay, WebAppAskPrompt, WebAppInspectPrompt, WebAppRestartPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
+    at('system', HandsPrompt, PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, ShotOverlay, WebAppAskPrompt, WebAppInspectPrompt, WebAppRestartPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
+    at('agent', HandsBanner),
     at('input', OskPanel, ImeOverlay, ThemeSwitchOverlay));   // the style changing: over everything (themeswitch.jsx)
 }
 // the wallpaper slideshow (0.8.9; a theme turns it on in theme.json: sdk/thememeta.js)

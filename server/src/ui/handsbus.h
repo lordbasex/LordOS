@@ -18,11 +18,10 @@
  *
  * Only for the user lord-server runs as: the bus says each caller's uid (GetConnectionUnixUser) before its first call is
  * served (GetConnectionCredentials: UnixUserID), and another uid gets AccessDenied (as org.lordos.Writing1, writebus.c).
- * The same answer's ProcessFD, a pidfd of the process that opened the connection, is kept for the connection's life:
- * its program is read through it (never a pid that may have been reused), a deleted program is refused, the prompt
- * shows the path and whether it is a system program (root's, in root's folders), and every later call first checks that
- * process still lives. A bus with no ProcessFD leaves the program unknown. A grant is the connection's alone (hands.c):
- * a new connection asks again, whatever name it gives. Every argument is checked here
+ * The same answer's ProcessFD, a pidfd of the process that opened the connection, is kept only so the grant ends when
+ * that process exits (each call checks it); the program path read through it is shown in the prompt as reported, never
+ * as an identity: same-user programs are one trust boundary (docs/HANDS.md "Threat model"). A grant is the
+ * connection's alone (hands.c): a new connection asks again, whatever name it gives. Every argument is checked here
  * (handsbus_parse) before hands.c's policy sees it; a call with any other signature is InvalidArgs. */
 #ifndef LORD_UI_HANDSBUS_H
 #define LORD_UI_HANDSBUS_H
@@ -41,8 +40,8 @@ void handsbus_gone(const char *name);
 /* the bus went away */
 void handsbus_lost(void);
 
-/* the program of the process a pidfd holds: 0 (path in out, *sys root's), -1 unknown, -2 deleted; tests/hands_test.c */
-int  handsbus_exe_of_pidfd(int pidfd, char *out, size_t n, int *sys);
+/* the program path of the process a pidfd holds, for the prompt only (reported, not verified): 0, or -1 unknown */
+int  handsbus_exe_of_pidfd(int pidfd, char *out, size_t n);
 
 /* ---- pure, for tests (tests/hands_test.c and its fuzz) ---- */
 /* The method's arguments into r (strings borrowed from m): 0, or -1 a wrong signature, method or value. */

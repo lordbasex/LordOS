@@ -15,7 +15,8 @@
 //   eye    Tesseract (the confined lord-ocr helper) and Debian's tesseract-ocr-<lang> language data
 //   ear    Whisper (whisper.cpp): coming soon, its facts only
 //   img    Real-ESRGAN: coming soon, its facts only (it made the 4K wallpapers, off LordOS)
-//   hands  the agent: coming soon
+//   hands  the agent's tools (Hands, docs/HANDS.md): lordos-mcp and org.lordos.Hands1, for Claude Code today and Lumo's
+//          own agent later; always there, on only when the person turns it on for a session
 
 import { VOICES, SOURCE_LICENSES, hasVoice } from './voicecatalog.js';
 
@@ -26,7 +27,7 @@ export const CAP_ICON = { brain: 'brain', ear: 'ear', voice: 'voice', eye: 'eye'
 // capabilities with nothing inside LordOS yet
 export const CAP_SOON = new Set(['ear', 'img']);
 
-// Lumo's pieces, in the order of a conversation; cap: the capability that makes the piece (hands: none yet)
+// Lumo's pieces, in the order of a conversation; cap: the capability that makes the piece (hands: none, it is part of LordOS)
 export const PIECES = [
   { id: 'ear', cap: 'ear' }, { id: 'brain', cap: 'brain' }, { id: 'voice', cap: 'voice' }, { id: 'eyes', cap: 'eye' }, { id: 'hands', cap: null },
 ];
@@ -37,6 +38,7 @@ export const PIECES = [
 export const LEVELS = ['read', 'ask', 'admin'];
 export const FUNCTIONS = [
   { id: 'writing', level: 0, ready: true, llm: true }, { id: 'sentinela', level: 0, ready: true, llm: true },
+  { id: 'hands', level: 1, ready: true },
   { id: 'notes', level: 1 }, { id: 'programs', level: 1 }, { id: 'logs', level: 0 },
   { id: 'files', level: 0 }, { id: 'apps', level: 1 }, { id: 'machines', level: 1 }, { id: 'settings', level: 1 }, { id: 'system', level: 2 },
 ];
@@ -157,20 +159,21 @@ export const imageEntries = () => IMAGE_MODELS.map(soonEntry('img'));
 // ---- Lumo's pieces ----
 
 // entries: every entry; a piece is ready when a model of its capability is installed (the brain: a model and the
-// engine); the Ear and the Hands don't exist yet
+// engine); the Hands are part of LordOS (docs/HANDS.md); the Ear doesn't exist yet
 export function pieceReady(id, entries) {
   const of = (cap) => (entries || []).filter((e) => e.cap === cap);
-  if (id === 'hands' || id === 'ear') return false;
+  if (id === 'hands') return true;
+  if (id === 'ear') return false;
   if (id === 'brain') return of('brain').some((e) => e.kind === 'llm' && e.state === 'installed') && of('brain').some((e) => e.kind === 'engine' && e.state === 'installed');
   const cap = PIECES.find((p) => p.id === id)?.cap;
   return !!cap && of(cap).some((e) => e.state === 'installed');
 }
 export function lumoState(entries) {
-  const pieces = PIECES.map((p) => ({ ...p, ready: pieceReady(p.id, entries), soon: p.id === 'ear' || p.id === 'hands' }));
+  const pieces = PIECES.map((p) => ({ ...p, ready: pieceReady(p.id, entries), soon: p.id === 'ear' }));
   const ready = pieces.filter((p) => p.ready).length;
   // waving when every piece that exists today is installed; asleep while one you could download is missing
   const missing = pieces.filter((p) => !p.ready && !p.soon).map((p) => p.id);
-  // talking needs the Ear, the Brain and the Voice, and the agent (the Hands): not yet
+  // talking needs the Ear, the Brain, the Voice and the Hands: the Ear isn't there yet
   const canTalk = pieces.filter((p) => ['ear', 'brain', 'voice', 'hands'].includes(p.id)).every((p) => p.ready);
   return { pieces, ready, total: pieces.length, missing, pose: missing.length ? 'sleep' : 'wave', canTalk };
 }

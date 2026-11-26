@@ -185,10 +185,9 @@ int handsbus_parse(const DMsg *m, HandsReq *r) {
 
 typedef struct {
     char name[64];
-    int st;                         /* 0 free, 1 asking the bus, 2 same user, 3 refused (another user, a deleted program) */
-    char exe[HANDS_EXE_MAX];        /* the program that opened the connection (read through its pidfd), "" unknown */
-    int sys;                        /* exe and every folder above it are root's and nobody else's to write */
-    int pidfd;                      /* the bus's ProcessFD of the connection's process, -1 none; checked at each call */
+    int st;                         /* 0 free, 1 asking the bus, 2 same user, 3 refused (another user, its process gone) */
+    char exe[HANDS_EXE_MAX];        /* its program's path, for the prompt only (reported, not verified), "" unknown */
+    int pidfd;                      /* the bus's ProcessFD: when that process exits, the connection's grant ends */
     const char *why;                /* why refused */
     uint32_t ask;
     DMsg pend;
@@ -226,7 +225,7 @@ static void serve(DConn *c, const DMsg *m) {
     dw_init(&b);
     if (r.call == HANDS_C_HELLO) {
         Caller *k = caller_of(m->sender);
-        int rc = hands_hello(m->sender, r.text, k ? k->exe : "", k ? k->sys : 0);
+        int rc = hands_hello(m->sender, r.text, k ? k->exe : "");
         if (rc == HANDS_OK || rc == HANDS_E_ASKING) {
             dw_str(&b, rc == HANDS_OK ? "granted" : "asking");
             dbus_reply(c, m, "s", &b);
@@ -282,7 +281,7 @@ void handsbus_call(DConn *c, const DMsg *m) {
         return;
     }
     Caller *k = caller_of(m->sender);
-    /* the process that opened the connection still lives (its pidfd, not a pid that may have been reused) */
+    /* the process that opened the connection still lives (its pidfd): when it exits, the grant ends with it */
     if (k && k->st == 2 && k->pidfd >= 0 && syscall(SYS_pidfd_send_signal, k->pidfd, 0, NULL, 0)) { k->st = 3; k->why = "program gone"; }
     if (k && k->st == 2) { serve(c, m); return; }
     if (k && k->st == 3) { dbus_error(c, m, HANDS_ERR_ACCESS, k->why ? k->why : "refused"); return; }
@@ -300,12 +299,10 @@ void handsbus_call(DConn *c, const DMsg *m) {
     snprintf(k->name, sizeof k->name, "%s", m->sender);
 }
 
-/* The program of the process a pidfd holds: its pid from the pidfd's fdinfo, /proc/<pid>/exe read, then the pidfd asked
- * whether that very process still lives (a pid reused meanwhile would leave the pidfd dead). 0 with the path in out and
- * *sys (hands_exe_system), -1 unknown, -2 a deleted program (refused: it can't be shown for what it is). */
-int handsbus_exe_of_pidfd(int pidfd, char *out, size_t n, int *sys) {
+/* The program path of the process a pidfd holds, for the prompt only: reported, never an identity (a program of the
+ * same user can be anything: docs/HANDS.md "Threat model"). 0 with the path in out, -1 unknown. */
+int handsbus_exe_of_pidfd(int pidfd, char *out, size_t n) {
     out[0] = 0;
-    *sys = 0;
     if (pidfd < 0 || n < 2) return -1;
     char p[64], line[256];
     snprintf(p, sizeof p, "/proc/self/fdinfo/%d", pidfd);
@@ -319,10 +316,8 @@ int handsbus_exe_of_pidfd(int pidfd, char *out, size_t n, int *sys) {
     ssize_t l = readlink(link, exe, sizeof exe - 1);
     if (l <= 0 || syscall(SYS_pidfd_send_signal, pidfd, 0, NULL, 0)) return -1;
     exe[l] = 0;
-    if (l > 10 && !strcmp(exe + l - 10, " (deleted)")) return -2;
     if (exe[0] != '/' || (size_t)l >= n || !hands_text_ok(exe, (size_t)l, n - 1, 0)) return -1;
     snprintf(out, n, "%s", exe);
-    *sys = hands_exe_system(exe);
     return 0;
 }
 
@@ -368,10 +363,8 @@ int handsbus_reply(DConn *c, const DMsg *m) {
         k->pidfd = pidfd;
         if (uid != (uint32_t)getuid()) { k->st = 3; k->why = "another user"; }
         else {
-            /* the program, through the pidfd only: a bus without ProcessFD leaves it unknown, never a pid's guess */
-            int e = handsbus_exe_of_pidfd(pidfd, k->exe, sizeof k->exe, &k->sys);
-            if (e == -2) { k->st = 3; k->why = "program deleted"; }
-            else k->st = 2;
+            handsbus_exe_of_pidfd(pidfd, k->exe, sizeof k->exe);   /* shown as reported; a bus without ProcessFD: unknown */
+            k->st = 2;
         }
         if (k->has_pend) {
             if (k->st == 2) serve(c, &k->pend);

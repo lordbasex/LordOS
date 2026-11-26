@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <sys/stat.h>
 
 /* ---- closed words ---- */
 
@@ -170,22 +169,6 @@ int hands_shot_target(const char *s, uint32_t *display, char *win, size_t n) {
         return HANDS_SHOT_WINDOW;
     }
     return HANDS_SHOT_NONE;
-}
-
-/* A system program: the file and every folder above it owned by root and writable by nobody else (a person's own copy
- * in their home folder or /tmp is not one, whatever its name). */
-int hands_exe_system(const char *path) {
-    if (!path || path[0] != '/' || strlen(path) >= HANDS_EXE_MAX) return 0;
-    char p[HANDS_EXE_MAX];
-    snprintf(p, sizeof p, "%s", path);
-    struct stat st;
-    if (lstat(p, &st) || !S_ISREG(st.st_mode) || st.st_uid != 0 || (st.st_mode & 022)) return 0;
-    for (char *s = strrchr(p, '/'); s; s = strrchr(p, '/')) {
-        if (s == p) { p[1] = 0; } else *s = 0;
-        if (lstat(p, &st) || !S_ISDIR(st.st_mode) || st.st_uid != 0 || (st.st_mode & 022)) return 0;
-        if (s == p) break;
-    }
-    return 1;
 }
 
 /* ---- key chords ---- */
@@ -351,11 +334,12 @@ enum { CS_FREE = 0, CS_ASKING, CS_GRANTED, CS_DENIED, CS_STOPPED };
 static const char *const CSW[] = { "free", "asking", "granted", "denied", "stopped" };
 
 /* A client is one bus connection: its grant is that connection's and dies with it (a new connection, even with the
- * same name, asks again). exe is the program the bus vouched for (GetConnectionUnixProcessID, /proc/<pid>/exe read by
- * handsbus.c), shown in the prompt; the name is only what the client says it is. */
+ * same name, asks again). The name it gives and the program path handsbus.c read are shown in the prompt as reported,
+ * never as verified: any program of the same user can claim any name or run inside any program (docs/HANDS.md "Threat
+ * model"). The control is the person's answer, the banner, Stop and the panic key. */
 typedef struct {
     char bus[64], name[HANDS_NAME_MAX + 1], exe[HANDS_EXE_MAX];
-    int kind, st, sys;
+    int kind, st;
     unsigned long actions;
 } Client;
 
@@ -403,7 +387,6 @@ char *hands_status_json(void) {
         jb_q(&b, k->name);
         jb_s(&b, ",\"exe\":");
         jb_q(&b, k->exe);
-        jb_s(&b, k->sys ? ",\"system\":true" : ",\"system\":false");
         jb_s(&b, ",\"kind\":");
         jb_q(&b, hands_kind_word(k->kind));
         jb_s(&b, ",\"state\":");
@@ -494,7 +477,7 @@ void hands_qa(int on) {
     tell();
 }
 
-int hands_hello(const char *bus, const char *name, const char *exe, int sys) {
+int hands_hello(const char *bus, const char *name, const char *exe) {
     if (!bus || !bus[0] || strlen(bus) >= sizeof S.c[0].bus) return HANDS_E_ARGS;
     if (!S.h || !hands_rate_take(&S.hello, now(), 2, 8)) return HANDS_E_RATE;
     if (!S.on) return HANDS_E_OFF;
@@ -510,7 +493,6 @@ int hands_hello(const char *bus, const char *name, const char *exe, int sys) {
         snprintf(k->bus, sizeof k->bus, "%s", bus);
         snprintf(k->name, sizeof k->name, "%s", clean);
         snprintf(k->exe, sizeof k->exe, "%s", exe && exe[0] == '/' && hands_text_ok(exe, strlen(exe), HANDS_EXE_MAX - 1, 0) ? exe : "");
-        k->sys = k->exe[0] && sys;
         k->kind = hands_kind_of(clean);
         k->st = S.qa ? CS_GRANTED : CS_ASKING;      /* every new connection asks: a grant is never a name's */
         log_call(k->kind, HANDS_C_HELLO, 0, k->st == CS_GRANTED ? HANDS_OK : k->st == CS_DENIED ? HANDS_E_DENIED : HANDS_E_ASKING, 0);

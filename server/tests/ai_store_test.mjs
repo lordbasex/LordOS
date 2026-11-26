@@ -27,8 +27,8 @@ yes('every capability has a colour and an icon', CAPS.every((c) => CAP_COLOR[c] 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 yes('every icon is in assets/ai/icons', Object.values(CAP_ICON).every((n) => existsSync(`${root}assets/ai/icons/${n}-symbolic.svg`) && existsSync(`${root}assets/ai/icons/${n}-96.png`)));
 yes('the before-and-after picture is shipped', existsSync(`${root}assets/ai/esrgan-compare.jpg`));
-eq('ten functions, the two that work first', FUNCTIONS.map((f) => f.id), ['writing', 'sentinela', 'notes', 'programs', 'logs', 'files', 'apps', 'machines', 'settings', 'system']);
-eq('Writing and Sentinela work today', FUNCTIONS.filter((f) => f.ready).map((f) => f.id), ['writing', 'sentinela']);
+eq('eleven functions, the three that work first', FUNCTIONS.map((f) => f.id), ['writing', 'sentinela', 'hands', 'notes', 'programs', 'logs', 'files', 'apps', 'machines', 'settings', 'system']);
+eq('Writing, Sentinela and the Hands work today', FUNCTIONS.filter((f) => f.ready).map((f) => f.id), ['writing', 'sentinela', 'hands']);
 eq('Writing only reads (the text comes back on the person\'s click)', FUNCTIONS.find((f) => f.id === 'writing').level, 0);
 yes('every function has a level', FUNCTIONS.every((f) => LEVELS[f.level]));
 eq('System needs an administrator', LEVELS[FUNCTIONS.find((f) => f.id === 'system').level], 'admin');
@@ -91,16 +91,17 @@ eq('img: coming soon, with a comparison', imageEntries().map((e) => [e.state, e.
 
 // ---- Lumo ----
 const all = (b = brainNone, v = voiceEntries(VOICE_LANGS, emptyScan()), e = eyeEntries(false, [])) => [...b, ...earEntries(), ...v, ...e, ...imageEntries()];
-eq('nothing installed: no piece', lumoState(all()).ready, 0);
+eq('nothing installed: only the Hands, part of LordOS', lumoState(all()).ready, 1);
 eq('nothing installed: asleep', lumoState(all()).pose, 'sleep');
 eq('nothing installed: what to download', lumoState(all()).missing, ['brain', 'voice', 'eyes']);
 yes('the brain needs a model and the engine', !pieceReady('brain', all(brainEntries(LLM_MODELS, { available: false, models: [{ id: 'qwen3-1.7b' }] }, null))));
 yes('… both installed', pieceReady('brain', all(brainOne)));
 const full = lumoState(all(brainOne, voices, eyes));
-eq('everything that exists installed: 3 of 5', [full.ready, full.total], [3, 5]);
+eq('everything that exists installed: 4 of 5 (the Hands are part of LordOS)', [full.ready, full.total], [4, 5]);
 eq('… waving', full.pose, 'wave');
-eq('… talking still needs the Ear and the agent', full.canTalk, false);
-eq('the Ear and the Hands are coming soon', full.pieces.filter((p) => p.soon).map((p) => p.id), ['ear', 'hands']);
+eq('… talking still needs the Ear', full.canTalk, false);
+eq('the Ear is coming soon', full.pieces.filter((p) => p.soon).map((p) => p.id), ['ear']);
+yes('the Hands are always ready', pieceReady('hands', all()));
 yes('the Ear is never ready today', !pieceReady('ear', all(brainOne, voices, eyes)));
 
 // ---- search and filters ----

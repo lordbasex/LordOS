@@ -4,9 +4,9 @@ import Reconciler from 'react-reconciler';
 import { ConcurrentRoot, DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants';
 import { createContext, useEffect, useState } from 'react';
 import { flatten, normalize, applyStyle } from './style.js';
-import { register, unregister, ops, wrapTick, currentPriority, addListener, setKeyFilter, setKeyFocus, setModGrab } from './events.js';
+import { register, unregister, ops, wrapTick, currentPriority, addListener, setKeyFilter, setKeyFocus, setModGrab, instanceOf } from './events.js';
 
-export { addListener, setKeyFilter, setKeyFocus, setModGrab };
+export { addListener, setKeyFilter, setKeyFocus, setModGrab, instanceOf };
 export { setLayout, getLayout, layouts, modifiers, capsLock } from './keymap.js';
 export const View = 'view';
 export const Text = 'text';
@@ -119,6 +119,8 @@ function applyProps(inst, prev, next) {
   if (next.wave && JSON.stringify(prev.wave) !== JSON.stringify(next.wave)) lord.setProp(inst.id, 'wave', next.wave);
   // protected: the node (and what's inside) comes out black in screenshots, recordings and remote desktop
   if (!!prev.protected !== !!next.protected) lord.setProp(inst.id, 'protected', !!next.protected);
+  // handsDeny: an AI agent never reads, clicks or sees it (Settings → AI → Hands, the theme-trust sheet; docs/HANDS.md)
+  if (!!prev.handsDeny !== !!next.handsDeny) lord.setProp(inst.id, 'handsDeny', !!next.handsDeny);
   // <Image pixels={{ width, height, data }} />: RGBA canvas (a new object for each frame)
   if (prev.pixels !== next.pixels && next.pixels) lord.setProp(inst.id, 'pixels', next.pixels);
 }
@@ -188,7 +190,7 @@ const host = {
     return inst;
   },
   createTextInstance(text) {
-    const inst = { id: lord.createNode('raw'), type: 'raw', props: {}, style: {}, parent: null, ...treeLinks() };
+    const inst = { id: lord.createNode('raw'), type: 'raw', props: {}, style: {}, parent: null, text, ...treeLinks() };
     lord.setText(inst.id, text);
     return inst;
   },
@@ -206,13 +208,13 @@ const host = {
   finalizeInitialChildren: () => false,
   // React 19: no prepareUpdate; commitUpdate receives the type and the old and new props
   commitUpdate(inst, _type, prev, next) { applyProps(inst, prev, next); inst.props = next; ops.updated++; ops.total++; ops.last = inst; },
-  commitTextUpdate(inst, _old, text) { lord.setText(inst.id, text); ops.updated++; },
+  commitTextUpdate(inst, _old, text) { inst.text = text; lord.setText(inst.id, text); ops.updated++; },
   resetTextContent() {},
   shouldSetTextContent: () => false,
   hideInstance(inst) { inst.hidden = true; lord.setStyle(inst.id, 'display', 'none'); },
   unhideInstance(inst) { inst.hidden = false; lord.setStyle(inst.id, 'display', inst.style.display ?? 'flex'); },
-  hideTextInstance(inst) { lord.setText(inst.id, ''); },
-  unhideTextInstance(inst, text) { lord.setText(inst.id, text); },
+  hideTextInstance(inst) { inst.hidden = true; lord.setText(inst.id, ''); },
+  unhideTextInstance(inst, text) { inst.hidden = false; inst.text = text; lord.setText(inst.id, text); },
 
   getRootHostContext: () => ({}),
   getChildHostContext: (ctx) => ctx,
@@ -343,6 +345,15 @@ export function createPortal(children, container, key = null) {
   return reconciler.createPortal(children, container, null, key);
 }
 
+// The host tree as React made it, for Hands' reader (sdk/handsmodel.js, docs/HANDS.md): the theme's root and each layer
+// with its zIndex, back to front. Each container's children are first/next (link above); a text instance keeps its text.
+let rootContainer = null;
+export function hostRoots() {
+  const out = rootContainer ? [{ z: 0, node: rootContainer }] : [];
+  for (const z of [...layerNodes.keys()].sort((a, b) => a - b)) out.push({ z, node: layerNodes.get(z) });
+  return out;
+}
+
 export function render(element) {
   wrapTick();
   const rootId = lord.createNode('view');
@@ -351,6 +362,7 @@ export function render(element) {
   lord.setStyle(rootId, 'height', screen.height);
   lord.setRoot(rootId);
   const container = { id: rootId, isContainer: true, ...treeLinks() };
+  rootContainer = container;
   const report = (kind) => (e) => {
     console.error(`react (${kind}):`, e?.message ? `${e.message}\n${e.stack || ''}` : e);
     if (kind === 'error' && rootError) rootError(e);

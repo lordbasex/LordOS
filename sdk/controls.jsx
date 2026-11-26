@@ -100,6 +100,7 @@ export function ToolbarButton({ icon, iconName, label, title, onClick, active, d
   const fg = disabled ? t.textDim : active ? t.accent : color || t.text;
   return (
     <View ref={ref} onClick={() => { tipLeave(); if (!disabled) onClick?.(); }} focusable={focusable && !disabled} onKeyDown={onKeyDown}
+      accessibilityRole="button" accessibilityState={{ disabled: !!disabled, selected: !!active }}
       accessibilityLabel={accessibilityLabel || (label ? undefined : title)}
       onFocus={tipEnter} onBlur={tipLeave} onMouseEnter={() => { setHover(true); tipEnter(); }} onMouseLeave={() => { setHover(false); tipLeave(); }}
       style={[{ height: h, minWidth: h, paddingHorizontal: label ? 8 : 0, borderRadius: t.controlRadiusSmall, flexDirection: 'row', gap: 6,
@@ -267,7 +268,8 @@ function MenuRow({ it, onDone, lit: keyed, onHover }) {
   const lit = (hover || keyed) && !it.disabled;
   const on = lit && t.menuHighlight !== 'subtle';     // 'subtle' (a theme token): a light fill, the text keeps its color
   return (
-    <View onClick={() => { if (it.disabled) return; onDone(); it.onClick?.(); }} onMouseEnter={() => { setHover(true); onHover?.(); }} onMouseLeave={() => setHover(false)}
+    <View onClick={() => { if (it.disabled) return; onDone(); it.onClick?.(); }} accessibilityRole="menuitem"
+      accessibilityState={{ disabled: !!it.disabled, checked: !!it.checked }} onMouseEnter={() => { setHover(true); onHover?.(); }} onMouseLeave={() => setHover(false)}
       style={{ height: it.detail ? 40 : 24, paddingHorizontal: 8, borderRadius: t.menuItemRadius, flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: on ? t.accent : lit ? t.hover : 'transparent', opacity: it.disabled ? 0.4 : 1 }}>
       <Text style={{ width: 12, fontSize: 11, color: on ? '#fff' : t.text }}>{it.checked ? '✓' : ''}</Text>
@@ -624,7 +626,7 @@ export function Dropdown({ value, options, onChange, width = 180, placeholder, s
     const on = lit === i;
     const fill = on && t.menuHighlight !== 'subtle';
     return (
-      <View key={String(v)} onClick={() => choose(i)} onMouseEnter={() => setLit(i)}
+      <View key={String(v)} onClick={() => choose(i)} onMouseEnter={() => setLit(i)} accessibilityRole="option" accessibilityState={{ selected: v === value }}
         style={{ height: DROP_ROW, paddingHorizontal: 8, borderRadius: t.menuItemRadius, flexDirection: 'row', alignItems: 'center', gap: 6,
           backgroundColor: fill ? t.accent : on ? t.hover : 'transparent' }}>
         <Text style={{ width: 12, fontSize: 11, color: fill ? '#fff' : t.text }}>{v === value ? '✓' : ''}</Text>
@@ -635,6 +637,15 @@ export function Dropdown({ value, options, onChange, width = 180, placeholder, s
   return (
     <View ref={btn} style={{ width }}>
       <View onClick={disabled ? undefined : () => setOpen((o) => !o)} focusable={focusable && !disabled} onKeyDown={keys}
+        // Hands: a pop-up; set_value picks an option by its value or its label
+        accessibilityRole="combobox" accessibilityValue={String(cur ?? '')} accessibilityState={{ disabled: !!disabled, expanded: open }}
+        handsSetValue={(want) => {
+          const L = latest.current, w = String(want);
+          const i = L.options.findIndex((o) => String(o[0]) === w || String(o[1] ?? '') === w);
+          if (i < 0) return false;
+          choose(i);
+          return true;
+        }}
         style={{ height: h, paddingHorizontal: 9, borderRadius: small ? t.controlRadiusSmall : t.controlRadius, flexDirection: 'row', alignItems: 'center', gap: 6,
           backgroundColor: t.control, opacity: disabled ? 0.45 : 1, ...(t.buttonBorder ? { border: `1px solid ${t.separator}` } : null) }}>
         <Text style={{ flex: 1, fontSize: small ? 12 : 13, color: current >= 0 ? t.text : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{cur}</Text>
@@ -661,6 +672,8 @@ export function Checkbox({ checked, onChange, label, disabled, mixed, focusable 
   const on = !!checked || !!mixed;
   return (
     <View onClick={disabled ? undefined : () => onChange?.(!checked)} focusable={focusable && !disabled}
+      accessibilityRole="checkbox" accessibilityState={{ checked: mixed ? 'mixed' : !!checked, disabled: !!disabled }}
+      handsSetValue={disabled ? undefined : (v) => { const want = /^(1|true|on|yes|checked)$/i.test(String(v)); if (want !== !!checked) onChange?.(want); return true; }}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: disabled ? 0.45 : 1, borderRadius: 4 }}>
       <View style={{ width: 14, height: 14, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? t.accent : t.control,
         border: `1px solid ${on ? t.accent : t.separator}` }}>
@@ -695,7 +708,8 @@ export function RadioGroup({ value, options, onChange, row = false, disabled, fo
       {options.map(([v, label], i) => {
         const on = v === value, off = skip(i);
         return (
-          <View key={String(v)} onClick={off ? undefined : () => onChange(v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: off ? 0.45 : 1 }}>
+          <View key={String(v)} onClick={off ? undefined : () => onChange(v)} accessibilityRole="radio" accessibilityState={{ checked: on, disabled: !!off }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: off ? 0.45 : 1 }}>
             <View style={{ width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? t.accent : t.control,
               border: `1px solid ${on ? t.accent : t.separator}` }}>
               {on ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} /> : null}
@@ -728,7 +742,7 @@ export function Tabs({ value, tabs, onChange, focusable = true, style }) {
       {tabs.map(([v, label], i) => {
         const on = v === value, off = skip(i);
         return (
-          <View key={String(v)} onClick={off ? undefined : () => onChange(v)}
+          <View key={String(v)} onClick={off ? undefined : () => onChange(v)} accessibilityRole="tab" accessibilityState={{ selected: on, disabled: !!off }}
             style={{ height: 30, paddingHorizontal: spacing.m, justifyContent: 'center', opacity: off ? 0.45 : 1 }}>
             <Text style={{ fontSize: typeScale.body, fontWeight: on ? 600 : 500, color: on ? t.text : t.textDim, whiteSpace: 'nowrap' }}>{label}</Text>
             {on ? <View style={{ position: 'absolute', left: spacing.s, right: spacing.s, bottom: 0, height: 2, borderRadius: 1, backgroundColor: t.accent }} /> : null}

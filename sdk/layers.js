@@ -20,6 +20,9 @@
 //                 draws in, so no tooltip, drag image or community theme's surface covers them)
 //   system        system prompts: permissions, passwords and the keyring, Bluetooth pairing,
 //                 «keep this display?», the file chooser
+//   agent         Hands' banner, "Claude / Lumo is using your computer" with Stop (sdk/hands.jsx, docs/HANDS.md): part of
+//                 the system band (100 and above), which an AI agent never reads, clicks or sees, and no theme reaches; it
+//                 doesn't take the keyboard
 //   input         the input method's candidate window and the on-screen keyboard (they serve the field below)
 //   capture       Screenshots' area selection (❖⇧4): a still of the whole screen, so it covers every
 //                 layer, sheets and prompts included, and the selection works whatever is open
@@ -43,7 +46,7 @@ import { wm } from './windows.js';
 
 export const LAYERS = Object.freeze({
   dock: 10, menubar: 20, floating: 30, overlay: 40, popover: 50, modal: 60,
-  tooltip: 80, drag: 90, notification: 95, system: 100, input: 110, capture: 120,
+  tooltip: 80, drag: 90, notification: 95, system: 100, agent: 105, input: 110, capture: 120,
 });
 
 let shell = false;

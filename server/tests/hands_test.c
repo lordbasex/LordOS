@@ -142,20 +142,19 @@ static void policy(void) {
     hands_init(&host);
     HandsReq r = { .call = HANDS_C_READ };
     int why = 0;
-    CHECK(hands_hello(":1.1", "Claude Code", "/usr/bin/lordos-mcp", 0) == HANDS_E_OFF, "off until turned on");
+    CHECK(hands_hello(":1.1", "Claude Code", "/usr/bin/lordos-mcp") == HANDS_E_OFF, "off until turned on");
     hands_serve(1, NULL, 0);
-    CHECK(hands_hello(":1.1", "Claude Code", "/usr/bin/lordos-mcp", 1) == HANDS_E_ASKING, "the prompt");
+    CHECK(hands_hello(":1.1", "Claude Code", "/usr/bin/lordos-mcp") == HANDS_E_ASKING, "the prompt");
     CHECK(strstr(last_event, "\"exe\":\"/usr/bin/lordos-mcp\"") && strstr(last_event, "\"bus\":\":1.1\""), "the prompt shows the verified program: %s", last_event);
-    CHECK(strstr(last_event, "\"system\":true"), "a system program says so");
     CHECK(call(":1.1", &r, &why) == HANDS_E_ASKING, "nothing before the answer");
     hands_answer(":1.1", 1);
     CHECK(call(":1.1", &r, &why) == HANDS_OK, "granted: read");
     /* identity: the grant is the connection's, never the name's */
-    CHECK(hands_hello(":1.2", "Claude Code", "/tmp/evil", 0) == HANDS_E_ASKING, "another connection with the same name asks again");
+    CHECK(hands_hello(":1.2", "Claude Code", "/tmp/evil") == HANDS_E_ASKING, "another connection with the same name asks again");
     CHECK(call(":1.2", &r, &why) == HANDS_E_ASKING, "and gets nothing meanwhile");
     {
         char *st = hands_status_json();
-        CHECK(st && strstr(st, "\"exe\":\"/tmp/evil\",\"system\":false"), "a program outside root's folders is not a system one: %s", st ? st : "");
+        CHECK(st && strstr(st, "\"exe\":\"/tmp/evil\"") && !strstr(st, "system") && !strstr(st, "verified"), "the path as reported, no trust label: %s", st ? st : "");
         free(st);
     }
     hands_answer("Claude Code", 1);
@@ -240,12 +239,12 @@ static void policy(void) {
     /* Stop, a new connection, the panic key */
     hands_stop("stop");
     CHECK(call(":1.1", &r, &why) == HANDS_E_STOPPED, "stopped");
-    CHECK(hands_hello(":1.1", "Claude Code", "", 0) == HANDS_E_STOPPED, "a stopped connection stays stopped");
-    CHECK(hands_hello(":1.3", "Claude Code", "", 0) == HANDS_E_ASKING, "a new connection asks again");
+    CHECK(hands_hello(":1.1", "Claude Code", "") == HANDS_E_STOPPED, "a stopped connection stays stopped");
+    CHECK(hands_hello(":1.3", "Claude Code", "") == HANDS_E_ASKING, "a new connection asks again");
     hands_panic();
     CHECK(!hands_on() && call(":1.3", &r, &why) == HANDS_E_OFF, "the panic key turns Hands off");
     hands_qa(1);
-    CHECK(hands_hello(":1.4", "QA", "", 0) == HANDS_OK, "the QA desktop grants with no prompt");
+    CHECK(hands_hello(":1.4", "QA", "") == HANDS_OK, "the QA desktop grants with no prompt");
     hands_qa(0);
     hands_lost();
 }
@@ -262,7 +261,7 @@ static void fuzz(void) {
     hands_init(&host);
     hands_serve(1, NULL, 0);
     hands_qa(1);
-    hands_hello(":9.9", "Fuzz", "", 0);
+    hands_hello(":9.9", "Fuzz", "");
     for (int it = 0; it < 20000; it++) {
         seed = seed * 1103515245u + 12345u;
         const char *mem = members[(seed >> 8) % (sizeof members / sizeof members[0])];
@@ -426,7 +425,7 @@ static void on_bus(void) {
     if (f) { size_t k = fread(st, 1, sizeof st - 1, f); st[k] = 0; fclose(f); }
     unlink(status_path);
     char want[PATH_MAX + 32];
-    snprintf(want, sizeof want, "\"exe\":\"%s\",\"system\":false", self);
+    snprintf(want, sizeof want, "\"exe\":\"%s\"", self);
     if (strstr(st, "\"exe\":\"\"")) printf("hands-test: this dbus-daemon gives no ProcessFD: the program stays unknown\n");
     else CHECK(strstr(st, want) != NULL, "the caller's program through its pidfd: %s", st);
     state[0] = err[0] = 0;
@@ -435,50 +434,22 @@ static void on_bus(void) {
     rmdir(dir);
 }
 
-/* the program of a pidfd: this process, a system program, a deleted one, one that ended */
-static pid_t spawn(const char *path, int *pidfd) {
-    pid_t p = fork();
-    if (!p) { execl(path, "sleep", "30", (char *)NULL); _exit(127); }
-    struct timespec ts = { 0, 100000000 };
-    nanosleep(&ts, NULL);
-    *pidfd = (int)syscall(SYS_pidfd_open, p, 0);
-    return p;
-}
+/* the program path of a pidfd (for the prompt, reported): this process, one that ended */
 static void pidfds(void) {
     char exe[HANDS_EXE_MAX], self[PATH_MAX];
-    int sys = 1;
     int me = (int)syscall(SYS_pidfd_open, getpid(), 0);
     ssize_t l = readlink("/proc/self/exe", self, sizeof self - 1);
     if (l > 0) self[l] = 0;
-    CHECK(me >= 0 && !handsbus_exe_of_pidfd(me, exe, sizeof exe, &sys) && !strcmp(exe, self) && !sys, "this test's program, not a system one: [%s]", exe);
+    CHECK(me >= 0 && !handsbus_exe_of_pidfd(me, exe, sizeof exe) && !strcmp(exe, self), "this test's program path: [%s]", exe);
     close(me);
-    if (!access("/usr/bin/sleep", X_OK)) {
-        int fd = -1;
-        pid_t p = spawn("/usr/bin/sleep", &fd);
-        CHECK(fd >= 0 && !handsbus_exe_of_pidfd(fd, exe, sizeof exe, &sys) && sys, "/usr/bin/sleep is a system program: [%s] %d", exe, sys);
-        kill(p, SIGKILL);
-        waitpid(p, NULL, 0);
-        CHECK(handsbus_exe_of_pidfd(fd, exe, sizeof exe, &sys) == -1 && !exe[0], "a process that ended has no program (never a pid reused)");
-        close(fd);
-        char dir[] = "/tmp/hands-exe-XXXXXX", copy[PATH_MAX];
-        if (mkdtemp(dir)) {
-            snprintf(copy, sizeof copy, "%s/sleep", dir);
-            int in = open("/usr/bin/sleep", O_RDONLY), out = open(copy, O_WRONLY | O_CREAT | O_TRUNC, 0700);
-            char buf[65536];
-            ssize_t k;
-            while (in >= 0 && out >= 0 && (k = read(in, buf, sizeof buf)) > 0) if (write(out, buf, (size_t)k) != k) break;
-            if (in >= 0) close(in);
-            if (out >= 0) close(out);
-            p = spawn(copy, &fd);
-            unlink(copy);
-            CHECK(fd >= 0 && handsbus_exe_of_pidfd(fd, exe, sizeof exe, &sys) == -2, "a deleted program refused");
-            kill(p, SIGKILL);
-            waitpid(p, NULL, 0);
-            close(fd);
-            rmdir(dir);
-        }
-    }
-    CHECK(handsbus_exe_of_pidfd(-1, exe, sizeof exe, &sys) == -1, "no pidfd, no program");
+    pid_t p = fork();
+    if (!p) { pause(); _exit(0); }
+    int fd = (int)syscall(SYS_pidfd_open, p, 0);
+    kill(p, SIGKILL);
+    waitpid(p, NULL, 0);
+    CHECK(fd >= 0 && handsbus_exe_of_pidfd(fd, exe, sizeof exe) == -1 && !exe[0], "a process that ended: nothing (its grant ends with it)");
+    if (fd >= 0) close(fd);
+    CHECK(handsbus_exe_of_pidfd(-1, exe, sizeof exe) == -1, "no pidfd, no path");
 }
 
 /* the screenshot's marks: fail closed */

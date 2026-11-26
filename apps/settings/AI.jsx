@@ -22,6 +22,7 @@ import {
   PREVIEWS_PACKAGE, scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName,
   takeName, errorText, fs, LLM_MODELS, packagesForModel, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, installLlm, setBrainBackend,
   removeLlm, lumoReady, translateWithLumo, ENGINE_PACKAGE, writingChoice, writingEnabled, setWritingOn,
+  Checkbox, listApps, appName, handsStatus, setHandsOn, setHandsAllow, handsAllowSaved, stopHands, refreshHands,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -231,8 +232,8 @@ function LumoHero({ st, width }) {
 
 // ---- what Lumo can do: the one brain's functions ----
 
-const fnName = (f, tr) => (f.id === 'sentinela' ? tr('sentinela.name') : f.id === 'writing' ? tr('writing.name') : tr(`settings.aiStore.fn.${f.id}`));
-const fnExample = (f, tr) => (f.id === 'writing' ? tr('writing.example') : tr(`settings.aiStore.fnExample.${f.id}`));
+const fnName = (f, tr) => (f.id === 'sentinela' ? tr('sentinela.name') : f.id === 'writing' ? tr('writing.name') : f.id === 'hands' ? tr('hands.name') : tr(`settings.aiStore.fn.${f.id}`));
+const fnExample = (f, tr) => (f.id === 'writing' ? tr('writing.example') : f.id === 'hands' ? tr('hands.example') : tr(`settings.aiStore.fnExample.${f.id}`));
 
 function FunctionCard({ f, w, on, onOpen }) {
   const t = useTheme();
@@ -692,6 +693,74 @@ function WritingPage({ ready, onBrain }) {
   );
 }
 
+// ---- Hands: an AI agent using this computer (docs/HANDS.md) ----
+// The whole page is handsDeny: an agent never reads it, clicks it or sees it in a screenshot, so it can't turn itself on,
+// widen its allowlist or answer for the person. On is for this session only (lord-server forgets it at the next login).
+
+function HandsPage() {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  useStore(settings);
+  const st = useStore(handsStatus);
+  useEffect(() => { refreshHands(); }, []);
+  const allow = handsAllowSaved();
+  const apps = listApps().map((a) => ({ id: a.id, name: appName(a) || a.name || a.id })).sort((a, b) => a.name.localeCompare(b.name));
+  const toggleApp = (id, on) => setHandsAllow(on ? [...new Set([...allow, id])] : allow.filter((x) => x !== id));
+  const clients = (st.clients || []).filter((c) => c.state !== 'free');
+  const line = (k) => <Text key={k} style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.45, textAlign: 'start' }}>{`• ${tr(k)}`}</Text>;
+  return (
+    <View handsDeny style={{ gap: 14 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, border: `1px solid ${t.separator}`, backgroundColor: t.control }}>
+        <Text style={{ fontSize: 24 }}>🖐</Text>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('hands.settings.toggle')}</Text>
+          <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{tr('hands.settings.what')}</Text>
+        </View>
+        <Toggle on={!!st.on} onChange={(v) => setHandsOn(v)} />
+      </View>
+      <Note>{tr('hands.settings.session')}</Note>
+      <View style={{ gap: 4 }}>
+        <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('hands.settings.can')}</Text>
+        {['hands.settings.can1', 'hands.settings.can2', 'hands.settings.can3', 'hands.settings.can4'].map(line)}
+      </View>
+      <View style={{ gap: 4 }}>
+        <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('hands.settings.never')}</Text>
+        {['hands.settings.never1', 'hands.settings.never2', 'hands.settings.never3', 'hands.settings.never4'].map(line)}
+      </View>
+      <Note>{tr('hands.settings.stop')}</Note>
+      <View style={{ gap: 6 }}>
+        <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('hands.settings.allowTitle')}</Text>
+        <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>
+          {allow.length ? tr('hands.settings.allowSome', { count: allow.length }) : tr('hands.settings.allowAll')}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          {apps.map((a) => <View key={a.id} style={{ width: 180 }}><Checkbox checked={allow.includes(a.id)} label={a.name} onChange={(v) => toggleApp(a.id, v)} /></View>)}
+        </View>
+      </View>
+      <View style={{ gap: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ flex: 1, fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('hands.settings.clients')}</Text>
+          {clients.length ? <Button small destructive label={tr('hands.banner.stop')} onClick={stopHands} /> : null}
+        </View>
+        {clients.length ? clients.map((c) => (
+          <View key={c.bus} style={{ padding: 10, gap: 2, borderRadius: 10, backgroundColor: t.control }}>
+            <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{`${c.name} · ${tr(`hands.state.${c.state}`)}`}</Text>
+            <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', direction: 'ltr' }}>{c.exe || tr('hands.prompt.unknownProgram')}</Text>
+            <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr('hands.settings.actions', { count: c.actions || 0 })}</Text>
+          </View>
+        )) : <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr('hands.settings.noClients')}</Text>}
+      </View>
+      <View style={{ gap: 6 }}>
+        <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('hands.settings.howTitle')}</Text>
+        <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{tr('hands.settings.how')}</Text>
+        <View style={{ padding: 10, borderRadius: 8, backgroundColor: t.control }}>
+          <Text style={{ fontFamily: 'monospace', fontSize: 12, color: t.text, direction: 'ltr', textAlign: 'left' }}>claude mcp add lordos-mcp -- lordos-mcp</Text>
+        </View>
+        <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{tr('hands.settings.qa')}</Text>
+      </View>
+    </View>
+  );
+}
+
 // ---- the page ----
 
 // page: index.jsx turns { section: 'ai', page } into the sub-page; alert: the Sentinela alert to open
@@ -856,7 +925,14 @@ export function AISettings({ alert }) {
   const avail = width;
 
   let body;
-  if (view === 'writing') {
+  if (view === 'hands') {
+    body = (
+      <View style={{ gap: 20 }}>
+        <Crumb here={tr('hands.name')} onBack={() => setView(null)} />
+        <HandsPage />
+      </View>
+    );
+  } else if (view === 'writing') {
     body = (
       <View style={{ gap: 20 }}>
         <Crumb here={tr('writing.name')} onBack={() => setView(null)} />
@@ -909,7 +985,7 @@ export function AISettings({ alert }) {
           <View style={{ gap: 10 }}>
             <Head title={tr('settings.aiStore.functions')} sub={tr('settings.aiStore.functionsSub')} />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
-              {(plain ? FUNCTIONS : fnFound).map((f) => <FunctionCard key={f.id} f={f} w={fn.w} on={f.id === 'sentinela' ? p.on : f.id === 'writing' ? writingEnabled(writingChoice(), installedLlm.size > 0) : false} onOpen={f.ready ? () => setView(f.id) : null} />)}
+              {(plain ? FUNCTIONS : fnFound).map((f) => <FunctionCard key={f.id} f={f} w={fn.w} on={f.id === 'sentinela' ? p.on : f.id === 'writing' ? writingEnabled(writingChoice(), installedLlm.size > 0) : f.id === 'hands' ? !!handsStatus.get().on : false} onOpen={f.ready ? () => setView(f.id) : null} />)}
             </View>
           </View>
         ) : null}
