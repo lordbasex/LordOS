@@ -166,7 +166,8 @@ Only lord-server starts `lord-web`:
 `lord-web` reads its app's registry file itself, read-only, and refuses to start on any mismatch. A second launch of a
 running app and profile raises its window instead: lord-server knows its process, starts nothing, issues an
 xdg-activation token and calls `Show(token)` on that lord-web (below); lord-web activates its window with it, or maps it
-again when it was hidden in the background. The shell does not focus it on its own.
+again when it was hidden in the background. The shell does not focus it on its own. That launch also pings it: one that
+doesn't answer within 5 s is started again ("When a web app stops answering", below).
 
 The window's `xdg_toplevel` app id is `lordos-web.<app>.<profile>`. lord-server maps that prefix to the registry
 entry, so the Dock and the window switcher show the app's name, its icon and the profile name. The title is the page's
@@ -1275,6 +1276,55 @@ When the app's own page (an address inside its `scope`) can't load for lack of n
   until the session ended. Only an address inside the scope is ever loaded again, one load at a time.
 - **While hidden:** an app in the background keeps trying, so it is connected again (and its notifications come) by
   the time the network is back.
+
+## When a web app stops answering (in development)
+
+Reported on 2026-11-26: after the engine hung, opening WhatsApp from the launcher did nothing. A launch of an app that
+runs only asks its lord-web to show its window (`Show`, no answer wanted), and a window hidden in the background maps
+again only with a new frame from the web process. A `lord-web` whose main loop is stuck never handles `Show`; a web
+process that is stuck never sends that frame. Either way nothing appeared, nothing noticed, and the profile's lock and
+lord-server's table kept a new process from starting. Now both sides keep watch, by the same rules
+(`server/src/web/webwatch.c`, `tests/webwatch_test.c`):
+
+| | lord-server watches each `lord-web` (`ui/webalive.c`) | `lord-web` watches its page (`web/webhang.c`) |
+|---|---|---|
+| Ping | `org.lordos.WebApp1.Ping() → s` on the app's bus name, answered from lord-web's main loop (`"ok"`, or `"page"` while a page ping is late) | `"0"` evaluated in a script world of lord-web's own (`lordos-watch`; the page's globals are never touched), answered by the web process's main thread |
+| Every | 15 s | 15 s |
+| A miss | no answer in 10 s; two in a row are a hang | no answer in 15 s; two in a row are a hang |
+| At once | when the person asks for the app while it runs (launcher, Dock: `lord.webapps.launch` answering `running`): one ping, 5 s | when the window is shown (`Show`, the tray) and when WebKit says the page stopped responding (`is-web-process-responsive`): one ping, 8 s |
+| Grace after the start | 20 s | 45 s (and again after each new web process) |
+| A hang | the process is ended and started again, and the shell shows "WhatsApp wasn't responding and was restarted" (the `webapps-restarted` event) | `webkit_web_view_terminate_web_process`; `web-process-terminated` then says it was lord-web's own, so the app's page loads again in a new web process (not counted as a crash) and a notification says "The page wasn't responding and was loaded again" |
+
+- **What counts as an answer:** any reply. An older `lord-web` without `Ping` answers `UnknownMethod`: it is there (an
+  update while apps run doesn't restart them). The bus saying nobody owns the name (`ServiceUnknown`,
+  `NameHasNoOwner`) counts as no answer once the grace is over: a launch couldn't reach it either. The bus's own
+  `NoReply` decides nothing; lord-server's wait does.
+- **Not the watcher's silence:** when the watcher itself didn't run for 3 s (lord-server busy, the computer asleep),
+  the wait in progress and the grace start again.
+- **Not in a loop:** at most 3 automatic restarts of one app and profile in 10 minutes; after that it is left alone and
+  logged, unless the person asks for it (a launch, the Dock) while it hangs.
+- **Ending it** (`webmgr.c`, `end_kid`): only a `lord-web` of lord-server's own table, never a pid from JS. Its process
+  group (its own session: `spawn` calls `setsid`, and WebKit's processes are in it) gets `SIGTERM`, then `SIGKILL`
+  after 2 s; then each process that was under it before (`webmem_descendants`) and is still the same process (pid and
+  start time, `webmem_start_time`) gets `SIGKILL`, in case one left the group. The app's scope is shared by all its
+  profiles, so it is never killed whole. A process that won't go even then (stuck in the kernel) no longer counts as
+  the app's and is reaped when it ends.
+- **By hand** (both ask first; only the confirm reaches lord-server):
+  - Settings → Web apps → *app*: **Restart** and **Force Quit** on each running profile (`lord.webapps.restart`,
+    `lord.webapps.quit`);
+  - Settings → Web apps → **Restart web apps engine**: every running web app ended and started again
+    (`lord.webapps.restartAll`);
+  - the Window menu of a web app's window: **Restart…** and **Force Quit…** (`<WebAppRestartPrompt />`).
+  A restart starts it with developer tools again only while developer mode is on.
+- **Log lines, closed words only** (no address, no page text): lord-server's `webapps: <app>/<profile> did not answer:
+  restarted`, `… restarted 3 times in 10 minutes, left alone`, `… force quit`, `… restarted by the person`,
+  `webapps: engine restarted by the person: <n> app windows`; lord-web's `lord-web: the page did not answer: its web
+  process restarted`, `lord-web: WebKit says the page stopped responding`, `lord-web: the page responds again`.
+- **Tests:** `build/webwatch-test` (the rules on a made-up clock), `build/webmem-test` (the processes under a lord-web,
+  start times), `build/webalive-test` under `dbus-run-session` (a stand-in lord-web, `tests/webalive_fake.c`, that stops
+  answering: restarted with the child that left its group, the urgent ping, `UnknownMethod`, the limit, Force Quit,
+  Restart and Restart all), `build/webhang-check fine|hang|urgent` (a page whose script never returns, on the real
+  engine headless: a new web process that works) and `tests/webapps_restart_settings_scene.mjs` (Settings).
 
 ## Not in the first version
 

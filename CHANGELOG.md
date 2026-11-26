@@ -113,6 +113,39 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `server/tests/theme_gallery_test.mjs`.
 
 ### Fixed
+- **Web apps: one that stops answering is started again, and a page that hangs gets a new web process**
+  (`server/src/ui/webalive.c`, `server/src/web/webwatch.c`, `webhang.c`, `webmgr.c`, `webmem.c`, `webmain.c`,
+  `webengine.c`, `server/src/ui/js_webapps.c`, `sdk/webapps.js`, `sdk/hardware.jsx`, `sdk/windowmenu.js`,
+  `apps/settings/WebApps.jsx`; reported by the maintainer 2026-11-26; `docs/WEBAPPS.md`, "When a web app stops
+  answering"). After the web app engine hung, opening WhatsApp from the launcher did nothing. A launch of a running app
+  only sent `Show` to its `lord-web` without waiting for an answer, and a window hidden in the background maps again
+  only with a new frame from the web process: a stuck `lord-web` never handled `Show`, a stuck web process never drew,
+  and nothing noticed, while the profile's lock and lord-server's table kept a new process from starting. Now:
+  - **lord-server pings each `lord-web`** it started (`org.lordos.WebApp1.Ping`, a new method answered from lord-web's
+    main loop) every 15 s, and at once when the person opens an app that already runs (one ping, 5 s). One that
+    doesn't answer (two misses in a row, or the urgent one) is ended and started again, and the shell shows "WhatsApp
+    wasn't responding and was restarted" (the `webapps-restarted` event). At most 3 automatic restarts in 10 minutes
+    per app and profile, unless the person asks for it; an older `lord-web` without `Ping` (`UnknownMethod`) counts as
+    alive; a stall of lord-server itself or a suspend restarts the wait instead of deciding.
+  - **`lord-web` pings its page** (a one-character script in a world of its own) every 15 s, when the window is shown
+    and when WebKit says the page stopped responding (`is-web-process-responsive`, not handled before; the web process's
+    crash, `web-process-terminated`, already was). A page that doesn't answer has its web process ended and the app's
+    page loaded again in a new one, with a notification; it doesn't count as a crash.
+  - **Ending a `lord-web`** now also kills each process that was under it and is still the same process (pid and start
+    time), in case one left its group, waits at most 3 s, and leaves one stuck in the kernel to be reaped later instead
+    of blocking lord-server on `waitpid`. Only processes of lord-server's own table, never a pid from JS; the app's
+    scope (shared by its profiles) is never killed whole.
+  - **By hand, each after a question:** Settings → Web apps → *app* → **Restart** and **Force Quit** for a running
+    profile; Settings → Web apps → **Restart web apps engine** (every running web app); and **Restart…** and **Force
+    Quit…** in a web app window's Window menu (`lord.webapps.restart`, `quit`, `restartAll`).
+  - Log lines in closed words: `webapps: <app>/<profile> did not answer: restarted`, `… left alone`, `… force quit`,
+    `… restarted by the person`; `lord-web: the page did not answer: its web process restarted`.
+  - New texts (`webapps.restarted`, `webapps.restart.*`, `webapps.quit.*`, `webapps.settings.engine*`,
+    `webapps.settings.restartEngine*`, `webruntime.json` `hang.reloaded`) in all 35 languages.
+  - Tests: `build/webwatch-test` (84 checks), `build/webmem-test` (31), `build/webalive-test` under `dbus-run-session`
+    (37: a stand-in `lord-web` that stops answering, `tests/webalive_fake.c`), `build/webhang-check fine|hang|urgent`
+    (a page that hangs, on the real engine, headless) and `tests/webapps_restart_settings_scene.mjs` (11); the
+    portal tests' stubs gained `webalive_*`.
 - **The calls check failed "video/H264: no video frames" on a PC with an AMD GPU: received H.264 does play there, in
   hardware; the check now plays it as a call does** (`server/tests/webcalls_check.py`; found 2026-11-26 on an RX 580,
   Mesa VA-API, WPE WebKit `2.54.3-1~lordos13+4.1`). Not a decoder failure. WebKit's GStreamer WebRTC backend asks its
