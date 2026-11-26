@@ -590,6 +590,9 @@ Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one ski
   disabled (`pickCommand`), exactly as the app's own button or menu item does.
 - **A list pane** (`listPane`): `{ title, items: [{ key, label, detail, selected, group }], actions: { select(key) } }`;
   `select(key)` opens only a listed item (`pickItem`).
+- **A header** (`SkinHeader` in `sdk/appskins.jsx`), for an app that has no bar of its own: region `header`, a command
+  bar with the app's title (and its commands where the app gives them). Without a skin the app is drawn exactly as before,
+  with no wrapper; Machines and Databases give it to their main window only.
 
 | App | Regions (shape) | What stays the app's | Stub scene |
 |---|---|---|---|
@@ -621,7 +624,6 @@ Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one ski
 | Cleaner | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `cleaner_skin_scene.mjs` (2 checks) |
 | LordOS Studio | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `studio_skin_scene.mjs` (8 checks) |
 | Remote Desk | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `remote-desk_skin_scene.mjs` (8 checks) |
-<!-- shared-shape apps -->
 
 A region drawn in the SDK's floating layer (Screenshots' capture bar, a picture-in-picture window) is outside the theme's
 tree: `useTheme()` there gives the default tokens, so a skin for it makes its own (Bluebell calls its `makeTheme`).
