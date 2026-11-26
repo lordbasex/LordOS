@@ -37,6 +37,11 @@
 # EXTRA_DEBS=<folder> (since +4): LordOS's own packages the build needs that trixie lacks (librice0 and librice-dev,
 # tools/pkg/build-librice.sh), installed in the build chroot before the build dependencies and in the test chroot with
 # the new packages; never anything else (the folder's *.deb only, no -dbgsym).
+# WEBRTC_BACKEND=gstreamer|libwebrtc (default gstreamer; libwebrtc since +5, maintainer's decision of 2026-11-26):
+# libwebrtc builds WebRTC with WebKit's LibWebRTC backend, WebKit's own libwebrtc (Source/ThirdParty/libwebrtc, which the
+# release tarball leaves out) added as the source package's libwebrtc component, wpewebkit_<upstream>.orig-libwebrtc.tar.xz,
+# made from WebKit's git by tools/pkg/wpewebkit-libwebrtc-source.sh and pinned in tools/pkg/wpewebkit-libwebrtc.sums;
+# the packaging changes are tools/pkg/wpewebkit-libwebrtc/. No EXTRA_DEBS (no librice).
 # LORDOS_SRC=<LordOS tree> (default: the tree this script is in) adds lord-web to the test: built on both of its view
 # backends (WPEPlatform and legacy) against the new packages, then its web-backend-test and probe test; LORDOS_SRC=none
 # skips it.
@@ -78,6 +83,8 @@ EMULATED=; [ "$ARCH" = "$(dpkg --print-architecture)" ] || EMULATED=1
 LORDOS_SRC=${LORDOS_SRC:-$(cd "$HERE/../.." && pwd)}
 [ "$LORDOS_SRC" = none ] || [ -f "$LORDOS_SRC/server/mk/web.mk" ] || die "LORDOS_SRC=$LORDOS_SRC is not a LordOS tree (or say none)"
 TMPFS=${TMPFS:-}
+WEBRTC_BACKEND=${WEBRTC_BACKEND:-gstreamer}
+case "$WEBRTC_BACKEND" in gstreamer|libwebrtc) ;; *) die "WEBRTC_BACKEND is gstreamer or libwebrtc" ;; esac
 case "$TMPFS" in ''|[0-9]*[GM]) ;; *) die "TMPFS is a size like 64G" ;; esac
 
 # remove a chroot folder: first whatever is still mounted in it (a run that was killed leaves /proc, /dev… there),
@@ -129,6 +136,11 @@ for f in $(awk '/^Checksums-Sha256:/ { s = 1; next } /^[^ ]/ { s = 0 } s && NF =
 done
 curl -fsSL -o "$WORK/in/wpewebkit-$UP.tar.xz.asc" "https://wpewebkit.org/releases/wpewebkit-$UP.tar.xz.asc" ||
     { rm -f "$WORK/in/wpewebkit-$UP.tar.xz.asc"; echo "  (wpewebkit.org has no wpewebkit-$UP.tar.xz.asc: only Debian's copy is checked)"; }
+if [ "$WEBRTC_BACKEND" = libwebrtc ]; then
+    # WebKit's libwebrtc at the release tag: its tag, commit and tree checked against the pins, and the tarball's
+    # SHA-256 (checked again in the chroot before it is used)
+    ORIG="$WORK/in/wpewebkit_$UP.orig.tar.xz" sh "$HERE/wpewebkit-libwebrtc-source.sh" "$UP" "$WORK/in"
+fi
 (cd "$WORK/in" && sha256sum ./* > "$WORK/out/SHA256SUMS.debian-source")
 cat "$WORK/out/SHA256SUMS.debian-source"
 
@@ -146,8 +158,11 @@ if [ -z "${TEST_ONLY:-}" ] && { [ -n "${REBUILD:-}" ] || ! built; }; then
         --customize-hook='mkdir -p "$1/build/extra"' \
         --customize-hook="sync-in $WORK/extra /build/extra" \
         --customize-hook="upload $HERE/wpewebkit-chroot.sh /build/wpewebkit-chroot.sh" \
+        --customize-hook="upload $HERE/wpewebkit-libwebrtc.sums /build/wpewebkit-libwebrtc.sums" \
+        --customize-hook='mkdir -p "$1/build/wpewebkit-libwebrtc"' \
+        --customize-hook="sync-in $HERE/wpewebkit-libwebrtc /build/wpewebkit-libwebrtc" \
         --customize-hook="mount --bind \"$WORK/out\" \"\$1/build/out\"" \
-        --customize-hook="chroot \"\$1\" env JOBS=$JOBS sh /build/wpewebkit-chroot.sh build $DVER $NEWVER || { echo FAILED > \"\$1/build/out/FAILED\"; }; sync; umount \"\$1/build/out\"" \
+        --customize-hook="chroot \"\$1\" env JOBS=$JOBS WEBRTC_BACKEND=$WEBRTC_BACKEND sh /build/wpewebkit-chroot.sh build $DVER $NEWVER || { echo FAILED > \"\$1/build/out/FAILED\"; }; sync; umount \"\$1/build/out\"" \
         "$SUITE" "$WORK/build-chroot" "$SOURCES1" "$SOURCES2" "$SOURCES3"
     $SUDO chown -R "$(id -u):$(id -g)" "$WORK/out"
     [ ! -e "$WORK/out/FAILED" ] || die "the build failed (log above; the chroot is $WORK/build-chroot)"
@@ -179,7 +194,7 @@ $SUDO $LOW mmdebstrap --variant=apt --mode=root --architectures="$ARCH" --dpkgop
     --customize-hook="$SRC_HOOK" \
     --customize-hook="upload $HERE/wpewebkit-chroot.sh /build/wpewebkit-chroot.sh" \
     --customize-hook="upload $HERE/wpewebkit-headless-test.c /build/wpewebkit-headless-test.c" \
-    --customize-hook="unshare --mount --pid --fork sh $HERE/wpewebkit-pivot.sh \"\$1\" /usr/bin/env EMULATED=$EMULATED /bin/sh /build/wpewebkit-chroot.sh test || echo FAILED > \"\$1/build/test/FAILED\"" \
+    --customize-hook="unshare --mount --pid --fork sh $HERE/wpewebkit-pivot.sh \"\$1\" /usr/bin/env EMULATED=$EMULATED WEBRTC_BACKEND=$WEBRTC_BACKEND /bin/sh /build/wpewebkit-chroot.sh test || echo FAILED > \"\$1/build/test/FAILED\"" \
     --customize-hook="sync-out /build/test $WORK/out/test" \
     "$SUITE" "$WORK/test-chroot" "$SOURCES1" "$SOURCES2" "$SOURCES3"
 $SUDO chown -R "$(id -u):$(id -g)" "$WORK/out/test"

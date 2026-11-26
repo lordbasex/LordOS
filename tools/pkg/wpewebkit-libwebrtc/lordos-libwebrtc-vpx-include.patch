@@ -1,0 +1,21 @@
+Description: libvpx's headers for libwebrtc on every platform
+ WebKit's CMake build of its libwebrtc adds libvpx's include folder for Apple only, but libvpx is built into libwebrtc
+ on Linux too and WebRTCPrefix.h (the precompiled header) includes vpx/vpx_codec.h, so the Linux build stops there.
+Author: LordOS <lord.basex@gmail.com>
+Forwarded: no
+Last-Update: 2026-11-26
+
+--- a/libwebrtc/CMakeLists.txt
++++ b/libwebrtc/CMakeLists.txt
+@@ -2443,6 +2443,11 @@
+         target_link_libraries(webrtc aom dav1d)
+     endif ()
+ else ()
++    # LordOS: libvpx is built into libwebrtc here too (vpx's objects are in webrtc_SOURCES) and WebRTCPrefix.h, the
++    # precompiled header, includes vpx/vpx_codec.h, so its headers are needed on every platform, not only Apple's
++    list(APPEND webrtc_INCLUDE_DIRECTORIES PRIVATE
++        Source/third_party/libvpx/source/libvpx
++    )
+     target_link_libraries(webrtc ${LIBEVENT_LIBRARY})
+     target_link_libraries(webrtc ${LIBOPUS_LIBRARY})
+ endif ()

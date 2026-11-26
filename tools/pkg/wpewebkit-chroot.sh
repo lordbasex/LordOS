@@ -235,8 +235,20 @@ cmd_build() {
     mkdir -p /build/work /build/out
     cp /build/in/wpewebkit_$up.orig.tar.xz /build/in/wpewebkit_$up.orig.tar.xz.asc /build/work/
     dpkg-source --no-check -x "$dsc" /build/work/wpewebkit-$up
+    if [ "${WEBRTC_BACKEND:-gstreamer}" = libwebrtc ]; then
+        # WebKit's own libwebrtc (+5): the source package's libwebrtc component, made outside from WebKit's git
+        # (tools/pkg/wpewebkit-libwebrtc-source.sh) and checked here against the SHA-256 pinned in the LordOS tree
+        comp=wpewebkit_$up.orig-libwebrtc.tar.xz
+        want=$(awk -v u="$up" '$1 == "upstream" && $2 != u { exit 1 } $1 == "sha256" { print $2 }' /build/wpewebkit-libwebrtc.sums) ||
+            die "wpewebkit-libwebrtc.sums doesn't pin libwebrtc for $up"
+        [ "$(sha256sum < "/build/in/$comp" | cut -d' ' -f1)" = "$want" ] || die "$comp: not the pinned SHA-256 $want"
+        echo "$comp: the pinned SHA-256"
+        cp "/build/in/$comp" /build/work/
+        tar -xJf "/build/work/$comp" -C /build/work/wpewebkit-$up
+    fi
     cd /build/work/wpewebkit-$up
     backport "$newver"
+    [ "${WEBRTC_BACKEND:-gstreamer}" != libwebrtc ] || sh /build/wpewebkit-libwebrtc/backport.sh /build/wpewebkit-libwebrtc
     # LordOS's own build dependencies (librice: tools/pkg/build-librice.sh), from /build/extra, then the rest from trixie
     # only (a missing one stops here and is named)
     if ls /build/extra/*.deb >/dev/null 2>&1; then apt-get install -y --no-install-recommends /build/extra/*.deb; fi
@@ -250,6 +262,7 @@ cmd_build() {
     cd /build/work
     # /build/out is the build machine's disk (a bind mount): the results are kept from here on, whatever happens next
     cp ./*.deb ./*.dsc ./*.debian.tar.xz ./*.orig.tar.xz ./*.orig.tar.xz.asc ./*.buildinfo /build/out/
+    cp ./*.orig-*.tar.xz /build/out/ 2>/dev/null || true    # the libwebrtc component (+5)
     cp ./*.changes /build/out/    # last: a .changes in out/ means the rest is there
     sync
     # the source package alone, re-checked: every file the .dsc names is in /build/out and matches
@@ -302,11 +315,23 @@ cmd_test() {
     lib=$(ls /usr/lib/*/libWPEWebKit-2.0.so.1.*)
     ! readelf -d "$lib" | grep -E 'NEEDED.*\[lib(input|udev)\.so' || die "libWPEWebKit-2.0 links libinput or libudev"
     echo "no libinput, no libudev in libWPEWebKit-2.0's NEEDED" | tee -a "$out/report.txt"
-    # WebRTC built (maintainer's decision, 2026-11-25): WebKit's GStreamer backend links GStreamer's WebRTC library
-    readelf -d "$lib" | grep -q 'NEEDED.*\[libgstwebrtc-1\.0\.so' || die "libWPEWebKit-2.0 doesn't link libgstwebrtc-1.0: WebRTC isn't built"
-    echo "WebRTC: libgstwebrtc-1.0 in libWPEWebKit-2.0's NEEDED" | tee -a "$out/report.txt"
-    readelf -d "$lib" | grep -q 'NEEDED.*\[librice-proto\.so' || die "libWPEWebKit-2.0 doesn't link librice-proto: ICE isn't librice's"
-    echo "ICE: librice-proto and librice-io in libWPEWebKit-2.0's NEEDED (the network process runs ICE)" | tee -a "$out/report.txt"
+    if [ "${WEBRTC_BACKEND:-gstreamer}" = libwebrtc ]; then
+        # WebKit's LibWebRTC backend (+5, maintainer's decision of 2026-11-26): libwebrtc with its BoringSSL, libvpx and
+        # libaom is inside the library and must stay there: none of their symbols exported (hidden visibility), so
+        # nothing else can link them; no GStreamer WebRTC, no librice; Linux's own libevent and libopus
+        readelf -d "$lib" | grep -q 'NEEDED.*\[libevent-2\.1\.so' || die "libWPEWebKit-2.0 doesn't link libevent: libwebrtc isn't built"
+        readelf -d "$lib" | grep -q 'NEEDED.*\[libopus\.so' || die "libWPEWebKit-2.0 doesn't link libopus: libwebrtc isn't built"
+        ! readelf -d "$lib" | grep -E 'NEEDED.*\[lib(gstwebrtc-1\.0|rice-proto|rice-io)\.so' || die "the GStreamer WebRTC backend is linked too"
+        nm -D --defined-only "$lib" | awk '{ print $NF }' | grep -E '^(SSL_|SSL_CTX_|EVP_|BIO_|X509_|RSA_|EC_|BN_|CRYPTO_|OPENSSL_|vpx_|vp8_|vp9_|aom_|av1_|srtp_|webrtc|_ZN6webrtc|_ZN3rtc|_ZN4absl)' > "$out/libwebrtc-exported.txt" || true
+        [ ! -s "$out/libwebrtc-exported.txt" ] || { head "$out/libwebrtc-exported.txt"; die "libWPEWebKit-2.0 exports libwebrtc's, BoringSSL's, libvpx's or libaom's symbols"; }
+        echo "WebRTC: LibWebRTC backend inside libWPEWebKit-2.0 (libevent, libopus in NEEDED; no BoringSSL, libvpx, libaom or libwebrtc symbol exported; no GStreamer WebRTC, no librice)" | tee -a "$out/report.txt"
+    else
+        # WebRTC built (maintainer's decision, 2026-11-25): WebKit's GStreamer backend links GStreamer's WebRTC library
+        readelf -d "$lib" | grep -q 'NEEDED.*\[libgstwebrtc-1\.0\.so' || die "libWPEWebKit-2.0 doesn't link libgstwebrtc-1.0: WebRTC isn't built"
+        echo "WebRTC: libgstwebrtc-1.0 in libWPEWebKit-2.0's NEEDED" | tee -a "$out/report.txt"
+        readelf -d "$lib" | grep -q 'NEEDED.*\[librice-proto\.so' || die "libWPEWebKit-2.0 doesn't link librice-proto: ICE isn't librice's"
+        echo "ICE: librice-proto and librice-io in libWPEWebKit-2.0's NEEDED (the network process runs ICE)" | tee -a "$out/report.txt"
+    fi
     gcc -Wall -Wextra -O1 -o "$out/wpe-headless-render" /build/wpewebkit-headless-test.c \
         $(pkg-config --cflags --libs wpe-webkit-2.0 wpe-platform-2.0 wpe-platform-headless-2.0)
     id -u tester >/dev/null 2>&1 || useradd -m tester
