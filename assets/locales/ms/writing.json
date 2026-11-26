@@ -22,5 +22,7 @@
   "settings.noModel": "Penulisan memerlukan model bahasa. Pasang satu dalam Otak.",
   "settings.openBrain": "Buka Otak",
   "settings.privacy": "Lumo berjalan pada komputer ini dengan enjin setempat; teks yang dipilih tidak pernah meninggalkannya. Apl tidak pernah bercakap dengan model: LordOS yang bertanya kepadanya dan hanya memberikan apl teks yang anda pilih untuk diganti. Tidak pernah ditawarkan dalam medan kata laluan.",
-  "settings.how": "Sehingga 4,000 aksara pada satu masa. Model boleh tersilap: baca hasilnya sebelum anda menggantikan teks anda."
+  "settings.how": "Sehingga 4,000 aksara pada satu masa. Model boleh tersilap: baca hasilnya sebelum anda menggantikan teks anda.",
+  "brain.usedBy": "Fungsi Lumo: {list}, dan “Siasat dengan Lumo” dalam Monitor",
+  "brain.tryNeeds": "Untuk mencubanya, hidupkan Penulisan atau Sentinela."
 }

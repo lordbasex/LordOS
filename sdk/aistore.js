@@ -36,7 +36,7 @@ export const PIECES = [
 // (✨ AI on selected text, 0.8.9.6.2; docs/AI.md "Writing") work.
 export const LEVELS = ['read', 'ask', 'admin'];
 export const FUNCTIONS = [
-  { id: 'writing', level: 0, ready: true }, { id: 'sentinela', level: 0, ready: true },
+  { id: 'writing', level: 0, ready: true, llm: true }, { id: 'sentinela', level: 0, ready: true, llm: true },
   { id: 'notes', level: 1 }, { id: 'programs', level: 1 }, { id: 'logs', level: 0 },
   { id: 'files', level: 0 }, { id: 'apps', level: 1 }, { id: 'machines', level: 1 }, { id: 'settings', level: 1 }, { id: 'system', level: 2 },
 ];
@@ -188,6 +188,12 @@ export function matchesQuery(e, query, label = (x) => x.name || '', capName = (c
 }
 // The functions ("What Lumo can do") a search finds, by their name and description in the person's language (and
 // their id): Sentinela, Writing… name(f), desc(f) → text. Every word of the query must be in one of them.
+// The functions that use the language model (the brain's sheet, "Used by"), from FUNCTIONS: name(f) → text
+export const llmFunctions = (list = FUNCTIONS) => (list || []).filter((f) => f.ready && f.llm);
+// Whether a model's sheet can try it: that model installed, the engine there, and a function that uses it on (Sentinela
+// or Writing, which is on with a model unless the person turned it off); not Sentinela in particular
+export const llmTryReady = ({ installed, engine, sentinelaOn, writingChoice }) => !!installed && !!engine && (!!sentinelaOn || writingChoice !== false);
+
 export function matchFunctions(list, query, name = (f) => f.id, desc = () => '') {
   const words = foldText(query).split(/\s+/).filter(Boolean);
   if (!words.length) return [];

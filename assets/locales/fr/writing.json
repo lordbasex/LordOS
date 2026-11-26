@@ -22,5 +22,7 @@
   "settings.noModel": "L’écriture a besoin d’un modèle de langage. Installez-en un dans Cerveau.",
   "settings.openBrain": "Ouvrir Cerveau",
   "settings.privacy": "Lumo fonctionne sur cet ordinateur avec le moteur local ; le texte sélectionné n’en sort jamais. Les applications ne parlent jamais au modèle : LordOS l’interroge et ne remet à l’application que le texte que vous choisissez de remplacer. Jamais proposé dans les champs de mot de passe.",
-  "settings.how": "Jusqu’à 4 000 caractères à la fois. Le modèle peut se tromper : lisez le résultat avant de remplacer votre texte."
+  "settings.how": "Jusqu’à 4 000 caractères à la fois. Le modèle peut se tromper : lisez le résultat avant de remplacer votre texte.",
+  "brain.usedBy": "Les fonctions de Lumo : {list}, et « Enquêter avec Lumo » du Moniteur",
+  "brain.tryNeeds": "Pour l’essayer, activez Écriture ou Sentinela."
 }

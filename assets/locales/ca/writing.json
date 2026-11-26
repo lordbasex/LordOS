@@ -22,5 +22,7 @@
   "settings.noModel": "Escriptura necessita un model de llenguatge. Instal·la’n un a Cervell.",
   "settings.openBrain": "Obre Cervell",
   "settings.privacy": "Lumo funciona en aquest ordinador amb el motor local; el text seleccionat no en surt mai. Les aplicacions mai no parlen amb el model: LordOS li pregunta i només lliura a l’aplicació el text que tries substituir. Mai no s’ofereix als camps de contrasenya.",
-  "settings.how": "Fins a 4.000 caràcters cada vegada. El model es pot equivocar: llegeix el resultat abans de substituir el teu text."
+  "settings.how": "Fins a 4.000 caràcters cada vegada. El model es pot equivocar: llegeix el resultat abans de substituir el teu text.",
+  "brain.usedBy": "Les funcions de Lumo: {list}, i «Investiga amb Lumo» del Monitor",
+  "brain.tryNeeds": "Per provar-lo, activa Escriptura o Sentinela."
 }

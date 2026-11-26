@@ -22,5 +22,7 @@
   "settings.noModel": "Yazı üçün dil modeli lazımdır. Beyin bölməsində birini quraşdırın.",
   "settings.openBrain": "Beyni aç",
   "settings.privacy": "Lumo bu kompüterdə yerli mühərriklə işləyir; seçilmiş mətn heç vaxt onu tərk etmir. Tətbiqlər modellə heç vaxt danışmır: LordOS ondan soruşur və tətbiqə yalnız əvəz etməyi seçdiyiniz mətni verir. Parol sahələrində heç vaxt təklif olunmur.",
-  "settings.how": "Bir dəfəyə 4 000 simvola qədər. Model səhv edə bilər: mətninizi əvəz etməzdən əvvəl nəticəni oxuyun."
+  "settings.how": "Bir dəfəyə 4 000 simvola qədər. Model səhv edə bilər: mətninizi əvəz etməzdən əvvəl nəticəni oxuyun.",
+  "brain.usedBy": "Lumo-nun funksiyaları: {list} və Monitordakı “Lumo ilə araşdır”",
+  "brain.tryNeeds": "Sınamaq üçün Yazı və ya Sentinela-nı yandırın."
 }

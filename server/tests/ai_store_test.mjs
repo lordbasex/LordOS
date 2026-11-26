@@ -4,7 +4,7 @@
 import {
   CAPS, PIECES, FUNCTIONS, LEVELS, EAR_MODELS, IMAGE_MODELS, OCR_LANGS, OCR_BASE, AI_FILTERS, ocrPackageOk, tessCodes, ocrLangs, brainEntries,
   voiceEntries, voicePage, eyeEntries, earEntries, imageEntries, pieceReady, lumoState, matchesQuery, filterEntries, filterCounts, groupByCap,
-  capCard, modelBytes, sortForPage, CAP_COLOR, CAP_ICON, matchFunctions,
+  capCard, modelBytes, sortForPage, CAP_COLOR, CAP_ICON, matchFunctions, llmFunctions, llmTryReady,
 } from '../../sdk/aistore.js';
 import { LLM_MODELS } from '../../sdk/llmcatalog.js';
 import { VOICE_LANGS } from '../../sdk/voicecatalog.js';
@@ -144,5 +144,11 @@ eq('by its description', fnIds('traducir'), ['writing']);
 eq('Sentinela by name', fnIds('sentinela'), ['sentinela']);
 eq('no query: none listed as results', fnIds('  '), []);
 eq('no match', fnIds('whisper'), []);
+// the brain's sheet: who uses the model, and when it can be tried (not Sentinela in particular)
+eq('the functions that use the model', llmFunctions().map((f) => f.id), ['writing', 'sentinela']);
+eq('tried with Writing on by default', llmTryReady({ installed: true, engine: true, sentinelaOn: false, writingChoice: null }), true);
+eq('tried with Sentinela on and Writing off', llmTryReady({ installed: true, engine: true, sentinelaOn: true, writingChoice: false }), true);
+eq('not with both off', llmTryReady({ installed: true, engine: true, sentinelaOn: false, writingChoice: false }), false);
+eq('not without the model or the engine', [llmTryReady({ installed: false, engine: true, writingChoice: null }), llmTryReady({ installed: true, engine: false, writingChoice: null })], [false, false]);
 console.log(`ai-store-test: ${ok} passed, ${bad} failed`);
 process.exit(bad ? 1 : 0);

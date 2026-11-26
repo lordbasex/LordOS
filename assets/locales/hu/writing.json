@@ -22,5 +22,7 @@
   "settings.noModel": "Az írás funkcióhoz nyelvi modell kell. Telepíts egyet az Agy oldalon.",
   "settings.openBrain": "Agy megnyitása",
   "settings.privacy": "Lumo ezen a számítógépen fut a helyi motorral; a kijelölt szöveg sosem hagyja el. Az alkalmazások sosem beszélnek a modellel: a LordOS kérdezi meg, és csak azt a szöveget adja át az alkalmazásnak, amelyet lecserélni választasz. Jelszómezőkben sosem jelenik meg.",
-  "settings.how": "Egyszerre legfeljebb 4000 karakter. A modell tévedhet: olvasd el az eredményt, mielőtt lecseréled a szövegedet."
+  "settings.how": "Egyszerre legfeljebb 4000 karakter. A modell tévedhet: olvasd el az eredményt, mielőtt lecseréled a szövegedet.",
+  "brain.usedBy": "Lumo funkciói: {list}, valamint a Monitor „Vizsgálat Lumóval” funkciója",
+  "brain.tryNeeds": "A kipróbáláshoz kapcsolja be az Írást vagy a Sentinelát."
 }

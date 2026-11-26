@@ -22,5 +22,7 @@
   "settings.noModel": "Schrijven heeft een taalmodel nodig. Installeer er een in Brein.",
   "settings.openBrain": "Brein openen",
   "settings.privacy": "Lumo draait op deze computer met de lokale engine; de geselecteerde tekst verlaat hem nooit. Apps praten nooit met het model: LordOS vraagt het en geeft de app alleen de tekst die jij kiest te vervangen. Nooit aangeboden in wachtwoordvelden.",
-  "settings.how": "Tot 4.000 tekens per keer. Het model kan zich vergissen: lees het resultaat voordat je je tekst vervangt."
+  "settings.how": "Tot 4.000 tekens per keer. Het model kan zich vergissen: lees het resultaat voordat je je tekst vervangt.",
+  "brain.usedBy": "De functies van Lumo: {list}, en ‘Onderzoeken met Lumo’ in Monitor",
+  "brain.tryNeeds": "Zet Schrijven of Sentinela aan om het te proberen."
 }

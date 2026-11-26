@@ -22,5 +22,7 @@
   "settings.noModel": "Viết cần một mô hình ngôn ngữ. Hãy cài một mô hình trong Não.",
   "settings.openBrain": "Mở Não",
   "settings.privacy": "Lumo chạy trên máy tính này bằng công cụ cục bộ; văn bản đã chọn không bao giờ rời khỏi máy. Ứng dụng không bao giờ nói chuyện với mô hình: LordOS hỏi mô hình và chỉ trao cho ứng dụng phần văn bản bạn chọn thay thế. Không bao giờ được đề xuất trong ô mật khẩu.",
-  "settings.how": "Tối đa 4.000 ký tự mỗi lần. Mô hình có thể sai: hãy đọc kết quả trước khi thay thế văn bản của bạn."
+  "settings.how": "Tối đa 4.000 ký tự mỗi lần. Mô hình có thể sai: hãy đọc kết quả trước khi thay thế văn bản của bạn.",
+  "brain.usedBy": "Các chức năng của Lumo: {list}, và “Điều tra với Lumo” của Monitor",
+  "brain.tryNeeds": "Để thử, hãy bật Viết hoặc Sentinela."
 }

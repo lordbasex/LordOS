@@ -25,7 +25,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
-  CAPS, CAP_COLOR, CAP_ICON, FUNCTIONS, matchFunctions, LEVELS, AI_FILTERS, TESSDATA, ocrPackageOk, tessCodes, ocrLangs, brainEntries, voiceEntries,
+  CAPS, CAP_COLOR, CAP_ICON, FUNCTIONS, matchFunctions, llmFunctions, llmTryReady, LEVELS, AI_FILTERS, TESSDATA, ocrPackageOk, tessCodes, ocrLangs, brainEntries, voiceEntries,
   eyeEntries, earEntries, imageEntries, lumoState, filterEntries, filterCounts, groupByCap, capCard, modelBytes, sortForPage, voicePage,
 } from '../../sdk/aistore.js';
 import { Stack, Section, SettingRow, Note, Actions, tint } from './ui.jsx';
@@ -366,13 +366,14 @@ function TryBox({ e, ctx }) {
     );
   }
   if (e.kind === 'llm') {
-    const ready = lumoReady();
-    const can = ready.ok && ready.model === e.model.id;
+    const eng = sentinelaEngine.get() || {};
+    const can = llmTryReady({ installed: (eng.models || []).some((m) => m.id === e.model.id), engine: eng.available,
+      sentinelaOn: sentinelaPrefs().on, writingChoice: writingChoice() });
     const go = async () => {
       if (!text.trim() || busy) return;
       setBusy(true);
       setOut('');
-      const r = await translateWithLumo(text.trim());
+      const r = await translateWithLumo(text.trim(), { model: e.model.id });
       setBusy(false);
       setOut(r.ok ? r.text : errorText(r.error));
     };
@@ -383,7 +384,7 @@ function TryBox({ e, ctx }) {
           <TextInput value={text} onChange={(v) => setText(v.slice(0, 400))} onSubmit={go} placeholder={tr('settings.aiStore.try.translateHint')} style={{ flex: 1, minWidth: 0 }} />
           <Button small primary disabled={!can || busy || !text.trim()} label={tr('settings.aiStore.try.translateDo')} onClick={go} />
         </View>
-        {can ? outBox(busy ? tr('settings.aiStore.try.thinking') : out, tr('settings.aiStore.try.out')) : <Note>{tr('settings.aiStore.try.needsSentinela')}</Note>}
+        {can ? outBox(busy ? tr('settings.aiStore.try.thinking') : out, tr('settings.aiStore.try.out')) : <Note>{tr('writing.brain.tryNeeds')}</Note>}
       </Box>
     );
   }
@@ -457,7 +458,10 @@ function Sheet({ e, ctx, onClose }) {
   const busy = !!ctx.job;
   const installed = e.state === 'installed', soon = e.state === 'soon';
   const sub = [tr(`settings.aiStore.cap.${e.cap}`), tr(`settings.aiStore.tech.${e.cap}`), e.recommended ? tr('settings.aiStore.recommended') : null].filter(Boolean).join(' · ');
-  const used = tr(`settings.aiStore.used.${e.kind === 'engine' ? 'engine' : e.cap}`);
+  // the brain's models: the functions that really use the model, from the list of functions, and Monitor's Investigate
+  const used = e.cap === 'brain' && e.kind !== 'engine'
+    ? tr('writing.brain.usedBy', { list: llmFunctions().map((f) => fnName(f, tr)).join(', ') })
+    : tr(`settings.aiStore.used.${e.kind === 'engine' ? 'engine' : e.cap}`);
   const stateText = tr(soon ? 'settings.aiStore.state.soon' : installed ? 'settings.aiStore.state.installed' : 'settings.aiStore.state.cloud');
   const hint = tr(soon ? 'settings.aiStore.hint.soon' : installed ? 'settings.aiStore.hint.installed' : e.kind === 'ocrLang' ? 'settings.aiStore.hint.debian' : 'settings.aiStore.hint.cloud');
   const acts = ctx.actions(e);

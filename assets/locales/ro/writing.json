@@ -22,5 +22,7 @@
   "settings.noModel": "Scrierea are nevoie de un model de limbaj. Instalează unul în Creier.",
   "settings.openBrain": "Deschide Creier",
   "settings.privacy": "Lumo rulează pe acest computer cu motorul local; textul selectat nu îl părăsește niciodată. Aplicațiile nu vorbesc niciodată cu modelul: LordOS îl întreabă și îi dă aplicației doar textul pe care alegi să-l înlocuiești. Nu este oferit niciodată în câmpurile de parolă.",
-  "settings.how": "Până la 4.000 de caractere o dată. Modelul poate greși: citește rezultatul înainte să-ți înlocuiești textul."
+  "settings.how": "Până la 4.000 de caractere o dată. Modelul poate greși: citește rezultatul înainte să-ți înlocuiești textul.",
+  "brain.usedBy": "Funcțiile lui Lumo: {list} și „Investighează cu Lumo” din Monitor",
+  "brain.tryNeeds": "Pentru a-l încerca, activați Scriere sau Sentinela."
 }

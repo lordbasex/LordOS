@@ -22,5 +22,7 @@
   "settings.noModel": "Uandishi unahitaji modeli ya lugha. Sakinisha moja katika Ubongo.",
   "settings.openBrain": "Fungua Ubongo",
   "settings.privacy": "Lumo huendeshwa kwenye kompyuta hii kwa injini ya ndani; maandishi uliyochagua hayaondoki humo kamwe. Programu hazizungumzi kamwe na modeli: LordOS ndiyo huiuliza na kuipa programu maandishi tu uliyochagua kubadilisha. Haitolewi kamwe katika sehemu za nenosiri.",
-  "settings.how": "Hadi herufi 4,000 kwa wakati mmoja. Modeli inaweza kukosea: soma matokeo kabla ya kubadilisha maandishi yako."
+  "settings.how": "Hadi herufi 4,000 kwa wakati mmoja. Modeli inaweza kukosea: soma matokeo kabla ya kubadilisha maandishi yako.",
+  "brain.usedBy": "Kazi za Lumo: {list}, na “Chunguza kwa Lumo” ya Monitor",
+  "brain.tryNeeds": "Ili kuijaribu, washa Uandishi au Sentinela."
 }

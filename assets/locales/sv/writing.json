@@ -22,5 +22,7 @@
   "settings.noModel": "Skrivande behöver en språkmodell. Installera en i Hjärna.",
   "settings.openBrain": "Öppna Hjärna",
   "settings.privacy": "Lumo körs på den här datorn med den lokala motorn; den markerade texten lämnar den aldrig. Appar pratar aldrig med modellen: LordOS frågar den och ger appen bara den text du väljer att ersätta. Erbjuds aldrig i lösenordsfält.",
-  "settings.how": "Upp till 4 000 tecken åt gången. Modellen kan ha fel: läs resultatet innan du ersätter din text."
+  "settings.how": "Upp till 4 000 tecken åt gången. Modellen kan ha fel: läs resultatet innan du ersätter din text.",
+  "brain.usedBy": "Lumos funktioner: {list} och Monitors ”Undersök med Lumo”",
+  "brain.tryNeeds": "Slå på Skrivande eller Sentinela för att prova."
 }

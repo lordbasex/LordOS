@@ -22,5 +22,7 @@
   "settings.noModel": "Menulis memerlukan model bahasa. Pasang satu di Otak.",
   "settings.openBrain": "Buka Otak",
   "settings.privacy": "Lumo berjalan di komputer ini dengan mesin lokal; teks yang dipilih tidak pernah keluar darinya. Aplikasi tidak pernah berbicara dengan model: LordOS yang bertanya kepadanya dan hanya memberikan ke aplikasi teks yang Anda pilih untuk diganti. Tidak pernah ditawarkan di kolom kata sandi.",
-  "settings.how": "Hingga 4.000 karakter sekaligus. Model bisa salah: baca hasilnya sebelum mengganti teks Anda."
+  "settings.how": "Hingga 4.000 karakter sekaligus. Model bisa salah: baca hasilnya sebelum mengganti teks Anda.",
+  "brain.usedBy": "Fungsi Lumo: {list}, dan “Selidiki dengan Lumo” di Monitor",
+  "brain.tryNeeds": "Untuk mencobanya, aktifkan Menulis atau Sentinela."
 }

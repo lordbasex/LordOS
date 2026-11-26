@@ -22,5 +22,7 @@
   "settings.noModel": "Pisanie wymaga modelu językowego. Zainstaluj go w sekcji Mózg.",
   "settings.openBrain": "Otwórz Mózg",
   "settings.privacy": "Lumo działa na tym komputerze z lokalnym silnikiem; zaznaczony tekst nigdy go nie opuszcza. Aplikacje nigdy nie rozmawiają z modelem: LordOS pyta go i przekazuje aplikacji tylko tekst, który zdecydujesz się zastąpić. Nigdy nie jest oferowane w polach haseł.",
-  "settings.how": "Do 4000 znaków naraz. Model może się mylić: przeczytaj wynik, zanim zastąpisz swój tekst."
+  "settings.how": "Do 4000 znaków naraz. Model może się mylić: przeczytaj wynik, zanim zastąpisz swój tekst.",
+  "brain.usedBy": "Funkcje Lumo: {list} oraz „Zbadaj z Lumo” w Monitorze",
+  "brain.tryNeeds": "Aby to wypróbować, włącz Pisanie lub Sentinela."
 }
