@@ -449,7 +449,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       </Row>
       {/* the guest's apps in the launcher while the machine is off (6.12, guestlaunch.js): once apps mode listed them */}
       {meta.guestApps?.length ? <Row label={tr('machines.cfg.launcherApps')} last note={tr('machines.cfg.launcherAppsNote', { count: meta.guestApps.length })}>
-        <Toggle on={meta.launcherApps !== false} onChange={(x) => { writeMeta(dir, { launcherApps: x }); setMeta(readMeta(dir)); }} />
+        <Toggle on={meta.launcherApps === true} onChange={(x) => { writeMeta(dir, { launcherApps: x }); setMeta(readMeta(dir)); }} />
       </Row> : null}
     </Group>
     {m.suspended ? <Group><Row label={tr('machines.cfg.saved')} value={bytes(m.stateBytes || 0)} last note={tr('machines.cfg.savedNote')} /></Group> : null}

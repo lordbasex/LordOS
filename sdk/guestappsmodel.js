@@ -87,11 +87,12 @@ export function parseGuestAppId(id) {
 }
 
 // Whether a machine's apps are in the launcher: its saved list (meta.guestApps), the person's switch (meta.launcherApps:
-// absent means on once the machine has a list), never a machine locked for anonymity or a member of a group (a Whonix
+// only `true` shows them, since 0.8.9.6.2: absent is off, so a machine's apps never mix with this computer's own unless
+// the person turns it on in Configure; before it was on once the machine had a list), never a machine locked for anonymity or a member of a group (a Whonix
 // member: its agent is off and nothing of its guest may show outside its window); the caller leaves out the unreadable
 export function showsGuestApps(m, meta) {
   if (!m || !meta || m.profileLock || m.groupDir) return false;
-  if (meta.launcherApps === false) return false;
+  if (meta.launcherApps !== true) return false;
   return Array.isArray(meta.guestApps) && meta.guestApps.length > 0;
 }
 

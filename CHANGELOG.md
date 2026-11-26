@@ -11,6 +11,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Fixed
+- **A machine's apps no longer mix with this computer's in the app launcher unless you turn it on** (the maintainer's
+  decision while testing 0.8.9.6.2: a Windows machine that was off filled the launcher with its apps). Since 0.8.9.6 a
+  machine that had listed its apps in apps mode put them in the launcher and search while off, marked with its name.
+  That is now off unless Machines → Configure → "Its apps in the launcher" is turned on for that machine
+  (`showsGuestApps` in `sdk/guestappsmodel.js`: only `launcherApps: true`; a machine with no saved choice shows none). A
+  running machine's apps still show by the clock in apps mode and in its window. Test: `server/tests/guest_apps_test.mjs`.
 - **With a moving wallpaper the desktop's right-click menu never opened** (found testing 0.8.9.6.2). The video is drawn
   over the still wallpaper, whose node takes the desktop's clicks (its menu, in every theme), and the video's node took
   them first. The moving picture and its poster are now `pointerEvents: 'none'` (`sdk/motion.jsx`): clicks reach the
