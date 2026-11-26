@@ -353,6 +353,11 @@ static int run_app(Web *w) {
     if (isolate(scope)) return 1;
 
     weblang_init();
+    /* the app's name for what WebKit sends the notification server itself: a service worker's notification
+     * (registration.showNotification) goes there from WebKit, not through the view's "show-notification"
+     * (docs/WEBAPPS.md, "Notifications"). Without a name GLib's is NULL: WebKit's Notify carried "[Invalid UTF-8]" and
+     * GLib logged a critical for each one. The registry's name is checked UTF-8 already; anything else gets the program's name. */
+    g_set_application_name(w->app.name[0] && g_utf8_validate(w->app.name, -1, NULL) ? w->app.name : "lord-web");
     w->loop = g_main_loop_new(NULL, FALSE);
     webbus_init(w);
     WebWin *win = webwin_new(w);

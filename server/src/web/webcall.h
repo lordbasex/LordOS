@@ -48,6 +48,8 @@ int webcall_hints_site(const char *uri, const char *scope, const char *app_origi
 
 /* lord-web's side (webcall.c, not pure): write one line, rate limited */
 void webcall_log(const char *line);
+/* the same for another kind of line ("notify": webbus.c), sharing the one budget of WEBCALL_RATE lines a minute */
+void webcall_log_as(const char *kind, const char *line);
 void webcall_log_hints(unsigned mask);
 
 #endif

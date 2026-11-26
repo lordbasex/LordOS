@@ -198,15 +198,17 @@ int webcall_hints_site(const char *uri, const char *scope, const char *app_origi
     return 0;
 }
 
-void webcall_log(const char *line) {
-    if (!line || !line[0]) return;
+void webcall_log_as(const char *kind, const char *line) {
+    if (!kind || !line || !line[0]) return;
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     unsigned dropped = 0;
     if (!webcall_rate((double)t.tv_sec + t.tv_nsec / 1e9, &dropped)) return;
     if (dropped) fprintf(stderr, "webcall: %u lines dropped (more than %d a minute)\n", dropped, WEBCALL_RATE);
-    fprintf(stderr, "webcall: %s\n", line);
+    fprintf(stderr, "%s: %s\n", kind, line);
 }
+
+void webcall_log(const char *line) { webcall_log_as("webcall", line); }
 
 void webcall_log_hints(unsigned mask) {
     char line[700];

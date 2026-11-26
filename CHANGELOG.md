@@ -100,6 +100,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `tests/webapp_test.c` the merged icon list and `purpose`; `tests/webapps_model_test.mjs` `siteIconError`;
     `tests/webapps_icon_settings_scene.mjs` Refresh icon (busy, the reason or "Icon updated", one log line per failure,
     never the page's text).
+- **Web apps: a log line for each notification, and a name for WebKit's own** (in development). lord-web writes
+  `notify: page tag <hash8|none> silent unknown renotify unknown shown|replaced` to the app's log for each notification
+  the page posts (`webpage_notify_line`, in the call log's 60 lines a minute): no title, body, icon or address, and the
+  tag (a chat id, often a phone number) only as 8 hex digits of a hash keyed with a random number picked at start and
+  never written. It tells "the page never posted a notification" from "it got lost on the way", for a messaging web
+  app whose message sound played without a banner (2026-11-26). lord-web also sets GLib's application name to the
+  app's: a service worker's notification (`registration.showNotification`) goes from WebKit straight to
+  `org.freedesktop.Notifications`, not through the view, and carried `[Invalid UTF-8]` as its app name with a GLib
+  critical each time. That path, what it lacks (LordOS's sound rule, the window brought forward on click) and the
+  WebKit patch that would route it through lord-web (a follow-up, not built) are in docs/WEBAPPS.md, "Permissions";
+  the messaging app's message notifications don't use it in WebKit 2.54 (no `Notification.maxActions`). Tests:
+  `webapp-test` (the line's shape, the hash keyed per run, no tag text).
 - **Web apps played no sound of their own without a click first:** a messaging web app's incoming-call ringtone and
   new-message sound were silent. WebKit's default autoplay policy allows only muted media until the person interacts;
   lord-web now gives every web app's view `WEBKIT_AUTOPLAY_ALLOW`, as Chrome does for installed apps (`webback_policies`).
