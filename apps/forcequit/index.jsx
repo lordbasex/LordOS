@@ -1,7 +1,7 @@
 // Force Quit (the crown menu, sdk/appcontrol.js): every app with a window; the chosen one ends without
 // being asked. Linux and isolated apps get SIGKILL from lord-server (only their own process), built-in
 // apps close without their close guard.
-import { View, Text, Button, ScrollView, useTheme, useWindows, runningApps, forceQuit, windowIcon, errorText, typeScale, t as tr } from '@lordos/sdk';
+import { View, Text, Button, ScrollView, useTheme, useWindows, runningApps, forceQuit, windowIcon, errorText, typeScale, t as tr, SkinRegion, useSkinned, listPane, pickItem, commandBar, pickCommand } from '@lordos/sdk';
 import { useState } from 'react';
 
 export function Icon({ size }) {
@@ -20,7 +20,13 @@ export default function ForceQuit() {
   const [err, setErr] = useState('');
   const chosen = list.find((g) => g.key === sel) ? sel : null;
   const quit = () => { if (!chosen) return; const e = forceQuit(chosen); setErr(e ? errorText(e) : ''); setSel(null); };
-  return (
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the running apps as a list pane and
+  // Force Quit as a command bar; quitting is Force Quit's own (forceQuit, only an app in the list)
+  const skinned = useSkinned('forcequit');
+  const pane = skinned ? listPane({ title: tr('forcequit.intro'), items: list.map((g) => ({ key: g.key, label: g.name, detail: g.windows.length > 1 ? tr('forcequit.windows', { count: g.windows.length }) : '', selected: g.key === chosen })) }) : null;
+  const bar = skinned ? commandBar({ commands: [{ id: 'quit', label: tr('forcequit.quit'), disabled: !chosen }] }) : null;
+  const vm = pane ? { app: 'forcequit', ...pane, commands: bar.commands, error: err, actions: { select: (key) => { const k = pickItem(pane, key); if (k) setSel(k); }, command: (id) => { if (pickCommand(bar, id)) quit(); } } } : null;
+  const own = (
     <View style={{ flex: 1, padding: 16, gap: 10 }}>
       <Text style={{ fontSize: typeScale.callout, color: t.text, textAlign: 'start', lineHeight: 1.4 }}>{tr('forcequit.intro')}</Text>
       <View style={{ flex: 1, borderRadius: 8, border: `1px solid ${t.separator}`, overflow: 'hidden' }}>
@@ -46,4 +52,5 @@ export default function ForceQuit() {
       </View>
     </View>
   );
+  return <SkinRegion app="forcequit" region="list" model={vm}>{own}</SkinRegion>;
 }
