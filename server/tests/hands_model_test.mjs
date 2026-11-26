@@ -1,7 +1,7 @@
 // hands_model_test.mjs — Hands' reader (sdk/handsmodel.js, docs/HANDS.md): the UI tree as text with ref_N ids. Refs stay
 // the same for a node while it lives; a password's value, a protected node's text, a handsDeny node and the system band
 // never come out; find; the windows list and the allowlist; and the prompt's texts claim nothing is verified.
-import { serializeTree, findNodes, makeRefs, roleOf, windowsList, matchApp, filterLog, allowed, clean } from '../../sdk/handsmodel.js';
+import { serializeTree, findNodes, makeRefs, roleOf, windowsList, matchApp, filterLog, allowed, clean, blackoutNodes } from '../../sdk/handsmodel.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -97,6 +97,45 @@ eq('windows with an allowlist', list.map((w) => [w.id, w.focused]), [['notes', t
 yes('allowed: empty list = every app', allowed([], 'x') && !allowed(['a'], 'x'));
 eq('an app by name, accents ignored', matchApp([{ id: 'notes', name: 'Notas' }], 'notas')?.id, 'notes');
 eq('log lines that hold the pattern', filterLog('a error 1\nb ok\nc ERROR 2', 'error', 1), 'c ERROR 2');
+
+// an allowlisted screenshot: everything is black but the allowed window and the menus tied to it (fail closed)
+{
+  const wallpaper = node('image', {});
+  const widget = node('view', {}, [text('Weather 21°')]);
+  const allowedWin = node('view', { lordWin: 'notes' }, [text('My note')]);
+  const otherWin = node('view', { lordWin: 'mail' }, [text('Inbox: 3 secrets')]);
+  const windowsBox = node('view', {}, [allowedWin, otherWin]);
+  const themeRoot = node('view', {}, [wallpaper, widget, windowsBox]);
+  const dockItem = node('view', {}, [text('Terminal')]);
+  const barMenu = node('view', {}, [text('File Edit')]);
+  const floating = node('view', {}, [text('pip video')]);
+  const search = node('view', {}, [text('Search')]);
+  const myMenu = node('view', { handsWin: 'notes' }, [text('Import…')]);
+  const otherMenu = node('view', { handsWin: 'mail' }, [text('Forward')]);
+  const clip = node('view', {}, [text('Clipboard: password123')]);
+  const emoji = node('view', {}, [text('😀')]);
+  const mySheet = node('view', { handsWin: 'notes' }, [text('Delete note?')]);
+  const tip = node('view', {}, [text('tooltip')]);
+  const drag = node('view', {}, [text('drag')]);
+  const banner = node('view', {}, [text('New mail from Ana')]);
+  const prompt = node('view', {}, [text('Allow camera?')]);
+  const L = (z, ...kids) => ({ node: node('view', {}, kids), z });
+  const allRoots = [{ node: themeRoot, z: 0 }, L(10, dockItem), L(20, barMenu), L(30, floating), L(40, search), L(50, myMenu, otherMenu, clip, emoji),
+    L(60, mySheet), L(80, tip), L(90, drag), L(95, banner), L(100, prompt)];
+  const kept = (n) => n === allowedWin || (n.props.handsWin === 'notes');
+  const black = new Set(blackoutNodes(allRoots, kept));
+  const is = (n) => black.has(n.id);
+  yes('the allowed window is not blacked', !is(allowedWin) && !is(themeRoot) && !is(windowsBox));
+  yes('its menu and its sheet are not blacked', !is(myMenu) && !is(mySheet));
+  yes('the wallpaper and the desktop\'s widgets: black', is(wallpaper) && is(widget));
+  yes('another app\'s window: black', is(otherWin));
+  for (const [z, n, name] of [[10, dockItem, 'the Dock'], [20, barMenu, 'the menu bar'], [30, floating, 'floating windows'], [40, search, 'search'],
+    [50, otherMenu, 'another window\'s menu'], [50, clip, 'the clipboard panel'], [50, emoji, 'the emoji panel'], [80, tip, 'tooltips'],
+    [90, drag, 'drag images'], [95, banner, 'notifications']]) yes(`layer ${z}: ${name} black`, is(n));
+  yes('the system band is left to lord-server (always black there)', !is(prompt));
+  const none = new Set(blackoutNodes(allRoots, () => false));
+  yes('nothing allowed: every surface black', none.has(wallpaper.id) && none.has(widget.id) && none.has(windowsBox.id) && none.has(dockItem.id) && none.has(myMenu.id));
+}
 
 // the prompt and the settings claim no identity: the name and the program are reported, never verified
 const root = fileURLToPath(new URL('../../', import.meta.url));

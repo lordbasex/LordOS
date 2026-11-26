@@ -61,7 +61,8 @@ export const shellLayers = () => shell;
 function SheetBox({ win, children }) {
   const box = useRef(null);
   useEffect(() => wm.addSheet(win, box.current?.id), [win]);
-  return h(View, { ref: box, style: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' } }, children);
+  // handsWin: the window it belongs to, so an allowlisted agent's screenshot of that window shows it (sdk/hands.jsx)
+  return h(View, { ref: box, handsWin: win, style: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' } }, children);
 }
 
 export function Layer({ name, children }) {
@@ -106,6 +107,7 @@ export function Overlay({ anchor, children, onClose, layer = 'popover' }) {
   return createPortal(h(View, {
     ref: box,
     protected: !!win?.protected,         // a protected window's list stays the protected fill in screenshots
+    handsWin: win?.id || undefined,      // the window it belongs to (Hands' allowlisted screenshots)
     style: { position: 'absolute', left: r[0] - o[0], top: r[1] - o[1], width: r[2], height: r[3], pointerEvents: 'box-none', direction: direction() },
   }, children), target);
 }

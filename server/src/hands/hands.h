@@ -41,7 +41,7 @@
 
 #define HANDS_CLIENTS     8         /* bus connections at once */
 #define HANDS_EXE_MAX     256       /* the program the bus vouched for, shown in the prompt */
-#define HANDS_BLACK_MAX   256       /* windows of other apps blacked out of an allowlisted screenshot */
+#define HANDS_BLACK_MAX   1024      /* windows of other apps blacked out of an allowlisted screenshot */
 #define HANDS_NAME_MAX    40        /* bytes of a client's shown name */
 #define HANDS_TEXT_MAX    2000      /* bytes one Type call takes */
 #define HANDS_VALUE_MAX   2000      /* bytes of a SetValue */

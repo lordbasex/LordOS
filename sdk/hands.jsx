@@ -34,8 +34,9 @@ import { textFocusBox } from './components.jsx';
 import { openFileWithApps } from './sysopen.js';
 import * as fs from './fs.js';
 import {
-  serializeTree, findNodes, makeRefs, own, allowed, appOfWindow, windowsList, matchApp, filterLog, SYSTEM_Z,
+  serializeTree, findNodes, makeRefs, own, allowed, appOfWindow, windowsList, matchApp, filterLog, SYSTEM_Z, blackoutNodes,
 } from './handsmodel.js';
+import { focusedNode } from './focus.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.hands && typeof lord.hands.serve === 'function' ? lord.hands : null);
 export const handsStatus = createStore({ on: false, qa: false, allow: [], clients: [], events: 0 });
@@ -103,9 +104,12 @@ function instAllowed(inst, allow) {
   if (z === 20 || z === 50 || z === 60) { const f = frontWindow(); return !!f && allowed(allow, appOfId(f)); }
   return false;
 }
+// the node, or one it is inside, is protected, denied, a secret field, or in the system band
 const deniedOrProtected = (inst) => {
   for (let n = inst, d = 0; n && d < 4096; n = n.parent || n.host || null, d++) {
     if (own(n.props, 'protected') || own(n.props, 'handsDeny')) return true;
+    const st = own(n.props, 'accessibilityState');
+    if (st && own(st, 'secure') === true) return true;
     if (n.isContainer) return (n.layer || 0) >= SYSTEM_Z;
   }
   return false;
@@ -118,7 +122,8 @@ const layer = (z) => hostRoots().find((r) => r.z === z);
 function rootsFor(window, allow) {
   if (window === 'desktop') {
     if (Array.isArray(allow) && allow.length) {
-      const out = windows.get().filter((w) => allowed(allow, appOfWindow(w)) && !w.minimized).map((w) => ({ node: frameInst(w.id), z: 0 })).filter((r) => r.node);
+      const out = windows.get().filter((w) => allowed(allow, appOfWindow(w)) && !w.minimized)
+        .map((w) => ({ node: frameInst(w.id), z: 0, win: w.id, title: windowTitle(w) })).filter((r) => r.node);
       if (allowed(allow, appOfId(frontWindow()))) for (const z of [20, 50, 60]) { const l = layer(z); if (l) out.push(l); }
       return { roots: out };
     }
@@ -129,7 +134,7 @@ function rootsFor(window, allow) {
   if (!allowed(allow, appOfId(id))) return { error: 'allowlist' };
   const f = frameInst(id);
   if (!f) return { error: 'not-found' };
-  const roots = [{ node: f, z: 0 }];
+  const roots = [{ node: f, z: 0, win: id, title: windowTitle(wm.get(id)) }];
   if (id === frontWindow()) for (const z of [20, 50, 60]) { const l = layer(z); if (l && l.node.first) roots.push(l); }
   return { roots };
 }
@@ -177,13 +182,18 @@ const OPS = {
     const inst = a.node ? instanceOf(a.node) : null;
     return { allowed: inst ? instAllowed(inst, a.allow) : !(Array.isArray(a.allow) && a.allow.length) };
   },
+  // where a key would go: the text field with the keys and the node with the keyboard focus, each and every node it is
+  // in (deniedOrProtected); their ids go back so lord-server checks them natively too (hands.c gate GATE_KEYS)
   focus(a) {
     const box = textFocusBox();
+    let kf = null;
+    try { kf = focusedNode(); } catch (e) { kf = null; }
     const f = frontWindow();
     const fi = f ? frameInst(f) : null;
-    const secure = !!(box && deniedOrProtected(box)) || !!(fi && own(fi.props, 'protected')) || !!(f && wm.get(f)?.protected);
-    const denied = !!(box && own(box.props, 'handsDeny'));
-    return { secure, denied, allowed: !(Array.isArray(a.allow) && a.allow.length) || (!!f && allowed(a.allow, appOfId(f))) };
+    const held = [box, kf].filter((n) => n && !n.deleted);
+    const secure = held.some(deniedOrProtected) || !!(fi && own(fi.props, 'protected')) || !!(f && wm.get(f)?.protected);
+    const nodes = held.map((n) => n.id).filter((id) => typeof id === 'number' && id > 0);
+    return { secure, nodes, allowed: !(Array.isArray(a.allow) && a.allow.length) || (!!f && allowed(a.allow, appOfId(f))) };
   },
   setvalue(a) {
     const n = refs.nodeOf(a.ref);
@@ -214,13 +224,12 @@ const OPS = {
     });
     return { inside };
   },
+  // fail closed: everything is black but the allowed windows and the menus, popovers and sheets tied to one of them
   blackout(a) {
-    const nodes = [];
-    for (const w of windows.get()) if (!allowed(a.allow, appOfWindow(w))) { const n = wm.frameNode(w.id); if (n) nodes.push(n); }
-    // the Dock, the launcher and search, the notifications: no app's window, so none of an allowed one
-    for (const z of [10, 30, 40, 95]) { const l = layer(z); for (let c = l && l.node.first; c; c = c.next) nodes.push(c.id); }
-    // the desktop itself (the wallpaper's widgets): everything of the theme's tree but the windows
-    return { nodes };
+    const keep = new Set();
+    for (const w of windows.get()) if (!w.minimized && allowed(a.allow, appOfWindow(w))) { const n = wm.frameNode(w.id); if (n) keep.add(n); }
+    const kept = (n) => keep.has(n.id) || (typeof own(n.props, 'handsWin') === 'string' && allowed(a.allow, appOfId(own(n.props, 'handsWin'))));
+    return { nodes: blackoutNodes(hostRoots().filter((r) => r.z < SYSTEM_Z), kept) };
   },
   open(a) {
     if (!a.app) return { error: 'not-found' };

@@ -14,6 +14,7 @@
 #include "hands/hands.h"
 #include "hands/handsimg.h"
 #include "hands/handsmark.h"
+#include "hands/mcp.h"
 #include "ui/handsbus.h"
 #include "vault/dbus.h"
 
@@ -46,7 +47,7 @@ static char *shell(const char *op, const char *json) {
     (void)json;
     char b[256];
     if (!strcmp(op, "resolve")) snprintf(b, sizeof b, "{\"node\":7,\"x\":100,\"y\":100,\"w\":40,\"h\":20,\"secure\":%s}", ref_secure ? "true" : "false");
-    else if (!strcmp(op, "focus")) snprintf(b, sizeof b, "{\"secure\":%s,\"allowed\":true}", focus_secure ? "true" : "false");
+    else if (!strcmp(op, "focus")) snprintf(b, sizeof b, "{\"secure\":%s,\"allowed\":true,\"nodes\":[55]}", focus_secure ? "true" : "false");
     else if (!strcmp(op, "target")) snprintf(b, sizeof b, "{\"allowed\":true}");
     else if (!strcmp(op, "region")) snprintf(b, sizeof b, "{\"inside\":%s}", region_inside ? "true" : "false");
     else if (!strcmp(op, "blackout")) snprintf(b, sizeof b, black_n ? "{\"nodes\":[41,42]}" : "{\"nodes\":[]}");
@@ -202,6 +203,12 @@ static void policy(void) {
     focus_secure = 0;
     HandsReq ty2 = { .call = HANDS_C_TYPE, .text = "ab\tcd", .text_len = 5 };
     CHECK(call(":1.1", &ty2, &why) == HANDS_OK && typed == 4 && keys == 1, "a Tab typed as a key between the parts");
+    /* the shell said nothing, but the node with the keyboard focus is in a handsDeny or protected node: refused natively */
+    node_why = HANDS_WHY_DENIED_NODE;
+    CHECK(call(":1.1", &ty, &why) == HANDS_E_REFUSED && why == HANDS_WHY_DENIED_NODE, "keys to a denied focused node refused in C");
+    node_why = HANDS_WHY_PROTECTED;
+    CHECK(call(":1.1", &ty, &why) == HANDS_E_REFUSED && why == HANDS_WHY_PASSWORD, "keys to a protected focused node refused in C");
+    node_why = 0;
     keys_why = HANDS_WHY_PROMPT;
     CHECK(call(":1.1", &ty, &why) == HANDS_E_REFUSED && why == HANDS_WHY_PROMPT, "an authentication prompt takes no agent keys");
     keys_why = 0;
@@ -483,6 +490,34 @@ static void marks(void) {
 }
 
 
+/* lordos-mcp's pure parts: the tools, the errors' sentences, a screenshot's points, base64, the GIF */
+static void mcp(void) {
+    CHECK(strstr(mcp_tools_json(), "\"read_window\"") && strstr(mcp_tools_json(), "\"computer\"") && !strstr(mcp_tools_json(), "javascript"),
+          "the tools, and none that runs code");
+    char b[256];
+    CHECK(strstr(mcp_error_text(HANDS_ERR_ACTIVE, NULL, b, sizeof b), "user is active"), "user active");
+    CHECK(strstr(mcp_error_text(HANDS_ERR_REFUSED, "password", b, sizeof b), "(password)"), "a refusal's word");
+    CHECK(!strstr(mcp_error_text(HANDS_ERR_REFUSED, "a b\x01", b, sizeof b), "\x01"), "a word that isn't one is not echoed");
+    McpShot s = { 0 };
+    mcp_shot_from_json(&s, "{\"x\":100,\"y\":50,\"w\":1920,\"h\":1080,\"width\":1568,\"height\":882}");
+    double x, y;
+    mcp_map_point(&s, 784, 441, &x, &y);
+    CHECK(s.valid && x > 1059 && x < 1061 && y > 589 && y < 591, "a screenshot's pixel back to the desktop: %.1f %.1f", x, y);
+    char *e = mcp_base64((const uint8_t *)"hands", 5);
+    CHECK(e && !strcmp(e, "aGFuZHM="), "base64 [%s]", e ? e : "");
+    free(e);
+    uint8_t rgb[16 * 8 * 3];
+    for (int i = 0; i < (int)sizeof rgb; i++) rgb[i] = (uint8_t)(i * 7);
+    McpFrame f[2] = { { rgb, 16, 8 }, { rgb, 16, 8 } };
+    size_t n = 0;
+    uint8_t *g = mcp_gif(f, 2, 50, &n);
+    CHECK(g && n > 800 && !memcmp(g, "GIF89a", 6) && g[n - 1] == 0x3b, "a GIF of two frames");
+    free(g);
+    char *q = mcp_quote("a\"b\n\x01");
+    CHECK(q && !strcmp(q, "\"a\\\"b\\n\\u0001\""), "JSON quoting [%s]", q ? q : "");
+    free(q);
+}
+
 int main(void) {
     pure();
     policy();
@@ -490,6 +525,7 @@ int main(void) {
     on_bus();
     pidfds();
     marks();
+    mcp();
     printf("hands-test: %d passed, %d failed\n", passes, fails);
     return fails ? 1 : 0;
 }

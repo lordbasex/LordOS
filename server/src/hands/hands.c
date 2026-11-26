@@ -653,7 +653,14 @@ static int gate(int kind, Gate *g, int *why) {
         int r = ask("focus", &a, &d, why);
         if (r) return r;
         int secure = json_bool(d.root, "secure", 0), denied = json_bool(d.root, "denied", 0), ok = json_bool(d.root, "allowed", 1);
+        /* the field and the node with the keyboard focus, checked here too (the system band, protected, handsDeny and
+         * every node they are in): the shell's word is not the only one */
+        int nw = 0;
+        const JVal *l = json_get(d.root, "nodes");
+        for (const JVal *v = l && l->type == J_ARR ? l->kid : NULL; v && !nw; v = v->next)
+            if (v->type == J_NUM && v->num > 0 && v->num < 1e9 && S.h->node_place) nw = S.h->node_place((int)v->num);
         json_free(&d);
+        if (nw) { *why = nw == HANDS_WHY_PROTECTED ? HANDS_WHY_PASSWORD : nw; return HANDS_E_REFUSED; }
         if (secure) { *why = HANDS_WHY_PASSWORD; return HANDS_E_REFUSED; }
         if (denied) { *why = HANDS_WHY_DENIED_NODE; return HANDS_E_REFUSED; }
         if (!ok) { *why = HANDS_WHY_ALLOWLIST; return HANDS_E_REFUSED; }

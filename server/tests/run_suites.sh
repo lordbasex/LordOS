@@ -244,6 +244,8 @@ EOF
     if have node; then run "remotedesk-test (sdk/remotedeskmodel.js)" node tests/remotedesk_test.mjs; fi
     if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
     if have node; then run "hands-model-test (sdk/handsmodel.js, Hands' reader)" node tests/hands_model_test.mjs; fi
+    # Hands end to end: lordos-mcp --headless against a private desktop (Notes import, a permission prompt, the banner's Stop)
+    if have python3; then python3 -I tests/hands_e2e.py >"$T/out" 2>&1; rc=$?; if [ $rc = 0 ]; then ok "hands-e2e (lordos-mcp --headless)"; elif [ $rc = 77 ]; then skip "hands-e2e" "npm run build and make"; else bad "hands-e2e (lordos-mcp --headless)"; fi; fi
     if have node; then run "protect-model-test (sdk/protectmodel.js, Machines' protected machines)" node tests/protect_model_test.mjs; fi
     run "spectrum-test" build/spectrum-test
     if have node; then run "soundwave-model-test (sdk/soundwavemodel.js, widgetgrid.js pins)" node tests/soundwave_model_test.mjs; fi

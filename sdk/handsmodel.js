@@ -173,7 +173,15 @@ function walkTree(roots, opts, visit) {
   };
   for (const r of roots || []) {
     if (!r || !r.node || (r.z || 0) >= SYSTEM_Z) continue;
-    walk(r.node, 0, null, null);
+    if (r.win) {
+      // a window's frame (whatever node the theme made it): its line first, its inside below it
+      if (hidden(r.node) || denied(r.node)) continue;
+      let b = null;
+      try { b = box(r.node); } catch (e) { b = null; }
+      if (visit({ node: r.node, role: 'window', name: clean(r.title || ''), states: [], value: null, box: b, depth: 0, win: r.win }) === false) break;
+      if (isProtected(r.node)) continue;
+      for (let c = r.node.first; c; c = c.next) walk(c, 1, b && (r.node.style || {}).overflow === 'hidden' ? b : null, r.win);
+    } else walk(r.node, 0, null, null);
     if (stop) break;
   }
 }
@@ -244,6 +252,40 @@ export function findNodes(roots, query, opts = {}) {
       `${e.states.length ? ` {${e.states.join(',')}}` : ''}${e.win ? ` in=${e.win}` : ''}${boxText(e.box)}`;
   }).join('\n');
   return { text, count: top.length };
+}
+
+// ---- an allowlisted screenshot: everything but the allowed windows is black (fail closed) ----
+// roots: [{ node, z }] below the system band (the theme's tree and every layer); kept(node) → true for an allowed window's
+// frame or a surface tied to one (a menu, popover or sheet with handsWin of an allowed window). The answer is the ids of
+// the largest subtrees holding nothing kept: the wallpaper, the desktop's widgets, other windows, the Dock, the menu bar,
+// panels, tooltips, notifications. A node above a kept one is not blacked (its children are, one by one); a kept one and
+// everything inside it stays. Raw text belongs to its Text, which is blacked whole.
+export function blackoutNodes(roots, kept) {
+  const out = [];
+  const has = new Map();
+  const holds = (n, d) => {
+    if (has.has(n)) return has.get(n);
+    let r = false;
+    if (d > 4096) r = true;
+    else if (kept(n)) r = true;
+    else for (let c = n.first; c && !r; c = c.next) if (holds(c, d + 1)) r = true;
+    has.set(n, r);
+    return r;
+  };
+  const walk = (n, d) => {
+    if (kept(n)) return;
+    for (let c = n.first; c; c = c.next) {
+      if (c.type === 'raw') continue;
+      if (holds(c, d + 1)) walk(c, d + 1);
+      else if (c.id) out.push(c.id);
+    }
+  };
+  for (const r of roots || []) {
+    if (!r || !r.node || (r.z || 0) >= SYSTEM_Z) continue;
+    if (!holds(r.node, 0) && r.node.id && r.z) { for (let c = r.node.first; c; c = c.next) if (c.id && c.type !== 'raw') out.push(c.id); continue; }
+    walk(r.node, 0);
+  }
+  return out;
 }
 
 // ---- the allowlist and the windows ----

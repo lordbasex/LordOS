@@ -93,6 +93,12 @@ export function keyFocused() {
   const s = a ? stateOf(a.root) : NO_FOCUS;
   return s.visible ? s.focus : null;
 }
+// The node with the keyboard focus whether or not its ring shows (Hands asks where a key would go: sdk/hands.jsx).
+export function focusedNode() {
+  const a = area();
+  const s = a ? stateOf(a.root) : NO_FOCUS;
+  return s.focus || null;
+}
 // fn() after each move of the keyboard focus; returns the function that stops it.
 export function onFocusMove(fn) { movers.add(fn); return () => movers.delete(fn); }
 
