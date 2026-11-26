@@ -384,6 +384,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **About LordOS: a long label was cut at its start** ("Pausas de más de 50 ms" showed as "sas de más de 50 ms" in
+  Spanish; found in QA 2026-11-26): the label column was a fixed 118 px, right-aligned and on one line, so a longer
+  label overflowed past the window's edge. The column now takes the width of the longest label, measured in the
+  interface's font (`lord.measureText`), at least 118 px and at most 45 % of the list, and a label longer than that
+  wraps instead of being cut; the same in right to left. `tests/about_labels_scene` (headless lord-server) checks every
+  label in es, de, ar and fi at About's own size and in a narrow window (`make test-full`).
+- **Help: a search with nothing found showed only a line of text** in the sidebar. It now shows the empty state with
+  Lumo confused (`EmptyState mascot="confused"`, docs/LORDOS-BRAND.md "Lumo poses"), in the sidebar where the
+  empty list is, so the article in view stays; no second Lumo while the main pane already shows one (an article that
+  does not exist). `tests/help_skin_scene.mjs` checks it.
 - **A web app's tray icon and notifications kept LordOS's letter tile** after its real icon was fetched (WhatsApp's "W"
   next to the clock): lord-web read only the registry's icon. It now prefers the site's own icon from
   `~/.cache/lordos/web/icons/<app>.png` when it starts (a regular PNG of the person's, no link, at most 1 MB). An app
