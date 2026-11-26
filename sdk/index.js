@@ -345,8 +345,8 @@ export const session = {
   // Restart… and Shut Down… (0.8.1): a confirmation with a 60 s countdown (sdk/power.jsx), then
   // lord-sessiond decides. canPower(): only in a session lord-sessiond shows on the monitor.
   canPower,
-  restart: () => askPower('reboot'),
-  shutdown: () => askPower('poweroff'),
+  restart: (opts) => askPower('reboot', opts),
+  shutdown: (opts) => askPower('poweroff', opts),
 };
 
 // The screen size changed: everything is redrawn with the new measurements.

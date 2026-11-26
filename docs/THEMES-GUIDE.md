@@ -688,7 +688,8 @@ record, which `lord.fs` can't write). A **watchdog** (`community_watch` in `serv
 off when it throws at start, never calls `startShell`, draws nothing within 6 seconds, has its React tree die, stalls
 the desktop until the main-loop watchdog stops it, or was running when two sessions in a row ended abnormally (a
 lord-server that died; logging out, shutting down, restarting or switching user from LordOS is never counted, however
-short, while a logout the theme's own code asks for keeps the count until the theme has run a healthy minute): the previous style comes back and
+short, while a logout the theme's own code asks for keeps the count until the theme has run a healthy minute, and a
+Restart… or Shut Down… countdown the theme starts never confirms by itself: only the person's click or key does): the previous style comes back and
 Settings shows "Couldn't start" with Report, **Try Again** and **Remove**. **Ctrl+Alt+Shift+Backspace** always
 restores Lord Flow.
 

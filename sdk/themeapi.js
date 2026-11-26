@@ -525,7 +525,8 @@ export function makeThemeSdk({ id, caps }) {
     get displays() { return SDK.screen.displays.map((d) => ({ ...d })); }, get mirror() { return SDK.screen.mirror; } });
   sdk.screenDisplays = () => SDK.screenDisplays().map((d) => ({ ...d }));
   sdk.session = Object.freeze({ lock: () => SDK.session.lock(), quit: () => SDK.session.quit(), canPower: () => SDK.session.canPower?.(),
-    restart: () => SDK.session.restart(), shutdown: () => SDK.session.shutdown(), managed: () => SDK.session.managed() });
+    // a countdown the theme starts never confirms by itself: only the person's real click or key does (powermodel.js)
+    restart: () => SDK.session.restart({ byTheme: true }), shutdown: () => SDK.session.shutdown({ byTheme: true }), managed: () => SDK.session.managed() });
   sdk.spotlight = Object.freeze({ toggle: (d) => SDK.spotlight.toggle(sanitizeIn(d)), open: (d) => SDK.spotlight.open?.(sanitizeIn(d)), close: () => SDK.spotlight.close?.() });
   sdk.keyboard = Object.freeze({ label: (x) => SDK.keyboard.label(sanitizeIn(x)), active: () => SDK.keyboard.active(), next: () => SDK.keyboard.next() });
   sdk.settings = Object.freeze({ get: () => snapshot(SDK.settings.get()), subscribe: (fn) => SDK.settings.subscribe(wrapCallback(fn)), set: (p) => settingsPatch(id, p) });
