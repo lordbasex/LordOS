@@ -56,6 +56,44 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     field, goes to lord-web as `WriteReplace` (lord-server only, checked by pid), which inserts the text only if the
     focused field is still a non-password text field with exactly that selection. Tests: `build/webapp-test`,
     `webapps_model_test.mjs`.
+  - **Fixed after the maintainer's test on ws164** (in WhatsApp's message box with Qwen3 1.7B; `fix/ai-writing`):
+    - **Correct, Improve and Translate gave the text back almost unchanged.** The cause was the prompt: one long system
+      text with the rules and a user message that held only the fenced text, so the 1.7B model copied it (only a capital
+      letter added, even for a translation). Now a short system text, the task in each user message right before the
+      fenced text, and fixed worked examples as earlier turns: a Spanish and an English correction, two improvements,
+      a shortening, and for each of the 35 translation targets its own informal chat line and a sentence with a
+      request in it translated as text. Sampling top-k 20 / top-p 0.8 (Qwen3's non-thinking values). Measured with the
+      real engine and model (`build/writing-real-check`, by hand): "ayer fuimos al cine y la pelicula…" → "Ayer fuimos
+      al cine y la película…, pero había…"; "i realy dont know wich one is beter" → "I really don't know which one is
+      better"; "Mañana a la tarde paso por tu casa…" → "Tomorrow afternoon I will pass by your house…"; "No sé si voy
+      a poder ir a la fiesta del sábado…" → "Não sei se vou poder ir à festa do sábado…"; a request inside the text is
+      translated, not obeyed. 1.7B still misses real-word errors ("esas" for "estás") and changes little to improve:
+      the panel suggests Qwen3 4B under Improve and Translate while the model is 1.7B (`docs/AI.md`, "What the models
+      do").
+    - **Replace did nothing in a web app's rich message box.** The shell's panel holds the keyboard, so the web app's
+      window had lost it and WebKit treated the page as unfocused; the check required `document.hasFocus()` and refused
+      every time. Now the menu marks the focused field, Replace waits (up to 3 s) until the window has the keyboard
+      back, and inserts the text as a paste would (`document.execCommand('insertText')`, which runs the page's
+      `beforeinput`), so editors with their own model such as WhatsApp's Lexical take it; WebKit's InsertText only when
+      the field didn't change. Still only in that same field, focused, editable, not a password, with exactly the
+      selection sent; a refusal is logged with one word of a closed list. Test: `build/web-ai-replace-check` (a
+      textarea, a contenteditable box and a Lexical-like editor on the real WebKit, and the refusals).
+    - **"Translate to" showed "zh-Hans" and "zh-Hant"** instead of the languages' names: the language catalogs
+      (`tools/gen-language-names.mjs`) now name LordOS's interface languages with a script too ("Chino simplificado",
+      "簡体中国語"…), checked for every target in every catalog by `writing_model_test.mjs`.
+  - **`lumo`: Writing from the terminal** (`server/src/cli/lumo.c`, `server/src/llm/lumo.c`, `server/src/ui/writebus.c`;
+    in development, **awaiting the maintainer's approval**; `docs/AI.md`, "Writing from the terminal"). `lumo corregir
+    "texto"` / `lumo correct "text"`, `mejorar`/`improve`, `resumir`/`summarize`, `traducir en "texto"` / `translate
+    pt "text"`, text from standard input (`echo texto | lumo corregir`), `lumo estado`/`status` and `--help`. The answer
+    streams to stdout, safe for a terminal; messages follow the locale (35 languages). It never reaches the model
+    itself: it asks the session's lord-server over a new session-bus service, `org.lordos.Writing1` (Status, Start,
+    Read, Cancel; only the same uid, checked with the bus; a job only for the connection that started it, cancelled
+    when it leaves; at most 4), which runs the panel's own job with `writing.c`'s fixed prompts. It follows the
+    panel's switch and model; off, it says to turn it on in Settings → AI → Writing. Exit status 0/1/2/3/4/5/130.
+    Installed as `/usr/bin/lumo` (a link to `/usr/lib/lordos/bin/lumo`, `tools/iso/mkdeb.sh`); no Debian package has a
+    `lumo` command. Tests: `build/lumo-test` (pure parts, then the real command against a private dbus-daemon and a
+    stand-in lord-server: status, streaming, a translation, stdin, Writing off in Spanish, no session, wrong command,
+    text too long, a job another connection can't read).
   - **Fixed:** Speech ▸ Start from a web app's menu read nothing for a selection in WhatsApp's message box (ws162): it
     now reads the selection the menu carries (up to 16,384 characters, cleaned twice, never a password field's) instead
     of the session's primary selection. And "Search the web for “…”" with a long selection no longer loses its end at

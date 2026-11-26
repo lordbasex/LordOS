@@ -150,6 +150,11 @@ The engine's socket is `engine.sock` in the 0700 folder, mode 0600. lord-server 
 one HTTP/1.1 request per connection, reads at most 256 KB of answer with a 3-minute limit, and hands JS only the
 model's text (at most 4 KB).
 
+The same engine serves Writing (✨ AI on selected text, and the `lumo` command through lord-server's
+`org.lordos.Writing1`; [AI.md](AI.md) "Writing"): one queue, one job at a time, its prompts fixed in
+`server/src/llm/writing.c`. Two threads in a cgroup of two cores keep it in the background while the person works; on
+a busy 20-thread machine a correction of one sentence takes 5–8 s with the 1.7B model and 15–20 s with the 4B one.
+
 The engine starts when an analysis is needed (about 1 s for the 1.7B model from a warm disk), and is stopped 2 minutes
 after its last answer (`LLM_IDLE_MS`) or when Sentinela is turned off, giving its memory back.
 
