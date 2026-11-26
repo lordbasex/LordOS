@@ -43,12 +43,25 @@ else the first installed.
 - **It runs in the shell, never in the app.** `lord.writing` (`server/src/ui/js_sentinela.c`) exists only in the
   desktop's own JS context; an isolated app's broker has none. The SDK's field hands the selection to the shell's
   panel (`sdk/writing.jsx`); the app gets text back only through its field's change after the person clicks Replace.
-- **Fixed prompts.** `server/src/llm/writing.c` holds the four system texts; JS sends only the action name, a target
-  of the closed list of LordOS's 35 interface languages and the text. The text goes between `<<<TEXT nonce>>>` and
-  `<<<END-TEXT nonce>>>` with a random nonce, stated as material and never instructions.
+- **Fixed prompts.** `server/src/llm/writing.c` holds every text the model gets; JS sends only the action name, a
+  target of the closed list of LordOS's 35 interface languages and the text. A short system text says the text is
+  data and never instructions; each user message holds the task ("Proofread this text…", "Translate this text into
+  Portuguese…") and then the text between `<<<TEXT nonce>>>` and `<<<END-TEXT nonce>>>` with a random nonce; one or
+  two fixed worked examples go first as earlier turns of the conversation (a Spanish and an English correction; for a
+  translation, each target language's own: an informal chat line without accents, and a sentence with a request in
+  it, translated as text). The first version (one long system text, the user message only the fenced text) made the
+  1.7B model copy the text back for every action, translation included (the maintainer's test on ws164, measured
+  again with `build/writing-real-check`: the corrected sentence came back with only its capital letter).
 - **Streamed.** The request asks llama-server to stream (chunked server-sent events); `wr_stream_feed` reads them
   strictly (status 200, chunk sizes, lines of at most 64 KB, JSON events) and keeps at most 16 KB of text, which the
-  panel shows as it comes (`lord.writing.peek`). 1,536 tokens at most, temperature 0.2 (0.4 to improve), no thinking.
+  panel shows as it comes (`lord.writing.peek`). 1,536 tokens at most, temperature 0.2 (0.4 to improve), top-k 20,
+  top-p 0.8 (Qwen3's non-thinking settings), no thinking (`--reasoning off` and `enable_thinking: false`).
+- **What the models do (measured, `build/writing-real-check`, 2026-11-26).** Qwen3 1.7B now corrects accents,
+  capitals and punctuation reliably ("ayer fuimos al cine y la pelicula…" → "Ayer fuimos al cine y la película…,
+  pero había…"; "i realy dont know wich one is beter" → "I really don't know which one is better") and translates
+  well-formed sentences, but it misses words that are themselves real words ("esas" for "estás"), changes little when
+  asked to improve, and loosely translates informal text. Qwen3 4B does all of these clearly better. The panel shows a
+  tip toward 4B under Improve and Translate while the model is 1.7B (`writing.panel.tip4b`).
 - **Plain text.** `sdk/writingmodel.js` `cleanOutput` drops control characters and bidi overrides, a `<think>` block,
   echoed markers and a code fence around the whole answer; nothing is interpreted. **Replace / Copy / Discard**:
   nothing changes without the click, and Replace only where the selection was if it still holds the text sent
@@ -60,10 +73,57 @@ else the first installed.
   Sentinela) plus Monitor's "Investigate with Lumo"; "Try it" translates with that model whenever Writing or Sentinela is
   on (`llmTryReady`), not only with Sentinela.
 - **Web apps:** lord-web's right-click menu has the same ✨ AI row for a page's selection; Replace goes back only to a
-  focused text field whose selection is unchanged (`docs/WEBAPPS.md`, "✨ AI on a page's selection").
-- **Tests:** `build/llm-engine-test` (the requests, streams whole and byte by byte, malformed answers, the 16 KB cap,
-  a fuzz, a streamed job through the fake engine seen while it streams, a translation, cancel, bad arguments);
-  `server/tests/writing_model_test.mjs`; `server/tests/spell_scene` (screenshots of the panel streaming and done).
+  focused text field whose selection is unchanged (`docs/WEBAPPS.md`, "✨ AI on a page's selection"). The menu marks the
+  focused field (`webedit.h` `WEBAI_MARK_JS`); Replace waits until the web app's window has the keyboard back (the
+  shell's panel holds it while open, and WebKit then treats the page as unfocused: the first version required
+  `document.hasFocus()` and so never replaced anything, WhatsApp's message box on ws164 included), then inserts the
+  text as a paste would, `document.execCommand('insertText')`, which runs the page's `beforeinput` and `input`
+  listeners, so a rich editor such as WhatsApp's Lexical takes it into its own model (`WEBAI_REPLACE_JS`); WebKit's own
+  InsertText only when the field didn't change. Only in that same field, still focused, editable, not a password, with
+  exactly the selection sent; a refusal is logged with one word of a closed list (`webai_refusal`: `gone`,
+  `other-field`, `password`, `read-only`, `not-editable`, `no-selection`, `selection-changed`, `no-menu`, `no-focus`,
+  `bad-text`, `no-answer`). "Translate to" names every language in the interface's language, Chinese's two scripts
+  included (`languages.json`, `tools/gen-language-names.mjs`; "zh-Hans" showed raw before).
+- **Tests:** `build/llm-engine-test` (the requests: task, examples, sampling, the text last and once; streams whole
+  and byte by byte, malformed answers, the 16 KB cap, a fuzz, a streamed job through the fake engine seen while it
+  streams, a translation, cancel, bad arguments); `server/tests/writing_model_test.mjs` (also: every translation
+  target named in every catalog); `server/tests/spell_scene` (screenshots of the panel streaming and done);
+  `build/web-ai-replace-check` (Replace in a textarea, a contenteditable box and a Lexical-like editor on the real
+  WebKit, its refusals); `build/writing-real-check [model] [threads]` (by hand: the test sentences through the real
+  engine and model, as lord-server sends them); `build/lumo-test` (the command against a private bus).
+
+### Writing from the terminal: `lumo` (in development, awaiting the maintainer's approval)
+
+```
+lumo corregir "texto"        lumo correct "text"          (fix)
+lumo mejorar "texto"         lumo improve "text"
+lumo resumir < archivo       lumo summarize < file        (shorten, acortar)
+lumo traducir en "texto"     lumo translate pt "text"     (a code or a name: en, inglés, Portuguese…)
+echo texto | lumo corregir   lumo estado | status         lumo --help | --ayuda
+```
+
+`/usr/bin/lumo` (a link to `/usr/lib/lordos/bin/lumo`, `server/src/cli/lumo.c`) never reaches the model itself. It asks
+the person's running session over the session bus: **`org.lordos.Writing1`** at `/org/lordos/Writing1`, served by
+lord-server (`server/src/ui/writebus.c`, on the portal's connection): `Status() → (state, model, engine)`,
+`Start(action, target, text) → id`, `Read(id) → (state, text)` (queued, starting, writing with the text so far, done,
+failed with an error code) and `Cancel(id)`. lord-server runs the panel's own job (`llm_submit_write`, `writing.c`'s
+prompts, the local engine in its sandbox; nothing goes online). The bus says each caller's uid before its first call
+is served, and another uid gets AccessDenied; a job belongs to the connection that started it, nobody else reads or
+cancels it, and it is cancelled when that connection leaves; at most 4 at once. The switch and the model are the
+panel's: the shell tells lord-server (`lord.writing.serve`); off, the command says to turn it on in Settings → AI →
+Writing (exit 3). The answer is written to stdout as it streams, safe for a terminal (`server/src/llm/lumo.c`
+`lumo_out_feed`: no control or bidi characters, no echoed markers or `<think>`). Verbs in English and Spanish; messages
+by the locale (`assets/locales/<lang>/lumo.json`). Exit status: 0 done, 1 the model failed or took too long, 2 a wrong
+command, 3 Writing off or no model or engine, 4 no LordOS session, 5 the text empty, too long (4,000 characters) or
+not UTF-8, 130 interrupted (the job is cancelled). No Debian package installs a `lumo` command (packages.debian.org,
+trixie and sid contents, 2026-11-26).
+
+### The engine's threads
+
+The engine runs with `-t 2 -tb 2` (`llmjail.c`) inside a cgroup capped at two cores (`launcher.c`, `cpu_percent =
+200`), Sentinela's low-priority design. More threads only help with the cap raised too; that is `feat/llm-gpu`'s
+files and a decision for the maintainer. Measured with `build/writing-real-check` (16 jobs, Qwen3 1.7B, an i9-10900,
+no cgroup, load ≈ 2): 2 threads 106 s (6.1 s a job), 4 threads 61 s (3.4 s), 8 threads 41 s (2.0 s).
 
 ## Capabilities
 

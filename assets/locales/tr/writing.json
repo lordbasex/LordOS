@@ -24,5 +24,7 @@
   "settings.privacy": "Lumo bu bilgisayarda yerel motorla çalışır; seçili metin bilgisayardan hiç çıkmaz. Uygulamalar modelle asla konuşmaz: LordOS ona sorar ve uygulamaya yalnızca değiştirmeyi seçtiğiniz metni verir. Parola alanlarında asla sunulmaz.",
   "settings.how": "Bir seferde en fazla 4.000 karakter. Model yanılabilir: metninizi değiştirmeden önce sonucu okuyun.",
   "brain.usedBy": "Lumo’nun işlevleri: {list} ve Monitör’deki “Lumo ile incele”",
-  "brain.tryNeeds": "Denemek için Yazma’yı veya Sentinela’yı açın."
+  "brain.tryNeeds": "Denemek için Yazma’yı veya Sentinela’yı açın.",
+  "panel.tip4b": "İpucu: Qwen3 4B modeli 1.7B’den daha iyi iyileştirir ve çevirir (Ayarlar → Yapay Zekâ → Beyin).",
+  "settings.terminal": "Terminalde de: lumo correct \"metin\", lumo translate en \"metin\" (lumo --help)."
 }

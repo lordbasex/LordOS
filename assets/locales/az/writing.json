@@ -24,5 +24,7 @@
   "settings.privacy": "Lumo bu kompüterdə yerli mühərriklə işləyir; seçilmiş mətn heç vaxt onu tərk etmir. Tətbiqlər modellə heç vaxt danışmır: LordOS ondan soruşur və tətbiqə yalnız əvəz etməyi seçdiyiniz mətni verir. Parol sahələrində heç vaxt təklif olunmur.",
   "settings.how": "Bir dəfəyə 4 000 simvola qədər. Model səhv edə bilər: mətninizi əvəz etməzdən əvvəl nəticəni oxuyun.",
   "brain.usedBy": "Lumo-nun funksiyaları: {list} və Monitordakı “Lumo ilə araşdır”",
-  "brain.tryNeeds": "Sınamaq üçün Yazı və ya Sentinela-nı yandırın."
+  "brain.tryNeeds": "Sınamaq üçün Yazı və ya Sentinela-nı yandırın.",
+  "panel.tip4b": "İpucu: Qwen3 4B modeli 1.7B-dən daha yaxşı təkmilləşdirir və tərcümə edir (Parametrlər → Süni intellekt → Beyin).",
+  "settings.terminal": "Terminalda da var: lumo correct \"mətn\", lumo translate en \"mətn\" (lumo --help)."
 }

@@ -22,6 +22,16 @@ export const writingChoice = () => { const w = settings.get().writing || {}; ret
 export const writingOn = () => writingChoice() !== false;
 export function setWritingOn(on) { settings.set((s) => ({ ...s, writing: { ...(s.writing || {}), on: !!on } })); }
 
+// The `lumo` command (docs/AI.md "Writing from the terminal") follows the same switch and model: lord-server is told
+// them (lord.writing.serve) and picks the installed model itself when a command asks.
+function serveTerminal() {
+  const w = api();
+  if (!w || typeof w.serve !== 'function') return;
+  try { w.serve(writingOn(), (settings.get().sentinela || {}).model || null); } catch (e) { /* an older lord-server */ }
+}
+serveTerminal();
+settings.subscribe(serveTerminal);
+
 // the model to write with, or null (Writing off, no engine, no model); checked when a menu opens
 export function writingReady() {
   if (!api()) return null;
@@ -61,6 +71,10 @@ function runJob({ model, action, target, text }, onState) {
   setTimeout(tick, 60);
   return () => { stop = true; try { a.cancel(id); } catch (e) { /* gone */ } };
 }
+
+// the 1.7B model barely changes a text it is asked to improve and translates loosely (docs/AI.md "Writing", measured):
+// a hint toward 4B under those two actions
+const tip4b = (job) => /^qwen3-1\.7b/.test(String(job.model || '')) && (job.action === 'improve' || job.action === 'translate');
 
 const TITLE = { fix: 'writing.action.fix', improve: 'writing.action.improve', shorter: 'writing.action.shorter' };
 
@@ -121,6 +135,7 @@ export function WritingPanel({ anchor, at, bounds, job, onReplace, onClose }) {
             </ScrollView>
           </View>
           {st.phase === 'error' && st.text ? <Text style={{ fontSize: 11, color: '#ff453a', textAlign: 'start' }}>{errText}</Text> : null}
+          {tip4b(job) ? <Text style={{ fontSize: 11, color: t.textDim, textAlign: 'start' }}>{tr('writing.panel.tip4b')}</Text> : null}
           {note ? <Text style={{ fontSize: 11, color: note === 'changed' ? '#ff9f0a' : t.textDim, textAlign: 'start' }}>{tr(`writing.panel.${note}`)}</Text> : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Text style={{ flex: 1, fontSize: 11, color: t.textDim, textAlign: 'start' }}>{tr('writing.panel.local')}</Text>

@@ -24,5 +24,7 @@
   "settings.privacy": "Lumo veikia šiame kompiuteryje su vietiniu varikliu; pažymėtas tekstas niekada jo nepalieka. Programos niekada nekalba su modeliu: LordOS jo klausia ir programai perduoda tik tą tekstą, kurį pasirenkate pakeisti. Niekada nesiūloma slaptažodžių laukuose.",
   "settings.how": "Iki 4 000 simbolių vienu metu. Modelis gali klysti: perskaitykite rezultatą prieš pakeisdami savo tekstą.",
   "brain.usedBy": "Lumo funkcijos: {list} ir Monitoriaus „Ištirti su Lumo“",
-  "brain.tryNeeds": "Norėdami išbandyti, įjunkite Rašymą arba Sentinela."
+  "brain.tryNeeds": "Norėdami išbandyti, įjunkite Rašymą arba Sentinela.",
+  "panel.tip4b": "Patarimas: Qwen3 4B modelis tobulina ir verčia geriau nei 1.7B (Nustatymai → DI → Smegenys).",
+  "settings.terminal": "Ir terminale: lumo correct \"tekstas\", lumo translate en \"tekstas\" (lumo --help)."
 }

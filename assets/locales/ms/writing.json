@@ -24,5 +24,7 @@
   "settings.privacy": "Lumo berjalan pada komputer ini dengan enjin setempat; teks yang dipilih tidak pernah meninggalkannya. Apl tidak pernah bercakap dengan model: LordOS yang bertanya kepadanya dan hanya memberikan apl teks yang anda pilih untuk diganti. Tidak pernah ditawarkan dalam medan kata laluan.",
   "settings.how": "Sehingga 4,000 aksara pada satu masa. Model boleh tersilap: baca hasilnya sebelum anda menggantikan teks anda.",
   "brain.usedBy": "Fungsi Lumo: {list}, dan “Siasat dengan Lumo” dalam Monitor",
-  "brain.tryNeeds": "Untuk mencubanya, hidupkan Penulisan atau Sentinela."
+  "brain.tryNeeds": "Untuk mencubanya, hidupkan Penulisan atau Sentinela.",
+  "panel.tip4b": "Petua: model Qwen3 4B menambah baik dan menterjemah lebih baik daripada 1.7B (Tetapan → AI → Otak).",
+  "settings.terminal": "Juga dalam terminal: lumo correct \"teks\", lumo translate en \"teks\" (lumo --help)."
 }

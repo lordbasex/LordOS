@@ -14,6 +14,8 @@
 #include "portalcheck.h"
 #include "gshort.h"
 #include "webask.h"
+#include "writebus.h"
+#include "../llm/lumo.h"
 #include "webalive.h"
 #include "../hw/hw.h"
 #include "../hw/jbuf.h"
@@ -1926,6 +1928,7 @@ static void on_reply(const DMsg *m) {
     if (webalive_reply(m)) return;          /* a lord-web's answer to lord-server's Ping (webalive.h) */
     if (!m->sender || strcmp(m->sender, "org.freedesktop.DBus")) return;
     if (webask_reply(&conn, m)) return;
+    if (writebus_reply(&conn, m)) return;      /* the uid of a `lumo` command's caller (writebus.h) */
     for (int i = 0; i < ngsess; i++) {
         if (gsess[i].known || gsess[i].serial != m->reply_serial) continue;
         uint32_t pid = 0;
@@ -1985,6 +1988,7 @@ static void on_signal(const DMsg *m) {
     int ids[CSM_MAX], n = csm_gone(&csm, name, ids, CSM_MAX);
     for (int i = 0; i < n; i++) { CsSess *s = csm_by_id(&csm, ids[i]); if (s) cast_close(s, 0); }
     webask_gone(name);
+    writebus_gone(name);
 }
 
 /* Request.Close: the app no longer wants it (a dialog, an open, a hold, a shortcuts sheet or a screen cast's
@@ -2049,6 +2053,8 @@ static void handle(const DMsg *m) {
     }
     /* web apps' permission questions (webask.c) */
     if (m->path && !strcmp(m->path, WEBASK_PATH)) { webask_call(&conn, m); return; }
+    /* ✨ AI Writing for the `lumo` command (writebus.h) */
+    if (m->path && !strcmp(m->path, LUMO_BUS_PATH)) { writebus_call(&conn, m); return; }
     if (only_web) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such object"); return; }
     if (!strcmp(mem, "Introspect")) {
         DBuf b;
@@ -2144,6 +2150,7 @@ int portal_start(void) {
     /* with fds: OpenFile and OpenDirectory hand the file over as one */
     if (fd < 0 || dbus_open_fds(&conn, fd, 2000)) { if (fd >= 0) dbus_close(&conn); return -1; }
     int web = own_name(WEBASK_NAME);
+    int writing = own_name(LUMO_BUS_NAME);
     if (!own_name(BUS_NAME)) {
         fprintf(stderr, "portal: %s is already served by another program (xdg-desktop-portal); not serving Settings\n", BUS_NAME);
         if (!web) { dbus_close(&conn); return -1; }
@@ -2167,6 +2174,7 @@ int portal_start(void) {
         fprintf(stderr, "portal: Settings, FileChooser, OpenURI, Inhibit, GlobalShortcuts, ScreenCast and Screenshot on the session bus%s\n",
                 ss ? ", and " SS_NAME : " (" SS_NAME " is another program's)");
     if (!web) fprintf(stderr, "portal: %s is another program's: web apps can't ask for permissions\n", WEBASK_NAME);
+    if (!writing) fprintf(stderr, "portal: %s is another program's: the lumo command can't write here\n", LUMO_BUS_NAME);
     return 0;
 }
 
@@ -2185,6 +2193,7 @@ void portal_dispatch(void) {
         nholds = 0;                         /* nobody can let them go any more */
         webask_lost();
         webalive_lost();
+        writebus_lost();
         while (nopens) open_drop(nopens - 1, 1);
         while (ngsess) gsess_drop(ngsess - 1);  /* no app can get a shortcut any more */
         nheld = 0;

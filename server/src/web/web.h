@@ -125,8 +125,10 @@ void web_context_menu(Web *w, const WebMenuAt *a);
  * Spelling are kept for LordOS's menu of the same right click */
 void web_menu_webkit(Web *w, WebKitContextMenu *m);
 /* ✨ AI's Replace from the shell (WriteReplace, lord-server only): text into the field the last menu's selection was in,
- * only if it still has the focus and that very selection (webmenu.c) */
+ * only if it still has the focus and that very selection (webmenu.c); it waits for the window to have the keyboard
+ * again (web_menu_ai_focused, from webwin.c's keyboard enter) */
 void web_menu_ai_replace(Web *w, const char *text);
+void web_menu_ai_focused(Web *w);
 #define WEBSELECT_WORLD "lordos-web-select"         /* the page script's world (webselect.c SELECT_WORLD) */
 /* 1 when WebKit asks for its menu on a right click in a text field the page left alone (WPEPlatform): the page
  * script lets it then, for the spelling items */

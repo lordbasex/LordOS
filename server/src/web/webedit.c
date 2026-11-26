@@ -115,3 +115,60 @@ int webmenu_parse(const char *const *names, int n, int out[WEBMENU_N]) {
     }
     return n;
 }
+
+/* ---- ✨ AI's Replace in the page (webedit.h) ---- */
+
+const char WEBAI_MARK_JS[] =
+    "const a = document.activeElement;\n"
+    "const ok = !!a && (a instanceof HTMLTextAreaElement || a instanceof HTMLInputElement || a.isContentEditable);\n"
+    "globalThis.__lordosAiField = ok ? a : null;\n"
+    "return ok;\n";
+
+const char WEBAI_REPLACE_JS[] =
+    "const f = globalThis.__lordosAiField || null;\n"
+    "globalThis.__lordosAiField = null;\n"
+    "if (!f || !f.isConnected) return 'gone';\n"
+    "if (document.activeElement !== f) return 'other-field';\n"
+    "const TEXT = ['', 'text', 'search', 'url', 'tel', 'email'];\n"
+    "const plain = f instanceof HTMLTextAreaElement || f instanceof HTMLInputElement;\n"
+    "let sel, read;\n"
+    "if (plain) {\n"
+    "  if (f instanceof HTMLInputElement && f.type === 'password') return 'password';\n"
+    "  if (f instanceof HTMLInputElement && !TEXT.includes(f.type)) return 'not-editable';\n"
+    "  if (f.readOnly || f.disabled) return 'read-only';\n"
+    "  sel = f.value.slice(f.selectionStart, f.selectionEnd);\n"
+    "  read = () => f.value;\n"
+    "} else {\n"
+    "  if (!f.isContentEditable) return 'not-editable';\n"
+    "  const s = getSelection();\n"
+    "  if (!s || !s.rangeCount || !f.contains(s.anchorNode) || !f.contains(s.focusNode)) return 'selection-changed';\n"
+    "  sel = String(s);\n"
+    "  read = () => f.textContent;\n"
+    "}\n"
+    "if (!sel) return 'no-selection';\n"
+    "if (sel !== orig) return 'selection-changed';\n"
+    "const before = read();\n"
+    "document.execCommand('insertText', false, text);\n"
+    "// a rich editor (Lexical, ProseMirror…) may apply it in its next update\n"
+    "for (let i = 0; i < 6 && read() === before; i++) await new Promise((r) => setTimeout(r, 25));\n"
+    "return read() !== before ? 'done' : 'fallback';\n";
+
+const char *webai_refusal(const char *word) {
+    static const char *const W[][2] = {
+        { "gone", "the field it was in is gone" },
+        { "other-field", "another field has the focus" },
+        { "password", "a password field" },
+        { "read-only", "the field is read-only" },
+        { "not-editable", "the focus isn't in a text field" },
+        { "no-selection", "nothing is selected any more" },
+        { "selection-changed", "the selection changed" },
+        { "unchanged", "the field took nothing" },
+        { "no-menu", "nothing to replace" },
+        { "no-focus", "the window didn't get the keyboard back" },
+        { "bad-text", "the text isn't clean UTF-8" },
+        { "no-answer", "the page didn't answer" },
+    };
+    if (word && (!strcmp(word, "done") || !strcmp(word, "fallback"))) return NULL;
+    for (size_t i = 0; word && i < sizeof W / sizeof W[0]; i++) if (!strcmp(word, W[i][0])) return W[i][1];
+    return W[sizeof W / sizeof W[0] - 1][1];
+}

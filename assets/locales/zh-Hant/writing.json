@@ -24,5 +24,7 @@
   "settings.privacy": "Lumo 使用本機引擎在這台電腦上執行；所選文字從不離開這台電腦。應用程式從不直接與模型對話：由 LordOS 詢問模型，並只把你選擇取代的文字交給應用程式。密碼欄位中從不提供此功能。",
   "settings.how": "每次最多 4,000 個字元。模型可能出錯：取代文字前請先閱讀結果。",
   "brain.usedBy": "Lumo 的功能：{list}，以及監視器的「用 Lumo 調查」",
-  "brain.tryNeeds": "若要試用，請開啟寫作或 Sentinela。"
+  "brain.tryNeeds": "若要試用，請開啟寫作或 Sentinela。",
+  "panel.tip4b": "提示：Qwen3 4B 模型的改寫和翻譯效果比 1.7B 更好（設定 → AI → 大腦）。",
+  "settings.terminal": "也可在終端機中使用：lumo correct \"文字\"、lumo translate en \"文字\"（lumo --help）。"
 }

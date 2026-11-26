@@ -1,9 +1,10 @@
 /* writing.h — "✨ AI" on selected text (docs/AI.md "Writing", docs/SPELLING.md): the fixed request for each action and
  * the engine's streamed answer, read strictly. Pure (tests/llm_engine_test.c); engine.c sends and reads.
  *
- * Only four actions exist, each with a system text fixed here: correct spelling and grammar, improve the writing, make
- * it shorter, translate into one language of a closed list. The person's selection goes to the model between two
- * markers with a random nonce, stated as text to work on and never instructions. The answer is streamed (OpenAI's
+ * Only four actions exist, each with its texts fixed here: correct spelling and grammar, improve the writing, make
+ * it shorter, translate into one language of a closed list. A short system text says the text is data; each user
+ * message holds the task, then the text between two markers with a random nonce; one or two fixed worked examples go
+ * first as earlier turns (a small model copied the text back without them, ws164). The answer is streamed (OpenAI's
  * server-sent events, as llama-server sends them); what comes back is only the model's text, at most LLM_WRITE_OUT_MAX
  * bytes, and the shell treats it as plain text (sdk/writingmodel.js cleanOutput). */
 #ifndef LORD_LLM_WRITING_H

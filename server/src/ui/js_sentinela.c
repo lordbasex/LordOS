@@ -25,12 +25,14 @@
  *                                  interface language), the text at most 16,000 bytes; the prompts are fixed in C
  *   peek(id)                       { state: 'queued'|'starting'|'writing', text } while it runs, else null
  *   take(id)                       { ok, content, truncated } or { ok: false, error } once
- *   cancel(id)                     drops it or stops the answer being streamed */
+ *   cancel(id)                     drops it or stops the answer being streamed
+ *   serve(on, chosen)              the shell's Writing switch and chosen model, for the `lumo` command (ui/writebus.h) */
 #include "js_sentinela.h"
 #include "js_err.h"
 #include "../llm/engine.h"
 #include "../llm/blockwatch.h"
 #include "../llm/writing.h"
+#include "writebus.h"
 
 #include <errno.h>
 #include <math.h>
@@ -205,7 +207,17 @@ static JSValue w_cancel(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     return JS_TRUE;
 }
 
+static JSValue w_serve(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1) return JS_FALSE;
+    const char *chosen = argc > 1 && JS_IsString(argv[1]) ? str_arg(c, argv[1], 48) : NULL;
+    writebus_serve(JS_ToBool(c, argv[0]), chosen);
+    if (chosen) JS_FreeCString(c, chosen);
+    return JS_TRUE;
+}
+
 static const JSCFunctionListEntry wfuncs[] = {
+    JS_CFUNC_DEF("serve", 2, w_serve),
     JS_CFUNC_DEF("start", 4, w_start),
     JS_CFUNC_DEF("peek", 1, w_peek),
     JS_CFUNC_DEF("take", 1, f_take),

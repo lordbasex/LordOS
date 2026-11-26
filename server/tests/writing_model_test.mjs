@@ -6,7 +6,7 @@ import {
   writingEnabled, WRITE_ACTIONS, WRITE_MAX_CHARS, TRANSLATE_LANGS, writingModel, offersWriting, tooLong, translateTargets, writingMenuItem, cleanOutput,
   writingStart, writingStep, canReplace, stillThere, forField,
 } from '../../sdk/writingmodel.js';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 let ok = 0, bad = 0;
@@ -81,6 +81,20 @@ eq('an injected answer is only text', writingStep(writingStart(), { type: 'take'
 eq('Replace where the selection was', stillThere('Hello wrold!', [6, 11], 'wrold'), true);
 eq('not when the text changed meanwhile', stillThere('Hello world!', [6, 11], 'wrold'), false);
 eq('code points, not UTF-16', stillThere('😀 wrold', [2, 7], 'wrold'), true);
+
+// ---- "Translate to" names every target in every interface language (languages.json, tools/gen-language-names.mjs):
+// "zh-Hans" showed raw (ws164) before the script ids were in the catalog ----
+{
+  const dir = fileURLToPath(new URL('../../assets/locales/', import.meta.url));
+  const missing = [];
+  for (const l of readdirSync(dir)) {
+    let names;
+    try { names = JSON.parse(readFileSync(`${dir}${l}/languages.json`, 'utf8')); } catch (e) { continue; }
+    for (const c of TRANSLATE_LANGS) if (typeof names[c] !== 'string' || !names[c] || names[c] === c) missing.push(`${l}:${c}`);
+  }
+  eq('every translation target has a name in every catalog', missing, []);
+  eq('Simplified Chinese in Spanish', JSON.parse(readFileSync(`${dir}es/languages.json`, 'utf8'))['zh-Hans'], 'Chino simplificado');
+}
 
 console.log(`writing-model-test: ${ok} passed, ${bad} failed`);
 process.exit(bad ? 1 : 0);

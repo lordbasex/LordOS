@@ -90,4 +90,20 @@ int         webmenu_parse(const char *const *names, int n, int out[WEBMENU_N]);
 #define WEBAI_MAX   65536
 int webai_clean(const char *in, char *out);
 
+/* ✨ AI's Replace in the page (webmenu.c), both run in the page script's world:
+ *   WEBAI_MARK_JS, when the menu offers ✨ AI in a text field: the focused field (a text input or textarea, or the
+ *     editing host of editable content) is kept as a weak reference;
+ *   WEBAI_REPLACE_JS(orig, text), once the window has the keyboard back: only in that same field, still focused, still
+ *     editable and not a password, with exactly the selection orig, the text goes in as a paste would
+ *     (document.execCommand("insertText"): the page's beforeinput and input listeners run, so a rich editor such as
+ *     Lexical takes it into its own model). It waits a moment for the page's editor to apply it, and answers one word
+ *     of webai_refusal's list: "done", "fallback" (the field didn't change: WebKit's own InsertText then, as typing),
+ *     or why it refused. */
+extern const char WEBAI_MARK_JS[];
+extern const char WEBAI_REPLACE_JS[];
+/* The log text for one of WEBAI_REPLACE_JS's words ("gone", "other-field", "password", "read-only", "not-editable",
+ * "no-selection", "selection-changed", "unchanged"), or for lord-web's own ("no-menu", "no-focus", "bad-text",
+ * "no-answer"); NULL for "done", "fallback" or a word that isn't one of them (then "no-answer"'s). */
+const char *webai_refusal(const char *word);
+
 #endif
