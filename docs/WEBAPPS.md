@@ -840,10 +840,9 @@ Voice and video calls in web apps (a messaging web app first, also video meeting
   revocable in Settings → Web Apps (Camera, Microphone, Screen). The page lists devices (`enumerateDevices`, with
   names) only once one of them is allowed, and chooses among them with its own picker; LordOS Studio's virtual camera
   is one of them when it is on. WebKit captures the microphone through PulseAudio (pipewire-pulse) from its sandboxed
-  web process, which the capture indicator already shows under the web app (PRIVACY.md); the camera WebKit opens through
-  V4L2 (`/dev/video*`, which WebKit's sandbox binds for the web process), which the indicator doesn't see
-  (PRIVACY.md, "Not covered"): lord-web logs WebKit's own capture state (`capture: camera on`) and a way for it to tell
-  the indicator is proposed for the maintainer's review (a new lord-web → lord-server method, not built).
+  web process, which the capture indicator already shows under the web app (PRIVACY.md); the camera WebKit opens itself
+  through V4L2 inside the same sandbox ("Cameras" below), which the indicator shows from the kernel (PRIVACY.md, "A
+  camera opened directly"); lord-web also logs WebKit's own capture state (`capture: camera on`).
 - **The network: ICE in WebKit's network process (librice, `+4`).** WebKit's web process has no network of its own
   (bubblewrap's `--unshare-net`, unchanged). With `+3` WebKit's GStreamer backend ran ICE (libnice) inside it, saw only
   the sandbox's loopback interface, ignored it and gathered no candidate at all, so nothing connected. The maintainer
@@ -929,6 +928,72 @@ Voice and video calls in web apps (a messaging web app first, also video meeting
   `tests/webcalls_check.py` with `build/webcalls-check` (the real engine, headless, WebKit's sandbox on: Chrome's
   identity, SharedArrayBuffer only when isolated, and with `--webrtc` the loopback below), also run by
   `tools/pkg/wpewebkit-chroot.sh`'s test on the WebRTC build.
+
+### Cameras (in development, awaiting the maintainer's approval)
+
+Found on 2026-11-26 (lordos-web 0.8.9.6.1+ws161, WPE WebKit 2.54.3 `+4.1`): in WhatsApp Web a video call said "no camera
+found" though the computer had a Logitech C930e and LordOS Studio's virtual camera, the person is in the `video` group
+and the app's camera permission was "allow". lord-web's log said `Video capture was requested but no device was found
+amongst 0 devices` and `getUserMedia video: failed: OverconstrainedError`; WebKit's mock camera had hidden it in the
+earlier tests (`WEBCALLS_MOCK_CAPTURE`).
+
+**Why.** In WPE WebKit 2.54 everything about a page's camera happens in its **web process**, inside WebKit's bubblewrap
+sandbox: the UI process (lord-web) asks the web process to list the devices and to check the request's constraints
+(`UserMediaPermissionRequestManagerProxyGLib.cpp`: `UserMediaCaptureManager::ValidateUserMediaRequestConstraints` and
+`GetMediaStreamDevices` go to the web process), and the web process opens the device (`GStreamerVideoCapturer`, a
+`v4l2src`). Two ways exist to find cameras there:
+
+- PipeWire through the Camera portal (`org.freedesktop.portal.Camera`, `PipeWireCaptureDeviceManager`): **compiled out
+  for WPE**, `computeCaptureDevices` returns at once under `PLATFORM(WPE)` (and `gstreamer1.0-pipewire` isn't installed);
+- GStreamer's device monitor (`GStreamerCaptureDeviceManager::refreshCaptureDevices`, filter `Video/Source`), which
+  is what WPE uses: GStreamer's `v4l2deviceprovider`, built with gudev, lists the `video4linux` devices through libudev.
+
+WebKit's sandbox binds every `/dev/video*`, `/dev/media*` and `/dev/v4l-subdev*` node (`BubblewrapLauncher.cpp`,
+`bindV4l`, "we still need v4l2 for video decoding") and `/sys/class`, `/sys/devices`, `/sys/bus` read-only, but not
+`/run/udev`. libudev counts a device that has a device node only once udev has finished with it, which it reads from
+udev's database (`/run/udev/data/c81:<minor>`); without it every camera was "not initialized" and left out, the list
+was empty, and the constraints of any video request failed (`GST_DEBUG=v4l2*:6`: the provider is loaded, probes
+nothing and logs nothing). The same computer outside the sandbox lists the camera (`udev-probed=true`).
+
+**The fix** (`server/src/web/webcam.c`, `webcalls_sandbox_cameras` in `webcalls.c`, called by `web_engine_start` before
+any web process exists, since WebKit refuses a sandbox path after that): lord-web adds to WebKit's sandbox, read-only
+(`webkit_web_context_add_path_to_sandbox`), the udev database entry of each video4linux node there is when the app
+starts, and nothing else: `/run/udev/data/c81:<minor>` for each `/sys/class/video4linux/video<N>` whose `dev` reads
+exactly `81:<minor>`, whose `/dev/video<N>` is a character device with that number and whose entry is a regular file
+(none of them a link). The path is made from the numbers, never from a name read from the file system. Its log says how
+many (`cameras: 4 in the web process's sandbox`).
+
+What it gives the web process: a few hundred bytes of udev properties per camera (its vendor, model, serial and USB path,
+which `/sys/devices` in the same sandbox already shows). No device access is new: the nodes were already bound by WebKit.
+Which site may use a camera is still only the person's answer (LordOS's prompt, "Permissions"); the capture indicator
+shows the camera while the web process holds it (PRIVACY.md, "A camera opened directly").
+
+Why not the Camera portal: WebKit would need a patch to turn its PipeWire path on for WPE, LordOS's portal would need
+`AccessCamera` and an `OpenPipeWireRemote` limited to camera nodes, PipeWire would need the camera nodes and
+`gstreamer1.0-pipewire`, and the web process would still have every `/dev/video*` node (`bindV4l`), so it would give no
+less access, for much more new code in lord-server. Why not all of `/run/udev`: it holds every device's database (disks'
+serials and file system UUIDs, input devices, network interfaces).
+
+Limits:
+
+- A camera plugged in after the app started is listed after the app restarts (Restart in Settings → Web Apps); so is
+  LordOS Studio's camera if its module was loaded after (its node normally exists from boot). The device nodes are
+  WebKit's own choice per web process; the database entries are lord-web's, fixed when it starts.
+- A web process keeps the device list it made first: LordOS Studio's camera, a v4l2loopback device that is a capture
+  device only while something writes to it, is listed if it was on when the page first asked.
+- WebKit's sandbox gives the web process the camera nodes whether or not a page was allowed one (WebKit's choice, for
+  decoding): a web process taken over by an exploit could open the camera without asking. That was so before this change;
+  the capture indicator shows it if it happens.
+- With ffmpeg writing a test pattern to the loopback, GStreamer's `v4l2src` sometimes stops after a few frames ("Failed
+  to allocate a buffer"); LordOS Studio's own output (lord-studio) is to be checked on the VM.
+
+Tests: `tests/webua_test.c` (which nodes count: the number checks, links and other files refused, sorted, each once),
+`tests/studio_hub_test.c` (`camera_scan_holders`, `camera_use_format`), `server/tests/capture_model_test.mjs` (the
+`camera-use` rows), and `tests/webcam_check.py` (`make -C server test-full`): in the real engine with WebKit's sandbox
+on, every capture device Linux has is listed, each is opened by its `deviceId` for 5 real frames, and
+`build/camuse-check` sees the web process hold a camera and let go; `--loopback` writes a test pattern to LordOS
+Studio's camera and checks it is listed and gives frames. 2026-11-26 on the maintainer's PC (Logitech C930e, LordOS
+Studio): passes; before the fix the same page listed no camera.
 
 ## What `lord-web` uses of the session (like any Linux app)
 

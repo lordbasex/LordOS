@@ -542,12 +542,21 @@ Where it knows from (`sdk/capturemodel.js`, `sdk/capturestatus.jsx`, `server/tes
 | `lord.media` in native apps (`sdk/media.js` → `markDeviceUse`) | — | per app, with a preview | per app |
 | The broker, for isolated `.lpk` apps (`device` events) | — | per app | per app |
 | The PipeWire guard (`server/src/sec/pwguard.c`, hw event `capture-use`) | a stream linked to a shared screen | a stream linked to a camera | a stream linked to a microphone |
+| A camera opened directly (`server/src/hw/camuse.c`, hw event `camera-use`; in development) | — | a process holding a `/dev/video*` device: a web app's web process, a V4L2 Linux app | — |
 
 The PipeWire guard follows every link from a capture node (a microphone, a camera, lord-screencast's screen) into a
 capture stream, and names the stream's owner as it does for the restrictions: the PID's cgroup and the launcher's scope,
 a Flatpak app by its sandbox, and a PulseAudio client's own word (`application.process.id`) always checked against the
 connections it really holds. lord-server's own streams are left out: they are the recordings and calls it makes for an
 app, already shown under that app.
+
+A camera opened directly (in development, awaiting the maintainer's approval): WebKit's web process opens the camera
+itself (docs/WEBAPPS.md, "Cameras"), and so does a Linux app using V4L2, so neither passes the PipeWire guard. lord-server
+watches every `/dev/video*` node with inotify (`IN_OPEN`, `IN_CLOSE`: a watch is on the inode, so an open inside WebKit's
+sandbox counts too; no privileges, no device opened) and 300 ms after a change, and every 3 s while one is held, lists
+the session user's processes with an fd on a video4linux device (`camera_scan_holders`; never lord-server itself or its
+own helpers, already shown under their app), named by their cgroup as above. The row has no Turn off: nothing in LordOS
+stands between such a program and the device, apart from the firewall's device rules.
 
 When there is no verified app, the indicator (and only the indicator: never the restrictions, the portals' gates or the
 restore token) still names it from what the kernel says (`sec/appid.h`, "only to show it"; since 2026-11-22):
@@ -566,8 +575,8 @@ restore token) still names it from what the kernel says (`sec/appid.h`, "only to
 - **Anything else:** "An unknown program (<executable>)", from `/proc/<pid>/exe`, or "an unknown program" when not
   even that is known; shown and never hidden, with nothing to turn off from the panel.
 
-Not covered: a program that opens `/dev/video*` or an ALSA capture device itself, without PipeWire (many browsers still
-read the camera through V4L2 directly), isn't seen by the indicator; "no camera" still blocks it through the device rules
+Not covered: a program that opens an ALSA capture device itself, without PipeWire, isn't seen by the indicator (one that
+opens `/dev/video*` itself is, as "A camera opened directly" above, in development); "no camera" still blocks it through the device rules
 (docs/FIREWALL.md). A capture stream that is linked but paused counts as in use. The remote desktop's viewers keep their
 own notice (`RemoteBadge`, docs/REMOTE.md).
 
