@@ -35,8 +35,10 @@ export async function mountStubbed(app, App, { id = `${app}-1`, args = {}, width
 }
 
 // The checks every app makes. own: a text the app's own region draws (gone while skinned, back with layouts off).
-export async function commonChecks(app, { seen, regions }, { own, bar = 'toolbar' } = {}) {
-  for (const r of regions.filter((x) => x !== 'contextMenu')) check(`${app}: the ${r} stub is drawn`, shown(`stub-${r}`));
+// absent: regions the app doesn't draw in this state (the Player's transport while nothing plays)
+export async function commonChecks(app, { seen, regions }, { own, bar = 'toolbar', absent = [] } = {}) {
+  const drawn = regions.filter((x) => x !== 'contextMenu' && !absent.includes(x));
+  for (const r of drawn) check(`${app}: the ${r} stub is drawn`, shown(`stub-${r}`));
   const m = seen[bar];
   check(`${app}: the model is frozen`, !!m && Object.isFrozen(m) && Object.isFrozen(m.actions), JSON.stringify(Object.keys(seen)));
   if (m && m.commands) {
@@ -53,7 +55,7 @@ export async function commonChecks(app, { seen, regions }, { own, bar = 'toolbar
   check(`${app}: layouts off brings its own regions back`, regions.every((r) => !shown(`stub-${r}`)) && (!own || shown(own)));
   settings.set({ themeParts: { layouts: true } });
   await flush();
-  check(`${app}: layouts on again`, regions.filter((x) => x !== 'contextMenu').every((r) => shown(`stub-${r}`)));
+  check(`${app}: layouts on again`, drawn.every((r) => shown(`stub-${r}`)));
   check(`${app}: no React errors`, !errs.length, JSON.stringify(errs.slice(0, 2)));
 }
 export { settings };

@@ -19,6 +19,7 @@ export const APP_REGIONS = {
   notes: ['sidebar', 'toolbar'],
   calculator: ['display', 'keypad'],
   photos: ['sidebar', 'toolbar'],
+  player: ['sidebar', 'toolbar', 'transport'],
 };
 
 // The parts of a style a person can turn off one by one.

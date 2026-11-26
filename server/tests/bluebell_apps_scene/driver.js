@@ -23,6 +23,7 @@
     ['notes', {}, (sdk) => sdk.t('notes.new')],
     ['calculator', {}, '÷'],
     ['photos', {}, (sdk) => sdk.t('photos.refresh')],
+    ['player', {}, (sdk) => sdk.t('player.nav.songs')],
   ];
   (async () => {
     await sleep(2500);

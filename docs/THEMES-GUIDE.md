@@ -596,6 +596,7 @@ Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one ski
 | Notes | `sidebar` (list pane with the search: titles and dates only), `toolbar` (command bar) | the note, its text and editor, every dialog | `notes_skin_scene.mjs` (14 checks) |
 | Calculator | `display` (`{ expression, result }`), `keypad` (`{ keys: [[{ id, label, kind }]], actions: { press(id) } }`, only a key of the keypad) | the arithmetic | `calculator_skin_scene.mjs` (9 checks) |
 | Photos | `sidebar` (list pane: All Photos, the folders, the cloud places), `toolbar` (command bar: smaller, larger, refresh) | the photos, the viewer, every edit and the Trash | `photos_skin_scene.mjs` (13 checks) |
+| Player | `sidebar` (list pane: the views), `toolbar` (command bar: the title, Back), `transport` (command bar: previous, play or pause, next, with `position` and `duration`; only while something plays) | the lists, the playing, the volume and the streams | `player_skin_scene.mjs` (12 checks) |
 <!-- shared-shape apps -->
 
 `server/tests/app_skin_helpers.js` gives each scene the common checks (the stubs drawn, the model frozen, a command not on

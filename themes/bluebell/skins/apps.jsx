@@ -47,7 +47,33 @@ function CalcKeypad({ model }) {
   );
 }
 
+// ---- Player: a transport bar of round blue buttons and a green progress strip, as on a media player of the era ----
+function Transport({ model }) {
+  const t = useTheme();
+  const font = useThemeFont();
+  const f = model.duration ? Math.min(1, model.position / model.duration) : 0;
+  return (
+    <View style={{ height: 64, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, background: t.barBg }}>
+      <View style={{ flexDirection: 'row', gap: 6, direction: 'ltr' }}>
+        {model.commands.map((c) => (
+          <View key={c.id} onClick={() => model.actions.command(c.id)} style={{ width: c.id === 'toggle' ? 40 : 30, height: c.id === 'toggle' ? 40 : 30, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+            background: c.active ? 'linear-gradient(180deg, #8fdc7a, #2f8a25)' : 'linear-gradient(180deg, #8ec5ff, #2f63d8)', border: '1px solid rgba(255,255,255,0.8)' }}>
+            <Text style={{ fontSize: c.id === 'toggle' ? 15 : 12, color: '#ffffff' }}>{c.label}</Text>
+          </View>
+        ))}
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+        <Text style={{ fontSize: 12, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start', ...(font ? { fontFamily: font } : null) }}>{model.title}</Text>
+        <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.35)', direction: 'ltr', overflow: 'hidden' }}>
+          <View style={{ width: `${Math.round(f * 100)}%`, height: 8, background: 'linear-gradient(180deg, #8fdc7a, #2f8a25)' }} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export const appSkins = {
+  player: { sidebar: ListPane, toolbar: CommandBar, transport: Transport },
   photos: { sidebar: ListPane, toolbar: CommandBar },
   calculator: { display: CalcDisplay, keypad: CalcKeypad },
   notes: { sidebar: SearchPane, toolbar: CommandBar },
