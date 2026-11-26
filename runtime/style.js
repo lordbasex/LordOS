@@ -75,7 +75,7 @@ function gradient(v) {
 }
 
 const SIDES = ['Left', 'Top', 'Right', 'Bottom', 'Start', 'End'];
-const COLOR_KEYS = new Set(['backgroundColor', 'borderColor', 'color', 'shadowColor', ...SIDES.map((s) => `border${s}Color`)]);
+const COLOR_KEYS = new Set(['backgroundColor', 'borderColor', 'color', 'shadowColor', 'wavyColor', ...SIDES.map((s) => `border${s}Color`)]);
 const DIM_KEYS = new Set(['width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight',
   'left', 'top', 'right', 'bottom', 'flexBasis', 'start', 'end']);
 // CSS logical names → the engine's (React Native) names

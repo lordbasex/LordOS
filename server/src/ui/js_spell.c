@@ -4,12 +4,13 @@
  *
  *   installed()          ["en_US","es_ES",…] the dictionaries in /usr/share/hunspell
  *   setLanguages(tags)   the languages to check with (at most 4, installed ones only); how many were kept
+ *   defaults(locale)     the default languages for "es_AR" / "pt_BR.UTF-8" (spellang.h, the rule lord-web uses)
  *   state()              { langs, loaded, state, queued }
  *   check(words)         a job id (0 when the queue is full): at most 64 words of at most 64 bytes
  *   suggest(word)        a job id (0 when the queue is full)
  *   take(id)             { ok, good: [1|0…] } or { ok, suggestions: […] } or { ok: false, error }, once; null while it runs
- *   words()              the person's dictionary (~/.config/lordos/dictionary.txt)
- *   addWord(w)           true, or throws sys.badArgument / sys.writeFailed
+ *   words()              the person's dictionary: enchant's word lists of the languages in use (shared with lord-web)
+ *   addWord(w)           true (into each language in use's list), or throws sys.badArgument / sys.writeFailed
  *   removeWord(w)        true, or throws */
 #include "js_spell.h"
 #include "js_err.h"
@@ -40,8 +41,11 @@ static const char *str_arg(JSContext *c, JSValueConst v, size_t max) {
  * good); their count, -1 when it isn't one (nothing to free) */
 static int str_list(JSContext *c, JSValueConst v, const char **out, int max, size_t len) {
     if (!JS_IsArray(c, v)) return -1;
-    int64_t n = 0;
-    if (JS_GetLength(c, v, &n) || n < 0 || n > max) return -1;
+    int32_t n = 0;
+    JSValue lv = JS_GetPropertyStr(c, v, "length");
+    int bad = JS_ToInt32(c, &n, lv);
+    JS_FreeValue(c, lv);
+    if (bad || n < 0 || n > max) return -1;
     for (int i = 0; i < (int)n; i++) {
         JSValue e = JS_GetPropertyUint32(c, v, (uint32_t)i);
         out[i] = str_arg(c, e, len);
@@ -64,6 +68,17 @@ static JSValue f_set_languages(JSContext *c, JSValueConst t, int argc, JSValueCo
     int k = spell_set_langs(tags, n);
     for (int i = 0; i < n; i++) if (tags[i]) JS_FreeCString(c, tags[i]);
     return JS_NewInt32(c, k);
+}
+
+static JSValue f_defaults(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *loc = argc > 0 ? str_arg(c, argv[0], 64) : NULL;
+    SpellTag out[2];
+    int n = spell_defaults(loc ? loc : "", out);
+    if (loc) JS_FreeCString(c, loc);
+    JSValue a = JS_NewArray(c);
+    for (int i = 0; i < n; i++) JS_SetPropertyUint32(c, a, (uint32_t)i, JS_NewString(c, out[i]));
+    return a;
 }
 
 static JSValue f_state(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -117,6 +132,7 @@ static JSValue f_remove_word(JSContext *c, JSValueConst t, int argc, JSValueCons
 static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("installed", 0, f_installed),
     JS_CFUNC_DEF("setLanguages", 1, f_set_languages),
+    JS_CFUNC_DEF("defaults", 1, f_defaults),
     JS_CFUNC_DEF("state", 0, f_state),
     JS_CFUNC_DEF("check", 1, f_check),
     JS_CFUNC_DEF("suggest", 1, f_suggest),

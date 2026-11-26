@@ -209,9 +209,9 @@ static void end_to_end(const char *helper, const char *probe, const char *evil) 
     put("fr_FR.aff", l1a, strlen(l1a));
     { const char *d = "2\ncaf\xe9\nbonjour\n"; put("fr_FR.dic", d, strlen(d)); }
     put("xx_XX.dic", "1\norphan\n", strlen("1\norphan\n"));                                      /* no .aff: not installed */
-    char words_file[300];
-    snprintf(words_file, sizeof words_file, "%s/cfg/lordos/dictionary.txt", tmpdir);
-    spell_set_paths(tmpdir, helper, words_file);
+    char words_dir[300], words_file[340];
+    snprintf(words_dir, sizeof words_dir, "%s/cfg/enchant", tmpdir);
+    spell_set_paths(tmpdir, helper, words_dir);
 
     SpellTag inst[8];
     int ni = spell_installed(inst, 8);
@@ -241,18 +241,35 @@ static void end_to_end(const char *helper, const char *probe, const char *evil) 
     CHECK(r && strstr(r, "\"state\":\"ready\"") && strstr(r, "\"loaded\":[1,1,1]"));
     free(r);
 
-    /* the person's dictionary: created 0600, words valid only, kept once */
+    /* spellang's defaults: the region first, then English */
+    SpellTag def[2];
+    CHECK(spell_defaults("es_AR.UTF-8", def) == 2 && !strcmp(def[0], "es_ES") && !strcmp(def[1], "en_US"));
+    CHECK(spell_defaults("fr", def) == 2 && !strcmp(def[0], "fr_FR"));
+    CHECK(spell_defaults("ja", def) == 1 && !strcmp(def[0], "en_US"));
+
+    /* the person's dictionary (enchant's lists, one per language in use): created 0600, words valid only, kept once,
+     * a word WebKit learned (already in one list) read too */
+    {
+        char d[340];
+        snprintf(d, sizeof d, "mkdir -p '%s'", words_dir);
+        if (system(d)) { /* checked below */ }
+        snprintf(words_file, sizeof words_file, "%s/es_ES.dic", words_dir);
+        FILE *f = fopen(words_file, "w");
+        if (f) { fputs("\xef\xbb\xbfWebKitWord\n", f); fclose(f); }
+    }
     CHECK(spell_add_word("LordOS") == 0 && spell_add_word("Lumo") == 0 && spell_add_word("LordOS") == 0);
     CHECK(spell_add_word("two words") < 0 && errno == EINVAL);
     CHECK(spell_add_word("x\n") < 0);
     r = spell_words_json();
-    CHECK(r && !strcmp(r, "[\"LordOS\",\"Lumo\"]"));
+    CHECK(r && !strcmp(r, "[\"LordOS\",\"Lumo\",\"WebKitWord\"]"));
+    if (r) printf("words: %s\n", r);
     free(r);
     struct stat st;
+    snprintf(words_file, sizeof words_file, "%s/fr_FR.dic", words_dir);
     CHECK(!stat(words_file, &st) && (st.st_mode & 0777) == 0600);
     CHECK(spell_remove_word("LordOS") == 0);
     r = spell_words_json();
-    CHECK(r && !strcmp(r, "[\"Lumo\"]"));
+    CHECK(r && !strcmp(r, "[\"Lumo\",\"WebKitWord\"]"));
     free(r);
 
     /* the sandbox: the probe answers only if files, sockets and exec were all refused */

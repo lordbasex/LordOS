@@ -132,6 +132,8 @@ static const StyleProp props[] = {
     PX("rotate", ST_FLOAT, rotate),
     PX("transformOriginX", ST_DIM, origin_x),
     PX("transformOriginY", ST_DIM, origin_y),
+    /* a misspelled word's wavy underline (paint.c paint_wavy) */
+    PX("wavyColor", ST_COLOR, wavy),
 };
 
 static const StyleProp *find(const char *key) {

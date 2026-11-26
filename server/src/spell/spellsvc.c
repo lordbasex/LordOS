@@ -2,6 +2,7 @@
  * spellsvc.h and docs/SPELLING.md). */
 #include "spellsvc.h"
 #include "../sec/json.h"
+#include "../spellang.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -50,7 +51,7 @@ static struct {
     double last_used, failed_at;
     int fails;
     int idle_ms;
-    char dict_dir[PATH_MAX], helper[PATH_MAX], words_file[PATH_MAX];
+    char dict_dir[PATH_MAX], helper[PATH_MAX], words_dir[PATH_MAX];
 } S = { .mu = PTHREAD_MUTEX_INITIALIZER, .cv = PTHREAD_COND_INITIALIZER, .pid = -1, .fd = -1, .have_gen = -1,
         .state = "off", .idle_ms = SPELL_IDLE_MS, .dict_dir = SPELL_DIR };
 
@@ -62,39 +63,22 @@ static double now_ms(void) {
     return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
 }
 
-void spell_set_paths(const char *dict_dir, const char *helper, const char *words_file) {
+void spell_set_paths(const char *dict_dir, const char *helper, const char *words_dir) {
     pthread_mutex_lock(&S.mu);
     if (dict_dir) snprintf(S.dict_dir, sizeof S.dict_dir, "%s", dict_dir);
     if (helper) snprintf(S.helper, sizeof S.helper, "%s", helper);
-    if (words_file) snprintf(S.words_file, sizeof S.words_file, "%s", words_file);
+    if (words_dir) snprintf(S.words_dir, sizeof S.words_dir, "%s", words_dir);
     pthread_mutex_unlock(&S.mu);
 }
 
 /* ---- the dictionaries ---- */
 
-static int cmp_tag(const void *a, const void *b) { return strcmp((const char *)a, (const char *)b); }
-
+/* spellang.h's list (the same one lord-web reads), keeping only the names lord-spell takes */
 static int installed_in(const char *dir, SpellTag *out, int max) {
-    DIR *d = opendir(dir);
-    if (!d) return 0;
-    int n = 0;
-    struct dirent *e;
-    while ((e = readdir(d)) && n < max) {
-        size_t l = strlen(e->d_name);
-        if (l < 5 || l - 4 >= SPELL_TAG_MAX || strcmp(e->d_name + l - 4, ".dic")) continue;
-        SpellTag t;
-        memcpy(t, e->d_name, l - 4);
-        t[l - 4] = 0;
-        if (!spell_tag_ok(t)) continue;
-        char aff[PATH_MAX];
-        snprintf(aff, sizeof aff, "%s/%s.aff", dir, t);
-        struct stat st;
-        if (stat(aff, &st) || !S_ISREG(st.st_mode)) continue;
-        memcpy(out[n++], t, sizeof t);
-    }
-    closedir(d);
-    qsort(out, (size_t)n, sizeof out[0], cmp_tag);
-    return n;
+    char t[SPELL_INSTALLED_MAX][SPELLANG_TAG_MAX];
+    int n = spellang_installed(dir, t, max < SPELL_INSTALLED_MAX ? max : SPELL_INSTALLED_MAX), k = 0;
+    for (int i = 0; i < n; i++) if (spell_tag_ok(t[i])) snprintf(out[k++], SPELL_TAG_MAX, "%s", t[i]);
+    return k;
 }
 
 int spell_installed(SpellTag *out, int max) {
@@ -482,6 +466,17 @@ char *spell_take(int id) {
     return r;
 }
 
+int spell_defaults(const char *locale, SpellTag *out) {
+    SpellTag inst[SPELL_INSTALLED_MAX];
+    const char *list[SPELL_INSTALLED_MAX];
+    int n = spell_installed(inst, SPELL_INSTALLED_MAX);
+    for (int i = 0; i < n; i++) list[i] = inst[i];
+    char pick[SPELLANG_MAX][SPELLANG_TAG_MAX];
+    int k = spellang_choose(locale, list, n, pick, SPELLANG_MAX);
+    for (int i = 0; i < k; i++) snprintf(out[i], SPELL_TAG_MAX, "%s", pick[i]);
+    return k;
+}
+
 char *spell_state_json(void) {
     char *o = malloc(256);
     if (!o) return NULL;
@@ -503,27 +498,32 @@ void spell_stop(void) {
     pthread_mutex_unlock(&S.mu);
 }
 
-/* ---- the person's dictionary ---- */
+/* ---- the person's dictionary: enchant's word lists, the same files lord-web's WebKit learns into ---- */
 
-static int words_path(char *out, size_t n) {
+/* <dir>/<tag>.dic, where dir is $XDG_CONFIG_HOME/enchant or ~/.config/enchant (enchant 2's own place) */
+static int words_path(const char *tag, char *out, size_t n) {
+    char dir[PATH_MAX];
     pthread_mutex_lock(&S.mu);
-    int set = S.words_file[0] != 0;
-    if (set) snprintf(out, n, "%s", S.words_file);
+    snprintf(dir, sizeof dir, "%s", S.words_dir);
     pthread_mutex_unlock(&S.mu);
-    if (set) return 0;
-    const char *home = getenv("HOME");
-    if (!home || home[0] != '/') return -1;
-    return snprintf(out, n, "%s/.config/lordos/dictionary.txt", home) >= (int)n ? -1 : 0;
+    if (!dir[0]) {
+        const char *x = getenv("XDG_CONFIG_HOME"), *home = getenv("HOME");
+        if (x && x[0] == '/') snprintf(dir, sizeof dir, "%s/enchant", x);
+        else if (home && home[0] == '/') snprintf(dir, sizeof dir, "%s/.config/enchant", home);
+        else return -1;
+    }
+    if (!spell_tag_ok(tag)) return -1;
+    return snprintf(out, n, "%s/%s.dic", dir, tag) >= (int)n ? -1 : 0;
 }
 
 static SpellWord dict_words[SPELL_DICT_WORDS_MAX];
 
-/* the words in the file (none when it is missing), into dict_words */
-static int read_words(void) {
+/* the words in one language's list (none when it is missing) appended to dict_words after the first n; the new count */
+static int read_words(const char *tag, int n) {
     char p[PATH_MAX];
-    if (words_path(p, sizeof p)) return -1;
+    if (words_path(tag, p, sizeof p)) return -1;
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
-    if (fd < 0) return errno == ENOENT ? 0 : -1;
+    if (fd < 0) return errno == ENOENT ? n : -1;
     struct stat st;
     if (fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size > (off_t)WORDS_FILE_MAX) { close(fd); return -1; }
     char *b = malloc((size_t)st.st_size + 1);
@@ -536,49 +536,78 @@ static int read_words(void) {
     }
     close(fd);
     if (!b) return -1;
-    int n = spelldict_parse(b, got, dict_words, SPELL_DICT_WORDS_MAX);
+    size_t skip = got >= 3 && !memcmp(b, "\xef\xbb\xbf", 3) ? 3 : 0;   /* enchant accepts a BOM */
+    static SpellWord tmp[SPELL_DICT_WORDS_MAX];
+    int k = spelldict_parse(b + skip, got - skip, tmp, SPELL_DICT_WORDS_MAX);
     free(b);
+    for (int i = 0; i < k && n < SPELL_DICT_WORDS_MAX; i++) {
+        int dup = 0;
+        for (int j = 0; j < n && !dup; j++) dup = !strcmp(dict_words[j], tmp[i]);
+        if (!dup) memcpy(dict_words[n++], tmp[i], sizeof tmp[i]);
+    }
     return n;
 }
 
-/* the folders up to the file, made 0700 when missing; the new text into <file>.new (O_EXCL, no link followed), then
- * renamed over the file */
-static int write_words(int n) {
-    char p[PATH_MAX], tmp[PATH_MAX + 8];
-    if (words_path(p, sizeof p)) return -1;
-    char dir[PATH_MAX];
+/* a list's raw text (enchant's or WebKit's lines we don't read are kept as they are); "" when it is missing */
+static char *read_raw(const char *path, size_t *len) {
+    *len = 0;
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return errno == ENOENT ? calloc(1, 1) : NULL;
+    struct stat st;
+    if (fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size > (off_t)WORDS_FILE_MAX) { close(fd); errno = EFBIG; return NULL; }
+    char *b = malloc((size_t)st.st_size + 1);
+    size_t got = 0;
+    while (b && got < (size_t)st.st_size) {
+        ssize_t r = read(fd, b + got, (size_t)st.st_size - got);
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) break;
+        got += (size_t)r;
+    }
+    close(fd);
+    if (b) { b[got] = 0; *len = got; }
+    return b;
+}
+
+/* the folders up to the file, made 0700 when missing; the text into <file>.new (O_EXCL, no link followed), then renamed
+ * over the file */
+static int write_raw(const char *p, const char *text, size_t len) {
+    char tmp[PATH_MAX + 8], dir[PATH_MAX];
     snprintf(dir, sizeof dir, "%s", p);
     for (char *s = strchr(dir + 1, '/'); s; s = strchr(s + 1, '/')) {
         *s = 0;
         if (mkdir(dir, 0700) && errno != EEXIST) return -1;
         *s = '/';
     }
-    size_t cap = (size_t)n * (SPELL_WORD_MAX + 1) + 1;
-    char *text = malloc(cap);
-    if (!text) return -1;
-    int len = spelldict_format(dict_words, n, text, cap);
-    if (len < 0) { free(text); return -1; }
     snprintf(tmp, sizeof tmp, "%s.new", p);
     unlink(tmp);
     int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
-    if (fd < 0) { free(text); return -1; }
+    if (fd < 0) return -1;
     size_t o = 0;
-    while (o < (size_t)len) {
-        ssize_t w = write(fd, text + o, (size_t)len - o);
+    while (o < len) {
+        ssize_t w = write(fd, text + o, len - o);
         if (w < 0 && errno == EINTR) continue;
         if (w <= 0) break;
         o += (size_t)w;
     }
-    free(text);
-    int bad = o != (size_t)len || fsync(fd);
+    int bad = o != len || fsync(fd);
     close(fd);
     if (bad || rename(tmp, p)) { unlink(tmp); return -1; }
     return 0;
 }
 
+/* the languages in use, for the lists */
+static int langs_now(SpellTag *t) {
+    pthread_mutex_lock(&S.mu);
+    int n = S.nwant;
+    memcpy(t, S.want, sizeof S.want);
+    pthread_mutex_unlock(&S.mu);
+    return n;
+}
+
 char *spell_words_json(void) {
-    int n = read_words();
-    if (n < 0) n = 0;
+    SpellTag t[SPELL_LANGS_MAX];
+    int nl = langs_now(t), n = 0;
+    for (int i = 0; i < nl; i++) { int r = read_words(t[i], n); if (r >= 0) n = r; }
     size_t cap = (size_t)n * (SPELL_WORD_MAX * 6 + 3) + 4;
     char *o = malloc(cap);
     if (!o) return NULL;
@@ -593,23 +622,54 @@ char *spell_words_json(void) {
     return o;
 }
 
-int spell_add_word(const char *w) {
-    size_t l = w ? strlen(w) : 0;
-    if (!spell_word_ok(w, l)) { errno = EINVAL; return -1; }
-    int n = read_words();
-    if (n < 0) return -1;
-    for (int i = 0; i < n; i++) if (!strcmp(dict_words[i], w)) return 0;
-    if (n >= SPELL_DICT_WORDS_MAX) { errno = ENOSPC; return -1; }
-    memcpy(dict_words[n], w, l + 1);
-    return write_words(n + 1);
+/* is line [a, b) of text the word (spaces and a CR around it don't count) */
+static int line_is(const char *a, const char *b, const char *w, size_t l) {
+    if (b > a && b[-1] == '\r') b--;
+    while (a < b && (*a == ' ' || *a == '\t')) a++;
+    while (b > a && (b[-1] == ' ' || b[-1] == '\t')) b--;
+    return (size_t)(b - a) == l && !memcmp(a, w, l);
 }
 
-int spell_remove_word(const char *w) {
+/* into (add: one line appended) or out of (every line that is the word) each language in use's list, as WebKit's Learn
+ * Spelling adds to each of its dictionaries; every other line stays as it was */
+static int change_word(const char *w, int add) {
     size_t l = w ? strlen(w) : 0;
     if (!spell_word_ok(w, l)) { errno = EINVAL; return -1; }
-    int n = read_words();
-    if (n < 0) return -1;
-    int k = 0;
-    for (int i = 0; i < n; i++) if (strcmp(dict_words[i], w)) { if (k != i) memcpy(dict_words[k], dict_words[i], sizeof dict_words[0]); k++; }
-    return k == n ? 0 : write_words(k);
+    SpellTag t[SPELL_LANGS_MAX];
+    int nl = langs_now(t);
+    if (!nl) { errno = ENOENT; return -1; }
+    for (int i = 0; i < nl; i++) {
+        char p[PATH_MAX];
+        size_t len;
+        if (words_path(t[i], p, sizeof p)) return -1;
+        char *raw = read_raw(p, &len);
+        if (!raw) return -1;
+        char *out = malloc(len + l + 3);
+        if (!out) { free(raw); return -1; }
+        size_t o = 0;
+        int found = 0, lines = 0;
+        for (char *a = raw; a < raw + len;) {
+            char *e = memchr(a, '\n', (size_t)(raw + len - a));
+            char *b = e ? e : raw + len;
+            int is = line_is(a, b, w, l);
+            found |= is;
+            lines++;
+            if (add || !is) { memcpy(out + o, a, (size_t)(b - a)); o += (size_t)(b - a); out[o++] = '\n'; }
+            a = e ? e + 1 : raw + len;
+        }
+        free(raw);
+        int r = 0;
+        if (add && !found) {
+            if (lines >= SPELL_DICT_WORDS_MAX * 4) { free(out); errno = ENOSPC; return -1; }
+            memcpy(out + o, w, l);
+            o += l;
+            out[o++] = '\n';
+            r = write_raw(p, out, o);
+        } else if (!add && found) r = write_raw(p, out, o);
+        free(out);
+        if (r) return -1;
+    }
+    return 0;
 }
+int spell_add_word(const char *w) { return change_word(w, 1); }
+int spell_remove_word(const char *w) { return change_word(w, 0); }

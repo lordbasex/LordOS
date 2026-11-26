@@ -2,8 +2,8 @@
 # (libhunspell-1.7.so.0, dlopen'd from the fixed system folders, sandboxed), and lord-server's side: the service that
 # starts it with the chosen dictionaries as descriptors and reads its answers on a thread (src/spell/spellsvc.c), the
 # person's dictionary, and lord.spell (src/ui/js_spell.c). lord-server never links or loads Hunspell.
-SPELL_HDR := src/spell/spellproto.h src/spell/spellsvc.h src/sec/sandbox.h src/sec/cgroup.h
-SPELL_SRV_SRC := src/spell/spellproto.c src/spell/spelldict.c src/spell/spellsvc.c src/ui/js_spell.c
+SPELL_HDR := src/spell/spellproto.h src/spell/spellsvc.h src/spellang.h src/sec/sandbox.h src/sec/cgroup.h
+SPELL_SRV_SRC := src/spell/spellproto.c src/spell/spelldict.c src/spell/spellsvc.c src/spellang.c src/ui/js_spell.c
 SPELL_SRV_OBJ := $(SPELL_SRV_SRC:src/%.c=build/obj/%.o)
 $(SPELL_SRV_OBJ): $(SPELL_HDR) src/ui/js_spell.h src/sec/json.h
 build/lord-server: $(SPELL_SRV_OBJ)
@@ -27,7 +27,7 @@ build/lord-spell-evil: $(LORD_SPELL_SRC) $(SPELL_HDR)
 # the frames' parser fuzzed (ASan, UBSan), the person's dictionary, and the service end to end with the real helper,
 # Hunspell and small dictionaries made by the test
 test: build/spell-test
-SPELL_TEST_SRC := tests/spell_proto_test.c src/spell/spellproto.c src/spell/spelldict.c src/spell/spellsvc.c src/sec/json.c
+SPELL_TEST_SRC := tests/spell_proto_test.c src/spell/spellproto.c src/spell/spelldict.c src/spell/spellsvc.c src/spellang.c src/sec/json.c
 build/spell-test: $(SPELL_TEST_SRC) $(SPELL_HDR) build/lord-spell build/lord-spell-probe build/lord-spell-evil
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -fsanitize=address,undefined -fno-sanitize-recover=undefined -o $@ $(SPELL_TEST_SRC) -lpthread
 	./$@ build/lord-spell build/lord-spell-probe build/lord-spell-evil || { rm -f $@; exit 1; }
