@@ -35,6 +35,7 @@ import { ShieldGlyph } from './sentinelaglyph.js';
 import { admin } from './admin.js';
 import { llmPackageOk } from './llmcatalog.js';
 import { brainBackend, brainThreads } from './aistore.js';
+import { vmAnyActive } from './vmlibrary.js';
 import {
   SENTINELA_DEFAULTS, TRIGGER_DEFAULTS, createTracker, buildSummary, systemPrompt, parseVerdict, ignoreMatch, ruleAction, factLines,
   placeOf, clean, presentAlert, buildInvestigation, investigateSystemPrompt, parseInvestigation, evidenceOf, translateSystemPrompt,
@@ -380,10 +381,16 @@ let started = false, watching = false, tracker = null, uid = null, lastAutostart
 
 // the machines now: lord.vm.list(), lord.vm.stats(dir) of the running ones and their network counts (null: no new
 // sample this tick, so no network sample is taken)
+// Read only while lord-server says a machine is active (vmlibrary.js), and once more after the last one stopped, so an
+// end is seen: no lord.vm call at all while nothing runs (docs/VIRTUALIZATION.md, "The shell and the machines")
 const VM_ACTIVE = new Set(['starting', 'running', 'paused', 'stopping']);
+let vmWasActive = false;
 function machineRows() {
   const v = vmApi();
   if (!v) return null;
+  const now = vmAnyActive();
+  if (!now && !vmWasActive) return null;
+  vmWasActive = now;
   let list = [];
   try { list = v.list() || []; } catch (e) { return null; }
   let net = null;

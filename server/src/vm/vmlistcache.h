@@ -8,9 +8,9 @@
  * supervisor that died writes nothing). Without inotify (no watch left), nothing is kept: every list reads the folders,
  * as before.
  *
- * The same events are lord-server's "the library changed" (js_vm.c → __lordVm('library') → sdk/vmlibrary.js), so the
- * shell lists the machines only when something changed instead of polling. Names that never change the list are left
- * out: a machine's picture (thumb.png, rewritten while it runs), logs, and temporary or hidden files (a name starting
+ * The same watch is set when lord-server starts (js_vm.c, "the machines' state for the shell"): its events are
+ * __lordVm('library') and, with a pidfd per active lord-vm and the sessions' apps mode, __lordVm('state'), so the shell
+ * never reads the library on a timer (sdk/vmlibrary.js). Names that never change the list are left out: a machine's picture (thumb.png, rewritten while it runs), logs, and temporary or hidden files (a name starting
  * with '.', or ending in ".tmp" or '~': each is renamed to its real name, which is seen).
  *
  * The firmware check (does a UEFI machine's firmware_code still hash to its firmware_sha256?) hashes each system file

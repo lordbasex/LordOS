@@ -28,6 +28,7 @@ import { canDeactivate, withOff, vmActive, mailPause } from './appsoffmodel.js';
 import { mailConfig } from './mail.js';
 import { backup, backupStatus } from './backup.js';
 import { arm as armClock, timerReset } from './alarms.js';
+import { vmAnyActive } from './vmlibrary.js';
 
 const hasLord = () => typeof lord !== 'undefined';
 const label = (id) => { const a = getApp(id); return a ? appName(a) : id; };
@@ -38,7 +39,9 @@ const setKept = (patch) => {
   settings.set({ appsOffKept: Object.keys(next).length ? next : null });
 };
 
+// the machines, read only when lord-server says one is active (vmlibrary.js): none is what "nothing runs" needs
 function machines() {
+  if (!vmAnyActive()) return [];
   try { return hasLord() && lord.vm && typeof lord.vm.list === 'function' ? lord.vm.list() || [] : []; } catch (e) { return []; }
 }
 

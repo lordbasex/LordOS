@@ -7,9 +7,12 @@
 //     computer busy and drains the battery);
 //   - "Pause while I'm away" (app.json autoPause): after AWAY_SEC without input the machines that chose it pause, and
 //     resume when the person is back (one the person paused stays paused).
+// Nothing here reads the library while no machine runs (docs/VIRTUALIZATION.md, "The shell and the machines"): the battery
+// and away checks tick only while lord-server says one is active (vmState), the session's starts read it only when some
+// machine chose to start with the session, and search only when the person types.
 // The decisions are model.js's pure functions (searchMachines, sessionStarts, batteryNotice, awayStep), tested in
 // server/tests/vm_model_test.mjs.
-import { registerSpotlightSource, settings, battery, notify, addListener, t as tr } from '@lordos/sdk';
+import { registerSpotlightSource, settings, battery, notify, addListener, t as tr, vmState, vmAnyActive } from '@lordos/sdk';
 import { openMachine } from './library.jsx';
 import { startPrep, vmRefusal } from './ui.jsx';
 import { readMeta } from './meta.js';
@@ -34,7 +37,9 @@ export function startMachinesTies() {
   });
   // start with the session: one at a time, a moment apart, after the desktop is up
   setTimeout(() => {
-    const todo = sessionStarts(list(), settings.get().machinesAtLogin);
+    const want = settings.get().machinesAtLogin;
+    if (!Array.isArray(want) || !want.length) return;
+    const todo = sessionStarts(list(), want);
     const next = () => {
       const m = todo.shift();
       if (!m) return;
@@ -53,7 +58,7 @@ export function startMachinesTies() {
   addListener('pointermove', touch);
   const paused = new Set();
   let bmem = {};
-  setInterval(() => {
+  const tick = () => {
     if (!has()) return;
     const ms = list();
     const b = batteryNotice(battery.get(), ms, bmem);
@@ -67,7 +72,17 @@ export function startMachinesTies() {
     const step = awayStep((Date.now() - lastInput) / 1000, ms, readMeta, paused);
     for (const d of step.pause) { lord.vm.stop(d, 'pause'); paused.add(d); }
     for (const d of step.resume) { lord.vm.stop(d, 'resume'); paused.delete(d); }
-  }, TICK_MS);
+  };
+  // only while a machine is active: started and stopped by lord-server's state events (vmState)
+  let timer = null;
+  const follow = () => {
+    if (vmAnyActive() && !timer) {
+      if (!battery.get()?.discharging) bmem = {};          // on the charger meanwhile: the next unplug says it again
+      timer = setInterval(tick, TICK_MS);
+    } else if (!vmAnyActive() && timer) { clearInterval(timer); timer = null; paused.clear(); }
+  };
+  vmState.subscribe(follow);
+  follow();
   // back from away: resume at once, not at the next tick
   addListener('pointerdown', () => {
     if (!paused.size || !has()) return;

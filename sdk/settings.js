@@ -61,6 +61,7 @@ const DEFAULTS = {
   x11Scaling: 'self',         // 0.8.8.8, Settings → Displays → X11 apps: 'self' (they scale themselves, sharp) | 'lordos' (wayland.js)
   appsOff: [],                // 0.8.8.8, Store → Installed → Deactivate: built-in apps turned off (appsoff.js, appsoffmodel.js)
   webAppPrefs: {},            // 0.8.8.8, Settings → Web apps: per app { badge, dockPerProfile } (webappsmodel.js webPrefs); new key, no migration
+  guestLauncherKept: null,    // 0.8.9.6.2, the launcher's guest apps of machines that are off (sdk/guestappsmodel.js keptGuestItems; apps/machines/guestlaunch.js): kept so the shell asks Machines nothing at login; null: never read, read once; new key, no migration
   appsOffKept: null,         // what deactivating changed, to put back on Activate: { backupInterval } (appsoffactions.js)
   flathub: null,              // 0.8.9.3, Store → Flathub: { on, showAll, appstreamAt } (flathubmodel.js prefsOf); new key, no migration
   openWithDefaults: {},       // 0.8.9.5, Files: "Always open .exe files with …" per extension → an "Open with" provider's id (sdk/openwith.js); new key, no migration

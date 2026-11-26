@@ -3867,7 +3867,7 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[205 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +17 machines (and their library's watch), +40 Spawn helpers, +5 test hooks (lord-server-test) */
+        struct pollfd pfd[214 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +26 machines (their pictures, the state's eventfd, the library's watch, 8 lord-vm pidfds), +40 Spawn helpers, +5 test hooks (lord-server-test) */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
@@ -3923,7 +3923,7 @@ int main(int argc, char **argv) {
         n += nmed;
         int hwbase = n, nhw = hw_pollfds(pfd + n, 48);   /* 16 fixed + up to 32 Spawn helpers */           /* uevents, the system bus and the session bus clients (src/hw) */
         n += nhw;
-        int vmbase = n, nvm = js_vm_pollfds(pfd + n, 17);        /* Machines: each picture's lord-vmdisplay, the library's watch (ui/js_vm.c) */
+        int vmbase = n, nvm = js_vm_pollfds(pfd + n, 26);        /* Machines: each picture's lord-vmdisplay, the state for the shell (ui/js_vm.c) */
         n += nvm;
         wdog_idle();
         int ready = poll(pfd, n, wait);

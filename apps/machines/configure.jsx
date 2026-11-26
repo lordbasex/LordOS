@@ -8,6 +8,7 @@ import { changedSections, sectionsMatching, atLoginToggle, stateView, memLimit, 
   portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice, parseTags, TAGS_MAX, usbAutoRows, guestChannels, channelSet, kbootBlocked } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
 import { readMeta, writeMeta, readCpuUse } from './meta.js';
+import { refreshGuestLauncher } from './guestlaunch.js';
 import { COLOR_HEX } from './systems.js';
 import { defaultsOf } from './store.js';
 import { SideRow, PaneHeader, Pill, Section, Sym } from './kit.jsx';
@@ -449,7 +450,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       </Row>
       {/* the guest's apps in the launcher while the machine is off (6.12, guestlaunch.js): once apps mode listed them */}
       {meta.guestApps?.length ? <Row label={tr('machines.cfg.launcherApps')} last note={tr('machines.cfg.launcherAppsNote', { count: meta.guestApps.length })}>
-        <Toggle on={meta.launcherApps === true} onChange={(x) => { writeMeta(dir, { launcherApps: x }); setMeta(readMeta(dir)); }} />
+        <Toggle on={meta.launcherApps === true} onChange={(x) => { writeMeta(dir, { launcherApps: x }); setMeta(readMeta(dir)); refreshGuestLauncher(); }} />
       </Row> : null}
     </Group>
     {m.suspended ? <Group><Row label={tr('machines.cfg.saved')} value={bytes(m.stateBytes || 0)} last note={tr('machines.cfg.savedNote')} /></Group> : null}

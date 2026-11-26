@@ -1562,11 +1562,22 @@ void js_fswatch_dispatch(double now) {
 
 /* Network (net/state.c): something changed in links, addresses or routes → __lordNet("link"|"addr"|"route"). */
 /* Disks (disk/disk.c): something was mounted, unmounted, plugged in or changed → __lordDisks(what). */
+/* Machines (ui/js_vm.c "the machines' state for the shell"): __lordVm('library') when the library changed,
+ * __lordVm('state', json) when what runs or what is in apps mode changed */
 void js_vm_library_event(void) {
     if (!ctx) return;
-    JSValueConst arg = JS_NewString(ctx, "library");
+    JSValue arg = JS_NewString(ctx, "library");
     JS_FreeValue(ctx, call_global("__lordVm", 1, &arg));
     JS_FreeValue(ctx, arg);
+    drain_jobs();
+}
+
+void js_vm_state_event(const char *json) {
+    if (!ctx || !json) return;
+    JSValue args[2] = { JS_NewString(ctx, "state"), JS_NewString(ctx, json) };
+    JS_FreeValue(ctx, call_global("__lordVm", 2, args));
+    JS_FreeValue(ctx, args[0]);
+    JS_FreeValue(ctx, args[1]);
     drain_jobs();
 }
 

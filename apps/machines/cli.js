@@ -11,7 +11,7 @@
 // The group's internal link (lord.vm.link: a socketpair lord-server hands both members) is made whenever both members
 // run under lord-vms it hasn't linked yet: after a start from here, from the app or from the terminal, and after either
 // member started anew (its old pair died with its QEMU).
-import { t as tr, isAppOff } from '@lordos/sdk';
+import { t as tr, isAppOff, vmState } from '@lordos/sdk';
 import { openMachine } from './library.jsx';
 import { startPrep, vmRefusal } from './ui.jsx';
 import { CLI, cliPlan, lordVmWhy, groupCliPlan, groupPlan, groupLinkKey, groupStartFailed } from './model.js';
@@ -124,11 +124,20 @@ export function startMachinesCli() {
       }
     }
   }, TICK_MS);
-  // groups whose members were started from anywhere get their link
-  setInterval(() => {
+  // groups whose members were started from anywhere get their link: looked at only while two machines or more are active
+  // (a link needs both members running), as lord-server's state events say (vmState); never while nothing runs
+  let linkTimer = null;
+  const linkTick = () => {
     try {
       const groups = lord.vm.groups ? lord.vm.groups() : [];
       if (groups.length) linkGroups(lord.vm.list() || [], groups);
     } catch (e) { /* the next turn tries again */ }
-  }, LINK_MS);
+  };
+  const follow = () => {
+    const two = vmState.get().active.length >= 2;
+    if (two && !linkTimer) { linkTick(); linkTimer = setInterval(linkTick, LINK_MS); }
+    else if (!two && linkTimer) { clearInterval(linkTimer); linkTimer = null; linked.clear(); }
+  };
+  vmState.subscribe(follow);
+  follow();
 }

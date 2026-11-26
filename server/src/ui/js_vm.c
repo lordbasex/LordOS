@@ -22,6 +22,7 @@
 #include "js_vm.h"
 #include "js.h"
 #include "js_secret.h"
+#include "js_sys.h"
 #include "../media/media_int.h"
 #include "../media/aring.h"
 #include "../vm/vmproto.h"
@@ -34,6 +35,7 @@
 #include "../vm/vmthumb.h"
 #include "../vm/vmops.h"
 #include "../vm/vmlistcache.h"
+#include "../hw/jbuf.h"
 #include "../vm/logclean.h"
 #include "../vm/vmagent.h"
 #include "../vm/vmrecv.h"
@@ -83,6 +85,7 @@
 #include <sys/sysmacros.h>
 #include <time.h>
 #include <sys/syscall.h>
+#include <sys/eventfd.h>
 #include <sys/un.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
@@ -747,27 +750,6 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     JS_FreeValue(c, js);
     return arr;
 }
-
-/* listVersion() → a number that moves when the library changed (an event that matters, a list that differs);
- * listWatch() → 1 when lord-server watches the library (then __lordVm('library') comes with every change and the shell
- * reads the list only then: sdk/vmlibrary.js), 0 when there is no library (~/Machines not made yet), -1 when it can't
- * watch it (no inotify watch left): the shell reads it now and then */
-static JSValue f_list_version(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc; (void)argv;
-    vmlc_drain(&lcache);
-    return JS_NewFloat64(c, (double)lcache.gen);
-}
-static JSValue f_list_watch(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc; (void)argv;
-    char lib[PATH_MAX];
-    if (library(lib, sizeof lib, 0)) return JS_NewInt32(c, 0);
-    if (strcmp(lcache.lib, lib) || lcache.fd < 0 || lcache.broken) {
-        vmlc_begin(&lcache, lib);
-        lcache.dirty = 1;                   /* watched now, nothing kept yet */
-    }
-    return JS_NewInt32(c, lcache.fd >= 0 && !lcache.broken ? 1 : -1);
-}
-
 
 /* groups() → [{ dir, id, name, kind, members: [{ role, dir, start, stop, primary }], disposable, freshGateway, release,
  * error }]: the library's machine groups (docs/VIRTUALIZATION.md 19.2), read with vm_group_load; error "newer" or
@@ -4096,14 +4078,138 @@ static void ack(Sess *s) {
  * for the Machines app's poll every 16 ms, and the acknowledgement came at the poll after the next one: a guest
  * drawing 60 frames a second was shown at 31 (docs/MACHINES-GPU.md, Part 1). A 3D picture's dmabuf waiting for its
  * fence is polled too (it becomes readable when the GPU is done with it). */
-static int vm_poll_sess[2 * MAX_SESS + 1];
+/* ---- the machines' state for the shell (docs/VIRTUALIZATION.md, "The shell and the machines") ----
+ * The shell (the launcher's guest apps, the battery notice, "Pause while I'm away", a group's link, Sentinela, the idle
+ * sleep's check) never reads the library on a timer: lord-server tells it what runs. __lordVm('state', json) with
+ * { active: [dir…], apps: [dir…] } when the set of active machines (run.json starting, running, paused or stopping, its
+ * lord-vm alive) or of sessions in apps mode changed, and once to every new JS context; __lordVm('library') when something
+ * in the library changed (the list cache's inotify watch, vm/vmlistcache.h). What wakes it: that watch (a start or a
+ * stop is a run.json renamed into place), a pidfd per active lord-vm (one that dies writes nothing; at most VST_PIDS,
+ * the rest are seen at their next run.json), an apps mode turned on or off or a session that ended (seen here, sent
+ * through an eventfd so the event never runs inside the JS call that caused it). Nothing is read while nothing changes:
+ * an idle desktop costs no system call at all. The login screen has none of it. */
+#define VST_PIDS 8
+static struct {
+    int init, efd, dirty, force, lib_changed;
+    unsigned seen_gen, apps_sig;
+    char *json;                         /* the state the shell has */
+    int pidfd[VST_PIDS];
+    long pid[VST_PIDS];
+} vst = { .efd = -1, .pidfd = { -1, -1, -1, -1, -1, -1, -1, -1 } };
+
+/* the sessions in apps mode, as a number that changes when they do (FNV-1a over their folders) */
+static unsigned apps_sig(void) {
+    unsigned h = 2166136261u;
+    for (int i = 0; i < MAX_SESS; i++) {
+        const Sess *s = &sess[i];
+        if (!s->used || s->vm < 0 || !s->apps_mode) continue;
+        for (const char *c = s->dir; *c; c++) { h ^= (unsigned char)*c; h *= 16777619u; }
+        h ^= 0xff; h *= 16777619u;
+    }
+    return h;
+}
+
+static void state_one(const char *dir, HBuf *b, int *n, long *pids, int *np) {
+    long pid = 0;
+    if (*n >= 256 || !vm_dir_active_pid(dir, lc_alive, &pid)) return;
+    hb_printf(b, "%s", (*n)++ ? "," : "");
+    hb_str(b, dir);
+    if (*np < VST_PIDS) pids[(*np)++] = pid;
+}
+
+/* { active, apps } now: run.json of each machine folder (the library's top level and a group's members), at most 2 KB
+ * each, never a symbolic link; the sessions' apps mode */
+static char *state_json(long *pids, int *np) {
+    HBuf b = { 0 };
+    hb_printf(&b, "{\"active\":[");
+    char lib[PATH_MAX];
+    int n = 0;
+    *np = 0;
+    DIR *d = library(lib, sizeof lib, 0) ? NULL : opendir(lib);
+    struct dirent *e;
+    while (d && (e = readdir(d))) {
+        size_t l = strlen(e->d_name);
+        int vm = l > 7 && !strcmp(e->d_name + l - 7, ".lordvm"), grp = l > 10 && !strcmp(e->d_name + l - 10, ".lordgroup");
+        if (e->d_name[0] == '.' || (!vm && !grp)) continue;
+        char p[PATH_MAX + 260];
+        struct stat st;
+        if ((size_t)snprintf(p, sizeof p, "%s/%s", lib, e->d_name) >= sizeof p || lstat(p, &st) || !S_ISDIR(st.st_mode)) continue;
+        if (vm) { state_one(p, &b, &n, pids, np); continue; }
+        DIR *g = opendir(p);
+        struct dirent *m;
+        while (g && (m = readdir(g))) {
+            size_t ml = strlen(m->d_name);
+            char q[PATH_MAX + 520];
+            if (m->d_name[0] == '.' || ml < 8 || strcmp(m->d_name + ml - 7, ".lordvm")) continue;
+            if ((size_t)snprintf(q, sizeof q, "%s/%s", p, m->d_name) >= sizeof q || lstat(q, &st) || !S_ISDIR(st.st_mode)) continue;
+            state_one(q, &b, &n, pids, np);
+        }
+        if (g) closedir(g);
+    }
+    if (d) closedir(d);
+    hb_printf(&b, "],\"apps\":[");
+    n = 0;
+    for (int i = 0; i < MAX_SESS; i++) {
+        const Sess *s = &sess[i];
+        if (!s->used || s->vm < 0 || !s->apps_mode) continue;
+        hb_printf(&b, "%s", n++ ? "," : "");
+        hb_str(&b, s->dir);
+    }
+    hb_printf(&b, "]}");
+    return hb_take(&b);
+}
+
+static void vst_init(void) {
+    vst.init = 1;
+    if (js_sys_greeter()) return;
+    vst.efd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    char lib[PATH_MAX];
+    if (!library(lib, sizeof lib, 0)) vmlc_begin(&lcache, lib);   /* watched from the start: starts and stops are seen */
+    vst.seen_gen = lcache.gen;
+    vst.apps_sig = apps_sig();
+    vst.dirty = 1;
+}
+
+/* the state again, sent when it differs (or to a new JS context); the library's change */
+static void vst_flush(void) {
+    if (vst.efd < 0) return;
+    if (lcache.gen != vst.seen_gen) { vst.seen_gen = lcache.gen; vst.dirty = 1; vst.lib_changed = 1; }
+    if (vst.dirty || vst.force) {
+        vst.dirty = 0;
+        long pids[VST_PIDS];
+        int np = 0;
+        char *j = state_json(pids, &np);
+        if (j && (vst.force || !vst.json || strcmp(j, vst.json))) {
+            free(vst.json);
+            vst.json = j;
+            vst.force = 0;
+            /* a pidfd for each active lord-vm, so one that dies (and writes nothing) is seen at once */
+            for (int i = 0; i < VST_PIDS; i++) { if (vst.pidfd[i] >= 0) close(vst.pidfd[i]); vst.pidfd[i] = -1; vst.pid[i] = 0; }
+            for (int i = 0; i < np; i++) { vst.pidfd[i] = (int)syscall(SYS_pidfd_open, (pid_t)pids[i], 0); vst.pid[i] = pids[i]; }
+            js_vm_state_event(vst.json);
+        } else free(j);
+    }
+    if (vst.lib_changed) { vst.lib_changed = 0; js_vm_library_event(); }
+}
+
+/* the eventfd, the library's watch, the pidfds: -2, -1, -3 - k in vm_poll_sess */
+static int vm_poll_sess[2 * MAX_SESS + 2 + VST_PIDS];
 
 int js_vm_pollfds(struct pollfd *p, int max) {
     int n = 0;
-    /* the library's watches (lcache): a change is the shell's __lordVm('library') */
-    if (lcache.fd >= 0 && n < max) {
-        vm_poll_sess[n] = -1;
-        p[n++] = (struct pollfd){ lcache.fd, POLLIN, 0 };
+    if (!vst.init) vst_init();
+    if (vst.efd >= 0) {
+        unsigned sig = apps_sig();
+        if (sig != vst.apps_sig) { vst.apps_sig = sig; vst.dirty = 1; }
+        if (lcache.gen != vst.seen_gen) vst.dirty = 1;
+        if (vst.dirty || vst.force) { uint64_t one = 1; if (write(vst.efd, &one, sizeof one) < 0) { /* already set */ } }
+        if (n < max) { vm_poll_sess[n] = -2; p[n++] = (struct pollfd){ vst.efd, POLLIN, 0 }; }
+        if (lcache.fd >= 0 && n < max) { vm_poll_sess[n] = -1; p[n++] = (struct pollfd){ lcache.fd, POLLIN, 0 }; }
+        for (int k = 0; k < VST_PIDS && n < max; k++) {
+            if (vst.pidfd[k] < 0) continue;
+            vm_poll_sess[n] = -3 - k;
+            p[n++] = (struct pollfd){ vst.pidfd[k], POLLIN, 0 };
+        }
     }
     for (int i = 0; i < MAX_SESS && n < max; i++) {
         Sess *s = &sess[i];
@@ -4124,11 +4230,18 @@ int js_vm_pollfds(struct pollfd *p, int max) {
 }
 
 void js_vm_dispatch(const struct pollfd *p, int n) {
-    int done[MAX_SESS] = { 0 };
-    for (int k = 0; k < n && k < 2 * MAX_SESS + 1; k++) {
+    int done[MAX_SESS] = { 0 }, any = 0;
+    for (int k = 0; k < n && k < (int)(sizeof vm_poll_sess / sizeof *vm_poll_sess); k++) {
         int i = vm_poll_sess[k];
         if (i < 0) {
-            if (p[k].revents && vmlc_drain(&lcache)) js_vm_library_event();
+            if (!p[k].revents) continue;
+            any = 1;
+            if (i == -1) vmlc_drain(&lcache);                 /* lcache.gen moves when it mattered */
+            else if (i == -2) { uint64_t v; if (read(vst.efd, &v, sizeof v) < 0) { /* nothing pending */ } }
+            else {
+                int j = -3 - i;
+                if (j < VST_PIDS && vst.pidfd[j] >= 0) { close(vst.pidfd[j]); vst.pidfd[j] = -1; vst.dirty = 1; }
+            }
             continue;
         }
         if (!p[k].revents || done[i]) continue;
@@ -4137,6 +4250,7 @@ void js_vm_dispatch(const struct pollfd *p, int n) {
         done[i] = 1;
         from_vd(s);
     }
+    if (any) vst_flush();
 }
 
 /* after a paint: every frame it showed is acknowledged now, so lord-vmdisplay hands the guest's next one over at once */
@@ -6569,7 +6683,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("keyState", 2, f_key_state), JS_CFUNC_DEF("keyNew", 1, f_key_new), JS_CFUNC_DEF("keyCopy", 1, f_key_copy),
     JS_CFUNC_DEF("keyEnter", 3, f_key_enter), JS_CFUNC_DEF("export", 2, f_export), JS_CFUNC_DEF("exportInfo", 1, f_export_info),
     JS_CFUNC_DEF("importExport", 1, f_import_export),
-    JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("listVersion", 0, f_list_version), JS_CFUNC_DEF("listWatch", 0, f_list_watch), JS_CFUNC_DEF("groups", 0, f_groups), JS_CFUNC_DEF("link", 2, f_link), JS_CFUNC_DEF("groupCreate", 1, f_group_create), JS_CFUNC_DEF("groupFresh", 2, f_group_fresh), JS_CFUNC_DEF("groupSet", 2, f_group_set), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
+    JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("groups", 0, f_groups), JS_CFUNC_DEF("link", 2, f_link), JS_CFUNC_DEF("groupCreate", 1, f_group_create), JS_CFUNC_DEF("groupFresh", 2, f_group_fresh), JS_CFUNC_DEF("groupSet", 2, f_group_set), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("groupDelete", 1, f_group_delete), JS_CFUNC_DEF("groupRename", 2, f_group_rename), JS_CFUNC_DEF("groupRenamePlan", 2, f_group_rename_plan), JS_CFUNC_DEF("groupRepair", 1, f_group_repair),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
@@ -6593,6 +6707,7 @@ static const JSCFunctionListEntry funcs[] = {
 };
 
 void js_vm_register(JSContext *c, JSValue lord) {
+    vst.force = 1;                      /* a new JS context: it gets the machines' state at the next turn */
     JSValue o = JS_NewObject(c);
     JS_SetPropertyFunctionList(c, o, funcs, sizeof funcs / sizeof funcs[0]);
     /* the screen locks, the user switches or logs out: the encrypted machines' keys held here go (vmkeysrv.h) */

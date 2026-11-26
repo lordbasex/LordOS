@@ -272,10 +272,10 @@ export { deactivateApp, activateApp, offerActivate } from './appsoffactions.js';
 import { startAppsOff } from './appsoffactions.js';
 // apps mode's guest side: inside a Machines guest, this desktop's windows go to the host one by one (guestwin.js)
 export { guestAppsMode } from './guestwin.js';
-// Machines' library as the shell sees it, read only when it changed (vmlibrary.js; docs/VIRTUALIZATION.md "The list's cache")
-export { vmMachines, vmAnyActive, refreshVmMachines } from './vmlibrary.js';
-import { startVmLibrary } from './vmlibrary.js';
-export { guestLauncherItems, cleanGuestApps, sameGuestApps, launchAskStep, isGuestAppId } from './guestappsmodel.js';
+// what runs in Machines and what is in apps mode, as lord-server says it: no lord.vm call while nothing runs (vmlibrary.js;
+// docs/VIRTUALIZATION.md "The shell and the machines")
+export { vmState, vmAnyActive, vmLibraryChanged } from './vmlibrary.js';
+export { guestLauncherItems, cleanGuestApps, sameGuestApps, launchAskStep, isGuestAppId, keptGuestItems, shownGuestItems } from './guestappsmodel.js';
 import { startGuestWin } from './guestwin.js';
 export { notifyPrefs, appNotifyPrefs, setAppNotifyPrefs, dndActive, NOTIFY_DEFAULTS } from './notify.js';
 
@@ -401,7 +401,6 @@ export function startShell(element) {
   refreshPackages();                    // after the theme's configureWindows
   startAppsOff();                       // deactivated apps open nothing; their background work stays off (appsoffactions.js)
   startGuestWin();                      // inside a Machines guest only: apps mode's endpoint (guestwin.js)
-  startVmLibrary();                     // Machines' library: read once, then only when lord-server says it changed
   enableShellLayers();                  // menus, popovers and prompts go to their layer (sdk/layers.js)
   resetShortcuts();                     // the dispatcher exists only in the session (sdk/shortcuts.js)
   startModDrag();                       // ❖ (or Alt) + drag anywhere in a window moves or resizes it (moddrag.js, #219)

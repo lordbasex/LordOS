@@ -54,6 +54,7 @@ void   js_term_event(int id, const char *type, const char *data);
 void   js_sound_event(const char *type, const char *json);
 void   js_net_event(const char *what);
 void   js_vm_library_event(void);           /* Machines: the library changed (vm/vmlistcache.h) → __lordVm('library') */
+void   js_vm_state_event(const char *json); /* Machines: what runs or is in apps mode changed → __lordVm('state', json) */
 void   js_disk_event(const char *what);      /* Disks app: something changed (disk/disk.c) */
 void   js_backup_event(const char *json);    /* Backups → __lordBackup */
 void   js_cloud_event(const char *json);     /* Cloud → __lordCloud */

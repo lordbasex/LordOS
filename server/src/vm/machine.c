@@ -741,8 +741,11 @@ int vm_budget_fits(const VmHost *h, long running_mb, long want_mb) {
     return running_mb >= 0 && want_mb > 0 && running_mb + want_mb <= h->ram_mb - floor;
 }
 
-int vm_dir_active(const char *dir, int (*alive)(long pid)) {
+int vm_dir_active(const char *dir, int (*alive)(long pid)) { return vm_dir_active_pid(dir, alive, NULL); }
+
+int vm_dir_active_pid(const char *dir, int (*alive)(long pid), long *pid_out) {
     char p[VM_PATH_MAX + 32], buf[2048];
+    if (pid_out) *pid_out = 0;
     if (!dir || (size_t)snprintf(p, sizeof p, "%s/run.json", dir) >= sizeof p) return 0;
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     if (fd < 0) return 0;
@@ -757,7 +760,9 @@ int vm_dir_active(const char *dir, int (*alive)(long pid)) {
     int on = s && (!strcmp(s, "starting") || !strcmp(s, "running") || !strcmp(s, "paused") || !strcmp(s, "stopping"));
     long pid = pd >= 1 && pd <= 4194304 ? (long)pd : 0;
     json_free(&d);
-    return on && pid && (!alive || alive(pid));
+    if (!on || !pid || (alive && !alive(pid))) return 0;
+    if (pid_out) *pid_out = pid;
+    return 1;
 }
 
 size_t vm_backup_hold(const char *rel) {

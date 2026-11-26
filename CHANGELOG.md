@@ -384,6 +384,52 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Machines: `lord-server: stall: ~27 ms call vm.list` thousands of times a day with no machine running** (in
+  development; approved by the maintainer 2026-11-26; docs/VIRTUALIZATION.md 6.14, "The list's cache" and "The shell and
+  the machines"). Three timers outside the Machines window read the whole library on lord-server's main thread: the
+  launcher's guest apps every 3 s (`apps/machines/guestlaunch.js`), a group's link every 2 s with any group in the
+  library (`cli.js`, `lord.vm.groups()` and `list()`), and the battery and away checks every 15 s (`ties.js`); Sentinela
+  read it at every tick when on. Each read hashed the 3.5 MB UEFI code again for machines whose ids started with
+  colliding characters (`1`/`a`, `2`/`b`: the old firmware cache was keyed by the id's first byte).
+  - **The shell makes no `lord.vm` call while no machine runs, and nothing polls.** lord-server tells it what runs:
+    `__lordVm('state', { active, apps })` when the active machines or the sessions in apps mode change (an inotify watch
+    on the library from the start, where every start and stop renames `run.json` into place; a pidfd per active lord-vm,
+    which sees one that died without writing; apps mode and a session's end through an eventfd), once to every new JS
+    context, and `__lordVm('library')` when the library changed (`server/src/ui/js_vm.c`; `sdk/vmlibrary.js`: `vmState`,
+    `vmAnyActive`, `vmLibraryChanged`). The group link runs only while two machines or more are active, the battery and
+    away checks only while one is, Sentinela's machine rows only then (and once after the last stops), the idle sleep's
+    `lord.vm.awake` and deactivating Machines read nothing while none is, and the session's starts read the list only
+    when some machine chose to start with the session.
+  - **The launcher's guest apps without asking Machines**: the entries are kept in `settings.json`
+    (`guestLauncherKept`, a new key with no migration: read once at the first login that has none; checked again as it is
+    read back, `keptGuestItems`) and shown without the machines that run (`shownGuestItems`). They are read again only when
+    apps mode saved a new list, Configure's "Its apps in the launcher" changed, or the library changed while there are
+    entries.
+  - **`lord.vm.list()` is cached** (`server/src/vm/vmlistcache.c`): kept as JSON while the inotify watch over the library,
+    each machine folder and its `disks/`, and each group says nothing changed (pictures, logs and temporary names
+    ignored), at most 10 s, and dropped as soon as an active machine's lord-vm is gone. The firmware is hashed once per
+    file version (device, inode, size, change time), not once per machine.
+  - Measured (headless lord-server, the real Lord Flow theme, 12 machine folders of which 8 UEFI with colliding ids and a
+    Whonix-like group, nothing running, 90 s idle): before, 81 `vm.list` calls of about 110 ms each (30 from the guest
+    launcher, 45 from the group link, 6 from the battery and away checks; about 78,000 a day) and a stall line for each;
+    now none and no stall line. A list costs 14 ms the first time (the one firmware hash), 0.9 ms after a change and
+    0.21 ms from the cache (median of 200; at most 0.35 ms), which is what the Machines window reads while it is open.
+  - Tests: `build/vmlistcache-test`, `tests/vm_list_headless.sh` (the cache, a change seen through `__lordVm('library')`,
+    a stand-in lord-vm's start and its death seen as state events) and `tests/vm_idle_headless.sh` (no `lord.vm` call and
+    no stall line while idle), both in `make test`; `guest_apps_test.mjs` (`keptGuestItems`, `shownGuestItems`,
+    `sdk/vmlibrary.js`) and `sentinela_notify_scene.mjs` (no machine read until one is active).
+- **Web apps' logs had no time on their lines** (in development; approved by the maintainer 2026-11-26; docs/WEBAPPS.md,
+  "The app's log"). `web/<app>-<profile>.log` now has lord-server's own stamp on every line,
+  `2026-11-26T18:22:03.713-03:00 WARN  lord-web: …`: local time with milliseconds, a level and the subsystem, `webkit` for
+  what WebKit's processes, GLib and GStreamer print. `lordlog_stamp_start` (`server/src/lordlog.c`) makes lord-web's stderr
+  a pipe to a `lord-log` child before any thread starts, only when stderr is that very file; lines are cut at 8 KB, the
+  16 MB cap is kept, the pipe holds 1 MB, and the child drains it until the last writer is gone, so a crash's last lines
+  stay. The Logs app and `lordos-issue` read them like any other LordOS log. Tests: `lordlog-test` (`test_stamp`),
+  `logfile_test.mjs`.
+- **Web apps: how long a page was stuck** (docs/WEBAPPS.md, "When a web app stops answering"): `lord-web: the page responds
+  again after N.N s` (since WebKit said it stopped responding) and `lord-web: the page did not answer for N.N s: its web
+  process restarted` (from the first ping it left unanswered, or WebKit's word if that came first; `webwatch.h`
+  `hung_for`, the watcher's own stall not counted). Tests: `webwatch-test` (`test_hung_for`).
 - **A web app's tray icon and notifications kept LordOS's letter tile** after its real icon was fetched (WhatsApp's "W"
   next to the clock): lord-web read only the registry's icon. It now prefers the site's own icon from
   `~/.cache/lordos/web/icons/<app>.png` when it starts (a regular PNG of the person's, no link, at most 1 MB). An app

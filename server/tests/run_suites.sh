@@ -329,6 +329,20 @@ EOF
         77) skip "moddrag" "build/lord-server-test and the default theme (make, npm run build)" ;;
         *) bad "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test)"; cat "$T/out" ;;
     esac
+    # Machines: lord.vm.list's cache and lord-server's events for the shell over a throwaway library (no machine runs)
+    sh tests/vm_list_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-list-cache (tests/vm_list_headless.sh: cached under 1 ms, a change seen, state events for a start and a lord-vm gone)" ;;
+        77) skip "vm-list-cache" "build/lord-server and OVMF (make, ovmf)" ;;
+        *) bad "vm-list-cache (tests/vm_list_headless.sh)"; cat "$T/out" ;;
+    esac
+    # the maintainer's rule (2026-11-26): an idle desktop with machines and none running makes no lord.vm call
+    sh tests/vm_idle_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-idle (tests/vm_idle_headless.sh: Lord Flow idle with 14 machines, none running: no lord.vm call, no stall line)" ;;
+        77) skip "vm-idle" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "vm-idle (tests/vm_idle_headless.sh)"; cat "$T/out" ;;
+    esac
     # (#232) a fullscreen window's desync subsurface (Firefox's page) repaints its own box, checked against a full repaint
     sh tests/fsub_headless.sh >"$T/out" 2>&1
     case $? in

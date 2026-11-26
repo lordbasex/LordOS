@@ -42,6 +42,7 @@ import { TextInput, Toggle } from './components.jsx';
 import { dialogStack, dialogKey, keyOwner } from './dialogkeys.js';
 import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent, webMenu, webMenuEvent, answerWebMenu, webInspectAsk, answerWebInspect, webDeveloper, webRestartAsk, answerWebRestart, webRestartedTitle } from './webapps.js';
 import { speechMenu } from './voice.js';
+import { vmAnyActive } from './vmlibrary.js';
 import { toggleEmojiPanel } from './emoji.jsx';
 import { ContextMenu } from './contextmenu.jsx';
 import { writingMenuFor, WritingPanel } from './writing.jsx';
@@ -323,7 +324,8 @@ export function applyIdle() {
 }
 
 const managed = () => typeof lord.session !== 'undefined' && lord.session.managed();
-const machinesAwake = () => { try { return typeof lord.vm !== 'undefined' ? lord.vm.awake() : 0; } catch (e) { return 0; } };
+// asked only while lord-server says a machine is active (vmlibrary.js)
+const machinesAwake = () => { if (!vmAnyActive()) return 0; try { return typeof lord.vm !== 'undefined' ? lord.vm.awake() : 0; } catch (e) { return 0; } };
 // the sleep deadline came while a machine ran: looked at again every 30 s, and the computer sleeps once none runs
 // (unless someone came back first: the "wake" stage)
 let sleepHeld = null;

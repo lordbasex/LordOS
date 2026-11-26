@@ -3657,6 +3657,11 @@ fresh list holds that exact token (`launchAskStep`); lord-vm checks the token ag
 the app isn't there any more, or that apps mode didn't start (10 minutes, or tools that can't list windows), and launches
 nothing. Tests: `guest_apps_test.mjs`. Not checked on screen yet. While apps mode runs, the guest's open apps are in the Dock
 as before (`vm:<machine>:<app>`).
+The entries come without asking Machines (since 2026-11-26, "The shell and the machines" in 6.14): every entry of every
+machine that shows its apps is kept in `settings.json` (`guestLauncherKept`, checked again as it is read back:
+`keptGuestItems`) and the launcher leaves out the machines lord-server says run (`shownGuestItems`). The list is read again
+only when apps mode saved a new one, Configure's switch changed, or the library changed while there are entries; once at
+the first login that has nothing kept.
 
 ### 6.13 Nested virtualization
 
@@ -3702,6 +3707,62 @@ development*, "Machines to 100 %"):
 - **Reclaim space from Cleaner** (*in development*): Cleaner's Storage view, on the Machines library, a machine's folder or a
   group's, offers **Reclaim in Machines** in place of Review, which opens Machines' Storage window (6.16), where a machine's
   disks are compacted safely (`apps/cleaner/vmspace.js` `machinesSpace`, the same places `clean_machine_path` refuses).
+
+#### The list's cache
+
+`lord.vm.list()` reads every machine folder (`machine.json`, `run.json`, `operation.json`, `identity.json`,
+`suspend.state`, a group's `group.json`, …) on lord-server's main thread. Since 2026-11-26 (*in development*) the list is
+kept as JSON (`server/src/vm/vmlistcache.c`) and given again while nothing changed: an inotify watch on the library, on each
+machine folder and its `disks/`, and on each group folder and its members says when something did (names that never
+change the list are left out: `thumb.png`, `*.log`, hidden and temporary names, which are renamed to a real name that is
+seen). A kept list is also dropped after 10 s (what no file says: the system's UEFI code updated, an idle macvtap or vGPU)
+and as soon as an active machine's lord-vm is gone (a supervisor that died writes nothing). Without inotify (no watch left)
+nothing is kept and every call reads the folders, as before. Each call returns a new array (the callers add fields to
+its objects).
+
+The firmware check (does a UEFI machine's `firmware_code` still hash to its `firmware_sha256`?) hashes each system file
+once per version (device, inode, size, change time), not once per machine: the old 16-slot table was keyed by the machine
+id's first byte, so ids starting with `1` and `a` (or `2` and `b`) evicted each other and every list hashed the 3.5 MB
+`OVMF_CODE_4M.fd` again for those machines.
+
+Measured on the development PC (headless lord-server, 12 machine folders of which 8 UEFI with colliding ids, and a
+Whonix-like group; nothing running): a call cost 110 ms before (the maintainer's own library: 25.7 ms, logged as
+`stall: ~27 ms call vm.list` more than 4,000 times a day). Now the first call costs 14 ms (the one firmware hash), a read
+after a change 0.9 ms, and a kept list 0.21 ms (median of 200; 0.35 ms at most). Tests: `build/vmlistcache-test` (the
+watch, the 10 s limit, a lord-vm gone, the firmware hashed once per file version) and `tests/vm_list_headless.sh`.
+
+#### The shell and the machines
+
+The maintainer's rule (2026-11-26): outside the Machines window (the launcher's guest apps, the battery notice, "Pause
+while I'm away", a group's link, Sentinela, the idle sleep's check, deactivating Machines, Hands) the shell makes no
+`lord.vm` call while no machine runs, and nothing polls. lord-server says what runs instead (`ui/js_vm.c`, "the machines'
+state for the shell"; `sdk/vmlibrary.js`):
+
+- `__lordVm('state', json)`, `{ active: [dir…], apps: [dir…] }`, when the set of active machines (`run.json` starting,
+  running, paused or stopping, its lord-vm alive) or of sessions in apps mode changes, and once to every new JS context.
+  What wakes it: the list cache's inotify watch, set when lord-server starts (a start and a stop are `run.json` renamed
+  into place), a pidfd per active lord-vm (at most 8; one that dies writes nothing), and apps mode turned on or off or a
+  session that ended (sent through an eventfd, so the event never runs inside the JS call that caused it). Nothing is
+  read while nothing changes. The login screen has none of it.
+- `__lordVm('library')` when something in the library changed.
+
+The SDK keeps them as `vmState` (`vmAnyActive()`) and `vmLibraryChanged`. What reads the list now, and when:
+
+| Caller | Before | Now |
+|---|---|---|
+| Launcher's guest apps (`guestlaunch.js`) | `lord.vm.list()` every 3 s | kept entries filtered by `vmState`; read again only after apps mode saved a list, Configure's switch, or a library change while there are entries |
+| A group's link (`cli.js`) | `lord.vm.groups()` and `list()` every 2 s, with any group in the library | only while two machines or more are active |
+| Battery notice and "Pause while I'm away" (`ties.js`) | `list()` every 15 s | only while a machine is active; the session's starts read it only when some machine chose to start with the session |
+| Sentinela's machines (`sdk/sentinela.js`, when on) | `list()` every tick | only while a machine is active, and once after the last one stopped (so its end is seen) |
+| The idle sleep's check (`lord.vm.awake`), deactivating Machines | at the moment | not at all while nothing is active |
+
+Measured with `tests/vm_idle_headless.sh` (the same library, the real Lord Flow theme, 90 s idle after a 12 s start, every
+`lord.vm` call counted by caller): before, 81 calls of about 110 ms each in those 90 s (30 from the guest launcher, 45
+`list()` and 45 `groups()` from the group link, 6 from the battery and away checks: about 78,000 a day) and a stall line
+for each; now none, and no stall line. What remains is the `machines` command's channel (`lord.vmcli.poll()`, `cli.js`,
+every 300 ms: a non-blocking `accept` on its socket, 13 µs, no file read), which is not `lord.vm`. `make test` runs both
+headless checks (`vm-list-cache`, `vm-idle`); the model parts are in `guest_apps_test.mjs` and
+`sentinela_notify_scene.mjs`.
 
 **No balloon (decided 2026-11-24).** A `virtio-balloon` device would let the host take memory back from an idle guest, but the
 guest decides how much it gives (a hostile one gives nothing), it is one more device model parsing what the guest writes, and
