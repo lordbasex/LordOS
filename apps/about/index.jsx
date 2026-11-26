@@ -8,17 +8,28 @@ export function Icon({ size }) {
 }
 
 // One line of the spec list, as in a classic "About" window: the label in a trailing-aligned column
-// and the value at its side.
-function InfoRow({ k, v }) {
+// and the value at its side. The column is as wide as the longest label (labelWidth); a label longer than the limit
+// wraps instead of being cut at its start ("Pausas de más de 50 ms" showed as "sas de más de 50 ms").
+function InfoRow({ k, v, w }) {
   const t = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 20, gap: 10 }}>
-      <Text style={{ width: 118, fontSize: typeScale.callout, color: t.textDim, textAlign: 'end', whiteSpace: 'nowrap', overflow: 'hidden' }}>{k}</Text>
+      <Text style={{ width: w || LABEL_MIN, flexShrink: 0, fontSize: typeScale.callout, color: t.textDim, textAlign: 'end', lineHeight: 16 }}>{k}</Text>
       <View style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
         <Text style={{ fontSize: typeScale.callout, fontWeight: 500, color: t.text, whiteSpace: 'nowrap' }}>{v}</Text>
       </View>
     </View>
   );
+}
+
+// The label column's width: the longest label measured in the window's font (any of the 35 languages), at least
+// LABEL_MIN and at most 45 % of the list's width, so the values keep the rest; a longer label wraps.
+const LABEL_MIN = 118;
+export function labelWidth(labels, listWidth, measure) {
+  let w = 0;
+  for (const s of labels) { try { w = Math.max(w, measure(String(s || ''))); } catch (e) { w = Math.max(w, String(s || '').length * typeScale.callout * 0.6); } }
+  const max = Math.max(LABEL_MIN, Math.floor((listWidth > 0 ? listWidth : 450) * 0.45));
+  return Math.min(max, Math.max(LABEL_MIN, Math.ceil(w) + 2));
 }
 
 // A small pill: a colored dot and a label (System app, Verified, Development build).
@@ -40,12 +51,12 @@ const CODE = {
   invalid: { color: '#ff453a', key: 'about.codeInvalid' },
 };
 
-// The height of a box after layout: the content keeps at least the window's height (the credits at the bottom) and
-// scrolls in a window shorter than it, such as a tile.
-function useHeight(ref) {
-  const [h, setH] = useState(0);
+// The size of a box after layout, [width, height]: the content keeps at least the window's height (the credits at the
+// bottom) and scrolls in a window shorter than it, such as a tile; the width limits the label column.
+function useSize(ref) {
+  const [h, setH] = useState([0, 0]);
   useEffect(() => {
-    const read = () => { try { if (ref.current) { const x = Math.round(lord.getLayout(ref.current.id)[3]); setH((o) => (Math.abs(o - x) > 1 ? x : o)); } } catch (e) { /* not laid out yet */ } };
+    const read = () => { try { if (ref.current) { const l = lord.getLayout(ref.current.id); const x = [Math.round(l[2]), Math.round(l[3])]; setH((o) => (Math.abs(o[0] - x[0]) > 1 || Math.abs(o[1] - x[1]) > 1 ? x : o)); } } catch (e) { /* not laid out yet */ } };
     read();
     const id = setInterval(read, 400);
     return () => clearInterval(id);
@@ -56,7 +67,7 @@ function useHeight(ref) {
 export default function About() {
   const t = useTheme();
   const box = useRef(null);
-  const boxH = useHeight(box);
+  const [boxW, boxH] = useSize(box);
   const info = useSystemInfo(5000);
   const st = useServerStats(2000);
   const cpu = info.cpu.replace(/\(R\)|\(TM\)|CPU|Processor/g, '').replace(/ Rev [\d.]+$/, '').replace(/\s+/g, ' ').trim();
@@ -66,6 +77,10 @@ export default function About() {
   const cs = CODE[code.refused?.length ? 'invalid' : code.state] || CODE.development;
   const codeNote = code.state === 'verified' && !code.refused?.length ? tr('about.codeVerifiedNote', { count: code.files })
     : code.state === 'development' ? tr('about.codeDevNote') : null;
+  // every label of the list, measured together so the column fits the longest one (the list is the content less its 20 px sides)
+  const labels = ['os', 'kernel', 'host', 'cpu', 'memory', 'case', 'uptime', 'bootTime', 'server', 'engine', 'codeLabel', 'display', 'ram', 'render', 'pauses']
+    .map((k) => tr(`about.${k}`));
+  const lw = useMemo(() => labelWidth(labels, boxW - 40, (s) => lord.measureText(s, typeScale.callout, 400)), [labels.join('\n'), boxW]);
   // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → About"): the banner (the version and the verified-code state)
   // and the facts as label and value rows; the numbers are read by About, the skin only shows them
   const skinned = useSkinned('about');
@@ -98,25 +113,25 @@ export default function About() {
       <Text style={{ fontSize: typeScale.callout, color: t.textDim, marginTop: 10, maxWidth: 320, textAlign: 'center', lineHeight: 17 }}>{tr('about.tagline')}</Text>
       </SkinRegion>
       <View style={{ alignSelf: 'stretch', marginTop: 16, gap: 2 }}>
-        <InfoRow k={tr('about.os')} v={info.os} />
-        <InfoRow k={tr('about.kernel')} v={`${info.kernel} (${info.arch})`} />
-        <InfoRow k={tr('about.host')} v={tr('about.hostValue', { host: info.hostname, user: info.user })} />
-        <InfoRow k={tr('about.cpu')} v={tr('about.cpuValue', { cpu: cpu.slice(0, 36) || tr('about.cpuUnknown'), count: info.cores })} />
-        <InfoRow k={tr('about.memory')} v={tr('shell.cc.memDetail', { used: formatBytes(memUsedKB(info) * 1024), total: formatBytes(info.memTotalKB * 1024) })} />
-        {caseId === 'argon-one-v5' ? <InfoRow k={tr('about.case')} v={tr('about.caseArgonV5')} /> : null}
-        <InfoRow k={tr('about.uptime')} v={formatDuration(info.uptime)} />
+        <InfoRow w={lw} k={tr('about.os')} v={info.os} />
+        <InfoRow w={lw} k={tr('about.kernel')} v={`${info.kernel} (${info.arch})`} />
+        <InfoRow w={lw} k={tr('about.host')} v={tr('about.hostValue', { host: info.hostname, user: info.user })} />
+        <InfoRow w={lw} k={tr('about.cpu')} v={tr('about.cpuValue', { cpu: cpu.slice(0, 36) || tr('about.cpuUnknown'), count: info.cores })} />
+        <InfoRow w={lw} k={tr('about.memory')} v={tr('shell.cc.memDetail', { used: formatBytes(memUsedKB(info) * 1024), total: formatBytes(info.memTotalKB * 1024) })} />
+        {caseId === 'argon-one-v5' ? <InfoRow w={lw} k={tr('about.case')} v={tr('about.caseArgonV5')} /> : null}
+        <InfoRow w={lw} k={tr('about.uptime')} v={formatDuration(info.uptime)} />
         {info.bootSeconds > 0 ? (
-          <InfoRow k={tr('about.bootTime')} v={tr(info.bootShown === 'session' ? 'about.bootToDesktop' : 'about.bootToLogin', { s: formatNumber(info.bootSeconds, 3) })} />
+          <InfoRow w={lw} k={tr('about.bootTime')} v={tr(info.bootShown === 'session' ? 'about.bootToDesktop' : 'about.bootToLogin', { s: formatNumber(info.bootSeconds, 3) })} />
         ) : null}
         <View style={{ height: 1, backgroundColor: t.separator, marginVertical: 8, marginHorizontal: 24 }} />
-        <InfoRow k={tr('about.server')} v="lord-server (C · DRM/KMS · evdev)" />
-        <InfoRow k={tr('about.engine')} v={`QuickJS + React ${reactVersion}`} />
-        <InfoRow k={tr('about.codeLabel')} v={tr(cs.key)} />
-        <InfoRow k={tr('about.display')} v={`${screen.width} × ${screen.height}`} />
-        <InfoRow k={tr('about.ram')} v={`${formatNumber(st.rssKB / 1024, 1)} MB (JS ${formatNumber(st.jsKB / 1024, 1)} MB)`} />
-        <InfoRow k={tr('about.render')} v={tr('about.renderValue', { ms: formatNumber(st.layoutMs + st.paintMs, 1), count: st.nodes })} />
+        <InfoRow w={lw} k={tr('about.server')} v="lord-server (C · DRM/KMS · evdev)" />
+        <InfoRow w={lw} k={tr('about.engine')} v={`QuickJS + React ${reactVersion}`} />
+        <InfoRow w={lw} k={tr('about.codeLabel')} v={tr(cs.key)} />
+        <InfoRow w={lw} k={tr('about.display')} v={`${screen.width} × ${screen.height}`} />
+        <InfoRow w={lw} k={tr('about.ram')} v={`${formatNumber(st.rssKB / 1024, 1)} MB (JS ${formatNumber(st.jsKB / 1024, 1)} MB)`} />
+        <InfoRow w={lw} k={tr('about.render')} v={tr('about.renderValue', { ms: formatNumber(st.layoutMs + st.paintMs, 1), count: st.nodes })} />
         {/* main-thread pauses this session: the stall detector's count (lord-server's log has each one) */}
-        {st.stalls != null ? <InfoRow k={tr('about.pauses')} v={tr('about.pausesValue', { count: formatNumber(st.stalls, 0), ms: formatNumber(st.stallWorstMs || 0, 0) })} /> : null}
+        {st.stalls != null ? <InfoRow w={lw} k={tr('about.pauses')} v={tr('about.pausesValue', { count: formatNumber(st.stalls, 0), ms: formatNumber(st.stallWorstMs || 0, 0) })} /> : null}
       </View>
       <View style={{ marginTop: 12 }}>
         <Button small label={tr('about.systemReport')} onClick={() => wm.open('sysinfo')} />

@@ -1362,6 +1362,16 @@ EOF
             *) bad "files-renamelayout-scene $th (tests/files_renamelayout_scene, headless lord-server)" ;;
         esac
     done
+    # (0.8.9.6.2) About's list of facts: no label cut at its start ("Pausas de más de 50 ms"), in the long languages and
+    # right to left, at About's own size and in a narrow window
+    for lg in es de ar fi; do
+        SCENE_TIMEOUT=40 sh tests/app_scene_headless.sh about_labels_scene "$T/scene" default "$lg" >"$T/out" 2>&1
+        case $? in
+            0) ok "about-labels-scene $lg (tests/about_labels_scene, headless lord-server)" ;;
+            77) skip "about-labels-scene $lg" "build/lord-server and themes/default/theme.bundle.js (make, npm run build)" ;;
+            *) bad "about-labels-scene $lg (tests/about_labels_scene, headless lord-server)" ;;
+        esac
+    done
     # (0.8.9.6.1) Workspaces' top band: the activity strip never over the status cluster (Arabic at 1600 px, German
     # on a narrow screen), the accent under the activity in view
     for c in "ar 1600x900" "de 1024x768" "en 1280x800"; do

@@ -9,13 +9,14 @@
 # ws_topbar_scene (Workspaces' top band in any language and size; run it with the workspaces theme),
 # settings_wallpaper_scene (Settings → Wallpaper's gallery: the cards, a collection, a sheet, a search; run it in ar too),
 # settings_ai_scene (Settings → Artificial intelligence, the store around Lumo: home, Voice, Brain, Image, Sentinela; ar too),
-# lumo_scene (the 3D Lumo in the tour, an empty state and About; it also takes docs/brand/mascot/screens), and
+# lumo_scene (the 3D Lumo in the tour, an empty state and About; it also takes docs/brand/mascot/screens),
+# about_labels_scene (About's list: no label cut, at its own size and narrow; run it in es, de, ar and fi), and
 # theme_tour_scene (any theme in themes/<id>, a community one too, the way a reviewer looks at it: the desktop, two
 # windows, a sidebar app; lordos-theme-kit's tour; run it in ar too).
 # The driver prints lines starting with "APP-SCENE" in the shell log; each check says "done" or "missing", and the exit
 # status is 1 when one is missing. Nothing outside the temporary home is read or written (never the person's own notes).
 # A test tool, never installed; not part of `make test` (`make test-full` runs files_slowrename_scene and
-# files_renamelayout_scene in every desktop, and ws_topbar_scene). From server/, after `npm run build` and `make`:
+# files_renamelayout_scene in every desktop, ws_topbar_scene and about_labels_scene). From server/, after `npm run build` and `make`:
 #   tests/app_scene_headless.sh SCENE OUT_DIR [theme] [language] [dark|light] [restart]
 #     → OUT_DIR/<scene>-<theme>-<language>-<mode>-1.png …
 #   SCENE_TIMEOUT (seconds, default 170): how long the server runs, for a longer scene.
