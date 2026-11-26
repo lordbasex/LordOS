@@ -642,6 +642,9 @@ static void spelling(Web *w) {
 
 int web_engine_start(Web *w) {
     w->context = web_context_new();
+    /* before any web process starts: the cameras' udev entries in WebKit's sandbox, so a page can list them (webcam.h);
+     * whether a page may use one is still asked (on_permission) */
+    web_note("cameras: %d in the web process's sandbox", webcalls_sandbox_cameras(w->context));
     spelling(w);
     webhints_context(w);                /* before any web process starts: the Client Hints extension */
     notification_permissions(w);

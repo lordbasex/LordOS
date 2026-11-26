@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -61,6 +62,7 @@ static void test_scan(void) {
     CHECK(pipe(pfd) == 0, "pipe");
     pid_t c = fork();
     if (c == 0) {
+        for (int f = 0; f < 3; f++) if (f != pfd[1]) close(f);     /* /dev/zero its only device (stdin may be /dev/null) */
         int z = open("/dev/zero", O_RDONLY);
         char b = z >= 0 ? 'y' : 'n';
         if (write(pfd[1], &b, 1) != 1) _exit(1);
@@ -81,6 +83,22 @@ static void test_scan(void) {
     n = studio_scan_readers("/proc", st.st_rdev, 1, getuid() + 4242, pids, 8192);
     CHECK(n == 0, "another uid's processes are never looked at (%d)", n);
     CHECK(studio_scan_readers("/nonexistent", st.st_rdev, 1, getuid(), pids, 8) == 0, "no /proc: nobody");
+    /* the camera rows (camera_scan_holders): any device of the major, here /dev/zero's (1) */
+    n = camera_scan_holders("/proc", major(st.st_rdev), 0, 1, getuid(), pids, 8192);
+    seen = 0;
+    for (int i = 0; i < n && i < 8192; i++) if (pids[i] == c) seen = 1;
+    CHECK(seen, "camera_scan_holders: the child holding a device of the major is found (%d)", n);
+    n = camera_scan_holders("/proc", major(st.st_rdev), st.st_rdev, 1, getuid(), pids, 8192);
+    seen = 0;
+    for (int i = 0; i < n && i < 8192; i++) if (pids[i] == c) seen = 1;
+    CHECK(!seen, "camera_scan_holders: the skipped device (Studio's loopback) isn't counted");
+    n = camera_scan_holders("/proc", major(st.st_rdev), 0, getpid(), getuid(), pids, 8192);
+    seen = 0;
+    for (int i = 0; i < n && i < 8192; i++) if (pids[i] == c || pids[i] == getpid()) seen = 1;
+    CHECK(!seen, "camera_scan_holders: lord-server's own children and itself are skipped");
+    CHECK(camera_scan_holders("/proc", major(st.st_rdev), 0, 1, getuid() + 4242, pids, 8192) == 0, "camera_scan_holders: another uid: nobody");
+    CHECK(camera_scan_holders("/proc", 81, 0, 1, getuid(), NULL, 0) >= 0, "no room: only counted");
+    CHECK(camera_scan_holders("/nonexistent", 81, 0, 1, getuid(), pids, 8) == 0, "camera_scan_holders: no /proc: nobody");
     kill(c, SIGKILL);
     waitpid(c, NULL, 0);
     close(pfd[0]);
@@ -98,6 +116,18 @@ static void test_use(void) {
     char br[1][64] = { "x]y" };
     CHECK(studio_use_format(&br[0][0], 64, 1, "c", 0, out, sizeof out) == 0 && strstr(out, "[\"\"]"), "a bracket isn't plain: %s", out);
     CHECK(studio_use_format(&apps[0][0], 64, 4, "cam", 1, out, 40) == -1, "too long: refused, not cut");
+}
+
+static void test_camera_use(void) {
+    char apps[5][64] = { "desktop:lordos-web-whatsapp", "", "desktop:lordos-web-whatsapp", "bad\"id", "desktop:cheese" };
+    char out[512];
+    CHECK(camera_use_format(&apps[0][0], 64, 5, out, sizeof out) == 0, "format");
+    CHECK(!strcmp(out, "{\"apps\":[\"desktop:lordos-web-whatsapp\",\"\",\"desktop:cheese\"]}"), "each app once, unknowns one \"\": %s", out);
+    CHECK(camera_use_format(&apps[0][0], 64, 0, out, sizeof out) == 0 && !strcmp(out, "{\"apps\":[]}"), "nobody: %s", out);
+    char full[1][8];
+    memset(full[0], 'a', sizeof full[0]);           /* no terminator inside stride: never read past it */
+    CHECK(camera_use_format(&full[0][0], sizeof full[0], 1, out, sizeof out) == 0 && !strcmp(out, "{\"apps\":[\"\"]}"), "unterminated: %s", out);
+    CHECK(camera_use_format(&apps[0][0], 64, 5, out, 30) == -1, "too long: refused, not cut");
 }
 
 static void test_cards(void) {
@@ -194,6 +224,7 @@ int main(void) {
     test_show();
     test_scan();
     test_use();
+    test_camera_use();
     test_cards();
     test_event();
     test_phase3();

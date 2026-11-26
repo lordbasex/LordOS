@@ -9,6 +9,7 @@
 #include "notifyd.h"
 #include "../sec/pwguard.h"
 #include "../media/mstudio.h"
+#include "camuse.h"
 #include "ppd.h"
 #include "sysbus.h"
 #include "pkagent.h"
@@ -59,7 +60,8 @@ static void power_changed(void) {
 }
 
 double hw_timeout(double now) {
-    double best = sleeplock_timeout(now);
+    double best = sleeplock_timeout(now), c = camuse_timeout(now);
+    if (c >= 0 && (best < 0 || c < best)) best = c;
     if (power_next <= 0) return best;
     double p = power_next > now ? power_next - now : 0;
     return best < 0 || p < best ? p : best;
@@ -96,6 +98,7 @@ void hw_start(const DisplayHost *h, int with_bus) {
     fpspawn_try();
     pwguard_on_use(hw_emit);                       /* the capture indicator: what Linux apps capture (sdk/capturestatus.jsx) */
     mstudio_on_use(hw_emit);                       /* the same, for the apps reading LordOS Studio's camera (media/mstudio.c) */
+    camuse_start(hw_emit);                         /* and for what opens a camera itself: a web app's web process (camuse.h) */
     if (with_bus && pwguard_start()) fprintf(stderr, "hw: PipeWire not reachable yet (the microphone and camera restrictions of Linux apps apply once it is)\n");
     if (with_bus && sysbus_start() == 0) {
         bt_start(hw_emit);
@@ -119,6 +122,7 @@ int hw_pollfds(struct pollfd *p, int max) {
     if (n < max && mpris_fd() >= 0) p[n++] = (struct pollfd){ mpris_fd(), (short)(POLLIN | (mpris_wants_write() ? POLLOUT : 0)), 0 };
     if (n < max && sysbus_fd() >= 0) p[n++] = (struct pollfd){ sysbus_fd(), (short)(POLLIN | (sysbus_wants_write() ? POLLOUT : 0)), 0 };
     if (n < max && fpspawn_fd() >= 0) p[n++] = (struct pollfd){ fpspawn_fd(), (short)(POLLIN | (fpspawn_wants_write() ? POLLOUT : 0)), 0 };
+    if (n < max && camuse_fd() >= 0) p[n++] = (struct pollfd){ camuse_fd(), POLLIN, 0 };
     /* the security-critical fds first: pwguard enforces each app's microphone, camera and screen restrictions and the
      * polkit agent answers admin prompts, so a growing list (one Spawn helper per running Flatpak app) must never push
      * them out of the poll set (a restriction would fail open). The helpers come last; those that don't fit are
@@ -137,12 +141,13 @@ void hw_dispatch(const struct pollfd *p, int n) {
             if (m & UEV_DRM) display_hotplug();
             if (m & UEV_POWER) { power_changed(); hidpp_kick(); }   /* a Logitech device woke up: ask lord-hidpp again */
             if (m & UEV_BACKLIGHT) display_hotplug();      /* the list carries the backlight */
-            if (m & UEV_VIDEO) hw_emit("cameras", "{}");   /* a camera came or went: sdk/cameras.js lists them again */
+            if (m & UEV_VIDEO) { hw_emit("cameras", "{}"); camuse_rewatch(); }   /* a camera came or went: sdk/cameras.js lists them again */
         } else if (p[i].fd == sysbus_fd()) sysbus_dispatch();
         else if (p[i].fd == notifyd_fd()) notifyd_dispatch();
         else if (p[i].fd == mpris_fd()) mpris_dispatch();
         else if (p[i].fd == pwguard_fd()) pwguard_dispatch();
         else if (p[i].fd == fpspawn_fd()) fpspawn_dispatch();
+        else if (p[i].fd == camuse_fd()) camuse_dispatch();
     }
     pkagent_dispatch(p, n);
     fpspawn_dispatch_views();
@@ -155,6 +160,7 @@ void hw_events(void) {
     notifyd_tick();
     mpris_tick();
     pwguard_tick();
+    camuse_tick(hw_now_ms());
     fpspawn_try();
     fpspawn_tick();
     pkagent_tick();
