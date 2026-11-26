@@ -82,6 +82,11 @@ int webalive_reply(const DMsg *m) { (void)m; return 0; }
 void webask_gone(const char *name) { (void)name; }
 void webask_appeared(const char *name) { (void)name; }
 void webask_lost(void) {}
+/* lumo's org.lordos.Writing1 (ui/writebus.c) is not under test here */
+void writebus_call(DConn *c, const DMsg *m) { (void)c; (void)m; }
+int writebus_reply(DConn *c, const DMsg *m) { (void)c; (void)m; return 0; }
+void writebus_gone(const char *name) { (void)name; }
+void writebus_lost(void) {}
 
 static DConn app;
 typedef struct { char member[64], path[400], token[64], uri[512], session[400]; uint32_t code, persist; int has_color; double color[3]; } Got;

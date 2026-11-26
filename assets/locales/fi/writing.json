@@ -24,5 +24,7 @@
   "settings.privacy": "Lumo toimii tällä tietokoneella paikallisella moottorilla; valittu teksti ei koskaan poistu siltä. Sovellukset eivät koskaan puhu mallin kanssa: LordOS kysyy siltä ja antaa sovellukselle vain tekstin, jonka valitset korvattavaksi. Ei koskaan tarjolla salasanakentissä.",
   "settings.how": "Enintään 4 000 merkkiä kerrallaan. Malli voi olla väärässä: lue tulos ennen kuin korvaat tekstisi.",
   "brain.usedBy": "Lumon toiminnot: {list} sekä Monitorin ”Tutki Lumolla”",
-  "brain.tryNeeds": "Kokeile ottamalla Kirjoittaminen tai Sentinela käyttöön."
+  "brain.tryNeeds": "Kokeile ottamalla Kirjoittaminen tai Sentinela käyttöön.",
+  "panel.tip4b": "Vinkki: Qwen3 4B -malli parantaa ja kääntää paremmin kuin 1.7B (Asetukset → Tekoäly → Aivot).",
+  "settings.terminal": "Myös päätteessä: lumo correct \"teksti\", lumo translate en \"teksti\" (lumo --help)."
 }

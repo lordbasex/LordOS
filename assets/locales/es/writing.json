@@ -24,5 +24,7 @@
   "settings.privacy": "Lumo funciona en esta computadora con el motor local; el texto seleccionado nunca sale de ella. Las apps nunca hablan con el modelo: LordOS le pregunta y le entrega a la app solo el texto que elegís reemplazar. Nunca se ofrece en campos de contraseña.",
   "settings.how": "Hasta 4000 caracteres por vez. El modelo puede equivocarse: leé el resultado antes de reemplazar tu texto.",
   "brain.usedBy": "Las funciones de Lumo: {list}, y el «Investigar con Lumo» de Monitor",
-  "brain.tryNeeds": "Para probarlo, activá Escritura o Sentinela."
+  "brain.tryNeeds": "Para probarlo, activá Escritura o Sentinela.",
+  "panel.tip4b": "Consejo: el modelo Qwen3 4B mejora y traduce mejor que el 1.7B (Configuración → IA → Cerebro).",
+  "settings.terminal": "También en una terminal: lumo corregir \"texto\", lumo traducir en \"texto\" (lumo --ayuda)."
 }

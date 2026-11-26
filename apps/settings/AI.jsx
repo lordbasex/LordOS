@@ -671,6 +671,7 @@ function WritingPage({ ready, onBrain }) {
       {!ready ? <View style={{ flexDirection: 'row' }}><Link label={tr('writing.settings.openBrain')} onClick={onBrain} /></View> : null}
       <Note>{tr('writing.settings.privacy')}</Note>
       <Note>{tr('writing.settings.how')}</Note>
+      <Note>{tr('writing.settings.terminal')}</Note>
     </View>
   );
 }

@@ -24,5 +24,7 @@
   "settings.privacy": "Lumo はローカルエンジンでこのコンピュータ上で動作し、選択したテキストが外に出ることはありません。アプリがモデルと直接やり取りすることはありません。LordOS がモデルに尋ね、置き換えると決めたテキストだけをアプリに渡します。パスワード欄では表示されません。",
   "settings.how": "一度に最大 4,000 文字。モデルは間違えることがあります。テキストを置き換える前に結果を読んでください。",
   "brain.usedBy": "Lumo の機能: {list}、そしてモニタの「Lumo で調べる」",
-  "brain.tryNeeds": "試すには「文章作成」または Sentinela をオンにしてください。"
+  "brain.tryNeeds": "試すには「文章作成」または Sentinela をオンにしてください。",
+  "panel.tip4b": "ヒント: Qwen3 4B モデルは 1.7B よりも上手に改善・翻訳します（設定 → AI → 脳）。",
+  "settings.terminal": "ターミナルでも使えます: lumo correct \"テキスト\"、lumo translate en \"テキスト\"（lumo --help）。"
 }
