@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "Fes servir a l’escriptori",
   "wallpaperGallery.useLogin": "Pantalla d’inici de sessió",
   "wallpaperGallery.useSlideshow": "Fes-la servir com a presentació",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · inclòs, funciona sense connexió"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · inclòs, funciona sense connexió",
+  "themeParts.title": "D’aquest estil",
+  "themeParts.icons": "Icones",
+  "themeParts.cursors": "Colors del punter",
+  "themeParts.sounds": "Sons",
+  "themeParts.fonts": "Tipus de lletra",
+  "themeParts.layouts": "Disposició de les apps",
+  "themeParts.layoutsHint": "Com s’organitzen apps com Fitxers. Les apps mantenen les seves pròpies regles igualment."
 }

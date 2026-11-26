@@ -1059,5 +1059,12 @@
   "wallpaperGallery.useDesktop": "Naudoti darbalaukyje",
   "wallpaperGallery.useLogin": "Prisijungimo ekranas",
   "wallpaperGallery.useSlideshow": "Naudoti kaip skaidrių peržiūrą",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · įtraukta, veikia be ryšio"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · įtraukta, veikia be ryšio",
+  "themeParts.title": "Iš šio stiliaus",
+  "themeParts.icons": "Piktogramos",
+  "themeParts.cursors": "Žymeklio spalvos",
+  "themeParts.sounds": "Garsai",
+  "themeParts.fonts": "Šriftas",
+  "themeParts.layouts": "Programų išdėstymas",
+  "themeParts.layoutsHint": "Kaip išdėstytos tokios programos kaip Failai. Programos bet kuriuo atveju laikosi savo taisyklių."
 }

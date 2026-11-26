@@ -979,5 +979,8 @@
   "themeSwitch.refusedBody": "コードが LordOS の署名済みのコピーと一致しないため、読み込まれませんでした。デスクトップのスタイルは元のままです。",
   "themeSwitch.failedBody": "起動しませんでした。デスクトップのスタイルは元のままです。",
   "spotlight.section.machines": "仮想マシン",
-  "guestApps.inMachine": "{machine} 内"
+  "guestApps.inMachine": "{machine} 内",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "2001年のデスクトップへのオマージュ：上部が丸い青いタイトルバー、青いタスクバーの緑のスタートボタン、タスクペイン付きのファイル。",
+  "bluebell.start": "スタート"
 }

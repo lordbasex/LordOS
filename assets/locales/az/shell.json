@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "Onun kodu LordOS-un imzalı nüsxəsi ilə uyğun gəlmir, ona görə yüklənmədi. İş masası üslubunuz olduğu kimi qalır.",
   "themeSwitch.failedBody": "Başlamadı. İş masası üslubunuz olduğu kimi qalır.",
   "spotlight.section.machines": "Virtual maşınlar",
-  "guestApps.inMachine": "{machine} daxilində"
+  "guestApps.inMachine": "{machine} daxilində",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "2001-ci ilin iş masalarına ehtiram: yuxarısı yumrulanmış mavi başlıq zolaqları, mavi tapşırıq panelində yaşıl başlat düyməsi və tapşırıq paneli ilə Fayllar.",
+  "bluebell.start": "Başlat"
 }

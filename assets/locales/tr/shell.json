@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "Kodu LordOS’un imzalı kopyasıyla eşleşmiyor, bu yüzden yüklenmedi. Masaüstü stiliniz olduğu gibi kalıyor.",
   "themeSwitch.failedBody": "Başlamadı. Masaüstü stiliniz olduğu gibi kalıyor.",
   "spotlight.section.machines": "Sanal Makineler",
-  "guestApps.inMachine": "{machine} içinde"
+  "guestApps.inMachine": "{machine} içinde",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "2001 masaüstlerine bir saygı duruşu: üstü yuvarlatılmış mavi başlık çubukları, mavi görev çubuğunda yeşil bir başlat düğmesi ve görev bölmesiyle Dosyalar.",
+  "bluebell.start": "Başlat"
 }

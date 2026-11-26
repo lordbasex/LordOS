@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "A kódja nem egyezik a LordOS aláírt példányával, ezért nem töltődött be. Az asztal stílusa marad a régi.",
   "themeSwitch.failedBody": "Nem indult el. Az asztal stílusa marad a régi.",
   "spotlight.section.machines": "Gépek",
-  "guestApps.inMachine": "A(z) {machine} gépen"
+  "guestApps.inMachine": "A(z) {machine} gépen",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "Tisztelgés a 2001-es asztalok előtt: kék címsorok lekerekített tetővel, zöld start gomb kék tálcán, és a Fájlok feladatpanellel.",
+  "bluebell.start": "Start"
 }

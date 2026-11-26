@@ -979,5 +979,8 @@
   "themeSwitch.refusedBody": "它的程式碼與 LordOS 的簽署副本不一致，因此未載入。你的桌面風格維持不變。",
   "themeSwitch.failedBody": "它沒有啟動。你的桌面風格維持不變。",
   "spotlight.section.machines": "虛擬機器",
-  "guestApps.inMachine": "在 {machine} 中"
+  "guestApps.inMachine": "在 {machine} 中",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "向 2001 年的桌面致敬：頂端圓角的藍色標題列、藍色工作列上的綠色開始按鈕，以及附有工作窗格的「檔案」。",
+  "bluebell.start": "開始"
 }

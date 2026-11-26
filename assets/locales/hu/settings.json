@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "Használat az asztalon",
   "wallpaperGallery.useLogin": "Bejelentkezési képernyő",
   "wallpaperGallery.useSlideshow": "Használat diavetítésként",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · beépített, hálózat nélkül is működik"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · beépített, hálózat nélkül is működik",
+  "themeParts.title": "Ebből a stílusból",
+  "themeParts.icons": "Ikonok",
+  "themeParts.cursors": "Mutató színei",
+  "themeParts.sounds": "Hangok",
+  "themeParts.fonts": "Betűtípus",
+  "themeParts.layouts": "Alkalmazások elrendezése",
+  "themeParts.layoutsHint": "Hogyan épülnek fel az olyan alkalmazások, mint a Fájlok. Az alkalmazások így is megtartják a saját szabályaikat."
 }

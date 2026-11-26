@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "O código dele não corresponde à cópia assinada do LordOS, então não foi carregado. Seu estilo de área de trabalho continua como estava.",
   "themeSwitch.failedBody": "Não iniciou. Seu estilo de área de trabalho continua como estava.",
   "spotlight.section.machines": "Máquinas",
-  "guestApps.inMachine": "Em {machine}"
+  "guestApps.inMachine": "Em {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "Uma homenagem aos desktops de 2001: barras de título azuis com o topo arredondado, um botão iniciar verde numa barra de tarefas azul e o Arquivos com um painel de tarefas.",
+  "bluebell.start": "Iniciar"
 }

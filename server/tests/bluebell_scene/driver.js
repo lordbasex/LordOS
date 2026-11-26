@@ -1,0 +1,86 @@
+// driver.js — goes after the theme bundle in tests/app_scene_headless.sh bluebell_scene (run it with the bluebell theme):
+// Lord Bluebell, the demo of style packs and app skins. Files as the explorer of its era (toolbar, address bar, task
+// pane, icons and details, the context menu), the start menu, and Settings → Appearance's "From this style" switches;
+// then layouts turned off there brings Files' own regions back. Lines start with "APP-SCENE".
+(function () {
+  const sdk = globalThis.__lordos.require('@lordos/sdk');
+  const P = globalThis.__appScene;
+  const log = (s) => lord.log(`APP-SCENE ${s}`);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const box = (id) => { const l = lord.getLayout(id); return l && l[2] > 0 && l[3] > 0 ? l : null; };
+  const ev = (type, id, x, y, b = 0) => globalThis.__lordEvent(type, id, x, y, b);
+  const textId = (label) => { for (const [raw, s] of P.texts) if (s === label) { const id = P.parent.get(raw); if (id && box(id)) return id; } return null; };
+  const shownTexts = () => { const out = []; for (const [raw, s] of P.texts) { const id = P.parent.get(raw); if (id && box(id)) out.push(s); } return out; };
+  const step = (what, ok, extra) => log(`${what} ${ok ? 'done' : 'missing'}${extra ? ` (${extra})` : ''}`);
+  const click = (id, b = 0) => { const r = box(id); const x = r[0] + r[2] / 2, y = r[1] + r[3] / 2; ev('move', id, x, y); ev('down', id, x, y, b); ev('up', id, x, y, b); };
+  let n = 0;
+  const shot = async (name) => {
+    n++;
+    await sleep(900);
+    const id = await sdk.media.screenshot('screenshots');
+    const r = id ? await sdk.media.saveImage(id, `${lord.fs.home()}/shot-${n}.png`, { format: 'png' }) : null;
+    log(`shot ${n} ${name} ${r && r.ok !== false ? 'saved' : 'failed'}`);
+  };
+  const win = (app) => (sdk.windows.get() || []).find((w) => w.app === app);
+  (async () => {
+    await sleep(2500);
+    const home = lord.fs.home();
+    step('the start button', !!textId(sdk.t('shell.bluebell.start')));
+    sdk.wm.open('files', { new: true, args: { path: `${home}/Documents`, view: 'icons', nonce: Date.now() } });
+    await sleep(2500);
+    const w = win('files');
+    if (w) { sdk.wm.resize(w.id, 900, 600); sdk.wm.setFrame?.(w.id, { x: 60, y: 40, w: 900, h: 600 }); }
+    await sleep(1500);
+    const all = shownTexts();
+    step('Files: the task pane', all.includes(sdk.t('files.skin.tasks')) && all.includes(sdk.t('files.skin.otherPlaces')));
+    step('Files: the address bar', all.includes(sdk.t('files.skin.address')) && all.includes(sdk.t('files.menu.go')));
+    step('Files: the items', all.includes('list.txt') && all.includes('Letters'));
+    const item = textId('manual.pdf');
+    if (item) { const r = box(item); ev('move', item, r[0] + 4, r[1] + 4); ev('down', item, r[0] + 4, r[1] + 4); ev('up', item, r[0] + 4, r[1] + 4); }
+    await sleep(600);
+    step('Files: Details shows the selected file', shownTexts().filter((s) => s === 'manual.pdf').length >= 2);
+    await shot('files-icons');
+    const views = textId(sdk.t('files.view.icons'));
+    if (views) click(views);
+    await sleep(1200);
+    step('Files: the details view', !!textId(sdk.t('files.col.size')));
+    await shot('files-details');
+    const row = textId('notes.md');
+    if (row) { const r = box(row); ev('move', row, r[0] + 4, r[1] + 4); ev('down', row, r[0] + 4, r[1] + 4, 2); ev('up', row, r[0] + 4, r[1] + 4, 2); globalThis.__lordEvent('contextmenu', row, r[0] + 4, r[1] + 4, 2); }
+    await sleep(800);
+    step('Files: the context menu', !!textId(sdk.t('files.menu.trash')));
+    await shot('files-menu');
+    globalThis.__lordKey(1, 1, 'Escape', '', '', 0); globalThis.__lordKey(1, 0, 'Escape', '', '', 0);
+    await sleep(500);
+    // the start menu
+    const start = textId(sdk.t('shell.bluebell.start'));
+    if (start) click(start);
+    await sleep(1200);
+    await shot('start-menu');
+    globalThis.__lordKey(1, 1, 'Escape', '', '', 0); globalThis.__lordKey(1, 0, 'Escape', '', '', 0);
+    await sleep(600);
+    // Settings → Appearance: the parts this style brings
+    sdk.wm.open('settings', { args: { section: 'appearance' } });
+    await sleep(2500);
+    const sw = win('settings');
+    if (sw) { sdk.wm.resize(sw.id, 900, 700); sdk.wm.setFrame?.(sw.id, { x: 320, y: 20, w: 900, h: 700 }); }
+    await sleep(1500);
+    const title = textId(sdk.t('settings.themeParts.title'));
+    if (title) { const r = box(title); for (let i = 0; i < 12 && r[1] > 500; i++) { ev('wheel', title, r[0] + 5, 300, 3); await sleep(60); } }
+    await sleep(600);
+    const parts = shownTexts();
+    step('Settings: From this style', !!textId(sdk.t('settings.themeParts.title')));
+    step('Settings: every part', ['icons', 'cursors', 'sounds', 'fonts', 'layouts'].every((p) => parts.includes(sdk.t(`settings.themeParts.${p}`))));
+    await shot('settings-parts');
+    // layouts off: Files' own regions come back
+    sdk.settings.set({ themeParts: { ...(sdk.settings.get().themeParts || {}), layouts: false } });
+    if (w) sdk.wm.focus(w.id);
+    await sleep(1500);
+    const own = shownTexts();
+    step('layouts off: Files draws its own sidebar', own.includes(sdk.t('files.place.recent')) || own.includes(sdk.t('files.favorites')), sdk.t('files.favorites'));
+    await shot('files-own-layout');
+    sdk.settings.set({ themeParts: { ...(sdk.settings.get().themeParts || {}), layouts: true } });
+    await sleep(500);
+    log('done');
+  })();
+})();

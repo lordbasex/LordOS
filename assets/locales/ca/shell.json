@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "El seu codi no coincideix amb la còpia signada de LordOS, així que no s’ha carregat. L’estil de l’escriptori es manté com estava.",
   "themeSwitch.failedBody": "No s’ha iniciat. L’estil de l’escriptori es manté com estava.",
   "spotlight.section.machines": "Màquines",
-  "guestApps.inMachine": "A {machine}"
+  "guestApps.inMachine": "A {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "Un homenatge als escriptoris del 2001: barres de títol blaves amb la part de dalt arrodonida, un botó d’inici verd en una barra de tasques blava i Fitxers amb un plafó de tasques.",
+  "bluebell.start": "Inici"
 }

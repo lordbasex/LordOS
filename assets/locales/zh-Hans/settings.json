@@ -1045,5 +1045,12 @@
   "wallpaperGallery.useDesktop": "用于桌面",
   "wallpaperGallery.useLogin": "登录屏幕",
   "wallpaperGallery.useSlideshow": "用作幻灯片",
-  "wallpaperGallery.option.builtinHd": "高清 · 1920 × 1080 · 内置，离线可用"
+  "wallpaperGallery.option.builtinHd": "高清 · 1920 × 1080 · 内置，离线可用",
+  "themeParts.title": "来自此风格",
+  "themeParts.icons": "图标",
+  "themeParts.cursors": "指针颜色",
+  "themeParts.sounds": "声音",
+  "themeParts.fonts": "字体",
+  "themeParts.layouts": "应用布局",
+  "themeParts.layoutsHint": "“文件”等应用的布局方式。无论哪种方式，应用都保留自己的规则。"
 }

@@ -1045,5 +1045,12 @@
   "wallpaperGallery.useDesktop": "ใช้บนเดสก์ท็อป",
   "wallpaperGallery.useLogin": "หน้าจอเข้าสู่ระบบ",
   "wallpaperGallery.useSlideshow": "ใช้เป็นสไลด์โชว์",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · มาพร้อมระบบ ใช้ได้แบบออฟไลน์"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · มาพร้อมระบบ ใช้ได้แบบออฟไลน์",
+  "themeParts.title": "จากสไตล์นี้",
+  "themeParts.icons": "ไอคอน",
+  "themeParts.cursors": "สีของตัวชี้",
+  "themeParts.sounds": "เสียง",
+  "themeParts.fonts": "แบบอักษร",
+  "themeParts.layouts": "เลย์เอาต์ของแอป",
+  "themeParts.layoutsHint": "การจัดวางแอปอย่างไฟล์ แอปยังคงใช้กฎของตัวเองไม่ว่ากรณีใด"
 }

@@ -1059,5 +1059,12 @@
   "wallpaperGallery.useDesktop": "На робочий стіл",
   "wallpaperGallery.useLogin": "Екран входу",
   "wallpaperGallery.useSlideshow": "Як слайд-шоу",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · вбудовано, працює без мережі"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · вбудовано, працює без мережі",
+  "themeParts.title": "З цього стилю",
+  "themeParts.icons": "Піктограми",
+  "themeParts.cursors": "Кольори вказівника",
+  "themeParts.sounds": "Звуки",
+  "themeParts.fonts": "Шрифт",
+  "themeParts.layouts": "Компонування застосунків",
+  "themeParts.layoutsHint": "Як упорядковано застосунки на кшталт «Файлів». Застосунки так чи інакше дотримуються власних правил."
 }

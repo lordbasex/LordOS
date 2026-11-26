@@ -23,7 +23,7 @@ import { PrintersSettings } from './Printers.jsx';
 import { TrackpadSettings } from './Trackpad.jsx';
 import { WindowPrefs } from './WindowPrefs.jsx';
 import { DockSettings } from './Dock.jsx';
-import { ThemeOptions } from './ThemeExtras.jsx';
+import { ThemeOptions, ThemeParts } from './ThemeExtras.jsx';
 import { ThemeGallery } from './ThemeGallery.jsx';   // Desktop style: the gallery of themes (docs/THEMES-PLAN.md, stage 1)
 import { WallpaperGallery } from './WallpaperGallery.jsx';
 import { subPage, placeOf, splitPlace } from './subpage.js';   // Wallpaper: the gallery (0.8.9.6.2)
@@ -113,6 +113,7 @@ function Appearance() {
     <Stack>
       <ThemeGallery />
       <ThemeOptions theme={themes.info()} />
+      <ThemeParts />
       <Section title={tr('settings.mode')}>
         <View style={{ flexDirection: 'row', gap: spacing.xxl, paddingVertical: spacing.m, justifyContent: 'center' }}>
           {[['dark', tr('settings.dark')], ['light', tr('settings.light')]].map(([id, label]) => (

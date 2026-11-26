@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "Use on desktop",
   "wallpaperGallery.useLogin": "Login screen",
   "wallpaperGallery.useSlideshow": "Use as slideshow",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · included, works offline"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · included, works offline",
+  "themeParts.title": "From this style",
+  "themeParts.icons": "Icons",
+  "themeParts.cursors": "Pointer colors",
+  "themeParts.sounds": "Sounds",
+  "themeParts.fonts": "Font",
+  "themeParts.layouts": "App layouts",
+  "themeParts.layoutsHint": "How apps such as Files are laid out. Apps keep their own rules either way."
 }

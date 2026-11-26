@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "Its code does not match the signed copy of LordOS, so it was not loaded. Your desktop style stays as it was.",
   "themeSwitch.failedBody": "It did not start. Your desktop style stays as it was.",
   "spotlight.section.machines": "Machines",
-  "guestApps.inMachine": "In {machine}"
+  "guestApps.inMachine": "In {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "A tribute to the desktops of 2001: blue title bars with rounded tops, a green start button on a blue taskbar, and Files with a task pane.",
+  "bluebell.start": "Start"
 }

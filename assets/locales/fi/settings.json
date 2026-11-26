@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "Käytä työpöydällä",
   "wallpaperGallery.useLogin": "Kirjautumisnäyttö",
   "wallpaperGallery.useSlideshow": "Käytä diaesityksenä",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · mukana, toimii ilman verkkoa"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · mukana, toimii ilman verkkoa",
+  "themeParts.title": "Tästä tyylistä",
+  "themeParts.icons": "Kuvakkeet",
+  "themeParts.cursors": "Osoittimen värit",
+  "themeParts.sounds": "Äänet",
+  "themeParts.fonts": "Fontti",
+  "themeParts.layouts": "Sovellusten asettelu",
+  "themeParts.layoutsHint": "Miten Tiedostot-sovelluksen kaltaiset sovellukset on aseteltu. Sovellukset pitävät joka tapauksessa omat sääntönsä."
 }

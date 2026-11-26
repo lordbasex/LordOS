@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "ڈیسک ٹاپ پر استعمال کریں",
   "wallpaperGallery.useLogin": "لاگ ان اسکرین",
   "wallpaperGallery.useSlideshow": "سلائیڈ شو کے طور پر استعمال کریں",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · شامل، آف لائن کام کرتا ہے"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · شامل، آف لائن کام کرتا ہے",
+  "themeParts.title": "اس انداز سے",
+  "themeParts.icons": "آئیکن",
+  "themeParts.cursors": "پوائنٹر کے رنگ",
+  "themeParts.sounds": "آوازیں",
+  "themeParts.fonts": "فونٹ",
+  "themeParts.layouts": "ایپس کی ترتیب",
+  "themeParts.layoutsHint": "فائلیں جیسی ایپس کی ترتیب کیسی ہو۔ ایپس ہر صورت اپنے اصول برقرار رکھتی ہیں۔"
 }

@@ -334,5 +334,9 @@
   "readOnly.denied": "このフォルダは読み出し専用です。アクセス権により変更できません。変更するには、ターミナルまたは別のアプリを使用してください。",
   "fromMachineNoRun": "「{name}」はマシン {machine} から届きました。ファイルはマシンから来たプログラムやインストーラを開きません。信頼できる場合は「このアプリで開く」を使ってください。",
   "info.from": "入手元",
-  "info.fromMachine": "マシン {machine}"
+  "info.fromMachine": "マシン {machine}",
+  "skin.address": "アドレス",
+  "skin.tasks": "ファイルとフォルダーのタスク",
+  "skin.otherPlaces": "その他の場所",
+  "skin.details": "詳細"
 }

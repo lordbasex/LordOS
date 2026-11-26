@@ -342,5 +342,9 @@
   "readOnly.denied": "Bu qovluq yalnız oxunandır: icazələri onu dəyişməyinizə imkan vermir. Onu dəyişmək üçün Terminaldan və ya başqa tətbiqdən istifadə edin.",
   "fromMachineNoRun": "“{name}” {machine} maşınından gəldi. Fayllar maşından gələn proqramları və quraşdırıcıları açmır: etibar edirsinizsə, Bununla aç seçimindən istifadə edin.",
   "info.from": "Mənbə",
-  "info.fromMachine": "{machine} maşını"
+  "info.fromMachine": "{machine} maşını",
+  "skin.address": "Ünvan",
+  "skin.tasks": "Fayl və qovluq tapşırıqları",
+  "skin.otherPlaces": "Digər yerlər",
+  "skin.details": "Təfərrüatlar"
 }

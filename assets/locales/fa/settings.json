@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "استفاده روی میز کار",
   "wallpaperGallery.useLogin": "صفحهٔ ورود",
   "wallpaperGallery.useSlideshow": "استفاده به‌صورت نمایش اسلاید",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · همراه سیستم، بدون اینترنت کار می‌کند"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · همراه سیستم، بدون اینترنت کار می‌کند",
+  "themeParts.title": "از این سبک",
+  "themeParts.icons": "نمادها",
+  "themeParts.cursors": "رنگ‌های نشانگر",
+  "themeParts.sounds": "صداها",
+  "themeParts.fonts": "قلم",
+  "themeParts.layouts": "چیدمان برنامه‌ها",
+  "themeParts.layoutsHint": "چیدمان برنامه‌هایی مانند «فایل‌ها». برنامه‌ها در هر حال قواعد خودشان را نگه می‌دارند."
 }

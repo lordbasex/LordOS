@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "এর কোড LordOS-এর স্বাক্ষরিত কপির সাথে মেলে না, তাই এটি লোড করা হয়নি। আপনার ডেস্কটপের স্টাইল আগের মতোই থাকবে।",
   "themeSwitch.failedBody": "এটি চালু হয়নি। আপনার ডেস্কটপের স্টাইল আগের মতোই থাকবে।",
   "spotlight.section.machines": "মেশিন",
-  "guestApps.inMachine": "{machine}-এ"
+  "guestApps.inMachine": "{machine}-এ",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "২০০১ সালের ডেস্কটপের প্রতি শ্রদ্ধা: উপরে গোলাকার নীল শিরোনাম বার, নীল টাস্কবারে সবুজ স্টার্ট বোতাম, আর কাজের প্যানসহ ফাইল।",
+  "bluebell.start": "স্টার্ট"
 }

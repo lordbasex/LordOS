@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "Msimbo wake haulingani na nakala iliyotiwa sahihi ya LordOS, kwa hivyo haukupakiwa. Mtindo wa eneo-kazi lako unabaki kama ulivyokuwa.",
   "themeSwitch.failedBody": "Haikuanza. Mtindo wa eneo-kazi lako unabaki kama ulivyokuwa.",
   "spotlight.section.machines": "Mashine",
-  "guestApps.inMachine": "Ndani ya {machine}"
+  "guestApps.inMachine": "Ndani ya {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "Heshima kwa eneo-kazi la mwaka 2001: pau za kichwa za buluu zenye juu iliyopindwa, kitufe cha anza cha kijani kwenye upau wa kazi wa buluu, na Faili zenye kidirisha cha kazi.",
+  "bluebell.start": "Anza"
 }

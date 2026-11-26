@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "Su código no coincide con la copia firmada de LordOS, así que no se cargó. Tu estilo de escritorio sigue como estaba.",
   "themeSwitch.failedBody": "No arrancó. Tu estilo de escritorio sigue como estaba.",
   "spotlight.section.machines": "Máquinas",
-  "guestApps.inMachine": "En {machine}"
+  "guestApps.inMachine": "En {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "Un homenaje a los escritorios de 2001: barras de título azules con la parte de arriba redondeada, un botón de inicio verde en una barra de tareas azul y Archivos con un panel de tareas.",
+  "bluebell.start": "Inicio"
 }

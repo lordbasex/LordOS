@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "Usar en el escritorio",
   "wallpaperGallery.useLogin": "Inicio de sesión",
   "wallpaperGallery.useSlideshow": "Usar como presentación",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · incluido, funciona sin conexión"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · incluido, funciona sin conexión",
+  "themeParts.title": "De este estilo",
+  "themeParts.icons": "Iconos",
+  "themeParts.cursors": "Colores del puntero",
+  "themeParts.sounds": "Sonidos",
+  "themeParts.fonts": "Tipo de letra",
+  "themeParts.layouts": "Diseño de las apps",
+  "themeParts.layoutsHint": "Cómo se organizan apps como Archivos. Las apps mantienen sus propias reglas igual."
 }

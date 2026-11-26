@@ -1,7 +1,8 @@
 // What Settings shows for a theme it doesn't know by id (0.8.9): its own choices (theme.json "options") under
 // Appearance → Desktop style while it is the current theme, checked by sdk/thememeta.js. The drawn picture of its
 // theme.json "sketch" is the SDK's (sdk/stylethumb.jsx DesktopStyleThumb).
-import { useLocale, useSettings, Toggle, Segmented, Button, themeOptionValue, themeOptionPatch, displayAppsOn, displayAppsStored, setDisplayAppsOn, forgetDisplayApps } from '@lordos/sdk';
+import { useLocale, useSettings, Toggle, Segmented, Button, themeOptionValue, themeOptionPatch, displayAppsOn, displayAppsStored, setDisplayAppsOn, forgetDisplayApps,
+  useStyleParts, partOn, partPatch } from '@lordos/sdk';
 import { Section, SettingRow } from './ui.jsx';
 
 // A theme's own choices, named by itself (its name is the section's title, unless `title` is given: the theme's page in
@@ -37,3 +38,22 @@ export function ThemeOptions({ theme, title }) {
   );
 }
 
+
+// (0.8.9.6.2) What the style in use brings beyond its frames (a style pack and app skins, docs/THEMES-GUIDE.md): a switch
+// per part, so someone can keep a theme's frames and use LordOS's icons, pointer, sounds, font or app layouts. Only the
+// parts this style brings are listed; a style that brings none shows nothing.
+export function ThemeParts() {
+  const { t: tr } = useLocale();
+  const [s, set] = useSettings();
+  const parts = useStyleParts();
+  if (!parts.length) return null;
+  return (
+    <Section title={tr('settings.themeParts.title')}>
+      {parts.map((p) => (
+        <SettingRow key={p} label={tr(`settings.themeParts.${p}`)} hint={p === 'layouts' ? tr('settings.themeParts.layoutsHint') : undefined}>
+          <Toggle small on={partOn(s, p)} onChange={(on) => set(partPatch(s, p, on))} />
+        </SettingRow>
+      ))}
+    </Section>
+  );
+}

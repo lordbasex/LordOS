@@ -334,5 +334,9 @@
   "readOnly.denied": "此文件夹为只读：其权限不允许你更改它。若要更改它，请使用“终端”或其他应用。",
   "fromMachineNoRun": "“{name}”来自机器 {machine}。“文件”不会打开来自机器的程序或安装程序：如果信任它，请使用“打开方式”。",
   "info.from": "来源",
-  "info.fromMachine": "机器 {machine}"
+  "info.fromMachine": "机器 {machine}",
+  "skin.address": "地址",
+  "skin.tasks": "文件和文件夹任务",
+  "skin.otherPlaces": "其他位置",
+  "skin.details": "详细信息"
 }

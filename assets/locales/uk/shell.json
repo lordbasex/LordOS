@@ -993,5 +993,8 @@
   "themeSwitch.refusedBody": "Його код не збігається з підписаною копією LordOS, тому його не завантажено. Стиль робочого столу залишається таким, як був.",
   "themeSwitch.failedBody": "Він не запустився. Стиль робочого столу залишається таким, як був.",
   "spotlight.section.machines": "Машини",
-  "guestApps.inMachine": "У {machine}"
+  "guestApps.inMachine": "У {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "Данина стільницям 2001 року: сині смуги заголовків із заокругленим верхом, зелена кнопка «Пуск» на синій панелі завдань і «Файли» з панеллю завдань.",
+  "bluebell.start": "Пуск"
 }

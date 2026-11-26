@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "Usa sulla scrivania",
   "wallpaperGallery.useLogin": "Schermata di accesso",
   "wallpaperGallery.useSlideshow": "Usa come presentazione",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · incluso, funziona offline"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · incluso, funziona offline",
+  "themeParts.title": "Da questo stile",
+  "themeParts.icons": "Icone",
+  "themeParts.cursors": "Colori del puntatore",
+  "themeParts.sounds": "Suoni",
+  "themeParts.fonts": "Carattere",
+  "themeParts.layouts": "Layout delle app",
+  "themeParts.layoutsHint": "Come sono disposte app come File. Le app mantengono comunque le proprie regole."
 }

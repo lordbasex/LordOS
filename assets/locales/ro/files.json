@@ -350,5 +350,9 @@
   "readOnly.denied": "Acest dosar este doar pentru citire: permisiunile lui nu îți permit să-l modifici. Pentru a-l modifica, folosește Terminalul sau altă aplicație.",
   "fromMachineNoRun": "„{name}” a venit de la mașina {machine}. Fișiere nu deschide programe sau programe de instalare de la o mașină: folosește Deschide cu dacă ai încredere.",
   "info.from": "Proveniență",
-  "info.fromMachine": "Mașina {machine}"
+  "info.fromMachine": "Mașina {machine}",
+  "skin.address": "Adresă",
+  "skin.tasks": "Activități pentru fișiere și foldere",
+  "skin.otherPlaces": "Alte locuri",
+  "skin.details": "Detalii"
 }

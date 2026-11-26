@@ -1059,5 +1059,12 @@
   "wallpaperGallery.useDesktop": "Folosește pe desktop",
   "wallpaperGallery.useLogin": "Ecranul de autentificare",
   "wallpaperGallery.useSlideshow": "Folosește ca prezentare",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · inclus, funcționează offline"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · inclus, funcționează offline",
+  "themeParts.title": "Din acest stil",
+  "themeParts.icons": "Pictograme",
+  "themeParts.cursors": "Culorile indicatorului",
+  "themeParts.sounds": "Sunete",
+  "themeParts.fonts": "Font",
+  "themeParts.layouts": "Aspectul aplicațiilor",
+  "themeParts.layoutsHint": "Cum sunt aranjate aplicații precum Fișiere. Aplicațiile își păstrează oricum propriile reguli."
 }

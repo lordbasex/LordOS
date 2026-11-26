@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "Il suo codice non corrisponde alla copia firmata di LordOS, quindi non è stato caricato. Lo stile della scrivania resta com’era.",
   "themeSwitch.failedBody": "Non si è avviato. Lo stile della scrivania resta com’era.",
   "spotlight.section.machines": "Macchine",
-  "guestApps.inMachine": "In {machine}"
+  "guestApps.inMachine": "In {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "Un omaggio ai desktop del 2001: barre del titolo blu con gli angoli superiori arrotondati, un pulsante start verde su una barra delle applicazioni blu e File con un riquadro delle operazioni.",
+  "bluebell.start": "Start"
 }

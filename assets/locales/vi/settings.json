@@ -1045,5 +1045,12 @@
   "wallpaperGallery.useDesktop": "Dùng trên màn hình nền",
   "wallpaperGallery.useLogin": "Màn hình đăng nhập",
   "wallpaperGallery.useSlideshow": "Dùng làm trình chiếu",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · có sẵn, dùng được khi ngoại tuyến"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · có sẵn, dùng được khi ngoại tuyến",
+  "themeParts.title": "Từ kiểu này",
+  "themeParts.icons": "Biểu tượng",
+  "themeParts.cursors": "Màu con trỏ",
+  "themeParts.sounds": "Âm thanh",
+  "themeParts.fonts": "Phông chữ",
+  "themeParts.layouts": "Bố cục ứng dụng",
+  "themeParts.layoutsHint": "Cách sắp xếp các ứng dụng như Tệp. Dù thế nào các ứng dụng vẫn giữ quy tắc riêng."
 }

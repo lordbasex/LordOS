@@ -1059,5 +1059,12 @@
   "wallpaperGallery.useDesktop": "Użyj na pulpicie",
   "wallpaperGallery.useLogin": "Ekran logowania",
   "wallpaperGallery.useSlideshow": "Użyj jako pokazu slajdów",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · wbudowane, działa offline"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · wbudowane, działa offline",
+  "themeParts.title": "Z tego stylu",
+  "themeParts.icons": "Ikony",
+  "themeParts.cursors": "Kolory wskaźnika",
+  "themeParts.sounds": "Dźwięki",
+  "themeParts.fonts": "Czcionka",
+  "themeParts.layouts": "Układ aplikacji",
+  "themeParts.layoutsHint": "Jak są rozmieszczone aplikacje takie jak Pliki. Aplikacje i tak zachowują własne zasady."
 }

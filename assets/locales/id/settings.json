@@ -1045,5 +1045,12 @@
   "wallpaperGallery.useDesktop": "Gunakan di desktop",
   "wallpaperGallery.useLogin": "Layar masuk",
   "wallpaperGallery.useSlideshow": "Gunakan sebagai salindia",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · bawaan, berfungsi luring"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · bawaan, berfungsi luring",
+  "themeParts.title": "Dari gaya ini",
+  "themeParts.icons": "Ikon",
+  "themeParts.cursors": "Warna penunjuk",
+  "themeParts.sounds": "Suara",
+  "themeParts.fonts": "Font",
+  "themeParts.layouts": "Tata letak aplikasi",
+  "themeParts.layoutsHint": "Bagaimana aplikasi seperti Berkas ditata. Aplikasi tetap memegang aturannya sendiri."
 }

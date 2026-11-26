@@ -993,5 +993,8 @@
   "themeSwitch.refusedBody": "Jego kod nie zgadza się z podpisaną kopią LordOS, więc nie został wczytany. Styl pulpitu pozostaje bez zmian.",
   "themeSwitch.failedBody": "Nie uruchomił się. Styl pulpitu pozostaje bez zmian.",
   "spotlight.section.machines": "Maszyny",
-  "guestApps.inMachine": "W {machine}"
+  "guestApps.inMachine": "W {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "Hołd dla pulpitów z 2001 roku: niebieskie paski tytułu z zaokrągloną górą, zielony przycisk start na niebieskim pasku zadań i Pliki z panelem zadań.",
+  "bluebell.start": "Start"
 }

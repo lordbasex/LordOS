@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "Masaüstünde kullan",
   "wallpaperGallery.useLogin": "Giriş ekranı",
   "wallpaperGallery.useSlideshow": "Slayt gösterisi olarak kullan",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · dahil, çevrimdışı çalışır"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · dahil, çevrimdışı çalışır",
+  "themeParts.title": "Bu stilden",
+  "themeParts.icons": "Simgeler",
+  "themeParts.cursors": "İşaretçi renkleri",
+  "themeParts.sounds": "Sesler",
+  "themeParts.fonts": "Yazı tipi",
+  "themeParts.layouts": "Uygulama düzenleri",
+  "themeParts.layoutsHint": "Dosyalar gibi uygulamaların nasıl yerleştirildiği. Uygulamalar her durumda kendi kurallarını korur."
 }

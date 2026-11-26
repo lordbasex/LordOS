@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "کد آن با نسخهٔ امضاشدهٔ LordOS مطابقت ندارد، پس بارگذاری نشد. سبک میز کار شما همان‌طور که بود می‌ماند.",
   "themeSwitch.failedBody": "اجرا نشد. سبک میز کار شما همان‌طور که بود می‌ماند.",
   "spotlight.section.machines": "ماشین‌های مجازی",
-  "guestApps.inMachine": "در {machine}"
+  "guestApps.inMachine": "در {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "ادای احترامی به میزکارهای سال ۲۰۰۱: نوارهای عنوان آبی با بالای گرد، دکمهٔ شروع سبز روی نوار وظیفهٔ آبی، و «فایل‌ها» با یک قاب کارها.",
+  "bluebell.start": "شروع"
 }

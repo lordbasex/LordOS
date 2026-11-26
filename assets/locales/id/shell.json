@@ -979,5 +979,8 @@
   "themeSwitch.refusedBody": "Kodenya tidak cocok dengan salinan LordOS yang ditandatangani, jadi tidak dimuat. Gaya desktop Anda tetap seperti semula.",
   "themeSwitch.failedBody": "Tidak dapat dimulai. Gaya desktop Anda tetap seperti semula.",
   "spotlight.section.machines": "Mesin Virtual",
-  "guestApps.inMachine": "Di {machine}"
+  "guestApps.inMachine": "Di {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "Penghormatan untuk desktop tahun 2001: bilah judul biru dengan bagian atas membulat, tombol mulai hijau pada bilah tugas biru, dan Berkas dengan panel tugas.",
+  "bluebell.start": "Mulai"
 }

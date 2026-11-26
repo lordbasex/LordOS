@@ -1059,5 +1059,12 @@
   "wallpaperGallery.useDesktop": "На рабочий стол",
   "wallpaperGallery.useLogin": "Экран входа",
   "wallpaperGallery.useSlideshow": "Как слайд-шоу",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · встроено, работает без сети"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · встроено, работает без сети",
+  "themeParts.title": "Из этого стиля",
+  "themeParts.icons": "Значки",
+  "themeParts.cursors": "Цвета указателя",
+  "themeParts.sounds": "Звуки",
+  "themeParts.fonts": "Шрифт",
+  "themeParts.layouts": "Компоновка приложений",
+  "themeParts.layoutsHint": "Как устроены приложения вроде «Файлов». Приложения в любом случае соблюдают свои правила."
 }

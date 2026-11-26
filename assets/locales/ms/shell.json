@@ -979,5 +979,8 @@
   "themeSwitch.refusedBody": "Kodnya tidak sepadan dengan salinan LordOS yang ditandatangani, jadi ia tidak dimuatkan. Gaya desktop anda kekal seperti sebelumnya.",
   "themeSwitch.failedBody": "Ia tidak bermula. Gaya desktop anda kekal seperti sebelumnya.",
   "spotlight.section.machines": "Mesin Maya",
-  "guestApps.inMachine": "Dalam {machine}"
+  "guestApps.inMachine": "Dalam {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "Penghormatan kepada desktop tahun 2001: bar tajuk biru dengan bahagian atas membulat, butang mula hijau pada bar tugas biru, dan Fail dengan anak tetingkap tugas.",
+  "bluebell.start": "Mula"
 }

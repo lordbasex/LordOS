@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "اس کا کوڈ LordOS کی دستخط شدہ نقل سے میل نہیں کھاتا، اس لیے اسے لوڈ نہیں کیا گیا۔ آپ کے ڈیسک ٹاپ کا انداز پہلے جیسا ہی رہے گا۔",
   "themeSwitch.failedBody": "یہ شروع نہیں ہوا۔ آپ کے ڈیسک ٹاپ کا انداز پہلے جیسا ہی رہے گا۔",
   "spotlight.section.machines": "ورچوئل مشینیں",
-  "guestApps.inMachine": "{machine} میں"
+  "guestApps.inMachine": "{machine} میں",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "2001 کے ڈیسک ٹاپس کو خراجِ تحسین: اوپر سے گول نیلی ٹائٹل بارز، نیلے ٹاسک بار پر سبز اسٹارٹ بٹن، اور کاموں کے پین کے ساتھ فائلیں۔",
+  "bluebell.start": "اسٹارٹ"
 }

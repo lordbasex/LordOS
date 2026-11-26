@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "De code komt niet overeen met de ondertekende kopie van LordOS en is dus niet geladen. Je bureaubladstijl blijft zoals hij was.",
   "themeSwitch.failedBody": "Hij is niet gestart. Je bureaubladstijl blijft zoals hij was.",
   "spotlight.section.machines": "Machines",
-  "guestApps.inMachine": "In {machine}"
+  "guestApps.inMachine": "In {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "Een eerbetoon aan de bureaubladen van 2001: blauwe titelbalken met afgeronde bovenkant, een groene startknop op een blauwe taakbalk en Bestanden met een takenvenster.",
+  "bluebell.start": "Start"
 }

@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "Auf dem Schreibtisch verwenden",
   "wallpaperGallery.useLogin": "Anmeldebildschirm",
   "wallpaperGallery.useSlideshow": "Als Diashow verwenden",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · enthalten, funktioniert offline"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · enthalten, funktioniert offline",
+  "themeParts.title": "Aus diesem Stil",
+  "themeParts.icons": "Symbole",
+  "themeParts.cursors": "Zeigerfarben",
+  "themeParts.sounds": "Töne",
+  "themeParts.fonts": "Schrift",
+  "themeParts.layouts": "App-Layouts",
+  "themeParts.layoutsHint": "Wie Apps wie Dateien aufgebaut sind. Die Apps behalten in jedem Fall ihre eigenen Regeln."
 }

@@ -342,5 +342,9 @@
   "readOnly.denied": "Esta pasta é somente leitura: as permissões dela não deixam você alterá-la. Para alterá-la, use o Terminal ou outro app.",
   "fromMachineNoRun": "“{name}” veio da máquina {machine}. Arquivos não abre programas nem instaladores de uma máquina: use Abrir com se confiar nele.",
   "info.from": "De",
-  "info.fromMachine": "A máquina {machine}"
+  "info.fromMachine": "A máquina {machine}",
+  "skin.address": "Endereço",
+  "skin.tasks": "Tarefas de arquivo e pasta",
+  "skin.otherPlaces": "Outros locais",
+  "skin.details": "Detalhes"
 }

@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "Gebruiken op bureaublad",
   "wallpaperGallery.useLogin": "Inlogscherm",
   "wallpaperGallery.useSlideshow": "Als diavoorstelling gebruiken",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · inbegrepen, werkt offline"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · inbegrepen, werkt offline",
+  "themeParts.title": "Uit deze stijl",
+  "themeParts.icons": "Pictogrammen",
+  "themeParts.cursors": "Aanwijzerkleuren",
+  "themeParts.sounds": "Geluiden",
+  "themeParts.fonts": "Lettertype",
+  "themeParts.layouts": "App-indelingen",
+  "themeParts.layoutsHint": "Hoe apps zoals Bestanden zijn ingedeeld. Apps houden hoe dan ook hun eigen regels."
 }

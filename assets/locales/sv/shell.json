@@ -986,5 +986,8 @@
   "themeSwitch.refusedBody": "Dess kod stämmer inte med den signerade kopian av LordOS, så den lästes inte in. Din skrivbordsstil förblir som den var.",
   "themeSwitch.failedBody": "Den startade inte. Din skrivbordsstil förblir som den var.",
   "spotlight.section.machines": "Maskiner",
-  "guestApps.inMachine": "I {machine}"
+  "guestApps.inMachine": "I {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "En hyllning till skrivborden från 2001: blå namnlister med rundade övre hörn, en grön startknapp i ett blått aktivitetsfält och Filer med en åtgärdspanel.",
+  "bluebell.start": "Start"
 }

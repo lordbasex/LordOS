@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "Gamitin sa desktop",
   "wallpaperGallery.useLogin": "Screen ng pag-login",
   "wallpaperGallery.useSlideshow": "Gamitin bilang slideshow",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · kasama, gumagana offline"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · kasama, gumagana offline",
+  "themeParts.title": "Mula sa istilong ito",
+  "themeParts.icons": "Mga icon",
+  "themeParts.cursors": "Mga kulay ng pointer",
+  "themeParts.sounds": "Mga tunog",
+  "themeParts.fonts": "Font",
+  "themeParts.layouts": "Ayos ng mga app",
+  "themeParts.layoutsHint": "Kung paano nakaayos ang mga app gaya ng Mga File. Nananatili pa rin sa mga app ang sarili nilang tuntunin."
 }

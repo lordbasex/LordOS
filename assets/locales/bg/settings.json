@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "На работния плот",
   "wallpaperGallery.useLogin": "Екран за вход",
   "wallpaperGallery.useSlideshow": "Като слайдшоу",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · вградено, работи без връзка"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · вградено, работи без връзка",
+  "themeParts.title": "От този стил",
+  "themeParts.icons": "Икони",
+  "themeParts.cursors": "Цветове на показалеца",
+  "themeParts.sounds": "Звуци",
+  "themeParts.fonts": "Шрифт",
+  "themeParts.layouts": "Подредба на приложенията",
+  "themeParts.layoutsHint": "Как са подредени приложения като Файлове. Приложенията и така запазват собствените си правила."
 }

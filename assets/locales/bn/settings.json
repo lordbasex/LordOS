@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "ডেস্কটপে ব্যবহার করুন",
   "wallpaperGallery.useLogin": "লগইন স্ক্রিন",
   "wallpaperGallery.useSlideshow": "স্লাইডশো হিসেবে ব্যবহার করুন",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · অন্তর্ভুক্ত, অফলাইনে চলে"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · অন্তর্ভুক্ত, অফলাইনে চলে",
+  "themeParts.title": "এই স্টাইল থেকে",
+  "themeParts.icons": "আইকন",
+  "themeParts.cursors": "পয়েন্টারের রং",
+  "themeParts.sounds": "শব্দ",
+  "themeParts.fonts": "ফন্ট",
+  "themeParts.layouts": "অ্যাপের বিন্যাস",
+  "themeParts.layoutsHint": "ফাইলের মতো অ্যাপ কীভাবে সাজানো হয়। অ্যাপগুলো সব ক্ষেত্রেই নিজেদের নিয়ম বজায় রাখে।"
 }

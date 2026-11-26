@@ -374,5 +374,9 @@
   "readOnly.denied": "هذا المجلد للقراءة فقط: لا تسمح لك أذوناته بتغييره. لتغييره، استخدم الطرفية أو تطبيقًا آخر.",
   "fromMachineNoRun": "جاء «{name}» من الآلة {machine}. لا يفتح تطبيق الملفات البرامج أو المثبّتات القادمة من آلة: استخدم «فتح باستخدام» إن كنت تثق به.",
   "info.from": "المصدر",
-  "info.fromMachine": "الآلة {machine}"
+  "info.fromMachine": "الآلة {machine}",
+  "skin.address": "العنوان",
+  "skin.tasks": "مهام الملفات والمجلدات",
+  "skin.otherPlaces": "أماكن أخرى",
+  "skin.details": "التفاصيل"
 }

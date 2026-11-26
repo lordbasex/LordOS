@@ -1,0 +1,5 @@
+{
+  "name": "Lord Bluebell",
+  "description": "A tribute to the desktops of 2001: blue title bars with rounded tops, a green start button on a blue taskbar, and Files with a task pane.",
+  "sketch": { "taskbar": true, "frame": true }
+}

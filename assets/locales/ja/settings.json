@@ -1045,5 +1045,12 @@
   "wallpaperGallery.useDesktop": "デスクトップに使用",
   "wallpaperGallery.useLogin": "ログイン画面",
   "wallpaperGallery.useSlideshow": "スライドショーとして使用",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · 付属、オフラインで使用可"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · 付属、オフラインで使用可",
+  "themeParts.title": "このスタイルから",
+  "themeParts.icons": "アイコン",
+  "themeParts.cursors": "ポインターの色",
+  "themeParts.sounds": "サウンド",
+  "themeParts.fonts": "フォント",
+  "themeParts.layouts": "アプリのレイアウト",
+  "themeParts.layoutsHint": "ファイルなどのアプリの配置。どちらの場合もアプリは独自のルールを守ります。"
 }

@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "Χρήση στην επιφάνεια εργασίας",
   "wallpaperGallery.useLogin": "Οθόνη σύνδεσης",
   "wallpaperGallery.useSlideshow": "Χρήση ως παρουσίαση",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · ενσωματωμένο, λειτουργεί εκτός σύνδεσης"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · ενσωματωμένο, λειτουργεί εκτός σύνδεσης",
+  "themeParts.title": "Από αυτό το στυλ",
+  "themeParts.icons": "Εικονίδια",
+  "themeParts.cursors": "Χρώματα δείκτη",
+  "themeParts.sounds": "Ήχοι",
+  "themeParts.fonts": "Γραμματοσειρά",
+  "themeParts.layouts": "Διάταξη εφαρμογών",
+  "themeParts.layoutsHint": "Πώς διατάσσονται εφαρμογές όπως τα Αρχεία. Οι εφαρμογές κρατούν ούτως ή άλλως τους δικούς τους κανόνες."
 }

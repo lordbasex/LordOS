@@ -993,5 +993,8 @@
   "themeSwitch.refusedBody": "Codul său nu se potrivește cu copia semnată a LordOS, așa că nu a fost încărcat. Stilul desktopului rămâne cum era.",
   "themeSwitch.failedBody": "Nu a pornit. Stilul desktopului rămâne cum era.",
   "spotlight.section.machines": "Mașini",
-  "guestApps.inMachine": "În {machine}"
+  "guestApps.inMachine": "În {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "Un omagiu adus desktopurilor din 2001: bare de titlu albastre cu colțurile de sus rotunjite, un buton de start verde pe o bară de activități albastră și Fișiere cu un panou de activități.",
+  "bluebell.start": "Start"
 }

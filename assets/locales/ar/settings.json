@@ -1080,5 +1080,12 @@
   "wallpaperGallery.useDesktop": "استخدام على سطح المكتب",
   "wallpaperGallery.useLogin": "شاشة تسجيل الدخول",
   "wallpaperGallery.useSlideshow": "استخدام كعرض شرائح",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · مضمّنة، تعمل دون اتصال"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · مضمّنة، تعمل دون اتصال",
+  "themeParts.title": "من هذا النمط",
+  "themeParts.icons": "الأيقونات",
+  "themeParts.cursors": "ألوان المؤشر",
+  "themeParts.sounds": "الأصوات",
+  "themeParts.fonts": "الخط",
+  "themeParts.layouts": "تخطيط التطبيقات",
+  "themeParts.layoutsHint": "طريقة ترتيب تطبيقات مثل «الملفات». تحتفظ التطبيقات بقواعدها في كل الأحوال."
 }

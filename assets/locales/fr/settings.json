@@ -1052,5 +1052,12 @@
   "wallpaperGallery.useDesktop": "Utiliser sur le bureau",
   "wallpaperGallery.useLogin": "Écran de connexion",
   "wallpaperGallery.useSlideshow": "Utiliser en diaporama",
-  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · inclus, fonctionne hors ligne"
+  "wallpaperGallery.option.builtinHd": "HD · 1920 × 1080 · inclus, fonctionne hors ligne",
+  "themeParts.title": "De ce style",
+  "themeParts.icons": "Icônes",
+  "themeParts.cursors": "Couleurs du pointeur",
+  "themeParts.sounds": "Sons",
+  "themeParts.fonts": "Police",
+  "themeParts.layouts": "Disposition des apps",
+  "themeParts.layoutsHint": "La disposition d’apps comme Fichiers. Les apps gardent leurs propres règles dans tous les cas."
 }

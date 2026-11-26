@@ -1045,5 +1045,12 @@
   "wallpaperGallery.useDesktop": "用於桌面",
   "wallpaperGallery.useLogin": "登入畫面",
   "wallpaperGallery.useSlideshow": "用作投影片秀",
-  "wallpaperGallery.option.builtinHd": "高畫質 · 1920 × 1080 · 內建，離線可用"
+  "wallpaperGallery.option.builtinHd": "高畫質 · 1920 × 1080 · 內建，離線可用",
+  "themeParts.title": "來自此風格",
+  "themeParts.icons": "圖示",
+  "themeParts.cursors": "指標色彩",
+  "themeParts.sounds": "聲音",
+  "themeParts.fonts": "字型",
+  "themeParts.layouts": "App 版面配置",
+  "themeParts.layoutsHint": "「檔案」等 App 的版面配置方式。無論如何，App 都保有自己的規則。"
 }

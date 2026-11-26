@@ -1014,5 +1014,8 @@
   "themeSwitch.refusedBody": "لا تطابق شيفرته النسخة الموقّعة من LordOS، لذا لم يُحمَّل. يبقى نمط سطح المكتب كما كان.",
   "themeSwitch.failedBody": "لم يبدأ. يبقى نمط سطح المكتب كما كان.",
   "spotlight.section.machines": "الأجهزة الافتراضية",
-  "guestApps.inMachine": "في {machine}"
+  "guestApps.inMachine": "في {machine}",
+  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.description": "تحية لأسطح المكتب في عام 2001: أشرطة عناوين زرقاء بحواف علوية مستديرة، وزر «ابدأ» أخضر على شريط مهام أزرق، و«الملفات» مع لوحة للمهام.",
+  "bluebell.start": "ابدأ"
 }

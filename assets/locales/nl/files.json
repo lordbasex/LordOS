@@ -342,5 +342,9 @@
   "readOnly.denied": "Deze map is alleen-lezen: de rechten ervan laten je hem niet wijzigen. Gebruik Terminal of een andere app om hem te wijzigen.",
   "fromMachineNoRun": "‘{name}’ kwam van de machine {machine}. Bestanden opent geen programma's of installatieprogramma's uit een machine: gebruik Openen met als je het vertrouwt.",
   "info.from": "Herkomst",
-  "info.fromMachine": "De machine {machine}"
+  "info.fromMachine": "De machine {machine}",
+  "skin.address": "Adres",
+  "skin.tasks": "Bestands- en maptaken",
+  "skin.otherPlaces": "Andere locaties",
+  "skin.details": "Details"
 }
