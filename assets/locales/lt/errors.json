@@ -967,5 +967,7 @@
   "sentinela.notBlocked": "Šios programos nėra blokavimo sąraše.",
   "sentinela.noAppNetwork": "Šis procesas neturi savos programos, kurios tinklą būtų galima blokuoti.",
   "sys.failed": "Kažkas nepavyko.",
-  "sys.unsupported": "Ši LordOS versija to padaryti negali."
+  "sys.unsupported": "Ši LordOS versija to padaryti negali.",
+  "theme.notAllowed": "{call} nepasiekiamas bendruomenės temoms",
+  "theme.noHost": "Trūksta darbalaukio stiliaus LordOS dalies"
 }

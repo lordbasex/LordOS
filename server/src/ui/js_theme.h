@@ -32,8 +32,13 @@ unsigned jst_caps(void);
 
 /* The policy for one native function, by its lord.* name ("setStyle", "fs.write"): decided once when the function is
  * wrapped. JST_ALLOW: also with the theme on the stack; JST_NODE: then only on a node the theme owns (its own View,
- * Text, Image); JST_DENY: never with the theme on the stack. */
-enum { JST_DENY = 0, JST_ALLOW = 1, JST_NODE = 2 };
+ * Text, Image); JST_NODE_PROP: the same, for lord.setProp, also checked by jst_prop_guard on every call; JST_DENY:
+ * never with the theme on the stack. */
+enum { JST_DENY = 0, JST_ALLOW = 1, JST_NODE = 2, JST_NODE_PROP = 3 };
+/* lord.setProp on a node a community theme owns, whatever the stack holds (React's commit included): never another
+ * app's terminal, window, video or pixels, and a picture only from the theme's assets/ or LordOS's "asset:" ones.
+ * 0, or -1 with an exception thrown. */
+int jst_prop_guard(JSContext *c, int argc, JSValueConst *argv);
 int jst_policy(const char *name);
 /* the theme's code is on the JavaScript stack now */
 int jst_on_stack(JSContext *c);

@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "Esse programa não está na lista de bloqueio.",
   "sentinela.noAppNetwork": "Este processo não tem um app próprio cuja rede possa ser bloqueada.",
   "sys.failed": "Algo deu errado.",
-  "sys.unsupported": "Esta versão do LordOS não consegue fazer isso."
+  "sys.unsupported": "Esta versão do LordOS não consegue fazer isso.",
+  "theme.notAllowed": "{call} não está disponível para temas da comunidade",
+  "theme.noHost": "Falta a parte do LordOS do estilo de área de trabalho"
 }

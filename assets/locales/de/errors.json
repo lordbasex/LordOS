@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "Dieses Programm steht nicht auf der Sperrliste.",
   "sentinela.noAppNetwork": "Dieser Prozess hat keine eigene App, deren Netzwerk gesperrt werden kann.",
   "sys.failed": "Etwas ist schiefgelaufen.",
-  "sys.unsupported": "Diese Version von LordOS kann das nicht."
+  "sys.unsupported": "Diese Version von LordOS kann das nicht.",
+  "theme.notAllowed": "{call} ist für Community-Themes nicht verfügbar",
+  "theme.noHost": "Der LordOS-Teil des Schreibtischstils fehlt"
 }

@@ -965,5 +965,7 @@
   "sentinela.notBlocked": "Chương trình đó không có trong danh sách chặn.",
   "sentinela.noAppNetwork": "Tiến trình này không có ứng dụng riêng nào có thể bị chặn mạng.",
   "sys.failed": "Đã xảy ra sự cố.",
-  "sys.unsupported": "Phiên bản LordOS này không làm được việc đó."
+  "sys.unsupported": "Phiên bản LordOS này không làm được việc đó.",
+  "theme.notAllowed": "{call} không dùng được cho chủ đề cộng đồng",
+  "theme.noHost": "Thiếu phần LordOS của kiểu màn hình nền"
 }

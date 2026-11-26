@@ -965,5 +965,7 @@
   "sentinela.notBlocked": "Program itu tidak ada di daftar blokir.",
   "sentinela.noAppNetwork": "Proses ini tidak memiliki aplikasi sendiri yang jaringannya bisa diblokir.",
   "sys.failed": "Terjadi kesalahan.",
-  "sys.unsupported": "Versi LordOS ini tidak dapat melakukannya."
+  "sys.unsupported": "Versi LordOS ini tidak dapat melakukannya.",
+  "theme.notAllowed": "{call} tidak tersedia untuk tema komunitas",
+  "theme.noHost": "Bagian LordOS dari gaya desktop tidak ada"
 }

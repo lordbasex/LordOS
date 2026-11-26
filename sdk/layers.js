@@ -14,9 +14,10 @@
 //   overlay       full-screen shell overlays: the app launcher, search
 //   popover       menus, context menus, popovers, Control Center, select lists, panels
 //   modal         shell sheets and confirmations (Empty Trash), the print dialog
-//   notification  notification banners and toasts
 //   tooltip       tooltips
 //   drag          drag images and the «poof»
+//   notification  notification banners and toasts, the privacy pill in the corner (0.8.9.6.2: above every layer a theme
+//                 draws in, so no tooltip, drag image or community theme's surface covers them)
 //   system        system prompts: permissions, passwords and the keyring, Bluetooth pairing,
 //                 «keep this display?», the file chooser
 //   input         the input method's candidate window and the on-screen keyboard (they serve the field below)
@@ -42,7 +43,7 @@ import { wm } from './windows.js';
 
 export const LAYERS = Object.freeze({
   dock: 10, menubar: 20, floating: 30, overlay: 40, popover: 50, modal: 60,
-  notification: 70, tooltip: 80, drag: 90, system: 100, input: 110, capture: 120,
+  tooltip: 80, drag: 90, notification: 95, system: 100, input: 110, capture: 120,
 });
 
 let shell = false;

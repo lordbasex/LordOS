@@ -970,5 +970,7 @@
   "sentinela.notBlocked": "هذا البرنامج ليس في قائمة الحظر.",
   "sentinela.noAppNetwork": "ليس لهذه العملية تطبيق خاص بها يمكن حظر شبكته.",
   "sys.failed": "حدث خطأ ما.",
-  "sys.unsupported": "لا يستطيع هذا الإصدار من LordOS فعل ذلك."
+  "sys.unsupported": "لا يستطيع هذا الإصدار من LordOS فعل ذلك.",
+  "theme.notAllowed": "{call} غير متاح لسمات المجتمع",
+  "theme.noHost": "جزء LordOS من نمط سطح المكتب مفقود"
 }

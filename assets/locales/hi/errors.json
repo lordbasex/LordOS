@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "वह प्रोग्राम ब्लॉकलिस्ट में नहीं है।",
   "sentinela.noAppNetwork": "इस प्रोसेस का अपना कोई ऐप नहीं है जिसका नेटवर्क रोका जा सके।",
   "sys.failed": "कुछ गड़बड़ हो गई।",
-  "sys.unsupported": "LordOS का यह संस्करण ऐसा नहीं कर सकता।"
+  "sys.unsupported": "LordOS का यह संस्करण ऐसा नहीं कर सकता।",
+  "theme.notAllowed": "{call} सामुदायिक थीम के लिए उपलब्ध नहीं है",
+  "theme.noHost": "डेस्कटॉप स्टाइल का LordOS हिस्सा मौजूद नहीं है"
 }

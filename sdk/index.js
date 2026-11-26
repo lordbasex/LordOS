@@ -273,8 +273,32 @@ export const themes = {
     return { id: t.id, current: t.current, hidden: !!meta.hidden, name: tOptional(`shell.theme.${t.id}.name`) || meta.name || t.id,
       description: tOptional(`shell.theme.${t.id}.description`) || meta.description || '', ...cleanThemeMeta(meta),
       // it couldn't start in this session (lord-server went back to the one before): Settings → Appearance says why
-      failed: t.failed === true, failedWhy: typeof t.failedWhy === 'string' ? t.failedWhy : '', failedCode: t.failedCode === true };
+      failed: t.failed === true, failedWhy: typeof t.failedWhy === 'string' ? t.failedWhy : '', failedCode: t.failedCode === true,
+      // (0.8.9.6.2) installed from a file by the person (docs/THEMES-GUIDE.md "Community themes"): a community theme
+      // whatever its theme.json says, confirmed or not, and the capabilities it declared
+      ...(t.user === true ? { user: true, community: true, trusted: t.trusted === true, caps: Array.isArray(t.caps) ? t.caps.map(String) : [],
+        author: cleanThemeMeta(meta).author || (typeof t.installedAuthor === 'string' ? t.installedAuthor.slice(0, 80) : '') } : null) };
   }).filter((t) => !t.hidden),         // the login screen (themes/greeter) can't be chosen
+  // (0.8.9.6.2) Install from a file: lord-themec checks and builds the .zip in its sandbox, lord-server installs what it
+  // built into the person's themes folder. Resolves with { ok, id, error, why, report } (report: the checks' findings).
+  install(path) {
+    const job = typeof lord.themes.install === 'function' ? lord.themes.install(String(path)) : 0;
+    if (!job) return Promise.resolve({ ok: false, error: 'start', report: null });
+    return new Promise((resolve) => {
+      const poll = () => {
+        let r = null;
+        try { r = lord.themes.installJob(job); } catch (e) { r = { done: true, ok: false, error: 'start' }; }
+        if (!r || r.done) resolve(r || { ok: false, error: 'start' });
+        else setTimeout(poll, 150);
+      };
+      setTimeout(poll, 100);
+    });
+  },
+  // the person confirmed "This theme isn't from LordOS…" (only Settings asks; a theme's code can't: js_theme.c)
+  trust: (id) => !!lord.themes.trust?.(id),
+  // a community theme the watchdog took off may be tried again, or removed
+  retry: (id) => !!lord.themes.retry?.(id),
+  remove: (id) => !!lord.themes.remove?.(id),
   current: () => lord.themes.list().find((t) => t.current)?.id || null,
   // the current theme's entry (null on the login screen or without lord.themes)
   info: () => { try { return themes.list().find((t) => t.current) || null; } catch (e) { return null; } },

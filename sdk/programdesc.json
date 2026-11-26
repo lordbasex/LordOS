@@ -270,6 +270,7 @@
     "lord-tls": "LordOS's secure connection helper, in a sandbox: encrypts the connections of other helpers.",
     "lord-bench": "LordOS's benchmark: measures this computer's speed.",
     "lord-pgpv": "LordOS's signature checker, in a sandbox: verifies the signatures of downloaded images.",
+    "lord-themec": "LordOS's theme builder, in a sandbox: checks a community desktop style's files and builds it.",
     "lord-appstream": "LordOS's software catalog reader, in a sandbox: reads the Store's app catalogs.",
     "lord-autoinstall": "LordOS's unattended installer: installs LordOS on a disk without questions.",
     "lord-browser-prefs": "LordOS's browser setup: writes the first preferences of installed web browsers.",

@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "Bu program engel listesinde değil.",
   "sentinela.noAppNetwork": "Bu işlemin, ağı engellenebilecek kendine ait bir uygulaması yok.",
   "sys.failed": "Bir şeyler ters gitti.",
-  "sys.unsupported": "LordOS’un bu sürümü bunu yapamaz."
+  "sys.unsupported": "LordOS’un bu sürümü bunu yapamaz.",
+  "theme.notAllowed": "{call} topluluk temaları için kullanılamaz",
+  "theme.noHost": "Masaüstü stilinin LordOS bölümü eksik"
 }

@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "সেই প্রোগ্রামটি ব্লকলিস্টে নেই।",
   "sentinela.noAppNetwork": "এই প্রসেসের নিজস্ব কোনো অ্যাপ নেই যার নেটওয়ার্ক ব্লক করা যায়।",
   "sys.failed": "কিছু একটা ভুল হয়েছে।",
-  "sys.unsupported": "LordOS-এর এই সংস্করণ সেটি করতে পারে না।"
+  "sys.unsupported": "LordOS-এর এই সংস্করণ সেটি করতে পারে না।",
+  "theme.notAllowed": "{call} কমিউনিটি থিমের জন্য উপলব্ধ নয়",
+  "theme.noHost": "ডেস্কটপ স্টাইলের LordOS অংশটি নেই"
 }

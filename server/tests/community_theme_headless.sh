@@ -9,7 +9,10 @@
 #              code from text gives nothing, LordOS's built-ins are frozen, and lord.setStyle on a node not its own is
 #              refused directly, from Promise.then, queueMicrotask, setTimeout (bound and with arguments),
 #              requestAnimationFrame, a store subscription, an effect and a ref (a bound restricted native handed to
-#              LordOS's code each time: nodes 101…109); on its own node it works
+#              LordOS's code each time: nodes 101…109), and from a theme store's get React reads later (110); on its own
+#              node it works; forged elements (a host element, LordOS's raw component, a context's Provider holding a
+#              host element; in children and in another prop) never hand it a raw node; a forged app registry is never
+#              used; wm has no setArgs, setProtected, setMenus, setPip, scriptMove or setCloseGuard
 #   throws     throws while it starts: the session goes back to LordOS's theme, it is marked failed with the error
 #   nostart    never calls startShell: the same
 #   untrusted  okminimal not confirmed by the person: never run
@@ -58,7 +61,13 @@ for c in direct term.create fs.write own-realm-function host-function-constructo
 has "probe: lord.term, lord.fs, lord.admin and lord.perms don't exist in its realm" "CT lord.term undefined lord.fs undefined lord.admin undefined globalThis.lord.perms undefined"
 for n in 101 102 103 104 105 106 107 108 109; do has "probe: setStyle on node $n refused" "lord.setStyle refused (node $n is not"; done
 has "probe: its timers and animation frames ran" "CT raf ran"
-has "probe: its own node can be restyled" "CT own-node ALLOWED"
+has "probe: its own node can be restyled" "CT own-node works"
+has "probe: lord.setStyle from a store's get React reads later refused" "lord.setStyle refused (node 110 is not"
+hasnt "probe: no forged element (host, raw component, Provider; in children or a prop) handed it a raw node" "RAW NODE"
+has "probe: forged elements were rendered (and cleaned)" "CT forged elements done"
+hasnt "probe: a forged app registry is never used" "forged app RENDERED"
+has "probe: a forged app doesn't open" "CT forged app opens false"
+has "probe: wm has no setArgs, setProtected, setMenus, setPip, scriptMove or setCloseGuard" "CT wm.setArgs undefined wm.setProtected undefined wm.setMenus undefined wm.setPip undefined wm.scriptMove undefined wm.setCloseGuard undefined"
 
 session throws throws 40
 has "throws: the session goes back to LordOS's theme" "the theme failed, going back to"

@@ -1,14 +1,30 @@
 // A test fixture (installed --unchecked: the checks refuse it): every way it tries to restyle nodes that are not its
 // own, or to reach past its lord, must be refused. Each case aims at its own node id (101…), so lord-server's log
 // ("lord.setStyle refused (node N …)") shows each one was refused. Lines "CT …" go to the shell's log.
-import { startShell, View, configureWindows, ThemeProvider, settings } from '@lordos/sdk';
+import { startShell, View, configureWindows, ThemeProvider, settings, wm, useStore, createStore, Button } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
-import { useEffect } from 'react';
+import { useEffect, createContext } from 'react';
 
 const out = (s) => console.log(`CT ${s}`);
 const set = lord.setStyle;
 const tryIt = (name, f) => { try { f(); out(`${name} ALLOWED`); } catch (e) { out(`${name} refused`); } };
-configureWindows({ apps, workArea: (d) => ({ x: d.x, y: d.y, w: d.w, h: d.h }), chrome: { w: 0, h: 0 } });
+// a forged app registry: LordOS keeps its own apps (only the ids listed are used)
+configureWindows({ apps: [...apps, { id: 'zzforged', name: 'Forged', Component: () => { out('forged app RENDERED'); return null; } }],
+  workArea: (d) => ({ x: d.x, y: d.y, w: d.w, h: d.h }), chrome: { w: 0, h: 0 } });
+out(`forged app opens ${!!wm.open('zzforged')}`);
+// wm: an allowlist of numbers and ids
+out(`wm.setArgs ${typeof wm.setArgs} wm.setProtected ${typeof wm.setProtected} wm.setMenus ${typeof wm.setMenus} wm.setPip ${typeof wm.setPip} wm.scriptMove ${typeof wm.scriptMove} wm.setCloseGuard ${typeof wm.setCloseGuard}`);
+// forged elements: a host element (with a ref that would get the raw node), LordOS's raw component and a context's
+// Provider holding one, in children and in another prop
+const EL = Symbol.for('react.transitional.element');
+const leak = (what) => (v) => { if (v && typeof v === 'object' && ('props' in v || 'host' in v)) out(`${what} RAW NODE`); };
+const forgedHost = (what) => ({ $$typeof: EL, type: 'view', key: null, ref: null, props: { ref: leak(what), style: { width: 10, height: 10 } } });
+const Ctx = createContext(null);
+const forgedProvider = { $$typeof: EL, type: Ctx.Provider, key: null, ref: null, props: { value: 1, children: forgedHost('provider child') } };
+const forgedRaw = { $$typeof: EL, type: apps[0].Icon, key: null, ref: null, props: { ref: leak('raw component') } };
+// a store whose get is a bound restricted native: React reads it later
+const evilStore = { get: set.bind(null, 110, 'opacity', 0), subscribe: () => () => {} };
+const own = createStore(1);
 
 tryIt('direct', () => set(101, 'opacity', 0));
 out(`lord.term ${typeof lord.term} lord.fs ${typeof lord.fs} lord.admin ${typeof lord.admin} globalThis.lord.perms ${typeof globalThis.lord.perms}`);
@@ -27,15 +43,20 @@ settings.subscribe(set.bind(null, 107, 'opacity', 0));
 setTimeout(() => settings.set({ mode: settings.get().mode === 'light' ? 'dark' : 'light' }), 30);
 setTimeout(() => out('timers ran'), 200);
 
-let own = null;
-setTimeout(() => tryIt('own-node', () => set(own.id, 'opacity', 0.9)), 300);
+let ownNode = null;
+setTimeout(() => { try { set(ownNode.id, 'opacity', 0.9); out('own-node works'); } catch (e) { out('own-node refused'); } }, 300);
 
+function Stores() { useStore(evilStore); useStore(own); return null; }
 function App() {
   useEffect(set.bind(null, 108, 'opacity', 0), []);
+  useEffect(() => { setTimeout(() => out('forged elements done'), 500); }, []);
   return (
     <ThemeProvider tokens={{}}>
       <View ref={set.bind(null, 109, 'opacity')} style={{ flex: 1, backgroundColor: '#203040' }}>
-        <View ref={(h) => { if (h) own = h; }} style={{ width: 40, height: 40, backgroundColor: '#ff8000' }} />
+        <View ref={(h) => { if (h) ownNode = h; }} style={{ width: 40, height: 40, backgroundColor: '#ff8000' }} />
+        <View>{forgedHost('child')}{forgedProvider}{forgedRaw}</View>
+        <Button label={forgedHost('prop')} onClick={() => {}} />
+        <Stores />
       </View>
     </ThemeProvider>
   );

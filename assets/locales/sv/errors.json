@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "Det programmet finns inte på blockeringslistan.",
   "sentinela.noAppNetwork": "Den här processen har ingen egen app vars nätverk kan blockeras.",
   "sys.failed": "Något gick fel.",
-  "sys.unsupported": "Den här versionen av LordOS kan inte göra det."
+  "sys.unsupported": "Den här versionen av LordOS kan inte göra det.",
+  "theme.notAllowed": "{call} är inte tillgängligt för gemenskapsteman",
+  "theme.noHost": "Skrivbordsstilens LordOS-del saknas"
 }

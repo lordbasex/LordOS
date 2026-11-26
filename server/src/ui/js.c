@@ -39,6 +39,7 @@
 #include "js_broker.h"
 #include "js_wasm.h"
 #include "js_theme.h"
+#include "js_err.h"
 #include "themestore.h"
 #include "../media/svgicon.h"
 #include "js_net.h"
@@ -265,6 +266,7 @@ static JSValue prof_call(JSContext *c, JSValueConst this_val, int argc, JSValueC
     if (jst_active()) {
         int32_t pol = JST_DENY;
         JS_ToInt32(c, &pol, data[2]);
+        if (pol == JST_NODE_PROP && jst_prop_guard(c, argc, argv)) return JS_EXCEPTION;
         if (pol != JST_ALLOW && jst_on_stack(c)) {
             const char *n = JS_ToCString(c, data[1]);
             int r = jst_check(c, pol, n ? n : "?", argc, argv);
@@ -911,7 +913,7 @@ static int start_community(const Community *cm) {
         if ((cm->caps & b) && ts_cap_name(b)) JS_SetPropertyUint32(ctx, caps, k++, JS_NewString(ctx, ts_cap_name(b)));
     }
     JSValue args[2] = { JS_NewString(ctx, cm->id), caps };
-    JSValue made = JS_IsFunction(ctx, prep) ? JS_Call(ctx, prep, host, 2, args) : JS_ThrowTypeError(ctx, "no theme host");
+    JSValue made = JS_IsFunction(ctx, prep) ? JS_Call(ctx, prep, host, 2, args) : js_throw_code(ctx, "theme.noHost", NULL);
     JS_FreeValue(ctx, args[0]);
     JS_FreeValue(ctx, args[1]);
     JS_FreeValue(ctx, prep);
@@ -942,7 +944,7 @@ static int start_community(const Community *cm) {
     JS_FreeValue(t, tg);
     /* from here LordOS's realm is locked down (its built-ins frozen, no code from text): sdk/themeapi.js */
     JSValue lock = JS_GetPropertyStr(ctx, host, "lockdown");
-    JSValue lr = JS_IsFunction(ctx, lock) ? JS_Call(ctx, lock, host, 0, NULL) : JS_ThrowTypeError(ctx, "no lockdown");
+    JSValue lr = JS_IsFunction(ctx, lock) ? JS_Call(ctx, lock, host, 0, NULL) : js_throw_code(ctx, "theme.noHost", NULL);
     JS_FreeValue(ctx, lock);
     if (JS_IsException(lr)) { dump_exception(ctx); JS_FreeContext(t); goto out; }
     JS_FreeValue(ctx, lr);
@@ -956,7 +958,7 @@ static int start_community(const Community *cm) {
     drain_jobs();
     if (!r) {                           /* the shell, started by LordOS's code with the element the theme gave */
         JSValue run = JS_GetPropertyStr(ctx, host, "run");
-        JSValue ran = JS_IsFunction(ctx, run) ? JS_Call(ctx, run, host, 0, NULL) : JS_ThrowTypeError(ctx, "no theme host");
+        JSValue ran = JS_IsFunction(ctx, run) ? JS_Call(ctx, run, host, 0, NULL) : js_throw_code(ctx, "theme.noHost", NULL);
         JS_FreeValue(ctx, run);
         if (JS_IsException(ran)) { dump_exception(ctx); r = -1; }
         else if (!JS_ToBool(ctx, ran)) { snprintf(last_error, sizeof last_error, "the theme never called startShell()"); r = -1; }

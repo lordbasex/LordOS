@@ -965,5 +965,7 @@
   "sentinela.notBlocked": "そのプログラムはブロックリストに入っていません。",
   "sentinela.noAppNetwork": "このプロセスには、ネットワークをブロックできる専用のアプリがありません。",
   "sys.failed": "問題が発生しました。",
-  "sys.unsupported": "このバージョンの LordOS ではできません。"
+  "sys.unsupported": "このバージョンの LordOS ではできません。",
+  "theme.notAllowed": "{call} はコミュニティテーマでは使用できません",
+  "theme.noHost": "デスクトップスタイルの LordOS 部分がありません"
 }

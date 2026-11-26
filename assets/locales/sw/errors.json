@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "Programu hiyo haiko kwenye orodha ya kuzuia.",
   "sentinela.noAppNetwork": "Mchakato huu hauna programu yake yenyewe ambayo mtandao wake unaweza kuzuiwa.",
   "sys.failed": "Hitilafu fulani imetokea.",
-  "sys.unsupported": "Toleo hili la LordOS haliwezi kufanya hivyo."
+  "sys.unsupported": "Toleo hili la LordOS haliwezi kufanya hivyo.",
+  "theme.notAllowed": "{call} haipatikani kwa mandhari ya jamii",
+  "theme.noHost": "Sehemu ya LordOS ya mtindo wa eneo-kazi haipo"
 }

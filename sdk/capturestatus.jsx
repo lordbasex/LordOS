@@ -320,12 +320,16 @@ export function PrivacyIndicators({ height = 22 }) {
 function Handshake() { useShownHandshake(); return null; }
 
 // Full screen: the bars may be under the window, so the pill stays in the top right corner of each display (no clicks:
-// the window's own). Mounted in the notification layer, above full-screen windows.
+// the window's own). Mounted in the notification layer, above full-screen windows. (0.8.9.6.2) With a community theme
+// it is always there while something captures: LordOS draws it above every layer the theme draws in, whatever the
+// theme shows or hides (sdk/themeapi.js, docs/THEMES-GUIDE.md "Community themes").
+let cornerAlways = false;
+export function captureCornerAlways() { cornerAlways = true; }
 export function CaptureCorner() {
   const rows = useCaptureRows();
   const glyph = captureGlyph(rows);
   const full = useStore(windows, (l) => l.some((w) => w.fullscreen && !w.minimized));
-  if (!glyph || !full) return null;
+  if (!glyph || !(full || cornerAlways)) return null;
   const list = screen.displays?.length ? screen.displays : [{ x: 0, y: 0, w: screen.width }];
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'none' }} accessibilityLabel={summaryLabel(rows)}>

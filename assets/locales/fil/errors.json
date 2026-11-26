@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "Wala sa blocklist ang program na iyon.",
   "sentinela.noAppNetwork": "Walang sariling app ang prosesong ito na maaaring i-block ang network.",
   "sys.failed": "May nangyaring mali.",
-  "sys.unsupported": "Hindi iyan kaya ng bersyong ito ng LordOS."
+  "sys.unsupported": "Hindi iyan kaya ng bersyong ito ng LordOS.",
+  "theme.notAllowed": "Hindi available ang {call} sa mga tema ng komunidad",
+  "theme.noHost": "Nawawala ang bahagi ng LordOS ng desktop style"
 }

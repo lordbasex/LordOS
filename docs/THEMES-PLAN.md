@@ -1,6 +1,6 @@
 # Many appearances: community themes, installing from a file, and a theme store (plan)
 
-Status: **plan, asked for by the maintainer on 2026-11-21**. Nothing here is built yet. How a theme is made today:
+Status: **plan, asked for by the maintainer on 2026-11-21**. Stage 2 is built (0.8.9.6.2, in development); stages 1 and 3 as noted. How a theme is made today:
 [THEMES-GUIDE.md](THEMES-GUIDE.md). Steps that widen what third-party code can do go through the maintainer's review
 and an AGENTS.md entry before they are built.
 
@@ -24,6 +24,10 @@ below). It is a useful test case for every stage of this plan.
   log, never sends anything by itself).
 
 ## Stage 2 — install a theme from a file
+
+**Built (0.8.9.6.2, in development; approved by the maintainer on 2026-11-26):** [THEMES-GUIDE.md](THEMES-GUIDE.md#6-community-themes-installed-from-a-file).
+What differs from the plan below: capabilities give read access only (no setters); `notifications` is a capability
+(a notification centre's history); a community theme may launch apps through the shell's list.
 
 - **Browse… → a `.zip`** with a `theme.json` manifest: id, name, author, license, version, minimum LordOS/SDK version,
   the capabilities it needs (below), its options, and the source files.

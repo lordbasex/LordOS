@@ -965,5 +965,7 @@
   "sentinela.notBlocked": "該程式不在封鎖清單中。",
   "sentinela.noAppNetwork": "這個處理程序沒有可以封鎖網路的獨立應用程式。",
   "sys.failed": "發生了一些問題。",
-  "sys.unsupported": "此版本的 LordOS 無法做到這件事。"
+  "sys.unsupported": "此版本的 LordOS 無法做到這件事。",
+  "theme.notAllowed": "社群主題無法使用 {call}",
+  "theme.noHost": "缺少桌面風格的 LordOS 部分"
 }

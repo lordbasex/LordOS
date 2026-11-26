@@ -19,6 +19,7 @@ import * as SDK from './index.js';
 import { apps as hostApps } from '@lordos/apps';
 import { addListener as rtAddListener, keyboardLayer, setHostGuard, setRootErrorHandler, onCommit, THEME_OWNED } from '@lordos/runtime';
 import { LAYERS } from './layers.js';
+import { captureCornerAlways } from './capturestatus.jsx';
 
 const { createElement: h } = React;
 
@@ -101,16 +102,27 @@ function wrapRef(r) {
   return w;
 }
 
-// children: a host element (a string type) the theme made itself is dropped, wherever it hides in arrays
-function cleanChildren(c, depth = 0) {
+// Elements the theme hands LordOS's code, in children or in any other prop (an icon, a label, a render result):
+// a host element (a string type) is dropped wherever it hides; an element of a component that is neither the
+// facade's nor plainly the theme's own (a forged one, with LordOS's raw component or an object type such as a context
+// Provider, memo, forwardRef or Suspense) is made again with sanitized props, so nothing reaches a host node unwrapped.
+const ELEMENT = Symbol.for('react.transitional.element');
+const isElement = (v) => v !== null && typeof v === 'object' && v.$$typeof === ELEMENT;
+function cleanNode(c, depth = 0) {
   if (depth > 32) return null;
-  if (Array.isArray(c)) return c.map((x) => cleanChildren(x, depth + 1));
-  if (c && typeof c === 'object' && typeof c.type === 'string') {
+  if (Array.isArray(c)) return c.map((x) => cleanNode(x, depth + 1));
+  if (!isElement(c)) return c;
+  const ty = c.type;
+  if (typeof ty === 'string') {
     console.error('community theme: a host element was dropped (use View, Text and Image from @lordos/sdk)');
     return null;
   }
-  return c;
+  if (typeof ty === 'function' && (facadeTypes.has(ty) || realmOf(ty) === 2)) return c;
+  const props = { ...themeProps(c.props, false, depth + 1) };
+  if (c.key != null) props.key = c.key;
+  return Object.freeze(h(typeof ty === 'function' ? typeFor(ty) : ty, props));
 }
+const cleanChildren = (c) => cleanNode(c, 0);
 
 // props a theme never sets on a node (another app's terminal, window, video, pixels or a node's protection)
 const BLOCKED_PROPS = new Set(['session', 'surface', 'media', 'crop', 'pixels', 'wave', 'dangerouslySetInnerHTML']);
@@ -118,16 +130,16 @@ const BLOCKED_PROPS = new Set(['session', 'surface', 'media', 'crop', 'pixels', 
 const srcOk = (s) => typeof s === 'string' && !s.includes('..') && !s.startsWith('/') && !s.includes('\0') &&
   (/^assets\/[A-Za-z0-9_][A-Za-z0-9._/-]*$/.test(s) || /^asset:[A-Za-z0-9_][A-Za-z0-9._/-]*$/.test(s));
 
-function themeProps(p, host) {
+function themeProps(p, host, depth = 0) {
   const o = {};
-  if (!p) return o;
+  if (!p || typeof p !== 'object') return o;
   for (const k of Object.keys(p)) {
     const v = p[k];
-    if (BLOCKED_PROPS.has(k)) continue;
+    if (BLOCKED_PROPS.has(k) || k === 'lordThemeOwned') continue;
     if (k === 'ref') o.ref = wrapRef(v);
-    else if (k === 'children') o.children = cleanChildren(v);
     else if (k === 'src' && host) { if (srcOk(v)) o.src = v; }
     else if (typeof v === 'function') o[k] = wrapCallback(v);
+    else if (isElement(v) || Array.isArray(v)) o[k] = cleanNode(v, depth);
     else o[k] = v;
   }
   if (host) o.lordThemeOwned = THEME_OWNED;     // a prop React copies (it drops symbol keys); its value can't be forged
@@ -166,8 +178,10 @@ function typeFor(type) {
 function themeCreateElement(type, props, ...children) {
   if (typeof type === 'string') throw new TypeError('a community theme draws with View, Text and Image from @lordos/sdk');
   const kids = children.map((c) => cleanChildren(c));
-  if (typeof type === 'function' && !facadeTypes.has(type) && realmOf(type) !== 2) return h(typeFor(type), themeProps(props, false), ...kids);
-  return h(type, props, ...kids);
+  if (typeof type === 'function' && (facadeTypes.has(type) || realmOf(type) === 2)) return h(type, props, ...kids);
+  // LordOS's own components (an app's), untrusted functions, and object or symbol types (a context's Provider,
+  // memo, forwardRef, Fragment, Suspense): sanitized props
+  return h(typeof type === 'function' ? typeFor(type) : type, themeProps(props, false), ...kids);
 }
 function themeCloneElement(el, props, ...children) {
   if (!el || typeof el.type === 'string') throw new TypeError('a community theme clones only its own elements');
@@ -207,12 +221,39 @@ function readOnly(store, map = (x) => x) {
   if (!v) {
     v = Object.freeze({ get: () => map(store.get()), subscribe: (fn) => store.subscribe(wrapCallback(fn)) });
     views.set(store, v);
+    sdkStores.add(v);
   }
   return v;
 }
-// a store the theme reads: a view, or the store itself when it is the SDK's own (useStore takes both)
-const storeFromTheme = (s) => s;
+// a store the theme reads: one of LordOS's (a read-only view, or one the facade's createStore made) as it is; any
+// other object is the theme's own, so its get and subscribe run through lord.themeCall (tainted), and the callback
+// React gives subscribe reaches the theme only as a fresh wrapper
+const sdkStores = new WeakSet();
+const themeStores = new WeakMap();
+function storeFromTheme(s) {
+  if (!s || typeof s !== 'object') return s;
+  if (sdkStores.has(s)) return s;
+  let w = themeStores.get(s);
+  if (!w) {
+    w = Object.freeze({
+      get: () => themeCallSafe(s.get),
+      subscribe: (fn) => { const off = themeCallSafe(s.subscribe, () => { fn(); }); return () => { if (typeof off === 'function') themeCallSafe(off); }; },
+    });
+    themeStores.set(s, w);
+  }
+  return w;
+}
 const themeUseStore = (s, sel) => SDK.useStore(storeFromTheme(s), sel ? wrapCallback(sel) : undefined);
+function themeCreateStore(initial) {
+  const st = SDK.createStore(initial);
+  const v = Object.freeze({
+    get: () => st.get(),
+    set: (p) => st.set(typeof p === 'function' ? (x) => themeCall(p, x) : p),
+    subscribe: (fn) => st.subscribe(wrapCallback(fn)),
+  });
+  sdkStores.add(v);
+  return v;
+}
 
 // notifications in a notification centre: plain data, never their actions
 const noteData = (n) => (n && typeof n === 'object' ? Object.freeze({
@@ -284,18 +325,52 @@ function ThemeWindowShell(p) {
   return h(SDK.WindowShell, { ...themeProps(p, false), win: real || p.win });
 }
 
-// ---- wm: everything a frame and a Dock need; opening only an app by its id ----
-const WM_DENY = new Set(['setProtected', 'addSheet', 'frameRef', 'setFullscreen']);
+// ---- wm: an allowlist of what a frame, a Dock and a window menu need ----
+// Window ids and geometry only: nothing that sets a window's arguments, protection, menus, close guard, layer,
+// picture-in-picture, full screen or script moves (setArgs, setProtected, setMenus, setCloseGuard, setLayer, setPip,
+// setFullscreen, scriptMove are not here). open takes an app id and at most { new, frame } with numbers.
+const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+const idOf = (v) => (typeof v === 'string' ? v : '');
+const rect = (r) => (r && typeof r === 'object' ? { x: num(r.x), y: num(r.y), w: num(r.w), h: num(r.h) } : undefined);
+const plain = (v) => (v == null || typeof v !== 'object' ? v : JSON.parse(JSON.stringify(v)));
 function themeWm() {
-  const o = {};
-  for (const k of Object.keys(SDK.wm)) {
-    const f = SDK.wm[k];
-    if (typeof f !== 'function' || WM_DENY.has(k)) continue;
-    o[k] = k === 'open' ? (app, opts) => SDK.wm.open(app, opts && typeof opts === 'object' ? { new: !!opts.new, frame: opts.frame } : undefined)
-      : (...a) => toTheme(f(...a.map(fromTheme)));
-  }
-  o.setFullscreen = (id, on) => SDK.wm.setFullscreen(id, !!on);
-  return Object.freeze(o);
+  const W = SDK.wm;
+  const id1 = (k) => (id) => plain(W[k](idOf(id)));
+  return Object.freeze({
+    focused: () => W.focused(), get: (id) => plain(W.get(idOf(id))), frame: (w) => plain(W.frame(w && typeof w === 'object' ? W.get(idOf(w.id)) || {} : {})),
+    focus: id1('focus'), raise: id1('raise'), minimize: id1('minimize'), toggleMaximize: id1('toggleMaximize'), center: id1('center'),
+    toggleAbove: id1('toggleAbove'), isAbove: id1('isAbove'), hasKeyboard: id1('hasKeyboard'), closeWindowMenu: id1('closeWindowMenu'),
+    beginMove: id1('beginMove'), cancelGrab: () => W.cancelGrab?.(), cornerRadius: id1('cornerRadius'),
+    close: (id) => W.close(idOf(id)),
+    beginResize: (id, edge) => W.beginResize(idOf(id), typeof edge === 'string' ? edge : ''),
+    snap: (id, where) => W.snap(idOf(id), typeof where === 'string' ? where : ''),
+    snapKey: (id, key) => W.snapKey(idOf(id), typeof key === 'string' ? key : ''),
+    move: (id, x, y) => W.move(idOf(id), num(x), num(y)),
+    resize: (id, w, hh) => W.resize(idOf(id), num(w), num(hh)),
+    setFrame: (id, r) => W.setFrame(idOf(id), rect(r)),
+    liftForKeyboard: (id, r) => W.liftForKeyboard?.(idOf(id), rect(r)),
+    dropFromKeyboard: id1('dropFromKeyboard'),
+    moveToDisplay: (id, d) => W.moveToDisplay(idOf(id), num(d)),
+    moveToDesktop: (id, d) => W.moveToDesktop(idOf(id), num(d)),
+    arrange: (how) => W.arrange(typeof how === 'string' ? how : ''),
+    showWindowMenu: (id, x, y) => W.showWindowMenu?.(idOf(id), num(x), num(y)),
+    open: (app, opts) => W.open(idOf(app), opts && typeof opts === 'object' ? { new: !!opts.new, frame: rect(opts.frame) } : undefined),
+  });
+}
+
+// ---- configureWindows: LordOS's apps (the ones the theme lists, by id), and only numbers and the theme's functions ----
+function themeConfigureWindows(o = {}) {
+  const ids = Array.isArray(o.apps) ? new Set(o.apps.map((a) => (a && typeof a === 'object' ? a.id : a)).filter((x) => typeof x === 'string')) : null;
+  const apps = ids ? hostApps.filter((a) => ids.has(a.id)) : hostApps;
+  const areaFn = typeof o.workArea === 'function' ? wrapCallback(o.workArea) : null;
+  const cfg = { apps };
+  if (areaFn) cfg.workArea = (d) => rect(areaFn({ ...d })) || { x: d.x, y: d.y, w: d.w, h: d.h };
+  else if (o.workArea && typeof o.workArea === 'object') cfg.workArea = rect(o.workArea);
+  if (o.chrome && typeof o.chrome === 'object') cfg.chrome = { w: num(o.chrome.w), h: num(o.chrome.h) };
+  if (o.snap != null) cfg.snap = !!o.snap;
+  if (o.snapThirds != null) cfg.snapThirds = !!o.snapThirds;
+  if (typeof o.locked === 'function') { const f = wrapCallback(o.locked); cfg.locked = (w) => !!f(plain(w)); }
+  SDK.configureWindows(cfg);
 }
 
 // ---- the allowlist ----
@@ -307,7 +382,7 @@ const COMPONENTS = ['View', 'Text', 'Image', 'ScrollView', 'TextInput', 'SearchF
   'AppSwitcher', 'DesktopHud', 'LevelHud', 'OverviewBackdrop', 'OverviewChrome', 'StatusItems', 'PrivacyIndicators', 'LordOSLogo',
   'MoonGlyph', 'SunGlyph', 'SignalGlyph'];
 const FUNCTIONS = ['t', 'tOptional', 'appName', 'formatDate', 'formatTime', 'formatNumber', 'formatBytes', 'weekdayName', 'monthName',
-  'monthWeeks', 'weekStartFor', 'direction', 'textDirection', 'useLocale', 'configureWindows', 'useWindows', 'getApp', 'windowTitle',
+  'monthWeeks', 'weekStartFor', 'direction', 'textDirection', 'useLocale', 'useWindows', 'getApp', 'windowTitle',
   'windowIcon', 'windowAccent', 'windowMenuItems', 'windowMenuTiling', 'alwaysOnTopItem', 'moveToDesktopItems', 'appMenuItems',
   'useAppMenus', 'useMenusWithSpeech', 'appGroup', 'appSettingsItem', 'hideApp', 'hideOthers', 'cycleAppWindows', 'launchApp',
   'useLauncherApps', 'refreshApps', 'appCategory', 'compareNames', 'groupApps', 'groupKey', 'groupRows', 'useDockEntries',
@@ -337,7 +412,7 @@ const NEUTRAL = { useBluetooth: () => null, useSound: () => ({ sinks: [], source
 
 function exportValue(name, v) {
   if (typeof v === 'function' && /^[A-Z]/.test(name)) { const W = wrapComponent(v, name); facadeTypes.add(W); return W; }
-  if (typeof v === 'function') return (...a) => toTheme(v(...a.map(fromTheme).map((x) => (typeof x === 'function' ? wrapCallback(x) : x))));
+  if (typeof v === 'function') return (...a) => toTheme(v(...a.map(fromTheme).map((x) => (typeof x === 'function' ? wrapCallback(x) : isElement(x) || Array.isArray(x) ? cleanNode(x) : x))));
   return v;
 }
 
@@ -357,6 +432,7 @@ export function makeThemeSdk({ id, caps }) {
   for (const [n, C] of [['Layer', ThemeLayer], ['Overlay', ThemeOverlay], ['WindowShell', ThemeWindowShell]]) { facadeTypes.add(C); sdk[n] = C; }
   // objects
   sdk.wm = themeWm();
+  sdk.configureWindows = themeConfigureWindows;
   sdk.screen = Object.freeze({ get width() { return SDK.screen.width; }, get height() { return SDK.screen.height; },
     get displays() { return SDK.screen.displays.map((d) => ({ ...d })); }, get mirror() { return SDK.screen.mirror; } });
   sdk.screenDisplays = () => SDK.screenDisplays().map((d) => ({ ...d }));
@@ -368,7 +444,7 @@ export function makeThemeSdk({ id, caps }) {
   sdk.useSettings = () => [SDK.useStore(SDK.settings), (p) => settingsPatch(id, p)];
   sdk.useTrackedSettings = () => { const [s] = SDK.useTrackedSettings(); return [s, (p) => settingsPatch(id, p)]; };
   sdk.useStore = themeUseStore;
-  sdk.createStore = SDK.createStore;
+  sdk.createStore = themeCreateStore;
   sdk.locale = readOnly(SDK.locale);
   sdk.snapPreview = readOnly(SDK.snapPreview);
   sdk.dockDrag = readOnly(SDK.dockDrag);
@@ -489,6 +565,7 @@ export function themeGlobals() {
 
 export function prepareThemeHost(id, caps) {
   setHostGuard(guardHost);
+  captureCornerAlways();               // the privacy pill is LordOS's, above the theme, whatever the theme draws
   const sdk = makeThemeSdk({ id, caps: Array.isArray(caps) ? caps : [] });
   // the theme's tree dying (React's uncaught error) takes it off (the watchdog, main.c)
   setRootErrorHandler((e) => { try { lord.themes.fail(String(e?.message || e).slice(0, 200)); } catch (x) { /* none */ } });

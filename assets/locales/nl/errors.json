@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "Dat programma staat niet op de blokkeerlijst.",
   "sentinela.noAppNetwork": "Dit proces heeft geen eigen app waarvan het netwerk kan worden geblokkeerd.",
   "sys.failed": "Er is iets misgegaan.",
-  "sys.unsupported": "Deze versie van LordOS kan dat niet."
+  "sys.unsupported": "Deze versie van LordOS kan dat niet.",
+  "theme.notAllowed": "{call} is niet beschikbaar voor communitythema's",
+  "theme.noHost": "Het LordOS-deel van de bureaubladstijl ontbreekt"
 }

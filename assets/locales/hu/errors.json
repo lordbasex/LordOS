@@ -966,5 +966,7 @@
   "sentinela.notBlocked": "Ez a program nincs a tiltólistán.",
   "sentinela.noAppNetwork": "Ennek a folyamatnak nincs saját alkalmazása, amelynek a hálózatát le lehetne tiltani.",
   "sys.failed": "Valami hiba történt.",
-  "sys.unsupported": "A LordOS ezen verziója erre nem képes."
+  "sys.unsupported": "A LordOS ezen verziója erre nem képes.",
+  "theme.notAllowed": "A(z) {call} nem érhető el a közösségi témák számára",
+  "theme.noHost": "Hiányzik az asztali stílus LordOS-része"
 }

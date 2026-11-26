@@ -1,5 +1,6 @@
 /* js_theme.c — community themes in a session (js_theme.h). */
 #include "js_theme.h"
+#include "js_err.h"
 #include "themestore.h"
 #include "ui.h"
 #include "../fsops.h"
@@ -112,13 +113,13 @@ static const struct { const char *name; unsigned cap; int policy; } rules[] = {
     { "themes.started", 0, JST_ALLOW }, { "themes.fail", 0, JST_ALLOW },
     /* drawing and measuring its own nodes */
     { "getLayout", 0, JST_ALLOW }, { "now", 0, JST_ALLOW }, { "log", 0, JST_ALLOW }, { "measureText", 0, JST_ALLOW },
-    { "stats", 0, JST_ALLOW }, { "setStyle", 0, JST_NODE }, { "setProp", 0, JST_NODE }, { "setText", 0, JST_NODE },
+    { "stats", 0, JST_ALLOW }, { "setStyle", 0, JST_NODE }, { "setProp", 0, JST_NODE_PROP }, { "setText", 0, JST_NODE },
     /* text, pictures, fonts and translations (read only) */
     { "text.", 0, JST_ALLOW }, { "image.", 0, JST_ALLOW }, { "fonts.list", 0, JST_ALLOW },
     { "locale.catalog", 0, JST_ALLOW }, { "locale.languages", 0, JST_ALLOW },
     { "time.", 0, JST_ALLOW }, { "system.info", 0, JST_ALLOW }, { "system.seen", 0, JST_ALLOW },
     { "system.load", 0, JST_ALLOW }, { "system.cpuTimes", 0, JST_ALLOW },
-    { "themes.list", 0, JST_ALLOW }, { "studio.status", 0, JST_ALLOW }, { "guestwin.active", 0, JST_ALLOW },
+    { "themes.list", 0, JST_ALLOW }, { "admin.available", 0, JST_ALLOW }, { "studio.status", 0, JST_ALLOW }, { "guestwin.active", 0, JST_ALLOW },
     /* windows: moving and resizing in C, focus, the work areas, Linux windows' frames */
     { "wm.", 0, JST_ALLOW }, { "wayland.focus", 0, JST_ALLOW }, { "wayland.close", 0, JST_ALLOW },
     { "wayland.state", 0, JST_ALLOW }, { "wayland.workAreas", 0, JST_ALLOW }, { "wayland.hasKeyboard", 0, JST_ALLOW },
@@ -177,12 +178,36 @@ static void refused(const char *name, const char *why) {
     }
 }
 
+/* a picture a theme's own node may show: assets/<…> of its folder, or LordOS's asset:<…>, never ".." or a path */
+static int src_ok(JSContext *c, JSValueConst v) {
+    if (JS_IsNull(v) || JS_IsUndefined(v)) return 1;
+    const char *s = JS_ToCString(c, v);
+    int ok = s && !strstr(s, "..") && (!strncmp(s, "assets/", 7) || !strncmp(s, "asset:", 6)) && strlen(s) < 512;
+    for (const char *p = s ? s : ""; ok && *p; p++) if ((unsigned char)*p < 0x20) ok = 0;
+    if (s) JS_FreeCString(c, s);
+    return ok;
+}
+
+int jst_prop_guard(JSContext *c, int argc, JSValueConst *argv) {
+    if (!S.active) return 0;
+    int32_t id = -1;
+    Node *n = argc > 0 && !JS_ToInt32(c, &id, argv[0]) ? node_get(id) : NULL;
+    if (!n || !n->theme_own) return 0;
+    const char *k = argc > 1 ? JS_ToCString(c, argv[1]) : NULL;
+    int bad = !k || prop_blocked(c, argv[1]) || (!strcmp(k, "src") && !src_ok(c, argc > 2 ? argv[2] : JS_UNDEFINED));
+    if (k) JS_FreeCString(c, k);
+    if (!bad) return 0;
+    refused("setProp", "a property a theme's own node can't have");
+    js_throw_code(c, "theme.notAllowed", "call", "setProp", NULL);
+    return -1;
+}
+
 int jst_on_stack(JSContext *c) { return S.active && S.realm && JS_StackHasRealm(c, S.realm); }
 
 static int check(JSContext *c, int policy, const char *name, int argc, JSValueConst *argv, int force) {
     if (!S.active || policy == JST_ALLOW || !S.realm) return 0;
     if (!force && !JS_StackHasRealm(c, S.realm)) return 0;
-    if (policy == JST_NODE) {
+    if (policy == JST_NODE || policy == JST_NODE_PROP) {
         int32_t id = -1;
         Node *n = argc > 0 && !JS_ToInt32(c, &id, argv[0]) ? node_get(id) : NULL;
         if (n && n->theme_own && !(n->protect) && !(!strcmp(name, "setProp") && (argc < 2 || prop_blocked(c, argv[1])))) return 0;
@@ -190,7 +215,7 @@ static int check(JSContext *c, int policy, const char *name, int argc, JSValueCo
         snprintf(why, sizeof why, "node %d is not one of the theme's own", (int)id);
         refused(name, why);
     } else refused(name, "not available to community themes");
-    JS_ThrowTypeError(c, "lord.%s is not available to community themes", name);
+    js_throw_code(c, "theme.notAllowed", "call", name, NULL);
     return -1;
 }
 

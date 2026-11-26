@@ -639,8 +639,9 @@
       const segs = f.name.split('/');
       if (names.has(f.name)) { add('error', 'files.duplicate', f.name, null, 'the archive holds this file twice'); continue; }
       names.add(f.name);
+      if (segs.some((s) => s === '..' || s === '.' || s === '') || f.name.startsWith('/') || f.name.includes('\\')) { add('error', 'files.name', f.name, null, 'no "..", "." or absolute names'); continue; }
       if (segs.some((s) => s.startsWith('.'))) { add('warning', 'files.hidden', f.name, null, 'hidden files are not installed'); continue; }
-      if (segs.some((s) => !SEGMENT.test(s) || s === '..') || f.name.length > LIMITS.pathLength) { add('error', 'files.name', f.name, null, 'use only letters, digits, ".", "-" and "_" in names'); continue; }
+      if (segs.some((s) => !SEGMENT.test(s)) || f.name.length > LIMITS.pathLength) { add('error', 'files.name', f.name, null, 'use only letters, digits, ".", "-" and "_" in names'); continue; }
       if (segs.length > LIMITS.depth) add('error', 'files.depth', f.name, null, `at most ${LIMITS.depth} folder levels`);
       count++; total += f.size;
       const ext = extOf(f.name), base = baseOf(f.name);
@@ -821,7 +822,7 @@
     const codeFiles = files.filter((f) => CODE_EXT.includes(extOf(f.name)) && typeof f.text === 'string');
     if (checks) for (const f of codeFiles) checkCode(f, add, ownNs, catalogs);
     const index = byName.get('index.jsx');
-    if (index && typeof index.text === 'string' && !/\bstartShell\s*\(/.test(scan(index.text).masked)) add('error', 'shell.startShell', 'index.jsx', null, 'index.jsx must end with startShell(<App />)');
+    if (checks && index && typeof index.text === 'string' && !/\bstartShell\s*\(/.test(scan(index.text).masked)) add('error', 'shell.startShell', 'index.jsx', null, 'index.jsx must end with startShell(<App />)');
 
     // the build, from index.jsx
     let code = null;

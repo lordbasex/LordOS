@@ -1640,3 +1640,8 @@ build/themestore-test: tests/themestore_test.c src/ui/themestore.c src/ui/themes
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/themestore_test.c src/ui/themestore.c src/themec/zipread.c src/themec/stbzlib.c src/sec/json.c src/pkg/crypto.c
 	./$@ build/lord-themec || { rm -f $@; exit 1; }
+# a community theme in a headless session: its realm, the guard of every lord.* call, forged elements, the watchdog
+test-full: community-theme-headless
+community-theme-headless: build/lord-server
+	tests/community_theme_headless.sh; r=$$?; [ $$r -eq 0 ] || [ $$r -eq 77 ]
+.PHONY: community-theme-headless

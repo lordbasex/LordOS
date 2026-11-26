@@ -965,5 +965,7 @@
   "sentinela.notBlocked": "该程序不在拦截列表中。",
   "sentinela.noAppNetwork": "这个进程没有可以阻止联网的独立应用。",
   "sys.failed": "出了点问题。",
-  "sys.unsupported": "此版本的 LordOS 无法做到这一点。"
+  "sys.unsupported": "此版本的 LordOS 无法做到这一点。",
+  "theme.notAllowed": "社区主题无法使用 {call}",
+  "theme.noHost": "缺少桌面风格的 LordOS 部分"
 }
