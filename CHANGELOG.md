@@ -39,6 +39,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **TURN URLs with `?transport=udp|tcp` accepted** (`lordos-turn-transport-query.patch`, `+4`): WebKit's check was
     inverted and refused every TURN URL with a query, so a video meeting site's `new RTCPeerConnection()` threw
     `SyntaxError`.
+  - **Document-Isolation-Policy gives cross-origin isolation** (`lordos-document-isolation-policy.patch`,
+    `2.54.3-1~lordos13+4.1`, amd64): WhatsApp Web said "Your browser doesn't support calling" because its page is
+    isolated in Chrome through `Document-Isolation-Policy: isolate-and-require-corp` (with COOP
+    `same-origin-allow-popups` and COEP `require-corp`), which WebKit doesn't implement, so it had no SharedArrayBuffer.
+    A document with DIP `isolate-and-require-corp` or `isolate-and-credentialless`, an enforced COEP `require-corp` and
+    COOP `unsafe-none` or `same-origin-allow-popups` now gets WebKit's own isolation, as if its COOP were `same-origin`:
+    a new browsing context group in a web process of its own, `crossOriginIsolated` true, SharedArrayBuffer in the page
+    and its dedicated workers. Stricter, never looser: cross-origin popups and openers lose `window.opener` (lord-web
+    never makes WebKit popups), subresource COEP/CORP enforcement is unchanged, DIP without COEP `require-corp` (WebKit
+    has no `credentialless`) isolates nothing. `build-wpewebkit.sh` accepts a revision `n.m`. lord-web's call log page
+    line ends with `DIP <word>` (closed words: `none`, `isolate-and-require-corp`, `isolate-and-credentialless`, `other`).
+    `webcalls_check.py --dip` checks a page with the app's exact headers (isolated, SharedArrayBuffer in it and in its
+    worker, a shared buffer written by the worker, a cross-origin script without CORP still blocked) and that COOP
+    `same-origin-allow-popups` + COEP alone, or DIP without COEP, stay not isolated (docs/WPEWEBKIT.md,
+    "Document-Isolation-Policy").
   - **SharedArrayBuffer for cross-origin-isolated pages only** (`lordos-sharedarraybuffer-coi.patch` in the same build):
     WebKit already starts a web process of its own for a page served with COOP `same-origin` and COEP `require-corp`;
     the patch turns SharedArrayBuffer on in that process only (`JSC_useSharedArrayBuffer`, removed from every other

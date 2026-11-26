@@ -21,7 +21,7 @@ published; the latest release, 0.8.9.5-beta, still uses Debian's 2.48. The curre
 
 `tools/pkg/build-wpewebkit.sh <debian-version> [lordos-revision]`, for example `tools/pkg/build-wpewebkit.sh 2.54.3-1 2`,
 makes version `2.54.3-1~lordos13+2` (`~` sorts it below Debian's own `2.54.3-1`, so a later Debian package of the same
-version wins; `lordos13` is Debian 13). `ARCH=arm64` builds arm64 on an amd64 machine under qemu-user (below). Its
+version wins; `lordos13` is Debian 13). The revision is a number or `n.m`: `4.1` sorts after `+4` and before `+5`. `ARCH=arm64` builds arm64 on an amd64 machine under qemu-user (below). Its
 steps, each in a clean chroot made by `mmdebstrap` (a Debian build tool, installed on the build machine with
 `apt-get install mmdebstrap`; no container runtime):
 
@@ -108,6 +108,7 @@ All in `backport()` of `tools/pkg/wpewebkit-chroot.sh`; a change that stops appl
 | `debian/rules`: `-DUSE_LIBRICE=ON`; `debian/control`: Build-Depends `librice-dev (>= 0.4.3)` (`+4`) | ICE in WebKit's network process ("librice" below): the web process keeps no network, and calls connect |
 | `debian/patches/lordos-turn-transport-query.patch` (`+4`) | WebKit's `RTCPeerConnection` refused every TURN URL with a query (an inverted check: `query()` has no `?`, so `find("?transport=")` is `notFound`, which is true); sites hand out `turn:host:443?transport=tcp`. Now exactly `transport=udp` and `transport=tcp` are accepted, which the ICE agent reads; another query is still a `SyntaxError` |
 | `debian/patches/lordos-sharedarraybuffer-coi.patch` (`+3`) | SharedArrayBuffer only in a web process made for cross-origin-isolated documents (COOP `same-origin` + COEP `require-corp`): WebKit already gives such a document a process of its own (`CrossOriginMode::Isolated`, `WebProcessProxy::shouldEnableSharedArrayBuffer()`), but only its Cocoa launcher turned SharedArrayBuffer on there; the patch does the same in the GLib launcher (`JSC_useSharedArrayBuffer=1` in that process's environment only, removed from every other's). Before it WPE never had SharedArrayBuffer, and a messaging web app requires it for calls. Checked by `tests/webcalls_check.py`: a plain page never has it, before or after an isolated one in the same view |
+| `debian/patches/lordos-document-isolation-policy.patch` (`+4.1`) | A messaging web app makes its page cross-origin isolated with **Document-Isolation-Policy** (DIP), which WebKit doesn't implement, next to COOP `same-origin-allow-popups`: without it the page had no SharedArrayBuffer and offered no calls. A document with DIP `isolate-and-require-corp` (or `-credentialless`), an enforced COEP `require-corp` and COOP `unsafe-none` or `same-origin-allow-popups` gets WebKit's own isolation, as if its COOP were `same-origin`. "Document-Isolation-Policy (since `+4.1`)" below |
 | `debian/control`: `Maintainer: LordOS`, `Uploaders` removed | Bugs in this build come to LordOS, not to Debian. Debian's WebKit team stays credited in the changelog and `debian/copyright` (not as `XSBC-Original-Maintainer`: Debian's lintian doesn't know that field) |
 | `debian/changelog`: entry `<version>~lordos13+<n>` for `trixie`, dated one second after the Debian entry it follows | The backport's version, below Debian's own. A fixed date (later than Debian's, as lintian requires) is the build's `SOURCE_DATE_EPOCH`, so building the same version again gives the same `.debian.tar.xz` |
 
@@ -147,6 +148,63 @@ Measured by the test against trixie's `libwpewebkit-2.0-1` 2.48.3-1 (`+2`, 2026-
   (`libwayland-client`, `libwayland-egl`, `libwayland-server`, `libxkbcommon`), `libatk-bridge`, `libenchant`,
   `libhyphen` and `libgpg-error`; gone: `libwoff2dec` (FreeType decodes WOFF2), Flite and `libgsttranscoder`.
   `libgbm` and `libdrm` were already there in 2.48. Only lord-web loads WebKit; `lord-server` links none of them.
+
+## Document-Isolation-Policy (since `+4.1`)
+
+**The problem.** WhatsApp Web in lord-web said "Your browser doesn't support calling"; the call log's page line read
+`crossOriginIsolated no, SharedArrayBuffer no, RTCPeerConnection yes, getUserMedia yes`. Its document is served with
+`Cross-Origin-Embedder-Policy: require-corp`, `Cross-Origin-Opener-Policy: same-origin-allow-popups`,
+`Document-Isolation-Policy: isolate-and-require-corp` and `Origin-Agent-Cluster: ?1` (captured from Chrome,
+2026-11-26). Chrome becomes cross-origin isolated through DIP, which isolates one document in an agent cluster and
+process of its own whatever its COOP. WebKit has no DIP, and COOP `same-origin-allow-popups` is not enough for its
+isolation (that needs COOP `same-origin` with COEP `require-corp`), so `lordos-sharedarraybuffer-coi.patch` never ran.
+
+**The patch** (`lordos-document-isolation-policy.patch`, one function: `obtainCrossOriginOpenerPolicy` in
+`Source/WebCore/loader/CrossOriginOpenerPolicy.cpp`). When a response has
+- `Document-Isolation-Policy` `isolate-and-require-corp` or `isolate-and-credentialless` (a structured-field token; `none`,
+  `Document-Isolation-Policy-Report-Only` and anything else change nothing),
+- an **enforced** `Cross-Origin-Embedder-Policy: require-corp` (WebKit's only enforcing COEP; it doesn't implement
+  `credentialless`, so DIP with COEP `credentialless` is not isolated: isolating without enforcing would be weaker), and
+- COOP `unsafe-none` or `same-origin-allow-popups`, from a potentially trustworthy origin (HTTPS or loopback; the
+  function already returns no policy for any other),
+
+its effective COOP becomes WebKit's `SameOriginPlusCOEP`, exactly what COOP `same-origin` + COEP `require-corp` give.
+Every part of WebKit reads COOP through that one function (the network process's browsing context group switch, the UI
+process's response policy, the web process's `DocumentLoader`), so they all agree: the navigation goes to a **new,
+isolated browsing context group in a web process of its own** (`CrossOriginMode::Isolated`, never reused or cached),
+the only kind of process where `lordos-sharedarraybuffer-coi.patch` turns SharedArrayBuffer on and WebKit allows
+high-precision timers; `crossOriginIsolated` is true in the page and its frames; its dedicated workers run in the
+same process and have SharedArrayBuffer (a buffer shared with one works). The report-only COOP is untouched.
+
+**Why this way, and the trade-off.** Chrome's DIP relies on site isolation: the document gets its own agent cluster
+and process even though cross-origin popups stay in its browsing context group. WPE runs without site isolation, so
+everything in one browsing context group shares one web process; a cross-origin page left there (a popup, its opener)
+would run next to SharedArrayBuffer and fine timers, which is what Spectre-style reads need. COOP `same-origin` is the
+model WebKit already has for keeping every other origin out of such a process, so DIP is mapped onto it rather than
+onto a new, partial isolation:
+- **Stricter than what the site asked, never looser.** From `same-origin-allow-popups` (or `unsafe-none`) the policy
+  only tightens: a popup the page opens to another origin, or the page's own cross-origin opener, loses the
+  `window.opener` link (the popup still opens), as under COOP `same-origin`. In lord-web this costs nothing: it never
+  creates WebKit popups (a new window inside the app's scope loads in the same view, one outside it opens in the
+  browser, WEBAPPS.md), so no messaging web app flow depends on an opener there. Same-origin popups with the same
+  headers keep it.
+- **Subresources are checked as before.** COEP `require-corp` is the document's own header and WebKit enforces it as
+  always: a cross-origin subresource without `Cross-Origin-Resource-Policy` (or CORS) is still blocked, and a
+  cross-origin iframe still needs its own COEP/CORP. Nothing here is relaxed.
+- **Top-level only in effect.** WebKit's `crossOriginIsolated` reads the main frame's COOP, so DIP in an iframe of a
+  page that isn't isolated isolates nothing (Chrome would isolate that iframe alone; WebKit can't without site
+  isolation). The only effect DIP has in such an iframe is stricter: `window.open` from it, cross-origin to the top,
+  gets no opener (`shouldForceNoOpenerBasedOnCOOP`).
+- **A page with COOP `same-origin-allow-popups` + COEP and no DIP stays not isolated**, as before and as in Chrome.
+
+**Checked** by `server/tests/webcalls_check.py --dip` (the build's test, sandbox on), with pages on 127.0.0.1: a page
+served with exactly the app's four headers is cross-origin isolated, has SharedArrayBuffer and Atomics, its dedicated
+worker (served with COEP `require-corp`) has SharedArrayBuffer and writes 42 into a buffer the page shares with it, a
+cross-origin script without CORP is blocked and one with `Cross-Origin-Resource-Policy: cross-origin` loads, and the
+call log's page line ends `DIP isolate-and-require-corp`; COOP `same-origin-allow-popups` + COEP without DIP, and DIP
+without COEP, are not isolated and have no SharedArrayBuffer in the page or its worker; a plain page afterwards still
+has none. lord-web's page line now ends `, DIP <word>`: `none`, `isolate-and-require-corp`,
+`isolate-and-credentialless` or `other` (`webcall_dip_word`, from the main frame's response, never the header's text).
 
 ## librice (since `+4`)
 
