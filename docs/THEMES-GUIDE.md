@@ -578,6 +578,11 @@ The view model (`apps/files/skinmodel.js`, `filesViewModel`):
   across renders; each call runs what the current render offers, exactly as Files' own button would (a new folder in a
   folder Files only browses shows Files' read-only notice; Move to Trash in a cloud folder asks first).
 
+**Isolated apps can't be skinned this way.** Mail, Calendar, Contacts, Passwords and Reminders run as their own processes
+(`"process": "isolated"`), where the theme's code never runs: they receive the tokens (richer ones included, as JSON
+through the broker), never a pack's components or a skin. Skinning them would need a declarative, data-only form of
+skins, which is not built.
+
 What a skin doesn't get in Files: drag and drop (Files' own item view keeps it), tabs, the search scope bar, the
 read-only banner and Files' sheets (Get Info, Quick Preview, Connect to Server, the confirmations), which stay Files'
 own over any skin. `server/tests/files_skin_scene.mjs` runs Files with every region replaced by a minimal stub
