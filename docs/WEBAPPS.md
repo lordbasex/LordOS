@@ -814,6 +814,20 @@ Voice and video calls in web apps (a messaging web app first, also video meeting
   one page gather host candidates (4 UDP, 8 TCP) and connect in 300 to 400 ms, with Opus and VP8 (215 to 221 audio
   packets, 64 to 67 frames of 320×240 in 4 s), and again with Opus and H.264; the audio comes from WebKit's mock
   microphone (`WEBCALLS_MOCK_CAPTURE=1`, test only), the video from a canvas.
+- **Received video and hardware decoders.** WebKit's GStreamer backend asks its registry scanner whether a hardware
+  decoder handles a received video codec. When one does, it leaves the track encoded and decodes it only in the
+  playback pipeline of the `<video>` element that shows it; otherwise it decodes it at once in software. On a PC with an
+  AMD or Intel GPU and Mesa's VA-API driver, H.264 goes to `vah264dec` (gst-plugins-bad's `va` plugin), which opens the
+  GPU's render node inside WebKit's sandboxed web process (WebKit's bubblewrap gives it `/dev/dri`) and decodes there;
+  VP8 and VP9 on an RX 580, which has no hardware decoder for them, go to `vp8dec` and `vp9dec`; without a GPU, H.264
+  goes to `openh264dec`. A track that no element plays therefore decodes nothing on such a PC, and its `inbound-rtp`
+  stats have no `framesDecoded` until an element plays it; every call page shows its video, so calls are unaffected.
+  lord-web sets nothing here: forcing early decoding (`WEBKIT_GST_WEBRTC_FORCE_EARLY_VIDEO_DECODING=1`) would decode
+  tracks nobody shows, and lowering the VA decoders' rank would give up the GPU that works. Checked 2026-11-26 on the
+  maintainer's PC (RX 580, `+4.1` installed): `tests/webcalls_check.py --webrtc` plays the received video in a `<video>`
+  element and requires frames shown there (`requestVideoFrameCallback`) as well as decoded, for VP8, VP9 and H.264: 59
+  frames of 320×240 shown each in 4 s, H.264 through `vah264dec`; the same with `LIBGL_ALWAYS_SOFTWARE=1` (lord-web's
+  shared-memory mode) and with `/dev/dri` hidden (H.264 through `openh264dec`, as in the build's test chroot).
 - **TURN URLs with `?transport=`.** WebKit 2.54's `RTCPeerConnection` refused every TURN server URL with a query (an
   inverted check), and sites hand out `turn:host:443?transport=tcp` (RFC 7065): a video meeting site's page threw
   `SyntaxError` when it created its connection. `lordos-turn-transport-query.patch` (`+4`) accepts exactly
