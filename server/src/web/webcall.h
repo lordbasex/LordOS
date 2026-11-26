@@ -29,6 +29,14 @@
  * message is dropped (not JSON, an unknown kind, a field out of its list or pattern). */
 size_t webcall_line(const char *json, size_t len, char *out, size_t n);
 
+/* The app's main document's Document-Isolation-Policy for the "page:" line, in closed words: "none" (no header, or
+ * "none"), "isolate-and-require-corp", "isolate-and-credentialless" or "other" (anything else; never the value itself).
+ * webcall_dip_word is pure; webcall_set_dip keeps the word of the main frame's last response (lord-web's response
+ * policy decision), which webcall_line adds to the "page:" line as ", DIP <word>". The engine never tells the page its
+ * own headers, so this comes from lord-web, not from webcall.js. */
+const char *webcall_dip_word(const char *header);
+void webcall_set_dip(const char *header);
+
 /* the kind of device a captured track comes from, in closed words, never its label: "lordos-studio" (LordOS Studio's
  * virtual camera), "virtual", "bluetooth", "usb", "built-in", "other", "unnamed" (no label), and "screen" for
  * getDisplayMedia. The label (a device's name, which can be a person's name or a serial number) is only read here. */

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """webcalls_check.py — web apps' calls and Chrome identity on the real engine (docs/WEBAPPS.md, "Calls").
 
-    python3 -I tests/webcalls_check.py build/webcalls-check [--webrtc]
+    python3 -I tests/webcalls_check.py build/webcalls-check [--webrtc] [--dip] [--swnotify]
 
 Serves pages on 127.0.0.1 (a secure context, as Chrome and WebKit treat loopback) and loads each in
 build/webcalls-check (tests/webcalls_check.c: a WebKit view set up as lord-web sets up a Chrome profile):
@@ -13,6 +13,12 @@ build/webcalls-check (tests/webcalls_check.c: a WebKit view set up as lord-web s
              is opened) in the call log by its name
   isolation  SharedArrayBuffer: never on a page that isn't cross-origin isolated; with --webrtc (an engine built with
              LordOS's patch) present on one served with COOP same-origin and COEP require-corp, in the same run
+  DIP        a page served with exactly a messaging web app's headers (COEP require-corp, COOP same-origin-allow-popups,
+             Document-Isolation-Policy isolate-and-require-corp, Origin-Agent-Cluster ?1): with --dip (an engine with
+             lordos-document-isolation-policy.patch, +4.1) cross-origin isolated, SharedArrayBuffer in the page and in a
+             dedicated worker, a SharedArrayBuffer shared with that worker, "DIP isolate-and-require-corp" in the call
+             log's page line; on any engine: a cross-origin script without CORP still blocked there (one with CORP
+             loads), and COOP same-origin-allow-popups with COEP, or DIP without COEP, still not isolated
   loopback   (--webrtc) two RTCPeerConnections in one page exchange audio (a WebAudio oscillator) and video (an
              animated canvas): both connect, frames and audio arrive, and the codecs are Opus and VP8, then VP9, then
              H.264 (the receiver's codec preferences); the received video plays in a <video> element, as a call shows
@@ -21,6 +27,16 @@ build/webcalls-check (tests/webcalls_check.c: a WebKit view set up as lord-web s
              received track encoded and decodes it only in the pipeline of the element that plays it, so a track no
              element plays decodes nothing and its inbound-rtp stats have no framesDecoded. The call log shows the
              connection, its states and codecs
+
+  swnotify   (--swnotify: an engine with lordos-sw-notifications.patch, +4.2; needs dbus-run-session) a page's service
+             worker calls registration.showNotification, under a session bus of its own with webcalls-check's own
+             notification server on it. With the page open: two notifications with one tag reach the view's
+             show-notification with their title, body and tag, the first closed when the second replaces it, none on
+             D-Bus; webcalls-check clicks the second (webkit_notification_clicked, as lord-web does) and the worker's
+             notificationclick gets it, its clients.focus() resolves and the view's lordos-focus-from-service-worker
+             fires. With no view of the worker's origin (the page gone to another origin first): the notification goes
+             to D-Bus as before (Notify, the app name set), and the server's click (ActionInvoked) reaches the worker's
+             notificationclick
 
 Without --webrtc (an engine without WebRTC, Debian's or LordOS's build before +3) the WebRTC checks are reported as
 "not built" and the rest must pass. Prints one line per check and exits 1 on the first failure."""
@@ -41,6 +57,8 @@ WEBRTC = "--webrtc" in sys.argv
 # as that known block, not a failure; anything else (a candidate gathered and still no connection, no frames, a
 # wrong codec) still fails.
 NO_NETWORK_KNOWN = "--no-network-known" in sys.argv
+DIP = "--dip" in sys.argv
+SWNOTIFY = "--swnotify" in sys.argv
 MAJOR = None
 
 ACCEPT_CH = ("Sec-CH-UA-Full-Version-List, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, "
@@ -84,6 +102,47 @@ fetch(location.pathname.replace('/page/', '/report/'), { method: 'POST', body: J
   sab: typeof SharedArrayBuffer, coi: self.crossOriginIsolated, atomics: typeof Atomics })
 }).then(() => { document.title = 'done'; });
 </script>"""
+
+# a dedicated worker (served with COEP require-corp, as a site that is isolated serves its workers), a
+# SharedArrayBuffer handed to it and written there, and two cross-origin scripts (another port: another origin), one
+# without Cross-Origin-Resource-Policy (COEP must block it) and one with CORP cross-origin (it loads)
+DIP_PAGE = b"""<!doctype html><title>dip</title><script>
+(async () => {
+  const name = location.pathname.replace('/page/', '');
+  const o = { sab: typeof SharedArrayBuffer, coi: self.crossOriginIsolated, atomics: typeof Atomics };
+  try {
+    const w = new Worker('/worker.js');
+    o.worker = await new Promise(res => {
+      w.onmessage = e => res(e.data);
+      w.onerror = e => res({ error: 'worker error' });
+      if (typeof SharedArrayBuffer === 'function') {
+        const sab = new SharedArrayBuffer(16);
+        o.shared = 'sent';
+        w.postMessage(sab);
+        setTimeout(() => { o.sharedValue = new Int32Array(sab)[0]; }, 500);
+      } else w.postMessage(null);
+      setTimeout(() => res({ error: 'timeout' }), 5000);
+    });
+    await new Promise(f => setTimeout(f, 700));
+  } catch (e) { o.worker = { error: e.name }; }
+  const load = src => new Promise(res => { const s = document.createElement('script'); s.src = src;
+    s.onload = () => res('loaded'); s.onerror = () => res('blocked'); document.head.appendChild(s); setTimeout(() => res('timeout'), 5000); });
+  o.noCorp = await load(XORIGIN + '/res/nocorp.js');
+  o.withCorp = await load(XORIGIN + '/res/corp.js');
+  await fetch('/report/' + name, { method: 'POST', body: JSON.stringify(o) });
+  document.title = 'done';
+})();
+</script>"""
+
+WORKER_JS = b"""self.onmessage = e => {
+  let wrote = false;
+  if (e.data && typeof SharedArrayBuffer === 'function' && e.data instanceof SharedArrayBuffer) { Atomics.store(new Int32Array(e.data), 0, 42); wrote = true; }
+  postMessage({ sab: typeof SharedArrayBuffer, coi: self.crossOriginIsolated, wrote });
+};"""
+
+# the headers a messaging web app's document is served with (captured from Chrome, 2026-11-26)
+DIP_HEADERS = [("Cross-Origin-Embedder-Policy", "require-corp"), ("Cross-Origin-Opener-Policy", "same-origin-allow-popups"),
+               ("Document-Isolation-Policy", "isolate-and-require-corp"), ("Origin-Agent-Cluster", "?1")]
 
 LOOPBACK_PAGE = b"""<!doctype html><title>loopback</title><canvas id=c width=320 height=240></canvas><script>
 async function call(prefer) {
@@ -156,6 +215,69 @@ async function call(prefer) {
 })();
 </script>"""
 
+# a service worker that shows the notifications a page asks for (after a delay, if asked: the page may be gone by then)
+# and reports its notificationclick (title, tag, body, its window clients and what clients.focus() gave) to /report/swclick-<tag>
+SW_JS = b"""self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+const report = (name, o) => fetch('/report/' + name, { method: 'POST', body: JSON.stringify(o) });
+self.addEventListener('message', e => {
+  const m = e.data || {};
+  e.waitUntil((async () => {
+    if (m.delay) await new Promise(f => setTimeout(f, m.delay));
+    try {
+      for (const n of m.show) await self.registration.showNotification(n.title, { body: n.body, tag: n.tag, data: { n: n.title } });
+      const list = await self.registration.getNotifications();
+      await report('swshown-' + m.name, { ok: true, open: list.map(x => x.title) });
+    } catch (err) { await report('swshown-' + m.name, { ok: false, error: err.name + ': ' + err.message }); }
+  })());
+});
+self.addEventListener('notificationclick', e => {
+  e.waitUntil((async () => {
+    const r = { title: e.notification.title, tag: e.notification.tag, body: e.notification.body, data: e.notification.data };
+    const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    r.clients = cs.length;
+    if (cs.length) { try { await cs[0].focus(); r.focus = 'resolved'; } catch (err) { r.focus = err.name; } }
+    e.notification.close();
+    await report('swclick-' + e.notification.tag, r);
+  })());
+});
+self.addEventListener('notificationclose', e => e.waitUntil(report('swclose-' + e.notification.title.replace(/ /g, '_'), {})));
+"""
+
+# the worker up and controlling the page, then the notifications asked for; the page waits for the click's report
+SW_VIEW_PAGE = b"""<!doctype html><title>sw</title><script>
+(async () => {
+  const o = { permission: Notification.permission };
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+    reg.active.postMessage({ name: 'view', show: [{ title: 'LordOS first', body: 'uno', tag: 't1' },
+                                                  { title: 'LordOS second', body: 'dos \\u00f1', tag: 't1' }] });
+    for (let i = 0; i < 150 && (await (await fetch('/status/swclick-t1')).text()) !== 'yes'; i++) await new Promise(f => setTimeout(f, 200));
+  } catch (e) { o.error = e.name + ': ' + e.message; }
+  await fetch('/report/swview', { method: 'POST', body: JSON.stringify(o) });
+  document.title = 'done';
+})();
+</script>"""
+
+# the worker asked for a notification in 3 s, then the page goes to another origin: no view has the worker's origin
+SW_AWAY_PAGE = b"""<!doctype html><title>sw away</title><script>
+(async () => {
+  const reg = await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.ready;
+  reg.active.postMessage({ name: 'away', delay: 3000, show: [{ title: 'LordOS away', body: 'no view', tag: 't2' }] });
+  location.href = XORIGIN + '/away';
+})();
+</script>"""
+
+# on the other origin: done once the worker reported the D-Bus click
+AWAY_PAGE = b"""<!doctype html><title>away</title><script>
+(async () => {
+  for (let i = 0; i < 150 && (await (await fetch(MAIN + '/status/swclick-t2')).text()) !== 'yes'; i++) await new Promise(f => setTimeout(f, 200));
+  document.title = 'done';
+})();
+</script>"""
+
 reports = {}
 requests = []
 
@@ -182,6 +304,35 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.page(SAB_PAGE)
         elif self.path == "/page/loopback":
             self.page(LOOPBACK_PAGE)
+        elif self.path == "/page/dip":
+            self.page(DIP_PAGE.replace(b"XORIGIN", b"'http://127.0.0.1:%d'" % xport), DIP_HEADERS)
+        elif self.path == "/page/soap":
+            self.page(DIP_PAGE.replace(b"XORIGIN", b"'http://127.0.0.1:%d'" % xport),
+                      [("Cross-Origin-Embedder-Policy", "require-corp"), ("Cross-Origin-Opener-Policy", "same-origin-allow-popups")])
+        elif self.path == "/page/dipnocoep":
+            self.page(DIP_PAGE.replace(b"XORIGIN", b"'http://127.0.0.1:%d'" % xport),
+                      [("Cross-Origin-Opener-Policy", "same-origin-allow-popups"), ("Document-Isolation-Policy", "isolate-and-require-corp")])
+        elif self.path == "/page/swview":
+            self.page(SW_VIEW_PAGE)
+        elif self.path == "/page/swaway":
+            self.page(SW_AWAY_PAGE.replace(b"XORIGIN", b"'http://127.0.0.1:%d'" % xport))
+        elif self.path == "/sw.js":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/javascript")
+            self.end_headers()
+            self.wfile.write(SW_JS)
+        elif self.path.startswith("/status/"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(b"yes" if "/report/" + self.path[len("/status/"):] in reports else b"no")
+        elif self.path == "/worker.js":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/javascript")
+            self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+            self.end_headers()
+            self.wfile.write(WORKER_JS)
         else:
             self.send_response(404)
             self.end_headers()
@@ -198,6 +349,30 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
 
 
+class XHandler(http.server.BaseHTTPRequestHandler):
+    """the other origin: two scripts, one without CORP and one with CORP cross-origin"""
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        if self.path == "/away":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(AWAY_PAGE.replace(b"MAIN", b"'http://127.0.0.1:%d'" % port))
+            return
+        if self.path not in ("/res/nocorp.js", "/res/corp.js"):
+            self.send_response(404)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/javascript")
+        if self.path == "/res/corp.js":
+            self.send_header("Cross-Origin-Resource-Policy", "cross-origin")
+        self.end_headers()
+        self.wfile.write(b"window.__x = 1;")
+
+
 def fail(msg):
     print("FAIL", msg)
     sys.exit(1)
@@ -207,13 +382,19 @@ def ok(msg):
     print("ok  ", msg)
 
 
-def run(path, secs=40, mock=False):
+def run(path, secs=40, mock=False, swnotify=False):
     env = dict(os.environ)
     if mock:
         env["WEBCALLS_MOCK_CAPTURE"] = "1"
     home = tempfile.mkdtemp(prefix="webcalls-home-")
     env.update(HOME=home, XDG_CACHE_HOME=home + "/.cache", XDG_DATA_HOME=home + "/.local/share", XDG_CONFIG_HOME=home + "/.config")
-    p = subprocess.run([CHECK, "http://127.0.0.1:%d%s" % (port, path), str(secs)], env=env, capture_output=True, text=True, timeout=secs + 30)
+    cmd = [CHECK, "http://127.0.0.1:%d%s" % (port, path), str(secs)]
+    if swnotify:
+        # a session bus of its own, with webcalls-check's notification server on it (never the desktop's)
+        env["WEBCALLS_SWNOTIFY"] = "1"
+        env.pop("DBUS_SESSION_BUS_ADDRESS", None)
+        cmd = ["dbus-run-session", "--"] + cmd
+    p = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=secs + 30)
     lines = p.stdout.splitlines()
     if p.returncode != 0:
         print(p.stdout + p.stderr)
@@ -242,6 +423,9 @@ def header_of(bl):
 srv = Server(("127.0.0.1", 0), Handler)
 port = srv.server_address[1]
 threading.Thread(target=srv.serve_forever, daemon=True).start()
+xsrv = Server(("127.0.0.1", 0), XHandler)
+xport = xsrv.server_address[1]
+threading.Thread(target=xsrv.serve_forever, daemon=True).start()
 
 # ---- identity ----
 calls, out = run("/page/ua")
@@ -330,6 +514,77 @@ again = reports["/report/plain"]
 if again["sab"] != "undefined":
     fail("SharedArrayBuffer leaked to a plain page after an isolated one: %r" % again)
 ok("a plain page after the isolated one still has no SharedArrayBuffer")
+
+# ---- Document-Isolation-Policy ----
+calls, _ = run("/page/dip")
+d = reports.get("/report/dip") or fail("no report from the DIP page")
+print("     DIP page:", json.dumps(d, sort_keys=True))
+if d.get("noCorp") != "blocked" or d.get("withCorp") != "loaded":
+    fail("DIP page: a cross-origin script without CORP %s, with CORP %s (want blocked, loaded)" % (d.get("noCorp"), d.get("withCorp")))
+ok("DIP page: a cross-origin script without CORP blocked, one with CORP cross-origin loaded (COEP require-corp enforced)")
+pl = [c for c in calls if c.startswith("webcall: page: ")]
+if not pl or not pl[0].endswith(", DIP isolate-and-require-corp"):
+    fail("the call log's page line lacks 'DIP isolate-and-require-corp': %r" % pl)
+wk = d.get("worker") or {}
+if DIP:
+    if not d["coi"] or d["sab"] != "function":
+        fail("the DIP page isn't cross-origin isolated (lordos-document-isolation-policy.patch): %r" % d)
+    if wk.get("sab") != "function" or not wk.get("wrote") or d.get("sharedValue") != 42:
+        fail("the DIP page's dedicated worker: %r, shared value %r (want SharedArrayBuffer there and 42 written)" % (wk, d.get("sharedValue")))
+    ok("DIP page (COOP same-origin-allow-popups, COEP require-corp, DIP isolate-and-require-corp): crossOriginIsolated, "
+       "SharedArrayBuffer in the page and its worker (worker crossOriginIsolated %s), 42 written there through a shared buffer" % wk.get("coi"))
+else:
+    print("     DIP page without --dip: crossOriginIsolated %s, SharedArrayBuffer %s (an engine without the DIP patch isn't isolated)" % (d["coi"], d["sab"]))
+ok("call log: " + pl[0][len("webcall: "):])
+for name, what in (("soap", "COOP same-origin-allow-popups with COEP, no DIP"), ("dipnocoep", "DIP without COEP")):
+    run("/page/" + name)
+    r2 = reports.get("/report/" + name) or fail("no report from /page/" + name)
+    if r2["coi"] or r2["sab"] != "undefined" or (r2.get("worker") or {}).get("sab") not in ("undefined", None):
+        fail("%s is cross-origin isolated or has SharedArrayBuffer: %r" % (what, r2))
+    ok("%s: not cross-origin isolated, no SharedArrayBuffer in the page or its worker" % what)
+run("/page/plain")
+if reports["/report/plain"]["sab"] != "undefined":
+    fail("SharedArrayBuffer leaked to a plain page after the DIP one: %r" % reports["/report/plain"])
+ok("a plain page after the DIP ones still has no SharedArrayBuffer")
+
+# ---- a service worker's notifications ----
+if SWNOTIFY:
+    import shutil
+    shutil.which("dbus-run-session") or fail("--swnotify needs dbus-run-session (package dbus-daemon)")
+    _, out = run("/page/swview", 60, swnotify=True)
+    v = reports.get("/report/swview") or fail("no report from the service-worker page")
+    shown = reports.get("/report/swshown-view") or fail("the worker didn't report its notifications: %r" % out)
+    if v.get("error") or not shown.get("ok"):
+        fail("service-worker page: %r, worker: %r" % (v, shown))
+    sn = [l for l in out if l.startswith("show-notification: ")]
+    want = ["show-notification: title=LordOS first body=uno tag=t1", "show-notification: title=LordOS second body=dos \u00f1 tag=t1"]
+    if sn != want:
+        fail("the view's show-notification: %r, want %r (output %r)" % (sn, want, out))
+    if any(l.startswith("dbus Notify") for l in out):
+        fail("a service worker's notification went to D-Bus though its page's view is open: %r" % out)
+    ok("service worker: two notifications with one tag reached the view's show-notification (title, body, tag), none on D-Bus")
+    if "notification closed: title=LordOS first body=uno tag=t1" not in out:
+        fail("the first notification wasn't closed when the second took its tag: %r" % out)
+    ok("the second replaced the first (same tag, same origin): the first closed (getNotifications: %r)" % shown.get("open"))
+    c = reports.get("/report/swclick-t1") or fail("the click (webkit_notification_clicked) didn't reach the worker's notificationclick: %r" % out)
+    if c.get("title") != "LordOS second" or c.get("body") != "dos \u00f1" or c.get("data") != {"n": "LordOS second"}:
+        fail("notificationclick got %r" % c)
+    ok("webkit_notification_clicked reached the worker's notificationclick (title, body, data; %d window client)" % c.get("clients", 0))
+    if c.get("focus") != "resolved" or "focus-from-service-worker" not in out:
+        fail("clients.focus(): %r, lordos-focus-from-service-worker %s" % (c.get("focus"), "focus-from-service-worker" in out))
+    ok("the worker's clients.focus() resolved and the view emitted lordos-focus-from-service-worker")
+    _, out = run("/page/swaway", 60, swnotify=True)
+    away = reports.get("/report/swshown-away") or fail("the worker didn't report its notification after the page left: %r" % out)
+    if not away.get("ok"):
+        fail("the worker's notification with no view: %r" % away)
+    dn = [l for l in out if l.startswith("dbus Notify: ")]
+    if len(dn) != 1 or not dn[0].startswith("dbus Notify: app=webcalls-check title=LordOS away body=no view ") or any(l.startswith("show-notification") for l in out):
+        fail("with no view of the worker's origin, want one D-Bus Notify and no show-notification: %r" % out)
+    ok("no view of the worker's origin: WebKit's D-Bus notification as before (%s)" % dn[0][len("dbus Notify: "):])
+    c = reports.get("/report/swclick-t2") or fail("the D-Bus click (ActionInvoked) didn't reach the worker's notificationclick: %r" % out)
+    if c.get("title") != "LordOS away":
+        fail("notificationclick after the D-Bus click got %r" % c)
+    ok("the D-Bus click reached the worker's notificationclick (%d window clients)" % c.get("clients", 0))
 
 # ---- loopback ----
 if api["RTCPeerConnection"] != "function":

@@ -7,6 +7,9 @@ and two network stacks' ICE, no third-party service.
     python3 -I tests/webcalls_pair.py serve <port> <report-dir>      the signaling server and the page
     python3 -I tests/webcalls_pair.py chrome <url> <seconds>          Chrome's side (role in the URL: ?role=callee)
 
+URL options: bundle=<policy> (bundlePolicy), turn=<turn: URL> (a TURN server with the fixed test credentials pair /
+pairpass, e.g. a local coturn), relay=1 (iceTransportPolicy relay: media only through TURN).
+
 The page (role=caller or callee) gets the camera and microphone, the caller offers, both trickle candidates through the
 server, and after 15 s each side posts what it sent and received (codecs, packets, frames, size; the kinds of the
 candidate pair, no addresses) to <report-dir>/<role>.json and sets its title to "done"."""
@@ -25,12 +28,18 @@ const post = (path, body) => fetch(path, { method: 'POST', body: JSON.stringify(
 const get = async path => { for (;;) { const r = await fetch(path); if (r.status === 200) return r.json(); await new Promise(f => setTimeout(f, 200)); } };
 (async () => {
   const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: { width: 640, height: 480 } });
-  const bundle = new URLSearchParams(location.search).get('bundle');
-  const pc = new RTCPeerConnection(bundle ? { bundlePolicy: bundle } : {});
+  const q = new URLSearchParams(location.search), bundle = q.get('bundle'), turn = q.get('turn');
+  // turn=<turn: URL>: a TURN server with the test's fixed credentials (a local coturn); relay=1: media only through it
+  const conf = {};
+  if (bundle) conf.bundlePolicy = bundle;
+  if (turn) conf.iceServers = [{ urls: turn, username: 'pair', credential: 'pairpass' }];
+  if (q.get('relay')) conf.iceTransportPolicy = 'relay';
+  const pc = new RTCPeerConnection(conf);
   s.getTracks().forEach(t => pc.addTrack(t, s));
   pc.onicecandidate = e => { if (e.candidate) post('/cand/' + role, e.candidate.toJSON()); };
   let seen = 0;
-  (async () => { for (;;) { const r = await fetch('/cands/' + other + '?from=' + seen); const l = await r.json(); for (const c of l) { seen++; try { await pc.addIceCandidate(c); } catch (e) {} } await new Promise(f => setTimeout(f, 200)); } })();
+  // the other side's candidates only once its description is set (before, addIceCandidate rejects them)
+  (async () => { for (;;) { if (!pc.remoteDescription) { await new Promise(f => setTimeout(f, 100)); continue; } const r = await fetch('/cands/' + other + '?from=' + seen); const l = await r.json(); for (const c of l) { seen++; try { await pc.addIceCandidate(c); } catch (e) {} } await new Promise(f => setTimeout(f, 200)); } })();
   if (role === 'caller') {
     await pc.setLocalDescription(await pc.createOffer());
     await post('/sdp/offer', pc.localDescription.toJSON());
@@ -52,6 +61,7 @@ const get = async path => { for (;;) { const r = await fetch(path); if (r.status
       d[x.kind] = { codec: codecs[x.codecId], packets: x.packetsReceived || x.packetsSent || 0, frames: x.framesDecoded || x.framesEncoded || 0,
                     width: x.frameWidth || 0, height: x.frameHeight || 0, bytes: x.bytesReceived || x.bytesSent || 0 };
     }
+    if (x.type === 'transport' && x.dtlsState) r.dtls = x.dtlsState + (x.srtpCipher ? ' ' + x.srtpCipher : '');
     if (x.type === 'candidate-pair' && x.state === 'succeeded' && (x.nominated || x.selected)) r.pair = (cands[x.localCandidateId] || '?') + ' -> ' + (cands[x.remoteCandidateId] || '?');
   });
   await post('/report/' + role, r);

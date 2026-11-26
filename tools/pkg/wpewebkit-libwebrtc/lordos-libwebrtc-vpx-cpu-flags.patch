@@ -1,0 +1,47 @@
+Description: libvpx's instruction set flags per file, not on all of libvpx
+ WebKit's CMake build of its libwebrtc compiles every libvpx file with -mavx2 (x86-64) or -march=armv8.2-a+dotprod
+ (arm64). libvpx selects its functions at run time (CONFIG_RUNTIME_CPU_DETECT), but with those flags on every file the
+ compiler may use AVX2 or dot-product instructions in the generic code too, which crashes (SIGILL) on CPUs without
+ them (x86-64 before AVX2, Armv8.0 such as the Raspberry Pi 4). Give each flag only to the files written for that
+ instruction set (_ssse3, _sse4, _avx, _avx2, _avx512, _neon_dotprod, _neon_i8mm), as libvpx's own build does.
+Author: LordOS <lord.basex@gmail.com>
+Forwarded: no
+Last-Update: 2026-11-26
+
+--- a/libwebrtc/CMakeLists.txt
++++ b/libwebrtc/CMakeLists.txt
+@@ -3325,13 +3325,30 @@
+ 
+ if (WTF_CPU_X86_64)
+     add_library(vpx OBJECT ${vpx_SOURCES} ${vpx_ASSEMBLY_SOURCES})
+-    target_compile_options(vpx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2>)
+-    target_compile_options(vpx PRIVATE $<$<COMPILE_LANGUAGE:C>:-mavx2>)
+ elseif (WTF_CPU_ARM64)
+     add_library(vpx OBJECT ${vpx_SOURCES})
+-    target_compile_options(vpx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=armv8.2-a+dotprod>)
+-    target_compile_options(vpx PRIVATE $<$<COMPILE_LANGUAGE:C>:-march=armv8.2-a+dotprod>)
+ endif ()
++# LordOS: an instruction set's flag only on the files written for it, as libvpx's own build does. libvpx chooses each
++# function at run time (CONFIG_RUNTIME_CPU_DETECT); -mavx2 or -march=armv8.2-a+dotprod on every file let the compiler
++# use those instructions in the generic code too, which then crashes (SIGILL) on an x86-64 CPU without AVX2 or on an
++# Armv8.0 CPU (Raspberry Pi 4)
++foreach (_vpx_source IN LISTS vpx_SOURCES)
++    if (_vpx_source MATCHES "_ssse3\\.c$")
++        set_source_files_properties(${_vpx_source} PROPERTIES COMPILE_OPTIONS "-mssse3")
++    elseif (_vpx_source MATCHES "_sse4\\.c$")
++        set_source_files_properties(${_vpx_source} PROPERTIES COMPILE_OPTIONS "-msse4.1")
++    elseif (_vpx_source MATCHES "_avx\\.c$")
++        set_source_files_properties(${_vpx_source} PROPERTIES COMPILE_OPTIONS "-mavx")
++    elseif (_vpx_source MATCHES "_avx2\\.c$")
++        set_source_files_properties(${_vpx_source} PROPERTIES COMPILE_OPTIONS "-mavx2")
++    elseif (_vpx_source MATCHES "_avx512\\.c$")
++        set_source_files_properties(${_vpx_source} PROPERTIES COMPILE_OPTIONS "-mavx512f;-mavx512cd;-mavx512bw;-mavx512dq;-mavx512vl")
++    elseif (_vpx_source MATCHES "_neon_dotprod\\.c$")
++        set_source_files_properties(${_vpx_source} PROPERTIES COMPILE_OPTIONS "-march=armv8.2-a+dotprod")
++    elseif (_vpx_source MATCHES "_neon_i8mm\\.c$")
++        set_source_files_properties(${_vpx_source} PROPERTIES COMPILE_OPTIONS "-march=armv8.2-a+dotprod+i8mm")
++    endif ()
++endforeach ()
+ 
+ target_include_directories(vpx PRIVATE ${vpx_INCLUDE_DIRECTORIES})
+ target_compile_options(vpx PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-Wno-cast-align> $<$<COMPILE_LANGUAGE:C,CXX>:-Wno-incompatible-pointer-types>)

@@ -518,6 +518,51 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **TURN URLs with `?transport=udp|tcp` accepted** (`lordos-turn-transport-query.patch`, `+4`): WebKit's check was
     inverted and refused every TURN URL with a query, so a video meeting site's `new RTCPeerConnection()` threw
     `SyntaxError`.
+  - **Document-Isolation-Policy gives cross-origin isolation** (`lordos-document-isolation-policy.patch`,
+    `2.54.3-1~lordos13+4.1`, amd64): WhatsApp Web said "Your browser doesn't support calling" because its page is
+    isolated in Chrome through `Document-Isolation-Policy: isolate-and-require-corp` (with COOP
+    `same-origin-allow-popups` and COEP `require-corp`), which WebKit doesn't implement, so it had no SharedArrayBuffer.
+    A document with DIP `isolate-and-require-corp` or `isolate-and-credentialless`, an enforced COEP `require-corp` and
+    COOP `unsafe-none` or `same-origin-allow-popups` now gets WebKit's own isolation, as if its COOP were `same-origin`:
+    a new browsing context group in a web process of its own, `crossOriginIsolated` true, SharedArrayBuffer in the page
+    and its dedicated workers. Stricter, never looser: cross-origin popups and openers lose `window.opener` (lord-web
+    never makes WebKit popups), subresource COEP/CORP enforcement is unchanged, DIP without COEP `require-corp` (WebKit
+    has no `credentialless`) isolates nothing. `build-wpewebkit.sh` accepts a revision `n.m`. lord-web's call log page
+    line ends with `DIP <word>` (closed words: `none`, `isolate-and-require-corp`, `isolate-and-credentialless`, `other`).
+    `webcalls_check.py --dip` checks a page with the app's exact headers (isolated, SharedArrayBuffer in it and in its
+    worker, a shared buffer written by the worker, a cross-origin script without CORP still blocked) and that COOP
+    `same-origin-allow-popups` + COEP alone, or DIP without COEP, stay not isolated (docs/WPEWEBKIT.md,
+    "Document-Isolation-Policy").
+  - **A service worker's notifications go through lord-web** (`lordos-sw-notifications.patch`,
+    `2.54.3-1~lordos13+4.2`, amd64, maintainer's request of 2026-11-26): `registration.showNotification` (chat and
+    messaging web apps' "persistent" notifications) has no page, so WebKit's GLib port sent it to
+    `org.freedesktop.Notifications` itself: no LordOS sound rule, no `silent`, no window brought forward, no `notify:`
+    line. It now goes to the `show-notification` signal of a view of the worker's network session whose page has the
+    worker's origin (a visible one first), so lord-web's own handling applies, and `webkit_notification_clicked` /
+    `webkit_notification_close` reach the worker as `notificationclick` / `notificationclose`; with no such view, D-Bus
+    as before. A tag replaces only a notification of the same origin. WebKit's `focusFromServiceWorker` is implemented
+    for GLib: a worker's `clients.focus()` (only during a user gesture such as `notificationclick`) emits the view's
+    `lordos-focus-from-service-worker`, on which lord-web brings its window forward (`web_show`; connected only when the
+    signal exists). `clients.openWindow()` is still not implemented (GLib has no `WebsiteDataStoreClient`).
+    `webcalls_check.py --swnotify` (in the WebKit build's test, a session bus of its own with `webcalls-check`'s own
+    notification server; `dbus-daemon` added to the test chroot) checks the view path (title, body, tag, same-tag
+    replace, nothing on D-Bus), the click reaching `notificationclick`, `clients.focus()` and its signal, and the D-Bus
+    fallback with its click; every earlier check passes again. Not published (docs/WPEWEBKIT.md, "Service-worker
+    notifications").
+  - **WebKit's LibWebRTC backend tried, then paused** (`2.54.3-1~lordos13+5`, "option B", approved and paused by the
+    maintainer on 2026-11-26: calls work with `+4.1`; to resume with WebKit 2.56). Not published. Feasible: WPE 2.54.3
+    builds with `USE_LIBWEBRTC` and WebKit's own libwebrtc (with its BoringSSL, libvpx and libaom, linked only inside
+    `libWPEWebKit-2.0.so.1`, none of their symbols exported; ICE and sockets in WebKit's network process, the web process
+    keeps no network). `WEBRTC_BACKEND=libwebrtc tools/pkg/build-wpewebkit.sh 2.54.3-1 5`: the libwebrtc source comes
+    from WebKit's git at the release tag as the source package's `libwebrtc` component
+    (`tools/pkg/wpewebkit-libwebrtc-source.sh`; tag, commit, tree and the reproducible tarball's SHA-256 pinned in
+    `tools/pkg/wpewebkit-libwebrtc.sums`), the packaging changes and `debian/copyright` stanzas are
+    `tools/pkg/wpewebkit-libwebrtc/`, with three patches (libvpx headers on Linux, libvpx's CPU flags per file, VP8 from
+    libwebrtc's own encoder). Against Chrome 158 the `+5` build passed offering with `max-bundle`, answering (`balanced`
+    and `max-bundle`, Opus and VP8 both ways) and TURN relay over UDP and TCP; offering with `balanced` carries media
+    but the engine's `connectionState` stays `connecting`; library 137.1 MB (+9.5 MB). docs/WPEWEBKIT.md, "LibWebRTC".
+    `tests/webcalls_pair.py`: `turn=`/`relay=1` options, the DTLS state in its report, and candidates added only after
+    the remote description.
   - **SharedArrayBuffer for cross-origin-isolated pages only** (`lordos-sharedarraybuffer-coi.patch` in the same build):
     WebKit already starts a web process of its own for a page served with COOP `same-origin` and COEP `require-corp`;
     the patch turns SharedArrayBuffer on in that process only (`JSC_useSharedArrayBuffer`, removed from every other

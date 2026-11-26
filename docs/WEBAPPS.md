@@ -826,12 +826,16 @@ Voice and video calls in web apps (a messaging web app first, also video meeting
   `red`, `G722`, `CN`, `AV1`, `rtx`, `ulpfec`); `createEncodedStreams`, `MediaStreamTrackProcessor`/`Generator`,
   `WebTransport` and `setSinkId` don't exist (Chrome has them).
 - **SharedArrayBuffer when the site is cross-origin isolated.** A messaging web app checks, before it offers calls,
-  `SharedArrayBuffer`, `Atomics` and `RTCPeerConnection` (its own gating code, read 2026-11-25), and its page is served
-  with COOP `same-origin` and COEP `require-corp`. WPE never had SharedArrayBuffer: WebKit gives such a page a web
-  process of its own but only its Cocoa ports turned SharedArrayBuffer on there. LordOS's build does the same on Linux
-  (`lordos-sharedarraybuffer-coi.patch`), so SharedArrayBuffer exists only in cross-origin-isolated pages, as in
+  `SharedArrayBuffer`, `Atomics` and `RTCPeerConnection` (its own gating code, read 2026-11-25). WPE never had
+  SharedArrayBuffer: WebKit gives a cross-origin-isolated page (COOP `same-origin` + COEP `require-corp`) a web process
+  of its own but only its Cocoa ports turned SharedArrayBuffer on there. LordOS's build does the same on Linux
+  (`lordos-sharedarraybuffer-coi.patch`, `+3`), so SharedArrayBuffer exists only in cross-origin-isolated pages, as in
   Chrome and Safari (Spectre: never for a page that isn't isolated). lord-web drops `JSC_*` from its environment, so
-  nothing turns it on for every page.
+  nothing turns it on for every page. The messaging app's page, though, is served with COOP `same-origin-allow-popups`,
+  COEP `require-corp` and **Document-Isolation-Policy** `isolate-and-require-corp` (captured 2026-11-26): Chrome
+  isolates it through DIP, which WebKit doesn't implement, so it stayed not isolated ("Your browser doesn't support
+  calling"). `+4.1`'s `lordos-document-isolation-policy.patch` treats such a document as COOP `same-origin` + COEP,
+  WebKit's own isolation (WPEWEBKIT.md, "Document-Isolation-Policy"): stricter for popups, unchanged for subresources.
 - **Chrome's identity, all of it** ("Browser identity" above): the site reads the User-Agent string, the Client Hints
   and `navigator.userAgentData`, and treats a WebKit it recognises differently (another code path for calls); with the
   Chrome identity all three say Chrome 158 on Linux, from one table.
@@ -906,7 +910,7 @@ Voice and video calls in web apps (a messaging web app first, also video meeting
   `webcall_line` checks each against a closed list or pattern again and drops the rest. Example:
 
   ```
-  webcall: page: crossOriginIsolated yes, SharedArrayBuffer yes, Atomics yes, RTCPeerConnection yes, getUserMedia yes
+  webcall: page: crossOriginIsolated yes, SharedArrayBuffer yes, Atomics yes, RTCPeerConnection yes, getUserMedia yes, DIP isolate-and-require-corp
   webcall: client hints asked by the app: sec-ch-ua-full-version-list, sec-ch-ua-arch, sec-ch-ua-bitness
   webcall: permission microphone: allowed (asked)
   webcall: getUserMedia audio: granted (audio usb)

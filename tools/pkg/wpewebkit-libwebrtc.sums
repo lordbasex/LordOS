@@ -1,0 +1,9 @@
+# WebKit's own libwebrtc (Source/ThirdParty/libwebrtc), the libwebrtc component of LordOS's WPE WebKit source package
+# since 2.54.3-1~lordos13+5 (docs/WPEWEBKIT.md, "LibWebRTC"). Made by tools/pkg/wpewebkit-libwebrtc-source.sh from
+# github.com/WebKit/WebKit; every value is checked before the tarball is used. A new WebKit release: new values here.
+upstream 2.54.3
+tag wpewebkit-2.54.3
+tag-object f91ccd8f7ffa01f2310c542b1ae9033784326615
+commit c01fbd906b1ff9cb047c4489f8f63c68135d9c1e
+tree 6cfa7beee90b1c41c7e991767761cfd38f577132
+sha256 18836cf385f6e14008322527e9249c2044338c995fa08236edd4c02158bb5f36
