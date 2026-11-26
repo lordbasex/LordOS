@@ -23,6 +23,7 @@ import {
   filterCounts, collectionOrder, groupCollections, collectionCard, collectionBytes, downloadPlan, usedBytes, idsInUse, freeUpPlan, twinExtra,
   displayQuality,
 } from '../../sdk/wallpapergallery.js';
+import { MOTION_BATTERY, MOTION_FPS_CAPS, MOTION_CACHE_MB, motionCacheMb } from '../../sdk/motionmodel.js';
 import { Stack, Section, SettingRow, Note, Actions, PopUp, tint } from './ui.jsx';
 import { subPage } from './subpage.js';
 import { SlideshowSettings } from './Slideshow.jsx';
@@ -391,6 +392,25 @@ function MotionOptions({ ctx }) {
       {ctx.canPlay && !ctx.login ? (
         <SettingRow label={tr('settings.motion.speed')}>
           <Segmented small options={MOTION_RATES.map((r) => [r, `${r / 100}×`])} value={MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100} onChange={(v) => set({ motionRate: v })} />
+        </SettingRow>
+      ) : null}
+      {/* what a moving wallpaper may spend (docs/MOVING-WALLPAPERS.md): its frame rate, on battery, the GPU's loop cache */}
+      {ctx.canPlay && !ctx.login ? (
+        <SettingRow label={tr('settings.motion.fps')}>
+          <Segmented small options={MOTION_FPS_CAPS.map((c) => [c, c ? tr(`settings.motion.fps${c}`) : tr('settings.motion.fpsOwn')])}
+            value={MOTION_FPS_CAPS.includes(s.motionFpsCap) ? s.motionFpsCap : 0} onChange={(v) => set({ motionFpsCap: v })} />
+        </SettingRow>
+      ) : null}
+      {ctx.canPlay && !ctx.login ? (
+        <SettingRow label={tr('settings.motion.battery')}>
+          <PopUp value={MOTION_BATTERY.includes(s.motionBattery) ? s.motionBattery : 'pause'} onChange={(v) => set({ motionBattery: v })}
+            options={MOTION_BATTERY.map((m) => [m, tr(`settings.motion.battery${m[0].toUpperCase()}${m.slice(1)}`)])} />
+        </SettingRow>
+      ) : null}
+      {ctx.canPlay && !ctx.login ? (
+        <SettingRow label={tr('settings.motion.cache')}>
+          <PopUp value={motionCacheMb(s.motionCacheMb)} onChange={(v) => set({ motionCacheMb: Number(v) })}
+            options={MOTION_CACHE_MB.map((mb) => [mb, mb ? formatBytes(mb * 1048576) : tr('settings.motion.cacheOff')])} />
         </SettingRow>
       ) : null}
       <Actions style={{ paddingVertical: spacing.s }}>

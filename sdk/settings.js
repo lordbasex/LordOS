@@ -15,6 +15,9 @@ const DEFAULTS = {
   motion: {},            // moving wallpaper per display: { '*': id, <display id>: id } (sdk/motion.jsx)
   motionFiles: {},       // id → the variant on disk
   motionUser: [],        // added videos: [{ id: 'user:…', name, path }]
+  motionFpsCap: 0,       // 0.8.9.7, Settings → Wallpaper: 0 the video's own frame rate, 30 or 15 (sdk/motionmodel.js); new key, no migration
+  motionBattery: 'pause',  // on battery: 'pause' | 'lower' (15 fps, pause at 20 %) | 'keep'; new key, no migration
+  motionCacheMb: 1024,   // GPU memory for the loop cache (docs/MOVING-WALLPAPERS.md), 0 off; new key, no migration
   wallpaperImages: [],   // the user's own pictures, newest first: ids 'image:<name>' (sdk/wallpapers.js)
   wallpaper: null,       // 0.8.9: null = the theme's default (Lumo Celestial; Lord Workspaces: Cyberpunk City HD's panorama),
                          // migration 5. 0.8.2–0.8.8: 'lumo-celestial' saved for everyone; before: 'aurora', still available

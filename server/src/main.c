@@ -2543,11 +2543,14 @@ static int render_frame(Server *s) {
     if (wlk && gpu_active())
         for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].gpu >= 0 && (wlk >> i & 1)) s->out[i].wl_new = 1;
     /* a machine's new frame in the texture its window draws (media_src_present): only the displays it is on */
-    float mx0, my0, mx1, my1;
-    if (media_present_take(&mx0, &my0, &mx1, &my1) && gpu_active())
+    float mb[32][4];
+    int nmb = media_present_take(mb, 32);
+    if (nmb && gpu_active())
         for (int i = 0; i < OUT_MAX; i++) {
             Out *o = &s->out[i];
-            if (o->on && o->gpu >= 0 && mx0 < o->v.x + o->v.w && mx1 > o->v.x && my0 < o->v.y + o->v.h && my1 > o->v.y) o->wl_new = 1;
+            if (!o->on || o->gpu < 0) continue;
+            for (int b = 0; b < nmb; b++)
+                if (mb[b][0] < o->v.x + o->v.w && mb[b][2] > o->v.x && mb[b][1] < o->v.y + o->v.h && mb[b][3] > o->v.y) { o->wl_new = 1; break; }
         }
     Out *feed = feed_out(s), *mo = main_out(s);
     int main_shown = 0, main_built = 0;     /* the main display got this frame; built here (not prepared before) */
@@ -3435,6 +3438,12 @@ int main(int argc, char **argv) {
         int unseen = s.headless && !headless_draw && !mirror_watchers() && !media_needs_cpu();   /* recording the screen: yes */
         if (!s.headless && display_is_off()) unseen = 1;     /* screen off after idle (DPMS): nothing to draw */
         js_sys_unseen = unseen;                     /* the desk widgets' data feeds rest too (lord.system.seen) */
+        /* moving wallpapers (media/mambient.c): which views show, their pause and stop, the loop cache's next frame */
+        media_ambient_tick(unseen);
+        {
+            double ad = media_ambient_due();
+            if (ad >= 0 && (delay < 0 || ad < delay)) delay = ad;
+        }
         /* the minimized windows and those on a hidden desktop: their frame callbacks once a second (wl/framegate.h) */
         if (!unseen) {
             double hd = wl_frame_hidden((unsigned)now_ms());

@@ -23,18 +23,37 @@ export function pickVariant(item, codecs, width, height) {
 }
 
 // Why the video should be paused now, or null. Each is a reason not to spend power on something nobody sees.
-export function pauseReason({ screenOff, reduceMotion, idleSec, idleMax = 300, battery, covered, fullscreen, busy }) {
+// What covers which display is lord-server's own business (media/mambient.c): every display's view is looked at on its
+// own (opaque windows over its whole area, a fullscreen app on it, the screen off), so a game in full screen on one
+// monitor pauses only that monitor's copy, and the player pauses only when no view shows. JS keeps the reasons it
+// alone knows. batteryMode: Settings' "On battery" (MOTION_BATTERY): 'pause' (the default) pauses on battery, 'lower'
+// caps the frame rate (motionFpsCap) and pauses at 20 % or less, 'keep' never pauses for the battery.
+export const MOTION_BATTERY = ['pause', 'lower', 'keep'];
+export const MOTION_FPS_CAPS = [0, 30, 15];
+export const MOTION_CACHE_MB = [0, 256, 512, 1024, 2048];
+export const onBattery = (b) => !!(b && b.discharging);
+
+export function pauseReason({ reduceMotion, idleSec, idleMax = 300, battery, batteryMode = 'pause', busy }) {
   if (reduceMotion) return 'reduceMotion';
-  if (screenOff) return 'screenOff';
-  if (fullscreen) return 'fullscreen';
-  if (covered) return 'covered';
   if (idleSec >= idleMax) return 'idle';
-  if (battery && battery.discharging && battery.percent <= 20) return 'battery';
+  if (onBattery(battery) && batteryMode !== 'keep' && (batteryMode !== 'lower' || battery.percent <= 20)) return 'battery';
   if (busy) return 'busy';
   return null;
 }
 
-// Is this display's desktop fully hidden by a window? rects: the windows on it, not minimized.
+// The frame-rate cap to ask (0 the video's own): Settings' choice, and 15 on battery in 'lower' mode. lord-server's
+// mloop_cap applies the same rule (server/tests/mloop_test.c).
+export function motionFpsCap({ cap, batteryMode = 'pause', battery }) {
+  let c = cap === 30 || cap === 15 ? cap : 0;
+  if (batteryMode === 'lower' && onBattery(battery) && (c === 0 || c > 15)) c = 15;
+  return c;
+}
+
+// Settings' motionCacheMb: one of MOTION_CACHE_MB (1 GB when never set)
+export const motionCacheMb = (v) => (MOTION_CACHE_MB.includes(v) ? v : 1024);
+
+// Is this display's desktop fully hidden by a window? rects: the windows on it, not minimized (the slideshow's rule;
+// moving wallpapers ask lord-server instead, per view).
 export function displayCovered(display, rects) {
   return rects.some((r) => r.x <= display.x && r.y <= display.y && r.x + r.w >= display.x + display.w && r.y + r.h >= display.y + display.h);
 }

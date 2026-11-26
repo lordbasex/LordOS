@@ -18,6 +18,7 @@
 #include "../media/mstudio.h"
 #include "ui.h"
 #include "../media/proto.h"
+#include "../gpu/gpu.h"
 #include "../media/hwdec.h"
 #include "../media/imgops.h"
 #include "../doc/doc.h"
@@ -153,9 +154,21 @@ static JSValue f_play(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     if (s->audio) maudio_volume(s->audio, opt_num(c, o, "volume", 1));
     int hw = opt_int(c, o, "hw", 1, 0, 1);
     if (hw) render = media_render_fd();
-    char params[256];
-    snprintf(params, sizeof params, "native=%d\nloop=%d\nautoplay=%d\naudio=%d\nhw=%d\nhwonly=%d\nrate=%d\nhwaccel=%s\n", opt_int(c, o, "native", 0, 0, 1),
-             opt_int(c, o, "loop", 0, 0, 1), opt_int(c, o, "autoplay", 1, 0, 1), s->audio ? 1 : 0, hw && render >= 0, opt_int(c, o, "hwOnly", 0, 0, 1), opt_int(c, o, "rate", 100, 10, 100), media_hwaccel());
+    /* a moving wallpaper (sdk/motion.jsx): a loop without sound, paused where nobody sees it, cached on the GPU
+     * (media/mambient.c, docs/MOVING-WALLPAPERS.md) */
+    int loop = opt_int(c, o, "loop", 0, 0, 1), ambient = loop && !s->audio && opt_int(c, o, "ambient", 0, 0, 1);
+    int fpscap = opt_int(c, o, "fpsCap", 0, 0, 30);
+    if (fpscap != 15 && fpscap != 30) fpscap = 0;
+    s->rate = opt_int(c, o, "rate", 100, 10, 100);
+    s->nv_capable = 1;
+    /* the frame format: a moving wallpaper's NV12 (then zero-copy dmabufs) only while the GPU composes; BGRA otherwise and
+     * for the Player (its window's rounded corners clip it on the CPU path) */
+    s->fmt_sent = !ambient || !gpu_active() || (getenv("LORD_MEDIA_NV12") && !strcmp(getenv("LORD_MEDIA_NV12"), "0")) ? MF_BGRA : MF_NV12;
+    char params[320];
+    snprintf(params, sizeof params, "native=%d\nloop=%d\nautoplay=%d\naudio=%d\nhw=%d\nhwonly=%d\nrate=%d\nhwaccel=%s\nnv12=%d\nfpscap=%d\n", opt_int(c, o, "native", 0, 0, 1),
+             loop, opt_int(c, o, "autoplay", 1, 0, 1), s->audio ? 1 : 0, hw && render >= 0, opt_int(c, o, "hwOnly", 0, 0, 1), s->rate, media_hwaccel(),
+             s->fmt_sent == MF_NV12, ambient ? fpscap : 0);
+    if (ambient) media_ambient_new(s, real, opt_int(c, o, "cacheMb", 1024, 0, 65536), fpscap);
     int fds[3] = { in, ring, render };
     s->sock = media_spawn(MK_PLAY, params, fds, 3, &s->pid);
     close(in);
@@ -240,13 +253,17 @@ out:
 static JSValue f_control(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     MediaSrc *s = argc >= 2 ? media_src_get(arg_id(c, argv[0])) : NULL;
-    if (!s || s->sock < 0) return JS_FALSE;
+    /* a moving wallpaper stopped while unseen (mambient.c) has no helper and still takes its controls */
+    if (!s || (s->sock < 0 && !s->amb)) return JS_FALSE;
     const char *cmd = JS_ToCString(c, argv[1]);
     if (!cmd) return JS_EXCEPTION;
     double v = 0;
     if (argc > 2 && JS_IsNumber(argv[2])) JS_ToFloat64(c, &v, argv[2]);
     else if (argc > 2 && JS_IsBool(argv[2])) v = JS_ToBool(c, argv[2]);
     int r = -1;
+    /* a moving wallpaper's pause, cache and frame-rate cap are lord-server's (media/mambient.c) */
+    if (s->amb && media_ambient_control(s, cmd, v)) { JS_FreeCString(c, cmd); return JS_TRUE; }
+    if (s->sock < 0) { JS_FreeCString(c, cmd); return JS_FALSE; }
     if (!strcmp(cmd, "play")) { r = mp_sendv(s->sock, MM_PLAY, 0, 0, 0, 0, 0); if (s->audio) maudio_playing(s->audio, 1); }
     else if (!strcmp(cmd, "pause")) { r = mp_sendv(s->sock, MM_PAUSE, 0, 0, 0, 0, 0); if (s->audio) maudio_playing(s->audio, 0); }
     else if (!strcmp(cmd, "seek") && v >= 0 && v < 1e10) r = mp_sendv(s->sock, MM_SEEK, 0, (int64_t)v, 0, 0, 0);

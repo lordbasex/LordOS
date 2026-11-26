@@ -85,10 +85,15 @@ enum {
     MM_STUDIO_CAM,      /* lord-studio with loopback=1: v[0] = what goes to the loopback (0 the idle card, 1 the camera, 2 the
                            off card); fd = the real camera when v[0] = 1 and it changes (none: keep the open one); v[1] = 1
                            the preview's frames are wanted in the ring too */
+    MM_FORMAT,          /* player: v[0] = the frame format wanted from the next frame on (MF_BGRA, MF_NV12); lord-server asks
+                           NV12 only while the GPU composes (docs/MEDIA.md, "Video frames"). Anything else: BGRA */
+    MM_FPSCAP,          /* player: v[0] = at most this many frames a second are sent (0: the video's own rate); the others are
+                           decoded (they are references) but never read back, converted or sent */
 
     /* lord-media → lord-server */
     MM_INFO = 64,       /* payload = JSON with the file's information */
-    MM_RING,            /* fd = frames memfd; v[0] = gen, v[1] = width, v[2] = height, v[3] = slots */
+    MM_RING,            /* fd = frames memfd; v[0] = gen, v[1] = width, v[2] = height, v[3] = slots, v[4] = MF_* (0 BGRA),
+                           v[5] = the colours of an NV12 ring (MC_*). Slot layout: mp_ring_layout, never the helper's word */
     MM_FRAME,           /* id = gen << 8 | slot; v[0] = pts ms */
     MM_POS,             /* v[0] = position ms, v[1] = duration ms, v[2] = playing */
     MM_STATE,           /* v[0] = MS_* */
@@ -105,6 +110,9 @@ enum {
                            v[3] = why skipped (VBS_*) */
     MM_STUDIO_STATS,    /* lord-studio, once a second: v[0] = frames done, v[1] = segmenter µs, v[2] = matte and composite µs,
                            v[3] = 1 when the GPU composites */
+    MM_DMAFRAME,        /* zero-copy (docs/MOVING-WALLPAPERS.md): id = frame number; v[0] = pts ms; payload = MpDma; fds = its
+                           1..2 dmabuf objects (the VA-API surface, exported read-only). lord-server checks it (mp_dma_check),
+                           imports it, answers MM_ACK with the number; a frame refused sends the player back to MF_NV12 */
     MM_STUDIO_READERS,  /* lord-studio with loopback=1, on every change: v[0] = readers streaming from the loopback (its
                            client-usage event; -1 when the module doesn't send it), v[1] = 1 the real camera is open,
                            v[2] = what the loopback shows (0 the idle card, 1 the camera, 2 the off card) */
@@ -114,6 +122,55 @@ enum {
 enum { VB_H264_1080, VB_HEVC_1080, VB_VP9_1080, VB_AV1_1080, VB_H264_2160, VB_HEVC_2160, VB_ENC_H264, VB_ENC_VP8, VB_COUNT };
 enum { VBR_STEP = 0, VBR_RESULT, VBR_SKIP };
 enum { VBS_NOCODEC = 1, VBS_FAILED, VBS_MODE };
+
+/* Frame formats of a ring (MM_RING v[4]). BGRA: premultiplied B, G, R, A bytes, w × h × 4 a slot. NV12 (4:2:0): the Y
+ * plane (w × h bytes, stride w) then the interleaved U, V plane (w/2 × h/2 pairs, stride w) right after it, w and h even:
+ * 1.5 bytes a pixel. Strides and offsets are never sent: both sides derive them from w and h. */
+enum { MF_BGRA = 0, MF_NV12 = 1, MF_DMABUF = 2, MF_COUNT };   /* MF_DMABUF: MM_FORMAT only (MM_DMAFRAME, never a ring) */
+/* An NV12 ring's colours (MM_RING v[5]): the matrix in the low byte (MC_601, MC_709, MC_2020), bit 8 full range */
+enum { MC_601 = 0, MC_709 = 1, MC_2020 = 2, MC_MATRICES };
+#define MC_FULL 0x100
+
+typedef struct {
+    int fmt, w, h, slots;
+    size_t slot_bytes;                /* bytes of one slot */
+    size_t y_off, uv_off;             /* NV12: where the planes start inside a slot (BGRA: 0, 0) */
+    int y_stride, uv_stride;          /* bytes a row (BGRA: w × 4, 0) */
+    int matrix, full;                 /* NV12's colours */
+} MpRing;
+/* A ring's layout from what MM_RING says (v[1..5]), checked strictly: a known format, 1..MP_MAX_DIM sides, even sides for
+ * NV12, 1..MP_RING_SLOTS slots, a known matrix and no other bit in the colours, BGRA with colours 0. 0 ok (out filled),
+ * -1 refused. The memfd must then hold slots × slot_bytes (map_sealed checks the size and the seal). */
+int mp_ring_layout(int64_t fmt, int64_t w, int64_t h, int64_t slots, int64_t colors, MpRing *out);
+
+/* A zero-copy frame's description (MM_DMAFRAME's payload, exactly this size). Two planes, each in one of the objects
+ * (the fds that came with the message, in order): Y (R8, or R16 for 10 bits) and the interleaved U, V (GR88, or GR1616). */
+#define MP_DMA_MAGIC 0x414d444cu          /* "LDMA" */
+#define MP_FOURCC(a, b, c, d) ((uint32_t)(a) | (uint32_t)(b) << 8 | (uint32_t)(c) << 16 | (uint32_t)(d) << 24)
+#define MP_FOURCC_R8     MP_FOURCC('R', '8', ' ', ' ')
+#define MP_FOURCC_GR88   MP_FOURCC('G', 'R', '8', '8')
+#define MP_FOURCC_R16    MP_FOURCC('R', '1', '6', ' ')
+#define MP_FOURCC_GR1616 MP_FOURCC('G', 'R', '3', '2')
+#define MP_DMA_MAX_OBJ 2
+#define MP_DMA_MAX_PITCH 65536
+#define MP_DMA_MAX_BYTES (512u << 20)     /* one object */
+typedef struct {
+    uint32_t magic;
+    uint32_t w, h;                        /* the picture, even sides */
+    uint32_t colors;                      /* MC_* | MC_FULL */
+    uint32_t nobj;                        /* objects (fds) */
+    uint32_t pad;
+    uint64_t modifier[MP_DMA_MAX_OBJ];    /* each object's DRM format modifier */
+    struct { uint32_t fourcc, obj, offset, pitch; } plane[2];
+} MpDma;
+/* Checks a description against what came with it: len its bytes, nfds the fds received, size[i] each object's real size
+ * (lseek SEEK_END on lord-server's side, never the helper's word), max_w × max_h the largest picture accepted (the box
+ * the player was asked for, rounded up a little; never more than MP_MAX_DIM), plane_ok(fourcc, modifier) the driver's
+ * allowlist (NULL: any of the four formats). Every plane must lie inside its object (offset + pitch × rows, no overflow),
+ * a pitch at least a row's bytes and at most MP_DMA_MAX_PITCH, Y and U-V of the same depth, two planes in one object
+ * apart, every object used. 0 ok, -1 refused. */
+int mp_dma_check(const void *payload, size_t len, int nfds, const int64_t size[MP_DMA_MAX_OBJ], int max_w, int max_h,
+                 int (*plane_ok)(uint32_t fourcc, uint64_t modifier));
 
 enum { MS_LOADING = 0, MS_PLAYING, MS_PAUSED, MS_ENDED, MS_RECORDING, MS_DONE, MS_FAILED };
 

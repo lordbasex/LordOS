@@ -73,7 +73,7 @@ QJS_OBJ := $(patsubst %,build/qjs/%.o,quickjs libregexp libunicode cutils dtoa)
 # Monitor: metrics, connections and the country of an IP (src/monitor, see docs/MONITOR.md)
 MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/exeown.c src/monitor/describe.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
 # Media (src/media, docs/MEDIA.md): only the lord-server side. Only lord-media links FFmpeg.
-MEDIA_SRC := src/media/mstudio.c src/media/mstudiohub.c src/ui/js_studio.c src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/mviews.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
+MEDIA_SRC := src/media/mstudio.c src/media/mstudiohub.c src/ui/js_studio.c src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/mviews.c src/media/mambient.c src/media/mloop.c src/media/nv12.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
@@ -164,6 +164,19 @@ build/firstrun-fuzz: tests/firstrun_test.c src/firstrun/firstrun.c src/firstrun/
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
 	    -o $@ tests/firstrun_test.c src/firstrun/firstrun.c
 	./$@ 300000 || { rm -f $@; exit 1; }
+# moving wallpapers' rules (docs/MOVING-WALLPAPERS.md): loop cache budget and recording, pause/stop, covered views,
+# NV12 rings and zero-copy frame descriptions (with a fuzz), the NV12 matrices
+test: build/mloop-test
+build/mloop-test: tests/mloop_test.c src/media/mloop.c src/media/mloop.h src/media/nv12.c src/media/nv12.h src/media/proto.c src/media/proto.h src/ui/rectsub.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=gnu11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/mloop_test.c src/media/mloop.c src/media/nv12.c src/media/proto.c -lm
+	./$@ || { rm -f $@; exit 1; }
+# moving wallpapers measured on the GPU with no screen (tests/motion_bench.c; docs/MOVING-WALLPAPERS.md): not in make test
+build/motion-bench: tests/motion_bench.c src/gpu/gpu.c src/gpu/gscissor.c src/kms.c src/canvas.c src/par.c src/media/nv12.c src/media/proto.c src/media/mloop.c src/gpu/gpu.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/motion_bench.c src/gpu/gpu.c src/gpu/gscissor.c src/kms.c src/canvas.c src/par.c \
+	    src/media/nv12.c src/media/proto.c src/media/mloop.c $(LDLIBS)
 # how a media node draws its picture (src/media/mview.c), the rest of media stubbed
 test: build/mview-test
 build/mview-test: tests/mview_test.c src/media/mview.c src/canvas.c src/media/media_int.h src/canvas.h

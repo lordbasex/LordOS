@@ -59,9 +59,20 @@ the rest 12.5 to 30 fps. No 120, 144 or 240 fps source with a clear license was 
 
 ## When it pauses
 
-`sdk/motion.jsx` pauses the decoder, and `pauseReason` says why: Reduce motion, a fullscreen window, every display showing
-it covered by a window, five minutes with no input, the battery at 20 % or less and discharging, or the CPU above 85 % for
-two readings 5 s apart. The login screen pauses after five minutes with no input.
+Which display shows it is lord-server's own knowledge, **per monitor** (`server/src/media/mambient.c`, details and numbers
+in [MOVING-WALLPAPERS.md](MOVING-WALLPAPERS.md)): a display's copy stops being presented when opaque windows cover its
+whole area together, a Linux app is fullscreen on it, or the screen is off; the decoder pauses only when no display shows
+it, and after 10 s with none, lord-media is ended and its GPU loop cache freed (it starts again, at the same place, when
+a display shows it). Other desktops pause globally: a game in full screen on one monitor pauses every monitor there.
+
+`sdk/motion.jsx` adds the reasons only JS knows, and `pauseReason` says which: Reduce motion, five minutes with no input,
+the battery (Settings → Wallpaper → On battery: Pause, the default; Lower frame rate, 15 fps and a pause at 20 % or
+less; Keep playing), or the CPU above 85 % for two readings 5 s apart. The login screen pauses after five minutes with no
+input.
+
+Settings → Wallpaper also has the **Frame rate** (Video's own, 30 or 15 fps) and the **GPU memory for loops** (Off to
+2 GB, 1 GB by default): after one whole pass a loop plays from GPU memory with lord-media paused, within that budget and
+never more than the card's VRAM allows.
 
 One video per file, however many displays show it. The still wallpaper stays drawn underneath, so a failure, a missing
 file or a helper crash just shows it.

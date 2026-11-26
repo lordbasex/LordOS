@@ -49,6 +49,41 @@ GpuTex *gpu_tex_pixels(GpuTex *t, const uint32_t *px, int w, int h, int opaque);
 GpuTex *gpu_tex_pixels_rect(GpuTex *t, const uint32_t *px, int w, int h, int opaque, Rect r);
 GpuTex *gpu_tex_dmabuf(const GpuDmabuf *d);
 void    gpu_tex_free(GpuTex *t);
+int     gpu_tex_width(const GpuTex *t);       /* 0 for NULL */
+
+/* NV12 video frames (docs/MEDIA.md, "Video frames"): the Y plane in one texture (w × h, one byte a texel) and the
+ * interleaved U, V plane in another (w/2 × h/2, two bytes), uploaded from lord-media's ring; gpu_yuv_convert draws them
+ * into an RGBA texture (opaque) with the video's matrix (nv12.h), which is then drawn like any picture (gpu_draw). One
+ * conversion a frame, however many displays show it. Planes: stride bytes a row (≥ w), w and h even. NULL without a GPU
+ * or on a GL error; a stale one (another context) is freed and made again. */
+typedef struct GpuYuv GpuYuv;
+GpuYuv *gpu_yuv_upload(GpuYuv *t, const uint8_t *y, int ystride, const uint8_t *uv, int uvstride, int w, int h);
+/* src into *dst (made, or remade at src's size, as needed): 0 ok, -1 failed (*dst is then left as it was) */
+int     gpu_yuv_convert(const GpuYuv *src, GpuTex **dst, int matrix, int full);
+/* the same, drawn smaller (w × h, at most src's): a zero-copy frame larger than its box, filtered by the GPU (2:1 is a
+ * 2 × 2 average) */
+int     gpu_yuv_convert_to(const GpuYuv *src, GpuTex **dst, int w, int h, int matrix, int full);
+int     gpu_yuv_current(const GpuYuv *t);
+long    gpu_yuv_bytes(const GpuYuv *t);     /* what its planes hold in GPU memory (w × h × 1.5) */
+void    gpu_yuv_free(GpuYuv *t);
+/* Zero-copy (docs/MOVING-WALLPAPERS.md): lord-media's VA-API surface as two dmabuf planes (R8 and GR88, or R16 and
+ * GR1616 for 10 bits), already checked by the caller (mp_dma_check); imported as external textures, freed with it.
+ * gpu_dmabuf_plane_ok: that plane format and modifier are ones this driver imports (eglQueryDmaBufModifiersEXT). */
+GpuYuv *gpu_yuv_import(const GpuDmabuf *y, const GpuDmabuf *uv);
+int     gpu_dmabuf_plane_ok(uint32_t fourcc, uint64_t modifier);
+/* The loop cache's frames: a source's planes copied on the GPU into textures of its own, packed (RGBA8 texels holding
+ * four Y or two U, V pairs: 1.5 bytes a pixel), with no read back; drawn back to RGBA by gpu_pack_convert. NULL when it
+ * can't (no highp in fragment shaders, out of memory). gpu_pack_ready: the programs exist on this GPU. */
+typedef struct GpuPack GpuPack;
+GpuPack *gpu_yuv_pack(const GpuYuv *src);
+int      gpu_pack_convert(const GpuPack *k, GpuTex **dst, int matrix, int full);
+int      gpu_pack_current(const GpuPack *k);
+long     gpu_pack_bytes(const GpuPack *k);
+void     gpu_pack_free(GpuPack *k);
+int      gpu_pack_ready(void);
+/* tests and benchmarks only: a surfaceless context on a render node (never lord-server's) */
+int      gpu_init_offscreen(int render_fd);
+void     gpu_offscreen_finish(void);
 
 /* GPU context lifetime. Each gpu_init that succeeds starts a new context ("generation"); a
  * texture made in an earlier one is stale: its GL name and EGLImage died with that context, so it
