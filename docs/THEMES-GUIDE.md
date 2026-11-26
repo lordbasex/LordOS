@@ -587,7 +587,15 @@ Lord Classic installed: they are the fallback (`start_theme` in `main.c`).
 
 ## 5. Checklist before sharing a theme
 
-Check each item on a real session and take a screenshot ([VM-SETUP.md](VM-SETUP.md), `screendump`):
+Check each item on a real session and take a screenshot ([VM-SETUP.md](VM-SETUP.md), `screendump`). For a first
+look without a session, the headless theme tour keeps the same three screenshots a reviewer starts from (the desktop,
+two windows, a sidebar app) for any theme in `themes/<id>`; from `server/`, after `npm run build` and `make`:
+
+```sh
+tests/app_scene_headless.sh theme_tour_scene /tmp/shots <id> en dark
+tests/app_scene_headless.sh theme_tour_scene /tmp/shots <id> ar light     # right to left
+```
+
 
 - **Both kinds of window:** LordOS apps (the Terminal for a transparent one, Settings, Files) and
   Linux apps with and without their own frame (`args.csd`), including the window menu from a right

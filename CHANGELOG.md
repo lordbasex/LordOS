@@ -18,6 +18,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   what was written new, reused code and its licence; never GPL code), the kit's check report, what was tested, and
   two required confirmations (no personal data; everything may be shared under its licence). It applies the labels
   `desktop-style` and `community` (to be created in the repository). `docs/THEMES-GUIDE.md` §5 points to it.
+- **`theme_tour_scene`: headless screenshots of any theme, a community one too** (`server/tests/theme_tour_scene/`,
+  lordos-theme-kit's tour, approved 2026-11-26). `tests/app_scene_headless.sh theme_tour_scene OUT <id> [lang] [mode]`
+  runs a theme in `themes/<id>` in a headless lord-server with a private home and keeps three screenshots: the empty
+  desktop, Text Editor in front of Calculator (a focused and an unfocused frame, the app's menus) and Characters (the
+  sidebar, a search field and the selection: the token contract with the apps). It opens only apps that show nothing
+  about the person or the machine; each step logs "done" or "missing", so the script's exit status is 1 when an app
+  didn't open or a screenshot wasn't saved. Checked on Lord Celeste in Arabic, dark (right to left), and Lord Flow.
 
 ### Fixed
 - **A machine's apps no longer mix with this computer's in the app launcher unless you turn it on** (the maintainer's
