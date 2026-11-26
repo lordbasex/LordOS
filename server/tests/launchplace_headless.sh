@@ -1,5 +1,5 @@
 #!/bin/sh
-# launchplace_headless.sh — Lord Workspaces: a window launched from a display's bar lands on that display, in that
+# launchplace_headless.sh — Workspaces: a window launched from a display's bar lands on that display, in that
 # activity and its layout slot, even when the app shows a picker first and the person goes to another activity meanwhile
 # (Google Chrome with profiles; themes/workspaces/model/launches.js, docs/WORKSPACES.md "Where launched windows go"), a
 # dialog told its parent late goes over it (sdk/dialogmodel.js lateParentFrame), and the bar shows every window of the

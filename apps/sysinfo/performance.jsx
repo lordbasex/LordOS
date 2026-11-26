@@ -16,7 +16,7 @@ import { CATEGORIES, DESKTOP_CATEGORIES, ratio, categoryRatios, comparableRefere
 import { startScene } from './scene.jsx';
 import { compatibility } from './model.js';
 
-// A small window (a tile of Lord Workspaces): narrower label columns, the comparison under a measurement's name. index.jsx
+// A small window (a tile of Workspaces): narrower label columns, the comparison under a measurement's name. index.jsx
 // uses the same width for its rows, its tabs (a drop-down) and Hardware's list (behind a button).
 export const NARROW_AT = 700;
 

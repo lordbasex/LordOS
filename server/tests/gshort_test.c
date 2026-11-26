@@ -92,7 +92,7 @@ int main(void) {
     CHECK(kept("Up") == GS_TYPING);
     CHECK(kept("SHIFT+1") == GS_TYPING);
     CHECK(kept("Delete") == GS_TYPING);
-    /* the theme's table: Lord Classic keeps ⌥F4, Lord Flow with Desktops arrows ⌃← */
+    /* the theme's table: Classic keeps ⌥F4, Flow with Desktops arrows ⌃← */
     CHECK(kept("ALT+F4") == GS_FREE);
     CHECK(kept("CTRL+Left") == GS_FREE);
     CHECK(keygrab_set("classic"));

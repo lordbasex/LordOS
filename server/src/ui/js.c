@@ -479,7 +479,7 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
                     stamp[vl] = 0;
                     rest += vl + 1;
                 }
-                /* the path may also be an "asset:" one (0.8.9: Lord Workspaces' wallpaper slideshow decodes the next picture
+                /* the path may also be an "asset:" one (0.8.9: Workspaces' wallpaper slideshow decodes the next picture
                  * off this thread, sdk/slideshow.jsx) */
                 if (rest && rest[0] == '/') n->img = image_get_thumb(rest, atoi(num), stamp);
                 else if (rest && !strncmp(rest, "asset:", 6) && !strstr(rest, "..")) {

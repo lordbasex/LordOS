@@ -306,9 +306,9 @@ function Body() {
 
   const failed = info.state === 'failed' && info.error ? tr(`cleaner.error.${info.error}`) : '';
 
-  // own frame: the window moves from the top edge and the sidebar's row, which stay free of controls. Lord Classic and
-  // Lord Workspaces draw their own buttons on the top edge (their components/Window.jsx), so that edge is taller and the
-  // app draws no lights. In Lord Flow the lights are the sidebar's, unless the window buttons go at the end: the theme
+  // own frame: the window moves from the top edge and the sidebar's row, which stay free of controls. Classic and
+  // Workspaces draw their own buttons on the top edge (their components/Window.jsx), so that edge is taller and the
+  // app draws no lights. In Flow the lights are the sidebar's, unless the window buttons go at the end: the theme
   // draws them there (issue #58). The theme that is running (settings.theme is null until one is chosen in Appearance).
   const classic = ['classic', 'workspaces'].includes(themes.current()), topEdge = classic ? 34 : 14;
   const lightsAtStart = useWindowButtons(true).atStart, ownLights = !classic && lightsAtStart;

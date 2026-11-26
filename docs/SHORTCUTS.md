@@ -21,7 +21,7 @@ never fires twice.
 - A theme's table, given to `useShortcuts({ grabs, table, onSuperTap, appsPaste })` from its root component
   (`flowTable` in `themes/default/index.jsx`, `classicTable` in `themes/classic/index.jsx`).
 - `addShortcuts(entries)` from a module: Screenshots and the Terminal's drop-down window. `runShortcut(id)`
-  runs one of those from a table: Lord Classic's ❖⇧S is Screenshots' area capture.
+  runs one of those from a table: Classic's ❖⇧S is Screenshots' area capture.
 
 Lookup order is modules, theme, base, and the first entry whose `when(e)` allows it wins. When none does the
 key goes on to the listeners, so `when` is how a key stays with an app (⌃Space in the Terminal).
@@ -36,10 +36,10 @@ their position. `label` lists the entry in Settings → Keyboard (`shortcutList(
 replaces its keys there; an entry with no `label` is not listed. A held key runs once unless the entry says
 `repeat: true`, and its repeats and its release are taken as well.
 
-❖ pressed and released alone calls the theme's `onSuperTap`: Lord Flow's launcher, Lord Classic's start menu.
+❖ pressed and released alone calls the theme's `onSuperTap`: Flow's launcher, Classic's start menu.
 
-F10, or the left ⌥ pressed and released alone, opens the menu bar from the keyboard: Lord Flow's bar on the
-focused window's display, Lord Classic's menu strip under the focused window's title bar. Each bar registers with
+F10, or the left ⌥ pressed and released alone, opens the menu bar from the keyboard: Flow's bar on the
+focused window's display, Classic's menu strip under the focused window's title bar. Each bar registers with
 `addMenuBarKeys({ can, run })` and the first whose `can()` says yes opens its first menu with the first row
 highlighted; the same key closes it. The Terminal keeps F10 (programs in it use it), the right ⌥ is AltGr and
 never counts, and a Linux app has its own menus and gets its keys first. In an open menu the keys follow
@@ -60,7 +60,7 @@ so a theme that asks for none keeps none.
 | Table | Keys |
 |---|---|
 | `flow` | ❖Tab, ❖⇧Tab (hold), ❖M, ❖H, ❖⌥H, ❖⌥D, ❖,, ❖⌃← ❖⌃→ |
-| `flow-desktops` | The same plus ⌃ ← → ↑ ↓: Lord Flow with Settings → Keyboard's Desktops arrows on |
+| `flow-desktops` | The same plus ⌃ ← → ↑ ↓: Flow with Settings → Keyboard's Desktops arrows on |
 | `classic` | ⌥Tab, ⌥⇧Tab (hold), ⌥F4, ⌃⇧Esc, ❖A, N, D, E, I, R, ❖⇧S, ❖ arrows, ❖1…9, ❖⌃D, ❖⌃F4, ❖⌃← ❖⌃→ |
 
 A Linux app never gets a ❖ combination, so for ❖ the table matters to isolated LordOS apps: without it those
@@ -81,11 +81,11 @@ opens on the previous app, and the dispatcher gives it every key while open. Whi
 **Z, the key under Esc, or ↓** move through the selected app's windows in a row below it (↑ goes back), Enter or letting go switches, Esc cancels. The keys go by position, so they're the same in every layout.
 A Linux or isolated app's window in that row is its real surface, drawn smaller and live; a window the shell draws itself shows its app's icon.
 Switching brings the app's top window, on this desktop if it has one. Listing apps from every desktop shows each one's desktop
-name, and choosing one elsewhere jumps there. ❖\` and ❖⇧\` in Lord Flow go through the visible windows of the app in front on this
+name, and choosing one elsewhere jumps there. ❖\` and ❖⇧\` in Flow go through the visible windows of the app in front on this
 desktop.
 
 Settings → Keyboard (`settings.switcher`): which keys open it (the theme's, ❖Tab, ⌥Tab or both; the grab profile gets `+tab-meta`, `+tab-alt` or `+tab-both`), apps from everywhere, this desktop or this display,
-leaving out apps with everything minimized, numbers, the windows row, size, a look (System, Glass, Solid, High contrast, Custom colors) and apps that never show. In Lord Classic, when ❖Tab opens the switcher, the Overview moves to ❖W.
+leaving out apps with everything minimized, numbers, the windows row, size, a look (System, Glass, Solid, High contrast, Custom colors) and apps that never show. In Classic, when ❖Tab opens the switcher, the Overview moves to ❖W.
 
 ## Stopping a screen share
 
@@ -106,7 +106,7 @@ its press went. The rule is one in C (`kbi_route`,
 `server/src/wl/kbinhibit.c`) and its twin in the session (`routeKey`, `sdk/kbinhibitmodel.js`), each with a test.
 Not for isolated LordOS apps, which keep the ❖ keys `system_meta_key` lists.
 
-## ❖ as Ctrl in Linux apps (Lord Flow)
+## ❖ as Ctrl in Linux apps (Flow)
 
 With the `flow` table, ❖C, V, X, A, Z, F, T, W, N, L, R, P and S with no other modifier reach the focused Linux
 app as Ctrl+key, or Ctrl+Shift+key if its `.desktop` lists the `TerminalEmulator` category (`sdk/wayland.js`
@@ -116,13 +116,13 @@ Super taken out of the modifiers it sees, and the real press and release, so the
 alone. So with a Linux app in front ❖L is that app's, and the screen locks with ❖⌃Q; ❖V pastes and the
 clipboard is ❖⇧V. Isolated LordOS apps keep their real ❖ keys.
 
-With `appsPaste` (Lord Flow) ❖V also goes to a LordOS app inside the session, where it pastes, and opens the
+With `appsPaste` (Flow) ❖V also goes to a LordOS app inside the session, where it pastes, and opens the
 clipboard panel only with no window in front. Isolated apps never receive ❖V, so there it stays the panel.
 
 ## Desktops
 
 `flowDesktopKeys` and `classicDesktopKeys` in `sdk/desktops.js` are part of each theme's table; [DESKTOPS.md](DESKTOPS.md)
-has the keys. In Lord Flow ⌃ arrows are word movement in apps, so they are an option, off by default since 0.8.9.1 (#201; on before): off, their
+has the keys. In Flow ⌃ arrows are word movement in apps, so they are an option, off by default since 0.8.9.1 (#201; on before): off, their
 entries stop applying and leave Settings → Keyboard's list (`listed`), and `useShortcuts` asks for the `flow` table
 (its `grabs` can change while the theme runs), so the keys reach the apps. ⌃⇧ arrows always stay with the app.
 

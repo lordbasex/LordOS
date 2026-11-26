@@ -426,7 +426,7 @@ export function AppGlyph({ item, size = 16 }) {
 // ---- window ----
 
 let lastTab = 'overview';
-// a small window (a Lord Workspaces tile): below TABS_AT the tabs become a pop-up menu and the pages lose some margin
+// a small window (a Workspaces tile): below TABS_AT the tabs become a pop-up menu and the pages lose some margin
 const TABS_AT = 900;
 // the GPU tab fits without scrolling from this window size up (GpuView.jsx)
 const GPU_FIT_W = 1100, GPU_FIT_H = 600;

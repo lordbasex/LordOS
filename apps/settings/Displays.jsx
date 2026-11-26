@@ -403,7 +403,7 @@ export function DisplaysSettings() {
           <SettingRow label={tr('prefs.display.mirrorDisplays')} disabled={act.length < 2 && !d.mirror}>
             <Toggle small pending on={!!d.mirror} onChange={(on) => setDisplayMirror(on)} />
           </SettingRow>
-          {/* the same switch as Settings → Desktop & Dock → Menu Bar, or Taskbar in Lord Classic (on by default since 0.8.8.6) */}
+          {/* the same switch as Settings → Desktop & Dock → Menu Bar, or Taskbar in Classic (on by default since 0.8.8.6) */}
           <SettingRow label={tr(themes.current() === 'classic' ? 'settings.dock.menubar.everyDisplayTaskbar' : 'prefs.display.menuBarAll')} disabled={d.mirror}>
             <Toggle small on={menuBarEveryDisplay(s)} onChange={(on) => set(menuBarPatch(s, 'everyDisplay', on))} />
           </SettingRow>

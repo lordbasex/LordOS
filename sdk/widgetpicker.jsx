@@ -1,10 +1,10 @@
 // Add widget, for every theme: the desktop widget catalog (sdk/deskwidgets.jsx) in a panel centred on a display, opened
-// from a theme's "Add widget" (Lord Workspaces' empty state, the wallpaper's right-click menu in each theme). A search field on top (name and description, in the
+// from a theme's "Add widget" (Workspaces' empty state, the wallpaper's right-click menu in each theme). A search field on top (name and description, in the
 // person's language), the categories with their counts on the side, and the cards in a scrolling list, by category.
 // Each card has a button per size (small 1×1, medium 2×1, large 2×2, wide 4×1, extra large 4×2, drawn as its block of
 // cells); a click puts the widget on the first free block of that display's grid, in the activity in view. The arrow
 // keys move between cards and Enter adds the highlighted one at its first size; Escape or a click outside closes it.
-// A theme can give its own panel (Panel: a component taking ref, style and children; Lord Workspaces passes its glass
+// A theme can give its own panel (Panel: a component taking ref, style and children; Workspaces passes its glass
 // Surface); otherwise a plain one in the theme's colours. Its tokens are the theme's (useTheme), chipBg falling back to
 // the control colour.
 // A kind with a Chooser (registerWidgetKind, sdk/deskwidgets.jsx; the Notes app's sticky note: a new note or one of

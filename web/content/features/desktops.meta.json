@@ -7,9 +7,9 @@
     "pt": "Três desktops, um motor"
   },
   "tagline": {
-    "en": "Lord Flow, Lord Classic and Lord Workspaces: three complete desktops on the same engine, with the same apps, switched live without logging out.",
-    "es": "Lord Flow, Lord Classic y Lord Workspaces: tres escritorios completos sobre el mismo motor, con las mismas apps, que se cambian en vivo sin cerrar sesión.",
-    "pt": "Lord Flow, Lord Classic e Lord Workspaces: três desktops completos sobre o mesmo motor, com os mesmos apps, trocados ao vivo sem sair da sessão."
+    "en": "Flow, Classic and Workspaces: three complete desktops on the same engine, with the same apps, switched live without logging out.",
+    "es": "Flow, Classic y Workspaces: tres escritorios completos sobre el mismo motor, con las mismas apps, que se cambian en vivo sin cerrar sesión.",
+    "pt": "Flow, Classic e Workspaces: três desktops completos sobre o mesmo motor, com os mesmos apps, trocados ao vivo sem sair da sessão."
   },
   "lumo": {
     "pose": "three-quarter",
@@ -23,25 +23,25 @@
     {
       "file": "docs/screenshots/desktop-overview-light.png",
       "caption": {
-        "en": "Lord Flow: the menu bar on top, the Dock at the bottom and apps open.",
-        "es": "Lord Flow: la barra de menús arriba, el Dock abajo y apps abiertas.",
-        "pt": "Lord Flow: a barra de menus em cima, o Dock embaixo e apps abertos."
+        "en": "Flow: the menu bar on top, the Dock at the bottom and apps open.",
+        "es": "Flow: la barra de menús arriba, el Dock abajo y apps abiertas.",
+        "pt": "Flow: a barra de menus em cima, o Dock embaixo e apps abertos."
       }
     },
     {
       "file": "docs/screenshots/desktop-classic.png",
       "caption": {
-        "en": "Lord Classic: the start menu with search, pinned and recent apps, over the taskbar.",
-        "es": "Lord Classic: el menú de inicio con búsqueda, apps fijadas y recientes, sobre la barra de tareas.",
-        "pt": "Lord Classic: o menu iniciar com busca, apps fixados e recentes, sobre a barra de tarefas."
+        "en": "Classic: the start menu with search, pinned and recent apps, over the taskbar.",
+        "es": "Classic: el menú de inicio con búsqueda, apps fijadas y recientes, sobre la barra de tareas.",
+        "pt": "Classic: o menu iniciar com busca, apps fixados e recentes, sobre a barra de tarefas."
       }
     },
     {
       "file": "docs/screenshots/desktop-workspaces.png",
       "caption": {
-        "en": "Lord Workspaces: the Context Spine on the left, the activity strip on top and widgets on the Cyberpunk City HD panorama.",
-        "es": "Lord Workspaces: la Context Spine a la izquierda, la franja de actividades arriba y widgets sobre el panorama de Cyberpunk City HD.",
-        "pt": "Lord Workspaces: a Context Spine à esquerda, a faixa de atividades em cima e widgets sobre o panorama de Cyberpunk City HD."
+        "en": "Workspaces: the Context Spine on the left, the activity strip on top and widgets on the Cyberpunk City HD panorama.",
+        "es": "Workspaces: la Context Spine a la izquierda, la franja de actividades arriba y widgets sobre el panorama de Cyberpunk City HD.",
+        "pt": "Workspaces: a Context Spine à esquerda, a faixa de atividades em cima e widgets sobre o panorama de Cyberpunk City HD."
       }
     }
   ],
@@ -50,9 +50,9 @@
     {
       "path": "docs/WORKSPACES.md",
       "what": {
-        "en": "Lord Workspaces: activities, tiling, widgets and what is not done yet",
-        "es": "Lord Workspaces: actividades, distribuciones, widgets y lo que todavía falta",
-        "pt": "Lord Workspaces: atividades, layouts, widgets e o que ainda falta"
+        "en": "Workspaces: activities, tiling, widgets and what is not done yet",
+        "es": "Workspaces: actividades, distribuciones, widgets y lo que todavía falta",
+        "pt": "Workspaces: atividades, layouts, widgets e o que ainda falta"
       }
     },
     {
@@ -74,25 +74,25 @@
     {
       "path": "themes/default",
       "what": {
-        "en": "Lord Flow",
-        "es": "Lord Flow",
-        "pt": "Lord Flow"
+        "en": "Flow",
+        "es": "Flow",
+        "pt": "Flow"
       }
     },
     {
       "path": "themes/classic",
       "what": {
-        "en": "Lord Classic",
-        "es": "Lord Classic",
-        "pt": "Lord Classic"
+        "en": "Classic",
+        "es": "Classic",
+        "pt": "Classic"
       }
     },
     {
       "path": "themes/workspaces",
       "what": {
-        "en": "Lord Workspaces",
-        "es": "Lord Workspaces",
-        "pt": "Lord Workspaces"
+        "en": "Workspaces",
+        "es": "Workspaces",
+        "pt": "Workspaces"
       }
     },
     {

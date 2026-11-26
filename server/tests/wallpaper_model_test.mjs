@@ -23,7 +23,7 @@ eq('all displays: the global picture, no own ones, no moving wallpaper', [[L, M,
 eq('no display (one monitor): the global picture', wallpaperIdFor(s2, null), 'aurora');
 eq('a bad map is ignored', wallpaperIdFor({ wallpaper: 'a', wallpapers: 'x' }, M), 'a');
 eq('an empty entry is ignored', wallpaperIdFor({ wallpaper: 'a', wallpapers: { 'HDMI-A-1': '' } }, M), 'a');
-// 0.8.9: never chosen (null) is the theme's default; Lumo Celestial when the theme has none (Lord Flow, Lord Classic)
+// 0.8.9: never chosen (null) is the theme's default; Lumo Celestial when the theme has none (Flow, Classic)
 eq('never chosen: Lumo Celestial', wallpaperIdFor({ wallpaper: null }, M), DEFAULT_WALLPAPER);
 eq('never chosen: the theme\'s default', wallpaperIdFor({ wallpaper: null }, M, 'cyberpunk-panorama'), 'cyberpunk-panorama');
 eq('never chosen, no display: the theme\'s default', wallpaperIdFor({ wallpaper: null }, null, 'cyberpunk-panorama'), 'cyberpunk-panorama');

@@ -6,7 +6,7 @@ import { withWidgetCities } from './weathermodel.js';
 
 const DEFAULTS = {
   mode: 'dark',          // 'dark' | 'light'
-  accent: null,          // 0.8.9: null = the theme's default (azul; Lord Workspaces: rosa, to go with its wallpaper), migration 7
+  accent: null,          // 0.8.9: null = the theme's default (azul; Workspaces: rosa, to go with its wallpaper), migration 7
   effects: true,         // transparency with blur
   reduceMotion: false,   // decorative animations off (Settings → Appearance)
   browserTabsInTitlebar: true,   // 0.8.4, Settings → Appearance: Chromium and Firefox draw their own bar (browserframe.js)
@@ -19,12 +19,12 @@ const DEFAULTS = {
   motionBattery: 'pause',  // on battery: 'pause' | 'lower' (15 fps, pause at 20 %) | 'keep'; new key, no migration
   motionCacheMb: 1024,   // GPU memory for the loop cache (docs/MOVING-WALLPAPERS.md), 0 off; new key, no migration
   wallpaperImages: [],   // the user's own pictures, newest first: ids 'image:<name>' (sdk/wallpapers.js)
-  wallpaper: null,       // 0.8.9: null = the theme's default (Lumo Celestial; Lord Workspaces: Cyberpunk City HD's panorama),
+  wallpaper: null,       // 0.8.9: null = the theme's default (Lumo Celestial; Workspaces: Cyberpunk City HD's panorama),
                          // migration 5. 0.8.2–0.8.8: 'lumo-celestial' saved for everyone; before: 'aurora', still available
-  slideshow: null,       // 0.8.9, Settings → Wallpaper in Lord Workspaces: { on, category, every, perDisplay } (sdk/slideshowmodel.js); new key, no migration
+  slideshow: null,       // 0.8.9, Settings → Wallpaper in Workspaces: { on, category, every, perDisplay } (sdk/slideshowmodel.js); new key, no migration
   weather: { on: false },  // { on, unit, city }: city is the default (0.8.9.1: each widget has its own, opts.city; weathermodel.js)
   playerStreams: [],        // 0.8.8.10: the Player's saved streams [{ name, url, user }] (no password: the keyring has it)   // 0.8.8.10: the weather widget asks Open-Meteo only once turned on (sdk/weathermodel.js)
-  deskWidgets: [],      // 0.8.8.10: Lord Workspaces' desktop widgets, [{ id, type, x, y }] (sdk/deskwidgets.jsx)
+  deskWidgets: [],      // 0.8.8.10: Workspaces' desktop widgets, [{ id, type, x, y }] (sdk/deskwidgets.jsx)
   wallpapers: {},       // 0.8.8.10: a display's own picture, { [connector]: id } (sdk/wallpapers.js wallpaperIdFor)
   wallpaperQuality: 'auto',   // 0.8.9.6.2, Settings → Wallpaper → Quality of the catalog's still pictures: 'auto' (4K only on a display
                               // above 1920 × 1080) | 'hd' | '4k' (sdk/wallpapergallery.js); new key, no migration
@@ -37,7 +37,7 @@ const DEFAULTS = {
   theme: null,           // id of the chosen theme (folder in themes/)
   desktopCount: 1,            // 0.8.7, how many desktops (sdk/desktops.js)
   desktopNames: null,         // 0.8.8.3, their names by position, '' for the default (sdk/desktops.js)
-  desktopArrows: false,       // 0.8.7, Settings → Desktop & Dock: Lord Flow's ⌃ arrows are the Desktops keys; off by default
+  desktopArrows: false,       // 0.8.7, Settings → Desktop & Dock: Flow's ⌃ arrows are the Desktops keys; off by default
                               // since 0.8.9.1 (#201: apps keep them for moving by word), migration 8
   switcher: null,             // 0.8.7.1, Settings → Keyboard: the app switcher (switchermodel.js)
   sessionRestore: 'always',   // 0.8.7, Settings → Session: 'off' | 'ask' | 'always' (sessionrestore.jsx)
@@ -68,7 +68,7 @@ const DEFAULTS = {
   cloudColors: {},            // 0.8.8.10 (#184), Settings → Cloud: a color chosen per account id (cloudmodel.js accountColor); new key, no migration
   themeOptions: {},           // 0.8.9, a theme's own choices from its theme.json "options", by theme id (thememeta.js); new key, no migration
   displayApps: null,          // 0.8.9.5, the apps used on each display, by connector: { v, off, displays } (sdk/displayappsmodel.js); new key, no migration
-  workspaces: null,           // 0.8.9, Lord Workspaces' activities: { v, activities } (themes/workspaces/model/activities.js); new key, no migration
+  workspaces: null,           // 0.8.9, Workspaces' activities: { v, activities } (themes/workspaces/model/activities.js); new key, no migration
   desktopChosen: false,       // 0.8.9, the first-start desktop chooser was finished (sdk/firststart.jsx); migration 5 sets it for existing users
   firstStart: null,           // 0.8.9, that chooser's step while it is open, across its live theme switches (sdk/firststartmodel.js cleanState)
 };
@@ -114,19 +114,19 @@ const MIGRATIONS = [
     if ((Array.isArray(s.keyboards) && s.keyboards.length) || s.keyboard !== 'latam') return s;
     return { ...s, keyboard: null };
   }],
-  [5, (s) => {            // 0.8.9: the default wallpaper became the theme's (null), so Lord Workspaces can have its own
+  [5, (s) => {            // 0.8.9: the default wallpaper became the theme's (null), so Workspaces can have its own
     // (Cyberpunk City HD's panorama). Lumo Celestial was every user's default since 0.8.2 and was saved with the rest
-    // of the settings, so it reads as a choice; nobody can tell it from one. Lord Flow and Lord Classic show it all the
-    // same (their default); only Lord Workspaces, new in 0.8.9, shows its own. Any other picture stays.
+    // of the settings, so it reads as a choice; nobody can tell it from one. Flow and Classic show it all the
+    // same (their default); only Workspaces, new in 0.8.9, shows its own. Any other picture stays.
     return s.wallpaper === 'lumo-celestial' ? { ...s, wallpaper: null } : s;
   }],
   [6, markExistingUser],  // 0.8.9: someone who already used LordOS never sees the first-start desktop chooser (firststartmodel.js)
-  [7, (s) => {            // 0.8.9: the default accent became the theme's (null), so Lord Workspaces can have its own (rosa,
+  [7, (s) => {            // 0.8.9: the default accent became the theme's (null), so Workspaces can have its own (rosa,
     // which goes with Cyberpunk City HD). Azul was every user's default and was saved with the rest of the settings,
-    // like the wallpaper in migration 5: Lord Flow and Lord Classic show it all the same; any other accent stays.
+    // like the wallpaper in migration 5: Flow and Classic show it all the same; any other accent stays.
     return s.accent === 'azul' ? { ...s, accent: null } : s;
   }],
-  [8, (s) => {            // 0.8.9.1 (#201): Lord Flow's ⌃ arrows became off by default, so apps get ⌃← ⌃→ for moving by
+  [8, (s) => {            // 0.8.9.1 (#201): Flow's ⌃ arrows became off by default, so apps get ⌃← ⌃→ for moving by
     // word (❖⌃← ❖⌃→ still switch desktops). On was every user's default since 0.8.7 and was saved with the rest of the
     // settings, so it reads as a choice; nobody can tell it from one. Someone who turned them off keeps that.
     return s.desktopArrows === true ? { ...s, desktopArrows: false } : s;

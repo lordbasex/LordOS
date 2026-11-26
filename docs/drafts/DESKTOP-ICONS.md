@@ -2,8 +2,8 @@
 
 **Status: draft, design only.** Nothing here is built. It designs the roadmap item "Icons and files on the desktop"
 (`docs/ROADMAP.md`, maintainer, 2026-11-24) for the release after 0.8.9.6.1: the files and folders of the XDG Desktop
-folder, plus optional places and app launchers, shown as icons on the desktop of every desktop style (Lord Flow, Lord
-Classic, Lord Workspaces, Lord Celeste), and handled the way Files handles them.
+folder, plus optional places and app launchers, shown as icons on the desktop of every desktop style (Flow,
+Classic, Workspaces, Celeste), and handled the way Files handles them.
 
 How to read it:
 
@@ -541,7 +541,7 @@ nothing to anyone.
 Per theme, only styling and placement, through a `look` prop (label color and shadow, selection fill, corner radius)
 built from the theme's tokens:
 
-| | Lord Flow | Lord Classic | Lord Workspaces | Lord Celeste |
+| | Flow | Classic | Workspaces | Celeste |
 |---|---|---|---|---|
 | Default | on | on | off | off |
 | Default places | drives | Home, Trash | none | none |

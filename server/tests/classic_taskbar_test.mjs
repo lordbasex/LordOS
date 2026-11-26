@@ -1,4 +1,4 @@
-// classic_taskbar_test.mjs — (0.8.8.6) Lord Classic's taskbar on every display. Bundles
+// classic_taskbar_test.mjs — (0.8.8.6) Classic's taskbar on every display. Bundles
 // tests/classic_taskbar_scene.mjs with esbuild (as the theme is built) together with the whole theme
 // (themes/classic/index.jsx, its startShell caught by a shim so the scene renders the shell itself) over a stub
 // `lord` whose screen has three monitors, runs it, and reads its checks. Needs node and the repository's

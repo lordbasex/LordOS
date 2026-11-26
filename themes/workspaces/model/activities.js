@@ -1,4 +1,4 @@
-// activities.js — Lord Workspaces' settings as plain data (tested by server/tests/workspaces_model_test.mjs).
+// activities.js — Workspaces' settings as plain data (tested by server/tests/workspaces_model_test.mjs).
 //
 // An activity is one of the SDK's desktops (sdk/desktops.js, at most MAX_DESKTOPS): its name is the desktop's own
 // (settings.desktopNames, renameDesktop), so the Overview and Settings → Desktop & Dock show the same name. What a

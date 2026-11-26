@@ -1,6 +1,6 @@
 #!/bin/sh
 # protected_headless.sh — protected windows (docs/PRIVACY.md "Protected windows") against a headless build/lord-server-test
-# with --test-hooks, on the CPU path, in a private runtime folder and home. The real Lord Flow with a small driver
+# with --test-hooks, on the CPU path, in a private runtime folder and home. The real Flow with a small driver
 # (tests/protected_scene.mjs) opens Calculator protected (wm.open's `protected`, locked) and Notes beside it; then the
 # test hooks write, as PPMs (testhooks.h "frame"): what the display shows (output), a screenshot (media_screenshot),
 # what the remote desktop, the screen-sharing API and a recording get (media_composed), the Screenshot portal's still

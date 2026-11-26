@@ -61,7 +61,7 @@
     click(byText('List purple'));
     await sleep(1500);
     const pw = desk().find((w) => w.id === 'check-purple');
-    // (at the place of the add, moved inside the display's work area: Lord Workspaces' rail and top bar)
+    // (at the place of the add, moved inside the display's work area: Workspaces' rail and top bar)
     step('the note picked goes on the desktop where the widget is added', !!pw && pw.x >= 60 && pw.x < 160 && pw.y >= 90 && pw.y < 160, JSON.stringify(pw));
 
     step('… keeping its text', (read(`${home}/Notes/check-purple/nota.md`) || '').includes('Open item') && (read(`${home}/Notes/check-purple/nota.md`) || '').includes('desktop: true'));

@@ -1,4 +1,4 @@
-// motion.js — Lord Workspaces' transitions. Each one changes a node's native transform or opacity with lord.setStyle
+// motion.js — Workspaces' transitions. Each one changes a node's native transform or opacity with lord.setStyle
 // (scaleX, scaleY, translateX, translateY, opacity): lord-server paints the subtree once into a cached raster and only
 // composites it, and React doesn't render per frame. One shared frame loop runs while a tween is alive and stops with
 // the last one; with Reduce motion (Settings → Appearance or the theme's Control Center) every tween jumps to its end.

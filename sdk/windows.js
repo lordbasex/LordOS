@@ -44,7 +44,7 @@ export function workAreaOf(d) {
   if (areaFn) return areaFn(d);
   return d.main ? area : { x: d.x, y: d.y, w: d.w, h: d.h };
 }
-// The display under the pointer (the main one before the pointer moves): Lord Classic opens the start menu there
+// The display under the pointer (the main one before the pointer moves): Classic opens the start menu there
 // from the keyboard.
 export const pointerDisplay = () => (pointer.x >= 0 ? displayAt(pointer.x, pointer.y) : mainDisplay());
 // Work area of the display under the pointer (where a new window opens).
@@ -146,7 +146,7 @@ onScreenChange((now, old) => {
 
 // Every window inside its display's work area: one left on a display that is gone (or outside every display) moves
 // to the main one; the others stay on their display, below its bar and within reach. Run when the screen changes and
-// when a theme changes what the work areas reserve (Lord Flow's menu bar on every display turned on).
+// when a theme changes what the work areas reserve (Flow's menu bar on every display turned on).
 export function keepWindowsInWorkAreas() {
   // a window left on a display that is gone (or outside every display) moves to the main one; the
   // others stay on their display, inside its work area
@@ -169,10 +169,10 @@ export const appMenus = createStore({});
 // returns it now (the title bar's height follows Settings → Appearance → Window options → Window buttons, windowbuttons.js);
 // used to open Linux app windows at the size they requested.
 // snap: true turns on window snapping (dragging a window to an edge of the screen, see "Snapping"
-// below); Lord Flow, Lord Classic and Lord Workspaces do. The person can still turn it off (settings.windowSnap).
-// locked: (window) => true for a window the person has locked in place (Lord Workspaces' padlock): the person's own
+// below); Flow, Classic and Workspaces do. The person can still turn it off (settings.windowSnap).
+// locked: (window) => true for a window the person has locked in place (Workspaces' padlock): the person's own
 // ways to move, resize, maximize, minimize, snap or close it refuse (see "Locked windows" below).
-// snapThirds: true (Lord Workspaces) turns a left or right half into a third after the pointer rests on that edge for
+// snapThirds: true (Workspaces) turns a left or right half into a third after the pointer rests on that edge for
 // SNAP_DWELL_MS while dragging; off, nothing changes for the other themes.
 export function configureWindows({ apps, workArea, chrome: c, snap, locked, snapThirds }) {
   themeApps = apps;
@@ -292,7 +292,7 @@ let snapOn = false;
 let thirdsOn = false;
 export { SNAP_DWELL_MS };
 // { id, edges } while a window is moved (edges 0) or resized by the person in C, else null: a theme may follow the
-// pointer meanwhile (lord.wm.pointer), as Lord Workspaces does to show where a tiled window will land
+// pointer meanwhile (lord.wm.pointer), as Workspaces does to show where a tiled window will land
 export const moveGrab = createStore(null);
 // { id, zone, rect: { x, y, w, h } } while a dragged window would snap, else null
 export const snapPreview = createStore(null);

@@ -1,11 +1,11 @@
-// appgroupsmodel.js — the start menu's apps by category (Lord Classic, themes/classic/components/StartMenu.jsx):
+// appgroupsmodel.js — the start menu's apps by category (Classic, themes/classic/components/StartMenu.jsx):
 // which group an app belongs to, the groups with their apps and counts, and the rows the keyboard walks.
 // No `lord`, no React: node tests import it (server/tests/app_groups_model_test.mjs).
 //
 // An app's group comes from, in order: its manifest's "category" (a LordOS app, a web app), the first freedesktop
 // main category in its .desktop's Categories (a Linux or Flatpak app), the first additional category this file
 // knows (a .desktop that lists only "WebBrowser" or "TerminalEmulator"), and else "Other". The group ids are the
-// freedesktop main categories, so their names are the same translations as the Store's and Lord Flow's app launcher's
+// freedesktop main categories, so their names are the same translations as the Store's and Flow's app launcher's
 // (shell.category.<id>), plus "Other".
 
 // The groups, in the order an English reader sees them; the start menu sorts them by their translated names.

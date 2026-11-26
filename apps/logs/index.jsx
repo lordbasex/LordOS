@@ -197,7 +197,7 @@ export default function Registros() {
   const query = useRef({ seq: 0 });
   const box = useRef(null);
   const [width, height] = useSize(box, [820, 600]);
-  // a small window (a tile of Lord Workspaces): the sources hide behind a toolbar button and open over the list
+  // a small window (a tile of Workspaces): the sources hide behind a toolbar button and open over the list
   const bar = useSidebar(640, 'logs');
   const tight = width < 560;           // narrower fields and process column, the filters may wrap
   const colProc = tight ? 100 : COL_PROC;

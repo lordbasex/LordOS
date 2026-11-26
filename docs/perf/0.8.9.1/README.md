@@ -2,7 +2,7 @@
 
 How these were measured: [../MEMORY-HEAPTRACK.md](../MEMORY-HEAPTRACK.md).
 
-PC: Intel i9-10900, 128 GB, RX 580, 3 displays at 1920×1080, Debian 13, kernel 6.12, THP `always`, Lord Workspaces,
+PC: Intel i9-10900, 128 GB, RX 580, 3 displays at 1920×1080, Debian 13, kernel 6.12, THP `always`, Workspaces,
 7 widgets on one display. Each CSV is one fresh session, sampled every 10 s after 3 minutes of settling
 (`tools/bench/session-sample.sh`).
 

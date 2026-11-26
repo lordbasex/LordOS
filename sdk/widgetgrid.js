@@ -1,4 +1,4 @@
-// widgetgrid.js — the desktop widgets' grid (0.8.8.10, Lord Workspaces), plain functions with no imports
+// widgetgrid.js — the desktop widgets' grid (0.8.8.10, Workspaces), plain functions with no imports
 // (server/tests/widget_grid_test.mjs). Each display's work area holds a grid of square cells, anchored to its top right
 // like TangoOS's; a widget takes a block of cells by its size and keeps them: no other widget can be placed or dropped
 // over them.

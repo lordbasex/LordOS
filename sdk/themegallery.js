@@ -9,8 +9,9 @@ import { encodeQuery, ISSUE_BASE, ISSUE_URL_MAX } from './cloudcheck.js';
 export const GALLERY_FILTERS = ['all', 'official', 'community', 'installed'];
 
 // One card. `t` is a theme from sdk/index.js themes.list() (id, name, description, current, failed, failedWhy and the
-// checked theme.json fields). The official themes (no `community: true`) are LordOS's: their author is LordOS, their
-// license the system's (MIT) and their version the release's. Every listed theme is installed (a store, stage 3, will
+// checked theme.json fields). The official themes (no `community: true`) are LordOS's, kept in the LordOS-themes
+// repository (themes/README.md): their theme.json names the author, email and organization (since 0.8.9.6.2; LordOS
+// when it doesn't), their license is the system's (MIT) and their version the release's. Every listed theme is installed (a store, stage 3, will
 // list some that aren't).
 export function galleryEntry(t, { lordosVersion = '' } = {}) {
   const community = t.community === true;
@@ -50,7 +51,7 @@ export function matchesFilter(e, filter) {
   return true;
 }
 
-// The order of the cards: the official themes first (Lord Flow, then Lord Classic, then by name), then the community
+// The order of the cards: the official themes first (Flow, then Classic, then by name), then the community
 // ones by name; the same order with any query or filter, so a card never jumps while typing.
 const rank = (e) => (e.community ? 3 : e.id === 'default' ? 0 : e.id === 'classic' ? 1 : 2);
 export function sortGallery(list) {

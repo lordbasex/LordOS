@@ -1,4 +1,4 @@
-// Lord Workspaces glyphs, drawn with views (our own shapes: no icon font, no colour emoji; docs/DESIGN.md, "Icons").
+// Workspaces glyphs, drawn with views (our own shapes: no icon font, no colour emoji; docs/DESIGN.md, "Icons").
 // Each takes a colour and a size; where one cuts a hole it also takes the colour behind it (bg).
 import { View } from '@lordos/sdk';
 

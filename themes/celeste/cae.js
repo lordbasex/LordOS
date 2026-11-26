@@ -1,4 +1,4 @@
-// cae.js: Lord Celeste's design values, its colour schemes (dark and light), its options and small helpers.
+// cae.js: Celeste's design values, its colour schemes (dark and light), its options and small helpers.
 // The layout idea (a screen frame with a bar on one side and drawers that slide out of its edges) is inspired by
 // Caelestia (caelestia-dots/shell, GPL-3.0); no code or assets come from it. Everything here was written for LordOS.
 import { themeOptionValue } from '@lordos/sdk';

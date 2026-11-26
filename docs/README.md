@@ -56,7 +56,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [ON-SCREEN-KEYBOARD.md](ON-SCREEN-KEYBOARD.md) | The on-screen keyboard, for a computer with no physical keyboard |
 | [THEMES-GUIDE.md](THEMES-GUIDE.md) | How to build a LordOS appearance (theme): anatomy, tokens, frames, building, verified code, testing |
 | [THEMES-PLAN.md](THEMES-PLAN.md) | Plan: many appearances, community themes from a file, a theme store with review and signing |
-| [WORKSPACES.md](WORKSPACES.md) | Lord Workspaces (since 0.8.9): activities, tiling per display, effects styles, performance, what is deferred |
+| [WORKSPACES.md](WORKSPACES.md) | Workspaces (since 0.8.9): activities, tiling per display, effects styles, performance, what is deferred |
 | [LAYERS.md](LAYERS.md) | The desktop's stacking order: what is drawn and clicked above what |
 | [SPOTLIGHT.md](SPOTLIGHT.md) | Search and the advanced clipboard |
 | [TRACKPAD.md](TRACKPAD.md) | Touchpads, gestures and touchscreens |
@@ -152,7 +152,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [iso-final/](iso-final/) | Screenshots of the final ISO test |
 | [polish/](polish/) | Before and after screenshots of the visual polish pass |
 | [packs/](packs/) | Sample language pack and script test text |
-| [classic/](classic/) | Screenshots of the Lord Classic theme and the Lord Flow theme, light and dark |
+| [classic/](classic/) | Screenshots of the Classic theme and the Flow theme, light and dark |
 | [imager/](imager/) | Screenshots of LordOS Imager (native app and desktop app) |
 | [qa/](qa/) | Screenshots of the app-by-app QA pass (see [VM-SETUP.md](VM-SETUP.md)) |
 

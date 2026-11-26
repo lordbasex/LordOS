@@ -1,4 +1,4 @@
-// workspaces_scene.mjs — the scene of tests/workspaces_test.mjs (not run by itself), 0.8.9: Lord Workspaces over a stub
+// workspaces_scene.mjs — the scene of tests/workspaces_test.mjs (not run by itself), 0.8.9: Workspaces over a stub
 // `lord` with three monitors side by side, the main one in the middle. It checks a group frame per display, the spine on
 // the main one, each display's work area, no timer per second at idle, tiling per display (split on the main one, single
 // on the right), a window moved by hand leaving its tile, Save layout, a monitor unplugged (its window joins the main
@@ -400,7 +400,7 @@ await flush();
   for (let i = 0; i < 3; i++) await flush();
 }
 
-// the layout flyout and the drop target (Lord Workspaces only)
+// the layout flyout and the drop target (Workspaces only)
 {
   const snapT = await import('../../themes/workspaces/components/SnapTargets.jsx');
   await new Promise((res) => setTimeout(res, 1100));
@@ -727,7 +727,7 @@ await flush();
   sdk.settings.set(sdk.wallpaperPatch(sdk.settings.get(), sdk.settings.get().wallpaper, null));
   await flush();
   check('wallpaper: all displays again', [L, M, R].map(wallOf), before);
-  // never chosen (null since 0.8.9): Lord Workspaces' own default, Cyberpunk City HD's panorama
+  // never chosen (null since 0.8.9): Workspaces' own default, Cyberpunk City HD's panorama
   sdk.settings.set({ wallpaper: null, wallpapers: {} });
   await flush();
   check('wallpaper: the theme\'s default when none was chosen', [L, M, R].map(wallOf).every((src) => src.includes('lordos-cyberpunk-panorama')), true);
@@ -969,7 +969,7 @@ check('idle again: still no timer every second', intervals(1000), 0);
 }
 
 
-// ❖` (sdk/appswitcher.jsx cycleAppWindows, in Lord Workspaces' table and Settings → Keyboard): the next window of the app
+// ❖` (sdk/appswitcher.jsx cycleAppWindows, in Workspaces' table and Settings → Keyboard): the next window of the app
 // in front, only among that app's windows in the activity in view; a window of the same app in another activity is left
 {
   tiler.forgetLaunches();                // the profile launches above never showed a window

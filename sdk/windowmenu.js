@@ -10,7 +10,7 @@
 //   Inspect (developer tools)  a web app's window, while Settings → Web Apps → Developer mode is on (webapps.js)
 //   the open windows, the one in front checked
 //
-// Lord Flow shows it under Window in its menu bar; Lord Classic in each window's Window menu.
+// Flow shows it under Window in its menu bar; Classic in each window's Window menu.
 import { windows, wm, getApp, windowTitle, onActiveDesktop } from './windows.js';
 import { screen, displayFor } from '@lordos/runtime';
 import { t } from './i18n.js';

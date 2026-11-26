@@ -2258,7 +2258,7 @@ static void test_gcontend(void) {
 }
 
 /* The blurred backdrop cache (paint.c, 0.8.8.10): four frosted cards 16 px apart over a striped wallpaper, like
- * Lord Workspaces' widgets. A hand moving inside one card repaints the hand, not the four cards and their margins;
+ * Workspaces' widgets. A hand moving inside one card repaints the hand, not the four cards and their margins;
  * a stripe changing under a card, a card moving and a card's own blur changing blur again; every frame is the
  * same as a full repaint. */
 static void test_blur_cache(void) {
@@ -2389,7 +2389,7 @@ static void test_sound_wave(void) {
     wave_source(NULL);
 }
 
-/* Paint order and the blur cache (0.8.8.10): three frosted cards 16 px apart in a row, as Lord Workspaces' widgets.
+/* Paint order and the blur cache (0.8.8.10): three frosted cards 16 px apart in a row, as Workspaces' widgets.
  * A ring changing near the edge of a card painted above its neighbour leaves the neighbour's blur alone (the change
  * is not under it); the same change in a card painted below blurs the neighbour again; a card raised with zIndex is
  * handled as unsure. Every frame equals a full repaint. */
@@ -4351,7 +4351,7 @@ static void bench(void) {
 #ifndef ENGINE_BEFORE
 /* the wallpaper slideshow's transition (0.8.9, sdk/slideshow.jsx) on a 1920×1080 display: the arriving picture over
  * the one shown, its opacity and translation (whole pixels) set every frame as lord.setStyle does, under a window and
- * Lord Workspaces' blurred bars (a spine and a top band); 144 frames (2.4 s at 60 Hz). Then Reduce motion's plain fade
+ * Workspaces' blurred bars (a spine and a top band); 144 frames (2.4 s at 60 Hz). Then Reduce motion's plain fade
  * (opacity only), and a 6 % zoom for comparison (a scaled raster composited every frame). The pictures are the
  * 1920×1080 bases, so they are scaled once to their 2 % larger box. */
 static void bench_slideshow(void) {

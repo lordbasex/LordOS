@@ -196,7 +196,7 @@ Every place with text has **Speech** (`sdk/voice.js`, `speechMenu`):
 - **Edit → Speech** (Text Editor, Terminal; Notes in View) and the **right-click** menu (Text Editor, Terminal, Notes):
   *Start Speaking*, *Stop Speaking*, *Save as Audio…* Start Speaking reads the selection, or the whole text when
   nothing is selected (Text Editor, Notes). The right-click menu is the SDK's (`sdk/contextmenu.jsx`, with submenus).
-- **A Linux app** (Firefox, foot…) gets an **Edit** menu with Speech in the menu bar (Lord Classic: in its window's
+- **A Linux app** (Firefox, foot…) gets an **Edit** menu with Speech in the menu bar (Classic: in its window's
   menu strip), as its own menus aren't the desktop's (`useMenusWithSpeech`). It reads the app's **primary selection**.
 - **A web app** (`lord-web`, in development) is such a Linux app: it makes the page's selection the primary selection
   (never a password field's), so Edit → Speech, ❖Esc and its right-click menu's Speech ▸ read it the same way

@@ -12,7 +12,7 @@ Tudo o que se configura no LordOS está nos Ajustes. O campo no alto busca entre
 | Seção | O que tem |
 |---|---|
 | [Geral](settings:general) | Este computador: nome, software e armazenamento |
-| [Aparência](settings:appearance) | Estilo da área de trabalho (Lord Flow ou Lord Classic), modo escuro ou claro, cor de destaque, transparências |
+| [Aparência](settings:appearance) | Estilo da área de trabalho (Flow ou Classic), modo escuro ou claro, cor de destaque, transparências |
 | [Fundo de tela](settings:wallpaper) | O fundo da área de trabalho |
 | [Mesa e Dock](settings:dock) | O Dock, as áreas de trabalho e os botões das janelas |
 | [Telas](settings:displays) | Resolução, escala, disposição de várias telas, Luz noturna |

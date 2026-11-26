@@ -1,4 +1,4 @@
-/* launchplace_client.c — a Wayland app that behaves like Google Chrome with several profiles, for Lord Workspaces' launch
+/* launchplace_client.c — a Wayland app that behaves like Google Chrome with several profiles, for Workspaces' launch
  * placement (tests/launchplace_headless.sh, docs/WORKSPACES.md "Where launched windows go"). Launched through a .desktop
  * entry by lord.apps.launch, as the real browser is:
  *

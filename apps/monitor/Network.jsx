@@ -856,7 +856,7 @@ export function NetworkTab({ last, prefs }) {
   const [range, setRange] = useState('live');           // the traffic chart's zoom: 'live' or a history window
   const [end, setEnd] = useState(null);                 // the history window's end (Unix s), null = now
   const sysHist = useHistory(range === 'live' ? null : range, end, null);
-  // a small window (a Lord Workspaces tile): below 900 px the map takes the list's place behind a globe button, below
+  // a small window (a Workspaces tile): below 900 px the map takes the list's place behind a globe button, below
   // 640 px the details too (with a back button)
   const narrow = useNarrow(900), tight = useNarrow(640);
   const [pane, setPane] = useState('list');             // narrow: 'list' or 'map'

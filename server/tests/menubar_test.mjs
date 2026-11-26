@@ -1,4 +1,4 @@
-// menubar_test.mjs — (0.8.8.6, #58) what the bar and Lord Flow's panels show, and (0.8.8.6) a bar on every display: the Control Center's tiles that
+// menubar_test.mjs — (0.8.8.6, #58) what the bar and Flow's panels show, and (0.8.8.6) a bar on every display: the Control Center's tiles that
 // Settings → Desktop & Dock turns off, the output list by the volume (a click makes that output the default one)
 // and the clock panel's calendar. Bundles tests/menubar_scene.mjs with esbuild (as the theme is built) over a stub
 // `lord` with two sound outputs, a Wi-Fi radio and a Bluetooth adapter that records lord.sound calls, runs it, and

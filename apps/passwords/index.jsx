@@ -147,7 +147,7 @@ function ListRow({ e, cat, selected, onClick, onContextMenu }) {
 }
 
 // The width of a box after layout (measured again on every render).
-// a small window (a Lord Workspaces tile): below SIDE_AT the source list hides behind a button, below ONE_AT the item
+// a small window (a Workspaces tile): below SIDE_AT the source list hides behind a button, below ONE_AT the item
 // list and the detail take turns (the detail with a back button)
 const SIDE_AT = 820, ONE_AT = 640;
 

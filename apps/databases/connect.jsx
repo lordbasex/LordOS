@@ -17,7 +17,7 @@ import { mergeImport } from './plist.js';
 export const connectAsks = { importNow: null };
 
 const QUICK = '__quick';
-// a small window (a Lord Workspaces tile): below SIDE_AT the favorites hide behind a button over the form
+// a small window (a Workspaces tile): below SIDE_AT the favorites hide behind a button over the form
 const SIDE_AT = 760;
 
 export function Connect({ onConnected }) {

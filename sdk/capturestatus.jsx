@@ -12,7 +12,7 @@
 //     opens the device in its sandbox), a Linux app using V4L2. Shown, with no Turn off.
 //
 // It is a security indicator: there is no setting to hide it, and every theme draws it where the privacy dots were
-// (<PrivacyIndicators />, next to the status items; a Lord Classic taskbar on the side hides its status items but not
+// (<PrivacyIndicators />, next to the status items; a Classic taskbar on the side hides its status items but not
 // this). A share's frames wait for it: lord-server sends none until an indicator is on screen (lord.share.shown,
 // lord.portal.castShown), and the screen-sharing API's share ends if every indicator leaves. When a window is full screen
 // the bars may be under it, so a small copy of the pill stays in the corner of each display (CaptureCorner).

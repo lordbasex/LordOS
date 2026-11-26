@@ -1,5 +1,5 @@
-// menunav.js — how a menu answers the keyboard and the pointer, with no screen. Lord Flow's menus and menu bar
-// (themes/default/components/Menu.jsx, MenuBar.jsx), Lord Classic's (themes/classic/components/Menu.jsx and the
+// menunav.js — how a menu answers the keyboard and the pointer, with no screen. Flow's menus and menu bar
+// (themes/default/components/Menu.jsx, MenuBar.jsx), Classic's (themes/classic/components/Menu.jsx and the
 // window's menu strip) and the apps' right-click menus (sdk/contextmenu.jsx) read these rules. Tested by
 // server/tests/menu_nav_test.mjs.
 //

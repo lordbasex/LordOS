@@ -52,7 +52,7 @@ export { trackpad, useTrackpads, hasTouchpad, registerGestureActions, lastSwipe,
 export { ime, useIme } from './ime.js';
 export { wayland, x11SelfScale, setX11Scaling } from './wayland.js';
 export { useLauncherApps, launchApp, refreshApps, guestLauncherApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, windowPixelIcons, LetterIcon, iconFromFile, webAppIcon, webProfileIcon, APP_CATEGORIES, appCategory } from './apps.js';
-export { APP_GROUPS, launcherGroup, groupApps, startView, groupRows, groupKey, keepSelection } from './appgroupsmodel.js';   // Lord Classic's start menu by category
+export { APP_GROUPS, launcherGroup, groupApps, startView, groupRows, groupKey, keepSelection } from './appgroupsmodel.js';   // Classic's start menu by category
 // Web apps (docs/WEBAPPS.md): the registry through lord.webapps, profiles, the probe, the permission questions
 export { webApps, useWebApps, refreshWebApps, webAppsAvailable, webAppEntry, webRunning, launchWebApp, probeWebApp, installWebApp, webAppCall, webAppOfWindow, webAppMemory, webEngine,
   webBadges, siteIcons, wantSiteIcon, refreshSiteIcon, siteIconBusy, siteIconStatus, webDeveloper, setWebDeveloperMode, webSearchEngine, setWebSearchEngine,
@@ -504,7 +504,7 @@ export { WidgetPicker, widgetPicker } from './widgetpicker.jsx';
 export { FirstStart, startFirstStart, firstStartState, useFirstStartOpen } from './firststart.jsx';
 export { DesktopStyleThumb, SketchThumb, knownStyleTheme } from './stylethumb.jsx';   // Add widget, in every theme (0.8.8.10)
 
-// A theme's own pointer (0.8.9, Lord Workspaces): the default arrow as a rounded tip in its accent colour ('#RRGGBB'),
+// A theme's own pointer (0.8.9, Workspaces): the default arrow as a rounded tip in its accent colour ('#RRGGBB'),
 // or null for LordOS's black arrow. Only the default pointer changes. startShell puts the black one back for every theme.
 // Style packs and app skins (part 4 of the community-themes plan, docs/THEMES-GUIDE.md "Style packs" and "App skins")
 export { registerStylePack, registerAppSkins, useStylePack, useStyleParts, stylePack, PackIcon, usePackHas, useSkin, useSkinned, SkinRegion, SkinHeader, useThemeFont, applyPack } from './appskins.jsx';

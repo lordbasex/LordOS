@@ -8,14 +8,14 @@ const chrome = { w: 2, h: 43 };
 assert.deepEqual(chromeInset(chrome, false), { left: 1, top: 42, w: 2, h: 43 });
 assert.deepEqual(chromeInset(chrome, true), { left: 0, top: 0, w: 0, h: 0 });
 
-// Lord Classic and Lord Workspaces: 1 px borders, a 30 px title bar and a 26 px menu strip under it for a window with
+// Classic and Workspaces: 1 px borders, a 30 px title bar and a 26 px menu strip under it for a window with
 // menus (every Linux window has its Edit menu with Speech). The strip is part of the frame: left out, the app got
 // 26 px less than it asked for and lost 26 more on each of its own resizes (400, 374, 348 on a fullscreen exit).
 const classic = { w: 2, h: 32, menu: 26 };
 assert.deepEqual(chromeInset(classic, false, true), { left: 1, top: 57, w: 2, h: 58 });
 assert.deepEqual(chromeInset(classic, false, false), { left: 1, top: 31, w: 2, h: 32 });      // no menus: no strip
 assert.deepEqual(chromeInset(classic, true, true), { left: 0, top: 0, w: 0, h: 0 });          // its own frame: no strip either
-assert.deepEqual(chromeInset(chrome, false, true), { left: 1, top: 42, w: 2, h: 43 });        // Lord Flow: no strip (menu bar)
+assert.deepEqual(chromeInset(chrome, false, true), { left: 1, top: 42, w: 2, h: 43 });        // Flow: no strip (menu bar)
 assert.deepEqual(chromeInset(chrome, false), chromeInset(chrome, false, false));
 // the app's size round trip (sdk/wayland.js: map and 'geometry' make the frame, the theme's layout gives the content back)
 {

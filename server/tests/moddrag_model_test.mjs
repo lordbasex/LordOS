@@ -41,7 +41,7 @@ eq('the Overview: its own clicks', modGrabAction(w, 0, { overview: true }), null
 eq('a shell panel: never', modGrabAction(w, 0, { shell: true }), null);
 eq('maximized, left: comes out of its place', modGrabAction({ ...w, maximized: true }, 0), 'unmaximize');
 eq('maximized, right: taken, nothing happens', modGrabAction({ ...w, maximized: true }, 2), 'hold');
-eq('locked (Lord Workspaces\' padlock): taken, nothing happens', modGrabAction(w, 0, { locked: true }), 'hold');
+eq('locked (Workspaces\' padlock): taken, nothing happens', modGrabAction(w, 0, { locked: true }), 'hold');
 eq('locked, right too', modGrabAction(w, 2, { locked: true }), 'hold');
 eq('snapped: moves (the end restores its size, as from the title bar)', modGrabAction({ ...w, snapped: 'left' }, 0), 'move');
 
@@ -62,9 +62,9 @@ eq('anything else: normal', windowButtonSizePref({ windowButtonSize: 'huge' }), 
 eq('scales', WINDOW_BUTTON_SIZES.map(buttonSizeScale), [1, 1.25, 1.5]);
 eq('unknown scale: 1', buttonSizeScale('x'), 1);
 eq('normal keeps the theme\'s own lengths, halves too', [scaledBar(40, 'normal'), scaledBar(1.5, 'normal'), scaledBar(13, 'normal')], [40, 1.5, 13]);
-eq('Lord Flow\'s bar and lights, large', [scaledBar(40, 'large'), scaledBar(13, 'large')], [50, 16]);
-eq('Lord Flow\'s bar and lights, extra large', [scaledBar(40, 'xlarge'), scaledBar(13, 'xlarge')], [60, 20]);
-eq('Lord Classic\'s bar and buttons, extra large', [scaledBar(34, 'xlarge'), scaledBar(44, 'xlarge')], [51, 66]);
+eq('Flow\'s bar and lights, large', [scaledBar(40, 'large'), scaledBar(13, 'large')], [50, 16]);
+eq('Flow\'s bar and lights, extra large', [scaledBar(40, 'xlarge'), scaledBar(13, 'xlarge')], [60, 20]);
+eq('Classic\'s bar and buttons, extra large', [scaledBar(34, 'xlarge'), scaledBar(44, 'xlarge')], [51, 66]);
 eq('larger lengths are whole pixels', [1.5, 13, 34, 36, 38, 44, 28].every((n) => Number.isInteger(scaledBar(n, 'large')) && Number.isInteger(scaledBar(n, 'xlarge'))), true);
 eq('larger is never smaller', [13, 28, 34, 36, 38, 40, 44].every((n) => scaledBar(n, 'normal') < scaledBar(n, 'large') && scaledBar(n, 'large') < scaledBar(n, 'xlarge')), true);
 

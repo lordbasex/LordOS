@@ -1,4 +1,4 @@
-// geometry.js — where Lord Workspaces puts its pieces on each display, as plain functions of the display (no runtime or
+// geometry.js — where Workspaces puts its pieces on each display, as plain functions of the display (no runtime or
 // React, so server/tests/workspaces_model_test.mjs checks them without a screen).
 //
 //   spineMode(pref, width)          'expanded' | 'collapsed' for the Context Spine on a display that wide

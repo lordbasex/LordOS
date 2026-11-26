@@ -1,4 +1,4 @@
-// menu_keys_scene.mjs — the scene of tests/menu_keys_test.mjs (not run by itself): Lord Flow's and Lord Classic's menus
+// menu_keys_scene.mjs — the scene of tests/menu_keys_test.mjs (not run by itself): Flow's and Classic's menus
 // rendered through runtime/index.js with a stub `lord`, driven with the server's own events (__lordEvent, __lordKey):
 // the arrows wrap past separators and disabled rows, letters go to the row they start, → opens a submenu with its
 // first row highlighted and Escape closes one level, ← and → step along the bar that opened the menu, a submenu
@@ -80,14 +80,14 @@ for (const kind of ['flow', 'classic']) {
   check(`${kind}: Escape closes it`, log.includes('close') && !shown('Open'), log.join());
 }
 
-// Lord Classic flattens submenus; ← and → step along the strip
+// Classic flattens submenus; ← and → step along the strip
 await open('classic', true);
 await press('ArrowRight');
 check('classic: → steps to the next menu', last() === 'step1', log.join());
 await press('ArrowLeft');
 check('classic: ← steps to the previous one', last() === 'step1,step-1', log.join());
 
-// Lord Flow: a submenu from the keyboard, one level at a time
+// Flow: a submenu from the keyboard, one level at a time
 await open('flow');
 await type('r'); await press('ArrowRight');
 check('flow: → opens the submenu', shown('Alpha') && shown('Open'));

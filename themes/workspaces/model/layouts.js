@@ -1,4 +1,4 @@
-// layouts.js — Lord Workspaces' static tiling, as plain data (tested by server/tests/workspaces_model_test.mjs). The
+// layouts.js — Workspaces' static tiling, as plain data (tested by server/tests/workspaces_model_test.mjs). The
 // runtime part is ../tiler.js, which moves windows with the SDK's own window store; nothing here moves anything.
 //
 //   LAYOUTS                          'free' (windows where the person puts them), 'single', 'halves' (two columns),

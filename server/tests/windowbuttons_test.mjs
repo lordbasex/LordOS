@@ -13,10 +13,10 @@ eq('anything else', windowButtonsPref({ windowButtons: 'top' }), 'auto');
 eq('not a string', windowButtonsPref({ windowButtons: 1 }), 'auto');
 
 // auto: each theme's own place, mirrored right to left by the engine as before
-eq('Lord Flow auto', buttonsAtStart('auto', true), true);
-eq('Lord Classic auto', buttonsAtStart('auto', false), false);
-eq('Lord Flow auto, right to left', buttonsAtStart('auto', true, true), true);
-eq('Lord Classic auto, right to left', buttonsAtStart('auto', false, true), false);
+eq('Flow auto', buttonsAtStart('auto', true), true);
+eq('Classic auto', buttonsAtStart('auto', false), false);
+eq('Flow auto, right to left', buttonsAtStart('auto', true, true), true);
+eq('Classic auto, right to left', buttonsAtStart('auto', false, true), false);
 // left and right are the screen's sides: right to left, the row is mirrored, so the place in it is the other one
 for (const theme of [true, false]) {
   eq(`left ${theme}`, buttonsAtStart('left', theme), true);

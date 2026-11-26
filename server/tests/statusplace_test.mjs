@@ -5,7 +5,7 @@ import { panelPlacement, panelRoom } from '../../sdk/statusplace.js';
 let ok = 0;
 const eq = (name, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.log(`FAIL ${name}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); process.exitCode = 1; } else ok++; };
 const d = { x: 0, y: 0, w: 1440, h: 900 };
-// Lord Flow's menu bar: items at the top right
+// Flow's menu bar: items at the top right
 eq('menu bar', panelPlacement([1300, 2, 26, 22], d), { position: 'absolute', top: 26, right: 0 });
 // the Classic taskbar at the bottom (issue #29): above the item, never below the screen
 eq('taskbar bottom', panelPlacement([1300, 856, 26, 40], d), { position: 'absolute', bottom: 44, right: 0 });

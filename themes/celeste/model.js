@@ -1,4 +1,4 @@
-// model.js: Lord Celeste's geometry and its launcher's calculator, as plain functions with no SDK (tested by
+// model.js: Celeste's geometry and its launcher's calculator, as plain functions with no SDK (tested by
 // server/tests/celeste_model_test.mjs). Coordinates are global (several displays side by side). In a right-to-left
 // language the frame is mirrored: the bar goes on the right, and the drawers of the "end" edge open on the left.
 export const FRAME = 10;    // the frame's thickness on the three sides without the bar

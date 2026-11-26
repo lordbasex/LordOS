@@ -1,4 +1,4 @@
-// placement.js — where Lord Classic's taskbars reserve room and where their panels open (0.8.8.6: a taskbar on every
+// placement.js — where Classic's taskbars reserve room and where their panels open (0.8.8.6: a taskbar on every
 // display). Plain functions of the displays, so server/tests/classic_taskbar_test.mjs can check them without a
 // screen; the start menu's box is startBox in components/StartMenu.jsx.
 //

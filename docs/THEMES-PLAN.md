@@ -42,7 +42,7 @@ What differs from the plan below: capabilities give read access only (no setters
   permissions or direct app launching — `launchApp` goes through the shell). The manifest declares capabilities such as
   `wifi`, `bluetooth`, `brightness`, `media` and LordOS grants only those, as for isolated apps.
 - **Watchdog with fallback (also useful for official themes):** an exception at start, no first frame within a few
-  seconds, a long JS stall or repeated crashes → back to the previous theme (or Lord Flow), the theme marked failed, the
+  seconds, a long JS stall or repeated crashes → back to the previous theme (or Flow), the theme marked failed, the
   error kept for a report; plus a fixed key combination that always restores the default theme.
 
 ## Stage 3 — a theme store ("Desktop styles")

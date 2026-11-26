@@ -23,7 +23,7 @@ import { direction } from './i18n.js';
 import { windowButtonsPref, buttonsAtStart, buttonOrder, windowButtonSizePref, scaledBar } from './windowbuttons.js';
 
 // Where a title bar's buttons go (Settings → Desktop & Dock → Title bars, issue #58; sdk/windowbuttons.js).
-// themeStart: the theme's own place (Lord Flow true, Lord Classic false). atStart: first in the title bar's row;
+// themeStart: the theme's own place (Flow true, Classic false). atStart: first in the title bar's row;
 // order: the buttons in the row's order ('close', 'minimize', 'maximize').
 // size: Settings → Appearance → Window options → Window buttons ('normal', 'large', 'xlarge'; GitHub #151, #219), and px(n) a
 // length of the theme's bar at that size (its height, a button, a glyph, a gap): the hit areas grow with what is drawn.

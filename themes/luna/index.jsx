@@ -7,7 +7,7 @@
 //   components/Taskbar.jsx the green start button, quick launch, a button per window, the tray and the clock
 //   skins/files.jsx        Files as that era's explorer: toolbar, address bar with Go, the task pane, icons or details
 //
-// Quick settings and menus are Lord Classic's own components with this theme's tokens; the start menu is its own. The style pack
+// Quick settings and menus are Classic's own components with this theme's tokens; the start menu is its own. The style pack
 // below gives the icons, white pointers with a black outline, a sound scheme of plain notes and an installed font
 // (DejaVu Sans, of fonts-dejavu-core, which LordOS recommends): each part can be turned off in Settings → Appearance.
 import {

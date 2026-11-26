@@ -47,7 +47,7 @@ export const brightnessDown = () => step('display-brightness', 'backlight', next
 export const keyLightUp = () => step('keyboard-light', 'keyboardLight', nextKeyLight, 1, 'keylight');
 export const keyLightDown = () => step('keyboard-light', 'keyboardLight', nextKeyLight, -1, 'keylight');
 
-// The brightness slider of Lord Flow's Control Center and Lord Classic's Quick Settings (issue #114): the same closed
+// The brightness slider of Flow's Control Center and Classic's Quick Settings (issue #114): the same closed
 // admin action as the keys and Settings → Displays (display-brightness, checked on the root side), sent at most every
 // 120 ms while the slider moves, always with its last position.
 let pending = null, timer = 0;

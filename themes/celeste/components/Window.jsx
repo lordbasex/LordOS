@@ -1,8 +1,8 @@
-// Lord Celeste's window frame: a 38 px title bar with round lights (close, minimize, maximize, in the order and on the
+// Celeste's window frame: a 38 px title bar with round lights (close, minimize, maximize, in the order and on the
 // side Settings → Desktop & Dock → Title bars asks, useWindowButtons; its Size makes the bar, the lights, their glyphs and
-// their hit areas larger, px, GitHub #151 and #219, and index.jsx's chrome follows it) and the title in the middle. Lord Celeste has no
+// their hit areas larger, px, GitHub #151 and #219, and index.jsx's chrome follows it) and the title in the middle. Celeste has no
 // global menu bar, so an app that declares menus (useAppMenus, via useMenusWithSpeech) gets them in a strip under the
-// title bar, with Window and Help, as Lord Classic and Lord Workspaces do; F10, or ⌥ pressed and released alone, opens
+// title bar, with Window and Help, as Classic and Workspaces do; F10, or ⌥ pressed and released alone, opens
 // the focused window's first menu (addMenuBarKeys). A right click on the title opens the app menu (About, Settings…,
 // Hide, Quit: appMenuItems) and the Window menu (windowMenuItems). Moving and resizing are lord-server's
 // (<WindowShell>, wm.beginMove); a maximized window is dragged out of its place by JS and snaps where it is dropped.

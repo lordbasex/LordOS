@@ -1,4 +1,4 @@
-// videowidget.jsx — the desktop's Video widget (0.8.8.10, Lord Workspaces): a camera, a stream or a TV channel in a card,
+// videowidget.jsx — the desktop's Video widget (0.8.8.10, Workspaces): a camera, a stream or a TV channel in a card,
 // played by lord-stream (sdk/streams.jsx). Small, medium, large and extra large; pause (a live stream closes: no
 // bandwidth, nothing decoding) and mute; Reconnecting while a lost stream comes back. Small and medium ask a camera
 // for its sub stream where the address says how (lowQuality). The address is kept without credentials in the

@@ -1,4 +1,4 @@
-// Where a window will go, Lord Workspaces only (the other themes keep the SDK's own preview):
+// Where a window will go, Workspaces only (the other themes keep the SDK's own preview):
 //   GlassTarget     the glass rectangle of a target: the Crystal material's blur over LordOS's own surfaces (a tint over
 //                   Linux apps, whose pixels the renderer doesn't blur on the GPU yet), a 1 px inner light, the accent edge;
 //                   it grows from the pointer in 150 ms, with no motion under Reduce motion

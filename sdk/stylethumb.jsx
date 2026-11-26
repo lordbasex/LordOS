@@ -1,6 +1,6 @@
 // stylethumb.jsx — the small drawn picture of a desktop style (Settings → Appearance → Desktop style, and its replica in
-// the first-start chooser, sdk/firststart.jsx). Drawn with views: our own sketch, no screenshots. Lord Flow ('default')
-// has a menu bar and a Dock, Lord Classic a centered taskbar; any other theme is drawn from its theme.json "sketch"
+// the first-start chooser, sdk/firststart.jsx). Drawn with views: our own sketch, no screenshots. Flow ('default')
+// has a menu bar and a Dock, Classic a centered taskbar; any other theme is drawn from its theme.json "sketch"
 // (sdk/thememeta.js: a rail at the start, a row of pills on top, a framed group of two windows; or a menu bar, a dock or
 // a taskbar). Moved here from apps/settings in 0.8.9.
 import { View } from '@lordos/runtime';

@@ -49,7 +49,7 @@ function ScannerMain() {
   const [msg, setMsg] = useState(null);
   const box = useRef(null);
   const drag = useRef(null);
-  // a small window (a tile of Lord Workspaces): a narrower settings panel, and the preview scaled down to the room it has
+  // a small window (a tile of Workspaces): a narrower settings panel, and the preview scaled down to the room it has
   const narrow = useNarrow();
   const pad = narrow ? 12 : 20;
   const pane = useRef(null);

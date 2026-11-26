@@ -1,8 +1,9 @@
 {
-  "name": "Lord Celeste",
+  "name": "Celeste",
   "description": "A screen frame with a side bar and drawers that slide out of its edges. Inspired by Caelestia (caelestia-dots/shell).",
-  "community": true,
-  "author": "author pending",
+  "author": "Federico Pereira",
+  "email": "fpereira@iperfex.com",
+  "organization": "IPERFEX",
   "license": "MIT",
   "sketch": { "rail": true, "frame": true },
   "desktopArrows": true,

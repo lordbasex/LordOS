@@ -66,9 +66,9 @@ eq('themeLabel cuts a theme\'s own text, never LordOS\'s', [[...themeLabel(fake,
 
 // ---- entries ----
 const raw = [
-  { id: 'classic', name: 'Lord Classic', description: 'A centered taskbar with a start menu.' },
-  { id: 'default', name: 'Lord Flow', description: 'Menu bar, magnifying dock.', current: true },
-  { id: 'workspaces', name: 'Lord Workspaces', description: 'Activities with their own apps.' },
+  { id: 'classic', name: 'Classic', description: 'A centered taskbar with a start menu.' },
+  { id: 'default', name: 'Flow', description: 'Menu bar, magnifying dock.', current: true },
+  { id: 'workspaces', name: 'Workspaces', description: 'Activities with their own apps.' },
   { id: 'caelestia', name: 'Caelestia', description: 'A shell inspired by Caelestia.', community: true, author: '', version: '0.1.0', failed: true, failedWhy: 'TypeError: x is undefined\n    at /home/ana/x.js' },
   { id: 'aurora', name: 'Aurora', description: 'Soft colors.', community: true, author: 'Ana Pérez', license: 'GPL-3.0-or-later' },
 ];

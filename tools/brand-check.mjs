@@ -2,6 +2,9 @@
 //
 //   node tools/brand-check.mjs           (also run by tools/i18n-check.mjs)
 //
+// It also keeps the desktop styles' names their own (rule of 2026-11-26): a theme's name never starts with "Lord"
+// (theme.json's "name" and every locale's shell.theme.<id>.name; "Lord Flow" became Flow in 0.8.9.6.2).
+//
 // Scans the user-facing text: assets/locales/*/*.json, the Help articles (assets/help), the app
 // manifests and theme.json files, the language packs in docs/packs, README.md and CHANGELOG.md.
 // LordOS uses its own names for its features (Search, Apps, Night Light, Quick Preview, Backups,
@@ -82,6 +85,18 @@ export function checkBrands({ quiet = false } = {}) {
       if (allowed(file, text, m.index, m[0])) continue;
       const line = text.slice(0, m.index).split('\n').length;
       problems.push({ file, line, name: m[0] });
+    }
+  }
+  // a theme's own name, never "Lord …"
+  const LORD_NAME = /^\s*Lord\b/;
+  for (const file of files()) {
+    let j;
+    if (/^themes\/[^/]+\/theme\.json$/.test(file)) {
+      try { j = JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')); } catch (e) { continue; }
+      if (typeof j.name === 'string' && LORD_NAME.test(j.name)) problems.push({ file, line: 1, name: j.name });
+    } else if (/^assets\/locales\/[^/]+\/shell\.json$/.test(file)) {
+      try { j = JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')); } catch (e) { continue; }
+      for (const [k, v] of Object.entries(j)) if (/^theme\.[^.]+\.name$/.test(k) && typeof v === 'string' && LORD_NAME.test(v)) problems.push({ file, line: k, name: v });
     }
   }
   if (!quiet) {

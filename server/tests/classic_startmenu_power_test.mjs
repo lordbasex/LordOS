@@ -1,4 +1,4 @@
-// classic_startmenu_power_test.mjs — (0.8.8.6, #48) Lord Classic's power menu: Lock Screen, Switch User,
+// classic_startmenu_power_test.mjs — (0.8.8.6, #48) Classic's power menu: Lock Screen, Switch User,
 // Log Out, Restart… and Shut Down… did nothing. The menu is a portal into the popover layer, so its rows
 // were not inside the start menu's node: the start menu's «press outside» listener closed it on the
 // press, the menu went with it, and the release found no row to click. Bundles

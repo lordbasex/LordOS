@@ -18,7 +18,7 @@ The trick is a common language. Linux apps speak **Wayland**, a protocol for "he
 
 ## Opening them
 
-Apps with a `.desktop` file appear in the app launcher, the Lord Classic theme's start menu and Search, with their icons. Clicking one goes through a deliberately narrow door in `lord-server`:
+Apps with a `.desktop` file appear in the app launcher, the Classic theme's start menu and Search, with their icons. Clicking one goes through a deliberately narrow door in `lord-server`:
 
 1. The interface can only pass the **id** of a `.desktop` file that is already installed in `/usr/share/applications` or `~/.local/share/applications`, never a command.
 2. `lord-server` re-reads that file, checks it is a real, visible, non-terminal application, and builds the command from its `Exec` line by the specification, without a shell and without arguments from the caller. "Open With" in Files may add exactly one file, only if the app declares the file types it handles and the file is in your home folder or on a disk you mounted.
@@ -29,7 +29,7 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 ## How they look and behave
 
 - **The frame.** Apps that ask the compositor to draw their frame (Qt apps, foot, Chromium with its system title bar) get the theme's frame. GTK 3 apps such as Firefox get it through a second decoration protocol LordOS also speaks. GTK 4 apps that draw their own bar keep it, and LordOS trims their shadow.
-- **Browsers with a single bar.** Since 0.8.4, the preinstalled Chromium and Firefox draw one bar with their tabs and the window buttons inside it, on the side the LordOS theme uses (left in Lord Flow, right in Lord Classic), following a theme or light/dark change live. One switch in Settings → Appearance, "Browsers: tabs in the title bar", puts both back under the LordOS frame. The compositor honours whichever frame an app asks for, even when it changes while the window is open.
+- **Browsers with a single bar.** Since 0.8.4, the preinstalled Chromium and Firefox draw one bar with their tabs and the window buttons inside it, on the side the LordOS theme uses (left in Flow, right in Classic), following a theme or light/dark change live. One switch in Settings → Appearance, "Browsers: tabs in the title bar", puts both back under the LordOS frame. The compositor honours whichever frame an app asks for, even when it changes while the window is open.
 - **Light and dark, live.** LordOS serves the "Settings" desktop portal itself on the session bus, so GTK 4 and libadwaita apps follow the mode, accent colour and button order. GTK 3 apps follow through the GSettings keyfile, and LordOS ships a matching GTK theme. Both change live when you switch modes. From 0.8.8 to 0.8.8.7 GTK 4 apps stayed dark with a blue accent whatever you chose; this is fixed in 0.8.8.8.
 - **Open and save with LordOS's dialog** (since 0.8.8): Linux apps with no file dialog of their own ask through the standard FileChooser portal, and LordOS answers with its own dialog, which looks and works like Files, inside the home folder.
 - **Administrator rights through LordOS's prompt** (since 0.8.8): an app that asks with `pkexec`, such as a launcher updating itself, gets LordOS's administrator prompt, which names the app and the command, instead of stopping with error 127. Programs that ask polkit over D-Bus still find no agent.
@@ -42,7 +42,7 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 - **Games and GPU apps.** With a GPU, apps can hand LordOS GPU buffers directly (`linux-dmabuf`), use real fullscreen, lock the pointer and get raw mouse motion. In 0.8.7, a lock holds only with the pointer on the window and the keyboard on its app, and ❖Esc always releases it.
 - **Notifications** from Linux apps arrive through the standard notifications service, which `lord-server` provides, and can be configured per app in Settings.
 - **Passwords:** the standard Secret Service is served by LordOS's keyring, so browsers can keep their secrets there without another keyring daemon.
-- **Force Quit** (since 0.8.5): in Lord Flow, the crown menu's Force Quit… lists the open apps and ends the chosen one without asking it. For a Linux app it ends only that app's own process; an X11 app is asked to close instead.
+- **Force Quit** (since 0.8.5): in Flow, the crown menu's Force Quit… lists the open apps and ends the chosen one without asking it. For a Linux app it ends only that app's own process; an X11 app is asked to close instead.
 - **Default apps without choosing** (since 0.8.6): when you haven't chosen an app for a file type, the file opens with the system's default or the first installed app that declares its type, shown as "Automatic" in Settings → Default Apps. Apps you chose stay as they are.
 
 [[shot:2]]

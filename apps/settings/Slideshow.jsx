@@ -1,5 +1,5 @@
 // Settings → Wallpaper → the slideshow (0.8.9): shown only for a theme that declares "wallpaper": { "slideshow": true }
-// in its theme.json (sdk/thememeta.js; Lord Workspaces). The rules are in sdk/slideshowmodel.js; the theme draws it. Its
+// in its theme.json (sdk/thememeta.js; Workspaces). The rules are in sdk/slideshowmodel.js; the theme draws it. Its
 // place is the bottom of Settings → Wallpaper (./WallpaperGallery.jsx), whose collection pages also offer Use as slideshow.
 import { useLocale, useSettings, useTheme, Toggle, slideshowPrefs, slideshowPatch, slideshowCategories, withDownloadedStills, SLIDESHOW_EVERY, WALLPAPER_CATEGORIES, tOptional } from '@lordos/sdk';
 import { Section, SettingRow, PopUp } from './ui.jsx';

@@ -463,7 +463,7 @@
     "next": "Next face",
     "items": {
       "flow": {
-        "name": "Lord Flow",
+        "name": "Flow",
         "kicker": "Familiar from the first minute",
         "lead": "A menu bar on top and a Dock at the bottom, with soft glass and rounded corners. Open it and you already know how to use it.",
         "points": [
@@ -472,11 +472,11 @@
           "Snap windows to the edges of the screen"
         ],
         "who": "anyone who wants to start working without learning anything new.",
-        "cta": "Meet Lord Flow",
-        "alt": "Lord Flow: the menu bar on top, the Dock at the bottom and apps open"
+        "cta": "Meet Flow",
+        "alt": "Flow: the menu bar on top, the Dock at the bottom and apps open"
       },
       "classic": {
-        "name": "Lord Classic",
+        "name": "Classic",
         "kicker": "Taskbar and start menu",
         "lead": "Everything in one bar at the bottom: the start menu with search, your open windows and quick settings.",
         "points": [
@@ -485,11 +485,11 @@
           "A taskbar on every display"
         ],
         "who": "anyone coming from a desktop with a taskbar who wants to feel at home.",
-        "cta": "Meet Lord Classic",
-        "alt": "Lord Classic: the start menu open over the taskbar"
+        "cta": "Meet Classic",
+        "alt": "Classic: the start menu open over the taskbar"
       },
       "workspaces": {
-        "name": "Lord Workspaces",
+        "name": "Workspaces",
         "kicker": "Organized by activities",
         "lead": "Your work is not a pile of windows: it's a set of things you're doing. Each activity has its own apps and layout.",
         "points": [
@@ -498,8 +498,8 @@
           "Widgets that read nothing while you can't see them"
         ],
         "who": "anyone who works with many windows, or with two or three monitors.",
-        "cta": "Meet Lord Workspaces",
-        "alt": "Lord Workspaces: the Context Spine, the activity strip and widgets over the Cyberpunk City HD panorama"
+        "cta": "Meet Workspaces",
+        "alt": "Workspaces: the Context Spine, the activity strip and widgets over the Cyberpunk City HD panorama"
       }
     },
     "nextFace": {

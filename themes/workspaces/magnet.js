@@ -1,4 +1,4 @@
-// magnet.js — Lord Workspaces' magnet at runtime (the rules are in model/magnet.js). In a display with the free layout,
+// magnet.js — Workspaces' magnet at runtime (the rules are in model/magnet.js). In a display with the free layout,
 // a window dragged to the left or right edge takes that half (the SDK's snapping) and the other half is filled: by the
 // only other window of that display, or by the one the person picks in the chooser (`assist`). The two windows are
 // then a pair: resizing one of them by its shared edge moves the other's edge to it, on release (the SDK commits a

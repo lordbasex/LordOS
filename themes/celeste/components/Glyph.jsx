@@ -1,4 +1,4 @@
-// Lord Celeste's line icons, drawn from views (no image files): any colour, any size, on a 20 × 20 grid with a 2 px
+// Celeste's line icons, drawn from views (no image files): any colour, any size, on a 20 × 20 grid with a 2 px
 // stroke. Memoized: a bar that re-renders doesn't rebuild them. Wi-Fi, Bluetooth, the sun and the moon come from the
 // SDK's quick-settings glyphs instead (sdk/quickglyphs.jsx).
 import { View } from '@lordos/sdk';

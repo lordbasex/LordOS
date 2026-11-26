@@ -1,4 +1,4 @@
-// deskwidgets.jsx — the desktop widgets of Lord Workspaces (0.8.8.10): a catalog, a grid per display, sizes and each
+// deskwidgets.jsx — the desktop widgets of Workspaces (0.8.8.10): a catalog, a grid per display, sizes and each
 // widget's body. widgets.js draws the layer; widgetgrid.js has the grid's rules.
 //
 //   registerWidgetKind({ type, nameKey, descKey, sizes?, add?(x, y) })   an entry of the catalog. Built-in kinds have
@@ -10,7 +10,7 @@
 //   addDeskWidget(type, size, display)   a widget on the first free block of that display's grid, in the activity in
 //                          view; null when there is no room
 //   removeDeskWidget(id) / setDeskWidget(id, patch)
-//   startDeskWidgets()     Lord Workspaces publishes them (the other themes never show them)
+//   startDeskWidgets()     Workspaces publishes them (the other themes never show them)
 //
 // A widget belongs to one activity (desktop) and one display (its connector): it shows only there, on a block of cells
 // of that display's grid that no other widget may take. Kept in settings.deskWidgets as

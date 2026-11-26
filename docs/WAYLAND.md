@@ -94,7 +94,7 @@ such an app (MusicBrainz Picard from the Store) stopped at start with "Could not
 Settings portal (see "Input methods"). Apps also receive LordOS's language and region (`LANG`, `LC_*`, see
 `LANGUAGES.md`).
 
-They also appear in the **app launcher**, in the Lord Classic theme's start menu and in the Store (see
+They also appear in the **app launcher**, in the Classic theme's start menu and in the Store (see
 `NATIVE-APPS.md` and `PACKAGES.md`): they are the apps with a `.desktop` in
 `/usr/share/applications` or `~/.local/share/applications`. They open with one click, and their
 window carries the same icon in the Dock as in the app launcher (they're recognized by the Wayland
@@ -105,7 +105,7 @@ app id or by `StartupWMClass`).
 | ![launchpad](app-launcher-linux-apps.png) | ![launched](app-launched-from-launcher.png) |
 | The app launcher with the installed Linux apps next to the LordOS apps, each with its own icon | FeatherPad opened with one click; it carries the same icon in the Dock |
 | ![classic](classic-theme-start-menu.png) | ![classic2](classic-theme-linux-app.png) |
-| Lord Classic theme: the start menu with LordOS apps and Linux apps, grouped by category | FeatherPad running in the Lord Classic theme, with its icon in the taskbar |
+| Classic theme: the start menu with LordOS apps and Linux apps, grouped by category | FeatherPad running in the Classic theme, with its icon in the taskbar |
 
 ### The launcher (`server/src/apps.c`)
 
@@ -221,14 +221,14 @@ protocol is in `wl.c`.
   `app_id` could already take the front by opening a new window then. A handoff nobody launched
   from LordOS still only asks for attention. Tested by `build/xdgact-test` and
   `tests/handoff_headless.sh` (`tests/handoff_client.c`, a client that runs once as Chrome does;
-  Lord Flow and Lord Workspaces): restored on a hidden desktop, launched again, its desktop comes
+  Flow and Workspaces): restored on a hidden desktop, launched again, its desktop comes
   into view with the window in front; a copy with no window maps a new one; the same handoff without
   a launch stays attention. Checked with Google Chrome 158 and a throwaway profile on a headless
   `lord-server-test`.
 - **`activate(token, surface)`.** A granted token raises and focuses the surface's window (a menu or
   subsurface counts as its window). An ungranted, expired, unknown or reused token never takes the
   focus: the window is marked as wanting attention, a larger dot in the accent under its Dock icon
-  (Lord Flow) or a long accent bar on its taskbar button (Lord Classic), until it comes to the front;
+  (Flow) or a long accent bar on its taskbar button (Classic), until it comes to the front;
   a click on the icon brings that window first. Tokens work once and last 60 s (LordOS's: a cold
   start can be slow) or at most 10 s (an app's); 32 are kept, a new one replaces the oldest.
 - The decision on the theme side is `activationOutcome` in `sdk/desktopmodel.js`
@@ -579,7 +579,7 @@ change there tells the app's inhibitors at once (`wl_shortcuts_changed`).
   seen) never takes them. With no window focused they go to the fullscreen window while the pointer is on its
   display. One display: every other window is under it, so the fullscreen window always has the keys.
   `build/fsfocus-test` (in `make -C server test`) checks these rules.
-- **Locked windows** (`wl_set_fixed`, from `lord.wayland.state`'s seventh argument; Lord Workspaces' padlock): the app
+- **Locked windows** (`wl_set_fixed`, from `lord.wayland.state`'s seventh argument; Workspaces' padlock): the app
   gets `wm_capabilities` with minimize only (no maximize) and a configure, its set_maximized/unset_maximized are
   answered with a configure of the state as it is; set_minimized is done (since 0.8.8.10: minimizing a locked window
   leaves its slot to another app). Any refused maximize request is
@@ -694,7 +694,7 @@ gets its `wl_pointer.motion` with the next frame. A refused request is ignored (
 | ![chromium light](chromium-csd-light.png) | ![chromium dark](chromium-csd-dark.png) |
 | Chromium with its own bar (0.8.4 default): tabs in the title bar and LordOS's traffic lights on the left, from LordOS's GTK theme | The same in dark: it follows the mode live |
 | ![before](chromium-csd-before.png) | ![classic](chromium-csd-classic.png) |
-| Before 0.8.4: Chromium asked to draw its own bar and LordOS put its frame on top anyway (two bars) | The Lord Classic theme: the buttons go to the right (`:minimize,maximize,close`), switched live |
+| Before 0.8.4: Chromium asked to draw its own bar and LordOS put its frame on top anyway (two bars) | The Classic theme: the buttons go to the right (`:minimize,maximize,close`), switched live |
 | ![firefox](firefox-csd.png) | ![own theme](chromium-own-theme.png) |
 | Firefox ESR with its own bar: LordOS's order and side, drawn in Firefox's own style | Chromium with its «Classic» theme (not GTK): LordOS's order and side, Chromium's own buttons |
 | ![gtk dark](decorations-gtk-dark.png) | ![gtk light](decorations-gtk3-light.png) |
@@ -729,8 +729,8 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   maximize, restore and minimize from its own buttons, double click on its bar (the app asks to
   maximize);
 - **the window menu**: a right click on a GTK headerbar asks `xdg_toplevel.show_window_menu`, and
-  the theme shows its menu at that point (`w.windowMenu`, `wm.showWindowMenu`): Lord Flow the
-  menu bar's Window items (Minimize, Zoom, Close Window), Lord Classic its title bar menu plus **Snap
+  the theme shows its menu at that point (`w.windowMenu`, `wm.showWindowMenu`): Flow the
+  menu bar's Window items (Minimize, Zoom, Close Window), Classic its title bar menu plus **Snap
   layouts**, which opens the same flyout its maximize button shows on hover (an app's own maximize
   button can't). Chromium shows its own menu on its tab strip instead (with «Use system title bar
   and borders» in it);
@@ -743,7 +743,7 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
 | | |
 |---|---|
 | ![window menu](csd-window-menu.png) | ![snap layouts](csd-snap-layouts.png) |
-| GTK Demo (own frame): right click on its bar, Lord Flow's window menu | Lord Classic: the window menu's «Snap layouts» on an app with its own bar |
+| GTK Demo (own frame): right click on its bar, Flow's window menu | Classic: the window menu's «Snap layouts» on an app with its own bar |
 
 ### The browsers by default
 
@@ -762,7 +762,7 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   Chromium's defaults for a desktop it doesn't know (`XDG_CURRENT_DESKTOP=LordOS`): its own bar
   (`custom_chrome_frame` on) with the **Classic** theme, whose window buttons are Chromium's own
   (minimize, maximize and close glyphs, on LordOS's side and in its order), not LordOS's traffic
-  lights; next to native windows they look like the Lord Classic theme's. Not a LordOS frame or
+  lights; next to native windows they look like the Classic theme's. Not a LordOS frame or
   decoration bug: lord-server answers Brave's `xdg-decoration` request (it runs as a native Wayland
   client, `--ozone-platform=wayland`) exactly as Chromium's, and with the GTK theme the same Brave
   draws the traffic lights. The switch below now also writes Brave's profiles
@@ -830,7 +830,7 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   - The `LordOS`/`LordOS-dark` theme (`assets/gtk/`, installed in `/usr/share/themes`) is Adwaita
     with LordOS's colors, bar and traffic lights.
   - GTK 3 has no accent: its own stays blue.
-- **The buttons** go on the left in traffic-light order (`close,minimize,maximize:`). The Lord Classic
+- **The buttons** go on the left in traffic-light order (`close,minimize,maximize:`). The Classic
   theme asks for them on the right with the `gtkButtons` token (`:minimize,maximize,close`). GTK
   apps, Chromium and Firefox move them live when the theme changes. Since 0.8.8.7 (#58) Settings →
   Desktop & Dock → Title bars → Window buttons (`settings.windowButtons`: `auto`, `left`, `right`;
@@ -843,9 +843,9 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   XSETTINGS, follows the session since the window manager serves it: see "XSETTINGS" below.) The `lordos` package now ships
   `/usr/share/glib-2.0/schemas/90_lordos.gschema.override` (GLib's dpkg trigger compiles it) and
   `/etc/gtk-3.0/settings.ini` and `/etc/gtk-4.0/settings.ini` (`gtk-decoration-layout`), both with
-  Lord Flow's `close,minimize,maximize:`. They are defaults only: a value stored by the user or the
+  Flow's `close,minimize,maximize:`. They are defaults only: a value stored by the user or the
   theme (the keyfile) wins, and `~/.config/gtk-3.0/settings.ini` wins over `/etc`. Those apps don't
-  follow a theme change to Lord Classic live. `server/tests/gtk_defaults_test.mjs` compiles the
+  follow a theme change to Classic live. `server/tests/gtk_defaults_test.mjs` compiles the
   override next to Debian's schema and checks that it, `settings.ini`, `sdk/theme.js` and `portal.c`
   agree.
 - **XSETTINGS** (in development after 0.8.9.6.1). GTK 3 on X11 (Xwayland) reads neither the portal nor GSettings,

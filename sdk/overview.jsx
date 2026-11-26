@@ -187,7 +187,7 @@ function Labels({ o, th }) {
 }
 
 // One desktop in the strip: the wallpaper and its windows as small frames.
-// A theme can mark each desktop in the strip (Lord Workspaces: its activity's icon and colour): fn(id) → { color, Icon }
+// A theme can mark each desktop in the strip (Workspaces: its activity's icon and colour): fn(id) → { color, Icon }
 // or null. The mark sits before the name and colours the card's lower edge.
 let decorOf = () => null;
 export function setDesktopDecor(fn) { decorOf = typeof fn === 'function' ? fn : () => null; refresh(); return () => { decorOf = () => null; }; }

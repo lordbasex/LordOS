@@ -60,7 +60,7 @@ function fieldWindow() {
   return w && !w.minimized ? w : null;
 }
 
-// From the window's top to its content: the title bar, and Lord Classic's menu strip when it has one.
+// From the window's top to its content: the title bar, and Classic's menu strip when it has one.
 // a Linux window's menu strip (its Edit menu with Speech) counts as the app's own menus do (sdk/shellxmodel.js chromeInset)
 const contentTop = (w) => (w.args?.csd ? 0 : windowChrome().h + (menusWithSpeech(w.id, undefined, w)?.length ? windowChrome().menu || 0 : 0));
 

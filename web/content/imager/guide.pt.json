@@ -54,7 +54,7 @@
         ["06-tab-user", "Usuário", "A sua conta de administrador: nome completo, nome de usuário e uma senha digitada duas vezes. No cartão vai só um hash de mão única da senha. O login automático é opcional."],
         ["07-tab-wifi", "Wi-Fi", "O nome da rede exatamente como aparece (maiúsculas contam) e a senha dela. O cartão guarda a chave derivada da rede, nunca a senha que você digitou. Redes ocultas e abertas também funcionam."],
         ["08-tab-remote", "Acesso remoto", "Login remoto (SSH): desligado, só chaves (o recomendado) ou senha e chaves. Você também pode ligar a área de trabalho remota do LordOS; ela fica na sua rede local."],
-        ["09-tab-look", "Aparência", "Lord Flow ou Lord Classic, claro ou escuro, uma cor de destaque e um papel de parede."],
+        ["09-tab-look", "Aparência", "Flow ou Classic, claro ou escuro, uma cor de destaque e um papel de parede."],
         ["10-tab-cooling", "Resfriamento", "Conte ao LordOS o que resfria a placa e ele escolhe a curva da ventoinha certa. Não tem certeza? Veja [Que resfriamento eu tenho?](#cooling)."],
         ["11-tab-cooling-overclock", "Overclock leve", "Só com ventoinha: 2,6 GHz em vez de 2,4 GHz, sem tensão extra. O aviso explica como desfazer."],
         ["12-tab-more", "Mais", "Bluetooth, a busca automática de atualizações e uma promessa: o LordOS não coleta nada."],

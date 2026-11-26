@@ -633,7 +633,7 @@ function UserCard({ onClick, selected }) {
 
 // The open section survives the interface being remounted when the language changes.
 let lastSection = 'general';
-// a small window (a Lord Workspaces tile): below SIDE_AT the sections hide behind a button in the title bar
+// a small window (a Workspaces tile): below SIDE_AT the sections hide behind a button in the title bar
 const SIDE_AT = 700;
 
 // Other apps open a section: wm.open('settings', { args: { section: 'network', page: 'vpn' } }).

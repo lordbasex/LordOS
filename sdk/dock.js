@@ -124,7 +124,7 @@ export const dock = {
 // Stored in settings.json. Left and right are physical sides of the screen, even with a
 // right-to-left language.
 export const DOCK_DEFAULTS = {
-  dockPosition: 'bottom',     // 'bottom' | 'left' | 'right' (Lord Flow theme)
+  dockPosition: 'bottom',     // 'bottom' | 'left' | 'right' (Flow theme)
   dockSize: 54,               // px of each icon (20–80: DOCK_SIZE_MIN/MAX in dockmodel.js)
   dockMagnify: true,          // magnification
   dockMagnifySize: 86,        // px of the largest icon when magnified (more than dockSize)
@@ -342,7 +342,7 @@ export function dockQuickActions(e) {
 
 // ---- the menu ----
 
-// One menu item per window of an app, the most recent first (the Dock's window list; Lord Workspaces' bar reuses it):
+// One menu item per window of an app, the most recent first (the Dock's window list; Workspaces' bar reuses it):
 // its title as the app set it, cleaned for a one-line label (sdk/windowlistmodel.js: no control or bidi-override
 // characters, at most WINDOW_LABEL_MAX), the window in front checked, a web app's profile colour as a dot and its unread
 // count, "–" for a minimized one. A click brings that window forward (wm.focus restores a minimized one).
@@ -448,7 +448,7 @@ export function trashMenu({ onEmpty }) {
 // The theme starts a press with beginDockDrag on mouse down (an icon of the Dock, the app launcher
 // or the start menu); past DRAG_START px it becomes a drag. The bar that accepts drops registers
 // a target: hit(x, y) → { index } (a position among the shown pinned items) | { trash: true } | null,
-// and near(x, y) → is the pointer still close to the bar. Several bars can register at once (Lord Classic's
+// and near(x, y) → is the pointer still close to the bar. Several bars can register at once (Classic's
 // taskbar on every display, 0.8.8.6): the first one hit takes the drop, and near is any of them. A Dock item taken more than about 60 px
 // away and held there for REMOVE_HOLD ms shows the remove cue; releasing it then unpins it (a
 // locked item springs back). dockDrag holds what is happening, for the theme to draw.

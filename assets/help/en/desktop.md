@@ -35,10 +35,10 @@ Change the wallpaper in [Settings → Wallpaper](settings:wallpaper). Notes from
 
 ## Themes
 
-LordOS ships two themes: **Lord Flow** (menu bar and Dock) and **Lord Classic** (taskbar and start
+LordOS ships two themes: **Flow** (menu bar and Dock) and **Classic** (taskbar and start
 menu). Switch them live in [Settings → Appearance](settings:appearance).
 
-In **Lord Classic**: the start button (or Super) opens the start menu, where typing searches apps,
+In **Classic**: the start button (or Super) opens the start menu, where typing searches apps,
 settings and files; right click an app there to pin it to Start or to the taskbar. The network and
 volume icons open quick settings, the clock opens the notifications and a calendar. Drag a window to
 the left or right edge to fill half the screen, to a corner for a quarter, or to the top to maximize

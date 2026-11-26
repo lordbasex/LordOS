@@ -1,13 +1,13 @@
-// thememeta.js — what a theme's theme.json may tell Settings besides its name (0.8.9, Lord Workspaces), as plain data
+// thememeta.js — what a theme's theme.json may tell Settings besides its name (0.8.9, Workspaces), as plain data
 // (tested by server/tests/theme_meta_test.mjs). Settings uses it instead of knowing each theme by its id; the bundled
-// Lord Flow and Lord Classic declare none of it and keep their own pictures and pages.
+// Flow and Classic declare only their author, email, organization and license (0.8.9.6.2) and keep their own pictures and pages.
 //
 //   sketch         { rail, pills, frame, menubar, dock, taskbar }: booleans for Settings → Appearance's drawn picture
 //   options        [{ key, label, hint, choices: [[value, label]] | toggle: true, default }]: the theme's own choices,
 //                  shown under Desktop style while it is the current theme and stored in
 //                  settings.themeOptions[<theme id>][key] (one key for every theme: a theme's id can't reach another
 //                  setting)
-//   desktopArrows  true: the theme follows Settings → Keyboard's ⌃ arrows for desktops (as Lord Flow does)
+//   desktopArrows  true: the theme follows Settings → Keyboard's ⌃ arrows for desktops (as Flow does)
 //   wallpaper      { default: <id>, slideshow: true }: the picture of a user who never chose one (settings.wallpaper
 //                  null; the theme's tokens.defaultWallpaper says the same to the SDK), and Settings → Wallpaper's
 //                  slideshow (sdk/slideshowmodel.js). Read as wallpaperDefault and wallpaperSlideshow.

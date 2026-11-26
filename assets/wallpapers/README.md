@@ -20,7 +20,7 @@ The collection that LordOS ships in `/usr/share/backgrounds/lordos/` and shows i
 | Cosmos | `cosmos/lordos-infinite-galaxy.jpg` | Infinite Galaxy / Galaxia infinita / Galáxia infinita |
 | Cosmos | `cosmos/lordos-solar-odyssey.jpg` | Solar Odyssey / Odisea solar / Odisseia solar |
 | Cosmos | `cosmos/lordos-stellar-voyage.jpg` | Stellar Voyage / Viaje estelar / Viagem estelar |
-| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-panorama.jpg` | Panorama (**default desktop in Lord Workspaces**) |
+| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-panorama.jpg` | Panorama (**default desktop in Workspaces**) |
 | Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-neon-road-entrance.jpg` | Neon Road Entrance / Entrada de neón / Entrada de neon |
 | Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-heart-of-the-city.jpg` | Heart of the City / Rumbo al corazón de la ciudad / Rumo ao coração da cidade |
 | Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-skyline-highway.jpg` | Skyline Highway / Autopista panorámica / Rodovia panorâmica |
@@ -64,7 +64,7 @@ hand.
 
 ## The slideshow
 
-Lord Workspaces can go through a category's pictures on its own (Settings → Wallpaper, "Change the wallpaper
+Workspaces can go through a category's pictures on its own (Settings → Wallpaper, "Change the wallpaper
 automatically"; `sdk/slideshow.jsx`, docs/WORKSPACES.md "Wallpaper slideshow"). It decodes each picture off the
 interface's thread at the size it is drawn at (`thumb:<px>:asset:wallpapers/…`): the display plus 2 % on each side for
 the transition's pan, so a 1080p display decodes an `@3840x2160` file down to 1999×1124. The still wallpaper of a

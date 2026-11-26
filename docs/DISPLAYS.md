@@ -20,7 +20,7 @@ a 1080p one at 100 % is sharp on both. Tested on VM 118 (`lordos-notes`) with tw
 | ![gpu](displays-gpu.png) | ![unplugged](displays-unplugged.png) |
 | GPU path (llvmpipe, `LORD_GPU=1`): two EGL surfaces on one context, GTK at 150 % | The second display unplugged: its window came back to the main one |
 | ![classic](displays-classic.png) | |
-| The Lord Classic theme: its bar on the main display, the second one is all work area | |
+| The Classic theme: its bar on the main display, the second one is all work area | |
 
 The cursor plane is not in `screendump`; on the CPU path the cursor is drawn into the frame and
 shows in the captures.
@@ -38,7 +38,7 @@ shows in the captures.
 - **Mirror**: every display shows the main display's logical rect, each one fitted at its own
   scale (`k = min(pw / w, ph / h)`) and centered (letterbox). Each is rendered, not copied, so a
   bigger mirror is sharp.
-- The **main display** gets the Dock. Since 0.8.8.6 Lord Flow draws a full menu bar on **every**
+- The **main display** gets the Dock. Since 0.8.8.6 Flow draws a full menu bar on **every**
   display (on by default; Settings → Desktop & Dock → Menu Bar → "Show the menu bar on every display",
   the same switch as Displays → "Show menu bar on all displays", `settings.menuBarAllDisplays`, absent =
   on). Each bar has its own clock, status items, search, Control Center and notifications panel,
@@ -48,7 +48,7 @@ shows in the captures.
   bars per display are `sdk/menubarmodel.js` (`server/tests/menubar_model_test.mjs`,
   `menubar_test.mjs`). Mirrored displays get the main display's bar only. The work area is per
   display and reserves the bar's height on each display that has one.
-- Lord Classic does the same with its **taskbar** (0.8.8.6, the same setting; Settings → Desktop & Dock →
+- Classic does the same with its **taskbar** (0.8.8.6, the same setting; Settings → Desktop & Dock →
   Taskbar → "Show the taskbar on every display"): every display gets a whole taskbar (start button,
   pinned and running apps, Trash, tray and clock). Every bar shows every app (the window list is
   global). The start menu, quick settings, notifications and the calendar open on the display whose
@@ -217,7 +217,7 @@ Like macOS's "Arrange Displays", with more than one display (extend mode):
   a window never goes under a menu bar but can go up to the top of a display without one.
 - System dialogs (permission prompts, Search, clipboard, keyring, print dialog, the display
   confirmation) go on the main display (`mainBox()`); fullscreen SDK windows cover their display.
-- Both themes: wallpaper per display, a menu bar (Lord Flow) or a taskbar (Lord Classic) on every display
+- Both themes: wallpaper per display, a menu bar (Flow) or a taskbar (Classic) on every display
   (the main one alone with the setting off), the Dock on the main display, the app launcher on the main
   display and Control Center on the display of the menu bar it was opened from.
 - **Window menu → Move to <display>** (0.8.5, both themes, `sdk/windowmenu.js`): one item for every

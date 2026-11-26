@@ -604,7 +604,7 @@ static void test_fetch_helpers(void) {
           "settings: null theme is the default");
     CHECK(!fetch_settings("{\"theme\":\"../../etc\"}", th, sizeof th, lg, sizeof lg) && !strcmp(th, "default"), "settings: unsafe theme id");
     CHECK(fetch_settings("{broken", th, sizeof th, lg, sizeof lg) && !strcmp(th, "default"), "settings: broken file");
-    CHECK(!fetch_theme_name("{\"id\":\"default\",\"name\":\"Lord Flow\"}", name, sizeof name) && !strcmp(name, "Lord Flow"), "theme name");
+    CHECK(!fetch_theme_name("{\"id\":\"default\",\"name\":\"Flow\"}", name, sizeof name) && !strcmp(name, "Flow"), "theme name");
     CHECK(fetch_theme_name("{\"id\":\"x\"}", name, sizeof name), "theme without a name");
 
     const char *status =
@@ -676,14 +676,14 @@ static void test_fetch_helpers(void) {
     snprintf(l.session, sizeof l.session, "Wayland");
     snprintf(l.xwayland, sizeof l.xwayland, "24.1.6");
     snprintf(l.server, sizeof l.server, "lord-server 0.8.9.4");
-    snprintf(l.desktop, sizeof l.desktop, "Lord Flow");
+    snprintf(l.desktop, sizeof l.desktop, "Flow");
     snprintf(l.build, sizeof l.build, "20261122.adae1e89 · development build");
     l.server_rss_kb = 392812;
     char *out = fetch_render(r, &l, FETCH_PLAIN);
     CHECK(contains(out, "Display     3 × S27F350, 1920 × 1080, 27\"\n") && contains(out, "Display     DELL U2720Q, 3840 × 2160, 27\"\n"),
           "fetch: identical displays collapsed");
     CHECK(contains(out, "Compositor  lord-server 0.8.9.4 (C · DRM/KMS · evdev) · Wayland · Xwayland 24.1.6\n"), "fetch: compositor");
-    CHECK(contains(out, "Swap        none\n") && contains(out, "DE          Lord Flow\n") && contains(out, "Boot time   12.714 s to the login screen\n")
+    CHECK(contains(out, "Swap        none\n") && contains(out, "DE          Flow\n") && contains(out, "Boot time   12.714 s to the login screen\n")
           && contains(out, "Server RAM  383.6 MB (lord-server)\n") && contains(out, "Build       20261122.adae1e89 · development build\n"),
           "fetch: swap, DE, boot time, server RAM, build");
     CHECK(!contains(out, "Local IP") && !contains(out, "Terminal"), "fetch: empty rows left out");

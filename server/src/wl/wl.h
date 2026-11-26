@@ -49,7 +49,7 @@ int  wl_pointer(float x, float y, struct Node *hit, int moved, int nbuttons, con
  * (they are sent leave) and only the button count is tracked. */
 void wl_pointer_grab(int nbuttons, const int *down, const int *button);
 /* 0: the key is the shell's; 1: it went to the focused app; 2: it went to the app as another key
- * (Lord Flow's ❖ → Ctrl): the shell is only told, so ❖ does not count as pressed alone. */
+ * (Flow's ❖ → Ctrl): the shell is only told, so ❖ does not count as pressed alone. */
 int  wl_key(int code, int value, const KeyInfo *k);
 void wl_keymap_changed(void);
 int  wl_send_paste(void);               /* synthetic Ctrl+V to the Linux app with the keyboard */
