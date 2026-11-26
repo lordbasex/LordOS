@@ -721,6 +721,43 @@ doesn't play a second sound. lord-web remembers it for the profile (`state.json`
 first time nothing waits or guesses. notifyd passes `suppress-sound` to the shell, which then shows the banner
 silently.
 
+**The notification log** (`webpage_notify_line`, `webbus.c`): each notification the page hands lord-web writes one
+line to the app's log (`/var/log/lordos/users/<user>/web/<app>-<profile>.log`), in the call log's budget of 60 lines a
+minute (`webcall_log_as`, shared with `webcall:`):
+
+    notify: page tag 3f9a0c17 silent unknown renotify unknown shown
+
+Never the title, the body, the icon or an address. The tag (a messaging app's chat id, often a phone number) is only 8
+hex digits of a hash keyed with a random number lord-web picks at start and never writes: two lines of the same run can
+be matched, a line can't be turned back into the tag, and the next run gives other digits. `none` when there is no
+tag. `replaced` when it took the place of one with the same tag (lord-web's own replace, or WebKit withdrawing the old
+one less than a second before). `silent` and `renotify` are `unknown`: WPE 2.54's `WebKitNotification` tells neither.
+With it, "the sound played but no banner" can be told apart: no `notify:` line means the page never posted one.
+
+**A service worker's notifications** (`registration.showNotification`, a "persistent" notification). WebKit 2.54's
+GLib port doesn't give them to the view: `WebKitNotificationProvider::show` gets no page for them (its "pageless"
+branch, `UIProcess/API/glib/WebKitNotificationProvider.cpp`), and sends them itself to `org.freedesktop.Notifications`
+(`UIProcess/Notifications/glib/NotificationService.cpp`). In LordOS that is notifyd, which still files it under the
+web app by lord-web's process, with `notifyd_plain` on its text, and WebKit replaces a same-tag one itself. A click
+reaches WebKit (`ActionInvoked`), which fires `notificationclick` in the service worker. What that path lacks: no
+`suppress-sound` (LordOS's sound can double the page's), no `silent`, and the window doesn't come forward, because
+GLib's WebKit doesn't implement `clients.focus()` or `clients.openWindow()` from a service worker
+(`focusFromServiceWorker`), and lord-web never sees these notifications, so they get no `notify:` line either.
+lord-web sets GLib's application name to the app's (`g_set_application_name`, webmain.c): before, WebKit sent
+`[Invalid UTF-8]` as the app name and GLib logged a critical for each one.
+
+A messaging web app checked on 2026-11-26 (its bundle as cached by lord-web) uses this path only when
+`Notification.maxActions` is at least 1, which WebKit 2.54 doesn't implement, so its message notifications are page
+notifications; its app log since 2026-11-11 has none of the criticals the service-worker path writes.
+
+Follow-up, not built: a WebKit patch for the backport (`+4.2` or later, `tools/pkg/wpewebkit-chroot.sh`): when a
+pageless notification arrives, `WebKitNotificationProvider` looks for a view of the same network session whose page
+has the notification's origin and emits that view's `show-notification`, keeping the D-Bus path when there is none.
+lord-web's own path would then apply unchanged (`notify:` line, sound rule, tag replace, the window brought forward on
+click), and `webkit_notification_clicked` and `webkit_notification_close` would reach the service worker as
+`notificationclick` and `notificationclose` through the service-worker notification manager, as they do now from
+D-Bus. A page-side shim was set aside: it can't fire `notificationclick` and doesn't see what the worker shows itself.
+
 ## Calls (in development; approved by the maintainer on 2026-11-25)
 
 Voice and video calls in web apps (a messaging web app first, also video meeting sites), for the release after

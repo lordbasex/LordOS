@@ -1240,6 +1240,26 @@ static void test_frame(void) {
     CHECK(webframe_copy(dst, 0, DW, DH, DS, src, DW, DH, DS) == 0 && webframe_copy(dst, DS, DW, DH, 0, src, DW, DH, DS) == 0, "frame copy: nonsense");
 }
 
+/* the notify: log line (webpage_notify_line): no text of the notification, the tag only as a keyed hash */
+static void test_notify_line(void) {
+    char out[128], a[9], b[9], c[9];
+    CHECK(webpage_notify_line("5491100000000@c.us", 42, -1, -1, 0, out, sizeof out) > 0, "line made");
+    CHECK(!strncmp(out, "page tag ", 9) && strlen(out) == strlen("page tag 00000000 silent unknown renotify unknown shown"), "shape: %s", out);
+    CHECK(!strstr(out, "549") && !strstr(out, "c.us"), "the tag itself never: %s", out);
+    for (const char *p = out + 9; p < out + 17; p++) CHECK((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f'), "8 hex digits: %s", out);
+    webpage_tag_hash("chat-1", 42, a);
+    webpage_tag_hash("chat-1", 42, b);
+    webpage_tag_hash("chat-1", 43, c);
+    CHECK(!strcmp(a, b), "the same tag and salt: the same hash");
+    CHECK(strcmp(a, c), "another salt (another run): another hash");
+    webpage_tag_hash("chat-2", 42, c);
+    CHECK(strcmp(a, c), "another tag: another hash");
+    CHECK(webpage_notify_line(NULL, 42, 1, 0, 1, out, sizeof out) && !strcmp(out, "page tag none silent yes renotify no replaced"), "no tag: %s", out);
+    CHECK(webpage_notify_line("", 42, 0, 1, 0, out, sizeof out) && !strcmp(out, "page tag none silent no renotify yes shown"), "empty tag: %s", out);
+    CHECK(!webpage_notify_line("t", 42, 0, 0, 0, out, 20) && !out[0], "too small: nothing");
+    CHECK(!webpage_notify_line("t", 42, 0, 0, 0, NULL, 0), "no buffer");
+}
+
 int main(void) {
     test_frame();
     test_guard();
@@ -1252,6 +1272,7 @@ int main(void) {
     test_scope_limits();
     test_user_agent();
     test_sound();
+    test_notify_line();
     test_drop();
     test_clip();
     test_registry_options();

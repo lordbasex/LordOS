@@ -64,6 +64,26 @@ int webpage_sound_learns(int mode, double note_ms, double audio_ms) {
     return d >= -WEBPAGE_SOUND_WINDOW_MS && d <= WEBPAGE_SOUND_WINDOW_MS;
 }
 
+void webpage_tag_hash(const char *tag, unsigned long long salt, char out[9]) {
+    /* FNV-1a, 64 bits, over the salt's 8 bytes and then the tag; the low 32 bits are written */
+    unsigned long long h = 1469598103934665603ULL;
+    for (int i = 0; i < 8; i++) { h ^= (salt >> (8 * i)) & 0xff; h *= 1099511628211ULL; }
+    for (const unsigned char *p = (const unsigned char *)(tag ? tag : ""); *p; p++) { h ^= *p; h *= 1099511628211ULL; }
+    for (int i = 0; i < 2; i++) { h ^= h >> 29; h *= 0xbf58476d1ce4e5b9ULL; }
+    snprintf(out, 9, "%08x", (unsigned)(h & 0xffffffffu));
+}
+
+static const char *tri(int v) { return v < 0 ? "unknown" : v ? "yes" : "no"; }
+
+size_t webpage_notify_line(const char *tag, unsigned long long salt, int silent, int renotify, int replaced, char *out, size_t n) {
+    if (!out || !n) return 0;
+    char h[9] = "none";
+    if (tag && tag[0]) webpage_tag_hash(tag, salt, h);
+    int k = snprintf(out, n, "page tag %s silent %s renotify %s %s", h, tri(silent), tri(renotify), replaced ? "replaced" : "shown");
+    if (k < 0 || (size_t)k >= n) { out[0] = 0; return 0; }
+    return (size_t)k;
+}
+
 void webpage_state_parse(const char *json, size_t len, WebPageState *s) {
     memset(s, 0, sizeof *s);
     JDoc d;
