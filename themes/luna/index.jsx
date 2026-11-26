@@ -1,8 +1,8 @@
-// "Bluebell" — a tribute to the desktops of 2001, and the demo of style packs and app skins (part 4 of the
+// "Luna" — a tribute to the desktops of 2001, and the demo of style packs and app skins (part 4 of the
 // community-themes plan; docs/THEMES-GUIDE.md "Style packs" and "App skins").
 //
 //   tokens.js              the colours, the shared controls' richer tokens (raised buttons, soft toolbars)
-//   glyphs.jsx             our own icons in the era's style: folders, pages, round green arrows, the bluebell
+//   glyphs.jsx             our own icons in the era's style: folders, pages, round green arrows, the crescent moon
 //   components/Window.jsx  glossy blue title bars with rounded tops, a menu strip for the apps that have menus
 //   components/Taskbar.jsx the green start button, quick launch, a button per window, the tray and the clock
 //   skins/files.jsx        Files as that era's explorer: toolbar, address bar with Go, the task pane, icons or details

@@ -1001,7 +1001,7 @@
   "edit.back": "后退",
   "edit.forward": "前进",
   "edit.reload": "重新加载",
-  "theme.bluebell.name": "Bluebell",
-  "theme.bluebell.description": "致敬 2001 年的桌面：顶部圆角的蓝色标题栏、蓝色任务栏上的绿色开始按钮，以及带任务窗格的“文件”。",
-  "bluebell.start": "开始"
+  "theme.luna.name": "Luna",
+  "theme.luna.description": "致敬 2001 年的桌面：顶部圆角的蓝色标题栏、蓝色任务栏上的绿色开始按钮，以及带任务窗格的“文件”。",
+  "luna.start": "开始"
 }

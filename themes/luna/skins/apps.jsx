@@ -1,4 +1,4 @@
-// skins/apps.jsx — Bluebell's skins for the apps whose regions take the shared shapes (a command bar, a list pane;
+// skins/apps.jsx — Luna's skins for the apps whose regions take the shared shapes (a command bar, a list pane;
 // docs/THEMES-GUIDE.md "App skins → the shared shapes"): each region is drawn by skins/common.jsx. Apps with their own
 // shapes have their own file (files, settings, terminal, editor, store).
 import { View, Text, TextInput, useTheme, useThemeFont, useSettings } from '@lordos/sdk';
@@ -97,7 +97,7 @@ function TabStrip({ model }) {
 // ---- Screenshots: the capture bar as a compact blue bar of small square buttons and a green Capture button ----
 const SHOT_GLYPH = { close: '✕', full: '▭', window: '❐', area: '⬚', recordFull: '●', recordArea: '◍', color: '◉', text: 'T' };
 function ShotBar({ model }) {
-  // the capture bar floats outside the theme's tree (the SDK's floating layer): Bluebell's tokens are made here
+  // the capture bar floats outside the theme's tree (the SDK's floating layer): Luna's tokens are made here
   const [st] = useSettings();
   const t = makeTheme(st);
   const font = useThemeFont();
@@ -118,7 +118,7 @@ function ShotBar({ model }) {
   );
 }
 
-// ---- About: a blue banner with the bluebell and the version, as on an "about" box of the era ----
+// ---- About: a blue banner with the crescent moon and the version, as on an "about" box of the era ----
 function AboutBanner({ model }) {
   const t = useTheme();
   const font = useThemeFont();

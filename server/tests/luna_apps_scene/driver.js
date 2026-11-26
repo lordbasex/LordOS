@@ -1,6 +1,6 @@
-// driver.js — goes after the theme bundle in tests/app_scene_headless.sh bluebell_apps_scene (run it with the bluebell
-// theme): each app Bluebell skins with the shared shapes (a command bar, a list pane), opened alone, checked by a text its
-// skin draws and screenshot. The same demo identity as bluebell_scene (pre.js), and the same check that the real account
+// driver.js — goes after the theme bundle in tests/app_scene_headless.sh luna_apps_scene (run it with the luna
+// theme): each app Luna skins with the shared shapes (a command bar, a list pane), opened alone, checked by a text its
+// skin draws and screenshot. The same demo identity as luna_scene (pre.js), and the same check that the real account
 // and computer never show. Lines start with "APP-SCENE".
 (function () {
   const sdk = globalThis.__lordos.require('@lordos/sdk');

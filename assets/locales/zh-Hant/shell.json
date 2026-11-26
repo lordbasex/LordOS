@@ -1001,7 +1001,7 @@
   "edit.back": "上一頁",
   "edit.forward": "下一頁",
   "edit.reload": "重新載入",
-  "theme.bluebell.name": "Bluebell",
-  "theme.bluebell.description": "向 2001 年的桌面致敬：頂端圓角的藍色標題列、藍色工作列上的綠色開始按鈕，以及附有工作窗格的「檔案」。",
-  "bluebell.start": "開始"
+  "theme.luna.name": "Luna",
+  "theme.luna.description": "向 2001 年的桌面致敬：頂端圓角的藍色標題列、藍色工作列上的綠色開始按鈕，以及附有工作窗格的「檔案」。",
+  "luna.start": "開始"
 }

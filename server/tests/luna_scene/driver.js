@@ -1,5 +1,5 @@
-// driver.js — goes after the theme bundle in tests/app_scene_headless.sh bluebell_scene (run it with the bluebell theme):
-// Bluebell, the demo of style packs and app skins. Files as the explorer of its era (toolbar, address bar, task
+// driver.js — goes after the theme bundle in tests/app_scene_headless.sh luna_scene (run it with the luna theme):
+// Luna, the demo of style packs and app skins. Files as the explorer of its era (toolbar, address bar, task
 // pane, icons and details, the context menu), the start menu, Settings as a page of categories with a task pane, and
 // Settings → Appearance's "From this style" switches;
 // then layouts turned off there brings Files' own regions back. Lines start with "APP-SCENE".
@@ -26,7 +26,7 @@
   (async () => {
     await sleep(2500);
     const home = lord.fs.home();
-    step('the start button', !!textId(sdk.t('shell.bluebell.start')));
+    step('the start button', !!textId(sdk.t('shell.luna.start')));
     sdk.wm.open('files', { new: true, args: { path: `${home}/Documents`, view: 'icons', nonce: Date.now() } });
     await sleep(2500);
     const w = win('files');
@@ -54,7 +54,7 @@
     globalThis.__lordKey(1, 1, 'Escape', '', '', 0); globalThis.__lordKey(1, 0, 'Escape', '', '', 0);
     await sleep(500);
     // the start menu
-    const start = textId(sdk.t('shell.bluebell.start'));
+    const start = textId(sdk.t('shell.luna.start'));
     if (start) click(start);
     await sleep(1200);
     step('start menu: the two columns and the footer', !!textId('Alex Demo') && !!textId(sdk.t('files.place.documents')) && !!textId(sdk.t('shell.menu.logout'))

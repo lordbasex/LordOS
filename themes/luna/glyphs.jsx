@@ -1,4 +1,4 @@
-// glyphs.jsx — Bluebell's own icons, drawn with nodes in the style of the desktops of 2001 (glossy, rounded,
+// glyphs.jsx — Luna's own icons, drawn with nodes in the style of the desktops of 2001 (glossy, rounded,
 // friendly colours). Original drawings: nothing here is copied or traced from another system's icons. They are the
 // theme's style pack (index.jsx registerStylePack): file-type icons, toolbar icons and a few app icons, by our names.
 import { View, Text } from '@lordos/sdk';
@@ -158,20 +158,17 @@ export function FrameGlyph({ kind, size = 21 }) {
   return <View style={{ width: s * 0.5, height: s * 0.46, borderTopWidth: w + 1, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#fff' }} />;
 }
 
-// The start button's mark: a bluebell flower, a blue bell on a green stem with a leaf (the theme's own name, drawn by us;
-// no other system's logo).
-export function StartMark({ size = 18 }) {
+// The start button's mark: a crescent moon with a small star, for the theme's name (Luna). Our own drawing: a gold disc
+// with a second disc over it in the badge's colour, and a four-pointed star; no other system's logo.
+export function StartMark({ size = 18, bg = '#ffffff' }) {
   const s = size;
   return (
     <View style={{ width: s, height: s, direction: 'ltr' }}>
-      <View style={{ position: 'absolute', left: s * 0.46, top: 0, width: Math.max(2, s * 0.1), height: s * 0.5, borderRadius: 1, backgroundColor: '#2f7a22', transform: 'rotate(18deg)' }} />
-      <View style={{ position: 'absolute', left: s * 0.08, top: s * 0.26, width: s * 0.36, height: s * 0.2, borderTopLeftRadius: s * 0.2, borderBottomRightRadius: s * 0.2,
-        backgroundColor: '#5cc04a', transform: 'rotate(-20deg)' }} />
-      <View style={{ position: 'absolute', left: s * 0.28, top: s * 0.38, width: s * 0.56, height: s * 0.5, borderTopLeftRadius: s * 0.22, borderTopRightRadius: s * 0.22,
-        borderBottomLeftRadius: s * 0.08, borderBottomRightRadius: s * 0.08, background: 'linear-gradient(180deg, #8ec5ff, #2f63d8)', border: '1px solid #1d3f9a' }} />
-      {[0.26, 0.5, 0.74].map((x) => (
-        <View key={x} style={{ position: 'absolute', left: s * (0.28 + 0.56 * x) - s * 0.07, top: s * 0.8, width: s * 0.14, height: s * 0.14, borderRadius: s * 0.07, backgroundColor: '#2f63d8' }} />
-      ))}
+      <View style={{ position: 'absolute', left: s * 0.06, top: s * 0.1, width: s * 0.78, height: s * 0.78, borderRadius: s * 0.39,
+        background: 'linear-gradient(180deg, #ffe27a, #f0a020)', border: '1px solid #c77d12' }} />
+      <View style={{ position: 'absolute', left: s * 0.3, top: s * 0.0, width: s * 0.7, height: s * 0.7, borderRadius: s * 0.35, backgroundColor: bg }} />
+      <View style={{ position: 'absolute', left: s * 0.7, top: s * 0.62, width: s * 0.22, height: s * 0.22, transform: 'rotate(45deg)', borderRadius: s * 0.03, backgroundColor: '#2f63d8' }} />
+      <View style={{ position: 'absolute', left: s * 0.735, top: s * 0.655, width: s * 0.15, height: s * 0.15, borderRadius: s * 0.075, backgroundColor: '#8ec5ff' }} />
     </View>
   );
 }

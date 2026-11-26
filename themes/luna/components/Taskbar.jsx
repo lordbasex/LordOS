@@ -1,4 +1,4 @@
-// Bluebell's taskbar, at the bottom of each display: a green start button with the bluebell mark, the pinned apps
+// Luna's taskbar, at the bottom of each display: a green start button with the crescent moon, the pinned apps
 // as small quick-launch icons, a button for every window (its icon and title; the one in front looks pressed), and the
 // light-blue tray at the end with the status items and the clock. Pinning and the pinned apps' menus are the SDK's
 // (sdk/dock.js), the same as in the other themes.
@@ -41,12 +41,12 @@ export function Taskbar({ t, area, start, onStart, onTray, font }) {
   return (
     <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: BAR_H, flexDirection: 'row', alignItems: 'center', background: t.barBg,
       borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.35)' }}>
-      {/* start: green, rounded on its trailing end, the bluebell and the word */}
+      {/* start: green, rounded on its trailing end, the crescent moon and the word */}
       <View onClick={onStart} style={{ height: BAR_H, flexDirection: 'row', alignItems: 'center', gap: 6, paddingStart: 10, paddingEnd: 18,
         borderTopEndRadius: 14, borderBottomEndRadius: 14, background: t.startBg, opacity: start ? 0.85 : 1,
         boxShadow: '2px 0 4px rgba(0,0,0,0.35)' }}>
         <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' }}><StartMark size={16} /></View>
-        <Text style={{ fontSize: 16, fontWeight: 700, fontFamily: font, color: '#ffffff' }}>{tr('shell.bluebell.start')}</Text>
+        <Text style={{ fontSize: 16, fontWeight: 700, fontFamily: font, color: '#ffffff' }}>{tr('shell.luna.start')}</Text>
       </View>
       {/* quick launch */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, borderEndWidth: 1, borderEndColor: 'rgba(0,0,0,0.25)' }}>

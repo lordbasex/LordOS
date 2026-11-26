@@ -1001,7 +1001,7 @@
   "edit.back": "戻る",
   "edit.forward": "進む",
   "edit.reload": "再読み込み",
-  "theme.bluebell.name": "Bluebell",
-  "theme.bluebell.description": "2001年のデスクトップへのオマージュ：上部が丸い青いタイトルバー、青いタスクバーの緑のスタートボタン、タスクペイン付きのファイル。",
-  "bluebell.start": "スタート"
+  "theme.luna.name": "Luna",
+  "theme.luna.description": "2001年のデスクトップへのオマージュ：上部が丸い青いタイトルバー、青いタスクバーの緑のスタートボタン、タスクペイン付きのファイル。",
+  "luna.start": "スタート"
 }

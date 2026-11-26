@@ -1,5 +1,5 @@
 #!/bin/sh
-# setup.sh HOME — the home of tests/app_scene_headless.sh bluebell_apps_scene: a few notes, pictures and the usual folders,
+# setup.sh HOME — the home of tests/app_scene_headless.sh luna_apps_scene: a few notes, pictures and the usual folders,
 # a demo shell prompt (never the real account or computer in a screenshot).
 H=${1:?usage: setup.sh HOME}
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)

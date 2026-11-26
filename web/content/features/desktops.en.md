@@ -51,7 +51,7 @@ The three run on the same display server, the same interface engine and the same
 
 [[shot:2]]
 
-## Bluebell (in development)
+## Luna (in development)
 
 In development after 0.8.9.6.1 (the latest release is 0.8.9.6.1): a tribute to the desktops of 2001, with art drawn by us in that style. Glossy blue title bars with rounded tops, a green start button on a blue taskbar with quick launch and a button for every window, and Files as that era's explorer: big Back, Forward and Up buttons, an address bar with Go, and a task pane with "File and Folder Tasks", "Other Places" and "Details".
 
@@ -88,4 +88,4 @@ That is also why there will be more. If you have an idea for the next one, [tell
 - **The wallpaper slideshow** was checked on test displays only, not on real monitors or the GPU path.
 - **The first-start chooser** is covered by automated tests in all three desktops, but hasn't been seen yet on a real first start.
 - **A theme you build yourself** runs only on a development build of LordOS for now: a release build loads only code listed in LordOS's signed manifest.
-- **Bluebell** and app skins were checked with automated tests and headless screenshots, in light and dark; not yet in a real session. Every native app that runs in the desktop's process can be skinned; Mail and Calendar, which run as isolated processes, take only the colours.
+- **Luna** and app skins were checked with automated tests and headless screenshots, in light and dark; not yet in a real session. Every native app that runs in the desktop's process can be skinned; Mail and Calendar, which run as isolated processes, take only the colours.

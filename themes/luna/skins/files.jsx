@@ -1,4 +1,4 @@
-// skins/files.jsx — Bluebell's skin for Files, in the manner of a file explorer of 2001: a toolbar of big Back,
+// skins/files.jsx — Luna's skin for Files, in the manner of a file explorer of 2001: a toolbar of big Back,
 // Forward and Up buttons with Search and Views, an address bar with Go, a task pane on the side with collapsible boxes
 // ("File and Folder Tasks", "Other Places", "Details"), the items as big icons or a details list, and a plain status
 // bar (docs/THEMES-GUIDE.md, "App skins → Files").

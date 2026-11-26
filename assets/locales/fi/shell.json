@@ -1008,7 +1008,7 @@
   "edit.back": "Takaisin",
   "edit.forward": "Eteenpäin",
   "edit.reload": "Lataa uudelleen",
-  "theme.bluebell.name": "Bluebell",
-  "theme.bluebell.description": "Kunnianosoitus vuoden 2001 työpöydille: siniset otsikkopalkit pyöristetyin yläkulmin, vihreä aloituspainike sinisellä tehtäväpalkilla ja Tiedostot tehtäväruudun kanssa.",
-  "bluebell.start": "Aloita"
+  "theme.luna.name": "Luna",
+  "theme.luna.description": "Kunnianosoitus vuoden 2001 työpöydille: siniset otsikkopalkit pyöristetyin yläkulmin, vihreä aloituspainike sinisellä tehtäväpalkilla ja Tiedostot tehtäväruudun kanssa.",
+  "luna.start": "Aloita"
 }

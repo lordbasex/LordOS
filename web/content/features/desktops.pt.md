@@ -51,7 +51,7 @@ Os três rodam sobre o mesmo servidor gráfico, o mesmo motor de interface e os 
 
 [[shot:2]]
 
-## Bluebell (em desenvolvimento)
+## Luna (em desenvolvimento)
 
 Em desenvolvimento depois da 0.8.9.6.1 (a versão mais recente é a 0.8.9.6.1): uma homenagem aos desktops de 2001, com arte desenhada por nós nesse estilo. Barras de título azuis brilhantes com o topo arredondado, um botão iniciar verde numa barra de tarefas azul com inicialização rápida e um botão para cada janela, e o Arquivos como o explorador daquela época: botões grandes de Voltar, Avançar e Acima, uma barra de endereço com Ir, e um painel de tarefas com "Tarefas de arquivo e pasta", "Outros locais" e "Detalhes".
 
@@ -88,4 +88,4 @@ Em outros desktops, como GNOME ou KDE, um desktop que funcione como o Lord Works
 - **A apresentação de fundos** foi verificada só em telas de teste, não em monitores reais nem pela GPU.
 - **O seletor do primeiro início** tem testes automáticos nos três desktops, mas ainda não foi visto num primeiro início real.
 - **Um tema que você mesmo faça** por enquanto só roda numa versão de desenvolvimento do LordOS: uma versão publicada só carrega código que está no manifesto assinado do LordOS.
-- **Bluebell** e as aparências de apps foram verificados com testes automáticos e capturas sem tela, no claro e no escuro; ainda não numa sessão real. Todos os apps nativos que rodam no processo do desktop aceitam aparências; o Mail e o Calendário, que rodam como processos isolados, recebem só as cores.
+- **Luna** e as aparências de apps foram verificados com testes automáticos e capturas sem tela, no claro e no escuro; ainda não numa sessão real. Todos os apps nativos que rodam no processo do desktop aceitam aparências; o Mail e o Calendário, que rodam como processos isolados, recebem só as cores.

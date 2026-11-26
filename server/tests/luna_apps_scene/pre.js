@@ -1,4 +1,4 @@
-// pre.js — goes before the theme bundle in tests/app_scene_headless.sh bluebell_apps_scene (a test tool, never shipped): keeps
+// pre.js — goes before the theme bundle in tests/app_scene_headless.sh luna_apps_scene (a test tool, never shipped): keeps
 // which text each node shows and where it hangs, so driver.js can find and click them.
 (function () {
   const texts = new Map(), parent = new Map();

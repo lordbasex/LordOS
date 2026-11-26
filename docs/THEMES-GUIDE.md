@@ -54,7 +54,7 @@ its own layout (for example what the Super key alone does).
 | Lord Flow | `themes/default` | menu bar on top (with the app's menus), magnifying Dock, app launcher, Control Center |
 | Lord Classic | `themes/classic` | taskbar (bottom, top or a side), start menu with search, quick settings, notification panel, menus in each window, snapping and the SDK's Overview |
 | Lord Workspaces (since 0.8.9) | `themes/workspaces` | activities (desktops with an icon, a colour, pinned apps and a layout per display), a Context Spine, group frames with static tiling, its own Search panel and Control Center, menus in each window, three effects styles ([WORKSPACES.md](WORKSPACES.md)) |
-| Bluebell (in development after 0.8.9.6.1) | `themes/bluebell` | a tribute to the desktops of 2001: glossy blue title bars with rounded tops, a green start button on a blue taskbar with quick launch and a button per window; the demo of [style packs and app skins](#style-packs-and-app-skins): its own icons, pointers, sounds and font, and Files as that era's explorer |
+| Luna (in development after 0.8.9.6.1) | `themes/luna` | a tribute to the desktops of 2001: glossy blue title bars with rounded tops, a green start button on a blue taskbar with quick launch and a button per window; the demo of [style packs and app skins](#style-packs-and-app-skins): its own icons, pointers, sounds and font, and Files as that era's explorer |
 | Lord Celeste (community, since 0.8.9.5) | `themes/celeste` | a frame around each display with rounded inner corners, a bar on its thick side (running apps, status items, privacy indicators, clock), drawers that slide out of the frame's edges (dashboard, launcher, session, sidebar with the notifications), menus in each window, mirrored right to left; the theme options of `theme.json` and a node-tested geometry (`model.js`). Layout inspired by Caelestia (caelestia-dots/shell); no code from it |
 
 `themes/greeter` is the login and lock screen: it is a separate program, not a desktop theme (see
@@ -146,7 +146,7 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
   | `email` (0.8.9.6.2) | the author's address, one `local@domain.tld`, at most 120 characters | an "Email" row on the theme's page, as text (never opened by itself) |
   | `organization` (0.8.9.6.2) | plain text, one line, at most 60 characters, the same rules as `author` | an "Organization" row on the theme's page |
 
-  Bluebell declares its author, email and organization (it is official, so its license and version are LordOS's).
+  Luna declares its author, email and organization (it is official, so its license and version are LordOS's).
   The other official themes (no `community: true`) declare none of them: Settings shows LordOS as their author, MIT as
   their license and the release's version as theirs. A community theme should declare all five:
 
@@ -509,7 +509,7 @@ logic. Both are registered at module level, before `startShell`, and both are th
 Appearance → From this style** lists only the parts the style in use brings, each with its own switch
 (`settings.themeParts[part] === false`), so someone can keep a theme's frames and use LordOS's icons. The rules are in
 `sdk/appskinmodel.js` (node-tested by `server/tests/appskin_test.mjs`), the session side in `sdk/appskins.jsx`. Lord
-Bluebell (`themes/bluebell`) uses all of it.
+Luna (`themes/luna`) uses all of it.
 
 ### Level 1: a style pack
 
@@ -543,7 +543,7 @@ Component icons and app skins stay an official theme's: they would draw inside L
 
 What a pack can't do, by design: a theme brings no audio file, no cursor image and no font file for lord-server to
 parse. Sounds are notes, pointers are two colours, and a font is one that is already installed (a Debian package, so its
-licence is a free one: Bluebell names DejaVu Sans of `fonts-dejavu-core`, which LordOS recommends). Anything the
+licence is a free one: Luna names DejaVu Sans of `fonts-dejavu-core`, which LordOS recommends). Anything the
 checks don't accept is dropped, and the rest of the pack still applies.
 
 ### Level 2: app skins
@@ -645,11 +645,11 @@ Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one ski
 | Remote Desk | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `remote-desk_skin_scene.mjs` (8 checks) |
 
 A region drawn in the SDK's floating layer (Screenshots' capture bar, a picture-in-picture window) is outside the theme's
-tree: `useTheme()` there gives the default tokens, so a skin for it makes its own (Bluebell calls its `makeTheme`).
+tree: `useTheme()` there gives the default tokens, so a skin for it makes its own (Luna calls its `makeTheme`).
 
 `server/tests/app_skin_helpers.js` gives each scene the common checks (the stubs drawn, the model frozen, a command not on
-the list refused, layouts off, no React errors); `server/tests/bluebell_apps_scene` screenshots Bluebell's skin of each
-(`tests/app_scene_headless.sh bluebell_apps_scene OUT bluebell en light|dark`).
+the list refused, layouts off, no React errors); `server/tests/luna_apps_scene` screenshots Luna's skin of each
+(`tests/app_scene_headless.sh luna_apps_scene OUT luna en light|dark`).
 
 **Isolated apps can't be skinned this way.** Mail, Calendar, Contacts, Passwords and Reminders run as their own processes
 (`"process": "isolated"`), where the theme's code never runs: they receive the tokens (richer ones included, as JSON
@@ -661,8 +661,8 @@ read-only banner and Files' sheets (Get Info, Quick Preview, Connect to Server, 
 own over any skin. `server/tests/files_skin_scene.mjs` runs Files with every region replaced by a minimal stub
 (`node tests/menubar_test.mjs files_skin_scene.mjs`, in `make test`): the stubs get the model, the actions go through
 Files (`lord.fs.trash`, no `mkdir` in a read-only folder), a throwing stub gives the region back and layouts off brings
-Files' own regions. `server/tests/bluebell_scene` screenshots Bluebell's skins
-(`tests/app_scene_headless.sh bluebell_scene OUT bluebell en light|dark`).
+Files' own regions. `server/tests/luna_scene` screenshots Luna's skins
+(`tests/app_scene_headless.sh luna_scene OUT luna en light|dark`).
 
 #### Settings
 

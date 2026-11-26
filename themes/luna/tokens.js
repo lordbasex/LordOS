@@ -1,4 +1,4 @@
-// Tokens of "Bluebell", a tribute to the desktops of 2001 (docs/THEMES-GUIDE.md, "Style packs" and "App skins").
+// Tokens of "Luna", a tribute to the desktops of 2001 (docs/THEMES-GUIDE.md, "Style packs" and "App skins").
 // The base keys are the contract with the apps (sdk/theme.js); the richer tokens (toolbarBg, buttonBg, bevel,
 // stateBorders) give every app's shared controls the era's raised buttons and soft toolbars; the rest is this theme's.
 // Every colour here is our own pick for the style; nothing is taken from another system's files.
@@ -104,7 +104,7 @@ export function makeTheme({ mode, accent }) {
 }
 
 // The desktop when no picture was chosen: an original sky of our own, deep blue above, paler toward the horizon, with a
-// few soft clouds. Drawn with nodes (themes/bluebell/index.jsx), no image file.
+// few soft clouds. Drawn with nodes (themes/luna/index.jsx), no image file.
 export const sky = (dark) => (dark
   ? { top: '#0d1b33', bottom: '#2a4a78', cloud: 'rgba(170,195,235,0.07)' }
   : { top: '#2c6fd6', bottom: '#a9d0f5', cloud: 'rgba(255,255,255,0.22)' });

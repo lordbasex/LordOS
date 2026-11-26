@@ -1,4 +1,4 @@
-// skins/common.jsx — Bluebell's drawing of the two shapes most apps share (docs/THEMES-GUIDE.md, "App skins → the shared
+// skins/common.jsx — Luna's drawing of the two shapes most apps share (docs/THEMES-GUIDE.md, "App skins → the shared
 // shapes"): a command bar (a row of labelled buttons with the place's title, in the manner of 2001) and a list pane (the
 // blue task pane with a box of links). Each app's skin maps its regions to these.
 import { View, Text, ScrollView, useTheme, useThemeFont } from '@lordos/sdk';

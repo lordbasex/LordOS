@@ -653,7 +653,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     and refreshes, and every install stays the Store's.
     Most other apps use two shared shapes (`commandBar` and `listPane` in `sdk/appskinmodel.js`): a command bar of the app's
     own commands and a list pane of its places or items, and a header (`SkinHeader`) for an app with no bar of its own;
-    Bluebell draws them once (`skins/common.jsx`). Apps with them:
+    Luna draws them once (`skins/common.jsx`). Apps with them:
     **Notes** (`sidebar`, `toolbar`; the list carries titles and dates, never a note's text); **Calculator**
     (`display`, `keypad`; `press` takes only a key of its keypad); **Photos** (`sidebar`, `toolbar`); **Player**
     (`sidebar`, `toolbar`, `transport`); **Monitor** (`toolbar`: its tabs); **Clock** (`toolbar`); **Screenshots**
@@ -666,8 +666,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     **Remote Desk** (`header`).
   - **Settings → Appearance → From this style**: a switch for each part the style in use brings (Icons, Pointer colors,
     Sounds, Font, App layouts; `settings.themeParts`), so someone can keep a theme's frames and use LordOS's icons.
-  - **Bluebell** (`themes/bluebell`), the demo: a tribute to the desktops of 2001 with glossy blue title bars with
-    rounded tops, a green start button with our own bluebell mark on a blue taskbar, quick launch and a button per
+  - **Luna** (`themes/luna`), the demo: a tribute to the desktops of 2001 with glossy blue title bars with
+    rounded tops, a green start button with our own crescent moon mark on a blue taskbar, quick launch and a button per
     window, a two-column start menu of that era (the person's picture and name in a blue header, pinned apps and "All
     apps ▸" in a white column, Documents, Pictures, Music, the computer, the network, Settings, Help and Search in a
     light-blue one, and Log Out and Shut Down… in the footer, LordOS's own session actions), an original sky when no picture is chosen, light and dark; its pack has our own folder, page and round-arrow
@@ -675,17 +675,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     (Back/Forward/Up, Search, Views, an address bar with Go, the task pane with "File and Folder Tasks", "Other Places"
     and "Details", icons or details, a plain status bar and context menu), and Settings a control panel of that era (a
     task pane and four categories, each with its sections as links). All of its art is drawn by us.
-  - Themes no longer carry "Lord" in their names (the maintainer's rule of 2026-11-26): the demo is just **Bluebell**.
+  - Themes no longer carry "Lord" in their names (the maintainer's rule of 2026-11-26): the demo is just **Luna**.
     Its `theme.json` names its author, Federico Pereira, with two new optional fields, `email` and `organization` (IPERFEX),
     checked by `sdk/thememeta.js` (one plain address of at most 120 characters; one line of at most 60) and shown as
     rows on the theme's page in Settings → Appearance (`settings.style.email`, `settings.style.organization`; tests in
     `server/tests/theme_gallery_test.mjs`).
-  - New texts in the 35 languages (`files.skin.*`, `settings.themeParts.*`, `settings.skin.*`, `shell.theme.bluebell.*`,
-    `shell.bluebell.start`). Tests: `server/tests/appskin_test.mjs` (76 checks), `server/tests/files_skin_scene.mjs`
+  - New texts in the 35 languages (`files.skin.*`, `settings.themeParts.*`, `settings.skin.*`, `shell.theme.luna.*`,
+    `shell.luna.start`). Tests: `server/tests/appskin_test.mjs` (76 checks), `server/tests/files_skin_scene.mjs`
     (Files with every region a stub: 31 checks), `server/tests/settings_skin_scene.mjs` (Settings with both regions
     stubbed: 17 checks), `server/tests/terminal_skin_scene.mjs` (the Terminal: 14 checks), `server/tests/editor_skin_scene.mjs` (the
-    Text Editor: 16 checks), `server/tests/store_skin_scene.mjs` (the Store: 11 checks; all six in `make test`) and `server/tests/bluebell_scene` (screenshots,
-    `app_scene_headless.sh bluebell_scene OUT bluebell en light|dark`; it runs with a demo account and computer name, and
+    Text Editor: 16 checks), `server/tests/store_skin_scene.mjs` (the Store: 11 checks; all six in `make test`) and `server/tests/luna_scene` (screenshots,
+    `app_scene_headless.sh luna_scene OUT luna en light|dark`; it runs with a demo account and computer name, and
     checks that the real ones appear nowhere on screen).
 - **Settings → Wallpaper is a gallery, with three new collections of still pictures: Abstract, Epic and Anime.** The
   approved redesign (apps/settings/WallpaperGallery.jsx) reorganises the page; nothing it had goes away.
