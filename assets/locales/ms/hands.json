@@ -44,5 +44,11 @@
   },
   "settings.howTitle": "Tambahkannya pada Claude Code",
   "settings.how": "Jalankan ini sekali dalam terminal. Selepas itu Claude Code mempunyai alat LordOS; kali pertama ia bersambung, LordOS akan bertanya kepada anda.",
-  "settings.qa": "Untuk menguji aplikasi tanpa menyentuh desktop anda, Claude Code boleh menggunakan “lordos-mcp --headless notes”: desktop peribadi dengan fail contoh yang tiada siapa nampak."
+  "settings.qa": "Untuk menguji aplikasi tanpa menyentuh desktop anda, Claude Code boleh menggunakan “lordos-mcp --headless notes”: desktop peribadi dengan fail contoh yang tiada siapa nampak.",
+  "cursor.label": "{client} · dilaporkan",
+  "settings.motionTitle": "Gerakan ejen",
+  "settings.motionHuman": "Manusia",
+  "settings.motionMachine": "Mesin",
+  "settings.motionHumanHint": "Kursor ungu ejen meluncur ke setiap sasaran, berhenti seketika di atasnya, kemudian mengklik, dan menaip pada kelajuan manusia supaya anda boleh mengikuti apa yang dilakukannya. Dengan Kurangkan gerakan, luncurannya pendek.",
+  "settings.motionMachineHint": "Setiap tindakan berlaku serta-merta; kursor ejen hanya berkelip di tempat tindakan itu berlaku."
 }

@@ -48,5 +48,11 @@
   },
   "settings.howTitle": "Adaugă-l în Claude Code",
   "settings.how": "Rulează asta o dată într-un terminal. Claude Code va avea apoi instrumentele LordOS; prima dată când se conectează, LordOS te întreabă.",
-  "settings.qa": "Ca să testeze o aplicație fără să-ți atingă desktopul, Claude Code poate folosi „lordos-mcp --headless notes”: un desktop privat cu fișiere de exemplu, pe care nu-l vede nimeni."
+  "settings.qa": "Ca să testeze o aplicație fără să-ți atingă desktopul, Claude Code poate folosi „lordos-mcp --headless notes”: un desktop privat cu fișiere de exemplu, pe care nu-l vede nimeni.",
+  "cursor.label": "{client} · declarat",
+  "settings.motionTitle": "Mișcarea agentului",
+  "settings.motionHuman": "Umană",
+  "settings.motionMachine": "Mașină",
+  "settings.motionHumanHint": "Cursorul violet al agentului alunecă până la fiecare țintă, se oprește o clipă deasupra ei și abia apoi dă clic, și tastează în ritmul unui om, ca să poți urmări ce face. Cu „Reduce mișcarea”, alunecările sunt scurte.",
+  "settings.motionMachineHint": "Fiecare acțiune are loc imediat; cursorul agentului doar clipește acolo unde ajunge."
 }

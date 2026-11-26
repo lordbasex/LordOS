@@ -54,5 +54,11 @@
   },
   "settings.howTitle": "أضِفه إلى Claude Code",
   "settings.how": "شغّل هذا مرة واحدة في طرفية. بعدها تصبح أدوات LordOS متاحة لـ Claude Code؛ وفي أول اتصال له، يسألك LordOS.",
-  "settings.qa": "لاختبار تطبيق دون لمس سطح مكتبك، يمكن لـ Claude Code استخدام «lordos-mcp --headless notes»: سطح مكتب خاص فيه ملفات نموذجية لا يراه أحد."
+  "settings.qa": "لاختبار تطبيق دون لمس سطح مكتبك، يمكن لـ Claude Code استخدام «lordos-mcp --headless notes»: سطح مكتب خاص فيه ملفات نموذجية لا يراه أحد.",
+  "cursor.label": "{client} · حسب قوله",
+  "settings.motionTitle": "حركة الوكيل",
+  "settings.motionHuman": "بشرية",
+  "settings.motionMachine": "آلية",
+  "settings.motionHumanHint": "ينزلق مؤشر الوكيل البنفسجي إلى كل هدف ويتوقف فوقه لحظة ثم ينقر، ويكتب بسرعة إنسان، لتتمكن من متابعة ما يفعله. مع «تقليل الحركة» تكون الانزلاقات قصيرة.",
+  "settings.motionMachineHint": "يحدث كل إجراء فورًا؛ ويومض مؤشر الوكيل فقط حيث يقع."
 }

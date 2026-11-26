@@ -46,5 +46,11 @@
   },
   "settings.howTitle": "Claude Code-a əlavə edin",
   "settings.how": "Bunu terminalda bir dəfə işə salın. Bundan sonra Claude Code-un LordOS alətləri olur; ilk qoşulanda LordOS sizdən soruşur.",
-  "settings.qa": "Masaüstünüzə toxunmadan tətbiqi sınamaq üçün Claude Code “lordos-mcp --headless notes” istifadə edə bilər: heç kimin görmədiyi, nümunə faylları olan şəxsi masaüstü."
+  "settings.qa": "Masaüstünüzə toxunmadan tətbiqi sınamaq üçün Claude Code “lordos-mcp --headless notes” istifadə edə bilər: heç kimin görmədiyi, nümunə faylları olan şəxsi masaüstü.",
+  "cursor.label": "{client} · özü bildirir",
+  "settings.motionTitle": "Agentin hərəkəti",
+  "settings.motionHuman": "İnsan",
+  "settings.motionMachine": "Maşın",
+  "settings.motionHumanHint": "Agentin bənövşəyi kursoru hər hədəfə sürüşür, bir an üzərində dayanır, sonra klikləyir və insan sürətində yazır ki, nə etdiyini izləyə biləsiniz. «Hərəkəti azalt» açıq olanda sürüşmələr qısa olur.",
+  "settings.motionMachineHint": "Hər əməliyyat dərhal baş verir; agentin kursoru yalnız düşdüyü yerdə parıldayır."
 }

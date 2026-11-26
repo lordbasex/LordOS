@@ -44,5 +44,11 @@
   },
   "settings.howTitle": "Claude Code에 추가",
   "settings.how": "터미널에서 이 명령을 한 번 실행하세요. 그러면 Claude Code가 LordOS의 도구를 쓸 수 있고, 처음 연결할 때 LordOS가 사용자에게 묻습니다.",
-  "settings.qa": "데스크톱을 건드리지 않고 앱을 테스트하려면 Claude Code에서 “lordos-mcp --headless notes”를 사용할 수 있습니다. 아무도 보지 않는, 샘플 파일이 있는 비공개 데스크톱입니다."
+  "settings.qa": "데스크톱을 건드리지 않고 앱을 테스트하려면 Claude Code에서 “lordos-mcp --headless notes”를 사용할 수 있습니다. 아무도 보지 않는, 샘플 파일이 있는 비공개 데스크톱입니다.",
+  "cursor.label": "{client} · 자체 신고",
+  "settings.motionTitle": "에이전트 동작",
+  "settings.motionHuman": "사람처럼",
+  "settings.motionMachine": "기계처럼",
+  "settings.motionHumanHint": "에이전트의 보라색 커서가 각 대상까지 미끄러지듯 이동해 잠시 멈춘 뒤 클릭하고, 사람의 속도로 입력하므로 무엇을 하는지 따라볼 수 있습니다. '동작 줄이기'를 켜면 이동이 짧아집니다.",
+  "settings.motionMachineHint": "각 동작이 즉시 일어나며, 에이전트의 커서는 동작한 곳에서 잠깐 반짝이기만 합니다."
 }

@@ -44,5 +44,11 @@
   },
   "settings.howTitle": "添加到 Claude Code",
   "settings.how": "在终端中运行一次即可。之后 Claude Code 就能使用 LordOS 的工具；首次连接时，LordOS 会询问你。",
-  "settings.qa": "如需在不影响你桌面的情况下测试应用，Claude Code 可以使用“lordos-mcp --headless notes”：一个带示例文件、无人可见的私有桌面。"
+  "settings.qa": "如需在不影响你桌面的情况下测试应用，Claude Code 可以使用“lordos-mcp --headless notes”：一个带示例文件、无人可见的私有桌面。",
+  "cursor.label": "{client} · 自行报告",
+  "settings.motionTitle": "代理的动作",
+  "settings.motionHuman": "像人一样",
+  "settings.motionMachine": "像机器一样",
+  "settings.motionHumanHint": "代理的紫色光标会滑到每个目标上，稍作停留后再点击，并以人的速度打字，方便你看清它在做什么。开启“减弱动态效果”时，滑动会很短。",
+  "settings.motionMachineHint": "每个操作都立即完成；代理的光标只会在操作落点处闪一下。"
 }

@@ -48,5 +48,11 @@
   },
   "settings.howTitle": "Dodaj do Claude Code",
   "settings.how": "Uruchom to raz w terminalu. Claude Code będzie miał wtedy narzędzia LordOS; przy pierwszym połączeniu LordOS cię zapyta.",
-  "settings.qa": "Aby przetestować aplikację bez dotykania twojego pulpitu, Claude Code może użyć „lordos-mcp --headless notes”: prywatnego pulpitu z przykładowymi plikami, którego nikt nie widzi."
+  "settings.qa": "Aby przetestować aplikację bez dotykania twojego pulpitu, Claude Code może użyć „lordos-mcp --headless notes”: prywatnego pulpitu z przykładowymi plikami, którego nikt nie widzi.",
+  "cursor.label": "{client} · według programu",
+  "settings.motionTitle": "Ruch agenta",
+  "settings.motionHuman": "Ludzki",
+  "settings.motionMachine": "Maszynowy",
+  "settings.motionHumanHint": "Fioletowy kursor agenta przesuwa się płynnie do każdego celu, zatrzymuje się nad nim na chwilę i dopiero wtedy klika, a pisze w tempie człowieka, więc możesz śledzić, co robi. Przy włączonym „Ogranicz ruch” przesunięcia są krótkie.",
+  "settings.motionMachineHint": "Każda czynność dzieje się od razu; kursor agenta tylko błyska tam, gdzie trafia."
 }

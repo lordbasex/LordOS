@@ -46,5 +46,11 @@
   },
   "settings.howTitle": "Idagdag ito sa Claude Code",
   "settings.how": "Patakbuhin ito nang isang beses sa isang terminal. Pagkatapos, may mga tool na ng LordOS ang Claude Code; sa unang beses na kumonekta ito, tatanungin ka ng LordOS.",
-  "settings.qa": "Para subukan ang isang app nang hindi ginagalaw ang iyong desktop, magagamit ng Claude Code ang “lordos-mcp --headless notes”: isang pribadong desktop na may mga sample na file na walang nakakakita."
+  "settings.qa": "Para subukan ang isang app nang hindi ginagalaw ang iyong desktop, magagamit ng Claude Code ang “lordos-mcp --headless notes”: isang pribadong desktop na may mga sample na file na walang nakakakita.",
+  "cursor.label": "{client} · ayon dito",
+  "settings.motionTitle": "Galaw ng agent",
+  "settings.motionHuman": "Parang tao",
+  "settings.motionMachine": "Parang makina",
+  "settings.motionHumanHint": "Dumudulas ang lilang cursor ng agent papunta sa bawat target, humihinto saglit sa ibabaw nito, saka nagki-click, at nagta-type ito sa bilis ng tao para masundan mo ang ginagawa nito. Kapag naka-on ang Bawasan ang galaw, maiikli ang mga dulas.",
+  "settings.motionMachineHint": "Agad nangyayari ang bawat aksyon; kumikislap lang ang cursor ng agent kung saan ito tumama."
 }
