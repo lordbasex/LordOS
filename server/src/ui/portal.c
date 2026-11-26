@@ -2311,6 +2311,13 @@ static int fonts_pick(void) {
     return diff;
 }
 
+void portal_gtk_values(const char **theme, const char **button_layout, const char **font, const char **icons) {
+    *theme = gtk_theme;
+    *button_layout = buttons;
+    *font = font_ui;
+    *icons = ICON_THEME;
+}
+
 void portal_set(int is_dark, const double rgb[3], const char *accent_name, const char *button_layout) {
     int old_dark = dark;
     double old[3] = { acc[0], acc[1], acc[2] };

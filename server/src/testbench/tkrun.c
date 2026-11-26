@@ -11,6 +11,7 @@
 #include "tkrun.h"
 #include "../sec/json.h"
 #include "../web/weblangid.h"
+#include "../wl/toolkitenv.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -93,6 +94,13 @@ int tk_env(const TkRunOpts *o, int combo, char *buf, size_t blen, char **out, in
      * one of GLib's backends. Without it GTK 3 read dconf's defaults and the theme check failed for nothing. */
     const char *gb = env_get(env, "GSETTINGS_BACKEND");
     env_put(&b, "GSETTINGS_BACKEND", gb && (!strcmp(gb, "keyfile") || !strcmp(gb, "dconf") || !strcmp(gb, "memory")) ? gb : "keyfile");
+    /* Qt follows LordOS's dark mode through the platform theme lord-server names for every app it starts
+     * (QT_QPA_PLATFORMTHEME, wl/toolkitenv.h): the harness gets the same, or the caller's own when it is a plain
+     * plugin name (lower case letters and digits, as Qt's own are: gnome, gtk3, xdgdesktopportal, qt5ct). */
+    const char *qt = env_get(env, "QT_QPA_PLATFORMTHEME");
+    int qt_ok = qt && *qt && strlen(qt) < 32;
+    for (const char *p = qt; qt_ok && *p; p++) qt_ok = (*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9');
+    env_put(&b, "QT_QPA_PLATFORMTHEME", qt_ok ? qt : TOOLKITENV_QT_THEME);
     if (c->wayland) env_put(&b, "WAYLAND_DISPLAY", wl);
     else {
         env_put(&b, "DISPLAY", dpy);

@@ -377,10 +377,21 @@ async function startServer() {
   const D = fs.mkdtempSync(path.join(os.tmpdir(), 'lwconf.'));
   fs.chmodSync(D, 0o700);
   fs.mkdirSync(path.join(D, 'home', '.config', 'lordos'), { recursive: true });
-  fs.writeFileSync(path.join(D, 'home', '.config', 'lordos', 'settings.json'), '{"schema": 9, "desktopChosen": true, "language": "en"}\n');
+  // the welcome seen too: the Help window opening mid-run took the keyboard from the toolkit harnesses
+  fs.writeFileSync(path.join(D, 'home', '.config', 'lordos', 'settings.json'), '{"schema": 9, "desktopChosen": true, "welcomeShown": true, "language": "en"}\n');
   fs.writeFileSync(path.join(D, 'theme.js'), fs.readFileSync(theme, 'utf8') + THEME_HOOK);
   const env = { ...process.env, XDG_RUNTIME_DIR: D, HOME: path.join(D, 'home'), LORD_GPU: '0', LANG: 'en_US.UTF-8', LORD_HEADLESS_DRAW: '1' };
   for (const k of ['WAYLAND_DISPLAY', 'WAYLAND_SOCKET', 'DISPLAY', 'XAUTHORITY', 'LORD_SESSIOND', 'LORDOS_SESSIOND', 'DBUS_SESSION_BUS_ADDRESS']) delete env[k];
+  // a private session bus, as a session has: lord-server serves the portal on it, and the toolkit harnesses' theme
+  // check compares the toolkit with it (without one it failed for nothing; docs/TOOLKIT-AUDIT.md). Skipped without
+  // dbus-daemon.
+  let bus = null;
+  if (fs.existsSync('/usr/bin/dbus-daemon')) {
+    bus = spawn('/usr/bin/dbus-daemon', ['--session', `--address=unix:path=${path.join(D, 'bus')}`, '--nofork', '--nopidfile'],
+      { stdio: 'ignore', detached: true });
+    for (let i = 0; i < 50 && !fs.existsSync(path.join(D, 'bus')); i++) await sleep(100);
+    if (fs.existsSync(path.join(D, 'bus'))) env.DBUS_SESSION_BUS_ADDRESS = `unix:path=${path.join(D, 'bus')}`;
+  }
   const out = fs.openSync(path.join(D, 'server.log'), 'w');
   // --user: the session's services, among them the X socket (Xwayland starts on the first X11 connection)
   // --test-hooks (build/lord-server-test only): the pointer, a graphics tablet, a VR headset and an Xwayland-like connection (src/testhooks.h)
@@ -388,13 +399,14 @@ async function startServer() {
     { cwd: SERVER, env, stdio: ['ignore', out, out], detached: true });
   let sock = '';
   for (let i = 0; i < 120 && !sock; i++) { await sleep(250); sock = fs.readdirSync(D).find((n) => /^wayland-\d+$/.test(n)) || ''; }
-  if (!sock) { try { process.kill(-P.pid, 'SIGTERM'); } catch {} throw new Error(`lord-server made no Wayland socket (log: ${D}/server.log)`); }
+  if (!sock) { try { process.kill(-P.pid, 'SIGTERM'); } catch {} if (bus) try { process.kill(-bus.pid, 'SIGTERM'); } catch {} throw new Error(`lord-server made no Wayland socket (log: ${D}/server.log)`); }
   await sleep(2500);                               // the theme is up
   const logs = () => ['server.log', 'home/.cache/lordos/shell.log', 'home/.cache/lordos/compositor.log'].map((f) => { try { return fs.readFileSync(path.join(D, f), 'utf8'); } catch { return ''; } }).join('\n');
   const display = () => { const m = logs().match(/xwayland: DISPLAY=(:\d+)/); return m ? m[1] : ''; };
   const clientEnv = { ...env, WAYLAND_DISPLAY: sock };
   // SIGTERM, then SIGKILL after 3 s: a lord-server stuck in a loop ignores SIGTERM (its group: Xwayland too)
   const stop = () => {
+    if (bus) { try { process.kill(-bus.pid, 'SIGTERM'); } catch {} bus = null; }
     try { process.kill(-P.pid, 'SIGTERM'); } catch { return; }
     const wait = new Int32Array(new SharedArrayBuffer(4));
     for (let i = 0; i < 30; i++) { try { process.kill(P.pid, 0); } catch { return; } Atomics.wait(wait, 0, 0, 100); }
@@ -723,6 +735,7 @@ function toolkitsSection(S) {
     PATH: process.env.PATH, HOME: path.join(S.D, 'home'), XDG_RUNTIME_DIR: S.D, XDG_CACHE_HOME: path.join(S.D, 'tk-cache'),
     WAYLAND_DISPLAY: S.sock, LANG: 'C.UTF-8', LORDOS_TOOLKIT_AUDIT_DIR: path.join(ROOT, 'tools', 'toolkit-audit'),
   };
+  if (S.env.DBUS_SESSION_BUS_ADDRESS) env.DBUS_SESSION_BUS_ADDRESS = S.env.DBUS_SESSION_BUS_ADDRESS;
   const disp = S.display();
   if (disp) { env.DISPLAY = disp; env.XAUTHORITY = path.join(S.D, `lord-xauth.${disp.slice(1)}`); }
   // 9 harnesses, each killed at 8 s, plus the import probes
