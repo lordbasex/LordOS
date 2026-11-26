@@ -73,6 +73,12 @@ static void on_title(WebKitWebView *v, GParamSpec *p, gpointer d) {
     if (t && !strncmp(t, "done", 4)) { printf("title: %s\n", t); ok = 1; g_main_loop_quit(loop); }
 }
 
+/* WEBCALLS_EVAL_AFTER (tests/webcalls_jitsi.py, test only): a script run in the page 8 s after it starts loading */
+static gboolean eval_later(gpointer d) {
+    webkit_web_view_evaluate_javascript(d, getenv("WEBCALLS_EVAL_AFTER"), -1, NULL, NULL, NULL, NULL, NULL);
+    return G_SOURCE_REMOVE;
+}
+
 static gboolean on_timeout(gpointer d) { (void)d; printf("timed out\n"); g_main_loop_quit(loop); return G_SOURCE_REMOVE; }
 
 int main(int argc, char **argv) {
@@ -104,6 +110,7 @@ int main(int argc, char **argv) {
     g_signal_connect(v, "notify::title", G_CALLBACK(on_title), NULL);
     printf("engine: WPE WebKit %u.%u.%u\n", webkit_get_major_version(), webkit_get_minor_version(), webkit_get_micro_version());
     webkit_web_view_load_uri(v, argv[1]);
+    if (getenv("WEBCALLS_EVAL_AFTER")) g_timeout_add_seconds(8, eval_later, v);
     loop = g_main_loop_new(NULL, FALSE);
     g_timeout_add_seconds(argc > 2 ? (guint)atoi(argv[2]) : 30, on_timeout, NULL);
     g_main_loop_run(loop);

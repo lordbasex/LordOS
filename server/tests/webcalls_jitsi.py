@@ -57,6 +57,11 @@ STATS = r"""(async () => {
 })()"""
 
 
+# Jitsi Meet's own app object: microphone and camera on (also run in lord-web's engine by webcalls-check,
+# WEBCALLS_EVAL_AFTER)
+UNMUTE = "try { APP.conference.muteAudio(false); APP.conference.muteVideo(false); } catch (e) {}"
+
+
 class Cdp:
     """the smallest DevTools Protocol client: one WebSocket, text frames"""
 
@@ -117,7 +122,7 @@ class Cdp:
 
 def chrome(url, secs, report):
     prof = tempfile.mkdtemp(prefix="webcalls-chrome-")
-    port = 9333
+    port = int(os.environ.get("WEBCALLS_CDP_PORT", "9333"))
     p = subprocess.Popen(["google-chrome", "--headless=new", "--user-data-dir=" + prof, "--no-first-run",
                           "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream",
                           "--autoplay-policy=no-user-gesture-required", "--remote-debugging-port=%d" % port, "about:blank"],
@@ -137,6 +142,9 @@ def chrome(url, secs, report):
         c.call("Page.addScriptToEvaluateOnNewDocument", source=HOOK)
         c.call("Page.navigate", url=url)
         t0 = time.time()
+        # the server's own settings may start a participant muted whatever the URL says: unmute through Jitsi's app
+        time.sleep(8)
+        c.call("Runtime.evaluate", expression=UNMUTE)
         samples = []
         while time.time() - t0 < secs:
             time.sleep(10)

@@ -764,6 +764,27 @@ Voice and video calls in web apps (a messaging web app first, also video meeting
   `SyntaxError` when it created its connection. `lordos-turn-transport-query.patch` (`+4`) accepts exactly
   `transport=udp` and `transport=tcp`, which the ICE agent reads; `tests/webcalls_check.py` checks both and that another
   query is still refused.
+- **Against Chrome, and where calls stop today** (2026-11-26, amd64, `+4` in the build's test chroot with WebKit's sandbox
+  on, Chrome 158 headless on the same machine with its fake camera and microphone; `tests/webcalls_pair.py`, a
+  signaling server of its own, and `tests/webcalls_jitsi.py`, by hand):
+  - **lord-web's engine offers, one transport (`bundlePolicy: 'max-bundle'`): works.** Connected in 201 ms over
+    host/UDP; both directions carry audio and video: lord-web's engine received 552 Opus packets and 221 H.264 frames of
+    640×480 and sent 772 and 300 in 15 s; its call log said `connection connected`, `out audio audio/OPUS`, `out video
+    video/H264 640x480 30 fps`, `in video …`, `in audio …`.
+  - **It offers with WebKit's default (`balanced`, a transport per media):** video flows both ways (about 690 frames of
+    640×480 each way) but the audio transport never connects, so neither side hears and both stay `connecting`.
+  - **Chrome offers, lord-web's engine answers:** the answer picks PCMU instead of the Opus Chrome offered first, video
+    doesn't flow and Chrome receives nothing. WebKit names Opus `OPUS` in its own capabilities; the answer's matching of
+    the offer's `opus` is the first suspect.
+  - **A public video meeting server (Jitsi Meet, through its video bridge, which offers):** the page joins, ICE
+    connects, but the bridge re-offers about 4 times a second (a renegotiation loop: 242 offers in 55 s) and DTLS never
+    finishes (WebKit's DTLS client hello goes out six times with no answer), so no media either way. TURN through librice
+    fails too (`LongTermClientAuthError { reason: UnsupportedFeature }`: WebKit asks librice for TURN's anonymous-username
+    feature as required). Two headless Chromes through the same server, the same way, exchange 720p VP9 and Opus both ways.
+  - So a call works today when the page offers with one transport; the answering side, several transports and the
+    bridge's renegotiation are WebKit GStreamer WebRTC bugs still to fix (or to take from a newer WebKit) before a
+    messaging web app's calls can be expected to work. Not yet tried with the messaging app itself (it needs the
+    maintainer's account).
 - **The call log** (`webcall.h`, `webcall.c`, `webcalls.c`, `webcall.js`): lines starting `webcall: ` in the app's log
   (`web/<app>-<profile>.log` in the user's log folder, docs/SYSTEM.md "Log files"; the Logs app and `lordos-issue` show
   it), always on, at most 60 a minute. They say what the page has for calls, each peer connection, its ICE gathering,

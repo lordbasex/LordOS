@@ -31,6 +31,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     is published next to WebKit's. `build-wpewebkit.sh` takes it with `EXTRA_DEBS`. Checked in the build's test chroot
     with WebKit's sandbox on: two peer connections in one page connect in 300 to 400 ms with Opus and VP8, and with Opus
     and H.264, audio and video arriving.
+  - **Against Chrome 158 (headless, fake devices):** when lord-web's engine offers with one transport the call connects in
+    about 200 ms and carries Opus and H.264 640×480 both ways; with a transport per media the audio never connects; when
+    Chrome offers, the answer picks PCMU and nothing reaches Chrome; through a public video meeting server's bridge, ICE
+    connects but DTLS never finishes amid a renegotiation loop. These WebKit GStreamer WebRTC bugs are still open
+    (docs/WEBAPPS.md, "Calls").
   - **TURN URLs with `?transport=udp|tcp` accepted** (`lordos-turn-transport-query.patch`, `+4`): WebKit's check was
     inverted and refused every TURN URL with a query, so a video meeting site's `new RTCPeerConnection()` threw
     `SyntaxError`.
