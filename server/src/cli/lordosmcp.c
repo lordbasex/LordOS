@@ -596,6 +596,8 @@ static int qa_start(const char *app) {
     write_file(d, "Shopping list.md", "# Shopping list\n\n- [ ] Bread\n- [ ] Milk\n- [ ] Coffee\n");
     write_file(d, "Meeting notes.txt", "Meeting notes\n\nRelease checklist reviewed. Next meeting on Monday.\n");
     write_file(d, "Ideas.md", "# Ideas\n\nA LordOS theme with sea colours.\n");
+    /* the demo identity in a terminal too: its prompt and what programs read from the environment */
+    write_file(home, ".bashrc", "export USER=demo LOGNAME=demo HOSTNAME=demo-pc\nPS1='demo@demo-pc:\\w\\$ '\nexport PS1\n");
     /* a private bus */
     char conf[PATH_MAX], sock[PATH_MAX], addr[PATH_MAX + 16];
     snprintf(conf, sizeof conf, "%s/bus.conf", qa_dir);
@@ -633,6 +635,10 @@ static int qa_start(const char *app) {
         if (chdir(bindir)) _exit(127);
         unsetenv("WAYLAND_DISPLAY"); unsetenv("DISPLAY"); unsetenv("LORD_SESSIOND"); unsetenv("LORDOS_SESSIOND");
         setenv("XDG_RUNTIME_DIR", qa_dir, 1);
+        /* the demo identity (lord-server's --hands-qa answers "Alex Demo", "demo", "demo-pc" too): never the real account */
+        setenv("USER", "demo", 1);
+        setenv("LOGNAME", "demo", 1);
+        setenv("HOSTNAME", "demo-pc", 1);
         setenv("HOME", home, 1);
         setenv("DBUS_SESSION_BUS_ADDRESS", addr, 1);
         setenv("LORD_GPU", "0", 1);

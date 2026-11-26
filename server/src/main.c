@@ -3553,7 +3553,7 @@ int main(int argc, char **argv) {
     if (getenv("LORD_DAMAGE") && !strcmp(getenv("LORD_DAMAGE"), "one")) paint_multi_damage = 0;    /* one box per frame, as before 0.8.8.10 (paint.c) */
     remote_server = &s;
     hands_init(&hands_host_impl);           /* Hands (hands/hands.h): off until the person turns it on, or --hands-qa */
-    if (hands_qa_flag) { hands_qa(1); fprintf(stderr, "lord-server: Hands QA desktop: an agent may use this private session (docs/HANDS.md)\n"); }
+    if (hands_qa_flag) { hands_qa(1); js_sys_set_demo_identity(1); fprintf(stderr, "lord-server: Hands QA desktop: an agent may use this private session (docs/HANDS.md)\n"); }
     tp_route_init(&tp_host);
     wl_warp_set_host(warp_move);                /* pointer-warp-v1 (wl/wl_warp.c) */
     static const MirrorInput mirror_in = { remote_pointer, remote_button, remote_wheel, remote_key, remote_clip, remote_clients,

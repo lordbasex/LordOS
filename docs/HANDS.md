@@ -164,7 +164,9 @@ never a secret field, the allowlist; for keys, the field and the node with the k
 The safest way to test an app with an agent: `lordos-mcp --headless notes` starts a **private desktop** nobody sees: a
 private `dbus-daemon`, `lord-server --headless 1280x800 --hands-qa` and a demo home with a few sample files
 (`Documents/Shopping list.md`, `Meeting notes.txt`, `Ideas.md`), then opens the app. The person keeps working on their own
-desktop; nothing of theirs is read or touched. `--hands-qa` is accepted only with `--headless` (never with a monitor or
+desktop; nothing of theirs is read or touched. It has a demo identity everywhere the account could show: "Alex Demo",
+login "demo", host "demo-pc" (`lord.system.info`, `lord.users`, the environment, the terminal's prompt); `tests/hands_e2e.py`
+fails if the real account or host name appears in its trees. `--hands-qa` is accepted only with `--headless` (never with a monitor or
 on the login screen): Hands is on and every client granted with no prompt, and there is no person to yield to. It all
 ends, and the folder is deleted, when `lordos-mcp` exits. `LORDOS_MCP_SIZE` (e.g. `1920x1080`) and `LORDOS_MCP_LANG`
 change the desktop. It needs `dbus-daemon` (Debian's `dbus-daemon` package).

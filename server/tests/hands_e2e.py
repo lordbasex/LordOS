@@ -91,6 +91,17 @@ class Agent:
         shutil.rmtree(self.home, ignore_errors=True)
 
 
+# the real account and host: never on the QA desktop (its identity is "Alex Demo", "demo", "demo-pc")
+import pwd
+_pw = pwd.getpwuid(os.getuid())
+REAL = [x for x in {_pw.pw_name, _pw.pw_gecos.split(',')[0].strip(), socket.gethostname()} if x and len(x) >= 3 and x not in ('demo', 'demo-pc', 'Alex Demo')]
+
+
+def no_leak(text, where):
+    found = [x for x in REAL if x.lower() in (text or '').lower()]
+    check(not found, f'no real account or host name in {where}' + (' (leaked)' if found else ''))
+
+
 def ref(text, pattern):
     m = re.search(pattern + r'[^\n]*?\[(ref_\d+)\]', text)
     return m.group(1) if m else None
@@ -167,6 +178,8 @@ def notes_import():
         time.sleep(1.0)
         t = a.text('read_window', window_id='notes')
         check('Shopping list' in t and 'Bread' in t, 'the note exists, with its text')
+        no_leak(t, 'Notes\' tree')
+        no_leak(a.text('read_window', window_id='desktop'), 'the desktop\'s tree')
         a.text('record', action='stop')
         r = a.call('record', action='export')
         data = next((base64.b64decode(c['data']) for c in r['content'] if c['type'] == 'image'), b'')
@@ -257,6 +270,10 @@ def trust_dialog():
         inst = subprocess.run(['node', os.path.join(HERE, 'community_theme_install.mjs'), os.path.join(HERE, 'community_themes/okminimal'), home, '--untrusted'],
                               capture_output=True, text=True)
         check(inst.returncode == 0, 'an untrusted community theme in the demo home')
+        t = a.text('read_window', window_id='settings')
+        check('Alex Demo' in t, 'Settings shows the demo account')
+        no_leak(t, 'Settings\' tree')
+        no_leak(a.text('read_window', window_id='desktop'), 'the desktop\'s tree with Settings')
         t = a.text('find', window_id='settings', query='Appearance')
         a.text('computer', action='left_click', ref=ref(t, r'row "◐ Appearance"'))
         time.sleep(1.0)

@@ -77,6 +77,7 @@
 #include <locale.h>
 #include <time.h>
 #include <unistd.h>
+static int demo_identity;               /* Hands' QA desktop: a demo identity (js_sys_set_demo_identity) */
 
 #define SETTINGS_MAX (1024 * 1024)
 #define FS_READ_MAX (8 * 1024 * 1024)
@@ -333,7 +334,7 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
     free(txt);
 
     JSValue o = JS_NewObject(c);
-    JS_SetPropertyStr(c, o, "hostname", JS_NewString(c, u.nodename));
+    JS_SetPropertyStr(c, o, "hostname", JS_NewString(c, demo_identity ? "demo-pc" : u.nodename));
     JS_SetPropertyStr(c, o, "kernel", JS_NewString(c, u.release));
     JS_SetPropertyStr(c, o, "arch", JS_NewString(c, u.machine));
     JS_SetPropertyStr(c, o, "os", JS_NewString(c, os));
@@ -351,11 +352,12 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
     JS_SetPropertyStr(c, o, "version", JS_NewString(c, LORD_VERSION));
     JS_SetPropertyStr(c, o, "channel", JS_NewString(c, LORD_CHANNEL));
     JS_SetPropertyStr(c, o, "build", JS_NewString(c, LORD_BUILD));
-    JS_SetPropertyStr(c, o, "user", JS_NewString(c, getenv("USER") ? getenv("USER") : ""));
+    JS_SetPropertyStr(c, o, "user", JS_NewString(c, demo_identity ? "demo" : getenv("USER") ? getenv("USER") : ""));
     /* full name (first GECOS field) and whether they are an administrator (sudo/admin/wheel) */
     struct passwd *pw = getpwuid(getuid());
     char full[128] = "";
     if (pw && pw->pw_gecos) { snprintf(full, sizeof full, "%s", pw->pw_gecos); full[strcspn(full, ",")] = 0; }
+    if (demo_identity) snprintf(full, sizeof full, "Alex Demo");
     JS_SetPropertyStr(c, o, "fullName", JS_NewString(c, full));
     /* by this process's own groups (getgrouplist's are the files', this session's are what it got
      * at login), against the shared list (src/users/admingroups.c) */
@@ -2715,6 +2717,12 @@ static const JSCFunctionListEntry ssh_funcs[] = {
     JS_CFUNC_DEF("status", 0, f_ssh_status),
 };
 
+/* ---- Hands' QA desktop (lord-server --headless --hands-qa, docs/HANDS.md): a demo identity, never the real account ----
+ * "Alex Demo", login "demo", host "demo-pc" wherever lord.system.info and lord.users show who and where this is. */
+static int demo_identity;
+void js_sys_set_demo_identity(int on) { demo_identity = !!on; }
+int js_sys_demo_identity(void) { return demo_identity; }
+
 /* ---- lord.users: accounts of the people on the machine (Settings → Users; read-only) ---- */
 
 /* an administrator by the shared list (src/users/admingroups.c); an unreadable list is not one */
@@ -2730,6 +2738,21 @@ static JSValue f_users_list(JSContext *c, JSValueConst this_val, int argc, JSVal
     JSValue o = JS_NewObject(c), arr = JS_NewArray(c);
     uint32_t n = 0;
     uid_t me = getuid();
+    if (demo_identity) {                    /* the QA desktop: one demo account, nobody's real one */
+        JSValue u = JS_NewObject(c);
+        JS_SetPropertyStr(c, u, "name", JS_NewString(c, "demo"));
+        JS_SetPropertyStr(c, u, "full", JS_NewString(c, "Alex Demo"));
+        JS_SetPropertyStr(c, u, "uid", JS_NewInt32(c, (int32_t)me));
+        JS_SetPropertyStr(c, u, "admin", JS_FALSE);
+        JS_SetPropertyStr(c, u, "self", JS_TRUE);
+        JS_SetPropertyStr(c, u, "color", JS_NewString(c, ""));
+        JS_SetPropertyStr(c, u, "image", JS_NULL);
+        JS_SetPropertyUint32(c, arr, 0, u);
+        JS_SetPropertyStr(c, o, "users", arr);
+        JS_SetPropertyStr(c, o, "autologin", JS_NewString(c, ""));
+        JS_SetPropertyStr(c, o, "textMode", JS_FALSE);
+        return o;
+    }
     setpwent();
     struct passwd *pw;
     while ((pw = getpwent()) && n < 256) {
