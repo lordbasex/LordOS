@@ -188,7 +188,7 @@ if [ "$LORDOS_SRC" != none ]; then
     SRC_HOOK="upload $WORK/lordos-src.tar /build/lordos-src.tar"
 fi
 $SUDO $LOW mmdebstrap --variant=apt --mode=root --architectures="$ARCH" --dpkgopt=force-unsafe-io \
-    --include=ca-certificates,gcc,libc6-dev,pkgconf,binutils,libegl-mesa0,libgl1-mesa-dri,libwpebackend-fdo-1.0-dev,passwd,make,libwayland-dev,wayland-protocols,libxkbcommon-dev,libegl-dev,python3,mount,gstreamer1.0-nice,gstreamer1.0-plugins-base,gstreamer1.0-plugins-good,gstreamer1.0-plugins-bad \
+    --include=ca-certificates,gcc,libc6-dev,pkgconf,binutils,libegl-mesa0,libgl1-mesa-dri,libwpebackend-fdo-1.0-dev,passwd,make,libwayland-dev,wayland-protocols,libxkbcommon-dev,libegl-dev,python3,mount,dbus-daemon,gstreamer1.0-nice,gstreamer1.0-plugins-base,gstreamer1.0-plugins-good,gstreamer1.0-plugins-bad \
     --customize-hook='mkdir -p "$1/build/debs" "$1/build/test"' \
     --customize-hook="sync-in $WORK/debs /build/debs" \
     --customize-hook="$SRC_HOOK" \

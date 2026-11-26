@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """webcalls_check.py — web apps' calls and Chrome identity on the real engine (docs/WEBAPPS.md, "Calls").
 
-    python3 -I tests/webcalls_check.py build/webcalls-check [--webrtc]
+    python3 -I tests/webcalls_check.py build/webcalls-check [--webrtc] [--dip] [--swnotify]
 
 Serves pages on 127.0.0.1 (a secure context, as Chrome and WebKit treat loopback) and loads each in
 build/webcalls-check (tests/webcalls_check.c: a WebKit view set up as lord-web sets up a Chrome profile):
@@ -23,6 +23,16 @@ build/webcalls-check (tests/webcalls_check.c: a WebKit view set up as lord-web s
              animated canvas): both connect, frames and audio arrive, and the codecs are Opus and VP8, then Opus and
              H.264 (the receiver's codec preferences); the call log shows the connection, its states and codecs
 
+  swnotify   (--swnotify: an engine with lordos-sw-notifications.patch, +4.2; needs dbus-run-session) a page's service
+             worker calls registration.showNotification, under a session bus of its own with webcalls-check's own
+             notification server on it. With the page open: two notifications with one tag reach the view's
+             show-notification with their title, body and tag, the first closed when the second replaces it, none on
+             D-Bus; webcalls-check clicks the second (webkit_notification_clicked, as lord-web does) and the worker's
+             notificationclick gets it, its clients.focus() resolves and the view's lordos-focus-from-service-worker
+             fires. With no view of the worker's origin (the page gone to another origin first): the notification goes
+             to D-Bus as before (Notify, the app name set), and the server's click (ActionInvoked) reaches the worker's
+             notificationclick
+
 Without --webrtc (an engine without WebRTC, Debian's or LordOS's build before +3) the WebRTC checks are reported as
 "not built" and the rest must pass. Prints one line per check and exits 1 on the first failure."""
 import http.server
@@ -43,6 +53,7 @@ WEBRTC = "--webrtc" in sys.argv
 # wrong codec) still fails.
 NO_NETWORK_KNOWN = "--no-network-known" in sys.argv
 DIP = "--dip" in sys.argv
+SWNOTIFY = "--swnotify" in sys.argv
 MAJOR = None
 
 ACCEPT_CH = ("Sec-CH-UA-Full-Version-List, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, "
@@ -191,6 +202,69 @@ async function call(prefer) {
 })();
 </script>"""
 
+# a service worker that shows the notifications a page asks for (after a delay, if asked: the page may be gone by then)
+# and reports its notificationclick (title, tag, body, its window clients and what clients.focus() gave) to /report/swclick-<tag>
+SW_JS = b"""self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+const report = (name, o) => fetch('/report/' + name, { method: 'POST', body: JSON.stringify(o) });
+self.addEventListener('message', e => {
+  const m = e.data || {};
+  e.waitUntil((async () => {
+    if (m.delay) await new Promise(f => setTimeout(f, m.delay));
+    try {
+      for (const n of m.show) await self.registration.showNotification(n.title, { body: n.body, tag: n.tag, data: { n: n.title } });
+      const list = await self.registration.getNotifications();
+      await report('swshown-' + m.name, { ok: true, open: list.map(x => x.title) });
+    } catch (err) { await report('swshown-' + m.name, { ok: false, error: err.name + ': ' + err.message }); }
+  })());
+});
+self.addEventListener('notificationclick', e => {
+  e.waitUntil((async () => {
+    const r = { title: e.notification.title, tag: e.notification.tag, body: e.notification.body, data: e.notification.data };
+    const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    r.clients = cs.length;
+    if (cs.length) { try { await cs[0].focus(); r.focus = 'resolved'; } catch (err) { r.focus = err.name; } }
+    e.notification.close();
+    await report('swclick-' + e.notification.tag, r);
+  })());
+});
+self.addEventListener('notificationclose', e => e.waitUntil(report('swclose-' + e.notification.title.replace(/ /g, '_'), {})));
+"""
+
+# the worker up and controlling the page, then the notifications asked for; the page waits for the click's report
+SW_VIEW_PAGE = b"""<!doctype html><title>sw</title><script>
+(async () => {
+  const o = { permission: Notification.permission };
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+    reg.active.postMessage({ name: 'view', show: [{ title: 'LordOS first', body: 'uno', tag: 't1' },
+                                                  { title: 'LordOS second', body: 'dos \\u00f1', tag: 't1' }] });
+    for (let i = 0; i < 150 && (await (await fetch('/status/swclick-t1')).text()) !== 'yes'; i++) await new Promise(f => setTimeout(f, 200));
+  } catch (e) { o.error = e.name + ': ' + e.message; }
+  await fetch('/report/swview', { method: 'POST', body: JSON.stringify(o) });
+  document.title = 'done';
+})();
+</script>"""
+
+# the worker asked for a notification in 3 s, then the page goes to another origin: no view has the worker's origin
+SW_AWAY_PAGE = b"""<!doctype html><title>sw away</title><script>
+(async () => {
+  const reg = await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.ready;
+  reg.active.postMessage({ name: 'away', delay: 3000, show: [{ title: 'LordOS away', body: 'no view', tag: 't2' }] });
+  location.href = XORIGIN + '/away';
+})();
+</script>"""
+
+# on the other origin: done once the worker reported the D-Bus click
+AWAY_PAGE = b"""<!doctype html><title>away</title><script>
+(async () => {
+  for (let i = 0; i < 150 && (await (await fetch(MAIN + '/status/swclick-t2')).text()) !== 'yes'; i++) await new Promise(f => setTimeout(f, 200));
+  document.title = 'done';
+})();
+</script>"""
+
 reports = {}
 requests = []
 
@@ -225,6 +299,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif self.path == "/page/dipnocoep":
             self.page(DIP_PAGE.replace(b"XORIGIN", b"'http://127.0.0.1:%d'" % xport),
                       [("Cross-Origin-Opener-Policy", "same-origin-allow-popups"), ("Document-Isolation-Policy", "isolate-and-require-corp")])
+        elif self.path == "/page/swview":
+            self.page(SW_VIEW_PAGE)
+        elif self.path == "/page/swaway":
+            self.page(SW_AWAY_PAGE.replace(b"XORIGIN", b"'http://127.0.0.1:%d'" % xport))
+        elif self.path == "/sw.js":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/javascript")
+            self.end_headers()
+            self.wfile.write(SW_JS)
+        elif self.path.startswith("/status/"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(b"yes" if "/report/" + self.path[len("/status/"):] in reports else b"no")
         elif self.path == "/worker.js":
             self.send_response(200)
             self.send_header("Content-Type", "text/javascript")
@@ -253,6 +342,12 @@ class XHandler(http.server.BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        if self.path == "/away":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(AWAY_PAGE.replace(b"MAIN", b"'http://127.0.0.1:%d'" % port))
+            return
         if self.path not in ("/res/nocorp.js", "/res/corp.js"):
             self.send_response(404)
             self.end_headers()
@@ -274,13 +369,19 @@ def ok(msg):
     print("ok  ", msg)
 
 
-def run(path, secs=40, mock=False):
+def run(path, secs=40, mock=False, swnotify=False):
     env = dict(os.environ)
     if mock:
         env["WEBCALLS_MOCK_CAPTURE"] = "1"
     home = tempfile.mkdtemp(prefix="webcalls-home-")
     env.update(HOME=home, XDG_CACHE_HOME=home + "/.cache", XDG_DATA_HOME=home + "/.local/share", XDG_CONFIG_HOME=home + "/.config")
-    p = subprocess.run([CHECK, "http://127.0.0.1:%d%s" % (port, path), str(secs)], env=env, capture_output=True, text=True, timeout=secs + 30)
+    cmd = [CHECK, "http://127.0.0.1:%d%s" % (port, path), str(secs)]
+    if swnotify:
+        # a session bus of its own, with webcalls-check's notification server on it (never the desktop's)
+        env["WEBCALLS_SWNOTIFY"] = "1"
+        env.pop("DBUS_SESSION_BUS_ADDRESS", None)
+        cmd = ["dbus-run-session", "--"] + cmd
+    p = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=secs + 30)
     lines = p.stdout.splitlines()
     if p.returncode != 0:
         print(p.stdout + p.stderr)
@@ -432,6 +533,45 @@ run("/page/plain")
 if reports["/report/plain"]["sab"] != "undefined":
     fail("SharedArrayBuffer leaked to a plain page after the DIP one: %r" % reports["/report/plain"])
 ok("a plain page after the DIP ones still has no SharedArrayBuffer")
+
+# ---- a service worker's notifications ----
+if SWNOTIFY:
+    import shutil
+    shutil.which("dbus-run-session") or fail("--swnotify needs dbus-run-session (package dbus-daemon)")
+    _, out = run("/page/swview", 60, swnotify=True)
+    v = reports.get("/report/swview") or fail("no report from the service-worker page")
+    shown = reports.get("/report/swshown-view") or fail("the worker didn't report its notifications: %r" % out)
+    if v.get("error") or not shown.get("ok"):
+        fail("service-worker page: %r, worker: %r" % (v, shown))
+    sn = [l for l in out if l.startswith("show-notification: ")]
+    want = ["show-notification: title=LordOS first body=uno tag=t1", "show-notification: title=LordOS second body=dos \u00f1 tag=t1"]
+    if sn != want:
+        fail("the view's show-notification: %r, want %r (output %r)" % (sn, want, out))
+    if any(l.startswith("dbus Notify") for l in out):
+        fail("a service worker's notification went to D-Bus though its page's view is open: %r" % out)
+    ok("service worker: two notifications with one tag reached the view's show-notification (title, body, tag), none on D-Bus")
+    if "notification closed: title=LordOS first body=uno tag=t1" not in out:
+        fail("the first notification wasn't closed when the second took its tag: %r" % out)
+    ok("the second replaced the first (same tag, same origin): the first closed (getNotifications: %r)" % shown.get("open"))
+    c = reports.get("/report/swclick-t1") or fail("the click (webkit_notification_clicked) didn't reach the worker's notificationclick: %r" % out)
+    if c.get("title") != "LordOS second" or c.get("body") != "dos \u00f1" or c.get("data") != {"n": "LordOS second"}:
+        fail("notificationclick got %r" % c)
+    ok("webkit_notification_clicked reached the worker's notificationclick (title, body, data; %d window client)" % c.get("clients", 0))
+    if c.get("focus") != "resolved" or "focus-from-service-worker" not in out:
+        fail("clients.focus(): %r, lordos-focus-from-service-worker %s" % (c.get("focus"), "focus-from-service-worker" in out))
+    ok("the worker's clients.focus() resolved and the view emitted lordos-focus-from-service-worker")
+    _, out = run("/page/swaway", 60, swnotify=True)
+    away = reports.get("/report/swshown-away") or fail("the worker didn't report its notification after the page left: %r" % out)
+    if not away.get("ok"):
+        fail("the worker's notification with no view: %r" % away)
+    dn = [l for l in out if l.startswith("dbus Notify: ")]
+    if len(dn) != 1 or not dn[0].startswith("dbus Notify: app=webcalls-check title=LordOS away body=no view ") or any(l.startswith("show-notification") for l in out):
+        fail("with no view of the worker's origin, want one D-Bus Notify and no show-notification: %r" % out)
+    ok("no view of the worker's origin: WebKit's D-Bus notification as before (%s)" % dn[0][len("dbus Notify: "):])
+    c = reports.get("/report/swclick-t2") or fail("the D-Bus click (ActionInvoked) didn't reach the worker's notificationclick: %r" % out)
+    if c.get("title") != "LordOS away":
+        fail("notificationclick after the D-Bus click got %r" % c)
+    ok("the D-Bus click reached the worker's notificationclick (%d window clients)" % c.get("clients", 0))
 
 # ---- loopback ----
 if api["RTCPeerConnection"] != "function":

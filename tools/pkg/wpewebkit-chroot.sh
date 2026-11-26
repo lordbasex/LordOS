@@ -660,15 +660,17 @@ lordweb_check() {
     # SharedArrayBuffer only when cross-origin isolated (lordos-sharedarraybuffer-coi.patch), and two peer connections in
     # one page exchanging audio and video (Opus, VP8 and H.264), with WebKit's sandbox on (ICE in the network process,
     # librice: the loopback must connect), and a page with a messaging web app's Document-Isolation-Policy headers
-    # cross-origin isolated (lordos-document-isolation-policy.patch, --dip)
+    # cross-origin isolated (lordos-document-isolation-policy.patch, --dip); a service worker's notifications reach the
+    # view's show-notification, a click there its notificationclick, clients.focus() the view's signal, and with no view
+    # of its origin they still go to D-Bus (lordos-sw-notifications.patch, --swnotify: a session bus of its own)
     if [ -z "${EMULATED:-}" ]; then
         runuser -u tester -- make -C /build/src/server -j"$(nproc)" LORD_WEB_BACKEND=platform build/webcalls-check > "$out/webcalls-build.log" 2>&1 ||
             { tail -n 30 "$out/webcalls-build.log"; die "webcalls-check does not build"; }
         ! grep -E 'warning:' "$out/webcalls-build.log" || die "webcalls-check builds with warnings"
-        (cd /build/src/server && runuser -u tester -- env HOME=/home/tester XDG_RUNTIME_DIR=/tmp timeout 600 python3 -I tests/webcalls_check.py build/webcalls-check --webrtc --dip) \
+        (cd /build/src/server && runuser -u tester -- env HOME=/home/tester XDG_RUNTIME_DIR=/tmp timeout 600 python3 -I tests/webcalls_check.py build/webcalls-check --webrtc --dip --swnotify) \
             > "$out/webcalls.txt" 2>&1 || { cat "$out/webcalls.txt"; die "webcalls_check failed"; }
         cat "$out/webcalls.txt" >> "$out/report.txt"
-        echo "WebRTC: webcalls_check passes (identity, SharedArrayBuffer, Document-Isolation-Policy, loopback call)" | tee -a "$out/report.txt"
+        echo "WebRTC: webcalls_check passes (identity, SharedArrayBuffer, Document-Isolation-Policy, service-worker notifications, loopback call)" | tee -a "$out/report.txt"
     fi
 }
 

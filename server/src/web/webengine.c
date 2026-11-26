@@ -487,6 +487,10 @@ static gboolean on_query(WebKitWebView *v, WebKitPermissionStateQuery *q, gpoint
 /* ---- notifications, the file chooser, the pointer, crashes ---- */
 
 static gboolean on_notification(WebKitWebView *v, WebKitNotification *n, gpointer d) { (void)v; webbus_notify(d, n); return TRUE; }
+/* a service worker's clients.focus() (LordOS's WebKit since +4.2: lordos-sw-notifications.patch). WebKit allows it only
+ * while the worker handles a user gesture, a click on one of its notifications: the window comes forward as on a click
+ * on a page's notification */
+static void on_sw_focus(WebKitWebView *v, gpointer d) { (void)v; web_show(d, NULL); }
 static gboolean on_file_chooser(WebKitWebView *v, WebKitFileChooserRequest *r, gpointer d) { (void)v; webbus_choose_files(d, r); return TRUE; }
 /* ---- editing: the shell's Edit menu and the page's context menu (LordOS's own menu, webbus_menu) ---- */
 
@@ -662,6 +666,8 @@ int web_engine_start(Web *w) {
     g_signal_connect(w->view, "permission-request", G_CALLBACK(on_permission), w);
     g_signal_connect(w->view, "query-permission-state", G_CALLBACK(on_query), w);
     g_signal_connect(w->view, "show-notification", G_CALLBACK(on_notification), w);
+    if (g_signal_lookup("lordos-focus-from-service-worker", WEBKIT_TYPE_WEB_VIEW))
+        g_signal_connect(w->view, "lordos-focus-from-service-worker", G_CALLBACK(on_sw_focus), w);
     g_signal_connect(w->view, "run-file-chooser", G_CALLBACK(on_file_chooser), w);
     g_signal_connect(w->view, "context-menu", G_CALLBACK(on_context_menu), w);
     g_signal_connect(w->view, "mouse-target-changed", G_CALLBACK(on_target), w);
