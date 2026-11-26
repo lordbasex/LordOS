@@ -853,6 +853,8 @@ export function WebAppMenu() {
     speech: () => speechMenu(null),
     emoji: () => later(toggleEmojiPanel),
     inspect: () => later(() => webInspectAsk.set({ app: m.app, profile: m.profile })),
+    // the search row's quoted words fit the menu's widest row (contextmenu.jsx MENU_ROW_MAX_W)
+    measure: (s, size) => lord.measureText(s, size, 400),
     // never a password field's: lord-web's page script reports no selection there
     writing: (text, edit) => writingMenuFor({ secure: false, selected: text, open: (o) => {
       answerWebMenu('', m);

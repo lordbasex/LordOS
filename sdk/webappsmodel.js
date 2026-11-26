@@ -519,7 +519,10 @@ export function webMenuItems(menu, label, pick, shell = {}) {
       it = { id: n, label: isolate(word), onClick: () => pick(n) };
     } else if (n === 'search') {
       if (typeof m.text !== 'string' || !m.text) continue;
-      it = { id: n, label: label(n, { text: isolate(m.text) }), onClick: () => pick(n) };
+      // the quoted words shortened inside the label, so all of it ("… on Google") fits the menu's widest row
+      const make = (s) => label(n, { text: isolate(s) });
+      const text = shell.measure ? fitQuoted(m.text, make, shell.measure, shell.maxWidth || 420) : m.text;
+      it = { id: n, label: make(text), onClick: () => pick(n) };
     } else if (n === 'speech') {
       const sp = shell.speech?.();
       if (!sp) continue;
@@ -545,6 +548,20 @@ export function webMenuItems(menu, label, pick, shell = {}) {
     if (at > 0) out.splice(out[at - 1] === '-' ? at - 1 : at, 0, ...add); else out.push(...add);
   }
   return out;
+}
+
+// The longest start of text (whole characters, then "…") whose row make(text) fits max px: 46 px of the row's own room
+// plus the label at 13 px (contextmenu.jsx rowWidth). measure(s, size) → px. Never shorter than one character and "…".
+export function fitQuoted(text, make, measure, max = 420) {
+  const fits = (s) => 46 + measure(make(s), 13) <= max;
+  const cps = [...String(text || '')];
+  if (fits(cps.join(''))) return cps.join('');
+  let lo = 1, hi = cps.length - 1, best = 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (fits(`${cps.slice(0, mid).join('').trimEnd()}…`)) { best = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return `${cps.slice(0, best).join('').trimEnd()}…`;
 }
 
 // ✨ AI's text of a page's menu: a string of 1..4,000 characters (lord-server's webai_clean already made it plain), else ''

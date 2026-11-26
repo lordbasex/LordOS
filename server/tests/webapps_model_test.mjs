@@ -433,5 +433,20 @@ for (const lang of langs) {
   eq('the text: plain, at most 4,000 characters', [M.webAiText({ ai: 'ok' }), M.webAiText({ ai: 'a\u001b[2J' }), M.webAiText({ ai: 'x'.repeat(4001) }), M.webAiText({ ai: '  ' }), M.webAiText({ ai: 3 })], ['ok', '', '', '', '']);
 }
 
+// ---- a long selection in "Search the web for “…”": the words around it always show (ws162) ----
+{
+  const measure = (s) => [...s].length * 7;                        // 7 px a character
+  const label = (n, v) => (n === 'search' ? `Buscar ${v.text} en Google` : n);
+  const long = 'hola como estas? tu muñeca inflable llego bien al final del dia';
+  const rows = M.webMenuItems({ items: ['copy', 'search'], text: long }, label, () => {}, { measure, maxWidth: 420 });
+  const row = rows.find((r) => r.id === 'search');
+  eq('the search row fits 420 px', 46 + measure(row.label) <= 420, true);
+  eq('its end ("en Google") is whole', row.label.endsWith('en Google'), true);
+  eq('the quoted words are cut with "…"', row.label.includes('…'), true);
+  const short = M.webMenuItems({ items: ['search'], text: 'hola' }, label, () => {}, { measure, maxWidth: 420 });
+  eq('a short one is left alone', short[0].label.includes('hola') && !short[0].label.includes('…'), true);
+  eq('fitQuoted never empty', M.fitQuoted('abcdef', (s) => `X${s}Y`, measure, 10).length >= 2, true);
+}
+
 console.log(bad ? `webapps-model: ${bad} of ${n} failed` : `webapps-model: ${n}/${n} ok`);
 process.exit(bad ? 1 : 0);
