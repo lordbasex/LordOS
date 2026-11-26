@@ -30,7 +30,7 @@ Mantené el modificador y tocá Tab: una tira de íconos de apps muestra el nomb
 las más recientes primero. Tab avanza, ⇧Tab retrocede, Esc cancela y al soltar el modificador cambia.
 Una pulsación rápida vuelve a la app anterior.
 
-## Lord Flow
+## Flow
 
 | Atajo | Qué hace |
 |---|---|
@@ -51,7 +51,7 @@ emulador de terminal, donde Ctrl+C es la interrupción), solo a esa app. Por eso
 propio Ctrl+L: con una app Linux al frente la pantalla se bloquea con ❖⌃Q y el portapapeles se abre con
 ❖⇧V. En una app de LordOS dentro de la sesión ❖V también pega; ❖⇧V es el portapapeles.
 
-## Lord Classic
+## Classic
 
 | Atajo | Qué hace |
 |---|---|
@@ -76,7 +76,7 @@ propio Ctrl+L: con una app Linux al frente la pantalla se bloquea con ❖⌃Q y 
 
 | Atajo | Qué hace |
 |---|---|
-| ❖N · ❖T · ❖W | Ventana nueva · pestaña nueva · cerrar (Lord Classic: ⌃N, ⌃T, ⌃W) |
+| ❖N · ❖T · ❖W | Ventana nueva · pestaña nueva · cerrar (Classic: ⌃N, ⌃T, ⌃W) |
 | ❖F · ❖G | Buscar · resultado siguiente |
 | ❖C · ❖X | Copiar · cortar |
 | ❖Z · ❖⇧Z | Deshacer · rehacer |

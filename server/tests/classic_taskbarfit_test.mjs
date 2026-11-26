@@ -1,4 +1,4 @@
-// classic_taskbarfit_test.mjs — themes/classic/taskbarfit.js (GitHub #111): with many apps on Lord Classic's taskbar
+// classic_taskbarfit_test.mjs — themes/classic/taskbarfit.js (GitHub #111): with many apps on Classic's taskbar
 // the app buttons shrink, then the rest move into "more apps", and the row never reaches the tray; centered, the
 // row stays in the middle of the display while there is room.
 //

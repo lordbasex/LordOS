@@ -1,6 +1,6 @@
 # Devices: the battery of everything connected
 
-The Devices desk widget (Lord Workspaces), the panel of the bar's battery item (every theme) and Monitor's Devices
+The Devices desk widget (Workspaces), the panel of the bar's battery item (every theme) and Monitor's Devices
 tab show one list: the computer's battery, mice and keyboards, headphones and the rest. No external app is needed.
 
 ## Where each number comes from

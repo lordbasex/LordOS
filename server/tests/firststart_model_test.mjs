@@ -94,14 +94,14 @@ eq('3 is the last: next stays (Start finishes)', M.next(s).step, 3);
 eq('1 has no back', M.back(M.startState(ALL)).step, 1);
 
 // ---- the floating box ----
-const area = { x: 0, y: 28, w: 1920, h: 980 };      // Lord Flow: below the menu bar, above the Dock
+const area = { x: 0, y: 28, w: 1920, h: 980 };      // Flow: below the menu bar, above the Dock
 const size = { w: M.FLOAT_W, h: 186 };
 const p0 = M.floatPlace(null, area, size);
 eq('it opens at the end of the work area', p0.x + size.w <= area.x + area.w && p0.x > area.x + area.w / 2, true);
 eq('about mid-height, inside the work area', p0.y > area.y + area.h * 0.3 && p0.y + size.h < area.y + area.h, true);
 eq('a dragged position is kept', M.floatPlace({ x: 300, y: 300 }, area, size), { x: 300, y: 300 });
 eq('dragged off the display it stays inside the work area', M.clampFloat({ x: -500, y: 5000 }, area, size), { x: 16, y: area.y + area.h - size.h - 16 });
-const ws = { x: 96, y: 60, w: 1812, h: 1008 };      // Lord Workspaces: right of the spine, below the band
+const ws = { x: 96, y: 60, w: 1812, h: 1008 };      // Workspaces: right of the spine, below the band
 eq('never over the Workspaces spine', M.clampFloat({ x: 0, y: 0 }, ws, size), { x: 112, y: 76 });
 const tiny = { x: 0, y: 0, w: 300, h: 150 };
 eq('a work area smaller than the box: its corner', M.clampFloat({ x: 50, y: 50 }, tiny, size), { x: 0, y: 0 });

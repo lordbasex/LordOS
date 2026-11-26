@@ -4,8 +4,8 @@
 // offers the snap layouts (halves, thirds, quarters; sdk/windows.js "Snapping"). Moving and
 // resizing are done in C (<WindowShell>, wm.beginMove; docs/WINDOWS.md); a maximized window is
 // dragged out of its place by JS, and snaps where it is dropped.
-// Lord Classic has no global menu bar: an app that declares menus (File, Edit, View, Go…; the same
-// ones Lord Flow shows on top, useAppMenus) gets them in a strip under its title bar, with Window and
+// Classic has no global menu bar: an app that declares menus (File, Edit, View, Go…; the same
+// ones Flow shows on top, useAppMenus) gets them in a strip under its title bar, with Window and
 // Help, as desktop apps do on a taskbar layout. Apps without menus of their own get no strip.
 // Settings → Desktop & Dock → Title bars can put the buttons at the start instead (close, minimize, maximize; the
 // icon and title follow them), and the snap layouts then open from there (useWindowButtons, issue #58). Its Size makes

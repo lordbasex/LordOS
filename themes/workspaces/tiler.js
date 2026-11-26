@@ -1,4 +1,4 @@
-// tiler.js — Lord Workspaces' static tiling at runtime (the rules are in model/layouts.js). Each activity has a layout
+// tiler.js — Workspaces' static tiling at runtime (the rules are in model/layouts.js). Each activity has a layout
 // per display ('free' leaves the windows alone); the windows of the activity in view are laid out in their display's
 // work area, each display on its own: a window belongs to one display and never straddles two.
 //
@@ -166,7 +166,7 @@ export function setLocked(desk, dkey, on) {
 // whether window w is on a locked display of its activity (the display its frame is on)
 export const windowLocked = (w) => !!w && !w.pip && isLocked(w.desktop, keyOfDisplay(displayFor(wFrame(w))));
 
-// The slot a window being dragged would land in on display d (Lord Workspaces' target preview): its rect, or null
+// The slot a window being dragged would land in on display d (Workspaces' target preview): its rect, or null
 // where windows are free or locked. The same rules as a drop (dropInto, slotAt).
 export function slotPreview(desk, d, id, x, y) {
   const dk = keyOfDisplay(d);

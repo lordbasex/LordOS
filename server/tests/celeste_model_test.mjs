@@ -1,4 +1,4 @@
-// Lord Celeste's geometry, hover edges and launcher calculator (themes/celeste/model.js), and its theme.json options as
+// Celeste's geometry, hover edges and launcher calculator (themes/celeste/model.js), and its theme.json options as
 // Settings reads them (sdk/thememeta.js). node server/tests/celeste_model_test.mjs
 import fs from 'node:fs';
 import { FRAME, BAR_W, GAP, F, frameGeom, workArea, drawerRect, hiddenOffset, hoverZone, DWELL, outside, calc } from '../../themes/celeste/model.js';
@@ -73,7 +73,8 @@ eq('choices kept', clean.options.map((o) => (o.choices ? o.choices.length : 'tog
 const en = JSON.parse(fs.readFileSync(new URL('../../assets/locales/en/shell.json', import.meta.url), 'utf8'));
 const labels = clean.options.flatMap((o) => [o.label, o.hint, ...(o.choices || []).map((c) => c[1])]).filter(Boolean);
 eq('labels translated', labels.filter((k) => !(k.slice(6) in en)), []);
-eq('community', [meta.community, meta.license], [true, 'MIT']);
+// an official theme since 0.8.9.6.2 (LordOS-themes), with its real author
+eq('official', [clean.community, clean.author, clean.email, clean.organization, clean.license], [false, 'Federico Pereira', 'fpereira@iperfex.com', 'IPERFEX', 'MIT']);
 eq('small', fs.statSync(new URL('../../themes/celeste/theme.json', import.meta.url)).size < 4096, true);
 
 console.log(`celeste-model-test: ${ok} ok`);

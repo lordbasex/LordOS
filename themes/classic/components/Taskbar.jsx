@@ -13,7 +13,7 @@
 // go into a "more apps" button at the end of the row, so the row never runs over the tray (../taskbarfit.js).
 //
 // One taskbar per display (0.8.8.6; Settings → Desktop & Dock → Taskbar → "Show the taskbar on every display", on by
-// default, the same settings.menuBarAllDisplays as Lord Flow's menu bar): each one is whole (start, pinned and
+// default, the same settings.menuBarAllDisplays as Flow's menu bar): each one is whole (start, pinned and
 // running apps, Trash, tray, clock) and every bar shows every app, as there is no per-display window list. `area`
 // is the display it is drawn on; the panels it opens go on that display (themes/classic/index.jsx). The bars share
 // one clock timer and one network poll, and each registers its own drop target for pins.

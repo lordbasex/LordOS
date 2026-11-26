@@ -1,4 +1,4 @@
-// Tokens of the "Lord Workspaces" theme. The base keys (text, accent, windowBg…) are the contract with the apps
+// Tokens of the "Workspaces" theme. The base keys (text, accent, windowBg…) are the contract with the apps
 // (sdk/theme.js); the shape keys restyle the SDK's shared controls; the rest is this theme's own, above all the three
 // effects styles of its surfaces (the Context Spine, the activity strip, the status cluster, panels and menus):
 //

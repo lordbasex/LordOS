@@ -96,8 +96,10 @@ social posts. Files: `brand/svg/social-card.svg`, `brand/png/social-card-1200x63
 |---|---|
 | <img src="brand/screenshots/about-light.png" alt="About LordOS, light" width="420"> | <img src="brand/screenshots/greeter.png" alt="Login screen" width="420"> |
 
-The two desktop styles carry the brand's name since 0.8.5: **Lord Flow** (menu bar and Dock, formerly
-Lord Default) and **Lord Classic** (taskbar and start menu, formerly Classic), in every language. In a
+The desktop styles have names of their own, never "Lord …" (rule of 2026-11-26): **Flow** (menu bar and Dock;
+Lord Default until 0.8.5, Lord Flow until 0.8.9.6.1), **Classic** (taskbar and start menu; Lord Classic from 0.8.5 to
+0.8.9.6.1), **Workspaces**, **Celeste** and **Luna**, the same in every language. Each names its author in
+`theme.json` (ours: Federico Pereira, IPERFEX). In a
 terminal, `lordos-fetch` (0.8.5) draws the crown in the brand colours beside a summary of the computer
 (true colour when the terminal says so, plain ASCII without colour).
 
@@ -299,7 +301,7 @@ Created by iPERFEX with an AI image generator; part of the LordOS brand assets.
 © iPERFEX, part of the LordOS brand.
 
 Eleven original wallpapers in three categories, shipped in `/usr/share/backgrounds/lordos/` and
-listed by category in **Settings → Wallpaper** (with the Lord Flow theme's four gradients as a fourth
+listed by category in **Settings → Wallpaper** (with the Flow theme's four gradients as a fourth
 category, "Gradients"). The files, sizes and how to regenerate them are in
 [`assets/wallpapers/README.md`](../assets/wallpapers/README.md).
 

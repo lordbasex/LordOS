@@ -273,7 +273,7 @@ export function RestorePrompt() {
     const a = apps.find((x) => (p.kind === 'desktop' ? x.desktopId === p.key : x.id === p.key));
     return a ? (a.kind === 'linux' ? shortAppName(a) : a.name) : null;
   };
-  // each window with its desktop (its activity in Lord Workspaces), and a box to leave it closed
+  // each window with its desktop (its activity in Workspaces), and a box to leave it closed
   const rows = ask.list.map((e, i) => ({ i, name: nameOf(e), desk: desktopList.get().length > 1 || e.desk ? desktopName(desktopAt(e.desk || 0)) : '' })).filter((r) => r.name);
   const d = mainDisplay();
   const line = (key, s) => h(Text, { key, style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.4, textAlign: 'start' } }, s);

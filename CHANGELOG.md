@@ -71,6 +71,40 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Fixed** on the way: a GPU engine that ran out of memory and died at once could be reported as "couldn't start"
     instead of "ran out of memory" when the log's reader lagged its death (`gpu_gave_up` now waits a moment for it;
     `llm-engine-test` failed about one run in three under load).
+- **The official themes have names of their own and live in their own repository, LordOS-themes** (approved by the
+  maintainer on 2026-11-26).
+  - **Renamed:** Lord Flow is now **Flow**, Lord Classic **Classic**, Lord Celeste **Celeste** and Lord Workspaces
+    **Workspaces** (Luna already had its own name), in all 35 languages and everywhere they show: Settings →
+    Appearance, the first-start chooser, the installer and Imager's look step, Help, the Dock and Keyboard pages, the
+    rescue hint, the wallpaper gallery, the shortcut sheets, the docs, the paper and the site. **The ids don't change**
+    (`default`, `classic`, `celeste`, `workspaces`, `luna`, `greeter`): settings store them, so no migration is needed.
+    `tools/brand-check.mjs` (run by `i18n-check.mjs`) now refuses a theme name that starts with "Lord" in a
+    `theme.json` or in any language's `shell.theme.<id>.name`.
+  - **Each theme names its author:** every official `theme.json` has `author` Federico Pereira, `email`
+    fpereira@iperfex.com, `organization` IPERFEX and `license` MIT, the fields `sdk/thememeta.js` already checks, so
+    Settings → Appearance shows the author, organization and email rows on each official theme's page. **Celeste is an
+    official theme now** (no `community` flag, so no "Community · unofficial" pill), with its real author instead of
+    "author pending"; `THIRD_PARTY.md` still credits Caelestia for the layout idea.
+  - **LordOS-themes** (github.com/lordbasex/LordOS-themes, modelled on LordOS-wallpapers): one folder per theme
+    (`flow/` is the id `default`; `classic/`, `celeste/`, `workspaces/`, `luna/`), each with its source as it was under
+    `themes/<id>/`, `theme.json`, three screenshots from the theme tour scene with the demo identity, `README.md`,
+    `LICENSE` and `PROVENANCE.md`; at the root `catalog.json` (id, folder, name, author, email, organization, version,
+    minLordOS, the verified star, and the size and SHA-256 of every source file, doc and screenshot), a README index
+    with the screenshots, and `CONTRIBUTING.md` pointing to lordos-theme-kit and the "New desktop style" issue form.
+    `tools/catalog.mjs` there writes `catalog.json` and the index (`--check` for CI).
+  - **How LordOS gets them: a vendored snapshot with a pin, not a submodule,** so `npm run build`, the .deb, the ISO and
+    the Raspberry Pi image keep building offline from the tree as before. `themes/upstream.json` pins the commit (and
+    tag) and the SHA-256 of its catalog, `themes/catalog.json` is that commit's catalog (as
+    `assets/wallpapers/motion.json` is the wallpapers'), and `themes/<id>/` holds the source. `tools/themes-sync.mjs
+    --from <clone> [--ref <commit|tag>]` copies a commit from a local clone with only `git cat-file`/`ls-tree`, checks
+    every file's size and SHA-256 and refuses a commit with a file its catalog doesn't list (nothing is written then);
+    with no arguments it checks offline that `themes/<id>/` is exactly the pinned snapshot; `--export <clone>` copies
+    the tree's themes back for a commit there. `tools/build-theme.mjs` and the code manifest are unchanged: the bundles
+    are built and listed as before and signed on the maintainer's machine (tools/release/).
+  - **Tests:** `server/tests/themes_sync_test.mjs` (in `make test`: the tree is the pinned snapshot; catalogs with
+    `..`, absolute or hidden paths, reserved or repeated ids, or a bad hash are refused), `celeste_model_test.mjs`
+    checks Celeste's author fields. The theme tour scene (`server/tests/theme_tour_scene/pre.js`) now uses the demo
+    identity, so its screenshots never show the real account or host.
 - **The Brain (the local language model of Sentinela and Writing) on the graphics card** (in development, asked by the
   maintainer on 2026-11-26; the new device access is **awaiting the maintainer's approval**, AGENTS.md; docs/AI.md
   "The Brain on the GPU"). Until now the engine ran on the processor only (`-ngl 0 -dev none`).
@@ -277,7 +311,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   desktop, Text Editor in front of Calculator (a focused and an unfocused frame, the app's menus) and Characters (the
   sidebar, a search field and the selection: the token contract with the apps). It opens only apps that show nothing
   about the person or the machine; each step logs "done" or "missing", so the script's exit status is 1 when an app
-  didn't open or a screenshot wasn't saved. Checked on Lord Celeste in Arabic, dark (right to left), and Lord Flow.
+  didn't open or a screenshot wasn't saved. Checked on Celeste in Arabic, dark (right to left), and Flow.
 - **`minLordOS` in `theme.json`: a theme can say which LordOS release it needs** (lordos-theme-kit proposal, approved
   2026-11-26; the kit already writes it). `cleanThemeMeta` (`sdk/thememeta.js`) keeps it only as two to six dot-separated
   numbers of at most five digits ("0.8.9.6.2"; any suffix, text or other type is dropped), and `lordosAtLeast` compares
@@ -326,7 +360,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **A watchdog:** a community theme that throws at its start, never starts its shell, draws nothing within 6 seconds,
     has its tree die, stalls the desktop until the watchdog stops it, or ends two sessions in a row is taken off; the
     previous style comes back, and the theme is marked failed with the error for Report, with Try Again and Remove.
-  - **Ctrl+Alt+Shift+Backspace always restores Lord Flow**, whatever style runs (handled before any JavaScript;
+  - **Ctrl+Alt+Shift+Backspace always restores Flow**, whatever style runs (handled before any JavaScript;
     Ctrl+Alt+Backspace alone still ends the session).
 
 ### Tests
@@ -890,7 +924,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - *Collections first*: with no search and the All filter, each collection is a card (a stack of three thumbnails,
     its count, NEW on Abstract, Epic and Anime), then one row of each collection with "See all N". A collection's page
     has its description, how many are on this computer, **Download all · HD** and **· 4K** (the bytes still to fetch)
-    and **Use as slideshow** where the theme has a slideshow (Lord Workspaces; two pictures or more on this computer).
+    and **Use as slideshow** where the theme has a slideshow (Workspaces; two pictures or more on this computer).
   - *Every tile says its state*: a cloud (it downloads when chosen), a check (on this computer), 4K or HD, a play mark
     when it moves, and a download's progress as a bar along its bottom edge. Moving wallpapers stay dimmed without a
     compatible GPU, as before.
@@ -911,7 +945,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   2160). This release ships the 50 Epic pictures and their 320 × 180 thumbnails in `assets/wallpapers/motion/`; the
   code doesn't depend on the count. A chosen picture is saved as `cat:<catalog id>` in `wallpaper`, a display's entry
   of `wallpapers`, `loginWallpaper` or the slideshow, and `findWallpaper` (sdk/wallpapers.js) resolves it to the files
-  on this computer, so every theme (Lord Flow, Lord Classic, Lord Workspaces, Celeste), the login screen and the
+  on this computer, so every theme (Flow, Classic, Workspaces, Celeste), the login screen and the
   slideshow show it with no change of their own; each display draws the file that covers it, or the one Quality
   names. A picture whose files are gone shows the theme's default (the login screen: its own). The pure logic is
   `sdk/wallpapergallery.js`, tested by `server/tests/wallpaper_gallery_test.mjs` (75 checks, the shipped catalog
@@ -921,7 +955,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   theirs (`section: "cyberpunk"`, upscaled to 3840 × 2160). The gallery shows one tile per picture in the built-in
   collection, with ✓ (its HD file is built in: offline, nothing to download) and the 4K badge; its sheet lists "HD · 1920
   × 1080 · included, works offline" and "4K · 3840 × 2160 · <size>", and the collection's page offers "Download all ·
-  4K". Choosing it keeps the plain built-in id in the settings (Lord Workspaces' default panorama and existing settings
+  4K". Choosing it keeps the plain built-in id in the settings (Workspaces' default panorama and existing settings
   are unchanged); choosing it for a display above 1920 × 1080 (Auto) or with 4K downloads the twin's 4K file first.
   `findWallpaper` adds that file to the built-in's variants once it is on disk (`withTwin`, sdk/wallpapergallery.js),
   so every theme, the login screen and the slideshow use the 4K on a display that needs it and the built-in HD
@@ -962,7 +996,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     a deleted folder goes, from the desktop too); new notes go first, newest first, and the others keep their place and
     their objects, so nothing redraws when nothing changed. A change in a note's folder in the second after Notes saved
     that note is its own save and isn't read again, so there is no loop.
-  - *Pick a note for the desktop.* "Sticky note" in Add widget (every theme with the catalog: Lord Flow, Lord
+  - *Pick a note for the desktop.* "Sticky note" in Add widget (every theme with the catalog: Flow,
     Workspaces, Celeste) now opens a list in the same panel, under a ‹ Back row: "New Note" (what it did before) and every
     note, with its colour, title and date, most recently updated first, a search over title and text (no accents, no
     case; every word), and "on the desktop" on the ones already there; arrows and Enter work. The folder is read again
@@ -1067,7 +1101,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (`geometry`) and no longer overwrites the fullscreen size; that covers an `xdg_toplevel.set_fullscreen` sent before
   the first commit too. After a live theme switch a fullscreen window is announced as fullscreen again
   (`wl_remap_all`).
-- **Lord Classic and Lord Workspaces shrank Linux windows by their menu strip's 26 px.** Both give every Linux window
+- **Classic and Workspaces shrank Linux windows by their menu strip's 26 px.** Both give every Linux window
   a menu strip (its Edit menu with Speech, `sdk/voice.js` `useMenusWithSpeech`, on by default), but `sdk/wayland.js`
   sized the frame with `windowChrome().h` only, never `.menu`: on map, on the app's own resize and for a window the app
   restored. So the app got 26 px less than it asked for, every fullscreen exit took 26 px more (400, 374, 348 on the
@@ -1099,7 +1133,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   fullscreen it is 320x240 again, and the driver's `fullscreen_before_map_reaches_theme`, the theme got the window at
   its own size with `"fullscreen": true` and a `fullscreen` event. The first and the last failed before the fix
   (320x240; not told). `server/tests/shellx_model_test.mjs`: `chromeInset` with and without a strip, for a window with
-  its own frame and in Lord Flow, the content's size kept over three resizes, and a restored frame with the strip.
+  its own frame and in Flow, the content's size kept over three resizes, and a restored frame with the strip.
 - `build/bgsave-test` (in `make -C server test`): with a test hook standing in for a slow disk, a save returns at once
   while a write is held, saves made meanwhile collapse into the newest, `bgsave_flush` waits for it, a durable write
   after a queued one wins, the clipboard's files are 0600 with nothing left behind (also when the write fails), and a
@@ -1188,7 +1222,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Checked:** against a private headless lord-server, with the GTK typelibs unpacked locally. GTK 3 scored 100 % on both backends and GTK 4 98.0 % on
     Wayland and 95.8 % on X11 (the theme check, without a session bus). Plain X11 scored 92.5 %: fullscreen
     didn't return to 600x400. Qt 5 and Qt 6 weren't installed on that machine.
-  - **Checked in a real session** on VM 127 (Lord Flow, dark mode): 97.5 % over all nine combinations. GTK 4 100 %
+  - **Checked in a real session** on VM 127 (Flow, dark mode): 97.5 % over all nine combinations. GTK 4 100 %
     on both backends, GTK 3 95.2 % / 95.8 %, Qt 5 97.2 % / 95.8 %, Qt 6 97.7 % / 96.2 %, plain X11 100 %; no crash,
     timeout or protocol error. What fails is the dark theme where the toolkit can't follow it (GTK 3 on X11, Qt) and
     a size LordOS's window memory restored. The scores and the two compositor and shell bugs the runs found are in
@@ -1269,7 +1303,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `--toolkits --show`; it refuses to run as root, kills the running harness's group when the window closes or a
     signal arrives, and saves the result to `~/.cache/lordos/toolkit-audit.json` (0600) as `--toolkits` does. The
     screen asks for 820x600 so a harness's 600x400 window can open beside it; where either opens is the
-    compositor's choice (a Wayland client can't place its window), so in Lord Flow the harness's window opens over the
+    compositor's choice (a Wayland client can't place its window), so in Flow the harness's window opens over the
     middle of it. Like the rest of the bench it draws with its own 5x7 font (now with lower case), so it shows only
     fixed ids, numbers, symbols and a few English words.
   - **System Information → Report → Share on GitHub → Include framework compatibility → Watch the tests** (off by
@@ -1286,7 +1320,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     drawn mid-run and at the end (`TK_SHOT_DIR=dir` keeps the pictures), a harness without `--show` refuses, and the
     abort flag kills a hanging harness's group at once. `tools/toolkit-audit/x11_test.py` runs `x11.py --show`
     against Xvfb: only well-formed progress lines, one check line per id, slowed down but under 15 s, and the same
-    results as the fast run. Checked against a headless `build/lord-server-test` with Lord Flow: `--toolkits` and
+    results as the fast run. Checked against a headless `build/lord-server-test` with Flow: `--toolkits` and
     `--toolkits --show` gave the same `x11-xwayland` results, and the Frameworks screen ran the whole list beside the
     X11 harness's window.
 

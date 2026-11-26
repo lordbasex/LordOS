@@ -11,7 +11,7 @@ Pensalo como un lector sentado a tu lado que solo lee lo que le señalás. No to
 ## Dónde lo encontrás
 
 - **Habla en toda app con texto.** *Edición → Habla* en el Editor de texto y la Terminal (en Notas, en Ver), y lo mismo en el menú del clic derecho del Editor de texto, la Terminal y Notas: *Iniciar locución*, *Detener locución* y *Guardar como audio…*. Iniciar locución lee la selección, o todo el texto cuando no hay nada seleccionado.
-- **También las apps de Linux.** Una app de Linux recibe un menú *Edición* con Habla en la barra de menús (en Lord Classic, en la tira de menús de su ventana), que lee lo que seleccionaste en ella.
+- **También las apps de Linux.** Una app de Linux recibe un menú *Edición* con Habla en la barra de menús (en Classic, en la tira de menús de su ventana), que lee lo que seleccionaste en ella.
 - **Un reproductor pequeño.** Mientras lee, una píldora muestra la onda de la voz en color, con leer de nuevo, pausa y seguir, detener y cerrar. Lo podés arrastrar a cualquier lugar, incluso a otra pantalla, y la próxima lectura se abre ahí.
 - **Guardar como audio…** pregunta dónde guardar con el diálogo de siempre y escribe un archivo WAV.
 - **Voz en tiempo real** (❖⇧Esc): un cuadro donde escribís, apretás Enter y se dice con la voz que elegiste. Las frases recientes quedan abajo, solo en memoria, para decirlas otra vez. Ayuda a quien no puede o prefiere no hablar.

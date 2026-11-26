@@ -69,7 +69,7 @@ await flush();
 check('a click on another normal window raises it within the normal layer only', drawn(all), [b, c, a]);
 check('...with the keyboard', sdk.wm.focused(), c);
 
-// the menu shows it checked; the Window menu (menu bar, Lord Classic's and Celeste's in-window menus) has the same item
+// the menu shows it checked; the Window menu (menu bar, Classic's and Celeste's in-window menus) has the same item
 sdk.wm.showWindowMenu(a, 300, 200);
 await flush();
 const again = shown(LABEL);

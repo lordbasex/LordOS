@@ -120,7 +120,7 @@ Longest single run of the main thread per scenario (ms), before the fixes (commi
 and after. The numbers vary by a few ms between runs (other work on the machine); the Store's sidebar and its
 categories had been fixed already (0efdde63).
 
-| Scenario | Lord Flow | Lord Classic | Lord Workspaces |
+| Scenario | Flow | Classic | Workspaces |
 |---|---|---|---|
 | A setting changed, Store, Settings and Files open | 161 → 20 | 163 → 18 | 171 → 27 |
 | A setting changed, no window open | 29 → 31 (noise) | 51 → 13 | 43 → 4 |

@@ -1,5 +1,5 @@
 // statusplace.js — where a status item's panel opens, with no screen (statusitems.js, statusPanelAt). The bar can be
-// at the top (Lord Flow's menu bar) or at the bottom (the Classic taskbar's default), so the panel goes toward the
+// at the top (Flow's menu bar) or at the bottom (the Classic taskbar's default), so the panel goes toward the
 // middle of the display on both axes. Tested by server/tests/statusplace_test.mjs.
 //
 // `box` is the item's [x, y, w, h], `d` its display ({ x, y, w, h }). The result is the style of a View inside

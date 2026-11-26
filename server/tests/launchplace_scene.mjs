@@ -1,4 +1,4 @@
-// launchplace_scene.mjs — builds the test bundle of tests/launchplace_headless.sh (not run by itself): Lord Workspaces
+// launchplace_scene.mjs — builds the test bundle of tests/launchplace_headless.sh (not run by itself): Workspaces
 // exactly as tools/build-theme.mjs builds it, plus a driver in the same module instances that, in a real headless
 // session, sets up two activities (Desarrollo, Chat), puts Desarrollo's display in Two halves with Files in the first
 // half, launches the fake Chrome (tests/launchplace_client.c, through its .desktop entry and lord.apps.launch, as the

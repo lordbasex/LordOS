@@ -28,7 +28,7 @@ static const Grab flow[] = {
     { KG_META | KG_CTRL, 0, KEY_LEFT, KG_TAKE }, { KG_META | KG_CTRL, 0, KEY_RIGHT, KG_TAKE },
 };
 
-/* Lord Flow with Settings → Desktop & Dock's Desktops arrows on (off by default since 0.8.9.1, #201): ⌃ arrows are
+/* Flow with Settings → Desktop & Dock's Desktops arrows on (off by default since 0.8.9.1, #201): ⌃ arrows are
  * word movement in a Linux app, so the person chooses. Kept together with `flow` by being a second table. */
 static const Grab flow_desktops[] = {
     { KG_META, 0, KEY_TAB, KG_HOLD },
@@ -43,7 +43,7 @@ static const Grab flow_desktops[] = {
     { KG_CTRL, 0, KEY_UP, KG_TAKE }, { KG_CTRL, 0, KEY_DOWN, KG_TAKE },
 };
 
-/* Lord Workspaces: Lord Flow's table (`workspaces` = flow, `workspaces-desktops` = flow-desktops), ⌃F2, which moves
+/* Workspaces: Flow's table (`workspaces` = flow, `workspaces-desktops` = flow-desktops), ⌃F2, which moves
  * the keyboard to the Context Spine and the activity strip (the bars' own focus, themes/workspaces/barfocus.js), and
  * ❖1…❖9, the activity at that position, ❖/, the list of shortcuts, and ❖⌥Esc, Force Quit. With the app switcher on ⌥Tab only (Settings → Keyboard, "+tab-alt"), ❖Tab
  * and ❖⇧Tab are the theme's too: the next and the previous activity (keygrab_match). */

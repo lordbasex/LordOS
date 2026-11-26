@@ -39,10 +39,10 @@ El fondo se cambia en [Ajustes → Fondo de pantalla](settings:wallpaper). Las n
 
 ## Temas
 
-LordOS trae dos temas: **Lord Flow** (barra de menú y Dock) y **Lord Classic** (barra de tareas y
+LordOS trae dos temas: **Flow** (barra de menú y Dock) y **Classic** (barra de tareas y
 menú de inicio). Se cambian en vivo en [Ajustes → Apariencia](settings:appearance).
 
-En **Lord Classic**: el botón de inicio (o Super) abre el menú de inicio, donde escribir busca apps,
+En **Classic**: el botón de inicio (o Super) abre el menú de inicio, donde escribir busca apps,
 ajustes y archivos; con clic derecho en una app la anclás a Inicio o a la barra de tareas. Los
 íconos de red y volumen abren los ajustes rápidos, y el reloj las notificaciones y un calendario.
 Arrastrá una ventana al borde izquierdo o derecho para que ocupe media pantalla, a una esquina para

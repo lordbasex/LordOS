@@ -82,8 +82,8 @@ const fullClipboard = () => toggleClipboardPanel('full');
 // Ctrl+Space stays with the program in the Terminal (in emacs it marks the start of a selection).
 const notInTerminal = () => spotlightOpen.get() || String(wm.focused() || '').split('#')[0] !== 'terminal';
 
-// F10, or ⌥ alone, opens the menu bar of the window in front from the keyboard (Lord Flow's bar on the focused
-// window's display, Lord Classic's strip under the focused window's title): the first bar whose can() says yes.
+// F10, or ⌥ alone, opens the menu bar of the window in front from the keyboard (Flow's bar on the focused
+// window's display, Classic's strip under the focused window's title): the first bar whose can() says yes.
 // The Terminal keeps F10 (programs in it use it) and a Linux app has its own menus and gets its keys first (wl.c).
 let menuBars = [];
 export function addMenuBarKeys(bar) {
@@ -97,7 +97,7 @@ const frontBar = () => {
 };
 const openMenuBar = () => frontBar()?.run();
 
-// With `appsPaste` (Lord Flow) ❖V is paste in a LordOS app inside the session, as it is in a Linux app:
+// With `appsPaste` (Flow) ❖V is paste in a LordOS app inside the session, as it is in a Linux app:
 // the key goes to the app, and ❖⇧V is the clipboard. An isolated app never receives ❖V (wl.c).
 let appsPaste = false;
 const clipboardKeyIsOurs = () => {
@@ -153,7 +153,7 @@ function index() {
   return map;
 }
 
-// Is this combination the shell's right now? A menu shows another key for what the theme takes (Files in Lord Classic).
+// Is this combination the shell's right now? A menu shows another key for what the theme takes (Files in Classic).
 export function shortcutTaken(combo) {
   lookup = lookup || index();
   return (lookup.get(parseCombo(combo)) || []).some((e) => !e.when || e.when());
@@ -243,11 +243,11 @@ export function useShortcuts({ grabs = '', table = [], onSuperTap: tap = null, a
     changed();
     return () => { themeTable = []; onSuperTap = null; changed(); };
   }, []);
-  // a setting can change the table of keys while the theme runs (Lord Flow's ⌃ arrows, the switcher's keys)
+  // a setting can change the table of keys while the theme runs (Flow's ⌃ arrows, the switcher's keys)
   useEffect(() => { themeTable = table; setGrabs(grabs); changed(); }, [grabs]);
 }
 
-// Runs a module's entry by its id (Lord Classic's ❖⇧S is Screenshots' area capture).
+// Runs a module's entry by its id (Classic's ❖⇧S is Screenshots' area capture).
 export function runShortcut(id) { added.find((x) => x.id === id)?.run(); }
 
 export function addShortcuts(entries) {

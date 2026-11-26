@@ -15,7 +15,7 @@ Both are mounted by the SDK, so **every theme has them** without doing anything:
 | ![notes](search-notes.png) | |
 | «apples» finds the note by its content | |
 
-It opens with **❖Space** or **Ctrl+Space**, or with the ⌕ magnifier in the Lord Flow theme's
+It opens with **❖Space** or **Ctrl+Space**, or with the ⌕ magnifier in the Flow theme's
 menu bar. With the Terminal in front, Ctrl+Space is left to the program (in emacs it sets a
 mark); ❖Space works the same.
 

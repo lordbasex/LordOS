@@ -1343,7 +1343,7 @@ See `WAYLAND.md` ("X11 apps (Xwayland)") and `PRIVACY.md` ("X11 apps"). Installe
 
 ## Step 35 — The Classic theme as a second full appearance (VM 119 `lordos-spot`, October 19)
 
-See `DESIGN.md` ("Lord Classic") and `WINDOWS.md` ("Snapping"). On VM 119 (172.17.0.54), tree in
+See `DESIGN.md` ("Classic") and `WINDOWS.md` ("Snapping"). On VM 119 (172.17.0.54), tree in
 `~/LordOS-classic`, built there (`make -C server`, `make -C server test`) and installed into
 `/usr/lib/lordos` (`lord-server`, `lord-media`, `lord-vault`, `lord-maild`, the theme bundles, the
 app host, the system apps, `assets/{fonts,locales,shell,icons,mascot,monitor,help}` and the wallpaper

@@ -189,7 +189,7 @@ enabled. `lordos.service` now has `DelegateSubgroup=supervisor`.
 
 It isn't a separate app: it's in Settings, as on popular desktop systems. At the top it has a row with each
 connection, Wi-Fi and VPN (`apps/settings/Network.jsx`). Control Center shows the main connection
-and whether there are active VPNs, and opens that section; its Wi-Fi tile (and Lord Classic's network glyph) lights
+and whether there are active VPNs, and opens that section; its Wi-Fi tile (and Classic's network glyph) lights
 the signal's bars (issue #114).
 
 **Wi-Fi page (0.8.8.10, GitHub #167):** "Available Wi-Fi networks" lists the scan with the network LordOS is connected
@@ -211,7 +211,7 @@ moves the mark without scanning again. The order is `apps/settings/wifimodel.js`
 
 | Call | Returns |
 |---|---|
-| `lord.net.interfaces()` | `[{ name, index, type, kind, up, carrier, operstate, mac, mtu, master, managed, rxBytes, txBytes, rxPackets, txPackets, rxErrors, txErrors, addresses: [{ family: 4\|6, address, prefix, scope: 'global'\|'link'\|'host', dynamic, validLifetime }], config, signal?, ssid? }]`; `signal` (issue #114): a Wi-Fi interface's level in dBm from `/proc/net/wireless`, only when it is a real reading (-110..-1; not associated, absent). The Control Center's Wi-Fi icon and Lord Classic's tray light 4 bars from -55 dBm, 3 to -67, 2 to -78, 1 below (`wifiBars`, `sdk/menubarmodel.js`). `ssid` (issue #192): the network a Wi-Fi interface is joined to, from nl80211's `GET_INTERFACE` (no privilege needed, like `iw dev`), only while associated and only when it is well-formed UTF-8 without control characters (`net_ssid_text`); the Control Center's Wi-Fi tile shows it under its name (`wifiTile`, `wifiTileView`) |
+| `lord.net.interfaces()` | `[{ name, index, type, kind, up, carrier, operstate, mac, mtu, master, managed, rxBytes, txBytes, rxPackets, txPackets, rxErrors, txErrors, addresses: [{ family: 4\|6, address, prefix, scope: 'global'\|'link'\|'host', dynamic, validLifetime }], config, signal?, ssid? }]`; `signal` (issue #114): a Wi-Fi interface's level in dBm from `/proc/net/wireless`, only when it is a real reading (-110..-1; not associated, absent). The Control Center's Wi-Fi icon and Classic's tray light 4 bars from -55 dBm, 3 to -67, 2 to -78, 1 below (`wifiBars`, `sdk/menubarmodel.js`). `ssid` (issue #192): the network a Wi-Fi interface is joined to, from nl80211's `GET_INTERFACE` (no privilege needed, like `iw dev`), only while associated and only when it is well-formed UTF-8 without control characters (`net_ssid_text`); the Control Center's Wi-Fi tile shows it under its name (`wifiTile`, `wifiTileView`) |
 | `lord.net.routes()` | `[{ family, dst: 'default'\|'a.b.c.d/n', gateway, dev, metric, table, protocol: 'kernel'\|'boot'\|'static'\|'dhcp'\|'ra'\|n }]` (without the local table or the fe80::/64 routes) |
 | `lord.net.dns()` | `{ source: 'systemd-resolved'\|'resolv.conf', servers: [...], search: [...] }` |
 | `lord.net.config(if)` | `{ method, addresses: [], gateway, dns: [] }` or `null` (what LordOS saved) |

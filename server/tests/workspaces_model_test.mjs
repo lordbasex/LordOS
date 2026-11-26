@@ -1,4 +1,4 @@
-// Lord Workspaces as plain data (themes/workspaces/model/*.js, tokens.js) and the theme.json fields Settings reads
+// Workspaces as plain data (themes/workspaces/model/*.js, tokens.js) and the theme.json fields Settings reads
 // (sdk/thememeta.js): where things go on each display, the top band's room, the tiles, the activities' settings key,
 // the three effects styles and the palette's contrast. node server/tests/workspaces_model_test.mjs
 import { displayPlan, shownDisplays, spineMode, onChrome, SPINE_BLUR, SPINE_GAP, FRAME_PAD, SPINE_W, MARGIN, SMALL_W, SPINE_SHADOW_REACH, WINDOW_SHADOW } from '../../themes/workspaces/model/geometry.js';
@@ -155,9 +155,9 @@ eq('theme.json options', cm.options.map((o) => o.key), ['surface', 'spine', 'spi
 eq('theme.json arrows', cm.desktopArrows, true);
 eq('theme.json apps per display (sdk/displayapps.js)', cm.displayApps, true);
 eq('theme.json under 4 KB', readFileSync(new URL('../../themes/workspaces/theme.json', import.meta.url)).length < 4096, true);
-eq('bundled themes declare nothing', ['default', 'classic'].map((id) => cleanThemeMeta(JSON.parse(readFileSync(new URL(`../../themes/${id}/theme.json`, import.meta.url))))),
-  [{ sketch: null, options: [], desktopArrows: false, displayApps: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: '', email: '', organization: '', license: '', version: '', minLordOS: '' },
-    { sketch: null, options: [], desktopArrows: false, displayApps: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: '', email: '', organization: '', license: '', version: '', minLordOS: '' }]);
+eq('bundled themes declare only their author (0.8.9.6.2)', ['default', 'classic'].map((id) => cleanThemeMeta(JSON.parse(readFileSync(new URL(`../../themes/${id}/theme.json`, import.meta.url))))),
+  [{ sketch: null, options: [], desktopArrows: false, displayApps: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: 'Federico Pereira', email: 'fpereira@iperfex.com', organization: 'IPERFEX', license: 'MIT', version: '', minLordOS: '' },
+    { sketch: null, options: [], desktopArrows: false, displayApps: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: 'Federico Pereira', email: 'fpereira@iperfex.com', organization: 'IPERFEX', license: 'MIT', version: '', minLordOS: '' }]);
 eq('junk meta', cleanThemeMeta({ sketch: 'x', options: [{ key: '__proto__', label: 'shell.x' }, { key: 'a', label: 'evil', toggle: true }, { key: 'b', label: 'shell.b', choices: [['x', 'shell.x']] }], desktopArrows: 1 }),
   { sketch: null, options: [], desktopArrows: false, displayApps: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: '', email: '', organization: '', license: '', version: '', minLordOS: '' });
 eq('theme.json wallpaper', [cm.wallpaperDefault, cm.wallpaperSlideshow], ['cyberpunk-panorama', true]);

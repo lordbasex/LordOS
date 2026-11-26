@@ -7,7 +7,7 @@
 #   2. ❖ chosen: build/moddrag-client (a Wayland app) and, where Xwayland and libxcb are installed, build/moddrag-x11 (an
 #      X11 app) — ❖ + drag moves, ❖ + right drag resizes, the app gets neither press; a locked pointer or held shortcuts
 #      keep ❖ + click the app's.
-# The theme is Lord Flow's bundle with one hook that allows the keyboard shortcuts prompt. Never against a live session.
+# The theme is Flow's bundle with one hook that allows the keyboard shortcuts prompt. Never against a live session.
 # Run from server/ (tests/run_suites.sh does). Exit 77 when something it needs is missing (the theme bundle: npm run
 # build; build/lord-server-test), 1 on a failure or if lord-server died. MODDRAG_DEBUG=1 shows the logs.
 cd "$(dirname "$0")/.." || exit 1

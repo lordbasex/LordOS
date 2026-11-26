@@ -508,8 +508,8 @@ its own section (see connections per app, locate them on the map) through
 
 (Since 0.8.9.5, 2026-11-22; before it, a green dot for the camera, an orange one for the microphone and a red pill per screen
 share.) While anything captures the screen, the camera or the microphone, a **green pill** stays by the clock in every
-theme (where `<PrivacyIndicators />` is: Lord Flow's menu bar, the Lord Classic taskbar — also on the side, where the
-other status items are left out — Lord Workspaces' status cluster and Lord Celeste's bar). Its glyph says what, system-wide:
+theme (where `<PrivacyIndicators />` is: Flow's menu bar, the Classic taskbar — also on the side, where the
+other status items are left out — Workspaces' status cluster and Celeste's bar). Its glyph says what, system-wide:
 
 | Captured now | Glyph |
 |---|---|
@@ -649,7 +649,7 @@ denied the framebuffer device.
   caches filled first; each captured whole at 100, 125, 150 and 200 % and at an offset, each window as Screenshots'
   `until` and shared alone: no capture may hold one protected pixel). `test_damage_fuzz` and `test_damage_pipeline`
   unchanged.
-- `tests/protected_headless.sh` (run by `make test`): a headless `lord-server-test` with the real Lord Flow opens
+- `tests/protected_headless.sh` (run by `make test`): a headless `lord-server-test` with the real Flow opens
   Calculator protected and Notes beside it; the test hooks (`frame`, `testhooks.h`) write the display's picture, a
   screenshot, the remote desktop's frame, the Screenshot portal's still and each window shared alone, and
   `tests/protected_check.py` wants Calculator drawn on the display and the fill everywhere else, Notes identical.
@@ -1169,7 +1169,7 @@ synchronous RPC (`js_broker_pending`), events are NUL-terminated before `JS_Pars
   ❖Space, ❖⌥Space, ❖V, ❖., ❖Tab, ❖`, ❖Esc, ❖⇧3/4/5 and ❖F1–F12 (`system_meta_key` in
   `wl/wl.c`) and those of the theme's fixed table (`wl/keygrab.c`, [SHORTCUTS.md](SHORTCUTS.md)), which
   isolated apps cannot change: `lord.wayland` does not exist in their process. A Linux app still gets no ❖
-  combination, except Lord Flow's ❖ as Ctrl, sent as Ctrl to that client only.
+  combination, except Flow's ❖ as Ctrl, sent as Ctrl to that client only.
 - **Keyboard layout:** the app compiles the keymap that the compositor sends over
   `wl_keyboard.keymap` (`kb_set_keymap_string`), which is already expanded and reads no files.
   `kb_set()` inside the sandbox failed, because Landlock hides `/usr/share/X11/xkb`

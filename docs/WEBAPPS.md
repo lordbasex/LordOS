@@ -376,7 +376,7 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     Emoji, Speech and Inspect run in the shell, which answers lord-web "" for them.
     Left out: **Print…** (WPE has no print operation and `webkit_web_view_save` makes only MHTML, so there is no PDF
     to print: no dead item), **Translate** (LordOS has no translator) and **Cast**.
-  - **The app menu and Help:** Settings… opens Settings → Web Apps on that app; in Lord Flow, Browser identity (Chrome on
+  - **The app menu and Help:** Settings… opens Settings → Web Apps on that app; in Flow, Browser identity (Chrome on
     Linux, Edge on Linux, Firefox on Linux, LordOS (WebKit)) the window's profile's `userAgent` ("Browser identity", below); Help starts with "<app> on the Web",
     the app's origin in the browser.
 - **Light and dark** (`webscheme.h`, `webscheme.c`, `webscheme.js`, `webdark.c`; since 0.8.8.8): a web app
@@ -422,8 +422,8 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     `SetColorScheme` with the new word to each running profile of the app (`webask_app_scheme`), so **open windows
     follow at once**; a page that only reads the scheme at load sees it on its next load. On WPEPlatform it reaches
     CSS `@media` rules too; on the legacy API only scripts that ask `matchMedia`. Where: Settings → Web Apps, the app's page
-    (Appearance, a three-way choice with a hint for each), and in Lord Flow the app menu of the web app's window
-    (Appearance ▸ Automatic, Light, Dark, the current one checked). Lord Classic flattens submenus, so there it is only
+    (Appearance, a three-way choice with a hint for each), and in Flow the app menu of the web app's window
+    (Appearance ▸ Automatic, Light, Dark, the current one checked). Classic flattens submenus, so there it is only
     in Settings. Tests: `build/webreg-test` (the start environment, `webmgr_scheme_of`), `build/webapp-test` (the key
     read, written only when not `auto`, anything else refused;
     `webscheme_for_app` for each pair; while held back, a stored light or dark follows the desktop),
@@ -516,8 +516,8 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   footer: LordOS still uses its own engine (WebKit), Chrome, Edge and Firefox are names of their owners, some sites
   check the browser and refuse it when something doesn't match (then choose another identity, such as LordOS
   (WebKit)), and a site that already linked this device keeps the name it saw. The texts
-  name no company or service (the brand check): Edge's hint says "Edge's own maker". In Lord Flow, the
-  app menu of the web app's window (Browser identity ▸ the four, for that window's profile; Lord Classic flattens
+  name no company or service (the brand check): Edge's hint says "Edge's own maker". In Flow, the
+  app menu of the web app's window (Browser identity ▸ the four, for that window's profile; Classic flattens
   submenus, so there it is in Settings only).
   - **Why Chrome by default, and why the old linked name stays** (2026-11-15): a messaging web app listed LordOS on
     the phone's "Linked devices" as the other system's own browser. That site names a linked computer after the
@@ -1157,7 +1157,7 @@ turned out to be another process is refused from then on (refused senders give t
 full). The count is clamped to 0..9999; it reaches the shell as the event `webapps-badge` `{ app, profile, count }`,
 and a lord-web that leaves the bus gets a 0. `lord.webapps.badges()` gives the counts to a new JS context.
 
-The Dock draws a red badge on the app's icon with the sum of its profiles ("99+" past 99), Lord Classic's taskbar
+The Dock draws a red badge on the app's icon with the sum of its profiles ("99+" past 99), Classic's taskbar
 too; the Dock's window list shows each profile's own count. Settings → Web Apps → "Show unread count on the Dock"
 (per user, `settings.webAppPrefs[app].badge`, on by default).
 
@@ -1240,7 +1240,7 @@ person's browser.
   `lord.webapps.setDeveloperMode` (the folder is in `fsops_protected`); a missing file, or one that isn't exactly a
   JSON object whose `developerMode` is `true`, is off (`webinspect_parse`). Turning it off ends every window that has
   developer tools on.
-- **The menu:** with the switch on, each web app window's Window menu (the menu bar's in Lord Flow, the window's in Lord
+- **The menu:** with the switch on, each web app window's Window menu (the menu bar's in Flow, the window's in
   Classic) has *Inspect (developer tools)* (`webInspectItem`, `inspectItem` in `webappsmodel.js`), checked and
   unavailable while that window has them.
 - **The question:** every time, Cancel focused (`<WebAppInspectPrompt />`, `sdk/hardware.jsx`): "Developer tools can see

@@ -257,7 +257,7 @@ export function createNote({ body = '', color = 'yellow', desktop = false, x, y,
   try { fs.mkdir(folder(slug)); } catch (e) { return null; }
   const now = new Date().toISOString();
   const count = notesStore.get().list.filter((n) => n.desktop).length;
-  // a new note's place: inside the desktop's work area (Lord Workspaces' top bar and side rail covered the note's bar)
+  // a new note's place: inside the desktop's work area (Workspaces' top bar and side rail covered the note's bar)
   let area = null;
   try { area = typeof workArea === 'function' ? workArea() : null; } catch (e) { area = null; }
   const ax = area && Number.isFinite(area.x) ? area.x : 0, ay = area && Number.isFinite(area.y) ? area.y : 0;

@@ -43,7 +43,7 @@ that changed) is repainted.
 | ![regex](terminal-regex-search.png) | ![replay](terminal-session-replay.png) |
 | Regular-expression search | Instant Replay |
 | ![colors](terminal-true-color.png) | ![theme](terminal-theme-switch.png) |
-| SGR: bold, italic, underline, strikethrough, direct color | The same shell (PID 4126) is still alive after switching to the Lord Classic theme |
+| SGR: bold, italic, underline, strikethrough, direct color | The same shell (PID 4126) is still alive after switching to the Classic theme |
 | ![ligatures](terminal-ligatures.png) | ![emoji](terminal-emoji.png) |
 | Profile imported from another terminal emulator: Fira Code with ligatures, Dracula, a trigger that highlights "ERROR" | Ligatures, combining marks and color emoji; below, with mode 2027 (👍🏽 🇦🇷 👨‍👩‍👧 as one glyph) |
 | ![import](terminal-import-color-scheme.png) | ![keys](terminal-key-bindings.png) |

@@ -75,7 +75,7 @@ export function useFrame(pick) {
   return useStore(windows, (ws) => { const w = ws.find((x) => x.id === id); return w ? pick(wm.frame(w)) : null; });
 }
 
-// A small window (a tile of Lord Workspaces): below this width the sidebar is a rail of icons and the margins shrink.
+// A small window (a tile of Workspaces): below this width the sidebar is a rail of icons and the margins shrink.
 export const RAIL_BELOW = 760;
 export const useRail = () => !!useFrame((g) => g.w < RAIL_BELOW);
 export const PAD = (rail) => (rail ? 18 : 38);              // the content's side margin

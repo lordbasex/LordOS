@@ -35,15 +35,15 @@ name, which three monitors of one model share. The rules are in `sdk/wallpapermo
   plus its connector when two share the model). A picture for one display also turns that display's moving wallpaper
   off (`settings.motion[displayId] = null`, which wins over the one for all displays); a picture for all clears the
   per-display pictures and the moving wallpapers, as before.
-- **The Control Center's quick pictures** (Lord Flow, Lord Workspaces) change the display the Control Center opened
+- **The Control Center's quick pictures** (Flow, Workspaces) change the display the Control Center opened
   on when there are several.
 - Removing one of your own pictures sends a display that showed it back to the picture of every display, and the
   picture of every display back to the theme's default.
 - The login screen keeps one picture.
-- **Never chosen** (0.8.9): `settings.wallpaper` is `null` and the theme's default shows: Lumo Celestial in Lord Flow
-  and Lord Classic, Cyberpunk City HD's panorama in Lord Workspaces (settings migration 5 turned the saved Celestial
+- **Never chosen** (0.8.9): `settings.wallpaper` is `null` and the theme's default shows: Lumo Celestial in Flow
+  and Classic, Cyberpunk City HD's panorama in Workspaces (settings migration 5 turned the saved Celestial
   default into `null`; docs/WORKSPACES.md, "Wallpaper and slideshow").
-- **A slideshow** of a category's still pictures, with a different one on each display if wanted, is Lord Workspaces'
+- **A slideshow** of a category's still pictures, with a different one on each display if wanted, is Workspaces'
   only (docs/WORKSPACES.md, "Wallpaper and slideshow"); a moving wallpaper chosen turns it off, and turning it on
   turns the moving wallpapers off.
 
@@ -184,7 +184,7 @@ as they were: no migration.
 
 `findWallpaper` (sdk/wallpapers.js) resolves `cat:<id>` after the theme's own list and your pictures: it lists
 `/var/lib/lordos/wallpapers` (at most every 10 s, or at once after a download or a removal in this session) and offers
-the variants whose `<sha256>.jpg` is there at the catalog's size. Every theme (Lord Flow, Lord Classic, Lord Workspaces,
+the variants whose `<sha256>.jpg` is there at the catalog's size. Every theme (Flow, Classic, Workspaces,
 Celeste), the greeter and the slideshow already go through `findWallpaper` and `wallpaperSrc`, so each display draws the
 smallest file that covers it. A picture whose files are gone (removed, or settings brought from another computer)
 gives `null`, and the theme's default shows (the login screen: its own).

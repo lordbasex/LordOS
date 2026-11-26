@@ -30,7 +30,7 @@ Hold the modifier and press Tab: a strip of app icons shows the selected app's n
 recently used first. Tab moves, ⇧Tab goes back, Esc cancels, and releasing the modifier switches. A
 quick press goes back to the previous app.
 
-## Lord Flow
+## Flow
 
 | Shortcut | What it does |
 |---|---|
@@ -51,7 +51,7 @@ emulator, where Ctrl+C is the interrupt), to that app only. So ❖V pastes and �
 there: with a Linux app in front the screen locks with ❖⌃Q, and the clipboard opens with ❖⇧V. In a
 LordOS app inside the session ❖V pastes too; ❖⇧V is the clipboard.
 
-## Lord Classic
+## Classic
 
 | Shortcut | What it does |
 |---|---|
@@ -76,7 +76,7 @@ LordOS app inside the session ❖V pastes too; ❖⇧V is the clipboard.
 
 | Shortcut | What it does |
 |---|---|
-| ❖N · ❖T · ❖W | New window · new tab · close (Lord Classic: ⌃N, ⌃T, ⌃W) |
+| ❖N · ❖T · ❖W | New window · new tab · close (Classic: ⌃N, ⌃T, ⌃W) |
 | ❖F · ❖G | Find · next result |
 | ❖C · ❖X | Copy · cut |
 | ❖Z · ❖⇧Z | Undo · redo |

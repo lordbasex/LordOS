@@ -1,5 +1,5 @@
 // pre.js — goes before the theme bundle in tests/app_scene_headless.sh ws_topbar_scene (a test tool, never shipped):
-// keeps which nodes are one of Lord Workspaces' top-band surfaces (44 px high, a 22 px radius: the activity strip and the
+// keeps which nodes are one of Workspaces' top-band surfaces (44 px high, a 22 px radius: the activity strip and the
 // status cluster, components/TopBar.jsx), the activities' pills and the accent under the one in view, so driver.js can compare where they are drawn.
 (function () {
   const seen = new Map();

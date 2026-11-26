@@ -88,7 +88,7 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   already focused window. Only what Rename changes without a notice: never in a read-only folder, the Trash, an
   archive, Applications, the Network page or on a mount point. A key, a double click or the window losing the focus
   cancels a rename that is waiting. The timing rule is the SDK's `sdk/slowclick.js` (pure; `server/tests/slowclick_test.mjs`)
-  for every view that shows files; LordOS's desktops (Lord Flow, Lord Classic, Lord Workspaces, Lord Celeste) don't
+  for every view that shows files; LordOS's desktops (Flow, Classic, Workspaces, Celeste) don't
   show files on the desktop, so Files is its only user today. Headless scene: `tests/app_scene_headless.sh
   files_slowrename_scene`.
 - **Copy, cut and paste files:** Files keeps its own list (a cut moves only between Files windows) and
@@ -153,7 +153,7 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   tag's color, in every view and in Get Info, and in the list view the tag dots sit right after the name.
 - **Path bar** at the bottom, clickable on each segment, and **status bar** («N items, X
   available», «N of M selected» or a copy's progress).
-- **App menus** in the theme's bar: File, Edit, View and Go (in Lord Classic, since 0.8.5, in a strip
+- **App menus** in the theme's bar: File, Edit, View and Go (in Classic, since 0.8.5, in a strip
   under the window's title bar). In a folder the user can't write (This Computer), the menus and the
   context menu leave out or disable the actions that would change it.
 

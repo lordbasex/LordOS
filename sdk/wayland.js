@@ -35,7 +35,7 @@ const launcherKeyFor = (appId) => (!appId ? null : getApp(appId)?.package || get
 
 const idOf = (sid) => `linux#${sid}`;
 // What a Linux window's frame adds around its content (sdk/shellxmodel.js chromeInset): the theme's borders and title bar
-// and, in a theme with a menu strip per window (Lord Classic, Lord Workspaces, Celeste), that strip when it shows one,
+// and, in a theme with a menu strip per window (Classic, Workspaces, Celeste), that strip when it shows one,
 // as every Linux window with the Edit menu with Speech does. win: the window, or { id, args } of one about to open.
 const frameInset = (win) => chromeInset(windowChrome(), !!win?.args?.csd, !win?.args?.csd && !!menusWithSpeech(win.id, undefined, win)?.length);
 export const surfaceOf = (wid) => (String(wid).startsWith('linux#') ? Number(String(wid).slice(6)) || 0 : 0);

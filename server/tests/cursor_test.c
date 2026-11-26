@@ -22,7 +22,7 @@ static void checkf(int ok, const char *fmt, ...) {
     check(ok, msg);
 }
 
-/* A theme's accent arrow (cursor_set_accent, Lord Workspaces 0.8.9): the default pointer takes the accent as its fill
+/* A theme's accent arrow (cursor_set_accent, Workspaces 0.8.9): the default pointer takes the accent as its fill
  * and its own shape; the text cursor stays LordOS's; off brings the black arrow back. */
 static void test_cursor_accent(void) {
     cursor_set_accent(0, 0);

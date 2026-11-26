@@ -274,7 +274,7 @@ maintainer's rule that a language ships complete, and `"partial"` was dropped: e
   cascades don't fit the interface's line heights; pending a check on the VM).
 - **What a translator needs to know** (the translators' guide on lordos.org repeats it): keep every `{variable}`
   exactly; write the plural forms of the language's rule (the table above); keep LordOS's own names in English
-  where the language keeps product names (LordOS, Lord Flow, Lord Classic, Lumo) and use generic words for the
+  where the language keeps product names (LordOS, Flow, Classic, Lumo) and use generic words for the
   rest, never another system's brand (`tools/brand-check.mjs`); `textAlign: 'start'` is already handled by the
   code, so a right-to-left translation needs nothing special; and run `node tools/i18n-check.mjs <id>`.
 
@@ -504,7 +504,7 @@ numbers).
 If the language is right to left (`meta.json` → `"direction": "rtl"`; `i18n-pack` sets it
 automatically for ar, he, fa, ur…), **the whole interface flips**, as on popular desktop systems: menu bar, menus
 (they open to the left), windows (buttons on the right), Dock, tabs, Settings, Files and the
-Lord Classic theme (start and taskbar on the right). The terminal's content stays left to right (see
+Classic theme (start and taskbar on the right). The terminal's content stays left to right (see
 "In the terminal" below).
 
 The engine follows CSS: `direction: 'rtl' | 'ltr'` is inherited, flips the row axis and the
@@ -585,7 +585,7 @@ can drop).
 | ![scripts](files-world-scripts.png) | ![arabic](ui-arabic.png) |
 | Names in Arabic, Hebrew, Chinese, Japanese, Korean and mixed (bidi), with emoji | Arabic interface: bar, window, sidebar, columns and Dock mirrored |
 | ![menu](menu-arabic.png) | ![classic](classic-theme-arabic.png) |
-| Menu in Arabic: opens to the left, shortcut on the other side | Lord Classic theme in Arabic; the terminal stays left to right |
+| Menu in Arabic: opens to the left, shortcut on the other side | Classic theme in Arabic; the terminal stays left to right |
 | ![japanese](ime-japanese.png) | ![pinyin](ime-pinyin.png) |
 | Japanese in the Terminal: にほんご → 日本語 / にほんご / ニホンゴ | Pinyin: zhongguo → 中国, 中古, 中… (page 1 of 7) |
 | ![hangul](ime-hangul.png) | ![result](ime-terminal.png) |

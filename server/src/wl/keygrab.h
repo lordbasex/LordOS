@@ -18,7 +18,7 @@ char keygrab_letter(int code, const char *base);
  * until the modifier that started it is released: the app switcher). */
 int keygrab_match(int code, char letter, unsigned mods);
 
-/* Does this ❖ + letter reach Linux apps as Ctrl (Lord Flow's table)? */
+/* Does this ❖ + letter reach Linux apps as Ctrl (Flow's table)? */
 int keygrab_is_remap(char letter, unsigned mods);
 
 /* The keys on a keyboard's media row: always LordOS's, whatever has the keyboard. 1 if code is one. */

@@ -71,7 +71,7 @@ eq('max → up stays', snapNext('max', 'up'), null);
 eq('a third → left is the half', snapNext('center-third', 'left'), 'left');
 eq('unknown direction', snapNext('left', 'sideways'), null);
 
-// snap thirds (Lord Workspaces): resting on a side edge turns the half into a third
+// snap thirds (Workspaces): resting on a side edge turns the half into a third
 {
   let r = dwellZone('left', null, 1000);
   eq('dwell: reaching the left edge, a half', r.zone, 'left');

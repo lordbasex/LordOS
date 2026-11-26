@@ -1627,12 +1627,12 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         /* Ctrl+Alt+Backspace ends the session at once. The modifiers are tracked from every keyboard and a release can
          * be lost (another console, a keyboard that sleeps or reconnects), so the kernel is asked whether Ctrl and Alt
          * are really held on this keyboard: a stale state must never end a session on a lone Backspace. */
-        /* Ctrl+Alt+Shift+Backspace: back to Lord Flow, whatever theme runs (a community theme can't take this key: it is
+        /* Ctrl+Alt+Shift+Backspace: back to Flow, whatever theme runs (a community theme can't take this key: it is
          * handled here, before any JavaScript; community_watch does the switch) */
         if (ev->code == KEY_BACKSPACE && ev->value == 1 && s->ctrl && s->alt && s->shift && !s->greeter) {
             int ctrl = 0, alt = 0;
             if (zap_held(d->fd, &ctrl, &alt) && ctrl && alt) {
-                fprintf(stderr, "lord-server: Ctrl+Alt+Shift+Backspace on %s: restoring Lord Flow\n", d->name);
+                fprintf(stderr, "lord-server: Ctrl+Alt+Shift+Backspace on %s: restoring Flow\n", d->name);
                 cw.rescue = 1;
             }
             break;
@@ -3121,7 +3121,7 @@ static int check_code(int argc, char **argv) {
  * uncaught error), or stalls the desktop until the main-loop watchdog stops it is taken off: it is marked failed in its
  * install record (with why, for Settings → Appearance's Report), and the theme that ran before it comes back (Lord
  * Flow when there was none). One that ends COMMUNITY_CRASHES sessions in a row is not started again (chosen_theme).
- * Ctrl+Alt+Shift+Backspace always restores Lord Flow, whatever theme runs (on_input, before any JavaScript). */
+ * Ctrl+Alt+Shift+Backspace always restores Flow, whatever theme runs (on_input, before any JavaScript). */
 #define COMMUNITY_FIRST_MS 6000
 #define COMMUNITY_HEALTHY_MS 60000
 
@@ -3160,7 +3160,7 @@ static void community_back(const char *current, const char *why, int persist) {
 }
 
 static void community_watch(const char *current, double now) {
-    if (cw.rescue) {                    /* Ctrl+Alt+Shift+Backspace: Lord Flow, whatever runs */
+    if (cw.rescue) {                    /* Ctrl+Alt+Shift+Backspace: Flow, whatever runs */
         cw.rescue = 0;
         char def[sizeof ui.theme_request];
         default_bundle(def, sizeof def);

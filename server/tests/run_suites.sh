@@ -256,6 +256,7 @@ EOF
     if have node; then run "logfile-test (sdk/logfile.js)" node tests/logfile_test.mjs; fi
     if have node; then run "browserframe-notes-test (sdk/browserframe.js, #222)" node tests/browserframe_notes_test.mjs; fi
     if have node; then run "menubar-model-test (sdk/menubarmodel.js, sdk/ticker.js)" node tests/menubar_model_test.mjs; fi
+    if have node; then run "themes-sync-test (tools/themes-sync.mjs: themes/<id> is the pinned LordOS-themes commit)" node tests/themes_sync_test.mjs; fi
     if have node; then run "editor-scrollbar-test (apps/editor/scrollbar.js)" node tests/editor_scrollbar_test.mjs; fi
     if have node; then run "editor-recent-test (apps/editor/recent.js, File → Open Recent, #113)" node tests/editor_recent_test.mjs; fi
     if have node; then run "backup-model-test (apps/backup/model.js exclusions, FilePicker cloud={false}, #200)" node tests/backup_model_test.mjs; fi
@@ -374,7 +375,7 @@ EOF
         77) skip "testbench-globals" "build/lord-server-test, build/lordos-testbench, the default theme and python3" ;;
         *) bad "testbench-globals (tests/testbench_globals_headless.sh, headless lord-server-test)" ;;
     esac
-    # Lord Workspaces: a window launched from a display's bar lands on that display, in that activity and its slot, even
+    # Workspaces: a window launched from a display's bar lands on that display, in that activity and its slot, even
     # after a profile picker and with another activity in view; a dialog told its parent late goes over it; the bar
     # marks a minimized window (themes/workspaces/model/launches.js; left to right and right to left)
     for lp in en ar; do
@@ -389,7 +390,7 @@ EOF
     # and a copy running with no window shows a new one (the 2026-11-23 Google Chrome case)
     sh tests/handoff_headless.sh >"$T/out" 2>&1
     case $? in
-        0) ok "handoff (tests/handoff_client.c, headless lord-server: relaunch of a running app, Lord Flow and Lord Workspaces)" ;;
+        0) ok "handoff (tests/handoff_client.c, headless lord-server: relaunch of a running app, Flow and Workspaces)" ;;
         77) skip "handoff" "build/lord-server, build/handoff-client and the default theme (make, npm run build)" ;;
         *) bad "handoff (tests/handoff_client.c, headless lord-server: relaunch of a running app)"; cat "$T/out" ;;
     esac
@@ -683,7 +684,7 @@ EOF
     if have node; then run "vpn-model-test (sdk/vpnmodel.js)" node tests/vpn_model_test.mjs; else skip "vpn-model-test" node; fi
     if have node; then run "claude-widget-model-test (sdk/claudewidgetmodel.js)" node tests/claude_widget_model_test.mjs; else skip "claude-widget-model-test" node; fi
     if have node; then run "stream-model-test (sdk/streammodel.js)" node tests/stream_model_test.mjs; else skip "stream-model-test" node; fi
-    # (0.8.8.8, #112) Lord Flow's minimize effect: which windows start it, none with Reduce motion
+    # (0.8.8.8, #112) Flow's minimize effect: which windows start it, none with Reduce motion
     if have node; then run "minimize-model-test (themes/default/minimize.js)" node tests/minimize_model_test.mjs; else skip "minimize-model-test" node; fi
     if have node; then run "share-model-test (sdk/sharemodel.js)" node tests/share_model_test.mjs
     else skip "share-model-test" "node"; fi
@@ -1007,11 +1008,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "menu-keys-test (themes/default Menu, themes/classic Menu, sdk/shortcuts.js)" node tests/menu_keys_test.mjs
     else skip "menu-keys-test" "node and the repository's node_modules (npm install)"; fi
-    # (0.8.8.6, #48) Lord Classic's power menu: a click on Lock Screen or Switch User reaches the session
+    # (0.8.8.6, #48) Classic's power menu: a click on Lock Screen or Switch User reaches the session
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-startmenu-power-test (themes/classic StartMenu)" node tests/classic_startmenu_power_test.mjs
     else skip "classic-startmenu-power-test" "node and the repository's node_modules (npm install)"; fi
-    # (#210) Lord Classic's start menu by category: the groups and counts, mouse and keyboard, RTL, the remembered view
+    # (#210) Classic's start menu by category: the groups and counts, mouse and keyboard, RTL, the remembered view
     if have node; then run "app-groups-model-test (sdk/appgroupsmodel.js)" node tests/app_groups_model_test.mjs; fi
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-startmenu-categories-scene (themes/classic StartMenu, sdk/appgroupsmodel.js)" node tests/classic_startmenu_power_test.mjs classic_startmenu_categories_scene.mjs
@@ -1020,7 +1021,7 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "side-buttons-test (runtime/events.js)" node tests/side_buttons_test.mjs
     else skip "side-buttons-test" "node and the repository's node_modules (npm install)"; fi
-    # (0.8.8.6, #58) what the bar shows: Lord Flow's Control Center tiles, the output list, the clock's calendar
+    # (0.8.8.6, #58) what the bar shows: Flow's Control Center tiles, the output list, the clock's calendar
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "menubar-test (themes/default ControlCenter, NotificationCenter, MenuBars on every display, sdk/soundoutputs.js)" node tests/menubar_test.mjs
     else skip "menubar-test" "node and the repository's node_modules (npm install)"; fi
@@ -1179,11 +1180,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-drag-scene (apps/files/dnd.jsx)" node tests/menubar_test.mjs files_drag_scene.mjs
     else skip "files-drag-scene" "node and the repository's node_modules (npm install)"; fi
-    # (0.8.8.6) Lord Classic's taskbar on every display: three monitors, panels on the clicked bar's display, one timer
+    # (0.8.8.6) Classic's taskbar on every display: three monitors, panels on the clicked bar's display, one timer
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-taskbar-test (themes/classic on every display, sdk/dock.js drop targets)" node tests/classic_taskbar_test.mjs
     else skip "classic-taskbar-test" "node and the repository's node_modules (npm install)"; fi
-    # (0.8.9) Lord Workspaces: three monitors, tiling per display, Save layout, a monitor unplugged and back, the styles
+    # (0.8.9) Workspaces: three monitors, tiling per display, Save layout, a monitor unplugged and back, the styles
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "workspaces-test (themes/workspaces on three displays)" node tests/workspaces_test.mjs
     else skip "workspaces-test" "node and the repository's node_modules (npm install)"; fi
@@ -1361,7 +1362,7 @@ EOF
             *) bad "files-renamelayout-scene $th (tests/files_renamelayout_scene, headless lord-server)" ;;
         esac
     done
-    # (0.8.9.6.1) Lord Workspaces' top band: the activity strip never over the status cluster (Arabic at 1600 px, German
+    # (0.8.9.6.1) Workspaces' top band: the activity strip never over the status cluster (Arabic at 1600 px, German
     # on a narrow screen), the accent under the activity in view
     for c in "ar 1600x900" "de 1024x768" "en 1280x800"; do
         lg=${c% *} sz=${c#* }

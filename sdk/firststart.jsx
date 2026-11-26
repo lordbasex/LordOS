@@ -31,7 +31,7 @@ const FLOAT_H = 186;            // the floating box's height, for keeping it ins
 // null while it isn't shown, else { st, desks: { id: { name, description } }, current, ctx }
 const fsStore = createStore(null);
 export const firstStartState = () => fsStore.get()?.st || null;
-// whether it is open: a theme's own first-run (Lord Workspaces' activity onboarding) waits until it is done
+// whether it is open: a theme's own first-run (Workspaces' activity onboarding) waits until it is done
 export const useFirstStartOpen = () => useStore(fsStore, (v) => !!v);
 
 // startShell, once per JS context. ctx: { list() and current() of sdk themes, use(id) switches live, onDone() }.
@@ -137,7 +137,7 @@ function Card({ id, desk, on, width }) {
 }
 
 // Settings → Appearance in miniature, in the person's language, with the chosen desktop selected and the Desktop style
-// group ringed: drawn with the SDK's own parts, not a screenshot. Its styles are in Settings' order (Lord Flow, Lord
+// group ringed: drawn with the SDK's own parts, not a screenshot. Its styles are in Settings' order (Flow, Lord
 // Classic, then the others), not the chooser's random one.
 function SettingsReplica({ cur, width }) {
   const tokens = useStore(shellTokens) || DEFAULT_TOKENS;

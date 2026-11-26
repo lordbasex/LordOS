@@ -6158,7 +6158,7 @@ static int system_meta_key(int code, const KeyInfo *k) {
     }
 }
 
-/* Keys the shell keeps (keygrab.c) and the ❖ → Ctrl of Lord Flow. grabbed[code]: its press went to
+/* Keys the shell keeps (keygrab.c) and the ❖ → Ctrl of Flow. grabbed[code]: its press went to
  * the shell, so its release does too. remapped[code]: its press went to the app as Ctrl+key.
  * grab_hold: the modifier of a switcher in progress; until it is released every key is the shell's,
  * while modifiers still reach the app too, so it never keeps one stuck. */
@@ -7390,7 +7390,7 @@ const char *wl_kill(int id) {
     return NULL;
 }
 
-/* Locked by the theme (Lord Workspaces' padlock): the app is told it can't maximize or minimize (xdg-shell 5's
+/* Locked by the theme (Workspaces' padlock): the app is told it can't maximize or minimize (xdg-shell 5's
  * wm_capabilities, which Chromium and GTK 4 read to hide those buttons; a new list takes effect with the next
  * configure), and its requests to do so are answered with the state as it is. Its own close button stays: closing is
  * the app's. */

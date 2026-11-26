@@ -1,9 +1,9 @@
-// Lord Celeste (id celeste), a community theme: a frame around each display with rounded inner corners, a bar on its
+// Celeste (id celeste), a community theme: a frame around each display with rounded inner corners, a bar on its
 // thick side and drawers that slide out of its edges (dashboard on top, app launcher at the bottom, session and
 // sidebar at the end). Layout inspired by Caelestia (caelestia-dots/shell, GPL-3.0); no code or assets from it.
 //
 // Several displays: every display gets the frame and the bar unless Settings → Desktop & Dock → Menu Bar → "Show the
-// menu bar on every display" is off or the displays are mirrored, as Lord Flow's menu bar (sdk/menubarmodel.js
+// menu bar on every display" is off or the displays are mirrored, as Flow's menu bar (sdk/menubarmodel.js
 // hasBar); the wallpaper is each display's own (wallpaperIdFor, by connector). In Arabic and Hebrew the frame is
 // mirrored. The theme's options (colour scheme, frame, hover edges, wallpaper effect) are in theme.json and shown by
 // Settings → Appearance.

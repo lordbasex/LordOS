@@ -484,8 +484,8 @@ releases, and a background with a brand reads as endorsement.
 
 ### 9.1 The popover (all themes)
 
-It opens from the camera status item next to the clock. The component is `sdk/studio.jsx`, so Lord Flow, Lord
-Classic, Lord Workspaces and Celeste get it with no theme code beyond placing the item (the rule "per-display and
+It opens from the camera status item next to the clock. The component is `sdk/studio.jsx`, so Flow,
+Classic, Workspaces and Celeste get it with no theme code beyond placing the item (the rule "per-display and
 shared features in the SDK"). It follows `textAlign: 'start'/'end'` for right-to-left languages, and the preview has
 `direction: 'ltr'` because it uses mouse x for the eyedropper.
 

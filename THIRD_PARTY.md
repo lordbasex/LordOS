@@ -114,7 +114,7 @@ recordings' origin isn't documented).
 
 | Theme | Credit | License |
 |---|---|---|
-| Lord Celeste (`themes/celeste`) | Layout inspired by Caelestia (caelestia-dots/shell, GPL-3.0); no code or assets from it. Author pending confirmation | MIT |
+| Celeste (`themes/celeste`) | Layout inspired by Caelestia (caelestia-dots/shell, GPL-3.0); no code or assets from it. Author: Federico Pereira (IPERFEX); kept in LordOS-themes since 0.8.9.6.2 | MIT |
 
 ## npm packages (bundled into the theme JavaScript at build time)
 

@@ -48,7 +48,7 @@ export function Icon({ size: s }) {
   );
 }
 
-// A menu never shows a key the theme takes: Lord Classic has ❖N, ❖D, ❖I, ❖A and ❖1…4, where Files answers to Ctrl as well.
+// A menu never shows a key the theme takes: Classic has ❖N, ❖D, ❖I, ❖A and ❖1…4, where Files answers to Ctrl as well.
 const ARROW_KEY = { '↑': 'ArrowUp', '↓': 'ArrowDown' };
 function localKey(hint) {
   const m = /^❖([A-Z0-9,↑↓])$/.exec(hint || '');

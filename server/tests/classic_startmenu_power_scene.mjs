@@ -1,5 +1,5 @@
 // classic_startmenu_power_scene.mjs — the scene of tests/classic_startmenu_power_test.mjs (not run by
-// itself): the Lord Classic start menu (themes/classic/components/StartMenu.jsx) rendered through
+// itself): the Classic start menu (themes/classic/components/StartMenu.jsx) rendered through
 // runtime/index.js and the real SDK with the shell's layers on, over a stub `lord` (the bundle's banner).
 // It opens the power menu and clicks a row the way lord-server sends a click (down, then up on the same
 // node). Prints one line per check: "ok <name>" or "FAIL <name> <detail>".

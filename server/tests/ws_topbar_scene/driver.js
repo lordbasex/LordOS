@@ -1,5 +1,5 @@
 // driver.js — goes after the theme bundle in tests/app_scene_headless.sh ws_topbar_scene (run with the workspaces
-// theme; SCENE_SIZE sets the screen): four activities in Lord Workspaces' top band, then checks that the activity strip
+// theme; SCENE_SIZE sets the screen): four activities in Workspaces' top band, then checks that the activity strip
 // and the status cluster are both on screen and never overlap (Arabic at 1600 px wide put the strip over the clock),
 // and the accent is under the activity in view, with a screenshot. Lines start with "APP-SCENE" in the shell log.
 (function () {

@@ -1,7 +1,7 @@
-// Lord Celeste's bar, on the frame's thick side (the left, or the right in Arabic and Hebrew), one per display that
+// Celeste's bar, on the frame's thick side (the left, or the right in Arabic and Hebrew), one per display that
 // gets a frame: the app launcher and Search, the desktops, the running apps (a click brings an app forward or back from
 // minimized, a right click opens its menu), the camera/microphone/screen indicators and the apps' status items (as Lord
-// Flow's menu bar and Lord Workspaces' top bar show them), the quick status (Wi-Fi, Bluetooth, sound, battery), the
+// Flow's menu bar and Workspaces' top bar show them), the quick status (Wi-Fi, Bluetooth, sound, battery), the
 // notifications' bell, the clock and the session button. Every drawer opens with a click here; the hover edges are
 // only a shortcut. The parts that change often subscribe on their own (the clock to one shared timer, the network to
 // one 5 s poll), so the bar is not drawn again every second.

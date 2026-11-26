@@ -463,7 +463,7 @@
     "next": "Cara siguiente",
     "items": {
       "flow": {
-        "name": "Lord Flow",
+        "name": "Flow",
         "kicker": "Familiar desde el primer minuto",
         "lead": "Una barra de menús arriba y un Dock abajo, con vidrio suave y esquinas redondeadas. Lo abrís y ya sabés usarlo.",
         "points": [
@@ -472,11 +472,11 @@
           "Ventanas que se acomodan en los bordes de la pantalla"
         ],
         "who": "quien quiere ponerse a trabajar sin aprender nada nuevo.",
-        "cta": "Conocé Lord Flow",
-        "alt": "Lord Flow: la barra de menús arriba, el Dock abajo y apps abiertas"
+        "cta": "Conocé Flow",
+        "alt": "Flow: la barra de menús arriba, el Dock abajo y apps abiertas"
       },
       "classic": {
-        "name": "Lord Classic",
+        "name": "Classic",
         "kicker": "Barra de tareas y menú de inicio",
         "lead": "Todo en una barra abajo: el menú de inicio con búsqueda, tus ventanas abiertas y los ajustes rápidos.",
         "points": [
@@ -485,11 +485,11 @@
           "Una barra de tareas en cada pantalla"
         ],
         "who": "quien viene de un escritorio con barra de tareas y quiere sentirse en casa.",
-        "cta": "Conocé Lord Classic",
-        "alt": "Lord Classic: el menú de inicio abierto sobre la barra de tareas"
+        "cta": "Conocé Classic",
+        "alt": "Classic: el menú de inicio abierto sobre la barra de tareas"
       },
       "workspaces": {
-        "name": "Lord Workspaces",
+        "name": "Workspaces",
         "kicker": "Organizado por actividades",
         "lead": "Tu trabajo no es una pila de ventanas: es un conjunto de cosas que estás haciendo. Cada actividad tiene sus apps y su disposición.",
         "points": [
@@ -498,8 +498,8 @@
           "Widgets que no leen nada mientras no los ves"
         ],
         "who": "quien trabaja con muchas ventanas, o con dos o tres monitores.",
-        "cta": "Conocé Lord Workspaces",
-        "alt": "Lord Workspaces: la Context Spine, la franja de actividades y widgets sobre el panorama de Cyberpunk City HD"
+        "cta": "Conocé Workspaces",
+        "alt": "Workspaces: la Context Spine, la franja de actividades y widgets sobre el panorama de Cyberpunk City HD"
       }
     },
     "nextFace": {

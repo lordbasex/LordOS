@@ -1,7 +1,7 @@
 // slideshow.jsx — the wallpaper slideshow (0.8.9; docs/WALLPAPERS.md is the collection, docs/WORKSPACES.md "Wallpaper
 // slideshow" the feature). The decisions are in slideshowmodel.js, tested with node; a theme that declares
 // "wallpaper": { "slideshow": true } in its theme.json draws <SlideshowWallpapers> instead of its still pictures while
-// settings.slideshow.on is true (Lord Workspaces only, today).
+// settings.slideshow.on is true (Workspaces only, today).
 //
 // Cost: nothing at rest. One timer per change (no interval): the next picture is decoded off the interface's thread a
 // few seconds before (a "thumb:" image, server/src/ui/image.c, at the display's size), drawn with opacity 0 until its

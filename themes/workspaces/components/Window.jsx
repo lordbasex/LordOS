@@ -1,4 +1,4 @@
-// Window frame of Lord Workspaces: a 36 px title bar (the app's icon and title at the start, the buttons at the end, or
+// Window frame of Workspaces: a 36 px title bar (the app's icon and title at the start, the buttons at the end, or
 // first with Settings → Desktop & Dock → Title bars → Left) and, for an app with menus of its own, a strip with them
 // under it, with Window and Help (there is no global menu bar: F10, or ⌥ pressed and released alone, opens the focused
 // window's first menu, sdk/shortcuts.js addMenuBarKeys). The buttons are real targets (28 px, a glyph that says what

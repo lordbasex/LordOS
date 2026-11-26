@@ -379,7 +379,7 @@
     "theme": "dark",
     "variant": "rtl",
     "caption": {
-      "en": "Lord Classic theme in Arabic",
+      "en": "Classic theme in Arabic",
       "es": "Tema clásico en árabe",
       "pt": "Tema clássico em árabe"
     }
@@ -390,9 +390,9 @@
     "theme": "light",
     "variant": "normal",
     "caption": {
-      "en": "Linux app in the Lord Classic theme",
-      "es": "App de Linux con el tema Lord Classic",
-      "pt": "App Linux no tema Lord Classic"
+      "en": "Linux app in the Classic theme",
+      "es": "App de Linux con el tema Classic",
+      "pt": "App Linux no tema Classic"
     }
   },
   {
@@ -401,9 +401,9 @@
     "theme": "dark",
     "variant": "normal",
     "caption": {
-      "en": "Lord Classic theme start menu",
-      "es": "Menú de inicio del tema Lord Classic",
-      "pt": "Menu iniciar do tema Lord Classic"
+      "en": "Classic theme start menu",
+      "es": "Menú de inicio del tema Classic",
+      "pt": "Menu iniciar do tema Classic"
     }
   },
   {
@@ -621,9 +621,9 @@
     "theme": "dark",
     "variant": "normal",
     "caption": {
-      "en": "Lord Classic left taskbar with top bar",
-      "es": "Barra de Lord Classic a la izquierda y barra superior",
-      "pt": "Barra do Lord Classic à esquerda com barra superior"
+      "en": "Classic left taskbar with top bar",
+      "es": "Barra de Classic a la izquierda y barra superior",
+      "pt": "Barra do Classic à esquerda com barra superior"
     }
   },
   {
@@ -632,9 +632,9 @@
     "theme": "dark",
     "variant": "normal",
     "caption": {
-      "en": "Lord Classic taskbar on the left",
-      "es": "Barra de tareas de Lord Classic a la izquierda",
-      "pt": "Barra de tarefas do Lord Classic à esquerda"
+      "en": "Classic taskbar on the left",
+      "es": "Barra de tareas de Classic a la izquierda",
+      "pt": "Barra de tarefas do Classic à esquerda"
     }
   },
   {
@@ -2293,9 +2293,9 @@
     "theme": "dark",
     "variant": "normal",
     "caption": {
-      "en": "Early Lord Classic theme",
-      "es": "Primer tema Lord Classic",
-      "pt": "Primeiro tema Lord Classic"
+      "en": "Early Classic theme",
+      "es": "Primer tema Classic",
+      "pt": "Primeiro tema Classic"
     }
   },
   {
@@ -2656,9 +2656,9 @@
     "theme": "dark",
     "variant": "normal",
     "caption": {
-      "en": "Notes in the Lord Classic theme",
-      "es": "Notas con el tema Lord Classic",
-      "pt": "Notas no tema Lord Classic"
+      "en": "Notes in the Classic theme",
+      "es": "Notas con el tema Classic",
+      "pt": "Notas no tema Classic"
     }
   },
   {
@@ -7584,9 +7584,9 @@
     "theme": "dark",
     "variant": "normal",
     "caption": {
-      "en": "Lord Classic: an app's own menus in a strip under its title bar",
-      "es": "Lord Classic: los menús de la app en una franja bajo la barra de título",
-      "pt": "Lord Classic: os menus do app numa faixa sob a barra de título"
+      "en": "Classic: an app's own menus in a strip under its title bar",
+      "es": "Classic: los menús de la app en una franja bajo la barra de título",
+      "pt": "Classic: os menus do app numa faixa sob a barra de título"
     }
   },
   {
@@ -7694,9 +7694,9 @@
     "theme": "dark",
     "variant": "normal",
     "caption": {
-      "en": "Settings → Appearance → Desktop style: Lord Flow or Lord Classic",
-      "es": "Ajustes → Apariencia → Estilo de escritorio: Lord Flow o Lord Classic",
-      "pt": "Ajustes → Aparência → Estilo da área de trabalho: Lord Flow ou Lord Classic"
+      "en": "Settings → Appearance → Desktop style: Flow or Classic",
+      "es": "Ajustes → Apariencia → Estilo de escritorio: Flow o Classic",
+      "pt": "Ajustes → Aparência → Estilo da área de trabalho: Flow ou Classic"
     }
   },
   {

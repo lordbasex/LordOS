@@ -161,7 +161,7 @@ Frameworks-only run.
 
 **Where the windows go.** The screen asks for 820x600 so a harness's 600x400 window fits beside it on a common
 screen, but a Wayland client can't choose where its window opens (xdg-shell has no position for a toplevel), and an
-X11 harness's position is the window manager's as well. Lord Flow opens each new window over the middle of the
+X11 harness's position is the window manager's as well. Flow opens each new window over the middle of the
 desktop, so the harness's window covers part of the screen while it runs (the rows' left part and the details box);
 the row, its ticks and the step on the harness's own label stay visible.
 
@@ -427,10 +427,10 @@ Two real runs of `lordos-testbench --toolkits` from `feat/ta-report`, with this 
 
 - **The maintainer's PC** (Debian 13, Xwayland 24.1.6, python3-gi without the GTK typelibs, no PyQt): a headless
   `build/lord-server-test --headless 1280x800 --test-hooks --user` with a private `XDG_RUNTIME_DIR` and `HOME`, as
-  `tools/wl-conformance.mjs` starts it. It came up with Lord Workspaces. `theme`: a test server has no session
-  bus, so no portal. `fullscreen`: the window came back 26 px shorter (the Workspaces bug below); with Lord Flow it
+  `tools/wl-conformance.mjs` starts it. It came up with Workspaces. `theme`: a test server has no session
+  bus, so no portal. `fullscreen`: the window came back 26 px shorter (the Workspaces bug below); with Flow it
   passes.
-- **VM 127** (0.8.9.6+ws148, Lord Flow, dark mode; GTK 3.24.49, GTK 4.18.6, Qt 5.15.15, Qt 6.8.2, Xwayland 24.1.6),
+- **VM 127** (0.8.9.6+ws148, Flow, dark mode; GTK 3.24.49, GTK 4.18.6, Qt 5.15.15, Qt 6.8.2, Xwayland 24.1.6),
   three identical runs. No crash, timeout or protocol error, and no protocol error attributed to any of the 28
   globals the toolkits bound. The failures are what an app of that toolkit really gets on LordOS:
   - `theme` on `gtk3-x11`: GTK 3 on X11 reads only XSETTINGS, which LordOS didn't serve then (served since
@@ -453,7 +453,7 @@ Two real runs of `lordos-testbench --toolkits` from `feat/ta-report`, with this 
   while the window stays fullscreen. `wl_paint()` never corrects it for the fullscreen surface (wl.c:4676), and the
   theme isn't told either: `emit(s, "fullscreen")` runs only for a mapped surface (wl.c:3908) and the map event
   doesn't carry the state.
-- **Lord Classic and Lord Workspaces shrink Linux windows by the menu strip's height.** Those themes give every
+- **Classic and Workspaces shrink Linux windows by the menu strip's height.** Those themes give every
   Linux window a 26 px menu strip (the Edit menu with Speech, `sdk/voice.js` `useMenusWithSpeech`, on by default),
   but `sdk/wayland.js` sizes the frame with `windowChrome().h` only: on map (line 142), on the app's own resize
   (line 231) and for a restored window (line 312), never `windowChrome().menu`. The app gets 26 px less than it
@@ -466,8 +466,8 @@ Two real runs of `lordos-testbench --toolkits` from `feat/ta-report`, with this 
   `xdg_toplevel.set_fullscreen` before the first commit. `sdk/wayland.js` sizes a Linux window's frame with the menu
   strip when the theme has one (`chromeInset(chrome, csd, strip)`, `sdk/voice.js` `menusWithSpeech`) on map, on the
   app's own resize, for a restored window and for a toplevel drag, and Celeste now declares its strip too. With both,
-  the X11 harness passes `fullscreen` (on 1280x800, off 600x400) three runs in a row in Lord Flow, Lord Classic,
-  Lord Workspaces and Celeste on the headless test server; Lord Workspaces failed it before. Sizes window memory
+  the X11 harness passes `fullscreen` (on 1280x800, off 600x400) three runs in a row in Flow, Classic,
+  Workspaces and Celeste on the headless test server; Workspaces failed it before. Sizes window memory
   already saved smaller stay as they are (they can't be told from a size the person chose) and no longer shrink.
 - **Smaller (fixed 2026-11-26, above):** the keyboard comes back to a window 60 to 75 ms after one of its child toplevels closes (VM 127). A
   Qt 6 popup the app opens in that gap is closed by Qt when the focus arrives (the harness now waits for it, as a

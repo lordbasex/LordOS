@@ -1,4 +1,4 @@
-// menubar_scene.mjs — the scene of tests/menubar_test.mjs (not run by itself), issue #58: Lord Flow's Control Center
+// menubar_scene.mjs — the scene of tests/menubar_test.mjs (not run by itself), issue #58: Flow's Control Center
 // and clock panel and the shared output list, rendered through runtime/index.js and the real SDK with the shell's
 // layers on, over a stub `lord` (the bundle's banner) with two sound outputs. It turns the choices of Settings →
 // Desktop & Dock → Menu Bar / Control Center on and off and reads what is drawn. Prints one line per check: "ok

@@ -1,5 +1,5 @@
 // theme_cost_scene.mjs — what a change costs in a theme, in native calls (createNode, setStyle, setText, appendChild,
-// insertBefore, removeChild) and in timers, for Lord Flow, Lord Classic, Lord Workspaces and Lord Celeste alike: node
+// insertBefore, removeChild) and in timers, for Flow, Classic, Workspaces and Celeste alike: node
 // tests/workspaces_test.mjs theme_cost_scene.mjs <default|classic|workspaces|celeste>. One 1920×1080 display, three windows.
 // Prints "ok cost <name> <value>" lines (numbers, not pass/fail: docs/WORKSPACES.md compares them), and fails only if
 // the theme doesn't start. Not in make test: a measurement.

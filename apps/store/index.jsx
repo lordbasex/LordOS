@@ -383,7 +383,7 @@ function InstalledPage({ query, filter: initial, only = null, empty = null, onNa
 // and, over it, an app page (`app`: a Debian package; `ai`: true for a catalog app; `web`: true for a web app, its id;
 // `native`: true for one of Apps LordOS's own items, its id).
 // Back returns to the page.
-// a small window (a Lord Workspaces tile): below SIDE_AT the pages and categories hide behind a toolbar button
+// a small window (a Workspaces tile): below SIDE_AT the pages and categories hide behind a toolbar button
 const SIDE_AT = 720;
 const SIDE_W = 250, SIDE_MIN = 190, SIDE_MAX = 380;      // 250 (2026-11-23): "Apps de GNU/Linux (Debian)" whole at the default width
 const PAGE_GLYPH = { flathub: GLYPH.flathub, suites: GLYPH.suites, remote: GLYPH.remote, commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, webapps: GLYPH.webapps, lordos: GLYPH.lordos };

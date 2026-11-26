@@ -1,4 +1,4 @@
-// narrow.jsx — apps in a small window (0.8.8.10): a tile of Lord Workspaces' Main and side or Grid is about 600×470 on a
+// narrow.jsx — apps in a small window (0.8.8.10): a tile of Workspaces' Main and side or Grid is about 600×470 on a
 // 1920×1080 display, so every native app must work down to that size. An app reads its window's width from the window
 // store (no polling, no measuring) and, below its breakpoint, hides its sidebar behind a toolbar button; shown again
 // there, the sidebar lays over the content instead of squeezing it.

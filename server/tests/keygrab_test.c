@@ -57,7 +57,7 @@ int main(void) {
     CHECK(!keygrab_set(NULL));
     CHECK(keygrab_match(KEY_TAB, 0, KG_ALT) == KG_HOLD);
 
-    /* Lord Classic */
+    /* Classic */
     CHECK(keygrab_match(KEY_TAB, 0, KG_ALT | KG_SHIFT) == KG_HOLD);
     CHECK(keygrab_match(KEY_TAB, 0, KG_CTRL) == KG_PASS);                  /* Ctrl+Tab stays with the apps */
     CHECK(keygrab_match(KEY_F4, 0, KG_ALT) == KG_TAKE);
@@ -73,7 +73,7 @@ int main(void) {
     CHECK(keygrab_match(KEY_Q, 'q', KG_CTRL) == KG_PASS);                  /* Ctrl+Q is never global */
     CHECK(!keygrab_is_remap('c', KG_META));                                /* no ❖ → Ctrl here */
 
-    /* Lord Flow */
+    /* Flow */
     CHECK(keygrab_set("flow"));
     CHECK(keygrab_match(KEY_TAB, 0, KG_ALT) == KG_PASS);
     CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_HOLD);
@@ -102,7 +102,7 @@ int main(void) {
     CHECK(keygrab_set("classic"));
     CHECK(keygrab_match(KEY_COMMA, 'w', KG_META) == KG_PASS);
 
-    /* Lord Workspaces: Lord Flow's keys plus ⌃F2 (the bars' focus); Lord Flow itself leaves ⌃F2 to the app */
+    /* Workspaces: Flow's keys plus ⌃F2 (the bars' focus); Flow itself leaves ⌃F2 to the app */
     CHECK(keygrab_set("workspaces"));
     CHECK(keygrab_match(KEY_F2, 0, KG_CTRL) == KG_TAKE);
     CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_HOLD);

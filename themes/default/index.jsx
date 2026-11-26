@@ -1,4 +1,4 @@
-// "Lord Flow" theme (id default) — a menu bar and dock layout, with its own assets.
+// "Flow" theme (id default) — a menu bar and dock layout, with its own assets.
 // The theme builds the desktop (wallpaper, bar, dock, app launcher, Control Center) and the
 // window frames. Apps come from apps/ through the SDK.
 import {
@@ -91,7 +91,7 @@ function useMinimizing(windows) {
     .filter((x) => x.win && x.win.minimized);
 }
 
-// Lord Flow's own shortcuts (the common ones are in sdk/shortcuts.js).
+// Flow's own shortcuts (the common ones are in sdk/shortcuts.js).
 const onFront = (fn) => () => { const id = wm.focused(); if (id) fn(id); };
 const minimizeFront = onFront(wm.minimize);
 const hideFront = onFront(hideApp);
@@ -125,7 +125,7 @@ function DockMenu({ pos, at, items, onClose }) {
 }
 
 function App() {
-  startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Lord Workspaces
+  startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Workspaces
   const [s] = useTrackedSettings();   // the desktop renders again only for the settings it reads (sdk/settings.js)
   const t = makeTheme(s);
   const { windows, mounted, focused } = useWindows();

@@ -1,6 +1,10 @@
 {
-  "name": "Lord Workspaces",
+  "name": "Workspaces",
   "description": "Activities with their own apps and layouts, a Context Spine, tiling per display and three effects styles.",
+  "author": "Federico Pereira",
+  "email": "fpereira@iperfex.com",
+  "organization": "IPERFEX",
+  "license": "MIT",
   "sketch": { "rail": true, "pills": true, "frame": true },
   "desktopArrows": true,
   "displayApps": true,

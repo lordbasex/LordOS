@@ -51,11 +51,11 @@ its own layout (for example what the Super key alone does).
 
 | Theme | Folder | Layout |
 |---|---|---|
-| Lord Flow | `themes/default` | menu bar on top (with the app's menus), magnifying Dock, app launcher, Control Center |
-| Lord Classic | `themes/classic` | taskbar (bottom, top or a side), start menu with search, quick settings, notification panel, menus in each window, snapping and the SDK's Overview |
-| Lord Workspaces (since 0.8.9) | `themes/workspaces` | activities (desktops with an icon, a colour, pinned apps and a layout per display), a Context Spine, group frames with static tiling, its own Search panel and Control Center, menus in each window, three effects styles ([WORKSPACES.md](WORKSPACES.md)) |
+| Flow | `themes/default` | menu bar on top (with the app's menus), magnifying Dock, app launcher, Control Center |
+| Classic | `themes/classic` | taskbar (bottom, top or a side), start menu with search, quick settings, notification panel, menus in each window, snapping and the SDK's Overview |
+| Workspaces (since 0.8.9) | `themes/workspaces` | activities (desktops with an icon, a colour, pinned apps and a layout per display), a Context Spine, group frames with static tiling, its own Search panel and Control Center, menus in each window, three effects styles ([WORKSPACES.md](WORKSPACES.md)) |
 | Luna (in development after 0.8.9.6.1) | `themes/luna` | a tribute to the desktops of 2001: glossy blue title bars with rounded tops, a green start button on a blue taskbar with quick launch and a button per window; the demo of [style packs and app skins](#style-packs-and-app-skins): its own icons, pointers, sounds and font, and Files as that era's explorer |
-| Lord Celeste (community, since 0.8.9.5) | `themes/celeste` | a frame around each display with rounded inner corners, a bar on its thick side (running apps, status items, privacy indicators, clock), drawers that slide out of the frame's edges (dashboard, launcher, session, sidebar with the notifications), menus in each window, mirrored right to left; the theme options of `theme.json` and a node-tested geometry (`model.js`). Layout inspired by Caelestia (caelestia-dots/shell); no code from it |
+| Celeste (since 0.8.9.5; a community theme until 0.8.9.6.1, official since) | `themes/celeste` | a frame around each display with rounded inner corners, a bar on its thick side (running apps, status items, privacy indicators, clock), drawers that slide out of the frame's edges (dashboard, launcher, session, sidebar with the notifications), menus in each window, mirrored right to left; the theme options of `theme.json` and a node-tested geometry (`model.js`). Layout inspired by Caelestia (caelestia-dots/shell); no code from it |
 
 `themes/greeter` is the login and lock screen: it is a separate program, not a desktop theme (see
 [The login and lock screen](#the-login-and-lock-screen-are-not-your-theme)).
@@ -65,7 +65,7 @@ since 0.8.5 lists every installed theme (the only place to choose one). It is a 
 (`apps/settings/ThemeGallery.jsx`, with its pure parts in `sdk/themegallery.js`): a search field
 (name, description, author and id, without accents), the filters All / Official / Community /
 Installed and a grid of cards that wraps with the window; the arrow keys move over the cards and
-Enter opens one. The official themes come first (Lord Flow, Lord Classic, then by name), then the
+Enter opens one. The official themes come first (Flow, Classic, then by name), then the
 community ones by name; a theme with `"hidden": true` in its `theme.json` is not listed. A card opens
 the theme's page: a larger picture, its description, author, license and version, its own options
 and **Apply**. A theme that couldn't start in this session (lord-server went back to the one before,
@@ -92,7 +92,7 @@ How a session starts: `lord-sessiond` always starts `lord-server` with
 `sess.c`), and `lord-server` starts the theme the user chose instead (`chosen_theme` in `server/src/main.c` reads
 `theme` from the settings), so no theme is loaded only to switch; if the default one did start anyway, its
 `startShell()` switches to the chosen one. If the chosen theme can't be loaded, the session starts in the default
-theme (then Lord Classic, then the recovery screen) and its `startShell()` puts the choice back and says why.
+theme (then Classic, then the recovery screen) and its `startShell()` puts the choice back and says why.
 
 ## 2. Anatomy of a theme
 
@@ -120,8 +120,12 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
   `shell.theme.<id>.name` / `shell.theme.<id>.description` (the bundled themes translate theirs
   that way; `themes.list` in `sdk/index.js`). A missing or invalid `theme.json` shows the id.
 - `hidden: true` keeps it out of Settings (the login screen uses it).
+- The name is the theme's own, never "Lord …" (`tools/brand-check.mjs` refuses one, in `theme.json` and in every
+  language's `shell.theme.<id>.name`), and `author` names a real person or project (with `email` and `organization`
+  when there is one: the official themes say Federico Pereira, fpereira@iperfex.com, IPERFEX). The official themes
+  are developed in LordOS-themes and synced into `themes/` (`themes/README.md`).
 - It is read as text of at most 4 KB. It is data, not code, so it is not in the code manifest.
-- (0.8.9) Three optional fields for Settings, which knows only Lord Flow and Lord Classic by id. `sdk/thememeta.js`
+- (0.8.9) Three optional fields for Settings, which knows only Flow and Classic by id. `sdk/thememeta.js`
   checks them and drops anything else (labels must be `shell.*` locale keys or, from 0.8.9.6.2, keys of the theme's
   own namespace `theme-<id>`, see [Translations](#translations); values short plain strings):
   - `"sketch": { "rail": true, "pills": true, "frame": true }` (also `menubar`, `dock`, `taskbar`): the drawn picture
@@ -129,10 +133,10 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
   - `"options": [{ "key", "label", "hint", "choices": [[value, label], …] | "toggle": true, "default" }]`: the theme's
     own choices, shown under Desktop style and on Desktop & Dock while it is the current theme, stored in
     `settings.themeOptions[<theme id>][key]`; read them with `themeOptionValue` (`@lordos/sdk`).
-  - `"desktopArrows": true`: the Desktops section offers Settings → Keyboard's ⌃-arrows switch, as for Lord Flow
+  - `"desktopArrows": true`: the Desktops section offers Settings → Keyboard's ⌃-arrows switch, as for Flow
     (the theme then uses `flowDesktopKeys` and `flowGrabs()`).
 
-  Lord Workspaces' `theme.json` uses all three.
+  Workspaces' `theme.json` uses all three.
 - Five optional fields that Settings → Appearance shows on the theme's card and page (checked by
   `cleanThemeMeta` in `sdk/thememeta.js`; an invalid value is dropped):
 
@@ -159,13 +163,13 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
   `community` is the author's own statement for now: an installed community theme still needs its bundle in the
   code manifest to run (below). From stage 2 of the themes plan, a theme installed from a file is a community
   theme whatever it says.
-  Credit any work a community theme was inspired by in `THIRD_PARTY.md` (Lord Celeste is an example).
+  Credit any work a community theme was inspired by in `THIRD_PARTY.md` (Celeste is an example).
 
 ### `tokens.js`: the contract with the apps
 
 Every app reads its colors with `useTheme()` (`sdk/theme.js`), so it looks right in any theme. The
 theme passes its tokens to `<ThemeProvider tokens={…}>`; whatever it leaves out falls back to
-`DEFAULT_TOKENS` (Lord Flow's dark colors), and its own extra keys pass through untouched. Isolated
+`DEFAULT_TOKENS` (Flow's dark colors), and its own extra keys pass through untouched. Isolated
 apps (their own processes) receive the same tokens through the broker, and Linux apps get the mode,
 the accent and the title-bar button order through the settings portal (`publishTokens` and
 `syncPortal` in `sdk/theme.js`). So the tokens must be plain JSON values (no functions).
@@ -263,7 +267,7 @@ startShell(<App />);
 - `chrome: { w, h }`: how much the frame adds around the content (borders plus title bar), so a
   Linux window opens at the size it asked for.
 - `snap: true`: window snapping (drag to the edges, `wm.snap`, `wm.snapKey`, the `snapPreview`
-  store to draw the preview; [WINDOWS.md](WINDOWS.md#snapping-083)). Lord Classic turns it on.
+  store to draw the preview; [WINDOWS.md](WINDOWS.md#snapping-083)). Classic turns it on.
 
 **`startShell(element)`** (`sdk/index.js`): switches to the user's theme if it isn't this one, turns
 the layers on, reopens the windows after a theme switch, renders your element inside a root that
@@ -294,7 +298,7 @@ Inside it:
 - a title bar whose `onMouseDown` calls **`wm.beginMove(w.id)`**. Moving and resizing are then done
   by `lord-server` in C (`server/src/ui/grab.c`): React gets no event per frame, and the moving
   window is painted from a cached layer ([WINDOWS.md](WINDOWS.md)). `beginMove` returns `false` when
-  it can't (a maximized window, no button held); Lord Classic then drags out of the maximized place
+  it can't (a maximized window, no button held); Classic then drags out of the maximized place
   in JS with `wm.move`;
 - **`<AppHost id={w.id} focused={…} />`** for the content, in a `flex: 1` box;
 - no background under the content when `getApp(w.id).transparent` (the Terminal). Such a window has
@@ -326,10 +330,10 @@ The SDK gives menus as **item lists**; the theme draws them. An item is
 | `windowMenuItems(winId)` | the Window menu, the same in every theme: Minimize, Zoom, Fill, Center, Move & Resize (halves, quarters, thirds, arrangements), Move to *display*, Bring All to Front, the window list (`sdk/windowmenu.js`) |
 | `dockMenu(entry)` | a Dock or taskbar item's context menu |
 | `trashMenu({ onEmpty })` | the Trash's menu |
-| `recentItems(n)`, `storeUpdates()`, `runningApps()`, `forceQuit(key)`, `appGroup(winId)` | for a system menu like Lord Flow's crown menu |
+| `recentItems(n)`, `storeUpdates()`, `runningApps()`, `forceQuit(key)`, `appGroup(winId)` | for a system menu like Flow's crown menu |
 
-Where they go is the theme's choice: Lord Flow shows the app menus in its top menu bar
-(`themes/default/components/MenuBar.jsx`), Lord Classic in a strip under each window's title bar
+Where they go is the theme's choice: Flow shows the app menus in its top menu bar
+(`themes/default/components/MenuBar.jsx`), Classic in a strip under each window's title bar
 (`themes/classic/components/Window.jsx`). A theme without either must still give the app's menus a
 place, or the apps lose commands. Each bundled theme has its own `components/Menu.jsx` that puts the
 menu in the `popover` layer.
@@ -369,7 +373,7 @@ There are no ready-made panels in the SDK: each theme draws its own from SDK sto
 
 - **App launcher / start menu:** `useLauncherApps()` (LordOS apps and installed Linux apps, sorted by
   name, with `name`, `Icon`, `kind`), `launchApp(id)`, `appCategory(app)`, `APP_CATEGORIES`;
-  system-wide search results from `searchEverything` (Lord Classic's start menu).
+  system-wide search results from `searchEverything` (Classic's start menu).
 - **Control Center / quick settings:** `Toggle`, `Slider`, `Segmented`; `useSound`, `sound`,
   `defaultSink`; `useBluetooth`; `useBattery`, `BatteryGlyph`; `nightActive`, `setNightManual`;
   `notifyPrefs`, `dndActive` (Do Not Disturb); `NowPlayingTile`; `useCpuUsage`, `useSystemInfo`;
@@ -425,7 +429,7 @@ With Arabic or Hebrew the engine flips rows and alignment by itself. Your part
 - The accent comes as a name (`settings.accent`) mapped through your `accents`.
 - `settings.effects === false` means "no transparency": draw opaque bars and `blur: 0`.
 - **Reduce motion** (`settings.reduceMotion`, also `useTheme().reduceMotion`): skip decorative
-  animation (both themes skip the Dock's "poof" when an item is removed, Lord Flow also the Dock's
+  animation (both themes skip the Dock's "poof" when an item is removed, Flow also the Dock's
   reorder glide; `ScrollView` stops fading).
 
 ### Several displays
@@ -434,12 +438,12 @@ Use `screenDisplays()` (`[{ id, name, x, y, w, h, scale, main }]`), `mainDisplay
 `displayAt(x, y)`, `displayFor(rect)` and `screen.mirror` ([DISPLAYS.md](DISPLAYS.md#the-theme-and-the-sdk)).
 The bundled themes draw a wallpaper per display at its pixel size
 (`wallpaperSrc(w, d.w * d.scale / 100, d.h * d.scale / 100)`), and put the Dock on the main display.
-Lord Flow draws a menu bar on every display (`<MenuBars>` in `themes/default/components/MenuBar.jsx`;
+Flow draws a menu bar on every display (`<MenuBars>` in `themes/default/components/MenuBar.jsx`;
 off with `settings.menuBarAllDisplays === false`, read it with `menuBarEveryDisplay(settings)`):
 `barDisplays`, `hasBar`, `activeBarId`, `pinBar` and `panelLeft` (`sdk/menubarmodel.js`) say which
 displays get a bar, which work areas reserve it, which bar has the app's menus lit and where a panel
 opens; `sharedTicker` (`sdk/ticker.js`) gives every bar's clock one timer; `spotlight.toggle(display)`
-opens Search on that display. Lord Classic draws a taskbar on every display under the same setting
+opens Search on that display. Classic draws a taskbar on every display under the same setting
 (`themes/classic/placement.js`; each bar registers its own `registerDockTarget`, and a drop goes to the first
 bar that is hit). Your `workArea` function receives each display; `workAreaOf(d)` and
 `pointerWorkArea()` read it back. New windows open on the display under the pointer, or the one the
@@ -457,14 +461,14 @@ Linux apps. A slow theme makes the whole desktop slow.
   it with reduce motion. `lord.setStyle` takes the engine's own keys (`rotate` in degrees, `scaleX`,
   `scaleY`), not a CSS `transform` string: an unknown key changes nothing and is logged once.
 - **`transform` scale and rotate are cheap**: the subtree is painted once into a cached raster and
-  composited (Lord Flow's minimize effect scales a whole window). The raster is freed 30 s after its last use
+  composited (Flow's minimize effect scales a whole window). The raster is freed 30 s after its last use
   (0.8.9.1), so an animation costs its memory only while it runs and shortly after.
 - **Blur costs**: `backdropFilter: blur(r)` reads a margin of 2×r around the surface, and any change
   touching it repaints the whole surface ([LAYERS.md](LAYERS.md#blurred-surfaces-and-partial-repaints)).
   Keep blurred surfaces few and small, and turn blur off with `effects: false`.
 - **Subscribe narrowly**: `useStore(store, selector)` re-renders only when the selected value changes;
   a clock that renders every second should only re-render its own text.
-- **Don't poll** when a store exists (sound, battery, Bluetooth and displays arrive as events). Lord
+- **Don't poll** when a store exists (sound, battery, Bluetooth and displays arrive as events).
   Classic's network glyph polls every 5 s; that is the upper bound to aim for.
 - The style subset has no CSS animations, dashed borders, skew or 3D (`themes/README.md`). An
   unknown style key is logged as `js: unsupported style '<key>'`, once per key per process (an
@@ -821,8 +825,8 @@ above):
    There is no hot reload.
 
 A theme that throws while its bundle is evaluated makes the switch fall back to the theme you came
-from (`lord-server: the theme failed, going back to …`); the error is in the log. Keep Lord Flow or
-Lord Classic installed: they are the fallback (`start_theme` in `main.c`).
+from (`lord-server: the theme failed, going back to …`); the error is in the log. Keep Flow or
+Classic installed: they are the fallback (`start_theme` in `main.c`).
 
 **Debugging.**
 
@@ -869,7 +873,7 @@ tests/app_scene_headless.sh theme_tour_scene /tmp/shots <id> ar light     # righ
 - **The work area follows the bar and the Dock** (position, size, auto-hide) live.
 - **Performance:** dragging and resizing stay smooth with your blur; nothing re-renders per frame
   when idle (no `requestAnimationFrame` loop left running).
-- **Theme switch both ways** with windows open: they come back in your theme, and back in Lord Flow.
+- **Theme switch both ways** with windows open: they come back in your theme, and back in Flow.
 - **The login and lock screen** are the system's (`themes/greeter`): nothing in your theme should
   try to imitate them.
 - **Notifications, search, permission prompts and the power dialog** look right inside your
@@ -956,7 +960,7 @@ lord-server that died; logging out, shutting down, restarting or switching user 
 short, while a logout the theme's own code asks for keeps the count until the theme has run a healthy minute, and a
 Restart… or Shut Down… countdown the theme starts never confirms by itself: only the person's click or key does): the previous style comes back and
 Settings shows "Couldn't start" with Report, **Try Again** and **Remove**. **Ctrl+Alt+Shift+Backspace** always
-restores Lord Flow.
+restores Flow.
 
 **Where it lives:** `~/.local/share/lordos/themes/<id>/` (`theme.json`, the built `theme.js`, `assets/`, `locales/`,
 `install.json`), written only by lord-server (`server/src/ui/themestore.c`). Its texts are the catalog `theme-<id>`

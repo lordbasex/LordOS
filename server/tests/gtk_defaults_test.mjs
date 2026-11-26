@@ -40,7 +40,7 @@ for (const raw of ov.split('\n')) {
 eq('override: only the window preferences group', Object.keys(groups), ['org.gnome.desktop.wm.preferences']);
 const wm = groups['org.gnome.desktop.wm.preferences'] || {};
 eq('override: button-layout only', Object.keys(wm), ['button-layout']);
-eq('override: Lord Flow\'s layout', wm['button-layout'], `'${WANT}'`);
+eq('override: Flow\'s layout', wm['button-layout'], `'${WANT}'`);
 
 const ini = read('assets/gtk/settings.ini').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
 eq('settings.ini: one group and one key', ini, ['[Settings]', `gtk-decoration-layout=${WANT}`]);
@@ -51,7 +51,7 @@ eq('sdk/windowbuttons.js default', theme && theme[1], WANT);
 const portal = /buttons\[64\] = "([^"]*)"/.exec(read('server/src/ui/portal.c'));
 eq('portal.c default', portal && portal[1], WANT);
 const classic = /gtkButtons:\s*'([^']*)'/.exec(read('themes/classic/tokens.js'));
-eq('Lord Classic asks for a valid layout', !!(classic && LAYOUT_RE.test(classic[1])), true);
+eq('Classic asks for a valid layout', !!(classic && LAYOUT_RE.test(classic[1])), true);
 eq('the default is a valid layout', LAYOUT_RE.test(WANT), true);
 
 const mk = read('tools/iso/mkdeb.sh');
@@ -75,7 +75,7 @@ if (!fs.existsSync(SYS) || !fs.existsSync(ENUMS) || !has('glib-compile-schemas')
     fs.copyFileSync(path.join(REPO, 'assets/gtk/90_lordos.gschema.override'), path.join(tmp, '90_lordos.gschema.override'));
     const out = execFileSync('glib-compile-schemas', ['--strict', tmp], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     eq('the override compiles without warnings', out.trim(), '');
-    eq('with the override: Lord Flow\'s layout', get(), `'${WANT}'`);
+    eq('with the override: Flow\'s layout', get(), `'${WANT}'`);
     // a value the user stored still wins (keyfile backend, as in a LordOS session)
     const kdir = path.join(tmp, 'cfg', 'glib-2.0', 'settings');
     fs.mkdirSync(kdir, { recursive: true });

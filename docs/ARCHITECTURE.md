@@ -30,11 +30,11 @@ like React Native but on top of our display server.
 | `server/src/` (kms, input, canvas) | **M1 done** | Display (KMS), input (evdev), 2D rasterizer |
 | `server/src/ui/` | **M2 done** | Nodes, styles, flexbox, text, images, painting, damage, QuickJS |
 | `runtime/`    | **M2 done** | React renderer (`@lordos/runtime`): a host config for the stock `react-reconciler` package, CSS → native, events |
-| `themes/default/` | **M2 done** | Lord Flow (named Lord Default until 0.8.5): theme with a menu bar, a dock and an app launcher, with our own assets |
+| `themes/default/` | **M2 done** | Flow (named Lord Default until 0.8.5, Lord Flow until 0.8.9.6.1): theme with a menu bar, a dock and an app launcher, with our own assets |
 | `server/src/ui/js_sys.c` | **M3 done** | System APIs: fs (writes in the home folder and the user's mounts; since 0.8.5 reads the whole tree except `/proc`, `/sys`, `/dev`, `/run`), /proc, settings, themes, session |
 | `sdk/` | **M3 done** | `@lordos/sdk`: windows, settings, tokens, controls, system hooks |
 | `apps/` | **M3 done** | Apps as packages (`manifest.json` + `index.jsx`), independent of the theme |
-| `themes/classic/` | **0.8.3 done** | Lord Classic (named Classic until 0.8.5): second full appearance (taskbar, start menu, snapping, menus inside the window since 0.8.5) and a base for new themes (`THEMES-GUIDE.md`) |
+| `themes/classic/` | **0.8.3 done** | Classic (named Classic until 0.8.5): second full appearance (taskbar, start menu, snapping, menus inside the window since 0.8.5) and a base for new themes (`THEMES-GUIDE.md`) |
 | `server/src/term/` | **M4 done** | Our own terminal: xterm emulator, PTY, drawing, session holders (see `TERMINAL.md`) |
 | `server/src/ui/otf.c`, `fonts.c` | **M4 done** | Our own OpenType (GSUB substitutions, CBDT emoji) and catalog of installed fonts: no HarfBuzz or fontconfig |
 | `apps/terminal/` | **M4 done** | Native Terminal app (tabs, panes, profiles…) |
@@ -389,7 +389,7 @@ A theme is a JS package that exports React components with a fixed contract:
 `Desktop`, `MenuBar`, `Dock`, `Launcher`, `ControlCenter`, `WindowFrame` and its tokens
 (colors, radii, shadows, fonts, wallpaper). The theme talks to the server only through
 `@lordos/sdk` (`useWindows()`, `launch()`, `focus()`, `close()`…), never directly.
-The default theme, Lord Flow, follows a familiar menu-bar-and-dock desktop layout, drawn with
+The default theme, Flow, follows a familiar menu-bar-and-dock desktop layout, drawn with
 our own icons and wallpapers; no third-party desktop assets are used or redistributed.
 
 ## JavaScript layers

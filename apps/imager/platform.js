@@ -155,7 +155,7 @@ export const platform = {
   followsSystem: true,
   appUpdates: null,
 
-  // a small window (a tile of Lord Workspaces): the steps hide behind a button and open over the step (sdk/narrow.jsx).
+  // a small window (a tile of Workspaces): the steps hide behind a button and open over the step (sdk/narrow.jsx).
   // The desktop app leaves these out and keeps its sidebar.
   useSidebar, SidebarToggle, SidebarOverlay,
 

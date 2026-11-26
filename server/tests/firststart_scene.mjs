@@ -35,7 +35,7 @@ lord.screen.displays = [D]; lord.screen.width = 1920; lord.screen.height = 1080;
 // the three desktops; use() records the switch (lord-server would discard this context and load the new theme)
 let current = theme;
 const switched = [];
-const NAMES = { default: 'Lord Flow', classic: 'Lord Classic', workspaces: 'Lord Workspaces' };
+const NAMES = { default: 'Flow', classic: 'Classic', workspaces: 'Workspaces' };
 lord.themes = {
   list: () => ['default', 'classic', 'workspaces', 'greeter'].map((id) => ({ id, current: id === current,
     meta: JSON.stringify(id === 'greeter' ? { hidden: true } : { name: NAMES[id], description: `${id} description`, ...(id === 'workspaces' ? { sketch: { rail: true, pills: true, frame: true } } : null) }) })),
@@ -53,7 +53,7 @@ const timersBefore = live.size;
 check('a new account sees it', sdk.startFirstStart(ctx), true);
 await flush();
 check('step 1: the title', shown('shell.firstStart.title').length, 1);
-check('step 1: three cards with their names and descriptions', ['Lord Flow', 'Lord Classic', 'Lord Workspaces', 'default description', 'classic description', 'workspaces description'].map((v) => shown(v).length), [1, 1, 1, 1, 1, 1]);
+check('step 1: three cards with their names and descriptions', ['Flow', 'Classic', 'Workspaces', 'default description', 'classic description', 'workspaces description'].map((v) => shown(v).length), [1, 1, 1, 1, 1, 1]);
 check('step 1: the crown and the three pictures', ['asset:icons/lordos-crown-512.png', 'asset:desktops/default.jpg', 'asset:desktops/classic.jpg', 'asset:desktops/workspaces.jpg']
   .map((src) => [...globalThis.__lordTest.props].some(([id, p]) => p.src === src && attached(id))), [true, true, true, true]);
 const order = sdk.firstStartState().order;
@@ -109,7 +109,7 @@ await click(shown('shell.firstStart.seeLive')[0]);
 check('forward again: no second switch (it is already the current one)', [sdk.firstStartState().step, switched.length], [2, 1]);
 await click(shown('shell.firstStart.useThis')[0]);
 check('step 3: the title and the path', [shown('shell.firstStart.laterTitle').length, shown('settings.style.title').length >= 2, shown('apps.settings').length >= 2], [1, true, true]);
-check('step 3: the replica has the three desktop styles', ['Lord Flow', 'Lord Classic', 'Lord Workspaces'].map((v) => shown(v).length), [1, 1, 1]);
+check('step 3: the replica has the three desktop styles', ['Flow', 'Classic', 'Workspaces'].map((v) => shown(v).length), [1, 1, 1]);
 check('step 3: the Desktop style group is ringed', [...styles].some(([id, s]) => s.borderWidth === 3 && (s.borderColor >>> 0) === 0xfff5b43c && attached(id)), true);
 await click(shown('shell.firstStart.back')[0]);
 check('Back on step 3: step 2', sdk.firstStartState().step, 2);

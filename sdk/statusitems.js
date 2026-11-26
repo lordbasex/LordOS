@@ -8,7 +8,7 @@
 // null.
 //
 // An item with a panel opens it with statusPanelAt(button): below the button when the bar is in the top half of its
-// display (Lord Flow's menu bar, a Classic taskbar at the top) and above it when the bar is at the bottom (the Classic
+// display (Flow's menu bar, a Classic taskbar at the top) and above it when the bar is at the bottom (the Classic
 // taskbar's default), aligned to the button's edge on the side away from the display's nearer edge.
 import { createElement as h } from 'react';
 import { View, displayAt } from '@lordos/runtime';
@@ -32,7 +32,7 @@ export function StatusItems({ color, height = 22 }) {
     ...list.map(({ id, Component }) => h(Component, { key: id, color, height })));
 }
 
-// A theme can put the items' panels where its own open (Lord Workspaces: where its notifications do, under its band):
+// A theme can put the items' panels where its own open (Workspaces: where its notifications do, under its band):
 // fn(box) → the style inside <Overlay anchor={button}> (box: the button's [x, y, w, h]), or null for the default.
 let placer = null;
 export function setStatusPanelPlacer(fn) { placer = typeof fn === 'function' ? fn : null; return () => { if (placer === fn) placer = null; }; }

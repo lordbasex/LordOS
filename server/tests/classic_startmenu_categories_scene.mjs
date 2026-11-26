@@ -1,5 +1,5 @@
 // classic_startmenu_categories_scene.mjs — a scene of tests/classic_startmenu_power_test.mjs (not run by itself;
-// `node tests/classic_startmenu_power_test.mjs classic_startmenu_categories_scene.mjs`): Lord Classic's start menu by
+// `node tests/classic_startmenu_power_test.mjs classic_startmenu_categories_scene.mjs`): Classic's start menu by
 // category (#210). The real StartMenu, SDK and runtime over the stub `lord` of that test, with Linux and Flatpak apps
 // (lord.apps.linux / lord.apps.flatpak, their .desktop Categories). It opens All apps (A–Z by default), switches to
 // Categories (remembered in settings.startMenuView), checks the groups and their counts, opens and closes one with

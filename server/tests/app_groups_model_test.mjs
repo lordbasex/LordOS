@@ -1,4 +1,4 @@
-// app_groups_model_test.mjs — Lord Classic's start menu by category (#210, sdk/appgroupsmodel.js): the group of a
+// app_groups_model_test.mjs — Classic's start menu by category (#210, sdk/appgroupsmodel.js): the group of a
 // LordOS app, a web app, a Linux and a Flatpak app (.desktop Categories, main ones first, then additional ones, else
 // Other), the groups with their counts sorted by their translated names with Other last, the remembered view, and
 // the keyboard on the categories list (↑/↓, Home/End, Enter, → opens and ← closes, mirrored right to left).
