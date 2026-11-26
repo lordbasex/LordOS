@@ -59,6 +59,11 @@ void writebus_call(DConn *c, const DMsg *m) { (void)c; (void)m; }
 int writebus_reply(DConn *c, const DMsg *m) { (void)c; (void)m; return 0; }
 void writebus_gone(const char *name) { (void)name; }
 void writebus_lost(void) {}
+/* Hands' org.lordos.Hands1 (ui/handsbus.c) is not under test here */
+void handsbus_call(DConn *c, const DMsg *m) { (void)c; (void)m; }
+int handsbus_reply(DConn *c, const DMsg *m) { (void)c; (void)m; return 0; }
+void handsbus_gone(const char *name) { (void)name; }
+void handsbus_lost(void) {}
 
 static DConn app;
 typedef struct { char member[64], sig[64], path[400], s1[400], s2[128]; uint32_t code; uint64_t t; int type; char err[128]; int nlist; char list[8][128]; } Got;

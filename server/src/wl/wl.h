@@ -61,6 +61,7 @@ int  wl_test_xwl(void);                /* build/lord-server-test only: a connect
  * (zwp_text_input_v3), on screen. 0 without one. */
 int  wl_text_caret(float *x, float *y, float *w, float *h);
 int  wl_focus_protected(void);          /* is that app's window a protected one? */
+int  wl_textinput_secret(void);         /* its focused field said it is a password, a PIN or hidden text (text-input-v3) */
 const char *wl_focus_app(void);         /* the isolated app with the keyboard, or NULL */
 int  wl_focus_pid(void);                 /* the process of the app with the keyboard, 0 if none (ui/portal.c) */
 int  wl_surface_pid(int id);             /* the process of window id (its client), 0 if none (lord.webapps.owner) */

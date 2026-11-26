@@ -26,9 +26,9 @@
 #include "bench/lbinput.h"
 #ifdef LORD_TEST_HOOKS
 #include "testhooks.h"           /* build/lord-server-test only */
-#include "media/media_int.h"     /* the capture paths' pictures (test_frame) */
 #include "cast/castproto.h"
 #endif
+#include "media/media_int.h"     /* the capture paths' pictures (test_frame, Hands' screenshots) */
 #include "net/net.h"
 #include "disk/disk.h"
 #include "backup/backup.h"
@@ -111,6 +111,9 @@
 #include "bench/lbframes.h"
 #include "fpipe.h"
 #include "nofile.h"
+#include "hands/hands.h"
+#include "hands/handsimg.h"
+#include "ui/js_hands.h"
 
 #include <ctype.h>
 #include <libgen.h>
@@ -694,6 +697,7 @@ static void remote_settle(Server *s) {
 
 static void remote_pointer(int fx, int fy) {
     Server *s = remote_server;
+    hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
     double lx, ly;                          /* frame pixels of the feed → logical */
     out_to_logical(&feed_out(s)->v, fx, fy, &lx, &ly);
     int x = (int)lround(lx), y = (int)lround(ly);
@@ -716,6 +720,7 @@ static void remote_pointer(int fx, int fy) {
 
 static void remote_button(int button, int down) {
     Server *s = remote_server;
+    hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
     if (ptrlock_button(button, down)) return;
     if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
     remote_settle(s);
@@ -723,6 +728,7 @@ static void remote_button(int button, int down) {
 
 static void remote_wheel(int steps) {
     Server *s = remote_server;
+    hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
     if (ptrlock_wheel(steps, 0)) return;
     s->wheel += steps;
     remote_settle(s);
@@ -743,6 +749,7 @@ static void keyboards_check(Server *s) {
 
 static void remote_key(int code, int value) {
     Server *s = remote_server;
+    hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
     if (pkagent_blocks_injected(value)) return;           /* an authentication prompt takes only this computer's keys */
     if (value == 1 && code >= KEY_Q && code <= KEY_M && !remote_typed) { remote_typed = 1; keyboards_check(s); }
     if (code == KEY_LEFTCTRL || code == KEY_RIGHTCTRL) s->ctrl = value != 0;
@@ -929,6 +936,216 @@ static void share_text_pump(void) {
 static int share_person(void) { return !remote_server->headless && !display_is_off(); }
 static void share_activity(void) { display_activity(now_ms()); }
 static int share_restricted(const char *id) { return restrict_blocks(id, FW_R_NO_SCREEN); }
+
+/* ---- Hands: an AI agent's input and screenshots (hands/hands.h, docs/HANDS.md; approved by the maintainer 2026-11-26) ----
+ * The agent's pointer, wheel and keys go through the same path as the remote desktop's (remote_settle, dispatch_pointer,
+ * hit test, js_key, the Wayland apps), never /dev/uinput or evdev. hands.c decided the call may happen; these say where
+ * a point or a key would land and refuse the places an agent never reaches. */
+
+/* the system band (sdk/layers.js: system 100, agent 105, input 110, capture 120) */
+#define HANDS_SYSTEM_Z 100
+static int hands_node_place(const Node *n) {
+    if (pkagent_blocks_injected(1)) return HANDS_WHY_PROMPT;   /* an authentication prompt takes only real keys and clicks */
+    for (const Node *a = n; a; a = a->parent) {
+        if (a->protect) return HANDS_WHY_PROTECTED;
+        if (a->hands_deny) return HANDS_WHY_DENIED_NODE;
+        if (a->parent == ui.root && a->s.z_index >= HANDS_SYSTEM_Z) return HANDS_WHY_SYSTEM;
+    }
+    return 0;
+}
+static int hands_place(double x, double y, int *node) {
+    Node *t = ui.root ? hit_test(ui.root, (float)x, (float)y) : NULL;
+    *node = t ? t->id : 0;
+    if (!t) return pkagent_blocks_injected(1) ? HANDS_WHY_PROMPT : 0;
+    return hands_node_place(t);
+}
+static int hands_same_target(int hit, int ref) {
+    if (hit <= 0 || ref <= 0) return 0;
+    const Node *h = node_get(hit), *r = node_get(ref);
+    if (!h || !r) return 0;
+    for (const Node *a = h; a; a = a->parent) if (a == r) return 1;     /* the click lands inside the ref */
+    for (const Node *a = r; a; a = a->parent) {                          /* or on what holds it, below its window */
+        if (a == h) return 1;
+        if (a->parent == ui.root) break;
+    }
+    return 0;
+}
+/* a system prompt or Screenshots' selection shows (they take the keyboard): an agent's key would go there */
+static int hands_prompt_up(void) {
+    for (const Node *n = ui.root ? ui.root->first : NULL; n; n = n->next) {
+        int z = (int)n->s.z_index;
+        if ((z == 100 || z == 120) && n->first) return 1;
+    }
+    return 0;
+}
+static int hands_keys_place(void) {
+    if (pkagent_blocks_injected(1)) return HANDS_WHY_PROMPT;
+    if (hands_prompt_up()) return HANDS_WHY_SYSTEM;
+    if (wl_has_key_focus()) {
+        if (wl_focus_protected()) return HANDS_WHY_PROTECTED;
+        if (wl_textinput_secret()) return HANDS_WHY_PASSWORD;
+    }
+    return 0;
+}
+static void hands_size(int *w, int *h) { *w = remote_server->W; *h = remote_server->H; }
+static int hands_pointer_locked(void) { return ptrlock_active() || wl_pointer_locked(); }
+static void hands_move(double x, double y) {
+    Server *s = remote_server;
+    int ix = (int)lround(x), iy = (int)lround(y);
+    if (ix != s->cx || iy != s->cy) {
+        s->rdx += ix - s->cx;
+        s->rdy += iy - s->cy;
+        s->cx = ix;
+        s->cy = iy;
+        wl_pointer_relative(s->rdx, s->rdy);
+        s->rdx = s->rdy = 0;
+    }
+    s->moved = 1;                           /* a hover over the same place still tells what is under it */
+    remote_settle(s);
+}
+static void hands_button(int button, int down) {
+    Server *s = remote_server;
+    if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
+    remote_settle(s);
+}
+static void hands_wheel(int dx, int dy) {
+    Server *s = remote_server;
+    if (dy) { s->wheel += dy; remote_settle(s); }
+    if (dx) { tp_route_wheel120(0, dx * 120); tp_route_wheel_flush(); }
+}
+/* one key, as the remote desktop types it: the modifiers' state follows (remote_key) */
+static void hands_keyev(int code, int value) {
+    Server *s = remote_server;
+    if (pkagent_blocks_injected(value)) return;
+    if (code == KEY_LEFTCTRL || code == KEY_RIGHTCTRL) s->ctrl = value != 0;
+    if (code == KEY_LEFTALT || code == KEY_RIGHTALT) s->alt = value != 0;
+    if (code == KEY_LEFTMETA || code == KEY_RIGHTMETA) s->meta = value != 0;
+    js_key(code, value);
+}
+/* a key with its level's modifiers (Shift, AltGr) and the chord's, pressed and released */
+static void hands_press(int code, int level, unsigned mods) {
+    static const struct { unsigned m; int code; } M[] = {
+        { HANDS_M_CTRL, KEY_LEFTCTRL }, { HANDS_M_ALT, KEY_LEFTALT }, { HANDS_M_SUPER, KEY_LEFTMETA }, { HANDS_M_SHIFT, KEY_LEFTSHIFT },
+    };
+    if (level & OSK_LEVEL_SHIFT) mods |= HANDS_M_SHIFT;
+    int altgr = (level & OSK_LEVEL_ALTGR) && kb_has_altgr();
+    for (int i = 0; i < 4; i++) if (mods & M[i].m) hands_keyev(M[i].code, 1);
+    if (altgr) hands_keyev(KEY_RIGHTALT, 1);
+    hands_keyev(code, 1);
+    hands_keyev(code, 0);
+    if (altgr) hands_keyev(KEY_RIGHTALT, 0);
+    for (int i = 3; i >= 0; i--) if (mods & M[i].m) hands_keyev(M[i].code, 0);
+}
+static int hands_key(const HandsChord *c) {
+    int code = c->code, level = 0;
+    if (!code) {
+        if (!kb_labels_begin()) return -1;
+        int ok = share_key_of(c->ch, &code, &level);
+        kb_labels_end();
+        if (!ok) return -1;
+        if (c->mods & (HANDS_M_CTRL | HANDS_M_ALT | HANDS_M_SUPER)) level &= ~OSK_LEVEL_ALTGR;   /* ctrl+s: the key, not its symbol */
+    }
+    hands_press(code, level, c->mods);
+    return 0;
+}
+/* text with no line breaks or tabs (hands.c sends those as keys and checks the field again): through the active layout
+ * as share_text_pump does, all at once; a Linux app's field with text input gets it as one input method's commit */
+static int hands_type(const char *t, size_t n) {
+    if (!n) return 0;
+    if (js_text_input_app()) {
+        char *z = strndup(t, n);
+        if (!z) return HANDS_WHY_NOT_EDITABLE;
+        js_input_flush();
+        js_commit_text(z);
+        free(z);
+        return 0;
+    }
+    int labels = kb_labels_begin();
+    for (size_t off = 0; off < n;) {
+        int w = hands_keys_place();
+        if (w) { if (labels) kb_labels_end(); return w; }
+        uint32_t cp = 0;
+        int l = sw_utf8_next(t + off, n - off, &cp);
+        if (l <= 0) break;
+        char want[8] = "";
+        memcpy(want, t + off, (size_t)l);
+        int code, lv;
+        char base[8], dead[16];
+        const char *mark;
+        int dcode, dlv;
+        if (labels && share_key_of(want, &code, &lv)) hands_press(code, lv, 0);
+        else if (labels && sw_dead_split(cp, base, &mark) && (size_t)snprintf(dead, sizeof dead, "dead:%s", mark) < sizeof dead &&
+                 share_key_of(dead, &dcode, &dlv) && share_key_of(base, &code, &lv)) {
+            hands_press(dcode, dlv, 0);
+            hands_press(code, lv, 0);
+        } else {
+            js_input_flush();
+            js_commit_text(want);           /* no key types it: an input method's finished text (dropped where none takes it) */
+        }
+        off += (size_t)l;
+    }
+    if (labels) kb_labels_end();
+    return 0;
+}
+/* what a capture by an agent leaves out: every surface of the system band and every handsDeny node is painted as the
+ * protected fill for the length of the capture (paint.c, as a protected window), then put back as it was */
+#define HANDS_MARK_MAX 512
+static int hands_marked[HANDS_MARK_MAX], hands_nmarked;
+static void hands_mark(Node *n, int depth) {
+    if (!n || depth > 4096 || hands_nmarked >= HANDS_MARK_MAX) return;
+    if (n->hands_deny && !n->protect) { n->protect = 1; hands_marked[hands_nmarked++] = n->id; return; }
+    for (Node *k = n->first; k; k = k->next) hands_mark(k, depth + 1);
+}
+static void hands_mark_capture(int on) {
+    if (!on) {
+        for (int i = 0; i < hands_nmarked; i++) { Node *n = node_get(hands_marked[i]); if (n) n->protect = 0; }
+        hands_nmarked = 0;
+        return;
+    }
+    hands_nmarked = 0;
+    for (Node *l = ui.root ? ui.root->first : NULL; l; l = l->next) {
+        if (l->s.z_index >= HANDS_SYSTEM_Z) {
+            for (Node *k = l->first; k && hands_nmarked < HANDS_MARK_MAX; k = k->next)
+                if (!k->protect) { k->protect = 1; hands_marked[hands_nmarked++] = k->id; }
+        } else hands_mark(l, 0);
+    }
+}
+static uint8_t *hands_shot(int kind, uint32_t display, int node, double x, double y, double w, double h, int maxdim,
+                           size_t *len, int *iw, int *ih, char *meta, size_t metan) {
+    *len = 0;
+    MediaSrc *m = NULL;
+    double lx = 0, ly = 0, lw = remote_server->W, lh = remote_server->H;
+    hands_mark_capture(1);
+    if (kind == HANDS_SHOT_DISPLAY) {
+        const DisplayPlan *plan = display_current();
+        const DisplayOut *o = NULL;
+        for (int i = 0; i < plan->n && !o; i++) if (display ? plan->o[i].conn == display : i == plan->main) o = &plan->o[i];
+        if (display && !o) { hands_mark_capture(0); return NULL; }
+        if (o) { lx = o->v.x; ly = o->v.y; lw = o->v.w; lh = o->v.h; }
+        m = media_screenshot("hands", 0, 0, 0, 0, o ? o->conn : 0, 0, NULL, 0, NULL);
+    } else if (kind == HANDS_SHOT_WINDOW) {
+        lx = x; ly = y; lw = w; lh = h;
+        m = media_screenshot("hands", (int)x, (int)y, (int)w, (int)h, 0, node, NULL, 0, NULL);
+    } else {
+        lx = x; ly = y; lw = w; lh = h;
+        m = media_screenshot("hands", (int)x, (int)y, (int)w, (int)h, 0, 0, NULL, 0, NULL);
+    }
+    hands_mark_capture(0);
+    if (!m || !m->px) { if (m) media_src_close(m); return NULL; }
+    hands_fit(m->w, m->h, maxdim, kind == HANDS_SHOT_REGION, iw, ih);
+    uint8_t *rgb = hands_scale_rgb(m->px, m->w, m->w, m->h, *iw, *ih);
+    media_src_close(m);
+    uint8_t *png = rgb ? hands_png(rgb, *iw, *ih, len) : NULL;
+    free(rgb);
+    snprintf(meta, metan, "{\"x\":%.0f,\"y\":%.0f,\"w\":%.0f,\"h\":%.0f,\"width\":%d,\"height\":%d}", lx, ly, lw, lh, *iw, *ih);
+    return png;
+}
+static char *hands_shell(const char *op, const char *json) { return js_hands_call(op, json); }
+static double hands_now(void) { return now_ms(); }
+static const HandsHost hands_host_impl = {
+    hands_shell, js_hands_event, hands_size, hands_pointer_locked, hands_place, hands_same_target, hands_keys_place,
+    hands_move, hands_button, hands_wheel, hands_key, hands_type, hands_shot, hands_now,
+};
 
 static void remote_greeter(const char *json) { js_greeter_event(json); }
 static void remote_notice(const char *json) { js_remote_notice(json); }
@@ -1345,7 +1562,10 @@ static int zap_held(int fd, int *ctrl, int *alt) {
 static void tablet_input(Server *s, const InputDevice *d, const struct input_event *ev);
 static void on_input(void *ud, const InputDevice *d, const struct input_event *ev) {
     Server *s = ud;
-    if (ev->type == EV_KEY || ev->type == EV_REL || ev->type == EV_ABS) display_input(now_ms());
+    if (ev->type == EV_KEY || ev->type == EV_REL || ev->type == EV_ABS) {
+        display_input(now_ms());
+        hands_person_input();               /* the person's own input wins: an agent waits (hands.h) */
+    }
     if (s->debug && ev->type != EV_SYN)
         fprintf(stderr, "ev %s type=%u code=%u value=%d\n", d->name, ev->type, ev->code, ev->value);
     if (d->tab) { tablet_input(s, d, ev); return; }     /* a graphics tablet's pen or pad (tablet.c) */
@@ -1428,6 +1648,16 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
             } else {
                 fprintf(stderr, "lord-server: Backspace on %s with Ctrl and Alt noted but not held: the session goes on\n", d->name);
                 s->ctrl = ctrl; s->alt = alt;
+            }
+        }
+        /* Hands' panic key, Ctrl+Alt+Esc: every agent stopped and Hands off for the session (hands.h), here on the
+         * physical keyboard, before any JavaScript; nothing an agent injects passes through on_input */
+        if (ev->code == KEY_ESC && ev->value == 1 && s->ctrl && s->alt && !s->shift) {
+            int ctrl = 0, alt = 0;
+            if (zap_held(d->fd, &ctrl, &alt) && ctrl && alt) {
+                fprintf(stderr, "lord-server: Ctrl+Alt+Esc on %s: every AI agent stopped (Hands)\n", d->name);
+                hands_panic();
+                break;
             }
         }
         /* ends a share with no JavaScript in the way; only here, on the physical keyboard: what the API or
@@ -3032,9 +3262,9 @@ const char *lord_composition(void) {
 static void on_sigpipe(int sig) { (void)sig; }
 
 #ifdef LORD_TEST_HOOKS
-#define USAGE_HEADLESS "[--headless WIDTHxHEIGHT [--greeter | --test-hooks]]"
+#define USAGE_HEADLESS "[--headless WIDTHxHEIGHT [--greeter | --test-hooks | --hands-qa]]"
 #else
-#define USAGE_HEADLESS "[--headless WIDTHxHEIGHT [--greeter]]"
+#define USAGE_HEADLESS "[--headless WIDTHxHEIGHT [--greeter | --hands-qa]]"
 #endif
 static void usage(const char *argv0) {
     fprintf(stderr, "usage: %s [--theme bundle.js] [--fonts dir] [--shell dir] [--user name] [--card /dev/dri/cardN]\n"
@@ -3172,6 +3402,7 @@ int main(int argc, char **argv) {
     int test_hooks = 0;
 #endif
     static Server s;
+    int hands_qa_flag = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--timeout") && i + 1 < argc) timeout_ms = atof(argv[++i]) * 1000;
         else if (!strcmp(argv[i], "--card") && i + 1 < argc) card = argv[++i];
@@ -3188,6 +3419,9 @@ int main(int argc, char **argv) {
             s.H = h & ~1;
         }
         else if (!strcmp(argv[i], "--greeter")) s.greeter = 1;      /* pantalla de ingreso (lord-sessiond) */
+        /* Hands' QA desktop (docs/HANDS.md): a private headless session an agent drives with no prompt; lordos-mcp
+         * --headless starts it with a private bus and a demo home. Never with a monitor or on the login screen. */
+        else if (!strcmp(argv[i], "--hands-qa")) hands_qa_flag = 1;
 #ifdef LORD_TEST_HOOKS
         else if (!strcmp(argv[i], "--test-hooks")) test_hooks = 1;  /* the conformance tool's socket (testhooks.h) */
 #endif
@@ -3197,6 +3431,7 @@ int main(int argc, char **argv) {
     }
 
     if (s.greeter && !s.headless) { usage(argv[0]); return 2; }
+    if (hands_qa_flag && (!s.headless || s.greeter)) { usage(argv[0]); return 2; }
 #ifdef LORD_TEST_HOOKS
     if (test_hooks && (!s.headless || s.greeter)) { usage(argv[0]); return 2; }   /* never on a monitor or the login screen */
 #endif
@@ -3328,6 +3563,8 @@ int main(int argc, char **argv) {
     netrec_init(ok && !s.greeter && session_user != NULL);   /* the Monitor's traffic history (monitor/netrec.c) */
     if (getenv("LORD_DAMAGE") && !strcmp(getenv("LORD_DAMAGE"), "one")) paint_multi_damage = 0;    /* one box per frame, as before 0.8.8.10 (paint.c) */
     remote_server = &s;
+    hands_init(&hands_host_impl);           /* Hands (hands/hands.h): off until the person turns it on, or --hands-qa */
+    if (hands_qa_flag) { hands_qa(1); fprintf(stderr, "lord-server: Hands QA desktop: an agent may use this private session (docs/HANDS.md)\n"); }
     tp_route_init(&tp_host);
     wl_warp_set_host(warp_move);                /* pointer-warp-v1 (wl/wl_warp.c) */
     static const MirrorInput mirror_in = { remote_pointer, remote_button, remote_wheel, remote_key, remote_clip, remote_clients,
@@ -3547,7 +3784,7 @@ int main(int argc, char **argv) {
         /* sin monitor y sin nadie mirando no se dibuja (al conectarse alguien llega un cuadro entero) */
         /* LORD_HEADLESS_DRAW=1 (tests/perf_headless.sh): headless and nobody watching, it still lays out and paints */
         static int headless_draw = -1;
-        if (headless_draw < 0) headless_draw = getenv("LORD_HEADLESS_DRAW") != NULL;
+        if (headless_draw < 0) headless_draw = getenv("LORD_HEADLESS_DRAW") != NULL || hands_qa_mode();   /* an agent's QA desktop: laid out and painted */
         int unseen = s.headless && !headless_draw && !mirror_watchers() && !media_needs_cpu();   /* recording the screen: yes */
         if (!s.headless && display_is_off()) unseen = 1;     /* screen off after idle (DPMS): nothing to draw */
         js_sys_unseen = unseen;                     /* the desk widgets' data feeds rest too (lord.system.seen) */

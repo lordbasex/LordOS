@@ -22,6 +22,7 @@
 #include "js_sql.h"
 #include "js_weather.h"
 #include "js_sentinela.h"
+#include "js_hands.h"
 #include "js_studio.h"
 #include "js_webapps.h"
 #include "js_sftp.h"
@@ -587,6 +588,8 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
     } else if (n && key && !strcmp(key, "protected")) {
         n->protect = JS_ToBool(c, argv[2]) ? 1 : 0;     /* protected window (wm.setProtected) */
         node_invalidate(n);
+    } else if (n && key && !strcmp(key, "handsDeny")) {
+        n->hands_deny = JS_ToBool(c, argv[2]) ? 1 : 0;  /* out of an AI agent's reach (hands/hands.h) */
     } else if (n && key && !strcmp(key, "surface") && n->type == NODE_SURFACE) {
         int32_t id = 0;                     /* window of a Wayland app (wl/wl.c) */
         if (JS_IsNumber(argv[2])) JS_ToInt32(c, &id, argv[2]);
@@ -861,6 +864,7 @@ static void session_context(void) {
     js_hw_register(ctx, lord);         /* lord.display/power/bt/mime/timedate (Settings, src/hw) */
     js_voice_register(ctx, lord);      /* lord.voice: reading text aloud through lord-say (tts/speak.c, docs/VOICE.md) */
     js_sentinela_register(ctx, lord);  /* lord.sentinela: Sentinela's local model engine (llm/engine.c, docs/SENTINELA.md) */
+    js_hands_register(ctx, lord);      /* lord.hands: an AI agent using the desktop (hands/hands.h, docs/HANDS.md) */
     js_spell_register(ctx, lord);      /* lord.spell: the spell checker through lord-spell (spell/spellsvc.c, docs/SPELLING.md) */
     if (jst_active()) jst_register_main(ctx, lord);    /* a community theme's session: its host's natives (js_theme.c) */
     prof_wrap_obj(ctx, lord, "", 0);   /* every lord.<ns>.* call timed (the stall detector) and guarded (js_theme.c) */
@@ -1609,6 +1613,34 @@ void js_remote_event(const char *json) {
     if (!ctx) return;
     JSValueConst args[1] = { JS_NewString(ctx, json) };
     JS_FreeValue(ctx, call_global("__lordRemote", 1, args));
+    JS_FreeValue(ctx, args[0]);
+    drain_jobs();
+}
+
+/* Hands (hands/hands.h): an agent's call answered by the shell → __lordHands(op, json), sdk/hands.jsx; its answer is
+ * JSON text (malloc'd), NULL when the shell has none. */
+char *js_hands_call(const char *op, const char *json) {
+    if (!ctx || !op || !json) return NULL;
+    JSValueConst args[2] = { JS_NewString(ctx, op), JS_NewString(ctx, json) };
+    JSValue r = call_global("__lordHands", 2, args);
+    JS_FreeValue(ctx, args[0]);
+    JS_FreeValue(ctx, args[1]);
+    char *out = NULL;
+    if (JS_IsString(r)) {
+        size_t n = 0;
+        const char *s = JS_ToCStringLen(ctx, &n, r);
+        if (s) { out = malloc(n + 1); if (out) { memcpy(out, s, n); out[n] = 0; } JS_FreeCString(ctx, s); }
+    }
+    JS_FreeValue(ctx, r);
+    drain_jobs();
+    return out;
+}
+
+/* Hands: the clients changed, a prompt, Stop, a log line → __lordHandsEvent(json) */
+void js_hands_event(const char *json) {
+    if (!ctx || !json) return;
+    JSValueConst args[1] = { JS_NewString(ctx, json) };
+    JS_FreeValue(ctx, call_global("__lordHandsEvent", 1, args));
     JS_FreeValue(ctx, args[0]);
     drain_jobs();
 }

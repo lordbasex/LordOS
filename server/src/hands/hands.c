@@ -1,0 +1,931 @@
+/* hands.c — Hands' state and policy (see hands.h, docs/HANDS.md) */
+#include "hands.h"
+#include "../sec/json.h"
+
+#include <linux/input-event-codes.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+
+/* ---- closed words ---- */
+
+static const char *const WHY[HANDS_WHY_COUNT] = {
+    "none", "system-layer", "protected", "password", "hidden-from-agent", "allowlist", "authentication-prompt", "locked",
+    "pointer-lock", "outside", "obscured", "not-editable",
+};
+const char *hands_why_word(int why) { return why >= 0 && why < HANDS_WHY_COUNT ? WHY[why] : "none"; }
+
+static const char *const CALL[HANDS_C_COUNT] = {
+    "hello", "status", "windows", "read", "find", "pointer", "scroll", "key", "type", "set-value", "screenshot",
+    "open-app", "open-path", "close-window", "app-log",
+};
+const char *hands_call_word(int call) { return call >= 0 && call < HANDS_C_COUNT ? CALL[call] : "call"; }
+
+static const char *const POINTER[HANDS_P_COUNT] = {
+    "", "left_click", "right_click", "middle_click", "double_click", "triple_click", "hover", "left_click_drag",
+};
+int hands_pointer_action(const char *s) {
+    for (int i = 1; s && i < HANDS_P_COUNT; i++) if (!strcmp(s, POINTER[i])) return i;
+    return HANDS_P_NONE;
+}
+const char *hands_pointer_word(int a) { return a > 0 && a < HANDS_P_COUNT ? POINTER[a] : ""; }
+
+int hands_direction(const char *s) {
+    static const char *const D[] = { "", "up", "down", "left", "right" };
+    for (int i = 1; s && i < 5; i++) if (!strcmp(s, D[i])) return i;
+    return HANDS_DIR_NONE;
+}
+
+static const char *const KIND[] = { "other", "claude", "lumo" };
+const char *hands_kind_word(int kind) { return kind >= 0 && kind <= HANDS_K_LUMO ? KIND[kind] : "other"; }
+
+/* ---- pure checks ---- */
+
+/* the code point at s (n bytes left), its length in *len; -1 not UTF-8 */
+static long utf8_at(const unsigned char *s, size_t n, int *len) {
+    unsigned c = s[0];
+    int k = c < 0x80 ? 0 : c >= 0xc2 && c <= 0xdf ? 1 : c >= 0xe0 && c <= 0xef ? 2 : c >= 0xf0 && c <= 0xf4 ? 3 : -1;
+    if (k < 0 || (size_t)k >= n) return -1;
+    long cp = k == 0 ? c : k == 1 ? c & 0x1f : k == 2 ? c & 0x0f : c & 0x07;
+    for (int j = 1; j <= k; j++) {
+        if ((s[j] & 0xc0) != 0x80) return -1;
+        cp = cp << 6 | (s[j] & 0x3f);
+    }
+    if ((k == 2 && cp < 0x800) || (k == 3 && (cp < 0x10000 || cp > 0x10ffff)) || (cp >= 0xd800 && cp <= 0xdfff)) return -1;
+    *len = k + 1;
+    return cp;
+}
+
+/* controls (C0, DEL, C1), bidi and invisible format characters: never in a name, a value or typed text */
+static int format_char(long cp) {
+    return cp < 0x20 || (cp >= 0x7f && cp <= 0x9f) || cp == 0xad || (cp >= 0x200b && cp <= 0x200f) ||
+           (cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2060 && cp <= 0x206f) || cp == 0xfeff || (cp >= 0xfff9 && cp <= 0xfffb);
+}
+
+int hands_text_ok(const char *s, size_t n, size_t max, int allow_lines) {
+    if (!s || n > max || strlen(s) != n) return 0;
+    for (size_t i = 0; i < n;) {
+        int l = 0;
+        long cp = utf8_at((const unsigned char *)s + i, n - i, &l);
+        if (cp < 0) return 0;
+        if (format_char(cp) && !(allow_lines && (cp == '\n' || cp == '\t'))) return 0;
+        i += (size_t)l;
+    }
+    return 1;
+}
+
+int hands_clean_name(const char *in, char *out, size_t n) {
+    size_t o = 0;
+    int space = 1;
+    if (!out || n < 2) return -1;
+    out[0] = 0;
+    if (!in) return -1;
+    size_t len = strnlen(in, 4096);
+    for (size_t i = 0; i < len;) {
+        int l = 1;
+        long cp = utf8_at((const unsigned char *)in + i, len - i, &l);
+        if (cp < 0) { i++; continue; }
+        if (format_char(cp) || cp == ' ' || cp == 0xa0) {
+            if (!space && o + 1 < n && o < HANDS_NAME_MAX) { out[o++] = ' '; space = 1; }
+            i += (size_t)l;
+            continue;
+        }
+        if (o + (size_t)l >= n || o + (size_t)l > HANDS_NAME_MAX) break;
+        memcpy(out + o, in + i, (size_t)l);
+        o += (size_t)l;
+        space = 0;
+        i += (size_t)l;
+    }
+    while (o && out[o - 1] == ' ') o--;
+    out[o] = 0;
+    return o ? 0 : -1;
+}
+
+int hands_kind_of(const char *name) {
+    if (!name) return HANDS_K_OTHER;
+    char low[HANDS_NAME_MAX + 1];
+    size_t i = 0;
+    for (; name[i] && i < HANDS_NAME_MAX; i++) low[i] = (char)((name[i] >= 'A' && name[i] <= 'Z') ? name[i] + 32 : name[i]);
+    low[i] = 0;
+    if (strstr(low, "claude")) return HANDS_K_CLAUDE;
+    if (strstr(low, "lumo")) return HANDS_K_LUMO;
+    return HANDS_K_OTHER;
+}
+
+int hands_ref_ok(const char *s) {
+    if (!s) return 0;
+    if (!s[0]) return 1;
+    if (strncmp(s, "ref_", 4)) return 0;
+    size_t d = 0;
+    for (const char *p = s + 4; *p; p++, d++) if (*p < '0' || *p > '9') return 0;
+    return d >= 1 && d <= 9;
+}
+
+int hands_id_ok(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    if (n < 1 || n > HANDS_ID_MAX) return 0;
+    for (size_t i = 0; i < n; i++) {
+        char c = s[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || strchr("._:#@+-", c))) return 0;
+    }
+    return 1;
+}
+
+int hands_name_ok(const char *s) { return s && s[0] && hands_text_ok(s, strlen(s), HANDS_ID_MAX, 0); }
+
+int hands_path_ok(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    if (n < 2 || n >= HANDS_PATH_MAX || s[0] != '/' || !hands_text_ok(s, n, HANDS_PATH_MAX, 0)) return 0;
+    for (const char *p = s; (p = strchr(p, '/')); p++) {
+        if (!strncmp(p, "/../", 4) || !strcmp(p, "/..") || !strncmp(p, "/./", 3) || !strcmp(p, "/.") || !strncmp(p, "//", 2)) return 0;
+    }
+    return 1;
+}
+
+int hands_filter(const char *s) {
+    if (!s || !s[0] || !strcmp(s, "all")) return 0;
+    if (!strcmp(s, "interactive")) return 1;
+    return -1;
+}
+
+int hands_shot_target(const char *s, uint32_t *display, char *win, size_t n) {
+    *display = 0;
+    if (win && n) win[0] = 0;
+    if (!s) return HANDS_SHOT_NONE;
+    if (!s[0] || !strcmp(s, "display")) return HANDS_SHOT_DISPLAY;
+    if (!strcmp(s, "region")) return HANDS_SHOT_REGION;
+    if (!strncmp(s, "display:", 8)) {
+        const char *p = s + 8;
+        unsigned long v = 0;
+        int d = 0;
+        for (; *p >= '0' && *p <= '9' && d < 10; p++, d++) v = v * 10 + (unsigned long)(*p - '0');
+        if (!d || *p || v > 0xffffffffUL) return HANDS_SHOT_NONE;
+        *display = (uint32_t)v;
+        return HANDS_SHOT_DISPLAY;
+    }
+    if (!strncmp(s, "window:", 7) && hands_id_ok(s + 7) && win && strlen(s + 7) < n) {
+        snprintf(win, n, "%s", s + 7);
+        return HANDS_SHOT_WINDOW;
+    }
+    return HANDS_SHOT_NONE;
+}
+
+/* ---- key chords ---- */
+
+static const struct { const char *name; int code; } KEYS[] = {
+    { "enter", KEY_ENTER }, { "return", KEY_ENTER }, { "tab", KEY_TAB }, { "escape", KEY_ESC }, { "esc", KEY_ESC },
+    { "backspace", KEY_BACKSPACE }, { "delete", KEY_DELETE }, { "del", KEY_DELETE }, { "insert", KEY_INSERT },
+    { "home", KEY_HOME }, { "end", KEY_END }, { "pageup", KEY_PAGEUP }, { "page_up", KEY_PAGEUP }, { "prior", KEY_PAGEUP },
+    { "pagedown", KEY_PAGEDOWN }, { "page_down", KEY_PAGEDOWN }, { "next", KEY_PAGEDOWN }, { "up", KEY_UP },
+    { "down", KEY_DOWN }, { "left", KEY_LEFT }, { "right", KEY_RIGHT }, { "space", KEY_SPACE }, { "menu", KEY_COMPOSE },
+    { "f1", KEY_F1 }, { "f2", KEY_F2 }, { "f3", KEY_F3 }, { "f4", KEY_F4 }, { "f5", KEY_F5 }, { "f6", KEY_F6 },
+    { "f7", KEY_F7 }, { "f8", KEY_F8 }, { "f9", KEY_F9 }, { "f10", KEY_F10 }, { "f11", KEY_F11 }, { "f12", KEY_F12 },
+};
+static const struct { const char *name; unsigned mod; } MODS[] = {
+    { "ctrl", HANDS_M_CTRL }, { "control", HANDS_M_CTRL }, { "alt", HANDS_M_ALT }, { "option", HANDS_M_ALT },
+    { "shift", HANDS_M_SHIFT }, { "super", HANDS_M_SUPER }, { "meta", HANDS_M_SUPER }, { "cmd", HANDS_M_SUPER },
+    { "win", HANDS_M_SUPER },
+};
+
+int hands_chord(const char *s, HandsChord *c) {
+    memset(c, 0, sizeof *c);
+    size_t n = s ? strlen(s) : 0;
+    if (n < 1 || n > 64 || !hands_text_ok(s, n, 64, 0)) return -1;
+    if (s[0] == '+' || (s[n - 1] == '+' && !(n >= 2 && s[n - 2] == '+'))) return -1;
+    char buf[65];
+    memcpy(buf, s, n + 1);
+    int have_key = 0;
+    unsigned lone_mod = 0;
+    char *save = NULL;
+    /* "+" alone is the plus key: "ctrl++" */
+    for (char *part = strtok_r(buf, "+", &save); part; part = strtok_r(NULL, "+", &save)) {
+        if (have_key) return -1;                        /* the key comes last */
+        int found = 0;
+        for (size_t i = 0; i < sizeof MODS / sizeof MODS[0]; i++)
+            if (!strcasecmp(part, MODS[i].name)) {
+                if (c->mods & MODS[i].mod) return -1;
+                c->mods |= MODS[i].mod;
+                lone_mod = MODS[i].mod;
+                found = 1;
+            }
+        if (found) continue;
+        lone_mod = 0;
+        for (size_t i = 0; i < sizeof KEYS / sizeof KEYS[0] && !found; i++)
+            if (!strcasecmp(part, KEYS[i].name)) { c->code = KEYS[i].code; found = 1; }
+        if (!found) {
+            int l = 0;
+            long cp = utf8_at((const unsigned char *)part, strlen(part), &l);
+            if (cp <= ' ' || (size_t)l != strlen(part) || format_char(cp)) return -1;
+            if (cp >= 'A' && cp <= 'Z') { part[0] = (char)(cp + 32); if (!c->mods) c->mods |= HANDS_M_SHIFT; }
+            memcpy(c->ch, part, (size_t)l);
+            c->ch[l] = 0;
+        }
+        have_key = 1;
+    }
+    if (n && s[n - 1] == '+' && n >= 2 && s[n - 2] == '+' && !have_key) { strcpy(c->ch, "+"); have_key = 1; }
+    if (!have_key) {
+        /* a modifier alone ("super", "shift"): pressed and released as a key of its own */
+        if (!lone_mod || (c->mods & (c->mods - 1))) return -1;
+        c->code = lone_mod == HANDS_M_CTRL ? KEY_LEFTCTRL : lone_mod == HANDS_M_ALT ? KEY_LEFTALT : lone_mod == HANDS_M_SHIFT ? KEY_LEFTSHIFT : KEY_LEFTMETA;
+        c->mods = 0;
+    }
+    /* the physical keyboard's own chords: ending the session, a text console, the panic key, Lord Flow's rescue */
+    unsigned ca = HANDS_M_CTRL | HANDS_M_ALT;
+    if ((c->mods & ca) == ca) {
+        if (c->code == KEY_BACKSPACE || c->code == KEY_ESC || c->code == KEY_DELETE) return -1;
+        if (c->code >= KEY_F1 && c->code <= KEY_F10) return -1;
+        if (c->code == KEY_F11 || c->code == KEY_F12) return -1;
+    }
+    return 0;
+}
+
+int hands_chords(const char *s, HandsChord *c, int max, int *n) {
+    *n = 0;
+    size_t len = s ? strlen(s) : 0;
+    if (len < 1 || len > 256) return -1;
+    char buf[257];
+    memcpy(buf, s, len + 1);
+    char *save = NULL;
+    for (char *w = strtok_r(buf, " ", &save); w; w = strtok_r(NULL, " ", &save)) {
+        if (*n >= max || hands_chord(w, &c[*n])) return -1;
+        (*n)++;
+    }
+    return *n ? 0 : -1;
+}
+
+/* ---- rate ---- */
+
+int hands_rate_take(HandsBucket *b, double now, double per_s, double burst) {
+    if (!b->init) { b->init = 1; b->tokens = burst; b->last = now; }
+    if (now > b->last) { b->tokens += (now - b->last) * per_s / 1000.0; b->last = now; }
+    if (b->tokens > burst) b->tokens = burst;
+    if (b->tokens < 1) return 0;
+    b->tokens -= 1;
+    return 1;
+}
+
+static const char *result_word(int r) {
+    switch (r) {
+    case HANDS_OK: return "ok";
+    case HANDS_E_OFF: return "off";
+    case HANDS_E_ASKING: return "asking";
+    case HANDS_E_DENIED: return "denied";
+    case HANDS_E_STOPPED: return "stopped";
+    case HANDS_E_ACTIVE: return "user-active";
+    case HANDS_E_REFUSED: return "refused";
+    case HANDS_E_RATE: return "rate-limited";
+    case HANDS_E_NOTFOUND: return "not-found";
+    case HANDS_E_ARGS: return "bad-arguments";
+    case HANDS_E_BUSY: return "busy";
+    default: return "failed";
+    }
+}
+
+size_t hands_log_line(char *out, size_t n, int kind, int call, int action, int result, int why) {
+    if (!out || !n) return 0;
+    int k = snprintf(out, n, "hands: %s %s%s%s %s%s%s", hands_kind_word(kind), hands_call_word(call),
+                     call == HANDS_C_POINTER && action > 0 ? " " : "", call == HANDS_C_POINTER ? hands_pointer_word(action) : "",
+                     result_word(result), result == HANDS_E_REFUSED ? " " : "", result == HANDS_E_REFUSED ? hands_why_word(why) : "");
+    return k < 0 ? 0 : (size_t)k < n ? (size_t)k : n - 1;
+}
+
+/* ---- JSON text ---- */
+
+typedef struct { char *p; size_t n, cap; int oom; } Jb;
+static void jb_put(Jb *b, const char *s, size_t n) {
+    if (b->oom) return;
+    if (b->n + n + 1 > b->cap) {
+        size_t cap = b->cap ? b->cap : 256;
+        while (cap < b->n + n + 1) cap *= 2;
+        char *q = realloc(b->p, cap);
+        if (!q) { b->oom = 1; return; }
+        b->p = q;
+        b->cap = cap;
+    }
+    memcpy(b->p + b->n, s, n);
+    b->n += n;
+    b->p[b->n] = 0;
+}
+static void jb_s(Jb *b, const char *s) { jb_put(b, s, strlen(s)); }
+static void jb_q(Jb *b, const char *s) {
+    jb_put(b, "\"", 1);
+    for (const unsigned char *p = (const unsigned char *)(s ? s : ""); *p; p++) {
+        char e[8];
+        if (*p == '"' || *p == '\\') { e[0] = '\\'; e[1] = (char)*p; jb_put(b, e, 2); }
+        else if (*p < 0x20) { snprintf(e, sizeof e, "\\u%04x", *p); jb_put(b, e, 6); }
+        else jb_put(b, (const char *)p, 1);
+    }
+    jb_put(b, "\"", 1);
+}
+static void jb_num(Jb *b, double v) { char t[48]; snprintf(t, sizeof t, "%.2f", v); jb_s(b, t); }
+/* the text, now the caller's (b is empty again) */
+static char *jb_take(Jb *b) {
+    char *p = b->p;
+    int oom = b->oom;
+    memset(b, 0, sizeof *b);
+    if (oom) { free(p); return NULL; }
+    return p ? p : strdup("");
+}
+
+/* ---- state ---- */
+
+enum { CS_FREE = 0, CS_ASKING, CS_GRANTED, CS_DENIED, CS_STOPPED };
+static const char *const CSW[] = { "free", "asking", "granted", "denied", "stopped" };
+
+typedef struct {
+    char bus[64], name[HANDS_NAME_MAX + 1];
+    int kind, st;
+    unsigned long actions;
+} Client;
+typedef struct { char name[HANDS_NAME_MAX + 1]; int allow; } Grant;
+
+static struct {
+    const HandsHost *h;
+    int on, qa, injecting;
+    char allow[HANDS_ALLOW_MAX][HANDS_ID_MAX + 1];
+    int nallow;
+    Client c[HANDS_CLIENTS];
+    Grant g[HANDS_NAMES];
+    int ng;
+    double person;
+    int person_seen;
+    unsigned long events;
+    HandsBucket input, shot, read, hello;
+} S;
+
+void hands_init(const HandsHost *h) { S.h = h; }
+const HandsHost *hands_host(void) { return S.h; }
+int hands_on(void) { return S.on; }
+int hands_qa_mode(void) { return S.qa; }
+int hands_injecting(void) { return S.injecting; }
+unsigned long hands_ai_events(void) { return S.events; }
+
+static double now(void) { return S.h && S.h->now ? S.h->now() : 0; }
+
+char *hands_status_json(void) {
+    Jb b = { 0 };
+    jb_s(&b, "{\"on\":");
+    jb_s(&b, S.on ? "true" : "false");
+    jb_s(&b, ",\"qa\":");
+    jb_s(&b, S.qa ? "true" : "false");
+    jb_s(&b, ",\"allow\":[");
+    for (int i = 0; i < S.nallow; i++) { if (i) jb_s(&b, ","); jb_q(&b, S.allow[i]); }
+    jb_s(&b, "],\"clients\":[");
+    int first = 1;
+    for (int i = 0; i < HANDS_CLIENTS; i++) {
+        const Client *k = &S.c[i];
+        if (k->st == CS_FREE) continue;
+        if (!first) jb_s(&b, ",");
+        first = 0;
+        char a[32];
+        snprintf(a, sizeof a, "%lu", k->actions);
+        jb_s(&b, "{\"name\":");
+        jb_q(&b, k->name);
+        jb_s(&b, ",\"kind\":");
+        jb_q(&b, hands_kind_word(k->kind));
+        jb_s(&b, ",\"state\":");
+        jb_q(&b, CSW[k->st]);
+        jb_s(&b, ",\"actions\":");
+        jb_s(&b, a);
+        jb_s(&b, "}");
+    }
+    char e[48];
+    snprintf(e, sizeof e, "],\"events\":%lu}", S.events);
+    jb_s(&b, e);
+    return jb_take(&b);
+}
+
+static void tell(void) {
+    if (!S.h || !S.h->event) return;
+    char *st = hands_status_json();
+    if (!st) return;
+    Jb b = { 0 };
+    jb_s(&b, "{\"t\":\"clients\",\"status\":");
+    jb_s(&b, st);
+    jb_s(&b, "}");
+    free(st);
+    char *j = jb_take(&b);
+    if (j) S.h->event(j);
+    free(j);
+}
+
+static void log_call(int kind, int call, int action, int result, int why) {
+    if (!S.h || !S.h->event) return;
+    char line[160], j[256];
+    hands_log_line(line, sizeof line, kind, call, action, result, why);
+    snprintf(j, sizeof j, "{\"t\":\"log\",\"line\":\"%s\"}", line);   /* closed words only: no quoting needed */
+    S.h->event(j);
+}
+
+static Client *client_of(const char *bus) {
+    for (int i = 0; bus && i < HANDS_CLIENTS; i++) if (S.c[i].st != CS_FREE && !strcmp(S.c[i].bus, bus)) return &S.c[i];
+    return NULL;
+}
+
+static Grant *grant_of(const char *name) {
+    for (int i = 0; i < S.ng; i++) if (!strcmp(S.g[i].name, name)) return &S.g[i];
+    return NULL;
+}
+
+void hands_serve(int on, const char *const *allow, int nallow) {
+    int was = S.on;
+    S.on = !!on;
+    S.nallow = 0;
+    for (int i = 0; allow && i < nallow && S.nallow < HANDS_ALLOW_MAX; i++)
+        if (hands_id_ok(allow[i])) snprintf(S.allow[S.nallow++], sizeof S.allow[0], "%s", allow[i]);
+    if (was && !S.on) hands_stop("off");
+    else tell();
+}
+
+void hands_answer(const char *name, int allow) {
+    if (!name) return;
+    Grant *g = grant_of(name);
+    if (!g && S.ng < HANDS_NAMES) { g = &S.g[S.ng++]; snprintf(g->name, sizeof g->name, "%s", name); }
+    if (g) g->allow = allow ? 1 : 0;
+    for (int i = 0; i < HANDS_CLIENTS; i++)
+        if (S.c[i].st == CS_ASKING && !strcmp(S.c[i].name, name)) S.c[i].st = allow ? CS_GRANTED : CS_DENIED;
+    tell();
+}
+
+void hands_stop(const char *why_word) {
+    (void)why_word;
+    for (int i = 0; i < HANDS_CLIENTS; i++) if (S.c[i].st != CS_FREE) S.c[i].st = CS_STOPPED;
+    S.ng = 0;                                       /* every grant forgotten: the next connection asks again */
+    if (S.h && S.h->event) {
+        char j[96];
+        snprintf(j, sizeof j, "{\"t\":\"stopped\",\"why\":\"%s\"}", why_word && hands_id_ok(why_word) ? why_word : "stop");
+        S.h->event(j);
+    }
+    tell();
+}
+
+void hands_panic(void) {
+    S.on = 0;
+    hands_stop("panic");
+}
+
+void hands_away(void) { if (!S.qa) hands_stop("locked"); }
+
+void hands_person_input(void) {
+    if (S.injecting) return;
+    S.person = now();
+    S.person_seen = 1;
+}
+
+void hands_qa(int on) {
+    S.qa = !!on;
+    if (on) S.on = 1;
+    tell();
+}
+
+int hands_hello(const char *bus, const char *name) {
+    if (!bus || !bus[0] || strlen(bus) >= sizeof S.c[0].bus) return HANDS_E_ARGS;
+    if (!S.h || !hands_rate_take(&S.hello, now(), 2, 8)) return HANDS_E_RATE;
+    if (!S.on) return HANDS_E_OFF;
+    char clean[HANDS_NAME_MAX + 1];
+    if (hands_clean_name(name, clean, sizeof clean)) return HANDS_E_ARGS;
+    Client *k = client_of(bus);
+    if (k && k->st == CS_STOPPED) return HANDS_E_STOPPED;
+    if (k && strcmp(k->name, clean)) return HANDS_E_ARGS;      /* one name per connection */
+    if (!k) {
+        for (int i = 0; i < HANDS_CLIENTS && !k; i++) if (S.c[i].st == CS_FREE) k = &S.c[i];
+        if (!k) return HANDS_E_BUSY;
+        memset(k, 0, sizeof *k);
+        snprintf(k->bus, sizeof k->bus, "%s", bus);
+        snprintf(k->name, sizeof k->name, "%s", clean);
+        k->kind = hands_kind_of(clean);
+        Grant *g = grant_of(clean);
+        k->st = S.qa ? CS_GRANTED : g ? (g->allow ? CS_GRANTED : CS_DENIED) : CS_ASKING;
+        log_call(k->kind, HANDS_C_HELLO, 0, k->st == CS_GRANTED ? HANDS_OK : k->st == CS_DENIED ? HANDS_E_DENIED : HANDS_E_ASKING, 0);
+        tell();
+    }
+    return k->st == CS_GRANTED ? HANDS_OK : k->st == CS_DENIED ? HANDS_E_DENIED : k->st == CS_STOPPED ? HANDS_E_STOPPED : HANDS_E_ASKING;
+}
+
+void hands_gone(const char *bus) {
+    Client *k = client_of(bus);
+    if (!k) return;
+    memset(k, 0, sizeof *k);
+    tell();
+}
+
+void hands_lost(void) {
+    memset(S.c, 0, sizeof S.c);
+    tell();
+}
+
+static int is_input(int call) {
+    return call == HANDS_C_POINTER || call == HANDS_C_SCROLL || call == HANDS_C_KEY || call == HANDS_C_TYPE ||
+           call == HANDS_C_SETVALUE || call == HANDS_C_OPENAPP || call == HANDS_C_OPENPATH || call == HANDS_C_CLOSE;
+}
+
+int hands_may(const char *bus, int call) {
+    if (!S.h) return HANDS_E_FAILED;
+    if (!S.on) return HANDS_E_OFF;
+    Client *k = client_of(bus);
+    if (!k) return HANDS_E_DENIED;                  /* Hello first */
+    if (k->st == CS_ASKING) return HANDS_E_ASKING;
+    if (k->st == CS_DENIED) return HANDS_E_DENIED;
+    if (k->st == CS_STOPPED) return HANDS_E_STOPPED;
+    double t = now();
+    if (is_input(call) && !S.qa && S.person_seen && t - S.person < HANDS_YIELD_MS) return HANDS_E_ACTIVE;
+    int ok = 1;
+    if (call == HANDS_C_SHOT) ok = hands_rate_take(&S.shot, t, 2, 4);
+    else if (is_input(call)) ok = hands_rate_take(&S.input, t, 8, 16);
+    else ok = hands_rate_take(&S.read, t, 10, 20);
+    return ok ? HANDS_OK : HANDS_E_RATE;
+}
+
+/* ---- the calls ---- */
+
+static void allow_json(Jb *b) {
+    jb_s(b, "\"allow\":[");
+    for (int i = 0; i < S.nallow; i++) { if (i) jb_s(b, ","); jb_q(b, S.allow[i]); }
+    jb_s(b, "]");
+}
+
+/* the shell's answer to op: 0 with its JSON in *d, or an error (its word into *why) */
+static int ask(const char *op, Jb *args, JDoc *d, int *why) {
+    char *a = jb_take(args);
+    char *r = a && S.h->shell ? S.h->shell(op, a) : NULL;
+    free(a);
+    memset(d, 0, sizeof *d);
+    if (!r) return HANDS_E_FAILED;
+    int bad = json_parse(r, strlen(r), d, NULL, 0) || !d->root || d->root->type != J_OBJ;
+    free(r);
+    if (bad) { json_free(d); return HANDS_E_FAILED; }
+    const char *e = json_str(d->root, "error");
+    if (!e) return HANDS_OK;
+    int code = HANDS_E_FAILED;
+    if (!strcmp(e, "not-found")) code = HANDS_E_NOTFOUND;
+    for (int w = 1; w < HANDS_WHY_COUNT; w++) if (!strcmp(e, WHY[w])) { code = HANDS_E_REFUSED; *why = w; }
+    json_free(d);
+    return code;
+}
+
+/* a call to the shell whose JSON answer goes back to the agent as it is */
+static int shell_pass(const char *op, Jb *args, char **out, int *why) {
+    char *a = jb_take(args);
+    char *r = a && S.h->shell ? S.h->shell(op, a) : NULL;
+    free(a);
+    if (!r) return HANDS_E_FAILED;
+    JDoc d;
+    if (json_parse(r, strlen(r), &d, NULL, 0) || !d.root || d.root->type != J_OBJ) { free(r); return HANDS_E_FAILED; }
+    const char *e = json_str(d.root, "error");
+    int code = HANDS_OK;
+    if (e) {
+        code = HANDS_E_FAILED;
+        if (!strcmp(e, "not-found")) code = HANDS_E_NOTFOUND;
+        for (int w = 1; w < HANDS_WHY_COUNT; w++) if (!strcmp(e, WHY[w])) { code = HANDS_E_REFUSED; *why = w; }
+    } else {
+        const char *t = json_str(d.root, "text");
+        *out = t ? strdup(t) : NULL;
+    }
+    json_free(&d);
+    if (code == HANDS_OK && !*out) *out = r;
+    else free(r);
+    return code;
+}
+
+/* where a ref is: its node and the centre of its box */
+static int resolve(const char *ref, int *node, double *x, double *y, double box[4], int *why) {
+    Jb a = { 0 };
+    jb_s(&a, "{\"ref\":");
+    jb_q(&a, ref);
+    jb_s(&a, ",");
+    allow_json(&a);
+    jb_s(&a, "}");
+    JDoc d;
+    int r = ask("resolve", &a, &d, why);
+    if (r) return r;
+    *node = (int)json_num(d.root, "node", 0);
+    double bx = json_num(d.root, "x", -1), by = json_num(d.root, "y", -1), bw = json_num(d.root, "w", 0), bh = json_num(d.root, "h", 0);
+    json_free(&d);
+    if (*node <= 0 || bw < 1 || bh < 1) return HANDS_E_NOTFOUND;
+    if (box) { box[0] = bx; box[1] = by; box[2] = bw; box[3] = bh; }
+    *x = bx + bw / 2;
+    *y = by + bh / 2;
+    return HANDS_OK;
+}
+
+/* the app of what is at node (its window's, or the window in front for the bar and the menus) is in the allowlist */
+static int allowlist_node(int node, int *why) {
+    if (!S.nallow) return HANDS_OK;
+    Jb a = { 0 };
+    char t[64];
+    snprintf(t, sizeof t, "{\"node\":%d,", node);
+    jb_s(&a, t);
+    allow_json(&a);
+    jb_s(&a, "}");
+    JDoc d;
+    int r = ask("target", &a, &d, why);
+    if (r) return r;
+    int ok = json_bool(d.root, "allowed", 0);
+    json_free(&d);
+    if (!ok) { *why = HANDS_WHY_ALLOWLIST; return HANDS_E_REFUSED; }
+    return HANDS_OK;
+}
+
+/* the field with the keyboard: never a password, never an app outside the allowlist */
+static int keys_ok(int *why) {
+    int w = S.h->keys_place ? S.h->keys_place() : 0;
+    if (w) { *why = w; return HANDS_E_REFUSED; }
+    Jb a = { 0 };
+    jb_s(&a, "{");
+    allow_json(&a);
+    jb_s(&a, "}");
+    JDoc d;
+    int r = ask("focus", &a, &d, why);
+    if (r) return r;
+    int secure = json_bool(d.root, "secure", 0), denied = json_bool(d.root, "denied", 0), ok = json_bool(d.root, "allowed", 1);
+    json_free(&d);
+    if (secure) { *why = HANDS_WHY_PASSWORD; return HANDS_E_REFUSED; }
+    if (denied) { *why = HANDS_WHY_DENIED_NODE; return HANDS_E_REFUSED; }
+    if (!ok) { *why = HANDS_WHY_ALLOWLIST; return HANDS_E_REFUSED; }
+    return HANDS_OK;
+}
+
+static int place_ok(double x, double y, int *node, int *why) {
+    int W = 0, H = 0;
+    S.h->size(&W, &H);
+    if (!(x >= 0 && y >= 0 && x < W && y < H)) { *why = HANDS_WHY_OUTSIDE; return HANDS_E_REFUSED; }
+    *node = 0;
+    int w = S.h->place(x, y, node);
+    if (w) { *why = w; return HANDS_E_REFUSED; }
+    return allowlist_node(*node, why);
+}
+
+static int do_pointer(const HandsReq *r, char **out, int *why) {
+    if (S.h->pointer_locked && S.h->pointer_locked()) { *why = HANDS_WHY_POINTER_LOCK; return HANDS_E_REFUSED; }
+    double x = r->x, y = r->y;
+    int ref_node = 0, node = 0, rc;
+    if (r->ref[0] && (rc = resolve(r->ref, &ref_node, &x, &y, NULL, why))) return rc;
+    if ((rc = place_ok(x, y, &node, why))) return rc;
+    if (ref_node && S.h->same_target && !S.h->same_target(node, ref_node)) { *why = HANDS_WHY_OBSCURED; return HANDS_E_REFUSED; }
+    if (r->action == HANDS_P_DRAG) {
+        int end = 0;
+        if ((rc = place_ok(r->x2, r->y2, &end, why))) return rc;
+    }
+    S.injecting = 1;
+    S.h->move(x, y);
+    int n = 1;
+    switch (r->action) {
+    case HANDS_P_HOVER: break;
+    case HANDS_P_DRAG:
+        S.h->button(0, 1);
+        for (int i = 1; i <= 8; i++) S.h->move(x + (r->x2 - x) * i / 8, y + (r->y2 - y) * i / 8);
+        S.h->button(0, 0);
+        n = 10;
+        break;
+    default: {
+        int b = r->action == HANDS_P_RIGHT ? 2 : r->action == HANDS_P_MIDDLE ? 1 : 0;
+        int times = r->action == HANDS_P_DOUBLE ? 2 : r->action == HANDS_P_TRIPLE ? 3 : 1;
+        for (int i = 0; i < times; i++) { S.h->button(b, 1); S.h->button(b, 0); }
+        n = 1 + 2 * times;
+    }
+    }
+    S.injecting = 0;
+    S.events += (unsigned long)n;
+    Jb o = { 0 };
+    jb_s(&o, "{\"x\":");
+    jb_num(&o, x);
+    jb_s(&o, ",\"y\":");
+    jb_num(&o, y);
+    jb_s(&o, "}");
+    *out = jb_take(&o);
+    return HANDS_OK;
+}
+
+static int do_scroll(const HandsReq *r, int *why) {
+    if (S.h->pointer_locked && S.h->pointer_locked()) { *why = HANDS_WHY_POINTER_LOCK; return HANDS_E_REFUSED; }
+    double x = r->x, y = r->y;
+    int ref_node = 0, node = 0, rc;
+    if (r->ref[0] && (rc = resolve(r->ref, &ref_node, &x, &y, NULL, why))) return rc;
+    if ((rc = place_ok(x, y, &node, why))) return rc;
+    int k = r->amount < 1 ? 3 : r->amount;
+    S.injecting = 1;
+    S.h->move(x, y);
+    int dx = r->dir == HANDS_DIR_LEFT ? -k : r->dir == HANDS_DIR_RIGHT ? k : 0;
+    int dy = r->dir == HANDS_DIR_UP ? k : r->dir == HANDS_DIR_DOWN ? -k : 0;
+    S.h->wheel(dx, dy);
+    S.injecting = 0;
+    S.events += 2;
+    return HANDS_OK;
+}
+
+static int do_key(const HandsReq *r, int *why) {
+    HandsChord c[8];
+    int n = 0;
+    if (hands_chords(r->text, c, 8, &n)) return HANDS_E_ARGS;
+    int rc = keys_ok(why);
+    if (rc) return rc;
+    int rep = r->repeat < 1 ? 1 : r->repeat;
+    S.injecting = 1;
+    for (int k = 0; k < rep && !rc; k++)
+        for (int i = 0; i < n && !rc; i++) {
+            if (S.h->keys_place && (*why = S.h->keys_place())) { rc = HANDS_E_REFUSED; break; }
+            if (S.h->key(&c[i])) rc = HANDS_E_ARGS;
+            S.events += 2;
+        }
+    S.injecting = 0;
+    return rc;
+}
+
+/* the text in pieces: a line break or a tab is a key of its own (Enter, Tab), and the field with the keyboard is checked
+ * again after each one (a Tab may have moved it to a password field) */
+static int do_type(const HandsReq *r, int *why) {
+    int rc = keys_ok(why);
+    if (rc) return rc;
+    const char *t = r->text;
+    size_t n = r->text_len;
+    for (size_t off = 0; off < n && !rc;) {
+        size_t end = off;
+        while (end < n && t[end] != '\n' && t[end] != '\t') end++;
+        S.injecting = 1;
+        int w = end > off ? S.h->type(t + off, end - off) : 0;
+        if (!w && end < n) {
+            HandsChord c = { 0 };
+            c.code = t[end] == '\n' ? KEY_ENTER : KEY_TAB;
+            S.h->key(&c);
+        }
+        S.injecting = 0;
+        S.events += end - off + 1;
+        if (w) { *why = w; return HANDS_E_REFUSED; }
+        off = end + 1;
+        if (end < n && off < n) rc = keys_ok(why);
+    }
+    return rc;
+}
+
+static int do_setvalue(const HandsReq *r, int *why) {
+    int node = 0;
+    double x, y, box[4];
+    int rc = resolve(r->ref, &node, &x, &y, box, why);
+    if (rc) return rc;
+    int hit = 0;
+    if ((rc = place_ok(x, y, &hit, why))) return rc;
+    Jb a = { 0 };
+    jb_s(&a, "{\"ref\":");
+    jb_q(&a, r->ref);
+    jb_s(&a, ",\"value\":");
+    jb_q(&a, r->text);
+    jb_s(&a, ",");
+    allow_json(&a);
+    jb_s(&a, "}");
+    JDoc d;
+    S.injecting = 1;
+    rc = ask("setvalue", &a, &d, why);
+    S.injecting = 0;
+    if (rc) return rc;
+    json_free(&d);
+    S.events++;
+    return HANDS_OK;
+}
+
+static int do_shot(const HandsReq *r, char **out, uint8_t **png, size_t *len, int *why) {
+    int node = 0;
+    double x = r->x, y = r->y, w = r->w, h = r->h;
+    if (r->shot == HANDS_SHOT_WINDOW) {
+        Jb a = { 0 };
+        jb_s(&a, "{\"window\":");
+        jb_q(&a, r->window);
+        jb_s(&a, ",");
+        allow_json(&a);
+        jb_s(&a, "}");
+        JDoc d;
+        int rc = ask("window", &a, &d, why);
+        if (rc) return rc;
+        node = (int)json_num(d.root, "node", 0);
+        x = json_num(d.root, "x", 0);
+        y = json_num(d.root, "y", 0);
+        w = json_num(d.root, "w", 0);
+        h = json_num(d.root, "h", 0);
+        json_free(&d);
+        if (node <= 0 || w < 1 || h < 1) return HANDS_E_NOTFOUND;
+    } else if (r->shot == HANDS_SHOT_REGION) {
+        int W = 0, H = 0;
+        S.h->size(&W, &H);
+        if (w < 1 || h < 1 || x < 0 || y < 0 || x + w > W || y + h > H) { *why = HANDS_WHY_OUTSIDE; return HANDS_E_REFUSED; }
+    } else if (S.nallow) {
+        /* with an allowlist, the whole screen is no window's: only a window or a region of one */
+        *why = HANDS_WHY_ALLOWLIST;
+        return HANDS_E_REFUSED;
+    }
+    if (r->shot == HANDS_SHOT_REGION && S.nallow) {
+        int hit = 0, rc = place_ok(x + w / 2, y + h / 2, &hit, why);   /* a region of an allowed window */
+        if (rc) return rc;
+    }
+    char meta[256] = "";
+    int iw = 0, ih = 0;
+    *png = S.h->shot(r->shot, r->display, node, x, y, w, h, r->maxdim, len, &iw, &ih, meta, sizeof meta);
+    if (!*png) return HANDS_E_FAILED;
+    *out = strdup(meta[0] ? meta : "{}");
+    return HANDS_OK;
+}
+
+int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, size_t *png_len, int *why) {
+    *out = NULL;
+    if (png) *png = NULL;
+    if (png_len) *png_len = 0;
+    *why = 0;
+    Client *k = client_of(bus);
+    int kind = k ? k->kind : HANDS_K_OTHER;
+    int rc = hands_may(bus, r->call);
+    if (rc) {
+        if (rc != HANDS_E_RATE) log_call(kind, r->call, r->action, rc, 0);
+        return rc;
+    }
+    Jb a = { 0 };
+    switch (r->call) {
+    case HANDS_C_STATUS: {
+        jb_s(&a, "{");
+        allow_json(&a);
+        jb_s(&a, "}");
+        rc = shell_pass("status", &a, out, why);
+        break;
+    }
+    case HANDS_C_WINDOWS:
+        jb_s(&a, "{");
+        allow_json(&a);
+        jb_s(&a, "}");
+        rc = shell_pass("windows", &a, out, why);
+        break;
+    case HANDS_C_READ: {
+        char t[96];
+        jb_s(&a, "{\"window\":");
+        jb_q(&a, r->window);
+        snprintf(t, sizeof t, ",\"filter\":\"%s\",\"depth\":%d,", r->filter ? "interactive" : "all", r->depth);
+        jb_s(&a, t);
+        allow_json(&a);
+        jb_s(&a, "}");
+        rc = shell_pass("read", &a, out, why);
+        break;
+    }
+    case HANDS_C_FIND:
+        jb_s(&a, "{\"window\":");
+        jb_q(&a, r->window);
+        jb_s(&a, ",\"query\":");
+        jb_q(&a, r->text);
+        jb_s(&a, ",");
+        allow_json(&a);
+        jb_s(&a, "}");
+        rc = shell_pass("find", &a, out, why);
+        break;
+    case HANDS_C_POINTER: rc = do_pointer(r, out, why); break;
+    case HANDS_C_SCROLL: rc = do_scroll(r, why); break;
+    case HANDS_C_KEY: rc = do_key(r, why); break;
+    case HANDS_C_TYPE: rc = do_type(r, why); break;
+    case HANDS_C_SETVALUE: rc = do_setvalue(r, why); break;
+    case HANDS_C_SHOT: rc = do_shot(r, out, png, png_len, why); break;
+    case HANDS_C_OPENAPP:
+        jb_s(&a, "{\"app\":");
+        jb_q(&a, r->app);
+        jb_s(&a, ",");
+        allow_json(&a);
+        jb_s(&a, "}");
+        S.injecting = 1;
+        rc = shell_pass("open", &a, out, why);
+        S.injecting = 0;
+        break;
+    case HANDS_C_OPENPATH:
+        jb_s(&a, "{\"path\":");
+        jb_q(&a, r->text);
+        jb_s(&a, ",");
+        allow_json(&a);
+        jb_s(&a, "}");
+        S.injecting = 1;
+        rc = shell_pass("openPath", &a, out, why);
+        S.injecting = 0;
+        break;
+    case HANDS_C_CLOSE:
+        jb_s(&a, "{\"window\":");
+        jb_q(&a, r->window);
+        jb_s(&a, ",");
+        allow_json(&a);
+        jb_s(&a, "}");
+        S.injecting = 1;
+        rc = shell_pass("close", &a, out, why);
+        S.injecting = 0;
+        break;
+    case HANDS_C_APPLOG: {
+        char t[64];
+        jb_s(&a, "{\"app\":");
+        jb_q(&a, r->app);
+        jb_s(&a, ",\"pattern\":");
+        jb_q(&a, r->text ? r->text : "");
+        snprintf(t, sizeof t, ",\"max\":%d,", r->amount);
+        jb_s(&a, t);
+        allow_json(&a);
+        jb_s(&a, "}");
+        rc = shell_pass("log", &a, out, why);
+        break;
+    }
+    default: rc = HANDS_E_ARGS;
+    }
+    free(a.p);
+    if (!rc && k) { k->actions++; if (is_input(r->call)) tell(); }
+    if (rc && *out) { free(*out); *out = NULL; }
+    log_call(kind, r->call, r->action, rc, *why);
+    return rc;
+}
