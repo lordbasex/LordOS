@@ -1,0 +1,22 @@
+{
+  "menu.looking": "제안 찾는 중…",
+  "menu.none": "제안 없음",
+  "menu.add": "사전에 “{word}” 추가",
+  "menu.ignore": "무시",
+  "settings.title": "맞춤법",
+  "settings.hint": "LordOS 텍스트 입력란에서 맞춤법이 틀린 단어에는 빨간 물결 밑줄이 표시됩니다. 단어를 마우스 오른쪽 버튼으로 클릭하면 제안이 나타납니다. 검사는 이 컴퓨터에서만 하며 온라인으로는 하지 않습니다. 암호, 검색, 주소 입력란은 검사하지 않습니다.",
+  "settings.check": "입력하는 동안 맞춤법 검사",
+  "settings.languages": "맞춤법: 언어",
+  "settings.defaultHint": "선택 안 함: 인터페이스 언어와 영어(사전이 설치된 경우). 웹 앱도 같은 사전을 사용합니다.",
+  "settings.chosenHint": "선택한 언어 중 하나라도 아는 단어면 올바른 단어로 봅니다(최대 4개). 웹 앱은 인터페이스 언어와 영어를 사용합니다.",
+  "settings.none": "설치된 사전이 없습니다. 아래에서 설치하세요.",
+  "settings.useDefault": "기본값 사용",
+  "settings.more": "더 많은 언어",
+  "settings.moreHint": "Debian의 사전입니다. 설치하려면 관리자 암호가 필요합니다.",
+  "settings.installing": "설치 중…",
+  "settings.install": "설치",
+  "settings.words": "내 사전",
+  "settings.wordsHint": "여기나 웹 앱에서 “사전에 추가”로 추가한 단어입니다.",
+  "settings.remove": "제거",
+  "settings.noWords": "아직 단어가 없습니다."
+}

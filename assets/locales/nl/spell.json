@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Suggesties zoeken…",
+  "menu.none": "Geen suggesties",
+  "menu.add": "“{word}” toevoegen aan woordenboek",
+  "menu.ignore": "Negeren",
+  "settings.title": "Spelling",
+  "settings.hint": "Verkeerd gespelde woorden krijgen een rode golflijn in de tekstvelden van LordOS; klik er met rechts op voor suggesties. Gecontroleerd op deze computer, nooit online. Wachtwoord-, zoek- en adresvelden worden niet gecontroleerd.",
+  "settings.check": "Spelling controleren tijdens het typen",
+  "settings.languages": "Spelling: talen",
+  "settings.defaultHint": "Niets gekozen: je interfacetaal en Engels, als hun woordenboeken zijn geïnstalleerd. Web-apps gebruiken dezelfde.",
+  "settings.chosenHint": "Een woord is goed als een van de gekozen talen het kent (maximaal 4). Web-apps gebruiken je interfacetaal en Engels.",
+  "settings.none": "Er is geen woordenboek geïnstalleerd. Installeer er hieronder een.",
+  "settings.useDefault": "Standaardinstellingen gebruiken",
+  "settings.more": "Meer talen",
+  "settings.moreHint": "Woordenboeken van Debian. Voor installeren is het wachtwoord van een beheerder nodig.",
+  "settings.installing": "Installeren…",
+  "settings.install": "Installeren",
+  "settings.words": "Je woordenboek",
+  "settings.wordsHint": "Woorden die je hebt toegevoegd met “Toevoegen aan woordenboek”, hier of in een web-app.",
+  "settings.remove": "Verwijderen",
+  "settings.noWords": "Nog geen woorden."
+}

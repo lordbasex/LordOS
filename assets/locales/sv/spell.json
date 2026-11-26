@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Söker förslag…",
+  "menu.none": "Inga förslag",
+  "menu.add": "Lägg till ”{word}” i ordlistan",
+  "menu.ignore": "Ignorera",
+  "settings.title": "Stavning",
+  "settings.hint": "Felstavade ord får en röd vågig understrykning i LordOS textfält; högerklicka på ett för förslag. Kontrolleras på den här datorn, aldrig online. Lösenords-, sök- och adressfält kontrolleras inte.",
+  "settings.check": "Kontrollera stavningen medan du skriver",
+  "settings.languages": "Stavning: språk",
+  "settings.defaultHint": "Inget valt: ditt gränssnittsspråk och engelska, när deras ordlistor är installerade. Webbappar använder samma.",
+  "settings.chosenHint": "Ett ord är rätt när något av språken du valt känner till det (högst 4). Webbappar använder ditt gränssnittsspråk och engelska.",
+  "settings.none": "Ingen ordlista är installerad. Installera en nedan.",
+  "settings.useDefault": "Använd standardinställningarna",
+  "settings.more": "Fler språk",
+  "settings.moreHint": "Ordlistor från Debian. Att installera en kräver en administratörs lösenord.",
+  "settings.installing": "Installerar…",
+  "settings.install": "Installera",
+  "settings.words": "Din ordlista",
+  "settings.wordsHint": "Ord du lagt till med ”Lägg till i ordlistan”, här eller i en webbapp.",
+  "settings.remove": "Ta bort",
+  "settings.noWords": "Inga ord än."
+}

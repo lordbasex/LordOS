@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Mencari saran…",
+  "menu.none": "Tidak ada saran",
+  "menu.add": "Tambahkan “{word}” ke kamus",
+  "menu.ignore": "Abaikan",
+  "settings.title": "Ejaan",
+  "settings.hint": "Kata yang salah eja diberi garis bawah merah bergelombang di kolom teks LordOS; klik kanan salah satunya untuk melihat saran. Diperiksa di komputer ini, tidak pernah online. Kolom kata sandi, pencarian, dan alamat tidak diperiksa.",
+  "settings.check": "Periksa ejaan saat mengetik",
+  "settings.languages": "Ejaan: bahasa",
+  "settings.defaultHint": "Tidak ada yang dipilih: bahasa antarmuka Anda dan bahasa Inggris, jika kamusnya terpasang. Aplikasi web memakai yang sama.",
+  "settings.chosenHint": "Sebuah kata dianggap benar jika dikenal oleh salah satu bahasa yang Anda pilih (paling banyak 4). Aplikasi web memakai bahasa antarmuka Anda dan bahasa Inggris.",
+  "settings.none": "Belum ada kamus yang terpasang. Pasang satu di bawah.",
+  "settings.useDefault": "Gunakan bawaan",
+  "settings.more": "Bahasa lainnya",
+  "settings.moreHint": "Kamus dari Debian. Memasangnya memerlukan kata sandi administrator.",
+  "settings.installing": "Memasang…",
+  "settings.install": "Pasang",
+  "settings.words": "Kamus Anda",
+  "settings.wordsHint": "Kata yang Anda tambahkan dengan “Tambahkan ke kamus”, di sini atau di aplikasi web.",
+  "settings.remove": "Hapus",
+  "settings.noWords": "Belum ada kata."
+}

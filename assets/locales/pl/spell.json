@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Szukanie podpowiedzi…",
+  "menu.none": "Brak podpowiedzi",
+  "menu.add": "Dodaj „{word}” do słownika",
+  "menu.ignore": "Ignoruj",
+  "settings.title": "Pisownia",
+  "settings.hint": "Błędnie napisane słowa są podkreślane czerwoną falką w polach tekstowych LordOS; kliknij jedno prawym przyciskiem, aby zobaczyć podpowiedzi. Sprawdzanie odbywa się na tym komputerze, nigdy online. Pola hasła, wyszukiwania i adresu nie są sprawdzane.",
+  "settings.check": "Sprawdzaj pisownię podczas pisania",
+  "settings.languages": "Pisownia: języki",
+  "settings.defaultHint": "Nic nie wybrano: język interfejsu i angielski, jeśli ich słowniki są zainstalowane. Aplikacje webowe używają tych samych.",
+  "settings.chosenHint": "Słowo jest poprawne, jeśli zna je którykolwiek z wybranych języków (najwyżej 4). Aplikacje webowe używają języka interfejsu i angielskiego.",
+  "settings.none": "Nie zainstalowano żadnego słownika. Zainstaluj jeden poniżej.",
+  "settings.useDefault": "Użyj domyślnych",
+  "settings.more": "Więcej języków",
+  "settings.moreHint": "Słowniki z Debiana. Instalacja wymaga hasła administratora.",
+  "settings.installing": "Instalowanie…",
+  "settings.install": "Zainstaluj",
+  "settings.words": "Twój słownik",
+  "settings.wordsHint": "Słowa dodane przez „Dodaj do słownika”, tutaj lub w aplikacji webowej.",
+  "settings.remove": "Usuń",
+  "settings.noWords": "Nie ma jeszcze słów."
+}

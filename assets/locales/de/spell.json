@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Suche nach Vorschlägen…",
+  "menu.none": "Keine Vorschläge",
+  "menu.add": "„{word}“ zum Wörterbuch hinzufügen",
+  "menu.ignore": "Ignorieren",
+  "settings.title": "Rechtschreibung",
+  "settings.hint": "Falsch geschriebene Wörter werden in den Textfeldern von LordOS rot gewellt unterstrichen; klicke mit der rechten Maustaste darauf, um Vorschläge zu sehen. Geprüft wird auf diesem Computer, nie online. Passwort-, Such- und Adressfelder werden nicht geprüft.",
+  "settings.check": "Rechtschreibung beim Tippen prüfen",
+  "settings.languages": "Rechtschreibung: Sprachen",
+  "settings.defaultHint": "Keine gewählt: deine Oberflächensprache und Englisch, sofern ihre Wörterbücher installiert sind. Web-Apps verwenden dieselben.",
+  "settings.chosenHint": "Ein Wort gilt als richtig, wenn eine der gewählten Sprachen es kennt (höchstens 4). Web-Apps verwenden deine Oberflächensprache und Englisch.",
+  "settings.none": "Es ist kein Wörterbuch installiert. Installiere unten eines.",
+  "settings.useDefault": "Standard verwenden",
+  "settings.more": "Weitere Sprachen",
+  "settings.moreHint": "Wörterbücher von Debian. Zum Installieren ist ein Administratorpasswort nötig.",
+  "settings.installing": "Wird installiert…",
+  "settings.install": "Installieren",
+  "settings.words": "Dein Wörterbuch",
+  "settings.wordsHint": "Wörter, die du mit „Zum Wörterbuch hinzufügen“ hinzugefügt hast, hier oder in einer Web-App.",
+  "settings.remove": "Entfernen",
+  "settings.noWords": "Noch keine Wörter."
+}

@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Đang tìm gợi ý…",
+  "menu.none": "Không có gợi ý",
+  "menu.add": "Thêm “{word}” vào từ điển",
+  "menu.ignore": "Bỏ qua",
+  "settings.title": "Chính tả",
+  "settings.hint": "Từ viết sai được gạch chân bằng đường lượn sóng màu đỏ trong các ô văn bản của LordOS; nhấp chuột phải vào một từ để xem gợi ý. Kiểm tra ngay trên máy tính này, không bao giờ trực tuyến. Ô mật khẩu, tìm kiếm và địa chỉ không được kiểm tra.",
+  "settings.check": "Kiểm tra chính tả khi gõ",
+  "settings.languages": "Chính tả: ngôn ngữ",
+  "settings.defaultHint": "Chưa chọn: ngôn ngữ giao diện của bạn và tiếng Anh, khi đã cài từ điển của chúng. Ứng dụng web dùng cùng các từ điển đó.",
+  "settings.chosenHint": "Một từ được coi là đúng khi bất kỳ ngôn ngữ nào bạn chọn biết từ đó (tối đa 4). Ứng dụng web dùng ngôn ngữ giao diện của bạn và tiếng Anh.",
+  "settings.none": "Chưa cài từ điển nào. Hãy cài một từ điển bên dưới.",
+  "settings.useDefault": "Dùng mặc định",
+  "settings.more": "Thêm ngôn ngữ",
+  "settings.moreHint": "Từ điển từ Debian. Cài đặt cần mật khẩu quản trị viên.",
+  "settings.installing": "Đang cài…",
+  "settings.install": "Cài đặt",
+  "settings.words": "Từ điển của bạn",
+  "settings.wordsHint": "Các từ bạn đã thêm bằng “Thêm vào từ điển”, tại đây hoặc trong ứng dụng web.",
+  "settings.remove": "Xóa",
+  "settings.noWords": "Chưa có từ nào."
+}

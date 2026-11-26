@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Öneriler aranıyor…",
+  "menu.none": "Öneri yok",
+  "menu.add": "“{word}” sözcüğünü sözlüğe ekle",
+  "menu.ignore": "Yoksay",
+  "settings.title": "Yazım",
+  "settings.hint": "Yanlış yazılan sözcüklerin altı LordOS metin alanlarında kırmızı dalgalı çizgiyle çizilir; öneriler için birine sağ tıklayın. Denetim bu bilgisayarda yapılır, asla çevrimiçi değil. Parola, arama ve adres alanları denetlenmez.",
+  "settings.check": "Yazarken yazımı denetle",
+  "settings.languages": "Yazım: diller",
+  "settings.defaultHint": "Seçim yok: arayüz diliniz ve İngilizce, sözlükleri yüklüyse. Web uygulamaları da aynılarını kullanır.",
+  "settings.chosenHint": "Seçtiğiniz dillerden herhangi biri bir sözcüğü tanıyorsa sözcük doğrudur (en fazla 4). Web uygulamaları arayüz dilinizi ve İngilizceyi kullanır.",
+  "settings.none": "Hiç sözlük yüklü değil. Aşağıdan bir tane yükleyin.",
+  "settings.useDefault": "Varsayılanları kullan",
+  "settings.more": "Daha fazla dil",
+  "settings.moreHint": "Debian sözlükleri. Yüklemek için bir yöneticinin parolası gerekir.",
+  "settings.installing": "Yükleniyor…",
+  "settings.install": "Yükle",
+  "settings.words": "Sözlüğünüz",
+  "settings.wordsHint": "“Sözlüğe ekle” ile buradan veya bir web uygulamasından eklediğiniz sözcükler.",
+  "settings.remove": "Kaldır",
+  "settings.noWords": "Henüz sözcük yok."
+}

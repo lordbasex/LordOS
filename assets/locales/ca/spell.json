@@ -1,0 +1,22 @@
+{
+  "menu.looking": "S’estan cercant suggeriments…",
+  "menu.none": "Cap suggeriment",
+  "menu.add": "Afegeix «{word}» al diccionari",
+  "menu.ignore": "Ignora",
+  "settings.title": "Ortografia",
+  "settings.hint": "Les paraules mal escrites es subratllen amb una ona vermella als camps de text de LordOS; fes-hi clic dret per veure suggeriments. Es comprova en aquest ordinador, mai en línia. Els camps de contrasenya, cerca i adreça no es comproven.",
+  "settings.check": "Comprova l’ortografia mentre escrius",
+  "settings.languages": "Ortografia: idiomes",
+  "settings.defaultHint": "Cap triat: l’idioma de la interfície i l’anglès, si els seus diccionaris estan instal·lats. Les aplicacions web fan servir els mateixos.",
+  "settings.chosenHint": "Una paraula és correcta si la coneix qualsevol dels idiomes que has triat (com a màxim 4). Les aplicacions web fan servir l’idioma de la interfície i l’anglès.",
+  "settings.none": "No hi ha cap diccionari instal·lat. Instal·la’n un a sota.",
+  "settings.useDefault": "Fes servir els predeterminats",
+  "settings.more": "Més idiomes",
+  "settings.moreHint": "Diccionaris de Debian. Per instal·lar-ne un cal la contrasenya d’un administrador.",
+  "settings.installing": "S’està instal·lant…",
+  "settings.install": "Instal·la",
+  "settings.words": "El teu diccionari",
+  "settings.wordsHint": "Paraules que has afegit amb «Afegeix al diccionari», aquí o en una aplicació web.",
+  "settings.remove": "Elimina",
+  "settings.noWords": "Encara no hi ha paraules."
+}
