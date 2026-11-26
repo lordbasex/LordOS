@@ -176,7 +176,8 @@ const useHere = () => { const info = useSystemInfo(60000); return DEB_ARCH[info.
 // Tailscale's private network; its system service is outside the per-app firewall) and
 // "suites" (featured open source suites from other projects, such as ArtCraft).
 const sectionOf = (a) => a.section || 'ai';
-export const catalogApps = (section) => (catalog.apps || []).filter((a) => !section || sectionOf(a) === section);
+// "addon": a part another install brings (llama.cpp's CUDA backend, with NVIDIA's driver): never a page or a search result
+export const catalogApps = (section) => (catalog.apps || []).filter((a) => sectionOf(a) !== 'addon' && (!section || sectionOf(a) === section));
 export const catalogApp = (pkg) => (catalog.apps || []).find((x) => x.package === pkg);
 
 // A catalog app's page: add its maker's repository first, fetch the lists when LordOS's own package

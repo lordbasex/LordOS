@@ -188,6 +188,42 @@
       }
     },
     {
+      "id": "llama.cpp-cuda",
+      "package": "llama.cpp-cuda",
+      "name": "llama.cpp CUDA backend",
+      "keywords": ["cuda", "nvidia", "llama.cpp"],
+      "summary": {
+        "en": "llama.cpp's CUDA module for NVIDIA cards, with NVIDIA's driver from its own repository",
+        "es": "El módulo CUDA de llama.cpp para placas NVIDIA, con el controlador de NVIDIA de su propio repositorio",
+        "pt": "O módulo CUDA do llama.cpp para placas NVIDIA, com o driver da NVIDIA do seu próprio repositório"
+      },
+      "license": "MIT",
+      "vendor": "ggml.ai (ggml-org)",
+      "homepage": "https://github.com/ggml-org/llama.cpp",
+      "arches": [
+        "amd64"
+      ],
+      "kind": "local-models",
+      "section": "addon",
+      "source": {
+        "type": "build",
+        "recipe": "llama.cpp-cuda",
+        "image": "nvidia-cuda",
+        "version": "0.7.0",
+        "revision": "1lordos1",
+        "source_date_epoch": 1792084399,
+        "tag": "v0.7.0",
+        "commit": "620d2225cc436ab0b001e3200e590e3b286ef9ab",
+        "build_number": 11669,
+        "url": "https://github.com/ggml-org/llama.cpp/archive/refs/tags/v0.7.0.tar.gz",
+        "sha256": "55d67acf3ad2ad747a9bbeb75f9f0e173dbcc0d1753a471038a90c819421c5e1",
+        "inputs": [],
+        "notes": {
+          "amd64": "Only libggml-cuda.so (GGML_BACKEND_DL, GGML_CUDA=ON), built with NVIDIA's CUDA 13.5 (nvcc, cudart and cuBLAS from NVIDIA's Debian 13 repository, key apt/keys/nvidia-cuda.asc) for Turing and newer cards; the same source and commit as llama.cpp, which it depends on exactly. Its RUNPATH finds CUDA 13.5's runtime in /usr/local/cuda-13.5; libcuda.so.1 is the driver's. Not shown in the Store: installed with NVIDIA's driver from the Store's card (docs/AI.md). Built with no network."
+        }
+      }
+    },
+    {
       "id": "goose",
       "package": "goose",
       "name": "goose",

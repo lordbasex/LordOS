@@ -917,6 +917,19 @@
           }
         },
         {
+          "id": "ai-gpu",
+          "q": {
+            "en": "Does LordOS's local AI use my graphics card?",
+            "es": "¿La IA local de LordOS usa mi placa de video?",
+            "pt": "A IA local do LordOS usa a minha placa de vídeo?"
+          },
+          "a": {
+            "en": "In development (the latest release is 0.8.9.6.1): the Brain, the local language model behind Sentinela and ✨ AI on selected text, can run on the graphics card. Settings → AI → Where they run has Automatic, Processor and Graphics card: Automatic uses CUDA on an NVIDIA card with NVIDIA's driver and LordOS's optional CUDA backend, else Vulkan (Mesa's drivers for AMD, Intel and NVIDIA), else the processor, and goes back to the processor if the card fails or runs out of memory; the page says which card it used and how much of the model fits on it. On an AMD RX 580 the small model writes about 110 word pieces (tokens) a second instead of 20, and a Sentinela analysis takes under a second instead of nine. NVIDIA and Intel cards and the Raspberry Pi's GPU haven't been tested yet, and nothing proprietary is installed unless you choose NVIDIA's driver in the Store.",
+            "es": "En desarrollo (la última versión es la 0.8.9.6.1): el Cerebro, el modelo de lenguaje local de Sentinela y de ✨ IA sobre el texto seleccionado, puede funcionar en la placa de video. Ajustes → IA → Dónde funcionan tiene Automático, Procesador y Placa de video: Automático usa CUDA en una placa NVIDIA con el controlador de NVIDIA y el backend CUDA opcional de LordOS, si no Vulkan (los controladores de Mesa para AMD, Intel y NVIDIA), si no el procesador, y vuelve al procesador si la placa falla o se queda sin memoria; la página dice qué placa usó y cuánto del modelo entra en ella. En una AMD RX 580 el modelo chico escribe unos 110 fragmentos de palabra (tokens) por segundo en lugar de 20, y un análisis de Sentinela tarda menos de un segundo en lugar de nueve. Las placas NVIDIA e Intel y la GPU de la Raspberry Pi todavía no se probaron, y no se instala nada propietario salvo que elijas el controlador de NVIDIA en la Tienda.",
+            "pt": "Em desenvolvimento (a versão mais recente é a 0.8.9.6.1): o Cérebro, o modelo de linguagem local da Sentinela e da ✨ IA sobre o texto selecionado, pode rodar na placa de vídeo. Ajustes → IA → Onde eles rodam tem Automático, Processador e Placa de vídeo: Automático usa CUDA numa placa NVIDIA com o driver da NVIDIA e o backend CUDA opcional do LordOS, senão Vulkan (os drivers do Mesa para AMD, Intel e NVIDIA), senão o processador, e volta ao processador se a placa falhar ou ficar sem memória; a página diz qual placa usou e quanto do modelo cabe nela. Numa AMD RX 580 o modelo pequeno escreve cerca de 110 pedaços de palavra (tokens) por segundo em vez de 20, e uma análise da Sentinela leva menos de um segundo em vez de nove. As placas NVIDIA e Intel e a GPU do Raspberry Pi ainda não foram testadas, e nada proprietário é instalado a menos que você escolha o driver da NVIDIA na Loja."
+          }
+        },
+        {
           "id": "multi-monitor-hidpi",
           "q": {
             "en": "Does it support several monitors and HiDPI screens?",

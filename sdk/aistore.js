@@ -224,3 +224,35 @@ export function sortForPage(list) {
   const rank = (e) => (e.inUse ? 0 : e.recommended ? 1 : e.state === 'installed' ? 2 : 3);
   return (list || []).map((e, i) => [e, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([e]) => e);
 }
+
+// ---- (0.8.9.6.2) where the Brain computes (Settings → AI, "Where they run"; docs/AI.md "The Brain on the GPU") ----
+
+// the person's choice, settings.brain.backend: 'auto' (CUDA, else Vulkan, else the processor), 'cpu' or 'gpu'
+export const BRAIN_BACKENDS = ['auto', 'cpu', 'gpu'];
+export const brainBackend = (s) => {
+  const b = s && s.brain && s.brain.backend;
+  return BRAIN_BACKENDS.includes(b) ? b : 'auto';
+};
+
+const API_NAME = { vulkan: 'Vulkan', cuda: 'CUDA' };
+// The line under the choice, from the engine's state (lord.sentinela.state(), engine.h): { key, vars } of
+// settings.aiStore.foot.*. What the engine used last this session when it has run; before that, what it will use.
+export function brainWhere(state, mode) {
+  const st = state || {};
+  const gpus = st.gpus || {};
+  const ready = gpus.cuda ? 'cuda' : gpus.vulkan ? 'vulkan' : null;
+  if (st.backend === 'vulkan' || st.backend === 'cuda') {
+    const vars = { api: API_NAME[st.backend], device: typeof st.device === 'string' && st.device ? st.device : API_NAME[st.backend] };
+    const total = Number.isInteger(st.layersTotal) && st.layersTotal > 0 ? st.layersTotal : 0;
+    const layers = Number.isInteger(st.layers) && st.layers >= 0 && st.layers <= total ? st.layers : 0;
+    if (total && layers < total) return { key: 'brainGpuPart', vars: { ...vars, layers, total } };
+    return { key: 'brainGpu', vars };
+  }
+  if (mode === 'cpu') return { key: 'brainCpuChosen', vars: {} };
+  if (st.backend === 'cpu') {
+    const why = { start: 'brainCpuStart', memory: 'brainCpuMemory', untested: 'brainCpuUntested', none: 'brainCpuNoGpu' }[st.fallback];
+    return { key: why || 'brainCpu', vars: {} };
+  }
+  if (ready) return { key: 'brainGpuReady', vars: { api: API_NAME[ready] } };
+  return { key: 'brainCpuNoGpu', vars: {} };
+}

@@ -62,6 +62,8 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
                                        // (Tailscale);
                                        // "suites" = open source apps and suites from other projects,
                                        // Store → Third-party apps (ArtCraft, VSCodium, Brave Browser);
+                                       // "addon" (0.8.9.6.2) = a part another install brings, never a Store
+                                       // page or search result (llama.cpp-cuda, with NVIDIA's driver);
                                        // missing = the AI section
     "source": { "type": "…", … }       // one of the four below
   }]
@@ -74,7 +76,7 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
 |---|---|---|
 | `apt` | `delivery` (`direct`/`mirror`), `url`, `suite` (the `dists/` name: the Suite, or the Codename when Suite is empty, as Cursor's), `components` [], `arches` [], `key` (`keys/<name>.asc`), `fingerprint` (40 hex digits, the key's primary fingerprint), `package`, optional `files` (`sources`, `keyring`: the vendor's own file names, for a package that always writes its own source, as Cursor's; or, since 0.8.8.9, `list`, `keyring`, `ownedBy`: a package that ships its source as its own files, as Steam's, which replaces LordOS's bootstrap `lordos-<id>` files once installed; `docs/UPDATES.md`), optional `multiarch` (`["i386"]` only, for an amd64-only app whose repository also serves its 32-bit libraries: Steam) | the vendor's signed index: the newest version per architecture |
 | `deb` | `version`, `files.<arch>.{url, sha256}` | the catalog |
-| `build` | `recipe`, `version`, `revision`, `source_date_epoch`, `tag`, `commit`, `url` + `sha256` of the source tarball, `inputs` [{`name`, `url`, `sha256`}], `notes.<arch>` | the catalog |
+| `build` | `recipe`, `version`, `revision`, `source_date_epoch`, `tag`, `commit`, `url` + `sha256` of the source tarball, `inputs` [{`name`, `url`, `sha256`}], `notes.<arch>`, optional `image` (`nvidia-cuda`: the build image plus NVIDIA's CUDA 13.5 compiler from its Debian 13 repository, key `keys/nvidia-cuda.asc` checked by fingerprint; amd64 only) | the catalog |
 | `binary` | `recipe`, `version`, `revision`, `source_date_epoch`, `files.<arch>.{url, sha256, sigstore?}`, `sigstore.{identity, issuer}`, `inputs` [] | the catalog |
 
 A package LordOS builds is versioned `<version>-<revision>` (`0.7.0-1lordos1`). A `deb822` source a

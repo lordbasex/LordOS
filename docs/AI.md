@@ -133,7 +133,8 @@ works, and its actions.
 
 - **Brain**: Qwen3 1.7B and 4B, and the engine. Install (the engine first when missing), Remove, Use (the model
   Sentinela and Lumo use, `settings.sentinela.model`). Try it: *Translate with Lumo* (`translateWithLumo`), when
-  Sentinela is on and the model is the one in use. The engine runs on the processor only (`-ngl 0`).
+  Sentinela is on and the model is the one in use. The engine runs on the graphics card when it can (in development,
+  "The Brain on the GPU" below), else on the processor.
 - **Voice**: one card per language (its standard model and own voice: install standard or HD, remove, listen to the
   recorded sample, try). Its page holds everything the old Voice page had: Read aloud, ❖Esc, the player, Live Speech,
   where speech is made (Auto / CPU / GPU), quality, a language's two models and its voices as cards (▶ sample, Try,
@@ -150,7 +151,64 @@ works, and its actions.
 
 The space the models take (measured on disk: `/usr/share/lordos/voice`, `~/.local/share/lordos/voice`,
 `/usr/share/lordos/llm`, Tesseract's `tessdata`), where they run (the Voice's real Auto / CPU / GPU setting from
-`voice.json`; the Brain and Vision on the processor) and the privacy note: no model uses the network.
+`voice.json`; the Brain's own Auto / CPU / GPU, below, with what the engine really used; Vision on the processor) and the
+privacy note: no model uses the network.
+
+## The Brain on the GPU (in development, awaiting the maintainer's approval)
+
+Asked by the maintainer on 2026-11-26. Until now the engine ran on the processor only (`-ngl 0 -dev none`). Now
+"Where they run" has **Automático / Procesador / Placa de video** for the Brain, as for the Voice
+(`settings.brain.backend`, default `auto`; `setBrainBackend` → `lord.sentinela.backend(mode)` → `llm_set_backend`), and
+under it the line of what the engine used (`brainWhere`, `sdk/aistore.js`): *Cerebro: en la placa de video (Vulkan, AMD
+Radeon RX 580 Series)*, *… 20 de 29 capas; el resto en el procesador* when only some fit, or on the processor with the
+reason (chosen, no usable card, the card couldn't start it, the card ran out of memory, an untested card on arm64).
+
+- **The engine.** LordOS's `llama.cpp` package was already built with `GGML_BACKEND_DL` and `GGML_CPU_ALL_VARIANTS` (every
+  CPU variant a module, the best loaded at run time) and `GGML_VULKAN` (`libggml-vulkan.so`, used only when a Vulkan
+  device exists; it needs `libvulkan1` and Mesa's `mesa-vulkan-drivers`, which the package recommends; built with
+  `libvulkan-dev`, `glslc` and `spirv-headers`). Nothing changes in it. **CUDA** is a separate, optional package,
+  `llama.cpp-cuda` (`apt/recipes/llama.cpp-cuda/build.sh`): only `libggml-cuda.so`, from the same pinned source, built
+  in the `nvidia-cuda` image (the build image plus NVIDIA's CUDA 13.5 compiler from NVIDIA's own Debian 13 repository,
+  its key pinned by fingerprint in `apt/keys/nvidia-cuda.asc`) for Turing and newer cards; it depends on NVIDIA's
+  `cuda-cudart-13-5`, `libcublas-13-5` (about 600 MB) and `libcuda1 (>= 590)`, so it can only be installed where
+  NVIDIA's repository is, and it is never a Store page (`section: "addon"`). Nothing proprietary enters the base system.
+- **Choosing** (`server/src/llm/engine.c`, `pick_backend`): the processor when chosen; else CUDA when
+  `libggml-cuda.so` is in `/usr/lib/llama.cpp` (root's, writable by no one else) and `/dev/nvidiactl` exists; else
+  Vulkan when `libggml-vulkan.so` is there and a render node exists; else the processor. On arm64 "auto" keeps the
+  processor (the Raspberry Pi's V3D isn't known to run the engine well); "Placa de video" tries it.
+- **Arguments** (fixed per backend, `llmjail.c`): the processor `-ngl 0 -dev none`; Vulkan `-ngl auto -dev Vulkan0 -lv 4`;
+  CUDA `-ngl auto -dev CUDA0 -lv 4`. `-ngl auto` is llama.cpp's `--fit`: as many layers as fit in the card's free
+  memory with 1 GB to spare, the rest on the processor. The first device is the one llama.cpp lists first (here the
+  RX 580 before the Intel UHD 630).
+- **What it used.** The engine's stderr is a pipe lord-server reads on a thread for as long as it runs: the device's
+  name from `using device Vulkan0 (…)` (printable ASCII, up to its first " (", at most 80 characters), `offloaded N/M
+  layers to GPU`, and the card's out-of-memory lines; nothing else is interpreted. `lord.sentinela.state()` gives
+  `mode`, `gpus`, `backend`, `device`, `layers`, `layersTotal` and `fallback`.
+- **Falling back.** A GPU that can't start the engine, has no room for a single layer, or runs out of memory while
+  answering (the engine dies or logs it) is given up on until the choice changes, and the job runs again at once on
+  the next backend, the processor last (a streamed Writing answer too, before its first word).
+- **Sandbox** (docs/SENTINELA.md "Sandbox"; AGENTS.md, awaiting approval): only for the backend in use, Vulkan reaches
+  the render nodes (`/dev/dri/renderD*`, never `card*`) with their ioctls and the parts of `/sys` Mesa reads; CUDA
+  reaches `/dev/nvidiactl`, `/dev/nvidia<N>`, `/dev/nvidia-uvm` and `/proc/driver/nvidia`. Nothing else changes.
+
+### Measured (2026-11-26, the development PC)
+
+Intel Core i9-10900 (10 cores), AMD Radeon RX 580 8 GB (RADV, Mesa 25.0.7), Debian 13, LordOS's llama.cpp 0.7.0
+(b11669). `llama-bench -p 512 -n 128 -r 3`, tokens per second (prompt reading / generating):
+
+| Model | Processor, 2 threads (the engine's setting) | Processor, 8 threads | RX 580, Vulkan (every layer) |
+|---|---|---|---|
+| Qwen3 1.7B Q4_K_M | 72.7 / 20.1 | 259.8 / 25.0 | **1038.4 / 110.4** |
+| Qwen3 4B Q4_K_M | 29.4 / 8.2 | 95.3 / 9.8 | **422.6 / 51.8** |
+
+A Sentinela analysis (the real summary and prompt, the engine in lord-llm's sandbox under the scope's memory cap,
+`build/llm-engine-test --real`, 51–61 tokens): Qwen3 1.7B **0.85 s warm on Vulkan against 9.3 s on the processor**
+(3.5 s against 11.7 s cold, the engine's start included, 2.5 s on Vulkan); Qwen3 4B 1.8 s against 23.3 s warm (5.3 s
+against 26.7 s cold). Generating inside the sandbox: about 98 tokens/s on Vulkan. Both models fit whole in the RX 580
+(29/29 and 37/37 layers).
+
+Not tested yet: CUDA (no NVIDIA card here; `llama.cpp-cuda` is written, not built: it needs Docker and NVIDIA's
+repository on the build machine), Intel and NVIDIA cards through Vulkan, and the Raspberry Pi's V3D.
 
 ## Pages and links
 

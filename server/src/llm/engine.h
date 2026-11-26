@@ -17,6 +17,7 @@
 
 #define LLM_MODEL_DIR "/usr/share/lordos/llm"     /* the lordos-llm-* packages (tools/llm/mkdeb-llm.mjs) */
 #define LLM_ENGINE "/usr/bin/llama-server"        /* LordOS's llama.cpp package (Store → Artificial Intelligence) */
+#define LLM_GGML_DIR "/usr/lib/llama.cpp"        /* ggml's backend modules: libggml-cpu-*.so, -vulkan.so, -cuda.so */
 #define LLM_IDLE_MS (120 * 1000)
 #define LLM_SYSTEM_MAX 4096
 #define LLM_USER_MAX 8192
@@ -64,14 +65,25 @@ char *llm_evidence(int pid, unsigned long long start, char **block);
  *   facts:   {"ok":true,"pid":N,"exe":"…","deleted":b,"pkg":"…"|null,"place":"system|home|temp|other|none",
  *             "exeUid":N,"exeMtime":N,"chain":[{"pid":N,"name":"…","exe":"…","pkg":"…"|null}]} or {"ok":false,…} */
 char *llm_take(int id);
-/* {"state":"off|starting|ready|busy","model":"…"|null,"pid":N,"idleMs":N} (malloc'd) */
+/* {"state":"off|starting|ready|busy","model":"…"|null,"pid":N,"idleMs":N,"queued":N,
+ *  (0.8.9.6.2) "mode":"auto|cpu|gpu","gpus":{"vulkan":b,"cuda":b},"backend":"cpu|vulkan|cuda"|null,"device":"…"|null,
+ *  "layers":N,"layersTotal":N,"fallback":"start|memory|untested|none"|null} (malloc'd): backend, device and layers are
+ * the running engine's, or the last one's this session; fallback says why the last start didn't use a GPU it could have */
 char *llm_state_json(void);
+/* (0.8.9.6.2) Where the engine computes (Settings → AI, "Where they run"): "auto" (CUDA, else Vulkan, else the
+ * processor; on arm64 the processor unless CUDA), "cpu", or "gpu" (CUDA, else Vulkan, else the processor). A GPU that
+ * fails to start the engine, has no room for a layer or runs out of memory is skipped until the choice changes, and
+ * the job runs again on the next one, the processor last. Returns 0, or -1 for another word. A change restarts the
+ * engine at its next job. */
+int llm_set_backend(const char *mode);
 /* Stops the engine now (Sentinela turned off). */
 void llm_stop(void);
 
 /* Tests: other folders and programs (NULL keeps the default). */
 void llm_set_paths(const char *model_dir, const char *engine, const char *launcher, const char *dpkg_info);
 void llm_set_idle_ms(int ms);
+/* Tests: the folder of ggml's backend modules and the device folder ("/dev") the GPUs are looked for in. */
+void llm_set_gpu_paths(const char *ggml_dir, const char *dev_dir);
 
 /* facts.c: the package that installed a file, from dpkg's lists (<info>/<pkg>[:<arch>].list), scanning them for that
  * exact line (and its /usr-merged twin); NULL when no package has it. Cached per path until the info folder changes. */

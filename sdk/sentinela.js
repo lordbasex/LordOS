@@ -34,6 +34,7 @@ import { LANGUAGE_NAMES } from './langnames.js';
 import { ShieldGlyph } from './sentinelaglyph.js';
 import { admin } from './admin.js';
 import { llmPackageOk } from './llmcatalog.js';
+import { brainBackend } from './aistore.js';
 import {
   SENTINELA_DEFAULTS, TRIGGER_DEFAULTS, createTracker, buildSummary, systemPrompt, parseVerdict, ignoreMatch, ruleAction, factLines,
   placeOf, clean, presentAlert, buildInvestigation, investigateSystemPrompt, parseInvestigation, evidenceOf, translateSystemPrompt,
@@ -62,6 +63,22 @@ export function setSentinelaPrefs(patch) {
 
 export function sentinelaOnBattery() {
   try { const b = lord.power.state(); return !!(b && b.hasBattery && b.onAC === false); } catch (e) { return false; }
+}
+
+// (0.8.9.6.2) where the engine computes (settings.brain.backend: 'auto' | 'cpu' | 'gpu'; Settings → AI, "Where they
+// run"), told to lord-server whenever it changes; the engine restarts there at its next job (engine.h llm_set_backend)
+let brainMode = null;
+function syncBrainBackend() {
+  const a = api();
+  if (!a || typeof a.backend !== 'function') return;
+  const m = brainBackend(settings.get());
+  if (m === brainMode) return;
+  try { a.backend(m); brainMode = m; } catch (e) { /* an older server: the processor only */ }
+}
+export function setBrainBackend(mode) {
+  settings.set((s) => ({ ...s, brain: { ...(s.brain || {}), backend: mode } }));
+  syncBrainBackend();
+  refreshSentinelaEngine();
 }
 
 export function refreshSentinelaEngine() {
@@ -409,6 +426,8 @@ export function sentinelaTick(now = Date.now()) {
 export function startSentinela() {
   if (started || typeof lord === 'undefined' || !lord.sentinela || typeof lord.greeter !== 'undefined') return;
   started = true;
+  syncBrainBackend();
+  settings.subscribe(syncBrainBackend);
   loadAlerts();
   refreshBlocked();
   sentinelaTick();
