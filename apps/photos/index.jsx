@@ -12,7 +12,7 @@ import {
   View, Text, Image, MediaView, ScrollView, SidebarItem, SectionTitle, Button, Slider, useTheme, useAppWindow, useKeyboard, useWindowState, wm,
   t as tr, errorText, media, useThumb, userDirs, fs, addListener, direction, print, ThemeProvider, ToolbarButton, ToolbarGroup, EmptyState, useStore, windows,
   Segmented, TextInput, Toggle, openMarkup, imageEdit as M, useCloud, useFilesDrop, FilesDropHint, dropCount,
-  ContextMenu, ConfirmDialog, cloud, cloudModel, useNarrow, useSidebar, SidebarToggle, SidebarOverlay,
+  ContextMenu, ConfirmDialog, cloud, cloudModel, useNarrow, useSidebar, SidebarToggle, SidebarOverlay, SkinRegion, useSkinned, commandBar, pickCommand, listPane, pickItem,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { keptPlaces, inPlaces } from './places.js';
@@ -402,6 +402,7 @@ function FolderGlyph({ on }) {
 export default function Photos() {
   const th = useTheme();
   const win = useAppWindow();
+  const skinned = useSkinned('photos');      // (0.8.9.6.2) app skins: the places and the header may be a theme's
   const dirs = userDirs();
   const [folder, setFolder] = useState(dirs.pictures);
   const [all, setAll] = useState(true);
@@ -592,6 +593,23 @@ export default function Photos() {
       ))}
     </>
   );
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the places as a list pane, the header
+  // as a command bar (refresh, smaller, larger); the photos, the viewer and every edit stay Photos'
+  const sk = skinned ? (() => {
+    const title = places.find((k) => k.path === folder)?.label || (all ? tr('photos.allPhotos') : baseName(folder));
+    const pane = listPane({ title: tr('photos.library'), items: [
+      { key: `all:${dirs.pictures}`, label: tr('photos.allPhotos'), selected: all && folder === dirs.pictures, group: tr('photos.library') },
+      ...subfolders(dirs.pictures).map((f) => ({ key: `dir:${f}`, label: baseName(f), selected: !all && folder === f, group: tr('photos.folders') })),
+      ...places.map((k) => ({ key: `all:${k.path}`, label: k.label, selected: folder === k.path, group: tr('photos.cloud') })),
+    ] });
+    const bar = commandBar({ title: `${title} · ${selected.length > 1 ? tr('photos.selectedOf', { count: selected.length, total: items.length }) : tr('photos.count', { count: items.length })}`,
+      commands: [{ id: 'smaller', label: '−', disabled: size <= 80 }, { id: 'larger', label: '+', disabled: size >= 240 }, { id: 'refresh', label: tr('photos.refresh'), group: 'r' }] });
+    const run = { smaller: () => setSize((v) => Math.max(80, v - 40)), larger: () => setSize((v) => Math.min(240, v + 40)), refresh: () => setRev((r) => r + 1) };
+    return {
+      sidebar: { app: 'photos', ...pane, actions: { select: (key) => { const k = pickItem(pane, key); if (k) pickPlace(k.slice(4), k.startsWith('all:')); } } },
+      toolbar: { app: 'photos', ...bar, actions: { command: (id) => { const c = pickCommand(bar, id); if (c) run[c](); } } },
+    };
+  })() : null;
   // grouped by month, like a photo library
   const groups = [];
   for (const e of items) {
@@ -602,11 +620,12 @@ export default function Photos() {
   }
   return (
     <View {...drop.props} ref={root} style={{ flex: 1, flexDirection: 'row' }}>
-      {sb.narrow ? null : <View style={{ width: 210, backgroundColor: th.sidebarBg, paddingTop: 8, paddingHorizontal: 10, gap: 2 }}>
+      {sb.narrow ? null : <SkinRegion app="photos" region="sidebar" model={sk && sk.sidebar}><View style={{ width: 210, backgroundColor: th.sidebarBg, paddingTop: 8, paddingHorizontal: 10, gap: 2 }}>
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: th.separator }} />
         {sidebar}
-      </View>}
+      </View></SkinRegion>}
       <View style={{ flex: 1, minWidth: 0 }}>
+        <SkinRegion app="photos" region="toolbar" model={sk && sk.toolbar}>
         <View style={{ height: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: sb.narrow ? 12 : 20, gap: sb.narrow ? 8 : 12 }}>
           {sb.narrow ? <SidebarToggle shown={sb.shown} onClick={sb.toggle} /> : null}
           <View style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
@@ -620,6 +639,7 @@ export default function Photos() {
           </View>
           <ToolbarButton icon="↻" title={tr('photos.refresh')} onClick={() => setRev((r) => r + 1)} />
         </View>
+        </SkinRegion>
         <ScrollView style={{ flex: 1, paddingHorizontal: sb.narrow ? 12 : 20 }}>
           {!items.length && (
             <EmptyState icon="▦" title={tr('photos.emptyTitle')} hint={tr('photos.empty')} style={{ paddingTop: 80 }} />

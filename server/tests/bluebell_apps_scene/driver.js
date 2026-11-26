@@ -22,6 +22,7 @@
   const APPS = [
     ['notes', {}, (sdk) => sdk.t('notes.new')],
     ['calculator', {}, '÷'],
+    ['photos', {}, (sdk) => sdk.t('photos.refresh')],
   ];
   (async () => {
     await sleep(2500);

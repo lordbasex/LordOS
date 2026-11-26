@@ -48,6 +48,7 @@ function CalcKeypad({ model }) {
 }
 
 export const appSkins = {
+  photos: { sidebar: ListPane, toolbar: CommandBar },
   calculator: { display: CalcDisplay, keypad: CalcKeypad },
   notes: { sidebar: SearchPane, toolbar: CommandBar },
 };
