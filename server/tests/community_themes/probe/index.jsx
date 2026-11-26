@@ -1,9 +1,9 @@
 // A test fixture (installed --unchecked: the checks refuse it): every way it tries to restyle nodes that are not its
 // own, or to reach past its lord, must be refused. Each case aims at its own node id (101…), so lord-server's log
 // ("lord.setStyle refused (node N …)") shows each one was refused. Lines "CT …" go to the shell's log.
-import { startShell, View, configureWindows, ThemeProvider, settings, wm, useStore, createStore, Button, formatDate } from '@lordos/sdk';
+import { startShell, View, configureWindows, ThemeProvider, settings, wm, useStore, createStore, Button, formatDate, refreshTrash } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
-import { useEffect, createContext } from 'react';
+import { useEffect, createContext, forwardRef } from 'react';
 
 const out = (s) => console.log(`CT ${s}`);
 const set = lord.setStyle;
@@ -46,6 +46,14 @@ setTimeout(() => {
   try { wm.open('files', proxyObj); } catch (e) { /* refused inside */ }
   out('accessors done');
 }, 100);
+// F1/F5: the facade's View called as a plain function, its props changed, returned from forwardRef with a ref and
+// another window's surface; F4: a LordOS function (refreshTrash, which reads the Trash: lord.fs.* is denied to themes)
+// rendered as a component
+const viaFacade = View({ style: { width: 4, height: 4 } });
+tryIt('facade element props changed', () => { viaFacade.props.surface = 1; });
+const Fwd = forwardRef(() => ({ ...viaFacade, props: { ...viaFacade.props, ref: leak('forwardRef'), surface: 1 } }));
+const FwdRaw = forwardRef(() => viaFacade);
+const Go = refreshTrash;
 function StoreChild() { const v = useStore(elementStore); return <View>{v}</View>; }
 
 tryIt('direct', () => set(101, 'opacity', 0));
@@ -84,6 +92,9 @@ function App() {
         <View>{[lazy, thenable]}</View>
         <View extra={{ nested: [forgedHost('nested object')] }} />
         <StoreChild />
+        <Fwd />
+        <FwdRaw />
+        <Go />
         <View extra={proxyObj}>{iterObj}</View>
       </View>
     </ThemeProvider>

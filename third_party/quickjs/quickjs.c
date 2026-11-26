@@ -232,6 +232,7 @@ struct JSRuntime {
     /* LordOS patch: the untrusted realm (a community theme's) and how many calls run on its behalf */
     JSContext *lordos_untrusted;
     int lordos_taint;
+    int lordos_enqueue_taint;   /* a promise reaction the untrusted realm registered is being queued */
     JSMallocFunctions mf;
     JSMallocState malloc_state;
     const char *rt_info;
@@ -848,6 +849,7 @@ struct JSModuleDef {
 typedef struct JSJobEntry {
     struct list_head link;
     JSContext *ctx;
+    int lordos_taint;   /* LordOS patch: queued by or for the untrusted realm (JS_EnqueueJob) */
     JSJobFunc *job_func;
     int argc;
     JSValue argv[0];
@@ -1745,6 +1747,10 @@ int JS_EnqueueJob(JSContext *ctx, JSJobFunc *job_func,
     if (!e)
         return -1;
     e->ctx = ctx;
+    /* LordOS patch: a job queued while the untrusted realm's code runs (or runs for it), or a promise reaction it
+       registered, runs tainted whoever resolves the promise (JS_ExecutePendingJob) */
+    e->lordos_taint = rt->lordos_untrusted &&
+        (rt->lordos_enqueue_taint || rt->lordos_taint > 0 || JS_StackHasRealm(ctx, rt->lordos_untrusted));
     e->job_func = job_func;
     e->argc = argc;
     for(i = 0; i < argc; i++) {
@@ -1835,7 +1841,7 @@ int JS_ExecutePendingJob(JSRuntime *rt, JSContext **pctx)
     {
         /* LordOS patch: a job of the untrusted realm, or one that calls a function that is not a trusted realm's
            bytecode (a native, a bound or proxied function), runs tainted: JS_StackHasRealm answers 1 meanwhile */
-        int taint = lordos_job_untrusted(rt, e);
+        int taint = e->lordos_taint || lordos_job_untrusted(rt, e);
         rt->lordos_taint += taint;
         res = e->job_func(e->ctx, e->argc, (JSValueConst *)e->argv);
         rt->lordos_taint -= taint;
@@ -48332,6 +48338,7 @@ typedef struct JSPromiseReactionData {
     struct list_head link; /* not used in promise_reaction_job */
     JSValue resolving_funcs[2];
     JSValue handler;
+    int lordos_taint;   /* LordOS patch: registered while the untrusted realm's code ran (perform_promise_then) */
 } JSPromiseReactionData;
 
 JSPromiseStateEnum JS_PromiseState(JSContext *ctx, JSValue promise)
@@ -48442,7 +48449,9 @@ static void fulfill_or_reject_promise(JSContext *ctx, JSValueConst promise,
         args[2] = rd->handler;
         args[3] = JS_NewBool(ctx, is_reject);
         args[4] = value;
+        ctx->rt->lordos_enqueue_taint = rd->lordos_taint;
         JS_EnqueueJob(ctx, promise_reaction_job, 5, args);
+        ctx->rt->lordos_enqueue_taint = 0;
         list_del(&rd->link);
         promise_reaction_data_free(ctx->rt, rd);
     }
@@ -49151,6 +49160,8 @@ static __exception int perform_promise_then(JSContext *ctx,
         if (!JS_IsFunction(ctx, handler))
             handler = JS_UNDEFINED;
         rd->handler = JS_DupValue(ctx, handler);
+        rd->lordos_taint = ctx->rt->lordos_untrusted &&
+            (ctx->rt->lordos_taint > 0 || JS_StackHasRealm(ctx, ctx->rt->lordos_untrusted));
         rd_array[i] = rd;
     }
 

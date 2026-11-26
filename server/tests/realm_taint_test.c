@@ -57,6 +57,9 @@ int main(void) {
     { const char *k = "var kept = null; function keep(f) { kept = f; } function later() { Promise.resolve().then(() => kept()); }"; JS_FreeValue(M, JS_Eval(M, k, strlen(k), "<main>", JS_EVAL_TYPE_GLOBAL)); }
     JSValue keep = JS_GetPropertyStr(M, mg, "keep");
     JS_SetPropertyStr(T, tg, "keep", keep);
+    /* a promise of main's that the theme can see, resolved later by main's own code */
+    { const char *k = "var resolveIt = null; var mainP = new Promise((r) => { resolveIt = r; }); var resolveIt2 = null; var mainP2 = new Promise((r) => { resolveIt2 = r; });"; JS_FreeValue(M, JS_Eval(M, k, strlen(k), "<main>", JS_EVAL_TYPE_GLOBAL)); }
+    JS_SetPropertyStr(T, tg, "mainP", JS_GetPropertyStr(M, mg, "mainP"));
     JS_SetUntrustedRealm(rt, T);
 
     run(M, "main calls probe", "probe()", 0);
@@ -74,6 +77,12 @@ int main(void) {
      * the theme's own always-checked natives cover (js_theme.c, sdk/themeapi.js) */
     run(T, "kept: the theme's own arrow", "keep(() => probe())", -1);
     run(M, "main calls the kept theme arrow later", "later()", 1);
+    /* F2: a reaction the theme registers with main's own function, on main's promise, that main resolves later from
+     * its own code: tainted from the moment the theme registered it */
+    run(T, "the theme registers main's function on main's promise", "mainP.then(viaMain)", -1);
+    run(M, "main resolves it later: the reaction runs tainted", "resolveIt(1)", 1);
+    run(M, "main's own reaction on main's promise stays untainted", "mainP2.then(viaMain); resolveIt2(1)", 0);
+    run(T, "a job the theme queues with main's function", "Promise.resolve().then(viaMain)", 1);
     JS_RealmTaint(rt, 1);
     run(M, "main calls anything while tainted (lord.themeCall)", "probe()", 1);
     JS_RealmTaint(rt, -1);

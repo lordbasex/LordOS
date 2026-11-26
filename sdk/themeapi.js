@@ -19,6 +19,7 @@ import * as SDK from './index.js';
 import { apps as hostApps } from '@lordos/apps';
 import { addListener as rtAddListener, keyboardLayer, setHostGuard, setRootErrorHandler, onCommit, THEME_OWNED } from '@lordos/runtime';
 import { LAYERS } from './layers.js';
+import { themeHearsKeys } from './themekeysmodel.js';
 import { captureCornerAlways } from './capturestatus.jsx';
 
 const { createElement: h } = React;
@@ -77,6 +78,21 @@ const looksLikeEvent = (v) => v !== null && typeof v === 'object' && ('target' i
 // can't change a window, a setting or a store's state in place (a window's `protected`, the theme setting); nodes as
 // handles; functions, elements and other objects as they are
 const snapshots = new WeakMap();
+// A function of LordOS's the theme gets (a menu item's onClick, a store's unsubscribe, an Icon): never the raw
+// closure. The wrapper runs it through lord.themeCall, so whatever it does is under the theme's policy, however and
+// whenever the theme calls it (directly, from a promise reaction, rendered as a component).
+const mainFns = new WeakMap();
+const themeWrappers = new WeakSet();        // the facade's wrappers of theme code: never LordOS's own code (guardHost)
+function mainFnForTheme(fn) {
+  if (facadeTypes.has(fn) || themeWrappers.has(fn)) return fn;
+  let w = mainFns.get(fn);
+  if (!w) {
+    w = (...a) => snapshot(themeCall(fn, ...a.map((x) => sanitizeIn(x))));
+    mainFns.set(fn, w);
+    themeWrappers.add(w);
+  }
+  return w;
+}
 const originals = new WeakMap();      // a frozen copy → LordOS's object it was made from
 // host code never reads a theme-owned object directly: every read of what may hold one runs through lord.themeCall
 // (tainted: a getter, a Proxy's trap or a toStringTag accessor in it runs under the theme's policy)
@@ -85,6 +101,7 @@ function snapshotRaw(v, depth = 0) {
   try { return snapshotOne(v, depth); } catch (e) { return undefined; }
 }
 function snapshotOne(v, depth) {
+  if (typeof v === 'function') return mainFnForTheme(v);
   if (v === null || typeof v !== 'object') return v;
   if (isInstance(v)) return handleOf(v);
   if (isElement(v) || depth > 8) return v;
@@ -101,6 +118,7 @@ function snapshotOne(v, depth) {
   return c;
 }
 function toTheme(v) {
+  if (typeof v === 'function') return mainFnForTheme(v);
   if (isInstance(v)) return handleOf(v);
   if (looksLikeEvent(v)) return eventToTheme(v);
   return snapshot(v);
@@ -250,9 +268,9 @@ const facadeTypes = new WeakSet();
 // a component the theme gives that isn't plainly its own function (a bound function, a native, a proxy): called tainted
 const untrustedTypes = new WeakMap();
 function typeFor(type) {
-  if (typeof type !== 'function' || facadeTypes.has(type) || realmOf(type) !== 1) return type;
+  if (typeof type !== 'function' || facadeTypes.has(type) || themeWrappers.has(type) || realmOf(type) === 2) return type;
   let W = untrustedTypes.get(type);
-  if (!W) { W = (p) => themeCall(type, p); untrustedTypes.set(type, W); }
+  if (!W) { W = (p) => cleanNode(themeCall(type, p)); untrustedTypes.set(type, W); themeWrappers.add(W); }
   return W;
 }
 
@@ -283,7 +301,7 @@ const themeReact = () => Object.freeze({
   createElement: (...a) => lord.themeCall(themeCreateElement, ...a), cloneElement: (...a) => lord.themeCall(themeCloneElement, ...a), Fragment: React.Fragment,
   isValidElement: React.isValidElement, Children: React.Children,
   memo: (C, cmp) => React.memo(realmOf(C) === 2 ? C : typeFor(C), typeof cmp === 'function' ? (a, b) => themeCall(cmp, a, b) : undefined),
-  forwardRef: (render) => React.forwardRef((p, r) => themeCall(render, p, r)),
+  forwardRef: (render) => { const fr = (p, r) => cleanNode(themeCall(render, p, r)); themeWrappers.add(fr); return React.forwardRef(fr); },
   createContext: React.createContext,
   useState: (init) => { const [v, set] = React.useState(fnOr(init)); return [v, setterFor(set)]; },
   useReducer: (red, init, initFn) => { const [v, d] = React.useReducer((st, a) => themeCall(red, st, a), init, typeof initFn === 'function' ? (x) => themeCall(initFn, x) : undefined); return [v, d]; },
@@ -372,12 +390,13 @@ function themeHoldKeyboard() {
   let on = true;
   return () => { if (on) { on = false; themeHolds--; release(); } };
 }
+// A key reaches the theme's own listeners only when nothing of LordOS's takes it: no keyboard layer is open (a system
+// prompt, LordOS's search, a sheet), no text field has the keyboard, and no LordOS window has the focus. Holding the
+// keyboard (its menu) only adds a Linux app's window in front, whose keys the hold keeps from the app anyway.
 function keysForTheme() {
-  const top = keyboardLayer();
-  if (top && top.layer >= LAYERS.system) return false;          // a system prompt has the keyboard
-  if (themeHolds > 0) return true;                                // its own menu or launcher holds it (holdKeyboard)
-  if (top) return false;                                          // LordOS's search, a sheet: not the theme's
-  return SDK.wm.focused() == null;                                // no window has the keyboard
+  const id = SDK.wm.focused();
+  const w = id != null && SDK.wm.get ? SDK.wm.get(id) : null;
+  return themeHearsKeys({ layerOpen: !!keyboardLayer(), textFocused: !!SDK.hasTextFocus?.(), focusedApp: id == null ? null : (w ? w.app : '?'), holds: themeHolds });
 }
 const POINTER_TYPES = new Set(['pointerdown', 'pointerup', 'pointermove']);
 function themeAddListener(type, fn) {
@@ -601,14 +620,15 @@ export function runThemeShell() {
 // React's host guard: a host node whose nearest component is the theme's own function was forged by the theme (it
 // renders View, Text and Image from the SDK, never a host element itself)
 const readRender = (t) => (typeof t.render === 'function' ? t.render : t.type);
-function guardHost(_type, props, fiber) {
-  // the backstop: every host node's element was made by LordOS's own React (runtime/react-made.cjs records them)
-  if (!React.lordMadeProps || !React.lordMadeProps(props)) throw new TypeError('a community theme draws with View, Text and Image from @lordos/sdk');
+function guardHost(type, props, fiber) {
+  // the backstop: every host node's element was made by LordOS's own React with this type (runtime/react-made.cjs
+  // keeps a private record and freezes the props)
+  if (!React.lordMadeProps || !React.lordMadeProps(props, type)) throw new TypeError('a community theme draws with View, Text and Image from @lordos/sdk');
   for (let f = fiber && fiber.return; f; f = f.return) {
     const t = f.type;
     const fn = typeof t === 'function' ? t : t && typeof t === 'object' ? lord.themeCall(readRender, t) : null;
     if (typeof fn === 'function') {
-      if (isThemeFn(fn)) throw new TypeError('a community theme draws with View, Text and Image from @lordos/sdk');
+      if (isThemeFn(fn) || themeWrappers.has(fn)) throw new TypeError('a community theme draws with View, Text and Image from @lordos/sdk');
       return;
     }
   }

@@ -92,7 +92,7 @@ if record quitter | grep -q '"crashes":1'; then echo "ok   quitter: its own logo
 session probe probe 40 --unchecked
 has "probe starts" "community theme probe started"
 hasnt "probe: nothing it tried was allowed" "CT .* ALLOWED"
-for c in direct settings-in-place term.create fs.write own-realm-function host-function-constructor host-proto-change promise; do has "probe: $c refused" "CT $c refused"; done
+for c in direct settings-in-place "facade element props changed" term.create fs.write own-realm-function host-function-constructor host-proto-change promise; do has "probe: $c refused" "CT $c refused"; done
 has "probe: lord.term, lord.fs, lord.admin and lord.perms don't exist in its realm" "CT lord.term undefined lord.fs undefined lord.admin undefined globalThis.lord.perms undefined"
 for n in 101 102 103 104 105 106 107 108 109; do has "probe: setStyle on node $n refused" "lord.setStyle refused (node $n is not"; done
 has "probe: its timers and animation frames ran" "CT raf ran"
@@ -100,6 +100,7 @@ has "probe: its own node can be restyled" "CT own-node works"
 has "probe: lord.setStyle from a store's get React reads later refused" "lord.setStyle refused (node 110 is not"
 hasnt "probe: no forged element (host, raw component, Provider; in children or a prop) handed it a raw node" "RAW NODE"
 has "probe: forged elements were rendered (and cleaned)" "CT forged elements done"
+has "probe: a LordOS function rendered as a component runs under its policy (lord.fs refused)" "lord.fs\.[a-zA-Z]* refused"
 has "probe: LordOS's code read its getter, Proxy, iterator and toStringTag objects" "CT accessors done"
 for n in 112 114; do has "probe: a bound native as an accessor (node $n) refused" "lord.setStyle refused (node $n is not"; done
 hasnt "probe: a forged app registry is never used" "forged app RENDERED"
