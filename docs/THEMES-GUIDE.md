@@ -598,6 +598,7 @@ Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one ski
 | Photos | `sidebar` (list pane: All Photos, the folders, the cloud places), `toolbar` (command bar: smaller, larger, refresh) | the photos, the viewer, every edit and the Trash | `photos_skin_scene.mjs` (13 checks) |
 | Player | `sidebar` (list pane: the views), `toolbar` (command bar: the title, Back), `transport` (command bar: previous, play or pause, next, with `position` and `duration`; only while something plays) | the lists, the playing, the volume and the streams | `player_skin_scene.mjs` (12 checks) |
 | Monitor | `toolbar` (command bar: the tabs this computer has, the one shown `active`) | every tab's content and every action on a process | `monitor_skin_scene.mjs` (10 checks) |
+| Clock | `toolbar` (command bar: the four tabs, the one shown `active`, and Add where the tab has one) | the clocks, alarms, timer and stopwatch | `clock_skin_scene.mjs` (11 checks) |
 <!-- shared-shape apps -->
 
 `server/tests/app_skin_helpers.js` gives each scene the common checks (the stubs drawn, the model frozen, a command not on

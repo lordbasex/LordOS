@@ -25,6 +25,7 @@
     ['photos', {}, (sdk) => sdk.t('photos.refresh')],
     ['player', {}, (sdk) => sdk.t('player.nav.songs')],
     ['monitor', {}, (sdk) => sdk.t('monitor.tab.overview')],
+    ['clock', {}, (sdk) => sdk.t('clock.tab.stopwatch')],
   ];
   (async () => {
     await sleep(2500);

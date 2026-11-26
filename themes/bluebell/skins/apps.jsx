@@ -93,6 +93,7 @@ function TabStrip({ model }) {
 }
 
 export const appSkins = {
+  clock: { toolbar: CommandBar },
   monitor: { toolbar: TabStrip },
   player: { sidebar: ListPane, toolbar: CommandBar, transport: Transport },
   photos: { sidebar: ListPane, toolbar: CommandBar },
