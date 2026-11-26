@@ -115,6 +115,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `server/tests/theme_gallery_test.mjs`.
 
 ### Fixed
+- **A web app's tray icon and notifications kept LordOS's letter tile** after its real icon was fetched (WhatsApp's "W"
+  next to the clock): lord-web read only the registry's icon. It now prefers the site's own icon from
+  `~/.cache/lordos/web/icons/<app>.png` when it starts (a regular PNG of the person's, no link, at most 1 MB). An app
+  already running shows it after Restart or the next login.
 - **Web apps: one that stops answering is started again, and a page that hangs gets a new web process**
   (`server/src/ui/webalive.c`, `server/src/web/webwatch.c`, `webhang.c`, `webmgr.c`, `webmem.c`, `webmain.c`,
   `webengine.c`, `server/src/ui/js_webapps.c`, `sdk/webapps.js`, `sdk/hardware.jsx`, `sdk/windowmenu.js`,

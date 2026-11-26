@@ -1073,6 +1073,8 @@ tried (`iconError`, a `web.probe.…` code).
   `tests/web_probe_test.py` keeps a local fixture of that pattern (a redirect, no manifest link, a WebP shortcut icon,
   WebPs labelled PNG, a maskable `image/svg` SVG, strict CSP, COOP, COEP and Document-Isolation-Policy headers, and 400
   to a request that isn't Chrome's).
+- **lord-web itself** (its tray icon and its notifications' `image-path`) takes the cached PNG when there is one, and
+  the registry's icon otherwise; it reads it when it starts.
 - An address-added app's icon is still the one saved in the registry when it was added; uninstalling it removes its
   cached icon too (a catalog app's stays for the Store's card).
 

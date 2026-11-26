@@ -21,6 +21,7 @@
 #include "webwin.h"
 #include "webback.h"
 #include "../sec/cgroup.h"
+#include "../ui/webicon.h"
 #include "../sec/sandbox.h"
 
 #include <errno.h>
@@ -329,7 +330,18 @@ static int run_app(Web *w) {
     w->profile = webreg_profile(&w->app, w->args.profile);
     snprintf(w->window_id, sizeof w->window_id, "lordos-web.%s.%s", w->app.id, w->profile->id);
     if (snprintf(w->profile_dir, sizeof w->profile_dir, "%s/.local/share/lordos/web/%s/%s", w->home, w->app.id, w->profile->id) >= (int)sizeof w->profile_dir) return 2;
-    if (w->app.icon[0]) {
+    /* the site's own icon, fetched by lord-server into ~/.cache/lordos/web/icons/<app>.png (ui/webicon.c: the name is the
+     * app id, the file checked as a PNG there), comes before the registry's: a catalog app's registry icon is only
+     * LordOS's letter tile, so the tray and the notifications showed the letter after the Store or Settings had fetched
+     * the real one. A PNG only (the tray sends pixels), a regular file of ours, no link, at most WEBREG_ICON_BYTES. */
+    {
+        char p[PATH_MAX];
+        struct stat st;
+        if (snprintf(p, sizeof p, "%s/" WEBICON_DIR "/%s.png", w->home, w->app.id) < (int)sizeof p && !lstat(p, &st) &&
+            S_ISREG(st.st_mode) && st.st_uid == getuid() && st.st_size > 0 && st.st_size <= WEBREG_ICON_BYTES && strlen(p) < sizeof w->icon_path)
+            snprintf(w->icon_path, sizeof w->icon_path, "%s", p);
+    }
+    if (!w->icon_path[0] && w->app.icon[0]) {
         char p[PATH_MAX + WEBREG_ICON_PATH_MAX + 2];
         struct stat st;
         snprintf(p, sizeof p, "%s/%s", w->config_dir, w->app.icon);
