@@ -53,6 +53,7 @@ its own layout (for example what the Super key alone does).
 | Lord Flow | `themes/default` | menu bar on top (with the app's menus), magnifying Dock, app launcher, Control Center |
 | Lord Classic | `themes/classic` | taskbar (bottom, top or a side), start menu with search, quick settings, notification panel, menus in each window, snapping and the SDK's Overview |
 | Lord Workspaces (since 0.8.9) | `themes/workspaces` | activities (desktops with an icon, a colour, pinned apps and a layout per display), a Context Spine, group frames with static tiling, its own Search panel and Control Center, menus in each window, three effects styles ([WORKSPACES.md](WORKSPACES.md)) |
+| Lord Bluebell (in development after 0.8.9.6.1) | `themes/bluebell` | a tribute to the desktops of 2001: glossy blue title bars with rounded tops, a green start button on a blue taskbar with quick launch and a button per window; the demo of [style packs and app skins](#style-packs-and-app-skins): its own icons, pointers, sounds and font, and Files as that era's explorer |
 | Lord Celeste (community, since 0.8.9.5) | `themes/celeste` | a frame around each display with rounded inner corners, a bar on its thick side (running apps, status items, privacy indicators, clock), drawers that slide out of the frame's edges (dashboard, launcher, session, sidebar with the notifications), menus in each window, mirrored right to left; the theme options of `theme.json` and a node-tested geometry (`model.js`). Layout inspired by Caelestia (caelestia-dots/shell); no code from it |
 
 `themes/greeter` is the login and lock screen: it is a separate program, not a desktop theme (see
@@ -203,6 +204,13 @@ the accent and the title-bar button order through the settings portal (`publishT
   in the returned `order` (`'close'`, `'minimize'`, `'maximize'`, close always nearest the corner). Left
   and Right are the screen's sides in every language; Automatic follows the reading direction (#58).
 - `radius`: a general corner radius (default 8).
+- Richer tokens (0.8.9.6.2, part 4 of the community-themes plan; all plain JSON, `null` keeps LordOS's flat look):
+  `toolbarBg` (the apps' toolbars: a colour or a two-stop `linear-gradient`, the toolbar "texture"), `buttonBg` (neutral
+  buttons' fill), `bevel: { light, dark }` (neutral buttons drawn raised, an active toolbar button sunken) and
+  `stateBorders: { normal, hover, pressed, disabled, toolbar }` (the border of buttons and toolbar buttons per state;
+  `toolbar` is a toolbar button at rest). `Button`, `Toolbar` and `ToolbarButton` read them (`sdk/components.jsx`,
+  `sdk/controls.jsx`; `stateBorder` and `bevelStyle` in `sdk/theme.js`), so every app gets the look without a change.
+  The engine's gradients have two stops: a `linear-gradient` with more uses its first and last colours.
 
 `ThemeProvider` adds two tokens from the user's settings: `scrollBars` and `reduceMotion`. The
 user's choices that a theme turns into tokens itself are in `settings` (`sdk/settings.js`): `mode`,
@@ -461,7 +469,8 @@ Linux apps. A slow theme makes the whole desktop slow.
 
 `<Image src="assets/x.png">` is resolved against the theme's folder; `asset:wallpapers/…` against
 LordOS's `assets/`; an absolute path as is (`server/src/ui/js.c`). PNG and JPEG. Text uses the
-bundled Inter (400/500/600/700). The `.deb` packaging copies only `theme.json`, `theme.bundle.js`
+bundled Inter (400/500/600/700); a style pack can name an installed font for `fontFamily: 'theme'`
+([Style packs](#level-1-a-style-pack)). The `.deb` packaging copies only `theme.json`, `theme.bundle.js`
 and `assets/` of each theme (`tools/iso/mkdeb.sh`), so keep your files there.
 
 ### Translations
@@ -474,6 +483,108 @@ the `shell` catalog (`assets/locales/<lang>/shell.json`, in every one of the 35 
 `assets/locales/` (`f_locale_catalog` in `js_sys.c`). A missing key shows the key itself. Inside the
 LordOS tree, `node tools/i18n-check.mjs` checks every `t()` key in `themes/` against the English
 catalog and every language against English.
+
+## Style packs and app skins
+
+(In development after 0.8.9.6.1; part 4 of the community-themes plan, approved on 2026-11-26.) A theme draws the
+desktop and gives the apps their colours through tokens. Two more levels let it go further without touching an app's
+logic. Both are registered at module level, before `startShell`, and both are the person's to turn off: **Settings →
+Appearance → From this style** lists only the parts the style in use brings, each with its own switch
+(`settings.themeParts[part] === false`), so someone can keep a theme's frames and use LordOS's icons. The rules are in
+`sdk/appskinmodel.js` (node-tested by `server/tests/appskin_test.mjs`), the session side in `sdk/appskins.jsx`. Lord
+Bluebell (`themes/bluebell`) uses all of it.
+
+### Level 1: a style pack
+
+```jsx
+import { registerStylePack } from '@lordos/sdk';
+registerStylePack({
+  icons: {
+    apps: { files: FilesIcon },                     // app icons, by app id
+    files: { folder: Folder, text: Page, pdf: Pdf }, // file-type icons: 'folder' and the kinds of sdk/filekinds.js
+    toolbar: { back: Back, forward: Fwd, up: Up },   // toolbar icons, by our names (TOOLBAR_ICONS)
+  },
+  cursors: { fill: '#ffffff', outline: '#000000' },
+  sounds: { startup: [[392, 160], [523.25, 160], [783.99, 420]], notify: [[880, 90], [1174.66, 220]], error: [[220, 110]], emptyTrash: [[988, 60]] },
+  fonts: { family: 'DejaVu Sans' },
+});
+```
+
+| Part | What it is | Where it shows |
+|---|---|---|
+| `icons.apps` | a component `({ size }) => …` or an image the theme carries (`"assets/….png"` or `.svg`, never `..`, an absolute path or a URL), by app id | every native app's icon (`getApp(id).Icon`: the Dock, the taskbar, the launcher, the title bars) |
+| `icons.files` | the same, for `folder` and each kind: `text`, `code`, `pdf`, `archive`, `audio`, `video`, `image`, `doc`, `deb`, `lpk`, `other` | Files and the file dialog (`EntryIcon` in `sdk/fileglyphs.jsx`); thumbnails of pictures and videos stay |
+| `icons.toolbar` | the same, for our names: `back`, `forward`, `up`, `newFolder`, `search`, `views`, `icons`, `list`, `columns`, `gallery`, `sort`, `tags`, `refresh`, `terminal`, `more`, `go`, `copy`, `cut`, `paste`, `trash`, `info`, `sidebar` | a `ToolbarButton` with that `iconName` (Files' toolbar names all of its buttons) |
+| `cursors` | `fill` and `outline`, two `#rrggbb` colours | every pointer shape lord-server draws (`lord.input.pointerScheme`, `cursor_set_scheme` in `server/src/cursor.c`); the shapes and the shadow stay ours |
+| `sounds` | for `startup`, `notify`, `error`, `emptyTrash`: up to 8 notes `[Hz, ms]` (60–5000 Hz, or 0 for a rest; 10–1000 ms; 2.5 s in all) | synthesized by lord-server like LordOS's own sounds (`lord.sound.scheme`, `snd_set_scheme` in `server/src/sound/snd.c`): the default notification sound, errors, emptying the Trash, and the startup tune once per session (not again after a theme switch). A notification sound chosen per app in Settings stays that sound |
+| `fonts` | `family`: the name of a font installed on the system (LordOS's own folder or the system's font folders) | text styled `fontFamily: 'theme'`: `useThemeFont()` returns `'theme'` while the pack brings a font and the person keeps it, else nothing (Inter). The theme's frames and its skins use it; the apps' own text stays Inter |
+
+What a pack can't do, by design: a theme brings no audio file, no cursor image and no font file for lord-server to
+parse. Sounds are notes, pointers are two colours, and a font is one that is already installed (a Debian package, so its
+licence is a free one: Lord Bluebell names DejaVu Sans of `fonts-dejavu-core`, which LordOS recommends). Anything the
+checks don't accept is dropped, and the rest of the pack still applies.
+
+### Level 2: app skins
+
+A native app names the regions a theme may draw (`APP_REGIONS` in `sdk/appskinmodel.js`) and keeps all its logic. A theme
+registers a component per region:
+
+```jsx
+import { registerAppSkins } from '@lordos/sdk';
+registerAppSkins({ files: { toolbar: MyToolbar, addressBar: MyAddress, sidebar: MyTaskPane, itemView: MyItems, statusBar: MyStatus, contextMenu: MyMenu } });
+```
+
+The app draws each region through `<SkinRegion app="files" region="toolbar" model={vm}>{its own}</SkinRegion>`: the
+theme's component gets `{ model }` and is drawn instead. **The rule that keeps it safe:** a skin only **asks** for
+actions through `model.actions`; the app does them with its own checks (`lord.fs`'s rules, the protected folders, the
+confirmations, the Trash instead of deleting). A skin never calls `lord.fs`, never opens a terminal and never gets one
+of the app's internal objects: the model is plain data, frozen, plus the app's actions as functions. It also has to
+work under the restricted theme API of part 2. A skin that throws is replaced by the app's own region for the rest of
+the session (logged once as `skin files.itemView failed, using the app's own`). Unknown apps, regions and anything that
+isn't a component are dropped when registered. App layouts off in Settings brings every app's own regions back at once.
+
+#### Files
+
+| Region | Where | Files' own | The skin's `model` |
+|---|---|---|---|
+| `toolbar` | the top row | Back, Forward, New Folder, the views, sort, tags, terminal, ⋯, search | the view model below |
+| `addressBar` | under the toolbar | none (Files' path bar is at the bottom) | the view model |
+| `sidebar` | the start side, resizable (Files keeps the width) | Favorites, Locations, Tags | the view model |
+| `itemView` | the content | icons, list, columns or gallery | the view model |
+| `statusBar` | the bottom | the path bar and the status line with the zoom | the view model |
+| `contextMenu` | over the window | Files' menu | `{ x, y, items, close, bounds }`: the items Files built (`{ label, onClick, hint, disabled, checked, danger, submenu, header, note, swatches }` or `'-'`); clicking one runs Files' action |
+
+The view model (`apps/files/skinmodel.js`, `filesViewModel`):
+
+- `location`: `{ type, path, title, crumbs: [{ label, folder, index }], readOnly, readOnlyText, writable }` (`type` is
+  `dir`, `recent`, `trash`, `network`, `apps`, `tag`, `search` or `archive`; `path` only for a folder);
+- `history`: `{ back, forward, up }`, booleans;
+- `view` (`icons`, `list`, `columns`, `gallery`), `views`, `sort: { by, desc }`, `zoom`, `query`;
+- `items`: `[{ key, name, label, dir, size, mtime, kind, ext, selected, cut, renaming }]`, fresh copies (`key` is what
+  the actions take);
+- `selection`: `{ count, keys, first }`; `renaming`: `{ key, value }` or null; `details`: the first selected item or the
+  folder shown (`{ name, kind, dir, size, mtime, count }`), for a "Details" box;
+- `places`: `[{ id, label, kind, selected }]` for `home`, `desktop`, `documents`, `downloads`, `pictures`, `music`,
+  `videos`, `computer`, `network`, `recent`, `trash` (those that exist here);
+- `status`: `{ text, message, job: { label, fraction } | null }`; `empty` (the text for an empty folder), `loading`,
+  `canPaste`;
+- `FileIcon`: a component `({ item, size })` that draws the item's own icon (a thumbnail, the pack's, or ours);
+- `actions`: `back()`, `forward()`, `up()`, `goPlace(id)`, `goCrumb(index)`, `goAddress(text)` (`~`, `~/…`, an absolute
+  path or one under the folder shown; false and a status message when there is no folder there), `open(key)`,
+  `openSelection()`, `select(key, { add, range })`, `selectAll()`, `clearSelection()`, `menu(key | null, event)` (Files'
+  context menu at the event's place), `newFolder()`, `rename(key?)`, `renameChange(text)`, `renameCommit()`,
+  `renameCancel()`, `copy()`, `cut()`, `paste()`, `trash()`, `duplicate()`, `info()`, `quickLook()`, `terminal()`,
+  `emptyTrash()`, `setView(view)`, `sortBy(by)`, `zoom(±1)`, `search(text)`, `newWindow()`. The object stays the same
+  across renders; each call runs what the current render offers, exactly as Files' own button would (a new folder in a
+  folder Files only browses shows Files' read-only notice; Move to Trash in a cloud folder asks first).
+
+What a skin doesn't get in Files: drag and drop (Files' own item view keeps it), tabs, the search scope bar, the
+read-only banner and Files' sheets (Get Info, Quick Preview, Connect to Server, the confirmations), which stay Files'
+own over any skin. `server/tests/files_skin_scene.mjs` runs Files with every region replaced by a minimal stub
+(`node tests/menubar_test.mjs files_skin_scene.mjs`, in `make test`): the stubs get the model, the actions go through
+Files (`lord.fs.trash`, no `mkdir` in a read-only folder), a throwing stub gives the region back and layouts off brings
+Files' own regions. `server/tests/bluebell_scene` screenshots Lord Bluebell's skin
+(`tests/app_scene_headless.sh bluebell_scene OUT bluebell en light|dark`).
 
 ## 3. Building it
 
