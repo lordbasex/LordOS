@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "শব্দ",
   "themeParts.fonts": "ফন্ট",
   "themeParts.layouts": "অ্যাপের বিন্যাস",
-  "themeParts.layoutsHint": "ফাইলের মতো অ্যাপ কীভাবে সাজানো হয়। অ্যাপগুলো সব ক্ষেত্রেই নিজেদের নিয়ম বজায় রাখে।"
+  "themeParts.layoutsHint": "ফাইলের মতো অ্যাপ কীভাবে সাজানো হয়। অ্যাপগুলো সব ক্ষেত্রেই নিজেদের নিয়ম বজায় রাখে।",
+  "skin.group.look": "চেহারা ও ডিসপ্লে",
+  "skin.group.connect": "নেটওয়ার্ক ও ডিভাইস",
+  "skin.group.input": "ভাষা, ইনপুট ও অ্যাপ",
+  "skin.group.system": "সিস্টেম ও নিরাপত্তা",
+  "skin.pick": "একটি বিভাগ বেছে নিন"
 }

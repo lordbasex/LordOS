@@ -1066,5 +1066,10 @@
   "themeParts.sounds": "Sunete",
   "themeParts.fonts": "Font",
   "themeParts.layouts": "Aspectul aplicațiilor",
-  "themeParts.layoutsHint": "Cum sunt aranjate aplicații precum Fișiere. Aplicațiile își păstrează oricum propriile reguli."
+  "themeParts.layoutsHint": "Cum sunt aranjate aplicații precum Fișiere. Aplicațiile își păstrează oricum propriile reguli.",
+  "skin.group.look": "Aspect și ecrane",
+  "skin.group.connect": "Rețea și dispozitive",
+  "skin.group.input": "Limbă, introducere și aplicații",
+  "skin.group.system": "Sistem și securitate",
+  "skin.pick": "Alegeți o categorie"
 }

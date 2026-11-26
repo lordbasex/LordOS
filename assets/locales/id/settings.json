@@ -1052,5 +1052,10 @@
   "themeParts.sounds": "Suara",
   "themeParts.fonts": "Font",
   "themeParts.layouts": "Tata letak aplikasi",
-  "themeParts.layoutsHint": "Bagaimana aplikasi seperti Berkas ditata. Aplikasi tetap memegang aturannya sendiri."
+  "themeParts.layoutsHint": "Bagaimana aplikasi seperti Berkas ditata. Aplikasi tetap memegang aturannya sendiri.",
+  "skin.group.look": "Tampilan dan Layar",
+  "skin.group.connect": "Jaringan dan Perangkat",
+  "skin.group.input": "Bahasa, Input, dan Aplikasi",
+  "skin.group.system": "Sistem dan Keamanan",
+  "skin.pick": "Pilih kategori"
 }

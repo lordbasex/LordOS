@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Töne",
   "themeParts.fonts": "Schrift",
   "themeParts.layouts": "App-Layouts",
-  "themeParts.layoutsHint": "Wie Apps wie Dateien aufgebaut sind. Die Apps behalten in jedem Fall ihre eigenen Regeln."
+  "themeParts.layoutsHint": "Wie Apps wie Dateien aufgebaut sind. Die Apps behalten in jedem Fall ihre eigenen Regeln.",
+  "skin.group.look": "Darstellung und Bildschirme",
+  "skin.group.connect": "Netzwerk und Geräte",
+  "skin.group.input": "Sprache, Eingabe und Apps",
+  "skin.group.system": "System und Sicherheit",
+  "skin.pick": "Kategorie auswählen"
 }

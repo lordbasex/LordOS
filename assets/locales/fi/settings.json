@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Äänet",
   "themeParts.fonts": "Fontti",
   "themeParts.layouts": "Sovellusten asettelu",
-  "themeParts.layoutsHint": "Miten Tiedostot-sovelluksen kaltaiset sovellukset on aseteltu. Sovellukset pitävät joka tapauksessa omat sääntönsä."
+  "themeParts.layoutsHint": "Miten Tiedostot-sovelluksen kaltaiset sovellukset on aseteltu. Sovellukset pitävät joka tapauksessa omat sääntönsä.",
+  "skin.group.look": "Ulkoasu ja näytöt",
+  "skin.group.connect": "Verkko ja laitteet",
+  "skin.group.input": "Kieli, syöttö ja sovellukset",
+  "skin.group.system": "Järjestelmä ja suojaus",
+  "skin.pick": "Valitse luokka"
 }

@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Sons",
   "themeParts.fonts": "Police",
   "themeParts.layouts": "Disposition des apps",
-  "themeParts.layoutsHint": "La disposition d’apps comme Fichiers. Les apps gardent leurs propres règles dans tous les cas."
+  "themeParts.layoutsHint": "La disposition d’apps comme Fichiers. Les apps gardent leurs propres règles dans tous les cas.",
+  "skin.group.look": "Apparence et écrans",
+  "skin.group.connect": "Réseau et périphériques",
+  "skin.group.input": "Langue, saisie et apps",
+  "skin.group.system": "Système et sécurité",
+  "skin.pick": "Choisissez une catégorie"
 }

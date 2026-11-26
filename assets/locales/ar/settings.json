@@ -1087,5 +1087,10 @@
   "themeParts.sounds": "الأصوات",
   "themeParts.fonts": "الخط",
   "themeParts.layouts": "تخطيط التطبيقات",
-  "themeParts.layoutsHint": "طريقة ترتيب تطبيقات مثل «الملفات». تحتفظ التطبيقات بقواعدها في كل الأحوال."
+  "themeParts.layoutsHint": "طريقة ترتيب تطبيقات مثل «الملفات». تحتفظ التطبيقات بقواعدها في كل الأحوال.",
+  "skin.group.look": "المظهر والشاشات",
+  "skin.group.connect": "الشبكة والأجهزة",
+  "skin.group.input": "اللغة والإدخال والتطبيقات",
+  "skin.group.system": "النظام والأمان",
+  "skin.pick": "اختر فئة"
 }

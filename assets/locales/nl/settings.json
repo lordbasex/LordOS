@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Geluiden",
   "themeParts.fonts": "Lettertype",
   "themeParts.layouts": "App-indelingen",
-  "themeParts.layoutsHint": "Hoe apps zoals Bestanden zijn ingedeeld. Apps houden hoe dan ook hun eigen regels."
+  "themeParts.layoutsHint": "Hoe apps zoals Bestanden zijn ingedeeld. Apps houden hoe dan ook hun eigen regels.",
+  "skin.group.look": "Uiterlijk en beeldschermen",
+  "skin.group.connect": "Netwerk en apparaten",
+  "skin.group.input": "Taal, invoer en apps",
+  "skin.group.system": "Systeem en beveiliging",
+  "skin.pick": "Kies een categorie"
 }

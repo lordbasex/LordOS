@@ -1052,5 +1052,10 @@
   "themeParts.sounds": "サウンド",
   "themeParts.fonts": "フォント",
   "themeParts.layouts": "アプリのレイアウト",
-  "themeParts.layoutsHint": "ファイルなどのアプリの配置。どちらの場合もアプリは独自のルールを守ります。"
+  "themeParts.layoutsHint": "ファイルなどのアプリの配置。どちらの場合もアプリは独自のルールを守ります。",
+  "skin.group.look": "外観とディスプレイ",
+  "skin.group.connect": "ネットワークとデバイス",
+  "skin.group.input": "言語、入力、アプリ",
+  "skin.group.system": "システムとセキュリティ",
+  "skin.pick": "カテゴリを選んでください"
 }

@@ -1052,5 +1052,10 @@
   "themeParts.sounds": "Bunyi",
   "themeParts.fonts": "Fon",
   "themeParts.layouts": "Susun atur aplikasi",
-  "themeParts.layoutsHint": "Cara aplikasi seperti Fail disusun. Aplikasi tetap mengekalkan peraturannya sendiri."
+  "themeParts.layoutsHint": "Cara aplikasi seperti Fail disusun. Aplikasi tetap mengekalkan peraturannya sendiri.",
+  "skin.group.look": "Penampilan dan Paparan",
+  "skin.group.connect": "Rangkaian dan Peranti",
+  "skin.group.input": "Bahasa, Input dan Aplikasi",
+  "skin.group.system": "Sistem dan Keselamatan",
+  "skin.pick": "Pilih kategori"
 }

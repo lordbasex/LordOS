@@ -583,8 +583,23 @@ read-only banner and Files' sheets (Get Info, Quick Preview, Connect to Server, 
 own over any skin. `server/tests/files_skin_scene.mjs` runs Files with every region replaced by a minimal stub
 (`node tests/menubar_test.mjs files_skin_scene.mjs`, in `make test`): the stubs get the model, the actions go through
 Files (`lord.fs.trash`, no `mkdir` in a read-only folder), a throwing stub gives the region back and layouts off brings
-Files' own regions. `server/tests/bluebell_scene` screenshots Lord Bluebell's skin
+Files' own regions. `server/tests/bluebell_scene` screenshots Lord Bluebell's skins
 (`tests/app_scene_headless.sh bluebell_scene OUT bluebell en light|dark`).
+
+#### Settings
+
+| Region | Where | Settings' own | The skin's `model` |
+|---|---|---|---|
+| `sidebar` | the start side | the search field, the user card and the sections in four groups | the view model below |
+| `home` | the content, before a section is open | none: Settings opens on the last section | the view model; with a `home` skin Settings opens on it unless another app asked for a section |
+
+The view model (`apps/settings/skinmodel.js`, `settingsViewModel`): `section` (the open section's id, or null on the home
+page), `title`, `query`, `groups: [{ id, label, sections: [{ id, label, color, glyph, selected }] }]` (the groups are
+`look`, `connect`, `input` and `system`, named by `settings.skin.group.*`; only the sections this computer shows and the
+search keeps), `user: { name, admin }`, `SectionIcon` (a component `({ color, glyph, size })`, the section's own badge)
+and `actions`: `open(id)` (only a section Settings shows here), `home()`, `search(text)` and `users()`. Each section's
+page is always Settings' own, drawn by Settings with its own title bar: a skin chooses where to go, never what a page
+does. `server/tests/settings_skin_scene.mjs` runs Settings with both regions stubbed (in `make test`).
 
 ## 3. Building it
 

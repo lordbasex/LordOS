@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Sons",
   "themeParts.fonts": "Fonte",
   "themeParts.layouts": "Layout dos apps",
-  "themeParts.layoutsHint": "Como apps como o Arquivos são organizados. Os apps mantêm as próprias regras de qualquer forma."
+  "themeParts.layoutsHint": "Como apps como o Arquivos são organizados. Os apps mantêm as próprias regras de qualquer forma.",
+  "skin.group.look": "Aparência e telas",
+  "skin.group.connect": "Rede e dispositivos",
+  "skin.group.input": "Idioma, entrada e apps",
+  "skin.group.system": "Sistema e segurança",
+  "skin.pick": "Escolha uma categoria"
 }

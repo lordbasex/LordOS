@@ -1,6 +1,7 @@
 // driver.js — goes after the theme bundle in tests/app_scene_headless.sh bluebell_scene (run it with the bluebell theme):
 // Lord Bluebell, the demo of style packs and app skins. Files as the explorer of its era (toolbar, address bar, task
-// pane, icons and details, the context menu), the start menu, and Settings → Appearance's "From this style" switches;
+// pane, icons and details, the context menu), the start menu, Settings as a page of categories with a task pane, and
+// Settings → Appearance's "From this style" switches;
 // then layouts turned off there brings Files' own regions back. Lines start with "APP-SCENE".
 (function () {
   const sdk = globalThis.__lordos.require('@lordos/sdk');
@@ -59,12 +60,17 @@
     await shot('start-menu');
     globalThis.__lordKey(1, 1, 'Escape', '', '', 0); globalThis.__lordKey(1, 0, 'Escape', '', '', 0);
     await sleep(600);
-    // Settings → Appearance: the parts this style brings
-    sdk.wm.open('settings', { args: { section: 'appearance' } });
+    // Settings: the categories first (the skin's home), then Appearance from its link: the parts this style brings
+    sdk.wm.open('settings');
     await sleep(2500);
     const sw = win('settings');
     if (sw) { sdk.wm.resize(sw.id, 900, 700); sdk.wm.setFrame?.(sw.id, { x: 320, y: 20, w: 900, h: 700 }); }
     await sleep(1500);
+    step('Settings: the categories', !!textId(sdk.t('settings.skin.group.look')) && shownTexts().filter((x) => x === sdk.t('settings.skin.pick')).length >= 2);
+    await shot('settings-home');
+    const look = textId(sdk.t('settings.section.appearance'));
+    if (look) click(look);
+    await sleep(2000);
     const title = textId(sdk.t('settings.themeParts.title'));
     if (title) { const r = box(title); for (let i = 0; i < 12 && r[1] > 500; i++) { ev('wheel', title, r[0] + 5, 300, 3); await sleep(60); } }
     await sleep(600);

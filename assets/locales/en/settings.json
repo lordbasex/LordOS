@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Sounds",
   "themeParts.fonts": "Font",
   "themeParts.layouts": "App layouts",
-  "themeParts.layoutsHint": "How apps such as Files are laid out. Apps keep their own rules either way."
+  "themeParts.layoutsHint": "How apps such as Files are laid out. Apps keep their own rules either way.",
+  "skin.group.look": "Appearance and Displays",
+  "skin.group.connect": "Network and Devices",
+  "skin.group.input": "Language, Input and Apps",
+  "skin.group.system": "System and Security",
+  "skin.pick": "Pick a category"
 }

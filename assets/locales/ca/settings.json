@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Sons",
   "themeParts.fonts": "Tipus de lletra",
   "themeParts.layouts": "Disposició de les apps",
-  "themeParts.layoutsHint": "Com s’organitzen apps com Fitxers. Les apps mantenen les seves pròpies regles igualment."
+  "themeParts.layoutsHint": "Com s’organitzen apps com Fitxers. Les apps mantenen les seves pròpies regles igualment.",
+  "skin.group.look": "Aparença i pantalles",
+  "skin.group.connect": "Xarxa i dispositius",
+  "skin.group.input": "Idioma, entrada i apps",
+  "skin.group.system": "Sistema i seguretat",
+  "skin.pick": "Trieu una categoria"
 }

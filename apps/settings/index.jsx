@@ -8,8 +8,9 @@ import {
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useVisitHistory, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionLabel, compareNames,
-  useSidebar, SidebarToggle, SidebarOverlay, battery, deviceList,
+  useSidebar, SidebarToggle, SidebarOverlay, battery, deviceList, SkinRegion, useSkin, useSkinned,
 } from '@lordos/sdk';
+import { settingsViewModel } from './skinmodel.js';
 import { useEffect, useRef, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
 import { SharingSettings } from './Sharing.jsx';
@@ -641,7 +642,12 @@ export default function Settings() {
   const [section, setSectionState] = useState(lastSection);
   const [query, setQuery] = useState('');
   const side = useSidebar(SIDE_AT);
-  const setSection = (s) => { lastSection = s; setSectionState(s); subPage.set(null); if (side.narrow) side.close(); };
+  // (0.8.9.6.2) a theme's `home` skin (docs/THEMES-GUIDE.md, "App skins → Settings"): a page of categories before a
+  // section is open; Settings opens on it unless another app asked for a section
+  const homeSkin = useSkin('settings', 'home');
+  const [atHomeState, setAtHome] = useState(() => !args?.section);
+  const atHome = !!homeSkin && atHomeState;
+  const setSection = (s) => { lastSection = s; setSectionState(s); setAtHome(false); subPage.set(null); if (side.narrow) side.close(); };
   // the mouse's back and forward buttons (#234) walk sections and a section's sub-pages (subpage.js: Wallpaper's collections)
   const sub = useStore(subPage);
   useVisitHistory(placeOf(section, sub), (p) => { const [s, sp] = splitPlace(p); lastSection = s; setSectionState(s); subPage.set(sp); });
@@ -661,8 +667,18 @@ export default function Settings() {
   const [pi5] = useState(isPi5);
   const [gpus] = useState(anyGpus);
   const visible = (id) => sectionShown(id, hasPad, pi5, gpus) && `${tr(`settings.section.${id}`)} ${tr(`settings.keywords.${id}`)}`.toLowerCase().includes(q);
+  const groupIndex = GROUPS.map((g, i) => (g.some(([id]) => visible(id)) ? i : -1)).filter((i) => i >= 0);
   const groups = GROUPS.map((g) => g.filter(([id]) => visible(id))).filter((g) => g.length);
   const pad = side.narrow ? spacing.l : spacing.xxl;
+  // the view model a theme's skin gets: the sections and Settings' own ways to move between them
+  const skinned = useSkinned('settings');
+  const info = useSystemInfo(60000);
+  const vm = skinned ? settingsViewModel({ atHome, section, query, groups, groupIndex, tr, SectionIcon, userName: info.fullName || info.user, admin: info.admin }, {
+    open: (id) => { if (SECTIONS.some(([x]) => x === id) && sectionShown(id, hasPad, pi5, gpus)) setSection(id); },
+    home: () => { if (homeSkin) { setAtHome(true); subPage.set(null); } },
+    search: (q) => setQuery(String(q || '')),
+    users: () => setSection('users'),
+  }) : null;
   const sidebar = (
       <View style={{ width: 220, flex: side.narrow ? 1 : undefined, backgroundColor: t.sidebarBg, paddingTop: spacing.m }}>
         <Hairline edge="end" />
@@ -688,7 +704,8 @@ export default function Settings() {
   );
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      {side.narrow ? null : sidebar}
+      {side.narrow ? null : <SkinRegion app="settings" region="sidebar" model={vm}>{sidebar}</SkinRegion>}
+      {atHome ? <View style={{ flex: 1, minWidth: 0 }}><SkinRegion app="settings" region="home" model={vm} /></View> : (
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ height: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: pad }}>
           <Hairline edge="bottom" />
@@ -706,7 +723,7 @@ export default function Settings() {
             </View>
           </View>
         </ScrollView>
-      </View>
+      </View>)}
       {side.narrow && side.shown ? <SidebarOverlay width={220} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
       {/* Cloud's sheets: inside this window, over its content, never in the shell's modal layer (docs/CLOUD.md 18.2) */}
       {section === 'cloud' ? <CloudSheets /> : null}

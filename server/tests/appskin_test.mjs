@@ -11,6 +11,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..', '..');
 const M = await import(path.join(root, 'sdk/appskinmodel.js'));
 const F = await import(path.join(root, 'apps/files/skinmodel.js'));
+const S = await import(path.join(root, 'apps/settings/skinmodel.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -29,6 +30,7 @@ eq('no skins from junk', M.cleanSkins('x'), {});
 ok('skinFor: the component', M.skinFor(skins, {}, 'files', 'toolbar') === A);
 eq('skinFor: layouts off', M.skinFor(skins, { themeParts: { layouts: false } }, 'files', 'toolbar'), null);
 eq('skinFor: a region without one', M.skinFor(skins, {}, 'files', 'statusBar'), null);
+eq('Settings names its regions', M.APP_REGIONS.settings, ['sidebar', 'home']);
 eq('every Files region is named', M.APP_REGIONS.files, ['toolbar', 'addressBar', 'sidebar', 'itemView', 'statusBar', 'contextMenu']);
 
 // ---- parts ----
@@ -112,6 +114,16 @@ eq('address above /', F.addressPath('/../..', '/home/u', null), '/');
 eq('address empty', F.addressPath('  ', '/home/u', '/'), null);
 eq('address relative without a folder', F.addressPath('x', '/home/u', null), null);
 eq('address with a newline', F.addressPath('/a\nb', '/home/u', null), null);
+
+// ---- Settings' view model ----
+const G = () => null;
+const svm = S.settingsViewModel({ atHome: false, section: 'sound', query: '', tr: (k) => `T:${k}`, SectionIcon: G, userName: 'Ana', admin: true,
+  groups: [[['network', G, '#00f', 'x'], ['sound', G, '#f00', '♪']], [['privacy', G, '#0f0', G]]], groupIndex: [1, 3] }, { open: fn });
+eq('settings: groups by their names', svm.groups.map((g) => [g.id, g.label]), [['connect', 'T:settings.skin.group.connect'], ['system', 'T:settings.skin.group.system']]);
+eq('settings: sections', svm.groups[0].sections.map((x) => [x.id, x.selected]), [['network', false], ['sound', true]]);
+eq('settings: the open section', [svm.section, svm.title], ['sound', 'T:settings.section.sound']);
+eq('settings: at home no section', S.settingsViewModel({ atHome: true, section: 'sound', query: '', tr: (k) => k, groups: [], groupIndex: [] }, {}).section, null);
+ok('settings: a section has no page component', !('Body' in svm.groups[0].sections[0]) && Object.keys(svm.groups[0].sections[0]).join() === 'id,label,color,glyph,selected');
 
 console.log(`appskin-test: ${n} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);

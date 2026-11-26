@@ -1052,5 +1052,10 @@
   "themeParts.sounds": "소리",
   "themeParts.fonts": "글꼴",
   "themeParts.layouts": "앱 레이아웃",
-  "themeParts.layoutsHint": "파일 같은 앱의 배치 방식. 어느 쪽이든 앱은 자체 규칙을 지킵니다."
+  "themeParts.layoutsHint": "파일 같은 앱의 배치 방식. 어느 쪽이든 앱은 자체 규칙을 지킵니다.",
+  "skin.group.look": "모양 및 디스플레이",
+  "skin.group.connect": "네트워크 및 장치",
+  "skin.group.input": "언어, 입력 및 앱",
+  "skin.group.system": "시스템 및 보안",
+  "skin.pick": "범주 선택"
 }

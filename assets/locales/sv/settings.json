@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Ljud",
   "themeParts.fonts": "Typsnitt",
   "themeParts.layouts": "Applayouter",
-  "themeParts.layoutsHint": "Hur appar som Filer är uppbyggda. Apparna behåller sina egna regler i vilket fall."
+  "themeParts.layoutsHint": "Hur appar som Filer är uppbyggda. Apparna behåller sina egna regler i vilket fall.",
+  "skin.group.look": "Utseende och skärmar",
+  "skin.group.connect": "Nätverk och enheter",
+  "skin.group.input": "Språk, inmatning och appar",
+  "skin.group.system": "System och säkerhet",
+  "skin.pick": "Välj en kategori"
 }

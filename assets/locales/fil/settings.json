@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Mga tunog",
   "themeParts.fonts": "Font",
   "themeParts.layouts": "Ayos ng mga app",
-  "themeParts.layoutsHint": "Kung paano nakaayos ang mga app gaya ng Mga File. Nananatili pa rin sa mga app ang sarili nilang tuntunin."
+  "themeParts.layoutsHint": "Kung paano nakaayos ang mga app gaya ng Mga File. Nananatili pa rin sa mga app ang sarili nilang tuntunin.",
+  "skin.group.look": "Hitsura at mga Display",
+  "skin.group.connect": "Network at mga Device",
+  "skin.group.input": "Wika, Input at mga App",
+  "skin.group.system": "System at Seguridad",
+  "skin.pick": "Pumili ng kategorya"
 }

@@ -1052,5 +1052,10 @@
   "themeParts.sounds": "声音",
   "themeParts.fonts": "字体",
   "themeParts.layouts": "应用布局",
-  "themeParts.layoutsHint": "“文件”等应用的布局方式。无论哪种方式，应用都保留自己的规则。"
+  "themeParts.layoutsHint": "“文件”等应用的布局方式。无论哪种方式，应用都保留自己的规则。",
+  "skin.group.look": "外观和显示器",
+  "skin.group.connect": "网络和设备",
+  "skin.group.input": "语言、输入和应用",
+  "skin.group.system": "系统和安全",
+  "skin.pick": "选择一个类别"
 }

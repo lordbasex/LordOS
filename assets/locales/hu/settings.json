@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Hangok",
   "themeParts.fonts": "Betűtípus",
   "themeParts.layouts": "Alkalmazások elrendezése",
-  "themeParts.layoutsHint": "Hogyan épülnek fel az olyan alkalmazások, mint a Fájlok. Az alkalmazások így is megtartják a saját szabályaikat."
+  "themeParts.layoutsHint": "Hogyan épülnek fel az olyan alkalmazások, mint a Fájlok. Az alkalmazások így is megtartják a saját szabályaikat.",
+  "skin.group.look": "Megjelenés és kijelzők",
+  "skin.group.connect": "Hálózat és eszközök",
+  "skin.group.input": "Nyelv, bevitel és alkalmazások",
+  "skin.group.system": "Rendszer és biztonság",
+  "skin.pick": "Válasszon kategóriát"
 }

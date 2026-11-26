@@ -243,7 +243,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     and a skin that throws gives the region back to the app. **Files** has six: `toolbar`, `addressBar`, `sidebar`,
     `itemView`, `statusBar` and `contextMenu` (`apps/files/skinmodel.js`: the items, the selection, the folder, the
     places, the status, and 30 actions from Back to Empty Trash; a typed address goes through `addressPath` and Files'
-    own check that the folder is there).
+    own check that the folder is there). **Settings** has two: `sidebar` and `home`, a page of categories before a
+    section is open (`apps/settings/skinmodel.js`); each section's page stays Settings' own.
   - **Settings → Appearance → From this style**: a switch for each part the style in use brings (Icons, Pointer colors,
     Sounds, Font, App layouts; `settings.themeParts`), so someone can keep a theme's frames and use LordOS's icons.
   - **Lord Bluebell** (`themes/bluebell`), the demo: a tribute to the desktops of 2001 with glossy blue title bars with
@@ -251,10 +252,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     window, an original sky when no picture is chosen, light and dark; its pack has our own folder, page and round-arrow
     icons, white pointers with a black outline, four short tunes and DejaVu Sans; and Files is that era's explorer
     (Back/Forward/Up, Search, Views, an address bar with Go, the task pane with "File and Folder Tasks", "Other Places"
-    and "Details", icons or details, a plain status bar and context menu). All of its art is drawn by us.
-  - New texts in the 35 languages (`files.skin.*`, `settings.themeParts.*`, `shell.theme.bluebell.*`,
-    `shell.bluebell.start`). Tests: `server/tests/appskin_test.mjs` (54 checks), `server/tests/files_skin_scene.mjs`
-    (Files with every region a stub: 31 checks; both in `make test`) and `server/tests/bluebell_scene` (screenshots,
+    and "Details", icons or details, a plain status bar and context menu), and Settings a control panel of that era (a
+    task pane and four categories, each with its sections as links). All of its art is drawn by us.
+  - New texts in the 35 languages (`files.skin.*`, `settings.themeParts.*`, `settings.skin.*`, `shell.theme.bluebell.*`,
+    `shell.bluebell.start`). Tests: `server/tests/appskin_test.mjs` (60 checks), `server/tests/files_skin_scene.mjs`
+    (Files with every region a stub: 31 checks), `server/tests/settings_skin_scene.mjs` (Settings with both regions
+    stubbed: 17 checks; all three in `make test`) and `server/tests/bluebell_scene` (screenshots,
     `app_scene_headless.sh bluebell_scene OUT bluebell en light|dark`).
 - **Settings → Wallpaper is a gallery, with three new collections of still pictures: Abstract, Epic and Anime.** The
   approved redesign (apps/settings/WallpaperGallery.jsx) reorganises the page; nothing it had goes away.

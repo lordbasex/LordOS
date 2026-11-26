@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Suoni",
   "themeParts.fonts": "Carattere",
   "themeParts.layouts": "Layout delle app",
-  "themeParts.layoutsHint": "Come sono disposte app come File. Le app mantengono comunque le proprie regole."
+  "themeParts.layoutsHint": "Come sono disposte app come File. Le app mantengono comunque le proprie regole.",
+  "skin.group.look": "Aspetto e schermi",
+  "skin.group.connect": "Rete e dispositivi",
+  "skin.group.input": "Lingua, input e app",
+  "skin.group.system": "Sistema e sicurezza",
+  "skin.pick": "Scegli una categoria"
 }

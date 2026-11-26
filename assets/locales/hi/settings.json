@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "ध्वनियाँ",
   "themeParts.fonts": "फ़ॉन्ट",
   "themeParts.layouts": "ऐप लेआउट",
-  "themeParts.layoutsHint": "फ़ाइलें जैसे ऐप कैसे सजे हों। ऐप हर हाल में अपने नियम बनाए रखते हैं।"
+  "themeParts.layoutsHint": "फ़ाइलें जैसे ऐप कैसे सजे हों। ऐप हर हाल में अपने नियम बनाए रखते हैं।",
+  "skin.group.look": "रूप और डिस्प्ले",
+  "skin.group.connect": "नेटवर्क और डिवाइस",
+  "skin.group.input": "भाषा, इनपुट और ऐप",
+  "skin.group.system": "सिस्टम और सुरक्षा",
+  "skin.pick": "एक श्रेणी चुनें"
 }

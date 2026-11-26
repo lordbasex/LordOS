@@ -1052,5 +1052,10 @@
   "themeParts.sounds": "เสียง",
   "themeParts.fonts": "แบบอักษร",
   "themeParts.layouts": "เลย์เอาต์ของแอป",
-  "themeParts.layoutsHint": "การจัดวางแอปอย่างไฟล์ แอปยังคงใช้กฎของตัวเองไม่ว่ากรณีใด"
+  "themeParts.layoutsHint": "การจัดวางแอปอย่างไฟล์ แอปยังคงใช้กฎของตัวเองไม่ว่ากรณีใด",
+  "skin.group.look": "ลักษณะที่ปรากฏและจอแสดงผล",
+  "skin.group.connect": "เครือข่ายและอุปกรณ์",
+  "skin.group.input": "ภาษา การป้อนข้อมูล และแอป",
+  "skin.group.system": "ระบบและความปลอดภัย",
+  "skin.pick": "เลือกหมวดหมู่"
 }

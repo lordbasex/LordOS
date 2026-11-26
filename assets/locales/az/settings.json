@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Səslər",
   "themeParts.fonts": "Şrift",
   "themeParts.layouts": "Tətbiq düzümləri",
-  "themeParts.layoutsHint": "Fayllar kimi tətbiqlərin necə düzüldüyü. Tətbiqlər hər halda öz qaydalarını saxlayır."
+  "themeParts.layoutsHint": "Fayllar kimi tətbiqlərin necə düzüldüyü. Tətbiqlər hər halda öz qaydalarını saxlayır.",
+  "skin.group.look": "Görünüş və ekranlar",
+  "skin.group.connect": "Şəbəkə və cihazlar",
+  "skin.group.input": "Dil, daxiletmə və tətbiqlər",
+  "skin.group.system": "Sistem və təhlükəsizlik",
+  "skin.pick": "Kateqoriya seçin"
 }

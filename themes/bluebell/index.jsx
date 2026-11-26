@@ -26,6 +26,7 @@ import { QuickSettings } from '../classic/components/QuickSettings.jsx';
 import { Menu } from '../classic/components/Menu.jsx';
 import { fileIcons, toolbarIcons, appIcons } from './glyphs.jsx';
 import { filesSkin } from './skins/files.jsx';
+import { settingsSkin } from './skins/settings.jsx';
 
 // ---- the style pack and the app skins (before startShell) ----
 registerStylePack({
@@ -40,7 +41,7 @@ registerStylePack({
   },
   fonts: { family: 'DejaVu Sans' },
 });
-registerAppSkins({ files: filesSkin });
+registerAppSkins({ files: filesSkin, settings: settingsSkin });
 
 const areaFn = (d) => {
   const a = { x: d.x, y: d.y, w: d.w, h: d.h };

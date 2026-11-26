@@ -1059,5 +1059,10 @@
   "themeParts.sounds": "Sesler",
   "themeParts.fonts": "Yazı tipi",
   "themeParts.layouts": "Uygulama düzenleri",
-  "themeParts.layoutsHint": "Dosyalar gibi uygulamaların nasıl yerleştirildiği. Uygulamalar her durumda kendi kurallarını korur."
+  "themeParts.layoutsHint": "Dosyalar gibi uygulamaların nasıl yerleştirildiği. Uygulamalar her durumda kendi kurallarını korur.",
+  "skin.group.look": "Görünüm ve Ekranlar",
+  "skin.group.connect": "Ağ ve Aygıtlar",
+  "skin.group.input": "Dil, Giriş ve Uygulamalar",
+  "skin.group.system": "Sistem ve Güvenlik",
+  "skin.pick": "Bir kategori seçin"
 }

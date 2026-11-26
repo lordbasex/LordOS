@@ -1066,5 +1066,10 @@
   "themeParts.sounds": "Dźwięki",
   "themeParts.fonts": "Czcionka",
   "themeParts.layouts": "Układ aplikacji",
-  "themeParts.layoutsHint": "Jak są rozmieszczone aplikacje takie jak Pliki. Aplikacje i tak zachowują własne zasady."
+  "themeParts.layoutsHint": "Jak są rozmieszczone aplikacje takie jak Pliki. Aplikacje i tak zachowują własne zasady.",
+  "skin.group.look": "Wygląd i ekrany",
+  "skin.group.connect": "Sieć i urządzenia",
+  "skin.group.input": "Język, wprowadzanie i aplikacje",
+  "skin.group.system": "System i bezpieczeństwo",
+  "skin.pick": "Wybierz kategorię"
 }

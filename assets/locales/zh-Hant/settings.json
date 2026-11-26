@@ -1052,5 +1052,10 @@
   "themeParts.sounds": "聲音",
   "themeParts.fonts": "字型",
   "themeParts.layouts": "App 版面配置",
-  "themeParts.layoutsHint": "「檔案」等 App 的版面配置方式。無論如何，App 都保有自己的規則。"
+  "themeParts.layoutsHint": "「檔案」等 App 的版面配置方式。無論如何，App 都保有自己的規則。",
+  "skin.group.look": "外觀與顯示器",
+  "skin.group.connect": "網路與裝置",
+  "skin.group.input": "語言、輸入與 App",
+  "skin.group.system": "系統與安全性",
+  "skin.pick": "選擇一個類別"
 }
