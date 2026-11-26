@@ -46,5 +46,11 @@
   },
   "settings.howTitle": "Lägg till i Claude Code",
   "settings.how": "Kör detta en gång i en terminal. Sedan har Claude Code LordOS:s verktyg; första gången det ansluter frågar LordOS dig.",
-  "settings.qa": "För att testa en app utan att röra ditt skrivbord kan Claude Code använda ”lordos-mcp --headless notes”: ett privat skrivbord med exempelfiler som ingen ser."
+  "settings.qa": "För att testa en app utan att röra ditt skrivbord kan Claude Code använda ”lordos-mcp --headless notes”: ett privat skrivbord med exempelfiler som ingen ser.",
+  "cursor.label": "{client} · enligt egen uppgift",
+  "settings.motionTitle": "Agentens rörelse",
+  "settings.motionHuman": "Mänsklig",
+  "settings.motionMachine": "Maskin",
+  "settings.motionHumanHint": "Agentens lila markör glider till varje mål, stannar ett ögonblick över det och klickar sedan, och den skriver i en människas takt så att du kan följa vad den gör. Med ”Minska rörelse” är förflyttningarna korta.",
+  "settings.motionMachineHint": "Varje åtgärd sker direkt; agentens markör blinkar bara till där den landar."
 }

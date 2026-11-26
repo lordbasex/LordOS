@@ -46,5 +46,11 @@
   },
   "settings.howTitle": "Lisää Claude Codeen",
   "settings.how": "Suorita tämä kerran päätteessä. Sen jälkeen Claude Codella on LordOSin työkalut; kun se yhdistää ensimmäisen kerran, LordOS kysyy sinulta.",
-  "settings.qa": "Testatakseen sovellusta koskematta työpöytääsi Claude Code voi käyttää komentoa ”lordos-mcp --headless notes”: yksityistä työpöytää esimerkkitiedostoineen, jota kukaan ei näe."
+  "settings.qa": "Testatakseen sovellusta koskematta työpöytääsi Claude Code voi käyttää komentoa ”lordos-mcp --headless notes”: yksityistä työpöytää esimerkkitiedostoineen, jota kukaan ei näe.",
+  "cursor.label": "{client} · oman ilmoituksen mukaan",
+  "settings.motionTitle": "Agentin liike",
+  "settings.motionHuman": "Ihminen",
+  "settings.motionMachine": "Kone",
+  "settings.motionHumanHint": "Agentin violetti osoitin liukuu jokaiseen kohteeseen, pysähtyy hetkeksi sen päälle ja napsauttaa vasta sitten, ja se kirjoittaa ihmisen tahtiin, jotta voit seurata, mitä se tekee. Kun ”Vähennä liikettä” on päällä, liu’ut ovat lyhyitä.",
+  "settings.motionMachineHint": "Jokainen toiminto tapahtuu heti; agentin osoitin vain välähtää siinä, mihin se osuu."
 }

@@ -12,6 +12,7 @@
  *     program, another uid refused with AccessDenied before anything runs.
  * Never touches the session's bus. */
 #include "hands/hands.h"
+#include "hands/handsmotion.h"
 #include "hands/handsimg.h"
 #include "hands/handsmark.h"
 #include "hands/mcp.h"
@@ -20,6 +21,7 @@
 #include "vault/dbus.h"
 
 #include <fcntl.h>
+#include <math.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdio.h>
@@ -54,9 +56,9 @@ static char *shell(const char *op, const char *json) {
     else if (!strcmp(op, "focus")) snprintf(b, sizeof b, "{\"secure\":%s,\"allowed\":true,\"nodes\":[55],\"dialog\":%s,\"dialogNode\":%d}",
                                              focus_secure ? "true" : "false", dialog_open == 1 ? "true" : "false", dialog_open ? 77 : 0);
     else if (!strcmp(op, "target")) snprintf(b, sizeof b, "{\"allowed\":true}");
-    else if (!strcmp(op, "region")) snprintf(b, sizeof b, "{\"inside\":%s}", region_inside ? "true" : "false");
+    else if (!strcmp(op, "region")) snprintf(b, sizeof b, "{\"shows\":%s}", region_inside ? "true" : "false");
     else if (!strcmp(op, "blackout")) snprintf(b, sizeof b, black_n ? "{\"nodes\":[41,42]}" : "{\"nodes\":[]}");
-    else if (!strcmp(op, "window")) snprintf(b, sizeof b, "{\"node\":9,\"x\":10,\"y\":10,\"w\":300,\"h\":200}");
+    else if (!strcmp(op, "window")) snprintf(b, sizeof b, "{\"node\":9,\"x\":10,\"y\":10,\"w\":300,\"h\":200,\"sheets\":[31,0,32]}");
     else if (!strcmp(op, "setvalue")) { setvalues++; snprintf(b, sizeof b, "{\"ok\":true}"); }
     else if (!strcmp(op, "read")) snprintf(b, sizeof b, "{\"text\":\"window \\\"Notes\\\" [ref_1]\"}");
     else snprintf(b, sizeof b, "{\"text\":\"[]\"}");
@@ -75,10 +77,15 @@ static void wheel(int dx, int dy) { (void)dx; (void)dy; }
 static int key_refuse;
 static int key(const HandsChord *c) { (void)c; if (key_refuse) return -2; keys++; return 0; }
 static int type(const char *t, size_t n) { (void)t; typed += (int)n; return 0; }
+static double shot_x, shot_y, shot_w, shot_h;
+static int shot_nalso, shot_also0;
 static uint8_t *shot(int kind, uint32_t display, int node, double x, double y, double w, double h, int maxdim,
-                     const int *black, int nblack, size_t *len, int *iw, int *ih, char *meta, size_t metan) {
-    (void)kind; (void)display; (void)node; (void)x; (void)y; (void)w; (void)h; (void)maxdim;
+                     const int *black, int nblack, const int *also, int nalso, size_t *len, int *iw, int *ih, char *meta, size_t metan) {
+    (void)kind; (void)display; (void)node; (void)maxdim;
     shots++;
+    shot_x = x; shot_y = y; shot_w = w; shot_h = h;
+    shot_nalso = nalso;
+    shot_also0 = nalso ? also[0] : 0;
     last_black = nblack == 2 && black[0] == 41 && black[1] == 42 ? 2 : nblack;
     *len = 4;
     *iw = *ih = 1;
@@ -88,7 +95,18 @@ static uint8_t *shot(int kind, uint32_t display, int node, double x, double y, d
 static double now(void) { return clock_ms; }
 static int clip_secret;
 static int clip_sensitive(void) { return clip_secret; }
-static const HandsHost host = { shell, event, size, plocked, place, same_target, node_place, keys_place, move, button, wheel, key, type, shot, now, clip_sensitive };
+/* the agent cursor's events, in order */
+static int cur_events[64], ncur, cur_last;
+static double cur_lx, cur_ly;
+static void cursor(int what, double x, double y, double w, double h) {
+    (void)w; (void)h;
+    cur_last = what;
+    if (ncur < 64) cur_events[ncur++] = what;
+    if (what != HANDS_CUR_PULSE && what != HANDS_CUR_HIDE) { cur_lx = x; cur_ly = y; }
+}
+static int pointer_at(double *x, double *y) { *x = 600; *y = 500; return 1; }
+static const HandsHost host = { shell, event, size, plocked, place, same_target, node_place, keys_place, move, button, wheel, key, type, shot, now, clip_sensitive,
+                                cursor, pointer_at };
 
 static int call(const char *bus, HandsReq *r, int *why) {
     char *out = NULL;
@@ -149,6 +167,7 @@ static void pure(void) {
 
 static void policy(void) {
     hands_init(&host);
+    hands_motion(HANDS_MODE_MACHINE, 0);    /* these checks are machine mode's (human mode: human_mode below) */
     HandsReq r = { .call = HANDS_C_READ };
     int why = 0;
     CHECK(hands_hello(":1.1", "Claude Code", "/usr/bin/lordos-mcp") == HANDS_E_OFF, "off until turned on");
@@ -288,12 +307,20 @@ static void policy(void) {
     CHECK(call(":1.1", &rg, &why) == HANDS_E_REFUSED && why == HANDS_WHY_ALLOWLIST && !shots, "a region over other windows refused");
     region_inside = 1;
     black_n = 1;
-    CHECK(call(":1.1", &rg, &why) == HANDS_OK && shots == 1 && last_black == 2, "a region inside an allowed window, the others blacked out");
+    CHECK(call(":1.1", &rg, &why) == HANDS_OK && shots == 1 && last_black == 2, "a region showing an allowed window, the rest blacked out");
     HandsReq ww = { .call = HANDS_C_SHOT, .shot = HANDS_SHOT_WINDOW, .maxdim = 800 };
     snprintf(ww.window, sizeof ww.window, "notes");
     CHECK(call(":1.1", &ww, &why) == HANDS_OK && shots == 2 && last_black == 2, "a window, the others blacked out");
+    CHECK(shot_nalso == 2 && shot_also0 == 31, "a window's sheets painted over it (Settings → Wallpaper's sheet): %d", shot_nalso);
     hands_serve(1, NULL, 0);
     black_n = 0;
+    /* a zoom at the edge: the part on the desktop (a window that runs off the screen), never "outside" for what shows */
+    HandsReq ed = { .call = HANDS_C_SHOT, .shot = HANDS_SHOT_REGION, .x = 1100, .y = 700, .w = 400, .h = 300, .maxdim = 1024 };
+    CHECK(call(":1.1", &ed, &why) == HANDS_OK && shot_x == 1100 && shot_y == 700 && shot_w == 180 && shot_h == 100,
+          "a region partly off the desktop: its part on it (%.0f,%.0f %.0fx%.0f)", shot_x, shot_y, shot_w, shot_h);
+    HandsReq off = { .call = HANDS_C_SHOT, .shot = HANDS_SHOT_REGION, .x = 1300, .y = 100, .w = 50, .h = 50, .maxdim = 1024 };
+    int before = shots;
+    CHECK(call(":1.1", &off, &why) == HANDS_E_REFUSED && why == HANDS_WHY_OUTSIDE && shots == before, "a region wholly off the desktop: outside");
 
     /* rate */
     int limited = 0;
@@ -557,17 +584,36 @@ static void marks(void) {
     nodes[6].hands_deny = 1;                /* Settings → AI → Hands */
     add(base, &nodes[7]);                   /* another app's window */
     int marked[HANDS_MARK_MAX + HANDS_BLACK_MAX], n = 0, black[] = { 7 };
-    CHECK(!hands_mark_nodes(root, get, black, 1, marked, 8, &n) && n == 3 && nodes[4].protect && nodes[6].protect && nodes[7].protect && !nodes[5].protect,
-          "the prompt, the denied node and the other window marked: %d", n);
+    CHECK(!hands_mark_nodes(root, get, black, 1, marked, 8, &n) && n == 3 && nodes[4].hands_black && nodes[6].hands_black && nodes[7].hands_black &&
+          !nodes[5].hands_black, "the prompt, the denied node and the other window marked: %d", n);
+    /* a mark is black in the capture, never `protect`: a window holding a denied node (Monitor's firewall switches,
+     * Settings' person-only pages) is still captured, with the node black (bug: "the action failed") */
+    CHECK(!nodes[4].protect && !nodes[6].protect && !nodes[7].protect, "a mark is not protect");
     hands_unmark_nodes(get, marked, n);
-    CHECK(!nodes[4].protect && !nodes[6].protect && !nodes[7].protect, "and put back");
+    CHECK(!nodes[4].hands_black && !nodes[6].hands_black && !nodes[7].hands_black, "and put back");
+    /* a node already protected (a password field) is marked too: black in an agent's capture like the rest */
+    nodes[6].protect = 1;
+    CHECK(!hands_mark_nodes(root, get, black, 1, marked, 8, &n) && n == 3 && nodes[6].hands_black, "a protected node marked black as well");
+    hands_unmark_nodes(get, marked, n);
+    CHECK(nodes[6].protect && !nodes[6].hands_black, "its own protect left as it was");
+    nodes[6].protect = 0;
+    /* every handsDeny node, however deep and however many in one window (Monitor's rule switch on each row) */
+    for (int i = 20; i < 60; i++) { add(&nodes[5], &nodes[i]); nodes[i].hands_deny = 1; }
+    CHECK(!hands_mark_nodes(root, get, NULL, 0, marked, HANDS_MARK_MAX, &n) && n == 42, "each of 40 denied rows marked: %d", n);
+    int all = 1;
+    for (int i = 20; i < 60; i++) all &= nodes[i].hands_black;
+    CHECK(all, "every one of them black");
+    hands_unmark_nodes(get, marked, n);
+    for (int i = 20; i < 60; i++) { nodes[i].hands_deny = 0; nodes[i].parent = NULL; nodes[i].next = nodes[i].prev = NULL; }
+    nodes[5].last = &nodes[6];
+    nodes[6].next = NULL;
     int unknown[] = { 5000 };
-    CHECK(hands_mark_nodes(root, get, unknown, 1, marked, 8, &n) == -1 && !nodes[4].protect, "a window that can't be found to black out: refused");
+    CHECK(hands_mark_nodes(root, get, unknown, 1, marked, 8, &n) == -1 && !nodes[4].hands_black, "a window that can't be found to black out: refused");
     /* more prompts than room: nothing stays marked, the capture is refused */
     for (int i = 100; i < 1100; i++) add(sys, &nodes[i]);
     CHECK(hands_mark_nodes(root, get, black, 1, marked, HANDS_MARK_MAX, &n) == -1 && n == 0, "too many to hide: refused");
     int any = 0;
-    for (int i = 0; i < 1200; i++) any |= nodes[i].protect;
+    for (int i = 0; i < 1200; i++) any |= nodes[i].protect | nodes[i].hands_black;
     CHECK(!any, "and every mark undone");
 }
 
@@ -651,9 +697,169 @@ static void mcp(void) {
     free(q);
 }
 
+/* human mode's motion: Fitts's law, the curve, the easing, typing's pace, a scroll's steps */
+static void motion(void) {
+    double near_big = hands_fitts_ms(60, 200, 0), far_small = hands_fitts_ms(1200, 12, 0);
+    CHECK(near_big >= HANDS_GLIDE_MIN && far_small <= HANDS_GLIDE_MAX && far_small > near_big, "Fitts: far and small takes longer (%.0f > %.0f)", far_small, near_big);
+    CHECK(hands_fitts_ms(5000, 1, 0) == HANDS_GLIDE_MAX && hands_fitts_ms(2, 400, 0) == HANDS_GLIDE_MIN && hands_fitts_ms(0.2, 10, 0) == 0, "clamped to 250–900 ms, 0 already there");
+    CHECK(hands_fitts_ms(1200, 12, 1) <= HANDS_GLIDE_REDUCED, "reduce motion: a short glide");
+    CHECK(hands_ease(0) == 0 && hands_ease(1) == 1 && hands_ease(0.5) > 0.49 && hands_ease(0.5) < 0.51 && hands_ease(0.1) < 0.1 && hands_ease(0.9) > 0.9, "ease in and out");
+    uint32_t seed = 7;
+    HandsGlide g;
+    hands_glide_make(&g, 100, 100, 900, 100, 30, 0, &seed);
+    double x, y, off = 0;
+    CHECK(!hands_glide_at(&g, 0, &x, &y) && x == 100 && y == 100, "it starts where the cursor is");
+    for (double t = 0; t < g.ms; t += 16) { hands_glide_at(&g, t, &x, &y); if (fabs(y - 100) > off) off = fabs(y - 100); }
+    CHECK(off > 20 && off < 90, "a slightly curved path (%.1f points off the line)", off);
+    CHECK(hands_glide_at(&g, g.ms, &x, &y) && x == 900 && y == 100, "and ends on the target");
+    hands_glide_make(&g, 100, 100, 900, 100, 30, 1, &seed);
+    hands_glide_at(&g, g.ms / 2, &x, &y);
+    CHECK(y == 100 && g.ms <= HANDS_GLIDE_REDUCED, "reduce motion: straight and short");
+    int ok = 1;
+    for (int i = 0; i < 200; i++) { double ms = hands_type_ms('a', 10, &seed); ok &= ms >= HANDS_TYPE_MIN && ms <= HANDS_TYPE_MAX; }
+    CHECK(ok, "25–60 ms a character");
+    CHECK(hands_type_ms('a', 2000, &seed) * 2000 <= HANDS_TYPE_BUDGET + 1, "a long text within the budget");
+    int st[HANDS_SCROLL_STEPS], n = hands_scroll_steps(10, st), sum = 0;
+    for (int i = 0; i < n; i++) sum += st[i];
+    CHECK(n == HANDS_SCROLL_STEPS && sum == 10, "a scroll of 10 in %d steps", n);
+    CHECK(hands_scroll_steps(2, st) == 2 && st[0] == 1, "a short one in its notches");
+    CHECK(hands_mode_of("human") == HANDS_MODE_HUMAN && hands_mode_of("machine") == HANDS_MODE_MACHINE && hands_mode_of("") == HANDS_MODE_DEFAULT &&
+          hands_mode_of("fast") == -1, "the modes' words");
+}
+
+/* human mode against the fake host: the glide, the hover, the action when the cursor arrives, every gate again then,
+ * the person's input stopping it at once */
+static int done_n, done_rc, done_why, done_call;
+static void on_done(const char *bus, int call, int rc, int why, const char *out) {
+    (void)bus; (void)out;
+    done_n++; done_rc = rc; done_why = why; done_call = call;
+}
+static int run_until_done(int max_ms) {
+    for (int t = 0; t < max_ms && !done_n; t += 8) { clock_ms += 8; hands_tick(); }
+    return done_n;
+}
+static void human_mode(void) {
+    hands_init(&host);
+    hands_on_done(on_done);
+    hands_serve(1, NULL, 0);
+    hands_hello(":2.1", "Claude Code", "");
+    hands_answer(":2.1", 1);
+    clock_ms += 10000;
+    hands_motion(HANDS_MODE_HUMAN, 0);
+    place_why = node_why = keys_why = focus_secure = 0;
+    same = 1;
+    int why = 0;
+    char *out = NULL;
+    /* a click: pending, nothing pressed until the cursor arrives */
+    HandsReq p = { .call = HANDS_C_POINTER, .action = HANDS_P_LEFT, .x = 200, .y = 200 };
+    buttons = 0; moves = 0; ncur = 0; done_n = 0;
+    CHECK(hands_call(":2.1", &p, &out, NULL, NULL, &why) == HANDS_E_PENDING && buttons == 0 && hands_acting(), "human mode: the click waits for the glide");
+    clock_ms += 100;
+    hands_tick();
+    CHECK(buttons == 0 && moves == 0 && ncur >= 2 && cur_events[0] == HANDS_CUR_MOVE && cur_lx != 200, "the glide moves only the cursor, injects nothing");
+    CHECK(hands_timeout() >= 0 && hands_timeout() <= 16, "it wants the next frame");
+    HandsReq q = { .call = HANDS_C_POINTER, .action = HANDS_P_LEFT, .x = 300, .y = 300 };
+    hands_hello(":2.2", "Lumo", "");
+    hands_answer(":2.2", 1);
+    char *o2 = NULL;
+    CHECK(hands_call(":2.2", &q, &o2, NULL, NULL, &why) == HANDS_E_BUSY, "one action at a time: another client's waits");
+    free(o2);
+    CHECK(run_until_done(3000) == 1 && done_rc == HANDS_OK && done_call == HANDS_C_POINTER && buttons == 2, "it arrives, hovers and clicks (%d)", buttons);
+    CHECK(moves >= 2 && cur_lx == 200 && cur_ly == 200 && cur_last == HANDS_CUR_CLICK, "a hover over the target, a ripple where it clicked");
+    CHECK(!hands_acting() && hands_timeout() < 0, "done");
+    /* the person's input stops a glide at once: nothing pressed */
+    clock_ms += 10000;
+    buttons = 0; done_n = 0;
+    CHECK(hands_call(":2.1", &p, &out, NULL, NULL, &why) == HANDS_E_PENDING, "another click");
+    clock_ms += 50;
+    hands_tick();
+    hands_person_input();
+    CHECK(done_n == 1 && done_rc == HANDS_E_ACTIVE && buttons == 0 && !hands_acting(), "the person moved: stopped, user active, no click");
+    /* the target becomes protected while the cursor glides: refused when it arrives */
+    clock_ms += 10000;
+    done_n = 0;
+    CHECK(hands_call(":2.1", &p, &out, NULL, NULL, &why) == HANDS_E_PENDING, "a click");
+    clock_ms += 50;
+    hands_tick();
+    place_why = HANDS_WHY_PROTECTED;
+    CHECK(run_until_done(3000) && done_rc == HANDS_E_REFUSED && done_why == HANDS_WHY_PROTECTED && buttons == 0, "gated again on arrival: refused, nothing pressed");
+    place_why = 0;
+    /* a protected target is refused at once: no glide toward it */
+    clock_ms += 10000;
+    done_n = 0;
+    HandsReq sy = { .call = HANDS_C_POINTER, .action = HANDS_P_LEFT, .x = 200, .y = 10 };
+    CHECK(hands_call(":2.1", &sy, &out, NULL, NULL, &why) == HANDS_E_REFUSED && why == HANDS_WHY_SYSTEM && !hands_acting(), "the system layer: refused before any glide");
+    /* a drag the person interrupts: its button let go */
+    clock_ms += 10000;
+    done_n = 0; buttons = 0;
+    HandsReq dg = { .call = HANDS_C_POINTER, .action = HANDS_P_DRAG, .x = 200, .y = 200, .x2 = 700, .y2 = 400 };
+    CHECK(hands_call(":2.1", &dg, &out, NULL, NULL, &why) == HANDS_E_PENDING, "a drag");
+    for (int i = 0; i < 400 && buttons < 1; i++) { clock_ms += 8; hands_tick(); }
+    CHECK(buttons == 1 && hands_acting(), "its button down, the cursor carrying it");
+    hands_person_input();
+    CHECK(done_n == 1 && done_rc == HANDS_E_ACTIVE && buttons == 2, "interrupted: the button released");
+    /* typing at a person's pace, gated before each character */
+    clock_ms += 10000;
+    done_n = 0; typed = 0;
+    HandsReq ty = { .call = HANDS_C_TYPE, .text = "hello world", .text_len = 11 };
+    CHECK(hands_call(":2.1", &ty, &out, NULL, NULL, &why) == HANDS_E_PENDING && typed == 0, "typing waits");
+    clock_ms += 8;
+    hands_tick();
+    clock_ms += 8;
+    hands_tick();
+    CHECK(typed >= 1 && typed <= 2, "a character at a time (%d)", typed);
+    focus_secure = 1;
+    CHECK(run_until_done(3000) && done_rc == HANDS_E_REFUSED && done_why == HANDS_WHY_PASSWORD && typed < 11, "the focus moved to a password field: stopped there (%d)", typed);
+    focus_secure = 0;
+    clock_ms += 10000;
+    done_n = 0; typed = 0;
+    CHECK(hands_call(":2.1", &ty, &out, NULL, NULL, &why) == HANDS_E_PENDING, "typing again");
+    double t0 = clock_ms;
+    CHECK(run_until_done(5000) && done_rc == HANDS_OK && typed == 11, "all of it (%d)", typed);
+    CHECK(clock_ms - t0 >= 10 * HANDS_TYPE_MIN && clock_ms - t0 <= 11 * (HANDS_TYPE_MAX + 16) + 50, "at 25–60 ms a character (%.0f ms)", clock_ms - t0);
+    /* a scroll in steps */
+    clock_ms += 10000;
+    done_n = 0;
+    HandsReq sc = { .call = HANDS_C_SCROLL, .x = 400, .y = 400, .dir = HANDS_DIR_DOWN, .amount = 6 };
+    CHECK(hands_call(":2.1", &sc, &out, NULL, NULL, &why) == HANDS_E_PENDING && run_until_done(4000) && done_rc == HANDS_OK, "a scroll in steps");
+    /* SetMode: this connection in machine mode is instant again, its cursor only flashing */
+    clock_ms += 10000;
+    HandsReq md = { .call = HANDS_C_MODE, .mode = HANDS_MODE_MACHINE };
+    CHECK(hands_call(":2.1", &md, &out, NULL, NULL, &why) == HANDS_OK && out && strstr(out, "\"effective\":\"machine\""), "SetMode machine: %s", out ? out : "");
+    free(out);
+    out = NULL;
+    clock_ms += 10000;
+    buttons = 0; ncur = 0;
+    CHECK(hands_call(":2.1", &p, &out, NULL, NULL, &why) == HANDS_OK && buttons == 2 && ncur >= 1 && cur_last == HANDS_CUR_FLASH,
+          "machine mode: at once, a flash where it landed");
+    free(out);
+    out = NULL;
+    /* the QA desktop's default is machine */
+    HandsReq dd = { .call = HANDS_C_MODE, .mode = HANDS_MODE_DEFAULT };
+    clock_ms += 10000;
+    hands_call(":2.1", &dd, &out, NULL, NULL, &why);
+    free(out);
+    out = NULL;
+    hands_qa(1);
+    CHECK(hands_motion_default() == HANDS_MODE_MACHINE, "QA: machine by default");
+    hands_qa(0);
+    CHECK(hands_motion_default() == HANDS_MODE_HUMAN, "the live desktop: human by default");
+    /* Stop ends an action in progress and hides the cursor */
+    clock_ms += 10000;
+    done_n = 0; ncur = 0;
+    CHECK(hands_call(":2.1", &p, &out, NULL, NULL, &why) == HANDS_E_PENDING, "a click");
+    hands_stop("stop");
+    CHECK(done_n == 1 && done_rc == HANDS_E_STOPPED && !hands_acting() && cur_last == HANDS_CUR_HIDE, "Stop: stopped, the cursor gone");
+    hands_gone(":2.1");
+    hands_gone(":2.2");
+    hands_on_done(NULL);
+}
+
 int main(void) {
     pure();
+    motion();
     policy();
+    human_mode();
     fuzz();
     on_bus();
     pidfds();

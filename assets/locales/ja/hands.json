@@ -44,5 +44,11 @@
   },
   "settings.howTitle": "Claude Code に追加",
   "settings.how": "ターミナルでこれを一度実行してください。Claude Code で LordOS のツールが使えるようになり、初めて接続するときに LordOS が確認します。",
-  "settings.qa": "デスクトップに触れずにアプリをテストするには、Claude Code で「lordos-mcp --headless notes」を使えます。誰にも見えない、サンプルファイル入りの非公開デスクトップです。"
+  "settings.qa": "デスクトップに触れずにアプリをテストするには、Claude Code で「lordos-mcp --headless notes」を使えます。誰にも見えない、サンプルファイル入りの非公開デスクトップです。",
+  "cursor.label": "{client}・自己申告",
+  "settings.motionTitle": "エージェントの動き",
+  "settings.motionHuman": "人間らしく",
+  "settings.motionMachine": "機械的に",
+  "settings.motionHumanHint": "エージェントの紫色のカーソルが各ターゲットまで滑るように移動し、一瞬止まってからクリックし、人と同じ速さで入力するので、何をしているかを目で追えます。「動きを減らす」がオンのときは移動が短くなります。",
+  "settings.motionMachineHint": "各操作はすぐに実行され、エージェントのカーソルは操作した場所で光るだけです。"
 }

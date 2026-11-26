@@ -46,5 +46,11 @@
   },
   "settings.howTitle": "Toevoegen aan Claude Code",
   "settings.how": "Voer dit één keer uit in een terminal. Claude Code heeft dan de tools van LordOS; de eerste keer dat het verbindt, vraagt LordOS het je.",
-  "settings.qa": "Om een app te testen zonder je bureaublad aan te raken, kan Claude Code “lordos-mcp --headless notes” gebruiken: een privébureaublad met voorbeeldbestanden dat niemand ziet."
+  "settings.qa": "Om een app te testen zonder je bureaublad aan te raken, kan Claude Code “lordos-mcp --headless notes” gebruiken: een privébureaublad met voorbeeldbestanden dat niemand ziet.",
+  "cursor.label": "{client} · volgens zichzelf",
+  "settings.motionTitle": "Beweging van de agent",
+  "settings.motionHuman": "Menselijk",
+  "settings.motionMachine": "Machine",
+  "settings.motionHumanHint": "De paarse cursor van de agent glijdt naar elk doel, blijft er even boven hangen en klikt dan pas, en typt in het tempo van een mens, zodat je kunt volgen wat hij doet. Met ‘Beperk beweging’ zijn de bewegingen kort.",
+  "settings.motionMachineHint": "Elke actie gebeurt meteen; de cursor van de agent licht alleen op waar ze terechtkomt."
 }

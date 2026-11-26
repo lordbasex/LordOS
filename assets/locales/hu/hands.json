@@ -46,5 +46,11 @@
   },
   "settings.howTitle": "Hozzáadás a Claude Code-hoz",
   "settings.how": "Futtasd ezt egyszer egy terminálban. Ezután a Claude Code eléri a LordOS eszközeit; az első csatlakozáskor a LordOS megkérdez.",
-  "settings.qa": "Ha az asztalod érintése nélkül akar tesztelni egy appot, a Claude Code használhatja a „lordos-mcp --headless notes” parancsot: egy privát asztalt mintafájlokkal, amelyet senki sem lát."
+  "settings.qa": "Ha az asztalod érintése nélkül akar tesztelni egy appot, a Claude Code használhatja a „lordos-mcp --headless notes” parancsot: egy privát asztalt mintafájlokkal, amelyet senki sem lát.",
+  "cursor.label": "{client} · saját bevallása szerint",
+  "settings.motionTitle": "Az ügynök mozgása",
+  "settings.motionHuman": "Emberi",
+  "settings.motionMachine": "Gépi",
+  "settings.motionHumanHint": "Az ügynök lila mutatója minden célhoz odasiklik, egy pillanatra megáll fölötte, és csak utána kattint, és emberi tempóban gépel, így követheted, mit csinál. A „Mozgás csökkentése” mellett a siklások rövidek.",
+  "settings.motionMachineHint": "Minden művelet azonnal megtörténik; az ügynök mutatója csak felvillan ott, ahová érkezik."
 }

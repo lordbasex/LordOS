@@ -2,9 +2,9 @@
 #include "handsmark.h"
 
 static int mark(Node *n, int *marked, int max, int *k) {
-    if (n->protect) return 0;                       /* already the protected fill: nothing to undo later */
+    if (n->hands_black) return 0;                   /* already marked: nothing to undo twice */
     if (*k >= max) return -1;
-    n->protect = 1;
+    n->hands_black = 1;
     marked[(*k)++] = n->id;
     return 0;
 }
@@ -18,7 +18,7 @@ static int walk(Node *n, int depth, int *marked, int max, int *k) {
 }
 
 void hands_unmark_nodes(Node *(*get)(int id), const int *marked, int n) {
-    for (int i = 0; i < n; i++) { Node *x = get(marked[i]); if (x) x->protect = 0; }
+    for (int i = 0; i < n; i++) { Node *x = get(marked[i]); if (x) x->hands_black = 0; }
 }
 
 int hands_mark_nodes(Node *root, Node *(*get)(int id), const int *black, int nblack, int *marked, int max, int *n) {

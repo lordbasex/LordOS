@@ -46,5 +46,11 @@
   },
   "settings.howTitle": "Iongeze kwenye Claude Code",
   "settings.how": "Endesha hii mara moja kwenye terminali. Kisha Claude Code itakuwa na zana za LordOS; mara ya kwanza inapounganisha, LordOS inakuuliza.",
-  "settings.qa": "Ili kujaribu programu bila kugusa eneo-kazi lako, Claude Code inaweza kutumia “lordos-mcp --headless notes”: eneo-kazi la faragha lenye faili za mfano ambalo hakuna anayeliona."
+  "settings.qa": "Ili kujaribu programu bila kugusa eneo-kazi lako, Claude Code inaweza kutumia “lordos-mcp --headless notes”: eneo-kazi la faragha lenye faili za mfano ambalo hakuna anayeliona.",
+  "cursor.label": "{client} · kwa maelezo yake",
+  "settings.motionTitle": "Mwendo wa wakala",
+  "settings.motionHuman": "Kama binadamu",
+  "settings.motionMachine": "Kama mashine",
+  "settings.motionHumanHint": "Kiashiria cha zambarau cha wakala huteleza hadi kila lengo, husimama juu yake kwa muda mfupi, kisha hubofya, na huandika kwa kasi ya binadamu ili uweze kufuatilia anachofanya. Ukiwasha Punguza mwendo, miteremko ni mifupi.",
+  "settings.motionMachineHint": "Kila kitendo hutokea mara moja; kiashiria cha wakala humulika tu pale kinapotua."
 }

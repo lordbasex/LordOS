@@ -45,16 +45,61 @@ MCP server over stdio; each tool is one or two calls to lord-server's `org.lordo
 | `tabs_close` | `close_window(window_id)` | closes a window (the app may ask about unsaved changes) |
 | `read_page` | `read_window(window_id, filter, depth)` | the UI tree as text (below) |
 | `find` | `find(window_id, query)` | words matched against roles, names and values; the best lines with their refs |
-| `computer` | `computer(action, …)` | `screenshot` (`display`, `display:<id>`, `window:<id>`), `left_click`, `right_click`, `middle_click`, `double_click`, `triple_click`, `hover` (at a `ref` or a `coordinate`), `left_click_drag` (`start_coordinate` → `coordinate`), `type` (`text`), `key` (`text`: `ctrl+s`, `Return`, `ctrl+a Delete`; `repeat`), `scroll` (`scroll_direction`, `scroll_amount`), `zoom` (`region` [x0, y0, x1, y1]), `wait` (`duration`, at most 10 s) |
-| `form_input` | `set_value(ref, value)` | a text field or area, a checkbox or switch, a pop-up or option list (by value or label), a slider; never a password field |
+| `computer` | `computer(action, …, mode)` | `screenshot` (`display`, `display:<id>`, `window:<id>`), `left_click`, `right_click`, `middle_click`, `double_click`, `triple_click`, `hover` (at a `ref` or a `coordinate`), `left_click_drag` (`start_coordinate` → `coordinate`), `type` (`text`), `key` (`text`: `ctrl+s`, `Return`, `ctrl+a Delete`; `repeat`), `scroll` (`scroll_direction`, `scroll_amount`), `zoom` (`region` [x0, y0, x1, y1]), `wait` (`duration`, at most 10 s); `mode` `human` or `machine` for this call (below) |
+| `form_input` | `set_value(ref, value, mode)` | a text field or area, a checkbox or switch, a pop-up or option list (by value or label), a slider; never a password field |
+| — | `hands_mode(mode)` | `human`, `machine` or `default` for the rest of the session (also `lordos-mcp --mode human\|machine`) |
 | `read_console_messages` | `read_app_log(app, pattern, max_lines)` | an app's own log: its file in the session's log folder (`apps/<app>.log`, a web app's `web/<app>-*.log`), else its lines of `shell.log`, through `lord.logs` (the Logs app's own access rules) |
 | `gif_creator` | `record(start \| stop \| export, name)` | every action adds a frame; `export` returns the animated GIF, or with `name` (a bare file name ending in `.gif`, no folders) saves it as a new file in `~/Pictures/LordOS QA`, the only place lordos-mcp ever writes (each folder opened `O_DIRECTORY \| O_NOFOLLOW`, the file `O_CREAT \| O_EXCL \| O_NOFOLLOW`, 0600) |
 
 There is **no `javascript_tool`**: nothing runs code. lord-server never runs a command for an agent.
 
 Coordinates are pixels of the last screenshot (desktop points before the first one); `lordos-mcp` maps them back with the
-screenshot's area (`{x, y, w, h, width, height}`). Screenshots are at most 1,568 px on their long side by default; a
-zoom may grow up to 4 times.
+screenshot's area (`{x, y, w, h, width, height}`: the part of the desktop it really shows, so a window that runs off the
+screen maps right). Screenshots are at most 1,568 px on their long side by default; a zoom may grow up to 4 times. A
+window's screenshot includes its sheets (Settings → Wallpaper's sheet, a file dialog: `wm.addSheet`), as Screenshots'
+window capture does. A zoom is clipped to the desktop; only a region wholly off it is refused (`outside`).
+
+## The agent's cursor
+
+The person sees the agent work, as Claude in Chrome shows its own cursor moving to each target.
+
+- **Its look**: a violet arrow (a rounded tip at the point) with a small label, the name the client gave followed by
+  "· reported" (`hands.cursor.label`): what the program calls itself, not verified, as the prompt says. The name was
+  cleaned in C when the client said Hello (printable UTF-8, no control, bidi or format characters, 40 bytes at most) and
+  is cut again in the shell; it is plain text. A ripple when it clicks, a short pulse at the field while it types or
+  presses keys, a quick ring where a machine-mode action lands. It fades out 4 s after the last action and goes at once
+  with Stop, the panic key or the last agent leaving.
+- **Where it is drawn**: lord-server draws it from C (`server/src/hands/handscur.c`) in a layer of its own at zIndex
+  99.5, built once by the shell out of React's sight (`sdk/hands.jsx` `HandsCursor`, `runtime` `overlayTree`): above
+  every layer a theme draws in (notification, 95) and below the system band (100), so a permission or password prompt
+  and Hands' banner are always above it. It takes no clicks. Each frame of a glide changes only its position: the damage
+  is its own box, with no JavaScript per frame. It is on whatever display its point is.
+- **Separate from the person's pointer**, which never moves for the agent: the agent borrows the pointer's position for
+  its input, the person's pointer image stays where they left it, and their next pointer input of their own (a move, a
+  button, a wheel, a remote viewer's) takes it back from there before it is applied (`main.c` `hands_reclaim`).
+- **Not in the agent's screenshots**: the agent sees the screen as it is, with nothing of its own over the target
+  (`paint_hands_cursor`), and it is not in `read_window`'s tree.
+
+**Human mode** (the default on the live desktop): before a click, a hover, a drag, a scroll or `set_value`, the cursor
+glides from where it is (the first time, from the person's pointer) to the target along a slightly curved path, eased in
+and out, in 250 to 900 ms by Fitts's law (longer for a far or small target, `server/src/hands/handsmotion.c`); it hovers
+90 to 170 ms (the pointer is over the target, so its highlight shows), then the action happens. A drag carries the
+cursor from start to end with the button held; a scroll comes in up to 4 steps; text is typed one character at a time,
+25 to 60 ms each with a small jitter (a long text faster: at most 10 s a call), the cursor resting at the field's end.
+With Settings → Accessibility → Reduce motion the glides are short (at most 120 ms) and straight. **Machine mode**
+(the default of the `--headless` QA desktop): every action at once, as before; the cursor only jumps and flashes where
+it lands.
+
+**Choosing it**: Settings → AI → Hands → *Agent motion*: *Human* / *Machine* (`settings.hands.motion`, on the
+`handsDeny` page, so only the person changes it; `lord.hands.motion`); a client's own choice wins for that connection:
+`hands_mode` (`SetMode` on the bus) or `lordos-mcp --mode`, and `mode` on one `computer` or `set_value` call.
+
+**What it never weakens**: the glide itself injects nothing; the hover move and the action pass the whole gate at the
+moment they happen (a target that became protected, covered or refused meanwhile is refused then); each scroll step and
+each typed character passes the gate again (the full key gate before every character); a drag's drop is gated on
+arrival, and if refused the button is let go where the drag began. The person's input stops an action in progress at
+once ("user is active"; a held button released) and still pauses the agent 3 s; Stop, the panic key, the lock and the
+switch end it. One action runs at a time (another client's input gets Busy).
 
 ### read_window
 
@@ -89,7 +134,8 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
   connection (`server/src/ui/handsbus.c`). The bus says each caller's uid (`GetConnectionCredentials`) before its first
   call is served; another uid gets AccessDenied. Methods are closed and typed: `Hello(s)`, `Status()`, `Windows()`,
   `ReadWindow(ssu)`, `Find(ss)`, `Pointer(ssiiii)`, `Scroll(siisu)`, `Key(su)`, `Type(s)`, `SetValue(ss)`,
-  `Screenshot(siiiiu) → (ay s)`, `OpenApp(s)`, `OpenPath(s)`, `CloseWindow(s)`, `AppLog(ssu)`. Every argument is checked
+  `Screenshot(siiiiu) → (ay s)`, `OpenApp(s)`, `OpenPath(s)`, `CloseWindow(s)`, `AppLog(ssu)`, `SetMode(s)`. In human mode
+  `Pointer`, `Scroll`, `Type` and `SetValue` answer when the action is done (the cursor arrived), not at once. Every argument is checked
   in C (`handsbus_parse`, fuzzed by `build/hands-test`) before the policy sees it.
 
 ### Consent and control
@@ -159,8 +205,11 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
 - the **lock screen** and the **greeter**: other processes; Hands1 is never served there.
 - an **authentication prompt** (polkit, `pkagent`) takes only physical input: no agent click or key while one is up.
 
-Screenshots of the system band and `handsDeny` nodes are painted as the protected fill (`server/src/hands/handsmark.c`);
-when not everything can be marked, there is no screenshot.
+Screenshots of the system band and `handsDeny` nodes are painted solid black over their whole box, in every capture path
+(a display, a window, a region), and so are a marked window's Linux menus (`server/src/hands/handsmark.c` marks them
+`hands_black`, not `protect`, for the length of the capture); when not everything can be marked, there is no screenshot.
+A window's screenshot is refused only when the window itself is protected: a protected node inside it (a password field)
+is painted as the protected fill and the rest is shown.
 
 ### Threat model
 
@@ -198,12 +247,13 @@ change the desktop. It needs `dbus-daemon` (Debian's `dbus-daemon` package).
 
 | Where | What |
 |---|---|
-| `server/src/hands/hands.c` | state and policy: clients, the gate, rate limits, the calls, the log's words |
+| `server/src/hands/hands.c` | state and policy: clients, the gate, rate limits, the calls, the log's words, human mode's actions over frames |
+| `server/src/hands/handsmotion.c`, `handscur.c` | human mode's motion (Fitts's law, the curve, typing's pace); the agent's cursor on the screen |
 | `server/src/ui/handsbus.c` | `org.lordos.Hands1`: the uid, the pidfd, the arguments |
 | `server/src/main.c` | the host: where a point or a key lands, the injection, screenshots, the panic key, `--hands-qa` |
 | `server/src/hands/handsmark.c`, `handsimg.c` | what a screenshot hides (fail closed); fitting and PNG |
 | `server/src/ui/js_hands.c` | `lord.hands` (desktop context only: never a community theme's or an isolated app's) |
-| `sdk/handsmodel.js`, `sdk/hands.jsx` | the reader and refs; the shell's answers, the prompt, the banner |
+| `sdk/handsmodel.js`, `sdk/hands.jsx` | the reader and refs; the shell's answers, the prompt, the banner, the agent's cursor |
 | `apps/settings/AI.jsx` | Settings → AI → Hands |
 | `server/src/cli/lordosmcp.c`, `server/src/hands/mcp.c` | lordos-mcp |
 
@@ -211,12 +261,21 @@ change the desktop. It needs `dbus-daemon` (Debian's `dbus-daemon` package).
 
 - `build/hands-test` (`make test`, ASan and UBSan): the pure checks, the policy against a fake host (the prompt per
   connection, Stop, the panic key, the person's input, the system layer, a covered ref, set-value's gate, keys into a
-  password field or a denied focused node, allowlisted screenshots), a fuzz of every method's arguments, the bus's uid
-  check on a private `dbus-daemon`, the pidfd, the screenshot's marks failing closed, lordos-mcp's pure parts.
+  password field or a denied focused node, allowlisted screenshots, a window's sheets, a region clipped to the desktop),
+  human mode (Fitts's law, the curve, typing's pace and budget, a scroll's steps; a click pending until the cursor
+  arrives with nothing injected during the glide, the person's input stopping it, a target protected meanwhile refused on
+  arrival, a drag's button released when interrupted, typing stopped when the focus moves to a password field, one
+  action at a time, SetMode, the QA default, Stop hiding the cursor), a fuzz of every method's arguments, the bus's uid
+  check on a private `dbus-daemon`, the pidfd, the screenshot's marks (black, not `protect`; forty denied rows; failing
+  closed), lordos-mcp's pure parts.
 - `tests/hands_model_test.mjs`: refs stay stable, password values and the system band never appear, `handsDeny` nodes
   are left out, the allowlisted blackout per layer, the prompt claims nothing is verified.
 - `tests/hands_e2e.py` (run by `make test` when the themes are built): `lordos-mcp --headless` with the test hooks:
   Notes' File → Import… of a fixture file (the note exists; a GIF recorded, returned and saved only under a bare name in
   `~/Pictures/LordOS QA` of a temporary HOME); a click and a key aimed at a permission
   prompt refused and the prompt black in screenshots; the banner on the display and the person's Stop ending the agent;
-  Enter and a click on a community theme's trust dialog refused, the theme left untrusted.
+  Enter and a click on a community theme's trust dialog refused, the theme left untrusted; Monitor's Network tab
+  captured as a window (it used to fail) and as the display with its firewall switches black in both; a window dragged
+  off the screen's edge, its screenshot and a zoom at the edge; a wallpaper's sheet in Settings' window screenshot and a
+  zoom over it; the agent's cursor on the display while it glides and where it clicks, never in the agent's screenshot,
+  the click landing after the glide, the person's pointer not moving (`where`, a test hook).

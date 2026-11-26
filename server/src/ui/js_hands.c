@@ -6,11 +6,15 @@
  *   lord.hands.stop()              the banner's Stop: every client stopped, every grant forgotten
  *   lord.hands.status()            {on, qa, allow, clients: [{bus, name, exe, kind, state, actions}], events}
  *   lord.hands.injecting()         the input being handled now is the agent's (it is counted in status().events)
+ *   lord.hands.motion(mode, reduce) Settings → AI → Hands → Agent motion ('human' or 'machine') and reduce motion
+ *   lord.hands.cursor(root, ring)  the agent cursor's nodes (sdk/handscursor.js), built once by the shell: lord-server
+ *                                  moves them (hands/handscur.h); refused unless they are where the cursor's layer must be
  *
  * lord-server calls the shell back through __lordHands(op, json) (the tree, refs, windows, opening; sdk/hands.jsx) and
  * tells it of changes through __lordHandsEvent(json). */
 #include "js_hands.h"
 #include "../hands/hands.h"
+#include "../hands/handscur.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -64,7 +68,25 @@ static JSValue f_injecting(JSContext *c, JSValueConst t, int argc, JSValueConst 
     return JS_NewBool(c, hands_injecting());
 }
 
+static JSValue f_motion(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *m = argc > 0 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
+    int mode = m ? hands_mode_of(m) : -1;
+    if (m) JS_FreeCString(c, m);
+    hands_motion(mode == HANDS_MODE_MACHINE ? HANDS_MODE_MACHINE : HANDS_MODE_HUMAN, argc > 1 && JS_ToBool(c, argv[1]) > 0);
+    return JS_UNDEFINED;
+}
+
+static JSValue f_cursor(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    int32_t root = 0, ring = 0;
+    if (argc < 2 || JS_ToInt32(c, &root, argv[0]) || JS_ToInt32(c, &ring, argv[1])) return JS_FALSE;
+    return JS_NewBool(c, handscur_set(root, ring) == 0);
+}
+
 static const JSCFunctionListEntry funcs[] = {
+    JS_CFUNC_DEF("motion", 2, f_motion),
+    JS_CFUNC_DEF("cursor", 2, f_cursor),
     JS_CFUNC_DEF("serve", 2, f_serve),
     JS_CFUNC_DEF("answer", 2, f_answer),
     JS_CFUNC_DEF("stop", 0, f_stop),

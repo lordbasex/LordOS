@@ -46,5 +46,11 @@
   },
   "settings.howTitle": "Add it to Claude Code",
   "settings.how": "Run this once in a terminal. Claude Code then has LordOS's tools; the first time it connects, LordOS asks you.",
-  "settings.qa": "To test an app without touching your desktop, Claude Code can use “lordos-mcp --headless notes”: a private desktop with sample files that nobody sees."
+  "settings.qa": "To test an app without touching your desktop, Claude Code can use “lordos-mcp --headless notes”: a private desktop with sample files that nobody sees.",
+  "cursor.label": "{client} · reported",
+  "settings.motionTitle": "Agent motion",
+  "settings.motionHuman": "Human",
+  "settings.motionMachine": "Machine",
+  "settings.motionHumanHint": "The agent's violet cursor glides to each target, pauses over it, then clicks, and it types at a person's pace, so you can follow what it does. With Reduce motion its glides are short.",
+  "settings.motionMachineHint": "Each action happens at once; the agent's cursor only flashes where it lands."
 }

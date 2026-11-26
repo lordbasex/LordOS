@@ -75,6 +75,8 @@ enum {
     HANDS_E_OFF = -1, HANDS_E_ASKING = -2, HANDS_E_DENIED = -3, HANDS_E_STOPPED = -4, HANDS_E_ACTIVE = -5,
     HANDS_E_REFUSED = -6, HANDS_E_RATE = -7, HANDS_E_NOTFOUND = -8, HANDS_E_FAILED = -9, HANDS_E_ARGS = -10,
     HANDS_E_BUSY = -11,
+    HANDS_E_PENDING = -12,      /* never sent: a human-mode action runs over the next frames, its answer comes through
+                                 * the done callback (hands_on_done) */
 };
 
 /* why a place or a field was refused (HANDS_E_REFUSED's word) */
@@ -89,7 +91,7 @@ const char *hands_why_word(int why);       /* "system-layer", "protected", "pass
 enum {
     HANDS_C_HELLO = 0, HANDS_C_STATUS, HANDS_C_WINDOWS, HANDS_C_READ, HANDS_C_FIND, HANDS_C_POINTER, HANDS_C_SCROLL,
     HANDS_C_KEY, HANDS_C_TYPE, HANDS_C_SETVALUE, HANDS_C_SHOT, HANDS_C_OPENAPP, HANDS_C_OPENPATH, HANDS_C_CLOSE,
-    HANDS_C_APPLOG, HANDS_C_COUNT,
+    HANDS_C_APPLOG, HANDS_C_MODE, HANDS_C_COUNT,
 };
 const char *hands_call_word(int call);
 
@@ -103,6 +105,18 @@ const char *hands_pointer_word(int a);
 
 enum { HANDS_DIR_NONE = 0, HANDS_DIR_UP, HANDS_DIR_DOWN, HANDS_DIR_LEFT, HANDS_DIR_RIGHT };
 int hands_direction(const char *s);
+
+/* How the agent's cursor moves (docs/HANDS.md "The agent's cursor"). Human: before each pointer action the cursor glides
+ * to the target (Fitts's law, a slight curve, eased), hovers, then acts; text is typed at a person's pace and a scroll
+ * comes in steps. Machine: at once, as before, the cursor only flashing where the action lands. The live desktop's
+ * default is Settings → AI → Hands → Agent motion (human); the QA desktop's is machine; a client may choose its own
+ * (SetMode: lordos-mcp's hands_mode tool and the mode of one computer or set_value call). */
+enum { HANDS_MODE_DEFAULT = 0, HANDS_MODE_HUMAN, HANDS_MODE_MACHINE };
+int hands_mode_of(const char *s);           /* "human", "machine", "default" or ""; -1 otherwise */
+const char *hands_mode_word(int mode);
+
+/* the agent cursor's visual events (HandsHost.cursor) */
+enum { HANDS_CUR_MOVE = 1, HANDS_CUR_CLICK, HANDS_CUR_FLASH, HANDS_CUR_PULSE, HANDS_CUR_HIDE };
 
 /* the clients' kinds, the only thing of a client's name that reaches a log line */
 enum { HANDS_K_OTHER = 0, HANDS_K_CLAUDE, HANDS_K_LUMO };
@@ -175,12 +189,19 @@ typedef struct {
     int  (*key)(const HandsChord *c);
     int  (*type)(const char *text, size_t n);       /* 0, or HANDS_WHY_* stopped part-way */
     /* a PNG (malloc'd) of a display, a window's node or a logical region, the system layer and denied nodes black; *w,
-     * *h its size; meta gets {"x","y","w","h","scale"} of the logical area it shows. NULL on failure. */
-    /* black: more nodes painted as the protected fill (other apps' windows, with an allowlist) */
+     * *h its size; meta gets {"x","y","w","h","width","height"} of the logical area it really shows (a window partly off
+     * the screen: the part on it). NULL on failure. */
+    /* black: more nodes painted black (other apps' windows, with an allowlist); also: a window's sheets (wm.addSheet),
+     * painted over it in a window's capture */
     uint8_t *(*shot)(int kind, uint32_t display, int node, double x, double y, double w, double h, int maxdim,
-                     const int *black, int nblack, size_t *len, int *iw, int *ih, char *meta, size_t metan);
+                     const int *black, int nblack, const int *also, int nalso, size_t *len, int *iw, int *ih, char *meta, size_t metan);
     double (*now)(void);                            /* ms, monotonic */
     int  (*clip_sensitive)(void);                   /* the clipboard holds a secret (Passwords' copy): no agent paste */
+    /* the agent's cursor (HANDS_CUR_*): where it is now (MOVE), a ripple where it clicks, a flash where a machine-mode
+     * action lands, a pulse at a field it types into (x, y, w, h: its box, 0 0 0 0 unknown), gone (HIDE). May be NULL. */
+    void (*cursor)(int what, double x, double y, double w, double h);
+    /* where the person's pointer is (the first glide starts there): 1, or 0 unknown. May be NULL. */
+    int  (*pointer_at)(double *x, double *y);
 } HandsHost;
 
 void hands_init(const HandsHost *h);
@@ -201,6 +222,20 @@ void hands_panic(void);
 void hands_away(void);
 /* a physical key, click or move (on_input): the agent waits HANDS_YIELD_MS */
 void hands_person_input(void);
+/* Settings → AI → Hands → Agent motion (HANDS_MODE_HUMAN or _MACHINE) and Settings' reduce motion: the live desktop's
+ * default for a client that chose none. On the QA desktop the default stays machine. */
+void hands_motion(int mode, int reduce);
+int  hands_motion_default(void);            /* the default now: HANDS_MODE_HUMAN or HANDS_MODE_MACHINE */
+/* Human mode's frames: main.c calls hands_tick each loop and wakes for hands_timeout (ms, -1 nothing to do). An action
+ * in progress is stopped by the person's input (HANDS_E_ACTIVE), Stop, the panic key, the lock and the switch
+ * (HANDS_E_STOPPED); a button an agent's drag held is released. */
+void hands_tick(void);
+double hands_timeout(void);
+int  hands_acting(void);                    /* a human-mode action is in progress */
+/* the answer to a call hands_call left pending (HANDS_E_PENDING): handsbus.c replies with it. out is the answer's
+ * text (borrowed, may be NULL). */
+typedef void (*HandsDone)(const char *bus, int call, int rc, int why, const char *out);
+void hands_on_done(HandsDone fn);
 /* lord-server --headless --hands-qa: a private desktop for an agent's QA (docs/HANDS.md): on, every client granted with
  * no prompt, no person to yield to. Never on a monitor or the login screen (main.c checks). */
 void hands_qa(int on);
@@ -238,6 +273,7 @@ typedef struct {
     int call;
     char window[HANDS_ID_MAX + 1], ref[16], app[HANDS_ID_MAX + 1];
     int filter, depth, action, dir, amount, repeat;
+    int mode;                                   /* SetMode: HANDS_MODE_* */
     double x, y, x2, y2, w, h;
     int shot;
     uint32_t display;
@@ -245,6 +281,7 @@ typedef struct {
     char *text;                                 /* Type, SetValue, Find, Key, AppLog pattern, OpenPath (borrowed) */
     size_t text_len;
 } HandsReq;
+/* HANDS_E_PENDING: a human-mode action began; its answer comes through hands_on_done's callback (r's text is copied) */
 int  hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, size_t *png_len, int *why);
 
 #endif

@@ -48,5 +48,11 @@
   },
   "settings.howTitle": "Pridėti prie Claude Code",
   "settings.how": "Vieną kartą paleiskite tai terminale. Tada Claude Code turės LordOS įrankius; pirmą kartą prisijungiant LordOS jūsų paklaus.",
-  "settings.qa": "Norėdamas išbandyti programą neliesdamas jūsų darbalaukio, Claude Code gali naudoti „lordos-mcp --headless notes“: privatų darbalaukį su pavyzdiniais failais, kurio niekas nemato."
+  "settings.qa": "Norėdamas išbandyti programą neliesdamas jūsų darbalaukio, Claude Code gali naudoti „lordos-mcp --headless notes“: privatų darbalaukį su pavyzdiniais failais, kurio niekas nemato.",
+  "cursor.label": "{client} · pačios nurodyta",
+  "settings.motionTitle": "Agento judėjimas",
+  "settings.motionHuman": "Žmogiškas",
+  "settings.motionMachine": "Mašininis",
+  "settings.motionHumanHint": "Violetinis agento žymeklis nuslysta iki kiekvieno tikslo, akimirką sustoja virš jo ir tik tada spusteli, o rašo žmogaus tempu, kad galėtumėte sekti, ką jis daro. Įjungus „Mažinti judesį“, slinkimai trumpi.",
+  "settings.motionMachineHint": "Kiekvienas veiksmas įvyksta iškart; agento žymeklis tik sužiba ten, kur veiksmas atliekamas."
 }

@@ -44,5 +44,11 @@
   },
   "settings.howTitle": "Thêm vào Claude Code",
   "settings.how": "Chạy lệnh này một lần trong terminal. Sau đó Claude Code có các công cụ của LordOS; lần đầu nó kết nối, LordOS sẽ hỏi bạn.",
-  "settings.qa": "Để kiểm thử một ứng dụng mà không đụng đến màn hình nền của bạn, Claude Code có thể dùng “lordos-mcp --headless notes”: một màn hình nền riêng với các tệp mẫu mà không ai thấy."
+  "settings.qa": "Để kiểm thử một ứng dụng mà không đụng đến màn hình nền của bạn, Claude Code có thể dùng “lordos-mcp --headless notes”: một màn hình nền riêng với các tệp mẫu mà không ai thấy.",
+  "cursor.label": "{client} · tự khai",
+  "settings.motionTitle": "Chuyển động của tác nhân",
+  "settings.motionHuman": "Như người",
+  "settings.motionMachine": "Như máy",
+  "settings.motionHumanHint": "Con trỏ màu tím của tác nhân lướt tới từng mục tiêu, dừng một chút phía trên rồi mới nhấp, và gõ với tốc độ của một người để bạn theo dõi được nó đang làm gì. Khi bật «Giảm chuyển động», các cú lướt sẽ ngắn.",
+  "settings.motionMachineHint": "Mỗi thao tác diễn ra ngay lập tức; con trỏ của tác nhân chỉ lóe lên ở nơi thao tác diễn ra."
 }

@@ -4527,6 +4527,10 @@ static Surf *toplevel_of(Surf *s) {
     while (s && s->parent) s = s->parent;
     return s;
 }
+static int node_hands_black(int node) {
+    for (Node *n = node ? node_get(node) : NULL; n; n = n->parent) if (n->hands_black) return 1;
+    return 0;
+}
 
 static int holes_off;                   /* wl_paint_holes(0): only note it (the ui/paint.c layer already has the hole) */
 void wl_paint_holes(int on) { holes_off = !on; }
@@ -4733,6 +4737,12 @@ void wl_paint_popups(Canvas *c) {
         float x, y;
         if (!origin(popups[i], &x, &y)) continue;
         Surf *top = toplevel_of(popups[i]);
+        /* an AI agent's screenshot (paint_hands_capture, docs/HANDS.md): the menu of a window it must not see (another app's
+         * under an allowlist, a person-only app's) is black like the window */
+        if (paint_capture_mode && paint_hands_capture && top && node_hands_black(top->node)) {
+            canvas_rrect(c, floorf(PVX(x)), floorf(PVY(y)), ceilf(popups[i]->lw * paint_view.k) + 1, ceilf(popups[i]->lh * paint_view.k) + 1, 0, 0xff000000u);
+            continue;
+        }
         if (paint_capture_mode && top && node_protected(top->node)) {   /* menu of a protected window */
             static const float r0[4] = { 0, 0, 0, 0 };
             paint_protected_fill(c, PVX(x), PVY(y), popups[i]->lw * paint_view.k, popups[i]->lh * paint_view.k, r0);

@@ -22,7 +22,7 @@ import {
   PREVIEWS_PACKAGE, scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName,
   takeName, errorText, fs, LLM_MODELS, packagesForModel, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, installLlm, setBrainBackend, setBrainThreads, Slider,
   removeLlm, lumoReady, translateWithLumo, ENGINE_PACKAGE, writingChoice, writingEnabled, setWritingOn,
-  Checkbox, CommandBlock, listApps, appName, handsStatus, setHandsOn, setHandsAllow, handsAllowSaved, stopHands, refreshHands,
+  Checkbox, CommandBlock, listApps, appName, handsStatus, setHandsOn, setHandsAllow, handsAllowSaved, handsMotionSaved, setHandsMotion, stopHands, refreshHands,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -720,6 +720,7 @@ function HandsPage() {
   const st = useStore(handsStatus);
   useEffect(() => { refreshHands(); }, []);
   const allow = handsAllowSaved();
+  const motion = handsMotionSaved();
   const apps = listApps().map((a) => ({ id: a.id, name: appName(a) || a.name || a.id })).sort((a, b) => a.name.localeCompare(b.name));
   const toggleApp = (id, on) => setHandsAllow(on ? [...new Set([...allow, id])] : allow.filter((x) => x !== id));
   const clients = (st.clients || []).filter((c) => c.state !== 'free');
@@ -751,6 +752,16 @@ function HandsPage() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           {apps.map((a) => <View key={a.id} style={{ width: 180 }}><Checkbox checked={allow.includes(a.id)} label={a.name} onChange={(v) => toggleApp(a.id, v)} /></View>)}
         </View>
+      </View>
+      {/* how the agent's cursor moves (docs/HANDS.md "The agent's cursor"): like a person, or at once */}
+      <View style={{ gap: 6 }}>
+        <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('hands.settings.motionTitle')}</Text>
+        <View style={{ flexDirection: 'row' }}>
+          <Segmented small value={motion} onChange={setHandsMotion}
+            options={[['human', tr('hands.settings.motionHuman')], ['machine', tr('hands.settings.motionMachine')]]} />
+        </View>
+        <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>
+          {tr(motion === 'machine' ? 'hands.settings.motionMachineHint' : 'hands.settings.motionHumanHint')}</Text>
       </View>
       <View style={{ gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

@@ -1,6 +1,8 @@
 /* handsmark.h — what an agent's screenshot leaves out (docs/HANDS.md "Screenshots"): every surface of the system band
  * (the root's layers at zIndex 100 and above), every handsDeny node and, with an allowlist, the nodes hands.c names
- * (other apps' windows) are painted as the protected fill for the length of the capture, then put back. Fail closed:
+ * (other apps' windows) are marked hands_black for the length of the capture, then put back: the capture (paint.c, in
+ * paint_hands_capture) paints each solid black over its whole box, in every path (a display, a window, a region). A
+ * mark is not `protect`, so a window holding a marked node is still captured (with the node black). Fail closed:
  * when not every one of them can be marked, none stays marked and the capture must not happen. Tested by
  * tests/hands_test.c on a tree of its own. */
 #ifndef LORD_HANDS_HANDSMARK_H
