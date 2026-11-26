@@ -14,8 +14,13 @@ build/webcalls-check (tests/webcalls_check.c: a WebKit view set up as lord-web s
   isolation  SharedArrayBuffer: never on a page that isn't cross-origin isolated; with --webrtc (an engine built with
              LordOS's patch) present on one served with COOP same-origin and COEP require-corp, in the same run
   loopback   (--webrtc) two RTCPeerConnections in one page exchange audio (a WebAudio oscillator) and video (an
-             animated canvas): both connect, frames and audio arrive, and the codecs are Opus and VP8, then Opus and
-             H.264 (the receiver's codec preferences); the call log shows the connection, its states and codecs
+             animated canvas): both connect, frames and audio arrive, and the codecs are Opus and VP8, then VP9, then
+             H.264 (the receiver's codec preferences); the received video plays in a <video> element, as a call shows
+             it, and its frames are counted there too (requestVideoFrameCallback, videoWidth). The element matters:
+             where GStreamer has a hardware decoder for the codec (vah264dec on an AMD or Intel GPU), WebKit leaves the
+             received track encoded and decodes it only in the pipeline of the element that plays it, so a track no
+             element plays decodes nothing and its inbound-rtp stats have no framesDecoded. The call log shows the
+             connection, its states and codecs
 
 Without --webrtc (an engine without WebRTC, Debian's or LordOS's build before +3) the WebRTC checks are reported as
 "not built" and the rest must pass. Prints one line per check and exits 1 on the first failure."""
@@ -97,7 +102,13 @@ async function call(prefer) {
   a.onicecandidate = e => { if (e.candidate) { count(e.candidate); b.addIceCandidate(e.candidate); } };
   b.onicecandidate = e => { if (e.candidate) { count(e.candidate); a.addIceCandidate(e.candidate); } };
   const got = { audio: false, video: false };
-  b.ontrack = e => { got[e.track.kind] = true; };
+  // the received video on screen, as a call shows it: frames counted as the element presents them
+  const v = document.createElement('video'); v.muted = true; v.autoplay = true; v.playsInline = true; v.width = 320; v.height = 240;
+  document.body.appendChild(v);
+  let shown = 0;
+  const onFrame = () => { shown++; v.requestVideoFrameCallback(onFrame); };
+  if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(onFrame);
+  b.ontrack = e => { got[e.track.kind] = true; if (e.track.kind === 'video') { v.srcObject = new MediaStream([e.track]); v.play().catch(() => {}); } };
   a.addTrack(mic.getAudioTracks()[0], mic);
   a.addTrack(vs.getVideoTracks()[0], vs);
   // the codec asked for, on the sending side's offer (setCodecPreferences, where the engine has it)
@@ -130,12 +141,14 @@ async function call(prefer) {
   sa.forEach(x => { if (x.type === 'outbound-rtp') r['sent_' + x.kind] = x.packetsSent; });
   s.forEach(x => { if (x.type === 'local-candidate') r.local = (r.local || []).concat(x.candidateType + '/' + x.protocol); });
   r.tracks = got;
-  clearInterval(tick); a.close(); b.close(); mic.getTracks().forEach(t => t.stop());
+  r.shown = shown; r.shownWidth = v.videoWidth; r.shownHeight = v.videoHeight;
+  r.played = v.getVideoPlaybackQuality ? v.getVideoPlaybackQuality().totalVideoFrames : null;
+  clearInterval(tick); v.srcObject = null; v.remove(); a.close(); b.close(); mic.getTracks().forEach(t => t.stop());
   return r;
 }
 (async () => {
   const out = {};
-  for (const p of ['video/VP8', 'video/H264']) {
+  for (const p of ['video/VP8', 'video/VP9', 'video/H264']) {
     try { out[p] = await call(p); } catch (e) { out[p] = { error: e.name + ': ' + e.message }; }
   }
   await fetch('/report/loopback', { method: 'POST', body: JSON.stringify(out) });
@@ -327,7 +340,8 @@ if api["RTCPeerConnection"] != "function":
 calls, out = run("/page/loopback", 90, mock=True)
 lb = reports.get("/report/loopback") or fail("no report from the loopback page")
 print("     loopback:", json.dumps(lb, sort_keys=True))
-for want, res in (("video/VP8", lb.get("video/VP8")), ("video/H264", lb.get("video/H264"))):
+VIDEO = ("video/VP8", "video/VP9", "video/H264")
+for want, res in ((k, lb.get(k)) for k in VIDEO):
     if not res or res.get("error"):
         fail("%s: %r" % (want, res))
     if NO_NETWORK_KNOWN and not res.get("candidates") and res["a"] != "connected":
@@ -339,16 +353,18 @@ for want, res in (("video/VP8", lb.get("video/VP8")), ("video/H264", lb.get("vid
         fail("%s: tracks %r" % (want, res["tracks"]))
     if (res.get("framesDecoded") or 0) < 10 or not res.get("width"):
         fail("%s: no video frames: %r" % (want, res))
+    if (res.get("shown") or 0) < 10 or not res.get("shownWidth"):
+        fail("%s: the <video> element showed no frames: %r" % (want, res))
     if (res.get("audioPackets") or 0) < 10:
         fail("%s: no audio: %r" % (want, res))
     if (res.get("audioCodec") or "").lower() != "audio/opus":       # WebKit writes "audio/OPUS"
         fail("%s: audio codec %r" % (want, res.get("audioCodec")))
     if (res.get("videoCodec") or "").lower() != want.lower():
         fail("video codec %r, the receiver preferred %s" % (res.get("videoCodec"), want))
-    ok("loopback %s: connected in %d ms, %s + %s, %d frames %dx%d at %.0f fps, %d audio packets" % (
+    ok("loopback %s: connected in %d ms, %s + %s, %d frames %dx%d at %.0f fps, %d shown by <video> at %dx%d, %d audio packets" % (
         want, res["connectMs"], res["audioCodec"], res["videoCodec"], res["framesDecoded"], res["width"], res["height"],
-        res.get("fps") or 0, res["audioPackets"]))
-if NO_NETWORK_KNOWN and all(not (lb.get(k) or {}).get("candidates") for k in ("video/VP8", "video/H264")):
+        res.get("fps") or 0, res["shown"], res["shownWidth"], res["shownHeight"], res["audioPackets"]))
+if NO_NETWORK_KNOWN and all(not (lb.get(k) or {}).get("candidates") for k in VIDEO):
     for n in ["peer connection 1 created", "peer connection 1: ice-gathering gathering"]:
         if not any(n in c for c in calls):
             fail("call log lacks %r: %r" % (n, calls))

@@ -113,6 +113,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `server/tests/theme_gallery_test.mjs`.
 
 ### Fixed
+- **The calls check failed "video/H264: no video frames" on a PC with an AMD GPU: received H.264 does play there, in
+  hardware; the check now plays it as a call does** (`server/tests/webcalls_check.py`; found 2026-11-26 on an RX 580,
+  Mesa VA-API, WPE WebKit `2.54.3-1~lordos13+4.1`). Not a decoder failure. WebKit's GStreamer WebRTC backend asks its
+  registry scanner whether a hardware decoder handles the received codec; when one does (`vah264dec` from
+  gst-plugins-bad's `va` plugin, for H.264 on that GPU), it leaves the track encoded and decodes it only in the
+  pipeline of the `<video>` element that plays it, and until then its `inbound-rtp` stats have no `framesDecoded` or
+  size. The check's loopback never played the received track, so on the PC nothing decoded H.264, while VP8 (no
+  hardware decoder there) was decoded early in software; the build's test chroot has no GPU, so H.264 went to
+  `openh264dec` and passed. Measured with `GST_DEBUG`: `vah264dec` opens `/dev/dri/renderD129` inside WebKit's sandboxed
+  web process, negotiates NV12 320×240 and decodes every frame; lowering its rank (`GST_PLUGIN_FEATURE_RANK=vah264dec:NONE`)
+  made the old check pass, which is how it was traced. Nothing changes in lord-web or WebKit: hardware decode works,
+  and forcing early decoding (`WEBKIT_GST_WEBRTC_FORCE_EARLY_VIDEO_DECODING`) or dropping the VA decoders would decode
+  tracks nobody shows or give up the GPU. The loopback now plays the received video in a `<video>` element and also
+  requires frames shown there (`requestVideoFrameCallback`, `videoWidth`), and it checks VP9 too. On the PC: VP8 64,
+  VP9 64 and H.264 59 frames decoded, 59 shown by `<video>` each at 320×240; the same with `LIBGL_ALWAYS_SOFTWARE=1`
+  (lord-web's shared-memory mode) and with `/dev/dri` hidden (H.264 then through `openh264dec`, as in the chroot).
 - **WhatsApp kept LordOS's letter tile: its own icon is fetched now, and Refresh icon says what happened**
   (`server/src/web/webprobe.c`, `webmanifest.c`, `webreg.c`, `webmgr.c`, `ui/js_webapps.c`, `sdk/webapps.js`,
   Settings → Web apps). Found with lord-web's own probe on `https://web.whatsapp.com/` (2026-11-26), three causes:
