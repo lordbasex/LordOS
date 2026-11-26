@@ -17,6 +17,8 @@
 //   webBadges (store) · webBadgeEvent(data)    the unread counts lord-web set (SetBadge): { [app]: { [profile]: n } }
 //   siteIcons (store) · wantSiteIcon(app) · refreshSiteIcon(app)   the site's own icon, fetched one at a time with the
 //                                  probe (lord.webapps.fetchIcon) and kept in ~/.cache/lordos/web/icons/
+//   siteIconStatus (store)         { [app]: { state: 'busy' | 'ok' | 'error', error } }: the last fetch of each app's
+//                                  icon (Settings → Web apps shows it); each failure is one line in the shell's log
 //   webDeveloper (store) · setWebDeveloperMode(on)   Settings → Web Apps → Developer mode (off by default)
 //   webInspectItem(w)              the Window menu's Inspect (developer tools) for a web app's window while developer
 //                                  mode is on, else null; it asks first (webInspectAsk, <WebAppInspectPrompt />)
@@ -27,7 +29,7 @@
 // open or a program to run.
 import { createStore, useStore } from './store.js';
 import { useEffect } from 'react';
-import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, webEditItems, inspectItem, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
+import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, siteIconError, webEditItems, inspectItem, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
 import { t } from './i18n.js';
 
 const has = () => typeof lord !== 'undefined' && typeof lord.webapps === 'object' && lord.webapps !== null;
@@ -37,6 +39,7 @@ export const webAsks = createStore([]);
 export const webBadges = createStore({});
 export const webMenu = createStore(null);
 export const siteIcons = createStore({});
+export const siteIconStatus = createStore({});
 export const webDeveloper = createStore(false);
 export const webInspectAsk = createStore(null);
 
@@ -148,21 +151,32 @@ function readIcons() {
   try { const m = has() && typeof lord.webapps.icons === 'function' ? lord.webapps.icons() : null; if (m && typeof m === 'object') siteIcons.set(m); } catch (e) { /* an older server */ }
 }
 
+function iconStatus(app, state, error) {
+  siteIconStatus.set({ ...siteIconStatus.get(), [app]: error ? { state, error } : { state } });
+  // one line in the shell's log per failure: the app's id and a closed code, never an address from the page
+  if (error) console.warn(`webapps: the site's icon of ${app} was not kept: ${error}`);
+}
+
 function pump() {
   if (busy || !queue.length) return;
   const app = queue.shift();
   let id = 0;
-  try { id = lord.webapps.fetchIcon(app); } catch (e) { id = 0; }
-  if (!id) { pump(); return; }
+  try { id = lord.webapps.fetchIcon(app); } catch (e) { iconStatus(app, 'error', siteIconError(e)); }
+  if (!id) {
+    if (siteIconStatus.get()[app]?.state === 'busy') iconStatus(app, 'error', 'webapps.probeFailed');
+    pump();
+    return;
+  }
   busy = app;
   const t0 = Date.now();
   const timer = setInterval(() => {
     let r = null;
-    try { r = lord.webapps.iconResult(app); } catch (e) { r = { done: true, ok: false }; }
+    try { r = lord.webapps.iconResult(app); } catch (e) { r = { done: true, ok: false, error: siteIconError(e) }; }
     if (!r && Date.now() - t0 < 45000) return;
     clearInterval(timer);
     busy = null;
-    if (r && r.ok) { readIcons(); refreshWebApps(); }
+    if (r && r.ok) { iconStatus(app, 'ok'); readIcons(); refreshWebApps(); }
+    else iconStatus(app, 'error', r ? siteIconError(r) : 'webapps.probeTimeout');
     pump();
   }, 500);
 }
@@ -171,14 +185,15 @@ function enqueue(app, force) {
   if (!has() || typeof lord.webapps.fetchIcon !== 'function' || busy === app || queue.includes(app)) return;
   const cached = !!siteIcons.get()[app];
   if (!force && !wantsSiteIcon({ available: webAppsAvailable(), cached, tried: tried.has(app) })) return;
-  if (force && !webAppsAvailable()) return;
+  if (force && !webAppsAvailable()) { iconStatus(app, 'error', 'webapps.noRuntime'); return; }
   tried.add(app);
+  iconStatus(app, 'busy');
   queue.push(app);
   pump();
 }
 // The Store's cards and an app's launch: fetched once when lord-web is there and nothing is cached yet.
 export const wantSiteIcon = (app) => enqueue(app, false);
-// Settings → Web apps → Refresh icon: fetched again now.
+// Settings → Web apps → Refresh icon: fetched again now (siteIconStatus says how it went).
 export const refreshSiteIcon = (app) => enqueue(app, true);
 export const siteIconBusy = (app) => busy === app || queue.includes(app);
 

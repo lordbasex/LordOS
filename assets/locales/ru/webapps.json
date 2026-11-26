@@ -188,6 +188,7 @@
   "settings.iconTile": "Плитка с буквой LordOS (значок сайта загружается при открытии приложения)",
   "settings.iconRefresh": "Обновить значок",
   "settings.iconRefreshing": "Обновление…",
+  "settings.iconUpdated": "Значок обновлён с сайта",
   "sound.auto": "Автоматически",
   "sound.app": "Приложения",
   "sound.system": "LordOS",

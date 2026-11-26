@@ -5,9 +5,12 @@
  * The page's side is read by a script in an isolated world (webprobe.c), which resolves every address against the
  * manifest's or the document's own and answers one JSON object:
  *   { "title": s, "metaThemeColor": s|null, "manifest": null | { "name", "short_name", "start_url", "scope",
- *     "theme_color": s|null, "icons": [{ "src", "sizes", "type" }] }, "linkIcons": [{ "src", "sizes", "type" }] }
+ *     "theme_color": s|null, "icons": [{ "src", "sizes", "type", "purpose" }] },
+ *   "linkIcons": [{ "src", "sizes", "type", "purpose" }] }
  * Nothing in it is trusted: the origin is the loaded address's, a start address or a scope on another origin is
- * replaced by the page's own, names and colors are cleaned, and at most WEBMANIFEST_ICONS icons are listed. */
+ * replaced by the page's own, names and colors are cleaned, and at most WEBMANIFEST_ICONS icons are listed: the
+ * manifest's first, then the page's own (<link rel="icon">, apple-touch-icon), each with its "purpose" when it has
+ * one. lord-server ranks them (webreg_probe_parse). */
 #ifndef LORD_WEB_WEBMANIFEST_H
 #define LORD_WEB_WEBMANIFEST_H
 

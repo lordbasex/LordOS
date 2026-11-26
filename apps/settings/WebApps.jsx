@@ -10,7 +10,7 @@
 import {
   View, Text, useLocale, useTheme, useAppWindow, useWebApps, webAppsAvailable, webAppCall, webAppIcon, webAppsModel as M, launchWebApp,
   Button, Toggle, Segmented, TextInput, ConfirmDialog, Layer, fs, formatBytes, errorText, wm, spacing, typeScale, useSettings,
-  webRunning, refreshSiteIcon, siteIconBusy, webProfileIcon, webBadges, useStore, webDeveloper, setWebDeveloperMode,
+  webRunning, refreshSiteIcon, siteIconStatus, Spinner, webProfileIcon, webBadges, useStore, webDeveloper, setWebDeveloperMode,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, ValueRow, Note, Actions, Message, PopUp } from './ui.jsx';
@@ -110,12 +110,11 @@ function AppDetails({ entry }) {
   const setPrefs = (x) => setS({ webAppPrefs: { ...(s.webAppPrefs || {}), [entry.id]: { ...prefs, ...x } } });
   const running = useRunning();
   const badges = useStore(webBadges);
-  const [iconBusy, setIconBusy] = useState(false);
-  const refreshIcon = () => {
-    refreshSiteIcon(entry.id);
-    setIconBusy(true);
-    const id = setInterval(() => { if (!siteIconBusy(entry.id)) { clearInterval(id); setIconBusy(false); } }, 1000);
-  };
+  // Refresh icon: a spinner while the probe runs, then the new icon (and a line saying so) or why there is none
+  const iconState = useStore(siteIconStatus, (m) => m[entry.id] || null);
+  const [iconAsked, setIconAsked] = useState(false);
+  const iconBusy = iconState?.state === 'busy';
+  const refreshIcon = () => { setIconAsked(true); refreshSiteIcon(entry.id); };
   const sounds = M.NOTIFY_SOUNDS.map((v) => [v, tr(`webapps.sound.${v}`)]);
   // Automatic, Light and Dark (webappsmodel.js, COLOR_SCHEMES_AVAILABLE; Light and Dark since 0.8.9.6.2, on WPEPlatform)
   const schemes = M.COLOR_SCHEMES.map((v) => [v, tr(`webapps.appearance.${v}`), !M.COLOR_SCHEMES_AVAILABLE.includes(v)]);
@@ -209,8 +208,12 @@ function AppDetails({ entry }) {
         <ValueRow label={tr('webapps.settings.origin')} value={entry.origin} mono />
         <ValueRow label={tr('webapps.settings.source')} value={tr(entry.source === 'catalog' ? 'webapps.settings.fromCatalog' : 'webapps.settings.fromAddress')} />
         <SettingRow label={tr('webapps.settings.icon')} hint={tr(entry.siteIcon ? 'webapps.settings.iconSite' : 'webapps.settings.iconTile')}>
+          {iconBusy ? <Spinner size={14} /> : null}
           <Button small label={tr(iconBusy ? 'webapps.settings.iconRefreshing' : 'webapps.settings.iconRefresh')} disabled={iconBusy || !webAppsAvailable()} onClick={refreshIcon} />
         </SettingRow>
+        {iconAsked && iconState && !iconBusy ? (
+          <Message msg={iconState.state === 'ok' ? { ok: true, text: tr('webapps.settings.iconUpdated') } : { ok: false, text: errorText({ code: iconState.error, message: iconState.error }) }} />
+        ) : null}
         <Actions style={{ paddingVertical: spacing.s }}>
           <Button small destructive label={tr('webapps.settings.uninstall')} onClick={() => { setWipe(true); setRemoving({ app: true }); }} />
         </Actions>

@@ -237,19 +237,39 @@ static void test_probe(void) {
     const char *li = "{\"ok\":true,\"name\":\"C\",\"startUrl\":\"https://c.example/\",\"icons\":[{\"src\":\"https://c.example/a.svg\",\"type\":\"image/svg+xml\"},"
                      "{\"src\":\"https://c.example/48.png\",\"sizes\":\"48x48\",\"type\":\"image/png\"},{\"src\":\"https://cdn.example/512.png\",\"sizes\":\"512x512\",\"type\":\"image/png\"},"
                      "{\"src\":\"https://c.example/1024.png\",\"sizes\":\"1024x1024\",\"type\":\"image/png\"},{\"src\":\"http://c.example/256.png\",\"sizes\":\"256x256\",\"type\":\"image/png\"}]}";
-    CHECK(!webreg_probe_parse(li, strlen(li), &p) && !strcmp(p.icon_url, "https://cdn.example/512.png"), "the icon: the largest PNG up to 512, https only (%s)", p.icon_url);
+    CHECK(!webreg_probe_parse(li, strlen(li), &p) && !strcmp(p.icon_url[0], "https://cdn.example/512.png"), "the icon: the largest PNG up to 512, https only (%s)", p.icon_url[0]);
     const char *lb = "{\"ok\":true,\"startUrl\":\"https://c.example/\",\"icons\":[{\"src\":\"https://c.example/2048.png\",\"sizes\":\"2048x2048\"},"
                      "{\"src\":\"https://c.example/1024.png\",\"sizes\":\"1024x1024\"},{\"src\":\"https://c.example/f.ico\"}]}";
-    CHECK(!webreg_probe_parse(lb, strlen(lb), &p) && !strcmp(p.icon_url, "https://c.example/1024.png"), "only big ones: the smallest (%s)", p.icon_url);
+    CHECK(!webreg_probe_parse(lb, strlen(lb), &p) && !strcmp(p.icon_url[0], "https://c.example/1024.png"), "only big ones: the smallest (%s)", p.icon_url[0]);
     const char *ls = "{\"ok\":true,\"startUrl\":\"https://c.example/\",\"icons\":[{\"src\":\"https://c.example/f.ico\"},{\"src\":\"https://c.example/i.svg\"}]}";
-    CHECK(!webreg_probe_parse(ls, strlen(ls), &p) && !strcmp(p.icon_url, "https://c.example/i.svg"), "no PNG: the SVG (%s)", p.icon_url);
+    CHECK(!webreg_probe_parse(ls, strlen(ls), &p) && !strcmp(p.icon_url[0], "https://c.example/i.svg"), "no PNG: the SVG (%s)", p.icon_url[0]);
     const char *lp = "{\"ok\":true,\"startUrl\":\"https://c.example/\",\"icons\":[{\"src\":\"https://127.0.0.1/a.png\",\"sizes\":\"512x512\"},"
                      "{\"src\":\"https://192.168.1.1/b.png\",\"sizes\":\"256x256\"},{\"src\":\"https://c.example/48.png\",\"sizes\":\"48x48\"}]}";
-    CHECK(!webreg_probe_parse(lp, strlen(lp), &p) && !strcmp(p.icon_url, "https://c.example/48.png"), "a public page's icon is never local (%s)", p.icon_url);
+    CHECK(!webreg_probe_parse(lp, strlen(lp), &p) && !strcmp(p.icon_url[0], "https://c.example/48.png"), "a public page's icon is never local (%s)", p.icon_url[0]);
     const char *ll = "{\"ok\":true,\"startUrl\":\"http://localhost:8000/\",\"icons\":[{\"src\":\"https://localhost:8443/a.png\"}]}";
-    CHECK(!webreg_probe_parse(ll, strlen(ll), &p) && !strcmp(p.icon_url, "https://localhost:8443/a.png"), "a local page's local icon (%s)", p.icon_url);
+    CHECK(!webreg_probe_parse(ll, strlen(ll), &p) && !strcmp(p.icon_url[0], "https://localhost:8443/a.png"), "a local page's local icon (%s)", p.icon_url[0]);
     const char *ln = "{\"ok\":true,\"startUrl\":\"https://c.example/\",\"icons\":[{\"src\":\"https://c.example/f.ico\"}]}";
-    CHECK(!webreg_probe_parse(ln, strlen(ln), &p) && !p.icon_url[0], "no usable icon");
+    CHECK(!webreg_probe_parse(ln, strlen(ln), &p) && !p.icons, "no usable icon");
+    /* WhatsApp's pattern (2026-11-26): its manifest labels WebP files "image/png", its SVG "image/svg" and only
+     * "maskable", and the page links a .webp shortcut icon: the WebPs are never tried, the SVG is */
+    const char *lw = "{\"ok\":true,\"startUrl\":\"https://web.chat.example/\",\"icons\":["
+                     "{\"src\":\"https://static.chat.example/rsrc.php/a/192.webp\",\"sizes\":\"192x192\",\"type\":\"image/png\"},"
+                     "{\"src\":\"https://static.chat.example/rsrc.php/b/512.webp?x=1\",\"sizes\":\"512x512\",\"type\":\"image/png\"},"
+                     "{\"src\":\"https://static.chat.example/rsrc.php/c/logo.svg\",\"sizes\":\"512x512\",\"type\":\"image/svg\",\"purpose\":\"maskable\"},"
+                     "{\"src\":\"https://static.chat.example/rsrc.php/d/fav.webp\",\"sizes\":\"\",\"type\":\"\"}]}";
+    CHECK(!webreg_probe_parse(lw, strlen(lw), &p) && p.icons == 1 && !strcmp(p.icon_url[0], "https://static.chat.example/rsrc.php/c/logo.svg"),
+          "WebPs labelled PNG skipped, the maskable SVG taken (%d: %s)", p.icons, p.icon_url[0]);
+    /* the order --probe-icon tries: PNGs, SVGs, then maskable-only ones; never a monochrome-only one; at most three */
+    const char *lr = "{\"ok\":true,\"startUrl\":\"https://c.example/\",\"icons\":["
+                     "{\"src\":\"https://c.example/mono.png\",\"sizes\":\"512x512\",\"purpose\":\"monochrome\"},"
+                     "{\"src\":\"https://c.example/mask.png\",\"sizes\":\"512x512\",\"type\":\"image/png\",\"purpose\":\"maskable\"},"
+                     "{\"src\":\"https://c.example/any.svg\",\"type\":\"image/svg+xml\",\"purpose\":\"any maskable\"},"
+                     "{\"src\":\"https://c.example/fav/\",\"sizes\":\"32x32\",\"type\":\"image/png\"},"
+                     "{\"src\":\"https://c.example/192.png\",\"sizes\":\"192x192\"},"
+                     "{\"src\":\"https://c.example/x.png\",\"type\":\"image/webp\"}]}";
+    CHECK(!webreg_probe_parse(lr, strlen(lr), &p) && p.icons == 3 && !strcmp(p.icon_url[0], "https://c.example/192.png") &&
+          !strcmp(p.icon_url[1], "https://c.example/fav/") && !strcmp(p.icon_url[2], "https://c.example/any.svg"),
+          "ranked: %d %s %s %s", p.icons, p.icon_url[0], p.icon_url[1], p.icon_url[2]);
     const char *l4 = "{\"ok\":true,\"startUrl\":\"http://b.example/\"}";
     CHECK(webreg_probe_parse(l4, strlen(l4), &p) < 0, "an http: page");
     CHECK(webreg_probe_parse("not json", 8, &p) < 0, "not JSON");
@@ -440,6 +460,26 @@ static const char FAKE_TLS[] =
     "read -r url <&3\n"
     "printf '{\"ok\":false,\"error\":\"web.probe.tls\"}\\n' >&3\n";
 
+/* a stand-in shaped like WhatsApp (2026-11-26): the page step lists a WebP labelled PNG (skipped), a PNG that
+ * turns out not to be one and an SVG; --probe-icon refuses the first it gets and gives the second. With "$HOME/no-svg"
+ * every icon is refused: the answer then says why (iconError) */
+static const char FAKE_WA[] =
+    "#!/bin/sh\n"
+    "if [ \"$1\" = --probe ]; then\n"
+    "  read -r url <&3\n"
+    "  printf '{\"ok\":true,\"name\":\"Chat\",\"startUrl\":\"https://web.chat.example/\",\"scope\":\"https://web.chat.example/\","
+    "\"origin\":\"https://web.chat.example\",\"themeColor\":null,\"icons\":[{\"src\":\"https://static.chat.example/a.webp\",\"sizes\":\"512x512\",\"type\":\"image/png\"},"
+    "{\"src\":\"https://web.chat.example/icon_512.png\",\"sizes\":\"512x512\",\"type\":\"image/png\"},"
+    "{\"src\":\"https://web.chat.example/icon_512.svg\",\"sizes\":\"512x512\",\"type\":\"image/svg\",\"purpose\":\"maskable\"}],\"manifest\":true}\\n' >&3\n"
+    "  exit 0\n"
+    "fi\n"
+    "read -r url <&3\n"
+    "echo \"$url\" >> \"$HOME/wa-icons\"\n"
+    "case \"$url\" in\n"
+    "  *.svg) if [ ! -e \"$HOME/no-svg\" ]; then printf '{\"ok\":true,\"type\":\"image/svg+xml\",\"size\":11}\\n<svg></svg>' >&3; exit 0; fi ;;\n"
+    "esac\n"
+    "printf '{\"ok\":false,\"error\":\"web.probe.iconType\"}\\n' >&3\n";
+
 static char *wait_probe(int id) {
     for (int i = 0; i < 500; i++) {
         int gone = 0;
@@ -517,6 +557,29 @@ static void test_manager(void) {
     char *tj = tid > 0 ? wait_probe(tid) : NULL;
     CHECK(tj && strstr(tj, "\"ok\":false") && strstr(tj, "\"error\":\"web.probe.tls\""), "a TLS failure: %s", tj ? tj : "(none)");
     free(tj);
+    /* WhatsApp's pattern: the first icon refused, the next one tried and kept; the log line names no address */
+    snprintf(p, sizeof p, "%s/lord-web-wa", root);
+    write_text(p, FAKE_WA, 0755);
+    webmgr_set_helper(p);
+    int wid = webmgr_probe("https://web.chat.example/", &err);
+    char *wj = wid > 0 ? wait_probe(wid) : NULL;
+    CHECK(wj && strstr(wj, "\"ok\":true") && strstr(wj, "\"iconKind\":\"svg\"") && strstr(wj, "\"iconPath\":\"/") && !strstr(wj, "iconError"),
+          "the second icon kept after the first was refused: %s", wj ? wj : "(none)");
+    free(wj);
+    snprintf(p, sizeof p, "%s/wa-icons", root);
+    probed = read_text(p);
+    CHECK(probed && !strcmp(probed, "https://web.chat.example/icon_512.png\nhttps://web.chat.example/icon_512.svg\n"),
+          "the PNG, then the SVG; the WebP never: %s", probed ? probed : "");
+    free(probed);
+    unlink(p);
+    snprintf(q, sizeof q, "%s/no-svg", root);
+    write_text(q, "", 0644);
+    wid = webmgr_probe("https://web.chat.example/", &err);
+    wj = wid > 0 ? wait_probe(wid) : NULL;
+    CHECK(wj && strstr(wj, "\"ok\":true") && strstr(wj, "\"iconError\":\"web.probe.iconType\"") && strstr(wj, "\"iconPath\":\"\""),
+          "no icon usable: the answer says why: %s", wj ? wj : "(none)");
+    free(wj);
+    unlink(q);
     snprintf(p, sizeof p, "%s/lord-web", root);
     webmgr_set_helper(p);
 
