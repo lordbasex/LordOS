@@ -11,6 +11,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Hands (Manos): an AI agent uses the LordOS desktop** (in development; approved by the maintainer on 2026-11-26,
+  AGENTS.md; docs/HANDS.md). Modelled on Claude in Chrome: Claude Code today, and later Lumo's own agent, reads the
+  windows as a tree, clicks, types, scrolls and takes screenshots through lord-server.
+  - **`lordos-mcp`** (`/usr/bin/lordos-mcp`, an MCP server over stdio; `claude mcp add lordos-mcp -- lordos-mcp`) with
+    the tools `windows_context`, `open_app`, `open_path`, `close_window`, `read_window`, `find`, `computer` (screenshot,
+    left/right/middle/double/triple click, hover, drag, type, key chords, scroll, zoom, wait), `set_value`,
+    `read_app_log` and `record` (an animated GIF, returned or saved under a bare name in `~/Pictures/LordOS QA`). No tool
+    runs code. Coordinates are the last screenshot's pixels, mapped back to the desktop.
+  - **`read_window`**: LordOS's UI tree as compact text with stable `ref_N` ids, roles, names, states, values (never a
+    password's) and boxes; the SDK's controls now say their role, state and value (`accessibilityRole`,
+    `accessibilityState`, `accessibilityValue`) and offer `handsSetValue` (`sdk/handsmodel.js`, `sdk/hands.jsx`).
+  - **`org.lordos.Hands1`** on the session bus (`server/src/ui/handsbus.c`): closed, typed methods, every argument checked
+    in C, the same user only; **the injection path** (`server/src/main.c`): the agent's input goes through lord-server's
+    own path (hit test, focus, Wayland and X11 apps) tagged as the agent's, never `/dev/uinput`, ydotool or evdev.
+  - **Consent and control**: off until the person turns on Settings → AI → Hands for the session; a system-layer prompt
+    per connection ("A program running on your account asked to control your computer", its name and program path as
+    reported, not verified; This session / Deny); a banner on every display while an agent acts ("Claude Code is using
+    your computer", Stop) in a new `agent` layer (105); the panic key **Ctrl+Alt+Esc**; the person's own input pauses the
+    agent for 3 s ("user is active"); locking the screen stops it; an optional per-app allowlist; rate limits; every call
+    a closed-word line in `shell.log`.
+  - **Never**: the system layer (permission, keyring, password and polkit prompts, the file chooser of Linux apps, the
+    banner), password fields (typing or reading), protected windows, the lock screen and the greeter, Settings → AI →
+    Hands and the theme-trust sheet (`handsDeny`). Screenshots show them black, failing closed; with an allowlist,
+    everything but the allowed windows is black.
+  - **QA mode**: `lordos-mcp --headless APP` starts a private headless desktop (`lord-server --headless --hands-qa`, a
+    private bus, a demo home with sample files) so an agent can test an app while the person keeps working.
+  - **Settings → AI → Hands**: the session switch, what it can and can never do, the allowlist, the connected clients
+    with Stop, how to add it to Claude Code; the Hands piece of Lumo is ready and "Hands" is one of Lumo's functions.
+  - Texts in all 35 languages.
 - **The Brain (the local language model of Sentinela and Writing) on the graphics card** (in development, asked by the
   maintainer on 2026-11-26; the new device access is **awaiting the maintainer's approval**, AGENTS.md; docs/AI.md
   "The Brain on the GPU"). Until now the engine ran on the processor only (`-ngl 0 -dev none`).
@@ -270,6 +299,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Ctrl+Alt+Backspace alone still ends the session).
 
 ### Tests
+- **Hands**: `build/hands-test` (ASan/UBSan: the policy against a fake host, the prompt per connection, Stop, the panic
+  key, the person's input, the system layer, a covered ref, set-value's and the keys' gate, allowlisted screenshots, a
+  fuzz of every `org.lordos.Hands1` method's arguments, the uid check on a private dbus-daemon, the screenshot's marks
+  failing closed, lordos-mcp's tools, errors, coordinates, GIF and export), `tests/hands_model_test.mjs` (refs stay
+  stable, no password value, no system layer or `handsDeny` node, the blackout per layer, no "verified" claim) and
+  `tests/hands_e2e.py` (`lordos-mcp --headless`: Notes' File → Import… of a fixture file and the note exists; a click
+  and a key aimed at a permission prompt refused; the banner on the display and the person's Stop ending the agent).
 - `build/realm-taint-test` (LordOS's QuickJS patches: a theme's code on the stack, its jobs, bound and native
   functions, the realm of a function), `build/themestore-test` (ASan/UBSan: 10 bad archives, lord-themec on the fixture
   and on eval, `lord.term.create`, `lord.fs.write`, `new Function`, `globalThis`, another package, a host element, a
