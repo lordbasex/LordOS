@@ -430,7 +430,19 @@ for (const lang of langs) {
   eq('✨ AI after the menu\'s rows, before Inspect', rows.map((r) => (r === '-' ? '-' : r.id)), ['cut', 'copy', 'paste', '-', 'speech', '-', 'ai', '-', 'inspect']);
   eq('no ✨ AI without the text', M.webMenuItems({ items: ['copy'] }, (x) => x, () => {}, { writing: () => ai }).some((r) => r.id === 'ai'), false);
   eq('no ✨ AI when the shell has no Writing', M.webMenuItems({ items: ['copy'], ai: 'x y' }, (x) => x, () => {}, { writing: () => null }).some((r) => r.id === 'ai'), false);
-  eq('the text: plain, at most 4,000 characters', [M.webAiText({ ai: 'ok' }), M.webAiText({ ai: 'a\u001b[2J' }), M.webAiText({ ai: 'x'.repeat(4001) }), M.webAiText({ ai: '  ' }), M.webAiText({ ai: 3 })], ['ok', '', '', '', '']);
+  eq('the text: plain, at most 16,384 characters', [M.webAiText({ ai: 'ok' }), M.webAiText({ ai: 'a\u001b[2J' }), M.webAiText({ ai: 'x'.repeat(16385) }), M.webAiText({ ai: '  ' }), M.webAiText({ ai: 3 })], ['ok', '', '', '', '']);
+}
+
+// ---- Speech from the menu reads the menu's own selection (a contenteditable's too; ws162), not the primary selection ----
+{
+  const said = [];
+  const speech = (get) => ({ label: 'Speech', submenu: [{ label: 'Start', onClick: () => said.push(get ? get() : 'PRIMARY') }] });
+  const menu = { items: ['undo', 'cut', 'copy', 'paste', 'speech'], ai: 'hola como estas', aiEdit: true };
+  const rows = M.webMenuItems(menu, (x) => x, () => {}, { speech: () => speech(M.webSpeechText(menu) ? () => M.webSpeechText(menu) : null) });
+  rows.find((r) => r.id === 'speech').submenu[0].onClick();
+  eq('Speech reads the selection the menu carried (a message field\'s)', said, ['hola como estas']);
+  eq('without one it falls back to the primary selection', M.webSpeechText({ items: ['speech'] }), '');
+  eq('a long selection still read (past ✨ AI\'s 4,000)', M.webSpeechText({ ai: 'y'.repeat(9000) }).length, 9000);
 }
 
 // ---- a long selection in "Search the web for “…”": the words around it always show (ws162) ----

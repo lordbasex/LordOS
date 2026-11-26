@@ -1419,10 +1419,10 @@ static void test_ai_clean(void) {
     static char big[WEBAI_CHARS + 2];
     memset(big, 'a', WEBAI_CHARS);
     big[WEBAI_CHARS] = 0;
-    CHECK(!webai_clean(big, out), "4,000 characters taken");
+    CHECK(!webai_clean(big, out), "16,384 characters taken");
     big[WEBAI_CHARS] = 'a';
     big[WEBAI_CHARS + 1] = 0;
-    CHECK(webai_clean(big, out), "4,001 refused");
+    CHECK(webai_clean(big, out), "16,385 refused");
     unsigned seed = 3;
     for (int it = 0; it < 50000; it++) {
         char r[64];

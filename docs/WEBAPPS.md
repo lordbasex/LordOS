@@ -1129,14 +1129,16 @@ Notification sound and, when LordOS's sound plays, which one.
 With text selected in a page, LordOS's menu also shows **✨ AI ▸** (Correct, Improve, Make it shorter, Translate to)
 when Writing is on and a model is installed ([AI.md](AI.md), "Writing"). It is the shell's, never the page's or
 lord-web's: the `Menu` call carries the whole selection as its last argument (`"(ssasusass)"`), only when the page
-didn't cut it, cleaned by `webai_clean` (`server/src/web/webedit.c`: at most 4,000 characters, no control or bidi
-characters) in lord-web and again in lord-server (`ui/webask.c`); a password field has none (the page script reports
+didn't cut it, cleaned by `webai_clean` (`server/src/web/webedit.c`: at most 16,384 characters, no control or bidi
+characters; ✨ AI takes at most 4,000 of them, a longer one shows its row disabled) in lord-web and again in lord-server (`ui/webask.c`); a password field has none (the page script reports
 no selection there). Choosing an action answers lord-web `""` and opens the shell's panel. **Replace** is offered only
 for a selection inside a text field: `lord.webapps.writeReplace(app, profile, text)` → `WriteReplace(text)` on lord-web's
 own bus name, which takes it only from lord-server (checked by pid, like `Edit`) and, in the page script's world, only
 if the focused element is still a text field that isn't a password (or editable content), the window has the focus and
 its selection is exactly the one the menu had; then the text goes in as typed (`insertText`, else WebKit's
-`InsertText`). Otherwise nothing changes and lord-web's log says why. Copy and Discard work as everywhere.
+`InsertText`). Otherwise nothing changes and lord-web's log says why. Copy and Discard work as everywhere. The menu's **Speech** reads that same text (a contenteditable message box's
+too), so it no longer depends on the session's primary selection (ws162); ❖Esc and Edit → Speech still read the primary
+selection.
 Tests: `build/webapp-test` (`webai_clean`, a fuzz), `webapps_model_test.mjs` (the row, its place, the text).
 
 ## Spelling (in development)

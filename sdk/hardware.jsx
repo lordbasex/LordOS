@@ -46,7 +46,7 @@ import { toggleEmojiPanel } from './emoji.jsx';
 import { ContextMenu } from './contextmenu.jsx';
 import { writingMenuFor, WritingPanel } from './writing.jsx';
 import { forField } from './writingmodel.js';
-import { profileOf, notifyKey, playsSystemSound, webIconPathOk, windowLabel, webMenuItems } from './webappsmodel.js';
+import { profileOf, notifyKey, playsSystemSound, webIconPathOk, windowLabel, webMenuItems, webSpeechText } from './webappsmodel.js';
 import { webProfileIcon, iconFromFile } from './apps.js';
 import { portalFile } from './filepicker.jsx';
 import { lockBeforeSleep, lockAfterWake } from './idlemodel.js';
@@ -850,7 +850,8 @@ export function WebAppMenu() {
   const later = (fn) => setTimeout(fn, 0);
   const items = webMenuItems(m, (n, vars) => (n === 'inspect' ? t('webapps.inspect.menu') : t(`shell.edit.${n}`, vars)), (n) => answerWebMenu(n, m), {
     developer,
-    speech: () => speechMenu(null),
+    // the menu's own selection (a contenteditable message box's too, ws162); else the primary selection, as ❖Esc reads
+    speech: () => { const s = webSpeechText(m); return speechMenu(s ? () => s : null); },
     emoji: () => later(toggleEmojiPanel),
     inspect: () => later(() => webInspectAsk.set({ app: m.app, profile: m.profile })),
     // the search row's quoted words fit the menu's widest row (contextmenu.jsx MENU_ROW_MAX_W)

@@ -56,6 +56,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     field, goes to lord-web as `WriteReplace` (lord-server only, checked by pid), which inserts the text only if the
     focused field is still a non-password text field with exactly that selection. Tests: `build/webapp-test`,
     `webapps_model_test.mjs`.
+  - **Fixed:** Speech ▸ Start from a web app's menu read nothing for a selection in WhatsApp's message box (ws162): it
+    now reads the selection the menu carries (up to 16,384 characters, cleaned twice, never a password field's) instead
+    of the session's primary selection. And "Search the web for “…”" with a long selection no longer loses its end at
+    the menu's edge: rows grow up to 420 px and the quoted words end in “…” inside the label.
 - **`dig`, `nslookup` and `host` in every image:** `bind9-dnsutils` joins the command-line tools of the PC ISO and the
   Raspberry Pi image (`tools/iso/packages-tools.sh`) and the `lordos` package's Recommends, so updated systems get it too.
 - **Web apps: a right-click menu like Chrome's, per context, and spell checking** (`server/src/web/webmenu.c`,

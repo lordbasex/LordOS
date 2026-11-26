@@ -564,8 +564,12 @@ export function fitQuoted(text, make, measure, max = 420) {
   return `${cps.slice(0, best).join('').trimEnd()}…`;
 }
 
-// ✨ AI's text of a page's menu: a string of 1..4,000 characters (lord-server's webai_clean already made it plain), else ''
-export const WEB_AI_CHARS = 4000;
+// The selection a page's menu carries (for ✨ AI, which takes at most 4,000 characters of it, and Speech): a string of
+// 1..16,384 characters (lord-server's webai_clean already made it plain), else ''
+export const WEB_AI_CHARS = 16384;
+// Speech's text from a page's menu: the selection it carried (a text field's or contenteditable's too; never a password
+// field's, which reports none), so reading it aloud doesn't depend on the session's primary selection
+export const webSpeechText = (menu) => webAiText(menu);
 export function webAiText(menu) {
   const s = menu && typeof menu.ai === 'string' ? menu.ai : '';
   if (!s.trim() || [...s].length > WEB_AI_CHARS) return '';
