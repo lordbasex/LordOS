@@ -104,7 +104,7 @@ export function Window({ win, t, focused, app, font }) {
   const button = (k) => (k === 'close' ? <FrameButton key={k} t={t} kind="close" size={size} focused={focused} onClick={() => wm.close(win.id)} />
     : k === 'minimize' ? <FrameButton key={k} t={t} kind="minimize" size={size} focused={focused} onClick={() => wm.minimize(win.id)} />
       : <FrameButton key={k} t={t} kind={win.maximized || win.snapped ? 'restore' : 'maximize'} size={size} focused={focused} onClick={() => wm.toggleMaximize(win.id)} />);
-  const buttons = <View style={{ flexDirection: 'row', gap: 2, direction: 'ltr' }}>{order.map(button)}</View>;
+  const buttons = <View style={{ flexDirection: 'row', gap: 2 }}>{order.map(button)}</View>;
   const round = flat ? 0 : 8;
   const border = app.transparent ? solidOver(edge, '#000000') : edge;
   return (
