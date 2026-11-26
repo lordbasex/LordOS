@@ -149,6 +149,85 @@ Measured by the test against trixie's `libwpewebkit-2.0-1` 2.48.3-1 (`+2`, 2026-
   `libhyphen` and `libgpg-error`; gone: `libwoff2dec` (FreeType decodes WOFF2), Flite and `libgsttranscoder`.
   `libgbm` and `libdrm` were already there in 2.48. Only lord-web loads WebKit; `lord-server` links none of them.
 
+## LibWebRTC (`+5`, paused 2026-11-26)
+
+"Option B", approved by the maintainer on 2026-11-26 and **paused the same day**: WebRTC with WebKit's **LibWebRTC**
+backend (WebKit's own copy of Google's libwebrtc) instead of the GStreamer backend of `+3`/`+4`. Paused because calls in
+a messaging web app already work with `+4.1` (GStreamer, librice and the DIP patch); to be resumed with WebKit 2.56.
+Nothing of `+5` is published or installed. Why it was tried: with `+4` against Chrome, the answering side, a transport
+per media (`balanced`), DTLS against a video bridge and TURN through librice failed (WEBAPPS.md, "Calls"); upstream
+deleted the GStreamer WebRTC backend (WebKit commit 6ae9a398d5, 2026-07-24), so LibWebRTC is the one WebKit maintains.
+
+**Verdict: feasible.** WPE 2.54.3 builds with `-DUSE_GSTREAMER_WEBRTC=OFF` (WebKit's CMake then sets `USE_LIBWEBRTC`)
+with two small patches to WebKit's CMake for libwebrtc, and a third for VP8 (below). Everything else, WebCore's and
+WebKit's LibWebRTC glue for the GLib ports included, compiled unchanged. Feasibility took about 1.3 hours.
+
+How to build it again: `WEBRTC_BACKEND=libwebrtc tools/pkg/build-wpewebkit.sh 2.54.3-1 5` (the default stays
+`gstreamer`). The pieces, committed:
+
+- **The source** (`tools/pkg/wpewebkit-libwebrtc-source.sh`, pins in `tools/pkg/wpewebkit-libwebrtc.sums`). Release
+  tarballs leave `Source/ThirdParty/libwebrtc` out, so it becomes a second upstream tarball of the source package, the
+  `libwebrtc` component (`wpewebkit_2.54.3.orig-libwebrtc.tar.xz`, 66 MB; `debian/rules` links `libwebrtc/` to
+  `Source/ThirdParty/libwebrtc` before cmake). Made from WebKit's git at the release commit only (sparse, about 400 MB),
+  checked: tag `wpewebkit-2.54.3` = tag object `f91ccd8f…` → commit `c01fbd90…`; the subtree's git tree `6cfa7bee…`;
+  `Source/cmake` at that commit byte for byte the signed release tarball's (92 files). Its 8 prebuilt test files
+  (`.o`, `.a`, `.lib`, an Android `.jar`) are left out. Dates are the commit's and xz is single-threaded: the same
+  SHA-256 (`18836cf3…`, pinned) three times; the build chroot checks it again.
+- **The packaging** (`tools/pkg/wpewebkit-libwebrtc/backport.sh`, run after `backport()`, so SharedArrayBuffer, the TURN
+  query and DIP patches stay): `-DUSE_GSTREAMER_WEBRTC=OFF`, `-DUSE_LIBRICE=OFF`; Build-Depends `libasound2-dev`,
+  `libevent-dev`, `libopus-dev`, `libpulse-dev`, `nasm [amd64]` instead of `libssl-dev` and `librice-dev`; Recommends
+  without `gstreamer1.0-nice`; the changelog lines; `debian/copyright` stanzas for `libwebrtc/` and each bundled library
+  from the component's own licence files (`copyright.sh`: BSD-3-clause libwebrtc, libvpx, libyuv, libwebm, libsrtp,
+  crc32c, opus, rnnoise with the patent grants named; Apache-2.0 BoringSSL and abseil; BSD-2-clause + AOM patent licence
+  libaom; pffft; yasm).
+- **Patches:** `lordos-libwebrtc-vpx-include.patch` (libvpx's include folder was Apple-only, but the precompiled header
+  includes `vpx/vpx_codec.h`: the port's only build error); `lordos-libwebrtc-vpx-cpu-flags.patch` (every libvpx file
+  was built with `-mavx2` / `-march=armv8.2-a+dotprod`, which can crash CPUs without AVX2 or an Armv8.0 Raspberry Pi 4;
+  now per file, as libvpx's own build); `lordos-libwebrtc-vp8-encoder.patch` (VP8 from libwebrtc's own libvpx encoder,
+  as WebKit already does for VP9: through GStreamer's `vp8enc` a canvas-sourced track encoded no frame, and libwebrtc
+  switched the call to VP9). The VP8 patch compiles (feasibility tree) but no package with it was built or tested yet.
+- **The test** (`wpewebkit-chroot.sh`, `WEBRTC_BACKEND=libwebrtc`): `libevent` and `libopus` in `NEEDED`; no
+  `libgstwebrtc`, no `librice`; and no symbol of libwebrtc, BoringSSL, libvpx or libaom exported (they stay inside
+  `libWPEWebKit-2.0.so.1`, hidden: AGENTS.md, lord-web).
+
+**What the `+5` build showed** (amd64, 2026-11-26, without the VP8 patch; `/mnt/HD08TB/build/wpewebkit/2.54.3-1~lordos13+5/amd64/out/`
+on the maintainer's build machine):
+
+- `dpkg-buildpackage` 2711 s (16 jobs, a busy desktop; `+4` took 1730 s), 11296 build steps (`+4` about 9000).
+  `libWPEWebKit-2.0.so.1` 137.1 MB (`+4` 127.7 MB, +9.5 MB), `libwpewebkit-2.0-1` .deb 35.7 MB (32.7 MB), installed
+  137.9 MB (128.7 MB). Exported symbols 1345, as `+2`/`+3` (no libwebrtc/BoringSSL/libvpx/libaom symbol). New in `NEEDED`:
+  `libevent-2.1.so.7`, `libopus.so.0`; gone: `libgstwebrtc-1.0`, `librice-proto`, `librice-io`, `libssl`, `libcrypto`.
+- Every earlier check passes: pkg-config, no DRM backend, no `libinput`/`libudev`, the headless render, lord-web on both
+  backends (no warnings; `web-backend-test` and `web_probe_test` pass, 299 MB and 308 MB peak PSS), the identity, the
+  SharedArrayBuffer and DIP checks of `webcalls_check.py`, and the TURN query check.
+- `webcalls_check.py --webrtc` loopback: Opus + H.264 connected in 101 ms (107 frames, 203 audio packets in 4 s);
+  **fails** the VP8 case: the track negotiates VP8 but encodes no frame, and libwebrtc switches to VP9 (what the VP8 patch
+  is for).
+- Against Chrome 158 (headless, fake devices; lord-web's engine with WebKit's mock camera and microphone in the build's
+  test chroot, sandbox on; `tests/webcalls_pair.py`, whose page now waits for the remote description before adding the
+  other side's candidates: libwebrtc gathers fast enough that they arrived before it and were rejected):
+
+  | Case | Result |
+  |---|---|
+  | engine offers, `max-bundle` | **pass**: connected ~200 ms, host/UDP, DTLS (SRTP AES_CM_128_HMAC_SHA1_80), Opus + VP8 640×480 both ways (~300 frames, ~750 audio packets each way in 15 s) |
+  | engine offers, `balanced` | media flows both ways (Opus + VP8, ~700 frames each way), ICE and DTLS connected, but the engine's `connectionState` stays `connecting` (Chrome's `connected`): **open** |
+  | Chrome offers, engine answers (`balanced`) | **pass**: 100 ms, Opus + VP8 both ways (`+4` picked PCMU and sent nothing) |
+  | Chrome offers, engine answers, `max-bundle` | **pass**: 100 ms, Opus + VP8 both ways |
+  | TURN relay only, UDP (local coturn in the test chroot) | **pass**: relay ↔ relay, 200–300 ms, DTLS, Opus + VP8 both ways |
+  | TURN relay only, TCP to the TURN server | **pass**: the same, coturn saw 3 allocations over TCP, permissions and channel binds |
+  | a video bridge (SFU) / a real messaging call | not run before the pause |
+
+- lintian: 2 errors, 28 warnings. The errors: `embedded-library srtp` (libsrtp inside libwebrtc, the approved
+  bundling: needs a documented override) and `missing-notice-file-for-apache-license` on libwebrtc's Android example
+  (the NOTICE file is there: a false positive to override, or leave the unbuilt Android example out of the component).
+  20 warnings are `debian-changelog-line-too-long` from `backport.sh`'s changelog lines (to rewrap at 80 columns).
+
+**Next steps when resuming with WebKit 2.56:** new pins in `wpewebkit-libwebrtc.sums` for the 2.56 tag; check the three
+patches still apply (or are upstream); the lintian overrides and changelog wrap above; build `+5`-style with the VP8
+patch and rerun the loopback (VP8 must stay VP8), the six Chrome cases, the engine's `connectionState` with `balanced`,
+a video bridge (Jitsi, `tests/webcalls_jitsi.py`) and a real messaging call; then arm64 (the libvpx flag patch matters
+most there); then publish (the component tarball is part of the source package).
+
 ## Document-Isolation-Policy (since `+4.1`)
 
 **The problem.** WhatsApp Web in lord-web said "Your browser doesn't support calling"; the call log's page line read

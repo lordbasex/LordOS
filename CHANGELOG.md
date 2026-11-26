@@ -54,6 +54,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     worker, a shared buffer written by the worker, a cross-origin script without CORP still blocked) and that COOP
     `same-origin-allow-popups` + COEP alone, or DIP without COEP, stay not isolated (docs/WPEWEBKIT.md,
     "Document-Isolation-Policy").
+  - **WebKit's LibWebRTC backend tried, then paused** (`2.54.3-1~lordos13+5`, "option B", approved and paused by the
+    maintainer on 2026-11-26: calls work with `+4.1`; to resume with WebKit 2.56). Not published. Feasible: WPE 2.54.3
+    builds with `USE_LIBWEBRTC` and WebKit's own libwebrtc (with its BoringSSL, libvpx and libaom, linked only inside
+    `libWPEWebKit-2.0.so.1`, none of their symbols exported; ICE and sockets in WebKit's network process, the web process
+    keeps no network). `WEBRTC_BACKEND=libwebrtc tools/pkg/build-wpewebkit.sh 2.54.3-1 5`: the libwebrtc source comes
+    from WebKit's git at the release tag as the source package's `libwebrtc` component
+    (`tools/pkg/wpewebkit-libwebrtc-source.sh`; tag, commit, tree and the reproducible tarball's SHA-256 pinned in
+    `tools/pkg/wpewebkit-libwebrtc.sums`), the packaging changes and `debian/copyright` stanzas are
+    `tools/pkg/wpewebkit-libwebrtc/`, with three patches (libvpx headers on Linux, libvpx's CPU flags per file, VP8 from
+    libwebrtc's own encoder). Against Chrome 158 the `+5` build passed offering with `max-bundle`, answering (`balanced`
+    and `max-bundle`, Opus and VP8 both ways) and TURN relay over UDP and TCP; offering with `balanced` carries media
+    but the engine's `connectionState` stays `connecting`; library 137.1 MB (+9.5 MB). docs/WPEWEBKIT.md, "LibWebRTC".
+    `tests/webcalls_pair.py`: `turn=`/`relay=1` options, the DTLS state in its report, and candidates added only after
+    the remote description.
   - **SharedArrayBuffer for cross-origin-isolated pages only** (`lordos-sharedarraybuffer-coi.patch` in the same build):
     WebKit already starts a web process of its own for a page served with COOP `same-origin` and COEP `require-corp`;
     the patch turns SharedArrayBuffer on in that process only (`JSC_useSharedArrayBuffer`, removed from every other

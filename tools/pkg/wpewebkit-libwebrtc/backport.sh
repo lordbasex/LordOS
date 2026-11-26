@@ -34,8 +34,8 @@ sed -i '/^               librice-dev (>= 0.4.3),$/d; s/^               libssl-de
 #    decoders through WebKit's GStreamer codec factories); libnice is no longer one of them
 grep -q '^Recommends: gstreamer1.0-nice, ' debian/control || die "debian/control: no WebRTC Recommends"
 sed -i 's/^Recommends: gstreamer1.0-nice, /Recommends: /' debian/control
-# 5. two fixes to WebKit's CMake build of libwebrtc on Linux (the patches say why)
-for p in lordos-libwebrtc-vpx-include.patch lordos-libwebrtc-vpx-cpu-flags.patch; do
+# 5. two fixes to WebKit's CMake build of libwebrtc on Linux, and VP8 from libwebrtc's own encoder (the patches say why)
+for p in lordos-libwebrtc-vpx-include.patch lordos-libwebrtc-vpx-cpu-flags.patch lordos-libwebrtc-vp8-encoder.patch; do
     cp "$H/$p" debian/patches/ && echo "$p" >> debian/patches/series
 done
 # 6. debian/copyright: the component's licences

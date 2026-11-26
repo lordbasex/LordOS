@@ -38,7 +38,8 @@ const get = async path => { for (;;) { const r = await fetch(path); if (r.status
   s.getTracks().forEach(t => pc.addTrack(t, s));
   pc.onicecandidate = e => { if (e.candidate) post('/cand/' + role, e.candidate.toJSON()); };
   let seen = 0;
-  (async () => { for (;;) { const r = await fetch('/cands/' + other + '?from=' + seen); const l = await r.json(); for (const c of l) { seen++; try { await pc.addIceCandidate(c); } catch (e) {} } await new Promise(f => setTimeout(f, 200)); } })();
+  // the other side's candidates only once its description is set (before, addIceCandidate rejects them)
+  (async () => { for (;;) { if (!pc.remoteDescription) { await new Promise(f => setTimeout(f, 100)); continue; } const r = await fetch('/cands/' + other + '?from=' + seen); const l = await r.json(); for (const c of l) { seen++; try { await pc.addIceCandidate(c); } catch (e) {} } await new Promise(f => setTimeout(f, 200)); } })();
   if (role === 'caller') {
     await pc.setLocalDescription(await pc.createOffer());
     await post('/sdp/offer', pc.localDescription.toJSON());
