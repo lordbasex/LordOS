@@ -10,6 +10,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+- **A "New desktop style" issue form for sharing a community theme** (`.github/ISSUE_TEMPLATE/new-desktop-style.yml`,
+  from the lordos-theme-kit proposals, approved 2026-11-26). It has the sections the kit's `/lordos-theme publish`
+  writes: name and id, description, version, licence and the LordOS release it was made for, screenshots (light, dark,
+  Arabic), a link to the source-only `.zip` and its SHA-256, the source repository, provenance (what inspired it,
+  what was written new, reused code and its licence; never GPL code), the kit's check report, what was tested, and
+  two required confirmations (no personal data; everything may be shared under its licence). It applies the labels
+  `desktop-style` and `community` (to be created in the repository). `docs/THEMES-GUIDE.md` §5 points to it.
+
 ### Fixed
 - **A machine's apps no longer mix with this computer's in the app launcher unless you turn it on** (the maintainer's
   decision while testing 0.8.9.6.2: a machine that was off filled the launcher with its apps). Since 0.8.9.6 a

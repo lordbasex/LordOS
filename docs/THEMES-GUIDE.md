@@ -613,3 +613,9 @@ Check each item on a real session and take a screenshot ([VM-SETUP.md](VM-SETUP.
 - **Notifications, search, permission prompts and the power dialog** look right inside your
   `ThemeProvider` (they use your tokens).
 - And the [DESIGN.md](DESIGN.md#robustness-checklist) robustness checklist.
+
+To share a theme with LordOS, open an issue with the **"New desktop style"** form
+(`.github/ISSUE_TEMPLATE/new-desktop-style.yml`): screenshots in light, dark and Arabic, a link to the source-only
+`.zip` and its SHA-256, the provenance of every idea, piece of code or art, and the check report. The
+[lordos-theme-kit](https://github.com/lordbasex/lordos-theme-kit) plugin for Claude Code (`/lordos-theme publish`)
+fills in every section.
