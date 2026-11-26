@@ -610,6 +610,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     after a theme switch); and an installed font by family name for `fontFamily: 'theme'` (`lord.fonts.useForTheme`,
     `text_set_theme_font` in `server/src/ui/text.c`). A theme brings no audio file, cursor image or font file for
     lord-server to parse.
+  - A community theme (part 2's restricted API) may register a style pack's data too (pointer colours, tunes, an
+    installed font, image icons) through its facade; `lord.input.pointerScheme`, `lord.sound.scheme` and
+    `lord.fonts.useForTheme` are on the restricted API's allowlist (`js_theme.c`). Component icons and app skins stay
+    an official theme's.
   - *Richer tokens* for every app's shared controls: `toolbarBg`, `buttonBg`, `bevel` and `stateBorders` (a border per
     state) in `Button`, `Toolbar` and `ToolbarButton`; `ToolbarButton` takes `iconName` for a pack's icon.
   - *Level 2, app skins* (`registerAppSkins`, `<SkinRegion>`): an app names the regions a theme may draw and hands the

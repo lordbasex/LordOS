@@ -536,6 +536,11 @@ registerStylePack({
 | `sounds` | for `startup`, `notify`, `error`, `emptyTrash`: up to 8 notes `[Hz, ms]` (60–5000 Hz, or 0 for a rest; 10–1000 ms; 2.5 s in all) | synthesized by lord-server like LordOS's own sounds (`lord.sound.scheme`, `snd_set_scheme` in `server/src/sound/snd.c`): the default notification sound, errors, emptying the Trash, and the startup tune once per session (not again after a theme switch). A notification sound chosen per app in Settings stays that sound |
 | `fonts` | `family`: the name of a font installed on the system (LordOS's own folder or the system's font folders) | text styled `fontFamily: 'theme'`: `useThemeFont()` returns `'theme'` while the pack brings a font and the person keeps it, else nothing (Inter). The theme's frames and its skins use it; the apps' own text stays Inter |
 
+A community theme (installed from a file, running under the restricted API) may register a style pack too, through its
+facade (`sdk/themeapi.js`): its pointer colours, its tunes, an installed font and icons as image files of its own; the
+three native calls are on the restricted API's allowlist (`server/src/ui/js_theme.c`) because they take data only.
+Component icons and app skins stay an official theme's: they would draw inside LordOS's apps.
+
 What a pack can't do, by design: a theme brings no audio file, no cursor image and no font file for lord-server to
 parse. Sounds are notes, pointers are two colours, and a font is one that is already installed (a Debian package, so its
 licence is a free one: Bluebell names DejaVu Sans of `fonts-dejavu-core`, which LordOS recommends). Anything the
