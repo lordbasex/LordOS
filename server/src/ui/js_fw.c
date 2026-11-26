@@ -41,6 +41,7 @@
  * or the microphone away at once (restrict_changed).
  *
  * All of them validate: app ids with fw_app_canon, destinations with fw_parse_dest, ports 1–65535. */
+#include "js_hands.h"
 #include "js_fw.h"
 #include "../fw/rules.h"
 #include "../fw/fwmap.h"
@@ -344,6 +345,7 @@ static JSValue f_app_rule(JSContext *c, JSValueConst t, int argc, JSValueConst *
 }
 
 static JSValue f_set_app_rule(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)t;
     char app[FW_APP_MAX];
     if (argc < 2 || arg_app(c, argv[0], app)) return js_throw_code(c, "fw.invalidApp", NULL);
@@ -376,6 +378,7 @@ static JSValue f_set_app_rule(JSContext *c, JSValueConst t, int argc, JSValueCon
 }
 
 static JSValue f_set_trusted(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)t;
     char app[FW_APP_MAX];
     if (argc < 2 || arg_app(c, argv[0], app)) return js_throw_code(c, "fw.invalidApp", NULL);
@@ -384,6 +387,7 @@ static JSValue f_set_trusted(JSContext *c, JSValueConst t, int argc, JSValueCons
 }
 
 static JSValue f_set_restricted(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)t;
     char app[FW_APP_MAX];
     if (argc < 2 || arg_app(c, argv[0], app)) return js_throw_code(c, "fw.invalidApp", NULL);
@@ -421,6 +425,7 @@ static JSValue f_blocks(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
 }
 
 static JSValue f_set_mode(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)t;
     char m[16];
     if (argc < 1 || !JS_IsString(argv[0])) return js_throw_code(c, "fw.invalidMode", NULL);
@@ -528,6 +533,7 @@ static int rule_from_js(JSContext *c, JSValueConst o, const char *app, FwRule *r
 }
 
 static JSValue f_add_rule(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)t;
     FwRule r;
     JSValue exc;
@@ -543,6 +549,7 @@ static JSValue f_add_rule(JSContext *c, JSValueConst t, int argc, JSValueConst *
  * put back, so a failed edit loses nothing. Adding a rule with the same destination, ports and
  * protocol as another one of the app replaces that one too (fw_rule_add), as addRule does. */
 static JSValue f_update_rule(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)t;
     uint32_t id = 0;
     if (argc < 2 || JS_ToUint32(c, &id, argv[0]) || !id) return js_throw_code(c, "fw.invalidRule", "field", "id", NULL);
@@ -588,6 +595,7 @@ static JSValue f_rule_apps(JSContext *c, JSValueConst t, int argc, JSValueConst 
 }
 
 static JSValue f_remove_rule(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)t;
     uint32_t id = 0;
     if (argc < 1 || JS_ToUint32(c, &id, argv[0]) || !id) return js_throw_code(c, "fw.invalidRule", "field", "id", NULL);
@@ -662,6 +670,7 @@ static int arg_list_id(JSContext *c, JSValueConst v, char *out) {
 }
 
 static JSValue f_set_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)t;
     char id[32];
     if (argc < 2 || arg_list_id(c, argv[0], id)) return js_throw_code(c, "fw.list.unknown", NULL);
@@ -671,6 +680,7 @@ static JSValue f_set_list(JSContext *c, JSValueConst t, int argc, JSValueConst *
 }
 
 static JSValue f_add_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)t;
     if (argc < 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) return js_throw_code(c, "fw.list.badUrl", NULL);
     lists_init();
@@ -685,6 +695,7 @@ static JSValue f_add_list(JSContext *c, JSValueConst t, int argc, JSValueConst *
 }
 
 static JSValue f_remove_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)t;
     char id[32];
     if (argc < 1 || arg_list_id(c, argv[0], id)) return js_throw_code(c, "fw.list.unknown", NULL);

@@ -722,6 +722,7 @@ static void remote_pointer(int fx, int fy) {
 static void remote_button(int button, int down) {
     Server *s = remote_server;
     hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
+    if (down) hands_person_press();
     if (ptrlock_button(button, down)) return;
     if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
     remote_settle(s);
@@ -751,6 +752,7 @@ static void keyboards_check(Server *s) {
 static void remote_key(int code, int value) {
     Server *s = remote_server;
     hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
+    if (value == 1) hands_person_press();
     if (pkagent_blocks_injected(value)) return;           /* an authentication prompt takes only this computer's keys */
     if (value == 1 && code >= KEY_Q && code <= KEY_M && !remote_typed) { remote_typed = 1; keyboards_check(s); }
     if (code == KEY_LEFTCTRL || code == KEY_RIGHTCTRL) s->ctrl = value != 0;
@@ -1049,6 +1051,10 @@ static int hands_key(const HandsChord *c) {
         if (!ok) return -1;
         if (c->mods & (HANDS_M_CTRL | HANDS_M_ALT | HANDS_M_SUPER)) level &= ~OSK_LEVEL_ALTGR;   /* ctrl+s: the key, not its symbol */
     }
+    /* a paste, by the key that will be pressed (whatever the layout calls it): never while the clipboard holds a secret */
+    unsigned pm = c->mods | ((level & OSK_LEVEL_SHIFT) ? HANDS_M_SHIFT : 0);
+    if (term_clipboard_sensitive() && ((code == KEY_V && (pm & (HANDS_M_CTRL | HANDS_M_SUPER))) || (code == KEY_INSERT && (pm & HANDS_M_SHIFT)) ||
+                                       code == KEY_PASTE || hands_paste_chord(c))) return -2;
     hands_press(code, level, c->mods);
     return 0;
 }
@@ -1555,6 +1561,7 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
     if (ev->type == EV_KEY || ev->type == EV_REL || ev->type == EV_ABS) {
         display_input(now_ms());
         hands_person_input();               /* the person's own input wins: an agent waits (hands.h) */
+        if (ev->type == EV_KEY && ev->value == 1) hands_person_press();   /* a real click or key: theirs again (not motion) */
     }
     if (s->debug && ev->type != EV_SYN)
         fprintf(stderr, "ev %s type=%u code=%u value=%d\n", d->name, ev->type, ev->code, ev->value);

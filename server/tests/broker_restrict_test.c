@@ -225,6 +225,12 @@ static void restrict_app(const char *fwid, uint32_t flags) {
 static uint32_t local_added;
 static void local_hook(uint32_t added) { local_added |= added; }
 
+/* Hands (hands/hands.h) and the clipboard's secret mark (term.c): not under test here; no agent is connected */
+int hands_injecting(void) { return 0; }
+int hands_active(void) { return 0; }
+int hands_agent_owns_input(void) { return 0; }
+int term_clipboard_sensitive(void) { return 0; }
+
 int main(void) {
     char home[] = "/tmp/broker-restrict-XXXXXX";
     if (!mkdtemp(home)) { perror("mkdtemp"); return 1; }

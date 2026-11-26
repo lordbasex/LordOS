@@ -155,11 +155,18 @@ function walkTree(roots, opts, visit) {
     if (stop || hidden(n) || denied(n)) return;
     let b = null;
     if (n.type !== 'raw' && n.id) { try { b = box(n); } catch (e) { b = null; } }
-    if (b && (b[2] <= 0 || b[3] <= 0)) return;
+    const st = n.style || {};
+    if (b && (b[2] <= 0 || b[3] <= 0)) {
+      // a zero-size anchor (a theme's bar positions its children from one): not a line of its own, but what it holds is
+      // there, unless it clips them away
+      if (st.overflow === 'hidden') return;
+      if (isProtected(n)) return;
+      for (let c = n.first; c; c = c.next) walk(c, depth, clip, inWin);
+      return;
+    }
     const vis = b ? intersect(b, clip) : null;
     if (b && clip && (!vis || vis[2] <= 0 || vis[3] <= 0)) return;      // scrolled or clipped out of sight
     const role = isProtected(n) ? 'protected' : roleOf(n);
-    const st = n.style || {};
     const nextClip = b && st.overflow === 'hidden' ? (clip ? intersect(clip, b) : b) : clip;
     if (role && n.type !== 'raw') {
       const entry = { node: n, role, name: nameOf(n, role), states: statesOf(n, role), value: valueOf(n, role), box: vis || b, depth, win: inWin };

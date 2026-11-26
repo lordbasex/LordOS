@@ -277,9 +277,11 @@ static JSValue prof_call(JSContext *c, JSValueConst this_val, int argc, JSValueC
     {
         int32_t hg = HANDS_G_NONE;
         JS_ToInt32(c, &hg, data[3]);
-        if (hg != HANDS_G_NONE && hands_agent_recent()) {
-            if (hg == HANDS_G_CLIP) { if (term_clipboard_sensitive()) return JS_NewString(c, ""); }
-            else {
+        /* a secret on the clipboard is nobody's to read while an agent is connected; the rest refuses when the agent's
+         * input set it off */
+        if (hg == HANDS_G_CLIP && hands_active() && term_clipboard_sensitive()) return JS_NewString(c, "");
+        if (hg == HANDS_G_REFUSE && hands_agent_owns_input()) {
+            {
                 const char *n = JS_ToCString(c, data[1]);
                 fprintf(stderr, "js: hands: lord.%s refused (an AI agent's input)\n", n ? n : "?");
                 if (n) JS_FreeCString(c, n);

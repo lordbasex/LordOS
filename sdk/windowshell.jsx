@@ -20,6 +20,7 @@ import { desktopFx } from './desktops.js';
 import { OverviewCover, OverviewPlaceholder, useOverviewPlace } from './overview.jsx';
 import { settings } from './settings.js';
 import { direction } from './i18n.js';
+import { appDenied } from './handsdeny.js';
 import { windowButtonsPref, buttonsAtStart, buttonOrder, windowButtonSizePref, scaledBar } from './windowbuttons.js';
 
 // Where a title bar's buttons go (Settings → Desktop & Dock → Title bars, issue #58; sdk/windowbuttons.js).
@@ -81,7 +82,8 @@ export function WindowShell({ win, style, children, onMouseDown, resizable = tru
   return (
     // the press focuses the window in the capture phase: a sheet, a dialog or a control inside that stops the press still
     // brings its window forward, so the keyboard follows (a Linux window in front kept it while a Settings sheet was typed into)
-    <View ref={wm.frameRef(win.id, m)} lordWin={win.id} onMouseDownCapture={tv ? undefined : onMouseDown}
+    // handsDeny: a person-only app's window (sdk/handsdeny.js), its title bar and an isolated or Linux app's surface too
+    <View ref={wm.frameRef(win.id, m)} lordWin={win.id} handsDeny={appDenied(win.app || win.id) || undefined} onMouseDownCapture={tv ? undefined : onMouseDown}
       style={{ position: 'absolute', left: geo.x - m, top: geo.y - m, width: geo.w + 2 * m, height: geo.h + 2 * m, display: here && (!win.minimized || tv || leaving) ? 'flex' : 'none', ...(tv ? { pointerEvents: 'box-none' } : null) }}>
       {/* protected (wm.setProtected, wm.open's `protected`): the whole window, its title bar included, is the protected fill
           in every capture, in its exact box and corners, through the overview's scale and the theme's effects */}

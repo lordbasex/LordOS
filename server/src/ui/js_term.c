@@ -7,6 +7,7 @@
  * only the login shell, the same way; lord-server then types the slot's argv into it once, quoted in C,
  * followed by one of three fixed exit rules (programExit: 'close' | 'closeIfOk' | 'keep'). JS never sees
  * or chooses the command: an unknown, used or expired token throws term.createFailed and nothing starts. */
+#include "js_hands.h"
 #include "js_term.h"
 #include "../hands/hands.h"
 #include "../wl/wl.h"
@@ -756,6 +757,7 @@ static int arg_token(JSContext *c, JSValueConst v, unsigned *token) {
 /* saveSecret(sid, token): the typed password the "save" event offered goes to Passwords (termfill_save); JS never
  * has it. false if the offer is gone (declined, expired, another prompt). The "saved" event says how it ended. */
 static JSValue f_save_secret(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)this_val;
     int32_t sid = 0;
     unsigned token = 0;
@@ -765,6 +767,7 @@ static JSValue f_save_secret(JSContext *c, JSValueConst this_val, int argc, JSVa
 
 /* dropSecret(sid, token): "Not Now": the typed password is wiped */
 static JSValue f_drop_secret(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)this_val;
     int32_t sid = 0;
     unsigned token = 0;
@@ -777,6 +780,7 @@ static JSValue f_drop_secret(JSContext *c, JSValueConst this_val, int argc, JSVa
 /* fill(sid, vault, entry, field, index): the entry's field goes from lord-vault to the pty without passing
  * through here; the "fill" event says how it ended. false when it couldn't be asked for. */
 static JSValue f_fill(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)this_val;
     if (argc < 5) return JS_FALSE;
     int32_t sid = 0, idx = 0;

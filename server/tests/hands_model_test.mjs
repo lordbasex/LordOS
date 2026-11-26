@@ -80,6 +80,13 @@ yes('a getter in props is never run', !ran);
 eq('roles', [roleOf(text('x')), roleOf(node('surface')), roleOf(node('view', { accessibilityRole: 'evil' }))], ['text', 'app', '']);
 eq('clean: controls and bidi', clean('a‮b\nc\u0007d'), 'a b c d');
 
+// a zero-size anchor (a theme's menu bar) still shows what it holds
+{
+  const item = node('view', { onClick: noop }, [text('File')], [10, 2, 40, 24]);
+  const anchor = node('view', {}, [item], [0, 0, 0, 0]);
+  yes('what a zero-size anchor holds is read', serializeTree([{ node: node('view', {}, [anchor]), z: 20 }], { box, refs }).text.includes('clickable "File"'));
+}
+
 // clipped out of sight: a ScrollView's row below its box
 const rowOut = node('view', { accessibilityRole: 'row', onClick: noop }, [text('Far away')], [0, 900, 100, 20]);
 const scroller = node('view', {}, [rowOut], [0, 0, 300, 300]);

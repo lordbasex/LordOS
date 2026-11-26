@@ -55,7 +55,6 @@
 #define HANDS_REPEAT_MAX  20
 #define HANDS_SCROLL_MAX  30
 #define HANDS_LOG_MAX     400       /* AppLog lines */
-#define HANDS_AFTER_MS    2500      /* what the agent's input set off stays the agent's this long (hands_agent_recent) */
 
 /* D-Bus error names (handsbus.c); their message is one closed word */
 #define HANDS_ERR_OFF      "org.lordos.Hands1.Error.Off"         /* Settings → AI → Hands is off */
@@ -171,7 +170,9 @@ typedef struct {
     void (*move)(double x, double y);
     void (*button)(int button, int down);
     void (*wheel)(int dx, int dy);
-    int  (*key)(const HandsChord *c);               /* 0 pressed and released; -1 no key types that character */
+    /* 0 pressed and released; -1 no key types that character; -2 refused: a paste (by the key it resolves to) while the
+     * clipboard holds a secret */
+    int  (*key)(const HandsChord *c);
     int  (*type)(const char *text, size_t n);       /* 0, or HANDS_WHY_* stopped part-way */
     /* a PNG (malloc'd) of a display, a window's node or a logical region, the system layer and denied nodes black; *w,
      * *h its size; meta gets {"x","y","w","h","scale"} of the logical area it shows. NULL on failure. */
@@ -206,9 +207,13 @@ void hands_qa(int on);
 int  hands_qa_mode(void);
 /* the agent's input is being delivered now (lord.hands.injecting) and how many events it has sent */
 int  hands_injecting(void);
-/* the agent's input is being delivered or was, after the person's own, less than HANDS_AFTER_MS ago: a security-state
- * change now is the agent's doing and is refused (js.c hands_guard, term.fill, the clipboard to Linux apps) */
+/* Fail closed: the agent's input is being delivered, or a Hands client is active and the agent's input came after the
+ * person's last real click or key (motion never counts, time never clears it): a security-state change now is the
+ * agent's doing and is refused (js.c prof_call, the broker, term.fill). hands_agent_recent is the same. */
+int  hands_agent_owns_input(void);
 int  hands_agent_recent(void);
+int  hands_active(void);                     /* a Hands client is granted and connected */
+void hands_person_press(void);               /* a real click or key (on_input, a remote viewer): the person's own again */
 /* what a lord.<ns>.<fn> native is to an agent's input: HANDS_G_REFUSE (a security-state change), HANDS_G_CLIP
  * (lord.clipboard.get: "" while the clipboard holds a secret) or HANDS_G_NONE (js.c prof_call) */
 enum { HANDS_G_NONE = 0, HANDS_G_REFUSE, HANDS_G_CLIP };

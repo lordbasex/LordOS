@@ -15,6 +15,7 @@
 #include "hands/handsimg.h"
 #include "hands/handsmark.h"
 #include "hands/mcp.h"
+#include "sec/broker.h"
 #include "ui/handsbus.h"
 #include "vault/dbus.h"
 
@@ -71,7 +72,8 @@ static int keys_place(void) { return keys_why; }
 static void move(double x, double y) { (void)x; (void)y; moves++; }
 static void button(int b, int d) { (void)b; (void)d; buttons++; }
 static void wheel(int dx, int dy) { (void)dx; (void)dy; }
-static int key(const HandsChord *c) { (void)c; keys++; return 0; }
+static int key_refuse;
+static int key(const HandsChord *c) { (void)c; if (key_refuse) return -2; keys++; return 0; }
 static int type(const char *t, size_t n) { (void)t; typed += (int)n; return 0; }
 static uint8_t *shot(int kind, uint32_t display, int node, double x, double y, double w, double h, int maxdim,
                      const int *black, int nblack, size_t *len, int *iw, int *ih, char *meta, size_t metan) {
@@ -251,14 +253,22 @@ static void policy(void) {
     HandsReq mc = { .call = HANDS_C_POINTER, .action = HANDS_P_MIDDLE, .x = 200, .y = 200 };
     CHECK(call(":1.1", &mc, &why) == HANDS_E_REFUSED && why == HANDS_WHY_SENSITIVE_CLIP, "a middle click refused");
     clip_secret = 0;
+    /* the host refuses by the key it resolves to (a layout where "v" isn't KEY_V, or Ctrl+Insert…) */
+    key_refuse = 1;
+    HandsReq odd = { .call = HANDS_C_KEY, .text = "ctrl+q", .text_len = 6 };
+    CHECK(call(":1.1", &odd, &why) == HANDS_E_REFUSED && why == HANDS_WHY_SENSITIVE_CLIP, "a paste the host resolved from its key code: refused");
+    key_refuse = 0;
     CHECK(call(":1.1", &pv, &why) == HANDS_OK, "ctrl+v goes when the clipboard holds no secret");
-    /* the agent's input stays its own for a moment: security-state natives refuse (js.c) */
-    CHECK(hands_agent_recent(), "just after the agent's key: recent");
-    clock_ms += HANDS_AFTER_MS + 10;
-    CHECK(!hands_agent_recent(), "later: not");
-    CHECK(call(":1.1", &pv, &why) == HANDS_OK && hands_agent_recent(), "again after a key");
+    /* fail closed: after the agent's input, security-state actions refuse until the person's own click or key */
+    CHECK(hands_active() && hands_agent_owns_input(), "just after the agent's key: the agent's");
+    clock_ms += 600000;
+    CHECK(hands_agent_owns_input(), "time passing never gives it back");
     hands_person_input();
-    CHECK(!hands_agent_recent(), "the person's own input after it: theirs");
+    CHECK(hands_agent_owns_input(), "nor the person's motion");
+    hands_person_press();
+    CHECK(!hands_agent_owns_input(), "the person's own click or key: theirs again");
+    clock_ms += 4000;                       /* past the pause the person's input asks for */
+    CHECK(call(":1.1", &pv, &why) == HANDS_OK && hands_agent_owns_input(), "the agent's key again: the agent's");
     clock_ms += 4000;
     keys_why = HANDS_WHY_PROMPT;
     CHECK(call(":1.1", &ty, &why) == HANDS_E_REFUSED && why == HANDS_WHY_PROMPT, "an authentication prompt takes no agent keys");
@@ -561,13 +571,20 @@ static void marks(void) {
 /* lordos-mcp's pure parts: the tools, the errors' sentences, a screenshot's points, base64, the GIF */
 /* F1, F5 and the rest: the security-state natives an agent's input never sets off */
 static void native_guard(void) {
-    const char *refused[] = { "vault.reveal", "vault.copy", "term.fill", "term.saveSecret", "fw.setAppRule", "fw.addRule", "fw.setMode",
-                              "fw.removeList", "perms.set", "admin.run", "sentinela.unblock", "themes.trust", "themes.remove",
+    const char *refused[] = { "keyring.request", "vault.request", "vault.fidoAttach", "term.fill", "term.saveSecret", "fw.setAppRule", "fw.addRule", "fw.setMode",
+                              "fw.removeList", "perms.set", "admin.request", "sentinela.unblock", "themes.trust", "themes.remove",
                               "hands.serve", "hands.answer", "share.answer", "session.power" };
     for (size_t i = 0; i < sizeof refused / sizeof refused[0]; i++) CHECK(hands_native_guard(refused[i]) == HANDS_G_REFUSE, "lord.%s refused to an agent", refused[i]);
     CHECK(hands_native_guard("clipboard.get") == HANDS_G_CLIP, "lord.clipboard.get: empty while a secret");
-    const char *free_[] = { "fs.list", "term.write", "fw.status", "fw.rules", "perms.get", "vaultx.y", "hands.status", "themes.list", "term.fillx" };
+    const char *free_[] = { "fs.list", "term.write", "fw.status", "fw.rules", "perms.get", "vaultx.y", "vault.poll", "vault.available", "admin.available", "hands.status", "themes.list", "term.fillx" };
     for (size_t i = 0; i < sizeof free_ / sizeof free_[0]; i++) CHECK(hands_native_guard(free_[i]) == HANDS_G_NONE, "lord.%s left alone", free_[i]);
+    /* the broker: an isolated app's keyring, FIDO key and secret to the clipboard refuse on an agent's input, the
+     * clipboard's secret while an agent is connected */
+    CHECK(brokersrv_hands_refuses(BOP_KEYRING, 1, 1, 0) && brokersrv_hands_refuses(BOP_VAULT_FIDO, 1, 1, 0) &&
+          brokersrv_hands_refuses(BOP_CLIP_SECRET, 1, 1, 0), "the broker refuses the keyring, the FIDO key and a secret on an agent's input");
+    CHECK(!brokersrv_hands_refuses(BOP_KEYRING, 0, 1, 0), "the person's own keyring use goes, an agent connected or not");
+    CHECK(brokersrv_hands_refuses(BOP_CLIP_GET, 0, 1, 1) && !brokersrv_hands_refuses(BOP_CLIP_GET, 0, 0, 1) && !brokersrv_hands_refuses(BOP_CLIP_GET, 1, 1, 0),
+          "the clipboard's secret to an app: never while an agent is connected; its ordinary text: yes");
     CHECK(handsbus_sandboxed(-1) && handsbus_sandboxed(0), "an unknown caller is taken as sandboxed");
     CHECK(!handsbus_sandboxed(getpid()), "this test is not sandboxed");
     CHECK(hands_paste_chord(&(HandsChord){ .mods = HANDS_M_CTRL | HANDS_M_SHIFT, .ch = "v" }) && !hands_paste_chord(&(HandsChord){ .mods = HANDS_M_CTRL, .ch = "c" }),

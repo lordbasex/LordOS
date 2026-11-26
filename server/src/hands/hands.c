@@ -255,12 +255,13 @@ int hands_chords(const char *s, HandsChord *c, int max, int *n) {
 }
 
 /* ---- the security-state natives an agent's input never sets off (js.c prof_call) ----
- * the vault, filling a password into a terminal, the firewall's changes, permissions, administrator actions, Sentinela's
+ * the vault's requests (vault.request: reveal, copy, edit…), the keyring, filling a password into a terminal, the
+ * firewall's changes, permissions, administrator actions (admin.request), Sentinela's
  * blocklist, theme trust and removal, signing keys, screen-sharing answers, Hands' own switch, power; lord.clipboard.get
  * answers "" while the clipboard holds a secret. A name ending in "." covers its whole namespace. */
 int hands_native_guard(const char *name) {
     static const char *const refuse[] = {
-        "vault.", "admin.", "term.fill", "term.saveSecret", "term.dropSecret", "perms.set",
+        "vault.request", "vault.fidoAttach", "vault.promptDone", "keyring.request", "admin.request", "term.fill", "term.saveSecret", "term.dropSecret", "perms.set",
         "fw.setList", "fw.addList", "fw.removeList", "fw.setAppRule", "fw.setTrusted", "fw.setRestricted", "fw.setMode",
         "fw.addRule", "fw.removeRule", "fw.updateRule", "sentinela.block", "sentinela.unblock",
         "themes.trust", "themes.remove", "sign.share", "sign.restore", "share.answer", "hands.serve", "hands.answer",
@@ -373,6 +374,8 @@ static struct {
     double person;
     int person_seen;
     double last_agent;                  /* when the agent's last input was delivered */
+    double person_press;                /* the person's last real click or key (physical, or a remote viewer's) */
+    unsigned long seq, agent_seq, press_seq;   /* which came last: the agent's input or the person's click or key */
     unsigned long events;
     HandsBucket input, shot, read, hello;
 } S;
@@ -384,14 +387,26 @@ int hands_qa_mode(void) { return S.qa; }
 static double now(void) { return S.h && S.h->now ? S.h->now() : 0; }
 int hands_injecting(void) { return S.injecting; }
 
-/* The agent's input is being delivered, or was the last input, less than HANDS_AFTER_MS ago and after the person's own:
- * what it set off (a click's handler, a promise after it) is the agent's. lord-server's security-state natives refuse
- * then (js.c hands_guard: the vault, term.fill, the firewall, permissions, administrator actions…), so a surface missing
- * its handsDeny can't reopen them. */
-int hands_agent_recent(void) {
+/* A Hands client is granted and connected (the banner shows) */
+int hands_active(void) {
+    for (int i = 0; i < HANDS_CLIENTS; i++) if (S.c[i].st == CS_GRANTED) return 1;
+    return 0;
+}
+
+/* Fail closed: while a Hands client is active, the input that set something off is the agent's unless the person's own
+ * click or key came after the agent's last input (never mere motion, never a time that passed). lord-server's
+ * security-state actions refuse then (hands_native_guard in js.c, the broker, term.fill, the clipboard). */
+int hands_agent_owns_input(void) {
     if (S.injecting) return 1;
-    if (!S.last_agent || (S.person_seen && S.person >= S.last_agent)) return 0;
-    return now() - S.last_agent < HANDS_AFTER_MS;
+    if (!hands_active() || !S.last_agent) return 0;
+    return S.press_seq < S.agent_seq;
+}
+int hands_agent_recent(void) { return hands_agent_owns_input(); }
+
+void hands_person_press(void) {
+    if (S.injecting) return;
+    S.person_press = now();
+    S.press_seq = ++S.seq;
 }
 unsigned long hands_ai_events(void) { return S.events; }
 
@@ -763,6 +778,7 @@ static int do_pointer(const HandsReq *r, char **out, int *why) {
     }
     S.injecting = 0;
     S.last_agent = now();
+    S.agent_seq = ++S.seq;
     S.events += (unsigned long)n;
     Jb o = { 0 };
     jb_s(&o, "{\"x\":");
@@ -787,6 +803,7 @@ static int do_scroll(const HandsReq *r, int *why) {
     S.h->wheel(dx, dy);
     S.injecting = 0;
     S.last_agent = now();
+    S.agent_seq = ++S.seq;
     S.events += 2;
     return HANDS_OK;
 }
@@ -809,12 +826,16 @@ static int do_key(const HandsReq *r, int *why) {
             if ((rc = gate(GATE_KEYS, NULL, why))) break;
             if (hands_paste_chord(&c[i]) && S.h->clip_sensitive && S.h->clip_sensitive()) { *why = HANDS_WHY_SENSITIVE_CLIP; rc = HANDS_E_REFUSED; break; }
             S.injecting = 1;
-            if (S.h->key(&c[i])) rc = HANDS_E_ARGS;
+            int kr = S.h->key(&c[i]);
             S.injecting = 0;
+            if (kr == -2) { *why = HANDS_WHY_SENSITIVE_CLIP; rc = HANDS_E_REFUSED; }
+            else if (kr) rc = HANDS_E_ARGS;
             S.last_agent = now();
+    S.agent_seq = ++S.seq;
             S.events += 2;
         }
     S.last_agent = now();
+    S.agent_seq = ++S.seq;
     return rc;
 }
 
@@ -832,6 +853,7 @@ static int do_type(const HandsReq *r, int *why) {
         int w = end > off ? S.h->type(t + off, end - off) : 0;
         S.injecting = 0;
         S.last_agent = now();
+    S.agent_seq = ++S.seq;
         S.events += end - off;
         if (w) { *why = w; return HANDS_E_REFUSED; }
         if (end < n) {
@@ -843,6 +865,7 @@ static int do_type(const HandsReq *r, int *why) {
             S.h->key(&c);
             S.injecting = 0;
             S.last_agent = now();
+    S.agent_seq = ++S.seq;
             S.events++;
         }
         off = end + 1;
@@ -868,6 +891,7 @@ static int do_setvalue(const HandsReq *r, int *why) {
     rc = ask("setvalue", &a, &d, why);
     S.injecting = 0;
     S.last_agent = now();
+    S.agent_seq = ++S.seq;
     if (rc) return rc;
     json_free(&d);
     S.events++;
@@ -1012,6 +1036,7 @@ int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, si
         rc = shell_pass("open", &a, out, why);
         S.injecting = 0;
     S.last_agent = now();
+    S.agent_seq = ++S.seq;
         break;
     case HANDS_C_OPENPATH:
         jb_s(&a, "{\"path\":");
@@ -1023,6 +1048,7 @@ int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, si
         rc = shell_pass("openPath", &a, out, why);
         S.injecting = 0;
     S.last_agent = now();
+    S.agent_seq = ++S.seq;
         break;
     case HANDS_C_CLOSE:
         jb_s(&a, "{\"window\":");
@@ -1034,6 +1060,7 @@ int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, si
         rc = shell_pass("close", &a, out, why);
         S.injecting = 0;
     S.last_agent = now();
+    S.agent_seq = ++S.seq;
         break;
     case HANDS_C_APPLOG: {
         char t[64];

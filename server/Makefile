@@ -731,7 +731,7 @@ build/journal-test: tests/journal_test.c src/logs/journal.c src/logs/journal.h s
 test: build/fw-rules-test build/dnsmap-test build/broker-restrict-test
 # the firewall's non-network restrictions in the real broker code (docs/FIREWALL.md); open() is
 # wrapped so a fake /dev/video9 can be opened
-BROKER_RESTRICT_SRC := src/sec/brokersrv.c src/sec/brokerclip.c src/sec/brokercam.c src/sec/restrict.c src/sec/perms.c src/sec/json.c \
+BROKER_RESTRICT_SRC := src/sec/brokersrv.c src/sec/brokerhands.c src/sec/brokerclip.c src/sec/brokercam.c src/sec/restrict.c src/sec/perms.c src/sec/json.c \
                        src/fw/rules.c src/fw/fwmap.c src/media/proto.c
 build/broker-restrict-test: tests/broker_restrict_test.c $(BROKER_RESTRICT_SRC) $(wildcard src/sec/*.h src/fw/*.h src/media/*.h)
 	@mkdir -p build

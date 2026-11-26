@@ -134,12 +134,16 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
   in the system band, or its root isn't known, **every** agent key is refused: "a protected dialog is open"
   (`protected-dialog`), checked in the shell and again in C on the dialog's root.
 - **security-state natives refuse an agent's input natively** (`hands_native_guard`, applied to every `lord.<ns>.<fn>` in
-  `js.c` `prof_call`): while the agent's input is delivered or was the last input less than 2.5 s ago
-  (`hands_agent_recent`), the vault, `term.fill` and saving a terminal secret, the firewall's changes, permissions,
-  administrator actions, Sentinela's blocklist, theme trust and removal, signing keys, screen-sharing answers, Hands' own
-  switch and power refuse (`hands.refused`), so a surface missing its `handsDeny` can't reopen them;
-  `lord.clipboard.get` answers "" then while the clipboard holds a secret, and the Wayland clipboard never hands a secret
-  to an app the agent is driving. The Terminal's Passwords and save bars, Monitor's firewall switch, rule sheet and
+  `js.c` `prof_call`, and again where each action runs: `term.fill`, the firewall's setters, `perms.set`,
+  `vault.request`, and the broker's keyring, FIDO key and secret-to-clipboard requests of isolated apps). Fail closed:
+  while a Hands client is active and the agent's input came after the person's last real click or key
+  (`hands_agent_owns_input`; motion never counts, time never clears it), the vault and keyring, `term.fill` and saving a
+  terminal secret, the firewall's changes, permissions, administrator actions, Sentinela's blocklist, theme trust and
+  removal, signing keys, screen-sharing answers, Hands' own switch and power refuse (`hands.refused`), so a surface
+  missing its `handsDeny` can't reopen them. While any Hands client is active, a secret on the clipboard is nobody's:
+  `lord.clipboard.get` answers "", the broker gives an app nothing and the Wayland clipboard is not offered; an agent's
+  paste (by the key it resolves to, `KEY_V` with Ctrl or Super, Shift+Insert, `KEY_PASTE`) and middle click are refused,
+  and an agent's input is never an isolated app's paste gesture. The Terminal's Passwords and save bars, Monitor's firewall switch, rule sheet and
   blocklists and Sentinela's blocklist Remove are `handsDeny` too; a program asking for a password in the Terminal gets
   no agent key.
 - **keys**: the whole key gate runs before every chord and repeat of a Key call and before each Tab or Enter of a Type
