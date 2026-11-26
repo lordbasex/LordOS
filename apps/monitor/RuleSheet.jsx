@@ -69,7 +69,8 @@ export function RuleSheet({ app, appLabel, initial = {}, editId, suggestions = [
   };
   const title = editId ? tr('fwrules.sheet.editTitle') : tr(f.action === 'allow' ? 'fwrules.sheet.allowTitle' : 'fwrules.sheet.blockTitle');
   const box = (
-    <View style={{ gap: spacing.l, padding: spacing.xl, borderRadius: 12, width: overlay ? 440 : undefined,
+    // handsDeny: a firewall rule is the person's own decision (docs/HANDS.md; lord.fw refuses an agent natively too)
+    <View handsDeny style={{ gap: spacing.l, padding: spacing.xl, borderRadius: 12, width: overlay ? 440 : undefined,
       backgroundColor: overlay ? (t.mode === 'dark' ? '#2a2a2f' : '#ffffff') : t.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.025)',
       border: `1px solid ${t.separator}`, boxShadow: overlay ? '0 18px 50px rgba(0,0,0,0.35)' : 'none' }}>
       <View style={{ gap: 3 }}>
@@ -116,7 +117,7 @@ export function RuleSheet({ app, appLabel, initial = {}, editId, suggestions = [
   );
   if (!overlay) return box;
   return (
-    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.28)' }}>
+    <View handsDeny style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.28)' }}>
       {box}
     </View>
   );

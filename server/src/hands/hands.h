@@ -55,6 +55,7 @@
 #define HANDS_REPEAT_MAX  20
 #define HANDS_SCROLL_MAX  30
 #define HANDS_LOG_MAX     400       /* AppLog lines */
+#define HANDS_AFTER_MS    2500      /* what the agent's input set off stays the agent's this long (hands_agent_recent) */
 
 /* D-Bus error names (handsbus.c); their message is one closed word */
 #define HANDS_ERR_OFF      "org.lordos.Hands1.Error.Off"         /* Settings → AI → Hands is off */
@@ -81,7 +82,7 @@ enum {
 enum {
     HANDS_WHY_NONE = 0, HANDS_WHY_SYSTEM, HANDS_WHY_PROTECTED, HANDS_WHY_PASSWORD, HANDS_WHY_DENIED_NODE,
     HANDS_WHY_ALLOWLIST, HANDS_WHY_PROMPT, HANDS_WHY_LOCKED, HANDS_WHY_POINTER_LOCK, HANDS_WHY_OUTSIDE,
-    HANDS_WHY_OBSCURED, HANDS_WHY_NOT_EDITABLE, HANDS_WHY_DIALOG, HANDS_WHY_COUNT,
+    HANDS_WHY_OBSCURED, HANDS_WHY_NOT_EDITABLE, HANDS_WHY_DIALOG, HANDS_WHY_SENSITIVE_CLIP, HANDS_WHY_COUNT,
 };
 const char *hands_why_word(int why);       /* "system-layer", "protected", "password", "protected-dialog", … */
 
@@ -138,6 +139,7 @@ typedef struct {
 int  hands_chord(const char *s, HandsChord *c);  /* 0, or -1 not a chord the agent may press */
 /* chords separated by spaces ("ctrl+a Delete"): at most 8; 0 each into c[], their count in *n */
 int  hands_chords(const char *s, HandsChord *c, int max, int *n);
+int  hands_paste_chord(const HandsChord *c);  /* Ctrl/Super+V, Ctrl+Shift+V, Shift+Insert */
 
 /* a token bucket: at most `burst` at once, `per_s` a second after that */
 typedef struct { double tokens, last; int init; } HandsBucket;
@@ -177,6 +179,7 @@ typedef struct {
     uint8_t *(*shot)(int kind, uint32_t display, int node, double x, double y, double w, double h, int maxdim,
                      const int *black, int nblack, size_t *len, int *iw, int *ih, char *meta, size_t metan);
     double (*now)(void);                            /* ms, monotonic */
+    int  (*clip_sensitive)(void);                   /* the clipboard holds a secret (Passwords' copy): no agent paste */
 } HandsHost;
 
 void hands_init(const HandsHost *h);
@@ -203,6 +206,13 @@ void hands_qa(int on);
 int  hands_qa_mode(void);
 /* the agent's input is being delivered now (lord.hands.injecting) and how many events it has sent */
 int  hands_injecting(void);
+/* the agent's input is being delivered or was, after the person's own, less than HANDS_AFTER_MS ago: a security-state
+ * change now is the agent's doing and is refused (js.c hands_guard, term.fill, the clipboard to Linux apps) */
+int  hands_agent_recent(void);
+/* what a lord.<ns>.<fn> native is to an agent's input: HANDS_G_REFUSE (a security-state change), HANDS_G_CLIP
+ * (lord.clipboard.get: "" while the clipboard holds a secret) or HANDS_G_NONE (js.c prof_call) */
+enum { HANDS_G_NONE = 0, HANDS_G_REFUSE, HANDS_G_CLIP };
+int  hands_native_guard(const char *name);
 unsigned long hands_ai_events(void);
 /* {"on","qa","allow":[…],"clients":[{"bus","name","exe","kind","state","actions"}],"events"} for the shell */
 char *hands_status_json(void);

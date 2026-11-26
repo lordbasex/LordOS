@@ -37,7 +37,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     out, the power dialog (its countdown cancels when an agent opened it), Machines' automation permission, encryption
     choice and recovery key, and the pages and apps listed in `sdk/handsdeny.js` (Settings → Network, Sharing, Cloud,
     Privacy with the firewall, Users, Web apps, Flatpak, Updates, Session; Store, Passwords, Backups, Disks, Imager,
-    the installer, Remote Desktop); no key at all while a protected dialog has the keyboard. Screenshots
+    the installer, Remote Desktop), the Terminal's Passwords bars, Monitor's firewall controls and Sentinela's blocklist;
+    no key at all while a protected dialog has the keyboard. Security-state natives (the vault, filling a terminal
+    password, the firewall, permissions, administrator actions, theme trust, power) refuse natively while an agent's
+    input is recent; no paste of a secret; the key gate runs before every chord; Flatpak apps can't reach Hands1. Screenshots
     show them black, failing closed; with an allowlist, everything but the allowed windows is black.
   - **QA mode**: `lordos-mcp --headless APP` starts a private headless desktop (`lord-server --headless --hands-qa`, a
     private bus, a demo home with sample files, and a demo identity: "Alex Demo", login "demo", host "demo-pc", never

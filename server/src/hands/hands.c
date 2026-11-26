@@ -12,7 +12,7 @@
 
 static const char *const WHY[HANDS_WHY_COUNT] = {
     "none", "system-layer", "protected", "password", "hidden-from-agent", "allowlist", "authentication-prompt", "locked",
-    "pointer-lock", "outside", "obscured", "not-editable", "protected-dialog",
+    "pointer-lock", "outside", "obscured", "not-editable", "protected-dialog", "sensitive-clipboard",
 };
 const char *hands_why_word(int why) { return why >= 0 && why < HANDS_WHY_COUNT ? WHY[why] : "none"; }
 
@@ -254,6 +254,27 @@ int hands_chords(const char *s, HandsChord *c, int max, int *n) {
     return *n ? 0 : -1;
 }
 
+/* ---- the security-state natives an agent's input never sets off (js.c prof_call) ----
+ * the vault, filling a password into a terminal, the firewall's changes, permissions, administrator actions, Sentinela's
+ * blocklist, theme trust and removal, signing keys, screen-sharing answers, Hands' own switch, power; lord.clipboard.get
+ * answers "" while the clipboard holds a secret. A name ending in "." covers its whole namespace. */
+int hands_native_guard(const char *name) {
+    static const char *const refuse[] = {
+        "vault.", "admin.", "term.fill", "term.saveSecret", "term.dropSecret", "perms.set",
+        "fw.setList", "fw.addList", "fw.removeList", "fw.setAppRule", "fw.setTrusted", "fw.setRestricted", "fw.setMode",
+        "fw.addRule", "fw.removeRule", "fw.updateRule", "sentinela.block", "sentinela.unblock",
+        "themes.trust", "themes.remove", "sign.share", "sign.restore", "share.answer", "hands.serve", "hands.answer",
+        "session.power",
+    };
+    if (!name) return HANDS_G_NONE;
+    if (!strcmp(name, "clipboard.get")) return HANDS_G_CLIP;
+    for (size_t i = 0; i < sizeof refuse / sizeof refuse[0]; i++) {
+        size_t l = strlen(refuse[i]);
+        if (refuse[i][l - 1] == '.' ? !strncmp(name, refuse[i], l) : !strcmp(name, refuse[i])) return HANDS_G_REFUSE;
+    }
+    return HANDS_G_NONE;
+}
+
 /* ---- rate ---- */
 
 int hands_rate_take(HandsBucket *b, double now, double per_s, double burst) {
@@ -351,6 +372,7 @@ static struct {
     Client c[HANDS_CLIENTS];
     double person;
     int person_seen;
+    double last_agent;                  /* when the agent's last input was delivered */
     unsigned long events;
     HandsBucket input, shot, read, hello;
 } S;
@@ -359,10 +381,20 @@ void hands_init(const HandsHost *h) { S.h = h; }
 const HandsHost *hands_host(void) { return S.h; }
 int hands_on(void) { return S.on; }
 int hands_qa_mode(void) { return S.qa; }
+static double now(void) { return S.h && S.h->now ? S.h->now() : 0; }
 int hands_injecting(void) { return S.injecting; }
+
+/* The agent's input is being delivered, or was the last input, less than HANDS_AFTER_MS ago and after the person's own:
+ * what it set off (a click's handler, a promise after it) is the agent's. lord-server's security-state natives refuse
+ * then (js.c hands_guard: the vault, term.fill, the firewall, permissions, administrator actions…), so a surface missing
+ * its handsDeny can't reopen them. */
+int hands_agent_recent(void) {
+    if (S.injecting) return 1;
+    if (!S.last_agent || (S.person_seen && S.person >= S.last_agent)) return 0;
+    return now() - S.last_agent < HANDS_AFTER_MS;
+}
 unsigned long hands_ai_events(void) { return S.events; }
 
-static double now(void) { return S.h && S.h->now ? S.h->now() : 0; }
 
 char *hands_status_json(void) {
     Jb b = { 0 };
@@ -705,6 +737,8 @@ static int gate_xy(double x, double y, int pointer, Gate *g, int *why) {
 
 static int do_pointer(const HandsReq *r, char **out, int *why) {
     Gate g, e;
+    /* a middle click pastes the primary selection: never while the clipboard holds a secret */
+    if (r->action == HANDS_P_MIDDLE && S.h->clip_sensitive && S.h->clip_sensitive()) { *why = HANDS_WHY_SENSITIVE_CLIP; return HANDS_E_REFUSED; }
     int rc = r->ref[0] ? gate_ref(r->ref, 1, &g, why) : gate_xy(r->x, r->y, 1, &g, why);
     if (rc) return rc;
     if (r->action == HANDS_P_DRAG && (rc = gate_xy(r->x2, r->y2, 1, &e, why))) return rc;
@@ -728,6 +762,7 @@ static int do_pointer(const HandsReq *r, char **out, int *why) {
     }
     }
     S.injecting = 0;
+    S.last_agent = now();
     S.events += (unsigned long)n;
     Jb o = { 0 };
     jb_s(&o, "{\"x\":");
@@ -751,25 +786,35 @@ static int do_scroll(const HandsReq *r, int *why) {
     int dy = r->dir == HANDS_DIR_UP ? k : r->dir == HANDS_DIR_DOWN ? -k : 0;
     S.h->wheel(dx, dy);
     S.injecting = 0;
+    S.last_agent = now();
     S.events += 2;
     return HANDS_OK;
+}
+
+/* Ctrl+V, Ctrl+Shift+V, Shift+Insert, Super+V: a paste */
+int hands_paste_chord(const HandsChord *c) {
+    if (c->code == KEY_INSERT && (c->mods & HANDS_M_SHIFT)) return 1;
+    return (c->ch[0] == 'v' || c->ch[0] == 'V') && !c->ch[1] && (c->mods & (HANDS_M_CTRL | HANDS_M_SUPER));
 }
 
 static int do_key(const HandsReq *r, int *why) {
     HandsChord c[8];
     int n = 0;
     if (hands_chords(r->text, c, 8, &n)) return HANDS_E_ARGS;
-    int rc = gate(GATE_KEYS, NULL, why);
-    if (rc) return rc;
+    int rc = 0;
     int rep = r->repeat < 1 ? 1 : r->repeat;
-    S.injecting = 1;
+    /* the whole key gate before every chord and every repeat: a Tab may have moved the focus into a denied control */
     for (int k = 0; k < rep && !rc; k++)
         for (int i = 0; i < n && !rc; i++) {
-            if (S.h->keys_place && (*why = S.h->keys_place())) { rc = HANDS_E_REFUSED; break; }
+            if ((rc = gate(GATE_KEYS, NULL, why))) break;
+            if (hands_paste_chord(&c[i]) && S.h->clip_sensitive && S.h->clip_sensitive()) { *why = HANDS_WHY_SENSITIVE_CLIP; rc = HANDS_E_REFUSED; break; }
+            S.injecting = 1;
             if (S.h->key(&c[i])) rc = HANDS_E_ARGS;
+            S.injecting = 0;
+            S.last_agent = now();
             S.events += 2;
         }
-    S.injecting = 0;
+    S.last_agent = now();
     return rc;
 }
 
@@ -785,14 +830,21 @@ static int do_type(const HandsReq *r, int *why) {
         while (end < n && t[end] != '\n' && t[end] != '\t') end++;
         S.injecting = 1;
         int w = end > off ? S.h->type(t + off, end - off) : 0;
-        if (!w && end < n) {
+        S.injecting = 0;
+        S.last_agent = now();
+        S.events += end - off;
+        if (w) { *why = w; return HANDS_E_REFUSED; }
+        if (end < n) {
+            /* the field is checked again before the Enter or Tab, then after it (the Tab may have moved the focus) */
+            if ((rc = gate(GATE_KEYS, NULL, why))) break;
             HandsChord c = { 0 };
             c.code = t[end] == '\n' ? KEY_ENTER : KEY_TAB;
+            S.injecting = 1;
             S.h->key(&c);
+            S.injecting = 0;
+            S.last_agent = now();
+            S.events++;
         }
-        S.injecting = 0;
-        S.events += end - off + 1;
-        if (w) { *why = w; return HANDS_E_REFUSED; }
         off = end + 1;
         if (end < n && off < n) rc = gate(GATE_KEYS, NULL, why);
     }
@@ -815,6 +867,7 @@ static int do_setvalue(const HandsReq *r, int *why) {
     S.injecting = 1;
     rc = ask("setvalue", &a, &d, why);
     S.injecting = 0;
+    S.last_agent = now();
     if (rc) return rc;
     json_free(&d);
     S.events++;
@@ -958,6 +1011,7 @@ int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, si
         S.injecting = 1;
         rc = shell_pass("open", &a, out, why);
         S.injecting = 0;
+    S.last_agent = now();
         break;
     case HANDS_C_OPENPATH:
         jb_s(&a, "{\"path\":");
@@ -968,6 +1022,7 @@ int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, si
         S.injecting = 1;
         rc = shell_pass("openPath", &a, out, why);
         S.injecting = 0;
+    S.last_agent = now();
         break;
     case HANDS_C_CLOSE:
         jb_s(&a, "{\"window\":");
@@ -978,6 +1033,7 @@ int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, si
         S.injecting = 1;
         rc = shell_pass("close", &a, out, why);
         S.injecting = 0;
+    S.last_agent = now();
         break;
     case HANDS_C_APPLOG: {
         char t[64];

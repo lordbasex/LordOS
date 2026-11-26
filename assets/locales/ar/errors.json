@@ -972,5 +972,6 @@
   "sys.failed": "حدث خطأ ما.",
   "sys.unsupported": "لا يستطيع هذا الإصدار من LordOS فعل ذلك.",
   "theme.notAllowed": "{call} غير متاح لسمات المجتمع",
-  "theme.noHost": "جزء LordOS من نمط سطح المكتب مفقود"
+  "theme.noHost": "جزء LordOS من نمط سطح المكتب مفقود",
+  "hands.refused": "يمكنك أنت فقط القيام بهذا: لا يمكن ذلك أبدًا بإدخال وكيل ذكاء اصطناعي"
 }

@@ -23,6 +23,7 @@
  *
  * wp_security_context_manager_v1 (secctx.c): a sandbox's own socket; its clients count as sandboxed and don't
  * see the globals only trusted clients get. */
+#include "../hands/hands.h"
 #include "wl.h"
 #include "keygrab.h"
 #include "secctx.h"
@@ -3312,6 +3313,8 @@ static void ofr_receive(struct wl_client *c, struct wl_resource *r, const char *
     OfferRef *ref = wl_resource_get_user_data(r);
     if (!ref || ref->gen != clip_offer_gen || !key_focus || key_focus->client != c) { close(fd); return; }   /* stale, or not focused */
     Source *src = ref->src;
+    /* LordOS's clipboard holding a secret (Passwords' copy) never goes to an app an AI agent's input is driving (Hands) */
+    if (!src && term_clipboard_sensitive() && hands_agent_recent()) { close(fd); return; }
     if (ref->nofiles && dndg_file_mime(mime)) { close(fd); return; }
     if (src && src == selection) { wl_data_source_send_send(src->res, mime, fd); close(fd); return; }
     if (!src && clip_is_image && clip_png && !strcmp(mime, "image/png")) { send_bytes(fd, clip_png, clip_png_len); return; }

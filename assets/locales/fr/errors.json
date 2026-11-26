@@ -968,5 +968,6 @@
   "sys.failed": "Un problème est survenu.",
   "sys.unsupported": "Cette version de LordOS ne peut pas faire cela.",
   "theme.notAllowed": "{call} n'est pas disponible pour les thèmes de la communauté",
-  "theme.noHost": "La partie LordOS du style de bureau est manquante"
+  "theme.noHost": "La partie LordOS du style de bureau est manquante",
+  "hands.refused": "Vous seul pouvez faire cela : jamais la saisie d'un agent d'IA"
 }

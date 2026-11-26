@@ -967,5 +967,6 @@
   "sys.failed": "Đã xảy ra sự cố.",
   "sys.unsupported": "Phiên bản LordOS này không làm được việc đó.",
   "theme.notAllowed": "{call} không dùng được cho chủ đề cộng đồng",
-  "theme.noHost": "Thiếu phần LordOS của kiểu màn hình nền"
+  "theme.noHost": "Thiếu phần LordOS của kiểu màn hình nền",
+  "hands.refused": "Chỉ bạn mới làm được việc này: không bao giờ là thao tác của tác tử AI"
 }

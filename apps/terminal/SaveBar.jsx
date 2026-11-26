@@ -39,7 +39,8 @@ export function SaveBar({ sid, wid, offer }) {
     </View>
   );
   return (
-    <View style={{ position: 'absolute', left: 10, right: 10, bottom: 10, padding: 8, gap: 6, borderRadius: 10, backgroundColor: th.windowBg,
+    // handsDeny: saving a typed password to the vault is never an AI agent's (docs/HANDS.md)
+    <View handsDeny style={{ position: 'absolute', left: 10, right: 10, bottom: 10, padding: 8, gap: 6, borderRadius: 10, backgroundColor: th.windowBg,
       border: `1px solid ${th.separator}`, boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Text style={{ fontSize: 14 }}>🔑</Text>

@@ -967,5 +967,6 @@
   "sys.failed": "Sesuatu tidak kena.",
   "sys.unsupported": "Versi LordOS ini tidak dapat melakukannya.",
   "theme.notAllowed": "{call} tidak tersedia untuk tema komuniti",
-  "theme.noHost": "Bahagian LordOS gaya desktop tiada"
+  "theme.noHost": "Bahagian LordOS gaya desktop tiada",
+  "hands.refused": "Hanya anda boleh melakukan ini: tidak sekali-kali input ejen AI"
 }

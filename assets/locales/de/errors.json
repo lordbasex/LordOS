@@ -968,5 +968,6 @@
   "sys.failed": "Etwas ist schiefgelaufen.",
   "sys.unsupported": "Diese Version von LordOS kann das nicht.",
   "theme.notAllowed": "{call} ist für Community-Themes nicht verfügbar",
-  "theme.noHost": "Der LordOS-Teil des Schreibtischstils fehlt"
+  "theme.noHost": "Der LordOS-Teil des Schreibtischstils fehlt",
+  "hands.refused": "Nur du kannst das tun: nie die Eingabe eines KI-Agenten"
 }

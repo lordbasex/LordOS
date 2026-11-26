@@ -233,7 +233,8 @@ function RuleSwitch({ g, selected, onConfirm }) {
     else firewall.setAppRule(g.key, on ? 'deny' : 'allow');
   };
   return (
-    <View onClick={(e) => { e.stopPropagation(); flip(); }}
+    // handsDeny: allowing or blocking an app is the person's own (docs/HANDS.md)
+    <View handsDeny onClick={(e) => { e.stopPropagation(); flip(); }}
       style={{ width: 26, height: 14, borderRadius: 7, backgroundColor: selected ? 'rgba(255,255,255,0.35)' : on ? 'rgba(48,209,88,0.35)' : 'rgba(255,69,58,0.35)',
         opacity: can ? 1 : 0.45, justifyContent: 'center', alignItems: on ? 'flex-end' : 'flex-start', paddingHorizontal: 2, direction: 'ltr' }}>
       <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: selected ? '#fff' : color }} />

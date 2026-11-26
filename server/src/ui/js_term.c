@@ -8,6 +8,7 @@
  * followed by one of three fixed exit rules (programExit: 'close' | 'closeIfOk' | 'keep'). JS never sees
  * or chooses the command: an unknown, used or expired token throws term.createFailed and nothing starts. */
 #include "js_term.h"
+#include "../hands/hands.h"
 #include "../wl/wl.h"
 #include "../wl/urilist.h"
 #include "../bgsave.h"
@@ -191,6 +192,8 @@ static JSValue f_configure(JSContext *c, JSValueConst this_val, int argc, JSValu
 static JSValue f_write(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     Session *s = arg_session(c, argv[0]);
+    /* a program asking for a password: never an AI agent's keys (Hands, docs/HANDS.md) */
+    if (s && hands_injecting() && term_asks_secret(s, NULL, 0)) return JS_UNDEFINED;
     size_t n;
     uint8_t *raw = JS_GetArrayBuffer(c, &n, argv[1]);      /* raw bytes as-is ("hex" mappings) */
     if (raw) { if (s) term_input(s, (const char *)raw, n); return JS_UNDEFINED; }
@@ -204,6 +207,8 @@ static JSValue f_write(JSContext *c, JSValueConst this_val, int argc, JSValueCon
 static JSValue f_key(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     Session *s = arg_session(c, argv[0]);
+    /* a program asking for a password: never an AI agent's keys (Hands, docs/HANDS.md) */
+    if (s && hands_injecting() && term_asks_secret(s, NULL, 0)) return JS_UNDEFINED;
     const char *key = JS_ToCString(c, argv[1]), *chr = JS_ToCString(c, argv[2]), *base = JS_ToCString(c, argv[3]);
     int32_t mods = 0;
     JS_ToInt32(c, &mods, argv[4]);
@@ -217,6 +222,8 @@ static JSValue f_key(JSContext *c, JSValueConst this_val, int argc, JSValueConst
 static JSValue f_paste(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     Session *s = arg_session(c, argv[0]);
+    /* a program asking for a password: never an AI agent's keys (Hands, docs/HANDS.md) */
+    if (s && hands_injecting() && term_asks_secret(s, NULL, 0)) return JS_UNDEFINED;
     const char *d = JS_ToCString(c, argv[1]);
     if (s && d) term_paste(s, d);
     if (d) JS_FreeCString(c, d);

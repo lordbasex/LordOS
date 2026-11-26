@@ -968,5 +968,6 @@
   "sys.failed": "Alguna cosa ha anat malament.",
   "sys.unsupported": "Aquesta versió de LordOS no pot fer això.",
   "theme.notAllowed": "{call} no està disponible per als temes de la comunitat",
-  "theme.noHost": "Falta la part de LordOS de l'estil d'escriptori"
+  "theme.noHost": "Falta la part de LordOS de l'estil d'escriptori",
+  "hands.refused": "Només tu pots fer això: mai l'entrada d'un agent d'IA"
 }

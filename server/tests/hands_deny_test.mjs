@@ -29,5 +29,17 @@ yes('every destructive confirmation is handsDeny', /handsDeny=\{handsDeny \?\? !
 yes('the trust dialog is handsDeny', /ConfirmDialog cautious handsDeny/.test(readFileSync(`${root}apps/settings/ThemeGallery.jsx`, 'utf8')));
 yes('the power dialog is handsDeny', /handsDeny: true/.test(readFileSync(`${root}sdk/power.jsx`, 'utf8')));
 yes('Settings → AI → Hands is handsDeny', /<View handsDeny style/.test(readFileSync(`${root}apps/settings/AI.jsx`, 'utf8')));
+// the person-only controls outside the denied pages and apps (security scan F1, F5)
+const has = (f, re) => re.test(readFileSync(`${root}${f}`, 'utf8'));
+yes('the Terminal\'s Passwords bar is handsDeny', has('apps/terminal/SecretBar.jsx', /<View handsDeny style/));
+yes('the Terminal\'s save-to-Passwords bar is handsDeny', has('apps/terminal/SaveBar.jsx', /<View handsDeny style/));
+yes('Monitor\'s per-app firewall switch is handsDeny', has('apps/monitor/Network.jsx', /<View handsDeny onClick=\{\(e\) => \{ e\.stopPropagation\(\); flip\(\); \}\}/));
+yes('the firewall rule sheet is handsDeny', (readFileSync(`${root}apps/monitor/RuleSheet.jsx`, 'utf8').match(/<View handsDeny/g) || []).length === 2);
+yes('the blocklists are handsDeny', has('apps/monitor/Blocklists.jsx', /<View handsDeny style/));
+yes('Sentinela\'s blocklist Remove is handsDeny', has('apps/settings/Sentinela.jsx', /<Button small handsDeny label=\{tr\('sentinela\.block\.remove'\)\}/));
+yes('Tab skips person-only controls for an agent', has('sdk/focus.js', /agentKey\(\) && to && deniedUp\(to\)/));
+yes('a person-only control swallows an agent\'s key', has('sdk/focus.js', /if \(agentKey\(\) && deniedUp\(n\)\) return true;/));
+yes('a person-only app is never opened by an agent', has('sdk/hands.jsx', /if \(appDenied\(app\.id\)\) return \{ error: 'hidden-from-agent' \}/));
+yes('a person-only app in front takes no agent key', has('sdk/hands.jsx', /frontDenied = !!\(f && appDenied\(appOfId\(f\)\)\)/));
 console.log(`hands-deny-test: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

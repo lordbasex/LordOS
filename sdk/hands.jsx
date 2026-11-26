@@ -38,6 +38,7 @@ import {
 } from './handsmodel.js';
 import { focusedNode } from './focus.js';
 import { dialogStack } from './dialogkeys.js';
+import { appDenied } from './handsdeny.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.hands && typeof lord.hands.serve === 'function' ? lord.hands : null);
 export const handsStatus = createStore({ on: false, qa: false, allow: [], clients: [], events: 0 });
@@ -192,7 +193,9 @@ const OPS = {
     const f = frontWindow();
     const fi = f ? frameInst(f) : null;
     const held = [box, kf].filter((n) => n && !n.deleted);
-    const secure = held.some(deniedOrProtected) || !!(fi && own(fi.props, 'protected')) || !!(f && wm.get(f)?.protected);
+    // a person-only app in front (sdk/handsdeny.js), or its frame in a denied place: no key, whatever holds the focus
+    const frontDenied = !!(f && appDenied(appOfId(f))) || !!(fi && deniedOrProtected(fi));
+    const secure = held.some(deniedOrProtected) || frontDenied || !!(f && wm.get(f)?.protected);
     const nodes = held.map((n) => n.id).filter((id) => typeof id === 'number' && id > 0);
     // a dialog that owns the keyboard (Enter answers it): one an agent never answers (handsDeny, protected, the system
     // band), or one whose root isn't known, refuses every key (fail closed)
@@ -246,6 +249,7 @@ const OPS = {
     const app = matchApp(apps, a.app);
     if (!app) return { error: 'not-found' };
     if (!allowed(a.allow, app.id)) return { error: 'allowlist' };
+    if (appDenied(app.id)) return { error: 'hidden-from-agent' };   // a person-only app (sdk/handsdeny.js)
     const id = wm.open(app.id);
     return id ? { window: id, app: app.id } : { error: 'not-found' };
   },

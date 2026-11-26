@@ -43,6 +43,9 @@ void handsbus_lost(void);
 /* the program path of the process a pidfd holds, for the prompt only (reported, not verified): 0, or -1 unknown */
 int  handsbus_exe_of_pidfd(int pidfd, char *out, size_t n);
 
+/* a Flatpak app or its D-Bus proxy (/.flatpak-info, an app-flatpak-* cgroup, xdg-dbus-proxy): 1, or unknowable */
+int  handsbus_sandboxed(long pid);
+
 /* ---- pure, for tests (tests/hands_test.c and its fuzz) ---- */
 /* The method's arguments into r (strings borrowed from m): 0, or -1 a wrong signature, method or value. */
 int  handsbus_parse(const DMsg *m, HandsReq *r);

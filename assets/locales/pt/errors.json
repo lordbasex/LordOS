@@ -968,5 +968,6 @@
   "sys.failed": "Algo deu errado.",
   "sys.unsupported": "Esta versão do LordOS não consegue fazer isso.",
   "theme.notAllowed": "{call} não está disponível para temas da comunidade",
-  "theme.noHost": "Falta a parte do LordOS do estilo de área de trabalho"
+  "theme.noHost": "Falta a parte do LordOS do estilo de área de trabalho",
+  "hands.refused": "Só você pode fazer isto: nunca a entrada de um agente de IA"
 }

@@ -1131,9 +1131,10 @@ static uint8_t *hands_shot(int kind, uint32_t display, int node, double x, doubl
 }
 static char *hands_shell(const char *op, const char *json) { return js_hands_call(op, json); }
 static double hands_now(void) { return now_ms(); }
+static int hands_clip_sensitive(void) { return term_clipboard_sensitive(); }
 static const HandsHost hands_host_impl = {
     hands_shell, js_hands_event, hands_size, hands_pointer_locked, hands_place, hands_same_target, hands_node_place_id, hands_keys_place,
-    hands_move, hands_button, hands_wheel, hands_key, hands_type, hands_shot, hands_now,
+    hands_move, hands_button, hands_wheel, hands_key, hands_type, hands_shot, hands_now, hands_clip_sensitive,
 };
 
 static void remote_greeter(const char *json) { js_greeter_event(json); }

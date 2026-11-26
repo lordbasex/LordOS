@@ -71,7 +71,8 @@ export function BlocklistsPrivacy() {
   const foot = (text, color) => <Text style={{ fontSize: typeScale.caption, color: color || t.textDim, lineHeight: 1.4, marginHorizontal: spacing.xs, textAlign: 'start' }}>{text}</Text>;
   const on = st.lists.filter((l) => l.on).length;
   return (
-    <View style={{ gap: 20 }}>
+    // handsDeny: the blocklists are the person's own (docs/HANDS.md)
+    <View handsDeny style={{ gap: 20 }}>
       <View style={{ gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 22, paddingHorizontal: spacing.xs, gap: spacing.s }}>
           <Text style={{ flex: 1, fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('firewall.lists.title')}</Text>

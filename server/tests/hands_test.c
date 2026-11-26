@@ -41,7 +41,7 @@ uid_t hands_test_getuid(void) { return (uid_t)(syscall(SYS_getuid) + uid_delta);
 /* ---- a fake host ---- */
 
 static double clock_ms = 100000;
-static int dialog_open, dialog_node_why;
+static int dialog_open, dialog_node_why, focus_secure_after, focus_calls;
 static int place_why, node_why, same, keys_why, focus_secure, region_inside, ref_secure, black_n;
 static int moves, buttons, keys, typed, shots, setvalues, last_black;
 static char last_event[512];
@@ -49,6 +49,7 @@ static char *shell(const char *op, const char *json) {
     (void)json;
     char b[256];
     if (!strcmp(op, "resolve")) snprintf(b, sizeof b, "{\"node\":7,\"x\":100,\"y\":100,\"w\":40,\"h\":20,\"secure\":%s}", ref_secure ? "true" : "false");
+    else if (!strcmp(op, "focus") && focus_secure_after && ++focus_calls > focus_secure_after) snprintf(b, sizeof b, "{\"secure\":true,\"allowed\":true}");
     else if (!strcmp(op, "focus")) snprintf(b, sizeof b, "{\"secure\":%s,\"allowed\":true,\"nodes\":[55],\"dialog\":%s,\"dialogNode\":%d}",
                                              focus_secure ? "true" : "false", dialog_open == 1 ? "true" : "false", dialog_open ? 77 : 0);
     else if (!strcmp(op, "target")) snprintf(b, sizeof b, "{\"allowed\":true}");
@@ -83,7 +84,9 @@ static uint8_t *shot(int kind, uint32_t display, int node, double x, double y, d
     return (uint8_t *)strdup("PNG");
 }
 static double now(void) { return clock_ms; }
-static const HandsHost host = { shell, event, size, plocked, place, same_target, node_place, keys_place, move, button, wheel, key, type, shot, now };
+static int clip_secret;
+static int clip_sensitive(void) { return clip_secret; }
+static const HandsHost host = { shell, event, size, plocked, place, same_target, node_place, keys_place, move, button, wheel, key, type, shot, now, clip_sensitive };
 
 static int call(const char *bus, HandsReq *r, int *why) {
     char *out = NULL;
@@ -223,6 +226,40 @@ static void policy(void) {
     int k0 = keys;
     CHECK(call(":1.1", &enter, &why) == HANDS_OK && keys == k0 + 1, "Enter on an ordinary dialog goes");
     dialog_open = 0;
+    /* F2: the whole key gate before every chord: "tab space" whose Tab lands in a denied control never presses it */
+    HandsReq ts = { .call = HANDS_C_KEY, .text = "Tab space", .text_len = 9 };
+    int kk = keys;
+    focus_secure_after = 1;
+    focus_calls = 0;
+    CHECK(call(":1.1", &ts, &why) == HANDS_E_REFUSED && why == HANDS_WHY_PASSWORD && keys == kk + 1, "the Space after a Tab into a denied control is refused (%d keys)", keys - kk);
+    HandsReq rp = { .call = HANDS_C_KEY, .text = "Tab", .text_len = 3, .repeat = 5 };
+    kk = keys;
+    focus_calls = 0;
+    CHECK(call(":1.1", &rp, &why) == HANDS_E_REFUSED && keys == kk + 1, "every repeat gated too (%d keys)", keys - kk);
+    HandsReq tt = { .call = HANDS_C_TYPE, .text = "a\tb", .text_len = 3 };
+    int ty0 = typed;
+    kk = keys;
+    focus_calls = 0;
+    CHECK(call(":1.1", &tt, &why) == HANDS_E_REFUSED && typed == ty0 + 1 && keys == kk, "typing: the gate runs before the Tab, not only after it");
+    focus_secure_after = 0;
+    /* F4: no paste of a secret: Ctrl+V, Shift+Insert and a middle click refused while the clipboard holds one */
+    clip_secret = 1;
+    HandsReq pv = { .call = HANDS_C_KEY, .text = "ctrl+v", .text_len = 6 };
+    CHECK(call(":1.1", &pv, &why) == HANDS_E_REFUSED && why == HANDS_WHY_SENSITIVE_CLIP, "ctrl+v with a secret on the clipboard refused");
+    HandsReq pi = { .call = HANDS_C_KEY, .text = "shift+Insert", .text_len = 12 };
+    CHECK(call(":1.1", &pi, &why) == HANDS_E_REFUSED && why == HANDS_WHY_SENSITIVE_CLIP, "shift+Insert refused");
+    HandsReq mc = { .call = HANDS_C_POINTER, .action = HANDS_P_MIDDLE, .x = 200, .y = 200 };
+    CHECK(call(":1.1", &mc, &why) == HANDS_E_REFUSED && why == HANDS_WHY_SENSITIVE_CLIP, "a middle click refused");
+    clip_secret = 0;
+    CHECK(call(":1.1", &pv, &why) == HANDS_OK, "ctrl+v goes when the clipboard holds no secret");
+    /* the agent's input stays its own for a moment: security-state natives refuse (js.c) */
+    CHECK(hands_agent_recent(), "just after the agent's key: recent");
+    clock_ms += HANDS_AFTER_MS + 10;
+    CHECK(!hands_agent_recent(), "later: not");
+    CHECK(call(":1.1", &pv, &why) == HANDS_OK && hands_agent_recent(), "again after a key");
+    hands_person_input();
+    CHECK(!hands_agent_recent(), "the person's own input after it: theirs");
+    clock_ms += 4000;
     keys_why = HANDS_WHY_PROMPT;
     CHECK(call(":1.1", &ty, &why) == HANDS_E_REFUSED && why == HANDS_WHY_PROMPT, "an authentication prompt takes no agent keys");
     keys_why = 0;
@@ -348,6 +385,13 @@ static void stand_in(const char *addr, int ready) {
     if (dbus_wait_reply(&c, dbus_send(&c, &h, &b), &m, 3000) != 1) _exit(1);
     dbus_msg_free(&m);
     dw_free(&b);
+    /* the portal's name too, as on the real connection: a call to it must never reach Hands */
+    dw_init(&b);
+    dw_str(&b, "org.freedesktop.portal.Desktop");
+    dw_u32(&b, 4);
+    if (dbus_wait_reply(&c, dbus_send(&c, &h, &b), &m, 3000) != 1) _exit(1);
+    dbus_msg_free(&m);
+    dw_free(&b);
     if (write(ready, "r", 1) != 1) _exit(1);
     close(ready);
     for (;;) {
@@ -367,14 +411,23 @@ static void stand_in(const char *addr, int ready) {
     }
 }
 
-static int hello(DConn *c, DMsg *m) {
+static int hello_to(DConn *c, DMsg *m, const char *dest) {
     DBuf q;
     dw_init(&q);
     dw_str(&q, "Claude Code");
-    DHdr h = { .type = DBUS_CALL, .path = HANDS_BUS_PATH, .iface = HANDS_BUS_IFACE, .member = "Hello", .dest = HANDS_BUS_NAME, .sig = "s" };
+    DHdr h = { .type = DBUS_CALL, .path = HANDS_BUS_PATH, .iface = HANDS_BUS_IFACE, .member = "Hello", .dest = dest, .sig = "s" };
     int r = dbus_wait_reply(c, dbus_send(c, &h, &q), m, 3000);
     dw_free(&q);
     return r;
+}
+static char portal_err[128];
+static int hello(DConn *c, DMsg *m) {
+    /* first through the portal's name (a Flatpak's proxy lets that one through): refused before anything */
+    DMsg pm;
+    int pr = hello_to(c, &pm, "org.freedesktop.portal.Desktop");
+    snprintf(portal_err, sizeof portal_err, "%s", pr == 0 && pm.error ? pm.error : "answered");
+    if (pr >= 0) dbus_msg_free(&pm);
+    return hello_to(c, m, HANDS_BUS_NAME);
 }
 
 static void bus_round(const char *dir, int delta, int *rc, char *state, size_t n, char *err, size_t en) {
@@ -438,6 +491,7 @@ static void on_bus(void) {
     char state[64] = "", err[128] = "";
     bus_round(dir, 0, &rc, state, sizeof state, err, sizeof err);
     CHECK(rc == 1 && !strcmp(state, "asking"), "the same user: Hello answered (the prompt): rc %d [%s] %s", rc, state, err);
+    CHECK(!strcmp(portal_err, "org.freedesktop.DBus.Error.UnknownObject"), "Hands1 through the portal's name: refused (%s)", portal_err);
     /* the program that opened the connection, from its pidfd: this test itself, in the build folder (no system one) */
     char self[PATH_MAX], st[2048] = "";
     ssize_t l = readlink("/proc/self/exe", self, sizeof self - 1);
@@ -505,6 +559,21 @@ static void marks(void) {
 
 
 /* lordos-mcp's pure parts: the tools, the errors' sentences, a screenshot's points, base64, the GIF */
+/* F1, F5 and the rest: the security-state natives an agent's input never sets off */
+static void native_guard(void) {
+    const char *refused[] = { "vault.reveal", "vault.copy", "term.fill", "term.saveSecret", "fw.setAppRule", "fw.addRule", "fw.setMode",
+                              "fw.removeList", "perms.set", "admin.run", "sentinela.unblock", "themes.trust", "themes.remove",
+                              "hands.serve", "hands.answer", "share.answer", "session.power" };
+    for (size_t i = 0; i < sizeof refused / sizeof refused[0]; i++) CHECK(hands_native_guard(refused[i]) == HANDS_G_REFUSE, "lord.%s refused to an agent", refused[i]);
+    CHECK(hands_native_guard("clipboard.get") == HANDS_G_CLIP, "lord.clipboard.get: empty while a secret");
+    const char *free_[] = { "fs.list", "term.write", "fw.status", "fw.rules", "perms.get", "vaultx.y", "hands.status", "themes.list", "term.fillx" };
+    for (size_t i = 0; i < sizeof free_ / sizeof free_[0]; i++) CHECK(hands_native_guard(free_[i]) == HANDS_G_NONE, "lord.%s left alone", free_[i]);
+    CHECK(handsbus_sandboxed(-1) && handsbus_sandboxed(0), "an unknown caller is taken as sandboxed");
+    CHECK(!handsbus_sandboxed(getpid()), "this test is not sandboxed");
+    CHECK(hands_paste_chord(&(HandsChord){ .mods = HANDS_M_CTRL | HANDS_M_SHIFT, .ch = "v" }) && !hands_paste_chord(&(HandsChord){ .mods = HANDS_M_CTRL, .ch = "c" }),
+          "paste chords");
+}
+
 static void mcp(void) {
     CHECK(strstr(mcp_tools_json(), "\"read_window\"") && strstr(mcp_tools_json(), "\"computer\"") && !strstr(mcp_tools_json(), "javascript"),
           "the tools, and none that runs code");
@@ -569,6 +638,7 @@ int main(void) {
     pidfds();
     marks();
     mcp();
+    native_guard();
     printf("hands-test: %d passed, %d failed\n", passes, fails);
     return fails ? 1 : 0;
 }

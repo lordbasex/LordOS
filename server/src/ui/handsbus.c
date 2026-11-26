@@ -267,6 +267,8 @@ static void caller_drop(Caller *k) {
 }
 
 void handsbus_call(DConn *c, const DMsg *m) {
+    /* only a call addressed to org.lordos.Hands1 itself: never one routed through another name this connection owns */
+    if (!m->dest || strcmp(m->dest, HANDS_BUS_NAME)) { dbus_error(c, m, "org.freedesktop.DBus.Error.UnknownObject", "no such object"); return; }
     if (m->member && !strcmp(m->member, "Introspect") && m->iface && !strcmp(m->iface, "org.freedesktop.DBus.Introspectable")) {
         DBuf b;
         dw_init(&b);
@@ -332,10 +334,49 @@ static uint32_t ask_bus(DConn *c, const char *member, const char *sender) {
     return serial;
 }
 
-/* GetConnectionCredentials' a{sv}: UnixUserID (u), ProcessFD (h: dup'd into *pidfd), the rest skipped */
-static void credentials(const DMsg *m, uint32_t *uid, int *pidfd) {
+/* A sandboxed caller (a Flatpak app, or the D-Bus proxy its sandbox talks through): its root holds /.flatpak-info, its
+ * cgroup is an app-flatpak-* scope, or it is xdg-dbus-proxy. Such a caller never reaches Hands, whatever it calls itself
+ * (as fpspawn.c tells a Flatpak caller). 1 sandboxed or unknowable, 0 not. */
+int handsbus_sandboxed(long pid) {
+    if (pid <= 0 || pid > INT_MAX) return 1;
+    char p[96], buf[4096];
+    snprintf(p, sizeof p, "/proc/%ld/root/.flatpak-info", pid);
+    if (!access(p, F_OK)) return 1;
+    snprintf(p, sizeof p, "/proc/%ld/cgroup", pid);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return 1;
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return 1;
+    buf[n] = 0;
+    if (strstr(buf, "app-flatpak-") || strstr(buf, "flatpak-session-helper")) return 1;
+    char exe[PATH_MAX];
+    snprintf(p, sizeof p, "/proc/%ld/exe", pid);
+    ssize_t l = readlink(p, exe, sizeof exe - 1);
+    if (l > 0) {
+        exe[l] = 0;
+        const char *b = strrchr(exe, '/');
+        if (b && !strncmp(b + 1, "xdg-dbus-proxy", 14)) return 1;
+    }
+    return 0;
+}
+
+static long pid_of_pidfd(int pidfd) {
+    if (pidfd < 0) return 0;
+    char p[64], line[256];
+    snprintf(p, sizeof p, "/proc/self/fdinfo/%d", pidfd);
+    FILE *f = fopen(p, "re");
+    long pid = 0;
+    while (f && fgets(line, sizeof line, f)) if (!strncmp(line, "Pid:", 4)) pid = strtol(line + 4, NULL, 10);
+    if (f) fclose(f);
+    return pid;
+}
+
+/* GetConnectionCredentials' a{sv}: UnixUserID (u), ProcessID (u), ProcessFD (h: dup'd into *pidfd), the rest skipped */
+static void credentials(const DMsg *m, uint32_t *uid, int *pidfd, uint32_t *pid) {
     *uid = (uint32_t)-1;
     *pidfd = -1;
+    *pid = 0;
     if (m->type != DBUS_RETURN || !m->sig || strcmp(m->sig, "a{sv}")) return;
     DRd r;
     dr_init(&r, m);
@@ -345,6 +386,7 @@ static void credentials(const DMsg *m, uint32_t *uid, int *pidfd) {
         const char *key = dr_str(&r, NULL), *vs = dr_variant(&r);
         if (r.err || !key || !vs) break;
         if (!strcmp(key, "UnixUserID") && !strcmp(vs, "u")) *uid = dr_u32(&r);
+        else if (!strcmp(key, "ProcessID") && !strcmp(vs, "u")) *pid = dr_u32(&r);
         else if (!strcmp(key, "ProcessFD") && !strcmp(vs, "h")) {
             uint32_t i = dr_u32(&r);
             if (!r.err && i < (uint32_t)m->n_fds && m->fds[i] >= 0 && *pidfd < 0) *pidfd = fcntl(m->fds[i], F_DUPFD_CLOEXEC, 3);
@@ -357,11 +399,13 @@ int handsbus_reply(DConn *c, const DMsg *m) {
     for (int i = 0; i < HANDSBUS_CALLERS; i++) {
         Caller *k = &callers[i];
         if (k->st != 1 || k->ask != m->reply_serial) continue;
-        uint32_t uid;
+        uint32_t uid, pid;
         int pidfd;
-        credentials(m, &uid, &pidfd);
+        credentials(m, &uid, &pidfd, &pid);
         k->pidfd = pidfd;
+        long who = pidfd >= 0 ? pid_of_pidfd(pidfd) : (long)pid;
         if (uid != (uint32_t)getuid()) { k->st = 3; k->why = "another user"; }
+        else if (handsbus_sandboxed(who)) { k->st = 3; k->why = "sandboxed"; }
         else {
             handsbus_exe_of_pidfd(pidfd, k->exe, sizeof k->exe);   /* shown as reported; a bus without ProcessFD: unknown */
             k->st = 2;

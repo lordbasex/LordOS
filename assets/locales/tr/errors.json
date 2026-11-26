@@ -968,5 +968,6 @@
   "sys.failed": "Bir şeyler ters gitti.",
   "sys.unsupported": "LordOS’un bu sürümü bunu yapamaz.",
   "theme.notAllowed": "{call} topluluk temaları için kullanılamaz",
-  "theme.noHost": "Masaüstü stilinin LordOS bölümü eksik"
+  "theme.noHost": "Masaüstü stilinin LordOS bölümü eksik",
+  "hands.refused": "Bunu yalnızca siz yapabilirsiniz: bir yapay zekâ ajanının girdisi asla"
 }

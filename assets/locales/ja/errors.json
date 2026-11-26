@@ -967,5 +967,6 @@
   "sys.failed": "問題が発生しました。",
   "sys.unsupported": "このバージョンの LordOS ではできません。",
   "theme.notAllowed": "{call} はコミュニティテーマでは使用できません",
-  "theme.noHost": "デスクトップスタイルの LordOS 部分がありません"
+  "theme.noHost": "デスクトップスタイルの LordOS 部分がありません",
+  "hands.refused": "これはあなただけが行えます。AI エージェントの入力では行えません"
 }

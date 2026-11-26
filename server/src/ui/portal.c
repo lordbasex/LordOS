@@ -2055,11 +2055,25 @@ static void handle(const DMsg *m) {
         return;
     }
     /* web apps' permission questions (webask.c) */
-    if (m->path && !strcmp(m->path, WEBASK_PATH)) { webask_call(&conn, m); return; }
+    /* the services that share this connection answer only calls addressed to their own name: a call routed to another
+     * name the connection owns (org.freedesktop.portal.Desktop, which a Flatpak's proxy lets through) never reaches them */
+    if (m->path && !strcmp(m->path, WEBASK_PATH)) {
+        if (!m->dest || strcmp(m->dest, WEBASK_NAME)) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such object"); return; }
+        webask_call(&conn, m);
+        return;
+    }
     /* ✨ AI Writing for the `lumo` command (writebus.h) */
-    if (m->path && !strcmp(m->path, LUMO_BUS_PATH)) { writebus_call(&conn, m); return; }
+    if (m->path && !strcmp(m->path, LUMO_BUS_PATH)) {
+        if (!m->dest || strcmp(m->dest, LUMO_BUS_NAME)) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such object"); return; }
+        writebus_call(&conn, m);
+        return;
+    }
     /* Hands: an AI agent using the desktop through lordos-mcp (handsbus.h, docs/HANDS.md) */
-    if (m->path && !strcmp(m->path, HANDS_BUS_PATH)) { handsbus_call(&conn, m); return; }
+    if (m->path && !strcmp(m->path, HANDS_BUS_PATH)) {
+        if (!m->dest || strcmp(m->dest, HANDS_BUS_NAME)) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such object"); return; }
+        handsbus_call(&conn, m);
+        return;
+    }
     if (only_web) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such object"); return; }
     if (!strcmp(mem, "Introspect")) {
         DBuf b;

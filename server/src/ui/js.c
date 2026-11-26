@@ -23,6 +23,9 @@
 #include "js_weather.h"
 #include "js_sentinela.h"
 #include "js_hands.h"
+#include "../hands/hands.h"
+#include "../term/term.h"
+#include "js_err.h"
 #include "js_studio.h"
 #include "js_webapps.h"
 #include "js_sftp.h"
@@ -263,8 +266,27 @@ void js_stall_end(const char *what) { js_run_end(what, NULL); }
 
 /* lord.<ns>.<fn>(): the native call, timed; data[0] the real function, data[1] its name ("pkg.apps"), data[2] its
  * policy for a community theme (js_theme.c): with the theme's code on the stack, a call its policy refuses throws */
+/* ---- Hands (hands/hands.h): security-state natives refuse what an AI agent's input set off ----
+ * While the agent's input is delivered or was the last input (hands_agent_recent), these never run: the vault, filling a
+ * password into a terminal, the firewall's changes, permissions, administrator actions, Sentinela's blocklist, theme
+ * trust and removal, signing keys, screen-sharing answers, Hands' own switch, power. A surface that misses its handsDeny
+ * can't reopen them. lord.clipboard.get answers "" then while the clipboard holds a secret. Closed list, by name. */
+#define hands_guard_of hands_native_guard        /* the closed list is hands.c's (tested by hands-test) */
 static JSValue prof_call(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *data) {
     (void)magic;
+    {
+        int32_t hg = HANDS_G_NONE;
+        JS_ToInt32(c, &hg, data[3]);
+        if (hg != HANDS_G_NONE && hands_agent_recent()) {
+            if (hg == HANDS_G_CLIP) { if (term_clipboard_sensitive()) return JS_NewString(c, ""); }
+            else {
+                const char *n = JS_ToCString(c, data[1]);
+                fprintf(stderr, "js: hands: lord.%s refused (an AI agent's input)\n", n ? n : "?");
+                if (n) JS_FreeCString(c, n);
+                return js_throw_code(c, "hands.refused", NULL);
+            }
+        }
+    }
     if (jst_active()) {
         int32_t pol = JST_DENY;
         JS_ToInt32(c, &pol, data[2]);
@@ -308,8 +330,8 @@ static void prof_wrap_obj(JSContext *c, JSValueConst obj, const char *prefix, in
             JSValue l = JS_GetPropertyStr(c, d.value, "length");
             JS_ToInt32(c, &len, l);
             JS_FreeValue(c, l);
-            JSValue data[3] = { d.value, JS_NewString(c, name), JS_NewInt32(c, jst_policy(name)) };
-            JSValue w = JS_NewCFunctionData(c, prof_call, len, 0, 3, data);
+            JSValue data[4] = { d.value, JS_NewString(c, name), JS_NewInt32(c, jst_policy(name)), JS_NewInt32(c, hands_guard_of(name)) };
+            JSValue w = JS_NewCFunctionData(c, prof_call, len, 0, 4, data);
             JS_FreeValue(c, data[1]);
             JS_DefinePropertyValue(c, obj, props[i].atom, w, d.flags & (JS_PROP_WRITABLE | JS_PROP_ENUMERABLE | JS_PROP_CONFIGURABLE));
         } else if (data_prop && JS_IsObject(d.value) && !JS_IsFunction(c, d.value) && !JS_IsArray(c, d.value) && level < 2) {

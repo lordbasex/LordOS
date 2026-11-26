@@ -133,6 +133,21 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
   keyboard (`dialogStack`'s top, whose root `ConfirmDialog` and the power dialog record) is `handsDeny`, protected or
   in the system band, or its root isn't known, **every** agent key is refused: "a protected dialog is open"
   (`protected-dialog`), checked in the shell and again in C on the dialog's root.
+- **security-state natives refuse an agent's input natively** (`hands_native_guard`, applied to every `lord.<ns>.<fn>` in
+  `js.c` `prof_call`): while the agent's input is delivered or was the last input less than 2.5 s ago
+  (`hands_agent_recent`), the vault, `term.fill` and saving a terminal secret, the firewall's changes, permissions,
+  administrator actions, Sentinela's blocklist, theme trust and removal, signing keys, screen-sharing answers, Hands' own
+  switch and power refuse (`hands.refused`), so a surface missing its `handsDeny` can't reopen them;
+  `lord.clipboard.get` answers "" then while the clipboard holds a secret, and the Wayland clipboard never hands a secret
+  to an app the agent is driving. The Terminal's Passwords and save bars, Monitor's firewall switch, rule sheet and
+  blocklists and Sentinela's blocklist Remove are `handsDeny` too; a program asking for a password in the Terminal gets
+  no agent key.
+- **keys**: the whole key gate runs before every chord and repeat of a Key call and before each Tab or Enter of a Type
+  call; a person-only app in front takes no agent key; paste chords and a middle click are refused while the clipboard
+  holds a secret (`sensitive-clipboard`); an agent's Tab skips person-only controls and their keys are swallowed.
+- **sandboxed callers**: Hands1 answers only calls addressed to `org.lordos.Hands1` (never through the portal's names,
+  which a Flatpak's D-Bus proxy lets through; Writing1 and WebApps1 likewise), and refuses a Flatpak app or its proxy
+  (`/.flatpak-info`, an `app-flatpak-*` cgroup, `xdg-dbus-proxy`).
 - the **lock screen** and the **greeter**: other processes; Hands1 is never served there.
 - an **authentication prompt** (polkit, `pkagent`) takes only physical input: no agent click or key while one is up.
 

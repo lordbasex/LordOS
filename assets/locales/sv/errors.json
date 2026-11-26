@@ -968,5 +968,6 @@
   "sys.failed": "Något gick fel.",
   "sys.unsupported": "Den här versionen av LordOS kan inte göra det.",
   "theme.notAllowed": "{call} är inte tillgängligt för gemenskapsteman",
-  "theme.noHost": "Skrivbordsstilens LordOS-del saknas"
+  "theme.noHost": "Skrivbordsstilens LordOS-del saknas",
+  "hands.refused": "Bara du kan göra detta: aldrig en AI-agents inmatning"
 }

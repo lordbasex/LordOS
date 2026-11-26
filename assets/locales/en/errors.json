@@ -968,5 +968,6 @@
   "sys.failed": "Something went wrong.",
   "sys.unsupported": "This version of LordOS can't do that.",
   "theme.notAllowed": "{call} is not available to community themes",
-  "theme.noHost": "The desktop style's LordOS part is missing"
+  "theme.noHost": "The desktop style's LordOS part is missing",
+  "hands.refused": "Only you can do this: an AI agent's input never can"
 }

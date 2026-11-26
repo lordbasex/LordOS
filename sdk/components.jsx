@@ -90,7 +90,7 @@ export function Spinner({ size = 14, color, thickness }) {
 // answered even when the action blocks.
 // The shared controls are Tab stops (sdk/focus.js) unless disabled or focusable={false}: Space and Enter press a
 // button or flip a Toggle, the arrows move a Slider, a Stepper or a Segmented control.
-export function Button({ label, onClick, primary, style, small, plain, disabled, destructive, icon, focusable = true, busy = false, pending = false }) {
+export function Button({ label, onClick, primary, style, small, plain, disabled, destructive, icon, focusable = true, busy = false, pending = false, handsDeny }) {
   const t = useTheme();
   const [hover, setHover] = useState(false);
   const [run, running] = usePending((...a) => onClick?.(...a));
@@ -105,7 +105,7 @@ export function Button({ label, onClick, primary, style, small, plain, disabled,
   const press = disabled || waiting ? undefined : pending ? (e) => { run(e); } : onClick;
   return (
     <View onClick={press} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      accessibilityRole="button" accessibilityState={{ disabled: !!disabled, busy: !!waiting }}
+      accessibilityRole="button" accessibilityState={{ disabled: !!disabled, busy: !!waiting }} handsDeny={handsDeny || undefined}
       focusable={focusable && !disabled}
       style={[{ height: small ? 22 : 28, paddingHorizontal: small ? 10 : 14, borderRadius: small ? t.controlRadiusSmall : t.controlRadius, flexDirection: 'row', gap: 6,
         justifyContent: 'center', alignItems: 'center', backgroundColor: bg, ...border, ...rich,

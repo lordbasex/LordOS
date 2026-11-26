@@ -387,8 +387,13 @@ export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCan
     return () => dialogStack.close(token);
   }, []);
   useEffect(() => { dialogStack.setFocused(token, focused); }, [focused]);
+  const personal = handsDeny ?? !!destructive;
+  const personalRef = useRef(personal);
+  personalRef.current = personal;
   useEffect(() => addListener('keydown', (e) => {
     if (dialogStack.owner() !== token || hasTextFocus()) return;
+    // the person's own answer: never an AI agent's key (Hands, docs/HANDS.md; lord-server refuses it before too)
+    if (personalRef.current && typeof lord !== 'undefined' && typeof lord.hands?.injecting === 'function' && lord.hands.injecting()) return;
     const p = latest.current;
     const r = dialogKey(e, p);
     if (r) dialogStack.take(e);
