@@ -12,7 +12,7 @@
 
 static const char *const WHY[HANDS_WHY_COUNT] = {
     "none", "system-layer", "protected", "password", "hidden-from-agent", "allowlist", "authentication-prompt", "locked",
-    "pointer-lock", "outside", "obscured", "not-editable",
+    "pointer-lock", "outside", "obscured", "not-editable", "protected-dialog",
 };
 const char *hands_why_word(int why) { return why >= 0 && why < HANDS_WHY_COUNT ? WHY[why] : "none"; }
 
@@ -659,7 +659,13 @@ static int gate(int kind, Gate *g, int *why) {
         const JVal *l = json_get(d.root, "nodes");
         for (const JVal *v = l && l->type == J_ARR ? l->kid : NULL; v && !nw; v = v->next)
             if (v->type == J_NUM && v->num > 0 && v->num < 1e9 && S.h->node_place) nw = S.h->node_place((int)v->num);
+        /* a dialog that owns the keyboard and is the person's own (handsDeny, protected, the system band): every key refused,
+         * whatever the shell said, its root checked here too */
+        int dialog = json_bool(d.root, "dialog", 0);
+        double dn = json_num(d.root, "dialogNode", 0);
+        if (!dialog && dn > 0 && dn < 1e9 && S.h->node_place && S.h->node_place((int)dn)) dialog = 1;
         json_free(&d);
+        if (dialog) { *why = HANDS_WHY_DIALOG; return HANDS_E_REFUSED; }
         if (nw) { *why = nw == HANDS_WHY_PROTECTED ? HANDS_WHY_PASSWORD : nw; return HANDS_E_REFUSED; }
         if (secure) { *why = HANDS_WHY_PASSWORD; return HANDS_E_REFUSED; }
         if (denied) { *why = HANDS_WHY_DENIED_NODE; return HANDS_E_REFUSED; }

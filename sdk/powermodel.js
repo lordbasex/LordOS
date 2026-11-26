@@ -4,5 +4,6 @@
 // can't end the session as if the person had, which would clear its crash count; docs/THEMES-GUIDE.md §6).
 export function countdownEnds(ask) {
   if (!ask || ask.state !== 'ask') return 'none';
-  return ask.byTheme ? 'cancel' : 'confirm';
+  // a community theme's code or an AI agent (Hands) asked: the countdown cancels instead of confirming
+  return ask.byTheme || ask.byAgent ? 'cancel' : 'confirm';
 }

@@ -113,6 +113,8 @@ export function flushSession() {
 }
 // Every logout in the shell comes through here (session.quit, Search).
 export function logOut() {
+  // never on an AI agent's click or key (Hands, docs/HANDS.md): logging out is the person's own
+  if (typeof lord !== 'undefined' && typeof lord.hands?.injecting === 'function' && lord.hands.injecting()) { console.log('hands: log out refused'); return; }
   flushSession();
   clipboard.beforeLogout();
   lord.quit();

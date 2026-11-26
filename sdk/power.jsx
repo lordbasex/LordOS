@@ -9,7 +9,7 @@
 // decided there: alone, any user; with other users' sessions open, only an administrator. The sheet
 // shows the same rule beforehand, and a refusal from lord-sessiond comes back as
 // {t:'power', ok:false, why:'admin'}.
-import { createElement as h, useEffect, useState } from 'react';
+import { createElement as h, useEffect, useRef, useState } from 'react';
 import { View, Text, addListener, mainDisplay } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { t } from './i18n.js';
@@ -20,6 +20,7 @@ import { windowAppName } from './apps.js';
 import { remote } from './remote.js';
 import { flushSession, resumeSession } from './sessionrestore.jsx';
 import { countdownEnds } from './powermodel.js';
+import { dialogStack } from './dialogkeys.js';
 
 export const POWER_SECONDS = 60;
 // null, or { action: 'reboot'|'poweroff', until (ms), state: 'ask'|'sent'|'denied'|'unavailable' }
@@ -33,7 +34,9 @@ export const canPower = () => typeof lord.session !== 'undefined' && typeof lord
 // opts.byTheme: a community theme's code asked (sdk/themeapi.js): the countdown cancels instead of confirming
 export function askPower(action, opts) {
   if (action !== 'reboot' && action !== 'poweroff') return;
-  powerAsk.set({ action, until: Date.now() + POWER_SECONDS * 1000, state: 'ask', byTheme: !!(opts && opts.byTheme) });
+  // byAgent: an AI agent's input opened it (Hands, docs/HANDS.md): only the person confirms, the countdown cancels
+  const byAgent = typeof lord !== 'undefined' && typeof lord.hands?.injecting === 'function' && !!lord.hands.injecting();
+  powerAsk.set({ action, until: Date.now() + POWER_SECONDS * 1000, state: 'ask', byTheme: !!(opts && opts.byTheme), byAgent });
 }
 
 // lord-sessiond's answers reach the session through the login screen's channel (RP_GREETER_IN);
@@ -100,15 +103,24 @@ export function PowerDialog() {
     const id = setInterval(() => {
       if (Date.now() >= powerAsk.get()?.until) {
         clearInterval(id);
-        if (countdownEnds(powerAsk.get()) === 'cancel') { console.log('power: the countdown a community theme started ran out: cancelled'); cancel(); } else confirm();
+        if (countdownEnds(powerAsk.get()) === 'cancel') { console.log('power: the countdown a community theme or an agent started ran out: cancelled'); cancel(); } else confirm();
       } else tick((n) => n + 1);
     }, 250);
     return () => clearInterval(id);
   }, [counting, ask?.until]);
 
+  // it owns the keyboard as a dialog does, with its root known: an agent's Enter is refused before it gets here (hands.c)
+  const token = useRef({}).current, root = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    dialogStack.open(token, null, true);
+    dialogStack.setNode(token, root.current);
+    return () => dialogStack.close(token);
+  }, [open]);
   useEffect(() => {
     if (!open) return undefined;
     return addListener('keydown', (e) => {
+      if (typeof lord.hands?.injecting === 'function' && lord.hands.injecting()) return;   // never an agent's key
       if (e.key === 'Escape') cancel();
       else if (e.key === 'Enter') confirm();
     });
@@ -133,6 +145,7 @@ export function PowerDialog() {
   }
   const asking = ask.state === 'ask' && !blocked;
   return h(View, {
+    ref: root, handsDeny: true,                    // shutting down or restarting is the person's own (docs/HANDS.md)
     onClick: ask.state === 'sent' ? undefined : cancel,
     style: { position: 'absolute', left: a.x, top: a.y, width: a.w, height: a.h, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' },
   }, h(View, {

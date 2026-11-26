@@ -587,6 +587,9 @@ const GROUPS = [
   [['battery', BatterySettings, '#30d158', '▮'], ['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['gpus', GpusSettings, '#5e5ce6', GpuGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
 ];
 const SECTIONS = GROUPS.flat();
+// Pages whose every answer is the person's own (docs/HANDS.md "Never"): permissions, accounts and passwords, installing
+// and removing software and web apps, updates, the session. An AI agent never reads, clicks or types in them (handsDeny).
+const PERSON_ONLY = new Set(['privacy', 'users', 'webapps', 'flatpak', 'updates', 'session', 'firewall']);
 // Board firmware
 // only on a BCM2712 board (Raspberry Pi 5, 500, CM5: lord.system.info().board)
 const isPi5 = () => { try { return lord.system.info().board === 'pi5'; } catch (e) { return false; } };
@@ -719,7 +722,7 @@ export default function Settings() {
         <ScrollView resetKey={placeOf(section, sub)} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: pad, paddingTop: side.narrow ? spacing.l : spacing.xl, alignItems: 'center' }}>
             {/* Cloud's account page has two columns, Wallpaper and AI are galleries: they take a wider column on wide windows */}
-            <View style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : section === 'wallpaper' || section === 'ai' ? 1180 : 680 }}>
+            <View handsDeny={PERSON_ONLY.has(section)} style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : section === 'wallpaper' || section === 'ai' ? 1180 : 680 }}>
               <Body page={section === 'network' || section === 'cloud' || section === 'ai' ? args?.page : undefined}
                 alert={section === 'ai' ? args?.alert : undefined} />
             </View>

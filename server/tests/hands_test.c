@@ -41,6 +41,7 @@ uid_t hands_test_getuid(void) { return (uid_t)(syscall(SYS_getuid) + uid_delta);
 /* ---- a fake host ---- */
 
 static double clock_ms = 100000;
+static int dialog_open, dialog_node_why;
 static int place_why, node_why, same, keys_why, focus_secure, region_inside, ref_secure, black_n;
 static int moves, buttons, keys, typed, shots, setvalues, last_black;
 static char last_event[512];
@@ -48,7 +49,8 @@ static char *shell(const char *op, const char *json) {
     (void)json;
     char b[256];
     if (!strcmp(op, "resolve")) snprintf(b, sizeof b, "{\"node\":7,\"x\":100,\"y\":100,\"w\":40,\"h\":20,\"secure\":%s}", ref_secure ? "true" : "false");
-    else if (!strcmp(op, "focus")) snprintf(b, sizeof b, "{\"secure\":%s,\"allowed\":true,\"nodes\":[55]}", focus_secure ? "true" : "false");
+    else if (!strcmp(op, "focus")) snprintf(b, sizeof b, "{\"secure\":%s,\"allowed\":true,\"nodes\":[55],\"dialog\":%s,\"dialogNode\":%d}",
+                                             focus_secure ? "true" : "false", dialog_open == 1 ? "true" : "false", dialog_open ? 77 : 0);
     else if (!strcmp(op, "target")) snprintf(b, sizeof b, "{\"allowed\":true}");
     else if (!strcmp(op, "region")) snprintf(b, sizeof b, "{\"inside\":%s}", region_inside ? "true" : "false");
     else if (!strcmp(op, "blackout")) snprintf(b, sizeof b, black_n ? "{\"nodes\":[41,42]}" : "{\"nodes\":[]}");
@@ -63,7 +65,7 @@ static void size(int *w, int *h) { *w = 1280; *h = 800; }
 static int plocked(void) { return 0; }
 static int place(double x, double y, int *node) { (void)x; *node = y < 30 ? 99 : 7; return y < 30 ? HANDS_WHY_SYSTEM : place_why; }
 static int same_target(int hit, int ref) { return same && hit == ref; }
-static int node_place(int node) { (void)node; return node_why; }
+static int node_place(int node) { return node == 77 ? dialog_node_why : node_why; }
 static int keys_place(void) { return keys_why; }
 static void move(double x, double y) { (void)x; (void)y; moves++; }
 static void button(int b, int d) { (void)b; (void)d; buttons++; }
@@ -210,6 +212,17 @@ static void policy(void) {
     node_why = HANDS_WHY_PROTECTED;
     CHECK(call(":1.1", &ty, &why) == HANDS_E_REFUSED && why == HANDS_WHY_PASSWORD, "keys to a protected focused node refused in C");
     node_why = 0;
+    /* a dialog that owns the keyboard and is the person's (the theme-trust sheet): Enter refused */
+    HandsReq enter = { .call = HANDS_C_KEY, .text = "Return", .text_len = 6 };
+    dialog_open = 1;
+    CHECK(call(":1.1", &enter, &why) == HANDS_E_REFUSED && why == HANDS_WHY_DIALOG, "Enter on a protected dialog refused (the shell said so)");
+    dialog_open = 2;
+    dialog_node_why = HANDS_WHY_DENIED_NODE;
+    CHECK(call(":1.1", &enter, &why) == HANDS_E_REFUSED && why == HANDS_WHY_DIALOG, "Enter on a protected dialog refused (its root checked in C)");
+    dialog_node_why = 0;
+    int k0 = keys;
+    CHECK(call(":1.1", &enter, &why) == HANDS_OK && keys == k0 + 1, "Enter on an ordinary dialog goes");
+    dialog_open = 0;
     keys_why = HANDS_WHY_PROMPT;
     CHECK(call(":1.1", &ty, &why) == HANDS_E_REFUSED && why == HANDS_WHY_PROMPT, "an authentication prompt takes no agent keys");
     keys_why = 0;

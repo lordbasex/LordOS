@@ -8,9 +8,11 @@
 #   2. a permission prompt (Screenshots asks for the screen): a click aimed at it and a key are refused, the screenshot
 #      shows it black;
 #   3. the banner shows on the display while the agent is connected, and the person's click on its Stop (through the test
-#      hooks, as a real pointer) stops the agent: its next call is refused as stopped.
+#      hooks, as a real pointer) stops the agent: its next call is refused as stopped;
+#   4. a community theme's trust dialog (Settings → Appearance, an untrusted theme): Enter while it has the keyboard and a
+#      click on it are refused, and the theme stays untrusted.
 # Exit 0 passed, 1 failed, 77 skipped (no theme bundle or binaries).
-import base64, json, os, re, socket, subprocess, sys, tempfile, time, zlib
+import base64, json, os, re, shutil, socket, subprocess, sys, tempfile, time, zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SERVER = os.path.abspath(os.path.join(HERE, '..'))
@@ -247,15 +249,52 @@ def banner_stop():
         a.close()
 
 
+def trust_dialog():
+    print('4. the theme-trust dialog is the person\'s own')
+    a = Agent('settings')
+    try:
+        home = os.path.join(a.dir, 'home')
+        inst = subprocess.run(['node', os.path.join(HERE, 'community_theme_install.mjs'), os.path.join(HERE, 'community_themes/okminimal'), home, '--untrusted'],
+                              capture_output=True, text=True)
+        check(inst.returncode == 0, 'an untrusted community theme in the demo home')
+        t = a.text('find', window_id='settings', query='Appearance')
+        a.text('computer', action='left_click', ref=ref(t, r'row "◐ Appearance"'))
+        time.sleep(1.0)
+        t = a.text('find', window_id='settings', query='Test Minimal')
+        r = ref(t, r'clickable "Test Minimal')
+        check(r is not None, 'its card')
+        a.text('computer', action='left_click', ref=r)
+        time.sleep(1.0)
+        t = a.text('find', window_id='settings', query='Apply button')
+        r = ref(t, r'button "Apply')
+        check(r is not None, 'its page with Apply')
+        a.text('computer', action='left_click', ref=r)
+        time.sleep(1.0)
+        t = a.text('read_window', window_id='settings')
+        cat = json.load(open(os.path.join(ROOT, 'assets/locales/en/settings.json')))
+        title = cat['settings.style.trustTitle' if 'settings.style.trustTitle' in cat else 'style.trustTitle']
+        check(title.split('{')[0][:20] not in t, 'the dialog is not in the tree')
+        k = a.text('computer', action='key', text='Return')
+        check('Refused (protected-dialog)' in k, f'Enter on the trust dialog refused ({k})')
+        w = json.loads(a.text('windows_context'))['windows'][0]
+        c = a.text('computer', action='left_click', coordinate=[w['x'] + w['w'] // 2 + 120, w['y'] + w['h'] // 2 + 40])
+        check('Refused (hidden-from-agent)' in c, f'a click on its OK refused ({c})')
+        rec = json.load(open(os.path.join(home, '.local/share/lordos/themes/okminimal/install.json')))
+        check(rec.get('trusted') is False, 'the theme is still untrusted')
+    finally:
+        a.close()
+
+
 def main():
     if not (os.access(MCP, os.X_OK) and os.access(LS, os.X_OK) and os.path.exists(os.path.join(ROOT, 'themes/default/theme.bundle.js'))
-            and os.access('/usr/bin/dbus-daemon', os.X_OK)):
-        print('skipped: needs build/lordos-mcp, build/lord-server-test, themes/default/theme.bundle.js and dbus-daemon')
+            and os.access('/usr/bin/dbus-daemon', os.X_OK) and shutil.which('node')):
+        print('skipped: needs build/lordos-mcp, build/lord-server-test, themes/default/theme.bundle.js, dbus-daemon and node')
         return 77
     os.environ.pop('DBUS_SESSION_BUS_ADDRESS', None)
     notes_import()
     permission_prompt()
     banner_stop()
+    trust_dialog()
     print(f'hands-e2e: {passes} passed, {fails} failed')
     return 1 if fails else 0
 

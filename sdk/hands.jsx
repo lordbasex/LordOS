@@ -37,6 +37,7 @@ import {
   serializeTree, findNodes, makeRefs, own, allowed, appOfWindow, windowsList, matchApp, filterLog, SYSTEM_Z, blackoutNodes,
 } from './handsmodel.js';
 import { focusedNode } from './focus.js';
+import { dialogStack } from './dialogkeys.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.hands && typeof lord.hands.serve === 'function' ? lord.hands : null);
 export const handsStatus = createStore({ on: false, qa: false, allow: [], clients: [], events: 0 });
@@ -193,7 +194,15 @@ const OPS = {
     const held = [box, kf].filter((n) => n && !n.deleted);
     const secure = held.some(deniedOrProtected) || !!(fi && own(fi.props, 'protected')) || !!(f && wm.get(f)?.protected);
     const nodes = held.map((n) => n.id).filter((id) => typeof id === 'number' && id > 0);
-    return { secure, nodes, allowed: !(Array.isArray(a.allow) && a.allow.length) || (!!f && allowed(a.allow, appOfId(f))) };
+    // a dialog that owns the keyboard (Enter answers it): one an agent never answers (handsDeny, protected, the system
+    // band), or one whose root isn't known, refuses every key (fail closed)
+    let dialog = false, dialogNode = 0;
+    if (dialogStack.owner() !== null) {
+      const dn = dialogStack.ownerNode();
+      dialog = !dn || dn.deleted || deniedOrProtected(dn);
+      dialogNode = dn && !dn.deleted && typeof dn.id === 'number' ? dn.id : 0;
+    }
+    return { secure, nodes, dialog, dialogNode, allowed: !(Array.isArray(a.allow) && a.allow.length) || (!!f && allowed(a.allow, appOfId(f))) };
   },
   setvalue(a) {
     const n = refs.nodeOf(a.ref);

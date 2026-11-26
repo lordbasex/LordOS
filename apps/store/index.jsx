@@ -635,7 +635,8 @@ export default function Store() {
     });
   })() : null;
   return (
-    <View style={{ flex: 1, flexDirection: 'row' }}>
+    // handsDeny: installing and removing software is the person's own; an AI agent never uses the Store (docs/HANDS.md)
+    <View handsDeny style={{ flex: 1, flexDirection: 'row' }}>
       {side.narrow ? null : <SkinRegion app="store" region="sidebar" model={vm}>{sidebar}</SkinRegion>}
       {subCounts && !app && !side.narrow ? <OriginColumn sub={sub} cats={subCats} counts={subCounts} total={subTotal} mine={mineCount} onPick={pickSub} /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>

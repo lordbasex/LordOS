@@ -366,7 +366,10 @@ export function FormRow({ label, children, labelWidth, minHeight = 36 }) {
 // the action needs a click, or Tab to it and then Space. cautious: the default is Cancel too, with a button
 // that isn't red (an action that only needs a second look, such as pasting files another app copied).
 // children: an option shown under the detail (Settings → Web apps' "Delete its data" toggle).
-export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCancel, destructive, cautious, area, children }) {
+// handsDeny: the answer is the person's own, never an AI agent's (docs/HANDS.md): a click on it, and any key while it has
+// the keyboard, are refused to an agent. Every destructive confirmation is (an irreversible action is the person's);
+// others pass handsDeny for a trust, an install or a removal, a permission, a sign-out.
+export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCancel, destructive, cautious, area, children, handsDeny }) {
   const t = useTheme();
   const { id: win, focused } = useAppWindow();
   const token = useRef({}).current;
@@ -376,8 +379,10 @@ export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCan
   const owner = useStore(dialogStack, (list) => keyOwner(list) === token);
   const latest = useRef(null);
   latest.current = { onOk, onCancel, destructive: safe, focus };
+  const root = useRef(null);
   useEffect(() => {
     dialogStack.open(token, win, focused);
+    dialogStack.setNode(token, root.current);
     if (dialogStack.owner() === token) clearTextFocus();   // a field under it must not go on typing
     return () => dialogStack.close(token);
   }, []);
@@ -393,7 +398,7 @@ export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCan
   }), []);
   const a = area || { x: 0, y: 0, w: undefined, h: undefined };
   return (
-    <View onClick={onCancel} style={{ position: 'absolute', left: a.x, top: a.y, ...(a.w ? { width: a.w, height: a.h } : { right: 0, bottom: 0 }),
+    <View ref={root} handsDeny={handsDeny ?? !!destructive} onClick={onCancel} style={{ position: 'absolute', left: a.x, top: a.y, ...(a.w ? { width: a.w, height: a.h } : { right: 0, bottom: 0 }),
       backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' }}>
       <View onClick={(e) => e.stopPropagation()} style={{ width: 360, padding: spacing.xl, gap: spacing.s, borderRadius: t.groupRadius + 2, backgroundColor: t.windowBg,
         border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>

@@ -33,8 +33,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     a closed-word line in `shell.log`.
   - **Never**: the system layer (permission, keyring, password and polkit prompts, the file chooser of Linux apps, the
     banner), password fields (typing or reading), protected windows, the lock screen and the greeter, Settings → AI →
-    Hands and the theme-trust sheet (`handsDeny`). Screenshots show them black, failing closed; with an allowlist,
-    everything but the allowed windows is black.
+    Hands and the theme-trust sheet (`handsDeny`), and the person's own answers: every destructive confirmation, signing
+    out, the power dialog (its countdown cancels when an agent opened it), the Store, Settings → Privacy, Users, Web
+    apps, Flatpak, Updates, Session and Firewall; no key at all while a protected dialog has the keyboard. Screenshots
+    show them black, failing closed; with an allowlist, everything but the allowed windows is black.
   - **QA mode**: `lordos-mcp --headless APP` starts a private headless desktop (`lord-server --headless --hands-qa`, a
     private bus, a demo home with sample files) so an agent can test an app while the person keeps working.
   - **Settings → AI → Hands**: the session switch, what it can and can never do, the allowlist, the connected clients
@@ -305,7 +307,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   failing closed, lordos-mcp's tools, errors, coordinates, GIF and export), `tests/hands_model_test.mjs` (refs stay
   stable, no password value, no system layer or `handsDeny` node, the blackout per layer, no "verified" claim) and
   `tests/hands_e2e.py` (`lordos-mcp --headless`: Notes' File → Import… of a fixture file and the note exists; a click
-  and a key aimed at a permission prompt refused; the banner on the display and the person's Stop ending the agent).
+  and a key aimed at a permission prompt refused; the banner on the display and the person's Stop ending the agent;
+  Enter and a click on a community theme's trust dialog refused).
 - `build/realm-taint-test` (LordOS's QuickJS patches: a theme's code on the stack, its jobs, bound and native
   functions, the realm of a function), `build/themestore-test` (ASan/UBSan: 10 bad archives, lord-themec on the fixture
   and on eval, `lord.term.create`, `lord.fs.write`, `new Function`, `globalThis`, another package, a host element, a

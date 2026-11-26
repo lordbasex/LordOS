@@ -81,9 +81,9 @@ enum {
 enum {
     HANDS_WHY_NONE = 0, HANDS_WHY_SYSTEM, HANDS_WHY_PROTECTED, HANDS_WHY_PASSWORD, HANDS_WHY_DENIED_NODE,
     HANDS_WHY_ALLOWLIST, HANDS_WHY_PROMPT, HANDS_WHY_LOCKED, HANDS_WHY_POINTER_LOCK, HANDS_WHY_OUTSIDE,
-    HANDS_WHY_OBSCURED, HANDS_WHY_NOT_EDITABLE, HANDS_WHY_COUNT,
+    HANDS_WHY_OBSCURED, HANDS_WHY_NOT_EDITABLE, HANDS_WHY_DIALOG, HANDS_WHY_COUNT,
 };
-const char *hands_why_word(int why);       /* "system-layer", "protected", "password", … */
+const char *hands_why_word(int why);       /* "system-layer", "protected", "password", "protected-dialog", … */
 
 /* the calls (handsbus.c's methods), each its own closed word in the log */
 enum {

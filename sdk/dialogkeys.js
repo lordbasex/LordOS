@@ -36,7 +36,11 @@ export function createDialogStack() {
     // a dialog that acted on key e may close before the app's listeners see e: they ask taken(e)
     take(e) { taken = e; },
     taken: (e) => e != null && e === taken,
-    open(token, win, focused) { list = [...list, { token, win: win ?? null, focused: !!focused }]; changed(); },
+    open(token, win, focused) { list = [...list, { token, win: win ?? null, focused: !!focused, node: null }]; changed(); },
+    // the dialog's root (a host instance): Hands asks whether the dialog with the keys is one an agent never answers
+    // (handsDeny, protected, the system band; sdk/hands.jsx focus)
+    setNode(token, node) { const d = find(token); if (d) d.node = node || null; },
+    ownerNode() { const tok = keyOwner(list); const d = tok === null ? null : find(tok); return d ? d.node : null; },
     setFocused(token, focused) {
       const d = find(token);
       if (d && d.focused !== !!focused) { list = list.map((x) => (x === d ? { ...d, focused: !!focused } : x)); changed(); }

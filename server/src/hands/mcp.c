@@ -52,6 +52,8 @@ const char *mcp_error_text(const char *error, const char *word, char *buf, size_
     else if (!strcmp(e, HANDS_ERR_DENIED)) snprintf(buf, n, "The person denied access to this computer. Do not retry; ask them.");
     else if (!strcmp(e, HANDS_ERR_STOPPED)) snprintf(buf, n, "The person stopped the agent (Stop or Ctrl+Alt+Esc). Do not retry; ask them what to do.");
     else if (!strcmp(e, HANDS_ERR_ACTIVE)) snprintf(buf, n, "user is active: the person is using the computer right now. Wait a few seconds and try again.");
+    else if (!strcmp(e, HANDS_ERR_REFUSED) && !strcmp(w, "protected-dialog"))
+        snprintf(buf, n, "Refused (protected-dialog): a protected dialog is open; only the person answers it. Ask them.");
     else if (!strcmp(e, HANDS_ERR_REFUSED)) snprintf(buf, n, "Refused (%s): LordOS never lets an agent reach that place or field.", w[0] ? w : "refused");
     else if (!strcmp(e, HANDS_ERR_RATE)) snprintf(buf, n, "Too many actions: slow down and try again in a second.");
     else if (!strcmp(e, HANDS_ERR_NOTFOUND)) snprintf(buf, n, "Not found: the window or ref is gone. Read the window again for fresh refs.");

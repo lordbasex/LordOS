@@ -279,7 +279,7 @@ function App() {
 
         {askLogout ? (
           <Layer name="modal">
-            <ConfirmDialog title={tr('shell.celeste.session.logoutTitle')} detail={tr('shell.celeste.session.logoutDetail')} okLabel={tr('shell.menu.logout')}
+            <ConfirmDialog handsDeny title={tr('shell.celeste.session.logoutTitle')} detail={tr('shell.celeste.session.logoutDetail')} okLabel={tr('shell.menu.logout')}
               cancelLabel={tr('shell.celeste.cancel')} cautious area={main}
               onCancel={() => setAskLogout(false)} onOk={() => { setAskLogout(false); session.quit(); }} />
           </Layer>

@@ -6,6 +6,7 @@ assert.equal(countdownEnds({ action: 'reboot', state: 'ask' }), 'confirm');
 assert.equal(countdownEnds({ action: 'poweroff', state: 'ask', byTheme: false }), 'confirm');
 assert.equal(countdownEnds({ action: 'reboot', state: 'ask', byTheme: true }), 'cancel');
 assert.equal(countdownEnds({ action: 'poweroff', state: 'ask', byTheme: true }), 'cancel');
+assert.equal(countdownEnds({ action: 'reboot', state: 'ask', byAgent: true }), 'cancel');   // an AI agent's (Hands) never confirms itself
 assert.equal(countdownEnds({ action: 'reboot', state: 'sent', byTheme: true }), 'none');
 assert.equal(countdownEnds(null), 'none');
 console.log('power-model-test: 6 ok');

@@ -123,6 +123,14 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
   fields (`protected`: the vault, password fields): no click, key or read.
 - nodes marked **`handsDeny`**: Settings → AI → Hands (so an agent can't turn itself on, widen its allowlist or answer
   for the person) and the theme-trust sheet.
+- **the person's own answers**: every destructive confirmation (`ConfirmDialog` is `handsDeny` when `destructive`:
+  deleting files for good, emptying the Trash, removing machines, packages, web apps and themes…), the theme-trust
+  dialog, signing out (`logOut` refuses an agent's click or key) and the power dialog (an agent's input never confirms
+  it; its countdown cancels instead), and whole pages: the Store (installing and removing software, Flatpak), Settings →
+  Privacy (permission grants), Users, Web apps, Flatpak, Updates, Session and Firewall. While a dialog that owns the
+  keyboard (`dialogStack`'s top, whose root `ConfirmDialog` and the power dialog record) is `handsDeny`, protected or
+  in the system band, or its root isn't known, **every** agent key is refused: "a protected dialog is open"
+  (`protected-dialog`), checked in the shell and again in C on the dialog's root.
 - the **lock screen** and the **greeter**: other processes; Hands1 is never served there.
 - an **authentication prompt** (polkit, `pkagent`) takes only physical input: no agent click or key while one is up.
 
@@ -183,4 +191,5 @@ change the desktop. It needs `dbus-daemon` (Debian's `dbus-daemon` package).
 - `tests/hands_e2e.py` (run by `make test` when the themes are built): `lordos-mcp --headless` with the test hooks:
   Notes' File → Import… of a fixture file (the note exists; a GIF recorded, returned and saved only under a bare name in
   `~/Pictures/LordOS QA` of a temporary HOME); a click and a key aimed at a permission
-  prompt refused and the prompt black in screenshots; the banner on the display and the person's Stop ending the agent.
+  prompt refused and the prompt black in screenshots; the banner on the display and the person's Stop ending the agent;
+  Enter and a click on a community theme's trust dialog refused, the theme left untrusted.
