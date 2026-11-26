@@ -4,7 +4,8 @@
 # folder the way an install does (community_theme_install.mjs, the same compiler), chosen in settings.json, and the
 # session runs it from LordOS's default theme:
 #   okminimal  the minimal example as a community theme: it starts in its own realm and draws (no watchdog), and
-#              nothing it does through the SDK is refused
+#              nothing it does through the SDK is refused; a session that ends normally is no crash, two killed under
+#              it in a row (kill -9) keep it off the next one
 #   probe      (installed unchecked) every way to reach past its policy: lord.term/fs/admin don't exist in its realm,
 #              code from text gives nothing, LordOS's built-ins are frozen, and lord.setStyle on a node not its own is
 #              refused directly, from Promise.then, queueMicrotask, setTimeout (bound and with arguments),
@@ -57,6 +58,31 @@ has "okminimal starts in its own realm" "community theme okminimal started"
 hasnt "okminimal: nothing it does through the SDK is refused" "community theme: lord\..* refused"
 hasnt "okminimal: the watchdog leaves it on" "taken off\|the theme failed"
 if record okminimal | grep -q '"failed":""'; then echo "ok   okminimal is not marked failed"; else echo "FAIL okminimal marked failed: $(record okminimal)"; R=1; fi
+
+if record okminimal | grep -q '"crashes":0'; then echo "ok   okminimal: a session that ended normally is no crash"; else echo "FAIL okminimal crash count: $(record okminimal)"; R=1; fi
+
+# sessions that end abnormally (lord-server killed while the theme runs) count; two in a row keep it off the third
+crashrun() {
+    rm -f "$S/home/.cache/lordos/"*.log
+    env -u WAYLAND_DISPLAY -u DISPLAY -u LORD_SESSIOND -u LORDOS_SESSIOND -u DBUS_SESSION_BUS_ADDRESS \
+        XDG_RUNTIME_DIR="$S" HOME="$S/home" LORD_GPU=0 LANG=en_US.UTF-8 LORD_HEADLESS_DRAW=1 \
+        ./build/lord-server --headless 1024x768 --theme "$ROOT/themes/default/theme.bundle.js" --timeout 60 >"$S/server.log" 2>&1 &
+    P=$!
+    n=0
+    while [ $n -lt 600 ] && ! grep -q "community theme okminimal started" "$S/server.log" "$S/home/.cache/lordos/"*.log 2>/dev/null; do sleep 0.1; n=$((n + 1)); done
+    kill -9 $P 2>/dev/null; wait $P 2>/dev/null
+    P=
+    rm -f "$S/home/.cache/lordos/"*.log
+}
+crashrun
+if record okminimal | grep -q '"crashes":1'; then echo "ok   okminimal: a session killed under it counts once"; else echo "FAIL okminimal after one kill: $(record okminimal)"; R=1; fi
+crashrun
+env -u WAYLAND_DISPLAY -u DISPLAY -u LORD_SESSIOND -u LORDOS_SESSIOND -u DBUS_SESSION_BUS_ADDRESS \
+    XDG_RUNTIME_DIR="$S" HOME="$S/home" LORD_GPU=0 LANG=en_US.UTF-8 \
+    ./build/lord-server --headless 1024x768 --theme "$ROOT/themes/default/theme.bundle.js" --timeout 20 >"$S/server.log" 2>&1
+L=$(cat "$S/server.log" "$S/home/.cache/lordos/"*.log 2>/dev/null)
+hasnt "okminimal: not started the third time" "community theme okminimal started"
+if record okminimal | grep -q 'ended 2 times in a row'; then echo "ok   okminimal: two killed sessions in a row keep it off the next one"; else echo "FAIL okminimal after two kills: $(record okminimal)"; R=1; fi
 
 session probe probe 40 --unchecked
 has "probe starts" "community theme probe started"

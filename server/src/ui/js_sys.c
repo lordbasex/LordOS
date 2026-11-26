@@ -541,6 +541,10 @@ static JSValue f_themes_use(JSContext *c, JSValueConst this_val, int argc, JSVal
          * refuses is answered here with false and the session goes on in this theme, untouched; the switch itself
          * (main.c switch_theme) runs exactly the bytes checked here. A community theme must be confirmed, not failed,
          * and its code must still be what LordOS built (its install record's SHA-256). */
+        /* a community theme: one more start in its crash count (cleared when the session ends normally, main.c); one
+         * that ended COMMUNITY_CRASHES sessions in a row is marked failed here and refused just below */
+        char cid[32];
+        if (ok && jst_is_user_bundle(bundle, cid, sizeof cid)) jst_session_starting(cid);
         int r = ok ? js_theme_prepare(bundle) : 0;
         if (r) {
             ok = 0;

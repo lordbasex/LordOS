@@ -661,6 +661,8 @@ translations, lock the session, and **read** the models its `theme.json` declare
 { "capabilities": ["wifi", "bluetooth", "sound", "battery", "brightness", "media", "notifications"] }
 ```
 
+`notifications` (approved by the maintainer on 2026-11-26) gives a notification centre the history as read-only plain
+data: titles, bodies, apps and times, never their actions, and no dismissing or clearing.
 Without a capability the SDK's hook gives a neutral value (no battery, no players). Never: the terminal, files,
 administrator actions, permission answers, packages, the keyring, the clipboard, network settings, switching themes or
 changing Wi-Fi, Bluetooth, the volume, the brightness or what plays. Refs and events give the theme a handle
@@ -684,7 +686,8 @@ greeter's, another process.
 can't do and what it may read; only the person's answer there lets it run (lord-server keeps it in the theme's install
 record, which `lord.fs` can't write). A **watchdog** (`community_watch` in `server/src/main.c`) takes a community theme
 off when it throws at start, never calls `startShell`, draws nothing within 6 seconds, has its React tree die, stalls
-the desktop until the main-loop watchdog stops it, or ended two sessions in a row: the previous style comes back and
+the desktop until the main-loop watchdog stops it, or was running when two sessions in a row ended abnormally (a
+lord-server that died; logging out, shutting down, restarting or switching user is never counted, however short): the previous style comes back and
 Settings shows "Couldn't start" with Report, **Try Again** and **Remove**. **Ctrl+Alt+Shift+Backspace** always
 restores Lord Flow.
 

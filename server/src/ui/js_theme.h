@@ -63,6 +63,8 @@ char *jst_load_code(const char *id, size_t *len, unsigned *caps, char *why, size
 void jst_mark_failed(const char *id, const char *why);
 /* at session start: one more start of this community theme; 1 when it already crashed too many sessions */
 int jst_session_starting(const char *id);
+/* the session ended normally (logout, shutdown, restart, switch user, lord-sessiond's SIGTERM): no crash */
+void jst_session_ended(const char *id);
 /* the theme ran a healthy minute: its crash count goes back to 0 */
 void jst_session_healthy(const char *id);
 /* the theme's React tree committed something (lord.themes.started) since jst_begin */

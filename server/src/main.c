@@ -2914,7 +2914,8 @@ static void community_watch_switched(const char *before, const char *now_running
     char id[32];
     /* the theme to come back to: the one before, unless it is the failed one */
     if (strcmp(before, ui.theme_failed)) snprintf(cw.prev, sizeof cw.prev, "%s", before);
-    if (jst_is_user_bundle(now_running, id, sizeof id)) jst_session_starting(id);
+    (void)now_running;
+    (void)id;
 }
 
 static void community_back(const char *current, const char *why, int persist) {
@@ -3837,6 +3838,12 @@ int main(int argc, char **argv) {
      * desktop for seconds */
     wdog_stop();                          /* closing the apps below may take seconds by design */
     if (ui.quit_requested) fprintf(stderr, "lord-server: the theme asked to log out\n");
+    {   /* the session ended as the person (or lord-sessiond: log out, shut down, restart, switch user) asked: never a
+         * crash of a community theme, however short it was (only a lord-server that died, a JS fatal or the watchdog
+         * counts: chosen_theme's count is cleared here) */
+        char cid[32];
+        if (!s.greeter && jst_is_user_bundle(current, cid, sizeof cid)) jst_session_ended(cid);
+    }
     if (ui.quit_requested && !s.headless) mirror_session("{\"a\":\"logout\"}");
     js_before_exit();                     /* what is open goes to settings.json, marked clean */
     bgsave_flush(NULL);                   /* every save still on bgsave.c's worker is on the disk before the session ends */

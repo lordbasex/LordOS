@@ -404,9 +404,20 @@ int jst_session_starting(const char *id) {
             over = 1;
         } else r.crashes++;
         ts_record_write(rfd, &r);
+        fprintf(stderr, "lord-server: community theme %s starting (%d session(s) in a row ended abnormally before)\n", id, r.crashes - !over);
     }
     if (rfd >= 0) close(rfd);
     return over;
+}
+
+void jst_session_ended(const char *id) {
+    int rfd = root_fd(0);
+    TsRecord r;
+    if (rfd >= 0 && !ts_record_read(rfd, id, &r) && r.crashes) {
+        r.crashes = 0;
+        ts_record_write(rfd, &r);
+    }
+    if (rfd >= 0) close(rfd);
 }
 
 void jst_session_healthy(const char *id) {

@@ -547,12 +547,13 @@ export function makeThemeSdk({ id, caps }) {
   sdk.holdKeyboard = themeHoldKeyboard;
   sdk.useShortcuts = themeUseShortcuts;
   sdk.registerGestureActions = (a) => SDK.registerGestureActions(sanitizeIn(a) || {});
-  // notifications: showing one is allowed; a notification centre reads plain data (with the capability)
+  // notifications: showing one is allowed; a notification centre reads the history as plain, read-only data (with the
+// capability): no actions, no dismissing, no clearing
   sdk.notify = (raw) => { const n = sanitizeIn(raw); const str = (v) => (typeof v === 'string' || typeof v === 'number' ? String(v) : ''); return SDK.notify({ title: str(n?.title), body: str(n?.body), app: 'theme' }); };
   if (has.has('notifications')) {
     sdk.notifyHistory = readOnly(SDK.notifyHistory, notesData);
     sdk.useNotifications = () => notesData(SDK.useNotifications());
-    sdk.clearNotifyHistory = () => SDK.clearNotifyHistory();
+    sdk.clearNotifyHistory = () => {};          // read-only: the history is the person's (Settings, LordOS's own centre)
   } else {
     sdk.notifyHistory = Object.freeze({ get: () => [], subscribe: () => () => {} });
     sdk.useNotifications = () => [];
