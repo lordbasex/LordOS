@@ -1895,6 +1895,19 @@ sudo apt-get install -y --no-install-recommends gir1.2-gtk-3.0 python3-pyqt6
                                    # python3-gi, gir1.2-gtk-4.0 and python3-pyqt5 (5.15.11) were already there
 ```
 
+**2026-11-26, the toolkit audit's packages ship with LordOS** (docs/TOOLKIT-AUDIT.md, "Shipped"). They are in the ISO and the
+Raspberry Pi image (`PKGS_TOOLKITS`) and Recommends of the `lordos` package, so VM 127 and the dev VMs get them with the next
+update of `lordos`, the Store's update installing the new Recommends; nothing is installed by hand any more. The whole list,
+all from trixie (amd64 and arm64):
+
+```sh
+python3-gi gir1.2-gtk-3.0 gir1.2-gtk-4.0 python3-pyqt5 python3-pyqt6 qtwayland5 qt6-wayland   # the bindings and Qt's Wayland plugins
+qgnomeplatform-qt5 qgnomeplatform-qt6        # 0.9.2: QT_QPA_PLATFORMTHEME=gnome (server/src/wl/toolkitenv.h), Qt follows dark mode
+```
+
+On the maintainer's development PC (Debian 13, not LordOS's VMs) the bindings were already installed; QGnomePlatform was
+tested headless from the trixie packages unpacked into a scratch folder (`QT_PLUGIN_PATH`, `LD_LIBRARY_PATH`), not installed.
+
 Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm monitor 127` → `screendump` for the screen. The
 monitor's `mouse_move` doesn't reach the guest; the pointer is moved with QMP `input-send-event` (`abs` x and y in 0–32767 on
 the HID tablet, `btn` for clicks and the wheel) on `/var/run/qemu-server/127.qmp`.

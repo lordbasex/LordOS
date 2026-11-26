@@ -90,6 +90,11 @@ PKGS_RPI="raspi-firmware firmware-brcm80211 rsync pciutils usbutils wireless-reg
 # (bluez-firmware: brcm/BCM4345C0.hcd), headset audio in PipeWire (libspa-0.2-bluetooth, with the
 # lordos package's WirePlumber drop-in) and rfkill. The same BlueZ packages as the ISO.
 PKGS_BT="bluez bluez-firmware libspa-0.2-bluetooth rfkill"
+# The toolkit audit's bindings and Qt's platform theme, the same as the ISO's PKGS_TOOLKITS (tools/iso/build.sh; every
+# one is in trixie for arm64): python3-gi, the GTK 3 and GTK 4 typelibs, PyQt5, PyQt6, Qt's Wayland plugins and
+# QGnomePlatform (QT_QPA_PLATFORMTHEME=gnome: Qt apps follow LordOS's dark mode)
+PKGS_TOOLKITS="python3-gi gir1.2-gtk-3.0 gir1.2-gtk-4.0 python3-pyqt5 python3-pyqt6 qtwayland5 qt6-wayland
+ qgnomeplatform-qt5 qgnomeplatform-qt6"
 PKGS_RPI_EXTRA="rpi-eeprom raspi-utils"
 # Kernels: Pi 5 (2712: 16K pages) and Pi 4/400/CM4 (v8: 4K pages). Ours (Landlock) if built,
 # per flavour; otherwise Raspberry Pi's.
@@ -280,7 +285,7 @@ mount_ch "$CH"
 echo "== paquetes"
 in_root "$CH" apt-get update -q > "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
 # shellcheck disable=SC2086
-in_root "$CH" apt-get install -y -q --no-install-recommends $PKGS_BASE $PKGS_TOOLS $PKGS_LORDOS $PKGS_RPI $PKGS_BT $ARCHIVE_K $PKGS_GPU $PKGS_APPS $PKGS_SSH $PKGS_SPLASH \
+in_root "$CH" apt-get install -y -q --no-install-recommends $PKGS_BASE $PKGS_TOOLS $PKGS_LORDOS $PKGS_RPI $PKGS_BT $ARCHIVE_K $PKGS_GPU $PKGS_APPS $PKGS_TOOLKITS $PKGS_SSH $PKGS_SPLASH \
     >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
 # the LordOS kernels (same hooks as Raspberry Pi's: initramfs, raspi-firmware copies kernel_2712.img,
 # device trees and overlays), and an apt pin so the archive kernel of that flavour never replaces them
