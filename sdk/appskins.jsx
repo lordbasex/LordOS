@@ -12,10 +12,10 @@
 // the session (a broken skin never takes an app down). A skin only reads the model and calls its actions: it never
 // needs lord.fs or anything else of the app's, and the app checks every action as if its own button had been pressed.
 import { createElement, Component } from 'react';
-import { Image } from '@lordos/runtime';
+import { Image, View } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
-import { cleanSkins, cleanStylePack, skinFor, packIcon, packEffects, packParts, freezeModel, partOn } from './appskinmodel.js';
+import { cleanSkins, cleanStylePack, skinFor, packIcon, packEffects, packParts, freezeModel, partOn, commandBar, pickCommand } from './appskinmodel.js';
 
 const skinStore = createStore({});
 const packStore = createStore(cleanStylePack(null));
@@ -122,3 +122,16 @@ export function SkinRegion({ app, region, model, children }) {
   return createElement(SkinBoundary, { id, fallback: own }, createElement(C, { model: freezeModel(model) }));
 }
 
+
+// A header a theme may add above an app that has no bar of its own (Scanner, Machines, Databases…; docs/THEMES-GUIDE.md,
+// "App skins → the shared shapes"): region `header` of that app, a command bar with the app's title and, where the app
+// offers them, its commands. Without a skin the app is drawn exactly as before (no wrapper at all).
+export function SkinHeader({ app, title, commands = [], onCommand, children }) {
+  const C = useSkin(app, 'header');
+  if (!C) return children;
+  const bar = commandBar({ title: title || app, commands });
+  const model = { app, ...bar, actions: { command: (id) => { const c = pickCommand(bar, id); if (c && onCommand) onCommand(c); } } };
+  return createElement(View, { style: { flex: 1 } },
+    createElement(SkinRegion, { app, region: 'header', model }),
+    createElement(View, { style: { flex: 1, minHeight: 0 } }, children));
+}

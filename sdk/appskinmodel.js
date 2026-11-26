@@ -29,6 +29,13 @@ export const APP_REGIONS = {
   characters: ['toolbar', 'sidebar'],
   fonts: ['sidebar'],
   logs: ['sidebar', 'toolbar'],
+  sysinfo: ['toolbar'],
+  backup: ['toolbar'],
+  pdf: ['toolbar'],
+  forcequit: ['list'],
+  appabout: ['banner'],
+  scanner: ['header'], recorder: ['header'], camera: ['header'], imager: ['header'], installer: ['header'],
+  databases: ['header'], machines: ['header'], cleaner: ['header'], studio: ['header'], 'remote-desk': ['header'],
 };
 
 // The parts of a style a person can turn off one by one.

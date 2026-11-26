@@ -126,9 +126,10 @@ function AboutBanner({ model }) {
   return (
     <View style={{ alignSelf: 'stretch', marginHorizontal: -20, marginTop: -20, marginBottom: 8 }}>
       <View style={{ height: 96, flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 24, background: t.titleBg }}>
-        <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' }}><StartMark size={44} /></View>
+        <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' }}>
+          {model.AppIcon ? <model.AppIcon size={40} /> : <StartMark size={44} />}</View>
         <View style={{ flex: 1, gap: 3 }}>
-          <Text style={{ fontSize: 22, fontWeight: 700, color: '#ffffff', textAlign: 'start', ...f }}>LordOS</Text>
+          <Text style={{ fontSize: 22, fontWeight: 700, color: '#ffffff', textAlign: 'start', ...f }}>{model.name || 'LordOS'}</Text>
           <Text style={{ fontSize: 12, color: '#d8e4f8', textAlign: 'start', ...f }}>{[model.version, model.build].filter(Boolean).join(' · ')}</Text>
         </View>
       </View>
@@ -142,7 +143,23 @@ function AboutBanner({ model }) {
   );
 }
 
+// ---- Force Quit: the running apps as a list pane, Force Quit under it ----
+function QuitList({ model }) {
+  return (
+    <View style={{ flex: 1 }}>
+      <ListPane model={model} width={undefined} style={{ flex: 1 }} />
+      <CommandBar model={{ title: model.error || '', commands: model.commands, actions: { command: model.actions.command } }} />
+    </View>
+  );
+}
+
 export const appSkins = {
+  sysinfo: { toolbar: CommandBar },
+  backup: { toolbar: CommandBar },
+  pdf: { toolbar: CommandBar },
+  forcequit: { list: QuitList },
+  appabout: { banner: AboutBanner },
+  ...Object.fromEntries(['scanner', 'recorder', 'camera', 'imager', 'installer', 'databases', 'machines', 'cleaner', 'studio', 'remote-desk'].map((a) => [a, { header: CommandBar }])),
   logs: { sidebar: (p) => <ListPane {...p} width={210} />, toolbar: CommandBar },
   fonts: { sidebar: SearchPane },
   characters: { toolbar: CommandBar, sidebar: (p) => <ListPane {...p} width={180} /> },
