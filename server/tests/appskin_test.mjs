@@ -14,6 +14,7 @@ const F = await import(path.join(root, 'apps/files/skinmodel.js'));
 const S = await import(path.join(root, 'apps/settings/skinmodel.js'));
 const T = await import(path.join(root, 'apps/terminal/skinmodel.js'));
 const E = await import(path.join(root, 'apps/editor/skinmodel.js'));
+const ST = await import(path.join(root, 'apps/store/skinmodel.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -147,6 +148,13 @@ eq('editor: tabs carry no text', Object.keys(evm.tabs[0]), ['key', 'name', 'dirt
 eq('editor: status', [evm.status.line, evm.status.col, evm.status.eol, evm.status.message], [3, 7, 'LF', { text: 'Saved', ok: true }]);
 eq('editor: commands are the closed list', evm.commands.map((c) => c.id), E.SKIN_COMMANDS);
 eq('editor: one that is not', E.skinCommand('insert'), null);
+
+// ---- the Store's view model ----
+eq('store regions', M.APP_REGIONS.store, ['sidebar', 'toolbar']);
+const svm2 = ST.storeViewModel({ pages: [{ id: 'discover', label: 'D', group: 'store' }, { id: 'updates', label: 'U', count: 3, group: 'store' }, { id: 'wine', label: 'W', group: 'origin', soon: true, count: -1 }],
+  page: 'updates', title: 'U', inApp: false, query: 'x', searchHint: 'h', refresh: { title: 'R', busy: false, run: fn } }, { go: fn });
+eq('store: pages', svm2.pages.map((p) => [p.id, p.count, p.selected, p.soon]), [['discover', 0, false, false], ['updates', 3, true, false], ['wine', 0, false, true]]);
+eq('store: refresh carries no function', Object.keys(svm2.refresh), ['title', 'busy']);
 
 console.log(`appskin-test: ${n} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);

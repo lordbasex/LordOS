@@ -5,8 +5,9 @@ import {
   View, Text, Image, useTheme, useLocale, useAppWindow, useNavigateButtons, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
   admin, canDeactivate, deactivateApp, activateApp, webAppEntry, settings, addListener,
-  useWebApps, suggestions, unseenSuggestions, refreshSuggestions, useSidebar, SidebarToggle, SidebarOverlay,
+  useWebApps, suggestions, unseenSuggestions, refreshSuggestions, useSidebar, SidebarToggle, SidebarOverlay, SkinRegion, useSkinned,
 } from '@lordos/sdk';
+import { storeViewModel } from './skinmodel.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AiDetail, AiDiscover, AiPage, CatalogCategory, CatalogResults, catalogApp, catalogApps, catalogCategoryCounts, searchCatalog } from './ai.js';
 import { matches } from './search.js';
@@ -608,11 +609,37 @@ export default function Store() {
         <View style={{ paddingHorizontal: 20, paddingBottom: 12, paddingTop: 6 }}><debian.Status /></View>
       </View>
   );
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → Store"): the pages' list and the toolbar may be a theme's;
+  // the pages, the cards and every install stay the Store's
+  const skinned = useSkinned('store');
+  const vm = skinned ? (() => {
+    const pages = [
+      { id: 'discover', label: tr('store.page.discover'), group: 'store' },
+      { id: 'suggested', label: tr('store.page.suggested'), count: unseen, group: 'store' },
+      { id: 'installed', label: tr('store.page.installed'), count: launcher.length + nat.installed.size, group: 'store' },
+      { id: 'updates', label: tr('store.page.updates'), count: deb.upgrades?.length, group: 'store' },
+      { id: 'src:debian', label: tr('store.src.debian'), group: 'origin' },
+      ...(fh.supported ? [{ id: 'src:flathub', label: tr('store.page.flathub'), group: 'origin' }] : []),
+      { id: 'src:web', label: tr('store.page.webapps'), count: webCatalog().length, group: 'origin' },
+      { id: 'src:lordos', label: tr('store.page.lordos'), group: 'origin' },
+      { id: 'wine', label: tr('store.src.wine'), group: 'origin', soon: true },
+      { id: 'android', label: tr('store.src.android'), group: 'origin', soon: true },
+      { id: 'ai', label: tr('store.page.ai'), count: catalogApps('ai').length, group: 'picks' },
+      ...['commercial', 'remote', 'suites'].filter((x) => catalogApps(x).length).map((x) => ({ id: x, label: tr(`store.page.${x}`), count: catalogApps(x).length, group: 'picks' })),
+    ];
+    return storeViewModel({ pages, page, title: app ? appTitle : pageTitle, inApp: !!app, query, searchHint: src ? tr(`store.search.in.${src}`) : tr('store.search'), refresh }, {
+      go: (id) => { const p = pages.find((x) => x.id === id && !x.soon); if (p) { if (id !== page) setQuery(''); go(id); } },
+      back: () => { if (app) setApp(null); },
+      search: (q) => { if (!app) onSearch(String(q || '')); },
+      refresh: () => { if (refresh && !refresh.busy) refresh.run(); },
+    });
+  })() : null;
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      {side.narrow ? null : sidebar}
+      {side.narrow ? null : <SkinRegion app="store" region="sidebar" model={vm}>{sidebar}</SkinRegion>}
       {subCounts && !app && !side.narrow ? <OriginColumn sub={sub} cats={subCats} counts={subCounts} total={subTotal} mine={mineCount} onPick={pickSub} /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
+        <SkinRegion app="store" region="toolbar" model={vm}>
         <Toolbar>
           {side.narrow ? <SidebarToggle small shown={side.shown} onClick={side.toggle} /> : null}
           {app ? <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} small title={tr('store.back')} onClick={() => setApp(null)} /> : null}
@@ -622,6 +649,7 @@ export default function Store() {
           {refresh ? <ToolbarButton icon={GLYPH.updates} small title={refresh.title} accessibilityLabel={refresh.title} disabled={refresh.busy} onClick={refresh.run} /> : null}
           {!app ? <SearchField value={query} onChange={onSearch} placeholder={src ? tr(`store.search.in.${src}`) : tr('store.search')} width={side.narrow ? 150 : 200} /> : null}
         </Toolbar>
+        </SkinRegion>
         <EndsContext.Provider value={ends}>
         <ScrollView scrollRef={scroll} onScroll={ends.check} resetKey={app ? `app:${app.native ? 'native' : app.flathub ? 'flathub' : app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: side.narrow ? 14 : 20 }}>
           {subCounts && !app && side.narrow ? <OriginChips sub={sub} cats={subCats} counts={subCounts} onPick={pickSub} /> : null}

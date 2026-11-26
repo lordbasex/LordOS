@@ -105,6 +105,14 @@
     await sleep(1200);
     step('Text Editor: the command row and the status', !!textId(sdk.t('editor.cmd.save')) && !!textId('LF'));
     await shot('editor');
+    // the Store: the column of big buttons and the toolbar
+    sdk.wm.open('store', { new: true });
+    await sleep(3000);
+    const stw = win('store');
+    if (stw) sdk.wm.setFrame?.(stw.id, { x: 140, y: 40, w: 900, h: 600 });
+    await sleep(1500);
+    step('Store: the pages column', !!textId(sdk.t('store.page.discover')) && !!textId(sdk.t('store.src.debian')));
+    await shot('store');
     // the demo identity is the only one on screen (pre.js)
     const R = globalThis.__sceneReal || {};
     // what React shows, and what every terminal session's screen shows (its prompt is the shell's)

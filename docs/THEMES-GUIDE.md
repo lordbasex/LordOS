@@ -636,6 +636,19 @@ editor's own menu at the event's place) and `command(id)`, which runs only one o
 carries no document text, and the project tree, the find bar and every dialog stay the editor's.
 `server/tests/editor_skin_scene.mjs` runs it with every region stubbed (in `make test`).
 
+#### Store
+
+| Region | Where | The Store's own | The skin's `model` |
+|---|---|---|---|
+| `sidebar` | the start side | the pages in three groups (the Store, the origins, the picks) and the package status | the view model below |
+| `toolbar` | the top of the page | Back, the title, refresh and the search | the view model |
+
+The view model (`apps/store/skinmodel.js`, `storeViewModel`): `pages: [{ id, label, count, group, soon, selected }]`
+(`group` is `store`, `origin` or `picks`; `soon` marks an origin that isn't there yet), `page`, `title`, `inApp` (an
+app's page is open), `query`, `searchHint`, `refresh: { title, busy } | null` and `actions`: `go(id)` (only a listed page
+that isn't `soon`), `back()`, `search(text)` and `refresh()`. Every page, card, install, update and removal stays the
+Store's, with its confirmations and the administrator prompt. `server/tests/store_skin_scene.mjs` (in `make test`).
+
 ## 3. Building it
 
 `npm install` once (React, the reconciler and esbuild), then:
