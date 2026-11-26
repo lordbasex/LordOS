@@ -10,8 +10,10 @@ THEME=../themes/default/theme.bundle.js
 [ -x build/lord-server ] && [ -x "build/$CLIENT" ] && [ -f "$THEME" ] || { echo "needs build/lord-server, build/$CLIENT and $THEME"; exit 77; }
 D=$(mktemp -d "${TMPDIR:-/tmp}/lpc.XXXXXX") || exit 1
 trap 'kill $P 2>/dev/null; rm -rf "$D"' EXIT
-mkdir -p "$D/home"
+mkdir -p "$D/home/.config/lordos"
 chmod 700 "$D"
+# a desktop already chosen and the welcome seen: nothing of the first start takes the keyboard from the client
+echo '{"schema": 9, "desktopChosen": true, "welcomeShown": true, "language": "en"}' >"$D/home/.config/lordos/settings.json"
 env -u WAYLAND_DISPLAY -u DISPLAY -u LORD_SESSIOND -u LORDOS_SESSIOND -u DBUS_SESSION_BUS_ADDRESS \
     XDG_RUNTIME_DIR="$D" HOME="$D/home" LORD_GPU=0 \
     ./build/lord-server --headless 640x480 --theme "$THEME" --timeout 40 >"$D/server.log" 2>&1 &

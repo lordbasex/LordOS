@@ -141,6 +141,7 @@ typedef struct Xfer {
 enum { SEL_CLIP, SEL_PRIM, NSEL };
 typedef struct {
     int owned;                          /* the window manager owns it in X (LordOS's selection) */
+    uint32_t changed;                   /* the X server's last-change time of it (XFixes), 0 before the first */
     unsigned owned_gen;
     unsigned x_gen;                     /* LordOS generation that belongs to an X app's copy */
     int stage;                          /* import: 0 idle, 1 TARGETS, 2 data, 3 INCR chunks */
@@ -227,11 +228,12 @@ static void set_focus(uint32_t win) {
     xo_end(&X.out);
 }
 
-static void set_owner(uint32_t owner, uint32_t selection) {
+static void set_owner_at(uint32_t owner, uint32_t selection, uint32_t time) {
     req(X_SetSelectionOwner, 0);
-    xo_u32(&X.out, owner); xo_u32(&X.out, selection); xo_u32(&X.out, 0);
+    xo_u32(&X.out, owner); xo_u32(&X.out, selection); xo_u32(&X.out, time);
     xo_end(&X.out);
 }
+static void set_owner(uint32_t owner, uint32_t selection) { set_owner_at(owner, selection, 0); }
 
 static void convert(uint32_t selection, uint32_t target, uint32_t prop, uint32_t time) {
     req(X_ConvertSelection, 0);
@@ -639,19 +641,25 @@ static int lord_has(int k) {
 }
 
 /* LordOS's selection is offered to X only while an X window has the keyboard, and only if it is
- * newer than what an X app copied. */
+ * newer than what an X app copied.
+ * Taken and given up at the selection's last-change time as XFixes last told it, never at CurrentTime: the X server
+ * ignores the request when an X app took the selection since then (ICCCM). At CurrentTime, LordOS's offer that went
+ * out while the focus came back (after fullscreen, a second window) replaced an X app's copy made a moment before, and
+ * giving it up cleared that copy: the app pasted LordOS's older text, or nothing (the toolkit audit's gtk3-x11 and
+ * gtk4-x11 clipboard checks, docs/TOOLKIT-AUDIT.md). */
 static void clip_sync(void) {
     for (int k = 0; k < NSEL; k++) {
         Sel *s = &X.sel[k];
         unsigned g = lord_gen(k);
         if (X.focus && lord_has(k) && g != s->x_gen) {
             if (!s->owned || s->owned_gen != g) {
-                set_owner(X.wmwin, sel_atom(k));
+                set_owner_at(X.wmwin, sel_atom(k), s->changed);
                 s->owned = 1;
                 s->owned_gen = g;
+                if (X.debug) fprintf(stderr, "xwm: %s offered to X (LordOS's selection)\n", k ? "PRIMARY" : "CLIPBOARD");
             }
         } else if (s->owned && (!X.focus || !lord_has(k))) {
-            set_owner(0, sel_atom(k));
+            set_owner_at(0, sel_atom(k), s->changed);
             s->owned = 0;
         }
     }
@@ -745,9 +753,12 @@ static void sel_owner_changed(const uint8_t *p) {
     uint32_t owner = x11_get32(p + 8), selection = x11_get32(p + 12);
     if (selection == AT(XdndSelection)) { dnd_owner(owner); return; }
     int k = sel_index(selection);
-    if (k < 0 || owner == X.wmwin) return;
+    if (k < 0) return;
     Sel *s = &X.sel[k];
+    s->changed = x11_get32(p + 20);                         /* selection-timestamp: its last-change time */
+    if (owner == X.wmwin) return;
     s->owned = 0;
+    if (X.debug) fprintf(stderr, "xwm: %s owner 0x%x\n", k ? "PRIMARY" : "CLIPBOARD", owner);
     if (!owner) { s->x_gen = 0; return; }                  /* the X app that had it is gone */
     s->x_gen = lord_gen(k);
     sel_start(k, owner);
