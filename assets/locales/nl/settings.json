@@ -1064,5 +1064,7 @@
   "skin.group.connect": "Netwerk en apparaten",
   "skin.group.input": "Taal, invoer en apps",
   "skin.group.system": "Systeem en beveiliging",
-  "skin.pick": "Kies een categorie"
+  "skin.pick": "Kies een categorie",
+  "style.organization": "Organisatie",
+  "style.email": "E-mail"
 }

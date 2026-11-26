@@ -51,7 +51,7 @@ Los tres corren sobre el mismo servidor gráfico, el mismo motor de interfaz y l
 
 [[shot:2]]
 
-## Lord Bluebell (en desarrollo)
+## Bluebell (en desarrollo)
 
 En desarrollo después de la 0.8.9.6.1 (la última versión publicada es la 0.8.9.6.1): un homenaje a los escritorios de 2001, con arte dibujado por nosotros en ese estilo. Barras de título azules brillantes con la parte de arriba redondeada, un botón de inicio verde en una barra de tareas azul con inicio rápido y un botón por cada ventana, y Archivos como el explorador de esa época: botones grandes de Atrás, Adelante y Subir, una barra de dirección con Ir, y un panel de tareas con "Tareas de archivo y carpeta", "Otros sitios" y "Detalles".
 
@@ -88,4 +88,4 @@ Por eso también van a venir más. Si tenés una idea para el próximo, [contano
 - **La presentación de fondos** se comprobó solo en pantallas de prueba, no en monitores reales ni por GPU.
 - **El selector del primer inicio** tiene pruebas automáticas en los tres escritorios, pero todavía no se vio en un primer inicio real.
 - **Un tema que hagas vos** por ahora solo corre en una versión de desarrollo de LordOS: una versión publicada solo carga código que está en el manifiesto firmado de LordOS.
-- **Lord Bluebell** y las apariencias de apps se comprobaron con pruebas automáticas y capturas sin pantalla, en claro y oscuro; todavía no en una sesión real. Por ahora Archivos, Ajustes, la Terminal, el Editor de texto y la Tienda admiten apariencias; las demás apps llegan de a una, y Mail y Calendario, que corren como procesos aislados, solo toman los colores.
+- **Bluebell** y las apariencias de apps se comprobaron con pruebas automáticas y capturas sin pantalla, en claro y oscuro; todavía no en una sesión real. Por ahora Archivos, Ajustes, la Terminal, el Editor de texto y la Tienda admiten apariencias; las demás apps llegan de a una, y Mail y Calendario, que corren como procesos aislados, solo toman los colores.

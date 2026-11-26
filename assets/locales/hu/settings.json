@@ -1064,5 +1064,7 @@
   "skin.group.connect": "Hálózat és eszközök",
   "skin.group.input": "Nyelv, bevitel és alkalmazások",
   "skin.group.system": "Rendszer és biztonság",
-  "skin.pick": "Válasszon kategóriát"
+  "skin.pick": "Válasszon kategóriát",
+  "style.organization": "Szervezet",
+  "style.email": "E-mail"
 }

@@ -1064,5 +1064,7 @@
   "skin.group.connect": "नेटवर्क और डिवाइस",
   "skin.group.input": "भाषा, इनपुट और ऐप",
   "skin.group.system": "सिस्टम और सुरक्षा",
-  "skin.pick": "एक श्रेणी चुनें"
+  "skin.pick": "एक श्रेणी चुनें",
+  "style.organization": "संगठन",
+  "style.email": "ईमेल"
 }

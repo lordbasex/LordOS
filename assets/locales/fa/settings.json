@@ -1064,5 +1064,7 @@
   "skin.group.connect": "شبکه و دستگاه‌ها",
   "skin.group.input": "زبان، ورودی و برنامه‌ها",
   "skin.group.system": "سیستم و امنیت",
-  "skin.pick": "یک دسته را برگزینید"
+  "skin.pick": "یک دسته را برگزینید",
+  "style.organization": "سازمان",
+  "style.email": "رایانامه"
 }

@@ -1064,5 +1064,7 @@
   "skin.group.connect": "Ağ ve Aygıtlar",
   "skin.group.input": "Dil, Giriş ve Uygulamalar",
   "skin.group.system": "Sistem ve Güvenlik",
-  "skin.pick": "Bir kategori seçin"
+  "skin.pick": "Bir kategori seçin",
+  "style.organization": "Kuruluş",
+  "style.email": "E-posta"
 }

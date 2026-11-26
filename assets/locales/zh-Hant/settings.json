@@ -1057,5 +1057,7 @@
   "skin.group.connect": "網路與裝置",
   "skin.group.input": "語言、輸入與 App",
   "skin.group.system": "系統與安全性",
-  "skin.pick": "選擇一個類別"
+  "skin.pick": "選擇一個類別",
+  "style.organization": "組織",
+  "style.email": "電子郵件"
 }

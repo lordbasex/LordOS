@@ -1064,5 +1064,7 @@
   "skin.group.connect": "Şəbəkə və cihazlar",
   "skin.group.input": "Dil, daxiletmə və tətbiqlər",
   "skin.group.system": "Sistem və təhlükəsizlik",
-  "skin.pick": "Kateqoriya seçin"
+  "skin.pick": "Kateqoriya seçin",
+  "style.organization": "Təşkilat",
+  "style.email": "E-poçt"
 }

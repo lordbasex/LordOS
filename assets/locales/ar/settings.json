@@ -1092,5 +1092,7 @@
   "skin.group.connect": "الشبكة والأجهزة",
   "skin.group.input": "اللغة والإدخال والتطبيقات",
   "skin.group.system": "النظام والأمان",
-  "skin.pick": "اختر فئة"
+  "skin.pick": "اختر فئة",
+  "style.organization": "المؤسسة",
+  "style.email": "البريد الإلكتروني"
 }

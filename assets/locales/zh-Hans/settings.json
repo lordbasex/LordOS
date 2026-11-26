@@ -1057,5 +1057,7 @@
   "skin.group.connect": "网络和设备",
   "skin.group.input": "语言、输入和应用",
   "skin.group.system": "系统和安全",
-  "skin.pick": "选择一个类别"
+  "skin.pick": "选择一个类别",
+  "style.organization": "组织",
+  "style.email": "电子邮件"
 }

@@ -1,4 +1,4 @@
-// Lord Bluebell's taskbar, at the bottom of each display: a green start button with the bluebell mark, the pinned apps
+// Bluebell's taskbar, at the bottom of each display: a green start button with the bluebell mark, the pinned apps
 // as small quick-launch icons, a button for every window (its icon and title; the one in front looks pressed), and the
 // light-blue tray at the end with the status items and the clock. Pinning and the pinned apps' menus are the SDK's
 // (sdk/dock.js), the same as in the other themes.

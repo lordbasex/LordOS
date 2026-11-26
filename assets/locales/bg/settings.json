@@ -1064,5 +1064,7 @@
   "skin.group.connect": "Мрежа и устройства",
   "skin.group.input": "Език, въвеждане и приложения",
   "skin.group.system": "Система и сигурност",
-  "skin.pick": "Изберете категория"
+  "skin.pick": "Изберете категория",
+  "style.organization": "Организация",
+  "style.email": "Имейл"
 }

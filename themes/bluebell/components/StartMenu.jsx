@@ -1,4 +1,4 @@
-// Lord Bluebell's start menu, in the two-column manner of 2001: a blue header with the person's picture and name, a white
+// Bluebell's start menu, in the two-column manner of 2001: a blue header with the person's picture and name, a white
 // column of pinned and frequent apps with "All apps ▸" at its foot, a light-blue column of places (Documents, Pictures,
 // Music, the computer, the network, Settings, Help, Search) and a blue footer with Log Out and Shut Down, which are
 // LordOS's own session actions (session.quit and session.shutdown, the latter asking first). All drawn by us.

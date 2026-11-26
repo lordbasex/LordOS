@@ -1071,5 +1071,7 @@
   "skin.group.connect": "Tinklas ir įrenginiai",
   "skin.group.input": "Kalba, įvestis ir programos",
   "skin.group.system": "Sistema ir sauga",
-  "skin.pick": "Pasirinkite kategoriją"
+  "skin.pick": "Pasirinkite kategoriją",
+  "style.organization": "Organizacija",
+  "style.email": "El. paštas"
 }

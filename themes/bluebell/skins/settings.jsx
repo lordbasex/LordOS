@@ -1,4 +1,4 @@
-// skins/settings.jsx — Lord Bluebell's skin for Settings, in the manner of a control panel of 2001: a task pane on the
+// skins/settings.jsx — Bluebell's skin for Settings, in the manner of a control panel of 2001: a task pane on the
 // side and, before a section is open, a page of four categories, each a big icon and its sections as links
 // (docs/THEMES-GUIDE.md, "App skins → Settings"). Each section's page is Settings' own; the skin only asks Settings to
 // open one (model.actions.open), to come back to the categories (home) or to search.

@@ -1064,5 +1064,7 @@
   "skin.group.connect": "Red y dispositivos",
   "skin.group.input": "Idioma, entrada y apps",
   "skin.group.system": "Sistema y seguridad",
-  "skin.pick": "Elegí una categoría"
+  "skin.pick": "Elegí una categoría",
+  "style.organization": "Organización",
+  "style.email": "Correo electrónico"
 }

@@ -1,4 +1,4 @@
-// skins/terminal.jsx — Lord Bluebell's skin for the Terminal: a row of command buttons and property-sheet tabs in the
+// skins/terminal.jsx — Bluebell's skin for the Terminal: a row of command buttons and property-sheet tabs in the
 // manner of 2001, a status bar of sunken panels, and the era's context menu (docs/THEMES-GUIDE.md, "App skins →
 // Terminal"). The panes stay the Terminal's; the skin only asks for the Terminal's own commands.
 import { View, Text, useTheme, useThemeFont, PackIcon, t as tr } from '@lordos/sdk';

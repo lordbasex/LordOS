@@ -1064,5 +1064,7 @@
   "skin.group.connect": "Xarxa i dispositius",
   "skin.group.input": "Idioma, entrada i apps",
   "skin.group.system": "Sistema i seguretat",
-  "skin.pick": "Trieu una categoria"
+  "skin.pick": "Trieu una categoria",
+  "style.organization": "Organització",
+  "style.email": "Correu electrònic"
 }

@@ -1064,5 +1064,7 @@
   "skin.group.connect": "নেটওয়ার্ক ও ডিভাইস",
   "skin.group.input": "ভাষা, ইনপুট ও অ্যাপ",
   "skin.group.system": "সিস্টেম ও নিরাপত্তা",
-  "skin.pick": "একটি বিভাগ বেছে নিন"
+  "skin.pick": "একটি বিভাগ বেছে নিন",
+  "style.organization": "প্রতিষ্ঠান",
+  "style.email": "ইমেল"
 }

@@ -53,7 +53,7 @@ its own layout (for example what the Super key alone does).
 | Lord Flow | `themes/default` | menu bar on top (with the app's menus), magnifying Dock, app launcher, Control Center |
 | Lord Classic | `themes/classic` | taskbar (bottom, top or a side), start menu with search, quick settings, notification panel, menus in each window, snapping and the SDK's Overview |
 | Lord Workspaces (since 0.8.9) | `themes/workspaces` | activities (desktops with an icon, a colour, pinned apps and a layout per display), a Context Spine, group frames with static tiling, its own Search panel and Control Center, menus in each window, three effects styles ([WORKSPACES.md](WORKSPACES.md)) |
-| Lord Bluebell (in development after 0.8.9.6.1) | `themes/bluebell` | a tribute to the desktops of 2001: glossy blue title bars with rounded tops, a green start button on a blue taskbar with quick launch and a button per window; the demo of [style packs and app skins](#style-packs-and-app-skins): its own icons, pointers, sounds and font, and Files as that era's explorer |
+| Bluebell (in development after 0.8.9.6.1) | `themes/bluebell` | a tribute to the desktops of 2001: glossy blue title bars with rounded tops, a green start button on a blue taskbar with quick launch and a button per window; the demo of [style packs and app skins](#style-packs-and-app-skins): its own icons, pointers, sounds and font, and Files as that era's explorer |
 | Lord Celeste (community, since 0.8.9.5) | `themes/celeste` | a frame around each display with rounded inner corners, a bar on its thick side (running apps, status items, privacy indicators, clock), drawers that slide out of the frame's edges (dashboard, launcher, session, sidebar with the notifications), menus in each window, mirrored right to left; the theme options of `theme.json` and a node-tested geometry (`model.js`). Layout inspired by Caelestia (caelestia-dots/shell); no code from it |
 
 `themes/greeter` is the login and lock screen: it is a separate program, not a desktop theme (see
@@ -140,8 +140,11 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
   | `author` | plain text, one line, at most 80 characters, no control or bidi-override characters | the author; missing, invalid or the placeholder `"author pending"` reads **"Unknown author"** |
   | `license` | an SPDX expression: `"MIT"`, `"GPL-3.0-or-later"`, `"MIT OR Apache-2.0"` (up to four terms joined by `OR`, `AND` or `WITH`) | the license; missing reads "Not stated" |
   | `version` | `1`, `1.2`, `1.2.3` or `1.2.3.4`, with an optional `-beta.1` or `+build` suffix | "Version 1.2.3" |
+  | `email` (0.8.9.6.2) | the author's address, one `local@domain.tld`, at most 120 characters | an "Email" row on the theme's page, as text (never opened by itself) |
+  | `organization` (0.8.9.6.2) | plain text, one line, at most 60 characters, the same rules as `author` | an "Organization" row on the theme's page |
 
-  The official themes (no `community: true`) declare none of them: Settings shows LordOS as their author, MIT as
+  Bluebell declares its author, email and organization (it is official, so its license and version are LordOS's).
+  The other official themes (no `community: true`) declare none of them: Settings shows LordOS as their author, MIT as
   their license and the release's version as theirs. A community theme should declare all four:
 
   ```json
@@ -521,7 +524,7 @@ registerStylePack({
 
 What a pack can't do, by design: a theme brings no audio file, no cursor image and no font file for lord-server to
 parse. Sounds are notes, pointers are two colours, and a font is one that is already installed (a Debian package, so its
-licence is a free one: Lord Bluebell names DejaVu Sans of `fonts-dejavu-core`, which LordOS recommends). Anything the
+licence is a free one: Bluebell names DejaVu Sans of `fonts-dejavu-core`, which LordOS recommends). Anything the
 checks don't accept is dropped, and the rest of the pack still applies.
 
 ### Level 2: app skins
@@ -588,7 +591,7 @@ read-only banner and Files' sheets (Get Info, Quick Preview, Connect to Server, 
 own over any skin. `server/tests/files_skin_scene.mjs` runs Files with every region replaced by a minimal stub
 (`node tests/menubar_test.mjs files_skin_scene.mjs`, in `make test`): the stubs get the model, the actions go through
 Files (`lord.fs.trash`, no `mkdir` in a read-only folder), a throwing stub gives the region back and layouts off brings
-Files' own regions. `server/tests/bluebell_scene` screenshots Lord Bluebell's skins
+Files' own regions. `server/tests/bluebell_scene` screenshots Bluebell's skins
 (`tests/app_scene_headless.sh bluebell_scene OUT bluebell en light|dark`).
 
 #### Settings

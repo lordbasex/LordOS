@@ -1071,5 +1071,7 @@
   "skin.group.connect": "Мережа й пристрої",
   "skin.group.input": "Мова, введення та застосунки",
   "skin.group.system": "Система й безпека",
-  "skin.pick": "Виберіть категорію"
+  "skin.pick": "Виберіть категорію",
+  "style.organization": "Організація",
+  "style.email": "Ел. пошта"
 }

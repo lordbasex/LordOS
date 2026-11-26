@@ -1,4 +1,4 @@
-// glyphs.jsx — Lord Bluebell's own icons, drawn with nodes in the style of the desktops of 2001 (glossy, rounded,
+// glyphs.jsx — Bluebell's own icons, drawn with nodes in the style of the desktops of 2001 (glossy, rounded,
 // friendly colours). Original drawings: nothing here is copied or traced from another system's icons. They are the
 // theme's style pack (index.jsx registerStylePack): file-type icons, toolbar icons and a few app icons, by our names.
 import { View, Text } from '@lordos/sdk';

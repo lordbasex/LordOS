@@ -1,4 +1,4 @@
-// "Lord Bluebell" — a tribute to the desktops of 2001, and the demo of style packs and app skins (part 4 of the
+// "Bluebell" — a tribute to the desktops of 2001, and the demo of style packs and app skins (part 4 of the
 // community-themes plan; docs/THEMES-GUIDE.md "Style packs" and "App skins").
 //
 //   tokens.js              the colours, the shared controls' richer tokens (raised buttons, soft toolbars)

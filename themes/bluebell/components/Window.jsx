@@ -1,4 +1,4 @@
-// Lord Bluebell's window frame: a glossy blue title bar with rounded top corners, the app's icon and title in white, and
+// Bluebell's window frame: a glossy blue title bar with rounded top corners, the app's icon and title in white, and
 // the minimize / maximize / close buttons as rounded squares at its end (close in warm red); a thin blue edge around the
 // rest of the window. Under the title bar, an app that has menus gets them in a light strip (File, Edit, View…, then
 // Window and Help), as on a taskbar layout. Moving and resizing are lord-server's (<WindowShell>, wm.beginMove).

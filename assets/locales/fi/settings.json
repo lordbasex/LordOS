@@ -1064,5 +1064,7 @@
   "skin.group.connect": "Verkko ja laitteet",
   "skin.group.input": "Kieli, syöttö ja sovellukset",
   "skin.group.system": "Järjestelmä ja suojaus",
-  "skin.pick": "Valitse luokka"
+  "skin.pick": "Valitse luokka",
+  "style.organization": "Organisaatio",
+  "style.email": "Sähköposti"
 }

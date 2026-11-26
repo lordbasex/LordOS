@@ -1,4 +1,4 @@
-// Tokens of "Lord Bluebell", a tribute to the desktops of 2001 (docs/THEMES-GUIDE.md, "Style packs" and "App skins").
+// Tokens of "Bluebell", a tribute to the desktops of 2001 (docs/THEMES-GUIDE.md, "Style packs" and "App skins").
 // The base keys are the contract with the apps (sdk/theme.js); the richer tokens (toolbarBg, buttonBg, bevel,
 // stateBorders) give every app's shared controls the era's raised buttons and soft toolbars; the rest is this theme's.
 // Every colour here is our own pick for the style; nothing is taken from another system's files.

@@ -1064,5 +1064,7 @@
   "skin.group.connect": "Δίκτυο και συσκευές",
   "skin.group.input": "Γλώσσα, εισαγωγή και εφαρμογές",
   "skin.group.system": "Σύστημα και ασφάλεια",
-  "skin.pick": "Επιλέξτε μια κατηγορία"
+  "skin.pick": "Επιλέξτε μια κατηγορία",
+  "style.organization": "Οργανισμός",
+  "style.email": "Email"
 }

@@ -1,5 +1,5 @@
 // driver.js — goes after the theme bundle in tests/app_scene_headless.sh bluebell_scene (run it with the bluebell theme):
-// Lord Bluebell, the demo of style packs and app skins. Files as the explorer of its era (toolbar, address bar, task
+// Bluebell, the demo of style packs and app skins. Files as the explorer of its era (toolbar, address bar, task
 // pane, icons and details, the context menu), the start menu, Settings as a page of categories with a task pane, and
 // Settings → Appearance's "From this style" switches;
 // then layouts turned off there brings Files' own regions back. Lines start with "APP-SCENE".

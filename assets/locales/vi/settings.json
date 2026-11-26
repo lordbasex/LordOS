@@ -1057,5 +1057,7 @@
   "skin.group.connect": "Mạng và thiết bị",
   "skin.group.input": "Ngôn ngữ, nhập liệu và ứng dụng",
   "skin.group.system": "Hệ thống và bảo mật",
-  "skin.pick": "Chọn một danh mục"
+  "skin.pick": "Chọn một danh mục",
+  "style.organization": "Tổ chức",
+  "style.email": "Email"
 }

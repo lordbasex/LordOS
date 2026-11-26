@@ -17,6 +17,8 @@
 //   author         who made it (plain text, at most 80 characters; "author pending" or none reads as an unknown author)
 //   license        its license as an SPDX expression ("MIT", "GPL-3.0-or-later", "MIT OR Apache-2.0")
 //   version        its own version ("1.2.0", "0.3.1-beta"); the official themes have none and show LordOS's
+//   email          (0.8.9.6.2) the author's contact address: one address, at most 120 characters, checked by its shape
+//   organization   (0.8.9.6.2) who the author works for or publishes as: plain text, one line, at most 60 characters
 //
 // theme.json is data (at most 4 KB, read by lord-server), never code: every field is checked here, labels must be
 // locale keys of the shell catalog, values short plain strings, and anything else is dropped.
@@ -42,6 +44,12 @@ export function themeAuthor(v) {
   return /^author pending$/i.test(s) ? '' : s;
 }
 
+// A theme.json email: one plain address (local@domain.tld), at most 120 characters; '' otherwise. Shown as text, never
+// opened by itself.
+const EMAIL = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.[A-Za-z]{2,24}$/;
+export const themeEmail = (v) => (typeof v === 'string' && v.length <= 120 && !UNSAFE.test(v) && EMAIL.test(v.trim()) ? v.trim() : '');
+export const themeOrganization = (v) => plainText(v, 60);
+
 function cleanOption(o) {
   if (!o || typeof o !== 'object' || !KEY.test(o.key) || !LABEL.test(o.label)) return null;
   const out = { key: o.key, label: o.label };
@@ -61,7 +69,7 @@ export function cleanThemeMeta(meta) {
   const wp = m.wallpaper && typeof m.wallpaper === 'object' && !Array.isArray(m.wallpaper) ? m.wallpaper : {};
   return { sketch: sketch && Object.keys(sketch).length ? sketch : null, options, desktopArrows: m.desktopArrows === true, displayApps: m.displayApps === true,
     wallpaperDefault: typeof wp.default === 'string' && WALLPAPER.test(wp.default) ? wp.default : null, wallpaperSlideshow: wp.slideshow === true,
-    community: m.community === true, author: themeAuthor(m.author),
+    community: m.community === true, author: themeAuthor(m.author), email: themeEmail(m.email), organization: themeOrganization(m.organization),
     license: typeof m.license === 'string' && LICENSE.test(m.license) ? m.license : '',
     version: typeof m.version === 'string' && VERSION.test(m.version) ? m.version : '' };
 }

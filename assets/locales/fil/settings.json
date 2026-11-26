@@ -1064,5 +1064,7 @@
   "skin.group.connect": "Network at mga Device",
   "skin.group.input": "Wika, Input at mga App",
   "skin.group.system": "System at Seguridad",
-  "skin.pick": "Pumili ng kategorya"
+  "skin.pick": "Pumili ng kategorya",
+  "style.organization": "Organisasyon",
+  "style.email": "Email"
 }

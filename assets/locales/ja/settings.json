@@ -1057,5 +1057,7 @@
   "skin.group.connect": "ネットワークとデバイス",
   "skin.group.input": "言語、入力、アプリ",
   "skin.group.system": "システムとセキュリティ",
-  "skin.pick": "カテゴリを選んでください"
+  "skin.pick": "カテゴリを選んでください",
+  "style.organization": "組織",
+  "style.email": "メール"
 }

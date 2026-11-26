@@ -1,4 +1,4 @@
-// skins/editor.jsx — Lord Bluebell's skin for the Text Editor, in the manner of a notepad of 2001 with a toolbar: a row of
+// skins/editor.jsx — Bluebell's skin for the Text Editor, in the manner of a notepad of 2001 with a toolbar: a row of
 // command buttons (New, Open, Save, Cut, Copy, Paste, Find), property-sheet tabs, a status bar of sunken panels and the
 // era's context menu (docs/THEMES-GUIDE.md, "App skins → Text Editor"). The text stays the Text Editor's; the skin only
 // asks for its commands.

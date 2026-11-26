@@ -994,7 +994,7 @@
   "themeSwitch.failedBody": "Он не запустился. Стиль рабочего стола остаётся прежним.",
   "spotlight.section.machines": "Машины",
   "guestApps.inMachine": "В {machine}",
-  "theme.bluebell.name": "Lord Bluebell",
+  "theme.bluebell.name": "Bluebell",
   "theme.bluebell.description": "Дань уважения рабочим столам 2001 года: синие заголовки окон со скруглённым верхом, зелёная кнопка «Пуск» на синей панели задач и «Файлы» с панелью задач.",
   "bluebell.start": "Пуск"
 }

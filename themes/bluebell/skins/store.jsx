@@ -1,4 +1,4 @@
-// skins/store.jsx — Lord Bluebell's skin for the Store, in the manner of a programs panel of 2001: a column of big square
+// skins/store.jsx — Bluebell's skin for the Store, in the manner of a programs panel of 2001: a column of big square
 // buttons on the side (the Store's pages, grouped), and a toolbar with Back, the page's title, refresh and a search field
 // (docs/THEMES-GUIDE.md, "App skins → Store"). The pages, the cards and every install stay the Store's.
 import { View, Text, ScrollView, TextInput, useTheme, useThemeFont, t as tr, direction } from '@lordos/sdk';

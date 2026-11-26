@@ -1064,5 +1064,7 @@
   "skin.group.connect": "Nätverk och enheter",
   "skin.group.input": "Språk, inmatning och appar",
   "skin.group.system": "System och säkerhet",
-  "skin.pick": "Välj en kategori"
+  "skin.pick": "Välj en kategori",
+  "style.organization": "Organisation",
+  "style.email": "E-post"
 }

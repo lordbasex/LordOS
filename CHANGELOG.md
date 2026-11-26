@@ -253,7 +253,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     and refreshes, and every install stays the Store's.
   - **Settings → Appearance → From this style**: a switch for each part the style in use brings (Icons, Pointer colors,
     Sounds, Font, App layouts; `settings.themeParts`), so someone can keep a theme's frames and use LordOS's icons.
-  - **Lord Bluebell** (`themes/bluebell`), the demo: a tribute to the desktops of 2001 with glossy blue title bars with
+  - **Bluebell** (`themes/bluebell`), the demo: a tribute to the desktops of 2001 with glossy blue title bars with
     rounded tops, a green start button with our own bluebell mark on a blue taskbar, quick launch and a button per
     window, a two-column start menu of that era (the person's picture and name in a blue header, pinned apps and "All
     apps ▸" in a white column, Documents, Pictures, Music, the computer, the network, Settings, Help and Search in a
@@ -262,6 +262,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     (Back/Forward/Up, Search, Views, an address bar with Go, the task pane with "File and Folder Tasks", "Other Places"
     and "Details", icons or details, a plain status bar and context menu), and Settings a control panel of that era (a
     task pane and four categories, each with its sections as links). All of its art is drawn by us.
+  - Themes no longer carry "Lord" in their names (the maintainer's rule of 2026-11-26): the demo is just **Bluebell**.
+    Its `theme.json` names its author, Federico Pereira, with two new optional fields, `email` and `organization` (IPERFEX),
+    checked by `sdk/thememeta.js` (one plain address of at most 120 characters; one line of at most 60) and shown as
+    rows on the theme's page in Settings → Appearance (`settings.style.email`, `settings.style.organization`; tests in
+    `server/tests/theme_gallery_test.mjs`).
   - New texts in the 35 languages (`files.skin.*`, `settings.themeParts.*`, `settings.skin.*`, `shell.theme.bluebell.*`,
     `shell.bluebell.start`). Tests: `server/tests/appskin_test.mjs` (76 checks), `server/tests/files_skin_scene.mjs`
     (Files with every region a stub: 31 checks), `server/tests/settings_skin_scene.mjs` (Settings with both regions
