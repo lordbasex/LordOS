@@ -54,13 +54,13 @@ function Item({ t, font, it, onClick }) {
 }
 
 // model: { title, items: [{ key, label, detail, selected, group }], actions: { select }, width? }
-export function ListPane({ model, width = 220 }) {
+export function ListPane({ model, width = 220, style }) {
   const t = useTheme();
   const font = useThemeFont();
   const groups = [];
   for (const it of model.items) { const g = it.group || ''; let b = groups.find((x) => x.g === g); if (!b) { b = { g, items: [] }; groups.push(b); } b.items.push(it); }
   return (
-    <View style={{ width, flex: 1, background: t.paneBg }}>
+    <View style={[{ width, alignSelf: 'stretch', background: t.paneBg }, style]}>
       <ScrollView style={{ flex: 1 }}>
         <View style={{ paddingBottom: 12 }}>
           {groups.map((b, i) => (

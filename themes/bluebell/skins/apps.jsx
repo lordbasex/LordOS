@@ -11,7 +11,7 @@ function SearchPane({ model }) {
   return (
     <View style={{ width: 240, background: t.paneBg }}>
       <View style={{ paddingHorizontal: 10, paddingTop: 10 }}><TextInput value={model.query} onChange={model.actions.search} placeholder={model.title} size={12} /></View>
-      <ListPane model={model} width={240} />
+      <ListPane model={model} width={240} style={{ flex: 1 }} />
     </View>
   );
 }
