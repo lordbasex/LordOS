@@ -51,6 +51,12 @@ Los tres corren sobre el mismo servidor gráfico, el mismo motor de interfaz y l
 
 [[shot:2]]
 
+## Bluebell (en desarrollo)
+
+En desarrollo después de la 0.8.9.6.1 (la última versión publicada es la 0.8.9.6.1): un homenaje a los escritorios de 2001, con arte dibujado por nosotros en ese estilo. Barras de título azules brillantes con la parte de arriba redondeada, un botón de inicio verde en una barra de tareas azul con inicio rápido y un botón por cada ventana, y Archivos como el explorador de esa época: botones grandes de Atrás, Adelante y Subir, una barra de dirección con Ir, y un panel de tareas con "Tareas de archivo y carpeta", "Otros sitios" y "Detalles".
+
+También es el primer escritorio que trae un **paquete de estilo** y **apariencias de apps**: sus propios iconos, punteros blancos, unos sonidos cortos y su propio tipo de letra, y la barra de herramientas, la barra lateral, los elementos y la barra de estado de Archivos dibujados a su manera. Archivos sigue haciendo cada acción él mismo, con sus comprobaciones de siempre. En **Ajustes → Apariencia → De este estilo** podés apagar cada parte, por ejemplo para quedarte con sus marcos y usar los iconos propios de LordOS.
+
 ## Cómo cambiar
 
 Andá a **Ajustes → Apariencia → Estilo del escritorio** y elegí otro. El cambio es inmediato, sin cerrar sesión: tus ventanas abiertas vuelven, cada una en su escritorio, y tus ajustes se quedan.
@@ -82,3 +88,4 @@ Por eso también van a venir más. Si tenés una idea para el próximo, [contano
 - **La presentación de fondos** se comprobó solo en pantallas de prueba, no en monitores reales ni por GPU.
 - **El selector del primer inicio** tiene pruebas automáticas en los tres escritorios, pero todavía no se vio en un primer inicio real.
 - **Un tema que hagas vos** por ahora solo corre en una versión de desarrollo de LordOS: una versión publicada solo carga código que está en el manifiesto firmado de LordOS.
+- **Bluebell** y las apariencias de apps se comprobaron con pruebas automáticas y capturas sin pantalla, en claro y oscuro; todavía no en una sesión real. Todas las apps nativas que corren en el proceso del escritorio admiten apariencias; Mail y Calendario, que corren como procesos aislados, solo toman los colores.

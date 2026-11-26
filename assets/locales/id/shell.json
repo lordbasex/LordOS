@@ -1000,5 +1000,8 @@
   "edit.saveAudio": "Simpan audio sebagai…",
   "edit.back": "Kembali",
   "edit.forward": "Maju",
-  "edit.reload": "Muat ulang"
+  "edit.reload": "Muat ulang",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "Penghormatan untuk desktop tahun 2001: bilah judul biru dengan bagian atas membulat, tombol mulai hijau pada bilah tugas biru, dan Berkas dengan panel tugas.",
+  "bluebell.start": "Mulai"
 }

@@ -5,7 +5,7 @@
 import {
   View, Text, useTheme, useAppWindow, useVisitHistory, useLocale, t as tr, help, Markdown, ScrollView, SidebarItem, SectionTitle, Button,
   getApp, wm, appName, settings, textDirection, SearchField, EmptyState, Hairline, Lumo, spacing, typeScale,
-  useSidebar, SidebarToggle, SidebarOverlay,
+  useSidebar, SidebarToggle, SidebarOverlay, SkinRegion, useSkinned, listPane, pickItem,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -190,13 +190,22 @@ export default function Help() {
       </ScrollView>
     </>
   );
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the articles (or the search's results)
+  // as a list pane with the search; the articles themselves stay Help's
+  const skinned = useSkinned('help');
+  const pane = skinned ? listPane({ title: tr('help.search'), items: results
+    ? results.map((r) => ({ key: r.id, label: r.title, selected: r.id === article && !tour }))
+    : [{ key: '@tour', label: tr('help.tour.open'), selected: tour }, ...SECTIONS.flatMap((sec) => list.filter((x) => (x.section || 'apps') === sec)
+      .map((x) => ({ key: x.id, label: x.title, selected: !tour && x.id === article, group: tr(`help.section.${sec}`) })))] }) : null;
+  const vm = pane ? { app: 'help', ...pane, query, actions: { search: (v) => setQuery(String(v || '')),
+    select: (key) => { const k = pickItem(pane, key); if (!k) return; if (k === '@tour') setTour(true); else pick(k); } } } : null;
   if (!help.available() || !list.length) return <EmptyState mascot="confused" title={tr('help.unavailable')} />;
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      {sb.narrow ? null : <View style={{ width: 240, backgroundColor: t.sidebarBg }}>
+      {sb.narrow ? null : <SkinRegion app="help" region="sidebar" model={vm}><View style={{ width: 240, backgroundColor: t.sidebarBg }}>
         {sidebar}
         <Hairline edge="end" />
-      </View>}
+      </View></SkinRegion>}
       <View style={{ flex: 1, minWidth: 0 }}>
         {sb.narrow ? (
           <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.s }}>

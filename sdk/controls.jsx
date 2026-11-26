@@ -5,7 +5,8 @@
 // and Table are in sdk/lists.jsx). The spacing and type scale they follow is in docs/DESIGN.md.
 import { View, Text, addListener, displayAt } from '@lordos/runtime';
 import { useEffect, useRef, useState } from 'react';
-import { useTheme, popupBg } from './theme.js';
+import { useTheme, popupBg, stateBorder, bevelStyle } from './theme.js';
+import { PackIcon } from './appskins.jsx';
 import { TextInput, ScrollView, useAppWindow, hasTextFocus, clearTextFocus } from './components.jsx';
 import { wm } from './windows.js';
 import { useStore } from './store.js';
@@ -87,7 +88,9 @@ function TooltipBubble({ text, end, top, bottom }) {
 // title: tooltip text (required for icon-only buttons). active: a toggled-on state.
 // A Tab stop unless disabled (sdk/focus.js): Space and Enter press it. onKeyDown (optional) sees its keys first.
 // accessibilityLabel: what a screen reader says for an icon-only button (the Store's update icon); its tooltip otherwise.
-export function ToolbarButton({ icon, label, title, onClick, active, disabled, small, iconSize, color, style, onKeyDown, focusable = true, accessibilityLabel }) {
+// iconName: the icon's name in a style pack (appskinmodel.js TOOLBAR_ICONS: 'back', 'forward', 'up', …); the pack's
+// icon is drawn instead of `icon` when the theme brings one.
+export function ToolbarButton({ icon, iconName, label, title, onClick, active, disabled, small, iconSize, color, style, onKeyDown, focusable = true, accessibilityLabel }) {
   const t = useTheme();
   const { id: winId } = useAppWindow();
   const ref = useRef(null);
@@ -101,10 +104,16 @@ export function ToolbarButton({ icon, label, title, onClick, active, disabled, s
       onFocus={tipEnter} onBlur={tipLeave} onMouseEnter={() => { setHover(true); tipEnter(); }} onMouseLeave={() => { setHover(false); tipLeave(); }}
       style={[{ height: h, minWidth: h, paddingHorizontal: label ? 8 : 0, borderRadius: t.controlRadiusSmall, flexDirection: 'row', gap: 6,
         alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.45 : 1, zIndex: tip ? 1000 : 0,
-        backgroundColor: active ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : hover && !disabled ? t.hover : 'transparent' }, style]}>
-      {icon == null ? null : typeof icon === 'string' || typeof icon === 'number'
-        ? <Text style={{ fontSize: iconSize || (small ? 13 : 15), color: fg, textAlign: 'center' }}>{icon}</Text>
-        : icon /* an element: a drawn glyph */}
+        backgroundColor: active ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : hover && !disabled ? t.hover : 'transparent',
+        // richer tokens (sdk/theme.js): a border per state, a sunken bevel while active
+        ...(t.stateBorders ? { border: '1px solid transparent', ...stateBorder(t, disabled ? 'disabled' : active ? 'pressed' : hover ? 'hover' : 'toolbar') } : null),
+        ...(active ? bevelStyle(t, true) : null) }, style]}>
+      {(() => {
+        const own = icon == null ? null : typeof icon === 'string' || typeof icon === 'number'
+          ? <Text style={{ fontSize: iconSize || (small ? 13 : 15), color: fg, textAlign: 'center' }}>{icon}</Text>
+          : icon; /* an element: a drawn glyph */
+        return iconName ? <PackIcon group="toolbar" name={iconName} size={iconSize ? Math.max(14, iconSize + 4) : small ? 16 : 20} color={fg} fallback={own} /> : own;
+      })()}
       {label ? <Text style={{ fontSize: small ? 12 : 13, fontWeight: 500, color: fg, whiteSpace: 'nowrap' }}>{label}</Text> : null}
       {/* in the tooltip layer (sdk/layers.js): zIndex only orders siblings, so a bubble drawn in place went
           under whatever the window draws after the toolbar (the picture in Photos, issue #72) */}
@@ -153,7 +162,8 @@ export function ToolbarGroup({ children, style }) {
 export function Toolbar({ children, style, separator = true }) {
   const t = useTheme();
   return (
-    <View style={[{ height: controlSize.toolbar, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.m, zIndex: 10 }, style]}>
+    <View style={[{ height: controlSize.toolbar, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.m, zIndex: 10,
+      ...(t.toolbarBg ? { background: t.toolbarBg } : null) }, style]}>
       {separator ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: t.separator }} /> : null}
       {children}
     </View>

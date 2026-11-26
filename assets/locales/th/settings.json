@@ -1074,5 +1074,19 @@
   "style.removeTitle": "เอา “{name}” ออกไหม",
   "style.removeDetail": "คุณติดตั้งใหม่จากไฟล์ของมันได้",
   "style.communityNoteInstalled": "LordOS ไม่ได้สร้างหรือตรวจสอบสไตล์เดสก์ท็อปนี้ มันทำงานแบบจำกัด: เปิด Terminal เปลี่ยนไฟล์ ตอบคำขอสิทธิ์ หรือเห็นสิ่งที่คุณพิมพ์ในแอปไม่ได้",
-  "style.rescueHint": "ถ้าทำงานผิดปกติ ให้กด Ctrl+Alt+Shift+Backspace เพื่อกลับไปที่ Lord Flow"
+  "style.rescueHint": "ถ้าทำงานผิดปกติ ให้กด Ctrl+Alt+Shift+Backspace เพื่อกลับไปที่ Lord Flow",
+  "themeParts.title": "จากสไตล์นี้",
+  "themeParts.icons": "ไอคอน",
+  "themeParts.cursors": "สีของตัวชี้",
+  "themeParts.sounds": "เสียง",
+  "themeParts.fonts": "แบบอักษร",
+  "themeParts.layouts": "เลย์เอาต์ของแอป",
+  "themeParts.layoutsHint": "การจัดวางแอปอย่างไฟล์ แอปยังคงใช้กฎของตัวเองไม่ว่ากรณีใด",
+  "skin.group.look": "ลักษณะที่ปรากฏและจอแสดงผล",
+  "skin.group.connect": "เครือข่ายและอุปกรณ์",
+  "skin.group.input": "ภาษา การป้อนข้อมูล และแอป",
+  "skin.group.system": "ระบบและความปลอดภัย",
+  "skin.pick": "เลือกหมวดหมู่",
+  "style.organization": "องค์กร",
+  "style.email": "อีเมล"
 }

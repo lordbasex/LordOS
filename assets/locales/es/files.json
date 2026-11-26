@@ -342,5 +342,9 @@
   "readOnly.denied": "Esta carpeta es de solo lectura: sus permisos no te dejan cambiarla. Para cambiarla, usá la Terminal u otra app.",
   "fromMachineNoRun": "«{name}» vino de la máquina {machine}. Archivos no abre programas ni instaladores de una máquina: usá Abrir con si confiás en él.",
   "info.from": "Desde",
-  "info.fromMachine": "La máquina {machine}"
+  "info.fromMachine": "La máquina {machine}",
+  "skin.address": "Dirección",
+  "skin.tasks": "Tareas de archivo y carpeta",
+  "skin.otherPlaces": "Otros sitios",
+  "skin.details": "Detalles"
 }

@@ -1,6 +1,6 @@
 // Calculator — sample native app: buttons and keyboard (no eval: our own parser).
-import { View, Text, useTheme, useKeyboard, t as tr, formatNumber } from '@lordos/sdk';
-import { useState } from 'react';
+import { View, Text, useTheme, useKeyboard, t as tr, formatNumber, SkinRegion, useSkinned } from '@lordos/sdk';
+import { useRef, useState } from 'react';
 
 export function Icon({ size: s }) {
   const key = (x, y, c) => (
@@ -79,18 +79,31 @@ export default function Calculator() {
   const shown = /\d/.test(result) ? show(result) : result;
   // the big number shrinks so it never gets clipped
   const big = shown.length <= 8 ? 44 : shown.length <= 11 ? 34 : 26;
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the display and the keypad may be a
+  // theme's; press() takes only a key of this keypad, and the arithmetic stays the calculator's
+  const skinned = useSkinned('calculator');
+  const latest = useRef(press);
+  latest.current = press;
+  const kind = (k) => (k === '=' ? 'equals' : '÷×-+'.includes(k) ? 'operator' : 'C()⌫'.includes(k) ? 'function' : 'digit');
+  const vm = skinned ? { app: 'calculator', expression: show(expr), result: shown,
+    keys: KEYS.map((row) => row.map((k) => ({ id: k, label: k === '.' ? dec : k === '-' ? '−' : k, kind: kind(k) }))),
+    actions: { press: (k) => { if (KEYS.flat().includes(k)) latest.current(k); } } } : null;
   return (
     // the calculator is always left to right, also in Arabic or Hebrew
     <View style={{ flex: 1, padding: 16, gap: 8, direction: 'ltr', backgroundColor: t.mode === 'dark' ? '#1c1c1e' : '#f5f5f7' }}>
+      <SkinRegion app="calculator" region="display" model={vm}>
       <View style={{ height: 92, justifyContent: 'flex-end', alignItems: 'flex-end', paddingHorizontal: 6, marginBottom: 4, overflow: 'hidden' }}>
         <Text style={{ fontSize: 13, color: t.textDim, whiteSpace: 'nowrap' }}>{show(expr) || ' '}</Text>
         <Text style={{ fontSize: big, fontWeight: 400, color: t.text, whiteSpace: 'nowrap' }}>{shown}</Text>
       </View>
+      </SkinRegion>
+      <SkinRegion app="calculator" region="keypad" model={vm}>
       {KEYS.map((row, r) => (
         <View key={r} style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
           {row.map((k) => <Key key={k} k={k} label={k === '.' ? dec : k === '-' ? '−' : k} onPress={() => press(k)} />)}
         </View>
       ))}
+      </SkinRegion>
     </View>
   );
 }

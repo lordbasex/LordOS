@@ -1081,5 +1081,19 @@
   "style.removeTitle": "«{name}» ہٹائیں؟",
   "style.removeDetail": "آپ اسے اس کی فائل سے دوبارہ انسٹال کر سکتے ہیں۔",
   "style.communityNoteInstalled": "یہ ڈیسک ٹاپ اسٹائل نہ LordOS نے بنایا نہ اس کا جائزہ لیا۔ یہ حدود کے ساتھ چلتا ہے: ٹرمینل نہیں کھول سکتا، فائلیں نہیں بدل سکتا، اجازت کی درخواستوں کا جواب نہیں دے سکتا اور ایپس میں آپ کی ٹائپنگ نہیں دیکھ سکتا۔",
-  "style.rescueHint": "اگر یہ ٹھیک کام نہ کرے تو Lord Flow پر واپس جانے کے لیے Ctrl+Alt+Shift+Backspace دبائیں۔"
+  "style.rescueHint": "اگر یہ ٹھیک کام نہ کرے تو Lord Flow پر واپس جانے کے لیے Ctrl+Alt+Shift+Backspace دبائیں۔",
+  "themeParts.title": "اس انداز سے",
+  "themeParts.icons": "آئیکن",
+  "themeParts.cursors": "پوائنٹر کے رنگ",
+  "themeParts.sounds": "آوازیں",
+  "themeParts.fonts": "فونٹ",
+  "themeParts.layouts": "ایپس کی ترتیب",
+  "themeParts.layoutsHint": "فائلیں جیسی ایپس کی ترتیب کیسی ہو۔ ایپس ہر صورت اپنے اصول برقرار رکھتی ہیں۔",
+  "skin.group.look": "ظاہری شکل اور ڈسپلے",
+  "skin.group.connect": "نیٹ ورک اور آلات",
+  "skin.group.input": "زبان، ان پٹ اور ایپس",
+  "skin.group.system": "سسٹم اور سیکیورٹی",
+  "skin.pick": "ایک زمرہ منتخب کریں",
+  "style.organization": "تنظیم",
+  "style.email": "ای میل"
 }

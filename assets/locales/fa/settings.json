@@ -1081,5 +1081,19 @@
   "style.removeTitle": "«{name}» برداشته شود؟",
   "style.removeDetail": "می‌توانید آن را دوباره از پرونده‌اش نصب کنید.",
   "style.communityNoteInstalled": "LordOS این سبک میز کار را نساخته و بررسی نکرده است. با محدودیت اجرا می‌شود: نمی‌تواند پایانه را باز کند، پرونده‌ها را تغییر دهد، به درخواست‌های مجوز پاسخ دهد یا آنچه در برنامه‌ها تایپ می‌کنید ببیند.",
-  "style.rescueHint": "اگر درست کار نکرد، Ctrl+Alt+Shift+Backspace را بزنید تا به Lord Flow برگردید."
+  "style.rescueHint": "اگر درست کار نکرد، Ctrl+Alt+Shift+Backspace را بزنید تا به Lord Flow برگردید.",
+  "themeParts.title": "از این سبک",
+  "themeParts.icons": "نمادها",
+  "themeParts.cursors": "رنگ‌های نشانگر",
+  "themeParts.sounds": "صداها",
+  "themeParts.fonts": "قلم",
+  "themeParts.layouts": "چیدمان برنامه‌ها",
+  "themeParts.layoutsHint": "چیدمان برنامه‌هایی مانند «فایل‌ها». برنامه‌ها در هر حال قواعد خودشان را نگه می‌دارند.",
+  "skin.group.look": "ظاهر و نمایشگرها",
+  "skin.group.connect": "شبکه و دستگاه‌ها",
+  "skin.group.input": "زبان، ورودی و برنامه‌ها",
+  "skin.group.system": "سیستم و امنیت",
+  "skin.pick": "یک دسته را برگزینید",
+  "style.organization": "سازمان",
+  "style.email": "رایانامه"
 }

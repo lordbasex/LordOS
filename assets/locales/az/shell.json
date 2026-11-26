@@ -1007,5 +1007,8 @@
   "edit.saveAudio": "Audionu fərqli saxla…",
   "edit.back": "Geri",
   "edit.forward": "İrəli",
-  "edit.reload": "Yenidən yüklə"
+  "edit.reload": "Yenidən yüklə",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "2001-ci ilin iş masalarına ehtiram: yuxarısı yumrulanmış mavi başlıq zolaqları, mavi tapşırıq panelində yaşıl başlat düyməsi və tapşırıq paneli ilə Fayllar.",
+  "bluebell.start": "Başlat"
 }

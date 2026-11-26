@@ -9,7 +9,7 @@ import {
   View, Text, ScrollView, Button, useTheme, useLocale, LordOSLogo, systemReport, systemInfo, lordosVersion, formatBytes, formatNumber,
   Toolbar, ToolbarSpacer, ToolbarButton, Segmented, SidebarItem, GroupBox, FormRow, EmptyState, Hairline, spacing, typeScale,
   fs, userDirs, clipboard, wm, admin, remote, codeStatus, launchApp, useAppWindow, useBluetooth, formatDate,
-  Dropdown, useNarrow, useSidebar, SidebarToggle, SidebarOverlay, Checkbox,
+  Dropdown, useNarrow, useSidebar, SidebarToggle, SidebarOverlay, Checkbox, SkinRegion, useSkinned, commandBar, pickCommand,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
 import { evaluate as evaluateChecks, evaluateProbe, evaluateBench, PENDING as PENDING_CHECKS, PROBE_CHECKS } from './checks.js';
@@ -852,10 +852,15 @@ function SystemInformationMain({ startTab }) {
   const info = useMemo(() => systemInfo(), [n]);
   const narrow = useNarrow(NARROW_AT);
   const side = useSidebar(640, 'sysinfo-hardware');
+  const skinned = useSkinned('sysinfo');    // (0.8.9.6.2) app skins: the tabs and Refresh as a command bar
   if (!r) return <EmptyState mascot="confused" title={tr('sysinfo.unavailable')} />;
   const tabs = [['overview', tr('sysinfo.tab.overview')], ['hardware', tr('sysinfo.tab.hardware')], ['compat', tr('sysinfo.tab.compat')], ['checks', tr('sysinfo.tab.checks')], ['perf', tr('sysinfo.tab.perf')], ['report', tr('sysinfo.tab.report')]];
+  // the tabs' content, the checks, the benchmark and the report stay System Information's
+  const bar = skinned ? commandBar({ commands: [...tabs.map(([id, label]) => ({ id, label, active: id === tab, group: 'tabs' })), { id: 'refresh', label: tr('sysinfo.refresh'), group: 'r' }] }) : null;
+  const vm = bar ? { app: 'sysinfo', ...bar, actions: { command: (id) => { const c = pickCommand(bar, id); if (c === 'refresh') setN((x) => x + 1); else if (c) setTab(c); } } } : null;
   return (
     <View style={{ flex: 1 }}>
+      <SkinRegion app="sysinfo" region="toolbar" model={vm}>
       <Toolbar>
         {tab === 'hardware' && side.narrow ? <SidebarToggle shown={side.shown} onClick={side.toggle} /> : null}
         <ToolbarSpacer />
@@ -864,6 +869,7 @@ function SystemInformationMain({ startTab }) {
         <ToolbarSpacer />
         <ToolbarButton icon="↻" title={tr('sysinfo.refresh')} onClick={() => setN(n + 1)} />
       </Toolbar>
+      </SkinRegion>
       {tab === 'overview' ? <Overview r={r} info={info} /> : tab === 'hardware' ? <Hardware r={r} side={side} /> : tab === 'compat' ? <Compatibility r={r} /> : tab === 'checks' ? <Checks r={r} /> : tab === 'perf' ? <Performance r={r} /> : <Report r={r} />}
     </View>
   );

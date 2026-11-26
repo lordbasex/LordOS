@@ -1081,5 +1081,19 @@
   "style.removeTitle": "Ta bort ”{name}”?",
   "style.removeDetail": "Du kan installera det igen från filen.",
   "style.communityNoteInstalled": "LordOS har inte gjort eller granskat den här skrivbordsstilen. Den körs med begränsningar: den kan inte öppna Terminal, ändra filer, svara på behörighetsfrågor eller se vad du skriver i appar.",
-  "style.rescueHint": "Om den beter sig illa trycker du på Ctrl+Alt+Skift+Backsteg för att gå tillbaka till Lord Flow."
+  "style.rescueHint": "Om den beter sig illa trycker du på Ctrl+Alt+Skift+Backsteg för att gå tillbaka till Lord Flow.",
+  "themeParts.title": "Från den här stilen",
+  "themeParts.icons": "Symboler",
+  "themeParts.cursors": "Pekarfärger",
+  "themeParts.sounds": "Ljud",
+  "themeParts.fonts": "Typsnitt",
+  "themeParts.layouts": "Applayouter",
+  "themeParts.layoutsHint": "Hur appar som Filer är uppbyggda. Apparna behåller sina egna regler i vilket fall.",
+  "skin.group.look": "Utseende och skärmar",
+  "skin.group.connect": "Nätverk och enheter",
+  "skin.group.input": "Språk, inmatning och appar",
+  "skin.group.system": "System och säkerhet",
+  "skin.pick": "Välj en kategori",
+  "style.organization": "Organisation",
+  "style.email": "E-post"
 }

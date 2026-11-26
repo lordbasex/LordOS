@@ -342,5 +342,9 @@
   "readOnly.denied": "Tämä kansio on vain luku -tilassa: sen oikeudet eivät salli sinun muuttaa sitä. Muuta sitä Päätteellä tai muulla apilla.",
   "fromMachineNoRun": "”{name}” tuli koneelta {machine}. Tiedostot ei avaa koneelta tulleita ohjelmia tai asennusohjelmia: käytä Avaa sovelluksella, jos luotat siihen.",
   "info.from": "Lähde",
-  "info.fromMachine": "Kone {machine}"
+  "info.fromMachine": "Kone {machine}",
+  "skin.address": "Osoite",
+  "skin.tasks": "Tiedosto- ja kansiotehtävät",
+  "skin.otherPlaces": "Muut sijainnit",
+  "skin.details": "Tiedot"
 }

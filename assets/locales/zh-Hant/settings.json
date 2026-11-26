@@ -1074,5 +1074,19 @@
   "style.removeTitle": "要移除「{name}」嗎?",
   "style.removeDetail": "你可以從它的檔案重新安裝。",
   "style.communityNoteInstalled": "LordOS 沒有製作或審查此桌面風格。它在限制下執行:無法開啟終端機、變更檔案、回應權限要求，也看不到你在 App 中輸入的內容。",
-  "style.rescueHint": "如果運作異常，按 Ctrl+Alt+Shift+Backspace 回到 Lord Flow。"
+  "style.rescueHint": "如果運作異常，按 Ctrl+Alt+Shift+Backspace 回到 Lord Flow。",
+  "themeParts.title": "來自此風格",
+  "themeParts.icons": "圖示",
+  "themeParts.cursors": "指標色彩",
+  "themeParts.sounds": "聲音",
+  "themeParts.fonts": "字型",
+  "themeParts.layouts": "App 版面配置",
+  "themeParts.layoutsHint": "「檔案」等 App 的版面配置方式。無論如何，App 都保有自己的規則。",
+  "skin.group.look": "外觀與顯示器",
+  "skin.group.connect": "網路與裝置",
+  "skin.group.input": "語言、輸入與 App",
+  "skin.group.system": "系統與安全性",
+  "skin.pick": "選擇一個類別",
+  "style.organization": "組織",
+  "style.email": "電子郵件"
 }

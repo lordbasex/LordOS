@@ -5,7 +5,7 @@
 import {
   View, Text, TextInput, Slider, Button, Segmented, useTheme, useAppWindow, useKeyboard, wm, fs, clipboard, DocImage, releaseImage,
   fontInfo, fontSample, fontGrid, formatBytes, t as tr, SidebarItem, SectionTitle, SearchField, GroupBox, FormRow, EmptyState,
-  Dropdown, useSidebar, SidebarToggle, SidebarOverlay,
+  Dropdown, useSidebar, SidebarToggle, SidebarOverlay, SkinRegion, useSkinned, listPane, pickItem,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BLOCKS } from './blocks.js';
@@ -222,12 +222,22 @@ export default function Fonts() {
       <FamilyList list={visible} fileFont={fileFont} current={fam} onPick={(f) => { setSel(f.file ? 'file' : f.family); if (sb.narrow) sb.close(); }} th={th} />
     </>
   );
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the collections and the families as a
+  // list pane with the search; the samples, installing and removing stay Fonts'
+  const skinned = useSkinned('fonts');
+  const fpane = skinned ? listPane({ title: tr('fonts.search'), items: [
+    ...colls.map(([k, l]) => ({ key: `c:${k}`, label: l, selected: coll === k, group: tr('fonts.collections') })),
+    ...(fileFont ? [{ key: 'f:@file', label: fileFont.family, detail: tr('fonts.notInstalled'), selected: fam === fileFont, group: tr('fonts.families', { count: visible.length }) }] : []),
+    ...visible.slice(0, 400).map((f) => ({ key: `f:${f.family}`, label: f.family, selected: fam === f, group: tr('fonts.families', { count: visible.length }) })),
+  ] }) : null;
+  const vm = fpane ? { app: 'fonts', ...fpane, query: q, actions: { search: (v) => setQ(String(v || '')),
+    select: (key) => { const k = pickItem(fpane, key); if (!k) return; if (k.startsWith('c:')) { setColl(k.slice(2)); setSel(null); } else setSel(k === 'f:@file' ? 'file' : k.slice(2)); } } } : null;
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      {sb.narrow ? null : <View style={{ width: 230, backgroundColor: th.sidebarBg, paddingTop: 12, paddingHorizontal: 10, gap: 2 }}>
+      {sb.narrow ? null : <SkinRegion app="fonts" region="sidebar" model={vm}><View style={{ width: 230, backgroundColor: th.sidebarBg, paddingTop: 12, paddingHorizontal: 10, gap: 2 }}>
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: th.separator }} />
         {sidebar}
-      </View>}
+      </View></SkinRegion>}
       <View ref={pane} style={{ flex: 1, minWidth: 0, paddingVertical: sb.narrow ? 12 : 20, paddingHorizontal: padH, gap: sb.narrow ? 10 : 14 }}>
         {!fam && sb.narrow ? <View style={{ flexDirection: 'row' }}>{toggle}</View> : null}
         {!fam ? <EmptyState icon="A" title={tr('fonts.none')} /> : (

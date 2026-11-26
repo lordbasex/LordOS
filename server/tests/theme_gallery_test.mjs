@@ -17,6 +17,11 @@ const m = cleanThemeMeta({ community: true, author: '  Ana   Pérez ', license: 
 eq('community fields', [m.community, m.author, m.license, m.version], [true, 'Ana Pérez', 'MIT OR Apache-2.0', '1.2.0-beta.1']);
 eq('author pending is unknown', [themeAuthor('author pending'), themeAuthor('Author Pending'), themeAuthor(''), themeAuthor(5)], ['', '', '', '']);
 eq('author with controls or bidi overrides', [themeAuthor('a‮b'), themeAuthor('a\nb'), themeAuthor('x'.repeat(81))], ['', '', '']);
+// (0.8.9.6.2) the author's email and organization: one plain address, a one-line name; anything else is dropped
+const mo = cleanThemeMeta({ author: 'Federico Pereira', email: ' fpereira@iperfex.com ', organization: 'IPERFEX' });
+eq('email and organization', [mo.author, mo.email, mo.organization], ['Federico Pereira', 'fpereira@iperfex.com', 'IPERFEX']);
+eq('bad emails', ['a@b', 'a b@c.com', 'a@@c.com', 'mailto:a@c.com', `${'a'.repeat(110)}@c.com`, 'a@c.com\n', 'a@-c.com', 5].map((v) => cleanThemeMeta({ email: v }).email), ['', '', '', '', '', '', '', '']);
+eq('bad organizations', ['x'.repeat(61), 'a\nb', 'a\u202eb', 7].map((v) => cleanThemeMeta({ organization: v }).organization), ['', '', '', '']);
 eq('junk license and version', [cleanThemeMeta({ license: 'MIT; rm -rf' }).license, cleanThemeMeta({ version: 'v1' }).version, cleanThemeMeta({ version: '1.2.3.4.5' }).version], ['', '', '']);
 eq('community must be true', [cleanThemeMeta({ community: 'yes' }).community, cleanThemeMeta({}).community], [false, false]);
 
@@ -70,6 +75,7 @@ const raw = [
 const list = raw.map((t) => galleryEntry(t, { lordosVersion: '0.9.0' }));
 const by = (id) => list.find((e) => e.id === id);
 eq('official entry', [by('default').official, by('default').author, by('default').license, by('default').version], [true, 'LordOS', 'MIT', '0.9.0']);
+eq('no email or organization unless given', [by('default').email, by('default').organization], ['', '']);
 eq('community entry', [by('caelestia').community, by('caelestia').author, by('caelestia').license, by('caelestia').version], [true, '', '', '0.1.0']);
 eq('failed entry', [by('caelestia').failed, by('aurora').failed], [true, false]);
 eq('installed', list.every((e) => e.installed), true);

@@ -1109,5 +1109,19 @@
   "style.removeTitle": "هل تريد إزالة «{name}»؟",
   "style.removeDetail": "يمكنك تثبيته مجددًا من ملفه.",
   "style.communityNoteInstalled": "لم يصنع LordOS نمط سطح المكتب هذا ولم يراجعه. يعمل ضمن حدود: لا يمكنه فتح الطرفية أو تغيير الملفات أو الرد على طلبات الأذونات أو رؤية ما تكتبه في التطبيقات.",
-  "style.rescueHint": "إن أساء التصرف، اضغط Ctrl+Alt+Shift+Backspace للعودة إلى Lord Flow."
+  "style.rescueHint": "إن أساء التصرف، اضغط Ctrl+Alt+Shift+Backspace للعودة إلى Lord Flow.",
+  "themeParts.title": "من هذا النمط",
+  "themeParts.icons": "الأيقونات",
+  "themeParts.cursors": "ألوان المؤشر",
+  "themeParts.sounds": "الأصوات",
+  "themeParts.fonts": "الخط",
+  "themeParts.layouts": "تخطيط التطبيقات",
+  "themeParts.layoutsHint": "طريقة ترتيب تطبيقات مثل «الملفات». تحتفظ التطبيقات بقواعدها في كل الأحوال.",
+  "skin.group.look": "المظهر والشاشات",
+  "skin.group.connect": "الشبكة والأجهزة",
+  "skin.group.input": "اللغة والإدخال والتطبيقات",
+  "skin.group.system": "النظام والأمان",
+  "skin.pick": "اختر فئة",
+  "style.organization": "المؤسسة",
+  "style.email": "البريد الإلكتروني"
 }

@@ -1081,5 +1081,19 @@
   "style.removeTitle": "Αφαίρεση του «{name}»;",
   "style.removeDetail": "Μπορείτε να το εγκαταστήσετε ξανά από το αρχείο του.",
   "style.communityNoteInstalled": "Το LordOS δεν έφτιαξε ούτε έλεγξε αυτό το στυλ επιφάνειας εργασίας. Λειτουργεί με όρια: δεν μπορεί να ανοίξει το Τερματικό, να αλλάξει αρχεία, να απαντήσει σε αιτήματα αδειών ή να δει τι πληκτρολογείτε στις εφαρμογές.",
-  "style.rescueHint": "Αν συμπεριφέρεται άσχημα, πατήστε Ctrl+Alt+Shift+Backspace για να επιστρέψετε στο Lord Flow."
+  "style.rescueHint": "Αν συμπεριφέρεται άσχημα, πατήστε Ctrl+Alt+Shift+Backspace για να επιστρέψετε στο Lord Flow.",
+  "themeParts.title": "Από αυτό το στυλ",
+  "themeParts.icons": "Εικονίδια",
+  "themeParts.cursors": "Χρώματα δείκτη",
+  "themeParts.sounds": "Ήχοι",
+  "themeParts.fonts": "Γραμματοσειρά",
+  "themeParts.layouts": "Διάταξη εφαρμογών",
+  "themeParts.layoutsHint": "Πώς διατάσσονται εφαρμογές όπως τα Αρχεία. Οι εφαρμογές κρατούν ούτως ή άλλως τους δικούς τους κανόνες.",
+  "skin.group.look": "Εμφάνιση και οθόνες",
+  "skin.group.connect": "Δίκτυο και συσκευές",
+  "skin.group.input": "Γλώσσα, εισαγωγή και εφαρμογές",
+  "skin.group.system": "Σύστημα και ασφάλεια",
+  "skin.pick": "Επιλέξτε μια κατηγορία",
+  "style.organization": "Οργανισμός",
+  "style.email": "Email"
 }

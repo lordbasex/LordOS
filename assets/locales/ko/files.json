@@ -334,5 +334,9 @@
   "readOnly.denied": "이 폴더는 읽기 전용입니다. 권한 때문에 변경할 수 없습니다. 변경하려면 터미널이나 다른 앱을 사용하세요.",
   "fromMachineNoRun": "«{name}»은(는) 머신 {machine}에서 왔습니다. 파일 앱은 머신에서 온 프로그램이나 설치 프로그램을 열지 않습니다. 신뢰한다면 «다음으로 열기»를 사용하세요.",
   "info.from": "출처",
-  "info.fromMachine": "머신 {machine}"
+  "info.fromMachine": "머신 {machine}",
+  "skin.address": "주소",
+  "skin.tasks": "파일 및 폴더 작업",
+  "skin.otherPlaces": "기타 위치",
+  "skin.details": "자세히"
 }

@@ -4,7 +4,7 @@
 //
 // The same files build the desktop app (desktop/imager, Tauri): only platform.js is swapped and the
 // few SDK primitives used are DOM versions there. Nothing here talks to the system directly.
-import { View, Text, ScrollView, Button, Lumo, useTheme, useLocale, useStore, typeScale, spacing } from '@lordos/sdk';
+import { View, Text, ScrollView, Button, Lumo, useTheme, useLocale, useStore, typeScale, spacing, SkinHeader, appName, getApp } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { platform } from './platform.js';
 import { app, set, setOptions, STEPS, loadReleases, isBusy } from './state.js';
@@ -194,7 +194,10 @@ function Footer({ s, side }) {
   );
 }
 
-export default function Imager() {
+// (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): a header a theme may add above the app
+export default function Imager() { return <SkinHeader app="imager" title={appName(getApp('imager'))}><ImagerMain /></SkinHeader>; }
+
+function ImagerMain() {
   const t = useTheme();
   const { t: tr } = useLocale();
   const s = useStore(app);

@@ -1007,5 +1007,8 @@
   "edit.saveAudio": "ذخیرهٔ صدا با نام…",
   "edit.back": "عقب",
   "edit.forward": "جلو",
-  "edit.reload": "بارگذاری دوباره"
+  "edit.reload": "بارگذاری دوباره",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "ادای احترامی به میزکارهای سال ۲۰۰۱: نوارهای عنوان آبی با بالای گرد، دکمهٔ شروع سبز روی نوار وظیفهٔ آبی، و «فایل‌ها» با یک قاب کارها.",
+  "bluebell.start": "شروع"
 }

@@ -7,7 +7,7 @@
 import {
   View, Text, Image, MediaView, ScrollView, SidebarItem, SectionTitle, Hairline, EmptyState, ToolbarButton, useTheme, useAppWindow, useKeyboard,
   useStore, useWindowState, wm, typeScale, t as tr, errorText, media, usePlayer, nowPlaying, mediaFormatTime, useThumb, fs, addListener, direction, useFilesDrop, FilesDropHint, dropCount,
-  useSidebar, SidebarToggle, SidebarOverlay,
+  useSidebar, SidebarToggle, SidebarOverlay, SkinRegion, useSkinned, commandBar, pickCommand, listPane, pickItem,
 } from '@lordos/sdk';
 import { StreamsView } from './streams.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -183,6 +183,7 @@ function Popup({ items, onClose, right = 12, bottom = 64 }) {
 export default function Player() {
   const th = useTheme();
   const win = useAppWindow();
+  const skinned = useSkinned('player');      // (0.8.9.6.2) app skins: the library's views, the header and the transport
   const lib = useStore(library);
   const [view, setView] = useWindowState('view', 'songs');           // songs | artists | albums | videos | queue
   const [sel, setSel] = useWindowState('sel', null);                 // chosen artist or album
@@ -527,20 +528,39 @@ export default function Player() {
     </>
   );
   const empty = !((view === 'videos' ? lib.videos.length : tracks.length) || view === 'queue' || view === 'streams');
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the views as a list pane, the header and
+  // the transport as command bars; the lists, the playing and the streams stay the Player's
+  const sk = skinned ? (() => {
+    const views = [['songs', 'player.library'], ['artists', 'player.library'], ['albums', 'player.library'], ['videos', 'player.library'], ['queue', 'player.playing'],
+      ...(current && isVideo(current) ? [['video', 'player.playing']] : []), ['streams', 'player.nav.network']];
+    const pane = listPane({ title: tr('player.library'), items: views.map(([k, g]) => ({ key: k, label: tr(`player.nav.${k}`), selected: view === k, group: tr(g) })) });
+    const head = commandBar({ title: titles[view], commands: sel ? [{ id: 'back', label: tr('player.back') }] : [] });
+    const tbar = commandBar({ title: current ? [meta?.title || p.info?.tags?.title || baseName(current), meta?.artist || p.info?.tags?.artist || ''].filter(Boolean).join(' — ') : '',
+      commands: current ? [{ id: 'prev', label: '⏮' }, { id: 'toggle', label: p.playing ? '⏸' : '▶', active: !!p.playing }, { id: 'next', label: '⏭' }] : [] });
+    const run = { back: () => setSel(null), prev, toggle, next: () => next(false) };
+    const cmd = (bar) => (id) => { const c = pickCommand(bar, id); if (c) run[c](); };
+    return {
+      sidebar: { app: 'player', ...pane, actions: { select: (key) => { const k = pickItem(pane, key); if (!k) return; if (k === 'video') setShowVideo(true); else { setView(k); if (k !== 'queue') setSel(null); } } } },
+      toolbar: { app: 'player', ...head, actions: { command: cmd(head) } },
+      transport: { app: 'player', ...tbar, position: pos, duration: p.duration || 0, actions: { command: cmd(tbar) } },
+    };
+  })() : null;
 
   return (
     <View ref={root} {...drop.props} style={{ flex: 1 }} onMouseDown={() => setMenu(null)}>
       <View style={{ flex: 1, flexDirection: 'row' }}>
-        {sb.narrow ? null : <View style={{ width: 200, backgroundColor: th.sidebarBg, paddingHorizontal: 10, paddingTop: 4, gap: 2 }}>
+        {sb.narrow ? null : <SkinRegion app="player" region="sidebar" model={sk && sk.sidebar}><View style={{ width: 200, backgroundColor: th.sidebarBg, paddingHorizontal: 10, paddingTop: 4, gap: 2 }}>
           <Hairline edge="end" />
           {sidebar}
-        </View>}
+        </View></SkinRegion>}
         <View style={{ flex: 1, minWidth: 0 }}>
+          <SkinRegion app="player" region="toolbar" model={sk && sk.toolbar}>
           <View style={{ height: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: sb.narrow ? 12 : 20, gap: 6 }}>
             {sb.narrow ? <SidebarToggle shown={sb.shown} onClick={sb.toggle} /> : null}
             {sel && <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} title={tr('player.back')} onClick={() => setSel(null)} style={{ marginHorizontal: -6 }} />}
             <Text style={{ fontSize: typeScale.largeTitle, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{titles[view]}</Text>
           </View>
+          </SkinRegion>
           {empty ? (
             <EmptyState icon={view === 'videos' ? '▶' : '♪'} title={tr(view === 'videos' ? 'player.emptyVideosTitle' : 'player.emptyMusicTitle')}
               hint={tr(view === 'videos' ? 'player.emptyVideos' : 'player.emptyMusic')} />
@@ -553,6 +573,7 @@ export default function Player() {
         </View>
       </View>
       {current && (
+        <SkinRegion app="player" region="transport" model={sk && sk.transport}>
         <View style={{ height: 72, flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 16, backgroundColor: th.sidebarBg }}>
           <Hairline edge="top" />
           <View style={[{ minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 }, narrow ? null : { flex: 1 }]}>
@@ -570,6 +591,7 @@ export default function Player() {
           </View>
           {!narrow && <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end' }}>{volumeCtl(false, th.text)}</View>}
         </View>
+        </SkinRegion>
       )}
       {sb.narrow && sb.shown ? (
         <SidebarOverlay width={200} onClose={sb.close}>

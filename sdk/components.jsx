@@ -2,7 +2,7 @@
 // adapt to any theme.
 import { View, Text, addListener, displayFor, onCommit, onScreenChange, capsLock } from '@lordos/runtime';
 import { Component, createContext, memo, use, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { useTheme } from './theme.js';
+import { useTheme, stateBorder, bevelStyle } from './theme.js';
 import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop, appContentNodes, appRegistry } from './windows.js';
 import { onDesktop } from './desktopmodel.js';
 import { useStore } from './store.js';
@@ -95,14 +95,18 @@ export function Button({ label, onClick, primary, style, small, plain, disabled,
   const [run, running] = usePending((...a) => onClick?.(...a));
   const waiting = busy || running;
   const fg = primary ? '#fff' : destructive ? '#ff453a' : t.text;
+  const neutral = !primary && !plain;
   const bg = primary ? t.accent : plain ? (hover && !disabled ? t.hover : 'transparent') : t.control;
+  // richer tokens (sdk/theme.js): a gradient fill, a raised bevel and a border per state for neutral buttons
+  const rich = neutral ? { ...(t.buttonBg ? { background: t.buttonBg } : null), ...bevelStyle(t, false),
+    ...stateBorder(t, disabled ? 'disabled' : hover ? 'hover' : 'normal') } : null;
   const border = t.buttonBorder && !plain ? { border: `1px solid ${primary ? t.accent : t.separator}` } : null;
   const press = disabled || waiting ? undefined : pending ? (e) => { run(e); } : onClick;
   return (
     <View onClick={press} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       focusable={focusable && !disabled}
       style={[{ height: small ? 22 : 28, paddingHorizontal: small ? 10 : 14, borderRadius: small ? t.controlRadiusSmall : t.controlRadius, flexDirection: 'row', gap: 6,
-        justifyContent: 'center', alignItems: 'center', backgroundColor: bg, ...border,
+        justifyContent: 'center', alignItems: 'center', backgroundColor: bg, ...border, ...rich,
         opacity: disabled ? 0.4 : waiting ? 0.75 : hover && !plain ? 0.85 : 1 }, style]}>
       {waiting ? <Spinner size={small ? 10 : 12} color={fg} /> : icon ? <Text style={{ fontSize: small ? 12 : 14, color: fg }}>{icon}</Text> : null}
       {/* a button held narrower than its label (maxWidth) ends it with "…" instead of cutting both ends (GitHub #231) */}

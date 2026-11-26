@@ -116,6 +116,9 @@ static void tip(Shape *s, float ox, float oy) {
 }
 
 static uint32_t accent_rgb;     /* 0 = LordOS's black arrow, else 0x01RRGGBB (the 0x01 marks it set) */
+/* A theme's pointer colours (cursor_set_scheme): every shape's fill and outline. Off: black and white. */
+static int scheme_on;
+static uint32_t scheme_fill, scheme_outline = 0xFFFFFF;
 
 /* Hand: index finger up (pointer), fingers open (grab) or closed (grabbing). */
 static void hand(Shape *s, int kind) {
@@ -236,6 +239,23 @@ int cursor_set_accent(int on, uint32_t rgb) {
     return 1;
 }
 
+int cursor_set_scheme(int on, uint32_t fill, uint32_t outline) {
+    if (!on) { fill = 0; outline = 0xFFFFFF; }
+    fill &= 0xFFFFFF;
+    outline &= 0xFFFFFF;
+    if (!!on == scheme_on && fill == scheme_fill && outline == scheme_outline) return 0;
+    scheme_on = !!on;
+    scheme_fill = fill;
+    scheme_outline = outline;
+    for (size_t i = 0; i < sizeof cache / sizeof cache[0]; i++)      /* every shape is drawn again */
+        for (int k = 0; k < CUR_COUNT; k++) {
+            free((void *)cache[i][k].px);
+            memset(&cache[i][k], 0, sizeof cache[i][k]);
+        }
+    size_serial++;
+    return 1;
+}
+
 /* Shaken, the pointer grows to 200 % (64 px); one already that large or larger grows to the largest. */
 static int cursor_shake_target(int pct) { return pct < 200 ? 200 : CURSOR_PCT_MAX; }
 
@@ -273,10 +293,12 @@ const CursorImage *cursor_image_pct(int shape, int pct) {
     uint32_t *px = calloc((size_t)size * size, 4);
     if (!px) return NULL;
     const float outline = 1.25f, inv = 1.0f / scale;
-    /* the fill: black, or the accent for the accent arrow */
-    int tinted = accent_rgb && shape == CUR_DEFAULT;
-    float fr = tinted ? (float)(accent_rgb >> 16 & 255) / 255 : 0, fg = tinted ? (float)(accent_rgb >> 8 & 255) / 255 : 0,
-          fb = tinted ? (float)(accent_rgb & 255) / 255 : 0;
+    /* the fill: black (or the theme's, cursor_set_scheme), or the accent for the accent arrow; the outline white (or the
+     * theme's) */
+    int accent = accent_rgb && shape == CUR_DEFAULT, tinted = accent || scheme_on;
+    uint32_t fc = accent ? accent_rgb : scheme_on ? scheme_fill : 0, oc = scheme_on ? scheme_outline : 0xFFFFFF;
+    float fr = (float)(fc >> 16 & 255) / 255, fg = (float)(fc >> 8 & 255) / 255, fb = (float)(fc & 255) / 255;
+    float orr = (float)(oc >> 16 & 255) / 255, og = (float)(oc >> 8 & 255) / 255, ob = (float)(oc & 255) / 255;
     for (int y = 0; y < size; y++)
         for (int x = 0; x < size; x++) {
             float a = 0, lum = 0, fill = 0;  /* alpha, white outline and fill sums (premultiplied) */
@@ -297,8 +319,8 @@ const CursorImage *cursor_image_pct(int shape, int pct) {
             if (!tinted) { px[(size_t)y * size + x] = pack(a, a > 0 ? lum / a : 0); continue; }
             if (a > 1) a = 1;
             uint32_t A = (uint32_t)(a * 255 + 0.5f);
-            uint32_t R = (uint32_t)((lum + fill * fr) * 255 + 0.5f), G = (uint32_t)((lum + fill * fg) * 255 + 0.5f),
-                     B = (uint32_t)((lum + fill * fb) * 255 + 0.5f);
+            uint32_t R = (uint32_t)((lum * orr + fill * fr) * 255 + 0.5f), G = (uint32_t)((lum * og + fill * fg) * 255 + 0.5f),
+                     B = (uint32_t)((lum * ob + fill * fb) * 255 + 0.5f);
             if (R > A) R = A;
             if (G > A) G = A;
             if (B > A) B = A;

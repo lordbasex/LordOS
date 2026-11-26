@@ -832,6 +832,8 @@ EOF
     # (0.8.8.8) Linux apps' tray icons: which show, a dbusmenu layout as the SDK's menu, where it opens (sdk/traymodel.js)
     if have node; then run "tray-model-test (sdk/traymodel.js)" node tests/tray_model_test.mjs
     else skip "tray-model-test" "node"; fi
+    # (0.8.9.6.2) style packs and app skins: the checks, the switches per part, Files' view model (docs/THEMES-GUIDE.md)
+    if have node; then run "appskin-test (sdk/appskinmodel.js, apps/files/skinmodel.js, apps/settings/skinmodel.js)" node tests/appskin_test.mjs; fi
     # (0.8.8.8) SVG icons of Linux apps: PNG as it is, SVG at the size shown, symbolic ones in the bar's color (sdk/iconsrc.js)
     if have node; then run "iconsrc-test (sdk/iconsrc.js)" node tests/iconsrc_test.mjs
     else skip "iconsrc-test" "node"; fi
@@ -1036,6 +1038,138 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "monitor-describe-scene (apps/monitor/Describe.jsx)" node tests/menubar_test.mjs monitor_describe_scene.mjs
     else skip "monitor-describe-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Files with every region a theme may draw replaced by a stub: the actions go through Files' own checks
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "files-skin-scene (apps/files regions, sdk/appskins.jsx)" node tests/menubar_test.mjs files_skin_scene.mjs
+    else skip "files-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Settings with its sidebar and home page replaced by stubs: each page stays Settings' own
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "settings-skin-scene (apps/settings regions, sdk/appskins.jsx)" node tests/menubar_test.mjs settings_skin_scene.mjs
+    else skip "settings-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) the Terminal with its tab bar, status bar and context menu stubbed: no skin action types into a session
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "terminal-skin-scene (apps/terminal regions, sdk/appskins.jsx)" node tests/menubar_test.mjs terminal_skin_scene.mjs
+    else skip "terminal-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) the Text Editor with its toolbar, tabs, status bar and context menu stubbed: the text is never a skin's
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "editor-skin-scene (apps/editor regions, sdk/appskins.jsx)" node tests/menubar_test.mjs editor_skin_scene.mjs
+    else skip "editor-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) the Store with its pages' list and toolbar stubbed: only listed pages open, installs stay the Store's
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "store-skin-scene (apps/store regions, sdk/appskins.jsx)" node tests/menubar_test.mjs store_skin_scene.mjs
+    else skip "store-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Notes with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "notes-skin-scene (apps/notes regions)" node tests/menubar_test.mjs notes_skin_scene.mjs
+    else skip "notes-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Calculator with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "calculator-skin-scene (apps/calculator regions)" node tests/menubar_test.mjs calculator_skin_scene.mjs
+    else skip "calculator-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Photos with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "photos-skin-scene (apps/photos regions)" node tests/menubar_test.mjs photos_skin_scene.mjs
+    else skip "photos-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Player with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "player-skin-scene (apps/player regions)" node tests/menubar_test.mjs player_skin_scene.mjs
+    else skip "player-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Monitor with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "monitor-skin-scene (apps/monitor regions)" node tests/menubar_test.mjs monitor_skin_scene.mjs
+    else skip "monitor-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Clock with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "clock-skin-scene (apps/clock regions)" node tests/menubar_test.mjs clock_skin_scene.mjs
+    else skip "clock-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Screenshots with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "screenshots-skin-scene (apps/screenshots regions)" node tests/menubar_test.mjs screenshots_skin_scene.mjs
+    else skip "screenshots-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Disks with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "disks-skin-scene (apps/disks regions)" node tests/menubar_test.mjs disks_skin_scene.mjs
+    else skip "disks-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) About with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "about-skin-scene (apps/about regions)" node tests/menubar_test.mjs about_skin_scene.mjs
+    else skip "about-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Help with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "help-skin-scene (apps/help regions)" node tests/menubar_test.mjs help_skin_scene.mjs
+    else skip "help-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Characters with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "characters-skin-scene (apps/characters regions)" node tests/menubar_test.mjs characters_skin_scene.mjs
+    else skip "characters-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Fonts with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "fonts-skin-scene (apps/fonts regions)" node tests/menubar_test.mjs fonts_skin_scene.mjs
+    else skip "fonts-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Logs with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "logs-skin-scene (apps/logs regions)" node tests/menubar_test.mjs logs_skin_scene.mjs
+    else skip "logs-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) System Information with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "sysinfo-skin-scene (apps/sysinfo regions)" node tests/menubar_test.mjs sysinfo_skin_scene.mjs
+    else skip "sysinfo-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Backups with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "backup-skin-scene (apps/backup regions)" node tests/menubar_test.mjs backup_skin_scene.mjs
+    else skip "backup-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) PDF Viewer with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "pdf-skin-scene (apps/pdf regions)" node tests/menubar_test.mjs pdf_skin_scene.mjs
+    else skip "pdf-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Force Quit with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "forcequit-skin-scene (apps/forcequit regions)" node tests/menubar_test.mjs forcequit_skin_scene.mjs
+    else skip "forcequit-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) About App with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "appabout-skin-scene (apps/appabout regions)" node tests/menubar_test.mjs appabout_skin_scene.mjs
+    else skip "appabout-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Scanner with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "scanner-skin-scene (apps/scanner regions)" node tests/menubar_test.mjs scanner_skin_scene.mjs
+    else skip "scanner-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Voice Recorder with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "recorder-skin-scene (apps/recorder regions)" node tests/menubar_test.mjs recorder_skin_scene.mjs
+    else skip "recorder-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Camera with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "camera-skin-scene (apps/camera regions)" node tests/menubar_test.mjs camera_skin_scene.mjs
+    else skip "camera-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) LordOS Imager with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "imager-skin-scene (apps/imager regions)" node tests/menubar_test.mjs imager_skin_scene.mjs
+    else skip "imager-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Install LordOS with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "installer-skin-scene (apps/installer regions)" node tests/menubar_test.mjs installer_skin_scene.mjs
+    else skip "installer-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Databases with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "databases-skin-scene (apps/databases regions)" node tests/menubar_test.mjs databases_skin_scene.mjs
+    else skip "databases-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Machines with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "machines-skin-scene (apps/machines regions)" node tests/menubar_test.mjs machines_skin_scene.mjs
+    else skip "machines-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Cleaner with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "cleaner-skin-scene (apps/cleaner regions)" node tests/menubar_test.mjs cleaner_skin_scene.mjs
+    else skip "cleaner-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) LordOS Studio with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "studio-skin-scene (apps/studio regions)" node tests/menubar_test.mjs studio_skin_scene.mjs
+    else skip "studio-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Remote Desk with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "remote-desk-skin-scene (apps/remote-desk regions)" node tests/menubar_test.mjs remote-desk_skin_scene.mjs
+    else skip "remote-desk-skin-scene" "node and the repository's node_modules (npm install)"; fi
     # (#218) Files: dragging in a folder of 2000 files draws only the ghost and the drop highlights, never the whole window
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-drag-scene (apps/files/dnd.jsx)" node tests/menubar_test.mjs files_drag_scene.mjs

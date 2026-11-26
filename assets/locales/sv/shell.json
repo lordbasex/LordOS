@@ -1007,5 +1007,8 @@
   "edit.saveAudio": "Spara ljud som…",
   "edit.back": "Bakåt",
   "edit.forward": "Framåt",
-  "edit.reload": "Läs in igen"
+  "edit.reload": "Läs in igen",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "En hyllning till skrivborden från 2001: blå namnlister med rundade övre hörn, en grön startknapp i ett blått aktivitetsfält och Filer med en åtgärdspanel.",
+  "bluebell.start": "Start"
 }

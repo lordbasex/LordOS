@@ -5,9 +5,10 @@ import {
   View, Text, useTheme, useLocale, useAppWindow, useStore, useKeyboard, Button, TextInput, ScrollView, ThemeProvider, Segmented, speechItems, registerSelection, ContextMenu,
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SearchField, EmptyState, textDirection,
   Markdown, markdownHeadings, toggleTask, wm, fs, formatBytes, addListener, screen, t, print, FilePicker as SysFilePicker, useFilesDrop, FilesDropHint, registerWidgetKind,
-  useSidebar, SidebarToggle, SidebarOverlay, Layer, openFileWithApps, screenDisplays, displayFor, workAreaOf,
+  useSidebar, SidebarToggle, SidebarOverlay, Layer, openFileWithApps, screenDisplays, displayFor, workAreaOf, SkinRegion, useSkinned, pickCommand, pickItem,
   editorMenuRows, WritingPanel,
 } from '@lordos/sdk';
+import { notesModels } from './skinmodel.js';
 import { useEffect, useRef, useState } from 'react';
 import { NoteEditor } from './NoteEditor.jsx';
 import { editKey, editItems, formatItems, contextItems, fromReading } from './editmenu.js';
@@ -555,16 +556,34 @@ export default function Notes() {
       </View>
     </>
   );
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → Notes"): the list and the note's toolbar may be a theme's
+  const skinned = useSkinned('notes');
+  const sk = skinned ? (() => {
+    const label = (id) => tr({ list: 'apps.notes', new: 'notes.new', read: 'notes.read', edit: 'notes.edit', checklist: 'notes.fmt.task', emoji: 'notes.insertEmoji',
+      image: 'notes.insertImage', attach: 'notes.insertFile', duplicate: 'notes.duplicate', desktop: 'notes.showDesktop', folder: 'notes.openFolder', delete: 'notes.delete' }[id]);
+    const run = { new: cmd.new, read: () => setMode('read'), edit: () => setMode('edit'), checklist, emoji: () => { toEdit(); setPanel('emoji'); },
+      image: () => { toEdit(); setPanel('image'); }, attach: () => { toEdit(); setPanel('attach'); }, duplicate: cmd.duplicate, desktop: cmd.desktop, folder: cmd.folder, delete: cmd.del };
+    const m = notesModels({ notes: shown.map((n) => ({ slug: n.slug, title: n.title || tr('notes.untitled'), date: fmtDate(n.updated, formatDate), selected: !!note && n.slug === note.slug })),
+      query: q, title: note ? note.title || tr('notes.untitled') : '', mode, onDesktop: !!note?.desktop, has: !!note }, label, {
+      select: (key) => { const k = pickItem(m.pane, key); if (k) { setSel(k); setMode('read'); } },
+      search: (v) => setQ(String(v || '')),
+      command: (id) => { const c = pickCommand(m.bar, id); if (c) run[c](); },
+    });
+    return m;
+  })() : null;
   return (
     <View ref={root} {...drop.props} style={{ flex: 1, flexDirection: 'row' }}>
       {sideInline && (
+      <SkinRegion app="notes" region="sidebar" model={sk && sk.sidebar}>
       <View style={{ width: sideW, backgroundColor: th.sidebarBg, paddingTop: 12, paddingHorizontal: 10, gap: 10 }}>
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: th.separator }} />
         {side}
       </View>
+      </SkinRegion>
       )}
       {note ? (
         <View style={{ flex: 1 }}>
+          <SkinRegion app="notes" region="toolbar" model={sk && sk.toolbar}>
           <Toolbar>
             {sb.narrow && <SidebarToggle shown={sb.shown} onClick={sb.toggle} />}
             <Segmented appearance="neutral" value={mode} onChange={setMode} options={[['read', tr('notes.read')], ['edit', tr('notes.edit')]]} />
@@ -587,6 +606,7 @@ export default function Notes() {
               { label: tr('notes.delete'), destructive: true, onClick: cmd.del },
             ]} />
           </Toolbar>
+          </SkinRegion>
           <View style={{ flex: 1, backgroundColor: PAPER[note.color][0] }}>
             <ThemeProvider tokens={paperTokens(th)}>
               <NoteBody key={note.slug} note={note} mode={mode} onMode={setMode} editorApi={api} showToc={toc && winW - sideW >= 520} onCommand={(b) => (b === 'n' ? cmd.new() : b === 'e' ? cmd.toggle() : null)} />

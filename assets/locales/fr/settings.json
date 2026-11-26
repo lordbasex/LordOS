@@ -1081,5 +1081,19 @@
   "style.removeTitle": "Supprimer « {name} » ?",
   "style.removeDetail": "Vous pourrez le réinstaller depuis son fichier.",
   "style.communityNoteInstalled": "LordOS n'a ni créé ni vérifié ce style de bureau. Il fonctionne avec des limites : il ne peut pas ouvrir le Terminal, modifier des fichiers, répondre aux demandes d'autorisation ni voir ce que vous tapez dans les apps.",
-  "style.rescueHint": "S'il se comporte mal, appuyez sur Ctrl+Alt+Maj+Retour arrière pour revenir à Lord Flow."
+  "style.rescueHint": "S'il se comporte mal, appuyez sur Ctrl+Alt+Maj+Retour arrière pour revenir à Lord Flow.",
+  "themeParts.title": "De ce style",
+  "themeParts.icons": "Icônes",
+  "themeParts.cursors": "Couleurs du pointeur",
+  "themeParts.sounds": "Sons",
+  "themeParts.fonts": "Police",
+  "themeParts.layouts": "Disposition des apps",
+  "themeParts.layoutsHint": "La disposition d’apps comme Fichiers. Les apps gardent leurs propres règles dans tous les cas.",
+  "skin.group.look": "Apparence et écrans",
+  "skin.group.connect": "Réseau et périphériques",
+  "skin.group.input": "Langue, saisie et apps",
+  "skin.group.system": "Système et sécurité",
+  "skin.pick": "Choisissez une catégorie",
+  "style.organization": "Organisation",
+  "style.email": "E-mail"
 }

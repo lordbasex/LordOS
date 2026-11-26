@@ -1081,5 +1081,19 @@
   "style.removeTitle": "Remove “{name}”?",
   "style.removeDetail": "You can install it again from its file.",
   "style.communityNoteInstalled": "LordOS didn't make this desktop style and hasn't reviewed it. It runs with limits: it can't open Terminal, change files, answer permission prompts or see what you type in apps.",
-  "style.rescueHint": "If it misbehaves, press Ctrl+Alt+Shift+Backspace to go back to Lord Flow."
+  "style.rescueHint": "If it misbehaves, press Ctrl+Alt+Shift+Backspace to go back to Lord Flow.",
+  "themeParts.title": "From this style",
+  "themeParts.icons": "Icons",
+  "themeParts.cursors": "Pointer colors",
+  "themeParts.sounds": "Sounds",
+  "themeParts.fonts": "Font",
+  "themeParts.layouts": "App layouts",
+  "themeParts.layoutsHint": "How apps such as Files are laid out. Apps keep their own rules either way.",
+  "skin.group.look": "Appearance and Displays",
+  "skin.group.connect": "Network and Devices",
+  "skin.group.input": "Language, Input and Apps",
+  "skin.group.system": "System and Security",
+  "skin.pick": "Pick a category",
+  "style.organization": "Organization",
+  "style.email": "Email"
 }

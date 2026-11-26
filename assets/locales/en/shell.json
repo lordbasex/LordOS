@@ -1007,5 +1007,8 @@
   "edit.saveAudio": "Save Audio As…",
   "edit.back": "Back",
   "edit.forward": "Forward",
-  "edit.reload": "Reload"
+  "edit.reload": "Reload",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "A tribute to the desktops of 2001: blue title bars with rounded tops, a green start button on a blue taskbar, and Files with a task pane.",
+  "bluebell.start": "Start"
 }

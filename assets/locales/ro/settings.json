@@ -1088,5 +1088,19 @@
   "style.removeTitle": "Elimini „{name}”?",
   "style.removeDetail": "O poți instala din nou din fișierul ei.",
   "style.communityNoteInstalled": "LordOS nu a făcut și nu a verificat acest stil de desktop. Rulează cu limite: nu poate deschide Terminalul, modifica fișiere, răspunde la cererile de permisiune sau vedea ce scrii în aplicații.",
-  "style.rescueHint": "Dacă se comportă greșit, apasă Ctrl+Alt+Shift+Backspace ca să revii la Lord Flow."
+  "style.rescueHint": "Dacă se comportă greșit, apasă Ctrl+Alt+Shift+Backspace ca să revii la Lord Flow.",
+  "themeParts.title": "Din acest stil",
+  "themeParts.icons": "Pictograme",
+  "themeParts.cursors": "Culorile indicatorului",
+  "themeParts.sounds": "Sunete",
+  "themeParts.fonts": "Font",
+  "themeParts.layouts": "Aspectul aplicațiilor",
+  "themeParts.layoutsHint": "Cum sunt aranjate aplicații precum Fișiere. Aplicațiile își păstrează oricum propriile reguli.",
+  "skin.group.look": "Aspect și ecrane",
+  "skin.group.connect": "Rețea și dispozitive",
+  "skin.group.input": "Limbă, introducere și aplicații",
+  "skin.group.system": "Sistem și securitate",
+  "skin.pick": "Alegeți o categorie",
+  "style.organization": "Organizație",
+  "style.email": "E-mail"
 }

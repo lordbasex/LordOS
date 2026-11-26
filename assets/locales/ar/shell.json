@@ -1035,5 +1035,8 @@
   "edit.saveAudio": "حفظ الصوت باسم…",
   "edit.back": "رجوع",
   "edit.forward": "تقدم",
-  "edit.reload": "إعادة التحميل"
+  "edit.reload": "إعادة التحميل",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "تحية لأسطح المكتب في عام 2001: أشرطة عناوين زرقاء بحواف علوية مستديرة، وزر «ابدأ» أخضر على شريط مهام أزرق، و«الملفات» مع لوحة للمهام.",
+  "bluebell.start": "ابدأ"
 }

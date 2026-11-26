@@ -350,5 +350,9 @@
   "readOnly.denied": "Ten folder jest tylko do odczytu: jego uprawnienia nie pozwalają Ci go zmienić. Aby go zmienić, użyj Terminala lub innej aplikacji.",
   "fromMachineNoRun": "„{name}” pochodzi z maszyny {machine}. Pliki nie otwierają programów ani instalatorów z maszyny: użyj Otwórz za pomocą, jeśli mu ufasz.",
   "info.from": "Pochodzenie",
-  "info.fromMachine": "Maszyna {machine}"
+  "info.fromMachine": "Maszyna {machine}",
+  "skin.address": "Adres",
+  "skin.tasks": "Zadania plików i folderów",
+  "skin.otherPlaces": "Inne miejsca",
+  "skin.details": "Szczegóły"
 }

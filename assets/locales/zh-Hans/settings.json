@@ -1074,5 +1074,19 @@
   "style.removeTitle": "要移除“{name}”吗?",
   "style.removeDetail": "你可以从它的文件重新安装。",
   "style.communityNoteInstalled": "LordOS 没有制作或审核此桌面风格。它在限制下运行:无法打开终端、更改文件、回应权限请求，也看不到你在应用中输入的内容。",
-  "style.rescueHint": "如果它运行异常，按 Ctrl+Alt+Shift+Backspace 返回 Lord Flow。"
+  "style.rescueHint": "如果它运行异常，按 Ctrl+Alt+Shift+Backspace 返回 Lord Flow。",
+  "themeParts.title": "来自此风格",
+  "themeParts.icons": "图标",
+  "themeParts.cursors": "指针颜色",
+  "themeParts.sounds": "声音",
+  "themeParts.fonts": "字体",
+  "themeParts.layouts": "应用布局",
+  "themeParts.layoutsHint": "“文件”等应用的布局方式。无论哪种方式，应用都保留自己的规则。",
+  "skin.group.look": "外观和显示器",
+  "skin.group.connect": "网络和设备",
+  "skin.group.input": "语言、输入和应用",
+  "skin.group.system": "系统和安全",
+  "skin.pick": "选择一个类别",
+  "style.organization": "组织",
+  "style.email": "电子邮件"
 }

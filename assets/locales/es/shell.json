@@ -1007,5 +1007,8 @@
   "edit.saveAudio": "Guardar audio como…",
   "edit.back": "Atrás",
   "edit.forward": "Adelante",
-  "edit.reload": "Volver a cargar"
+  "edit.reload": "Volver a cargar",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "Un homenaje a los escritorios de 2001: barras de título azules con la parte de arriba redondeada, un botón de inicio verde en una barra de tareas azul y Archivos con un panel de tareas.",
+  "bluebell.start": "Inicio"
 }

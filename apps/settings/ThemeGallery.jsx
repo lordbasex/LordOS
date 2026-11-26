@@ -190,6 +190,8 @@ function Detail({ e, current, onBack }) {
       <Section footer={e.user ? `${tr('settings.style.communityNoteInstalled')} ${tr('settings.style.rescueHint')}` : e.community ? tr('settings.style.communityNote') : tr('settings.style.hint')}>
         <ValueRow label={tr('settings.style.author')} value={e.author || tr('settings.style.unknownAuthor')} />
         {e.user ? <ValueRow label={tr('settings.style.capsLabel')} value={capsText(tr, e.caps)} /> : null}
+        {e.organization ? <ValueRow label={tr('settings.style.organization')} value={e.organization} /> : null}
+        {e.email ? <ValueRow label={tr('settings.style.email')} value={e.email} /> : null}
         <ValueRow label={tr('settings.style.license')} value={e.license || tr('settings.style.notStated')} />
         <ValueRow label={tr('settings.style.versionLabel')} value={e.version || tr('settings.style.notStated')} />
         {e.minLordOS ? <ValueRow label={tr('settings.style.requires')} value={tr('settings.style.requiresValue', { version: e.minLordOS })} /> : null}

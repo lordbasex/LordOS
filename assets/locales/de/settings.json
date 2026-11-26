@@ -1081,5 +1081,19 @@
   "style.removeTitle": "„{name}“ entfernen?",
   "style.removeDetail": "Du kannst es aus seiner Datei erneut installieren.",
   "style.communityNoteInstalled": "LordOS hat diesen Schreibtischstil weder erstellt noch geprüft. Er läuft mit Grenzen: Er kann weder das Terminal öffnen, Dateien ändern, Berechtigungsanfragen beantworten noch sehen, was du in Apps tippst.",
-  "style.rescueHint": "Wenn er sich falsch verhält, drücke Strg+Alt+Umschalt+Rücktaste, um zu Lord Flow zurückzukehren."
+  "style.rescueHint": "Wenn er sich falsch verhält, drücke Strg+Alt+Umschalt+Rücktaste, um zu Lord Flow zurückzukehren.",
+  "themeParts.title": "Aus diesem Stil",
+  "themeParts.icons": "Symbole",
+  "themeParts.cursors": "Zeigerfarben",
+  "themeParts.sounds": "Töne",
+  "themeParts.fonts": "Schrift",
+  "themeParts.layouts": "App-Layouts",
+  "themeParts.layoutsHint": "Wie Apps wie Dateien aufgebaut sind. Die Apps behalten in jedem Fall ihre eigenen Regeln.",
+  "skin.group.look": "Darstellung und Bildschirme",
+  "skin.group.connect": "Netzwerk und Geräte",
+  "skin.group.input": "Sprache, Eingabe und Apps",
+  "skin.group.system": "System und Sicherheit",
+  "skin.pick": "Kategorie auswählen",
+  "style.organization": "Organisation",
+  "style.email": "E-Mail"
 }

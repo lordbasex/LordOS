@@ -1081,5 +1081,19 @@
   "style.removeTitle": "Remover “{name}”?",
   "style.removeDetail": "Você pode instalá-lo de novo a partir do arquivo.",
   "style.communityNoteInstalled": "O LordOS não fez este estilo de área de trabalho nem o revisou. Ele roda com limites: não pode abrir o Terminal, alterar arquivos, responder pedidos de permissão nem ver o que você digita nos apps.",
-  "style.rescueHint": "Se ele se comportar mal, pressione Ctrl+Alt+Shift+Backspace para voltar ao Lord Flow."
+  "style.rescueHint": "Se ele se comportar mal, pressione Ctrl+Alt+Shift+Backspace para voltar ao Lord Flow.",
+  "themeParts.title": "Deste estilo",
+  "themeParts.icons": "Ícones",
+  "themeParts.cursors": "Cores do ponteiro",
+  "themeParts.sounds": "Sons",
+  "themeParts.fonts": "Fonte",
+  "themeParts.layouts": "Layout dos apps",
+  "themeParts.layoutsHint": "Como apps como o Arquivos são organizados. Os apps mantêm as próprias regras de qualquer forma.",
+  "skin.group.look": "Aparência e telas",
+  "skin.group.connect": "Rede e dispositivos",
+  "skin.group.input": "Idioma, entrada e apps",
+  "skin.group.system": "Sistema e segurança",
+  "skin.pick": "Escolha uma categoria",
+  "style.organization": "Organização",
+  "style.email": "E-mail"
 }

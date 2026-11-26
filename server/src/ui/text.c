@@ -39,7 +39,8 @@ static Font fonts[MAX_FONTS];
 static int nfonts;
 static char font_dir[1024];
 static int mono_font[2] = { -2, -2 };   /* JetBrains Mono regular and bold: -2 not loaded, -1 absent */
-static int brand_font[2] = { -2, -2 };  /* Plus Jakarta Sans Medium and ExtraBold (the wordmark), same */
+static int brand_font[2] = { -2, -2 };
+static int theme_font[2] = { -1, -1 };  /* the theme's font (fontFamily: 'theme'), regular and bold: -1 none (Inter) */  /* Plus Jakarta Sans Medium and ExtraBold (the wordmark), same */
 
 static Glyph *cache;
 static size_t cache_cap, cache_used;
@@ -179,7 +180,21 @@ void text_font_vmetrics(int font, float size, float *asc, float *desc) {
     *desc = f->descent * scale;
 }
 
+int text_set_theme_font(const char *regular, int regular_index, const char *bold, int bold_index) {
+    theme_font[0] = theme_font[1] = -1;
+    if (!regular) return 0;
+    theme_font[0] = text_font_load(regular, regular_index);
+    theme_font[1] = bold ? text_font_load(bold, bold_index) : theme_font[0];
+    if (theme_font[1] < 0) theme_font[1] = theme_font[0];
+    return theme_font[0] >= 0 ? 0 : -1;
+}
+
 static int font_for(float weight) {
+    if (weight >= TEXT_THEME) {                 /* fontFamily: 'theme' */
+        int bold = weight - TEXT_THEME >= 600;
+        if (theme_font[bold] >= 0) return theme_font[bold];
+        weight -= TEXT_THEME;                   /* none: Inter */
+    }
     if (weight >= TEXT_BRAND) {                 /* fontFamily: 'brand', loaded the first time it's used */
         int bold = weight - TEXT_BRAND >= 600;
         if (brand_font[bold] == -2) {

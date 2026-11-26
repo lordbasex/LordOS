@@ -1081,5 +1081,19 @@
   "style.removeTitle": "Vols eliminar «{name}»?",
   "style.removeDetail": "El pots tornar a instal·lar des del seu fitxer.",
   "style.communityNoteInstalled": "LordOS no ha fet ni revisat aquest estil d'escriptori. Funciona amb límits: no pot obrir el Terminal, canviar fitxers, respondre sol·licituds de permís ni veure el que escrius a les apps.",
-  "style.rescueHint": "Si es comporta malament, prem Ctrl+Alt+Maj+Retrocés per tornar a Lord Flow."
+  "style.rescueHint": "Si es comporta malament, prem Ctrl+Alt+Maj+Retrocés per tornar a Lord Flow.",
+  "themeParts.title": "D’aquest estil",
+  "themeParts.icons": "Icones",
+  "themeParts.cursors": "Colors del punter",
+  "themeParts.sounds": "Sons",
+  "themeParts.fonts": "Tipus de lletra",
+  "themeParts.layouts": "Disposició de les apps",
+  "themeParts.layoutsHint": "Com s’organitzen apps com Fitxers. Les apps mantenen les seves pròpies regles igualment.",
+  "skin.group.look": "Aparença i pantalles",
+  "skin.group.connect": "Xarxa i dispositius",
+  "skin.group.input": "Idioma, entrada i apps",
+  "skin.group.system": "Sistema i seguretat",
+  "skin.pick": "Trieu una categoria",
+  "style.organization": "Organització",
+  "style.email": "Correu electrònic"
 }

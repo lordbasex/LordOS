@@ -1074,5 +1074,19 @@
   "style.removeTitle": "Buang “{name}”?",
   "style.removeDetail": "Anda boleh memasangnya semula daripada failnya.",
   "style.communityNoteInstalled": "LordOS tidak membuat atau menyemak gaya desktop ini. Ia berjalan dengan had: ia tidak boleh membuka Terminal, mengubah fail, menjawab permintaan kebenaran atau melihat apa yang anda taip dalam apl.",
-  "style.rescueHint": "Jika ia bermasalah, tekan Ctrl+Alt+Shift+Backspace untuk kembali ke Lord Flow."
+  "style.rescueHint": "Jika ia bermasalah, tekan Ctrl+Alt+Shift+Backspace untuk kembali ke Lord Flow.",
+  "themeParts.title": "Daripada gaya ini",
+  "themeParts.icons": "Ikon",
+  "themeParts.cursors": "Warna penuding",
+  "themeParts.sounds": "Bunyi",
+  "themeParts.fonts": "Fon",
+  "themeParts.layouts": "Susun atur aplikasi",
+  "themeParts.layoutsHint": "Cara aplikasi seperti Fail disusun. Aplikasi tetap mengekalkan peraturannya sendiri.",
+  "skin.group.look": "Penampilan dan Paparan",
+  "skin.group.connect": "Rangkaian dan Peranti",
+  "skin.group.input": "Bahasa, Input dan Aplikasi",
+  "skin.group.system": "Sistem dan Keselamatan",
+  "skin.pick": "Pilih kategori",
+  "style.organization": "Organisasi",
+  "style.email": "E-mel"
 }

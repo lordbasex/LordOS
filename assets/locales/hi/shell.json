@@ -1007,5 +1007,8 @@
   "edit.saveAudio": "ऑडियो इस रूप में सहेजें…",
   "edit.back": "पीछे",
   "edit.forward": "आगे",
-  "edit.reload": "फिर से लोड करें"
+  "edit.reload": "फिर से लोड करें",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "2001 के डेस्कटॉप को श्रद्धांजलि: ऊपर से गोल नीली शीर्षक पट्टियाँ, नीली टास्कबार पर हरा स्टार्ट बटन, और कार्य फलक के साथ फ़ाइलें।",
+  "bluebell.start": "स्टार्ट"
 }

@@ -591,6 +591,23 @@ static JSValue f_fonts_list(JSContext *c, JSValueConst this_val, int argc, JSVal
     return arr;
 }
 
+/* lord.fonts.useForTheme(family | null): a style pack's font (docs/THEMES-GUIDE.md), drawn where a node asks for
+ * fontFamily: 'theme'. Only a family already installed on the system (the catalog of fonts.c: LordOS's own and the
+ * system's font folders), by name; nothing is read from the theme's folder. True when it was found. */
+static JSValue f_fonts_theme(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    const char *fam = argc > 0 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
+    if (!fam) { text_set_theme_font(NULL, 0, NULL, 0); return JS_FALSE; }
+    size_t n = strlen(fam);
+    int ok = n > 0 && n < 64;
+    for (size_t i = 0; ok && i < n; i++) ok = fam[i] >= 0x20 && fam[i] != 0x7f;
+    const FontEntry *r = ok ? fonts_pick(fam, 0, 0) : NULL, *b = ok ? fonts_pick(fam, 1, 0) : NULL;
+    JS_FreeCString(c, fam);
+    if (!r || r->color) { text_set_theme_font(NULL, 0, NULL, 0); return JS_FALSE; }
+    if (b && b->color) b = NULL;
+    return JS_NewBool(c, text_set_theme_font(r->path, r->index, b ? b->path : NULL, b ? b->index : 0) == 0);
+}
+
 /* ---- lord.admin: privileged helper actions (admin.c) ---- */
 
 static JSValue f_admin_available(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -2885,6 +2902,7 @@ static const JSCFunctionListEntry time_funcs[] = {
 };
 static const JSCFunctionListEntry fonts_funcs[] = {
     JS_CFUNC_DEF("list", 1, f_fonts_list),
+    JS_CFUNC_DEF("useForTheme", 1, f_fonts_theme),
 };
 static const JSCFunctionListEntry themes_funcs[] = {
     JS_CFUNC_DEF("list", 0, f_themes_list),

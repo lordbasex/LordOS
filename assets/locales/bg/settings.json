@@ -1081,5 +1081,19 @@
   "style.removeTitle": "Премахване на „{name}“?",
   "style.removeDetail": "Можете да я инсталирате отново от файла ѝ.",
   "style.communityNoteInstalled": "LordOS не е създала, нито проверила този стил на работния плот. Той работи с ограничения: не може да отвори Терминал, да променя файлове, да отговаря на заявки за разрешения или да вижда какво пишете в приложенията.",
-  "style.rescueHint": "Ако се държи неправилно, натиснете Ctrl+Alt+Shift+Backspace, за да се върнете към Lord Flow."
+  "style.rescueHint": "Ако се държи неправилно, натиснете Ctrl+Alt+Shift+Backspace, за да се върнете към Lord Flow.",
+  "themeParts.title": "От този стил",
+  "themeParts.icons": "Икони",
+  "themeParts.cursors": "Цветове на показалеца",
+  "themeParts.sounds": "Звуци",
+  "themeParts.fonts": "Шрифт",
+  "themeParts.layouts": "Подредба на приложенията",
+  "themeParts.layoutsHint": "Как са подредени приложения като Файлове. Приложенията и така запазват собствените си правила.",
+  "skin.group.look": "Облик и екрани",
+  "skin.group.connect": "Мрежа и устройства",
+  "skin.group.input": "Език, въвеждане и приложения",
+  "skin.group.system": "Система и сигурност",
+  "skin.pick": "Изберете категория",
+  "style.organization": "Организация",
+  "style.email": "Имейл"
 }

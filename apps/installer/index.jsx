@@ -7,7 +7,7 @@
 import {
   View, Text, Button, TextInput, ScrollView, Toggle, Segmented, SearchField, Hairline, GroupBox, FormRow, MenuButton, useTheme, useLocale, useStore, createStore,
   admin, keyboard, languages, setLanguage, formatBytes, locale, regionOf, localeOf, regionCountry, localeLanguage, tOptional, wm, useAppWindow, useSystemInfo, typeScale, statusText, errorText, Lumo,
-  useSidebar, SidebarToggle, SidebarOverlay,
+  useSidebar, SidebarToggle, SidebarOverlay, SkinHeader, appName, getApp,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { emptyManual, actionsFor, setAction, addPartition, removeAdded, placeIn, rows as manualRows, review as manualReview } from './manualmodel.js';
@@ -555,7 +555,10 @@ const manualReady = (s) => {
   return !r.errors.length && s.confirmManual && (!r.destructive || s.confirmDisk === s.disk.name);
 };
 
-export default function Installer() {
+// (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): a header a theme may add above the app
+export default function Installer() { return <SkinHeader app="installer" title={appName(getApp('installer'))}><InstallerMain /></SkinHeader>; }
+
+function InstallerMain() {
   const t = useTheme();
   const { t: tr } = useLocale();
   const { id } = useAppWindow();

@@ -4,7 +4,7 @@
 // lord-server (lord.clean). Sections appear only for what works.
 import {
   View, cleaner, wm, windows, useStore, useAppWindow, useSettings, useWindowButtons, themes, userDirs, t as tr, formatBytes, spacing,
- Tooltip,
+ Tooltip, SkinHeader, appName, getApp,
 } from '@lordos/sdk';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Label, Sky, Tints, Tile, Orb, Enter, Pill, GlassButton, PalProvider, usePal, tween, useRail, PAD } from './ui.jsx';
@@ -71,7 +71,10 @@ function Lights({ id }) {
 }
 const KIND = { scan: 'rules', cleanup: 'rules', large: 'tree', storage: 'tree', duplicates: 'dups', apps: 'rules' };
 
-export default function Cleaner() { return <PalProvider><Body /></PalProvider>; }
+// (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): a header a theme may add above the app
+export default function Cleaner() { return <SkinHeader app="cleaner" title={appName(getApp('cleaner'))}><CleanerMain /></SkinHeader>; }
+
+function CleanerMain() { return <PalProvider><Body /></PalProvider>; }
 
 function Body() {
   const p = usePal();

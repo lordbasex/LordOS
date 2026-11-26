@@ -1081,5 +1081,19 @@
   "style.removeTitle": "‘{name}’ verwijderen?",
   "style.removeDetail": "Je kunt het opnieuw installeren vanuit het bestand.",
   "style.communityNoteInstalled": "LordOS heeft deze bureaubladstijl niet gemaakt of gecontroleerd. Hij draait met beperkingen: hij kan Terminal niet openen, geen bestanden wijzigen, geen toestemmingsvragen beantwoorden en niet zien wat je in apps typt.",
-  "style.rescueHint": "Als hij zich misdraagt, druk je op Ctrl+Alt+Shift+Backspace om terug te gaan naar Lord Flow."
+  "style.rescueHint": "Als hij zich misdraagt, druk je op Ctrl+Alt+Shift+Backspace om terug te gaan naar Lord Flow.",
+  "themeParts.title": "Uit deze stijl",
+  "themeParts.icons": "Pictogrammen",
+  "themeParts.cursors": "Aanwijzerkleuren",
+  "themeParts.sounds": "Geluiden",
+  "themeParts.fonts": "Lettertype",
+  "themeParts.layouts": "App-indelingen",
+  "themeParts.layoutsHint": "Hoe apps zoals Bestanden zijn ingedeeld. Apps houden hoe dan ook hun eigen regels.",
+  "skin.group.look": "Uiterlijk en beeldschermen",
+  "skin.group.connect": "Netwerk en apparaten",
+  "skin.group.input": "Taal, invoer en apps",
+  "skin.group.system": "Systeem en beveiliging",
+  "skin.pick": "Kies een categorie",
+  "style.organization": "Organisatie",
+  "style.email": "E-mail"
 }

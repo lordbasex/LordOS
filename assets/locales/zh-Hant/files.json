@@ -334,5 +334,9 @@
   "readOnly.denied": "此資料夾為唯讀：其權限不允許你更改它。若要更改它，請使用「終端機」或其他 App。",
   "fromMachineNoRun": "「{name}」來自機器 {machine}。「檔案」不會開啟來自機器的程式或安裝程式：如果信任它，請使用「打開方式」。",
   "info.from": "來源",
-  "info.fromMachine": "機器 {machine}"
+  "info.fromMachine": "機器 {machine}",
+  "skin.address": "位址",
+  "skin.tasks": "檔案和資料夾工作",
+  "skin.otherPlaces": "其他位置",
+  "skin.details": "詳細資料"
 }

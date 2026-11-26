@@ -1074,5 +1074,19 @@
   "style.removeTitle": "「{name}」を削除しますか?",
   "style.removeDetail": "ファイルから再インストールできます。",
   "style.communityNoteInstalled": "このデスクトップスタイルは LordOS が作成・確認したものではありません。制限付きで動作します: ターミナルを開く、ファイルを変更する、アクセス許可の確認に答える、アプリでの入力を見ることはできません。",
-  "style.rescueHint": "おかしな動作をしたら、Ctrl+Alt+Shift+Backspace を押すと Lord Flow に戻ります。"
+  "style.rescueHint": "おかしな動作をしたら、Ctrl+Alt+Shift+Backspace を押すと Lord Flow に戻ります。",
+  "themeParts.title": "このスタイルから",
+  "themeParts.icons": "アイコン",
+  "themeParts.cursors": "ポインターの色",
+  "themeParts.sounds": "サウンド",
+  "themeParts.fonts": "フォント",
+  "themeParts.layouts": "アプリのレイアウト",
+  "themeParts.layoutsHint": "ファイルなどのアプリの配置。どちらの場合もアプリは独自のルールを守ります。",
+  "skin.group.look": "外観とディスプレイ",
+  "skin.group.connect": "ネットワークとデバイス",
+  "skin.group.input": "言語、入力、アプリ",
+  "skin.group.system": "システムとセキュリティ",
+  "skin.pick": "カテゴリを選んでください",
+  "style.organization": "組織",
+  "style.email": "メール"
 }

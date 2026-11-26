@@ -334,5 +334,9 @@
   "readOnly.denied": "Folder ini baca sahaja: kebenarannya tidak membenarkan anda mengubahnya. Untuk mengubahnya, gunakan Terminal atau apl lain.",
   "fromMachineNoRun": "“{name}” datang daripada mesin {machine}. Fail tidak membuka program atau pemasang daripada mesin: gunakan Buka Dengan jika anda mempercayainya.",
   "info.from": "Asal",
-  "info.fromMachine": "Mesin {machine}"
+  "info.fromMachine": "Mesin {machine}",
+  "skin.address": "Alamat",
+  "skin.tasks": "Tugas Fail dan Folder",
+  "skin.otherPlaces": "Tempat Lain",
+  "skin.details": "Butiran"
 }

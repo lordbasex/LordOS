@@ -1007,5 +1007,8 @@
   "edit.saveAudio": "Audio opslaan als…",
   "edit.back": "Terug",
   "edit.forward": "Vooruit",
-  "edit.reload": "Opnieuw laden"
+  "edit.reload": "Opnieuw laden",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "Een eerbetoon aan de bureaubladen van 2001: blauwe titelbalken met afgeronde bovenkant, een groene startknop op een blauwe taakbalk en Bestanden met een takenvenster.",
+  "bluebell.start": "Start"
 }

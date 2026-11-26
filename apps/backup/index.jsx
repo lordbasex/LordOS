@@ -7,7 +7,7 @@ import {
   View, Text, ScrollView, Segmented, Toggle, Button, TextInput, useTheme, useBackup, backup, fs, wm, t as tr, errorText,
   formatBytes, formatDate, formatTime, formatNumber, direction,
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SidebarItem, SectionTitle, EmptyState, GroupBox, FormRow, Hairline, spacing, typeScale,
-  useSidebar, SidebarToggle, SidebarOverlay, cloudModel, FilePicker, NO_SELECTION, clickSelect,
+  useSidebar, SidebarToggle, SidebarOverlay, cloudModel, FilePicker, NO_SELECTION, clickSelect, SkinRegion, useSkinned, commandBar, pickCommand,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { exclusionFor, addExclusion, restoreTarget, baseName } from './model.js';
@@ -518,13 +518,20 @@ function Browser({ st }) {
 export default function Backup() {
   const st = useBackup();
   const [tab, setTab] = useState(() => (st && st.dest ? 'snapshots' : 'settings'));
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the two tabs as a command bar; the
+  // backups, restoring and every setting stay Backup's
+  const skinned = useSkinned('backup');
+  const bar = skinned ? commandBar({ commands: [['snapshots', 'backup.tabSnapshots'], ['settings', 'backup.tabSettings']].map(([id, k]) => ({ id, label: tr(k), active: tab === id })) }) : null;
+  const vm = bar ? { app: 'backup', ...bar, actions: { command: (id) => { const c = pickCommand(bar, id); if (c) setTab(c); } } } : null;
   return (
     <View style={{ flex: 1 }}>
       <Header st={st} />
+      <SkinRegion app="backup" region="toolbar" model={vm}>
       <View style={{ height: 44, alignItems: 'center', justifyContent: 'center' }}>
         <Segmented appearance="neutral" value={tab} onChange={setTab} options={[['snapshots', tr('backup.tabSnapshots')], ['settings', tr('backup.tabSettings')]]} />
         <Hairline edge="bottom" />
       </View>
+      </SkinRegion>
       {tab === 'snapshots' ? <Browser st={st} /> : <Settings st={st} />}
     </View>
   );

@@ -1088,5 +1088,19 @@
   "style.removeTitle": "Usunąć „{name}”?",
   "style.removeDetail": "Możesz zainstalować go ponownie z jego pliku.",
   "style.communityNoteInstalled": "LordOS nie stworzył tego stylu pulpitu ani go nie sprawdził. Działa z ograniczeniami: nie może otworzyć Terminala, zmieniać plików, odpowiadać na prośby o uprawnienia ani widzieć, co piszesz w aplikacjach.",
-  "style.rescueHint": "Jeśli działa źle, naciśnij Ctrl+Alt+Shift+Backspace, aby wrócić do Lord Flow."
+  "style.rescueHint": "Jeśli działa źle, naciśnij Ctrl+Alt+Shift+Backspace, aby wrócić do Lord Flow.",
+  "themeParts.title": "Z tego stylu",
+  "themeParts.icons": "Ikony",
+  "themeParts.cursors": "Kolory wskaźnika",
+  "themeParts.sounds": "Dźwięki",
+  "themeParts.fonts": "Czcionka",
+  "themeParts.layouts": "Układ aplikacji",
+  "themeParts.layoutsHint": "Jak są rozmieszczone aplikacje takie jak Pliki. Aplikacje i tak zachowują własne zasady.",
+  "skin.group.look": "Wygląd i ekrany",
+  "skin.group.connect": "Sieć i urządzenia",
+  "skin.group.input": "Język, wprowadzanie i aplikacje",
+  "skin.group.system": "System i bezpieczeństwo",
+  "skin.pick": "Wybierz kategorię",
+  "style.organization": "Organizacja",
+  "style.email": "E-mail"
 }

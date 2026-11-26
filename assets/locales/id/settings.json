@@ -1074,5 +1074,19 @@
   "style.removeTitle": "Hapus “{name}”?",
   "style.removeDetail": "Anda dapat memasangnya lagi dari berkasnya.",
   "style.communityNoteInstalled": "LordOS tidak membuat atau meninjau gaya desktop ini. Gaya ini berjalan dengan batasan: tidak dapat membuka Terminal, mengubah berkas, menjawab permintaan izin, atau melihat apa yang Anda ketik di aplikasi.",
-  "style.rescueHint": "Jika bermasalah, tekan Ctrl+Alt+Shift+Backspace untuk kembali ke Lord Flow."
+  "style.rescueHint": "Jika bermasalah, tekan Ctrl+Alt+Shift+Backspace untuk kembali ke Lord Flow.",
+  "themeParts.title": "Dari gaya ini",
+  "themeParts.icons": "Ikon",
+  "themeParts.cursors": "Warna penunjuk",
+  "themeParts.sounds": "Suara",
+  "themeParts.fonts": "Font",
+  "themeParts.layouts": "Tata letak aplikasi",
+  "themeParts.layoutsHint": "Bagaimana aplikasi seperti Berkas ditata. Aplikasi tetap memegang aturannya sendiri.",
+  "skin.group.look": "Tampilan dan Layar",
+  "skin.group.connect": "Jaringan dan Perangkat",
+  "skin.group.input": "Bahasa, Input, dan Aplikasi",
+  "skin.group.system": "Sistem dan Keamanan",
+  "skin.pick": "Pilih kategori",
+  "style.organization": "Organisasi",
+  "style.email": "Email"
 }

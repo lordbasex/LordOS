@@ -154,6 +154,7 @@ export { WindowShell, WINDOW_EDGE, useWindowButtons, titleBarPx, SeamCover } fro
 export { WINDOW_BUTTON_SIDES, windowButtonsPref, WINDOW_BUTTON_SIZES, windowButtonSizePref, buttonSizeScale, scaledBar, windowMenuTiling } from './windowbuttons.js';   // title bar buttons' side (issue #58), size (#151, #219), the Window menu's layouts (#151)
 export { DRAG_MODIFIERS, dragModifierPref } from './moddragmodel.js';   // ❖ or Alt + drag anywhere in a window (#219)
 import { startModDrag } from './moddrag.js';
+import { startStylePack } from './appskins.jsx';
 export { term } from './terminal.js';
 export { clipboard, clipboardHistory, clipboardPanel, clipboardKind, toast } from './clipboard.js';
 export { restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers } from './sessionrestore.jsx';
@@ -390,6 +391,7 @@ export function startShell(element) {
     }
   }
   try { lord.input?.pointerAccent?.(null); } catch (e) { /* older server */ }   // LordOS's black arrow; a theme may tint it (setPointerAccent)
+  startStylePack();                     // the theme's pointer colours, sounds and font, or LordOS's own (appskins.jsx)
   refreshPackages();                    // after the theme's configureWindows
   startAppsOff();                       // deactivated apps open nothing; their background work stays off (appsoffactions.js)
   startGuestWin();                      // inside a Machines guest only: apps mode's endpoint (guestwin.js)
@@ -504,4 +506,7 @@ export { DesktopStyleThumb, SketchThumb, knownStyleTheme } from './stylethumb.js
 
 // A theme's own pointer (0.8.9, Lord Workspaces): the default arrow as a rounded tip in its accent colour ('#RRGGBB'),
 // or null for LordOS's black arrow. Only the default pointer changes. startShell puts the black one back for every theme.
+// Style packs and app skins (part 4 of the community-themes plan, docs/THEMES-GUIDE.md "Style packs" and "App skins")
+export { registerStylePack, registerAppSkins, useStylePack, useStyleParts, stylePack, PackIcon, usePackHas, useSkin, useSkinned, SkinRegion, SkinHeader, useThemeFont, applyPack } from './appskins.jsx';
+export { APP_REGIONS, STYLE_PARTS, SOUND_EVENTS, TOOLBAR_ICONS, partOn, partPatch, packParts, commandBar, pickCommand, listPane, pickItem } from './appskinmodel.js';
 export const setPointerAccent = (color) => { try { return !!lord.input?.pointerAccent?.(color || null); } catch (e) { return false; } };

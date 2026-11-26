@@ -1081,5 +1081,19 @@
   "style.removeTitle": "Rimuovere «{name}»?",
   "style.removeDetail": "Puoi installarlo di nuovo dal suo file.",
   "style.communityNoteInstalled": "LordOS non ha creato né controllato questo stile della scrivania. Funziona con dei limiti: non può aprire il Terminale, modificare file, rispondere alle richieste di autorizzazione né vedere ciò che scrivi nelle app.",
-  "style.rescueHint": "Se si comporta male, premi Ctrl+Alt+Maiusc+Backspace per tornare a Lord Flow."
+  "style.rescueHint": "Se si comporta male, premi Ctrl+Alt+Maiusc+Backspace per tornare a Lord Flow.",
+  "themeParts.title": "Da questo stile",
+  "themeParts.icons": "Icone",
+  "themeParts.cursors": "Colori del puntatore",
+  "themeParts.sounds": "Suoni",
+  "themeParts.fonts": "Carattere",
+  "themeParts.layouts": "Layout delle app",
+  "themeParts.layoutsHint": "Come sono disposte app come File. Le app mantengono comunque le proprie regole.",
+  "skin.group.look": "Aspetto e schermi",
+  "skin.group.connect": "Rete e dispositivi",
+  "skin.group.input": "Lingua, input e app",
+  "skin.group.system": "Sistema e sicurezza",
+  "skin.pick": "Scegli una categoria",
+  "style.organization": "Organizzazione",
+  "style.email": "Email"
 }

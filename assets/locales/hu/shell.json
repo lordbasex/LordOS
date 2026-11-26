@@ -1007,5 +1007,8 @@
   "edit.saveAudio": "Hang mentése másként…",
   "edit.back": "Vissza",
   "edit.forward": "Előre",
-  "edit.reload": "Újratöltés"
+  "edit.reload": "Újratöltés",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "Tisztelgés a 2001-es asztalok előtt: kék címsorok lekerekített tetővel, zöld start gomb kék tálcán, és a Fájlok feladatpanellel.",
+  "bluebell.start": "Start"
 }

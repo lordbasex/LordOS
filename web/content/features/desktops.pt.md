@@ -51,6 +51,12 @@ Os três rodam sobre o mesmo servidor gráfico, o mesmo motor de interface e os 
 
 [[shot:2]]
 
+## Bluebell (em desenvolvimento)
+
+Em desenvolvimento depois da 0.8.9.6.1 (a versão mais recente é a 0.8.9.6.1): uma homenagem aos desktops de 2001, com arte desenhada por nós nesse estilo. Barras de título azuis brilhantes com o topo arredondado, um botão iniciar verde numa barra de tarefas azul com inicialização rápida e um botão para cada janela, e o Arquivos como o explorador daquela época: botões grandes de Voltar, Avançar e Acima, uma barra de endereço com Ir, e um painel de tarefas com "Tarefas de arquivo e pasta", "Outros locais" e "Detalhes".
+
+Também é o primeiro desktop que traz um **pacote de estilo** e **aparências de apps**: os próprios ícones, ponteiros brancos, alguns sons curtos e a própria fonte, e a barra de ferramentas, a barra lateral, os itens e a barra de status do Arquivos desenhados do seu jeito. O Arquivos continua fazendo cada ação ele mesmo, com as verificações de sempre. Em **Ajustes → Aparência → Deste estilo** você pode desligar cada parte, por exemplo para ficar com as molduras dele e usar os ícones do próprio LordOS.
+
 ## Como trocar
 
 Vá em **Ajustes → Aparência → Estilo da área de trabalho** e escolha outro. A troca é imediata, sem sair da sessão: suas janelas abertas voltam, cada uma no seu desktop, e seus ajustes ficam.
@@ -82,3 +88,4 @@ Em outros desktops, como GNOME ou KDE, um desktop que funcione como o Lord Works
 - **A apresentação de fundos** foi verificada só em telas de teste, não em monitores reais nem pela GPU.
 - **O seletor do primeiro início** tem testes automáticos nos três desktops, mas ainda não foi visto num primeiro início real.
 - **Um tema que você mesmo faça** por enquanto só roda numa versão de desenvolvimento do LordOS: uma versão publicada só carrega código que está no manifesto assinado do LordOS.
+- **Bluebell** e as aparências de apps foram verificados com testes automáticos e capturas sem tela, no claro e no escuro; ainda não numa sessão real. Todos os apps nativos que rodam no processo do desktop aceitam aparências; o Mail e o Calendário, que rodam como processos isolados, recebem só as cores.

@@ -598,6 +598,69 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     and keeps the screenshots.
 
 ### Added
+- **Style packs and app skins: a theme can bring its own icons, pointers, sounds and font, and redraw parts of an app**
+  (part 4 of the community-themes plan, approved by the maintainer on 2026-11-26, for every native app starting with
+  Files; docs/THEMES-GUIDE.md "Style packs and app skins").
+  - *Level 1, a style pack* (`registerStylePack`, `sdk/appskins.jsx`, rules in `sdk/appskinmodel.js`): app icons by app
+    id, file-type icons by kind and toolbar icons by our names (a component drawn with nodes, or a PNG or SVG in the
+    theme's `assets/`); pointer colours (fill and outline of every shape: `lord.input.pointerScheme`,
+    `cursor_set_scheme` in `server/src/cursor.c`); a sound scheme for startup, the default notification sound, errors
+    and emptying the Trash, as up to 8 plain notes each that lord-server synthesizes like its own sounds
+    (`lord.sound.scheme`, `snd_set_scheme` in `server/src/sound/snd.c`; the startup tune plays once per session, not
+    after a theme switch); and an installed font by family name for `fontFamily: 'theme'` (`lord.fonts.useForTheme`,
+    `text_set_theme_font` in `server/src/ui/text.c`). A theme brings no audio file, cursor image or font file for
+    lord-server to parse.
+  - *Richer tokens* for every app's shared controls: `toolbarBg`, `buttonBg`, `bevel` and `stateBorders` (a border per
+    state) in `Button`, `Toolbar` and `ToolbarButton`; `ToolbarButton` takes `iconName` for a pack's icon.
+  - *Level 2, app skins* (`registerAppSkins`, `<SkinRegion>`): an app names the regions a theme may draw and hands the
+    theme's component a frozen view model with its actions as functions; the app does every action with its own checks,
+    and a skin that throws gives the region back to the app. **Files** has six: `toolbar`, `addressBar`, `sidebar`,
+    `itemView`, `statusBar` and `contextMenu` (`apps/files/skinmodel.js`: the items, the selection, the folder, the
+    places, the status, and 30 actions from Back to Empty Trash; a typed address goes through `addressPath` and Files'
+    own check that the folder is there). **Settings** has two: `sidebar` and `home`, a page of categories before a
+    section is open (`apps/settings/skinmodel.js`); each section's page stays Settings' own.
+    The **Terminal** has three: `tabBar`, `statusBar` and `contextMenu` (`apps/terminal/skinmodel.js`); a skin asks
+    only for a closed list of the Terminal's commands, and the panes and what is typed into them are never a skin's.
+    The **Text Editor** has four: `toolbar`, `tabBar`, `statusBar` and `contextMenu` (`apps/editor/skinmodel.js`); the
+    model never carries the document's text.
+    The **Store** has two: `sidebar` and `toolbar` (`apps/store/skinmodel.js`); a skin chooses a page, goes back, searches
+    and refreshes, and every install stays the Store's.
+    Most other apps use two shared shapes (`commandBar` and `listPane` in `sdk/appskinmodel.js`): a command bar of the app's
+    own commands and a list pane of its places or items, and a header (`SkinHeader`) for an app with no bar of its own;
+    Bluebell draws them once (`skins/common.jsx`). Apps with them:
+    **Notes** (`sidebar`, `toolbar`; the list carries titles and dates, never a note's text); **Calculator**
+    (`display`, `keypad`; `press` takes only a key of its keypad); **Photos** (`sidebar`, `toolbar`); **Player**
+    (`sidebar`, `toolbar`, `transport`); **Monitor** (`toolbar`: its tabs); **Clock** (`toolbar`); **Screenshots**
+    (`toolbar`: the capture bar; it floats outside the theme's tree, so a skin makes its own tokens); **Disks**
+    (`sidebar`); **About** (`banner`); **Help** (`sidebar`); **Characters** (`toolbar`, `sidebar`); **Fonts**
+    (`sidebar`); **Logs** (`sidebar`, `toolbar`); **System Information** (`toolbar`); **Backups** (`toolbar`); **PDF
+    Viewer** (`toolbar`); **Force Quit** (`list`); **About App** (`banner`); **Scanner** (`header`); **Voice
+    Recorder** (`header`); **Camera** (`header`); **LordOS Imager** (`header`); **Install LordOS** (`header`);
+    **Databases** (`header`); **Machines** (`header`); **Cleaner** (`header`); **LordOS Studio** (`header`);
+    **Remote Desk** (`header`).
+  - **Settings → Appearance → From this style**: a switch for each part the style in use brings (Icons, Pointer colors,
+    Sounds, Font, App layouts; `settings.themeParts`), so someone can keep a theme's frames and use LordOS's icons.
+  - **Bluebell** (`themes/bluebell`), the demo: a tribute to the desktops of 2001 with glossy blue title bars with
+    rounded tops, a green start button with our own bluebell mark on a blue taskbar, quick launch and a button per
+    window, a two-column start menu of that era (the person's picture and name in a blue header, pinned apps and "All
+    apps ▸" in a white column, Documents, Pictures, Music, the computer, the network, Settings, Help and Search in a
+    light-blue one, and Log Out and Shut Down… in the footer, LordOS's own session actions), an original sky when no picture is chosen, light and dark; its pack has our own folder, page and round-arrow
+    icons, white pointers with a black outline, four short tunes and DejaVu Sans; and Files is that era's explorer
+    (Back/Forward/Up, Search, Views, an address bar with Go, the task pane with "File and Folder Tasks", "Other Places"
+    and "Details", icons or details, a plain status bar and context menu), and Settings a control panel of that era (a
+    task pane and four categories, each with its sections as links). All of its art is drawn by us.
+  - Themes no longer carry "Lord" in their names (the maintainer's rule of 2026-11-26): the demo is just **Bluebell**.
+    Its `theme.json` names its author, Federico Pereira, with two new optional fields, `email` and `organization` (IPERFEX),
+    checked by `sdk/thememeta.js` (one plain address of at most 120 characters; one line of at most 60) and shown as
+    rows on the theme's page in Settings → Appearance (`settings.style.email`, `settings.style.organization`; tests in
+    `server/tests/theme_gallery_test.mjs`).
+  - New texts in the 35 languages (`files.skin.*`, `settings.themeParts.*`, `settings.skin.*`, `shell.theme.bluebell.*`,
+    `shell.bluebell.start`). Tests: `server/tests/appskin_test.mjs` (76 checks), `server/tests/files_skin_scene.mjs`
+    (Files with every region a stub: 31 checks), `server/tests/settings_skin_scene.mjs` (Settings with both regions
+    stubbed: 17 checks), `server/tests/terminal_skin_scene.mjs` (the Terminal: 14 checks), `server/tests/editor_skin_scene.mjs` (the
+    Text Editor: 16 checks), `server/tests/store_skin_scene.mjs` (the Store: 11 checks; all six in `make test`) and `server/tests/bluebell_scene` (screenshots,
+    `app_scene_headless.sh bluebell_scene OUT bluebell en light|dark`; it runs with a demo account and computer name, and
+    checks that the real ones appear nowhere on screen).
 - **Settings → Wallpaper is a gallery, with three new collections of still pictures: Abstract, Epic and Anime.** The
   approved redesign (apps/settings/WallpaperGallery.jsx) reorganises the page; nothing it had goes away.
   - *What shows now*, at the top: a large picture with its name, collection and license, and three controls: **For**

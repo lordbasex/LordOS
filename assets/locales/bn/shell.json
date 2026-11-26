@@ -1007,5 +1007,8 @@
   "edit.saveAudio": "অডিও এভাবে সংরক্ষণ করুন…",
   "edit.back": "পেছনে",
   "edit.forward": "সামনে",
-  "edit.reload": "আবার লোড করুন"
+  "edit.reload": "আবার লোড করুন",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "২০০১ সালের ডেস্কটপের প্রতি শ্রদ্ধা: উপরে গোলাকার নীল শিরোনাম বার, নীল টাস্কবারে সবুজ স্টার্ট বোতাম, আর কাজের প্যানসহ ফাইল।",
+  "bluebell.start": "স্টার্ট"
 }

@@ -11,7 +11,7 @@
 import {
   partMountable, partUnmountable, statusText, needsDiskFormats, openDiskFormats, View, Text, ScrollView, useTheme, useLocale, useSystemInfo, useAppWindow, admin, useDisks, disks, formatBytes,
   Toolbar as Bar, ToolbarButton, ToolbarSpacer, MenuButton, Hairline, GroupBox, FormRow, EmptyState, spacing, typeScale,
-  useSidebar, SidebarToggle, SidebarOverlay, Button,
+  useSidebar, SidebarToggle, SidebarOverlay, Button, SkinRegion, useSkinned, listPane, pickItem,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DisksIcon, DriveGlyph, PartGlyph, fsColor } from './icons.jsx';
@@ -295,10 +295,18 @@ export default function Disks() {
   // pick something on open (the first removable, if any) and keep a valid selection if it disappears
   const disk = list.find((d) => d.name === sel.disk) || list.find((d) => d.removable) || list[0];
   const part = disk && sel.part ? disk.partitions.find((p) => p.name === sel.part) || null : null;
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the disks and their partitions as a list
+  // pane; the details, every disk action and the administrator's prompt stay Disks'
+  const skinned = useSkinned('disks');
+  const pane = skinned ? listPane({ title: tr('disks.title'), items: list.flatMap((d) => [
+    { key: `d:${d.name}`, label: diskTitle(d), detail: formatBytes(d.size), selected: !!disk && d.name === disk.name && !part, group: diskTitle(d) },
+    ...d.partitions.map((p) => ({ key: `p:${d.name}:${p.name}`, label: partTitle(p, tr), detail: formatBytes(p.size), selected: !!part && d.name === disk.name && p.name === part.name, group: diskTitle(d) })),
+  ]) }) : null;
+  const vm = pane ? { app: 'disks', ...pane, actions: { select: (key) => { const k = pickItem(pane, key); if (!k) return; const [kind, dn, pn] = k.split(':'); setSel({ disk: dn, part: kind === 'p' ? pn : null }); } } } : null;
   if (!disks.available()) return <EmptyState mascot="confused" title={tr('disks.unavailable')} />;
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      {side.narrow ? null : <Sidebar list={list} sel={{ disk: disk && disk.name, part: part && part.name }} onSel={setSel} />}
+      {side.narrow ? null : <SkinRegion app="disks" region="sidebar" model={vm}><Sidebar list={list} sel={{ disk: disk && disk.name, part: part && part.name }} onSel={setSel} /></SkinRegion>}
       {disk ? <Details key={disk.name} disk={disk} part={part} onDialog={(d) => setDialog({ ...d, disk, part })} autoCheck={args?.disk === disk.name ? args.nonce || 1 : null} side={side.narrow ? side : null} />
         : <EmptyState icon={<DisksIcon size={56} />} title={tr('disks.none')} />}
       {side.narrow && side.shown ? (

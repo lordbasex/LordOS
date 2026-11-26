@@ -1,6 +1,6 @@
 // About <app> (the app menu's first item, sdk/appcontrol.js): the app's icon, name, its own version
 // (manifest "version"; a package's version), where it comes from and whether it runs isolated.
-import { View, Text, useTheme, useAppWindow, useLauncherApps, getApp, wm, typeScale, isSystemApp, appName, t as tr } from '@lordos/sdk';
+import { View, Text, useTheme, useAppWindow, useLauncherApps, getApp, wm, typeScale, isSystemApp, appName, t as tr, SkinRegion, useSkinned } from '@lordos/sdk';
 import { useEffect } from 'react';
 
 export function Icon({ size }) {
@@ -25,7 +25,11 @@ export default function AppAbout() {
   const isolated = !!(own?.isolated || own?.package);
   const version = own?.version || a?.version || '';
   const desc = a?.comment || own?.description || a?.genericName || '';
-  return (
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → About"): the same banner shape as About's, for one app
+  const skinned = useSkinned('appabout');
+  const vm = skinned ? { app: 'appabout', name, version: version ? tr('appabout.version', { v: version }) : '', build: '', code: kind, codeNote: isolated ? tr('appabout.isolated') : '',
+    tagline: desc, rows: [], AppIcon: AppIcon || Icon, actions: {} } : null;
+  const ownView = (
     <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 22, paddingTop: 22, paddingBottom: 18, gap: 6 }}>
       {AppIcon ? <AppIcon size={64} /> : <Icon size={64} />}
       <Text style={{ fontSize: typeScale.title2, fontWeight: 700, color: t.text, marginTop: 6, textAlign: 'center' }}>{name}</Text>
@@ -37,4 +41,5 @@ export default function AppAbout() {
       <Text style={{ fontSize: typeScale.caption2 || 10, color: t.textDim }}>{a?.kind === 'linux' ? String(key).replace(/^desktop:/, '') : key}</Text>
     </View>
   );
+  return <SkinRegion app="appabout" region="banner" model={vm}>{ownView}</SkinRegion>;
 }

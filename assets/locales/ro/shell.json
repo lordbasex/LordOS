@@ -1014,5 +1014,8 @@
   "edit.saveAudio": "Salvează audio ca…",
   "edit.back": "Înapoi",
   "edit.forward": "Înainte",
-  "edit.reload": "Reîncarcă"
+  "edit.reload": "Reîncarcă",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "Un omagiu adus desktopurilor din 2001: bare de titlu albastre cu colțurile de sus rotunjite, un buton de start verde pe o bară de activități albastră și Fișiere cu un panou de activități.",
+  "bluebell.start": "Start"
 }

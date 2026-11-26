@@ -1081,5 +1081,19 @@
   "style.removeTitle": "“{name}” kaldırılsın mı?",
   "style.removeDetail": "Dosyasından yeniden yükleyebilirsiniz.",
   "style.communityNoteInstalled": "LordOS bu masaüstü stilini yapmadı ve incelemedi. Sınırlarla çalışır: Terminal'i açamaz, dosyaları değiştiremez, izin isteklerini yanıtlayamaz ve uygulamalara ne yazdığınızı göremez.",
-  "style.rescueHint": "Düzgün çalışmazsa Lord Flow'a dönmek için Ctrl+Alt+Shift+Backspace tuşlarına basın."
+  "style.rescueHint": "Düzgün çalışmazsa Lord Flow'a dönmek için Ctrl+Alt+Shift+Backspace tuşlarına basın.",
+  "themeParts.title": "Bu stilden",
+  "themeParts.icons": "Simgeler",
+  "themeParts.cursors": "İşaretçi renkleri",
+  "themeParts.sounds": "Sesler",
+  "themeParts.fonts": "Yazı tipi",
+  "themeParts.layouts": "Uygulama düzenleri",
+  "themeParts.layoutsHint": "Dosyalar gibi uygulamaların nasıl yerleştirildiği. Uygulamalar her durumda kendi kurallarını korur.",
+  "skin.group.look": "Görünüm ve Ekranlar",
+  "skin.group.connect": "Ağ ve Aygıtlar",
+  "skin.group.input": "Dil, Giriş ve Uygulamalar",
+  "skin.group.system": "Sistem ve Güvenlik",
+  "skin.pick": "Bir kategori seçin",
+  "style.organization": "Kuruluş",
+  "style.email": "E-posta"
 }

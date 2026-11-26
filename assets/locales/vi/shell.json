@@ -1000,5 +1000,8 @@
   "edit.saveAudio": "Lưu âm thanh thành…",
   "edit.back": "Quay lại",
   "edit.forward": "Tiến tới",
-  "edit.reload": "Tải lại"
+  "edit.reload": "Tải lại",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "Lời tri ân những màn hình nền năm 2001: thanh tiêu đề xanh lam bo tròn phía trên, nút bắt đầu màu xanh lá trên thanh tác vụ xanh lam và Tệp với khung tác vụ.",
+  "bluebell.start": "Bắt đầu"
 }

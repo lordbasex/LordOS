@@ -1088,5 +1088,19 @@
   "style.removeTitle": "Удалить «{name}»?",
   "style.removeDetail": "Вы сможете снова установить её из файла.",
   "style.communityNoteInstalled": "LordOS не создавала и не проверяла этот стиль рабочего стола. Он работает с ограничениями: не может открыть Терминал, изменять файлы, отвечать на запросы разрешений или видеть, что вы печатаете в приложениях.",
-  "style.rescueHint": "Если он работает неправильно, нажмите Ctrl+Alt+Shift+Backspace, чтобы вернуться к Lord Flow."
+  "style.rescueHint": "Если он работает неправильно, нажмите Ctrl+Alt+Shift+Backspace, чтобы вернуться к Lord Flow.",
+  "themeParts.title": "Из этого стиля",
+  "themeParts.icons": "Значки",
+  "themeParts.cursors": "Цвета указателя",
+  "themeParts.sounds": "Звуки",
+  "themeParts.fonts": "Шрифт",
+  "themeParts.layouts": "Компоновка приложений",
+  "themeParts.layoutsHint": "Как устроены приложения вроде «Файлов». Приложения в любом случае соблюдают свои правила.",
+  "skin.group.look": "Оформление и экраны",
+  "skin.group.connect": "Сеть и устройства",
+  "skin.group.input": "Язык, ввод и приложения",
+  "skin.group.system": "Система и безопасность",
+  "skin.pick": "Выберите категорию",
+  "style.organization": "Организация",
+  "style.email": "Эл. почта"
 }

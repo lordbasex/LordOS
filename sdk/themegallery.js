@@ -18,6 +18,7 @@ export function galleryEntry(t, { lordosVersion = '' } = {}) {
     id: t.id, name: t.name || t.id, description: t.description || '', current: !!t.current,
     community, official: !community, installed: t.installed !== false,
     author: t.author || (community ? '' : 'LordOS'),         // '' → "Unknown author"
+    email: t.email || '', organization: t.organization || '', // (0.8.9.6.2) shown only when the theme gives them
     license: t.license || (community ? '' : 'MIT'),
     version: t.version || (community ? '' : String(lordosVersion || '')),
     failed: !!t.failed, failedWhy: typeof t.failedWhy === 'string' ? t.failedWhy : '',

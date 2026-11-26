@@ -1081,5 +1081,19 @@
   "style.removeTitle": "Ungependa kuondoa “{name}”?",
   "style.removeDetail": "Unaweza kuisakinisha tena kutoka kwa faili yake.",
   "style.communityNoteInstalled": "LordOS haikutengeneza wala kukagua mtindo huu wa eneo-kazi. Huendeshwa kwa mipaka: haiwezi kufungua Terminal, kubadilisha faili, kujibu maombi ya ruhusa au kuona unachoandika kwenye programu.",
-  "style.rescueHint": "Ikifanya vibaya, bonyeza Ctrl+Alt+Shift+Backspace kurudi kwenye Lord Flow."
+  "style.rescueHint": "Ikifanya vibaya, bonyeza Ctrl+Alt+Shift+Backspace kurudi kwenye Lord Flow.",
+  "themeParts.title": "Kutoka kwa mtindo huu",
+  "themeParts.icons": "Aikoni",
+  "themeParts.cursors": "Rangi za kiashiria",
+  "themeParts.sounds": "Sauti",
+  "themeParts.fonts": "Fonti",
+  "themeParts.layouts": "Mpangilio wa programu",
+  "themeParts.layoutsHint": "Jinsi programu kama Faili zinavyopangwa. Programu hushika kanuni zake zenyewe kwa hali yoyote.",
+  "skin.group.look": "Mwonekano na Skrini",
+  "skin.group.connect": "Mtandao na Vifaa",
+  "skin.group.input": "Lugha, Uingizaji na Programu",
+  "skin.group.system": "Mfumo na Usalama",
+  "skin.pick": "Chagua kategoria",
+  "style.organization": "Shirika",
+  "style.email": "Barua pepe"
 }

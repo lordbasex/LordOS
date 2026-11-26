@@ -153,6 +153,25 @@ static JSValue f_pointer_accent(JSContext *c, JSValueConst this, int argc, JSVal
     return JS_NewBool(c, on);
 }
 
+/* lord.input.pointerScheme({ fill: '#RRGGBB', outline: '#RRGGBB' } | null): a theme's pointer colours (cursor.h), every
+ * shape. Two colours only: no image is read. */
+static int hex_field(JSContext *c, JSValueConst o, const char *k, unsigned *rgb) {
+    JSValue v = JS_GetPropertyStr(c, o, k);
+    const char *str = JS_IsString(v) ? JS_ToCString(c, v) : NULL;
+    JS_FreeValue(c, v);
+    if (!str) return 0;
+    int ok = strlen(str) == 7 && str[0] == '#' && strspn(str + 1, "0123456789abcdefABCDEF") == 6 && sscanf(str + 1, "%6x", rgb) == 1;
+    JS_FreeCString(c, str);
+    return ok;
+}
+static JSValue f_pointer_scheme(JSContext *c, JSValueConst this, int argc, JSValueConst *argv) {
+    (void)this;
+    unsigned fill = 0, outline = 0;
+    int on = argc > 0 && JS_IsObject(argv[0]) && hex_field(c, argv[0], "fill", &fill) && hex_field(c, argv[0], "outline", &outline);
+    cursor_set_scheme(on, fill, outline);
+    return JS_NewBool(c, on);
+}
+
 static int keyboard_present;
 void js_input_set_keyboard(int present) { keyboard_present = present; }
 
@@ -244,6 +263,7 @@ static const JSCFunctionListEntry input_funcs[] = {
     JS_CFUNC_DEF("keyLabels", 0, f_key_labels),
     JS_CFUNC_DEF("tap", 2, f_tap),
     JS_CFUNC_DEF("pointerAccent", 1, f_pointer_accent),
+    JS_CFUNC_DEF("pointerScheme", 1, f_pointer_scheme),
     JS_CFUNC_DEF("lockPointer", 1, f_lock_pointer),
     JS_CFUNC_DEF("unlockPointer", 0, f_unlock_pointer),
     JS_CFUNC_DEF("pointerLocked", 0, f_pointer_locked),

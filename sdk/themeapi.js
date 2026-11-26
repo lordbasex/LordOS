@@ -484,7 +484,7 @@ const FUNCTIONS = ['t', 'tOptional', 'appName', 'formatDate', 'formatTime', 'for
   'openOverview', 'closeOverview', 'toggleOverview', 'toggleShowDesktop', 'snapZoneAt', 'startDeskWidgets', 'widgetPicker',
   'statusItems', 'useIndicators', 'useThumb', 'openCalendarApp', 'webHelpItems', 'menuAction', 'startView', 'guestAppsMode',
   'takeTextFocus', 'releaseTextFocus', 'restoreFocus', 'textFocusOwner', 'focusToken', 'setBannerPlacement', 'useSystemInfo',
-  'useCpuUsage', 'memUsedKB', 'mediaFormatTime', 'lordosWallpapers', 'nightActive', 'dndActive'];
+  'useCpuUsage', 'memUsedKB', 'mediaFormatTime', 'lordosWallpapers', 'nightActive', 'dndActive', 'useThemeFont'];
 // read access to a system model, by the capability theme.json declares; undeclared, a neutral value
 const CAPABILITY = {
   wifi: ['wifiTile', 'wifiTileView', 'wifiBars'],
@@ -547,6 +547,14 @@ export function makeThemeSdk({ id, caps }) {
   sdk.notifyPrefs = readOnly(SDK.notifyPrefs);
   sdk.dock = SDK.dock ? Object.freeze({ pin: (x, i) => SDK.dock.pin(sanitizeIn(x), i === undefined ? undefined : num(i)), move: (x, i) => SDK.dock.move(sanitizeIn(x), num(i)), unpin: (x) => SDK.dock.unpin(sanitizeIn(x)) }) : undefined;
   sdk.sound = has.has('sound') ? Object.freeze({ available: () => SDK.sound.available?.() }) : Object.freeze({ available: () => false });
+  // a style pack (sdk/appskins.jsx): its data only, pointer colours, tunes, an installed font and icons as image files of
+  // its own; component icons and app skins are not a community theme's (they would draw inside LordOS's apps)
+  sdk.registerStylePack = (raw) => {
+    const p = sanitizeIn(raw) || {};
+    const imgs = (o) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([, v]) => typeof v === 'string'));
+    const ic = p.icons && typeof p.icons === 'object' ? p.icons : {};
+    SDK.registerStylePack({ cursors: p.cursors, sounds: p.sounds, fonts: p.fonts, icons: { apps: imgs(ic.apps), files: imgs(ic.files), toolbar: imgs(ic.toolbar) } });
+  };
   sdk.addListener = themeAddListener;
   sdk.holdKeyboard = themeHoldKeyboard;
   sdk.useShortcuts = themeUseShortcuts;

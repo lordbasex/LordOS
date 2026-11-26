@@ -1,5 +1,5 @@
 // Remote Desk — saved computers and a connection over RDP or VNC; the picture is the backend's own window (sdk/remotedesk.jsx).
-import { View, RemoteDeskApp } from '@lordos/sdk';
+import { View, RemoteDeskApp, SkinHeader, appName, getApp } from '@lordos/sdk';
 
 export function Icon({ size: s }) {
   const box = (x, y, w, h, color, r = 0, opacity = 1) => <View style={{ position: 'absolute', left: s * x, top: s * y, width: s * w, height: s * h, backgroundColor: color, borderRadius: s * r, opacity }} />;
@@ -17,4 +17,7 @@ export function Icon({ size: s }) {
   );
 }
 
-export default function App() { return <RemoteDeskApp />; }
+// (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): a header a theme may add above the app
+export default function App() { return <SkinHeader app="remote-desk" title={appName(getApp('remote-desk'))}><RemotedeskMain /></SkinHeader>; }
+
+function RemotedeskMain() { return <RemoteDeskApp />; }

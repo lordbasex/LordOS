@@ -1081,5 +1081,19 @@
   "style.removeTitle": "“{name}” silinsin?",
   "style.removeDetail": "Onu faylından yenidən quraşdıra bilərsiniz.",
   "style.communityNoteInstalled": "LordOS bu masaüstü üslubunu hazırlamayıb və yoxlamayıb. O, məhdudiyyətlərlə işləyir: Terminalı aça, faylları dəyişə, icazə sorğularına cavab verə və tətbiqlərdə nə yazdığınızı görə bilməz.",
-  "style.rescueHint": "Düzgün işləməsə, Lord Flow-a qayıtmaq üçün Ctrl+Alt+Shift+Backspace düymələrini basın."
+  "style.rescueHint": "Düzgün işləməsə, Lord Flow-a qayıtmaq üçün Ctrl+Alt+Shift+Backspace düymələrini basın.",
+  "themeParts.title": "Bu üslubdan",
+  "themeParts.icons": "Nişanlar",
+  "themeParts.cursors": "Göstərici rəngləri",
+  "themeParts.sounds": "Səslər",
+  "themeParts.fonts": "Şrift",
+  "themeParts.layouts": "Tətbiq düzümləri",
+  "themeParts.layoutsHint": "Fayllar kimi tətbiqlərin necə düzüldüyü. Tətbiqlər hər halda öz qaydalarını saxlayır.",
+  "skin.group.look": "Görünüş və ekranlar",
+  "skin.group.connect": "Şəbəkə və cihazlar",
+  "skin.group.input": "Dil, daxiletmə və tətbiqlər",
+  "skin.group.system": "Sistem və təhlükəsizlik",
+  "skin.pick": "Kateqoriya seçin",
+  "style.organization": "Təşkilat",
+  "style.email": "E-poçt"
 }

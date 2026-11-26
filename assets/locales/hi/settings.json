@@ -1081,5 +1081,19 @@
   "style.removeTitle": "“{name}” हटाएँ?",
   "style.removeDetail": "आप इसे इसकी फ़ाइल से फिर इंस्टॉल कर सकते हैं।",
   "style.communityNoteInstalled": "यह डेस्कटॉप स्टाइल न LordOS ने बनाया है, न उसकी समीक्षा की है। यह सीमाओं के साथ चलता है: Terminal नहीं खोल सकता, फ़ाइलें नहीं बदल सकता, अनुमति अनुरोधों का जवाब नहीं दे सकता और ऐप्स में आपकी टाइपिंग नहीं देख सकता।",
-  "style.rescueHint": "अगर यह ठीक से काम न करे, तो Lord Flow पर लौटने के लिए Ctrl+Alt+Shift+Backspace दबाएँ।"
+  "style.rescueHint": "अगर यह ठीक से काम न करे, तो Lord Flow पर लौटने के लिए Ctrl+Alt+Shift+Backspace दबाएँ।",
+  "themeParts.title": "इस शैली से",
+  "themeParts.icons": "आइकन",
+  "themeParts.cursors": "पॉइंटर के रंग",
+  "themeParts.sounds": "ध्वनियाँ",
+  "themeParts.fonts": "फ़ॉन्ट",
+  "themeParts.layouts": "ऐप लेआउट",
+  "themeParts.layoutsHint": "फ़ाइलें जैसे ऐप कैसे सजे हों। ऐप हर हाल में अपने नियम बनाए रखते हैं।",
+  "skin.group.look": "रूप और डिस्प्ले",
+  "skin.group.connect": "नेटवर्क और डिवाइस",
+  "skin.group.input": "भाषा, इनपुट और ऐप",
+  "skin.group.system": "सिस्टम और सुरक्षा",
+  "skin.pick": "एक श्रेणी चुनें",
+  "style.organization": "संगठन",
+  "style.email": "ईमेल"
 }

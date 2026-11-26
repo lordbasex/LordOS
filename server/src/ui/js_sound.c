@@ -169,7 +169,45 @@ static JSValue f_play(JSContext *c, JSValueConst this_val, int argc, JSValueCons
     return JS_NewBool(c, ok);
 }
 
+/* lord.sound.scheme(name, [[freq, ms], …]): a theme's sound for "startup", "notify", "error" or "emptyTrash" as plain
+ * notes (snd_set_scheme checks them); an empty list or null puts LordOS's back. Numbers only: no file is read. */
+static JSValue f_scheme(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1) return JS_FALSE;
+    const char *name = arg_name(c, argv[0]);
+    if (!name) return JS_FALSE;
+    float freq[SND_SCHEME_NOTES], ms[SND_SCHEME_NOTES];
+    int n = 0, ok = 1;
+    if (argc > 1 && JS_IsArray(c, argv[1])) {
+        JSValue lv = JS_GetPropertyStr(c, argv[1], "length");
+        int64_t len = 0;
+        JS_ToInt64(c, &len, lv);
+        JS_FreeValue(c, lv);
+        if (len > SND_SCHEME_NOTES) ok = 0;
+        for (int64_t k = 0; ok && k < len; k++) {
+            JSValue note = JS_GetPropertyUint32(c, argv[1], (uint32_t)k);
+            double f = -1, d = -1;
+            if (JS_IsArray(c, note)) {
+                JSValue a = JS_GetPropertyUint32(c, note, 0), b = JS_GetPropertyUint32(c, note, 1);
+                if (JS_IsNumber(a)) JS_ToFloat64(c, &f, a);
+                if (JS_IsNumber(b)) JS_ToFloat64(c, &d, b);
+                JS_FreeValue(c, a);
+                JS_FreeValue(c, b);
+            }
+            JS_FreeValue(c, note);
+            if (f < 0 || d < 0) { ok = 0; break; }
+            freq[n] = (float)f;
+            ms[n] = (float)d;
+            n++;
+        }
+    }
+    ok = ok && snd_set_scheme(name, freq, ms, n) == 0;
+    JS_FreeCString(c, name);
+    return JS_NewBool(c, ok);
+}
+
 static const JSCFunctionListEntry sound_funcs[] = {
+    JS_CFUNC_DEF("scheme", 2, f_scheme),
     JS_CFUNC_DEF("state", 0, f_state),
     JS_CFUNC_DEF("setVolume", 3, f_set_volume),
     JS_CFUNC_DEF("setMute", 3, f_set_mute),

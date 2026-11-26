@@ -1007,5 +1007,8 @@
   "edit.saveAudio": "Hifadhi sauti kama…",
   "edit.back": "Nyuma",
   "edit.forward": "Mbele",
-  "edit.reload": "Pakia upya"
+  "edit.reload": "Pakia upya",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "Heshima kwa eneo-kazi la mwaka 2001: pau za kichwa za buluu zenye juu iliyopindwa, kitufe cha anza cha kijani kwenye upau wa kazi wa buluu, na Faili zenye kidirisha cha kazi.",
+  "bluebell.start": "Anza"
 }

@@ -1081,5 +1081,19 @@
   "style.removeTitle": "Poistetaanko ”{name}”?",
   "style.removeDetail": "Voit asentaa sen uudelleen sen tiedostosta.",
   "style.communityNoteInstalled": "LordOS ei ole tehnyt eikä tarkistanut tätä työpöytätyyliä. Se toimii rajoitettuna: se ei voi avata Päätettä, muuttaa tiedostoja, vastata lupakyselyihin eikä nähdä, mitä kirjoitat sovelluksiin.",
-  "style.rescueHint": "Jos se toimii väärin, paina Ctrl+Alt+Vaihto+Askelpalautin palataksesi Lord Flow'hun."
+  "style.rescueHint": "Jos se toimii väärin, paina Ctrl+Alt+Vaihto+Askelpalautin palataksesi Lord Flow'hun.",
+  "themeParts.title": "Tästä tyylistä",
+  "themeParts.icons": "Kuvakkeet",
+  "themeParts.cursors": "Osoittimen värit",
+  "themeParts.sounds": "Äänet",
+  "themeParts.fonts": "Fontti",
+  "themeParts.layouts": "Sovellusten asettelu",
+  "themeParts.layoutsHint": "Miten Tiedostot-sovelluksen kaltaiset sovellukset on aseteltu. Sovellukset pitävät joka tapauksessa omat sääntönsä.",
+  "skin.group.look": "Ulkoasu ja näytöt",
+  "skin.group.connect": "Verkko ja laitteet",
+  "skin.group.input": "Kieli, syöttö ja sovellukset",
+  "skin.group.system": "Järjestelmä ja suojaus",
+  "skin.pick": "Valitse luokka",
+  "style.organization": "Organisaatio",
+  "style.email": "Sähköposti"
 }

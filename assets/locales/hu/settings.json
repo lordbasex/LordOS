@@ -1081,5 +1081,19 @@
   "style.removeTitle": "Eltávolítod: „{name}”?",
   "style.removeDetail": "A fájljából újra telepítheted.",
   "style.communityNoteInstalled": "Ezt az asztali stílust nem a LordOS készítette és nem is ellenőrizte. Korlátozásokkal fut: nem nyithatja meg a Terminált, nem módosíthat fájlokat, nem válaszolhat engedélykérésekre, és nem láthatja, mit gépelsz az alkalmazásokba.",
-  "style.rescueHint": "Ha rosszul működik, nyomd meg a Ctrl+Alt+Shift+Backspace billentyűket, hogy visszatérj a Lord Flow-ra."
+  "style.rescueHint": "Ha rosszul működik, nyomd meg a Ctrl+Alt+Shift+Backspace billentyűket, hogy visszatérj a Lord Flow-ra.",
+  "themeParts.title": "Ebből a stílusból",
+  "themeParts.icons": "Ikonok",
+  "themeParts.cursors": "Mutató színei",
+  "themeParts.sounds": "Hangok",
+  "themeParts.fonts": "Betűtípus",
+  "themeParts.layouts": "Alkalmazások elrendezése",
+  "themeParts.layoutsHint": "Hogyan épülnek fel az olyan alkalmazások, mint a Fájlok. Az alkalmazások így is megtartják a saját szabályaikat.",
+  "skin.group.look": "Megjelenés és kijelzők",
+  "skin.group.connect": "Hálózat és eszközök",
+  "skin.group.input": "Nyelv, bevitel és alkalmazások",
+  "skin.group.system": "Rendszer és biztonság",
+  "skin.pick": "Válasszon kategóriát",
+  "style.organization": "Szervezet",
+  "style.email": "E-mail"
 }

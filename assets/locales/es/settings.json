@@ -1081,5 +1081,19 @@
   "style.removeTitle": "¿Eliminar «{name}»?",
   "style.removeDetail": "Podés volver a instalarlo desde su archivo.",
   "style.communityNoteInstalled": "LordOS no hizo este estilo de escritorio ni lo revisó. Funciona con límites: no puede abrir la Terminal, cambiar archivos, responder pedidos de permiso ni ver lo que escribís en las apps.",
-  "style.rescueHint": "Si se comporta mal, presioná Ctrl+Alt+Mayús+Retroceso para volver a Lord Flow."
+  "style.rescueHint": "Si se comporta mal, presioná Ctrl+Alt+Mayús+Retroceso para volver a Lord Flow.",
+  "themeParts.title": "De este estilo",
+  "themeParts.icons": "Iconos",
+  "themeParts.cursors": "Colores del puntero",
+  "themeParts.sounds": "Sonidos",
+  "themeParts.fonts": "Tipo de letra",
+  "themeParts.layouts": "Diseño de las apps",
+  "themeParts.layoutsHint": "Cómo se organizan apps como Archivos. Las apps mantienen sus propias reglas igual.",
+  "skin.group.look": "Apariencia y pantallas",
+  "skin.group.connect": "Red y dispositivos",
+  "skin.group.input": "Idioma, entrada y apps",
+  "skin.group.system": "Sistema y seguridad",
+  "skin.pick": "Elegí una categoría",
+  "style.organization": "Organización",
+  "style.email": "Correo electrónico"
 }

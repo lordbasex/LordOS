@@ -1007,5 +1007,8 @@
   "edit.saveAudio": "Enregistrer l'audio sous…",
   "edit.back": "Précédent",
   "edit.forward": "Suivant",
-  "edit.reload": "Actualiser"
+  "edit.reload": "Actualiser",
+  "theme.bluebell.name": "Bluebell",
+  "theme.bluebell.description": "Un hommage aux bureaux de 2001 : barres de titre bleues aux coins supérieurs arrondis, un bouton démarrer vert sur une barre des tâches bleue et Fichiers avec un volet de tâches.",
+  "bluebell.start": "Démarrer"
 }

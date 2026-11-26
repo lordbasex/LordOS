@@ -130,6 +130,9 @@ static const struct { const char *name; unsigned cap; int policy; } rules[] = {
     { "apps.launchPackage", 0, JST_ALLOW }, { "apps.packages", 0, JST_ALLOW }, { "apps.packagedStamp", 0, JST_ALLOW },
     { "keyboard.current", 0, JST_ALLOW }, { "keyboard.list", 0, JST_ALLOW },
     { "input.pointerAccent", 0, JST_ALLOW },
+    /* a style pack (sdk/appskins.jsx, docs/THEMES-GUIDE.md "Style packs"): data only, checked by lord-server: two pointer
+     * colours, tunes of plain notes, an installed font family by name; nothing is read from the theme */
+    { "input.pointerScheme", 0, JST_ALLOW }, { "sound.scheme", 0, JST_ALLOW }, { "fonts.useForTheme", 0, JST_ALLOW },
     /* the session: lock and the 60 s power confirmations the SDK draws (sdk/power.jsx) */
     { "session.lock", 0, JST_ALLOW }, { "quit", 0, JST_ALLOW }, { "session.managed", 0, JST_ALLOW }, { "session.onMonitor", 0, JST_ALLOW },
     { "session.status", 0, JST_ALLOW },

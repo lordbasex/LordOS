@@ -1074,5 +1074,19 @@
   "style.removeTitle": "“{name}”을(를) 제거할까요?",
   "style.removeDetail": "파일에서 다시 설치할 수 있습니다.",
   "style.communityNoteInstalled": "LordOS가 이 데스크톱 스타일을 만들거나 검토하지 않았습니다. 제한된 상태로 실행됩니다: 터미널을 열거나, 파일을 바꾸거나, 권한 요청에 답하거나, 앱에 입력하는 내용을 볼 수 없습니다.",
-  "style.rescueHint": "제대로 동작하지 않으면 Ctrl+Alt+Shift+Backspace를 눌러 Lord Flow로 돌아가세요."
+  "style.rescueHint": "제대로 동작하지 않으면 Ctrl+Alt+Shift+Backspace를 눌러 Lord Flow로 돌아가세요.",
+  "themeParts.title": "이 스타일에서",
+  "themeParts.icons": "아이콘",
+  "themeParts.cursors": "포인터 색상",
+  "themeParts.sounds": "소리",
+  "themeParts.fonts": "글꼴",
+  "themeParts.layouts": "앱 레이아웃",
+  "themeParts.layoutsHint": "파일 같은 앱의 배치 방식. 어느 쪽이든 앱은 자체 규칙을 지킵니다.",
+  "skin.group.look": "모양 및 디스플레이",
+  "skin.group.connect": "네트워크 및 장치",
+  "skin.group.input": "언어, 입력 및 앱",
+  "skin.group.system": "시스템 및 보안",
+  "skin.pick": "범주 선택",
+  "style.organization": "조직",
+  "style.email": "이메일"
 }

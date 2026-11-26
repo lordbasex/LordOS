@@ -54,6 +54,7 @@ its own layout (for example what the Super key alone does).
 | Lord Flow | `themes/default` | menu bar on top (with the app's menus), magnifying Dock, app launcher, Control Center |
 | Lord Classic | `themes/classic` | taskbar (bottom, top or a side), start menu with search, quick settings, notification panel, menus in each window, snapping and the SDK's Overview |
 | Lord Workspaces (since 0.8.9) | `themes/workspaces` | activities (desktops with an icon, a colour, pinned apps and a layout per display), a Context Spine, group frames with static tiling, its own Search panel and Control Center, menus in each window, three effects styles ([WORKSPACES.md](WORKSPACES.md)) |
+| Bluebell (in development after 0.8.9.6.1) | `themes/bluebell` | a tribute to the desktops of 2001: glossy blue title bars with rounded tops, a green start button on a blue taskbar with quick launch and a button per window; the demo of [style packs and app skins](#style-packs-and-app-skins): its own icons, pointers, sounds and font, and Files as that era's explorer |
 | Lord Celeste (community, since 0.8.9.5) | `themes/celeste` | a frame around each display with rounded inner corners, a bar on its thick side (running apps, status items, privacy indicators, clock), drawers that slide out of the frame's edges (dashboard, launcher, session, sidebar with the notifications), menus in each window, mirrored right to left; the theme options of `theme.json` and a node-tested geometry (`model.js`). Layout inspired by Caelestia (caelestia-dots/shell); no code from it |
 
 `themes/greeter` is the login and lock screen: it is a separate program, not a desktop theme (see
@@ -142,8 +143,11 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
   | `license` | an SPDX expression: `"MIT"`, `"GPL-3.0-or-later"`, `"MIT OR Apache-2.0"` (up to four terms joined by `OR`, `AND` or `WITH`) | the license; missing reads "Not stated" |
   | `version` | `1`, `1.2`, `1.2.3` or `1.2.3.4`, with an optional `-beta.1` or `+build` suffix | "Version 1.2.3" |
   | `minLordOS` | (0.8.9.6.2) the oldest LordOS release it runs on: `"0.8.9.6.2"` (two to six numbers, no suffix) | on an older release, "Needs LordOS 0.8.9.6.2" on the card and "Needs LordOS 0.8.9.6.2 or later" instead of Apply; `themes.use` refuses it with a notification |
+  | `email` (0.8.9.6.2) | the author's address, one `local@domain.tld`, at most 120 characters | an "Email" row on the theme's page, as text (never opened by itself) |
+  | `organization` (0.8.9.6.2) | plain text, one line, at most 60 characters, the same rules as `author` | an "Organization" row on the theme's page |
 
-  The official themes (no `community: true`) declare none of them: Settings shows LordOS as their author, MIT as
+  Bluebell declares its author, email and organization (it is official, so its license and version are LordOS's).
+  The other official themes (no `community: true`) declare none of them: Settings shows LordOS as their author, MIT as
   their license and the release's version as theirs. A community theme should declare all five:
 
   ```json
@@ -206,6 +210,13 @@ the accent and the title-bar button order through the settings portal (`publishT
   in the returned `order` (`'close'`, `'minimize'`, `'maximize'`, close always nearest the corner). Left
   and Right are the screen's sides in every language; Automatic follows the reading direction (#58).
 - `radius`: a general corner radius (default 8).
+- Richer tokens (0.8.9.6.2, part 4 of the community-themes plan; all plain JSON, `null` keeps LordOS's flat look):
+  `toolbarBg` (the apps' toolbars: a colour or a two-stop `linear-gradient`, the toolbar "texture"), `buttonBg` (neutral
+  buttons' fill), `bevel: { light, dark }` (neutral buttons drawn raised, an active toolbar button sunken) and
+  `stateBorders: { normal, hover, pressed, disabled, toolbar }` (the border of buttons and toolbar buttons per state;
+  `toolbar` is a toolbar button at rest). `Button`, `Toolbar` and `ToolbarButton` read them (`sdk/components.jsx`,
+  `sdk/controls.jsx`; `stateBorder` and `bevelStyle` in `sdk/theme.js`), so every app gets the look without a change.
+  The engine's gradients have two stops: a `linear-gradient` with more uses its first and last colours.
 
 `ThemeProvider` adds two tokens from the user's settings: `scrollBars` and `reduceMotion`. The
 user's choices that a theme turns into tokens itself are in `settings` (`sdk/settings.js`): `mode`,
@@ -464,7 +475,8 @@ Linux apps. A slow theme makes the whole desktop slow.
 
 `<Image src="assets/x.png">` is resolved against the theme's folder; `asset:wallpapers/…` against
 LordOS's `assets/`; an absolute path as is (`server/src/ui/js.c`). PNG and JPEG. Text uses the
-bundled Inter (400/500/600/700). The `.deb` packaging copies only `theme.json`, `theme.bundle.js`
+bundled Inter (400/500/600/700); a style pack can name an installed font for `fontFamily: 'theme'`
+([Style packs](#level-1-a-style-pack)). The `.deb` packaging copies only `theme.json`, `theme.bundle.js`
 and `assets/` of each theme (`tools/iso/mkdeb.sh`), so keep your files there.
 
 ### Translations
@@ -489,6 +501,226 @@ them as `locales/<lang>.json` in the theme and copies them there when it builds.
 24 for a choice, 160 for a hint and 240 for a description. Like every text of LordOS, a theme's are in all 35
 languages: `node tools/i18n-check.mjs` checks each `theme-<id>.json` like LordOS's own catalogs, and every label in
 `themes/*/theme.json` against English. No `.lpk` package may have an id that starts with `theme-`.
+## Style packs and app skins
+
+(In development after 0.8.9.6.1; part 4 of the community-themes plan, approved on 2026-11-26.) A theme draws the
+desktop and gives the apps their colours through tokens. Two more levels let it go further without touching an app's
+logic. Both are registered at module level, before `startShell`, and both are the person's to turn off: **Settings →
+Appearance → From this style** lists only the parts the style in use brings, each with its own switch
+(`settings.themeParts[part] === false`), so someone can keep a theme's frames and use LordOS's icons. The rules are in
+`sdk/appskinmodel.js` (node-tested by `server/tests/appskin_test.mjs`), the session side in `sdk/appskins.jsx`. Lord
+Bluebell (`themes/bluebell`) uses all of it.
+
+### Level 1: a style pack
+
+```jsx
+import { registerStylePack } from '@lordos/sdk';
+registerStylePack({
+  icons: {
+    apps: { files: FilesIcon },                     // app icons, by app id
+    files: { folder: Folder, text: Page, pdf: Pdf }, // file-type icons: 'folder' and the kinds of sdk/filekinds.js
+    toolbar: { back: Back, forward: Fwd, up: Up },   // toolbar icons, by our names (TOOLBAR_ICONS)
+  },
+  cursors: { fill: '#ffffff', outline: '#000000' },
+  sounds: { startup: [[392, 160], [523.25, 160], [783.99, 420]], notify: [[880, 90], [1174.66, 220]], error: [[220, 110]], emptyTrash: [[988, 60]] },
+  fonts: { family: 'DejaVu Sans' },
+});
+```
+
+| Part | What it is | Where it shows |
+|---|---|---|
+| `icons.apps` | a component `({ size }) => …` or an image the theme carries (`"assets/….png"` or `.svg`, never `..`, an absolute path or a URL), by app id | every native app's icon (`getApp(id).Icon`: the Dock, the taskbar, the launcher, the title bars) |
+| `icons.files` | the same, for `folder` and each kind: `text`, `code`, `pdf`, `archive`, `audio`, `video`, `image`, `doc`, `deb`, `lpk`, `other` | Files and the file dialog (`EntryIcon` in `sdk/fileglyphs.jsx`); thumbnails of pictures and videos stay |
+| `icons.toolbar` | the same, for our names: `back`, `forward`, `up`, `newFolder`, `search`, `views`, `icons`, `list`, `columns`, `gallery`, `sort`, `tags`, `refresh`, `terminal`, `more`, `go`, `copy`, `cut`, `paste`, `trash`, `info`, `sidebar` | a `ToolbarButton` with that `iconName` (Files' toolbar names all of its buttons) |
+| `cursors` | `fill` and `outline`, two `#rrggbb` colours | every pointer shape lord-server draws (`lord.input.pointerScheme`, `cursor_set_scheme` in `server/src/cursor.c`); the shapes and the shadow stay ours |
+| `sounds` | for `startup`, `notify`, `error`, `emptyTrash`: up to 8 notes `[Hz, ms]` (60–5000 Hz, or 0 for a rest; 10–1000 ms; 2.5 s in all) | synthesized by lord-server like LordOS's own sounds (`lord.sound.scheme`, `snd_set_scheme` in `server/src/sound/snd.c`): the default notification sound, errors, emptying the Trash, and the startup tune once per session (not again after a theme switch). A notification sound chosen per app in Settings stays that sound |
+| `fonts` | `family`: the name of a font installed on the system (LordOS's own folder or the system's font folders) | text styled `fontFamily: 'theme'`: `useThemeFont()` returns `'theme'` while the pack brings a font and the person keeps it, else nothing (Inter). The theme's frames and its skins use it; the apps' own text stays Inter |
+
+What a pack can't do, by design: a theme brings no audio file, no cursor image and no font file for lord-server to
+parse. Sounds are notes, pointers are two colours, and a font is one that is already installed (a Debian package, so its
+licence is a free one: Bluebell names DejaVu Sans of `fonts-dejavu-core`, which LordOS recommends). Anything the
+checks don't accept is dropped, and the rest of the pack still applies.
+
+### Level 2: app skins
+
+A native app names the regions a theme may draw (`APP_REGIONS` in `sdk/appskinmodel.js`) and keeps all its logic. A theme
+registers a component per region:
+
+```jsx
+import { registerAppSkins } from '@lordos/sdk';
+registerAppSkins({ files: { toolbar: MyToolbar, addressBar: MyAddress, sidebar: MyTaskPane, itemView: MyItems, statusBar: MyStatus, contextMenu: MyMenu } });
+```
+
+The app draws each region through `<SkinRegion app="files" region="toolbar" model={vm}>{its own}</SkinRegion>`: the
+theme's component gets `{ model }` and is drawn instead. **The rule that keeps it safe:** a skin only **asks** for
+actions through `model.actions`; the app does them with its own checks (`lord.fs`'s rules, the protected folders, the
+confirmations, the Trash instead of deleting). A skin never calls `lord.fs`, never opens a terminal and never gets one
+of the app's internal objects: the model is plain data, frozen, plus the app's actions as functions. It also has to
+work under the restricted theme API of part 2. A skin that throws is replaced by the app's own region for the rest of
+the session (logged once as `skin files.itemView failed, using the app's own`). Unknown apps, regions and anything that
+isn't a component are dropped when registered. App layouts off in Settings brings every app's own regions back at once.
+
+#### Files
+
+| Region | Where | Files' own | The skin's `model` |
+|---|---|---|---|
+| `toolbar` | the top row | Back, Forward, New Folder, the views, sort, tags, terminal, ⋯, search | the view model below |
+| `addressBar` | under the toolbar | none (Files' path bar is at the bottom) | the view model |
+| `sidebar` | the start side, resizable (Files keeps the width) | Favorites, Locations, Tags | the view model |
+| `itemView` | the content | icons, list, columns or gallery | the view model |
+| `statusBar` | the bottom | the path bar and the status line with the zoom | the view model |
+| `contextMenu` | over the window | Files' menu | `{ x, y, items, close, bounds }`: the items Files built (`{ label, onClick, hint, disabled, checked, danger, submenu, header, note, swatches }` or `'-'`); clicking one runs Files' action |
+
+The view model (`apps/files/skinmodel.js`, `filesViewModel`):
+
+- `location`: `{ type, path, title, crumbs: [{ label, folder, index }], readOnly, readOnlyText, writable }` (`type` is
+  `dir`, `recent`, `trash`, `network`, `apps`, `tag`, `search` or `archive`; `path` only for a folder);
+- `history`: `{ back, forward, up }`, booleans;
+- `view` (`icons`, `list`, `columns`, `gallery`), `views`, `sort: { by, desc }`, `zoom`, `query`;
+- `items`: `[{ key, name, label, dir, size, mtime, kind, ext, selected, cut, renaming }]`, fresh copies (`key` is what
+  the actions take);
+- `selection`: `{ count, keys, first }`; `renaming`: `{ key, value }` or null; `details`: the first selected item or the
+  folder shown (`{ name, kind, dir, size, mtime, count }`), for a "Details" box;
+- `places`: `[{ id, label, kind, selected }]` for `home`, `desktop`, `documents`, `downloads`, `pictures`, `music`,
+  `videos`, `computer`, `network`, `recent`, `trash` (those that exist here);
+- `status`: `{ text, message, job: { label, fraction } | null }`; `empty` (the text for an empty folder), `loading`,
+  `canPaste`;
+- `FileIcon`: a component `({ item, size })` that draws the item's own icon (a thumbnail, the pack's, or ours);
+- `actions`: `back()`, `forward()`, `up()`, `goPlace(id)`, `goCrumb(index)`, `goAddress(text)` (`~`, `~/…`, an absolute
+  path or one under the folder shown; false and a status message when there is no folder there), `open(key)`,
+  `openSelection()`, `select(key, { add, range })`, `selectAll()`, `clearSelection()`, `menu(key | null, event)` (Files'
+  context menu at the event's place), `newFolder()`, `rename(key?)`, `renameChange(text)`, `renameCommit()`,
+  `renameCancel()`, `copy()`, `cut()`, `paste()`, `trash()`, `duplicate()`, `info()`, `quickLook()`, `terminal()`,
+  `emptyTrash()`, `setView(view)`, `sortBy(by)`, `zoom(±1)`, `search(text)`, `newWindow()`. The object stays the same
+  across renders; each call runs what the current render offers, exactly as Files' own button would (a new folder in a
+  folder Files only browses shows Files' read-only notice; Move to Trash in a cloud folder asks first).
+
+#### The shared shapes, and the apps that use them
+
+Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one skin component can draw them all:
+
+- **A command bar** (`commandBar`): `{ title, commands: [{ id, label, disabled, active, group }], actions: { command(id) } }`.
+  The app lists only its own commands for the place shown; `command(id)` runs one only while it is on that list and not
+  disabled (`pickCommand`), exactly as the app's own button or menu item does.
+- **A list pane** (`listPane`): `{ title, items: [{ key, label, detail, selected, group }], actions: { select(key) } }`;
+  `select(key)` opens only a listed item (`pickItem`).
+- **A header** (`SkinHeader` in `sdk/appskins.jsx`), for an app that has no bar of its own: region `header`, a command
+  bar with the app's title (and its commands where the app gives them). Without a skin the app is drawn exactly as before,
+  with no wrapper; Machines and Databases give it to their main window only.
+
+| App | Regions (shape) | What stays the app's | Stub scene |
+|---|---|---|---|
+| Notes | `sidebar` (list pane with the search: titles and dates only), `toolbar` (command bar) | the note, its text and editor, every dialog | `notes_skin_scene.mjs` (14 checks) |
+| Calculator | `display` (`{ expression, result }`), `keypad` (`{ keys: [[{ id, label, kind }]], actions: { press(id) } }`, only a key of the keypad) | the arithmetic | `calculator_skin_scene.mjs` (9 checks) |
+| Photos | `sidebar` (list pane: All Photos, the folders, the cloud places), `toolbar` (command bar: smaller, larger, refresh) | the photos, the viewer, every edit and the Trash | `photos_skin_scene.mjs` (13 checks) |
+| Player | `sidebar` (list pane: the views), `toolbar` (command bar: the title, Back), `transport` (command bar: previous, play or pause, next, with `position` and `duration`; only while something plays) | the lists, the playing, the volume and the streams | `player_skin_scene.mjs` (12 checks) |
+| Monitor | `toolbar` (command bar: the tabs this computer has, the one shown `active`) | every tab's content and every action on a process | `monitor_skin_scene.mjs` (10 checks) |
+| Clock | `toolbar` (command bar: the four tabs, the one shown `active`, and Add where the tab has one) | the clocks, alarms, timer and stopwatch | `clock_skin_scene.mjs` (11 checks) |
+| Screenshots | `toolbar` (command bar: close, the five modes with the chosen one `active`, the color picker, text, and Capture or Record) | the capturing, the options menu, the files and the markup editor | `screenshots_skin_scene.mjs` (10 checks) |
+| Disks | `sidebar` (list pane: each disk and its partitions, grouped by disk) | the details, every disk action and the administrator prompt | `disks_skin_scene.mjs` (9 checks) |
+| About | `banner` (`{ version, build, code, codeNote, tagline, rows: [{ label, value }] }`; one action, `systemReport()`) | every number it reads and the rest of the window | `about_skin_scene.mjs` (8 checks) |
+| Help | `sidebar` (list pane with the search: the tour and the articles by section, or the search's results) | the articles and the tour | `help_skin_scene.mjs` (9 checks) |
+| Characters | `toolbar` (command bar: the emoji and symbols tabs), `sidebar` (list pane: the emoji groups or the symbol blocks) | the grid, the search, the skin tones and the copying | `characters_skin_scene.mjs` (12 checks) |
+| Fonts | `sidebar` (list pane with the search: the collections and the families) | the samples, installing and removing | `fonts_skin_scene.mjs` (9 checks) |
+| Logs | `sidebar` (list pane: the journal sources and the log files by group), `toolbar` (command bar: Live, Export) | the reading, the filters and the export's file dialog | `logs_skin_scene.mjs` (12 checks) |
+| System Information | `toolbar` (command bar: the six tabs and Refresh) | every tab's content, the checks, the benchmark and the report | `sysinfo_skin_scene.mjs` (9 checks) |
+| Backups | `toolbar` (command bar: the Snapshots and Settings tabs) | the backups, restoring and every setting | `backup_skin_scene.mjs` (9 checks) |
+| PDF Viewer | `toolbar` (command bar: the sidebar, zoom, rotate, the four tools, invert, print; disabled with no document; the page in the title) | the pages, the annotations, the search, the password and printing | `pdf_skin_scene.mjs` (10 checks) |
+| Force Quit | `list` (list pane of the running apps, plus `commands` with Force Quit, disabled until one is chosen, and `error`) | quitting (forceQuit, only an app on the list) | `forcequit_skin_scene.mjs` (9 checks) |
+| About App | `banner` (About's banner shape for one app: `name`, `version`, `code` (its kind), `codeNote`, `tagline`, `AppIcon`; no action) | the rest of the window | `appabout_skin_scene.mjs` (6 checks) |
+| Scanner | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `scanner_skin_scene.mjs` (8 checks) |
+| Voice Recorder | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `recorder_skin_scene.mjs` (8 checks) |
+| Camera | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `camera_skin_scene.mjs` (8 checks) |
+| LordOS Imager | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `imager_skin_scene.mjs` (8 checks) |
+| Install LordOS | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `installer_skin_scene.mjs` (8 checks) |
+| Databases | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything; only the main window gets the header (a machine's screen, a console are drawn as before) | `databases_skin_scene.mjs` (8 checks) |
+| Machines | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything; only the main window gets the header (a machine's screen, a console are drawn as before) | `machines_skin_scene.mjs` (8 checks) |
+| Cleaner | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `cleaner_skin_scene.mjs` (2 checks) |
+| LordOS Studio | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `studio_skin_scene.mjs` (8 checks) |
+| Remote Desk | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `remote-desk_skin_scene.mjs` (8 checks) |
+
+A region drawn in the SDK's floating layer (Screenshots' capture bar, a picture-in-picture window) is outside the theme's
+tree: `useTheme()` there gives the default tokens, so a skin for it makes its own (Bluebell calls its `makeTheme`).
+
+`server/tests/app_skin_helpers.js` gives each scene the common checks (the stubs drawn, the model frozen, a command not on
+the list refused, layouts off, no React errors); `server/tests/bluebell_apps_scene` screenshots Bluebell's skin of each
+(`tests/app_scene_headless.sh bluebell_apps_scene OUT bluebell en light|dark`).
+
+**Isolated apps can't be skinned this way.** Mail, Calendar, Contacts, Passwords and Reminders run as their own processes
+(`"process": "isolated"`), where the theme's code never runs: they receive the tokens (richer ones included, as JSON
+through the broker), never a pack's components or a skin. Skinning them would need a declarative, data-only form of
+skins, which is not built.
+
+What a skin doesn't get in Files: drag and drop (Files' own item view keeps it), tabs, the search scope bar, the
+read-only banner and Files' sheets (Get Info, Quick Preview, Connect to Server, the confirmations), which stay Files'
+own over any skin. `server/tests/files_skin_scene.mjs` runs Files with every region replaced by a minimal stub
+(`node tests/menubar_test.mjs files_skin_scene.mjs`, in `make test`): the stubs get the model, the actions go through
+Files (`lord.fs.trash`, no `mkdir` in a read-only folder), a throwing stub gives the region back and layouts off brings
+Files' own regions. `server/tests/bluebell_scene` screenshots Bluebell's skins
+(`tests/app_scene_headless.sh bluebell_scene OUT bluebell en light|dark`).
+
+#### Settings
+
+| Region | Where | Settings' own | The skin's `model` |
+|---|---|---|---|
+| `sidebar` | the start side | the search field, the user card and the sections in four groups | the view model below |
+| `home` | the content, before a section is open | none: Settings opens on the last section | the view model; with a `home` skin Settings opens on it unless another app asked for a section |
+
+The view model (`apps/settings/skinmodel.js`, `settingsViewModel`): `section` (the open section's id, or null on the home
+page), `title`, `query`, `groups: [{ id, label, sections: [{ id, label, color, glyph, selected }] }]` (the groups are
+`look`, `connect`, `input` and `system`, named by `settings.skin.group.*`; only the sections this computer shows and the
+search keeps), `user: { name, admin }`, `SectionIcon` (a component `({ color, glyph, size })`, the section's own badge)
+and `actions`: `open(id)` (only a section Settings shows here), `home()`, `search(text)` and `users()`. Each section's
+page is always Settings' own, drawn by Settings with its own title bar: a skin chooses where to go, never what a page
+does. `server/tests/settings_skin_scene.mjs` runs Settings with both regions stubbed (in `make test`).
+
+#### Terminal
+
+| Region | Where | The Terminal's own | The skin's `model` |
+|---|---|---|---|
+| `tabBar` | the top | the tabs and + | the view model below |
+| `statusBar` | the bottom, only while the profile shows one | the folder, the program, Claude Code's segments, the size, the clock | the view model |
+| `contextMenu` | over the window | the Terminal's menu | `{ x, y, items, close, bounds }`, as in Files |
+
+The view model (`apps/terminal/skinmodel.js`, `terminalViewModel`): `tabs: [{ key, title, color, active, busy, bell,
+index }]`, `status: { cwd, process, busy, shell, cols, rows }` (the session in front, read when the Terminal draws; null
+without one), `broadcast`, `commands: [{ id, label }]` and `actions`: `selectTab(key)`, `closeTab(key)` (the Terminal
+still asks before closing a busy tab), `tabMenu(key, event)` (the Terminal's own tab menu) and `command(id)`, which runs
+only one of `SKIN_COMMANDS` (`newTab`, `newWindow`, `copy`, `paste`, `find`, `splitRight`, `splitDown`, `selectAll`,
+`clearBuffer`, `preferences`, `closePane`) exactly as its menu item does. **The panes are never a skin's**, and no action
+writes to a session or reads its text. `server/tests/terminal_skin_scene.mjs` runs the Terminal with every region stubbed
+and checks that nothing a skin does reaches a session (in `make test`).
+
+#### Text Editor
+
+| Region | Where | The Text Editor's own | The skin's `model` |
+|---|---|---|---|
+| `toolbar` | above the tabs | none | the view model below |
+| `tabBar` | the top of the text | the open files' tabs | the view model |
+| `statusBar` | the bottom | line and column, cursors, selection, a message, language, indent, line ends | the view model |
+| `contextMenu` | over the text | the clipboard and Speech | `{ x, y, items, close, bounds }`, as in Files |
+
+The view model (`apps/editor/skinmodel.js`, `editorViewModel`): `tabs: [{ key, name, dirty, active, index }]`,
+`status: { line, col, cursors, selected, language, indent, eol, message: { text, ok } | null }`, `commands: [{ id,
+label }]` and `actions`: `selectTab(key)`, `closeTab(key)` (a tab with unsaved changes still asks), `menu(event)` (the
+editor's own menu at the event's place) and `command(id)`, which runs only one of `SKIN_COMMANDS` (`new`, `open`,
+`openFolder`, `save`, `saveAs`, `close`, `print`, `undo`, `redo`, `cut`, `copy`, `paste`, `selectAll`, `find`, `findNext`,
+`gotoLine`, `gotoFile`, `language`, `toggleProject`) as its menu item does. **The text is never a skin's:** the model
+carries no document text, and the project tree, the find bar and every dialog stay the editor's.
+`server/tests/editor_skin_scene.mjs` runs it with every region stubbed (in `make test`).
+
+#### Store
+
+| Region | Where | The Store's own | The skin's `model` |
+|---|---|---|---|
+| `sidebar` | the start side | the pages in three groups (the Store, the origins, the picks) and the package status | the view model below |
+| `toolbar` | the top of the page | Back, the title, refresh and the search | the view model |
+
+The view model (`apps/store/skinmodel.js`, `storeViewModel`): `pages: [{ id, label, count, group, soon, selected }]`
+(`group` is `store`, `origin` or `picks`; `soon` marks an origin that isn't there yet), `page`, `title`, `inApp` (an
+app's page is open), `query`, `searchHint`, `refresh: { title, busy } | null` and `actions`: `go(id)` (only a listed page
+that isn't `soon`), `back()`, `search(text)` and `refresh()`. Every page, card, install, update and removal stays the
+Store's, with its confirmations and the administrator prompt. `server/tests/store_skin_scene.mjs` (in `make test`).
 
 ## 3. Building it
 

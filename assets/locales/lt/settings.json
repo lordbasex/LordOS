@@ -1088,5 +1088,19 @@
   "style.removeTitle": "Pašalinti „{name}“?",
   "style.removeDetail": "Galėsite ją vėl įdiegti iš jos failo.",
   "style.communityNoteInstalled": "LordOS nesukūrė ir neperžiūrėjo šio darbalaukio stiliaus. Jis veikia su apribojimais: negali atidaryti Terminalo, keisti failų, atsakyti į leidimų užklausas ar matyti, ką rašote programose.",
-  "style.rescueHint": "Jei jis veikia netinkamai, paspauskite Ctrl+Alt+Shift+Backspace ir grįšite į Lord Flow."
+  "style.rescueHint": "Jei jis veikia netinkamai, paspauskite Ctrl+Alt+Shift+Backspace ir grįšite į Lord Flow.",
+  "themeParts.title": "Iš šio stiliaus",
+  "themeParts.icons": "Piktogramos",
+  "themeParts.cursors": "Žymeklio spalvos",
+  "themeParts.sounds": "Garsai",
+  "themeParts.fonts": "Šriftas",
+  "themeParts.layouts": "Programų išdėstymas",
+  "themeParts.layoutsHint": "Kaip išdėstytos tokios programos kaip Failai. Programos bet kuriuo atveju laikosi savo taisyklių.",
+  "skin.group.look": "Išvaizda ir ekranai",
+  "skin.group.connect": "Tinklas ir įrenginiai",
+  "skin.group.input": "Kalba, įvestis ir programos",
+  "skin.group.system": "Sistema ir sauga",
+  "skin.pick": "Pasirinkite kategoriją",
+  "style.organization": "Organizacija",
+  "style.email": "El. paštas"
 }

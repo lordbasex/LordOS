@@ -4,7 +4,7 @@
 // opened with args.machine is a machine's window, args.configure its Configure window, args.logs its logs, args.guestWin
 // one window of a guest in apps mode (appsmode.jsx), args.settings Machines settings (settingswin.jsx).
 import { useEffect } from 'react';
-import { useAppWindow, addListener, wm, t as tr, registerDockActions, registerDockActivate, registerWindowMenuItems, registerOpenProviders, registerBundle } from '@lordos/sdk';
+import { useAppWindow, addListener, wm, t as tr, registerDockActions, registerDockActivate, registerWindowMenuItems, registerOpenProviders, registerBundle, SkinHeader, appName, getApp } from '@lordos/sdk';
 import { Library, AppMark, openInMachine, openMachine } from './library.jsx';
 import { startGuestLauncher } from './guestlaunch.js';
 import { openMachines, windowsNeedsTools } from './openwith.js';
@@ -78,7 +78,15 @@ startAppsStatus();
 
 export const isLibraryKey = (e) => !!e && !!e.meta && !e.ctrl && !e.alt && (e.base || e.key) === '0';
 
+// (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): a header a theme may add above the app
+// only the main window gets the header (a machine's screen, a console or a sheet window is drawn as before)
 export default function App() {
+  const { args } = useAppWindow();
+  if (args && Object.keys(args).some((k) => k !== 'nonce')) return <MachinesMain />;
+  return <SkinHeader app="machines" title={appName(getApp('machines'))}><MachinesMain /></SkinHeader>;
+}
+
+function MachinesMain() {
   const { args, focused } = useAppWindow();
   useEffect(() => (focused && args && Object.keys(args).length ? addListener('keydown', (e) => { if (isLibraryKey(e)) { e.preventDefault?.(); openLibrary(); } }) : undefined), [focused]);
   // a machine renamed with its folder (6.26): its windows follow it there, by its id

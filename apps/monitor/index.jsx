@@ -6,7 +6,7 @@
 import {
   View, Text, Image, ScrollView, Segmented, Toolbar, typeScale, useTheme, useLocale, useStore, useSettings, useAppWindow,
   useMonitor, monitor, monitorSamples, monitorProcesses, formatBytes, formatNumber, LordOSLogo, iconFromFile, getApp, appName,
-  Dropdown, useNarrow, useBattery, useDevices, useWindowWidth, useWindowHeight,
+  Dropdown, useNarrow, useBattery, useDevices, useWindowWidth, useWindowHeight, SkinRegion, useSkinned, commandBar, pickCommand,
 } from '@lordos/sdk';
 import { registerDockActions } from '@lordos/sdk';
 import * as sdk from '@lordos/sdk';
@@ -503,11 +503,17 @@ export default function Monitor() {
     ...(hasBattery ? [['battery', tr('monitor.tab.battery')]] : []),
     ...(hasDevices ? [['devices', tr('monitor.tab.devices')]] : []),
   ];
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the tabs as a command bar; every tab's
+  // content, and every action on a process, stay Monitor's
+  const skinned = useSkinned('monitor');
+  const bar = skinned ? commandBar({ title: tr('monitor.title'), commands: tabs.map(([id, label]) => ({ id, label, active: id === view, group: 'tabs' })) }) : null;
+  const vm = bar ? { app: 'monitor', ...bar, actions: { command: (id) => { const c = pickCommand(bar, id); if (c) setTab(c); } } } : null;
   if (!monitor.available()) {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 13, color: t.textDim }}>{tr('monitor.unavailable')}</Text></View>;
   }
   return (
     <View style={{ flex: 1 }}>
+      <SkinRegion app="monitor" region="toolbar" model={vm}>
       {narrow ? (
         <Toolbar style={{ paddingHorizontal: 12 }}>
           <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.body, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{tr('monitor.title')}</Text>
@@ -522,6 +528,7 @@ export default function Monitor() {
           <View style={{ width: 110 }} />
         </Toolbar>
       )}
+      </SkinRegion>
       {!ready ? (
         <View style={{ flex: 1, padding: 20 }}><Text style={{ fontSize: 13, color: t.textDim }}>{tr('monitor.waiting')}</Text></View>
       ) : view === 'network' ? (
