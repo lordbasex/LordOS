@@ -318,6 +318,12 @@ build/toolkitenv-test: tests/toolkitenv_test.c src/wl/toolkitenv.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/toolkitenv_test.c
 	./$@ || { rm -f $@; exit 1; }
+# XSETTINGS for GTK 3 on X11: the property the X window manager serves (src/wl/xsettings.h, docs/TOOLKIT-AUDIT.md)
+test: build/xsettings-test
+build/xsettings-test: tests/xsettings_test.c src/wl/xsettings.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -fsanitize=address,undefined -o $@ tests/xsettings_test.c
+	./$@ || { rm -f $@; exit 1; }
 test: build/ptrlock-test
 build/ptrlock-test: tests/ptrlock_test.c src/wl/ptrlock.h src/testbench/lockkey.h
 	@mkdir -p build
