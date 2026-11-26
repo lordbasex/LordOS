@@ -125,9 +125,11 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
   for the person) and the theme-trust sheet.
 - **the person's own answers**: every destructive confirmation (`ConfirmDialog` is `handsDeny` when `destructive`:
   deleting files for good, emptying the Trash, removing machines, packages, web apps and themes…), the theme-trust
-  dialog, signing out (`logOut` refuses an agent's click or key) and the power dialog (an agent's input never confirms
-  it; its countdown cancels instead), and whole pages: the Store (installing and removing software, Flatpak), Settings →
-  Privacy (permission grants), Users, Web apps, Flatpak, Updates, Session and Firewall. While a dialog that owns the
+  dialog, Machines' automation permission, encryption choice and recovery key, signing out (`logOut` refuses an agent's
+  click or key) and the power dialog (an agent's input never confirms it; its countdown cancels instead), and, listed in
+  one place (`sdk/handsdeny.js`, checked by `tests/hands_deny_test.mjs` so a dead key fails), whole Settings pages
+  (Network with its Wi-Fi and VPN credentials, Sharing, Cloud, Privacy with the firewall and its rules, Users, Web apps,
+  Flatpak, Updates, Session) and whole apps (Store, Passwords, Backups, Disks, Imager, the installer, Remote Desktop). While a dialog that owns the
   keyboard (`dialogStack`'s top, whose root `ConfirmDialog` and the power dialog record) is `handsDeny`, protected or
   in the system band, or its root isn't known, **every** agent key is refused: "a protected dialog is open"
   (`protected-dialog`), checked in the shell and again in C on the dialog's root.

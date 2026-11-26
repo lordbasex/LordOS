@@ -646,7 +646,8 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
           </View>
         </View>
       ) : null}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
+      {/* handsDeny: whether a machine is encrypted is the person's own choice (docs/HANDS.md) */}
+      <View handsDeny style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
         <Toggle on={encrypt} onChange={setEncrypt} />
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.as.encrypt')}</Text>

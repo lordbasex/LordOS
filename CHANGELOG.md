@@ -34,8 +34,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Never**: the system layer (permission, keyring, password and polkit prompts, the file chooser of Linux apps, the
     banner), password fields (typing or reading), protected windows, the lock screen and the greeter, Settings → AI →
     Hands and the theme-trust sheet (`handsDeny`), and the person's own answers: every destructive confirmation, signing
-    out, the power dialog (its countdown cancels when an agent opened it), the Store, Settings → Privacy, Users, Web
-    apps, Flatpak, Updates, Session and Firewall; no key at all while a protected dialog has the keyboard. Screenshots
+    out, the power dialog (its countdown cancels when an agent opened it), Machines' automation permission, encryption
+    choice and recovery key, and the pages and apps listed in `sdk/handsdeny.js` (Settings → Network, Sharing, Cloud,
+    Privacy with the firewall, Users, Web apps, Flatpak, Updates, Session; Store, Passwords, Backups, Disks, Imager,
+    the installer, Remote Desktop); no key at all while a protected dialog has the keyboard. Screenshots
     show them black, failing closed; with an allowlist, everything but the allowed windows is black.
   - **QA mode**: `lordos-mcp --headless APP` starts a private headless desktop (`lord-server --headless --hands-qa`, a
     private bus, a demo home with sample files) so an agent can test an app while the person keeps working.

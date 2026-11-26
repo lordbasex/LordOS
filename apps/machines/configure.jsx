@@ -755,7 +755,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       <Row label={tr('machines.cfg.automation')} note={[tr('machines.cfg.automationNote'), offNote].filter(Boolean).join(' ')}>
         <Off off={running || !cur.agent}><Toggle on={!!cur.automation} onChange={(x) => (x ? setAskAuto(true) : set({ automation: false }))} /></Off>
       </Row>
-      {askAuto ? <ConfirmDialog title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
+      {askAuto ? <ConfirmDialog handsDeny title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
         cancelLabel={tr('machines.cancel')} onOk={() => { setAskAuto(false); set({ automation: true }); }} onCancel={() => setAskAuto(false)} /> : null}
       {/* the LordOS tools brought up to date by themselves (model.js toolsAutoStep): app.json, at once, also while it runs */}
       <Row label={tr('machines.cfg.toolsAuto')} last note={tr('machines.cfg.toolsAutoNote')}>
@@ -823,7 +823,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   </>;
   else if (sec === 'security') pane = <><GuestCanSee rows={guestChannels(cur, m, { running, agentState: m.agentState })} running={running} cur={cur}
     onSet={(id, on) => (id === 'automation' && on ? setAskAuto(true) : set(channelSet(id, on, cur)))} onShow={setSec} />
-  {askAuto ? <ConfirmDialog title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
+  {askAuto ? <ConfirmDialog handsDeny title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
     cancelLabel={tr('machines.cancel')} onOk={() => { setAskAuto(false); set({ automation: true }); }} onCancel={() => setAskAuto(false)} /> : null}
   <Group>
     {/* encrypted machines (8): whole (disks, UEFI variables, TPM, snapshots' memory), the key in Passwords; host swap */}

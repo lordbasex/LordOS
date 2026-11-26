@@ -26,7 +26,8 @@ export function RecoveryKeyWindow({ id, name }) {
     wm.close(winId, true);
   };
   return (
-    <View style={{ flex: 1, padding: 22, gap: 12, backgroundColor: p.bg }}>
+    // handsDeny: a machine's recovery key is never an AI agent's to read (docs/HANDS.md)
+    <View handsDeny style={{ flex: 1, padding: 22, gap: 12, backgroundColor: p.bg }}>
       <Text style={{ fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.key.recoveryTitle', { name })}</Text>
       <Text style={{ fontSize: 13, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.key.recoveryText', { name })}</Text>
       <TextInput secure value={text} onChange={(x) => { setText(x); setBad(false); }} onSubmit={submit} placeholder={tr('machines.key.recoveryPlaceholder')} />

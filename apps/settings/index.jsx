@@ -2,6 +2,7 @@
 // icons, and the open page under a title bar) plus the appearance, language and region,
 // keyboard, themes and session pages. The other pages are in their own files; all of them are built
 // from ./ui.jsx (docs/DESIGN.md, "Settings"); the wallpaper page is ./WallpaperGallery.jsx.
+import { settingsPageDenied } from '../../sdk/handsdeny.js';
 import { BatterySettings } from './Battery.jsx';
 import {
   View, Text, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
@@ -587,9 +588,8 @@ const GROUPS = [
   [['battery', BatterySettings, '#30d158', '▮'], ['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['gpus', GpusSettings, '#5e5ce6', GpuGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
 ];
 const SECTIONS = GROUPS.flat();
-// Pages whose every answer is the person's own (docs/HANDS.md "Never"): permissions, accounts and passwords, installing
-// and removing software and web apps, updates, the session. An AI agent never reads, clicks or types in them (handsDeny).
-const PERSON_ONLY = new Set(['privacy', 'users', 'webapps', 'flatpak', 'updates', 'session', 'firewall']);
+// Pages whose every answer is the person's own (docs/HANDS.md "Never"; the list is sdk/handsdeny.js): an AI agent never
+// reads, clicks or types in them (handsDeny).
 // Board firmware
 // only on a BCM2712 board (Raspberry Pi 5, 500, CM5: lord.system.info().board)
 const isPi5 = () => { try { return lord.system.info().board === 'pi5'; } catch (e) { return false; } };
@@ -722,7 +722,7 @@ export default function Settings() {
         <ScrollView resetKey={placeOf(section, sub)} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: pad, paddingTop: side.narrow ? spacing.l : spacing.xl, alignItems: 'center' }}>
             {/* Cloud's account page has two columns, Wallpaper and AI are galleries: they take a wider column on wide windows */}
-            <View handsDeny={PERSON_ONLY.has(section)} style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : section === 'wallpaper' || section === 'ai' ? 1180 : 680 }}>
+            <View handsDeny={settingsPageDenied(section)} style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : section === 'wallpaper' || section === 'ai' ? 1180 : 680 }}>
               <Body page={section === 'network' || section === 'cloud' || section === 'ai' ? args?.page : undefined}
                 alert={section === 'ai' ? args?.alert : undefined} />
             </View>

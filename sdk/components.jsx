@@ -17,6 +17,7 @@ import { revealAfter, eyeShown, maskedText, eyeLabel, capsAfter, capsHint, capsF
 import { Layer, Overlay, shellLayers } from './layers.js';
 import { ContextMenu } from './contextmenu.jsx';
 import { dialogStack } from './dialogkeys.js';
+import { appDenied } from './handsdeny.js';
 import { stat as fsStat, isRemote as fsIsRemote } from './fs.js';
 import { dropSorter, dropCount } from './filedrop.js';
 import { setTextFocusBridge, useFocusArea, focusRingColor } from './focus.js';
@@ -1454,7 +1455,8 @@ export const AppHost = memo(function AppHost({ id, focused: asked }) {
   return (
     <AppWindowContext.Provider value={value}>
       <AppFocusContext.Provider value={!!focused}>
-        <View ref={area} protected={prot} style={{ flex: 1, alignSelf: 'stretch' }}>
+        {/* handsDeny: an app whose every answer is the person's own (sdk/handsdeny.js, docs/HANDS.md) */}
+        <View ref={area} protected={prot} handsDeny={appDenied(app.id)} style={{ flex: 1, alignSelf: 'stretch' }}>
           {body}
           <View ref={setOverlayHost} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }} />
         </View>
