@@ -26,14 +26,17 @@
     ['player', {}, (sdk) => sdk.t('player.nav.songs')],
     ['monitor', {}, (sdk) => sdk.t('monitor.tab.overview')],
     ['clock', {}, (sdk) => sdk.t('clock.tab.stopwatch')],
+    ['screenshots', { shortcut: 'capture.panel' }, (sdk) => sdk.t('screenshots.capture')],
   ];
   (async () => {
     await sleep(2500);
     for (const [app, args, text] of APPS) {
-      const id = sdk.wm.open(app, { new: true, args: args || {} });
+      // an app shown its own way (Screenshots' capture bar) is opened by its shortcut and keeps its own frame
+      const own = args && args.shortcut;
+      const id = own ? (sdk.runShortcut(args.shortcut), null) : sdk.wm.open(app, { new: true, args: args || {} });
       await sleep(2800);
       const w = (sdk.windows.get() || []).find((x) => x.app === app);
-      if (w) sdk.wm.setFrame?.(w.id, { x: 120, y: 40, w: 900, h: 600 });
+      if (w && !own) sdk.wm.setFrame?.(w.id, { x: 120, y: 40, w: 900, h: 600 });
       await sleep(1500);
       const texts = shownTexts();
       step(`${app}: its skin is drawn`, texts.includes(typeof text === 'function' ? text(sdk) : text));

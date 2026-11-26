@@ -18,4 +18,6 @@
   const demo = () => ({ ...real(), user: 'demo', fullName: 'Alex Demo', hostname: 'demo-pc' });
   try { sys.info = demo; } catch (e) { /* below */ }
   if (sys.info !== demo) { try { Object.defineProperty(sys, 'info', { value: demo, configurable: true, writable: true }); } catch (e) { /* stays real */ } }
+  // the time zone says where someone lives: the Clock shows a neutral one
+  try { if (lord.time) lord.time.zone = () => 'Etc/UTC'; } catch (e) { /* stays real */ }
 })();

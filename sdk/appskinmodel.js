@@ -22,6 +22,7 @@ export const APP_REGIONS = {
   player: ['sidebar', 'toolbar', 'transport'],
   monitor: ['toolbar'],
   clock: ['toolbar'],
+  screenshots: ['toolbar'],
 };
 
 // The parts of a style a person can turn off one by one.

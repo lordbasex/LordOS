@@ -599,7 +599,11 @@ Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one ski
 | Player | `sidebar` (list pane: the views), `toolbar` (command bar: the title, Back), `transport` (command bar: previous, play or pause, next, with `position` and `duration`; only while something plays) | the lists, the playing, the volume and the streams | `player_skin_scene.mjs` (12 checks) |
 | Monitor | `toolbar` (command bar: the tabs this computer has, the one shown `active`) | every tab's content and every action on a process | `monitor_skin_scene.mjs` (10 checks) |
 | Clock | `toolbar` (command bar: the four tabs, the one shown `active`, and Add where the tab has one) | the clocks, alarms, timer and stopwatch | `clock_skin_scene.mjs` (11 checks) |
+| Screenshots | `toolbar` (command bar: close, the five modes with the chosen one `active`, the color picker, text, and Capture or Record) | the capturing, the options menu, the files and the markup editor | `screenshots_skin_scene.mjs` (10 checks) |
 <!-- shared-shape apps -->
+
+A region drawn in the SDK's floating layer (Screenshots' capture bar, a picture-in-picture window) is outside the theme's
+tree: `useTheme()` there gives the default tokens, so a skin for it makes its own (Bluebell calls its `makeTheme`).
 
 `server/tests/app_skin_helpers.js` gives each scene the common checks (the stubs drawn, the model frozen, a command not on
 the list refused, layouts off, no React errors); `server/tests/bluebell_apps_scene` screenshots Bluebell's skin of each

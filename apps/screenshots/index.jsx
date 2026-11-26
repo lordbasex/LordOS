@@ -15,7 +15,7 @@ import {
   View, Text, Image, MediaView, FilePicker, clipboard,
   useAppWindow, useStore, useWindows, wm, windows, getApp,
   t as tr, media, userDirs, fs, addListener, addShortcuts, createStore, windowTitle, settings, notify, microphones, soundState, toast, errorText, dndActive, appNotifyPrefs, direction,
-  workAreaOf, screenDisplays,
+  workAreaOf, screenDisplays, SkinRegion, useSkinned, commandBar, pickCommand, useSettings,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import {
@@ -25,6 +25,7 @@ import {
 import { ocrLangs, cleanText } from './ocr.js';
 import { Editor } from './editor.jsx';
 import { APP, recording, recent, bar, options, setOptions, addRecent } from './state.js';
+import { isRecordMode } from './toolbarmodel.js';
 import { saveDirFor, barStops, stepStop, keepRect, restoreRect, hitHandle, adjustRect, handlePoints, printKeyLabel, refusal } from './toolbarmodel.js';
 import { Toolbar, barFrame, menuRows, selectable } from './toolbar.jsx';
 
@@ -644,5 +645,25 @@ export default function Screenshots() {
   if (inst === 'rec') return <RecBadge />;
   if (inst === 'folder') return <FolderWindow />;
   if (inst.startsWith('edit') && (a.handle || a.path)) return <MarkupWindow handle={a.handle} path={a.path} />;
-  return <Toolbar actions={barActions} />;
+  return <SkinnedBar />;
+}
+
+// (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the capture bar as a command bar (close,
+// the five modes, the color picker, text, and Capture or Record). The capturing, the options menu and the files stay
+// Screenshots'.
+const MODE_TIP = { full: 'screenshots.tip.full', window: 'screenshots.tip.window', area: 'screenshots.tip.area',
+  recordFull: 'screenshots.tip.recordFull', recordArea: 'screenshots.tip.recordArea' };
+function SkinnedBar() {
+  const skinned = useSkinned(APP);
+  useSettings();
+  const o = opts();
+  const bar = skinned ? commandBar({ commands: [
+    { id: 'close', label: tr('screenshots.bar.close'), group: 'close' },
+    ...Object.keys(MODE_TIP).map((id) => ({ id, label: tr(MODE_TIP[id]), active: o.mode === id, group: isRecordMode(id) ? 'record' : 'capture' })),
+    { id: 'color', label: tr('screenshots.tip.color'), group: 'tools' }, { id: 'text', label: tr('screenshots.tip.text'), group: 'tools' },
+    { id: 'primary', label: tr(isRecordMode(o.mode) ? 'screenshots.record' : 'screenshots.capture'), group: 'go' },
+  ] }) : null;
+  const run = (c) => { if (MODE_TIP[c]) setOptions({ mode: c }); else barActions[c](); };
+  const vm = bar ? { app: APP, ...bar, actions: { command: (id) => { const c = pickCommand(bar, id); if (c) run(c); } } } : null;
+  return <SkinRegion app={APP} region="toolbar" model={vm}><Toolbar actions={barActions} /></SkinRegion>;
 }

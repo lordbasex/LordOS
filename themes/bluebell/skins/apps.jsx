@@ -1,7 +1,8 @@
 // skins/apps.jsx — Bluebell's skins for the apps whose regions take the shared shapes (a command bar, a list pane;
 // docs/THEMES-GUIDE.md "App skins → the shared shapes"): each region is drawn by skins/common.jsx. Apps with their own
 // shapes have their own file (files, settings, terminal, editor, store).
-import { View, Text, TextInput, useTheme, useThemeFont } from '@lordos/sdk';
+import { View, Text, TextInput, useTheme, useThemeFont, useSettings } from '@lordos/sdk';
+import { makeTheme } from '../tokens.js';
 import { useState } from 'react';
 import { CommandBar, ListPane } from './common.jsx';
 
@@ -92,7 +93,32 @@ function TabStrip({ model }) {
   );
 }
 
+// ---- Screenshots: the capture bar as a compact blue bar of small square buttons and a green Capture button ----
+const SHOT_GLYPH = { close: '✕', full: '▭', window: '❐', area: '⬚', recordFull: '●', recordArea: '◍', color: '◉', text: 'T' };
+function ShotBar({ model }) {
+  // the capture bar floats outside the theme's tree (the SDK's floating layer): Bluebell's tokens are made here
+  const [st] = useSettings();
+  const t = makeTheme(st);
+  const font = useThemeFont();
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, borderRadius: 6, background: t.barBg, border: `1px solid ${t.frameEdge}`, direction: 'ltr' }}>
+      {model.commands.map((c) => (c.id === 'primary' ? (
+        <View key={c.id} onClick={() => model.actions.command(c.id)} style={{ height: 30, marginStart: 6, paddingHorizontal: 12, borderRadius: 4, justifyContent: 'center', background: t.startBg, border: '1px solid rgba(255,255,255,0.7)' }}>
+          <Text style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', ...(font ? { fontFamily: font } : null) }}>{c.label}</Text>
+        </View>
+      ) : (
+        <View key={c.id} onClick={() => model.actions.command(c.id)} accessibilityLabel={c.label}
+          style={{ width: 30, height: 30, borderRadius: 4, alignItems: 'center', justifyContent: 'center', border: `1px solid ${c.active ? '#ffffff' : 'rgba(255,255,255,0.3)'}`,
+            background: c.active ? 'linear-gradient(180deg, #8ec5ff, #2f63d8)' : 'rgba(255,255,255,0.08)' }}>
+          <Text style={{ fontSize: 14, color: c.group === 'record' ? '#ff9b8a' : '#ffffff' }}>{SHOT_GLYPH[c.id] || '•'}</Text>
+        </View>
+      )))}
+    </View>
+  );
+}
+
 export const appSkins = {
+  screenshots: { toolbar: ShotBar },
   clock: { toolbar: CommandBar },
   monitor: { toolbar: TabStrip },
   player: { sidebar: ListPane, toolbar: CommandBar, transport: Transport },
