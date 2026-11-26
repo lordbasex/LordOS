@@ -280,6 +280,11 @@ sentence, keeping 50 ms.
 
 ## Settings → AI → Voice
 
+(0.8.9.6.2) The Voice page is now the **Voice capability** of the AI store ([AI.md](AI.md)): the store shows one card
+per language (its standard model and own voice: install standard or HD, remove, listen to the recorded sample, try),
+and the capability's page ("‹ Artificial intelligence › Voice") holds everything below, the models and voices as cards
+with a sheet each. Nothing was taken away.
+
 `apps/settings/AI.jsx`: Read aloud, ❖Esc, the player, Live Speech, Process with (Automatic / Processor / Graphics card)
 and Quality (Automatic: HD when installed / Standard / HD), then per language the two models (Download with a progress
 bar, Remove) and the voices: ▶ plays the recorded sample, Download, Try (reads the language's sample sentence), Use,

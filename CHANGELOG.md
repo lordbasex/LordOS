@@ -12,7 +12,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 - **A machine's apps no longer mix with this computer's in the app launcher unless you turn it on** (the maintainer's
-  decision while testing 0.8.9.6.2: a Windows machine that was off filled the launcher with its apps). Since 0.8.9.6 a
+  decision while testing 0.8.9.6.2: a machine that was off filled the launcher with its apps). Since 0.8.9.6 a
   machine that had listed its apps in apps mode put them in the launcher and search while off, marked with its name.
   That is now off unless Machines → Configure → "Its apps in the launcher" is turned on for that machine
   (`showsGuestApps` in `sdk/guestappsmodel.js`: only `launcherApps: true`; a machine with no saved choice shows none). A
@@ -74,6 +74,43 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   settles a request. Found while testing the 0.8.9.6.2 gallery. Test: `server/tests/admin_js_test.mjs`.
 
 ### Changed
+- **Settings → Artificial intelligence is a store around Lumo** (the maintainer's approved design, 0.8.9.6.2). The page
+  was two tabs (Voice and Sentinela); it is now built like the wallpaper gallery (`apps/settings/AI.jsx`, the pure part
+  `sdk/aistore.js`, docs/AI.md). At the top the 3D Lumo (waving when every piece that exists today is installed, asleep
+  while one you could download is missing) and the chain of his five pieces, each ✓ when installed: **Ear** (speech to
+  text) → **Brain** (the language model) → **Voice** (reading aloud) → **Eyes** (text recognition) → **Hands** (doing
+  things with your permission), with "3 of 5 pieces ready" and **Talk to Lumo**, disabled with a "coming soon" line
+  until the Ear and the agent exist. Then a search ("whisper", "Spanish", "4K"…) with the filters All, Installed, Brain,
+  Ear, Voice, Vision and Image, each with its count; **What Lumo can do**: one brain, many functions (Notes, Programs,
+  Log audit, Sentinela, Files, Apps and windows, Machines, Settings, System), each with its level (read only, with your
+  permission, administrator); only **Sentinela** works today: its card says whether it is on and opens its page, the
+  others say "coming soon" (no switches that do nothing). The **capabilities** as cards (models, installed), one row of
+  each, and a page per capability ("‹ Artificial intelligence › Voice"; Esc and the mouse's Back and Forward walk them
+  as Settings sub-pages, `apps/settings/subpage.js`). Every model is a card (its capability's colour and icon, ✓
+  installed or ☁, RECOMMENDED / IN USE / COMING SOON, size, memory, license, the download's progress) with a sheet: its
+  facts, what uses it, **try it** where it really works, and its actions. At the bottom the space the models take
+  (measured on disk), where they run (the Voice's real Auto / CPU / GPU setting; the Brain and Vision on the processor)
+  and the privacy note.
+  - **Brain**: Qwen3 1.7B and 4B and the llama.cpp engine: install (the engine first when missing), remove, use; try it
+    with *Translate with Lumo* when Sentinela is on and the model is the one in use.
+  - **Voice**: a card per language (its standard model and own voice: install standard or HD, remove, listen to the
+    recorded sample, try). Its page keeps everything the Voice tab had: Read aloud, ❖Esc, the player, Live Speech,
+    Process with, Quality, the language's two models and its voices as cards (▶ sample, Try, Use, Download, Remove),
+    the samples' package and your own voices (record, from a file, try, use, remove).
+  - **Vision**: Tesseract (included: Screenshots' "copy the text") and a card per interface language, Debian 13's
+    `tesseract-ocr-<lang>` data (sizes from Debian), installed and removed with the package engine like the voices (only
+    the 35 names in `OCR_LANGS`); try it with *Read a picture…* (lord-media decodes it, the confined lord-ocr reads it).
+  - **Ear** (Whisper Base, Small and Large v3 Turbo via whisper.cpp: 148, 488 and 574 MB) and **Image** (Real-ESRGAN x4
+    and x4 Anime, ~64 and ~17 MB; the x4 model made the 4K wallpapers): **coming soon**, their real facts and no install
+    button; Image's sheet shows a before-and-after crop. They need a new helper, which needs the maintainer's security
+    approval first: no helper, dependency or network path was added.
+  - Links from other apps still work (`{ section: 'ai', page: 'sentinela' }`, the Monitor's AI card); a page may also
+    be `voice`, `brain`, `ear`, `eye` or `img`. The AI section takes the wider column on wide windows, as Wallpaper.
+    131 new texts in the 35 languages (`settings.aiStore.*`); icons in `assets/ai/icons/` (installed by mkdeb.sh).
+  Tests: `server/tests/ai_store_test.mjs` (81 checks: entries from what is installed, Lumo's pieces and pose, filters
+  and counts, the Voice page's cards, Tesseract's languages and packages, space; in `make test`) and the headless scene
+  `server/tests/app_scene_headless.sh settings_ai_scene` (home, Voice, a sheet, Brain, Image, Sentinela, a search; in
+  English and Arabic).
 - **Web apps: Light and Dark per app are back, and now they reach the pages' CSS.** lord-web runs on WPEPlatform (WPE
   WebKit 2.54) since 0.8.9.6, whose display settings have `WPE_SETTING_DARK_MODE`: lord-web now sets it at start and on
   every `SetColorScheme` (`webback_set_dark` in `server/src/web/webback_platform.c`, called from `webdark.c`; a no-op

@@ -100,6 +100,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [MAIL.md](MAIL.md) | Mail, Calendar, Contacts and Reminders |
 | [CLOUD.md](CLOUD.md) | Cloud: the person's cloud storage accounts (rclone) in Files, Settings and Backups (0.8.8.5) |
 | [DATABASES.md](DATABASES.md) | Databases, the MySQL / MariaDB client: connections, structure, content, queries, import and export |
+| [AI.md](AI.md) | Settings → Artificial intelligence: the store around Lumo (its pieces, the brain's functions, the models of each capability) |
 | [VOICE.md](VOICE.md) | Text to speech without the internet (`lord-tts`): voice packages, reading aloud from the desktop |
 | [SENTINELA.md](SENTINELA.md) | Sentinela, the process guard: rules over the Monitor's process list, a local model (llama-server in its sandbox, no network) that explains alerts; in development |
 | [MONITOR.md](MONITOR.md) | Monitor: usage, processes, network map and connections, firewall, disk health, cooling |
