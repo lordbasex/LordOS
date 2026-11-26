@@ -1,7 +1,7 @@
 // Databases — the MySQL and MariaDB client (docs/DATABASES.md). One window holds a tab per open connection and the
 // Connect tab (favorites, Quick Connect, the Sequel Ace / Sequel Pro import); each connection is its own sandboxed
 // lord-sql process. The same app opened with args.console is that connection's Console window.
-import { View, Text, useAppWindow, useStore, wm, sqlPasswords, t as tr } from '@lordos/sdk';
+import { View, Text, useAppWindow, useStore, wm, sqlPasswords, t as tr, SkinHeader, appName, getApp } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { usePal, Dot } from './ui.jsx';
 import { store, listen, setActive, closeSession, openSession, sessionOf } from './conn.js';
@@ -32,7 +32,15 @@ export function Icon({ size: s }) {
   );
 }
 
+// (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): a header a theme may add above the app
+// only the main window gets the header (a machine's screen, a console or a sheet window is drawn as before)
 export default function App() {
+  const { args } = useAppWindow();
+  if (args && Object.keys(args).length) return <DatabasesMain />;
+  return <SkinHeader app="databases" title={appName(getApp('databases'))}><DatabasesMain /></SkinHeader>;
+}
+
+function DatabasesMain() {
   const { args } = useAppWindow();
   if (args?.console) return <ConsoleWindow sessionKey={args.console} />;
   return <Main />;
