@@ -9,3 +9,6 @@ printf 'print("hi")\n' >"$H/Documents/script.py"
 printf '%%PDF-1.4\n' >"$H/Documents/manual.pdf"
 printf 'PK' >"$H/Documents/photos.zip"
 printf 'hello\n' >"$H/readme.txt"
+# the shell's prompt names a demo account and computer, never the real ones (the screenshots may go into docs or the site)
+printf "PS1='demo@demo-pc:\\\\w\\\\\$ '\nexport PS1\n" >"$H/.bashrc"
+cp "$H/.bashrc" "$H/.bash_profile"

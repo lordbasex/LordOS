@@ -12,6 +12,7 @@ const root = path.join(here, '..', '..');
 const M = await import(path.join(root, 'sdk/appskinmodel.js'));
 const F = await import(path.join(root, 'apps/files/skinmodel.js'));
 const S = await import(path.join(root, 'apps/settings/skinmodel.js'));
+const T = await import(path.join(root, 'apps/terminal/skinmodel.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -124,6 +125,18 @@ eq('settings: sections', svm.groups[0].sections.map((x) => [x.id, x.selected]), 
 eq('settings: the open section', [svm.section, svm.title], ['sound', 'T:settings.section.sound']);
 eq('settings: at home no section', S.settingsViewModel({ atHome: true, section: 'sound', query: '', tr: (k) => k, groups: [], groupIndex: [] }, {}).section, null);
 ok('settings: a section has no page component', !('Body' in svm.groups[0].sections[0]) && Object.keys(svm.groups[0].sections[0]).join() === 'id,label,color,glyph,selected');
+
+// ---- the Terminal's view model ----
+eq('terminal regions', M.APP_REGIONS.terminal, ['tabBar', 'statusBar', 'contextMenu']);
+const tvm = T.terminalViewModel({ tabs: [{ id: 3, title: 'a', active: true, extra: 1 }, { id: 4, title: 'b', busy: 1 }], status: { cwd: '~', process: 'vim', busy: true, cols: 80.5, rows: 24, pid: 9 },
+  broadcast: false, label: (id) => `L:${id}` }, { command: fn });
+eq('terminal: tabs', tvm.tabs.map((x) => Object.keys(x).join()), ['key,title,color,active,busy,bell,index', 'key,title,color,active,busy,bell,index']);
+eq('terminal: status keeps no pid', Object.keys(tvm.status), ['cwd', 'process', 'busy', 'shell', 'cols', 'rows']);
+eq('terminal: cols are whole', tvm.status.cols, 80);
+eq('terminal: commands are the closed list', tvm.commands.map((c) => c.id), T.SKIN_COMMANDS);
+eq('terminal: a command on the list', T.skinCommand('copy'), 'copy');
+eq('terminal: one that is not', T.skinCommand('write'), null);
+ok('terminal: no command writes to a session', !T.SKIN_COMMANDS.some((c) => /write|type|send|paste[A-Z]|run/.test(c)));
 
 console.log(`appskin-test: ${n} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);

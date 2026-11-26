@@ -89,9 +89,19 @@
     await shot('files-own-layout');
     sdk.settings.set({ themeParts: { ...(sdk.settings.get().themeParts || {}), layouts: true } });
     await sleep(500);
+    // the Terminal: the command row and the property-sheet tabs
+    sdk.wm.open('terminal', { new: true });
+    await sleep(2500);
+    const tw = win('terminal');
+    if (tw) sdk.wm.setFrame?.(tw.id, { x: 200, y: 120, w: 760, h: 460 });
+    await sleep(1200);
+    step('Terminal: the command row', !!textId(sdk.t('terminal.action.newTab')) && !!textId(sdk.t('terminal.action.find')));
+    await shot('terminal');
     // the demo identity is the only one on screen (pre.js)
     const R = globalThis.__sceneReal || {};
-    const leaks = shownTexts().filter((x) => [R.user, R.fullName, R.hostname].some((v) => v && v.length > 2 && x.includes(v)));
+    // what React shows, and what every terminal session's screen shows (its prompt is the shell's)
+    const screens = []; try { for (const id of lord.term.list() || []) screens.push(String(lord.term.text(id, 'screen') || '')); } catch (e) { /* no sessions */ }
+    const leaks = [...shownTexts(), ...screens].filter((x) => [R.user, R.fullName, R.hostname].some((v) => v && v.length > 2 && x.includes(v)));
     step('privacy: no real account or host name on screen', !leaks.length && lord.system.info().hostname === 'demo-pc', leaks.slice(0, 3).length ? 'leaked' : '');
     log('done');
   })();

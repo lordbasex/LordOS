@@ -245,6 +245,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     places, the status, and 30 actions from Back to Empty Trash; a typed address goes through `addressPath` and Files'
     own check that the folder is there). **Settings** has two: `sidebar` and `home`, a page of categories before a
     section is open (`apps/settings/skinmodel.js`); each section's page stays Settings' own.
+    The **Terminal** has three: `tabBar`, `statusBar` and `contextMenu` (`apps/terminal/skinmodel.js`); a skin asks
+    only for a closed list of the Terminal's commands, and the panes and what is typed into them are never a skin's.
   - **Settings → Appearance → From this style**: a switch for each part the style in use brings (Icons, Pointer colors,
     Sounds, Font, App layouts; `settings.themeParts`), so someone can keep a theme's frames and use LordOS's icons.
   - **Lord Bluebell** (`themes/bluebell`), the demo: a tribute to the desktops of 2001 with glossy blue title bars with
@@ -257,9 +259,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     and "Details", icons or details, a plain status bar and context menu), and Settings a control panel of that era (a
     task pane and four categories, each with its sections as links). All of its art is drawn by us.
   - New texts in the 35 languages (`files.skin.*`, `settings.themeParts.*`, `settings.skin.*`, `shell.theme.bluebell.*`,
-    `shell.bluebell.start`). Tests: `server/tests/appskin_test.mjs` (60 checks), `server/tests/files_skin_scene.mjs`
+    `shell.bluebell.start`). Tests: `server/tests/appskin_test.mjs` (68 checks), `server/tests/files_skin_scene.mjs`
     (Files with every region a stub: 31 checks), `server/tests/settings_skin_scene.mjs` (Settings with both regions
-    stubbed: 17 checks; all three in `make test`) and `server/tests/bluebell_scene` (screenshots,
+    stubbed: 17 checks), `server/tests/terminal_skin_scene.mjs` (the Terminal: 14 checks; all four in `make test`) and `server/tests/bluebell_scene` (screenshots,
     `app_scene_headless.sh bluebell_scene OUT bluebell en light|dark`; it runs with a demo account and computer name, and
     checks that the real ones appear nowhere on screen).
 - **Settings → Wallpaper is a gallery, with three new collections of still pictures: Abstract, Epic and Anime.** The

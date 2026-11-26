@@ -601,6 +601,23 @@ and `actions`: `open(id)` (only a section Settings shows here), `home()`, `searc
 page is always Settings' own, drawn by Settings with its own title bar: a skin chooses where to go, never what a page
 does. `server/tests/settings_skin_scene.mjs` runs Settings with both regions stubbed (in `make test`).
 
+#### Terminal
+
+| Region | Where | The Terminal's own | The skin's `model` |
+|---|---|---|---|
+| `tabBar` | the top | the tabs and + | the view model below |
+| `statusBar` | the bottom, only while the profile shows one | the folder, the program, Claude Code's segments, the size, the clock | the view model |
+| `contextMenu` | over the window | the Terminal's menu | `{ x, y, items, close, bounds }`, as in Files |
+
+The view model (`apps/terminal/skinmodel.js`, `terminalViewModel`): `tabs: [{ key, title, color, active, busy, bell,
+index }]`, `status: { cwd, process, busy, shell, cols, rows }` (the session in front, read when the Terminal draws; null
+without one), `broadcast`, `commands: [{ id, label }]` and `actions`: `selectTab(key)`, `closeTab(key)` (the Terminal
+still asks before closing a busy tab), `tabMenu(key, event)` (the Terminal's own tab menu) and `command(id)`, which runs
+only one of `SKIN_COMMANDS` (`newTab`, `newWindow`, `copy`, `paste`, `find`, `splitRight`, `splitDown`, `selectAll`,
+`clearBuffer`, `preferences`, `closePane`) exactly as its menu item does. **The panes are never a skin's**, and no action
+writes to a session or reads its text. `server/tests/terminal_skin_scene.mjs` runs the Terminal with every region stubbed
+and checks that nothing a skin does reaches a session (in `make test`).
+
 ## 3. Building it
 
 `npm install` once (React, the reconciler and esbuild), then:
