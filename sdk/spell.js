@@ -75,7 +75,8 @@ function schedule() {
 function flush() {
   timer = 0;
   const a = api();
-  if (!a || !pending.size || Date.now() < failedUntil) return;
+  if (!a || !pending.size) return;
+  if (Date.now() < failedUntil) { pending.clear(); return; }   // resting after a failure: ask again on the next change
   const words = [...pending].slice(0, BATCH);
   let id = 0;
   try { id = a.check(words); } catch (e) { id = 0; }
