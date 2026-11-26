@@ -118,6 +118,7 @@ function ShotBar({ model }) {
 }
 
 export const appSkins = {
+  disks: { sidebar: ListPane },
   screenshots: { toolbar: ShotBar },
   clock: { toolbar: CommandBar },
   monitor: { toolbar: TabStrip },

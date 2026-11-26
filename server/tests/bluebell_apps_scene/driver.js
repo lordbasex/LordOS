@@ -27,6 +27,7 @@
     ['monitor', {}, (sdk) => sdk.t('monitor.tab.overview')],
     ['clock', {}, (sdk) => sdk.t('clock.tab.stopwatch')],
     ['screenshots', { shortcut: 'capture.panel' }, (sdk) => sdk.t('screenshots.capture')],
+    ['disks', {}, (sdk) => sdk.t('disks.title')],
   ];
   (async () => {
     await sleep(2500);

@@ -600,6 +600,7 @@ Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one ski
 | Monitor | `toolbar` (command bar: the tabs this computer has, the one shown `active`) | every tab's content and every action on a process | `monitor_skin_scene.mjs` (10 checks) |
 | Clock | `toolbar` (command bar: the four tabs, the one shown `active`, and Add where the tab has one) | the clocks, alarms, timer and stopwatch | `clock_skin_scene.mjs` (11 checks) |
 | Screenshots | `toolbar` (command bar: close, the five modes with the chosen one `active`, the color picker, text, and Capture or Record) | the capturing, the options menu, the files and the markup editor | `screenshots_skin_scene.mjs` (10 checks) |
+| Disks | `sidebar` (list pane: each disk and its partitions, grouped by disk) | the details, every disk action and the administrator prompt | `disks_skin_scene.mjs` (9 checks) |
 <!-- shared-shape apps -->
 
 A region drawn in the SDK's floating layer (Screenshots' capture bar, a picture-in-picture window) is outside the theme's
