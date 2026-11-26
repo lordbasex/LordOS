@@ -1,7 +1,7 @@
 // About LordOS: real system data (/proc) and display server stats.
 import { version as reactVersion } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Button, ScrollView, wm, LordOSLogo, LordOSWordmark, Lumo, screen, lordosVersion, useTheme, useSystemInfo, useServerStats, memUsedKB, formatBytes, formatDuration, formatNumber, typeScale, codeStatus, isSystemApp, t as tr } from '@lordos/sdk';
+import { View, Text, Button, ScrollView, wm, LordOSLogo, LordOSWordmark, Lumo, screen, lordosVersion, useTheme, useSystemInfo, useServerStats, memUsedKB, formatBytes, formatDuration, formatNumber, typeScale, codeStatus, isSystemApp, t as tr, SkinRegion, useSkinned } from '@lordos/sdk';
 
 export function Icon({ size }) {
   return <LordOSLogo size={size} />;
@@ -66,10 +66,26 @@ export default function About() {
   const cs = CODE[code.refused?.length ? 'invalid' : code.state] || CODE.development;
   const codeNote = code.state === 'verified' && !code.refused?.length ? tr('about.codeVerifiedNote', { count: code.files })
     : code.state === 'development' ? tr('about.codeDevNote') : null;
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → About"): the banner (the version and the verified-code state)
+  // and the facts as label and value rows; the numbers are read by About, the skin only shows them
+  const skinned = useSkinned('about');
+  const vm = skinned ? {
+    app: 'about',
+    version: ver.channel ? tr('about.versionChannel', { v: ver.version, channel: ver.channel }) : tr('about.version', { v: ver.version }),
+    build: ver.build ? tr('about.build', { b: ver.build }) : '', code: tr(cs.key), codeNote: codeNote || '', tagline: tr('about.tagline'),
+    rows: [
+      [tr('about.os'), info.os], [tr('about.kernel'), `${info.kernel} (${info.arch})`], [tr('about.host'), tr('about.hostValue', { host: info.hostname, user: info.user })],
+      [tr('about.cpu'), tr('about.cpuValue', { cpu: cpu.slice(0, 36) || tr('about.cpuUnknown'), count: info.cores })],
+      [tr('about.memory'), tr('shell.cc.memDetail', { used: formatBytes(memUsedKB(info) * 1024), total: formatBytes(info.memTotalKB * 1024) })],
+      [tr('about.uptime'), formatDuration(info.uptime)],
+    ].map(([label, value]) => ({ label, value: String(value || '') })),
+    actions: { systemReport: () => wm.open('sysinfo') },
+  } : null;
   return (
     <View ref={box} style={{ flex: 1 }}>
     <ScrollView style={{ flex: 1 }}>
     <View style={{ minHeight: boxH, alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
+      <SkinRegion app="about" region="banner" model={vm}>
       <Icon size={64} />
       <View style={{ marginTop: 12 }}><LordOSWordmark size={typeScale.largeTitle} crown={false} /></View>
       <Text style={{ fontSize: typeScale.callout, color: t.textDim, marginTop: 2 }}>{ver.channel ? tr('about.versionChannel', { v: ver.version, channel: ver.channel }) : tr('about.version', { v: ver.version })}</Text>
@@ -80,6 +96,7 @@ export default function About() {
       </View>
       {codeNote ? <Text style={{ fontSize: typeScale.caption, color: code.state === 'development' ? '#ff9f0a' : t.textDim, marginTop: 4, textAlign: 'center' }}>{codeNote}</Text> : null}
       <Text style={{ fontSize: typeScale.callout, color: t.textDim, marginTop: 10, maxWidth: 320, textAlign: 'center', lineHeight: 17 }}>{tr('about.tagline')}</Text>
+      </SkinRegion>
       <View style={{ alignSelf: 'stretch', marginTop: 16, gap: 2 }}>
         <InfoRow k={tr('about.os')} v={info.os} />
         <InfoRow k={tr('about.kernel')} v={`${info.kernel} (${info.arch})`} />

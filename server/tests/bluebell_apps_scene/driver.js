@@ -28,6 +28,7 @@
     ['clock', {}, (sdk) => sdk.t('clock.tab.stopwatch')],
     ['screenshots', { shortcut: 'capture.panel' }, (sdk) => sdk.t('screenshots.capture')],
     ['disks', {}, (sdk) => sdk.t('disks.title')],
+    ['about', {}, 'LordOS'],
   ];
   (async () => {
     await sleep(2500);
@@ -48,7 +49,7 @@
     const R = globalThis.__sceneReal || {};
     let author = ''; try { author = String(sdk.themes.info()?.author || ''); } catch (e) { author = ''; }
     const screens = []; try { for (const id of lord.term.list() || []) screens.push(String(lord.term.text(id, 'screen') || '')); } catch (e) { /* none */ }
-    const leaks = [...shownTexts(), ...screens].filter((x) => [R.user, R.fullName, R.hostname].some((v) => v && v.length > 2 && v !== author && x.includes(v)));
+    const leaks = [...shownTexts(), ...screens].filter((x) => [R.user, R.fullName, R.hostname, ...(R.disks || [])].some((v) => v && v.length > 2 && v !== author && x.includes(v)));
     step('privacy: no real account or host name on screen', !leaks.length, leaks.length ? `leaked in: ${leaks.slice(0, 3).map((x) => x.slice(0, 60)).join(' | ')}` : '');
     log('done');
   })();

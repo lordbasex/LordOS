@@ -119,7 +119,7 @@
     const screens = []; try { for (const id of lord.term.list() || []) screens.push(String(lord.term.text(id, 'screen') || '')); } catch (e) { /* no sessions */ }
     // the theme's own credited author (theme.json, public on purpose) is not the account: a name equal to it is left out
     let author = ''; try { author = String(sdk.themes.info()?.author || ''); } catch (e) { author = ''; }
-    const leaks = [...shownTexts(), ...screens].filter((x) => [R.user, R.fullName, R.hostname].some((v) => v && v.length > 2 && v !== author && x.includes(v)));
+    const leaks = [...shownTexts(), ...screens].filter((x) => [R.user, R.fullName, R.hostname, ...(R.disks || [])].some((v) => v && v.length > 2 && v !== author && x.includes(v)));
     step('privacy: no real account or host name on screen', !leaks.length && lord.system.info().hostname === 'demo-pc', leaks.length ? `leaked in: ${leaks.slice(0, 3).map((x) => x.slice(0, 60)).join(' | ')}` : '');
     log('done');
   })();

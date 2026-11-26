@@ -3,6 +3,7 @@
 // shapes have their own file (files, settings, terminal, editor, store).
 import { View, Text, TextInput, useTheme, useThemeFont, useSettings } from '@lordos/sdk';
 import { makeTheme } from '../tokens.js';
+import { StartMark } from '../glyphs.jsx';
 import { useState } from 'react';
 import { CommandBar, ListPane } from './common.jsx';
 
@@ -117,7 +118,32 @@ function ShotBar({ model }) {
   );
 }
 
+// ---- About: a blue banner with the bluebell and the version, as on an "about" box of the era ----
+function AboutBanner({ model }) {
+  const t = useTheme();
+  const font = useThemeFont();
+  const f = font ? { fontFamily: font } : null;
+  return (
+    <View style={{ alignSelf: 'stretch', marginHorizontal: -20, marginTop: -20, marginBottom: 8 }}>
+      <View style={{ height: 96, flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 24, background: t.titleBg }}>
+        <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' }}><StartMark size={44} /></View>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={{ fontSize: 22, fontWeight: 700, color: '#ffffff', textAlign: 'start', ...f }}>LordOS</Text>
+          <Text style={{ fontSize: 12, color: '#d8e4f8', textAlign: 'start', ...f }}>{[model.version, model.build].filter(Boolean).join(' · ')}</Text>
+        </View>
+      </View>
+      <View style={{ height: 3, background: 'linear-gradient(90deg, #f0a040, #ffd36b)' }} />
+      <View style={{ paddingHorizontal: 24, paddingTop: 10, gap: 4 }}>
+        <Text style={{ fontSize: 12, fontWeight: 700, color: t.paneHeadText, textAlign: 'start', ...f }}>{model.code}</Text>
+        {model.codeNote ? <Text style={{ fontSize: 11, color: t.textDim, textAlign: 'start', ...f }}>{model.codeNote}</Text> : null}
+        <Text style={{ fontSize: 12, color: t.text, textAlign: 'start', ...f }}>{model.tagline}</Text>
+      </View>
+    </View>
+  );
+}
+
 export const appSkins = {
+  about: { banner: AboutBanner },
   disks: { sidebar: ListPane },
   screenshots: { toolbar: ShotBar },
   clock: { toolbar: CommandBar },
