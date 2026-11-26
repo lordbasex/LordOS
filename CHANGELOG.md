@@ -11,6 +11,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **`dig`, `nslookup` and `host` in every image:** `bind9-dnsutils` joins the command-line tools of the PC ISO and the
+  Raspberry Pi image (`tools/iso/packages-tools.sh`) and the `lordos` package's Recommends, so updated systems get it too.
 - **Web apps: a right-click menu like Chrome's, per context, and spell checking** (`server/src/web/webmenu.c`,
   `webedit.c`, `websearch.c`, `webselect.c`, `server/src/spellang.c`, `sdk/webappsmodel.js`; in development, requested by
   the maintainer 2026-11-26; `docs/WEBAPPS.md`, "Editing" and "Spelling"). Right-clicking selected text in a messaging
