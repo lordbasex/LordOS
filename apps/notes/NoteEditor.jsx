@@ -7,7 +7,7 @@
 // window (store.js editBody); only the line being edited is wrapped again (a per-line cache); only the rows in sight
 // are drawn, each a memoized Row that redraws only when its text, place or style changes; the caret and the selection
 // are drawn over them.
-import { View, Text, ime, clipboard, takeTextFocus, releaseTextFocus, textFocusOwner, addListener } from '@lordos/sdk';
+import { View, Text, ime, clipboard, takeTextFocus, releaseTextFocus, textFocusOwner, addListener, useTheme, useEditorSpell, EditorSquiggles, squiggleColorFor, spellHitAt } from '@lordos/sdk';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { makeMeasure, wrapText, rowAt, xIn, offsetAt, display } from './wrapmodel.js';
 
@@ -42,7 +42,7 @@ function lineStyle(s, inCode) {
   return 'text';
 }
 
-export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, emojiSearch, onEscape, autoFocus, padding = 10, apiRef, onBlur, onCommand, onContextMenu }) {
+export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, emojiSearch, onEscape, autoFocus, padding = 10, apiRef, onBlur, onCommand, onContextMenu, spellCheck = true }) {
   const area = useRef(null);
   const token = useRef({}).current;
   const st = useRef({ undo: [], redo: [], last: 0, w: 300, h: 200 });
@@ -99,6 +99,8 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
 
   // ---- editing ----
   const lo = Math.min(sel.a, sel.b), hi = Math.max(sel.a, sel.b);
+  const theme = useTheme();
+  const spellR = useEditorSpell(text, spellCheck, focus ? sel.b : -1);
   const pushUndo = (kind) => {
     const now = Date.now(), s = st.current;
     if (kind !== 'type' || now - s.last > 900 || s.kind !== kind) s.undo.push({ text, sel });
@@ -284,6 +286,9 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
   st.current.caret = caretRect;
   // send: a key from the Edit and Format menus (editmenu.js), handled as if it were typed
   if (apiRef) apiRef.current = { insert: (txt) => insert(txt, 'edit'), focus: () => take(), selection: () => text.slice(lo, hi),
+    // spelling and ✨ AI (sdk/editorextras.jsx): the misspelled word under a right click, the selection's offsets, a range replaced
+    spellHit: (e) => { try { return spellHitAt(spellR, text, posFromEvent(e)); } catch (err) { return null; } }, selRange: () => [lo, hi], textNow: () => text,
+    replaceRange: (a, b, s) => replace(a, b, s, 'edit'),
     send: (e) => { take(); st.current.onKey(e); } };
   const take = () => {
     if (textFocusOwner() === token) return;
@@ -368,6 +373,8 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
     <View ref={area} onMouseDown={onMouseDown} onWheel={onWheel} onContextMenu={onContextMenu} style={{ flex: 1, overflow: 'hidden', direction: 'ltr' }}>
       {selRects}
       {out}
+      <EditorSquiggles ranges={spellR} rows={rows} first={first} last={last} left={padding} color={squiggleColorFor(theme.mode)}
+        xOf={(row, off) => xIn(text, row, off, measure, boldLine(row.line))} top={(r) => Math.round(padding + r * LH - scroll + (LH + size * 1.3) / 2) - 2} />
       {focus && blink && caretRow >= first && caretRow <= last && (
         <View style={{ position: 'absolute', left: padding + xOf(sel.b) - 1, top: padding + caretRow * LH - scroll + 2, width: 2, height: LH - 4, backgroundColor: colors.caret }} />
       )}

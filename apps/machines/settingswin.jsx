@@ -410,9 +410,9 @@ function ProfileEdit({ host, gpus, start, fresh, taken, onClose, onSaved }) {
                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, direction: 'ltr' }}>
                         <Segmented small value={r.proto} onChange={(x) => setRule({ proto: x })} options={[['tcp', 'TCP'], ['udp', 'UDP']]} />
                         <Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.cfg.portHost')}</Text>
-                        <TextInput value={r.host ? String(r.host) : ''} onChange={(x) => setRule({ host: portInput(x) })} style={{ width: 70 }} />
+                        <TextInput spellCheck={false} value={r.host ? String(r.host) : ''} onChange={(x) => setRule({ host: portInput(x) })} style={{ width: 70 }} />
                         <Text style={{ fontSize: 12, color: p.dim }}>→ {tr('machines.cfg.portGuest')}</Text>
-                        <TextInput value={r.guest ? String(r.guest) : ''} onChange={(x) => setRule({ guest: portInput(x) })} style={{ width: 70 }} />
+                        <TextInput spellCheck={false} value={r.guest ? String(r.guest) : ''} onChange={(x) => setRule({ guest: portInput(x) })} style={{ width: 70 }} />
                         {pr.network.mode === 'shared' ? <Segmented small value={r.open === 'lan' ? 'lan' : 'this-computer'} onChange={(x) => setRule({ open: x })}
                           options={[['this-computer', tr('machines.cfg.portOpen.local')], ['lan', tr('machines.cfg.portOpen.lan')]]} /> : null}
                         <Btn label={tr('machines.cfg.portRemove')} onClick={() => set('network', { ports: pr.network.ports.filter((_, k) => k !== i) })} />

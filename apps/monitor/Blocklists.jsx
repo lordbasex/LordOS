@@ -91,7 +91,7 @@ export function BlocklistsPrivacy() {
                 onRemove={l.custom ? () => { try { firewall.removeList(l.id); } catch (e) { setMsg(e.message); } refresh(); } : null} />)}
               {topic === 'custom' ? (
                 <View style={{ gap: spacing.s, paddingVertical: spacing.s }}>
-                  <TextInput value={url} onChange={setUrl} placeholder={tr('firewall.lists.urlPlaceholder')} onSubmit={add} />
+                  <TextInput spellCheck={false} value={url} onChange={setUrl} placeholder={tr('firewall.lists.urlPlaceholder')} onSubmit={add} />
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
                     <Segmented small value={format} onChange={setFormat}
                       options={[['hosts', tr('firewall.lists.format.hosts')], ['domains', tr('firewall.lists.format.domains')], ['ips', tr('firewall.lists.format.ips')]]} />

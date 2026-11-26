@@ -279,7 +279,7 @@ export function SearchField({ value, onChange, placeholder, onSubmit, onCancel, 
   const lead = rtl ? 'right' : 'left', trail = rtl ? 'left' : 'right';
   return (
     <View style={[{ width, flexDirection: 'row', alignItems: 'center' }, style]}>
-      <TextInput value={value} onChange={onChange} placeholder={placeholder} onSubmit={onSubmit} onKeyDown={onKeyDown} autoFocus={autoFocus}
+      <TextInput spellCheck={false} value={value} onChange={onChange} placeholder={placeholder} onSubmit={onSubmit} onKeyDown={onKeyDown} autoFocus={autoFocus}
         onCancel={() => { if (value) onChange(''); onCancel?.(); }}
         style={{ flex: 1, [rtl ? 'paddingRight' : 'paddingLeft']: 26, [rtl ? 'paddingLeft' : 'paddingRight']: value ? 26 : 10 }} />
       <Text style={{ position: 'absolute', [lead]: 9, top: 5, fontSize: 13, color: t.textDim, pointerEvents: 'none' }}>⌕</Text>

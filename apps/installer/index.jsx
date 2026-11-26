@@ -414,7 +414,7 @@ function UserStep() {
         }} placeholder={tr('installer.user.fullnameHint')} />
       </Field>
       <Field label={tr('installer.user.user')} hint={tr('installer.user.userHint')} error={show('user')}>
-        <TextInput value={s.user} onChange={(user) => set({ user: user.toLowerCase(), userEdited: true })} />
+        <TextInput spellCheck={false} value={s.user} onChange={(user) => set({ user: user.toLowerCase(), userEdited: true })} />
       </Field>
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
@@ -429,7 +429,7 @@ function UserStep() {
         </View>
       </View>
       <Field label={tr('installer.user.host')} hint={tr('installer.user.hostHint')} error={show('host')}>
-        <TextInput value={s.host} onChange={(host) => set({ host: host.toLowerCase(), hostEdited: true })} />
+        <TextInput spellCheck={false} value={s.host} onChange={(host) => set({ host: host.toLowerCase(), hostEdited: true })} />
       </Field>
     </View>
   );

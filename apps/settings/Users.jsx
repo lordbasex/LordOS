@@ -116,7 +116,7 @@ function AddUser({ onDone, run }) {
             onChange={(full) => put(nameTouched ? { full } : { full, name: suggest(full) })} />
         </FieldRow>
         <FieldRow label={tr('settings.users.userName')}>
-          <TextInput value={f.name} placeholder={tr('settings.users.userName')} style={field} onChange={(name) => { setNameTouched(true); put({ name: name.toLowerCase() }); }} />
+          <TextInput spellCheck={false} value={f.name} placeholder={tr('settings.users.userName')} style={field} onChange={(name) => { setNameTouched(true); put({ name: name.toLowerCase() }); }} />
         </FieldRow>
         <FieldRow label={tr('settings.users.password')}>
           <TextInput secure value={f.pass} placeholder={tr('settings.users.password')} style={field} onChange={(pass) => put({ pass })} />

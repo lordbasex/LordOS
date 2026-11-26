@@ -32,10 +32,12 @@ export const PIECES = [
 ];
 
 // What Lumo can do: one brain, many functions (groups of LordOS tools, MCP later). level: 0 read only, 1 with your
-// permission, 2 administrator (the password always in the system's dialog, never in a chat). Only Sentinela works.
+// permission, 2 administrator (the password always in the system's dialog, never in a chat). Sentinela and Writing
+// (✨ AI on selected text, 0.8.9.6.2; docs/AI.md "Writing") work.
 export const LEVELS = ['read', 'ask', 'admin'];
 export const FUNCTIONS = [
-  { id: 'notes', level: 1 }, { id: 'programs', level: 1 }, { id: 'logs', level: 0 }, { id: 'sentinela', level: 0, ready: true },
+  { id: 'writing', level: 0, ready: true }, { id: 'sentinela', level: 0, ready: true },
+  { id: 'notes', level: 1 }, { id: 'programs', level: 1 }, { id: 'logs', level: 0 },
   { id: 'files', level: 0 }, { id: 'apps', level: 1 }, { id: 'machines', level: 1 }, { id: 'settings', level: 1 }, { id: 'system', level: 2 },
 ];
 

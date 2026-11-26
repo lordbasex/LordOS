@@ -243,7 +243,7 @@ function ImageDialog({ disk, onClose }) {
       {step === 'choose' ? (
         <View style={{ gap: 10 }}>
           <Text style={{ fontSize: 12, color: t.textDim, textAlign: 'start' }}>{tr('disks.imageHint')}</Text>
-          <TextInput value={path} onChange={setPath} placeholder={tr('disks.imagePath')} />
+          <TextInput spellCheck={false} value={path} onChange={setPath} placeholder={tr('disks.imagePath')} />
           {found.length ? (
             <ScrollView style={{ maxHeight: 150 }}>
               <View style={{ gap: 2 }}>

@@ -147,9 +147,9 @@ function InterfacePage({ name, net }) {
               <Segmented small value={f.method} onChange={(method) => setForm({ ...f, method })}
                 options={[['dhcp', tr('network.dhcp')], ['static', tr('network.static')], ['off', tr('network.off')]]} />
             </SettingRow>
-            {f.method === 'static' && <FieldRow label={tr('network.address')}><TextInput value={f.address} onChange={(address) => setForm({ ...f, address })} placeholder="192.168.1.20/24" style={field} /></FieldRow>}
+            {f.method === 'static' && <FieldRow label={tr('network.address')}><TextInput spellCheck={false} value={f.address} onChange={(address) => setForm({ ...f, address })} placeholder="192.168.1.20/24" style={field} /></FieldRow>}
             {f.method === 'static' && <FieldRow label={tr('network.gateway')}><TextInput value={f.gateway} onChange={(gateway) => setForm({ ...f, gateway })} placeholder="192.168.1.1" style={field} /></FieldRow>}
-            {f.method === 'static' && <FieldRow label="DNS"><TextInput value={f.dns} onChange={(dns) => setForm({ ...f, dns })} placeholder="1.1.1.1 9.9.9.9" style={field} /></FieldRow>}
+            {f.method === 'static' && <FieldRow label="DNS"><TextInput spellCheck={false} value={f.dns} onChange={(dns) => setForm({ ...f, dns })} placeholder="1.1.1.1 9.9.9.9" style={field} /></FieldRow>}
           </Section>
           <Actions>
             {i.managed === 'lordos' && isAdmin && saved && <Button label={tr('network.unmanage')} onClick={() => run(setMsg, 'net-unmanage', name)} />}
@@ -375,7 +375,7 @@ function VpnImport({ onDone, edit }) {
         <View style={{ flex: 1, gap: spacing.xs }}>
           {(form.gateways || []).map((g, i) => (
             <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              <TextInput value={g} onChange={(v) => setGw(i, v)} placeholder={tr('network.vpn.serverPlaceholder')} style={field} />
+              <TextInput spellCheck={false} value={g} onChange={(v) => setGw(i, v)} placeholder={tr('network.vpn.serverPlaceholder')} style={field} />
               <ToolbarButton small icon="−" title={tr('network.vpn.removeServer')}
                 onClick={() => setForm({ ...form, gateways: form.gateways.filter((_, j) => j !== i) })} />
             </View>
@@ -611,7 +611,7 @@ function VpnPage({ net }) {
         <View style={{ gap: spacing.m }}>
           <Section title={tr('network.vpn.authTitle', { name: auth.name })}>
             <FieldRow label={tr('network.vpn.user')}>
-              <TextInput value={auth.user} onChange={(user) => setAuth({ ...auth, user })} placeholder={tr('network.vpn.user')} style={field} />
+              <TextInput spellCheck={false} value={auth.user} onChange={(user) => setAuth({ ...auth, user })} placeholder={tr('network.vpn.user')} style={field} />
             </FieldRow>
             <FieldRow label={tr('network.vpn.password')}>
               <TextInput secure value={auth.pass} onChange={(pass) => setAuth({ ...auth, pass })} placeholder={tr('network.vpn.password')} style={field} />

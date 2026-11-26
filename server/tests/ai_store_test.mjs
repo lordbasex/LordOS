@@ -27,8 +27,9 @@ yes('every capability has a colour and an icon', CAPS.every((c) => CAP_COLOR[c] 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 yes('every icon is in assets/ai/icons', Object.values(CAP_ICON).every((n) => existsSync(`${root}assets/ai/icons/${n}-symbolic.svg`) && existsSync(`${root}assets/ai/icons/${n}-96.png`)));
 yes('the before-and-after picture is shipped', existsSync(`${root}assets/ai/esrgan-compare.jpg`));
-eq('nine functions', FUNCTIONS.map((f) => f.id), ['notes', 'programs', 'logs', 'sentinela', 'files', 'apps', 'machines', 'settings', 'system']);
-eq('only Sentinela works today', FUNCTIONS.filter((f) => f.ready).map((f) => f.id), ['sentinela']);
+eq('ten functions, the two that work first', FUNCTIONS.map((f) => f.id), ['writing', 'sentinela', 'notes', 'programs', 'logs', 'files', 'apps', 'machines', 'settings', 'system']);
+eq('Writing and Sentinela work today', FUNCTIONS.filter((f) => f.ready).map((f) => f.id), ['writing', 'sentinela']);
+eq('Writing only reads (the text comes back on the person\'s click)', FUNCTIONS.find((f) => f.id === 'writing').level, 0);
 yes('every function has a level', FUNCTIONS.every((f) => LEVELS[f.level]));
 eq('System needs an administrator', LEVELS[FUNCTIONS.find((f) => f.id === 'system').level], 'admin');
 eq('Sentinela only reads', LEVELS[FUNCTIONS.find((f) => f.id === 'sentinela').level], 'read');

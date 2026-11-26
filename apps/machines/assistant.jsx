@@ -573,7 +573,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.un.user')}</Text>
-            <TextInput value={un.user} onChange={(user) => setUn((u) => ({ ...u, user }))} />
+            <TextInput spellCheck={false} value={un.user} onChange={(user) => setUn((u) => ({ ...u, user }))} />
             {setup.errors.user ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr(`machines.un.err.${setup.errors.user}`)}</Text> : null}
           </View>
           <View style={{ flex: 1, gap: 4 }}>
@@ -867,7 +867,7 @@ function WinSetup({ un, setUn, setup, plan, entry, mode, edition, setEdition, wi
         </View>
         <View style={{ gap: 4 }}>
           <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.win.key')}</Text>
-          <TextInput value={winKey} onChange={setWinKey} placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" />
+          <TextInput spellCheck={false} value={winKey} onChange={setWinKey} placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" />
           <Text style={{ fontSize: 12, lineHeight: 1.4, color: plan?.err ? '#ff453a' : p.dim, textAlign: 'start' }}>
             {plan?.err === 'needsKey' ? tr('machines.win.needsKey') : plan?.err === 'key' ? tr('machines.win.badKey') : plan?.generic ? tr('machines.win.keyHint', { edition: plan.name }) : tr('machines.win.keyYours')}</Text>
         </View>

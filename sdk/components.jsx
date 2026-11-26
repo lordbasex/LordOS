@@ -23,6 +23,10 @@ import { setTextFocusBridge, useFocusArea, focusRingColor } from './focus.js';
 import { rangeKey, choiceKey, scrollKey } from './focusmodel.js';
 import { wheelValue } from './controlmodel.js';
 import { crashReport } from './crashreport.js';
+import { useSpellRanges, spellSuggest, spellAddWord, spellIgnore } from './spell.js';
+import { spellMenuItems, rangeAt, underlines } from './spellmodel.js';
+import { writingMenuFor, WritingPanel } from './writing.jsx';
+import { stillThere, forField } from './writingmodel.js';
 
 // ---- actions that take a while (docs/MAIN-THREAD.md) ----
 // Everything on the screen, the pointer too, waits for the JavaScript of the desktop: an action that blocks (an
@@ -516,15 +520,17 @@ function fieldMenuItems(send, { hist, sel, secure, value }) {
 
 // The menu at { x, y } of the field's box (anchor), above the window (layers.js). keepFocus: choosing an item leaves the
 // field focused. It stays inside the display (or, in an isolated app, the window) the field is on.
-function FieldMenu({ anchor, at, items, onClose }) {
-  const win = useContext(AppWindowContext);
-  let bounds;
+function fieldBounds(anchor, win) {
   try {
     const r = lord.getLayout(anchor.current.id);
     const host = !shellLayers() && win?.overlayHost ? lord.getLayout(win.overlayHost.id) : null;
     const d = host ? { x: host[0], y: host[1], w: host[2], h: host[3] } : displayFor({ x: r[0], y: r[1], w: r[2], h: r[3] });
-    bounds = { w: d.x + d.w - r[0], h: d.y + d.h - r[1] };
-  } catch (e) { bounds = undefined; }
+    return { w: d.x + d.w - r[0], h: d.y + d.h - r[1] };
+  } catch (e) { return undefined; }
+}
+function FieldMenu({ anchor, at, items, onClose }) {
+  const win = useContext(AppWindowContext);
+  const bounds = fieldBounds(anchor, win);
   return (
     <Overlay anchor={anchor}>
       <View keepFocus style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }}>
@@ -532,6 +538,29 @@ function FieldMenu({ anchor, at, items, onClose }) {
       </View>
     </Overlay>
   );
+}
+
+// The spelling and ✨ AI parts every text field shares (docs/SPELLING.md, docs/AI.md "Writing").
+// A misspelled word's wavy line (the engine's wavyColor: a box of 3 px painted alone, so a line coming or going damages
+// only its own box); its colour follows the theme's mode.
+const squiggleColor = (t) => (t.mode === 'dark' ? '#ff6961' : '#e0352b');
+function Squiggles({ list, top, edge = 'left', shift = 0, color }) {
+  return list.map((u, i) => <View key={`sq${i}`} style={{ position: 'absolute', top, height: 3, [edge]: u.x - shift, width: Math.max(2, u.w), wavyColor: color, pointerEvents: 'none' }} />);
+}
+// The rows a field's menu gets around its own: the spelling rows of the word under the pointer first (spell: { word,
+// suggestions, loading }), then the field's, then ✨ AI when something is selected (writing: its row or null).
+function withExtras(base, spell, writing, act) {
+  const top = spell ? spellMenuItems({ word: spell.word, suggestions: spell.suggestions, loading: spell.loading, tr,
+    onReplace: act.replace, onAdd: (w) => spellAddWord(w), onIgnore: (w) => spellIgnore(w) }) : [];
+  return [...top, ...base, ...(writing ? ['-', writing] : [])];
+}
+// the spelling part of a right click at pos: the bad range there, its word, its suggestions on their way
+function spellAt(ranges, value, pos, set) {
+  const r = rangeAt(ranges, pos);
+  if (!r) { set(null); return; }
+  const word = [...(value || '')].slice(r[0], r[1]).join('');
+  set({ word, range: r, loading: true, suggestions: [] });
+  spellSuggest(word).then((list) => set((cur) => (cur && cur.word === word ? { ...cur, loading: false, suggestions: list } : cur)));
 }
 
 // onKeyDown(e) optional: return true if the key was already handled (e.g. Shift+Enter).
@@ -554,8 +583,9 @@ function FieldMenu({ anchor, at, items, onClose }) {
 // Where the caret and the selection go comes from the text as drawn (lord.text.carets): in Hebrew or Arabic with numbers
 // or Latin the selection may be several boxes and ← → move on screen, and the caret never stops inside an emoji, a flag
 // or a letter with its accents.
-export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, onKeyDown, autoFocus, style, secure, eye, size = 13, selectAll = false }) {
+export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, onKeyDown, autoFocus, style, secure, eye, size = 13, selectAll = false, spellCheck = true, writing: allowWriting = true }) {
   const t = useTheme();
+  const win = useContext(AppWindowContext);
   const token = useRef({}).current;
   const [isFocused, setIsFocused] = useState(false);
   const [blink, setBlink] = useState(true);
@@ -577,8 +607,11 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   adopt(value);
   const box = useRef(null);
   const [menu, setMenu] = useState(null);   // the right-click menu: { x, y } in the field's box
+  const [spellMenu, setSpellMenu] = useState(null);   // the misspelled word under the right click (spellAt)
+  const [job, setJob] = useState(null);     // ✨ AI's panel: { action, target, model, text, range, at }
+  const rangesRef = useRef([]);
   const menuOpen = useRef(false);
-  menuOpen.current = !!menu;
+  menuOpen.current = !!menu || !!job;
   const scroll = useRef(0);                 // how far the text is moved toward its start edge, to keep the caret in sight
   const pressing = useRef(false);           // a drag that selects
   const [, redraw] = useState(0);
@@ -753,8 +786,23 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   };
   const onMenu = (ev) => {
     ev.stopPropagation();                                          // the field's menu, not the one of the view it is in
-    try { const [bx, by] = lord.getLayout(box.current.id); setMenu({ x: ev.x - bx, y: ev.y - by }); } catch (e) { /* not laid out yet */ }
+    try { const [bx, by] = lord.getLayout(box.current.id); setMenu({ x: ev.x - bx, y: ev.y - by }); } catch (e) { return; /* not laid out yet */ }
+    if (!secure) spellAt(rangesRef.current, value, posAtX(ev.x), setSpellMenu); else setSpellMenu(null);
   };
+  // a misspelled word replaced by a suggestion, or the selection by ✨ AI's answer: a step of the history, as a paste
+  const replaceRange = (a, b, text) => {
+    const p = latest.current;
+    adopt(p.value);
+    const cur = at.current, r = replaceSel({ value: p.value || '', pos: b, anchor: a }, text);
+    hist.current = record(hist.current, cur, r, 'paste', lord.now());
+    at.current = r;
+    if (r.value !== p.value) p.onChange(r.value);
+    publish();
+    redraw((n) => n + 1);
+  };
+  const checking = !secure && spellCheck !== false && !(isFocused && imeSt.preedit);
+  const ranges = useSpellRanges(value || '', checking, isFocused ? clampPos(value, at.current.pos) : -1);
+  rangesRef.current = ranges;
 
   const shown = secure ? maskedText(value, shownRef.current) : value || '';
   const chars = [...shown];
@@ -842,14 +890,22 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
           <>
             {shown ? <Text style={{ position: 'absolute', top: 0, [edge]: -sx, fontSize: size, lineHeight: lineH, color: t.text, whiteSpace: 'nowrap' }}>{shown}</Text>
               : <Text style={{ position: 'absolute', top: 0, [edge]: 0, fontSize: size, lineHeight: lineH, color: t.textDim, whiteSpace: 'nowrap' }}>{placeholder || ''}</Text>}
+            {ranges.length && !secure ? <Squiggles edge={edge} shift={sx} top={Math.round(lineH / 2 + size * 0.5) - 1} color={squiggleColor(t)}
+              list={underlines(ranges, 0, chars.length, (a, b) => (lay ? selRects(lay, a, b).map((r) => ({ x: fromStart(r.x, r.w), w: r.w }))
+                : [{ x: measure(chars.slice(0, a).join('')), w: measure(chars.slice(a, b).join('')) }]))} /> : null}
             {isFocused && <View ref={caret} style={{ position: 'absolute', top: 1.5, height: size + 3, width: 1.5, [edge]: caretX - sx,
               backgroundColor: blink && !sel ? t.accent : 'transparent' }} />}
           </>
         )}
       </View>
       {startSide ? null : tail}
-      {menu ? <FieldMenu anchor={box} at={menu} onClose={() => setMenu(null)}
-        items={fieldMenuItems((e) => handlers.get(token)?.(e), { hist: hist.current, sel: !!selRange(at.current), secure, value })} /> : null}
+      {menu ? <FieldMenu anchor={box} at={menu} onClose={() => { setMenu(null); setSpellMenu(null); }}
+        items={withExtras(fieldMenuItems((e) => handlers.get(token)?.(e), { hist: hist.current, sel: !!selRange(at.current), secure, value }), spellMenu,
+          writingMenuFor({ secure, selected: secure ? '' : selectedText(at.current), allowed: allowWriting !== false,
+            open: (o) => setJob({ ...o, text: selectedText(at.current), range: selRange(at.current), at: menu }) }),
+          { replace: (w) => spellMenu && replaceRange(spellMenu.range[0], spellMenu.range[1], w) })} /> : null}
+      {job ? <WritingPanel anchor={box} at={job.at} bounds={fieldBounds(box, win)} job={job} onClose={() => setJob(null)}
+        onReplace={(text) => { if (!stillThere(latest.current.value, job.range, job.text)) return false; replaceRange(job.range[0], job.range[1], forField(text, false)); return true; }} /> : null}
     </View>
   );
 }
@@ -885,8 +941,9 @@ function FieldTip({ text }) {
 // in one piece with the caret and the selection over it. A paste keeps its line breaks. Grows with its rows. A triple
 // click selects the line (up to its line breaks, not the row); Undo, Redo, the right-click menu and the primary selection
 // (select to copy, middle click to paste) work as in a TextInput.
-export function TextArea({ value, onChange, placeholder, onCancel, style, size = 13, minRows = 3 }) {
+export function TextArea({ value, onChange, placeholder, onCancel, style, size = 13, minRows = 3, spellCheck = true, writing: allowWriting = true }) {
   const t = useTheme();
+  const win = useContext(AppWindowContext);
   const token = useRef({}).current;
   const [isFocused, setIsFocused] = useState(false);
   const [blink, setBlink] = useState(true);
@@ -907,8 +964,11 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   };
   adopt(value);
   const [menu, setMenu] = useState(null);
+  const [spellMenu, setSpellMenu] = useState(null);
+  const [job, setJob] = useState(null);
+  const rangesRef = useRef([]);
   const menuOpen = useRef(false);
-  menuOpen.current = !!menu;
+  menuOpen.current = !!menu || !!job;
   const pressing = useRef(false);
   const [, redraw] = useState(0);
   const order = useContext(FieldOrder);
@@ -1055,8 +1115,23 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   };
   const onMenu = (ev) => {
     ev.stopPropagation();                                          // the field's menu, not the one of the view it is in
-    try { const [bx, by] = lord.getLayout(box.current.id); setMenu({ x: ev.x - bx, y: ev.y - by }); } catch (e) { /* not laid out yet */ }
+    try { const [bx, by] = lord.getLayout(box.current.id); setMenu({ x: ev.x - bx, y: ev.y - by }); } catch (e) { return; /* not laid out yet */ }
+    spellAt(rangesRef.current, value, posAtXY(ev.x, ev.y), setSpellMenu);
   };
+  const replaceRange = (a, b, text) => {
+    const p = latest.current;
+    adopt(p.value);
+    const cur = at.current, r = replaceSel({ value: p.value || '', pos: b, anchor: a }, text);
+    hist.current = record(hist.current, cur, r, 'paste', lord.now());
+    at.current = r;
+    if (r.value !== p.value) p.onChange(r.value);
+    publish();
+    redraw((n) => n + 1);
+  };
+  const checking = spellCheck !== false && !(isFocused && preedit);
+  const ranges = useSpellRanges(value || '', checking, isFocused ? clampPos(value, at.current.pos) : -1);
+  rangesRef.current = ranges;
+  const sqColor = squiggleColor(t), sqTop = Math.round(lineH / 2 + size * 0.5) - 1;
 
   const chars = [...(value || '')];
   const pos = isFocused ? clampPos(value, at.current.pos) : chars.length;
@@ -1099,13 +1174,20 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
           <View key={i} style={{ height: lineH }}>
             {boxes.map((bx, j) => <View key={`sel${j}`} style={{ position: 'absolute', top: 1, left: bx.x, width: Math.max(1, bx.w), height: lineH - 2, backgroundColor: t.accent, opacity: 0.38, borderRadius: 2 }} />)}
             {text ? <Text style={textStyle}>{text}</Text> : null}
+            {ranges.length ? <Squiggles top={sqTop} color={sqColor} list={underlines(ranges, r.start, r.end, (a2, b2) => (rl ? selRects(rl, a2, b2)
+              : [{ x: measure(chars.slice(r.start, r.start + a2).join('')), w: measure(chars.slice(r.start + a2, r.start + b2).join('')) }]))} /> : null}
             {mine && <View ref={caret} style={{ position: 'absolute', top: (lineH - size - 3) / 2, left: rl ? layCaretX(rl, pos - r.start) : measure(chars.slice(r.start, pos).join('')), width: 1.5, height: size + 3,
               backgroundColor: blink && !sel ? t.accent : 'transparent' }} />}
           </View>
         );
       })}
-      {menu ? <FieldMenu anchor={box} at={menu} onClose={() => setMenu(null)}
-        items={fieldMenuItems((e) => handlers.get(token)?.(e), { hist: hist.current, sel: !!selRange(at.current), secure: false, value })} /> : null}
+      {menu ? <FieldMenu anchor={box} at={menu} onClose={() => { setMenu(null); setSpellMenu(null); }}
+        items={withExtras(fieldMenuItems((e) => handlers.get(token)?.(e), { hist: hist.current, sel: !!selRange(at.current), secure: false, value }), spellMenu,
+          writingMenuFor({ secure: false, selected: selectedText(at.current), allowed: allowWriting !== false,
+            open: (o) => setJob({ ...o, text: selectedText(at.current), range: selRange(at.current), at: menu }) }),
+          { replace: (w) => spellMenu && replaceRange(spellMenu.range[0], spellMenu.range[1], w) })} /> : null}
+      {job ? <WritingPanel anchor={box} at={job.at} bounds={fieldBounds(box, win)} job={job} onClose={() => setJob(null)}
+        onReplace={(text) => { if (!stillThere(latest.current.value, job.range, job.text)) return false; replaceRange(job.range[0], job.range[1], forField(text, true)); return true; }} /> : null}
     </View>
   );
 }

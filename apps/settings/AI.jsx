@@ -21,7 +21,7 @@ import {
   VOICE_DEFAULTS, speakAvailable, previewVoice, tryVoice, player as voicePlayer, VOICE_LANGS, voiceLabel, voicePackage, modelPackage, hasVoice,
   PREVIEWS_PACKAGE, scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName,
   takeName, errorText, fs, LLM_MODELS, packagesForModel, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, installLlm,
-  removeLlm, lumoReady, translateWithLumo, ENGINE_PACKAGE,
+  removeLlm, lumoReady, translateWithLumo, ENGINE_PACKAGE, writingOn, setWritingOn,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -235,7 +235,7 @@ function FunctionCard({ f, w, on, onOpen }) {
   const { t: tr } = useLocale();
   const [hover, setHover] = useState(false);
   const level = LEVELS[f.level];
-  const name = f.id === 'sentinela' ? tr('sentinela.name') : tr(`settings.aiStore.fn.${f.id}`);
+  const name = f.id === 'sentinela' ? tr('sentinela.name') : f.id === 'writing' ? tr('writing.name') : tr(`settings.aiStore.fn.${f.id}`);
   return (
     <View focusable={!!onOpen} onClick={onOpen} onKeyDown={(ev) => { if (onOpen && (ev.key === 'Enter' || ev.key === ' ')) onOpen(); }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
@@ -245,7 +245,7 @@ function FunctionCard({ f, w, on, onOpen }) {
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{name}</Text>
         <Tag tone={level === 'read' ? 'ok' : level === 'admin' ? 'warn' : undefined} label={tr(`settings.aiStore.level.${level}`)} />
       </View>
-      <Text style={{ height: 30, overflow: 'hidden', fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{tr(`settings.aiStore.fnExample.${f.id}`)}</Text>
+      <Text style={{ height: 30, overflow: 'hidden', fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{f.id === 'writing' ? tr('writing.example') : tr(`settings.aiStore.fnExample.${f.id}`)}</Text>
       {f.ready ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text style={{ flex: 1, fontSize: typeScale.caption, fontWeight: 600, color: on ? tint.ok : t.textDim, textAlign: 'start' }}>{tr(on ? 'settings.aiStore.fnOn' : 'settings.aiStore.fnOff')}</Text>
@@ -642,6 +642,31 @@ function Footer({ ctx, width }) {
   );
 }
 
+// ---- Writing: ✨ AI on selected text (docs/AI.md "Writing"), off by default ----
+
+function WritingPage({ ready, onBrain }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  useStore(settings);
+  const on = writingOn();
+  return (
+    <View style={{ gap: 14 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, border: `1px solid ${t.separator}`, backgroundColor: t.control }}>
+        <Text style={{ fontSize: 24 }}>✨</Text>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('writing.settings.toggle')}</Text>
+          <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{tr('writing.settings.what')}</Text>
+        </View>
+        <Toggle on={on} onChange={(v) => setWritingOn(v)} />
+      </View>
+      {!ready ? <Note tone="warn">{tr('writing.settings.noModel')}</Note> : null}
+      {!ready ? <View style={{ flexDirection: 'row' }}><Link label={tr('writing.settings.openBrain')} onClick={onBrain} /></View> : null}
+      <Note>{tr('writing.settings.privacy')}</Note>
+      <Note>{tr('writing.settings.how')}</Note>
+    </View>
+  );
+}
+
 // ---- the page ----
 
 // page: index.jsx turns { section: 'ai', page } into the sub-page; alert: the Sentinela alert to open
@@ -806,7 +831,14 @@ export function AISettings({ alert }) {
   const avail = width;
 
   let body;
-  if (view === 'sentinela') {
+  if (view === 'writing') {
+    body = (
+      <View style={{ gap: 20 }}>
+        <Crumb here={tr('writing.name')} onBack={() => setView(null)} />
+        <WritingPage ready={!!chosen || installedLlm.size > 0} onBrain={() => setView('brain')} />
+      </View>
+    );
+  } else if (view === 'sentinela') {
     body = (
       <View style={{ gap: 20 }}>
         <Crumb here={tr('sentinela.name')} onBack={() => setView(null)} />
@@ -850,7 +882,7 @@ export function AISettings({ alert }) {
           <View style={{ gap: 10 }}>
             <Head title={tr('settings.aiStore.functions')} sub={tr('settings.aiStore.functionsSub')} />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
-              {FUNCTIONS.map((f) => <FunctionCard key={f.id} f={f} w={fn.w} on={f.id === 'sentinela' ? p.on : false} onOpen={f.ready ? () => setView(f.id) : null} />)}
+              {FUNCTIONS.map((f) => <FunctionCard key={f.id} f={f} w={fn.w} on={f.id === 'sentinela' ? p.on : f.id === 'writing' ? writingOn() : false} onOpen={f.ready ? () => setView(f.id) : null} />)}
             </View>
           </View>
         ) : null}

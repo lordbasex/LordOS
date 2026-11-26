@@ -98,7 +98,7 @@ export function RuleSheet({ app, appLabel, initial = {}, editId, suggestions = [
       </Field>
       <View style={{ flexDirection: 'row', gap: spacing.l, flexWrap: 'wrap' }}>
         <Field label={tr('fwrules.field.port')} hint={portErr || tr('fwrules.field.portHint')} hintColor={portErr ? RED : null}>
-          <TextInput value={f.port} placeholder={tr('fwrules.any')} onChange={(port) => put({ port })} onSubmit={save} onCancel={() => onDone(null)} style={{ width: 130, direction: 'ltr' }} />
+          <TextInput spellCheck={false} value={f.port} placeholder={tr('fwrules.any')} onChange={(port) => put({ port })} onSubmit={save} onCancel={() => onDone(null)} style={{ width: 130, direction: 'ltr' }} />
         </Field>
         <Field label={tr('fwrules.field.proto')}>
           <View style={{ flexDirection: 'row', height: 28, alignItems: 'center' }}>
