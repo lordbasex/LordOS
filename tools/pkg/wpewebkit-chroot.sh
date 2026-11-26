@@ -196,6 +196,287 @@ Last-Update: 2026-11-26
  
 PATCH
     echo lordos-document-isolation-policy.patch >> debian/patches/series
+    #    A service worker's notifications (+4.2, maintainer's request of 2026-11-26): registration.showNotification has no
+    #    page, so WebKit's GLib port sent it to org.freedesktop.Notifications itself and the application never saw it (no
+    #    sound rule, no silent, no window brought forward). Now it goes to the show-notification signal of a view of the
+    #    worker's network session that has the worker's origin, like a page's notification, and a click or close there
+    #    reaches the worker (notificationclick, notificationclose); with no such view, WebKit's D-Bus path as before. And a
+    #    worker's clients.focus() reaches the application as the view's lordos-focus-from-service-worker signal
+    #    (docs/WPEWEBKIT.md, "Service-worker notifications")
+    cat > debian/patches/lordos-sw-notifications.patch <<'PATCH'
+Description: a service worker's notifications reach a web view's show-notification; clients.focus() reaches the view
+ WebKitNotificationProvider::show() had no page for a persistent notification (ServiceWorkerRegistration.showNotification)
+ and sent it to org.freedesktop.Notifications from the UI process, so the application never saw it. Such a notification
+ now goes to the show-notification signal of a WebKitWebView of the same network session whose page has the service
+ worker's origin (a visible one first), like a page's notification; webkit_notification_clicked() and
+ webkit_notification_close() reach the worker as notificationclick and notificationclose through the service workers'
+ WebNotificationManagerProxy. Without such a view, or when no handler takes it, the D-Bus notification as before. A tag
+ replaces only a notification of the same origin.
+ WebPageProxy::focusFromServiceWorker (clients.focus(), WindowClient.focus()) did nothing in the GLib port: the view
+ now emits lordos-focus-from-service-worker, for the application to bring its window forward; the worker's promise is
+ answered at once, as before.
+Author: LordOS <lord.basex@gmail.com>
+Forwarded: no
+Last-Update: 2026-11-26
+
+--- a/Source/WebKit/UIProcess/API/glib/WebKitNotificationProvider.h
++++ b/Source/WebKit/UIProcess/API/glib/WebKitNotificationProvider.h
+@@ -60,7 +60,7 @@
+     void removeAPINotification(WebNotificationIdentifier);
+     void closeAPINotification(WebNotificationIdentifier);
+ 
+-    void withdrawAnyPreviousAPINotificationMatchingTag(const CString&);
++    void withdrawAnyPreviousAPINotificationMatchingTag(const CString&, const String& origin);
+ 
+     void show(WebNotification&, const RefPtr<WebCore::NotificationResources>&);
+ 
+--- a/Source/WebKit/UIProcess/API/glib/WebKitNotificationProvider.cpp
++++ b/Source/WebKit/UIProcess/API/glib/WebKitNotificationProvider.cpp
+@@ -30,6 +30,7 @@
+ #include "APIArray.h"
+ #include "APINotificationProvider.h"
+ #include "APINumber.h"
++#include "APISecurityOrigin.h"
+ #include "NotificationService.h"
+ #include "WebKitNotificationPrivate.h"
+ #include "WebKitWebContextPrivate.h"
+@@ -112,48 +113,60 @@
+         webkit_notification_close(notification.get());
+ }
+ 
+-void WebKitNotificationProvider::withdrawAnyPreviousAPINotificationMatchingTag(const CString& tag)
++// LordOS: the origin a notification given to a view came from (a tag replaces only a notification of the same origin:
++// the service workers' provider holds every origin's)
++static const char* lordosNotificationOriginKey = "lordos-notification-origin";
++
++void WebKitNotificationProvider::withdrawAnyPreviousAPINotificationMatchingTag(const CString& tag, const String& origin)
+ {
+     if (!tag.length())
+         return;
+ 
++    auto originUTF8 = origin.utf8();
+     for (auto& notification : m_apiNotifications.values()) {
+-        if (tag == webkit_notification_get_tag(notification.get())) {
++        auto* notificationOrigin = static_cast<const char*>(g_object_get_data(G_OBJECT(notification.get()), lordosNotificationOriginKey));
++        if (tag == webkit_notification_get_tag(notification.get()) && notificationOrigin && originUTF8 == notificationOrigin) {
+             closeAPINotification(WebNotificationIdentifier { webkit_notification_get_id(notification.get()) });
+             break;
+         }
+     }
+-
+-#if ASSERT_ENABLED
+-    for (auto& notification : m_apiNotifications.values())
+-        ASSERT(tag != webkit_notification_get_tag(notification.get()));
+-#endif
+ }
+ 
+ void WebKitNotificationProvider::show(WebPageProxy* page, WebNotification& webNotification, RefPtr<WebCore::NotificationResources>&& resources)
+ {
+-    if (!page || !m_webContext) {
+-        // FIXME: glib API needs to find their own solution to handling pageless notifications.
++    // LordOS: a service worker's notification (registration.showNotification: persistent, no page) goes to the
++    // show-notification signal of a view of the worker's network session that has the worker's origin, like a page's;
++    // the application's handler shows it, and webkit_notification_clicked() and webkit_notification_close() reach the
++    // worker as notificationclick and notificationclose (WebNotificationManagerProxy, as from D-Bus). Without such a
++    // view, or when no handler takes it, WebKit's own D-Bus notification as before.
++    WebKitWebView* webView = nullptr;
++    if (page && m_webContext)
++        webView = webkitWebContextGetWebViewForPage(m_webContext, page);
++    else if (!page && webNotification.isPersistentNotification())
++        webView = webkitWebContextGetWebViewForServiceWorkerNotification(webNotification.sessionID(), webNotification.origin().securityOrigin());
++    if (!webView) {
++        ASSERT(!page || !m_webContext);
+         show(webNotification, resources);
+         return;
+     }
+ 
+     GRefPtr<WebKitNotification> notification = m_apiNotifications.get(webNotification.identifier());
+     if (!notification) {
+-        withdrawAnyPreviousAPINotificationMatchingTag(webNotification.tag().utf8());
++        auto origin = webNotification.origin().securityOrigin().toString();
++        withdrawAnyPreviousAPINotificationMatchingTag(webNotification.tag().utf8(), origin);
+         notification = adoptGRef(webkitNotificationCreate(webNotification));
++        g_object_set_data_full(G_OBJECT(notification.get()), lordosNotificationOriginKey, g_strdup(origin.utf8().data()), g_free);
+         g_signal_connect(notification.get(), "closed", G_CALLBACK(apiNotificationCloseCallback), this);
+         g_signal_connect(notification.get(), "clicked", G_CALLBACK(apiNotificationClickedCallback), this);
+         m_apiNotifications.set(webNotification.identifier(), notification);
+     }
+ 
+-    auto* webView = webkitWebContextGetWebViewForPage(m_webContext, page);
+-    ASSERT(webView);
+-
+     if (webkitWebViewEmitShowNotification(webView, notification.get()))
+         m_notificationManager->providerDidShowNotification(webNotification.identifier());
+     else {
+         g_signal_handlers_disconnect_by_data(notification.get(), this);
++        // LordOS: not left in the map, so a later same-tag notification can't close it
++        m_apiNotifications.remove(webNotification.identifier());
+         show(webNotification, resources);
+     }
+ }
+--- a/Source/WebKit/UIProcess/API/glib/WebKitWebContextPrivate.h
++++ b/Source/WebKit/UIProcess/API/glib/WebKitWebContextPrivate.h
+@@ -30,6 +30,8 @@
+ #include "WebKitWebsitePolicies.h"
+ #include "WebProcessPool.h"
+ #include <WebCore/ResourceRequest.h>
++#include <WebCore/SecurityOriginData.h>
++#include <pal/SessionID.h>
+ 
+ WebKit::WebProcessPool& webkitWebContextGetProcessPool(WebKitWebContext*);
+ #if !ENABLE(2022_GLIB_API)
+@@ -38,6 +40,7 @@
+ void webkitWebContextWebViewCreated(WebKitWebContext*, WebKitWebView*);
+ void webkitWebContextWebViewDestroyed(WebKitWebContext*, WebKitWebView*);
+ WebKitWebView* webkitWebContextGetWebViewForPage(WebKitWebContext*, WebKit::WebPageProxy*);
++WebKitWebView* webkitWebContextGetWebViewForServiceWorkerNotification(PAL::SessionID, const WebCore::SecurityOriginData&);
+ GVariant* webkitWebContextInitializeWebProcessExtensions(WebKitWebContext*);
+ void webkitWebContextInitializeNotificationPermissions(WebKitWebContext*);
+ #if ENABLE(REMOTE_INSPECTOR)
+--- a/Source/WebKit/UIProcess/API/glib/WebKitWebContext.cpp
++++ b/Source/WebKit/UIProcess/API/glib/WebKitWebContext.cpp
+@@ -58,6 +58,7 @@
+ #include <JavaScriptCore/RemoteInspector.h>
+ #include <WebCore/ContentSecurityPolicy.h>
+ #include <WebCore/ResourceLoaderIdentifier.h>
++#include <WebCore/SecurityOriginData.h>
+ #include <cstdlib>
+ #include <glib/gi18n-lib.h>
+ #include <libintl.h>
+@@ -68,6 +69,7 @@
+ #include <wtf/FileSystem.h>
+ #include <wtf/HashMap.h>
+ #include <wtf/HashSet.h>
++#include <wtf/ListHashSet.h>
+ #include <wtf/NeverDestroyed.h>
+ #include <wtf/RefCounted.h>
+ #include <wtf/RefPtr.h>
+@@ -2048,6 +2050,14 @@
+     return *context->priv->processPool;
+ }
+ 
++// LordOS: every web view of every context, in creation order: a service worker's notification has no page, and is shown
++// by a view of its network session that has its origin (webkitWebContextGetWebViewForServiceWorkerNotification)
++static ListHashSet<WebKitWebView*>& allWebViews()
++{
++    static NeverDestroyed<ListHashSet<WebKitWebView*>> webViews;
++    return webViews;
++}
++
+ void webkitWebContextWebViewCreated(WebKitWebContext* context, WebKitWebView* webView)
+ {
+     Ref page = webkitWebViewGetPage(webView);
+@@ -2057,14 +2067,38 @@
+     }
+ 
+     context->priv->webViews.set(page->identifier(), webView);
++    allWebViews().add(webView);
+ }
+ 
+ void webkitWebContextWebViewDestroyed(WebKitWebContext* context, WebKitWebView* webView)
+ {
+     context->priv->webViews.remove(webkitWebViewGetPage(webView).identifier());
++    allWebViews().remove(webView);
+ }
+ 
+ WebKitWebView* webkitWebContextGetWebViewForPage(WebKitWebContext* context, WebPageProxy* page)
+ {
+     return page ? context->priv->webViews.get(page->identifier()) : nullptr;
+ }
++
++// LordOS: the view that shows a service worker's notification (registration.showNotification, which has no page): one
++// of the same network session (the worker's website data store) whose page has the worker's origin, a visible one
++// first; none (nullptr) keeps WebKit's own D-Bus notification
++WebKitWebView* webkitWebContextGetWebViewForServiceWorkerNotification(PAL::SessionID sessionID, const WebCore::SecurityOriginData& origin)
++{
++    if (origin.isOpaque())
++        return nullptr;
++    WebKitWebView* found = nullptr;
++    for (auto* webView : allWebViews()) {
++        auto& page = webkitWebViewGetPage(webView);
++        if (page.isClosed() || page.sessionID() != sessionID)
++            continue;
++        if (WebCore::SecurityOriginData::fromURLWithoutStrictOpaqueness(URL { page.currentURL() }) != origin)
++            continue;
++        if (page.isViewVisible())
++            return webView;
++        if (!found)
++            found = webView;
++    }
++    return found;
++}
+--- a/Source/WebKit/UIProcess/API/glib/WebKitWebViewPrivate.h
++++ b/Source/WebKit/UIProcess/API/glib/WebKitWebViewPrivate.h
+@@ -96,6 +96,7 @@
+ void webkitWebViewHandleAuthenticationChallenge(WebKitWebView*, WebKit::AuthenticationChallengeProxy*);
+ void webkitWebViewInsecureContentDetected(WebKitWebView*, WebKitInsecureContentEvent);
+ bool webkitWebViewEmitShowNotification(WebKitWebView*, WebKitNotification*);
++void webkitWebViewFocusFromServiceWorker(WebKitWebView*);
+ void webkitWebViewWebProcessTerminated(WebKitWebView*, WebKitWebProcessTerminationReason);
+ void webkitWebViewIsPlayingAudioChanged(WebKitWebView*);
+ void webkitWebViewMediaCaptureStateDidChange(WebKitWebView*, WebCore::MediaProducer::MediaStateFlags);
+--- a/Source/WebKit/UIProcess/API/glib/WebKitWebView.cpp
++++ b/Source/WebKit/UIProcess/API/glib/WebKitWebView.cpp
+@@ -209,6 +209,8 @@
+ 
+     QUERY_PERMISSION_STATE,
+ 
++    LORDOS_FOCUS_FROM_SERVICE_WORKER,
++
+     LAST_SIGNAL
+ };
+ 
+@@ -2588,6 +2590,18 @@
+         G_TYPE_BOOLEAN, 1,
+         WEBKIT_TYPE_NOTIFICATION);
+ 
++    // LordOS (not WebKit's API): WebKitWebView::lordos-focus-from-service-worker, emitted when a service worker asks
++    // for this view's page to be focused (clients.focus(), WindowClient.focus(): only while the worker handles a user
++    // gesture such as notificationclick). The application brings the view's window forward; the worker's promise
++    // resolves whatever it does.
++    signals[LORDOS_FOCUS_FROM_SERVICE_WORKER] = g_signal_new(
++        "lordos-focus-from-service-worker",
++        G_TYPE_FROM_CLASS(gObjectClass),
++        G_SIGNAL_RUN_LAST,
++        0, nullptr, nullptr,
++        g_cclosure_marshal_VOID__VOID,
++        G_TYPE_NONE, 0);
++
+ #if PLATFORM(GTK)
+      /**
+       * WebKitWebView::run-color-chooser:
+@@ -3220,6 +3234,11 @@
+     return handled;
+ }
+ 
++void webkitWebViewFocusFromServiceWorker(WebKitWebView* webView)
++{
++    g_signal_emit(webView, signals[LORDOS_FOCUS_FROM_SERVICE_WORKER], 0);
++}
++
+ #if PLATFORM(GTK)
+ bool webkitWebViewEmitRunColorChooser(WebKitWebView* webView, WebKitColorChooserRequest* request)
+ {
+--- a/Source/WebKit/UIProcess/API/glib/WebKitUIClient.cpp
++++ b/Source/WebKit/UIProcess/API/glib/WebKitUIClient.cpp
+@@ -80,6 +80,15 @@
+         webkitWebViewReadyToShowPage(m_webView);
+     }
+ 
++    // LordOS: a service worker's clients.focus() (WebPageProxy::focusFromServiceWorker) reaches the application as
++    // WebKitWebView::lordos-focus-from-service-worker. False: WebKit answers the worker at once, as before, instead of
++    // waiting for the view to become visible (which an application that doesn't bring it forward would never do)
++    bool focusFromServiceWorker(WebPageProxy&) final
++    {
++        webkitWebViewFocusFromServiceWorker(m_webView);
++        return false;
++    }
++
+     void close(WebPageProxy*) final
+     {
+         webkitWebViewClosePage(m_webView);
+PATCH
+    echo lordos-sw-notifications.patch >> debian/patches/series
     #    The DRM backend's own API (WPEDisplayDRM, WPEScreenDRM, WPEToplevelDRM, WPEViewDRM: wpe_display_drm_* and the
     #    _get_type of the others) isn't in the library then, so it leaves Debian's symbols file too; WPEPlatform's core
     #    DRM device API (wpe_drm_device_*, used for dmabuf) stays
@@ -220,6 +501,7 @@ PATCH
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "ICE with librice (USE_LIBRICE) in the network process, so the web process keeps no network; Build-Depends on librice-dev (LordOS's package)."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "lordos-sharedarraybuffer-coi.patch: SharedArrayBuffer in cross-origin-isolated web processes only, as on Cocoa."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "lordos-document-isolation-policy.patch: Document-Isolation-Policy with COEP require-corp gives WebKit's cross-origin isolation (COOP same-origin + COEP)."
+    DEBEMAIL=$DEBEMAIL_LORDOS dch --append "lordos-sw-notifications.patch: a service worker's notifications go to a web view's show-notification (same network session and origin), D-Bus otherwise; clients.focus() emits lordos-focus-from-service-worker."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Maintainer: LordOS (the packaging is the Debian WebKit Maintainers')."
     sed -i "0,/^ -- /s/^\( -- .*>  \).*$/\1$debdate/" debian/changelog
     [ "$(dpkg-parsechangelog -S Date)" = "$debdate" ] || die "could not date the changelog entry"
