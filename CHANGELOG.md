@@ -10,10 +10,51 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+- **A "New desktop style" issue form for sharing a community theme** (`.github/ISSUE_TEMPLATE/new-desktop-style.yml`,
+  from the lordos-theme-kit proposals, approved 2026-11-26). It has the sections the kit's `/lordos-theme publish`
+  writes: name and id, description, version, licence and the LordOS release it was made for, screenshots (light, dark,
+  Arabic), a link to the source-only `.zip` and its SHA-256, the source repository, provenance (what inspired it,
+  what was written new, reused code and its licence; never GPL code), the kit's check report, what was tested, and
+  two required confirmations (no personal data; everything may be shared under its licence). It applies the labels
+  `desktop-style` and `community` (to be created in the repository). `docs/THEMES-GUIDE.md` §5 points to it.
+- **`theme_tour_scene`: headless screenshots of any theme, a community one too** (`server/tests/theme_tour_scene/`,
+  lordos-theme-kit's tour, approved 2026-11-26). `tests/app_scene_headless.sh theme_tour_scene OUT <id> [lang] [mode]`
+  runs a theme in `themes/<id>` in a headless lord-server with a private home and keeps three screenshots: the empty
+  desktop, Text Editor in front of Calculator (a focused and an unfocused frame, the app's menus) and Characters (the
+  sidebar, a search field and the selection: the token contract with the apps). It opens only apps that show nothing
+  about the person or the machine; each step logs "done" or "missing", so the script's exit status is 1 when an app
+  didn't open or a screenshot wasn't saved. Checked on Lord Celeste in Arabic, dark (right to left), and Lord Flow.
+- **`minLordOS` in `theme.json`: a theme can say which LordOS release it needs** (lordos-theme-kit proposal, approved
+  2026-11-26; the kit already writes it). `cleanThemeMeta` (`sdk/thememeta.js`) keeps it only as two to six dot-separated
+  numbers of at most five digits ("0.8.9.6.2"; any suffix, text or other type is dropped), and `lordosAtLeast` compares
+  it with this build's version number by number, ignoring a `-beta`/`+build` suffix (an unknown version or a missing
+  field never blocks). On an older LordOS, Settings → Appearance → Desktop style marks the card "Needs LordOS ‹version›",
+  the theme's page shows "Needs LordOS ‹version› or later" instead of Apply and a "Requires" row, and `themes.use`
+  refuses it before anything changes, with a notification that names the release (`themeNeedsNewer`). Five new texts,
+  in all 35 languages. Test: `server/tests/theme_gallery_test.mjs`.
+- **A community theme's own texts are translated, under its namespace `theme-<id>`** (lordos-theme-kit proposal,
+  approved 2026-11-26). A theme's options in `theme.json` may now use keys of its own namespace (`theme-aurora.opt.x`)
+  besides `shell.*`, but never another theme's: `cleanThemeMeta(meta, id)` keeps `theme-<id>.` keys only for that id
+  (an id of at most 26 characters, so the namespace fits `lord.locale.catalog`'s 32), and drops the rest. Its name and
+  description may come from `theme-<id>.theme.name` / `.theme.description` after LordOS's own `shell.theme.<id>.*`.
+  The texts behind those keys are the theme's, so they are shown through `themeText`: one line, control and
+  bidi-override characters removed, cut with "…" at 48 characters for a name or label, 24 for a choice, 160 for a
+  hint and 240 for a description (`THEME_TEXT_MAX`; LordOS's own `shell.*` texts are shown whole). A theme's texts live
+  in `assets/locales/<lang>/theme-<id>.json` (lordos-theme-kit copies the theme's `locales/<lang>.json` there), so
+  `node tools/i18n-check.mjs` checks every language of them like LordOS's own; it now also checks that every label in
+  each `themes/*/theme.json` is an English key and that no option is dropped. lord-server no longer lets a `.lpk`
+  package use an id starting with `theme-` (`lpk_reserved`), so no package can supply a theme's texts. Test:
+  `server/tests/theme_gallery_test.mjs`.
+
 ### Fixed
 - **Web apps played no sound of their own without a click first:** a messaging web app's incoming-call ringtone and
   new-message sound were silent. WebKit's default autoplay policy allows only muted media until the person interacts;
   lord-web now gives every web app's view `WEBKIT_AUTOPLAY_ALLOW`, as Chrome does for installed apps (`webback_policies`).
+- **Toolkit Audit from the launcher closed before its table could be read.** The entry runs in a Terminal window
+  (`Terminal=true`), which closed as soon as `lordos-testbench --toolkits` ended. It now runs
+  `--toolkits --show --wait`: each check shows as it is decided, and the new `--wait` asks "Press Enter to close" (all
+  35 languages) when stdin is a terminal, so scripts and `lordos-issue` never block.
 - **A machine's apps no longer mix with this computer's in the app launcher unless you turn it on** (the maintainer's
   decision while testing 0.8.9.6.2: a machine that was off filled the launcher with its apps). Since 0.8.9.6 a
   machine that had listed its apps in apps mode put them in the launcher and search while off, marked with its name.

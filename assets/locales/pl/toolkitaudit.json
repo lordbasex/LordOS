@@ -1,6 +1,6 @@
 {
   "title": "Zestawy narzędzi Linuksa na tym pulpicie",
-  "usage": "Użycie: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Użycie: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Nieznana kombinacja: {id}. Znane: {list}",
   "running": "Testowanie {combo}...",
   "col.combo": "Kombinacja",
@@ -27,5 +27,6 @@
   "matrix": "Obiekty globalne Wayland użyte przez każdy zestaw (wersja; ! błąd protokołu; - nieużyty):",
   "saved": "Zapisano dla lordos-issue: {path}",
   "notSaved": "Nie udało się zapisać wyniku w ~/.cache/lordos.",
-  "root": "Audyt zestawów narzędzi nie działa jako root: uruchom lordos-testbench --toolkits jako swój użytkownik, w Terminalu LordOS."
+  "root": "Audyt zestawów narzędzi nie działa jako root: uruchom lordos-testbench --toolkits jako swój użytkownik, w Terminalu LordOS.",
+  "pressEnter": "Naciśnij Enter, aby zamknąć."
 }

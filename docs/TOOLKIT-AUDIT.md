@@ -12,6 +12,7 @@ lordos-testbench --toolkits --json                # the result below, one line
 lordos-testbench --toolkits --only gtk4-wayland,qt6-xcb
 lordos-testbench --toolkits --last                # the saved result, checked and summed up (what lordos-issue adds)
 lordos-testbench --toolkits --show                # slowed down to watch, each check printed as it is decided
+lordos-testbench --toolkits --show --wait         # then "Press Enter to close" (the launcher's Toolkit Audit entry)
 lordos-testbench --frameworks                     # the same, watched in the Test Bench's Frameworks screen
 ```
 

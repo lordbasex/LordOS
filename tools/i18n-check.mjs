@@ -64,6 +64,26 @@ const ref = flat(loadLang(REF).cats);
 let bad = 0;
 for (const [k, file] of usedKeys()) if (!(k in ref)) { console.log(`✗ ${k} (used in ${file}) is not in ${REF}`); bad++; }
 
+// (0.8.9.6.2) The labels a theme's theme.json shows in Settings (its options' label, hint and choices) are English keys
+// too: shell.* or the theme's own namespace theme-<id> (sdk/thememeta.js; lordos-theme-kit copies a community theme's
+// locales/<lang>.json to assets/locales/<lang>/theme-<id>.json, so every language is checked below like LordOS's own).
+// An option sdk/thememeta.js would drop (another theme's namespace, a bad key) is reported as well.
+const { cleanThemeMeta } = await import(path.join(root, 'sdk/thememeta.js'));
+for (const id of fs.readdirSync(path.join(root, 'themes'))) {
+  const f = path.join(root, 'themes', id, 'theme.json');
+  if (!fs.existsSync(f)) continue;
+  let meta;
+  try { meta = JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { console.log(`✗ themes/${id}/theme.json: ${e.message}`); bad++; continue; }
+  const raw = Array.isArray(meta.options) ? meta.options.slice(0, 8) : [];
+  const opts = cleanThemeMeta(meta, id).options;
+  if (opts.length !== raw.length) { console.log(`✗ themes/${id}/theme.json: ${raw.length - opts.length} option(s) dropped by sdk/thememeta.js`); bad++; }
+  for (const o of opts) {
+    for (const k of [o.label, o.hint, ...(o.choices || []).map((c) => c[1])].filter(Boolean)) {
+      if (!(k in ref)) { console.log(`✗ ${k} (themes/${id}/theme.json) is not in ${REF}`); bad++; }
+    }
+  }
+}
+
 // The core set (tools/i18n-core.json): the English keys a new language translates first.
 const CORE = JSON.parse(fs.readFileSync(path.join(root, 'tools/i18n-core.json'), 'utf8')).namespaces;
 const inCore = (k) => {

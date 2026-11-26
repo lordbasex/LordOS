@@ -120,7 +120,8 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
 - `hidden: true` keeps it out of Settings (the login screen uses it).
 - It is read as text of at most 4 KB. It is data, not code, so it is not in the code manifest.
 - (0.8.9) Three optional fields for Settings, which knows only Lord Flow and Lord Classic by id. `sdk/thememeta.js`
-  checks them and drops anything else (labels must be `shell.*` locale keys, values short plain strings):
+  checks them and drops anything else (labels must be `shell.*` locale keys or, from 0.8.9.6.2, keys of the theme's
+  own namespace `theme-<id>`, see [Translations](#translations); values short plain strings):
   - `"sketch": { "rail": true, "pills": true, "frame": true }` (also `menubar`, `dock`, `taskbar`): the drawn picture
     in Appearance → Desktop style.
   - `"options": [{ "key", "label", "hint", "choices": [[value, label], …] | "toggle": true, "default" }]`: the theme's
@@ -130,7 +131,7 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
     (the theme then uses `flowDesktopKeys` and `flowGrabs()`).
 
   Lord Workspaces' `theme.json` uses all three.
-- Four optional fields that Settings → Appearance shows on the theme's card and page (checked by
+- Five optional fields that Settings → Appearance shows on the theme's card and page (checked by
   `cleanThemeMeta` in `sdk/thememeta.js`; an invalid value is dropped):
 
   | Field | Value | Shown as |
@@ -139,13 +140,14 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
   | `author` | plain text, one line, at most 80 characters, no control or bidi-override characters | the author; missing, invalid or the placeholder `"author pending"` reads **"Unknown author"** |
   | `license` | an SPDX expression: `"MIT"`, `"GPL-3.0-or-later"`, `"MIT OR Apache-2.0"` (up to four terms joined by `OR`, `AND` or `WITH`) | the license; missing reads "Not stated" |
   | `version` | `1`, `1.2`, `1.2.3` or `1.2.3.4`, with an optional `-beta.1` or `+build` suffix | "Version 1.2.3" |
+  | `minLordOS` | (0.8.9.6.2) the oldest LordOS release it runs on: `"0.8.9.6.2"` (two to six numbers, no suffix) | on an older release, "Needs LordOS 0.8.9.6.2" on the card and "Needs LordOS 0.8.9.6.2 or later" instead of Apply; `themes.use` refuses it with a notification |
 
   The official themes (no `community: true`) declare none of them: Settings shows LordOS as their author, MIT as
-  their license and the release's version as theirs. A community theme should declare all four:
+  their license and the release's version as theirs. A community theme should declare all five:
 
   ```json
   { "name": "Aurora", "description": "Soft colors and a floating dock.",
-    "community": true, "author": "Ana Pérez", "license": "MIT", "version": "1.0.0",
+    "community": true, "author": "Ana Pérez", "license": "MIT", "version": "1.0.0", "minLordOS": "0.8.9.6.2",
     "sketch": { "dock": true, "menubar": true } }
   ```
 
@@ -475,6 +477,18 @@ the `shell` catalog (`assets/locales/<lang>/shell.json`, in every one of the 35 
 LordOS tree, `node tools/i18n-check.mjs` checks every `t()` key in `themes/` against the English
 catalog and every language against English.
 
+**A community theme's own namespace (0.8.9.6.2): `theme-<id>`.** A theme that LordOS didn't make keeps its texts in
+`theme-<id>` (`themeNamespace` in `sdk/thememeta.js`; its id at most 26 characters), as
+`assets/locales/<lang>/theme-<id>.json`: [lordos-theme-kit](https://github.com/lordbasex/lordos-theme-kit) keeps
+them as `locales/<lang>.json` in the theme and copies them there when it builds. The theme's code calls
+`t('theme-<id>.bar.apps')`; its `theme.json` option labels, hints and choices may use the same keys
+(`"label": "theme-aurora.opt.glass"`), never another theme's (they are dropped); and `theme-<id>.theme.name` /
+`theme-<id>.theme.description` translate its name and description in Settings. Settings shows those texts through
+`themeText`: one line, without control or bidi-override characters, cut with "…" at 48 characters for a name or label,
+24 for a choice, 160 for a hint and 240 for a description. Like every text of LordOS, a theme's are in all 35
+languages: `node tools/i18n-check.mjs` checks each `theme-<id>.json` like LordOS's own catalogs, and every label in
+`themes/*/theme.json` against English. No `.lpk` package may have an id that starts with `theme-`.
+
 ## 3. Building it
 
 `npm install` once (React, the reconciler and esbuild), then:
@@ -587,7 +601,15 @@ Lord Classic installed: they are the fallback (`start_theme` in `main.c`).
 
 ## 5. Checklist before sharing a theme
 
-Check each item on a real session and take a screenshot ([VM-SETUP.md](VM-SETUP.md), `screendump`):
+Check each item on a real session and take a screenshot ([VM-SETUP.md](VM-SETUP.md), `screendump`). For a first
+look without a session, the headless theme tour keeps the same three screenshots a reviewer starts from (the desktop,
+two windows, a sidebar app) for any theme in `themes/<id>`; from `server/`, after `npm run build` and `make`:
+
+```sh
+tests/app_scene_headless.sh theme_tour_scene /tmp/shots <id> en dark
+tests/app_scene_headless.sh theme_tour_scene /tmp/shots <id> ar light     # right to left
+```
+
 
 - **Both kinds of window:** LordOS apps (the Terminal for a transparent one, Settings, Files) and
   Linux apps with and without their own frame (`args.csd`), including the window menu from a right
@@ -613,3 +635,9 @@ Check each item on a real session and take a screenshot ([VM-SETUP.md](VM-SETUP.
 - **Notifications, search, permission prompts and the power dialog** look right inside your
   `ThemeProvider` (they use your tokens).
 - And the [DESIGN.md](DESIGN.md#robustness-checklist) robustness checklist.
+
+To share a theme with LordOS, open an issue with the **"New desktop style"** form
+(`.github/ISSUE_TEMPLATE/new-desktop-style.yml`): screenshots in light, dark and Arabic, a link to the source-only
+`.zip` and its SHA-256, the provenance of every idea, piece of code or art, and the check report. The
+[lordos-theme-kit](https://github.com/lordbasex/lordos-theme-kit) plugin for Claude Code (`/lordos-theme publish`)
+fills in every section.

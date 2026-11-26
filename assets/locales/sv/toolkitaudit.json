@@ -1,6 +1,6 @@
 {
   "title": "Linux-verktygslådor på det här skrivbordet",
-  "usage": "Användning: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Användning: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Okänd kombination: {id}. Kända: {list}",
   "running": "Testar {combo}...",
   "col.combo": "Kombination",
@@ -27,5 +27,6 @@
   "matrix": "Wayland-globaler som varje verktygslåda band (version; ! protokollfel; - inte bunden):",
   "saved": "Sparat för lordos-issue: {path}",
   "notSaved": "Resultatet kunde inte sparas i ~/.cache/lordos.",
-  "root": "Verktygslådegranskningen körs inte som root: kör lordos-testbench --toolkits som dig själv, i LordOS-terminalen."
+  "root": "Verktygslådegranskningen körs inte som root: kör lordos-testbench --toolkits som dig själv, i LordOS-terminalen.",
+  "pressEnter": "Tryck på Enter för att stänga."
 }

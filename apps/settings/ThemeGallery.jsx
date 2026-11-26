@@ -2,7 +2,9 @@
 // A search field, the filters All / Official / Community / Installed and a grid of cards that wraps with the window;
 // a card opens the theme's page (a larger picture, its description, author, license, version, its own options from
 // theme.json and Apply). A theme that couldn't start in this session (lord-server went back to the one before) says so
-// on its card, with Report: the GitHub issue form, filled in, in the browser; nothing is sent by itself.
+// on its card, with Report: the GitHub issue form, filled in, in the browser; nothing is sent by itself. (0.8.9.6.2) A
+// theme whose theme.json asks for a newer LordOS (minLordOS) says "Needs LordOS ‹version›" on its card and page, and
+// its page has no Apply (themes.use refuses it too).
 // Changing the style still applies at once, without logging out (sdk/index.js themes.use). The pure parts (search,
 // filters, order, arrow keys, the report's address) are sdk/themegallery.js.
 import {
@@ -109,6 +111,7 @@ function Card({ e, current, lit, onOpen }) {
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
         {e.current ? <Pill label={tr('settings.style.inUse')} color={t.accent} /> : null}
         {e.community ? <Pill label={tr('settings.style.community')} color={tint.warn} /> : null}
+        {e.needsLordOS ? <Pill label={tr('settings.style.needsLordOSShort', { version: e.needsLordOS })} color={tint.error} /> : null}
       </View>
       {e.failed ? <Failed e={e} current={current} small /> : null}
     </View>
@@ -136,6 +139,7 @@ function Detail({ e, current, onBack }) {
             {e.failed ? <Failed e={e} current={current} /> : null}
             <View style={{ flexDirection: 'row' }}>
               {e.current ? <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{tr('settings.style.inUseLong')}</Text>
+                : e.needsLordOS ? <Text style={{ fontSize: typeScale.callout, color: tint.error, textAlign: 'start' }}>{tr('settings.style.needsLordOS', { version: e.needsLordOS })}</Text>
                 : <Button primary label={tr('settings.style.apply')} disabled={e.failed} onClick={() => apply(e.id)} />}
             </View>
           </View>
@@ -145,6 +149,7 @@ function Detail({ e, current, onBack }) {
         <ValueRow label={tr('settings.style.author')} value={e.author || tr('settings.style.unknownAuthor')} />
         <ValueRow label={tr('settings.style.license')} value={e.license || tr('settings.style.notStated')} />
         <ValueRow label={tr('settings.style.versionLabel')} value={e.version || tr('settings.style.notStated')} />
+        {e.minLordOS ? <ValueRow label={tr('settings.style.requires')} value={tr('settings.style.requiresValue', { version: e.minLordOS })} /> : null}
       </Section>
       <ThemeOptions theme={e} title={tr('settings.style.options')} />
     </View>

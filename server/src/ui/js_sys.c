@@ -2245,6 +2245,9 @@ static JSValue f_apps_last_error(JSContext *c, JSValueConst this_val, int argc, 
 static int lpk_reserved(const char *id) {
     static const char *const fixed[] = { "shell", "apps", "common", "linux", "desktop", "lordos", "sdk", "store", NULL };
     for (int i = 0; fixed[i]; i++) if (!strcmp(id, fixed[i])) return 1;
+    /* (0.8.9.6.2) "theme-<id>" is a theme's own namespace (sdk/thememeta.js themeNamespace): no package supplies its
+     * texts (lord.locale.catalog would otherwise fall back to a package's locales for a theme's option labels) */
+    if (!strncmp(id, "theme-", 6)) return 1;
     char path[PATH_MAX * 2];
     struct stat st;
     snprintf(path, sizeof path, "%s/locales/en/%s.json", assets, id);

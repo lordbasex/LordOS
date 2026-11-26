@@ -1,6 +1,6 @@
 {
   "title": "इस डेस्कटॉप पर Linux टूलकिट",
-  "usage": "उपयोग: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "उपयोग: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "अज्ञात संयोजन: {id}। ज्ञात: {list}",
   "running": "{combo} की जाँच हो रही है...",
   "col.combo": "संयोजन",
@@ -27,5 +27,6 @@
   "matrix": "हर टूलकिट द्वारा बाँधे गए Wayland ग्लोबल (संस्करण; ! प्रोटोकॉल त्रुटि; - नहीं बाँधा):",
   "saved": "lordos-issue के लिए सहेजा गया: {path}",
   "notSaved": "परिणाम ~/.cache/lordos में सहेजा नहीं जा सका।",
-  "root": "टूलकिट ऑडिट root के रूप में नहीं चलता: LordOS टर्मिनल में अपने खाते से lordos-testbench --toolkits चलाएँ।"
+  "root": "टूलकिट ऑडिट root के रूप में नहीं चलता: LordOS टर्मिनल में अपने खाते से lordos-testbench --toolkits चलाएँ।",
+  "pressEnter": "बंद करने के लिए Enter दबाएँ।"
 }

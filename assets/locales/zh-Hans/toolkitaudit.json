@@ -1,6 +1,6 @@
 {
   "title": "此桌面上的 Linux 工具包",
-  "usage": "用法: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "用法: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "未知组合: {id}。已知: {list}",
   "running": "正在测试 {combo}...",
   "col.combo": "组合",
@@ -27,5 +27,6 @@
   "matrix": "各工具包绑定的 Wayland 全局对象 (版本; ! 协议错误; - 未绑定):",
   "saved": "已为 lordos-issue 保存: {path}",
   "notSaved": "无法将结果保存到 ~/.cache/lordos。",
-  "root": "工具包审核不以 root 身份运行：请在 LordOS 终端中以你自己的用户运行 lordos-testbench --toolkits。"
+  "root": "工具包审核不以 root 身份运行：请在 LordOS 终端中以你自己的用户运行 lordos-testbench --toolkits。",
+  "pressEnter": "按 Enter 键关闭。"
 }

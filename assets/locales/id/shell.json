@@ -978,6 +978,7 @@
   "themeSwitch.failedTitle": "{name} tidak dapat diterapkan",
   "themeSwitch.refusedBody": "Kodenya tidak cocok dengan salinan LordOS yang ditandatangani, jadi tidak dimuat. Gaya desktop Anda tetap seperti semula.",
   "themeSwitch.failedBody": "Tidak dapat dimulai. Gaya desktop Anda tetap seperti semula.",
+  "themeSwitch.needsLordOSBody": "Ini memerlukan LordOS {version} atau yang lebih baru. Gaya desktop Anda tetap seperti semula.",
   "spotlight.section.machines": "Mesin Virtual",
   "guestApps.inMachine": "Di {machine}"
 }

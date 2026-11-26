@@ -1,6 +1,6 @@
 {
   "title": "Mga toolkit ng Linux sa desktop na ito",
-  "usage": "Paggamit: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Paggamit: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Hindi kilalang kombinasyon: {id}. Mga kilala: {list}",
   "running": "Sinusubok ang {combo}...",
   "col.combo": "Kombinasyon",
@@ -27,5 +27,6 @@
   "matrix": "Mga global ng Wayland na ginamit ng bawat toolkit (bersyon; ! error sa protocol; - hindi ginamit):",
   "saved": "Na-save para sa lordos-issue: {path}",
   "notSaved": "Hindi ma-save ang resulta sa ~/.cache/lordos.",
-  "root": "Hindi tumatakbo bilang root ang toolkit audit: patakbuhin ang lordos-testbench --toolkits bilang ikaw, sa LordOS Terminal."
+  "root": "Hindi tumatakbo bilang root ang toolkit audit: patakbuhin ang lordos-testbench --toolkits bilang ikaw, sa LordOS Terminal.",
+  "pressEnter": "Pindutin ang Enter para isara."
 }

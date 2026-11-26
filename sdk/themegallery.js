@@ -3,6 +3,7 @@
 // address of the issue form that Report opens for a theme that couldn't start. Tested by
 // server/tests/theme_gallery_test.mjs. The theme.json fields are checked first by sdk/thememeta.js.
 import { compareNames } from './collate.js';
+import { themeNeedsNewer } from './thememeta.js';
 import { encodeQuery, ISSUE_BASE, ISSUE_URL_MAX } from './cloudcheck.js';
 
 export const GALLERY_FILTERS = ['all', 'official', 'community', 'installed'];
@@ -21,6 +22,8 @@ export function galleryEntry(t, { lordosVersion = '' } = {}) {
     version: t.version || (community ? '' : String(lordosVersion || '')),
     failed: !!t.failed, failedWhy: typeof t.failedWhy === 'string' ? t.failedWhy : '',
     options: Array.isArray(t.options) ? t.options : [], sketch: t.sketch || null,
+    // (0.8.9.6.2) theme.json's minLordOS, and the release it needs when this one is older ('' when it runs here)
+    minLordOS: typeof t.minLordOS === 'string' ? t.minLordOS : '', needsLordOS: themeNeedsNewer(t, lordosVersion),
   };
 }
 

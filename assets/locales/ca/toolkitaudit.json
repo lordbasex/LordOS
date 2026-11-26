@@ -1,6 +1,6 @@
 {
   "title": "Toolkits de Linux en aquest escriptori",
-  "usage": "Ús: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Ús: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Combinació desconeguda: {id}. Conegudes: {list}",
   "running": "S'està provant {combo}...",
   "col.combo": "Combinació",
@@ -27,5 +27,6 @@
   "matrix": "Globals de Wayland que ha usat cada toolkit (versió; ! error de protocol; - sense usar):",
   "saved": "Desat per a lordos-issue: {path}",
   "notSaved": "No s'ha pogut desar el resultat a ~/.cache/lordos.",
-  "root": "L'auditoria de toolkits no s'executa com a root: executeu lordos-testbench --toolkits amb el vostre usuari, al Terminal del LordOS."
+  "root": "L'auditoria de toolkits no s'executa com a root: executeu lordos-testbench --toolkits amb el vostre usuari, al Terminal del LordOS.",
+  "pressEnter": "Premeu Retorn per tancar."
 }

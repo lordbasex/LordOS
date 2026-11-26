@@ -1,6 +1,6 @@
 {
   "title": "Các bộ công cụ Linux trên màn hình nền này",
-  "usage": "Cách dùng: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Cách dùng: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Tổ hợp không xác định: {id}. Đã biết: {list}",
   "running": "Đang kiểm tra {combo}...",
   "col.combo": "Tổ hợp",
@@ -27,5 +27,6 @@
   "matrix": "Các global Wayland mà mỗi bộ công cụ đã gắn (phiên bản; ! lỗi giao thức; - không gắn):",
   "saved": "Đã lưu cho lordos-issue: {path}",
   "notSaved": "Không thể lưu kết quả vào ~/.cache/lordos.",
-  "root": "Kiểm tra bộ công cụ không chạy với quyền root: hãy chạy lordos-testbench --toolkits bằng tài khoản của bạn, trong Terminal của LordOS."
+  "root": "Kiểm tra bộ công cụ không chạy với quyền root: hãy chạy lordos-testbench --toolkits bằng tài khoản của bạn, trong Terminal của LordOS.",
+  "pressEnter": "Nhấn Enter để đóng."
 }

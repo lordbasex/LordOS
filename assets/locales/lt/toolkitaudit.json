@@ -1,6 +1,6 @@
 {
   "title": "Linux įrankių rinkiniai šiame darbalaukyje",
-  "usage": "Naudojimas: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Naudojimas: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Nežinomas derinys: {id}. Žinomi: {list}",
   "running": "Tikrinama {combo}...",
   "col.combo": "Derinys",
@@ -27,5 +27,6 @@
   "matrix": "Wayland globalūs objektai, kuriuos susiejo kiekvienas rinkinys (versija; ! protokolo klaida; - nesusieta):",
   "saved": "Išsaugota lordos-issue: {path}",
   "notSaved": "Rezultato nepavyko išsaugoti ~/.cache/lordos.",
-  "root": "Įrankių rinkinių patikra neveikia kaip root: paleiskite lordos-testbench --toolkits savo naudotoju LordOS terminale."
+  "root": "Įrankių rinkinių patikra neveikia kaip root: paleiskite lordos-testbench --toolkits savo naudotoju LordOS terminale.",
+  "pressEnter": "Paspauskite Enter, kad uždarytumėte."
 }

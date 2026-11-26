@@ -1,6 +1,6 @@
 {
   "title": "Linux-Toolkits auf diesem Desktop",
-  "usage": "Aufruf: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Aufruf: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Unbekannte Kombination: {id}. Bekannt: {list}",
   "running": "Teste {combo}...",
   "col.combo": "Kombination",
@@ -27,5 +27,6 @@
   "matrix": "Wayland-Globals, die jedes Toolkit gebunden hat (Version; ! Protokollfehler; - nicht gebunden):",
   "saved": "Für lordos-issue gespeichert: {path}",
   "notSaved": "Das Ergebnis konnte nicht in ~/.cache/lordos gespeichert werden.",
-  "root": "Die Toolkit-Prüfung läuft nicht als root: Führe lordos-testbench --toolkits als du selbst im LordOS-Terminal aus."
+  "root": "Die Toolkit-Prüfung läuft nicht als root: Führe lordos-testbench --toolkits als du selbst im LordOS-Terminal aus.",
+  "pressEnter": "Zum Schließen Eingabetaste drücken."
 }

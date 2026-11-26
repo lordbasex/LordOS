@@ -1,6 +1,6 @@
 {
   "title": "Наборы инструментов Linux на этом рабочем столе",
-  "usage": "Использование: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Использование: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Неизвестная комбинация: {id}. Известные: {list}",
   "running": "Проверка {combo}...",
   "col.combo": "Комбинация",
@@ -27,5 +27,6 @@
   "matrix": "Глобальные объекты Wayland, привязанные каждым набором (версия; ! ошибка протокола; - не привязан):",
   "saved": "Сохранено для lordos-issue: {path}",
   "notSaved": "Не удалось сохранить результат в ~/.cache/lordos.",
-  "root": "Проверка тулкитов не запускается от root: выполните lordos-testbench --toolkits от своего пользователя в терминале LordOS."
+  "root": "Проверка тулкитов не запускается от root: выполните lordos-testbench --toolkits от своего пользователя в терминале LordOS.",
+  "pressEnter": "Нажмите Enter, чтобы закрыть."
 }

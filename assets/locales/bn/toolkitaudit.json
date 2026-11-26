@@ -1,6 +1,6 @@
 {
   "title": "এই ডেস্কটপে Linux টুলকিট",
-  "usage": "ব্যবহার: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "ব্যবহার: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "অজানা সমন্বয়: {id}। পরিচিত: {list}",
   "running": "{combo} পরীক্ষা করা হচ্ছে...",
   "col.combo": "সমন্বয়",
@@ -27,5 +27,6 @@
   "matrix": "প্রতিটি টুলকিট যে Wayland গ্লোবাল বেঁধেছে (সংস্করণ; ! প্রোটোকল ত্রুটি; - বাঁধা হয়নি):",
   "saved": "lordos-issue-এর জন্য সংরক্ষিত: {path}",
   "notSaved": "ফলাফল ~/.cache/lordos-এ সংরক্ষণ করা যায়নি।",
-  "root": "টুলকিট অডিট root হিসেবে চলে না: LordOS টার্মিনালে নিজের অ্যাকাউন্ট দিয়ে lordos-testbench --toolkits চালান।"
+  "root": "টুলকিট অডিট root হিসেবে চলে না: LordOS টার্মিনালে নিজের অ্যাকাউন্ট দিয়ে lordos-testbench --toolkits চালান।",
+  "pressEnter": "বন্ধ করতে Enter চাপুন।"
 }

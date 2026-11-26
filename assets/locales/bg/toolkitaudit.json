@@ -1,6 +1,6 @@
 {
   "title": "Инструментариуми на Linux на този работен плот",
-  "usage": "Употреба: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Употреба: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Непозната комбинация: {id}. Известни: {list}",
   "running": "Проверка на {combo}...",
   "col.combo": "Комбинация",
@@ -27,5 +27,6 @@
   "matrix": "Глобални обекти на Wayland, свързани от всеки инструментариум (версия; ! грешка в протокола; - несвързан):",
   "saved": "Запазено за lordos-issue: {path}",
   "notSaved": "Резултатът не можа да се запази в ~/.cache/lordos.",
-  "root": "Проверката на инструментариумите не се изпълнява като root: стартирайте lordos-testbench --toolkits като себе си, в терминала на LordOS."
+  "root": "Проверката на инструментариумите не се изпълнява като root: стартирайте lordos-testbench --toolkits като себе си, в терминала на LordOS.",
+  "pressEnter": "Натиснете Enter, за да затворите."
 }

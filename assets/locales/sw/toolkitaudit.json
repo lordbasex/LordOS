@@ -1,6 +1,6 @@
 {
   "title": "Zana za kiolesura za Linux kwenye eneo-kazi hili",
-  "usage": "Matumizi: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "Matumizi: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "Mchanganyiko usiojulikana: {id}. Inayojulikana: {list}",
   "running": "Inajaribu {combo}...",
   "col.combo": "Mchanganyiko",
@@ -27,5 +27,6 @@
   "matrix": "Vitu vya jumla vya Wayland vilivyofungwa na kila zana (toleo; ! hitilafu ya itifaki; - haikufungwa):",
   "saved": "Imehifadhiwa kwa lordos-issue: {path}",
   "notSaved": "Matokeo hayakuweza kuhifadhiwa katika ~/.cache/lordos.",
-  "root": "Ukaguzi wa toolkit hauendeshwi kama root: endesha lordos-testbench --toolkits kama wewe mwenyewe, kwenye Terminal ya LordOS."
+  "root": "Ukaguzi wa toolkit hauendeshwi kama root: endesha lordos-testbench --toolkits kama wewe mwenyewe, kwenye Terminal ya LordOS.",
+  "pressEnter": "Bonyeza Enter ili kufunga."
 }

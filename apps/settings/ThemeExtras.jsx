@@ -1,11 +1,12 @@
 // What Settings shows for a theme it doesn't know by id (0.8.9): its own choices (theme.json "options") under
 // Appearance → Desktop style while it is the current theme, checked by sdk/thememeta.js. The drawn picture of its
 // theme.json "sketch" is the SDK's (sdk/stylethumb.jsx DesktopStyleThumb).
-import { useLocale, useSettings, Toggle, Segmented, Button, themeOptionValue, themeOptionPatch, displayAppsOn, displayAppsStored, setDisplayAppsOn, forgetDisplayApps } from '@lordos/sdk';
+import { useLocale, useSettings, Toggle, Segmented, Button, themeOptionValue, themeOptionPatch, themeLabel, displayAppsOn, displayAppsStored, setDisplayAppsOn, forgetDisplayApps } from '@lordos/sdk';
 import { Section, SettingRow } from './ui.jsx';
 
 // A theme's own choices, named by itself (its name is the section's title, unless `title` is given: the theme's page in
-// the gallery, ThemeGallery.jsx).
+// the gallery, ThemeGallery.jsx). A community theme's own keys (theme-<id>.…) are its texts: themeLabel shows them on one
+// line and cut at a fixed length (sdk/thememeta.js).
 export function ThemeOptions({ theme, title }) {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
@@ -15,10 +16,10 @@ export function ThemeOptions({ theme, title }) {
       {(theme.options || []).map((o) => {
         const v = themeOptionValue(s, theme.id, o);
         return (
-          <SettingRow key={o.key} label={tr(o.label)} hint={o.hint ? tr(o.hint) : undefined}>
+          <SettingRow key={o.key} label={themeLabel(tr, o.label)} hint={o.hint ? themeLabel(tr, o.hint, 'hint') : undefined}>
             {o.toggle
               ? <Toggle small on={v} onChange={(on) => set(themeOptionPatch(s, theme.id, o.key, on))} />
-              : <Segmented small appearance="neutral" value={v} onChange={(x) => set(themeOptionPatch(s, theme.id, o.key, x))} options={o.choices.map(([c, l]) => [c, tr(l)])} />}
+              : <Segmented small appearance="neutral" value={v} onChange={(x) => set(themeOptionPatch(s, theme.id, o.key, x))} options={o.choices.map(([c, l]) => [c, themeLabel(tr, l, 'choice')])} />}
           </SettingRow>
         );
       })}

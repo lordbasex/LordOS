@@ -978,6 +978,7 @@
   "themeSwitch.failedTitle": "{name}을(를) 적용할 수 없습니다",
   "themeSwitch.refusedBody": "코드가 LordOS의 서명된 사본과 일치하지 않아 불러오지 않았습니다. 데스크톱 스타일은 그대로 유지됩니다.",
   "themeSwitch.failedBody": "시작되지 않았습니다. 데스크톱 스타일은 그대로 유지됩니다.",
+  "themeSwitch.needsLordOSBody": "LordOS {version} 이상이 필요합니다. 데스크톱 스타일은 그대로 유지됩니다.",
   "spotlight.section.machines": "가상 머신",
   "guestApps.inMachine": "{machine}에서"
 }

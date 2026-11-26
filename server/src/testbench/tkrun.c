@@ -542,7 +542,7 @@ static void term_event(void *ctx, const TkEvent *e) {
 }
 
 int toolkits_main(int argc, char **argv) {
-    int json = 0, show = 0, which[TK_COMBOS], n = 0;
+    int json = 0, show = 0, wait = 0, which[TK_COMBOS], n = 0;
     const char *only = NULL;
     texts_init();
     for (int i = 1; i < argc; i++) if (!strcmp(argv[i], "--last")) return argc == 3 ? last_main() : (usage(), 2);
@@ -550,6 +550,7 @@ int toolkits_main(int argc, char **argv) {
         if (!strcmp(argv[i], "--toolkits")) continue;
         if (!strcmp(argv[i], "--json")) json = 1;
         else if (!strcmp(argv[i], "--show")) show = 1;
+        else if (!strcmp(argv[i], "--wait")) wait = 1;
         else if (!strcmp(argv[i], "--only") && i + 1 < argc) only = argv[++i];
         else if (!strncmp(argv[i], "--only=", 7)) only = argv[i] + 7;
         else { usage(); return 2; }
@@ -593,5 +594,14 @@ int toolkits_main(int argc, char **argv) {
         fprintf(stderr, "%s\n", T("notSaved"));
     }
     tk_report_free(&rep);
-    return ferror(stdout) ? 1 : 0;
+    int rc = ferror(stdout) ? 1 : 0;
+    /* --wait (the launcher's Toolkit Audit entry, Terminal=true): keep the window open until Enter, so the table can be
+     * read; only with a terminal on stdin, so scripts and lordos-issue never block */
+    if (wait && isatty(0)) {
+        printf("\n%s", T("pressEnter"));
+        fflush(stdout);
+        int ch;
+        while ((ch = getchar()) != EOF && ch != '\n') {}
+    }
+    return rc;
 }

@@ -1,6 +1,6 @@
 {
   "title": "ชุดเครื่องมือ Linux บนเดสก์ท็อปนี้",
-  "usage": "วิธีใช้: lordos-testbench --toolkits [--show] [--json] [--only COMBINATION,...]",
+  "usage": "วิธีใช้: lordos-testbench --toolkits [--show] [--json] [--wait] [--only COMBINATION,...]",
   "badOnly": "ไม่รู้จักชุดผสม: {id} ที่รู้จัก: {list}",
   "running": "กำลังทดสอบ {combo}...",
   "col.combo": "ชุดผสม",
@@ -27,5 +27,6 @@
   "matrix": "Wayland global ที่แต่ละชุดเครื่องมือผูกไว้ (รุ่น; ! ข้อผิดพลาดโพรโทคอล; - ไม่ได้ผูก):",
   "saved": "บันทึกไว้สำหรับ lordos-issue: {path}",
   "notSaved": "บันทึกผลลัพธ์ลงใน ~/.cache/lordos ไม่ได้",
-  "root": "การตรวจสอบชุดเครื่องมือไม่ทำงานในฐานะ root: ให้รัน lordos-testbench --toolkits ด้วยบัญชีของคุณเองในเทอร์มินัลของ LordOS"
+  "root": "การตรวจสอบชุดเครื่องมือไม่ทำงานในฐานะ root: ให้รัน lordos-testbench --toolkits ด้วยบัญชีของคุณเองในเทอร์มินัลของ LordOS",
+  "pressEnter": "กด Enter เพื่อปิด"
 }
