@@ -24,6 +24,7 @@
     ['calculator', {}, '÷'],
     ['photos', {}, (sdk) => sdk.t('photos.refresh')],
     ['player', {}, (sdk) => sdk.t('player.nav.songs')],
+    ['monitor', {}, (sdk) => sdk.t('monitor.tab.overview')],
   ];
   (async () => {
     await sleep(2500);

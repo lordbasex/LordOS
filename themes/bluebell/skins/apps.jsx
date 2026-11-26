@@ -72,7 +72,28 @@ function Transport({ model }) {
   );
 }
 
+// ---- a command bar whose commands are tabs (Monitor): property-sheet tabs under the title, as in the era's dialogs ----
+function TabStrip({ model }) {
+  const t = useTheme();
+  const font = useThemeFont();
+  return (
+    <View style={{ background: t.toolbarBg, borderBottom: `1px solid ${t.separator}` }}>
+      {model.title ? <Text style={{ fontSize: 13, fontWeight: 700, color: t.paneHeadText, paddingHorizontal: 10, paddingTop: 6, textAlign: 'start', ...(font ? { fontFamily: font } : null) }}>{model.title}</Text> : null}
+      <View style={{ height: 28, flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 2, paddingHorizontal: 8 }}>
+        {model.commands.map((c) => (
+          <View key={c.id} onMouseDown={() => model.actions.command(c.id)} style={{ height: c.active ? 25 : 22, marginTop: c.active ? 0 : 3, justifyContent: 'center', paddingHorizontal: 10,
+            borderTopLeftRadius: 3, borderTopRightRadius: 3, borderWidth: 1, borderBottomWidth: 0, borderColor: t.separator, borderTopColor: c.active ? '#e8a33c' : t.separator,
+            borderTopWidth: c.active ? 2 : 1, backgroundColor: c.active ? t.windowBg : t.sidebarBg }}>
+            <Text style={{ fontSize: 12, fontWeight: c.active ? 700 : 400, color: t.text, whiteSpace: 'nowrap', ...(font ? { fontFamily: font } : null) }}>{c.label}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export const appSkins = {
+  monitor: { toolbar: TabStrip },
   player: { sidebar: ListPane, toolbar: CommandBar, transport: Transport },
   photos: { sidebar: ListPane, toolbar: CommandBar },
   calculator: { display: CalcDisplay, keypad: CalcKeypad },
