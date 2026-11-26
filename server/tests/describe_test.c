@@ -18,6 +18,7 @@ static void put(const char *path, const char *s) {
     if (!f) { perror(path); exit(1); }
     fputs(s, f);
     fclose(f);
+    chmod(path, 0644); /* describe.c refuses group- or world-writable files; a umask of 002 would make them so */
 }
 
 int main(void) {
