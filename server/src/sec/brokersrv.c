@@ -297,7 +297,7 @@ int brokersrv_quit(const char *id) {
 }
 
 /* an AI agent's key or click is never a paste gesture of the person's (Hands, hands.h) */
-void brokersrv_paste_gesture(const char *app) { if (hands_injecting()) return; bclip_paste_gesture(app, mono_s()); }
+void brokersrv_paste_gesture(const char *app) { if (hands_agent_owns_input()) return; bclip_paste_gesture(app, mono_s()); }
 
 const char *brokersrv_app_of_pid(int pid) {
     if (pid <= 0) return NULL;

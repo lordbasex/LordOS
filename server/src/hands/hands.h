@@ -207,8 +207,8 @@ void hands_qa(int on);
 int  hands_qa_mode(void);
 /* the agent's input is being delivered now (lord.hands.injecting) and how many events it has sent */
 int  hands_injecting(void);
-/* Fail closed: the agent's input is being delivered, or a Hands client is active and the agent's input came after the
- * person's last real click or key (motion never counts, time never clears it): a security-state change now is the
+/* Fail closed: the agent's input is being delivered, or the agent's input came after the person's last real click or key
+ * (motion never counts, time never clears it, nor the agent disconnecting): a security-state change now is the
  * agent's doing and is refused (js.c prof_call, the broker, term.fill). hands_agent_recent is the same. */
 int  hands_agent_owns_input(void);
 int  hands_agent_recent(void);

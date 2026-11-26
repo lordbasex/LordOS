@@ -269,6 +269,10 @@ static void policy(void) {
     CHECK(!hands_agent_owns_input(), "the person's own click or key: theirs again");
     clock_ms += 4000;                       /* past the pause the person's input asks for */
     CHECK(call(":1.1", &pv, &why) == HANDS_OK && hands_agent_owns_input(), "the agent's key again: the agent's");
+    hands_gone(":1.1");
+    CHECK(!hands_active() && hands_agent_owns_input(), "the agent disconnecting never gives the input back");
+    hands_hello(":1.1", "Claude Code", "");
+    hands_answer(":1.1", 1);
     clock_ms += 4000;
     keys_why = HANDS_WHY_PROMPT;
     CHECK(call(":1.1", &ty, &why) == HANDS_E_REFUSED && why == HANDS_WHY_PROMPT, "an authentication prompt takes no agent keys");

@@ -393,13 +393,14 @@ int hands_active(void) {
     return 0;
 }
 
-/* Fail closed: while a Hands client is active, the input that set something off is the agent's unless the person's own
- * click or key came after the agent's last input (never mere motion, never a time that passed). lord-server's
+/* Fail closed: the input that set something off is the agent's unless the person's own click or key came after the
+ * agent's last input (never mere motion, never a time that passed, never the agent leaving). lord-server's
  * security-state actions refuse then (hands_native_guard in js.c, the broker, term.fill, the clipboard). */
 int hands_agent_owns_input(void) {
     if (S.injecting) return 1;
-    if (!hands_active() || !S.last_agent) return 0;
-    return S.press_seq < S.agent_seq;
+    /* sticky: the agent's last input stays its own until the person's click or key, even after it disconnects (a
+     * deferred action of its own never runs as the person's) */
+    return S.agent_seq && S.press_seq < S.agent_seq;
 }
 int hands_agent_recent(void) { return hands_agent_owns_input(); }
 

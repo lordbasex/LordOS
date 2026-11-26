@@ -19,6 +19,8 @@
 #include "media/media_int.h"
 #include "errcode.h"
 
+#include "sec/brokerclip.h"
+#include <time.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <stdarg.h>
@@ -228,7 +230,8 @@ static void local_hook(uint32_t added) { local_added |= added; }
 /* Hands (hands/hands.h) and the clipboard's secret mark (term.c): not under test here; no agent is connected */
 int hands_injecting(void) { return 0; }
 int hands_active(void) { return 0; }
-int hands_agent_owns_input(void) { return 0; }
+static int agent_owns;                  /* the paste gesture's test sets it */
+int hands_agent_owns_input(void) { return agent_owns; }
 int term_clipboard_sensitive(void) { return 0; }
 
 int main(void) {
@@ -398,6 +401,18 @@ int main(void) {
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", home);
     if (system(cmd)) {}
     fw_store_free(store);
+    /* Hands: an AI agent's input (as long as it owns the input) is never a paste gesture of the person's */
+    {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        double now = (double)ts.tv_sec + ts.tv_nsec / 1e9;
+        agent_owns = 1;
+        brokersrv_paste_gesture("mail");
+        check(!bclip_paste_take("mail", now), "an agent's Ctrl+V is no paste gesture (it owns the input)");
+        agent_owns = 0;
+        brokersrv_paste_gesture("mail");
+        check(bclip_paste_take("mail", now + 0.1), "the person's Ctrl+V is one");
+    }
     printf("%d/%d %s\n", total - fails, total, fails ? "FAILED" : "passed");
     return fails ? 1 : 0;
 }
