@@ -524,7 +524,10 @@ export function makeThemeSdk({ id, caps }) {
   sdk.screen = Object.freeze({ get width() { return SDK.screen.width; }, get height() { return SDK.screen.height; },
     get displays() { return SDK.screen.displays.map((d) => ({ ...d })); }, get mirror() { return SDK.screen.mirror; } });
   sdk.screenDisplays = () => SDK.screenDisplays().map((d) => ({ ...d }));
-  sdk.session = Object.freeze({ lock: () => SDK.session.lock(), quit: () => SDK.session.quit(), canPower: () => SDK.session.canPower?.(),
+  // logging out: marked the theme's (its crash count stays, main.c), then done by LordOS's own code in a job of its own,
+  // so saving the session before it goes isn't under the theme's policy
+  const quitForTheme = () => SDK.session.quit();
+  sdk.session = Object.freeze({ lock: () => SDK.session.lock(), quit: () => { lord.themes.quitByTheme(); Promise.resolve().then(quitForTheme); }, canPower: () => SDK.session.canPower?.(),
     // a countdown the theme starts never confirms by itself: only the person's real click or key does (powermodel.js)
     restart: () => SDK.session.restart({ byTheme: true }), shutdown: () => SDK.session.shutdown({ byTheme: true }), managed: () => SDK.session.managed() });
   sdk.spotlight = Object.freeze({ toggle: (d) => SDK.spotlight.toggle(sanitizeIn(d)), open: (d) => SDK.spotlight.open?.(sanitizeIn(d)), close: () => SDK.spotlight.close?.() });

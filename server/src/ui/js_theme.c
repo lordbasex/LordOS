@@ -110,7 +110,7 @@ const char *jst_failure(void) { return S.failure[0] ? S.failure : NULL; }
 static const struct { const char *name; unsigned cap; int policy; } rules[] = {
     /* the host's own natives (jst_register_main): never in the theme's realm, and called by the facade on its behalf */
     { "themeRealmFn", 0, JST_ALLOW }, { "themeCall", 0, JST_ALLOW }, { "themeOwn", 0, JST_ALLOW },
-    { "themes.started", 0, JST_ALLOW }, { "themes.fail", 0, JST_ALLOW },
+    { "themes.started", 0, JST_ALLOW }, { "themes.fail", 0, JST_ALLOW }, { "themes.quitByTheme", 0, JST_ALLOW },
     /* drawing and measuring its own nodes */
     { "getLayout", 0, JST_ALLOW }, { "now", 0, JST_ALLOW }, { "log", 0, JST_ALLOW }, { "measureText", 0, JST_ALLOW },
     { "stats", 0, JST_ALLOW }, { "setStyle", 0, JST_NODE }, { "setProp", 0, JST_NODE_PROP }, { "setText", 0, JST_NODE },
@@ -286,6 +286,13 @@ static JSValue f_started(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     S.started = 1;
     return JS_UNDEFINED;
 }
+/* lord.themes.quitByTheme(): the facade's session.quit, before LordOS's own code logs out for the theme (sdk/themeapi.js):
+ * this end is the theme's, not the person's, so its crash count stays (main.c) */
+static JSValue f_quit_by_theme(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)c; (void)t; (void)argc; (void)argv;
+    ui.quit_by_theme = 1;
+    return JS_UNDEFINED;
+}
 /* lord.themes.fail(why): the theme's tree died (React's uncaught error): the watchdog restores the previous theme */
 static JSValue f_fail(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
@@ -306,6 +313,7 @@ void jst_register_main(JSContext *c, JSValue lord) {
     if (JS_IsObject(th)) {
         JS_SetPropertyStr(c, th, "started", JS_NewCFunction(c, f_started, "started", 0));
         JS_SetPropertyStr(c, th, "fail", JS_NewCFunction(c, f_fail, "fail", 1));
+        JS_SetPropertyStr(c, th, "quitByTheme", JS_NewCFunction(c, f_quit_by_theme, "quitByTheme", 0));
     }
     JS_FreeValue(c, th);
 }
