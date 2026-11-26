@@ -1,14 +1,19 @@
 /* webua_test.c — Chrome's Client Hints and navigator.userAgentData from one table (src/web/webua.h), the client hints
- * kept in the profile's state file (webpage.h) and the call log's lines (src/web/webcall.h).
+ * kept in the profile's state file (webpage.h), the call log's lines (src/web/webcall.h) and the cameras' udev entries
+ * for WebKit's sandbox (src/web/webcam.h).
  * Expected values: what Chrome 158 on Linux sent and answered, captured on 2026-11-25 against a local echo server. */
 #include "../src/web/webua.h"
 #include "../src/web/webpage.h"
 #include "../src/web/webcall.h"
+#include "../src/web/webcam.h"
 #include "../src/web/webreg.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
+#include <unistd.h>
 
 static int fails, checks;
 #define CHECK(c, ...) do { checks++; if (!(c)) { fails++; printf("FAIL %s:%d: ", __FILE__, __LINE__); printf(__VA_ARGS__); printf("\n"); } } while (0)
@@ -229,6 +234,65 @@ static void test_call_log(void) {
     CHECK(webcall_rate(1061.0, &dropped) && dropped == 10, "a minute later, and how many were dropped (%u)", dropped);
 }
 
+static void put(const char *path, const char *text) {
+    FILE *f = fopen(path, "w");
+    if (f) { fputs(text, f); fclose(f); }
+}
+
+static void test_cameras(void) {
+    const unsigned chr = S_IFCHR | 0660, reg = S_IFREG | 0644;
+    unsigned long long v2 = makedev(81, 2), v50 = makedev(81, 50);
+    CHECK(webcam_entry("video0", "81:2\n", chr, v2, reg) == 2, "a camera: its minor");
+    CHECK(webcam_entry("video50", "81:50", chr, v50, reg) == 50, "no newline");
+    CHECK(webcam_entry("video0", "81:2\n", S_IFREG | 0644, v2, reg) < 0, "the node isn't a character device");
+    CHECK(webcam_entry("video0", "81:2\n", S_IFLNK | 0777, v2, reg) < 0, "the node is a link");
+    CHECK(webcam_entry("video0", "81:2\n", chr, makedev(81, 3), reg) < 0, "the node's number isn't sysfs's");
+    CHECK(webcam_entry("video0", "81:2\n", chr, makedev(13, 2), reg) < 0, "the node isn't video4linux's (an input device)");
+    CHECK(webcam_entry("video0", "13:2\n", chr, makedev(13, 2), reg) < 0, "sysfs names another major");
+    CHECK(webcam_entry("video0", "81:2\n", chr, v2, S_IFLNK | 0777) < 0, "the database entry is a link");
+    CHECK(webcam_entry("video0", "81:2\n", chr, v2, S_IFDIR | 0755) < 0, "the database entry is a folder");
+    static const char *const names[] = { "media0", "v4l-subdev0", "radio0", "video", "video12345", "video0/../x", "video-1", "../video0", "" };
+    for (size_t i = 0; i < sizeof names / sizeof names[0]; i++)
+        CHECK(webcam_entry(names[i], "81:2\n", chr, v2, reg) < 0, "not a video node: '%s'", names[i]);
+    static const char *const texts[] = { "", "81:", ":2", "81:2 ", "81:2\n\n", "81:-2", "81:+2", "81:2x", "81:12345", "081:2", " 81:2", "81:2/../3" };
+    for (size_t i = 0; i < sizeof texts / sizeof texts[0]; i++)
+        CHECK(webcam_entry("video0", texts[i], chr, v2, reg) < 0, "not sysfs's dev text: '%s'", texts[i]);
+
+    /* a folder that looks like the system: no character device can be made here, so nothing is taken, and links and
+     * names out of the pattern never are */
+    char root[] = "/tmp/webua-cam-XXXXXX", p[256], out[WEBCAM_MAX][WEBCAM_PATH_MAX];
+    CHECK(mkdtemp(root) != NULL, "a folder");
+    static const char *const dirs[] = { "/sys", "/sys/class", "/sys/class/video4linux", "/sys/class/video4linux/video0",
+                                        "/sys/class/video4linux/media0", "/dev", "/run", "/run/udev", "/run/udev/data" };
+    for (size_t i = 0; i < sizeof dirs / sizeof dirs[0]; i++) { snprintf(p, sizeof p, "%s%s", root, dirs[i]); mkdir(p, 0755); }
+    snprintf(p, sizeof p, "%s/sys/class/video4linux/video0/dev", root); put(p, "81:2\n");
+    snprintf(p, sizeof p, "%s/sys/class/video4linux/media0/dev", root); put(p, "81:2\n");
+    snprintf(p, sizeof p, "%s/dev/video0", root); put(p, "");                    /* a file, not a device */
+    snprintf(p, sizeof p, "%s/run/udev/data/c81:2", root); put(p, "I:1\n");
+    CHECK(webcam_udev_paths(root, out, WEBCAM_MAX) == 0, "a node that isn't a character device: nothing");
+    unlink(p);
+    char t[256];
+    snprintf(t, sizeof t, "%s/run/udev/data/c13:64", root); put(t, "");
+    CHECK(!symlink(t, p), "a link");
+    CHECK(webcam_udev_paths(root, out, WEBCAM_MAX) == 0, "a database entry that is a link: nothing");
+    CHECK(webcam_udev_paths("/nonexistent-lordos", out, WEBCAM_MAX) == 0, "no video4linux: nothing");
+    CHECK(webcam_udev_paths(root, out, 0) == 0, "no room: nothing");
+    char cmd[300];
+    snprintf(cmd, sizeof cmd, "rm -rf '%s'", root);
+    CHECK(system(cmd) == 0, "cleaned up");
+
+    /* this computer: every entry taken is a regular file of video4linux's major whose node is that device */
+    int n = webcam_udev_paths("", out, WEBCAM_MAX);
+    for (int i = 0; i < n; i++) {
+        struct stat st;
+        int minor = -1;
+        CHECK(sscanf(out[i], "/run/udev/data/c81:%d", &minor) == 1 && minor >= 0, "the path's form: %s", out[i]);
+        CHECK(!lstat(out[i], &st) && S_ISREG(st.st_mode), "%s is a regular file", out[i]);
+        CHECK(i == 0 || strcmp(out[i - 1], out[i]), "no entry twice");
+    }
+    printf("webua-test: %d camera node(s) on this computer\n", n);
+}
+
 int main(void) {
     test_version();
     test_grease();
@@ -238,6 +302,7 @@ int main(void) {
     test_sites();
     test_script();
     test_call_log();
+    test_cameras();
     printf("webua-test: %d checks, %d failures\n", checks, fails);
     return fails != 0;
 }

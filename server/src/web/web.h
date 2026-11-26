@@ -153,6 +153,9 @@ void webcalls_init(Web *w);                              /* webcall.js, its brid
 int  webcalls_add_scripts(WebKitUserContentManager *ucm, GCallback on_message, gpointer data);
 /* a camera, microphone or screen permission answered (kinds: WEBREG_PERM_*), how: "asked" or "the app's setting" */
 void webcalls_permission(Web *w, const int *kinds, int n, int allowed, const char *how);
+/* the cameras' udev database entries, read-only, in WebKit's web process sandbox (webcam.h); before any web process
+ * of c starts (WebKit refuses a sandbox path after that): how many */
+int  webcalls_sandbox_cameras(WebKitWebContext *c);
 
 /* webxfer.c */
 void webxfer_init(Web *w);                               /* the clipboard script and its message handler */

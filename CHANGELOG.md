@@ -209,6 +209,28 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   next to the clock): lord-web read only the registry's icon. It now prefers the site's own icon from
   `~/.cache/lordos/web/icons/<app>.png` when it starts (a regular PNG of the person's, no link, at most 1 MB). An app
   already running shows it after Restart or the next login.
+- **Web apps: no camera in a video call** (`server/src/web/webcam.c`, `webcalls.c`, `webengine.c`; in development,
+  reported by the maintainer 2026-11-26, **awaiting his approval**: it adds paths to WebKit's sandbox; `docs/WEBAPPS.md`,
+  "Cameras"). Turning video on in WhatsApp Web said "no camera found" with a Logitech C930e and LordOS Studio's camera
+  plugged in and the camera allowed; the log said `no device was found amongst 0 devices` and `OverconstrainedError`.
+  In WPE WebKit 2.54 the web process lists and opens the camera itself, inside WebKit's bubblewrap sandbox, through
+  GStreamer's v4l2 device provider (WebKit's PipeWire/Camera portal path is compiled out for WPE). The sandbox had every
+  `/dev/video*` node and `/sys` but not udev's database, so libudev counted every camera as not initialised and
+  skipped it. `lord-web` now adds, read-only and before any web process starts, only the database entries of the
+  video4linux nodes (`/run/udev/data/c81:<minor>`, each checked against sysfs and its device node, built from numbers,
+  never a link): no new device access, and which site gets a camera is still only the person's answer. A camera plugged
+  in after the app started appears after it restarts.
+- **The capture indicator shows a camera opened directly** (`server/src/hw/camuse.c`, `camera_scan_holders` in
+  `server/src/media/mstudiohub.c`, `sdk/capturemodel.js`, `sdk/capturestatus.jsx`; same approval; `docs/PRIVACY.md`). A
+  web app's web process opens `/dev/video*` itself, as a Linux app using V4L2 does, so neither passed the PipeWire guard
+  and the indicator never showed them. lord-server now watches the `/dev/video*` nodes with inotify (an open inside
+  WebKit's sandbox counts: the watch is on the inode) and, 300 ms after a change and every 3 s while one is held, lists
+  the session user's processes holding a video4linux device, named by their cgroup: hw event `camera-use`, a camera
+  row (the app's name, or "an unknown program") with no Turn off. lord-server's own helpers stay under their app.
+  Tests: `webua-test` (which nodes count), `studio-hub-test` (the scan, the event), `capture_model_test.mjs` (the rows),
+  and `tests/webcam_check.py` in `make test-full`, on the real engine with WebKit's sandbox on: every capture device
+  listed, each opened for 5 real frames, `camera-use` while held and empty after (`--loopback`: LordOS Studio's camera
+  fed a test pattern, listed and giving frames). Before the fix the same page listed no camera.
 - **Web apps: one that stops answering is started again, and a page that hangs gets a new web process**
   (`server/src/ui/webalive.c`, `server/src/web/webwatch.c`, `webhang.c`, `webmgr.c`, `webmem.c`, `webmain.c`,
   `webengine.c`, `server/src/ui/js_webapps.c`, `sdk/webapps.js`, `sdk/hardware.jsx`, `sdk/windowmenu.js`,

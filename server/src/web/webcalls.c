@@ -8,9 +8,11 @@
  *     webkit.messageHandlers of lord-web's);
  *   - webcall_line checks every field against its closed list and writes the line, rate limited; while the window shows
  *     another site (a sign-in), nothing is written;
- *   - the permission answers for the camera, the microphone and the screen are written here too. */
+ *   - the permission answers for the camera, the microphone and the screen are written here too;
+ *   - the cameras: their udev database entries in WebKit's web process sandbox (webcam.h), so the web process lists them. */
 #include "web.h"
 #include "webcall.h"
+#include "webcam.h"
 #include "webcall_js.h"                 /* build/gen, from webcall.js (mk/web.mk) */
 
 #include <stdio.h>
@@ -29,6 +31,13 @@ static void on_call_msg(WebKitUserContentManager *m, JSCValue *v, gpointer d) {
     size_t n = s ? strlen(s) : 0;
     if (s && n <= WEBCALL_MSG_MAX && webcall_line(s, n, line, sizeof line)) webcall_log(line);
     g_free(s);
+}
+
+int webcalls_sandbox_cameras(WebKitWebContext *c) {
+    char paths[WEBCAM_MAX][WEBCAM_PATH_MAX];
+    int n = webcam_udev_paths("", paths, WEBCAM_MAX);
+    for (int i = 0; i < n; i++) webkit_web_context_add_path_to_sandbox(c, paths[i], TRUE);
+    return n;
 }
 
 int webcalls_add_scripts(WebKitUserContentManager *ucm, GCallback on_message, gpointer data) {

@@ -1,6 +1,6 @@
 // capture_model_test.mjs — the capture indicator by the clock (sdk/capturemodel.js): which glyph the pill shows for what
 // is captured, the rows of its panel (one per app, whatever source said so) and what each row's buttons do.
-import { captureRows, captureGlyph, captureSummary, rowStops } from '../../sdk/capturemodel.js';
+import { captureRows, captureGlyph, captureSummary, rowStops, cameraUseOf } from '../../sdk/capturemodel.js';
 
 let ok = 0, bad = 0;
 const eq = (label, got, want) => {
@@ -142,6 +142,21 @@ const live = (src) => captureRows(src, real);
   eq('no detail: none', live({ devices: [{ app: 'recorder', kind: 'microphone' }] })[0].details, []);
 }
 eq('no row: no stops', rowStops(null), { screen: [], off: null });
+
+// ---- a camera opened directly (server/src/hw/camuse.c, "camera-use"): a web app's web process, a V4L2 Linux app ----
+eq('camera-use: the event\'s list', cameraUseOf({ apps: ['desktop:lordos-web-whatsapp', '', 'desktop:lordos-web-whatsapp', 7, null, 'x'.repeat(300)] }),
+  ['desktop:lordos-web-whatsapp', '']);
+eq('camera-use: nonsense is nobody', [cameraUseOf(null), cameraUseOf('x'), cameraUseOf({ apps: 'x' })], [[], [], []]);
+eq('a web app\'s camera: the camera glyph', glyph({ cameras: ['desktop:lordos-web-whatsapp'] }), 'camera');
+{
+  // its microphone comes from the PipeWire guard: one row for the app, camera and microphone
+  const r = rows({ cameras: ['desktop:lordos-web-whatsapp'], linux: [{ app: 'desktop:lordos-web-whatsapp', mic: 1, camera: 0, screen: 0 }] });
+  eq('a web app\'s camera and microphone: one row', r.map((x) => [x.key, x.camera, x.mic]), [['desktop:lordos-web-whatsapp', true, true]]);
+  eq('camera-use: no Turn off for the camera (nothing to act on), the microphone\'s stays', rowStops(r[0]).off.flags, ['no-mic']);
+  const u = rows({ cameras: [''] });
+  eq('an unknown program\'s camera: one unnamed row', u.map((x) => [x.key, x.name, x.camera]), [['unknown', '', true]]);
+  eq('an unknown program\'s camera: no stops', rowStops(u[0]).off, null);
+}
 
 console.log(`capture-model-test: ${ok}/${ok + bad}`);
 process.exit(bad ? 1 : 0);
