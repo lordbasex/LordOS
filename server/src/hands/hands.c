@@ -287,6 +287,61 @@ int hands_native_guard(const char *name) {
     return HANDS_G_NONE;
 }
 
+/* ---- the administrator actions an agent's input may set off (docs/HANDS.md "Catalog wallpapers") ----
+ * Maintainer-approved 2026-11-26 (AGENTS.md): lord.admin.request stays refused to an agent's input except for the closed
+ * catalog actions below, with their exact argument shapes. They name an entry of a catalog in the package that root
+ * reads (server/src/hw/wallpaper_admin.c, studio_bg_admin.c), never a URL or a path, and root keeps a file only at the
+ * catalog's size and SHA-256. A person's own picture (wallpaper-image, wallpaper-login-image), Studio's removal and every
+ * other action stay refused. Anything that doesn't parse is refused (fail closed). */
+static const char *const ADMIN_OK[] = { "wallpaper-get", "wallpaper-remove", "wallpaper-login", "studio-bg-get" };
+enum { ADMIN_OK_N = (int)(sizeof ADMIN_OK / sizeof ADMIN_OK[0]) };
+
+static int id_char(char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-'; }
+/* a catalog id: [a-z0-9][a-z0-9-]{0,63} */
+static int cat_id(const char *s, size_t n) {
+    if (n < 1 || n > 64 || s[0] == '-') return 0;
+    for (size_t i = 0; i < n; i++) if (!id_char(s[i])) return 0;
+    return 1;
+}
+/* a variant name ("1080.hevc", "2160.jpeg", "full"): [a-z0-9][a-z0-9.]{0,15} */
+static int cat_variant(const char *s, size_t n) {
+    if (n < 1 || n > 16 || s[0] == '.') return 0;
+    for (size_t i = 0; i < n; i++) if (!((s[i] >= 'a' && s[i] <= 'z') || (s[i] >= '0' && s[i] <= '9') || s[i] == '.')) return 0;
+    return 1;
+}
+/* "<id> <variant>": one space, nothing else */
+static int id_variant(const char *s, size_t n) {
+    const char *sp = memchr(s, ' ', n);
+    if (!sp) return 0;
+    size_t a = (size_t)(sp - s);
+    return cat_id(s, a) && cat_variant(sp + 1, n - a - 1);
+}
+
+int hands_admin_word(const char *action) {
+    for (int i = 0; action && i < ADMIN_OK_N; i++) if (!strcmp(action, ADMIN_OK[i])) return i;
+    return -1;
+}
+
+int hands_admin_allowed(const char *action, const char *arg, size_t len) {
+    int w = hands_admin_word(action);
+    if (w < 0 || !arg || strlen(arg) != len || len > 128) return 0;
+    if (w == 2) {                                           /* wallpaper-login */
+        if (len == 7 && !memcmp(arg, "default", 7)) return 1;
+        if (len > 6 && !memcmp(arg, "still ", 6)) {
+            size_t at = len > 10 && !memcmp(arg + 6, "cat:", 4) ? 10 : 6;
+            return cat_id(arg + at, len - at);
+        }
+    }
+    return id_variant(arg, len);
+}
+
+size_t hands_admin_line(char *out, size_t n, int kind, int word, int ok) {
+    if (!out || !n) return 0;
+    int k = snprintf(out, n, "hands: %s admin %s %s", hands_kind_word(kind), word >= 0 && word < ADMIN_OK_N ? ADMIN_OK[word] : "other",
+                     ok ? "ok" : "refused");
+    return k < 0 ? 0 : (size_t)k < n ? (size_t)k : n - 1;
+}
+
 /* ---- rate ---- */
 
 int hands_rate_take(HandsBucket *b, double now, double per_s, double burst) {
@@ -406,6 +461,7 @@ static struct {
     double person_press;                /* the person's last real click or key (physical, or a remote viewer's) */
     unsigned long seq, agent_seq, press_seq;   /* which came last: the agent's input or the person's click or key */
     unsigned long events;
+    int agent_kind;                     /* the kind of the client whose input came last (hands_admin_log) */
     HandsBucket input, shot, read, hello;
     int motion, reduce;                 /* Settings → AI → Hands → Agent motion; reduce motion */
     double cx, cy;                      /* the agent cursor */
@@ -514,6 +570,14 @@ static void log_call(int kind, int call, int action, int result, int why) {
     char line[160], j[256];
     hands_log_line(line, sizeof line, kind, call, action, result, why);
     snprintf(j, sizeof j, "{\"t\":\"log\",\"line\":\"%s\"}", line);   /* closed words only: no quoting needed */
+    S.h->event(j);
+}
+
+void hands_admin_log(int word, int ok) {
+    if (!S.h || !S.h->event) return;
+    char line[96], j[160];
+    hands_admin_line(line, sizeof line, S.agent_kind, word, ok);
+    snprintf(j, sizeof j, "{\"t\":\"log\",\"line\":\"%s\"}", line);   /* closed words only */
     S.h->event(j);
 }
 
@@ -1356,6 +1420,7 @@ int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, si
     Client *k = client_of(bus);
     int kind = k ? k->kind : HANDS_K_OTHER;
     int rc = hands_may(bus, r->call);
+    if (!rc && is_input(r->call)) S.agent_kind = kind;
     if (rc) {
         if (rc != HANDS_E_RATE) log_call(kind, r->call, r->action, rc, 0);
         return rc;

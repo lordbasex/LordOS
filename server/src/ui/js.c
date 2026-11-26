@@ -281,7 +281,28 @@ static JSValue prof_call(JSContext *c, JSValueConst this_val, int argc, JSValueC
          * input set it off */
         if (hg == HANDS_G_CLIP && hands_active() && term_clipboard_sensitive()) return JS_NewString(c, "");
         if (hg == HANDS_G_REFUSE && hands_agent_owns_input()) {
-            {
+            const char *n = JS_ToCString(c, data[1]);
+            int admin = n && !strcmp(n, "admin.request");
+            if (n) JS_FreeCString(c, n);
+            /* lord.admin.request: only the closed catalog-wallpaper actions (hands.c hands_admin_allowed, maintainer-
+             * approved 2026-11-26). Both values must already be strings: a primitive string can't change between this
+             * check and f_admin_request reading it (an object's toString could) */
+            if (admin) {
+                int word = -1, ok = 0;
+                if (argc >= 2 && JS_IsString(argv[0]) && JS_IsString(argv[1])) {
+                    size_t len = 0;
+                    const char *a = JS_ToCString(c, argv[0]), *arg = JS_ToCStringLen(c, &len, argv[1]);
+                    word = a ? hands_admin_word(a) : -1;
+                    ok = a && arg && hands_admin_allowed(a, arg, len);
+                    if (a) JS_FreeCString(c, a);
+                    if (arg) JS_FreeCString(c, arg);
+                }
+                hands_admin_log(word, ok);
+                if (!ok) {
+                    fprintf(stderr, "js: hands: lord.admin.request refused (an AI agent's input)\n");
+                    return js_throw_code(c, "hands.refused", NULL);
+                }
+            } else {
                 const char *n = JS_ToCString(c, data[1]);
                 fprintf(stderr, "js: hands: lord.%s refused (an AI agent's input)\n", n ? n : "?");
                 if (n) JS_FreeCString(c, n);

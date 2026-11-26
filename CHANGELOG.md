@@ -408,6 +408,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Hands: an AI agent can download, use and free up catalog wallpapers** (maintainer-approved Hands exception,
+  2026-11-26; AGENTS.md; docs/HANDS.md). Before, `hands_native_guard` refused `lord.admin.request` as a whole to an
+  agent's input, so Settings → Wallpaper's "Download and use" showed "Only you can do this: an AI agent's input never can".
+  lord-server now decides `admin.request` natively in `js.c` `prof_call` (`hands_admin_allowed` in
+  `server/src/hands/hands.c`, fail closed): an agent's input may set off only `wallpaper-get "<id> <variant>"` (also
+  "Download all · 4K/HD", one request per file), `wallpaper-remove "<id> <variant>"` ("Free up space"),
+  `wallpaper-login` with `default`, `still <id>`, `still cat:<id>` or `<id> <variant>`, and LordOS Studio's twin
+  `studio-bg-get "<id> <variant>"`, each with exactly that shape (ids `[a-z0-9-]`, variants `[a-z0-9.]`, one space) and
+  only when both values are already JS strings. They name an entry of the packaged catalog that root reads, never a URL
+  or a path, and root keeps only a file of the catalog's size and SHA-256. `wallpaper-image`, `wallpaper-login-image`
+  (a person's own picture on every account's login screen), `studio-bg-remove` and every other administrator action stay
+  refused. Each request is logged as closed words (`hands: claude admin wallpaper-get ok`, `… admin other refused`).
+  `build/hands-test` covers the allowed shapes and the refusals (a person's own picture, other actions, a name with a
+  prefix or suffix, extra spaces, paths, URLs, a NUL, an over-long argument) and the log line.
 - **Machines: `lord-server: stall: ~27 ms call vm.list` thousands of times a day with no machine running** (in
   development; approved by the maintainer 2026-11-26; docs/VIRTUALIZATION.md 6.14, "The list's cache" and "The shell and
   the machines"). Three timers outside the Machines window read the whole library on lord-server's main thread: the

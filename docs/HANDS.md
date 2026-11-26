@@ -190,7 +190,18 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
   (`hands_agent_owns_input`; motion never counts, time never clears it), the vault and keyring, `term.fill` and saving a
   terminal secret, the firewall's changes, permissions, administrator actions, Sentinela's blocklist, theme trust and
   removal, signing keys, screen-sharing answers, Hands' own switch and power refuse (`hands.refused`), so a surface
-  missing its `handsDeny` can't reopen them. While any Hands client is active, a secret on the clipboard is nobody's:
+  missing its `handsDeny` can't reopen them. **One exception, catalog wallpapers** (maintainer-approved 2026-11-26,
+  AGENTS.md): `lord.admin.request` is decided in C (`hands_admin_allowed`, `js.c` `prof_call`) and an agent's input may
+  set off only `wallpaper-get "<id> <variant>"` (Settings → Wallpaper's "Download and use" and "Download all"),
+  `wallpaper-remove "<id> <variant>"` ("Free up space"), `wallpaper-login` with `default`, `still <id>`,
+  `still cat:<id>` or `<id> <variant>`, and Studio's twin `studio-bg-get "<id> <variant>"`: ids `[a-z0-9-]`, variants
+  `[a-z0-9.]`, one space, nothing else, both values already JS strings (never an object whose `toString` could change
+  between the check and the call). Why: each names an entry of a closed catalog in the package that root reads
+  (`server/src/hw/wallpaper_admin.c`, `studio_bg_admin.c`), never a URL or a path, and root keeps a file only at the
+  catalog's size and SHA-256; at worst an agent downloads, uses or deletes a stock wallpaper. A person's own picture
+  (`wallpaper-image`, and `wallpaper-login-image`, which shows it on the login screen to every account), Studio's
+  removal and every other action stay refused, and so does anything that doesn't parse. Each such request is logged as
+  closed words: `hands: claude admin wallpaper-get ok`, `hands: claude admin other refused`. While any Hands client is active, a secret on the clipboard is nobody's:
   `lord.clipboard.get` answers "", the broker gives an app nothing and the Wayland clipboard is not offered; an agent's
   paste (by the key it resolves to, `KEY_V` with Ctrl or Super, Shift+Insert, `KEY_PASTE`) and middle click are refused,
   and an agent's input is never an isolated app's paste gesture. The Terminal's Passwords and save bars, Monitor's firewall switch, rule sheet and
@@ -267,7 +278,9 @@ change the desktop. It needs `dbus-daemon` (Debian's `dbus-daemon` package).
   arrival, a drag's button released when interrupted, typing stopped when the focus moves to a password field, one
   action at a time, SetMode, the QA default, Stop hiding the cursor), a fuzz of every method's arguments, the bus's uid
   check on a private `dbus-daemon`, the pidfd, the screenshot's marks (black, not `protect`; forty denied rows; failing
-  closed), lordos-mcp's pure parts.
+  closed), lordos-mcp's pure parts, the catalog-wallpaper admin allowlist (the allowed actions with valid arguments;
+  a person's own picture, other actions, a name with a prefix or a suffix, extra spaces, paths, URLs, a NUL refused) and
+  its log line.
 - `tests/hands_model_test.mjs`: refs stay stable, password values and the system band never appear, `handsDeny` nodes
   are left out, the allowlisted blackout per layer, the prompt claims nothing is verified.
 - `tests/hands_e2e.py` (run by `make test` when the themes are built): `lordos-mcp --headless` with the test hooks:

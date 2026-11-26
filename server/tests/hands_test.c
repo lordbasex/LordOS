@@ -628,6 +628,60 @@ static void native_guard(void) {
     CHECK(hands_native_guard("clipboard.get") == HANDS_G_CLIP, "lord.clipboard.get: empty while a secret");
     const char *free_[] = { "fs.list", "term.write", "fw.status", "fw.rules", "perms.get", "vaultx.y", "vault.poll", "vault.available", "admin.available", "hands.status", "themes.list", "term.fillx" };
     for (size_t i = 0; i < sizeof free_ / sizeof free_[0]; i++) CHECK(hands_native_guard(free_[i]) == HANDS_G_NONE, "lord.%s left alone", free_[i]);
+    /* lord.admin.request under an agent's input: only the closed catalog actions, with their exact argument shapes
+     * (maintainer-approved 2026-11-26, docs/HANDS.md) */
+    struct { const char *a, *arg; int ok; } adm[] = {
+        { "wallpaper-get", "aurora-flow 2160.hevc", 1 }, { "wallpaper-get", "lumo-sea 1080.jpeg", 1 },
+        { "wallpaper-remove", "aurora-flow 1080.h264", 1 }, { "wallpaper-login", "default", 1 },
+        { "wallpaper-login", "still lumo-dawn", 1 }, { "wallpaper-login", "still cat:city-rain", 1 },
+        { "wallpaper-login", "aurora-flow 2160.hevc", 1 }, { "studio-bg-get", "office-blur full", 1 },
+        { "studio-bg-get", "beach 2160.h264", 1 },
+        /* a person's own picture, Studio's removal, any other action */
+        { "wallpaper-image", "/home/u/Pictures/me.jpg", 0 }, { "wallpaper-image", "remove 0123456789abcdef", 0 },
+        { "wallpaper-login-image", "0123456789abcdef", 0 }, { "studio-bg-remove", "beach full", 0 },
+        { "user-add", "eve", 0 }, { "pkg-install", "aurora-flow 2160.hevc", 0 }, { "fw-set", "default", 0 },
+        /* a name with a prefix or a suffix, another case */
+        { "wallpaper-get2", "aurora-flow 2160.hevc", 0 }, { "xwallpaper-get", "aurora-flow 2160.hevc", 0 },
+        { "wallpaper-get ", "aurora-flow 2160.hevc", 0 }, { " wallpaper-get", "aurora-flow 2160.hevc", 0 },
+        { "Wallpaper-get", "aurora-flow 2160.hevc", 0 }, { "wallpaper-", "aurora-flow 2160.hevc", 0 },
+        { "wallpaper-login-image2", "default", 0 }, { "", "default", 0 },
+        /* malformed arguments: extra spaces, a path, a URL, a third word, odd characters */
+        { "wallpaper-get", "aurora-flow  2160.hevc", 0 }, { "wallpaper-get", " aurora-flow 2160.hevc", 0 },
+        { "wallpaper-get", "aurora-flow 2160.hevc ", 0 }, { "wallpaper-get", "aurora-flow 2160.hevc x", 0 },
+        { "wallpaper-get", "aurora-flow", 0 }, { "wallpaper-get", "", 0 }, { "wallpaper-get", "aurora-flow ", 0 },
+        { "wallpaper-get", " 2160.hevc", 0 }, { "wallpaper-get", "../etc 2160.hevc", 0 },
+        { "wallpaper-get", "aurora-flow ../../x", 0 }, { "wallpaper-get", "/tmp/x 2160.hevc", 0 },
+        { "wallpaper-get", "https://evil.example/x.mp4 1080.hevc", 0 }, { "wallpaper-get", "Aurora 2160.hevc", 0 },
+        { "wallpaper-get", "-x 2160.hevc", 0 }, { "wallpaper-get", "aurora .hevc", 0 }, { "wallpaper-get", "aurora\t2160.hevc", 0 },
+        { "wallpaper-get", "aurora 2160.hevc\n", 0 }, { "wallpaper-remove", "aurora-flow", 0 },
+        { "wallpaper-login", "default ", 0 }, { "wallpaper-login", " default", 0 }, { "wallpaper-login", "Default", 0 },
+        { "wallpaper-login", "still ", 0 }, { "wallpaper-login", "still  lumo", 0 }, { "wallpaper-login", "still /tmp/x", 0 },
+        { "wallpaper-login", "still cat:", 0 }, { "wallpaper-login", "still lumo dawn", 0 }, { "wallpaper-login", "still", 0 },
+        { "wallpaper-login", "still cat:a/b", 0 }, { "wallpaper-login", "/home/u/me.jpg", 0 }, { "wallpaper-login", "", 0 },
+        { "studio-bg-get", "office-blur", 0 }, { "studio-bg-get", "office-blur full extra", 0 },
+    };
+    for (size_t i = 0; i < sizeof adm / sizeof adm[0]; i++)
+        CHECK(hands_admin_allowed(adm[i].a, adm[i].arg, strlen(adm[i].arg)) == adm[i].ok, "admin %s \"%s\": %s", adm[i].a, adm[i].arg,
+              adm[i].ok ? "allowed to an agent" : "refused to an agent");
+    /* a NUL inside the argument, a NULL, a too-long one */
+    CHECK(!hands_admin_allowed("wallpaper-get", "aurora 2160.hevc\0x", 18), "admin: a NUL inside the argument refused");
+    CHECK(!hands_admin_allowed(NULL, "default", 7) && !hands_admin_allowed("wallpaper-login", NULL, 0), "admin: NULL refused");
+    {
+        char big[200];
+        memset(big, 'a', sizeof big - 12);
+        memcpy(big + sizeof big - 12, " 2160.hevc", 11);
+        CHECK(!hands_admin_allowed("wallpaper-get", big, strlen(big)), "admin: an over-long argument refused");
+    }
+    CHECK(hands_admin_word("wallpaper-image") < 0 && hands_admin_word("wallpaper-login-image") < 0, "admin: a person's own picture isn't in the list");
+    {
+        char line[96];
+        hands_admin_line(line, sizeof line, HANDS_K_CLAUDE, hands_admin_word("wallpaper-get"), 1);
+        CHECK(!strcmp(line, "hands: claude admin wallpaper-get ok"), "admin log line \"%s\"", line);
+        hands_admin_line(line, sizeof line, HANDS_K_LUMO, hands_admin_word("wallpaper-image"), 0);
+        CHECK(!strcmp(line, "hands: lumo admin other refused"), "admin log line \"%s\": an action off the list is never named", line);
+        hands_admin_line(line, sizeof line, HANDS_K_CLAUDE, hands_admin_word("wallpaper-login"), 0);
+        CHECK(!strcmp(line, "hands: claude admin wallpaper-login refused"), "admin log line \"%s\"", line);
+    }
     /* the broker: an isolated app's keyring, FIDO key and secret to the clipboard refuse on an agent's input, the
      * clipboard's secret while an agent is connected */
     CHECK(brokersrv_hands_refuses(BOP_KEYRING, 1, 1, 0) && brokersrv_hands_refuses(BOP_VAULT_FIDO, 1, 1, 0) &&
