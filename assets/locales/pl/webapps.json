@@ -233,5 +233,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "Aplikacja {app} nie odpowiadała i została uruchomiona ponownie",
+  "restart.menu": "Uruchom ponownie…",
+  "restart.title": "Uruchomić ponownie {app}?",
+  "quit.title": "Wymusić zakończenie {app}?",
+  "restart.detail": "Jej okno zamknie się i otworzy ponownie. Trwające połączenie lub wysyłanie zostanie przerwane.",
+  "quit.detail": "Jej okno zamknie się bez czekania. Trwające połączenie lub wysyłanie zostanie przerwane.",
+  "restart.ok": "Uruchom ponownie",
+  "settings.engineTitle": "Silnik aplikacji internetowych",
+  "settings.engineFooter": "Gdy aplikacja internetowa przestaje odpowiadać, LordOS sam uruchamia ją ponownie i informuje o tym.",
+  "settings.restartEngine": "Uruchom ponownie silnik aplikacji internetowych",
+  "settings.restartEngineHint": "Zamyka każdą otwartą aplikację internetową i otwiera ją ponownie. Użyj, gdy aplikacja internetowa się nie otwiera lub przestaje odpowiadać.",
+  "settings.restartEngineTitle": "Uruchomić ponownie wszystkie otwarte aplikacje internetowe?",
+  "settings.restartEngineDetail": "Każda otwarta aplikacja internetowa zamknie się i otworzy ponownie. Trwające połączenia i wysyłanie zostaną przerwane.",
+  "settings.restartEngineDone": "Aplikacje internetowe uruchomione ponownie",
+  "quit.menu": "Wymuś zakończenie…",
+  "quit.ok": "Wymuś zakończenie"
 }

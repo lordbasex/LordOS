@@ -15,5 +15,6 @@
   "inspect.failed": "无法启动开发者工具",
   "save.image": "保存图片",
   "save.video": "保存视频",
-  "save.audio": "保存音频"
+  "save.audio": "保存音频",
+  "hang.reloaded": "页面没有响应，已重新载入"
 }

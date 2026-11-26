@@ -227,5 +227,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} tidak merespons dan telah dimulai ulang",
+  "restart.menu": "Mulai Ulang…",
+  "restart.title": "Mulai ulang {app}?",
+  "quit.title": "Paksa keluar {app}?",
+  "restart.detail": "Jendelanya tertutup lalu terbuka lagi. Panggilan atau unggahan yang sedang berjalan berhenti.",
+  "quit.detail": "Jendelanya tertutup tanpa menunggu. Panggilan atau unggahan yang sedang berjalan berhenti.",
+  "restart.ok": "Mulai Ulang",
+  "settings.engineTitle": "Mesin aplikasi web",
+  "settings.engineFooter": "Jika aplikasi web berhenti merespons, LordOS memulainya ulang sendiri dan memberi tahu Anda.",
+  "settings.restartEngine": "Mulai ulang mesin aplikasi web",
+  "settings.restartEngineHint": "Menutup setiap aplikasi web yang terbuka lalu membukanya lagi. Gunakan saat aplikasi web tidak mau terbuka atau berhenti merespons.",
+  "settings.restartEngineTitle": "Mulai ulang semua aplikasi web yang terbuka?",
+  "settings.restartEngineDetail": "Setiap aplikasi web yang terbuka tertutup lalu terbuka lagi. Panggilan dan unggahan yang sedang berjalan berhenti.",
+  "settings.restartEngineDone": "Aplikasi web dimulai ulang",
+  "quit.menu": "Paksa Keluar…",
+  "quit.ok": "Paksa Keluar"
 }

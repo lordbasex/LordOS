@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} svarade inte och startades om",
+  "restart.menu": "Starta om…",
+  "restart.title": "Starta om {app}?",
+  "quit.title": "Tvångsavsluta {app}?",
+  "restart.detail": "Fönstret stängs och öppnas igen. Ett pågående samtal eller en pågående uppladdning avbryts.",
+  "quit.detail": "Fönstret stängs utan att vänta. Ett pågående samtal eller en pågående uppladdning avbryts.",
+  "restart.ok": "Starta om",
+  "settings.engineTitle": "Motor för webbappar",
+  "settings.engineFooter": "När en webbapp slutar svara startar LordOS om den själv och talar om det för dig.",
+  "settings.restartEngine": "Starta om motorn för webbappar",
+  "settings.restartEngineHint": "Stänger varje öppen webbapp och öppnar den igen. Använd det när en webbapp inte öppnas eller slutar svara.",
+  "settings.restartEngineTitle": "Starta om alla öppna webbappar?",
+  "settings.restartEngineDetail": "Varje öppen webbapp stängs och öppnas igen. Pågående samtal och uppladdningar avbryts.",
+  "settings.restartEngineDone": "Webbapparna startades om",
+  "quit.menu": "Tvångsavsluta…",
+  "quit.ok": "Tvångsavsluta"
 }

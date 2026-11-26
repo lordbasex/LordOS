@@ -15,5 +15,6 @@
   "inspect.failed": "Kehittäjätyökaluja ei voitu käynnistää",
   "save.image": "Tallenna kuva",
   "save.video": "Tallenna video",
-  "save.audio": "Tallenna ääni"
+  "save.audio": "Tallenna ääni",
+  "hang.reloaded": "Sivu ei vastannut, ja se ladattiin uudelleen"
 }

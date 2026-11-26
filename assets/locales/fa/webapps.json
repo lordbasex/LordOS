@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} پاسخ نمی‌داد و دوباره راه‌اندازی شد",
+  "restart.menu": "راه‌اندازی دوباره…",
+  "restart.title": "{app} دوباره راه‌اندازی شود؟",
+  "quit.title": "{app} به‌اجبار بسته شود؟",
+  "restart.detail": "پنجره‌اش بسته و دوباره باز می‌شود. تماس یا بارگذاری در حال انجام قطع می‌شود.",
+  "quit.detail": "پنجره‌اش بدون انتظار بسته می‌شود. تماس یا بارگذاری در حال انجام قطع می‌شود.",
+  "restart.ok": "راه‌اندازی دوباره",
+  "settings.engineTitle": "موتور برنامه‌های وب",
+  "settings.engineFooter": "وقتی یک برنامهٔ وب پاسخ ندهد، LordOS خودش آن را دوباره راه‌اندازی می‌کند و به شما خبر می‌دهد.",
+  "settings.restartEngine": "راه‌اندازی دوبارهٔ موتور برنامه‌های وب",
+  "settings.restartEngineHint": "هر برنامهٔ وب باز را می‌بندد و دوباره باز می‌کند. وقتی یک برنامهٔ وب باز نمی‌شود یا پاسخ نمی‌دهد از آن استفاده کنید.",
+  "settings.restartEngineTitle": "همهٔ برنامه‌های وب باز دوباره راه‌اندازی شوند؟",
+  "settings.restartEngineDetail": "هر برنامهٔ وب باز بسته و دوباره باز می‌شود. تماس‌ها و بارگذاری‌های در حال انجام قطع می‌شوند.",
+  "settings.restartEngineDone": "برنامه‌های وب دوباره راه‌اندازی شدند",
+  "quit.menu": "خروج اجباری…",
+  "quit.ok": "خروج اجباری"
 }

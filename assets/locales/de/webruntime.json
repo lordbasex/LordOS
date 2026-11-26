@@ -15,5 +15,6 @@
   "inspect.failed": "Die Entwicklertools konnten nicht starten",
   "save.image": "Bild speichern",
   "save.video": "Video speichern",
-  "save.audio": "Audio speichern"
+  "save.audio": "Audio speichern",
+  "hang.reloaded": "Die Seite hat nicht reagiert und wurde neu geladen"
 }

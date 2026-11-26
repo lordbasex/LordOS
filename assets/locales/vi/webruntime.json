@@ -15,5 +15,6 @@
   "inspect.failed": "Không thể khởi động công cụ nhà phát triển",
   "save.image": "Lưu hình ảnh",
   "save.video": "Lưu video",
-  "save.audio": "Lưu âm thanh"
+  "save.audio": "Lưu âm thanh",
+  "hang.reloaded": "Trang không phản hồi và đã được tải lại"
 }

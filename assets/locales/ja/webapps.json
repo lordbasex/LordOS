@@ -227,5 +227,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} が応答しなかったため再起動しました",
+  "restart.menu": "再起動…",
+  "restart.title": "{app} を再起動しますか？",
+  "quit.title": "{app} を強制終了しますか？",
+  "restart.detail": "ウインドウが閉じて、もう一度開きます。進行中の通話やアップロードは終了します。",
+  "quit.detail": "ウインドウは待たずに閉じます。進行中の通話やアップロードは終了します。",
+  "restart.ok": "再起動",
+  "settings.engineTitle": "Web アプリのエンジン",
+  "settings.engineFooter": "Web アプリが応答しなくなると、LordOS が自動で再起動してお知らせします。",
+  "settings.restartEngine": "Web アプリのエンジンを再起動",
+  "settings.restartEngineHint": "開いているすべての Web アプリを閉じて、もう一度開きます。Web アプリが開かないときや応答しないときに使います。",
+  "settings.restartEngineTitle": "開いているすべての Web アプリを再起動しますか？",
+  "settings.restartEngineDetail": "開いている各 Web アプリが閉じて、もう一度開きます。進行中の通話やアップロードは終了します。",
+  "settings.restartEngineDone": "Web アプリを再起動しました",
+  "quit.menu": "強制終了…",
+  "quit.ok": "強制終了"
 }

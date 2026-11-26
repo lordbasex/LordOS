@@ -15,5 +15,6 @@
   "inspect.failed": "De ontwikkelaarstools konden niet starten",
   "save.image": "Afbeelding opslaan",
   "save.video": "Video opslaan",
-  "save.audio": "Audio opslaan"
+  "save.audio": "Audio opslaan",
+  "hang.reloaded": "De pagina reageerde niet en is opnieuw geladen"
 }

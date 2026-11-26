@@ -237,5 +237,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "لم يكن {app} يستجيب فأُعيد تشغيله",
+  "restart.menu": "إعادة التشغيل…",
+  "restart.title": "إعادة تشغيل {app}؟",
+  "quit.title": "إنهاء {app} إجباريًا؟",
+  "restart.detail": "تُغلق نافذته ثم تُفتح من جديد. تنتهي المكالمة أو عملية الرفع الجارية.",
+  "quit.detail": "تُغلق نافذته دون انتظار. تنتهي المكالمة أو عملية الرفع الجارية.",
+  "restart.ok": "إعادة التشغيل",
+  "settings.engineTitle": "محرك تطبيقات الويب",
+  "settings.engineFooter": "عندما يتوقف تطبيق ويب عن الاستجابة، يعيد LordOS تشغيله تلقائيًا ويُعلمك.",
+  "settings.restartEngine": "إعادة تشغيل محرك تطبيقات الويب",
+  "settings.restartEngineHint": "يغلق كل تطبيق ويب مفتوح ثم يفتحه من جديد. استخدمه عندما لا يفتح تطبيق ويب أو يتوقف عن الاستجابة.",
+  "settings.restartEngineTitle": "إعادة تشغيل كل تطبيقات الويب المفتوحة؟",
+  "settings.restartEngineDetail": "يُغلق كل تطبيق ويب مفتوح ثم يُفتح من جديد. تنتهي المكالمات وعمليات الرفع الجارية.",
+  "settings.restartEngineDone": "أُعيد تشغيل تطبيقات الويب",
+  "quit.menu": "إنهاء إجباري…",
+  "quit.ok": "إنهاء إجباري"
 }

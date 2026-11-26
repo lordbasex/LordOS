@@ -227,5 +227,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} không phản hồi và đã được khởi động lại",
+  "restart.menu": "Khởi động lại…",
+  "restart.title": "Khởi động lại {app}?",
+  "quit.title": "Buộc thoát {app}?",
+  "restart.detail": "Cửa sổ của ứng dụng sẽ đóng rồi mở lại. Cuộc gọi hoặc lượt tải lên đang diễn ra sẽ dừng.",
+  "quit.detail": "Cửa sổ của ứng dụng sẽ đóng mà không chờ. Cuộc gọi hoặc lượt tải lên đang diễn ra sẽ dừng.",
+  "restart.ok": "Khởi động lại",
+  "settings.engineTitle": "Bộ máy ứng dụng web",
+  "settings.engineFooter": "Khi một ứng dụng web ngừng phản hồi, LordOS tự khởi động lại và báo cho bạn.",
+  "settings.restartEngine": "Khởi động lại bộ máy ứng dụng web",
+  "settings.restartEngineHint": "Đóng mọi ứng dụng web đang mở rồi mở lại. Dùng khi một ứng dụng web không mở được hoặc ngừng phản hồi.",
+  "settings.restartEngineTitle": "Khởi động lại mọi ứng dụng web đang mở?",
+  "settings.restartEngineDetail": "Mỗi ứng dụng web đang mở sẽ đóng rồi mở lại. Các cuộc gọi và lượt tải lên đang diễn ra sẽ dừng.",
+  "settings.restartEngineDone": "Đã khởi động lại các ứng dụng web",
+  "quit.menu": "Buộc thoát…",
+  "quit.ok": "Buộc thoát"
 }

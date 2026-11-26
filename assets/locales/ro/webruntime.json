@@ -15,5 +15,6 @@
   "inspect.failed": "Instrumentele pentru dezvoltatori nu au putut porni",
   "save.image": "Salvează imaginea",
   "save.video": "Salvează videoclipul",
-  "save.audio": "Salvează audio"
+  "save.audio": "Salvează audio",
+  "hang.reloaded": "Pagina nu răspundea și a fost reîncărcată"
 }

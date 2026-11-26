@@ -49,7 +49,8 @@ export { useLauncherApps, launchApp, refreshApps, guestLauncherApps, isLinuxApp,
 export { APP_GROUPS, launcherGroup, groupApps, startView, groupRows, groupKey, keepSelection } from './appgroupsmodel.js';   // Lord Classic's start menu by category
 // Web apps (docs/WEBAPPS.md): the registry through lord.webapps, profiles, the probe, the permission questions
 export { webApps, useWebApps, refreshWebApps, webAppsAvailable, webAppEntry, webRunning, launchWebApp, probeWebApp, installWebApp, webAppCall, webAppOfWindow, webAppMemory, webEngine,
-  webBadges, siteIcons, wantSiteIcon, refreshSiteIcon, siteIconBusy, siteIconStatus, webDeveloper, setWebDeveloperMode, webSearchEngine, setWebSearchEngine } from './webapps.js';
+  webBadges, siteIcons, wantSiteIcon, refreshSiteIcon, siteIconBusy, siteIconStatus, webDeveloper, setWebDeveloperMode, webSearchEngine, setWebSearchEngine,
+  restartWebApp, quitWebApp, restartWebEngine } from './webapps.js';
 export * as notifyTones from './notifytones.js';
 export * as webAppsModel from './webappsmodel.js';
 export * as flathubModel from './flathubmodel.js';
@@ -241,7 +242,7 @@ export {
   powerProfiles, usePowerProfiles, onPowerProfileResult, bluetooth, useBluetooth, onBluetoothResult, setBluetoothPower, timedate, useTimedate, menuClock, clockPrefs,
   CLOCK_DEFAULTS, applyIdle,
 } from './hardware.jsx';
-import { DisplayConfirm, BluetoothPrompt, PolkitPrompt, PortalOpenPrompt, WebAppAskPrompt, WebAppInspectPrompt, WebAppMenu, startHardware } from './hardware.jsx';
+import { DisplayConfirm, BluetoothPrompt, PolkitPrompt, PortalOpenPrompt, WebAppAskPrompt, WebAppInspectPrompt, WebAppRestartPrompt, WebAppMenu, startHardware } from './hardware.jsx';
 import { GlobalShortcutsPrompt } from './globalshortcuts.jsx';
 export { KeyComboField, useGlobalShortcuts, checkGlobalShortcut, setGlobalShortcut, forgetGlobalShortcuts } from './globalshortcuts.jsx';
 import { startTray } from './trayitems.jsx';
@@ -448,7 +449,7 @@ function LocaleRoot({ children }) {
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt, FirstStart),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, CaptureCorner, DisplayIdentify, VoicePlayer),
-    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, ShotOverlay, WebAppAskPrompt, WebAppInspectPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
+    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, ShotOverlay, WebAppAskPrompt, WebAppInspectPrompt, WebAppRestartPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
     at('input', OskPanel, ImeOverlay, ThemeSwitchOverlay));   // the style changing: over everything (themeswitch.jsx)
 }
 // the wallpaper slideshow (0.8.9; a theme turns it on in theme.json: sdk/thememeta.js)

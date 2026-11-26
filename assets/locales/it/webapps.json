@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} non rispondeva ed è stata riavviata",
+  "restart.menu": "Riavvia…",
+  "restart.title": "Riavviare {app}?",
+  "quit.title": "Forzare l'uscita da {app}?",
+  "restart.detail": "La sua finestra si chiude e si riapre. Una chiamata o un caricamento in corso si interrompe.",
+  "quit.detail": "La sua finestra si chiude senza attendere. Una chiamata o un caricamento in corso si interrompe.",
+  "restart.ok": "Riavvia",
+  "settings.engineTitle": "Motore delle app web",
+  "settings.engineFooter": "Quando un'app web smette di rispondere, LordOS la riavvia da solo e te lo dice.",
+  "settings.restartEngine": "Riavvia il motore delle app web",
+  "settings.restartEngineHint": "Chiude ogni app web aperta e la riapre. Usalo quando un'app web non si apre o smette di rispondere.",
+  "settings.restartEngineTitle": "Riavviare tutte le app web aperte?",
+  "settings.restartEngineDetail": "Ogni app web aperta si chiude e si riapre. Le chiamate e i caricamenti in corso si interrompono.",
+  "settings.restartEngineDone": "App web riavviate",
+  "quit.menu": "Uscita forzata…",
+  "quit.ok": "Uscita forzata"
 }

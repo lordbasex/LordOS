@@ -231,5 +231,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} neatsakė, todėl buvo paleista iš naujo",
+  "restart.menu": "Paleisti iš naujo…",
+  "restart.title": "Paleisti {app} iš naujo?",
+  "quit.title": "Priverstinai išjungti {app}?",
+  "restart.detail": "Jos langas užsidaro ir vėl atsidaro. Vykstantis skambutis ar įkėlimas nutrūksta.",
+  "quit.detail": "Jos langas užsidaro nelaukiant. Vykstantis skambutis ar įkėlimas nutrūksta.",
+  "restart.ok": "Paleisti iš naujo",
+  "settings.engineTitle": "Žiniatinklio programų variklis",
+  "settings.engineFooter": "Kai žiniatinklio programa nustoja atsakyti, LordOS pats ją paleidžia iš naujo ir apie tai praneša.",
+  "settings.restartEngine": "Paleisti žiniatinklio programų variklį iš naujo",
+  "settings.restartEngineHint": "Uždaro kiekvieną atidarytą žiniatinklio programą ir vėl ją atidaro. Naudokite, kai žiniatinklio programa neatsidaro arba nustoja atsakyti.",
+  "settings.restartEngineTitle": "Paleisti visas atidarytas žiniatinklio programas iš naujo?",
+  "settings.restartEngineDetail": "Kiekviena atidaryta žiniatinklio programa užsidaro ir vėl atsidaro. Vykstantys skambučiai ir įkėlimai nutrūksta.",
+  "settings.restartEngineDone": "Žiniatinklio programos paleistos iš naujo",
+  "quit.menu": "Priverstinai išjungti…",
+  "quit.ok": "Priverstinai išjungti"
 }

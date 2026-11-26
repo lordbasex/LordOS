@@ -15,5 +15,6 @@
   "inspect.failed": "Alat pembangun tidak dapat dimulakan",
   "save.image": "Simpan imej",
   "save.video": "Simpan video",
-  "save.audio": "Simpan audio"
+  "save.audio": "Simpan audio",
+  "hang.reloaded": "Halaman tidak bertindak balas dan telah dimuatkan semula"
 }

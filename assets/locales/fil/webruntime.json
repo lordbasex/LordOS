@@ -15,5 +15,6 @@
   "inspect.failed": "Hindi masimulan ang mga tool ng developer",
   "save.image": "I-save ang larawan",
   "save.video": "I-save ang video",
-  "save.audio": "I-save ang audio"
+  "save.audio": "I-save ang audio",
+  "hang.reloaded": "Hindi tumutugon ang page kaya muli itong ni-load"
 }

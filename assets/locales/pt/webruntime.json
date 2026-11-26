@@ -15,5 +15,6 @@
   "inspect.failed": "Não foi possível iniciar as ferramentas de desenvolvedor",
   "save.image": "Salvar imagem",
   "save.video": "Salvar vídeo",
-  "save.audio": "Salvar áudio"
+  "save.audio": "Salvar áudio",
+  "hang.reloaded": "A página não respondia e foi carregada de novo"
 }

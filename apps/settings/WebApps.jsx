@@ -12,7 +12,8 @@
 import {
   View, Text, useLocale, useTheme, useAppWindow, useWebApps, webAppsAvailable, webAppCall, webAppIcon, webAppsModel as M, launchWebApp,
   Button, Toggle, Segmented, TextInput, ConfirmDialog, Layer, fs, formatBytes, errorText, wm, spacing, typeScale, useSettings,
-  webRunning, refreshSiteIcon, siteIconStatus, Spinner, webProfileIcon, webBadges, useStore, webDeveloper, setWebDeveloperMode, webSearchEngine, setWebSearchEngine,
+  webRunning, refreshSiteIcon, siteIconStatus, Spinner, webProfileIcon, webBadges, useStore, webDeveloper, setWebDeveloperMode,
+  restartWebApp, quitWebApp, restartWebEngine, webSearchEngine, setWebSearchEngine,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, ValueRow, Note, Actions, Message, PopUp } from './ui.jsx';
@@ -72,7 +73,7 @@ function Over({ children }) {
   return <Layer name="modal">{children({ x: g.x || 0, y: g.y || 0, w: g.w || 640, h: g.h || 480 })}</Layer>;
 }
 
-function ProfileRow({ entry, p, size, onMsg, onRemove, live, badge }) {
+function ProfileRow({ entry, p, size, onMsg, onRemove, onAct, live, badge }) {
   const { t: tr } = useLocale();
   const [name, setName] = useState(null);           // renaming: the text being typed
   const rename = () => {
@@ -98,6 +99,8 @@ function ProfileRow({ entry, p, size, onMsg, onRemove, live, badge }) {
       hint={[tr('webapps.settings.profileData', { size: used }), badge ? tr('webapps.settings.unread', { count: badge }) : ''].filter(Boolean).join(' · ')}>
       <ColorDots value={color} onPick={(c) => { try { webAppCall('setProfileColor', entry.id, p.id, c); } catch (e) { onMsg({ ok: false, text: errorText(e) }); } }} />
       <Button small label={tr('webapps.settings.open')} onClick={() => { try { launchWebApp(entry.id, p.id); } catch (e) { onMsg({ ok: false, text: errorText(e) }); } }} />
+      {live ? <Button small label={tr('webapps.restart.ok')} onClick={() => onAct({ kind: 'restart', profile: p })} /> : null}
+      {live ? <Button small label={tr('webapps.quit.ok')} onClick={() => onAct({ kind: 'quit', profile: p })} /> : null}
       <Button small label={tr('webapps.settings.rename')} onClick={() => setName(p.name)} />
       {M.canRemoveProfile(entry) ? <Button small destructive label={tr('webapps.settings.remove')} onClick={() => onRemove(p)} /> : null}
     </SettingRow>
@@ -127,6 +130,7 @@ function AppDetails({ entry }) {
   const [adding, setAdding] = useState(null);       // the new profile's name being typed
   const [removing, setRemoving] = useState(null);   // { profile } or { app: true }
   const [wipe, setWipe] = useState(true);
+  const [acting, setActing] = useState(null);       // { kind: 'restart' | 'quit', profile }: asked before it happens
   const sizes = useSizes(entry, running);
   const live = new Set(running.filter((r) => r.app === entry.id).map((r) => r.profile));
   const call = (...args) => { try { webAppCall(...args); setMsg(null); return true; } catch (e) { setMsg({ ok: false, text: errorText(e) }); return false; } };
@@ -141,13 +145,19 @@ function AppDetails({ entry }) {
     if (r.app) { if (call('uninstall', entry.id, wipe)) setMsg({ ok: true, text: tr('webapps.settings.uninstalled', { name: entry.name }) }); }
     else call('removeProfile', entry.id, r.profile.id, wipe);
   };
+  const confirmAct = () => {
+    const a = acting;
+    setActing(null);
+    try { if (a.kind === 'quit') quitWebApp(entry.id, a.profile.id); else restartWebApp(entry.id, a.profile.id); setMsg(null); } catch (e) { setMsg({ ok: false, text: errorText(e) }); }
+  };
+  const actName = acting ? (one ? entry.name : tr('webapps.windowName', { app: entry.name, profile: acting.profile.name })) : '';
   const perms = M.permissionRows(entry);
   const options = [['allow', tr('webapps.perm.allow')], ['ask', tr('webapps.perm.ask')], ['deny', tr('webapps.perm.deny')]];
   return (
     <>
       <Section title={tr('webapps.settings.profiles')} footer={tr('webapps.settings.profilesFooter')}>
         {entry.profiles.map((p) => <ProfileRow key={p.id} entry={entry} p={p} size={sizes[p.id]} live={live.has(p.id)} badge={M.badgeLabel(M.badgeTotal(badges, entry.id, p.id))}
-          onMsg={setMsg} onRemove={(profile) => { setWipe(true); setRemoving({ profile }); }} />)}
+          onMsg={setMsg} onRemove={(profile) => { setWipe(true); setRemoving({ profile }); }} onAct={setActing} />)}
         {adding !== null ? (
           <SettingRow label={tr('webapps.settings.newProfile')}>
             <View style={{ width: 180 }}><TextInput value={adding} onChange={setAdding} onSubmit={add} onCancel={() => setAdding(null)} autoFocus selectAll /></View>
@@ -221,6 +231,15 @@ function AppDetails({ entry }) {
         </Actions>
       </Section>
       {msg ? <Message msg={msg} /> : null}
+      {acting ? (
+        <Over>{(area) => (
+          <ConfirmDialog area={area} destructive
+            title={tr(acting.kind === 'quit' ? 'webapps.quit.title' : 'webapps.restart.title', { app: actName })}
+            detail={tr(acting.kind === 'quit' ? 'webapps.quit.detail' : 'webapps.restart.detail')}
+            okLabel={tr(acting.kind === 'quit' ? 'webapps.quit.ok' : 'webapps.restart.ok')} cancelLabel={tr('webapps.settings.cancel')}
+            onOk={confirmAct} onCancel={() => setActing(null)} />
+        )}</Over>
+      ) : null}
       {removing ? (
         <Over>{(area) => (
           <ConfirmDialog area={area} destructive
@@ -251,6 +270,13 @@ export function WebAppsSettings() {
   const entry = list.find((e) => e.id === sel) || null;
   const developer = useStore(webDeveloper);
   const [devErr, setDevErr] = useState(null);
+  const running = useRunning();
+  const [engineAsk, setEngineAsk] = useState(false);
+  const [engineMsg, setEngineMsg] = useState(null);
+  const restartEngine = () => {
+    setEngineAsk(false);
+    try { restartWebEngine(); setEngineMsg({ ok: true, text: tr('webapps.settings.restartEngineDone') }); } catch (e) { setEngineMsg({ ok: false, text: errorText(e) }); }
+  };
   const setDeveloper = (on) => { try { setWebDeveloperMode(on); setDevErr(null); } catch (e) { setDevErr({ ok: false, text: errorText(e) }); } };
   const engine = useStore(webSearchEngine);
   const engines = M.SEARCH_ENGINES.map((v) => [v, tr(`webapps.search.${v}`)]);
@@ -277,6 +303,18 @@ export function WebAppsSettings() {
           <PopUp value={engine} options={engines} width={210} onChange={setEngine} />
         </SettingRow>
       </Section>
+      <Section title={tr('webapps.settings.engineTitle')} footer={tr('webapps.settings.engineFooter')}>
+        <SettingRow label={tr('webapps.settings.restartEngine')} hint={tr('webapps.settings.restartEngineHint')}>
+          <Button small label={tr('webapps.restart.ok')} disabled={!available || !running.length} onClick={() => setEngineAsk(true)} />
+        </SettingRow>
+      </Section>
+      {engineMsg ? <Message msg={engineMsg} /> : null}
+      {engineAsk ? (
+        <Over>{(area) => (
+          <ConfirmDialog area={area} destructive title={tr('webapps.settings.restartEngineTitle')} detail={tr('webapps.settings.restartEngineDetail')}
+            okLabel={tr('webapps.restart.ok')} cancelLabel={tr('webapps.settings.cancel')} onOk={restartEngine} onCancel={() => setEngineAsk(false)} />
+        )}</Over>
+      ) : null}
       <Section title={tr('webapps.settings.developerTitle')} footer={tr('webapps.settings.developerFooter')}>
         <SettingRow label={tr('webapps.settings.developer')} hint={tr('webapps.settings.developerHint')}>
           <Toggle on={developer} onChange={setDeveloper} />

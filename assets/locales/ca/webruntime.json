@@ -15,5 +15,6 @@
   "inspect.failed": "No s'han pogut iniciar les eines per a desenvolupadors",
   "save.image": "Desa la imatge",
   "save.video": "Desa el vídeo",
-  "save.audio": "Desa l'àudio"
+  "save.audio": "Desa l'àudio",
+  "hang.reloaded": "La pàgina no responia i s'ha tornat a carregar"
 }

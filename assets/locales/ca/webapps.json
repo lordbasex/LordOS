@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} no responia i s'ha reiniciat",
+  "restart.menu": "Reinicia…",
+  "restart.title": "Voleu reiniciar {app}?",
+  "quit.title": "Voleu forçar la sortida de {app}?",
+  "restart.detail": "La finestra es tanca i es torna a obrir. Una trucada o una pujada en curs s'aturen.",
+  "quit.detail": "La finestra es tanca sense esperar. Una trucada o una pujada en curs s'aturen.",
+  "restart.ok": "Reinicia",
+  "settings.engineTitle": "Motor de les aplicacions web",
+  "settings.engineFooter": "Quan una aplicació web deixa de respondre, LordOS la reinicia sol i us ho diu.",
+  "settings.restartEngine": "Reinicia el motor de les aplicacions web",
+  "settings.restartEngineHint": "Tanca cada aplicació web oberta i la torna a obrir. Feu-lo servir quan una aplicació web no s'obre o deixa de respondre.",
+  "settings.restartEngineTitle": "Voleu reiniciar totes les aplicacions web obertes?",
+  "settings.restartEngineDetail": "Cada aplicació web oberta es tanca i es torna a obrir. Les trucades i pujades en curs s'aturen.",
+  "settings.restartEngineDone": "Aplicacions web reiniciades",
+  "quit.menu": "Força la sortida…",
+  "quit.ok": "Força la sortida"
 }

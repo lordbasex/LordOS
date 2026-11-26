@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} جواب نہیں دے رہا تھا، اس لیے اسے دوبارہ شروع کیا گیا",
+  "restart.menu": "دوبارہ شروع کریں…",
+  "restart.title": "{app} دوبارہ شروع کریں؟",
+  "quit.title": "{app} زبردستی بند کریں؟",
+  "restart.detail": "اس کی ونڈو بند ہو کر دوبارہ کھلے گی۔ جاری کال یا اپ لوڈ رک جائے گا۔",
+  "quit.detail": "اس کی ونڈو انتظار کیے بغیر بند ہو جائے گی۔ جاری کال یا اپ لوڈ رک جائے گا۔",
+  "restart.ok": "دوبارہ شروع کریں",
+  "settings.engineTitle": "ویب ایپس کا انجن",
+  "settings.engineFooter": "جب کوئی ویب ایپ جواب دینا بند کر دے تو LordOS اسے خود دوبارہ شروع کرتا ہے اور آپ کو بتاتا ہے۔",
+  "settings.restartEngine": "ویب ایپس کا انجن دوبارہ شروع کریں",
+  "settings.restartEngineHint": "ہر کھلی ویب ایپ کو بند کر کے دوبارہ کھولتا ہے۔ جب کوئی ویب ایپ نہ کھلے یا جواب دینا بند کر دے تو اسے استعمال کریں۔",
+  "settings.restartEngineTitle": "سبھی کھلی ویب ایپس دوبارہ شروع کریں؟",
+  "settings.restartEngineDetail": "ہر کھلی ویب ایپ بند ہو کر دوبارہ کھلے گی۔ جاری کالز اور اپ لوڈز رک جائیں گے۔",
+  "settings.restartEngineDone": "ویب ایپس دوبارہ شروع ہو گئیں",
+  "quit.menu": "زبردستی بند کریں…",
+  "quit.ok": "زبردستی بند کریں"
 }

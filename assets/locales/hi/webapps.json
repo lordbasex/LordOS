@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} जवाब नहीं दे रहा था, इसलिए उसे फिर से शुरू किया गया",
+  "restart.menu": "फिर से शुरू करें…",
+  "restart.title": "{app} फिर से शुरू करें?",
+  "quit.title": "{app} बलपूर्वक बंद करें?",
+  "restart.detail": "इसकी विंडो बंद होकर फिर खुलेगी। चल रही कॉल या अपलोड रुक जाएगा।",
+  "quit.detail": "इसकी विंडो बिना इंतज़ार किए बंद होगी। चल रही कॉल या अपलोड रुक जाएगा।",
+  "restart.ok": "फिर से शुरू करें",
+  "settings.engineTitle": "वेब ऐप इंजन",
+  "settings.engineFooter": "जब कोई वेब ऐप जवाब देना बंद कर देता है, तो LordOS उसे अपने-आप फिर से शुरू करता है और आपको बताता है।",
+  "settings.restartEngine": "वेब ऐप इंजन फिर से शुरू करें",
+  "settings.restartEngineHint": "हर खुले वेब ऐप को बंद करके फिर खोलता है। जब कोई वेब ऐप न खुले या जवाब देना बंद कर दे, तब इसका उपयोग करें।",
+  "settings.restartEngineTitle": "सभी खुले वेब ऐप फिर से शुरू करें?",
+  "settings.restartEngineDetail": "हर खुला वेब ऐप बंद होकर फिर खुलेगा। चल रही कॉल और अपलोड रुक जाएँगे।",
+  "settings.restartEngineDone": "वेब ऐप फिर से शुरू हुए",
+  "quit.menu": "बलपूर्वक बंद करें…",
+  "quit.ok": "बलपूर्वक बंद करें"
 }

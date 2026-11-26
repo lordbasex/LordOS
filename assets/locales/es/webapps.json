@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} no respondía y se reinició",
+  "restart.menu": "Reiniciar…",
+  "restart.title": "¿Reiniciar {app}?",
+  "quit.title": "¿Forzar la salida de {app}?",
+  "restart.detail": "Su ventana se cierra y se vuelve a abrir. Una llamada o una subida en curso se cortan.",
+  "quit.detail": "Su ventana se cierra sin esperarla. Una llamada o una subida en curso se cortan.",
+  "restart.ok": "Reiniciar",
+  "settings.engineTitle": "Motor de las apps web",
+  "settings.engineFooter": "Cuando una app web deja de responder, LordOS la reinicia solo y te avisa.",
+  "settings.restartEngine": "Reiniciar el motor de las apps web",
+  "settings.restartEngineHint": "Cierra cada app web abierta y la vuelve a abrir. Usalo cuando una app web no abre o deja de responder.",
+  "settings.restartEngineTitle": "¿Reiniciar todas las apps web abiertas?",
+  "settings.restartEngineDetail": "Cada app web abierta se cierra y se vuelve a abrir. Las llamadas y subidas en curso se cortan.",
+  "settings.restartEngineDone": "Apps web reiniciadas",
+  "quit.menu": "Forzar salida…",
+  "quit.ok": "Forzar salida"
 }

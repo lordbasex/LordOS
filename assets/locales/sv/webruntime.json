@@ -15,5 +15,6 @@
   "inspect.failed": "Utvecklarverktygen kunde inte starta",
   "save.image": "Spara bild",
   "save.video": "Spara video",
-  "save.audio": "Spara ljud"
+  "save.audio": "Spara ljud",
+  "hang.reloaded": "Sidan svarade inte och lästes in igen"
 }

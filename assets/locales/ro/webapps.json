@@ -231,5 +231,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} nu răspundea și a fost repornită",
+  "restart.menu": "Repornește…",
+  "restart.title": "Repornești {app}?",
+  "quit.title": "Forțezi închiderea {app}?",
+  "restart.detail": "Fereastra ei se închide și se redeschide. Un apel sau o încărcare în curs se oprește.",
+  "quit.detail": "Fereastra ei se închide fără să aștepte. Un apel sau o încărcare în curs se oprește.",
+  "restart.ok": "Repornește",
+  "settings.engineTitle": "Motorul aplicațiilor web",
+  "settings.engineFooter": "Când o aplicație web nu mai răspunde, LordOS o repornește singur și te anunță.",
+  "settings.restartEngine": "Repornește motorul aplicațiilor web",
+  "settings.restartEngineHint": "Închide fiecare aplicație web deschisă și o redeschide. Folosește-l când o aplicație web nu se deschide sau nu mai răspunde.",
+  "settings.restartEngineTitle": "Repornești toate aplicațiile web deschise?",
+  "settings.restartEngineDetail": "Fiecare aplicație web deschisă se închide și se redeschide. Apelurile și încărcările în curs se opresc.",
+  "settings.restartEngineDone": "Aplicațiile web au fost repornite",
+  "quit.menu": "Închidere forțată…",
+  "quit.ok": "Închidere forțată"
 }

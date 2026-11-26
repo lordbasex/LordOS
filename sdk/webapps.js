@@ -26,12 +26,19 @@
 //                                  mode is on, else null; it asks first (webInspectAsk, <WebAppInspectPrompt />)
 //   webInspectAsk (store) · answerWebInspect(yes)   then lord.webapps.inspect starts that window again with WebKit's
 //                                  inspector on 127.0.0.1, which lord-web opens in the person's browser
+//   restartWebApp(app, profile) · quitWebApp(app, profile) · restartWebEngine()   Restart, Force Quit and Restart web
+//                                  apps engine (Settings → Web apps, the Window menu; the caller asks the person first):
+//                                  only the lord-web lord-server started for that app and profile. Throw the server's error
+//   webRestartItems(w)             the Window menu's Restart… and Force Quit… for a web app's window; they ask first
+//                                  (webRestartAsk, <WebAppRestartPrompt />), then answerWebRestart(yes) does it
+//   webRestartedTitle(data)        lord-server restarted an app that stopped answering (ui/webalive.c, the
+//                                  "webapps-restarted" event): the notification's words (hardware.jsx shows it)
 //
 // Only lord-server starts lord-web, with an app and a profile from the registry; nothing here names a URL to
 // open or a program to run.
 import { createStore, useStore } from './store.js';
 import { useEffect } from 'react';
-import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, siteIconError, webEditItems, inspectItem, searchEngineOf, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
+import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, siteIconError, webEditItems, inspectItem, restartItems, appProfileName, searchEngineOf, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
 import { t } from './i18n.js';
 
 const has = () => typeof lord !== 'undefined' && typeof lord.webapps === 'object' && lord.webapps !== null;
@@ -45,6 +52,7 @@ export const siteIconStatus = createStore({});
 export const webDeveloper = createStore(false);
 export const webSearchEngine = createStore('google');
 export const webInspectAsk = createStore(null);
+export const webRestartAsk = createStore(null);
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -274,6 +282,52 @@ export function answerWebInspect(yes) {
   webInspectAsk.set(null);
   if (!q || !yes) return;
   try { lord.webapps.inspect(q.app, q.profile); } catch (e) { console.error('inspect:', e.code || e); }
+}
+
+// ---- Restart and Force Quit (docs/WEBAPPS.md, "When a web app stops answering") ----
+
+const hasCall = (name) => has() && typeof lord.webapps[name] === 'function';
+
+// That profile's window ended and started again: 'restarted' (or 'started' when it wasn't running).
+export function restartWebApp(app, profile) {
+  if (!hasCall('restart')) throw Object.assign(new Error('unavailable'), { code: 'webapps.noRuntime' });
+  return lord.webapps.restart(app, profile);
+}
+
+// That profile's window ended without saving: true when it was running.
+export function quitWebApp(app, profile) {
+  if (!hasCall('quit')) throw Object.assign(new Error('unavailable'), { code: 'webapps.noRuntime' });
+  return lord.webapps.quit(app, profile);
+}
+
+// Every running web app ended and started again: how many.
+export function restartWebEngine() {
+  if (!hasCall('restartAll')) throw Object.assign(new Error('unavailable'), { code: 'webapps.noRuntime' });
+  return lord.webapps.restartAll();
+}
+
+// The Window menu's Restart… and Force Quit… for a window of a lord-web we started; each asks first.
+export function webRestartItems(w) {
+  const web = w?.args?.web;
+  if (!web || !hasCall('restart')) return [];
+  return restartItems(web, webRunning(), { restart: t('webapps.restart.menu'), quit: t('webapps.quit.menu') }, (q) => webRestartAsk.set(q));
+}
+
+// The person's answer to "Restart …?" or "Force quit …?": only a yes reaches lord-server.
+export function answerWebRestart(yes) {
+  const q = webRestartAsk.get();
+  webRestartAsk.set(null);
+  if (!q || !yes) return;
+  try { if (q.kind === 'quit') quitWebApp(q.app, q.profile); else restartWebApp(q.app, q.profile); } catch (e) { console.error('restart:', e.code || e); }
+}
+
+// lord-server found an app that stopped answering and started it again (the "webapps-restarted" event): what the
+// notification says, or null for an event that names no app.
+export function webRestartedTitle(data) {
+  if (!data || typeof data.app !== 'string') return null;
+  if (!webAppEntry(data.app)) refreshWebApps();
+  const name = appProfileName(webAppEntry(data.app), data.profile, t);
+  return t('webapps.restarted', { app: name || data.app });
 }
 
 // A page's right click: shown at the pointer by <WebAppMenu /> (hardware.jsx); one at a time.

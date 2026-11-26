@@ -231,5 +231,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} не отвечало и было перезапущено",
+  "restart.menu": "Перезапустить…",
+  "restart.title": "Перезапустить {app}?",
+  "quit.title": "Завершить {app} принудительно?",
+  "restart.detail": "Его окно закроется и откроется снова. Текущий звонок или загрузка прервутся.",
+  "quit.detail": "Его окно закроется без ожидания. Текущий звонок или загрузка прервутся.",
+  "restart.ok": "Перезапустить",
+  "settings.engineTitle": "Движок веб-приложений",
+  "settings.engineFooter": "Когда веб-приложение перестаёт отвечать, LordOS сам перезапускает его и сообщает вам.",
+  "settings.restartEngine": "Перезапустить движок веб-приложений",
+  "settings.restartEngineHint": "Закрывает каждое открытое веб-приложение и открывает его снова. Используйте, когда веб-приложение не открывается или перестало отвечать.",
+  "settings.restartEngineTitle": "Перезапустить все открытые веб-приложения?",
+  "settings.restartEngineDetail": "Каждое открытое веб-приложение закроется и откроется снова. Текущие звонки и загрузки прервутся.",
+  "settings.restartEngineDone": "Веб-приложения перезапущены",
+  "quit.menu": "Завершить принудительно…",
+  "quit.ok": "Завершить принудительно"
 }

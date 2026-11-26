@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} ne répondait plus et a été redémarré",
+  "restart.menu": "Redémarrer…",
+  "restart.title": "Redémarrer {app} ?",
+  "quit.title": "Forcer {app} à quitter ?",
+  "restart.detail": "Sa fenêtre se ferme et se rouvre. Un appel ou un envoi en cours s'arrête.",
+  "quit.detail": "Sa fenêtre se ferme sans attendre. Un appel ou un envoi en cours s'arrête.",
+  "restart.ok": "Redémarrer",
+  "settings.engineTitle": "Moteur des applications web",
+  "settings.engineFooter": "Quand une application web ne répond plus, LordOS la redémarre de lui-même et vous le signale.",
+  "settings.restartEngine": "Redémarrer le moteur des applications web",
+  "settings.restartEngineHint": "Ferme chaque application web ouverte et la rouvre. À utiliser quand une application web ne s'ouvre pas ou ne répond plus.",
+  "settings.restartEngineTitle": "Redémarrer toutes les applications web ouvertes ?",
+  "settings.restartEngineDetail": "Chaque application web ouverte se ferme et se rouvre. Les appels et envois en cours s'arrêtent.",
+  "settings.restartEngineDone": "Applications web redémarrées",
+  "quit.menu": "Forcer à quitter…",
+  "quit.ok": "Forcer à quitter"
 }

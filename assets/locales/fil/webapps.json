@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "Hindi tumutugon ang {app} kaya ni-restart ito",
+  "restart.menu": "I-restart…",
+  "restart.title": "I-restart ang {app}?",
+  "quit.title": "Sapilitang ihinto ang {app}?",
+  "restart.detail": "Magsasara at muling magbubukas ang window nito. Matatapos ang kasalukuyang tawag o upload.",
+  "quit.detail": "Magsasara ang window nito nang hindi naghihintay. Matatapos ang kasalukuyang tawag o upload.",
+  "restart.ok": "I-restart",
+  "settings.engineTitle": "Engine ng mga web app",
+  "settings.engineFooter": "Kapag huminto sa pagtugon ang isang web app, kusa itong ni-re-restart ng LordOS at sinasabihan ka.",
+  "settings.restartEngine": "I-restart ang engine ng mga web app",
+  "settings.restartEngineHint": "Isinasara ang bawat bukas na web app at muling binubuksan. Gamitin ito kapag ayaw bumukas o huminto sa pagtugon ang isang web app.",
+  "settings.restartEngineTitle": "I-restart ang lahat ng bukas na web app?",
+  "settings.restartEngineDetail": "Magsasara at muling magbubukas ang bawat bukas na web app. Matatapos ang mga kasalukuyang tawag at upload.",
+  "settings.restartEngineDone": "Na-restart ang mga web app",
+  "quit.menu": "Sapilitang Ihinto…",
+  "quit.ok": "Sapilitang Ihinto"
 }

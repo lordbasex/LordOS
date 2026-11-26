@@ -15,5 +15,6 @@
   "inspect.failed": "Nie udało się uruchomić narzędzi deweloperskich",
   "save.image": "Zapisz obraz",
   "save.video": "Zapisz wideo",
-  "save.audio": "Zapisz dźwięk"
+  "save.audio": "Zapisz dźwięk",
+  "hang.reloaded": "Strona nie odpowiadała i została wczytana ponownie"
 }

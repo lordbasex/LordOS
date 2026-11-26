@@ -15,5 +15,6 @@
   "inspect.failed": "Impossibile avviare gli strumenti per sviluppatori",
   "save.image": "Salva immagine",
   "save.video": "Salva video",
-  "save.audio": "Salva audio"
+  "save.audio": "Salva audio",
+  "hang.reloaded": "La pagina non rispondeva ed è stata ricaricata"
 }

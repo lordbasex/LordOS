@@ -15,5 +15,6 @@
   "inspect.failed": "Alat developer tidak dapat dimulai",
   "save.image": "Simpan gambar",
   "save.video": "Simpan video",
-  "save.audio": "Simpan audio"
+  "save.audio": "Simpan audio",
+  "hang.reloaded": "Halaman tidak merespons dan telah dimuat ulang"
 }

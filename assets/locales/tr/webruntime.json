@@ -15,5 +15,6 @@
   "inspect.failed": "Geliştirici araçları başlatılamadı",
   "save.image": "Görseli kaydet",
   "save.video": "Videoyu kaydet",
-  "save.audio": "Sesi kaydet"
+  "save.audio": "Sesi kaydet",
+  "hang.reloaded": "Sayfa yanıt vermiyordu ve yeniden yüklendi"
 }

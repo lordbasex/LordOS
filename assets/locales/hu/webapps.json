@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "A(z) {app} nem válaszolt, ezért újraindult",
+  "restart.menu": "Újraindítás…",
+  "restart.title": "Újraindítja: {app}?",
+  "quit.title": "Kilépteti kényszerítve: {app}?",
+  "restart.detail": "Az ablaka bezárul, majd újra megnyílik. A folyamatban lévő hívás vagy feltöltés megszakad.",
+  "quit.detail": "Az ablaka várakozás nélkül bezárul. A folyamatban lévő hívás vagy feltöltés megszakad.",
+  "restart.ok": "Újraindítás",
+  "settings.engineTitle": "Webalkalmazás-motor",
+  "settings.engineFooter": "Ha egy webalkalmazás nem válaszol, a LordOS magától újraindítja, és szól róla.",
+  "settings.restartEngine": "Webalkalmazás-motor újraindítása",
+  "settings.restartEngineHint": "Bezár minden megnyitott webalkalmazást, majd újra megnyitja. Akkor használja, ha egy webalkalmazás nem nyílik meg vagy nem válaszol.",
+  "settings.restartEngineTitle": "Újraindítja az összes megnyitott webalkalmazást?",
+  "settings.restartEngineDetail": "Minden megnyitott webalkalmazás bezárul, majd újra megnyílik. A folyamatban lévő hívások és feltöltések megszakadnak.",
+  "settings.restartEngineDone": "A webalkalmazások újraindultak",
+  "quit.menu": "Kilépés kényszerítése…",
+  "quit.ok": "Kilépés kényszerítése"
 }

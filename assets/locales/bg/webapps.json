@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} не отговаряше и беше рестартирано",
+  "restart.menu": "Рестартиране…",
+  "restart.title": "Рестартиране на {app}?",
+  "quit.title": "Принудително затваряне на {app}?",
+  "restart.detail": "Прозорецът му се затваря и отваря отново. Текущ разговор или качване прекъсва.",
+  "quit.detail": "Прозорецът му се затваря без изчакване. Текущ разговор или качване прекъсва.",
+  "restart.ok": "Рестартиране",
+  "settings.engineTitle": "Двигател на уеб приложенията",
+  "settings.engineFooter": "Когато уеб приложение спре да отговаря, LordOS го рестартира сам и ви уведомява.",
+  "settings.restartEngine": "Рестартиране на двигателя на уеб приложенията",
+  "settings.restartEngineHint": "Затваря всяко отворено уеб приложение и го отваря отново. Използвайте го, когато уеб приложение не се отваря или спре да отговаря.",
+  "settings.restartEngineTitle": "Рестартиране на всички отворени уеб приложения?",
+  "settings.restartEngineDetail": "Всяко отворено уеб приложение се затваря и отваря отново. Текущите разговори и качвания прекъсват.",
+  "settings.restartEngineDone": "Уеб приложенията са рестартирани",
+  "quit.menu": "Принудително затваряне…",
+  "quit.ok": "Принудително затваряне"
 }

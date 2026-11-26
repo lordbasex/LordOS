@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} cavab vermirdi və yenidən başladıldı",
+  "restart.menu": "Yenidən başlat…",
+  "restart.title": "{app} yenidən başladılsın?",
+  "quit.title": "{app} məcburi bağlansın?",
+  "restart.detail": "Pəncərəsi bağlanır və yenidən açılır. Davam edən zəng və ya yükləmə dayanır.",
+  "quit.detail": "Pəncərəsi gözləmədən bağlanır. Davam edən zəng və ya yükləmə dayanır.",
+  "restart.ok": "Yenidən başlat",
+  "settings.engineTitle": "Veb tətbiqlərin mühərriki",
+  "settings.engineFooter": "Veb tətbiq cavab verməyəndə LordOS onu özü yenidən başladır və sizə bildirir.",
+  "settings.restartEngine": "Veb tətbiqlərin mühərrikini yenidən başlat",
+  "settings.restartEngineHint": "Açıq olan hər veb tətbiqi bağlayıb yenidən açır. Veb tətbiq açılmayanda və ya cavab verməyəndə istifadə edin.",
+  "settings.restartEngineTitle": "Bütün açıq veb tətbiqlər yenidən başladılsın?",
+  "settings.restartEngineDetail": "Hər açıq veb tətbiq bağlanır və yenidən açılır. Davam edən zənglər və yükləmələr dayanır.",
+  "settings.restartEngineDone": "Veb tətbiqlər yenidən başladıldı",
+  "quit.menu": "Məcburi çıxış…",
+  "quit.ok": "Məcburi çıxış"
 }

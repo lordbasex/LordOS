@@ -227,5 +227,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} 没有响应，已重新启动",
+  "restart.menu": "重新启动…",
+  "restart.title": "要重新启动 {app} 吗？",
+  "quit.title": "要强制退出 {app} 吗？",
+  "restart.detail": "它的窗口会关闭并重新打开。正在进行的通话或上传会结束。",
+  "quit.detail": "它的窗口会立即关闭，不再等待。正在进行的通话或上传会结束。",
+  "restart.ok": "重新启动",
+  "settings.engineTitle": "网页应用引擎",
+  "settings.engineFooter": "网页应用停止响应时，LordOS 会自动重新启动它并告诉你。",
+  "settings.restartEngine": "重新启动网页应用引擎",
+  "settings.restartEngineHint": "关闭每个打开的网页应用并重新打开。网页应用打不开或停止响应时使用。",
+  "settings.restartEngineTitle": "要重新启动所有打开的网页应用吗？",
+  "settings.restartEngineDetail": "每个打开的网页应用都会关闭并重新打开。正在进行的通话和上传会结束。",
+  "settings.restartEngineDone": "网页应用已重新启动",
+  "quit.menu": "强制退出…",
+  "quit.ok": "强制退出"
 }

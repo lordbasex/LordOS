@@ -15,5 +15,6 @@
   "inspect.failed": "개발자 도구를 시작할 수 없습니다",
   "save.image": "이미지 저장",
   "save.video": "동영상 저장",
-  "save.audio": "오디오 저장"
+  "save.audio": "오디오 저장",
+  "hang.reloaded": "페이지가 응답하지 않아 다시 불러왔습니다"
 }

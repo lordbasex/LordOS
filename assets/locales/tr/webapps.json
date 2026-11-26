@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} yanıt vermiyordu ve yeniden başlatıldı",
+  "restart.menu": "Yeniden Başlat…",
+  "restart.title": "{app} yeniden başlatılsın mı?",
+  "quit.title": "{app} zorla kapatılsın mı?",
+  "restart.detail": "Penceresi kapanır ve yeniden açılır. Süren bir arama veya yükleme sona erer.",
+  "quit.detail": "Penceresi beklemeden kapanır. Süren bir arama veya yükleme sona erer.",
+  "restart.ok": "Yeniden Başlat",
+  "settings.engineTitle": "Web uygulamaları motoru",
+  "settings.engineFooter": "Bir web uygulaması yanıt vermeyi bıraktığında LordOS onu kendiliğinden yeniden başlatır ve size bildirir.",
+  "settings.restartEngine": "Web uygulamaları motorunu yeniden başlat",
+  "settings.restartEngineHint": "Açık olan her web uygulamasını kapatıp yeniden açar. Bir web uygulaması açılmadığında veya yanıt vermediğinde kullanın.",
+  "settings.restartEngineTitle": "Açık olan tüm web uygulamaları yeniden başlatılsın mı?",
+  "settings.restartEngineDetail": "Açık olan her web uygulaması kapanır ve yeniden açılır. Süren aramalar ve yüklemeler sona erer.",
+  "settings.restartEngineDone": "Web uygulamaları yeniden başlatıldı",
+  "quit.menu": "Zorla Çık…",
+  "quit.ok": "Zorla Çık"
 }

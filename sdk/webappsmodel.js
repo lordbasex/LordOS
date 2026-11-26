@@ -549,6 +549,23 @@ export const searchEngineOf = (v) => (SEARCH_ENGINES.includes(v) ? v : 'google')
 // The Window menu's Inspect (developer tools) for a web app's window (web: { app, profile } of a lord-web we started),
 // only while developer mode is on; checked and unavailable while that window already has them (they end when it
 // closes). running: lord.webapps.running(); ask({ app, profile }) shows the question before anything starts.
+// The Window menu's Restart and Force Quit for a web app's window (docs/WEBAPPS.md, "When a web app stops answering"):
+// both ask first (ask({ app, profile, kind: 'restart' | 'quit' })); nothing when the window isn't a web app's or its
+// process isn't running. labels: { restart, quit }.
+export function restartItems(web, running, labels, ask) {
+  if (!web || !web.app || !web.profile || typeof ask !== 'function') return [];
+  const on = (Array.isArray(running) ? running : []).some((r) => r && r.app === web.app && r.profile === web.profile);
+  if (!on) return [];
+  return ['restart', 'quit'].map((kind) => ({ label: labels?.[kind] || kind, onClick: () => ask({ app: web.app, profile: web.profile, kind }) }));
+}
+
+// The name a notification or a question gives a web app's profile: the app's, with the profile's when it has several.
+export function appProfileName(entry, profileId, tr) {
+  if (!entry) return String(profileId || '');
+  const l = windowLabel(entry, profileId);
+  return l.profile && typeof tr === 'function' ? tr('webapps.windowName', { app: l.name, profile: l.profile }) : l.name;
+}
+
 export function inspectItem(web, developer, running, label, ask) {
   if (!web || !web.app || !web.profile || developer !== true) return null;
   const on = (Array.isArray(running) ? running : []).some((r) => r && r.app === web.app && r.profile === web.profile && r.inspect === true);

@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} সাড়া দিচ্ছিল না, তাই আবার চালু করা হয়েছে",
+  "restart.menu": "আবার চালু করুন…",
+  "restart.title": "{app} আবার চালু করবেন?",
+  "quit.title": "{app} জোর করে বন্ধ করবেন?",
+  "restart.detail": "এর উইন্ডো বন্ধ হয়ে আবার খুলবে। চলমান কল বা আপলোড থেমে যাবে।",
+  "quit.detail": "এর উইন্ডো অপেক্ষা না করেই বন্ধ হবে। চলমান কল বা আপলোড থেমে যাবে।",
+  "restart.ok": "আবার চালু করুন",
+  "settings.engineTitle": "ওয়েব অ্যাপ ইঞ্জিন",
+  "settings.engineFooter": "কোনো ওয়েব অ্যাপ সাড়া দেওয়া বন্ধ করলে LordOS নিজেই সেটি আবার চালু করে এবং আপনাকে জানায়।",
+  "settings.restartEngine": "ওয়েব অ্যাপ ইঞ্জিন আবার চালু করুন",
+  "settings.restartEngineHint": "খোলা প্রতিটি ওয়েব অ্যাপ বন্ধ করে আবার খোলে। কোনো ওয়েব অ্যাপ না খুললে বা সাড়া না দিলে এটি ব্যবহার করুন।",
+  "settings.restartEngineTitle": "খোলা সব ওয়েব অ্যাপ আবার চালু করবেন?",
+  "settings.restartEngineDetail": "খোলা প্রতিটি ওয়েব অ্যাপ বন্ধ হয়ে আবার খুলবে। চলমান কল ও আপলোড থেমে যাবে।",
+  "settings.restartEngineDone": "ওয়েব অ্যাপ আবার চালু হয়েছে",
+  "quit.menu": "জোর করে বন্ধ করুন…",
+  "quit.ok": "জোর করে বন্ধ করুন"
 }

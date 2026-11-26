@@ -227,5 +227,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} 沒有回應，已重新啟動",
+  "restart.menu": "重新啟動…",
+  "restart.title": "要重新啟動 {app} 嗎？",
+  "quit.title": "要強制結束 {app} 嗎？",
+  "restart.detail": "它的視窗會關閉並重新開啟。進行中的通話或上傳會結束。",
+  "quit.detail": "它的視窗會立即關閉，不再等待。進行中的通話或上傳會結束。",
+  "restart.ok": "重新啟動",
+  "settings.engineTitle": "網頁 App 引擎",
+  "settings.engineFooter": "網頁 App 停止回應時，LordOS 會自動重新啟動它並告訴你。",
+  "settings.restartEngine": "重新啟動網頁 App 引擎",
+  "settings.restartEngineHint": "關閉每個開啟中的網頁 App 並重新開啟。網頁 App 打不開或停止回應時使用。",
+  "settings.restartEngineTitle": "要重新啟動所有開啟中的網頁 App 嗎？",
+  "settings.restartEngineDetail": "每個開啟中的網頁 App 都會關閉並重新開啟。進行中的通話和上傳會結束。",
+  "settings.restartEngineDone": "網頁 App 已重新啟動",
+  "quit.menu": "強制結束…",
+  "quit.ok": "強制結束"
 }

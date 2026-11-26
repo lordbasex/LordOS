@@ -15,5 +15,6 @@
   "inspect.failed": "Les outils de développement n'ont pas pu démarrer",
   "save.image": "Enregistrer l'image",
   "save.video": "Enregistrer la vidéo",
-  "save.audio": "Enregistrer l'audio"
+  "save.audio": "Enregistrer l'audio",
+  "hang.reloaded": "La page ne répondait plus et a été rechargée"
 }

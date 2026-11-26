@@ -229,5 +229,21 @@
   "search.google": "Google",
   "search.duckduckgo": "DuckDuckGo",
   "search.bing": "Bing",
-  "search.startpage": "Startpage"
+  "search.startpage": "Startpage",
+  "restarted": "{app} reageerde niet en is opnieuw gestart",
+  "restart.menu": "Opnieuw starten…",
+  "restart.title": "{app} opnieuw starten?",
+  "quit.title": "{app} geforceerd stoppen?",
+  "restart.detail": "Het venster sluit en gaat weer open. Een lopend gesprek of een lopende upload stopt.",
+  "quit.detail": "Het venster sluit zonder te wachten. Een lopend gesprek of een lopende upload stopt.",
+  "restart.ok": "Opnieuw starten",
+  "settings.engineTitle": "Engine van web-apps",
+  "settings.engineFooter": "Als een web-app niet meer reageert, start LordOS die zelf opnieuw en laat het je weten.",
+  "settings.restartEngine": "Engine van web-apps opnieuw starten",
+  "settings.restartEngineHint": "Sluit elke geopende web-app en opent die opnieuw. Gebruik dit als een web-app niet opent of niet meer reageert.",
+  "settings.restartEngineTitle": "Alle geopende web-apps opnieuw starten?",
+  "settings.restartEngineDetail": "Elke geopende web-app sluit en gaat weer open. Lopende gesprekken en uploads stoppen.",
+  "settings.restartEngineDone": "Web-apps opnieuw gestart",
+  "quit.menu": "Geforceerd stoppen…",
+  "quit.ok": "Geforceerd stoppen"
 }

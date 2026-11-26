@@ -15,5 +15,6 @@
   "inspect.failed": "Tərtibatçı alətləri başlamadı",
   "save.image": "Şəkli saxla",
   "save.video": "Videonu saxla",
-  "save.audio": "Audionu saxla"
+  "save.audio": "Audionu saxla",
+  "hang.reloaded": "Səhifə cavab vermirdi və yenidən yükləndi"
 }
