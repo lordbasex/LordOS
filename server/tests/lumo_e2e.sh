@@ -27,7 +27,11 @@ start() {
     P=$!
     for i in $(seq 1 120); do ./build/lumo status >/dev/null 2>&1; r=$?; [ $r != 4 ] && break; sleep 0.5; done
 }
-stop() { kill $P 2>/dev/null; sleep 1; kill -9 $P 2>/dev/null; wait $P 2>/dev/null; }
+stop() {
+    kill $P 2>/dev/null; sleep 2; kill -9 $P 2>/dev/null; wait $P 2>/dev/null
+    # its engine, if lord-server had no time to stop it: only the one in this test'"'"'s runtime folder
+    for e in $(pgrep -u "$(id -u)" -x llama-server); do case "$(readlink /proc/$e/cwd)" in "$D"/*) kill "$e";; esac; done
+}
 check() { if eval "$2"; then echo "  ok: $1"; else echo "  FAILED: $1"; fail=1; fi; }
 start
 out=$(LANG=en_US.UTF-8 ./build/lumo status); rc=$?
