@@ -6,3 +6,6 @@ export { ime } from '../../sdk/ime.js';
 export { takeTextFocus, releaseTextFocus, textFocusOwner } from '../../sdk/components.jsx';
 export { ContextMenu } from '../../sdk/contextmenu.jsx';
 export const clipboard = { get: () => lord.clipboard.get(), set: (s) => lord.clipboard.set(String(s)) };
+// spelling (sdk/editorextras.jsx): the stub lord has no lord.spell, so nothing is underlined
+export { useTheme } from '../../sdk/theme.js';
+export { useEditorSpell, EditorSquiggles, squiggleColorFor, spellHitAt } from '../../sdk/editorextras.jsx';

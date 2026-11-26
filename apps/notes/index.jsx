@@ -6,6 +6,7 @@ import {
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SearchField, EmptyState, textDirection,
   Markdown, markdownHeadings, toggleTask, wm, fs, formatBytes, addListener, screen, t, print, FilePicker as SysFilePicker, useFilesDrop, FilesDropHint, registerWidgetKind,
   useSidebar, SidebarToggle, SidebarOverlay, Layer, openFileWithApps, screenDisplays, displayFor, workAreaOf,
+  editorMenuRows, WritingPanel,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { NoteEditor } from './NoteEditor.jsx';
@@ -132,6 +133,7 @@ function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, 
   });
   // right click while editing: Cut, Copy, Paste, Select All and Speech (for the selection or the whole note)
   const [ctx, setCtx] = useState(null);
+  const [job, setJob] = useState(null);             // ✨ AI's panel on the selection (sdk/writing.jsx)
   // the open menu takes the keyboard for a while: that is not leaving the desktop note's editor
   const menuOpen = useRef(false);
   menuOpen.current = !!ctx;
@@ -147,11 +149,19 @@ function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, 
           onPasteImage={() => pasteClipboardImage(note.slug)} onEscape={() => onMode('read')} onBlur={compact ? () => { if (!menuOpen.current && !hold?.current) onMode('read'); } : undefined}
           onCommand={(b) => { if (b === 'e') onMode('read'); else onCommand?.(b); }}
           onContextMenu={(e) => {
-            const items = contextItems(t, { selected: !!editorApi.current?.selection?.(), empty: !note.body }, (a) => editorApi.current?.send?.(editKey(a)),
+            const ed = editorApi.current;
+            const base = contextItems(t, { selected: !!ed?.selection?.(), empty: !note.body }, (a) => ed?.send?.(editKey(a)),
               speechItems(speechText).filter((x) => x !== '-'));
-            setCtx({ ...(box.current ? e.local(box.current) : e), items });
+            // spelling first, ✨ AI with a selection (sdk/editorextras.jsx); the model's text comes back only on Replace
+            const at = box.current ? e.local(box.current) : e;
+            const range = ed?.selRange?.() || [0, 0], selected = ed?.selection?.() || '';
+            const items = editorMenuRows({ base, hit: ed?.spellHit?.(e), selected, onReplaceWord: (a, b, w) => ed?.replaceRange?.(a, b, w),
+              openWriting: (o) => setJob({ ...o, text: selected, range, at }), refresh: (rows) => setCtx((c) => (c && c.at === at ? { ...c, items: rows } : c)) });
+            setCtx({ ...at, at, items });
           }} />
         {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} bounds={{ w, h: box.current ? lord.getLayout(box.current.id)[3] : 600 }} />}
+        {job && <WritingPanel anchor={box} at={job.at} job={job} bounds={{ w, h: box.current ? lord.getLayout(box.current.id)[3] : 600 }} onClose={() => setJob(null)}
+          onReplace={(txt) => { const ed = editorApi.current; if (!ed || ed.textNow().slice(job.range[0], job.range[1]) !== job.text) return false; ed.replaceRange(job.range[0], job.range[1], txt); return true; }} />}
       </View>
     );
   }

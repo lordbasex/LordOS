@@ -33,8 +33,8 @@ function ServerFields({ value, onChange, label }) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={{ fontSize: 12, fontWeight: 600, color: th.text }}>{label}</Text>
-      <Field label={t('mail.setup.server')}><TextInput value={value.host} onChange={(host) => onChange({ ...value, host })} placeholder="imap.example.com" /></Field>
-      <Field label={t('mail.setup.port')}><TextInput value={String(value.port || '')} onChange={(p) => onChange({ ...value, port: Number(p.replace(/\D/g, '')) || 0 })} /></Field>
+      <Field label={t('mail.setup.server')}><TextInput spellCheck={false} value={value.host} onChange={(host) => onChange({ ...value, host })} placeholder="imap.example.com" /></Field>
+      <Field label={t('mail.setup.port')}><TextInput spellCheck={false} value={String(value.port || '')} onChange={(p) => onChange({ ...value, port: Number(p.replace(/\D/g, '')) || 0 })} /></Field>
       <Field label={t('mail.setup.security')}>
         <Segmented options={opts} value={value.security} onChange={(security) => onChange({ ...value, security, port: value.port === 993 || value.port === 143 ? (security === 'ssl' ? 993 : 143) : value.port === 465 || value.port === 587 ? (security === 'ssl' ? 465 : 587) : value.port })} />
       </Field>
@@ -89,16 +89,16 @@ function DavFields({ dav, setDav, preset }) {
           <Text style={{ fontSize: 12, color: th.text }}>{t('mail.setup.davAppPassword', { name: p.name })}</Text>
           {p.appPassword ? <Text style={{ fontSize: 11, color: th.accent }}>{p.appPassword}</Text> : null}
         </View>
-        <Field label={t('mail.setup.davAccountEmail')}><TextInput value={dav.user} onChange={(user) => setDav({ ...dav, user })} placeholder={t('mail.setup.emailPh')} /></Field>
+        <Field label={t('mail.setup.davAccountEmail')}><TextInput spellCheck={false} value={dav.user} onChange={(user) => setDav({ ...dav, user })} placeholder={t('mail.setup.emailPh')} /></Field>
         {toggles}
       </View>
     );
   }
   return (
     <View style={{ gap: 8 }}>
-      <Field label={t('mail.setup.url')}><TextInput value={dav.url} onChange={(url) => setDav({ ...dav, url })} placeholder="https://cloud.example.com/remote.php/dav" /></Field>
-      <Field label={t('mail.setup.cardUrl')}><TextInput value={dav.carddav} onChange={(carddav) => setDav({ ...dav, carddav })} placeholder={t('mail.setup.cardUrlPh')} /></Field>
-      <Field label={t('mail.setup.user')}><TextInput value={dav.user} onChange={(user) => setDav({ ...dav, user })} /></Field>
+      <Field label={t('mail.setup.url')}><TextInput spellCheck={false} value={dav.url} onChange={(url) => setDav({ ...dav, url })} placeholder="https://cloud.example.com/remote.php/dav" /></Field>
+      <Field label={t('mail.setup.cardUrl')}><TextInput spellCheck={false} value={dav.carddav} onChange={(carddav) => setDav({ ...dav, carddav })} placeholder={t('mail.setup.cardUrlPh')} /></Field>
+      <Field label={t('mail.setup.user')}><TextInput spellCheck={false} value={dav.user} onChange={(user) => setDav({ ...dav, user })} /></Field>
       {toggles}
     </View>
   );
@@ -202,7 +202,7 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail', preset: preset0 = 
           )}
           {!davBlocked && <Field label={t('mail.setup.name')}><TextInput value={name} onChange={setName} placeholder={kind === 'dav' ? (pre.id === 'other' ? t('mail.setup.davNamePh') : `${pre.name} — ${t('mail.setup.calContacts')}`) : t('mail.setup.namePh')} autoFocus /></Field>}
           {kind === 'mail' ? (
-            <Field label={t('mail.setup.email')}><TextInput value={email} onChange={setEmail} placeholder={t('mail.setup.emailPh')} onSubmit={next} /></Field>
+            <Field label={t('mail.setup.email')}><TextInput spellCheck={false} value={email} onChange={setEmail} placeholder={t('mail.setup.emailPh')} onSubmit={next} /></Field>
           ) : <DavFields dav={dav} setDav={setDav} preset={preset} />}
           {!davBlocked && <Field label={kind === 'dav' && pre.id !== 'other' ? t('mail.setup.appSpecificPassword') : t('mail.setup.password')}><TextInput value={pw} onChange={setPw} secure onSubmit={next} /></Field>}
           {!davBlocked && <Text style={{ fontSize: 11, color: th.textDim }}>{t('mail.setup.keyringNote')}</Text>}
@@ -238,7 +238,7 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail', preset: preset0 = 
             </View>
             {manual && (
               <>
-                <Field label={t('mail.setup.user')}><TextInput value={cfg.user} onChange={(user) => setCfg({ ...cfg, user })} /></Field>
+                <Field label={t('mail.setup.user')}><TextInput spellCheck={false} value={cfg.user} onChange={(user) => setCfg({ ...cfg, user })} /></Field>
                 <ServerFields label={t('mail.setup.incoming')} value={cfg.imap} onChange={(imap) => setCfg({ ...cfg, imap })} />
                 <ServerFields label={t('mail.setup.outgoing')} value={cfg.smtp} onChange={(smtp) => setCfg({ ...cfg, smtp })} />
               </>

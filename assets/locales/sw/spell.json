@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Inatafuta mapendekezo…",
+  "menu.none": "Hakuna mapendekezo",
+  "menu.add": "Ongeza “{word}” kwenye kamusi",
+  "menu.ignore": "Puuza",
+  "settings.title": "Tahajia",
+  "settings.hint": "Maneno yaliyoandikwa vibaya hupigiwa mstari mwekundu wa mawimbi katika sehemu za maandishi za LordOS; bofya kulia kwenye neno ili kuona mapendekezo. Hukaguliwa kwenye kompyuta hii, kamwe si mtandaoni. Sehemu za nenosiri, utafutaji na anwani hazikaguliwi.",
+  "settings.check": "Kagua tahajia unapoandika",
+  "settings.languages": "Tahajia: lugha",
+  "settings.defaultHint": "Hakuna iliyochaguliwa: lugha ya kiolesura chako na Kiingereza, kamusi zake zikiwa zimesakinishwa. Programu za wavuti hutumia zilezile.",
+  "settings.chosenHint": "Neno ni sahihi ikiwa lugha yoyote uliyochagua inalijua (zisizozidi 4). Programu za wavuti hutumia lugha ya kiolesura chako na Kiingereza.",
+  "settings.none": "Hakuna kamusi iliyosakinishwa. Sakinisha moja hapa chini.",
+  "settings.useDefault": "Tumia chaguo-msingi",
+  "settings.more": "Lugha zaidi",
+  "settings.moreHint": "Kamusi kutoka Debian. Kusakinisha moja kunahitaji nenosiri la msimamizi.",
+  "settings.installing": "Inasakinisha…",
+  "settings.install": "Sakinisha",
+  "settings.words": "Kamusi yako",
+  "settings.wordsHint": "Maneno uliyoongeza kwa “Ongeza kwenye kamusi”, hapa au katika programu ya wavuti.",
+  "settings.remove": "Ondoa",
+  "settings.noWords": "Bado hakuna maneno."
+}

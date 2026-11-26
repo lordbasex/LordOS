@@ -1,0 +1,22 @@
+{
+  "menu.looking": "正在尋找建議…",
+  "menu.none": "沒有建議",
+  "menu.add": "將「{word}」加入字典",
+  "menu.ignore": "略過",
+  "settings.title": "拼字檢查",
+  "settings.hint": "在 LordOS 的文字欄位中，拼錯的字會加上紅色波浪底線；按右鍵即可查看建議。檢查在這台電腦上進行，從不上網。密碼、搜尋和網址欄位不會檢查。",
+  "settings.check": "輸入時檢查拼字",
+  "settings.languages": "拼字檢查：語言",
+  "settings.defaultHint": "未選擇：使用介面語言和英文（已安裝其字典時）。網頁應用程式也使用相同的字典。",
+  "settings.chosenHint": "只要所選語言中有任一種認得某個字，就視為正確（最多 4 種）。網頁應用程式使用介面語言和英文。",
+  "settings.none": "尚未安裝字典。請在下方安裝一個。",
+  "settings.useDefault": "使用預設值",
+  "settings.more": "更多語言",
+  "settings.moreHint": "來自 Debian 的字典。安裝需要管理員密碼。",
+  "settings.installing": "正在安裝…",
+  "settings.install": "安裝",
+  "settings.words": "你的字典",
+  "settings.wordsHint": "你在這裡或網頁應用程式中透過「加入字典」加入的字。",
+  "settings.remove": "移除",
+  "settings.noWords": "還沒有字詞。"
+}

@@ -36,6 +36,7 @@ import { BluetoothSettings } from './Bluetooth.jsx';
 import { PowerSettings } from './Power.jsx';
 import { CoolingSettings } from './Cooling.jsx';
 import { AISettings } from './AI.jsx';
+import { SpellingSettings } from './Spelling.jsx';
 import { NotificationsSettings } from './Notifications.jsx';
 import { DateTimeSettings } from './DateTime.jsx';
 import { DefaultAppsSettings } from './DefaultApps.jsx';
@@ -482,6 +483,7 @@ function Keyboard() {
           <TextInput value={sample} onChange={setSample} placeholder={tr('settings.kb.placeholder')} onCancel={() => setSample('')} />
         </View>
       </Section>
+      <SpellingSettings />
       <SwitcherSettings tr={tr} />
       <ShortcutsList />
       <GlobalShortcutsSettings tr={tr} />

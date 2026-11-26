@@ -519,7 +519,10 @@ export function webMenuItems(menu, label, pick, shell = {}) {
       it = { id: n, label: isolate(word), onClick: () => pick(n) };
     } else if (n === 'search') {
       if (typeof m.text !== 'string' || !m.text) continue;
-      it = { id: n, label: label(n, { text: isolate(m.text) }), onClick: () => pick(n) };
+      // the quoted words shortened inside the label, so all of it ("… on Google") fits the menu's widest row
+      const make = (s) => label(n, { text: isolate(s) });
+      const text = shell.measure ? fitQuoted(m.text, make, shell.measure, shell.maxWidth || 420) : m.text;
+      it = { id: n, label: make(text), onClick: () => pick(n) };
     } else if (n === 'speech') {
       const sp = shell.speech?.();
       if (!sp) continue;
@@ -535,7 +538,42 @@ export function webMenuItems(menu, label, pick, shell = {}) {
     group = MENU_GROUP[n];
     out.push(it);
   }
+  // ✨ AI (docs/AI.md "Writing"): the shell's own row, with the selection lord-web sent and lord-server cleaned; the
+  // shell answers lord-web "" and runs it in its own panel (shell.writing(text, editable) → the row, or null)
+  const ai = webAiText(m);
+  const row = ai && shell.writing ? shell.writing(ai, m.aiEdit === true) : null;
+  if (row) {
+    const at = out.findIndex((i) => i !== '-' && i.id === 'inspect');
+    const add = ['-', { ...row, id: 'ai' }];
+    if (at > 0) out.splice(out[at - 1] === '-' ? at - 1 : at, 0, ...add); else out.push(...add);
+  }
   return out;
+}
+
+// The longest start of text (whole characters, then "…") whose row make(text) fits max px: 46 px of the row's own room
+// plus the label at 13 px (contextmenu.jsx rowWidth). measure(s, size) → px. Never shorter than one character and "…".
+export function fitQuoted(text, make, measure, max = 420) {
+  const fits = (s) => 46 + measure(make(s), 13) <= max;
+  const cps = [...String(text || '')];
+  if (fits(cps.join(''))) return cps.join('');
+  let lo = 1, hi = cps.length - 1, best = 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (fits(`${cps.slice(0, mid).join('').trimEnd()}…`)) { best = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return `${cps.slice(0, best).join('').trimEnd()}…`;
+}
+
+// The selection a page's menu carries (for ✨ AI, which takes at most 4,000 characters of it, and Speech): a string of
+// 1..16,384 characters (lord-server's webai_clean already made it plain), else ''
+export const WEB_AI_CHARS = 16384;
+// Speech's text from a page's menu: the selection it carried (a text field's or contenteditable's too; never a password
+// field's, which reports none), so reading it aloud doesn't depend on the session's primary selection
+export const webSpeechText = (menu) => webAiText(menu);
+export function webAiText(menu) {
+  const s = menu && typeof menu.ai === 'string' ? menu.ai : '';
+  if (!s.trim() || [...s].length > WEB_AI_CHARS) return '';
+  return /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/.test(s) ? '' : s;
 }
 
 // ---- Search the web (Settings → Web apps; server/src/web/websearch.h) ----

@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Ieškoma pasiūlymų…",
+  "menu.none": "Pasiūlymų nėra",
+  "menu.add": "Įtraukti „{word}“ į žodyną",
+  "menu.ignore": "Nepaisyti",
+  "settings.title": "Rašyba",
+  "settings.hint": "Klaidingai parašyti žodžiai LordOS teksto laukuose pabraukiami raudona banguota linija; spustelėkite vieną dešiniuoju pelės mygtuku, kad pamatytumėte pasiūlymus. Tikrinama šiame kompiuteryje, niekada ne internete. Slaptažodžių, paieškos ir adreso laukai netikrinami.",
+  "settings.check": "Tikrinti rašybą rašant",
+  "settings.languages": "Rašyba: kalbos",
+  "settings.defaultHint": "Nieko nepasirinkta: jūsų sąsajos kalba ir anglų, jei jų žodynai įdiegti. Žiniatinklio programos naudoja tuos pačius.",
+  "settings.chosenHint": "Žodis laikomas teisingu, jei jį žino bet kuri pasirinkta kalba (daugiausia 4). Žiniatinklio programos naudoja jūsų sąsajos kalbą ir anglų.",
+  "settings.none": "Neįdiegtas joks žodynas. Įdiekite jį žemiau.",
+  "settings.useDefault": "Naudoti numatytuosius",
+  "settings.more": "Daugiau kalbų",
+  "settings.moreHint": "Žodynai iš Debian. Norint įdiegti, reikia administratoriaus slaptažodžio.",
+  "settings.installing": "Diegiama…",
+  "settings.install": "Įdiegti",
+  "settings.words": "Jūsų žodynas",
+  "settings.wordsHint": "Žodžiai, kuriuos įtraukėte per „Įtraukti į žodyną“, čia arba žiniatinklio programoje.",
+  "settings.remove": "Pašalinti",
+  "settings.noWords": "Žodžių dar nėra."
+}

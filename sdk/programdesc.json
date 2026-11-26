@@ -287,6 +287,7 @@
     "lord-sql": "Databases' helper, in a sandbox: talks to the database servers.",
     "lord-stream": "LordOS's streaming helper, in a sandbox: plays internet radio and video streams.",
     "lord-studio": "LordOS Studio's camera helper: blurs or replaces the background and improves the camera's picture.",
+    "lord-spell": "LordOS's spell checker, in a sandbox: checks words against the installed dictionaries and suggests corrections.",
     "lord-nvgpu": "Monitor's NVIDIA reader, in a sandbox: reads an NVIDIA card's load, memory and temperature while the GPU view is open.",
     "lord-tts": "LordOS's speech helper, in a sandbox: turns text into speech.",
     "lord-vault-agent": "LordOS's Passwords helper.",

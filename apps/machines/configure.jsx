@@ -165,9 +165,9 @@ function NetworkPane({ m, cur, set, running, offNote, host, issues, onNewMac }) 
               <Off off={running}><View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, direction: 'ltr' }}>
                 <Segmented small value={r.proto} onChange={(x) => setRule(i, { proto: x })} options={[['tcp', 'TCP'], ['udp', 'UDP']]} />
                 <Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.cfg.portHost')}</Text>
-                <TextInput value={r.host ? String(r.host) : ''} onChange={(x) => setRule(i, { host: portInput(x) })} style={{ width: 64 }} />
+                <TextInput spellCheck={false} value={r.host ? String(r.host) : ''} onChange={(x) => setRule(i, { host: portInput(x) })} style={{ width: 64 }} />
                 <Text style={{ fontSize: 12, color: p.dim }}>→ {tr('machines.cfg.portGuest')}</Text>
-                <TextInput value={r.guest ? String(r.guest) : ''} onChange={(x) => setRule(i, { guest: portInput(x) })} style={{ width: 64 }} />
+                <TextInput spellCheck={false} value={r.guest ? String(r.guest) : ''} onChange={(x) => setRule(i, { guest: portInput(x) })} style={{ width: 64 }} />
                 {cur.network === 'shared' ? <Segmented small value={r.open} onChange={(x) => setRule(i, { open: x })}
                   options={[['this-computer', tr('machines.cfg.portOpen.local')], ['lan', tr('machines.cfg.portOpen.lan')]]} /> : null}
                 <Btn label={tr('machines.cfg.portRemove')} onClick={() => set({ ports: cur.ports.filter((_, k) => k !== i) })} />

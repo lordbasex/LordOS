@@ -59,6 +59,10 @@ int  webask_menu_answer(int id, const char *item);
 /* The Edit menu: org.lordos.WebApp1.Edit(command) to that app and profile's lord-web, no reply wanted; command is
  * one of webedit.h's names. 0 sent, -1 no bus, a bad id or an unknown command. */
 int  webask_edit(const char *app, const char *profile, const char *command);
+/* ✨ AI's Replace (docs/AI.md "Writing"): the person's click in the shell's panel sends text (cleaned again, at most
+ * 4,000 characters) to that app and profile's lord-web as WriteReplace; lord-web inserts it only from lord-server and
+ * only where the menu's selection still is, in a focused text field that isn't a password */
+int  webask_write_replace(const char *app, const char *profile, const char *text);
 /* The desktop's mode, from the theme (lord.portal.set): kept for the next lord-web's environment and, when it
  * changed, told to every running one (SetColorScheme, no reply wanted). */
 void webask_scheme(int dark);

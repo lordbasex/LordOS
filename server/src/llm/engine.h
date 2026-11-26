@@ -46,6 +46,15 @@ int llm_submit_facts(int pid, unsigned long long start);
 #define LLM_TRANSLATE_MAX 2048
 int llm_submit_investigate(const char *model, const char *system, const char *user, int pid, unsigned long long start);
 int llm_submit_translate(const char *model, const char *system, const char *text);
+/* (0.8.9.6.2) "✨ AI" on selected text (writing.h): one of the fixed actions ("fix", "improve", "shorter",
+ * "translate" with target a LordOS interface language) on the person's text (at most LLM_WRITE_MAX bytes); a job id or
+ * -1 (EINVAL, EBUSY). Its answer is streamed: llm_peek gives the text so far while it runs, llm_take the whole of it at
+ * the end: {"ok":true,"content":"…","truncated":b,"ms":N,"startMs":N} or {"ok":false,"error":"llm.<code>"}. */
+int llm_submit_write(const char *model, const char *action, const char *target, const char *text);
+/* {"state":"writing","text":"…"} while it streams, {"state":"queued"|"starting"} before; NULL otherwise (malloc'd) */
+char *llm_peek(int id);
+/* Drops a queued job or stops the one streaming (its result: llm.cancelled). */
+void llm_cancel(int id);
 /* evidence.c: the program's evidence for the process (pid, start): a JSON of what was read ({"kind":"script"|"inline"|
  * "binary"|"none", ...}, malloc'd, NULL on no memory) and in *block the text for the model (malloc'd, or NULL). Only the
  * user's own processes. */

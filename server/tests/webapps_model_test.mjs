@@ -422,5 +422,43 @@ for (const lang of langs) {
   eq(`edit words in ${lang}`, missing, []);
 }
 
+// ---- ✨ AI on a page's selection (docs/AI.md "Writing") ----
+{
+  const ai = { label: '✨ AI', submenu: [] };
+  const rows = M.webMenuItems({ items: ['cut', 'copy', 'paste', 'speech', 'inspect'], ai: 'Teh text', aiEdit: true }, (x) => x, () => {},
+    { developer: true, speech: () => ({ label: 'Speech' }), writing: (text, edit) => (text === 'Teh text' && edit ? ai : null) });
+  eq('✨ AI after the menu\'s rows, before Inspect', rows.map((r) => (r === '-' ? '-' : r.id)), ['cut', 'copy', 'paste', '-', 'speech', '-', 'ai', '-', 'inspect']);
+  eq('no ✨ AI without the text', M.webMenuItems({ items: ['copy'] }, (x) => x, () => {}, { writing: () => ai }).some((r) => r.id === 'ai'), false);
+  eq('no ✨ AI when the shell has no Writing', M.webMenuItems({ items: ['copy'], ai: 'x y' }, (x) => x, () => {}, { writing: () => null }).some((r) => r.id === 'ai'), false);
+  eq('the text: plain, at most 16,384 characters', [M.webAiText({ ai: 'ok' }), M.webAiText({ ai: 'a\u001b[2J' }), M.webAiText({ ai: 'x'.repeat(16385) }), M.webAiText({ ai: '  ' }), M.webAiText({ ai: 3 })], ['ok', '', '', '', '']);
+}
+
+// ---- Speech from the menu reads the menu's own selection (a contenteditable's too; ws162), not the primary selection ----
+{
+  const said = [];
+  const speech = (get) => ({ label: 'Speech', submenu: [{ label: 'Start', onClick: () => said.push(get ? get() : 'PRIMARY') }] });
+  const menu = { items: ['undo', 'cut', 'copy', 'paste', 'speech'], ai: 'hola como estas', aiEdit: true };
+  const rows = M.webMenuItems(menu, (x) => x, () => {}, { speech: () => speech(M.webSpeechText(menu) ? () => M.webSpeechText(menu) : null) });
+  rows.find((r) => r.id === 'speech').submenu[0].onClick();
+  eq('Speech reads the selection the menu carried (a message field\'s)', said, ['hola como estas']);
+  eq('without one it falls back to the primary selection', M.webSpeechText({ items: ['speech'] }), '');
+  eq('a long selection still read (past ✨ AI\'s 4,000)', M.webSpeechText({ ai: 'y'.repeat(9000) }).length, 9000);
+}
+
+// ---- a long selection in "Search the web for “…”": the words around it always show (ws162) ----
+{
+  const measure = (s) => [...s].length * 7;                        // 7 px a character
+  const label = (n, v) => (n === 'search' ? `Buscar ${v.text} en Google` : n);
+  const long = 'hola como estas? tu muñeca inflable llego bien al final del dia';
+  const rows = M.webMenuItems({ items: ['copy', 'search'], text: long }, label, () => {}, { measure, maxWidth: 420 });
+  const row = rows.find((r) => r.id === 'search');
+  eq('the search row fits 420 px', 46 + measure(row.label) <= 420, true);
+  eq('its end ("en Google") is whole', row.label.endsWith('en Google'), true);
+  eq('the quoted words are cut with "…"', row.label.includes('…'), true);
+  const short = M.webMenuItems({ items: ['search'], text: 'hola' }, label, () => {}, { measure, maxWidth: 420 });
+  eq('a short one is left alone', short[0].label.includes('hola') && !short[0].label.includes('…'), true);
+  eq('fitQuoted never empty', M.fitQuoted('abcdef', (s) => `X${s}Y`, measure, 10).length >= 2, true);
+}
+
 console.log(bad ? `webapps-model: ${bad} of ${n} failed` : `webapps-model: ${n}/${n} ok`);
 process.exit(bad ? 1 : 0);

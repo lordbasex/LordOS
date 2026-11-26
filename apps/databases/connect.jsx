@@ -355,8 +355,8 @@ export function Connect({ onConnected }) {
               <Box title={tr('databases.box.cloud')}>
                 {!draft.quick ? <Field label={tr('databases.f.name')}><TextInput value={draft.name} onChange={(v) => set({ name: v })} /></Field> : null}
                 <Field label={tr('databases.f.service')}><Popup width={side.narrow ? 240 : 400} value={draft.cloud.service || 'rds'} options={cloudOptions()} onChange={(v) => setIn('cloud', { service: v })} /></Field>
-                <Field label={tr('databases.f.endpoint')}><TextInput value={draft.host} onChange={(v) => set({ host: v.trim() })} placeholder={tr('databases.f.endpointHint')} /></Field>
-                <Field label={tr('databases.f.port')}><TextInput value={String(draft.port ?? '')} onChange={(v) => set({ port: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 100 }} /></Field>
+                <Field label={tr('databases.f.endpoint')}><TextInput spellCheck={false} value={draft.host} onChange={(v) => set({ host: v.trim() })} placeholder={tr('databases.f.endpointHint')} /></Field>
+                <Field label={tr('databases.f.port')}><TextInput spellCheck={false} value={String(draft.port ?? '')} onChange={(v) => set({ port: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 100 }} /></Field>
                 <Field label={tr('databases.f.database')}><TextInput value={draft.database} onChange={(v) => set({ database: v })} placeholder={tr('databases.f.optional')} /></Field>
               </Box>
               <Box title={tr('databases.box.signIn')}>
@@ -366,7 +366,7 @@ export function Connect({ onConnected }) {
                     <RadioLabel on={false} disabled label={tr('databases.f.methodIam')} />
                   </View>
                 </Field>
-                <Field label={tr('databases.f.user')}><TextInput value={draft.user} onChange={(v) => set({ user: v })} /></Field>
+                <Field label={tr('databases.f.user')}><TextInput spellCheck={false} value={draft.user} onChange={(v) => set({ user: v })} /></Field>
                 <Field label={tr('databases.f.password')}>{pwField}</Field>
                 <Field label=""><Text style={{ fontSize: 12, color: p.dim, lineHeight: 1.4, textAlign: 'start' }}>{tr('databases.iamLater')}</Text></Field>
               </Box>
@@ -385,23 +385,23 @@ export function Connect({ onConnected }) {
                 {!draft.quick ? <Field label={tr('databases.f.name')}><TextInput value={draft.name} onChange={(v) => set({ name: v })} /></Field> : null}
                 {kind === 'socket'
                   ? <Field label={tr('databases.f.socket')}><TextInput value={draft.socket} onChange={(v) => set({ socket: v.trim() })} placeholder="/run/mysqld/mysqld.sock" /></Field>
-                  : <Field label={tr('databases.f.host')}><TextInput value={draft.host} onChange={(v) => set({ host: v.trim() })} placeholder="127.0.0.1" /></Field>}
-                <Field label={tr('databases.f.user')}><TextInput value={draft.user} onChange={(v) => set({ user: v })} /></Field>
+                  : <Field label={tr('databases.f.host')}><TextInput spellCheck={false} value={draft.host} onChange={(v) => set({ host: v.trim() })} placeholder="127.0.0.1" /></Field>}
+                <Field label={tr('databases.f.user')}><TextInput spellCheck={false} value={draft.user} onChange={(v) => set({ user: v })} /></Field>
                 <Field label={tr('databases.f.password')}>{pwField}</Field>
                 <Field label={tr('databases.f.database')}><TextInput value={draft.database} onChange={(v) => set({ database: v })} placeholder={tr('databases.f.optional')} /></Field>
-                {kind !== 'socket' ? <Field label={tr('databases.f.port')}><TextInput value={String(draft.port ?? '')} onChange={(v) => set({ port: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 100 }} /></Field> : null}
+                {kind !== 'socket' ? <Field label={tr('databases.f.port')}><TextInput spellCheck={false} value={String(draft.port ?? '')} onChange={(v) => set({ port: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 100 }} /></Field> : null}
               </Box>
               {kind === 'ssh' ? (
                 <Box title={tr('databases.box.ssh')}>
-                  <Field label={tr('databases.f.sshHost')}><TextInput value={draft.ssh.host} onChange={(v) => setIn('ssh', { host: v.trim() })} /></Field>
-                  <Field label={tr('databases.f.sshUser')}><TextInput value={draft.ssh.user} onChange={(v) => setIn('ssh', { user: v })} /></Field>
+                  <Field label={tr('databases.f.sshHost')}><TextInput spellCheck={false} value={draft.ssh.host} onChange={(v) => setIn('ssh', { host: v.trim() })} /></Field>
+                  <Field label={tr('databases.f.sshUser')}><TextInput spellCheck={false} value={draft.ssh.user} onChange={(v) => setIn('ssh', { user: v })} /></Field>
                   <Field label={tr('databases.f.sshKey')}>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <TextInput value={draft.ssh.key} onChange={(v) => setIn('ssh', { key: v })} placeholder="~/.ssh/id_ed25519" style={{ flex: 1 }} />
+                      <TextInput spellCheck={false} value={draft.ssh.key} onChange={(v) => setIn('ssh', { key: v })} placeholder="~/.ssh/id_ed25519" style={{ flex: 1 }} />
                       <Btn label={tr('databases.choose')} onClick={() => setSheet({ kind: 'pick', key: 'ssh' })} />
                     </View>
                   </Field>
-                  <Field label={tr('databases.f.sshPort')}><TextInput value={String(draft.ssh.port ?? '')} onChange={(v) => setIn('ssh', { port: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 100 }} /></Field>
+                  <Field label={tr('databases.f.sshPort')}><TextInput spellCheck={false} value={String(draft.ssh.port ?? '')} onChange={(v) => setIn('ssh', { port: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 100 }} /></Field>
                   <Field label="">
                     {draft.ssh.hostKey ? (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

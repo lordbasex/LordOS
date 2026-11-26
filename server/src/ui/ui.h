@@ -60,6 +60,9 @@ typedef struct StyleExt {
     Dim inset_inline[2];            /* insetInlineStart / insetInlineEnd (auto = unset) */
     float radius_corner[8];         /* top-left, top-right, bottom-right, bottom-left, top-start, top-end, bottom-start, bottom-end */
     Dim origin_x, origin_y;         /* transformOrigin, 50% 50% by default */
+    /* wavyColor: a wavy line across the box's width, centred in its height (a misspelled word's underline,
+     * docs/SPELLING.md); its amplitude is the box's height less its thickness, its wavelength 4 px */
+    uint32_t wavy;
     /* not style: the edges resolved for the node's direction (layout.c node_resolve_edges), physical L, T, R, B */
     struct {
         float mg[4], pd[4], bw[4];

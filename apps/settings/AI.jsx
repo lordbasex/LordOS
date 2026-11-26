@@ -21,11 +21,11 @@ import {
   VOICE_DEFAULTS, speakAvailable, previewVoice, tryVoice, player as voicePlayer, VOICE_LANGS, voiceLabel, voicePackage, modelPackage, hasVoice,
   PREVIEWS_PACKAGE, scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName,
   takeName, errorText, fs, LLM_MODELS, packagesForModel, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, installLlm,
-  removeLlm, lumoReady, translateWithLumo, ENGINE_PACKAGE,
+  removeLlm, lumoReady, translateWithLumo, ENGINE_PACKAGE, writingChoice, writingEnabled, setWritingOn,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
-  CAPS, CAP_COLOR, CAP_ICON, FUNCTIONS, LEVELS, AI_FILTERS, TESSDATA, ocrPackageOk, tessCodes, ocrLangs, brainEntries, voiceEntries,
+  CAPS, CAP_COLOR, CAP_ICON, FUNCTIONS, matchFunctions, llmFunctions, llmTryReady, LEVELS, AI_FILTERS, TESSDATA, ocrPackageOk, tessCodes, ocrLangs, brainEntries, voiceEntries,
   eyeEntries, earEntries, imageEntries, lumoState, filterEntries, filterCounts, groupByCap, capCard, modelBytes, sortForPage, voicePage,
 } from '../../sdk/aistore.js';
 import { Stack, Section, SettingRow, Note, Actions, tint } from './ui.jsx';
@@ -230,12 +230,15 @@ function LumoHero({ st, width }) {
 
 // ---- what Lumo can do: the one brain's functions ----
 
+const fnName = (f, tr) => (f.id === 'sentinela' ? tr('sentinela.name') : f.id === 'writing' ? tr('writing.name') : tr(`settings.aiStore.fn.${f.id}`));
+const fnExample = (f, tr) => (f.id === 'writing' ? tr('writing.example') : tr(`settings.aiStore.fnExample.${f.id}`));
+
 function FunctionCard({ f, w, on, onOpen }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [hover, setHover] = useState(false);
   const level = LEVELS[f.level];
-  const name = f.id === 'sentinela' ? tr('sentinela.name') : tr(`settings.aiStore.fn.${f.id}`);
+  const name = fnName(f, tr);
   return (
     <View focusable={!!onOpen} onClick={onOpen} onKeyDown={(ev) => { if (onOpen && (ev.key === 'Enter' || ev.key === ' ')) onOpen(); }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
@@ -245,7 +248,7 @@ function FunctionCard({ f, w, on, onOpen }) {
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{name}</Text>
         <Tag tone={level === 'read' ? 'ok' : level === 'admin' ? 'warn' : undefined} label={tr(`settings.aiStore.level.${level}`)} />
       </View>
-      <Text style={{ height: 30, overflow: 'hidden', fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{tr(`settings.aiStore.fnExample.${f.id}`)}</Text>
+      <Text style={{ height: 30, overflow: 'hidden', fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{fnExample(f, tr)}</Text>
       {f.ready ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text style={{ flex: 1, fontSize: typeScale.caption, fontWeight: 600, color: on ? tint.ok : t.textDim, textAlign: 'start' }}>{tr(on ? 'settings.aiStore.fnOn' : 'settings.aiStore.fnOff')}</Text>
@@ -363,13 +366,14 @@ function TryBox({ e, ctx }) {
     );
   }
   if (e.kind === 'llm') {
-    const ready = lumoReady();
-    const can = ready.ok && ready.model === e.model.id;
+    const eng = sentinelaEngine.get() || {};
+    const can = llmTryReady({ installed: (eng.models || []).some((m) => m.id === e.model.id), engine: eng.available,
+      sentinelaOn: sentinelaPrefs().on, writingChoice: writingChoice() });
     const go = async () => {
       if (!text.trim() || busy) return;
       setBusy(true);
       setOut('');
-      const r = await translateWithLumo(text.trim());
+      const r = await translateWithLumo(text.trim(), { model: e.model.id });
       setBusy(false);
       setOut(r.ok ? r.text : errorText(r.error));
     };
@@ -380,7 +384,7 @@ function TryBox({ e, ctx }) {
           <TextInput value={text} onChange={(v) => setText(v.slice(0, 400))} onSubmit={go} placeholder={tr('settings.aiStore.try.translateHint')} style={{ flex: 1, minWidth: 0 }} />
           <Button small primary disabled={!can || busy || !text.trim()} label={tr('settings.aiStore.try.translateDo')} onClick={go} />
         </View>
-        {can ? outBox(busy ? tr('settings.aiStore.try.thinking') : out, tr('settings.aiStore.try.out')) : <Note>{tr('settings.aiStore.try.needsSentinela')}</Note>}
+        {can ? outBox(busy ? tr('settings.aiStore.try.thinking') : out, tr('settings.aiStore.try.out')) : <Note>{tr('writing.brain.tryNeeds')}</Note>}
       </Box>
     );
   }
@@ -454,7 +458,10 @@ function Sheet({ e, ctx, onClose }) {
   const busy = !!ctx.job;
   const installed = e.state === 'installed', soon = e.state === 'soon';
   const sub = [tr(`settings.aiStore.cap.${e.cap}`), tr(`settings.aiStore.tech.${e.cap}`), e.recommended ? tr('settings.aiStore.recommended') : null].filter(Boolean).join(' · ');
-  const used = tr(`settings.aiStore.used.${e.kind === 'engine' ? 'engine' : e.cap}`);
+  // the brain's models: the functions that really use the model, from the list of functions, and Monitor's Investigate
+  const used = e.cap === 'brain' && e.kind !== 'engine'
+    ? tr('writing.brain.usedBy', { list: llmFunctions().map((f) => fnName(f, tr)).join(', ') })
+    : tr(`settings.aiStore.used.${e.kind === 'engine' ? 'engine' : e.cap}`);
   const stateText = tr(soon ? 'settings.aiStore.state.soon' : installed ? 'settings.aiStore.state.installed' : 'settings.aiStore.state.cloud');
   const hint = tr(soon ? 'settings.aiStore.hint.soon' : installed ? 'settings.aiStore.hint.installed' : e.kind === 'ocrLang' ? 'settings.aiStore.hint.debian' : 'settings.aiStore.hint.cloud');
   const acts = ctx.actions(e);
@@ -642,6 +649,32 @@ function Footer({ ctx, width }) {
   );
 }
 
+// ---- Writing: ✨ AI on selected text (docs/AI.md "Writing"), off by default ----
+
+function WritingPage({ ready, onBrain }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  useStore(settings);
+  // on with a model unless turned off; the switch writes the person's choice, kept for good
+  const on = writingEnabled(writingChoice(), ready);
+  return (
+    <View style={{ gap: 14 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, border: `1px solid ${t.separator}`, backgroundColor: t.control }}>
+        <Text style={{ fontSize: 24 }}>✨</Text>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('writing.settings.toggle')}</Text>
+          <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{tr('writing.settings.what')}</Text>
+        </View>
+        <Toggle on={on} onChange={(v) => setWritingOn(v)} />
+      </View>
+      {!ready ? <Note tone="warn">{tr('writing.settings.noModel')}</Note> : null}
+      {!ready ? <View style={{ flexDirection: 'row' }}><Link label={tr('writing.settings.openBrain')} onClick={onBrain} /></View> : null}
+      <Note>{tr('writing.settings.privacy')}</Note>
+      <Note>{tr('writing.settings.how')}</Note>
+    </View>
+  );
+}
+
 // ---- the page ----
 
 // page: index.jsx turns { section: 'ai', page } into the sub-page; alert: the Sentinela alert to open
@@ -806,7 +839,14 @@ export function AISettings({ alert }) {
   const avail = width;
 
   let body;
-  if (view === 'sentinela') {
+  if (view === 'writing') {
+    body = (
+      <View style={{ gap: 20 }}>
+        <Crumb here={tr('writing.name')} onBack={() => setView(null)} />
+        <WritingPage ready={!!chosen || installedLlm.size > 0} onBrain={() => setView('brain')} />
+      </View>
+    );
+  } else if (view === 'sentinela') {
     body = (
       <View style={{ gap: 20 }}>
         <Crumb here={tr('sentinela.name')} onBack={() => setView(null)} />
@@ -838,6 +878,8 @@ export function AISettings({ alert }) {
     const fn = columns(avail, FN_CARD);
     const caps = columns(avail, 170);
     const plain = !query.trim() && filter === 'all';
+    // a search finds functions too (Sentinela, Writing…), by their name and description in the person's language
+    const fnFound = filter === 'all' ? matchFunctions(FUNCTIONS, query, (f) => fnName(f, tr), (f) => fnExample(f, tr)) : [];
     body = (
       <View style={{ gap: 20 }}>
         <LumoHero st={lumo} width={width} />
@@ -846,11 +888,11 @@ export function AISettings({ alert }) {
           <Chips value={filter} onChange={setFilter}
             options={AI_FILTERS.map((f) => [f, f === 'all' || f === 'installed' ? tr(`settings.aiStore.filter.${f}`) : capName(f), counts[f]])} />
         </View>
-        {plain ? (
+        {plain || fnFound.length ? (
           <View style={{ gap: 10 }}>
             <Head title={tr('settings.aiStore.functions')} sub={tr('settings.aiStore.functionsSub')} />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
-              {FUNCTIONS.map((f) => <FunctionCard key={f.id} f={f} w={fn.w} on={f.id === 'sentinela' ? p.on : false} onOpen={f.ready ? () => setView(f.id) : null} />)}
+              {(plain ? FUNCTIONS : fnFound).map((f) => <FunctionCard key={f.id} f={f} w={fn.w} on={f.id === 'sentinela' ? p.on : f.id === 'writing' ? writingEnabled(writingChoice(), installedLlm.size > 0) : false} onOpen={f.ready ? () => setView(f.id) : null} />)}
             </View>
           </View>
         ) : null}
@@ -862,7 +904,7 @@ export function AISettings({ alert }) {
             </View>
           </View>
         ) : null}
-        {!groups.length ? (
+        {!groups.length && !fnFound.length ? (
           <Text style={{ paddingVertical: spacing.xl, fontSize: typeScale.callout, color: t.textDim, textAlign: 'center' }}>{tr('settings.aiStore.noMatch', { query: query.trim() })}</Text>
         ) : groups.map(([c, es]) => {
           const cut = query.trim() || filter !== 'all' ? es.length : perRow;

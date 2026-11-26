@@ -49,7 +49,7 @@ export function ForwardsPanel({ t, wid, w, panel }) {
         {target != null && (
           <View style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <TextInput value={host} onChange={(v) => { setHost(v); setBad(false); }} onSubmit={add} placeholder={tr('terminal.fwd.serverPh')} style={{ flex: 1 }} />
+              <TextInput spellCheck={false} value={host} onChange={(v) => { setHost(v); setBad(false); }} onSubmit={add} placeholder={tr('terminal.fwd.serverPh')} style={{ flex: 1 }} />
               <Text style={{ fontSize: 12, color: t.textDim }}>→</Text>
               <TextInput value={local} onChange={(v) => { setLocal(v); setBad(false); }} onSubmit={add} placeholder={tr('terminal.fwd.auto')} style={{ width: 70 }} />
               <Button small label={tr('terminal.fwd.add')} onClick={add} />

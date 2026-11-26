@@ -1,7 +1,7 @@
 // Compose.jsx — the compose window: From, To/Cc/Bcc with autocomplete (Contacts and people you
 // wrote to), subject, a body in rich text (formatting buttons and a live preview), markdown or
 // plain text, attachments, signature, drafts saved to the server, send now or later.
-import { View, Text, useTheme, useAppWindow, Button, TextInput, Segmented, ScrollView, Markdown, FilePicker, t, wm, fs, mailRequest, mailAccounts, contacts, useKeyboard, isolatedPim, pickFileFd, closeFileFd, ContextMenu } from '@lordos/sdk';
+import { View, Text, useTheme, useAppWindow, Button, TextInput, Segmented, ScrollView, Markdown, FilePicker, t, wm, fs, mailRequest, mailAccounts, contacts, useKeyboard, isolatedPim, pickFileFd, closeFileFd, ContextMenu, editorMenuRows, WritingPanel } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { BodyEditor } from './BodyEditor.jsx';
 import { mdToHtml, mdToText } from './md.js';
@@ -111,7 +111,8 @@ export function Compose({ draft: initial }) {
   const dirty = useRef(false);
   const ed = useRef(null);
   const bodyBox = useRef(null);
-  const [ctx, setCtx] = useState(null);       // the body's right-click menu: { x, y }
+  const [ctx, setCtx] = useState(null);       // the body's right-click menu: { x, y, items }
+  const [job, setJob] = useState(null);       // ✨ AI's panel on the selection (sdk/writing.jsx)
   const set = (patch) => { dirty.current = true; setD((x) => ({ ...x, ...patch })); };
 
   useEffect(() => { wm.setTitle(wid, d.subject || t('mail.compose.newMessage')); }, [d.subject]);
@@ -252,18 +253,29 @@ export function Compose({ draft: initial }) {
       <View style={{ flex: 1, flexDirection: 'row' }}>
         <View ref={bodyBox} style={{ flex: 1 }}>
           <BodyEditor value={d.body} onChange={(body) => set({ body })} colors={colors} apiRef={ed} autoFocus={!!d.to.length} padding={14} caret={0}
-            onContextMenu={(e) => setCtx(bodyBox.current ? e.local(bodyBox.current) : { x: e.x, y: e.y })} />
-          {ctx && (
-            <ContextMenu x={ctx.x} y={ctx.y} onClose={() => setCtx(null)}
-              bounds={{ w: bodyBox.current ? lord.getLayout(bodyBox.current.id)[2] : 600, h: bodyBox.current ? lord.getLayout(bodyBox.current.id)[3] : 400 }}
-              items={[
-                { label: t('mail.compose.cut'), hint: 'Ctrl+X', disabled: !ed.current?.hasSelection?.(), onClick: () => ed.current?.cut?.() },
-                { label: t('mail.compose.copy'), hint: 'Ctrl+C', disabled: !ed.current?.hasSelection?.(), onClick: () => ed.current?.copy?.() },
+            onContextMenu={(e) => {
+              const api = ed.current;
+              const base = [
+                { label: t('mail.compose.cut'), hint: 'Ctrl+X', disabled: !api?.hasSelection?.(), onClick: () => ed.current?.cut?.() },
+                { label: t('mail.compose.copy'), hint: 'Ctrl+C', disabled: !api?.hasSelection?.(), onClick: () => ed.current?.copy?.() },
                 { label: t('mail.compose.paste'), hint: 'Ctrl+V', onClick: () => ed.current?.paste?.() },
                 '-',
                 { label: t('mail.compose.selectAll'), hint: 'Ctrl+A', onClick: () => ed.current?.selectAll?.() },
-              ]} />
+              ];
+              // spelling first, ✨ AI with a selection (sdk/editorextras.jsx); the model's text comes back only on Replace
+              const at = bodyBox.current ? e.local(bodyBox.current) : { x: e.x, y: e.y };
+              const range = api?.selRange?.() || [0, 0], selected = range[1] > range[0] ? api.textNow().slice(range[0], range[1]) : '';
+              const items = editorMenuRows({ base, hit: api?.spellHit?.(e), selected, onReplaceWord: (a, b, w) => ed.current?.replaceRange?.(a, b, w),
+                openWriting: (o) => setJob({ ...o, text: selected, range, at }), refresh: (rows) => setCtx((c) => (c && c.at === at ? { ...c, items: rows } : c)) });
+              setCtx({ ...at, at, items });
+            }} />
+          {ctx && (
+            <ContextMenu x={ctx.x} y={ctx.y} onClose={() => setCtx(null)} items={ctx.items}
+              bounds={{ w: bodyBox.current ? lord.getLayout(bodyBox.current.id)[2] : 600, h: bodyBox.current ? lord.getLayout(bodyBox.current.id)[3] : 400 }} />
           )}
+          {job && <WritingPanel anchor={bodyBox} at={job.at} job={job} onClose={() => setJob(null)}
+            bounds={{ w: bodyBox.current ? lord.getLayout(bodyBox.current.id)[2] : 600, h: bodyBox.current ? lord.getLayout(bodyBox.current.id)[3] : 400 }}
+            onReplace={(txt) => { const api = ed.current; if (!api || api.textNow().slice(job.range[0], job.range[1]) !== job.text) return false; api.replaceRange(job.range[0], job.range[1], txt); return true; }} />}
         </View>
         {d.format === 'rich' && preview && <View style={{ width: 1, backgroundColor: th.separator }} />}
         {d.format === 'rich' && preview && (

@@ -81,4 +81,13 @@ unsigned    webmenu_checked(unsigned at, const int *items, int n);
 /* A Menu call's item list, checked: 1..WEBMENU_N known names, none twice. The count and the items in out, or -1. */
 int         webmenu_parse(const char *const *names, int n, int out[WEBMENU_N]);
 
+/* The selection a page's menu carries for the shell's own items (docs/AI.md "Writing", docs/VOICE.md): ✨ AI (which takes
+ * at most 4,000 characters of it) and Speech (which reads it aloud without the primary selection), as both lord-web
+ * and lord-server clean it. in (at most WEBAI_MAX bytes of well-formed UTF-8, at most WEBAI_CHARS characters) into out
+ * (WEBAI_MAX + 1 bytes) without C0 controls but line breaks and tabs, DEL, C1 controls or bidi controls (U+200E/F,
+ * U+202A..E, U+2066..9); 0, or -1 (empty, too long, not UTF-8: nothing is offered). */
+#define WEBAI_CHARS 16384          /* the selection lord-web keeps for a menu (websearch.h WEBSEARCH_SELECTION_MAX) */
+#define WEBAI_MAX   65536
+int webai_clean(const char *in, char *out);
+
 #endif

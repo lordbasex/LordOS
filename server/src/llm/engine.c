@@ -1,6 +1,7 @@
 /* engine.c — Sentinela's local model engine, started on demand in its sandbox (see engine.h and docs/SENTINELA.md). */
 #include "engine.h"
 #include "llmjail.h"
+#include "writing.h"
 #include "../sec/json.h"
 
 #include <dirent.h>
@@ -18,6 +19,8 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <stdint.h>
+#include <sys/random.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -26,8 +29,8 @@
 #define QUEUE 8
 #define RESULTS 16
 
-enum { J_ANALYZE = 1, J_FACTS, J_INVESTIGATE, J_TRANSLATE };
-typedef struct { int id, kind; char model[64]; char *system, *user; int pid; unsigned long long start; } Job;
+enum { J_ANALYZE = 1, J_FACTS, J_INVESTIGATE, J_TRANSLATE, J_WRITE };
+typedef struct { int id, kind; char model[64]; char *system, *user; int pid; unsigned long long start; int action; char target[16]; } Job;
 typedef struct { int id; char *json; } Result;
 
 static struct {
@@ -45,6 +48,9 @@ static struct {
     double last_used;
     int idle_ms;
     char model_dir[PATH_MAX], engine[PATH_MAX], launcher[PATH_MAX], dpkg_info[PATH_MAX];
+    /* (0.8.9.6.2) the writing job being streamed: its id, the text so far, and the one cancelled */
+    int wr_id, cancel_id;
+    char *wr_text;
 } E = { .mu = PTHREAD_MUTEX_INITIALIZER, .cv = PTHREAD_COND_INITIALIZER, .pid = -1, .dirfd = -1, .state = "off",
         .idle_ms = LLM_IDLE_MS, .model_dir = LLM_MODEL_DIR, .engine = LLM_ENGINE, .dpkg_info = "/var/lib/dpkg/info" };
 
@@ -442,9 +448,9 @@ static char *errjson(const char *code) {
     return o;
 }
 
-static char *run_analyze(Job *j) {
+/* the engine with this job's model, started when it isn't running; NULL, or the error's JSON */
+static char *ensure_engine(Job *j, double *started) {
     char *err = "llm.start";
-    double t0 = now_ms(), started = t0;
     pthread_mutex_lock(&E.mu);
     int same = E.pid > 0 && !strcmp(E.model, j->model);
     pthread_mutex_unlock(&E.mu);
@@ -460,8 +466,15 @@ static char *run_analyze(Job *j) {
             pthread_mutex_unlock(&E.mu);
             return errjson(err);
         }
-        started = now_ms();
+        *started = now_ms();
     }
+    return NULL;
+}
+
+static char *run_analyze(Job *j) {
+    double t0 = now_ms(), started = t0;
+    char *e = ensure_engine(j, &started);
+    if (e) return e;
     pthread_mutex_lock(&E.mu);
     E.state = "busy";
     pthread_mutex_unlock(&E.mu);
@@ -527,6 +540,88 @@ static char *run_investigate(Job *j) {
     return o;
 }
 
+/* (0.8.9.6.2) "✨ AI" on selected text: the fixed request (writing.c), the answer streamed into E.wr_text so the shell
+ * shows it as it comes (llm_peek); cancelled by llm_cancel or llm_stop */
+static char *run_write(Job *j) {
+    double t0 = now_ms(), started = t0;
+    char *e = ensure_engine(j, &started);
+    if (e) return e;
+    uint8_t r[8] = { 0 };
+    char nonce[17];
+    if (getrandom(r, sizeof r, 0) != (ssize_t)sizeof r) return errjson("llm.failed");
+    for (int i = 0; i < 8; i++) snprintf(nonce + 2 * i, 3, "%02x", r[i]);
+    char *body = wr_request(j->action, j->target, j->user, nonce);
+    if (!body) return errjson("llm.failed");
+    pthread_mutex_lock(&E.mu);
+    E.state = "busy";
+    pthread_mutex_unlock(&E.mu);
+    int fd = sock_connect();
+    char head[256];
+    size_t bl = strlen(body);
+    int hl = snprintf(head, sizeof head, "POST /v1/chat/completions HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n"
+                                         "Content-Type: application/json\r\nContent-Length: %zu\r\n\r\n", bl);
+    int ok = fd >= 0;
+    const char *parts[2] = { head, body };
+    size_t lens[2] = { (size_t)hl, bl };
+    for (int i = 0; ok && i < 2; i++)
+        for (size_t off = 0; ok && off < lens[i];) {
+            ssize_t w = send(fd, parts[i] + off, lens[i] - off, MSG_NOSIGNAL);
+            if (w < 0 && errno == EINTR) continue;
+            if (w <= 0) ok = 0; else off += (size_t)w;
+        }
+    free(body);
+    WrStream *st = malloc(sizeof *st);
+    const char *why = ok && st ? NULL : "llm.answer";
+    if (st) wr_stream_init(st);
+    double end = now_ms() + LLM_REPLY_MS;
+    size_t got = 0;
+    char buf[8192];
+    while (!why) {
+        int left = (int)(end - now_ms());
+        if (left <= 0) { why = "llm.timeout"; break; }
+        pthread_mutex_lock(&E.mu);
+        int stop = E.stop_now || E.cancel_id == j->id;
+        pthread_mutex_unlock(&E.mu);
+        if (stop) { why = "llm.cancelled"; break; }
+        struct pollfd p = { .fd = fd, .events = POLLIN };
+        int pr = poll(&p, 1, left > 250 ? 250 : left);
+        if (pr < 0 && errno == EINTR) continue;
+        if (pr <= 0) continue;
+        ssize_t n = recv(fd, buf, sizeof buf, 0);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) { if (!st->done && !(st->phase == 4 && st->tn)) why = "llm.answer"; break; }
+        got += (size_t)n;
+        if (got > LLM_ANSWER_MAX * 4) { why = "llm.answer"; break; }
+        int fr = wr_stream_feed(st, buf, (size_t)n);
+        pthread_mutex_lock(&E.mu);
+        char *copy = strdup(st->text);
+        if (copy) { free(E.wr_text); E.wr_text = copy; }
+        pthread_mutex_unlock(&E.mu);
+        if (fr < 0) why = "llm.answer";
+        if (fr > 0) break;
+    }
+    if (fd >= 0) close(fd);
+    pthread_mutex_lock(&E.mu);
+    E.state = "ready";
+    E.last_used = now_ms();
+    if (E.cancel_id == j->id) E.cancel_id = 0;
+    pthread_mutex_unlock(&E.mu);
+    if (why && !strcmp(why, "llm.timeout")) engine_kill();
+    char *out = NULL;
+    if (!why && st) {
+        size_t cap = st->tn * 6 + 160;
+        out = malloc(cap);
+        if (out) {
+            int k = snprintf(out, cap, "{\"ok\":true,\"ms\":%.0f,\"startMs\":%.0f,\"truncated\":%s,\"content\":", now_ms() - t0,
+                             started - t0, st->truncated ? "true" : "false");
+            size_t q = json_quote(out + k, cap - (size_t)k - 2, st->text);
+            snprintf(out + k + q, cap - (size_t)k - q, "}");
+        }
+    }
+    free(st);
+    return out ? out : errjson(why ? why : "llm.answer");
+}
+
 static void *worker(void *arg) {
     (void)arg;
     for (;;) {
@@ -565,7 +660,17 @@ static void *worker(void *arg) {
         snprintf(info, sizeof info, "%s", E.dpkg_info);
         pthread_mutex_unlock(&E.mu);
         char *res = NULL;
-        if (j.kind == J_ANALYZE || j.kind == J_TRANSLATE) res = run_analyze(&j);
+        if (j.kind == J_WRITE) {
+            pthread_mutex_lock(&E.mu);
+            E.wr_id = j.id;
+            free(E.wr_text);
+            E.wr_text = strdup("");
+            pthread_mutex_unlock(&E.mu);
+            res = run_write(&j);
+            pthread_mutex_lock(&E.mu);
+            E.wr_id = 0;
+            pthread_mutex_unlock(&E.mu);
+        } else if (j.kind == J_ANALYZE || j.kind == J_TRANSLATE) res = run_analyze(&j);
         else if (j.kind == J_INVESTIGATE) res = run_investigate(&j);
         else res = llm_facts_json(j.pid, j.start, info, getenv("HOME"));
         if (!res) res = errjson("llm.failed");
@@ -642,6 +747,52 @@ int llm_submit_translate(const char *model, const char *system, const char *text
     int id = submit(&j);
     if (id < 0) { free(j.system); free(j.user); }
     return id;
+}
+
+int llm_submit_write(const char *model, const char *action, const char *target, const char *text) {
+    int a = wr_action(action);
+    size_t tl = text ? strlen(text) : 0;
+    if (!llm_model_id_ok(model) || !a || tl == 0 || tl > LLM_WRITE_MAX || (a == WR_TRANSLATE && !wr_language(target))) { errno = EINVAL; return -1; }
+    Job j = { .kind = J_WRITE, .action = a };
+    snprintf(j.model, sizeof j.model, "%s", model);
+    if (a == WR_TRANSLATE) snprintf(j.target, sizeof j.target, "%s", target);
+    j.user = strdup(text);
+    if (!j.user) { errno = ENOMEM; return -1; }
+    int id = submit(&j);
+    if (id < 0) free(j.user);
+    return id;
+}
+
+char *llm_peek(int id) {
+    char *o = NULL;
+    pthread_mutex_lock(&E.mu);
+    int queued = 0;
+    for (int i = 0; i < E.nq; i++) if (E.q[i].id == id) queued = 1;
+    if (id > 0 && E.wr_id == id) {
+        const char *t = E.wr_text ? E.wr_text : "";
+        size_t cap = strlen(t) * 6 + 48;
+        if ((o = malloc(cap))) {
+            int k = snprintf(o, cap, "{\"state\":\"writing\",\"text\":");
+            size_t q = json_quote(o + k, cap - (size_t)k - 2, t);
+            snprintf(o + k + q, cap - (size_t)k - q, "}");
+        }
+    } else if (queued) o = strdup(strcmp(E.state, "off") && strcmp(E.state, "starting") ? "{\"state\":\"queued\"}" : "{\"state\":\"starting\"}");
+    pthread_mutex_unlock(&E.mu);
+    return o;
+}
+
+void llm_cancel(int id) {
+    pthread_mutex_lock(&E.mu);
+    for (int i = 0; i < E.nq; i++)
+        if (E.q[i].id == id) {
+            free(E.q[i].system);
+            free(E.q[i].user);
+            memmove(E.q + i, E.q + i + 1, sizeof E.q[0] * (size_t)(E.nq - i - 1));
+            E.nq--;
+            break;
+        }
+    if (id > 0 && E.wr_id == id) E.cancel_id = id;
+    pthread_mutex_unlock(&E.mu);
 }
 
 int llm_submit_facts(int pid, unsigned long long start) {

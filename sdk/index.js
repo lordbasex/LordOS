@@ -20,6 +20,12 @@ export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage, re
 export { LANGUAGE_NAMES } from './langnames.js';   // languages not translated yet (Settings → Language & Region)
 export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken, addMenuBarKeys } from './shortcuts.js';
 export { ContextMenu } from './contextmenu.jsx';
+// spelling and ✨ AI on selected text (docs/SPELLING.md, docs/AI.md "Writing")
+export { spellVersion, spellOn, spellLangs, spellInstalled, spellDefaults, spellRanges, useSpellRanges, spellSuggest, spellAddWord, spellRemoveWord, spellWordsList, spellIgnore } from './spell.js';
+export { SPELL_PACKAGES, spellPackageOk, packageInstalled, toggleLang, spellLanguages, spellWords, badRanges } from './spellmodel.js';
+export { useEditorSpell, EditorSquiggles, squiggleColorFor, spellHitAt, editorMenuRows } from './editorextras.jsx';
+export { WritingPanel, writingReady, writingOn, writingChoice, setWritingOn, writingMenuFor } from './writing.jsx';
+export { writingEnabled } from './writingmodel.js';
 export { liveSpeech } from './livespeech.jsx';
 export { speak, stopSpeaking, pauseSpeaking, replaySpeaking, closePlayer, saveSpeech, speaking, player, speakSelection, speakAvailable, registerSelection, speechMenu, speechItems, useMenusWithSpeech, voiceSettings, VOICE_DEFAULTS, previewVoice, tryVoice } from './voice.js';
 export { VOICE_LANGS, VOICES, voiceLabel, voicePackage, modelPackage, hasVoice, PREVIEWS_PACKAGE } from './voicecatalog.js';

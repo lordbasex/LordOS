@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Procurando sugestões…",
+  "menu.none": "Nenhuma sugestão",
+  "menu.add": "Adicionar “{word}” ao dicionário",
+  "menu.ignore": "Ignorar",
+  "settings.title": "Ortografia",
+  "settings.hint": "Palavras com erro ganham um sublinhado vermelho ondulado nos campos de texto do LordOS; clique com o botão direito em uma para ver sugestões. A verificação é feita neste computador, nunca online. Campos de senha, pesquisa e endereço não são verificados.",
+  "settings.check": "Verificar a ortografia ao digitar",
+  "settings.languages": "Ortografia: idiomas",
+  "settings.defaultHint": "Nenhum escolhido: o idioma da sua interface e o inglês, quando os dicionários deles estão instalados. Os apps web usam os mesmos.",
+  "settings.chosenHint": "Uma palavra está correta quando algum dos idiomas escolhidos a conhece (no máximo 4). Os apps web usam o idioma da sua interface e o inglês.",
+  "settings.none": "Nenhum dicionário instalado. Instale um abaixo.",
+  "settings.useDefault": "Usar os padrões",
+  "settings.more": "Mais idiomas",
+  "settings.moreHint": "Dicionários do Debian. Instalar um exige a senha de um administrador.",
+  "settings.installing": "Instalando…",
+  "settings.install": "Instalar",
+  "settings.words": "Seu dicionário",
+  "settings.wordsHint": "Palavras que você adicionou com “Adicionar ao dicionário”, aqui ou em um app web.",
+  "settings.remove": "Remover",
+  "settings.noWords": "Nenhuma palavra ainda."
+}

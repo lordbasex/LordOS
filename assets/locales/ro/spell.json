@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Se caută sugestii…",
+  "menu.none": "Nicio sugestie",
+  "menu.add": "Adaugă „{word}” în dicționar",
+  "menu.ignore": "Ignoră",
+  "settings.title": "Ortografie",
+  "settings.hint": "Cuvintele scrise greșit primesc o subliniere roșie ondulată în câmpurile de text din LordOS; fă clic dreapta pe unul pentru sugestii. Verificarea se face pe acest computer, niciodată online. Câmpurile de parolă, căutare și adresă nu sunt verificate.",
+  "settings.check": "Verifică ortografia în timp ce scrii",
+  "settings.languages": "Ortografie: limbi",
+  "settings.defaultHint": "Nicio limbă aleasă: limba interfeței tale și engleza, dacă dicționarele lor sunt instalate. Aplicațiile web le folosesc pe aceleași.",
+  "settings.chosenHint": "Un cuvânt e corect dacă îl cunoaște oricare dintre limbile alese (cel mult 4). Aplicațiile web folosesc limba interfeței tale și engleza.",
+  "settings.none": "Nu este instalat niciun dicționar. Instalează unul mai jos.",
+  "settings.useDefault": "Folosește valorile implicite",
+  "settings.more": "Mai multe limbi",
+  "settings.moreHint": "Dicționare din Debian. Instalarea unuia cere parola unui administrator.",
+  "settings.installing": "Se instalează…",
+  "settings.install": "Instalează",
+  "settings.words": "Dicționarul tău",
+  "settings.wordsHint": "Cuvinte adăugate cu „Adaugă în dicționar”, aici sau într-o aplicație web.",
+  "settings.remove": "Elimină",
+  "settings.noWords": "Încă niciun cuvânt."
+}

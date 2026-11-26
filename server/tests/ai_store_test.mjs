@@ -4,7 +4,7 @@
 import {
   CAPS, PIECES, FUNCTIONS, LEVELS, EAR_MODELS, IMAGE_MODELS, OCR_LANGS, OCR_BASE, AI_FILTERS, ocrPackageOk, tessCodes, ocrLangs, brainEntries,
   voiceEntries, voicePage, eyeEntries, earEntries, imageEntries, pieceReady, lumoState, matchesQuery, filterEntries, filterCounts, groupByCap,
-  capCard, modelBytes, sortForPage, CAP_COLOR, CAP_ICON,
+  capCard, modelBytes, sortForPage, CAP_COLOR, CAP_ICON, matchFunctions, llmFunctions, llmTryReady,
 } from '../../sdk/aistore.js';
 import { LLM_MODELS } from '../../sdk/llmcatalog.js';
 import { VOICE_LANGS } from '../../sdk/voicecatalog.js';
@@ -27,8 +27,9 @@ yes('every capability has a colour and an icon', CAPS.every((c) => CAP_COLOR[c] 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 yes('every icon is in assets/ai/icons', Object.values(CAP_ICON).every((n) => existsSync(`${root}assets/ai/icons/${n}-symbolic.svg`) && existsSync(`${root}assets/ai/icons/${n}-96.png`)));
 yes('the before-and-after picture is shipped', existsSync(`${root}assets/ai/esrgan-compare.jpg`));
-eq('nine functions', FUNCTIONS.map((f) => f.id), ['notes', 'programs', 'logs', 'sentinela', 'files', 'apps', 'machines', 'settings', 'system']);
-eq('only Sentinela works today', FUNCTIONS.filter((f) => f.ready).map((f) => f.id), ['sentinela']);
+eq('ten functions, the two that work first', FUNCTIONS.map((f) => f.id), ['writing', 'sentinela', 'notes', 'programs', 'logs', 'files', 'apps', 'machines', 'settings', 'system']);
+eq('Writing and Sentinela work today', FUNCTIONS.filter((f) => f.ready).map((f) => f.id), ['writing', 'sentinela']);
+eq('Writing only reads (the text comes back on the person\'s click)', FUNCTIONS.find((f) => f.id === 'writing').level, 0);
 yes('every function has a level', FUNCTIONS.every((f) => LEVELS[f.level]));
 eq('System needs an administrator', LEVELS[FUNCTIONS.find((f) => f.id === 'system').level], 'admin');
 eq('Sentinela only reads', LEVELS[FUNCTIONS.find((f) => f.id === 'sentinela').level], 'read');
@@ -133,5 +134,21 @@ eq('space: the folders measured', modelBytes({ voiceSys: 100, voiceUser: 20, llm
 eq('space: unmeasured and bad values count 0', modelBytes({ a: NaN, b: -5, c: undefined, d: 7 }), 7);
 eq('space: nothing measured yet', modelBytes(null), 0);
 
+// a search finds the functions by their translated name and description (the maintainer searched «Escritura»)
+const esName = { writing: 'Escritura', sentinela: 'Sentinela', notes: 'Notas' };
+const esDesc = { writing: '«Corregí este texto»: corregir, mejorar o traducir', sentinela: 'Vigila los procesos' };
+const fnIds = (q) => matchFunctions(FUNCTIONS, q, (f) => esName[f.id] || f.id, (f) => esDesc[f.id] || '').map((f) => f.id);
+eq('«Escritura» finds Writing', fnIds('Escritura'), ['writing']);
+eq('accents and case don\'t matter', fnIds('escritura'), ['writing']);
+eq('by its description', fnIds('traducir'), ['writing']);
+eq('Sentinela by name', fnIds('sentinela'), ['sentinela']);
+eq('no query: none listed as results', fnIds('  '), []);
+eq('no match', fnIds('whisper'), []);
+// the brain's sheet: who uses the model, and when it can be tried (not Sentinela in particular)
+eq('the functions that use the model', llmFunctions().map((f) => f.id), ['writing', 'sentinela']);
+eq('tried with Writing on by default', llmTryReady({ installed: true, engine: true, sentinelaOn: false, writingChoice: null }), true);
+eq('tried with Sentinela on and Writing off', llmTryReady({ installed: true, engine: true, sentinelaOn: true, writingChoice: false }), true);
+eq('not with both off', llmTryReady({ installed: true, engine: true, sentinelaOn: false, writingChoice: false }), false);
+eq('not without the model or the engine', [llmTryReady({ installed: false, engine: true, writingChoice: null }), llmTryReady({ installed: true, engine: false, writingChoice: null })], [false, false]);
 console.log(`ai-store-test: ${ok} passed, ${bad} failed`);
 process.exit(bad ? 1 : 0);

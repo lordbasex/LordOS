@@ -99,7 +99,7 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
           {!keepId ? (
             <View style={{ gap: 4 }}>
               <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.clone.hostname')}</Text>
-              <TextInput value={host} onChange={(x) => setHost(win ? x.trim().toLowerCase().slice(0, WIN_NAME_MAX) : x.trim().toLowerCase())} />
+              <TextInput spellCheck={false} value={host} onChange={(x) => setHost(win ? x.trim().toLowerCase().slice(0, WIN_NAME_MAX) : x.trim().toLowerCase())} />
             </View>
           ) : null}
           <Text style={{ fontSize: 12, lineHeight: 1.45, color: hostBad ? '#ff453a' : p.dim, textAlign: 'start' }}>

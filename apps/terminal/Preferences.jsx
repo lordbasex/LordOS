@@ -286,7 +286,7 @@ function TriggerSheet({ t, sheet, onCancel, onSave }) {
       <View style={{ width: 520, maxWidth: '92%', padding: spacing.xl, gap: spacing.m, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{T(sheet.index < 0 ? 'terminal.prefs.tr.newTitle' : 'terminal.prefs.tr.editTitle')}</Text>
         <Field t={t} label={T('terminal.prefs.tr.regex')} note={T('terminal.prefs.tr.regexNote')}>
-          <TextInput value={d.regex} placeholder="error|failed" onChange={(v) => upd({ regex: v })} style={{ width: 280, maxWidth: '100%', fontFamily: 'monospace', direction: 'ltr' }} />
+          <TextInput spellCheck={false} value={d.regex} placeholder="error|failed" onChange={(v) => upd({ regex: v })} style={{ width: 280, maxWidth: '100%', fontFamily: 'monospace', direction: 'ltr' }} />
         </Field>
         <Field t={t} label={T('terminal.prefs.tr.action')}>
           <Picker t={t} width={200} value={d.action} onChange={(v) => upd({ action: v })} options={TRIGGER_ACTIONS.map((a) => [a.id, actionName(a.id)])} />
@@ -369,7 +369,7 @@ function ImportPanel({ t, onClose, onDone }) {
         <Text style={{ fontSize: typeScale.callout, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{T('terminal.prefs.import.intro')}</Text>
       </View>
       <View style={{ flexDirection: 'row', gap: spacing.s, alignItems: 'center' }}>
-        <TextInput value={path} placeholder={T('terminal.prefs.import.placeholder')} onChange={setPath} onSubmit={load} style={{ flex: 1 }} />
+        <TextInput spellCheck={false} value={path} placeholder={T('terminal.prefs.import.placeholder')} onChange={setPath} onSubmit={load} style={{ flex: 1 }} />
         <Button label={T('terminal.prefs.cancel')} onClick={onClose} />
         <Button label={T('terminal.prefs.import.open')} primary onClick={() => load(path)} />
       </View>
@@ -466,7 +466,7 @@ function ConfigFileSection({ t, onImport, onNotice, pick }) {
       ) : st.problem ? <Note bad>{errorText(st.problem)}</Note> : null}
       {error ? <Note bad>{error}</Note> : null}
       <Field t={t} label={T('terminal.prefs.file.where')} note={st.custom ? T('terminal.prefs.file.cacheNote', { path: shortPath(st.cache) }) : T('terminal.prefs.file.defaultNote')}>
-        <TextInput value={shortPath(st.path)} onChange={() => {}} readOnly style={{ flex: 1, minWidth: 220 }} />
+        <TextInput spellCheck={false} value={shortPath(st.path)} onChange={() => {}} readOnly style={{ flex: 1, minWidth: 220 }} />
         <Button small label={T('terminal.prefs.file.show')} onClick={() => revealPath(st.readOnly ? st.cache : st.path)} />
       </Field>
       <Field t={t} label="">
@@ -747,9 +747,9 @@ export function Preferences({ wid, onClose }) {
           return (
             <View key={i} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.s, paddingVertical: spacing.s, direction: 'ltr' }}>
               <Toggle small on={f.enabled !== false} onChange={(v) => upd({ enabled: v })} />
-              <TextInput value={f.host || ''} placeholder="localhost" onChange={(v) => upd({ host: v.trim() })} style={{ width: 130 }} />
+              <TextInput spellCheck={false} value={f.host || ''} placeholder="localhost" onChange={(v) => upd({ host: v.trim() })} style={{ width: 130 }} />
               <Text style={{ fontSize: 12, color: t.textDim }}>:</Text>
-              <TextInput value={f.port == null ? '' : String(f.port)} placeholder="80" onChange={(v) => upd({ port: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 60 }} />
+              <TextInput spellCheck={false} value={f.port == null ? '' : String(f.port)} placeholder="80" onChange={(v) => upd({ port: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 60 }} />
               <Text style={{ fontSize: 12, color: t.textDim, whiteSpace: 'nowrap' }}>→ 127.0.0.1:</Text>
               <TextInput value={f.local == null ? '' : String(f.local)} placeholder={T('terminal.fwd.auto')} onChange={(v) => upd({ local: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 70 }} />
               {!ok && <Text style={{ fontSize: 11, color: '#ff453a' }}>{T('terminal.fwd.badInput')}</Text>}

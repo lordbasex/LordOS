@@ -28,6 +28,43 @@ system's dialog). Notes, Programs, Log audit, Sentinela, Files, Apps and windows
 (`apps/settings/Sentinela.jsx`, [SENTINELA.md](SENTINELA.md)); the others are marked "coming soon" (no toggles that
 do nothing).
 
+## Writing: ✨ AI on selected text (in development)
+
+Approved by the maintainer on 2026-11-26. With text selected in a LordOS text field (`TextInput`, `TextArea`, Notes,
+Mail's body), the right-click menu shows **✨ AI ▸ Correct spelling and grammar · Improve writing · Make it shorter ·
+Translate to** (the interface language, the spelling languages, then English, Spanish, Portuguese, French, German,
+Italian, Chinese, Japanese). Its function card is **Writing** in "What Lumo can do" (read only), with its own page
+(`{ section: 'ai', page: 'writing' }`): **on whenever a model is installed** (on a system that has one and right after
+installing one); the person can turn it off there, and that choice is kept (`settings.writing.on === false` is never
+turned back on, a new model included; `sdk/writingmodel.js` `writingEnabled`: a default that depends on a model being
+present, not a migration). Without a model it is off and the menu shows nothing. It uses the model chosen for Lumo,
+else the first installed.
+
+- **It runs in the shell, never in the app.** `lord.writing` (`server/src/ui/js_sentinela.c`) exists only in the
+  desktop's own JS context; an isolated app's broker has none. The SDK's field hands the selection to the shell's
+  panel (`sdk/writing.jsx`); the app gets text back only through its field's change after the person clicks Replace.
+- **Fixed prompts.** `server/src/llm/writing.c` holds the four system texts; JS sends only the action name, a target
+  of the closed list of LordOS's 35 interface languages and the text. The text goes between `<<<TEXT nonce>>>` and
+  `<<<END-TEXT nonce>>>` with a random nonce, stated as material and never instructions.
+- **Streamed.** The request asks llama-server to stream (chunked server-sent events); `wr_stream_feed` reads them
+  strictly (status 200, chunk sizes, lines of at most 64 KB, JSON events) and keeps at most 16 KB of text, which the
+  panel shows as it comes (`lord.writing.peek`). 1,536 tokens at most, temperature 0.2 (0.4 to improve), no thinking.
+- **Plain text.** `sdk/writingmodel.js` `cleanOutput` drops control characters and bidi overrides, a `<think>` block,
+  echoed markers and a code fence around the whole answer; nothing is interpreted. **Replace / Copy / Discard**:
+  nothing changes without the click, and Replace only where the selection was if it still holds the text sent
+  (`stillThere`).
+- **Limits.** Never in a password field; at most 4,000 characters (the engine's context is 4,096 tokens); one job at a
+  time in the engine's queue with Sentinela's; Discard or Esc cancels the stream (`lord.writing.cancel`). Nothing goes
+  online: the same engine and sandbox as Sentinela ([SENTINELA.md](SENTINELA.md)).
+- **The Brain's sheets:** "Used by" lists the functions that use the model from `FUNCTIONS` (`llmFunctions`: Writing,
+  Sentinela) plus Monitor's "Investigate with Lumo"; "Try it" translates with that model whenever Writing or Sentinela is
+  on (`llmTryReady`), not only with Sentinela.
+- **Web apps:** lord-web's right-click menu has the same ✨ AI row for a page's selection; Replace goes back only to a
+  focused text field whose selection is unchanged (`docs/WEBAPPS.md`, "✨ AI on a page's selection").
+- **Tests:** `build/llm-engine-test` (the requests, streams whole and byte by byte, malformed answers, the 16 KB cap,
+  a fuzz, a streamed job through the fake engine seen while it streams, a translation, cancel, bad arguments);
+  `server/tests/writing_model_test.mjs`; `server/tests/spell_scene` (screenshots of the panel streaming and done).
+
 ## Capabilities
 
 Each capability is a collection of models; each model is a card (size, memory, license, state: ✓ installed, ☁ not

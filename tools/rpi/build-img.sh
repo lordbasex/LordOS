@@ -76,7 +76,8 @@ PKGS_LORDOS="libwayland-server0 libxkbcommon0 xkb-data pipewire pipewire-pulse p
  alsa-ucm-conf wpasupplicant openvpn fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji libthai-data
  skkdic rime-data-pinyin-simp fonts-dejavu-core xwayland
  cups avahi-daemon libnss-mdns power-profiles-daemon shared-mime-info gsettings-desktop-schemas
- libtesseract5 tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-por tesseract-ocr-fra tesseract-ocr-ita libpipewire-0.3-0t64"
+ libtesseract5 tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-por tesseract-ocr-fra tesseract-ocr-ita libpipewire-0.3-0t64
+ libhunspell-1.7-0 hunspell-en-us hunspell-es hunspell-pt-br"
 # The board has no clock that survives without a battery: systemd-timesyncd sets the time from the
 # network at boot (Settings → Date & Time, "Automatic time"); without it the clock starts months
 # behind and every signed package index is refused as "not valid yet". The rest is the same as the

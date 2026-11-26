@@ -363,6 +363,15 @@ pre-release that never shipped. The paper marked all of it "0.8.9, in developmen
 | 5.1 | A paused Cloud account sends nothing to its provider: no mount retries, check listing, quota call, background listing or change polling (#194) | Test (`cloud-test` `t_pause`: `cloud_bring_up_ok` and the `vfs/poll-interval` call) | Not yet with a real Google account or a packet capture |
 | 5.1 | The package installs `assets/cloud/providers.json`, so verified providers read verified (#195) | Test (`cloud_model_test.mjs`: mkdeb.sh installs `assets/cloud`, the fallback) | Not yet in a built .deb |
 
+## In development after 0.8.9.6.1: spelling and ✨ AI on selected text (the paper's edition of 2026-11-26)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 2.2, 6.7 | `lord-spell` is the only program that loads Hunspell (dlopen from root-owned system folders); dictionaries arrive as descriptors; it takes `sandbox_apply_helper` before reading a word and has no files, network, new sockets or exec | Test (`build/spell-test`: `lord-spellprobe-test` answers only when `/etc/passwd`, `/usr/share/hunspell`, `/tmp`, AF_INET and AF_UNIX sockets and execve are refused) | Holds in the test; **Untested** on the VM and the Raspberry Pi |
+| 6.7 | Both sides parse the same strict, length-capped frames; a malformed answer kills the helper | Test (`build/spell-test`: 400,000 fuzzed payloads under ASan and UBSan, `lord-spellevil-test`) | Holds |
+| 6.7 | The person's dictionary is enchant's word lists shared with lord-web, written only by lord-server (0600, unknown lines kept) | Test (`build/spell-test`: a word WebKit learned is read, the files are 0600) | Holds in the test; sharing with a running lord-web not checked on screen |
+| 6.7 | ✨ AI: fixed prompts in C, the selection fenced with a nonce, the streamed answer read strictly and shown as plain text, applied only on Replace, never in password fields, on when a model is installed unless turned off (kept) | Test (`build/llm-engine-test`, `writing_model_test.mjs`, `spell_scene` with a fake model) | Holds in the tests; **Untested** with a real Qwen3 model |
+
 ## In development after 0.8.9.6.1 (the paper's edition of 2026-11-26)
 
 | § | Claim | How | State |

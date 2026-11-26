@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Looking for suggestions…",
+  "menu.none": "No suggestions",
+  "menu.add": "Add “{word}” to dictionary",
+  "menu.ignore": "Ignore",
+  "settings.title": "Spelling",
+  "settings.hint": "Misspelled words get a wavy red underline in LordOS’s text fields; right-click one for suggestions. Checked on this computer, never online. Password, search and address fields aren’t checked.",
+  "settings.check": "Check spelling while typing",
+  "settings.languages": "Spelling: languages",
+  "settings.defaultHint": "None chosen: your interface language and English, when their dictionaries are installed. Web apps use the same ones.",
+  "settings.chosenHint": "A word is correct when any of the languages you chose knows it (at most 4). Web apps use your interface language and English.",
+  "settings.none": "No dictionary is installed. Install one below.",
+  "settings.useDefault": "Use the defaults",
+  "settings.more": "More languages",
+  "settings.moreHint": "Dictionaries from Debian. Installing one needs an administrator’s password.",
+  "settings.installing": "Installing…",
+  "settings.install": "Install",
+  "settings.words": "Your dictionary",
+  "settings.wordsHint": "Words you added with “Add to dictionary”, here or in a web app.",
+  "settings.remove": "Remove",
+  "settings.noWords": "No words yet."
+}

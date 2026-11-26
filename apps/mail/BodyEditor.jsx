@@ -2,7 +2,7 @@
 // one caret with selection, undo, and markdown shortcuts (Ctrl+B, Ctrl+I, Ctrl+K, lists). It is
 // the editor of the Notes app (apps/notes/NoteEditor.jsx), kept as a copy because apps cannot
 // import each other; the font is monospaced so every width is measured once per character.
-import { View, Text, ime, clipboard, takeTextFocus, releaseTextFocus, textFocusOwner, addListener, requestPermission } from '@lordos/sdk';
+import { View, Text, ime, clipboard, takeTextFocus, releaseTextFocus, textFocusOwner, addListener, requestPermission, useTheme, useEditorSpell, EditorSquiggles, squiggleColorFor, spellHitAt } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
 const MONO = 1400;
@@ -61,7 +61,7 @@ function lineStyle(s, inCode) {
   return 'text';
 }
 
-export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, emojiSearch, onEscape, autoFocus, padding = 10, apiRef, onBlur, onCommand, onContextMenu, caret = null }) {
+export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, emojiSearch, onEscape, autoFocus, padding = 10, apiRef, onBlur, onCommand, onContextMenu, spellCheck = true, caret = null }) {
   const area = useRef(null);
   const token = useRef({}).current;
   const st = useRef({ undo: [], redo: [], last: 0, w: 300, h: 200 });
@@ -110,6 +110,8 @@ export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, e
 
   // ---- editing ----
   const lo = Math.min(sel.a, sel.b), hi = Math.max(sel.a, sel.b);
+  const theme = useTheme();
+  const spellR = useEditorSpell(text, spellCheck, focus ? sel.b : -1);
   const pushUndo = (kind) => {
     const now = Date.now(), s = st.current;
     if (kind !== 'type' || now - s.last > 900 || s.kind !== kind) s.undo.push({ text, sel });
@@ -304,6 +306,9 @@ export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, e
   };
   st.current.caret = caretRect;
   if (apiRef) apiRef.current = {
+    // spelling and ✨ AI (sdk/editorextras.jsx): the misspelled word under a right click, the selection's offsets, a range replaced
+    spellHit: (e) => { try { return spellHitAt(spellR, text, posFromEvent(e)); } catch (err) { return null; } }, selRange: () => [lo, hi], textNow: () => text,
+    replaceRange: (a, b, s) => replace(a, b, s, 'edit'),
     insert: (txt) => insert(txt, 'edit'), focus: () => take(),
     hasSelection: () => hi > lo, cut, copy, paste: () => paste(true), selectAll: () => { take(); setSel({ a: 0, b: text.length }); },
     wrap: (a, b) => wrap(a, b), list: (kind) => listify(kind),
@@ -400,6 +405,8 @@ export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, e
     <View ref={area} onMouseDown={onMouseDown} onWheel={onWheel} onContextMenu={onContextMenu} style={{ flex: 1, overflow: 'hidden', direction: 'ltr' }}>
       {selRects}
       {out}
+      <EditorSquiggles ranges={spellR} rows={rows} first={first} last={last} left={padding} color={squiggleColorFor(theme.mode)}
+        xOf={(row, off) => widthOf(text.slice(row.start, off), size)} top={(r) => Math.round(padding + r * LH - scroll + (LH + size * 1.3) / 2) - 2} />
       {focus && blink && caretRow >= first && caretRow <= last && (
         <View style={{ position: 'absolute', left: padding + xOf(sel.b) - 1, top: padding + caretRow * LH - scroll + 2, width: 2, height: LH - 4, backgroundColor: colors.caret }} />
       )}

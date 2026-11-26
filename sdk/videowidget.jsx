@@ -129,7 +129,7 @@ export function VideoSetup() {
           {label('shell.widgets.video.nameLabel')}
           <TextInput value={name} onChange={setName} placeholder={t('shell.widgets.video.namePlaceholder')} style={field} />
           {label('shell.widgets.video.urlLabel')}
-          <TextInput value={addr} onChange={setAddr} placeholder="rtsp://user:password@192.168.1.10:554/stream" style={field} onSubmit={() => save(addr, name)} />
+          <TextInput spellCheck={false} value={addr} onChange={setAddr} placeholder="rtsp://user:password@192.168.1.10:554/stream" style={field} onSubmit={() => save(addr, name)} />
           <Text style={{ fontSize: 11, color: th.textDim, textAlign: 'start' }}>{t('shell.widgets.video.urlHint')}</Text>
           {label('shell.widgets.video.listLabel')}
           <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>

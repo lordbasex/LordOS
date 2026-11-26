@@ -119,6 +119,31 @@ static void paint_node(Canvas *c, Node *n, float opacity) {
     if (cap_last && n->id == cap_last) cap_done = 1;
 }
 
+/* A wavy line across (x, y, w, h), device pixels: a sine of period 4 logical px whose peaks touch the box's top and
+ * bottom, 1 logical px thick, antialiased by its distance to each pixel's centre; drawn as one alpha mask, so the box
+ * is all it touches (a misspelled word's underline, docs/SPELLING.md). */
+static void paint_wavy(Canvas *c, float x, float y, float w, float h, float k, uint32_t argb) {
+    int x0 = (int)floorf(x), y0 = (int)floorf(y), pw = (int)ceilf(x + w) - x0, ph = (int)ceilf(y + h) - y0;
+    if (pw <= 0 || ph <= 0 || pw > 8192 || ph > 64) return;
+    uint8_t stack[4096], *a = (size_t)pw * (size_t)ph <= sizeof stack ? stack : malloc((size_t)pw * (size_t)ph);
+    if (!a) return;
+    float th = k * 1.0f, amp = (h - th) / 2, mid = y + h / 2, per = 4 * k;
+    if (amp < 0) amp = 0;
+    for (int j = 0; j < ph; j++) {
+        float py = y0 + j + 0.5f;
+        for (int i = 0; i < pw; i++) {
+            float px = x0 + i + 0.5f;
+            if (px < x || px > x + w) { a[j * pw + i] = 0; continue; }
+            float cy = mid - amp * sinf((px - x) * 6.2831853f / per);
+            float d = fabsf(py - cy) - th / 2;
+            float v = d <= 0 ? 1 : d >= 1 ? 0 : 1 - d;
+            a[j * pw + i] = (uint8_t)(v * 255 + 0.5f);
+        }
+    }
+    canvas_alpha_mask(c, x0, y0, a, pw, ph, pw, argb);
+    if (a != stack) free(a);
+}
+
 static void paint_node_body(Canvas *c, Node *n, float opacity) {
     if (n->type == NODE_RAW || n->s.display_none) return;
     if (layer_paint(c, n, opacity)) return;
@@ -183,6 +208,7 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
         if (corners_differ) PROF(2, canvas_rrect4(c, x, y, w, h, r4, with_opacity(s->bg, op)));
         else PROF(2, canvas_rrect(c, x, y, w, h, rad, with_opacity(s->bg, op)));
     }
+    if (own && s->ext && (s->ext->wavy >> 24)) PROF(2, paint_wavy(c, x, y, w, h, k, with_opacity(s->ext->wavy, op)));
     if (own && s->has_gradient) {
         if (corners_differ) PROF(2, canvas_rrect4_gradient(c, x, y, w, h, r4, s->grad_from, s->grad_to, s->grad_angle, op));
         else PROF(2, canvas_rrect_gradient(c, x, y, w, h, rad, s->grad_from, s->grad_to, s->grad_angle, op));
@@ -1421,6 +1447,7 @@ static int node_paints(const Node *n) {
     const Style *s = &n->s;
     if (n->type != NODE_VIEW) return 1;             /* text, image, terminal, app window, video */
     if ((s->bg >> 24) || s->has_gradient || (s->shadow_color >> 24) || s->backdrop_blur >= 1 || n->own_tf) return 1;
+    if (s->ext && (s->ext->wavy >> 24)) return 1;
     for (int e = EDGE_L; e <= EDGE_B; e++) if (node_border(n, e) > 0) return 1;
     /* rounded and clipping: its corners are saved and restored around its children (paint_node), which
      * changes what is below them even when it paints nothing itself */

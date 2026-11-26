@@ -50,6 +50,7 @@
 #include "js_flatpak.h"
 #include "js_help.h"
 #include "js_voice.h"
+#include "js_spell.h"
 #include "js_hw.h"
 #include "portal.h"
 #include "../wl/keygrab.h"
@@ -843,6 +844,7 @@ static void session_context(void) {
     js_hw_register(ctx, lord);         /* lord.display/power/bt/mime/timedate (Settings, src/hw) */
     js_voice_register(ctx, lord);      /* lord.voice: reading text aloud through lord-say (tts/speak.c, docs/VOICE.md) */
     js_sentinela_register(ctx, lord);  /* lord.sentinela: Sentinela's local model engine (llm/engine.c, docs/SENTINELA.md) */
+    js_spell_register(ctx, lord);      /* lord.spell: the spell checker through lord-spell (spell/spellsvc.c, docs/SPELLING.md) */
     prof_wrap_obj(ctx, lord, "", 0);   /* every lord.<ns>.* call timed (the stall detector) */
     JS_SetPropertyStr(ctx, g, "lord", lord);
     JS_FreeValue(ctx, g);

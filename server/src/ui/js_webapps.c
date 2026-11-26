@@ -54,6 +54,7 @@
  *   edit(app, profile, command)         the Edit menu on that web app's window: undo|redo|cut|copy|paste|selectAll, to its
  *                                       lord-web (org.lordos.WebApp1.Edit, which checks the caller is lord-server)
  *   menuAnswer(id, item)                the person's choice in a page's context menu (the "webapps-menu" event), or ""
+ *   writeReplace(app, profile, text)    ✨ AI's Replace in a page: the text to lord-web (webask_write_replace)
  *   searchEngine() · setSearchEngine(name)  Settings → Web Apps → Search the web with (google, duckduckgo, bing,
  *                                       startpage; ~/.config/lordos/web/search.json): the page's context menu's search
  *   developerMode() · setDeveloperMode(on)  Settings → Web Apps → Developer mode (~/.config/lordos/web/developer.json);
@@ -693,6 +694,20 @@ static JSValue f_edit(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     return JS_NewBool(c, sent);
 }
 
+/* ✨ AI's Replace (docs/AI.md "Writing"), on the person's click in the shell's panel: the text to that app and profile's
+ * lord-web (webask_write_replace), which inserts it only where the menu's selection still is */
+static JSValue f_write_replace(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *app = arg_str(c, argc, argv, 0), *prof = arg_str(c, argc, argv, 1), *text = arg_str(c, argc, argv, 2);
+    int ok = app && prof && text && webreg_id_ok(app) && webreg_id_ok(prof) && strlen(text) <= WEBAI_MAX;
+    int sent = ok && !webask_write_replace(app, prof, text);
+    JS_FreeCString(c, app);
+    JS_FreeCString(c, prof);
+    JS_FreeCString(c, text);
+    if (!ok) return js_throw_code(c, "sys.badArgument", NULL);
+    return JS_NewBool(c, sent);
+}
+
 /* The person's choice in a page's context menu (the "webapps-menu" event): one of its items, or "" */
 static JSValue f_menu_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
@@ -789,6 +804,7 @@ static const JSCFunctionListEntry webapps_funcs[] = {
     JS_CFUNC_DEF("asks", 0, f_asks),
     JS_CFUNC_DEF("edit", 3, f_edit),
     JS_CFUNC_DEF("menuAnswer", 2, f_menu_answer),
+    JS_CFUNC_DEF("writeReplace", 3, f_write_replace),
     JS_CFUNC_DEF("developerMode", 0, f_developer_mode),
     JS_CFUNC_DEF("setDeveloperMode", 1, f_set_developer_mode),
     JS_CFUNC_DEF("inspect", 2, f_inspect),

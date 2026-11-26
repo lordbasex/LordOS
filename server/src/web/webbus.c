@@ -322,8 +322,8 @@ void webbus_ask(Web *w, int kind, WebAskDone cb, void *data) {
 /* ---- editing: the shell's Edit menu and the page's context menu ---- */
 
 /* cmd >= 0: Edit; CALL_SCHEME: SetColorScheme(arg); CALL_UA: SetUserAgent(arg) */
-enum { CALL_SCHEME = -1, CALL_UA = -2 };
-typedef struct { Web *w; int cmd, arg; } EditCall;
+enum { CALL_SCHEME = -1, CALL_UA = -2, CALL_WRITE = -3 };
+typedef struct { Web *w; int cmd, arg; char *text; } EditCall;
 
 static void on_edit_pid(GObject *src, GAsyncResult *res, gpointer d) {
     EditCall *ec = d;
@@ -334,22 +334,27 @@ static void on_edit_pid(GObject *src, GAsyncResult *res, gpointer d) {
         if (ec->cmd >= 0) web_edit(ec->w, ec->cmd);
         else if (ec->cmd == CALL_SCHEME) web_set_scheme(ec->w, ec->arg);
         else if (ec->cmd == CALL_UA) web_set_user_agent(ec->w, ec->arg);
+        else if (ec->cmd == CALL_WRITE && ec->text) web_menu_ai_replace(ec->w, ec->text);
     } else fprintf(stderr, "lord-web: %s call from a process that is not lord-server: refused\n",
-                   ec->cmd >= 0 ? "an Edit" : ec->cmd == CALL_SCHEME ? "a SetColorScheme" : "a SetUserAgent");
+                   ec->cmd >= 0 ? "an Edit" : ec->cmd == CALL_SCHEME ? "a SetColorScheme" : ec->cmd == CALL_WRITE ? "a WriteReplace" : "a SetUserAgent");
+    if (ec->text) { memset(ec->text, 0, strlen(ec->text)); g_free(ec->text); }
     g_free(ec);
 }
 
 /* the bus answers from the caller's socket credentials, never from the caller */
-static void check_caller(Web *w, const char *sender, int cmd, int arg) {
+static void check_caller_text(Web *w, const char *sender, int cmd, int arg, const char *text) {
     if (!w->bus || !sender) return;
     EditCall *ec = g_new0(EditCall, 1);
     ec->w = w;
     ec->cmd = cmd;
     ec->arg = arg;
+    ec->text = text ? g_strdup(text) : NULL;
     g_dbus_connection_call(w->bus, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "GetConnectionUnixProcessID",
                            g_variant_new("(s)", sender), G_VARIANT_TYPE("(u)"), G_DBUS_CALL_FLAGS_NONE, 5000, NULL, on_edit_pid, ec);
 }
 
+static void check_caller(Web *w, const char *sender, int cmd, int arg) { check_caller_text(w, sender, cmd, arg, NULL); }
+void webbus_write_replace(Web *w, const char *sender, const char *text) { if (text && strlen(text) <= WEBAI_MAX) check_caller_text(w, sender, CALL_WRITE, 0, text); }
 void webbus_edit(Web *w, const char *sender, int cmd) { if (cmd >= 0) check_caller(w, sender, cmd, 0); }
 void webbus_scheme(Web *w, const char *sender, int scheme) { if (webscheme_name(scheme)) check_caller(w, sender, CALL_SCHEME, scheme); }
 void webbus_user_agent(Web *w, const char *sender, int kind) { if (webreg_ua_name(kind)) check_caller(w, sender, CALL_UA, kind); }

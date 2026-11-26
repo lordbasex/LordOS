@@ -450,8 +450,17 @@ export async function investigateProcess(p, { started = '', conns = null } = {})
 }
 
 // "Translate with Lumo": an English description into the person's language (kept per language by sdk/describe.js)
-export async function translateWithLumo(text) {
-  const ready = lumoReady();
+// model: try this installed model (Settings → AI's sheet) whenever a function that uses the model is on (Sentinela, or
+// Writing unless turned off), not only Sentinela's own
+export async function translateWithLumo(text, { model = null } = {}) {
+  let ready = lumoReady();
+  if (model) {
+    const eng = refreshSentinelaEngine();
+    const writingOff = (settings.get().writing || {}).on === false;
+    const fnOn = sentinelaPrefs().on || !writingOff;
+    ready = !api() || !eng.available ? { ok: false, why: 'noEngine' } : !eng.models.some((m) => m.id === model) ? { ok: false, why: 'noModel' }
+      : !fnOn ? { ok: false, why: 'off' } : { ok: true, model };
+  }
   if (!ready.ok) return { ok: false, error: `sentinela.lumo.${ready.why}` };
   const nonce = Array.from({ length: 16 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
   const language = langName(locale.get().lang);

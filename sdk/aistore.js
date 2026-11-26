@@ -32,10 +32,12 @@ export const PIECES = [
 ];
 
 // What Lumo can do: one brain, many functions (groups of LordOS tools, MCP later). level: 0 read only, 1 with your
-// permission, 2 administrator (the password always in the system's dialog, never in a chat). Only Sentinela works.
+// permission, 2 administrator (the password always in the system's dialog, never in a chat). Sentinela and Writing
+// (✨ AI on selected text, 0.8.9.6.2; docs/AI.md "Writing") work.
 export const LEVELS = ['read', 'ask', 'admin'];
 export const FUNCTIONS = [
-  { id: 'notes', level: 1 }, { id: 'programs', level: 1 }, { id: 'logs', level: 0 }, { id: 'sentinela', level: 0, ready: true },
+  { id: 'writing', level: 0, ready: true, llm: true }, { id: 'sentinela', level: 0, ready: true, llm: true },
+  { id: 'notes', level: 1 }, { id: 'programs', level: 1 }, { id: 'logs', level: 0 },
   { id: 'files', level: 0 }, { id: 'apps', level: 1 }, { id: 'machines', level: 1 }, { id: 'settings', level: 1 }, { id: 'system', level: 2 },
 ];
 
@@ -183,6 +185,19 @@ export function matchesQuery(e, query, label = (x) => x.name || '', capName = (c
   if (!words.length) return true;
   const hay = foldText([label(e), e.id, e.source, e.cap, capName(e.cap)].join(' '));
   return words.every((w) => hay.includes(w));
+}
+// The functions ("What Lumo can do") a search finds, by their name and description in the person's language (and
+// their id): Sentinela, Writing… name(f), desc(f) → text. Every word of the query must be in one of them.
+// The functions that use the language model (the brain's sheet, "Used by"), from FUNCTIONS: name(f) → text
+export const llmFunctions = (list = FUNCTIONS) => (list || []).filter((f) => f.ready && f.llm);
+// Whether a model's sheet can try it: that model installed, the engine there, and a function that uses it on (Sentinela
+// or Writing, which is on with a model unless the person turned it off); not Sentinela in particular
+export const llmTryReady = ({ installed, engine, sentinelaOn, writingChoice }) => !!installed && !!engine && (!!sentinelaOn || writingChoice !== false);
+
+export function matchFunctions(list, query, name = (f) => f.id, desc = () => '') {
+  const words = foldText(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  return (list || []).filter((f) => { const hay = foldText([name(f), desc(f), f.id].join(' ')); return words.every((w) => hay.includes(w)); });
 }
 export const matchesFilter = (e, f) => f === 'all' || (f === 'installed' ? e.state === 'installed' : e.cap === f);
 export const filterEntries = (list, { filter = 'all', query = '', label, capName } = {}) =>

@@ -3,6 +3,26 @@
 
 #include <string.h>
 
+int webai_clean(const char *in, char *out) {
+    if (!in) return -1;
+    size_t n = strlen(in), o = 0, chars = 0;
+    if (!n || n > WEBAI_MAX) return -1;
+    for (size_t i = 0; i < n;) {
+        unsigned char c = (unsigned char)in[i];
+        int k = c < 0x80 ? 0 : c >= 0xf0 && c <= 0xf4 ? 3 : c >= 0xe0 && c <= 0xef ? 2 : c >= 0xc2 && c <= 0xdf ? 1 : -1;
+        if (k < 0 || i + (size_t)k >= n + (k ? 0 : 1)) return -1;
+        unsigned cp = k ? c & (0x3f >> k) : c;
+        for (int j = 1; j <= k; j++) { if (((unsigned char)in[i + j] & 0xc0) != 0x80) return -1; cp = cp << 6 | ((unsigned char)in[i + j] & 0x3f); }
+        if ((k == 1 && cp < 0x80) || (k == 2 && (cp < 0x800 || (cp >= 0xd800 && cp <= 0xdfff))) || (k == 3 && (cp < 0x10000 || cp > 0x10ffff))) return -1;
+        int drop = (cp < 0x20 && cp != '\n' && cp != '\t') || (cp >= 0x7f && cp <= 0x9f) || cp == 0x200e || cp == 0x200f ||
+                   (cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2066 && cp <= 0x2069);
+        if (!drop) { memcpy(out + o, in + i, (size_t)k + 1); o += (size_t)k + 1; if (++chars > WEBAI_CHARS) return -1; }
+        i += (size_t)k + 1;
+    }
+    out[o] = 0;
+    return o ? 0 : -1;
+}
+
 static const char *const EDIT_NAMES[WEBEDIT_N] = { "undo", "redo", "cut", "copy", "paste", "selectAll" };
 static const char *const EDIT_WEBKIT[WEBEDIT_N] = { "Undo", "Redo", "Cut", "Copy", "Paste", "SelectAll" };
 static const char *const MENU_NAMES[WEBMENU_N] = {
