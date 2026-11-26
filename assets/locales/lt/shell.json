@@ -150,6 +150,8 @@
   "clipboard.tab.snippets": "Fragmentai",
   "clipboard.title": "Iškarpinė",
   "clipboard.unpin": "Atsegti",
+  "code.copied": "Nukopijuota",
+  "code.copy": "Kopijuoti",
   "textMenu.undo": "Anuliuoti",
   "textMenu.redo": "Grąžinti",
   "textMenu.cut": "Iškirpti",

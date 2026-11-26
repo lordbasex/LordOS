@@ -142,6 +142,8 @@
   "clipboard.tab.snippets": "片段",
   "clipboard.title": "剪貼簿",
   "clipboard.unpin": "取消釘選",
+  "code.copied": "已複製",
+  "code.copy": "拷貝",
   "textMenu.undo": "還原",
   "textMenu.redo": "重做",
   "textMenu.cut": "剪下",

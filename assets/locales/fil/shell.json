@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Mga snippet",
   "clipboard.title": "Clipboard",
   "clipboard.unpin": "I-unpin",
+  "code.copied": "Nakopya na",
+  "code.copy": "Kopyahin",
   "textMenu.undo": "I-undo",
   "textMenu.redo": "I-redo",
   "textMenu.cut": "I-cut",

@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Fraqmentlər",
   "clipboard.title": "Mübadilə buferi",
   "clipboard.unpin": "Ayır",
+  "code.copied": "Kopyalandı",
+  "code.copy": "Kopyala",
   "textMenu.undo": "Geri qaytar",
   "textMenu.redo": "Təkrarla",
   "textMenu.cut": "Kəs",

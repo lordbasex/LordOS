@@ -142,6 +142,8 @@
   "clipboard.tab.snippets": "ข้อความสำเร็จรูป",
   "clipboard.title": "คลิปบอร์ด",
   "clipboard.unpin": "เลิกปักหมุด",
+  "code.copied": "คัดลอกแล้ว",
+  "code.copy": "คัดลอก",
   "textMenu.undo": "เลิกทำ",
   "textMenu.redo": "ทำซ้ำ",
   "textMenu.cut": "ตัด",

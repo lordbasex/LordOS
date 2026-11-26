@@ -142,6 +142,8 @@
   "clipboard.tab.snippets": "Đoạn mẫu",
   "clipboard.title": "Bảng nhớ tạm",
   "clipboard.unpin": "Bỏ ghim",
+  "code.copied": "Đã sao chép",
+  "code.copy": "Sao chép",
   "textMenu.undo": "Hoàn tác",
   "textMenu.redo": "Làm lại",
   "textMenu.cut": "Cắt",

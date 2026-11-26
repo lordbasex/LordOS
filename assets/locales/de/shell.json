@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Textbausteine",
   "clipboard.title": "Zwischenablage",
   "clipboard.unpin": "Lösen",
+  "code.copied": "Kopiert",
+  "code.copy": "Kopieren",
   "textMenu.undo": "Widerrufen",
   "textMenu.redo": "Wiederholen",
   "textMenu.cut": "Ausschneiden",

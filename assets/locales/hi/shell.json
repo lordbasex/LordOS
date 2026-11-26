@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "स्निपेट",
   "clipboard.title": "क्लिपबोर्ड",
   "clipboard.unpin": "अनपिन करें",
+  "code.copied": "कॉपी हो गया",
+  "code.copy": "कॉपी करें",
   "textMenu.undo": "पूर्ववत करें",
   "textMenu.redo": "फिर से करें",
   "textMenu.cut": "काटें",

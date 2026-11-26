@@ -14,7 +14,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Hands (Manos): an AI agent uses the LordOS desktop** (in development; approved by the maintainer on 2026-11-26,
   AGENTS.md; docs/HANDS.md). Modelled on Claude in Chrome: Claude Code today, and later Lumo's own agent, reads the
   windows as a tree, clicks, types, scrolls and takes screenshots through lord-server.
-  - **`lordos-mcp`** (`/usr/bin/lordos-mcp`, an MCP server over stdio; `claude mcp add lordos-mcp -- lordos-mcp`) with
+  - **`lordos-mcp`** (`/usr/bin/lordos-mcp`, an MCP server over stdio; `claude mcp add -s user lordos-mcp -- lordos-mcp`) with
     the tools `windows_context`, `open_app`, `open_path`, `close_window`, `read_window`, `find`, `computer` (screenshot,
     left/right/middle/double/triple click, hover, drag, type, key chords, scroll, zoom, wait), `set_value`,
     `read_app_log` and `record` (an animated GIF, returned or saved under a bare name in `~/Pictures/LordOS QA`). No tool
@@ -384,6 +384,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Settings → AI → Hands: the commands had no way to copy them, and `claude mcp add` added lordos-mcp only for one
+  project.** Each command on the page (`claude mcp add -s user lordos-mcp -- lordos-mcp` and `lordos-mcp --headless
+  notes`) is now a `<CommandBlock>` (new in the SDK, `sdk/codeblock.jsx`): monospace, left to right in any language,
+  with a Copy button that puts exactly that text on the clipboard and says "Copied" for 2 s (`shell.code.copy`,
+  `shell.code.copied` in the 35 languages). It only copies; nothing is typed or run. The command now has `-s user`, so
+  it works in every project; docs/HANDS.md, the paper, the site and `lordos-mcp --help` say the same.
+  `tests/settings_ai_scene` checks the button and the exact text on the clipboard.
 - **About LordOS: a long label was cut at its start** ("Pausas de más de 50 ms" showed as "sas de más de 50 ms" in
   Spanish; found in QA 2026-11-26): the label column was a fixed 118 px, right-aligned and on one line, so a longer
   label overflowed past the window's edge. The column now takes the width of the longest label, measured in the

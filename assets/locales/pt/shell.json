@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Trechos",
   "clipboard.title": "Área de transferência",
   "clipboard.unpin": "Desafixar",
+  "code.copied": "Copiado",
+  "code.copy": "Copiar",
   "textMenu.undo": "Desfazer",
   "textMenu.redo": "Refazer",
   "textMenu.cut": "Recortar",

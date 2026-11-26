@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Katkelmat",
   "clipboard.title": "Leikepöytä",
   "clipboard.unpin": "Irrota",
+  "code.copied": "Kopioitu",
+  "code.copy": "Kopioi",
   "textMenu.undo": "Kumoa",
   "textMenu.redo": "Tee uudelleen",
   "textMenu.cut": "Leikkaa",

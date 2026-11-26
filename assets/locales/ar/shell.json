@@ -162,6 +162,8 @@
   "clipboard.tab.snippets": "المقتطفات",
   "clipboard.title": "الحافظة",
   "clipboard.unpin": "إلغاء التثبيت",
+  "code.copied": "تم النسخ",
+  "code.copy": "نسخ",
   "textMenu.undo": "تراجع",
   "textMenu.redo": "إعادة",
   "textMenu.cut": "قص",

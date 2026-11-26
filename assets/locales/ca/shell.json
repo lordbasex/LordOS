@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Fragments",
   "clipboard.title": "Porta-retalls",
   "clipboard.unpin": "Deixa de fixar",
+  "code.copied": "Copiat",
+  "code.copy": "Copia",
   "textMenu.undo": "Desfés",
   "textMenu.redo": "Refés",
   "textMenu.cut": "Retalla",

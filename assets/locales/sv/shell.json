@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Textsnuttar",
   "clipboard.title": "Urklipp",
   "clipboard.unpin": "Lossa",
+  "code.copied": "Kopierat",
+  "code.copy": "Kopiera",
   "textMenu.undo": "Ångra",
   "textMenu.redo": "Gör om",
   "textMenu.cut": "Klipp ut",

@@ -7,7 +7,7 @@
  *   lordos-mcp --headless APP   a private desktop of its own for QA: a headless lord-server --hands-qa on a private bus,
  *                               a demo home with sample files, APP opened; nobody sees it and the person's desktop is
  *                               never touched. Ends (and is deleted) with this program.
- *   claude mcp add lordos-mcp -- lordos-mcp
+ *   claude mcp add -s user lordos-mcp -- lordos-mcp
  *
  * It runs as the person and links only libc: it never reads the screen, injects input or opens anything itself. Every
  * tool is one or two calls to lord-server, which checks everything (hands/hands.c). Tools: windows_context, open_app,
@@ -679,7 +679,7 @@ static void on_stop(int s) { (void)s; stop_now = 1; }
 static void usage(FILE *f) {
     fprintf(f, "usage: lordos-mcp [--headless APP]\n"
                "  An MCP server (stdio) for AI agents to use the LordOS desktop (docs/HANDS.md).\n"
-               "  claude mcp add lordos-mcp -- lordos-mcp\n"
+               "  claude mcp add -s user lordos-mcp -- lordos-mcp\n"
                "  --headless APP   a private desktop for QA with APP open (notes, files, …); nothing of yours is touched\n");
 }
 

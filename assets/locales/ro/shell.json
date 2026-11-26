@@ -150,6 +150,8 @@
   "clipboard.tab.snippets": "Fragmente",
   "clipboard.title": "Clipboard",
   "clipboard.unpin": "Anulează fixarea",
+  "code.copied": "Copiat",
+  "code.copy": "Copiază",
   "textMenu.undo": "Anulează",
   "textMenu.redo": "Refă",
   "textMenu.cut": "Decupează",

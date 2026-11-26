@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Fragmentos",
   "clipboard.title": "Portapapeles",
   "clipboard.unpin": "Soltar",
+  "code.copied": "Copiado",
+  "code.copy": "Copiar",
   "textMenu.undo": "Deshacer",
   "textMenu.redo": "Rehacer",
   "textMenu.cut": "Cortar",

@@ -22,7 +22,7 @@ import {
   PREVIEWS_PACKAGE, scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName,
   takeName, errorText, fs, LLM_MODELS, packagesForModel, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, installLlm, setBrainBackend, setBrainThreads, Slider,
   removeLlm, lumoReady, translateWithLumo, ENGINE_PACKAGE, writingChoice, writingEnabled, setWritingOn,
-  Checkbox, listApps, appName, handsStatus, setHandsOn, setHandsAllow, handsAllowSaved, stopHands, refreshHands,
+  Checkbox, CommandBlock, listApps, appName, handsStatus, setHandsOn, setHandsAllow, handsAllowSaved, stopHands, refreshHands,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -708,6 +708,11 @@ function WritingPage({ ready, onBrain }) {
 // The whole page is handsDeny: an agent never reads it, clicks it or sees it in a screenshot, so it can't turn itself on,
 // widen its allowlist or answer for the person. On is for this session only (lord-server forgets it at the next login).
 
+// the commands the Hands page shows, each with Copy (docs/HANDS.md): -s user adds lordos-mcp for every project, not only
+// the folder the command runs in
+export const HANDS_MCP_ADD = 'claude mcp add -s user lordos-mcp -- lordos-mcp';
+export const HANDS_MCP_QA = 'lordos-mcp --headless notes';
+
 function HandsPage() {
   const t = useTheme();
   const { t: tr } = useLocale();
@@ -763,10 +768,9 @@ function HandsPage() {
       <View style={{ gap: 6 }}>
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('hands.settings.howTitle')}</Text>
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{tr('hands.settings.how')}</Text>
-        <View style={{ padding: 10, borderRadius: 8, backgroundColor: t.control }}>
-          <Text style={{ fontFamily: 'monospace', fontSize: 12, color: t.text, direction: 'ltr', textAlign: 'left' }}>claude mcp add lordos-mcp -- lordos-mcp</Text>
-        </View>
+        <CommandBlock text={HANDS_MCP_ADD} />
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{tr('hands.settings.qa')}</Text>
+        <CommandBlock text={HANDS_MCP_QA} />
       </View>
     </View>
   );

@@ -150,6 +150,8 @@
   "clipboard.tab.snippets": "Fragmenty",
   "clipboard.title": "Schowek",
   "clipboard.unpin": "Odepnij",
+  "code.copied": "Skopiowano",
+  "code.copy": "Kopiuj",
   "textMenu.undo": "Cofnij",
   "textMenu.redo": "Ponów",
   "textMenu.cut": "Wytnij",

@@ -142,6 +142,8 @@
   "clipboard.tab.snippets": "스니펫",
   "clipboard.title": "클립보드",
   "clipboard.unpin": "고정 해제",
+  "code.copied": "복사됨",
+  "code.copy": "복사",
   "textMenu.undo": "실행 취소",
   "textMenu.redo": "실행 복귀",
   "textMenu.cut": "오려두기",
