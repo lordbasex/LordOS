@@ -323,18 +323,58 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     rich text editor) undoes; a plain text field can't, from the menu or the keys. What Copy or Cut put in WebKit's pasteboard is offered to the
     session at once (the window may not have the keyboard while the menu is open). The commands are a closed list
     (`webedit.c`), checked on both sides.
-  - **The context menu:** WPE 2.48 never asks its embedder for a menu (the view's `context-menu` signal doesn't
-    come) and, once a right click's default asked WebKit for one, the view took no more mouse input. So the same
-    isolated script prevents the default of every trusted `contextmenu` event and, when the page's own listeners
-    (on the element or the document) left it alone, tells lord-web what is under the pointer: an editable field, a
-    selection, a link's address, an image's. lord-web takes it only right after a click in the window and asks
-    lord-server for LordOS's own menu: `org.lordos.WebApps1.Menu(app, profile, items) → item`, the items being names
-    from the closed list (`cut`, `copy`, `paste`, `selectAll`, `copyLink`, `openLink`, `copyImage`), never text.
-    lord-server checks them and the caller's pid as for Ask, and the shell shows the menu at the pointer with its own
-    words (a press anywhere else closes it and goes no further). Copy Link Address offers the link's address as text;
-    Open Link in Browser goes to OpenURI (web, mail and phone links only); Copy Image reads the image with the page's
-    origin in lord-web's isolated world (made a PNG unless it is a PNG or a JPEG, at most 32 MB) and offers it as an
-    image.
+  - **The context menu** (in development; `webmenu.c`, `webedit.c`, `websearch.c`, `webselect.c`; like Chrome's): a
+    right click the page's own listeners (on the element or the document) left alone is reported by the same isolated
+    script with what is under the pointer: an editable field, the selection (its text, at most 16384 characters, never
+    a password field's), a link's address, an image's, and, in the top frame, a video or audio element with its state
+    (paused, muted, loop, controls, an http(s) source). The script prevents the event's default everywhere except in a
+    text field on WPEPlatform (2.54), where WebKit then asks for its own menu ("Spelling", below); on WPE 2.48, which
+    never asks and took no more mouse input once asked, it is always prevented. lord-web takes the report only right
+    after a click in the window and asks lord-server for LordOS's own menu:
+    `org.lordos.WebApps1.Menu(app, profile, items, checked, text, guesses) → item` (the older `(app, profile, items)`
+    is still taken). The items are names from a closed list (`webedit.c`), never text; `checked` marks Loop and Show
+    Controls; `text` is the selection's few words for the search item and `guesses` WebKit's spelling suggestions,
+    the only page-derived strings in a menu: lord-web cleans them and lord-server cleans them again
+    (`websearch_snippet`: control characters, bidi embeddings, overrides and isolates and invalid UTF-8 removed,
+    whitespace made single spaces, at most 30 characters and an ellipsis) and refuses a menu whose search item has no
+    words or whose suggestions don't match its items. The shell shows the menu at the pointer with its own words,
+    the page's words in their own direction (an isolate), each row with its key; a press anywhere else closes it. The
+    items, by what is under the pointer:
+    - **a text field:** WebKit's spelling suggestions, Ignore Spelling and Add to Dictionary (when the word is
+      misspelled), Undo (Ctrl+Z), Redo (Ctrl+Shift+Z), Cut (Ctrl+X) and Copy (Ctrl+C) with a selection, Paste
+      (Ctrl+V), Paste as Plain Text (Ctrl+Shift+V: the session's text only, never its HTML, files or image), Select
+      All (Ctrl+A) and Emoji (❖., LordOS's emoji picker, which pastes into the field);
+    - **selected text:** Copy (outside a field), Copy Link to Highlight (outside a field, on an http(s) page in the
+      top frame: the page's address with a `#:~:text=` fragment, the whole text up to 80 characters, else its first
+      and last four words), Search the Web for “…” and Speech ▸;
+    - **a link:** Open Link in Browser (OpenURI: web, mail and phone links only), Copy Link Address;
+    - **an image:** Open Image in Browser and Copy Image Address (an http(s) address only), Save Image As…, Copy
+      Image (read with the page's origin in lord-web's isolated world, made a PNG unless it is a PNG or a JPEG, at
+      most 32 MB, offered as an image);
+    - **a video or audio:** Play or Pause, Mute or Unmute, Loop and Show Controls (checked when on), run on that
+      element by the isolated script; Save Video As… or Save Audio As… for an http(s) source (not a stream the page
+      feeds it, such as a `blob:` from Media Source);
+    - **the page itself:** Back and Forward (when the view can; Alt+← and Alt+→), Reload (Ctrl+R) and Select All;
+    - and **Inspect** last, only while developer mode is on, with the same question as the Window menu's
+      ("Developer tools").
+    **Search the Web** opens the person's browser through OpenURI at the engine chosen in Settings → Web Apps →
+    Search the web (Google by default, as Chrome; DuckDuckGo, Bing or Startpage: a closed list, kept in
+    `~/.config/lordos/web/search.json` as `{"engine":"…"}`, written only by `lord.webapps.setSearchEngine` and read by
+    lord-web when the item is chosen). The address is the engine's fixed search address with the selected text, up
+    to 512 bytes, percent-encoded as its one parameter: nothing else of the page goes with it.
+    **Save Image As… and Save Video As…** ask where with LordOS's save dialog (the FileChooser portal's `SaveFile`,
+    which asks before replacing a file); the chosen file must be in the home folder, outside hidden folders and not a
+    `*.desktop` launcher, also once its folder's links are resolved (`webdl_target_ok`). An http(s) or `data:`
+    address then goes through the page's own download path into that file; an image the page made itself (`blob:`)
+    is read as for Copy Image and written there. A notification says when it is done, as for any download.
+    **Speech ▸** is LordOS's own (Start Speaking ❖Esc, Stop Speaking, Save as Audio…, `docs/VOICE.md`): lord-web makes
+    the person's selection the session's **primary selection** once it settles (300 ms after its last change, right
+    after a click or key in the window, at most 256 KB, never a password field's; the right-clicked selection too), as
+    a browser on Linux does, and lord-server reads that one aloud or saves it, as for any Linux app; JS never sees it.
+    The same makes ❖Esc and Edit → Speech read a web app's selection, and a middle click paste it in another app.
+    Emoji, Speech and Inspect run in the shell, which answers lord-web "" for them.
+    Left out: **Print…** (WPE has no print operation and `webkit_web_view_save` makes only MHTML, so there is no PDF
+    to print: no dead item), **Translate** (LordOS has no translator) and **Cast**.
   - **The app menu and Help:** Settings… opens Settings → Web Apps on that app; in Lord Flow, Browser identity (Chrome on
     Linux, Edge on Linux, Firefox on Linux, LordOS (WebKit)) the window's profile's `userAgent` ("Browser identity", below); Help starts with "<app> on the Web",
     the app's origin in the browser.
@@ -828,12 +868,17 @@ Voice and video calls in web apps (a messaging web app first, also video meeting
 ## What `lord-web` uses of the session (like any Linux app)
 
 - **Files:** WebKit's file chooser goes through the FileChooser portal. Downloads go to the XDG Downloads folder only,
-  with a notification when done.
+  with a notification when done; the context menu's Save Image As… and Save Video As… ask with the portal's
+  `SaveFile` and go to the file the person chose (in the home folder, not hidden, not a launcher).
 - **Notifications:** `org.freedesktop.Notifications` (`notifyd`). A click tells the page, then opens that app's window.
 - **Links outside `scope`:** OpenURI, so they open in the person's browser.
 - **Screen sharing:** the ScreenCast portal (`docs/WAYLAND.md`).
 - **Background:** a StatusNotifierItem tray icon with Open and Quit when `background` and `tray` are on.
-- **The clipboard and the keyboard:** a normal Wayland client.
+- **The clipboard and the keyboard:** a normal Wayland client; the person's page selection is also the session's
+  primary selection (`zwp_primary_selection_v1`), which LordOS's Speech reads aloud.
+- **Search the web:** OpenURI with the chosen engine's address (Settings → Web Apps).
+- **Spelling:** WebKit's checker with enchant and the installed hunspell dictionaries (`spellang.h`); Add to
+  Dictionary writes the person's enchant word list.
 
 ## Isolation
 
@@ -1001,6 +1046,24 @@ Notification sound and, when LordOS's sound plays, which one.
 - **Each profile's data** in Settings → Web Apps is measured again when a profile is added or starts running and every
   30 s: before, a profile added during the visit showed "none yet" until Settings was opened again, because its folder
   only exists after its first start.
+
+## Spelling (in development)
+
+lord-web turns on WebKit's own spell checker (`webkit_web_context_set_spell_checking_enabled`; WebKit checks with
+enchant and hunspell's dictionaries) in every text field of the page, underlining misspelled words as the person
+types. The languages come from one small model (`server/src/spellang.h`), the one LordOS's own text fields will share:
+the interface language's dictionary (the locale's region first, es_AR for es_AR.UTF-8, then the language's usual
+one, es_ES, pt_BR, en_US…, then any installed region) and English's, only dictionaries that are installed
+(`/usr/share/hunspell/<tag>.dic` with its `.aff`). Without one, spelling stays off and lord-web's log says so. The
+`lordos-web` package recommends `hunspell-en-us`, `hunspell-es` and `hunspell-pt-br`.
+
+WebKit's suggestions reach LordOS's context menu only on WPEPlatform (2.54): there the page script leaves a right
+click in a text field to WebKit, which asks for its own menu (the view's `context-menu`); lord-web keeps its spelling
+suggestions (at most five), Ignore Spelling and Learn Spelling (shown as Add to Dictionary, the person's enchant word
+list) and shows nothing of WebKit's. The page script's report and WebKit's request come in either order, so a text
+field's report waits for WebKit's at most 300 ms. A suggestion chosen in LordOS's menu runs WebKit's own item, which
+replaces the word. `tests/web_menu_check.c` checks this on the real engine, headless: the suggestions, the word
+replaced after the menu, and the view still taking clicks (WPE 2.48 didn't).
 
 ## Developer tools (0.8.8.9)
 

@@ -11,6 +11,52 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Web apps: a right-click menu like Chrome's, per context, and spell checking** (`server/src/web/webmenu.c`,
+  `webedit.c`, `websearch.c`, `webselect.c`, `server/src/spellang.c`, `sdk/webappsmodel.js`; in development, requested by
+  the maintainer 2026-11-26; `docs/WEBAPPS.md`, "Editing" and "Spelling"). Right-clicking selected text in a messaging
+  web app showed only Copy and Select All. Now, in LordOS's own menu style and from a closed list of item names checked
+  by `lord-web` and `lord-server`:
+  - **text field:** WebKit's spelling suggestions (up to five), Ignore Spelling, Add to Dictionary, Undo (Ctrl+Z), Redo
+    (Ctrl+Shift+Z), Cut (Ctrl+X) and Copy (Ctrl+C) with a selection, Paste (Ctrl+V), **Paste as Plain Text**
+    (Ctrl+Shift+V, also a new key: the session's text only), Select All (Ctrl+A) and **Emoji** (❖., LordOS's picker);
+  - **selected text:** Copy, **Copy Link to Highlight** (the page's address with a `#:~:text=` fragment: the whole
+    text up to 80 characters, else its first and last four words), **Search the Web for “…”** (the selection cut to 30
+    characters in the row; the person's browser opens the chosen engine's fixed search address with only the selected
+    text, up to 512 bytes, percent-encoded) and **Speech ▸** (Start Speaking ❖Esc, Stop Speaking, Save as Audio…);
+  - **link:** Open Link in Browser, Copy Link Address; **image:** Open Image in Browser, **Save Image As…**, Copy Image,
+    Copy Image Address; **video or audio:** Play/Pause, Mute/Unmute, Loop and Show Controls (checked when on), Save
+    Video As… / Save Audio As… for an http(s) source; **page:** Back (Alt+←), Forward (Alt+→) when possible, Reload
+    (Ctrl+R), Select All;
+  - **Inspect** last, only while Settings → Web Apps → Developer mode is on, with the Window menu's question.
+  - **Search engine:** Settings → Web Apps → Search the web, a closed choice of Google (the default, as Chrome),
+    DuckDuckGo, Bing or Startpage, kept in `~/.config/lordos/web/search.json` (a folder `lord.fs` can't write) through
+    the new `lord.webapps.searchEngine()` and `setSearchEngine(name)`.
+  - **Speech:** `lord-web` now makes the person's page selection the session's primary selection (Wayland's
+    `zwp_primary_selection`, once the selection settles and right after a click or key, at most 256 KB, never a
+    password field's), as a browser on Linux does; LordOS's existing Speech reads that one, so ❖Esc and the window's
+    Edit → Speech now read a web app's selection too, and a middle click pastes it elsewhere. No second voice path.
+  - **Save Image As… / Save Video As…** ask with LordOS's save dialog (the FileChooser portal's `SaveFile`), then use
+    the page's own download path into the chosen file, or, for an image the page made (`blob:`), the bytes Copy Image
+    reads. The file must be in the home folder, outside hidden folders and not a `*.desktop` launcher, also with its
+    folder's links resolved (`webdl_target_ok`).
+  - **Spelling:** `lord-web` turns WebKit's spell checker on with the dictionaries one small model picks
+    (`server/src/spellang.h`, for LordOS's own text fields later too): the interface language's (its region first) and
+    English's, only installed hunspell dictionaries. On WPEPlatform (2.54) the page script leaves a right click in a text
+    field to WebKit, which then asks for its own menu; `lord-web` takes its suggestions, Ignore Spelling and Learn
+    Spelling into LordOS's menu and shows nothing of WebKit's (on 2.48 the default stays prevented: that port took no
+    more mouse input once asked). `lordos-web` recommends `hunspell-en-us`, `hunspell-es` and `hunspell-pt-br`.
+  - **Untrusted text:** the only page strings in a menu, the selection's few words and the suggestions, are cleaned by
+    `lord-web` and again by `lord-server` (`websearch_snippet`: control characters, bidi embeddings, overrides and
+    isolates and invalid UTF-8 removed, whitespace collapsed, 30 characters and an ellipsis) and shown isolated in
+    their own direction, so the menu works in right-to-left languages. `org.lordos.WebApps1.Menu` takes two more
+    arguments, `checked` and `text`, and the spelling `guesses` (the older call is still accepted).
+  - **Left out:** Print… (WPE WebKit has no print operation and `webkit_web_view_save` writes only MHTML, so there is
+    nothing to send to the printer, and no dead item is shown), Translate (LordOS has no translator) and Cast.
+  - Words in all 35 languages (`shell.edit.*`, `webapps.search.*`, `webruntime` `save.*`). Tests: `webapp-test` (832
+    checks: the items per context, the check marks, the search address, the cleaning, the highlight link, the save
+    target, the dictionary choice), `webapps_model_test.mjs` (the rows the shell shows, Inspect only with developer
+    mode, the shell's own items) and the new headless `web-menu-check` on WPE WebKit 2.54 (WebKit's suggestions with
+    hunspell-es, a word replaced after the menu, the view still taking clicks). Not yet checked on screen.
 - **A "New desktop style" issue form for sharing a community theme** (`.github/ISSUE_TEMPLATE/new-desktop-style.yml`,
   from the lordos-theme-kit proposals, approved 2026-11-26). It has the sections the kit's `/lordos-theme publish`
   writes: name and id, description, version, licence and the LordOS release it was made for, screenshots (light, dark,

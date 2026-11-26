@@ -363,6 +363,16 @@ pre-release that never shipped. The paper marked all of it "0.8.9, in developmen
 | 5.1 | A paused Cloud account sends nothing to its provider: no mount retries, check listing, quota call, background listing or change polling (#194) | Test (`cloud-test` `t_pause`: `cloud_bring_up_ok` and the `vfs/poll-interval` call) | Not yet with a real Google account or a packet capture |
 | 5.1 | The package installs `assets/cloud/providers.json`, so verified providers read verified (#195) | Test (`cloud_model_test.mjs`: mkdeb.sh installs `assets/cloud`, the fallback) | Not yet in a built .deb |
 
+## In development after 0.8.9.6.1 (the paper's edition of 2026-11-26)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 5.4 | A web app's right-click menu has Chrome's items per context (spelling suggestions, editing, Copy Link to Highlight, Search the Web, Speech, link, image and media items, Back, Forward, Reload, Inspect with developer mode); its items are a closed list checked on both sides | Test (`build/webapp-test`: `webmenu_items` per context, `webmenu_parse`; `webapps_model_test.mjs`: the rows the shell shows, Inspect only with developer mode) | Holds in the tests; not yet on screen |
+| 5.4, 6.7 | The only page text a menu shows (the selection's few words, WebKit's suggestions) is cleaned of control and bidi characters and cut to 30 characters by `lord-web` and again by `lord-server`; a search sends only the selected text, percent-encoded, to a fixed engine address | Test (`build/webapp-test`: `websearch_snippet`, `websearch_url`, `websearch_highlight`) | Holds in the tests |
+| 5.4 | Spell checking uses the interface language's and English's installed dictionaries; WebKit's suggestions reach LordOS's menu and a chosen one replaces the word, and the view keeps taking clicks | Test (`build/webapp-test`: `spellang_choose`; `build/web-menu-check`, headless on WPE WebKit 2.54 with hunspell-es) | Holds in the tests (es_AR, 5 suggestions on the development machine) |
+| 5.4 | Save Image As… and Save Video As… write only a file in the home folder, outside hidden folders and not a launcher | Test (`build/webapp-test`: `webdl_target_ok`) | Holds in the tests |
+| 5.4 | Print and Translate are not offered | Design (WPE has no print operation; LordOS has no translator) | Design |
+
 ## 0.8.9.6.1 (released 2026-11-25; the paper's edition of that day)
 
 The paper's edition names 0.8.9.6.1 Beta as the latest release (an update of 0.8.9.6, package only) and turns "in
