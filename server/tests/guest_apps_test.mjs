@@ -40,10 +40,12 @@ eq('id parses back', [isGuestAppId(id), parseGuestAppId(id)], [true, { mid: '0f8
 eq('not ids', [parseGuestAppId('files'), parseGuestAppId('vmapp:'), parseGuestAppId('vmapp:a/b:12345678'), parseGuestAppId('vmapp:a:xyz'), isGuestAppId(5)], [null, null, null, null, false]);
 
 // which machines show: a list, the switch, never a locked one or a group's member
-eq('shows', [showsGuestApps({}, { guestApps: [{ name: 'a', token: 'a' }] }), showsGuestApps({}, { guestApps: [] }), showsGuestApps({}, {}),
+eq('shows', [showsGuestApps({}, { guestApps: [{ name: 'a', token: 'a' }], launcherApps: true }), showsGuestApps({}, { guestApps: [], launcherApps: true }), showsGuestApps({}, {}),
   showsGuestApps({}, { guestApps: [{ name: 'a', token: 'a' }], launcherApps: false }),
-  showsGuestApps({ profileLock: 'anonymity' }, { guestApps: [{ name: 'a', token: 'a' }] }),
-  showsGuestApps({ groupDir: '/m/W.lordgroup' }, { guestApps: [{ name: 'a', token: 'a' }] })], [true, false, false, false, false, false]);
+  showsGuestApps({ profileLock: 'anonymity' }, { guestApps: [{ name: 'a', token: 'a' }], launcherApps: true }),
+  showsGuestApps({ groupDir: '/m/W.lordgroup' }, { guestApps: [{ name: 'a', token: 'a' }], launcherApps: true })], [true, false, false, false, false, false]);
+// since 0.8.9.6.2 the switch is off unless turned on: a machine's saved list alone no longer puts its apps in the launcher
+eq('off by default', showsGuestApps({}, { guestApps: [{ name: 'a', token: 'a' }] }), false);
 
 const machines = [
   { dir: '/m/w.lordvm', id: 'w1', name: 'Win\u202e 11', state: 'stopped' },
@@ -54,13 +56,14 @@ const machines = [
   { dir: '/m/l.lordvm', id: 'l1', name: 'Locked by caller', state: 'stopped' },
 ];
 const apps = [{ name: 'Paint', token: 'p' }, { name: 'Notepad', token: 'n' }];
-const meta = { '/m/w.lordvm': { guestApps: apps }, '/m/u.lordvm': { guestApps: apps }, '/m/x.lordvm': { guestApps: apps }, '/m/b.lordvm': { guestApps: apps },
-  '/m/o.lordvm': { guestApps: apps, launcherApps: false }, '/m/l.lordvm': { guestApps: apps } };
+const on = { guestApps: apps, launcherApps: true };
+const meta = { '/m/w.lordvm': on, '/m/u.lordvm': on, '/m/x.lordvm': on, '/m/b.lordvm': on,
+  '/m/o.lordvm': { guestApps: apps, launcherApps: false }, '/m/l.lordvm': on };
 const items = guestLauncherItems(machines, (d) => meta[d], { active: (m) => m.state === 'running', locked: (m) => m.id === 'l1' });
 eq('entries: only the off, shown, unlocked machine', items.map((x) => [x.machine, x.name, x.token, x.kind, x.mid]), [['Win 11', 'Notepad', 'n', 'machine', 'w1'], ['Win 11', 'Paint', 'p', 'machine', 'w1']]);
 eq('entry ids', items.map((x) => x.id), [guestAppId('w1', 'n'), guestAppId('w1', 'p')]);
 eq('a broken app.json lists nothing', guestLauncherItems(machines, () => { throw new Error('x'); }), []);
-const longName = guestLauncherItems([{ dir: '/d', id: 'q', name: 'Q' }], () => ({ guestApps: [{ name: 'N'.repeat(200), token: 't' }] }));
+const longName = guestLauncherItems([{ dir: '/d', id: 'q', name: 'Q' }], () => ({ guestApps: [{ name: 'N'.repeat(200), token: 't' }], launcherApps: true }));
 eq('a long name shortened', [[...longName[0].name].length, longName[0].name.endsWith('…')], [80, true]);
 
 // the launch: only the exact token of the guest's own fresh list

@@ -199,9 +199,11 @@ export function MotionWallpaper({ display }) {
   const it = motionItems.find((x) => x.id === chosen);
   if (!path) {
     // chosen, but this machine can't play it: its still poster
-    return it && !codecs.length ? h(Image, { src: motionPoster(it), style: { position: 'absolute', left: display.x, top: display.y, width: display.w, height: display.h, objectFit: 'cover' } }) : null;
+    return it && !codecs.length ? h(Image, { src: motionPoster(it), style: { position: 'absolute', left: display.x, top: display.y, width: display.w, height: display.h, objectFit: 'cover', pointerEvents: 'none' } }) : null;
   }
-  return h(Layer, { path, rate: MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100, display, style: { position: 'absolute', left: display.x, top: display.y, width: display.w, height: display.h } });
+  // pointerEvents none: the picture is drawn over the still wallpaper, whose node takes the desktop's clicks (its right-click
+  // menu, a drop, a click that ends a selection); before 0.8.9.6.2 the video took them and the desktop's menu never opened
+  return h(Layer, { path, rate: MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100, display, style: { position: 'absolute', left: display.x, top: display.y, width: display.w, height: display.h, pointerEvents: 'none' } });
 }
 
 export const variantFor = (it, codecs, display) => pickVariant(it, codecs, display.w, display.h);
