@@ -333,12 +333,14 @@ static char *jb_take(Jb *b) {
 enum { CS_FREE = 0, CS_ASKING, CS_GRANTED, CS_DENIED, CS_STOPPED };
 static const char *const CSW[] = { "free", "asking", "granted", "denied", "stopped" };
 
+/* A client is one bus connection: its grant is that connection's and dies with it (a new connection, even with the
+ * same name, asks again). exe is the program the bus vouched for (GetConnectionUnixProcessID, /proc/<pid>/exe read by
+ * handsbus.c), shown in the prompt; the name is only what the client says it is. */
 typedef struct {
-    char bus[64], name[HANDS_NAME_MAX + 1];
+    char bus[64], name[HANDS_NAME_MAX + 1], exe[HANDS_EXE_MAX];
     int kind, st;
     unsigned long actions;
 } Client;
-typedef struct { char name[HANDS_NAME_MAX + 1]; int allow; } Grant;
 
 static struct {
     const HandsHost *h;
@@ -346,8 +348,6 @@ static struct {
     char allow[HANDS_ALLOW_MAX][HANDS_ID_MAX + 1];
     int nallow;
     Client c[HANDS_CLIENTS];
-    Grant g[HANDS_NAMES];
-    int ng;
     double person;
     int person_seen;
     unsigned long events;
@@ -380,8 +380,12 @@ char *hands_status_json(void) {
         first = 0;
         char a[32];
         snprintf(a, sizeof a, "%lu", k->actions);
-        jb_s(&b, "{\"name\":");
+        jb_s(&b, "{\"bus\":");
+        jb_q(&b, k->bus);
+        jb_s(&b, ",\"name\":");
         jb_q(&b, k->name);
+        jb_s(&b, ",\"exe\":");
+        jb_q(&b, k->exe);
         jb_s(&b, ",\"kind\":");
         jb_q(&b, hands_kind_word(k->kind));
         jb_s(&b, ",\"state\":");
@@ -423,10 +427,6 @@ static Client *client_of(const char *bus) {
     return NULL;
 }
 
-static Grant *grant_of(const char *name) {
-    for (int i = 0; i < S.ng; i++) if (!strcmp(S.g[i].name, name)) return &S.g[i];
-    return NULL;
-}
 
 void hands_serve(int on, const char *const *allow, int nallow) {
     int was = S.on;
@@ -438,20 +438,17 @@ void hands_serve(int on, const char *const *allow, int nallow) {
     else tell();
 }
 
-void hands_answer(const char *name, int allow) {
-    if (!name) return;
-    Grant *g = grant_of(name);
-    if (!g && S.ng < HANDS_NAMES) { g = &S.g[S.ng++]; snprintf(g->name, sizeof g->name, "%s", name); }
-    if (g) g->allow = allow ? 1 : 0;
-    for (int i = 0; i < HANDS_CLIENTS; i++)
-        if (S.c[i].st == CS_ASKING && !strcmp(S.c[i].name, name)) S.c[i].st = allow ? CS_GRANTED : CS_DENIED;
+void hands_answer(const char *bus, int allow) {
+    Client *k = client_of(bus);
+    if (!k || k->st != CS_ASKING) return;
+    k->st = allow ? CS_GRANTED : CS_DENIED;
     tell();
 }
 
 void hands_stop(const char *why_word) {
     (void)why_word;
     for (int i = 0; i < HANDS_CLIENTS; i++) if (S.c[i].st != CS_FREE) S.c[i].st = CS_STOPPED;
-    S.ng = 0;                                       /* every grant forgotten: the next connection asks again */
+    /* a stopped connection never acts again: the next one asks again */
     if (S.h && S.h->event) {
         char j[96];
         snprintf(j, sizeof j, "{\"t\":\"stopped\",\"why\":\"%s\"}", why_word && hands_id_ok(why_word) ? why_word : "stop");
@@ -479,7 +476,7 @@ void hands_qa(int on) {
     tell();
 }
 
-int hands_hello(const char *bus, const char *name) {
+int hands_hello(const char *bus, const char *name, const char *exe) {
     if (!bus || !bus[0] || strlen(bus) >= sizeof S.c[0].bus) return HANDS_E_ARGS;
     if (!S.h || !hands_rate_take(&S.hello, now(), 2, 8)) return HANDS_E_RATE;
     if (!S.on) return HANDS_E_OFF;
@@ -494,9 +491,9 @@ int hands_hello(const char *bus, const char *name) {
         memset(k, 0, sizeof *k);
         snprintf(k->bus, sizeof k->bus, "%s", bus);
         snprintf(k->name, sizeof k->name, "%s", clean);
+        snprintf(k->exe, sizeof k->exe, "%s", exe && exe[0] == '/' && hands_text_ok(exe, strlen(exe), HANDS_EXE_MAX - 1, 0) ? exe : "");
         k->kind = hands_kind_of(clean);
-        Grant *g = grant_of(clean);
-        k->st = S.qa ? CS_GRANTED : g ? (g->allow ? CS_GRANTED : CS_DENIED) : CS_ASKING;
+        k->st = S.qa ? CS_GRANTED : CS_ASKING;      /* every new connection asks: a grant is never a name's */
         log_call(k->kind, HANDS_C_HELLO, 0, k->st == CS_GRANTED ? HANDS_OK : k->st == CS_DENIED ? HANDS_E_DENIED : HANDS_E_ASKING, 0);
         tell();
     }
@@ -588,8 +585,8 @@ static int shell_pass(const char *op, Jb *args, char **out, int *why) {
     return code;
 }
 
-/* where a ref is: its node and the centre of its box */
-static int resolve(const char *ref, int *node, double *x, double *y, double box[4], int *why) {
+/* where a ref is: its node, the centre of its box, and whether it is a secret field */
+static int resolve(const char *ref, int *node, double *x, double *y, double box[4], int *secure, int *why) {
     Jb a = { 0 };
     jb_s(&a, "{\"ref\":");
     jb_q(&a, ref);
@@ -600,6 +597,7 @@ static int resolve(const char *ref, int *node, double *x, double *y, double box[
     int r = ask("resolve", &a, &d, why);
     if (r) return r;
     *node = (int)json_num(d.root, "node", 0);
+    if (secure) *secure = json_bool(d.root, "secure", 0);
     double bx = json_num(d.root, "x", -1), by = json_num(d.root, "y", -1), bw = json_num(d.root, "w", 0), bh = json_num(d.root, "h", 0);
     json_free(&d);
     if (*node <= 0 || bw < 1 || bh < 1) return HANDS_E_NOTFOUND;
@@ -627,46 +625,76 @@ static int allowlist_node(int node, int *why) {
     return HANDS_OK;
 }
 
-/* the field with the keyboard: never a password, never an app outside the allowlist */
-static int keys_ok(int *why) {
-    int w = S.h->keys_place ? S.h->keys_place() : 0;
-    if (w) { *why = w; return HANDS_E_REFUSED; }
-    Jb a = { 0 };
-    jb_s(&a, "{");
-    allow_json(&a);
-    jb_s(&a, "}");
-    JDoc d;
-    int r = ask("focus", &a, &d, why);
-    if (r) return r;
-    int secure = json_bool(d.root, "secure", 0), denied = json_bool(d.root, "denied", 0), ok = json_bool(d.root, "allowed", 1);
-    json_free(&d);
-    if (secure) { *why = HANDS_WHY_PASSWORD; return HANDS_E_REFUSED; }
-    if (denied) { *why = HANDS_WHY_DENIED_NODE; return HANDS_E_REFUSED; }
-    if (!ok) { *why = HANDS_WHY_ALLOWLIST; return HANDS_E_REFUSED; }
-    return HANDS_OK;
-}
+/* ---- the gate: every action passes here (pointer, drag, scroll, set-value, keys, typing) ----
+ * GATE_POINT: a place on the screen and, when a ref named it, that ref's own node: inside the desktop; not the system
+ * band, a protected or handsDeny node or an authentication prompt (the ref's node and the node hit there both); the ref
+ * really under the point (not covered by something else); never a secret field; in the allowlist. GATE_KEYS: where a
+ * key would go now: no prompt, protected window, password field or app outside the allowlist. A screenshot has its own
+ * checks (do_shot) on top of the same node places. */
+enum { GATE_POINT = 1, GATE_KEYS = 2 };
+typedef struct {
+    double x, y;
+    int ref_node;               /* 0: a bare point */
+    int secure;                 /* the ref is a secret field (the shell's resolve) */
+    int pointer;                /* the pointer moves: refused while a pointer lock holds it */
+    int node;                   /* out: the node hit */
+} Gate;
 
-static int place_ok(double x, double y, int *node, int *why) {
+static int gate(int kind, Gate *g, int *why) {
+    if (kind == GATE_KEYS) {
+        int w = S.h->keys_place ? S.h->keys_place() : 0;
+        if (w) { *why = w; return HANDS_E_REFUSED; }
+        Jb a = { 0 };
+        jb_s(&a, "{");
+        allow_json(&a);
+        jb_s(&a, "}");
+        JDoc d;
+        int r = ask("focus", &a, &d, why);
+        if (r) return r;
+        int secure = json_bool(d.root, "secure", 0), denied = json_bool(d.root, "denied", 0), ok = json_bool(d.root, "allowed", 1);
+        json_free(&d);
+        if (secure) { *why = HANDS_WHY_PASSWORD; return HANDS_E_REFUSED; }
+        if (denied) { *why = HANDS_WHY_DENIED_NODE; return HANDS_E_REFUSED; }
+        if (!ok) { *why = HANDS_WHY_ALLOWLIST; return HANDS_E_REFUSED; }
+        return HANDS_OK;
+    }
+    if (g->pointer && S.h->pointer_locked && S.h->pointer_locked()) { *why = HANDS_WHY_POINTER_LOCK; return HANDS_E_REFUSED; }
+    if (g->secure) { *why = HANDS_WHY_PASSWORD; return HANDS_E_REFUSED; }
+    if (g->ref_node && S.h->node_place) {
+        int w = S.h->node_place(g->ref_node);
+        if (w) { *why = w; return HANDS_E_REFUSED; }
+    }
     int W = 0, H = 0;
     S.h->size(&W, &H);
-    if (!(x >= 0 && y >= 0 && x < W && y < H)) { *why = HANDS_WHY_OUTSIDE; return HANDS_E_REFUSED; }
-    *node = 0;
-    int w = S.h->place(x, y, node);
+    if (!(g->x >= 0 && g->y >= 0 && g->x < W && g->y < H)) { *why = HANDS_WHY_OUTSIDE; return HANDS_E_REFUSED; }
+    g->node = 0;
+    int w = S.h->place(g->x, g->y, &g->node);
     if (w) { *why = w; return HANDS_E_REFUSED; }
-    return allowlist_node(*node, why);
+    if (g->ref_node && (!S.h->same_target || !S.h->same_target(g->node, g->ref_node))) { *why = HANDS_WHY_OBSCURED; return HANDS_E_REFUSED; }
+    return allowlist_node(g->node, why);
+}
+
+/* a ref's place, or a bare point's, through the gate */
+static int gate_ref(const char *ref, int pointer, Gate *g, int *why) {
+    memset(g, 0, sizeof *g);
+    g->pointer = pointer;
+    int rc = resolve(ref, &g->ref_node, &g->x, &g->y, NULL, &g->secure, why);
+    return rc ? rc : gate(GATE_POINT, g, why);
+}
+static int gate_xy(double x, double y, int pointer, Gate *g, int *why) {
+    memset(g, 0, sizeof *g);
+    g->x = x;
+    g->y = y;
+    g->pointer = pointer;
+    return gate(GATE_POINT, g, why);
 }
 
 static int do_pointer(const HandsReq *r, char **out, int *why) {
-    if (S.h->pointer_locked && S.h->pointer_locked()) { *why = HANDS_WHY_POINTER_LOCK; return HANDS_E_REFUSED; }
-    double x = r->x, y = r->y;
-    int ref_node = 0, node = 0, rc;
-    if (r->ref[0] && (rc = resolve(r->ref, &ref_node, &x, &y, NULL, why))) return rc;
-    if ((rc = place_ok(x, y, &node, why))) return rc;
-    if (ref_node && S.h->same_target && !S.h->same_target(node, ref_node)) { *why = HANDS_WHY_OBSCURED; return HANDS_E_REFUSED; }
-    if (r->action == HANDS_P_DRAG) {
-        int end = 0;
-        if ((rc = place_ok(r->x2, r->y2, &end, why))) return rc;
-    }
+    Gate g, e;
+    int rc = r->ref[0] ? gate_ref(r->ref, 1, &g, why) : gate_xy(r->x, r->y, 1, &g, why);
+    if (rc) return rc;
+    if (r->action == HANDS_P_DRAG && (rc = gate_xy(r->x2, r->y2, 1, &e, why))) return rc;
+    double x = g.x, y = g.y;
     S.injecting = 1;
     S.h->move(x, y);
     int n = 1;
@@ -698,11 +726,10 @@ static int do_pointer(const HandsReq *r, char **out, int *why) {
 }
 
 static int do_scroll(const HandsReq *r, int *why) {
-    if (S.h->pointer_locked && S.h->pointer_locked()) { *why = HANDS_WHY_POINTER_LOCK; return HANDS_E_REFUSED; }
-    double x = r->x, y = r->y;
-    int ref_node = 0, node = 0, rc;
-    if (r->ref[0] && (rc = resolve(r->ref, &ref_node, &x, &y, NULL, why))) return rc;
-    if ((rc = place_ok(x, y, &node, why))) return rc;
+    Gate g;
+    int rc = r->ref[0] ? gate_ref(r->ref, 1, &g, why) : gate_xy(r->x, r->y, 1, &g, why);
+    if (rc) return rc;
+    double x = g.x, y = g.y;
     int k = r->amount < 1 ? 3 : r->amount;
     S.injecting = 1;
     S.h->move(x, y);
@@ -718,7 +745,7 @@ static int do_key(const HandsReq *r, int *why) {
     HandsChord c[8];
     int n = 0;
     if (hands_chords(r->text, c, 8, &n)) return HANDS_E_ARGS;
-    int rc = keys_ok(why);
+    int rc = gate(GATE_KEYS, NULL, why);
     if (rc) return rc;
     int rep = r->repeat < 1 ? 1 : r->repeat;
     S.injecting = 1;
@@ -735,7 +762,7 @@ static int do_key(const HandsReq *r, int *why) {
 /* the text in pieces: a line break or a tab is a key of its own (Enter, Tab), and the field with the keyboard is checked
  * again after each one (a Tab may have moved it to a password field) */
 static int do_type(const HandsReq *r, int *why) {
-    int rc = keys_ok(why);
+    int rc = gate(GATE_KEYS, NULL, why);
     if (rc) return rc;
     const char *t = r->text;
     size_t n = r->text_len;
@@ -753,18 +780,15 @@ static int do_type(const HandsReq *r, int *why) {
         S.events += end - off + 1;
         if (w) { *why = w; return HANDS_E_REFUSED; }
         off = end + 1;
-        if (end < n && off < n) rc = keys_ok(why);
+        if (end < n && off < n) rc = gate(GATE_KEYS, NULL, why);
     }
     return rc;
 }
 
 static int do_setvalue(const HandsReq *r, int *why) {
-    int node = 0;
-    double x, y, box[4];
-    int rc = resolve(r->ref, &node, &x, &y, box, why);
+    Gate g;
+    int rc = gate_ref(r->ref, 0, &g, why);      /* the ref's own node, the node under it, a secret field, the allowlist */
     if (rc) return rc;
-    int hit = 0;
-    if ((rc = place_ok(x, y, &hit, why))) return rc;
     Jb a = { 0 };
     jb_s(&a, "{\"ref\":");
     jb_q(&a, r->ref);
@@ -783,8 +807,29 @@ static int do_setvalue(const HandsReq *r, int *why) {
     return HANDS_OK;
 }
 
+/* With an allowlist a screenshot shows only allowed apps: a window of one, or a region entirely inside one allowed
+ * window (never judged by its centre alone); every window of another app is blacked out in it as the system band is. */
+static int blackout(int *nodes, int max, int *n, int *why) {
+    *n = 0;
+    if (!S.nallow) return HANDS_OK;
+    Jb a = { 0 };
+    jb_s(&a, "{");
+    allow_json(&a);
+    jb_s(&a, "}");
+    JDoc d;
+    int rc = ask("blackout", &a, &d, why);
+    if (rc) return rc;
+    const JVal *l = json_get(d.root, "nodes");
+    for (const JVal *v = l && l->type == J_ARR ? l->kid : NULL; v && *n < max; v = v->next)
+        if (v->type == J_NUM && v->num > 0 && v->num < 1e9) nodes[(*n)++] = (int)v->num;
+    int over = !l || l->type != J_ARR || (int)l->len > max;
+    json_free(&d);
+    if (over) { *why = HANDS_WHY_ALLOWLIST; return HANDS_E_REFUSED; }     /* can't black out all of them: nothing taken */
+    return HANDS_OK;
+}
+
 static int do_shot(const HandsReq *r, char **out, uint8_t **png, size_t *len, int *why) {
-    int node = 0;
+    int node = 0, rc;
     double x = r->x, y = r->y, w = r->w, h = r->h;
     if (r->shot == HANDS_SHOT_WINDOW) {
         Jb a = { 0 };
@@ -794,8 +839,7 @@ static int do_shot(const HandsReq *r, char **out, uint8_t **png, size_t *len, in
         allow_json(&a);
         jb_s(&a, "}");
         JDoc d;
-        int rc = ask("window", &a, &d, why);
-        if (rc) return rc;
+        if ((rc = ask("window", &a, &d, why))) return rc;
         node = (int)json_num(d.root, "node", 0);
         x = json_num(d.root, "x", 0);
         y = json_num(d.root, "y", 0);
@@ -803,22 +847,35 @@ static int do_shot(const HandsReq *r, char **out, uint8_t **png, size_t *len, in
         h = json_num(d.root, "h", 0);
         json_free(&d);
         if (node <= 0 || w < 1 || h < 1) return HANDS_E_NOTFOUND;
+        if (S.h->node_place && (rc = S.h->node_place(node))) { *why = rc; return HANDS_E_REFUSED; }
     } else if (r->shot == HANDS_SHOT_REGION) {
         int W = 0, H = 0;
         S.h->size(&W, &H);
         if (w < 1 || h < 1 || x < 0 || y < 0 || x + w > W || y + h > H) { *why = HANDS_WHY_OUTSIDE; return HANDS_E_REFUSED; }
+        if (S.nallow) {
+            char t[160];
+            Jb a = { 0 };
+            snprintf(t, sizeof t, "{\"x\":%.0f,\"y\":%.0f,\"w\":%.0f,\"h\":%.0f,", x, y, w, h);
+            jb_s(&a, t);
+            allow_json(&a);
+            jb_s(&a, "}");
+            JDoc d;
+            if ((rc = ask("region", &a, &d, why))) return rc;
+            int inside = json_bool(d.root, "inside", 0);
+            json_free(&d);
+            if (!inside) { *why = HANDS_WHY_ALLOWLIST; return HANDS_E_REFUSED; }
+        }
     } else if (S.nallow) {
         /* with an allowlist, the whole screen is no window's: only a window or a region of one */
         *why = HANDS_WHY_ALLOWLIST;
         return HANDS_E_REFUSED;
     }
-    if (r->shot == HANDS_SHOT_REGION && S.nallow) {
-        int hit = 0, rc = place_ok(x + w / 2, y + h / 2, &hit, why);   /* a region of an allowed window */
-        if (rc) return rc;
-    }
+    static int black[HANDS_BLACK_MAX];
+    int nblack = 0;
+    if ((rc = blackout(black, HANDS_BLACK_MAX, &nblack, why))) return rc;
     char meta[256] = "";
     int iw = 0, ih = 0;
-    *png = S.h->shot(r->shot, r->display, node, x, y, w, h, r->maxdim, len, &iw, &ih, meta, sizeof meta);
+    *png = S.h->shot(r->shot, r->display, node, x, y, w, h, r->maxdim, black, nblack, len, &iw, &ih, meta, sizeof meta);
     if (!*png) return HANDS_E_FAILED;
     *out = strdup(meta[0] ? meta : "{}");
     return HANDS_OK;

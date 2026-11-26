@@ -1,7 +1,11 @@
 /* handsbus.c — org.lordos.Hands1 for lordos-mcp (see handsbus.h, docs/HANDS.md) */
 #include "handsbus.h"
 
+#include <fcntl.h>
+#include <limits.h>
+#include <signal.h>
 #include <stdio.h>
+#include <sys/syscall.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -181,7 +185,8 @@ int handsbus_parse(const DMsg *m, HandsReq *r) {
 
 typedef struct {
     char name[64];
-    int st;                         /* 0 free, 1 asking the bus, 2 same user, 3 another user */
+    int st;                         /* 0 free, 1 asking the bus its uid, 4 its pid, 2 same user, 3 another user */
+    char exe[HANDS_EXE_MAX];        /* the program the bus vouched for (its pid's /proc/<pid>/exe), "" unknown */
     uint32_t ask;
     DMsg pend;
     int has_pend;
@@ -204,6 +209,7 @@ static const char *err_name(int rc) {
     }
 }
 
+static Caller *caller_of(const char *name);
 static void serve(DConn *c, const DMsg *m) {
     HandsReq r;
     if (handsbus_parse(m, &r)) {
@@ -215,7 +221,8 @@ static void serve(DConn *c, const DMsg *m) {
     DBuf b;
     dw_init(&b);
     if (r.call == HANDS_C_HELLO) {
-        int rc = hands_hello(m->sender, r.text);
+        Caller *k = caller_of(m->sender);
+        int rc = hands_hello(m->sender, r.text, k ? k->exe : "");
         if (rc == HANDS_OK || rc == HANDS_E_ASKING) {
             dw_str(&b, rc == HANDS_OK ? "granted" : "asking");
             dbus_reply(c, m, "s", &b);
@@ -289,13 +296,51 @@ void handsbus_call(DConn *c, const DMsg *m) {
     snprintf(k->name, sizeof k->name, "%s", m->sender);
 }
 
+/* the executable of pid, only while that very process lives (a pidfd held across the read): "" otherwise */
+void handsbus_exe_of(uint32_t pid, char *out, size_t n) {
+    out[0] = 0;
+    if (!pid || pid > (uint32_t)INT_MAX || n < 2) return;
+    int pfd = (int)syscall(SYS_pidfd_open, (pid_t)pid, 0);
+    if (pfd < 0) return;
+    char link[64], exe[PATH_MAX];
+    snprintf(link, sizeof link, "/proc/%u/exe", pid);
+    ssize_t l = readlink(link, exe, sizeof exe - 1);
+    /* still the same process after the read: a pid reused meanwhile has a dead pidfd */
+    if (l > 0 && (size_t)l < n && syscall(SYS_pidfd_send_signal, pfd, 0, NULL, 0) == 0) {
+        exe[l] = 0;
+        if (exe[0] == '/' && hands_text_ok(exe, (size_t)l, n - 1, 0)) snprintf(out, n, "%s", exe);
+    }
+    close(pfd);
+}
+
+static uint32_t ask_bus(DConn *c, const char *member, const char *sender) {
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, sender);
+    DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/DBus", .iface = "org.freedesktop.DBus",
+               .member = member, .dest = "org.freedesktop.DBus", .sig = "s" };
+    uint32_t serial = dbus_send(c, &h, &b);
+    dw_free(&b);
+    return serial;
+}
+
 int handsbus_reply(DConn *c, const DMsg *m) {
     for (int i = 0; i < HANDSBUS_CALLERS; i++) {
         Caller *k = &callers[i];
-        if (k->st != 1 || k->ask != m->reply_serial) continue;
-        uint32_t uid = (uint32_t)-1;
-        if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u")) { DRd r; dr_init(&r, m); uid = dr_u32(&r); if (r.err) uid = (uint32_t)-1; }
-        k->st = uid == (uint32_t)getuid() ? 2 : 3;
+        if ((k->st != 1 && k->st != 4) || k->ask != m->reply_serial) continue;
+        uint32_t v = (uint32_t)-1;
+        if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u")) { DRd r; dr_init(&r, m); v = dr_u32(&r); if (r.err) v = (uint32_t)-1; }
+        if (k->st == 1) {
+            if (v == (uint32_t)getuid()) {
+                /* the same user: now which program it is, for the prompt (GetConnectionUnixProcessID) */
+                uint32_t serial = ask_bus(c, "GetConnectionUnixProcessID", k->name);
+                if (serial) { k->st = 4; k->ask = serial; return 1; }
+                k->st = 2;
+            } else k->st = 3;
+        } else {
+            handsbus_exe_of(v == (uint32_t)-1 ? 0 : v, k->exe, sizeof k->exe);
+            k->st = 2;
+        }
         if (k->has_pend) {
             if (k->st == 2) serve(c, &k->pend);
             else dbus_error(c, &k->pend, HANDS_ERR_ACCESS, "another user");

@@ -959,6 +959,10 @@ static int hands_place(double x, double y, int *node) {
     if (!t) return pkagent_blocks_injected(1) ? HANDS_WHY_PROMPT : 0;
     return hands_node_place(t);
 }
+static int hands_node_place_id(int id) {
+    const Node *n = id > 0 ? node_get(id) : NULL;
+    return n ? hands_node_place(n) : HANDS_WHY_OUTSIDE;
+}
 static int hands_same_target(int hit, int ref) {
     if (hit <= 0 || ref <= 0) return 0;
     const Node *h = node_get(hit), *r = node_get(ref);
@@ -1111,11 +1115,16 @@ static void hands_mark_capture(int on) {
     }
 }
 static uint8_t *hands_shot(int kind, uint32_t display, int node, double x, double y, double w, double h, int maxdim,
-                           size_t *len, int *iw, int *ih, char *meta, size_t metan) {
+                           const int *black, int nblack, size_t *len, int *iw, int *ih, char *meta, size_t metan) {
     *len = 0;
     MediaSrc *m = NULL;
     double lx = 0, ly = 0, lw = remote_server->W, lh = remote_server->H;
     hands_mark_capture(1);
+    /* with an allowlist: every other app's window too (hands.c blackout) */
+    for (int i = 0; i < nblack && hands_nmarked < HANDS_MARK_MAX; i++) {
+        Node *b = node_get(black[i]);
+        if (b && !b->protect) { b->protect = 1; hands_marked[hands_nmarked++] = b->id; }
+    }
     if (kind == HANDS_SHOT_DISPLAY) {
         const DisplayPlan *plan = display_current();
         const DisplayOut *o = NULL;
@@ -1143,7 +1152,7 @@ static uint8_t *hands_shot(int kind, uint32_t display, int node, double x, doubl
 static char *hands_shell(const char *op, const char *json) { return js_hands_call(op, json); }
 static double hands_now(void) { return now_ms(); }
 static const HandsHost hands_host_impl = {
-    hands_shell, js_hands_event, hands_size, hands_pointer_locked, hands_place, hands_same_target, hands_keys_place,
+    hands_shell, js_hands_event, hands_size, hands_pointer_locked, hands_place, hands_same_target, hands_node_place_id, hands_keys_place,
     hands_move, hands_button, hands_wheel, hands_key, hands_type, hands_shot, hands_now,
 };
 

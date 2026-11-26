@@ -8,7 +8,8 @@
  * existing paths, read an app's log. Every rule below is checked here, in C, before anything happens:
  *
  *   - off until the person turns it on for this login session (Settings → AI → Hands: lord.hands.serve, never kept on
- *     disk), and each client name asks once in a system-layer prompt ("This session" / "Deny");
+ *     disk), and each new bus connection asks in a system-layer prompt ("This session" / "Deny") that shows the name
+ *     the client gave and the program the bus vouched for (its pid's executable); a grant is that connection's alone;
  *   - Stop (the banner), the panic key (Ctrl+Alt+Esc on a real keyboard, before any JavaScript), locking the screen and
  *     turning the switch off end every client at once; a stopped client gets HANDS_E_STOPPED from then on;
  *   - the person's real input wins: for HANDS_YIELD_MS after a key, a click or a move of theirs the agent's input is
@@ -37,7 +38,8 @@
 #define HANDS_BUS_IFACE "org.lordos.Hands1"
 
 #define HANDS_CLIENTS     8         /* bus connections at once */
-#define HANDS_NAMES       16        /* client names granted or denied this session */
+#define HANDS_EXE_MAX     256       /* the program the bus vouched for, shown in the prompt */
+#define HANDS_BLACK_MAX   256       /* windows of other apps blacked out of an allowlisted screenshot */
 #define HANDS_NAME_MAX    40        /* bytes of a client's shown name */
 #define HANDS_TEXT_MAX    2000      /* bytes one Type call takes */
 #define HANDS_VALUE_MAX   2000      /* bytes of a SetValue */
@@ -156,6 +158,8 @@ typedef struct {
     int  (*place)(double x, double y, int *node);
     /* the node is ref's node, inside it, or holds it (the click lands on what the ref named) */
     int  (*same_target)(int hit, int ref_node);
+    /* 0, or HANDS_WHY_* when the node itself is one the agent never reaches (the system band, protected, handsDeny) */
+    int  (*node_place)(int node);
     /* 0, or HANDS_WHY_* when a key now would go to a place the agent never reaches (a Linux app's password field, a
      * protected window, an authentication prompt) */
     int  (*keys_place)(void);
@@ -167,8 +171,9 @@ typedef struct {
     int  (*type)(const char *text, size_t n);       /* 0, or HANDS_WHY_* stopped part-way */
     /* a PNG (malloc'd) of a display, a window's node or a logical region, the system layer and denied nodes black; *w,
      * *h its size; meta gets {"x","y","w","h","scale"} of the logical area it shows. NULL on failure. */
+    /* black: more nodes painted as the protected fill (other apps' windows, with an allowlist) */
     uint8_t *(*shot)(int kind, uint32_t display, int node, double x, double y, double w, double h, int maxdim,
-                     size_t *len, int *iw, int *ih, char *meta, size_t metan);
+                     const int *black, int nblack, size_t *len, int *iw, int *ih, char *meta, size_t metan);
     double (*now)(void);                            /* ms, monotonic */
 } HandsHost;
 
@@ -180,8 +185,8 @@ const HandsHost *hands_host(void);
 /* Settings → AI → Hands: on for this session, and the allowlist (app ids, "" none = every app) */
 void hands_serve(int on, const char *const *allow, int nallow);
 int  hands_on(void);
-/* the person's answer to the prompt for a client name: 1 This session, 0 Deny */
-void hands_answer(const char *name, int allow);
+/* the person's answer to the prompt for one connection (its unique bus name): 1 This session, 0 Deny */
+void hands_answer(const char *bus, int allow);
 /* the banner's Stop (and turning it off): every client stopped, every grant forgotten */
 void hands_stop(const char *why_word);
 /* the panic key: hands_stop, and Hands off for the session */
@@ -197,13 +202,14 @@ int  hands_qa_mode(void);
 /* the agent's input is being delivered now (lord.hands.injecting) and how many events it has sent */
 int  hands_injecting(void);
 unsigned long hands_ai_events(void);
-/* {"on","qa","allow":[…],"clients":[{"name","kind","state","actions"}],"events"} for the shell */
+/* {"on","qa","allow":[…],"clients":[{"bus","name","exe","kind","state","actions"}],"events"} for the shell */
 char *hands_status_json(void);
 
 /* ---- a bus client (handsbus.c) ---- */
 
-/* the client named itself: HANDS_OK granted, HANDS_E_ASKING (a prompt is up), or an error */
-int  hands_hello(const char *bus, const char *name);
+/* the client named itself; exe is what the bus vouched for ("" unknown): HANDS_OK granted, HANDS_E_ASKING (a prompt
+ * is up), or an error */
+int  hands_hello(const char *bus, const char *name, const char *exe);
 void hands_gone(const char *bus);           /* left the bus */
 void hands_lost(void);                      /* the bus went away */
 /* 0 when that client may act now (on, granted, not stopped, not throttled for this kind); else HANDS_E_* */

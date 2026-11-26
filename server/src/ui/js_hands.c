@@ -2,9 +2,9 @@
  * own JS context (never an isolated app's broker, never a community theme's restricted lord):
  *
  *   lord.hands.serve(on, allow)    Settings → AI → Hands: on for this session, the allowlist (app ids, at most 16)
- *   lord.hands.answer(name, yes)   the system layer's prompt: "This session" (true) or "Deny" (false) for a client name
+ *   lord.hands.answer(bus, yes)    the system layer's prompt: "This session" (true) or "Deny" (false) for one connection
  *   lord.hands.stop()              the banner's Stop: every client stopped, every grant forgotten
- *   lord.hands.status()            {on, qa, allow, clients: [{name, kind, state, actions}], events}
+ *   lord.hands.status()            {on, qa, allow, clients: [{bus, name, exe, kind, state, actions}], events}
  *   lord.hands.injecting()         the input being handled now is the agent's (it is counted in status().events)
  *
  * lord-server calls the shell back through __lordHands(op, json) (the tree, refs, windows, opening; sdk/hands.jsx) and
@@ -39,10 +39,9 @@ static JSValue f_serve(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
 static JSValue f_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 2) return JS_UNDEFINED;
-    const char *name = JS_ToCString(c, argv[0]);
-    char clean[HANDS_NAME_MAX + 1];
-    if (name && !hands_clean_name(name, clean, sizeof clean)) hands_answer(clean, JS_ToBool(c, argv[1]) > 0);
-    if (name) JS_FreeCString(c, name);
+    const char *bus = JS_ToCString(c, argv[0]);
+    if (bus && bus[0] == ':' && strlen(bus) < 64) hands_answer(bus, JS_ToBool(c, argv[1]) > 0);
+    if (bus) JS_FreeCString(c, bus);
     return JS_UNDEFINED;
 }
 
