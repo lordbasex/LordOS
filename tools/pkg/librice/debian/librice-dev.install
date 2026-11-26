@@ -1,0 +1,5 @@
+usr/include/rice/*
+usr/lib/*/librice-proto.so
+usr/lib/*/librice-io.so
+usr/lib/*/pkgconfig/rice-proto.pc
+usr/lib/*/pkgconfig/rice-io.pc

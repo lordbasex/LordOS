@@ -1,0 +1,37 @@
+Source: librice
+Section: libs
+Priority: optional
+Maintainer: LordOS <lord.basex@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               cargo (>= 1.85),
+               rustc (>= 1.85),
+               cargo-c,
+               libssl-dev,
+               pkgconf
+Standards-Version: 4.7.2
+Homepage: https://github.com/ystreet/librice
+Rules-Requires-Root: no
+
+Package: librice0
+Architecture: linux-any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: ICE (RFC 8445) library, C API of rice-proto and rice-io
+ librice implements Interactive Connectivity Establishment (ICE, RFC 8445),
+ the way WebRTC peers find a network path to each other, with STUN and TURN.
+ .
+ This package contains the shared libraries librice-proto (the protocol,
+ sans I/O) and librice-io (sockets and timers), used by LordOS's build of
+ WPE WebKit to run WebRTC's ICE in WebKit's network process.
+
+Package: librice-dev
+Section: libdevel
+Architecture: linux-any
+Multi-Arch: same
+Depends: librice0 (= ${binary:Version}), ${misc:Depends}
+Description: ICE (RFC 8445) library, C API of rice-proto and rice-io - development files
+ librice implements Interactive Connectivity Establishment (ICE, RFC 8445),
+ the way WebRTC peers find a network path to each other, with STUN and TURN.
+ .
+ This package contains the headers (rice-proto.h, rice-io.h) and the
+ pkg-config files (rice-proto, rice-io).

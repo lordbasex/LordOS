@@ -57,8 +57,10 @@ The releases page is the project's public changelog: every release is documented
    once `web/content/downloads.json` names an ISO newer than the card's tag ([VIRTUALIZATION.md](VIRTUALIZATION.md),
    3.9, "The LordOS card").
 
-   **Web apps' Browser identity** (0.8.8.9): set `WEBPAGE_CHROME_MAJOR`, `WEBPAGE_EDGE_MAJOR` and `WEBPAGE_FIREFOX_MAJOR`
-   in `server/src/web/webpage.h` to the current stable desktop majors (Chrome's from the Chrome Releases blog, Edge's
+   **Web apps' Browser identity** (0.8.8.9): set `WEBPAGE_CHROME_FULL` (Chrome's whole stable version, e.g.
+   `158.0.8127.36`: the Client Hints and `navigator.userAgentData` send it, `webua.h`), `WEBPAGE_CHROME_MAJOR` (its
+   first number; `build/webua-test` fails when they disagree), `WEBPAGE_EDGE_MAJOR` and `WEBPAGE_FIREFOX_MAJOR`
+   in `server/src/web/webpage.h` to the current stable desktop versions (Chrome's from the Chrome Releases blog, Edge's
    from its Stable channel release notes, Firefox's from its release notes) and update the strings quoted in `docs/WEBAPPS.md` ("Browser identity") and in the
    changelog entry if they changed. A stale major is what makes sites treat a browser as outdated. `build/webapp-test`
    checks only that the numbers are plausible, never the date, so this step is the only reminder.

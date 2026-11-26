@@ -418,9 +418,38 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   system's identity), picked from a closed list in Settings (never typed), in this order. `<version>` is always
   `LORD_VERSION`, the installed LordOS's, never written by hand.
   - `chrome`, **Chrome on Linux**, the default (a profile without the key):
-    `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36`,
+    `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36`,
     exactly what desktop Chrome on Linux sends, nothing added. Chrome's reduced user agent says `Linux x86_64` on
-    every Linux, an ARM one too, so this string is the same on `aarch64`.
+    every Linux, an ARM one too, so this string is the same on `aarch64`. Since the calls work (in development,
+    "Calls" below) Chrome is also Chrome in the two other places sites look, from the same table
+    (`webua.h`, `webua.c`; Chrome's whole version `WEBPAGE_CHROME_FULL`, `158.0.8127.36`, next to the string's major in
+    `webpage.h`): the **User-Agent Client Hints** on the page's requests and **`navigator.userAgentData`**. Both are
+    exactly what Chrome 158 on Linux sent and answered on 2026-11-25 (a throwaway profile against a local echo server):
+    - every request to a secure origin (https, or http on localhost) carries `Sec-CH-UA: "Chromium";v="158",
+      "Not.A/Brand";v="24", "Google Chrome";v="158"`, `Sec-CH-UA-Mobile: ?0` and `Sec-CH-UA-Platform: "Linux"`. The
+      third brand ("GREASE") and the order change with each major, worked out as Chromium does
+      (`webua_brands`; checked for 120, 124 and 158);
+    - after the app's own site sends `Accept-CH` (read on the main frame's responses inside the app's scope and on its
+      origin only, `webcall_hints_site`, kept in the profile's `state.json`, `clientHints`, as Chrome keeps it; another
+      site's, a sign-in's or a redirect's, is neither kept nor logged, so no trail of other sites is written), that
+      site's own requests also carry the ones it named:
+      `Sec-CH-UA-Full-Version-List` (`"Chromium";v="158.0.8127.36", "Not.A/Brand";v="24.0.0.0", "Google
+      Chrome";v="158.0.8127.36"`), `-Full-Version`, `-Platform-Version` (`""`), `-Arch` (`"x86"`; `"arm"` on
+      `aarch64`), `-Bitness` (`"64"`), `-Model` (`""`), `-WoW64` (`?0`), `-Form-Factors` (`"Desktop"`). Another site's
+      requests from that page carry only the first three (no Permissions-Policy delegation, a limit);
+    - `navigator.userAgentData` in a secure context (brands, `mobile` false, `platform` "Linux", `getHighEntropyValues()`
+      with the same values in a dictionary's order, `toJSON()`), the `NavigatorUAData` interface (not constructible), and
+      `navigator.vendor` "Google Inc." (WebKit says "Apple Computer, Inc."). `navigator.platform` stays WebKit's
+      ("Linux x86_64" on a PC, as Chrome; "Linux aarch64" on a Pi). Not in workers: the script reaches frames only.
+    The headers come from **`lord-web-ext.so`** (`webext.c`), WebKit's web process extension, because no API of the
+    UI process can add a header to every request: WebKit loads it only from `lord-web-ext/` next to lord-web
+    (`/usr/lib/lordos/bin/lord-web-ext/`, a folder lord-web names itself from `/proc/self/exe`), inside the web process's
+    sandbox, and it only adds those headers in `send-request`, from what lord-web tells it (Chrome or not, the machine,
+    each site's hint bits, all checked again there). The script is `webua.js`, in the page's world with no privileges
+    and no message handler (`webhints.c`); its functions read as native code, as Chrome's do. Other identities get
+    neither (Firefox sends no hints; Edge's own brands and LordOS's are not made up), and switching identity adds or
+    removes both at once. Checked by `build/webua-test` (the table, GREASE, every header, Accept-CH, the state file)
+    and `tests/webcalls_check.py` (the real engine against Chrome 158's captured headers and values).
   - `edge`, **Edge on Linux**: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)
     Chrome/158.0.0.0 Safari/537.36 Edg/158.0.0.0`, what desktop Edge on Linux sends, without LordOS's token. For the
     office, mail and team chat sites of Edge's own maker, which expect it.
@@ -687,6 +716,110 @@ doesn't play a second sound. lord-web remembers it for the profile (`state.json`
 first time nothing waits or guesses. notifyd passes `suppress-sound` to the shell, which then shows the banner
 silently.
 
+## Calls (in development; approved by the maintainer on 2026-11-25)
+
+Voice and video calls in web apps (a messaging web app first, also video meeting sites), for the release after
+0.8.9.6.2. What a call needs, and where each piece is:
+
+- **WebRTC in the engine.** Debian builds WPE WebKit without WebRTC, so `RTCPeerConnection` didn't exist. LordOS's
+  build `2.54.3-1~lordos13+3` turns it on with WebKit's GStreamer backend (GStreamer 1.26's `webrtcbin`; ICE by libnice,
+  `gstreamer1.0-nice`; DTLS, SRTP and SCTP from plugins-bad; Opus, VP8, H.264 through OpenH264) ([WPEWEBKIT.md](WPEWEBKIT.md)).
+  `lordos-web` depends on `gstreamer1.0-nice`. Checked 2026-11-25 on amd64 (`tests/webcalls_check.py` in the build's test
+  chroot, WebKit's sandbox on): `RTCPeerConnection`, `RTCRtpSender.getCapabilities` and `RTCRtpScriptTransform` exist;
+  the engine offers audio `opus`, `PCMU`, `PCMA`, `telephone-event` and video `H264`, `VP8`, `VP9` (Chrome 158 also has
+  `red`, `G722`, `CN`, `AV1`, `rtx`, `ulpfec`); `createEncodedStreams`, `MediaStreamTrackProcessor`/`Generator`,
+  `WebTransport` and `setSinkId` don't exist (Chrome has them).
+- **SharedArrayBuffer when the site is cross-origin isolated.** A messaging web app checks, before it offers calls,
+  `SharedArrayBuffer`, `Atomics` and `RTCPeerConnection` (its own gating code, read 2026-11-25), and its page is served
+  with COOP `same-origin` and COEP `require-corp`. WPE never had SharedArrayBuffer: WebKit gives such a page a web
+  process of its own but only its Cocoa ports turned SharedArrayBuffer on there. LordOS's build does the same on Linux
+  (`lordos-sharedarraybuffer-coi.patch`), so SharedArrayBuffer exists only in cross-origin-isolated pages, as in
+  Chrome and Safari (Spectre: never for a page that isn't isolated). lord-web drops `JSC_*` from its environment, so
+  nothing turns it on for every page.
+- **Chrome's identity, all of it** ("Browser identity" above): the site reads the User-Agent string, the Client Hints
+  and `navigator.userAgentData`, and treats a WebKit it recognises differently (another code path for calls); with the
+  Chrome identity all three say Chrome 158 on Linux, from one table.
+- **Microphone and camera** ("Permissions" above): the page's `getUserMedia` reaches lord-web as WebKit's permission
+  request and is answered from the registry or by LordOS's own prompt (`Ask`, lord-server's dialog), once per app,
+  revocable in Settings → Web Apps (Camera, Microphone, Screen). The page lists devices (`enumerateDevices`, with
+  names) only once one of them is allowed, and chooses among them with its own picker; LordOS Studio's virtual camera
+  is one of them when it is on. WebKit captures the microphone through PulseAudio (pipewire-pulse) from its sandboxed
+  web process, which the capture indicator already shows under the web app (PRIVACY.md); the camera WebKit opens through
+  V4L2 (`/dev/video*`, which WebKit's sandbox binds for the web process), which the indicator doesn't see
+  (PRIVACY.md, "Not covered"): lord-web logs WebKit's own capture state (`capture: camera on`) and a way for it to tell
+  the indicator is proposed for the maintainer's review (a new lord-web → lord-server method, not built).
+- **The network: ICE in WebKit's network process (librice, `+4`).** WebKit's web process has no network of its own
+  (bubblewrap's `--unshare-net`, unchanged). With `+3` WebKit's GStreamer backend ran ICE (libnice) inside it, saw only
+  the sandbox's loopback interface, ignored it and gathered no candidate at all, so nothing connected. The maintainer
+  chose librice on 2026-11-25: with `-DUSE_LIBRICE=ON` WebCore's ICE agent speaks librice's protocol and every ICE
+  socket (UDP, and TCP for ICE-TCP and TURN over TCP/TLS) is opened by WebKit's **network process**, which already has
+  the network for every page load and runs in lord-web's firewall scope like the rest of the app; the web process keeps
+  none. LordOS builds librice for Debian 13 ([WPEWEBKIT.md](WPEWEBKIT.md), "librice"). Checked 2026-11-25 on amd64 in
+  the build's test chroot with WebKit's sandbox on (`tests/webcalls_check.py --webrtc`): the two peer connections of
+  one page gather host candidates (4 UDP, 8 TCP) and connect in 300 to 400 ms, with Opus and VP8 (215 to 221 audio
+  packets, 64 to 67 frames of 320×240 in 4 s), and again with Opus and H.264; the audio comes from WebKit's mock
+  microphone (`WEBCALLS_MOCK_CAPTURE=1`, test only), the video from a canvas.
+- **TURN URLs with `?transport=`.** WebKit 2.54's `RTCPeerConnection` refused every TURN server URL with a query (an
+  inverted check), and sites hand out `turn:host:443?transport=tcp` (RFC 7065): a video meeting site's page threw
+  `SyntaxError` when it created its connection. `lordos-turn-transport-query.patch` (`+4`) accepts exactly
+  `transport=udp` and `transport=tcp`, which the ICE agent reads; `tests/webcalls_check.py` checks both and that another
+  query is still refused.
+- **Against Chrome, and where calls stop today** (2026-11-26, amd64, `+4` in the build's test chroot with WebKit's sandbox
+  on, Chrome 158 headless on the same machine with its fake camera and microphone; `tests/webcalls_pair.py`, a
+  signaling server of its own, and `tests/webcalls_jitsi.py`, by hand):
+  - **lord-web's engine offers, one transport (`bundlePolicy: 'max-bundle'`): works.** Connected in 201 ms over
+    host/UDP; both directions carry audio and video: lord-web's engine received 552 Opus packets and 221 H.264 frames of
+    640×480 and sent 772 and 300 in 15 s; its call log said `connection connected`, `out audio audio/OPUS`, `out video
+    video/H264 640x480 30 fps`, `in video …`, `in audio …`.
+  - **It offers with WebKit's default (`balanced`, a transport per media):** video flows both ways (about 690 frames of
+    640×480 each way) but the audio transport never connects, so neither side hears and both stay `connecting`.
+  - **Chrome offers, lord-web's engine answers:** the answer picks PCMU instead of the Opus Chrome offered first, video
+    doesn't flow and Chrome receives nothing. WebKit names Opus `OPUS` in its own capabilities; the answer's matching of
+    the offer's `opus` is the first suspect.
+  - **A public video meeting server (Jitsi Meet, through its video bridge, which offers):** the page joins, ICE
+    connects, but the bridge re-offers about 4 times a second (a renegotiation loop: 242 offers in 55 s) and DTLS never
+    finishes (WebKit's DTLS client hello goes out six times with no answer), so no media either way. TURN through librice
+    fails too (`LongTermClientAuthError { reason: UnsupportedFeature }`: WebKit asks librice for TURN's anonymous-username
+    feature as required). Two headless Chromes through the same server, the same way, exchange 720p VP9 and Opus both ways.
+  - So a call works today when the page offers with one transport; the answering side, several transports and the
+    bridge's renegotiation are WebKit GStreamer WebRTC bugs still to fix (or to take from a newer WebKit) before a
+    messaging web app's calls can be expected to work. Not yet tried with the messaging app itself (it needs the
+    maintainer's account).
+- **The call log** (`webcall.h`, `webcall.c`, `webcalls.c`, `webcall.js`): lines starting `webcall: ` in the app's log
+  (`web/<app>-<profile>.log` in the user's log folder, docs/SYSTEM.md "Log files"; the Logs app and `lordos-issue` show
+  it), always on, at most 60 a minute. They say what the page has for calls, each peer connection, its ICE gathering,
+  ICE connection, connection and signaling states, once connected (and every 5 minutes) the codec, size and frame rate
+  of each direction and the kinds of ICE candidates in use, errors by name and the call that failed, `getUserMedia` and
+  `getDisplayMedia` (what, the result, the error's name, each device as a closed word: `built-in`, `usb`,
+  `bluetooth`, `virtual`, `lordos-studio`, `other`), the permission answers, WebKit's capture state, and the Client
+  Hints the app's own site asked for. Never SDP, ICE candidates, addresses, ports, tokens, ids, phone numbers, device
+  labels, other sites' addresses or anything said in the call: the page-side script sends only fixed fields, and
+  `webcall_line` checks each against a closed list or pattern again and drops the rest. Example:
+
+  ```
+  webcall: page: crossOriginIsolated yes, SharedArrayBuffer yes, Atomics yes, RTCPeerConnection yes, getUserMedia yes
+  webcall: client hints asked by the app: sec-ch-ua-full-version-list, sec-ch-ua-arch, sec-ch-ua-bitness
+  webcall: permission microphone: allowed (asked)
+  webcall: getUserMedia audio: granted (audio usb)
+  webcall: capture: microphone on
+  webcall: peer connection 1 created
+  webcall: peer connection 1: ice-gathering gathering
+  webcall: peer connection 1: ice-connection checking
+  webcall: peer connection 1: connection failed
+  ```
+
+  The page-side script (`webcall.js`, the app's main frame, the page's world) only watches: `RTCPeerConnection` stays
+  the engine's (a proxy that constructs the same object; `instanceof`, statics and `constructor` unchanged), its
+  methods are the engine's called through, every function reads as native code, and nothing is added that the engine
+  lacks. It reports through a DOM event with a name random per process to a bridge in lord-web's own isolated world
+  (`lordos-web-call`), the only world with the `lordosCall` message handler: the page never sees a
+  `webkit.messageHandlers` of lord-web's.
+- **Tests:** `build/webua-test` (the line for each kind of report, what is dropped: an address, SDP, a candidate, an
+  unknown kind or word, a label; the device words; the rate; only the app's own site's Client Hints kept),
+  `tests/webcalls_check.py` with `build/webcalls-check` (the real engine, headless, WebKit's sandbox on: Chrome's
+  identity, SharedArrayBuffer only when isolated, and with `--webrtc` the loopback below), also run by
+  `tools/pkg/wpewebkit-chroot.sh`'s test on the WebRTC build.
+
 ## What `lord-web` uses of the session (like any Linux app)
 
 - **Files:** WebKit's file chooser goes through the FileChooser portal. Downloads go to the XDG Downloads folder only,
@@ -726,7 +859,8 @@ silently.
     with an unknown key, a wrong type, a bad id or address, a scope that isn't a prefix of `startUrl` or not on
     `origin`, or an app or profile that isn't the one asked for (`webargs.c`, `webreg.c`, `weburl.c`, tested by
     `tests/webapp_test.c`); and when `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS` is set. It drops the variables that
-    point WebKit or GStreamer at other code (`WEBKIT_*`, `WPE_*`, `GST_PLUGIN*`, `GIO_EXTRA_MODULES`, `LD_PRELOAD`…).
+    point WebKit or GStreamer at other code (`WEBKIT_*`, `WPE_*`, `GST_PLUGIN*`, `GIO_EXTRA_MODULES`, `LD_PRELOAD`…)
+    and JavaScriptCore's options (`JSC_*`: `JSC_useSharedArrayBuffer` would give every page SharedArrayBuffer, "Calls").
 - **What a page never gets:** no `lord.*`, no broker, no script injected with privileges. The one script of lord-web's
   a page can see is the clipboard's `write` and `writeText` that WPE lacks, and what it hands over reaches the
   session only right after the person's own key or click in the window. The files of a drop are only the ones the
@@ -1006,4 +1140,4 @@ When the app's own page (an address inside its `scope`) can't load for lack of n
 - Dark mode through CSS alone: pages that choose their colors only with `@media (prefers-color-scheme)` rules stay
   light (WPE 2.48 has no API for the scheme; "Light and dark" above). Scripts that ask `matchMedia` follow the desktop.
   For the same reason Light and Dark per app are held back until the move to WPEPlatform.
-- WhatsApp Web's calls: they depend on WPE's WebRTC and on the service. Still to check.
+- Calls: in development ("Calls" above).

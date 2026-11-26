@@ -72,6 +72,62 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   A moving wallpaper's or a Studio background's download failed the same way. `PROGRESS` is now a progress line:
   `onLog` gets `PROGRESS <n>` (what `sdk/motion.jsx` and `sdk/studiobg.js` already parse), and only `OK` or `ERR`
   settles a request. Found while testing the 0.8.9.6.2 gallery. Test: `server/tests/admin_js_test.mjs`.
+### Added
+- **Web apps: the groundwork for voice and video calls (in development; approved by the maintainer on 2026-11-25).**
+  docs/WEBAPPS.md, "Calls".
+  - **WebRTC in LordOS's WPE WebKit build** `2.54.3-1~lordos13+3` (`tools/pkg/wpewebkit-chroot.sh`, docs/WPEWEBKIT.md):
+    `-DENABLE_WEB_RTC=ON` with WebKit's GStreamer backend (`webrtcbin`, `USE_GSTREAMER_WEBRTC`; librice off, not in
+    Debian 13), MediaStream written out, Build-Depends `libssl-dev` (WebCore links `libcrypto` for SFrame), and
+    `libwpewebkit-2.0-1` Recommends `gstreamer1.0-nice`, `gstreamer1.0-plugins-bad`, `-good` and `-base`. The test
+    checks that the library links `libgstwebrtc-1.0` and runs the call checks below. `lordos-web` depends on
+    `gstreamer1.0-nice`. Built and tested on amd64 on 2026-11-25 (lintian 0 errors; every earlier check passes):
+    `RTCPeerConnection` exists, with Opus, PCMU, PCMA, H.264, VP8 and VP9.
+  - **ICE in WebKit's network process, with librice** (`2.54.3-1~lordos13+4`, approved by the maintainer on
+    2026-11-25): with `+3` ICE ran in the web process, which has no network in WebKit's sandbox, and gathered no
+    candidate. `-DUSE_LIBRICE=ON` moves every ICE socket to WebKit's network process; the web process keeps none.
+    librice isn't in Debian 13, so LordOS builds it: `tools/pkg/build-librice.sh` makes `librice 0.4.3-1~lordos13+1`
+    (`librice0`, `librice-dev`) from upstream's tag and the 291 crates its `Cargo.lock` pins, vendored once
+    (reproducible: the same SHA-256 twice) and pinned in `tools/pkg/librice.sums`, built offline, with cbindgen 0.29.2
+    vendored too (Debian 13's cargo-c writes empty headers for Rust 2024 code), the vendored crates' prebuilt binaries
+    removed, `debian/copyright` generated from each crate's license, and a C test of both libraries; its source package
+    is published next to WebKit's. `build-wpewebkit.sh` takes it with `EXTRA_DEBS`. Checked in the build's test chroot
+    with WebKit's sandbox on: two peer connections in one page connect in 300 to 400 ms with Opus and VP8, and with Opus
+    and H.264, audio and video arriving.
+  - **Against Chrome 158 (headless, fake devices):** when lord-web's engine offers with one transport the call connects in
+    about 200 ms and carries Opus and H.264 640×480 both ways; with a transport per media the audio never connects; when
+    Chrome offers, the answer picks PCMU and nothing reaches Chrome; through a public video meeting server's bridge, ICE
+    connects but DTLS never finishes amid a renegotiation loop. These WebKit GStreamer WebRTC bugs are still open
+    (docs/WEBAPPS.md, "Calls").
+  - **TURN URLs with `?transport=udp|tcp` accepted** (`lordos-turn-transport-query.patch`, `+4`): WebKit's check was
+    inverted and refused every TURN URL with a query, so a video meeting site's `new RTCPeerConnection()` threw
+    `SyntaxError`.
+  - **SharedArrayBuffer for cross-origin-isolated pages only** (`lordos-sharedarraybuffer-coi.patch` in the same build):
+    WebKit already starts a web process of its own for a page served with COOP `same-origin` and COEP `require-corp`;
+    the patch turns SharedArrayBuffer on in that process only (`JSC_useSharedArrayBuffer`, removed from every other
+    process's environment), as WebKit already did on its other platforms. A messaging web app requires it for calls.
+    lord-web now drops every `JSC_*` variable, so nothing can turn it on for every page.
+  - **Chrome's User-Agent Client Hints and `navigator.userAgentData`** for a profile whose Browser identity is Chrome
+    (`server/src/web/webua.h`, `webua.c`, `webua.js`, `webhints.c`, `webext.c`): `Sec-CH-UA` (Chromium's own brand
+    order and "GREASE" brand for the version, `"Chromium";v="158", "Not.A/Brand";v="24", "Google Chrome";v="158"`),
+    `Sec-CH-UA-Mobile: ?0` and `Sec-CH-UA-Platform: "Linux"` on every request to a secure origin; the high-entropy
+    hints (`-Full-Version-List`, `-Full-Version`, `-Platform-Version`, `-Arch`, `-Bitness`, `-Model`, `-WoW64`,
+    `-Form-Factors`) only after the app's own site asked with `Accept-CH`, kept in the profile's `state.json`
+    (`clientHints`); `navigator.userAgentData` (brands, mobile, platform, `getHighEntropyValues()`, `toJSON()`) and
+    `navigator.vendor` "Google Inc.". All of it, and the User-Agent string, from one table:
+    `WEBPAGE_CHROME_FULL` `158.0.8127.36` next to `WEBPAGE_CHROME_MAJOR` in `webpage.h` (Chrome's major moves from
+    157 to 158; docs/RELEASING.md now bumps the whole version). Values checked against what Chrome 158 on Linux sent and
+    answered. The headers come from `lord-web-ext.so`, a WebKit web process extension that WebKit loads only from
+    `lord-web-ext/` next to lord-web (`/usr/lib/lordos/bin/lord-web-ext/` in `lordos-web`): it only adds those headers.
+    Other identities are unchanged.
+  - **A call log**: lines starting `webcall: ` in the web app's own log (`server/src/web/webcall.h`, `webcall.c`,
+    `webcalls.c`, `webcall.js`): what the page has for calls (crossOriginIsolated, SharedArrayBuffer, Atomics,
+    RTCPeerConnection, getUserMedia), each peer connection with its ICE and connection states, codecs, video size and
+    frame rate, the kinds of ICE candidates in use, errors by name, getUserMedia and getDisplayMedia with the kind of
+    each device in closed words (never its label), the permission answers, WebKit's capture state and the Client Hints
+    the app's own site asked for. Never SDP, candidates, addresses, tokens, phone numbers, device labels or other
+    sites. Always on, at most 60 lines a minute; each field checked in C against a closed list.
+  - Tests: `build/webua-test` (153 checks), `build/webcalls-check` with `tests/webcalls_check.py` (in
+    `make -C server test` and the WPE build's own test).
 
 ### Changed
 - **Moving wallpapers cost a fraction of what they did** (docs/MOVING-WALLPAPERS.md). Measured by the maintainer with

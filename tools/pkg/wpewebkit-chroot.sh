@@ -54,7 +54,89 @@ backport() {
 	   -DENABLE_WPE_PLATFORM_DRM=OFF \\\
 	   -DENABLE_WPE_PLATFORM_HEADLESS=ON \\\
 	   -DENABLE_WPE_PLATFORM_WAYLAND=ON \\\
-	   -DENABLE_WPE_LEGACY_API=ON/' debian/rules
+	   -DENABLE_WPE_LEGACY_API=ON \\\
+	   -DENABLE_MEDIA_STREAM=ON \\\
+	   -DENABLE_WEB_RTC=ON \\\
+	   -DUSE_GSTREAMER_WEBRTC=ON \\\
+	   -DUSE_LIBRICE=ON/' debian/rules
+    #    WebRTC (maintainer's decision, 2026-11-25: voice and video calls in web apps): WebKit's GStreamer backend
+    #    (webrtcbin, GStreamer 1.26's), not Google's libwebrtc, and getUserMedia (MediaStream, on by default, written
+    #    out). Its only new build dependency is OpenSSL 3 (libssl-dev: WebCore links libcrypto for SFrame); webrtcbin's
+    #    own pieces come at run time: libnice's ICE (gstreamer1.0-nice), DTLS, SRTP and SCTP (plugins-bad), RTP,
+    #    VP8 and Opus (plugins-good and -base), H.264 through OpenH264 (plugins-bad). ICE with librice (+4, maintainer's
+    #    decision of 2026-11-25): WebKit then runs ICE and its UDP and TCP sockets in its network process, which has the
+    #    network already, and the web process keeps none (bubblewrap's --unshare-net, unchanged). librice isn't in
+    #    Debian 13: LordOS builds it (tools/pkg/build-librice.sh) and this build installs it from EXTRA_DEBS
+    grep -q '^               libgstreamer-plugins-bad1.0-dev,$' debian/control || die "debian/control changed: the Build-Depends anchor is gone"
+    sed -i 's/^               libgstreamer-plugins-bad1.0-dev,$/               libgstreamer-plugins-bad1.0-dev,\
+               libssl-dev,\
+               librice-dev (>= 0.4.3),/' debian/control
+    #    what WebRTC needs at run time, as Recommends of the library (like any GStreamer element WebKit loads)
+    awk '/^Package: libwpewebkit-2.0-1$/ { p = 1 } p && /^Suggests:/ { print "Recommends: gstreamer1.0-nice, gstreamer1.0-plugins-bad, gstreamer1.0-plugins-good, gstreamer1.0-plugins-base"; p = 0 } { print }' \
+        debian/control > debian/control.new && mv debian/control.new debian/control
+    grep -q '^Recommends: gstreamer1.0-nice' debian/control || die "could not add the WebRTC Recommends to debian/control"
+    #    SharedArrayBuffer only for cross-origin-isolated documents (COOP same-origin + COEP require-corp), as Safari and
+    #    Chrome do: WebKit already gives such a document a web process of its own (CrossOriginMode::Isolated) but only
+    #    its Cocoa launcher turns SharedArrayBuffer on there; this does the same in the GLib launcher (JSC's
+    #    useSharedArrayBuffer in that process's environment, and removed from every other's). A messaging web app's
+    #    calls need it (docs/WEBAPPS.md "Calls")
+    cat > debian/patches/lordos-sharedarraybuffer-coi.patch <<'PATCH'
+Description: SharedArrayBuffer in cross-origin-isolated web processes only
+ WebProcessProxy::shouldEnableSharedArrayBuffer() is true for a web process made for a cross-origin-isolated browsing
+ context group (COOP same-origin and COEP require-corp). The Cocoa process launcher turns SharedArrayBuffer on in such
+ a process; the GLib one ignored it, so SharedArrayBuffer was never available. Set JSC's useSharedArrayBuffer in that
+ process's environment only, and remove it from every other process's.
+Author: LordOS <lord.basex@gmail.com>
+Forwarded: no
+Last-Update: 2026-11-25
+
+--- a/Source/WebKit/UIProcess/Launcher/glib/ProcessLauncherGLib.cpp
++++ b/Source/WebKit/UIProcess/Launcher/glib/ProcessLauncherGLib.cpp
+@@ -235,6 +235,14 @@
+     int webkitClientSocketValue = webkitSocketPair.client.release();
+     g_subprocess_launcher_take_fd(launcher.get(), webkitClientSocketValue, webkitClientSocketValue);
+ 
++    // LordOS: SharedArrayBuffer only in a web process made for cross-origin-isolated documents (COOP same-origin and
++    // COEP require-corp: WebProcessProxy's CrossOriginMode::Isolated), as WebKit's Cocoa ports do; never in any other
++    // process, whatever the embedder's environment says.
++    if (m_launchOptions.processType == ProcessLauncher::ProcessType::Web && m_client && m_client->shouldEnableSharedArrayBuffer())
++        g_subprocess_launcher_setenv(launcher.get(), "JSC_useSharedArrayBuffer", "1", TRUE);
++    else
++        g_subprocess_launcher_unsetenv(launcher.get(), "JSC_useSharedArrayBuffer");
++
+ #if USE(SYSPROF_CAPTURE)
+     UnixFileDescriptor sysprofFd;
+ 
+PATCH
+    echo lordos-sharedarraybuffer-coi.patch >> debian/patches/series
+    #    TURN URLs with RFC 7065's transport query (turn:host:443?transport=tcp, as a video meeting site and others hand
+    #    out) were refused with a SyntaxError by RTCPeerConnection's check, which is inverted: the GStreamer ICE agent
+    #    reads that query, so the check now accepts exactly transport=udp and transport=tcp (+4)
+    cat > debian/patches/lordos-turn-transport-query.patch <<'PATCH'
+Description: accept TURN URLs with ?transport=udp|tcp in RTCPeerConnection
+ RTCPeerConnection::iceServersFromConfiguration refused every TURN URL that has a query: URL::query() has no "?",
+ so findIgnoringASCIICase("?transport=") is notFound, and !!notFound is true. Sites hand out
+ "turn:host:443?transport=tcp" (RFC 7065), and the GStreamer ICE agent reads that parameter. Accept exactly
+ transport=udp and transport=tcp; any other query is still a SyntaxError.
+Author: LordOS <lord.basex@gmail.com>
+Forwarded: no
+Last-Update: 2026-11-26
+
+--- a/Source/WebCore/Modules/mediastream/RTCPeerConnection.cpp
++++ b/Source/WebCore/Modules/mediastream/RTCPeerConnection.cpp
+@@ -555,7 +555,9 @@
+             if (!serverURL.hasOpaquePath())
+                 return Exception { ExceptionCode::SyntaxError, "STUN/TURN URL should be opaque-path"_s };
+             if (serverURL.protocolIs("turn"_s) || serverURL.protocolIs("turns"_s)) {
+-                if (serverURL.hasQuery() && !!serverURL.query().findIgnoringASCIICase("?transport="_s))
++                // LordOS: RFC 7065's only query, "transport=udp" or "transport=tcp" (the ICE agent reads it). The check
++                // before refused every TURN URL with a query: query() has no "?", so find() was notFound, which is true.
++                if (serverURL.hasQuery() && !equalLettersIgnoringASCIICase(serverURL.query(), "transport=udp"_s) && !equalLettersIgnoringASCIICase(serverURL.query(), "transport=tcp"_s))
+                     return Exception { ExceptionCode::SyntaxError, "Invalid TURN URL query string"_s };
+                 if (server.credential.isNull() || server.username.isNull())
+                     return Exception { ExceptionCode::InvalidAccessError, "TURN/TURNS server requires both username and credential"_s };
+PATCH
+    echo lordos-turn-transport-query.patch >> debian/patches/series
     #    The DRM backend's own API (WPEDisplayDRM, WPEScreenDRM, WPEToplevelDRM, WPEViewDRM: wpe_display_drm_* and the
     #    _get_type of the others) isn't in the library then, so it leaves Debian's symbols file too; WPEPlatform's core
     #    DRM device API (wpe_drm_device_*, used for dmabuf) stays
@@ -74,6 +156,10 @@ backport() {
         "Backport to Debian 13 (trixie) for LordOS (docs/WPEWEBKIT.md in the LordOS repository)."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Build WPEPlatform (wpe-platform-2.0: headless, Wayland) and keep the legacy libwpe API, both explicitly."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Don't build WPEPlatform's DRM backend, so libinput and libudev aren't linked; its symbols leave debian/libwpewebkit-2.0-1.symbols."
+    DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Build WebRTC with WebKit's GStreamer backend (webrtcbin) and MediaStream; Build-Depends on libssl-dev, Recommends the GStreamer plugins WebRTC uses (libnice, bad, good, base)."
+    DEBEMAIL=$DEBEMAIL_LORDOS dch --append "lordos-turn-transport-query.patch: TURN URLs with ?transport=udp or ?transport=tcp are accepted."
+    DEBEMAIL=$DEBEMAIL_LORDOS dch --append "ICE with librice (USE_LIBRICE) in the network process, so the web process keeps no network; Build-Depends on librice-dev (LordOS's package)."
+    DEBEMAIL=$DEBEMAIL_LORDOS dch --append "lordos-sharedarraybuffer-coi.patch: SharedArrayBuffer in cross-origin-isolated web processes only, as on Cocoa."
     DEBEMAIL=$DEBEMAIL_LORDOS dch --append "Maintainer: LordOS (the packaging is the Debian WebKit Maintainers')."
     sed -i "0,/^ -- /s/^\( -- .*>  \).*$/\1$debdate/" debian/changelog
     [ "$(dpkg-parsechangelog -S Date)" = "$debdate" ] || die "could not date the changelog entry"
@@ -91,7 +177,9 @@ cmd_build() {
     dpkg-source --no-check -x "$dsc" /build/work/wpewebkit-$up
     cd /build/work/wpewebkit-$up
     backport "$newver"
-    # the build dependencies, from trixie only (a missing one stops here and is named)
+    # LordOS's own build dependencies (librice: tools/pkg/build-librice.sh), from /build/extra, then the rest from trixie
+    # only (a missing one stops here and is named)
+    if ls /build/extra/*.deb >/dev/null 2>&1; then apt-get install -y --no-install-recommends /build/extra/*.deb; fi
     mk-build-deps --install --remove --tool 'apt-get -y --no-install-recommends' debian/control
     rm -f wpewebkit-build-deps_*
     chown -R builder: /build/work
@@ -154,6 +242,11 @@ cmd_test() {
     lib=$(ls /usr/lib/*/libWPEWebKit-2.0.so.1.*)
     ! readelf -d "$lib" | grep -E 'NEEDED.*\[lib(input|udev)\.so' || die "libWPEWebKit-2.0 links libinput or libudev"
     echo "no libinput, no libudev in libWPEWebKit-2.0's NEEDED" | tee -a "$out/report.txt"
+    # WebRTC built (maintainer's decision, 2026-11-25): WebKit's GStreamer backend links GStreamer's WebRTC library
+    readelf -d "$lib" | grep -q 'NEEDED.*\[libgstwebrtc-1\.0\.so' || die "libWPEWebKit-2.0 doesn't link libgstwebrtc-1.0: WebRTC isn't built"
+    echo "WebRTC: libgstwebrtc-1.0 in libWPEWebKit-2.0's NEEDED" | tee -a "$out/report.txt"
+    readelf -d "$lib" | grep -q 'NEEDED.*\[librice-proto\.so' || die "libWPEWebKit-2.0 doesn't link librice-proto: ICE isn't librice's"
+    echo "ICE: librice-proto and librice-io in libWPEWebKit-2.0's NEEDED (the network process runs ICE)" | tee -a "$out/report.txt"
     gcc -Wall -Wextra -O1 -o "$out/wpe-headless-render" /build/wpewebkit-headless-test.c \
         $(pkg-config --cflags --libs wpe-webkit-2.0 wpe-platform-2.0 wpe-platform-headless-2.0)
     id -u tester >/dev/null 2>&1 || useradd -m tester
@@ -196,6 +289,19 @@ lordweb_check() {
             >> "$out/report.txt" 2>&1 || { tail -n 20 "$out/report.txt"; die "web_probe_test ($b) failed"; }
         echo "lord-web ($b backend): builds without warnings, web-backend-test and web_probe_test pass" | tee -a "$out/report.txt"
     done
+    # WebRTC (maintainer's decision, 2026-11-25): on WPEPlatform, the call checks against this engine: Chrome's identity,
+    # SharedArrayBuffer only when cross-origin isolated (lordos-sharedarraybuffer-coi.patch), and two peer connections in
+    # one page exchanging audio and video (Opus, VP8 and H.264), with WebKit's sandbox on (ICE in the network process,
+    # librice: the loopback must connect)
+    if [ -z "${EMULATED:-}" ]; then
+        runuser -u tester -- make -C /build/src/server -j"$(nproc)" LORD_WEB_BACKEND=platform build/webcalls-check > "$out/webcalls-build.log" 2>&1 ||
+            { tail -n 30 "$out/webcalls-build.log"; die "webcalls-check does not build"; }
+        ! grep -E 'warning:' "$out/webcalls-build.log" || die "webcalls-check builds with warnings"
+        (cd /build/src/server && runuser -u tester -- env HOME=/home/tester XDG_RUNTIME_DIR=/tmp timeout 600 python3 -I tests/webcalls_check.py build/webcalls-check --webrtc) \
+            > "$out/webcalls.txt" 2>&1 || { cat "$out/webcalls.txt"; die "webcalls_check failed"; }
+        cat "$out/webcalls.txt" >> "$out/report.txt"
+        echo "WebRTC: webcalls_check passes (identity, SharedArrayBuffer, loopback call)" | tee -a "$out/report.txt"
+    fi
 }
 
 case "${1:-}" in

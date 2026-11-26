@@ -67,14 +67,57 @@ int webpage_sound_learns(int mode, double note_ms, double audio_ms) {
 void webpage_state_parse(const char *json, size_t len, WebPageState *s) {
     memset(s, 0, sizeof *s);
     JDoc d;
-    if (!json || len > 4096 || json_parse(json, len, &d, NULL, 0)) return;
-    if (d.root && d.root->type == J_OBJ) s->own_sound = json_bool(d.root, "ownSound", 0) != 0;
+    if (!json || len > WEBPAGE_STATE_MAX || json_parse(json, len, &d, NULL, 0)) return;
+    if (d.root && d.root->type == J_OBJ) {
+        s->own_sound = json_bool(d.root, "ownSound", 0) != 0;
+        const JVal *ch = json_get(d.root, "clientHints");
+        for (const JVal *o = ch && ch->type == J_OBJ ? ch->kid : NULL; o; o = o->next) {
+            char origin[256];
+            if (o->type != J_ARR || webua_origin(o->key, origin, sizeof origin) || strcmp(origin, o->key)) continue;
+            unsigned mask = 0;
+            for (const JVal *h = o->kid; h; h = h->next)
+                if (h->type == J_STR) for (unsigned b = 1; b & WEBUA_HINT_ALL; b <<= 1)
+                    if (webua_hint_name(b) && !strcmp(h->str, webua_hint_name(b))) mask |= b;
+            webua_sites_set(&s->hints, origin, mask);
+        }
+    }
     json_free(&d);
 }
 
 size_t webpage_state_write(const WebPageState *s, char *out, size_t n) {
-    int k = snprintf(out, n, "{ \"ownSound\": %s }\n", s->own_sound ? "true" : "false");
-    return k < 0 || (size_t)k >= n ? 0 : (size_t)k;
+    size_t at = 0;
+    int k = snprintf(out, n, "{ \"ownSound\": %s", s->own_sound ? "true" : "false");
+    if (k < 0 || (size_t)k >= n) return 0;
+    at = (size_t)k;
+    if (s->hints.n) {
+        k = snprintf(out + at, n - at, ", \"clientHints\": {");
+        if (k < 0 || (size_t)k >= n - at) return 0;
+        at += (size_t)k;
+        for (int i = 0; i < s->hints.n; i++) {
+            char q[600];
+            /* an origin is only [a-z0-9.:[]_-] after webua_origin, so quoting changes nothing; quoted all the same */
+            if (!json_quote(q, sizeof q, s->hints.site[i].origin)) return 0;
+            k = snprintf(out + at, n - at, "%s %s: [", i ? "," : "", q);
+            if (k < 0 || (size_t)k >= n - at) return 0;
+            at += (size_t)k;
+            int first = 1;
+            for (unsigned b = 1; b & WEBUA_HINT_ALL; b <<= 1) {
+                if (!(s->hints.site[i].mask & b)) continue;
+                k = snprintf(out + at, n - at, "%s\"%s\"", first ? "" : ", ", webua_hint_name(b));
+                if (k < 0 || (size_t)k >= n - at) return 0;
+                at += (size_t)k;
+                first = 0;
+            }
+            k = snprintf(out + at, n - at, "]");
+            if (k < 0 || (size_t)k >= n - at) return 0;
+            at += (size_t)k;
+        }
+        k = snprintf(out + at, n - at, " }");
+        if (k < 0 || (size_t)k >= n - at) return 0;
+        at += (size_t)k;
+    }
+    k = snprintf(out + at, n - at, " }\n");
+    return k < 0 || (size_t)k >= n - at ? 0 : at + (size_t)k;
 }
 
 int webpage_view_visible(int shown, int configured, int suspended) { return shown && configured && !suspended; }

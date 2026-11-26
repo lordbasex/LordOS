@@ -65,7 +65,9 @@ static int clean_env(void) {
         fprintf(stderr, "lord-web: WebKit's sandbox is never turned off\n");
         return -1;
     }
-    static const char *const drop[] = { "WEBKIT_", "WPE_", "GST_PLUGIN", "GST_REGISTRY", "GIO_EXTRA_MODULES", "GIO_MODULE_DIR", "LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", NULL };
+    /* JSC_*: JavaScriptCore options (JSC_useSharedArrayBuffer would hand SharedArrayBuffer to every page, not only the
+     * cross-origin-isolated ones WebKit turns it on for itself) */
+    static const char *const drop[] = { "WEBKIT_", "WPE_", "JSC_", "GST_PLUGIN", "GST_REGISTRY", "GIO_EXTRA_MODULES", "GIO_MODULE_DIR", "LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", NULL };
     for (int again = 1; again;) {
         again = 0;
         for (char **e = environ; e && *e; e++) {
@@ -330,7 +332,7 @@ static int run_app(Web *w) {
     char state[PATH_MAX + 16];
     size_t slen = 0;
     snprintf(state, sizeof state, "%s/state.json", w->profile_dir);
-    char *stext = webreg_read_file(state, 4096, &slen);
+    char *stext = webreg_read_file(state, WEBPAGE_STATE_MAX, &slen);
     webpage_state_parse(stext, stext ? slen : 0, &w->state);
     free(stext);
     w->audio_ms = w->note_ms = -1;
