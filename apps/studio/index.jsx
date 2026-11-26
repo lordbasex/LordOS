@@ -6,7 +6,7 @@
 // (sdk/studio.jsx StudioWindow; settings.studio), so the window, the popover and every app that chose the "LordOS
 // Studio" camera agree. It runs in the desktop's own process like Settings and uses the desktop-only lord.studio; it
 // is listed only where LordOS Studio can work (available below).
-import { View, useTheme, StudioWindow, studioAvailable } from '@lordos/sdk';
+import { View, useTheme, StudioWindow, studioAvailable, SkinHeader, appName, getApp } from '@lordos/sdk';
 
 // the launcher and search list it only where lord-studio and its model are installed (sdk/windows.js listApps)
 export const available = () => studioAvailable();
@@ -31,7 +31,10 @@ export function Icon({ size: s }) {
   );
 }
 
-export default function Studio() {
+// (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): a header a theme may add above the app
+export default function Studio() { return <SkinHeader app="studio" title={appName(getApp('studio'))}><StudioMain /></SkinHeader>; }
+
+function StudioMain() {
   const th = useTheme();
   return <StudioWindow th={th} />;
 }
