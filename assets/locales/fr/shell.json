@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Extraits",
   "clipboard.title": "Presse-papiers",
   "clipboard.unpin": "Désépingler",
+  "code.copied": "Copié",
+  "code.copy": "Copier",
   "textMenu.undo": "Annuler",
   "textMenu.redo": "Rétablir",
   "textMenu.cut": "Couper",

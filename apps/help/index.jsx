@@ -146,6 +146,7 @@ export default function Help() {
   const list = useMemo(() => help.list(), [lang]);
   const results = useMemo(() => (query.trim().length >= 2 ? help.search(query) : null), [query, lang]);
   const sb = useSidebar(640);
+  const articleMissing = !tour && !list.some((x) => x.id === article);
   // picking an article in a narrow window closes the sidebar over it
   const pick = (id) => { setArticle(id); if (sb.narrow) sb.close(); };
   const finishTour = () => { setTour(false); settings.set({ welcomeShown: true }); setArticle('welcome'); };
@@ -165,7 +166,13 @@ export default function Help() {
                   <Text style={{ fontSize: typeScale.caption, color: on ? 'rgba(255,255,255,0.85)' : t.textDim, lineHeight: 1.35, maxHeight: 44, overflow: 'hidden', textAlign: 'start' }}>{r.snippet}</Text>
                 </View>
               );
-            }) : <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'center', paddingTop: spacing.xl }}>{tr('help.noResults')}</Text>
+            }) : (
+              // a search with nothing found: Lumo confused (docs/LORDOS-BRAND.md, "Lumo poses": empty states, Help), in the
+              // sidebar where the empty list is (240 px fits it), so the article in the main pane stays as it was; one Lumo
+              // per view, so none here while the main pane already shows its own (an article that does not exist)
+              <EmptyState mascot={articleMissing ? undefined : 'confused'} title={tr('help.noResults')}
+                style={{ flex: 0, paddingHorizontal: spacing.s, paddingTop: spacing.xl }} />
+            )
           ) : (
             <>
               <View style={{ height: spacing.xs }} />

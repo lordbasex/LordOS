@@ -142,6 +142,8 @@
   "clipboard.tab.snippets": "スニペット",
   "clipboard.title": "クリップボード",
   "clipboard.unpin": "ピン留めを外す",
+  "code.copied": "コピーしました",
+  "code.copy": "コピー",
   "textMenu.undo": "取り消す",
   "textMenu.redo": "やり直す",
   "textMenu.cut": "カット",

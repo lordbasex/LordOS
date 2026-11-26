@@ -14,7 +14,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Hands (Manos): an AI agent uses the LordOS desktop** (in development; approved by the maintainer on 2026-11-26,
   AGENTS.md; docs/HANDS.md). Modelled on Claude in Chrome: Claude Code today, and later Lumo's own agent, reads the
   windows as a tree, clicks, types, scrolls and takes screenshots through lord-server.
-  - **`lordos-mcp`** (`/usr/bin/lordos-mcp`, an MCP server over stdio; `claude mcp add lordos-mcp -- lordos-mcp`) with
+  - **`lordos-mcp`** (`/usr/bin/lordos-mcp`, an MCP server over stdio; `claude mcp add -s user lordos-mcp -- lordos-mcp`) with
     the tools `windows_context`, `open_app`, `open_path`, `close_window`, `read_window`, `find`, `computer` (screenshot,
     left/right/middle/double/triple click, hover, drag, type, key chords, scroll, zoom, wait), `set_value`,
     `read_app_log` and `record` (an animated GIF, returned or saved under a bare name in `~/Pictures/LordOS QA`). No tool
@@ -430,6 +430,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   again after N.N s` (since WebKit said it stopped responding) and `lord-web: the page did not answer for N.N s: its web
   process restarted` (from the first ping it left unanswered, or WebKit's word if that came first; `webwatch.h`
   `hung_for`, the watcher's own stall not counted). Tests: `webwatch-test` (`test_hung_for`).
+- **Settings → AI → Hands: the commands had no way to copy them, and `claude mcp add` added lordos-mcp only for one
+  project.** Each command on the page (`claude mcp add -s user lordos-mcp -- lordos-mcp` and `lordos-mcp --headless
+  notes`) is now a `<CommandBlock>` (new in the SDK, `sdk/codeblock.jsx`): monospace, left to right in any language,
+  with a Copy button that puts exactly that text on the clipboard and says "Copied" for 2 s (`shell.code.copy`,
+  `shell.code.copied` in the 35 languages). It only copies; nothing is typed or run. The command now has `-s user`, so
+  it works in every project; docs/HANDS.md, the paper, the site and `lordos-mcp --help` say the same.
+  `tests/settings_ai_scene` checks the button and the exact text on the clipboard.
+- **About LordOS: a long label was cut at its start** ("Pausas de más de 50 ms" showed as "sas de más de 50 ms" in
+  Spanish; found in QA 2026-11-26): the label column was a fixed 118 px, right-aligned and on one line, so a longer
+  label overflowed past the window's edge. The column now takes the width of the longest label, measured in the
+  interface's font (`lord.measureText`), at least 118 px and at most 45 % of the list, and a label longer than that
+  wraps instead of being cut; the same in right to left. `tests/about_labels_scene` (headless lord-server) checks every
+  label in es, de, ar and fi at About's own size and in a narrow window (`make test-full`).
+- **Help: a search with nothing found showed only a line of text** in the sidebar. It now shows the empty state with
+  Lumo confused (`EmptyState mascot="confused"`, docs/LORDOS-BRAND.md "Lumo poses"), in the sidebar where the
+  empty list is, so the article in view stays; no second Lumo while the main pane already shows one (an article that
+  does not exist). `tests/help_skin_scene.mjs` checks it.
 - **A web app's tray icon and notifications kept LordOS's letter tile** after its real icon was fetched (WhatsApp's "W"
   next to the clock): lord-web read only the registry's icon. It now prefers the site's own icon from
   `~/.cache/lordos/web/icons/<app>.png` when it starts (a regular PNG of the person's, no link, at most 1 MB). An app

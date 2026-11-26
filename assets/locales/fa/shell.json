@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "قطعه‌متن‌ها",
   "clipboard.title": "کلیپ‌بورد",
   "clipboard.unpin": "برداشتن سنجاق",
+  "code.copied": "کپی شد",
+  "code.copy": "رونوشت",
   "textMenu.undo": "واگرد",
   "textMenu.redo": "ازنو",
   "textMenu.cut": "برش",

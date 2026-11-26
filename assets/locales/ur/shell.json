@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "ٹکڑے",
   "clipboard.title": "کلپ بورڈ",
   "clipboard.unpin": "ان پن کریں",
+  "code.copied": "کاپی ہو گیا",
+  "code.copy": "کاپی کریں",
   "textMenu.undo": "کالعدم کریں",
   "textMenu.redo": "دوبارہ کریں",
   "textMenu.cut": "کاٹیں",

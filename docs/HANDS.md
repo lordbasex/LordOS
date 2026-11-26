@@ -11,8 +11,12 @@ page's accessibility tree, instead of guessing from pixels.
 ## Add it to Claude Code
 
 ```sh
-claude mcp add lordos-mcp -- lordos-mcp
+claude mcp add -s user lordos-mcp -- lordos-mcp
 ```
+
+`-s user` adds it for every project (without it, Claude Code keeps it only for the folder the command ran in). Settings →
+AI → Hands shows this command with a Copy button (`<CommandBlock>`, `sdk/codeblock.jsx`); LordOS only copies it, it
+never types or runs it.
 
 Or in a project's `.mcp.json`:
 

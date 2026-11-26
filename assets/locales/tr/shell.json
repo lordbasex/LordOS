@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Parçacıklar",
   "clipboard.title": "Pano",
   "clipboard.unpin": "Sabitlemeyi kaldır",
+  "code.copied": "Kopyalandı",
+  "code.copy": "Kopyala",
   "textMenu.undo": "Geri Al",
   "textMenu.redo": "Yinele",
   "textMenu.cut": "Kes",

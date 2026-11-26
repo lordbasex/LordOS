@@ -150,6 +150,8 @@
   "clipboard.tab.snippets": "Фрагменты",
   "clipboard.title": "Буфер обмена",
   "clipboard.unpin": "Открепить",
+  "code.copied": "Скопировано",
+  "code.copy": "Копировать",
   "textMenu.undo": "Отменить",
   "textMenu.redo": "Повторить",
   "textMenu.cut": "Вырезать",

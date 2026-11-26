@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Vijisehemu",
   "clipboard.title": "Ubao wa Kunakili",
   "clipboard.unpin": "Bandua",
+  "code.copied": "Imenakiliwa",
+  "code.copy": "Nakili",
   "textMenu.undo": "Tendua",
   "textMenu.redo": "Rudia",
   "textMenu.cut": "Kata",

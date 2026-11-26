@@ -142,6 +142,8 @@
   "clipboard.tab.snippets": "Petikan",
   "clipboard.title": "Papan Keratan",
   "clipboard.unpin": "Nyahsemat",
+  "code.copied": "Disalin",
+  "code.copy": "Salin",
   "textMenu.undo": "Buat Asal",
   "textMenu.redo": "Buat Semula",
   "textMenu.cut": "Potong",

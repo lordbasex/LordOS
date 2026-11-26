@@ -142,6 +142,8 @@
   "clipboard.tab.snippets": "Cuplikan",
   "clipboard.title": "Papan Klip",
   "clipboard.unpin": "Lepas sematan",
+  "code.copied": "Disalin",
+  "code.copy": "Salin",
   "textMenu.undo": "Urungkan",
   "textMenu.redo": "Ulangi",
   "textMenu.cut": "Potong",

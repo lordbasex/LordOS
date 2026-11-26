@@ -158,6 +158,32 @@
       key('Escape', 1);
       await sleep(1000);
     } else step('Sentinela card', false);
+    // (0.8.9.6.2) Hands: each command has Copy, which puts exactly that command on the clipboard and says Copied
+    sdk.wm.open('settings', { args: { section: 'ai', page: 'hands', nonce: Date.now() } });
+    await sleep(2000);
+    {
+      const CMD = 'claude mcp add -s user lordos-mcp -- lordos-mcp';
+      // to the bottom of the page, where the commands are
+      const title = textId(sdk.t('hands.settings.howTitle'));
+      if (title) { const b = box(title); for (let i = 0; i < 40; i++) { ev('wheel', title, b[0] + 5, b[1] + 5, -3); await sleep(30); } }
+      await sleep(600);
+      const cmd = textId(CMD);
+      step('Hands: the command with -s user is shown', !!cmd);
+      step('Hands: the QA command is shown too', !!textId('lordos-mcp --headless notes'));
+      const under = (id, top) => { for (let n = id; n; n = P.parent.get(n)) if (n === top) return true; return false; };
+      const row = cmd ? P.parent.get(P.parent.get(cmd)) : null;   // the text, its column, the block's row
+      const copy = row ? textIds(sdk.t('shell.code.copy')).find((id) => under(id, row)) : null;
+      step('Hands: the command has a Copy button', !!copy);
+      if (copy) {
+        sdk.clipboard.set('something else');
+        click(copy);
+        await sleep(400);
+        const got = String(sdk.clipboard.get() || '');
+        step('Hands: Copy puts the exact command on the clipboard', got === CMD, JSON.stringify(got));
+        step('Hands: the button says Copied', textIds(sdk.t('shell.code.copied')).some((id) => under(id, row)));
+        await shot('hands-copied');
+      }
+    }
     log('done');
   })();
 })();

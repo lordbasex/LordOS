@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "স্নিপেট",
   "clipboard.title": "ক্লিপবোর্ড",
   "clipboard.unpin": "আনপিন করুন",
+  "code.copied": "কপি হয়েছে",
+  "code.copy": "কপি করুন",
   "textMenu.undo": "পূর্বাবস্থায় ফেরান",
   "textMenu.redo": "আবার করুন",
   "textMenu.cut": "কাটুন",

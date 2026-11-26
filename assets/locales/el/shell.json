@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Αποσπάσματα",
   "clipboard.title": "Πρόχειρο",
   "clipboard.unpin": "Ξεκαρφίτσωμα",
+  "code.copied": "Αντιγράφηκε",
+  "code.copy": "Αντιγραφή",
   "textMenu.undo": "Αναίρεση",
   "textMenu.redo": "Επανάληψη",
   "textMenu.cut": "Αποκοπή",

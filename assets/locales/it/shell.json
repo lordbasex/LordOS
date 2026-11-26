@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Frammenti",
   "clipboard.title": "Appunti",
   "clipboard.unpin": "Non fissare",
+  "code.copied": "Copiato",
+  "code.copy": "Copia",
   "textMenu.undo": "Annulla",
   "textMenu.redo": "Ripeti",
   "textMenu.cut": "Taglia",

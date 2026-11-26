@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Fragmenten",
   "clipboard.title": "Klembord",
   "clipboard.unpin": "Maak los",
+  "code.copied": "Gekopieerd",
+  "code.copy": "Kopieer",
   "textMenu.undo": "Herstel",
   "textMenu.redo": "Opnieuw",
   "textMenu.cut": "Knip",

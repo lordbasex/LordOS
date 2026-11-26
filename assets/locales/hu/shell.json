@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Szövegrészletek",
   "clipboard.title": "Vágólap",
   "clipboard.unpin": "Rögzítés feloldása",
+  "code.copied": "Másolva",
+  "code.copy": "Másolás",
   "textMenu.undo": "Visszavonás",
   "textMenu.redo": "Ismétlés",
   "textMenu.cut": "Kivágás",

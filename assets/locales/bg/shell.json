@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Фрагменти",
   "clipboard.title": "Клипборд",
   "clipboard.unpin": "Откачи",
+  "code.copied": "Копирано",
+  "code.copy": "Копирай",
   "textMenu.undo": "Отмени",
   "textMenu.redo": "Повтори",
   "textMenu.cut": "Изрежи",

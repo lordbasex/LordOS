@@ -146,6 +146,8 @@
   "clipboard.tab.snippets": "Snippets",
   "clipboard.title": "Clipboard",
   "clipboard.unpin": "Unpin",
+  "code.copied": "Copied",
+  "code.copy": "Copy",
   "textMenu.undo": "Undo",
   "textMenu.redo": "Redo",
   "textMenu.cut": "Cut",
