@@ -1406,7 +1406,35 @@ static void test_notify_line(void) {
     CHECK(!webpage_notify_line("t", 42, 0, 0, 0, NULL, 0), "no buffer");
 }
 
+/* ✨ AI on a page's selection (docs/AI.md "Writing"): what lord-web and lord-server let reach the shell */
+static void test_ai_clean(void) {
+    static char out[WEBAI_MAX + 1];
+    CHECK(!webai_clean("Hello\nworld\tok", out) && !strcmp(out, "Hello\nworld\tok"), "line breaks and tabs kept");
+    CHECK(!webai_clean("a\x1b[2Jb\x07" "c\x7f", out) && !strcmp(out, "a[2Jbc"), "C0 controls and DEL out: %s", out);
+    CHECK(!webai_clean("x\xe2\x80\xaey\xe2\x81\xa6z\xe2\x80\x8e", out) && !strcmp(out, "xyz"), "bidi controls out");
+    CHECK(!webai_clean("x\xc2\x85y", out) && !strcmp(out, "xy"), "C1 out");
+    CHECK(!webai_clean("cañón 😀", out) && !strcmp(out, "cañón 😀"), "UTF-8 kept");
+    CHECK(webai_clean("", out) && webai_clean("\x1b\x07", out) && webai_clean(NULL, out), "nothing left: refused");
+    CHECK(webai_clean("caf\xe9", out) && webai_clean("\xc0\xaf", out) && webai_clean("\xed\xa0\x80", out) && webai_clean("ab\xe2\x80", out), "bad UTF-8 refused");
+    static char big[WEBAI_CHARS + 2];
+    memset(big, 'a', WEBAI_CHARS);
+    big[WEBAI_CHARS] = 0;
+    CHECK(!webai_clean(big, out), "4,000 characters taken");
+    big[WEBAI_CHARS] = 'a';
+    big[WEBAI_CHARS + 1] = 0;
+    CHECK(webai_clean(big, out), "4,001 refused");
+    unsigned seed = 3;
+    for (int it = 0; it < 50000; it++) {
+        char r[64];
+        int n = 1 + (int)(seed % 63);
+        for (int k = 0; k < n; k++) { seed = seed * 1103515245u + 12345u; r[k] = (char)(seed >> 16); if (!r[k]) r[k] = 'x'; }
+        r[n] = 0;
+        if (!webai_clean(r, out)) for (const unsigned char *p = (const unsigned char *)out; *p; p++) CHECK(*p >= 0x20 || *p == '\n' || *p == '\t', "no control left");
+    }
+}
+
 int main(void) {
+    test_ai_clean();
     test_frame();
     test_guard();
     test_offline();

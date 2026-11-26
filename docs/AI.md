@@ -53,6 +53,8 @@ with Writing on, the engine installed and a model (the one chosen for Lumo, else
 - **Limits.** Never in a password field; at most 4,000 characters (the engine's context is 4,096 tokens); one job at a
   time in the engine's queue with Sentinela's; Discard or Esc cancels the stream (`lord.writing.cancel`). Nothing goes
   online: the same engine and sandbox as Sentinela ([SENTINELA.md](SENTINELA.md)).
+- **Web apps:** lord-web's right-click menu has the same ✨ AI row for a page's selection; Replace goes back only to a
+  focused text field whose selection is unchanged (`docs/WEBAPPS.md`, "✨ AI on a page's selection").
 - **Tests:** `build/llm-engine-test` (the requests, streams whole and byte by byte, malformed answers, the 16 KB cap,
   a fuzz, a streamed job through the fake engine seen while it streams, a translation, cancel, bad arguments);
   `server/tests/writing_model_test.mjs`; `server/tests/spell_scene` (screenshots of the panel streaming and done).

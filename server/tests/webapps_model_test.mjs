@@ -422,5 +422,16 @@ for (const lang of langs) {
   eq(`edit words in ${lang}`, missing, []);
 }
 
+// ---- ✨ AI on a page's selection (docs/AI.md "Writing") ----
+{
+  const ai = { label: '✨ AI', submenu: [] };
+  const rows = M.webMenuItems({ items: ['cut', 'copy', 'paste', 'speech', 'inspect'], ai: 'Teh text', aiEdit: true }, (x) => x, () => {},
+    { developer: true, speech: () => ({ label: 'Speech' }), writing: (text, edit) => (text === 'Teh text' && edit ? ai : null) });
+  eq('✨ AI after the menu\'s rows, before Inspect', rows.map((r) => (r === '-' ? '-' : r.id)), ['cut', 'copy', 'paste', '-', 'speech', '-', 'ai', '-', 'inspect']);
+  eq('no ✨ AI without the text', M.webMenuItems({ items: ['copy'] }, (x) => x, () => {}, { writing: () => ai }).some((r) => r.id === 'ai'), false);
+  eq('no ✨ AI when the shell has no Writing', M.webMenuItems({ items: ['copy'], ai: 'x y' }, (x) => x, () => {}, { writing: () => null }).some((r) => r.id === 'ai'), false);
+  eq('the text: plain, at most 4,000 characters', [M.webAiText({ ai: 'ok' }), M.webAiText({ ai: 'a\u001b[2J' }), M.webAiText({ ai: 'x'.repeat(4001) }), M.webAiText({ ai: '  ' }), M.webAiText({ ai: 3 })], ['ok', '', '', '', '']);
+}
+
 console.log(bad ? `webapps-model: ${bad} of ${n} failed` : `webapps-model: ${n}/${n} ok`);
 process.exit(bad ? 1 : 0);

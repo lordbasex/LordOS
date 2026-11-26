@@ -44,6 +44,8 @@ import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBad
 import { speechMenu } from './voice.js';
 import { toggleEmojiPanel } from './emoji.jsx';
 import { ContextMenu } from './contextmenu.jsx';
+import { writingMenuFor, WritingPanel } from './writing.jsx';
+import { forField } from './writingmodel.js';
 import { profileOf, notifyKey, playsSystemSound, webIconPathOk, windowLabel, webMenuItems } from './webappsmodel.js';
 import { webProfileIcon, iconFromFile } from './apps.js';
 import { portalFile } from './filepicker.jsx';
@@ -827,16 +829,35 @@ export function WebAppRestartPrompt() {
 // menu opens at the pointer; the chosen item (or "" when it closes) goes back to lord-web. Emoji, Speech and Inspect
 // are the shell's own: Speech reads the selection lord-web made the session's primary selection (sdk/voice.js), and
 // Inspect shows only while developer mode is on, with the Window menu's question first.
+// ✨ AI on a page's selection (docs/AI.md "Writing"): the menu's selection (lord-web's, cleaned by both) goes to the
+// shell's own panel, never to the page or lord-web; Replace (only for a selection in a text field) sends the final text
+// to that lord-web, which inserts it only where that selection still is (WriteReplace, server/src/web/webmenu.c).
+const webWriting = createStore(null);          // { job, app, profile, edit, x, y }
+function WebWritingPanel() {
+  const w = useStore(webWriting);
+  if (!w) return null;
+  const all = { w: screen.width, h: screen.height };
+  const close = () => webWriting.set(null);
+  const replace = w.edit ? (text) => { try { return lord.webapps.writeReplace(w.app, w.profile, forField(text, true)) !== false; } catch (e) { return false; } } : null;
+  return h(View, { style: { position: 'absolute', left: 0, top: 0, width: all.w, height: all.h, zIndex: 100000, pointerEvents: 'box-none' } },
+    h(WritingPanel, { key: w.job.id, at: { x: w.x, y: w.y }, bounds: all, job: w.job, onClose: close, onReplace: replace }));
+}
+
 export function WebAppMenu() {
   const m = useStore(webMenu);
   const developer = useStore(webDeveloper);
-  if (!m) return null;
+  if (!m) return h(WebWritingPanel);
   const later = (fn) => setTimeout(fn, 0);
   const items = webMenuItems(m, (n, vars) => (n === 'inspect' ? t('webapps.inspect.menu') : t(`shell.edit.${n}`, vars)), (n) => answerWebMenu(n, m), {
     developer,
     speech: () => speechMenu(null),
     emoji: () => later(toggleEmojiPanel),
     inspect: () => later(() => webInspectAsk.set({ app: m.app, profile: m.profile })),
+    // never a password field's: lord-web's page script reports no selection there
+    writing: (text, edit) => writingMenuFor({ secure: false, selected: text, open: (o) => {
+      answerWebMenu('', m);
+      webWriting.set({ job: { ...o, text, id: m.id }, app: m.app, profile: m.profile, edit, x: m.x, y: m.y });
+    } }),
   });
   if (!items.length) return null;
   const all = { w: screen.width, h: screen.height };

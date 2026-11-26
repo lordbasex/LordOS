@@ -49,6 +49,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   nonce, the answer is read strictly (chunked server-sent events, at most 16 KB) and shown as plain text. Never in a
   password field; at most 4,000 characters. Tests: `build/llm-engine-test` (requests, streams, fuzz, a streamed job
   through the fake engine, cancel), `server/tests/writing_model_test.mjs`, `spell_scene`.
+  - **In web apps too** (`server/src/web/webmenu.c`, `ui/webask.c`, `sdk/webappsmodel.js`, `sdk/hardware.jsx`): lord-web's
+    menu carries the whole selection (not one the page cut; never a password field's), cleaned by `webai_clean` in
+    lord-web and again in lord-server; the shell shows ✨ AI ▸ and its panel. Replace, only for a selection in a text
+    field, goes to lord-web as `WriteReplace` (lord-server only, checked by pid), which inserts the text only if the
+    focused field is still a non-password text field with exactly that selection. Tests: `build/webapp-test`,
+    `webapps_model_test.mjs`.
 - **`dig`, `nslookup` and `host` in every image:** `bind9-dnsutils` joins the command-line tools of the PC ISO and the
   Raspberry Pi image (`tools/iso/packages-tools.sh`) and the `lordos` package's Recommends, so updated systems get it too.
 - **Web apps: a right-click menu like Chrome's, per context, and spell checking** (`server/src/web/webmenu.c`,

@@ -251,6 +251,15 @@ static void show_call(GDBusConnection *c, const char *sender, const char *path, 
             return;
         }
         webbus_scheme(d, sender, k);
+    } else if (!strcmp(method, "WriteReplace")) {
+        /* ✨ AI's Replace (docs/AI.md "Writing"): only lord-server, checked by pid like Edit */
+        const char *text = NULL;
+        g_variant_get(p, "(&s)", &text);
+        if (!text || !sender || strlen(text) > WEBAI_MAX) {
+            g_dbus_method_invocation_return_dbus_error(inv, "org.freedesktop.DBus.Error.InvalidArgs", "text");
+            return;
+        }
+        webbus_write_replace(d, sender, text);
     } else if (!strcmp(method, "SetUserAgent")) {
         const char *word = NULL;
         g_variant_get(p, "(&s)", &word);
@@ -268,7 +277,8 @@ static const char SHOW_XML[] = "<node><interface name='" SHOW_IFACE "'><method n
                                "<method name='Ping'><arg type='s' direction='out'/></method>"
                                "<method name='Edit'><arg type='s' direction='in'/></method>"
                                "<method name='SetColorScheme'><arg type='s' direction='in'/></method>"
-                               "<method name='SetUserAgent'><arg type='s' direction='in'/></method></interface></node>";
+                               "<method name='SetUserAgent'><arg type='s' direction='in'/></method>"
+                               "<method name='WriteReplace'><arg type='s' direction='in'/></method></interface></node>";
 
 /* org.lordos.WebApp.app_<app>.profile_<profile> (webreg_bus_name: the name lord-server calls too) */
 static void bus_name(const Web *w, char *out, size_t n) {

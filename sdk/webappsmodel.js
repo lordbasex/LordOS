@@ -535,7 +535,24 @@ export function webMenuItems(menu, label, pick, shell = {}) {
     group = MENU_GROUP[n];
     out.push(it);
   }
+  // ✨ AI (docs/AI.md "Writing"): the shell's own row, with the selection lord-web sent and lord-server cleaned; the
+  // shell answers lord-web "" and runs it in its own panel (shell.writing(text, editable) → the row, or null)
+  const ai = webAiText(m);
+  const row = ai && shell.writing ? shell.writing(ai, m.aiEdit === true) : null;
+  if (row) {
+    const at = out.findIndex((i) => i !== '-' && i.id === 'inspect');
+    const add = ['-', { ...row, id: 'ai' }];
+    if (at > 0) out.splice(out[at - 1] === '-' ? at - 1 : at, 0, ...add); else out.push(...add);
+  }
   return out;
+}
+
+// ✨ AI's text of a page's menu: a string of 1..4,000 characters (lord-server's webai_clean already made it plain), else ''
+export const WEB_AI_CHARS = 4000;
+export function webAiText(menu) {
+  const s = menu && typeof menu.ai === 'string' ? menu.ai : '';
+  if (!s.trim() || [...s].length > WEB_AI_CHARS) return '';
+  return /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/.test(s) ? '' : s;
 }
 
 // ---- Search the web (Settings → Web apps; server/src/web/websearch.h) ----

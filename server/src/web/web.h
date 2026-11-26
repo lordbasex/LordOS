@@ -124,6 +124,10 @@ void web_context_menu(Web *w, const WebMenuAt *a);
 /* WebKit asked for its own menu (the view's "context-menu"): its spelling suggestions, Ignore Spelling and Learn
  * Spelling are kept for LordOS's menu of the same right click */
 void web_menu_webkit(Web *w, WebKitContextMenu *m);
+/* ✨ AI's Replace from the shell (WriteReplace, lord-server only): text into the field the last menu's selection was in,
+ * only if it still has the focus and that very selection (webmenu.c) */
+void web_menu_ai_replace(Web *w, const char *text);
+#define WEBSELECT_WORLD "lordos-web-select"         /* the page script's world (webselect.c SELECT_WORLD) */
 /* 1 when WebKit asks for its menu on a right click in a text field the page left alone (WPEPlatform): the page
  * script lets it then, for the spelling items */
 int web_menu_webkit_asks(void);
@@ -206,6 +210,7 @@ void webbus_edit(Web *w, const char *sender, int cmd);
 void webbus_scheme(Web *w, const char *sender, int scheme);
 /* org.lordos.WebApp1.SetUserAgent(chrome|edge|firefox|lordos) from sender: the same check, then web_set_user_agent */
 void webbus_user_agent(Web *w, const char *sender, int kind);
+void webbus_write_replace(Web *w, const char *sender, const char *text);
 
 /* webhang.c: the page's watch (docs/WEBAPPS.md, "When a web app stops answering"; webwatch.h's WEBWATCH_PAGE) */
 void web_hang_start(Web *w);                             /* after the view is made: the ping every 15 s */

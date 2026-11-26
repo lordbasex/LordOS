@@ -22,7 +22,14 @@
  * order, so a report from a text field waits for WebKit's at most SPELL_WAIT_MS. A suggestion chosen runs WebKit's own
  * item (it replaces the word); the suggestions are dictionary words, cleaned like the selection before they show.
  *
- * Emoji, Speech and Inspect are the shell's own (webmenu_shell_only): lord-server answers "" for them. */
+ * Emoji, Speech and Inspect are the shell's own (webmenu_shell_only): lord-server answers "" for them.
+ *
+ * ✨ AI (docs/AI.md "Writing"): with a selection that isn't cut (never a password field's: the page script reports
+ * none), the menu also carries the selection, cleaned (webai_clean, at most 4,000 characters), for the shell's own
+ * Writing panel; lord-web keeps the selection as it was. The shell's Replace comes back as WriteReplace(text)
+ * (only from lord-server, checked by pid): the text goes in through WebKit's InsertText only when the field that had
+ * that selection is still focused, still an editable field that isn't a password, and still has exactly that
+ * selection (web_menu_ai_replace). */
 #include "web.h"
 #include "webwin.h"
 #include "webdl.h"
@@ -240,6 +247,58 @@ static void spell_run(WebKitContextMenuItem *it) {
 
 int web_menu_webkit_asks(void) { return !strcmp(webback_name(), "platform"); }
 
+/* ---- ✨ AI: the selection the last menu offered, and Replace ---- */
+
+static char *ai_orig;               /* the selection as the page had it, when the menu offered ✨ AI in a text field */
+
+static void ai_forget(void) { if (ai_orig) { memset(ai_orig, 0, strlen(ai_orig)); g_free(ai_orig); ai_orig = NULL; } }
+
+/* in the page script's world: the focused field is a text field (not a password) or editable content, the window has
+ * the focus, and its selection is exactly the one the menu had; then the text goes in as typed ("done"), or "ok" when
+ * the page's insertText did nothing (WebKit's own InsertText then), else "no" */
+static const char AI_CHECK[] =
+    "const a = document.activeElement;\n"
+    "if (!a || !document.hasFocus()) return 'no';\n"
+    "const TEXT = ['', 'text', 'search', 'url', 'tel', 'email'];\n"
+    "let sel = null;\n"
+    "if (a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && TEXT.includes(a.type))) {\n"
+    "  if (a.readOnly || a.disabled) return 'no';\n"
+    "  sel = a.value.slice(a.selectionStart, a.selectionEnd);\n"
+    "} else if (a.isContentEditable) sel = String(getSelection() || '');\n"
+    "if (sel === null || sel !== orig || !sel) return 'no';\n"
+    "return document.execCommand('insertText', false, text) ? 'done' : 'ok';\n";
+
+typedef struct { Web *w; char *text; } AiCall;
+
+static void on_ai_check(GObject *o, GAsyncResult *res, gpointer d) {
+    AiCall *ac = d;
+    GError *e = NULL;
+    JSCValue *v = webkit_web_view_call_async_javascript_function_finish(WEBKIT_WEB_VIEW(o), res, &e);
+    char *r = v && jsc_value_is_string(v) ? jsc_value_to_string(v) : NULL;
+    if (r && !strcmp(r, "ok") && ac->w->view) webkit_web_view_execute_editing_command_with_argument(ac->w->view, "InsertText", ac->text);
+    if (!r || (strcmp(r, "ok") && strcmp(r, "done"))) web_note("✨ AI's Replace refused: the field lost the focus or its selection changed");
+    g_free(r);
+    if (v) g_object_unref(v);
+    g_clear_error(&e);
+    memset(ac->text, 0, strlen(ac->text));
+    g_free(ac->text);
+    g_free(ac);
+}
+
+void web_menu_ai_replace(Web *w, const char *text) {
+    char *clean = g_malloc(WEBAI_MAX + 1);
+    if (!w->view || !ai_orig || webai_clean(text, clean)) { g_free(clean); web_note("✨ AI's Replace refused: nothing to replace"); return; }
+    GVariantDict args;
+    g_variant_dict_init(&args, NULL);
+    g_variant_dict_insert(&args, "orig", "s", ai_orig);
+    g_variant_dict_insert(&args, "text", "s", clean);
+    AiCall *ac = g_new0(AiCall, 1);
+    ac->w = w;
+    ac->text = clean;
+    ai_forget();                    /* one Replace per menu */
+    webkit_web_view_call_async_javascript_function(w->view, AI_CHECK, -1, g_variant_dict_end(&args), WEBSELECT_WORLD, NULL, NULL, on_ai_check, ac);
+}
+
 /* ---- the menu ---- */
 
 typedef struct {
@@ -344,6 +403,12 @@ static void show(Web *w, const WebMenuAt *a) {
     if (w->view && webkit_web_view_can_go_forward(w->view)) at |= WEBMENU_AT_FORWARD;
     /* the selection right-clicked is the session's primary selection too: the menu's Speech reads that one */
     if (text && !a->text_cut && w->win) webwin_set_primary(w->win, text);
+    /* ✨ AI: the whole selection (not one the page cut), cleaned; kept as it was for a Replace in a text field */
+    char *ai = g_malloc(WEBAI_MAX + 1);
+    ai[0] = 0;
+    ai_forget();
+    if (text && !a->text_cut && webai_clean(text, ai)) ai[0] = 0;
+    if (ai[0] && (at & WEBMENU_AT_EDITABLE)) ai_orig = g_strdup(text);
     MenuCall *mc = g_new0(MenuCall, 1);
     mc->w = w;
     /* WebKit's spelling items of this right click (a text field's), taken over */
@@ -374,8 +439,10 @@ static void show(Web *w, const WebMenuAt *a) {
     for (int i = 0; i < mc->spell.n; i++) g_variant_builder_add(&gb, "s", mc->spell.guess[i]);
     w->menu_open = 1;
     g_dbus_connection_call(w->bus, ASK_NAME, ASK_PATH, ASK_NAME, "Menu",
-                           g_variant_new("(ssasusas)", w->app.id, w->profile->id, &b, checked, has_search ? snip : "", &gb),
+                           g_variant_new("(ssasusass)", w->app.id, w->profile->id, &b, checked, has_search ? snip : "", &gb, ai),
                            G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NO_AUTO_START, ASK_TIMEOUT_MS, NULL, on_menu, mc);
+    memset(ai, 0, strlen(ai));
+    g_free(ai);
 }
 
 /* ---- a text field's report, waiting for WebKit's menu ---- */

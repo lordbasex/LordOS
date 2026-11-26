@@ -62,7 +62,8 @@ function runJob({ model, action, target, text }, onState) {
 const TITLE = { fix: 'writing.action.fix', improve: 'writing.action.improve', shorter: 'writing.action.shorter' };
 
 // The panel, at { x, y } of the field's box (anchor), above the windows; bounds as the field's menu has them.
-// job: { action, target, text, model }; onReplace(text) → false when the field's text changed meanwhile.
+// job: { action, target, text, model }; onReplace(text) → false when the field's text changed meanwhile (none: no
+// Replace, as for a page's text that isn't in a field). Without anchor it is drawn where the caller's layer is.
 export function WritingPanel({ anchor, at, bounds, job, onReplace, onClose }) {
   const t = useTheme();
   const [st, setSt] = useState(writingStart);
@@ -78,6 +79,7 @@ export function WritingPanel({ anchor, at, bounds, job, onReplace, onClose }) {
   const replace = () => {
     const s = view.current.st;
     if (!canReplace(s)) return;
+    if (!view.current.onReplace) return;
     if (view.current.onReplace(s.text) === false) { setNote('changed'); return; }
     view.current.onClose();
   };
@@ -100,8 +102,7 @@ export function WritingPanel({ anchor, at, bounds, job, onReplace, onClose }) {
     ? tr('writing.action.translateTo', { language: tOptional(`languages.${job.target}`) || job.target }) : tr(TITLE[job.action]);
   const busy = st.phase === 'waiting' || st.phase === 'writing';
   const errText = st.phase === 'error' ? (st.error === 'llm.timeout' ? tr('writing.panel.timeout') : tr('writing.panel.failed')) : '';
-  return (
-    <Overlay anchor={anchor}>
+  const box = (
       <View keepFocus style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }}>
         <View onMouseDown={(e) => e?.stopPropagation?.()} style={{ position: 'absolute', left, top, width: W, padding: 12, gap: 10, borderRadius: 12,
           backgroundColor: t.mode === 'dark' ? '#2c2c31' : '#ffffff', border: `1px solid ${t.separator}`, boxShadow: '0 12px 34px rgba(0,0,0,0.35)' }}>
@@ -122,10 +123,11 @@ export function WritingPanel({ anchor, at, bounds, job, onReplace, onClose }) {
             <Text style={{ flex: 1, fontSize: 11, color: t.textDim, textAlign: 'start' }}>{tr('writing.panel.local')}</Text>
             <Button small label={tr('writing.panel.discard')} onClick={discard} />
             <Button small label={tr('writing.panel.copy')} onClick={copy} disabled={!st.text || busy} />
-            <Button small primary label={tr('writing.panel.replace')} onClick={replace} disabled={!canReplace(st)} />
+            {onReplace ? <Button small primary label={tr('writing.panel.replace')} onClick={replace} disabled={!canReplace(st)} /> : null}
           </View>
         </View>
       </View>
-    </Overlay>
   );
+  // no anchor: the caller's own layer (a web app's page menu, at screen coordinates); no onReplace: Copy only
+  return anchor ? <Overlay anchor={anchor}>{box}</Overlay> : box;
 }

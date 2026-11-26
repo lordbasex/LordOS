@@ -1124,6 +1124,21 @@ Notification sound and, when LordOS's sound plays, which one.
   30 s: before, a profile added during the visit showed "none yet" until Settings was opened again, because its folder
   only exists after its first start.
 
+## ✨ AI on a page's selection (in development)
+
+With text selected in a page, LordOS's menu also shows **✨ AI ▸** (Correct, Improve, Make it shorter, Translate to)
+when Writing is on and a model is installed ([AI.md](AI.md), "Writing"). It is the shell's, never the page's or
+lord-web's: the `Menu` call carries the whole selection as its last argument (`"(ssasusass)"`), only when the page
+didn't cut it, cleaned by `webai_clean` (`server/src/web/webedit.c`: at most 4,000 characters, no control or bidi
+characters) in lord-web and again in lord-server (`ui/webask.c`); a password field has none (the page script reports
+no selection there). Choosing an action answers lord-web `""` and opens the shell's panel. **Replace** is offered only
+for a selection inside a text field: `lord.webapps.writeReplace(app, profile, text)` → `WriteReplace(text)` on lord-web's
+own bus name, which takes it only from lord-server (checked by pid, like `Edit`) and, in the page script's world, only
+if the focused element is still a text field that isn't a password (or editable content), the window has the focus and
+its selection is exactly the one the menu had; then the text goes in as typed (`insertText`, else WebKit's
+`InsertText`). Otherwise nothing changes and lord-web's log says why. Copy and Discard work as everywhere.
+Tests: `build/webapp-test` (`webai_clean`, a fuzz), `webapps_model_test.mjs` (the row, its place, the text).
+
 ## Spelling (in development)
 
 lord-web turns on WebKit's own spell checker (`webkit_web_context_set_spell_checking_enabled`; WebKit checks with
