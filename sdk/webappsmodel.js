@@ -460,24 +460,83 @@ export function webEditItems(label, run) {
   return WEB_EDIT_ROWS.map((r) => (r === '-' ? '-' : { label: label(r[0]), hint: r[1], onClick: () => run(r[0]) }));
 }
 
-// The items a page's context menu may have (server/src/web/webedit.c's closed list, in its order); the editing
-// ones come first, then the link's, then the image's, with a separator between the groups.
-export const WEB_MENU_ITEMS = ['cut', 'copy', 'paste', 'selectAll', 'copyLink', 'openLink', 'copyImage'];
-const MENU_GROUP = { cut: 0, copy: 0, paste: 0, selectAll: 0, copyLink: 1, openLink: 1, copyImage: 2 };
+// The items a page's context menu may have (server/src/web/webedit.c's closed list, in its order). lord-web sends the
+// ones for what is under the pointer, in a browser's order; the shell groups them with separators between groups.
+export const WEB_MENU_ITEMS = [
+  'spell1', 'spell2', 'spell3', 'spell4', 'spell5', 'ignoreSpelling', 'learnSpelling',
+  'undo', 'redo', 'cut', 'copy', 'paste', 'pastePlain', 'selectAll', 'emoji',
+  'copyHighlight', 'search', 'speech',
+  'openLink', 'copyLink',
+  'openImage', 'saveImage', 'copyImage', 'copyImageAddress',
+  'play', 'pause', 'mute', 'unmute', 'loop', 'controls', 'saveVideo', 'saveAudio',
+  'back', 'forward', 'reload',
+  'inspect',
+];
+const SPELL = ['spell1', 'spell2', 'spell3', 'spell4', 'spell5'];
+const MENU_GROUP = {
+  spell1: 0, spell2: 0, spell3: 0, spell4: 0, spell5: 0, ignoreSpelling: 1, learnSpelling: 1, undo: 2, redo: 2,
+  cut: 3, copy: 3, paste: 3, pastePlain: 3, selectAll: 3, copyHighlight: 3, search: 3, emoji: 4, speech: 5,
+  openLink: 6, copyLink: 6, openImage: 7, saveImage: 7, copyImage: 7, copyImageAddress: 7,
+  play: 8, pause: 8, mute: 8, unmute: 8, loop: 8, controls: 8, saveVideo: 8, saveAudio: 8, back: 9, forward: 9, reload: 9, inspect: 10,
+};
+// the keys that do the same in a web app's window (lord-web's own, server/src/web/webwin.c, or WebKit's)
+export const WEB_MENU_KEYS = {
+  undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', cut: 'Ctrl+X', copy: 'Ctrl+C', paste: 'Ctrl+V', pastePlain: 'Ctrl+Shift+V', selectAll: 'Ctrl+A',
+  emoji: '❖.', back: 'Alt+←', forward: 'Alt+→', reload: 'Ctrl+R',
+};
+// Items the shell runs itself, never lord-web (webmenu_shell_only): LordOS's emoji picker, its Speech submenu, and
+// Inspect (developer tools), which shows only while developer mode is on.
+export const WEB_MENU_SHELL = ['emoji', 'speech', 'inspect'];
 
-// The "webapps-menu" event's items → ContextMenu items. Unknown names and repeats are left out (lord-server sends
-// only known ones, once); pick(name) is what a click does.
-export function webMenuItems(names, label, pick) {
+// A page's text in a menu row, in its own direction whatever the menu's (first strong isolate … pop isolate):
+// lord-server already removed control and bidi characters from it.
+export const isolate = (s) => `⁨${String(s ?? '')}⁩`;
+
+// The "webapps-menu" event → ContextMenu items. menu: { items, checked, text, guesses } (or just the items' names).
+// label(name, vars) is a row's words; pick(name) answers lord-web; shell: { developer, speech() → a submenu item or
+// null, emoji(), inspect() } for the shell's own items (a pick of one answers lord-web "" first). Unknown names,
+// repeats, a spelling suggestion without its word and a search without its text are left out.
+export function webMenuItems(menu, label, pick, shell = {}) {
+  const m = Array.isArray(menu) ? { items: menu } : menu || {};
+  const checked = new Set(Array.isArray(m.checked) ? m.checked : []);
+  const guesses = Array.isArray(m.guesses) ? m.guesses : [];
   const out = [];
   let group = -1;
-  for (const n of Array.isArray(names) ? names : []) {
+  let guess = 0;
+  const own = (fn) => () => { pick(''); fn?.(); };
+  for (const n of Array.isArray(m.items) ? m.items : []) {
     if (!WEB_MENU_ITEMS.includes(n) || out.some((i) => i !== '-' && i.id === n)) continue;
+    let it;
+    if (SPELL.includes(n)) {
+      const word = guesses[guess++];
+      if (typeof word !== 'string' || !word) continue;
+      it = { id: n, label: isolate(word), onClick: () => pick(n) };
+    } else if (n === 'search') {
+      if (typeof m.text !== 'string' || !m.text) continue;
+      it = { id: n, label: label(n, { text: isolate(m.text) }), onClick: () => pick(n) };
+    } else if (n === 'speech') {
+      const sp = shell.speech?.();
+      if (!sp) continue;
+      it = { ...sp, id: n };
+    } else if (n === 'inspect') {
+      if (shell.developer !== true) continue;
+      it = { id: n, label: label(n), onClick: own(shell.inspect) };
+    } else if (n === 'emoji') {
+      if (!shell.emoji) continue;
+      it = { id: n, label: label(n), hint: WEB_MENU_KEYS[n], onClick: own(shell.emoji) };
+    } else it = { id: n, label: label(n), hint: WEB_MENU_KEYS[n], checked: checked.has(n) || undefined, onClick: () => pick(n) };
     if (group >= 0 && MENU_GROUP[n] !== group) out.push('-');
     group = MENU_GROUP[n];
-    out.push({ id: n, label: label(n), onClick: () => pick(n) });
+    out.push(it);
   }
   return out;
 }
+
+// ---- Search the web (Settings → Web apps; server/src/web/websearch.h) ----
+
+// The engines the context menu's "Search the web" may use, a closed list; Google is the default, as in Chrome.
+export const SEARCH_ENGINES = ['google', 'duckduckgo', 'bing', 'startpage'];
+export const searchEngineOf = (v) => (SEARCH_ENGINES.includes(v) ? v : 'google');
 
 // ---- developer tools (docs/WEBAPPS.md, "Developer tools") ----
 

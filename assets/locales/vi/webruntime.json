@@ -12,5 +12,8 @@
   "inspect.title": "Công cụ nhà phát triển đang bật",
   "inspect.body": "Công cụ đã mở trong trình duyệt của bạn và vẫn bật cho đến khi bạn đóng cửa sổ này.",
   "inspect.open": "Mở trong trình duyệt",
-  "inspect.failed": "Không thể khởi động công cụ nhà phát triển"
+  "inspect.failed": "Không thể khởi động công cụ nhà phát triển",
+  "save.image": "Lưu hình ảnh",
+  "save.video": "Lưu video",
+  "save.audio": "Lưu âm thanh"
 }

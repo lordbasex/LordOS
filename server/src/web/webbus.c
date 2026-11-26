@@ -17,8 +17,7 @@
  *     the bus says the caller's pid is the lord-server that started this lord-web; the desktop's light or dark mode,
  *     org.lordos.WebApp1.SetColorScheme("light" | "dark"), with the same check (webscheme.h); the profile's Browser
  *     identity, org.lordos.WebApp1.SetUserAgent("chrome" | "edge" | "firefox" | "lordos"), with the same check (webpage.h);
- *   - the page's context menu: org.lordos.WebApps1.Menu(app, profile, items) on lord-server, which shows LordOS's own
- *     menu with those items (names from webedit.h, never the page's text) and answers the one chosen.
+ *   - (the page's context menu, org.lordos.WebApps1.Menu, and its save dialog are webmenu.c's)
  * Every call is asynchronous: nothing here waits for another program. */
 #include "web.h"
 #include "webwin.h"
@@ -333,43 +332,3 @@ static void check_caller(Web *w, const char *sender, int cmd, int arg) {
 void webbus_edit(Web *w, const char *sender, int cmd) { if (cmd >= 0) check_caller(w, sender, cmd, 0); }
 void webbus_scheme(Web *w, const char *sender, int scheme) { if (webscheme_name(scheme)) check_caller(w, sender, CALL_SCHEME, scheme); }
 void webbus_user_agent(Web *w, const char *sender, int kind) { if (webreg_ua_name(kind)) check_caller(w, sender, CALL_UA, kind); }
-
-typedef struct { Web *w; int items[WEBMENU_N], n; char *link, *image; } MenuCall;
-
-static void on_menu(GObject *src, GAsyncResult *res, gpointer d) {
-    MenuCall *mc = d;
-    GError *e = NULL;
-    GVariant *r = g_dbus_connection_call_finish(G_DBUS_CONNECTION(src), res, &e);
-    mc->w->menu_open = 0;
-    int item = -1;
-    if (r) {
-        const char *s = NULL;
-        g_variant_get(r, "(&s)", &s);
-        int k = s && s[0] ? webmenu_item(s) : -1;
-        for (int i = 0; i < mc->n; i++) if (mc->items[i] == k) item = k;     /* only one this menu had */
-        g_variant_unref(r);
-    } else {
-        fprintf(stderr, "lord-web: no context menu (%s)\n", e ? e->message : "?");
-        g_clear_error(&e);
-    }
-    if (item >= 0) web_menu_chosen(mc->w, item, mc->link, mc->image);
-    g_free(mc->link);
-    g_free(mc->image);
-    g_free(mc);
-}
-
-void webbus_menu(Web *w, const int *items, int n, const char *link, const char *image) {
-    if (!w->bus || !w->profile || n < 1 || n > WEBMENU_N || w->menu_open) return;
-    GVariantBuilder b;
-    g_variant_builder_init(&b, G_VARIANT_TYPE("as"));
-    for (int i = 0; i < n; i++) g_variant_builder_add(&b, "s", webmenu_name(items[i]));
-    MenuCall *mc = g_new0(MenuCall, 1);
-    mc->w = w;
-    mc->n = n;
-    for (int i = 0; i < n; i++) mc->items[i] = items[i];
-    mc->link = link ? g_strdup(link) : NULL;
-    mc->image = image ? g_strdup(image) : NULL;
-    w->menu_open = 1;
-    g_dbus_connection_call(w->bus, ASK_NAME, ASK_PATH, ASK_NAME, "Menu", g_variant_new("(ssas)", w->app.id, w->profile->id, &b),
-                           G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NO_AUTO_START, ASK_TIMEOUT_MS, NULL, on_menu, mc);
-}

@@ -1074,6 +1074,10 @@ EOF
     if [ -x build/web-backend-test ] && have bwrap && have xdg-dbus-proxy; then
         run "web-backend-test ($(cat build/gen/web_backend 2>/dev/null) backend)" build/web-backend-test
     else skip "web-backend-test" "wpe-webkit-2.0 (build/web-backend-test), bubblewrap and xdg-dbus-proxy"; fi
+    # the context menu's spelling suggestions from WebKit (docs/WEBAPPS.md, "Spelling"), WPEPlatform only
+    if [ -x build/web-menu-check ] && have bwrap && have xdg-dbus-proxy && ls /usr/share/hunspell/*.dic >/dev/null 2>&1; then
+        run "web-menu-check (spelling suggestions in the context menu)" build/web-menu-check
+    else skip "web-menu-check" "WPEPlatform (build/web-menu-check), bubblewrap, xdg-dbus-proxy and a hunspell dictionary"; fi
     # (in development, docs/WEBAPPS.md "Calls") a Chrome profile's Client Hints and navigator.userAgentData against
     # Chrome's own, SharedArrayBuffer only when cross-origin isolated, the call log; with an engine that has WebRTC, two
     # peer connections in one page exchanging audio and video (Opus with VP8, then H.264). WPEPlatform only

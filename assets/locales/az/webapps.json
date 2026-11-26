@@ -221,5 +221,12 @@
   "settings.developerTitle": "Tərtibatçı",
   "settings.developer": "Tərtibatçı rejimi",
   "settings.developerHint": "Hər veb tətbiqin Pəncərə menyusuna Yoxla (tərtibatçı alətləri) əlavə edir",
-  "settings.developerFooter": "Veb tərtibatçılar üçün. Tərtibatçı alətləri yoxladıqları tətbiqdəki hər şeyi görür; yalnız pəncərədə Yoxla seçib təsdiqlədikdən sonra və yalnız bu kompüterdə açılır. Bunu söndürmək onların aktiv olduğu hər pəncərəni bağlayır."
+  "settings.developerFooter": "Veb tərtibatçılar üçün. Tərtibatçı alətləri yoxladıqları tətbiqdəki hər şeyi görür; yalnız pəncərədə Yoxla seçib təsdiqlədikdən sonra və yalnız bu kompüterdə açılır. Bunu söndürmək onların aktiv olduğu hər pəncərəni bağlayır.",
+  "search.title": "Vebdə axtar",
+  "search.label": "Axtarış sistemi",
+  "search.footer": "Veb tətbiqin sağ klik menyusu seçilmiş mətni vebdə axtara bilər. Yalnız həmin mətn seçdiyiniz axtarış sisteminə gedir və brauzerinizdə açılır.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

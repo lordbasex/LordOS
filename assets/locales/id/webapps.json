@@ -219,5 +219,12 @@
   "settings.developerTitle": "Developer",
   "settings.developer": "Mode developer",
   "settings.developerHint": "Menambahkan Periksa (alat developer) ke menu Jendela setiap aplikasi web",
-  "settings.developerFooter": "Untuk developer web. Alat developer melihat semua hal di aplikasi yang diperiksanya; alat hanya terbuka setelah Anda memilih Periksa di sebuah jendela dan mengonfirmasi, dan hanya di komputer ini. Menonaktifkannya menutup setiap jendela yang alatnya aktif."
+  "settings.developerFooter": "Untuk developer web. Alat developer melihat semua hal di aplikasi yang diperiksanya; alat hanya terbuka setelah Anda memilih Periksa di sebuah jendela dan mengonfirmasi, dan hanya di komputer ini. Menonaktifkannya menutup setiap jendela yang alatnya aktif.",
+  "search.title": "Telusuri web",
+  "search.label": "Telusuri dengan",
+  "search.footer": "Menu klik kanan aplikasi web dapat menelusuri teks yang dipilih di web. Hanya teks itu yang dikirim ke mesin telusur pilihan Anda, dibuka di browser Anda.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

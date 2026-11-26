@@ -221,5 +221,12 @@
   "settings.developerTitle": "Geliştirici",
   "settings.developer": "Geliştirici modu",
   "settings.developerHint": "Her web uygulamasının Pencere menüsüne İncele (geliştirici araçları) ekler",
-  "settings.developerFooter": "Web geliştiricileri için. Geliştirici araçları inceledikleri uygulamadaki her şeyi görür; yalnızca bir pencerede İncele'yi seçip onayladıktan sonra ve yalnızca bu bilgisayarda açılır. Kapatmak, araçların açık olduğu her pencereyi kapatır."
+  "settings.developerFooter": "Web geliştiricileri için. Geliştirici araçları inceledikleri uygulamadaki her şeyi görür; yalnızca bir pencerede İncele'yi seçip onayladıktan sonra ve yalnızca bu bilgisayarda açılır. Kapatmak, araçların açık olduğu her pencereyi kapatır.",
+  "search.title": "Web'de ara",
+  "search.label": "Arama motoru",
+  "search.footer": "Bir web uygulamasının sağ tık menüsü seçili metni web'de arayabilir. Yalnızca o metin, tarayıcınızda açılan seçtiğiniz arama motoruna gider.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

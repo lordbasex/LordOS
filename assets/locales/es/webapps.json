@@ -221,5 +221,12 @@
   "settings.developerTitle": "Desarrollo",
   "settings.developer": "Modo desarrollador",
   "settings.developerHint": "Agrega Inspeccionar (herramientas para desarrolladores) al menú Ventana de cada app web",
-  "settings.developerFooter": "Para desarrolladores web. Las herramientas para desarrolladores ven todo en la app que inspeccionan; se abren solo después de elegir Inspeccionar en una ventana y confirmar, y solo en esta computadora. Desactivarlo cierra cualquier ventana que las tenga activadas."
+  "settings.developerFooter": "Para desarrolladores web. Las herramientas para desarrolladores ven todo en la app que inspeccionan; se abren solo después de elegir Inspeccionar en una ventana y confirmar, y solo en esta computadora. Desactivarlo cierra cualquier ventana que las tenga activadas.",
+  "search.title": "Buscar en la web",
+  "search.label": "Buscar con",
+  "search.footer": "El menú del clic derecho de una app web puede buscar en la web el texto seleccionado. Solo ese texto va al buscador que elijas, abierto en tu navegador.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

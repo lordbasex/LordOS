@@ -221,5 +221,12 @@
   "settings.developerTitle": "Desenvolupament",
   "settings.developer": "Mode de desenvolupador",
   "settings.developerHint": "Afegeix Inspecciona (eines per a desenvolupadors) al menú Finestra de cada app web",
-  "settings.developerFooter": "Per a desenvolupadors web. Les eines per a desenvolupadors ho veuen tot en l'app que inspeccionen; només s'obren després que triïs Inspecciona en una finestra i ho confirmis, i només en aquest ordinador. Desactivar-ho tanca qualsevol finestra que les tingui actives."
+  "settings.developerFooter": "Per a desenvolupadors web. Les eines per a desenvolupadors ho veuen tot en l'app que inspeccionen; només s'obren després que triïs Inspecciona en una finestra i ho confirmis, i només en aquest ordinador. Desactivar-ho tanca qualsevol finestra que les tingui actives.",
+  "search.title": "Cerca al web",
+  "search.label": "Cerca amb",
+  "search.footer": "El menú del clic dret d'una app web pot cercar al web el text seleccionat. Només aquest text va al cercador que triïs, obert al teu navegador.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

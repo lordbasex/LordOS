@@ -221,5 +221,12 @@
   "settings.developerTitle": "Developer",
   "settings.developer": "Developer mode",
   "settings.developerHint": "Adds Inspect (developer tools) to each web app's Window menu",
-  "settings.developerFooter": "For web developers. Developer tools see everything in the app they inspect; they open only after you choose Inspect in a window and confirm, and only on this computer. Turning this off closes any window that has them on."
+  "settings.developerFooter": "For web developers. Developer tools see everything in the app they inspect; they open only after you choose Inspect in a window and confirm, and only on this computer. Turning this off closes any window that has them on.",
+  "search.title": "Search the web",
+  "search.label": "Search with",
+  "search.footer": "A web app's right-click menu can search the web for the selected text. Only that text goes to the engine you choose, opened in your browser.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

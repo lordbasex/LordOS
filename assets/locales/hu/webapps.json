@@ -221,5 +221,12 @@
   "settings.developerTitle": "Fejlesztő",
   "settings.developer": "Fejlesztői mód",
   "settings.developerHint": "Hozzáadja a Vizsgálat (fejlesztői eszközök) parancsot minden webalkalmazás Ablak menüjéhez",
-  "settings.developerFooter": "Webfejlesztőknek. A fejlesztői eszközök mindent látnak a vizsgált alkalmazásban; csak akkor nyílnak meg, ha egy ablakban a Vizsgálatot választja és megerősíti, és csak ezen a számítógépen. A kikapcsolás bezár minden ablakot, amelyben be vannak kapcsolva."
+  "settings.developerFooter": "Webfejlesztőknek. A fejlesztői eszközök mindent látnak a vizsgált alkalmazásban; csak akkor nyílnak meg, ha egy ablakban a Vizsgálatot választja és megerősíti, és csak ezen a számítógépen. A kikapcsolás bezár minden ablakot, amelyben be vannak kapcsolva.",
+  "search.title": "Keresés a weben",
+  "search.label": "Keresés ezzel",
+  "search.footer": "Egy webalkalmazás jobb gombos menüje a kijelölt szövegre kereshet a weben. Csak ez a szöveg kerül a választott keresőhöz, a böngésződben megnyitva.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

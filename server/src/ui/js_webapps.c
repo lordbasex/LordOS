@@ -47,6 +47,8 @@
  *   edit(app, profile, command)         the Edit menu on that web app's window: undo|redo|cut|copy|paste|selectAll, to its
  *                                       lord-web (org.lordos.WebApp1.Edit, which checks the caller is lord-server)
  *   menuAnswer(id, item)                the person's choice in a page's context menu (the "webapps-menu" event), or ""
+ *   searchEngine() · setSearchEngine(name)  Settings → Web Apps → Search the web with (google, duckduckgo, bing,
+ *                                       startpage; ~/.config/lordos/web/search.json): the page's context menu's search
  *   developerMode() · setDeveloperMode(on)  Settings → Web Apps → Developer mode (~/.config/lordos/web/developer.json);
  *                                       off ends every window that has developer tools on
  *   inspect(app, profile)               → 'started' or 'running': that window again with WebKit's remote inspector on
@@ -63,6 +65,7 @@
 #include "../web/webedit.h"
 #include "../web/webmem.h"
 #include "../web/webmgr.h"
+#include "../web/websearch.h"
 #include "../wl/wl.h"
 #include "../wl/wl.h"
 #include "../wl/xdgact.h"
@@ -668,6 +671,20 @@ static JSValue f_set_developer_mode(JSContext *c, JSValueConst t, int argc, JSVa
     return done(c, webmgr_set_developer(JS_ToBool(c, argv[0]) == 1), JS_TRUE);
 }
 
+/* Settings → Web apps → Search the web with (websearch.h): "google", "duckduckgo", "bing" or "startpage" */
+static JSValue f_search_engine(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return JS_NewString(c, websearch_engine_name(webmgr_search_engine()));
+}
+
+static JSValue f_set_search_engine(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *v = arg_str(c, argc, argv, 0);
+    const char *err = v ? webmgr_set_search_engine(v) : "sys.badArgument";
+    JS_FreeCString(c, v);
+    return done(c, err, JS_TRUE);
+}
+
 /* the shell asked the person first (<WebAppInspectPrompt />); the window starts again with the inspector on */
 static JSValue f_inspect(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
@@ -726,6 +743,8 @@ static const JSCFunctionListEntry webapps_funcs[] = {
     JS_CFUNC_DEF("developerMode", 0, f_developer_mode),
     JS_CFUNC_DEF("setDeveloperMode", 1, f_set_developer_mode),
     JS_CFUNC_DEF("inspect", 2, f_inspect),
+    JS_CFUNC_DEF("searchEngine", 0, f_search_engine),
+    JS_CFUNC_DEF("setSearchEngine", 1, f_set_search_engine),
 };
 
 /* notifyd's question: is pid one of our lord-web processes (and whose)? */

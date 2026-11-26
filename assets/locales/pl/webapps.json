@@ -225,5 +225,12 @@
   "settings.developerTitle": "Dla deweloperów",
   "settings.developer": "Tryb dewelopera",
   "settings.developerHint": "Dodaje Zbadaj (narzędzia deweloperskie) do menu Okno każdej aplikacji webowej",
-  "settings.developerFooter": "Dla twórców stron. Narzędzia deweloperskie widzą wszystko w badanej aplikacji; otwierają się dopiero po wybraniu Zbadaj w oknie i potwierdzeniu, i tylko na tym komputerze. Wyłączenie zamyka każde okno, w którym są włączone."
+  "settings.developerFooter": "Dla twórców stron. Narzędzia deweloperskie widzą wszystko w badanej aplikacji; otwierają się dopiero po wybraniu Zbadaj w oknie i potwierdzeniu, i tylko na tym komputerze. Wyłączenie zamyka każde okno, w którym są włączone.",
+  "search.title": "Szukaj w sieci",
+  "search.label": "Szukaj za pomocą",
+  "search.footer": "Menu prawego przycisku aplikacji internetowej może wyszukać w sieci zaznaczony tekst. Tylko ten tekst trafia do wybranej wyszukiwarki, otwartej w przeglądarce.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

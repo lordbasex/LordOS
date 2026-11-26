@@ -221,5 +221,12 @@
   "settings.developerTitle": "Msanidi",
   "settings.developer": "Hali ya msanidi",
   "settings.developerHint": "Huongeza Kagua (zana za msanidi) kwenye menyu ya Dirisha ya kila programu ya wavuti",
-  "settings.developerFooter": "Kwa wasanidi wa wavuti. Zana za msanidi huona kila kitu katika programu wanayoikagua; zinafunguka tu baada ya kuchagua Kagua katika dirisha na kuthibitisha, na kwenye kompyuta hii pekee. Kuzima hiki hufunga dirisha lolote lenye zana hizo zimewashwa."
+  "settings.developerFooter": "Kwa wasanidi wa wavuti. Zana za msanidi huona kila kitu katika programu wanayoikagua; zinafunguka tu baada ya kuchagua Kagua katika dirisha na kuthibitisha, na kwenye kompyuta hii pekee. Kuzima hiki hufunga dirisha lolote lenye zana hizo zimewashwa.",
+  "search.title": "Tafuta kwenye wavuti",
+  "search.label": "Tafuta kwa",
+  "search.footer": "Menyu ya kubofya kulia ya programu ya wavuti inaweza kutafuta maandishi uliyochagua kwenye wavuti. Maandishi hayo pekee ndiyo huenda kwa injini ya utafutaji unayochagua, ikifunguliwa kwenye kivinjari chako.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

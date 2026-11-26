@@ -12,5 +12,8 @@
   "inspect.title": "Strumenti per sviluppatori attivi",
   "inspect.body": "Si sono aperti nel browser e restano attivi finché non chiudi questa finestra.",
   "inspect.open": "Apri nel browser",
-  "inspect.failed": "Impossibile avviare gli strumenti per sviluppatori"
+  "inspect.failed": "Impossibile avviare gli strumenti per sviluppatori",
+  "save.image": "Salva immagine",
+  "save.video": "Salva video",
+  "save.audio": "Salva audio"
 }

@@ -41,9 +41,9 @@ endif
 # the language of its own words, an app that is offline (weboffline.h: which load errors are the network's, the retry's delay, its page),
 # the gate in front of the developer tools (webguard.h: the request head, Host, Origin, the one-time address and the cookie)
 WEB_PURE_SRC := src/web/webargs.c src/web/webreg.c src/web/weburl.c src/web/webmanifest.c src/web/webdl.c src/web/webaxis.c src/web/webpage.c \
-                src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/webscheme.c src/web/webinspect.c src/web/webguard.c src/web/webua.c src/web/webcall.c src/sec/json.c
+                src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/websearch.c src/web/webscheme.c src/web/webinspect.c src/web/webguard.c src/web/webua.c src/web/webcall.c src/spellang.c src/sec/json.c
 WEB_PURE_HDR := src/web/webargs.h src/web/webreg.h src/web/weburl.h src/web/webmanifest.h src/web/webdl.h src/web/webaxis.h src/web/webpage.h \
-                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/webscheme.h src/web/webinspect.h src/web/webguard.h src/web/weblangid.h src/web/weboffline.h src/web/webframe.h src/web/webua.h src/web/webcall.h src/sec/json.h
+                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/websearch.h src/web/webscheme.h src/web/webinspect.h src/web/webguard.h src/web/weblangid.h src/web/weboffline.h src/web/webframe.h src/web/webua.h src/web/webcall.h src/spellang.h src/sec/json.h
 
 # Chrome's Client Hints and navigator.userAgentData from one table (webua.h), the call log's lines (webcall.h)
 test: build/webua-test
@@ -71,7 +71,7 @@ WEB_PROTO := staging/xdg-activation/xdg-activation-v1
 $(foreach p,$(WEB_PROTO),$(eval $(call wl_client_proto,$(p))))
 WEB_GEN := $(foreach p,$(WEB_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
 WEB_CLIENT_C := $(filter %/xdg-shell-protocol.c %/xdg-decoration-unstable-v1-protocol.c %/linux-dmabuf-v1-protocol.c %/viewporter-protocol.c \
-                         %/fractional-scale-v1-protocol.c %/text-input-unstable-v3-protocol.c %/cursor-shape-v1-protocol.c %/tablet-v2-protocol.c,$(CLIENT_GEN)) \
+                         %/fractional-scale-v1-protocol.c %/text-input-unstable-v3-protocol.c %/cursor-shape-v1-protocol.c %/tablet-v2-protocol.c %/primary-selection-unstable-v1-protocol.c,$(CLIENT_GEN)) \
                 $(filter %.c,$(WEB_GEN))
 
 ifeq ($(LORD_WEB_BACKEND),platform)
@@ -80,7 +80,7 @@ else
 WEB_BACK_SRC := src/web/webback_legacy.c src/web/webshm.c
 endif
 WEB_SRC := src/web/webmain.c src/web/webengine.c src/web/webwin.c $(WEB_BACK_SRC) src/web/webbus.c src/web/webtray.c src/web/webprobe.c \
-           src/web/weblang.c src/web/webxfer.c src/web/webselect.c src/web/webdark.c src/web/webproxy.c src/web/webhints.c src/web/webcalls.c $(WEB_PURE_SRC) src/sec/cgroup.c src/sec/sandbox.c
+           src/web/weblang.c src/web/webxfer.c src/web/webselect.c src/web/webdark.c src/web/webproxy.c src/web/webhints.c src/web/webcalls.c src/web/webmenu.c $(WEB_PURE_SRC) src/sec/cgroup.c src/sec/sandbox.c
 WEB_HDR := src/web/web.h src/web/webwin.h src/web/webback.h src/web/webshm.h $(WEB_PURE_HDR) src/sec/cgroup.h src/sec/sandbox.h
 
 # WebKit's headers are not ours: -isystem, so -Wall -Wextra apply to lord-web's own code only
@@ -132,6 +132,15 @@ build/webcalls-check: tests/webcalls_check.c src/web/webhints.c src/web/webcalls
 	$(CC) $(CPPFLAGS) $(WEB_CFLAGS) $(patsubst -I%,-isystem %,$(shell pkg-config --cflags wpe-platform-headless-2.0)) $(CFLAGS) $(WARN) -std=c11 \
 	    -o $@ tests/webcalls_check.c src/web/webhints.c src/web/webcalls.c $(WEB_PURE_SRC) $(WEB_LIBS) $(shell pkg-config --libs wpe-platform-headless-2.0) -lm
 test: build/webcalls-check
+endif
+
+# what the context menu takes from WebKit, headless (tests/web_menu_check.c): spelling suggestions with the dictionaries
+# spellang.h picks, applied after the menu; WPEPlatform only (run by tests/run_suites.sh when a dictionary is installed)
+ifeq ($(LORD_WEB_BACKEND),platform)
+build/web-menu-check: tests/web_menu_check.c $(WEB_BACK_SRC) src/web/webback.h src/web/websearch.c src/web/websearch.h src/spellang.c src/spellang.h src/sec/json.c build/gen/web_backend
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(WEB_CFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/web_menu_check.c $(WEB_BACK_SRC) src/web/websearch.c src/spellang.c src/sec/json.c $(WEB_LIBS) -lm
+test: build/web-menu-check
 endif
 
 # the backend alone, headless (tests/web_backend_test.c): a local page rendered and its pixels checked, a key and a

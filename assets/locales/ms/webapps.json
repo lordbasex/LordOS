@@ -219,5 +219,12 @@
   "settings.developerTitle": "Pembangun",
   "settings.developer": "Mod pembangun",
   "settings.developerHint": "Menambah Periksa (alat pembangun) pada menu Tetingkap setiap apl web",
-  "settings.developerFooter": "Untuk pembangun web. Alat pembangun melihat segala-galanya dalam apl yang diperiksanya; alat hanya dibuka selepas anda memilih Periksa dalam tetingkap dan mengesahkannya, dan hanya pada komputer ini. Mematikannya menutup mana-mana tetingkap yang alatnya hidup."
+  "settings.developerFooter": "Untuk pembangun web. Alat pembangun melihat segala-galanya dalam apl yang diperiksanya; alat hanya dibuka selepas anda memilih Periksa dalam tetingkap dan mengesahkannya, dan hanya pada komputer ini. Mematikannya menutup mana-mana tetingkap yang alatnya hidup.",
+  "search.title": "Cari di web",
+  "search.label": "Cari dengan",
+  "search.footer": "Menu klik kanan apl web boleh mencari teks yang dipilih di web. Hanya teks itu dihantar ke enjin carian pilihan anda, dibuka dalam pelayar anda.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

@@ -223,5 +223,12 @@
   "settings.developerTitle": "Kūrėjams",
   "settings.developer": "Kūrėjo režimas",
   "settings.developerHint": "Prideda „Tikrinti (kūrėjo įrankiai)“ prie kiekvienos žiniatinklio programos meniu „Langas“",
-  "settings.developerFooter": "Žiniatinklio kūrėjams. Kūrėjo įrankiai mato viską programoje, kurią tikrina; jie atsidaro tik lange pasirinkus „Tikrinti“ ir patvirtinus, ir tik šiame kompiuteryje. Išjungus uždaromas kiekvienas langas, kuriame jie įjungti."
+  "settings.developerFooter": "Žiniatinklio kūrėjams. Kūrėjo įrankiai mato viską programoje, kurią tikrina; jie atsidaro tik lange pasirinkus „Tikrinti“ ir patvirtinus, ir tik šiame kompiuteryje. Išjungus uždaromas kiekvienas langas, kuriame jie įjungti.",
+  "search.title": "Ieškoti žiniatinklyje",
+  "search.label": "Ieškoti su",
+  "search.footer": "Žiniatinklio programos dešiniojo spustelėjimo meniu gali ieškoti pažymėto teksto žiniatinklyje. Tik tas tekstas siunčiamas pasirinktai paieškos sistemai, atidarytai jūsų naršyklėje.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

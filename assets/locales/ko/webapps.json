@@ -219,5 +219,12 @@
   "settings.developerTitle": "개발자",
   "settings.developer": "개발자 모드",
   "settings.developerHint": "각 웹 앱의 윈도우 메뉴에 검사(개발자 도구)를 추가합니다",
-  "settings.developerFooter": "웹 개발자용입니다. 개발자 도구는 검사하는 앱의 모든 것을 봅니다. 윈도우에서 검사를 선택하고 확인한 후에만, 이 컴퓨터에서만 열립니다. 끄면 도구가 켜진 윈도우가 모두 닫힙니다."
+  "settings.developerFooter": "웹 개발자용입니다. 개발자 도구는 검사하는 앱의 모든 것을 봅니다. 윈도우에서 검사를 선택하고 확인한 후에만, 이 컴퓨터에서만 열립니다. 끄면 도구가 켜진 윈도우가 모두 닫힙니다.",
+  "search.title": "웹 검색",
+  "search.label": "검색 엔진",
+  "search.footer": "웹 앱의 오른쪽 클릭 메뉴에서 선택한 텍스트를 웹에서 검색할 수 있습니다. 그 텍스트만 선택한 검색 엔진으로 전송되어 브라우저에서 열립니다.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

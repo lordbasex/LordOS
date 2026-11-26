@@ -221,5 +221,12 @@
   "settings.developerTitle": "Ontwikkelaar",
   "settings.developer": "Ontwikkelaarsmodus",
   "settings.developerHint": "Voegt Inspecteren (ontwikkelaarstools) toe aan het menu Venster van elke webapp",
-  "settings.developerFooter": "Voor webontwikkelaars. Ontwikkelaarstools zien alles in de app die ze inspecteren; ze openen pas nadat je in een venster Inspecteren kiest en bevestigt, en alleen op deze computer. Uitschakelen sluit elk venster waarin ze aan staan."
+  "settings.developerFooter": "Voor webontwikkelaars. Ontwikkelaarstools zien alles in de app die ze inspecteren; ze openen pas nadat je in een venster Inspecteren kiest en bevestigt, en alleen op deze computer. Uitschakelen sluit elk venster waarin ze aan staan.",
+  "search.title": "Op het web zoeken",
+  "search.label": "Zoeken met",
+  "search.footer": "Het rechtsklikmenu van een web-app kan de geselecteerde tekst op het web zoeken. Alleen die tekst gaat naar de gekozen zoekmachine, geopend in je browser.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

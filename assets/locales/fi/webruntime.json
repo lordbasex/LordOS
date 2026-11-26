@@ -12,5 +12,8 @@
   "inspect.title": "Kehittäjätyökalut ovat päällä",
   "inspect.body": "Ne avautuivat selaimeesi ja pysyvät päällä, kunnes suljet tämän ikkunan.",
   "inspect.open": "Avaa selaimessa",
-  "inspect.failed": "Kehittäjätyökaluja ei voitu käynnistää"
+  "inspect.failed": "Kehittäjätyökaluja ei voitu käynnistää",
+  "save.image": "Tallenna kuva",
+  "save.video": "Tallenna video",
+  "save.audio": "Tallenna ääni"
 }

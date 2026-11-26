@@ -113,11 +113,23 @@ void web_offline_restyle(Web *w);
 double web_now_ms(void);                                 /* monotonic */
 /* an editing command on the page (webedit.h's WEBEDIT_*): the Edit menu, the context menu */
 void web_edit(Web *w, int cmd);
-/* the person chose item (WEBMENU_*) in the page's context menu; link and image are what was under the pointer */
-void web_menu_chosen(Web *w, int item, const char *link, const char *image);
-/* a right click in the page (WEBMENU_AT_* of what is under the pointer, a link's and an image's address or NULL):
- * LordOS's menu with the items for it (webbus_menu); addresses of the wrong kind are dropped */
-void web_context_menu(Web *w, unsigned at, const char *link, const char *image);
+/* what a right click in the page was on (webselect.c's report, or WebKit's hit test): WEBMENU_AT_EDITABLE and
+ * WEBMENU_AT_SELECTION, the media states (WEBMENU_AT_PAUSED…), and the page's strings (each may be NULL): a link's
+ * address, an image's, a video's or audio's source, the selected text (text_cut: the page had more of it) */
+typedef struct { unsigned at; const char *link, *image, *media, *text; int text_cut; } WebMenuAt;
+/* webmenu.c: LordOS's menu at the pointer with the items for it (org.lordos.WebApps1.Menu); addresses of the wrong
+ * kind are dropped, and what the person chooses runs here */
+void web_context_menu(Web *w, const WebMenuAt *a);
+/* WebKit asked for its own menu (the view's "context-menu"): its spelling suggestions, Ignore Spelling and Learn
+ * Spelling are kept for LordOS's menu of the same right click */
+void web_menu_webkit(Web *w, WebKitContextMenu *m);
+/* 1 when WebKit asks for its menu on a right click in a text field the page left alone (WPEPlatform): the page
+ * script lets it then, for the spelling items */
+int web_menu_webkit_asks(void);
+/* the key of a download (g_object_get_data) whose file the person chose in the save dialog: its path */
+#define WEBMENU_DEST_KEY "lord-web-dest"
+/* Save Image As… on an image the page made itself (a blob: address), read by webxfer.c: its bytes (taken over) */
+void web_menu_save_bytes(Web *w, const char *mime, GBytes *data);
 void web_state_save(Web *w);
 
 /* webhints.c: Chrome's Client Hints and navigator.userAgentData for a profile that identifies as Chrome (webua.h) */
@@ -160,14 +172,19 @@ int webxfer_paste_text(Web *w, const char *text);
 /* the context menu's Copy Image: the page's image at uri (read by the page's own origin, in lord-web's isolated world,
  * made a PNG when it is in another format) goes to the session's clipboard */
 void webxfer_copy_image(Web *w, const char *uri);
+/* Save Image As… on a blob: image: the same read, its bytes to web_menu_save_bytes */
+void webxfer_save_image(Web *w, const char *uri);
 
 /* webdark.c */
 void webdark_init(Web *w);                               /* the script and the background, before the first load */
 void web_set_scheme(Web *w, int scheme);                 /* the desktop's mode changed (SetColorScheme) */
 void webdark_load(Web *w, WebKitLoadEvent ev);           /* the view's load-changed */
 
-/* webselect.c: dragging across text selects it (WPE 2.48 has no drag support, which in WebCore holds that too) */
+/* webselect.c: dragging across text selects it (WPE 2.48 has no drag support, which in WebCore holds that too); the
+ * right click's report; the page's selection as the session's primary selection (webwin_set_primary) */
 void webselect_init(Web *w);
+/* the context menu's media items on the element it was opened on: play, pause, mute, unmute, loop, controls */
+void webselect_media(Web *w, const char *what);
 
 /* webbus.c */
 void webbus_init(Web *w);
@@ -188,9 +205,6 @@ void webbus_edit(Web *w, const char *sender, int cmd);
 void webbus_scheme(Web *w, const char *sender, int scheme);
 /* org.lordos.WebApp1.SetUserAgent(chrome|edge|firefox|lordos) from sender: the same check, then web_set_user_agent */
 void webbus_user_agent(Web *w, const char *sender, int kind);
-/* the page's context menu: org.lordos.WebApps1.Menu(app, profile, items) on lord-server, which shows it at the
- * pointer; the chosen item goes to web_menu_chosen with link and image (copied here) */
-void webbus_menu(Web *w, const int *items, int n, const char *link, const char *image);
 
 /* webtray.c */
 WebTray *webtray_new(Web *w);

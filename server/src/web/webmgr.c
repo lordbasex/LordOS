@@ -2,6 +2,7 @@
 #include "webmgr.h"
 #include "webinspect.h"
 #include "webscheme.h"
+#include "websearch.h"
 #include "../sec/json.h"
 #include "../lordlog.h"
 
@@ -901,6 +902,29 @@ const char *webmgr_set_developer(int on) {
         reap();
         for (int i = 0; i < WEB_MAX_RUNNING; i++) if (kids[i].used && kids[i].inspect) end_kid(&kids[i]);
     }
+    return NULL;
+}
+
+/* ---- Search the web (websearch.h) ---- */
+
+int webmgr_search_engine(void) {
+    char path[PATH_MAX];
+    size_t len = 0;
+    int w = snprintf(path, sizeof path, "%s/" WEBSEARCH_FILE, webmgr_config_dir());
+    if (w < 0 || (size_t)w >= sizeof path) return WEBSEARCH_GOOGLE;
+    char *t = webreg_read_file(path, WEBSEARCH_FILE_MAX, &len);
+    int e = t ? websearch_parse(t, len) : WEBSEARCH_GOOGLE;
+    free(t);
+    return e;
+}
+
+const char *webmgr_set_search_engine(const char *name) {
+    char path[PATH_MAX], text[64];
+    int e = websearch_engine(name);
+    if (e < 0) return "sys.badArgument";
+    size_t n = websearch_write(e, text, sizeof text);
+    int w = snprintf(path, sizeof path, "%s/" WEBSEARCH_FILE, webmgr_config_dir());
+    if (!n || w < 0 || (size_t)w >= sizeof path || mkdirs(webmgr_config_dir()) || webreg_write_file(path, text, n)) return "webapps.writeFailed";
     return NULL;
 }
 

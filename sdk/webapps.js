@@ -18,6 +18,8 @@
 //   siteIcons (store) · wantSiteIcon(app) · refreshSiteIcon(app)   the site's own icon, fetched one at a time with the
 //                                  probe (lord.webapps.fetchIcon) and kept in ~/.cache/lordos/web/icons/
 //   webDeveloper (store) · setWebDeveloperMode(on)   Settings → Web Apps → Developer mode (off by default)
+//   webSearchEngine (store) · setWebSearchEngine(name)   Settings → Web Apps → Search the web with (Google by default):
+//                                  the engine of the page context menu's "Search the web for “…”"
 //   webInspectItem(w)              the Window menu's Inspect (developer tools) for a web app's window while developer
 //                                  mode is on, else null; it asks first (webInspectAsk, <WebAppInspectPrompt />)
 //   webInspectAsk (store) · answerWebInspect(yes)   then lord.webapps.inspect starts that window again with WebKit's
@@ -27,7 +29,7 @@
 // open or a program to run.
 import { createStore, useStore } from './store.js';
 import { useEffect } from 'react';
-import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, webEditItems, inspectItem, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
+import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, webEditItems, inspectItem, searchEngineOf, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
 import { t } from './i18n.js';
 
 const has = () => typeof lord !== 'undefined' && typeof lord.webapps === 'object' && lord.webapps !== null;
@@ -38,6 +40,7 @@ export const webBadges = createStore({});
 export const webMenu = createStore(null);
 export const siteIcons = createStore({});
 export const webDeveloper = createStore(false);
+export const webSearchEngine = createStore('google');
 export const webInspectAsk = createStore(null);
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -228,6 +231,19 @@ export function setWebDeveloperMode(on) {
   try { lord.webapps.setDeveloperMode(!!on); } finally { readDeveloperMode(); }
 }
 
+// ---- Search the web (docs/WEBAPPS.md, "Editing") ----
+
+function readSearchEngine() {
+  let v = 'google';
+  try { if (has() && typeof lord.webapps.searchEngine === 'function') v = lord.webapps.searchEngine(); } catch (e) { v = 'google'; }
+  webSearchEngine.set(searchEngineOf(v));
+}
+
+// Settings → Web Apps → Search the web with: one of SEARCH_ENGINES (lord-server checks it again and keeps it)
+export function setWebSearchEngine(name) {
+  try { lord.webapps.setSearchEngine(searchEngineOf(name)); } finally { readSearchEngine(); }
+}
+
 // The Window menu's Inspect (developer tools) for a window of a lord-web we started, only while developer mode is on;
 // checked while that window has them (they end when it closes).
 export function webInspectItem(w) {
@@ -268,6 +284,7 @@ if (has()) {
   refreshWebApps();
   readIcons();
   readDeveloperMode();
+  readSearchEngine();
   try {
     const list = typeof lord.webapps.badges === 'function' ? lord.webapps.badges() : [];
     if (Array.isArray(list)) webBadges.set(list.reduce(badgeReducer, {}));

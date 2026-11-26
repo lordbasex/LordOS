@@ -12,5 +12,8 @@
   "inspect.title": "Utvecklarverktygen är på",
   "inspect.body": "De öppnades i din webbläsare och är på tills du stänger det här fönstret.",
   "inspect.open": "Öppna i webbläsaren",
-  "inspect.failed": "Utvecklarverktygen kunde inte starta"
+  "inspect.failed": "Utvecklarverktygen kunde inte starta",
+  "save.image": "Spara bild",
+  "save.video": "Spara video",
+  "save.audio": "Spara ljud"
 }

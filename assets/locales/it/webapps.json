@@ -221,5 +221,12 @@
   "settings.developerTitle": "Sviluppo",
   "settings.developer": "Modalità sviluppatore",
   "settings.developerHint": "Aggiunge Ispeziona (strumenti per sviluppatori) al menu Finestra di ogni app web",
-  "settings.developerFooter": "Per gli sviluppatori web. Gli strumenti per sviluppatori vedono tutto nell'app che ispezionano; si aprono solo dopo che scegli Ispeziona in una finestra e confermi, e solo su questo computer. Disattivarla chiude ogni finestra in cui sono attivi."
+  "settings.developerFooter": "Per gli sviluppatori web. Gli strumenti per sviluppatori vedono tutto nell'app che ispezionano; si aprono solo dopo che scegli Ispeziona in una finestra e confermi, e solo su questo computer. Disattivarla chiude ogni finestra in cui sono attivi.",
+  "search.title": "Cerca sul web",
+  "search.label": "Cerca con",
+  "search.footer": "Il menu del clic destro di un'app web può cercare sul web il testo selezionato. Solo quel testo va al motore che scegli, aperto nel tuo browser.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

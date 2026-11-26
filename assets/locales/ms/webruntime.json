@@ -12,5 +12,8 @@
   "inspect.title": "Alat pembangun dihidupkan",
   "inspect.body": "Ia dibuka dalam pelayar anda dan kekal aktif sehingga anda menutup tetingkap ini.",
   "inspect.open": "Buka dalam pelayar",
-  "inspect.failed": "Alat pembangun tidak dapat dimulakan"
+  "inspect.failed": "Alat pembangun tidak dapat dimulakan",
+  "save.image": "Simpan imej",
+  "save.video": "Simpan video",
+  "save.audio": "Simpan audio"
 }

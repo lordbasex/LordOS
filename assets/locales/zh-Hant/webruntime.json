@@ -12,5 +12,8 @@
   "inspect.title": "開發者工具已開啟",
   "inspect.body": "已在你的瀏覽器中開啟，在你關閉這個視窗前都會保持開啟。",
   "inspect.open": "在瀏覽器中開啟",
-  "inspect.failed": "無法啟動開發者工具"
+  "inspect.failed": "無法啟動開發者工具",
+  "save.image": "儲存圖片",
+  "save.video": "儲存影片",
+  "save.audio": "儲存音訊"
 }

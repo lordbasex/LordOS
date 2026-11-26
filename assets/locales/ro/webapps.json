@@ -223,5 +223,12 @@
   "settings.developerTitle": "Dezvoltator",
   "settings.developer": "Mod dezvoltator",
   "settings.developerHint": "Adaugă Inspectează (instrumente pentru dezvoltatori) în meniul Fereastră al fiecărei aplicații web",
-  "settings.developerFooter": "Pentru dezvoltatorii web. Instrumentele pentru dezvoltatori văd tot în aplicația pe care o inspectează; se deschid doar după ce alegeți Inspectează într-o fereastră și confirmați, și doar pe acest computer. Dezactivarea închide orice fereastră în care sunt active."
+  "settings.developerFooter": "Pentru dezvoltatorii web. Instrumentele pentru dezvoltatori văd tot în aplicația pe care o inspectează; se deschid doar după ce alegeți Inspectează într-o fereastră și confirmați, și doar pe acest computer. Dezactivarea închide orice fereastră în care sunt active.",
+  "search.title": "Caută pe web",
+  "search.label": "Caută cu",
+  "search.footer": "Meniul clicului dreapta al unei aplicații web poate căuta pe web textul selectat. Doar acel text ajunge la motorul ales, deschis în browserul tău.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

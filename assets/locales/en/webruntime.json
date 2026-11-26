@@ -12,5 +12,8 @@
   "inspect.title": "Developer tools are on",
   "inspect.body": "They opened in your browser and stay on until you close this window.",
   "inspect.open": "Open in browser",
-  "inspect.failed": "Developer tools couldn't start"
+  "inspect.failed": "Developer tools couldn't start",
+  "save.image": "Save Image",
+  "save.video": "Save Video",
+  "save.audio": "Save Audio"
 }

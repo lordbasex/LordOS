@@ -219,5 +219,12 @@
   "settings.developerTitle": "Nhà phát triển",
   "settings.developer": "Chế độ nhà phát triển",
   "settings.developerHint": "Thêm Kiểm tra (công cụ nhà phát triển) vào menu Cửa sổ của mỗi ứng dụng web",
-  "settings.developerFooter": "Dành cho nhà phát triển web. Công cụ nhà phát triển thấy mọi thứ trong ứng dụng được kiểm tra; chỉ mở sau khi bạn chọn Kiểm tra trong một cửa sổ và xác nhận, và chỉ trên máy tính này. Tắt tùy chọn này sẽ đóng mọi cửa sổ đang bật công cụ."
+  "settings.developerFooter": "Dành cho nhà phát triển web. Công cụ nhà phát triển thấy mọi thứ trong ứng dụng được kiểm tra; chỉ mở sau khi bạn chọn Kiểm tra trong một cửa sổ và xác nhận, và chỉ trên máy tính này. Tắt tùy chọn này sẽ đóng mọi cửa sổ đang bật công cụ.",
+  "search.title": "Tìm trên web",
+  "search.label": "Tìm bằng",
+  "search.footer": "Menu chuột phải của ứng dụng web có thể tìm văn bản đã chọn trên web. Chỉ văn bản đó được gửi đến công cụ tìm kiếm bạn chọn, mở trong trình duyệt của bạn.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

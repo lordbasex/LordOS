@@ -12,5 +12,8 @@
   "inspect.title": "Alat developer aktif",
   "inspect.body": "Alat ini terbuka di browser Anda dan tetap aktif sampai Anda menutup jendela ini.",
   "inspect.open": "Buka di browser",
-  "inspect.failed": "Alat developer tidak dapat dimulai"
+  "inspect.failed": "Alat developer tidak dapat dimulai",
+  "save.image": "Simpan gambar",
+  "save.video": "Simpan video",
+  "save.audio": "Simpan audio"
 }

@@ -219,5 +219,12 @@
   "settings.developerTitle": "開發者",
   "settings.developer": "開發者模式",
   "settings.developerHint": "在每個網頁 App 的「視窗」選單中加入「檢查（開發者工具）」",
-  "settings.developerFooter": "供網頁開發者使用。開發者工具能看到所檢查 App 中的一切；只有在你於某個視窗中選擇「檢查」並確認後才會開啟，而且只在這台電腦上。關閉此項會關閉所有開啟了工具的視窗。"
+  "settings.developerFooter": "供網頁開發者使用。開發者工具能看到所檢查 App 中的一切；只有在你於某個視窗中選擇「檢查」並確認後才會開啟，而且只在這台電腦上。關閉此項會關閉所有開啟了工具的視窗。",
+  "search.title": "網路搜尋",
+  "search.label": "搜尋引擎",
+  "search.footer": "網頁應用程式的右鍵選單可以在網路上搜尋所選文字。只有這段文字會傳送到你選擇的搜尋引擎，並在瀏覽器中開啟。",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

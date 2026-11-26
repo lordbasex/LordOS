@@ -38,7 +38,9 @@ import { devicesFrom, fractionOf, toneOf as deviceTone } from './devicesmodel.js
 import { batteryStep, batteryPrefs } from './batterypolicy.js';
 import { TextInput, Toggle } from './components.jsx';
 import { dialogStack, dialogKey, keyOwner } from './dialogkeys.js';
-import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent, webMenu, webMenuEvent, answerWebMenu, webInspectAsk, answerWebInspect } from './webapps.js';
+import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent, webMenu, webMenuEvent, answerWebMenu, webInspectAsk, answerWebInspect, webDeveloper } from './webapps.js';
+import { speechMenu } from './voice.js';
+import { toggleEmojiPanel } from './emoji.jsx';
 import { ContextMenu } from './contextmenu.jsx';
 import { profileOf, notifyKey, playsSystemSound, webIconPathOk, windowLabel, webMenuItems } from './webappsmodel.js';
 import { webProfileIcon, iconFromFile } from './apps.js';
@@ -775,12 +777,22 @@ export function WebAppInspectPrompt() {
 // ---- A right click in a web app's page (org.lordos.WebApps1.Menu, server/src/ui/webask.c) ----
 //
 // lord-server checked that the menu comes from that app's lord-web and that its items are names from the closed list
-// (Cut, Copy, Paste, Select All, Copy Link Address, Open Link in Browser, Copy Image): the words are LordOS's, never
-// the page's. The menu opens at the pointer; the chosen item (or "" when it closes) goes back to lord-web.
+// (sdk/webappsmodel.js WEB_MENU_ITEMS): the words are LordOS's. The only page text is the selection's few words in
+// "Search the web for “…”" and WebKit's spelling suggestions, both cleaned by lord-web and again by lord-server. The
+// menu opens at the pointer; the chosen item (or "" when it closes) goes back to lord-web. Emoji, Speech and Inspect
+// are the shell's own: Speech reads the selection lord-web made the session's primary selection (sdk/voice.js), and
+// Inspect shows only while developer mode is on, with the Window menu's question first.
 export function WebAppMenu() {
   const m = useStore(webMenu);
+  const developer = useStore(webDeveloper);
   if (!m) return null;
-  const items = webMenuItems(m.items, (n) => t(`shell.edit.${n}`), (n) => answerWebMenu(n, m));
+  const later = (fn) => setTimeout(fn, 0);
+  const items = webMenuItems(m, (n, vars) => (n === 'inspect' ? t('webapps.inspect.menu') : t(`shell.edit.${n}`, vars)), (n) => answerWebMenu(n, m), {
+    developer,
+    speech: () => speechMenu(null),
+    emoji: () => later(toggleEmojiPanel),
+    inspect: () => later(() => webInspectAsk.set({ app: m.app, profile: m.profile })),
+  });
   if (!items.length) return null;
   const all = { w: screen.width, h: screen.height };
   // a press anywhere else closes it and goes no further (not into the page), as a browser's menu does

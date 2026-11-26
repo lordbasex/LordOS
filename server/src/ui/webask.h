@@ -16,11 +16,14 @@
  * (webbadge.h keeps who was checked); the count is clamped to 0..9999 and goes to the shell as the "webapps-badge"
  * event { app, profile, count }; a lord-web that leaves the bus gets a 0.
  *
- *   org.lordos.WebApps1.Menu(s app, s profile, as items) → s item
+ *   org.lordos.WebApps1.Menu(s app, s profile, as items, u checked, s text) → s item   (or the older (s, s, as))
  *
  * A right click in a web app's page (docs/WEBAPPS.md, "Editing"): lord-web asks for a menu at the pointer. The items
- * are names from webedit.h's closed list (never text), checked, with the same pid check as Ask; the shell gets the
- * "webapps-menu" event { id, app, profile, items } and lord.webapps.menuAnswer(id, item) brings back the chosen
+ * are names from webedit.h's closed list (never text), checked, with the same pid check as Ask; checked is a mask of
+ * the positions that show a check mark (Loop, Show Controls); text is the selection's few words for "Search the web
+ * for “…”", cleaned here again (websearch_snippet: no control or bidi characters, at most 30 characters) and sent only
+ * when the menu has that item. The shell gets the "webapps-menu" event { id, app, profile, items, checked: [names],
+ * text } and lord.webapps.menuAnswer(id, item) brings back the chosen
  * item, or "" when the menu closed. A new menu from the same lord-web closes the one before ("webapps-menu-gone").
  *
  * The other way, lord-server to lord-web: org.lordos.WebApp1.Edit(s command) on its bus name, from the shell's Edit

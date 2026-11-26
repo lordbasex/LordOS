@@ -78,6 +78,10 @@ int  webmgr_owner(pid_t pid, char *app, char *profile);
 /* Developer mode (Settings → Web Apps): 1 on, 0 off (no file, or one that isn't valid). Turning it off ends every
  * lord-web started with --inspect. */
 int  webmgr_developer(void);
+/* Settings → Web apps → Search the web with: the engine (websearch.h's WEBSEARCH_*; Google without a valid file), and
+ * a new one by name (google, duckduckgo, bing, startpage) into ~/.config/lordos/web/search.json */
+int  webmgr_search_engine(void);
+const char *webmgr_set_search_engine(const char *name);
 const char *webmgr_set_developer(int on);
 /* That app and profile's window with developer tools on: its lord-web, if it runs without them, is ended, then started
  * again with --inspect. "webapps.developerOff" while developer mode is off; *already = 1 when it runs with them

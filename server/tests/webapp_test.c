@@ -27,6 +27,8 @@
 #include "../src/web/weboffline.h"
 #include "../src/web/webreg.h"
 #include "../src/web/webscheme.h"
+#include "../src/web/websearch.h"
+#include "../src/spellang.h"
 #include "../src/web/weburl.h"
 
 #include <arpa/inet.h>
@@ -884,6 +886,12 @@ static void test_registry_options(void) {
           !webreg_scheme_name(-1), "scheme names");
 }
 
+static int same(const int *a, int n, const int *b, int m) {
+    if (n != m) return 0;
+    for (int i = 0; i < n; i++) if (a[i] != b[i]) return 0;
+    return 1;
+}
+
 static void test_edit(void) {
     static const char *const names[] = { "undo", "redo", "cut", "copy", "paste", "selectAll" };
     static const char *const wk[] = { "Undo", "Redo", "Cut", "Copy", "Paste", "SelectAll" };
@@ -896,31 +904,61 @@ static void test_edit(void) {
     CHECK(webedit_command(NULL) < 0 && !webedit_name(-1) && !webedit_webkit(WEBEDIT_N), "edit: nothing");
 
     int it[WEBMENU_N];
-    int n = webmenu_items(0, it);
-    CHECK(n == 1 && it[0] == WEBMENU_SELECT_ALL, "plain page: Select All only (%d)", n);
+    int n;
+#define IS(...) same(it, n, (const int[]){ __VA_ARGS__ }, (int)(sizeof((const int[]){ __VA_ARGS__ }) / sizeof(int)))
+    n = webmenu_items(0, it);
+    CHECK(IS(WEBMENU_RELOAD, WEBMENU_SELECT_ALL, WEBMENU_INSPECT), "the page itself: Reload, Select All, Inspect (%d)", n);
+    n = webmenu_items(WEBMENU_AT_BACK | WEBMENU_AT_FORWARD, it);
+    CHECK(IS(WEBMENU_BACK, WEBMENU_FORWARD, WEBMENU_RELOAD, WEBMENU_SELECT_ALL, WEBMENU_INSPECT), "with history: Back, Forward first");
     n = webmenu_items(WEBMENU_AT_SELECTION, it);
-    CHECK(n == 2 && it[0] == WEBMENU_COPY && it[1] == WEBMENU_SELECT_ALL, "a selection: Copy, Select All");
+    CHECK(IS(WEBMENU_COPY, WEBMENU_SPEECH, WEBMENU_INSPECT), "a selection without words: Copy, Speech, Inspect");
+    n = webmenu_items(WEBMENU_AT_SELECTION | WEBMENU_AT_SEARCH | WEBMENU_AT_HIGHLIGHT | WEBMENU_AT_BACK, it);
+    CHECK(IS(WEBMENU_COPY, WEBMENU_COPY_HIGHLIGHT, WEBMENU_SEARCH, WEBMENU_SPEECH, WEBMENU_INSPECT), "selected text: Copy, Copy Link to Highlight, Search, Speech, Inspect (no Back)");
     n = webmenu_items(WEBMENU_AT_EDITABLE, it);
-    CHECK(n == 2 && it[0] == WEBMENU_PASTE && it[1] == WEBMENU_SELECT_ALL, "an empty field: Paste, Select All");
-    n = webmenu_items(WEBMENU_AT_EDITABLE | WEBMENU_AT_SELECTION, it);
-    CHECK(n == 4 && it[0] == WEBMENU_CUT && it[1] == WEBMENU_COPY && it[2] == WEBMENU_PASTE && it[3] == WEBMENU_SELECT_ALL, "a field with a selection");
-    n = webmenu_items(WEBMENU_AT_LINK | WEBMENU_AT_IMAGE, it);
-    CHECK(n == 4 && it[1] == WEBMENU_COPY_LINK && it[2] == WEBMENU_OPEN_LINK && it[3] == WEBMENU_COPY_IMAGE, "a linked image");
+    CHECK(IS(WEBMENU_UNDO, WEBMENU_REDO, WEBMENU_PASTE, WEBMENU_PASTE_PLAIN, WEBMENU_SELECT_ALL, WEBMENU_EMOJI, WEBMENU_INSPECT), "an empty field");
+    n = webmenu_items(WEBMENU_AT_EDITABLE | WEBMENU_AT_SELECTION | WEBMENU_AT_SEARCH | WEBMENU_AT_HIGHLIGHT, it);
+    CHECK(IS(WEBMENU_UNDO, WEBMENU_REDO, WEBMENU_CUT, WEBMENU_COPY, WEBMENU_PASTE, WEBMENU_PASTE_PLAIN, WEBMENU_SELECT_ALL, WEBMENU_EMOJI,
+             WEBMENU_SEARCH, WEBMENU_SPEECH, WEBMENU_INSPECT), "a field with a selection: Cut and Copy, Search, no link to a highlight in a field");
+    n = webmenu_items(WEBMENU_AT_EDITABLE | WEBMENU_AT_GUESSES(3) | WEBMENU_AT_IGNORE | WEBMENU_AT_LEARN, it);
+    CHECK(n > 5 && it[0] == WEBMENU_SPELL_1 && it[2] == WEBMENU_SPELL_3 && it[3] == WEBMENU_IGNORE_SPELLING && it[4] == WEBMENU_LEARN_SPELLING && it[5] == WEBMENU_UNDO,
+          "a misspelled word: WebKit's suggestions, Ignore, Add to Dictionary, then Undo");
+    n = webmenu_items(WEBMENU_AT_GUESSES(7), it);
+    CHECK(IS(WEBMENU_RELOAD, WEBMENU_SELECT_ALL, WEBMENU_INSPECT), "suggestions only in a field");
+    n = webmenu_items(WEBMENU_AT_EDITABLE | WEBMENU_AT_GUESSES(7), it);
+    CHECK(n > 5 && it[4] == WEBMENU_SPELL_5 && it[5] == WEBMENU_UNDO, "at most five suggestions");
+    n = webmenu_items(WEBMENU_AT_LINK, it);
+    CHECK(IS(WEBMENU_OPEN_LINK, WEBMENU_COPY_LINK, WEBMENU_INSPECT), "a link");
+    n = webmenu_items(WEBMENU_AT_IMAGE | WEBMENU_AT_IMAGE_WEB | WEBMENU_AT_IMAGE_SAVE, it);
+    CHECK(IS(WEBMENU_OPEN_IMAGE, WEBMENU_SAVE_IMAGE, WEBMENU_COPY_IMAGE, WEBMENU_COPY_IMAGE_ADDRESS, WEBMENU_INSPECT), "a web image");
+    n = webmenu_items(WEBMENU_AT_IMAGE | WEBMENU_AT_IMAGE_SAVE, it);
+    CHECK(IS(WEBMENU_SAVE_IMAGE, WEBMENU_COPY_IMAGE, WEBMENU_INSPECT), "an image the page made: no address to open or copy");
+    n = webmenu_items(WEBMENU_AT_MEDIA | WEBMENU_AT_PAUSED | WEBMENU_AT_LOOP | WEBMENU_AT_VIDEO | WEBMENU_AT_MEDIA_SAVE, it);
+    CHECK(IS(WEBMENU_PLAY, WEBMENU_MUTE, WEBMENU_LOOP, WEBMENU_CONTROLS, WEBMENU_SAVE_VIDEO, WEBMENU_INSPECT), "a paused video with sound");
+    unsigned ck = webmenu_checked(WEBMENU_AT_MEDIA | WEBMENU_AT_PAUSED | WEBMENU_AT_LOOP | WEBMENU_AT_VIDEO | WEBMENU_AT_MEDIA_SAVE, it, n);
+    CHECK(ck == 1u << 2, "only Loop checked (%#x)", ck);
+    n = webmenu_items(WEBMENU_AT_MEDIA | WEBMENU_AT_MUTED | WEBMENU_AT_CONTROLS, it);
+    CHECK(IS(WEBMENU_PAUSE, WEBMENU_UNMUTE, WEBMENU_LOOP, WEBMENU_CONTROLS, WEBMENU_INSPECT), "a muted, playing audio fed by the page: nothing to save");
+    CHECK(webmenu_checked(WEBMENU_AT_MEDIA | WEBMENU_AT_MUTED | WEBMENU_AT_CONTROLS, it, n) == 1u << 3, "Show Controls checked");
     n = webmenu_items(~0u, it);
-    CHECK(n == WEBMENU_N, "everything: %d items", n);
+    CHECK(n <= 32 && n > 20, "everything: %d items, within the check mask", n);
+    CHECK(webmenu_shell_only(WEBMENU_EMOJI) && webmenu_shell_only(WEBMENU_SPEECH) && webmenu_shell_only(WEBMENU_INSPECT) && !webmenu_shell_only(WEBMENU_COPY), "the shell's own items");
+#undef IS
 
     const char *ok[] = { "copy", "selectAll", "openLink" };
     n = webmenu_parse(ok, 3, it);
     CHECK(n == 3 && it[0] == WEBMENU_COPY && it[2] == WEBMENU_OPEN_LINK, "parse");
-    const char *all[] = { "cut", "copy", "paste", "selectAll", "copyLink", "openLink", "copyImage" };
-    CHECK(webmenu_parse(all, 7, it) == 7, "all seven");
+    const char *old[] = { "cut", "copy", "paste", "selectAll", "copyLink", "openLink", "copyImage" };
+    CHECK(webmenu_parse(old, 7, it) == 7, "the older lord-web's seven still parse");
+    const char *all_names[WEBMENU_N];
+    for (int i = 0; i < WEBMENU_N; i++) all_names[i] = webmenu_name(i);
+    CHECK(webmenu_parse(all_names, WEBMENU_N, it) == WEBMENU_N, "every item once");
     const char *twice[] = { "copy", "copy" };
     CHECK(webmenu_parse(twice, 2, it) < 0, "an item twice is refused");
     const char *unknown[] = { "copy", "Delete everything" };
     CHECK(webmenu_parse(unknown, 2, it) < 0, "an unknown item (text) is refused");
     const char *nul[] = { "copy", NULL };
     CHECK(webmenu_parse(nul, 2, it) < 0, "a missing item is refused");
-    CHECK(webmenu_parse(ok, 0, it) < 0 && webmenu_parse(all, 8, it) < 0 && webmenu_parse(NULL, 1, it) < 0, "none, or too many");
+    CHECK(webmenu_parse(ok, 0, it) < 0 && webmenu_parse(names, WEBMENU_N + 1, it) < 0 && webmenu_parse(NULL, 1, it) < 0, "none, or too many");
     for (int i = 0; i < WEBMENU_N; i++) CHECK(webmenu_item(webmenu_name(i)) == i, "menu name %d", i);
     CHECK(!webmenu_name(WEBMENU_N) && webmenu_item("") < 0, "menu: nothing");
 }
@@ -1240,12 +1278,116 @@ static void test_frame(void) {
     CHECK(webframe_copy(dst, 0, DW, DH, DS, src, DW, DH, DS) == 0 && webframe_copy(dst, DS, DW, DH, 0, src, DW, DH, DS) == 0, "frame copy: nonsense");
 }
 
+/* Search the web, the menu's few words of the page, a link to a highlight (websearch.h) */
+static void test_search(void) {
+    char u[WEBSEARCH_URL_MAX];
+    CHECK(!websearch_url(WEBSEARCH_GOOGLE, "hola mundo", u, sizeof u) && !strcmp(u, "https://www.google.com/search?q=hola%20mundo"), "google: %s", u);
+    CHECK(!websearch_url(WEBSEARCH_DUCKDUCKGO, "a&b=c#d?e/f+g", u, sizeof u) && !strcmp(u, "https://duckduckgo.com/?q=a%26b%3Dc%23d%3Fe%2Ff%2Bg"), "every reserved character encoded: %s", u);
+    CHECK(!websearch_url(WEBSEARCH_BING, "  cañón\n\t日本 ", u, sizeof u) && !strcmp(u, "https://www.bing.com/search?q=ca%C3%B1%C3%B3n%20%E6%97%A5%E6%9C%AC"), "UTF-8, whitespace made one space and trimmed: %s", u);
+    CHECK(!websearch_url(WEBSEARCH_STARTPAGE, "x\xE2\x80\xAEy\x01z", u, sizeof u) && !strcmp(u, "https://www.startpage.com/do/search?q=xyz"), "bidi override and control left out: %s", u);
+    CHECK(!websearch_url(WEBSEARCH_GOOGLE, "a\xC3(b", u, sizeof u) && !strcmp(u, "https://www.google.com/search?q=a%28b"), "invalid UTF-8 left out: %s", u);
+    CHECK(websearch_url(WEBSEARCH_GOOGLE, " \n\xE2\x80\x8F ", u, sizeof u) < 0 && websearch_url(WEBSEARCH_GOOGLE, NULL, u, sizeof u) < 0, "nothing to search");
+    CHECK(websearch_url(WEBSEARCH_N, "x", u, sizeof u) < 0 && websearch_url(-1, "x", u, sizeof u) < 0, "an engine off the list");
+    char big[3000];
+    memset(big, 'a', sizeof big - 1);
+    big[sizeof big - 1] = 0;
+    big[WEBSEARCH_QUERY_MAX - 1] = (char)0xC3;      /* a two-byte character across the limit: left out whole */
+    big[WEBSEARCH_QUERY_MAX] = (char)0xB1;
+    CHECK(!websearch_url(WEBSEARCH_GOOGLE, big, u, sizeof u) && strlen(u) == strlen("https://www.google.com/search?q=") + WEBSEARCH_QUERY_MAX - 1, "cut at %d bytes on a character: %zu", WEBSEARCH_QUERY_MAX, strlen(u));
+    CHECK(websearch_url(WEBSEARCH_GOOGLE, "hola", u, 20) < 0, "a small buffer");
+
+    char sn[WEBSEARCH_SNIPPET_MAX];
+    CHECK(websearch_snippet("hola", WEBSEARCH_SNIPPET_CHARS, sn, sizeof sn) == 4 && !strcmp(sn, "hola"), "short: as it is");
+    websearch_snippet("Lorem ipsum dolor sit amet, consectetur adipiscing", WEBSEARCH_SNIPPET_CHARS, sn, sizeof sn);
+    CHECK(!strcmp(sn, "Lorem ipsum dolor sit amet, co\xE2\x80\xA6"), "30 characters and an ellipsis: %s", sn);
+    websearch_snippet("abcdefghijklmnopqrstuvwxyzABC  DEF", WEBSEARCH_SNIPPET_CHARS, sn, sizeof sn);
+    CHECK(!strcmp(sn, "abcdefghijklmnopqrstuvwxyzABC\xE2\x80\xA6"), "no space before the ellipsis: %s", sn);
+    websearch_snippet("\xE2\x80\xAE" "evil\xE2\x81\xA6" "x\r\n\x1b[31m\xC2\x85y\xEF\xBB\xBF", WEBSEARCH_SNIPPET_CHARS, sn, sizeof sn);
+    CHECK(!strcmp(sn, "evilx [31m y"), "RLO, isolates, ESC, NEL and BOM gone: '%s'", sn);
+    websearch_snippet("ñandú日本語😀", 4, sn, sizeof sn);
+    CHECK(!strcmp(sn, "ñand\xE2\x80\xA6"), "characters, not bytes: %s", sn);
+    CHECK(websearch_snippet("\x01\x02 ", 30, sn, sizeof sn) == 0 && !sn[0], "nothing left");
+
+    char hl[256];
+    CHECK(!websearch_highlight("https://ex.ample/a/b?x=1#old", "hello, world-wide", hl, sizeof hl) && !strcmp(hl, "https://ex.ample/a/b?x=1#:~:text=hello%2C%20world%2Dwide"),
+          "a short text whole, its fragment replaced, comma and dash encoded: %s", hl);
+    CHECK(!websearch_highlight("https://ex.ample/", "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen", hl, sizeof hl)
+          && !strcmp(hl, "https://ex.ample/#:~:text=one%20two%20three%20four,thirteen%20fourteen%20fifteen%20sixteen"), "a long text: its first and last words: %s", hl);
+    CHECK(websearch_highlight("file:///etc/passwd", "x", hl, sizeof hl) < 0 && websearch_highlight("javascript:alert(1)", "x", hl, sizeof hl) < 0, "only an http(s) page");
+    CHECK(websearch_highlight("https://ex.ample/", " \n", hl, sizeof hl) < 0, "nothing selected");
+    CHECK(websearch_highlight("https://ex.ample/", "x", hl, 10) < 0, "a small buffer");
+
+    char f[64];
+    for (int e = 0; e < WEBSEARCH_N; e++) {
+        size_t len = websearch_write(e, f, sizeof f);
+        CHECK(len && websearch_parse(f, len) == e && websearch_engine(websearch_engine_name(e)) == e, "engine %d round trip", e);
+    }
+    CHECK(websearch_parse("{\"engine\":\"https://evil.example/?q=\"}", 36) == WEBSEARCH_GOOGLE && websearch_parse("garbage", 7) == WEBSEARCH_GOOGLE && websearch_parse(NULL, 0) == WEBSEARCH_GOOGLE,
+          "anything else is Google");
+    CHECK(!websearch_write(WEBSEARCH_N, f, sizeof f) && !websearch_write(0, f, 4), "nothing written off the list or too small");
+}
+
+/* where Save Image As… may write (webdl_target_ok) */
+static void test_save_target(void) {
+    CHECK(webdl_target_ok("/home/ana", "/home/ana/Pictures/cat.png"), "a picture in the home folder");
+    CHECK(webdl_target_ok("/home/ana/", "/home/ana/cat.png"), "home with a slash");
+    CHECK(!webdl_target_ok("/home/ana", "/home/ana"), "not home itself");
+    CHECK(!webdl_target_ok("/home/ana", "/home/anabel/cat.png") && !webdl_target_ok("/home/ana", "/etc/cat.png"), "not outside");
+    CHECK(!webdl_target_ok("/home/ana", "/home/ana/.config/autostart/x.png"), "not a hidden folder");
+    CHECK(!webdl_target_ok("/home/ana", "/home/ana/a/../.bashrc") && !webdl_target_ok("/home/ana", "/home/ana/./x"), "no . or ..");
+    CHECK(!webdl_target_ok("/home/ana", "/home/ana/Desktop/run.desktop") && !webdl_target_ok("/home/ana", "/home/ana/x.DESKTOP"), "not a launcher");
+    CHECK(!webdl_target_ok("/home/ana", "/home/ana/a\nb.png") && !webdl_target_ok("/home/ana", "/home/ana/dir/"), "no control character, not a folder");
+    CHECK(!webdl_target_ok("/home/ana", "relative.png") && !webdl_target_ok(NULL, "/x") && !webdl_target_ok("/home/ana", NULL), "nothing else");
+}
+
+/* which spelling dictionaries (spellang.h) */
+static void test_spellang(void) {
+    const char *inst[] = { "en_GB", "en_US", "es_AR", "es_ES", "es_MX", "pt_BR", "pt_PT" };
+    char out[SPELLANG_MAX][SPELLANG_TAG_MAX];
+    int n = spellang_choose("es_AR.UTF-8", inst, 7, out, SPELLANG_MAX);
+    CHECK(n == 2 && !strcmp(out[0], "es_AR") && !strcmp(out[1], "en_US"), "es_AR and English (US)");
+    n = spellang_choose("es_CL.UTF-8", inst, 7, out, SPELLANG_MAX);
+    CHECK(n == 2 && !strcmp(out[0], "es_ES"), "a region not installed: the usual one (%s)", out[0]);
+    n = spellang_choose("pt", inst, 7, out, SPELLANG_MAX);
+    CHECK(n == 2 && !strcmp(out[0], "pt_BR"), "pt: Brazil's (%s)", out[0]);
+    n = spellang_choose("en_GB.UTF-8", inst, 7, out, SPELLANG_MAX);
+    CHECK(n == 1 && !strcmp(out[0], "en_GB"), "English once (%d)", n);
+    n = spellang_choose("de_DE.UTF-8", inst, 7, out, SPELLANG_MAX);
+    CHECK(n == 1 && !strcmp(out[0], "en_US"), "no German dictionary: English only");
+    const char *one[] = { "es_MX" };
+    n = spellang_choose("es_ES.UTF-8", one, 1, out, SPELLANG_MAX);
+    CHECK(n == 1 && !strcmp(out[0], "es_MX"), "any installed region of the language");
+    n = spellang_choose("fil_PH.UTF-8", inst, 7, out, SPELLANG_MAX);
+    CHECK(n == 1 && !strcmp(out[0], "en_US"), "fil is not fi");
+    n = spellang_choose(NULL, inst, 7, out, SPELLANG_MAX);
+    CHECK(n == 1 && !strcmp(out[0], "en_US"), "no locale: English");
+    n = spellang_choose("C", inst, 7, out, SPELLANG_MAX);
+    CHECK(n == 1 && !strcmp(out[0], "en_US"), "C: English");
+    CHECK(spellang_choose("es_ES", NULL, 0, out, SPELLANG_MAX) == 0, "nothing installed");
+    CHECK(spellang_choose("es_ES", inst, 7, out, 1) == 1, "max");
+    char dir[] = "/tmp/spellang-test-XXXXXX";
+    if (mkdtemp(dir)) {
+        const char *files[] = { "es_AR.dic", "es_AR.aff", "en_US.dic", "en_US.aff", "pt_BR.dic", "hyph_es.dic.txt", ".x.dic", ".x.aff" };
+        char p[256];
+        for (size_t i = 0; i < sizeof files / sizeof files[0]; i++) { snprintf(p, sizeof p, "%s/%s", dir, files[i]); FILE *fp = fopen(p, "w"); if (fp) fclose(fp); }
+        char tags[8][SPELLANG_TAG_MAX];
+        n = spellang_installed(dir, tags, 8);
+        CHECK(n == 2 && !strcmp(tags[0], "en_US") && !strcmp(tags[1], "es_AR"), "installed: a .dic with its .aff, sorted (%d)", n);
+        for (size_t i = 0; i < sizeof files / sizeof files[0]; i++) { snprintf(p, sizeof p, "%s/%s", dir, files[i]); unlink(p); }
+        rmdir(dir);
+    }
+    CHECK(spellang_installed("/nonexistent-dir", NULL, 0) == 0, "no folder");
+}
+
 int main(void) {
     test_frame();
     test_guard();
     test_offline();
     test_scheme();
     test_edit();
+    test_search();
+    test_save_target();
+    test_spellang();
     test_axis();
     test_badge();
     test_visibility();

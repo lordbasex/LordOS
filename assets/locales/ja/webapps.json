@@ -219,5 +219,12 @@
   "settings.developerTitle": "デベロッパ",
   "settings.developer": "デベロッパモード",
   "settings.developerHint": "各 Web アプリの「ウインドウ」メニューに「検証（デベロッパツール）」を追加します",
-  "settings.developerFooter": "Web デベロッパ向けです。デベロッパツールは検証するアプリ内のすべてを見ることができます。ウインドウで「検証」を選んで確認した後にだけ、このコンピュータ上でのみ開きます。オフにすると、ツールがオンになっているウインドウはすべて閉じます。"
+  "settings.developerFooter": "Web デベロッパ向けです。デベロッパツールは検証するアプリ内のすべてを見ることができます。ウインドウで「検証」を選んで確認した後にだけ、このコンピュータ上でのみ開きます。オフにすると、ツールがオンになっているウインドウはすべて閉じます。",
+  "search.title": "ウェブで検索",
+  "search.label": "検索エンジン",
+  "search.footer": "ウェブアプリの右クリックメニューから、選択したテキストをウェブで検索できます。送られるのはそのテキストだけで、選んだ検索エンジンがブラウザで開きます。",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

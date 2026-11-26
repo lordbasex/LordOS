@@ -12,5 +12,8 @@
   "inspect.title": "Zana za msanidi zimewashwa",
   "inspect.body": "Zimefunguka kwenye kivinjari chako na zitaendelea kuwaka hadi utakapofunga dirisha hili.",
   "inspect.open": "Fungua kwenye kivinjari",
-  "inspect.failed": "Zana za msanidi hazikuweza kuanza"
+  "inspect.failed": "Zana za msanidi hazikuweza kuanza",
+  "save.image": "Hifadhi picha",
+  "save.video": "Hifadhi video",
+  "save.audio": "Hifadhi sauti"
 }

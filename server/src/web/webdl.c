@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 
 /* the length of s cut to at most max bytes, not inside a UTF-8 character */
@@ -63,4 +64,20 @@ int webdl_unique(int dirfd, const char *name, char *out, size_t n) {
         if (fstatat(dirfd, out, &st, AT_SYMLINK_NOFOLLOW) && errno == ENOENT) return 0;
     }
     return -1;
+}
+
+int webdl_target_ok(const char *home, const char *path) {
+    if (!home || !path || home[0] != '/' || path[0] != '/') return 0;
+    size_t hl = strlen(home);
+    while (hl > 1 && home[hl - 1] == '/') hl--;
+    if (strncmp(path, home, hl) || path[hl] != '/' || !path[hl + 1]) return 0;
+    size_t pl = strlen(path);
+    if (pl >= 4096 || path[pl - 1] == '/') return 0;
+    for (const unsigned char *p = (const unsigned char *)path; *p; p++) if (*p < 0x20 || *p == 0x7f) return 0;
+    for (const char *p = path + hl; *p;) {
+        while (*p == '/') p++;
+        if (*p == '.') return 0;                    /* ".", "..", or a hidden part */
+        while (*p && *p != '/') p++;
+    }
+    return !(pl >= 8 && !strcasecmp(path + pl - 8, ".desktop"));
 }

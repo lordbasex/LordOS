@@ -219,5 +219,12 @@
   "settings.developerTitle": "开发者",
   "settings.developer": "开发者模式",
   "settings.developerHint": "在每个网页应用的“窗口”菜单中添加“检查（开发者工具）”",
-  "settings.developerFooter": "供网页开发者使用。开发者工具能看到所检查应用中的一切；只有在你于某个窗口中选择“检查”并确认后才会打开，而且只在这台电脑上。关闭此项会关闭所有打开了工具的窗口。"
+  "settings.developerFooter": "供网页开发者使用。开发者工具能看到所检查应用中的一切；只有在你于某个窗口中选择“检查”并确认后才会打开，而且只在这台电脑上。关闭此项会关闭所有打开了工具的窗口。",
+  "search.title": "网上搜索",
+  "search.label": "搜索引擎",
+  "search.footer": "网页应用的右键菜单可以在网上搜索所选文字。只有这段文字会发送到你选择的搜索引擎，并在浏览器中打开。",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

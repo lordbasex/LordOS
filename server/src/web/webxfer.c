@@ -607,10 +607,11 @@ static const char JS_IMAGE[] =
     "}\n"
     "return await new Promise((ok, no) => { const f = new FileReader(); f.onload = () => ok(String(f.result)); f.onerror = () => no(f.error); f.readAsDataURL(b); });";
 
-static int copying;
+static int copying;                 /* 1 Copy Image, 2 Save Image As… (a blob: image) */
 
 static void on_image(GObject *src, GAsyncResult *res, gpointer d) {
     Web *w = d;
+    int save = copying == 2;
     copying = 0;
     GError *e = NULL;
     JSCValue *v = webkit_web_view_call_async_javascript_function_finish(WEBKIT_WEB_VIEW(src), res, &e);
@@ -623,16 +624,20 @@ static void on_image(GObject *src, GAsyncResult *res, gpointer d) {
     gsize n = 0;
     guchar *img = b64 && strlen(b64) <= (size_t)CLIP_IMAGE_MAX / 3 * 4 + 8 ? g_base64_decode(b64, &n) : NULL;
     g_free(s);
-    if (img && n <= CLIP_IMAGE_MAX && image_ok(mime, img, n) && w->win) { webwin_offer(w->win, mime, g_bytes_new_take(img, n)); img = NULL; }
+    if (img && n <= CLIP_IMAGE_MAX && image_ok(mime, img, n) && save) { web_menu_save_bytes(w, mime, g_bytes_new_take(img, n)); img = NULL; }
+    else if (img && n <= CLIP_IMAGE_MAX && image_ok(mime, img, n) && w->win) { webwin_offer(w->win, mime, g_bytes_new_take(img, n)); img = NULL; }
     g_free(img);
 }
 
-void webxfer_copy_image(Web *w, const char *uri) {
+static void read_image(Web *w, const char *uri, int how) {
     if (copying || !w->view || w->outside || !uri) return;
-    copying = 1;
+    copying = how;
     GVariantDict args;
     g_variant_dict_init(&args, NULL);
     g_variant_dict_insert_value(&args, "u", g_variant_new_string(uri));
     g_variant_dict_insert_value(&args, "max", g_variant_new_double((double)CLIP_IMAGE_MAX));
     webkit_web_view_call_async_javascript_function(w->view, JS_IMAGE, -1, g_variant_dict_end(&args), XFER_WORLD, NULL, NULL, on_image, w);
 }
+
+void webxfer_copy_image(Web *w, const char *uri) { read_image(w, uri, 1); }
+void webxfer_save_image(Web *w, const char *uri) { read_image(w, uri, 2); }

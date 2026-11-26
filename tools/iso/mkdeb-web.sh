@@ -24,6 +24,9 @@ else
     DEPS="libwpewebkit-2.0-1 (>= 2.48), libwpe-1.0-1 (>= 1.16), libwpebackend-fdo-1.0-1 (>= 1.16), libegl1, libwayland-client0, libwayland-server0, libxkbcommon0, libglib2.0-0t64, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, bubblewrap, xdg-dbus-proxy"
     ENGINE="Debian's own packages, unmodified"
 fi
+# spelling dictionaries for the page's text fields (docs/WEBAPPS.md, "Spelling"): WebKit checks with enchant and
+# hunspell's dictionaries, LordOS's three main languages; Recommends, so a system without them still installs
+RECS="hunspell-en-us, hunspell-es, hunspell-pt-br"
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/DEBIAN" "$T/usr/lib/lordos/bin" "$T/usr/share/doc/lordos-web"
@@ -50,6 +53,7 @@ Maintainer: LordOS <lord.basex@gmail.com>
 Section: web
 Priority: optional
 Depends: lordos (= $V), $DEPS
+Recommends: $RECS
 Description: LordOS Web Runtime: web apps as LordOS apps
  lord-web runs each installed web app and profile in its own process, in a
  window of the LordOS desktop, with WebKit's sandbox always on.

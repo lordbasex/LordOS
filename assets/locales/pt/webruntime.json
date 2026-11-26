@@ -12,5 +12,8 @@
   "inspect.title": "Ferramentas de desenvolvedor ativadas",
   "inspect.body": "Elas abriram no seu navegador e ficam ativas até você fechar esta janela.",
   "inspect.open": "Abrir no navegador",
-  "inspect.failed": "Não foi possível iniciar as ferramentas de desenvolvedor"
+  "inspect.failed": "Não foi possível iniciar as ferramentas de desenvolvedor",
+  "save.image": "Salvar imagem",
+  "save.video": "Salvar vídeo",
+  "save.audio": "Salvar áudio"
 }

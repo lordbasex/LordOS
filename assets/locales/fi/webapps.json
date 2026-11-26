@@ -221,5 +221,12 @@
   "settings.developerTitle": "Kehittäjä",
   "settings.developer": "Kehittäjätila",
   "settings.developerHint": "Lisää Tarkasta (kehittäjätyökalut) jokaisen verkkosovelluksen Ikkuna-valikkoon",
-  "settings.developerFooter": "Verkkokehittäjille. Kehittäjätyökalut näkevät kaiken tarkastamassaan sovelluksessa; ne avautuvat vasta, kun valitset ikkunassa Tarkasta ja vahvistat, ja vain tällä tietokoneella. Tämän poistaminen käytöstä sulkee jokaisen ikkunan, jossa ne ovat päällä."
+  "settings.developerFooter": "Verkkokehittäjille. Kehittäjätyökalut näkevät kaiken tarkastamassaan sovelluksessa; ne avautuvat vasta, kun valitset ikkunassa Tarkasta ja vahvistat, ja vain tällä tietokoneella. Tämän poistaminen käytöstä sulkee jokaisen ikkunan, jossa ne ovat päällä.",
+  "search.title": "Hae verkosta",
+  "search.label": "Hakukone",
+  "search.footer": "Verkkosovelluksen hiiren oikean painikkeen valikko voi hakea valittua tekstiä verkosta. Vain se teksti menee valitsemallesi hakukoneelle, joka avautuu selaimessasi.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

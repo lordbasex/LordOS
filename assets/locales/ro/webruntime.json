@@ -12,5 +12,8 @@
   "inspect.title": "Instrumentele pentru dezvoltatori sunt active",
   "inspect.body": "S-au deschis în browser și rămân active până închideți această fereastră.",
   "inspect.open": "Deschide în browser",
-  "inspect.failed": "Instrumentele pentru dezvoltatori nu au putut porni"
+  "inspect.failed": "Instrumentele pentru dezvoltatori nu au putut porni",
+  "save.image": "Salvează imaginea",
+  "save.video": "Salvează videoclipul",
+  "save.audio": "Salvează audio"
 }

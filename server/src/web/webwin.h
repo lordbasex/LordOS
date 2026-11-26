@@ -34,6 +34,13 @@ int webwin_send_shortcut(WebWin *win, uint32_t keysym, int shift);
  * when it has no text, or a text WebKit would garble, pasted into the page by lord-web (webxfer.c); 1 when it was,
  * 0 for WebKit's own Paste */
 int webwin_paste(WebWin *win);
+/* Paste as Plain Text (the context menu, Ctrl+Shift+V): the session's text only, as text/plain, never its HTML, files
+ * or image */
+void webwin_paste_plain(WebWin *win);
+/* the page's selection (UTF-8, the person's own: after a click or key in the window) as the session's primary
+ * selection, as a browser on Linux does: what LordOS's Speech (❖Esc, Edit → Speech, the context menu's Speech) reads
+ * aloud, and a middle click pastes. Never a password field's (webselect.c doesn't report those). */
+void webwin_set_primary(WebWin *win, const char *text);
 void webwin_free(WebWin *win);
 
 #endif

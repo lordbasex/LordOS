@@ -221,5 +221,12 @@
   "settings.developerTitle": "Entwickler",
   "settings.developer": "Entwicklermodus",
   "settings.developerHint": "Fügt „Untersuchen (Entwicklertools)“ zum Menü „Fenster“ jeder Web-App hinzu",
-  "settings.developerFooter": "Für Webentwickler. Entwicklertools sehen alles in der App, die sie untersuchen; sie öffnen sich erst, wenn du in einem Fenster „Untersuchen“ wählst und bestätigst, und nur auf diesem Computer. Ausschalten schließt jedes Fenster, in dem sie an sind."
+  "settings.developerFooter": "Für Webentwickler. Entwicklertools sehen alles in der App, die sie untersuchen; sie öffnen sich erst, wenn du in einem Fenster „Untersuchen“ wählst und bestätigst, und nur auf diesem Computer. Ausschalten schließt jedes Fenster, in dem sie an sind.",
+  "search.title": "Im Web suchen",
+  "search.label": "Suchen mit",
+  "search.footer": "Das Rechtsklickmenü einer Web-App kann den markierten Text im Web suchen. Nur dieser Text geht an die gewählte Suchmaschine, geöffnet in deinem Browser.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }

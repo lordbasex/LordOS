@@ -6,11 +6,13 @@
 // notifications and its tray icon. Also: the tray icon while the window shows, the unread count on the Dock, one Dock
 // icon per profile, whose sound a notification makes, and the site's own icon fetched again. Every change goes through lord.webapps, which validates it and writes the
 // registry (the folder is closed to lord.fs). Apps come from the Store's Web apps section. Developer mode, one switch for
-// every web app, adds Inspect (developer tools) to each web app window's Window menu (docs/WEBAPPS.md, "Developer tools").
+// every web app, adds Inspect (developer tools) to each web app window's Window menu and to the page's context menu
+// (docs/WEBAPPS.md, "Developer tools"). Search the web with: the engine of the context menu's "Search the web for “…”"
+// (Google, DuckDuckGo, Bing or Startpage; a closed list).
 import {
   View, Text, useLocale, useTheme, useAppWindow, useWebApps, webAppsAvailable, webAppCall, webAppIcon, webAppsModel as M, launchWebApp,
   Button, Toggle, Segmented, TextInput, ConfirmDialog, Layer, fs, formatBytes, errorText, wm, spacing, typeScale, useSettings,
-  webRunning, refreshSiteIcon, siteIconBusy, webProfileIcon, webBadges, useStore, webDeveloper, setWebDeveloperMode,
+  webRunning, refreshSiteIcon, siteIconBusy, webProfileIcon, webBadges, useStore, webDeveloper, setWebDeveloperMode, webSearchEngine, setWebSearchEngine,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, ValueRow, Note, Actions, Message, PopUp } from './ui.jsx';
@@ -247,6 +249,9 @@ export function WebAppsSettings() {
   const developer = useStore(webDeveloper);
   const [devErr, setDevErr] = useState(null);
   const setDeveloper = (on) => { try { setWebDeveloperMode(on); setDevErr(null); } catch (e) { setDevErr({ ok: false, text: errorText(e) }); } };
+  const engine = useStore(webSearchEngine);
+  const engines = M.SEARCH_ENGINES.map((v) => [v, tr(`webapps.search.${v}`)]);
+  const setEngine = (v) => { try { setWebSearchEngine(v); setDevErr(null); } catch (e) { setDevErr({ ok: false, text: errorText(e) }); } };
   return (
     <Stack>
       {!available ? <Note tone="warn">{tr('webapps.settings.noRuntime')}</Note> : null}
@@ -264,6 +269,11 @@ export function WebAppsSettings() {
         })}
       </Section>
       {entry ? <AppDetails key={entry.id} entry={entry} /> : null}
+      <Section title={tr('webapps.search.title')} footer={tr('webapps.search.footer')}>
+        <SettingRow label={tr('webapps.search.label')}>
+          <PopUp value={engine} options={engines} width={210} onChange={setEngine} />
+        </SettingRow>
+      </Section>
       <Section title={tr('webapps.settings.developerTitle')} footer={tr('webapps.settings.developerFooter')}>
         <SettingRow label={tr('webapps.settings.developer')} hint={tr('webapps.settings.developerHint')}>
           <Toggle on={developer} onChange={setDeveloper} />

@@ -221,5 +221,12 @@
   "settings.developerTitle": "Utvecklare",
   "settings.developer": "Utvecklarläge",
   "settings.developerHint": "Lägger till Inspektera (utvecklarverktyg) i menyn Fönster för varje webbapp",
-  "settings.developerFooter": "För webbutvecklare. Utvecklarverktyg ser allt i appen de inspekterar; de öppnas bara efter att du väljer Inspektera i ett fönster och bekräftar, och bara på den här datorn. Att stänga av det stänger alla fönster där de är på."
+  "settings.developerFooter": "För webbutvecklare. Utvecklarverktyg ser allt i appen de inspekterar; de öppnas bara efter att du väljer Inspektera i ett fönster och bekräftar, och bara på den här datorn. Att stänga av det stänger alla fönster där de är på.",
+  "search.title": "Sök på webben",
+  "search.label": "Sök med",
+  "search.footer": "En webbapps högerklicksmeny kan söka på webben efter den markerade texten. Bara den texten skickas till sökmotorn du väljer, öppnad i din webbläsare.",
+  "search.google": "Google",
+  "search.duckduckgo": "DuckDuckGo",
+  "search.bing": "Bing",
+  "search.startpage": "Startpage"
 }
