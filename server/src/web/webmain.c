@@ -442,7 +442,7 @@ int main(int argc, char **argv) {
          * a subsystem on every line, WebKit's processes' lines too: a lord-log child stamps them (lordlog.h). Before any
          * thread; a stderr that isn't that file (a terminal) is left as it is */
         char name[2 * WEBREG_ID_MAX + 2];
-        if (w->args.mode == WEBARGS_APP) snprintf(name, sizeof name, "%s-%s", w->args.app, w->args.profile);
+        if (w->args.mode == WEBARGS_APP) snprintf(name, sizeof name, "%.*s-%.*s", WEBREG_ID_MAX, w->args.app, WEBREG_ID_MAX, w->args.profile);
         else snprintf(name, sizeof name, "probe");
         lordlog_stamp_start("web", name, "webkit");
     }

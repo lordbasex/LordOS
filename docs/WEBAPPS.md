@@ -1365,6 +1365,28 @@ When the app's own page (an address inside its `scope`) can't load for lack of n
 - **While hidden:** an app in the background keeps trying, so it is connected again (and its notifications come) by
   the time the network is back.
 
+## The app's log (in development)
+
+Each running app writes `web/<app>-<profile>.log` in the user's log folder (`/var/log/lordos/users/<user>/`, docs/SYSTEM.md
+"Log files"; the Store's probe `web/probe.log`): lord-server's `webmgr.c` opens it as lord-web's stderr and writes a stamped
+`webapps: starting lord-web …` line. Since 2026-11-26 every later line has the same stamp as lord-server's own logs:
+
+```
+2026-11-26T18:22:03.713-03:00 WARN  lord-web: WebKit says the page stopped responding
+2026-11-26T18:22:04.001-03:00 WARN  webkit: ** (WPEWebProcess:2): WARNING **: 18:22:04.001: …
+2026-11-26T18:22:07.913-03:00 INFO  lord-web: the page responds again after 4.2 s
+```
+
+Local time with milliseconds and offset, `ERROR`/`WARN`/`INFO` from the message's words, and the subsystem: the line's own
+`name:` prefix (`lord-web`, `webcall`, …), else `webkit` for what WebKit's processes, GLib and GStreamer print on the same
+stderr. `lordlog_stamp_start` (`server/src/lordlog.h`) does it first thing in `main`, before any thread and only when stderr
+is that very file (a terminal is left alone): a `lord-log` child reads a pipe that becomes lord-web's stderr (and so every
+process it starts), cuts a line at 8 KB, appends to the file and keeps the 16 MB cap; it ignores SIGTERM and drains the
+pipe until the last writer is gone, so a crash's last lines are kept. The pipe holds 1 MB, so a writer waits only when the
+disk itself stalls. The Logs app and `lordos-issue` read these lines like any other LordOS log (`sdk/logfile.js`
+`parseLordLog`; an older unstamped line is still shown). Tests: `build/lordlog-test` (`test_stamp`) and
+`tests/logfile_test.mjs`.
+
 ## When a web app stops answering (in development)
 
 Reported on 2026-11-26: after the engine hung, opening WhatsApp from the launcher did nothing. A launch of an app that
@@ -1406,8 +1428,10 @@ lord-server's table kept a new process from starting. Now both sides keep watch,
   A restart starts it with developer tools again only while developer mode is on.
 - **Log lines, closed words only** (no address, no page text): lord-server's `webapps: <app>/<profile> did not answer:
   restarted`, `… restarted 3 times in 10 minutes, left alone`, `… force quit`, `… restarted by the person`,
-  `webapps: engine restarted by the person: <n> app windows`; lord-web's `lord-web: the page did not answer: its web
-  process restarted`, `lord-web: WebKit says the page stopped responding`, `lord-web: the page responds again`.
+  `webapps: engine restarted by the person: <n> app windows`; lord-web's `lord-web: the page did not answer for N.N s:
+  its web process restarted` (how long it had been silent: from the first ping it left unanswered, or from WebKit's
+  word if that came first; `webwatch.h` `hung_for`), `lord-web: WebKit says the page stopped responding` and
+  `lord-web: the page responds again after N.N s` (since WebKit said it stopped).
 - **Tests:** `build/webwatch-test` (the rules on a made-up clock), `build/webmem-test` (the processes under a lord-web,
   start times), `build/webalive-test` under `dbus-run-session` (a stand-in lord-web, `tests/webalive_fake.c`, that stops
   answering: restarted with the child that left its group, the urgent ping, `UnknownMethod`, the limit, Force Quit,

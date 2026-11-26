@@ -424,6 +424,9 @@ static void copier(int in, Out *o) {
 static int start(Out *outs, int nout, int raw, const char *scan_dir, int also_stdout, int copy) {
     int p[2];
     if (pipe2(p, O_CLOEXEC)) return -1;
+    /* room for a burst (WebKit's processes at a crash, a JS stack) while the child writes the file: a writer waits on
+     * the pipe only when the disk itself stalls. The default 64 KB if the kernel says no */
+    if (fcntl(p[1], F_SETPIPE_SZ, 1 << 20) < 0) { /* kept as it is */ }
     tzset();
     fflush(stdout);
     fflush(stderr);
@@ -508,9 +511,12 @@ int lordlog_system_start(const char *name) {
 static int take_stderr(const char *sub, const char *name, const char *dflt, int copy) {
     static Out out;
     out = (Out){ .fd = -1, .dflt = dflt };
-    if (lordlog_path(sub, name, out.path, sizeof out.path)) return -1;
     struct stat a, b;
-    if (fstat(2, &a) || lstat(out.path, &b) || !S_ISREG(a.st_mode) || !S_ISREG(b.st_mode) ||
+    /* a stderr that is no file (a terminal, a test's pipe) is left alone before anything else: lordlog_path makes the
+     * log folders, which a throwaway HOME must not get (web_probe_test.py) */
+    if (fstat(2, &a) || !S_ISREG(a.st_mode)) return -1;
+    if (lordlog_path(sub, name, out.path, sizeof out.path)) return -1;
+    if (lstat(out.path, &b) || !S_ISREG(b.st_mode) ||
         a.st_dev != b.st_dev || a.st_ino != b.st_ino) return -1;
     out.fd = 2;
     return start(&out, 1, -1, NULL, 1, copy);

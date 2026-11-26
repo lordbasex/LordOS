@@ -645,8 +645,10 @@ user's ones:
   `compositor`, `shell` or the daemon). A small `lord-log` child stamps them: lord-server's (and each
   root daemon's) stderr is a pipe to it. It drains the pipe until the last writer is gone, so a crash
   loses nothing already written, and it ignores SIGTERM for that. The root daemons' lines still go
-  to the journal as they were. A child with a log of its own (Linux apps, Xwayland, lord-web, rclone)
-  writes its own output as is, after a stamped "starting …" line from lord-server.
+  to the journal as they were. A child with a log of its own (Linux apps, Xwayland, rclone) writes its
+  own output as is, after a stamped "starting …" line from lord-server. lord-web's log is stamped too
+  (since 2026-11-26, *in development*): its own lines and those of the WebKit, GLib and GStreamer
+  processes it starts (docs/WEBAPPS.md, "The app's log").
 - **The memory report** (0.8.9.1, `mem_report` in `server/src/main.c`). 10 minutes after login, then every 6 hours,
   lord-server writes a few `memory:` lines to `compositor.log`, right after a `malloc_trim(0)`: the process (RSS,
   anonymous, file-backed, huge pages), glibc's heap and each of its arenas, the image cache, the per-display scenes,
