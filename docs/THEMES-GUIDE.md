@@ -602,6 +602,7 @@ Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one ski
 | Screenshots | `toolbar` (command bar: close, the five modes with the chosen one `active`, the color picker, text, and Capture or Record) | the capturing, the options menu, the files and the markup editor | `screenshots_skin_scene.mjs` (10 checks) |
 | Disks | `sidebar` (list pane: each disk and its partitions, grouped by disk) | the details, every disk action and the administrator prompt | `disks_skin_scene.mjs` (9 checks) |
 | About | `banner` (`{ version, build, code, codeNote, tagline, rows: [{ label, value }] }`; one action, `systemReport()`) | every number it reads and the rest of the window | `about_skin_scene.mjs` (8 checks) |
+| Help | `sidebar` (list pane with the search: the tour and the articles by section, or the search's results) | the articles and the tour | `help_skin_scene.mjs` (9 checks) |
 <!-- shared-shape apps -->
 
 A region drawn in the SDK's floating layer (Screenshots' capture bar, a picture-in-picture window) is outside the theme's

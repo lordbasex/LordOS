@@ -143,6 +143,7 @@ function AboutBanner({ model }) {
 }
 
 export const appSkins = {
+  help: { sidebar: SearchPane },
   about: { banner: AboutBanner },
   disks: { sidebar: ListPane },
   screenshots: { toolbar: ShotBar },

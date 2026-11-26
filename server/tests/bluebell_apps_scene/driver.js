@@ -29,6 +29,7 @@
     ['screenshots', { shortcut: 'capture.panel' }, (sdk) => sdk.t('screenshots.capture')],
     ['disks', {}, (sdk) => sdk.t('disks.title')],
     ['about', {}, 'LordOS'],
+    ['help', {}, (sdk) => sdk.t('help.tour.open')],
   ];
   (async () => {
     await sleep(2500);
