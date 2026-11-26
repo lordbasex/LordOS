@@ -52,9 +52,11 @@ function handleOf(inst) {
 }
 // what the theme passes back to the SDK (an Overlay's anchor): the instance again
 const fromTheme = (v) => (v && typeof v === 'object' && instances.has(v) ? instances.get(v) : v);
+const readCurrent = (r) => r.current;
 function refFromTheme(r) {
-  if (!r || typeof r !== 'object' || !('current' in r)) return fromTheme(r);
-  return { get current() { return fromTheme(r.current); } };
+  if (!r || typeof r !== 'object') return fromTheme(r);
+  // read later, as the theme's code (its getter, a Proxy's trap): tainted
+  return { get current() { return fromTheme(lord.themeCall(readCurrent, r)); } };
 }
 
 // an event as a plain copy (no instance, no internal fields)
@@ -76,7 +78,13 @@ const looksLikeEvent = (v) => v !== null && typeof v === 'object' && ('target' i
 // handles; functions, elements and other objects as they are
 const snapshots = new WeakMap();
 const originals = new WeakMap();      // a frozen copy → LordOS's object it was made from
-function snapshot(v, depth = 0) {
+// host code never reads a theme-owned object directly: every read of what may hold one runs through lord.themeCall
+// (tainted: a getter, a Proxy's trap or a toStringTag accessor in it runs under the theme's policy)
+const snapshot = (v) => (v === null || typeof v !== 'object' ? v : lord.themeCall(snapshotRaw, v));
+function snapshotRaw(v, depth = 0) {
+  try { return snapshotOne(v, depth); } catch (e) { return undefined; }
+}
+function snapshotOne(v, depth) {
   if (v === null || typeof v !== 'object') return v;
   if (isInstance(v)) return handleOf(v);
   if (isElement(v) || depth > 8) return v;
@@ -85,8 +93,8 @@ function snapshot(v, depth = 0) {
   if (!arr && proto !== Object.prototype && proto !== null) return v;
   let c = snapshots.get(v);
   if (c) return c;
-  c = arr ? v.map((x) => snapshot(x, depth + 1)) : {};
-  if (!arr) for (const k of Object.keys(v)) c[k] = snapshot(v[k], depth + 1);
+  c = arr ? v.map((x) => snapshotRaw(x, depth + 1)) : {};
+  if (!arr) for (const k of Object.keys(v)) c[k] = snapshotRaw(v[k], depth + 1);
   Object.freeze(c);
   snapshots.set(v, c);
   originals.set(c, v);
@@ -111,13 +119,14 @@ function wrapCallback(fn) {
   return w;
 }
 const refs = new WeakMap();
+const writeCurrent = (r, v) => { r.current = v; };
 function wrapRef(r) {
   if (r == null) return r;
   if (typeof r === 'function') return wrapCallback(r);
   if (typeof r !== 'object') return undefined;
   let w = refs.get(r);
   if (!w) {
-    w = (v) => { r.current = toTheme(v); };
+    w = (v) => { lord.themeCall(writeCurrent, r, toTheme(v)); };   // the theme's ref object, written as its code
     refs.set(r, w);
   }
   return w;
@@ -134,7 +143,11 @@ const isElement = (v) => v !== null && typeof v === 'object' && v.$$typeof === E
 // made again with sanitized props otherwise, and dropped when it is a host element; everything else (thenables, lazy
 // objects, contexts, portals, plain objects) is dropped. The host guard (guardHost) is the backstop behind it.
 const NODE_MAX = 5000;
-function cleanNode(c, depth = 0, budget = { n: 0 }) {
+const cleanNode = (c, depth = 0) => (c === null || typeof c !== 'object' ? cleanNodeRaw(c, depth) : lord.themeCall(cleanNodeRaw, c, depth));
+function cleanNodeRaw(c, depth = 0, budget = { n: 0 }) {
+  try { return cleanOne(c, depth, budget); } catch (e) { return null; }
+}
+function cleanOne(c, depth, budget) {
   if (++budget.n > NODE_MAX || depth > 32) return null;
   if (c === null || c === undefined || typeof c === 'string' || typeof c === 'number' || typeof c === 'boolean') return c;
   if (typeof c !== 'object') return null;
@@ -145,16 +158,15 @@ function cleanNode(c, depth = 0, budget = { n: 0 }) {
       return null;
     }
     if (typeof ty === 'function' && (facadeTypes.has(ty) || realmOf(ty) === 2)) return c;
-    const props = { ...themeProps(c.props, false, depth + 1) };
+    const props = { ...themePropsRaw(c.props, false, depth + 1) };
     if (c.key != null) props.key = String(c.key);
     return Object.freeze(h(typeof ty === 'function' ? typeFor(ty) : ty, props));
   }
-  let list = null;
-  if (Array.isArray(c)) list = c;
-  else if (typeof c[Symbol.iterator] === 'function' && Object.prototype.toString.call(c) !== '[object String]') {
-    try { list = []; for (const x of c) { list.push(x); if (list.length > NODE_MAX) break; } } catch (e) { list = null; }
-  }
-  return list ? list.map((x) => cleanNode(x, depth + 1, budget)) : null;
+  // real arrays only (never a theme's iterator), read index by index
+  if (!Array.isArray(c)) return null;
+  const n = Math.min(c.length >>> 0, NODE_MAX), out = [];
+  for (let i = 0; i < n; i++) out.push(cleanNodeRaw(c[i], depth + 1, budget));
+  return out;
 }
 const cleanChildren = (c) => cleanNode(c, 0);
 
@@ -163,24 +175,31 @@ const cleanChildren = (c) => cleanNode(c, 0);
 // again; a ref object stays live; an element or an iterable goes through cleanNode; a plain object or array is copied
 // key by key (bounded in depth and count); a date is copied; anything else is dropped.
 const VALUE_MAX = 20000;
-function sanitizeIn(v, depth = 0, budget = { n: 0 }) {
+const sanitizeIn = (v) => (v === null || (typeof v !== 'object' && typeof v !== 'function') ? v : lord.themeCall(sanitizeRaw, v));
+// a theme value that throws while it is read (a refused native in its getter or trap) is dropped, never LordOS's error
+function sanitizeRaw(v, depth = 0, budget = { n: 0 }) {
+  try { return sanitizeOne(v, depth, budget); } catch (e) { return undefined; }
+}
+function sanitizeOne(v, depth, budget) {
   if (++budget.n > VALUE_MAX || depth > 16) return undefined;
   if (v === null || v === undefined || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint') return v;
   if (typeof v === 'function') return wrapCallback(v);
   if (typeof v !== 'object') return undefined;
   if (instances.has(v)) return instances.get(v);
-  if (isElement(v)) return cleanNode(v, depth);
-  if (Array.isArray(v)) return v.slice(0, VALUE_MAX).map((x) => sanitizeIn(x, depth + 1, budget));
-  const tag = Object.prototype.toString.call(v);
-  if (tag === '[object Date]') return new Date(Date.prototype.getTime.call(v));
-  if (tag !== '[object Object]') return typeof v[Symbol.iterator] === 'function' ? cleanNode(v, depth) : undefined;
+  if (isElement(v)) return cleanNodeRaw(v, depth);
+  if (Array.isArray(v)) { const n = Math.min(v.length >>> 0, VALUE_MAX), out = []; for (let i = 0; i < n; i++) out.push(sanitizeRaw(v[i], depth + 1, budget)); return out; }
+  let time = NaN;
+  try { time = Date.prototype.getTime.call(v); } catch (e) { time = NaN; }
+  if (time === time) return new Date(time);
+  const proto = Object.getPrototypeOf(v);
+  if (proto !== null && Object.getPrototypeOf(proto) !== null) return undefined;     // plain objects only (any realm's)
   if (originals.has(v)) return originals.get(v);    // a frozen copy of LordOS's data, given back as it was
   const keys = Object.keys(v);
   if (keys.length === 1 && keys[0] === 'current') return refFromTheme(v);
   const o = {};
   for (const k of keys) {
     if (k === '__proto__') continue;
-    o[k] = sanitizeIn(v[k], depth + 1, budget);
+    o[k] = sanitizeRaw(v[k], depth + 1, budget);
   }
   return o;
 }
@@ -191,16 +210,20 @@ const BLOCKED_PROPS = new Set(['session', 'surface', 'media', 'crop', 'pixels', 
 const srcOk = (s) => typeof s === 'string' && !s.includes('..') && !s.startsWith('/') && !s.includes('\0') &&
   (/^assets\/[A-Za-z0-9_][A-Za-z0-9._/-]*$/.test(s) || /^asset:[A-Za-z0-9_][A-Za-z0-9._/-]*$/.test(s));
 
-function themeProps(p, host, depth = 0) {
+const themeProps = (p, host, depth = 0) => lord.themeCall(themePropsRaw, p, host, depth);
+function themePropsRaw(p, host, depth = 0) {
   const o = {};
   if (!p || typeof p !== 'object') return o;
-  for (const k of Object.keys(p)) {
-    const v = p[k];
+  let keys = [];
+  try { keys = Object.keys(p); } catch (e) { keys = []; }
+  for (const k of keys) {
     if (BLOCKED_PROPS.has(k) || k === 'lordThemeOwned') continue;
+    let v;
+    try { v = p[k]; } catch (e) { continue; }
     if (k === 'ref') o.ref = wrapRef(v);
     else if (k === 'src' && host) { if (srcOk(v)) o.src = v; }
-    else if (k === 'children') o.children = cleanNode(v, depth);
-    else o[k] = sanitizeIn(v, depth);
+    else if (k === 'children') o.children = cleanNodeRaw(v, depth);
+    else o[k] = sanitizeRaw(v, depth);
   }
   if (host) o.lordThemeOwned = THEME_OWNED;     // a prop React copies (it drops symbol keys); its value can't be forged
   return o;
@@ -257,7 +280,7 @@ function setterFor(set) {
   return w;
 }
 const themeReact = () => Object.freeze({
-  createElement: themeCreateElement, cloneElement: themeCloneElement, Fragment: React.Fragment,
+  createElement: (...a) => lord.themeCall(themeCreateElement, ...a), cloneElement: (...a) => lord.themeCall(themeCloneElement, ...a), Fragment: React.Fragment,
   isValidElement: React.isValidElement, Children: React.Children,
   memo: (C, cmp) => React.memo(realmOf(C) === 2 ? C : typeFor(C), typeof cmp === 'function' ? (a, b) => themeCall(cmp, a, b) : undefined),
   forwardRef: (render) => React.forwardRef((p, r) => themeCall(render, p, r)),
@@ -290,14 +313,16 @@ function readOnly(store, map = (x) => snapshot(x)) {
 // React gives subscribe reaches the theme only as a fresh wrapper
 const sdkStores = new WeakSet();
 const themeStores = new WeakMap();
+const callGet = (s) => s.get();
+const callSubscribe = (s, fn) => s.subscribe(fn);
 function storeFromTheme(s) {
   if (!s || typeof s !== 'object') return s;
   if (sdkStores.has(s)) return s;
   let w = themeStores.get(s);
   if (!w) {
     w = Object.freeze({
-      get: () => sanitizeIn(themeCallSafe(s.get)),
-      subscribe: (fn) => { const off = themeCallSafe(s.subscribe, () => { fn(); }); return () => { if (typeof off === 'function') themeCallSafe(off); }; },
+      get: () => sanitizeIn(themeCallSafe(callGet, s)),
+      subscribe: (fn) => { const off = themeCallSafe(callSubscribe, s, () => { fn(); }); return () => { if (typeof off === 'function') themeCallSafe(off); }; },
     });
     themeStores.set(s, w);
   }
@@ -326,7 +351,7 @@ const notesData = (l) => (Array.isArray(l) ? Object.freeze(l.map(noteData)) : []
 const WRITABLE = /^(mode|accent|effects|reduceTransparency|dock[A-Z][A-Za-z]*|menuBar[A-Za-z]*|taskbar[A-Za-z]*)$/;
 function settingsPatch(id, patch) {
   const cur = SDK.settings.get();
-  const p = typeof patch === 'function' ? patch(cur) : patch;
+  const p = sanitizeIn(typeof patch === 'function' ? themeCall(patch, snapshot(cur)) : patch);
   if (!p || typeof p !== 'object') return;
   const out = {};
   for (const k of Object.keys(p)) {
@@ -363,7 +388,8 @@ function themeAddListener(type, fn) {
 }
 // a theme's shortcuts: only combinations with ❖, ⌃ or ⌥ (or Esc and F1–F24), so a table can't read what is typed
 const comboOk = (c) => typeof c === 'string' && (/(^|\+)(Meta|Ctrl|Alt)\+/.test(c) || /^(Escape|F([1-9]|1[0-9]|2[0-4]))$/.test(c));
-function themeUseShortcuts(o = {}) {
+function themeUseShortcuts(raw = {}) {
+  const o = sanitizeIn(raw) || {};
   const table = Array.isArray(o.table) ? o.table.filter((e) => e && comboOk(e.combo) && typeof e.run === 'function')
     .map((e) => ({ id: typeof e.id === 'string' ? e.id : undefined, combo: e.combo, run: wrapCallback(e.run), when: e.when ? wrapCallback(e.when) : undefined, repeat: !!e.repeat })) : [];
   return SDK.useShortcuts({ grabs: typeof o.grabs === 'string' ? o.grabs : '', table, onSuperTap: o.onSuperTap ? wrapCallback(o.onSuperTap) : null });
@@ -372,7 +398,7 @@ function themeUseShortcuts(o = {}) {
 // ---- layers: a theme's surfaces go below the system's (notifications, prompts, the input method, Screenshots) ----
 const THEME_LAYERS = new Set(['dock', 'menubar', 'overlay', 'popover', 'modal', 'tooltip', 'drag']);
 function ThemeLayer(p) {
-  if (!THEME_LAYERS.has(p.name)) throw new Error(`a community theme can't draw in the ${p.name} layer`);
+  if (!THEME_LAYERS.has(p.name)) throw new Error(`a community theme can't draw in the ${typeof p.name === 'string' ? p.name : '?'} layer`);
   return h(SDK.Layer, { name: p.name }, cleanChildren(p.children));
 }
 function ThemeOverlay(p) {
@@ -380,7 +406,8 @@ function ThemeOverlay(p) {
   return h(SDK.Overlay, { anchor: refFromTheme(p.anchor), onClose: p.onClose ? wrapCallback(p.onClose) : undefined, layer }, cleanChildren(p.children));
 }
 // a window's frame: the window as the window manager has it (its protection can't be dropped by the theme)
-function ThemeWindowShell(p) {
+function ThemeWindowShell(props) {
+  const p = { ...props, win: sanitizeIn(props.win) };
   const real = p.win && SDK.wm.get ? SDK.wm.get(p.win.id) : null;
   return h(SDK.WindowShell, { ...themeProps(p, false), win: real || p.win });
 }
@@ -391,7 +418,7 @@ function ThemeWindowShell(p) {
 // setFullscreen, scriptMove are not here). open takes an app id and at most { new, frame } with numbers.
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 const idOf = (v) => (typeof v === 'string' ? v : '');
-const rect = (r) => (r && typeof r === 'object' ? { x: num(r.x), y: num(r.y), w: num(r.w), h: num(r.h) } : undefined);
+const rect = (raw) => { const r = sanitizeIn(raw); return r && typeof r === 'object' ? { x: num(r.x), y: num(r.y), w: num(r.w), h: num(r.h) } : undefined; };
 const plain = (v) => (v == null || typeof v !== 'object' ? v : JSON.parse(JSON.stringify(v)));
 function themeWm() {
   const W = SDK.wm;
@@ -414,12 +441,13 @@ function themeWm() {
     moveToDesktop: (id, d) => W.moveToDesktop(idOf(id), num(d)),
     arrange: (how) => W.arrange(typeof how === 'string' ? how : ''),
     showWindowMenu: (id, x, y) => W.showWindowMenu?.(idOf(id), num(x), num(y)),
-    open: (app, opts) => W.open(idOf(app), opts && typeof opts === 'object' ? { new: !!opts.new, frame: rect(opts.frame) } : undefined),
+    open: (app, raw) => { const opts = sanitizeIn(raw); return W.open(idOf(app), opts && typeof opts === 'object' ? { new: !!opts.new, frame: rect(opts.frame) } : undefined); },
   });
 }
 
 // ---- configureWindows: LordOS's apps (the ones the theme lists, by id), and only numbers and the theme's functions ----
-function themeConfigureWindows(o = {}) {
+function themeConfigureWindows(raw = {}) {
+  const o = sanitizeIn(raw) || {};
   const ids = Array.isArray(o.apps) ? new Set(o.apps.map((a) => (a && typeof a === 'object' ? a.id : a)).filter((x) => typeof x === 'string')) : null;
   const apps = ids ? hostApps.filter((a) => ids.has(a.id)) : hostApps;
   const areaFn = typeof o.workArea === 'function' ? wrapCallback(o.workArea) : null;
@@ -498,8 +526,8 @@ export function makeThemeSdk({ id, caps }) {
   sdk.screenDisplays = () => SDK.screenDisplays().map((d) => ({ ...d }));
   sdk.session = Object.freeze({ lock: () => SDK.session.lock(), quit: () => SDK.session.quit(), canPower: () => SDK.session.canPower?.(),
     restart: () => SDK.session.restart(), shutdown: () => SDK.session.shutdown(), managed: () => SDK.session.managed() });
-  sdk.spotlight = Object.freeze({ toggle: (d) => SDK.spotlight.toggle(d), open: (d) => SDK.spotlight.open?.(d), close: () => SDK.spotlight.close?.() });
-  sdk.keyboard = Object.freeze({ label: (x) => SDK.keyboard.label(x), active: () => SDK.keyboard.active(), next: () => SDK.keyboard.next() });
+  sdk.spotlight = Object.freeze({ toggle: (d) => SDK.spotlight.toggle(sanitizeIn(d)), open: (d) => SDK.spotlight.open?.(sanitizeIn(d)), close: () => SDK.spotlight.close?.() });
+  sdk.keyboard = Object.freeze({ label: (x) => SDK.keyboard.label(sanitizeIn(x)), active: () => SDK.keyboard.active(), next: () => SDK.keyboard.next() });
   sdk.settings = Object.freeze({ get: () => snapshot(SDK.settings.get()), subscribe: (fn) => SDK.settings.subscribe(wrapCallback(fn)), set: (p) => settingsPatch(id, p) });
   const setSettings = (p) => settingsPatch(id, p);
   sdk.useSettings = () => [SDK.useStore(SDK.settings, snapshot), setSettings];
@@ -513,14 +541,14 @@ export function makeThemeSdk({ id, caps }) {
   sdk.dockDragJustEnded = SDK.dockDragJustEnded ? exportValue('dockDragJustEnded', SDK.dockDragJustEnded) : undefined;
   sdk.overview = readOnly(SDK.overview);
   sdk.notifyPrefs = readOnly(SDK.notifyPrefs);
-  sdk.dock = SDK.dock ? Object.freeze({ pin: (x, i) => SDK.dock.pin(x, i), move: (x, i) => SDK.dock.move(x, i), unpin: (x) => SDK.dock.unpin(x) }) : undefined;
+  sdk.dock = SDK.dock ? Object.freeze({ pin: (x, i) => SDK.dock.pin(sanitizeIn(x), i === undefined ? undefined : num(i)), move: (x, i) => SDK.dock.move(sanitizeIn(x), num(i)), unpin: (x) => SDK.dock.unpin(sanitizeIn(x)) }) : undefined;
   sdk.sound = has.has('sound') ? Object.freeze({ available: () => SDK.sound.available?.() }) : Object.freeze({ available: () => false });
   sdk.addListener = themeAddListener;
   sdk.holdKeyboard = themeHoldKeyboard;
   sdk.useShortcuts = themeUseShortcuts;
-  sdk.registerGestureActions = (a) => SDK.registerGestureActions(Object.fromEntries(Object.entries(a || {}).map(([k, f]) => [k, wrapCallback(f)])));
+  sdk.registerGestureActions = (a) => SDK.registerGestureActions(sanitizeIn(a) || {});
   // notifications: showing one is allowed; a notification centre reads plain data (with the capability)
-  sdk.notify = (n) => SDK.notify({ title: String(n?.title ?? ''), body: String(n?.body ?? ''), app: 'theme' });
+  sdk.notify = (raw) => { const n = sanitizeIn(raw); const str = (v) => (typeof v === 'string' || typeof v === 'number' ? String(v) : ''); return SDK.notify({ title: str(n?.title), body: str(n?.body), app: 'theme' }); };
   if (has.has('notifications')) {
     sdk.notifyHistory = readOnly(SDK.notifyHistory, notesData);
     sdk.useNotifications = () => notesData(SDK.useNotifications());
@@ -559,12 +587,13 @@ export function runThemeShell() {
 
 // React's host guard: a host node whose nearest component is the theme's own function was forged by the theme (it
 // renders View, Text and Image from the SDK, never a host element itself)
+const readRender = (t) => (typeof t.render === 'function' ? t.render : t.type);
 function guardHost(_type, props, fiber) {
   // the backstop: every host node's element was made by LordOS's own React (runtime/react-made.cjs records them)
   if (!React.lordMadeProps || !React.lordMadeProps(props)) throw new TypeError('a community theme draws with View, Text and Image from @lordos/sdk');
   for (let f = fiber && fiber.return; f; f = f.return) {
     const t = f.type;
-    const fn = typeof t === 'function' ? t : t && typeof t === 'object' ? (t.render || t.type) : null;
+    const fn = typeof t === 'function' ? t : t && typeof t === 'object' ? lord.themeCall(readRender, t) : null;
     if (typeof fn === 'function') {
       if (isThemeFn(fn)) throw new TypeError('a community theme draws with View, Text and Image from @lordos/sdk');
       return;

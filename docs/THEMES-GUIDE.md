@@ -665,7 +665,8 @@ Without a capability the SDK's hook gives a neutral value (no battery, no player
 administrator actions, permission answers, packages, the keyring, the clipboard, network settings, switching themes or
 changing Wi-Fi, Bluetooth, the volume, the brightness or what plays. Refs and events give the theme a handle
 `{ id, type }`, never LordOS's node objects; LordOS's data (windows, settings, stores) arrives as frozen copies;
-whatever the theme hands back (props at any depth, arguments, what its callbacks return) is sanitized, and a host
+whatever the theme hands back (props at any depth, arguments, what its callbacks return) is copied by an allowlist,
+always as the theme's own code (a getter, a Proxy or an iterator in it runs under the theme's policy), and a host
 node whose element LordOS's own React didn't make is refused (a forged React element never becomes a node); its key listeners hear keys only while the keyboard is the shell's (its
 launcher, its menus, no window focused) and never while a system prompt is up; its shortcuts need ❖, ⌃ or ⌥;
 `settings` is read whole but written only for its own options (`themeOptions[<id>]`) and `mode`, `accent`, `effects`,

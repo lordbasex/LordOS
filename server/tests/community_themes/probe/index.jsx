@@ -1,7 +1,7 @@
 // A test fixture (installed --unchecked: the checks refuse it): every way it tries to restyle nodes that are not its
 // own, or to reach past its lord, must be refused. Each case aims at its own node id (101…), so lord-server's log
 // ("lord.setStyle refused (node N …)") shows each one was refused. Lines "CT …" go to the shell's log.
-import { startShell, View, configureWindows, ThemeProvider, settings, wm, useStore, createStore, Button } from '@lordos/sdk';
+import { startShell, View, configureWindows, ThemeProvider, settings, wm, useStore, createStore, Button, formatDate } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, createContext } from 'react';
 
@@ -31,6 +31,21 @@ const iterable = { [Symbol.iterator]: function* () { yield forgedHost('iterable'
 const lazy = { $$typeof: Symbol.for('react.lazy'), _payload: null, _init: () => forgedHost('lazy') };
 const thenable = { then: (r) => r(forgedHost('thenable')) };
 const elementStore = { get: () => forgedHost('store value'), subscribe: () => () => {} };
+// accessors LordOS's code might read: a getter, a Proxy's traps, a custom iterator and a toStringTag accessor, each
+// trying a restricted lord.* (a theme function, or a bound native of its lord); every one that runs is refused
+const tryAt = (name, id) => { try { set(id, 'opacity', 0); out(`${name} ALLOWED`); } catch (e) { out(`${name} refused`); } return 0; };
+const getterObj = { get x() { return tryAt('getter', 111); }, y: 0, w: 10, h: 10 };
+Object.defineProperty(getterObj, 'y', { get: set.bind(null, 112, 'opacity', 0), enumerable: true });
+const proxyObj = new Proxy({}, { ownKeys: () => { tryAt('proxy ownKeys', 113); return []; }, get: set.bind(null, 114, 'opacity', 0),
+  getPrototypeOf: () => { tryAt('proxy getPrototypeOf', 117); return Object.prototype; } });
+const iterObj = { [Symbol.iterator]: () => { tryAt('iterator', 115); return [][Symbol.iterator](); } };
+const tagObj = { get [Symbol.toStringTag]() { tryAt('toStringTag', 116); return 'Date'; } };
+setTimeout(() => {
+  try { wm.setFrame('none', getterObj); } catch (e) { /* refused inside */ }
+  try { formatDate(tagObj); } catch (e) { /* not a date */ }
+  try { wm.open('files', proxyObj); } catch (e) { /* refused inside */ }
+  out('accessors done');
+}, 100);
 function StoreChild() { const v = useStore(elementStore); return <View>{v}</View>; }
 
 tryIt('direct', () => set(101, 'opacity', 0));
@@ -69,6 +84,7 @@ function App() {
         <View>{[lazy, thenable]}</View>
         <View extra={{ nested: [forgedHost('nested object')] }} />
         <StoreChild />
+        <View extra={proxyObj}>{iterObj}</View>
       </View>
     </ThemeProvider>
   );

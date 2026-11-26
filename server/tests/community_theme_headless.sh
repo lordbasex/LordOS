@@ -13,7 +13,8 @@
 #              node it works; forged elements (a host element, LordOS's raw component, a context's Provider holding a
 #              host element; in children, another prop, a nested object, an iterable, a lazy element, a thenable or a store's
 #              value) never hand it a raw node; a forged app registry is never
-#              used; wm has no setArgs, setProtected, setMenus, setPip, scriptMove or setCloseGuard
+#              used; accessors LordOS's code reads (a getter, a Proxy's traps, a custom iterator, a toStringTag
+#              accessor; theme functions and bound natives, nodes 111-117) are refused when they run; wm has no setArgs, setProtected, setMenus, setPip, scriptMove or setCloseGuard
 #   forger     its own component returns a forged host element: the host guard refuses it (its element wasn't made by
 #              LordOS's React), the theme is taken off
 #   throws     throws while it starts: the session goes back to LordOS's theme, it is marked failed with the error
@@ -68,6 +69,8 @@ has "probe: its own node can be restyled" "CT own-node works"
 has "probe: lord.setStyle from a store's get React reads later refused" "lord.setStyle refused (node 110 is not"
 hasnt "probe: no forged element (host, raw component, Provider; in children or a prop) handed it a raw node" "RAW NODE"
 has "probe: forged elements were rendered (and cleaned)" "CT forged elements done"
+has "probe: LordOS's code read its getter, Proxy, iterator and toStringTag objects" "CT accessors done"
+for n in 112 114; do has "probe: a bound native as an accessor (node $n) refused" "lord.setStyle refused (node $n is not"; done
 hasnt "probe: a forged app registry is never used" "forged app RENDERED"
 has "probe: a forged app doesn't open" "CT forged app opens false"
 has "probe: wm has no setArgs, setProtected, setMenus, setPip, scriptMove or setCloseGuard" "CT wm.setArgs undefined wm.setProtected undefined wm.setMenus undefined wm.setPip undefined wm.scriptMove undefined wm.setCloseGuard undefined"
