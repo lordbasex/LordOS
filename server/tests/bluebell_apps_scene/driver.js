@@ -21,6 +21,7 @@
   // [app, args, a text its skin draws (or (sdk) => it)]: one row per app skinned with the shared shapes
   const APPS = [
     ['notes', {}, (sdk) => sdk.t('notes.new')],
+    ['calculator', {}, '÷'],
   ];
   (async () => {
     await sleep(2500);
