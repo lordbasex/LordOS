@@ -48,6 +48,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Settings → AI → Hands**: the session switch, what it can and can never do, the allowlist, the connected clients
     with Stop, how to add it to Claude Code; the Hands piece of Lumo is ready and "Hands" is one of Lumo's functions.
   - Texts in all 35 languages.
+- **Hands: the agent's own cursor, human and machine motion** (asked by the maintainer on 2026-11-26, after watching an
+  agent validate his checklist with no pointer moving; docs/HANDS.md "The agent's cursor").
+  - **The cursor**: a violet arrow with the client's name "· reported" (as the prompt says: what the program calls
+    itself, not verified; cleaned in C at Hello, cut again in the shell), a ripple where it clicks, a pulse at the field
+    it types into, a quick ring where a machine-mode action lands; it fades 4 s after the last action and goes with
+    Stop. Drawn from C (`server/src/hands/handscur.c`) in a layer of its own at zIndex 99.5, built once by the shell
+    out of React's sight (`sdk/hands.jsx` `HandsCursor`, `runtime` `overlayTree`): above every theme layer, below the
+    system band (prompts and the banner stay above it), no clicks; a glide's frames change only its position (its box is
+    the damage). Never in the agent's own screenshots nor in `read_window`.
+  - **The person's pointer never moves**: the agent borrows the pointer's position for its input; the person's pointer
+    image stays where they left it and their next pointer input takes it back from there (`main.c` `hands_reclaim`).
+  - **Human mode** (the live desktop's default): the cursor glides to each target along a slightly curved, eased path in
+    250 to 900 ms by Fitts's law, hovers 90 to 170 ms, then acts; a drag carries it with the button held, a scroll comes
+    in up to 4 steps, text is typed at 25 to 60 ms a character (at most 10 s a call). Reduce motion makes the glides
+    short and straight. `Pointer`, `Scroll`, `Type` and `SetValue` answer when the action is done (`HANDS_E_PENDING`,
+    `handsbus.c` keeps the call). Every step passes the gate when it happens (the glide injects nothing; the hover, the
+    click, each scroll step and each character are gated then; a refused drop lets go where the drag began); the
+    person's input stops it at once (a held button released) and still pauses the agent 3 s; one action at a time.
+    `server/src/hands/handsmotion.c` has the math.
+  - **Machine mode** (the `--headless` QA default): at once, as before, with the flash.
+  - **Choosing it**: Settings → AI → Hands → *Agent motion: Human / Machine* (`settings.hands.motion`,
+    `lord.hands.motion`); `hands_mode` (a new lordos-mcp tool, `SetMode` on `org.lordos.Hands1`), `lordos-mcp --mode`,
+    and `mode` on one `computer` or `set_value` call. In all 35 languages (`hands.cursor.label`, `hands.settings.motion*`).
+  - A `where` test hook (test builds only) says where the person's pointer image is.
 - **How many processor cores the Brain uses** (asked and approved by the maintainer on 2026-11-26; docs/AI.md "The
   engine's threads"). The engine always ran with `-t 2 -tb 2` in a cgroup of two cores; on an i9-10900 with Qwen3 1.7B
   a Writing job takes 6.1 s on 2 threads, 3.4 s on 4 and 2.0 s on 8.
@@ -384,6 +408,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Hands: `screenshot target window:<id>` failed ("The action failed.")** for Monitor on its Network tab and Settings on
+  Web apps: the screenshot marked the window's `handsDeny` nodes (the firewall switches, a person-only page) as
+  `protect`, and a window captured alone is refused when anything inside it is protected (`paint_capture_until`). The
+  marks are now their own flag, `hands_black`, and an agent's window capture is refused only when the window itself is
+  protected (a protected node inside is painted as the protected fill). The window's sheets are now in it too.
+- **Hands: `handsDeny` nodes didn't look blacked out** in a display screenshot of Monitor's Network tab: they were
+  painted as the protected fill, a neutral grey (#2e2e2e) in the node's own rounded shape, so a firewall rule switch
+  came out as a grey switch on a dark row. An agent's screenshots now paint every mark solid black over its whole box,
+  in every path (display, window, region), and the menus of a marked Linux window too.
+- **Hands: `computer zoom` refused "outside" over a wallpaper's sheet**: the region had to lie wholly on the desktop, and
+  a window's screenshot reported the window's full box even where it ran off the screen, so points mapped from it fell
+  outside. A window's screenshot now reports the part on the desktop, a region is clipped to the desktop (refused only
+  when nothing of it is there) and, with an allowlist, a region needs only to show some of an allowed window or a
+  surface tied to one (`handsWin`), everything else black, as the screenshot rules say.
 - **A web app's tray icon and notifications kept LordOS's letter tile** after its real icon was fetched (WhatsApp's "W"
   next to the clock): lord-web read only the registry's icon. It now prefers the site's own icon from
   `~/.cache/lordos/web/icons/<app>.png` when it starts (a regular PNG of the person's, no link, at most 1 MB). An app
