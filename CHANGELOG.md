@@ -11,6 +11,45 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **The Brain (the local language model of Sentinela and Writing) on the graphics card** (in development, asked by the
+  maintainer on 2026-11-26; the new device access is **awaiting the maintainer's approval**, AGENTS.md; docs/AI.md
+  "The Brain on the GPU"). Until now the engine ran on the processor only (`-ngl 0 -dev none`).
+  - **Settings → AI → "Where they run"** now has **Automatic / Processor / Graphics card** for the Brain, like the
+    Voice (`settings.brain.backend`, default automatic; `setBrainBackend` → the new `lord.sentinela.backend(mode)`),
+    and under it what the engine really used: *Brain: on the graphics card (Vulkan, AMD Radeon RX 580 Series)*,
+    *… 20 of 29 layers; the rest on the processor*, or the processor with its reason (chosen, no usable card, the card
+    couldn't start it, it ran out of memory, an untested card on arm64). In all 35 languages (`brainCpu` no longer says
+    the engine never uses the card). `brainWhere` in `sdk/aistore.js`, tested by `server/tests/ai_store_test.mjs`.
+  - **Choosing at run time** (`server/src/llm/engine.c`): automatic = CUDA when llama.cpp's `libggml-cuda.so` and
+    `/dev/nvidiactl` are there, else Vulkan when `libggml-vulkan.so` and a render node are there, else the processor
+    (on arm64 automatic keeps the processor; Graphics card tries the Pi's GPU). lord-llm gets the choice as one closed
+    word (`LORD_LLM_BACKEND=cpu|vulkan|cuda`) and runs the engine with that backend's fixed arguments
+    (`-ngl auto -dev Vulkan0 -lv 4`: llama.cpp's `--fit` puts as many layers on the card as fit with 1 GB to spare).
+  - **Falling back:** a GPU that can't start the engine, has no room for a layer, or runs out of memory while
+    answering is given up on until the choice changes, and the job runs again at once on the next backend (a streamed
+    Writing answer too, before its first word). The engine's stderr is now a pipe lord-server reads on a thread: only
+    the device's name (printable ASCII, ≤ 80 characters), the layers offloaded and out-of-memory lines are understood.
+  - **Sandbox** (`server/src/llm/llmjail.c`), only for the backend in use: Vulkan reaches the render nodes
+    `/dev/dri/renderD128`–`191` (DRM's major only, with their ioctls), lists `/dev/dri` and reads `/etc/vulkan` and the
+    parts of `/sys` Mesa uses, never `/dev/dri/card*`; CUDA reaches `/dev/nvidiactl`, `/dev/nvidia<N>`,
+    `/dev/nvidia-uvm(-tools)` and `/proc/driver/nvidia`. The processor's sandbox is unchanged; without a cgroup the
+    address-space limit stays for the processor only.
+  - **CUDA as its own optional package**, `llama.cpp-cuda` (`apt/recipes/llama.cpp-cuda/build.sh`, catalog
+    `section: "addon"`, never a Store page): only `libggml-cuda.so`, from the same pinned llama.cpp source, built in a new
+    `nvidia-cuda` build image (NVIDIA's CUDA 13.5 compiler from NVIDIA's own Debian 13 repository, key
+    `apt/keys/nvidia-cuda.asc` checked by fingerprint `0218 2E60 104F CDC2 6EAE 1B85 97A5 D4CB 8793 F200`) for Turing and
+    newer cards; it depends on NVIDIA's `cuda-cudart-13-5`, `libcublas-13-5` and `libcuda1`, so it installs only where
+    NVIDIA's repository is (the Store's NVIDIA card, docs/NVIDIA-PLAN.md Part A). Not built yet. llama.cpp's own
+    package already had every CPU variant and Vulkan as run-time modules; nothing proprietary enters the base system.
+  - **Measured** on the development PC (i9-10900, RX 580 8 GB, Mesa 25.0.7; `llama-bench`, prompt / generation
+    tokens per second): Qwen3 1.7B 72.7 / 20.1 on the processor with the engine's 2 threads against **1038 / 110** on
+    the RX 580 through Vulkan; Qwen3 4B 29.4 / 8.2 against **423 / 52**. A Sentinela analysis takes 0.85 s instead of
+    9.3 s (1.7B, warm) and 1.8 s instead of 23.3 s (4B).
+  - **Tests:** `build/llm-engine-test` runs the fake engine with fake ggml modules and devices: Vulkan chosen, its
+    device and layers read, the render node and its DRM ioctl reachable only under Vulkan, `card0` and NVIDIA's node
+    never, the processor's sandbox when chosen, CUDA first, a module writable by others ignored, every fallback with its
+    reason, a hostile device name cleaned; `--real` with `LLM_BACKEND=auto|cpu|gpu` prints where it ran.
+    `tests/settings_ai_scene` checks and photographs the new row.
 - **Spell checking in LordOS's own text fields** (`lord-spell`, `server/src/spell/`, `sdk/spell.js`, `sdk/spellmodel.js`;
   in development, approved by the maintainer on 2026-11-26; `docs/SPELLING.md`). Misspelled words get a wavy red
   underline as you type in any `TextInput` or `TextArea`, Notes and Mail's body; a right click on one starts the

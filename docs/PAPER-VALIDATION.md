@@ -372,6 +372,15 @@ pre-release that never shipped. The paper marked all of it "0.8.9, in developmen
 | 6.7 | The person's dictionary is enchant's word lists shared with lord-web, written only by lord-server (0600, unknown lines kept) | Test (`build/spell-test`: a word WebKit learned is read, the files are 0600) | Holds in the test; sharing with a running lord-web not checked on screen |
 | 6.7 | ✨ AI: fixed prompts in C, the selection fenced with a nonce, the streamed answer read strictly and shown as plain text, applied only on Replace, never in password fields, on when a model is installed unless turned off (kept) | Test (`build/llm-engine-test`, `writing_model_test.mjs`, `spell_scene` with a fake model) | Holds in the tests; **Untested** with a real Qwen3 model |
 
+## In development after 0.8.9.6.1: the Brain on the GPU (the paper's edition of 2026-11-26; awaiting approval)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 6.7 | Settings → AI chooses where the engine computes (Automatic / Processor / Graphics card): CUDA, else Vulkan, else the processor; a card that fails to start it, has no room or runs out of memory is given up on and the job runs again on the processor | Test (`build/llm-engine-test` with fake ggml modules, devices and a fake engine that fails each way; `ai_store_test.mjs` `brainWhere`; `tests/settings_ai_scene`) | Holds in the tests |
+| 6.7 | Only the chosen backend's device nodes enter lord-llm's sandbox: render nodes (with their ioctls) for Vulkan, NVIDIA's nodes for CUDA, never `/dev/dri/card*`; the processor's sandbox is unchanged | Test (`build/llm-engine-test`: the fake engine opens a render node and runs `DRM_IOCTL_VERSION` only under Vulkan; card0 and `/dev/nvidiactl` refused) | Holds in the tests for Vulkan; **Untested** for CUDA on NVIDIA hardware |
+| 6.7 | On the RX 580 through Vulkan, Qwen3 1.7B generates 110 tokens/s against 20 on the processor with the engine's two threads (4B: 52 against 8); an analysis takes 0.85 s instead of 9.3 s | Measured (`llama-bench -p 512 -n 128 -r 3`; `build/llm-engine-test --real` in the sandbox under the scope's memory cap; i9-10900, RX 580 8 GB, Mesa 25.0.7, 2026-11-26; docs/AI.md "Measured") | Measured once |
+| 6.7, 11 | The optional CUDA backend (`llama.cpp-cuda`) is written, not built or tested; NVIDIA and Intel cards through Vulkan and the Raspberry Pi's GPU are untested | — | **Untested** |
+
 ## In development after 0.8.9.6.1 (the paper's edition of 2026-11-26)
 
 | § | Claim | How | State |
