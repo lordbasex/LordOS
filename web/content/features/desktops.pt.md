@@ -88,4 +88,4 @@ Em outros desktops, como GNOME ou KDE, um desktop que funcione como o Lord Works
 - **A apresentação de fundos** foi verificada só em telas de teste, não em monitores reais nem pela GPU.
 - **O seletor do primeiro início** tem testes automáticos nos três desktops, mas ainda não foi visto num primeiro início real.
 - **Um tema que você mesmo faça** por enquanto só roda numa versão de desenvolvimento do LordOS: uma versão publicada só carrega código que está no manifesto assinado do LordOS.
-- **Lord Bluebell** e as aparências de apps foram verificados com testes automáticos e capturas sem tela, no claro e no escuro; ainda não numa sessão real. Por enquanto só o Arquivos aceita aparências; os outros apps chegam um por um.
+- **Lord Bluebell** e as aparências de apps foram verificados com testes automáticos e capturas sem tela, no claro e no escuro; ainda não numa sessão real. Por enquanto o Arquivos e o Ajustes aceitam aparências; os outros apps chegam um por um.

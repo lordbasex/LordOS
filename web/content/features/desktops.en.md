@@ -88,4 +88,4 @@ That is also why there will be more. If you have an idea for the next one, [tell
 - **The wallpaper slideshow** was checked on test displays only, not on real monitors or the GPU path.
 - **The first-start chooser** is covered by automated tests in all three desktops, but hasn't been seen yet on a real first start.
 - **A theme you build yourself** runs only on a development build of LordOS for now: a release build loads only code listed in LordOS's signed manifest.
-- **Lord Bluebell** and app skins were checked with automated tests and headless screenshots, in light and dark; not yet in a real session. For now only Files can be skinned; the other apps come one by one.
+- **Lord Bluebell** and app skins were checked with automated tests and headless screenshots, in light and dark; not yet in a real session. For now Files and Settings can be skinned; the other apps come one by one.
