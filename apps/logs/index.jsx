@@ -18,7 +18,7 @@ import {
   logs, fs, formatDate, formatNumber, addListener, parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder,
   levelMatch, LEVEL_MAX, cloudAccounts, inRange, rowText, exportLine, toggleGroup, useCloud, cloudModel,
   Toolbar, ToolbarButton, ToolbarSpacer, SearchField, EmptyState, Hairline, spacing, typeScale, useAppWindow,
-  useSidebar, SidebarToggle, SidebarOverlay,
+  useSidebar, SidebarToggle, SidebarOverlay, SkinRegion, useSkinned, listPane, pickItem, commandBar, pickCommand,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -374,10 +374,28 @@ export default function Registros() {
     </View>
   );
 
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the sources as a list pane (journal,
+  // LordOS's own files, apps, web, older) and Live and Export as a command bar; the reading, the filters and the export's
+  // file dialog stay Logs'
+  const skinned = useSkinned('logs');
+  const sk = skinned ? (() => {
+    const fileLabelOf = (f) => (isPrevious(f.name) ? tr('logs.previous', { name: fileLabel(f.name) }) : isOlder(f.name) ? tr('logs.older', { name: fileLabel(f.name) }) : fileLabel(f.name));
+    const pane = listPane({ title: tr('logs.section.journal'), items: [
+      ...['user', 'system', 'kernel'].map((k) => ({ key: `j:${k}`, label: tr(`logs.src.${k}`), selected: src.kind === k, group: tr('logs.section.journal') })),
+      ...['session', 'apps', 'web', 'old'].flatMap((g) => files.filter((f) => fileGroup(f.name) === g).map((f) => ({ key: `f:${f.name}`, label: fileLabelOf(f),
+        selected: src.kind === 'lordos' && src.file === f.name, group: tr(`logs.section.${g === 'session' ? 'lordos' : g}`) }))),
+    ] });
+    const cbar = commandBar({ commands: [{ id: 'live', label: tr('logs.live'), active: live }, { id: 'export', label: tr('logs.export') }] });
+    return {
+      sidebar: { app: 'logs', ...pane, actions: { select: (key) => { const k = pickItem(pane, key); if (!k) return; setSrc(k.startsWith('j:') ? { kind: k.slice(2) } : { kind: 'lordos', file: k.slice(2) }); } } },
+      toolbar: { app: 'logs', ...cbar, actions: { command: (id) => { const c = pickCommand(cbar, id); if (c === 'live') setLive(!live); else if (c === 'export') exportView(); } } },
+    };
+  })() : null;
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      {bar.narrow ? null : sourceList}
+      {bar.narrow ? null : <SkinRegion app="logs" region="sidebar" model={sk && sk.sidebar}>{sourceList}</SkinRegion>}
       <View ref={box} style={{ flex: 1, minWidth: 0 }}>
+        <SkinRegion app="logs" region="toolbar" model={sk && sk.toolbar}>
         <Toolbar>
           {bar.narrow ? <SidebarToggle shown={bar.shown} onClick={bar.toggle} /> : null}
           <ToolbarButton icon="●" iconSize={9} label={tr('logs.live')} active={live} color={t.textDim} onClick={() => setLive(!live)} />
@@ -387,6 +405,7 @@ export default function Registros() {
             style={{ width: tight ? 96 : narrow ? 130 : 150, ...(procValid ? {} : { border: '1px solid #ff453a' }) }} />
           <SearchField value={search} onChange={setSearch} placeholder={tr('logs.search')} width={tight ? 130 : narrow ? 190 : 220} />
         </Toolbar>
+        </SkinRegion>
         <View style={{ ...(tight ? { minHeight: 40, flexWrap: 'wrap', paddingVertical: 6 } : { height: 40 }), flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m }}>
           <Segmented small appearance="neutral" value={level} onChange={setLevel}
             options={[['all', tr('logs.lv.all')], ['info', tr('logs.lv.info')], ['warning', tr('logs.lv.warning')], ['error', tr('logs.lv.error')]]} />

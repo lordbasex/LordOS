@@ -143,6 +143,7 @@ function AboutBanner({ model }) {
 }
 
 export const appSkins = {
+  logs: { sidebar: (p) => <ListPane {...p} width={210} />, toolbar: CommandBar },
   fonts: { sidebar: SearchPane },
   characters: { toolbar: CommandBar, sidebar: (p) => <ListPane {...p} width={180} /> },
   help: { sidebar: SearchPane },
