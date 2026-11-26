@@ -944,6 +944,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "webapps-get-scene (apps/store/getweb.js)" node tests/textfield_menu_test.mjs webapps_get_scene.mjs
     else skip "webapps-get-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Settings → Web apps → Refresh icon: busy, then the icon or the reason, one closed log line per failure
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "webapps-icon-settings-scene (apps/settings/WebApps.jsx)" node tests/textfield_menu_test.mjs webapps_icon_settings_scene.mjs
+    else skip "webapps-icon-settings-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.9) the trademark notice of the Store's Web apps section and of each web app's page
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "store-trademark-scene (apps/store/trademark.js)" node tests/textfield_menu_test.mjs store_trademark_scene.mjs

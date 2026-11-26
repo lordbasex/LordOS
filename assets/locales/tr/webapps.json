@@ -186,6 +186,7 @@
   "settings.iconTile": "LordOS’un harf karosu (sitenin simgesi uygulama açıldığında alınır)",
   "settings.iconRefresh": "Simgeyi yenile",
   "settings.iconRefreshing": "Yenileniyor…",
+  "settings.iconUpdated": "Simge siteden güncellendi",
   "sound.auto": "Otomatik",
   "sound.app": "Uygulamanınki",
   "sound.system": "LordOS’unki",

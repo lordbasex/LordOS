@@ -184,6 +184,7 @@
   "settings.iconTile": "LordOS 的字母圖塊（App 開啟時會取得網站的圖示）",
   "settings.iconRefresh": "重新整理圖示",
   "settings.iconRefreshing": "正在重新整理…",
+  "settings.iconUpdated": "已從網站更新圖示",
   "sound.auto": "自動",
   "sound.app": "App 的聲音",
   "sound.system": "LordOS 的聲音",

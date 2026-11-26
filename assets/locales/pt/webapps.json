@@ -186,6 +186,7 @@
   "settings.iconTile": "A letra do LordOS (o ícone do site é buscado quando o app abre)",
   "settings.iconRefresh": "Atualizar ícone",
   "settings.iconRefreshing": "Atualizando…",
+  "settings.iconUpdated": "Ícone atualizado a partir do site",
   "sound.auto": "Automático",
   "sound.app": "O do app",
   "sound.system": "O do LordOS",

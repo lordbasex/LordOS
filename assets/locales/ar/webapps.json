@@ -194,6 +194,7 @@
   "settings.iconTile": "مربع الحرف من LordOS (تُجلب أيقونة الموقع عند فتح التطبيق)",
   "settings.iconRefresh": "تحديث الأيقونة",
   "settings.iconRefreshing": "جارٍ التحديث…",
+  "settings.iconUpdated": "تم تحديث الأيقونة من الموقع",
   "sound.auto": "تلقائي",
   "sound.app": "صوت التطبيق",
   "sound.system": "صوت LordOS",

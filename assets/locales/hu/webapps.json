@@ -186,6 +186,7 @@
   "settings.iconTile": "A LordOS betűs csempéje (a webhely ikonja az alkalmazás megnyitásakor töltődik le)",
   "settings.iconRefresh": "Ikon frissítése",
   "settings.iconRefreshing": "Frissítés…",
+  "settings.iconUpdated": "Az ikon frissítve a webhelyről",
   "sound.auto": "Automatikus",
   "sound.app": "Az alkalmazásé",
   "sound.system": "A LordOS-é",

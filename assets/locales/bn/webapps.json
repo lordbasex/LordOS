@@ -186,6 +186,7 @@
   "settings.iconTile": "LordOS-এর অক্ষর টাইল (অ্যাপ খুললে সাইটের আইকন আনা হয়)",
   "settings.iconRefresh": "আইকন রিফ্রেশ করুন",
   "settings.iconRefreshing": "রিফ্রেশ হচ্ছে…",
+  "settings.iconUpdated": "সাইট থেকে আইকন হালনাগাদ হয়েছে",
   "sound.auto": "স্বয়ংক্রিয়",
   "sound.app": "অ্যাপের",
   "sound.system": "LordOS-এর",

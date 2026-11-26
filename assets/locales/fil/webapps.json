@@ -186,6 +186,7 @@
   "settings.iconTile": "Letter tile ng LordOS (kinukuha ang icon ng site kapag bumukas ang app)",
   "settings.iconRefresh": "I-refresh ang icon",
   "settings.iconRefreshing": "Nire-refresh…",
+  "settings.iconUpdated": "Na-update ang icon mula sa site",
   "sound.auto": "Awtomatiko",
   "sound.app": "Sa app",
   "sound.system": "Sa LordOS",

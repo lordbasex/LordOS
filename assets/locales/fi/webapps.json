@@ -186,6 +186,7 @@
   "settings.iconTile": "LordOS:n kirjainruutu (sivuston kuvake haetaan, kun sovellus avautuu)",
   "settings.iconRefresh": "Päivitä kuvake",
   "settings.iconRefreshing": "Päivitetään…",
+  "settings.iconUpdated": "Kuvake päivitettiin sivustolta",
   "sound.auto": "Automaattinen",
   "sound.app": "Sovelluksen",
   "sound.system": "LordOS:n",

@@ -186,6 +186,7 @@
   "settings.iconTile": "De lettertegel van LordOS (het pictogram van de site wordt opgehaald als de app opent)",
   "settings.iconRefresh": "Vernieuw pictogram",
   "settings.iconRefreshing": "Vernieuwen…",
+  "settings.iconUpdated": "Pictogram bijgewerkt vanaf de site",
   "sound.auto": "Automatisch",
   "sound.app": "Van de app",
   "sound.system": "Van LordOS",

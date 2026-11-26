@@ -48,6 +48,39 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `server/tests/theme_gallery_test.mjs`.
 
 ### Fixed
+- **WhatsApp kept LordOS's letter tile: its own icon is fetched now, and Refresh icon says what happened**
+  (`server/src/web/webprobe.c`, `webmanifest.c`, `webreg.c`, `webmgr.c`, `ui/js_webapps.c`, `sdk/webapps.js`,
+  Settings → Web apps). Found with lord-web's own probe on `https://web.whatsapp.com/` (2026-11-26), three causes:
+  - **No manifest was read.** WhatsApp sends a signed-out probe to its sign-in page (`/login/`), which links no
+    manifest and only a WebP shortcut icon. When a page links none, the probe now looks for it on the page's own origin
+    at `/manifest.webmanifest`, `/manifest.json`, `/site.webmanifest` and `/data/manifest.json` (the answer must stay
+    on that origin and be a manifest object; the rest of the rules are unchanged). The manifest's start address (`/`)
+    and name come with it.
+  - **The icon download was refused.** `--probe-icon` downloaded with WebKit's own identity and request, and
+    WhatsApp's server answered 400. The icon is now opened as a page is, in a view without a window with the Chrome
+    identity (the same as the probe's page), and its answer becomes the download; every hop is checked like the
+    page's (https only, no hop to this computer or a local network), and an answer that isn't 2xx is no icon
+    (`web.probe.load`). The size limit, the temporary folder and the PNG/SVG check are unchanged.
+  - **The wrong icons were chosen.** WhatsApp's manifests label WebP files `image/png` and type their SVG `image/svg`.
+    lord-server now ranks every icon the page offers, the manifest's and the page's own (`<link rel="icon">`,
+    apple-touch-icon) together: PNGs (the largest up to 512 px), then SVGs, then icons that are only `maskable`; a
+    `monochrome`-only icon is never taken; an address ending in another image's extension (`.webp`, `.ico`, `.jpg`, …)
+    is skipped whatever its type says; `image/svg` counts as SVG. `--probe-icon` tries the best three in order until
+    one really is a PNG or an SVG, within the step's one 20 s. WhatsApp now gets its 512 px PNG.
+  - **Refresh icon never failed silently, but never said anything either.** Settings → Web apps → Refresh icon shows a
+    spinner while the probe runs, then "Icon updated from the site" with the new icon, or the reason there is none
+    (`webapps.iconOrigin`, `webapps.noIcon`, the runtime's `web.probe.…` code of the last icon tried, which lord-server
+    now passes on as `iconError`, or `webapps.noRuntime`). Each failure is one `js: [warn] webapps: the site's icon of
+    <app> was not kept: <code>` line in `shell.log` (the app's id and a closed code); lord-server's per-icon line in
+    the compositor log no longer prints the icon's address. One new text, in all 35 languages.
+  - Tests: `tests/web_probe_test.py` serves WhatsApp's pattern from a local origin of its own (a redirect to a sign-in
+    page with no manifest link and a WebP icon, the manifest at `/data/manifest.json` with WebPs labelled PNG, a real
+    PNG and a maskable `image/svg` SVG, strict CSP, COOP, COEP and Document-Isolation-Policy headers, 400 to any
+    request that isn't Chrome's); the lord-web before this fix fails 8 of its checks. `tests/webreg_test.c` checks the
+    ranking and a stand-in runtime that refuses the first icon (the second is kept) or all of them (`iconError`);
+    `tests/webapp_test.c` the merged icon list and `purpose`; `tests/webapps_model_test.mjs` `siteIconError`;
+    `tests/webapps_icon_settings_scene.mjs` Refresh icon (busy, the reason or "Icon updated", one log line per failure,
+    never the page's text).
 - **Web apps played no sound of their own without a click first:** a messaging web app's incoming-call ringtone and
   new-message sound were silent. WebKit's default autoplay policy allows only muted media until the person interacts;
   lord-web now gives every web app's view `WEBKIT_AUTOPLAY_ALLOW`, as Chrome does for installed apps (`webback_policies`).

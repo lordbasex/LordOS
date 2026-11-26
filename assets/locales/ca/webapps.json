@@ -186,6 +186,7 @@
   "settings.iconTile": "El mosaic amb la lletra de LordOS (la icona del lloc s’obté quan s’obre l’app)",
   "settings.iconRefresh": "Actualitza la icona",
   "settings.iconRefreshing": "S’està actualitzant…",
+  "settings.iconUpdated": "S’ha actualitzat la icona des del lloc",
   "sound.auto": "Automàtic",
   "sound.app": "El de l’app",
   "sound.system": "El de LordOS",

@@ -315,6 +315,12 @@ export function webIconPathOk(path, app, home, profile = null) {
 // Whether the Store or a launch should fetch the site's icon now: lord-web there, not fetched yet and not tried
 // this session (a failure is not retried until the next session or "Refresh icon").
 export const wantsSiteIcon = ({ available, cached, tried }) => !!available && !cached && !tried;
+// Why the site's icon was not kept, as a closed code for the message and the log: lord-server's own (webapps.…, the
+// probe's web.probe.…), else webapps.probeFailed. Never text from the page.
+export function siteIconError(x) {
+  const code = x && typeof x === 'object' ? x.code || x.error : x;
+  return typeof code === 'string' && /^(webapps|web\.probe)\.[A-Za-z]{1,40}$/.test(code) ? code : 'webapps.probeFailed';
+}
 
 // ---- unread counts on the Dock (org.lordos.WebApps1.SetBadge → the "webapps-badge" event) ----
 

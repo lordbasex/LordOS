@@ -301,7 +301,14 @@ static void test_manifest(void) {
     CHECK(strstr(out, "\"ok\":true") && strstr(out, "\"name\":\"Chat App\"") && strstr(out, "\"startUrl\":\"https://web.example.com/app/?src=pwa\"")
           && strstr(out, "\"scope\":\"https://web.example.com/app/\"") && strstr(out, "\"origin\":\"https://web.example.com\"")
           && strstr(out, "\"themeColor\":\"#25d366\"") && strstr(out, "\"manifest\":true"), "fields: %s", out);
-    CHECK(strstr(out, "192.png") && strstr(out, "cdn.example.net/512.png") && !strstr(out, "data:") && !strstr(out, "favicon"), "icons: %s", out);
+    /* the manifest's icons, then the page's own after them (lord-server ranks them all) */
+    const char *i192 = strstr(out, "192.png"), *fav = strstr(out, "favicon.ico");
+    CHECK(i192 && strstr(out, "cdn.example.net/512.png") && !strstr(out, "data:") && fav && fav > i192, "icons: %s", out);
+    /* an icon's purpose goes along (cleaned like sizes and type) */
+    const char *purp = "{\"title\":\"P\",\"manifest\":{\"icons\":[{\"src\":\"https://p.example/m.svg\",\"type\":\"image/svg\",\"purpose\":\"maskable\"},"
+                       "{\"src\":\"https://p.example/x.png\",\"purpose\":\"any\\u0001\"}]}}";
+    CHECK(!webmanifest_answer("https://p.example/", purp, strlen(purp), out, sizeof out) && strstr(out, "\"type\":\"image/svg\",\"purpose\":\"maskable\"}")
+          && strstr(out, "x.png\",\"sizes\":\"\",\"type\":\"\"}"), "purpose: %s", out);
 
     /* a manifest pointing elsewhere: the page's own address and folder instead */
     const char *evil =

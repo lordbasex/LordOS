@@ -34,6 +34,8 @@
  *                                       of "Add from an address" on the app's own start address (lord-web needed)
  *   iconResult(app)                     null while it runs; { done, ok, iconPath } once the icon is kept in
  *                                       ~/.cache/lordos/web/icons/<app>.<png|svg> (webicon.c), or { done, ok: false, error }
+ *                                       (webapps.iconOrigin, webapps.noIcon, or the runtime's web.probe.… code: the
+ *                                       probe's, or the last icon's when none was usable)
  *   icons()                             { [app]: path } of the cached icons (list() and get() already use them)
  *   badges()                            [{ app, profile, count }]: the unread counts lord-web set (SetBadge, webask.c)
  *   launch(app, profile)                → 'started' or 'running' (lord-server then asks it to show its window)
@@ -469,6 +471,7 @@ static JSValue f_icon_result(JSContext *c, JSValueConst t, int argc, JSValueCons
     if (j && !json_parse(j, strlen(j), &d, NULL, 0)) {
         const JVal *r = d.root;
         const char *e = json_str(r, "error"), *origin = json_str(r, "origin"), *path = json_str(r, "iconPath");
+        const char *why = json_str(r, "iconError");       /* why no icon was usable (webmgr.c: a web.probe.… code) */
         static char code[48];
         if (!json_bool(r, "ok", 0)) {
             /* the probe's own code (web.probe.…, webapps.probe…: made by lord-server, never the page's text) */
@@ -476,7 +479,10 @@ static JSValue f_icon_result(JSContext *c, JSValueConst t, int argc, JSValueCons
             snprintf(code, sizeof code, "%s", known ? e : "webapps.probeFailed");
             err = code;
         } else if (!err && (!origin || strcmp(origin, fetches[i].origin))) err = "webapps.iconOrigin";   /* it ended on another site */
-        else if (!err && (!path || !path[0])) err = "webapps.noIcon";
+        else if (!err && (!path || !path[0])) {
+            snprintf(code, sizeof code, "%s", why && webreg_probe_code_ok(why) ? why : "webapps.noIcon");
+            err = code;                                     /* copied: the answer's text is freed below */
+        }
         else if (!err && !probe_icon_path_ok(path)) err = "webapps.noIcon";
         else if (!err) {
             size_t len = 0;

@@ -184,6 +184,7 @@
   "settings.iconTile": "LordOS 的字母图块（应用打开时获取网站图标）",
   "settings.iconRefresh": "刷新图标",
   "settings.iconRefreshing": "正在刷新…",
+  "settings.iconUpdated": "已从网站更新图标",
   "sound.auto": "自动",
   "sound.app": "应用的",
   "sound.system": "LordOS 的",
