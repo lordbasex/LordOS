@@ -24,7 +24,10 @@
     const d = lord.disks;
     if (d && typeof d.list === 'function') {
       const realDisks = d.list() || [];
-      globalThis.__sceneReal.disks = realDisks.flatMap((x) => [x.serial, x.model, x.wwn, ...(x.partitions || []).flatMap((p) => [p.label, p.uuid, p.partlabel])]).filter((v) => typeof v === 'string' && v.length > 3);
+      // serial numbers, WWNs and UUIDs identify the machine; a label counts unless it is a word every system has
+      const COMMON = /^(lordos|efi|esp|boot|root|home|swap|system|data|recovery|windows|linux|ubuntu|debian|basic data partition|microsoft reserved partition|biosboot)$/i;
+      globalThis.__sceneReal.disks = realDisks.flatMap((x) => [x.serial, x.wwn, ...(x.partitions || []).flatMap((p) => [p.uuid, ...[p.label, p.partlabel].filter((l) => l && !COMMON.test(l))])])
+        .filter((v) => typeof v === 'string' && v.length > 3);
       const DEMO = [
         { name: 'sda', model: 'Demo SSD 512', serial: 'DEMO0001', size: 512e9, removable: false, system: true, transport: 'sata', table: 'gpt', rota: false, partitions: [
           { name: 'sda1', number: 1, label: 'EFI', size: 5e8, fstype: 'vfat', mounts: ['/boot/efi'] }, { name: 'sda2', number: 2, label: 'LordOS', size: 5.1e11, fstype: 'ext4', mounts: ['/'] }] },

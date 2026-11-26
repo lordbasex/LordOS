@@ -31,6 +31,8 @@
     ['about', {}, 'LordOS'],
     ['help', {}, (sdk) => sdk.t('help.tour.open')],
     ['characters', {}, (sdk) => sdk.t('characters.tab.symbols')],
+    ['fonts', {}, (sdk) => sdk.t('fonts.coll.mono')],
+    ['logs', {}, (sdk) => sdk.t('logs.src.kernel')],
   ];
   (async () => {
     await sleep(2500);
