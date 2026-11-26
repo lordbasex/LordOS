@@ -345,6 +345,10 @@ fanotify capability (`CAP_SYS_ADMIN`), the per-user list protocol, and the fail-
   `machinesWatched()` and `lord.vm.stats`' new fields are the machine rules' ("Machines").
 - SDK: `sdk/sentinela.js` (the service, `startSentinela` from `startShell`), `sdk/sentinelamodel.js` (pure logic),
   `sdk/llmcatalog.js`, `sdk/sentinelaglyph.js`. Settings → AI → Sentinela: `apps/settings/Sentinela.jsx`.
+- (0.8.9.6.2) Settings → Artificial intelligence is a store around Lumo ([AI.md](AI.md)): Sentinela is one of the
+  functions of the one brain (read only), with a card that says whether it is on and opens its page ("‹ Artificial
+  intelligence › Sentinela", the same `{ section: 'ai', page: 'sentinela' }` links). The models and the engine are the
+  **Brain** capability's cards (install, remove, use; *Translate with Lumo* to try one).
 - Strings: `assets/locales/<lang>/sentinela.json` in every language, and `errors.llm.*`, `errors.sentinela.*`.
 
 ## Tests

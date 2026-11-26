@@ -645,7 +645,13 @@ export default function Settings() {
   const sub = useStore(subPage);
   useVisitHistory(placeOf(section, sub), (p) => { const [s, sp] = splitPlace(p); lastSection = s; setSectionState(s); subPage.set(sp); });
   // 'themes' (the old Themes page, links from older help) now opens Appearance
-  useEffect(() => { const sec = args?.section === 'themes' ? 'appearance' : args?.section; if (sec && SECTIONS.some(([id]) => id === sec)) setSection(sec); }, [args?.nonce]);
+  // (0.8.9.6.2) AI's pages are sub-pages: { section: 'ai', page: 'sentinela' } opens Sentinela's (set after setSection clears it)
+  useEffect(() => {
+    const sec = args?.section === 'themes' ? 'appearance' : args?.section;
+    if (!sec || !SECTIONS.some(([id]) => id === sec)) return;
+    setSection(sec);
+    if (sec === 'ai' && typeof args?.page === 'string' && /^[a-z]+$/.test(args.page)) subPage.set(args.page);
+  }, [args?.nonce]);
   const [, Body] = SECTIONS.find(([id]) => id === section) || SECTIONS[0];
   const q = query.trim().toLowerCase();
   // Mouse & Trackpad always shows (its touchpad rows need a touchpad, which lord-sessiond lends with the monitor);
@@ -690,10 +696,10 @@ export default function Settings() {
             {tr(`settings.section.${section}`)}</Text>
           {section === 'cloud' ? <CloudHeaderAction /> : null}
         </View>
-        <ScrollView resetKey={section} style={{ flex: 1 }}>
+        <ScrollView resetKey={placeOf(section, sub)} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: pad, paddingTop: side.narrow ? spacing.l : spacing.xl, alignItems: 'center' }}>
-            {/* Cloud's account page has two columns and Wallpaper is a gallery: they take a wider column on wide windows */}
-            <View style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : section === 'wallpaper' ? 1180 : 680 }}>
+            {/* Cloud's account page has two columns, Wallpaper and AI are galleries: they take a wider column on wide windows */}
+            <View style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : section === 'wallpaper' || section === 'ai' ? 1180 : 680 }}>
               <Body page={section === 'network' || section === 'cloud' || section === 'ai' ? args?.page : undefined}
                 alert={section === 'ai' ? args?.alert : undefined} />
             </View>
