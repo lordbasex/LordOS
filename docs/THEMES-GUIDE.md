@@ -615,6 +615,7 @@ Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one ski
 | Voice Recorder | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `recorder_skin_scene.mjs` (8 checks) |
 | Camera | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `camera_skin_scene.mjs` (8 checks) |
 | LordOS Imager | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `imager_skin_scene.mjs` (8 checks) |
+| Install LordOS | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `installer_skin_scene.mjs` (8 checks) |
 <!-- shared-shape apps -->
 
 A region drawn in the SDK's floating layer (Screenshots' capture bar, a picture-in-picture window) is outside the theme's
