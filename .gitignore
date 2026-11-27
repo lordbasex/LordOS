@@ -16,7 +16,8 @@ assets/theme-host.bundle.js
 .idea/
 assets/sysapps/
 assets/locales/*.tgz
-logs/
+# agents' progress logs at the top only: apps/logs and server/src/logs are source folders
+/logs/
 /code-manifest.json
 /code-manifest.sig
 /assets/hwreport/snapshot.json.sig

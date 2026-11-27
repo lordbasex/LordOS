@@ -424,6 +424,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **`.gitignore`'s `logs/` matched the source folders `apps/logs` and `server/src/logs`** (a sync that applies the
+  ignore rules dropped them): anchored to the top, `/logs/` (the agents' progress logs).
 - **Sentinela's third notification button read "It's…"** (ws171 QA). A notification's buttons now wrap to a second
   row whole instead of being squeezed and cut (`sdk/notify.js`).
 - **A new desktop widget could land on top of a pinned one** (ws171 QA). The pinned sound wave along the bottom is off
