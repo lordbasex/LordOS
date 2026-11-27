@@ -234,6 +234,14 @@ int main(void) {
                      home, fps[i][0], commit, fps[i][0], commit, fps[i][0], fps[i][0], fps[i][0], commit, fps[i][0], fps[i][1], fps[i][0]);
             if (system(tree)) {}
         }
+        /* (ws170 QA BUG-22) a second export of an app, named after its id plus a suffix, declares the types (LibreOffice's
+         * .writer): they go to the app's own entry, which becomes an "Open with" choice; an export of no installed app adds
+         * nothing to anyone */
+        snprintf(tree, sizeof tree, "d='%s/.local/share/flatpak/exports/share/applications' && "
+                 "printf '[Desktop Entry]\nType=Application\nName=Writer\nExec=nope\nMimeType=application/vnd.oasis.opendocument.text;text/plain;\n' > \"$d/org.example.NoMime.writer.desktop\" && "
+                 "printf '[Desktop Entry]\nType=Application\nName=Other\nExec=nope\nMimeType=image/png;\n' > \"$d/org.example.Nothere.desktop\" && "
+                 "printf '[Desktop Entry]\nType=Application\nName=Calc\nExec=nope\nMimeType=text/csv;\n' > \"$d/org.example.Opens.calc.desktop\"", home);
+        if (system(tree)) {}
         const DesktopApp *fl;
         int nf = apps_flatpak_list("en", &fl), no = -1, yes = -1;
         for (int i = 0; i < nf; i++) {
@@ -242,12 +250,17 @@ int main(void) {
         }
 #if defined(__x86_64__)
         CHECK("both Flatpak apps are listed", no >= 0 && yes >= 0);
-        CHECK("their MIME types are read", no >= 0 && yes >= 0 && !fl[no].mime[0] && strstr(fl[yes].mime, "text/plain") != NULL);
+        CHECK("their MIME types are read, a second export's added to its app", no >= 0 && yes >= 0 &&
+              !strcmp(fl[no].mime, "application/vnd.oasis.opendocument.text;text/plain;") &&
+              !strcmp(fl[yes].mime, "text/plain;text/csv;"));
+        int extra = 0;
+        for (int i = 0; i < nf; i++) if (strstr(fl[i].id, ".writer") || strstr(fl[i].id, ".calc") || strstr(fl[i].id, "Nothere")) extra = 1;
+        CHECK("a second export is no app of its own, nor one of no installed app", !extra && nf == 2);
 #endif
         snprintf(doc, sizeof doc, "%s/note.txt", home);
         f = fopen(doc, "w");
         if (f) { fputs("hi\n", f); fclose(f); }
-        CHECK("Open with a Flatpak app that declares no MimeType is refused", apps_launch_flatpak_with("org.example.NoMime", doc) != 0);
+        CHECK("Open with a Flatpak app's second export by its own name is refused", apps_launch_flatpak_with("org.example.NoMime.writer", doc) != 0);
         CHECK("Open with an app that isn't installed is refused", apps_launch_flatpak_with("org.example.Gone", doc) != 0);
         CHECK("Open with the home folder itself is refused", apps_launch_flatpak_with("org.example.Opens", home) != 0);
         snprintf(doc, sizeof doc, "%s/.config/lordos", home);

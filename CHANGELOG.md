@@ -420,6 +420,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Files → Open with didn't offer LibreOffice installed from Flathub for an `.odt`** (BUG-22 of the ws170 QA). Only
+  exports named exactly after an installed app's id were read, and LibreOffice declares its types in its other exports
+  (`org.libreoffice.LibreOffice.writer.desktop`, `…calc`, …). An app's other exports, named after its id plus a suffix
+  (as Flatpak requires), now lend their `MimeType` to the app's entry (user and system installations; nothing else of
+  them is read, they never become apps of their own, and the file opens in the app by its id). `build/apps-actions-test`:
+  a second export's types reach its app, an export of no installed app adds nothing, a second export's own name is
+  refused for Open with.
 - **Moving wallpapers: a damaged file showed as downloaded and the desktop started it again every 0.6 s for good**
   (BUG-13 of the ws170 QA: 13 bytes of text, "crystal-crown", under a catalog video's hash). The cause was in root's
   `wallpaper-login`: choosing the same login video twice made `rename()` act on the same inode and leave the temporary

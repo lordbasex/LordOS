@@ -357,7 +357,9 @@ entry. The orphaned-grandchild, log, signal and fd hygiene of `launch()` stays a
 **Built on 2026-11-19 (phase 1 step 6):** `flatpak` is a Dock kind (`sdk/dockmodel.js`, the rules of `fpak_id_ok`),
 so "Keep in Dock", dragging from the launcher and session restore take `flatpak:<id>` like `desktop:<id>`. Files' and
 the Terminal's "Open with" list the Flatpak apps whose export declares the type, and `apps_launch_flatpak_with`
-refuses an app whose export has no `MimeType` (as `launchWith` does for Linux apps). Not done in phase 1: Settings →
+refuses an app whose export has no `MimeType` (as `launchWith` does for Linux apps). An app's other exports, named
+after its id plus a suffix (LibreOffice's `org.libreoffice.LibreOffice.writer.desktop`), lend it their `MimeType` and
+nothing else: they are no apps of their own, and the file opens in the app by its id (ws170 QA BUG-22). Not done in phase 1: Settings →
 Default Apps doesn't offer Flatpak apps (`apps_default_for` reads only Linux apps), and MIME aliases aren't resolved
 for them either (an app that declares `audio/wav` isn't offered for a `.wav`, which the system calls
 `audio/vnd.wave`; the same holds for Linux apps).

@@ -1302,6 +1302,52 @@ int apps_flatpak_list(const char *lang, const DesktopApp **out) {
         }
         closedir(d);
     }
+    /* An app may export more entries, each named after its id plus a suffix (Flatpak requires the prefix):
+     * org.libreoffice.LibreOffice.writer.desktop next to org.libreoffice.LibreOffice.desktop. Their MimeType goes to
+     * their app's entry, so "Open with" offers that app for those types (the ws170 QA found LibreOffice missing for an
+     * .odt: only Writer's export declares it); nothing else of them is read, and they never become an app of their own
+     * (the launch is the app's, by its id). */
+    for (int k = 0; e && k < 2; k++) {
+        char dir[PATH_MAX + 32];
+        snprintf(dir, sizeof dir, "%.4000s/applications", roots[k]);
+        DIR *d = opendir(dir);
+        if (!d) continue;
+        struct dirent *de;
+        while ((de = readdir(d))) {
+            size_t l = strlen(de->d_name);
+            if (l <= 8 || strcmp(de->d_name + l - 8, ".desktop") || l - 8 > FPAK_ID_MAX) continue;
+            int owner = -1;
+            size_t best = 0;
+            for (int i = 0; i < n; i++) {
+                size_t il = strlen(flatpaks[i].id);
+                if (il > best && il + 1 < l - 8 && !strncmp(de->d_name, flatpaks[i].id, il) && de->d_name[il] == '.') { owner = i; best = il; }
+            }
+            if (owner < 0) continue;
+            char file[PATH_MAX * 2];
+            snprintf(file, sizeof file, "%s/%s", dir, de->d_name);
+            if (parse_desktop(file, lang, e) || !e->is_app || e->hidden || !e->a.mime[0]) continue;
+            DesktopApp *a = &flatpaks[owner];
+            for (char *tok = e->a.mime; *tok;) {
+                size_t tl = strcspn(tok, ";");
+                if (tl && tl < 256) {
+                    char m[258];
+                    snprintf(m, sizeof m, ";%.*s;", (int)tl, tok);
+                    char have[sizeof a->mime + 2];
+                    snprintf(have, sizeof have, ";%s%s", a->mime, a->mime[0] && a->mime[strlen(a->mime) - 1] == ';' ? "" : ";");
+                    size_t al = strlen(a->mime);
+                    if (!strstr(have, m) && al + tl + 2 < sizeof a->mime) {
+                        if (al && a->mime[al - 1] != ';') a->mime[al++] = ';';
+                        memcpy(a->mime + al, tok, tl);
+                        a->mime[al + tl] = ';';
+                        a->mime[al + tl + 1] = 0;
+                    }
+                }
+                tok += tl;
+                if (*tok == ';') tok++;
+            }
+        }
+        closedir(d);
+    }
     free(e);
     *out = flatpaks;
     return n;
