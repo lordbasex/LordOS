@@ -420,6 +420,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Spelling: Notes underlined the "txt" of an attachment's link** (MEJORA-2 of the ws170 QA: "[📎 nota.txt](nota.txt)").
+  A markdown link's target (`](…)`) and file names with an extension (`nota.txt`, `informe-final.pdf`) are no longer
+  checked; the link's own text still is, and the positions of the rest stay (`sdk/spellmodel.js` `spellText`).
+  `spell-model-test`: three cases. docs/SPELLING.md.
 - **Files: renaming selected the extension too** (MEJORA-1 of the ws170 QA: typing over "archivo-3.txt" removed ".txt"
   and asked whether to change the extension). F2 and a slow click now select the name up to its last dot, as macOS and
   Nautilus do; a folder, a name without a dot and a hidden file (".bashrc") are selected whole

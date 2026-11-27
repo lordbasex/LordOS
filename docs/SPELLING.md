@@ -66,7 +66,7 @@ row it rests a minute.
 
 `sdk/spellmodel.js` `spellWords`: runs of letters and marks, with `'`, `’` or `-` inside. Left alone: anything in a
 chunk (between spaces) that is a link, an e-mail address, a path or code (`://`, `@`, `www.`, `/` or `~/` first, `_`,
-`{}<>=#$%^*|\`, a domain); words with digits next to them; abbreviations in capitals; camelCase; one letter; words
+`{}<>=#$%^*|\`, a domain); a markdown link's target (`](…)`) and a file name with an extension (`nota.txt`); words with digits next to them; abbreviations in capitals; camelCase; one letter; words
 longer than 64 bytes. **Scripts:** a word is checked only when a dictionary in use is written in its script (Latin,
 Cyrillic, Greek, Arabic, Hebrew, Devanagari, Bengali, Thai, Hangul…); without an Arabic dictionary nothing Arabic is
 underlined, so right-to-left text stays clean. The word being typed (ending at the caret) isn't underlined until the

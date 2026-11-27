@@ -41,10 +41,20 @@ const SKIP_CHUNK = /:\/\/|^www\.|@|^[~/]|[\\_{}<>=#$%^*|]|\.(com|org|net|io|dev|
 
 // The words of a text: [{ start, end, word }] in code points, checkable ones only. scripts: the scripts of the
 // dictionaries in use (a Set; null checks every script).
+// Markdown link targets ("[📎 nota.txt](nota.txt)": the part in parentheses) and file names with an extension
+// ("nota.txt", "informe-final.pdf") are not words: each is blanked, code point for code point, so the positions of the
+// rest stay (MEJORA-2 of the ws170 QA: Notes underlined the "txt" of an attachment's link).
+const LINK_TARGET = /\]\([^)\s]*\)/gu;
+const FILE_NAME = /[\p{L}\p{N}_-]+(?:\.[\p{L}\p{N}_-]+)*\.[a-z0-9]{1,5}(?![\p{L}\p{N}])/gu;
+const blank = (m) => ' '.repeat([...m].length);
+export function spellText(text) {
+  return String(text).replace(LINK_TARGET, (m) => `]${blank(m.slice(1))}`).replace(FILE_NAME, blank);
+}
+
 export function spellWords(text, scripts = null) {
   const out = [];
   if (!text) return out;
-  const cps = [...text];
+  const cps = [...spellText(text)];
   let i = 0;
   const isSpace = (ch) => /\s/u.test(ch);
   while (i < cps.length) {

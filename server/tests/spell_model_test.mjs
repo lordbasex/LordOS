@@ -16,6 +16,10 @@ const words = (t, s) => spellWords(t, s).map((w) => w.word);
 
 // ---- which words ----
 eq('plain words', words('Hello wrold, this is a tset.'), ['Hello', 'wrold', 'this', 'is', 'tset']);
+// (ws170 QA MEJORA-2) a markdown link's target and file names with an extension are no words; the link's text is
+eq('a link target and a file name', words('Ver [📎 nota.txt](nota.txt) y [la guía](docs/guia-uso.md) mañana'), ['Ver', 'la', 'guía', 'mañana']);
+eq('a file name alone, positions kept after it', spellWords('abrí informe-final.pdf hoy').map((w) => [w.word, w.start]), [['abrí', 0], ['hoy', 23]]);
+eq('a sentence ending in a dot still checked', words('Fin. Otra frase.'), ['Fin', 'Otra', 'frase']);
 eq('positions are code points', spellWords('😀 cañón x').map((w) => [w.start, w.end]), [[2, 7]]);
 eq('apostrophes and hyphens inside a word', words("don't d’accord e-mail -dash- 'quoted'"), ["don't", 'd’accord', 'e-mail', 'dash', 'quoted']);
 eq('links, addresses and paths left alone', words('see https://lordos.org/x www.example.com me@mail.com /usr/share ~/Notes lordos.org now'), ['see', 'now']);
