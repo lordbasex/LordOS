@@ -148,11 +148,12 @@ function Banner({ n, th }) {
       onClick: (e) => { e.stopPropagation(); dismissNotification(n.id); },
       style: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hover ? th.control : 'transparent' },
     }, h(Text, { style: { fontSize: 11, color: th.textDim } }, '×'))),
-  n.actions.length ? h(View, { style: { flexDirection: 'row', gap: 8, justifyContent: 'flex-end' } },
+  // three buttons (Sentinela's) don't fit one row of the banner: they wrap whole instead of cutting a label ("It's…")
+  n.actions.length ? h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' } },
     ...n.actions.map((a, i) => h(View, {
       key: a.id || i, onClick: (e) => { e.stopPropagation(); runAction(n, a); },
-      style: { height: 26, paddingHorizontal: 12, borderRadius: 7, justifyContent: 'center', backgroundColor: a.primary ? th.accent : th.control },
-    }, h(Text, { style: { fontSize: 12, fontWeight: 600, color: a.primary ? '#fff' : th.text } }, a.label)))) : null);
+      style: { height: 26, flexShrink: 0, paddingHorizontal: 12, borderRadius: 7, justifyContent: 'center', backgroundColor: a.primary ? th.accent : th.control },
+    }, h(Text, { style: { fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', color: a.primary ? '#fff' : th.text } }, a.label)))) : null);
 }
 
 export function NotificationBanner() {

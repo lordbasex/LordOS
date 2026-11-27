@@ -420,6 +420,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Sentinela's third notification button read "It's…"** (ws171 QA). A notification's buttons now wrap to a second
+  row whole instead of being squeezed and cut (`sdk/notify.js`).
 - **A new desktop widget could land on top of a pinned one** (ws171 QA). The pinned sound wave along the bottom is off
   the grid, so its cells counted as free; they are now taken when a widget is added or resized (`pinBlocks` in
   `sdk/widgetgrid.js`). Test: `widget-grid-test`.
