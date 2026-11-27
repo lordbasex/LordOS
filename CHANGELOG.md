@@ -420,6 +420,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Moving wallpapers: a damaged file showed as downloaded and the desktop started it again every 0.6 s for good**
+  (BUG-13 of the ws170 QA: 13 bytes of text, "crystal-crown", under a catalog video's hash). The cause was in root's
+  `wallpaper-login`: choosing the same login video twice made `rename()` act on the same inode and leave the temporary
+  `.login.part` as a hard link to the video, and a still login wallpaper chosen later wrote its name into it with
+  `O_TRUNC`. The temporary name is now always removed, and the still's mark is written only into a new file (`O_EXCL`).
+  No test wrote into the real store (every test uses its own folder under `build/`). Also: `wallpaper-get` keeps an
+  existing file only when its size and SHA-256 are the catalog's (otherwise it fetches it again over it); Settings →
+  Wallpaper counts a moving wallpaper as downloaded only when the variant settings names is in the store at the
+  catalog's size (`motionHere`), and choosing one that isn't fetches it; the desktop plays only such a file. A player
+  that stops is tried again after 0.5, 1, 2 and 4 s, then no more, and a file lord-media can't open
+  (`media.cannotOpen`) is given up after three failures in a row on every display: its still poster shows and a
+  notification says so once (a new download clears it). Tests: `wallpaper-admin-test` (the same login video twice then
+  a still leaves the video whole; a same-size and a short wrong file are fetched again), `wallpaper-gallery-test`
+  (`motionHere`), `motion-model-test` (`retryDelay`, `openFailure`). docs/MOVING-WALLPAPERS.md.
 - **The menu bar's search lost the letters C and T and the Space** (BUG-28 of the ws170 QA: "documento-qa" became
   "doumeno-qa", "c t ca to" became "ao"). Not the search: Screenshots' area selection had been ended by closing its
   overlays from outside (an agent's `close_window` on the three `screenshots#overlayN` windows, BUG-26), which left the

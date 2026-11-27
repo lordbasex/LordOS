@@ -106,6 +106,18 @@ static void test_actions(void) {
     int before = fetches;
     hw_act_wallpaper_get(&r, "epic-01-king 1080.jpeg", 22);
     CHECK(fetches == before && !strcmp(last(), want), "a second get fetched again");
+    /* a file named after the catalog's hash that holds something else: at the catalog's size (same length, other bytes)
+     * or not (13 bytes of text, as the ws170 QA found): fetched again over it, never answered OK as it is */
+    for (int k = 0; k < 2; k++) {
+        FILE *w = fopen(jpg, "w");
+        if (w) { fputs(k ? "crystal-crown" : "FAKE wallpaper bytes", w); fclose(w); }
+        before = fetches;
+        hw_act_wallpaper_get(&r, "epic-01-king 1080.jpeg", 22);
+        char got[64] = "";
+        FILE *rd = fopen(jpg, "r");
+        if (rd) { if (!fgets(got, sizeof got, rd)) got[0] = 0; fclose(rd); }
+        CHECK(fetches == before + 1 && !strcmp(last(), want) && !strcmp(got, fake_body), "a wrong file (%s) was kept: %s, %s", k ? "short" : "same size", last(), got);
+    }
     /* a video still goes to .mp4 */
     hw_act_wallpaper_get(&r, "crown 1080.hevc", 15);
     CHECK(!strcmp(last(), want) && exists(mp4), "the video isn't <sha>.mp4: %s", last());
@@ -125,6 +137,18 @@ static void test_actions(void) {
     }
     hw_act_wallpaper_login(&r, "still crystal-crown", 19);
     CHECK(!strcmp(last(), "OK still"), "a built-in still: %s", last());
+    /* (ws170 QA BUG-13) the same login video chosen twice, then a still: rename() over the same inode left the temporary
+     * name linked to the video, and the still's mark was written into it ("crystal-crown", 13 bytes, under the hash) */
+    hw_act_wallpaper_login(&r, "crown 1080.hevc", 15);
+    hw_act_wallpaper_login(&r, "crown 1080.hevc", 15);
+    CHECK(!strcmp(last(), want) && !exists(DIR "/store/.login.part"), "the login video twice: %s, temporary left %d", last(), exists(DIR "/store/.login.part"));
+    hw_act_wallpaper_login(&r, "still crystal-crown", 19);
+    {
+        char vb[64] = "";
+        FILE *vf = fopen(mp4, "r");
+        if (vf) { if (!fgets(vb, sizeof vb, vf)) vb[0] = 0; fclose(vf); }
+        CHECK(!strcmp(last(), "OK still") && !strcmp(vb, fake_body), "a still after the login video wrote into the video: %s", vb);
+    }
     /* the bytes differ from the catalog's hash: deleted, an error */
     unlink(jpg);
     write_catalog("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", strlen(fake_body));

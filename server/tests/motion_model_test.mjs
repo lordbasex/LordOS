@@ -1,5 +1,5 @@
 // motion_model_test.mjs — moving wallpapers without a screen (sdk/motionmodel.js).
-import { motionCodecs, pickVariant, pauseReason, motionFpsCap, motionCacheMb, userVideoProblem, nextRandom } from '../../sdk/motionmodel.js';
+import { motionCodecs, pickVariant, pauseReason, motionFpsCap, motionCacheMb, userVideoProblem, nextRandom, retryDelay, openFailure, OPEN_FAILS } from '../../sdk/motionmodel.js';
 
 let ok = 0, bad = 0;
 const eq = (name, a, b) => {
@@ -14,6 +14,17 @@ eq('no decoder: nothing', motionCodecs({ hevc: false, h264: false }, 'gpu'), [])
 eq('no gpu composition: nothing', motionCodecs({ hevc: true, h264: true }, 'gpu-off'), []);
 eq('a virtual gpu: nothing', motionCodecs({ hevc: true, virtualGpu: true }, 'gpu'), []);
 eq('unknown yet: nothing', motionCodecs(null, 'gpu'), []);
+
+// (ws170 QA BUG-13) a player lost: tried again after a growing pause, then no more; a file that can't be opened is
+// given up after OPEN_FAILS in a row, other errors never count
+eq('retry: 0.5, 1, 2, 4 s, then no more', [0, 1, 2, 3, 4, 9].map((n) => retryDelay(n)), [500, 1000, 2000, 4000, -1, -1]);
+{
+  let c = {}, broke = [];
+  for (let i = 0; i < OPEN_FAILS + 1; i++) { const r = openFailure(c, '/v.mp4', 'media.cannotOpen'); c = r.counts; broke.push(r.broken); }
+  eq('cannotOpen: given up at the third', broke, [false, false, true, true]);
+  eq('other errors never count', openFailure({}, '/v.mp4', 'media.decoderLost'), { counts: {}, broken: false });
+  eq('a file of its own count', openFailure({ '/a.mp4': 2 }, '/b.mp4', 'media.cannotOpen').broken, false);
+}
 
 const item = { variants: [{ name: '2160.hevc', codec: 'hevc', w: 3840, h: 2160 }, { name: '1080.hevc', codec: 'hevc', w: 1920, h: 1080 }, { name: '1080.h264', codec: 'h264', w: 1920, h: 1080 }] };
 eq('1080 screen', pickVariant(item, ['hevc', 'h264'], 1920, 1080).name, '1080.hevc');

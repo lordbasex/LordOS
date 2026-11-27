@@ -74,3 +74,17 @@ export function nextRandom(ids, last, pick = Math.random) {
   if (!list.length) return ids[0] || null;
   return list[Math.floor(pick() * list.length) % list.length];
 }
+
+// A player that stops by itself (its helper ended, the decoder still held by the last one) is started again after a
+// growing pause: 0.5 s, 1 s, 2 s, 4 s, then no more (-1) and the still picture stays.
+export const MOTION_RETRIES = 4;
+export const retryDelay = (tries, base = 500) => (tries >= 0 && tries < MOTION_RETRIES ? base * 2 ** tries : -1);
+// A file lord-media can't open (media.cannotOpen: damaged, not a video) is given up after OPEN_FAILS failures in a row,
+// for every display at once and until it changes (a new download) or the session ends: it was started again every
+// 0.6 s for good, a new helper each time (ws170 QA BUG-13). A play that reached "playing" clears the count.
+export const OPEN_FAILS = 3;
+export function openFailure(counts, path, message) {
+  if (message !== 'media.cannotOpen') return { counts, broken: false };
+  const n = (counts[path] || 0) + 1;
+  return { counts: { ...counts, [path]: n }, broken: n >= OPEN_FAILS };
+}

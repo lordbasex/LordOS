@@ -167,6 +167,14 @@ export function stillEntry(it, index, name, thumb) {
   };
 }
 // A moving wallpaper's sizes are its first codec's (HEVC before H.264, as sdk/motionmodel.js pickVariant).
+// Is a moving wallpaper on this computer: the variant settings.motionFiles names (or, with none named, any of its
+// videos) is in the store at the catalog's size. A file named after the catalog's hash but of another size (the ws170 QA
+// found 13 bytes of text named after a video's hash) is not: it counts as not downloaded, and choosing it fetches it
+// again (wallpaper-get checks the size and the SHA-256 of what is there and replaces what isn't the catalog's).
+export function motionHere(it, index, files) {
+  const named = files && files[it.id] ? videoVariants(it).find((v) => v.name === files[it.id]) : null;
+  return named ? onDisk(named, index) : videoVariants(it).some((v) => onDisk(v, index));
+}
 export function motionEntry(it, index, name, thumb, files) {
   const vids = videoVariants(it);
   const codec = vids.some((v) => v.codec === 'hevc') ? 'hevc' : vids[0] ? vids[0].codec : '';
@@ -174,7 +182,7 @@ export function motionEntry(it, index, name, thumb, files) {
   const hd = mine.filter((v) => num(v.w) <= HD.w).pop() || mine[0], k4 = mine.find((v) => num(v.w) >= 3840) || null;
   return {
     id: it.id, kind: 'motion', col: it.section, name: name || it.name || it.id, thumb,
-    here: !!(files && files[it.id]) || vids.some((v) => onDisk(v, index)), k4: !!k4,
+    here: motionHere(it, index, files), k4: !!k4,
     sizes: { hd: hd ? num(hd.size) : 0, k4: k4 ? num(k4.size) : 0 }, item: it,
     author: it.author || '', license: it.license || '',
   };

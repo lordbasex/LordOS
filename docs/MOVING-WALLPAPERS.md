@@ -126,6 +126,17 @@ the buffer covers the rest (no CPU waits). Only when the picture is at most twic
 clip on a 1080p display is a 2 × 2 average, no shimmer); anything larger goes through the memfd ring, scaled by
 lord-media. A frame drawn down isn't cached (a 4K loop wouldn't fit the budget anyway).
 
+### A file that can't be played
+
+A player that stops by itself is started again after a growing pause (0.5 s, 1 s, 2 s, 4 s; `sdk/motionmodel.js`
+`retryDelay`), then the still poster stays. A file lord-media can't open (`media.cannotOpen`) is given up after three
+failures in a row for every display (`openFailure`), its poster shows and a notification says so once; a new download
+of the file clears that. Settings → Wallpaper counts a moving wallpaper as downloaded only when the variant it names is
+in the store at the catalog's size (`motionHere`), and `wallpaper-get` keeps an existing file only when its size and
+SHA-256 are the catalog's (otherwise it fetches it again over it). Before 0.8.9.6.2's fix (ws170 QA), choosing the same
+login video twice left `.login.part` as a hard link to that video, and a still login wallpaper chosen afterwards wrote
+its name into the video; `wallpaper-login` now never leaves the temporary link and writes a mark only into a new file.
+
 ## Security of the dmabuf input
 
 lord-media decodes untrusted files and is sandboxed ([MEDIA.md](MEDIA.md), "The lord-media helper"); a dmabuf from it is

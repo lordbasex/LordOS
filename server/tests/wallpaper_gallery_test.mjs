@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   STILL_SECTIONS, GALLERY_FILTERS, stillId, stillOf, stillVariants, videoVariants, isStill, stillCatalog, motionCatalog, storeName,
   storeIndex, onDisk, qualityOf, autoQuality, displayQuality, variantFor, variantsToGet, drawnVariant, qualityPlan, stillWallpaper,
-  stillEntry, motionEntry, builtinEntry, mineEntry, matchesQuery, filterItems, filterCounts, collectionOrder, groupCollections,
+  stillEntry, motionEntry, motionHere, builtinEntry, mineEntry, matchesQuery, filterItems, filterCounts, collectionOrder, groupCollections,
   collectionCard, collectionBytes, downloadPlan, filesOnDisk, usedBytes, idsInUse, freeUpPlan, twinMap, catalogOnly, twinExtra, withTwin,
 } from '../../sdk/wallpapergallery.js';
 
@@ -97,14 +97,19 @@ const files = { 'earth-orbit': '1080.hevc' };
 const list = [
   ...stillCatalog(catalog).map((it) => stillEntry(it, hdOnly, it.name, thumb(it))),
   ...builtins.map((b) => builtinEntry(b, b.name)),
-  ...motionCatalog(catalog).map((it) => motionEntry(it, storeIndex([]), 'Orbit', thumb(it), files)),
+  ...motionCatalog(catalog).map((it) => motionEntry(it, storeIndex([{ name: `${H('c')}.mp4`, size: 3000 }]), 'Orbit', thumb(it), files)),
   mineEntry({ id: 'image:0123456789abcdef', thumb: 'x', name: 'Your picture' }, 'Your picture'),
 ];
 const byId = Object.fromEntries(list.map((e) => [e.id, e]));
 eq('a still: here once a file is', [byId['cat:epic-01-king'].here, byId['cat:abstract-lake'].here], [true, false]);
 eq('a still: 4K badge and both sizes', [byId['cat:epic-01-king'].k4, byId['cat:epic-01-king'].sizes], [true, { hd: 400, k4: 1200 }]);
 eq('a built-in: always here, 4K from its variants', [byId['crystal-crown'].here, byId['crystal-crown'].k4, byId['lumo-celestial'].k4], [true, true, false]);
-eq('a moving one: here by settings.motionFiles, HEVC sizes', [byId['earth-orbit'].here, byId['earth-orbit'].sizes], [true, { hd: 3000, k4: 9000 }]);
+eq('a moving one: here when the file settings.motionFiles names is in the store, HEVC sizes', [byId['earth-orbit'].here, byId['earth-orbit'].sizes], [true, { hd: 3000, k4: 9000 }]);
+// (ws170 QA BUG-13) named in settings but missing, or a file of another size under its hash: not downloaded
+eq('a moving one: named but not in the store', motionHere(earth, storeIndex([]), files), false);
+eq('a moving one: a file of another size under its hash', motionHere(earth, storeIndex([{ name: `${H('c')}.mp4`, size: 13 }]), files), false);
+eq('a moving one: another variant on disk, none named', motionHere(earth, storeIndex([{ name: `${H('d')}.mp4`, size: 9000 }]), {}), true);
+eq('a moving one: named, but only another variant on disk', motionHere(earth, storeIndex([{ name: `${H('d')}.mp4`, size: 9000 }]), files), false);
 const names = { epic: 'Épicos', abstract: 'Abstractos', anime: 'Anime', signature: 'Signature', lumo: 'Lumo', earth: 'La Tierra' };
 const colName = (c) => names[c] || c;
 eq('search: the name', filterItems(list, { query: 'king' }).map((e) => e.id), ['cat:epic-01-king']);

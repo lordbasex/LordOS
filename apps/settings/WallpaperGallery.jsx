@@ -617,7 +617,7 @@ export function WallpaperGallery() {
     try {
       if (e.kind === 'motion') {
         const it = e.item;
-        if (!(s.motionFiles || {})[it.id]) {
+        if (!e.here) {                 // not in the store at the catalog's size (named in settings or not): fetched
           const box = q === '4k' ? { w: 3840, h: 2160 } : q === 'hd' ? { w: 1920, h: 1080 } : (d || displays[0] || { w: 1920, h: 1080 });
           const v = motionVariantFor(it, codecs, box);
           if (!v) return;
