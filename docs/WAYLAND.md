@@ -576,8 +576,13 @@ change there tells the app's inhibitors at once (`wl_shortcuts_changed`).
   chosen, not the pointer (`fsfocus.h`, #175): a window clicked on another display keeps them when the pointer goes
   back over the fullscreen one, clicking the fullscreen window gives them back to it, a window going fullscreen takes
   them unless they are with a window on another display, and a window under the fullscreen one (on its display, not
-  seen) never takes them. With no window focused they go to the fullscreen window while the pointer is on its
-  display. One display: every other window is under it, so the fullscreen window always has the keys.
+  seen) never takes them. A LordOS window (or the desktop) chosen counts by where the pointer was when it was chosen:
+  on another display it keeps the keys wherever the pointer goes afterwards, on the fullscreen display they go to the
+  fullscreen window (`wl.c` `none_on_fs`; before, the pointer at each key decided, so Notes clicked on another display
+  lost its keys to a fullscreen X11 game as soon as the pointer rested on the game's display again: BUG-30 of the ws170
+  QA). One display: every other window is under it, so the fullscreen window always has the keys. The theme's
+  "fullscreen" event carries the display's box (`x`, `y`, `w`, `h`), kept as the window's `args.fullscreenRect`; Hands'
+  `windows_context` reports that box for a fullscreen Linux window instead of its own frame (BUG-30b).
   `build/fsfocus-test` (in `make -C server test`) checks these rules.
 - **Locked windows** (`wl_set_fixed`, from `lord.wayland.state`'s seventh argument; Workspaces' padlock): the app
   gets `wm_capabilities` with minimize only (no maximize) and a configure, its set_maximized/unset_maximized are

@@ -67,3 +67,9 @@ export function blurBoxes(rects) {
   return out;
 }
 export const BLUR_RADIUS = 24;          // as the theme's own translucent panels
+
+// A Linux window's fullscreen box from lord-server's "fullscreen" event ({ x, y, w, h }, the display it covers), or null.
+export function fullscreenRectOf(d) {
+  if (!d || ![d.x, d.y, d.w, d.h].every(Number.isFinite) || d.w <= 0 || d.h <= 0) return null;
+  return { x: Math.round(d.x), y: Math.round(d.y), w: Math.round(d.w), h: Math.round(d.h) };
+}

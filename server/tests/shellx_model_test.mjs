@@ -1,7 +1,7 @@
 // node server/tests/shellx_model_test.mjs — the shell's side of the Wayland shell extras (sdk/shellxmodel.js): where a
 // window following a drag goes, the tag as part of a remembered place's key, a restored window's frame, the bell, blur boxes.
 import assert from 'node:assert/strict';
-import { chromeInset, dragFrameAt, tagKey, placeKeyOf, descriptionTitle, restoredFrame, bellAction, blurBoxes, remembersPlace } from '../../sdk/shellxmodel.js';
+import { chromeInset, dragFrameAt, tagKey, placeKeyOf, descriptionTitle, restoredFrame, bellAction, blurBoxes, remembersPlace, fullscreenRectOf } from '../../sdk/shellxmodel.js';
 
 // the theme's frame: 1 px borders and a 41 px title bar (themes/default chrome { w: 2, h: 43 })
 const chrome = { w: 2, h: 43 };
@@ -71,4 +71,9 @@ assert.deepEqual(blurBoxes(null), []);
 for (const k of ['linux:lordos-toolkit-audit', 'linux:lordos-toolkit-audit-qt6', 'desktop:lordos-toolkit-audit', 'linux:lordos-toolkit-audit-gtk3#main', 'linux:Lordos-toolkit-audit-gtk3']) assert.equal(remembersPlace(k), false, k);
 for (const k of ['linux:org.gnome.TextEditor', 'desktop:firefox-esr', 'linux:lordos-toolkit-auditor', 'linux:python3', 'linux:gtk3.py']) assert.equal(remembersPlace(k), true, k);
 assert.equal(remembersPlace(''), false);
+// a Linux window's fullscreen box from lord-server's event (BUG-30b of the ws170 QA)
+assert.deepEqual(fullscreenRectOf({ x: 1920, y: 0, w: 1920, h: 1080 }), { x: 1920, y: 0, w: 1920, h: 1080 });
+assert.equal(fullscreenRectOf({}), null);
+assert.equal(fullscreenRectOf({ x: 0, y: 0, w: 0, h: 1080 }), null);
+assert.equal(fullscreenRectOf(null), null);
 console.log('shellx-model: ok');

@@ -153,8 +153,11 @@ function rootsFor(window, allow) {
   return { roots };
 }
 
+// where a window really is: a Linux window lord-server shows fullscreen covers its display (args.fullscreenRect, from
+// lord-server's "fullscreen" event), whatever its own frame (the size it comes back to; BUG-30b of the ws170 QA)
+const shownFrame = (w) => w.args?.fullscreenRect || (wm.frame ? wm.frame(w) : w);
 function displayOf(w) {
-  const f = w.maximized ? (wm.frame ? wm.frame(w) : w) : w;
+  const f = w.args?.fullscreenRect || (w.maximized ? (wm.frame ? wm.frame(w) : w) : w);
   const cx = (f.x || 0) + (f.w || 0) / 2, cy = (f.y || 0) + (f.h || 0) / 2;
   const d = screen.displays.find((x) => cx >= x.x && cx < x.x + x.w && cy >= x.y && cy < x.y + x.h) || screen.displays[0];
   return d ? d.id : 0;
@@ -171,7 +174,7 @@ const OPS = {
       width: screen.width, height: screen.height, focused: frontWindow(), allow: a.allow || [] };
   },
   windows(a) {
-    const list = windows.get().map((w) => ({ ...w, frame: wm.frame ? wm.frame(w) : w }));
+    const list = windows.get().map((w) => ({ ...w, frame: shownFrame(w) }));
     return { windows: windowsList(list, { focusedId: frontWindow(), displayOf, titleOf: (w) => windowTitle(w), allow: a.allow, kindOf }) };
   },
   read(a) {

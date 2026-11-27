@@ -26,7 +26,7 @@ import { settings } from './settings.js';
 import { dockIdOfWindow } from './dock.js';
 import { promptForServer } from './privacy.js';
 import { fitFrame } from './sessionmodel.js';
-import { chromeInset, dragFrameAt, tagKey, placeKeyOf, descriptionTitle, restoredFrame, bellAction, blurBoxes, BLUR_RADIUS } from './shellxmodel.js';
+import { chromeInset, dragFrameAt, tagKey, placeKeyOf, descriptionTitle, restoredFrame, bellAction, blurBoxes, BLUR_RADIUS, fullscreenRectOf } from './shellxmodel.js';
 import { dndActive } from './notify.js';
 import { sound } from './sound.js';
 
@@ -244,6 +244,10 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     // A hidden desktop's window never gets to bring itself forward: these requests come from the app.
     case 'move': if (acceptsAppRequest(win, activeDesktop.get())) { wm.focus(id); if (!wm.beginMove(id)) drag = { id, edges: null, start: { x: d.x, y: d.y, f: wm.frame(wm.get(id)) } }; } break;
     case 'resize': if (acceptsAppRequest(win, activeDesktop.get())) { wm.focus(id); if (!wm.beginResize(id, d.edges || 10)) drag = { id, edges: d.edges || 10, start: { x: d.x, y: d.y, f: wm.frame(wm.get(id)) } }; } break;
+    // lord-server shows it over a whole display (its own frame stays the size it comes back to): the display's box, for
+    // whoever needs where it really is (Hands' windows_context, BUG-30b of the ws170 QA)
+    case 'fullscreen': if (win) wm.setArgs(id, { fullscreenRect: fullscreenRectOf(d) }); break;
+    case 'unfullscreen': if (win && win.args?.fullscreenRect) wm.setArgs(id, { fullscreenRect: null }); break;
     case 'maximize': if (win && !win.maximized) wm.toggleMaximize(id); break;
     case 'unmaximize': if (win && win.maximized) wm.toggleMaximize(id); break;
     case 'minimize':        // a move still under way ends with it: a minimized window never follows the pointer (#189)

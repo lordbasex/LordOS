@@ -348,9 +348,15 @@ static int fs_hides(Surf *s) {
 }
 /* The fullscreen window takes the keys instead of s (a window, or NULL for none): fsfocus.h. The keys follow the
  * window chosen, not the pointer: one chosen on another display keeps them when the pointer comes back (issue #175). */
+/* "No window" (a LordOS window or the desktop) was chosen with the pointer on the fullscreen window's display (1), on
+ * another (0), or not since this fullscreen began (-1: the pointer now). Kept from that moment: a LordOS window chosen on
+ * another display kept the keys only while the pointer stayed off the fullscreen display, so the person's pointer
+ * resting there (or taken back there after an agent's click) gave the next key to the fullscreen window (BUG-30 of the
+ * ws170 QA). */
+static int none_on_fs = -1;
 static int fs_takes_keys(Surf *s) {
     if (!fs_surf || !fs_surf->content) return 0;
-    return fsf_take(s == fs_surf, !s, s && fs_hides(s), ptr_on_fs());
+    return fsf_take(s == fs_surf, !s, s && fs_hides(s), fsf_none_ptr(s ? -1 : none_on_fs, ptr_on_fs()));
 }
 
 /* cursor of the app with the pointer: 0 LordOS arrow, 1 app image, 2 hidden */
@@ -3903,6 +3909,15 @@ void wl_fullscreen_allow(int on) {
     }
 }
 
+/* "fullscreen" to the theme, with the display it covers: the shell keeps a Linux window's own frame (the size it comes
+ * back to), and Hands' windows_context reported that small frame for a window shown over a whole display (BUG-30b of the
+ * ws170 QA). */
+static void emit_fullscreen(Surf *s) {
+    float fx, fy, fw, fh;
+    fs_rect(&fx, &fy, &fw, &fh);
+    emit(s, "fullscreen", "{\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d}", (int)fx, (int)fy, (int)fw, (int)fh);
+}
+
 static void enter_fullscreen(Surf *s) {
     if (!s || (!s->top && !s->xw) || s == fs_surf) return;
     if (fs_refused) { send_toplevel_configure(s); return; }
@@ -3913,6 +3928,7 @@ static void enter_fullscreen(Surf *s) {
     }
     if (fs_surf) { fs_surf->fullscreen = 0; send_toplevel_configure(fs_surf); }
     fs_surf = s;
+    none_on_fs = -1;
     s->fullscreen = 1;
     /* not configured yet (fullscreen asked for before its first frame): an X window's own size, so it comes back to it */
     s->fs_saved_w = s->conf_w > 0 ? s->conf_w : s->own_w;
@@ -3925,7 +3941,7 @@ static void enter_fullscreen(Surf *s) {
     s->conf_w = (int)fw;
     s->conf_h = (int)fh;
     send_toplevel_configure(s);
-    if (s->mapped) emit(s, "fullscreen", "{}");
+    if (s->mapped) emit_fullscreen(s);
     /* the keys: its own, unless they are with a window on another display (fsfocus.h) */
     if (s->mapped && key_focus != s && (!key_focus || fs_hides(key_focus))) wl_set_focus(s->id);
     damage_add((Box){ 0, 0, ui.width, ui.height });
@@ -4411,7 +4427,7 @@ void wl_remap_all(void) {
         s->node = 0;
         emit_map(s, s == fs_surf && s->fs_saved_w > 16 ? s->fs_saved_w : w, s == fs_surf && s->fs_saved_h > 16 ? s->fs_saved_h : h);
         if (s->maximized) emit(s, "maximize", "{}");
-        if (s == fs_surf) emit(s, "fullscreen", "{}");
+        if (s == fs_surf) emit_fullscreen(s);
     }
 }
 
@@ -4423,7 +4439,7 @@ void wl_remap_all(void) {
 static void map_fullscreen(Surf *s, int w, int h) {
     if (s->fs_saved_w <= 16 || s->fs_saved_h <= 16) { s->fs_saved_w = w; s->fs_saved_h = h; }
     emit_map(s, s->fs_saved_w, s->fs_saved_h);
-    emit(s, "fullscreen", "{}");
+    emit_fullscreen(s);
     if (w != s->conf_w || h != s->conf_h) send_toplevel_configure(s);
     if (key_focus != s && (!key_focus || fs_hides(key_focus))) wl_set_focus(s->id);
     damage_add((Box){ 0, 0, ui.width, ui.height });
@@ -7303,6 +7319,7 @@ static void key_focus_gone(Surf *s) {
 
 void wl_set_focus(int id) {
     if (!dpy) return;
+    if (!id) none_on_fs = fs_surf && fs_surf->content ? ptr_on_fs() : -1;   /* where "no window" was chosen (fsfocus.h) */
     Surf *s = id ? find(id) : NULL;
     if (s && s->role != R_TOPLEVEL) s = NULL;
     if (s && s->parked) s = NULL;                      /* a window on a hidden desktop never has the keyboard */
