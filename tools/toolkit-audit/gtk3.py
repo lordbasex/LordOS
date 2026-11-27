@@ -693,6 +693,13 @@ class Harness:
         if s is not None:
             name = (s.get_property('gtk-theme-name') or '').lower()
             tk = bool(s.get_property('gtk-application-prefer-dark-theme')) or name.endswith('-dark') or name.endswith(':dark')
+        # what the window really draws with: its text colour, light on a dark theme (a theme named "-dark" that GTK
+        # can't load draws light, BUG-29 of the ws170 QA); the names above only when no colour can be read
+        try:
+            c = self.win.get_style_context().get_color(Gtk.StateFlags.NORMAL)
+            tk = 0.2126 * c.red + 0.7152 * c.green + 0.0722 * c.blue > 0.5
+        except Exception:
+            pass
         portal = None
         bus_ok = bool(os.environ.get('DBUS_SESSION_BUS_ADDRESS')) or \
             os.path.exists(os.path.join(os.environ.get('XDG_RUNTIME_DIR') or '/nonexistent', 'bus'))

@@ -275,6 +275,14 @@ class Audit:
         dark_tk = bool(settings.get_property('gtk-application-prefer-dark-theme'))
         name = (settings.get_property('gtk-theme-name') or '').lower()
         dark_tk = dark_tk or name.endswith('-dark') or name.endswith(':dark')
+        # what the window really draws with: its text colour (GTK 4.10+), light on a dark style. The names above said
+        # dark for "LordOS-dark" while GTK 4, finding no gtk-4.0 folder in that theme, drew its light default (BUG-29
+        # of the ws170 QA); they count only when no colour can be read
+        try:
+            c = self.win.get_color()
+            dark_tk = 0.2126 * c.red + 0.7152 * c.green + 0.0722 * c.blue > 0.5
+        except Exception:
+            pass
         t = ms()
 
         def done(scheme, how):
@@ -285,8 +293,9 @@ class Audit:
                 'weather-clear-night-symbolic' if (scheme == 1 or (scheme is None and dark_tk))
                 else 'weather-clear-symbolic')
             if scheme in words:
-                self.put('theme', True, 'portal=%s toolkit=%s' % (words[scheme], 'dark' if dark_tk else 'light'),
-                         ms() - t)
+                # a dark or light desktop: the app must draw the same (no preference: either)
+                self.put('theme', scheme == 0 or dark_tk == (scheme == 1),
+                         'portal=%s toolkit=%s' % (words[scheme], 'dark' if dark_tk else 'light'), ms() - t)
             else:
                 self.put('theme', False, '%s toolkit=%s' % (how, 'dark' if dark_tk else 'light'), ms() - t)
             GLib.idle_add(self.held(self.next_step, HOLD_MS // 2))

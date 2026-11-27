@@ -187,7 +187,7 @@ is passed points / counted points x 100, one decimal, rounded down.
 | `clipboard` | 3 | a clipboard round trip within itself, through the compositor or X server |
 | `dnd` | 3 | a drag and drop within itself (often skipped: it needs a real pointer) |
 | `scale` | 1 | the scale factor |
-| `theme` | 1 | the toolkit's own light or dark scheme (GTK's settings, Qt 6's colour scheme, else the palette Qt draws with) is the one the portal's Settings says; it passes with no portal preference |
+| `theme` | 1 | the toolkit's own light or dark scheme (on GTK the colour the window's text is really drawn with, else GTK's settings; Qt 6's colour scheme, else the palette Qt draws with) is the one the portal's Settings says; it passes with no portal preference |
 | `tooltip` | 1 | a tooltip popup maps |
 | `text` | 1 | a text field receives text typed through the toolkit's own synthetic input |
 | `fullscreen` | 1 | fullscreen on (the monitor's size) and off (600x400 again) |
@@ -365,6 +365,15 @@ opens, Qt 5 through `setDesktopFileName`). The check stays what it was: a window
 the compositor. With the same stale entries, the headless run is at 100 % on all nine rows in `--show` mode, and
 nothing is saved for the harnesses afterwards. The stale entries in a person's settings are left alone and no longer
 read.
+
+**GTK 4 stayed light on a dark desktop, and `theme` passed** (BUG-29 of the same QA). The LordOS portal names the GTK
+theme `LordOS-dark` in dark mode, which had only a `gtk-3.0` folder: GTK 4 found no `gtk-4.0` style there and drew its light
+default. `gtk4.py` passed `theme` on any portal answer and judged GTK 4 "dark" by the theme's name. Now `LordOS` and
+`LordOS-dark` have a `gtk-4.0/gtk.css` that imports GTK 4's own light or dark style (`assets/gtk`, installed by the
+package as before), and the GTK harnesses judge light or dark by the colour the window's text is drawn with (GTK 3's style
+context, GTK 4.10's `gtk_widget_get_color`), failing when it differs from a dark or light desktop. Headless with a dark
+portal: `gtk4-wayland` and `gtk4-x11` fail `theme` with the installed theme (no `gtk-4.0`) and pass with this tree's
+(`XDG_DATA_DIRS`); GTK 3 passes both ways.
 
 ## The 0.8.9.6.2 QA: 98.5 % and 98.3 % on the maintainer's desktop (in development, 2026-11-27)
 
