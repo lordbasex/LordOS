@@ -420,6 +420,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Flatpak: installing VS Code or Steam from the Store failed while pulling `org.freedesktop.Sdk`** (BUG-A of the ws171
+  QA: "Flatpak no pudo terminar: Instalando runtime/org.freedesktop.Sdk/x86_64/26.08"; the kernel OOM-killed it in
+  `lordos-net-flathub.scope` at 64 MB). `/usr/bin/flatpak` runs in the same scope as the `flathub` network connector,
+  and the connector's 64 MB `memory.max` applied to Flatpak's OSTree pulls too. The scope's limit is now 4096 MB
+  (`NC_FLATHUB_MEM_MAX_MB`, `sec/netconn.h`), written the same by the connector and by every Flatpak command so neither
+  undoes the other; the other connectors keep 64 MB. Still a bound: a runaway `flatpak` is killed in its scope. Test:
+  `netconn-test` (`test_scope_limits`). docs/FLATPAK.md.
 - **Hands: "lord.admin.request refused (an AI agent's input)" for requests the agent never made** (BUG-10b of the ws170
   QA: three after each agent click in Settings, logged as "other"). Two settings are mirrored machine-wide by closed
   administrator actions run on every settings change: the browsers' "continue where you left off" (`browser-restore`)

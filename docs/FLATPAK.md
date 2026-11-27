@@ -618,6 +618,12 @@ Each command is started like a connector: lord-server forks, the child enters a 
 `lordos:store`). Downloads of `extra-data` (proprietary apps that fetch from their vendor during
 install) go through the same scope.
 
+The scope's `memory.max` is 4096 MB (`NC_FLATHUB_MEM_MAX_MB` in `server/src/sec/netconn.h`), written the same by the
+commands and by the `flathub` connector that shares the scope (the other connectors keep 64 MB). Until 0.8.9.6.2 the
+connector's 64 MB applied to Flatpak too, and installing VS Code or Steam was OOM-killed while pulling
+`org.freedesktop.Sdk` (an OSTree static delta of a large runtime). The bound stays: a runaway `flatpak` is killed in
+its scope, not the session.
+
 **Built and checked on 2026-11-19** (`server/src/fpak.c` `fpak_cmd_argv`, `server/src/fpakrun.c`, `lord.flatpak` in
 `server/src/ui/js_flatpak.c`; the shipped file is Flathub's own, keys `6E5C…7CAE` and subkey `54A6…7EE8` checked): on
 VM 127, from the session's `server` leaf, remote-add, list, install (`cc.nift.nsm`), info and uninstall exited 0, the

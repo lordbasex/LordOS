@@ -8,6 +8,7 @@
 #include "fpakrun.h"
 #include "fpak.h"
 #include "sec/cgroup.h"
+#include "sec/netconn.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -84,8 +85,10 @@ int fpak_run(int cmd, const char *ref, void (*on_line)(void *ud, const char *lin
         for (int s = 1; s < 32; s++) signal(s, SIG_DFL);
         const char *home = getenv("HOME");
         if (home && chdir(home)) {}
-        /* its own firewall component; in a LordOS session a command that can't be placed there never runs */
-        CgroupLimits lim = { 0 };
+        /* its own firewall component; in a LordOS session a command that can't be placed there never runs. The scope's
+         * memory.max is the one the flathub connector writes too (netconn.h): enough for an OSTree pull of a large
+         * runtime, still bounded */
+        CgroupLimits lim = { .mem_max_mb = NC_FLATHUB_MEM_MAX_MB };
         if (cgroup_enter("lordos-net-flathub.scope", &lim) && getenv("LORDOS_SESSIOND")) {
             static const char msg[] = "flatpak: could not enter lordos-net-flathub.scope: not run\n";
             if (write(2, msg, sizeof msg - 1) < 0) {}

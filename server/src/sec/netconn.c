@@ -190,6 +190,10 @@ int netconn_socket(NcComponent comp, int fam, int type, const struct sockaddr *t
 
 /* ---- the connector ---- */
 
+long netconn_scope_mem_max_mb(const char *name) {
+    return name && !strcmp(name, NAMES[NC_FLATHUB]) ? NC_FLATHUB_MEM_MAX_MB : NC_MEM_MAX_MB;
+}
+
 int netconn_main(int argc, char **argv) {
     if (argc != 3 || !fw_component_ok(argv[2])) { fprintf(stderr, "lord-server --net-connector: unknown component\n"); return 2; }
     int known = 0;
@@ -207,7 +211,7 @@ int netconn_main(int argc, char **argv) {
     if (getsockopt(3, SOL_SOCKET, SO_TYPE, &type, &tl) || type != SOCK_SEQPACKET) { fprintf(stderr, "lord-server --net-connector: started by lord-server only\n"); return 2; }
     char scope[64];
     snprintf(scope, sizeof scope, "lordos-net-%s.scope", argv[2]);
-    CgroupLimits lim = { .mem_high_mb = 0, .mem_max_mb = 64, .cpu_percent = 0 };
+    CgroupLimits lim = { .mem_high_mb = 0, .mem_max_mb = netconn_scope_mem_max_mb(argv[2]), .cpu_percent = 0 };
     if (cgroup_enter(scope, &lim) && getenv("LORDOS_SESSIOND")) {
         fprintf(stderr, "netconn: could not place the %s connector in %s: its connections are refused\n", argv[2], scope);
         return 3;                           /* fail closed: lord-server's requests get EPIPE */
