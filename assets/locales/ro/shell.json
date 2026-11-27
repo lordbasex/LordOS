@@ -1021,5 +1021,8 @@
   "edit.reload": "Reîncarcă",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Un omagiu adus desktopurilor din 2001: bare de titlu albastre cu colțurile de sus rotunjite, un buton de start verde pe o bară de activități albastră și Fișiere cu un panou de activități.",
-  "luna.start": "Start"
+  "luna.start": "Start",
+  "picker.folderName": "Numele dosarului",
+  "picker.createFolder": "Creează",
+  "picker.folderExists": "Aici există deja ceva cu acest nume."
 }

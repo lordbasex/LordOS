@@ -1042,5 +1042,8 @@
   "edit.reload": "إعادة التحميل",
   "theme.luna.name": "Luna",
   "theme.luna.description": "تحية لأسطح المكتب في عام 2001: أشرطة عناوين زرقاء بحواف علوية مستديرة، وزر «ابدأ» أخضر على شريط مهام أزرق، و«الملفات» مع لوحة للمهام.",
-  "luna.start": "ابدأ"
+  "luna.start": "ابدأ",
+  "picker.folderName": "اسم المجلد",
+  "picker.createFolder": "إنشاء",
+  "picker.folderExists": "يوجد هنا بالفعل عنصر بهذا الاسم."
 }

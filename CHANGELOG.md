@@ -461,6 +461,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **The system file dialog had no way to make a folder** (GitHub #262 (b): saving a file from a link in Brave, Files'
+  New Folder button was missing). Save and folder dialogs (`sdk/filepicker.jsx`, also the portal's dialog for Linux
+  and Flatpak apps) now have Files' New Folder button in the toolbar: it proposes "untitled folder" (or "… 2", "… 3"
+  when taken), makes the typed name in the folder in view with `lord.fs.mkdir` and opens it. It is off where the
+  dialog can't write and in a Cloud account's folder; `lord.fs` still refuses anything outside the home folder and the
+  user's disks and the protected folders, so nothing new is reachable. Tests: `canMakeFolder` and `freeFolderName` in
+  `tests/filepicker_model_test.mjs` (now also run by `make test`), and New Folder end to end in
+  `tests/backup_pickers_scene.mjs`.
 - **Machines: buttons and the Whonix badge ran out of their space in long languages** (GitHub #266, French). The
   empty library's three buttons (New Machine, Import a machine, What This Computer Can Run) sat in one row that clipped
   both ends; they now wrap onto more rows, centred, and the pane scrolls in a short window instead of spilling out

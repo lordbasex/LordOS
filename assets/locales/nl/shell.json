@@ -1014,5 +1014,8 @@
   "edit.reload": "Opnieuw laden",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Een eerbetoon aan de bureaubladen van 2001: blauwe titelbalken met afgeronde bovenkant, een groene startknop op een blauwe taakbalk en Bestanden met een takenvenster.",
-  "luna.start": "Start"
+  "luna.start": "Start",
+  "picker.folderName": "Mapnaam",
+  "picker.createFolder": "Aanmaken",
+  "picker.folderExists": "Hier staat al iets met deze naam."
 }

@@ -1014,5 +1014,8 @@
   "edit.reload": "Lataa uudelleen",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Kunnianosoitus vuoden 2001 työpöydille: siniset otsikkopalkit pyöristetyin yläkulmin, vihreä aloituspainike sinisellä tehtäväpalkilla ja Tiedostot tehtäväruudun kanssa.",
-  "luna.start": "Aloita"
+  "luna.start": "Aloita",
+  "picker.folderName": "Kansion nimi",
+  "picker.createFolder": "Luo",
+  "picker.folderExists": "Täällä on jo jotain tällä nimellä."
 }

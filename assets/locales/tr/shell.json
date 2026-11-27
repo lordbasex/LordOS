@@ -1014,5 +1014,8 @@
   "edit.reload": "Yeniden yükle",
   "theme.luna.name": "Luna",
   "theme.luna.description": "2001 masaüstlerine bir saygı duruşu: üstü yuvarlatılmış mavi başlık çubukları, mavi görev çubuğunda yeşil bir başlat düğmesi ve görev bölmesiyle Dosyalar.",
-  "luna.start": "Başlat"
+  "luna.start": "Başlat",
+  "picker.folderName": "Klasör adı",
+  "picker.createFolder": "Oluştur",
+  "picker.folderExists": "Burada bu adda bir öğe zaten var."
 }

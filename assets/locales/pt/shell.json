@@ -1014,5 +1014,8 @@
   "edit.reload": "Recarregar",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Uma homenagem aos desktops de 2001: barras de título azuis com o topo arredondado, um botão iniciar verde numa barra de tarefas azul e o Arquivos com um painel de tarefas.",
-  "luna.start": "Iniciar"
+  "luna.start": "Iniciar",
+  "picker.folderName": "Nome da pasta",
+  "picker.createFolder": "Criar",
+  "picker.folderExists": "Já existe algo com este nome aqui."
 }

@@ -1007,5 +1007,8 @@
   "edit.reload": "重新加载",
   "theme.luna.name": "Luna",
   "theme.luna.description": "致敬 2001 年的桌面：顶部圆角的蓝色标题栏、蓝色任务栏上的绿色开始按钮，以及带任务窗格的“文件”。",
-  "luna.start": "开始"
+  "luna.start": "开始",
+  "picker.folderName": "文件夹名称",
+  "picker.createFolder": "创建",
+  "picker.folderExists": "此处已有同名项目。"
 }

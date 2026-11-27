@@ -1014,5 +1014,8 @@
   "edit.reload": "Torna a carregar",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Un homenatge als escriptoris del 2001: barres de títol blaves amb la part de dalt arrodonida, un botó d’inici verd en una barra de tasques blava i Fitxers amb un plafó de tasques.",
-  "luna.start": "Inici"
+  "luna.start": "Inici",
+  "picker.folderName": "Nom de la carpeta",
+  "picker.createFolder": "Crea",
+  "picker.folderExists": "Ja hi ha alguna cosa amb aquest nom aquí."
 }

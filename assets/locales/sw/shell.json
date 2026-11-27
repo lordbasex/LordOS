@@ -1014,5 +1014,8 @@
   "edit.reload": "Pakia upya",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Heshima kwa eneo-kazi la mwaka 2001: pau za kichwa za buluu zenye juu iliyopindwa, kitufe cha anza cha kijani kwenye upau wa kazi wa buluu, na Faili zenye kidirisha cha kazi.",
-  "luna.start": "Anza"
+  "luna.start": "Anza",
+  "picker.folderName": "Jina la folda",
+  "picker.createFolder": "Unda",
+  "picker.folderExists": "Tayari kuna kitu chenye jina hili hapa."
 }

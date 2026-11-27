@@ -1014,5 +1014,8 @@
   "edit.reload": "আবার লোড করুন",
   "theme.luna.name": "Luna",
   "theme.luna.description": "২০০১ সালের ডেস্কটপের প্রতি শ্রদ্ধা: উপরে গোলাকার নীল শিরোনাম বার, নীল টাস্কবারে সবুজ স্টার্ট বোতাম, আর কাজের প্যানসহ ফাইল।",
-  "luna.start": "স্টার্ট"
+  "luna.start": "স্টার্ট",
+  "picker.folderName": "ফোল্ডারের নাম",
+  "picker.createFolder": "তৈরি করুন",
+  "picker.folderExists": "এই নামে কিছু এখানে আগে থেকেই আছে।"
 }

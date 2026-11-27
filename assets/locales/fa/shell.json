@@ -1014,5 +1014,8 @@
   "edit.reload": "بارگذاری دوباره",
   "theme.luna.name": "Luna",
   "theme.luna.description": "ادای احترامی به میزکارهای سال ۲۰۰۱: نوارهای عنوان آبی با بالای گرد، دکمهٔ شروع سبز روی نوار وظیفهٔ آبی، و «فایل‌ها» با یک قاب کارها.",
-  "luna.start": "شروع"
+  "luna.start": "شروع",
+  "picker.folderName": "نام پوشه",
+  "picker.createFolder": "ایجاد",
+  "picker.folderExists": "چیزی با این نام از قبل اینجا هست."
 }

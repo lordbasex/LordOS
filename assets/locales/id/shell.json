@@ -1007,5 +1007,8 @@
   "edit.reload": "Muat ulang",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Penghormatan untuk desktop tahun 2001: bilah judul biru dengan bagian atas membulat, tombol mulai hijau pada bilah tugas biru, dan Berkas dengan panel tugas.",
-  "luna.start": "Mulai"
+  "luna.start": "Mulai",
+  "picker.folderName": "Nama folder",
+  "picker.createFolder": "Buat",
+  "picker.folderExists": "Sudah ada sesuatu dengan nama ini di sini."
 }

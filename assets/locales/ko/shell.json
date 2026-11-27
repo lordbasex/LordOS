@@ -1007,5 +1007,8 @@
   "edit.reload": "새로고침",
   "theme.luna.name": "Luna",
   "theme.luna.description": "2001년 데스크톱에 대한 헌사: 위쪽이 둥근 파란 제목 표시줄, 파란 작업 표시줄의 초록 시작 버튼, 작업 창이 있는 파일.",
-  "luna.start": "시작"
+  "luna.start": "시작",
+  "picker.folderName": "폴더 이름",
+  "picker.createFolder": "만들기",
+  "picker.folderExists": "이 이름을 가진 항목이 이미 여기에 있습니다."
 }

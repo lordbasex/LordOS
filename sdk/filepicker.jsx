@@ -25,7 +25,7 @@ import { kindOf } from './filekinds.js';
 import { formatBytes } from './system.js';
 import { EntryIcon, FolderGlyph, DriveGlyph } from './fileglyphs.jsx';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, listRowStyle, listHeaderCell, listCell, when, useWidth, userDirs, ZoomControl } from './fileparts.jsx';
-import { localDisks, startFolder, locationPlaces, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction,
+import { localDisks, startFolder, locationPlaces, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction, canMakeFolder, freeFolderName,
   imagesOnly, viewFor, saveView, liveRange, gridStep, cloudPlaces, cloudRoot, refuseCloud, thumbMetrics, zoomFor, saveZoom, clampZoom } from './filepickermodel.js';
 import { cloudState } from './cloud.js';
 import { windows, wm, workAreaOf, onActiveDesktop } from './windows.js';
@@ -39,6 +39,14 @@ const SIDE_W = 176, DATE_W = 150, SIZE_W = 84;
 const COL_TITLE = { name: 'files.col.name', date: 'files.col.date', size: 'files.col.size' };
 
 const statOf = (path) => { try { return fs.stat(path); } catch (e) { return null; } };
+
+// New Folder's button, as Files draws it: a small folder with a plus on it
+const NewFolderGlyph = () => (
+  <View style={{ width: 18, height: 18, justifyContent: 'center' }}>
+    <FolderGlyph size={18} />
+    <Text style={{ position: 'absolute', left: 0, right: 0, top: 2, fontSize: 12, fontWeight: 700, color: '#ffffff', textAlign: 'center' }}>+</Text>
+  </View>
+);
 
 function SortTitle({ k, width, sort, onSort, t: th }) {
   const on = sort.by === k;
@@ -104,6 +112,9 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
   const [sort, setSort] = useState({ by: 'name', desc: false });
   const [saveName, setSaveName] = useState(name);
   const [replacing, setReplacing] = useState(false);
+  // New Folder (GitHub #262): the name being typed, or null; and why the last try failed
+  const [naming, setNaming] = useState(null);
+  const [folderErr, setFolderErr] = useState('');
   const root = useRef(null), listBox = useRef(null), scroll = useRef(null), typed = useRef({ text: '', at: 0 });
   const width = useWidth(root, 800);
   const listW = useWidth(listBox, 600);
@@ -136,7 +147,8 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
   }, [dir, sort.by, sort.desc]);
   const row = rows.find((e) => e.path === cursor) || null;
   // lord.fs answers for a name inside a folder it may write to: the home folder and a disk are their own roots
-  const writable = useMemo(() => mode !== 'save' || dir === home || disks.some((d) => d.path === dir) || !!statOf(dir)?.writable, [dir]);
+  const canWrite = useMemo(() => dir === home || disks.some((d) => d.path === dir) || !!statOf(dir)?.writable, [dir, rows]);
+  const writable = mode !== 'save' || canWrite;
 
   const show = (path) => {
     const i = rows.findIndex((r) => r.path === path);
@@ -148,7 +160,7 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
   };
   const go = (path, how = 'push') => {
     if (path === dir) return;
-    setCursor(null); setReplacing(false); anchor.current = null;
+    setCursor(null); setReplacing(false); setNaming(null); setFolderErr(''); anchor.current = null;
     setNav((n) => {
       if (how === 'back') return { dir: n.back[n.back.length - 1], back: n.back.slice(0, -1), fwd: [n.dir, ...n.fwd] };
       if (how === 'fwd') return { dir: n.fwd[0], back: [...n.back, n.dir], fwd: n.fwd.slice(1) };
@@ -166,6 +178,17 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
     if (st?.dir) { setSaveName(''); go(target); return; }
     if (st && !replacing && askReplace) { setReplacing(true); return; }
     onPick(target);
+  };
+  // New Folder: made in the folder in view (lord.fs.mkdir, only in the home folder and the user's disks), then opened
+  const startFolderName = () => { setFolderErr(''); setNaming(freeFolderName(new Set(rows.map((r) => r.name)), t('files.newFolder'))); };
+  const endFolderName = () => { setNaming(null); setFolderErr(''); if (mode !== 'save') hold(); };
+  const makeFolder = () => {
+    if (!validName(naming)) return;
+    const target = `${dir === '/' ? '' : dir}/${naming.trim()}`;
+    if (statOf(target)) { setFolderErr(t('shell.picker.folderExists')); return; }
+    try { fs.mkdir(target); } catch (e) { setFolderErr(e.message); return; }
+    endFolderName();
+    go(target);
   };
   const act = (a) => {
     if (!a) return;
@@ -242,6 +265,7 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
   const inCloudOf = (p) => !!cloudRoot(p, home);
   const inCloud = inCloudOf(dir);
   const cloudRefused = !cloud && !primary && (inCloudOf(dir) || (row?.dir && inCloudOf(row.path)));
+  const newFolderOk = canMakeFolder({ mode, writable: canWrite, cloud: inCloud });
   const showDate = width - (narrow ? 0 : SIDE_W) > 520;
   const crumbs = pathCrumbs(dir, home).map((c) => ({ label: c.home ? t('files.place.home') : c.path === '/' ? t('files.place.computer') : c.label, folder: true, path: c.path }));
   const shown = fitCrumbs(crumbs);
@@ -285,11 +309,28 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
             <PathCrumbs t={th} crumbs={shown} onGo={(i) => go(shown[i].path)} />
           </View>
           {thumbs ? <ZoomControl t={th} zoom={zoom} slider={!narrow} onStep={(d) => setZoom(zoom + d)} onSet={setZoom} /> : null}
+          {mode === 'save' || mode === 'folder'
+            ? <ToolbarButton icon={<NewFolderGlyph />} small title={t('files.menu.newFolder')} disabled={!newFolderOk} onClick={startFolderName} /> : null}
           <ToolbarGroup>
             <ToolbarButton icon="≡" iconSize={14} small title={t('shell.picker.viewList')} active={!thumbs} onClick={() => setView('list')} />
             <ToolbarButton icon="▦" iconSize={14} small title={t('shell.picker.viewThumbs')} active={thumbs} onClick={() => setView('thumbs')} />
           </ToolbarGroup>
         </Toolbar>
+        {naming !== null ? (
+          <View onMouseDown={(e) => e.stopPropagation?.()} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.m, paddingVertical: spacing.s,
+            borderTopWidth: 1, borderTopColor: th.separator }}>
+            <NewFolderGlyph />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <TextInput value={naming} placeholder={t('shell.picker.folderName')} autoFocus selectAll
+                onChange={(v) => { setNaming(v); setFolderErr(''); }} onSubmit={makeFolder} onCancel={endFolderName} />
+            </View>
+            <Button label={t('shell.picker.cancel')} onClick={endFolderName} />
+            <Button primary label={t('shell.picker.createFolder')} disabled={!validName(naming)} onClick={makeFolder} />
+          </View>
+        ) : null}
+        {naming !== null && folderErr ? (
+          <Text style={{ paddingHorizontal: spacing.m, paddingBottom: spacing.s, fontSize: typeScale.caption, color: '#ff453a', textAlign: 'start' }}>{folderErr}</Text>
+        ) : null}
         {thumbs ? <View style={{ height: 1, backgroundColor: th.separator }} /> : (
           <View style={{ flexDirection: 'row', height: 27, alignItems: 'center', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: th.separator }}>
             <SortTitle k="name" sort={sort} onSort={onSort} t={th} />

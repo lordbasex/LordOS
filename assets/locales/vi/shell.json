@@ -1007,5 +1007,8 @@
   "edit.reload": "Tải lại",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Lời tri ân những màn hình nền năm 2001: thanh tiêu đề xanh lam bo tròn phía trên, nút bắt đầu màu xanh lá trên thanh tác vụ xanh lam và Tệp với khung tác vụ.",
-  "luna.start": "Bắt đầu"
+  "luna.start": "Bắt đầu",
+  "picker.folderName": "Tên thư mục",
+  "picker.createFolder": "Tạo",
+  "picker.folderExists": "Ở đây đã có một mục cùng tên."
 }

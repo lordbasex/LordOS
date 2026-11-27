@@ -1014,5 +1014,8 @@
   "edit.reload": "Reload",
   "theme.luna.name": "Luna",
   "theme.luna.description": "A tribute to the desktops of 2001: blue title bars with rounded tops, a green start button on a blue taskbar, and Files with a task pane.",
-  "luna.start": "Start"
+  "luna.start": "Start",
+  "picker.folderName": "Folder name",
+  "picker.createFolder": "Create",
+  "picker.folderExists": "Something with this name is already here."
 }

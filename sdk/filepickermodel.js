@@ -95,6 +95,19 @@ export function rangeOf(rows, anchor, path) {
 
 export const validName = (name) => { const n = String(name || '').trim(); return !!n && !n.includes('/') && n !== '.' && n !== '..'; };
 
+// New Folder in a save or folder dialog (GitHub #262: Files has it, the dialog didn't). Only where the dialog may write
+// (the folder in view is writable, not a Cloud account's, whose folders are made off the thread in Files), and lord.fs
+// refuses anything outside the home folder and the user's disks anyway.
+export const canMakeFolder = ({ mode, writable, cloud }) => (mode === 'save' || mode === 'folder') && !!writable && !cloud;
+
+// The name it proposes: base ("untitled folder"), else "base 2", "base 3"… not taken in the folder (taken: a Set)
+export function freeFolderName(taken, base) {
+  const b = String(base || '').trim();
+  if (!b || !taken.has(b)) return b;
+  for (let i = 2; i < 10000; i++) if (!taken.has(`${b} ${i}`)) return `${b} ${i}`;
+  return `${b} ${Date.now()}`;
+}
+
 // What the primary button does. Never enters a folder in folder mode: there it chooses it.
 //   mode, multiple, dir (in view), row (under the cursor, or null), chosen ([paths]), name (save), writable
 // → { pick } | { pickMany } | { go } | { save } | null, and null means the button is disabled.

@@ -1,6 +1,6 @@
 // The system file dialog without a screen. node server/tests/filepicker_model_test.mjs
 import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction, imagesOnly, viewFor, saveView, liveRange, gridStep,
-  ZOOM_MIN, ZOOM_MAX, clampZoom, thumbMetrics, zoomFor, saveZoom, cloudPlaces, locationPlaces } from '../../sdk/filepickermodel.js';
+  ZOOM_MIN, ZOOM_MAX, clampZoom, thumbMetrics, zoomFor, saveZoom, cloudPlaces, locationPlaces, canMakeFolder, freeFolderName } from '../../sdk/filepickermodel.js';
 import { ZOOM_MIN as FILES_MIN, ZOOM_MAX as FILES_MAX } from '../../apps/files/viewprefs.js';
 
 let ok = 0;
@@ -143,5 +143,15 @@ eq('save size keeps the view', saveZoom({ images: 'thumbs' }, true, 2), { images
 eq('save size beside the other', saveZoom({ zoom: { files: -1 } }, true, 4), { zoom: { files: -1, images: 4 } });
 eq('save size, nothing yet', saveZoom(null, false, 7), { zoom: { files: ZOOM_MAX } });
 eq('the view saved after keeps the size', saveView(saveZoom(null, true, 1), true, 'list'), { zoom: { images: 1 }, images: 'list' });
+
+// New Folder (GitHub #262): in a save or folder dialog, where it may write, never in a Cloud account's folder
+eq('new folder in a save dialog', canMakeFolder({ mode: 'save', writable: true, cloud: false }), true);
+eq('new folder in a folder dialog', canMakeFolder({ mode: 'folder', writable: true, cloud: false }), true);
+eq('no new folder in an open dialog', canMakeFolder({ mode: 'open', writable: true, cloud: false }), false);
+eq('no new folder where it can\'t write', canMakeFolder({ mode: 'save', writable: false, cloud: false }), false);
+eq('no new folder in a Cloud folder', canMakeFolder({ mode: 'save', writable: true, cloud: true }), false);
+eq('a free name', freeFolderName(new Set(['a.txt']), 'untitled folder'), 'untitled folder');
+eq('the next free name', freeFolderName(new Set(['untitled folder', 'untitled folder 2']), 'untitled folder'), 'untitled folder 3');
+eq('no base, no name', freeFolderName(new Set(), ''), '');
 
 console.log(process.exitCode ? 'FAILED' : `ok ${ok}`);

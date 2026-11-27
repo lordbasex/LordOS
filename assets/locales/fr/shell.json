@@ -1014,5 +1014,8 @@
   "edit.reload": "Actualiser",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Un hommage aux bureaux de 2001 : barres de titre bleues aux coins supérieurs arrondis, un bouton démarrer vert sur une barre des tâches bleue et Fichiers avec un volet de tâches.",
-  "luna.start": "Démarrer"
+  "luna.start": "Démarrer",
+  "picker.folderName": "Nom du dossier",
+  "picker.createFolder": "Créer",
+  "picker.folderExists": "Un élément portant ce nom existe déjà ici."
 }

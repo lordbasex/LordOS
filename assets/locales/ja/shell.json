@@ -1007,5 +1007,8 @@
   "edit.reload": "再読み込み",
   "theme.luna.name": "Luna",
   "theme.luna.description": "2001年のデスクトップへのオマージュ：上部が丸い青いタイトルバー、青いタスクバーの緑のスタートボタン、タスクペイン付きのファイル。",
-  "luna.start": "スタート"
+  "luna.start": "スタート",
+  "picker.folderName": "フォルダ名",
+  "picker.createFolder": "作成",
+  "picker.folderExists": "ここにはすでに同じ名前の項目があります。"
 }

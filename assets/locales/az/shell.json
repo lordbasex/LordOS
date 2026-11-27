@@ -1014,5 +1014,8 @@
   "edit.reload": "Yenidən yüklə",
   "theme.luna.name": "Luna",
   "theme.luna.description": "2001-ci ilin iş masalarına ehtiram: yuxarısı yumrulanmış mavi başlıq zolaqları, mavi tapşırıq panelində yaşıl başlat düyməsi və tapşırıq paneli ilə Fayllar.",
-  "luna.start": "Başlat"
+  "luna.start": "Başlat",
+  "picker.folderName": "Qovluğun adı",
+  "picker.createFolder": "Yarat",
+  "picker.folderExists": "Burada bu adda artıq nəsə var."
 }

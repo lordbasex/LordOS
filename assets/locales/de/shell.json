@@ -1014,5 +1014,8 @@
   "edit.reload": "Neu laden",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Eine Hommage an die Desktops von 2001: blaue Titelleisten mit runden oberen Ecken, ein grüner Startknopf auf einer blauen Taskleiste und Dateien mit einem Aufgabenbereich.",
-  "luna.start": "Start"
+  "luna.start": "Start",
+  "picker.folderName": "Ordnername",
+  "picker.createFolder": "Erstellen",
+  "picker.folderExists": "Hier gibt es bereits etwas mit diesem Namen."
 }

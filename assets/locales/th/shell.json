@@ -1007,5 +1007,8 @@
   "edit.reload": "โหลดใหม่",
   "theme.luna.name": "Luna",
   "theme.luna.description": "คารวะเดสก์ท็อปปี 2001: แถบชื่อสีฟ้าที่มุมบนโค้งมน ปุ่มเริ่มสีเขียวบนแถบงานสีฟ้า และไฟล์ที่มีบานหน้าต่างงาน",
-  "luna.start": "เริ่ม"
+  "luna.start": "เริ่ม",
+  "picker.folderName": "ชื่อโฟลเดอร์",
+  "picker.createFolder": "สร้าง",
+  "picker.folderExists": "มีรายการชื่อนี้อยู่ที่นี่แล้ว"
 }

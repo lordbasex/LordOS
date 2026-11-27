@@ -1014,5 +1014,8 @@
   "edit.reload": "Läs in igen",
   "theme.luna.name": "Luna",
   "theme.luna.description": "En hyllning till skrivborden från 2001: blå namnlister med rundade övre hörn, en grön startknapp i ett blått aktivitetsfält och Filer med en åtgärdspanel.",
-  "luna.start": "Start"
+  "luna.start": "Start",
+  "picker.folderName": "Mappnamn",
+  "picker.createFolder": "Skapa",
+  "picker.folderExists": "Det finns redan något med det här namnet här."
 }

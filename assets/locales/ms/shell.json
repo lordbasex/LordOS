@@ -1007,5 +1007,8 @@
   "edit.reload": "Muat semula",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Penghormatan kepada desktop tahun 2001: bar tajuk biru dengan bahagian atas membulat, butang mula hijau pada bar tugas biru, dan Fail dengan anak tetingkap tugas.",
-  "luna.start": "Mula"
+  "luna.start": "Mula",
+  "picker.folderName": "Nama folder",
+  "picker.createFolder": "Cipta",
+  "picker.folderExists": "Sudah ada sesuatu dengan nama ini di sini."
 }

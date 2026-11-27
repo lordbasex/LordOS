@@ -1014,5 +1014,8 @@
   "edit.reload": "Újratöltés",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Tisztelgés a 2001-es asztalok előtt: kék címsorok lekerekített tetővel, zöld start gomb kék tálcán, és a Fájlok feladatpanellel.",
-  "luna.start": "Start"
+  "luna.start": "Start",
+  "picker.folderName": "Mappa neve",
+  "picker.createFolder": "Létrehozás",
+  "picker.folderExists": "Itt már van valami ezzel a névvel."
 }

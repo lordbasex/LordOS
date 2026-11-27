@@ -1014,5 +1014,8 @@
   "edit.reload": "Ricarica",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Un omaggio ai desktop del 2001: barre del titolo blu con gli angoli superiori arrotondati, un pulsante start verde su una barra delle applicazioni blu e File con un riquadro delle operazioni.",
-  "luna.start": "Start"
+  "luna.start": "Start",
+  "picker.folderName": "Nome della cartella",
+  "picker.createFolder": "Crea",
+  "picker.folderExists": "Qui c’è già qualcosa con questo nome."
 }

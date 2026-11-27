@@ -1014,5 +1014,8 @@
   "edit.reload": "Volver a cargar",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Un homenaje a los escritorios de 2001: barras de título azules con la parte de arriba redondeada, un botón de inicio verde en una barra de tareas azul y Archivos con un panel de tareas.",
-  "luna.start": "Inicio"
+  "luna.start": "Inicio",
+  "picker.folderName": "Nombre de la carpeta",
+  "picker.createFolder": "Crear",
+  "picker.folderExists": "Ya hay algo con este nombre acá."
 }

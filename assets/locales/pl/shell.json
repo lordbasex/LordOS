@@ -1021,5 +1021,8 @@
   "edit.reload": "Załaduj ponownie",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Hołd dla pulpitów z 2001 roku: niebieskie paski tytułu z zaokrągloną górą, zielony przycisk start na niebieskim pasku zadań i Pliki z panelem zadań.",
-  "luna.start": "Start"
+  "luna.start": "Start",
+  "picker.folderName": "Nazwa folderu",
+  "picker.createFolder": "Utwórz",
+  "picker.folderExists": "Coś o tej nazwie już tu jest."
 }

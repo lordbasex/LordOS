@@ -1021,5 +1021,8 @@
   "edit.reload": "Įkelti iš naujo",
   "theme.luna.name": "Luna",
   "theme.luna.description": "Duoklė 2001 m. darbalaukiams: mėlynos pavadinimo juostos suapvalintu viršumi, žalias pradžios mygtukas mėlynoje užduočių juostoje ir Failai su užduočių sritimi.",
-  "luna.start": "Pradžia"
+  "luna.start": "Pradžia",
+  "picker.folderName": "Aplanko pavadinimas",
+  "picker.createFolder": "Sukurti",
+  "picker.folderExists": "Čia jau yra kažkas tokiu pavadinimu."
 }
