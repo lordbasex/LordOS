@@ -479,6 +479,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Community themes: drawing an app's icon no longer takes the theme off** (Meridian review; BUG-H of the ws171 QA had
+  the same cause once a window was open: okminimal's taskbar draws `windowIcon(win)`). LordOS's icon components reached
+  the theme wrapped as tainted functions, so React's host guard found the theme's wrapper as the nearest component of
+  their `Image` and refused it ("a community theme draws with View, Text and Image"). An `Icon`/`…Icon`/`…Glyph` in
+  LordOS's data (`useLauncherApps`, `useDockEntries`) and what `windowIcon` returns are now facade components, drawn
+  with sanitized props as the SDK's exported ones; any other function (an app's `Component`, a menu's `onClick`) still
+  runs tainted. Test: `community_theme_headless.sh` ("clicker": launcher rows with icons, a window's icon).
 - **Community themes: a click that opens something no longer takes the theme off** (Meridian review of 0.8.9.6.2,
   blocker: every community theme, the kit's template too, was taken off at its first click that mounted new nodes).
   The theme's `setState` ran inside `lord.themeCall`, so React's render, queued as a microtask then, inherited the

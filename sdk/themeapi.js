@@ -111,11 +111,21 @@ function snapshotOne(v, depth) {
   let c = snapshots.get(v);
   if (c) return c;
   c = arr ? v.map((x) => snapshotRaw(x, depth + 1)) : {};
-  if (!arr) for (const k of Object.keys(v)) c[k] = snapshotRaw(v[k], depth + 1);
+  // an icon component of LordOS's (an app's Icon in useLauncherApps or useDockEntries, a status item's Glyph): the theme
+  // renders it as one of the facade's, with sanitized props, as the SDK's exported components (exportValue). Only keys
+  // named so: any other function (an app's Component, a menu item's onClick) still runs tainted when the theme calls it
+  if (!arr) for (const k of Object.keys(v)) c[k] = typeof v[k] === 'function' && ICON_KEY.test(k) ? componentForTheme(v[k], k) : snapshotRaw(v[k], depth + 1);
   Object.freeze(c);
   snapshots.set(v, c);
   originals.set(c, v);
   return c;
+}
+const ICON_KEY = /^([A-Z][A-Za-z]{0,30})?(Icon|Glyph)$/;
+function componentForTheme(C, name) {
+  if (facadeTypes.has(C) || themeWrappers.has(C)) return C;
+  const W = wrapComponent(C, name);
+  facadeTypes.add(W);
+  return W;
 }
 function toTheme(v) {
   if (typeof v === 'function') return mainFnForTheme(v);
@@ -519,6 +529,10 @@ const NEUTRAL = { useBluetooth: () => null, useSound: () => ({ sinks: [], source
 
 function exportValue(name, v) {
   if (typeof v === 'function' && /^[A-Z]/.test(name)) { const W = wrapComponent(v, name); facadeTypes.add(W); return W; }
+  // a function that returns an icon component (windowIcon): the component is the facade's, as an Icon in LordOS's data
+  if (typeof v === 'function' && /Icon$/.test(name)) {
+    return (...a) => { const r = v(...a.map((x) => sanitizeIn(x))); return typeof r === 'function' ? componentForTheme(r, 'Icon') : toTheme(r); };
+  }
   if (typeof v === 'function') return (...a) => toTheme(v(...a.map((x) => sanitizeIn(x))));
   return v;
 }
