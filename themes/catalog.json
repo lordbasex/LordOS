@@ -63,8 +63,8 @@
     },
     {
      "path": "components/Dock.jsx",
-     "size": 25753,
-     "sha256": "f825e12bc3c8fef5bc8dbe92107c3cf1f7f6b33781d01414cf398b32145a040e"
+     "size": 25936,
+     "sha256": "985e1b5a0cde4ec22c77853d748c44fae1ea340ac2e6cca347ba36c16e72c8cf"
     },
     {
      "path": "components/Launchpad.jsx",
@@ -78,8 +78,8 @@
     },
     {
      "path": "components/MenuBar.jsx",
-     "size": 14533,
-     "sha256": "f457aa4f85dffad10c66c5d08eae810cc5274a42651a20a87a0072009d50e688"
+     "size": 14851,
+     "sha256": "0e15e374cb92c3abb2d0828d21d07492f2727f91793b78bb0bab34715bf175f8"
     },
     {
      "path": "components/NotificationCenter.jsx",
@@ -306,8 +306,8 @@
     },
     {
      "path": "components/BarButton.jsx",
-     "size": 2363,
-     "sha256": "62d40ca868bc35b21eb408d1b184ecdf2e24fc400e1ae50482892d742e98a60b"
+     "size": 2430,
+     "sha256": "423dc7fdc8d1d8d6b87c5383ef9b5daac740e1067594ebeb6d199a4ae74dae8e"
     },
     {
      "path": "components/ControlCenter.jsx",
@@ -341,8 +341,8 @@
     },
     {
      "path": "components/Spine.jsx",
-     "size": 5537,
-     "sha256": "69147c74ee9738f363c7721dbf28a43e843aa76d03b0c36ac294bc3413265a67"
+     "size": 5782,
+     "sha256": "3f5c4cf804b89d5dc0227fccd56a8d1fd66dbc9cf47b6856a539cad8868c7c78"
     },
     {
      "path": "components/Surface.jsx",
