@@ -25,6 +25,20 @@ export function registerStatusItem(id, Component, order = 0) {
   return () => statusItems.set((l) => l.filter((x) => x.id !== id));
 }
 
+// Is the bar's `color` (what <StatusItems color> passes to each item) a light one? An item drawn as a picture picks its
+// light or dark variant by it; null when there is none or it can't be read (the item follows the theme's mode then).
+// '#rgb', '#rrggbb', '#rrggbbaa', 'rgb(…)' and 'rgba(…)'.
+export function lightColor(color) {
+  const c = String(color || '').trim();
+  let m = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(c), r, g, b;
+  if (m) {
+    const x = m[1].length === 3 ? m[1].split('').map((d) => d + d).join('') : m[1].slice(0, 6);
+    [r, g, b] = [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16));
+  } else if ((m = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i.exec(c))) [r, g, b] = [m[1], m[2], m[3]].map(Number);
+  else return null;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b >= 140;
+}
+
 export function StatusItems({ color, height = 22 }) {
   const list = useStore(statusItems);
   if (!list.length) return null;

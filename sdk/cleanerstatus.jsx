@@ -11,7 +11,7 @@ import { t } from './i18n.js';
 import { formatBytes, memUsedKB, systemInfo } from './system.js';
 import { wm } from './windows.js';
 import { Overlay } from './layers.js';
-import { registerStatusItem, statusPanelAt } from './statusitems.js';
+import { registerStatusItem, statusPanelAt, lightColor } from './statusitems.js';
 import { cleaner } from './cleaner.js';
 import { shellPalette } from './cleanertheme.js';
 import { lordosUpdateWaiting } from './updates.js';
@@ -84,7 +84,7 @@ function Panel({ p, onClose }) {
         h(Text, { style: { fontSize: 13, fontWeight: 600, color: p.btnText } }, t(act.label)))));
 }
 
-function CleanerItem({ height }) {
+function CleanerItem({ height, color }) {
   const th = useTheme();
   const all = useStore(settings);
   const on = cleanerItemShown(all) && !isAppOff('cleaner');      // Cleaner deactivated (Store → Installed): no item
@@ -100,7 +100,8 @@ function CleanerItem({ height }) {
   if (!on) return null;
   const p = shellPalette(th);           // the bar's panels look like the theme, not like Cleaner's own window
   return h(View, { ref: btn, onClick: () => setOpen((o) => !o), style: { height, width: 26, alignItems: 'center', justifyContent: 'center' } },
-    h(Image, { src: `asset:cleaner/status-${th.mode === 'light' ? 'dark' : 'light'}.png`, style: { width: 16, height: 16 } }),
+    // the bar's colour when the theme gives one (a dark bar in a light mode), else the theme's mode
+    h(Image, { src: `asset:cleaner/status-${(lightColor(color) ?? th.mode !== 'light') ? 'light' : 'dark'}.png`, style: { width: 16, height: 16 } }),
     open ? h(Overlay, { anchor: btn }, h(View, { ref: panel, style: statusPanelAt(btn) }, h(Panel, { p, onClose: () => setOpen(false) }))) : null);
 }
 

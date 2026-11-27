@@ -50,7 +50,7 @@ function TrayMenu({ btn, item, layout, close }) {
     h(View, { style: at.frame }, h(ContextMenu, { x: at.x, y: at.y, bounds: at.bounds, items: all, onClose: close })));
 }
 
-function TrayItem({ id, height }) {
+function TrayItem({ id, height, color }) {
   const th = useTheme();
   const all = useStore(items);
   const shown = useStore(menus);
@@ -74,9 +74,9 @@ function TrayItem({ id, height }) {
   const onMouseDown = (e) => { if (e.button === 1) { try { lord.sni.activate(id, ...point(e), true); } catch (err) { /* idem */ } } };
   const px = item.icon ? null : item.pix ? pixelsOf(item) : null;
   const glyph = item.icon
-    ? h(Image, { src: iconSrc(item.icon, 16, th.text), style: { width: 16, height: 16, objectFit: 'contain' } })
+    ? h(Image, { src: iconSrc(item.icon, 16, color || th.text), style: { width: 16, height: 16, objectFit: 'contain' } })
     : px ? h(Image, { pixels: px, style: { width: 16, height: 16, objectFit: 'contain' } })
-      : h(Text, { style: { fontSize: 11, fontWeight: 700, color: th.text } }, trayInitial(item));
+      : h(Text, { style: { fontSize: 11, fontWeight: 700, color: color || th.text } }, trayInitial(item));
   return h(View, { ref: btn, onClick, onContextMenu, onMouseDown, style: { height, width: 26, alignItems: 'center', justifyContent: 'center' } },
     glyph,
     item.status === 'NeedsAttention' && !item.icon && !px

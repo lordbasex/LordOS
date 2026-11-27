@@ -479,6 +479,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Status items drawn as pictures follow the bar's colour** (Meridian review: a status item ignored `color`). The
+  Cleaner's item picks its light or dark picture by `<StatusItems color>` when a theme gives one (`lightColor` in
+  `sdk/statusitems.js`), else by the mode as before; tray icons and their initials take the colour too.
 - **lord-themec: a theme's parent import that stays in its folder builds** (Meridian review: `import … from
   '../tokens.js'` in `components/` was refused as `code.path`, though the kit allows it). The path rule is for
   pictures; a module's specifier is the resolver's, which already refuses any import that leaves the theme's folder
