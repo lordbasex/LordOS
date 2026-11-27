@@ -461,6 +461,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **The keyboard's light stayed on while the display was off** (GitHub #270, a MacBookPro12,1: it went off only when
+  the computer slept). lord-server sends the idle stages "off" and "wake" (`server/src/hw/display.c`), but the
+  desktop only acted on lock, sleep, suspend and resume. Now "off" turns every lit `*::kbd_backlight` off and
+  remembers its level, and "wake" puts each one back where it is still off (one somebody set again meanwhile is left
+  alone; a smaller maximum after a driver reload is respected), through the same closed `keyboard-light` admin action
+  as the keyboard-light keys (`keyLightsOff`, `keyLightsBack` in `sdk/idlemodel.js`, `sdk/hardware.jsx`). On a locked
+  session's login screen the light comes back when the session itself wakes. Test: `tests/idle_model_test.mjs`.
 - **Installer: "No disk to install on was found" on a healthy GPT disk with several partitions** (GitHub #280, an HP
   ProBook 650 G2 with seven partitions). install-disks describes each disk in one LOG line of JSON, and the privileged
   helper cut every reply line at 1200 bytes (its text at 1024): with four or more partitions the JSON was cut, the

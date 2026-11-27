@@ -50,7 +50,7 @@ import { forField } from './writingmodel.js';
 import { profileOf, notifyKey, playsSystemSound, webIconPathOk, windowLabel, webMenuItems, webSpeechText } from './webappsmodel.js';
 import { webProfileIcon, iconFromFile } from './apps.js';
 import { portalFile } from './filepicker.jsx';
-import { lockBeforeSleep, lockAfterWake } from './idlemodel.js';
+import { lockBeforeSleep, lockAfterWake, keyLightsOff, keyLightsBack } from './idlemodel.js';
 import { btPowerAction } from './btpowermodel.js';
 import { openPlan, urlHost, splitPath } from './portalopenmodel.js';
 import { openUrl, openFileWithApps, revealPath } from './sysopen.js';
@@ -329,9 +329,28 @@ const machinesAwake = () => { if (!vmAnyActive()) return 0; try { return typeof 
 // the sleep deadline came while a machine ran: looked at again every 30 s, and the computer sleeps once none runs
 // (unless someone came back first: the "wake" stage)
 let sleepHeld = null;
+// the keyboard's light goes off with the display and comes back with it (GitHub #270; idlemodel.js): the lights it
+// turned off, until the display wakes
+let keyLightsSaved = null;
+const keyLights = () => { try { return lord.display.list()?.keyboardLight || []; } catch (e) { return []; } };
+const setKeyLight = (w) => admin.run('keyboard-light', `${w.name} ${w.value}`, undefined, { quiet: true })
+  .catch((e) => console.log(`idle: keyboard light ${w.name}: ${e.message}`));
+function keyLightsIdle(stage) {
+  if (!has('display')) return;
+  if (stage === 'off' && !keyLightsSaved) {
+    const { saved, writes } = keyLightsOff(keyLights());
+    keyLightsSaved = saved;
+    writes.forEach(setKeyLight);
+  } else if (stage === 'wake' && keyLightsSaved) {
+    const back = keyLightsBack(keyLightsSaved, keyLights());
+    keyLightsSaved = null;
+    back.forEach(setKeyLight);
+  }
+}
 function onIdle(data) {
   const stage = data?.stage;
   if (stage === 'wake' && sleepHeld) { clearInterval(sleepHeld); sleepHeld = null; }
+  if (stage === 'off' || stage === 'wake') keyLightsIdle(stage);
   // the lock deadline, or logind's Lock (loginctl lock-session, lock-sessions: hw/logindlock.c, from:'logind')
   if (stage === 'lock' && managed()) lord.session.lock();
   // the computer is going to sleep (the lid, the power button, a sleep timer) or woke up: the display was
