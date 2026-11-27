@@ -506,8 +506,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Hands: `find "Papelera"` didn't find the Dock's Trash** (BUG-11 of the ws169/ws170 QA): the shell's glyph-only
   buttons had no accessible name. Flow's Dock icons (the app's name, "Apps" for the launcher) and its Trash, Flow's menu
   bar items (the LordOS logo, Search, Quick settings, Notifications; every item is a button), Workspaces' column (each
-  item, the crown and the expand/collapse toggle) and its bar buttons now carry `accessibilityRole="button"` and an
-  `accessibilityLabel` from the existing translations. New `tests/hands_names_scene.mjs` (Flow and Workspaces, over the
+  item, the crown and the expand/collapse toggle) and its bar buttons now carry an `accessibilityLabel` from the existing
+  translations (their role stays "clickable"; the themes come from LordOS-themes, pinned at its branch fix/qa-ws170). New `tests/hands_names_scene.mjs` (Flow and Workspaces, over the
   theme's real host tree).
 - **Settings' search didn't find a page by its rows** (BUG-18 of the ws170 QA: "Acomodar" and "borde" found nothing,
   though Desktop & Dock has "Acomodar ventanas en los bordes de la pantalla"). Each section is now also found by the short

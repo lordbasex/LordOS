@@ -27,7 +27,7 @@ const itemAt = (ref) => { try { const [x, , w] = lord.getLayout(ref.current.id);
 function BarItem({ t, children, onClick, active, anchorRef, onEnter, label }) {
   const [hover, setHover] = useState(false);
   return (
-    <View ref={anchorRef} onClick={onClick} accessibilityRole="button" accessibilityLabel={label || undefined} onMouseEnter={() => { setHover(true); onEnter?.(); }} onMouseLeave={() => setHover(false)}
+    <View ref={anchorRef} onClick={onClick} accessibilityLabel={label || undefined} onMouseEnter={() => { setHover(true); onEnter?.(); }} onMouseLeave={() => setHover(false)}
       style={{ alignSelf: 'stretch', justifyContent: 'center' }}>
       <View style={{ height: 22, paddingHorizontal: 9, borderRadius: 5, justifyContent: 'center', flexDirection: 'row', alignItems: 'center',
         backgroundColor: active || hover ? t.menuHover : 'transparent' }}>
