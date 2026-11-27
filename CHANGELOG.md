@@ -420,6 +420,49 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Web apps: a right-click menu stayed on screen after its window closed** (BUG-31 of the ws170 QA). lord-web keeps
+  running in the background when its window closes, so the menu it had asked for (the shell's, in the system layer, with
+  a full-screen catcher) never got its "gone" and outlived a window an AI agent closed: every Hands screenshot was black
+  and every agent input refused until the person closed it. The menu now closes, answering "" to lord-web, when no
+  window of that web app (same app and profile) is left (`sdk/hardware.jsx` WebAppMenu). An agent's Escape still never
+  closes it (the system band is the person's; docs/HANDS.md). Test: `tests/webapp_menu_orphan_scene.mjs`.
+- **Hands: `open_app` found only LordOS apps and answered the wrong window for a Linux app; `set_value` refused a pop-up;
+  `key` refused the keypad; refused admin requests were logged without a name** (BUG-15, BUG-23, BUG-17, BUG-19, BUG-10b
+  of the ws170 QA). `open_app` now finds an app as the launcher's search does: a LordOS app's id or name, a Linux,
+  Flatpak or web app's shown name, its `.desktop` Name in English, `desktop:<id>` or `<id>`, or a word of its name. An
+  app that brings its own window is started as the launcher starts it, and the answer is that window's real id
+  (`linux#149`) with `"ready":true` once it maps (at most 10 s, else `"window":null`). No match says "No app named …"
+  instead of "the window or ref is gone". `set_value` on a pop-up or a segmented control takes an option's value or
+  label: exact, then ignoring case and accents, then the one label it starts; never a disabled one (`sdk/handsmodel.js`
+  `optionIndex`). `key` accepts `KP_0`…`KP_9`, `KP_Add`, `KP_Subtract`, `KP_Multiply`, `KP_Divide`, `KP_Decimal`,
+  `KP_Enter` and `Num_Lock`. A refused administrator request is logged once as `hands: <kind> admin <action> refused
+  (agent|shell|callback)`: the action is named only when it has an action name's shape, else `other`. docs/HANDS.md also
+  explains that the shell's shortcuts work for an agent's keys, and that Flow's Apps row "❖ · F4" means ❖ alone or F4,
+  not ❖+F4 (BUG-21: `super`, `F4` and `super+m` checked on a headless desktop). Tests: `build/hands-test` (keypad
+  chords, a Linux app's window named or none in time, the "no app" text, the log lines) and `hands-model-test`
+  (`matchApp` by `.desktop` Name, id and word; `optionIndex`).
+- **Toolkit audit: `size` failed on Qt 5, Qt 6 and GTK 3 on X11, and `fullscreen` on the plain X11 window, on a real
+  desktop** (BUG-12 and BUG-24 of the ws170 QA: 600x421, 600x406). LordOS's window memory had saved a frame for each
+  harness window in earlier runs (shared between toolkits through the ids `python3`, the script's name and
+  `lordos-toolkit-audit`), and every later run opened at that size. The shell now neither remembers nor restores a place
+  for `lordos-toolkit-audit*` windows (`sdk/shellxmodel.js` `remembersPlace`), and each harness names its window
+  `lordos-toolkit-audit-<toolkit>`. The check is unchanged: a window that asks for 600x400 must get it. Reproduced
+  headless with those saved places (93.8 %); 100 % on all nine rows after. Test: `tests/shellx_model_test.mjs`.
+- **Test bench: "PRIMARY SELECTION: offer came, no text" on a real desktop** (BUG-24 of the ws170 QA). The check took the
+  selection the new device is told at once (another app's) for its own. Both selection checks now read those events
+  first (a roundtrip). Test: `tests/testbench_selection_headless.sh` (a second test bench while another holds the
+  selection; failed before).
+- **GTK 4 apps stayed light on a dark desktop, and the toolkit audit's `theme` check passed anyway** (BUG-29 of the ws170
+  QA). The theme LordOS names in dark mode, `LordOS-dark`, had no `gtk-4.0` folder, so GTK 4 drew its light default.
+  `LordOS` and `LordOS-dark` now have a `gtk-4.0/gtk.css` that imports GTK 4's own light or dark style. The GTK harnesses
+  judge light or dark by the colour the window's text is really drawn with, and `gtk4.py` fails when it differs from the
+  desktop's scheme.
+- **Full screen on several displays: a LordOS window chosen on another display lost the keyboard to the fullscreen
+  window, and Hands reported a fullscreen Linux window at its small own size** (BUG-30 and BUG-30b of the ws170 QA).
+  Choosing a LordOS window now counts by where the pointer was when it was chosen, not where it is at each key (`wl.c`
+  `none_on_fs`, `fsfocus.h` `fsf_none_ptr`). lord-server's "fullscreen" event carries the display's box
+  (`args.fullscreenRect`), and `windows_context` reports it. Tests: `build/fsfocus-test` (four new cases),
+  `tests/shellx_model_test.mjs`.
 - **Moving wallpapers: lord-server spent most of a core re-blurring the frosted surfaces over the video** (BUG-14 of the
   ws170 QA: a 4K wallpaper on three 4K displays with Settings, Files, Notes and the Terminal open averaged 145 %, its
   main thread about 80 %). Every video frame cleared, re-blurred and repainted on the CPU every frosted window, the menu
