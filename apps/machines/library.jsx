@@ -7,11 +7,11 @@
 // Requirements and the Pi page are the other screens of this window.
 import {
   View, Text, Image, ScrollView, TextInput, useAppWindow, useStore, createStore, admin, fs, wm, windows, revealPath, openFolder, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
-  EmptyState, useNarrow, useWindowWidth, addListener, direction, Overlay, screen, t as tr, battery,
+  EmptyState, useNarrow, useWindowWidth, addListener, direction, Overlay, screen, t as tr, battery, workAreaOf,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { groupJobCloses, canRun, sensorLines, cardLights, budgetLine, isolationGaps, stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
-  chipCounts, libGrid, skeletonPlan, seenNext, specParts, restLine, gvtGpu, vcpuAdvice, LIB_VIEWS, LIB_SORTS, menuSpot, popMenuHeight, displayUnder } from './model.js';
+  chipCounts, libGrid, skeletonPlan, seenNext, specParts, restLine, gvtGpu, vcpuAdvice, LIB_VIEWS, LIB_SORTS, menuSpot, popMenuHeight, popMenuWidth, menuBounds, displayUnder } from './model.js';
 import { Assistant } from './assistant.jsx';
 import { Configure } from './configure.jsx';
 import { Sheet, Sym } from './kit.jsx';
@@ -113,7 +113,12 @@ function stateOf(m, windowed) {
 // A machine's menu over everything, not cut by the window (the shell's popover layer): below the ··· button or the
 // pointer, above them when it doesn't fit, always on the screen (model.js menuSpot)
 function CardMenu({ at, root, rl, items, onClose }) {
-  const w = 232, spot = menuSpot(at, w, popMenuHeight(items), displayUnder(screen.displays, at.x, at.y) || { x: 0, y: 0, w: screen.width, h: screen.height });
+  // (QA of 0.8.9.6.2: the menu was cut at 1280 px and covered the Dock) as wide as its labels need, inside the work area
+  const d = displayUnder(screen.displays, at.x, at.y) || { x: 0, y: 0, w: screen.width, h: screen.height };
+  let area = null;
+  try { area = workAreaOf(d); } catch (e) { area = null; }
+  const b = menuBounds(d, area);
+  const w = Math.min(popMenuWidth(items), Math.max(160, b.w - 16)), spot = menuSpot(at, w, popMenuHeight(items), b);
   return (
     <Overlay anchor={root}>
       <View style={{ position: 'absolute', left: spot.left - rl[0], top: spot.top - rl[1], width: w }}>

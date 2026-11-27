@@ -479,6 +479,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Machines: a machine's menu in the library stays inside the screen's work area** (QA of 0.8.9.6.2: at 1280 px the
+  card's menu was cut and reached over the Dock). The menu is placed in the work area of the display under it
+  (`menuBounds`: under the menu bar, above the Dock) instead of the whole display, and is as wide as its longest
+  label needs in the person's language (`popMenuWidth`, 232 to 380 px). Tests: `vm_model_test` (the work area, a long
+  Spanish label, the menu at the right edge of a 1280 × 800 screen inside on every side).
 - **Machines: "Display again" no longer fails for good after 16 reconnects** (found in review of 0.8.9.6.2: lord-vm
   allowed 16 display connections per run of the machine in all, `display_n` was never decreased, so after 16
   reconnects or All Displays changes every new one was refused until the machine restarted). The bound is now on the

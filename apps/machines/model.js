@@ -2016,6 +2016,16 @@ export const lordVmWhy = (out) => {
 // A PopMenu's height (apps/machines/ui.jsx: 6 px padding and a 1 px edge on each side, 30 px a row, 11 a separator,
 // about 24 an information row), for placing it before it's drawn
 export const popMenuHeight = (items) => 14 + (items || []).filter(Boolean).reduce((s, it) => s + (it === '-' ? 11 : it.note ? 24 : 30), 0);
+// (QA of 0.8.9.6.2) its width: wide enough for its longest label in the person's language (about 7.4 px a character of
+// the 13 px menu font, the check column and the padding), from min to max
+export const popMenuWidth = (items, min = 232, max = 380) => Math.max(min, Math.min(max,
+  Math.ceil(60 + 7.4 * Math.max(0, ...(items || []).filter((it) => it && it !== '-' && !it.note).map((it) => String(it.label || '').length)))));
+// the box a menu stays in: the work area of the display under the point (no Dock, no menu bar), else the display
+export function menuBounds(display, area) {
+  const d = display || { x: 0, y: 0, w: 0, h: 0 };
+  const a = area && area.w > 0 && area.h > 0 ? area : null;
+  return a ? { x: Math.max(d.x, a.x), y: Math.max(d.y, a.y), w: Math.min(d.x + d.w, a.x + a.w) - Math.max(d.x, a.x), h: Math.min(d.y + d.h, a.y + a.h) - Math.max(d.y, a.y) } : d;
+}
 
 // Where a menu w × h opened at at ({ x, y }: its top-left on the desktop; above: the y its bottom goes to when it opens
 // upwards, the button's top or the pointer) goes on the display b ({ x, y, w, h }, the one under at): below when it
