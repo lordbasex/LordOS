@@ -420,6 +420,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Settings' account card always showed initials** (BUG-K of the ws171 QA). The card at the top of Settings' sidebar
+  now draws the account's picture when one is set, and otherwise its initials on its own color, as Users does
+  (`UserAvatar`); it reads the account again when the Users page is opened or left.
 - **Ctrl+Alt+Shift+Backspace from Classic marked Classic failed for the rest of the session** (BUG-F of the ws171
   QA: "theme …/classic/theme.bundle.js taken off (restored with Ctrl+Alt+Shift+Backspace)", and Settings refused to
   apply it again). The rescue key goes back to Flow from any theme, but only a community theme is now marked failed

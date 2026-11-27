@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
 import { SharingSettings } from './Sharing.jsx';
 import { CloudSettings, CloudHeaderAction, CloudSheets } from './Cloud.jsx';
-import { UsersSettings } from './Users.jsx';
+import { UsersSettings, UserAvatar } from './Users.jsx';
 import { NetworkSettings } from './Network.jsx';
 import { General, Updates } from './General.jsx';
 import { ClipboardSettings } from './Clipboard.jsx';
@@ -611,21 +611,27 @@ function SectionIcon({ color, glyph: G, size = 20 }) {
     : <Badge color={color} size={size}><G /></Badge>;
 }
 
-// Session user: initials, name and whether they are an administrator.
+// the session's own account (its picture and color), or null (no lord.users: an older server, a test)
+function selfUser() {
+  try { return (typeof lord.users === 'undefined' ? null : (lord.users.list().users || []).find((u) => u.self)) || null; } catch (e) { return null; }
+}
+
+// Session user: the account's picture (or its initials on its color, as Users draws it), name and whether they are an
+// administrator. Read again when the Users page is opened or left (where the picture is changed).
 function UserCard({ onClick, selected }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [hover, setHover] = useState(false);
   const info = useSystemInfo(60000);
   const name = info.fullName || info.user || '';
-  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
+  const [me, setMe] = useState(selfUser);
+  useEffect(() => { setMe(selfUser()); }, [selected, name]);
+  const user = me || { name: info.user || '?', full: name };
   return (
     <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8,
         backgroundColor: selected || hover ? t.hover : 'transparent' }}>
-      <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, #5ac8fa, #0a6cd6)' }}>
-        <Text style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{initials}</Text>
-      </View>
+      <UserAvatar user={user} size={36} />
       <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{name}</Text>
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
