@@ -227,7 +227,7 @@
   },
   "suggest.nvidiaDriver.detail": "현재는 LordOS에 포함된 자유 드라이버인 nouveau를 사용합니다. 제조사 드라이버({packages})는 보통 더 나은 3D 성능과 전원 관리를 제공합니다.",
   "suggest.nvidiaDriver.note.nouveau": "설치하기 전까지는 자유 드라이버 nouveau가 계속 사용되며, 패키지를 제거하면 다시 nouveau로 돌아갑니다.",
-  "suggest.nvidiaDriver.note.older": "약 2014년 이전의 카드는 이 드라이버 버전에서 지원되지 않으므로 자유 드라이버를 유지하십시오. LordOS 데스크탑은 아직 이 드라이버로 테스트되지 않았습니다.",
+  "suggest.nvidiaDriver.note.older": "약 2014년 이전의 카드는 이 드라이버 버전에서 지원되지 않으므로 자유 드라이버를 계속 사용하세요. 이 드라이버에서의 LordOS 데스크톱은 실험적입니다. 커뮤니티 보고 1건에서는 카드에서 합성되었고(드라이버 580의 GTX 1070), 이전 보고에서는 프로세서가 합성했습니다.",
   "suggest.nvidiaDriver.note.secureBoot": "드라이버는 이 컴퓨터에서 커널용으로 빌드되며(DKMS) 커널을 업데이트할 때마다 다시 빌드됩니다. 보안 부팅이 켜져 있으면 다음 재시작 때 서명 키를 등록해야 하며, 그렇지 않으면 드라이버가 로드되지 않습니다.",
   "suggest.nvidiaDriver.title": "독점 그래픽 드라이버",
   "suggest.nvidiaDriver.unavailable": "제조사 드라이버에는 Debian의 contrib 및 non-free 구성 요소가 필요한데, 이 컴퓨터의 패키지 소스에서 둘 다 사용하도록 설정되어 있지 않습니다. 자유 드라이버 nouveau는 계속 작동합니다.",

@@ -987,7 +987,7 @@
   "gpus.roleCompute": "Süni intellekt və hesablama (CUDA)",
   "gpus.roleDesktop": "İş masası",
   "gpus.planned": "Planlaşdırılıb",
-  "gpus.plannedHint": "Hələ mövcud deyil: NVIDIA drayverinin quraşdırılması və iş masasının onunla çəkilməsi onların sistem əməliyyatları və açıq sinxronizasiya dizaynı təsdiqləndikdən sonra gələcək. O vaxta qədər LordOS bu kartda heç nəyi dəyişmir.",
+  "gpus.plannedHint": "Süni intellekt və hesablama (CUDA): LordOS hələ təklif etmir. NVIDIA-nın sürücüsünü Mağazadan qurmasanız, bu kartda heç nə dəyişmir.",
   "gpus.report": "Uyğunluq hesabatı",
   "gpus.reportHint": "Yalnız texniki məlumatlar: kartlar, onların drayverləri, iş masasını hansının çəkdiyi və bu sessiyanın nədən istifadə etdiyi. Heç vaxt adınız, kompüterin adı, ev qovluğunuzdakı yollar, seriya nömrələri və ya ünvanlar. Buradan heç nə göndərilmir: forma brauzerinizdə açılır və göndərib-göndərməməyə siz qərar verirsiniz.",
   "gpus.reportRun": "Uyğunluq hesabatı göndər",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "Sistem və təhlükəsizlik",
   "skin.pick": "Kateqoriya seçin",
   "style.organization": "Təşkilat",
-  "style.email": "E-poçt"
+  "style.email": "E-poçt",
+  "gpus.experimental": "Eksperimental",
+  "gpus.composedGpu": "Bu kartda birləşdirilir — eksperimental",
+  "gpus.composedCpu": "Prosessor tərəfindən birləşdirilir",
+  "gpus.desktopNvHint": "İş masası: standart olaraq azad sürücü (nouveau) qalır. Mağazadan istəyə görə qurulan NVIDIA-nın öz sürücüsü ilə bir icma hesabatı iş masasının kartda birləşdirildiyini göstərir (580 sürücülü GTX 1070); əvvəlki hesabatda (LordOS 0.8.8.9-da RTX 3060) prosessor birləşdirirdi və bəzi tətbiqlərin pəncərələrinin görünmədiyi bildirildi. Bu eksperimentaldır."
 }

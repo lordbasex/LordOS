@@ -980,7 +980,7 @@
   "gpus.roleCompute": "AI 및 연산(CUDA)",
   "gpus.roleDesktop": "데스크톱",
   "gpus.planned": "계획됨",
-  "gpus.plannedHint": "아직 사용할 수 없습니다. NVIDIA 드라이버 설치와 이를 사용한 데스크톱 그리기는 해당 시스템 작업과 명시적 동기화 설계가 승인된 후에 제공됩니다. 그때까지 LordOS는 이 카드에서 아무것도 바꾸지 않습니다.",
+  "gpus.plannedHint": "AI 및 연산(CUDA): LordOS에서 아직 제공하지 않습니다. 스토어에서 NVIDIA 드라이버를 설치하지 않는 한 이 카드는 아무것도 바뀌지 않습니다.",
   "gpus.report": "호환성 보고서",
   "gpus.reportHint": "기술 데이터만 포함됩니다: 카드, 드라이버, 어느 카드가 데스크톱을 그리는지, 이 세션이 무엇을 사용하는지. 이름, 컴퓨터 이름, 홈 폴더의 경로, 일련번호, 주소는 절대 포함되지 않습니다. 여기서는 아무것도 전송되지 않습니다. 양식은 브라우저에서 열리며 제출 여부는 사용자가 결정합니다.",
   "gpus.reportRun": "호환성 보고서 보내기",
@@ -1104,5 +1104,9 @@
   "skin.group.system": "시스템 및 보안",
   "skin.pick": "범주 선택",
   "style.organization": "조직",
-  "style.email": "이메일"
+  "style.email": "이메일",
+  "gpus.experimental": "실험적",
+  "gpus.composedGpu": "이 카드에서 합성 — 실험적",
+  "gpus.composedCpu": "프로세서가 합성",
+  "gpus.desktopNvHint": "데스크톱: 기본값은 계속 자유 드라이버(nouveau)입니다. 스토어에서 선택해 설치하는 NVIDIA 자체 드라이버로는 커뮤니티 보고 1건에서 데스크톱이 카드에서 합성되었습니다(드라이버 580의 GTX 1070). 이전 보고(LordOS 0.8.8.9의 RTX 3060)에서는 프로세서가 합성했고, 일부 앱의 창이 표시되지 않는다는 보고도 있습니다. 실험적입니다."
 }

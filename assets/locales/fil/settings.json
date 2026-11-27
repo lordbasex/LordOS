@@ -987,7 +987,7 @@
   "gpus.roleCompute": "AI at compute (CUDA)",
   "gpus.roleDesktop": "Desktop",
   "gpus.planned": "Nakaplano",
-  "gpus.plannedHint": "Hindi pa available: ang pag-install ng driver ng NVIDIA at ang pagguhit ng desktop gamit ito ay darating kapag naaprubahan na ang mga system action nila at ang disenyo ng explicit sync. Hanggang doon, walang binabago ang LordOS sa card na ito.",
+  "gpus.plannedHint": "AI at compute (CUDA): hindi pa iniaalok ng LordOS. Walang magbabago sa card na ito maliban kung i-install mo ang driver ng NVIDIA mula sa Store.",
   "gpus.report": "Compatibility report",
   "gpus.reportHint": "Teknikal na data lang: ang mga card, ang mga driver nila, alin ang gumuguhit ng desktop at ano ang ginagamit ng session na ito. Hindi kailanman ang pangalan mo, ang pangalan ng computer, mga path sa home folder mo, mga serial number o mga address. Walang ipinapadala mula rito: bubukas ang form sa browser mo at ikaw ang magpapasya kung ipapasa ito.",
   "gpus.reportRun": "Magpadala ng compatibility report",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "System at Seguridad",
   "skin.pick": "Pumili ng kategorya",
   "style.organization": "Organisasyon",
-  "style.email": "Email"
+  "style.email": "Email",
+  "gpus.experimental": "Eksperimental",
+  "gpus.composedGpu": "Binubuo sa card na ito — eksperimental",
+  "gpus.composedCpu": "Binubuo ng processor",
+  "gpus.desktopNvHint": "Desktop: nananatiling default ang libreng driver (nouveau). Sa sariling driver ng NVIDIA, na opsyonal mula sa Store, may isang ulat ng komunidad na binubuo ang desktop sa card (isang GTX 1070 na may driver 580); sa mas naunang ulat (isang RTX 3060 sa LordOS 0.8.8.9) ang processor ang bumuo nito, at iniulat na hindi lumalabas ang mga window ng ilang app. Eksperimental ito."
 }

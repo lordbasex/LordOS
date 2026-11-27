@@ -980,7 +980,7 @@
   "gpus.roleCompute": "AI và tính toán (CUDA)",
   "gpus.roleDesktop": "Màn hình nền",
   "gpus.planned": "Đã lên kế hoạch",
-  "gpus.plannedHint": "Chưa có: cài driver NVIDIA và vẽ màn hình nền bằng nó sẽ đến sau khi các thao tác hệ thống của chúng và thiết kế đồng bộ tường minh được duyệt. Trước đó LordOS không thay đổi gì trên card này.",
+  "gpus.plannedHint": "AI và tính toán (CUDA): LordOS chưa cung cấp. Không có gì thay đổi trên card này trừ khi bạn cài trình điều khiển của NVIDIA từ Cửa hàng.",
   "gpus.report": "Báo cáo tương thích",
   "gpus.reportHint": "Chỉ dữ liệu kỹ thuật: các card, driver của chúng, card nào vẽ màn hình nền và phiên này dùng gì. Không bao giờ có tên bạn, tên máy tính, đường dẫn trong thư mục riêng, số sê-ri hay địa chỉ. Không gì được gửi từ đây: biểu mẫu mở trong trình duyệt và bạn quyết định có gửi hay không.",
   "gpus.reportRun": "Gửi báo cáo tương thích",
@@ -1104,5 +1104,9 @@
   "skin.group.system": "Hệ thống và bảo mật",
   "skin.pick": "Chọn một danh mục",
   "style.organization": "Tổ chức",
-  "style.email": "Email"
+  "style.email": "Email",
+  "gpus.experimental": "Thử nghiệm",
+  "gpus.composedGpu": "Được kết hợp trên card này — thử nghiệm",
+  "gpus.composedCpu": "Được bộ xử lý kết hợp",
+  "gpus.desktopNvHint": "Màn hình nền: trình điều khiển tự do (nouveau) vẫn là mặc định. Với trình điều khiển riêng của NVIDIA, tùy chọn từ Cửa hàng, một báo cáo cộng đồng cho thấy màn hình nền được kết hợp trên card (một GTX 1070 với trình điều khiển 580); một báo cáo trước (một RTX 3060 trên LordOS 0.8.8.9) do bộ xử lý kết hợp, và có báo cáo cửa sổ của một số ứng dụng không hiện. Đây là thử nghiệm."
 }

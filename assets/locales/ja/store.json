@@ -227,7 +227,7 @@
   },
   "suggest.nvidiaDriver.detail": "現在は LordOS に含まれる無料のドライバ nouveau を使っています。メーカーのドライバ（{packages}）のほうが、通常は 3D 性能と電力管理が優れています。",
   "suggest.nvidiaDriver.note.nouveau": "インストールするまでは無料のドライバ nouveau が使われます。パッケージを削除すると nouveau に戻ります。",
-  "suggest.nvidiaDriver.note.older": "おおむね 2014 年より前のカードはこのバージョンのドライバに対応していません。そうしたカードでは無料のドライバを使い続けてください。LordOS のデスクトップはこのドライバでまだテストされていません。",
+  "suggest.nvidiaDriver.note.older": "2014 年ごろより古いカードはこのバージョンのドライバーでは対応していません。それらではフリーのドライバーを使い続けてください。このドライバーでの LordOS デスクトップは試験的です。コミュニティの報告 1 件ではカード上で合成されています（ドライバー 580 の GTX 1070）。以前の報告ではプロセッサーが合成していました。",
   "suggest.nvidiaDriver.note.secureBoot": "ドライバはこのコンピュータでカーネルに合わせてビルドされ（DKMS）、カーネルを更新するたびに再ビルドされます。セキュアブートが有効な場合は、次回の再起動時に署名鍵を登録する必要があります。登録しないとドライバは読み込まれません。",
   "suggest.nvidiaDriver.title": "プロプライエタリなグラフィックドライバ",
   "suggest.nvidiaDriver.unavailable": "メーカーのドライバには Debian の contrib と non-free コンポーネントが必要ですが、このコンピュータのパッケージソースでは両方とも有効になっていません。無料のドライバ nouveau は引き続き動作します。",

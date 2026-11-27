@@ -987,7 +987,7 @@
   "gpus.roleCompute": "Tekoäly ja laskenta (CUDA)",
   "gpus.roleDesktop": "Työpöytä",
   "gpus.planned": "Suunniteltu",
-  "gpus.plannedHint": "Ei vielä saatavilla: NVIDIA-ajurin asennus ja työpöydän piirtäminen sillä tulevat, kun niiden järjestelmätoiminnot ja eksplisiittisen synkronoinnin suunnitelma on hyväksytty. Siihen asti LordOS ei muuta tällä kortilla mitään.",
+  "gpus.plannedHint": "Tekoäly ja laskenta (CUDA): LordOS ei vielä tarjoa sitä. Tällä kortilla ei muutu mitään, ellet asenna NVIDIAn ajuria Kaupasta.",
   "gpus.report": "Yhteensopivuusraportti",
   "gpus.reportHint": "Vain teknisiä tietoja: kortit, niiden ajurit, mikä piirtää työpöydän ja mitä tämä istunto käyttää. Ei koskaan nimeäsi, tietokoneen nimeä, kotikansiosi polkuja, sarjanumeroita tai osoitteita. Täältä ei lähetetä mitään: lomake avautuu selaimessa ja sinä päätät, lähetätkö sen.",
   "gpus.reportRun": "Lähetä yhteensopivuusraportti",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "Järjestelmä ja suojaus",
   "skin.pick": "Valitse luokka",
   "style.organization": "Organisaatio",
-  "style.email": "Sähköposti"
+  "style.email": "Sähköposti",
+  "gpus.experimental": "Kokeellinen",
+  "gpus.composedGpu": "Koostetaan tällä kortilla — kokeellinen",
+  "gpus.composedCpu": "Suoritin koostaa",
+  "gpus.desktopNvHint": "Työpöytä: oletuksena pysyy vapaa ajuri (nouveau). NVIDIAn omalla ajurilla, joka on valinnainen Kaupasta, yksi yhteisön raportti näyttää työpöydän koostettuna kortilla (GTX 1070 ja ajuri 580); aiemmassa (RTX 3060 LordOS 0.8.8.9:llä) suoritin koosti sen, ja joidenkin sovellusten ikkunoiden kerrottiin jäävän näkymättä. Se on kokeellinen."
 }

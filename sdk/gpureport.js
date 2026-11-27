@@ -11,7 +11,8 @@
 //   cardSummary(card)                      "NVIDIA Corporation GA106 [GeForce RTX 3060] [10de:2504]"
 //   driverSummary(card, info)              "nvidia 560.35.03 (open)", "nouveau (Mesa 25.0.7)", "amdgpu (Mesa …)" or ""
 //   isNvidia(card)                         an NVIDIA card (PCI vendor 0x10de), from lord.vm.gpus() or the report's info
-//   NVIDIA_ROLES                           the roles shown as planned: [['compute', key], ['desktop', key]]
+//   NVIDIA_ROLES                           the roles an NVIDIA card lists: [['compute', key], ['desktop', key]]
+//   nvidiaRoleState(id, card, info)        what Settings says about one: 'planned', 'experimental', 'gpu' or 'cpu'
 //
 // The report is written in English (GitHub issues are) and holds technical data only. Nothing here sends anything:
 // the browser opens the form, and the person reads and submits it there.
@@ -19,9 +20,20 @@ import { encodeQuery, ISSUE_BASE, ISSUE_URL_MAX } from './cloudcheck.js';
 
 export const GPU_TEMPLATE = 'gpu-report.yml';
 export const NVIDIA = 0x10de;
-// both planned and not available yet: driver installation and the desktop on NVIDIA wait for the maintainer's approval of
-// their admin actions and of the explicit-sync design (docs/NVIDIA-PLAN.md)
+// AI and compute (CUDA) is planned. The desktop is experimental: the free driver (nouveau) stays the default, NVIDIA's own
+// driver is an opt-in from the Store, and with it the community has seen the desktop composed on the GPU (#276, a GTX
+// 1070 on 580) and on the CPU (#171, an RTX 3060 on 0.8.8.9, no GL context) (docs/NVIDIA-PLAN.md)
 export const NVIDIA_ROLES = [['compute', 'settings.gpus.roleCompute'], ['desktop', 'settings.gpus.roleDesktop']];
+
+// One role of an NVIDIA card as Settings shows it. card: the report's entry for it (reportCard), info: the report's facts.
+// The desktop of the card that draws this session shows the session's real composition: 'gpu' composed on the card,
+// 'cpu' composed by the processor; any other card's desktop role is 'experimental'.
+export function nvidiaRoleState(id, card, info) {
+  if (id !== 'desktop') return 'planned';
+  const comp = info?.session?.composition;
+  if (card?.desktop === 1 && typeof comp === 'string' && comp) return comp === 'gpu' ? 'gpu' : 'cpu';
+  return 'experimental';
+}
 
 export function readGpuReport() {
   try { return typeof lord.sysinfo?.gpuReport === 'function' ? lord.sysinfo.gpuReport() : null; } catch (e) { return null; }

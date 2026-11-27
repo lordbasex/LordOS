@@ -987,7 +987,7 @@
   "gpus.roleCompute": "AI na ukokotoaji (CUDA)",
   "gpus.roleDesktop": "Eneo-kazi",
   "gpus.planned": "Imepangwa",
-  "gpus.plannedHint": "Bado haipatikani: kusakinisha kiendeshi cha NVIDIA na kuchora eneo-kazi kwa kiendeshi hicho kutakuja baada ya vitendo vyao vya mfumo na muundo wa usawazishaji dhahiri kuidhinishwa. Hadi hapo LordOS haibadilishi chochote kwenye kadi hii.",
+  "gpus.plannedHint": "AI na ukokotoaji (CUDA): LordOS bado haitoi. Hakuna kinachobadilika kwenye kadi hii usiposakinisha kiendeshi cha NVIDIA kutoka Duka.",
   "gpus.report": "Ripoti ya uoanifu",
   "gpus.reportHint": "Data za kiufundi tu: kadi, viendeshi vyake, ipi inachora eneo-kazi na kipindi hiki kinatumia nini. Kamwe si jina lako, jina la kompyuta, njia katika folda yako ya nyumbani, nambari za mfululizo wala anwani. Hakuna kinachotumwa kutoka hapa: fomu hufunguka kwenye kivinjari chako na wewe ndiye unaamua kuiwasilisha.",
   "gpus.reportRun": "Tuma ripoti ya uoanifu",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "Mfumo na Usalama",
   "skin.pick": "Chagua kategoria",
   "style.organization": "Shirika",
-  "style.email": "Barua pepe"
+  "style.email": "Barua pepe",
+  "gpus.experimental": "Ya majaribio",
+  "gpus.composedGpu": "Huundwa kwenye kadi hii — ya majaribio",
+  "gpus.composedCpu": "Huundwa na kichakataji",
+  "gpus.desktopNvHint": "Eneo-kazi: kiendeshi huru (nouveau) kinabaki kuwa chaguo-msingi. Kwa kiendeshi cha NVIDIA chenyewe, cha hiari kutoka Duka, ripoti moja ya jumuiya inaonyesha eneo-kazi likiundwa kwenye kadi (GTX 1070 yenye kiendeshi 580); ripoti ya awali (RTX 3060 kwenye LordOS 0.8.8.9) liliundwa na kichakataji, na iliripotiwa kuwa madirisha ya baadhi ya programu hayakuonekana. Ni ya majaribio."
 }

@@ -987,7 +987,7 @@
   "gpus.roleCompute": "IA y cómputo (CUDA)",
   "gpus.roleDesktop": "Escritorio",
   "gpus.planned": "Planeado",
-  "gpus.plannedHint": "Todavía no disponible: instalar el driver de NVIDIA y dibujar el escritorio con él llegan cuando se aprueben sus acciones del sistema y el diseño de sincronización explícita. Hasta entonces LordOS no cambia nada en esta tarjeta.",
+  "gpus.plannedHint": "IA y cómputo (CUDA): LordOS todavía no lo ofrece. Nada cambia en esta placa salvo que instales el driver de NVIDIA desde la Tienda.",
   "gpus.report": "Informe de compatibilidad",
   "gpus.reportHint": "Solo datos técnicos: las tarjetas, sus drivers, cuál dibuja el escritorio y qué usa esta sesión. Nunca tu nombre, el nombre de la computadora, rutas de tu carpeta personal, números de serie ni direcciones. Desde acá no se envía nada: el formulario se abre en tu navegador y vos decidís si lo enviás.",
   "gpus.reportRun": "Enviar un informe de compatibilidad",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "Sistema y seguridad",
   "skin.pick": "Elegí una categoría",
   "style.organization": "Organización",
-  "style.email": "Correo electrónico"
+  "style.email": "Correo electrónico",
+  "gpus.experimental": "Experimental",
+  "gpus.composedGpu": "Compuesto en esta placa — experimental",
+  "gpus.composedCpu": "Compuesto por el procesador",
+  "gpus.desktopNvHint": "Escritorio: el driver libre (nouveau) sigue siendo el predeterminado. Con el driver propio de NVIDIA, opcional desde la Tienda, un informe de la comunidad muestra el escritorio compuesto en la placa (una GTX 1070 con el driver 580); uno anterior (una RTX 3060 con LordOS 0.8.8.9) lo componía el procesador, y se informó que las ventanas de algunas apps no se mostraban. Es experimental."
 }

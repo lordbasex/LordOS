@@ -987,7 +987,7 @@
   "gpus.roleCompute": "IA et calcul (CUDA)",
   "gpus.roleDesktop": "Bureau",
   "gpus.planned": "Prévu",
-  "gpus.plannedHint": "Pas encore disponible : l’installation du pilote NVIDIA et l’affichage du bureau avec lui viendront après l’approbation de leurs actions système et de la conception de la synchronisation explicite. D’ici là, LordOS ne change rien sur cette carte.",
+  "gpus.plannedHint": "IA et calcul (CUDA) : pas encore proposé par LordOS. Rien ne change sur cette carte tant que vous n’installez pas le pilote de NVIDIA depuis la Boutique.",
   "gpus.report": "Rapport de compatibilité",
   "gpus.reportHint": "Uniquement des données techniques : les cartes, leurs pilotes, celle qui affiche le bureau et ce que cette session utilise. Jamais votre nom, le nom de l’ordinateur, des chemins de votre dossier personnel, des numéros de série ni des adresses. Rien n’est envoyé d’ici : le formulaire s’ouvre dans votre navigateur et vous décidez de l’envoyer ou non.",
   "gpus.reportRun": "Envoyer un rapport de compatibilité",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "Système et sécurité",
   "skin.pick": "Choisissez une catégorie",
   "style.organization": "Organisation",
-  "style.email": "E-mail"
+  "style.email": "E-mail",
+  "gpus.experimental": "Expérimental",
+  "gpus.composedGpu": "Composé sur cette carte — expérimental",
+  "gpus.composedCpu": "Composé par le processeur",
+  "gpus.desktopNvHint": "Bureau : le pilote libre (nouveau) reste celui par défaut. Avec le pilote de NVIDIA, à installer au choix depuis la Boutique, un rapport de la communauté montre le bureau composé sur la carte (une GTX 1070 avec le pilote 580) ; un rapport plus ancien (une RTX 3060 sous LordOS 0.8.8.9) était composé par le processeur, et des fenêtres de certaines apps ne s’affichaient pas. C’est expérimental."
 }

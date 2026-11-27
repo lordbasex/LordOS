@@ -980,7 +980,7 @@
   "gpus.roleCompute": "AI dan pengkomputeran (CUDA)",
   "gpus.roleDesktop": "Desktop",
   "gpus.planned": "Dirancang",
-  "gpus.plannedHint": "Belum tersedia: memasang pemacu NVIDIA dan melukis desktop dengannya akan datang selepas tindakan sistem dan reka bentuk penyegerakan eksplisitnya diluluskan. Sehingga itu LordOS tidak mengubah apa-apa pada kad ini.",
+  "gpus.plannedHint": "AI dan pengiraan (CUDA): belum ditawarkan oleh LordOS. Tiada apa yang berubah pada kad ini melainkan anda memasang pemacu NVIDIA dari Kedai.",
   "gpus.report": "Laporan keserasian",
   "gpus.reportHint": "Hanya data teknikal: kad, pemacunya, yang mana melukis desktop dan apa yang digunakan sesi ini. Tidak sekali-kali nama anda, nama komputer, laluan dalam folder peribadi anda, nombor siri atau alamat. Tiada apa-apa dihantar dari sini: borang dibuka dalam pelayar anda dan anda yang memutuskan sama ada menghantarnya.",
   "gpus.reportRun": "Hantar laporan keserasian",
@@ -1104,5 +1104,9 @@
   "skin.group.system": "Sistem dan Keselamatan",
   "skin.pick": "Pilih kategori",
   "style.organization": "Organisasi",
-  "style.email": "E-mel"
+  "style.email": "E-mel",
+  "gpus.experimental": "Eksperimen",
+  "gpus.composedGpu": "Digubah pada kad ini — eksperimen",
+  "gpus.composedCpu": "Digubah oleh pemproses",
+  "gpus.desktopNvHint": "Desktop: pemacu bebas (nouveau) kekal sebagai lalai. Dengan pemacu NVIDIA sendiri, pilihan dari Kedai, satu laporan komuniti menunjukkan desktop digubah pada kad (GTX 1070 dengan pemacu 580); laporan lebih awal (RTX 3060 pada LordOS 0.8.8.9) digubah oleh pemproses, dan tetingkap sesetengah aplikasi dilaporkan tidak muncul. Ia eksperimen."
 }

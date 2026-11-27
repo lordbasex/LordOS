@@ -234,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Nu gebruikt hij nouveau, het vrije stuurprogramma dat bij LordOS hoort. Het stuurprogramma van de fabrikant ({packages}) geeft meestal betere 3D-prestaties en energiebeheer.",
   "suggest.nvidiaDriver.note.nouveau": "Tot je het installeert, blijft het vrije stuurprogramma nouveau in gebruik; het pakket verwijderen zet dat terug.",
-  "suggest.nvidiaDriver.note.older": "Kaarten van vóór ongeveer 2014 worden door deze versie van het stuurprogramma niet ondersteund; houd daarop het vrije stuurprogramma. Het bureaublad van LordOS is nog niet getest met dit stuurprogramma.",
+  "suggest.nvidiaDriver.note.older": "Kaarten van vóór ongeveer 2014 worden door deze stuurprogrammaversie niet ondersteund; houd daar het vrije stuurprogramma. Het LordOS-bureaublad met dit stuurprogramma is experimenteel: één communityrapport toont het samengesteld op de kaart (een GTX 1070 met stuurprogramma 580); een eerder werd door de processor samengesteld.",
   "suggest.nvidiaDriver.note.secureBoot": "Het stuurprogramma wordt op deze computer voor je kernel gebouwd (DKMS), en opnieuw na elke kernelupdate. Met Secure Boot aan moet je de ondertekeningssleutel registreren bij de volgende herstart, anders laadt het stuurprogramma niet.",
   "suggest.nvidiaDriver.title": "Eigen grafisch stuurprogramma van de fabrikant",
   "suggest.nvidiaDriver.unavailable": "Het stuurprogramma van de fabrikant vereist de onderdelen contrib en non-free van Debian, en die zijn niet allebei ingeschakeld in de pakketbronnen van deze computer. Het vrije stuurprogramma, nouveau, blijft werken.",

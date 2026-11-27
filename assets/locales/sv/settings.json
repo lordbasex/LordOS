@@ -987,7 +987,7 @@
   "gpus.roleCompute": "AI och beräkning (CUDA)",
   "gpus.roleDesktop": "Skrivbord",
   "gpus.planned": "Planerat",
-  "gpus.plannedHint": "Inte tillgängligt än: att installera NVIDIA:s drivrutin och rita skrivbordet med den kommer när deras systemåtgärder och designen för explicit synkronisering har godkänts. Fram till dess ändrar LordOS ingenting på det här kortet.",
+  "gpus.plannedHint": "AI och beräkning (CUDA): erbjuds inte av LordOS än. Inget ändras på det här kortet om du inte installerar NVIDIAs drivrutin från Butiken.",
   "gpus.report": "Kompatibilitetsrapport",
   "gpus.reportHint": "Bara tekniska data: korten, deras drivrutiner, vilket som ritar skrivbordet och vad den här sessionen använder. Aldrig ditt namn, datorns namn, sökvägar i din hemmapp, serienummer eller adresser. Härifrån skickas ingenting: formuläret öppnas i din webbläsare och du bestämmer om du skickar det.",
   "gpus.reportRun": "Skicka en kompatibilitetsrapport",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "System och säkerhet",
   "skin.pick": "Välj en kategori",
   "style.organization": "Organisation",
-  "style.email": "E-post"
+  "style.email": "E-post",
+  "gpus.experimental": "Experimentellt",
+  "gpus.composedGpu": "Sammansätts på det här kortet — experimentellt",
+  "gpus.composedCpu": "Sammansätts av processorn",
+  "gpus.desktopNvHint": "Skrivbord: den fria drivrutinen (nouveau) är fortfarande standard. Med NVIDIAs egen drivrutin, ett val i Butiken, visar en rapport från gemenskapen skrivbordet sammansatt på kortet (ett GTX 1070 med drivrutin 580); en tidigare (ett RTX 3060 på LordOS 0.8.8.9) sammansattes av processorn, och fönster för vissa appar rapporterades inte visas. Det är experimentellt."
 }

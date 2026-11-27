@@ -234,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Jelenleg a nouveau-t használja, a LordOS-hez mellékelt szabad illesztőprogramot. A gyártó illesztőprogramja ({packages}) általában jobb 3D-teljesítményt és energiagazdálkodást nyújt.",
   "suggest.nvidiaDriver.note.nouveau": "A telepítésig a szabad nouveau illesztőprogram marad használatban; a csomag eltávolításával visszatér hozzá.",
-  "suggest.nvidiaDriver.note.older": "A nagyjából 2014-nél régebbi kártyákat ez az illesztőprogram-verzió nem támogatja; azokon tartsa meg a szabad illesztőprogramot. A LordOS asztalát még nem tesztelték ezzel az illesztőprogrammal.",
+  "suggest.nvidiaDriver.note.older": "A nagyjából 2014 előtti kártyákat ez az illesztőprogram-verzió nem támogatja; azokon maradjon a szabad illesztőprogram. A LordOS asztala ezzel az illesztőprogrammal kísérleti: egy közösségi jelentés szerint a kártya komponálja (egy GTX 1070 az 580-as illesztőprogrammal); egy korábbiban a processzor komponálta.",
   "suggest.nvidiaDriver.note.secureBoot": "Az illesztőprogram ezen a számítógépen épül fel a kerneléhez (DKMS), és minden kernelfrissítés után újra. Bekapcsolt Secure Boot esetén a következő újraindításkor regisztrálnia kell az aláírókulcsát, különben az illesztőprogram nem töltődik be.",
   "suggest.nvidiaDriver.title": "Zárt grafikus illesztőprogram",
   "suggest.nvidiaDriver.unavailable": "A gyártó illesztőprogramjához a Debian contrib és non-free összetevői szükségesek, és ezek nincsenek mindketten engedélyezve a számítógép csomagforrásaiban. A szabad illesztőprogram, a nouveau, tovább működik.",

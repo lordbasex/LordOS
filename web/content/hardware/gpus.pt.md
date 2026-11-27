@@ -19,7 +19,7 @@ modelo.
 |---|---|---|---|---|
 | AMD Radeon RX 580 (Polaris, Ellesmere) | `amdgpu`, Mesa `radeonsi` | Área de trabalho composta na GPU, dois monitores DisplayPort, Vulkan (RADV) | ✓ Verificada | Equipe do LordOS |
 | Intel UHD Graphics 630 (Comet Lake) | `i915` com GVT-g | Compartilhada com Máquinas como GPU virtual (GVT-g), ao lado da RX 580 que desenha a área de trabalho | ✓ Verificada | Equipe do LordOS |
-| NVIDIA GeForce RTX 3060 (GA106) | `nvidia` (o driver proprietário) | A área de trabalho funciona, composta na CPU: o LordOS ainda não compõe sobre o driver proprietário da NVIDIA | ◐ Experimental | Um relatório da comunidade ([#171](https://github.com/lordbasex/LordOS/issues/171)) |
+| NVIDIA GeForce RTX 3060 (GA106) | `nvidia` (o driver proprietário) | A área de trabalho funciona, composta na CPU: no LordOS 0.8.8.9 a partida da GPU não obteve um contexto GL deste driver | ◐ Experimental | Um relatório da comunidade ([#171](https://github.com/lordbasex/LordOS/issues/171)) |
 | NVIDIA GeForce RTX 5070 Ti 16 GB (GB203) | `nvidia` 620.73.04 (os módulos de kernel abertos da NVIDIA) | A área de trabalho funciona, fluida, sem cortes nem falhas; o relatório não diz se foi composta na GPU ou na CPU. As bibliotecas do CUDA estavam instaladas e o llama.cpp rodou nela | ◐ Experimental | Um relatório da comunidade ([#235](https://github.com/lordbasex/LordOS/issues/235)) |
 | Intel HD Graphics 520 (Skylake GT2) | `i915`, Mesa `iris` | A área de trabalho funciona, fluida, sem falhas, composta na GPU | ◐ Experimental | Um relatório da comunidade ([#278](https://github.com/lordbasex/LordOS/issues/278)) |
 | Intel UHD Graphics (Tiger Lake-H GT1) | `i915`, Mesa `iris` | Desenha a área de trabalho, composta na GPU, num notebook com uma segunda GPU NVIDIA; o relatório diz que funciona com problemas que não nomeia | ◐ Experimental | Um relatório da comunidade ([#274](https://github.com/lordbasex/LordOS/issues/274)) |
@@ -32,12 +32,17 @@ página lista as placas verificadas especificamente em gráficos.
 
 ## NVIDIA: o que funciona hoje
 
-- **Qualquer placa NVIDIA** mostra a área de trabalho: com o driver `nouveau` do Mesa, ou com o driver da NVIDIA e a
-  tela composta na CPU. Ajustes → Placas de vídeo a marca como *Experimental — ainda não verificada no modelo da sua
-  placa*.
-- **IA e computação (CUDA)** e **a área de trabalho no driver da NVIDIA** estão planejadas, ainda não disponíveis:
-  instalar o driver da NVIDIA pelos Ajustes e compor a área de trabalho sobre ele vêm depois que suas ações de sistema
-  e o design de sincronização explícita forem aprovados.
+- **O driver livre é o padrão.** Qualquer placa NVIDIA mostra a área de trabalho com o driver `nouveau` do Mesa.
+  Ajustes → Placas de vídeo a marca como *Experimental — ainda não verificada no modelo da sua placa*.
+- **O driver da própria NVIDIA é opcional**: Loja → Para este computador o oferece para uma placa NVIDIA enquanto o
+  driver livre está em uso.
+- **A área de trabalho no driver da NVIDIA é experimental.** Um relato da comunidade a mostra composta na GPU, fluida
+  (uma GTX 1070, Pascal, driver 580.196.11, [#276](https://github.com/lordbasex/LordOS/issues/276)); um anterior, no
+  LordOS 0.8.8.9, era composto na CPU porque a partida da GPU não obteve um contexto GL (uma RTX 3060,
+  [#171](https://github.com/lordbasex/LordOS/issues/171)); e no tópico do #276 outra pessoa viu janelas de alguns apps
+  não aparecerem depois de instalar o driver (uma GTX 960 e uma RTX 3070 Ti com 550.163.01). Na placa que desenha a sua
+  sessão, Ajustes → Placas de vídeo mostra como a área de trabalho é composta de fato.
+- **IA e computação (CUDA)** está planejado; o LordOS ainda não oferece.
 
 ## Envie um relatório
 

@@ -234,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Right now it uses nouveau, the free driver included with LordOS. The vendor's driver ({packages}) usually gives better 3D performance and power management.",
   "suggest.nvidiaDriver.note.nouveau": "Until you install it, the free nouveau driver stays in use; removing the package goes back to it.",
-  "suggest.nvidiaDriver.note.older": "Cards older than about 2014 aren't supported by this driver version; keep the free driver on them. The LordOS desktop hasn't been tested with this driver yet.",
+  "suggest.nvidiaDriver.note.older": "Cards older than about 2014 aren't supported by this driver version; keep the free driver on them. The LordOS desktop with this driver is experimental: one community report shows it composed on the card (a GTX 1070 with driver 580); an earlier one was composed by the processor.",
   "suggest.nvidiaDriver.note.secureBoot": "The driver is built for your kernel on this computer (DKMS) and again after every kernel update. With Secure Boot on, you have to enroll its signing key at the next restart, or the driver won't load.",
   "suggest.nvidiaDriver.title": "Proprietary graphics driver",
   "suggest.nvidiaDriver.unavailable": "The vendor's driver needs Debian's contrib and non-free components, and they aren't both enabled in this computer's package sources. The free driver, nouveau, keeps working.",

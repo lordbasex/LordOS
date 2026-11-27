@@ -987,7 +987,7 @@
   "gpus.roleCompute": "KI und Rechnen (CUDA)",
   "gpus.roleDesktop": "Schreibtisch",
   "gpus.planned": "Geplant",
-  "gpus.plannedHint": "Noch nicht verfügbar: Die Installation des NVIDIA-Treibers und das Zeichnen des Schreibtischs damit kommen, sobald ihre Systemaktionen und das Design für explizite Synchronisierung genehmigt sind. Bis dahin ändert LordOS nichts an dieser Karte.",
+  "gpus.plannedHint": "KI und Berechnung (CUDA): bietet LordOS noch nicht an. An dieser Karte ändert sich nichts, solange Sie NVIDIAs Treiber nicht aus dem Store installieren.",
   "gpus.report": "Kompatibilitätsbericht",
   "gpus.reportHint": "Nur technische Daten: die Karten, ihre Treiber, welche den Schreibtisch zeichnet und was diese Sitzung verwendet. Nie dein Name, der Name des Computers, Pfade in deinem persönlichen Ordner, Seriennummern oder Adressen. Von hier wird nichts gesendet: Das Formular öffnet sich in deinem Browser und du entscheidest, ob du es absendest.",
   "gpus.reportRun": "Kompatibilitätsbericht senden",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "System und Sicherheit",
   "skin.pick": "Kategorie auswählen",
   "style.organization": "Organisation",
-  "style.email": "E-Mail"
+  "style.email": "E-Mail",
+  "gpus.experimental": "Experimentell",
+  "gpus.composedGpu": "Auf dieser Karte zusammengesetzt — experimentell",
+  "gpus.composedCpu": "Vom Prozessor zusammengesetzt",
+  "gpus.desktopNvHint": "Desktop: Der freie Treiber (nouveau) bleibt der Standard. Mit NVIDIAs eigenem Treiber, wahlweise aus dem Store, zeigt ein Community-Bericht den Desktop auf der Karte zusammengesetzt (eine GTX 1070 mit Treiber 580); ein früherer (eine RTX 3060 mit LordOS 0.8.8.9) wurde vom Prozessor zusammengesetzt, und es wurde gemeldet, dass Fenster mancher Apps nicht erschienen. Das ist experimentell."
 }

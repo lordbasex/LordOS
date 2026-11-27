@@ -461,6 +461,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **NVIDIA: the texts now match what the reports show** (after #276, a GTX 1070 on NVIDIA's proprietary 580.196.11 on
+  0.8.9.5-beta, whose report says `composition: gpu`). The free drivers (nouveau, NVK) stay the default and NVIDIA's own
+  driver stays the Store's opt-in (Store → For this computer). Settings → Graphics cards no longer lists *Desktop* as
+  simply *Planned*: it is *Experimental*, and on the card that draws the session it shows the session's real
+  composition, *Composed on this card — experimental* or *Composed by the processor* (`nvidiaRoleState` in
+  `sdk/gpureport.js`, `apps/settings/Gpus.jsx`), with a note naming what is known: one report composed on the card
+  (#276), an earlier one composed by the processor (#171, an RTX 3060 on 0.8.8.9, no GL context), and some apps' windows
+  not showing for another person in #276's thread (a GTX 960 and an RTX 3070 Ti on 550.163.01). *AI and compute (CUDA)*
+  stays *Planned*, and its note no longer says installing the driver waits for approval. The Store card's
+  `note.older` no longer says the desktop is untested with the driver. Every UI language updated; the Help article
+  `graphics-cards` (en, es, pt), `docs/NVIDIA-PLAN.md` and the draft `web/content/hardware/gpus.*` ("what works today")
+  say the same. Checked that the Store's suggestion appears for any NVIDIA display device (VGA 0300, 3D 0302, other
+  0380; nouveau or no driver bound) on x86-64: new cases in `tests/suggest_engine_test.mjs`; `nvidiaRoleState` cases in
+  `tests/gpu_report_test.mjs`.
 - **Monitor → GPU: lord-nvgpu didn't find NVML from Debian's own NVIDIA packages** (GitHub #273, a GTX 1650 Mobile on
   Debian's 550.163.01: "libMissing"). Debian's `libnvidia-ml1` puts `libnvidia-ml.so.1` in
   `/usr/lib/<arch>-linux-gnu/nvidia/current/`, and the helper searched only the main library folders. That folder

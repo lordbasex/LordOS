@@ -987,7 +987,7 @@
   "gpus.roleCompute": "MI és számítás (CUDA)",
   "gpus.roleDesktop": "Asztal",
   "gpus.planned": "Tervezett",
-  "gpus.plannedHint": "Még nem érhető el: az NVIDIA-illesztőprogram telepítése és az asztal rajzolása vele a rendszerműveleteik és az explicit szinkronizálás tervének jóváhagyása után jön. Addig a LordOS semmit sem változtat ezen a kártyán.",
+  "gpus.plannedHint": "MI és számítás (CUDA): a LordOS még nem kínálja. Ezen a kártyán semmi sem változik, amíg nem telepíti az NVIDIA illesztőprogramját a Boltból.",
   "gpus.report": "Kompatibilitási jelentés",
   "gpus.reportHint": "Csak műszaki adatok: a kártyák, az illesztőprogramjaik, melyik rajzolja az asztalt, és mit használ ez a munkamenet. Soha nem a neved, a számítógép neve, a saját mappád útvonalai, sorozatszámok vagy címek. Innen semmi sem megy el: az űrlap a böngésződben nyílik meg, és te döntöd el, hogy elküldöd-e.",
   "gpus.reportRun": "Kompatibilitási jelentés küldése",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "Rendszer és biztonság",
   "skin.pick": "Válasszon kategóriát",
   "style.organization": "Szervezet",
-  "style.email": "E-mail"
+  "style.email": "E-mail",
+  "gpus.experimental": "Kísérleti",
+  "gpus.composedGpu": "Ezen a kártyán komponálva — kísérleti",
+  "gpus.composedCpu": "A processzor komponálja",
+  "gpus.desktopNvHint": "Asztal: az alapértelmezett továbbra is a szabad illesztőprogram (nouveau). Az NVIDIA saját, a Boltból választhatóan telepíthető illesztőprogramjával egy közösségi jelentés szerint az asztalt a kártya komponálja (egy GTX 1070 az 580-as illesztőprogrammal); egy korábbiban (egy RTX 3060 LordOS 0.8.8.9-en) a processzor komponálta, és egyes alkalmazások ablakai nem jelentek meg. Kísérleti."
 }

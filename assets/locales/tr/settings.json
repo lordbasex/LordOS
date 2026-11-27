@@ -987,7 +987,7 @@
   "gpus.roleCompute": "Yapay zekâ ve hesaplama (CUDA)",
   "gpus.roleDesktop": "Masaüstü",
   "gpus.planned": "Planlandı",
-  "gpus.plannedHint": "Henüz kullanılamıyor: NVIDIA sürücüsünün kurulması ve masaüstünün onunla çizilmesi, sistem eylemleri ve açık eşitleme tasarımı onaylandıktan sonra gelecek. O zamana kadar LordOS bu kartta hiçbir şeyi değiştirmez.",
+  "gpus.plannedHint": "Yapay zekâ ve hesaplama (CUDA): LordOS henüz sunmuyor. NVIDIA'nın sürücüsünü Mağaza'dan kurmadıkça bu kartta hiçbir şey değişmez.",
   "gpus.report": "Uyumluluk raporu",
   "gpus.reportHint": "Yalnızca teknik veriler: kartlar, sürücüleri, masaüstünü hangisinin çizdiği ve bu oturumun ne kullandığı. Asla adınız, bilgisayarın adı, ana klasörünüzdeki yollar, seri numaraları veya adresler değil. Buradan hiçbir şey gönderilmez: form tarayıcınızda açılır ve göndermeye siz karar verirsiniz.",
   "gpus.reportRun": "Uyumluluk raporu gönder",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "Sistem ve Güvenlik",
   "skin.pick": "Bir kategori seçin",
   "style.organization": "Kuruluş",
-  "style.email": "E-posta"
+  "style.email": "E-posta",
+  "gpus.experimental": "Deneysel",
+  "gpus.composedGpu": "Bu kartta birleştiriliyor — deneysel",
+  "gpus.composedCpu": "İşlemci tarafından birleştiriliyor",
+  "gpus.desktopNvHint": "Masaüstü: varsayılan olarak özgür sürücü (nouveau) kalır. Mağaza'dan isteğe bağlı kurulan NVIDIA'nın kendi sürücüsüyle bir topluluk raporu masaüstünün kartta birleştirildiğini gösteriyor (580 sürücülü bir GTX 1070); daha eski bir rapor (LordOS 0.8.8.9'da bir RTX 3060) işlemciyle birleştiriliyordu ve bazı uygulamaların pencerelerinin görünmediği bildirildi. Deneyseldir."
 }

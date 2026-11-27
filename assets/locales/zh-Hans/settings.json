@@ -980,7 +980,7 @@
   "gpus.roleCompute": "AI 与计算（CUDA）",
   "gpus.roleDesktop": "桌面",
   "gpus.planned": "已计划",
-  "gpus.plannedHint": "暂不可用：安装 NVIDIA 驱动以及用它绘制桌面，要等相应的系统操作和显式同步设计获得批准之后才会推出。在此之前，LordOS 不会更改这张显卡上的任何内容。",
+  "gpus.plannedHint": "AI 与计算（CUDA）：LordOS 尚未提供。除非你从商店安装 NVIDIA 驱动，这张显卡不会有任何改变。",
   "gpus.report": "兼容性报告",
   "gpus.reportHint": "只包含技术数据：显卡、它们的驱动、哪一张绘制桌面，以及本会话使用了什么。绝不包含你的名字、计算机名、个人文件夹中的路径、序列号或地址。这里不会发送任何内容：表单会在浏览器中打开，由你决定是否提交。",
   "gpus.reportRun": "发送兼容性报告",
@@ -1104,5 +1104,9 @@
   "skin.group.system": "系统和安全",
   "skin.pick": "选择一个类别",
   "style.organization": "组织",
-  "style.email": "电子邮件"
+  "style.email": "电子邮件",
+  "gpus.experimental": "实验性",
+  "gpus.composedGpu": "在此显卡上合成 — 实验性",
+  "gpus.composedCpu": "由处理器合成",
+  "gpus.desktopNvHint": "桌面：默认仍是自由驱动（nouveau）。使用可在商店中选择安装的 NVIDIA 自家驱动时，一份社区报告显示桌面在显卡上合成（GTX 1070，驱动 580）；更早的一份报告（LordOS 0.8.8.9 上的 RTX 3060）由处理器合成，另有报告称部分应用的窗口无法显示。这是实验性的。"
 }

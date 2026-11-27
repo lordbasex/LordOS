@@ -994,7 +994,7 @@
   "gpus.roleCompute": "IA și calcul (CUDA)",
   "gpus.roleDesktop": "Desktop",
   "gpus.planned": "Planificat",
-  "gpus.plannedHint": "Încă indisponibil: instalarea driverului NVIDIA și desenarea desktopului cu el vin după aprobarea acțiunilor de sistem și a designului de sincronizare explicită. Până atunci LordOS nu schimbă nimic la această placă.",
+  "gpus.plannedHint": "IA și calcul (CUDA): LordOS nu le oferă încă. Nimic nu se schimbă pe această placă decât dacă instalați driverul NVIDIA din Magazin.",
   "gpus.report": "Raport de compatibilitate",
   "gpus.reportHint": "Doar date tehnice: plăcile, driverele lor, care desenează desktopul și ce folosește această sesiune. Niciodată numele tău, numele computerului, căi din dosarul tău personal, numere de serie sau adrese. De aici nu se trimite nimic: formularul se deschide în browser și tu decizi dacă îl trimiți.",
   "gpus.reportRun": "Trimite un raport de compatibilitate",
@@ -1118,5 +1118,9 @@
   "skin.group.system": "Sistem și securitate",
   "skin.pick": "Alegeți o categorie",
   "style.organization": "Organizație",
-  "style.email": "E-mail"
+  "style.email": "E-mail",
+  "gpus.experimental": "Experimental",
+  "gpus.composedGpu": "Compus pe această placă — experimental",
+  "gpus.composedCpu": "Compus de procesor",
+  "gpus.desktopNvHint": "Desktop: driverul liber (nouveau) rămâne cel implicit. Cu driverul propriu NVIDIA, opțional din Magazin, un raport al comunității arată desktopul compus pe placă (o GTX 1070 cu driverul 580); unul mai vechi (o RTX 3060 cu LordOS 0.8.8.9) era compus de procesor, iar ferestrele unor aplicații nu apăreau. Este experimental."
 }

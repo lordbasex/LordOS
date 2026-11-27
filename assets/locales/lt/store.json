@@ -241,7 +241,7 @@
   },
   "suggest.nvidiaDriver.detail": "Šiuo metu naudojama nouveau – laisvoji tvarkyklė, įtraukta į LordOS. Gamintojo tvarkyklė ({packages}) paprastai užtikrina geresnį 3D našumą ir energijos valdymą.",
   "suggest.nvidiaDriver.note.nouveau": "Kol jos neįdiegsite, naudojama laisvoji nouveau tvarkyklė; pašalinus paketą, grįžtama prie jos.",
-  "suggest.nvidiaDriver.note.older": "Ši tvarkyklės versija nepalaiko maždaug senesnių nei 2014 m. plokščių; joms palikite laisvąją tvarkyklę. LordOS darbalaukis su šia tvarkykle dar neišbandytas.",
+  "suggest.nvidiaDriver.note.older": "Plokštės, senesnės nei maždaug 2014 m., šios tvarkyklės versijos nepalaikomos; jose palikite laisvąją tvarkyklę. LordOS darbalaukis su šia tvarkykle yra eksperimentinis: viena bendruomenės ataskaita rodo jį komponuojamą plokštėje (GTX 1070 su 580 tvarkykle); ankstesnėje komponavo procesorius.",
   "suggest.nvidiaDriver.note.secureBoot": "Tvarkyklė jūsų branduoliui sukompiliuojama šiame kompiuteryje (DKMS) ir vėl po kiekvieno branduolio atnaujinimo. Jei įjungtas Secure Boot, kito paleidimo metu turite užregistruoti jos pasirašymo raktą, kitaip tvarkyklė nebus įkelta.",
   "suggest.nvidiaDriver.title": "Nuosavybinė vaizdo plokštės tvarkyklė",
   "suggest.nvidiaDriver.unavailable": "Gamintojo tvarkyklei reikia Debian komponentų contrib ir non-free, o šio kompiuterio paketų šaltiniuose jie abu neįjungti. Laisvoji tvarkyklė nouveau toliau veikia.",

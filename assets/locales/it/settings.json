@@ -987,7 +987,7 @@
   "gpus.roleCompute": "IA e calcolo (CUDA)",
   "gpus.roleDesktop": "Scrivania",
   "gpus.planned": "Previsto",
-  "gpus.plannedHint": "Non ancora disponibile: l’installazione del driver NVIDIA e il disegno della scrivania con esso arriveranno dopo l’approvazione delle loro azioni di sistema e del progetto di sincronizzazione esplicita. Fino ad allora LordOS non cambia nulla su questa scheda.",
+  "gpus.plannedHint": "IA e calcolo (CUDA): LordOS non lo offre ancora. Su questa scheda non cambia nulla finché non installi il driver di NVIDIA dallo Store.",
   "gpus.report": "Rapporto di compatibilità",
   "gpus.reportHint": "Solo dati tecnici: le schede, i loro driver, quale disegna la scrivania e cosa usa questa sessione. Mai il tuo nome, il nome del computer, percorsi nella tua cartella personale, numeri di serie o indirizzi. Da qui non viene inviato nulla: il modulo si apre nel browser e decidi tu se inviarlo.",
   "gpus.reportRun": "Invia un rapporto di compatibilità",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "Sistema e sicurezza",
   "skin.pick": "Scegli una categoria",
   "style.organization": "Organizzazione",
-  "style.email": "Email"
+  "style.email": "Email",
+  "gpus.experimental": "Sperimentale",
+  "gpus.composedGpu": "Composto su questa scheda — sperimentale",
+  "gpus.composedCpu": "Composto dal processore",
+  "gpus.desktopNvHint": "Scrivania: il driver libero (nouveau) resta quello predefinito. Con il driver di NVIDIA, facoltativo dallo Store, una segnalazione della comunità mostra la scrivania composta sulla scheda (una GTX 1070 con il driver 580); una precedente (una RTX 3060 con LordOS 0.8.8.9) era composta dal processore, e sono state segnalate finestre di alcune app che non comparivano. È sperimentale."
 }

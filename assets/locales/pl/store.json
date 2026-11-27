@@ -248,7 +248,7 @@
   },
   "suggest.nvidiaDriver.detail": "Obecnie używa nouveau, wolnego sterownika dołączonego do LordOS. Sterownik producenta ({packages}) zwykle zapewnia lepszą wydajność 3D i zarządzanie energią.",
   "suggest.nvidiaDriver.note.nouveau": "Do czasu jego instalacji pozostaje w użyciu wolny sterownik nouveau; usunięcie pakietu przywraca go.",
-  "suggest.nvidiaDriver.note.older": "Karty starsze niż mniej więcej z 2014 roku nie są obsługiwane przez tę wersję sterownika; zostaw na nich wolny sterownik. Pulpit LordOS nie był jeszcze testowany z tym sterownikiem.",
+  "suggest.nvidiaDriver.note.older": "Karty starsze niż mniej więcej z 2014 roku nie są obsługiwane przez tę wersję sterownika; zostaw na nich wolny sterownik. Pulpit LordOS z tym sterownikiem jest eksperymentalny: jeden raport społeczności pokazuje go składanego na karcie (GTX 1070 ze sterownikiem 580); wcześniejszy składał procesor.",
   "suggest.nvidiaDriver.note.secureBoot": "Sterownik jest budowany dla Twojego jądra na tym komputerze (DKMS) i ponownie po każdej aktualizacji jądra. Przy włączonym Secure Boot musisz zarejestrować jego klucz podpisujący przy następnym uruchomieniu, inaczej sterownik się nie załaduje.",
   "suggest.nvidiaDriver.title": "Własnościowy sterownik grafiki",
   "suggest.nvidiaDriver.unavailable": "Sterownik producenta wymaga komponentów contrib i non-free Debiana, a nie oba są włączone w źródłach pakietów tego komputera. Wolny sterownik nouveau nadal działa.",

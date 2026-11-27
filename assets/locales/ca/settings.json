@@ -987,7 +987,7 @@
   "gpus.roleCompute": "IA i càlcul (CUDA)",
   "gpus.roleDesktop": "Escriptori",
   "gpus.planned": "Previst",
-  "gpus.plannedHint": "Encara no disponible: instal·lar el controlador d’NVIDIA i dibuixar l’escriptori amb ell arribaran quan s’aprovin les seves accions de sistema i el disseny de sincronització explícita. Fins aleshores LordOS no canvia res en aquesta targeta.",
+  "gpus.plannedHint": "IA i càlcul (CUDA): LordOS encara no ho ofereix. No canvia res en aquesta targeta tret que instal·lis el controlador de NVIDIA des de la Botiga.",
   "gpus.report": "Informe de compatibilitat",
   "gpus.reportHint": "Només dades tècniques: les targetes, els seus controladors, quina dibuixa l’escriptori i què fa servir aquesta sessió. Mai el teu nom, el nom de l’ordinador, camins de la teva carpeta personal, números de sèrie ni adreces. Des d’aquí no s’envia res: el formulari s’obre al navegador i tu decideixes si l’envies.",
   "gpus.reportRun": "Envia un informe de compatibilitat",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "Sistema i seguretat",
   "skin.pick": "Trieu una categoria",
   "style.organization": "Organització",
-  "style.email": "Correu electrònic"
+  "style.email": "Correu electrònic",
+  "gpus.experimental": "Experimental",
+  "gpus.composedGpu": "Compost en aquesta targeta — experimental",
+  "gpus.composedCpu": "Compost pel processador",
+  "gpus.desktopNvHint": "Escriptori: el controlador lliure (nouveau) continua sent el predeterminat. Amb el controlador propi de NVIDIA, opcional des de la Botiga, un informe de la comunitat mostra l’escriptori compost a la targeta (una GTX 1070 amb el controlador 580); un d’anterior (una RTX 3060 amb LordOS 0.8.8.9) el componia el processador, i es va informar que les finestres d’algunes apps no es mostraven. És experimental."
 }

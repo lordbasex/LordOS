@@ -18,7 +18,7 @@ community**: we don't own every card, so your compatibility reports are how a mo
 |---|---|---|---|---|
 | AMD Radeon RX 580 (Polaris, Ellesmere) | `amdgpu`, Mesa `radeonsi` | Desktop composed on the GPU, two DisplayPort monitors, Vulkan (RADV) | ✓ Verified | LordOS team |
 | Intel UHD Graphics 630 (Comet Lake) | `i915` with GVT-g | Shared with Machines as a virtual GPU (GVT-g), next to the RX 580 drawing the desktop | ✓ Verified | LordOS team |
-| NVIDIA GeForce RTX 3060 (GA106) | `nvidia` (the proprietary driver) | The desktop works, composed on the CPU: LordOS doesn't compose on NVIDIA's proprietary driver yet | ◐ Experimental | One community report ([#171](https://github.com/lordbasex/LordOS/issues/171)) |
+| NVIDIA GeForce RTX 3060 (GA106) | `nvidia` (the proprietary driver) | The desktop works, composed on the CPU: on LordOS 0.8.8.9 the GPU start got no GL context from this driver | ◐ Experimental | One community report ([#171](https://github.com/lordbasex/LordOS/issues/171)) |
 | NVIDIA GeForce RTX 5070 Ti 16 GB (GB203) | `nvidia` 620.73.04 (NVIDIA's open kernel modules) | The desktop works, smooth, with no tearing or glitches; the report doesn't say whether it was composed on the GPU or the CPU. CUDA's libraries were installed and llama.cpp ran on it | ◐ Experimental | One community report ([#235](https://github.com/lordbasex/LordOS/issues/235)) |
 | Intel HD Graphics 520 (Skylake GT2) | `i915`, Mesa `iris` | The desktop works, smooth, with no glitches, composed on the GPU | ◐ Experimental | One community report ([#278](https://github.com/lordbasex/LordOS/issues/278)) |
 | Intel UHD Graphics (Tiger Lake-H GT1) | `i915`, Mesa `iris` | Draws the desktop, composed on the GPU, on a laptop with a second, NVIDIA GPU; the report says it works with problems it doesn't name | ◐ Experimental | One community report ([#274](https://github.com/lordbasex/LordOS/issues/274)) |
@@ -31,11 +31,17 @@ checked for graphics specifically.
 
 ## NVIDIA: what works today
 
-- **Any NVIDIA card** shows the desktop: on Mesa's `nouveau` driver, or on NVIDIA's driver with the screen composed on
-  the CPU. Settings → Graphics cards marks it *Experimental — not verified on your card model yet*.
-- **AI and compute (CUDA)** and **the desktop on NVIDIA's driver** are planned, not available yet: installing NVIDIA's
-  driver from Settings and composing the desktop on it come after their system actions and the explicit-sync design
-  are approved.
+- **The free driver is the default.** Any NVIDIA card shows the desktop on Mesa's `nouveau` driver. Settings →
+  Graphics cards marks it *Experimental — not verified on your card model yet*.
+- **NVIDIA's own driver is an opt-in**: Store → For this computer offers it for an NVIDIA card while the free driver
+  is in use.
+- **The desktop on NVIDIA's driver is experimental.** One community report shows it composed on the GPU, smooth (a GTX
+  1070, Pascal, driver 580.196.11, [#276](https://github.com/lordbasex/LordOS/issues/276)); an earlier one, on LordOS
+  0.8.8.9, was composed on the CPU because the GPU start got no GL context (an RTX 3060,
+  [#171](https://github.com/lordbasex/LordOS/issues/171)); and in #276's thread another person saw some apps' windows
+  not show after installing the driver (a GTX 960 and an RTX 3070 Ti on 550.163.01). On the card that draws your
+  session, Settings → Graphics cards shows how the desktop is really composed.
+- **AI and compute (CUDA)** is planned, not offered by LordOS yet.
 
 ## Send a report
 

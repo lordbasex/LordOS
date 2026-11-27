@@ -994,7 +994,7 @@
   "gpus.roleCompute": "DI ir skaičiavimai (CUDA)",
   "gpus.roleDesktop": "Darbalaukis",
   "gpus.planned": "Suplanuota",
-  "gpus.plannedHint": "Dar neprieinama: NVIDIA tvarkyklės diegimas ir darbalaukio piešimas su ja atsiras, kai bus patvirtinti jų sistemos veiksmai ir aiškiojo sinchronizavimo projektas. Iki tol LordOS šioje kortoje nieko nekeičia.",
+  "gpus.plannedHint": "DI ir skaičiavimai (CUDA): LordOS to dar nesiūlo. Šioje plokštėje niekas nesikeičia, kol neįdiegiate NVIDIA tvarkyklės iš Parduotuvės.",
   "gpus.report": "Suderinamumo ataskaita",
   "gpus.reportHint": "Tik techniniai duomenys: kortos, jų tvarkyklės, kuri piešia darbalaukį ir ką naudoja šis seansas. Niekada jūsų vardas, kompiuterio vardas, keliai jūsų asmeniniame aplanke, serijos numeriai ar adresai. Iš čia niekas nesiunčiama: forma atsidaro naršyklėje, ir jūs nusprendžiate, ar ją pateikti.",
   "gpus.reportRun": "Siųsti suderinamumo ataskaitą",
@@ -1118,5 +1118,9 @@
   "skin.group.system": "Sistema ir sauga",
   "skin.pick": "Pasirinkite kategoriją",
   "style.organization": "Organizacija",
-  "style.email": "El. paštas"
+  "style.email": "El. paštas",
+  "gpus.experimental": "Eksperimentinis",
+  "gpus.composedGpu": "Komponuojama šioje plokštėje — eksperimentinis",
+  "gpus.composedCpu": "Komponuoja procesorius",
+  "gpus.desktopNvHint": "Darbalaukis: numatytoji lieka laisvoji tvarkyklė (nouveau). Su NVIDIA tvarkykle, kurią galima pasirinktinai įdiegti iš Parduotuvės, viena bendruomenės ataskaita rodo darbalaukį komponuojamą plokštėje (GTX 1070 su 580 tvarkykle); ankstesnėje (RTX 3060 su LordOS 0.8.8.9) komponavo procesorius, ir buvo pranešta, kad kai kurių programų langai nepasirodė. Tai eksperimentinė funkcija."
 }

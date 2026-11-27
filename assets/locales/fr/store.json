@@ -234,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Pour l’instant, elle utilise nouveau, le pilote libre inclus dans LordOS. Le pilote du fabricant ({packages}) offre généralement de meilleures performances 3D et une meilleure gestion de l’énergie.",
   "suggest.nvidiaDriver.note.nouveau": "Tant que vous ne l’installez pas, le pilote libre nouveau reste utilisé ; supprimer le paquet permet d’y revenir.",
-  "suggest.nvidiaDriver.note.older": "Les cartes antérieures à 2014 environ ne sont pas prises en charge par cette version du pilote ; gardez le pilote libre sur celles-ci. Le bureau LordOS n’a pas encore été testé avec ce pilote.",
+  "suggest.nvidiaDriver.note.older": "Les cartes antérieures à 2014 environ ne sont pas prises en charge par cette version du pilote ; gardez le pilote libre sur celles-ci. Le bureau de LordOS avec ce pilote est expérimental : un rapport de la communauté le montre composé sur la carte (une GTX 1070 avec le pilote 580) ; un rapport plus ancien était composé par le processeur.",
   "suggest.nvidiaDriver.note.secureBoot": "Le pilote est compilé pour votre noyau sur cet ordinateur (DKMS), puis de nouveau après chaque mise à jour du noyau. Avec Secure Boot activé, vous devez enregistrer sa clé de signature au prochain redémarrage, sinon le pilote ne se chargera pas.",
   "suggest.nvidiaDriver.title": "Pilote graphique propriétaire",
   "suggest.nvidiaDriver.unavailable": "Le pilote du fabricant nécessite les composants contrib et non-free de Debian, qui ne sont pas tous deux activés dans les sources de paquets de cet ordinateur. Le pilote libre, nouveau, continue de fonctionner.",

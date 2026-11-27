@@ -987,7 +987,7 @@
   "gpus.roleCompute": "AI en rekenen (CUDA)",
   "gpus.roleDesktop": "Bureaublad",
   "gpus.planned": "Gepland",
-  "gpus.plannedHint": "Nog niet beschikbaar: het installeren van de NVIDIA-driver en het tekenen van het bureaublad ermee komen nadat hun systeemacties en het ontwerp voor expliciete synchronisatie zijn goedgekeurd. Tot dan verandert LordOS niets aan deze kaart.",
+  "gpus.plannedHint": "AI en rekenwerk (CUDA): biedt LordOS nog niet aan. Aan deze kaart verandert niets tenzij u het stuurprogramma van NVIDIA uit de Store installeert.",
   "gpus.report": "Compatibiliteitsrapport",
   "gpus.reportHint": "Alleen technische gegevens: de kaarten, hun drivers, welke het bureaublad tekent en wat deze sessie gebruikt. Nooit je naam, de naam van de computer, paden in je persoonlijke map, serienummers of adressen. Vanaf hier wordt niets verzonden: het formulier opent in je browser en jij beslist of je het verstuurt.",
   "gpus.reportRun": "Een compatibiliteitsrapport sturen",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "Systeem en beveiliging",
   "skin.pick": "Kies een categorie",
   "style.organization": "Organisatie",
-  "style.email": "E-mail"
+  "style.email": "E-mail",
+  "gpus.experimental": "Experimenteel",
+  "gpus.composedGpu": "Samengesteld op deze kaart — experimenteel",
+  "gpus.composedCpu": "Samengesteld door de processor",
+  "gpus.desktopNvHint": "Bureaublad: het vrije stuurprogramma (nouveau) blijft de standaard. Met NVIDIA's eigen stuurprogramma, optioneel uit de Store, toont één communityrapport het bureaublad samengesteld op de kaart (een GTX 1070 met stuurprogramma 580); een eerder rapport (een RTX 3060 met LordOS 0.8.8.9) werd door de processor samengesteld, en vensters van sommige apps verschenen volgens een melding niet. Het is experimenteel."
 }

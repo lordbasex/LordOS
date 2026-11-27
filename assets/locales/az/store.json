@@ -234,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Hazırda LordOS-a daxil olan azad drayver nouveau istifadə olunur. İstehsalçının drayveri ({packages}) adətən daha yaxşı 3D performansı və enerji idarəetməsi verir.",
   "suggest.nvidiaDriver.note.nouveau": "Onu quraşdırana qədər azad nouveau drayveri istifadədə qalır; paketi silmək ona qayıdır.",
-  "suggest.nvidiaDriver.note.older": "Təxminən 2014-dən köhnə kartlar bu drayver versiyası tərəfindən dəstəklənmir; onlarda azad drayveri saxlayın. LordOS iş masası hələ bu drayverlə sınaqdan keçirilməyib.",
+  "suggest.nvidiaDriver.note.older": "Təxminən 2014-dən köhnə kartlar bu sürücü versiyası ilə dəstəklənmir; onlarda azad sürücünü saxlayın. Bu sürücü ilə LordOS iş masası eksperimentaldır: bir icma hesabatı onun kartda birləşdirildiyini göstərir (580 sürücülü GTX 1070); əvvəlki hesabatda prosessor birləşdirirdi.",
   "suggest.nvidiaDriver.note.secureBoot": "Drayver bu kompüterdə nüvəniz üçün (DKMS) və hər nüvə yeniləməsindən sonra yenidən qurulur. Secure Boot aktiv olduqda növbəti yenidən başlamada onun imza açarını qeydiyyata almalısınız, əks halda drayver yüklənməyəcək.",
   "suggest.nvidiaDriver.title": "Mülkiyyət qrafik drayveri",
   "suggest.nvidiaDriver.unavailable": "İstehsalçının drayverinə Debian-ın contrib və non-free komponentləri lazımdır və onların hər ikisi bu kompüterin paket mənbələrində aktiv deyil. Azad drayver nouveau işləməyə davam edir.",

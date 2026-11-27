@@ -994,7 +994,7 @@
   "gpus.roleCompute": "AI i obliczenia (CUDA)",
   "gpus.roleDesktop": "Pulpit",
   "gpus.planned": "Planowane",
-  "gpus.plannedHint": "Jeszcze niedostępne: instalacja sterownika NVIDIA i rysowanie nim pulpitu pojawią się po zatwierdzeniu ich akcji systemowych i projektu jawnej synchronizacji. Do tego czasu LordOS niczego nie zmienia na tej karcie.",
+  "gpus.plannedHint": "AI i obliczenia (CUDA): LordOS jeszcze tego nie oferuje. Na tej karcie nic się nie zmienia, dopóki nie zainstalujesz sterownika NVIDIA ze Sklepu.",
   "gpus.report": "Raport zgodności",
   "gpus.reportHint": "Tylko dane techniczne: karty, ich sterowniki, która rysuje pulpit i czego używa ta sesja. Nigdy twoje imię, nazwa komputera, ścieżki w folderze domowym, numery seryjne ani adresy. Stąd nic nie jest wysyłane: formularz otwiera się w przeglądarce, a ty decydujesz, czy go wysłać.",
   "gpus.reportRun": "Wyślij raport zgodności",
@@ -1118,5 +1118,9 @@
   "skin.group.system": "System i bezpieczeństwo",
   "skin.pick": "Wybierz kategorię",
   "style.organization": "Organizacja",
-  "style.email": "E-mail"
+  "style.email": "E-mail",
+  "gpus.experimental": "Eksperymentalne",
+  "gpus.composedGpu": "Składany na tej karcie — eksperymentalnie",
+  "gpus.composedCpu": "Składany przez procesor",
+  "gpus.desktopNvHint": "Pulpit: domyślny pozostaje wolny sterownik (nouveau). Z własnym sterownikiem NVIDIA, instalowanym z wyboru ze Sklepu, jeden raport społeczności pokazuje pulpit składany na karcie (GTX 1070 ze sterownikiem 580); wcześniejszy (RTX 3060 na LordOS 0.8.8.9) składał procesor, a okna niektórych aplikacji się nie pokazywały. To funkcja eksperymentalna."
 }

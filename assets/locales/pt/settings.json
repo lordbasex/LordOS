@@ -987,7 +987,7 @@
   "gpus.roleCompute": "IA e computação (CUDA)",
   "gpus.roleDesktop": "Área de trabalho",
   "gpus.planned": "Planejado",
-  "gpus.plannedHint": "Ainda não disponível: instalar o driver da NVIDIA e desenhar a área de trabalho com ele vêm depois que suas ações de sistema e o design de sincronização explícita forem aprovados. Até lá o LordOS não muda nada nesta placa.",
+  "gpus.plannedHint": "IA e computação (CUDA): o LordOS ainda não oferece. Nada muda nesta placa a menos que você instale o driver da NVIDIA pela Loja.",
   "gpus.report": "Relatório de compatibilidade",
   "gpus.reportHint": "Só dados técnicos: as placas, seus drivers, qual desenha a área de trabalho e o que esta sessão usa. Nunca seu nome, o nome do computador, caminhos da sua pasta pessoal, números de série nem endereços. Nada é enviado daqui: o formulário abre no seu navegador e você decide se o envia.",
   "gpus.reportRun": "Enviar um relatório de compatibilidade",
@@ -1111,5 +1111,9 @@
   "skin.group.system": "Sistema e segurança",
   "skin.pick": "Escolha uma categoria",
   "style.organization": "Organização",
-  "style.email": "E-mail"
+  "style.email": "E-mail",
+  "gpus.experimental": "Experimental",
+  "gpus.composedGpu": "Composta nesta placa — experimental",
+  "gpus.composedCpu": "Composta pelo processador",
+  "gpus.desktopNvHint": "Área de trabalho: o driver livre (nouveau) continua sendo o padrão. Com o driver da própria NVIDIA, opcional pela Loja, um relato da comunidade mostra a área de trabalho composta na placa (uma GTX 1070 com o driver 580); um anterior (uma RTX 3060 no LordOS 0.8.8.9) era composto pelo processador, e foi relatado que as janelas de alguns apps não apareciam. É experimental."
 }

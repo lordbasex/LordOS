@@ -14,13 +14,15 @@ the desktop. A card that isn't drawing the desktop can be shared with Machines, 
 
 NVIDIA support is **experimental and verified by the community**. LordOS's team has tested Intel and AMD graphics on
 its own computers, but not every NVIDIA model, so an NVIDIA card says *"Experimental — not verified on your card model
-yet"*. Its future uses are listed as **planned**:
+yet"*. The free driver (nouveau, from Mesa) is the default. NVIDIA's own driver is an opt-in: Store → For this
+computer offers it for an NVIDIA card while the free driver is in use. Its uses are listed as:
 
-- **AI and compute (CUDA):** installing NVIDIA's driver and its CUDA libraries from Settings.
-- **Desktop:** drawing the desktop with NVIDIA's driver.
-
-Neither can be turned on yet, and LordOS changes nothing on the card until they are ready: both need system actions
-that are still being reviewed, and the desktop also needs explicit synchronization in the display server.
+- **AI and compute (CUDA):** **planned**; LordOS doesn't offer it yet.
+- **Desktop:** **experimental**. On the card that draws your session, Settings shows how the desktop is really composed
+  (on the card, or by the processor). With NVIDIA's driver, one community report so far shows the desktop composed on
+  the card (a GTX 1070, Pascal, driver 580); an earlier one (an RTX 3060 on LordOS 0.8.8.9) was composed by the
+  processor, and another person saw some apps' windows not show after installing the driver. More reports tell us
+  which cards and drivers work.
 
 ## How to help test it
 

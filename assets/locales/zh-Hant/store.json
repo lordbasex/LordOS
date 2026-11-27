@@ -227,7 +227,7 @@
   },
   "suggest.nvidiaDriver.detail": "目前使用的是 LordOS 內建的自由驅動程式 nouveau。製造商的驅動程式（{packages}）通常能提供更好的 3D 效能和電源管理。",
   "suggest.nvidiaDriver.note.nouveau": "在你安裝之前，會繼續使用自由的 nouveau 驅動程式；移除套件就會回到它。",
-  "suggest.nvidiaDriver.note.older": "這個版本的驅動程式不支援大約 2014 年以前的顯示卡；這些顯示卡請繼續使用自由驅動程式。LordOS 桌面尚未以此驅動程式測試。",
+  "suggest.nvidiaDriver.note.older": "約 2014 年以前的顯示卡不受此版本驅動程式支援，請繼續使用自由驅動程式。LordOS 桌面搭配此驅動程式屬於實驗性：一份社群回報顯示桌面在顯示卡上合成（GTX 1070，驅動程式 580）；較早的一份由處理器合成。",
   "suggest.nvidiaDriver.note.secureBoot": "驅動程式會在這台電腦上為你的核心建置（DKMS），並在每次核心更新後重新建置。若開啟了安全開機（Secure Boot），你必須在下次重新啟動時登錄它的簽署金鑰，否則驅動程式不會載入。",
   "suggest.nvidiaDriver.title": "專有顯示卡驅動程式",
   "suggest.nvidiaDriver.unavailable": "製造商的驅動程式需要 Debian 的 contrib 和 non-free 元件，而這台電腦的套件來源並未同時啟用兩者。自由驅動程式 nouveau 會繼續運作。",

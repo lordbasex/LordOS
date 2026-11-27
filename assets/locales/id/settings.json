@@ -980,7 +980,7 @@
   "gpus.roleCompute": "AI dan komputasi (CUDA)",
   "gpus.roleDesktop": "Desktop",
   "gpus.planned": "Direncanakan",
-  "gpus.plannedHint": "Belum tersedia: memasang driver NVIDIA dan menggambar desktop dengannya hadir setelah tindakan sistem dan desain sinkronisasi eksplisitnya disetujui. Sampai saat itu LordOS tidak mengubah apa pun pada kartu ini.",
+  "gpus.plannedHint": "AI dan komputasi (CUDA): belum ditawarkan LordOS. Tidak ada yang berubah pada kartu ini kecuali Anda memasang driver NVIDIA dari Toko.",
   "gpus.report": "Laporan kompatibilitas",
   "gpus.reportHint": "Hanya data teknis: kartu, driver-nya, mana yang menggambar desktop, dan apa yang dipakai sesi ini. Tidak pernah nama Anda, nama komputer, jalur di folder pribadi Anda, nomor seri, atau alamat. Tidak ada yang dikirim dari sini: formulir terbuka di peramban dan Anda yang memutuskan untuk mengirimnya.",
   "gpus.reportRun": "Kirim laporan kompatibilitas",
@@ -1104,5 +1104,9 @@
   "skin.group.system": "Sistem dan Keamanan",
   "skin.pick": "Pilih kategori",
   "style.organization": "Organisasi",
-  "style.email": "Email"
+  "style.email": "Email",
+  "gpus.experimental": "Eksperimental",
+  "gpus.composedGpu": "Dikomposisi di kartu ini — eksperimental",
+  "gpus.composedCpu": "Dikomposisi oleh prosesor",
+  "gpus.desktopNvHint": "Desktop: driver bebas (nouveau) tetap menjadi bawaan. Dengan driver milik NVIDIA, opsional dari Toko, satu laporan komunitas menunjukkan desktop dikomposisi di kartu (GTX 1070 dengan driver 580); laporan sebelumnya (RTX 3060 di LordOS 0.8.8.9) dikomposisi oleh prosesor, dan jendela beberapa aplikasi dilaporkan tidak muncul. Ini eksperimental."
 }

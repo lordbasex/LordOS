@@ -234,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Ara mateix fa servir nouveau, el controlador lliure inclòs amb LordOS. El controlador del fabricant ({packages}) sol oferir un rendiment 3D i una gestió d’energia millors.",
   "suggest.nvidiaDriver.note.nouveau": "Fins que no l’instal·lis, es continua fent servir el controlador lliure nouveau; si suprimeixes el paquet, s’hi torna.",
-  "suggest.nvidiaDriver.note.older": "Aquesta versió del controlador no admet les targetes anteriors al 2014 aproximadament; mantén-hi el controlador lliure. L’escriptori de LordOS encara no s’ha provat amb aquest controlador.",
+  "suggest.nvidiaDriver.note.older": "Les targetes anteriors al 2014, aproximadament, no són compatibles amb aquesta versió del controlador; en aquestes, mantén el controlador lliure. L’escriptori de LordOS amb aquest controlador és experimental: un informe de la comunitat el mostra compost a la targeta (una GTX 1070 amb el controlador 580); un d’anterior el componia el processador.",
   "suggest.nvidiaDriver.note.secureBoot": "El controlador es compila per al teu nucli en aquest ordinador (DKMS) i de nou després de cada actualització del nucli. Amb l’Arrencada segura activada, n’has d’inscriure la clau de signatura en el pròxim reinici, o el controlador no es carregarà.",
   "suggest.nvidiaDriver.title": "Controlador gràfic privatiu",
   "suggest.nvidiaDriver.unavailable": "El controlador del fabricant necessita els components contrib i non-free de Debian, i no estan tots dos habilitats a les fonts de paquets d’aquest ordinador. El controlador lliure, nouveau, continua funcionant.",

@@ -14,14 +14,16 @@ el escritorio. Una tarjeta que no dibuja el escritorio se puede compartir con M�
 
 El soporte de NVIDIA es **experimental y lo verifica la comunidad**. El equipo de LordOS probó gráficos Intel y AMD en
 sus propias computadoras, pero no todos los modelos de NVIDIA, así que una tarjeta NVIDIA dice *"Experimental — todavía
-no verificada en el modelo de tu tarjeta"*. Sus usos futuros aparecen como **planeados**:
+no verificada en el modelo de tu tarjeta"*. El driver libre (nouveau, de Mesa) es el predeterminado. El driver propio
+de NVIDIA es opcional: Tienda → Para tu equipo lo ofrece para una tarjeta NVIDIA mientras se usa el driver
+libre. Sus usos aparecen así:
 
-- **IA y cómputo (CUDA):** instalar el driver de NVIDIA y sus bibliotecas CUDA desde Ajustes.
-- **Escritorio:** dibujar el escritorio con el driver de NVIDIA.
-
-Ninguno se puede activar todavía, y LordOS no cambia nada en la tarjeta hasta que estén listos: los dos necesitan
-acciones del sistema que todavía se están revisando, y el escritorio necesita además sincronización explícita en el
-servidor de pantalla.
+- **IA y cómputo (CUDA):** **planeado**; LordOS todavía no lo ofrece.
+- **Escritorio:** **experimental**. En la tarjeta que dibuja tu sesión, Ajustes muestra cómo se compone de verdad el
+  escritorio (en la tarjeta o con el procesador). Con el driver de NVIDIA, hasta ahora un informe de la comunidad
+  muestra el escritorio compuesto en la tarjeta (una GTX 1070, Pascal, driver 580); uno anterior (una RTX 3060 con
+  LordOS 0.8.8.9) lo componía el procesador, y otra persona vio que las ventanas de algunas apps no se mostraban después
+  de instalar el driver. Más informes nos dicen qué tarjetas y drivers funcionan.
 
 ## Cómo ayudar a probarla
 
