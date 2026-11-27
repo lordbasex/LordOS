@@ -116,6 +116,12 @@ int main(void) {
     bgsave_flush(dst);
     CHECK(same(dst, "next") && bgsave_last_flags == 0);
 
+    /* 2c. (QA 0.8.9.6.2, PI-1) lord.fs.write's sync later: queued once per path, done by the worker, flush waits for it */
+    CHECK(bgsave_sync_later(dst) == 0 && bgsave_sync_later(dst) == 0);
+    CHECK(bgsave_sync_later("") <= 1 && bgsave_sync_later(NULL) == -1);
+    bgsave_flush(NULL);
+    CHECK(same(dst, "next"));
+
     /* 3. a private store: 0600 from a mkstemp name next to it, nothing else left in the folder */
     char sub[300];
     snprintf(sub, sizeof sub, "%s/clip", D);

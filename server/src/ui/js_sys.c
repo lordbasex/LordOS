@@ -1305,10 +1305,13 @@ static JSValue f_fs_write(JSContext *c, JSValueConst this_val, int argc, JSValue
             if (w < 0 && errno == EINTR) continue;
             if (w <= 0) ok = 0; else off += (size_t)w;
         }
-        if (ok && fsync(fd)) ok = 0;
+        /* no fsync here (QA 0.8.9.6.2: under a 1.4 GB copy to a Raspberry Pi's SD card it held the desktop 5 to 23 s):
+         * the new file is renamed over the old one now, as before (ext4's auto_da_alloc writes a file renamed over
+         * another before the rename commits), and synced with its folder on bgsave's worker right after */
         if (close(fd)) ok = 0;
         if (ok && rename(tmp, target)) ok = 0;
         if (!ok) unlink(tmp);
+        else bgsave_sync_later(target);
     }
     int err = errno;
     if (text) JS_FreeCString(c, text);

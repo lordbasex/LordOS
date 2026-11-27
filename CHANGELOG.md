@@ -434,6 +434,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **lord.fs.write froze the desktop 5 to 23 s while Machines copied an image to a Raspberry Pi's SD card** (PI-1 of the
+  ws171 QA; the watchdog's C stacks in `f_fs_write`'s fsync). The file is still written and renamed over the old one
+  before the call returns (ext4's `auto_da_alloc` writes a file renamed over another before the rename commits), and
+  its fsync, with its folder's, now runs on bgsave's worker right after (`bgsave_sync_later`; `bgsave_flush(NULL)`
+  at the end of the session waits for it). Test: `bgsave-test`.
 - **A tree built with umask 0002 left the helpers group-writable, and lord-server refused them** (Raspberry Pi 5,
   ws171: lord-sql, lord-sftp, lord-web and lord-media refused, `sql-e2e` hung, and Machines' toolbar glyphs, drawn by
   lord-media, were blank). Every helper's rule now ends with `chmod g-w`, as lord-vm's did, and the `sql-e2e`

@@ -40,6 +40,11 @@ typedef struct {
     int used;
 } Slot;
 
+/* bgsave_sync_later's files: synced by the worker after the saves (one entry per path) */
+#define SYNC_MAX 32
+static char *syncq[SYNC_MAX];
+static int nsync, syncing;
+
 static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t work_cv = PTHREAD_COND_INITIALIZER, done_cv = PTHREAD_COND_INITIALIZER;
 static Slot slots[BGS_SLOTS];
@@ -80,6 +85,18 @@ static void *worker(void *arg) {
     for (;;) {
         Slot *s = NULL;
         for (int i = 0; i < BGS_SLOTS && !s; i++) if (slots[i].used && slots[i].data && !slots[i].busy) s = &slots[i];
+        if (!s && nsync) {                  /* a file lord.fs.write wrote: on the disk now, off the interface's thread */
+            char *path = syncq[0];
+            memmove(syncq, syncq + 1, sizeof syncq[0] * (size_t)--nsync);
+            syncing = 1;
+            pthread_mutex_unlock(&mu);
+            bgsave_sync_now(path);
+            free(path);
+            pthread_mutex_lock(&mu);
+            syncing = 0;
+            pthread_cond_broadcast(&done_cv);
+            continue;
+        }
         if (!s) { pthread_cond_wait(&work_cv, &mu); continue; }
         char *data = s->data;
         size_t len = s->len;
@@ -161,10 +178,33 @@ int bgsave_put(const char *dst, const char *tmp, const char *data, size_t len, u
     return 0;
 }
 
+void bgsave_sync_now(const char *path) {
+    int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | O_NOCTTY);
+    if (fd >= 0) { fsync(fd); close(fd); }
+    char dir[PATH_MAX];
+    snprintf(dir, sizeof dir, "%s", path);
+    char *sl = strrchr(dir, '/');
+    if (!sl) return;
+    if (sl == dir) sl[1] = 0; else *sl = 0;
+    int d = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (d >= 0) { fsync(d); close(d); }
+}
+
+int bgsave_sync_later(const char *path) {
+    if (!path || strlen(path) >= PATH_MAX) return -1;
+    pthread_mutex_lock(&mu);
+    for (int i = 0; i < nsync; i++) if (!strcmp(syncq[i], path)) { pthread_mutex_unlock(&mu); return 0; }   /* already queued */
+    char *copy = nsync < SYNC_MAX && !start() ? strdup(path) : NULL;
+    if (copy) { syncq[nsync++] = copy; pthread_cond_signal(&work_cv); }
+    pthread_mutex_unlock(&mu);
+    if (!copy) { bgsave_sync_now(path); return 1; }       /* no worker or a full queue: here, as before */
+    return 0;
+}
+
 void bgsave_flush(const char *dst) {
     pthread_mutex_lock(&mu);
     for (;;) {
-        int waiting = 0;
+        int waiting = !dst && (nsync || syncing);
         for (int i = 0; i < BGS_SLOTS && !waiting; i++)
             waiting = slots[i].used && (slots[i].data || slots[i].busy) && (!dst || !strcmp(slots[i].dst, dst));
         if (!waiting) break;
