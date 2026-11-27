@@ -400,6 +400,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   a zoom saved, full size, the firewall switches black in the file, no overwrite, no path).
 
 ### Tests
+- **`hands-e2e` no longer assumes this computer's state** (ws171 on a Pi): case 5 takes the first app row of
+  Monitor → Network, whatever it is (it looked for "Machines"), so the handsDeny blackout checks run everywhere; case 9
+  says it skipped when no voice is installed instead of failing.
 - **Tests that need their scratch outside a masked path say so** (ws171 on a Pi): `sandbox-home-mounts-test` and
   `vm-jail-probe` skip with a clear message when the tree is under /tmp, /var/tmp or /dev/shm (the sandbox mounts its
   own there), and `vm-qemu-args` when it is inside the home folder (lord-vm's namespace hides it).

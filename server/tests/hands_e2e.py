@@ -326,7 +326,13 @@ def capture_paths():
         a.text('computer', action='left_click', ref=ref(t, r'tab "Network"'))
         time.sleep(1.5)
         t = a.text('read_window', window_id='monitor')
-        m = re.search(r'clickable "Machines[^"]*" \[ref_\d+\] @(\d+),(\d+) (\d+)x(\d+)', t)
+        # the first app row with a Rule switch, whatever it is on this computer (Machines on a PC with machines; another
+        # app or LordOS's own component elsewhere, as on a Raspberry Pi): a wide, row-high clickable under the tabs
+        m = None
+        for mm in re.finditer(r'clickable "[^"]*" \[ref_\d+\] @(\d+),(\d+) (\d+)x(\d+)', t):
+            if int(mm.group(3)) >= 250 and 30 <= int(mm.group(4)) <= 60 and int(mm.group(2)) > 150:
+                m = mm
+                break
         check(m is not None, 'the Network tab\'s first row')
         rx, ry, rw, rh = (int(v) for v in m.groups()) if m else (32, 230, 314, 40)
         sx, sy = rx + rw - 21, ry + 20                       # its Rule switch (handsDeny)
@@ -586,8 +592,10 @@ def window_popup():
                 break
             a.text('computer', action='scroll', coordinate=[700, 400], scroll_direction='down', scroll_amount=5)
             time.sleep(0.6)
-        check(m is not None, 'the Voice page\'s Language pop-up is there')
         if not m:
+            # the Voice page is reached through an installed voice's language (Spanish or English); a computer with
+            # none (a fresh Raspberry Pi) has no way there: said, not failed
+            print('  skipped: no voice installed here, so no Voice page with its Language pop-up (install one to run case 9)')
             return
         def size():
             r = a.call('computer', action='screenshot', target='window:settings')
