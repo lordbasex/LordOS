@@ -420,6 +420,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **System Information showed dates in the US format in any language** (BUG-25 of the ws170 QA: "Incluida: la prueba de
+  11/27/2026, 07:08:26 AM" in Spanish). The report's toolkit audit, the probe's and the benchmark's times used
+  `toLocaleString()` without a locale; they now go through the SDK's `formatDate` and `formatTime`, which follow the
+  interface's language and region. New `tests/locale_dates_test.mjs` fails on any `toLocale…String()` without a locale
+  in `apps/`, `sdk/` and `themes/` (none left).
 - **Notes: "Show on desktop" put a new note at its default place, behind the window in front and on another display**
   (MEJORA-3 of the ws170 QA: x=2112 on the main display while Notes was on another). A note now records in its header
   whether its place is one it had on the desktop (`placed`; a note already on the desktop counts as placed, no migration

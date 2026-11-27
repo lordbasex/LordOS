@@ -8,12 +8,12 @@
 import {
   View, Text, ScrollView, Button, useTheme, useLocale, LordOSLogo, systemReport, systemInfo, lordosVersion, formatBytes, formatNumber,
   Toolbar, ToolbarSpacer, ToolbarButton, Segmented, SidebarItem, GroupBox, FormRow, EmptyState, Hairline, spacing, typeScale,
-  fs, userDirs, clipboard, wm, admin, remote, codeStatus, launchApp, useAppWindow, useBluetooth, formatDate,
+  fs, userDirs, clipboard, wm, admin, remote, codeStatus, launchApp, useAppWindow, useBluetooth, formatDate, formatTime,
   Dropdown, useNarrow, useSidebar, SidebarToggle, SidebarOverlay, Checkbox, SkinRegion, useSkinned, commandBar, pickCommand,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
 import { evaluate as evaluateChecks, evaluateProbe, evaluateBench, PENDING as PENDING_CHECKS, PROBE_CHECKS } from './checks.js';
-import Performance, { NARROW_AT } from './performance.jsx';
+import Performance, { NARROW_AT, dateTime } from './performance.jsx';
 import { Scene } from './scene.jsx';
 import { cardLayers, sessionLayers, compatibility, hardwareSections, piStatus, piBoard, machineName, compositionReason, reportFileName, reportJson, parseMemoryLines, parseSerialLines, peripherals, firmwareDate } from './model.js';
 import { buildShareReport, summaryRows, issueUrl, shareFileNames, shareJson, sharePage, bootInfo } from './share.js';
@@ -581,7 +581,7 @@ function BenchGroup() {
         <Button label={tr('sysinfo.bench.reload')} onClick={() => setN(n + 1)} />
         <Button primary label={tr('sysinfo.bench.open')} onClick={() => launchApp('desktop:lordos-testbench')} />
       </View>
-      <GroupBox footer={b && b.at ? tr('sysinfo.probe.when', { time: new Date(b.at).toLocaleString() }) : null}>
+      <GroupBox footer={b && b.at ? tr('sysinfo.probe.when', { time: dateTime(new Date(b.at)) }) : null}>
         {rows ? rows.map((c) => <CheckRow key={c.id} c={c} />)
           : <CheckRow c={{ id: 'wayland', level: 'effective', state: 'pending', paper: '§3.4' }} />}
       </GroupBox>
@@ -616,7 +616,7 @@ function Checks({ r }) {
             <Button primary label={probe.busy ? tr('sysinfo.probe.running') : probe.result ? tr('sysinfo.probe.again') : tr('sysinfo.probe.run')} disabled={probe.busy} onClick={runProbe} />
           </View>
           {probe.error ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a', textAlign: 'start' }}>{tr(`sysinfo.probe.error.${probe.error}`)}</Text> : null}
-          <GroupBox footer={probe.result ? tr('sysinfo.probe.when', { time: new Date(probe.result.at).toLocaleTimeString() }) : null}>
+          <GroupBox footer={probe.result ? tr('sysinfo.probe.when', { time: formatTime(new Date(probe.result.at), { seconds: true }) }) : null}>
             {(probeRows || PROBE_CHECKS.map((id) => ({ id, level: 'effective', state: 'pending' }))).map((c) => <CheckRow key={c.id} c={c} />)}
           </GroupBox>
         </View>
@@ -716,7 +716,7 @@ function toolkitStatus(tr, st) {
   if (st.busy) return tr(st.watch ? 'sysinfo.share.toolkits.watching' : 'sysinfo.share.toolkits.running');
   if (st.error) return tr(`sysinfo.share.toolkits.${st.error}`);
   if (!st.audit) return tr('sysinfo.share.toolkits.hint');
-  const time = new Date(st.audit.at).toLocaleString();
+  const time = dateTime(new Date(st.audit.at));
   return typeof st.audit.score === 'number'
     ? tr('sysinfo.share.toolkits.included', { time, score: formatNumber(st.audit.score, 1) })
     : tr('sysinfo.share.toolkits.includedNone', { time });
