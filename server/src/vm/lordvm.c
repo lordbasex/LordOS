@@ -12743,21 +12743,10 @@ static int cmd_import_lordvm(const char *src, int argc, char **argv) {
     if (!realpath(src, real)) { fprintf(stderr, "lord-vm: %s: %s\n", src, strerror(errno)); return 1; }
     int sfd = open(real, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
     if (sfd < 0) { fprintf(stderr, "lord-vm: %s isn't a folder\n", real); return 1; }
-    /* the manifest: at most VMX_MANIFEST_MAX, regular, read through the folder's descriptor */
-    int mfd = openat(sfd, "manifest.json", O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
-    struct stat st;
-    if (mfd < 0 || fstat(mfd, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > (off_t)VMX_MANIFEST_MAX) {
-        if (mfd >= 0) close(mfd);
-        close(sfd);
-        fprintf(stderr, "lord-vm: %s has no manifest.json: not a LordOS export\n", real);
-        return 1;
-    }
-    char *mt = malloc((size_t)st.st_size + 1);
-    ssize_t got = mt ? pread(mfd, mt, (size_t)st.st_size, 0) : -1;
-    close(mfd);
+    /* the manifest: at most VMX_MANIFEST_MAX, regular, read through the folder's descriptor (the same reader as
+     * lord-server's exportInfo) */
     VmxManifest man;
-    if (got != st.st_size || vmx_manifest_parse(mt, (size_t)got, &man, err, sizeof err)) { free(mt); close(sfd); fprintf(stderr, "lord-vm: the manifest: %s\n", err[0] ? err : "unreadable"); return 1; }
-    free(mt);
+    if (vmx_manifest_read(sfd, &man, err, sizeof err)) { close(sfd); fprintf(stderr, "lord-vm: %s: not a LordOS export: %s\n", real, err); return 1; }
     if (man.encrypted && !key_have()) { close(sfd); fprintf(stderr, "lord-vm: the machine is encrypted: its key is needed (--key-fd)\n"); return 4; }
     if (!man.encrypted && key_have()) key_wipe();
     int fds[VMX_MAX_FILES];

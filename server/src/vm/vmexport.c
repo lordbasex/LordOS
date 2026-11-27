@@ -688,3 +688,27 @@ int vmx_tar_end(int out) {
     static const uint8_t z[1024];
     return write_all(out, z, sizeof z);
 }
+
+int vmx_manifest_read(int dirfd, VmxManifest *m, char *why, size_t wn) {
+    if (why && wn) why[0] = 0;
+    int fd = openat(dirfd, "manifest.json", O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY);
+    struct stat st;
+    if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > (off_t)VMX_MANIFEST_MAX) {
+        if (fd >= 0) close(fd);
+        if (why && wn) snprintf(why, wn, "no manifest.json (a regular file of at most %d bytes)", (int)VMX_MANIFEST_MAX);
+        return -1;
+    }
+    char *t = malloc((size_t)st.st_size + 1);
+    size_t n = 0;
+    while (t && n < (size_t)st.st_size) {
+        ssize_t r = pread(fd, t + n, (size_t)st.st_size - n, (off_t)n);
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) break;
+        n += (size_t)r;
+    }
+    close(fd);
+    int rc = !t || n != (size_t)st.st_size ? -1 : vmx_manifest_parse(t, n, m, why, wn);
+    if (rc && why && wn && !why[0]) snprintf(why, wn, "manifest.json unreadable");
+    free(t);
+    return rc;
+}

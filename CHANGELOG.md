@@ -434,6 +434,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Machines → "Bring an exported machine" refused LordOS's own exports** (BUG-M of the ws171 QA on VM 116).
+  lord-server read the export's `manifest.json` with the reader for LordOS's own root-owned store files, so the
+  person's export never passed. An export now has its own reader, shared by lord-server (`exportInfo`,
+  `importExport`) and lord-vm (`--import-lordvm`): `vmx_manifest_read` (`server/src/vm/vmexport.c`) opens it
+  through the folder's descriptor without following a link or blocking, takes only a regular file of 1 to
+  `VMX_MANIFEST_MAX` bytes whoever owns it, reads it once and parses it strictly; every file it lists is then checked
+  by `vmx_manifest_verify` as before. Tests: `vmexport-test` (`test_read`: a 0664 manifest read; a link, a FIFO, a
+  folder, none, empty, past the cap and broken JSON refused); the export → import round trip stays in
+  `tests/vm_storage_test.sh`.
 - **lord.fs.write froze the desktop 5 to 23 s while Machines copied an image to a Raspberry Pi's SD card** (PI-1 of the
   ws171 QA; the watchdog's C stacks in `f_fs_write`'s fsync). The file is still written and renamed over the old one
   before the call returns (ext4's `auto_da_alloc` writes a file renamed over another before the rename commits), and

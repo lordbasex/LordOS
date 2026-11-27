@@ -65,6 +65,13 @@ char *vmx_manifest_json(const VmxManifest *m);
  * hash that isn't 64 lowercase hex digits are refused. 0, or -1 with a reason. */
 int vmx_manifest_parse(const char *text, size_t len, VmxManifest *m, char *why, size_t wn);
 
+/* An export's manifest.json under dirfd, read and parsed (vmx_manifest_parse) the same way wherever an export is opened
+ * (lord-server's exportInfo and importExport, lord-vm --import-lordvm): opened without following a link and without
+ * blocking, a regular file of 1..VMX_MANIFEST_MAX bytes, read whole once. Whoever owns it: an export is the person's
+ * own file (on their disk or a USB stick), never root's, and everything in it is checked as hostile. 0, or -1 with a
+ * reason. (QA 0.8.9.6.2, BUG-M: lord-server read it as a root-owned store file and refused every export.) */
+int vmx_manifest_read(int dirfd, VmxManifest *m, char *why, size_t wn);
+
 /* Checks the folder under dirfd against m: every listed file is a regular file with one link, reached without
  * following a symlink, of the listed size and SHA-256; and the folder holds nothing else but manifest.json and the
  * folders disks/ and disks/tpm/ (no symlinks, no other files or folders, at any depth). When fds is not NULL it gets

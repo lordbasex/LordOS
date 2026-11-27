@@ -6636,19 +6636,23 @@ static JSValue f_export(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     char *args[] = { "lord-vm", "--export", dir, "--to", to, "--format", ova ? "ova" : "lordvm", nosnap ? "--no-snapshots" : NULL, NULL };
     return JS_NewInt32(c, spawn_job(args, dir));
 }
+/* an export's manifest: the person's own file, read through its folder's descriptor (vmx_manifest_read), never with
+ * store_file's rule that a file be root's (that is for LordOS's own catalog and images) */
+static int export_manifest(const char *dir, VmxManifest *man) {
+    int dfd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+    if (dfd < 0) return -1;
+    int r = vmx_manifest_read(dfd, man, NULL, 0);
+    close(dfd);
+    return r;
+}
 /* exportInfo(path) → { id, name, encrypted, snapshots, files } of an export's manifest.json (parsed strictly by
  * vmexport.c), or null */
 static JSValue f_export_info(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
-    char src[PATH_MAX], mp[PATH_MAX + 32];
+    char src[PATH_MAX];
     if (user_dir(c, argv[0], 0, src, sizeof src)) return JS_NULL;
-    snprintf(mp, sizeof mp, "%s/manifest.json", src);
-    size_t len = 0;
-    char *txt = store_file(mp, VMX_MANIFEST_MAX, &len);
     VmxManifest man;
-    int bad = !txt || vmx_manifest_parse(txt, len, &man, NULL, 0);
-    free(txt);
-    if (bad) return JS_NULL;
+    if (export_manifest(src, &man)) return JS_NULL;
     JSValue o = JS_NewObject(c);
     set_str(c, o, "id", man.id);
     set_str(c, o, "name", man.name);
@@ -6662,15 +6666,10 @@ static JSValue f_export_info(JSContext *c, JSValueConst t, int argc, JSValueCons
  * machine. An encrypted one needs its key held first (keyEnter, or the keyring of the computer it came from) */
 static JSValue f_import_export(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
-    char src[PATH_MAX], lib[PATH_MAX], mp[PATH_MAX + 32], folder[64], dst[PATH_MAX + 80];
+    char src[PATH_MAX], lib[PATH_MAX], folder[64], dst[PATH_MAX + 80];
     if (user_dir(c, argv[0], 0, src, sizeof src) || library(lib, sizeof lib, 1)) return JS_NewInt32(c, 0);
-    snprintf(mp, sizeof mp, "%s/manifest.json", src);
-    size_t len = 0;
-    char *txt = store_file(mp, VMX_MANIFEST_MAX, &len);
     VmxManifest man;
-    int bad = !txt || vmx_manifest_parse(txt, len, &man, NULL, 0);
-    free(txt);
-    if (bad) return JS_NewInt32(c, 0);
+    if (export_manifest(src, &man)) return JS_NewInt32(c, 0);
     folder_name(man.name, folder, sizeof folder);
     snprintf(dst, sizeof dst, "%s/%s.lordvm", lib, folder);
     for (int k = 2; !access(dst, F_OK) && k < 100; k++) snprintf(dst, sizeof dst, "%s/%s %d.lordvm", lib, folder, k);
