@@ -418,6 +418,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Hands: an agent can download a Machines catalog system** (FIX-1 of the 0.8.9.6.2 QA, approved by the maintainer
+  on 2026-11-26, AGENTS.md): Whonix's and the other catalog cards' downloads were refused as administrator actions under
+  the agent's input. `hands_admin_allowed` now also takes `vm-image-list "<id> <arch>[ <list name>]"`, `vm-image-get
+  "<id> <arch> <file> <hash>"` and `vm-image-cancel ""`, with exactly those shapes (id `[a-z0-9-]`, `amd64`/`arm64`,
+  plain file names, a SHA-256 or SHA-512), the same as the catalog wallpapers: root takes only an entry of the signed
+  catalog, checks its maker's signed list and keeps the image only with its hash; never a URL or a path from JS.
+  `vm-image-get-user` and `vm-image-remove` stay refused. `build/hands-test` (new cases: the real shapes of Debian's
+  and Whonix's downloads, paths, URLs, short hashes, extra words and spaces refused); docs/HANDS.md.
 - **Files with Luna's skin showed wrong modification dates** (BUG-8 of the 0.8.9.6.2 QA: a folder changed on
   26/11/2026 read "Thu 19 Jul", no year). The skin's item `mtime` is in milliseconds (`lord.fs`), and the skin
   multiplied it by 1000 again and showed the short weekday style. Its list column and its Details box now show the date

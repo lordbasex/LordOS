@@ -230,7 +230,15 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
   (`server/src/hw/wallpaper_admin.c`, `studio_bg_admin.c`), never a URL or a path, and root keeps a file only at the
   catalog's size and SHA-256; at worst an agent downloads, uses or deletes a stock wallpaper. A person's own picture
   (`wallpaper-image`, and `wallpaper-login-image`, which shows it on the login screen to every account), Studio's
-  removal and every other action stay refused, and so does anything that doesn't parse. Each such request is logged as
+  removal and every other action stay refused, and so does anything that doesn't parse. **And Machines' catalog
+  images** (FIX-1 of the 0.8.9.6.2 QA, maintainer-approved 2026-11-26): `vm-image-list "<id> <arch>[ <list name>]"`,
+  `vm-image-get "<id> <arch> <file> <hash>"` and `vm-image-cancel ""`, so an agent can download Whonix or another
+  catalog card's system: id `[a-z0-9-]` (32 at most), arch `amd64` or `arm64`, file and list names
+  `[A-Za-z0-9._+~-]` (128 at most, no leading `.` or `-`, no `..`), a SHA-256 or SHA-512 in hex, single spaces. Root
+  takes only an entry of the signed catalog in the package, fetches only its maker's list, checks its OpenPGP
+  signature with the entry's pinned keys, and keeps a download only with the hash that list gives
+  (`server/src/vm/vmimage_admin.c`); never a URL or a path. `vm-image-get-user` (an address the person typed) and
+  `vm-image-remove` stay refused. Each such request is logged as
   closed words: `hands: claude admin wallpaper-get ok`, `hands: claude admin other refused`. While any Hands client is active, a secret on the clipboard is nobody's:
   `lord.clipboard.get` answers "", the broker gives an app nothing and the Wayland clipboard is not offered; an agent's
   paste (by the key it resolves to, `KEY_V` with Ctrl or Super, Shift+Insert, `KEY_PASTE`) and middle click are refused,

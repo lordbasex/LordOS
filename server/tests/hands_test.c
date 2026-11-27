@@ -716,6 +716,27 @@ static void native_guard(void) {
         { "wallpaper-login", "still cat:", 0 }, { "wallpaper-login", "still lumo dawn", 0 }, { "wallpaper-login", "still", 0 },
         { "wallpaper-login", "still cat:a/b", 0 }, { "wallpaper-login", "/home/u/me.jpg", 0 }, { "wallpaper-login", "", 0 },
         { "studio-bg-get", "office-blur", 0 }, { "studio-bg-get", "office-blur full extra", 0 },
+        /* (FIX-1 of the 0.8.9.6.2 QA, approved 2026-11-26) Machines' catalog images: the list, the image it names, stop */
+        { "vm-image-list", "debian amd64", 1 }, { "vm-image-list", "whonix arm64", 1 },
+        { "vm-image-list", "whonix amd64 Whonix-Xfce-18.0.8.7.Intel_AMD64.qcow2.libvirt.xz.sha512sums", 1 },
+        { "vm-image-get", "debian amd64 debian-13.2.0-amd64-netinst.iso e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 1 },
+        { "vm-image-get", "whonix amd64 Whonix-Xfce-18.0.8.7.Intel_AMD64.qcow2.libvirt.xz e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 1 },
+        { "vm-image-get", "ubuntu arm64 ubuntu-24.04.3-live-server~arm64+largemem.iso E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855", 1 },
+        { "vm-image-cancel", "", 1 },
+        /* an address the person typed, a removal, other machine actions */
+        { "vm-image-get-user", "https://example.org/x.iso e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 -", 0 }, { "vm-image-remove", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 0 },
+        { "vm-enable", "", 0 }, { "vm-kvm", "", 0 }, { "vm-net-bridge", "m1 eth0 52:54:00:00:00:01", 0 },
+        /* malformed: an arch off the list, a URL or a path, a short or odd hash, a wrong count of words, spaces */
+        { "vm-image-list", "debian i386", 0 }, { "vm-image-list", "debian", 0 }, { "vm-image-list", "Debian amd64", 0 },
+        { "vm-image-list", "debian amd64 ../../etc/shadow", 0 }, { "vm-image-list", "debian amd64 a/b", 0 },
+        { "vm-image-list", "debian amd64 .hidden", 0 }, { "vm-image-list", "debian amd64 x y", 0 },
+        { "vm-image-list", "debian  amd64", 0 }, { "vm-image-list", "debian amd64 ", 0 }, { "vm-image-list", " debian amd64", 0 },
+        { "vm-image-list", "https://evil.example/x amd64", 0 }, { "vm-image-list", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa amd64", 0 },
+        { "vm-image-get", "debian amd64 x.iso", 0 }, { "vm-image-get", "debian amd64 x.iso e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85", 0 },
+        { "vm-image-get", "debian amd64 x.iso e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85g", 0 }, { "vm-image-get", "debian amd64 x..iso e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 0 },
+        { "vm-image-get", "debian amd64 /tmp/x.iso e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 0 }, { "vm-image-get", "debian amd64 https://e.org/x.iso e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 0 },
+        { "vm-image-get", "debian amd64 x.iso e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 extra", 0 }, { "vm-image-get", "debian amd64 -x.iso e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 0 },
+        { "vm-image-get", "debian amd64 x\tiso e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 0 }, { "vm-image-cancel", " ", 0 }, { "vm-image-cancel", "all", 0 },
     };
     for (size_t i = 0; i < sizeof adm / sizeof adm[0]; i++)
         CHECK(hands_admin_allowed(adm[i].a, adm[i].arg, strlen(adm[i].arg)) == adm[i].ok, "admin %s \"%s\": %s", adm[i].a, adm[i].arg,

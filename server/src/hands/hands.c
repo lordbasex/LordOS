@@ -296,7 +296,15 @@ int hands_native_guard(const char *name) {
  * reads (server/src/hw/wallpaper_admin.c, studio_bg_admin.c), never a URL or a path, and root keeps a file only at the
  * catalog's size and SHA-256. A person's own picture (wallpaper-image, wallpaper-login-image), Studio's removal and every
  * other action stay refused. Anything that doesn't parse is refused (fail closed). */
-static const char *const ADMIN_OK[] = { "wallpaper-get", "wallpaper-remove", "wallpaper-login", "studio-bg-get" };
+/* (0.8.9.6.2, FIX-1 of the QA, maintainer-approved 2026-11-26, AGENTS.md) the Machines catalog's image downloads too:
+ * vm-image-list "<id> <arch>[ <list name>]", vm-image-get "<id> <arch> <file> <hash>" and vm-image-cancel "". Each names
+ * an entry of the signed catalog in the package (assets/machines/systems.json) that root reads; root fetches only that
+ * entry's maker's list, checks its OpenPGP signature with the keys the entry pins, downloads only a file that list
+ * names with exactly that hash and keeps it only with it (server/src/vm/vmimage_admin.c). Never a URL or a path from JS:
+ * vm-image-get-user (an address the person typed) and vm-image-remove stay refused. */
+static const char *const ADMIN_OK[] = { "wallpaper-get", "wallpaper-remove", "wallpaper-login", "studio-bg-get",
+                                        "vm-image-list", "vm-image-get", "vm-image-cancel" };
+enum { ADMIN_VM_LIST = 4, ADMIN_VM_GET = 5, ADMIN_VM_CANCEL = 6 };
 enum { ADMIN_OK_N = (int)(sizeof ADMIN_OK / sizeof ADMIN_OK[0]) };
 
 static int id_char(char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-'; }
@@ -320,6 +328,53 @@ static int id_variant(const char *s, size_t n) {
     return cat_id(s, a) && cat_variant(sp + 1, n - a - 1);
 }
 
+/* a catalog entry's id as root takes it: [a-z0-9-]{1,32}, not starting with '-' */
+static int vm_id(const char *s, size_t n) { return n <= 32 && cat_id(s, n); }
+static int vm_arch(const char *s, size_t n) { return (n == 5 && !memcmp(s, "amd64", 5)) || (n == 5 && !memcmp(s, "arm64", 5)); }
+/* a file name of a maker's list or release listing: [A-Za-z0-9._+~-]{1,128}, not starting with '.' or '-', no ".." */
+static int vm_file(const char *s, size_t n) {
+    if (n < 1 || n > 128 || s[0] == '.' || s[0] == '-') return 0;
+    for (size_t i = 0; i < n; i++) {
+        char c = s[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '+' ||
+              c == '~' || c == '-')) return 0;
+        if (c == '.' && i + 1 < n && s[i + 1] == '.') return 0;
+    }
+    return 1;
+}
+/* a SHA-256 or SHA-512 in hex (Whonix's lists are SHA-512) */
+static int vm_hash(const char *s, size_t n) {
+    if (n != 64 && n != 128) return 0;
+    for (size_t i = 0; i < n; i++) if (!((s[i] >= '0' && s[i] <= '9') || (s[i] >= 'a' && s[i] <= 'f') || (s[i] >= 'A' && s[i] <= 'F'))) return 0;
+    return 1;
+}
+/* exactly k words of arg split by single spaces (no leading, trailing or double space): their starts and lengths */
+static int vm_words(const char *arg, size_t len, const char **w, size_t *wl, int k) {
+    int n = 0;
+    size_t i = 0;
+    while (i < len) {
+        if (n == k) return -1;
+        size_t j = i;
+        while (j < len && arg[j] != ' ') j++;
+        if (j == i) return -1;
+        w[n] = arg + i;
+        wl[n++] = j - i;
+        if (j == len) break;
+        i = j + 1;
+        if (i == len) return -1;                    /* a trailing space */
+    }
+    return n;
+}
+static int vm_admin_allowed(int w, const char *arg, size_t len) {
+    const char *f[4];
+    size_t fl[4];
+    if (w == ADMIN_VM_CANCEL) return len == 0;
+    int n = vm_words(arg, len, f, fl, 4);
+    if (n < 2 || !vm_id(f[0], fl[0]) || !vm_arch(f[1], fl[1])) return 0;
+    if (w == ADMIN_VM_LIST) return n == 2 || (n == 3 && vm_file(f[2], fl[2]));
+    return n == 4 && vm_file(f[2], fl[2]) && vm_hash(f[3], fl[3]);    /* ADMIN_VM_GET */
+}
+
 int hands_admin_word(const char *action) {
     for (int i = 0; action && i < ADMIN_OK_N; i++) if (!strcmp(action, ADMIN_OK[i])) return i;
     return -1;
@@ -327,7 +382,9 @@ int hands_admin_word(const char *action) {
 
 int hands_admin_allowed(const char *action, const char *arg, size_t len) {
     int w = hands_admin_word(action);
-    if (w < 0 || !arg || strlen(arg) != len || len > 128) return 0;
+    if (w < 0 || !arg || strlen(arg) != len) return 0;
+    if (w >= ADMIN_VM_LIST) return len <= 320 && vm_admin_allowed(w, arg, len);
+    if (len > 128) return 0;
     if (w == 2) {                                           /* wallpaper-login */
         if (len == 7 && !memcmp(arg, "default", 7)) return 1;
         if (len > 6 && !memcmp(arg, "still ", 6)) {

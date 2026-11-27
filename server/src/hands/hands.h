@@ -272,7 +272,8 @@ enum { HANDS_G_NONE = 0, HANDS_G_REFUSE, HANDS_G_CLIP };
 int  hands_native_guard(const char *name);
 /* lord.admin.request under an agent's input (js.c prof_call): 1 only for the closed catalog actions with their exact
  * argument shapes (wallpaper-get/-remove "<id> <variant>", wallpaper-login "default"|"still [cat:]<id>"|"<id> <variant>",
- * studio-bg-get "<id> <variant>"), 0 for anything else (docs/HANDS.md, AGENTS.md 2026-11-26) */
+ * studio-bg-get "<id> <variant>"; and Machines' catalog images: vm-image-list "<id> <arch>[ <list name>]", vm-image-get
+ * "<id> <arch> <file> <sha256|sha512>", vm-image-cancel ""), 0 for anything else (docs/HANDS.md, AGENTS.md 2026-11-26) */
 int  hands_admin_allowed(const char *action, const char *arg, size_t len);
 int  hands_admin_word(const char *action);            /* its index in that closed list, -1 not there */
 /* "hands: <kind> admin <action|other> ok|refused" (closed words only) and the shell's Hands log */
