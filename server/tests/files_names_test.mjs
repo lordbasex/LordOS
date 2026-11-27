@@ -1,6 +1,6 @@
 // files_names_test.mjs — the free names Files gives copies, duplicates and new folders stay within 255 bytes
 // (apps/files/names.js, GitHub #102).
-import { freeNameOf, nameBytes, NAME_MAX } from '../../apps/files/names.js';
+import { freeNameOf, nameBytes, NAME_MAX, renameSelection } from '../../apps/files/names.js';
 
 let ok = 0, bad = 0;
 const eq = (label, got, want) => {
@@ -8,6 +8,14 @@ const eq = (label, got, want) => {
   else { bad++; console.log(`FAIL ${label}: ${JSON.stringify(got)} != ${JSON.stringify(want)}`); }
 };
 const S = (...a) => new Set(a);
+
+// renaming selects the name without its extension (ws170 QA MEJORA-1)
+eq('rename: up to the last dot', renameSelection('archivo-3.txt'), [0, 9]);
+eq('rename: two extensions, the last one kept', renameSelection('backup.tar.gz'), [0, 10]);
+eq('rename: a folder whole', renameSelection('fotos.2024', true), [0, 10]);
+eq('rename: no dot, whole', renameSelection('README'), [0, 6]);
+eq('rename: a hidden file whole', renameSelection('.bashrc'), [0, 7]);
+eq('rename: code points, not UTF-16 units', renameSelection('😀ñ.md'), [0, 2]);
 
 eq('bytes: ascii', nameBytes('abc'), 3);
 eq('bytes: accents', nameBytes('ñá'), 4);

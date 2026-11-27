@@ -420,6 +420,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Files: renaming selected the extension too** (MEJORA-1 of the ws170 QA: typing over "archivo-3.txt" removed ".txt"
+  and asked whether to change the extension). F2 and a slow click now select the name up to its last dot, as macOS and
+  Nautilus do; a folder, a name without a dot and a hidden file (".bashrc") are selected whole
+  (`apps/files/names.js` `renameSelection`; the SDK's `TextInput` takes a first selection, `select: [start, end]`).
+  Tests: `files-names-test` (six cases, code points) and `tests/textinput_select_scene.mjs`.
 - **Hands: `find "Papelera"` didn't find the Dock's Trash** (BUG-11 of the ws169/ws170 QA): the shell's glyph-only
   buttons had no accessible name. Flow's Dock icons (the app's name, "Apps" for the launcher) and its Trash, Flow's menu
   bar items (the LordOS logo, Search, Quick settings, Notifications; every item is a button), Workspaces' column (each

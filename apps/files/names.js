@@ -47,3 +47,12 @@ export function freeNameOf(taken, name, max = NAME_MAX) {
   }
   return fit(base, ` ${Date.now()}${ext}`, max);
 }
+
+// What renaming selects first (F2, a slow click; MEJORA-1 of the ws170 QA): the name up to its last dot, so typing keeps
+// the extension, as macOS and Nautilus do; a folder, a name without a dot, or one whose only dot leads it (".bashrc")
+// selects it whole. [start, end] in code points (the text field counts characters so).
+export function renameSelection(name, dir = false) {
+  const chars = [...String(name || '')];
+  const dot = dir ? -1 : chars.lastIndexOf('.');
+  return [0, dot > 0 ? dot : chars.length];
+}

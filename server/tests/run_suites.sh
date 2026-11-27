@@ -1038,6 +1038,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "vm-keys-scene (sdk/components.jsx AppHost, sdk/windows.js hasKeyboard, apps/machines guestKeys)" node tests/focus_scene_test.mjs vm_keys_scene.mjs
     else skip "vm-keys-scene" "node and the repository's node_modules (npm install)"; fi
+    # (ws170 QA MEJORA-1) a TextInput's first selection (Files' rename: the name without its extension)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "textinput-select-scene (sdk/components.jsx TextInput select, apps/files/names.js renameSelection)" node tests/focus_scene_test.mjs textinput_select_scene.mjs
+    else skip "textinput-select-scene" "node and the repository's node_modules (npm install)"; fi
     # (ws170 QA BUG-20) an input method's commit and the key that ended the syllable, in one turn, both reach a field
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "ime-commit-scene (sdk/components.jsx TextInput: 가 then Space is \"가 \")" node tests/focus_scene_test.mjs ime_commit_scene.mjs

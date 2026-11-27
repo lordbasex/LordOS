@@ -597,7 +597,7 @@ function spellAt(ranges, value, pos, set) {
 // Where the caret and the selection go comes from the text as drawn (lord.text.carets): in Hebrew or Arabic with numbers
 // or Latin the selection may be several boxes and ← → move on screen, and the caret never stops inside an emoji, a flag
 // or a letter with its accents.
-export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, onKeyDown, autoFocus, style, secure, eye, size = 13, selectAll = false, spellCheck = true, writing: allowWriting = true }) {
+export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, onKeyDown, autoFocus, style, secure, eye, size = 13, selectAll = false, select = null, spellCheck = true, writing: allowWriting = true }) {
   const t = useTheme();
   const win = useContext(AppWindowContext);
   const token = useRef({}).current;
@@ -607,7 +607,10 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const caret = useRef(null);
   const textBox = useRef(null);
   const len = (v) => [...(v || '')].length;
-  const at = useRef({ value, pos: len(value), anchor: selectAll && value ? 0 : null });    // caret and selection, for the value they were made in
+  // caret and selection, for the value they were made in; select: [start, end] in characters to select first (Files'
+  // rename selects the name without its extension), selectAll the whole text
+  const at = useRef(Array.isArray(select) && value ? { value, pos: Math.min(len(value), select[1]), anchor: Math.max(0, select[0]) }
+    : { value, pos: len(value), anchor: selectAll && value ? 0 : null });
   const hist = useRef(newHistory(secure));  // undo and redo (textfieldmodel.js); none for a password field
   hist.current = historyFor(hist.current, secure);   // a password field keeps no history; a change of secure drops it
   const prim = useRef(null);                // the selection last published as the primary selection (primarymodel.js)
