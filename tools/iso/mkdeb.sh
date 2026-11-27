@@ -754,7 +754,9 @@ fi
 # (the Debian convention /run/reboot-required; never on a new install or in an image build)
 if [ "$1" = configure ] && [ -n "${2:-}" ] && [ -d /run/systemd/system ] &&
    [ "$2" != "$(dpkg-query -W -f '${Version}' lordos 2>/dev/null || true)" ]; then
-    touch /run/reboot-required 2>/dev/null && echo lordos >> /run/reboot-required.pkgs 2>/dev/null || true
+    if touch /run/reboot-required 2>/dev/null; then
+        grep -qsx lordos /run/reboot-required.pkgs || echo lordos >> /run/reboot-required.pkgs 2>/dev/null || true
+    fi
 fi
 # the boot splash lives in the initramfs: when it is the selected theme, rebuild it with the new images
 # (initramfs-tools' trigger; the theme is selected by the ISO, the Pi image or install.sh, never here)

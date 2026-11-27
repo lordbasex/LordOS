@@ -420,6 +420,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Package: `/run/reboot-required.pkgs` listed `lordos` once per upgrade** (BUG-16 of the ws170 QA; 28 times on the
+  test machine). The postinst now adds the line only when it is not already there (`grep -qsx lordos`).
 - **Toolkit audit: `gtk3-x11` `size` and `qt6-wayland` `combo` on a real desktop** (BUG-2 of the 0.8.9.6.2 QA: 98.5 %
   and 98.3 % on the maintainer's three-display desktop; not reproduced on a headless lord-server, where both pass every
   run). `gtk3.py` and `qt6.py` now wait for the configure to settle before they read the size (every 30 ms, at most
