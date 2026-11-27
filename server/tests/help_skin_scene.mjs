@@ -9,7 +9,7 @@ globalThis.lord.help = { list: () => ARTS.map((a) => ({ ...a })), read: (lang, i
 // the image each node shows (the stub lord has no setProp), to find Lumo's pose
 const srcs = new Map();
 globalThis.lord.setProp = (id, k, v) => { if (k === 'src') { if (v) srcs.set(id, String(v)); else srcs.delete(id); } };
-const { parents, removed } = globalThis.__lordTest;
+const { parents, removed, styles, texts } = globalThis.__lordTest;
 const inTree = (id) => { for (let n = id; n; n = parents.get(n)) if (removed.has(n)) return false; return true; };
 const lumos = (pose) => [...srcs].filter(([id, s]) => s.startsWith(`asset:mascot/lumo-${pose}-`) && inTree(id)).length;
 const st = await mountStubbed('help', Help);
@@ -34,4 +34,9 @@ settings.set({ themeParts: { layouts: false } });
 await flush();
 check('help: no results says so', shown('help.noResults'));
 check('help: no results shows Lumo confused, once', lumos('confused') === 1, String(lumos('confused')));
+// the title takes the sidebar's whole width (QA ws168: shrunk to its measured width it broke into one more line than
+// measured, and "No se encontraron artículos." showed only "No se encontraron")
+const titleNode = [...texts].filter(([id, v]) => v === 'help.noResults' && inTree(id)).map(([id]) => parents.get(id))[0];
+const ts = titleNode && styles.get(titleNode);
+check('help: the no-results title takes the sidebar\'s width', !!ts && ts.width === '100%' && ts.textAlign === 'center', JSON.stringify(ts));
 process.exit(0);

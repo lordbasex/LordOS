@@ -129,9 +129,15 @@ function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, 
   const [w, setW] = useState(300);
   const box = useRef(null);
   useEffect(() => {
-    const id = setInterval(() => { if (box.current) { const nw = lord.getLayout(box.current.id)[2]; if (Math.abs(nw - w) > 1) setW(nw); } }, 400);
+    const id = setInterval(() => { if (box.current) { const nw = lord.getLayout(box.current.id)[2]; if (nw > 1 && Math.abs(nw - w) > 1) setW(nw); } }, 400);
     return () => clearInterval(id);
   });
+  // the body's size as it is shown now (the reading view): the editor's first frame wraps at it, not at a guess
+  const size0 = useRef(null);
+  if (box.current) {
+    const [, , bw, bh] = lord.getLayout(box.current.id);
+    if (bw > 1 && bh > 1) size0.current = { w: bw, h: bh };
+  }
   // right click while editing: Cut, Copy, Paste, Select All and Speech (for the selection or the whole note)
   const [ctx, setCtx] = useState(null);
   const [job, setJob] = useState(null);             // ✨ AI's panel on the selection (sdk/writing.jsx)
@@ -145,7 +151,7 @@ function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, 
   if (mode === 'edit') {
     return (
       <View ref={box} style={{ flex: 1 }}>
-        <NoteEditor value={note.body} onChange={(body) => editBody(note.slug, body)} size={size} colors={ink} autoFocus
+        <NoteEditor value={note.body} onChange={(body) => editBody(note.slug, body)} size={size} colors={ink} autoFocus initialSize={size0.current}
           apiRef={editorApi} emojiSearch={searchEmoji} padding={compact ? 8 : 14}
           onPasteImage={() => pasteClipboardImage(note.slug)} onEscape={() => onMode('read')} onBlur={compact ? () => { if (!menuOpen.current && !hold?.current) onMode('read'); } : undefined}
           onCommand={(b) => { if (b === 'e') onMode('read'); else onCommand?.(b); }}

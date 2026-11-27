@@ -42,10 +42,12 @@ function lineStyle(s, inCode) {
   return 'text';
 }
 
-export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, emojiSearch, onEscape, autoFocus, padding = 10, apiRef, onBlur, onCommand, onContextMenu, spellCheck = true }) {
+export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, emojiSearch, onEscape, autoFocus, padding = 10, apiRef, onBlur, onCommand, onContextMenu, spellCheck = true, initialSize }) {
   const area = useRef(null);
   const token = useRef({}).current;
-  const st = useRef({ undo: [], redo: [], last: 0, w: 300, h: 200 });
+  // the first frame's size: the place it opens in (Notes' reading view, measured), until lord-server has laid the area out
+  const size0 = initialSize && initialSize.w > 1 && initialSize.h > 1 ? { w: initialSize.w, h: initialSize.h } : { w: 300, h: 200 };
+  const st = useRef({ undo: [], redo: [], last: 0, ...size0 });
   // the text is the editor's own: each change goes to onChange, and a value from outside (another program changed the
   // note, a checkbox ticked elsewhere) replaces it only when it is not what the editor itself last gave
   const [text, setText] = useState(value);
@@ -58,7 +60,7 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
   const [scroll, setScroll] = useState(0);
   const [focus, setFocusState] = useState(false);
   const [blink, setBlink] = useState(true);
-  const [dims, setDims] = useState({ w: 300, h: 200 });
+  const [dims, setDims] = useState(size0);
   const [sugg, setSugg] = useState(null);           // { q, start, items, i }
   const LH = Math.round(size * 1.55);
   const measure = measurerFor(size);
@@ -68,9 +70,16 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
   const readSize = () => {
     if (!area.current) return;
     const [, , w, h] = lord.getLayout(area.current.id);
+    // a node not laid out yet answers 0 × 0: wrapping at that width broke every line every few characters for a frame
+    // (Read → Edit, QA ws168); keep the size we have and look again on the next frame
+    if (!(w > 1 && h > 1)) { if (!st.current.again) st.current.again = setTimeout(() => { st.current.again = 0; readSize(); }, 16); return; }
     if (Math.abs(w - st.current.w) > 0.5 || Math.abs(h - st.current.h) > 0.5) { st.current.w = w; st.current.h = h; setDims({ w, h }); }
   };
-  useEffect(() => { readSize(); const id = setInterval(readSize, 400); return () => clearInterval(id); }, []);
+  useEffect(() => {
+    readSize();
+    const id = setInterval(readSize, 400);
+    return () => { clearInterval(id); if (st.current.again) clearTimeout(st.current.again); };
+  }, []);
 
   // each line's markdown kind (headings are drawn and measured bold), then the rows: only changed lines are wrapped
   const lineKinds = useMemo(() => {

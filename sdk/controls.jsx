@@ -315,8 +315,11 @@ export function EmptyState({ icon, mascot, title, hint, action, style }) {
     <View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.s, padding: spacing.xxl }, style]}>
       {mascot ? <Lumo pose={mascot} size={112} style={{ marginBottom: spacing.xs }} />
         : typeof icon === 'string' ? <Text style={{ fontSize: 40, color: t.textDim, marginBottom: spacing.xs }}>{icon}</Text> : icon}
-      {title ? <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'center' }}>{title}</Text> : null}
-      {hint ? <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'center', maxWidth: 360, lineHeight: 1.4 }}>{hint}</Text> : null}
+      {/* the title and the hint take the width they have (100 %, the hint at most 360) and center their lines: shrunk to
+          their own measured width, a title in a narrow sidebar broke into one line more than it was measured for, and
+          the last one was cut (Help, "No se encontraron" without "artículos.", QA ws168) */}
+      {title ? <Text style={{ width: '100%', fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'center' }}>{title}</Text> : null}
+      {hint ? <Text style={{ width: '100%', fontSize: typeScale.callout, color: t.textDim, textAlign: 'center', maxWidth: 360, lineHeight: 1.4 }}>{hint}</Text> : null}
       {action ? <View style={{ marginTop: spacing.s }}>{action}</View> : null}
     </View>
   );

@@ -147,10 +147,16 @@ function Card({ e, current, lit, onOpen }) {
       style={{ width: CARD, padding: 8, gap: 6, borderRadius: 10, border: `2px solid ${ring}`,
         backgroundColor: hover || lit ? t.hover : 'transparent' }}>
       <View style={{ alignItems: 'center' }}><Preview e={e} /></View>
-      <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.name}</Text>
-      <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
-        {[e.author || tr('settings.style.unknownAuthor'), e.version ? tr('settings.style.version', { version: e.version }) : ''].filter(Boolean).join(' · ')}
+      <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{e.name}</Text>
+      {/* the author and the version, a line each, cut with "…" (a development version, "0.8.9.6.1+ws168", is long) */}
+      <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>
+        {e.author || tr('settings.style.unknownAuthor')}
       </Text>
+      {e.version ? (
+        <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>
+          {tr('settings.style.version', { version: e.version })}
+        </Text>
+      ) : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
         {e.current ? <Pill label={tr('settings.style.inUse')} color={t.accent} /> : null}
         {e.community ? <Pill label={tr('settings.style.community')} color={tint.warn} /> : null}
