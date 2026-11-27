@@ -428,7 +428,7 @@ static JSValue f_settings_load(JSContext *c, JSValueConst this_val, int argc, JS
     return s;
 }
 
-/* lord.settings.save(text, durable): the file is written on bgsave.c's worker (GitHub #250: on a spinning disk the
+/* lord.settings.save(text, durable, queuedDurable): the file is written on bgsave.c's worker (GitHub #250: on a spinning disk the
  * rename over settings.json waited up to 650 ms for ext4's journal, the desktop frozen meanwhile); true once queued.
  * durable (session restore's marker): on the disk, synced, before this returns, after any save still queued. */
 static JSValue f_settings_save(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -446,8 +446,12 @@ static JSValue f_settings_save(JSContext *c, JSValueConst this_val, int argc, JS
     settings_path(path, sizeof path, "");
     /* second argument true: on the disk before this returns (session restore, sdk/sessionrestore.jsx) */
     int durable = argc > 1 && JS_ToBool(c, argv[1]) == 1;
+    /* third argument true (session restore's autosave, QA 0.8.9.6.2 BUG-I): as durable, but on the worker */
+    int queued_durable = !durable && argc > 2 && JS_ToBool(c, argv[2]) == 1;
     int ok;
-    if (durable) {
+    if (queued_durable) {
+        ok = bgsave_put(path, tmp, txt, len, BGS_FSYNC | BGS_SYNCDIR) == 0;
+    } else if (durable) {
         bgsave_flush(path);             /* an older save still queued must not land after this one */
         ok = bgsave_write_now(path, tmp, txt, len, BGS_FSYNC) == 0;
         if (ok) {

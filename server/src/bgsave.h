@@ -15,6 +15,9 @@
 #define BGS_FSYNC   1u          /* fsync the new file before the rename */
 #define BGS_PRIVATE 2u          /* the new file is 0600 (else 0666 less the umask, as fopen makes it) */
 #define BGS_UNIQUE  4u          /* tmp is a mkstemp template (…XXXXXX) instead of a fixed name */
+#define BGS_SYNCDIR 8u          /* fsync dst's folder after the rename (the rename itself on the disk) */
+/* A newer save of dst replacing one still queued keeps the older one's BGS_FSYNC and BGS_SYNCDIR: a durable save is
+ * never made plain by the next one (session restore's marker, then a setting changed). */
 
 #define BGS_SLOTS 8             /* files with a save queued at once; one more is written on the caller's thread */
 
@@ -28,6 +31,7 @@ int  bgsave_write_now(const char *dst, const char *tmp, const char *data, size_t
 #ifdef BGSAVE_TEST
 extern void (*bgsave_test_hook)(const char *dst);
 extern int bgsave_writes;       /* files written by the worker, for the coalescing check */
+extern unsigned bgsave_last_flags;  /* the flags of the worker's last write */
 #endif
 
 #endif

@@ -97,5 +97,9 @@ eq('second display', fitFrame({ x: 1400, y: 100, w: 400, h: 300 }, [...D, { x: 1
   eq('ask first: the terminal yes, a Linux app no', [M.asksFirst(L[1]), M.asksFirst(L[2])], [true, false]);
 }
 
+// QA 0.8.9.6.2 (BUG-I): how session restore's marker is saved
+eq('the last word is synchronous', M.markerSave(true), true);
+eq('the autosave is queued and durable', [M.markerSave(false), M.markerSave('theme')], ['queued', 'queued']);
+
 console.log(bad ? `session-model: ${bad}/${n} failed` : `session-model: ${n} ok`);
 process.exit(bad ? 1 : 0);

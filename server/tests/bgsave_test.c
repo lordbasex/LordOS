@@ -100,6 +100,22 @@ int main(void) {
     bgsave_flush(NULL);
     CHECK(same(dst, "durable"));
 
+    /* 2b. (QA 0.8.9.6.2, BUG-I) a durable save queued on the worker (session restore's autosave) stays durable when a
+     * plain save of the same file replaces it before it is written, and its folder is synced too */
+    set_gate(0);
+    CHECK(bgsave_put(dst, tmp, "busy", 4, 0) == 0);
+    wait_held();
+    CHECK(bgsave_put(dst, tmp, "marker", 6, BGS_FSYNC | BGS_SYNCDIR) == 0);
+    CHECK(bgsave_put(dst, tmp, "plain-after", 11, 0) == 0);
+    set_gate(1);
+    bgsave_flush(dst);
+    CHECK(same(dst, "plain-after"));
+    CHECK((bgsave_last_flags & (BGS_FSYNC | BGS_SYNCDIR)) == (BGS_FSYNC | BGS_SYNCDIR));
+    /* once written, the next plain save is plain again */
+    CHECK(bgsave_put(dst, tmp, "next", 4, 0) == 0);
+    bgsave_flush(dst);
+    CHECK(same(dst, "next") && bgsave_last_flags == 0);
+
     /* 3. a private store: 0600 from a mkstemp name next to it, nothing else left in the folder */
     char sub[300];
     snprintf(sub, sizeof sub, "%s/clip", D);

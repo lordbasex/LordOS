@@ -29,7 +29,7 @@ import { useLauncherApps, shortAppName } from './apps.js';
 import { admin } from './admin.js';
 import { syncStep, syncDone, SYNC_START, agentInput } from './adminsyncmodel.js';
 import { clipboard } from './clipboard.js';
-import { RESTORE_MODES, RESTORE_DEFAULT, MAX_WINDOWS, NEVER, cleanArgs, cleanFrame, cleanList, restoreDecision, restoreSplit, planRestore, fitFrame, launchesOnce } from './sessionmodel.js';
+import { RESTORE_MODES, RESTORE_DEFAULT, MAX_WINDOWS, NEVER, cleanArgs, cleanFrame, cleanList, restoreDecision, markerSave, restoreSplit, planRestore, fitFrame, launchesOnce } from './sessionmodel.js';
 
 const AUTOSAVE_MS = 2000;     // a dragged window or a new one reaches the disk this long after
 const START_MS = 1500;        // after the theme's first frames
@@ -80,9 +80,12 @@ const snapshot = () => windows.get().map(entryOf).filter(Boolean).slice(-MAX_WIN
 
 // ---- autosave ----
 
+// clean (the session's last word: logout, power, the end of lord-server): on the disk before this returns. Otherwise (the
+// autosave after each window change, GitHub #250, QA 0.8.9.6.2 BUG-I) durable too, but written and synced on
+// lord-server's save worker: the fsync of settings.json took 94 to 145 ms of the interface's thread under disk load.
 function write(list, clean) {
   settings.set({ sessionSaved: { clean, windows: list, active: activeIndex() } });
-  saveSettingsNow(true);
+  saveSettingsNow(markerSave(clean));
 }
 function fire() {
   timer = 0;

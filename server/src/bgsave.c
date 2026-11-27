@@ -28,6 +28,7 @@
 #ifdef BGSAVE_TEST
 void (*bgsave_test_hook)(const char *dst);
 int bgsave_writes;
+unsigned bgsave_last_flags;
 #endif
 
 typedef struct {
@@ -62,6 +63,14 @@ int bgsave_write_now(const char *dst, const char *tmp, const char *data, size_t 
     if (close(fd)) { if (ok) e = errno; ok = 0; }
     if (ok && rename(t, dst)) { e = errno; ok = 0; }
     if (!ok) { unlink(t); errno = e ? e : EIO; return -1; }
+    if (flags & BGS_SYNCDIR) {
+        char dir[PATH_MAX];
+        snprintf(dir, sizeof dir, "%s", dst);
+        char *sl = strrchr(dir, '/');
+        if (sl) { if (sl == dir) sl[1] = 0; else *sl = 0; } else snprintf(dir, sizeof dir, ".");
+        int d = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (d >= 0) { fsync(d); close(d); }
+    }
     return 0;
 }
 
@@ -83,6 +92,7 @@ static void *worker(void *arg) {
         pthread_mutex_unlock(&mu);
 #ifdef BGSAVE_TEST
         if (bgsave_test_hook) bgsave_test_hook(dst);
+        bgsave_last_flags = flags;
 #endif
         if (bgsave_write_now(dst, tmp, data, len, flags))
             fprintf(stderr, "lord-server: %s not saved: %s\n", dst, strerror(errno));
@@ -140,10 +150,11 @@ int bgsave_put(const char *dst, const char *tmp, const char *data, size_t len, u
         free(copy);
         return bgsave_write_now(dst, tmp, data, len, flags);
     }
+    unsigned keep = s->data ? s->flags & (BGS_FSYNC | BGS_SYNCDIR) : 0;    /* a durable save queued stays durable */
     free(s->data);                      /* an older text not written yet: only the newest matters */
     s->data = copy;
     s->len = len;
-    s->flags = flags;
+    s->flags = flags | keep;
     snprintf(s->tmp, sizeof s->tmp, "%s", tmp);
     pthread_cond_signal(&work_cv);
     pthread_mutex_unlock(&mu);

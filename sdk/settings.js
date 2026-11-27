@@ -162,11 +162,14 @@ settings.subscribe(() => {
   pending = setTimeout(() => lord.settings.save(JSON.stringify(settings.get(), null, 2)), 300);
 });
 
-// Now, not in 300 ms; durable: on the disk before this returns (session restore's marker must survive
-// a power cut). Blocks the frame for that write, so it's only for that.
+// Now, not in 300 ms. durable true: on the disk before this returns (session restore's last word must survive a power
+// cut); it blocks the frame for that write, so it's only for that. 'queued': as durable (synced, then the folder
+// synced), but on lord-server's save worker, never the frame's (session restore's autosave, #250); a later plain save
+// never drops the sync.
 export function saveSettingsNow(durable = false) {
   clearTimeout(pending);
-  return lord.settings.save(JSON.stringify(settings.get(), null, 2), durable);
+  const text = JSON.stringify(settings.get(), null, 2);
+  return durable === 'queued' ? lord.settings.save(text, false, true) : lord.settings.save(text, durable);
 }
 
 // [settings, set]: the component renders again on every change to any setting.

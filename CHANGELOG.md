@@ -420,6 +420,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Session restore's autosave still synced settings.json on the interface's thread** (BUG-I of the ws171 QA, GitHub
+  #250 partly open: "stall: call settings.save" of 94 to 145 ms under heavy disk IO, two seconds after each window
+  change). The marker is now written and synced on lord-server's save worker (`lord.settings.save(text, false, true)`:
+  `BGS_FSYNC` and the new `BGS_SYNCDIR`, the folder synced after the rename), so it stays durable without blocking a
+  frame; a later plain save of settings.json replacing it before it is written keeps the sync. Only the session's
+  last word (logout, power, the end of lord-server) is still written before the call returns. Tests: `bgsave-test`
+  (the sync kept through coalescing, the folder synced), `session-model-test` (`markerSave`).
 - **Settings' account card always showed initials** (BUG-K of the ws171 QA). The card at the top of Settings' sidebar
   now draws the account's picture when one is set, and otherwise its initials on its own color, as Users does
   (`UserAvatar`); it reads the account again when the Users page is opened or left.
