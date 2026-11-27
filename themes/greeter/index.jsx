@@ -214,7 +214,9 @@ function Greeter() {
   const [now, setNow] = useState(() => new Date());
   // a display plugged in or out while it shows: lay it out again on the main one
   useEffect(() => onScreenChange(() => setNow(new Date())), []);
-  const [info, setInfo] = useState({ users: [], host: '', mode: 'login', user: '' });
+  // heard: lord-sessiond's first hello answered. Until then the user area stays empty: no "No users" (and no login
+  // screen for a moment) while a locked session's screen comes back from a text console (QA of 0.8.9.6.2)
+  const [info, setInfo] = useState({ users: [], host: '', mode: 'login', user: '', heard: false });
   const [sel, setSel] = useState('');
   const [pass, setPass] = useState('');
   const [msg, setMsg] = useState('');
@@ -242,7 +244,7 @@ function Greeter() {
     const on = (m) => {
       if (m.t === 'hello') {
         // a boot time test restarts soon (LordBench, bench/boottest.h): when, by this screen's clock
-        setInfo((old) => ({ ...old, ...m, bootTest: m.bootTest ? { ...m.bootTest, end: Date.now() + m.bootTest.in * 1000 } : null }));
+        setInfo((old) => ({ ...old, ...m, heard: true, bootTest: m.bootTest ? { ...m.bootTest, end: Date.now() + m.bootTest.in * 1000 } : null }));
         // system keyboard and language (/etc/default/keyboard and /etc/default/locale)
         const layouts = String(m.layouts || 'us').split(',').filter(Boolean);     // no file: US, as the server's (#55)
         const variants = String(m.variants || '').split(',');
@@ -360,8 +362,8 @@ function Greeter() {
           </View>
         ) : null}
 
-        {/* selected user and password */}
-        <View style={{ position: 'absolute', left: 0, top: Math.round(H * 0.6) - avatarSize - lift, width: W, alignItems: 'center' }}>
+        {/* selected user and password (nothing until the first answer: never a "No users" that only means "not yet") */}
+        {info.heard ? <View style={{ position: 'absolute', left: 0, top: Math.round(H * 0.6) - avatarSize - lift, width: W, alignItems: 'center' }}>
           {user ? <Avatar user={user} size={avatarSize} /> : null}
           <Text style={{ marginTop: 14, fontSize: 16, fontWeight: 600, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,0.4)' }}>
             {user ? user.full || user.name : t('greeter.noUsers')}</Text>
@@ -390,7 +392,7 @@ function Greeter() {
               ))}
             </View>
           ) : null}
-        </View>
+        </View> : null}
 
         {/* the LordOS logo: the crown and the wordmark as live text (docs/brand/README.md) */}
         <View style={{ position: 'absolute', left: 0, bottom: 24, width: W, height: 28, alignItems: 'center', justifyContent: 'center' }}>

@@ -479,6 +479,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Login screen: no "No users" flash when a locked session comes back from a text console** (QA of 0.8.9.6.2:
+  Ctrl+Alt+F2 then Ctrl+Alt+F1 showed a login screen with no users for a moment before the lock screen). The greeter
+  drew its user area before lord-sessiond's first answer, so its empty list read as "No users"; it now draws nothing
+  there until that answer (`heard`).
 - **Community themes: the person's own wallpaper no longer takes the theme off at start** (BUG-H of the ws171 QA,
   reproduced on VM 127 with ws173: QA Tiny, the okminimal example, applied from Settings → Appearance died at once with
   `lord.fs.home refused`, then "a community theme draws with View, Text and Image" headless). `findWallpaper` read
