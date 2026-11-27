@@ -170,7 +170,7 @@ export function forceQuit(key) {
 
 export function recentItems(n = 10) {
   let list = [];
-  try { list = fs.recent(n, 30) || []; } catch (e) { list = []; }
+  try { list = fs.recentCached(n, 30) || []; } catch (e) { list = []; }
   if (!list.length) return [{ label: t('shell.recent.none'), disabled: true }];
   return list.slice(0, n).map((f) => ({ label: f.name || fs.basename(f.path), onClick: () => openFileWithApps(f.path, f.name) }));
 }

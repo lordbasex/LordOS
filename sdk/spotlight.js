@@ -233,9 +233,9 @@ function revealFile(f) {
 
 let recentCache = { at: 0, list: [] };
 function recentFiles() {
-  if (Date.now() - recentCache.at > 60000) {
+  if (Date.now() - recentCache.at > 60000 || !recentCache.list.length) {
     let list = [];
-    try { list = typeof lord !== 'undefined' && lord.fs?.recent ? fs.recent(200, 30) || [] : []; } catch (e) { list = []; }
+    try { list = typeof lord !== 'undefined' && lord.fs?.recent ? fs.recentCached(200, 30) || [] : []; } catch (e) { list = []; }
     recentCache = { at: Date.now(), list: list.filter((f) => f && f.name && !f.dir) };
   }
   return recentCache.list;

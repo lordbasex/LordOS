@@ -434,6 +434,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **The Recent widget and the search walked the whole home folder on the interface's thread** (ws171 QA on VM 116 and the
+  Pi: 250 ms to 1.6 s stalls about every minute on a 37 GB home, and at the start). `lord.fs.recentAsync` walks it on
+  lord-server's workers (`fsasync_submit_fn`, the same `fs_recent`), and `recentCached` (`sdk/fs.js`) gives the
+  widget, the search and the menus the last walk's list at once, with a new walk when it is a minute old and
+  `recentFiles` to draw again when it answers. Files' Recents (a person's click) still asks at once. Test:
+  `fs-recent-cache-test`.
 - **Machines → "Bring an exported machine" refused LordOS's own exports** (BUG-M of the ws171 QA on VM 116).
   lord-server read the export's `manifest.json` with the reader for LordOS's own root-owned store files, so the
   person's export never passed. An export now has its own reader, shared by lord-server (`exportInfo`,

@@ -51,6 +51,7 @@
 #include "../keyboard.h"
 #include "../fsops.h"
 #include "../fsasync.h"
+#include "../doc/wire.h"
 #include "../fswatch.h"
 #include "../remote/mirror.h"
 #include "js_share.h"
@@ -1638,6 +1639,46 @@ static JSValue f_fs_recent(JSContext *c, JSValueConst this_val, int argc, JSValu
     return a.arr;
 }
 
+/* lord.fs.recentAsync(limit, days) → req: the same walk on an fsasync.c worker (QA 0.8.9.6.2: on a 37 GB home it held
+ * the interface 250 ms to 1.6 s about every minute, for the Recent widget and the search); the answer comes as
+ * __lordFsReply(req, { recent: [{ path, name, dir, size, mtime }] }) */
+typedef struct { JBuf b; int n; } RecentJson;
+static void recent_json_cb(void *ud, const char *path, int dir, double size, double mtime) {
+    RecentJson *r = ud;
+    const char *base = strrchr(path, '/');
+    jb_raw(&r->b, r->n++ ? ",{\"path\":" : "{\"path\":");
+    jb_str(&r->b, path);
+    jb_raw(&r->b, ",\"name\":");
+    jb_str(&r->b, base ? base + 1 : path);
+    jb_printf(&r->b, ",\"dir\":%s,\"size\":%.0f,\"mtime\":%.3f}", dir ? "true" : "false", size, mtime);
+}
+static char *recent_job(const char *arg) {
+    int limit = 60, days = 30;
+    if (sscanf(arg, "%d %d", &limit, &days) != 2) return NULL;
+    RecentJson r = { .n = 0 };
+    jb_init(&r.b);
+    jb_raw(&r.b, "{\"recent\":[");
+    fs_recent(limit, days, recent_json_cb, &r);
+    jb_raw(&r.b, "]}");
+    if (r.b.oom) { jb_free(&r.b); return NULL; }
+    return r.b.p;
+}
+static JSValue f_fs_recent_async(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t limit = 60, days = 30;
+    if (argc > 0 && JS_IsNumber(argv[0])) JS_ToInt32(c, &limit, argv[0]);
+    if (argc > 1 && JS_IsNumber(argv[1])) JS_ToInt32(c, &days, argv[1]);
+    if (days < 1) days = 1;
+    if (days > 365) days = 365;
+    if (limit < 1) limit = 1;
+    if (limit > 500) limit = 500;
+    char arg[32], err[256] = "";
+    snprintf(arg, sizeof arg, "%d %d", (int)limit, (int)days);
+    int req = fsasync_submit_fn(recent_job, arg, err, sizeof err);
+    if (req < 0) return js_throw_line(c, err);
+    return JS_NewInt32(c, req);
+}
+
 static void vol_cb(void *ud, const char *path, const char *fstype, double total, double avail) {
     Acc *a = ud;
     JSValue o = JS_NewObject(a->c);
@@ -1806,6 +1847,7 @@ static const JSCFunctionListEntry fs_funcs[] = {
     JS_CFUNC_DEF("free", 1, f_fs_free),
     JS_CFUNC_DEF("search", 3, f_fs_search),
     JS_CFUNC_DEF("recent", 2, f_fs_recent),
+    JS_CFUNC_DEF("recentAsync", 2, f_fs_recent_async),
     JS_CFUNC_DEF("volumes", 0, f_fs_volumes),
 };
 int js_sys_unseen;

@@ -764,6 +764,9 @@ EOF
     # session restore's data rules (sdk/sessionmodel.js)
     if have node; then run "session-model-test (sdk/sessionmodel.js)" node tests/session_model_test.mjs
     else skip "session-model-test" "node"; fi
+    # (0.8.9.6.2) the recently changed files from a walk on lord-server's workers, never on the interface's thread
+    if have node; then run "fs-recent-cache-test (sdk/fs.js recentCached)" node tests/fs_recent_cache_test.mjs
+    else skip "fs-recent-cache-test" "node"; fi
     # window snapping geometry (sdk/snap.js): zones without gaps or overlaps, drop zones, Super+arrows
     if have node; then run "snap-test (sdk/snap.js)" node tests/snap_test.mjs
     else skip "snap-test" "node"; fi

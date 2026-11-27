@@ -56,7 +56,7 @@ import { configDirs, accountOf, leftText, alertOf, summarize } from './claudewid
 import { admin } from './admin.js';
 import { clockTimer, timerStart, timerPause, timerResume, timerReset, timerLeft, stopwatch, swStart, swStop, swReset, swElapsed } from './alarms.js';
 import { timerLayout, idleSeconds, PRESETS, PRESET_DROP } from './timerwidgetmodel.js';
-import { recent as fsRecent, basename } from './fs.js';
+import { recentCached as fsRecent, recentFiles, basename } from './fs.js';
 import { openFileWithApps } from './sysopen.js';
 import { lordosUpdate, restartNeeded } from './updates.js';
 import { storeUpdates } from './appcontrol.js';
@@ -1670,7 +1670,10 @@ function TimerBody({ w, L }) {
 const extOf = (n) => { const m = /\.([A-Za-z0-9]{1,5})$/.exec(String(n || '')); return m ? m[1].toUpperCase() : ''; };
 function RecentBody({ w, L }) {
   const n = w.size === 'l' ? 8 : 3;
-  const list = useEvery(() => { try { return fsRecent(n, 30) || []; } catch (e) { return []; } }, 60000, [n]) || [];
+  useStore(recentFiles);                            // a new walk's answer (it runs on lord-server's workers) draws again
+  useEvery(() => { fsRecent(n, 30); return 0; }, 60000, [n]);   // a new walk asked for each minute
+  let list = [];
+  try { list = fsRecent(n, 30) || []; } catch (e) { list = []; }
   return (
     <View style={{ flex: 1, gap: 6 }}>
       <Head L={L} title={t('shell.widgets.recent.name')} />

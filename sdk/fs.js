@@ -63,6 +63,31 @@ export const du = (path, ms) => lord.fs.du(path, ms);          // { size, files,
 export const free = (path) => lord.fs.free(path);              // { total, free } of the disk
 export const search = (dir, text, opts) => lord.fs.search(dir, text, opts);   // by name, no hidden files
 export const recent = (limit = 60, days = 30) => lord.fs.recent(limit, days);
+// The recently changed files for what refreshes by itself (the Recent widget, the search, a menu): the last walk's list,
+// at once, while a new walk runs on lord-server's workers when that one is a minute old (lord.fs.recentAsync, QA
+// 0.8.9.6.2: walking a 37 GB home on the interface's thread held it 250 ms to 1.6 s about every minute). [] until the
+// first walk answers; recentFiles says when a new list came. Files' Recents still asks lord.fs.recent (a person's click).
+const RECENT_MAX = 200;
+let recentList = null, recentAt = 0, recentBusy = false;
+const recentSubs = new Set();
+const NO_RECENT = Object.freeze([]);
+export const recentFiles = { get: () => recentList || NO_RECENT, subscribe: (fn) => { recentSubs.add(fn); return () => recentSubs.delete(fn); } };
+export function recentCached(limit = 60, days = 30) {
+  if (typeof lord === 'undefined' || typeof lord.fs?.recentAsync !== 'function') return lord.fs.recent(limit, days);
+  if (!recentBusy && (!recentList || Date.now() - recentAt > 60000)) {
+    recentBusy = true;
+    let req = 0;
+    try { req = lord.fs.recentAsync(RECENT_MAX, 30); } catch (e) { req = 0; }
+    if (!req) recentBusy = false;
+    else waiting.set(req, (r) => {
+      recentBusy = false;
+      recentAt = Date.now();
+      if (r && Array.isArray(r.recent)) { recentList = r.recent; for (const fn of recentSubs) fn(); }
+    });
+  }
+  const cut = Date.now() / 1000 - days * 86400;
+  return (recentList || []).filter((f) => !(f.mtime < cut)).slice(0, limit);
+}
 export const volumes = () => lord.fs.volumes();                // [{ path, name, fs, total, free }]
 
 // ---- off the interface's thread (server/src/fsasync.c, 0.8.8.7) ----
