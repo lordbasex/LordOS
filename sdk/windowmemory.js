@@ -6,7 +6,7 @@ import { settings } from './settings.js';
 import { windows, workAreaOf, getApp, setWindowMemory, assignedDisplayOf, isLiveSystem } from './windows.js';
 import { dockIdOfWindow } from './dock.js';
 import { placeOf, putPlace, restoreFrame } from './placemodel.js';
-import { placeKeyOf } from './shellxmodel.js';
+import { placeKeyOf, remembersPlace } from './shellxmodel.js';
 
 const SAVE_MS = 800;
 let timer = 0;
@@ -24,6 +24,7 @@ function save() {
     if (w.args?.guest) continue;                       // a guest's window: the guest says where it is (Machines' apps mode)
     const base = dockIdOfWindow(w) || w.app;
     if (base.startsWith('linux:linux#') || base === 'linux:') continue;   // nothing names this app
+    if (!remembersPlace(keyOf(w))) continue;          // the toolkit audit's windows (shellxmodel.js)
     const p = placeOf(w, displayFor(w.snapped && w.restore ? w.restore : w));
     if (!p) continue;
     const json = JSON.stringify(p);
@@ -38,6 +39,7 @@ function save() {
 }
 
 export function rememberedFrame(key, opts = {}) {
+  if (!remembersPlace(key)) return null;
   const p = (settings.get().windowPlaces || {})[key];
   if (!p) return null;
   const twins = windows.get().filter((w) => keyOf(w) === key).length;

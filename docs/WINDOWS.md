@@ -435,6 +435,7 @@ Each app reopens where it was: size, position, maximized and display, per app, i
 - **Snapped, keyboard-lifted:** the normal frame is saved, not the snapped or lifted one. Fullscreen and picture-in-picture save nothing.
 - **Fixed size:** a Linux window with equal minimum and maximum keeps the size it asks for, and only its position is remembered. A second window of an app opens 30 px along from the first.
 - Up to 200 apps are kept, oldest out first. Not on a live system.
+- **Never for the toolkit audit's windows** (`lordos-toolkit-audit*` app ids and X classes, any case; `sdk/shellxmodel.js` `remembersPlace`): they ask for 600x400 and check that they get it, so a size remembered from one run must not come back in the next (docs/TOOLKIT-AUDIT.md).
 
 ## The Window menu, the app menu and Force Quit (0.8.5)
 

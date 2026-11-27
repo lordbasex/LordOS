@@ -33,6 +33,11 @@ export function tagKey(tag) {
 // The key a window's place is remembered under (sdk/windowmemory.js): its app's, and with a tag that app's window of
 // that kind. Only ever beside the app's own Dock id, so one app's tag can't reach another app's places.
 export const placeKeyOf = (appKey, tag) => (appKey && tagKey(tag) ? `${appKey}#${tagKey(tag)}` : appKey);
+// The toolkit audit's own windows (tools/toolkit-audit, app ids and X classes lordos-toolkit-audit*) are never remembered
+// nor placed from memory: they ask for 600x400 and check that they get it. A size saved from one run (and, while the
+// harnesses shared an id, from another toolkit's window; any case: GTK's X class is "Lordos-toolkit-audit-gtk3") came back in every later run: qt5 and qt6 at 600x421, gtk3-x11
+// at 600x406, x11-xwayland back from fullscreen at its remembered size (BUG-12 and BUG-24 of the ws170 QA).
+export const remembersPlace = (key) => typeof key === 'string' && !!key && !/^(linux|desktop):lordos-toolkit-audit(?:$|[-#.])/i.test(key);
 // The description an app gave a window, as its name while it has no title (at most 120 characters).
 export const descriptionTitle = (d) => (typeof d === 'string' ? d.replace(/\s+/g, ' ').trim().slice(0, 120) : '');
 

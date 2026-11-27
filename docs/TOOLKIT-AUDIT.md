@@ -344,6 +344,28 @@ ASan and UBSan. It covers:
 The harnesses have their own checks (`tools/toolkit-audit/x11_test.py` against Xvfb, fast and in show mode). The report side is tested by
 `server/tests/hwreport_test.mjs` and `build/hwsnap-test` (docs/HARDWARE-REPORT.md).
 
+## The ws170 QA: `size` on five rows and `fullscreen` on `x11-xwayland` (in development, 2026-11-27)
+
+On the maintainer's three-display desktop `size` failed every time on `qt6-wayland` and `qt6-xcb` (600x421), on
+`gtk3-x11` (600x406, after 600 ms) and, with `--show`, on `qt5-wayland` and `qt5-xcb`; `x11-xwayland` failed
+`fullscreen` in `--show` mode (BUG-12 and BUG-24 of the QA). Neither the probes' content (Qt 6's minimum is 114x165,
+114x194 with the show label, under Inter 10) nor the GTK theme: **LordOS's window memory** (docs/WINDOWS.md,
+"Remembered places"). The person's `settings.windowPlaces` held a frame for every harness window (`linux:gtk3.py`
+600x441, `linux:Gtk3.py`, `linux:python3`, `linux:lordos-toolkit-audit-qt6` and `desktop:lordos-toolkit-audit` 602x464),
+saved from earlier runs, and shared between toolkits: the harnesses' ids were `python3` (Qt 5 on Wayland), the script's
+name (GTK) or `lordos-toolkit-audit` (Qt 5 on X11 and the X11 harness, which also matches the menu's
+`lordos-toolkit-audit.desktop`). Every run then opened at the remembered size, and `x11-xwayland` came back from
+fullscreen to it. With those five entries in a headless server's settings, `lordos-testbench --toolkits --show`
+reproduced exactly that row by row (93.8 %).
+
+**Fixed:** the shell neither remembers nor applies a place for `lordos-toolkit-audit*` app ids and X classes, in any case
+(`sdk/shellxmodel.js` `remembersPlace`, used by `sdk/windowmemory.js` on save and on restore; `tests/shellx_model_test.mjs`),
+and every harness names its window `lordos-toolkit-audit-<toolkit>` (GTK through `GLib.set_prgname` before the display
+opens, Qt 5 through `setDesktopFileName`). The check stays what it was: a window that asks for 600x400 must get it from
+the compositor. With the same stale entries, the headless run is at 100 % on all nine rows in `--show` mode, and
+nothing is saved for the harnesses afterwards. The stale entries in a person's settings are left alone and no longer
+read.
+
 ## The 0.8.9.6.2 QA: 98.5 % and 98.3 % on the maintainer's desktop (in development, 2026-11-27)
 
 Two runs on the maintainer's live session (three 1080p displays, RX 580 and an Intel iGPU, ws169): `qt6-wayland`

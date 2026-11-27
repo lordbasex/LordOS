@@ -1,7 +1,7 @@
 // node server/tests/shellx_model_test.mjs — the shell's side of the Wayland shell extras (sdk/shellxmodel.js): where a
 // window following a drag goes, the tag as part of a remembered place's key, a restored window's frame, the bell, blur boxes.
 import assert from 'node:assert/strict';
-import { chromeInset, dragFrameAt, tagKey, placeKeyOf, descriptionTitle, restoredFrame, bellAction, blurBoxes } from '../../sdk/shellxmodel.js';
+import { chromeInset, dragFrameAt, tagKey, placeKeyOf, descriptionTitle, restoredFrame, bellAction, blurBoxes, remembersPlace } from '../../sdk/shellxmodel.js';
 
 // the theme's frame: 1 px borders and a 41 px title bar (themes/default chrome { w: 2, h: 43 })
 const chrome = { w: 2, h: 43 };
@@ -67,4 +67,8 @@ assert.deepEqual(bellAction({ window: false, dnd: false }), { sound: true, atten
 assert.deepEqual(blurBoxes([[10, 10, 100, 50], [0, 0, 0, 5], [1, 2, 3], 'x', [1.4, 2.6, 3, 4]]), [{ x: 10, y: 10, w: 100, h: 50 }, { x: 1, y: 3, w: 3, h: 4 }]);
 assert.equal(blurBoxes(Array.from({ length: 40 }, () => [0, 0, 1, 1])).length, 16);
 assert.deepEqual(blurBoxes(null), []);
+// the toolkit audit's windows are never remembered (BUG-12, BUG-24 of the ws170 QA); every other app is
+for (const k of ['linux:lordos-toolkit-audit', 'linux:lordos-toolkit-audit-qt6', 'desktop:lordos-toolkit-audit', 'linux:lordos-toolkit-audit-gtk3#main', 'linux:Lordos-toolkit-audit-gtk3']) assert.equal(remembersPlace(k), false, k);
+for (const k of ['linux:org.gnome.TextEditor', 'desktop:firefox-esr', 'linux:lordos-toolkit-auditor', 'linux:python3', 'linux:gtk3.py']) assert.equal(remembersPlace(k), true, k);
+assert.equal(remembersPlace(''), false);
 console.log('shellx-model: ok');

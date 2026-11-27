@@ -871,6 +871,7 @@ def main():
         emit_and_exit(3)
         return
     app.setApplicationName('lordos-toolkit-audit')
+    app.setDesktopFileName('lordos-toolkit-audit-qt5')     # the Wayland app_id, not "python3" (no window memory for it)
     app.setQuitOnLastWindowClosed(False)
     win = Win()
     audit = Audit(app, win)

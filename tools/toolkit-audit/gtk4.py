@@ -67,6 +67,10 @@ try:
     import gi
     gi.require_version('Gtk', '4.0')
     gi.require_version('Gdk', '4.0')
+    from gi.repository import GLib
+    # the window's own app id and X class (never "python3" or the script's name), set before GTK opens the display:
+    # the shell keeps no window memory for lordos-toolkit-audit* (sdk/shellxmodel.js remembersPlace)
+    GLib.set_prgname('lordos-toolkit-audit-gtk4')
     from gi.repository import Gdk, Gio, GLib, GObject, Gtk
 except (ImportError, ValueError):
     emit(None, None, {i: {'ok': None, 'detail': 'skipped: not installed'} for i in IDS}, 3)
