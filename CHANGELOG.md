@@ -420,6 +420,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Settings' search didn't find a page by its rows** (BUG-18 of the ws170 QA: "Acomodar" and "borde" found nothing,
+  though Desktop & Dock has "Acomodar ventanas en los bordes de la pantalla"). Each section is now also found by the short
+  text its page shows: every row label, choice and short note, 1,356 keys over the 30 sections, listed in
+  `apps/settings/searchkeys.js`, generated from the pages by `tools/gen-settings-search.mjs` (it follows each section's
+  component and the Settings components it draws). `tests/settings_search_test.mjs`: in all 35 languages every one of
+  those texts finds its section by its first word, "acomodar" and "borde" find Desktop & Dock, and the generated file is
+  up to date.
 - **Files → Open with didn't offer LibreOffice installed from Flathub for an `.odt`** (BUG-22 of the ws170 QA). Only
   exports named exactly after an installed app's id were read, and LibreOffice declares its types in its other exports
   (`org.libreoffice.LibreOffice.writer.desktop`, `…calc`, …). An app's other exports, named after its id plus a suffix
