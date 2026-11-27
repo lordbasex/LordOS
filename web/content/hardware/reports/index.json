@@ -16,6 +16,7 @@
     "community-224-gigabyte-b760m-c.json": { "issue": 224, "fixedIn": {} },
     "community-230-asus-k72f.json": { "issue": 230, "fixedIn": {} },
     "community-245-acer-aspire-r3-131t.json": { "issue": 245, "fixedIn": {} },
-    "community-249-huawei-crefg-xx.json": { "issue": 249, "fixedIn": {} }
+    "community-249-huawei-crefg-xx.json": { "issue": 249, "fixedIn": {} },
+    "community-272-dell-inspiron-15-3511.json": { "issue": 272, "fixedIn": {} }
   }
 }

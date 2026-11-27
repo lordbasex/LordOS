@@ -410,6 +410,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   the size. `build/hands-test` (names, the native size on the bus, the write) and `tests/hands_e2e.py` (a screenshot and
   a zoom saved, full size, the firewall switches black in the file, no overwrite, no path).
 
+- **Hardware reports: #272 and the graphics card reports #273, #274, #276, #277 and #278 (`docs/HARDWARE-REPORT.md`,
+  updated 2026-11-27).** #272 adds a Dell Inspiron 15 3511 (Core i5-1135G7, Iris Xe on Tiger Lake-LP, 0.8.9-beta),
+  the first Tiger Lake machine: every row works except network, *limits* only because nothing was connected; its
+  brightness keys do nothing (listed as open). Its report joins the catalogue (`web/content/hardware/reports/`, index
+  and `assets/hwreport/snapshot.json` rebuilt: 17 reports, 109 device entries; `hwreport_test.mjs` expects it); the
+  snapshot is signed with the next `lordos-hwdata`. #278 (and #277, the same report twice) is an Intel HD Graphics 520,
+  the first Skylake GPU, smooth and composed on the GPU. #276 is a GTX 1070 on NVIDIA's proprietary driver 580.196.11
+  whose desktop is composed on the GPU with NVIDIA's OpenGL ES, smooth: the first Pascal card and the first report of
+  GPU composition on the proprietary driver. #274 is the first hybrid laptop (Tiger Lake-H UHD draws, a GTX 1650
+  Mobile on 550.163.01 doesn't), and its Monitor → GPU report #273 shows `lord-nvgpu` not finding NVML where Debian's
+  own `libnvidia-ml1` installs it (`/usr/lib/x86_64-linux-gnu/nvidia/current/`; listed as open). Counts now 31
+  physical machines, 14 with a report's data, 4 graphics card reports, 32 people, 19 Intel, 5 AMD and 3 NVIDIA GPUs;
+  the comparison, what works, open problems, untested combinations and thanks follow, and so do the paper (en, es,
+  pt, `docs/PAPER.md`), the own-desktop feature page, the FAQ, `GPU.md`, `SESSIONS.md`, `BENCHMARK.md`,
+  `PAPER-VALIDATION.md` and the draft tested-graphics-cards page (`web/content/hardware/gpus.*.md`).
+
 ### Tests
 - **`hands-e2e` no longer assumes this computer's state** (ws171 on a Pi): case 5 takes the first app row of
   Monitor → Network, whatever it is (it looked for "Machines"), so the handsDeny blackout checks run everywhere; case 9
