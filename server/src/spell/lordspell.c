@@ -49,7 +49,7 @@ static struct {
     char *(*encoding)(Hunhandle *);
 } H;
 
-static struct { Hunhandle *h; int latin1; } L[SPELL_LANGS_MAX];
+static struct { Hunhandle *h; int latin1; const char *marks; } L[SPELL_LANGS_MAX];
 static int nlang;
 
 /* a folder of the system: root's, not writable by group or others, every parent too */
@@ -152,7 +152,69 @@ static int known(int i, const char *w) {
     return H.spell(L[i].h, w) != 0;
 }
 
-/* suggestions from each language of the mask in turn, each valid and new, at most SPELL_SUGG_MAX */
+/* The letters a language writes with a mark, each after the plain one it stands for (pairs of UTF-8: plain, marked; the
+ * lowercase ones, then the capitals: a, a-acute, e, e-acute… for Spanish),
+ * for the words typed without their accents. Hunspell's own suggestions find most of them (MAP), but not always: in
+ * the 0.8.9.6.2 QA "cancion" got none in a session where "pelicula" got "película" (BUG-7). */
+static const char *const MARKS[][2] = {
+    { "es", "a" "\xc3\xa1" "e" "\xc3\xa9" "i" "\xc3\xad" "o" "\xc3\xb3" "u" "\xc3\xba" "n" "\xc3\xb1" "u" "\xc3\xbc"
+      "A" "\xc3\x81" "E" "\xc3\x89" "I" "\xc3\x8d" "O" "\xc3\x93" "U" "\xc3\x9a" "N" "\xc3\x91" "U" "\xc3\x9c" },
+    { "pt", "a" "\xc3\xa1" "a" "\xc3\xa2" "a" "\xc3\xa3" "a" "\xc3\xa0" "e" "\xc3\xa9" "e" "\xc3\xaa" "i" "\xc3\xad"
+      "o" "\xc3\xb3" "o" "\xc3\xb4" "o" "\xc3\xb5" "u" "\xc3\xba" "c" "\xc3\xa7"
+      "A" "\xc3\x81" "A" "\xc3\x82" "A" "\xc3\x83" "A" "\xc3\x80" "E" "\xc3\x89" "E" "\xc3\x8a" "I" "\xc3\x8d" "O"
+      "\xc3\x93" "O" "\xc3\x94" "O" "\xc3\x95" "U" "\xc3\x9a" "C" "\xc3\x87" },
+    { "fr", "e" "\xc3\xa9" "e" "\xc3\xa8" "e" "\xc3\xaa" "a" "\xc3\xa0" "a" "\xc3\xa2" "u" "\xc3\xb9" "u" "\xc3\xbb"
+      "i" "\xc3\xae" "i" "\xc3\xaf" "o" "\xc3\xb4" "c" "\xc3\xa7" "E" "\xc3\x89" "E" "\xc3\x88" "E" "\xc3\x8a"
+      "A" "\xc3\x80" "A" "\xc3\x82" "U" "\xc3\x99" "U" "\xc3\x9b" "I" "\xc3\x8e" "I" "\xc3\x8f" "O" "\xc3\x94" "C"
+      "\xc3\x87" },
+    { "it", "a" "\xc3\xa0" "e" "\xc3\xa8" "e" "\xc3\xa9" "i" "\xc3\xac" "o" "\xc3\xb2" "u" "\xc3\xb9"
+      "A" "\xc3\x80" "E" "\xc3\x88" "E" "\xc3\x89" "I" "\xc3\x8c" "O" "\xc3\x92" "U" "\xc3\x99" },
+    { "ca", "a" "\xc3\xa0" "e" "\xc3\xa8" "e" "\xc3\xa9" "i" "\xc3\xad" "o" "\xc3\xb2" "o" "\xc3\xb3" "u" "\xc3\xba"
+      "i" "\xc3\xaf" "u" "\xc3\xbc" "c" "\xc3\xa7"
+      "A" "\xc3\x80" "E" "\xc3\x88" "E" "\xc3\x89" "I" "\xc3\x8d" "O" "\xc3\x92" "O" "\xc3\x93" "U" "\xc3\x9a" "I"
+      "\xc3\x8f" "U" "\xc3\x9c" "C" "\xc3\x87" },
+    { "gl", "a" "\xc3\xa1" "e" "\xc3\xa9" "i" "\xc3\xad" "o" "\xc3\xb3" "u" "\xc3\xba" "n" "\xc3\xb1"
+      "A" "\xc3\x81" "E" "\xc3\x89" "I" "\xc3\x8d" "O" "\xc3\x93" "U" "\xc3\x9a" "N" "\xc3\x91" },
+    { "de", "a" "\xc3\xa4" "o" "\xc3\xb6" "u" "\xc3\xbc"
+      "A" "\xc3\x84" "O" "\xc3\x96" "U" "\xc3\x9c" },
+};
+static const char *marks_of(const char *tag) {
+    for (size_t i = 0; i < sizeof MARKS / sizeof MARKS[0]; i++)
+        if (!strncmp(tag, MARKS[i][0], 2) && (tag[2] == 0 || tag[2] == '_')) return MARKS[i][1];
+    return NULL;
+}
+static size_t u8len(const char *s) { unsigned c = (unsigned char)*s; return c < 0x80 ? 1 : c < 0xe0 ? 2 : c < 0xf0 ? 3 : 4; }
+static int add_sugg(SpellWord *out, int n, const char *asked, const char *s) {
+    size_t l = strlen(s);
+    if (n >= SPELL_SUGG_MAX || !strcmp(s, asked) || !spell_sugg_ok(s, l)) return n;   /* the word itself is no suggestion */
+    for (int m = 0; m < n; m++) if (!strcmp(out[m], s)) return n;
+    memcpy(out[n], s, l + 1);
+    return n + 1;
+}
+/* the word with one of its letters given its mark (each place, each mark), the ones the dictionary knows */
+static int marked(int i, const char *w, SpellWord *out, int n) {
+    const char *mk = L[i].marks;
+    if (!mk) return n;
+    size_t wl = strlen(w);
+    for (size_t at = 0; at < wl && n < SPELL_SUGG_MAX; at += u8len(w + at)) {
+        size_t cl = u8len(w + at);
+        for (const char *p = mk; *p && n < SPELL_SUGG_MAX;) {
+            size_t pl = u8len(p), ml = u8len(p + pl);
+            if (pl == cl && !memcmp(p, w + at, cl) && wl - cl + ml <= SPELL_WORD_MAX) {
+                char v[SPELL_WORD_MAX + 1];
+                memcpy(v, w, at);
+                memcpy(v + at, p + pl, ml);
+                memcpy(v + at + ml, w + at + cl, wl - at - cl + 1);
+                if (known(i, v)) n = add_sugg(out, n, w, v);
+            }
+            p += pl + ml;
+        }
+    }
+    return n;
+}
+
+/* suggestions from each language of the mask in turn, each valid and new and not the word itself, at most
+ * SPELL_SUGG_MAX; a language that suggests nothing gives the word with one accent it lacks, when it knows that */
 static int suggest(unsigned mask, const char *w, SpellWord *out) {
     int n = 0;
     for (int i = 0; i < nlang && n < SPELL_SUGG_MAX; i++) {
@@ -161,21 +223,21 @@ static int suggest(unsigned mask, const char *w, SpellWord *out) {
         const char *q = w;
         if (L[i].latin1) { if (to_latin1(w, l1, sizeof l1)) continue; q = l1; }
         char **list = NULL;
-        int k = H.suggest(L[i].h, &list, q);
+#ifdef SPELL_NOSUGGEST
+        int k = 0, before = n;                  /* tests only: Hunspell suggests nothing (the fallback alone) */
+        (void)q;
+#else
+        int k = H.suggest(L[i].h, &list, q), before = n;
+#endif
         for (int j = 0; j < k && n < SPELL_SUGG_MAX; j++) {
             char u[SPELL_WORD_MAX * 2 + 1];
             const char *s = list[j];
             if (!s) continue;
             if (L[i].latin1) { if (from_latin1(s, u, sizeof u)) continue; s = u; }
-            size_t l = strlen(s);
-            if (!spell_sugg_ok(s, l)) continue;
-            int dup = 0;
-            for (int m = 0; m < n; m++) if (!strcmp(out[m], s)) dup = 1;
-            if (dup) continue;
-            memcpy(out[n], s, l + 1);
-            n++;
+            n = add_sugg(out, n, w, s);
         }
         if (list) H.free_list(L[i].h, &list, k);
+        if (n == before) n = marked(i, w, out, n);
     }
     return n;
 }
@@ -222,6 +284,7 @@ int main(int argc, char **argv) {
         if (enc && (!strcmp(enc, "UTF-8") || !strcmp(enc, "utf-8"))) L[i].h = h;
         else if (enc && (!strcmp(enc, "ISO8859-1") || !strcmp(enc, "ISO-8859-1"))) { L[i].h = h; L[i].latin1 = 1; }
         else { H.destroy(h); continue; }       /* another 8-bit encoding: that language stays off */
+        L[i].marks = marks_of(tags[i]);
         ok[i] = 1;
     }
     /* nothing but the channel from here on, and then the sandbox: no files, no network, no exec */

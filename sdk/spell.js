@@ -94,7 +94,8 @@ function flush() {
       if (cache.size > CACHE_MAX) cache = new Map();
       words.forEach((w, i) => cache.set(w, r.good[i] === 1));
       bump();
-    } else if (!r || !r.ok) failedUntil = Date.now() + 30000;          // no dictionary or the helper failed: rest a while
+    } else if (r && r.error === 'spell.busy') { for (const w of words) pending.add(w); }   // a menu's suggestion went first
+    else if (!r || !r.ok) failedUntil = Date.now() + 30000;          // no dictionary or the helper failed: rest a while
     if (pending.size) schedule();
   };
   setTimeout(poll, 10);
@@ -118,21 +119,29 @@ export function useSpellRanges(text, enabled, caret = -1) {
   return enabled ? spellRanges(text, caret) : [];
 }
 
-// A word's suggestions: a promise of [strings] (empty when there are none or the helper isn't there)
+// A word's suggestions: a promise of [strings] (empty when there are none or the helper isn't there). A queue that was
+// full, or a helper that failed and is started again, is asked once more before the menu says there are none (BUG-7
+// of the 0.8.9.6.2 QA: "cancion" answered "No suggestions" though the dictionary has "canción").
 export function spellSuggest(word) {
   const a = api();
   return new Promise((resolve) => {
-    let id = 0;
-    try { id = a ? a.suggest(word) : 0; } catch (e) { id = 0; }
-    if (!(id > 0)) { resolve([]); return; }
     const until = Date.now() + 6000;
-    const poll = () => {
-      let r = null;
-      try { r = a.take(id); } catch (e) { r = { ok: false }; }
-      if (!r && Date.now() < until) { setTimeout(poll, 30); return; }
-      resolve(r && r.ok && Array.isArray(r.suggestions) ? r.suggestions.filter((s) => typeof s === 'string') : []);
+    let tries = 0;
+    const ask = () => {
+      tries++;
+      let id = 0;
+      try { id = a ? a.suggest(word) : 0; } catch (e) { id = 0; }
+      if (!(id > 0)) { if (a && tries < 2) { setTimeout(ask, 150); return; } resolve([]); return; }
+      const poll = () => {
+        let r = null;
+        try { r = a.take(id); } catch (e) { r = { ok: false }; }
+        if (!r && Date.now() < until) { setTimeout(poll, 30); return; }
+        if (r && !r.ok && r.error !== 'spell.nolang' && tries < 2 && Date.now() < until) { setTimeout(ask, 150); return; }
+        resolve(r && r.ok && Array.isArray(r.suggestions) ? r.suggestions.filter((s) => typeof s === 'string' && s !== word) : []);
+      };
+      setTimeout(poll, 10);
     };
-    setTimeout(poll, 10);
+    ask();
   });
 }
 

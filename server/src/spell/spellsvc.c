@@ -328,13 +328,16 @@ static char *run(Job *j, unsigned mask) {
     return o;
 }
 
-static void put_result(int id, char *json) {
-    pthread_mutex_lock(&S.mu);
+static void put_result_locked(int id, char *json) {
     int slot = 0;
     for (int i = 0; i < RESULTS; i++) if (!S.r[i].id) { slot = i; break; } else if (S.r[i].id < S.r[slot].id) slot = i;
     free(S.r[slot].json);                   /* the oldest one never taken */
     S.r[slot].id = id;
     S.r[slot].json = json;
+}
+static void put_result(int id, char *json) {
+    pthread_mutex_lock(&S.mu);
+    put_result_locked(id, json);
     pthread_mutex_unlock(&S.mu);
 }
 
@@ -423,10 +426,22 @@ static int submit(Job *j) {
         pthread_attr_destroy(&at);
         if (!S.started) { pthread_mutex_unlock(&S.mu); errno = EAGAIN; return -1; }
     }
+    /* a suggestion is a person waiting on a menu: it goes first, and a full queue drops its newest check for it (the
+     * field asks about those words again) rather than answering the menu with nothing (BUG-7 of the 0.8.9.6.2 QA) */
+    if (S.nq >= QUEUE && j->kind == J_SUGGEST && S.q[S.nq - 1].kind == J_CHECK) {
+        put_result_locked(S.q[S.nq - 1].id, errjson("spell.busy"));
+        S.nq--;
+    }
     if (S.nq >= QUEUE) { pthread_mutex_unlock(&S.mu); errno = EBUSY; return -1; }
     if (++S.next_id <= 0) S.next_id = 1;
     j->id = S.next_id;
-    S.q[S.nq++] = *j;
+    if (j->kind == J_SUGGEST) {
+        int at = 0;
+        while (at < S.nq && S.q[at].kind == J_SUGGEST) at++;          /* after the suggestions already asked for */
+        memmove(S.q + at + 1, S.q + at, sizeof S.q[0] * (size_t)(S.nq - at));
+        S.q[at] = *j;
+        S.nq++;
+    } else S.q[S.nq++] = *j;
     pthread_cond_signal(&S.cv);
     pthread_mutex_unlock(&S.mu);
     return j->id;

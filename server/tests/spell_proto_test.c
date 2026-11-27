@@ -307,6 +307,48 @@ static void end_to_end(const char *helper, const char *probe, const char *evil) 
         free(r);
         spell_stop();
     } else printf("es_ES: skipped: needs hunspell-es\n");
+    /* (BUG-7 of the 0.8.9.6.2 QA) es_AR, the dictionary an Argentine session picks: accents missing, a word each */
+    if (!access("/usr/share/hunspell/es_AR.dic", R_OK)) {
+        spell_set_paths(SPELL_DIR, helper, NULL);
+        const char *ar[] = { "es_AR" };
+        CHECK(spell_set_langs(ar, 1) == 1);
+        static const struct { const char *bad, *want; } acc[] = {
+            { "cancion", "canción" }, { "pelicula", "película" }, { "camion", "camión" }, { "accion", "acción" },
+            { "arbol", "árbol" }, { "musica", "música" }, { "telefono", "teléfono" }, { "corazon", "corazón" },
+            { "Cancion", "Canción" }, { "CANCION", "CANCIÓN" },
+        };
+        for (size_t i = 0; i < sizeof acc / sizeof acc[0]; i++) {
+            r = wait_for(spell_submit_suggest(acc[i].bad));
+            char want[64];
+            snprintf(want, sizeof want, "\"%s\"", acc[i].want);
+            CHECK(r && strstr(r, want));
+            printf("es_AR suggest %s: %s\n", acc[i].bad, r ? r : "(nothing)");
+            free(r);
+        }
+        spell_stop();
+        /* when Hunspell suggests nothing, the word with the one accent it lacks (lord-spell built with SPELL_NOSUGGEST,
+         * next to the helper); never the word itself */
+        char nosugg[1024];
+        snprintf(nosugg, sizeof nosugg, "%s", helper);
+        char *sl = strrchr(nosugg, '/');
+        if (sl) snprintf(sl + 1, sizeof nosugg - (size_t)(sl + 1 - nosugg), "lord-spellnosugg-test");
+        if (!access(nosugg, X_OK)) {
+            spell_set_paths(SPELL_DIR, nosugg, NULL);
+            CHECK(spell_set_langs(ar, 1) == 1);
+            static const struct { const char *bad, *want; } fb[] = {
+                { "cancion", "{\"ok\":true,\"suggestions\":[\"canción\"]}" }, { "arbol", "{\"ok\":true,\"suggestions\":[\"árbol\"]}" },
+                { "pinguino", "{\"ok\":true,\"suggestions\":[\"pingüino\"]}" }, { "nino", "{\"ok\":true,\"suggestions\":[\"niño\"]}" },
+                { "Cancion", "{\"ok\":true,\"suggestions\":[\"Canción\"]}" }, { "zzzq", "{\"ok\":true,\"suggestions\":[]}" },
+            };
+            for (size_t i = 0; i < sizeof fb / sizeof fb[0]; i++) {
+                r = wait_for(spell_submit_suggest(fb[i].bad));
+                CHECK(r && !strcmp(r, fb[i].want));
+                printf("es_AR fallback %s: %s\n", fb[i].bad, r ? r : "(nothing)");
+                free(r);
+            }
+            spell_stop();
+        } else printf("es_AR fallback: skipped: needs build/lord-spellnosugg-test\n");
+    } else printf("es_AR: skipped: needs hunspell-es\n");
 
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", tmpdir);

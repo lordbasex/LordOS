@@ -418,6 +418,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **The local model engine outlived its session** (BUG-6 of the 0.8.9.6.2 QA: a `llama-server -t 2 -ngl 0` of an
+  earlier session still running 9 hours later, its parent gone). lord-llm now sets `PR_SET_PDEATHSIG` (SIGKILL), first
+  and again just before the exec (it stays set across it: llama-server is no set-user-ID program), and checks that its
+  parent is the lord-server `LORD_LLM_PARENT` names (`llm/engine.c` passes its pid): a lord-server already gone starts
+  nothing. `build/llm-engine-test`: a stand-in lord-server starts lord-llm with the fake engine in its sandbox and
+  exits, and the engine must be gone within 3 s; a parent other than the one named is refused (both fail on the old
+  launcher).
+- **Spelling: "cancion" said "No suggestions"** (BUG-7 of the 0.8.9.6.2 QA; "pelicula" did suggest "película").
+  Through the real helper and es_AR every accent case suggests the right word, so the menu's empty answer came from a
+  failed or refused request; the path is now sturdier at each step: a suggestion goes first in the service's queue and a
+  full queue drops its newest check for it instead of refusing the menu (`spellsvc.c`); the SDK asks once more when the
+  queue was full or the helper had failed (`spellSuggest`), and a dropped check is asked again without resting; and
+  lord-spell itself, when a language's Hunspell suggests nothing, offers the word with the one accent it lacks that the
+  dictionary knows (Spanish, Portuguese, French, Italian, Catalan, Galician, German marks), and never the word itself
+  as its own suggestion ("musica" listed "musica"). `build/spell-test`: es_AR's cancion, pelicula, camion, accion,
+  arbol, musica, telefono, corazon, Cancion and CANCION; the fallback alone (a test build whose Hunspell suggests
+  nothing): canción, árbol, pingüino, niño, Canción, and nothing for a word with no accented twin.
 - **Hands: `close_window` answered `closed:false` for a Linux app's window that went a moment later, and `open_app`
   answered before the app had drawn, so a `find` right after it found nothing** (FIX-2 and FIX-3 of the 0.8.9.6.2 QA).
   Both now wait over the next frames, never blocking the desktop: `close_window` until the window is gone (at most
