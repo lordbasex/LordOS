@@ -420,6 +420,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Hands: a window's screenshot left out its own open pop-up** (BUG-17 of the ws170 QA: Settings → AI → Voice's open
+  Language list was missing). A window's capture now also paints the menus and pop-ups that are that window's (the shell
+  surfaces marked `handsWin`, below the system band only), as it paints its sheets, and grows to hold a list that hangs
+  past the window's edge (`sdk/handsmodel.js` `unionBox`). Tests: `hands-model-test`, `tests/hands_e2e.py` case 9 (the
+  list in the window's screenshot; `set_value` by the option's label).
+- **Settings → Keyboard: "❖ · F4" read as ❖+F4** (BUG-21 of the ws170 QA: an agent's `super+F4` didn't open Apps). A
+  modifier the list shows by itself, pressed and released alone, now says so: Flow's Apps row is "❖ alone · F4", and
+  the same for ⌥ (the menu bar) and Classic's Start menu (`shell.shortcuts.alone`, every language); and ❖+F4 now opens
+  Apps too in Flow and Celeste (LordOS-themes fix/qa-ws170). An agent's `super+m` right after its click in Settings was
+  checked on a headless desktop: it minimizes. Test: `tests/shortcuts_list_scene.mjs` (Flow, Classic).
+- **Hands: `open_app` didn't find a Linux app by its name in another language** (BUG-23 of the ws170 QA: "Auditoría de
+  toolkits" on an English desktop). The list of Linux apps now carries every `Name[xx]` of each `.desktop` file (each
+  once, whole names, never a variant such as `Name[en@shaw]`; `lord.apps.linux` `names`), and `open_app` matches them
+  as well as the plain `Name`. Test: `apps-actions-test`.
 - **Web apps: a right-click menu stayed on screen after its window closed** (BUG-31 of the ws170 QA). lord-web keeps
   running in the background when its window closes, so the menu it had asked for (the shell's, in the system layer, with
   a full-screen catcher) never got its "gone" and outlived a window an AI agent closed: every Hands screenshot was black

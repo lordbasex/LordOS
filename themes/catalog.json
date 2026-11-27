@@ -93,8 +93,8 @@
     },
     {
      "path": "index.jsx",
-     "size": 17718,
-     "sha256": "8b25ee49c32251cf2b6de53877064e5b844b54297b9d29a832ce162d25114e2e"
+     "size": 17729,
+     "sha256": "2a514494713a10f0aaefcdb4f3262f4337cf858171124f2f03f518eae5cde476"
     },
     {
      "path": "minimize.js",
@@ -421,8 +421,8 @@
     },
     {
      "path": "tiler.js",
-     "size": 26871,
-     "sha256": "3cb1107ac068342c7e42e97558d1c24479d8d5da9d18b36ed5f49055c35087ef"
+     "size": 27688,
+     "sha256": "2db1f544315f058925c9d7e414da8a4ca2ee80bdc79ffd4039c4884f3417a56f"
     },
     {
      "path": "tokens.js",
@@ -535,8 +535,8 @@
     },
     {
      "path": "index.jsx",
-     "size": 16918,
-     "sha256": "30ee41949da205526ec5b3a76ec53d3e7d9261d3d63aad3d3f42b2311c5a2561"
+     "size": 16929,
+     "sha256": "601739e251e9d936fae15a904ea484c8947909610d67a8f0562b2b68d2b8574c"
     },
     {
      "path": "mediaHook.js",
