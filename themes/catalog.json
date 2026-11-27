@@ -63,8 +63,8 @@
     },
     {
      "path": "components/Dock.jsx",
-     "size": 25432,
-     "sha256": "d8e7f504b4961ed0df333c49e29ae28432d52f26dcba26df9ee4e3842fe24442"
+     "size": 25753,
+     "sha256": "f825e12bc3c8fef5bc8dbe92107c3cf1f7f6b33781d01414cf398b32145a040e"
     },
     {
      "path": "components/Launchpad.jsx",
@@ -78,8 +78,8 @@
     },
     {
      "path": "components/MenuBar.jsx",
-     "size": 13467,
-     "sha256": "b9baa4a7dbdf5d027f351ede9c99448a74c5e227bf08f0351b63f0cd4cc78b72"
+     "size": 14533,
+     "sha256": "f457aa4f85dffad10c66c5d08eae810cc5274a42651a20a87a0072009d50e688"
     },
     {
      "path": "components/NotificationCenter.jsx",
@@ -88,13 +88,13 @@
     },
     {
      "path": "components/Window.jsx",
-     "size": 8747,
-     "sha256": "623878f82c4e6860dd8b7190eaa4440d05a3c024337a4456c994b84012502836"
+     "size": 9026,
+     "sha256": "a80a805eef20b5f118040fb16f88eaf315f324e800ba4f74cf2f148c3909b89d"
     },
     {
      "path": "index.jsx",
-     "size": 17324,
-     "sha256": "d78c081744153d9c1429d93a1dc6c180df50a1687a786d6549a066c7feb4b5d3"
+     "size": 17718,
+     "sha256": "8b25ee49c32251cf2b6de53877064e5b844b54297b9d29a832ce162d25114e2e"
     },
     {
      "path": "minimize.js",
@@ -192,13 +192,13 @@
     },
     {
      "path": "components/Taskbar.jsx",
-     "size": 20923,
-     "sha256": "fc83ea8ece28ec3d8fe3391720c43e1256f87236ac9ec64919f05f4a8c7370d2"
+     "size": 21229,
+     "sha256": "db6b18d071128c0be258d1be640fdac3887c13e1962d9d050ffbc3cb504d1075"
     },
     {
      "path": "components/Window.jsx",
-     "size": 16849,
-     "sha256": "43768d3e71a820b20cb9c09f65669672920f0d1a6e1d4e43d3906e92304d5105"
+     "size": 17128,
+     "sha256": "d0c76a2c88c32c71e735e687489671b3eba48c76a421c38a9f06edddbe7991e6"
     },
     {
      "path": "glyphs.jsx",
@@ -207,8 +207,8 @@
     },
     {
      "path": "index.jsx",
-     "size": 16930,
-     "sha256": "cdeb94e07dc44d776e6027e4cf9e25b05c5290a8cfadb978156f0a12fcc80c6c"
+     "size": 17075,
+     "sha256": "e0a0eaefcfc219f53f392d445f926ba7cbef0128d23316f813c6093bc269d06b"
     },
     {
      "path": "placement.js",
@@ -500,8 +500,8 @@
     },
     {
      "path": "components/Bar.jsx",
-     "size": 8860,
-     "sha256": "68096f5d7a15f1ca2a29e2b304e41bc66936bb903c4bc5a6eac1f131a9514138"
+     "size": 9160,
+     "sha256": "a3faf392c9aebd77d7a3e1c5fe878daa0e9b71974cc3ada4e90c002c0988d050"
     },
     {
      "path": "components/Drawer.jsx",
@@ -530,13 +530,13 @@
     },
     {
      "path": "components/Window.jsx",
-     "size": 10930,
-     "sha256": "1178bfbfa882b8808b5c7ff5609957b9ead8c124fe49ffeb7d1712159b5278ff"
+     "size": 11209,
+     "sha256": "457dbd72d42ec17dacded82c1a95a395ec8a5880decd02e0409620fa20e9e74b"
     },
     {
      "path": "index.jsx",
-     "size": 16729,
-     "sha256": "ecc108d944d4dfd67012a92bdb1a6e23d62deead39e6dc3def02711a52cb83f8"
+     "size": 16918,
+     "sha256": "30ee41949da205526ec5b3a76ec53d3e7d9261d3d63aad3d3f42b2311c5a2561"
     },
     {
      "path": "mediaHook.js",
@@ -629,13 +629,13 @@
     },
     {
      "path": "components/Taskbar.jsx",
-     "size": 5324,
-     "sha256": "efd5e9dc545879d8fb7842cd7e2f01168fd64ccd0a2e87884d00d1fc45465b55"
+     "size": 5612,
+     "sha256": "f50a760cc553acb29e1c2047fb48ce77b314e731083c781a8bee05a856587f7b"
     },
     {
      "path": "components/Window.jsx",
-     "size": 7832,
-     "sha256": "3cfc18f2459827b451226c5b02d933e9b685920a88eb4fa1a369483c72bb749d"
+     "size": 8111,
+     "sha256": "3a99278067b6f5669a2777064cbd5314cdbe1b5f13a68e39de65bea2d7e5be06"
     },
     {
      "path": "glyphs.jsx",
@@ -644,8 +644,8 @@
     },
     {
      "path": "index.jsx",
-     "size": 9667,
-     "sha256": "6668e4832a89c60fa474638dd7370b6579ea5dc3d660a2ae390855278d609873"
+     "size": 10048,
+     "sha256": "4719a6b8b5196279b8b800bcb1bbcd1c562186a9e0621d1079f7a9455c64a16f"
     },
     {
      "path": "skins/apps.jsx",
@@ -664,8 +664,8 @@
     },
     {
      "path": "skins/files.jsx",
-     "size": 20035,
-     "sha256": "5331a996a4ee8356f25853ce0f5f8d6041e711c161415567588a29fd970cf61c"
+     "size": 20359,
+     "sha256": "469426471f87660d48e61578df19cdaf1901a133ff661f906989f5017d051abb"
     },
     {
      "path": "skins/settings.jsx",
