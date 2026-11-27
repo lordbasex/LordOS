@@ -519,15 +519,19 @@ function FirstRun({ host, onNew, onImport, onCheck, onCanRun }) {
   const narrow = useNarrow();       // a small window: the two panes one above the other
   return (
     <View style={{ flex: 1, flexDirection: narrow ? 'column' : 'row', gap: 16, padding: 16 }}>
-      <View style={{ flex: 1, padding: narrow ? 16 : 28, alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 18, backgroundColor: side ? p.raised : 'transparent' }}>
+      {/* centred while it fits, and it scrolls in a short window instead of spilling out (GitHub #266) */}
+      <View style={{ flex: 1, justifyContent: 'center', borderRadius: 18, backgroundColor: side ? p.raised : 'transparent' }}>
+       <ScrollView style={{ flex: -1 }} contentStyle={{ padding: narrow ? 16 : 28, alignItems: 'center', gap: 10 }}>
         <AppMark size={96} />
         <Text style={{ marginTop: 8, fontSize: 20, fontWeight: 700, color: p.text }}>{tr('machines.empty')}</Text>
         <Text style={{ maxWidth: 420, fontSize: 13, lineHeight: 1.5, color: p.dim, textAlign: 'center' }}>{tr('machines.first.addHint')}</Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+        {/* the buttons wrap onto a second row when they don't fit (GitHub #266: French clipped both ends) */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignSelf: 'stretch', gap: 8, marginTop: 6 }}>
           <Btn primary label={tr('machines.newMachine')} onClick={onNew} />
           <Btn label={tr('machines.first.import')} onClick={onImport} />
           {onCanRun ? <Btn label={tr('machines.pi.menu')} onClick={onCanRun} /> : null}
         </View>
+       </ScrollView>
       </View>
       {side ? (
         <View style={{ flex: 1, padding: narrow ? 16 : 28, gap: 12, borderRadius: 18, backgroundColor: p.raised }}>
@@ -540,7 +544,7 @@ function FirstRun({ host, onNew, onImport, onCheck, onCanRun }) {
             <Text style={{ fontSize: 20, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.first.offTitle')}</Text>
             <Text style={{ fontSize: 14, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr('machines.first.offText')}</Text>
             <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{tr('machines.first.emulated')}</Text></View>
-            <View style={{ flexDirection: 'row', gap: 8 }}><Btn big label={tr('machines.first.checkAgain')} onClick={onCheck} /><Btn big label={tr('machines.first.continueEmulated')} onClick={onNew} /></View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}><Btn big label={tr('machines.first.checkAgain')} onClick={onCheck} /><Btn big label={tr('machines.first.continueEmulated')} onClick={onNew} /></View>
           </>}
         </View>
       ) : null}

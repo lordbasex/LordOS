@@ -51,7 +51,7 @@ function Tile({ title, hint, onClick, selected, disabled, mark, height = 76, dro
       {mark}
       <View>
         <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
-        {hint ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{hint}</Text> : null}
+        {hint ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{hint}</Text> : null}
       </View>
       {children}
     </View>
@@ -781,13 +781,15 @@ function DetectPage({ detect, dp, sys, ver, path, host, onOther }) {
   </>;
 }
 
-// a group card's mark: the group's two machines and a badge "Group · 2 machines"
+// a group card's mark: the group's two machines and a badge "Group · 2 machines". The badge takes the room left
+// beside the mark and wraps onto a second line in a long language (GitHub #266: "Groupe · 2 machines" ran out of the
+// card in French)
 function GroupTileMark({ n }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <View style={{ width: 56, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', background: `linear-gradient(135deg, ${groupColors[0]}, ${groupColors[1]})` }}><GroupMark size={26} /></View>
-      <View style={{ height: 20, paddingHorizontal: 8, borderRadius: 10, justifyContent: 'center', backgroundColor: 'rgba(125,70,152,0.85)' }}>
-        <Text style={{ fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>{tr('machines.whonix.badge', { n })}</Text>
+      <View style={{ width: 56, height: 40, flexShrink: 0, borderRadius: 8, alignItems: 'center', justifyContent: 'center', background: `linear-gradient(135deg, ${groupColors[0]}, ${groupColors[1]})` }}><GroupMark size={26} /></View>
+      <View style={{ flexShrink: 1, minWidth: 0, minHeight: 20, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, justifyContent: 'center', backgroundColor: 'rgba(125,70,152,0.85)' }}>
+        <Text style={{ fontSize: 11, lineHeight: 1.25, fontWeight: 700, color: '#fff', textAlign: 'start', numberOfLines: 2, textOverflow: 'ellipsis' }}>{tr('machines.whonix.badge', { n })}</Text>
       </View>
     </View>
   );

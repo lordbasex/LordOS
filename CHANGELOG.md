@@ -461,6 +461,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Machines: buttons and the Whonix badge ran out of their space in long languages** (GitHub #266, French). The
+  empty library's three buttons (New Machine, Import a machine, What This Computer Can Run) sat in one row that clipped
+  both ends; they now wrap onto more rows, centred, and the pane scrolls in a short window instead of spilling out
+  (`FirstRun` in `apps/machines/library.jsx`; "Check Again" and "Continue Emulated" wrap too). The assistant's Whonix
+  card badge ("Groupe · 2 machines") was kept on one line past the card's edge; it now takes the room beside the
+  mark and wraps onto a second line, and a card's one-line hint ends with an ellipsis
+  (`apps/machines/assistant.jsx`). Checked with headless screenshots in French and German at 760×500 and 1100×700
+  (`tests/machines_group_headless.sh`'s scene, an empty library and a window that small).
 - **The keyboard's light stayed on while the display was off** (GitHub #270, a MacBookPro12,1: it went off only when
   the computer slept). lord-server sends the idle stages "off" and "wake" (`server/src/hw/display.c`), but the
   desktop only acted on lock, sleep, suspend and resume. Now "off" turns every lit `*::kbd_backlight` off and
