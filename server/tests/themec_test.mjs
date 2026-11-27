@@ -143,6 +143,9 @@ ok(`${refused.length} refusals (eval, Function, globalThis, __ names, constructo
   });
   assert.ok(!bad.code && bad.report.findings.some((f) => /outside the theme/.test(f.message)), JSON.stringify(bad.report.findings));
   ok('a parent import inside the theme builds; one that leaves it is refused');
+  const credits = theme({ 'index.jsx': `import { startShell } from '@lordos/sdk';\nstartShell(null);\n`, 'PROVENANCE.md': '# Provenance\n', 'THIRD_PARTY.md': '# Third party\n' });
+  assert.ok(credits.keep.includes('PROVENANCE.md') && credits.keep.includes('THIRD_PARTY.md'), JSON.stringify(credits.keep));
+  ok('the credits files (PROVENANCE.md, THIRD_PARTY.md) are installed');
 }
 {
   const r = C.compile({ id: 'okminimal', files: readTheme(path.join(here, 'community_themes', 'okminimal')) });

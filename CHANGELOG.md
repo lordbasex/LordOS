@@ -479,6 +479,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Community themes: `PROVENANCE.md` is installed with the theme** (the credits file LordOS-themes and the kit now
+  use): lord-themec's build (`keep`) and lord-server's install list (`ts_valid_name`) kept `THIRD_PARTY.md` but not
+  `PROVENANCE.md`. Tests: `themec_test.mjs`, `themestore-test`.
 - **Status items drawn as pictures follow the bar's colour** (Meridian review: a status item ignored `color`). The
   Cleaner's item picks its light or dark picture by `<StatusItems color>` when a theme gives one (`lightColor` in
   `sdk/statusitems.js`), else by the mode as before; tray icons and their initials take the colour too.

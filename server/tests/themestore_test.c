@@ -144,6 +144,7 @@ int main(int argc, char **argv) {
 
     /* names */
     CHECK(ts_valid_name("theme.js") && ts_valid_name("assets/a/b.png") && ts_valid_name("locales/zh-Hans.json"), "names: theme files accepted");
+    CHECK(ts_valid_name("THIRD_PARTY.md") && ts_valid_name("PROVENANCE.md") && !ts_valid_name("OTHER.md"), "names: the credits files (THIRD_PARTY.md, PROVENANCE.md) kept");
     CHECK(!ts_valid_name("../x") && !ts_valid_name("/etc/passwd") && !ts_valid_name("assets/../theme.js") &&
           !ts_valid_name("assets/x.svg") && !ts_valid_name("install.json") && !ts_valid_name("index.jsx") &&
           !ts_valid_name("assets//x.png") && !ts_valid_name("locales/x/en.json") && !ts_valid_name(".hidden"), "names: others refused");

@@ -67,7 +67,7 @@ int ts_valid_name(const char *name) {
     }
     if (levels > 6) return 0;
     if (!strcmp(name, "theme.json") || !strcmp(name, "theme.js") || !strcmp(name, "LICENSE") || !strcmp(name, "NOTICE") ||
-        !strcmp(name, "THIRD_PARTY.md") || !strcmp(name, "README.md")) return 1;
+        !strcmp(name, "THIRD_PARTY.md") || !strcmp(name, "PROVENANCE.md") || !strcmp(name, "README.md")) return 1;
     if (!strncmp(name, "assets/", 7)) {
         char low[TS_PATH_MAX + 1];
         for (size_t i = 0; i <= n; i++) low[i] = (char)(name[i] >= 'A' && name[i] <= 'Z' ? name[i] + 32 : name[i]);

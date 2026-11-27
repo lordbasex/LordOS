@@ -866,7 +866,7 @@
     const errors = findings.filter((x) => x.level === 'error').length;
     const warnings = findings.filter((x) => x.level === 'warning').length;
     const keep = errors ? [] : files.map((f) => f.name).filter((nm) => nm === 'theme.json' || (nm.startsWith('assets/') && IMAGE_EXT.includes(extOf(nm))) ||
-      /^locales\/[A-Za-z-]+\.json$/.test(nm) || ['LICENSE', 'NOTICE', 'THIRD_PARTY.md', 'README.md'].includes(nm));
+      /^locales\/[A-Za-z-]+\.json$/.test(nm) || ['LICENSE', 'NOTICE', 'THIRD_PARTY.md', 'PROVENANCE.md', 'README.md'].includes(nm));
     const caps = meta && Array.isArray(meta.capabilities) ? meta.capabilities.filter((c) => CAPABILITIES.includes(c)) : [];
     return {
       report: {
