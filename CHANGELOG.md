@@ -551,9 +551,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   r k Space gave " ", not "가 "). The input method committed the syllable and passed the key on, but both reached the
   field in the same JavaScript turn, and the field (`TextInput`, `TextArea`) still read its value from its last render:
   the Space was applied over the old value. lord-server now runs the commit's render (its promise jobs) before the key
-  that ended the syllable (`js_key`), and the SDK's fields keep the value they just sent until the next render.
+  that ended the syllable (`js_key`), for every field (the SDK's, Notes', Mail's, the editor's).
   Tests: `ime-test` cases (Space, Shift jamo, a full stop and Enter commit first: "가 빠 아.") and a new scene,
-  `tests/ime_commit_scene.mjs` (a controlled `TextInput` receiving the commit and the key in one turn).
+  `tests/ime_commit_scene.mjs` (a controlled `TextInput` receiving the commit, its jobs, then the key).
 - **Tests: `tests/vm_list_headless.sh` failed now and then on a loaded computer** (TEST-1 of the ws169/ws170 QA): the
   cold first `lord.vm.list()` (every folder read, the firmware hashed once: 14–32 ms by load) could pass lord-server's
   20 ms slow-call line and fail the stall check. That one line is now allowed with its own margin (150 ms,
