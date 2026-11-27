@@ -415,12 +415,26 @@ function themeAddListener(type, fn) {
   if (POINTER_TYPES.has(type)) return rtAddListener(type, (e) => themeCallSafe(fn, Object.freeze({ type: e.type, x: e.x, y: e.y, button: e.button })));
   return () => {};
 }
-// a theme's shortcuts: only combinations with ❖, ⌃ or ⌥ (or Esc and F1–F24), so a table can't read what is typed
-const comboOk = (c) => typeof c === 'string' && (/(^|\+)(Meta|Ctrl|Alt)\+/.test(c) || /^(Escape|F([1-9]|1[0-9]|2[0-4]))$/.test(c));
+// a theme's shortcuts: only combinations with ❖, ⌃ or ⌥ (or Esc and F1–F24), so a table can't read what is typed, and
+// never one of the keys every theme shares (sdk/shortcuts.js BASE: search, lock, the clipboard, media keys…), which a
+// theme's entry would otherwise shadow. An entry is the SDK's own form, { id, keys: [combo, …], run, when, repeat,
+// label, group } (docs/THEMES-GUIDE.md); { combo } is still taken as one key. Modifiers are spelled as the SDK does.
+const COMBO_RE = /^((Meta|Ctrl|Alt|Shift)\+){0,4}[A-Za-z0-9`,./]{1,12}$/;
+const comboOk = (c) => typeof c === 'string' && c.length <= 40 && COMBO_RE.test(c) &&
+  (/(^|\+)(Meta|Ctrl|Alt)\+/.test(c) || /^(Escape|F([1-9]|1[0-9]|2[0-4]))$/.test(c)) && !SDK.shortcutInBase(c);
+const ENTRY_MAX = 64;
+function themeShortcut(e) {
+  if (!e || typeof e !== 'object' || typeof e.run !== 'function') return null;
+  const list = Array.isArray(e.keys) ? e.keys.slice(0, 8) : typeof e.combo === 'string' ? [e.combo] : [];
+  const keys = list.filter(comboOk);
+  if (!keys.length) return null;
+  const str = (v, n) => (typeof v === 'string' && v.length <= n ? v : undefined);
+  return { id: str(e.id, 64), keys, run: wrapCallback(e.run), when: typeof e.when === 'function' ? wrapCallback(e.when) : undefined,
+    repeat: !!e.repeat, label: str(e.label, 120), group: str(e.group, 32) };
+}
 function themeUseShortcuts(raw = {}) {
   const o = sanitizeIn(raw) || {};
-  const table = Array.isArray(o.table) ? o.table.filter((e) => e && comboOk(e.combo) && typeof e.run === 'function')
-    .map((e) => ({ id: typeof e.id === 'string' ? e.id : undefined, combo: e.combo, run: wrapCallback(e.run), when: e.when ? wrapCallback(e.when) : undefined, repeat: !!e.repeat })) : [];
+  const table = Array.isArray(o.table) ? o.table.slice(0, ENTRY_MAX).map(themeShortcut).filter(Boolean) : [];
   return SDK.useShortcuts({ grabs: typeof o.grabs === 'string' ? o.grabs : '', table, onSuperTap: o.onSuperTap ? wrapCallback(o.onSuperTap) : null });
 }
 

@@ -18,7 +18,7 @@ export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPref
 export { keyboard } from './keyboard.js';
 export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage, regionLanguageCode, regionLabel } from './localename.js';   // glibc region names (installer, Settings)
 export { LANGUAGE_NAMES } from './langnames.js';   // languages not translated yet (Settings → Language & Region)
-export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken, addMenuBarKeys } from './shortcuts.js';
+export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken, shortcutInBase, addMenuBarKeys } from './shortcuts.js';
 export { ContextMenu } from './contextmenu.jsx';
 // spelling and ✨ AI on selected text (docs/SPELLING.md, docs/AI.md "Writing")
 export { spellVersion, spellOn, spellLangs, spellInstalled, spellDefaults, spellRanges, useSpellRanges, spellSuggest, spellAddWord, spellRemoveWord, spellWordsList, spellIgnore } from './spell.js';

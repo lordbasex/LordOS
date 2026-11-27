@@ -479,6 +479,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Community themes: shortcut tables in the SDK's own form work, and can't shadow the shared keys** (Meridian review:
+  `themeUseShortcuts` kept only entries with `combo`, but the dispatcher reads `keys`, so `keys: [...]` entries such as
+  Alt+Tab were dropped and a `combo` one would have thrown). An entry is now `{ id, keys, run, when, repeat, label,
+  group }` (`combo` still read as one key; at most 64 entries of 8 keys), each key spelled as the SDK does, with ❖, ⌃ or
+  ⌥ (or Esc and F1–F24), and never one of the keys every theme shares (`shortcutInBase` in `sdk/shortcuts.js`: search,
+  lock, the clipboard, media keys…), which a theme's entry would otherwise shadow. Test: `community_theme_headless.sh`
+  ("clicker": a `keys` entry runs from ❖⇧K, a ❖Space entry is dropped).
 - **Community themes: drawing an app's icon no longer takes the theme off** (Meridian review; BUG-H of the ws171 QA had
   the same cause once a window was open: okminimal's taskbar draws `windowIcon(win)`). LordOS's icon components reached
   the theme wrapped as tainted functions, so React's host guard found the theme's wrapper as the nearest component of

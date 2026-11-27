@@ -163,6 +163,14 @@ export function shortcutReserved(combo) {
   return (lookup.get(parseCombo(combo)) || []).length > 0;
 }
 
+// Is this combination one of the keys every theme shares (BASE)? A community theme's table never takes one
+// (sdk/themeapi.js themeUseShortcuts): a theme's entries come before BASE's in the lookup.
+let baseCombos = null;
+export function shortcutInBase(combo) {
+  if (!baseCombos) baseCombos = new Set(BASE.flatMap((e) => e.keys.map(parseCombo)));
+  return typeof combo === 'string' && baseCombos.has(parseCombo(combo));
+}
+
 // A field recording a new combination (an app's global shortcut) gets every press that is not a modifier, and
 // no key runs anything meanwhile: fn(e) with the key event. The returned function ends it.
 const MODIFIER_CODES = new Set([29, 97, 42, 54, 56, 100, 125, 126]);
