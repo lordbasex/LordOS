@@ -321,7 +321,7 @@ static int copy_file(const char *from, const char *to, mode_t mode) {
 
 static int userns = -1, before, venus_mode;
 static char render_node[32];
-static char loader[PATH_MAX], probe[PATH_MAX + 64], disks[PATH_MAX + 16], bindir[PATH_MAX + 64];
+static char loader[PATH_MAX], probe[PATH_MAX + 128], disks[PATH_MAX + 128], bindir[PATH_MAX + 64];
 
 /* lord-vm's child: namespaces, the private loader, the jail (with a listener when `notify`), the listener sent on `st`
  * (lord-vm's way: SCM_RIGHTS, then closed), the exec of the loader by descriptor with `args` */
@@ -516,6 +516,11 @@ int main(int argc, char **argv) {
     exe[xl] = 0;
     char *sl = strrchr(exe, '/');
     if (sl) *sl = 0;
+    /* the jail mounts its own /tmp and /var/tmp: a probe built under them would vanish inside it */
+    if (!strncmp(exe, "/tmp/", 5) || !strncmp(exe, "/var/tmp/", 9) || !strncmp(exe, "/dev/shm/", 9)) {
+        printf("skipped: the tree is under %s, which the jail replaces (build it elsewhere)\n", exe);
+        return 0;
+    }
     snprintf(bindir, sizeof bindir, "%s/.vm-jail-probe.XXXXXX", exe);
     if (!mkdtemp(bindir)) { perror("mkdtemp"); return 1; }
     snprintf(probe, sizeof probe, "%s/probe", bindir);

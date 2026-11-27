@@ -400,6 +400,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   a zoom saved, full size, the firewall switches black in the file, no overwrite, no path).
 
 ### Tests
+- **No `-Wformat-truncation` warnings on arm64** in `rdesk_thumb_test.c`, `vm_test.c` and `vm_jail_probe.c` (larger
+  buffers).
 - **`vmunpack-test` on a 16 KB-page kernel** (Raspberry Pi 5, ws171): the holes' allocation bounds counted 4 KB
   pages; they use the page size now (`sysconf(_SC_PAGESIZE)`).
 - **Hands**: `build/hands-test` (ASan/UBSan: the policy against a fake host, the prompt per connection, Stop, the panic

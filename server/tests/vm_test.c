@@ -1217,7 +1217,7 @@ static void test_host(void) {
                 x.memory_mb = 1000 * (i + 1);
                 x.accel = VM_ACCEL_KVM;
                 CHECK(!mkdir(d[i], 0700) && vm_machine_save(d[i], &x) == VM_OK);
-                char rp[300], rj[128];
+                char rp[320], rj[128];
                 snprintf(rp, sizeof rp, "%s/run.json", d[i]);
                 snprintf(rj, sizeof rj, "{\"state\":\"%s\",\"pid\":%ld}\n", st[i], pids[i]);
                 FILE *f = fopen(rp, "w");
