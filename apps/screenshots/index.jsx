@@ -169,13 +169,31 @@ const grab = (d) => allowed(() => media.screenshot(APP, d ? { display: d.id } : 
 // ❖⇧4 on every display at once: a capture and a full-screen overlay per display (geometry.js), sharing one
 // selection; it stays inside the display it began on.
 const area = createStore(null);   // { shots: [{ handle, display }], mode, start, rect, hover, pointer }
+const isOverlay = (w) => w.app === APP && String(w.instance || w.id).includes('overlay');
+let overlaysUp = false;           // the selection's overlays were opened (and none closed yet)
+let agentTimer = 0;               // a selection an AI agent's input opened ends by itself (below)
 function endArea(keep) {
+  overlaysUp = false;
+  clearTimeout(agentTimer);
+  agentTimer = 0;
   const a = area.get();
   if (!a) return;
   area.set(null);
-  for (const w of windows.get()) if (w.app === APP && String(w.instance || w.id).includes('overlay')) wm.close(w.id, true);
+  for (const w of windows.get()) if (isOverlay(w)) wm.close(w.id, true);
   for (const sh of a.shots) if (sh.handle !== keep) media.close(sh.handle);
 }
+// An overlay closed from elsewhere (an agent's close_window, a theme closing every window) ends the whole selection:
+// its keys (Space, C, T, Escape) stayed shortcuts with nothing on screen, and were taken from every field typed in
+// after it (the menu bar's search lost c, t and Space; ws170 QA BUG-28).
+windows.subscribe(() => {
+  if (overlaysUp && area.get() && windows.get().filter(isOverlay).length < (area.get().shots || []).length) endArea();
+});
+// Screenshots' selection is in the system band, which an AI agent never reaches (docs/HANDS.md): one its input opened
+// would cover the person's screens with no way out for it. It ends by itself after AGENT_SELECT_MS unless the person
+// takes it (their own pointer or key on it).
+const AGENT_SELECT_MS = 15000;
+const byAgent = () => typeof lord !== 'undefined' && typeof lord.hands?.injecting === 'function' && !!lord.hands.injecting();
+const personTook = () => { if (agentTimer && !byAgent()) { clearTimeout(agentTimer); agentTimer = 0; } };
 // A window alone (issue #70): the screen painted again up to that window and no further, so what covered it
 // (other windows, a menu, the Dock) is left out and the window is whole. Its sheets are painted over it (a dialog
 // its app opened in the modal layer, such as Settings → Wallpaper's file dialog, issue #58). null when lord-server
@@ -251,7 +269,7 @@ export const capture = {
   // mode: 'area', 'window', 'color', 'text' or 'record' (the area to record: on the main display, which is what is
   // recorded). With Remember Last Selection the last area comes back with its handles, and Enter or the button takes
   // it; an area to record is always confirmed so.
-  area: (mode = 'area') => afterHide(() => (mode === 'record' ? (f) => f() : withTimer)(async () => {
+  area: (mode = 'area') => { const agent = byAgent(); return afterHide(() => (mode === 'record' ? (f) => f() : withTimer)(async () => {
     endArea();
     const shots = [];
     const main = (lord.screen.displays || []).length > 1 && !lord.screen.mirror ? lord.screen.displays.find((d) => d.main) || null : null;
@@ -271,7 +289,9 @@ export const capture = {
       const id = wm.open(APP, { instance: `overlay${i}`, args: { index: i }, ...(d ? { frame: { x: d.x, y: d.y, w: d.w, h: d.h } } : {}) });
       wm.setFullscreen(id, true, { capture: true });
     });
-  })),
+    overlaysUp = shots.length > 0;
+    if (agent && overlaysUp) agentTimer = setTimeout(() => { agentTimer = 0; endArea(); }, AGENT_SELECT_MS);
+  })); },
   // region: an area of the main display (logical pixels), or the whole screen
   async record(region = null) {
     const cur = recording.get();
@@ -302,7 +322,7 @@ export const capture = {
 const hasMedia = () => typeof lord !== 'undefined' && !!lord.media;
 // While a selection is open its keys are shortcuts: the dispatcher takes them, so they never reach the app in
 // front as well (a C or a Space used to be typed into a Terminal under the overlay).
-const selecting = () => !!area.get();
+const selecting = () => !!area.get() && overlaysUp;
 const toggleWindowMode = () => area.set((x) => (x ? { ...x, mode: x.mode === 'area' ? 'window' : 'area', start: null, rect: null } : x));
 const copyUnderPointer = () => { const l = area.get()?.loupe; if (l) { copyColor(l.color); endArea(); } };
 const captureFull = () => capture.full();
@@ -415,7 +435,7 @@ addShortcuts([
   { id: 'capture.bar.down', keys: ['ArrowDown'], when: ringOrMenu, run: () => barKey('ArrowDown'), listed: () => false },
   { id: 'capture.bar.up', keys: ['ArrowUp'], when: ringOrMenu, run: () => barKey('ArrowUp'), listed: () => false },
   { id: 'capture.cancel', keys: ['Escape'], when: selecting, run: () => endArea(), listed: () => false },
-  { id: 'capture.windowMode', keys: ['Space'], when: selecting, run: toggleWindowMode, listed: () => false },
+  { id: 'capture.windowMode', keys: ['Space'], when: selecting, run: () => { personTook(); toggleWindowMode(); }, listed: () => false },
   { id: 'capture.copyColor', keys: ['c', 'Shift+c'], when: selecting, run: copyUnderPointer, listed: () => false },
   { id: 'capture.textMode', keys: ['t', 'Shift+t'], when: selecting, run: () => area.set((x) => (x ? { ...x, mode: x.mode === 'text' ? 'area' : 'text', start: null, rect: null } : x)), listed: () => false },
 ]);
@@ -435,6 +455,7 @@ function Overlay({ index }) {
     const offMove = addListener('pointermove', (e) => {
       const cur = area.get();
       if (!cur) return;
+      personTook();
       const loupe = cur.mode !== 'window' ? loupeAt(cur, e.x, e.y) : null;
       // a handle or the inside of a selection that waits (adjust): it is resized or moved inside its display
       if (cur.grab) {
@@ -462,6 +483,7 @@ function Overlay({ index }) {
   }, [list, index]);
   if (!a || !shot) return null;
   const down = (e) => {
+    personTook();
     if (a.mode === 'color') { if (a.loupe) copyColor(a.loupe.color); endArea(); return; }
     const shown = (a.shots || []).map((sh) => sh.display).filter(Boolean);
     const what = a.adjust && a.rect ? hitHandle(a.rect, e.x, e.y) : null;

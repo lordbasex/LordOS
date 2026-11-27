@@ -420,6 +420,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **The menu bar's search lost the letters C and T and the Space** (BUG-28 of the ws170 QA: "documento-qa" became
+  "doumeno-qa", "c t ca to" became "ao"). Not the search: Screenshots' area selection had been ended by closing its
+  overlays from outside (an agent's `close_window` on the three `screenshots#overlayN` windows, BUG-26), which left the
+  selection's state behind, and its keys (Space for window mode, C to copy a colour, T for text mode) stayed shortcuts
+  taken before any field. Closing any of its overlays now ends the whole selection, and those keys apply only while its
+  overlays are up. A selection an AI agent's input opened ends by itself after 15 s unless the person takes it (their
+  pointer or a key on it): it is in the system band, which an agent never reaches, Escape included (docs/HANDS.md).
+  With nothing typed, the search now lists the files changed most recently (newest first), as it should (checklist item
+  180). Tests: `tests/screenshots_overlay_close_scene.mjs` (reproduced "ao" before the fix) and
+  `tests/spotlight_keys_scene.mjs` (Flow and Classic: every key reaches the field; the recent files with nothing typed).
 - **Korean: the syllable being composed was lost when Space, Enter or punctuation ended it** (BUG-20 of the ws170 QA;
   r k Space gave " ", not "가 "). The input method committed the syllable and passed the key on, but both reached the
   field in the same JavaScript turn, and the field (`TextInput`, `TextArea`) still read its value from its last render:

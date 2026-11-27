@@ -957,6 +957,8 @@ EOF
         # (#252) Screenshots with several displays: Print Screen copies the main display's capture, a thumbnail per display
         # inside it, the markup editor inside one display (side by side, main listed second; another above-left at 200 %)
         run "screenshots-displays-scene (apps/screenshots/index.jsx)" node tests/textfield_menu_test.mjs screenshots_displays_scene.mjs
+        # (ws170 QA BUG-28) the selection's overlays closed from elsewhere end it: Space, C and T reach a field again
+        run "screenshots-overlay-close-scene (apps/screenshots/index.jsx)" node tests/textfield_menu_test.mjs screenshots_overlay_close_scene.mjs
         # the Screenshots toolbar: modes, the primary button, the Options menu and its choices saved in settings
         run "screenshots-toolbar-scene (apps/screenshots/toolbar.jsx)" node tests/textfield_menu_test.mjs screenshots_toolbar_scene.mjs
         # (#200) Backups: Choose… for the destination (no Cloud folder) and the exclusions (inside home), typing still works
@@ -1233,6 +1235,12 @@ EOF
             run "firststart-scene-$th (sdk/firststart.jsx over themes/$th)" node tests/workspaces_test.mjs firststart_scene.mjs "$th"
         done
     else skip "firststart-scene" "node and the repository's node_modules (npm install)"; fi
+    # (ws170 QA BUG-28) the menu bar's search gets every key typed in it, and lists the recent files with nothing typed
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        for th in default classic; do
+            run "spotlight-keys-scene-$th (sdk/spotlight.js over themes/$th)" node tests/workspaces_test.mjs spotlight_keys_scene.mjs "$th"
+        done
+    else skip "spotlight-keys-scene" "node and the repository's node_modules (npm install)"; fi
     # always on top in every theme: drawing order apart from the keyboard, the window menu's item, skip pager
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         for th in default classic workspaces celeste; do

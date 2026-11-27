@@ -182,7 +182,10 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
 
 - the **system layer** and everything above it (`sdk/layers.js` 100 and up: permission, keyring, password, polkit and
   Bluetooth prompts, the portal's file chooser for Linux apps, Screenshots' selection, the on-screen keyboard, the banner
-  itself): no click, key, read or pixel. While a system prompt shows, no key at all.
+  itself): no click, key, read or pixel. While a system prompt shows, no key at all. Screenshots' selection that an
+  agent's input opened (its overlay on every display, in the capture layer) is out of the agent's reach too, Escape
+  included, so it ends by itself after 15 s unless the person takes it (their pointer or a key on it); closing one of its
+  overlays (`close_window`) ends the whole selection, and its keys (Space, C, T) go back to the fields.
 - **password fields**: never typed into, never read (no value in the tree, `set_value` refused in C and in the shell, a
   Linux app's field that says it is a password or PIN through text-input-v3 refused too), and **protected** windows and
   fields (`protected`: the vault, password fields): no click, key or read.
