@@ -12,6 +12,7 @@
 cd "$(dirname "$0")/.." || exit 1
 [ -x build/lord-server-test ] && [ -x build/launchplace-client ] || { echo "skipped: needs build/lord-server-test and build/launchplace-client"; exit 77; }
 command -v node >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1 || { echo "skipped: needs node and python3"; exit 77; }
+python3 -c 'import PIL' 2>/dev/null || { echo "skipped: needs python3-pil (the screenshots it takes)"; exit 77; }
 LANG_UI=${LAUNCHPLACE_LANG:-en}
 # the folder for the run and its pictures: a fresh private one (mktemp -d), or the one given if it is a real folder of
 # this user (not a link someone else could have planted)

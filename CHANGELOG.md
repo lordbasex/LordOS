@@ -400,6 +400,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   a zoom saved, full size, the firewall switches black in the file, no overwrite, no path).
 
 ### Tests
+- **Tests skip what can't run on arm64 or without a tool instead of failing** (Raspberry Pi 5, ws171):
+  `vm-whonix-xml`, `vm-group-manage`, `machines-group-manage` and the Machines e2e group flow (Whonix is amd64 only;
+  lord-vm refuses it), `launch-placement-en/ar` without python3-pil. The Machines e2e's Create and Start waits 480 s on
+  arm64 (an SD card copies the image slowly; 120 s elsewhere; `MH_CREATE_S` overrides it).
 - **No `-Wformat-truncation` warnings on arm64** in `rdesk_thumb_test.c`, `vm_test.c` and `vm_jail_probe.c` (larger
   buffers).
 - **`vmunpack-test` on a 16 KB-page kernel** (Raspberry Pi 5, ws171): the holes' allocation bounds counted 4 KB

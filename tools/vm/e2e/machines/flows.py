@@ -3,9 +3,13 @@
 # FLOWS in one session and one scratch library; a flow that needs what an earlier one made skips when it isn't there.
 # Every step looks at the app as a person would (texts on screen, a click where they are drawn) and at what is on disk or
 # in lord-vm, and keeps a screenshot (MH_OUT, or the run's shots/ folder).
-import json, os, re, shutil, subprocess, time
+import json, os, platform, re, shutil, subprocess, time
 from mh import Session, Image, BUILD, IMAGES, skip, log, kvm_ok, have
 import images
+
+# Create and Start copies the image into the machine's folder first: 120 s on an SSD, up to 480 s on a Raspberry Pi's SD
+# card (ws171, 54 of 54 passed there with 480). MH_CREATE_S overrides it; the default is longer on arm64.
+CREATE_S = int(os.environ.get("MH_CREATE_S") or (480 if platform.machine() in ("aarch64", "arm64") else 120))
 
 NAME = "MH Debian"
 CLONE = "MH Debian clone"
@@ -161,7 +165,7 @@ def flow_assistant(s, r, c):
     r.t("assistant: the review names the image and the Light profile's 2 vCPUs", "debian13.qcow2" in review and any("2 vCPU" in t for t in review), review)
     t0 = time.time()
     s.click_text("Create and Start")
-    m = r.step("assistant: Create and Start makes the machine and it runs", lambda: s.wait_state(NAME, "running", 120))
+    m = r.step("assistant: Create and Start makes the machine and it runs", lambda: s.wait_state(NAME, "running", CREATE_S))
     if not m:
         return
     c.update(dir=m["dir"], id=m["id"], created_s=round(time.time() - t0, 1))
@@ -673,6 +677,8 @@ def _gone(s, name, timeout):
 
 def flow_group(s, r, c):
     """A machine group's card (19.8): a group made by lord-vm's test build from two empty disks, shown in the library."""
+    if platform.machine() != "x86_64":
+        skip("needs an x86-64 host (Whonix is amd64 only; lord-vm refuses it elsewhere)")
     tp = os.path.join(BUILD, "lord-vm-testpaths")
     if not os.access(tp, os.X_OK):
         subprocess.run(["make", "-s", "build/lord-vm-testpaths"], cwd=os.path.dirname(BUILD), capture_output=True)

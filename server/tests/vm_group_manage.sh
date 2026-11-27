@@ -17,6 +17,8 @@
 cd "$(dirname "$0")/.." || exit 1
 [ -x build/lord-vm-testpaths ] || make -s build/lord-vm-testpaths >/dev/null 2>&1
 [ -x build/lord-vm-testpaths ] && [ -x build/lord-vmunpack ] && [ -x build/machines ] || { echo "skipped: needs build/lord-vm-testpaths, build/lord-vmunpack and build/machines"; exit 77; }
+# the groups are Whonix's, amd64 only: lord-vm refuses them on another architecture (a Raspberry Pi 5)
+[ "$(uname -m)" = x86_64 ] || { echo "skipped: needs an x86-64 host (Whonix is amd64 only)"; exit 77; }
 for t in qemu-img qemu-io xz tar python3 sha512sum; do command -v $t >/dev/null 2>&1 || { echo "skipped: needs $t"; exit 77; }; done
 [ -r /dev/kvm ] && [ -w /dev/kvm ] || { echo "skipped: needs /dev/kvm (the members are KVM machines)"; exit 77; }
 D=$(mktemp -d "${TMPDIR:-/var/tmp}/lgman.XXXXXX") || exit 1
