@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "Képernyőkép egy területről",
   "shortcuts.capturePanel": "Képernyőkép-panel és képernyőfelvétel",
   "shortcuts.space": "Szóköz",
+  "shortcuts.alone": "csak {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Képernyő-billentyűzet",
   "osk.space": "szóköz",

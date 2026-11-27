@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "Schermafbeelding van een gebied",
   "shortcuts.capturePanel": "Paneel voor schermafbeeldingen en schermopname",
   "shortcuts.space": "Spatie",
+  "shortcuts.alone": "alleen {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Schermtoetsenbord",
   "osk.space": "spatie",

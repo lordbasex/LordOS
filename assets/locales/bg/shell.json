@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "Снимка на област",
   "shortcuts.capturePanel": "Панел за екранни снимки и запис на екрана",
   "shortcuts.space": "Интервал",
+  "shortcuts.alone": "само {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Екранна клавиатура",
   "osk.space": "интервал",

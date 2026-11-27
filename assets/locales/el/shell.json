@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "Στιγμιότυπο μιας περιοχής",
   "shortcuts.capturePanel": "Πλαίσιο στιγμιοτύπων και εγγραφή οθόνης",
   "shortcuts.space": "Διάστημα",
+  "shortcuts.alone": "μόνο {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Πληκτρολόγιο οθόνης",
   "osk.space": "διάστημα",

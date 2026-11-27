@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "Skärmdump av ett område",
   "shortcuts.capturePanel": "Panel för skärmdumpar och skärminspelning",
   "shortcuts.space": "Mellanslag",
+  "shortcuts.alone": "bara {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Skärmtangentbord",
   "osk.space": "mellanslag",

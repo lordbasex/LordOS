@@ -437,6 +437,7 @@
   "shortcuts.captureArea": "範囲を選択したスクリーンショット",
   "shortcuts.capturePanel": "スクリーンショットパネルと画面収録",
   "shortcuts.space": "スペース",
+  "shortcuts.alone": "{key} のみ",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "スクリーンキーボード",
   "osk.space": "空白",

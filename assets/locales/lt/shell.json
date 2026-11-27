@@ -451,6 +451,7 @@
   "shortcuts.captureArea": "Srities ekrano kopija",
   "shortcuts.capturePanel": "Ekrano kopijų skydelis ir ekrano įrašymas",
   "shortcuts.space": "Tarpas",
+  "shortcuts.alone": "tik {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Ekraninė klaviatūra",
   "osk.space": "tarpas",

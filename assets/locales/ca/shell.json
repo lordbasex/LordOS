@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "Captura d’una àrea",
   "shortcuts.capturePanel": "Tauler de captures i enregistrament de pantalla",
   "shortcuts.space": "Espai",
+  "shortcuts.alone": "{key} sol",
   "shortcuts.printScreen": "Impr Pant",
   "osk.name": "Teclat en pantalla",
   "osk.space": "espai",

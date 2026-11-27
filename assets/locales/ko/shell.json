@@ -437,6 +437,7 @@
   "shortcuts.captureArea": "영역 스크린샷",
   "shortcuts.capturePanel": "스크린샷 패널 및 화면 기록",
   "shortcuts.space": "스페이스",
+  "shortcuts.alone": "{key}만",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "화상 키보드",
   "osk.space": "스페이스",

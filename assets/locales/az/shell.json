@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "Sahənin skrinşotu",
   "shortcuts.capturePanel": "Skrinşot paneli və ekran yazısı",
   "shortcuts.space": "Space",
+  "shortcuts.alone": "yalnız {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Ekran klaviaturası",
   "osk.space": "boşluq",

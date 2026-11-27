@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "Screenshot ng isang bahagi",
   "shortcuts.capturePanel": "Panel ng mga screenshot at pag-record ng screen",
   "shortcuts.space": "Space",
+  "shortcuts.alone": "{key} lang",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "On-Screen Keyboard",
   "osk.space": "space",

@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "Kuvakaappaus alueesta",
   "shortcuts.capturePanel": "Kuvakaappauspaneeli ja näytön tallennus",
   "shortcuts.space": "Välilyönti",
+  "shortcuts.alone": "pelkkä {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Näyttönäppäimistö",
   "osk.space": "välilyönti",

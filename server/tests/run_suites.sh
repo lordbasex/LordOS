@@ -1249,6 +1249,12 @@ EOF
             run "firststart-scene-$th (sdk/firststart.jsx over themes/$th)" node tests/workspaces_test.mjs firststart_scene.mjs "$th"
         done
     else skip "firststart-scene" "node and the repository's node_modules (npm install)"; fi
+    # (ws170 QA BUG-21) Settings → Keyboard's list: a modifier pressed alone is labelled so ("❖ alone · F4", not "❖ · F4")
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        for th in default classic; do
+            run "shortcuts-list-scene-$th (sdk/shortcuts.js shortcutList over themes/$th)" node tests/workspaces_test.mjs shortcuts_list_scene.mjs "$th"
+        done
+    else skip "shortcuts-list-scene" "node and the repository's node_modules (npm install)"; fi
     # (ws170 QA BUG-28) the menu bar's search gets every key typed in it, and lists the recent files with nothing typed
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         for th in default classic; do

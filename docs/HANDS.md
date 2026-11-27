@@ -178,9 +178,9 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
   everything but the allowed windows and the menus, popovers and sheets tied to them by `handsWin`).
 - **Rate limits**: 8 input actions a second (bursts of 16), 10 reads, 2 screenshots (bursts of 4).
 - **The shell's shortcuts** (Settings → Keyboard) work for an agent's keys as for the person's: they go through the same
-  dispatcher (`sdk/shortcuts.js`). A row that lists two keys shows them apart with a dot: Flow's Apps row, `❖ · F4`,
-  is ❖ pressed alone or F4, not ❖+F4 (ws170 QA BUG-21: `super+F4` is no shortcut; `super` alone, `F4` and `super+m`
-  work). The physical keyboard's own chords (Ctrl+Alt+Backspace, Ctrl+Alt+Del, Ctrl+Alt+F1…F12, the panic key) stay
+  dispatcher (`sdk/shortcuts.js`). A row that lists two keys shows them apart with a dot, and a modifier pressed and
+  released by itself says so: Flow's Apps row is `❖ alone · F4` (it read `❖ · F4`, taken for ❖+F4: ws170 QA BUG-21;
+  `super+F4` is no shortcut; `super` alone, `F4` and `super+m`, also right after an agent's click in Settings, work). The physical keyboard's own chords (Ctrl+Alt+Backspace, Ctrl+Alt+Del, Ctrl+Alt+F1…F12, the panic key) stay
   refused (`Invalid arguments`).
 - **Logged**: each call is a line of closed words in `shell.log` (`hands: claude pointer left_click refused password`),
   never text, names or values.

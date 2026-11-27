@@ -259,6 +259,7 @@ export function addShortcuts(entries) {
 // ---- the list in Settings → Keyboard ----
 
 const SYMBOLS = { Meta: '❖', Ctrl: '⌃', Alt: '⌥', Shift: '⇧' };
+const LONE_MODS = new Set(Object.values(SYMBOLS));
 const KEY_LABELS = { Escape: 'Esc', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓' };
 export function comboLabel(combo) {
   const parts = combo.split('+');
@@ -276,7 +277,9 @@ export function shortcutList() {
   const from = new Map([...added.map((e) => [e, 'app']), ...themeTable.map((e) => [e, 'theme']), ...BASE.map((e) => [e, 'lordos'])]);
   for (const entry of [...added, ...themeTable, ...BASE]) {
     if (!entry.label || (entry.listed && !entry.listed())) continue;
-    const keys = entry.show || entry.keys.map(comboLabel);
+    // a modifier shown by itself is that key pressed and released alone ("❖ alone"), never part of the next one: Flow's
+    // Apps row read "❖ · F4" and was taken for ❖+F4 (ws170 QA BUG-21)
+    const keys = (entry.show || entry.keys.map(comboLabel)).map((k) => (LONE_MODS.has(k) ? t('shell.shortcuts.alone', { key: k }) : k));
     const list = groups.get(entry.group) || groups.get('system');
     const same = list.find((x) => x.labelKey === entry.label);
     if (same) same.keys.push(...keys.filter((k) => !same.keys.includes(k)));

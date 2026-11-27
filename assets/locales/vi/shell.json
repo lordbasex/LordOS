@@ -437,6 +437,7 @@
   "shortcuts.captureArea": "Chụp một vùng màn hình",
   "shortcuts.capturePanel": "Bảng chụp màn hình và quay màn hình",
   "shortcuts.space": "Space",
+  "shortcuts.alone": "chỉ {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Bàn phím ảo",
   "osk.space": "space",

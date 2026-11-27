@@ -451,6 +451,7 @@
   "shortcuts.captureArea": "Zrzut obszaru",
   "shortcuts.capturePanel": "Panel zrzutów ekranu i nagrywanie ekranu",
   "shortcuts.space": "Spacja",
+  "shortcuts.alone": "sam {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Klawiatura ekranowa",
   "osk.space": "spacja",

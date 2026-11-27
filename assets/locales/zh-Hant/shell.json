@@ -437,6 +437,7 @@
   "shortcuts.captureArea": "擷取一個區域",
   "shortcuts.capturePanel": "截圖面板與螢幕錄影",
   "shortcuts.space": "空白鍵",
+  "shortcuts.alone": "僅 {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "螢幕小鍵盤",
   "osk.space": "空白",

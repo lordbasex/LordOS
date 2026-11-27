@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "एक क्षेत्र का स्क्रीनशॉट",
   "shortcuts.capturePanel": "स्क्रीनशॉट पैनल और स्क्रीन रिकॉर्डिंग",
   "shortcuts.space": "Space",
+  "shortcuts.alone": "केवल {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "ऑन-स्क्रीन कीबोर्ड",
   "osk.space": "स्पेस",

@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "عکس از یک ناحیه",
   "shortcuts.capturePanel": "پنل عکس صفحه و ضبط صفحه",
   "shortcuts.space": "فاصله",
+  "shortcuts.alone": "فقط {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "صفحه‌کلید روی صفحه",
   "osk.space": "فاصله",

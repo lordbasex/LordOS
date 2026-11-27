@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "ایک حصے کا اسکرین شاٹ",
   "shortcuts.capturePanel": "اسکرین شاٹس پینل اور اسکرین ریکارڈنگ",
   "shortcuts.space": "Space",
+  "shortcuts.alone": "صرف {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "آن اسکرین کی بورڈ",
   "osk.space": "اسپیس",

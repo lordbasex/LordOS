@@ -437,6 +437,7 @@
   "shortcuts.captureArea": "จับภาพบางพื้นที่",
   "shortcuts.capturePanel": "แผงภาพหน้าจอและการบันทึกหน้าจอ",
   "shortcuts.space": "Space",
+  "shortcuts.alone": "{key} อย่างเดียว",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "แป้นพิมพ์บนหน้าจอ",
   "osk.space": "space",

@@ -451,6 +451,7 @@
   "shortcuts.captureArea": "Снимок области",
   "shortcuts.capturePanel": "Панель снимков экрана и запись экрана",
   "shortcuts.space": "Пробел",
+  "shortcuts.alone": "только {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Экранная клавиатура",
   "osk.space": "пробел",

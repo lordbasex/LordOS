@@ -451,6 +451,7 @@
   "shortcuts.captureArea": "Captură a unei zone",
   "shortcuts.capturePanel": "Panoul de capturi și înregistrarea ecranului",
   "shortcuts.space": "Spațiu",
+  "shortcuts.alone": "doar {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Tastatură pe ecran",
   "osk.space": "spațiu",

@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "একটি অংশের স্ক্রিনশট",
   "shortcuts.capturePanel": "স্ক্রিনশট প্যানেল ও স্ক্রিন রেকর্ডিং",
   "shortcuts.space": "Space",
+  "shortcuts.alone": "শুধু {key}",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "অন-স্ক্রিন কিবোর্ড",
   "osk.space": "স্পেস",

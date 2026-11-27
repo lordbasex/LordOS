@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "Captura de uma área",
   "shortcuts.capturePanel": "Painel de capturas e gravação de tela",
   "shortcuts.space": "Espaço",
+  "shortcuts.alone": "{key} sozinho",
   "shortcuts.printScreen": "Print Screen",
   "osk.name": "Teclado na tela",
   "osk.space": "espaço",

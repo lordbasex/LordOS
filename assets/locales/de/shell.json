@@ -444,6 +444,7 @@
   "shortcuts.captureArea": "Bildschirmfoto eines Bereichs",
   "shortcuts.capturePanel": "Bildschirmfotos und Bildschirmaufnahme",
   "shortcuts.space": "Leertaste",
+  "shortcuts.alone": "{key} allein",
   "shortcuts.printScreen": "Druck",
   "osk.name": "Bildschirmtastatur",
   "osk.space": "Leerzeichen",
