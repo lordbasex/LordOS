@@ -420,6 +420,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **The mouse wheel over a list inside a page scrolled the page too** (ws171 QA: Settings → Privacy → Add app). A
+  `ScrollView` that moves takes the wheel; at its end the wheel goes on to the page around it, as in a browser
+  (`sdk/components.jsx`).
 - **A text field's right-click menu near the bottom of the screen was cut** (ws171 QA). The menu was kept inside the
   whole display and could never go above the field's own top; now it stays inside the work area (clear of the Dock and
   the bar) and opens upward when there is no room below (`fieldBounds` in `sdk/components.jsx`, `boxAt` in

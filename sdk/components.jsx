@@ -412,6 +412,10 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter, r
       const m = measure() || metrics;
       const mx = Math.max(0, m.content - m.view);
       if (mx > 0 && d) scrolled();
+      // a view that moves takes the wheel: the page around it doesn't scroll too (a list inside a page, as Privacy's
+      // Add app list); at its end the wheel goes on to the page, as in a browser
+      const at = Math.min(offset, max);
+      if (d && Math.max(0, Math.min(mx, at + d)) !== at) e.stopPropagation?.();
       setOffset((o) => Math.max(0, Math.min(mx, Math.min(o, max) + (d || 0))));
     }} onMouseMove={onMove} onMouseLeave={() => { st.current.ui = { ...st.current.ui, near: false, hover: false }; update({ near: false, hover: false }); schedule(); }}
       focusable={focusable ?? max > 0} onKeyDown={onKey} onRevealFocus={(r) => reveal(r, true)}
