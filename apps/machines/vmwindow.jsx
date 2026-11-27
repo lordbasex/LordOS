@@ -607,8 +607,11 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0, asked: null, askedAt: 0 };
     setErr(''); setSt(null); setSid(id);
   };
-  const begin = (opts) => {
-    if (starting || bridging.has(dir)) return;
+  // again: the second half of a start this window already began (its Gateway first): the render that holds `starting`
+  // may not have caught up with setStarting(false) yet, so that stale flag doesn't stop it (QA 0.8.9.6.2: `machines start`
+  // of a Workstation started its Gateway and then waited forever)
+  const begin = (opts, again) => {
+    if (!again && (starting || bridging.has(dir))) return;
     if (!has()) { setErr(tr('machines.noBackend')); return; }
     const m = lord.vm.list().find((x) => x.dir === dir);
     if (!m) { setErr(tr('machines.win.gone')); return; }
@@ -645,7 +648,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
           };
           setTimeout(look, 1000);
         });
-      }).then(() => { setStarting(false); if (windows.get().some((w) => w.id === winId)) { gatewayUp.add(dir); beginRef.current(opts); } },
+      }).then(() => { setStarting(false); if (windows.get().some((w) => w.id === winId)) { gatewayUp.add(dir); beginRef.current(opts, true); } },
         (e) => { setStarting(false); setErr(e.message); });
       return;
     }

@@ -577,6 +577,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `sentinela.why.*` texts, every language). Tests: `sentinela_investigate_test.mjs` (the model's answer mocked: a fake
   sshd raised from low to high, a high answer kept, the real `/usr/sbin/sshd` untouched, a kernel name in `/tmp`, a
   replaced program at medium). docs/SENTINELA.md, "Investigate".
+- **Machines: a Whonix Workstation's window started its Gateway and then waited forever** (ws173 QA on VM 116,
+  `machines start "Whonix Workstation"`: the Gateway ran, the Workstation's window kept saying it was starting, and only a
+  second ▶ started it). Once the Gateway ran, the window asked its start again from a render that still had `starting`
+  set, and the start returned at its first line. That second half now goes on regardless of the stale flag
+  (`begin(opts, again)` in `apps/machines/vmwindow.jsx`). Checked on VM 116: the same command starts the Gateway, then
+  the Workstation in its window, and links them.
 - **Machines: a Whonix member that ran alone for a while never sent on the group's link again** (BUG-N of the ws171
   QA on VM 116: the Workstation started first and the Gateway from its "Start Gateway" bar, the link came up on both
   sides, "link: connected … lk1", yet the Workstation's `ip neigh` showed 10.152.152.10 FAILED; reproduced on ws173 with
