@@ -47,7 +47,7 @@ import { fractionOf, toneOf as deviceTone } from './devicesmodel.js';
 import { useDevices, deviceShort, deviceValue, deviceVia } from './devices.js';
 import { clipboard, clipboardHistory } from './clipboard.js';
 import { wifiBars, monthWeeks, weekStartFor } from './menubarmodel.js';
-import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER, PINS, pinnedRect } from './widgetgrid.js';
+import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER, PINS, pinnedRect, pinBlocks } from './widgetgrid.js';
 import { useSound, useSpectrumSource } from './sound.js';
 import { sourceOf, appsPlaying, colorsOf, gainOf, PALETTE_ORDER } from './soundwavemodel.js';
 import { kindOf, unitFor, temp as tempIn, skyOf, cityOk, widgetCity, placeOf } from './weathermodel.js';
@@ -122,7 +122,8 @@ export function addDeskWidget(type, size, display) {
   // a new weather widget starts on the last city chosen and keeps it (#193: each widget has its own)
   if (type === 'weather') opts.city = cityOk(settings.get().weather?.city);
   // a pinned one needs no free block; it still gets one to go back to when it is dragged
-  const spot = firstFree(gridFor(d), placed(desk, d), sz) || (opts.pin ? { col: 0, row: 0 } : null);
+  // never under a pinned one either (the sound wave along the bottom): its cells count as taken
+  const spot = firstFree(gridFor(d), [...placed(desk, d), ...pinBlocks(gridFor(d), workAreaOf(d), pinnedOn(desk, d))], sz) || (opts.pin ? { col: 0, row: 0 } : null);
   if (!spot) return null;
   const id = `${type}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
   settings.set({ deskWidgets: [...all(), { id, type, size: sz, desk, dk: dkOf(d), ...spot, opts }].slice(-MAX_WIDGETS) });
@@ -136,7 +137,7 @@ export function resizeDeskWidget(id, size) {
   const d = shown().find((x) => dkOf(x) === w?.dk) || mainDisplay();
   if (!w || !d) return false;
   if (pinOf(w)) { setDeskWidget(id, { size }); return true; }
-  const g = gridFor(d), others = placed(deskOf(w), d).filter((x) => x.id !== id);
+  const g = gridFor(d), others = [...placed(deskOf(w), d).filter((x) => x.id !== id), ...pinBlocks(g, workAreaOf(d), pinnedOn(deskOf(w), d))];
   const spot = fits(g, occupancy(others), w.col, w.row, size) ? { col: w.col, row: w.row } : nearestFree(g, others, size, w.col, w.row);
   if (!spot) return false;
   setDeskWidget(id, { size, ...spot });

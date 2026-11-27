@@ -420,6 +420,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **A new desktop widget could land on top of a pinned one** (ws171 QA). The pinned sound wave along the bottom is off
+  the grid, so its cells counted as free; they are now taken when a widget is added or resized (`pinBlocks` in
+  `sdk/widgetgrid.js`). Test: `widget-grid-test`.
 - **The mouse wheel over a list inside a page scrolled the page too** (ws171 QA: Settings → Privacy → Add app). A
   `ScrollView` that moves takes the wheel; at its end the wheel goes on to the page around it, as in a browser
   (`sdk/components.jsx`).

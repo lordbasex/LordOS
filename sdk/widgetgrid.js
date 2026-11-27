@@ -79,3 +79,18 @@ export function pinnedRect(area, size, pin, margin = MARGIN) {
   const w = c * CELL + (c - 1) * GAP, h = r * CELL + (r - 1) * GAP;
   return { x: Math.round(area.x + (area.w - w) / 2), y: Math.round(area.y + area.h - margin - h), w, h };
 }
+
+// The grid cells a pinned widget covers (pinnedRect, off the grid), as one-cell blocks a new widget's place must avoid:
+// a widget added was put on top of a pinned one (QA 0.8.9.6.2). pins: [{ size, opts: { pin } }].
+export function pinBlocks(g, area, pins) {
+  const out = [];
+  for (const p of pins || []) {
+    const r = pinnedRect(area, p.size, p.opts?.pin);
+    if (!r) continue;
+    for (let row = 0; row < g.rows; row++) for (let col = 0; col < g.cols; col++) {
+      const c = rectOf(g, col, row, 's');
+      if (c.x < r.x + r.w && r.x < c.x + c.w && c.y < r.y + r.h && r.y < c.y + c.h) out.push({ id: `pin:${col},${row}`, col, row, size: 's' });
+    }
+  }
+  return out;
+}
