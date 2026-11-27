@@ -51,6 +51,7 @@
 #define HANDS_ALLOW_MAX   16        /* apps in the allowlist */
 #define HANDS_YIELD_MS    3000      /* the person's input wins for this long */
 #define HANDS_SHOT_MAXDIM 1568      /* a screenshot's longest side by default (and at most 2560) */
+#define HANDS_SHOT_NATIVE 65535u     /* Screenshot's maxdim for the capture at its own resolution (lordos-mcp's save) */
 #define HANDS_DEPTH_MAX   60
 #define HANDS_REPEAT_MAX  20
 #define HANDS_SCROLL_MAX  30
@@ -225,6 +226,9 @@ void hands_person_input(void);
 /* Settings → AI → Hands → Agent motion (HANDS_MODE_HUMAN or _MACHINE) and Settings' reduce motion: the live desktop's
  * default for a client that chose none. On the QA desktop the default stays machine. */
 void hands_motion(int mode, int reduce);
+/* lord.hands.motion while the agent owns the input (agent 1): only re-sending what is set already (a shell re-mounted by
+ * a theme switch the agent clicked), never a change; any call when agent is 0 */
+int  hands_motion_allowed(int mode, int reduce, int agent);
 int  hands_motion_default(void);            /* the default now: HANDS_MODE_HUMAN or HANDS_MODE_MACHINE */
 /* Human mode's frames: main.c calls hands_tick each loop and wakes for hands_timeout (ms, -1 nothing to do). An action
  * in progress is stopped by the person's input (HANDS_E_ACTIVE), Stop, the panic key, the lock and the switch

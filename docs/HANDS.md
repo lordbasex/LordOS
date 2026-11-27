@@ -44,8 +44,8 @@ MCP server over stdio; each tool is one or two calls to lord-server's `org.lordo
 | `navigate` | `open_path(path)` | a file or folder of the home folder or a disk in its default app, through `openFileWithApps` with `untrusted` (a file that would run code is only shown in Files) |
 | `tabs_close` | `close_window(window_id)` | closes a window (the app may ask about unsaved changes) |
 | `read_page` | `read_window(window_id, filter, depth)` | the UI tree as text (below) |
-| `find` | `find(window_id, query)` | words matched against roles, names and values; the best lines with their refs |
-| `computer` | `computer(action, …, mode)` | `screenshot` (`display`, `display:<id>`, `window:<id>`), `left_click`, `right_click`, `middle_click`, `double_click`, `triple_click`, `hover` (at a `ref` or a `coordinate`), `left_click_drag` (`start_coordinate` → `coordinate`), `type` (`text`), `key` (`text`: `ctrl+s`, `Return`, `ctrl+a Delete`; `repeat`), `scroll` (`scroll_direction`, `scroll_amount`), `zoom` (`region` [x0, y0, x1, y1]), `wait` (`duration`, at most 10 s); `mode` `human` or `machine` for this call (below) |
+| `find` | `find(window_id, query)` | words matched against roles, names and values; the best lines with their refs, or `No matches for "<query>"` (never a bare `done`; `read_app_log` likewise says `No log lines`) |
+| `computer` | `computer(action, …, mode)` | `screenshot` (`display`, `display:<id>`, `window:<id>`), `left_click`, `right_click`, `middle_click`, `double_click`, `triple_click`, `hover` (at a `ref` or a `coordinate`), `left_click_drag` (`start_coordinate` → `coordinate`), `type` (`text`), `key` (`text`: `ctrl+s`, `Return`, `ctrl+a Delete`; `repeat`), `scroll` (`scroll_direction`, `scroll_amount`), `zoom` (`region` [x0, y0, x1, y1]); `save` on `screenshot` and `zoom` (below), `wait` (`duration`, at most 10 s); `mode` `human` or `machine` for this call (below) |
 | `form_input` | `set_value(ref, value, mode)` | a text field or area, a checkbox or switch, a pop-up or option list (by value or label), a slider; never a password field |
 | — | `hands_mode(mode)` | `human`, `machine` or `default` for the rest of the session (also `lordos-mcp --mode human\|machine`) |
 | `read_console_messages` | `read_app_log(app, pattern, max_lines)` | an app's own log: its file in the session's log folder (`apps/<app>.log`, a web app's `web/<app>-*.log`), else its lines of `shell.log`, through `lord.logs` (the Logs app's own access rules) |
@@ -58,6 +58,15 @@ screenshot's area (`{x, y, w, h, width, height}`: the part of the desktop it rea
 screen maps right). Screenshots are at most 1,568 px on their long side by default; a zoom may grow up to 4 times. A
 window's screenshot includes its sheets (Settings → Wallpaper's sheet, a file dialog: `wm.addSheet`), as Screenshots'
 window capture does. A zoom is clipped to the desktop; only a region wholly off it is refused (`outside`).
+
+**Saving a capture for the person** (`save` on `screenshot` and `zoom`): the agent's image is scaled for the model
+(1,568 px), too small for a person reading QA evidence. With `save` (a bare file name with the same rules as `record`'s,
+`.png` added when missing) lordos-mcp also asks lord-server for the same capture at its own resolution (`Screenshot`
+with maxdim `HANDS_SHOT_NATIVE`: not scaled, a zoom never grown) and writes it as a new file
+`~/Pictures/LordOS QA/<name>.png` (`O_EXCL | O_NOFOLLOW`, as a recording's export). It goes through the very same capture
+path, so the same areas are black (protected and password areas, `handsDeny`, prompts) and it never holds more of the
+screen than the agent's image does, only more pixels of it. The result says the path and the size, or why it was not
+saved (an existing file is never replaced).
 
 ## The agent's cursor
 
@@ -79,6 +88,10 @@ The person sees the agent work, as Claude in Chrome shows its own cursor moving 
   button, a wheel, a remote viewer's) takes it back from there before it is applied (`main.c` `hands_reclaim`).
 - **Not in the agent's screenshots**: the agent sees the screen as it is, with nothing of its own over the target
   (`paint_hands_cursor`), and it is not in `read_window`'s tree.
+- **Registered again by a new shell**: a theme switch (even one the agent clicked) builds the shell anew, and its
+  `HandsCursor` registers its nodes again (`lord.hands.cursor`, tried again each second until lord-server takes them).
+  That is not on the agent-input refusal list: lord-server takes only nodes that are a child of the root at the cursor's
+  layer (99.5) and take no clicks, by id and serial (`handscur.c`), so registering gives an agent nothing.
 
 **Human mode** (the default on the live desktop): before a click, a hover, a drag, a scroll or `set_value`, the cursor
 glides from where it is (the first time, from the person's pointer) to the target along a slightly curved path, eased in
@@ -91,7 +104,9 @@ With Settings → Accessibility → Reduce motion the glides are short (at most 
 it lands.
 
 **Choosing it**: Settings → AI → Hands → *Agent motion*: *Human* / *Machine* (`settings.hands.motion`, on the
-`handsDeny` page, so only the person changes it; `lord.hands.motion`); a client's own choice wins for that connection:
+`handsDeny` page, so only the person changes it; `lord.hands.motion`, which refuses a change while the agent owns the
+input but takes the same values again, as a shell re-mounted by a theme switch the agent clicked sends them; the shell
+sends a refused change again until it is taken); a client's own choice wins for that connection:
 `hands_mode` (`SetMode` on the bus) or `lordos-mcp --mode`, and `mode` on one `computer` or `set_value` call.
 
 **What it never weakens**: the glide itself injects nothing; the hover move and the action pass the whole gate at the
@@ -291,4 +306,7 @@ change the desktop. It needs `dbus-daemon` (Debian's `dbus-daemon` package).
   captured as a window (it used to fail) and as the display with its firewall switches black in both; a window dragged
   off the screen's edge, its screenshot and a zoom at the edge; a wallpaper's sheet in Settings' window screenshot and a
   zoom over it; the agent's cursor on the display while it glides and where it clicks, never in the agent's screenshot,
-  the click landing after the glide, the person's pointer not moving (`where`, a test hook).
+  the click landing after the glide, the person's pointer not moving (`where`, a test hook); a screenshot and a zoom
+  saved with `save` (full resolution, the firewall switches black in the file too, never over an existing file, never
+  a path); the agent clicking a theme switch (Settings → Appearance → Classic → Apply) and its cursor on the display
+  again on its next action.

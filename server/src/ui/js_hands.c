@@ -73,7 +73,10 @@ static JSValue f_motion(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     const char *m = argc > 0 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
     int mode = m ? hands_mode_of(m) : -1;
     if (m) JS_FreeCString(c, m);
-    hands_motion(mode == HANDS_MODE_MACHINE ? HANDS_MODE_MACHINE : HANDS_MODE_HUMAN, argc > 1 && JS_ToBool(c, argv[1]) > 0);
+    int reduce = argc > 1 && JS_ToBool(c, argv[1]) > 0;
+    /* a change is the person's (Settings → AI is handsDeny): under the agent's input only the same values again */
+    if (!hands_motion_allowed(mode, reduce, hands_agent_owns_input())) return js_throw_code(c, "hands.refused", NULL);
+    hands_motion(mode == HANDS_MODE_MACHINE ? HANDS_MODE_MACHINE : HANDS_MODE_HUMAN, reduce);
     return JS_UNDEFINED;
 }
 

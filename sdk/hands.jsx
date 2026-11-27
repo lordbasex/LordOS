@@ -382,44 +382,65 @@ export function HandsBanner() {
 // and is cut again here.
 export const HANDS_CURSOR_Z = 99.5;                      // server/src/hands/handscur.h HANDSCUR_Z
 const TIP = 24, VIOLET = '#8b5cf6';
-let cursorNodes = null;
+let cursorNodes = null, cursorOk = false;
+// the nodes once; lord.hands.cursor until lord-server takes them (false before the desktop's root is up, or if it ever
+// refuses: HandsCursor tries again)
 function buildCursor() {
-  if (cursorNodes || typeof lord === 'undefined' || !lord.hands || typeof lord.hands.cursor !== 'function') return cursorNodes;
-  let ring = 0, text = 0;
-  const root = overlayTree(HANDS_CURSOR_Z, { left: -1000, top: -1000, width: 240, height: 72, display: 'none', direction: 'ltr' }, (el, r) => {
-    ring = el('view', { position: 'absolute', left: TIP - 5, top: TIP - 5, width: 10, height: 10, borderRadius: 5, border: `2px solid ${VIOLET}`, opacity: 0 }, r);
-    // the arrow: a teardrop whose sharp corner is the point
-    el('view', { position: 'absolute', left: TIP, top: TIP, width: 17, height: 17, backgroundColor: VIOLET, border: '2px solid #ffffff',
-      borderTopLeftRadius: 1, borderTopRightRadius: 9, borderBottomRightRadius: 9, borderBottomLeftRadius: 9, boxShadow: '0 2px 6px rgba(0,0,0,0.45)' }, r);
-    const pill = el('view', { position: 'absolute', left: TIP + 14, top: TIP + 19, height: 18, paddingHorizontal: 7, borderRadius: 9, justifyContent: 'center',
-      backgroundColor: VIOLET, boxShadow: '0 2px 6px rgba(0,0,0,0.35)' }, r);
-    const tx = el('text', { fontSize: 11, fontWeight: 600, color: '#ffffff', whiteSpace: 'nowrap' }, pill);
-    text = lord.createNode('raw');
-    lord.appendChild(tx, text);
-  });
-  if (!root) return null;
-  let ok = false;
-  try { ok = lord.hands.cursor(root, ring) === true; } catch (e) { ok = false; }
-  cursorNodes = ok ? { root, ring, text, label: null } : null;
+  if (cursorOk) return cursorNodes;
+  if (typeof lord === 'undefined' || !lord.hands || typeof lord.hands.cursor !== 'function') return null;
+  if (!cursorNodes) {
+    let ring = 0, text = 0;
+    const root = overlayTree(HANDS_CURSOR_Z, { left: -1000, top: -1000, width: 240, height: 72, display: 'none', direction: 'ltr' }, (el, r) => {
+      ring = el('view', { position: 'absolute', left: TIP - 5, top: TIP - 5, width: 10, height: 10, borderRadius: 5, border: `2px solid ${VIOLET}`, opacity: 0 }, r);
+      // the arrow: a teardrop whose sharp corner is the point
+      el('view', { position: 'absolute', left: TIP, top: TIP, width: 17, height: 17, backgroundColor: VIOLET, border: '2px solid #ffffff',
+        borderTopLeftRadius: 1, borderTopRightRadius: 9, borderBottomRightRadius: 9, borderBottomLeftRadius: 9, boxShadow: '0 2px 6px rgba(0,0,0,0.45)' }, r);
+      const pill = el('view', { position: 'absolute', left: TIP + 14, top: TIP + 19, height: 18, paddingHorizontal: 7, borderRadius: 9, justifyContent: 'center',
+        backgroundColor: VIOLET, boxShadow: '0 2px 6px rgba(0,0,0,0.35)' }, r);
+      const tx = el('text', { fontSize: 11, fontWeight: 600, color: '#ffffff', whiteSpace: 'nowrap' }, pill);
+      text = lord.createNode('raw');
+      lord.appendChild(tx, text);
+    });
+    if (!root) return null;
+    cursorNodes = { root, ring, text, label: null };
+  }
+  try { cursorOk = lord.hands.cursor(cursorNodes.root, cursorNodes.ring) === true; } catch (e) { cursorOk = false; }
   return cursorNodes;
 }
+const RETRY_MS = 1000;
 const cut = (str, n) => (str.length > n ? `${str.slice(0, n - 1)}…` : str);
 export function HandsCursor() {
   const st = useStore(handsStatus);
   const motion = useStore(settings, (s) => `${(s.hands || {}).motion === 'machine' ? 'machine' : 'human'}|${!!s.reduceMotion}`);
+  // the person's motion to lord-server; a change is refused while the agent owns the input (only the person's Settings
+  // page changes it), so it is sent again until it is taken
   useEffect(() => {
     const a = api();
+    if (!a || typeof a.motion !== 'function') return undefined;
     const [m, r] = motion.split('|');
-    if (a && typeof a.motion === 'function') { try { a.motion(m, r === 'true'); } catch (e) { /* refused while an agent acts */ } }
+    let timer = 0, live = true;
+    const send = () => {
+      try { a.motion(m, r === 'true'); } catch (e) { if (live) timer = setTimeout(send, RETRY_MS); }
+    };
+    send();
+    return () => { live = false; if (timer) clearTimeout(timer); };
   }, [motion]);
   const granted = (st.clients || []).filter((c) => c.state === 'granted');
   const who = cut([...new Set(granted.map(clientName))].join(', '), 48);
   const label = t('hands.cursor.label', { client: who });
   useEffect(() => {
-    const c = buildCursor();
-    if (!c || c.label === label) return;
-    c.label = label;
-    try { lord.setText(c.text, label); } catch (e) { /* gone */ }
+    let timer = 0, live = true;
+    const apply = () => {
+      const c = buildCursor();
+      if (c && c.label !== label) {
+        c.label = label;
+        try { lord.setText(c.text, label); } catch (e) { /* gone */ }
+      }
+      // registration failed (the root not up yet, a refusal): again, until lord-server takes the nodes
+      if (!cursorOk && live) timer = setTimeout(apply, RETRY_MS);
+    };
+    apply();
+    return () => { live = false; if (timer) clearTimeout(timer); };
   }, [label, granted.length]);
   return null;
 }

@@ -25,7 +25,7 @@ static const char TOOLS[] =
 "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"window_id\":{\"type\":\"string\"},\"filter\":{\"type\":\"string\",\"enum\":[\"all\",\"interactive\"]},\"depth\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":60}}}},"
 "{\"name\":\"find\",\"description\":\"Find UI elements by words (\\\"save button\\\", \\\"search field\\\", \\\"Import\\\") in a window or the desktop; returns matching lines with their refs.\","
 "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"window_id\":{\"type\":\"string\"},\"query\":{\"type\":\"string\"}},\"required\":[\"query\"]}},"
-"{\"name\":\"computer\",\"description\":\"Use the mouse and keyboard and see the screen, through LordOS's own input path. Actions: screenshot (target \\\"display\\\", \\\"display:<id>\\\" or \\\"window:<id>\\\"), left_click, right_click, middle_click, double_click, triple_click, hover (at ref or coordinate), left_click_drag (start_coordinate to coordinate), type (text), key (text: chords such as \\\"ctrl+s\\\", \\\"Return\\\", \\\"ctrl+a Delete\\\"; repeat), scroll (ref or coordinate, scroll_direction, scroll_amount), zoom (region [x0, y0, x1, y1]: a closer screenshot), wait (duration seconds, at most 10). Coordinates are pixels of the last screenshot (desktop points before any). Password fields, permission and password prompts and the lock screen are never reachable; the person's own input pauses you for a few seconds. The person sees your own violet cursor: in human mode (the live desktop's default) it glides to each target, hovers, then acts, and types at a person's pace; in machine mode every action is at once and the cursor only flashes where it lands. mode sets it for this call; hands_mode for the session. Your cursor is never in your screenshots.\","
+"{\"name\":\"computer\",\"description\":\"Use the mouse and keyboard and see the screen, through LordOS's own input path. Actions: screenshot (target \\\"display\\\", \\\"display:<id>\\\" or \\\"window:<id>\\\"), left_click, right_click, middle_click, double_click, triple_click, hover (at ref or coordinate), left_click_drag (start_coordinate to coordinate), type (text), key (text: chords such as \\\"ctrl+s\\\", \\\"Return\\\", \\\"ctrl+a Delete\\\"; repeat), scroll (ref or coordinate, scroll_direction, scroll_amount), zoom (region [x0, y0, x1, y1]: a closer screenshot; screenshot and zoom take save, a file name, to also write the capture at its full resolution, with the same black areas, as ~/Pictures/LordOS QA/<save>.png for the person), wait (duration seconds, at most 10). Coordinates are pixels of the last screenshot (desktop points before any). Password fields, permission and password prompts and the lock screen are never reachable; the person's own input pauses you for a few seconds. The person sees your own violet cursor: in human mode (the live desktop's default) it glides to each target, hovers, then acts, and types at a person's pace; in machine mode every action is at once and the cursor only flashes where it lands. mode sets it for this call; hands_mode for the session. Your cursor is never in your screenshots.\","
 "\"inputSchema\":{\"type\":\"object\",\"properties\":{"
 "\"action\":{\"type\":\"string\",\"enum\":[\"screenshot\",\"left_click\",\"right_click\",\"middle_click\",\"double_click\",\"triple_click\",\"hover\",\"left_click_drag\",\"type\",\"key\",\"scroll\",\"zoom\",\"wait\"]},"
 "\"ref\":{\"type\":\"string\"},\"coordinate\":{\"type\":\"array\",\"items\":{\"type\":\"number\"},\"minItems\":2,\"maxItems\":2},"
@@ -34,6 +34,7 @@ static const char TOOLS[] =
 "\"scroll_direction\":{\"type\":\"string\",\"enum\":[\"up\",\"down\",\"left\",\"right\"]},\"scroll_amount\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":30},"
 "\"region\":{\"type\":\"array\",\"items\":{\"type\":\"number\"},\"minItems\":4,\"maxItems\":4},"
 "\"duration\":{\"type\":\"number\",\"minimum\":0,\"maximum\":10},\"target\":{\"type\":\"string\"},"
+"\"save\":{\"type\":\"string\",\"description\":\"screenshot and zoom: also save the capture at full resolution (the same black areas) as ~/Pictures/LordOS QA/<save>.png; a bare file name (letters, digits, spaces, . _ -), never a path; an existing file is never replaced\"},"
 "\"mode\":{\"type\":\"string\",\"enum\":[\"human\",\"machine\"],\"description\":\"how this action moves: human (a visible glide, a hover, a person's typing pace) or machine (at once)\"}},\"required\":[\"action\"]}},"
 "{\"name\":\"set_value\",\"description\":\"Set a control's value directly: a text field or text area (the text), a checkbox or switch (true/false), a pop-up or option list (an option's value or label), a slider (a number). Never a password field.\","
 "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"ref\":{\"type\":\"string\"},\"value\":{\"type\":[\"string\",\"boolean\",\"number\"]},"
@@ -68,6 +69,38 @@ const char *mcp_error_text(const char *error, const char *word, char *buf, size_
              !strcmp(e, "org.freedesktop.DBus.Error.UnknownObject") || !strcmp(e, "org.freedesktop.DBus.Error.UnknownMethod"))
         snprintf(buf, n, "No LordOS session answers on this bus (is this LordOS, and is the desktop running?).");
     else snprintf(buf, n, "The action failed.");
+    return buf;
+}
+
+/* the agent's own text, to say it back: printable ASCII and UTF-8 only (no control or format bytes), " as ', at most
+ * 64 bytes, cut at a character */
+static void echo_of(const char *s, char *out, size_t n) {
+    size_t o = 0;
+    for (const unsigned char *p = (const unsigned char *)(s ? s : ""); *p && o + 5 < n && o < 64;) {
+        size_t l = *p < 0x80 ? 1 : (*p & 0xe0) == 0xc0 ? 2 : (*p & 0xf0) == 0xe0 ? 3 : (*p & 0xf8) == 0xf0 ? 4 : 0;
+        if (!l) { p++; continue; }
+        int ok = 1;
+        for (size_t i = 1; i < l; i++) if ((p[i] & 0xc0) != 0x80) ok = 0;
+        if (!ok) { p++; continue; }
+        if (l == 1 && (*p < 0x20 || *p == 0x7f)) { p++; continue; }
+        /* U+200B..U+200F, U+202A..U+202E, U+2066..U+2069: direction and zero-width marks are never echoed */
+        if (l == 3 && p[0] == 0xe2 && ((p[1] == 0x80 && ((p[2] >= 0x8b && p[2] <= 0x8f) || (p[2] >= 0xaa && p[2] <= 0xae))) ||
+                                       (p[1] == 0x81 && p[2] >= 0xa6 && p[2] <= 0xa9))) { p += l; continue; }
+        if (o + l > 64) break;
+        if (l == 1 && *p == '"') out[o++] = '\'';
+        else { memcpy(out + o, p, l); o += l; }
+        p += l;
+    }
+    out[o] = 0;
+}
+
+const char *mcp_empty_text(const char *tool, const char *arg, char *buf, size_t n) {
+    char e[72];
+    echo_of(arg, e, sizeof e);
+    if (tool && !strcmp(tool, "find")) snprintf(buf, n, "No matches for \"%s\". Try other words, or read_window for the whole tree.", e);
+    else if (tool && !strcmp(tool, "read_app_log") && e[0]) snprintf(buf, n, "No log lines match \"%s\".", e);
+    else if (tool && !strcmp(tool, "read_app_log")) snprintf(buf, n, "No log lines.");
+    else snprintf(buf, n, "done");
     return buf;
 }
 
@@ -127,14 +160,23 @@ char *mcp_quote(const char *s) {
 
 /* ---- the export ---- */
 
-int mcp_export_name_ok(const char *name) {
+static int file_name_ok(const char *name, const char *ext) {
     size_t n = name ? strlen(name) : 0;
-    if (n < 5 || n > 100 || name[0] == '.' || name[0] == ' ' || strcmp(name + n - 4, ".gif")) return 0;
+    if (n < 5 || n > 100 || name[0] == '.' || name[0] == ' ' || strcmp(name + n - 4, ext)) return 0;
     for (size_t i = 0; i < n; i++) {
         char c = name[i];
         if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == ' ' || c == '.' || c == '_' || c == '-')) return 0;
     }
     return !strstr(name, "..");
+}
+int mcp_export_name_ok(const char *name) { return file_name_ok(name, ".gif"); }
+
+int mcp_shot_save_name(const char *save, char *out, size_t n) {
+    size_t l = save ? strlen(save) : 0;
+    if (!l || l > 100 || n < 101) return -1;
+    if (l >= 4 && !strcmp(save + l - 4, ".png")) snprintf(out, n, "%s", save);
+    else snprintf(out, n, "%s.png", save);
+    return file_name_ok(out, ".png") ? 0 : -1;
 }
 
 /* a folder under dirfd, made when missing, opened without following a link */
@@ -145,7 +187,7 @@ static int sub(int dirfd, const char *name) {
 
 int mcp_write_export(const char *home, const char *name, const uint8_t *d, size_t n, char *out, size_t on) {
     if (out && on) out[0] = 0;
-    if (!home || home[0] != '/' || !mcp_export_name_ok(name)) { errno = EINVAL; return -1; }
+    if (!home || home[0] != '/' || !(file_name_ok(name, ".gif") || file_name_ok(name, ".png"))) { errno = EINVAL; return -1; }
     int h = open(home, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     int pics = h >= 0 ? sub(h, "Pictures") : -1;
     int qa = pics >= 0 ? sub(pics, "LordOS QA") : -1;

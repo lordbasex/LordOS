@@ -16,7 +16,10 @@
 #   6. a window that runs off the screen: its screenshot says the part on the desktop, and a zoom at its edge works;
 #      a wallpaper's sheet (Settings → Wallpaper) is in the window's screenshot and a zoom over it works;
 #   7. the agent's cursor in human mode: it shows on the display while it glides and where it clicks, never in the agent's
-#      own screenshot, and the click lands.
+#      own screenshot, and the click lands;
+#   8. the agent clicks a theme switch (Settings → Appearance → Classic → Apply): the new shell registers the cursor again
+#      under the agent's input (QA ws168: lord.hands.cursor was refused then), and it shows on the agent's next action.
+#   5 also saves a screenshot and a zoom (computer save): full resolution in ~/Pictures/LordOS QA, the same black areas.
 # Exit 0 passed, 1 failed, 77 skipped (no theme bundle or binaries).
 import base64, json, os, re, shutil, socket, subprocess, sys, tempfile, time, zlib
 
@@ -336,6 +339,33 @@ def capture_paths():
         w, h, rows = png_rgb(a.png())
         check(px(rows, sx, sy) == (0, 0, 0) and px(rows, sx - 9, sy - 4) == (0, 0, 0), f'and in the display\'s {px(rows, sx, sy)}')
         check(px(rows, rx + 80, sy) != (0, 0, 0), 'the rest of the row shows')
+        # save: the same capture at full resolution in ~/Pictures/LordOS QA, with the same black areas
+        qa = os.path.join(a.home, 'Pictures', 'LordOS QA')
+        r = a.call('computer', action='screenshot', save='network tab')
+        t = next((c['text'] for c in r['content'] if c['type'] == 'text'), '')
+        f = os.path.join(qa, 'network tab.png')
+        check(not r.get('isError') and 'Saved at full resolution' in t and os.path.exists(f), f'a screenshot saved ({t[-120:]})')
+        if os.path.exists(f):
+            fw, fh, frows = png_rgb(open(f, 'rb').read())
+            check((fw, fh) == (w, h), f'saved at the display\'s own size ({fw}x{fh}, the agent\'s {w}x{h})')
+            check(px(frows, sx, sy) == (0, 0, 0) and px(frows, sx - 9, sy - 4) == (0, 0, 0), 'the rule switch is black in the saved file too')
+            check(px(frows, rx + 80, sy) != (0, 0, 0), 'and the rest of the row shows in it')
+        r = a.call('computer', action='screenshot', save='network tab')
+        t = next((c['text'] for c in r['content'] if c['type'] == 'text'), '')
+        check('a file with that name exists' in t, 'never over an existing file')
+        r = a.call('computer', action='screenshot', save='../escape')
+        check(r.get('isError') and not os.path.exists(os.path.join(a.home, 'Pictures', 'escape.png')), 'save is never a path')
+        # a zoom: the agent's image is grown (up to 4 times); the saved one is the region's own pixels, the switch black
+        z = a.call('computer', action='zoom', region=[sx - 60, sy - 30, sx + 60, sy + 30], save='switch zoom.png')
+        zi = next((base64.b64decode(c['data']) for c in z['content'] if c['type'] == 'image'), None)
+        f = os.path.join(qa, 'switch zoom.png')
+        if zi and os.path.exists(f):
+            zw, zh, _ = png_rgb(zi)
+            fw, fh, frows = png_rgb(open(f, 'rb').read())
+            check(zw > fw and (fw, fh) == (120, 60), f'a zoom saved at the region\'s size ({fw}x{fh}; the agent\'s {zw}x{zh})')
+            check(px(frows, 60, 30) == (0, 0, 0), 'the switch black in the saved zoom')
+        else:
+            check(False, 'a zoom saved')
     finally:
         a.close()
 
@@ -455,6 +485,61 @@ def agent_cursor():
         a.close()
 
 
+def theme_switch_cursor():
+    print('8. a theme switch the agent clicked: its cursor comes back')
+    a = Agent('settings')
+    try:
+        check('"effective":"human"' in a.text('hands_mode', mode='human'), 'hands_mode human')
+        t = a.text('find', window_id='settings', query='Appearance')
+        a.text('computer', action='left_click', ref=ref(t, r'row "◐ Appearance"'), mode='machine')
+        time.sleep(1.0)
+        t = a.text('find', window_id='settings', query='Classic')
+        r = ref(t, r'clickable "Classic')
+        check(r is not None, 'the Classic card')
+        a.text('computer', action='left_click', ref=r, mode='machine')
+        time.sleep(1.0)
+        t = a.text('find', window_id='settings', query='Apply button')
+        r = ref(t, r'button "Apply')
+        check(r is not None, 'its Apply')
+        a.text('computer', action='left_click', ref=r, mode='machine')    # the agent's own click switches the desktop
+        ok = False
+        for _ in range(40):
+            time.sleep(0.5)
+            try:
+                st = json.loads(open(os.path.join(a.dir, 'home', '.config', 'lordos', 'settings.json')).read())
+            except Exception:
+                st = {}
+            if st.get('theme') == 'classic':
+                ok = True
+                break
+        check(ok, 'the desktop is now Classic')
+        time.sleep(4.0)                                        # the new shell up
+        a.hook('frame output')
+        w, h, d = ppm(os.path.join(a.dir, 'lordos-test-frame-output.ppm'))
+        def violet():
+            n = 0
+            for y in range(0, h, 2):
+                for x in range(0, w, 2):
+                    p = d[(y * w + x) * 3:(y * w + x) * 3 + 3]
+                    if 120 < p[0] < 165 and 70 < p[1] < 115 and p[2] > 215:
+                        n += 1
+            return n
+        base = violet()
+        import threading
+        res = {}
+        th = threading.Thread(target=lambda: res.setdefault('c', a.text('computer', action='hover', coordinate=[200, 300])))
+        th.start()
+        time.sleep(0.15)
+        a.hook('frame output')
+        th.join()
+        w, h, d = ppm(os.path.join(a.dir, 'lordos-test-frame-output.ppm'))
+        mid = violet() - base
+        check(not res.get('c', '').startswith('ERROR'), f'the next action runs ({res.get("c")})')
+        check(mid > 10, f'the agent\'s cursor on the display again after the switch ({mid} more violet pixels)')
+    finally:
+        a.close()
+
+
 def main():
     if not (os.access(MCP, os.X_OK) and os.access(LS, os.X_OK) and os.path.exists(os.path.join(ROOT, 'themes/default/theme.bundle.js'))
             and os.access('/usr/bin/dbus-daemon', os.X_OK) and shutil.which('node')):
@@ -468,6 +553,7 @@ def main():
     capture_paths()
     zoom_edges()
     agent_cursor()
+    theme_switch_cursor()
     print(f'hands-e2e: {passes} passed, {fails} failed')
     return 1 if fails else 0
 

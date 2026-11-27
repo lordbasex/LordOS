@@ -387,6 +387,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Ctrl+Alt+Shift+Backspace always restores Flow**, whatever style runs (handled before any JavaScript;
     Ctrl+Alt+Backspace alone still ends the session).
 
+- **Hands: `computer` saves a full-resolution capture for the person** (`save` on `screenshot` and `zoom`). The agent's
+  image is scaled for the model (1,568 px on its long side), too small to read as QA evidence. With `save` (a bare file
+  name, the same rules as `record`'s; `.png` added when missing) lordos-mcp also asks lord-server for the same capture at
+  its own resolution (`Screenshot` with maxdim `HANDS_SHOT_NATIVE`, 65535: not scaled, a zoom never grown) and writes it
+  as a new `~/Pictures/LordOS QA/<name>.png` (`O_EXCL | O_NOFOLLOW`, 0600, as a recording's export; never over an
+  existing file, never a path). The same capture path blacks out the same areas (protected and password areas,
+  `handsDeny`, prompts): never more of the screen than the agent sees, only more pixels. The result names the path and
+  the size. `build/hands-test` (names, the native size on the bus, the write) and `tests/hands_e2e.py` (a screenshot and
+  a zoom saved, full size, the firewall switches black in the file, no overwrite, no path).
+
 ### Tests
 - **Hands**: `build/hands-test` (ASan/UBSan: the policy against a fake host, the prompt per connection, Stop, the panic
   key, the person's input, the system layer, a covered ref, set-value's and the keys' gate, allowlisted screenshots, a
@@ -408,6 +418,31 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Hands: the agent's violet cursor never came back after a theme switch the agent clicked** (QA ws168). The new shell's
+  `HandsCursor` registers its nodes again (`lord.hands.cursor`) and re-sends the person's motion (`lord.hands.motion`),
+  but both were on `hands_native_guard`'s refusal list, so under the agent's (sticky) input they were refused
+  ("lord.hands.cursor refused (an AI agent's input)") and the cursor stayed gone, in human mode too. Both are off the
+  list now: lord-server still takes only cursor nodes that are a child of the root at the cursor's layer (99.5) and take
+  no clicks, by id and serial (`handscur.c`); `lord.hands.motion` refuses a change while the agent owns the input but takes
+  the same values again (`hands_motion_allowed`). `HandsCursor` tries the registration (and a refused motion) again each
+  second until lord-server takes it. `build/hands-test` (the guard, `hands_motion_allowed`) and `tests/hands_e2e.py` step 8
+  (the agent clicks Settings → Appearance → Classic → Apply; its cursor shows on its next action; the step fails with
+  the old guard).
+- **Hands: `find` with no match answered a bare "done"**; it now says `No matches for "<query>". Try other words, or
+  read_window for the whole tree.` (the query echoed printable only, no control or direction marks, at most 64 bytes),
+  and `read_app_log` with no line says `No log lines` (`mcp_empty_text`, `build/hands-test`).
+- **Help: a search with no results cut its title in the narrow sidebar** ("No se encontraron" without "artículos."). The
+  `EmptyState` title and hint were shrunk to their own measured width and then broke into one line more than measured,
+  whose last line was cut. They now take the width they have (100 %, the hint at most 360) and center their lines
+  (`sdk/controls.jsx`; checked headless in es, de, pt, fi and ar; `tests/help_skin_scene.mjs`).
+- **Notes: Read → Edit drew one frame with every line broken every few characters** ("# QA / ws16 / 8 / impo / rtad").
+  The editor wrapped at the size `lord.getLayout` gives a node not laid out yet (0 × 0). It now starts at the size of the
+  reading view it replaces and ignores a 0 × 0 answer, looking again on the next frame
+  (`apps/notes/NoteEditor.jsx` `initialSize`; `tests/notes_editor_scene.mjs`, which reproduces the broken rows without
+  the fix).
+- **Settings → Appearance: a theme card's "Author · Version 0.8.9.6.1+ws168" was clipped** ("Versión 0", no ellipsis).
+  The author and the version are now a line each, cut with "…" when too long, as is the theme's name
+  (`apps/settings/ThemeGallery.jsx`).
 - **Hands: an AI agent can download, use and free up catalog wallpapers** (maintainer-approved Hands exception,
   2026-11-26; AGENTS.md; docs/HANDS.md). Before, `hands_native_guard` refused `lord.admin.request` as a whole to an
   agent's input, so Settings → Wallpaper's "Download and use" showed "Only you can do this: an AI agent's input never can".

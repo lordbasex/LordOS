@@ -268,14 +268,17 @@ int hands_chords(const char *s, HandsChord *c, int max, int *n) {
  * the vault's requests (vault.request: reveal, copy, edit…), the keyring, filling a password into a terminal, the
  * firewall's changes, permissions, administrator actions (admin.request), Sentinela's
  * blocklist, theme trust and removal, signing keys, screen-sharing answers, Hands' own switch, power; lord.clipboard.get
- * answers "" while the clipboard holds a secret. A name ending in "." covers its whole namespace. */
+ * answers "" while the clipboard holds a secret. A name ending in "." covers its whole namespace.
+ * lord.hands.cursor and lord.hands.motion are not on it: a shell that re-mounts while the agent owns the input (a theme
+ * switch the agent clicked) registers its cursor again and re-sends the person's motion. The cursor's nodes are checked
+ * natively (handscur.c: a child of the root at HANDSCUR_Z that takes no clicks, ids and serials), and motion refuses
+ * only a change under the agent's input (hands_motion_allowed, js_hands.c). */
 int hands_native_guard(const char *name) {
     static const char *const refuse[] = {
         "vault.request", "vault.fidoAttach", "vault.promptDone", "keyring.request", "admin.request", "term.fill", "term.saveSecret", "term.dropSecret", "perms.set",
         "fw.setList", "fw.addList", "fw.removeList", "fw.setAppRule", "fw.setTrusted", "fw.setRestricted", "fw.setMode",
         "fw.addRule", "fw.removeRule", "fw.updateRule", "sentinela.block", "sentinela.unblock",
         "themes.trust", "themes.remove", "sign.share", "sign.restore", "share.answer", "hands.serve", "hands.answer",
-        "hands.motion", "hands.cursor",
         "session.power",
     };
     if (!name) return HANDS_G_NONE;
@@ -480,6 +483,10 @@ void hands_on_done(HandsDone fn) { S.done = fn; }
 void hands_motion(int mode, int reduce) {
     S.motion = mode == HANDS_MODE_MACHINE ? HANDS_MODE_MACHINE : HANDS_MODE_HUMAN;
     S.reduce = !!reduce;
+}
+int hands_motion_allowed(int mode, int reduce, int agent) {
+    int m = mode == HANDS_MODE_MACHINE ? HANDS_MODE_MACHINE : HANDS_MODE_HUMAN;
+    return !agent || (m == (S.motion == HANDS_MODE_MACHINE ? HANDS_MODE_MACHINE : HANDS_MODE_HUMAN) && !!reduce == S.reduce);
 }
 int hands_motion_default(void) { return S.qa ? HANDS_MODE_MACHINE : S.motion == HANDS_MODE_MACHINE ? HANDS_MODE_MACHINE : HANDS_MODE_HUMAN; }
 int hands_acting(void) { return S.P.on; }

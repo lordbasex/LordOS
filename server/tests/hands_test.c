@@ -620,7 +620,41 @@ static void marks(void) {
 
 /* lordos-mcp's pure parts: the tools, the errors' sentences, a screenshot's points, base64, the GIF */
 /* F1, F5 and the rest: the security-state natives an agent's input never sets off */
+/* Screenshot's maxdim: 64..2560, or HANDS_SHOT_NATIVE (lordos-mcp's save: the capture at its own size, maxdim 0) */
+static int shot_maxdim(uint32_t u, int *maxdim) {
+    DBuf body;
+    dw_init(&body);
+    dw_str(&body, "display");
+    for (int i = 0; i < 4; i++) dw_i32(&body, 0);
+    dw_u32(&body, u);
+    DHdr h = { .type = DBUS_CALL, .path = HANDS_BUS_PATH, .iface = HANDS_BUS_IFACE, .member = "Screenshot", .dest = HANDS_BUS_NAME,
+               .sig = "siiiiu", .serial = 7 };
+    DBuf raw;
+    dw_init(&raw);
+    int ok = -1;
+    DMsg m;
+    if (!dbus_build(&h, &body, &raw) && !dbus_msg_parse(raw.p, raw.n, &m)) {
+        HandsReq r;
+        ok = handsbus_parse(&m, &r);
+        if (!ok) *maxdim = r.maxdim;
+        dbus_msg_free(&m);
+    }
+    dw_free(&raw);
+    dw_free(&body);
+    return ok;
+}
+
 static void native_guard(void) {
+    int md = -1;
+    CHECK(!shot_maxdim(0, &md) && md == HANDS_SHOT_MAXDIM, "Screenshot: the default size (%d)", md);
+    CHECK(!shot_maxdim(800, &md) && md == 800, "Screenshot: a size asked for");
+    CHECK(!shot_maxdim(HANDS_SHOT_NATIVE, &md) && md == 0, "Screenshot: native, not scaled (%d)", md);
+    CHECK(shot_maxdim(2561, &md) && shot_maxdim(63, &md) && shot_maxdim(65534, &md), "Screenshot: any other size refused");
+    int ow = 0, oh = 0;
+    hands_fit(3840, 2160, 0, 0, &ow, &oh);
+    CHECK(ow == 3840 && oh == 2160, "native: kept at %dx%d", ow, oh);
+    hands_fit(300, 200, 0, 1, &ow, &oh);
+    CHECK(ow == 300 && oh == 200, "native: a region never grown (%dx%d)", ow, oh);
     const char *refused[] = { "keyring.request", "vault.request", "vault.fidoAttach", "term.fill", "term.saveSecret", "fw.setAppRule", "fw.addRule", "fw.setMode",
                               "fw.removeList", "perms.set", "admin.request", "sentinela.unblock", "themes.trust", "themes.remove",
                               "hands.serve", "hands.answer", "share.answer", "session.power" };
@@ -628,6 +662,19 @@ static void native_guard(void) {
     CHECK(hands_native_guard("clipboard.get") == HANDS_G_CLIP, "lord.clipboard.get: empty while a secret");
     const char *free_[] = { "fs.list", "term.write", "fw.status", "fw.rules", "perms.get", "vaultx.y", "vault.poll", "vault.available", "admin.available", "hands.status", "themes.list", "term.fillx" };
     for (size_t i = 0; i < sizeof free_ / sizeof free_[0]; i++) CHECK(hands_native_guard(free_[i]) == HANDS_G_NONE, "lord.%s left alone", free_[i]);
+    /* a shell re-mounted by a theme switch the agent clicked registers its cursor again and re-sends the person's motion
+     * (QA ws168: the violet cursor never came back): neither is on the closed list; the cursor's nodes are checked in
+     * handscur.c and motion refuses only a change */
+    CHECK(hands_native_guard("hands.cursor") == HANDS_G_NONE, "lord.hands.cursor: a re-mounted shell registers it again");
+    CHECK(hands_native_guard("hands.motion") == HANDS_G_NONE, "lord.hands.motion: not refused by name");
+    hands_motion(HANDS_MODE_HUMAN, 0);
+    CHECK(hands_motion_allowed(HANDS_MODE_HUMAN, 0, 1), "the agent's input: the same motion again is allowed");
+    CHECK(!hands_motion_allowed(HANDS_MODE_MACHINE, 0, 1), "the agent's input: human to machine refused");
+    CHECK(!hands_motion_allowed(HANDS_MODE_HUMAN, 1, 1), "the agent's input: reduce motion on refused");
+    CHECK(hands_motion_allowed(HANDS_MODE_MACHINE, 1, 0), "the person's input: any change");
+    hands_motion(HANDS_MODE_MACHINE, 1);
+    CHECK(hands_motion_allowed(HANDS_MODE_MACHINE, 1, 1) && !hands_motion_allowed(HANDS_MODE_HUMAN, 1, 1), "machine and reduce kept, back to human refused");
+    hands_motion(HANDS_MODE_MACHINE, 0);
     /* lord.admin.request under an agent's input: only the closed catalog actions, with their exact argument shapes
      * (maintainer-approved 2026-11-26, docs/HANDS.md) */
     struct { const char *a, *arg; int ok; } adm[] = {
@@ -702,6 +749,17 @@ static void mcp(void) {
     CHECK(strstr(mcp_error_text(HANDS_ERR_ACTIVE, NULL, b, sizeof b), "user is active"), "user active");
     CHECK(strstr(mcp_error_text(HANDS_ERR_REFUSED, "password", b, sizeof b), "(password)"), "a refusal's word");
     CHECK(!strstr(mcp_error_text(HANDS_ERR_REFUSED, "a b\x01", b, sizeof b), "\x01"), "a word that isn't one is not echoed");
+    /* nothing back from lord-server: find says so instead of a bare "done" (QA ws168) */
+    CHECK(!strcmp(mcp_empty_text("find", "Apply button", b, sizeof b), "No matches for \"Apply button\". Try other words, or read_window for the whole tree."), "find: no matches, %s", b);
+    CHECK(!strstr(mcp_empty_text("find", "a\x01\x1b[2Jb\"c\xe2\x80\xae" "d", b, sizeof b), "\x01") && !strstr(b, "\x1b") && !strstr(b, "\xe2\x80\xae") && strstr(b, "\"a[2Jb'cd\""),
+          "find: control, bidi and quote bytes are never echoed (%s)", b);
+    char longq[300];
+    memset(longq, 'x', sizeof longq - 1); longq[sizeof longq - 1] = 0;
+    CHECK(strlen(mcp_empty_text("find", longq, b, sizeof b)) < 140, "find: a long query cut");
+    CHECK(strstr(mcp_empty_text("find", "\xc3\xa1\xc3\xa1\xc3", b, sizeof b), "\"\xc3\xa1\xc3\xa1\""), "find: a broken character dropped (%s)", b);
+    CHECK(!strcmp(mcp_empty_text("read_app_log", "error", b, sizeof b), "No log lines match \"error\"."), "read_app_log with a pattern");
+    CHECK(!strcmp(mcp_empty_text("read_app_log", NULL, b, sizeof b), "No log lines."), "read_app_log without one");
+    CHECK(!strcmp(mcp_empty_text(NULL, NULL, b, sizeof b), "done") && !strcmp(mcp_empty_text("open_app", "x", b, sizeof b), "done"), "an action: done");
     McpShot s = { 0 };
     mcp_shot_from_json(&s, "{\"x\":100,\"y\":50,\"w\":1920,\"h\":1080,\"width\":1568,\"height\":882}");
     double x, y;
@@ -721,8 +779,21 @@ static void mcp(void) {
     CHECK(mcp_export_name_ok("qa run 1.gif") && !mcp_export_name_ok("../x.gif") && !mcp_export_name_ok("a/b.gif") &&
           !mcp_export_name_ok(".hidden.gif") && !mcp_export_name_ok("x.desktop") && !mcp_export_name_ok("/tmp/x.gif") &&
           !mcp_export_name_ok("a..gif"), "export names");
+    /* computer screenshot/zoom's save: a bare name, ".png" added once, the same rules */
+    char sv[128];
+    CHECK(!mcp_shot_save_name("login screen", sv, sizeof sv) && !strcmp(sv, "login screen.png"), "save: .png added (%s)", sv);
+    CHECK(!mcp_shot_save_name("qa-1.png", sv, sizeof sv) && !strcmp(sv, "qa-1.png"), "save: .png kept once (%s)", sv);
+    CHECK(mcp_shot_save_name("../x", sv, sizeof sv) && mcp_shot_save_name("a/b", sv, sizeof sv) && mcp_shot_save_name(".x", sv, sizeof sv) &&
+          mcp_shot_save_name("", sv, sizeof sv) && mcp_shot_save_name(NULL, sv, sizeof sv) && mcp_shot_save_name("x\n", sv, sizeof sv) &&
+          mcp_shot_save_name("/tmp/x.png", sv, sizeof sv), "save: never a path or a hidden name");
     char home[] = "/tmp/hands-export-XXXXXX", path[PATH_MAX + 128], sneaky[PATH_MAX];
     if (mkdtemp(home)) {
+        CHECK(!mcp_write_export(home, "shot.png", (const uint8_t *)"\x89PNG", 4, path, sizeof path) && strstr(path, "/Pictures/LordOS QA/shot.png"),
+              "a saved screenshot in ~/Pictures/LordOS QA: %s", path);
+        CHECK(mcp_write_export(home, "shot.png", (const uint8_t *)"x", 1, path, sizeof path) == -1, "a screenshot never over an existing file");
+        CHECK(mcp_write_export(home, "shot.desktop", (const uint8_t *)"x", 1, path, sizeof path) == -1, "only .gif and .png");
+        snprintf(sneaky, sizeof sneaky, "%s/Pictures/LordOS QA/shot.png", home);
+        unlink(sneaky);
         CHECK(!mcp_write_export(home, "run.gif", (const uint8_t *)"GIF89a", 6, path, sizeof path) && strstr(path, "/Pictures/LordOS QA/run.gif"),
               "written in ~/Pictures/LordOS QA: %s", path);
         CHECK(mcp_write_export(home, "run.gif", (const uint8_t *)"x", 1, path, sizeof path) == -1, "never over an existing file");

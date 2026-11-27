@@ -149,9 +149,10 @@ int handsbus_parse(const DMsg *m, HandsReq *r) {
         if (d.err || !(r->shot = hands_shot_target(s1, &r->display, r->window, sizeof r->window))) return -1;
         if (x < 0 || y < 0 || x2 < 0 || y2 < 0 || x >= COORD_MAX || y >= COORD_MAX || x2 >= COORD_MAX || y2 >= COORD_MAX) return -1;
         if (r->shot == HANDS_SHOT_REGION && (x2 < 1 || y2 < 1)) return -1;
-        if (u && (u < 64 || u > 2560)) return -1;
+        if (u && u != HANDS_SHOT_NATIVE && (u < 64 || u > 2560)) return -1;
         r->x = x; r->y = y; r->w = x2; r->h = y2;
-        r->maxdim = u ? (int)u : HANDS_SHOT_MAXDIM;
+        /* HANDS_SHOT_NATIVE: not scaled (0: hands_fit keeps the size); the same capture path, the same black areas */
+        r->maxdim = u == HANDS_SHOT_NATIVE ? 0 : u ? (int)u : HANDS_SHOT_MAXDIM;
         return 0;
     case HANDS_C_OPENAPP:
         s1 = dr_str(&d, NULL);

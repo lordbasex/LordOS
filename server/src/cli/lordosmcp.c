@@ -239,8 +239,9 @@ static int point_arg(const JVal *a, const char *k, double *x, double *y) {
     return 1;
 }
 
-static char *tool_simple(const char *member, const char *arg, const char *sig2, const char *arg2, unsigned u) {
-    char why[256];
+/* empty: the tool's name for its answer when lord-server sends back nothing (mcp_empty_text), and empty_arg what to echo */
+static char *tool_simple_as(const char *empty, const char *empty_arg, const char *member, const char *arg, const char *sig2, const char *arg2, unsigned u) {
+    char why[256], none[192];
     if (ready(why, sizeof why)) return text_result(why, 1);
     DBuf b;
     dw_init(&b);
@@ -252,14 +253,17 @@ static char *tool_simple(const char *member, const char *arg, const char *sig2, 
     char *out = NULL;
     int ok = call_s(member, sig[0] ? sig : NULL, &b, &out, why, sizeof why);
     dw_free(&b);
-    char *r = text_result(ok ? (out && out[0] ? out : "done") : why, !ok);
+    char *r = text_result(ok ? (out && out[0] ? out : mcp_empty_text(empty, empty_arg, none, sizeof none)) : why, !ok);
     free(out);
     return r;
 }
+static char *tool_simple(const char *member, const char *arg, const char *sig2, const char *arg2, unsigned u) {
+    return tool_simple_as(NULL, NULL, member, arg, sig2, arg2, u);
+}
 
-static char *screenshot(const char *target, double x, double y, double w, double h, int maxdim, int keep) {
-    char why[256];
-    if (ready(why, sizeof why)) return text_result(why, 1);
+/* one Screenshot call: 1 with the reply in *m (its PNG and meta point into it), 0 with why */
+static int shot_call(const char *target, double x, double y, double w, double h, uint32_t maxdim, DMsg *m,
+                     const uint8_t **png, uint32_t *n, const char **meta, char *why, size_t wn) {
     DBuf b;
     dw_init(&b);
     dw_str(&b, target);
@@ -267,34 +271,70 @@ static char *screenshot(const char *target, double x, double y, double w, double
     dw_i32(&b, (int32_t)y);
     dw_i32(&b, (int32_t)w);
     dw_i32(&b, (int32_t)h);
-    dw_u32(&b, (uint32_t)maxdim);
-    DMsg m;
-    int r = call("Screenshot", "siiiiu", &b, &m);
+    dw_u32(&b, maxdim);
+    int r = call("Screenshot", "siiiiu", &b, m);
     dw_free(&b);
-    if (r < 0) return text_result(mcp_error_text("org.freedesktop.DBus.Error.ServiceUnknown", NULL, why, sizeof why), 1);
-    if (r == 0) { err_of(&m, why, sizeof why); dbus_msg_free(&m); return text_result(why, 1); }
+    if (r < 0) { mcp_error_text("org.freedesktop.DBus.Error.ServiceUnknown", NULL, why, wn); return 0; }
+    if (r == 0) { err_of(m, why, wn); dbus_msg_free(m); return 0; }
     DRd d;
-    dr_init(&d, &m);
+    dr_init(&d, m);
+    *n = 0;
+    *png = dr_bytes(&d, n);
+    *meta = dr_str(&d, NULL);
+    if (d.err) { dbus_msg_free(m); snprintf(why, wn, "The screenshot failed."); return 0; }
+    return 1;
+}
+
+/* save: the same capture again at its own resolution (lord-server's same path: the same black areas, never more of the
+ * screen than the agent's image shows), written as a new file in ~/Pictures/LordOS QA; the sentence for the result */
+static void shot_save(const char *target, double x, double y, double w, double h, const char *file, char *say, size_t sn) {
+    char why[256];
+    DMsg m;
+    const uint8_t *png = NULL;
+    const char *meta = NULL;
     uint32_t n = 0;
-    const uint8_t *png = dr_bytes(&d, &n);
-    const char *meta = dr_str(&d, NULL);
-    if (d.err) { dbus_msg_free(&m); return text_result("The screenshot failed.", 1); }
+    if (!shot_call(target, x, y, w, h, HANDS_SHOT_NATIVE, &m, &png, &n, &meta, why, sizeof why)) {
+        snprintf(say, sn, " Not saved: %s", why);
+        return;
+    }
+    McpShot s;
+    mcp_shot_from_json(&s, meta);
+    char where[PATH_MAX + 128];
+    int ok = !mcp_write_export(getenv("HOME"), file, png, n, where, sizeof where);
+    int e = errno;
+    dbus_msg_free(&m);
+    if (ok) snprintf(say, sn, " Saved at full resolution (%dx%d) to %s.", s.width, s.height, where);
+    else snprintf(say, sn, " Not saved: could not write ~/%s/%s: %s.", MCP_EXPORT_DIR, file, e == EEXIST ? "a file with that name exists" : strerror(e));
+}
+
+static char *screenshot(const char *target, double x, double y, double w, double h, int maxdim, int keep, const char *save) {
+    char why[256], file[128];
+    if (save && mcp_shot_save_name(save, file, sizeof file))
+        return text_result("save must be a bare file name (letters, digits, spaces, . _ -), no folders.", 1);
+    if (ready(why, sizeof why)) return text_result(why, 1);
+    DMsg m;
+    const uint8_t *png = NULL;
+    const char *meta = NULL;
+    uint32_t n = 0;
+    if (!shot_call(target, x, y, w, h, (uint32_t)maxdim, &m, &png, &n, &meta, why, sizeof why)) return text_result(why, 1);
     McpShot s;
     mcp_shot_from_json(&s, meta);
     if (keep && s.valid) last_shot = s;
     char *b64 = mcp_base64(png, n);
+    dbus_msg_free(&m);
+    char saved[PATH_MAX + 256] = "";
+    if (save) shot_save(target, x, y, w, h, file, saved, sizeof saved);
     Str o = { 0 };
     s_add(&o, "{\"content\":[{\"type\":\"image\",\"mimeType\":\"image/png\",\"data\":\"");
     s_add(&o, b64 ? b64 : "");
     s_add(&o, "\"},{\"type\":\"text\",\"text\":");
-    char t[400];
+    char t[PATH_MAX + 700];
     snprintf(t, sizeof t, "%dx%d image of the desktop area at (%.0f, %.0f), %.0fx%.0f points.%s System prompts and protected or "
-             "password areas show as black.", s.width, s.height, s.x, s.y, s.w, s.h,
-             keep ? " Coordinates you give now are pixels of this image." : " (Zoom: coordinates still refer to the last screenshot.)");
+             "password areas show as black.%s", s.width, s.height, s.x, s.y, s.w, s.h,
+             keep ? " Coordinates you give now are pixels of this image." : " (Zoom: coordinates still refer to the last screenshot.)", saved);
     s_q(&o, t);
     s_add(&o, "}]}");
     free(b64);
-    dbus_msg_free(&m);
     return o.oom ? NULL : o.p;
 }
 
@@ -314,7 +354,7 @@ static char *computer(const JVal *a) {
     }
     if (!strcmp(act, "screenshot")) {
         const char *target = str_arg(a, "target");
-        char *r = screenshot(target ? target : "display", 0, 0, 0, 0, HANDS_SHOT_MAXDIM, 1);
+        char *r = screenshot(target ? target : "display", 0, 0, 0, 0, HANDS_SHOT_MAXDIM, 1, str_arg(a, "save"));
         return r;
     }
     if (!strcmp(act, "zoom")) {
@@ -327,7 +367,7 @@ static char *computer(const JVal *a) {
         mcp_map_point(&last_shot, c[0], c[1], &x0, &y0);
         mcp_map_point(&last_shot, c[2], c[3], &x1, &y1);
         if (x1 <= x0 || y1 <= y0) return text_result("region must be [x0, y0, x1, y1] with x1 > x0 and y1 > y0.", 1);
-        return screenshot("region", x0, y0, x1 - x0, y1 - y0, 1024, 0);
+        return screenshot("region", x0, y0, x1 - x0, y1 - y0, 1024, 0, str_arg(a, "save"));
     }
     if (ready(why, sizeof why)) return text_result(why, 1);
     int mode = mode_arg(a);
@@ -486,7 +526,7 @@ static char *tools_call(const JVal *params) {
     if (!strcmp(name, "find")) {
         const char *q = str_arg(a, "query"), *w = str_arg(a, "window_id");
         if (!q || !q[0]) return text_result("query is required.", 1);
-        char *r = tool_simple("Find", w ? w : "", "s", q, 0);
+        char *r = tool_simple_as("find", q, "Find", w ? w : "", "s", q, 0);
         return r;
     }
     if (!strcmp(name, "computer")) return computer(a);
@@ -495,7 +535,7 @@ static char *tools_call(const JVal *params) {
         const char *app = str_arg(a, "app"), *p = str_arg(a, "pattern");
         double mx = a ? json_num(a, "max_lines", 100) : 100;
         if (!app || !hands_name_ok(app)) return text_result("app is required.", 1);
-        return tool_simple("AppLog", app, "su", p ? p : "", mx >= 1 && mx <= HANDS_LOG_MAX ? (unsigned)mx : 100);
+        return tool_simple_as("read_app_log", p, "AppLog", app, "su", p ? p : "", mx >= 1 && mx <= HANDS_LOG_MAX ? (unsigned)mx : 100);
     }
     if (!strcmp(name, "record")) return record(a);
     if (!strcmp(name, "hands_mode")) {
