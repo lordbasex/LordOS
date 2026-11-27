@@ -593,6 +593,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   cable is pulled frames are dropped, as on a real unplugged switch, and the member sends again once the link is made,
   whichever member started first. Nothing else changes: the port has no backend and reaches nothing. Test:
   `vm-whonix-xml` checks that each member's link hub has the peerless port. Checked on VM 116: the Workstation alone for ten minutes (`ip neigh` INCOMPLETE), then its "Start Gateway" bar: 10.152.152.10 REACHABLE and Tor's check `IsTor: true`.
+- **A slow native call's stall line now says who called it.** `lord-server: stall: N ms call <name>` past the stall
+  limit (50 ms, `LORD_STALL_MS`) ends with the caller's JavaScript frames, as the `__lordTick` lines do (`js.c`
+  `js_prof_wrap`, `JS_GetStackText`). The 0.8.9.6.2 QA's Pi start-up stalls named only `fs.recent`, `vm.list` and
+  `pkg.available`; with the frames, `pkg.upgrades` was traced to the menu bar's crown menu in one boot.
 - **The shell's first `__lordTick` stalled about a second on the Raspberry Pi** (ws171 QA: 1095 ms at session start).
   Two synchronous native calls ran inside it: the Recent files walk (`fs.recent`, 1006 ms; see the Recent widget entry below: the walk now runs on
   lord-server's workers) and, once that was gone, `lord.pkg.upgrades()` (655 ms on the rebuilt package): the menu

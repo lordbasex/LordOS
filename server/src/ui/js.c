@@ -342,7 +342,11 @@ static JSValue prof_call(JSContext *c, JSValueConst this_val, int argc, JSValueC
     if (ms > SLOW_CALL_MS) {
         stall.slow_calls++;
         const char *n = JS_ToCString(c, data[1]);
-        stall_line("call", n ? n : "?", NULL, NULL, ms);
+        /* past the stall limit, also who called it (its caller's frames; the native's own frame is "native"), so a
+         * slow call at session start names the module that made it (QA 0.8.9.6.2: fs.recent, vm.list, pkg.available) */
+        char where[384] = "";
+        if (ms > stall_limit()) JS_GetStackText(c, where, (int)sizeof where, 5);
+        stall_line("call", n ? n : "?", NULL, where, ms);
         if (n) JS_FreeCString(c, n);
     }
     return r;
