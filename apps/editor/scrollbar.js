@@ -20,3 +20,17 @@ export function topOfThumb(viewH, contentH, pos) {
   if (!th || viewH - th.size <= 0) return 0;
   return Math.max(0, Math.min(contentH - viewH, (pos * (contentH - viewH)) / (viewH - th.size)));
 }
+
+// The horizontal bar (GitHub #264: the end of a line wider than the window could only be reached with the caret or
+// Shift + wheel). thumbOf and topOfThumb work on either axis; these say how wide the text is and how far it may scroll.
+// widest(lines, width): the widest line's width, width(line) giving one line's; RIGHT_ROOM past it, so the caret at the
+// end of the widest line is never under the edge
+export const RIGHT_ROOM = 40;
+export function widest(lines, width) {
+  let w = 0;
+  for (const line of lines) if (line.length) { const x = width(line); if (x > w) w = x; }
+  return w ? w + RIGHT_ROOM : 0;
+}
+// the most it may scroll sideways for text contentW wide in a column textW wide
+export const maxLeft = (contentW, textW) => Math.max(0, contentW - Math.max(0, textW));
+export const clampLeft = (left, contentW, textW) => Math.max(0, Math.min(maxLeft(contentW, textW), left));

@@ -6,7 +6,7 @@ import { View, Text, useAppWindow, addListener, ime, clipboard, hasTextFocus } f
 import { memo, useEffect, useRef, useState } from 'react';
 import { cmp, head, anchor, hasSel, selStart, selEnd, cursorAt } from './buffer.js';
 import { tokenizeLine } from './syntax.js';
-import { BAR, BAR_COL, textWidth, thumbOf, topOfThumb } from './scrollbar.js';
+import { BAR, BAR_COL, textWidth, thumbOf, topOfThumb, widest, clampLeft } from './scrollbar.js';
 
 export const FONT = 13;
 export const LH = 20;
@@ -592,6 +592,18 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
 
   // the scroll bar: drag the thumb, or click the track to jump there
   const barDrag = useRef(null);
+  // the horizontal bar (GitHub #264): drag its thumb, or click its track to jump there
+  const hbarDown = (e) => {
+    e.stopPropagation?.();
+    if (!area.current || e.button === 2) return;
+    const [ax] = lord.getLayout(area.current.id);
+    const tw = textW(), th = thumbOf(tw, contentW(), scroll.left);
+    if (!th) return;
+    const x = e.x - ax - gutter - PAD;
+    const grab = x >= th.pos && x <= th.pos + th.size ? x - th.pos : th.size / 2;
+    barDrag.current = { ax: ax + gutter + PAD, grab, h: true };
+    setScroll((s) => ({ ...s, left: topOfThumb(tw, contentW(), x - grab) }));
+  };
   const barDown = (e) => {
     e.stopPropagation?.();
     if (!area.current || e.button === 2) return;
@@ -608,6 +620,7 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
     const offMove = addListener('pointermove', (e) => {
       const b = barDrag.current;
       if (!b) return;
+      if (b.h) { setScroll((s) => ({ ...s, left: topOfThumb(textW(s.top), contentW(), e.x - b.ax - b.grab) })); return; }
       setScroll((s) => ({ ...s, top: topOfThumb(st.current.h || size.h, contentH(), e.y - b.ay - b.grab) }));
     });
     const offUp = addListener('pointerup', () => { barDrag.current = null; });
@@ -615,12 +628,26 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
   });
 
   const contentH = () => doc.lineCount * LH + LH * 3;
+  // the widest line (GitHub #264), measured again only when the text or the tab size changes
+  const wide = useRef({ doc: null, version: -1, tab: 0, w: 0 });
+  const contentW = () => {
+    const k = wide.current;
+    if (k.doc !== doc || k.version !== doc.version || k.tab !== tab) {
+      k.doc = doc; k.version = doc.version; k.tab = tab;
+      k.w = widest(doc.lines, (line) => measure(expand(line, tab)));
+    }
+    return k.w;
+  };
+  // the text column's width: the view less the line numbers, the padding and the vertical bar when it shows
+  const textW = (top = scroll.top) => textWidth(st.current.w || size.w, gutter, PAD, !!thumbOf(st.current.h || size.h, contentH(), top));
   const onWheel = (e) => {
     setScroll((s) => {
       const max = Math.max(0, contentH() - (st.current.h || size.h));
-      const top = Math.max(0, Math.min(max, s.top + (e.shift ? 0 : e.deltaY)));
-      const leftS = e.shift ? Math.max(0, s.left + e.deltaY) : s.left;
-      return { top, left: leftS };
+      // sideways: Shift and the wheel, or a touchpad's or tilted wheel's deltaX
+      const dx = e.shift ? e.deltaY || 0 : e.deltaX || 0;
+      const top = Math.max(0, Math.min(max, s.top + (e.shift ? 0 : e.deltaY || 0)));
+      const left = dx ? clampLeft(s.left + dx, contentW(), textW(top)) : s.left;
+      return top === s.top && left === s.left ? s : { top, left };
     });
   };
 
@@ -632,6 +659,8 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
   for (let l = first; l <= last; l++) rows.push(l);
   const primary = doc.cursors[doc.cursors.length - 1];
   const thumb = thumbOf(st.current.h || size.h, contentH(), scroll.top);
+  // the horizontal bar, along the bottom of the text column (from the line numbers to the vertical bar)
+  const hthumb = thumbOf(textW(), contentW(), scroll.left);
 
   // selection rectangles per visible line
   const selRects = [];
@@ -675,6 +704,12 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
             fontSize: FONT - 1, color: doc.cursors.some((k) => k.l === l) ? t.gutterActive : t.gutterText }}>{String(l + 1)}</Text>
         ))}
       </View>
+      {hthumb && (
+        <View onMouseDown={hbarDown} style={{ position: 'absolute', left: gutter + PAD, bottom: 0, height: BAR_COL, width: textW(), backgroundColor: t.editorBg }}>
+          <View style={{ position: 'absolute', bottom: 2, left: hthumb.pos, height: BAR - 2, width: hthumb.size, borderRadius: (BAR - 2) / 2,
+            backgroundColor: t.scrollThumb }} />
+        </View>
+      )}
       {thumb && (
         <View onMouseDown={barDown} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: BAR_COL, backgroundColor: t.editorBg }}>
           <View style={{ position: 'absolute', right: 2, top: thumb.pos, width: BAR - 2, height: thumb.size, borderRadius: (BAR - 2) / 2,

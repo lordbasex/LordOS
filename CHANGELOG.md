@@ -11,6 +11,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Text Editor: a horizontal scroll bar for lines wider than the window** (GitHub #264, first part; soft word wrap
+  is planned for 0.8.9.6.3). Along the bottom of the text column, it shows when the widest line doesn't fit; drag its
+  thumb or click its track. Sideways scrolling (Shift and the wheel, or a touchpad's sideways swipe, now read too) stops
+  at the end of the widest line instead of running on. The widest line is measured again only when the text or the
+  tab size changes (`widest`, `clampLeft` in `apps/editor/scrollbar.js`, `apps/editor/EditorView.jsx`). Checked with a
+  headless screenshot of a 1,600-character line. Test: `tests/editor_scrollbar_test.mjs`.
 - **Machines: "Close the window when the machine stops"** (GitHub #267; Configure → Startup and shutdown, per machine,
   `closeOnStop` in its `app.json`, off by default). After a clean stop (the guest shut down, LordOS shut down, Shut Down
   or Turn Off) the machine's window closes. After a failure, a reset Machines restarts, or the installer's restart, the
