@@ -420,6 +420,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **The clipboard panel and the weather widget's city picker opened on the main display** (BUG-27 of the ws170 QA:
+  Settings → Clipboard → Open panel from Settings on display 2, and "Change city…" of a widget on display 2, both looked
+  as if nothing happened). The clipboard panel (❖V, ❖⇧V and Settings' button, `openClipboardPanel`) now opens on the
+  focused window's display, and the city picker on its widget's display; the main display stays the fallback.
 - **System Information showed dates in the US format in any language** (BUG-25 of the ws170 QA: "Incluida: la prueba de
   11/27/2026, 07:08:26 AM" in Spanish). The report's toolkit audit, the probe's and the benchmark's times used
   `toLocaleString()` without a locale; they now go through the SDK's `formatDate` and `formatTime`, which follow the

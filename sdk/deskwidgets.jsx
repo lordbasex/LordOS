@@ -24,7 +24,7 @@
 // node, the only one that changes each second); otherwise clocks move once a minute. System, Network, Temperatures and
 // Claude Code read only while shown.
 import { memo, useEffect, useRef, useState } from 'react';
-import { View, Text, SoundWave, addListener, screen, onScreenChange, displays as screenDisplays, mainDisplay } from '@lordos/runtime';
+import { View, Text, SoundWave, addListener, screen, onScreenChange, displays as screenDisplays, mainDisplay, displayAt } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
 import { registerWidgetType, setWidgets } from './widgets.js';
@@ -1296,7 +1296,7 @@ function WxGlyph({ code, day = 1, size = 40 }) {
   return <View style={{ width: size, height: size, direction: 'ltr' }}>{parts}</View>;
 }
 // Weather → Change city…: a search over the offline list of cities (lord.weather.cities: nothing asked of the network),
-// or back to the time zone's, for the widget that asked (w). Centred on the main display, in the person's theme.
+// or back to the time zone's, for the widget that asked (w). Centred on the widget's display, in the person's theme.
 const foldQuery = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 '.-]/g, '').slice(0, 40);
 function CityPicker({ w, onClose }) {
   const th = useTheme() || {};
@@ -1307,7 +1307,9 @@ function CityPicker({ w, onClose }) {
   const cur = wxCity(w);
   const pick = (c) => { wxSetCity(w, c); onClose(); };
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') onClose(); }), []);
-  const d = mainDisplay() || { x: 0, y: 0, w: 1280, h: 800 };
+  // on the widget's display (it opened on the main one; BUG-27 of the ws170 QA)
+  const on = Number.isFinite(w.x) && Number.isFinite(w.y) ? displayAt(w.x + (w.w || 0) / 2, w.y + (w.h || 0) / 2) : null;
+  const d = on || mainDisplay() || { x: 0, y: 0, w: 1280, h: 800 };
   const W = 420, H = 460;
   const row = (key, label, sub, on, onClick) => (
     <View key={key} onClick={onClick} style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: on ? th.hover : 'transparent' }}>

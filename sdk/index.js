@@ -159,7 +159,7 @@ export { DRAG_MODIFIERS, dragModifierPref } from './moddragmodel.js';   // ❖ o
 import { startModDrag } from './moddrag.js';
 import { startStylePack } from './appskins.jsx';
 export { term } from './terminal.js';
-export { clipboard, clipboardHistory, clipboardPanel, clipboardKind, toast } from './clipboard.js';
+export { clipboard, clipboardHistory, clipboardPanel, openClipboardPanel, clipboardKind, toast } from './clipboard.js';
 export { restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers } from './sessionrestore.jsx';
 export { spotlight, spotlightOpen, calc as spotlightCalc, convert as spotlightConvert } from './spotlight.js';
 export { registerSpotlightSource, searchEverything } from './spotlight.js';

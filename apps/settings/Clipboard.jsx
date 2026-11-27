@@ -1,6 +1,6 @@
 // Settings → Clipboard: saved history, limits, privacy (sdk/clipboard.js).
 import {
-  View, Text, Button, Toggle, Stepper, TextInput, useTheme, useLocale, useSettings, useStore, clipboard, clipboardHistory, clipboardPanel,
+  View, Text, Button, Toggle, Stepper, TextInput, useTheme, useLocale, useSettings, useStore, clipboard, clipboardHistory, openClipboardPanel,
   spacing, typeScale,
 } from '@lordos/sdk';
 import { useState } from 'react';
@@ -59,7 +59,7 @@ export function ClipboardSettings() {
       </Section>
       <Section footer={tr('settings.clipboard.historyHint')}>
         <SettingRow label={tr('settings.clipboard.history', { count: list.length })}>
-          <Button small label={tr('settings.clipboard.open')} onClick={() => clipboardPanel.set('full')} />
+          <Button small label={tr('settings.clipboard.open')} onClick={() => openClipboardPanel('full')} />
           <Button small destructive label={tr('settings.clipboard.clearAll')} onClick={() => clipboard.clear({ keepPinned: false })} />
         </SettingRow>
       </Section>
