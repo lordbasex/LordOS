@@ -420,6 +420,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Tests: `tests/vm_list_headless.sh` failed now and then on a loaded computer** (TEST-1 of the ws169/ws170 QA): the
+  cold first `lord.vm.list()` (every folder read, the firmware hashed once: 14–32 ms by load) could pass lord-server's
+  20 ms slow-call line and fail the stall check. That one line is now allowed with its own margin (150 ms,
+  `VMLIST_COLD_MS`) only when the scene's own cold read was that slow; any cached list or re-read still fails it.
 - **Package: `/run/reboot-required.pkgs` listed `lordos` once per upgrade** (BUG-16 of the ws170 QA; 28 times on the
   test machine). The postinst now adds the line only when it is not already there (`grep -qsx lordos`).
 - **Toolkit audit: `gtk3-x11` `size` and `qt6-wayland` `combo` on a real desktop** (BUG-2 of the 0.8.9.6.2 QA: 98.5 %

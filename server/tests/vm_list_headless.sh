@@ -6,7 +6,8 @@
 # under 1 ms); then this script renames one machine and adds another (the next list must show both, after
 # __lordVm('library')), runs a stand-in "lord-vm" (a copy of sleep) and writes a run.json naming it (__lordVm('state')
 # must say that machine is active), and kills it (another state event, none active: lord-server's pidfd saw it). No
-# "stall: … call vm.list" line may reach the log. Exit 77 when something is missing.
+# "stall: … call vm.list" line may reach the log, except one for the cold first read (its own margin). Exit 77 when
+# something is missing.
 cd "$(dirname "$0")/.." || exit 1
 [ -x build/lord-server ] || { echo "skipped: needs build/lord-server"; exit 77; }
 FW=/usr/share/OVMF/OVMF_CODE_4M.fd
@@ -63,8 +64,21 @@ grep -ah 'VMLIST' "$LOG" "$D/out.log" 2>/dev/null | sed 's/.*VMLIST/ /' | sort -
 R=0
 seen done || { echo "FAIL: the scene did not finish"; R=1; }
 grep -aqs 'VMLIST FAIL' "$LOG" "$D/out.log" && R=1
-if grep -aqs 'call vm.list' "$D/home/.cache/lordos/compositor.log" "$D/out.log"; then
-    echo "FAIL: stall lines:"; grep -ah 'call vm.list' "$D/home/.cache/lordos/compositor.log" "$D/out.log" | head -5; R=1
+# The cold first list reads every folder and hashes the firmware once (14-32 ms by load): past lord-server's 20 ms
+# slow-call line it may log one "call vm.list", allowed with its own margin (COLD_MS) only when the scene's cold read
+# itself was that slow. Every other list (cached, or the re-read after a change) must never log one.
+COLD_MS=${VMLIST_COLD_MS:-150}
+grep -aho 'stall: [0-9.]* ms call vm\.list.*' "$D/home/.cache/lordos/compositor.log" "$D/out.log" 2>/dev/null | sort -u >"$D/stalls"
+COLD=$(grep -aho 'VMLIST cold [0-9.]* ms' "$LOG" "$D/out.log" 2>/dev/null | head -1 | sed 's/VMLIST cold \([0-9.]*\) ms/\1/')
+NS=$(wc -l <"$D/stalls")
+if [ "$NS" -gt 0 ]; then
+    first=$(head -1 "$D/stalls" | sed -n 's/.*stall: \([0-9.]*\) ms.*/\1/p')
+    if [ "$NS" -eq 1 ] && [ -n "$COLD" ] && [ -n "$first" ] &&
+       awk -v c="$COLD" -v f="$first" -v m="$COLD_MS" 'BEGIN { exit !(c >= 20 && f <= m && c <= m) }'; then
+        echo " the cold read (${COLD} ms) logged its one slow call, within ${COLD_MS} ms"
+    else
+        echo "FAIL: stall lines:"; head -5 "$D/stalls"; R=1
+    fi
 fi
 [ $R -eq 0 ] && echo "ok"
 exit $R
