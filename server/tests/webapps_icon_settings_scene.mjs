@@ -8,6 +8,7 @@ import React from 'react';
 import * as rt from '@lordos/runtime';
 import { enableShellLayers } from '../../sdk/layers.js';
 import { WebAppsSettings } from '../../apps/settings/WebApps.jsx';
+import { wantSiteIcon } from '../../sdk/webapps.js';
 
 const { texts, parents, removed } = globalThis.__lordTest;
 const h = React.createElement;
@@ -21,14 +22,15 @@ const entry = (site) => ({
   ...(site ? { siteIcon: true, iconPath: '/home/ana/.cache/lordos/web/icons/whatsapp.png' } : {}),
 });
 let kept = false, answer = null, fetches = 0;
+const manualArgs = [];
 lord.webapps = {
   available: () => true,
   list: () => [entry(kept)],
   icons: () => (kept ? { whatsapp: '/home/ana/.cache/lordos/web/icons/whatsapp.png' } : {}),
   running: () => [], badges: () => [], developerMode: () => false,
-  fetchIcon: (app) => { fetches++; return app === 'whatsapp' ? 5 : 0; },
-  // null while the probe runs; then the answer the scene set
-  iconResult: () => answer,
+  fetchIcon: (app, manual) => { fetches++; manualArgs.push([app, manual]); return app === 'whatsapp' ? 5 : app === 'telegram' ? 6 : 0; },
+  // null while the probe runs; then the answer the scene set (the Store's background one never ends here)
+  iconResult: (app) => (app === 'whatsapp' ? answer : null),
 };
 lord.fs = { ...(lord.fs || {}), home: () => '/home/ana', duAsync: () => new Promise(() => {}), read: () => { throw new Error('none'); }, list: () => [] };
 const warned = [];
@@ -47,9 +49,17 @@ await click(parents.get(textNode('WhatsApp')));
 check('the app\'s page: the letter tile', shows('webapps.settings.iconTile'));
 check('Refresh icon is there', shows('webapps.settings.iconRefresh'));
 
+// the Store's background queue is busy with another app's icon (QA 0.8.9.6.2, BUG-E): Refresh icon doesn't wait for it
+wantSiteIcon('telegram');
+wantSiteIcon('whatsapp');
+check('a background fetch runs, not manual', fetches === 1 && manualArgs[0][0] === 'telegram' && manualArgs[0][1] === false, JSON.stringify(manualArgs));
+fetches = 0;
+manualArgs.length = 0;
 // a failure: busy first, then the runtime's own code, said and logged
 await click(parents.get(textNode('webapps.settings.iconRefresh')));
 check('a probe started', fetches === 1, `fetches ${fetches}`);
+check('at once, as a manual fetch, ahead of the queue', manualArgs.length === 1 && manualArgs[0][0] === 'whatsapp' && manualArgs[0][1] === true,
+  JSON.stringify(manualArgs));
 check('busy: "Refreshing…"', shows('webapps.settings.iconRefreshing'));
 answer = { done: true, ok: false, error: 'web.probe.iconType' };
 await wait(700);

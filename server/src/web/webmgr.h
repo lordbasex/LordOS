@@ -36,6 +36,8 @@
 #define WEB_MAX_RUNNING   32
 #define WEB_PROBE_MS      20000
 #define WEB_PROBE_SLOTS   8
+#define WEB_PROBE_RESERVED 2        /* slots a background probe (the Store's icons) never takes: the person's own probes */
+#define WEB_PROBE_BG_KEEP_MS 60000  /* a finished background probe nobody read in this long is abandoned: its slot is free */
 
 /* The folder LordOS's assets are in (the catalog and its icons). Called once, before anything else. */
 void webmgr_init(const char *assets_dir);
@@ -98,10 +100,19 @@ const char *webmgr_set_developer(int on);
  * (nothing started). */
 const char *webmgr_inspect(const char *app, const char *profile, int *already);
 
-/* A probe of url: its id (> 0), or 0 with *err set. */
+/* A probe of url: its id (> 0), or 0 with *err set ("webapps.tooMany" when every slot is taken). The person's own
+ * (Add from an address, Refresh icon) may use every slot, and take one from a finished background probe; a
+ * background one (the Store's icon of a catalog app) never takes the last WEB_PROBE_RESERVED, so the person is
+ * never kept waiting behind them (QA 0.8.9.6.2, BUG-E). webmgr_probe is webmgr_probe_ex(url, 0, err). */
 int  webmgr_probe(const char *url, const char **err);
+int  webmgr_probe_ex(const char *url, int background, const char **err);
 /* Its answer as JSON (malloc'd), or NULL while it runs; *gone = 1 for an unknown id. */
 char *webmgr_probe_result(int id, int *gone);
+/* A finished probe whose answer was read and won't be installed (an icon fetch): its slot and icon file go now
+ * instead of after the 15 minutes kept for an Install. Nothing while it runs. */
+void webmgr_probe_release(int id);
+/* -1: unknown id; 0: running; else the milliseconds since it finished (at least 1). */
+long webmgr_probe_age(int id);
 
 /* For tests: run this program instead of the lord-web next to lord-server. */
 void webmgr_set_helper(const char *path);

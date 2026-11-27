@@ -600,6 +600,46 @@ static void test_manager(void) {
     CHECK(!stat(p, &st) && (st.st_mode & 0777) == 0600, "written 0600");
     CHECK(webmgr_install(entry, strlen(entry), app, sizeof app) != NULL, "a probe is used once");
 
+    /* QA 0.8.9.6.2 (BUG-E): the Store's background icon probes never starve the person's own, and a read one frees
+     * its slot at once instead of after 15 minutes */
+    for (int k = 1; k <= wid; k++) webmgr_probe_release(k);
+    int bg[WEB_PROBE_SLOTS], nbg = 0;
+    for (int k = 0; k < WEB_PROBE_SLOTS; k++) {
+        int b = webmgr_probe_ex("https://notes.example/", 1, &err);
+        if (!b) break;
+        bg[nbg++] = b;
+    }
+    CHECK(nbg == WEB_PROBE_SLOTS - WEB_PROBE_RESERVED && err && !strcmp(err, "webapps.tooMany"),
+          "background probes leave %d slots: %d taken (%s)", WEB_PROBE_RESERVED, nbg, err ? err : "");
+    for (int k = 0; k < nbg; k++) free(wait_probe(bg[k]));
+    CHECK(nbg > 0 && webmgr_probe_age(bg[0]) >= 1 && webmgr_probe_age(999999) == -1, "a finished probe's age; an unknown one's");
+    int m1 = webmgr_probe("https://notes.example/", &err), m2 = webmgr_probe("https://notes.example/", &err);
+    CHECK(m1 > 0 && m2 > 0, "the person's probes get the reserved slots");
+    free(wait_probe(m1));
+    free(wait_probe(m2));
+    int m3 = webmgr_probe("https://notes.example/", &err);
+    int gone = 0;
+    char *gj = webmgr_probe_result(bg[0], &gone);
+    CHECK(m3 > 0 && gone && !gj, "with every slot taken, a finished background probe gives way to the person's (%d)", m3);
+    free(gj);
+    free(wait_probe(m3));
+    CHECK(!webmgr_probe_ex("https://notes.example/", 1, &err), "still no slot for the background");
+    webmgr_probe_release(bg[1]);
+    CHECK(webmgr_probe_age(bg[1]) == -1, "a released probe is gone");
+    webmgr_probe_release(m2);
+    webmgr_probe_release(m3);
+    int b2 = webmgr_probe_ex("https://notes.example/", 1, &err);
+    CHECK(b2 > 0, "its slot is free for the next background probe: %s", err ? err : "");
+    CHECK(webmgr_probe_age(m1) >= 0, "the person's finished probe is kept for its Install");
+    free(wait_probe(b2));
+    int all[] = { b2, m1, m2, m3 };
+    for (int k = 0; k < nbg; k++) webmgr_probe_release(bg[k]);
+    for (size_t k = 0; k < sizeof all / sizeof *all; k++) webmgr_probe_release(all[k]);
+    int left = 0;
+    for (int k = 0; k < nbg; k++) left += webmgr_probe_age(bg[k]) != -1;
+    for (size_t k = 0; k < sizeof all / sizeof *all; k++) left += webmgr_probe_age(all[k]) != -1;
+    CHECK(!left, "every slot free again (%d left)", left);
+
     /* the catalog: its data, never JS's; a broken icon only means no icon */
     CHECK(webmgr_install("{\"source\":\"catalog\",\"id\":\"nope\",\"profile\":\"Personal\"}", 51, app, sizeof app) != NULL, "not in the catalog");
     const char *cat = "{\"source\":\"catalog\",\"id\":\"chat\",\"name\":\"Other\",\"profile\":\"Personal\"}";

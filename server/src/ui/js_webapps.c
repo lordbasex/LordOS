@@ -30,8 +30,11 @@
  *                                       the browser its pages are told it is; lord-web maps the word to the string). A
  *                                       running profile gets it at once and loads its page again (SetUserAgent,
  *                                       webask_user_agent)
- *   fetchIcon(app)                      → probe id; the site's own icon for an installed or a catalog app: the probe
- *                                       of "Add from an address" on the app's own start address (lord-web needed)
+ *   fetchIcon(app, manual)              → probe id; the site's own icon for an installed or a catalog app: the probe
+ *                                       of "Add from an address" on the app's own start address (lord-web needed).
+ *                                       manual (Settings → Refresh icon) may use every slot; the Store's background
+ *                                       fetches leave one fetch and WEB_PROBE_RESERVED probe slots to it, and a probe
+ *                                       is freed as soon as iconResult read it
  *   iconResult(app)                     null while it runs; { done, ok, iconPath } once the icon is kept in
  *                                       ~/.cache/lordos/web/icons/<app>.<png|svg> (webicon.c), or { done, ok: false, error }
  *                                       (webapps.iconOrigin, webapps.noIcon, or the runtime's web.probe.… code: the
@@ -417,6 +420,7 @@ static int icon_source(const char *app, char *start, char *origin) {
 }
 
 #define ICON_FETCHES 4
+#define ICON_FETCHES_BG 3                               /* the last one is for the person's Refresh icon */
 static struct { char app[WEBREG_ID_MAX + 1]; int probe; char origin[WEBREG_URL_MAX + 1]; } fetches[ICON_FETCHES];
 
 static int fetch_of(const char *app) {
@@ -424,20 +428,37 @@ static int fetch_of(const char *app) {
     return -1;
 }
 
+/* fetches nobody will read: the probe is gone, or finished and unread for WEB_PROBE_BG_KEEP_MS (the shell gave up on
+ * it): their probe slot and entry go */
+static void fetches_sweep(void) {
+    for (int i = 0; i < ICON_FETCHES; i++) {
+        if (!fetches[i].probe) continue;
+        long age = webmgr_probe_age(fetches[i].probe);
+        if (age < 0 || age > WEB_PROBE_BG_KEEP_MS) {
+            webmgr_probe_release(fetches[i].probe);
+            memset(&fetches[i], 0, sizeof fetches[i]);
+        }
+    }
+}
+
 static JSValue f_fetch_icon(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     const char *app = arg_str(c, argc, argv, 0);
     if (!app) return js_throw_code(c, "sys.badArgument", NULL);
+    int manual = argc > 1 && JS_ToBool(c, argv[1]) > 0;
     const char *err = NULL;
+    fetches_sweep();
     int id = 0, i = webreg_id_ok(app) ? fetch_of(app) : -1;
     if (!webreg_id_ok(app)) err = "webapps.badId";
     else if (i >= 0) id = fetches[i].probe;              /* already on its way */
     else {
         static char start[WEBREG_URL_MAX + 1], origin[WEBREG_URL_MAX + 1];
+        int busy = 0;
+        for (int k = 0; k < ICON_FETCHES; k++) busy += !!fetches[k].probe;
         for (i = 0; i < ICON_FETCHES && fetches[i].probe; i++) {}
-        if (i == ICON_FETCHES) err = "webapps.tooMany";
+        if (i == ICON_FETCHES || (!manual && busy >= ICON_FETCHES_BG)) err = "webapps.tooMany";
         else if (icon_source(app, start, origin)) err = "webapps.notInstalled";
-        else if ((id = webmgr_probe(start, &err))) {
+        else if ((id = webmgr_probe_ex(start, !manual, &err))) {
             snprintf(fetches[i].app, sizeof fetches[i].app, "%s", app);
             snprintf(fetches[i].origin, sizeof fetches[i].origin, "%s", origin);
             fetches[i].probe = id;
@@ -504,6 +525,7 @@ static JSValue f_icon_result(JSContext *c, JSValueConst t, int argc, JSValueCons
         json_free(&d);
     } else if (j) err = "webapps.probeFailed";
     free(j);
+    webmgr_probe_release(fetches[i].probe);                 /* read: its slot is free now, not in 15 minutes */
     memset(&fetches[i], 0, sizeof fetches[i]);
     return icon_answer(c, err, kept);
 }
@@ -789,7 +811,7 @@ static const JSCFunctionListEntry webapps_funcs[] = {
     JS_CFUNC_DEF("setNotifySound", 2, f_set_notify_sound),
     JS_CFUNC_DEF("setColorScheme", 2, f_set_color_scheme),
     JS_CFUNC_DEF("setUserAgent", 3, f_set_user_agent),
-    JS_CFUNC_DEF("fetchIcon", 1, f_fetch_icon),
+    JS_CFUNC_DEF("fetchIcon", 2, f_fetch_icon),
     JS_CFUNC_DEF("iconResult", 1, f_icon_result),
     JS_CFUNC_DEF("icons", 0, f_icons),
     JS_CFUNC_DEF("badges", 0, f_badges),

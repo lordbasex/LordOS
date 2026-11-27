@@ -411,6 +411,7 @@ static int catalog_entry(const char *id, WebApp *a, char *icon, size_t n) {
 
 typedef struct {
     int used, id, done;
+    int background;                 /* the Store's icon of a catalog app, not the person's own probe */
     double started, finished;
     pid_t pid;
     int fd;
@@ -626,17 +627,35 @@ static void probe_free(Probe *p) {
     memset(p, 0, sizeof *p);
 }
 
-int webmgr_probe(const char *url, const char **err) {
+/* with pmu held: a free slot for a new probe, or NULL. Finished probes past their time are freed first. */
+static Probe *take_slot(int background) {
+    double now = now_ms();
+    int used = 0;
+    for (int i = 0; i < WEB_PROBE_SLOTS; i++) {
+        Probe *p = &probes[i];
+        if (!p->used) continue;
+        if (p->done && (now - p->finished > PROBE_KEEP_MS || (p->background && now - p->finished > WEB_PROBE_BG_KEEP_MS))) probe_free(p);
+        else used++;
+    }
+    if (background && used >= WEB_PROBE_SLOTS - WEB_PROBE_RESERVED) return NULL;
+    for (int i = 0; i < WEB_PROBE_SLOTS; i++) if (!probes[i].used) return &probes[i];
+    /* the person's own: a finished background probe gives way (its reader sees webapps.probeGone) */
+    for (int i = 0; i < WEB_PROBE_SLOTS && !background; i++)
+        if (probes[i].done && probes[i].background) { probe_free(&probes[i]); return &probes[i]; }
+    return NULL;
+}
+
+int webmgr_probe(const char *url, const char **err) { return webmgr_probe_ex(url, 0, err); }
+
+int webmgr_probe_ex(const char *url, int background, const char **err) {
     *err = NULL;
     if (!url || strlen(url) >= 2048 || strncmp(url, "https://", 8) || webreg_url_origin(url, NULL, 0)) { *err = "webapps.badAddress"; return 0; }
     if (!webmgr_available()) { *err = "webapps.noRuntime"; return 0; }
     pthread_mutex_lock(&pmu);
-    Probe *slot = NULL;
-    for (int i = 0; i < WEB_PROBE_SLOTS && !slot; i++) if (!probes[i].used) slot = &probes[i];
-    for (int i = 0; i < WEB_PROBE_SLOTS && !slot; i++)
-        if (probes[i].done && now_ms() - probes[i].finished > PROBE_KEEP_MS) { probe_free(&probes[i]); slot = &probes[i]; }
+    Probe *slot = take_slot(background);
     if (!slot) { pthread_mutex_unlock(&pmu); *err = "webapps.tooMany"; return 0; }
     slot->used = 1;
+    slot->background = !!background;
     slot->id = next_probe++;
     pthread_mutex_unlock(&pmu);
 
@@ -675,6 +694,24 @@ char *webmgr_probe_result(int id, int *gone) {
     else if (p->done && p->json) out = strdup(p->json);
     pthread_mutex_unlock(&pmu);
     return out;
+}
+
+void webmgr_probe_release(int id) {
+    pthread_mutex_lock(&pmu);
+    for (int i = 0; i < WEB_PROBE_SLOTS; i++) if (probes[i].used && probes[i].done && probes[i].id == id) probe_free(&probes[i]);
+    pthread_mutex_unlock(&pmu);
+}
+
+long webmgr_probe_age(int id) {
+    long age = -1;
+    pthread_mutex_lock(&pmu);
+    for (int i = 0; i < WEB_PROBE_SLOTS; i++)
+        if (probes[i].used && probes[i].id == id) {
+            double d = probes[i].done ? now_ms() - probes[i].finished : 0;
+            age = !probes[i].done ? 0 : d < 1 ? 1 : (long)d;
+        }
+    pthread_mutex_unlock(&pmu);
+    return age;
 }
 
 /* ---- installing ---- */

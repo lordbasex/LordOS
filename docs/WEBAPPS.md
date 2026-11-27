@@ -1137,6 +1137,13 @@ tried (`iconError`, a `web.probe.…` code).
   <code>`, the app's id and a closed code, never an address from the page. lord-server's compositor log has one line
   per refused icon (`webapps: probe <n>: icon <i> of <k> refused: <code>`), without its address. Without lord-web the
   letter tile stays.
+- **Slots** (0.8.9.6.2, BUG-E of the ws171 QA): lord-server runs at most `WEB_PROBE_SLOTS` (8) probes, and a finished
+  one waits 15 minutes for its Install. An icon fetch's probe is freed as soon as `iconResult` read it, and one nobody
+  read for a minute (the shell gave up) is freed too. The Store's background fetches (`fetchIcon(app)`) never take the
+  last `WEB_PROBE_RESERVED` (2) slots nor the last of the four icon fetches; the person's own (Add from an address,
+  `fetchIcon(app, true)` from Refresh icon) may use them all and take the slot of a finished background probe. Refresh
+  icon starts at once, ahead of the Store's queue. Before, 37 catalog icons on a first login held every slot and
+  Refresh icon answered `webapps.tooMany`. Tests: `webreg-test`, `webapps-icon-settings-scene`.
 - **WhatsApp** (2026-11-26): the signed-out probe ends on `/login/`, which links no manifest; its manifest is found at
   a usual address (`/manifest.json`), and its 512 px PNG is fetched with the Chrome identity.
   `tests/web_probe_test.py` keeps a local fixture of that pattern (a redirect, no manifest link, a WebP shortcut icon,

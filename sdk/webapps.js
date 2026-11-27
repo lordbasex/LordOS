@@ -152,11 +152,14 @@ export function webEngine() {
 
 // ---- the site's own icon ----
 //
-// One probe at a time (each is a WebKit page load: about 220 MB for some seconds), queued; a failure is not tried
-// again this session, except by refreshSiteIcon (Settings → Web apps → Refresh icon).
+// One background probe at a time (each is a WebKit page load: about 220 MB for some seconds), queued; a failure is not
+// tried again this session, except by refreshSiteIcon (Settings → Web apps → Refresh icon). The person's Refresh icon
+// never waits behind the queue: it starts at once, as a manual fetch, which lord-server keeps a fetch and probe slots
+// for (js_webapps.c, WEB_PROBE_RESERVED; QA 0.8.9.6.2: 37 catalog icons on a first login left it "webapps.tooMany").
 const tried = new Set();
 const queue = [];
 let busy = null;
+const manualBusy = new Set();
 
 function readIcons() {
   try { const m = has() && typeof lord.webapps.icons === 'function' ? lord.webapps.icons() : null; if (m && typeof m === 'object') siteIcons.set(m); } catch (e) { /* an older server */ }
@@ -168,35 +171,55 @@ function iconStatus(app, state, error) {
   if (error) console.warn(`webapps: the site's icon of ${app} was not kept: ${error}`);
 }
 
-function pump() {
-  if (busy || !queue.length) return;
-  const app = queue.shift();
+// starts app's fetch; false (and its status said) when lord-server refused it
+function begin(app, manual) {
   let id = 0;
-  try { id = lord.webapps.fetchIcon(app); } catch (e) { iconStatus(app, 'error', siteIconError(e)); }
+  try { id = lord.webapps.fetchIcon(app, manual); } catch (e) { iconStatus(app, 'error', siteIconError(e)); return false; }
   if (!id) {
     if (siteIconStatus.get()[app]?.state === 'busy') iconStatus(app, 'error', 'webapps.probeFailed');
-    pump();
-    return;
+    return false;
   }
-  busy = app;
+  return true;
+}
+
+// polls app's answer (reading it frees lord-server's slot), then end()
+function watch(app, end) {
   const t0 = Date.now();
   const timer = setInterval(() => {
     let r = null;
     try { r = lord.webapps.iconResult(app); } catch (e) { r = { done: true, ok: false, error: siteIconError(e) }; }
     if (!r && Date.now() - t0 < 45000) return;
     clearInterval(timer);
-    busy = null;
     if (r && r.ok) { iconStatus(app, 'ok'); readIcons(); refreshWebApps(); }
     else iconStatus(app, 'error', r ? siteIconError(r) : 'webapps.probeTimeout');
-    pump();
+    end();
   }, 500);
 }
 
+function pump() {
+  if (busy || !queue.length) return;
+  const app = queue.shift();
+  if (!begin(app, false)) { pump(); return; }
+  busy = app;
+  watch(app, () => { busy = null; pump(); });
+}
+
 function enqueue(app, force) {
-  if (!has() || typeof lord.webapps.fetchIcon !== 'function' || busy === app || queue.includes(app)) return;
+  if (!has() || typeof lord.webapps.fetchIcon !== 'function' || busy === app || manualBusy.has(app)) return;
+  if (force) {
+    if (!webAppsAvailable()) { iconStatus(app, 'error', 'webapps.noRuntime'); return; }
+    const q = queue.indexOf(app);
+    if (q >= 0) queue.splice(q, 1);
+    tried.add(app);
+    iconStatus(app, 'busy');
+    if (!begin(app, true)) return;
+    manualBusy.add(app);
+    watch(app, () => manualBusy.delete(app));
+    return;
+  }
+  if (queue.includes(app)) return;
   const cached = !!siteIcons.get()[app];
-  if (!force && !wantsSiteIcon({ available: webAppsAvailable(), cached, tried: tried.has(app) })) return;
-  if (force && !webAppsAvailable()) { iconStatus(app, 'error', 'webapps.noRuntime'); return; }
+  if (!wantsSiteIcon({ available: webAppsAvailable(), cached, tried: tried.has(app) })) return;
   tried.add(app);
   iconStatus(app, 'busy');
   queue.push(app);
@@ -204,9 +227,9 @@ function enqueue(app, force) {
 }
 // The Store's cards and an app's launch: fetched once when lord-web is there and nothing is cached yet.
 export const wantSiteIcon = (app) => enqueue(app, false);
-// Settings → Web apps → Refresh icon: fetched again now (siteIconStatus says how it went).
+// Settings → Web apps → Refresh icon: fetched again now, ahead of the Store's queue (siteIconStatus says how it went).
 export const refreshSiteIcon = (app) => enqueue(app, true);
-export const siteIconBusy = (app) => busy === app || queue.includes(app);
+export const siteIconBusy = (app) => busy === app || manualBusy.has(app) || queue.includes(app);
 
 // ---- unread counts ----
 

@@ -420,6 +420,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Settings → Web apps → Refresh icon answered "webapps.tooMany" after the Store fetched the catalog's icons** (BUG-E of
+  the ws171 QA). On a first login the Store queued icon probes for all 37 catalog apps; each finished probe kept one of
+  lord-server's 8 probe slots for 15 minutes (the time an "Add from an address" probe waits for its Install), so the
+  person's own probe found none. Now an icon fetch's probe is freed as soon as its answer is read
+  (`webmgr_probe_release`), one nobody read for a minute is freed too, the Store's background fetches never take the
+  last two probe slots (`WEB_PROBE_RESERVED`) nor the last icon fetch, and the person's (Add from an address, Refresh
+  icon: `lord.webapps.fetchIcon(app, true)`) may take a finished background probe's slot. Refresh icon starts at once
+  instead of waiting behind the Store's queue (`sdk/webapps.js`). Tests: `webreg-test` (slots), the
+  `webapps-icon-settings-scene` (a manual fetch while the background one runs). docs/WEBAPPS.md.
 - **Flatpak: installing VS Code or Steam from the Store failed while pulling `org.freedesktop.Sdk`** (BUG-A of the ws171
   QA: "Flatpak no pudo terminar: Instalando runtime/org.freedesktop.Sdk/x86_64/26.08"; the kernel OOM-killed it in
   `lordos-net-flathub.scope` at 64 MB). `/usr/bin/flatpak` runs in the same scope as the `flathub` network connector,
