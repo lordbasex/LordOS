@@ -958,6 +958,8 @@ EOF
         # (#252) Screenshots with several displays: Print Screen copies the main display's capture, a thumbnail per display
         # inside it, the markup editor inside one display (side by side, main listed second; another above-left at 200 %)
         run "screenshots-displays-scene (apps/screenshots/index.jsx)" node tests/textfield_menu_test.mjs screenshots_displays_scene.mjs
+        # (ws170 QA BUG-31) a web app's right-click menu closes with its app's last window (lord-web keeps running)
+        run "webapp-menu-orphan-scene (sdk/hardware.jsx WebAppMenu)" node tests/textfield_menu_test.mjs webapp_menu_orphan_scene.mjs
         # (ws170 QA BUG-28) the selection's overlays closed from elsewhere end it: Space, C and T reach a field again
         run "screenshots-overlay-close-scene (apps/screenshots/index.jsx)" node tests/textfield_menu_test.mjs screenshots_overlay_close_scene.mjs
         # the Screenshots toolbar: modes, the primary button, the Options menu and its choices saved in settings

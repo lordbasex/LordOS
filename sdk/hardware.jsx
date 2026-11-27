@@ -54,7 +54,7 @@ import { lockBeforeSleep, lockAfterWake } from './idlemodel.js';
 import { btPowerAction } from './btpowermodel.js';
 import { openPlan, urlHost, splitPath } from './portalopenmodel.js';
 import { openUrl, openFileWithApps, revealPath } from './sysopen.js';
-import { wm, getApp } from './windows.js';
+import { wm, getApp, windows } from './windows.js';
 import { linuxPlayersChanged, userDirs } from './media.js';
 import { trayEvent } from './trayitems.jsx';
 import { globalShortcutsEvent } from './globalshortcuts.jsx';
@@ -846,9 +846,17 @@ function WebWritingPanel() {
     h(WritingPanel, { key: w.job.id, at: { x: w.x, y: w.y }, bounds: all, job: w.job, onClose: close, onReplace: replace }));
 }
 
+// The menu belongs to its web app's windows: when the last of them closes (close_window, its close button) while the
+// menu is open, the menu closes too. lord-web keeps running in the background (notifications), so its own "menu gone"
+// never came, and the menu stayed in the system band over every display: an AI agent's screenshots were all black and
+// every input refused until the person closed it (ws170 QA BUG-31).
+const webMenuWindows = (m) => windows.get().some((w) => w.args?.web && w.args.web.app === m.app && w.args.web.profile === m.profile);
+const closeOrphanMenu = () => { const m = webMenu.get(); if (m && m.app && !webMenuWindows(m)) answerWebMenu('', m); };
+
 export function WebAppMenu() {
   const m = useStore(webMenu);
   const developer = useStore(webDeveloper);
+  useEffect(() => windows.subscribe(closeOrphanMenu), []);
   if (!m) return h(WebWritingPanel);
   const later = (fn) => setTimeout(fn, 0);
   const items = webMenuItems(m, (n, vars) => (n === 'inspect' ? t('webapps.inspect.menu') : t(`shell.edit.${n}`, vars)), (n) => answerWebMenu(n, m), {
