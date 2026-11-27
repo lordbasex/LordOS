@@ -461,6 +461,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Monitor → GPU: lord-nvgpu didn't find NVML from Debian's own NVIDIA packages** (GitHub #273, a GTX 1650 Mobile on
+  Debian's 550.163.01: "libMissing"). Debian's `libnvidia-ml1` puts `libnvidia-ml.so.1` in
+  `/usr/lib/<arch>-linux-gnu/nvidia/current/`, and the helper searched only the main library folders. That folder
+  (x86-64 and arm64) is now searched after them and accepted as the real file's folder, with the same checks: the
+  folder and each parent root's and not writable by group or others, the real file a root-owned regular file
+  (`LIB_DIRS` in `server/src/monitor/nvgpu_main.c`, `docs/MONITOR.md`). It is already inside the sandbox's read-only
+  library folders. `build/nvgpu-test` passes; reading the card needs a check on a machine with Debian's driver.
 - **Linux apps didn't get the interface language** (GitHub #262 (a): with French chosen in Settings, Brave's save
   dialog title and menus stayed in English). The desktop's language is settings.json's, but launched apps only got
   the session's `LANG` (often `C.UTF-8` after an install in English). Now, whenever the SDK sets the interface

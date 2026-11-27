@@ -882,7 +882,8 @@ on 2026-11-24; AGENTS.md, `lord-nvgpu`). `lord-server` never links or loads NVML
   tries at once.
 - **The helper** (`monitor/nvgpu_main.c`): no arguments, an empty environment, fd 3 a `SOCK_SEQPACKET` socketpair,
   fds 0–2 `/dev/null`, every other fd closed, `no_new_privs`. It `dlopen`s only `libnvidia-ml.so.1` from
-  `/usr/lib/x86_64-linux-gnu`, `/usr/lib/aarch64-linux-gnu`, `/usr/lib64` or `/usr/lib`, after checking that the
+  `/usr/lib/x86_64-linux-gnu`, `/usr/lib/aarch64-linux-gnu`, `/usr/lib64`, `/usr/lib` or Debian's own
+  `/usr/lib/<arch>-linux-gnu/nvidia/current` (where the libnvidia-ml1 package puts it; GitHub #273), after checking that the
   folder and each parent, and the real file behind the symlink (in one of those folders), belong to root and aren't
   writable by group or others; `RTLD_NOW | RTLD_LOCAL`. Then `nvmlInit_v2`, the device handles and one warm-up sample,
   and only then `sandbox_apply_helper` (scope `lordos-nvgpu`, 256 MB): no network or new sockets, no exec, threads

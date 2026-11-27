@@ -53,7 +53,11 @@
 #define NV_PROCS_PER_DEV 64
 #define NV_SAMPLES_MAX   256
 
-static const char *const LIB_DIRS[] = { "/usr/lib/x86_64-linux-gnu", "/usr/lib/aarch64-linux-gnu", "/usr/lib64", "/usr/lib", NULL };
+/* the system library folders, and the one Debian's own NVIDIA packages (libnvidia-ml1, from non-free) install NVML in
+ * (GitHub #273: a GTX 1650 on Debian's 550.163.01 had it only there). Searched in this order; the real file must be in
+ * one of them too. */
+static const char *const LIB_DIRS[] = { "/usr/lib/x86_64-linux-gnu", "/usr/lib/aarch64-linux-gnu", "/usr/lib64", "/usr/lib",
+                                        "/usr/lib/x86_64-linux-gnu/nvidia/current", "/usr/lib/aarch64-linux-gnu/nvidia/current", NULL };
 
 static struct {
     nvmlReturn_t (*init)(void);
