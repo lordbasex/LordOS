@@ -2,7 +2,7 @@
 // library card per group, its menu, Destroy and start fresh's plan, the group's memory budget, the chips and search) and
 // the group card of apps/machines/catalog.js (the Whonix card only with KVM on the host's architecture, the release
 // folders, SHA-512 lists, the archive in Storage). node server/tests/vm_group_ui_test.mjs
-import { libraryItems, groupMenu, freshPlan, groupBudget, sessionCapMb, groupShows, groupSpec, LOCKED_ROWS, groupDamage, archiveMatches, gatewayBar, gatewayOf, renameProblemKey } from '../../apps/machines/group.js';
+import { libraryItems, groupMenu, freshPlan, groupBudget, sessionCapMb, groupShows, groupSpec, LOCKED_ROWS, groupDamage, archiveMatches, gatewayBar, gatewayOf, gatewayFirst, gatewayReady, renameProblemKey } from '../../apps/machines/group.js';
 import { systemsFor, releaseNames, newestRelease, releaseCmp, pickImage, entryOf, groupMachines, downloadedImages } from '../../apps/machines/catalog.js';
 import { machineProtected, groupState, groupPlan } from '../../apps/machines/model.js';
 import { readFileSync } from 'node:fs';
@@ -75,6 +75,18 @@ eq('bar: the workstation off', gatewayBar(wsOf(L2('stopped', 'stopped')), gwOfL(
 eq('bar: the gateway shutting down', gatewayBar(wsOf(L2('stopping', 'running')), gwOfL(L2('stopping', 'running'))), 'off');
 eq('bar: a machine of no group', gatewayBar(deb, null), null);
 eq('bar: the gateway is the same group\'s', gatewayOf(wsOf(L2('running', 'running')), [...L2('running', 'running').filter((m) => m.role !== 'gateway'), { ...mem('gateway', 'running'), groupDir: '/x.lordgroup' }]), null);
+
+// ▶ in the Workstation's window starts its Gateway first (QA 0.8.9.6.2, BUG-N)
+eq('gateway first: off', gatewayFirst(wsOf(L2('stopped', 'stopped')), L2('stopped', 'stopped'))?.role, 'gateway');
+eq('gateway first: crashed', gatewayFirst(wsOf(L2('crashed', 'stopped')), L2('crashed', 'stopped'))?.role, 'gateway');
+eq('gateway first: already running', gatewayFirst(wsOf(L2('running', 'stopped')), L2('running', 'stopped')), null);
+eq('gateway first: starting', gatewayFirst(wsOf(L2('starting', 'stopped')), L2('starting', 'stopped')), null);
+eq('gateway first: not a workstation', gatewayFirst(gwOfL(L2('stopped', 'stopped')), L2('stopped', 'stopped')), null);
+eq('gateway first: a machine of no group', gatewayFirst(deb, [deb]), null);
+eq('gateway ready: running', gatewayReady({ state: 'running' }), true);
+eq('gateway ready: still starting', gatewayReady({ state: 'starting' }), false);
+eq('gateway ready: crashed', gatewayReady({ state: 'crashed' }), 'failed');
+eq('gateway ready: gone', gatewayReady(null), 'failed');
 
 // the rename dialog's line
 eq('rename: a free name', renameProblemKey({ problem: '' }, 'Tor', 'Whonix'), '');

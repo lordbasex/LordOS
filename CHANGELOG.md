@@ -434,6 +434,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Machines: ▶ in a Whonix Workstation's window started it alone** (BUG-N of the ws171 QA on VM 116: started before its
+  Gateway, the group's link came up on both sides, "link: connected … lk1", but no traffic passed). ▶ there now starts
+  the Gateway first and the Workstation once the Gateway runs, as the library and the CLI start a group
+  (`gatewayFirst`, `gatewayReady` in `apps/machines/group.js`); a Gateway that doesn't start says so and the
+  Workstation stays off. Why the link carries nothing when the Workstation came first is not found yet (the "Start
+  Gateway" bar of a Workstation already running still takes that path). Test: `vm-group-ui-test`.
 - **The Recent widget and the search walked the whole home folder on the interface's thread** (ws171 QA on VM 116 and the
   Pi: 250 ms to 1.6 s stalls about every minute on a 37 GB home, and at the start). `lord.fs.recentAsync` walks it on
   lord-server's workers (`fsasync_submit_fn`, the same `fs_recent`), and `recentCached` (`sdk/fs.js`) gives the

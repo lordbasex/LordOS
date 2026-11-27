@@ -41,6 +41,22 @@ export function gatewayBar(ws, gw) {
   if (gw.state === 'starting') return 'starting';
   return stateView(gw.state).active && gw.state !== 'stopping' ? null : 'off';
 }
+// ▶ in a Workstation's own window (QA 0.8.9.6.2, BUG-N): its Gateway first, as the library and the CLI start a group
+// (groupPlan), and the Workstation once the Gateway runs. The Gateway to start first, or null (not a group's
+// Workstation, no Gateway, or it already runs or is starting).
+export function gatewayFirst(ws, list) {
+  if (!ws || ws.role !== 'workstation' || !ws.groupDir) return null;
+  const gw = gatewayOf(ws, list);
+  if (!gw || gw.state === 'starting' || (stateView(gw.state).active && gw.state !== 'stopping')) return null;
+  return gw;
+}
+// whether the Workstation may start now that its Gateway was asked to: it runs; 'failed' when it stopped again
+export function gatewayReady(gw) {
+  if (!gw) return 'failed';
+  if (gw.state === 'running') return true;
+  return gw.state === 'starting' || gw.state === 'stopped' || stateView(gw.state).active ? false : 'failed';
+}
+
 // the workstation's gateway in lord.vm.list(): the member of the same group with the gateway's role
 export const gatewayOf = (ws, list) => (list || []).find((m) => m && ws && m.groupDir === ws.groupDir && m.role === 'gateway' && m.groupOk && !m.error) || null;
 

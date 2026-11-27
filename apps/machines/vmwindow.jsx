@@ -19,7 +19,9 @@ import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
 import { disposableOf, disposableAllowed, disposableToggle } from './storagemodel.js';
 import { defaultsOf } from './store.js';
 import { ClipAskBar } from './clipask.jsx';
-import { gatewayBar, gatewayOf } from './group.js';
+import { gatewayBar, gatewayOf, gatewayFirst, gatewayReady } from './group.js';
+// Workstations whose Gateway the window just started: the next begin starts them
+const gatewayUp = new Set();
 import { TransfersPanel } from './transfers.jsx';
 import { xferStep, xferShown, xferNextExpiry } from './xfer.js';
 import { KeysBtn, sendKeysItems } from './keys.jsx';
@@ -620,6 +622,31 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       if (b && !b.ok) { setOver({ b, m, plan: budgetPlan(b, lord.vm.list(), m), waiting: '' }); return; }
     }
     setOver(null);
+    // a Whonix Workstation's ▶ starts its Gateway first and waits for it, as the library and the CLI do (BUG-N: started
+    // alone and its Gateway after, the link came up with no traffic)
+    const gwDone = gatewayUp.delete(dir);
+    const gwFirst = !active && !gwDone ? gatewayFirst(m, lord.vm.list()) : null;
+    if (gwFirst) {
+      setErr('');
+      setStarting(true);
+      startPrep(gwFirst).then(() => {
+        if (!lord.vm.startDetached(gwFirst.dir)) throw new Error(vmRefusal(tr('machines.win.cantStart')));
+        return new Promise((resolve, reject) => {
+          const t0 = Date.now();
+          const look = () => {
+            const gw = lord.vm.list().find((x) => x.dir === gwFirst.dir);
+            const ok = gatewayReady(gw);
+            if (ok === true) { resolve(); return; }
+            if ((ok === 'failed' && Date.now() - t0 > 3000) || (gw?.state === 'stopped' && Date.now() - t0 > 15000)) { reject(new Error(tr('machines.group.gatewayFailed', { name: gw?.name || '', why: gw?.reason || '' }))); return; }
+            if (Date.now() - t0 > 180000) { reject(new Error(tr('machines.group.gatewayFailed', { name: gw?.name || '', why: '' }))); return; }
+            setTimeout(look, 1000);
+          };
+          setTimeout(look, 1000);
+        });
+      }).then(() => { setStarting(false); if (windows.get().some((w) => w.id === winId)) { gatewayUp.add(dir); beginRef.current(opts); } },
+        (e) => { setStarting(false); setErr(e.message); });
+      return;
+    }
     // a bridged machine's network first (6.5): Starting meanwhile, then the start, once
     setGpu(m.gpu || '');
     if (!active && needsPrep(m)) {
