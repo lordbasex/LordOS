@@ -1,8 +1,10 @@
 // Settings → Artificial intelligence (0.8.9.6.2): a store around Lumo (docs/AI.md). At the top Lumo with the chain of
-// its pieces (Ear → Brain → Voice → Eyes → Hands, each ✓ when installed) and "Talk to Lumo", disabled until the Ear and
-// the agent exist; then a search with the filters All, Installed and one per capability (each with its count); "What
-// Lumo can do": the functions of the one brain with their level (Sentinela works today and opens its own page, the
-// others are "coming soon"); the capabilities as cards (Brain, Ear, Voice, Vision, Image) and one row of each; a
+// its pieces (Ear → Brain → Voice → Eyes → Hands, each ✓ when installed; the Hands when they are turned on) and "Talk
+// to Lumo", disabled until the Ear and Lumo's own agent exist (Hands serves outside agents such as Claude Code); then a
+// search with the filters All, Installed and one per capability (each with its count); "What Lumo can do": the
+// functions of the one brain with their level (✨ Writing, Sentinela and Hands work today and open their own pages; the
+// others are "coming soon"); the capabilities as cards (Brain, Ear, Voice, Vision, Image; Vision counts its reading
+// languages, Tesseract's OCR data, not models) and one row of each; a
 // capability's own page ("‹ Artificial intelligence › Voice", Esc and the mouse's Back go back: subpage.js); a sheet
 // per model (its size, memory, license, source, what uses it, "try it" where it really works, install, remove, use);
 // and at the bottom the space the models take, where they run and the privacy note.
@@ -276,7 +278,7 @@ function CapCard({ card, w, onOpen }) {
         {card.soon ? <Tag label={tr('settings.aiStore.tag.soon')} /> : null}
       </View>
       <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr(`settings.aiStore.tech.${card.cap}`)}</Text>
-      <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr('settings.aiStore.capMeta', { count: card.count, installed: card.installed })}</Text>
+      <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr(card.cap === 'eye' ? 'settings.aiStore.capMetaEye' : 'settings.aiStore.capMeta', { count: card.count, installed: card.installed })}</Text>
     </View>
   );
 }
@@ -860,7 +862,8 @@ export function AISettings({ alert }) {
     ...eyeEntries(tess.ready, tess.codes),
     ...imageEntries(),
   ];
-  const lumo = lumoState(entries);
+  const handsOn = !!useStore(handsStatus).on;
+  const lumo = lumoState(entries, { handsOn });
 
   // what each sheet offers; a voice of the page's language, model or own voice as the old Voice page did
   const voiceReady = (e) => {
@@ -1017,7 +1020,7 @@ export function AISettings({ alert }) {
         ) : null}
         {plain ? (
           <View style={{ gap: 10 }}>
-            <Head title={tr('settings.aiStore.capabilities')} sub={tr('settings.aiStore.capabilitiesSub', { count: entries.length })} />
+            <Head title={tr('settings.aiStore.capabilities')} sub={tr('settings.aiStore.capabilitiesSubOcr', { count: entries.filter((e) => e.cap !== 'eye').length, langs: entries.filter((e) => e.cap === 'eye').length })} />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
               {CAPS.map((c) => <CapCard key={c} card={capCard(c, entries)} w={caps.w} onOpen={() => setView(c)} />)}
             </View>

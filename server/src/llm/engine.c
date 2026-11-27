@@ -108,6 +108,9 @@ int llm_set_backend(const char *mode) {
         E.mode_gen++;                       /* the running engine is restarted at the next job */
         memset(E.failed, 0, sizeof E.failed);
         E.fallback = FB_NONE_YET;
+        /* (0.8.9.6.2, BUG-5 of the QA) an idle one now, as a thread count's change does: Settings → AI says where the
+         * Brain runs from what the engine reports, so it follows the choice at once instead of at the next job */
+        if (E.pid > 0 && !E.nq && !strcmp(E.state, "ready")) { E.restart_now = 1; pthread_cond_signal(&E.cv); }
     }
     pthread_mutex_unlock(&E.mu);
     return 0;

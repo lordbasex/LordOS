@@ -159,17 +159,18 @@ export const imageEntries = () => IMAGE_MODELS.map(soonEntry('img'));
 // ---- Lumo's pieces ----
 
 // entries: every entry; a piece is ready when a model of its capability is installed (the brain: a model and the
-// engine); the Hands are part of LordOS (docs/HANDS.md); the Ear doesn't exist yet
-export function pieceReady(id, entries) {
+// engine); the Hands when they are turned on (Settings → AI → Hands, docs/HANDS.md: opts.handsOn; before 0.8.9.6.2 they
+// were ✓ even when off, BUG-3 of the QA); the Ear doesn't exist yet
+export function pieceReady(id, entries, opts = {}) {
   const of = (cap) => (entries || []).filter((e) => e.cap === cap);
-  if (id === 'hands') return true;
+  if (id === 'hands') return !!opts.handsOn;
   if (id === 'ear') return false;
   if (id === 'brain') return of('brain').some((e) => e.kind === 'llm' && e.state === 'installed') && of('brain').some((e) => e.kind === 'engine' && e.state === 'installed');
   const cap = PIECES.find((p) => p.id === id)?.cap;
   return !!cap && of(cap).some((e) => e.state === 'installed');
 }
-export function lumoState(entries) {
-  const pieces = PIECES.map((p) => ({ ...p, ready: pieceReady(p.id, entries), soon: p.id === 'ear' }));
+export function lumoState(entries, opts = {}) {
+  const pieces = PIECES.map((p) => ({ ...p, ready: pieceReady(p.id, entries, opts), soon: p.id === 'ear' }));
   const ready = pieces.filter((p) => p.ready).length;
   // waving when every piece that exists today is installed; asleep while one you could download is missing
   const missing = pieces.filter((p) => !p.ready && !p.soon).map((p) => p.id);
@@ -263,6 +264,9 @@ export function brainWhere(state, mode) {
   const ready = gpus.cuda ? 'cuda' : gpus.vulkan ? 'vulkan' : null;
   if (st.backend === 'vulkan' || st.backend === 'cuda') {
     const vars = { api: API_NAME[st.backend], device: typeof st.device === 'string' && st.device ? st.device : API_NAME[st.backend] };
+    // the processor chosen while the engine that ran was on the card: what was chosen, and that it changes at its next
+    // start (BUG-5 of the 0.8.9.6.2 QA: it kept saying "on the graphics card" under Processor)
+    if (mode === 'cpu') return { key: 'brainCpuNext', vars };
     const total = Number.isInteger(st.layersTotal) && st.layersTotal > 0 ? st.layersTotal : 0;
     const layers = Number.isInteger(st.layers) && st.layers >= 0 && st.layers <= total ? st.layers : 0;
     if (total && layers < total) return { key: 'brainGpuPart', vars: { ...vars, layers, total } };

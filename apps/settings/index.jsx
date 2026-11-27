@@ -47,6 +47,7 @@ import { FlatpakSettings } from './Flatpak.jsx';
 import { FirmwareSettings } from './Firmware.jsx';
 import { GpusSettings, anyGpus } from './Gpus.jsx';
 import { Stack, Section, SettingRow, ValueRow, Badge, Note, Message, Actions, PopUp, shade } from './ui.jsx';
+import { foldSearch, sectionWords } from './searchmodel.js';
 
 export function Icon({ size: s }) {
   const dark = '#3b3e46';
@@ -665,13 +666,13 @@ export default function Settings() {
     if (sec === 'ai' && typeof args?.page === 'string' && /^[a-z]+$/.test(args.page)) subPage.set(args.page);
   }, [args?.nonce]);
   const [, Body] = SECTIONS.find(([id]) => id === section) || SECTIONS[0];
-  const q = query.trim().toLowerCase();
+  const q = foldSearch(query.trim());
   // Mouse & Trackpad always shows (its touchpad rows need a touchpad, which lord-sessiond lends with the monitor);
   // hasPad is still passed to sectionShown, which only hides Board firmware off a Raspberry Pi 5
   const hasPad = useTrackpads().some((d) => d.kind === 'touchpad');
   const [pi5] = useState(isPi5);
   const [gpus] = useState(anyGpus);
-  const visible = (id) => sectionShown(id, hasPad, pi5, gpus) && `${tr(`settings.section.${id}`)} ${tr(`settings.keywords.${id}`)}`.toLowerCase().includes(q);
+  const visible = (id) => sectionShown(id, hasPad, pi5, gpus) && foldSearch(sectionWords(id, tr)).includes(q);
   const groupIndex = GROUPS.map((g, i) => (g.some(([id]) => visible(id)) ? i : -1)).filter((i) => i >= 0);
   const groups = GROUPS.map((g) => g.filter(([id]) => visible(id))).filter((g) => g.length);
   const pad = side.narrow ? spacing.l : spacing.xxl;

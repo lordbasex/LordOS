@@ -669,6 +669,7 @@ EOF
     run "wallpaper-admin-test (wallpaper-get keeps a picture as .jpg and a video as .mp4, wallpaper-remove, still cat:<id>, the shipped catalog)" build/wallpaper-admin-test
     if have node; then run "wallpaper-gallery-test (sdk/wallpapergallery.js, Settings → Wallpaper)" node tests/wallpaper_gallery_test.mjs; else skip "wallpaper-gallery-test" node; fi
     if have node; then run "ai-store-test (sdk/aistore.js, Settings → Artificial intelligence)" node tests/ai_store_test.mjs; else skip "ai-store-test" node; fi
+    if have node; then run "settings-search-test (apps/settings/searchmodel.js: AI found by its functions in every language)" node tests/settings_search_test.mjs; else skip "settings-search-test" node; fi
     if have node; then run "spell-model-test (sdk/spellmodel.js, the spell checker's words, lines and menu)" node tests/spell_model_test.mjs; else skip "spell-model-test" node; fi
     if have node; then run "writing-model-test (sdk/writingmodel.js, ✨ AI on selected text)" node tests/writing_model_test.mjs; else skip "writing-model-test" node; fi
     if have node; then run "display-apps-model-test (sdk/displayappsmodel.js)" node tests/display_apps_model_test.mjs; else skip "display-apps-model-test" node; fi

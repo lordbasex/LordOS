@@ -91,17 +91,21 @@ eq('img: coming soon, with a comparison', imageEntries().map((e) => [e.state, e.
 
 // ---- Lumo ----
 const all = (b = brainNone, v = voiceEntries(VOICE_LANGS, emptyScan()), e = eyeEntries(false, [])) => [...b, ...earEntries(), ...v, ...e, ...imageEntries()];
-eq('nothing installed: only the Hands, part of LordOS', lumoState(all()).ready, 1);
+eq('nothing installed, Hands on: only the Hands', lumoState(all(), { handsOn: true }).ready, 1);
+eq('Hands off: not ✓ (BUG-3 of the 0.8.9.6.2 QA)', lumoState(all()).ready, 0);
+yes('Hands off: the piece is not ready', !pieceReady('hands', all()) && pieceReady('hands', all(), { handsOn: true }));
 eq('nothing installed: asleep', lumoState(all()).pose, 'sleep');
-eq('nothing installed: what to download', lumoState(all()).missing, ['brain', 'voice', 'eyes']);
+eq('nothing installed: what to download', lumoState(all(), { handsOn: true }).missing, ['brain', 'voice', 'eyes']);
+eq('… and Hands to turn on when off', lumoState(all()).missing, ['brain', 'voice', 'eyes', 'hands']);
 yes('the brain needs a model and the engine', !pieceReady('brain', all(brainEntries(LLM_MODELS, { available: false, models: [{ id: 'qwen3-1.7b' }] }, null))));
 yes('… both installed', pieceReady('brain', all(brainOne)));
-const full = lumoState(all(brainOne, voices, eyes));
-eq('everything that exists installed: 4 of 5 (the Hands are part of LordOS)', [full.ready, full.total], [4, 5]);
+const full = lumoState(all(brainOne, voices, eyes), { handsOn: true });
+eq('everything that exists installed, Hands on: 4 of 5', [full.ready, full.total], [4, 5]);
+eq('… Hands off: 3 of 5, asleep', [lumoState(all(brainOne, voices, eyes)).ready, lumoState(all(brainOne, voices, eyes)).pose], [3, 'sleep']);
 eq('… waving', full.pose, 'wave');
 eq('… talking still needs the Ear', full.canTalk, false);
 eq('the Ear is coming soon', full.pieces.filter((p) => p.soon).map((p) => p.id), ['ear']);
-yes('the Hands are always ready', pieceReady('hands', all()));
+yes('the Hands are ready only when on', pieceReady('hands', all(), { handsOn: true }) && !pieceReady('hands', all(), { handsOn: false }));
 yes('the Ear is never ready today', !pieceReady('ear', all(brainOne, voices, eyes)));
 
 // ---- search and filters ----
@@ -160,6 +164,7 @@ eq('on the GPU, some layers', brainWhere({ ...vk, layers: 20 }, 'gpu'), { key: '
 eq('CUDA without a name', brainWhere({ backend: 'cuda', device: null, layers: 0, layersTotal: 0 }, 'auto'), { key: 'brainGpu', vars: { api: 'CUDA', device: 'CUDA' } });
 eq('nonsense layers ignored', brainWhere({ ...vk, layers: 99, layersTotal: 29 }, 'auto').key, 'brainGpuPart');
 eq('processor chosen', brainWhere({ backend: 'cpu', fallback: null, gpus: { vulkan: true } }, 'cpu').key, 'brainCpuChosen');
+eq('processor chosen while the engine ran on the card: what was chosen, from its next start (BUG-5)', brainWhere(vk, 'cpu'), { key: 'brainCpuNext', vars: { api: 'Vulkan', device: 'AMD Radeon RX 580 Series' } });
 eq('fallbacks say why', ['start', 'memory', 'untested', 'none', null].map((f) => brainWhere({ backend: 'cpu', fallback: f }, 'auto').key),
   ['brainCpuStart', 'brainCpuMemory', 'brainCpuUntested', 'brainCpuNoGpu', 'brainCpu']);
 eq('not run yet: the GPU it will use', brainWhere({ backend: null, gpus: { vulkan: true, cuda: true } }, 'auto'), { key: 'brainGpuReady', vars: { api: 'CUDA' } });

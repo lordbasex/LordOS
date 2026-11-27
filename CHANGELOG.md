@@ -418,6 +418,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Settings' search didn't find the AI functions** (BUG-4 of the 0.8.9.6.2 QA: "Escritura" said "No results" though
+  ✨ Writing was on in Settings → AI). The AI section had no keywords at all; it is now found by its functions and
+  capabilities as each language names them (✨ Writing, Sentinela, Hands, Brain, Ear, Voice, Vision, Image) and by
+  `settings.keywords.ai` (AI, Lumo, spell checker, correct, translate, summarize, agent…), new in all 35 languages, and
+  accents and case no longer count in the search ("musica" finds "Música"). `apps/settings/searchmodel.js`,
+  `tests/settings_search_test.mjs` (new, in `make test`: every language's catalogs).
+- **Settings → AI said things that weren't true** (BUG-3 of the 0.8.9.6.2 QA): the Hands piece had a ✓ even with Hands
+  off (now only when on, `pieceReady(…, { handsOn })`); "Talk to Lumo" said it needed "the Ear and the Hands (the
+  agent)", but Hands exists: what is missing is the Ear and Lumo's own agent (reworded in all 35 languages); Vision's
+  card said "Models: 35", which are Tesseract's reading languages: it says "Reading languages (OCR): 35" now, and the
+  capabilities' line counts models and reading languages apart; `AI.jsx`'s header no longer says only Sentinela works.
+- **Settings → AI → Where they run ignored the Brain's choice** (BUG-5 of the 0.8.9.6.2 QA: under Processor it kept
+  saying "Brain: on the graphics card (Vulkan, AMD Radeon RX 580 Series)"). The text came from the engine that last ran;
+  with Processor chosen while that engine was on the card it now says "on the processor from its next start (the engine
+  running now is on the graphics card: …)", and an idle engine restarts on the new choice at once, as a change of
+  cores already did (`llm_set_backend`), so the text follows within a second. `tests/ai_store_test.mjs`,
+  `build/llm-engine-test` (an idle engine on the card restarts on the processor with no job).
 - **The local model engine outlived its session** (BUG-6 of the 0.8.9.6.2 QA: a `llama-server -t 2 -ngl 0` of an
   earlier session still running 9 hours later, its parent gone). lord-llm now sets `PR_SET_PDEATHSIG` (SIGKILL), first
   and again just before the exec (it stays set across it: llama-server is no set-user-ID program), and checks that its

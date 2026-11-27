@@ -484,8 +484,23 @@ static void gpu_cases(const char *dir, const char *mdir, const char *gdir, const
         CHECK(strstr(jail, want), "vulkan: %s must be denied", *d);
     }
 
-    /* the processor when chosen: the engine restarts, with no GPU device */
+    /* the processor when chosen: an idle engine on the card restarts now, with no job, so Settings → AI says where it
+     * runs from what the engine reports (BUG-5 of the 0.8.9.6.2 QA: "on the graphics card" under Processor) */
+    st = llm_state_json();
+    int vpid = state_int(st, "pid");
+    free(st);
     CHECK(!llm_set_backend("cpu"), "cpu");
+    {
+        int on_cpu = 0, npid = -1;
+        for (int i = 0; i < 400 && !on_cpu; i++) {
+            st = llm_state_json();
+            npid = state_int(st, "pid");
+            on_cpu = st && strstr(st, "\"backend\":\"cpu\"") && strstr(st, "\"state\":\"ready\"") && npid > 0 && npid != vpid;
+            free(st);
+            if (!on_cpu) msleep(25);
+        }
+        CHECK(on_cpu, "an idle engine on the card restarted on the processor with no job (pid %d → %d)", vpid, npid);
+    }
     st = analyze_state("gpu-ok", jail, sizeof jail, sock);
     CHECK(st && strstr(st, "\"mode\":\"cpu\"") && strstr(st, "\"backend\":\"cpu\"") && strstr(st, "\"device\":null"), "cpu: %s", st ? st : "");
     free(st);
