@@ -939,6 +939,22 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 - [x] **Raspberry Pi with 0.8.9.1** in the same report (2026-11-19): Flow 113 MB and 6.2 % of one core, as 0.8.9;
   Workspaces, measured on the Pi for the first time, 99 MB and 0.06 %.
 
+## Release 0.8.9.6.3 (the next pre-release; chosen by the maintainer on 2026-11-27)
+
+- [ ] **Files: Replace / Keep Both / Skip on a name conflict** ([#263](https://github.com/lordbasex/LordOS/issues/263)),
+  with **Keep Both** as the default, for copies, moves and drops; an "apply to all" for the rest of the batch. It never
+  offers Replace where `lord.fs` may not write: the protected folders (`fsops_protected`) and read-only places keep
+  refusing, checked again in C, not only by the dialog.
+- [ ] **iCloud: choose which calendars and contacts to sync** ([#241](https://github.com/lordbasex/LordOS/issues/241));
+  the plan is the item "iCloud: choose what to sync" under *Next release after 0.8.9.6.1* below.
+- [ ] **Cloud: a shortcut to the existing "Encrypted folder"** (rclone crypt;
+  [#265](https://github.com/lordbasex/LordOS/issues/265)) from an account's menu, and a careful export of its keys (a
+  file the person saves, with a clear warning that whoever has it can read the folder). No union view of several
+  remotes.
+- [ ] **Text Editor: soft word wrap** ([#264](https://github.com/lordbasex/LordOS/issues/264), part 2; part 1, the
+  horizontal scroll bar, is in 0.8.9.6.2): long lines wrap at the window's edge without changing the file, as a View
+  option remembered per file kind, with the caret, selection and line numbers following the wrapped rows.
+
 ## Next release after 0.8.9.6.1
 
 - [ ] **Toolkit audit** (`docs/TOOLKIT-AUDIT.md`; branches `feat/toolkit-audit`, `feat/ta-score`, `feat/ta-report`).
