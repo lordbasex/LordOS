@@ -379,7 +379,7 @@ EOF
     python3 -I tests/vm_qemu_args_test.py >"$T/out" 2>&1
     case $? in
         0) ok "vm-qemu-args (tests/vm_qemu_args_test.py: $(grep -c '^ok:' "$T/out") rows of settings against QEMU's arguments)" ;;
-        77) skip "vm-qemu-args" "KVM, QEMU, qemu-img, passt, unshare and python3" ;;
+        77) skip "vm-qemu-args" "KVM, QEMU, qemu-img, passt, unshare, python3 and the tree outside the home folder" ;;
         *) bad "vm-qemu-args (tests/vm_qemu_args_test.py)"; cat "$T/out" ;;
     esac
     # protected windows (docs/PRIVACY.md): drawn on the display, the protected fill in a screenshot, the remote desktop's
@@ -412,7 +412,7 @@ EOF
         mkdir -p -m 700 "$T/launchplace"; LAUNCHPLACE_LANG=$lp LAUNCHPLACE_DIR="$T/launchplace" sh tests/launchplace_headless.sh >"$T/out" 2>&1
         case $? in
             0) ok "launch-placement-$lp (tests/launchplace_headless.sh, headless lord-server-test, a fake Chrome with a profile picker)" ;;
-            77) skip "launch-placement-$lp" "build/lord-server-test, build/launchplace-client, python3 and node with esbuild" ;;
+            77) skip "launch-placement-$lp" "build/lord-server-test, build/launchplace-client, python3 with PIL and node with esbuild" ;;
             *) bad "launch-placement-$lp (tests/launchplace_headless.sh)"; cat "$T/out" ;;
         esac
     done

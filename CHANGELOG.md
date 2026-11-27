@@ -400,6 +400,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   a zoom saved, full size, the firewall switches black in the file, no overwrite, no path).
 
 ### Tests
+- **Tests that need their scratch outside a masked path say so** (ws171 on a Pi): `sandbox-home-mounts-test` and
+  `vm-jail-probe` skip with a clear message when the tree is under /tmp, /var/tmp or /dev/shm (the sandbox mounts its
+  own there), and `vm-qemu-args` when it is inside the home folder (lord-vm's namespace hides it).
 - **Tests skip what can't run on arm64 or without a tool instead of failing** (Raspberry Pi 5, ws171):
   `vm-whonix-xml`, `vm-group-manage`, `machines-group-manage` and the Machines e2e group flow (Whonix is amd64 only;
   lord-vm refuses it), `launch-placement-en/ar` without python3-pil. The Machines e2e's Create and Start waits 480 s on
