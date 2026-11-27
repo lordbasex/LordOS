@@ -420,6 +420,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Hands: "lord.admin.request refused (an AI agent's input)" for requests the agent never made** (BUG-10b of the ws170
+  QA: three after each agent click in Settings, logged as "other"). Two settings are mirrored machine-wide by closed
+  administrator actions run on every settings change: the browsers' "continue where you left off" (`browser-restore`)
+  and the video optimization (`video-optimize`). After a failed attempt they forgot what was applied, so any later
+  change of any setting (an agent's click in Settings writes settings) ran them again, and lord-server refused them
+  under the agent's input. Now they run once per new choice, a failed one is not tried again for 60 s, and never from an
+  AI agent's input (the person's next change, or the next start, applies it) (`sdk/adminsyncmodel.js`). The refusal
+  line also names the action and where the run came from (above). New `tests/admin_sync_test.mjs`.
 - **Hands: a window's screenshot left out its own open pop-up** (BUG-17 of the ws170 QA: Settings → AI → Voice's open
   Language list was missing). A window's capture now also paints the menus and pop-ups that are that window's (the shell
   surfaces marked `handsWin`, below the system band only), as it paints its sheets, and grows to hold a list that hangs

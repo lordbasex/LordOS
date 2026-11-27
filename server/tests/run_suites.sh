@@ -687,6 +687,7 @@ EOF
     if have node; then run "ai-store-test (sdk/aistore.js, Settings → Artificial intelligence)" node tests/ai_store_test.mjs; else skip "ai-store-test" node; fi
     if have node; then run "settings-search-test (apps/settings/searchmodel.js: AI by its functions, every page by its row labels, in every language)" node tests/settings_search_test.mjs; else skip "settings-search-test" node; fi
     if have node; then run "locale-dates-test (no toLocaleString() without a locale in apps, sdk, themes)" node tests/locale_dates_test.mjs; else skip "locale-dates-test" node; fi
+    if have node; then run "admin-sync-test (sdk/adminsyncmodel.js: a mirrored setting's admin action once per choice, no retry storm)" node tests/admin_sync_test.mjs; else skip "admin-sync-test" node; fi
     if have node; then run "spell-model-test (sdk/spellmodel.js, the spell checker's words, lines and menu)" node tests/spell_model_test.mjs; else skip "spell-model-test" node; fi
     if have node; then run "writing-model-test (sdk/writingmodel.js, ✨ AI on selected text)" node tests/writing_model_test.mjs; else skip "writing-model-test" node; fi
     if have node; then run "display-apps-model-test (sdk/displayappsmodel.js)" node tests/display_apps_model_test.mjs; else skip "display-apps-model-test" node; fi

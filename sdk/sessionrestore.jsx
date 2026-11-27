@@ -27,6 +27,7 @@ import { parseDockId } from './dockmodel.js';
 import { isAppOff } from './appsoff.js';
 import { useLauncherApps, shortAppName } from './apps.js';
 import { admin } from './admin.js';
+import { syncStep, syncDone, SYNC_START, agentInput } from './adminsyncmodel.js';
 import { clipboard } from './clipboard.js';
 import { RESTORE_MODES, RESTORE_DEFAULT, MAX_WINDOWS, NEVER, cleanArgs, cleanFrame, cleanList, restoreDecision, restoreSplit, planRestore, fitFrame, launchesOnce } from './sessionmodel.js';
 
@@ -296,13 +297,19 @@ export function RestorePrompt() {
 // ---- browsers ----
 // The closed admin action browser-restore (server/src/hw/hw_admin.c, docs/SESSIONS.md): each browser's
 // own "continue where you left off" as a fixed policy, on or off. It is a machine-wide file.
-let appliedBrowsers = '';
+// what was applied, and a failed attempt not tried again for a while (adminsyncmodel.js)
+let browserSync = SYNC_START;
 function applyBrowsers() {
   if (!lord.admin?.available()) return;
+  // never from an AI agent's input: lord-server refuses administrator requests then (docs/HANDS.md); the person's next
+  // change, or the next start, applies it
+  if (agentInput()) return;
   const arg = restoreBrowsers() && restoreMode() !== 'off' ? 'on' : 'off';
-  if (arg === appliedBrowsers) return;
-  appliedBrowsers = arg;
-  admin.run('browser-restore', arg, undefined, { quiet: true }).catch(() => { appliedBrowsers = ''; });
+  const step = syncStep(browserSync, arg, Date.now());
+  browserSync = step.state;
+  if (!step.run) return;
+  admin.run('browser-restore', arg, undefined, { quiet: true }).then(() => { browserSync = syncDone(browserSync, arg, true, Date.now()); },
+    () => { browserSync = syncDone(browserSync, arg, false, Date.now()); });
 }
 
 export function setRestoreBrowsers(on) { settings.set({ sessionBrowsers: !!on }); }

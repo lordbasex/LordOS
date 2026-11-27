@@ -10,6 +10,7 @@
 // settings.video = { mode: 'auto' | 'always' | 'never', autoLower: false }. Nothing leaves the computer.
 import { settings } from './settings.js';
 import { admin } from './admin.js';
+import { syncStep, syncDone, SYNC_START, agentInput } from './adminsyncmodel.js';
 import { createStore } from './store.js';
 
 export const VIDEO_DEFAULTS = { mode: 'auto', autoLower: false };
@@ -44,15 +45,20 @@ export function videoOptimizing(prefs, hw) {
   return !!hw && !(hw.vp9 && hw.av1);
 }
 
-let applied = '';
+// what was applied, and a failed attempt not tried again for a while (adminsyncmodel.js)
+let sync = SYNC_START;
 function apply() {
   const hw = videoHardware.get();
   if (!hw) return;
+  // never from an AI agent's input: lord-server refuses administrator requests then (docs/HANDS.md); the person's next
+  // change, or the next start, applies it
+  if (agentInput()) return;
   const arg = videoArg(videoPrefs(), hw);
-  if (arg === applied) return;
-  applied = arg;
-  admin.run('video-optimize', arg, undefined, { quiet: true }).then(() => videoError.set(''), (e) => {
-    applied = '';
+  const step = syncStep(sync, arg, Date.now());
+  sync = step.state;
+  if (!step.run) return;
+  admin.run('video-optimize', arg, undefined, { quiet: true }).then(() => { sync = syncDone(sync, arg, true, Date.now()); videoError.set(''); }, (e) => {
+    sync = syncDone(sync, arg, false, Date.now());
     videoError.set(e.message);
   });
 }
