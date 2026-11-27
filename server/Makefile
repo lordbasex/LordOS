@@ -1597,6 +1597,12 @@ build/adminline-test: tests/adminline_test.c src/adminline.h src/admin.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/adminline_test.c
 	./$@ || { rm -f $@; exit 1; }
+# the interface language for launched Linux apps (src/uilangenv.h, GitHub #262): LANGUAGE and LC_MESSAGES' candidates
+test: build/uilangenv-test
+build/uilangenv-test: tests/uilangenv_test.c src/uilangenv.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/uilangenv_test.c
+	./$@ || { rm -f $@; exit 1; }
 # a system with no administrator (src/users/admin_rescue.c): who may become one
 test: build/admin-rescue-test
 build/admin-rescue-test: tests/admin_rescue_test.c src/users/admin_rescue.c src/users/admin_rescue.h

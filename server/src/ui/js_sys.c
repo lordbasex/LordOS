@@ -51,6 +51,7 @@
 #include "../keyboard.h"
 #include "../fsops.h"
 #include "../fsasync.h"
+#include "../uilangenv.h"
 #include "../doc/wire.h"
 #include "../fswatch.h"
 #include "../remote/mirror.h"
@@ -684,6 +685,40 @@ static void apply_locale_conf(void) {
     }
 }
 
+/* The interface language for the Linux apps launched from now on and the Terminal's shells (GitHub #262,
+ * uilangenv.h): LANGUAGE, and LC_MESSAGES only to a generated locale of that language when the session's messages are
+ * in another one. The session's own LC_MESSAGES is kept to go back to (another language, a new region). */
+static char uilang_msgs0[64];
+static int uilang_msgs_saved, uilang_msgs_ours;
+
+static void uilang_rebase(void) {
+    const char *m = getenv("LC_MESSAGES");
+    snprintf(uilang_msgs0, sizeof uilang_msgs0, "%s", m && valid_locale_name(m) ? m : "");
+    uilang_msgs_saved = 1;
+    uilang_msgs_ours = 0;
+}
+
+static void uilang_apply(const char *lang) {
+    char val[32];
+    if (!uilang_language(lang, val, sizeof val)) return;
+    if (!uilang_msgs_saved) uilang_rebase();
+    setenv("LANGUAGE", val, 1);
+    if (uilang_msgs_ours) {
+        if (uilang_msgs0[0]) setenv("LC_MESSAGES", uilang_msgs0, 1); else unsetenv("LC_MESSAGES");
+        uilang_msgs_ours = 0;
+    }
+    char cand[2][32];
+    int n = uilang_candidates(lang, getenv("LANG"), getenv("LC_MESSAGES"), cand, 2);
+    for (int i = 0; i < n; i++) {
+        locale_t l = newlocale(LC_MESSAGES_MASK, cand[i], (locale_t)0);
+        if (!l) continue;
+        freelocale(l);
+        setenv("LC_MESSAGES", cand[i], 1);
+        uilang_msgs_ours = 1;
+        break;
+    }
+}
+
 /* lord.locale.get() → { user: {LANG…}, system: {LANG…} } */
 static JSValue f_locale_get(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
@@ -714,6 +749,9 @@ static JSValue f_locale_set(JSContext *c, JSValueConst this_val, int argc, JSVal
         if (s) JS_FreeCString(c, s);
         JS_FreeValue(c, v);
     }
+    /* the new region is the session's own; the interface language goes over it again */
+    uilang_rebase();
+    if (text_language()[0]) uilang_apply(text_language());
     char dir[PATH_MAX + 16], path[PATH_MAX + 32], tmp[PATH_MAX + 40];
     snprintf(dir, sizeof dir, "%s/.config", home);
     mkdir(dir, 0700);
@@ -1104,7 +1142,7 @@ static JSValue f_text_language(JSContext *c, JSValueConst this_val, int argc, JS
     if (!l) return JS_EXCEPTION;
     int ok = strlen(l) < 16;
     for (const char *p = l; ok && *p; p++) ok = (*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || *p == '-' || *p == '_';
-    if (ok) { text_set_language(l); ui.dirty = 1; }
+    if (ok) { text_set_language(l); uilang_apply(l); ui.dirty = 1; }
     JS_FreeCString(c, l);
     return JS_NewBool(c, ok);
 }

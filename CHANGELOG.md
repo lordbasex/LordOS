@@ -461,6 +461,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Linux apps didn't get the interface language** (GitHub #262 (a): with French chosen in Settings, Brave's save
+  dialog title and menus stayed in English). The desktop's language is settings.json's, but launched apps only got
+  the session's `LANG` (often `C.UTF-8` after an install in English). Now, whenever the SDK sets the interface
+  language (`lord.text.setLanguage`), lord-server puts it in its own environment for the apps it launches and the
+  Terminal's shells: `LANGUAGE` (gettext's spelling: `fr`, `pt_BR:pt`, `zh_CN`, `zh_TW`; read by GTK/gettext, Chromium
+  and Qt apps), and `LC_MESSAGES` only when the session's messages are in another language and only to a generated
+  UTF-8 locale of that language (the session's region first, `es` under `en_US` tries `es_US`, then the language's
+  own, `es_AR`), checked with `newlocale`, so an app never gets a locale it can't load. `LANG` and the other `LC_*`
+  (the region chosen in Settings) are never changed; a new region from Settings is the new base
+  (`server/src/uilangenv.h`, `uilang_apply` in `server/src/ui/js_sys.c`). Apps that D-Bus or systemd start on their
+  own don't inherit lord-server's environment and keep the session's. Tests: `build/uilangenv-test`; checked on a
+  headless lord-server under strace: an app launched with French chosen and `LANG=C.UTF-8` got `LANGUAGE=fr` and
+  `LC_MESSAGES=fr_FR.UTF-8`, with Spanish under `en_US` `LANGUAGE=es` and `LC_MESSAGES=es_AR.UTF-8`.
 - **The system file dialog had no way to make a folder** (GitHub #262 (b): saving a file from a link in Brave, Files'
   New Folder button was missing). Save and folder dialogs (`sdk/filepicker.jsx`, also the portal's dialog for Linux
   and Flatpak apps) now have Files' New Folder button in the toolbar: it proposes "untitled folder" (or "… 2", "… 3"
