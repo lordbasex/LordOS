@@ -967,6 +967,10 @@ const char *cloud_off_reason(const char *saved) {
     return saved && !strcmp(saved, CLOUD_OFF_SIGNIN) ? CLOUD_OFF_SIGNIN : "";
 }
 
+int cloud_cancel_due(int held, int uploading, long long last_ms, long long now_ms) {
+    return held && uploading && (!last_ms || now_ms - last_ms >= CLOUD_CANCEL_AGAIN_MS || now_ms < last_ms);
+}
+
 int cloud_bring_up_ok(int own_pause, int any_pause, int failed) { return !own_pause && !(any_pause && failed); }
 
 int cloud_poll_body(const char *id, int off, char *out, size_t n) {

@@ -420,6 +420,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Cloud: Pause didn't stop an upload already in progress** (BUG-C of the ws171 QA). Pause held only the files waiting
+  in rclone's queue; one already going up went on, and rclone has no rc call that stops a VFS upload. Now Pause stops
+  it the way rclone's VFS does when a file changes while it goes up: lord-server rewrites the file's first byte,
+  unchanged, through the mount, in a thread of its own; rclone cancels the transfer and cleans up after it (the
+  `.partial` file removed, a multipart upload aborted), the file goes back in the queue and is held at once, and on
+  Resume it is checked again (the conflict rule) and goes. The content stays the same; its modification time becomes
+  the moment of the pause. Each upload is stopped at most once every 30 s (`cloud_cancel_due`). Checked against rclone
+  1.75.2 (a 40 MB file at 2 MB/s: canceled, `.partial` gone, requeued under the same id, uploaded whole after Resume).
+  Tests: `cloud-test` (`t_pause`: when to stop, the rewrite keeps the content and follows no link). docs/CLOUD.md.
 - **Settings' sheets stayed drawn over windows opened after them** (BUG-D of the ws171 QA: Settings → AI's model sheet
   over Thunderbird and the launcher). Settings drew its sheets and file dialogs in the shell's `modal` layer, above
   every window, at the window's coordinates; while one showed, no Linux app got the keyboard either. A new

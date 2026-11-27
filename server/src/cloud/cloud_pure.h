@@ -280,6 +280,13 @@ const char *cloud_off_reason(const char *saved);
  * every 30 seconds. Only what the person does reaches the provider: opening a file not on this computer, Measure, Empty
  * Trash. 1: bring_up may run. */
 int  cloud_bring_up_ok(int own_pause, int any_pause, int failed);
+/* An upload already running when the account is paused (QA 0.8.9.6.2, BUG-C): rclone has no rc call that stops a VFS
+ * upload, and vfs/queue-set-expiry doesn't touch one that started. Its own way is a write to the file through the mount
+ * (the VFS cancels the upload in progress, and the closed file goes back in the queue, where Pause holds it): lord-server
+ * rewrites the file's first byte with itself. 1: stop it now (held, uploading, and not already stopped in the last
+ * CLOUD_CANCEL_AGAIN_MS: last_ms 0 never was). */
+#define CLOUD_CANCEL_AGAIN_MS 30000
+int  cloud_cancel_due(int held, int uploading, long long last_ms, long long now_ms);
 /* the mount's change polling, as vfs/poll-interval's body: off for a paused account. 0, -1 doesn't fit */
 int  cloud_poll_body(const char *id, int off, char *out, size_t n);
 

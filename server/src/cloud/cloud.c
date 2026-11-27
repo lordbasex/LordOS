@@ -2322,11 +2322,12 @@ static void record_done(void) {
     }
 }
 
-static void set_expiry(Acc *a, int qid, double e) {
+static void set_expiry_id(const char *id, int qid, double e) {
     char b[160];
-    cl_pf(b, sizeof b, "{\"fs\":\"%s:\",\"id\":%d,\"expiry\":%.0f,\"relative\":false}", a->id, qid, e);
+    cl_pf(b, sizeof b, "{\"fs\":\"%s:\",\"id\":%d,\"expiry\":%.0f,\"relative\":false}", id, qid, e);
     rcs(RCM_VFS_EXPIRY, b, NULL, 0, RC_SHORT);
 }
+static void set_expiry(Acc *a, int qid, double e) { set_expiry_id(a->id, qid, e); }
 
 static int was_checked(Acc *a, const char *name) {
     pthread_mutex_lock(&cl_mu);
@@ -2484,6 +2485,58 @@ static int conflict_check(Acc *a, const char *rel, char *kept, size_t kn) {
     return 0;
 }
 
+/* ---- Pause stops an upload already running (QA 0.8.9.6.2, BUG-C; cloud_cancel_due) ----
+ * The VFS cancels an upload in progress when its file is written through the mount (vfscache Item._dirty →
+ * WriteBack.Remove); the backend's own cancel cleans up what it left (a multipart upload aborted, a partial file
+ * removed, as rclone does for any cancelled transfer), and on close the file is queued again, where Pause holds it
+ * (poll_acc: expiry far away) until Resume, when it is checked again (the conflict rule) and goes. The write is the
+ * file's first byte, read back and written unchanged: the content stays the same; its modification time becomes now.
+ * In a thread of its own: the write waits for rclone to end the upload, and the cloud's worker must not. */
+struct cancel_job { char path[PATH_MAX * 2]; char id[sizeof ((Acc *)0)->id]; int qid; };
+int cloud_rewrite_first_byte(const char *path) {
+    int fd = open(path, O_RDWR | O_NOFOLLOW | O_CLOEXEC | O_NOCTTY | O_NONBLOCK);
+    struct stat st;
+    unsigned char c;
+    int ok = 0;
+    if (fd >= 0 && !fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_size > 0 && pread(fd, &c, 1, 0) == 1) ok = pwrite(fd, &c, 1, 0) == 1;
+    if (fd >= 0) close(fd);
+    return ok;
+}
+static void *cancel_thread(void *arg) {
+    struct cancel_job *j = arg;
+    int ok = cloud_rewrite_first_byte(j->path);
+    /* back in the queue with the write-back delay (5 s): held at once, not at the next tick (it could start again) */
+    if (ok) set_expiry_id(j->id, j->qid, 1e9);
+    fprintf(stderr, "cloud: paused: an upload in progress %s\n", ok ? "stopped; it waits for Resume" : "could not be stopped");
+    free(j);
+    return NULL;
+}
+static void cancel_upload(Acc *a, int qid, const char *name) {
+    long long now = mono_ms();
+    int slot = -1, oldest = 0;
+    for (int i = 0; i < CANCEL_MAX; i++) {
+        if (a->cancel_qid[i] == qid) slot = i;
+        if (a->cancel_at[i] < a->cancel_at[oldest]) oldest = i;
+    }
+    if (!cloud_cancel_due(1, 1, slot >= 0 ? a->cancel_at[slot] : 0, now) || !cloud_rel_ok(name) || !name[0]) return;
+    if (slot < 0) slot = oldest;
+    a->cancel_qid[slot] = qid;
+    a->cancel_at[slot] = now;
+    struct cancel_job *j = malloc(sizeof *j);
+    if (!j) return;
+    pthread_mutex_lock(&cl_mu);
+    int n = snprintf(j->path, sizeof j->path, "%s/%s/%s", cl_root, a->name, name);
+    cl_pf(j->id, sizeof j->id, "%s", a->id);
+    pthread_mutex_unlock(&cl_mu);
+    j->qid = qid;
+    pthread_t th;
+    pthread_attr_t at;
+    pthread_attr_init(&at);
+    pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+    if (n <= 0 || (size_t)n >= sizeof j->path || pthread_create(&th, &at, cancel_thread, j)) free(j);
+    pthread_attr_destroy(&at);
+}
+
 static void poll_acc(Acc *a) {
     char body[64];
     cl_pf(body, sizeof body, "{\"fs\":\"%s:\"}", a->id);
@@ -2538,7 +2591,7 @@ static void poll_acc(Acc *a) {
     int offline = !strcmp(a->err, "cloud.unreachable") || !strcmp(a->err, "cloud.offline");
     pthread_mutex_unlock(&cl_mu);
     for (int k = 0; k < ni; k++) {
-        if (it[k].up) continue;
+        if (it[k].up) { if (hold) cancel_upload(a, it[k].id, it[k].name); continue; }
         if (it[k].tries > 0 && was_checked(a, it[k].name)) {
             unmark_checked(a, it[k].name);              /* an attempt failed: looked at again before the next one */
             set_expiry(a, it[k].id, 1e9);
