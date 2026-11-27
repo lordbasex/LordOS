@@ -663,6 +663,13 @@ export function useWindowHidden(id) {
 // opaque window. Opaque as for the Linux windows' pacing (wayland.js): a web app's window, or a LordOS window whose app
 // isn't transparent.
 const opaqueWindow = (w) => !!w.args?.web || (!w.args?.surface && !getApp(w.id)?.transparent);
+// What a memoized window frame (the themes' Window) must draw again for besides its own props: a maximized window's
+// work area (the Dock or a bar moved), '' for any other window, whose frame is its own x, y, w, h.
+export function windowFrameKey(w) {
+  if (!w || !w.maximized) return '';
+  const f = wm.frame(w);
+  return `${f.x},${f.y},${f.w},${f.h}`;
+}
 export const windowsOutOfSight = (ids, list = windows.get()) => outOfSight(list, activeDesktop.get(), overviewShowing.get(), ids, (w) => wm.frame(w), opaqueWindow);
 export function useWindowsOutOfSight(ids) {
   const desktop = useStore(activeDesktop);

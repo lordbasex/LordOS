@@ -20,9 +20,10 @@ import {
   menuBarPrefs, menuBarEveryDisplay, barDisplays, pointerDisplay, keepWindowsInWorkAreas,
   guestAppsMode,
   titleBarPx,
+  windowFrameKey,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
-import { useEffect, useRef, useState, Fragment } from 'react';
+import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { makeTheme } from './tokens.js';
 import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Taskbar, BAR_H, taskbarEntries } from './components/Taskbar.jsx';
@@ -126,7 +127,7 @@ const classicTable = (ui) => {
 function App() {
   startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Workspaces
   const [s] = useTrackedSettings();   // the desktop renders again only for the settings it reads (sdk/settings.js)
-  const t = makeTheme(s);
+  const t = useMemo(() => makeTheme(s), [s]);   // the same tokens until a setting they read changes (memo Window)
   const { mounted, focused } = useWindows();
   const taskView = !!useStore(overview);
   const [panel, setPanel] = useState(null);           // { name: 'start' | 'quick' | 'notif', display: id } | null
@@ -206,7 +207,7 @@ function App() {
         {mounted.map((w) => (
           <Fragment key={w.id}>
             {preview && w === top ? <SnapPreview t={t} /> : null}
-            <Window win={w} t={t} focused={!taskView && w.id === focused} app={getApp(w.id)} />
+            <Window win={w} t={t} focused={!taskView && w.id === focused} app={getApp(w.id)} frameKey={windowFrameKey(w)} />
           </Fragment>
         ))}
         {!ga && <DesktopWidgets layer="above" />}

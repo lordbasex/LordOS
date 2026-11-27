@@ -4,7 +4,7 @@
 // Window and Help), as on a taskbar layout. Moving and resizing are lord-server's (<WindowShell>, wm.beginMove).
 import { View, Text, wm, AppHost, windowTitle, WindowShell, windowIcon, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, alwaysOnTopItem,
   useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, SeamCover, solidOver, t as tr, buttonSizeScale } from '@lordos/sdk';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { FrameGlyph } from '../glyphs.jsx';
 
@@ -71,7 +71,7 @@ function FrameButton({ t, kind, focused, onClick, size }) {
   );
 }
 
-export function Window({ win, t, focused, app, font }) {
+function WindowFrame({ win, t, focused, app, font }) {
   const geo = wm.frame(win);
   const [menu, setMenu] = useState(null);
   const flat = win.maximized || !!win.snapped;
@@ -130,3 +130,7 @@ export function Window({ win, t, focused, app, font }) {
     </WindowShell>
   );
 }
+
+// memo: a window draws again for its own changes (win, focused, the tokens, the minimize effect, a maximized one's work
+// area: frameKey), never because another window's title or the desktop around it changed (0.8.9.6.2 QA, BUG-9)
+export const Window = memo(WindowFrame);

@@ -12,7 +12,7 @@
 // the bar, the buttons, their glyphs and their hit areas larger (px, GitHub #151 and #219); index.jsx's chrome follows.
 // Settings → Appearance → Window options can leave the snap items out of the title bar's menu (windowMenuTiling, #151).
 import { View, Text, Layer, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, alwaysOnTopItem, solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, SeamCover, t as tr, buttonSizeScale, windowMenuTiling, settings } from '@lordos/sdk';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LayoutGlyph } from '../glyphs.jsx';
 import { Menu } from './Menu.jsx';
 
@@ -131,7 +131,7 @@ function AppMenuStrip({ t, win, focused, transparent }) {
   return menus.length ? <MenuStrip t={t} win={win} focused={focused} menus={menus} transparent={transparent} /> : null;
 }
 
-export function Window({ win, t, focused, app }) {
+function WindowFrame({ win, t, focused, app }) {
   const drag = useRef(null);
   const geo = wm.frame(win);
   const maxRef = useRef(null);
@@ -258,3 +258,7 @@ export function Window({ win, t, focused, app }) {
     </WindowShell>
   );
 }
+
+// memo: a window draws again for its own changes (win, focused, the tokens, the minimize effect, a maximized one's work
+// area: frameKey), never because another window's title or the desktop around it changed (0.8.9.6.2 QA, BUG-9)
+export const Window = memo(WindowFrame);

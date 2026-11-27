@@ -4,9 +4,13 @@
 // (sdk/dock.js), the same as in the other themes.
 import { View, Text, useWindows, wm, windowTitle, windowIcon, formatTime, t as tr, sharedTicker, useStore, useDockEntries, dockActivate, dockMenu,
   StatusItems, PrivacyIndicators, mainDisplay } from '@lordos/sdk';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { StartMark } from '../glyphs.jsx';
+// an icon draws again only for its own picture and size, not with every render of the bar (a window's title changing
+// re-renders the bar's list: BUG-9 of the 0.8.9.6.2 QA)
+const IconGlyph = memo(function IconGlyph({ Icon, size }) { return Icon ? <Icon size={size} /> : null; });
+
 
 export const BAR_H = 36;
 const clock = sharedTicker(() => formatTime(new Date()), 15000);
@@ -53,7 +57,7 @@ export function Taskbar({ t, area, start, onStart, onTray, font }) {
         {quick.map((e) => (
           <View key={e.id} onClick={() => dockActivate(e)} onContextMenu={(ev) => setMenu({ x: ev.x, y: m.y + m.h - BAR_H - 4, items: dockMenu(e), above: true })}
             style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
-            {e.Icon ? <e.Icon size={20} /> : null}
+            <IconGlyph Icon={e.Icon} size={20} />
           </View>
         ))}
       </View>

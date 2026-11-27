@@ -17,7 +17,11 @@ import { Menu } from '../../classic/components/Menu.jsx';
 
 // one timer for every bar's clock (sdk/ticker.js), and one 5 s read of the network for every bar and the sidebar
 const clockTicker = sharedTicker((d) => formatTime(d), 1000);
-const readWifi = () => { try { return typeof lord.net !== 'undefined' ? wifiTile(lord.net.interfaces()) : null; } catch (e) { return null; } };
+const readWifi = () => { try { return typeof lord.net !== 'undefined' ? wifiTile(lord.net.interfaces()) : null; } catch (e) { return null; } };// an icon draws again only for its own picture and size, not with every render of the bar (a window's title changing
+// re-renders the bar's list: BUG-9 of the 0.8.9.6.2 QA)
+const IconGlyph = memo(function IconGlyph({ Icon, size }) { return Icon ? <Icon size={size} /> : null; });
+
+
 export const wifiTicker = sharedTicker(() => JSON.stringify(readWifi()), 5000);
 export const useWifi = () => JSON.parse(useStore(wifiTicker));
 
@@ -79,7 +83,7 @@ const Running = memo(function Running({ cx, t }) {
           return (
             <View key={e.id} title={e.name} onClick={() => dockActivate(e)} onContextMenu={(ev) => setCtx({ e, x: ev.x, y: ev.y })}
               style={{ width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: e.focused ? cx.container : 'transparent' }}>
-              <View style={{ opacity: hidden ? 0.45 : 1 }}><Icon size={26} /></View>
+              <View style={{ opacity: hidden ? 0.45 : 1 }}><IconGlyph Icon={Icon} size={26} /></View>
               <View style={{ position: 'absolute', bottom: 1, left: hidden ? 17 : 18, width: hidden ? 6 : 4, height: hidden ? 6 : 4, borderRadius: 3,
                 backgroundColor: hidden ? 'transparent' : e.attention ? cx.danger : cx.primary, border: hidden ? `1.5px solid ${cx.dim}` : undefined }} />
             </View>

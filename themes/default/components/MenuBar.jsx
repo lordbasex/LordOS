@@ -10,7 +10,7 @@
 // bar's whole height, so the pointer pushed against the top of the display is on it (Fitts's law; #190: the 22 px
 // items, centered in the 28 px bar, left the top 3 px of the display on the bar itself, where a click did nothing).
 import { View, Text, useStore, sharedTicker, barDisplays, activeBarId, pinBar, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems, menuBarPrefs, addMenuBarKeys, barIndex, barHover, webHelpItems } from '@lordos/sdk';
-import { useState, useRef, useEffect } from 'react';
+import { memo, useState, useRef, useEffect } from 'react';
 import { Menu } from './Menu.jsx';
 
 // Date and time with the region's format (sdk/i18n.js),
@@ -184,7 +184,7 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
 // screenDisplays(); every: menuBarEveryDisplay(settings); mirror: screen.mirror. control / clock: the display id
 // whose Control Center / clock panel is open. onControlCenter(display, at) and onClock(display, at) open them there.
 // Adding or removing a monitor re-renders the shell (startShell's screen revision): its bar comes and goes with it.
-export function MenuBars({ t, height, displays, every, mirror, focused, focusRect, control, clock, unread, onClock, onControlCenter, onLaunchpad }) {
+function MenuBarsOf({ t, height, displays, every, mirror, focused, focusRect, control, clock, unread, onClock, onControlCenter, onLaunchpad }) {
   const [pin, setPin] = useState(null);       // the dimmed bar the user clicked (sdk/menubarmodel.js pinBar)
   const bars = barDisplays(displays, every, mirror);
   const focus = focused ? { id: focused, rect: focusRect || null } : null;
@@ -196,3 +196,20 @@ export function MenuBars({ t, height, displays, every, mirror, focused, focusRec
       onClock={(at) => onClock(d, at)} onControlCenter={(at) => onControlCenter(d, at)} onLaunchpad={onLaunchpad} />
   ));
 }
+
+// The bars draw again for what they show, never because the desktop around them did (a window's title changing, a
+// timer): handlers count as the same (the shell's only call its state setters), the displays and the focused window's
+// frame by value; focusName (the focused window's app name, the bar's bold item) is compared only to draw again for it.
+const sameRect = (a, b) => a === b || (!!a && !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
+const sameDisplays = (a, b) => a === b || (Array.isArray(a) && Array.isArray(b) && a.length === b.length
+  && a.every((d, i) => JSON.stringify(d) === JSON.stringify(b[i])));
+export function sameBarProps(a, b) {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const k of keys) {
+    const x = a[k], y = b[k];
+    if (typeof x === 'function' && typeof y === 'function') continue;
+    if (k === 'focusRect' ? !sameRect(x, y) : k === 'displays' ? !sameDisplays(x, y) : !Object.is(x, y)) return false;
+  }
+  return true;
+}
+export const MenuBars = memo(MenuBarsOf, sameBarProps);

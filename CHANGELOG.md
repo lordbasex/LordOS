@@ -418,6 +418,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **The desktop drew itself again whenever a window's title changed** (BUG-9 of the 0.8.9.6.2 QA: lord-server at ~69 %
+  CPU with nothing happening, `stall: js __lordTick [shell; react made 0, changed ~4300]` about every second). A
+  terminal running Claude Code spins its title ("◐ ◓ ◑ ◒"); each change updated the windows store, the desktop's `App`
+  rendered again with it, and every window frame, every desktop widget (calendar, network graph, clock face…), every
+  menu bar item and every Dock or taskbar icon rendered again with it: ~700 nodes per title change on one 1080p display,
+  ~4300 on the maintainer's three. It was not the theme switches: an earlier session's log had the same lines. Now the
+  desktops' window frames are `memo` (Flow, Classic, Celeste and Luna, as Workspaces' already was) with their tokens kept
+  (`useMemo`), a maximized window's work area passed as `frameKey` (`windowFrameKey`, new in the SDK and the theme API),
+  the desktop widget layer is `memo` inside `DesktopWidgets`, Flow's menu bars compare their props by value
+  (`sameBarProps`) and the Dock's, Classic's, Celeste's and Luna's bar icons and Luna's sky draw only for their own
+  props. One title change now draws 42 nodes in Flow, 28 to 90 in the others. `tests/idle_rerender_headless.sh` (new,
+  in `make test`): five apps and five widgets in a headless session, a quiet phase then a spinning title in each desktop
+  round Flow → Classic → Celeste → Luna → Workspaces → Flow; at most 120 nodes per title change (687 before) and Flow
+  as quiet after the five switches as at the start.
 - **Hands: the agent's violet cursor never came back after a theme switch the agent clicked** (QA ws168). The new shell's
   `HandsCursor` registers its nodes again (`lord.hands.cursor`) and re-sends the person's motion (`lord.hands.motion`),
   but both were on `hands_native_guard`'s refusal list, so under the agent's (sticky) input they were refused

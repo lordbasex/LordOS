@@ -495,7 +495,7 @@ const FUNCTIONS = ['t', 'tOptional', 'appName', 'formatDate', 'formatTime', 'for
   'useLauncherApps', 'refreshApps', 'appCategory', 'compareNames', 'groupApps', 'groupKey', 'groupRows', 'useDockEntries',
   'dockActivate', 'dockMenu', 'dockPrefs', 'dockIdOf', 'beginDockDrag', 'registerDockTarget', 'trashMenu', 'useTrash', 'openTrash',
   'refreshTrash', 'screenDisplays', 'mainDisplay', 'displayAt', 'displayFor', 'mainBox', 'pointerDisplay', 'workAreaOf',
-  'pointerWorkArea', 'keepWindowsInWorkAreas', 'titleBarPx', 'useWindowButtons', 'solidOver', 'useClock', 'sharedTicker',
+  'pointerWorkArea', 'keepWindowsInWorkAreas', 'titleBarPx', 'windowFrameKey', 'useWindowButtons', 'solidOver', 'useClock', 'sharedTicker',
   'findWallpaper', 'wallpaperSrc', 'wallpaperIdFor', 'themeOptionValue', 'themeOptionPatch', 'menuBarEveryDisplay', 'menuBarPrefs',
   'barDisplays', 'hasBar', 'barIndex', 'edgeIndex', 'stepIndex', 'matchIndex', 'typeAhead', 'selectable', 'keepSelection',
   'openSwitcher', 'switcherGrabs', 'switcherHold', 'switcherKeys', 'flowGrabs', 'flowDesktopKeys', 'classicDesktopKeys',

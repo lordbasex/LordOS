@@ -431,6 +431,14 @@ EOF
         77) skip "theme-switch-fails" "build/lord-server (make)" ;;
         *) bad "theme-switch-fails (tests/theme_switch_headless.sh, headless lord-server)"; cat "$T/out" ;;
     esac
+    # a quiet desktop stays quiet in every desktop and after five switches: a window's spinning title draws only that
+    # window, never every window, widget, bar and Dock icon (BUG-9 of the 0.8.9.6.2 QA)
+    sh tests/idle_rerender_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "idle-rerender (tests/idle_rerender_headless.sh, headless lord-server, five desktops)" ;;
+        77) skip "idle-rerender" "build/lord-server, node and esbuild (make, npm install)" ;;
+        *) bad "idle-rerender (tests/idle_rerender_headless.sh, headless lord-server, five desktops)"; cat "$T/out" ;;
+    esac
     # explicit sync's kernel side (src/wl/syncobj.c) on this machine's render node
     ./build/syncobj-kernel-test >"$T/out" 2>&1
     case $? in

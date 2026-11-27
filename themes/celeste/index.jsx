@@ -16,9 +16,10 @@ import {
   startShell, switcherGrabs, switcherHold, switcherKeys, t as tr, themeOptionPatch, toggleOverview, toggleShowDesktop, useSettings,
   useShortcuts, useStore, useWindows, wallpaperIdFor, wallpaperSrc, widgetPicker, wm,
   titleBarPx,
+  windowFrameKey,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { makeTheme } from './tokens.js';
 import { minimizeStarts } from './minimize.js';
 import { OPTIONS, THEME_ID, caeTokens, option } from './cae.js';
@@ -91,7 +92,7 @@ const shortcutTable = (toggleLauncher) => [
 function App() {
   startDeskWidgets();
   const [s] = useSettings();
-  const t = makeTheme(s);
+  const t = useMemo(() => makeTheme(s), [s]);   // the same tokens until a setting changes (memo Window, components/Window.jsx)
   const cx = caeTokens(s);
   const reduce = !!s.reduceMotion;
   const rtl = rtlNow();
@@ -234,10 +235,10 @@ function App() {
         {mounted.map((w) => (
           <Fragment key={w.id}>
             {preview && w === top ? <SnapPreview cx={cx} /> : null}
-            <Window win={w} app={getApp(w.id)} t={t} focused={w.id === focused} fx={minFx(w.id)} />
+            <Window win={w} app={getApp(w.id)} t={t} focused={w.id === focused} fx={minFx(w.id)} frameKey={windowFrameKey(w)} />
           </Fragment>
         ))}
-        {minimizing.filter((x) => !mounted.includes(x.win)).map(({ win }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false} fx={minFx(win.id)} />)}
+        {minimizing.filter((x) => !mounted.includes(x.win)).map(({ win }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false} fx={minFx(win.id)} frameKey={windowFrameKey(win)} />)}
         <DesktopWidgets layer="above" />
         <WidgetPicker />
 

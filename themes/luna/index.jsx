@@ -15,9 +15,10 @@ import {
   DesktopWidgets, PowerDialog, findWallpaper, wallpaperIdFor, wallpaperSrc, setBannerPlacement, useShortcuts, AppSwitcher, openSwitcher, switcherKeys,
   switcherGrabs, switcherHold, toggleShowDesktop, spotlight, launchApp, screen, screenDisplays, mainDisplay, hasBar, menuBarEveryDisplay, barDisplays,
   pointerDisplay, titleBarPx, registerStylePack, registerAppSkins, useThemeFont, LevelHud,
+  windowFrameKey,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
-import { useEffect, useRef, useState, Fragment } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { makeTheme, sky } from './tokens.js';
 import { Window, TITLE_H, MENU_H, EDGE } from './components/Window.jsx';
 import { Taskbar, BAR_H } from './components/Taskbar.jsx';
@@ -65,14 +66,15 @@ function Cloud({ x, y, w, color }) {
     </View>
   );
 }
-function Sky({ d, dark }) {
+// the sky draws again only for its display's size or the mode, never with the desktop around it (BUG-9)
+const Sky = memo(function Sky({ d, dark }) {
   const c = sky(dark);
   return (
     <View style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, overflow: 'hidden', background: `linear-gradient(180deg, ${c.top}, ${c.bottom})` }}>
       {CLOUDS.map(([x, y, w]) => <Cloud key={x} x={d.w * x} y={d.h * y} w={d.w * w} color={c.cloud} />)}
     </View>
   );
-}
+}, (a, b) => a.dark === b.dark && a.d.w === b.d.w && a.d.h === b.d.h && a.d.x === b.d.x && a.d.y === b.d.y);
 
 const table = (ui) => [
   { id: 'start', keys: [], show: ['❖'], run: () => {}, label: 'shell.shortcuts.startMenu', group: 'system' },
@@ -87,7 +89,7 @@ const table = (ui) => [
 function App() {
   const [s] = useTrackedSettings();
   const font = useThemeFont();
-  const t = { ...makeTheme(s), fontFamily: font };
+  const t = useMemo(() => ({ ...makeTheme(s), fontFamily: font }), [s, font]);   // stable until a setting or the font changes (memo Window)
   const { mounted, focused } = useWindows();
   const [panel, setPanel] = useState(null);           // { name: 'start' | 'quick', display }
   const [desk, setDesk] = useState(null);
@@ -113,7 +115,7 @@ function App() {
         <DesktopWidgets layer="below" />
         {mounted.map((w) => (
           <Fragment key={w.id}>
-            <Window win={w} t={t} font={font} focused={w.id === focused} app={getApp(w.id)} />
+            <Window win={w} t={t} font={font} focused={w.id === focused} app={getApp(w.id)} frameKey={windowFrameKey(w)} />
           </Fragment>
         ))}
         <DesktopWidgets layer="above" />
