@@ -420,6 +420,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Ctrl+Alt+Shift+Backspace from Classic marked Classic failed for the rest of the session** (BUG-F of the ws171
+  QA: "theme …/classic/theme.bundle.js taken off (restored with Ctrl+Alt+Shift+Backspace)", and Settings refused to
+  apply it again). The rescue key goes back to Flow from any theme, but only a community theme is now marked failed
+  (`community_back` in `server/src/main.c`, `jst_is_user_bundle`); from one of LordOS's own themes the log says it was
+  left, and it can be chosen again at once.
 - **Settings → Appearance → Install from a file failed on every installed system: `lord-themec` wasn't in the
   package** (BUG-G of the ws171 QA). `tools/iso/mkdeb.sh` never installed `server/build/lord-themec`, which lord-server
   starts only from next to itself (`ui/js_theme.c`). It is now installed in `/usr/lib/lordos/bin` and required like

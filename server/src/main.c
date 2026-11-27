@@ -3204,14 +3204,18 @@ static void community_watch_switched(const char *before, const char *now_running
 
 static void community_back(const char *current, const char *why, int persist) {
     char id[32];
-    snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", current);
-    snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", why);
-    ui.theme_failed_code = 0;
-    if (persist && jst_is_user_bundle(current, id, sizeof id)) jst_mark_failed(id, why);
+    /* only a community theme is marked failed: Ctrl+Alt+Shift+Backspace from one of LordOS's own (Classic) is the
+     * person's way back to Flow, not a failure, and Classic must stay choosable (QA 0.8.9.6.2, BUG-F) */
+    if (jst_is_user_bundle(current, id, sizeof id)) {
+        snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", current);
+        snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", why);
+        ui.theme_failed_code = 0;
+        if (persist) jst_mark_failed(id, why);
+    }
     char back[sizeof ui.theme_request];
     snprintf(back, sizeof back, "%s", cw.prev);
     if (!back[0] || !strcmp(back, current) || access(back, R_OK)) default_bundle(back, sizeof back);
-    fprintf(stderr, "lord-server: theme %s taken off (%s): back to %s\n", current, why, back);
+    fprintf(stderr, "lord-server: theme %s %s (%s): back to %s\n", current, ui.theme_failed[0] && !strcmp(ui.theme_failed, current) ? "taken off" : "left", why, back);
     snprintf(ui.theme_request, sizeof ui.theme_request, "%s", back);
 }
 
