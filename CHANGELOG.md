@@ -1371,6 +1371,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `make -C server test` and the WPE build's own test).
 
 ### Changed
+- **Files: "Get Info" is now called "Properties"** (GitHub #279: people looked for "Properties" in the right-click
+  menu and didn't recognise "Get Info"). The same entry, in the item's and the folder's context menus and the File
+  menu, opens the same info panel (size, item count, location, dates, permissions, Open with) with the same shortcut,
+  ❖I. Every UI language ("Propiedades", "Propriedades", "Propriétés", …); Help's Files page (en, es, pt). No executable
+  toggle is added.
 - **Moving wallpapers cost a fraction of what they did** (docs/MOVING-WALLPAPERS.md). Measured by the maintainer with
   0.8.9.6.2 on an i9-10900 with a Radeon RX 580 and three 1920×1080 monitors showing one 1080p moving wallpaper:
   lord-server ~184 % of a core, lord-media ~58 %. Each frame was read back from the GPU, converted to BGRA on the CPU,

@@ -18,7 +18,7 @@ The file manager.
 - **Tabs** (❖T) and **new windows** (❖N).
 - **Quick Preview:** Space shows the image, text, PDF or video without opening it; the arrows move
   to the next one.
-- **Get Info** (❖I): size, location, dates, permissions and “Open with”.
+- **Properties** (❖I): size, location, dates, permissions and “Open with”.
 
 ## Working with files
 
