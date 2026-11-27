@@ -420,6 +420,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **"Reopen your windows? LordOS did not shut down properly" after a theme was taken off** (BUG-H of the ws171 QA). A
+  community theme writes session restore's "unclean" marker when it starts, like any desktop; when lord-server's
+  watchdog took it off (or Ctrl+Alt+Shift+Backspace left a theme), the desktop loaded instead read that marker as a
+  crash. lord-server now says so once (`lord.themes.fellBack()`, set by `community_back` and a failed switch in
+  `main.c`), and session restore takes it as the same session going on, as after a theme switch
+  (`sameSession` in `sdk/sessionmodel.js`). Test: `session-model-test`.
 - **The "This theme isn't from LordOS" dialog's Cancel button had no label** (BUG-H of the ws171 QA). `ConfirmDialog`
   now says Cancel (`shell.dialog.cancel`, every language) when the caller gives no `cancelLabel`. Test:
   `window-sheet-scene`.

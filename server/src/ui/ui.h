@@ -162,6 +162,8 @@ typedef struct {
     char theme_failed_why[1024];    /* why (the exception, or the verified-code check): Settings → Appearance's report */
     int theme_failed_code;          /* it was the verified-code check: tried again once a newer manifest is in use */
     unsigned theme_failed_gen;      /* codesig_generation() when it was refused */
+    int theme_fell_back;            /* the theme running now was loaded because the one before failed or was left (main.c):
+                                     * that one's "unclean" session marker is no crash (lord.themes.fellBack, read once) */
     uint64_t serial;                /* the last node's serial (node_new) */
 } Ui;
 

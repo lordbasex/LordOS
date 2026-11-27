@@ -291,6 +291,14 @@ static JSValue f_started(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     S.started = 1;
     return JS_UNDEFINED;
 }
+/* lord.themes.fellBack(): true once when this desktop was loaded because the theme before it failed or was left
+ * (main.c community_back, switch_theme): session restore then takes that theme's unclean marker as no crash */
+static JSValue f_fell_back(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    int v = ui.theme_fell_back;
+    ui.theme_fell_back = 0;
+    return JS_NewBool(c, v);
+}
 /* lord.themes.quitByTheme(): the facade's session.quit, before LordOS's own code logs out for the theme (sdk/themeapi.js):
  * this end is the theme's, not the person's, so its crash count stays (main.c) */
 static JSValue f_quit_by_theme(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -672,6 +680,7 @@ static const JSCFunctionListEntry user_funcs[] = {
     JS_CFUNC_DEF("installJob", 1, f_install_job),
     JS_CFUNC_DEF("trust", 1, f_trust),
     JS_CFUNC_DEF("retry", 1, f_retry),
+    JS_CFUNC_DEF("fellBack", 0, f_fell_back),
     JS_CFUNC_DEF("remove", 1, f_remove),
 };
 

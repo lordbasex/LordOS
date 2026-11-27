@@ -29,7 +29,7 @@ import { useLauncherApps, shortAppName } from './apps.js';
 import { admin } from './admin.js';
 import { syncStep, syncDone, SYNC_START, agentInput } from './adminsyncmodel.js';
 import { clipboard } from './clipboard.js';
-import { RESTORE_MODES, RESTORE_DEFAULT, MAX_WINDOWS, NEVER, cleanArgs, cleanFrame, cleanList, restoreDecision, markerSave, restoreSplit, planRestore, fitFrame, launchesOnce } from './sessionmodel.js';
+import { RESTORE_MODES, RESTORE_DEFAULT, MAX_WINDOWS, NEVER, cleanArgs, cleanFrame, cleanList, restoreDecision, sameSession, markerSave, restoreSplit, planRestore, fitFrame, launchesOnce } from './sessionmodel.js';
 
 const AUTOSAVE_MS = 2000;     // a dragged window or a new one reaches the disk this long after
 const START_MS = 1500;        // after the theme's first frames
@@ -330,7 +330,11 @@ export function startSessionRestore() {
   activeDesktop.subscribe(schedule);
   desktopList.subscribe(schedule);                      // desktops reordered: each window's position changed
   if (mode === 'off') { if (saved) settings.set({ sessionSaved: null }); hold = false; return; }
-  const switched = saved?.clean === 'theme';           // the same session in a new theme (themeReopen)
+  // the same session in a new theme (themeReopen), or back in this one after the theme before failed or was left
+  // (lord-server's watchdog, Ctrl+Alt+Shift+Backspace): that theme's "unclean" marker is no crash (QA 0.8.9.6.2)
+  let fellBack = false;
+  try { fellBack = typeof lord.themes?.fellBack === 'function' && !!lord.themes.fellBack(); } catch (e) { fellBack = false; }
+  const switched = sameSession(saved, fellBack);
   const list = cleanList(saved?.windows, SNAP_ZONES);
   const now = switched ? 'none' : restoreDecision(mode, saved?.clean === true, list.length);
   // from here on this session is the one that must end well; written now, so that a crash during

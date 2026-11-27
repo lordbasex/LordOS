@@ -3215,6 +3215,7 @@ static void community_back(const char *current, const char *why, int persist) {
     char back[sizeof ui.theme_request];
     snprintf(back, sizeof back, "%s", cw.prev);
     if (!back[0] || !strcmp(back, current) || access(back, R_OK)) default_bundle(back, sizeof back);
+    ui.theme_fell_back = 1;
     fprintf(stderr, "lord-server: theme %s %s (%s): back to %s\n", current, ui.theme_failed[0] && !strcmp(ui.theme_failed, current) ? "taken off" : "left", why, back);
     snprintf(ui.theme_request, sizeof ui.theme_request, "%s", back);
 }
@@ -3268,6 +3269,7 @@ static int switch_theme(const char *current) {
         ui.theme_failed_gen = codesig_generation();
         char cid[32];
         if (jst_is_user_bundle(path, cid, sizeof cid)) jst_mark_failed(cid, ui.theme_failed_why);   /* kept for Report */
+        ui.theme_fell_back = 1;
         js_shutdown();
         ui_reset();
         /* the theme that was running, from the bytes verified when it loaded: not its file again, which a package
