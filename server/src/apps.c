@@ -171,6 +171,22 @@ static void set_mime(char *dst, size_t n, const char *v) {
     dst[len] = 0;
 }
 
+/* one more Name[xx] into the list (apps.h DesktopApp.names): one per line, each once, never cut */
+void apps_add_name(char *list, size_t n, const char *v) {
+    size_t vl = strlen(v), have = strlen(list);
+    if (!vl || vl > 159 || strchr(v, '\n')) return;
+    for (const char *p = list; *p;) {
+        const char *e = strchr(p, '\n');
+        size_t l = e ? (size_t)(e - p) : strlen(p);
+        if (l == vl && !memcmp(p, v, vl)) return;
+        p += l + (e ? 1 : 0);
+    }
+    if (have + vl + 2 > n) return;
+    if (have) list[have++] = '\n';
+    memcpy(list + have, v, vl + 1);
+}
+#define add_name apps_add_name
+
 static int parse_desktop(const char *file, const char *lang, Entry *e) {
     FILE *f = fopen(file, "r");
     if (!f) return -1;
@@ -215,6 +231,7 @@ static int parse_desktop(const char *file, const char *lang, Entry *e) {
         if (!strcmp(k, "Name")) {
             set_tr(e, 0, e->a.name, sizeof e->a.name, v, loc, lang); e->has_name = 1;
             if (!loc) snprintf(e->a.name_c, sizeof e->a.name_c, "%s", v);
+            else if (strcmp(loc, "@")) add_name(e->a.names, sizeof e->a.names, v);   /* not Name[en@shaw] */
         }
         else if (!strcmp(k, "GenericName")) set_tr(e, 1, e->a.generic, sizeof e->a.generic, v, loc, lang);
         else if (!strcmp(k, "Comment")) set_tr(e, 2, e->a.comment, sizeof e->a.comment, v, loc, lang);

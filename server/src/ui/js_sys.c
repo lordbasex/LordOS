@@ -2187,6 +2187,7 @@ static JSValue f_apps_linux(JSContext *c, JSValueConst this_val, int argc, JSVal
         JS_SetPropertyStr(c, o, "id", JS_NewString(c, a->id));
         JS_SetPropertyStr(c, o, "name", JS_NewString(c, a->name));
         JS_SetPropertyStr(c, o, "nameC", JS_NewString(c, a->name_c));
+        JS_SetPropertyStr(c, o, "names", JS_NewString(c, a->names));     /* every Name[xx], one per line */
         JS_SetPropertyStr(c, o, "genericName", JS_NewString(c, a->generic));
         JS_SetPropertyStr(c, o, "comment", JS_NewString(c, a->comment));
         JS_SetPropertyStr(c, o, "commentLocal", JS_NewBool(c, a->comment_l10n));
@@ -2551,6 +2552,7 @@ static JSValue f_apps_flatpak(JSContext *c, JSValueConst this_val, int argc, JSV
         JS_SetPropertyStr(c, o, "id", JS_NewString(c, a->id));
         JS_SetPropertyStr(c, o, "name", JS_NewString(c, a->name));
         JS_SetPropertyStr(c, o, "nameC", JS_NewString(c, a->name_c));
+        JS_SetPropertyStr(c, o, "names", JS_NewString(c, a->names));     /* every Name[xx], one per line */
         JS_SetPropertyStr(c, o, "comment", JS_NewString(c, a->comment));
         JS_SetPropertyStr(c, o, "commentLocal", JS_NewBool(c, a->comment_l10n));
         JS_SetPropertyStr(c, o, "keywords", JS_NewString(c, a->keywords));

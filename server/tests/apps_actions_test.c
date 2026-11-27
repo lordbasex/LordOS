@@ -106,6 +106,17 @@ int main(void) {
         m = apps_list("es", &l2);
         for (int i = 0; i < m; i++) if (!strcmp(l2[i].id, "lord-demo")) nm = l2[i].name;
         CHECK("es: not the modified one", !strcmp(nm, "Demo"));
+        /* (ws170 QA BUG-23) every Name[xx] the file has, for Hands' open_app: not a modifier's */
+        const char *names = "";
+        for (int i = 0; i < m; i++) if (!strcmp(l2[i].id, "lord-demo")) names = l2[i].names;
+        CHECK("names: Name[es_AR], not Name[en@shaw] or Name[es@x]", !strcmp(names, "Demo AR"));
+        char list[16] = "";
+        apps_add_name(list, sizeof list, "Uno");
+        apps_add_name(list, sizeof list, "Dos");
+        apps_add_name(list, sizeof list, "Uno");
+        apps_add_name(list, sizeof list, "Demasiado largo");
+        apps_add_name(list, sizeof list, "a\nb");
+        CHECK("names: each once, one per line, never cut", !strcmp(list, "Uno\nDos"));
     }
 
     /* a package that names its file freely ("Lord Spaced App.desktop"): listed as Lord-Spaced-App,

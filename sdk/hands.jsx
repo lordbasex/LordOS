@@ -36,7 +36,7 @@ import { settings } from './settings.js';
 import { windows, wm, getApp, listApps, windowTitle, appContentNodes } from './windows.js';
 import { textFocusBox } from './components.jsx';
 import { openFileWithApps } from './sysopen.js';
-import { launchApp, launcherAppsNow, linuxNamesIn, windowLinuxApp } from './apps.js';
+import { launchApp, launcherAppsNow, windowLinuxApp } from './apps.js';
 import * as fs from './fs.js';
 import {
   serializeTree, findNodes, makeRefs, own, allowed, appOfWindow, windowsList, matchApp, filterLog, SYSTEM_Z, blackoutNodes, unionBox,
@@ -284,12 +284,11 @@ const OPS = {
   open(a) {
     if (!a.app) return { error: 'not-found' };
     // LordOS's own apps first, then everything the launcher lists (Linux, Flatpak, web and guest apps), found as its
-    // search finds them; a Linux app also by its .desktop Name in English (ws170 QA BUG-23)
+    // search finds them; a Linux app also by its plain .desktop Name and every Name[xx] it has (ws170 QA BUG-23)
     const own = listApps().map((x) => ({ id: x.id, name: appName(x) || x.name || x.id, plain: !x.package && !x.isolated }));
     const ownIds = new Set(own.map((x) => x.id));
-    const en = new Map(linuxNamesIn('en').map((x) => [x.id, x.name]));
     const rest = launcherAppsNow().filter((x) => !ownIds.has(x.id))
-      .map((x) => ({ id: x.id, name: x.name || x.id, desktopId: x.desktopId, aliases: en.has(x.id) ? [en.get(x.id)] : [], plain: false }));
+      .map((x) => ({ id: x.id, name: x.name || x.id, desktopId: x.desktopId, aliases: [x.nameC, ...String(x.names || '').split('\n')].filter(Boolean), plain: false }));
     const app = matchApp([...own, ...rest], a.app);
     if (!app) return { error: 'not-found' };
     if (!allowed(a.allow, app.id)) return { error: 'allowlist' };

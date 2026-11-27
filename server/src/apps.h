@@ -9,6 +9,9 @@ typedef struct {
     char id[160];                       /* "org.featherpad.FeatherPad" (.desktop name without the extension) */
     char name[160], generic[160], comment[320], keywords[320], categories[256];
     char name_c[160];                   /* the untranslated Name ("Chromium" next to "Navegador web Chromium") */
+    char names[2048];                   /* every Name[xx] of the file, one per line, each once (Hands' open_app finds an
+                                         * app by its name in any language the file has: ws170 QA BUG-23); whole names
+                                         * only, the rest left out when full */
     char wmclass[160];                  /* StartupWMClass: to recognize its Wayland window */
     char mime[8192];                    /* MimeType: file types it opens ("text/plain;…"; VLC's is 2.4 KB) */
     char icon[PATH_MAX];                /* PNG found, or "" */
@@ -24,6 +27,8 @@ typedef struct {
  * their Exec line's program is also found in the launcher's fixed PATH. lang = "es-AR": translated names.
  * Returns the count; *out is an internal array valid until the next call. */
 int apps_list(const char *lang, const DesktopApp **out);
+/* one Name[xx] into a DesktopApp.names list (one per line, each once, never cut; tests) */
+void apps_add_name(char *list, size_t n, const char *v);
 
 /* The PNG for a tray icon's name (IconName of a StatusNotifierItem): hicolor's status and apps folders, the user's
  * and the system's, at the bar's sizes first, then /usr/share/pixmaps. A name with a '/' or "..", or other characters
