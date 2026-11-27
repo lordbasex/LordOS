@@ -2584,6 +2584,8 @@ static int mem_backing(const VmMachine *m) {
 /* the hub of a group's internal link: the workstation's only card is on hub 0, a gateway's second card on hub 1 (hub 0
  * is its passt card's) */
 #define LINK_HUB(m) ((m)->network == VM_NET_LINK ? 0 : 1)
+/* whether the machine has a group's link card (19.3): a Workstation's only card, or a Gateway's second one */
+static int link_card_of(const VmMachine *m) { return m->group[0] && (m->network == VM_NET_LINK || (m->role == VM_ROLE_GATEWAY && m->link_mac[0])); }
 #define XNIC_HUB 10                     /* an imported machine's other cards' hubs: 10 .. 10 + VM_EXTRA_NICS - 1 */
 #define MAXARGS 192
 static char *qargv[MAXARGS];
@@ -3310,6 +3312,11 @@ static void build_qemu_args(void) {
         arg("-netdev"); argf("hubport,id=lnk0,hubid=%d", LINK_HUB(m));
         arg("-device"); argf("virtio-net-pci,id=link0,netdev=lnk0,mac=%s,addr=0x%x", m->link_mac, VM_LINK_SLOT_GATEWAY);
     }
+    /* (QA 0.8.9.6.2, BUG-N) and a port with nothing behind it on that hub, so the pulled cable drops frames. A hub whose
+     * card is its only port can't receive: QEMU queues the card's first frame there and stops its transmit queue until
+     * that queue is flushed, and adding the link's port later flushes nothing. A Workstation started before its Gateway
+     * sent its ARP into the empty hub and never sent again; a port without a peer always takes frames and drops them */
+    if (link_card_of(m)) { arg("-netdev"); argf("hubport,id=lnkz,hubid=%d", LINK_HUB(m)); }
     /* an imported machine's other cards: there with their addresses, so the guest keeps its interfaces. In Shared and
      * Host-only each sits on a hub of its own (XNIC_HUB + i), where its own passt goes once the machine runs
      * (xnic_attach); in Bridged and Isolated it has no backend: its cable is out */
@@ -7299,7 +7306,7 @@ static void console_out(const char *b, size_t n);
  * socket backend lk<gen> on hub port lh<gen>, and the previous one comes off first, as the network's healing does with
  * passt. The descriptor must be one end of a connected AF_UNIX stream pair made by a process of this account: never a
  * listening socket, a file, or a socket to anything else. The two QEMUs then exchange frames directly. */
-static int link_card(void) { return S.m.group[0] && (S.m.network == VM_NET_LINK || (S.m.role == VM_ROLE_GATEWAY && S.m.link_mac[0])); }
+static int link_card(void) { return link_card_of(&S.m); }
 
 static int link_fd_ok(int fd, char *why, size_t wn) { return vm_link_fd_ok(fd, why, wn); }
 

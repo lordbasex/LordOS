@@ -5958,6 +5958,11 @@ reach only that socket. Our code and kernel rule that out:
   Shared's card already does with passt (`lordvm.c`: `hubport` + `stream,addr.type=fd`). The card exists from the
   start; the backend comes and goes. A card without a backend is a pulled cable: the Workstation then has **no network
   at all**, which is the fail-closed state.
+- The hub also has a port with nothing behind it (`lnkz`; QA 0.8.9.6.2, BUG-N). QEMU's hub can't receive while the card
+  is its only port: the card's first frame stays queued there and its transmit queue waits for it for good, so a member
+  that ran alone for a while (the Workstation before its Gateway, or a Gateway minutes before its Workstation) never
+  sent on the link again. With the peerless port the pulled cable drops frames, and the member sends again as soon as
+  the link is made, whichever started first.
 - When both members run, lord-server makes a pair and sends one end to each `lord-vm` with a new control message,
   **`VM_LINK`** (one descriptor). `lord-vm` checks the descriptor (`SO_DOMAIN` AF_UNIX, `SO_TYPE` SOCK_STREAM, the peer's
   `SO_PEERCRED` uid its own), passes it to QEMU with QMP `getfd`, puts it on the hub (`netdev_add` + `hubport`) and

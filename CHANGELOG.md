@@ -577,6 +577,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `sentinela.why.*` texts, every language). Tests: `sentinela_investigate_test.mjs` (the model's answer mocked: a fake
   sshd raised from low to high, a high answer kept, the real `/usr/sbin/sshd` untouched, a kernel name in `/tmp`, a
   replaced program at medium). docs/SENTINELA.md, "Investigate".
+- **Machines: a Whonix member that ran alone for a while never sent on the group's link again** (BUG-N of the ws171
+  QA on VM 116: the Workstation started first and the Gateway from its "Start Gateway" bar, the link came up on both
+  sides, "link: connected … lk1", yet the Workstation's `ip neigh` showed 10.152.152.10 FAILED; reproduced on ws173 with
+  the Gateway first too, when it had run alone about five minutes before the Workstation started). The cause is QEMU's
+  hub: a hub whose only port is the card can't receive, so the card's first frame (an ARP, IPv6 discovery) is queued
+  there and its transmit queue waits for that frame for good; adding the link's port later flushes nothing. The link's
+  hub now has a second port with nothing behind it (`lnkz` in `build_qemu_args`, `server/src/vm/lordvm.c`): while the
+  cable is pulled frames are dropped, as on a real unplugged switch, and the member sends again once the link is made,
+  whichever member started first. Nothing else changes: the port has no backend and reaches nothing. Test:
+  `vm-whonix-xml` checks that each member's link hub has the peerless port. Checked on VM 116: the Workstation alone for ten minutes (`ip neigh` INCOMPLETE), then its "Start Gateway" bar: 10.152.152.10 REACHABLE and Tor's check `IsTor: true`.
 - **NVIDIA: the texts now match what the reports show** (after #276, a GTX 1070 on NVIDIA's proprietary 580.196.11 on
   0.8.9.5-beta, whose report says `composition: gpu`). The free drivers (nouveau, NVK) stay the default and NVIDIA's own
   driver stays the Store's opt-in (Store → For this computer). Settings → Graphics cards no longer lists *Desktop* as
