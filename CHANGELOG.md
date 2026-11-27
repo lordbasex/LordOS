@@ -434,6 +434,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Machines: an unattended Debian guest got the console's keyboard layout instead of the person's** (ws171 QA on VM
+  116: "latam" from `/etc/default/keyboard` while the desktop types in US). `hostDefaults` and the first-boot
+  answers now take the session's active layout (Settings → Keyboard), and `/etc/default/keyboard` only without one
+  (`host_keymap` in `server/src/ui/js_vm.c`).
 - **Machines: Back from "Install what's missing" lost the half-filled assistant** (ws171 QA on VM 116). The assistant
   stays mounted under its Requirements page, and Back returns to it as it was left (`apps/machines/library.jsx`).
 - **Machines: ▶ in a Whonix Workstation's window started it alone** (BUG-N of the ws171 QA on VM 116: started before its

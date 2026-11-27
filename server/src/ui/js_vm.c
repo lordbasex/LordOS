@@ -96,6 +96,7 @@
 #include "../vm/vmkeysrv.h"
 #include "../vault/vclient.h"
 #include "../vm/vmexport.h"
+#include "../keyboard.h"
 #include "../pkg/crypto.h"
 
 extern char **environ;
@@ -3025,6 +3026,24 @@ static int safe_word(const char *s, const char *extra) {
 }
 static void host_keymap(char *out, size_t n) {
     snprintf(out, n, "us");
+    /* the session's own layout first: the one the person types with now (Settings → Keyboard), its active group
+     * (QA 0.8.9.6.2: an unattended Debian guest got the console's "latam" from /etc/default/keyboard while the
+     * person's desktop was US) */
+    const char *ls = kb_ready() ? kb_layouts() : NULL;
+    if (ls && ls[0]) {
+        int g = kb_group(), i = 0;
+        char w[64];
+        size_t k = 0;
+        for (const char *p = ls;; p++) {
+            if (*p == ',' || !*p) {
+                w[k] = 0;
+                if ((i == g || (!*p && i < g)) && k && safe_word(w, "-_")) { snprintf(out, n, "%s", w); return; }
+                if (!*p) break;
+                i++;
+                k = 0;
+            } else if (k + 1 < sizeof w) w[k++] = *p;
+        }
+    }
     FILE *f = fopen("/etc/default/keyboard", "re");
     if (!f) return;
     char line[256];
