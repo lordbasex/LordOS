@@ -5,9 +5,13 @@
 //
 // The skin only draws and asks: everything it does is a call to model.actions, and Files does it with its own checks
 // (read-only folders, lord.fs's protected folders, confirmations, the Trash). It reads nothing from the disk itself.
-import { View, Text, ScrollView, TextInput, addListener, useTheme, useThemeFont, PackIcon, formatBytes, formatDate, direction, t as tr } from '@lordos/sdk';
+import { View, Text, ScrollView, TextInput, addListener, useTheme, useThemeFont, PackIcon, formatBytes, formatDate, formatTime, direction, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { RoundArrow, Folder } from '../glyphs.jsx';
+
+// a modification date as Files' own list shows it (sdk/fileparts.jsx when): the skin's mtime is in milliseconds. Until
+// 0.8.9.6.2 it was multiplied by 1000 again and shown without the year: 26/11/2026 read "Thu 19 Jul" (BUG-8 of the QA)
+const fileDate = (ms) => { const d = new Date(ms); return `${formatDate(d, 'numeric')} ${formatTime(d)}`; };
 
 const fontOf = (font) => (font ? { fontFamily: font } : null);
 
@@ -143,7 +147,7 @@ export function TaskPane({ model }) {
               <Text style={{ fontSize: 12, fontWeight: 700, color: t.text, textAlign: 'start', ...fontOf(font) }}>{d.name}</Text>
               <Text style={{ fontSize: 11, color: t.text, textAlign: 'start', ...fontOf(font) }}>{tr(`files.kind.${d.kind}`)}</Text>
               {!d.dir && d.size ? <Text style={{ fontSize: 11, color: t.text, textAlign: 'start', ...fontOf(font) }}>{`${tr('files.info.size')}: ${formatBytes(d.size)}`}</Text> : null}
-              {d.mtime ? <Text style={{ fontSize: 11, color: t.text, textAlign: 'start', ...fontOf(font) }}>{`${tr('files.info.modified')}: ${formatDate(new Date(d.mtime * 1000))}`}</Text> : null}
+              {d.mtime ? <Text style={{ fontSize: 11, color: t.text, textAlign: 'start', ...fontOf(font) }}>{`${tr('files.info.modified')}: ${fileDate(d.mtime)}`}</Text> : null}
             </PaneBox>
           ) : null}
         </View>
@@ -199,7 +203,7 @@ function DetailsRow({ t, font, it, model }) {
       </View>
       {cell(90, it.dir ? '' : formatBytes(it.size))}
       {cell(140, tr(`files.kind.${it.kind}`))}
-      {cell(150, it.mtime ? formatDate(new Date(it.mtime * 1000)) : '')}
+      {cell(150, it.mtime ? fileDate(it.mtime) : '')}
     </View>
   );
 }

@@ -587,7 +587,8 @@ The view model (`apps/files/skinmodel.js`, `filesViewModel`):
 - `history`: `{ back, forward, up }`, booleans;
 - `view` (`icons`, `list`, `columns`, `gallery`), `views`, `sort: { by, desc }`, `zoom`, `query`;
 - `items`: `[{ key, name, label, dir, size, mtime, kind, ext, selected, cut, renaming }]`, fresh copies (`key` is what
-  the actions take);
+  the actions take; `mtime` in milliseconds, as `new Date(mtime)` takes it, 0 when unknown: Files' own list shows
+  `formatDate(d, 'numeric')` and `formatTime(d)`);
 - `selection`: `{ count, keys, first }`; `renaming`: `{ key, value }` or null; `details`: the first selected item or the
   folder shown (`{ name, kind, dir, size, mtime, count }`), for a "Details" box;
 - `places`: `[{ id, label, kind, selected }]` for `home`, `desktop`, `documents`, `downloads`, `pictures`, `music`,

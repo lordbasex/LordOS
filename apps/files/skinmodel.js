@@ -17,7 +17,7 @@ export function skinItem(e, s) {
     label: s.shownName ? s.shownName(e) : e.name,
     dir: !!e.dir,
     size: typeof e.size === 'number' ? e.size : 0,
-    mtime: typeof e.mtime === 'number' ? e.mtime : 0,
+    mtime: typeof e.mtime === 'number' ? e.mtime : 0,      // milliseconds (lord.fs), as new Date(mtime) takes it
     kind: e.app ? 'app' : kindOf(e),
     ext: e.dir ? '' : extOf(e.name),
     selected: s.selected.has(e.path),

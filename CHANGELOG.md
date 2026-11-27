@@ -418,6 +418,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Files with Luna's skin showed wrong modification dates** (BUG-8 of the 0.8.9.6.2 QA: a folder changed on
+  26/11/2026 read "Thu 19 Jul", no year). The skin's item `mtime` is in milliseconds (`lord.fs`), and the skin
+  multiplied it by 1000 again and showed the short weekday style. Its list column and its Details box now show the date
+  as Files' own list does (`formatDate(d, 'numeric')` and the time: "26/11/2026 22:43"); docs/THEMES-GUIDE.md says
+  `mtime` is milliseconds. `tests/appskin_test.mjs`: an item keeps lord.fs's milliseconds, and no theme's skin takes
+  `mtime` for seconds (fails on the old skin).
 - **Hands: the shell's own refreshes were refused as the agent's** (BUG-10 of the 0.8.9.6.2 QA: `hands: claude admin
   other refused` 237 times in one session, in bursts after each agent click and at the start of a desktop the agent
   switched to). The security-state guard (`js.c` `prof_call`) refused by time only: everything after the agent's input

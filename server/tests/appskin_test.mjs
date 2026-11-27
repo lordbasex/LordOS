@@ -169,5 +169,23 @@ const N = await import(path.join(root, 'apps/notes/skinmodel.js'));
 const nm = N.notesModels({ notes: [{ slug: 's', title: 'T', date: 'd', selected: true }], query: '', title: 'T', mode: 'edit', onDesktop: false, has: false }, (k) => k, {});
 eq('notes: without a note only New', nm.bar.commands.map((c) => c.id), ['new']);
 
+// ---- a skin's dates (BUG-8 of the 0.8.9.6.2 QA): an item's mtime is milliseconds, and no skin takes it for seconds ----
+{
+  const ms = Date.UTC(2026, 10, 26, 12, 0, 0);
+  const it = F.skinItem({ path: '/h/a', name: 'a', dir: true, mtime: ms }, { selected: new Set(), cut: new Set(), renaming: null });
+  eq('files: an item keeps lord.fs\'s mtime in milliseconds', it.mtime, ms);
+  eq('files: that is the day it was changed, with its year', new Date(it.mtime).getUTCFullYear(), 2026);
+  const themes = path.join(root, 'themes');
+  for (const th of fs.readdirSync(themes)) {
+    const dir = path.join(themes, th, 'skins');
+    if (!fs.existsSync(dir)) continue;
+    for (const f of fs.readdirSync(dir).filter((x) => /\.jsx?$/.test(x))) {
+      const src = fs.readFileSync(path.join(dir, f), 'utf8');
+      eq(`${th}/skins/${f}: no mtime taken for seconds (× 1000)`, /mtime\s*\*\s*1000/.test(src), false);
+      if (/\.mtime\b/.test(src) && f === 'files.jsx') ok(`${th}/skins/${f}: a date with its year (formatDate 'numeric', as Files' list)`, /formatDate\([^)]*'numeric'\)/.test(src));
+    }
+  }
+}
+
 console.log(`appskin-test: ${n} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);
