@@ -744,7 +744,9 @@
     for (const s of r.strings) {
       if (/^[a-z][a-z0-9+.-]{1,15}:\/\//i.test(s.value.trim())) err('code.url', s.line, 'no remote URLs in a theme');
       else if (/^data:/i.test(s.value)) warn('code.dataUri', s.line, 'a data: URI: put the image in assets/');
-      if ((s.attr === 'src' || /^(\.\.\/|\/)/.test(s.value)) && (/(^|\/)\.\.(\/|$)/.test(s.value) || (s.attr === 'src' && s.value.startsWith('/')))) {
+      // a module's specifier (import … from '../tokens.js') is the resolver's: it stays inside the theme or the build fails
+      const specifier = s.kind !== 'jsxattr' && s.kind !== 'template' && /(?<![\w$.])(from|import)\s*$/.test(m.slice(Math.max(0, s.pos - 24), s.pos));
+      if (!specifier && (s.attr === 'src' || /^(\.\.\/|\/)/.test(s.value)) && (/(^|\/)\.\.(\/|$)/.test(s.value) || (s.attr === 'src' && s.value.startsWith('/')))) {
         err('code.path', s.line, 'images come from assets/ (or LordOS\'s "asset:" pictures), never outside the theme');
       }
       if (!WORDS.test(s.value) || /^[a-z][\w-]*(\.[\w-]+)+$/.test(s.value) || s.dynamic) continue;

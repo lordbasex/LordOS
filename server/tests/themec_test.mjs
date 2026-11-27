@@ -105,7 +105,8 @@ const refused = [
   ['a remote URL', 'const u = "https://example.com/x"', 'code.url'],
   ['a host element', 'const e = <view />', 'build'],
   ['another package', 'import x from "left-pad"', 'build'],
-  ['a file outside the theme', 'import x from "../../etc/x.js"', 'code.path'],
+  ['a file outside the theme', 'import x from "../../etc/x.js"', 'build'],
+  ['an image outside the theme', 'const i = <Image src="../x.png" />', 'code.path'],
   ['dynamic import()', 'import("./x.js")', 'code.dynamicImport'],
   ['export *', 'export * from "./x.js"', 'build'],
 ];
@@ -127,6 +128,21 @@ ok(`${refused.length} refusals (eval, Function, globalThis, __ names, constructo
   }
   assert.ok(C.compile({ id: '../x', files: [] }).report.findings.some((f) => f.rule === 'id'));
   ok('the manifest (community, capabilities), file types, names with "..", the id');
+}
+{
+  // (Meridian review, 0.8.9.6.2) a parent import that stays inside the theme is the kit's documented layout: allowed
+  const r = theme({
+    'index.jsx': `import { startShell } from '@lordos/sdk';\nimport Bar from './components/Bar.jsx';\nstartShell(<Bar />);\n`,
+    'components/Bar.jsx': `import { View } from '@lordos/sdk';\nimport { k } from '../tokens.js';\nexport default function Bar() { return <View style={{ height: k }} />; }\n`,
+    'tokens.js': 'export const k = 3;\n',
+  });
+  assert.equal(r.report.errors, 0, JSON.stringify(r.report.findings));
+  const bad = theme({
+    'index.jsx': `import { startShell } from '@lordos/sdk';\nimport Bar from './components/Bar.jsx';\nstartShell(<Bar />);\n`,
+    'components/Bar.jsx': `import { k } from '../../tokens.js';\nexport default function Bar() { return k; }\n`,
+  });
+  assert.ok(!bad.code && bad.report.findings.some((f) => /outside the theme/.test(f.message)), JSON.stringify(bad.report.findings));
+  ok('a parent import inside the theme builds; one that leaves it is refused');
 }
 {
   const r = C.compile({ id: 'okminimal', files: readTheme(path.join(here, 'community_themes', 'okminimal')) });

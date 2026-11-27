@@ -479,6 +479,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **lord-themec: a theme's parent import that stays in its folder builds** (Meridian review: `import … from
+  '../tokens.js'` in `components/` was refused as `code.path`, though the kit allows it). The path rule is for
+  pictures; a module's specifier is the resolver's, which already refuses any import that leaves the theme's folder
+  ("points outside the theme"). Tests: `themec_test.mjs` (a parent import inside builds, one leaving it and an image
+  `src="../x.png"` are refused).
 - **Community themes: shortcut tables in the SDK's own form work, and can't shadow the shared keys** (Meridian review:
   `themeUseShortcuts` kept only entries with `combo`, but the dispatcher reads `keys`, so `keys: [...]` entries such as
   Alt+Tab were dropped and a `combo` one would have thrown). An entry is now `{ id, keys, run, when, repeat, label,
