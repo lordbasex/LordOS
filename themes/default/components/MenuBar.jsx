@@ -23,10 +23,11 @@ const itemAt = (ref) => { try { const [x, , w] = lord.getLayout(ref.current.id);
 
 // The item is as tall as the bar (alignSelf: stretch), its highlight the 22 px pill inside. onEnter: the pointer came
 // onto it (a menu title switches the open menu there).
-function BarItem({ t, children, onClick, active, anchorRef, onEnter }) {
+// label: its accessible name when it shows a glyph only (Hands' find and read_window; ws170 QA BUG-11)
+function BarItem({ t, children, onClick, active, anchorRef, onEnter, label }) {
   const [hover, setHover] = useState(false);
   return (
-    <View ref={anchorRef} onClick={onClick} onMouseEnter={() => { setHover(true); onEnter?.(); }} onMouseLeave={() => setHover(false)}
+    <View ref={anchorRef} onClick={onClick} accessibilityRole="button" accessibilityLabel={label || undefined} onMouseEnter={() => { setHover(true); onEnter?.(); }} onMouseLeave={() => setHover(false)}
       style={{ alignSelf: 'stretch', justifyContent: 'center' }}>
       <View style={{ height: 22, paddingHorizontal: 9, borderRadius: 5, justifyContent: 'center', flexDirection: 'row', alignItems: 'center',
         backgroundColor: active || hover ? t.menuHover : 'transparent' }}>
@@ -148,7 +149,7 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
         position: 'absolute', left: area.x, top: area.y, width: area.w, height, flexDirection: 'row', alignItems: 'center',
         paddingHorizontal: 8, backgroundColor: t.menuBg, backdropFilter: `blur(${t.blur}px)`,
       }}>
-        <BarItem t={t} active={open?.name === 'logo'} anchorRef={refs.logo} onClick={() => toggle('logo', refs.logo)} onEnter={() => slide('logo', refs.logo)}>
+        <BarItem t={t} label="LordOS" active={open?.name === 'logo'} anchorRef={refs.logo} onClick={() => toggle('logo', refs.logo)} onEnter={() => slide('logo', refs.logo)}>
           <LordOSGlyph size={16} color={t.menuText} />
         </BarItem>
         <BarItem t={t} active={open?.name === 'app'} anchorRef={refs.app} onClick={() => toggle('app', refs.app)} onEnter={() => slide('app', refs.app)}><Label t={t} bold dim={dim}>{app ? (app.builtin ? windowAppName(wm.get(focused)) : appName(app)) : 'LordOS'}</Label></BarItem>
@@ -170,9 +171,9 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
         ) : null}
         <StatusItems color={t.menuText} />
         <PrivacyIndicators />
-        <BarItem t={t} onClick={() => spotlight.toggle(area)}><Label t={t}>⌕</Label></BarItem>
-        <BarItem t={t} active={controlCenter} anchorRef={refs.cc} onClick={() => onControlCenter(itemAt(refs.cc))}><ControlGlyph t={t} /></BarItem>
-        {bar.bell ? <BarItem t={t} active={clockPanel} anchorRef={refs.bell} onClick={() => onClock(itemAt(refs.bell))}><BellGlyph color={t.menuText} dot={unread ? t.accent : null} /></BarItem> : null}
+        <BarItem t={t} label={tr('shell.shortcuts.search')} onClick={() => spotlight.toggle(area)}><Label t={t}>⌕</Label></BarItem>
+        <BarItem t={t} label={tr('shell.shortcuts.quickSettings')} active={controlCenter} anchorRef={refs.cc} onClick={() => onControlCenter(itemAt(refs.cc))}><ControlGlyph t={t} /></BarItem>
+        {bar.bell ? <BarItem t={t} label={tr('shell.shortcuts.notifications')} active={clockPanel} anchorRef={refs.bell} onClick={() => onClock(itemAt(refs.bell))}><BellGlyph color={t.menuText} dot={unread ? t.accent : null} /></BarItem> : null}
         <BarItem t={t} active={clockPanel} anchorRef={refs.clock} onClick={() => onClock(itemAt(refs.clock))}><Label t={t}>{clock}</Label></BarItem>
       </View>
       {cur && <Menu key={open.name} x={open.x} y={area.y + height + 2} items={cur.items} onClose={close} anchor={anchor} width={260} keys={!!open.keys} onStep={step} />}

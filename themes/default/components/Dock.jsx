@@ -403,7 +403,7 @@ export function Dock({ t, items: list, running, onOpen, onContext, onTrash, onTr
             : { position: 'absolute', left: c, width: 1, height: BASE * 0.7, bottom: PAD + BASE * 0.15, backgroundColor: t.dockBorder }} />
         ))}
         {items.map((app, i) => (app.trash ? (
-          <View key={TRASH} dropTrash onClick={() => { if (!dockDragJustEnded()) onTrash?.(); }}
+          <View key={TRASH} dropTrash accessibilityRole="button" accessibilityLabel={tr('shell.trash.name')} onClick={() => { if (!dockDragJustEnded()) onTrash?.(); }}
             onContextMenu={() => onTrashContext?.(anchor(i))}
             onMouseEnter={() => setTrashHover(true)} onMouseLeave={() => setTrashHover(false)}
             onMouseUp={() => setTimeout(refreshTrash, 60)}
@@ -412,7 +412,8 @@ export function Dock({ t, items: list, running, onOpen, onContext, onTrash, onTr
             <TrashIcon size={sizes[i]} full={trashFull} />
           </View>
         ) : (
-          <View key={app.id} onClick={() => { if (!dockDragJustEnded()) onOpen(app.id); }} onContextMenu={() => onContext?.(app.id, anchor(i))}
+          <View key={app.id} accessibilityRole="button" accessibilityLabel={app.launcher ? tr('shell.menu.apps') : appName(app)}
+            onClick={() => { if (!dockDragJustEnded()) onOpen(app.id); }} onContextMenu={() => onContext?.(app.id, anchor(i))}
             onMouseDown={(e) => { if (!e.button) beginDockDrag({ id: app.id, Icon: app.Icon, x: e.x, y: e.y, source: 'dock' }); }}
             style={{ position: 'absolute', ...place(i), width: sizes[i], height: sizes[i] }}>
             <DockGlyph Icon={app.Icon} size={sizes[i]} />

@@ -1241,6 +1241,12 @@ EOF
             run "spotlight-keys-scene-$th (sdk/spotlight.js over themes/$th)" node tests/workspaces_test.mjs spotlight_keys_scene.mjs "$th"
         done
     else skip "spotlight-keys-scene" "node and the repository's node_modules (npm install)"; fi
+    # (ws170 QA BUG-11) the shell's glyph-only buttons (Flow's Dock and menu bar, Workspaces' column) have accessible names
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        for th in default workspaces; do
+            run "hands-names-scene-$th (accessible names over themes/$th)" node tests/workspaces_test.mjs hands_names_scene.mjs "$th"
+        done
+    else skip "hands-names-scene" "node and the repository's node_modules (npm install)"; fi
     # always on top in every theme: drawing order apart from the keyboard, the window menu's item, skip pager
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         for th in default classic workspaces celeste; do

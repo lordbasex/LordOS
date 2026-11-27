@@ -21,7 +21,7 @@ export const BarButton = memo(forwardRef(function BarButton({ t, glyph, title, o
   const [hover, setHover] = useState(false);
   const fg = active ? t.onAccent : hover && !disabled ? t.iconFgHover : t.iconFg;
   return (
-    <View ref={ref} title={title} onClick={disabled ? undefined : onClick}
+    <View ref={ref} title={title} accessibilityRole="button" accessibilityLabel={title || undefined} onClick={disabled ? undefined : onClick}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ height: BAR_ITEM, minWidth: BAR_ITEM, borderRadius: BAR_ITEM / 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
         gap: 6, paddingHorizontal: children ? 12 : 0, opacity: disabled ? 0.45 : 1,
