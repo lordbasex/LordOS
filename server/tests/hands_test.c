@@ -48,7 +48,8 @@ static int dialog_open, dialog_node_why, focus_secure_after, focus_calls;
 static int place_why, node_why, same, keys_why, focus_secure, region_inside, ref_secure, black_n;
 static int moves, buttons, keys, typed, shots, setvalues, last_black;
 static char last_event[512];
-static int shell_delivering, move_delivering;   /* hands_delivering() seen inside a shell call and an agent move */
+static int shell_delivering, move_delivering;
+static int close_at_once, gone_after, gone_looks, ready_looks, ready_seq[8];   /* hands_delivering() seen inside a shell call and an agent move */
 static char *shell(const char *op, const char *json) {
     (void)json;
     shell_delivering |= hands_delivering() && hands_origin_refused(HANDS_ORIGIN_SHELL);
@@ -63,6 +64,11 @@ static char *shell(const char *op, const char *json) {
     else if (!strcmp(op, "window")) snprintf(b, sizeof b, "{\"node\":9,\"x\":10,\"y\":10,\"w\":300,\"h\":200,\"sheets\":[31,0,32]}");
     else if (!strcmp(op, "setvalue")) { setvalues++; snprintf(b, sizeof b, "{\"ok\":true}"); }
     else if (!strcmp(op, "read")) snprintf(b, sizeof b, "{\"text\":\"window \\\"Notes\\\" [ref_1]\"}");
+    /* close_window and open_app (FIX-2, FIX-3): a window closing a moment later, a tree drawing over a few frames */
+    else if (!strcmp(op, "close")) snprintf(b, sizeof b, "{\"closed\":%s}", close_at_once ? "true" : "false");
+    else if (!strcmp(op, "gone")) snprintf(b, sizeof b, "{\"gone\":%s}", ++gone_looks > gone_after ? "true" : "false");
+    else if (!strcmp(op, "open")) snprintf(b, sizeof b, "{\"window\":\"notes\",\"app\":\"notes\"}");
+    else if (!strcmp(op, "ready")) { int i = ready_looks < 8 ? ready_looks : 7; ready_looks++; snprintf(b, sizeof b, "{\"n\":%d}", ready_seq[i]); }
     else snprintf(b, sizeof b, "{\"text\":\"[]\"}");
     return strdup(b);
 }
@@ -886,14 +892,71 @@ static void motion(void) {
 /* human mode against the fake host: the glide, the hover, the action when the cursor arrives, every gate again then,
  * the person's input stopping it at once */
 static int done_n, done_rc, done_why, done_call;
+static char done_out[512];
 static void on_done(const char *bus, int call, int rc, int why, const char *out) {
-    (void)bus; (void)out;
+    (void)bus;
     done_n++; done_rc = rc; done_why = why; done_call = call;
+    snprintf(done_out, sizeof done_out, "%s", out ? out : "");
 }
 static int run_until_done(int max_ms) {
     for (int t = 0; t < max_ms && !done_n; t += 8) { clock_ms += 8; hands_tick(); }
     return done_n;
 }
+/* close_window waits for the window to go, open_app for its tree (FIX-2, FIX-3 of the 0.8.9.6.2 QA), bounded */
+static void waits(void) {
+    hands_init(&host);
+    hands_on_done(on_done);
+    hands_serve(1, NULL, 0);
+    hands_hello(":3.1", "Claude Code", "");
+    hands_answer(":3.1", 1);
+    clock_ms += 10000;
+    int why = 0;
+    char *out = NULL;
+    HandsReq c = { .call = HANDS_C_CLOSE };
+    snprintf(c.window, sizeof c.window, "linux#7");
+    /* a native window gone at once: answered at once */
+    close_at_once = 1; done_n = 0;
+    CHECK(hands_call(":3.1", &c, &out, NULL, NULL, &why) == HANDS_OK && out && strstr(out, "\"closed\":true") && !hands_acting(), "close: gone at once, answered at once");
+    free(out); out = NULL;
+    /* a Linux app's window, gone three looks later: closed true, not false */
+    close_at_once = 0; gone_after = 3; gone_looks = 0; done_n = 0;
+    CHECK(hands_call(":3.1", &c, &out, NULL, NULL, &why) == HANDS_E_PENDING && !out && hands_acting(), "close: a window still there waits");
+    HandsReq k = { .call = HANDS_C_KEY, .text = "a", .text_len = 1 };
+    CHECK(hands_call(":3.1", &k, &out, NULL, NULL, &why) == HANDS_E_BUSY, "close: no other input meanwhile");
+    CHECK(run_until_done(3000) == 1 && done_rc == HANDS_OK && done_call == HANDS_C_CLOSE && !strcmp(done_out, "{\"closed\":true}"),
+          "close: answered closed:true once it went (%s, %d looks)", done_out, gone_looks);
+    /* one that never goes: false at the limit, never longer */
+    gone_after = 1000000; gone_looks = 0; done_n = 0;
+    double t0 = clock_ms;
+    CHECK(hands_call(":3.1", &c, &out, NULL, NULL, &why) == HANDS_E_PENDING, "close: a window that stays");
+    CHECK(run_until_done(10000) == 1 && !strcmp(done_out, "{\"closed\":false}") && clock_ms - t0 <= 2600,
+          "close: closed:false at the limit (%.0f ms)", clock_ms - t0);
+    /* the person's input while it waits: answered with what is there, never "user active" */
+    gone_after = 1000000; gone_looks = 0; done_n = 0;
+    CHECK(hands_call(":3.1", &c, &out, NULL, NULL, &why) == HANDS_E_PENDING, "close: waiting again");
+    hands_person_input();
+    CHECK(done_n == 1 && done_rc == HANDS_OK && !strcmp(done_out, "{\"closed\":false}") && !hands_acting(), "close: the person's input answers at once (%s)", done_out);
+    clock_ms += 4000;
+    /* open_app: its tree grows, then holds: ready once the same count comes twice */
+    HandsReq o = { .call = HANDS_C_OPENAPP };
+    snprintf(o.app, sizeof o.app, "notes");
+    int seq[8] = { 0, 0, 12, 40, 40, 40, 40, 40 };
+    memcpy(ready_seq, seq, sizeof seq);
+    ready_looks = 0; done_n = 0;
+    CHECK(hands_call(":3.1", &o, &out, NULL, NULL, &why) == HANDS_E_PENDING && !out, "open: waits for the window's tree");
+    CHECK(run_until_done(4000) == 1 && done_rc == HANDS_OK && done_call == HANDS_C_OPENAPP &&
+          !strcmp(done_out, "{\"window\":\"notes\",\"app\":\"notes\",\"ready\":true}") && ready_looks == 5,
+          "open: ready once its tree held (%s after %d looks)", done_out, ready_looks);
+    /* a tree that never comes: ready false at the limit */
+    int none[8] = { 0 };
+    memcpy(ready_seq, none, sizeof none);
+    ready_looks = 0; done_n = 0;
+    t0 = clock_ms;
+    CHECK(hands_call(":3.1", &o, &out, NULL, NULL, &why) == HANDS_E_PENDING, "open: a window that draws nothing");
+    CHECK(run_until_done(10000) == 1 && strstr(done_out, "\"ready\":false") && clock_ms - t0 <= 3100, "open: ready:false at the limit (%.0f ms)", clock_ms - t0);
+    hands_gone(":3.1");
+}
+
 static void human_mode(void) {
     hands_init(&host);
     hands_on_done(on_done);
@@ -1016,6 +1079,7 @@ int main(void) {
     motion();
     policy();
     human_mode();
+    waits();
     fuzz();
     on_bus();
     pidfds();

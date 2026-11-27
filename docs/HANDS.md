@@ -40,9 +40,9 @@ MCP server over stdio; each tool is one or two calls to lord-server's `org.lordo
 | Claude in Chrome | lordos-mcp | What it does |
 |---|---|---|
 | `tabs_context` | `windows_context` | the windows: id, app, title, display, focused, minimized, kind (native, linux, package), frame |
-| `tabs_create`, `navigate` | `open_app(app)` | opens an app by id or shown name; answers its window id |
+| `tabs_create`, `navigate` | `open_app(app)` | opens an app by id or shown name; answers its window id once its tree is there (`"ready":true`; at most 3 s, then `"ready":false`) |
 | `navigate` | `open_path(path)` | a file or folder of the home folder or a disk in its default app, through `openFileWithApps` with `untrusted` (a file that would run code is only shown in Files) |
-| `tabs_close` | `close_window(window_id)` | closes a window (the app may ask about unsaved changes) |
+| `tabs_close` | `close_window(window_id)` | closes a window (the app may ask about unsaved changes); a Linux app's goes a moment later and the answer waits for it (`closed:true`; at most 2.5 s, then `closed:false`) |
 | `read_page` | `read_window(window_id, filter, depth)` | the UI tree as text (below) |
 | `find` | `find(window_id, query)` | words matched against roles, names and values; the best lines with their refs, or `No matches for "<query>"` (never a bare `done`; `read_app_log` likewise says `No log lines`) |
 | `computer` | `computer(action, …, mode)` | `screenshot` (`display`, `display:<id>`, `window:<id>`), `left_click`, `right_click`, `middle_click`, `double_click`, `triple_click`, `hover` (at a `ref` or a `coordinate`), `left_click_drag` (`start_coordinate` → `coordinate`), `type` (`text`), `key` (`text`: `ctrl+s`, `Return`, `ctrl+a Delete`; `repeat`), `scroll` (`scroll_direction`, `scroll_amount`), `zoom` (`region` [x0, y0, x1, y1]); `save` on `screenshot` and `zoom` (below), `wait` (`duration`, at most 10 s); `mode` `human` or `machine` for this call (below) |

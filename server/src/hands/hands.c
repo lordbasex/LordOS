@@ -494,7 +494,7 @@ typedef struct {
 
 /* A human-mode action in progress (one at a time: there is one agent cursor). Its request is a copy (its text owned);
  * every step goes through the same gate as a machine-mode action, at the moment it happens. */
-enum { PH_GLIDE = 1, PH_HOVER, PH_DRAG, PH_SCROLL, PH_TYPE };
+enum { PH_GLIDE = 1, PH_HOVER, PH_DRAG, PH_SCROLL, PH_TYPE, PH_WAIT };
 typedef struct {
     int on;
     char bus[64];
@@ -507,6 +507,8 @@ typedef struct {
     int steps[HANDS_SCROLL_STEPS], nsteps, step;
     size_t off, chars;                  /* typing */
     int held;                           /* a drag's button is down */
+    double until;                       /* PH_WAIT: the last moment it waits */
+    int seen;                           /* PH_WAIT (open_app): the window's node count at the last look */
 } Plan;
 
 static struct {
@@ -534,6 +536,7 @@ static struct {
 } S;
 
 static void plan_end(int rc, int why, const char *out, int reply);
+static void wait_answer(int known);
 static void cur(int what, double x, double y, double w, double h);
 
 void hands_init(const HandsHost *h) { S.h = h; }
@@ -710,6 +713,7 @@ void hands_person_input(void) {
     S.person = now();
     S.person_seen = 1;
     /* the person's own input wins at once: an agent's glide, drag, scroll or typing in progress stops where it is */
+    if (S.P.on && S.P.phase == PH_WAIT) { wait_answer(-1); return; }   /* only waiting: answered with what is there now */
     if (S.P.on && !S.qa) plan_end(HANDS_E_ACTIVE, 0, NULL, 1);
 }
 
@@ -1384,6 +1388,82 @@ static void plan_act(double t) {
     }
 }
 
+/* ---- close_window and open_app answer once it happened (FIX-2 and FIX-3 of the 0.8.9.6.2 QA) ----
+ * A Linux app's window closes when the app lets go of it, a moment after it was asked (close answered closed:false
+ * though it went); a new window draws its first tree a few frames after wm.open (a find right after open_app found
+ * nothing). Both wait, over the next frames and never blocking the desktop, for at most HANDS_CLOSE_WAIT_MS or
+ * HANDS_OPEN_WAIT_MS: close until the window is gone ({"closed":true}, false at the limit), open until the window's
+ * tree has nodes and the same count twice in a row ("ready":true, false at the limit). The person's input answers at
+ * once with what is there; Stop ends it as any action. Polled through the shell's "gone" and "ready". */
+#define HANDS_CLOSE_WAIT_MS 2500
+#define HANDS_OPEN_WAIT_MS 3000
+#define HANDS_WAIT_STEP_MS 60
+static int wait_start(const char *bus, const HandsReq *r, const char *answer) {
+    if (!answer) return 0;
+    char win[HANDS_ID_MAX + 1] = "";
+    if (r->call == HANDS_C_CLOSE) {
+        if (strstr(answer, "\"closed\":true")) return 0;
+        snprintf(win, sizeof win, "%s", r->window);
+    } else {
+        JDoc d;
+        if (json_parse(answer, strlen(answer), &d, NULL, 0) || !d.root || d.root->type != J_OBJ) return 0;
+        const char *w = json_str(d.root, "window");
+        if (w && strlen(w) <= HANDS_ID_MAX) snprintf(win, sizeof win, "%s", w);
+        json_free(&d);
+    }
+    if (!win[0]) return 0;
+    memset(&S.P, 0, sizeof S.P);
+    S.P.r.call = r->call;
+    snprintf(S.P.r.window, sizeof S.P.r.window, "%s", win);
+    S.P.text = strdup(answer);
+    if (!S.P.text) return 0;
+    snprintf(S.P.bus, sizeof S.P.bus, "%s", bus);
+    S.P.on = 1;
+    S.P.phase = PH_WAIT;
+    S.P.t0 = now();
+    S.P.next = S.P.t0 + HANDS_WAIT_STEP_MS;
+    S.P.until = S.P.t0 + (r->call == HANDS_C_CLOSE ? HANDS_CLOSE_WAIT_MS : HANDS_OPEN_WAIT_MS);
+    S.P.seen = -1;
+    return 1;
+}
+/* one look: 1 when what it waits for happened */
+static int wait_look(void) {
+    Jb a = { 0 };
+    jb_s(&a, "{\"window\":");
+    jb_q(&a, S.P.r.window);
+    jb_s(&a, "}");
+    char *q = jb_take(&a);
+    char *r = shell_call(S.P.r.call == HANDS_C_CLOSE ? "gone" : "ready", q);
+    free(q);
+    if (!r) return 0;
+    JDoc d;
+    int done = 0;
+    if (!json_parse(r, strlen(r), &d, NULL, 0) && d.root && d.root->type == J_OBJ) {
+        if (S.P.r.call == HANDS_C_CLOSE) done = json_bool(d.root, "gone", 0);
+        else {
+            int n = (int)json_num(d.root, "n", -1);
+            done = n > 0 && n == S.P.seen;
+            S.P.seen = n;
+        }
+        json_free(&d);
+    }
+    free(r);
+    return done;
+}
+/* known: what the last look said, -1 to look now */
+static void wait_answer(int known) {
+    int ok = known >= 0 ? known : wait_look();
+    char out[512];
+    if (S.P.r.call == HANDS_C_CLOSE) snprintf(out, sizeof out, "{\"closed\":%s}", ok ? "true" : "false");
+    else {
+        /* the shell's own answer, with whether the window's tree was there */
+        size_t n = S.P.text ? strlen(S.P.text) : 0;
+        if (n >= 2 && n < sizeof out - 20 && S.P.text[n - 1] == '}') snprintf(out, sizeof out, "%.*s,\"ready\":%s}", (int)(n - 1), S.P.text, ok ? "true" : "false");
+        else snprintf(out, sizeof out, "{\"ready\":%s}", ok ? "true" : "false");
+    }
+    plan_end(HANDS_OK, 0, out, 1);
+}
+
 void hands_tick(void) {
     if (!S.P.on || !S.h) return;
     Client *k = client_of(S.P.bus);
@@ -1455,6 +1535,12 @@ void hands_tick(void) {
         S.P.next = t + (S.reduce ? 30 : HANDS_SCROLL_STEP);
         return;
     }
+    case PH_WAIT:
+        if (t < S.P.next) return;
+        if (wait_look()) { wait_answer(1); return; }
+        if (t >= S.P.until) { wait_answer(0); return; }
+        S.P.next = t + HANDS_WAIT_STEP_MS;
+        return;
     case PH_TYPE: {
         if (t < S.P.next) return;
         const char *s = S.P.text ? S.P.text : "";
@@ -1567,6 +1653,7 @@ int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, si
         S.injecting = 0;
     S.last_agent = now();
     S.agent_seq = ++S.seq;
+        if (!rc && wait_start(bus, r, *out)) { free(*out); *out = NULL; free(a.p); return HANDS_E_PENDING; }
         break;
     case HANDS_C_OPENPATH:
         jb_s(&a, "{\"path\":");
@@ -1591,6 +1678,7 @@ int hands_call(const char *bus, const HandsReq *r, char **out, uint8_t **png, si
         S.injecting = 0;
     S.last_agent = now();
     S.agent_seq = ++S.seq;
+        if (!rc && wait_start(bus, r, *out)) { free(*out); *out = NULL; free(a.p); return HANDS_E_PENDING; }
         break;
     case HANDS_C_APPLOG: {
         char t[64];

@@ -418,6 +418,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Hands: `close_window` answered `closed:false` for a Linux app's window that went a moment later, and `open_app`
+  answered before the app had drawn, so a `find` right after it found nothing** (FIX-2 and FIX-3 of the 0.8.9.6.2 QA).
+  Both now wait over the next frames, never blocking the desktop: `close_window` until the window is gone (at most
+  2.5 s, then `closed:false`), `open_app` until the window's content has nodes and the same count twice in a row (at
+  most 3 s; the answer says `"ready":true` or `false`; a Linux window once its surface is mapped, an isolated app once
+  its content is laid out). Another input waits (Busy); the person's input answers at once with what is there. New
+  shell answers `gone` and `ready` (`sdk/hands.jsx`). `build/hands-test`: gone at once, gone three looks later, never
+  gone (false at the limit), the person's input while waiting, a tree growing then holding, a tree that never comes.
 - **Hands: an agent can download a Machines catalog system** (FIX-1 of the 0.8.9.6.2 QA, approved by the maintainer
   on 2026-11-26, AGENTS.md): Whonix's and the other catalog cards' downloads were refused as administrator actions under
   the agent's input. `hands_admin_allowed` now also takes `vm-image-list "<id> <arch>[ <list name>]"`, `vm-image-get

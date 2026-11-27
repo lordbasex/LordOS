@@ -33,7 +33,7 @@ import { View, Text, screen, hostRoots, instanceOf, overlayTree } from '@lordos/
 import { createStore, useStore } from './store.js';
 import { t, appName } from './i18n.js';
 import { settings } from './settings.js';
-import { windows, wm, getApp, listApps, windowTitle } from './windows.js';
+import { windows, wm, getApp, listApps, windowTitle, appContentNodes } from './windows.js';
 import { textFocusBox } from './components.jsx';
 import { openFileWithApps } from './sysopen.js';
 import * as fs from './fs.js';
@@ -288,6 +288,30 @@ const OPS = {
     if (!w) return { error: 'not-found' };
     if (!allowed(a.allow, appOfWindow(w))) return { error: 'allowlist' };
     return { closed: wm.close(a.window) !== false };
+  },
+  // close_window and open_app wait for it to happen (hands.c PH_WAIT): the window is gone; how many nodes its tree has
+  // now (0 before its frame and content are laid out). Only for the window the agent itself just closed or opened.
+  gone(a) { return { gone: !wm.get(String(a.window || '')) }; },
+  ready(a) {
+    const id = String(a.window || '');
+    const w = wm.get(id);
+    if (!w) return { n: 0 };
+    // the app's own content (AppHost's node), not the frame the theme draws around it before the app is there
+    const cn = appContentNodes.get(id);
+    const f = (cn && instanceOf(cn)) || null;
+    let n = 0;
+    const walk = (x, d) => {
+      if (!x || d > 4096 || n > 4096) return;
+      const b = x.type === 'raw' ? null : boxOf(x);
+      if (b && b[2] > 0 && b[3] > 0) n++;
+      for (let c = x.first; c; c = c.next) walk(c, d + 1);
+    };
+    if (f) for (let c = f.first; c; c = c.next) walk(c, 0);   // its children: the node itself is there with the frame
+    // a Linux app's window is its surface: there once it was mapped with a size
+    if (!n && w.args && w.args.surface && w.w > 0 && w.h > 0) n = 1;
+    // an isolated app draws in its own process: its content node laid out is all there is to see here
+    if (!n && f && getApp(appOfWindow(w))?.isolated) { const b = boxOf(f); if (b && b[2] > 0 && b[3] > 0) n = 1; }
+    return { n };
   },
   log(a) {
     if (!allowed(a.allow, a.app)) return { error: 'allowlist' };
