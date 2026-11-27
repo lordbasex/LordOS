@@ -456,7 +456,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   checked; the link's own text still is, and the positions of the rest stay (`sdk/spellmodel.js` `spellText`).
   `spell-model-test`: three cases. docs/SPELLING.md.
 - **Files: renaming selected the extension too** (MEJORA-1 of the ws170 QA: typing over "archivo-3.txt" removed ".txt"
-  and asked whether to change the extension). F2 and a slow click now select the name up to its last dot, as macOS and
+  and asked whether to change the extension). F2 and a slow click now select the name up to its last dot, as other desktops and
   Nautilus do; a folder, a name without a dot and a hidden file (".bashrc") are selected whole
   (`apps/files/names.js` `renameSelection`; the SDK's `TextInput` takes a first selection, `select: [start, end]`).
   Tests: `files-names-test` (six cases, code points) and `tests/textinput_select_scene.mjs`.
