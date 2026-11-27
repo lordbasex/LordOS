@@ -2027,5 +2027,7 @@
   "req.row.answers": "Réponses d'installation",
   "req.use.answers": "Faites par Machines : rien à installer",
   "req.st.download": "À la création",
-  "req.st.builtin": "Intégré"
+  "req.st.builtin": "Intégré",
+  "cfg.closeOnStop": "Fermer la fenêtre quand la machine s’arrête",
+  "cfg.closeOnStopNote": "Après un arrêt ou Éteindre. Si elle s’arrête à cause d’un problème, la fenêtre reste ouverte pour montrer ce qui s’est passé."
 }

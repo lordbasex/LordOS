@@ -2027,5 +2027,7 @@
   "req.row.answers": "Câu trả lời cài đặt",
   "req.use.answers": "Do chính Machines tạo: không cần cài gì",
   "req.st.download": "Khi tạo",
-  "req.st.builtin": "Có sẵn"
+  "req.st.builtin": "Có sẵn",
+  "cfg.closeOnStop": "Đóng cửa sổ khi máy dừng",
+  "cfg.closeOnStopNote": "Sau khi tắt hoặc Tắt nguồn. Nếu máy dừng vì sự cố, cửa sổ vẫn mở để cho thấy chuyện gì đã xảy ra."
 }

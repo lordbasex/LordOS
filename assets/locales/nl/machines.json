@@ -2027,5 +2027,7 @@
   "req.row.answers": "Installatieantwoorden",
   "req.use.answers": "Door Machines zelf gemaakt: niets te installeren",
   "req.st.download": "Bij maken",
-  "req.st.builtin": "Ingebouwd"
+  "req.st.builtin": "Ingebouwd",
+  "cfg.closeOnStop": "Venster sluiten als de machine stopt",
+  "cfg.closeOnStopNote": "Na afsluiten of Uitzetten. Stopt ze door een probleem, dan blijft het venster open om te tonen wat er gebeurde."
 }

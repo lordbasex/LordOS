@@ -2027,5 +2027,7 @@
   "req.row.answers": "Risposte di installazione",
   "req.use.answers": "Create da Machines: niente da installare",
   "req.st.download": "Alla creazione",
-  "req.st.builtin": "Incluso"
+  "req.st.builtin": "Incluso",
+  "cfg.closeOnStop": "Chiudi la finestra quando la macchina si ferma",
+  "cfg.closeOnStopNote": "Dopo uno spegnimento o Spegni. Se si ferma per un problema, la finestra resta aperta per mostrare cosa è successo."
 }

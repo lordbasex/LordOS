@@ -2027,5 +2027,7 @@
   "req.row.answers": "Odpowiedzi instalacji",
   "req.use.answers": "Tworzone przez Machines: nic do instalowania",
   "req.st.download": "Przy tworzeniu",
-  "req.st.builtin": "Wbudowane"
+  "req.st.builtin": "Wbudowane",
+  "cfg.closeOnStop": "Zamknij okno, gdy maszyna się zatrzyma",
+  "cfg.closeOnStopNote": "Po zamknięciu systemu lub Wyłącz. Jeśli zatrzyma się przez problem, okno zostaje otwarte i pokazuje, co się stało."
 }

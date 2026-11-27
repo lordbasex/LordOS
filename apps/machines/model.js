@@ -34,6 +34,14 @@ export function offers2d(why) { return why === 'qemu-3d-crash'; }
 // vmlog_3d_abort_end). A restart that aborts again right after the start comes back as 'qemu-3d-crash' instead
 export function restartsAgain(state, reason) { return state === 'stopped' && reason === 'reset'; }
 
+// "Close the window when the machine stops" (Configure → Startup, app.json closeOnStop, off by default; GitHub #267): only
+// after a clean stop (the guest shut down, LordOS shut down, Shut Down or Turn Off), never after a failure, so its error
+// stays on screen, and not after the installer's restart (the installed system starts next)
+const CLEAN_STOPS = ['guest-shutdown', 'host-shutdown', 'poweroff'];
+export function closesOnStop(meta, state, reason) {
+  return meta?.closeOnStop === true && state === 'stopped' && CLEAN_STOPS.includes(reason);
+}
+
 // the off card's hint: after the 3D abort with no tools in the guest to say why ('qemu-3d-stop': most likely its own
 // shutdown or restart), what happened and that a restart needs Start; otherwise the usual one
 export function offHint(reason) { return reason === 'qemu-3d-stop' ? 'machines.win.stopped3dHint' : 'machines.win.playHint'; }

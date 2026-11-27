@@ -2027,5 +2027,7 @@
   "req.row.answers": "Diegimo atsakymai",
   "req.use.answers": "Juos sukuria pati Machines: nieko nereikia diegti",
   "req.st.download": "Kuriant",
-  "req.st.builtin": "Įtaisyta"
+  "req.st.builtin": "Įtaisyta",
+  "cfg.closeOnStop": "Uždaryti langą, kai mašina sustoja",
+  "cfg.closeOnStopNote": "Po išjungimo arba „Išjungti“. Jei ji sustoja dėl problemos, langas lieka atidarytas ir parodo, kas nutiko."
 }

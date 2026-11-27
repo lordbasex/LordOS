@@ -2027,5 +2027,7 @@
   "req.row.answers": "Kurulum yanıtları",
   "req.use.answers": "Machines kendisi hazırlar: kurulacak bir şey yok",
   "req.st.download": "Oluştururken",
-  "req.st.builtin": "Yerleşik"
+  "req.st.builtin": "Yerleşik",
+  "cfg.closeOnStop": "Makine durunca pencereyi kapat",
+  "cfg.closeOnStopNote": "Kapatma veya Kapat'tan sonra. Bir sorun yüzünden durursa, ne olduğunu göstermek için pencere açık kalır."
 }

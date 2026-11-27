@@ -31,6 +31,11 @@ eq('3D abort at a shutdown: a plain stop', stateView('stopped', 'guest-shutdown'
 eq('3D abort at a stop LordOS asked for: a plain stop', stateView('stopped', 'host-shutdown').why, null);
 eq('3D abort, guest stop without tools: off, no error', stateView('stopped', 'qemu-3d-stop'), { key: 'stopped', tone: 'off', active: false, why: null });
 eq('3D abort, guest stop without tools: no 2D offer', offers2d(stateView('stopped', 'qemu-3d-stop').why), false);
+// GitHub #267: the window closes once the machine stops cleanly, only when asked; a failure keeps it open
+eq('close on stop: off by default', M.closesOnStop({}, 'stopped', 'guest-shutdown'), false);
+eq('close on stop: clean stops', ['guest-shutdown', 'host-shutdown', 'poweroff'].map((r) => M.closesOnStop({ closeOnStop: true }, 'stopped', r)), [true, true, true]);
+eq('close on stop: never a failure, a reset or the installer\'s restart', [M.closesOnStop({ closeOnStop: true }, 'crashed', 'qemu-3d-crash'), M.closesOnStop({ closeOnStop: true }, 'stopped', 'qemu-exit'),
+  M.closesOnStop({ closeOnStop: true }, 'stopped', 'reset'), M.closesOnStop({ closeOnStop: true }, 'stopped', 'installed'), M.closesOnStop({ closeOnStop: true }, 'failed', 'guest-shutdown')], [false, false, false, false, false]);
 eq('restart again: stopped by a reset only', [restartsAgain('stopped', 'reset'), restartsAgain('crashed', 'qemu-3d-crash'), restartsAgain('stopped', 'qemu-3d-stop'),
   restartsAgain('stopped', 'guest-shutdown'), restartsAgain('running', 'reset'), restartsAgain('stopped', 'installed')], [true, false, false, false, false, false]);
 eq('off hint after a guest stop without tools', [offHint('qemu-3d-stop'), offHint('guest-shutdown'), offHint(undefined)],

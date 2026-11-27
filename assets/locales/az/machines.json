@@ -2027,5 +2027,7 @@
   "req.row.answers": "Quraşdırma cavabları",
   "req.use.answers": "Machines özü hazırlayır: quraşdırılacaq heç nə yoxdur",
   "req.st.download": "Yaradanda",
-  "req.st.builtin": "Daxili"
+  "req.st.builtin": "Daxili",
+  "cfg.closeOnStop": "Maşın dayananda pəncərəni bağla",
+  "cfg.closeOnStopNote": "Söndürmə və ya Söndür əmrindən sonra. Problem səbəbindən dayanarsa, nə baş verdiyini göstərmək üçün pəncərə açıq qalır."
 }

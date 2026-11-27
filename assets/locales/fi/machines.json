@@ -2027,5 +2027,7 @@
   "req.row.answers": "Asennusvastaukset",
   "req.use.answers": "Machines tekee ne itse: ei asennettavaa",
   "req.st.download": "Luotaessa",
-  "req.st.builtin": "Sisäänrakennettu"
+  "req.st.builtin": "Sisäänrakennettu",
+  "cfg.closeOnStop": "Sulje ikkuna, kun kone pysähtyy",
+  "cfg.closeOnStopNote": "Sammutuksen tai Katkaise virta -toiminnon jälkeen. Jos se pysähtyy ongelman vuoksi, ikkuna jää auki näyttämään, mitä tapahtui."
 }

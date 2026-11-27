@@ -2027,5 +2027,7 @@
   "req.row.answers": "Majibu ya usakinishaji",
   "req.use.answers": "Hutengenezwa na Machines yenyewe: hakuna cha kusakinisha",
   "req.st.download": "Wakati wa kuunda",
-  "req.st.builtin": "Iliyojengwa ndani"
+  "req.st.builtin": "Iliyojengwa ndani",
+  "cfg.closeOnStop": "Funga dirisha mashine ikisimama",
+  "cfg.closeOnStopNote": "Baada ya kuzima au Zima. Ikisimama kwa sababu ya tatizo, dirisha hubaki wazi kuonyesha kilichotokea."
 }

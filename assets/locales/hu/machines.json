@@ -2027,5 +2027,7 @@
   "req.row.answers": "Telepítési válaszok",
   "req.use.answers": "Maga a Machines készíti: nincs mit telepíteni",
   "req.st.download": "Létrehozáskor",
-  "req.st.builtin": "Beépített"
+  "req.st.builtin": "Beépített",
+  "cfg.closeOnStop": "Az ablak bezárása, amikor a gép leáll",
+  "cfg.closeOnStopNote": "Leállítás vagy Kikapcsolás után. Ha hiba miatt áll le, az ablak nyitva marad, és megmutatja, mi történt."
 }

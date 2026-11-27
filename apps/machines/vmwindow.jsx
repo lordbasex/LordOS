@@ -10,7 +10,7 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending, discOffer, discCommands, discCanCopy, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered, usbRows, usbCamLive, usbMicLive, usbNeedsPerm, toolsSnapOk } from './model.js';
+import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, closesOnStop, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending, discOffer, discCommands, discCanCopy, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered, usbRows, usbCamLive, usbMicLive, usbNeedsPerm, toolsSnapOk } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS, launchGuest } from './appsmode.jsx';
 import { launchAsks, dropLaunchAsk } from './guestlaunch.js';
 import { launchAskStep } from '../../sdk/guestappsmodel.js';
@@ -795,6 +795,8 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
         // 3D graphics whose QEMU aborted at the guest's restart (QEMU issue 4918; lord-vm says 'reset' only when the
         // guest's tools said it restarts)
         if (restartsAgain(q.state, q.reason)) { setTimeout(() => begin(), 300); return false; }
+        // the person asked for the window to close once the machine stops cleanly (GitHub #267); a failure keeps it open
+        if (closesOnStop(readMeta(dir), q.state, q.reason)) { wm.close(winId, true); return false; }
         if (q.state !== 'stopped' || !['guest-shutdown', 'host-shutdown', 'poweroff', 'installed'].includes(q.reason)) setLog(lord.vm.log(dir, 'vm', 16384));
         return false;
       }

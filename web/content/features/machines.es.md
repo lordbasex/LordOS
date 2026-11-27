@@ -97,6 +97,7 @@ El resto del escritorio recibió el mismo cuidado: Ajustes, la Tienda, Archivos 
 - **Capturar el mouse** para juegos y programas 3D; ❖Esc o Ctrl+Alt lo sueltan.
 - **Una tarjeta gráfica real para una máquina**: una parte de una iGPU Intel (de Broadwell a Comet Lake) con GVT-g, con un controlador de arranque propio de LordOS para ella, escrito a partir de fuentes públicas.
 - **`machines` en la Terminal**: listar, arrancar, detener, tomar instantáneas, clonar y cambiar máquinas desde una terminal. Desde la 0.8.9.6: ejecutar un programa en una máquina Linux, copiar archivos hacia ella y desde ella, leer sus registros, crear una máquina desde un archivo corto guardado con un proyecto, y un servidor MCP local para agentes de programación, solo en una máquina que permitiste en su Configurar.
+- **Cerrar la ventana cuando la máquina se apaga** (en desarrollo, Configurar → Arranque y apagado, desactivado de fábrica): después de un apagado o de Apagar, la ventana de la máquina se cierra; si la máquina se detiene por un problema, la ventana queda abierta con el error.
 
 ## Nuevo en la 0.8.9.6
 

@@ -2027,5 +2027,7 @@
   "req.row.answers": "Installationssvar",
   "req.use.answers": "Görs av Machines självt: inget att installera",
   "req.st.download": "Vid skapande",
-  "req.st.builtin": "Inbyggt"
+  "req.st.builtin": "Inbyggt",
+  "cfg.closeOnStop": "Stäng fönstret när maskinen stannar",
+  "cfg.closeOnStopNote": "Efter en avstängning eller Stäng av. Om den stannar på grund av ett problem förblir fönstret öppet och visar vad som hände."
 }

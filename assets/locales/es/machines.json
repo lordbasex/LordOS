@@ -2027,5 +2027,7 @@
   "req.row.answers": "Respuestas de instalación",
   "req.use.answers": "Las arma Machines: no hay nada que instalar",
   "req.st.download": "Al crear",
-  "req.st.builtin": "Incluido"
+  "req.st.builtin": "Incluido",
+  "cfg.closeOnStop": "Cerrar la ventana cuando la máquina se apaga",
+  "cfg.closeOnStopNote": "Después de un apagado o de Apagar. Si se detiene por un problema, la ventana queda abierta para mostrar qué pasó."
 }

@@ -2027,5 +2027,7 @@
   "req.row.answers": "Mga sagot sa pag-install",
   "req.use.answers": "Ginagawa mismo ng Machines: walang i-install",
   "req.st.download": "Sa paggawa",
-  "req.st.builtin": "Built-in"
+  "req.st.builtin": "Built-in",
+  "cfg.closeOnStop": "Isara ang window kapag huminto ang makina",
+  "cfg.closeOnStopNote": "Pagkatapos ng shutdown o I-off. Kung huminto ito dahil sa problema, mananatiling bukas ang window para ipakita ang nangyari."
 }

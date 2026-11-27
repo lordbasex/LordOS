@@ -2027,5 +2027,7 @@
   "req.row.answers": "安装应答",
   "req.use.answers": "由 Machines 自行生成：无需安装",
   "req.st.download": "创建时",
-  "req.st.builtin": "内置"
+  "req.st.builtin": "内置",
+  "cfg.closeOnStop": "虚拟机停止时关闭窗口",
+  "cfg.closeOnStopNote": "在关机或“关闭电源”之后。若因故障停止，窗口会保持打开以显示发生了什么。"
 }

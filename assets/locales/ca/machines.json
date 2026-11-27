@@ -2027,5 +2027,7 @@
   "req.row.answers": "Respostes d'instal·lació",
   "req.use.answers": "Les fa Machines: no cal instal·lar res",
   "req.st.download": "En crear",
-  "req.st.builtin": "Inclòs"
+  "req.st.builtin": "Inclòs",
+  "cfg.closeOnStop": "Tanca la finestra quan la màquina s’aturi",
+  "cfg.closeOnStopNote": "Després d’una aturada o d’Apaga. Si s’atura per un problema, la finestra queda oberta per mostrar què ha passat."
 }

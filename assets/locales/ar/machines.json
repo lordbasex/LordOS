@@ -2027,5 +2027,7 @@
   "req.row.answers": "إجابات التثبيت",
   "req.use.answers": "يصنعها Machines بنفسه: لا شيء للتثبيت",
   "req.st.download": "عند الإنشاء",
-  "req.st.builtin": "مدمج"
+  "req.st.builtin": "مدمج",
+  "cfg.closeOnStop": "إغلاق النافذة عند توقف الجهاز",
+  "cfg.closeOnStopNote": "بعد إيقاف التشغيل أو «إيقاف». إذا توقف بسبب مشكلة، تبقى النافذة مفتوحة لتُظهر ما حدث."
 }

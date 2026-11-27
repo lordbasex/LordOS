@@ -2027,5 +2027,7 @@
   "req.row.answers": "Jawapan pemasangan",
   "req.use.answers": "Dibuat oleh Machines sendiri: tiada apa untuk dipasang",
   "req.st.download": "Semasa mencipta",
-  "req.st.builtin": "Terbina dalam"
+  "req.st.builtin": "Terbina dalam",
+  "cfg.closeOnStop": "Tutup tetingkap apabila mesin berhenti",
+  "cfg.closeOnStopNote": "Selepas dimatikan atau Matikan. Jika ia berhenti kerana masalah, tetingkap kekal terbuka untuk menunjukkan apa yang berlaku."
 }

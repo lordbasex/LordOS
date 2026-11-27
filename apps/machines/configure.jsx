@@ -438,6 +438,9 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         <Segmented small value={closeChoice(meta)} onChange={(x) => { writeMeta(dir, { onClose: x }); setMeta(readMeta(dir)); }}
           options={CLOSE_CHOICES.map((k) => [k, tr(`machines.cfg.close.${k}`)])} />
       </Row>
+      <Row label={tr('machines.cfg.closeOnStop')} note={tr('machines.cfg.closeOnStopNote')}>
+        <Toggle on={meta.closeOnStop === true} onChange={(x) => { writeMeta(dir, { closeOnStop: x }); setMeta(readMeta(dir)); }} />
+      </Row>
       <Row label={tr('machines.cfg.keepAwake')} note={tr('machines.cfg.keepAwakeNote')}>
         <Toggle on={meta.keepAwake !== false} onChange={(x) => { writeMeta(dir, { keepAwake: x }); setMeta(readMeta(dir)); }} />
       </Row>

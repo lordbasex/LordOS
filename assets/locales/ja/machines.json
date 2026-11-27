@@ -2027,5 +2027,7 @@
   "req.row.answers": "インストールの回答",
   "req.use.answers": "Machines 自身が作成します。インストールは不要です",
   "req.st.download": "作成時",
-  "req.st.builtin": "組み込み"
+  "req.st.builtin": "組み込み",
+  "cfg.closeOnStop": "マシンが停止したらウィンドウを閉じる",
+  "cfg.closeOnStopNote": "シャットダウンまたは電源オフの後。問題で停止した場合は、何が起きたかを示すためにウィンドウは開いたままです。"
 }

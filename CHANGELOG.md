@@ -11,6 +11,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: "Close the window when the machine stops"** (GitHub #267; Configure → Startup and shutdown, per machine,
+  `closeOnStop` in its `app.json`, off by default). After a clean stop (the guest shut down, LordOS shut down, Shut Down
+  or Turn Off) the machine's window closes. After a failure, a reset Machines restarts, or the installer's restart, the
+  window stays as before, so an error stays on screen (`closesOnStop` in `apps/machines/model.js`, `vmwindow.jsx`,
+  `configure.jsx`). Every UI language; the Machines feature page (en, es, pt) names it. Test: `tests/vm_model_test.mjs`.
 - **Calculator: % and ± keys** (GitHub #271). **%** after **+** or **−** takes that percent of what comes before it
   (200 + 10% = 220, 200 − 10% = 180, 2 × 100 + 10% = 220); anywhere else it divides by 100 (200 × 10% = 20, 50% = 0.5).
   **±** changes the sign of the number being typed (a minus in front of it, or taken away; a binary minus stays). On

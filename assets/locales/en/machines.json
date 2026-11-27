@@ -2027,5 +2027,7 @@
   "req.row.answers": "Install answers",
   "req.use.answers": "Made by Machines itself: nothing to install",
   "req.st.download": "At Create",
-  "req.st.builtin": "Built in"
+  "req.st.builtin": "Built in",
+  "cfg.closeOnStop": "Close the window when the machine stops",
+  "cfg.closeOnStopNote": "After a shutdown or Turn Off. If it stops because of a problem, the window stays open to show what happened."
 }

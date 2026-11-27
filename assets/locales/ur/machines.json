@@ -2027,5 +2027,7 @@
   "req.row.answers": "انسٹال کے جوابات",
   "req.use.answers": "Machines خود بناتا ہے: کچھ انسٹال نہیں کرنا",
   "req.st.download": "بناتے وقت",
-  "req.st.builtin": "بلٹ ان"
+  "req.st.builtin": "بلٹ ان",
+  "cfg.closeOnStop": "مشین رکنے پر ونڈو بند کریں",
+  "cfg.closeOnStopNote": "شٹ ڈاؤن یا بند کرنے کے بعد۔ اگر کسی مسئلے کی وجہ سے رکے تو ونڈو کھلی رہتی ہے تاکہ دکھائے کیا ہوا۔"
 }

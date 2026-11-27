@@ -2027,5 +2027,7 @@
   "req.row.answers": "설치 응답",
   "req.use.answers": "Machines가 직접 만듭니다. 설치할 것이 없습니다",
   "req.st.download": "만들 때",
-  "req.st.builtin": "내장"
+  "req.st.builtin": "내장",
+  "cfg.closeOnStop": "머신이 멈추면 창 닫기",
+  "cfg.closeOnStopNote": "종료하거나 전원 끄기 후. 문제로 멈추면 무슨 일이 있었는지 보여 주도록 창이 열린 채로 있습니다."
 }

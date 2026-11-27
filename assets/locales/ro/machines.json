@@ -2027,5 +2027,7 @@
   "req.row.answers": "Răspunsuri de instalare",
   "req.use.answers": "Făcute chiar de Machines: nimic de instalat",
   "req.st.download": "La creare",
-  "req.st.builtin": "Inclus"
+  "req.st.builtin": "Inclus",
+  "cfg.closeOnStop": "Închide fereastra când mașina se oprește",
+  "cfg.closeOnStopNote": "După o oprire sau Oprește. Dacă se oprește din cauza unei probleme, fereastra rămâne deschisă ca să arate ce s-a întâmplat."
 }

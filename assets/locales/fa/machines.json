@@ -2027,5 +2027,7 @@
   "req.row.answers": "پاسخ‌های نصب",
   "req.use.answers": "خود Machines می‌سازد: چیزی برای نصب نیست",
   "req.st.download": "هنگام ساخت",
-  "req.st.builtin": "داخلی"
+  "req.st.builtin": "داخلی",
+  "cfg.closeOnStop": "بستن پنجره وقتی ماشین متوقف می‌شود",
+  "cfg.closeOnStopNote": "پس از خاموش شدن یا «خاموش کردن». اگر به خاطر مشکلی متوقف شود، پنجره باز می‌ماند تا نشان دهد چه شد."
 }

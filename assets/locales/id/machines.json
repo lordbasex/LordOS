@@ -2027,5 +2027,7 @@
   "req.row.answers": "Jawaban instalasi",
   "req.use.answers": "Dibuat oleh Machines sendiri: tidak ada yang perlu dipasang",
   "req.st.download": "Saat membuat",
-  "req.st.builtin": "Bawaan"
+  "req.st.builtin": "Bawaan",
+  "cfg.closeOnStop": "Tutup jendela saat mesin berhenti",
+  "cfg.closeOnStopNote": "Setelah dimatikan atau Matikan. Jika berhenti karena masalah, jendela tetap terbuka untuk menunjukkan apa yang terjadi."
 }

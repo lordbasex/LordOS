@@ -2027,5 +2027,7 @@
   "req.row.answers": "Respostas de instalação",
   "req.use.answers": "Feitas pelo próprio Machines: nada a instalar",
   "req.st.download": "Ao criar",
-  "req.st.builtin": "Incluído"
+  "req.st.builtin": "Incluído",
+  "cfg.closeOnStop": "Fechar a janela quando a máquina parar",
+  "cfg.closeOnStopNote": "Depois de um desligamento ou de Desligar. Se ela parar por causa de um problema, a janela fica aberta para mostrar o que aconteceu."
 }

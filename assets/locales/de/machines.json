@@ -2027,5 +2027,7 @@
   "req.row.answers": "Installationsantworten",
   "req.use.answers": "Von Machines selbst erstellt: nichts zu installieren",
   "req.st.download": "Beim Erstellen",
-  "req.st.builtin": "Eingebaut"
+  "req.st.builtin": "Eingebaut",
+  "cfg.closeOnStop": "Fenster schließen, wenn die Maschine anhält",
+  "cfg.closeOnStopNote": "Nach dem Herunterfahren oder Ausschalten. Hält sie wegen eines Problems an, bleibt das Fenster offen und zeigt, was passiert ist."
 }
