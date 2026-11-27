@@ -12,6 +12,7 @@
 #include "vm/logclean.h"
 #include "vm/vmops.h"
 #include "vm/vmagent.h"
+#include "vm/vmdispconn.h"
 #include "vm/vmnet.h"
 #include "vm/vmgvtwin.h"
 #include "vm/vmperfwin.h"
@@ -1903,6 +1904,50 @@ static size_t win1(uint8_t *b, size_t o, uint32_t id, int x, int y, int w, int h
     o = putstr(b, o, title);
     return putstr(b, o, app);
 }
+/* (QA of 0.8.9.6.2) a machine's display connections: a bound on the ones alive and a rate, never on the run's total */
+static void test_display_conns(void) {
+    VmDispConns d;
+    memset(&d, 0, sizeof d);
+    long long t = 1000000;
+    int handed = 0;
+    /* 40 reconnects, each closing the one before ("Display again"), spread over time: never refused */
+    for (int i = 0; i < 40; i++) {
+        t += 2000;
+        char list[256];
+        int n = snprintf(list, sizeof list, "Num       RefCount Protocol Flags    Type St Inode Path\n"
+                         "0000000000000000: 00000003 00000000 00000000 0001 03 %lu\n", 5000UL + (unsigned long)i);
+        if (d.n >= VM_DISP_LIVE_MAX) vm_disp_prune(&d, list, (size_t)n);
+        if (vm_disp_rate_ok(&d, t) && d.n < VM_DISP_LIVE_MAX && !vm_disp_add(&d, 5000UL + (unsigned long)(i + 1), t)) handed++;
+        /* the client closed the previous one: only the newest is in the list */
+        snprintf(list, sizeof list, "Num RefCount Protocol Flags Type St Inode Path\n0: 00000002 00000000 00010000 0001 01 %lu\n", 5000UL + (unsigned long)(i + 1));
+        vm_disp_prune(&d, list, strlen(list));
+    }
+    CHECK(handed == 40 && d.n == 1);
+    /* 16 alive at once and none closed: the 17th refused */
+    memset(&d, 0, sizeof d);
+    t = 5000000;
+    for (int i = 0; i < VM_DISP_LIVE_MAX; i++) { t += 2000; CHECK(vm_disp_rate_ok(&d, t) && !vm_disp_add(&d, 100UL + (unsigned long)i, t)); }
+    CHECK(vm_disp_add(&d, 999, t + 2000) == -1);
+    /* a list that names them all: none dropped; one that names one: fifteen dropped; no list: none */
+    char all[2048];
+    size_t o = (size_t)snprintf(all, sizeof all, "header\n");
+    for (int i = 0; i < VM_DISP_LIVE_MAX; i++) o += (size_t)snprintf(all + o, sizeof all - o, "0: 2 0 0 1 3 %d /x\n", 100 + i);
+    CHECK(vm_disp_prune(&d, all, o) == 0 && d.n == VM_DISP_LIVE_MAX);
+    CHECK(vm_disp_prune(&d, NULL, 0) == 0 && d.n == VM_DISP_LIVE_MAX);
+    { static const char l1[] = "header\n0: 2 0 0 1 3 1050\n0: 2 0 0 1 3 105\n"; CHECK(vm_disp_prune(&d, l1, sizeof l1 - 1) == 15 && d.n == 1 && d.ino[0] == 105); }
+    /* an inode that only starts like one, or a short line: not a match */
+    memset(&d, 0, sizeof d);
+    vm_disp_add(&d, 77, 1);
+    { static const char l2[] = "h\n0: 2 0 0 1 3 770\n0: 2 77\n"; CHECK(vm_disp_prune(&d, l2, sizeof l2 - 1) == 1 && d.n == 0); }
+    /* the rate: a looping client gets VM_DISP_RATE_N in a window, then waits */
+    memset(&d, 0, sizeof d);
+    t = 9000000;
+    int got = 0;
+    for (int i = 0; i < 50; i++) { if (vm_disp_rate_ok(&d, t + i * 10) && !vm_disp_add(&d, (unsigned long)(300 + i), t + i * 10)) got++; d.n = 0; }
+    CHECK(got == VM_DISP_RATE_N);
+    CHECK(!vm_disp_rate_ok(&d, t + 600) && vm_disp_rate_ok(&d, t + VM_DISP_RATE_MS + 100));
+}
+
 static void test_apps_mode(void) {
     static uint8_t b[LAG_WINDOWS_BYTES], c[LAG_WINDOWS_BYTES];
     static LagWinList l, l2;
@@ -3218,6 +3263,7 @@ int main(void) {
     test_winrefused();
     test_tablet_layout();
     test_apps_mode();
+    test_display_conns();
     test_clipx();
     test_log_clean();
     test_images();

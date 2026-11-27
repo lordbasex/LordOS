@@ -23,6 +23,7 @@
 #include "vmgpu.h"
 #include "qmp.h"
 #include "vmproto.h"
+#include "vmdispconn.h"
 #include "vmmem.h"
 #include "vmsandbox.h"
 #include "vmseccomp.h"
@@ -1248,7 +1249,9 @@ static struct {
     long long ml_wait;                  /* waiting for vm-memlock until then (ms), 0 not waiting */
     char vgpu_render[32], vgpu_dev[96];
     int notify_fd;
-    int display_n;
+    int display_n;                       /* the display connections' names (vmdisplay<n>): only grows */
+    VmDispConns disp;                    /* the ones alive and the rate (vmdispconn.h) */
+    int net_unix_fd;                     /* /proc/self/net/unix, opened before lord-vm's own Landlock; -1 none */
     int cred_fd[MAX_CREDS];
     char cred_name[MAX_CREDS][130];
     int ncreds;
@@ -1443,6 +1446,30 @@ static struct {
     uint64_t sc_seen[512];
     int sc_nseen;
 } S;
+
+/* the display connections whose client end was closed are no longer alive (vmdispconn.h): /proc/net/unix read again */
+static void disp_prune(void) {
+    if (S.net_unix_fd < 0 || lseek(S.net_unix_fd, 0, SEEK_SET) < 0) return;
+    size_t cap = 1 << 16, n = 0;
+    char *b = malloc(cap);
+    while (b) {
+        if (n == cap) {
+            if (cap >= (8u << 20)) { free(b); return; }     /* never more than 8 MB: not pruned */
+            char *nb = realloc(b, cap * 2);
+            if (!nb) break;
+            b = nb; cap *= 2;
+        }
+        ssize_t r = read(S.net_unix_fd, b + n, cap - n);
+        if (r < 0 && errno == EINTR) continue;
+        if (r < 0) { free(b); return; }
+        if (r == 0) break;
+        n += (size_t)r;
+    }
+    if (!b) return;
+    int gone = vm_disp_prune(&S.disp, b, n);
+    free(b);
+    if (gone) vlog("display: %d connection(s) closed by their client, %d alive", gone, S.disp.n);
+}
 
 /* what the guest said of the transfer folder */
 enum { XG_UNKNOWN = 0, XG_MOUNTED, XG_NEEDS_WINFSP, XG_NO_SERVICE, XG_FAILED };
@@ -7458,7 +7485,10 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
     case VM_DISPLAY: {
         if (S.m.display != VM_DISPLAY_WINDOW) { reply(ci, m->seq, VME_NO_DISPLAY, "this machine has no display"); return; }
         if (!alive) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
-        if (S.display_n >= 16) { reply(ci, m->seq, VME_BUSY, "too many display connections"); return; }
+        /* (QA of 0.8.9.6.2) a bound on the connections alive at once and a rate, never on the run's total */
+        if (!vm_disp_rate_ok(&S.disp, now_ms())) { reply(ci, m->seq, VME_BUSY, "too many display connections in a short time"); return; }
+        if (S.disp.n >= VM_DISP_LIVE_MAX) disp_prune();
+        if (S.disp.n >= VM_DISP_LIVE_MAX) { reply(ci, m->seq, VME_BUSY, "too many display connections"); return; }
         int sv[2];
         if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sv)) { reply(ci, m->seq, VME_INTERNAL, strerror(errno)); return; }
         char args[96];
@@ -8105,7 +8135,12 @@ static void on_qmp_reply(const JVal *root, int ok) {
         if (p.kind == P_CD_LAST) cd_done();
         break;
     case P_ADDCLIENT:
-        if (ok) { VmMsg r = vm_msg(VM_DISPLAY_FD, p.seq, 0, 0, 0, 0, ""); send_to(p.client, &r, p.fd); vlog("display: connection %d handed to client %d", S.display_n, p.client); }
+        if (ok) {
+            struct stat dst;
+            if (p.fd >= 0 && !fstat(p.fd, &dst)) vm_disp_add(&S.disp, (unsigned long)dst.st_ino, now_ms());
+            VmMsg r = vm_msg(VM_DISPLAY_FD, p.seq, 0, 0, 0, 0, ""); send_to(p.client, &r, p.fd);
+            vlog("display: connection %d handed to client %d (%d alive)", S.display_n, p.client, S.disp.n);
+        }
         else reply(p.client, p.seq, VME_QMP, desc);
         if (p.fd >= 0) close(p.fd);
         break;
@@ -8837,6 +8872,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.key_w = S.fw_fd = S.render_fd = S.render_qfd = S.vs_pidfd = S.vs_fd = S.vs_qemu_end = S.vs_qfd = S.vs_err = -1;
     for (int i = 0; i < 2 + VM_DATA_DISKS; i++) S.sess_fds[i] = -1;
     S.qmp.fd = -1;
+    S.net_unix_fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
     for (int i = 0; i < argc; i++) {
         if (!strcmp(argv[i], "--paused")) S.paused_start = 1;
@@ -9088,6 +9124,8 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         }
         logind_open();
         cpu_begin();
+        /* the display connections' liveness (vmdispconn.h): this namespace's unix sockets, read again when needed */
+        if (S.net_unix_fd < 0) S.net_unix_fd = open("/proc/self/net/unix", O_RDONLY | O_CLOEXEC);
         S.sandbox |= vm_jail_self(S.dir, S.rundir, S.xfer_on && S.xfer_dfd >= 0 ? S.xfer_path : NULL);
         vlog("lord-vm: own Landlock %s", S.sandbox & VMS_SUPERVISOR_LANDLOCK ? "applied (machine folder only)" : "not available");
         VmMsg i = info_msg();

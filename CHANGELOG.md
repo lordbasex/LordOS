@@ -479,6 +479,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Machines: "Display again" no longer fails for good after 16 reconnects** (found in review of 0.8.9.6.2: lord-vm
+  allowed 16 display connections per run of the machine in all, `display_n` was never decreased, so after 16
+  reconnects or All Displays changes every new one was refused until the machine restarted). The bound is now on the
+  connections alive at once (16) plus a rate (at most 8 new ones in any 10 s), so a hostile or looping client still
+  can't make QEMU take connection after connection (`server/src/vm/vmdispconn.h`). A connection is alive while the
+  client's end of its socketpair exists: lord-vm keeps that socket's inode and, when the bound is reached, looks for
+  it in its own `/proc/self/net/unix` (opened before lord-vm's own Landlock, read again from the start); when the list
+  can't be read nothing is given back. Tests: `vm-test` (40 reconnects each closing the previous one, 16 alive refusing
+  the 17th, lists naming all, one or none, a near-miss inode, the rate window).
 - **Machines: a LordOS guest too old for apps mode says to update LordOS, not "Needs the tools"** (QA of 0.8.9.6.2:
   in a LordOS 0.8.9 guest apps mode stayed "Needs the tools" even after the tools disc, because apps mode needs the
   guest's own lord-server to list its windows, which LordOS has since 0.8.9.5). `lordos-guest` 11 reads the installed
