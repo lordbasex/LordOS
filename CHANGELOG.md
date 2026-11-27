@@ -420,6 +420,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Workspaces: a display's bar with two windows on it** (BUG-32 of the ws170 QA, investigated: the Terminal and the
+  Calculator on one display each seemed to list only itself). Not reproduced in the scene: two windows tiled on one
+  display in Two halves and in One at a time both appear in that display's bar, as they do floating. A case for each is
+  now in `tests/workspaces_scene.mjs`; the real desktop's case stays to be checked on the QA machine.
 - **The clipboard panel and the weather widget's city picker opened on the main display** (BUG-27 of the ws170 QA:
   Settings → Clipboard → Open panel from Settings on display 2, and "Change city…" of a widget on display 2, both looked
   as if nothing happened). The clipboard panel (❖V, ❖⇧V and Settings' button, `openClipboardPanel`) now opens on the

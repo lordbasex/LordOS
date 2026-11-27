@@ -303,6 +303,22 @@ await flush();
   const items = aw.appMenuItems(sdk.launcherIdOf(sdk.wm.get(m2)), desk, R, null, true);
   check('app menu: its window, then New window', items.map((x) => (x === '-' ? '-' : x.label)), ['Work - Chrome second line', '-', sdk.t('shell.dock.newWindow')]);
   for (const id of [m1, m2]) sdk.wm.close(id, true);
+  // (ws170 QA BUG-32) two windows on one display, tiled in Two halves and in One at a time: both in the bar (the
+  // Terminal and the Calculator are single-window apps already open on another display in this scene: two others)
+  for (const lay of ['halves', 'single']) {
+    tiler.setLayout(desk, 'HDMI-A-1', lay);
+    for (let i = 0; i < 2; i++) await flush();
+    const c0 = new Map(trays().map((id) => [id, iconsIn(id).length]));
+    const tt = sdk.wm.open('extra42', { frame: { x: R.x + 200, y: 200, w: 700, h: 480 } });
+    for (let i = 0; i < 2; i++) await flush();
+    const cc = sdk.wm.open('extra43', { frame: { x: R.x + 1000, y: 220, w: 300, h: 430 } });
+    for (let i = 0; i < 3; i++) await flush();
+    const grew = trays().map((id) => iconsIn(id).length - (c0.get(id) || 0));
+    check(`bar (${lay}): two tiled windows both in the display's bar`, grew.includes(2), true);
+    for (const id of [tt, cc]) sdk.wm.close(id, true);
+    for (let i = 0; i < 2; i++) await flush();
+    await new Promise((res) => setTimeout(res, 1100));     // the tiler's passes per second start again
+  }
   tiler.setLayout(desk, 'HDMI-A-1', 'single');
   await flush();
 }
