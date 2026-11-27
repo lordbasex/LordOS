@@ -59,7 +59,7 @@ import { timerLayout, idleSeconds, PRESETS, PRESET_DROP } from './timerwidgetmod
 import { recentCached as fsRecent, recentFiles, basename } from './fs.js';
 import { openFileWithApps } from './sysopen.js';
 import { lordosUpdate, restartNeeded } from './updates.js';
-import { storeUpdates } from './appcontrol.js';
+import { storeUpdatesCount } from './appcontrol.js';
 import { useLauncherApps, launchApp } from './apps.js';
 import { VideoBody, videoSetup } from './videowidget.jsx';
 import { dock, dockIdOf } from './dock.js';
@@ -1694,13 +1694,14 @@ function RecentBody({ w, L }) {
 
 // ---- updates: LordOS's own package and the apps' (the signed lists' last check; nothing is fetched here) ----
 function UpdatesBody({ w, L }) {
-  const st = useEvery(() => {
-    let os = null, apps = 0, restart = null;
+  const apps = useStore(storeUpdatesCount);          // read off the first render, drawn again when it changes
+  const st0 = useEvery(() => {
+    let os = null, restart = null;
     try { os = lordosUpdate(); } catch (e) { os = null; }
-    try { apps = storeUpdates(); } catch (e) { apps = 0; }
     try { restart = restartNeeded(); } catch (e) { restart = null; }
-    return { os, apps, restart };
+    return { os, restart };
   }, 600000) || {};
+  const st = { ...st0, apps };
   const ok = !st.os?.available && !st.apps && !st.restart;
   const open = () => wm.open('store', { args: { page: 'updates' } });
   return (

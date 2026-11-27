@@ -593,6 +593,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   cable is pulled frames are dropped, as on a real unplugged switch, and the member sends again once the link is made,
   whichever member started first. Nothing else changes: the port has no backend and reaches nothing. Test:
   `vm-whonix-xml` checks that each member's link hub has the peerless port. Checked on VM 116: the Workstation alone for ten minutes (`ip neigh` INCOMPLETE), then its "Start Gateway" bar: 10.152.152.10 REACHABLE and Tor's check `IsTor: true`.
+- **The shell's first `__lordTick` stalled about a second on the Raspberry Pi** (ws171 QA: 1095 ms at session start).
+  Two synchronous native calls ran inside it: the Recent files walk (`fs.recent`, 1006 ms; see the Recent widget entry below: the walk now runs on
+  lord-server's workers) and, once that was gone, `lord.pkg.upgrades()` (655 ms on the rebuilt package): the menu
+  bar builds the crown menu on every render and its Store item counted the package updates there, opening the
+  package index and dpkg's status. `storeUpdates()` (`sdk/appcontrol.js`) now gives the last count at once and reads it
+  off the first render: 15 s after the shell starts, then at most once a minute (`sdk/lazycount.js`).
+  `storeUpdatesCount` is a store of it (the Updates widget draws again when it changes) and `storeUpdatesChanged()` asks
+  for a new count. Test: `lazy-count-test`.
 - **`lord.pkg.available()` and `lastUpdate()` opened the whole package index while the theme loaded** (PI stall of the
   ws171 QA on the Raspberry Pi: 640 ms of `pkg.available` at session start, from `sdk/updates.js`). Both now read only
   the index's header (its magic and its time) unless the index is already open; opening it (the mmap and apt's

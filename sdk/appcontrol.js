@@ -6,7 +6,8 @@
 //   runningApps()          every app with a window, for Force Quit
 //   forceQuit(key)         ends an app that stopped answering (see below)
 //   recentItems(n)         the recent files as menu items (Recent Items in the crown menu)
-//   storeUpdates()         how many package updates are waiting (the crown menu's Store item)
+//   storeUpdates()         how many package updates are waiting (the crown menu's Store item; the last count, read
+//                          off the first render and at most once a minute: storeUpdatesCount, storeUpdatesChanged())
 //
 //   hideApp, hideOthers, toggleShowDesktop, appSettingsItem   what the keyboard shortcuts call too
 //
@@ -22,6 +23,7 @@ import { COLOR_SCHEMES, colorSchemeOf, USER_AGENTS, userAgentOf } from './webapp
 import * as fs from './fs.js';
 import { t, appName } from './i18n.js';
 import { compareNames } from './collate.js';
+import { lazyCount } from './lazycount.js';
 
 // the theme's own panels; a Linux window also runs under a built-in app id, but it is an app
 const isShellPanel = (w) => !!getApp(w.id)?.builtin && !String(w.id).startsWith('linux#');
@@ -175,6 +177,10 @@ export function recentItems(n = 10) {
   return list.slice(0, n).map((f) => ({ label: f.name || fs.basename(f.path), onClick: () => openFileWithApps(f.path, f.name) }));
 }
 
-export function storeUpdates() {
-  try { return typeof lord !== 'undefined' && lord.pkg && typeof lord.pkg.upgrades === 'function' ? (lord.pkg.upgrades() || []).length : 0; } catch (e) { return 0; }
-}
+// The count is read off the shell's first render and then at most once a minute (lazycount.js): the menu bar builds the
+// crown menu on every render, and lord.pkg.upgrades() opens the package index and dpkg's status (655 ms of the first
+// __lordTick on the Raspberry Pi, QA 0.8.9.6.2). storeUpdatesCount is a store of it: what shows the number subscribes.
+const upgradesCount = lazyCount(() => (typeof lord !== 'undefined' && lord.pkg && typeof lord.pkg.upgrades === 'function' ? (lord.pkg.upgrades() || []).length : 0));
+export const storeUpdatesCount = { get: () => upgradesCount.get(), subscribe: (fn) => upgradesCount.subscribe(fn) };
+export function storeUpdates() { return upgradesCount.get(); }
+export function storeUpdatesChanged() { upgradesCount.invalidate(); }

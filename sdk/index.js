@@ -498,6 +498,8 @@ export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, 
 export { userVideoProblem, motionCodecs, MAX_SECONDS } from './motionmodel.js';
 export { lordosWallpapers, userWallpaperName, USER_WALLPAPER_DIR, warmWallpapers, wallpaperSrc, wallpaperThumb, findWallpaper, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES, STILL_STORE, stillItems, twinItems, withTwinFile, stillThumb, stillStore, stillFiles, refreshStillFiles, downloadedStills } from './wallpapers.js';
 export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates, hideApp, hideOthers, toggleShowDesktop, appSettingsItem, webHelpItems, webAppearanceItem, webUserAgentItem } from './appcontrol.js';
+export { lordosWallpapers, userWallpaperName, wallpaperSrc, wallpaperThumb, findWallpaper, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES, STILL_STORE, stillItems, twinItems, withTwinFile, stillThumb, stillStore, stillFiles, refreshStillFiles, downloadedStills } from './wallpapers.js';
+export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates, storeUpdatesCount, storeUpdatesChanged, hideApp, hideOthers, toggleShowDesktop, appSettingsItem, webHelpItems, webAppearanceItem, webUserAgentItem } from './appcontrol.js';
 export { windowMenuItems, moveResizeItems, registerWindowMenuItems, alwaysOnTopItem } from './windowmenu.js';
 export { setDesktopCount } from './desktops.js';
 // Apps in a small window (a Workspaces tile): the window's width, a breakpoint and a sidebar that hides (sdk/narrow.jsx)
