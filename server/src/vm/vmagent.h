@@ -510,7 +510,8 @@ int ag_drop_staging_ok(const char *p, int windows);
 /* the hello's capability words as bits (ag_hello_caps); LAG_CAP_WINDOWS is the VM_AGENT_STATE bit, not one of these */
 enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8, AG_HELLO_CLIPREQ = 16, AG_HELLO_OPEN = 32, AG_HELLO_PLACE = 64,
        AG_HELLO_POINTER = 128, AG_HELLO_GVT = 256, AG_HELLO_EXTRA = 512, AG_HELLO_EXTRAOFF = 1024, AG_HELLO_STOPPING = 2048,
-       AG_HELLO_PERF = 4096, AG_HELLO_SHELL = 8192, AG_HELLO_LINKS = 16384, AG_HELLO_NOTIFY = 32768, AG_HELLO_SEND = 65536 };
+       AG_HELLO_PERF = 4096, AG_HELLO_SHELL = 8192, AG_HELLO_LINKS = 16384, AG_HELLO_NOTIFY = 32768, AG_HELLO_SEND = 65536,
+       AG_HELLO_OLDLORDOS = 131072 };
 typedef struct { uint32_t id, flags, owner, pid; int32_t x, y, w, h; char title[LAG_TITLE_MAX + 1], app[LAG_APP_MAX + 1]; } LagWinEntry;
 typedef struct { uint32_t serial; int n; LagWinEntry w[LAG_WIN_MAX]; } LagWinList;
 typedef struct { char name[LAG_NAME_MAX + 1], token[LAG_TOKEN_MAX + 1]; } LagAppEntry;
@@ -519,6 +520,14 @@ typedef struct { int n; LagAppEntry a[LAG_APPS_MAX]; } LagAppList;
 #define LAG_APPLIST_BYTES (2 + LAG_APPS_MAX * (4 + LAG_NAME_MAX + LAG_TOKEN_MAX))
 
 unsigned ag_hello_caps(const uint8_t *p, size_t n);
+/* Apps mode in a guest that runs LordOS needs the guest's lord-server to list its windows (js_guestwin.c, first in
+ * AG_APPS_LORDOS). The tools (11) say "oldlordos" in their hello when the guest's installed lordos package is older:
+ * ag_lordos_older compares Debian-style versions by their numeric dot parts ("0.8.9.6.1+ws173" → 0 8 9 6 1), 1 when
+ * `have` is older than `need`, 0 when it isn't or `have` doesn't start with a digit. ag_dpkg_lordos finds the installed
+ * lordos package's Version in a dpkg status file's text (at most `cap` bytes of it into `out`): 1 found, 0 not. */
+#define AG_APPS_LORDOS "0.8.9.5"
+int ag_lordos_older(const char *have, const char *need);
+int ag_dpkg_lordos(const char *status, size_t n, char *out, size_t cap);
 /* text from the other side: valid UTF-8, no NUL or other control character (C0, DEL, C1). 1 yes */
 int lag_text_ok(const uint8_t *p, size_t n);
 /* a rectangle a window may have (w, h 1..LAG_DIM_MAX, x, y within ±LAG_DIM_MAX). 1 yes */

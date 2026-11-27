@@ -4,6 +4,7 @@
 //   node tests/vm_model_test.mjs        (from server/; run_suites.sh runs it when node exists)
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync as readSrc } from 'node:fs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
@@ -556,6 +557,14 @@ eq('auto setup', [M.autoTransferSetup({ transferSetup: true }, 'setup'), M.autoT
 // ---- apps mode (7.2) ----
 eq('apps blocker', [M.appsBlocker(null, { agent: true }), M.appsBlocker({ state: 'connected', caps: 32 }, { agent: false }), M.appsBlocker({ state: 'connected', caps: 32 }, { agent: true }),
   M.appsBlocker({ state: 'connected', caps: 288 }, { agent: true })], ['needsAgent', 'needsAgent', 'needsTools', null]);
+// (tools 11) a LordOS guest older than apps mode needs: update LordOS in it, not the tools; with "windows" it works anyway
+eq('apps blocker: old LordOS', [M.appsBlocker({ state: 'connected', caps: 32 | M.AGENT_CAPS.oldLordos }, { agent: true }),
+  M.appsBlocker({ state: 'connected', caps: 288 | M.AGENT_CAPS.oldLordos }, { agent: true }), M.APPS_GUEST_LORDOS], ['oldLordos', null, '0.8.9.5']);
+eq('apps mode needs LordOS = vmagent.h AG_APPS_LORDOS', M.APPS_GUEST_LORDOS,
+  (/#define AG_APPS_LORDOS "([^"]+)"/.exec(readSrc(path.join(here, '../../server/src/vm/vmagent.h'), 'utf8')) || [])[1]);
+eq('the oldLordos cap = vmproto.h VAC_OLD_LORDOS', M.AGENT_CAPS.oldLordos,
+  Number((/VAC_OLD_LORDOS = ([0-9]+)/.exec(readSrc(path.join(here, '../../server/src/vm/vmproto.h'), 'utf8')) || [])[1]));
+eq('the apps line says to update LordOS', M.agentLines({ state: 'connected', caps: M.AGENT_CAPS.oldLordos }, { agent: true }).find((x) => x[0] === 'apps')[1], 'oldLordos');
 eq('agent lines say apps', agentLines({ state: 'connected', caps: 256 }, { agent: true }).find((x) => x[0] === 'apps')[1], 'works');
 eq('apps guest size', [M.appsGuestSize({ w: 1920, h: 1080 }), M.appsGuestSize({ w: 1367, h: 769 }), M.appsGuestSize({ w: 100, h: 50 }), M.appsGuestSize({ w: 10000, h: 9000 })],
   [[1920, 1080], [1366, 768], [320, 200], [8192, 8192]]);

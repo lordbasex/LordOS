@@ -1909,6 +1909,28 @@ static void test_apps_mode(void) {
     CHECK(ag_hello_caps((const uint8_t *)"2 clipboard clipx windows", 25) == (AG_HELLO_CLIPBOARD | AG_HELLO_CLIPX | AG_HELLO_WINDOWS));
     CHECK(ag_hello_caps((const uint8_t *)"2 clipboard windowsx", 20) == AG_HELLO_CLIPBOARD && ag_hello_caps((const uint8_t *)"", 0) == 0);
     CHECK(ag_hello_caps((const uint8_t *)"4 noclip windows", 16) == (AG_HELLO_NOCLIP | AG_HELLO_WINDOWS) && ag_hello_caps((const uint8_t *)"4 noclipx", 9) == 0);
+    /* (tools 11) a LordOS guest too old for apps mode says "oldlordos": the version from dpkg's status, compared */
+    CHECK(ag_hello_caps((const uint8_t *)"11 clipboard oldlordos shell", 28) == (AG_HELLO_CLIPBOARD | AG_HELLO_OLDLORDOS | AG_HELLO_SHELL));
+    CHECK(ag_hello_caps((const uint8_t *)"11 oldlordosx", 13) == 0);
+    CHECK(ag_lordos_older("0.8.9-beta", AG_APPS_LORDOS) && ag_lordos_older("0.8.9.4+ws12", AG_APPS_LORDOS) && ag_lordos_older("0.8.8.10", AG_APPS_LORDOS));
+    CHECK(!ag_lordos_older("0.8.9.5", AG_APPS_LORDOS) && !ag_lordos_older("0.8.9.6.1+ws173", AG_APPS_LORDOS) && !ag_lordos_older("0.9", AG_APPS_LORDOS) &&
+          !ag_lordos_older("1.0", AG_APPS_LORDOS) && !ag_lordos_older("0.8.10", AG_APPS_LORDOS));
+    CHECK(!ag_lordos_older("", AG_APPS_LORDOS) && !ag_lordos_older("x1", AG_APPS_LORDOS) && !ag_lordos_older(NULL, AG_APPS_LORDOS) &&
+          !ag_lordos_older("99999999999999999999.1", AG_APPS_LORDOS));
+    {
+        char v[64];
+        static const char st1[] = "Package: lordos-web\nStatus: install ok installed\nVersion: 0.8.9.6\n\n"
+                                  "Package: lordos\nStatus: install ok installed\nArchitecture: amd64\nVersion: 0.8.9-beta\n\n";
+        CHECK(ag_dpkg_lordos(st1, sizeof st1 - 1, v, sizeof v) && !strcmp(v, "0.8.9-beta") && ag_lordos_older(v, AG_APPS_LORDOS));
+        static const char st2[] = "Package: lordos\nStatus: deinstall ok config-files\nVersion: 0.8.8\n";
+        CHECK(!ag_dpkg_lordos(st2, sizeof st2 - 1, v, sizeof v));
+        static const char st3[] = "Package: bash\nStatus: install ok installed\nVersion: 5.2\n";
+        CHECK(!ag_dpkg_lordos(st3, sizeof st3 - 1, v, sizeof v) && !ag_dpkg_lordos(NULL, 0, v, sizeof v));
+        static const char st4[] = "Package: lordos\nStatus: install ok installed\nVersion: 0.8.9 `rm`\n";
+        CHECK(!ag_dpkg_lordos(st4, sizeof st4 - 1, v, sizeof v));
+        static const char st5[] = "Package: lordos\nStatus: install ok installed\nVersion: 0.8.9.6.1+ws173";   /* no final newline */
+        CHECK(ag_dpkg_lordos(st5, sizeof st5 - 1, v, sizeof v) && !strcmp(v, "0.8.9.6.1+ws173") && !ag_lordos_older(v, AG_APPS_LORDOS));
+    }
     size_t o = put32(b, 0, 7);
     o = put16(b, o, 2);
     o = win1(b, o, 10, 100, 50, 640, 480, LAGW_FOCUSED, 0, "Notes \xe2\x80\x94 untitled", "notepad.exe");

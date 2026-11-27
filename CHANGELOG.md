@@ -479,6 +479,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Machines: a LordOS guest too old for apps mode says to update LordOS, not "Needs the tools"** (QA of 0.8.9.6.2:
+  in a LordOS 0.8.9 guest apps mode stayed "Needs the tools" even after the tools disc, because apps mode needs the
+  guest's own lord-server to list its windows, which LordOS has since 0.8.9.5). `lordos-guest` 11 reads the installed
+  `lordos` package's version from dpkg's status file (`ag_dpkg_lordos`, `ag_lordos_older` against `AG_APPS_LORDOS` in
+  `server/src/vm/vmagent.h`; only the version's letters, digits and `.+~-:` are kept) and says `oldlordos` in its hello
+  while the guest has no window endpoint; lord-vm passes it on as `VAC_OLD_LORDOS` and `appsBlocker` returns
+  `oldLordos`. The Apps button, the agent popover's Apps line ("Update LordOS in it") and a note under it say that apps
+  mode needs LordOS 0.8.9.5 or later inside the machine and must be updated there, in every language; a guest app asked
+  for from the launcher stops waiting at once there, as for a guest without apps mode. The Linux tools shipped are now
+  11 (`TOOLS_SHIPPED`), so guests with tools 10 update by themselves. Tests: `vm-test` (the hello word, the version
+  comparison, dpkg stanzas: another package, a removed lordos, a hostile version, no final newline), `vm_model_test`
+  (the blocker, the constants matching the C headers, the popover's line), the guest tests' hello now `lordos-guest 11`.
+  docs/VIRTUALIZATION.md 7.2.
 - **Sentinela: "Investigate with Lumo" can't call a disguised program "low risk"** (QA of 0.8.9.6.2: with Qwen3
   1.7B, a fake `sshd` running from the home folder was rated "Low risk", against Sentinela's own imitation rule). The
   rules now set a floor the model can't lower (`investigationFindings`, `applyRiskFloor` in `sdk/sentinelamodel.js`): a

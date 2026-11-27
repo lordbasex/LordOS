@@ -353,11 +353,13 @@ enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
  * VAC_EVENTLOG: a Windows guest's event logs come through qemu-guest-agent (6.19);
  * VAC_TOOLS_DISC: the LordOS Guest Tools disc is in the machine's drive (VAG_DISC), waiting for the guest agent;
  * VAC_SEND: the tools said "send" and machine.json takes files from the guest: "Send to LordOS" lands in its quarantine
- * folder (VM_RECV_OFFER, 6.21) */
+ * folder (VM_RECV_OFFER, 6.21);
+ * VAC_OLD_LORDOS: the tools (11) said "oldlordos": the guest runs a LordOS older than apps mode needs (AG_APPS_LORDOS) */
 enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
        VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024, VAC_CLIP_NOTOOL = 2048, VAC_CLIP_LAZY = 4096, VAC_OPEN = 8192,
        VAC_PLACE = 16384, VAC_EXTRA = 32768, VAC_EXTRA_OFF = 65536, VAC_SHELL = 131072, VAC_LINKS = 262144, VAC_NOTIFY = 524288,
-       VAC_EVENTLOG = 1048576, VAC_TOOLS_DISC = 2097152, VAC_SEND = 4194304, VAC_ALL = 8388607 };
+       VAC_EVENTLOG = 1048576, VAC_TOOLS_DISC = 2097152, VAC_SEND = 4194304, VAC_OLD_LORDOS = 8388608,
+       VAC_ALL = 16777215 };
 /* how long a VM_FILE with a = 1 waits for the guest tools' AGK_OPENED after the copy (a program may ask for consent) */
 #define AG_OPEN_WAIT_MS 120000
 #define VM_WINDATA_MAX (1u << 20)
