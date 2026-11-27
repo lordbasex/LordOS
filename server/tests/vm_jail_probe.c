@@ -45,6 +45,8 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/vfs.h>
+#include <linux/magic.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
@@ -117,6 +119,17 @@ static int inside(char **argv) {
         int sr = statvfs(p, &sv);
         e = errno;
         check(!sr && (sv.f_flag & (ST_NOEXEC | ST_NOSUID | ST_NODEV)) == (ST_NOEXEC | ST_NOSUID | ST_NODEV), what, e);
+    }
+    /* (BUG-L) no NVDIMM bus in its view: libndctl's walk of /sys/bus/nd would call fchdir, which seccomp kills */
+    {
+        struct stat nd;
+        struct statfs sf;
+        if (!stat("/sys/bus/nd", &nd)) {
+            errno = 0;
+            int sr = statfs("/sys/bus/nd", &sf);
+            e = errno;
+            check(!sr && sf.f_type == TMPFS_MAGIC, "inside: /sys/bus/nd is an empty tmpfs in its mount namespace", e);
+        } else printf("note: no /sys/bus/nd on this host (nfit not loaded): its mask isn't checked here\n");
     }
     REFUSED(open("/etc/hostname", O_RDONLY), 0, "inside: can't read /etc");
     REFUSED(socket(AF_UNIX, SOCK_STREAM, 0), EACCES, "inside: can't make a socket (EACCES)");
@@ -321,7 +334,7 @@ static int copy_file(const char *from, const char *to, mode_t mode) {
 
 static int userns = -1, before, venus_mode;
 static char render_node[32];
-static char loader[PATH_MAX], probe[PATH_MAX + 128], disks[PATH_MAX + 128], bindir[PATH_MAX + 64];
+static char loader[PATH_MAX], probe[PATH_MAX + 128], disks[PATH_MAX + 16], bindir[PATH_MAX + 64];
 
 /* lord-vm's child: namespaces, the private loader, the jail (with a listener when `notify`), the listener sent on `st`
  * (lord-vm's way: SCM_RIGHTS, then closed), the exec of the loader by descriptor with `args` */

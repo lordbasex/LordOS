@@ -605,6 +605,12 @@ int vm_ns_setup(const char *tmpdir, const char *disks) {
         else dprintf(2, "lord-vm: QEMU's disks folder couldn't be made noexec in its mount namespace (%s): a file QEMU writes "
                         "there could still be mapped executable where seccomp has no listener; Landlock and seccomp still hold\n", why);
     }
+    /* (BUG-L proposal) no NVDIMM bus in QEMU's view: libndctl, loaded with libpmem, walks /sys/bus/nd when it exists and
+     * calls fchdir, which seccomp doesn't allow. An empty read-only tmpfs over it: nothing to walk, nothing widened */
+    struct stat nd;
+    if (!stat("/sys/bus/nd", &nd) && S_ISDIR(nd.st_mode) &&
+        mount("tmpfs", "/sys/bus/nd", "tmpfs", MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, "mode=0555,size=4k"))
+        dprintf(2, "lord-vm: /sys/bus/nd couldn't be hidden from QEMU (%s)\n", strerror(errno));
     const char *rt = getenv("XDG_RUNTIME_DIR");
     const char *tmps[] = { "/dev/shm", "/tmp", "/var/tmp", rt && rt[0] == '/' ? rt : td };
     for (size_t i = 0; i < sizeof tmps / sizeof tmps[0]; i++) {

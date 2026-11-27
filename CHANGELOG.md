@@ -434,6 +434,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Machines: on a host with the NVDIMM bus (`/sys/bus/nd`, nfit and libnvdimm loaded) QEMU could be stopped by its
+  seccomp allowlist for `fchdir`** (BUG-L of the ws171 QA on VM 116; libndctl, loaded with QEMU's libpmem, walks
+  that bus). Decided by the maintainer on 2026-11-27: no new system call. QEMU's mount namespace now has an empty,
+  read-only tmpfs over `/sys/bus/nd` (`vm_ns_setup`), so there is nothing to walk. Checked on VM 116 with nfit and
+  libnvdimm loaded: machines (BIOS and UEFI, no display and a window, isolated and shared network) start, and QEMU's
+  mountinfo shows the tmpfs there. Test: `vm-jail-probe` checks it where `/sys/bus/nd` exists.
 - **Machines: an unattended Debian guest got the console's keyboard layout instead of the person's** (ws171 QA on VM
   116: "latam" from `/etc/default/keyboard` while the desktop types in US). `hostDefaults` and the first-boot
   answers now take the session's active layout (Settings → Keyboard), and `/etc/default/keyboard` only without one
