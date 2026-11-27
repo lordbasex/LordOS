@@ -541,8 +541,12 @@ static int spawn_engine(const char *model, int backend, char **err) {
     posix_spawnattr_setsigdefault(&at, &all);
     posix_spawnattr_setpgroup(&at, 0);
     posix_spawnattr_setflags(&at, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETPGROUP);
-    char *envp[5];
+    char *envp[6];
     int ne = 0;
+    /* who lord-llm's parent must be: it dies with this process (PR_SET_PDEATHSIG) and refuses to start without it */
+    char parent_env[40];
+    snprintf(parent_env, sizeof parent_env, "LORD_LLM_PARENT=%d", (int)getpid());
+    envp[ne++] = parent_env;
     if (getenv("LORDOS_SESSIOND")) envp[ne++] = "LORDOS_SESSIOND=1";      /* cgroup_enter asks lord-sessiond */
     static const char *const be_env[3] = { "LORD_LLM_BACKEND=cpu", "LORD_LLM_BACKEND=vulkan", "LORD_LLM_BACKEND=cuda" };
     envp[ne++] = (char *)be_env[backend];

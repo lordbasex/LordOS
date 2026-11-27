@@ -295,6 +295,89 @@ static void threads_launcher(const char *launcher, const char *model, const char
     }
 }
 
+/* (0.8.9.6.2, BUG-6 of the QA) the engine dies with lord-server: lord-llm sets PR_SET_PDEATHSIG and checks that its
+ * parent is the one LORD_LLM_PARENT names. A "lord-server" (a child of this test) starts lord-llm, which runs the fake
+ * engine in its sandbox, and exits: the engine must be gone within seconds, not left running as an orphan. And a
+ * parent that isn't the one named starts nothing. In a runtime folder of its own (the main engine's socket stays). */
+static pid_t start_launcher(const char *launcher, const char *model, const char *rtdir, const char *engine, int wrong_parent, int perr) {
+    pid_t k = fork();
+    if (k != 0) return k;
+    if (perr >= 0 && dup2(perr, 2) < 0) _exit(99);
+    int m = fcntl(open(model, O_RDONLY), F_DUPFD, 10), d = fcntl(open(rtdir, O_RDONLY | O_DIRECTORY), F_DUPFD, 10),
+        e = fcntl(open(engine, O_PATH), F_DUPFD, 10);
+    if (m < 0 || d < 0 || e < 0 || dup2(m, 3) < 0 || dup2(d, 4) < 0 || dup2(e, 5) < 0) _exit(99);
+    char penv[40];
+    snprintf(penv, sizeof penv, "LORD_LLM_PARENT=%d", wrong_parent ? 1 : (int)getppid());
+    char *envp[] = { "LORD_LLM_BACKEND=cpu", "LORD_LLM_THREADS=1", penv, NULL };
+    char *argv[] = { "lord-llm", NULL };
+    execve(launcher, argv, envp);
+    _exit(98);
+}
+static int gone(pid_t p) {
+    char f[64], st[256] = "";
+    snprintf(f, sizeof f, "/proc/%d/stat", (int)p);
+    FILE *fp = fopen(f, "r");
+    if (!fp) return 1;
+    size_t n = fread(st, 1, sizeof st - 1, fp);
+    fclose(fp);
+    st[n] = 0;
+    const char *r = strrchr(st, ')');
+    return r && (r[2] == 'Z' || r[2] == 'X');
+}
+static void parent_death(const char *launcher, const char *model, const char *engine) {
+    char rtdir[] = "/tmp/llm-pdeath-XXXXXX";
+    if (!mkdtemp(rtdir)) return;
+    /* a parent other than the one named: refused before anything runs */
+    int perr[2];
+    if (pipe(perr)) return;
+    pid_t k = start_launcher(launcher, model, rtdir, engine, 1, perr[1]);
+    close(perr[1]);
+    char out[256] = "";
+    /* at most 5 s: a lord-llm that started anyway keeps the pipe open (it is killed then, and the check fails) */
+    int st = 0, ended = 0;
+    for (int i = 0; i < 100 && !(ended = waitpid(k, &st, WNOHANG) == k); i++) msleep(50);
+    if (!ended) { kill(k, SIGKILL); waitpid(k, &st, 0); st = -1; }
+    fcntl(perr[0], F_SETFL, O_NONBLOCK);
+    ssize_t n = read(perr[0], out, sizeof out - 1);
+    out[n > 0 ? n : 0] = 0;
+    close(perr[0]);
+    CHECK(ended && WIFEXITED(st) && WEXITSTATUS(st) == 2 && strstr(out, "lord-server is gone"), "lord-llm refuses a parent LORD_LLM_PARENT doesn't name (%s)", out);
+    /* the real case: lord-server (here a child of the test) goes, its engine goes with it */
+    int pp[2];
+    if (pipe(pp)) return;
+    pid_t server = fork();
+    if (server == 0) {
+        close(pp[0]);
+        int dn = open("/dev/null", O_WRONLY);
+        pid_t eng = start_launcher(launcher, model, rtdir, engine, 0, dn);
+        if (write(pp[1], &eng, sizeof eng) != (ssize_t)sizeof eng) _exit(97);
+        /* until the engine runs (its socket is there), then this "lord-server" ends without stopping it */
+        for (int i = 0; i < 100; i++) {
+            char sp[PATH_MAX];
+            snprintf(sp, sizeof sp, "%s/engine.sock", rtdir);
+            struct stat ss;
+            if (!stat(sp, &ss)) break;
+            usleep(50000);
+        }
+        _exit(0);
+    }
+    close(pp[1]);
+    pid_t eng = 0;
+    if (read(pp[0], &eng, sizeof eng) != (ssize_t)sizeof eng) eng = 0;
+    close(pp[0]);
+    waitpid(server, NULL, 0);
+    int dead = 0;
+    for (int i = 0; i < 60 && eng > 0 && !(dead = gone(eng)); i++) usleep(50000);
+    char sp[PATH_MAX];
+    snprintf(sp, sizeof sp, "%s/engine.sock", rtdir);
+    struct stat ss;
+    int ran = !stat(sp, &ss);
+    CHECK(eng > 0 && ran && dead, "the engine dies with lord-server (PR_SET_PDEATHSIG through the exec): ran %d, gone %d", ran, dead);
+    if (eng > 0 && !dead) kill(eng, SIGKILL);
+    unlink(sp);
+    rmdir(rtdir);
+}
+
 static int state_int(const char *st, const char *key) {
     char k[40];
     snprintf(k, sizeof k, "\"%s\":", key);
@@ -575,6 +658,7 @@ int main(int argc, char **argv) {
         char mp[PATH_MAX + 32];
         snprintf(mp, sizeof mp, "%s/qwen-test.gguf", mdir);
         threads_launcher(launcher, mp, llmdir, fake);
+        parent_death(launcher, mp, fake);
     }
 
     /* (0.8.9.6) "Investigate with Lumo": a script's text fenced as data with a nonce, code given inline, a binary's

@@ -15,6 +15,10 @@
  * (0.8.9.6.2) LORD_LLM_THREADS is the engine's processor threads (Settings → AI, the Brain's cores): a plain decimal
  * in 1..the online cores, checked here (llmjail_threads_parse); any other value refuses to start (exit 2). None at all
  * is "automatic", half the cores (llmjail_threads_auto). -t, -tb and the scope's cpu.max follow it.
+ * (0.8.9.6.2) It dies with lord-server (BUG-6 of the QA: an engine of an earlier session left running for hours, its
+ * parent gone): PR_SET_PDEATHSIG SIGKILL, set first and again just before the exec, and LORD_LLM_PARENT (lord-server's
+ * pid, engine.c) checked against its parent after each: a lord-server already gone starts nothing. The signal stays
+ * set across the exec (llama-server is no set-user-ID program and has no file capabilities).
  * Exit codes before the exec: 2 bad descriptors or thread count, 3 the sandbox could not be applied, 4 the exec failed. */
 #include "llmjail.h"
 #include "../sec/cgroup.h"
@@ -25,6 +29,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
+#include <sys/prctl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -33,6 +39,21 @@
 static int fail(int code, const char *what) {
     fprintf(stderr, "lord-llm: %s (%s)\n", what, strerror(errno));
     return code;
+}
+
+/* the engine goes when lord-server goes: SIGKILL at its death, and a parent already gone (or not lord-server, when
+ * LORD_LLM_PARENT says who it is) refuses to start */
+static int die_with_parent(void) {
+    if (prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0)) return -1;
+    const char *pp = getenv("LORD_LLM_PARENT");
+    pid_t parent = getppid();
+    if (parent <= 1) { errno = ESRCH; return -1; }
+    if (pp) {
+        char *end = NULL;
+        long want = strtol(pp, &end, 10);
+        if (!*pp || *end || want <= 1 || (pid_t)want != parent) { errno = ESRCH; return -1; }
+    }
+    return 0;
 }
 
 int main(int argc, char **argv) {
@@ -45,6 +66,7 @@ int main(int argc, char **argv) {
         !(e.st_mode & S_IXUSR)) return fail(2, "no engine at fd 5");
     /* nothing else of the caller's stays open */
     closefrom(LLMJAIL_ENGINE_FD + 1);
+    if (die_with_parent()) return fail(2, "lord-server is gone");
 
     /* low priority: whatever it does, the desktop comes first */
     setpriority(PRIO_PROCESS, 0, 15);
@@ -90,6 +112,8 @@ int main(int argc, char **argv) {
     dup2(null, 1);
     /* Mesa's shader cache would be written in the home folder, which the sandbox doesn't reach: off, said once */
     char *envp[] = { "PATH=/usr/bin:/bin", "LANG=C.UTF-8", "HOME=/nonexistent", "MESA_SHADER_CACHE_DISABLE=true", NULL };
+    /* again after the sandbox (a credential change would have cleared it), and the parent checked once more */
+    if (die_with_parent()) return fail(2, "lord-server is gone");
     syscall(SYS_execveat, LLMJAIL_ENGINE_FD, "", (char *const *)args, envp, AT_EMPTY_PATH);
     return fail(4, "exec");
 }
