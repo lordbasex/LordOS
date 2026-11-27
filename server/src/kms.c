@@ -569,6 +569,7 @@ int kms_flip_fb(Kms *k, uint32_t fb, void *data) {
         .crtc_id = k->crtc_id, .fb_id = fb, .flags = DRM_MODE_PAGE_FLIP_EVENT, .user_data = (uintptr_t)data,
     };
     k->custom = 1;
+    k->flip_data = data;
     int async = k->async_next && k->async_cap && !k->modeset_pending;
     k->async_next = 0;
     /* a torn flip the driver refuses (amdgpu: a buffer of another format, modifier or pitch than the one shown, as the
@@ -588,6 +589,21 @@ int kms_flip_fb(Kms *k, uint32_t fb, void *data) {
     k->flip_seq++;
     if (k->on_flip) k->on_flip(data);
     return 0;
+}
+
+int kms_flip_stuck(const Kms *k, uint64_t now_ns, uint64_t limit_ns) {
+    return k->flip_pending && k->flip_submit_ns && now_ns > k->flip_submit_ns + limit_ns;
+}
+
+void kms_flip_abandon(Kms *k) {
+    if (!k->flip_pending) return;
+    k->flip_pending = 0;
+    k->flip_async = 0;
+    k->flip_ns = kms_now_ns();
+    k->flip_seq++;
+    if (k->custom) { if (k->on_flip) k->on_flip(k->flip_data); }
+    else k->front ^= 1;
+    k->modeset_pending = 1;
 }
 
 /* ---- hardware cursor ---- */

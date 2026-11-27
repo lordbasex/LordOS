@@ -335,6 +335,10 @@ static SoftPace pace_sw;                /* the next frame's slot when frames are
 static FPipe fpipe;                     /* LORD_PIPELINE (fpipe.h), read once at startup */
 static void prep_undo_all(Server *s) { for (int i = 0; i < OUT_MAX; i++) prep_undo(&s->out[i]); }
 
+/* the watchdog's full modesets for a display whose page flip never completed, since one last completed (main loop) */
+#define FLIP_RECOVER_MAX 3
+static int flip_recover[OUT_MAX];
+
 static int any_flip_pending(const Server *s) {
     for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].kms.flip_pending) return 1;
     return 0;
@@ -4006,6 +4010,7 @@ int main(int argc, char **argv) {
                 if (s.out[i].on && s.out[i].kms.fd >= 0) heads[nh++] = &s.out[i].kms;
             }
             if (nh) kms_dispatch_heads(heads, nh);
+            for (int i = 0; i < OUT_MAX; i++) if (waswho[i] && !s.out[i].kms.flip_pending) flip_recover[i] = 0;   /* flips again */
             /* the other displays' flips: the presentation feedback of the windows on them (the main one's below) */
             for (int i = 0; i < OUT_MAX; i++) {
                 const Kms *k = &s.out[i].kms;
@@ -4043,18 +4048,36 @@ int main(int argc, char **argv) {
         int vt_moved = vt_sfd >= 0 && (pfd[vt_i].revents & POLLIN);
         if (vt_moved) vt_signal(&s);           /* the input list changed: this pass's poll entries are stale */
         /* the watchdog's other half (wdog.h): a display whose page flip never completes leaves the desktop
-         * frozen on it while this loop runs on; said once per flip, from fields this loop already keeps */
+         * frozen on it while this loop runs on; said once per flip, from fields this loop already keeps. And
+         * (QA 0.8.9.6.2, BUG-B: virtio-gpu after an s2idle suspend never completed it, and the greeter never
+         * showed) recovered: the flip is taken as done and the next frame, painted whole, is a full modeset
+         * (kms_flip_abandon). At most FLIP_RECOVER_MAX times until one of its flips completes again, and never
+         * while the displays are off (a modeset would light them). */
         if (!s.headless) {
             static uint64_t flip_told[OUT_MAX];
+            int recovered = 0;
             for (int i = 0; i < OUT_MAX; i++) {
-                const Kms *k = &s.out[i].kms;
+                Kms *k = &s.out[i].kms;
                 if (!s.out[i].on || !k->flip_pending) { flip_told[i] = 0; continue; }
-                if (flip_told[i] != k->flip_submit_ns && k->flip_submit_ns && loop_wake > k->flip_submit_ns + 2000000000ull) {
+                if (flip_told[i] != k->flip_submit_ns && kms_flip_stuck(k, loop_wake, 2000000000ull)) {
                     flip_told[i] = k->flip_submit_ns;
                     fprintf(stderr, "lord-server: watchdog: %s: its page flip has not completed for %.1f s\n",
                             s.out[i].d.connector, (loop_wake - k->flip_submit_ns) / 1e9);
+                    if (display_is_off()) continue;
+                    if (flip_recover[i] >= FLIP_RECOVER_MAX) {
+                        if (flip_recover[i]++ == FLIP_RECOVER_MAX)
+                            fprintf(stderr, "lord-server: watchdog: %s: still no page flip after %d full modesets: left as it is\n",
+                                    s.out[i].d.connector, FLIP_RECOVER_MAX);
+                        continue;
+                    }
+                    flip_recover[i]++;
+                    fprintf(stderr, "lord-server: watchdog: %s: the flip is dropped and the next frame is a full modeset (%d of %d)\n",
+                            s.out[i].d.connector, flip_recover[i], FLIP_RECOVER_MAX);
+                    kms_flip_abandon(k);
+                    recovered = 1;
                 }
             }
+            if (recovered) full_damage(&s);
         }
         int lost[INPUT_MAX_DEVICES], nlost = 0;
         for (int i = 0; !vt_moved && i < s.input.count; i++) {

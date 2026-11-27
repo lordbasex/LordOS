@@ -659,6 +659,13 @@ build/nofile-test: tests/nofile_test.c src/nofile.c src/nofile.h
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
 	    -o $@ tests/nofile_test.c src/nofile.c
 	./$@ || { rm -f $@; exit 1; }
+# tests/kms_recover_test.c: a page flip that never completes is dropped and the next frame is a full modeset (BUG-B)
+test: build/kms-recover-test
+build/kms-recover-test: tests/kms_recover_test.c src/kms.c src/kms.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/kms_recover_test.c src/kms.c
+	./$@ || { rm -f $@; exit 1; }
 # tests/wdog_test.c: the compositor's watchdog (src/wdog.c): stalls seen, priority dropped, endless JS stopped
 test: build/wdog-test
 build/wdog-test: tests/wdog_test.c src/wdog.c src/wdog.h src/par.c src/par.h $(QJS_OBJ)

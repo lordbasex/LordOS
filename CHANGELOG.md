@@ -420,6 +420,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **After an s2idle suspend on virtio-gpu the login screen never showed** (BUG-B of the ws171 QA: compositor.log
+  "watchdog: Virtual-1: its page flip has not completed for 2.4 s", and nothing after). The watchdog only logged a page
+  flip the kernel never completed. Now it recovers: the flip is taken as done (`kms_flip_abandon`: the GPU path's
+  buffers released as the event would, or the CPU path's swapped), everything is painted again and the next frame is a
+  full modeset (`SETCRTC`, as the first frame after the boot splash) instead of a page flip. At most three times until
+  one of that display's flips completes again, logged each time, and never while the displays are off after idle (a
+  modeset would light them). A late event for the dropped flip completes nothing. Test: `build/kms-recover-test`.
+  docs/MAIN-THREAD.md.
 - **Cloud: Pause didn't stop an upload already in progress** (BUG-C of the ws171 QA). Pause held only the files waiting
   in rclone's queue; one already going up went on, and rclone has no rc call that stops a VFS upload. Now Pause stops
   it the way rclone's VFS does when a file changes while it goes up: lord-server rewrites the file's first byte,

@@ -29,6 +29,7 @@ typedef struct {
     /* last flip: time (CLOCK_MONOTONIC, ns) and vblank number (wp_presentation) */
     uint64_t flip_ns;
     uint64_t flip_submit_ns; /* when that flip was queued (CLOCK_MONOTONIC, ns) */
+    void *flip_data;    /* what the flip pending was queued with (kms_flip_fb), for kms_flip_abandon */
     unsigned flip_seq;
     /* tearing (tearing-control-v1, docs/WAYLAND.md "Frame timing"): async_cap, the driver takes DRM_MODE_PAGE_FLIP_ASYNC
      * on the legacy page flip (DRM_CAP_ASYNC_PAGE_FLIP); async_next, the next kms_flip_fb may tear (gpu_scanout sets it
@@ -79,6 +80,14 @@ void kms_close_handle(Kms *k, uint32_t handle);
 /* First modeset with our own framebuffer, and page flip to one (data comes back in on_flip). */
 int  kms_set_fb(Kms *k, uint32_t fb);
 int  kms_flip_fb(Kms *k, uint32_t fb, void *data);
+
+/* A page flip the kernel never completed (virtio-gpu after an s2idle suspend never sent its event: QA 0.8.9.6.2,
+ * BUG-B). kms_flip_stuck: 1 when the flip pending was queued more than limit_ns before now_ns. kms_flip_abandon takes
+ * it as done (kms_flip_fb's on_flip with its data, else the two buffers swap, as the event would) and makes the next
+ * frame a full modeset (SETCRTC, as the first one after the boot splash) instead of a page flip. A late event for it
+ * finds no flip pending and is ignored. Nothing when no flip is pending. */
+int  kms_flip_stuck(const Kms *k, uint64_t now_ns, uint64_t limit_ns);
+void kms_flip_abandon(Kms *k);
 
 /* Does the primary plane show this format with this modifier? 1 yes (or unknown), 0 no.
  * DRM_FORMAT_MOD_INVALID (implicit) counts as linear. */

@@ -34,6 +34,15 @@ Always on, in every session (`server/src/ui/js.c`):
 The watchdog (`server/src/wdog.h`) is still what stops a task that runs for seconds; the stall detector is about
 the pauses people feel, from 50 ms up.
 
+The main loop watches the page flips too: a display whose flip has not completed for 2 s is logged
+(`watchdog: Virtual-1: its page flip has not completed for 2.4 s`) and, since 0.8.9.6.2 (BUG-B of the ws171 QA:
+virtio-gpu never completed one after an s2idle suspend and the login screen never showed), recovered: the flip is
+taken as done (`kms_flip_abandon`, `server/src/kms.c`), everything is painted again and the next frame is a full
+modeset (`SETCRTC`) instead of a page flip (`... the flip is dropped and the next frame is a full modeset (1 of 3)`).
+At most three times until one of that display's flips completes again (then `still no page flip after 3 full
+modesets: left as it is`), and never while the displays are off after idle, which a modeset would light. A late
+event for the dropped flip completes nothing. Test: `build/kms-recover-test`.
+
 ### Reading a stack
 
 The bundles are minified, so a stack names places like `theme.bundle.js:26:8524`. A source map made from the
