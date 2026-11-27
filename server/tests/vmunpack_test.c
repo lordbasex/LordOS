@@ -18,6 +18,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+/* the allocation unit a hole is measured in: the page size (tmpfs; 16 KB on a Raspberry Pi 5) or 4 KB, the larger */
+static long long page_unit(void) { long p = sysconf(_SC_PAGESIZE); return p > 4096 ? p : 4096; }
+
 static int fails;
 #define CHECK(c, ...) do { if (!(c)) { fails++; fprintf(stderr, "FAIL %s:%d: ", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } } while (0)
 
@@ -241,7 +244,9 @@ static void test_tar(void) {
         CHECK(same_file(1, w, 1 << 20, 1 << 20), "workstation's bytes");
         free(w);
         long long a = allocated(1);
-        CHECK(a > 0 && a <= 7 * 4096 + 16384, "the workstation keeps its holes (%lld allocated)", a);
+        /* each extent may take whole pages (blocks) at both ends: 16 KB on a Raspberry Pi 5's kernel, 4 KB elsewhere */
+        long long u = page_unit();
+        CHECK(a > 0 && a <= 17389 + 10 * u, "the workstation keeps its holes (%lld allocated, unit %lld)", a, u);
     }
     /* a POSIX ustar regular member is fine too; base-256 sizes read */
     {
@@ -351,7 +356,7 @@ static void test_gnu_tar(void) {
     CHECK(e == VMU_OK, "GNU tar's archive: %s", vmu_code_name(e));
     CHECK(same_file(1, want, real, real) && same_file(0, pat, 123456, 123456), "GNU tar's members, byte for byte");
     long long a = allocated(1);
-    CHECK(a > 0 && a < 40 * 8192 + 65536, "GNU tar's sparse member keeps its holes (%lld allocated)", a);
+    CHECK(a > 0 && a < 40 * (8192 + 2 * page_unit()) + 65536, "GNU tar's sparse member keeps its holes (%lld allocated)", a);
     size_t xn;
     uint8_t *x = xz_of(t, n, "-6 --block-size=200000 --check=crc64", &xn);
     if (x) {

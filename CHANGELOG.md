@@ -400,6 +400,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   a zoom saved, full size, the firewall switches black in the file, no overwrite, no path).
 
 ### Tests
+- **`vmunpack-test` on a 16 KB-page kernel** (Raspberry Pi 5, ws171): the holes' allocation bounds counted 4 KB
+  pages; they use the page size now (`sysconf(_SC_PAGESIZE)`).
 - **Hands**: `build/hands-test` (ASan/UBSan: the policy against a fake host, the prompt per connection, Stop, the panic
   key, the person's input, the system layer, a covered ref, set-value's and the keys' gate, allowlisted screenshots, a
   fuzz of every `org.lordos.Hands1` method's arguments, the uid check on a private dbus-daemon, the screenshot's marks
