@@ -12,7 +12,8 @@ import {
   flathubModel as M, typeScale, spacing, t,
 } from '@lordos/sdk';
 import { debian } from './debian.js';
-import { Card, CardGrid, ConfirmRemove, Facts, Featured, GLYPH, Pill, Shelf, Tag, nameColor, tint } from './ui.js';
+import { ConfirmRemove } from './confirmremove.js';
+import { Card, CardGrid, Facts, Featured, GLYPH, Pill, Shelf, Tag, nameColor, tint } from './ui.js';
 import { MoreButton, usePaged } from './endless.js';
 import { DisplayToolkit } from './fhlook.js';
 import { SettingsPage, About as AboutText, Group, Row } from './sectionsettings.js';

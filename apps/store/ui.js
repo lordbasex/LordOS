@@ -2,7 +2,7 @@
 // pill, the featured banner, the facts row of an app page and the sidebar glyphs. Data comes from the
 // pages (debian.js, ai.js, index.jsx); these pieces only draw.
 import { createElement as h, useEffect, useState } from 'react';
-import { View, Text, Image, Button, useTheme, useStore, settings, typeScale, spacing, openUrl, t } from '@lordos/sdk';
+import { View, Text, Image, useTheme, useStore, settings, typeScale, spacing, openUrl } from '@lordos/sdk';
 
 export const CARD_BASIS = 250;
 const CARD_HEIGHT = 148;     // two lines of summary and the foot, so the action keeps the card's padding
@@ -169,14 +169,4 @@ export function FeaturedSkeleton() {
     h(Skeleton, { width: '80%', height: 12 }),
     h(Skeleton, { width: '60%', height: 12 })),
   h(Skeleton, { width: 96, height: 30, radius: 15 }));
-}
-
-// Remove asks first, as every destructive action does (QA 0.8.9.6.2: a Flatpak app or a LordOS package went at one
-// click): "Remove {name}?" with Cancel and a red Remove. Shown under the app's row or button.
-export function ConfirmRemove({ name, onYes, onNo }) {
-  const th = useTheme();
-  return h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingVertical: spacing.xs } },
-    h(Text, { style: { flex: 1, minWidth: 0, fontSize: typeScale.callout, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('store.removeAsk', { name })),
-    h(Button, { small: true, label: t('store.cancel'), onClick: onNo }),
-    h(Button, { small: true, destructive: true, primary: true, label: t('store.remove'), onClick: onYes }));
 }
