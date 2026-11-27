@@ -167,6 +167,7 @@
     "other": "{count} ang ia-update"
   },
   "remove": "Alisin",
+  "removeAsk": "Alisin ang {name}?",
   "rescue.ask": "Walang administrator na account sa computer na ito. Kung alam mo ang root password, puwede mong gawing administrator ang account na ito. Magkakabisa lang ito pagkatapos i-restart ang computer.",
   "rescue.button": "Gawin Akong Administrator",
   "rescue.noSudo": "Walang administrator na account sa computer na ito, at hindi naka-install ang sudo package. Bilang root, patakbuhin ang apt install sudo, pagkatapos ay subukan ulit dito.",

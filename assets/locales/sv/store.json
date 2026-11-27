@@ -167,6 +167,7 @@
     "other": "{count} att uppdatera"
   },
   "remove": "Ta bort",
+  "removeAsk": "Ta bort {name}?",
   "rescue.ask": "Inget konto på den här datorn är administratör. Om du känner till root-lösenordet kan du göra det här kontot till administratör. Det börjar gälla först efter att datorn har startats om.",
   "rescue.button": "Gör mig till administratör",
   "rescue.noSudo": "Inget konto på den här datorn är administratör, och paketet sudo är inte installerat. Kör apt install sudo som root och försök sedan igen här.",

@@ -12,7 +12,7 @@ import {
   flathubModel as M, typeScale, spacing, t,
 } from '@lordos/sdk';
 import { debian } from './debian.js';
-import { Card, CardGrid, Facts, Featured, GLYPH, Pill, Shelf, Tag, nameColor, tint } from './ui.js';
+import { Card, CardGrid, ConfirmRemove, Facts, Featured, GLYPH, Pill, Shelf, Tag, nameColor, tint } from './ui.js';
 import { MoreButton, usePaged } from './endless.js';
 import { DisplayToolkit } from './fhlook.js';
 import { SettingsPage, About as AboutText, Group, Row } from './sectionsettings.js';
@@ -139,6 +139,7 @@ function TurnOn() {
 function InstalledList({ onOpen, query = '' }) {
   const th = useTheme();
   const s = useStore(F.state);
+  const [asking, setAsking] = useState(null);           // Remove asks first (ConfirmRemove)
   const q = String(query || '').trim().toLowerCase();
   const list = s.installed.map((x) => ({ x, a: F.catalogApp(x.id) || { id: x.id, name: x.id, summary: '', icon: '' } }))
     .filter(({ x, a }) => !q || q.split(/\s+/).every((w) => `${a.name} ${x.id}`.toLowerCase().includes(w)));
@@ -148,13 +149,14 @@ function InstalledList({ onOpen, query = '' }) {
   return h(View, { style: { marginBottom: spacing.xl } },
     h(Header, { th }, t('flathub.installedTitle', { count: s.installed.length })),
     h(GroupBox, null, ...list.map(({ x, a }) => {
+      if (asking === x.id) return h(ConfirmRemove, { key: x.id, name: a.name, onNo: () => setAsking(null), onYes: () => { setAsking(null); if (!busy) F.uninstall({ ...x, name: a.name }); } });
       return h(View, { key: x.id, style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingVertical: spacing.s + 2 } },
         h(FlathubIcon, { a, size: 32 }),
         h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
           h(Text, { onClick: () => onOpen(x.id), style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' } }, a.name),
           h(Text, { style: { fontSize: typeScale.caption, color: th.textDim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' } },
             x.version ? t('store.version', { version: x.version }) : x.id)),
-        h(Button, { small: true, label: t('flathub.remove'), busy, pending: true, onClick: () => !busy && F.uninstall({ ...x, name: a.name }) }),
+        h(Button, { small: true, label: t('flathub.remove'), busy, pending: true, onClick: () => !busy && setAsking(x.id) }),
         h(Button, { small: true, label: t('store.open'), onClick: () => openApp(x.id) }));
     })));
 }
@@ -422,6 +424,7 @@ export function FlathubDetail({ id }) {
   const a = F.catalogApp(id) || (inst || exported ? { id, branch: inst ? inst.branch : 'stable', name: exported ? exported.name : id, summary: '', icon: '', license: '', developer: '', verified: false, unknown: true } : null);
   const ref = a ? M.refOf(a.id, a.branch) : null;
   const [meta, setMeta] = useState(null);
+  const [asking, setAsking] = useState(false);           // Remove asks first (ConfirmRemove)
   useEffect(() => {
     setMeta(null);
     let live = true;
@@ -435,7 +438,7 @@ export function FlathubDetail({ id }) {
   const mine = s.job && s.job.id === a.id;
   const lic = M.licenseView(a.license);
   const buttons = inst
-    ? [h(Button, { key: 'rm', label: t('flathub.remove'), disabled: busy, onClick: () => !busy && F.uninstall({ ...inst, name: a.name }) }),
+    ? [h(Button, { key: 'rm', label: t('flathub.remove'), disabled: busy, onClick: () => !busy && setAsking(true) }),
       h(Button, { key: 'up', label: t('flathub.update'), disabled: busy, onClick: () => !busy && F.update({ ...inst, name: a.name }) }),
       h(Button, { key: 'open', primary: true, label: t('store.open'), onClick: () => openApp(a.id) })]
     : [h(Button, { key: 'in', primary: true, label: t('store.install'), disabled: busy || !meta || !!meta.error,
@@ -451,6 +454,7 @@ export function FlathubDetail({ id }) {
           h(Text, { style: { fontSize: typeScale.caption, color: a.verified ? '#30d158' : '#ff9f0a', textAlign: 'start' } },
             a.verified ? t('flathub.verified', { developer: a.developer || a.id }) : t('flathub.unverified')))),
       h(View, { style: { flexDirection: 'row', gap: spacing.s, alignItems: 'center' } }, ...buttons)),
+    asking && inst ? h(ConfirmRemove, { name: a.name, onNo: () => setAsking(false), onYes: () => { setAsking(false); if (!s.job) F.uninstall({ ...inst, name: a.name }); } }) : null,
     mine || (!s.job && s.msg && s.msg.id === a.id) ? h(JobProgress, { forId: a.id }) : null,
     a.unknown ? null : h(About, { id: a.id, catalog: s.catalog }),
     h(Facts, { items: [

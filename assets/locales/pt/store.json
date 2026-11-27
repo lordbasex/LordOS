@@ -167,6 +167,7 @@
     "other": "Atualizam {count}"
   },
   "remove": "Remover",
+  "removeAsk": "Remover {name}?",
   "rescue.ask": "Nenhuma conta deste computador é administradora. Se você sabe a senha do root, pode tornar esta conta administradora. Só tem efeito depois de reiniciar o computador.",
   "rescue.button": "Tornar-me administrador",
   "rescue.noSudo": "Nenhuma conta deste computador é administradora e o pacote sudo não está instalado. Como root, execute apt install sudo e tente de novo aqui.",

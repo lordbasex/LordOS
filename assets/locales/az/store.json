@@ -167,6 +167,7 @@
     "other": "{count} yenilənəcək"
   },
   "remove": "Sil",
+  "removeAsk": "{name} silinsin?",
   "rescue.ask": "Bu kompüterdə heç bir hesab administrator deyil. Root parolunu bilirsinizsə, bu hesabı administrator edə bilərsiniz. Bu, yalnız kompüter yenidən başladıqdan sonra qüvvəyə minir.",
   "rescue.button": "Məni administrator et",
   "rescue.noSudo": "Bu kompüterdə heç bir hesab administrator deyil və sudo paketi quraşdırılmayıb. Root kimi apt install sudo icra edin, sonra burada yenidən cəhd edin.",

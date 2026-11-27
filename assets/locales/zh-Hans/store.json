@@ -162,6 +162,7 @@
     "other": "{count} 个待更新"
   },
   "remove": "移除",
+  "removeAsk": "要删除 {name} 吗？",
   "rescue.ask": "这台电脑上没有任何账户是管理员。如果你知道 root 密码，可以将此账户设为管理员。重新启动电脑后才会生效。",
   "rescue.button": "将我设为管理员",
   "rescue.noSudo": "这台电脑上没有任何账户是管理员，并且未安装 sudo 软件包。请以 root 身份运行 apt install sudo，然后在这里重试。",

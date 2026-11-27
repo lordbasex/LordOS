@@ -167,6 +167,7 @@
     "other": "Se actualizan {count}"
   },
   "remove": "Quitar",
+  "removeAsk": "¿Quitar {name}?",
   "rescue.ask": "Ninguna cuenta de este equipo es administradora. Si sabés la contraseña de root, podés hacer administradora a esta cuenta. Solo tiene efecto después de reiniciar el equipo.",
   "rescue.button": "Hacerme administrador",
   "rescue.noSudo": "Ninguna cuenta de este equipo es administradora y el paquete sudo no está instalado. Como root, ejecutá apt install sudo y volvé a probar acá.",

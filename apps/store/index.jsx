@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AiDetail, AiDiscover, AiPage, CatalogCategory, CatalogResults, catalogApp, catalogApps, catalogCategoryCounts, searchCatalog } from './ai.js';
 import { matches } from './search.js';
 import { CATS, debian, useDebian } from './debian.js';
-import { GLYPH } from './ui.js';
+import { ConfirmRemove, GLYPH } from './ui.js';
 import { isMine, isSettings, installedFilters, filterInstalled, filterOk, systemOf } from './installedmodel.js';
 import { DebianSettings, LordOSSettings, refreshLists } from './sectionsettings.js';
 import { FilterChips, OriginChips, OriginColumn } from './origincol.js';
@@ -242,6 +242,7 @@ function LordOSInstalled({ query, onOpen, go }) {
   const list = useStore(packageList);
   const { items, installed } = useNative();
   const [msg, setMsg] = useState(null);
+  const [asking, setAsking] = useState(null);       // Remove asks first (ConfirmRemove)
   const rows = nativeRows(items, installed).filter((a) => matches(query, [a.name, a.native.id, a.native.package], [a.comment]));
   const shown = list.filter((p) => matches(query, [p.name, p.id], [p.description]));
   return (
@@ -259,8 +260,10 @@ function LordOSInstalled({ query, onOpen, go }) {
       <List title={tr('store.lordos.lpkTitle')} count={shown.length || null} empty={tr('store.lordos.noneLpk')}>
         {shown.map((p) => (
           <AppRow key={p.id} icon={<p.Icon size={40} />} name={p.name} detail={p.description} extra={tr('store.version', { version: p.version })}
-            below={<PkgManage pkg={p} onMsg={setMsg} />}>
-            {!p.packaged && <Button small label={tr('store.remove')} onClick={() => { packages.remove(p.id); setMsg({ ok: true, text: tr('store.lordos.removed', { name: p.name }) }); }} />}
+            below={asking === p.id
+              ? <ConfirmRemove name={p.name} onNo={() => setAsking(null)} onYes={() => { setAsking(null); packages.remove(p.id); setMsg({ ok: true, text: tr('store.lordos.removed', { name: p.name }) }); }} />
+              : <PkgManage pkg={p} onMsg={setMsg} />}>
+            {!p.packaged && <Button small label={tr('store.remove')} onClick={() => setAsking(asking === p.id ? null : p.id)} />}
             <Button small label={tr('store.open')} onClick={() => launchApp(p.id)} />
           </AppRow>
         ))}
@@ -354,7 +357,9 @@ function InstalledPage({ query, filter: initial, only = null, empty = null, onNa
         {shown.slice(0, limit).map((a) => (
           <AppRow key={a.id} icon={<View style={{ opacity: a.off ? 0.45 : 1 }}><a.Icon size={32} /></View>} name={a.name} detail={a.comment || a.genericName || ''}
             extra={a.off ? `${kind(a)} · ${tr('store.off.badge')}` : kind(a)}
-            below={removing === a.id ? <debian.RemoveSheet app={a} onClose={() => setRemoving(null)} /> : null}>
+            below={removing === a.id ? (a.kind === 'flatpak'
+              ? <ConfirmRemove name={a.name} onNo={() => setRemoving(null)} onYes={() => { setRemoving(null); if (!fhJob) removeInstalled(a).then((ok) => setMsg(ok ? { ok: true, text: tr('flathub.msg.uninstallDone', { name: a.name }) } : flathub.state.get().msg)); }} />
+              : <debian.RemoveSheet app={a} onClose={() => setRemoving(null)} />) : null}>
             {/* a system app is part of LordOS: never removable here (docs/SIGNING.md, "Verified system code"); the ones
                 LordOS can do without are deactivated instead (sdk/appsoffmodel.js) */}
             {builtin(a) && !canDeactivate(a.id) && <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap' }}>{tr('store.systemApp')}</Text>}
@@ -364,7 +369,7 @@ function InstalledPage({ query, filter: initial, only = null, empty = null, onNa
             {a.kind === 'linux' && debian.canRemove(a) && <Button small label={tr('store.remove')} disabled={!admin.available()}
               onClick={() => setRemoving(removing === a.id ? null : a.id)} />}
             {a.kind === 'flatpak' && flathub.available() && <Button small label={tr('store.remove')} disabled={!!fhJob}
-              onClick={() => !fhJob && removeInstalled(a).then((ok) => setMsg(ok ? { ok: true, text: tr('flathub.msg.uninstallDone', { name: a.name }) } : flathub.state.get().msg))} />}
+              onClick={() => !fhJob && setRemoving(removing === a.id ? null : a.id)} />}
             {a.native && onNative && <Button small label={tr('store.ai.view')} onClick={() => onNative(a.native.id)} />}
             {a.native ? (a.native.open && <Button small label={tr('store.open')} onClick={() => openNative(a.native, go)} />)
               : !a.off && <Button small label={tr('store.open')} onClick={() => launchApp(a.id)} />}

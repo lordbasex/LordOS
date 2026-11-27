@@ -167,6 +167,7 @@
     "other": "{count} päivitettävää"
   },
   "remove": "Poista",
+  "removeAsk": "Poistetaanko {name}?",
   "rescue.ask": "Mikään tämän tietokoneen tili ei ole järjestelmänvalvoja. Jos tiedät rootin salasanan, voit tehdä tästä tilistä järjestelmänvalvojan. Muutos tulee voimaan vasta tietokoneen uudelleenkäynnistyksen jälkeen.",
   "rescue.button": "Tee minusta järjestelmänvalvoja",
   "rescue.noSudo": "Mikään tämän tietokoneen tili ei ole järjestelmänvalvoja, eikä sudo-pakettia ole asennettu. Suorita rootina apt install sudo ja yritä sitten uudelleen täällä.",

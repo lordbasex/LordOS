@@ -167,6 +167,7 @@
     "other": "{count} güncellenecek"
   },
   "remove": "Kaldır",
+  "removeAsk": "{name} kaldırılsın mı?",
   "rescue.ask": "Bu bilgisayardaki hiçbir hesap yönetici değil. Root parolasını biliyorsanız bu hesabı yönetici yapabilirsiniz. Bu, yalnızca bilgisayar yeniden başlatıldıktan sonra geçerli olur.",
   "rescue.button": "Beni Yönetici Yap",
   "rescue.noSudo": "Bu bilgisayardaki hiçbir hesap yönetici değil ve sudo paketi yüklü değil. Root olarak apt install sudo komutunu çalıştırın, sonra burada yeniden deneyin.",

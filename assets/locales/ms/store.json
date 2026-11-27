@@ -162,6 +162,7 @@
     "other": "{count} untuk dikemas kini"
   },
   "remove": "Alih keluar",
+  "removeAsk": "Alih keluar {name}?",
   "rescue.ask": "Tiada akaun pada komputer ini ialah pentadbir. Jika anda tahu kata laluan root, anda boleh menjadikan akaun ini pentadbir. Ia berkuat kuasa hanya selepas komputer dimulakan semula.",
   "rescue.button": "Jadikan Saya Pentadbir",
   "rescue.noSudo": "Tiada akaun pada komputer ini ialah pentadbir, dan pakej sudo tidak dipasang. Sebagai root, jalankan apt install sudo, kemudian cuba lagi di sini.",

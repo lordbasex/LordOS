@@ -167,6 +167,7 @@
     "other": "{count} da aggiornare"
   },
   "remove": "Rimuovi",
+  "removeAsk": "Rimuovere {name}?",
   "rescue.ask": "Nessun account su questo computer è amministratore. Se conosci la password di root, puoi rendere amministratore questo account. La modifica ha effetto solo dopo il riavvio del computer.",
   "rescue.button": "Rendimi amministratore",
   "rescue.noSudo": "Nessun account su questo computer è amministratore e il pacchetto sudo non è installato. Come root, esegui apt install sudo, poi riprova qui.",

@@ -172,6 +172,7 @@
     "other": "{count} de actualizat"
   },
   "remove": "Elimină",
+  "removeAsk": "Eliminați {name}?",
   "rescue.ask": "Niciun cont de pe acest computer nu este administrator. Dacă știți parola root, puteți face din acest cont un administrator. Intră în vigoare doar după repornirea computerului.",
   "rescue.button": "Fă-mă administrator",
   "rescue.noSudo": "Niciun cont de pe acest computer nu este administrator, iar pachetul sudo nu este instalat. Ca root, rulați apt install sudo, apoi încercați din nou aici.",

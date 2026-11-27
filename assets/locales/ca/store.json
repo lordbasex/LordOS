@@ -167,6 +167,7 @@
     "other": "{count} per actualitzar"
   },
   "remove": "Suprimeix",
+  "removeAsk": "Vols eliminar {name}?",
   "rescue.ask": "Cap compte d’aquest ordinador no és administrador. Si coneixes la contrasenya de root, pots fer que aquest compte ho sigui. Té efecte només després de reiniciar l’ordinador.",
   "rescue.button": "Fes-me administrador",
   "rescue.noSudo": "Cap compte d’aquest ordinador no és administrador, i el paquet sudo no està instal·lat. Com a root, executa apt install sudo i torna-ho a provar aquí.",

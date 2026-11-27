@@ -167,6 +167,7 @@
     "other": "{count} zu aktualisieren"
   },
   "remove": "Entfernen",
+  "removeAsk": "{name} entfernen?",
   "rescue.ask": "Kein Konto auf diesem Computer ist Administrator. Wenn du das root-Passwort kennst, kannst du dieses Konto dazu machen. Es wird erst nach einem Neustart des Computers wirksam.",
   "rescue.button": "Mich zum Administrator machen",
   "rescue.noSudo": "Kein Konto auf diesem Computer ist Administrator, und das Paket sudo ist nicht installiert. Führe als root apt install sudo aus und versuche es dann hier erneut.",

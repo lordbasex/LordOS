@@ -167,6 +167,7 @@
     "other": "{count} frissítendő"
   },
   "remove": "Eltávolítás",
+  "removeAsk": "Eltávolítja: {name}?",
   "rescue.ask": "Ezen a számítógépen egyik fiók sem rendszergazda. Ha ismeri a root jelszavát, ezt a fiókot rendszergazdává teheti. Csak a számítógép újraindítása után lép érvénybe.",
   "rescue.button": "Legyek rendszergazda",
   "rescue.noSudo": "Ezen a számítógépen egyik fiók sem rendszergazda, és a sudo csomag nincs telepítve. Rootként futtassa az apt install sudo parancsot, majd próbálja újra itt.",

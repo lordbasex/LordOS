@@ -420,6 +420,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Store: Remove asked nothing for Flatpak apps and LordOS packages** (ws171 QA). It now asks "Remove {name}?" with
+  Cancel and a red Remove first, in Installed and on a Flatpak app's page, as Debian's removal (its plan) and web apps
+  (their sheet) already did (`ConfirmRemove` in `apps/store/ui.js`; `store.removeAsk`, every language).
 - **"Reopen your windows? LordOS did not shut down properly" after a theme was taken off** (BUG-H of the ws171 QA). A
   community theme writes session restore's "unclean" marker when it starts, like any desktop; when lord-server's
   watchdog took it off (or Ctrl+Alt+Shift+Backspace left a theme), the desktop loaded instead read that marker as a

@@ -167,6 +167,7 @@
     "other": "{count} to update"
   },
   "remove": "Remove",
+  "removeAsk": "Remove {name}?",
   "rescue.ask": "No account on this computer is an administrator. If you know the root password, you can make this account one. It takes effect only after restarting the computer.",
   "rescue.button": "Make Me an Administrator",
   "rescue.noSudo": "No account on this computer is an administrator, and the sudo package is not installed. As root, run apt install sudo, then try again here.",

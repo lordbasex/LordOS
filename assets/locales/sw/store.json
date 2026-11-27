@@ -167,6 +167,7 @@
     "other": "{count} za kusasisha"
   },
   "remove": "Ondoa",
+  "removeAsk": "Ondoa {name}?",
   "rescue.ask": "Hakuna akaunti kwenye kompyuta hii iliyo msimamizi. Ikiwa unajua nenosiri la root, unaweza kuifanya akaunti hii kuwa msimamizi. Inaanza kufanya kazi baada ya kuwasha upya kompyuta tu.",
   "rescue.button": "Nifanye Msimamizi",
   "rescue.noSudo": "Hakuna akaunti kwenye kompyuta hii iliyo msimamizi, na kifurushi cha sudo hakijasakinishwa. Kama root, endesha apt install sudo, kisha ujaribu tena hapa.",

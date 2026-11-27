@@ -177,6 +177,7 @@
     "other": "Do aktualizacji: {count}"
   },
   "remove": "Usuń",
+  "removeAsk": "Usunąć {name}?",
   "rescue.ask": "Żadne konto na tym komputerze nie jest administratorem. Jeśli znasz hasło roota, możesz uczynić to konto administratorem. Zmiana zadziała dopiero po ponownym uruchomieniu komputera.",
   "rescue.button": "Uczyń mnie administratorem",
   "rescue.noSudo": "Żadne konto na tym komputerze nie jest administratorem, a pakiet sudo nie jest zainstalowany. Jako root uruchom apt install sudo, a następnie spróbuj ponownie tutaj.",

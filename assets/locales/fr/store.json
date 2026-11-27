@@ -167,6 +167,7 @@
     "other": "{count} à mettre à jour"
   },
   "remove": "Supprimer",
+  "removeAsk": "Supprimer {name} ?",
   "rescue.ask": "Aucun compte de cet ordinateur n’est administrateur. Si vous connaissez le mot de passe root, vous pouvez rendre ce compte administrateur. Cela ne prend effet qu’après le redémarrage de l’ordinateur.",
   "rescue.button": "Me nommer administrateur",
   "rescue.noSudo": "Aucun compte de cet ordinateur n’est administrateur et le paquet sudo n’est pas installé. En tant que root, exécutez apt install sudo, puis réessayez ici.",

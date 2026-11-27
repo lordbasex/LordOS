@@ -162,6 +162,7 @@
     "other": "{count} để cập nhật"
   },
   "remove": "Gỡ",
+  "removeAsk": "Gỡ {name}?",
   "rescue.ask": "Không có tài khoản nào trên máy tính này là quản trị viên. Nếu bạn biết mật khẩu root, bạn có thể đặt tài khoản này làm quản trị viên. Thay đổi chỉ có hiệu lực sau khi khởi động lại máy tính.",
   "rescue.button": "Đặt tôi làm quản trị viên",
   "rescue.noSudo": "Không có tài khoản nào trên máy tính này là quản trị viên, và gói sudo chưa được cài. Với quyền root, hãy chạy apt install sudo, rồi thử lại ở đây.",

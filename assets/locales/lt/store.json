@@ -172,6 +172,7 @@
     "other": "{count} bus atnaujinta"
   },
   "remove": "Pašalinti",
+  "removeAsk": "Pašalinti {name}?",
   "rescue.ask": "Nė viena šio kompiuterio paskyra nėra administratoriaus. Jei žinote root slaptažodį, galite šią paskyrą padaryti administratoriaus. Tai įsigalioja tik iš naujo paleidus kompiuterį.",
   "rescue.button": "Padaryti mane administratoriumi",
   "rescue.noSudo": "Nė viena šio kompiuterio paskyra nėra administratoriaus, o sudo paketas neįdiegtas. Kaip root paleiskite apt install sudo ir bandykite čia dar kartą.",

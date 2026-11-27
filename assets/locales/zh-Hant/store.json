@@ -162,6 +162,7 @@
     "other": "要更新 {count} 個"
   },
   "remove": "移除",
+  "removeAsk": "要移除 {name} 嗎？",
   "rescue.ask": "這台電腦上沒有任何帳號是管理者。如果你知道 root 密碼，就可以將這個帳號設為管理者。重新啟動電腦後才會生效。",
   "rescue.button": "將我設為管理者",
   "rescue.noSudo": "這台電腦上沒有任何帳號是管理者，而且未安裝 sudo 套件。請以 root 身分執行 apt install sudo，然後再回到這裡試一次。",

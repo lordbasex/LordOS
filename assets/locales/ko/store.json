@@ -162,6 +162,7 @@
     "other": "업데이트할 항목 {count}개"
   },
   "remove": "제거",
+  "removeAsk": "{name}을(를) 제거할까요?",
   "rescue.ask": "이 컴퓨터에 관리자 계정이 없습니다. root 암호를 알고 있다면 이 계정을 관리자로 만들 수 있습니다. 컴퓨터를 다시 시작한 후에 적용됩니다.",
   "rescue.button": "나를 관리자로 만들기",
   "rescue.noSudo": "이 컴퓨터에 관리자 계정이 없으며 sudo 패키지도 설치되어 있지 않습니다. root로 apt install sudo를 실행한 후 여기에서 다시 시도하십시오.",

@@ -167,6 +167,7 @@
     "other": "{count} bij te werken"
   },
   "remove": "Verwijder",
+  "removeAsk": "{name} verwijderen?",
   "rescue.ask": "Geen enkel account op deze computer is beheerder. Als je het root-wachtwoord kent, kun je dit account beheerder maken. Het werkt pas na een herstart van de computer.",
   "rescue.button": "Maak mij beheerder",
   "rescue.noSudo": "Geen enkel account op deze computer is beheerder en het pakket sudo is niet geïnstalleerd. Voer als root apt install sudo uit en probeer het hier opnieuw.",
