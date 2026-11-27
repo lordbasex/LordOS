@@ -319,6 +319,15 @@ await flush();
     for (let i = 0; i < 2; i++) await flush();
     await new Promise((res) => setTimeout(res, 1100));     // the tiler's passes per second start again
   }
+  // (BUG-32, the cause) a window placed above the work area (restored, launched or opened there) never covers the
+  // display's bar: it goes down to the work area, its size kept, in Free and over tiles (floating)
+  tiler.setLayout(desk, 'HDMI-A-1', 'free');
+  for (let i = 0; i < 2; i++) await flush();
+  const hi = sdk.wm.open('extra44', { frame: { x: R.x + 300, y: R.y + 14, w: 700, h: 500 } });
+  for (let i = 0; i < 3; i++) await flush();
+  check('bar: a window opened over the bar goes down to the work area, its size kept', [frameOf(hi).y, frameOf(hi).w, frameOf(hi).h], [plan(R).work.y, 700, 500]);
+  sdk.wm.close(hi, true);
+  await new Promise((res) => setTimeout(res, 1100));
   tiler.setLayout(desk, 'HDMI-A-1', 'single');
   await flush();
 }

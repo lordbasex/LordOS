@@ -329,6 +329,17 @@ export function retile() {
     const keyOf = (id) => { const w = all.find((x) => x.id === id); return w ? launcherIdOf(w) : ''; };
     const { layout, ratio } = layoutOf(desk, dk);
     const area = workAreaOf(d);
+    // nothing of the activity covers this display's bar (its frame header, with the tray of its windows): a window the
+    // tiler doesn't place (free layout, floating, restored or launched there) whose top is above the work area goes
+    // down to it, its size kept (BUG-32 of the ws170 QA: a Terminal at the frame's top hid the bar, so each window
+    // seemed to list only itself)
+    for (const w of all) {
+      if (w.desktop !== desk || w.minimized || w.fullscreen || w.maximized || w.pip || w.args?.parent || w.args?.dialog || moves.has(w.id)) continue;
+      if (applied.has(w.id) && !floating.has(w.id)) continue;
+      const f = wFrame(w);
+      if (f.y >= area.y - 1 || keyOfDisplay(displayFor(f)) !== dk) continue;
+      moves.set(w.id, { x: f.x, y: area.y, w: f.w, h: Math.min(f.h, area.h) });
+    }
     const [min, max] = slotLimits(cleanLayout(layout));
     // the layout's own slots first (a drop or the flyout may aim at one still empty)
     if (cleanLayout(layout) !== 'free') { prevStacks = [...prevStacks]; while (prevStacks.length < min) prevStacks.push([]); }

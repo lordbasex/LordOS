@@ -77,7 +77,7 @@ function SnapPreview({ cx }) {
 const onFront = (fn) => () => { const id = wm.focused(); if (id) fn(id); };
 const frontSettings = () => { const id = wm.focused(); return id ? appSettingsItem(id) : null; };
 const shortcutTable = (toggleLauncher) => [
-  { id: 'launcher', keys: ['F4'], show: ['❖', 'F4'], run: toggleLauncher, label: 'shell.shortcuts.launcher', group: 'system' },
+  { id: 'launcher', keys: ['F4', 'Meta+F4'], show: ['❖', 'F4'], run: toggleLauncher, label: 'shell.shortcuts.launcher', group: 'system' },
   { id: 'showDesktop', keys: ['Meta+F11'], run: toggleShowDesktop, label: 'shell.shortcuts.showDesktop', group: 'system' },
   { id: 'switchApps', keys: switcherKeys('meta'), run: (e) => openSwitcher(switcherHold(e), e.shift), label: 'shell.shortcuts.switchApps', group: 'windows' },
   { id: 'cycleWindows', keys: ['Meta+`', 'Meta+Shift+`'], run: (e) => cycleAppWindows(e.shift), label: 'shell.shortcuts.cycleWindows', group: 'windows' },

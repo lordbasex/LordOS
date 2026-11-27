@@ -475,10 +475,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   and two frosted windows: 4.2 Mpx): one refresh 32 ms, 97 % of a core per display at 30 frames/s before, 16 % after.
   Still to do: caching a window's content apart from its blurred backdrop, or blurring on the GPU
   (docs/MOVING-WALLPAPERS.md). Test: `engine-test` `test_motion_blur_refresh`.
-- **Workspaces: a display's bar with two windows on it** (BUG-32 of the ws170 QA, investigated: the Terminal and the
-  Calculator on one display each seemed to list only itself). Not reproduced in the scene: two windows tiled on one
-  display in Two halves and in One at a time both appear in that display's bar, as they do floating. A case for each is
-  now in `tests/workspaces_scene.mjs`; the real desktop's case stays to be checked on the QA machine.
+- **Workspaces: a window could cover its display's bar, so the tray of the activity's windows couldn't be seen** (BUG-32
+  of the ws170 QA: with the Terminal and the Calculator on the main display, only each window's own title icons showed,
+  and the bar listing both was under the Terminal). The bar's tray did list both; a window the tiler doesn't place (Free
+  layout, floating, restored or launched there) could sit above the work area, over the bar. The tiler now moves such a
+  window down to the work area, its size kept (`themes/workspaces/tiler.js`). `tests/workspaces_scene.mjs`: two windows
+  tiled on one display (Two halves, One at a time) both in its bar, and a window opened over the bar goes down to the
+  work area.
 - **The clipboard panel and the weather widget's city picker opened on the main display** (BUG-27 of the ws170 QA:
   Settings → Clipboard → Open panel from Settings on display 2, and "Change city…" of a widget on display 2, both looked
   as if nothing happened). The clipboard panel (❖V, ❖⇧V and Settings' button, `openClipboardPanel`) now opens on the
