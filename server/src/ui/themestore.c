@@ -398,3 +398,21 @@ char *ts_code_read(int root_fd, const TsRecord *r, size_t *len) {
     if (strcmp(h, r->sha256)) { free(b); return NULL; }
     return b;
 }
+
+/* the person's wallpaper as the SDK's findWallpaper gives it (QA of 0.8.9.6.2, BUG-H): the copy of their own picture,
+ * <home>/.local/share/lordos/wallpapers/<16 hex>[.thumb].jpg, or a catalog picture LordOS downloaded,
+ * /var/lib/lordos/wallpapers/<64 hex>.jpg. Those exact names only: never another file of the home or the system */
+static int hex_run(const char *s, size_t n) {
+    for (size_t i = 0; i < n; i++) if (!((s[i] >= '0' && s[i] <= '9') || (s[i] >= 'a' && s[i] <= 'f'))) return 0;
+    return 1;
+}
+int jst_wallpaper_file(const char *s, const char *home) {
+    static const char store[] = "/var/lib/lordos/wallpapers/", mine[] = "/.local/share/lordos/wallpapers/";
+    if (!s) return 0;
+    size_t n = strlen(s);
+    if (!strncmp(s, store, sizeof store - 1)) return n == sizeof store - 1 + 68 && hex_run(s + sizeof store - 1, 64) && !strcmp(s + n - 4, ".jpg");
+    size_t h = home ? strlen(home) : 0;
+    if (h < 2 || home[0] != '/' || strncmp(s, home, h) || strncmp(s + h, mine, sizeof mine - 1)) return 0;
+    const char *f = s + h + sizeof mine - 1;
+    return hex_run(f, 16) && (!strcmp(f + 16, ".jpg") || !strcmp(f + 16, ".thumb.jpg"));
+}

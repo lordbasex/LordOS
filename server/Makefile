@@ -1688,6 +1688,6 @@ build/themestore-test: tests/themestore_test.c src/ui/themestore.c src/ui/themes
 	./$@ build/lord-themec || { rm -f $@; exit 1; }
 # a community theme in a headless session: its realm, the guard of every lord.* call, forged elements, the watchdog
 test-full: community-theme-headless
-community-theme-headless: build/lord-server
+community-theme-headless: build/lord-server build/lord-server-test
 	tests/community_theme_headless.sh; r=$$?; [ $$r -eq 0 ] || [ $$r -eq 77 ]
 .PHONY: community-theme-headless

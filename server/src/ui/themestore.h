@@ -79,4 +79,8 @@ char *ts_code_read(int root_fd, const TsRecord *r, size_t *len);
 /* removes <id> and everything in it (no link followed) — 0 ok */
 int ts_remove(int root_fd, const char *id);
 
+/* the person's wallpaper file a community theme's own Image may show (js_theme.c src_ok; QA of 0.8.9.6.2, BUG-H):
+ * <home>/.local/share/lordos/wallpapers/<16 hex>[.thumb].jpg or /var/lib/lordos/wallpapers/<64 hex>.jpg; 1 yes */
+int jst_wallpaper_file(const char *s, const char *home);
+
 #endif

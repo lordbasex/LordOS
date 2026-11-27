@@ -54,12 +54,23 @@ export function wallpaperSrc(w, width, height) {
 // by the wallpaper-image action. It works in every theme, because themes all go through findWallpaper and wallpaperSrc.
 export const USER_WALLPAPER = /^image:([0-9a-f]{16})$/;
 export const userWallpaperName = (id) => (USER_WALLPAPER.exec(id || '') || [])[1] || null;
+// (QA of 0.8.9.6.2, BUG-H) A community theme calls findWallpaper from its own code, where lord.fs is refused: the home
+// folder is read once when the SDK loads, and whether the picture is there is checked by LordOS's own code (when the SDK
+// loads and whenever the settings change, warmWallpapers) and kept, so the theme's call only reads what was found.
+// A check that can't run (refused) is never kept: the picture's entry is what LordOS found last, or none.
+const HOME = (() => { try { return typeof lord !== 'undefined' && lord.fs ? String(lord.fs.home() || '') : ''; } catch (e) { return ''; } })();
+export const USER_WALLPAPER_DIR = HOME ? `${HOME}/.local/share/lordos/wallpapers` : '';
+const userChecked = new Map();            // id → entry | null
 function userWallpaper(id) {
   const name = userWallpaperName(id);
-  if (!name) return null;
-  const base = `${lord.fs.home()}/.local/share/lordos/wallpapers/${name}`;
-  try { if (!lord.fs.stat(`${base}.jpg`)) return null; } catch (e) { return null; }    // deleted: the default one
-  return { id, category: 'mine', nameKey: 'settings.wallpaperImage.name', name: 'Your picture', src: `${base}.jpg`, thumb: `${base}.thumb.jpg` };
+  if (!name || !USER_WALLPAPER_DIR) return null;
+  if (userChecked.has(id)) return userChecked.get(id);
+  const base = `${USER_WALLPAPER_DIR}/${name}`;
+  let there;
+  try { there = !!lord.fs.stat(`${base}.jpg`); } catch (e) { return null; }    // refused (a theme's call): not kept
+  const e = there ? { id, category: 'mine', nameKey: 'settings.wallpaperImage.name', name: 'Your picture', src: `${base}.jpg`, thumb: `${base}.thumb.jpg` } : null;
+  userChecked.set(id, e);                 // deleted: the default one
+  return e;
 }
 
 // A still picture of the catalog (Settings → Wallpaper's Abstract, Epic and Anime collections, 0.8.9.6.2): the id is
@@ -79,10 +90,10 @@ export const stillStore = createStore(0);           // bumped when the listing c
 let storeList = null, storeAt = 0;
 export function stillFiles(fresh = false) {
   if (fresh || !storeList || Date.now() - storeAt > 10000) {
-    let list = [];
-    try { list = lord.fs.list(STILL_STORE) || []; } catch (e) { list = []; }
-    storeList = storeIndex(list);
-    storeAt = Date.now();
+    // a listing that can't be read (refused: a community theme's call) keeps the last one LordOS read
+    let list = null;
+    try { list = lord.fs.list(STILL_STORE) || []; } catch (e) { list = storeList ? null : []; }
+    if (list) { storeList = storeIndex(list); storeAt = Date.now(); }
   }
   return storeList;
 }
@@ -109,3 +120,19 @@ export const wallpaperThumb = (w) => (w && (w.thumb || w.src)) || null;
 
 // One wallpaper per display (every theme): the rules are in wallpapermodel.js, tested with node.
 export { displayWallpaperKey, wallpaperIdFor, wallpaperPatch, displayLabel } from './wallpapermodel.js';
+
+// LordOS's own code checks the person's pictures and the catalog's files ahead of any theme's call: when the SDK loads
+// and whenever the settings change (a new picture, another display's). Called from LordOS's code only.
+let warmKey = null;
+export function warmWallpapers() {
+  let s = {};
+  try { s = settings.get() || {}; } catch (e) { s = {}; }
+  const ids = [s.wallpaper, ...Object.values(s.wallpapers && typeof s.wallpapers === 'object' ? s.wallpapers : {})].filter((x) => typeof x === 'string');
+  const key = ids.join('|');
+  if (key === warmKey) return;            // only when the pictures chosen changed (not on every setting)
+  warmKey = key;
+  userChecked.clear();
+  for (const id of ids) userWallpaper(id);
+  stillFiles(true);
+}
+try { warmWallpapers(); settings.subscribe(warmWallpapers); } catch (e) { /* no settings yet (tests) */ }

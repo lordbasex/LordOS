@@ -22,6 +22,10 @@
 #   throws     throws while it starts: the session goes back to LordOS's theme, it is marked failed with the error
 #   nostart    never calls startShell: the same
 #   untrusted  okminimal not confirmed by the person: never run
+#   clicker    (build/lord-server-test with its hooks) a click on its own View, and a timer, mount new nodes: React's
+#              render after the theme's setState is LordOS's (lord.hostMicrotask), never refused; the new rows draw each
+#              app's Icon from useLauncherApps; a component imports '../tokens.js'; its shortcut table in the SDK's own
+#              form (keys: [...]) runs, and an entry on a key every theme shares (❖Space) is dropped
 # Exit 77 when something it needs is missing, 1 on a failure. Slow (each session loads two desktops on the CPU path):
 # `make -C server test-full` runs it.
 cd "$(dirname "$0")/.." || exit 1
@@ -121,5 +125,54 @@ if record nostart | grep -q 'never called startShell'; then echo "ok   nostart: 
 session untrusted okminimal 30 --untrusted
 has "untrusted: not run before the person confirms it" "not confirmed by the person"
 hasnt "untrusted: its code never started" "community theme okminimal started"
+
+# a click that mounts new nodes (Meridian's review: every community theme was taken off at its first click that opened
+# something), a timer that does, launcher icons and a shortcut in the SDK's form: through lord-server-test's hooks
+if [ -x build/lord-server-test ] && command -v python3 >/dev/null; then
+    S=$D/clicker
+    mkdir -p "$S/home/.config/lordos"
+    chmod 700 "$S"
+    if node tests/community_theme_install.mjs tests/community_themes/clicker "$S/home" >/dev/null; then
+        # the person's own wallpaper, as Settings → Wallpaper keeps it (BUG-H of the ws171 QA)
+        mkdir -p "$S/home/.local/share/lordos/wallpapers"
+        cp "$ROOT/assets/desktops/default.jpg" "$S/home/.local/share/lordos/wallpapers/0123456789abcdef.jpg"
+        printf '{"schema": 9, "desktopChosen": true, "welcomeShown": true, "theme": "clicker", "wallpaper": "image:0123456789abcdef"}\n' >"$S/home/.config/lordos/settings.json"
+        env -u WAYLAND_DISPLAY -u DISPLAY -u LORD_SESSIOND -u LORDOS_SESSIOND -u DBUS_SESSION_BUS_ADDRESS \
+            XDG_RUNTIME_DIR="$S" HOME="$S/home" LORD_GPU=0 LANG=en_US.UTF-8 LORD_HEADLESS_DRAW=1 \
+            ./build/lord-server-test --headless 1024x768 --theme "$ROOT/themes/default/theme.bundle.js" --timeout 40 \
+            --user "$(id -un)" --test-hooks >"$S/server.log" 2>&1 &
+        P=$!
+        n=0
+        while [ $n -lt 600 ] && ! grep -q "community theme clicker started" "$S/server.log" "$S/home/.cache/lordos/"*.log 2>/dev/null; do sleep 0.1; n=$((n + 1)); done
+        sleep 3
+        python3 -I - "$S/lordos-test-hooks.sock" <<'PY'
+import socket, sys, time
+s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+s.connect(sys.argv[1])
+def cmd(c):
+    s.send(c.encode()); s.recv(4096)
+for x, y in ((500, 400), (520, 420)):
+    cmd(f'ptr {x} {y}'); time.sleep(0.15); cmd('btn 0 1'); time.sleep(0.08); cmd('btn 0 0'); time.sleep(1.0)
+for c in (125, 42, 37): cmd(f'key {c} 1'); time.sleep(0.03)
+for c in (37, 42, 125): cmd(f'key {c} 0'); time.sleep(0.03)
+time.sleep(1.0)
+PY
+        kill $P 2>/dev/null; wait $P 2>/dev/null
+        P=
+        L=$(cat "$S/server.log" "$S/home/.cache/lordos/"*.log 2>/dev/null)
+        has "clicker starts" "community theme clicker started"
+        has "clicker: the person's own wallpaper is found (no lord.fs from the theme's call)" "CT clicker wallpaper mine"
+        hasnt "clicker: its Image of the person's wallpaper isn't refused" "setProp refused"
+        has "clicker: a timer's state update mounts new nodes" "CT clicker opened timer with apps"
+        has "clicker: a window's icon from windowIcon draws" "CT clicker window icons"
+        has "clicker: a click mounts new nodes" "CT clicker opened click1 with apps"
+        has "clicker: a second click too" "CT clicker opened click2 with apps"
+        hasnt "clicker: React's render after its setState is never refused" "community theme: lord\.\(createNode\|removeChild\|appendChild\|insertBefore\|destroy\|setStyle\|setProp\|setText\) refused"
+        hasnt "clicker: the launcher's icons don't take it off" "View, Text and Image"
+        hasnt "clicker: never taken off" "taken off\|marked failed"
+        has "clicker: its shortcut in the SDK's form (keys: [...]) runs" "CT clicker shortcut ran"
+        hasnt "clicker: an entry on a key every theme shares is dropped" "BASE SHADOWED"
+    else echo "FAIL clicker: not installed"; R=1; fi
+else echo "skipped: clicker needs build/lord-server-test and python3"; fi
 
 exit $R

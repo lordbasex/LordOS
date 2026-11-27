@@ -184,11 +184,12 @@ static void refused(const char *name, const char *why) {
     }
 }
 
-/* a picture a theme's own node may show: assets/<…> of its folder, or LordOS's asset:<…>, never ".." or a path */
+/* a picture a theme's own node may show: assets/<…> of its folder, LordOS's asset:<…> or the person's wallpaper
+ * (jst_wallpaper_file), never ".." or another path */
 static int src_ok(JSContext *c, JSValueConst v) {
     if (JS_IsNull(v) || JS_IsUndefined(v)) return 1;
     const char *s = JS_ToCString(c, v);
-    int ok = s && !strstr(s, "..") && (!strncmp(s, "assets/", 7) || !strncmp(s, "asset:", 6)) && strlen(s) < 512;
+    int ok = s && !strstr(s, "..") && (!strncmp(s, "assets/", 7) || !strncmp(s, "asset:", 6) || jst_wallpaper_file(s, fsops_home())) && strlen(s) < 512;
     for (const char *p = s ? s : ""; ok && *p; p++) if ((unsigned char)*p < 0x20) ok = 0;
     if (s) JS_FreeCString(c, s);
     return ok;

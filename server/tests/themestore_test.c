@@ -142,6 +142,24 @@ static int report_has(const uint8_t *ans, size_t n, const char *needle) {
 int main(int argc, char **argv) {
     const char *bin = argc > 1 ? argv[1] : "build/lord-themec";
 
+    /* (QA of 0.8.9.6.2, BUG-H) the person's wallpaper a community theme's Image may show: those exact names only */
+    {
+        const char *H = "/home/alex", *K = "/var/lib/lordos/wallpapers/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.jpg";
+        CHECK(jst_wallpaper_file("/home/alex/.local/share/lordos/wallpapers/7dddf09ba4cf287f.jpg", H) &&
+              jst_wallpaper_file("/home/alex/.local/share/lordos/wallpapers/7dddf09ba4cf287f.thumb.jpg", H) && jst_wallpaper_file(K, H),
+              "wallpaper: the person's own picture, its thumbnail and a catalog picture");
+        CHECK(!jst_wallpaper_file("/home/alex/.local/share/lordos/wallpapers/7dddf09ba4cf287f.png", H) &&
+              !jst_wallpaper_file("/home/alex/.local/share/lordos/wallpapers/7DDDF09BA4CF287F.jpg", H) &&
+              !jst_wallpaper_file("/home/alex/.local/share/lordos/wallpapers/7dddf09ba4cf287.jpg", H) &&
+              !jst_wallpaper_file("/home/alex/.local/share/lordos/wallpapers/7dddf09ba4cf287f.jpg/x", H) &&
+              !jst_wallpaper_file("/home/alex/.ssh/id_ed25519", H) && !jst_wallpaper_file("/home/bob/.local/share/lordos/wallpapers/7dddf09ba4cf287f.jpg", H) &&
+              !jst_wallpaper_file("/home/alexx/.local/share/lordos/wallpapers/7dddf09ba4cf287f.jpg", H) &&
+              !jst_wallpaper_file("/home/alex/.local/share/lordos/wallpapers/7dddf09ba4cf287f.jpg", "") &&
+              !jst_wallpaper_file("/var/lib/lordos/wallpapers/0123.jpg", H) && !jst_wallpaper_file("/var/lib/lordos/wallpapers/../x.jpg", H) &&
+              !jst_wallpaper_file("/etc/passwd", H) && !jst_wallpaper_file(NULL, H),
+              "wallpaper: any other name, user, folder or file refused");
+    }
+
     /* names */
     CHECK(ts_valid_name("theme.js") && ts_valid_name("assets/a/b.png") && ts_valid_name("locales/zh-Hans.json"), "names: theme files accepted");
     CHECK(ts_valid_name("THIRD_PARTY.md") && ts_valid_name("PROVENANCE.md") && !ts_valid_name("OTHER.md"), "names: the credits files (THIRD_PARTY.md, PROVENANCE.md) kept");

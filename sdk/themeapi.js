@@ -235,8 +235,12 @@ function sanitizeOne(v, depth, budget) {
 // props a theme never sets on a node (another app's terminal, window, video, pixels or a node's protection)
 const BLOCKED_PROPS = new Set(['session', 'surface', 'media', 'crop', 'pixels', 'wave', 'dangerouslySetInnerHTML']);
 // an image: the theme's own assets/ or LordOS's "asset:" pictures, never a path elsewhere
-const srcOk = (s) => typeof s === 'string' && !s.includes('..') && !s.startsWith('/') && !s.includes('\0') &&
-  (/^assets\/[A-Za-z0-9_][A-Za-z0-9._/-]*$/.test(s) || /^asset:[A-Za-z0-9_][A-Za-z0-9._/-]*$/.test(s));
+// (QA of 0.8.9.6.2, BUG-H) and the person's wallpaper as findWallpaper gives it: their own picture's copy or a catalog
+// picture LordOS downloaded, by those exact file names, never another path
+const wallpaperFileOk = (s) => (!!SDK.USER_WALLPAPER_DIR && s.startsWith(`${SDK.USER_WALLPAPER_DIR}/`) &&
+  /^[0-9a-f]{16}(\.thumb)?\.jpg$/.test(s.slice(SDK.USER_WALLPAPER_DIR.length + 1))) || /^\/var\/lib\/lordos\/wallpapers\/[0-9a-f]{64}\.jpg$/.test(s);
+const srcOk = (s) => typeof s === 'string' && !s.includes('..') && !s.includes('\0') && (wallpaperFileOk(s) || (!s.startsWith('/') &&
+  (/^assets\/[A-Za-z0-9_][A-Za-z0-9._/-]*$/.test(s) || /^asset:[A-Za-z0-9_][A-Za-z0-9._/-]*$/.test(s))));
 
 const themeProps = (p, host, depth = 0) => lord.themeCall(themePropsRaw, p, host, depth);
 function themePropsRaw(p, host, depth = 0) {

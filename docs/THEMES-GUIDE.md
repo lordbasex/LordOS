@@ -905,7 +905,8 @@ An id that one of LordOS's themes has is refused.
 
 **2. The static checks** (the kit's `check.mjs`, on the files in memory): the manifest (`name`, `description`,
 `"community": true`, `author`, `license`, `version`, `capabilities`); allowed file types and sizes; imports only of
-`react`, `@lordos/sdk`, `@lordos/apps` and its own files; no `eval`, `Function`, dynamic `import()`, `require`,
+`react`, `@lordos/sdk`, `@lordos/apps` and its own files (a parent import such as `../tokens.js` from `components/` is
+fine while it stays inside the theme's folder: the build refuses one that leaves it); no `eval`, `Function`, dynamic `import()`, `require`,
 `globalThis`/`window`, names starting with `__`, `constructor`/`__proto__` tricks, `Reflect`, `Proxy`, `Symbol.for`,
 `fetch` and friends, remote URLs, obfuscation or minified lines; no `lord.*` beyond the theme's own five functions; no
 host elements (`<view>`); every visible text through `t()` (keys of its own namespace `theme-<id>` must be in
@@ -940,10 +941,22 @@ changing Wi-Fi, Bluetooth, the volume, the brightness or what plays. Refs and ev
 whatever the theme hands back (props at any depth, arguments, what its callbacks return) is copied by an allowlist,
 always as the theme's own code (a getter, a Proxy or an iterator in it runs under the theme's policy), and a host
 node whose element LordOS's own React didn't make is refused (a forged React element never becomes a node); its key listeners hear keys only while the keyboard is the shell's (its
-launcher, its menus, no window focused) and never while a system prompt is up; its shortcuts need ❖, ⌃ or ⌥;
+launcher, its menus, no window focused) and never while a system prompt is up; its shortcut table takes the SDK's own
+entries (`{ id, keys: ['Alt+F4', …], run, when, repeat, label, group }`; `{ combo }` is read as one key), and each key
+needs ❖, ⌃ or ⌥ (or is Esc or F1–F24) and is never one every theme shares (search, lock, the clipboard, media keys…:
+such an entry is dropped, so a theme can't shadow them);
 `settings` is read whole but written only for its own options (`themeOptions[<id>]`) and `mode`, `accent`, `effects`,
 `dock…`, `menuBar…`, `taskbar…`. A refused call throws `theme.notAllowed` and is logged as
 `community theme: lord.<name> refused` in the compositor log.
+
+React's render after a state update the theme makes (a click that opens a menu, a timer) is LordOS's own code, as at
+the theme's start: it is queued with `lord.hostMicrotask`, a job that doesn't inherit the theme's taint
+(`JS_EnqueueTrustedJob`; only a function of LordOS's realm, never the theme's, a bound or a native one), and every
+function of the theme it reaches still runs through `lord.themeCall`. An app's `Icon` (in `useLauncherApps`,
+`useDockEntries`) and `windowIcon(win)` are drawn as the facade's own components. `findWallpaper` gives the person's own
+picture and the catalog's downloaded ones (checked by LordOS's code when the settings change, never from the theme's
+call), and a theme's `Image` may show exactly those files besides its `assets/` and `asset:` pictures. A status item
+drawn as a picture follows `<StatusItems color>` (light or dark by the colour).
 
 **4. The system layer.** Permission, keyring and administrator prompts, the file chooser and the other system surfaces
 are drawn by LordOS in the `system` layer; notification banners and the privacy pill in `notification`, above every

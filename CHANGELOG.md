@@ -479,6 +479,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Community themes: the person's own wallpaper no longer takes the theme off at start** (BUG-H of the ws171 QA,
+  reproduced on VM 127 with ws173: QA Tiny, the okminimal example, applied from Settings → Appearance died at once with
+  `lord.fs.home refused`, then "a community theme draws with View, Text and Image" headless). `findWallpaper` read
+  `lord.fs.home` and `lord.fs.stat` for an `image:<id>` wallpaper from the theme's own call, which is refused; the
+  headless test had no such wallpaper. The home folder is now read when the SDK loads and whether the picture is
+  there is checked by LordOS's code when the SDK loads and when the chosen pictures change (`warmWallpapers`), the
+  catalog's listing keeps its last good read, and a theme's own `Image` may show exactly those files
+  (`jst_wallpaper_file`: `<home>/.local/share/lordos/wallpapers/<16 hex>[.thumb].jpg`, `/var/lib/lordos/wallpapers/<64
+  hex>.jpg`, in C and in the facade). Tests: `themestore-test` (the names allowed and refused),
+  `community_theme_headless.sh` (a new "clicker" fixture: the person's wallpaper found and drawn, a click and a timer
+  that mount nodes, launcher icons, a window's icon, a `../tokens.js` import, its shortcuts).
 - **Community themes: `PROVENANCE.md` is installed with the theme** (the credits file LordOS-themes and the kit now
   use): lord-themec's build (`keep`) and lord-server's install list (`ts_valid_name`) kept `THIRD_PARTY.md` but not
   `PROVENANCE.md`. Tests: `themec_test.mjs`, `themestore-test`.
