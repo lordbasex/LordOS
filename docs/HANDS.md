@@ -57,7 +57,9 @@ Coordinates are pixels of the last screenshot (desktop points before the first o
 screenshot's area (`{x, y, w, h, width, height}`: the part of the desktop it really shows, so a window that runs off the
 screen maps right). Screenshots are at most 1,568 px on their long side by default; a zoom may grow up to 4 times. A
 window's screenshot includes its sheets (Settings → Wallpaper's sheet, a file dialog: `wm.addSheet`), as Screenshots'
-window capture does. A zoom is clipped to the desktop; only a region wholly off it is refused (`outside`).
+window capture does, and its own open menus and pop-ups (a pop-up's list, a context menu: the shell surfaces marked as
+that window's, `handsWin`, below the system band), the capture grown to hold one that hangs past the window's edge (ws170
+QA BUG-17: Settings → AI → Voice's open Language list was missing). A zoom is clipped to the desktop; only a region wholly off it is refused (`outside`).
 
 **Saving a capture for the person** (`save` on `screenshot` and `zoom`): the agent's image is scaled for the model
 (1,568 px), too small for a person reading QA evidence. With `save` (a bare file name with the same rules as `record`'s,

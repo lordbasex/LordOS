@@ -39,7 +39,7 @@ import { openFileWithApps } from './sysopen.js';
 import { launchApp, launcherAppsNow, linuxNamesIn, windowLinuxApp } from './apps.js';
 import * as fs from './fs.js';
 import {
-  serializeTree, findNodes, makeRefs, own, allowed, appOfWindow, windowsList, matchApp, filterLog, SYSTEM_Z, blackoutNodes,
+  serializeTree, findNodes, makeRefs, own, allowed, appOfWindow, windowsList, matchApp, filterLog, SYSTEM_Z, blackoutNodes, unionBox,
 } from './handsmodel.js';
 import { focusedNode } from './focus.js';
 import { dialogStack } from './dialogkeys.js';
@@ -248,8 +248,20 @@ const OPS = {
     const node = wm.frameNode(id);
     const b = node ? boxOf({ id: node }) : null;
     // its sheets (a modal of its own: Settings → Wallpaper's sheet, a file dialog), painted over it as Screenshots does
-    const sheets = (wm.sheetNodes ? wm.sheetNodes(id) : []).filter((n) => typeof n === 'number' && n > 0).slice(0, 8);
-    return b ? { node, x: b[0], y: b[1], w: b[2], h: b[3], sheets } : { error: 'not-found' };
+    const sheets = (wm.sheetNodes ? wm.sheetNodes(id) : []).filter((n) => typeof n === 'number' && n > 0);
+    if (!b) return { error: 'not-found' };
+    // and its own open menus and pop-ups (a Dropdown's list, a context menu: Overlay's handsWin, in the popover and menu
+    // layers, never the system band), painted over it, the capture grown to hold one that reaches past its edge
+    // (ws170 QA BUG-17: Settings → AI → Voice's open language list was missing from the window's screenshot)
+    const deep = (n) => {           // a pop-up's list hangs below its anchor's box: the box of everything in it
+      const boxes = [];
+      const walk = (x, d) => { if (!x || d > 64 || boxes.length > 2000) return; const bx = x.type === 'raw' ? null : boxOf(x); if (bx && bx[2] > 0 && bx[3] > 0) boxes.push(bx); for (let c = x.first; c; c = c.next) walk(c, d + 1); };
+      walk(n, 0);
+      return boxes.length ? unionBox(boxes[0], boxes.slice(1)) : null;
+    };
+    const pops = windowSurfaces(id).map((n) => ({ id: n.id, box: deep(n) })).filter((p) => p.box);
+    const r = unionBox(b, pops.map((p) => p.box));
+    return { node, x: r[0], y: r[1], w: r[2], h: r[3], sheets: [...sheets, ...pops.map((p) => p.id)].slice(0, 8) };
   },
   // with an allowlist: the region shows some of an allowed window, or of a menu, popover or sheet tied to one (handsWin);
   // everything else in it is painted black (blackout), as in a window's screenshot
@@ -374,6 +386,18 @@ globalThis.__lordHands = (op, json) => {
 };
 
 // the shell surfaces tied to an allowed window (handsWin: its sheets, menus and popovers), below the system band
+// the shell surfaces of one window (handsWin === its id) below the system band, outermost only
+function windowSurfaces(id) {
+  const out = [];
+  const walk = (n, d) => {
+    if (!n || d > 4096 || out.length > 8) return;
+    if (own(n.props, 'handsWin') === id && n.id) { out.push(n); return; }
+    for (let c = n.first; c; c = c.next) walk(c, d + 1);
+  };
+  for (const r of hostRoots()) if (r.z > 0 && r.z < SYSTEM_Z) walk(r.node, 0);
+  return out;
+}
+
 function tiedSurfaces(allow) {
   const out = [];
   const walk = (n, d) => {

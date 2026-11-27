@@ -351,3 +351,14 @@ export function optionIndex(options, want) {
   const starts = list.map((o, k) => (ok(o) && fold(o[1] ?? '').trim().startsWith(q) ? k : -1)).filter((k) => k >= 0);
   return starts.length === 1 ? starts[0] : -1;
 }
+
+// A window's screenshot: its frame's box grown to hold its own open menus and pop-ups ([x, y, w, h] each); a box that
+// isn't a real one is left out
+export function unionBox(frame, boxes) {
+  let [x0, y0, x1, y1] = [frame[0], frame[1], frame[0] + frame[2], frame[1] + frame[3]];
+  for (const b of boxes || []) {
+    if (!Array.isArray(b) || b.length < 4 || !b.slice(0, 4).every(Number.isFinite) || b[2] <= 0 || b[3] <= 0) continue;
+    x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]); x1 = Math.max(x1, b[0] + b[2]); y1 = Math.max(y1, b[1] + b[3]);
+  }
+  return [x0, y0, x1 - x0, y1 - y0];
+}

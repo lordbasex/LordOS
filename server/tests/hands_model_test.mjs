@@ -1,7 +1,7 @@
 // hands_model_test.mjs — Hands' reader (sdk/handsmodel.js, docs/HANDS.md): the UI tree as text with ref_N ids. Refs stay
 // the same for a node while it lives; a password's value, a protected node's text, a handsDeny node and the system band
 // never come out; find; the windows list and the allowlist; and the prompt's texts claim nothing is verified.
-import { serializeTree, findNodes, makeRefs, roleOf, windowsList, matchApp, filterLog, allowed, clean, blackoutNodes, optionIndex } from '../../sdk/handsmodel.js';
+import { serializeTree, findNodes, makeRefs, roleOf, windowsList, matchApp, filterLog, allowed, clean, blackoutNodes, optionIndex, unionBox } from '../../sdk/handsmodel.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -103,6 +103,10 @@ const list = windowsList([{ id: 'notes', app: 'notes', title: 'Notes', x: 1, y: 
 eq('windows with an allowlist', list.map((w) => [w.id, w.focused]), [['notes', true]]);
 yes('allowed: empty list = every app', allowed([], 'x') && !allowed(['a'], 'x'));
 eq('an app by name, accents ignored', matchApp([{ id: 'notes', name: 'Notas' }], 'notas')?.id, 'notes');
+// (ws170 QA BUG-17) a window's screenshot grows to hold its own open pop-up; a box that isn't one is left out
+eq('the frame alone', unionBox([140, 44, 880, 600], []), [140, 44, 880, 600]);
+eq('a list hanging past its bottom', unionBox([140, 44, 880, 600], [[460, 470, 220, 180]]), [140, 44, 880, 606]);
+eq('bad boxes ignored', unionBox([0, 0, 10, 10], [[5, 5, 0, 9], null, [1, 2], [NaN, 0, 5, 5]]), [0, 0, 10, 10]);
 // (ws170 QA BUG-17) set_value on a pop-up (Settings → AI → Voice → Language) or a segmented control
 const OPTS = [['es', 'Español'], ['en', 'English'], ['pt', 'Português'], ['fr', 'Français', true], ['de', 'Deutsch']];
 eq('an option by its value', optionIndex(OPTS, 'pt'), 2);

@@ -20,6 +20,8 @@
 #   8. the agent clicks a theme switch (Settings → Appearance → Classic → Apply): the new shell registers the cursor again
 #      under the agent's input (QA ws168: lord.hands.cursor was refused then), and it shows on the agent's next action;
 #      nothing the new shell's start does is refused as the agent's (BUG-10 of the 0.8.9.6.2 QA).
+#   9. a window's screenshot holds its own open pop-up (Settings → AI → Voice → Language), grown past the window's edge
+#      for it (ws170 QA BUG-17), and set_value picks that pop-up's option by its label;
 #   5 also saves a screenshot and a zoom (computer save): full resolution in ~/Pictures/LordOS QA, the same black areas.
 # Exit 0 passed, 1 failed, 77 skipped (no theme bundle or binaries).
 import base64, json, os, re, shutil, socket, subprocess, sys, tempfile, time, zlib
@@ -544,8 +546,65 @@ def theme_switch_cursor():
         except OSError:
             log = ''
         after = log[log.rfind('themes/classic/'):] if 'themes/classic/' in log else ''
-        n = after.count('refused (an AI agent\'s input)')
+        n = after.count('refused (an AI agent\'s input)') + len(re.findall(r'hands: \S+ admin \S+ refused \(', after))
         check(after != '' and n == 0, f'nothing of the new shell\'s own start refused as the agent\'s ({n})')
+    finally:
+        a.close()
+
+
+def window_popup():
+    print('9. a window\'s screenshot holds its own open pop-up (Settings → AI → Voice → Language), set_value by label')
+    a = Agent('settings')
+    try:
+        t = a.text('read_window', window_id='settings', filter='interactive')
+        a.text('computer', action='left_click', ref=ref(t, r'textfield "Search"'))
+        a.text('computer', action='type', text='voice')
+        time.sleep(0.8)
+        t = a.text('read_window', window_id='settings', filter='interactive')
+        a.text('computer', action='left_click', ref=ref(t, r'row "✦ AI"'))
+        time.sleep(1.0)
+        t = a.text('read_window', window_id='settings', filter='interactive')
+        r = ref(t, r'clickable "Voice \d')
+        if r:
+            a.text('computer', action='left_click', ref=r)
+            time.sleep(1.0)
+        t = a.text('read_window', window_id='settings', filter='interactive')
+        r = ref(t, r'clickable "✓ (?:Spanish|English)')
+        if r:
+            a.text('computer', action='left_click', ref=r)
+            time.sleep(1.0)
+            t = a.text('read_window', window_id='settings', filter='interactive')
+            r = ref(t, r'button "Its voices')
+            if r:
+                a.text('computer', action='left_click', ref=r)
+                time.sleep(1.2)
+        m = None
+        for _ in range(5):
+            t = a.text('read_window', window_id='settings', filter='interactive')
+            m = re.search(r'combobox [^\n]*\[(ref_\d+)\]', t)
+            if m:
+                break
+            a.text('computer', action='scroll', coordinate=[700, 400], scroll_direction='down', scroll_amount=5)
+            time.sleep(0.6)
+        check(m is not None, 'the Voice page\'s Language pop-up is there')
+        if not m:
+            return
+        def size():
+            r = a.call('computer', action='screenshot', target='window:settings')
+            txt = ' '.join(c.get('text', '') for c in r['content'] if c['type'] == 'text')
+            mm = re.search(r'(\d+)x(\d+) points', txt)
+            return (int(mm.group(1)), int(mm.group(2))) if mm else (0, 0)
+        closed = size()
+        a.text('computer', action='left_click', ref=m.group(1))
+        time.sleep(0.8)
+        opened = size()
+        # the list hangs below the pop-up, past the window's bottom edge here: the capture grows to hold it
+        check(opened[1] > closed[1] or opened[0] > closed[0], f'the open list is in the window\'s screenshot ({closed} → {opened})')
+        sv = a.text('set_value', ref=m.group(1), value='english')
+        check(not sv.startswith('ERROR'), f'set_value picks an option by its label, case ignored ({sv[:80]})')
+        time.sleep(0.6)
+        t = a.text('read_window', window_id='settings', filter='interactive')
+        check(re.search(r'combobox [^\n]*value="English"', t) is not None, 'and the pop-up says English')
     finally:
         a.close()
 
@@ -564,6 +623,7 @@ def main():
     zoom_edges()
     agent_cursor()
     theme_switch_cursor()
+    window_popup()
     print(f'hands-e2e: {passes} passed, {fails} failed')
     return 1 if fails else 0
 
