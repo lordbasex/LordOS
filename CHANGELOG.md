@@ -11,6 +11,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Flatpak apps can notify: `org.freedesktop.portal.Notification`** (BUG-J of the ws171 QA: AddNotification answered
+  UnknownMethod; approved by the maintainer on 2026-11-27 with limits). lord-server's portal serves `AddNotification`
+  and `RemoveNotification` (version 1) for Flatpak apps only: the caller is known only by its root-owned
+  `app-lordos-fp-<id>.scope`, an app with the firewall's "no notifications" isn't shown, and anyone else is refused.
+  The banner is the one Linux apps' notifications get (Settings → Notifications, Do Not Disturb), named and drawn with
+  the icon of the app's own installed export (the icon it sends is read past). Title and body are plain text; at most
+  three buttons, plain labels whose action names stay in lord-server and go back only as `ActionInvoked` to the
+  connection that added the notification. Their ids (`PNOTE_BASE` and up) can't be reached through the Notifications
+  server (`NOTIFYD_ID_MAX`). Tests: `portal-cast-test` (shown, replaced, a button's action, Remove; a bad id, a
+  long id, the wrong signature, a native caller, an unknown one and a restricted app refused), `notifyd-test`.
+  docs/FLATPAK.md.
 - **Hands (Manos): an AI agent uses the LordOS desktop** (in development; approved by the maintainer on 2026-11-26,
   AGENTS.md; docs/HANDS.md). Modelled on Claude in Chrome: Claude Code today, and later Lumo's own agent, reads the
   windows as a tree, clicks, types, scrolls and takes screenshots through lord-server.

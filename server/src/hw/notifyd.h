@@ -21,6 +21,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* this server's ids stay below this: the ones above are the Notification portal's (ui/portal.h PNOTE_BASE); a
+ * "replaces" past it is a new notification */
+#define NOTIFYD_ID_MAX 0x40000000u
+
 typedef void (*NotifydEvent)(const char *kind, const char *json);   /* "notify", "notify-close" */
 
 int  notifyd_start(NotifydEvent fn);    /* 0 if we own the name */

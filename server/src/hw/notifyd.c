@@ -85,6 +85,7 @@ static void on_notify(const DMsg *m, uint32_t pid) {
     dr_init(&r, m);
     const char *app = dr_str(&r, NULL);
     uint32_t replaces = dr_u32(&r);
+    if (replaces >= NOTIFYD_ID_MAX) replaces = 0;    /* ids from there up are the Notification portal's (portal.h PNOTE_BASE) */
     const char *icon = dr_str(&r, NULL), *summary = dr_str(&r, NULL), *body = dr_str(&r, NULL);
     HBuf j = { 0 };
     char plain[2048];
@@ -121,7 +122,7 @@ static void on_notify(const DMsg *m, uint32_t pid) {
         return;
     }
     uint32_t id = replaces ? replaces : next_id++;
-    if (!next_id) next_id = 1;
+    if (!next_id || next_id >= NOTIFYD_ID_MAX) next_id = 1;
     hb_printf(&j, "],\"id\":%u,\"replaces\":%s,\"urgency\":%d,\"timeout\":%d,\"app\":", id, replaces ? "true" : "false", urgency, timeout);
     notifyd_plain(app, plain, 128);
     hb_str(&j, plain);
@@ -188,8 +189,9 @@ static void drop_notify(const DMsg *m) {
     dr_init(&r, m);
     dr_str(&r, NULL);
     uint32_t replaces = dr_u32(&r);
+    if (replaces >= NOTIFYD_ID_MAX) replaces = 0;    /* ids from there up are the Notification portal's (portal.h PNOTE_BASE) */
     uint32_t id = replaces ? replaces : next_id++;
-    if (!next_id) next_id = 1;
+    if (!next_id || next_id >= NOTIFYD_ID_MAX) next_id = 1;
     DBuf b;
     dw_init(&b);
     dw_u32(&b, id);

@@ -862,7 +862,8 @@ static const JSCFunctionListEntry td_funcs[] = { JS_CFUNC_DEF("refresh", 0, f_td
 static JSValue f_nd_closed(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     int id = argc ? arg_int(c, argv[0], 0) : 0, reason = argc > 1 ? arg_int(c, argv[1], 2) : 2;
-    if (id > 0) notifyd_closed((uint32_t)id, (uint32_t)reason);
+    if (id > 0 && (uint32_t)id >= PNOTE_BASE) portal_note_closed((uint32_t)id);    /* a Flatpak app's, through the portal */
+    else if (id > 0) notifyd_closed((uint32_t)id, (uint32_t)reason);
     return JS_UNDEFINED;
 }
 
@@ -870,7 +871,10 @@ static JSValue f_nd_action(JSContext *c, JSValueConst t, int argc, JSValueConst 
     (void)t;
     char key[129];
     int id = argc ? arg_int(c, argv[0], 0) : 0;
-    if (id > 0 && argc > 1 && !arg_str(c, argv[1], key, sizeof key)) notifyd_action((uint32_t)id, key);
+    if (id > 0 && argc > 1 && !arg_str(c, argv[1], key, sizeof key)) {
+        if ((uint32_t)id >= PNOTE_BASE) portal_note_action((uint32_t)id, key);
+        else notifyd_action((uint32_t)id, key);
+    }
     return JS_UNDEFINED;
 }
 

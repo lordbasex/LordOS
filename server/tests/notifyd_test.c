@@ -122,11 +122,12 @@ static void reply_to(const DMsg *call, const char *sig, DBuf *b, const char *sen
     bus_send(&h, b);
 }
 
-/* sends Notify(title) from :1.9 and returns its serial */
+/* sends Notify(title) from :1.9 and returns its serial; replaces: notify_replaces's */
+static uint32_t notify_replaces;
 static uint32_t notify(const char *title) {
     DBuf b;
     dw_init(&b);
-    dw_str(&b, "test"); dw_u32(&b, 0); dw_str(&b, ""); dw_str(&b, title); dw_str(&b, "body");
+    dw_str(&b, "test"); dw_u32(&b, notify_replaces); dw_str(&b, ""); dw_str(&b, title); dw_str(&b, "body");
     size_t a = dw_arr_begin(&b, 4); dw_arr_end(&b, a);
     a = dw_arr_begin(&b, 8); dw_arr_end(&b, a);
     dw_i32(&b, -1);
@@ -350,6 +351,15 @@ int main(void) {
     pid_answer(q, 400, "org.freedesktop.DBus");
     check(notify_answer(n, 2000) > 0, "1e: answered");
 
+    /* 1f. (0.8.9.6.2) an id at or past NOTIFYD_ID_MAX is the Notification portal's: a "replaces" there is a new one,
+     *     so no app reaches a Flatpak app's portal notification through this server */
+    notify_replaces = 0x40000005u;
+    n = notify("portal id"); q = pid_question();
+    pid_answer(q, 200, "org.freedesktop.DBus");
+    uint32_t got = notify_answer(n, 2000);
+    check(got > 0 && got < 0x40000000u, "1f: a replaces in the portal's ids gets a new id of this server's");
+    notify_replaces = 0;
+
     /* 2. restricted: answered, not shown */
     n = notify("bad"); q = pid_question();
     pid_answer(q, 100, "org.freedesktop.DBus");
@@ -382,7 +392,7 @@ int main(void) {
     char shown[512] = "";
     ssize_t r = read(pipefd[0], shown, sizeof shown - 1);
     shown[r > 0 ? r : 0] = 0;
-    const char *want = "good\nchrome|desktop|actions|quiet\nweb|web|icon\nnotweb\nflatpak|flatpak\nfpchrome|desktop|actions|quiet|flatpak\n";
+    const char *want = "good\nchrome|desktop|actions|quiet\nweb|web|icon\nnotweb\nflatpak|flatpak\nfpchrome|desktop|actions|quiet|flatpak\nportal id\n";
     check(!strcmp(shown, want), "only the unrestricted notifications were shown, Chrome's with its entry, actions and suppress-sound, "
                                 "lord-web's as its web app with its icon, an impostor's without");
     if (strcmp(shown, want)) printf("  shown: %s\n", shown);

@@ -258,6 +258,12 @@ static const char introspect_xml[] =
     "  <method name=\"PickColor\"><arg type=\"s\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"in\"/><arg type=\"o\" direction=\"out\"/></method>\n"
     "  <property name=\"version\" type=\"u\" access=\"read\"/>\n"
     " </interface>\n"
+    " <interface name=\"org.freedesktop.portal.Notification\">\n"
+    "  <method name=\"AddNotification\"><arg type=\"s\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"in\"/></method>\n"
+    "  <method name=\"RemoveNotification\"><arg type=\"s\" direction=\"in\"/></method>\n"
+    "  <signal name=\"ActionInvoked\"><arg type=\"s\"/><arg type=\"s\"/><arg type=\"s\"/><arg type=\"av\"/></signal>\n"
+    "  <property name=\"version\" type=\"u\" access=\"read\"/>\n"
+    " </interface>\n"
     " <interface name=\"org.freedesktop.DBus.Properties\">\n"
     "  <method name=\"Get\"><arg type=\"s\" direction=\"in\"/><arg type=\"s\" direction=\"in\"/><arg type=\"v\" direction=\"out\"/></method>\n"
     "  <method name=\"GetAll\"><arg type=\"s\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"out\"/></method>\n"
@@ -1924,6 +1930,238 @@ void portal_color_chosen(int id, const CastSource *src, int x, int y) {
     shot_gone(0);
 }
 
+/* ---- org.freedesktop.portal.Notification (approved by the maintainer 2026-11-27, with limits; AGENTS.md) ----
+ * Flatpak apps notify through this portal (they can't reach org.freedesktop.Notifications). Exactly this and nothing
+ * more: AddNotification and RemoveNotification. The caller is identified only by its root-owned app-lordos-fp-<id>.scope
+ * (the bus's GetConnectionUnixProcessID, appid_of_pid: "flatpak:<id>"); anyone else is refused, and so is an app with
+ * the firewall's "no notifications". The notification is the same "notify" event the Notifications server sends
+ * (hw/notifyd.c, sdk/hardware.jsx linuxNotify) with the verified Flatpak id, so the shell names it and draws the icon
+ * of that app's own installed export: the "icon" the app sends is read past, as are every target, sound and
+ * category. Title and body are plain text, cut; at most three buttons, plain labels whose action names are kept here
+ * and come back only through ActionInvoked to that app's connection (the shell answers with an index, never a name).
+ * Ids above PNOTE_BASE in lord.notifyd are this portal's (js_hw.c). Tests: build/portal-cast-test. */
+#define NOTE_IFACE "org.freedesktop.portal.Notification"
+#define NOTE_VERSION 1
+#define NOTE_MAX 64                 /* notifications shown at once (the oldest is forgotten past it) */
+#define NOTE_PENDING 16             /* AddNotification calls waiting for the bus to say who sent them */
+#define NOTE_ID_MAX 64
+#define NOTE_TITLE_MAX 256
+#define NOTE_BODY_MAX 2048
+#define NOTE_LABEL_MAX 96
+#define NOTE_BUTTONS 3
+
+typedef struct {
+    char id[NOTE_ID_MAX + 1], title[NOTE_TITLE_MAX + 1], body[NOTE_BODY_MAX + 1], def[NOTE_ID_MAX + 1];
+    char label[NOTE_BUTTONS][NOTE_LABEL_MAX + 1], act[NOTE_BUTTONS][NOTE_ID_MAX + 1];
+    int nbtn, urgency;
+} PNote;
+typedef struct { int used; uint32_t nid; char app[FW_APP_MAX], sender[96], id[NOTE_ID_MAX + 1], def[NOTE_ID_MAX + 1];
+                 char act[NOTE_BUTTONS][NOTE_ID_MAX + 1]; int nbtn; double at; } NoteLive;
+static NoteLive notes[NOTE_MAX];
+static struct { uint32_t serial; char sender[96]; PNote n; } npend[NOTE_PENDING];
+static uint32_t note_seq;
+
+/* an app's id or action name: 1..64 of [A-Za-z0-9._:-] */
+static int note_word(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    if (!n || n > NOTE_ID_MAX) return 0;
+    for (; *s; s++) if (!((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z') || (*s >= '0' && *s <= '9') || *s == '.' || *s == '_' || *s == ':' || *s == '-')) return 0;
+    return 1;
+}
+/* plain text: control characters (but new lines in a body) become spaces, cut at max bytes on a character boundary */
+static void note_text(const char *in, char *out, size_t max, int lines) {
+    size_t o = 0;
+    for (const unsigned char *p = (const unsigned char *)(in ? in : ""); *p && o < max; p++)
+        out[o++] = (*p < 0x20 && !(lines && *p == '\n')) || *p == 0x7f ? ' ' : (char)*p;
+    while (o > 0 && o == max && ((unsigned char)out[o - 1] & 0xc0) == 0x80) o--;
+    if (o > 0 && o == max && ((unsigned char)out[o - 1] & 0xc0) == 0xc0) o--;
+    out[o] = 0;
+}
+
+/* AddNotification's arguments, strictly: id, then a{sv} with title, body, priority, default-action and buttons (each
+ * a{sv} with label and action); anything else is skipped by its signature. 0, or -1 (not the shape the spec gives). */
+static int portal_note_parse(const DMsg *m, PNote *n) {
+    memset(n, 0, sizeof *n);
+    n->urgency = 1;
+    if (!m->sig || strcmp(m->sig, "sa{sv}")) return -1;
+    DRd r;
+    dr_init(&r, m);
+    const char *id = dr_str(&r, NULL);
+    if (r.err || !note_word(id)) return -1;
+    snprintf(n->id, sizeof n->id, "%s", id);
+    size_t end = dr_arr(&r, 8);
+    while (!r.err && dr_more(&r, end)) {
+        dr_struct(&r);
+        const char *k = dr_str(&r, NULL), *sig = dr_variant(&r);
+        if (r.err || !k || !sig) return -1;
+        if (!strcmp(k, "title") && !strcmp(sig, "s")) note_text(dr_str(&r, NULL), n->title, NOTE_TITLE_MAX, 0);
+        else if (!strcmp(k, "body") && !strcmp(sig, "s")) note_text(dr_str(&r, NULL), n->body, NOTE_BODY_MAX, 1);
+        else if (!strcmp(k, "priority") && !strcmp(sig, "s")) {
+            const char *v = dr_str(&r, NULL);
+            n->urgency = v && !strcmp(v, "urgent") ? 2 : v && !strcmp(v, "low") ? 0 : 1;
+        } else if (!strcmp(k, "default-action") && !strcmp(sig, "s")) {
+            const char *v = dr_str(&r, NULL);
+            if (note_word(v)) snprintf(n->def, sizeof n->def, "%s", v);
+        } else if (!strcmp(k, "buttons") && !strcmp(sig, "aa{sv}")) {
+            size_t be = dr_arr(&r, 4);
+            while (!r.err && dr_more(&r, be)) {
+                char label[NOTE_LABEL_MAX + 1] = "", act[NOTE_ID_MAX + 1] = "";
+                size_t de = dr_arr(&r, 8);
+                while (!r.err && dr_more(&r, de)) {
+                    dr_struct(&r);
+                    const char *bk = dr_str(&r, NULL), *bs = dr_variant(&r);
+                    if (r.err || !bk || !bs) return -1;
+                    if (!strcmp(bk, "label") && !strcmp(bs, "s")) note_text(dr_str(&r, NULL), label, NOTE_LABEL_MAX, 0);
+                    else if (!strcmp(bk, "action") && !strcmp(bs, "s")) { const char *v = dr_str(&r, NULL); if (note_word(v)) snprintf(act, sizeof act, "%s", v); }
+                    else dr_skip(&r, bs);
+                }
+                if (label[0] && act[0] && n->nbtn < NOTE_BUTTONS) {
+                    memcpy(n->label[n->nbtn], label, sizeof label);
+                    memcpy(n->act[n->nbtn], act, sizeof act);
+                    n->nbtn++;
+                }
+            }
+        } else dr_skip(&r, sig);
+    }
+    return r.err ? -1 : 0;
+}
+
+static NoteLive *note_find(const char *app, const char *id) {
+    for (int i = 0; i < NOTE_MAX; i++) if (notes[i].used && !strcmp(notes[i].app, app) && !strcmp(notes[i].id, id)) return &notes[i];
+    return NULL;
+}
+static NoteLive *note_by_nid(uint32_t nid) {
+    for (int i = 0; i < NOTE_MAX; i++) if (notes[i].used && notes[i].nid == nid) return &notes[i];
+    return NULL;
+}
+
+/* the bus said who sent it: shown only for a Flatpak app's scope without "no notifications" */
+static void note_show(const char *sender, const PNote *n, unsigned pid) {
+    char app[FW_APP_MAX];
+    if (!pid || appid_of_pid(pid, app, sizeof app) != 0 || strncmp(app, "flatpak:", 8) || !app[8]) {
+        fprintf(stderr, "portal: a notification from a program that is no Flatpak app: not shown\n");
+        return;
+    }
+    if (restrict_blocks(app, FW_R_NO_NOTIFICATIONS)) return;
+    NoteLive *l = note_find(app, n->id);
+    int replaces = l != NULL;
+    if (!l) {
+        int k = 0;
+        for (int i = 0; i < NOTE_MAX; i++) { if (!notes[i].used) { k = i; break; } if (notes[i].at < notes[k].at) k = i; }
+        l = &notes[k];
+        memset(l, 0, sizeof *l);
+        l->used = 1;
+        l->nid = PNOTE_BASE + (++note_seq % (0x7fffffffu - PNOTE_BASE));
+        snprintf(l->app, sizeof l->app, "%s", app);
+        snprintf(l->id, sizeof l->id, "%s", n->id);
+    }
+    snprintf(l->sender, sizeof l->sender, "%s", sender);
+    snprintf(l->def, sizeof l->def, "%s", n->def);
+    l->nbtn = n->nbtn;
+    for (int i = 0; i < n->nbtn; i++) snprintf(l->act[i], sizeof l->act[i], "%s", n->act[i]);
+    l->at = (double)time(NULL);
+    HBuf j = { 0 };
+    hb_printf(&j, "{\"actions\":[");
+    int na = 0;
+    if (n->def[0]) { hb_printf(&j, "[\"default\",\"\"]"); na++; }
+    for (int i = 0; i < n->nbtn; i++) {
+        hb_printf(&j, "%s[\"%d\",", na++ ? "," : "", i);
+        hb_str(&j, n->label[i]);
+        hb_printf(&j, "]");
+    }
+    hb_printf(&j, "],\"id\":%u,\"replaces\":%s,\"urgency\":%d,\"timeout\":0,\"desktop\":\"\",\"portal\":true,\"app\":",
+              l->nid, replaces ? "true" : "false", n->urgency);
+    hb_str(&j, app + 8);                    /* its name until the shell finds the app's export */
+    hb_printf(&j, ",\"flatpak\":");
+    hb_str(&j, app + 8);
+    hb_printf(&j, ",\"title\":");
+    hb_str(&j, n->title);
+    hb_printf(&j, ",\"body\":");
+    hb_str(&j, n->body);
+    hb_printf(&j, "}");
+    char *json = hb_take(&j);
+    if (json) hw_emit("notify", json);
+    free(json);
+}
+
+static void note_add(const DMsg *m) {
+    PNote *n = malloc(sizeof *n);
+    if (!n) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.NoMemory", "memory"); return; }
+    if (!m->sender || portal_note_parse(m, n)) { free(n); dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "AddNotification(sa{sv})"); return; }
+    int k = -1;
+    for (int i = 0; i < NOTE_PENDING && k < 0; i++) if (!npend[i].serial) k = i;
+    if (k < 0) { free(n); dbus_error(&conn, m, "org.freedesktop.DBus.Error.LimitsExceeded", "too many notifications at once"); return; }
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, m->sender);
+    DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/DBus", .iface = "org.freedesktop.DBus",
+               .member = "GetConnectionUnixProcessID", .dest = "org.freedesktop.DBus", .sig = "s" };
+    uint32_t s = dbus_send(&conn, &h, &b);
+    dw_free(&b);
+    if (s) {
+        npend[k].serial = s;
+        snprintf(npend[k].sender, sizeof npend[k].sender, "%s", m->sender);
+        npend[k].n = *n;
+    }
+    free(n);
+    dbus_reply(&conn, m, NULL, NULL);       /* the app goes on; it is shown, or not, once the bus says who it is */
+}
+/* 1 when the reply was a pending AddNotification's */
+static int note_reply(const DMsg *m) {
+    for (int i = 0; i < NOTE_PENDING; i++) {
+        if (!npend[i].serial || npend[i].serial != m->reply_serial) continue;
+        uint32_t pid = 0;
+        if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u")) { DRd r; dr_init(&r, m); pid = dr_u32(&r); if (r.err) pid = 0; }
+        npend[i].serial = 0;
+        note_show(npend[i].sender, &npend[i].n, pid);
+        return 1;
+    }
+    return 0;
+}
+/* RemoveNotification(id): only the connection that added it */
+static void note_remove(const DMsg *m) {
+    DRd r;
+    dr_init(&r, m);
+    const char *id = m->sig && !strcmp(m->sig, "s") ? dr_str(&r, NULL) : NULL;
+    if (r.err || !m->sender || !note_word(id)) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "RemoveNotification(s)"); return; }
+    for (int i = 0; i < NOTE_MAX; i++) {
+        if (!notes[i].used || strcmp(notes[i].sender, m->sender) || strcmp(notes[i].id, id)) continue;
+        char j[48];
+        snprintf(j, sizeof j, "{\"id\":%u}", notes[i].nid);
+        hw_emit("notify-close", j);
+        notes[i].used = 0;
+    }
+    dbus_reply(&conn, m, NULL, NULL);
+}
+
+void portal_note_closed(uint32_t nid) {
+    NoteLive *l = note_by_nid(nid);
+    if (l) l->used = 0;
+}
+/* the person clicked: "default" or a button's index ("0".."2"); ActionInvoked(app_id, id, action, []) to that app's
+ * connection only */
+void portal_note_action(uint32_t nid, const char *key) {
+    NoteLive *l = note_by_nid(nid);
+    if (!l || !key || !up) return;
+    const char *act = NULL;
+    if (!strcmp(key, "default")) act = l->def[0] ? l->def : NULL;
+    else if (key[0] >= '0' && key[0] < '0' + l->nbtn && !key[1]) act = l->act[key[0] - '0'];
+    if (act) {
+        DBuf b;
+        dw_init(&b);
+        dw_str(&b, l->app + 8);
+        dw_str(&b, l->id);
+        dw_str(&b, act);
+        size_t a = dw_arr_begin(&b, 1);
+        dw_arr_end(&b, a);
+        DHdr h = { .type = DBUS_SIGNAL, .path = OBJ_PATH, .iface = NOTE_IFACE, .member = "ActionInvoked", .dest = l->sender, .sig = "sssav" };
+        dbus_send(&conn, &h, &b);
+        dw_free(&b);
+        dbus_flush(&conn);
+    }
+    l->used = 0;
+}
+
 /* ---- the bus: who asked, and who left ---- */
 static void on_reply(const DMsg *m) {
     if (webalive_reply(m)) return;          /* a lord-web's answer to lord-server's Ping (webalive.h) */
@@ -1945,6 +2183,7 @@ static void on_reply(const DMsg *m) {
         cast_ask(&csm.s[i], pid);
         return;
     }
+    if (note_reply(m)) return;
     if (shot.st == SH_ASKING && shot.serial && shot.serial == m->reply_serial) {
         uint32_t pid = 0;
         if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u")) { DRd r; dr_init(&r, m); pid = dr_u32(&r); if (r.err) pid = 0; }
@@ -1987,6 +2226,8 @@ static void on_signal(const DMsg *m) {
     for (int i = npicks; i-- > 0;) if (!strcmp(picks[i].sender, name)) pick_drop(i);
     for (int i = ngsess; i-- > 0;) if (!strcmp(gsess[i].sender, name)) gsess_drop(i);
     if (shot.st != SH_FREE && !strcmp(shot.sender, name)) shot_gone(1);
+    for (int i = 0; i < NOTE_PENDING; i++) if (npend[i].serial && !strcmp(npend[i].sender, name)) npend[i].serial = 0;
+    for (int i = 0; i < NOTE_MAX; i++) if (notes[i].used && !strcmp(notes[i].sender, name)) notes[i].used = 0;   /* banners stay; no app to tell */
     int ids[CSM_MAX], n = csm_gone(&csm, name, ids, CSM_MAX);
     for (int i = 0; i < n; i++) { CsSess *s = csm_by_id(&csm, ids[i]); if (s) cast_close(s, 0); }
     webask_gone(name);
@@ -2029,7 +2270,7 @@ static void request_close(const DMsg *m) {
 static int version_of(const char *iface) {
     return !strcmp(iface, IFACE) ? 2 : !strcmp(iface, FC_IFACE) || !strcmp(iface, OU_IFACE) ? 3
          : !strcmp(iface, INH_IFACE) || !strcmp(iface, GS_IFACE) ? 1 : !strcmp(iface, SC_IFACE) ? SC_VERSION
-         : !strcmp(iface, SHOT_IFACE) ? SHOT_VERSION : -1;
+         : !strcmp(iface, SHOT_IFACE) ? SHOT_VERSION : !strcmp(iface, NOTE_IFACE) ? NOTE_VERSION : -1;
 }
 
 static int screensaver_path(const char *p) { return p && (!strcmp(p, "/ScreenSaver") || !strcmp(p, "/org/freedesktop/ScreenSaver")); }
@@ -2135,6 +2376,8 @@ static void handle(const DMsg *m) {
     if (!strcmp(iface, SC_IFACE) && !strcmp(mem, "OpenPipeWireRemote")) { sc_remote(m); return; }
     if (!strcmp(iface, SHOT_IFACE) && !strcmp(mem, "Screenshot")) { shot_request(m, 0); return; }
     if (!strcmp(iface, SHOT_IFACE) && !strcmp(mem, "PickColor")) { shot_request(m, 1); return; }
+    if (!strcmp(iface, NOTE_IFACE) && !strcmp(mem, "AddNotification")) { note_add(m); return; }
+    if (!strcmp(iface, NOTE_IFACE) && !strcmp(mem, "RemoveNotification")) { note_remove(m); return; }
     if (!strcmp(iface, IFACE) || !iface[0]) {
         if (!strcmp(mem, "ReadAll") && m->sig && !strcmp(m->sig, "as")) { read_all(m); return; }
         if (!strcmp(mem, "Read") && m->sig && !strcmp(m->sig, "ss")) { read_one(m, 1); return; }
@@ -2191,7 +2434,7 @@ int portal_start(void) {
     webask_attach(&conn);                   /* lord-server's own calls to web apps (Show) */
     webalive_attach(&conn);                 /* and their Ping: a lord-web that stopped answering is started again */
     if (!only_web)
-        fprintf(stderr, "portal: Settings, FileChooser, OpenURI, Inhibit, GlobalShortcuts, ScreenCast and Screenshot on the session bus%s\n",
+        fprintf(stderr, "portal: Settings, FileChooser, OpenURI, Inhibit, GlobalShortcuts, ScreenCast, Screenshot and Notification on the session bus%s\n",
                 ss ? ", and " SS_NAME : " (" SS_NAME " is another program's)");
     if (!web) fprintf(stderr, "portal: %s is another program's: web apps can't ask for permissions\n", WEBASK_NAME);
     if (!writing) fprintf(stderr, "portal: %s is another program's: the lumo command can't write here\n", LUMO_BUS_NAME);
