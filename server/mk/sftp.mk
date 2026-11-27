@@ -15,6 +15,7 @@ all: build/lord-sftp
 build/lord-sftp: $(LSFTP_SRC) $(SFTP_HDR) src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LSFTP_SRC) -lpthread
+	chmod g-w $@
 
 # the mux and SFTP wire against hostile bytes (tests/sftp_test.c), lord-sftp against a fake server over pipes
 test: build/sftp-test

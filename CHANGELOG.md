@@ -428,6 +428,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **A tree built with umask 0002 left the helpers group-writable, and lord-server refused them** (Raspberry Pi 5,
+  ws171: lord-sql, lord-sftp, lord-web and lord-media refused, `sql-e2e` hung, and Machines' toolbar glyphs, drawn by
+  lord-media, were blank). Every helper's rule now ends with `chmod g-w`, as lord-vm's did, and the `sql-e2e`
+  acceptor gives up after 30 s so a refused helper fails the test instead of hanging it.
 - **`.gitignore`'s `logs/` matched the source folders `apps/logs` and `server/src/logs`** (a sync that applies the
   ignore rules dropped them): anchored to the top, `/logs/` (the agents' progress logs).
 - **Sentinela's third notification button read "It's…"** (ws171 QA). A notification's buttons now wrap to a second

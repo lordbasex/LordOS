@@ -56,6 +56,7 @@ test: build/lord-vm-testpaths
 build/lordos-guest: ../tools/guest/lordos-guest.c ../tools/guest/gshell.c ../tools/guest/gshell.h ../tools/guest/x11clip.c ../tools/guest/x11clip.h ../tools/guest/perf.c ../tools/guest/perf.h ../tools/guest/dbusmin.c ../tools/guest/dbusmin.h ../tools/guest/gsend.c ../tools/guest/gsend.h ../tools/guest/gnotes.c ../tools/guest/gnotes.h src/vm/vmagent.c src/vm/vmagent.h src/pkg/crypto.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -static -o $@ ../tools/guest/lordos-guest.c ../tools/guest/gshell.c ../tools/guest/x11clip.c ../tools/guest/perf.c ../tools/guest/dbusmin.c ../tools/guest/gsend.c ../tools/guest/gnotes.c src/vm/vmagent.c src/pkg/crypto.c
+	chmod g-w $@
 
 # The "LordOS Guest Tools" disc (docs/VIRTUALIZATION.md 6.17): for a Linux machine without qemu-guest-agent, a read-only
 # ISO 9660 image with lordos-guest (stripped), install.sh, its checksum and a README, made here by our own small writer
@@ -304,6 +305,7 @@ test: build/guest-fuzz
 build/lordos-guest-asan: $(GUEST_ASAN_SRC) ../tools/guest/gshell.h ../tools/guest/x11clip.h ../tools/guest/perf.h ../tools/guest/dbusmin.h ../tools/guest/gsend.h ../tools/guest/gnotes.h src/vm/vmagent.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ $(GUEST_ASAN_SRC)
+	chmod g-w $@
 build/guest-fuzz: tests/guest_fuzz.c ../tools/guest/dbusmin.c src/vm/vmagent.c src/pkg/crypto.c build/lordos-guest-asan
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/guest_fuzz.c ../tools/guest/dbusmin.c src/vm/vmagent.c src/pkg/crypto.c

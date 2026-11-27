@@ -112,6 +112,7 @@ build/lord-web: $(WEB_SRC) $(WEB_HDR) $(CLIENT_GEN) $(WEB_GEN) build/obj/ui/stb.
 	@mkdir -p build
 	@echo "lord-web: $(LORD_WEB_BACKEND) backend"
 	$(CC) $(CPPFLAGS) -Ibuild/gen/client $(WEB_CFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(WEB_SRC) $(WEB_CLIENT_C) build/obj/ui/stb.o $(WEB_LIBS) -lm
+	chmod g-w $@
 
 # lord-web's web process extension (src/web/webext.c): Chrome's Client Hints on the page's requests. WebKit loads it
 # from build/lord-web-ext/ next to lord-web (/usr/lib/lordos/bin/lord-web-ext/ once installed), never from elsewhere

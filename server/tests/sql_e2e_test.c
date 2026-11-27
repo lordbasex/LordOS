@@ -607,6 +607,10 @@ static void test_helper(void) {
 typedef struct { int lfd; Scn *s; } Acc;
 static void *acceptor(void *arg) {
     Acc *a = arg;
+    /* never forever: when sqlc refuses to start lord-sql (a group-writable build, umask 0002) nobody connects, and the
+     * test must fail instead of hanging in pthread_join */
+    struct pollfd pf = { a->lfd, POLLIN, 0 };
+    if (poll(&pf, 1, 30000) != 1) { fprintf(stderr, "sql-e2e: nobody connected in 30 s (was lord-sql refused?)\n"); return NULL; }
     int fd = accept4(a->lfd, NULL, NULL, SOCK_CLOEXEC);
     if (fd < 0) return NULL;
     a->s->fd = fd;

@@ -156,6 +156,7 @@ ALL += build/lordos-firstrun
 build/lordos-firstrun: $(FIRSTRUN_SRC) src/firstrun/firstrun.h src/users/homedirs.h src/users/admingroups.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(FIRSTRUN_SRC)
+	chmod g-w $@
 test: build/firstrun-test build/firstrun-fuzz build/imager-test
 build/firstrun-test: tests/firstrun_test.c src/firstrun/firstrun.c src/firstrun/firstrun.h
 	@mkdir -p build
@@ -258,6 +259,7 @@ build/gen/np_bpf.h: build/np.bpf.o build/bpf2c
 build/lord-netperm: $(NP_SRC) $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h) src/sec/json.h $(NP_GEN)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(NP_CPP) $(CFLAGS) $(WARN) -std=c11 -o $@ $(NP_SRC)
+	chmod g-w $@
 # tests/npverify_test.c: the BTF reader, and (as root) every program through the kernel verifier
 ifeq ($(BPF),1)
 test: build/npverify-test
@@ -295,6 +297,7 @@ ALL += build/lord-fand
 build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.h src/lordlog.c src/lordlog.h src/users/admingroups.c src/users/admingroups.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC) src/lordlog.c src/users/admingroups.c
+	chmod g-w $@
 # lordos.service restarts with live sessions on systemd 258+: controllers off and limits back (src/sec/cgroup.c, #140)
 # tests/cgslice_test.c (docs/VIRTUALIZATION.md 3.7): lord-sessiond's placement of a machine's scope into the machines'
 # slice, on a throwaway tree of the real cgroupfs; as root (without root it says it skipped)
@@ -360,6 +363,7 @@ ALL += build/lord-autoinstall
 build/lord-autoinstall: $(AUTOINSTALL_SRC) $(INSTALL_DISK_HDR) src/admin.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(AUTOINSTALL_SRC) -lcrypt
+	chmod g-w $@
 build/freepart-cli: tests/freepart_cli.c src/install/freepart.c src/install/freespace.c src/install/freepart.h src/install/freespace.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFP_TEST -o $@ tests/freepart_cli.c src/install/freepart.c src/install/freespace.c
@@ -415,6 +419,7 @@ all: build/lord-browser-prefs
 build/lord-browser-prefs: src/pkg/browserprefs_tool.c src/pkg/browserprefs.c src/pkg/browserprefs.h src/sec/json.c src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/pkg/browserprefs_tool.c src/pkg/browserprefs.c src/sec/json.c -lm
+	chmod g-w $@
 # lordos-lid-wake (src/hw/lidwake_tool.c, GitHub #172): the systemd-sleep hook that keeps an open lid from waking
 # a laptop right after it sleeps (/usr/lib/systemd/system-sleep/, root, libc only). Its parsing and decisions are
 # the pure src/hw/lidwake.h, tested by tests/lidwake_test.c.
@@ -422,6 +427,7 @@ all: build/lordos-lid-wake
 build/lordos-lid-wake: src/hw/lidwake_tool.c src/hw/lidwake.h src/hw/chassis.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/hw/lidwake_tool.c
+	chmod g-w $@
 test: build/lidwake-test
 build/lidwake-test: tests/lidwake_test.c src/hw/lidwake.h src/hw/chassis.h
 	@mkdir -p build
@@ -1211,6 +1217,7 @@ build/lord-media: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h s
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+	chmod g-w $@
 # lord-stream (0.8.8.10; cameras and IPTV, docs/MEDIA.md "Network streams"): lord-media's player built with LM_NET, the
 # only helper with internet sockets (sandbox network=1, firewall scope lordos-net-streams). Network players and M3U
 # lists only; lord-media itself keeps no network at all.
@@ -1219,6 +1226,7 @@ build/lord-stream: $(LS_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h 
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_NET $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LS_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+	chmod g-w $@
 # lord-stream end to end against a test server (a tool, never installed): build/lordstream-e2e build/lord-stream play URL
 build/lordstream-e2e: tests/lordstream_e2e.c src/media/proto.c src/media/proto.h
 	@mkdir -p build
@@ -1236,6 +1244,7 @@ build/lord-media-hwfall: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/pr
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_HWFALL_TEST=$(HWFALL) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+	chmod g-w $@
 # the remote desktop's check of a hardware encoder's first H.264 keyframe (src/media/helper/lm_encheck.h, #94);
 # in test-full when FFmpeg's -dev packages are there; ENCHECK_VAAPI=/dev/dri/renderD128 also checks that card
 ifeq ($(MEDIA),1)
@@ -1256,6 +1265,7 @@ build/lord-media-encfail: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/p
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_ENCHECK_FAIL_TEST $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+	chmod g-w $@
 # the image editor's pixel operations (crop, resize, turns, redaction; src/media/imgops.c)
 build/imgops-test: tests/imgops_test.c src/media/imgops.c src/media/imgops.h
 	@mkdir -p build
@@ -1369,6 +1379,7 @@ build/gen/%.o: build/gen/%.c
 build/lord-server: $(OBJ) build/obj/ui/stb.o $(QJS_OBJ) $(WL_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 	@printf '%s\n' $^ > build/lord-server.objs
+	chmod g-w $@
 
 # The conformance tool's server (tools/wl-conformance.mjs, tools/wl-proof.mjs; docs/WAYLAND.md "Conformance"): the same
 # objects as lord-server, but main.c, wl/wl.c and wl/drmlease.c built again with -DLORD_TEST_HOOKS, plus testhooks.c
@@ -1425,6 +1436,7 @@ build/blackfb-test: tests/blackfb_test.c src/remote/blackfb.c src/remote/blackfb
 	./$@ || { rm -f $@; exit 1; }
 build/lord-sessiond: $(SESSIOND_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(shell pkg-config --libs openssl) $(SESSIOND_LIBS) -lcrypt -lpthread -lm
+	chmod g-w $@
 
 # Version, channel and build of LordOS, shown in About and Settings → General (lord.version and
 # lord.system.info()). Version and channel come from ../package.json ("version" and "lordos": {"channel"}),
@@ -1493,12 +1505,15 @@ build/obj/doc/h_stb.o: src/doc/h_stb.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -w -c -o $@ $<
 build/lord-doc: $(LD_SRC) build/obj/doc/h_stb.o $(wildcard src/doc/*.h) src/sec/sandbox.h src/sec/cgroup.h src/sec/json.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 $(shell pkg-config --cflags $(LD_PKGS)) -o $@ $(LD_SRC) build/obj/doc/h_stb.o $(shell pkg-config --libs $(LD_PKGS)) -lm
+	chmod g-w $@
 build/lord-claude-status: src/term/claudebridge.c src/sec/json.c src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/term/claudebridge.c src/sec/json.c
+	chmod g-w $@
 LO_SRC := src/doc/helper.c src/doc/h_ocr.c src/doc/wire.c src/sec/json.c src/sec/sandbox.c src/sec/cgroup.c
 build/lord-ocr: $(LO_SRC) $(wildcard src/doc/*.h) src/sec/sandbox.h src/sec/cgroup.h src/sec/json.h
 	$(CC) $(CPPFLAGS) -DLORD_HELPER_OCR $(CFLAGS) $(WARN) -std=c11 $(shell pkg-config --cflags tesseract) -o $@ $(LO_SRC) $(shell pkg-config --libs tesseract) -lm
+	chmod g-w $@
 # rules for extracting without leaving the folder (tests/arcpath_test.c)
 build/arcpath-test: tests/arcpath_test.c src/doc/arcpath.c src/doc/arcpath.h
 	@mkdir -p build
@@ -1542,6 +1557,7 @@ build/obj/netd/netd.o: src/net/netd.c src/admin.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -c -o $@ $<
 build/lord-netd: $(NETD_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ -lm -lpthread
+	chmod g-w $@
 
 # SMART parsers (ATA and NVMe) of the Disks app: hand-built data, healthy/warning/failing
 test: build/smart-test

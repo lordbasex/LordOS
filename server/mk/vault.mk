@@ -44,6 +44,7 @@ LV_SRC := $(VAULT_CORE) src/vault/vault.c src/vault/keyring.c src/vault/vimport.
 build/lord-vault: $(LV_SRC) build/obj/vault/monocypher.o build/obj/vault/vstb.o build/obj/vault/lists.o $(VAULT_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(VAULT_CPP) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LV_SRC) build/obj/vault/monocypher.o build/obj/vault/vstb.o build/obj/vault/lists.o -lpthread -lm
+	chmod g-w $@
 # (only when all its parts are there, so the tree always builds)
 LV_READY := $(and $(wildcard src/vault/secretsvc.c),$(wildcard src/vault/dbus.c),$(wildcard src/vault/vimport.c),$(wildcard src/vault/kdbx.c),$(wildcard src/vault/csvp.c),$(wildcard src/vault/xmlmini.c))
 ifneq ($(LV_READY),)

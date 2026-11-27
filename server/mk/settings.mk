@@ -95,6 +95,7 @@ all: build/lord-pkexec
 build/lord-pkexec: src/hw/lord_pkexec.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/hw/lord_pkexec.c
+	chmod g-w $@
 # automatic rotation (accel.c, issue #60): the mount matrix, the orientation with hysteresis, the
 # debounce, and finding the screen's accelerometer in a fake sysfs/udev tree; `build/accel-test --live`
 # reads this machine's

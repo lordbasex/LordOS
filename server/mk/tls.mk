@@ -9,3 +9,4 @@ endif
 build/lord-tls: $(TLS_SRC) src/sec/sandbox.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(TLS_SRC) $(shell pkg-config --libs openssl) -lpthread
+	chmod g-w $@

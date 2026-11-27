@@ -17,6 +17,7 @@ endif
 build/lord-sql: $(LSQL_SRC) $(SQL_HDR) src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LSQL_SRC) $(shell pkg-config --libs openssl) -lpthread
+	chmod g-w $@
 
 # favorites.json: the validator (no secrets, ports, hosts, sizes), the lookup and the socket rule (tests/sqlc_test.c)
 test: build/sqlc-test

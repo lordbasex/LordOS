@@ -26,6 +26,7 @@ build/lord-studio: $(LST_SRC) $(STUDIO_OBJ) $(STUDIO_HDR) $(wildcard src/media/h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_STUDIO $(STUDIO_GL_FLAGS) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LST_SRC) $(STUDIO_OBJ) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) $(STUDIO_GL_LIBS) -lpthread -lm
+	chmod g-w $@
 
 # the inference against ONNX Runtime's stored outputs, face decoding and the loader's fuzz (tests/run_suites.sh runs it)
 test: build/studio-nn-test

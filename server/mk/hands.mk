@@ -29,3 +29,4 @@ all: build/lordos-mcp
 build/lordos-mcp: $(LORDOS_MCP_SRC) src/hands/mcp.h src/hands/mcpimg.h $(HANDS_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ $(LORDOS_MCP_SRC) -lm
+	chmod g-w $@

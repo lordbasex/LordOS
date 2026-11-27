@@ -36,6 +36,7 @@ LORD_APPSTREAM_SRC := src/fpakasmain.c src/fpakas.c src/fpak.c src/sec/sandbox.c
 build/lord-appstream: $(LORD_APPSTREAM_SRC) src/fpakas.h src/fpak.h src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ $(LORD_APPSTREAM_SRC) -lpthread
+	chmod g-w $@
 all: build/lord-appstream
 
 # the launcher's view of a home with mounts under it (tests/sandbox_home_mounts_test.c; 77: no user namespaces here)

@@ -20,6 +20,7 @@ build/lord-screencast: $(LSC_SRC) src/cast/castproto.h src/sec/sandbox.h src/sec
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 $(shell pkg-config --cflags libpipewire-0.3) -o $@ $(LSC_SRC) \
 	    $(shell pkg-config --libs libpipewire-0.3) -lpthread
+	chmod g-w $@
 
 # the portal's sessions (tests/castsm_test.c) and the ring and channel (tests/castproto_test.c), no bus or helper
 test: build/castsm-test build/castproto-test
