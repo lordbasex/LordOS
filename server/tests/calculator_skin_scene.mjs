@@ -12,5 +12,11 @@ m().actions.press('alert(1)');
 m().actions.press('9;');
 await flush();
 check('calculator: anything not a key is refused', st.seen.display.expression === '15' && st.seen.display.result === '15', st.seen.display.expression);
+// GitHub #271: % and ± are keys of the keypad, with the calculator's meaning
+check('calculator: % and ± keys', ['%', '±'].every((id) => m().keys.flat().some((k) => k.id === id && k.kind === 'function')));
+for (const k of ['C', '2', '0', '0', '+', '1', '0', '%', '=']) { m().actions.press(k); await flush(); }
+check('calculator: 200 + 10% = 220', st.seen.display.result === '220', st.seen.display.result);
+for (const k of ['C', '7', '±', '×', '3', '=']) { m().actions.press(k); await flush(); }
+check('calculator: ±7 × 3 = −21', st.seen.display.result === '−21', st.seen.display.result);
 await commonChecks('calculator', st, { bar: 'keypad' });
 process.exit(0);

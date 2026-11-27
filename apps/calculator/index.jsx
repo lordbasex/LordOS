@@ -1,6 +1,7 @@
-// Calculator — sample native app: buttons and keyboard (no eval: our own parser).
+// Calculator — sample native app: buttons and keyboard (no eval: our own parser, model.js).
 import { View, Text, useTheme, useKeyboard, t as tr, formatNumber, SkinRegion, useSkinned } from '@lordos/sdk';
 import { useRef, useState } from 'react';
+import { evaluate, addPercent, toggleSign } from './model.js';
 
 export function Icon({ size: s }) {
   const key = (x, y, c) => (
@@ -17,41 +18,17 @@ export function Icon({ size: s }) {
   );
 }
 
-// Evaluates + - × ÷ with precedence and parentheses (recursive descent).
-function evaluate(src) {
-  const toks = src.replace(/×/g, '*').replace(/÷/g, '/').replace(/,/g, '.').match(/\d*\.?\d+|[-+*/()]/g) || [];
-  let i = 0;
-  const peek = () => toks[i], next = () => toks[i++];
-  const factor = () => {
-    const tk = next();
-    if (tk === '-') return -factor();
-    if (tk === '(') { const v = expr(); next(); return v; }
-    const n = parseFloat(tk);
-    if (Number.isNaN(n)) throw new Error('syntax');
-    return n;
-  };
-  const term = () => {
-    let v = factor();
-    while (peek() === '*' || peek() === '/') v = next() === '*' ? v * factor() : v / factor();
-    return v;
-  };
-  const expr = () => {
-    let v = term();
-    while (peek() === '+' || peek() === '-') v = next() === '+' ? v + term() : v - term();
-    return v;
-  };
-  const v = expr();
-  if (i !== toks.length || !Number.isFinite(v)) throw new Error('error');
-  return Math.round(v * 1e10) / 1e10;
-}
-
+// the keypad (GitHub #271: % and ±); "0" and "=" take two places each
 const KEYS = [
-  ['C', '(', ')', '÷'],
-  ['7', '8', '9', '×'],
-  ['4', '5', '6', '-'],
-  ['1', '2', '3', '+'],
-  ['0', '.', '⌫', '='],
+  ['C', '±', '%', '÷'],
+  ['(', ')', '⌫', '×'],
+  ['7', '8', '9', '-'],
+  ['4', '5', '6', '+'],
+  ['1', '2', '3', '.'],
+  ['0', '='],
 ];
+const SPAN = { 0: 2, '=': 2 };
+const FN = 'C()⌫±%';
 
 export default function Calculator() {
   const t = useTheme();
@@ -61,13 +38,16 @@ export default function Calculator() {
   const press = (k) => {
     if (k === 'C') { setExpr(''); setResult('0'); }
     else if (k === '⌫') setExpr((e) => e.slice(0, -1));
+    else if (k === '%') setExpr((e) => addPercent(e).slice(0, 40));
+    else if (k === '±') setExpr((e) => toggleSign(e).slice(0, 40));
     else if (k === '=') {
       try { const v = String(evaluate(expr)); setResult(v); setExpr(v); } catch (e) { setResult(tr('calculator.error')); }
     } else setExpr((e) => (e + k).slice(0, 40));
   };
 
   useKeyboard((e) => {
-    const map = { '*': '×', '/': '÷', Enter: '=', Backspace: '⌫', Escape: 'C', ',': '.' };
+    // F9 changes the sign, as in other desktop calculators
+    const map = { '*': '×', '/': '÷', Enter: '=', Backspace: '⌫', Escape: 'C', ',': '.', F9: '±' };
     const k = map[e.key] || map[e.char] || e.char;
     if (KEYS.flat().includes(k)) press(k);
   });
@@ -84,9 +64,9 @@ export default function Calculator() {
   const skinned = useSkinned('calculator');
   const latest = useRef(press);
   latest.current = press;
-  const kind = (k) => (k === '=' ? 'equals' : '÷×-+'.includes(k) ? 'operator' : 'C()⌫'.includes(k) ? 'function' : 'digit');
+  const kind = (k) => (k === '=' ? 'equals' : '÷×-+'.includes(k) ? 'operator' : FN.includes(k) ? 'function' : 'digit');
   const vm = skinned ? { app: 'calculator', expression: show(expr), result: shown,
-    keys: KEYS.map((row) => row.map((k) => ({ id: k, label: k === '.' ? dec : k === '-' ? '−' : k, kind: kind(k) }))),
+    keys: KEYS.map((row) => row.map((k) => ({ id: k, label: k === '.' ? dec : k === '-' ? '−' : k, kind: kind(k), span: SPAN[k] || 1 }))),
     actions: { press: (k) => { if (KEYS.flat().includes(k)) latest.current(k); } } } : null;
   return (
     // the calculator is always left to right, also in Arabic or Hebrew
@@ -100,7 +80,7 @@ export default function Calculator() {
       <SkinRegion app="calculator" region="keypad" model={vm}>
       {KEYS.map((row, r) => (
         <View key={r} style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
-          {row.map((k) => <Key key={k} k={k} label={k === '.' ? dec : k === '-' ? '−' : k} onPress={() => press(k)} />)}
+          {row.map((k) => <Key key={k} k={k} span={SPAN[k] || 1} label={k === '.' ? dec : k === '-' ? '−' : k} onPress={() => press(k)} />)}
         </View>
       ))}
       </SkinRegion>
@@ -108,19 +88,19 @@ export default function Calculator() {
   );
 }
 
-// Key: digits, functions (C, parentheses, delete) and operators in orange; = in the accent color
+// Key: digits, functions (C, ±, %, parentheses, delete) and operators in orange; = in the accent color
 // (the primary action). Lightens on hover and dims while pressed.
-function Key({ k, label, onPress }) {
+function Key({ k, label, span = 1, onPress }) {
   const t = useTheme();
   const [hover, setHover] = useState(false);
   const [down, setDown] = useState(false);
   const dark = t.mode === 'dark';
-  const op = '÷×-+'.includes(k), fn = 'C()⌫'.includes(k);
+  const op = '÷×-+'.includes(k), fn = FN.includes(k);
   const bg = k === '=' ? t.accent : op ? '#ff9f0a' : fn ? (dark ? '#4a4a50' : '#d4d4d9') : (dark ? '#333338' : '#ffffff');
   return (
     <View onMouseDown={() => setDown(true)} onMouseUp={() => setDown(false)} onClick={onPress}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => { setHover(false); setDown(false); }}
-      style={{ flex: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: bg,
+      style={{ flex: span, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: bg,
         opacity: down ? 0.7 : hover ? 0.88 : 1, boxShadow: dark ? 'none' : '0 1px 1px rgba(0,0,0,0.08)' }}>
       <Text style={{ fontSize: op || k === '=' ? 24 : 20, fontWeight: op || k === '=' ? 500 : 400,
         color: op || k === '=' ? '#fff' : t.text }}>{label}</Text>

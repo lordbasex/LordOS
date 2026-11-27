@@ -11,6 +11,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Calculator: % and ± keys** (GitHub #271). **%** after **+** or **−** takes that percent of what comes before it
+  (200 + 10% = 220, 200 − 10% = 180, 2 × 100 + 10% = 220); anywhere else it divides by 100 (200 × 10% = 20, 50% = 0.5).
+  **±** changes the sign of the number being typed (a minus in front of it, or taken away; a binary minus stays). On
+  the keyboard, **%** and **F9**. The keypad has six rows (C ± % ÷ · ( ) ⌫ × · 7 8 9 − · 4 5 6 + · 1 2 3 . · 0 =), the
+  window is a little taller, and app skins get each key's `span`. The arithmetic moved to `apps/calculator/model.js`
+  (still no `eval`). Help's Calculator page (en, es, pt) explains both. Tests: `tests/calculator_model_test.mjs` and
+  two new checks in `tests/calculator_skin_scene.mjs`.
 - **Flatpak apps can notify: `org.freedesktop.portal.Notification`** (BUG-J of the ws171 QA: AddNotification answered
   UnknownMethod; approved by the maintainer on 2026-11-27 with limits). lord-server's portal serves `AddNotification`
   and `RemoveNotification` (version 1) for Flatpak apps only: the caller is known only by its root-owned

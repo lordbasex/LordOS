@@ -263,6 +263,7 @@ EOF
     if have node; then run "admin-js-test (sdk/admin.js: PROGRESS is progress, not the answer)" node tests/admin_js_test.mjs; fi
     if have node; then run "installer-disk-model-test (apps/installer/diskmodel.js, #280)" node tests/installer_disk_model_test.mjs; fi
     if have node; then run "filepicker-model-test (sdk/filepickermodel.js, the system file dialog)" node tests/filepicker_model_test.mjs; fi
+    if have node; then run "calculator-model-test (apps/calculator/model.js, % and ±, #271)" node tests/calculator_model_test.mjs; fi
     if have node; then run "statusplace-test (sdk/statusplace.js)" node tests/statusplace_test.mjs; fi
     if have node; then run "logfile-test (sdk/logfile.js)" node tests/logfile_test.mjs; fi
     if have node; then run "browserframe-notes-test (sdk/browserframe.js, #222)" node tests/browserframe_notes_test.mjs; fi
