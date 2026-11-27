@@ -511,16 +511,35 @@ static JSValue f_multiarch(JSContext *c, JSValueConst this_val, int argc, JSValu
     return o;
 }
 
+/* Whether there is a readable index, and its time, without opening it: only its header (magic, sizes) is read.
+ * lord.pkg.available()/lastUpdate() run while the theme loads (sdk/updates.js) and at every search, and opening the
+ * index (mmap, apt's preferences applied to every record) and reading dpkg's status took 640 ms on the Raspberry Pi's
+ * SD card at session start (QA 0.8.9.6.2). The first query that needs the packages pays it instead. */
+static int index_header(long *mtime) {
+    if (X.map) {                                            /* already open: the usual refresh check is cheap */
+        idx_refresh(&X, PKG_DIR);
+        if (X.map) { if (mtime) *mtime = X.mtime; return 1; }
+    }
+    int fd = open(PKG_DIR "/index.bin", O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return 0;
+    IdxHeader h;
+    struct stat st;
+    int ok = !fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_size >= (off_t)sizeof h && read(fd, &h, sizeof h) == (ssize_t)sizeof h &&
+             !memcmp(h.magic, IDX_MAGIC, 8);
+    close(fd);
+    if (ok && mtime) *mtime = (long)st.st_mtime;
+    return ok;
+}
+
 static JSValue f_last_update(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
-    refresh();
-    return JS_NewFloat64(c, X.map ? (double)X.mtime : 0);      /* the last time it was checked */
+    long mt = 0;
+    return JS_NewFloat64(c, index_header(&mt) ? (double)mt : 0);      /* the last time it was checked */
 }
 
 static JSValue f_available(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
-    refresh();
-    return JS_NewBool(c, X.map != NULL);
+    return JS_NewBool(c, index_header(NULL));
 }
 
 static JSValue f_icon(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {

@@ -593,6 +593,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   cable is pulled frames are dropped, as on a real unplugged switch, and the member sends again once the link is made,
   whichever member started first. Nothing else changes: the port has no backend and reaches nothing. Test:
   `vm-whonix-xml` checks that each member's link hub has the peerless port. Checked on VM 116: the Workstation alone for ten minutes (`ip neigh` INCOMPLETE), then its "Start Gateway" bar: 10.152.152.10 REACHABLE and Tor's check `IsTor: true`.
+- **`lord.pkg.available()` and `lastUpdate()` opened the whole package index while the theme loaded** (PI stall of the
+  ws171 QA on the Raspberry Pi: 640 ms of `pkg.available` at session start, from `sdk/updates.js`). Both now read only
+  the index's header (its magic and its time) unless the index is already open; opening it (the mmap and apt's
+  preferences applied to all 74 712 records, then dpkg's status) is left to the first query that needs packages.
+  Measured on the Pi: header read well under 1 ms against 70–100 ms cold for the full open on an idle SD card, 640 ms
+  under the session's start-up I/O.
 - **NVIDIA: the texts now match what the reports show** (after #276, a GTX 1070 on NVIDIA's proprietary 580.196.11 on
   0.8.9.5-beta, whose report says `composition: gpu`). The free drivers (nouveau, NVK) stay the default and NVIDIA's own
   driver stays the Store's opt-in (Store → For this computer). Settings → Graphics cards no longer lists *Desktop* as
