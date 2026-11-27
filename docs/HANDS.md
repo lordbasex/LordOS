@@ -285,7 +285,11 @@ never a secret field, the allowlist; for keys, the field and the node with the k
 The safest way to test an app with an agent: `lordos-mcp --headless notes` starts a **private desktop** nobody sees: a
 private `dbus-daemon`, `lord-server --headless 1280x800 --hands-qa` and a demo home with a few sample files
 (`Documents/Shopping list.md`, `Meeting notes.txt`, `Ideas.md`), then opens the app. The person keeps working on their own
-desktop; nothing of theirs is read or touched. It has a demo identity everywhere the account could show: "Alex Demo",
+desktop, and the private desktop's own apps start in the demo home. **It is not a sandbox**: lord-server runs as the
+same user, with no user, mount or network namespace, so a program started there (a Terminal, a Linux app) can still read
+and write the real home, and `open_path` reaches the real `/media/`. Keep it for testing apps, not for running untrusted
+agents or content; real isolation (own user and mount namespaces, the real home and `/media` hidden) is planned for
+0.8.9.6.3. It has a demo identity everywhere the account could show: "Alex Demo",
 login "demo", host "demo-pc" (`lord.system.info`, `lord.users`, the environment, the terminal's prompt); `tests/hands_e2e.py`
 fails if the real account or host name appears in its trees. `--hands-qa` is accepted only with `--headless` (never with a monitor or
 on the login screen): Hands is on and every client granted with no prompt, and there is no person to yield to. It all

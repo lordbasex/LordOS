@@ -44,7 +44,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     show them black, failing closed; with an allowlist, everything but the allowed windows is black.
   - **QA mode**: `lordos-mcp --headless APP` starts a private headless desktop (`lord-server --headless --hands-qa`, a
     private bus, a demo home with sample files, and a demo identity: "Alex Demo", login "demo", host "demo-pc", never
-    the real account) so an agent can test an app while the person keeps working.
+    the real account) so an agent can test an app while the person keeps working. It is not a sandbox (same user, no
+    namespaces: a Terminal there still reaches the real home and `/media`), and docs/HANDS.md says so; real isolation
+    is planned for 0.8.9.6.3.
   - **Settings → AI → Hands**: the session switch, what it can and can never do, the allowlist, the connected clients
     with Stop, how to add it to Claude Code; the Hands piece of Lumo is ready and "Hands" is one of Lumo's functions.
   - Texts in all 35 languages.
