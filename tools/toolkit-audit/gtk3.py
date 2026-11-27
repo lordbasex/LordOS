@@ -295,8 +295,20 @@ class Harness:
         if self.first_draw is None:
             check('first_frame', False, detail='no frame painted by the map')
         self.mark('size')
+        # the size the window settles at: read again every 30 ms for at most 600 ms after the map. Under XWayland a
+        # ConfigureNotify can come a frame after the 150 ms above (the X server and the window manager answer in turn),
+        # and one read then failed the check once in two runs on a real desktop (BUG-2 of the 0.8.9.6.2 QA)
+        self.size_t = time.monotonic()
+        GLib.timeout_add(1, self.size_settle)
+        return False
+
+    def size_settle(self):
         w, h = self.win.get_size()
-        check('size', (w, h) == (REQ_W, REQ_H), detail='%dx%d' % (w, h))
+        if (w, h) != (REQ_W, REQ_H) and time.monotonic() - self.size_t < 0.6:
+            GLib.timeout_add(30, self.size_settle)
+            return False
+        check('size', (w, h) == (REQ_W, REQ_H), detail='%dx%d' % (w, h) +
+              ('' if time.monotonic() - self.size_t < 0.05 else ' after %d ms' % ms_since(self.size_t)))
         f = self.win.get_scale_factor()
         mon = DISPLAY.get_monitor_at_window(self.win.get_window()) if self.win.get_window() else None
         mf = mon.get_scale_factor() if mon else None

@@ -344,6 +344,29 @@ ASan and UBSan. It covers:
 The harnesses have their own checks (`tools/toolkit-audit/x11_test.py` against Xvfb, fast and in show mode). The report side is tested by
 `server/tests/hwreport_test.mjs` and `build/hwsnap-test` (docs/HARDWARE-REPORT.md).
 
+## The 0.8.9.6.2 QA: 98.5 % and 98.3 % on the maintainer's desktop (in development, 2026-11-27)
+
+Two runs on the maintainer's live session (three 1080p displays, RX 580 and an Intel iGPU, ws169): `qt6-wayland`
+93.6 % in both (`combo`: "the popup did not map in 1 s"), and once each `gtk3-x11` 91.6 % (`size`) and `qt5-wayland`
+93 % (`combo`: "closed at once"). Every other check passed. What was done (BUG-2 of the QA):
+
+- **Not reproduced headless.** A headless lord-server (one output, the test hooks' pointer over the window or not)
+  ran `qt6-wayland`, `qt5-wayland`, `gtk3-wayland` and `gtk4-wayland` repeatedly: `combo` and `size` passed every
+  time (only `theme` fails there, with no session bus or portal). So these are the real desktop's: its input (the
+  keyboard in the Terminal the audit was started from, the person's own serials), its three outputs, or timing.
+- **`size` waits for the configure to settle.** `gtk3.py` read the size once, 150 ms after the map; under XWayland a
+  ConfigureNotify can come a frame later. It now reads again every 30 ms for at most 600 ms (as `qt5.py` already
+  did), and so does `qt6.py` after its 120 ms; the detail says how long it took.
+- **`qt6-wayland` `combo` tries once more and says what it saw.** When the list didn't map in 1 s, the harness
+  notes whether Qt had it visible and whether the window had the keyboard, waits until the window has the keyboard
+  again (`settled()`) and opens it once more: a list Qt closed because the keyboard moved is not a failure (a person
+  opens it with the window in front). A second miss fails with both observations in the detail, and a pass on the
+  second try says so in the detail, so the next run on the hardware tells which it is.
+- **Needs the hardware:** whether the first `combo` miss on the three-display desktop is the keyboard focus (the
+  window launched from a Terminal without an activation token may not get the keyboard at once) or a compositor bug
+  with the popup's grab, and whether `qt5-wayland`'s "closed at once" is the same. Run
+  `lordos-testbench --toolkits --only qt6-wayland,qt5-wayland,gtk3-x11` a few times there and read the details.
+
 ## Measured: every combination at 100 % (in development, 2026-11-26)
 
 The latest release is 0.8.9.6.1; this is in development (`fix/toolkit-100`).

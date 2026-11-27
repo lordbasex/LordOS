@@ -365,6 +365,9 @@ class Audit:
         # size: the client area the compositor gave us (decorations not counted), after configure settles
         self.mark('size')
         yield (lambda: False, 120)
+        # then until it is the size asked for, at most 600 ms more: a configure can come a frame later (qt5.py and
+        # gtk3.py wait the same way; BUG-2 of the 0.8.9.6.2 QA)
+        yield (lambda: w.size().width() == WANT_W and w.size().height() == WANT_H, 600)
         s = w.size()
         put('size', s.width() == WANT_W and s.height() == WANT_H, detail='%dx%d' % (s.width(), s.height()))
 
@@ -418,7 +421,24 @@ class Audit:
         self.combo.showPopup()
         pop = self.combo.view().window()
         yield (lambda: (pop is not w and exposed(pop)) or QT_SAID['no_grab_serial'] > said, 1000)
-        self.popup_result('combo', pop is not w and exposed(pop), said, t)
+        if not (pop is not w and exposed(pop)) and QT_SAID['no_grab_serial'] <= said:
+            # (BUG-2 of the 0.8.9.6.2 QA: "the popup did not map in 1 s" in every run on a real three-display desktop,
+            # never headless) what Qt saw, for the report, then once more after the window has the keyboard again: a
+            # list Qt closed because the keyboard moved (a person opens it with the window in front) is not a failure
+            seen = 'visible=%s focus=%s' % (pop.isVisible(), QGuiApplication.focusWindow() is w.windowHandle())
+            self.combo.hidePopup()
+            yield self.settled()
+            t = time.monotonic()
+            self.combo.showPopup()
+            pop = self.combo.view().window()
+            yield (lambda: (pop is not w and exposed(pop)) or QT_SAID['no_grab_serial'] > said, 1000)
+            if not (pop is not w and exposed(pop)):
+                put('combo', False, ms=ms_since(t), detail='the popup did not map in 1 s, twice (first: %s; then: visible=%s focus=%s)'
+                    % (seen, pop.isVisible(), QGuiApplication.focusWindow() is w.windowHandle()))
+            else:
+                put('combo', True, ms=ms_since(t), detail='on the second try, once the window had the keyboard again (first: %s)' % seen)
+        else:
+            self.popup_result('combo', pop is not w and exposed(pop), said, t)
         if SHOW:
             yield hold
         self.combo.hidePopup()

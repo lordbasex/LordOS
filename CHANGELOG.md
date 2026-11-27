@@ -418,6 +418,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Toolkit audit: `gtk3-x11` `size` and `qt6-wayland` `combo` on a real desktop** (BUG-2 of the 0.8.9.6.2 QA: 98.5 %
+  and 98.3 % on the maintainer's three-display desktop; not reproduced on a headless lord-server, where both pass every
+  run). `gtk3.py` and `qt6.py` now wait for the configure to settle before they read the size (every 30 ms, at most
+  600 ms, as `qt5.py` did); `qt6.py`'s combo, when its list doesn't map in 1 s, records what Qt saw (visible, keyboard
+  focus), waits for the keyboard to come back and tries once more, and says in the detail whether it passed on the
+  second try. What still needs the hardware is written down in docs/TOOLKIT-AUDIT.md.
 - **✨ Writing didn't fix "nose" → "no sé"** (BUG-1 of the 0.8.9.6.2 QA: `lumo corregir "nose si vas a venir"` answered
   "Nose si vas a venir."). The correction's task now names words wrongly written together or apart (in Spanish nose →
   no sé, aver → a ver, haber → a ver), its Spanish worked example has them, and a short Spanish one goes last, the
