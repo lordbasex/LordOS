@@ -485,18 +485,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `none_on_fs`, `fsfocus.h` `fsf_none_ptr`). lord-server's "fullscreen" event carries the display's box
   (`args.fullscreenRect`), and `windows_context` reports it. Tests: `build/fsfocus-test` (four new cases),
   `tests/shellx_model_test.mjs`.
-- **Moving wallpapers: lord-server spent most of a core re-blurring the frosted surfaces over the video** (BUG-14 of the
-  ws170 QA: a 4K wallpaper on three 4K displays with Settings, Files, Notes and the Terminal open averaged 145 %, its
-  main thread about 80 %). Every video frame cleared, re-blurred and repainted on the CPU every frosted window, the menu
-  bar, the Dock and the widgets over a GPU-drawn moving wallpaper, and read the video's rows back from the GPU for them.
-  A new frame now refreshes those strips only when the last refresh is 200 ms old (`MEDIA_BLUR_MS`,
-  `media_src_blur_frame`; `LORD_MOTION_BLUR_MS`, 0 = every frame); a frame that waits is refreshed by the moving
-  wallpapers' tick once its time comes, so the last one shown is always blurred. The video itself still plays at its own
-  rate on the GPU. A blurred node with an opaque background is no longer refreshed for new frames, since its blur never
-  shows. Measured with the new `build/engine-test bench-motion` (one 3840×2160 display, the menu bar, the Dock, a widget
-  and two frosted windows: 4.2 Mpx): one refresh 32 ms, 97 % of a core per display at 30 frames/s before, 16 % after.
-  Still to do: caching a window's content apart from its blurred backdrop, or blurring on the GPU
-  (docs/MOVING-WALLPAPERS.md). Test: `engine-test` `test_motion_blur_refresh`.
+- **Moving wallpapers: the frosted surfaces over the video no longer cost the CPU anything per frame** (BUG-14 of the
+  ws170 QA: a 4K wallpaper on three 4K displays with Settings, Files, Notes and the Terminal open averaged 145 % of a
+  core, its main thread about 80 %, because every frame re-blurred and repainted on the CPU each frosted window, the menu
+  bar, the Dock and the widgets, and read the video's rows back from the GPU for them). On a GPU display, a frosted node
+  whose only backdrop is the GPU-drawn moving wallpaper is now blurred by the GPU from the picture's texture with each
+  composed frame (`gpu_draw_frosted`, `wl_paint_frost`, `frost_source`: the picture at 1/4 of its size, one Gaussian of
+  the CPU blur's variance, a rounded mask). The CPU paints only the node's own background and content, once, over the
+  picture's transparent hole, and a new video frame repaints, reads back and uploads nothing. Anything else painted under
+  the node (another window, its shadow, a desktop icon, an app window, a transform), a capture, a turned display or a
+  remote viewer or recording keeps the CPU's blur, as before; those strips refresh at most every 200 ms
+  (`MEDIA_BLUR_MS`, `LORD_MOTION_BLUR_MS`; `LORD_GPU_FROST=0` turns the GPU's glass off). A blurred node with an opaque
+  background is never refreshed, since its blur never shows. Measured: `build/engine-test bench-motion` (one 3840×2160
+  display, the menu bar, the Dock, a widget and two frosted windows, 4.2 Mpx): 31 ms and 92 % of a core per display at
+  30 frames/s before, 0 ms after. `build/motion-bench frost` on an RX 580: within 2.5 levels of the CPU's blur on
+  average, 2.5 ms of GPU and 0.1 ms of CPU for a 4K desktop's boxes. Tests: `engine-test` `test_gpu_frost`,
+  `test_motion_blur_refresh`, `motion-bench frost`. docs/MOVING-WALLPAPERS.md.
 - **Workspaces: a window could cover its display's bar, so the tray of the activity's windows couldn't be seen** (BUG-32
   of the ws170 QA: with the Terminal and the Calculator on the main display, only each window's own title icons showed,
   and the bar listing both was under the Terminal). The bar's tray did list both; a window the tiler doesn't place (Free
