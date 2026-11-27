@@ -3,7 +3,7 @@
 import { View, Text, addListener, displayFor, onCommit, onScreenChange, capsLock } from '@lordos/runtime';
 import { Component, createContext, memo, use, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme, stateBorder, bevelStyle } from './theme.js';
-import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop, appContentNodes, appRegistry } from './windows.js';
+import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop, appContentNodes, appRegistry, workAreaOf } from './windows.js';
 import { onDesktop } from './desktopmodel.js';
 import { useStore } from './store.js';
 import { textDirection, direction, t as tr } from './i18n.js';
@@ -538,12 +538,16 @@ function fieldMenuItems(send, { hist, sel, secure, value }) {
 
 // The menu at { x, y } of the field's box (anchor), above the window (layers.js). keepFocus: choosing an item leaves the
 // field focused. It stays inside the display (or, in an isolated app, the window) the field is on.
+// In the desktop's process the area is the display's work area (the Dock and the bar stay clear), and the bounds say how
+// far up and to the start it may go too (top, left: negative, from the field's corner), so a menu opened near the
+// bottom edge goes up instead of being cut (QA 0.8.9.6.2).
 function fieldBounds(anchor, win) {
   try {
     const r = lord.getLayout(anchor.current.id);
     const host = !shellLayers() && win?.overlayHost ? lord.getLayout(win.overlayHost.id) : null;
-    const d = host ? { x: host[0], y: host[1], w: host[2], h: host[3] } : displayFor({ x: r[0], y: r[1], w: r[2], h: r[3] });
-    return { w: d.x + d.w - r[0], h: d.y + d.h - r[1] };
+    let d = host ? { x: host[0], y: host[1], w: host[2], h: host[3] } : displayFor({ x: r[0], y: r[1], w: r[2], h: r[3] });
+    if (!host) { const a = workAreaOf(d); if (a && a.w > 0 && a.h > 0) d = a; }
+    return { left: d.x - r[0], top: d.y - r[1], w: d.x + d.w - r[0], h: d.y + d.h - r[1] };
   } catch (e) { return undefined; }
 }
 function FieldMenu({ anchor, at, items, onClose }) {

@@ -10,6 +10,7 @@ import * as rt from '@lordos/runtime';
 import { enableShellLayers, WindowSheet, Layer, LAYERS } from '../../sdk/layers.js';
 import { AppWindowContext } from '../../sdk/components.jsx';
 import { ConfirmDialog } from '../../sdk/controls.jsx';
+import { boxAt } from '../../sdk/contextmenu.jsx';
 
 const { texts, parents, removed } = globalThis.__lordTest;
 const h = React.createElement;
@@ -47,6 +48,14 @@ const alone = textNode('no window');
 check('outside a window: the modal layer', !!alone && under(alone, modal.id));
 // a dialog given no cancelLabel still says Cancel (QA 0.8.9.6.2: the community theme trust dialog's button was empty)
 check('ConfirmDialog without cancelLabel: "Cancel"', !!textNode('Cancel'), [...texts.values()].join(' | '));
+// a text field's menu near the bottom of the work area goes up, above the field, instead of being cut (QA 0.8.9.6.2)
+{
+  const items = Array.from({ length: 9 }, (_, i) => ({ label: `item ${i}` }));
+  const b = boxAt(items, 10, 20, 200, { left: -300, top: -700, w: 900, h: 60 });
+  check('a field\'s menu near the bottom opens upward', b.top < 0 && b.top + 10 + 9 * 26 <= 60 + 30, JSON.stringify(b));
+  const plain = boxAt(items, 10, 20, 200, { w: 4000, h: 4000 });
+  check('with room below it stays where it was asked', plain.top === 20 && plain.left === 10, JSON.stringify(plain));
+}
 // and no app draws a window's sheet in the modal layer any more (run from server/, as run_suites.sh does)
 const found = [];
 const walk = (d) => {

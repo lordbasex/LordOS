@@ -420,6 +420,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **A text field's right-click menu near the bottom of the screen was cut** (ws171 QA). The menu was kept inside the
+  whole display and could never go above the field's own top; now it stays inside the work area (clear of the Dock and
+  the bar) and opens upward when there is no room below (`fieldBounds` in `sdk/components.jsx`, `boxAt` in
+  `sdk/contextmenu.jsx`). Test: `window-sheet-scene`.
 - **Store: Remove asked nothing for Flatpak apps and LordOS packages** (ws171 QA). It now asks "Remove {name}?" with
   Cancel and a red Remove first, in Installed and on a Flatpak app's page, as Debian's removal (its plan) and web apps
   (their sheet) already did (`ConfirmRemove` in `apps/store/ui.js`; `store.removeAsk`, every language).

@@ -32,10 +32,11 @@ const noteLines = (s) => {
 const rowH = (it) => (it === '-' ? 9 : it.header ? 20 : it.note ? 8 + NOTE_LINE * noteLines(it.note) : it.swatches ? ITEM_H + 4 : ITEM_H);
 const heightOf = (items) => items.reduce((s, it) => s + rowH(it), 10);
 const rowTop = (items, i) => 5 + items.slice(0, i).reduce((s, q) => s + rowH(q), 0);
-// where a box of this size goes, inside the bounds
-const boxAt = (items, x, y, width, bounds) => ({
-  left: Math.max(4, Math.min(x, bounds.w - width - 4)),
-  top: Math.max(4, Math.min(y, bounds.h - heightOf(items) - 4)),
+// where a box of this size goes, inside the bounds (bounds.left and bounds.top: how far it may go to the start and up,
+// 0 when not given; negative when x, y are relative to a box inside the area, as a text field's menu)
+export const boxAt = (items, x, y, width, bounds) => ({
+  left: Math.max((bounds.left || 0) + 4, Math.min(x, bounds.w - width - 4)),
+  top: Math.max((bounds.top || 0) + 4, Math.min(y, bounds.h - heightOf(items) - 4)),
 });
 
 function MenuBox({ items, left, top, width, active, onRow, onPick, onMove, onEnter, onDown, boxRef }) {
