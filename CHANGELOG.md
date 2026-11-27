@@ -418,6 +418,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Hands: the shell's own refreshes were refused as the agent's** (BUG-10 of the 0.8.9.6.2 QA: `hands: claude admin
+  other refused` 237 times in one session, in bursts after each agent click and at the start of a desktop the agent
+  switched to). The security-state guard (`js.c` `prof_call`) refused by time only: everything after the agent's input
+  until the person's own click or key. It now decides by where the JavaScript run came from (`hands.h`
+  `HANDS_ORIGIN_*`): the agent's input, a shell call made for the agent (`open_app`, `set_value`…) and every timer,
+  interval and animation frame those set (the prelude's timers keep the origin of the run that set them,
+  `lord.__origin`/`__originSet`, deleted from `lord` before any bundle runs) are always refused, even after the person's
+  click; the person's input, a theme's start and the timers they set are the shell's and are never refused for the
+  agent's sake; any other native callback keeps the sticky check. `build/hands-test` (`hands_origin_refused`, what a
+  shell call for the agent and an agent's move deliver), `build/timer-order-test` (origins along a chain of timers and
+  a frame; the 400 random scripts still match the old prelude), `tests/hands_e2e.py` step 8 (nothing of the new shell's
+  start refused after the agent's theme switch); docs/HANDS.md.
 - **The desktop drew itself again whenever a window's title changed** (BUG-9 of the 0.8.9.6.2 QA: lord-server at ~69 %
   CPU with nothing happening, `stall: js __lordTick [shell; react made 0, changed ~4300]` about every second). A
   terminal running Claude Code spins its title ("◐ ◓ ◑ ◒"); each change updated the windows store, the desktop's `App`

@@ -455,6 +455,7 @@ typedef struct {
 static struct {
     const HandsHost *h;
     int on, qa, injecting;
+    int shell_depth;                    /* inside a shell call made for the agent (ask, shell_pass) */
     char allow[HANDS_ALLOW_MAX][HANDS_ID_MAX + 1];
     int nallow;
     Client c[HANDS_CLIENTS];
@@ -512,6 +513,21 @@ int hands_agent_owns_input(void) {
     return S.agent_seq && S.press_seq < S.agent_seq;
 }
 int hands_agent_recent(void) { return hands_agent_owns_input(); }
+
+int hands_delivering(void) { return S.injecting || S.shell_depth > 0; }
+int hands_origin_refused(int origin) {
+    if (hands_delivering() || origin >= HANDS_ORIGIN_AGENT) return 1;
+    if (origin == HANDS_ORIGIN_SHELL) return 0;
+    return hands_agent_owns_input();
+}
+/* the shell answers a call made for the agent: what that run sets off is the agent's (hands_delivering) */
+static char *shell_call(const char *op, const char *a) {
+    if (!a || !S.h || !S.h->shell) return NULL;
+    S.shell_depth++;
+    char *r = S.h->shell(op, a);
+    S.shell_depth--;
+    return r;
+}
 
 void hands_person_press(void) {
     if (S.injecting) return;
@@ -719,7 +735,7 @@ static void allow_json(Jb *b) {
 /* the shell's answer to op: 0 with its JSON in *d, or an error (its word into *why) */
 static int ask(const char *op, Jb *args, JDoc *d, int *why) {
     char *a = jb_take(args);
-    char *r = a && S.h->shell ? S.h->shell(op, a) : NULL;
+    char *r = shell_call(op, a);
     free(a);
     memset(d, 0, sizeof *d);
     if (!r) return HANDS_E_FAILED;
@@ -738,7 +754,7 @@ static int ask(const char *op, Jb *args, JDoc *d, int *why) {
 /* a call to the shell whose JSON answer goes back to the agent as it is */
 static int shell_pass(const char *op, Jb *args, char **out, int *why) {
     char *a = jb_take(args);
-    char *r = a && S.h->shell ? S.h->shell(op, a) : NULL;
+    char *r = shell_call(op, a);
     free(a);
     if (!r) return HANDS_E_FAILED;
     JDoc d;

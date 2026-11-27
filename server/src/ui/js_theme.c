@@ -113,6 +113,8 @@ static const struct { const char *name; unsigned cap; int policy; } rules[] = {
     { "themes.started", 0, JST_ALLOW }, { "themes.fail", 0, JST_ALLOW }, { "themes.quitByTheme", 0, JST_ALLOW },
     /* drawing and measuring its own nodes */
     { "getLayout", 0, JST_ALLOW }, { "now", 0, JST_ALLOW }, { "log", 0, JST_ALLOW }, { "measureText", 0, JST_ALLOW },
+    /* the prelude's timers keep their origin (hands.h HANDS_ORIGIN_*): taken and deleted before any bundle runs */
+    { "__origin", 0, JST_ALLOW }, { "__originSet", 0, JST_ALLOW },
     { "stats", 0, JST_ALLOW }, { "setStyle", 0, JST_NODE }, { "setProp", 0, JST_NODE_PROP }, { "setText", 0, JST_NODE },
     /* text, pictures, fonts and translations (read only) */
     { "text.", 0, JST_ALLOW }, { "image.", 0, JST_ALLOW }, { "fonts.list", 0, JST_ALLOW },

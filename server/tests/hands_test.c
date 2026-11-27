@@ -48,8 +48,10 @@ static int dialog_open, dialog_node_why, focus_secure_after, focus_calls;
 static int place_why, node_why, same, keys_why, focus_secure, region_inside, ref_secure, black_n;
 static int moves, buttons, keys, typed, shots, setvalues, last_black;
 static char last_event[512];
+static int shell_delivering, move_delivering;   /* hands_delivering() seen inside a shell call and an agent move */
 static char *shell(const char *op, const char *json) {
     (void)json;
+    shell_delivering |= hands_delivering() && hands_origin_refused(HANDS_ORIGIN_SHELL);
     char b[256];
     if (!strcmp(op, "resolve")) snprintf(b, sizeof b, "{\"node\":7,\"x\":100,\"y\":100,\"w\":40,\"h\":20,\"secure\":%s}", ref_secure ? "true" : "false");
     else if (!strcmp(op, "focus") && focus_secure_after && ++focus_calls > focus_secure_after) snprintf(b, sizeof b, "{\"secure\":true,\"allowed\":true}");
@@ -71,7 +73,7 @@ static int place(double x, double y, int *node) { (void)x; *node = y < 30 ? 99 :
 static int same_target(int hit, int ref) { return same && hit == ref; }
 static int node_place(int node) { return node == 77 ? dialog_node_why : node_why; }
 static int keys_place(void) { return keys_why; }
-static void move(double x, double y) { (void)x; (void)y; moves++; }
+static void move(double x, double y) { (void)x; (void)y; moves++; move_delivering |= hands_delivering(); }
 static void button(int b, int d) { (void)b; (void)d; buttons++; }
 static void wheel(int dx, int dy) { (void)dx; (void)dy; }
 static int key_refuse;
@@ -282,10 +284,18 @@ static void policy(void) {
     CHECK(hands_active() && hands_agent_owns_input(), "just after the agent's key: the agent's");
     clock_ms += 600000;
     CHECK(hands_agent_owns_input(), "time passing never gives it back");
+    /* by origin (BUG-10 of the 0.8.9.6.2 QA): under the agent's sticky input the shell's own runs (its timers set by
+     * the person or at the desktop's start, a theme's start) are not refused; the agent's runs and the unknown ones are */
+    CHECK(!hands_delivering(), "nothing of the agent's is being delivered between its calls");
+    CHECK(!hands_origin_refused(HANDS_ORIGIN_SHELL), "sticky: the shell's own refresh (an admin query) is not refused");
+    CHECK(hands_origin_refused(HANDS_ORIGIN_AGENT), "sticky: a timer the agent's click set is refused");
+    CHECK(hands_origin_refused(HANDS_ORIGIN_OTHER), "sticky: an unknown callback (an fs or admin answer) is refused");
     hands_person_input();
     CHECK(hands_agent_owns_input(), "nor the person's motion");
     hands_person_press();
     CHECK(!hands_agent_owns_input(), "the person's own click or key: theirs again");
+    CHECK(!hands_origin_refused(HANDS_ORIGIN_OTHER) && !hands_origin_refused(HANDS_ORIGIN_SHELL), "the person's again: callbacks and the shell's runs go");
+    CHECK(hands_origin_refused(HANDS_ORIGIN_AGENT), "a timer the agent's click set stays the agent's after the person's click");
     clock_ms += 4000;                       /* past the pause the person's input asks for */
     CHECK(call(":1.1", &pv, &why) == HANDS_OK && hands_agent_owns_input(), "the agent's key again: the agent's");
     hands_gone(":1.1");
@@ -991,6 +1001,9 @@ int main(void) {
     marks();
     mcp();
     native_guard();
+    /* what runs inside the agent's delivered input and inside a shell call made for it is the agent's whatever its origin */
+    CHECK(move_delivering, "an agent's move is delivered as the agent's (hands_delivering)");
+    CHECK(shell_delivering, "a shell call made for the agent (resolve, set_value…) runs as the agent's, even a shell timer's origin refused");
     printf("hands-test: %d passed, %d failed\n", passes, fails);
     return fails ? 1 : 0;
 }

@@ -18,7 +18,8 @@
 #   7. the agent's cursor in human mode: it shows on the display while it glides and where it clicks, never in the agent's
 #      own screenshot, and the click lands;
 #   8. the agent clicks a theme switch (Settings → Appearance → Classic → Apply): the new shell registers the cursor again
-#      under the agent's input (QA ws168: lord.hands.cursor was refused then), and it shows on the agent's next action.
+#      under the agent's input (QA ws168: lord.hands.cursor was refused then), and it shows on the agent's next action;
+#      nothing the new shell's start does is refused as the agent's (BUG-10 of the 0.8.9.6.2 QA).
 #   5 also saves a screenshot and a zoom (computer save): full resolution in ~/Pictures/LordOS QA, the same black areas.
 # Exit 0 passed, 1 failed, 77 skipped (no theme bundle or binaries).
 import base64, json, os, re, shutil, socket, subprocess, sys, tempfile, time, zlib
@@ -536,6 +537,15 @@ def theme_switch_cursor():
         mid = violet() - base
         check(not res.get('c', '').startswith('ERROR'), f'the next action runs ({res.get("c")})')
         check(mid > 10, f'the agent\'s cursor on the display again after the switch ({mid} more violet pixels)')
+        # the new shell's own start (its refreshes and timers) is the shell's, not the agent's, even though the agent's
+        # click switched to it (BUG-10 of the 0.8.9.6.2 QA: "hands: claude admin other refused" in bursts after it)
+        try:
+            log = open(os.path.join(a.dir, 'home', '.cache', 'lordos', 'shell.log'), errors='replace').read()
+        except OSError:
+            log = ''
+        after = log[log.rfind('themes/classic/'):] if 'themes/classic/' in log else ''
+        n = after.count('refused (an AI agent\'s input)')
+        check(after != '' and n == 0, f'nothing of the new shell\'s own start refused as the agent\'s ({n})')
     finally:
         a.close()
 

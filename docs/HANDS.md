@@ -205,7 +205,22 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
   (`hands_agent_owns_input`; motion never counts, time never clears it), the vault and keyring, `term.fill` and saving a
   terminal secret, the firewall's changes, permissions, administrator actions, Sentinela's blocklist, theme trust and
   removal, signing keys, screen-sharing answers, Hands' own switch and power refuse (`hands.refused`), so a surface
-  missing its `handsDeny` can't reopen them. **One exception, catalog wallpapers** (maintainer-approved 2026-11-26,
+  missing its `handsDeny` can't reopen them. **By origin, not only by time** (0.8.9.6.2, BUG-10 of the QA: the shell's
+  own refreshes were refused for minutes after each agent click, 237 times in one session): every JavaScript run has
+  an origin (`hands.h` `HANDS_ORIGIN_*`, `js.c` `run_origin`). The agent's: its input being delivered, a shell call
+  made for it (`open_app`, `set_value`, `close_window`…) and every timer, interval and animation frame one of those set,
+  along the whole chain (the prelude's timers keep the origin of the run that set them and run as it: `lord.__origin`,
+  `lord.__originSet`, taken and deleted from `lord` before any bundle runs, `__originSet` taken only inside the main
+  loop's own tick or frame): always refused, even after the person's click. The shell's: the person's own input, a
+  theme's start (also a switch the agent clicked) and the timers those set (Monitor's refresh of a process the person
+  opened, an interval set when the desktop started): never refused for the agent's sake. Anything else (a native
+  callback: a file watch, an admin or file answer, a Wayland event), whose cause can't be told, keeps the sticky check
+  above. Promise jobs run as the run they belong to; after a tick, as the most refused of the callbacks it ran. What
+  stays possible: an interval the shell set before the agent's click that acts on state the agent's click changed (a
+  debounce such as the brightness slider's 120 ms timer, started by the person's own drag) runs as the shell's.
+  `build/hands-test` (`hands_origin_refused`, what a shell call made for the agent and an agent's move deliver) and
+  `build/timer-order-test` (a timer and frame the agent set run as the agent's, a chained one too; the start's
+  interval as the shell's). **One exception, catalog wallpapers** (maintainer-approved 2026-11-26,
   AGENTS.md): `lord.admin.request` is decided in C (`hands_admin_allowed`, `js.c` `prof_call`) and an agent's input may
   set off only `wallpaper-get "<id> <variant>"` (Settings → Wallpaper's "Download and use" and "Download all"),
   `wallpaper-remove "<id> <variant>"` ("Free up space"), `wallpaper-login` with `default`, `still <id>`,

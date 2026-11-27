@@ -252,6 +252,19 @@ int  hands_injecting(void);
 int  hands_agent_owns_input(void);
 int  hands_agent_recent(void);
 int  hands_active(void);                     /* a Hands client is granted and connected */
+/* Where a JavaScript run came from, for the security-state natives (js.c prof_call; BUG-10 of the 0.8.9.6.2 QA: the
+ * shell's own refreshes were refused while the agent's input was sticky, 237 times in one session).
+ *   HANDS_ORIGIN_AGENT: the agent's input being delivered, a shell call made for the agent (open_app, set_value…), or a
+ *     timer or animation frame one of those set (inherited along the chain): always refused.
+ *   HANDS_ORIGIN_SHELL: the shell's own: the person's input, a theme's start, and a timer or frame one of those set (an
+ *     interval set at the desktop's start, Monitor's refresh of a process the person opened): never refused for the
+ *     agent's sake.
+ *   HANDS_ORIGIN_OTHER: anything else (a native callback: a file watch, an admin or fs answer, a Wayland event, the
+ *     person's own motion): unknown, so the sticky check (hands_agent_owns_input) as before.
+ * The agent's input being delivered refuses whatever the origin says. */
+enum { HANDS_ORIGIN_SHELL = 0, HANDS_ORIGIN_OTHER = 1, HANDS_ORIGIN_AGENT = 2 };
+int  hands_delivering(void);                 /* the agent's input is delivered, or a shell call for it runs, now */
+int  hands_origin_refused(int origin);
 void hands_person_press(void);               /* a real click or key (on_input, a remote viewer): the person's own again */
 /* what a lord.<ns>.<fn> native is to an agent's input: HANDS_G_REFUSE (a security-state change), HANDS_G_CLIP
  * (lord.clipboard.get: "" while the clipboard holds a secret) or HANDS_G_NONE (js.c prof_call) */

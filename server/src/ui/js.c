@@ -192,11 +192,24 @@ static void stall_sample(void) {
  * the next run does (a call with no jobs after it). */
 static struct { int open; double t_end; JSAtom name; JSValue detail; } run;
 
+/* Where the run in progress came from (hands.h HANDS_ORIGIN_*), for the security-state natives (prof_call): the agent's
+ * when its input or a shell call made for it runs; the shell's for the main loop's timers and frames (each callback then
+ * runs as what set it: the prelude's lord.__originSet) and a theme's start; other for any other call from C. Back to
+ * other when the run ends, so a callback nobody classified (a JS_Call of another module) takes the sticky check. */
+static int run_origin = HANDS_ORIGIN_OTHER;
+static int next_origin = -1;           /* what the next run that starts is (call_hot, eval), -1 by the rule above */
+static int hot_call;                   /* inside __lordTick or __lordFrame: lord.__originSet is taken */
+static int hot_worst;                  /* the most refused origin a callback of that call ran as: its promise jobs' */
+
 static void js_run_finish(void);
 
 static void js_run_begin(void) {
     if (stall.depth == 0 && run.open) js_run_finish();
-    if (stall.depth++ == 0) { stall.t0 = now_ms(); stall.sampled = 0; stall.sample[0] = 0; }
+    if (stall.depth++ == 0) {
+        stall.t0 = now_ms(); stall.sampled = 0; stall.sample[0] = 0;
+        run_origin = hands_delivering() ? HANDS_ORIGIN_AGENT : next_origin >= 0 ? next_origin : HANDS_ORIGIN_OTHER;
+    }
+    next_origin = -1;
 }
 
 /* the outermost call returned: the run stays open for its jobs (name and first argument kept) */
@@ -237,6 +250,7 @@ static void stall_report(const char *what, const char *detail, double ms) {
 static void js_run_finish(void) {
     if (!run.open) return;
     run.open = 0;
+    run_origin = HANDS_ORIGIN_OTHER;
     double ms = run.t_end - stall.t0;
     stall.busy_js += ms;
     if (ms > stall.max_run) stall.max_run = ms;
@@ -255,6 +269,7 @@ static void js_run_finish(void) {
 /* a run that isn't a call_global_atom (js_wm_end, jobs with no call before them) */
 static void js_run_end(const char *what, const char *detail) {
     if (--stall.depth > 0) return;
+    run_origin = HANDS_ORIGIN_OTHER;
     double ms = now_ms() - stall.t0;
     stall.busy_js += ms;
     if (ms > stall.max_run) stall.max_run = ms;
@@ -280,7 +295,7 @@ static JSValue prof_call(JSContext *c, JSValueConst this_val, int argc, JSValueC
         /* a secret on the clipboard is nobody's to read while an agent is connected; the rest refuses when the agent's
          * input set it off */
         if (hg == HANDS_G_CLIP && hands_active() && term_clipboard_sensitive()) return JS_NewString(c, "");
-        if (hg == HANDS_G_REFUSE && hands_agent_owns_input()) {
+        if (hg == HANDS_G_REFUSE && hands_origin_refused(run_origin)) {
             const char *n = JS_ToCString(c, data[1]);
             int admin = n && !strcmp(n, "admin.request");
             if (n) JS_FreeCString(c, n);
@@ -740,6 +755,25 @@ static JSValue f_stats(JSContext *c, JSValueConst this_val, int argc, JSValueCon
     return o;
 }
 
+/* lord.__origin() and lord.__originSet(o): the prelude's timers and animation frames keep the origin of the run that set
+ * them and run as it (hands.h HANDS_ORIGIN_*). The prelude takes both and deletes them from lord before any bundle runs.
+ * __originSet is taken only inside the main loop's __lordTick or __lordFrame, never lowers what the agent's delivered
+ * input is, and can't name anything but the three origins. */
+static JSValue f_origin(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    return JS_NewInt32(c, hands_delivering() ? HANDS_ORIGIN_AGENT : run_origin);
+}
+static JSValue f_origin_set(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t o = HANDS_ORIGIN_OTHER;
+    if (!hot_call || argc < 1 || JS_ToInt32(c, &o, argv[0])) return JS_UNDEFINED;
+    if (o < HANDS_ORIGIN_SHELL || o > HANDS_ORIGIN_AGENT) o = HANDS_ORIGIN_OTHER;
+    if (hands_delivering()) o = HANDS_ORIGIN_AGENT;
+    run_origin = o;
+    if (o > hot_worst) hot_worst = o;
+    return JS_UNDEFINED;
+}
+
 static const JSCFunctionListEntry lord_funcs[] = {
     JS_CFUNC_DEF("createNode", 1, f_create_node),
     JS_CFUNC_DEF("setText", 2, f_set_text),
@@ -754,16 +788,23 @@ static const JSCFunctionListEntry lord_funcs[] = {
     JS_CFUNC_DEF("now", 0, f_now),
     JS_CFUNC_DEF("log", 1, f_log),
     JS_CFUNC_DEF("stats", 0, f_stats),
+    JS_CFUNC_DEF("__origin", 0, f_origin),
+    JS_CFUNC_DEF("__originSet", 1, f_origin_set),
 };
 
 /* Runs JS code. Only used with the internal prelude and with the theme bundle that
  * is passed on the command line (trusted local file); never with external data. */
 static int eval(const char *src, size_t len, const char *name) {
+    /* a theme's start (and the prelude) is the shell's own: what it sets runs as the shell's, even after a switch the
+     * agent clicked (its start's refreshes were refused before, BUG-10) */
+    run_origin = hands_delivering() ? HANDS_ORIGIN_AGENT : HANDS_ORIGIN_SHELL;
     JSValue r = JS_Eval(ctx, src, len, name, JS_EVAL_TYPE_GLOBAL);
     int ok = !JS_IsException(r);
     if (!ok) dump_exception(ctx);
     JS_FreeValue(ctx, r);
+    next_origin = run_origin;
     drain_jobs();
+    run_origin = HANDS_ORIGIN_OTHER;
     return ok ? 0 : -1;
 }
 
@@ -781,8 +822,14 @@ static JSValue call_global_atom(JSAtom name, int argc, JSValueConst *argv) {
 }
 
 static JSValue call_global(const char *name, int argc, JSValueConst *argv) {
+    /* input (a pointer, a key, a gesture, the input method): the person's own unless the agent's is being delivered
+     * (js_run_begin makes that the agent's), so what it sets runs as the shell's; never a continuation of anything */
+    if (stall.depth == 0 && (!strcmp(name, "__lordEvent") || !strcmp(name, "__lordKey") || !strcmp(name, "__lordGesture")
+                             || !strcmp(name, "__lordIme")))
+        next_origin = HANDS_ORIGIN_SHELL;
     JSAtom a = JS_NewAtom(ctx, name);
     JSValue r = call_global_atom(a, argc, argv);
+    next_origin = -1;
     JS_FreeAtom(ctx, a);
     return r;
 }
@@ -799,7 +846,13 @@ static JSValue call_hot(int which, int argc, JSValueConst *argv) {
         for (int i = 0; i < HOT_N; i++) hot_atom[i] = JS_NewAtom(ctx, hot_name[i]);
         hot_rt = rt;
     }
-    return call_global_atom(hot_atom[which], argc, argv);
+    /* the main loop's own call: the shell's, each timer or frame callback then as what set it (lord.__originSet), and
+     * the promise jobs after them as the most refused of those (they can't be told apart once queued) */
+    int top = stall.depth == 0 && which != HOT_WANTS_FRAME;
+    if (top) { next_origin = HANDS_ORIGIN_SHELL; hot_call = 1; hot_worst = HANDS_ORIGIN_SHELL; }
+    JSValue r = call_global_atom(hot_atom[which], argc, argv);
+    if (top) { hot_call = 0; run_origin = hands_delivering() ? HANDS_ORIGIN_AGENT : hot_worst; next_origin = -1; }
+    return r;
 }
 
 /* Reads a bundle of LordOS's own code through the verified-code check (sec/codesig.c): the bytes

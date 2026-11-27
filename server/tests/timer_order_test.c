@@ -235,6 +235,70 @@ static double bench(const char *prel) {
     return per;
 }
 
+/* ---- the origins (BUG-10 of the 0.8.9.6.2 QA): each timer and frame runs as the run that set it ----
+ * A fake lord.__origin / __originSet over one C variable (js.c's run_origin): 0 the shell's, 1 other, 2 the agent's. */
+static int cur_origin = 1;
+static char seen[256];
+static JSValue f_origin(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    return JS_NewInt32(c, cur_origin);
+}
+static JSValue f_origin_set(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t o = 1;
+    if (argc > 0 && !JS_ToInt32(c, &o, argv[0])) cur_origin = o;
+    return JS_UNDEFINED;
+}
+static JSValue f_seen(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    const char *t = argc > 0 ? JS_ToCString(c, argv[0]) : NULL;
+    if (t) {
+        size_t n = strlen(seen);
+        snprintf(seen + n, sizeof seen - n, "%s%s=%d", n ? " " : "", t, cur_origin);
+        JS_FreeCString(c, t);
+    }
+    return JS_UNDEFINED;
+}
+static int origins(void) {
+    JSRuntime *rt = JS_NewRuntime();
+    JSContext *c = JS_NewContext(rt);
+    JSValue g = JS_GetGlobalObject(c), lord = JS_NewObject(c);
+    JS_SetPropertyStr(c, lord, "now", JS_NewCFunction(c, f_now, "now", 0));
+    JS_SetPropertyStr(c, lord, "log", JS_NewCFunction(c, f_log, "log", 1));
+    JS_SetPropertyStr(c, lord, "__origin", JS_NewCFunction(c, f_origin, "__origin", 0));
+    JS_SetPropertyStr(c, lord, "__originSet", JS_NewCFunction(c, f_origin_set, "__originSet", 1));
+    JS_SetPropertyStr(c, g, "seen", JS_NewCFunction(c, f_seen, "seen", 1));
+    JS_SetPropertyStr(c, g, "lord", lord);
+    JS_FreeValue(c, g);
+    clk = 1000;
+    crng = 1;
+    int bad = 0;
+    cur_origin = 0;                              /* the prelude and the desktop's start: the shell's */
+    if (!eval(c, prelude, "<prelude>")) exit(2);
+    if (!eval(c, "seen(typeof lord.__origin + ',' + typeof lord.__originSet);"
+                 "setInterval(() => seen('interval'), 10);", "<start>")) exit(2);
+    cur_origin = 2;                              /* the agent's click: a timer, a timer it sets, a frame */
+    if (!eval(c, "setTimeout(() => { seen('agentTimer'); setTimeout(() => seen('agentChained'), 1); }, 5);"
+                 "requestAnimationFrame(() => seen('agentFrame'));", "<agent>")) exit(2);
+    cur_origin = 1;                              /* the main loop's own tick (js.c makes it the shell's first) */
+    for (int i = 0; i < 6; i++) {
+        cur_origin = 0;
+        JSValue arg = JS_NewFloat64(c, 1000 + 12.0 * (i + 1));
+        JS_FreeValue(c, call(c, "__lordTick", 1, &arg));
+        drain(rt);
+        if (i == 0) { cur_origin = 0; JS_FreeValue(c, call(c, "__lordFrame", 1, &arg)); drain(rt); }
+    }
+    JS_FreeContext(c);
+    JS_FreeRuntime(rt);
+    /* both natives gone from lord; the interval always the shell's, the agent's timer, the one it set and its frame the
+     * agent's, wherever they ran */
+    if (strncmp(seen, "undefined,undefined=0", 21)) { printf("✗ the prelude left lord.__origin or __originSet: %s\n", seen); bad++; }
+    if (!strstr(seen, "interval=0") || strstr(seen, "interval=1") || strstr(seen, "interval=2")) { printf("✗ the start's interval ran as another origin: %s\n", seen); bad++; }
+    if (!strstr(seen, "agentTimer=2") || !strstr(seen, "agentChained=2") || !strstr(seen, "agentFrame=2")) { printf("✗ the agent's timers did not run as the agent's: %s\n", seen); bad++; }
+    printf("timer-order-test origins: %s (%s)\n", bad ? "FAIL" : "ok", seen);
+    return bad;
+}
+
 int main(int argc, char **argv) {
     if (argc > 1 && !strcmp(argv[1], "bench")) {
         printf("timer-order-test bench: a tick with 200 timers pending, nothing due: before %.2f us, now %.2f us\n",
@@ -264,5 +328,6 @@ int main(int argc, char **argv) {
     }
     printf("timer-order-test: %u random scripts, %ld callbacks run, %ld bytes of trace compared, %d differ\n",
            seeds, fires, bytes, fails);
+    fails += origins();
     return fails ? 1 : 0;
 }
