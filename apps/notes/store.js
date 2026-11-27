@@ -262,7 +262,7 @@ export function createNote({ body = '', color = 'yellow', desktop = false, x, y,
   try { area = typeof workArea === 'function' ? workArea() : null; } catch (e) { area = null; }
   const ax = area && Number.isFinite(area.x) ? area.x : 0, ay = area && Number.isFinite(area.y) ? area.y : 0;
   const n = { slug, body, title: (title && titleOf(title)) || titleOf(body), color: COLORS.includes(color) ? color : 'yellow', x: x ?? ax + 80 + (count % 6) * 30, y: y ?? ay + 40 + (count % 6) * 30, w: 260, h: 240,
-    desktop, pinned: false, created: now, updated: now };
+    desktop, placed: !!desktop, pinned: false, created: now, updated: now };
   patchList((list) => [n, ...list]);
   writeNow(slug);
   return slug;
@@ -404,7 +404,7 @@ export function showNoteAt(slug, x, y, area) {
   const n = notesStore.get().list.find((v) => v.slug === slug);
   if (!n) return null;
   const r = area ? clampInto({ x, y, w: n.w, h: n.h }, area) : { x: Math.round(x), y: Math.round(y), w: n.w, h: n.h };
-  updateNote(slug, { desktop: true, ...r }, { touch: false });
+  updateNote(slug, { desktop: true, placed: true, ...r }, { touch: false });
   flushAll();
   return slug;
 }
@@ -415,5 +415,6 @@ export function toggleDesktop(slug, displays, area) {
   const n = notesStore.get().list.find((v) => v.slug === slug);
   if (!n) return;
   if (n.desktop) { updateNote(slug, { desktop: false }, { touch: false }); return; }
-  updateNote(slug, { desktop: true, ...placeOnDesktop(n, displays, area) }, { touch: false });
+  const others = notesStore.get().list.filter((v) => v.desktop && v.slug !== slug);
+  updateNote(slug, { desktop: true, placed: true, ...placeOnDesktop(n, displays, area, others) }, { touch: false });
 }

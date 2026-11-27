@@ -86,6 +86,11 @@ const mk = (slug, extra = {}) => ({ slug, body: `# ${slug}`, title: slug, color:
   eq('below every display', visibleOn({ x: 100, y: 1100, w: 260, h: 240 }, displays), false);
   eq('Show on desktop: a visible note keeps its place', placeOnDesktop({ x: 100, y: 100, w: 260, h: 240 }, displays, area), { x: 100, y: 100, w: 260, h: 240 });
   eq('Show on desktop: a note off every display comes to the window\'s display', placeOnDesktop({ x: 5000, y: 3000, w: 260, h: 240 }, displays, area), { x: 2000, y: 68, w: 260, h: 240 });
+  // (ws170 QA MEJORA-3) a new note's x and y are only a default: it goes to the window's display, past the ones there
+  eq('Show on desktop: a new note goes to the window\'s display, not its default place', placeOnDesktop({ x: 100, y: 100, w: 260, h: 240, placed: false }, displays, area), { x: 2000, y: 68, w: 260, h: 240 });
+  eq('Show on desktop: past a desktop note already there', placeOnDesktop({ x: 100, y: 100, w: 260, h: 240, placed: false }, displays, area, [{ x: 2000, y: 68 }]), { x: 2030, y: 98, w: 260, h: 240 });
+  eq('a note read from disk that was on the desktop counts as placed', [noteFrom('a', '---\ndesktop: true\nx: 10\n---\nx', 0).placed, noteFrom('b', '---\nx: 10\n---\nx', 0).placed], [true, false]);
+  eq('placed is written in the header', serialize({ title: 't', placed: true, body: 'b' }).includes('placed: true'), true);
   eq('a note larger than the area shrinks to it', placeOnDesktop({ x: 5000, y: 0, w: 4000, h: 4000 }, [], { x: 0, y: 0, w: 800, h: 600 }), { x: 0, y: 0, w: 800, h: 600 });
   eq('the pick: a place near the right edge is moved in', clampInto({ x: 3150, y: 900, w: 260, h: 240 }, area), { x: 2940, y: 784, w: 260, h: 240 });
   eq('the pick: a place inside stays', clampInto({ x: 2000, y: 100, w: 260, h: 240 }, area), { x: 2000, y: 100, w: 260, h: 240 });

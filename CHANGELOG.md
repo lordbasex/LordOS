@@ -420,6 +420,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Notes: "Show on desktop" put a new note at its default place, behind the window in front and on another display**
+  (MEJORA-3 of the ws170 QA: x=2112 on the main display while Notes was on another). A note now records in its header
+  whether its place is one it had on the desktop (`placed`; a note already on the desktop counts as placed, no migration
+  needed); a new note goes to the Notes window's display, 80 px in and 40 down, 30 px further for each desktop note
+  already there, while one that has been on the desktop and is still on a display keeps its place
+  (`apps/notes/notesmodel.js` `placeOnDesktop`). `notes-model-test`: four cases.
 - **Spelling: Notes underlined the "txt" of an attachment's link** (MEJORA-2 of the ws170 QA: "[📎 nota.txt](nota.txt)").
   A markdown link's target (`](…)`) and file names with an extension (`nota.txt`, `informe-final.pdf`) are no longer
   checked; the link's own text still is, and the positions of the rest stay (`sdk/spellmodel.js` `spellText`).

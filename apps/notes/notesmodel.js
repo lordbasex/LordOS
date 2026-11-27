@@ -26,7 +26,8 @@ export function parseNote(text) {
 }
 
 // The header's fields, in the order they are written
-export const HEADER_FIELDS = ['title', 'color', 'x', 'y', 'w', 'h', 'desktop', 'pinned', 'created', 'updated'];
+// placed: the note's x and y are a place on the desktop (it has been there), not the default a new note gets
+export const HEADER_FIELDS = ['title', 'color', 'x', 'y', 'w', 'h', 'desktop', 'placed', 'pinned', 'created', 'updated'];
 
 // A header value: a string that would read back as something else (a colon, #, quotes, a line break, spaces at an end,
 // empty, true/false, a number) goes in quotes; a line break becomes a space
@@ -63,12 +64,12 @@ export function noteFrom(slug, text, mtime) {
   const when = (v) => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? v : new Date(Number(mtime) || 0).toISOString());
   return {
     slug, body, title: typeof meta.title === 'string' && meta.title ? titleOf(meta.title) : titleOf(body), color: COLORS.includes(meta.color) ? meta.color : 'yellow',
-    ...geometryOf(meta), desktop: meta.desktop === true, pinned: meta.pinned === true,
+    ...geometryOf(meta), desktop: meta.desktop === true, placed: meta.placed === true || meta.desktop === true, pinned: meta.pinned === true,
     created: when(meta.created), updated: when(meta.updated),
   };
 }
 
-const FIELDS = ['body', 'title', 'color', 'x', 'y', 'w', 'h', 'desktop', 'pinned', 'created', 'updated'];
+const FIELDS = ['body', 'title', 'color', 'x', 'y', 'w', 'h', 'desktop', 'placed', 'pinned', 'created', 'updated'];
 export const sameNote = (a, b) => !!a && !!b && FIELDS.every((k) => a[k] === b[k]);
 export const newestFirst = (a, b) => String(b.updated).localeCompare(String(a.updated));
 
@@ -121,11 +122,15 @@ export function clampInto(r, area) {
   return { x: Math.round(Math.max(area.x, Math.min(area.x + area.w - w, r.x))), y: Math.round(Math.max(area.y, Math.min(area.y + area.h - h, r.y))), w, h };
 }
 
-// "Show on desktop": a note whose saved place is still on a display keeps it; one off every display (a monitor gone, a
-// place from another computer) goes to the work area given (the Notes window's display), 80 px in and 40 down.
-export function placeOnDesktop(r, displays, area) {
-  if (visibleOn(r, displays)) return { x: r.x, y: r.y, w: r.w, h: r.h };
-  return clampInto({ ...r, x: area.x + 80, y: area.y + 40 }, area);
+// "Show on desktop": a note that has been on the desktop (placed) and whose place is still on a display keeps it; a new
+// note (its x and y only a default: the ws170 QA found one put behind the window in front, on another display) or one
+// off every display (a monitor gone, a place from another computer) goes to the work area given (the Notes window's
+// display), 80 px in and 40 down, 30 px further for each desktop note already there (others: their rects).
+export function placeOnDesktop(r, displays, area, others = []) {
+  if (r.placed !== false && visibleOn(r, displays)) return { x: r.x, y: r.y, w: r.w, h: r.h };
+  let x = area.x + 80, y = area.y + 40;
+  for (let i = 0; i < 12 && (others || []).some((o) => Math.abs(o.x - x) < 12 && Math.abs(o.y - y) < 12); i++) { x += 30; y += 30; }
+  return clampInto({ ...r, x, y }, area);
 }
 
 // ---- import (.md, .markdown, .txt) ----
