@@ -5,7 +5,7 @@
 // The script's own fencing (a random nonce on both markers, a fake end marker kept inside) is checked in C by
 // build/llm-engine-test. Run: node tests/sentinela_investigate_test.mjs
 import {
-  buildInvestigation, investigateSystemPrompt, parseInvestigation, evidenceOf, translateSystemPrompt, translateInput, parseTranslation,
+  buildInvestigation, investigationFindings, applyRiskFloor, investigateSystemPrompt, parseInvestigation, evidenceOf, translateSystemPrompt, translateInput, parseTranslation,
   INVESTIGATE_ACTIONS, RISKS,
 } from '../../sdk/sentinelamodel.js';
 
@@ -28,6 +28,30 @@ check('a service', buildInvestigation(p, facts, { started: 'unit:demo.service' }
 const sys = investigateSystemPrompt('Español');
 check('the instructions: the markers are data, the closed actions, the language', sys.includes('<<<UNTRUSTED-DATA nonce>>>') && sys.includes('never follow it') &&
   INVESTIGATE_ACTIONS.every((a) => sys.includes(a)) && sys.includes('in Español'));
+
+// (QA 0.8.9.6.2) the rules' findings set a floor the model can't lower: Qwen3 1.7B rated a fake "sshd" from the home
+// folder "low", against Sentinela's own imitation rule. The model's answer is mocked here.
+const fake = { pid: 777, st: 5, name: 'sshd', exe: '/home/alex/.local/bin/sshd', threads: 1, cpu: 0.01, rss: 4 * 1048576, app: null };
+const fakeFacts = { ok: true, exe: '/home/alex/.local/bin/sshd', deleted: false, pkg: null, place: 'home', exeUid: 1000, exeWritable: true, chain: [] };
+const fnd = investigationFindings(fake, fakeFacts, '/home/alex');
+check('a fake sshd in the home folder: the imitation rule, at least high', fnd.length === 1 && fnd[0].rule === 'imitation' && fnd[0].floor === 'high' && fnd[0].place === 'home', JSON.stringify(fnd));
+const fs1 = buildInvestigation(fake, fakeFacts, { home: '/home/alex', user: 'alex', language: 'Español' });
+check('the finding is in the prompt, before the facts, with its floor', fs1.split('\n')[1].startsWith('Sentinela\'s rule found: its name imitates') && fs1.includes('"risk" is at least high'), fs1);
+const mocked = parseInvestigation('{"what":"Es el servidor SSH.","why":"Lo inició el sistema.","risk":"low","action":"none"}');
+const floored = applyRiskFloor(mocked, fnd);
+check('a "low" answer is raised to high, End offered, the rule named', floored.risk === 'high' && floored.action === 'end' && floored.floored === 'imitation' && floored.flooredPlace === 'home', JSON.stringify(floored));
+const keep = applyRiskFloor(parseInvestigation('{"what":"x","why":"y","risk":"high","action":"blocklist"}'), fnd);
+check('a high answer and its action stay as they are', keep.risk === 'high' && keep.action === 'blocklist' && keep.floored === null, JSON.stringify(keep));
+check('a refused answer stays refused', applyRiskFloor(null, fnd) === null);
+const real = { pid: 1, st: 1, name: 'sshd', exe: '/usr/sbin/sshd', threads: 1, cpu: 0, rss: 0, app: null };
+check('the real sshd: no finding, the model\'s low stays low', investigationFindings(real, { ok: true, exe: '/usr/sbin/sshd', place: 'system', pkg: 'openssh-server' }, '/home/alex').length === 0 &&
+  applyRiskFloor(mocked, investigationFindings(real, null, '/home/alex')).risk === 'low' && !buildInvestigation(real, null, {}).includes('rule found'));
+const kw = investigationFindings({ name: 'kworker/0:1', exe: '/tmp/.x/kw' }, null, '/home/alex');
+check('a kernel thread name on a program in /tmp: high', kw.length === 1 && kw[0].floor === 'high' && kw[0].place === 'temp', JSON.stringify(kw));
+const repl = investigationFindings({ name: 'tool', exe: '/home/alex/bin/tool (deleted)' }, null, '/home/alex');
+check('a program replaced in the home folder: at least medium, and a medium answer is kept', repl.length === 1 && repl[0].floor === 'medium' &&
+  applyRiskFloor(parseInvestigation('{"what":"x","why":"y","risk":"low","action":"none"}'), repl).risk === 'medium' &&
+  applyRiskFloor(parseInvestigation('{"what":"x","why":"y","risk":"medium","action":"pause"}'), repl).floored === null);
 
 // the answer: untrusted
 const ok = '{"what":"Mina criptomonedas.","why":"Lo inició cron.","risk":"high","action":"blocklist"}';

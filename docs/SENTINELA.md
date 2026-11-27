@@ -289,6 +289,14 @@ processes. Nothing happens until that click.
   person's language (asked in the system text and on the summary's last line). The result also says what was read
   (`evidence`: kind, interpreter, bytes, sent, hash, libraries, strings; `evidenceOf` keeps only those fields), shown
   under the answer ("Lumo read the shell script (2 KB)").
+- **The rules' floor** (QA of 0.8.9.6.2: Qwen3 1.7B called a fake `sshd` running from the home folder "low risk"):
+  what Sentinela's own rules already see is decided in code, not by the model (`investigationFindings`). A name that
+  imitates a system or kernel process on a program that isn't the system's (`imitates`, the imitation trigger) makes
+  the risk at least **high**; a program deleted or replaced while it runs outside the system folders, at least
+  **medium**. The finding is the summary's second line ("Sentinela's rule found: …", which the system text says is
+  LordOS's own and must not be contradicted), and `applyRiskFloor` raises a lower answer to it whatever the model says
+  (a raised answer that suggested nothing suggests End). Get Info then shows the rule's own sentence under the answer
+  ("Its name is that of a system or kernel process, but its program lives in your home folder.").
 - **Actions** run only on the person's click, under the answer, the suggested one highlighted: **End** (TERM), **Pause**
   (STOP) — `lord.monitor.signal`, the user's own unprotected processes —, **Block its network** (the app's existing
   `no-network` firewall restriction; only for a process in an app's scope), and **Blocklist** (below), which asks first.

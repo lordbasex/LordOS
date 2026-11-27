@@ -479,6 +479,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Sentinela: "Investigate with Lumo" can't call a disguised program "low risk"** (QA of 0.8.9.6.2: with Qwen3
+  1.7B, a fake `sshd` running from the home folder was rated "Low risk", against Sentinela's own imitation rule). The
+  rules now set a floor the model can't lower (`investigationFindings`, `applyRiskFloor` in `sdk/sentinelamodel.js`): a
+  system or kernel process name on a program that isn't the system's is at least high risk, a program deleted or
+  replaced while it runs outside the system folders at least medium. The finding is also the second line of what the
+  model reads, and the system text says such a line is LordOS's own and can't be contradicted. A raised answer that
+  suggested nothing suggests End, and Monitor → Get Info shows the rule's sentence under the answer (existing
+  `sentinela.why.*` texts, every language). Tests: `sentinela_investigate_test.mjs` (the model's answer mocked: a fake
+  sshd raised from low to high, a high answer kept, the real `/usr/sbin/sshd` untouched, a kernel name in `/tmp`, a
+  replaced program at medium). docs/SENTINELA.md, "Investigate".
 - **NVIDIA: the texts now match what the reports show** (after #276, a GTX 1070 on NVIDIA's proprietary 580.196.11 on
   0.8.9.5-beta, whose report says `composition: gpu`). The free drivers (nouveau, NVK) stay the default and NVIDIA's own
   driver stays the Store's opt-in (Store → For this computer). Settings → Graphics cards no longer lists *Desktop* as

@@ -38,7 +38,7 @@ import { brainBackend, brainThreads } from './aistore.js';
 import { vmAnyActive } from './vmlibrary.js';
 import {
   SENTINELA_DEFAULTS, TRIGGER_DEFAULTS, createTracker, buildSummary, systemPrompt, parseVerdict, ignoreMatch, ruleAction, factLines,
-  placeOf, clean, presentAlert, buildInvestigation, investigateSystemPrompt, parseInvestigation, evidenceOf, translateSystemPrompt,
+  placeOf, clean, presentAlert, buildInvestigation, investigationFindings, applyRiskFloor, investigateSystemPrompt, parseInvestigation, evidenceOf, translateSystemPrompt,
   translateInput, parseTranslation, INVESTIGATE_ACTIONS,
 } from './sentinelamodel.js';
 import {
@@ -494,7 +494,7 @@ export async function investigateProcess(p, { started = '', conns = null } = {})
   try { r = await job(a.investigate(ready.model, investigateSystemPrompt(language), user_, p.pid, p.st), ANSWER_MAX_MS); } catch (e) { return { ok: false, error: e.code || 'llm.failed' }; }
   if (!r) return { ok: false, error: 'llm.timeout' };
   if (!r.ok) return { ok: false, error: r.error || 'llm.failed' };
-  const v = parseInvestigation(r.content);
+  const v = applyRiskFloor(parseInvestigation(r.content), investigationFindings(p, facts, home()));
   if (!v) return { ok: false, error: 'sentinela.lumo.rejected', evidence: evidenceOf(r.evidence) };
   return { ok: true, result: v, evidence: evidenceOf(r.evidence), ms: r.ms || 0, facts: facts && facts.ok ? facts : null };
 }
