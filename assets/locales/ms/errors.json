@@ -968,5 +968,6 @@
   "sys.unsupported": "Versi LordOS ini tidak dapat melakukannya.",
   "theme.notAllowed": "{call} tidak tersedia untuk tema komuniti",
   "theme.noHost": "Bahagian LordOS gaya desktop tiada",
-  "hands.refused": "Hanya anda boleh melakukan ini: tidak sekali-kali input ejen AI"
+  "hands.refused": "Hanya anda boleh melakukan ini: tidak sekali-kali input ejen AI",
+  "install.diskTooManyParts": "Cakera ini mempunyai terlalu banyak partisyen untuk disenaraikan oleh pemasang"
 }

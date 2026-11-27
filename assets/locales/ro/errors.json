@@ -970,5 +970,6 @@
   "sys.unsupported": "Această versiune de LordOS nu poate face asta.",
   "theme.notAllowed": "{call} nu este disponibil pentru temele comunității",
   "theme.noHost": "Lipsește partea LordOS a stilului de desktop",
-  "hands.refused": "Doar dumneavoastră puteți face asta: niciodată intrarea unui agent IA"
+  "hands.refused": "Doar dumneavoastră puteți face asta: niciodată intrarea unui agent IA",
+  "install.diskTooManyParts": "Acest disc are prea multe partiții pentru ca programul de instalare să le poată lista"
 }

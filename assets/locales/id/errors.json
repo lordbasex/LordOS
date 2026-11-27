@@ -968,5 +968,6 @@
   "sys.unsupported": "Versi LordOS ini tidak dapat melakukannya.",
   "theme.notAllowed": "{call} tidak tersedia untuk tema komunitas",
   "theme.noHost": "Bagian LordOS dari gaya desktop tidak ada",
-  "hands.refused": "Hanya Anda yang dapat melakukan ini: tidak pernah masukan agen AI"
+  "hands.refused": "Hanya Anda yang dapat melakukan ini: tidak pernah masukan agen AI",
+  "install.diskTooManyParts": "Disk ini memiliki terlalu banyak partisi untuk dicantumkan oleh penginstal"
 }

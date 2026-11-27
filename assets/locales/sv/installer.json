@@ -128,5 +128,6 @@
   "user.user": "Användarnamn",
   "user.userHint": "Små bokstäver, siffror, - och _. Den blir administratör (sudo).",
   "welcome.text": "Den här assistenten installerar LordOS på den här datorns skiva. Du väljer språk, tangentbord, skiva och din användare. Installationen raderar den valda skivan, om du inte installerar bredvid det som finns eller själv väljer partitionerna.",
-  "welcome.title": "Välkommen till LordOS"
+  "welcome.title": "Välkommen till LordOS",
+  "disk.unreadable": "En disks beskrivning kunde inte läsas, så den visas inte i listan. Sök igen; om den fortfarande saknas, rapportera det."
 }

@@ -969,5 +969,6 @@
   "sys.unsupported": "Tämä LordOS-versio ei osaa tehdä sitä.",
   "theme.notAllowed": "{call} ei ole yhteisön teemojen käytettävissä",
   "theme.noHost": "Työpöytätyylin LordOS-osa puuttuu",
-  "hands.refused": "Vain sinä voit tehdä tämän: tekoälyagentin syöte ei koskaan"
+  "hands.refused": "Vain sinä voit tehdä tämän: tekoälyagentin syöte ei koskaan",
+  "install.diskTooManyParts": "Levyllä on liian monta osiota, jotta asennusohjelma voisi luetella ne"
 }

@@ -969,5 +969,6 @@
   "sys.unsupported": "Aquesta versió de LordOS no pot fer això.",
   "theme.notAllowed": "{call} no està disponible per als temes de la comunitat",
   "theme.noHost": "Falta la part de LordOS de l'estil d'escriptori",
-  "hands.refused": "Només tu pots fer això: mai l'entrada d'un agent d'IA"
+  "hands.refused": "Només tu pots fer això: mai l'entrada d'un agent d'IA",
+  "install.diskTooManyParts": "Aquest disc té massa particions perquè l’instal·lador les pugui llistar"
 }

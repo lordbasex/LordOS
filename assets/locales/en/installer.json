@@ -128,5 +128,6 @@
   "user.user": "Username",
   "user.userHint": "Lowercase letters, numbers, - and _. It will be an administrator (sudo).",
   "welcome.text": "This assistant installs LordOS on this computer’s disk. You will choose the language, keyboard, disk and your user. Installing erases the chosen disk, unless you install beside what is there or choose the partitions yourself.",
-  "welcome.title": "Welcome to LordOS"
+  "welcome.title": "Welcome to LordOS",
+  "disk.unreadable": "A disk’s description couldn’t be read, so it isn’t listed. Search again; if it’s still missing, please report it."
 }

@@ -969,5 +969,6 @@
   "sys.unsupported": "Hindi iyan kaya ng bersyong ito ng LordOS.",
   "theme.notAllowed": "Hindi available ang {call} sa mga tema ng komunidad",
   "theme.noHost": "Nawawala ang bahagi ng LordOS ng desktop style",
-  "hands.refused": "Ikaw lang ang makagagawa nito: hindi kailanman ang input ng isang AI agent"
+  "hands.refused": "Ikaw lang ang makagagawa nito: hindi kailanman ang input ng isang AI agent",
+  "install.diskTooManyParts": "Masyadong maraming partition ang disk na ito para mailista ng installer"
 }

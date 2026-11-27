@@ -968,5 +968,6 @@
   "sys.unsupported": "此版本的 LordOS 無法做到這件事。",
   "theme.notAllowed": "社群主題無法使用 {call}",
   "theme.noHost": "缺少桌面風格的 LordOS 部分",
-  "hands.refused": "只有你本人可以執行此操作：AI 代理的輸入永遠不行"
+  "hands.refused": "只有你本人可以執行此操作：AI 代理的輸入永遠不行",
+  "install.diskTooManyParts": "此磁碟的分割區過多，安裝程式無法列出"
 }

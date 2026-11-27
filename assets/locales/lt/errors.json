@@ -970,5 +970,6 @@
   "sys.unsupported": "Ši LordOS versija to padaryti negali.",
   "theme.notAllowed": "{call} nepasiekiamas bendruomenės temoms",
   "theme.noHost": "Trūksta darbalaukio stiliaus LordOS dalies",
-  "hands.refused": "Tai galite padaryti tik jūs: niekada DI agento įvestis"
+  "hands.refused": "Tai galite padaryti tik jūs: niekada DI agento įvestis",
+  "install.diskTooManyParts": "Šiame diske per daug skaidinių, kad diegimo programa galėtų juos išvardyti"
 }

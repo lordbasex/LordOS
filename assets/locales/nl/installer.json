@@ -128,5 +128,6 @@
   "user.user": "Gebruikersnaam",
   "user.userHint": "Kleine letters, cijfers, - en _. Het wordt een beheerder (sudo).",
   "welcome.text": "Deze assistent installeert LordOS op de schijf van deze computer. Je kiest de taal, het toetsenbord, de schijf en je gebruiker. Installeren wist de gekozen schijf, tenzij je naast wat er staat installeert of zelf de partities kiest.",
-  "welcome.title": "Welkom bij LordOS"
+  "welcome.title": "Welkom bij LordOS",
+  "disk.unreadable": "De beschrijving van een schijf kon niet worden gelezen, dus staat hij niet in de lijst. Zoek opnieuw; ontbreekt hij nog steeds, meld het dan."
 }

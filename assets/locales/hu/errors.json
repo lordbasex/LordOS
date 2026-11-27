@@ -969,5 +969,6 @@
   "sys.unsupported": "A LordOS ezen verziója erre nem képes.",
   "theme.notAllowed": "A(z) {call} nem érhető el a közösségi témák számára",
   "theme.noHost": "Hiányzik az asztali stílus LordOS-része",
-  "hands.refused": "Ezt csak te teheted meg: egy MI-ügynök bevitele soha"
+  "hands.refused": "Ezt csak te teheted meg: egy MI-ügynök bevitele soha",
+  "install.diskTooManyParts": "Ezen a lemezen túl sok partíció van ahhoz, hogy a telepítő listázni tudja őket"
 }

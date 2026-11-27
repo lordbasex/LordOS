@@ -128,5 +128,6 @@
   "user.user": "Nama pengguna",
   "user.userHint": "Huruf kecil, angka, - dan _. Pengguna ini akan menjadi administrator (sudo).",
   "welcome.text": "Asisten ini menginstal LordOS di disk komputer ini. Anda akan memilih bahasa, papan ketik, disk, dan pengguna. Instalasi menghapus disk yang dipilih, kecuali Anda menginstal berdampingan dengan yang sudah ada atau memilih partisi sendiri.",
-  "welcome.title": "Selamat datang di LordOS"
+  "welcome.title": "Selamat datang di LordOS",
+  "disk.unreadable": "Deskripsi sebuah disk tidak dapat dibaca, jadi disk itu tidak tercantum. Cari lagi; jika masih tidak ada, silakan laporkan."
 }

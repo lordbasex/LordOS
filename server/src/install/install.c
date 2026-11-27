@@ -324,7 +324,23 @@ void install_act_disks(const AdminReq *r, const char *arg, size_t len) {
         }
         fprintf(f, "]}");
         fclose(f);
-        admin_say("LOG", "%s", js);
+        /* a line holds at most ADMIN_LINE_MAX (#280: seven partitions didn't fit the old 1200 bytes and the disk
+         * vanished from the list): a disk whose description is longer still goes in it, as one that can't be used */
+        if (js && jl + 64 > ADMIN_LINE_MAX) {
+            free(js);
+            js = NULL;
+            f = open_memstream(&js, &jl);
+            if (!f) continue;
+            fprintf(f, "{\"name\":"); json_str(f, k->name);
+            fprintf(f, ",\"path\":"); json_str(f, dev);
+            fprintf(f, ",\"size\":%llu,\"model\":", k->size); json_str(f, k->model);
+            fprintf(f, ",\"vendor\":"); json_str(f, k->vendor);
+            fprintf(f, ",\"transport\":"); json_str(f, k->transport);
+            fprintf(f, ",\"removable\":%s,\"usable\":false,\"freeOk\":false,\"manualOk\":false,\"parts\":[],"
+                       "\"listWhy\":\"install.diskTooManyParts\"}", k->removable ? "true" : "false");
+            fclose(f);
+        }
+        if (js) admin_say("LOG", "%s", js);
         free(js);
     }
     admin_say("OK", "%d", n);   /* i18n-ok */

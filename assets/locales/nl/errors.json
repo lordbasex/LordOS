@@ -969,5 +969,6 @@
   "sys.unsupported": "Deze versie van LordOS kan dat niet.",
   "theme.notAllowed": "{call} is niet beschikbaar voor communitythema's",
   "theme.noHost": "Het LordOS-deel van de bureaubladstijl ontbreekt",
-  "hands.refused": "Alleen jij kunt dit doen: nooit de invoer van een AI-agent"
+  "hands.refused": "Alleen jij kunt dit doen: nooit de invoer van een AI-agent",
+  "install.diskTooManyParts": "Deze schijf heeft te veel partities om door het installatieprogramma te worden weergegeven"
 }

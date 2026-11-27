@@ -970,5 +970,6 @@
   "sys.unsupported": "Ta wersja LordOS nie potrafi tego zrobić.",
   "theme.notAllowed": "{call} nie jest dostępne dla motywów społeczności",
   "theme.noHost": "Brakuje części LordOS stylu pulpitu",
-  "hands.refused": "Tylko Ty możesz to zrobić: nigdy wejście agenta AI"
+  "hands.refused": "Tylko Ty możesz to zrobić: nigdy wejście agenta AI",
+  "install.diskTooManyParts": "Ten dysk ma zbyt wiele partycji, by instalator mógł je wyświetlić"
 }

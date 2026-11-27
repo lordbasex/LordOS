@@ -969,5 +969,6 @@
   "sys.unsupported": "This version of LordOS can't do that.",
   "theme.notAllowed": "{call} is not available to community themes",
   "theme.noHost": "The desktop style's LordOS part is missing",
-  "hands.refused": "Only you can do this: an AI agent's input never can"
+  "hands.refused": "Only you can do this: an AI agent's input never can",
+  "install.diskTooManyParts": "This disk has too many partitions for the installer to list them"
 }

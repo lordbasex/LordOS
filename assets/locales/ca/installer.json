@@ -128,5 +128,6 @@
   "user.user": "Nom d’usuari",
   "user.userHint": "Lletres minúscules, nombres, - i _. Serà administrador (sudo).",
   "welcome.text": "Aquest assistent instal·la LordOS al disc d’aquest ordinador. Triaràs l’idioma, el teclat, el disc i el teu usuari. La instal·lació esborra el disc triat, tret que instal·lis al costat del que hi ha o triïs tu mateix les particions.",
-  "welcome.title": "Et donem la benvinguda a LordOS"
+  "welcome.title": "Et donem la benvinguda a LordOS",
+  "disk.unreadable": "No s’ha pogut llegir la descripció d’un disc, així que no apareix a la llista. Torna a cercar; si encara no hi és, informa’n."
 }

@@ -969,5 +969,6 @@
   "sys.unsupported": "Den här versionen av LordOS kan inte göra det.",
   "theme.notAllowed": "{call} är inte tillgängligt för gemenskapsteman",
   "theme.noHost": "Skrivbordsstilens LordOS-del saknas",
-  "hands.refused": "Bara du kan göra detta: aldrig en AI-agents inmatning"
+  "hands.refused": "Bara du kan göra detta: aldrig en AI-agents inmatning",
+  "install.diskTooManyParts": "Den här disken har för många partitioner för att installationsprogrammet ska kunna lista dem"
 }

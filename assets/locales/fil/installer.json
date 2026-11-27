@@ -128,5 +128,6 @@
   "user.user": "Username",
   "user.userHint": "Maliliit na titik, numero, - at _. Magiging administrator ito (sudo).",
   "welcome.text": "Ini-install ng assistant na ito ang LordOS sa disk ng computer na ito. Pipiliin mo ang wika, keyboard, disk at ang iyong user. Buburahin ng pag-install ang napiling disk, maliban kung mag-i-install ka katabi ng nandoon na o ikaw mismo ang pipili ng mga partition.",
-  "welcome.title": "Maligayang pagdating sa LordOS"
+  "welcome.title": "Maligayang pagdating sa LordOS",
+  "disk.unreadable": "Hindi nabasa ang paglalarawan ng isang disk, kaya hindi ito nakalista. Maghanap muli; kung wala pa rin, pakiulat ito."
 }

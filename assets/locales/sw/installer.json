@@ -128,5 +128,6 @@
   "user.user": "Jina la mtumiaji",
   "user.userHint": "Herufi ndogo, nambari, - na _. Atakuwa msimamizi (sudo).",
   "welcome.text": "Msaidizi huyu anasakinisha LordOS kwenye diski ya kompyuta hii. Utachagua lugha, kibodi, diski na mtumiaji wako. Kusakinisha kunafuta diski iliyochaguliwa, isipokuwa ukisakinisha kando ya kilichopo au ukichagua vigawanyo mwenyewe.",
-  "welcome.title": "Karibu LordOS"
+  "welcome.title": "Karibu LordOS",
+  "disk.unreadable": "Maelezo ya diski moja hayakuweza kusomwa, kwa hivyo haijaorodheshwa. Tafuta tena; ikiendelea kukosekana, tafadhali iripoti."
 }

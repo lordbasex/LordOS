@@ -969,5 +969,6 @@
   "sys.unsupported": "LordOS-un bu versiyası bunu edə bilmir.",
   "theme.notAllowed": "{call} icma mövzuları üçün əlçatan deyil",
   "theme.noHost": "Masaüstü üslubunun LordOS hissəsi yoxdur",
-  "hands.refused": "Bunu yalnız siz edə bilərsiniz: süni intellekt agentinin girişi heç vaxt"
+  "hands.refused": "Bunu yalnız siz edə bilərsiniz: süni intellekt agentinin girişi heç vaxt",
+  "install.diskTooManyParts": "Bu diskdə quraşdırıcının sadalaya biləcəyindən çox bölmə var"
 }

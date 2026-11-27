@@ -969,5 +969,6 @@
   "sys.unsupported": "Toleo hili la LordOS haliwezi kufanya hivyo.",
   "theme.notAllowed": "{call} haipatikani kwa mandhari ya jamii",
   "theme.noHost": "Sehemu ya LordOS ya mtindo wa eneo-kazi haipo",
-  "hands.refused": "Ni wewe tu unayeweza kufanya hivi: kamwe si ingizo la wakala wa AI"
+  "hands.refused": "Ni wewe tu unayeweza kufanya hivi: kamwe si ingizo la wakala wa AI",
+  "install.diskTooManyParts": "Diski hii ina sehemu nyingi mno kwa kisakinishi kuziorodhesha"
 }

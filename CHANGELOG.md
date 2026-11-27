@@ -461,6 +461,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Installer: "No disk to install on was found" on a healthy GPT disk with several partitions** (GitHub #280, an HP
+  ProBook 650 G2 with seven partitions). install-disks describes each disk in one LOG line of JSON, and the privileged
+  helper cut every reply line at 1200 bytes (its text at 1024): with four or more partitions the JSON was cut, the
+  installer's `JSON.parse` failed silently and the disk was dropped. It showed up only while a partition was mounted,
+  because then the table's entries are left out and the line was short enough. Reply lines now hold up to
+  `ADMIN_LINE_MAX` (64 KiB, `server/src/admin.h`) on every hop: the helper's own lines, its `A_FORK` children's, lord-netd's
+  and lord-server's reader. A longer text is still cut to one line, and a reader drops a line too long for it whole,
+  up to its newline, instead of reading its tail as a line of its own with a made-up id (`server/src/adminline.h`). A
+  disk whose description would still be longer (far more than 128 partitions' worth) is listed as unusable with
+  `install.diskTooManyParts` instead of vanishing. The installer now checks each disk line's shape
+  (`apps/installer/diskmodel.js`) and says "A disk's description couldn't be read" instead of claiming there is no disk.
+  The other long replies (VPN details, journal entries, SMART) gain the same room. Tests: `build/adminline-test` (a
+  seven-partition disk's line whole through a reader fed in pieces, cutting, a too-long line dropped whole) and
+  `tests/installer_disk_model_test.mjs`.
 - **Machines: on a host with the NVDIMM bus (`/sys/bus/nd`, nfit and libnvdimm loaded) QEMU could be stopped by its
   seccomp allowlist for `fchdir`** (BUG-L of the ws171 QA on VM 116; libndctl, loaded with QEMU's libpmem, walks
   that bus). Decided by the maintainer on 2026-11-27: no new system call. QEMU's mount namespace now has an empty,

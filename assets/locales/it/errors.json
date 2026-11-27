@@ -969,5 +969,6 @@
   "sys.unsupported": "Questa versione di LordOS non può farlo.",
   "theme.notAllowed": "{call} non è disponibile per i temi della comunità",
   "theme.noHost": "Manca la parte di LordOS dello stile della scrivania",
-  "hands.refused": "Solo tu puoi farlo: mai l'input di un agente IA"
+  "hands.refused": "Solo tu puoi farlo: mai l'input di un agente IA",
+  "install.diskTooManyParts": "Questo disco ha troppe partizioni perché il programma di installazione possa elencarle"
 }

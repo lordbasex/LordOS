@@ -969,5 +969,6 @@
   "sys.unsupported": "LordOS’un bu sürümü bunu yapamaz.",
   "theme.notAllowed": "{call} topluluk temaları için kullanılamaz",
   "theme.noHost": "Masaüstü stilinin LordOS bölümü eksik",
-  "hands.refused": "Bunu yalnızca siz yapabilirsiniz: bir yapay zekâ ajanının girdisi asla"
+  "hands.refused": "Bunu yalnızca siz yapabilirsiniz: bir yapay zekâ ajanının girdisi asla",
+  "install.diskTooManyParts": "Bu diskte, yükleyicinin listeleyemeyeceği kadar çok bölüm var"
 }

@@ -11,6 +11,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { emptyManual, actionsFor, setAction, addPartition, removeAdded, placeIn, rows as manualRows, review as manualReview } from './manualmodel.js';
+import { diskCollector } from './diskmodel.js';
 import { compareNames } from '../../sdk/collate.js';
 
 export function Icon({ size: s }) {
@@ -172,12 +173,17 @@ function DiskStep() {
   const s = useStore(wiz);
   const [disks, setDisks] = useState(null);
   const [err, setErr] = useState(null);
+  const [unreadable, setUnreadable] = useState(0);
   const load = () => {
-    const found = [];
+    const list = diskCollector();
     setDisks(null);
-    admin.run('install-disks', '', (l) => { try { found.push(JSON.parse(l)); } catch (e) { /* plain text */ } }, { quiet: true })
+    setErr(null);
+    setUnreadable(0);
+    admin.run('install-disks', '', list.add, { quiet: true })
       .then(() => {
+        const { disks: found, unreadable: bad } = list.result();
         setDisks(found);
+        setUnreadable(bad);
         // a new look at the disk asks for a new confirmation: what was confirmed may have changed
         const now = wiz.get().disk && found.find((d) => d.name === wiz.get().disk.name);
         if (wiz.get().disk) set({ disk: now && now.usable ? now : null, mode: now?.freeOk ? 'free' : 'erase', confirmDisk: '', confirmBox: false, confirmFree: false, manual: emptyManual(), confirmManual: false });
@@ -190,7 +196,8 @@ function DiskStep() {
     <View style={{ gap: 12 }}>
       {err && <Text style={{ fontSize: 12, color: '#ff453a' }}>{err}</Text>}
       {disks === null && <Text style={{ fontSize: 12, color: t.textDim }}>{tr('installer.disk.loading')}</Text>}
-      {disks && disks.length === 0 && !err && <Text style={{ fontSize: 13, color: t.text }}>{tr('installer.disk.none')}</Text>}
+      {unreadable > 0 && <Text style={{ fontSize: 12, color: '#ff453a' }}>{tr('installer.disk.unreadable')}</Text>}
+      {disks && disks.length === 0 && !err && !unreadable && <Text style={{ fontSize: 13, color: t.text }}>{tr('installer.disk.none')}</Text>}
       {(disks || []).map((d) => (
         <View key={d.name} onClick={() => d.usable && s.disk?.name !== d.name && set({ disk: d, mode: d.freeOk ? 'free' : 'erase', confirmDisk: '', confirmBox: false, confirmFree: false, manual: emptyManual(), confirmManual: false })}
           style={{ padding: 14, borderRadius: 10, gap: 4, opacity: d.usable ? 1 : 0.5,
@@ -201,7 +208,7 @@ function DiskStep() {
           </View>
           <Text style={{ fontSize: 11, color: t.textDim }}>{`${d.path} · ${d.transport.toUpperCase()}${d.removable ? ` · ${tr('installer.disk.removable')}` : ''}`}</Text>
           <Text style={{ fontSize: 11, color: t.textDim }}>{content(d)}</Text>
-          {!d.usable && <Text style={{ fontSize: 11, color: '#ff9f0a' }}>{tr('installer.disk.small')}</Text>}
+          {!d.usable && <Text style={{ fontSize: 11, color: '#ff9f0a' }}>{d.listWhy ? errorText(d.listWhy) : tr('installer.disk.small')}</Text>}
         </View>
       ))}
       {s.disk && !s.disk.freeOk && s.disk.freeWhy && s.disk.ptable !== 'none' && (

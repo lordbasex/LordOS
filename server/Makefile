@@ -1590,6 +1590,13 @@ DISKCLI_SRC := tests/disk_cli.c src/disk/disk.c src/disk/diskuse.c src/disk/smar
 build/disk-cli: $(DISKCLI_SRC) src/disk/disk.h src/imager/imager_admin.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(DISKCLI_SRC)
+# the privileged helper's reply lines (src/adminline.h, GitHub #280): a disk with seven partitions is one whole line,
+# a longer text is cut but stays one line, a reader drops a line too long for it whole and keeps the next one
+test: build/adminline-test
+build/adminline-test: tests/adminline_test.c src/adminline.h src/admin.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/adminline_test.c
+	./$@ || { rm -f $@; exit 1; }
 # a system with no administrator (src/users/admin_rescue.c): who may become one
 test: build/admin-rescue-test
 build/admin-rescue-test: tests/admin_rescue_test.c src/users/admin_rescue.c src/users/admin_rescue.h

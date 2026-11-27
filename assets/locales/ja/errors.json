@@ -968,5 +968,6 @@
   "sys.unsupported": "このバージョンの LordOS ではできません。",
   "theme.notAllowed": "{call} はコミュニティテーマでは使用できません",
   "theme.noHost": "デスクトップスタイルの LordOS 部分がありません",
-  "hands.refused": "これはあなただけが行えます。AI エージェントの入力では行えません"
+  "hands.refused": "これはあなただけが行えます。AI エージェントの入力では行えません",
+  "install.diskTooManyParts": "このディスクはパーティションが多すぎるため、インストーラーで一覧表示できません"
 }

@@ -969,5 +969,6 @@
   "sys.unsupported": "Diese Version von LordOS kann das nicht.",
   "theme.notAllowed": "{call} ist für Community-Themes nicht verfügbar",
   "theme.noHost": "Der LordOS-Teil des Schreibtischstils fehlt",
-  "hands.refused": "Nur du kannst das tun: nie die Eingabe eines KI-Agenten"
+  "hands.refused": "Nur du kannst das tun: nie die Eingabe eines KI-Agenten",
+  "install.diskTooManyParts": "Dieser Datenträger hat zu viele Partitionen, als dass das Installationsprogramm sie auflisten könnte"
 }

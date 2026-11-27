@@ -968,5 +968,6 @@
   "sys.unsupported": "Phiên bản LordOS này không làm được việc đó.",
   "theme.notAllowed": "{call} không dùng được cho chủ đề cộng đồng",
   "theme.noHost": "Thiếu phần LordOS của kiểu màn hình nền",
-  "hands.refused": "Chỉ bạn mới làm được việc này: không bao giờ là thao tác của tác tử AI"
+  "hands.refused": "Chỉ bạn mới làm được việc này: không bao giờ là thao tác của tác tử AI",
+  "install.diskTooManyParts": "Ổ đĩa này có quá nhiều phân vùng để trình cài đặt liệt kê"
 }
