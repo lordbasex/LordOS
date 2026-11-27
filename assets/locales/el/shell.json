@@ -221,6 +221,7 @@
   "edit.copyImage": "Αντιγραφή εικόνας",
   "packages.loadError": "Δεν ήταν δυνατό το άνοιγμα της εφαρμογής: {error}",
   "picker.cancel": "Ακύρωση",
+  "dialog.cancel": "Ακύρωση",
   "picker.open": "Άνοιγμα",
   "picker.readOnly": "Αυτός ο φάκελος είναι μόνο για ανάγνωση.",
   "picker.choose": "Επιλογή ({n})",

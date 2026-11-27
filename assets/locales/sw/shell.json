@@ -221,6 +221,7 @@
   "edit.copyImage": "Nakili Picha",
   "packages.loadError": "Programu haikuweza kufunguliwa: {error}",
   "picker.cancel": "Ghairi",
+  "dialog.cancel": "Ghairi",
   "picker.open": "Fungua",
   "picker.readOnly": "Folda hii ni ya kusoma tu.",
   "picker.choose": "Chagua ({n})",

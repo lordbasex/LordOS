@@ -225,6 +225,7 @@
   "edit.copyImage": "Копировать изображение",
   "packages.loadError": "Не удалось открыть приложение: {error}",
   "picker.cancel": "Отменить",
+  "dialog.cancel": "Отменить",
   "picker.open": "Открыть",
   "picker.readOnly": "Эта папка доступна только для чтения.",
   "picker.choose": "Выбрать ({n})",

@@ -221,6 +221,7 @@
   "edit.copyImage": "ছবি কপি করুন",
   "packages.loadError": "অ্যাপটি খোলা যায়নি: {error}",
   "picker.cancel": "বাতিল",
+  "dialog.cancel": "বাতিল",
   "picker.open": "খুলুন",
   "picker.readOnly": "এই ফোল্ডারটি শুধু পড়ার জন্য।",
   "picker.choose": "বেছে নিন ({n})",

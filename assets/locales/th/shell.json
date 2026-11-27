@@ -217,6 +217,7 @@
   "edit.copyImage": "คัดลอกรูปภาพ",
   "packages.loadError": "ไม่สามารถเปิดแอปได้: {error}",
   "picker.cancel": "ยกเลิก",
+  "dialog.cancel": "ยกเลิก",
   "picker.open": "เปิด",
   "picker.readOnly": "โฟลเดอร์นี้อ่านได้อย่างเดียว",
   "picker.choose": "เลือก ({n})",

@@ -221,6 +221,7 @@
   "edit.copyImage": "Kopiera bild",
   "packages.loadError": "Appen kunde inte öppnas: {error}",
   "picker.cancel": "Avbryt",
+  "dialog.cancel": "Avbryt",
   "picker.open": "Öppna",
   "picker.readOnly": "Den här mappen är skrivskyddad.",
   "picker.choose": "Välj ({n})",

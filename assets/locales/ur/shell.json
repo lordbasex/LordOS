@@ -221,6 +221,7 @@
   "edit.copyImage": "تصویر کاپی کریں",
   "packages.loadError": "ایپ نہیں کھولی جا سکی: {error}",
   "picker.cancel": "منسوخ کریں",
+  "dialog.cancel": "منسوخ کریں",
   "picker.open": "کھولیں",
   "picker.readOnly": "یہ فولڈر صرف پڑھنے کے لیے ہے۔",
   "picker.choose": "منتخب کریں ({n})",

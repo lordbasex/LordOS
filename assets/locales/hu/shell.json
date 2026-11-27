@@ -221,6 +221,7 @@
   "edit.copyImage": "Kép másolása",
   "packages.loadError": "Az alkalmazást nem sikerült megnyitni: {error}",
   "picker.cancel": "Mégse",
+  "dialog.cancel": "Mégse",
   "picker.open": "Megnyitás",
   "picker.readOnly": "Ez a mappa csak olvasható.",
   "picker.choose": "Kiválasztás ({n})",

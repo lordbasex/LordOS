@@ -237,6 +237,7 @@
   "edit.copyImage": "نسخ الصورة",
   "packages.loadError": "تعذّر فتح التطبيق: {error}",
   "picker.cancel": "إلغاء",
+  "dialog.cancel": "إلغاء",
   "picker.open": "فتح",
   "picker.readOnly": "هذا المجلد للقراءة فقط.",
   "picker.choose": "اختيار ({n})",

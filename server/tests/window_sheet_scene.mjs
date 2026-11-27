@@ -9,6 +9,7 @@ import path from 'node:path';
 import * as rt from '@lordos/runtime';
 import { enableShellLayers, WindowSheet, Layer, LAYERS } from '../../sdk/layers.js';
 import { AppWindowContext } from '../../sdk/components.jsx';
+import { ConfirmDialog } from '../../sdk/controls.jsx';
 
 const { texts, parents, removed } = globalThis.__lordTest;
 const h = React.createElement;
@@ -31,7 +32,8 @@ function Win({ name, children }) {
 rt.render(h(rt.View, null,
   h(Win, { name: 'a' }, h(WindowSheet, null, (a) => h(rt.Text, null, `sheet ${a.x},${a.y} ${a.w}x${a.h}`))),
   h(Win, { name: 'b' }, h(Layer, { name: 'modal' }, h(rt.Text, null, 'old modal'))),
-  h(WindowSheet, null, h(rt.Text, null, 'no window'))));
+  h(WindowSheet, null, h(rt.Text, null, 'no window')),
+  h(ConfirmDialog, { title: 'Trust it?', okLabel: 'Trust', onOk: () => {}, onCancel: () => {} })));
 await flush();
 await flush();
 const modal = rt.layerContainer(LAYERS.modal);
@@ -43,6 +45,8 @@ const old = textNode('old modal');
 check('(a <Layer name="modal"> is in the modal layer, above every window)', !!old && under(old, modal.id));
 const alone = textNode('no window');
 check('outside a window: the modal layer', !!alone && under(alone, modal.id));
+// a dialog given no cancelLabel still says Cancel (QA 0.8.9.6.2: the community theme trust dialog's button was empty)
+check('ConfirmDialog without cancelLabel: "Cancel"', !!textNode('Cancel'), [...texts.values()].join(' | '));
 // and no app draws a window's sheet in the modal layer any more (run from server/, as run_suites.sh does)
 const found = [];
 const walk = (d) => {

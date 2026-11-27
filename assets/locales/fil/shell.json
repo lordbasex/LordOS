@@ -221,6 +221,7 @@
   "edit.copyImage": "Kopyahin ang Larawan",
   "packages.loadError": "Hindi mabuksan ang app: {error}",
   "picker.cancel": "Kanselahin",
+  "dialog.cancel": "Kanselahin",
   "picker.open": "Buksan",
   "picker.readOnly": "Read-only ang folder na ito.",
   "picker.choose": "Piliin ({n})",

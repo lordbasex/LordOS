@@ -217,6 +217,7 @@
   "edit.copyImage": "拷貝影像",
   "packages.loadError": "無法打開 App：{error}",
   "picker.cancel": "取消",
+  "dialog.cancel": "取消",
   "picker.open": "打開",
   "picker.readOnly": "此資料夾為唯讀。",
   "picker.choose": "選擇（{n}）",

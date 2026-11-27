@@ -221,6 +221,7 @@
   "edit.copyImage": "Copia la imatge",
   "packages.loadError": "No s’ha pogut obrir l’aplicació: {error}",
   "picker.cancel": "Cancel·la",
+  "dialog.cancel": "Cancel·la",
   "picker.open": "Obre",
   "picker.readOnly": "Aquesta carpeta és només de lectura.",
   "picker.choose": "Tria ({n})",

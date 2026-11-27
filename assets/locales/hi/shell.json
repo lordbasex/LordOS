@@ -221,6 +221,7 @@
   "edit.copyImage": "छवि कॉपी करें",
   "packages.loadError": "ऐप नहीं खोला जा सका: {error}",
   "picker.cancel": "रद्द करें",
+  "dialog.cancel": "रद्द करें",
   "picker.open": "खोलें",
   "picker.readOnly": "यह फ़ोल्डर केवल पढ़ने के लिए है।",
   "picker.choose": "चुनें ({n})",

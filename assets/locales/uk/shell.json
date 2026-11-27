@@ -225,6 +225,7 @@
   "edit.copyImage": "Копіювати зображення",
   "packages.loadError": "Не вдалося відкрити програму: {error}",
   "picker.cancel": "Скасувати",
+  "dialog.cancel": "Скасувати",
   "picker.open": "Відкрити",
   "picker.readOnly": "Ця тека доступна лише для читання.",
   "picker.choose": "Вибрати ({n})",

@@ -420,6 +420,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **The "This theme isn't from LordOS" dialog's Cancel button had no label** (BUG-H of the ws171 QA). `ConfirmDialog`
+  now says Cancel (`shell.dialog.cancel`, every language) when the caller gives no `cancelLabel`. Test:
+  `window-sheet-scene`.
 - **Session restore's autosave still synced settings.json on the interface's thread** (BUG-I of the ws171 QA, GitHub
   #250 partly open: "stall: call settings.save" of 94 to 145 ms under heavy disk IO, two seconds after each window
   change). The marker is now written and synced on lord-server's save worker (`lord.settings.save(text, false, true)`:

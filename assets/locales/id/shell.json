@@ -217,6 +217,7 @@
   "edit.copyImage": "Salin Gambar",
   "packages.loadError": "Aplikasi tidak dapat dibuka: {error}",
   "picker.cancel": "Batal",
+  "dialog.cancel": "Batal",
   "picker.open": "Buka",
   "picker.readOnly": "Folder ini hanya baca.",
   "picker.choose": "Pilih ({n})",

@@ -221,6 +221,7 @@
   "edit.copyImage": "رونوشت تصویر",
   "packages.loadError": "برنامه باز نشد: {error}",
   "picker.cancel": "لغو",
+  "dialog.cancel": "لغو",
   "picker.open": "باز کردن",
   "picker.readOnly": "این پوشه فقط‌خواندنی است.",
   "picker.choose": "انتخاب ({n})",

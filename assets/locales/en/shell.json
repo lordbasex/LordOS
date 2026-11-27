@@ -221,6 +221,7 @@
   "edit.copyImage": "Copy Image",
   "packages.loadError": "The app could not be opened: {error}",
   "picker.cancel": "Cancel",
+  "dialog.cancel": "Cancel",
   "picker.open": "Open",
   "picker.readOnly": "This folder is read-only.",
   "picker.choose": "Choose ({n})",

@@ -217,6 +217,7 @@
   "edit.copyImage": "拷贝图像",
   "packages.loadError": "无法打开应用：{error}",
   "picker.cancel": "取消",
+  "dialog.cancel": "取消",
   "picker.open": "打开",
   "picker.readOnly": "此文件夹是只读的。",
   "picker.choose": "选取（{n}）",

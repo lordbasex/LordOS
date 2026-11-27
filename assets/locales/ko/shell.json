@@ -217,6 +217,7 @@
   "edit.copyImage": "이미지 복사",
   "packages.loadError": "앱을 열 수 없습니다: {error}",
   "picker.cancel": "취소",
+  "dialog.cancel": "취소",
   "picker.open": "열기",
   "picker.readOnly": "이 폴더는 읽기 전용입니다.",
   "picker.choose": "선택({n})",

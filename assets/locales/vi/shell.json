@@ -217,6 +217,7 @@
   "edit.copyImage": "Sao chép hình ảnh",
   "packages.loadError": "Không thể mở ứng dụng: {error}",
   "picker.cancel": "Hủy",
+  "dialog.cancel": "Hủy",
   "picker.open": "Mở",
   "picker.readOnly": "Thư mục này chỉ đọc.",
   "picker.choose": "Chọn ({n})",

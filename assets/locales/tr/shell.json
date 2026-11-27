@@ -221,6 +221,7 @@
   "edit.copyImage": "Görüntüyü Kopyala",
   "packages.loadError": "Uygulama açılamadı: {error}",
   "picker.cancel": "Vazgeç",
+  "dialog.cancel": "Vazgeç",
   "picker.open": "Aç",
   "picker.readOnly": "Bu klasör salt okunur.",
   "picker.choose": "Seç ({n})",

@@ -225,6 +225,7 @@
   "edit.copyImage": "Copiază imaginea",
   "packages.loadError": "Aplicația nu a putut fi deschisă: {error}",
   "picker.cancel": "Anulează",
+  "dialog.cancel": "Anulează",
   "picker.open": "Deschide",
   "picker.readOnly": "Acest dosar este doar în citire.",
   "picker.choose": "Alege ({n})",

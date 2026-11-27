@@ -225,6 +225,7 @@
   "edit.copyImage": "Kopijuoti paveikslėlį",
   "packages.loadError": "Nepavyko atidaryti programos: {error}",
   "picker.cancel": "Atšaukti",
+  "dialog.cancel": "Atšaukti",
   "picker.open": "Atidaryti",
   "picker.readOnly": "Šis aplankas skirtas tik skaityti.",
   "picker.choose": "Pasirinkti ({n})",

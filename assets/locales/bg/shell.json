@@ -221,6 +221,7 @@
   "edit.copyImage": "Копирай изображението",
   "packages.loadError": "Приложението не можа да се отвори: {error}",
   "picker.cancel": "Отказ",
+  "dialog.cancel": "Отказ",
   "picker.open": "Отвори",
   "picker.readOnly": "Тази папка е само за четене.",
   "picker.choose": "Избери ({n})",

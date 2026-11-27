@@ -217,6 +217,7 @@
   "edit.copyImage": "画像をコピー",
   "packages.loadError": "アプリを開けませんでした：{error}",
   "picker.cancel": "キャンセル",
+  "dialog.cancel": "キャンセル",
   "picker.open": "開く",
   "picker.readOnly": "このフォルダは読み出し専用です。",
   "picker.choose": "選択（{n}）",

@@ -221,6 +221,7 @@
   "edit.copyImage": "Kopioi kuva",
   "packages.loadError": "Sovellusta ei voitu avata: {error}",
   "picker.cancel": "Peruuta",
+  "dialog.cancel": "Peruuta",
   "picker.open": "Avaa",
   "picker.readOnly": "Tämä kansio on vain luku -tilassa.",
   "picker.choose": "Valitse ({n})",

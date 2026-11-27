@@ -221,6 +221,7 @@
   "edit.copyImage": "Kopieer afbeelding",
   "packages.loadError": "De app kon niet worden geopend: {error}",
   "picker.cancel": "Annuleer",
+  "dialog.cancel": "Annuleer",
   "picker.open": "Open",
   "picker.readOnly": "Deze map is alleen-lezen.",
   "picker.choose": "Kies ({n})",

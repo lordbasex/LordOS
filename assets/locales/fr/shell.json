@@ -221,6 +221,7 @@
   "edit.copyImage": "Copier l’image",
   "packages.loadError": "L’app n’a pas pu être ouverte : {error}",
   "picker.cancel": "Annuler",
+  "dialog.cancel": "Annuler",
   "picker.open": "Ouvrir",
   "picker.readOnly": "Ce dossier est en lecture seule.",
   "picker.choose": "Choisir ({n})",

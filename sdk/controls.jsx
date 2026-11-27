@@ -415,7 +415,7 @@ export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCan
         {detail ? <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{detail}</Text> : null}
         {children || null}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
-          <DialogButton t={t} label={cancelLabel} onClick={onCancel} isDefault={dflt === 'cancel'} ring={owner && focus === 'cancel'} />
+          <DialogButton t={t} label={cancelLabel || tr('shell.dialog.cancel')} onClick={onCancel} isDefault={dflt === 'cancel'} ring={owner && focus === 'cancel'} />
           <DialogButton t={t} label={okLabel} onClick={onOk} primary destructive={destructive} isDefault={dflt === 'ok'} ring={owner && focus === 'ok'} />
         </View>
       </View>

@@ -221,6 +221,7 @@
   "edit.copyImage": "Şəkli kopyala",
   "packages.loadError": "Tətbiqi açmaq mümkün olmadı: {error}",
   "picker.cancel": "Ləğv et",
+  "dialog.cancel": "Ləğv et",
   "picker.open": "Aç",
   "picker.readOnly": "Bu qovluq yalnız oxumaq üçündür.",
   "picker.choose": "Seç ({n})",

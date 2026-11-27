@@ -221,6 +221,7 @@
   "edit.copyImage": "Bild kopieren",
   "packages.loadError": "Die App konnte nicht geöffnet werden: {error}",
   "picker.cancel": "Abbrechen",
+  "dialog.cancel": "Abbrechen",
   "picker.open": "Öffnen",
   "picker.readOnly": "Dieser Ordner ist schreibgeschützt.",
   "picker.choose": "Auswählen ({n})",
