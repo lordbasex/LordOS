@@ -27,20 +27,26 @@ static const char SYS[] =
 
 static const char *const TASK[] = {
     [WR_FIX] = "Proofread this text. Fix every spelling mistake, missing accent, capital letter, punctuation mark and "
-               "grammar error. Answer in the language of the text, keeping its words and meaning.",
+               "grammar error, and words wrongly written together or apart (in Spanish: nose → no sé, aver → a ver, "
+               "haber → a ver when it means to see). Answer in the language of the text, keeping its words and meaning.",
     [WR_IMPROVE] = "Rewrite this text so it reads clearly and naturally, with correct spelling, accents and grammar. Answer "
                    "in the language of the text, keeping its meaning, facts, names and tone.",
     [WR_SHORTER] = "Rewrite this text much shorter, keeping its key points, facts and names. Answer in the language of the "
                    "text.",
 };
 
-/* worked examples: { text, answer }, up to two per action */
+/* worked examples: { text, answer }, up to three per action */
 typedef struct { const char *in, *out; } Shot;
 static const Shot FIX_SHOTS[] = {
-    { "hola que haces? manana no puedo ir porque tengo que trabajar , despues te aviso",
-      "Hola, ¿qué haces? Mañana no puedo ir porque tengo que trabajar, después te aviso." },
+    /* (0.8.9.6.2, BUG-1 of the QA: "nose si vas a venir" came back "Nose si vas a venir.") Spanish's most common slips
+     * written together or apart: "nose" (no sé), "aver"/"haber" (a ver), "porque" in a question (por qué), "q" */
+    { "hola que haces? nose si manana puedo ir , aver que pasa en el trabajo. porque no venis vos? tengo que ir haber a mi abuela",
+      "Hola, ¿qué haces? No sé si mañana puedo ir, a ver qué pasa en el trabajo. ¿Por qué no venís vos? Tengo que ir a ver a mi abuela." },
     { "i dont now if hes coming, they has not answer my mesage",
       "I don't know if he's coming; they have not answered my message." },
+    /* a short one last, the closest to what the 1.7B model is asked: it copied "nose si…" back unchanged without it */
+    { "nose si llego a tiempo. aver que dice el jefe",
+      "No sé si llego a tiempo. A ver qué dice el jefe." },
 };
 static const Shot IMPROVE_SHOTS[] = {
     { "bueno te queria decir que lo de ayer no salio como pensabamos y hay que verlo de nuevo",

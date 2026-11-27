@@ -119,6 +119,11 @@ static void writing_pure(void) {
     CHECK(b && strstr(b, "\"content\":\"Proofread this text.") && strstr(b, "Hola, ¿qué haces?") &&
           strstr(b, "\"role\":\"assistant\"") && strstr(b, "\"top_k\":20") && strstr(b, "\"enable_thinking\":false"),
           "the fix request: its task, its examples and its sampling");
+    /* (BUG-1 of the 0.8.9.6.2 QA) Spanish's joined and split words: named in the task, and a short worked example last */
+    CHECK(b && strstr(b, "nose → no sé") && strstr(b, "No sé si mañana puedo ir, a ver qué pasa") &&
+          strstr(b, "No sé si llego a tiempo. A ver qué dice el jefe.") &&
+          strstr(b, "No sé si llego a tiempo") > strstr(b, "I don't know if he's coming"),
+          "the fix request: nose → no sé and aver → a ver, in the task and the examples, the short one last");
     {
         /* the person's text is the last message, once */
         const char *last = b ? strstr(b, "<<<TEXT 0123456789abcdef>>>\\u000ahello") : NULL;

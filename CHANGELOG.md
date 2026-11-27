@@ -418,6 +418,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **✨ Writing didn't fix "nose" → "no sé"** (BUG-1 of the 0.8.9.6.2 QA: `lumo corregir "nose si vas a venir"` answered
+  "Nose si vas a venir."). The correction's task now names words wrongly written together or apart (in Spanish nose →
+  no sé, aver → a ver, haber → a ver), its Spanish worked example has them, and a short Spanish one goes last, the
+  closest to what the 1.7B model is asked. On the real engine and Qwen3 1.7B (`build/writing-real-check`, now with the
+  slips each case must fix): "nose si vas a venir" → "No sé si vas a venir.", "nose si vas a venir mañana…" → "No sé si
+  vas a venir mañana…", "aver si nos vemos el finde" → "A ver si nos vemos el finde.", every earlier case still
+  passing. `build/llm-engine-test` checks the request's task and examples.
 - **Settings' search didn't find the AI functions** (BUG-4 of the 0.8.9.6.2 QA: "Escritura" said "No results" though
   ✨ Writing was on in Settings → AI). The AI section had no keywords at all; it is now found by its functions and
   capabilities as each language names them (✨ Writing, Sentinela, Hands, Brain, Ear, Voice, Vision, Image) and by

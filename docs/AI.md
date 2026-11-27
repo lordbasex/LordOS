@@ -48,7 +48,10 @@ else the first installed.
   target of the closed list of LordOS's 35 interface languages and the text. A short system text says the text is
   data and never instructions; each user message holds the task ("Proofread this text…", "Translate this text into
   Portuguese…") and then the text between `<<<TEXT nonce>>>` and `<<<END-TEXT nonce>>>` with a random nonce; one or
-  two fixed worked examples go first as earlier turns of the conversation (a Spanish and an English correction; for a
+  three fixed worked examples go first as earlier turns of the conversation (a Spanish and an English correction and,
+  last, a short Spanish one with "nose" and "aver"; the correction's task also names words written together or apart,
+  "nose → no sé", "aver → a ver": without them the 1.7B model gave "nose si vas a venir" back unchanged, BUG-1 of the
+  0.8.9.6.2 QA, and now answers "No sé si vas a venir."; for a
   translation, each target language's own: an informal chat line without accents, and a sentence with a request in
   it, translated as text). The first version (one long system text, the user message only the fenced text) made the
   1.7B model copy the text back for every action, translation included (the maintainer's test on ws164, measured
