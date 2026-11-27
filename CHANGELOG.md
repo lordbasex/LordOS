@@ -420,6 +420,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Moving wallpapers: lord-server spent most of a core re-blurring the frosted surfaces over the video** (BUG-14 of the
+  ws170 QA: a 4K wallpaper on three 4K displays with Settings, Files, Notes and the Terminal open averaged 145 %, its
+  main thread about 80 %). Every video frame cleared, re-blurred and repainted on the CPU every frosted window, the menu
+  bar, the Dock and the widgets over a GPU-drawn moving wallpaper, and read the video's rows back from the GPU for them.
+  A new frame now refreshes those strips only when the last refresh is 200 ms old (`MEDIA_BLUR_MS`,
+  `media_src_blur_frame`; `LORD_MOTION_BLUR_MS`, 0 = every frame); a frame that waits is refreshed by the moving
+  wallpapers' tick once its time comes, so the last one shown is always blurred. The video itself still plays at its own
+  rate on the GPU. A blurred node with an opaque background is no longer refreshed for new frames, since its blur never
+  shows. Measured with the new `build/engine-test bench-motion` (one 3840×2160 display, the menu bar, the Dock, a widget
+  and two frosted windows: 4.2 Mpx): one refresh 32 ms, 97 % of a core per display at 30 frames/s before, 16 % after.
+  Still to do: caching a window's content apart from its blurred backdrop, or blurring on the GPU
+  (docs/MOVING-WALLPAPERS.md). Test: `engine-test` `test_motion_blur_refresh`.
 - **Workspaces: a display's bar with two windows on it** (BUG-32 of the ws170 QA, investigated: the Terminal and the
   Calculator on one display each seemed to list only itself). Not reproduced in the scene: two windows tiled on one
   display in Two halves and in One at a time both appear in that display's bar, as they do floating. A case for each is

@@ -14,6 +14,7 @@
 #include "../ui/ui.h"
 
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* a plain node in view_nodes still shows all of this source? (pruned when it died, shows another one or a part) */
@@ -242,6 +243,33 @@ void media_src_blur_damage(MediaSrc *s) {
         damage_add((Box){ s->blur_box[i][0], s->blur_box[i][1], s->blur_box[i][2], s->blur_box[i][3] });
         ui.dirty = 1;
     }
+}
+
+int media_blur_interval_ms(void) {
+    static int ms = -2;
+    if (ms == -2) {
+        const char *e = getenv("LORD_MOTION_BLUR_MS");
+        char *end = NULL;
+        long v = e && *e ? strtol(e, &end, 10) : -1;
+        ms = e && *e && end && !*end && v >= 0 && v <= 2000 ? (int)v : MEDIA_BLUR_MS;
+    }
+    return ms;
+}
+
+int media_src_blur_frame(MediaSrc *s, double now) {
+    int every = media_blur_interval_ms();
+    if (every > 0 && s->blur_at > 0 && now - s->blur_at < every && now >= s->blur_at) { s->blur_pending = 1; return 0; }
+    s->blur_at = now;
+    s->blur_pending = 0;
+    media_src_blur_damage(s);
+    return 1;
+}
+
+double media_src_blur_due(MediaSrc *s, double now) {
+    if (!s->blur_pending) return -1;
+    double left = s->blur_at + media_blur_interval_ms() - now;
+    if (left <= 0 || now < s->blur_at) { media_src_blur_frame(s, now); return -1; }
+    return left < 1 ? 1 : left;
 }
 
 /* The frame of a video or of the camera covers its whole box (the bands are painted opaque): if everything

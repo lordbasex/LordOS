@@ -206,7 +206,7 @@ static void nv_show(MediaSrc *s, int w, int h, int64_t pts) {
     else s->gtex = NULL;
     if (s->gtex && s->gpu_drawn) {
         media_src_present(s);
-        media_src_blur_damage(s);
+        media_src_blur_frame(s, now_ms());      /* the frosted strips over it: at most every MEDIA_BLUR_MS */
     } else media_src_damage(s);
 }
 
@@ -579,6 +579,8 @@ void media_ambient_tick(int unseen) {
                 if (due_ms < 0 || d < due_ms) due_ms = d;
             }
         }
+        double bd = media_src_blur_due(s, now);          /* a frame whose frosted strips wait (media_src_blur_frame) */
+        if (bd >= 0 && (due_ms < 0 || bd < due_ms)) due_ms = bd;
         double vd = a->last_vis + VIS_MS - now;
         if (vd < 1) vd = 1;
         if (due_ms < 0 || vd < due_ms) due_ms = vd;

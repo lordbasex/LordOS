@@ -4471,12 +4471,147 @@ static void test_blit_crop(void) {
     CHECK(a[0] == (src[40 * SWP + 50] | 0xff000000u), "a part past the edge: clamped by the bilinear path");
 }
 
+#ifndef ENGINE_BEFORE
+/* (ws170 QA BUG-14) the frosted strips over a GPU-drawn moving wallpaper: a blurred node whose background is opaque is
+ * not one (its blur never shows), and a new frame repaints them at most every media_blur_interval_ms(), the last frame
+ * always reaching them once its time comes */
+static void test_motion_blur_refresh(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    Node *video = view(root);
+    ss(video, "position", "absolute");
+    sn(video, "left", 0); sn(video, "top", 0); sn(video, "width", 800); sn(video, "height", 600);
+    Node *glass = view(root), *solid = view(root), *faded = view(root);
+    Node *nodes[3] = { glass, solid, faded };
+    static const uint32_t bgs[3] = { 0x80ffffff, 0xff202020, 0xff202020 };
+    for (int i = 0; i < 3; i++) {
+        ss(nodes[i], "position", "absolute");
+        sn(nodes[i], "left", 20 + 260 * i); sn(nodes[i], "top", 20); sn(nodes[i], "width", 200); sn(nodes[i], "height", 100);
+        sn(nodes[i], "backgroundColor", bgs[i]); sn(nodes[i], "backdropBlur", 20);
+    }
+    sn(faded, "opacity", 0.5);              /* opaque, but drawn translucent: its blur shows */
+    layout_root(root, 800, 600);
+    paint_damage(root);
+    Box out[8];
+    int n = paint_blurs_over(video, out, 8);
+    int left_of_solid = 0;
+    for (int i = 0; i < n; i++) if (out[i].x0 >= 260 && out[i].x1 <= 520 - 20) left_of_solid++;
+    CHECK(n == 2 && !left_of_solid, "frosted strips over the video: %d (want the translucent and the faded one, not the opaque)", n);
+    sn(solid, "backgroundColor", 0xf0202020);
+    layout_root(root, 800, 600);
+    paint_damage(root);
+    CHECK(paint_blurs_over(video, out, 8) == 3, "a translucent background shows its blur again");
+    ui.damage = (Box){ 0, 0, 0, 0 };
+
+    int every = media_blur_interval_ms();
+    MediaSrc *s = calloc(1, sizeof *s);
+    double t = 1000;
+    CHECK(media_src_blur_frame(s, t) == 1, "the first frame refreshes the strips");
+    int refreshed = 0;
+    for (int f = 1; f <= 30; f++) refreshed += media_src_blur_frame(s, t + f * 33.3);   /* a second at 30 frames/s */
+    int want = every > 0 ? (int)(1000 / every) : 30;
+    CHECK(refreshed >= want - 1 && refreshed <= want + 1, "30 frames in a second: %d refreshes (interval %d ms)", refreshed, every);
+    double last = t + 30 * 33.3;
+    int pending = s->blur_pending;
+    double due = media_src_blur_due(s, last);
+    CHECK(!every || (pending && due > 0 && due <= every), "the last frame waits at most one interval: pending %d, due %.1f", pending, due);
+    CHECK(media_src_blur_due(s, last + every + 1) < 0 && !s->blur_pending, "and is refreshed once its time came");
+    CHECK(media_src_blur_due(s, last + 2 * every) < 0, "then nothing waits");
+    free(s);
+    ui_reset();
+}
+#endif
+
+#ifndef ENGINE_BEFORE
+/* A moving wallpaper under Flow's frosted surfaces (ws170 QA BUG-14; docs/MOVING-WALLPAPERS.md "The frosted surfaces
+ * over the video"): one 3840×2160 display at scale 1, a full-screen node standing in for the video (the GPU draws it;
+ * the CPU repaints only what blurs it), the menu bar, the Dock, a desk widget and two frosted windows with text, as on
+ * the QA's desktop. Each refresh is what media_src_blur_damage asks for after a video frame: every frosted box over the
+ * video (paint_blurs_over) damaged and repainted (the blur recomputed, as the video changed under it). Printed: the
+ * median time of one refresh and what it costs of the main thread per display at 30 frames a second (every frame,
+ * before) and at the throttled rate (MEDIA_BLUR_MS, after). The video's rows read back from the GPU are not counted. */
+static void bench_motion(void) {
+    quiet = 1;
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    Node *video = view(root);
+    ss(video, "position", "absolute");
+    sn(video, "left", 0); sn(video, "top", 0); sn(video, "width", 3840); sn(video, "height", 2160);
+    sn(video, "backgroundColor", 0xff204060);
+    const float frost = 30;
+    Node *bar = view(root);
+    ss(bar, "position", "absolute");
+    sn(bar, "left", 0); sn(bar, "top", 0); sn(bar, "width", 3840); sn(bar, "height", 28);
+    sn(bar, "backgroundColor", 0x99202020); sn(bar, "backdropBlur", frost);
+    ss(bar, "flexDirection", "row"); sn(bar, "gap", 18); sn(bar, "paddingLeft", 14);
+    static const char *const menus[] = { "Terminal", "Shell", "Edit", "View", "Profiles", "Window", "Help" };
+    for (int i = 0; i < 7; i++) text(bar, menus[i], 13);
+    static const struct { float x, y, w, h; int rows; } wins[] = { { 200, 120, 1600, 1000, 45 }, { 2000, 300, 1200, 800, 24 } };
+    for (int k = 0; k < 2; k++) {
+        Node *w = view(root);
+        ss(w, "position", "absolute");
+        sn(w, "left", wins[k].x); sn(w, "top", wins[k].y); sn(w, "width", wins[k].w); sn(w, "height", wins[k].h);
+        sn(w, "backgroundColor", 0xd0202024); sn(w, "borderRadius", 12); sn(w, "backdropBlur", frost);
+        sn(w, "shadowColor", 0x66000000); sn(w, "shadowBlur", 24); sn(w, "shadowOffsetY", 8);
+        sn(w, "padding", 12); sn(w, "gap", 4); ss(w, "overflow", "hidden");
+        for (int r = 0; r < wins[k].rows; r++) text(w, "lordbasex@master-lordos:~$ pt standard caro_davy anna eve jane giovanni vera", 14);
+    }
+    Node *widget = view(root);
+    ss(widget, "position", "absolute");
+    sn(widget, "left", 3300); sn(widget, "top", 120); sn(widget, "width", 360); sn(widget, "height", 200);
+    sn(widget, "backgroundColor", 0x66ffffff); sn(widget, "borderRadius", 18); sn(widget, "backdropBlur", frost);
+    text(widget, "27 Nov 07:14", 28);
+    Node *dock = view(root);
+    ss(dock, "position", "absolute");
+    sn(dock, "left", 1370); sn(dock, "top", 2060); sn(dock, "width", 1100); sn(dock, "height", 84);
+    sn(dock, "backgroundColor", 0x80ffffff); sn(dock, "borderRadius", 20); sn(dock, "backdropBlur", frost);
+
+    const int W = 3840, H = 2160;
+    uint32_t *px = calloc((size_t)W * H, 4);
+    Canvas c;
+    canvas_init(&c, px, W, H, W);
+    layout_root(root, W, H);
+    paint_damage(root);
+    ui.damage = (Box){ 0, 0, (float)W, (float)H };
+    paint_root_clear(&c, root, 0);
+    Box boxes[32];
+    int nb = paint_blurs_over(video, boxes, 32);
+    double area = 0;
+    for (int i = 0; i < nb; i++) area += (double)(boxes[i].x1 - boxes[i].x0) * (boxes[i].y1 - boxes[i].y0);
+    enum { N = 31 };
+    double v[N];
+    for (int f = 0; f < N; f++) {
+        double a = now_ms();
+        for (int i = 0; i < nb; i++) {
+            Rect r = { (int)boxes[i].x0, (int)boxes[i].y0, (int)boxes[i].x1, (int)boxes[i].y1 };
+            ui.damage = boxes[i];
+            canvas_set_clip(&c, r);
+            paint_root_clear(&c, root, 0);
+        }
+        canvas_set_clip(&c, (Rect){ 0, 0, W, H });
+        v[f] = now_ms() - a;
+    }
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    double ms = median(v, N);
+    int every = media_blur_interval_ms();
+    double after_hz = every > 0 ? 1000.0 / every : 30;
+    if (after_hz > 30) after_hz = 30;
+    printf("motion: %d frosted boxes over the video, %.1f Mpx; one refresh %.2f ms; main thread per display: "
+           "%.0f %% at 30 frames/s (every frame), %.0f %% at %.1f refreshes/s (every %d ms)\n",
+           nb, area / 1e6, ms, ms * 30 / 10, ms * after_hz / 10, after_hz, every);
+    free(px);
+}
+#endif
+
 int main(int argc, char **argv) {
     const char *dir = getenv("LORD_FONTS") ? getenv("LORD_FONTS") : "../assets/fonts";
     fonts_set_builtin_dir(dir);
     if (text_init(dir)) { printf("engine-test: no fonts in %s\n", dir); return 1; }
 #ifndef ENGINE_BEFORE
     if (argc > 1 && !strcmp(argv[1], "bench-slideshow")) { bench_slideshow(); return 0; }
+    if (argc > 1 && !strcmp(argv[1], "bench-motion")) { bench_motion(); return 0; }
 #endif
     if (argc > 1 && !strcmp(argv[1], "bench")) { bench(); return 0; }
 #ifdef ENGINE_BEFORE
@@ -4514,6 +4649,7 @@ int main(int argc, char **argv) {
     test_text_child_damage();
     test_minimize_damage();
     test_hidden_blur_damage();
+    test_motion_blur_refresh();
     test_gscissor_unit();
     test_gcontend();
     memset(&gc_all, 0, sizeof gc_all);

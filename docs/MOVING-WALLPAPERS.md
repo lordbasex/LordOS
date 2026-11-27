@@ -47,6 +47,28 @@ strips under a blurred node (the Dock, the menu bar, an open menu) keep the CPU'
 the video: those rows alone are converted (or read back from the GPU) and those strips alone are repainted
 (`nv_blur_strips` in `mview.c`, `media_src_blur_damage` in `mviews.c`).
 
+### The frosted surfaces over the video (ws170 QA BUG-14)
+
+Those strips were repainted with **every** frame: with a 4K wallpaper on three 4K displays, Settings, Files, Notes and
+the Terminal open and translucent widgets, lord-server averaged 145 % of a core (its main thread about 80 %: clearing,
+re-blurring and repainting every frosted window, the menu bar, the Dock and the widgets, and reading the video's rows
+back from the GPU for them, `gpu_tex_read_rows`). Since then:
+
+- **At most every 200 ms** (`MEDIA_BLUR_MS`, `media_src_blur_frame` in `mviews.c`; `LORD_MOTION_BLUR_MS`, 0 = every
+  frame as before): a new frame repaints the strips only when the last refresh is that old; otherwise it waits
+  (`blur_pending`), and the main loop's ambient tick refreshes it once its time comes (`media_src_blur_due`), so the
+  last frame shown is always blurred too. The video itself still plays at its own rate on the GPU; only its blurred
+  copy behind frosted glass steps at 5 refreshes a second, which a 30 px blur hides.
+- **A blurred node with an opaque background is not a strip** (`blur_covered` in `paint.c`): its blur never shows, so a
+  new frame doesn't repaint it.
+
+Measured with `build/engine-test bench-motion` (one 3840×2160 display at scale 1, the menu bar, the Dock, a widget and
+two frosted windows with text: 4.2 Mpx of strips; the video's read-back not counted): one refresh **31.7 ms**, so
+**95 % of a core per display at 30 frames/s** before and **16 % at 5 refreshes/s** after. What remains: each refresh
+still repaints a whole frosted window's content with its blur on the CPU (caching a node's content apart from its
+blurred backdrop, or blurring on the GPU, would remove that); and three displays' strips are refreshed in the same
+frame. The full desktop has not been measured again on the maintainer's three monitors yet.
+
 ## Each technique
 
 ### Per-display pause (lord-server's own knowledge)
@@ -195,7 +217,8 @@ Other runs, one view:
 
 "lord-server's frame work" is what the bench does per frame: in the BGRA rows a copy into each display's canvas and
 that canvas's upload, in the others one upload (NV12) or import (dmabuf) or nothing (cache), plus the shader pass. It
-leaves out what a real session adds on top: the blurred strips (repainted per frame on every path; before, with the
+leaves out what a real session adds on top: the blurred strips (repainted at most every 200 ms since the ws170 QA, per
+frame before; earlier still, with the
 whole display's repaint around them) and composing the displays (GPU work, a few GL calls). So the session's 184 % is
 not this table's 19.6 %: most of it was repainting and uploading each whole display, which the GPU path no longer does.
 The full session with three monitors has **not** been measured yet: it needs the maintainer's desktop; the line to

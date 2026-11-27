@@ -122,6 +122,8 @@ typedef struct {
     unsigned char view_hidden[MEDIA_VIEW_NODES];
     float blur_box[MEDIA_BLUR_MAX * 2][4];
     int blur_node[MEDIA_BLUR_MAX * 2], nblur;
+    double blur_at;                     /* when the blurred strips were last refreshed (media_src_blur_frame) */
+    int blur_pending;                   /* a newer frame than the strips show, waiting for MEDIA_BLUR_MS */
     struct MAmb *amb;                   /* a moving wallpaper's player (play's ambient): its pause, stop and loop cache */
     /* player state */
     int64_t pos, dur;
@@ -193,6 +195,14 @@ struct Node *media_src_view_at(MediaSrc *s, int i);
  * strips of visible views are damaged with each new frame (media_src_blur_damage) */
 void media_src_blur_note(MediaSrc *s, int node, const void *boxes, int n);
 void media_src_blur_damage(MediaSrc *s);
+/* A new frame of a GPU-drawn moving wallpaper: its blurred strips (the menu bar, the Dock, frosted windows and widgets
+ * over it) are repainted on the CPU at most every media_blur_interval_ms(), not with every frame (ws170 QA BUG-14: three
+ * 4K displays spent most of lord-server's main thread re-blurring them). 1 if they were damaged now, 0 if the refresh
+ * waits (blur_pending); media_src_blur_due says when, and damages them once it is time. */
+#define MEDIA_BLUR_MS 200
+int    media_blur_interval_ms(void);        /* MEDIA_BLUR_MS, or LORD_MOTION_BLUR_MS (0: every frame, as before) */
+int    media_src_blur_frame(MediaSrc *s, double now);
+double media_src_blur_due(MediaSrc *s, double now);   /* ms until the waiting refresh (after doing it when due), -1 none */
 /* mambient.c: rows [y0, y1) of the shown NV12 frame in map (converted, or read back from the GPU), or NULL; map otherwise */
 const uint32_t *media_src_rows(MediaSrc *s, int y0, int y1);
 int  media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *pid);

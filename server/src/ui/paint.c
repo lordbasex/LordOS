@@ -2216,10 +2216,17 @@ int paint_node_hidden(const Node *target) {
 /* The nodes with a backdrop blur painted over target (after it in paint order) that meet its box: each one's box and the
  * margin its blur reads (blur_near), cut to target's box, at most max. A moving wallpaper drawn by the GPU below the UI
  * keeps the CPU's pixels there, so the Dock and the menu bar still blur it (media/mview.c). Their count (≤ max). */
+/* A blurred node whose own background is opaque (no gradient, no transparency in it or above it) covers its blur
+ * entirely: what moves under it never shows, so a new video frame need not repaint it (ws170 QA BUG-14). */
+static int blur_covered(const Node *n) {
+    if ((n->s.bg >> 24) != 255 || n->s.has_gradient) return 0;
+    for (const Node *p = n; p; p = p->parent) if (p->s.opacity < 0.999f) return 0;
+    return 1;
+}
 static void blurs_after(Node *n, const Node *target, Box d, int *seen, Box *out, int max, int *k) {
     if (n->type == NODE_RAW || n->s.display_none || *k >= max) return;
     if (n == target) { *seen = 1; return; }
-    if (*seen && n->s.backdrop_blur >= 1 && n->s.opacity > 0.004f) {
+    if (*seen && n->s.backdrop_blur >= 1 && n->s.opacity > 0.004f && !blur_covered(n)) {
         Box b = n->prev_box;
         if (b.x1 <= b.x0 || b.y1 <= b.y0) b = (Box){ n->ax, n->ay, n->ax + n->w, n->ay + n->h };
         if (b.x1 > b.x0 && b.y1 > b.y0 && box_meets(b, d)) {
