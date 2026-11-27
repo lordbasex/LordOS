@@ -690,7 +690,9 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
       }
       adopt(p.value);
       // a value and its caret, drawn at once (a caret that only moved changes no value)
-      const show = (r) => { at.current = r; if (r.value !== p.value) p.onChange(r.value); publish(); redraw((n) => n + 1); };
+      // the value just sent is this field's until the next render: a second key in the same turn (an input method's
+      // commit and then the Space that ended it) builds on it, instead of adopting the old value as an outside change
+      const show = (r) => { at.current = r; if (r.value !== p.value) { p.onChange(r.value); p.value = r.value; } publish(); redraw((n) => n + 1); };
       const put = (r, step) => { hist.current = record(hist.current, at.current, r, step, lord.now()); show(r); };
       const cur = at.current;
       const mod = (e.ctrl || e.meta) && !e.alt;
@@ -1047,7 +1049,9 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
         return;
       }
       adopt(p.value);
-      const show = (r) => { at.current = r; if (r.value !== p.value) p.onChange(r.value); publish(); redraw((n) => n + 1); };
+      // the value just sent is this field's until the next render: a second key in the same turn (an input method's
+      // commit and then the Space that ended it) builds on it, instead of adopting the old value as an outside change
+      const show = (r) => { at.current = r; if (r.value !== p.value) { p.onChange(r.value); p.value = r.value; } publish(); redraw((n) => n + 1); };
       const put = (r, step) => { hist.current = record(hist.current, at.current, r, step, lord.now()); show(r); };
       const cur = at.current;
       const mod = (e.ctrl || e.meta) && !e.alt;

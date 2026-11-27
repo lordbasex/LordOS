@@ -1499,9 +1499,13 @@ void js_key(int code, int value) {
     if (value && !to_app && !composed) {
         char commit[512];
         int used = ime_key(&k, commit, sizeof commit);
+        /* The finished syllable goes first, and React renders it (the microtasks of that key) before the key that
+         * ended it (Space, Enter, punctuation, an arrow) reaches the field: a field that read its value from its last
+         * render applied the Space over the old value and lost the syllable (가 + Space gave " "; ws170 QA BUG-20). */
         if (commit[0]) ime_commit(commit);
         if (ime_changed()) ime_event();
-        if (used) { drain_jobs(); return; }
+        if (used || commit[0]) drain_jobs();
+        if (used) return;
     }
     int flags = k.shift | k.ctrl << 1 | k.alt << 2 | k.altgr << 3 | k.meta << 4 | k.caps << 5 | k.dead << 6 | (to_app == 2) << 7;
     JSValueConst args[6] = { JS_NewInt32(ctx, code), JS_NewInt32(ctx, value), JS_NewString(ctx, k.key),

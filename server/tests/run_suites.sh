@@ -136,6 +136,15 @@ EOF
     ime "ime-test: hangul Shift jamo" hangul 'dl+T_qk+R_rk+Rk_dl+Tdj_r+O_d+P_+dl+T_' "" <<'EOF'
 committed: 있 밖 가까 있어 걔 예 있
 EOF
+    # (ws170 QA BUG-20) a key that is no jamo (Space, punctuation, Enter) commits the syllable first, then types itself;
+    # js_key renders that commit before the key reaches the field
+    ime "ime-test: hangul Space and punctuation commit first" hangul 'rk_+Qk_dk.x' "" <<'EOF'
+committed: 가 빠 아.
+preedit: ㅌ
+EOF
+    ime "ime-test: hangul Enter commits first" hangul 'rk^' "" <<'EOF'
+committed: 가
+EOF
     # every double final consonant, and how one splits when a vowel follows
     ime "ime-test: hangul double finals" hangul 'rkrt_ahrt_dksw_dksg_ekfr_tkfa_sjfq_rhft_gkfx_dmfv_dlfg_djqt_ekfrl_dkswdk_djqtdj_' "" <<'EOF'
 committed: 갃 몫 앉 않 닭 삶 넓 곬 핥 읊 잃 없 달기 앉아 없어
@@ -1027,6 +1036,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "vm-keys-scene (sdk/components.jsx AppHost, sdk/windows.js hasKeyboard, apps/machines guestKeys)" node tests/focus_scene_test.mjs vm_keys_scene.mjs
     else skip "vm-keys-scene" "node and the repository's node_modules (npm install)"; fi
+    # (ws170 QA BUG-20) an input method's commit and the key that ended the syllable, in one turn, both reach a field
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "ime-commit-scene (sdk/components.jsx TextInput: 가 then Space is \"가 \")" node tests/focus_scene_test.mjs ime_commit_scene.mjs
+    else skip "ime-commit-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) menus from the keyboard in both themes: arrows, type-ahead, submenus, the hover pause, F10 and ⌥ alone
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "menu-keys-test (themes/default Menu, themes/classic Menu, sdk/shortcuts.js)" node tests/menu_keys_test.mjs
