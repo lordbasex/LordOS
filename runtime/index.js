@@ -177,7 +177,9 @@ const host = {
   scheduleTimeout: (fn, ms) => setTimeout(fn, ms),
   cancelTimeout: (id) => clearTimeout(id),
   supportsMicrotasks: true,
-  scheduleMicrotask: (fn) => queueMicrotask(fn),
+  // under a community theme, React's render after a state update the theme made is queued untainted (lord.hostMicrotask,
+  // server/src/ui/js_theme.c): it is LordOS's code, and a tainted job would have its own nodes' commit refused
+  scheduleMicrotask: (fn) => (typeof lord.hostMicrotask === 'function' ? lord.hostMicrotask(fn) : queueMicrotask(fn)),
 
   createInstance(type, props, _root, _ctx, fiber) {
     if (hostGuard) hostGuard(type, props, fiber);

@@ -479,6 +479,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Community themes: a click that opens something no longer takes the theme off** (Meridian review of 0.8.9.6.2,
+  blocker: every community theme, the kit's template too, was taken off at its first click that mounted new nodes).
+  The theme's `setState` ran inside `lord.themeCall`, so React's render, queued as a microtask then, inherited the
+  theme's taint and its commit of the SDK's own nodes was refused (`lord.createNode`, `removeChild`, `destroy`:
+  "marked failed: Error"). React's `scheduleMicrotask` now uses `lord.hostMicrotask` (`server/src/ui/js_theme.c`, host
+  realm only), which queues the render with `JS_EnqueueTrustedJob` (a QuickJS patch: a job that doesn't inherit the
+  taint, still tainted when its function is bound or native); a function of the theme's realm is refused, and every
+  function of the theme the render reaches still runs through `lord.themeCall`. Tests: `realm-taint-test` (a trusted
+  job queued while the theme's code runs, and inside `lord.themeCall`, runs untainted; one of a bound function stays
+  tainted), `community_theme_headless.sh` ("clicker").
 - **Machines: a machine's menu in the library stays inside the screen's work area** (QA of 0.8.9.6.2: at 1280 px the
   card's menu was cut and reached over the Dock). The menu is placed in the work area of the display under it
   (`menuBounds`: under the menu bar, above the Dock) instead of the whole display, and is as wide as its longest

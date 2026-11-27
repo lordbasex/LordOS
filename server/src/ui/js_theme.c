@@ -110,6 +110,7 @@ const char *jst_failure(void) { return S.failure[0] ? S.failure : NULL; }
 static const struct { const char *name; unsigned cap; int policy; } rules[] = {
     /* the host's own natives (jst_register_main): never in the theme's realm, and called by the facade on its behalf */
     { "themeRealmFn", 0, JST_ALLOW }, { "themeCall", 0, JST_ALLOW }, { "themeOwn", 0, JST_ALLOW },
+    { "hostMicrotask", 0, JST_ALLOW },
     { "themes.started", 0, JST_ALLOW }, { "themes.fail", 0, JST_ALLOW }, { "themes.quitByTheme", 0, JST_ALLOW },
     /* drawing and measuring its own nodes */
     { "getLayout", 0, JST_ALLOW }, { "now", 0, JST_ALLOW }, { "log", 0, JST_ALLOW }, { "measureText", 0, JST_ALLOW },
@@ -277,6 +278,24 @@ static JSValue f_theme_call(JSContext *c, JSValueConst t, int argc, JSValueConst
     JS_RealmTaint(JS_GetRuntime(c), -1);
     return v;
 }
+/* lord.hostMicrotask(fn): React's own scheduleMicrotask (runtime/index.js) while a community theme runs. A state update
+ * the theme makes (a click's setState, a timer) queues React's render as a microtask from a tainted call, and a job queued
+ * then would run tainted: React's commit of the SDK's own nodes (lord.createNode, removeChild, destroy) would be refused
+ * and the theme taken off at its first click that opens something. The render is LordOS's code, as at the theme's start:
+ * every function of the theme it reaches still runs through lord.themeCall, and React's host guard still checks every
+ * element. Only a function of LordOS's realm is queued (one of the theme's, or a bound or native one, is refused), and
+ * QuickJS still taints the job if its function isn't trusted bytecode. Never in the theme's realm. */
+static JSValue job_call(JSContext *c, int argc, JSValueConst *argv) {
+    if (argc < 1) return JS_UNDEFINED;
+    return JS_Call(c, argv[0], JS_UNDEFINED, 0, NULL);
+}
+static JSValue f_host_microtask(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1 || !JS_IsFunction(c, argv[0])) return JS_ThrowTypeError(c, "hostMicrotask: a function");
+    if (S.realm && JS_IsFunctionOfRealm(c, argv[0], S.realm)) return JS_ThrowTypeError(c, "hostMicrotask: not a theme's function");
+    if (JS_EnqueueTrustedJob(c, job_call, 1, argv) < 0) return JS_EXCEPTION;
+    return JS_UNDEFINED;
+}
 /* lord.themeOwn(id): this node is one of the theme's own (made by the facade's View, Text or Image) */
 static JSValue f_theme_own(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
@@ -322,6 +341,7 @@ void jst_register_main(JSContext *c, JSValue lord) {
     JS_SetPropertyStr(c, lord, "themeRealmFn", JS_NewCFunction(c, f_realm_fn, "themeRealmFn", 1));
     JS_SetPropertyStr(c, lord, "themeOwn", JS_NewCFunction(c, f_theme_own, "themeOwn", 1));
     JS_SetPropertyStr(c, lord, "themeCall", JS_NewCFunction(c, f_theme_call, "themeCall", 1));
+    JS_SetPropertyStr(c, lord, "hostMicrotask", JS_NewCFunction(c, f_host_microtask, "hostMicrotask", 1));
     JSValue th = JS_GetPropertyStr(c, lord, "themes");
     if (JS_IsObject(th)) {
         JS_SetPropertyStr(c, th, "started", JS_NewCFunction(c, f_started, "started", 0));

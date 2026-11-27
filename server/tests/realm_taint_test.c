@@ -18,6 +18,16 @@ static JSValue probe(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     return JS_UNDEFINED;
 }
 
+/* trusted(fn): JS_EnqueueTrustedJob, as lord.hostMicrotask (js_theme.c) queues React's render */
+static JSValue call_job(JSContext *c, int argc, JSValueConst *argv) {
+    return argc > 0 ? JS_Call(c, argv[0], JS_UNDEFINED, 0, NULL) : JS_UNDEFINED;
+}
+static JSValue trusted(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc > 0) JS_EnqueueTrustedJob(c, call_job, 1, argv);
+    return JS_UNDEFINED;
+}
+
 static void drain(JSRuntime *rt) {
     JSContext *c;
     while (JS_ExecutePendingJob(rt, &c) > 0) {}
@@ -60,6 +70,11 @@ int main(void) {
     /* a promise of main's that the theme can see, resolved later by main's own code */
     { const char *k = "var resolveIt = null; var mainP = new Promise((r) => { resolveIt = r; }); var resolveIt2 = null; var mainP2 = new Promise((r) => { resolveIt2 = r; });"; JS_FreeValue(M, JS_Eval(M, k, strlen(k), "<main>", JS_EVAL_TYPE_GLOBAL)); }
     JS_SetPropertyStr(T, tg, "mainP", JS_GetPropertyStr(M, mg, "mainP"));
+    JS_SetPropertyStr(M, mg, "trusted", JS_NewCFunction(M, trusted, "trusted", 1));
+    /* main's scheduler the theme reaches (React's setState → scheduleMicrotask): main's own render queued for later */
+    { const char *k = "function render() { probe(); } function schedule() { trusted(render); } function scheduleBound() { trusted(render.bind(null)); }"; JS_FreeValue(M, JS_Eval(M, k, strlen(k), "<main>", JS_EVAL_TYPE_GLOBAL)); }
+    JS_SetPropertyStr(T, tg, "schedule", JS_GetPropertyStr(M, mg, "schedule"));
+    JS_SetPropertyStr(T, tg, "scheduleBound", JS_GetPropertyStr(M, mg, "scheduleBound"));
     JS_SetUntrustedRealm(rt, T);
 
     run(M, "main calls probe", "probe()", 0);
@@ -83,6 +98,14 @@ int main(void) {
     run(M, "main resolves it later: the reaction runs tainted", "resolveIt(1)", 1);
     run(M, "main's own reaction on main's promise stays untainted", "mainP2.then(viaMain); resolveIt2(1)", 0);
     run(T, "a job the theme queues with main's function", "Promise.resolve().then(viaMain)", 1);
+    /* (0.8.9.6.2) a trusted job (lord.hostMicrotask): main's own render, queued while the theme's code runs, runs
+     * untainted; a bound function in it is still tainted when it runs */
+    run(T, "a trusted job main queues while the theme's code runs: untainted", "schedule()", 0);
+    JS_RealmTaint(rt, 1);
+    { const char *k = "schedule()"; JS_FreeValue(M, JS_Eval(M, k, strlen(k), "<main>", JS_EVAL_TYPE_GLOBAL)); }
+    JS_RealmTaint(rt, -1);
+    run(M, "a trusted job queued inside lord.themeCall: untainted", "", 0);
+    run(T, "a trusted job of a bound function: still tainted", "scheduleBound()", 1);
     JS_RealmTaint(rt, 1);
     run(M, "main calls anything while tainted (lord.themeCall)", "probe()", 1);
     JS_RealmTaint(rt, -1);

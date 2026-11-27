@@ -956,6 +956,10 @@ JSValue JS_GetModuleNamespace(JSContext *ctx, JSModuleDef *m);
 
 typedef JSValue JSJobFunc(JSContext *ctx, int argc, JSValueConst *argv);
 int JS_EnqueueJob(JSContext *ctx, JSJobFunc *job_func, int argc, JSValueConst *argv);
+/* LordOS patch: queued by LordOS's own code for itself (React's render after a state update), never inheriting the
+   untrusted realm's taint from the call that queued it; JS_ExecutePendingJob still taints it when one of its arguments
+   is a function that isn't a trusted realm's bytecode */
+int JS_EnqueueTrustedJob(JSContext *ctx, JSJobFunc *job_func, int argc, JSValueConst *argv);
 
 JS_BOOL JS_IsJobPending(JSRuntime *rt);
 int JS_ExecutePendingJob(JSRuntime *rt, JSContext **pctx);

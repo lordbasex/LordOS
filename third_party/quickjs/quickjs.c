@@ -1797,6 +1797,17 @@ static int lordos_fn_untrusted(JSRuntime *rt, JSValueConst f)
     return 1;
 }
 
+int JS_EnqueueTrustedJob(JSContext *ctx, JSJobFunc *job_func, int argc, JSValueConst *argv)
+{
+    JSRuntime *rt = ctx->rt;
+    struct list_head *last;
+    if (JS_EnqueueJob(ctx, job_func, argc, argv) < 0)
+        return -1;
+    last = rt->job_list.prev;
+    list_entry(last, JSJobEntry, link)->lordos_taint = 0;
+    return 0;
+}
+
 static int lordos_job_untrusted(JSRuntime *rt, JSJobEntry *e)
 {
     int i;
