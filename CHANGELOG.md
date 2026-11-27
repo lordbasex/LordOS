@@ -434,6 +434,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Machines: Back from "Install what's missing" lost the half-filled assistant** (ws171 QA on VM 116). The assistant
+  stays mounted under its Requirements page, and Back returns to it as it was left (`apps/machines/library.jsx`).
 - **Machines: ▶ in a Whonix Workstation's window started it alone** (BUG-N of the ws171 QA on VM 116: started before its
   Gateway, the group's link came up on both sides, "link: connected … lk1", but no traffic passed). ▶ there now starts
   the Gateway first and the Workstation once the Gateway runs, as the library and the CLI start a group
