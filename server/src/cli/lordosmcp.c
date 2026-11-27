@@ -111,7 +111,9 @@ static int call(const char *member, const char *sig, const DBuf *body, DMsg *m) 
 static void sleep_ms(int ms) { struct timespec ts = { ms / 1000, (long)(ms % 1000) * 1000000L }; nanosleep(&ts, NULL); }
 
 /* the error's sentence for the agent; the message of a D-Bus error from Hands1 is one closed word */
+static char last_error[128];         /* the D-Bus error name of the last call that failed (open_app says "no app named") */
 static const char *err_of(const DMsg *m, char *buf, size_t n) {
+    snprintf(last_error, sizeof last_error, "%s", m->error ? m->error : "");
     const char *word = NULL;
     if (m->sig && !strcmp(m->sig, "s")) { DRd d; dr_init(&d, m); word = dr_str(&d, NULL); if (d.err) word = NULL; }
     return mcp_error_text(m->error, word, buf, n);
@@ -490,7 +492,13 @@ static char *tools_call(const JVal *params) {
     if (!strcmp(name, "open_app")) {
         const char *app = str_arg(a, "app");
         if (!app || !hands_name_ok(app)) return text_result("app is required.", 1);
+        last_error[0] = 0;
         char *r = tool_simple("OpenApp", app, NULL, NULL, 0);
+        if (!strcmp(last_error, HANDS_ERR_NOTFOUND)) {         /* not a window or a ref: no app answers to that name */
+            char t[256];
+            free(r);
+            r = text_result(mcp_no_app_text(app, t, sizeof t), 1);
+        }
         rec_frame();
         return r;
     }

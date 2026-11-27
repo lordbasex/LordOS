@@ -191,6 +191,11 @@ static const struct { const char *name; int code; } KEYS[] = {
     { "down", KEY_DOWN }, { "left", KEY_LEFT }, { "right", KEY_RIGHT }, { "space", KEY_SPACE }, { "menu", KEY_COMPOSE },
     { "f1", KEY_F1 }, { "f2", KEY_F2 }, { "f3", KEY_F3 }, { "f4", KEY_F4 }, { "f5", KEY_F5 }, { "f6", KEY_F6 },
     { "f7", KEY_F7 }, { "f8", KEY_F8 }, { "f9", KEY_F9 }, { "f10", KEY_F10 }, { "f11", KEY_F11 }, { "f12", KEY_F12 },
+    /* the numeric keypad (X keysym names, ws170 QA BUG-19): what a digit key types follows the keyboard's Num Lock */
+    { "kp_0", KEY_KP0 }, { "kp_1", KEY_KP1 }, { "kp_2", KEY_KP2 }, { "kp_3", KEY_KP3 }, { "kp_4", KEY_KP4 },
+    { "kp_5", KEY_KP5 }, { "kp_6", KEY_KP6 }, { "kp_7", KEY_KP7 }, { "kp_8", KEY_KP8 }, { "kp_9", KEY_KP9 },
+    { "kp_add", KEY_KPPLUS }, { "kp_subtract", KEY_KPMINUS }, { "kp_multiply", KEY_KPASTERISK }, { "kp_divide", KEY_KPSLASH },
+    { "kp_decimal", KEY_KPDOT }, { "kp_enter", KEY_KPENTER }, { "num_lock", KEY_NUMLOCK },
 };
 static const struct { const char *name; unsigned mod; } MODS[] = {
     { "ctrl", HANDS_M_CTRL }, { "control", HANDS_M_CTRL }, { "alt", HANDS_M_ALT }, { "option", HANDS_M_ALT },
@@ -395,10 +400,17 @@ int hands_admin_allowed(const char *action, const char *arg, size_t len) {
     return id_variant(arg, len);
 }
 
-size_t hands_admin_line(char *out, size_t n, int kind, int word, int ok) {
+static int action_shape(const char *a) {
+    size_t l = a ? strlen(a) : 0;
+    if (l < 1 || l > 40) return 0;
+    for (size_t i = 0; i < l; i++) if (!((a[i] >= 'a' && a[i] <= 'z') || (a[i] >= '0' && a[i] <= '9') || a[i] == '-')) return 0;
+    return 1;
+}
+size_t hands_admin_line(char *out, size_t n, int kind, const char *action, int ok, int origin) {
     if (!out || !n) return 0;
-    int k = snprintf(out, n, "hands: %s admin %s %s", hands_kind_word(kind), word >= 0 && word < ADMIN_OK_N ? ADMIN_OK[word] : "other",
-                     ok ? "ok" : "refused");
+    const char *o = origin >= HANDS_ORIGIN_AGENT ? "agent" : origin == HANDS_ORIGIN_SHELL ? "shell" : "callback";
+    int k = ok ? snprintf(out, n, "hands: %s admin %s ok", hands_kind_word(kind), action_shape(action) ? action : "other")
+               : snprintf(out, n, "hands: %s admin %s refused (%s)", hands_kind_word(kind), action_shape(action) ? action : "other", o);
     return k < 0 ? 0 : (size_t)k < n ? (size_t)k : n - 1;
 }
 
@@ -656,10 +668,10 @@ static void log_call(int kind, int call, int action, int result, int why) {
     S.h->event(j);
 }
 
-void hands_admin_log(int word, int ok) {
+void hands_admin_log(const char *action, int ok, int origin) {
     if (!S.h || !S.h->event) return;
-    char line[96], j[160];
-    hands_admin_line(line, sizeof line, S.agent_kind, word, ok);
+    char line[112], j[176];
+    hands_admin_line(line, sizeof line, S.agent_kind, action, ok, origin);
     snprintf(j, sizeof j, "{\"t\":\"log\",\"line\":\"%s\"}", line);   /* closed words only */
     S.h->event(j);
 }
@@ -1397,6 +1409,7 @@ static void plan_act(double t) {
  * once with what is there; Stop ends it as any action. Polled through the shell's "gone" and "ready". */
 #define HANDS_CLOSE_WAIT_MS 2500
 #define HANDS_OPEN_WAIT_MS 3000
+#define HANDS_LAUNCH_WAIT_MS 10000     /* an app that brings its own window (a Linux app starting): longer */
 #define HANDS_WAIT_STEP_MS 60
 static int wait_start(const char *bus, const HandsReq *r, const char *answer) {
     if (!answer) return 0;
@@ -1422,7 +1435,7 @@ static int wait_start(const char *bus, const HandsReq *r, const char *answer) {
     S.P.phase = PH_WAIT;
     S.P.t0 = now();
     S.P.next = S.P.t0 + HANDS_WAIT_STEP_MS;
-    S.P.until = S.P.t0 + (r->call == HANDS_C_CLOSE ? HANDS_CLOSE_WAIT_MS : HANDS_OPEN_WAIT_MS);
+    S.P.until = S.P.t0 + (r->call == HANDS_C_CLOSE ? HANDS_CLOSE_WAIT_MS : !strncmp(win, "launch-", 7) ? HANDS_LAUNCH_WAIT_MS : HANDS_OPEN_WAIT_MS);
     S.P.seen = -1;
     return 1;
 }
@@ -1441,6 +1454,9 @@ static int wait_look(void) {
     if (!json_parse(r, strlen(r), &d, NULL, 0) && d.root && d.root->type == J_OBJ) {
         if (S.P.r.call == HANDS_C_CLOSE) done = json_bool(d.root, "gone", 0);
         else {
+            /* an app that brings its own window (open_app's "launch-N"): the shell names the window it brought */
+            const char *w = json_str(d.root, "window");
+            if (w && hands_id_ok(w) && strcmp(w, S.P.r.window)) { snprintf(S.P.r.window, sizeof S.P.r.window, "%s", w); S.P.seen = -1; }
             int n = (int)json_num(d.root, "n", -1);
             done = n > 0 && n == S.P.seen;
             S.P.seen = n;
@@ -1456,10 +1472,23 @@ static void wait_answer(int known) {
     char out[512];
     if (S.P.r.call == HANDS_C_CLOSE) snprintf(out, sizeof out, "{\"closed\":%s}", ok ? "true" : "false");
     else {
-        /* the shell's own answer, with whether the window's tree was there */
-        size_t n = S.P.text ? strlen(S.P.text) : 0;
-        if (n >= 2 && n < sizeof out - 20 && S.P.text[n - 1] == '}') snprintf(out, sizeof out, "%.*s,\"ready\":%s}", (int)(n - 1), S.P.text, ok ? "true" : "false");
-        else snprintf(out, sizeof out, "{\"ready\":%s}", ok ? "true" : "false");
+        /* the window that opened (a launched app's real one, "linux#149", once it came; null when none came in time),
+         * the app, and whether the window's tree was there */
+        JDoc d;
+        const char *app = NULL;
+        int parsed = S.P.text && !json_parse(S.P.text, strlen(S.P.text), &d, NULL, 0) && d.root && d.root->type == J_OBJ;
+        if (parsed) app = json_str(d.root, "app");
+        int launched = !strncmp(S.P.r.window, "launch-", 7);
+        Jb a = { 0 };
+        jb_s(&a, "{\"window\":");
+        if (launched) jb_s(&a, "null");
+        else jb_q(&a, S.P.r.window);
+        if (app && hands_id_ok(app)) { jb_s(&a, ",\"app\":"); jb_q(&a, app); }
+        jb_s(&a, ok && !launched ? ",\"ready\":true}" : ",\"ready\":false}");
+        if (parsed) json_free(&d);
+        char *t = jb_take(&a);
+        snprintf(out, sizeof out, "%s", t ? t : "{\"ready\":false}");
+        free(t);
     }
     plan_end(HANDS_OK, 0, out, 1);
 }

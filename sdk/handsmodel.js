@@ -314,11 +314,18 @@ export function windowsList(list, { focusedId, displayOf, titleOf, allow, kindOf
 }
 
 // an app named by the agent: its id, or a shown name ("Notes", "notas"), case and accents ignored
+// An app by what the agent called it, as the launcher's search finds it: its id (a LordOS app's "notes", a Linux app's
+// "desktop:<id>" or just "<id>" of its .desktop file), its name as shown, any other name it has (aliases: its .desktop
+// Name when the desktop shows Name[lang]); exact first, then a name that starts with it, then one that holds it as a word.
 export function matchApp(apps, wanted) {
   const q = fold(wanted).trim();
   if (!q) return null;
-  return (apps || []).find((a) => fold(a.id) === q) || (apps || []).find((a) => fold(a.name) === q) ||
-    (apps || []).find((a) => fold(a.name).startsWith(q)) || null;
+  const list = apps || [];
+  const names = (a) => [a.name, ...(Array.isArray(a.aliases) ? a.aliases : [])].filter(Boolean).map(fold);
+  const ids = (a) => [a.id, a.desktopId].filter(Boolean).map(fold);
+  return list.find((a) => ids(a).includes(q)) || list.find((a) => names(a).includes(q)) ||
+    list.find((a) => names(a).some((n) => n.startsWith(q))) ||
+    (q.length >= 3 ? list.find((a) => names(a).some((n) => n.split(/[^\p{L}\p{N}]+/u).includes(q) || n.includes(` ${q}`))) : null) || null;
 }
 
 // AppLog: the lines of an app's log that hold the pattern (plain text, case ignored), the newest last, at most max
@@ -326,4 +333,21 @@ export function filterLog(text, pattern, max = 100) {
   const p = fold(pattern || '');
   const lines = String(text || '').split('\n').filter((l) => l && (!p || fold(l).includes(p)));
   return lines.slice(-Math.max(1, Math.min(max, 400))).map((l) => clean(l, 400)).join('\n');
+}
+
+// set_value on a pop-up or a segmented control: the option the agent named, by its value or its label (exact, then
+// ignoring case and accents, then the one label that starts with it), never a disabled one ([value, label, disabled]);
+// -1 when none or more than one could be meant (ws170 QA BUG-17)
+export function optionIndex(options, want) {
+  const list = Array.isArray(options) ? options : [];
+  const w = str(want);
+  const ok = (o) => Array.isArray(o) && !o[2];
+  let i = list.findIndex((o) => ok(o) && (str(o[0]) === w || str(o[1] ?? '') === w));
+  if (i >= 0) return i;
+  const q = fold(w).trim();
+  if (!q) return -1;
+  i = list.findIndex((o) => ok(o) && (fold(o[0]).trim() === q || fold(o[1] ?? '').trim() === q));
+  if (i >= 0) return i;
+  const starts = list.map((o, k) => (ok(o) && fold(o[1] ?? '').trim().startsWith(q) ? k : -1)).filter((k) => k >= 0);
+  return starts.length === 1 ? starts[0] : -1;
 }

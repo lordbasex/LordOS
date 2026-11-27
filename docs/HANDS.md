@@ -40,13 +40,13 @@ MCP server over stdio; each tool is one or two calls to lord-server's `org.lordo
 | Claude in Chrome | lordos-mcp | What it does |
 |---|---|---|
 | `tabs_context` | `windows_context` | the windows: id, app, title, display, focused, minimized, kind (native, linux, package), frame |
-| `tabs_create`, `navigate` | `open_app(app)` | opens an app by id or shown name; answers its window id once its tree is there (`"ready":true`; at most 3 s, then `"ready":false`) |
+| `tabs_create`, `navigate` | `open_app(app)` | opens an app as the launcher's search finds it: a LordOS app's id or shown name, a Linux, Flatpak or web app's shown name, its `.desktop` Name in English, `desktop:<id>` or `<id>`, a word of its name; answers its window id once its tree is there (`"ready":true`; at most 3 s, then `"ready":false`). An app that brings its own window (a Linux or Flatpak app, an isolated one) answers that window's real id (`linux#149`) once it maps (at most 10 s; none in time: `"window":null`, `"ready":false`). No app of that name: "No app named …" |
 | `navigate` | `open_path(path)` | a file or folder of the home folder or a disk in its default app, through `openFileWithApps` with `untrusted` (a file that would run code is only shown in Files) |
 | `tabs_close` | `close_window(window_id)` | closes a window (the app may ask about unsaved changes); a Linux app's goes a moment later and the answer waits for it (`closed:true`; at most 2.5 s, then `closed:false`) |
 | `read_page` | `read_window(window_id, filter, depth)` | the UI tree as text (below) |
 | `find` | `find(window_id, query)` | words matched against roles, names and values; the best lines with their refs, or `No matches for "<query>"` (never a bare `done`; `read_app_log` likewise says `No log lines`) |
-| `computer` | `computer(action, …, mode)` | `screenshot` (`display`, `display:<id>`, `window:<id>`), `left_click`, `right_click`, `middle_click`, `double_click`, `triple_click`, `hover` (at a `ref` or a `coordinate`), `left_click_drag` (`start_coordinate` → `coordinate`), `type` (`text`), `key` (`text`: `ctrl+s`, `Return`, `ctrl+a Delete`; `repeat`), `scroll` (`scroll_direction`, `scroll_amount`), `zoom` (`region` [x0, y0, x1, y1]); `save` on `screenshot` and `zoom` (below), `wait` (`duration`, at most 10 s); `mode` `human` or `machine` for this call (below) |
-| `form_input` | `set_value(ref, value, mode)` | a text field or area, a checkbox or switch, a pop-up or option list (by value or label), a slider; never a password field |
+| `computer` | `computer(action, …, mode)` | `screenshot` (`display`, `display:<id>`, `window:<id>`), `left_click`, `right_click`, `middle_click`, `double_click`, `triple_click`, `hover` (at a `ref` or a `coordinate`), `left_click_drag` (`start_coordinate` → `coordinate`), `type` (`text`), `key` (`text`: `ctrl+s`, `Return`, `ctrl+a Delete`, the keypad's `KP_0`…`KP_9`, `KP_Add`, `KP_Subtract`, `KP_Multiply`, `KP_Divide`, `KP_Decimal`, `KP_Enter`, `Num_Lock`; `repeat`), `scroll` (`scroll_direction`, `scroll_amount`), `zoom` (`region` [x0, y0, x1, y1]); `save` on `screenshot` and `zoom` (below), `wait` (`duration`, at most 10 s); `mode` `human` or `machine` for this call (below) |
+| `form_input` | `set_value(ref, value, mode)` | a text field or area, a checkbox or switch, a pop-up (`combobox`) or a segmented control (by an option's value or label: exact, then ignoring case and accents, then the one label it starts; never a disabled option), a slider; never a password field |
 | — | `hands_mode(mode)` | `human`, `machine` or `default` for the rest of the session (also `lordos-mcp --mode human\|machine`) |
 | `read_console_messages` | `read_app_log(app, pattern, max_lines)` | an app's own log: its file in the session's log folder (`apps/<app>.log`, a web app's `web/<app>-*.log`), else its lines of `shell.log`, through `lord.logs` (the Logs app's own access rules) |
 | `gif_creator` | `record(start \| stop \| export, name)` | every action adds a frame; `export` returns the animated GIF, or with `name` (a bare file name ending in `.gif`, no folders) saves it as a new file in `~/Pictures/LordOS QA`, the only place lordos-mcp ever writes (each folder opened `O_DIRECTORY \| O_NOFOLLOW`, the file `O_CREAT \| O_EXCL \| O_NOFOLLOW`, 0600) |
@@ -175,6 +175,11 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
   screenshots are a window or a region entirely inside one allowed window, with every other surface black (fail closed:
   everything but the allowed windows and the menus, popovers and sheets tied to them by `handsWin`).
 - **Rate limits**: 8 input actions a second (bursts of 16), 10 reads, 2 screenshots (bursts of 4).
+- **The shell's shortcuts** (Settings → Keyboard) work for an agent's keys as for the person's: they go through the same
+  dispatcher (`sdk/shortcuts.js`). A row that lists two keys shows them apart with a dot: Flow's Apps row, `❖ · F4`,
+  is ❖ pressed alone or F4, not ❖+F4 (ws170 QA BUG-21: `super+F4` is no shortcut; `super` alone, `F4` and `super+m`
+  work). The physical keyboard's own chords (Ctrl+Alt+Backspace, Ctrl+Alt+Del, Ctrl+Alt+F1…F12, the panic key) stay
+  refused (`Invalid arguments`).
 - **Logged**: each call is a line of closed words in `shell.log` (`hands: claude pointer left_click refused password`),
   never text, names or values.
 
@@ -182,7 +187,10 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
 
 - the **system layer** and everything above it (`sdk/layers.js` 100 and up: permission, keyring, password, polkit and
   Bluetooth prompts, the portal's file chooser for Linux apps, Screenshots' selection, the on-screen keyboard, the banner
-  itself): no click, key, read or pixel. While a system prompt shows, no key at all. Screenshots' selection that an
+  itself, and a web app's right-click menu, drawn there over the app's window): no click, key, read or pixel. While a
+  system prompt shows, no key at all. A web app's menu closes with its app's last window (ws170 QA BUG-31: lord-web
+  keeps running in the background, so the menu outlived a window an agent closed, and every screenshot was black and
+  every input refused until the person closed it); an agent's Escape still never closes it. Screenshots' selection that an
   agent's input opened (its overlay on every display, in the capture layer) is out of the agent's reach too, Escape
   included, so it ends by itself after 15 s unless the person takes it (their pointer or a key on it); closing one of its
   overlays (`close_window`) ends the whole selection, and its keys (Space, C, T) go back to the fields.
@@ -242,7 +250,10 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
   signature with the entry's pinned keys, and keeps a download only with the hash that list gives
   (`server/src/vm/vmimage_admin.c`); never a URL or a path. `vm-image-get-user` (an address the person typed) and
   `vm-image-remove` stay refused. Each such request is logged as
-  closed words: `hands: claude admin wallpaper-get ok`, `hands: claude admin other refused`. While any Hands client is active, a secret on the clipboard is nobody's:
+  closed words: `hands: claude admin wallpaper-get ok`, `hands: claude admin power-profile refused (agent)`: a refused
+  action is named when it has an action name's shape (`[a-z0-9-]`, at most 40 bytes; else `other`), with where its run
+  came from: `agent` (the agent's own run), `shell`, or `callback` (a native callback after the agent's input, refused
+  by the sticky check above; ws170 QA BUG-10b), once per request. While any Hands client is active, a secret on the clipboard is nobody's:
   `lord.clipboard.get` answers "", the broker gives an app nothing and the Wayland clipboard is not offered; an agent's
   paste (by the key it resolves to, `KEY_V` with Ctrl or Super, Shift+Insert, `KEY_PASTE`) and middle click are refused,
   and an agent's input is never an isolated app's paste gesture. The Terminal's Passwords and save bars, Monitor's firewall switch, rule sheet and

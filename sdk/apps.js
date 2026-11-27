@@ -169,6 +169,17 @@ export function useLauncherApps({ all = false } = {}) {
   return launcherList(lin, fps, web, all);
 }
 
+// The same list outside React (Hands' open_app): the .desktop files read again if their folders changed.
+export function launcherAppsNow() {
+  refreshApps();
+  return launcherList(linux.get(), flatpak.get(), webApps.get(), false);
+}
+// The installed Linux apps' names in another language (Hands' open_app also finds an app by its plain .desktop Name
+// while the desktop shows Name[es]): [{ id: 'desktop:<id>', name }]
+export function linuxNamesIn(lang) {
+  try { return typeof lord.apps?.linux === 'function' ? lord.apps.linux(lang).map((a) => ({ id: DESKTOP + a.id, name: a.name })) : []; } catch (e) { return []; }
+}
+
 // The list is made once for what it depends on and shared by every caller: the Dock, the launcher, the Store's
 // cards (each one asked) and the start menu used to make and sort it on every render, ~1600 names with Linux
 // apps installed. Kept: the inputs it was made from (stores' values, which change identity when they change).

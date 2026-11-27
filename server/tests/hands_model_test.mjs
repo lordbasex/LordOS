@@ -1,7 +1,7 @@
 // hands_model_test.mjs — Hands' reader (sdk/handsmodel.js, docs/HANDS.md): the UI tree as text with ref_N ids. Refs stay
 // the same for a node while it lives; a password's value, a protected node's text, a handsDeny node and the system band
 // never come out; find; the windows list and the allowlist; and the prompt's texts claim nothing is verified.
-import { serializeTree, findNodes, makeRefs, roleOf, windowsList, matchApp, filterLog, allowed, clean, blackoutNodes } from '../../sdk/handsmodel.js';
+import { serializeTree, findNodes, makeRefs, roleOf, windowsList, matchApp, filterLog, allowed, clean, blackoutNodes, optionIndex } from '../../sdk/handsmodel.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -103,6 +103,23 @@ const list = windowsList([{ id: 'notes', app: 'notes', title: 'Notes', x: 1, y: 
 eq('windows with an allowlist', list.map((w) => [w.id, w.focused]), [['notes', true]]);
 yes('allowed: empty list = every app', allowed([], 'x') && !allowed(['a'], 'x'));
 eq('an app by name, accents ignored', matchApp([{ id: 'notes', name: 'Notas' }], 'notas')?.id, 'notes');
+// (ws170 QA BUG-17) set_value on a pop-up (Settings → AI → Voice → Language) or a segmented control
+const OPTS = [['es', 'Español'], ['en', 'English'], ['pt', 'Português'], ['fr', 'Français', true], ['de', 'Deutsch']];
+eq('an option by its value', optionIndex(OPTS, 'pt'), 2);
+eq('… by its label', optionIndex(OPTS, 'English'), 1);
+eq('… by its label, case and accents ignored', optionIndex(OPTS, 'espanol'), 0);
+eq('… by the one label it starts', optionIndex(OPTS, 'Deu'), 4);
+eq('a disabled one never', optionIndex(OPTS, 'Français'), -1);
+eq('none, or more than one meant', [optionIndex(OPTS, 'Klingon'), optionIndex([['a', 'Port A'], ['b', 'Port B']], 'Port')], [-1, -1]);
+eq('numbers as values', optionIndex([[25, '25 %'], [50, '50 %']], '50'), 1);
+// (ws170 QA BUG-23) a Linux app as the launcher's search finds it: Name[es] shown, its .desktop Name, its id
+const LA = [{ id: 'notes', name: 'Notas' }, { id: 'desktop:lordos-toolkit-audit', desktopId: 'lordos-toolkit-audit', name: 'Auditoría de toolkits', aliases: ['Toolkit Audit'] }];
+eq('a Linux app by its shown name', matchApp(LA, 'Auditoría de toolkits')?.id, 'desktop:lordos-toolkit-audit');
+eq('… by its .desktop Name in English', matchApp(LA, 'Toolkit Audit')?.id, 'desktop:lordos-toolkit-audit');
+eq('… by desktop:<id> and by <id>', [matchApp(LA, 'desktop:lordos-toolkit-audit')?.id, matchApp(LA, 'lordos-toolkit-audit')?.id], ['desktop:lordos-toolkit-audit', 'desktop:lordos-toolkit-audit']);
+eq('… by a word of its name', matchApp(LA, 'toolkits')?.id, 'desktop:lordos-toolkit-audit');
+eq('no app of that name: null', matchApp(LA, 'Calculadora científica'), null);
+eq('an exact id wins over a name', matchApp([{ id: 'x', name: 'notes' }, { id: 'notes', name: 'Notas' }], 'notes')?.id, 'notes');
 eq('log lines that hold the pattern', filterLog('a error 1\nb ok\nc ERROR 2', 'error', 1), 'c ERROR 2');
 
 // an allowlisted screenshot: everything is black but the allowed window and the menus tied to it (fail closed)

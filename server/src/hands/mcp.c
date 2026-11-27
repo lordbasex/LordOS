@@ -94,6 +94,13 @@ static void echo_of(const char *s, char *out, size_t n) {
     out[o] = 0;
 }
 
+const char *mcp_no_app_text(const char *app, char *buf, size_t n) {
+    char e[72];
+    echo_of(app, e, sizeof e);
+    snprintf(buf, n, "No app named \"%s\". Use its name as the launcher shows it, its .desktop name or id (desktop:<id>), or a LordOS app's id.", e);
+    return buf;
+}
+
 const char *mcp_empty_text(const char *tool, const char *arg, char *buf, size_t n) {
     char e[72];
     echo_of(arg, e, sizeof e);

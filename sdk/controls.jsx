@@ -13,6 +13,7 @@ import { useStore } from './store.js';
 import { dialogStack, dialogKey, defaultButton, keyOwner } from './dialogkeys.js';
 import { direction, t as tr } from './i18n.js';
 import { Lumo } from './mascot.js';
+import { optionIndex } from './handsmodel.js';
 import { Overlay, shellLayers } from './layers.js';
 import { menuStep, within } from './focusmodel.js';
 import { focusRingColor, useFocusScope, keyFocused, onFocusMove } from './focus.js';
@@ -653,8 +654,7 @@ export function Dropdown({ value, options, onChange, width = 180, placeholder, s
         // Hands: a pop-up; set_value picks an option by its value or its label
         accessibilityRole="combobox" accessibilityValue={String(cur ?? '')} accessibilityState={{ disabled: !!disabled, expanded: open }}
         handsSetValue={(want) => {
-          const L = latest.current, w = String(want);
-          const i = L.options.findIndex((o) => String(o[0]) === w || String(o[1] ?? '') === w);
+          const i = optionIndex(latest.current.options, want);
           if (i < 0) return false;
           choose(i);
           return true;

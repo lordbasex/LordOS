@@ -15,6 +15,9 @@ const char *mcp_tools_json(void);
 /* the agent-facing sentence for a D-Bus error name (and its closed word): never the person's data */
 const char *mcp_error_text(const char *error, const char *word, char *buf, size_t n);
 
+/* open_app's answer when no app answers to that name (the agent's text echoed as mcp_empty_text does) */
+const char *mcp_no_app_text(const char *app, char *buf, size_t n);
+
 /* a tool's answer when lord-server sent back nothing: "find" says no ref matched the query (echoed, the agent's own text:
  * at most 64 bytes, printable, cut at a character), "read_app_log" no line (matching its pattern), any other "done" */
 const char *mcp_empty_text(const char *tool, const char *arg, char *buf, size_t n);

@@ -276,9 +276,12 @@ int  hands_native_guard(const char *name);
  * "<id> <arch> <file> <sha256|sha512>", vm-image-cancel ""), 0 for anything else (docs/HANDS.md, AGENTS.md 2026-11-26) */
 int  hands_admin_allowed(const char *action, const char *arg, size_t len);
 int  hands_admin_word(const char *action);            /* its index in that closed list, -1 not there */
-/* "hands: <kind> admin <action|other> ok|refused" (closed words only) and the shell's Hands log */
-size_t hands_admin_line(char *out, size_t n, int kind, int word, int ok);
-void hands_admin_log(int word, int ok);
+/* "hands: <kind> admin <action> ok|refused[ (<origin>)]" and the shell's Hands log. The action is named when it is an
+ * action name's shape ([a-z0-9-], at most 40 bytes: admin.c's names are, never the person's data), else "other"; a
+ * refusal says where the run came from ("agent", "shell", "callback": a native callback that came after the agent's
+ * input, refused by the sticky check; ws170 QA BUG-10b) */
+size_t hands_admin_line(char *out, size_t n, int kind, const char *action, int ok, int origin);
+void hands_admin_log(const char *action, int ok, int origin);
 unsigned long hands_ai_events(void);
 /* {"on","qa","allow":[…],"clients":[{"bus","name","exe","kind","state","actions"}],"events"} for the shell */
 char *hands_status_json(void);

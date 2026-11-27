@@ -18,6 +18,7 @@ import { Layer, Overlay, shellLayers } from './layers.js';
 import { ContextMenu } from './contextmenu.jsx';
 import { dialogStack } from './dialogkeys.js';
 import { appDenied } from './handsdeny.js';
+import { optionIndex } from './handsmodel.js';
 import { stat as fsStat, isRemote as fsIsRemote } from './fs.js';
 import { dropSorter, dropCount } from './filedrop.js';
 import { setTextFocusBridge, useFocusArea, focusRingColor } from './focus.js';
@@ -179,6 +180,9 @@ export function Segmented({ options, value, onChange, appearance = 'accent', sma
   };
   return (
     <View focusable={focusable && options.length > 0} onKeyDown={onKey} accessibilityRole="tablist"
+      // Hands: set_value picks a segment by its value or its label (sdk/handsmodel.js optionIndex)
+      accessibilityValue={String(options.find(([v]) => v === value)?.[1] ?? '')}
+      handsSetValue={(want) => { const i = optionIndex(options, want); if (i < 0) return false; if (options[i][0] !== value) onChange(options[i][0]); return true; }}
       style={[{ flexDirection: 'row', backgroundColor: t.control, borderRadius: small ? t.controlRadiusSmall : t.controlRadius + 1, padding: 2 }, style]}>
       {options.map(([v, label, disabled]) => {
         const on = value === v;

@@ -303,20 +303,20 @@ static JSValue prof_call(JSContext *c, JSValueConst this_val, int argc, JSValueC
              * approved 2026-11-26). Both values must already be strings: a primitive string can't change between this
              * check and f_admin_request reading it (an object's toString could) */
             if (admin) {
-                int word = -1, ok = 0;
+                int ok = 0;
+                char act[48] = "";
                 if (argc >= 2 && JS_IsString(argv[0]) && JS_IsString(argv[1])) {
                     size_t len = 0;
                     const char *a = JS_ToCString(c, argv[0]), *arg = JS_ToCStringLen(c, &len, argv[1]);
-                    word = a ? hands_admin_word(a) : -1;
+                    if (a) snprintf(act, sizeof act, "%s", a);
                     ok = a && arg && hands_admin_allowed(a, arg, len);
                     if (a) JS_FreeCString(c, a);
                     if (arg) JS_FreeCString(c, arg);
                 }
-                hands_admin_log(word, ok);
-                if (!ok) {
-                    fprintf(stderr, "js: hands: lord.admin.request refused (an AI agent's input)\n");
-                    return js_throw_code(c, "hands.refused", NULL);
-                }
+                /* one line, in the Hands log (shell.log): the action's name when it has an action's shape, and where the
+                 * run came from (a native callback after the agent's input is "callback", not the agent's own run) */
+                hands_admin_log(act, ok, hands_delivering() ? HANDS_ORIGIN_AGENT : run_origin);
+                if (!ok) return js_throw_code(c, "hands.refused", NULL);
             } else {
                 const char *n = JS_ToCString(c, data[1]);
                 fprintf(stderr, "js: hands: lord.%s refused (an AI agent's input)\n", n ? n : "?");

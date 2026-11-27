@@ -36,6 +36,7 @@ import { settings } from './settings.js';
 import { windows, wm, getApp, listApps, windowTitle, appContentNodes } from './windows.js';
 import { textFocusBox } from './components.jsx';
 import { openFileWithApps } from './sysopen.js';
+import { launchApp, launcherAppsNow, linuxNamesIn, windowLinuxApp } from './apps.js';
 import * as fs from './fs.js';
 import {
   serializeTree, findNodes, makeRefs, own, allowed, appOfWindow, windowsList, matchApp, filterLog, SYSTEM_Z, blackoutNodes,
@@ -160,6 +161,10 @@ function displayOf(w) {
 }
 const kindOf = (w) => (w.args && w.args.surface ? 'linux' : getApp(appOfWindow(w))?.package ? 'package' : 'native');
 
+// open_app's launches waiting for their window: token → { before: the window ids then, app, desktopId }
+const launches = new Map();
+let launchSeq = 0;
+
 const OPS = {
   status(a) {
     return { displays: screen.displays.map((d) => ({ id: d.id, name: d.name || '', x: d.x, y: d.y, w: d.w, h: d.h, scale: d.scale || 100, main: !!d.main })),
@@ -263,13 +268,29 @@ const OPS = {
   },
   open(a) {
     if (!a.app) return { error: 'not-found' };
-    const apps = listApps().map((x) => ({ id: x.id, name: appName(x) || x.name || x.id }));
-    const app = matchApp(apps, a.app);
+    // LordOS's own apps first, then everything the launcher lists (Linux, Flatpak, web and guest apps), found as its
+    // search finds them; a Linux app also by its .desktop Name in English (ws170 QA BUG-23)
+    const own = listApps().map((x) => ({ id: x.id, name: appName(x) || x.name || x.id, plain: !x.package && !x.isolated }));
+    const ownIds = new Set(own.map((x) => x.id));
+    const en = new Map(linuxNamesIn('en').map((x) => [x.id, x.name]));
+    const rest = launcherAppsNow().filter((x) => !ownIds.has(x.id))
+      .map((x) => ({ id: x.id, name: x.name || x.id, desktopId: x.desktopId, aliases: en.has(x.id) ? [en.get(x.id)] : [], plain: false }));
+    const app = matchApp([...own, ...rest], a.app);
     if (!app) return { error: 'not-found' };
     if (!allowed(a.allow, app.id)) return { error: 'allowlist' };
     if (appDenied(app.id)) return { error: 'hidden-from-agent' };   // a person-only app (sdk/handsdeny.js)
-    const id = wm.open(app.id);
-    return id ? { window: id, app: app.id } : { error: 'not-found' };
+    if (app.plain) {
+      const id = wm.open(app.id);
+      return id ? { window: id, app: app.id } : { error: 'not-found' };
+    }
+    // an app that brings its own window (a Linux or Flatpak app, an isolated one): launched as the launcher does, and
+    // its window is the one that appears next (hands.c waits for it through "ready", which names it; ws170 QA BUG-15)
+    const before = new Set(windows.get().map((w) => w.id));
+    if (!launchApp(app.id)) return { error: 'not-found' };
+    const token = `launch-${++launchSeq}`;
+    launches.set(token, { before, app: app.id, desktopId: app.desktopId || '' });
+    if (launches.size > 8) launches.delete(launches.keys().next().value);
+    return { window: token, app: app.id };
   },
   openPath(a) {
     if (Array.isArray(a.allow) && a.allow.length) return { error: 'allowlist' };   // which app opens it isn't known before
@@ -293,7 +314,19 @@ const OPS = {
   // now (0 before its frame and content are laid out). Only for the window the agent itself just closed or opened.
   gone(a) { return { gone: !wm.get(String(a.window || '')) }; },
   ready(a) {
-    const id = String(a.window || '');
+    let id = String(a.window || '');
+    const l = launches.get(id);
+    if (l) {
+      // the window the launch brought: a new one of that app (its .desktop's or Flatpak's, an isolated app's), else the
+      // first new window at all; none yet: not ready
+      const fresh = windows.get().filter((w) => !l.before.has(w.id));
+      const ofApp = (w) => w.app === l.app || w.args?.appId === l.app || (w.args?.appId && windowLinuxApp(w.args.appId)?.id === l.app);
+      const w = fresh.find(ofApp) || fresh[0];
+      if (!w) return { n: 0 };
+      id = w.id;
+      const r = OPS.ready({ window: id });
+      return { ...r, window: id };
+    }
     const w = wm.get(id);
     if (!w) return { n: 0 };
     // the app's own content (AppHost's node), not the frame the theme draws around it before the app is there

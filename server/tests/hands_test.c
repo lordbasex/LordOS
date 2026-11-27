@@ -21,6 +21,7 @@
 #include "vault/dbus.h"
 
 #include <fcntl.h>
+#include <linux/input-event-codes.h>
 #include <math.h>
 #include <limits.h>
 #include <signal.h>
@@ -49,7 +50,7 @@ static int place_why, node_why, same, keys_why, focus_secure, region_inside, ref
 static int moves, buttons, keys, typed, shots, setvalues, last_black;
 static char last_event[512];
 static int shell_delivering, move_delivering;
-static int close_at_once, gone_after, gone_looks, ready_looks, ready_seq[8];   /* hands_delivering() seen inside a shell call and an agent move */
+static int close_at_once, gone_after, gone_looks, ready_looks, ready_seq[8], open_launches, launch_after;   /* hands_delivering() seen inside a shell call and an agent move */
 static char *shell(const char *op, const char *json) {
     (void)json;
     shell_delivering |= hands_delivering() && hands_origin_refused(HANDS_ORIGIN_SHELL);
@@ -67,7 +68,14 @@ static char *shell(const char *op, const char *json) {
     /* close_window and open_app (FIX-2, FIX-3): a window closing a moment later, a tree drawing over a few frames */
     else if (!strcmp(op, "close")) snprintf(b, sizeof b, "{\"closed\":%s}", close_at_once ? "true" : "false");
     else if (!strcmp(op, "gone")) snprintf(b, sizeof b, "{\"gone\":%s}", ++gone_looks > gone_after ? "true" : "false");
+    else if (!strcmp(op, "open") && open_launches) snprintf(b, sizeof b, "{\"window\":\"launch-1\",\"app\":\"desktop:lordos-toolkit-audit\"}");
     else if (!strcmp(op, "open")) snprintf(b, sizeof b, "{\"window\":\"notes\",\"app\":\"notes\"}");
+    /* a launched app (ws170 QA BUG-15): no window for launch_after looks, then linux#149 and its tree */
+    else if (!strcmp(op, "ready") && open_launches) {
+        int i = ready_looks < 8 ? ready_looks : 7;
+        if (ready_looks++ < launch_after) snprintf(b, sizeof b, "{\"n\":0}");
+        else snprintf(b, sizeof b, "{\"n\":%d,\"window\":\"linux#149\"}", ready_seq[i]);
+    }
     else if (!strcmp(op, "ready")) { int i = ready_looks < 8 ? ready_looks : 7; ready_looks++; snprintf(b, sizeof b, "{\"n\":%d}", ready_seq[i]); }
     else snprintf(b, sizeof b, "{\"text\":\"[]\"}");
     return strdup(b);
@@ -143,6 +151,13 @@ static void pure(void) {
     CHECK(!hands_chord("ctrl+shift+Left", &c) && c.mods == (HANDS_M_CTRL | HANDS_M_SHIFT), "ctrl+shift+Left");
     CHECK(!hands_chord("super", &c) && c.code && !c.mods, "a modifier alone");
     CHECK(!hands_chord("ctrl++", &c) && !strcmp(c.ch, "+"), "the plus key");
+    /* (ws170 QA BUG-19) the numeric keypad */
+    CHECK(!hands_chord("KP_0", &c) && c.code == KEY_KP0 && !c.mods, "KP_0");
+    CHECK(!hands_chord("KP_9", &c) && c.code == KEY_KP9 && !hands_chord("kp_5", &c) && c.code == KEY_KP5, "KP_9, kp_5");
+    CHECK(!hands_chord("KP_Add", &c) && c.code == KEY_KPPLUS && !hands_chord("KP_Subtract", &c) && c.code == KEY_KPMINUS &&
+          !hands_chord("KP_Multiply", &c) && c.code == KEY_KPASTERISK && !hands_chord("KP_Divide", &c) && c.code == KEY_KPSLASH &&
+          !hands_chord("KP_Decimal", &c) && c.code == KEY_KPDOT && !hands_chord("KP_Enter", &c) && c.code == KEY_KPENTER, "the keypad's operators and Enter");
+    CHECK(!hands_chord("shift+KP_7", &c) && c.code == KEY_KP7 && c.mods == HANDS_M_SHIFT && hands_chord("KP_10", &c), "a keypad chord; no KP_10");
     CHECK(hands_chord("ctrl+alt+BackSpace", &c) && hands_chord("ctrl+alt+Escape", &c) && hands_chord("ctrl+alt+F2", &c) &&
           hands_chord("ctrl+alt+Delete", &c), "the physical keyboard's own chords refused");
     CHECK(hands_chord("ctrl+", &c) && hands_chord("s+ctrl", &c) && hands_chord("ctrl+ctrl+s", &c) && hands_chord("ctrl+\x01", &c), "bad chords");
@@ -758,13 +773,18 @@ static void native_guard(void) {
     }
     CHECK(hands_admin_word("wallpaper-image") < 0 && hands_admin_word("wallpaper-login-image") < 0, "admin: a person's own picture isn't in the list");
     {
-        char line[96];
-        hands_admin_line(line, sizeof line, HANDS_K_CLAUDE, hands_admin_word("wallpaper-get"), 1);
+        char line[112];
+        hands_admin_line(line, sizeof line, HANDS_K_CLAUDE, "wallpaper-get", 1, HANDS_ORIGIN_AGENT);
         CHECK(!strcmp(line, "hands: claude admin wallpaper-get ok"), "admin log line \"%s\"", line);
-        hands_admin_line(line, sizeof line, HANDS_K_LUMO, hands_admin_word("wallpaper-image"), 0);
-        CHECK(!strcmp(line, "hands: lumo admin other refused"), "admin log line \"%s\": an action off the list is never named", line);
-        hands_admin_line(line, sizeof line, HANDS_K_CLAUDE, hands_admin_word("wallpaper-login"), 0);
-        CHECK(!strcmp(line, "hands: claude admin wallpaper-login refused"), "admin log line \"%s\"", line);
+        /* (ws170 QA BUG-10b) a refused action is named, with where its run came from */
+        hands_admin_line(line, sizeof line, HANDS_K_LUMO, "wallpaper-image", 0, HANDS_ORIGIN_AGENT);
+        CHECK(!strcmp(line, "hands: lumo admin wallpaper-image refused (agent)"), "admin log line \"%s\"", line);
+        hands_admin_line(line, sizeof line, HANDS_K_CLAUDE, "battery-status", 0, HANDS_ORIGIN_OTHER);
+        CHECK(!strcmp(line, "hands: claude admin battery-status refused (callback)"), "admin log line \"%s\": a callback's", line);
+        hands_admin_line(line, sizeof line, HANDS_K_CLAUDE, "/home/alex/secret file", 0, HANDS_ORIGIN_OTHER);
+        CHECK(!strcmp(line, "hands: claude admin other refused (callback)"), "admin log line \"%s\": what isn't an action's name is never logged", line);
+        hands_admin_line(line, sizeof line, HANDS_K_CLAUDE, "an-action-name-much-longer-than-forty-bytes-x", 0, HANDS_ORIGIN_AGENT);
+        CHECK(!strcmp(line, "hands: claude admin other refused (agent)"), "admin log line \"%s\": too long", line);
     }
     /* the broker: an isolated app's keyring, FIDO key and secret to the clipboard refuse on an agent's input, the
      * clipboard's secret while an agent is connected */
@@ -793,6 +813,8 @@ static void mcp(void) {
     char longq[300];
     memset(longq, 'x', sizeof longq - 1); longq[sizeof longq - 1] = 0;
     CHECK(strlen(mcp_empty_text("find", longq, b, sizeof b)) < 140, "find: a long query cut");
+    /* (ws170 QA BUG-23) open_app with no app of that name: said so, not "the window or ref is gone" */
+    CHECK(strstr(mcp_no_app_text("Toolkit \x1b[2JAudit", b, sizeof b), "No app named \"Toolkit [2JAudit\"") && !strstr(b, "\x1b") && !strstr(b, "ref is gone"), "no app named: %s", b);
     CHECK(strstr(mcp_empty_text("find", "\xc3\xa1\xc3\xa1\xc3", b, sizeof b), "\"\xc3\xa1\xc3\xa1\""), "find: a broken character dropped (%s)", b);
     CHECK(!strcmp(mcp_empty_text("read_app_log", "error", b, sizeof b), "No log lines match \"error\"."), "read_app_log with a pattern");
     CHECK(!strcmp(mcp_empty_text("read_app_log", NULL, b, sizeof b), "No log lines."), "read_app_log without one");
@@ -954,6 +976,21 @@ static void waits(void) {
     t0 = clock_ms;
     CHECK(hands_call(":3.1", &o, &out, NULL, NULL, &why) == HANDS_E_PENDING, "open: a window that draws nothing");
     CHECK(run_until_done(10000) == 1 && strstr(done_out, "\"ready\":false") && clock_ms - t0 <= 3100, "open: ready:false at the limit (%.0f ms)", clock_ms - t0);
+    /* (ws170 QA BUG-15) a Linux app: answered with the window it brought (linux#149), ready, not the launch's token */
+    int lin[8] = { 1, 1, 1, 1, 1, 1, 1, 1 };
+    memcpy(ready_seq, lin, sizeof lin);
+    open_launches = 1; launch_after = 4; ready_looks = 0; done_n = 0;
+    CHECK(hands_call(":3.1", &o, &out, NULL, NULL, &why) == HANDS_E_PENDING, "open: a Linux app launching");
+    CHECK(run_until_done(12000) == 1 && done_rc == HANDS_OK &&
+          !strcmp(done_out, "{\"window\":\"linux#149\",\"app\":\"desktop:lordos-toolkit-audit\",\"ready\":true}"),
+          "open: the Linux app's own window, ready (%s)", done_out);
+    /* its window never comes: window null, ready false, after the launch's longer limit */
+    launch_after = 1000000; ready_looks = 0; done_n = 0;
+    t0 = clock_ms;
+    CHECK(hands_call(":3.1", &o, &out, NULL, NULL, &why) == HANDS_E_PENDING, "open: a launch whose window never comes");
+    CHECK(run_until_done(20000) == 1 && !strcmp(done_out, "{\"window\":null,\"app\":\"desktop:lordos-toolkit-audit\",\"ready\":false}") &&
+          clock_ms - t0 > 3100 && clock_ms - t0 <= 10100, "open: no window in time (%s, %.0f ms)", done_out, clock_ms - t0);
+    open_launches = 0;
     hands_gone(":3.1");
 }
 
