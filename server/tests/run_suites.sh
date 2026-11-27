@@ -398,6 +398,13 @@ EOF
         77) skip "testbench-globals" "build/lord-server-test, build/lordos-testbench, the default theme and python3" ;;
         *) bad "testbench-globals (tests/testbench_globals_headless.sh, headless lord-server-test)" ;;
     esac
+    # (ws170 QA BUG-24) the test bench's clipboard and primary-selection checks while another client holds both selections
+    sh tests/testbench_selection_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "testbench-selection (tests/testbench_selection_headless.sh: its own text back with another client's selection there)" ;;
+        77) skip "testbench-selection" "build/lord-server-test, build/lordos-testbench, the default theme and python3" ;;
+        *) bad "testbench-selection (tests/testbench_selection_headless.sh)"; cat "$T/out" ;;
+    esac
     # Workspaces: a window launched from a display's bar lands on that display, in that activity and its slot, even
     # after a profile picker and with another activity in view; a dialog told its parent late goes over it; the bar
     # marks a minimized window (themes/workspaces/model/launches.js; left to right and right to left)
