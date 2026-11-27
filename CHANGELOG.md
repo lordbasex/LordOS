@@ -420,6 +420,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Settings → Appearance → Install from a file failed on every installed system: `lord-themec` wasn't in the
+  package** (BUG-G of the ws171 QA). `tools/iso/mkdeb.sh` never installed `server/build/lord-themec`, which lord-server
+  starts only from next to itself (`ui/js_theme.c`). It is now installed in `/usr/lib/lordos/bin` and required like
+  the other helpers. And `mkdeb.sh` now refuses to build a package when a program `server/Makefile` or
+  `server/mk/*.mk` builds is neither installed nor named as not shipped (tests, development tools, `lord-web` in its
+  own package), so a new helper can't be left out again.
 - **After an s2idle suspend on virtio-gpu the login screen never showed** (BUG-B of the ws171 QA: compositor.log
   "watchdog: Virtual-1: its page flip has not completed for 2.4 s", and nothing after). The watchdog only logged a page
   flip the kernel never completed. Now it recovers: the flip is taken as done (`kms_flip_abandon`: the GPU path's

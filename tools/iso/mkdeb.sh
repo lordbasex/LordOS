@@ -130,13 +130,26 @@ for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
          lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-nvgpu:"" lord-spell:"" lord-appstream:"" \
-         lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lord-vmunpack:"" lord-pgpv:"" lord-llm:"" lordos-guest:""; do
+         lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lord-vmunpack:"" lord-pgpv:"" lord-llm:"" lordos-guest:"" lord-themec:""; do
     b=${h%%:*}; need=${h#*:}
     [ -x "server/build/$b" ] && continue
     case " ${ALLOW_MISSING:-} " in *" $b "*) echo "mkdeb: leaving out $b (ALLOW_MISSING)" >&2; continue ;; esac
     missing="$missing\n  server/build/$b${need:+  (needs $need)}"
 done
 [ -z "$missing" ] || { printf "missing helpers, the package would ship without them:$missing\nmake -C server after installing what they need, or ALLOW_MISSING=\"name …\" to leave one out on purpose\n" >&2; exit 1; }
+# Every program server/Makefile and server/mk/*.mk build must be installed below or named here as not shipped (tests,
+# development tools, lord-web in its own package): 0.8.9.6.2's ws171 left lord-themec out, and Settings → Appearance →
+# Install from a file failed on every installed system. A new helper fails the package until it has a line.
+NOT_SHIPPED=" bpf2c clip-offers gpu-contention lan-list lan-scan lbcorpus lock-seat lord-llm-abi5 lord-llm-norule lord-media-encfail
+ lord-media-hwfall lordos-fetch lordos-guest-asan lordvm-dev lord-web mkguestiso seat-cycle softfido vm-link-tool
+ vm-net-cli-dummy wl-globals moddrag-x11 xpopup-x11 "
+unlisted=""
+for b in $(grep -ohE '^build/[A-Za-z0-9_.-]+:' server/Makefile server/mk/*.mk | sed 's|^build/||; s|:$||' |
+           grep -vE 'test|check|bench$|cli$|fuzz|harness|dump|demo|probe|fake|scene|walk|e2e|-client$|\.o$' | sort -u); do
+    case " $(echo $NOT_SHIPPED) " in *" $b "*) continue ;; esac
+    grep -q "server/build/$b\b\|for b in .*\b$b\b" "$ROOT/tools/iso/mkdeb.sh" || unlisted="$unlisted $b"
+done
+[ -z "$unlisted" ] || { echo "mkdeb: built by server/ but neither packaged nor listed as not shipped:$unlisted" >&2; exit 1; }
 [ -f themes/greeter/theme.bundle.js ] || { echo "missing the login screen (npm run build)" >&2; exit 1; }
 for t in themes/*/theme.bundle.js; do [ -f "$t" ] || { echo "built themes missing (npm run build)" >&2; exit 1; }; done
 
@@ -281,6 +294,10 @@ fi
 # lord-appstream (Flatpak phase 1, E7): reads Flathub's catalog in its sandbox; only the C library (docs/FLATPAK.md)
 [ -x server/build/lord-appstream ] && install -m 755 server/build/lord-appstream "$L/bin/lord-appstream"
 [ -x "$L/bin/lord-appstream" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-appstream" 2>/dev/null || true; }
+# lord-themec (0.8.9.6.2): a community theme's .zip checked and built in the helpers' sandbox; lord-server starts only the
+# one next to it (ui/js_theme.c helper_path; AGENTS.md "lord-themec")
+install -m 755 server/build/lord-themec "$L/bin/lord-themec"
+"$STRIP" --strip-unneeded "$L/bin/lord-themec" 2>/dev/null || true
 # lord-rdesk (0.8.7): one RDP or VNC connection, sandboxed (docs/FILES.md, "Remote desktop")
 install -m 755 server/build/lord-rdesk "$L/bin/lord-rdesk"
 "$STRIP" --strip-unneeded "$L/bin/lord-rdesk" 2>/dev/null || true
