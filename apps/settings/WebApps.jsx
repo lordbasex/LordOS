@@ -11,7 +11,7 @@
 // (Google, DuckDuckGo, Bing or Startpage; a closed list).
 import {
   View, Text, useLocale, useTheme, useAppWindow, useWebApps, webAppsAvailable, webAppCall, webAppIcon, webAppsModel as M, launchWebApp,
-  Button, Toggle, Segmented, TextInput, ConfirmDialog, Layer, fs, formatBytes, errorText, wm, spacing, typeScale, useSettings,
+  Button, Toggle, Segmented, TextInput, ConfirmDialog, WindowSheet, fs, formatBytes, errorText, wm, spacing, typeScale, useSettings,
   webRunning, refreshSiteIcon, siteIconStatus, Spinner, webProfileIcon, webBadges, useStore, webDeveloper, setWebDeveloperMode,
   restartWebApp, quitWebApp, restartWebEngine, webSearchEngine, setWebSearchEngine,
 } from '@lordos/sdk';
@@ -66,12 +66,8 @@ function ColorDots({ value, onPick }) {
   );
 }
 
-// A dialog over this Settings window (the page itself scrolls).
-function Over({ children }) {
-  const win = useAppWindow();
-  const g = wm.frame(wm.get(win.id) || {}) || {};
-  return <Layer name="modal">{children({ x: g.x || 0, y: g.y || 0, w: g.w || 640, h: g.h || 480 })}</Layer>;
-}
+// A dialog over this Settings window's content (the page itself scrolls), never above other windows (sdk/layers.js).
+const Over = WindowSheet;
 
 function ProfileRow({ entry, p, size, onMsg, onRemove, onAct, live, badge }) {
   const { t: tr } = useLocale();

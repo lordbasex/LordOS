@@ -4,7 +4,7 @@
 // server is installed, the first time, with the package engine's own pkg-install action.
 import {
   View, Text, Button, Toggle, Segmented, TextInput, useTheme, useLocale, useStore, admin, remote, remoteViewers, shareHolder, sshLogin, remoteCidr,
-  remoteMinutesLeft, remoteVideo, remoteIceServer, remoteFingerprint, statusText, useSystemInfo, spacing, typeScale, FilePicker, fs, Layer, useAppWindow, wm,
+  remoteMinutesLeft, remoteVideo, remoteIceServer, remoteFingerprint, statusText, useSystemInfo, spacing, typeScale, FilePicker, fs, WindowSheet,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, Note, Message, StatusDot, tint } from './ui.jsx';
@@ -263,7 +263,6 @@ function RootSshSection({ ips, hostname }) {
   const [keyText, setKeyText] = useState('');
   const [rootPw, setRootPw] = useState(['', '']);
   const [picking, setPicking] = useState(false);
-  const win = useAppWindow();
   const load = () => {
     const s = { mode: 'off', password: false, keys: [] };
     admin.run('ssh-root-status', '', (line) => {
@@ -353,17 +352,16 @@ function RootSshSection({ ips, hostname }) {
       {on ? <Note tone="warn">{tr('settings.sharing.root.activeWarning')}</Note> : null}
       <Message msg={msg} />
       {picking ? (() => {
-        // over this Settings window, in the modal layer (the page itself scrolls); starts in ~/.ssh
-        const g = wm.frame(wm.get(win.id) || {});
+        // a sheet over this Settings window's content (the page itself scrolls); starts in ~/.ssh
         let start = fs.home();
         try { if (fs.stat(`${start}/.ssh`)?.dir) start = `${start}/.ssh`; } catch (e) { /* no ~/.ssh */ }
         return (
-          <Layer name="modal">
-            <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 640, height: g.h || 480 }}>
+          <WindowSheet>
+            <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
               <FilePicker title={tr('settings.sharing.root.importFile')} filter={/\.pub$/} start={start} onClose={() => setPicking(false)}
                 onPick={(paths) => { setPicking(false); const p = [].concat(paths)[0]; try { setKeyText(String(fs.read(p)).split('\n')[0].trim()); } catch (e) { setMsg({ ok: false, text: e.message }); } }} />
             </View>
-          </Layer>
+          </WindowSheet>
         );
       })() : null}
     </>

@@ -74,8 +74,8 @@ export const appContentNodes = new Map();
 // Window id → the corner radius its frame is drawn with (WindowShell's borderRadius; 0 when square):
 // a window capture leaves the corners outside it transparent (apps/screenshots, issue #70).
 export const frameRadii = new Map();
-// Window id → the nodes of its sheets in a shell layer (a <Layer name="modal"> drawn by the window's app, such as
-// Settings → Wallpaper's file dialog; sdk/layers.js): a window capture paints them over the window (issue #58).
+// Window id → the nodes of its sheets in a shell layer (a <Layer name="modal"> drawn inside the window's app; sdk/layers.js;
+// an app's own sheets are <WindowSheet>s, inside the window): a window capture paints them over the window (issue #58).
 const sheets = new Map();
 // Session restore (sdk/sessionrestore.jsx): a new Linux window of a Dock id may have a saved place.
 let linuxPlacement = null;

@@ -31,6 +31,10 @@
 // session (lord-sessiond), above all of this.
 //
 //   <Layer name="popover">…</Layer>          a shell surface (themes, startShell)
+//   <WindowSheet>{(area) => …}</WindowSheet>
+//       an app window's sheet (a dialog over that window: a file picker, a model's details): drawn in the window's own
+//       overlay host, over its content and nothing else, so a window, the launcher or a menu opened later is drawn
+//       above it. Never <Layer name="modal"> for that: the modal layer is above every window (QA 0.8.9.6.2, BUG-D).
 //   <Overlay anchor={ref} onClose={…}>…</Overlay>
 //       a list, popover or menu opened from a control: its children are positioned against the
 //       anchor's box (`position: 'absolute', top: h + 4, left: 0` keeps meaning «below the
@@ -38,11 +42,12 @@
 //       other windows. In an isolated app's process it goes to the window's own overlay host
 //       (the app's surface is the window, so it is clipped to it). Clicking outside or Escape
 //       calls onClose.
-import { createElement as h, Fragment, useContext, useEffect, useRef } from 'react';
+import { createElement as h, Fragment, useContext, useEffect, useRef, useState } from 'react';
 import { View, layerContainer, createPortal, addListener } from '@lordos/runtime';
 import { AppWindowContext } from './components.jsx';
 import { direction } from './i18n.js';
-import { wm } from './windows.js';
+import { wm, windows } from './windows.js';
+import { useStore } from './store.js';
 
 export const LAYERS = Object.freeze({
   dock: 10, menubar: 20, floating: 30, overlay: 40, popover: 50, modal: 60,
@@ -72,6 +77,42 @@ export function Layer({ name, children }) {
   const c = shell ? layerContainer(z) : null;
   if (!c) return h(Fragment, null, children);
   return createPortal(name === 'modal' && win?.id ? h(SheetBox, { win: win.id }, children) : children, c);
+}
+
+// ---- an app window's sheet ----
+
+const sizeOf = (inst) => { try { const r = inst ? lord.getLayout(inst.id) : null; return r && r[2] > 0 && r[3] > 0 ? { w: r[2], h: r[3] } : null; } catch (e) { return null; } };
+
+// The area a sheet of this window has, { x: 0, y: 0, w, h }: its overlay host's size (the window's content, without the
+// title bar), followed as the window is resized. Before the host has a size: the window's frame, else 640 × 480.
+export function useWindowSheetArea() {
+  const win = useContext(AppWindowContext);
+  const host = win?.overlayHost || null;
+  const [, bump] = useState(0);
+  // the window's frame size: a resize renders again (the host's own layout follows one frame later: checked below)
+  const frame = useStore(windows, (ws) => { const w = win?.id != null ? ws.find((x) => x.id === win.id) : null; const f = w ? wm.frame(w) : null; return f ? `${f.w}x${f.h}` : ''; });
+  const got = sizeOf(host);
+  useEffect(() => {
+    const id = setTimeout(() => { const n = sizeOf(host); if (n && (!got || n.w !== got.w || n.h !== got.h)) bump((x) => x + 1); }, 32);
+    return () => clearTimeout(id);
+  });
+  if (got) return { x: 0, y: 0, w: got.w, h: got.h };
+  const [fw, fh] = frame ? frame.split('x').map(Number) : [];
+  return { x: 0, y: 0, w: fw || 640, h: fh || 480 };
+}
+
+// children: nodes, or a function of useWindowSheetArea()'s area. Positioned from the host's top left (0, 0). Outside an
+// app window (a scene rendering a page alone) it falls back to the modal layer.
+export function WindowSheet({ children }) {
+  const win = useContext(AppWindowContext);
+  const area = useWindowSheetArea();
+  const host = win?.overlayHost || null;
+  const body = typeof children === 'function' ? children(area) : children;
+  if (!host) return win?.id != null ? null : h(Layer, { name: 'modal' }, body);
+  return createPortal(h(View, {
+    protected: !!win.protected,
+    style: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none', direction: direction() },
+  }, body), host);
 }
 
 const insideOf = (inst, ref) => {

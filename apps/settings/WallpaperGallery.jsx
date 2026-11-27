@@ -11,7 +11,7 @@
 // compatible GPU only, sdk/motion.jsx) and your own pictures. The pure parts are sdk/wallpapergallery.js.
 import {
   View, Text, Image, useTheme, useSettings, useLocale, tOptional, useStore, direction, useAppWindow, useKeyboard, Button, Slider, SearchField, Segmented,
-  RadioGroup, Layer, Overlay, FilePicker, wm, spacing, typeScale, settings, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop,
+  RadioGroup, WindowSheet, useWindowSheetArea, Overlay, FilePicker, wm, spacing, typeScale, settings, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop,
   slideshowPatch, slideshowPrefs, themes, displayLabel, displayFor, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage,
   addWallpaperImage, removeWallpaperImage, userWallpaperName, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs,
   downloadMotion, removeMotion, setLoginMotion, variantFor as motionVariantFor, userVideoProblem, media, screenDisplays, errorText,
@@ -243,7 +243,7 @@ function Sheet({ e, ctx, onClose, onStep }) {
     // ← and → as the arrows draw them (mirrored in right-to-left)
     else if ((ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') && onStep) onStep((ev.key === 'ArrowRight') !== (direction() === 'rtl') ? 1 : -1);
   });
-  const g = wm.frame(wm.get(win.id) || {}) || {};
+  const g = useWindowSheetArea();                       // a sheet over this window's content only (sdk/layers.js)
   const W = g.w || 720, H = g.h || 560;
   const wide = W >= 700;
   // the picture takes most of the sheet on a large window (up to 900 px), with 280 px left for the choices
@@ -263,8 +263,8 @@ function Sheet({ e, ctx, onClose, onStep }) {
   const only = ctx.onlyDisplay;
   const inUse = ctx.inUse.has(e.item?.id) || ctx.inUse.has(e.id);
   return (
-    <Layer name="modal">
-      <View onClick={onClose} style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: W, height: H, alignItems: 'center', justifyContent: 'center',
+    <WindowSheet>
+      <View onClick={onClose} style={{ position: 'absolute', left: 0, top: 0, width: W, height: H, alignItems: 'center', justifyContent: 'center',
         backgroundColor: 'rgba(0,0,0,0.45)' }}>
         <View onClick={(ev) => ev?.stopPropagation?.()} style={{ flexDirection: wide ? 'row' : 'column', maxWidth: W - 32, maxHeight: H - 32, borderRadius: 14, overflow: 'hidden',
           backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
@@ -323,7 +323,7 @@ function Sheet({ e, ctx, onClose, onStep }) {
           {onStep ? <StepArrow side="end" onClick={() => onStep(direction() === 'rtl' ? -1 : 1)} /> : null}
         </View>
       ) : null}
-    </Layer>
+    </WindowSheet>
   );
 }
 
@@ -347,7 +347,6 @@ function MyPhotos({ entries, ctx }) {
       return ctx.use(mineEntry({ id }, ''), ctx.login ? 'login' : 'desktop', 'auto');
     }).catch((e) => ctx.setNote(errorText(e))).finally(() => setBusy(false));
   };
-  const g = picking ? wm.frame(wm.get(win.id) || {}) : null;
   return (
     <Section title={tr('settings.wallpaperCategory.mine')} footer={tr('settings.wallpaperImage.hint')}>
       {entries.length ? <Grid entries={entries} ctx={ctx} /> : null}
@@ -356,11 +355,11 @@ function MyPhotos({ entries, ctx }) {
         {ctx.login && userWallpaperName(s.loginWallpaper) ? <Button small label={tr('settings.motion.loginDefault')} onClick={ctx.loginDefault} /> : null}
       </Actions>
       {picking ? (
-        <Layer name="modal">
-          <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 640, height: g.h || 480 }}>
+        <WindowSheet>
+          <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
             <FilePicker computer title={tr('settings.wallpaperImage.pick')} filter={/\.(png|jpe?g)$/i} onClose={() => setPicking(false)} onPick={(p) => add([].concat(p)[0])} />
           </View>
-        </Layer>
+        </WindowSheet>
       ) : null}
     </Section>
   );

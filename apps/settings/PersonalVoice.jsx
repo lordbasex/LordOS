@@ -17,7 +17,7 @@
 // (done, too noisy, a silent microphone, Cancel, closing the sheet, an error) goes through release(): the microphone
 // is let go and the sheet is as it was, so trying again works as the first time did.
 import {
-  View, Text, Button, Toggle, TextInput, Layer, useTheme, useLocale, useAppWindow, wm, media, usePlayer, spacing, typeScale, fs,
+  View, Text, Button, Toggle, TextInput, WindowSheet, useTheme, useLocale, media, usePlayer, spacing, typeScale, fs,
   addOwnVoice, ownVoiceName, tryVoice, parseWav, roomCheck, takeName, trimSilence, joinPhrases, phraseDone, errorText,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -73,7 +73,6 @@ const Dots = ({ n, at, th }) => (
 export function PersonalVoiceSheet({ lang, onClose }) {
   const th = useTheme();
   const { t: tr } = useLocale();
-  const win = useAppWindow();
   const [step, setStep] = useState('intro');
   const [consent, setConsent] = useState(false);
   const [phrase, setPhrase] = useState(0);
@@ -186,7 +185,6 @@ export function PersonalVoiceSheet({ lang, onClose }) {
   const close = (n) => { release(); setRec(0); onClose(n); };
   const stopNow = () => { if (rec) media.stop(rec); };
 
-  const g = wm.frame(wm.get(win.id) || {});
   const title = (k) => <Text style={{ fontSize: 17, fontWeight: 700, color: th.text, textAlign: 'center' }}>{tr(k)}</Text>;
   const body = (k, p) => <Text style={{ fontSize: typeScale.callout, color: th.textDim, lineHeight: 1.45, textAlign: 'center' }}>{tr(k, p)}</Text>;
   const recording = !!rec;
@@ -318,14 +316,14 @@ export function PersonalVoiceSheet({ lang, onClose }) {
     );
   }
   return (
-    <Layer name="modal">
-      <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 720, height: g.h || 560, alignItems: 'center',
+    <WindowSheet>
+      <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center',
         justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }}>
         <View style={{ width: 540, maxWidth: '94%', padding: 24, gap: spacing.m, borderRadius: 14, backgroundColor: th.windowBg,
           border: `1px solid ${th.separator}`, boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
           {content}
         </View>
       </View>
-    </Layer>
+    </WindowSheet>
   );
 }

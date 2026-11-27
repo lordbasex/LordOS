@@ -420,6 +420,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Settings' sheets stayed drawn over windows opened after them** (BUG-D of the ws171 QA: Settings → AI's model sheet
+  over Thunderbird and the launcher). Settings drew its sheets and file dialogs in the shell's `modal` layer, above
+  every window, at the window's coordinates; while one showed, no Linux app got the keyboard either. A new
+  `<WindowSheet>` (`sdk/layers.js`, with `useWindowSheetArea()`) draws a window's sheet in that window's own overlay
+  host, over its content only, so it stacks, moves and is captured with its window. Every such sheet in Settings moved
+  to it: AI (the model sheet, the OCR try-out's picker, a voice from a file), Personal Voice, Wallpaper (the details
+  sheet, adding a picture), Desktop style (themes from a file), Users (the picture editor), Sharing (importing a key),
+  Network (VPN certificates), Web apps and Flatpak (their confirmations). Test: `window-sheet-scene` (the sheet is in
+  its window's host, never in the modal layer; no app under `apps/` uses `<Layer name="modal">`). docs/LAYERS.md.
 - **Settings → Web apps → Refresh icon answered "webapps.tooMany" after the Store fetched the catalog's icons** (BUG-E of
   the ws171 QA). On a first login the Store queued icon probes for all 37 catalog apps; each finished probe kept one of
   lord-server's 8 probe slots for 15 minutes (the time an "Add from an address" probe waits for its Install), so the

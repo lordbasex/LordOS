@@ -9,7 +9,7 @@
 // filters, order, arrow keys, the report's address) are sdk/themegallery.js.
 import {
   View, Text, useTheme, useLocale, themes, wm, spacing, typeScale, SearchField, Segmented, Button, DesktopStyleThumb,
-  direction, openUrl, lordosVersion, useKeyboard, FilePicker, Layer, ConfirmDialog, useAppWindow,
+  direction, openUrl, lordosVersion, useKeyboard, FilePicker, WindowSheet, ConfirmDialog,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { galleryEntry, filterGallery, filterCounts, gridStep, gridColumns, themeIssueUrl, GALLERY_FILTERS } from '../../sdk/themegallery.js';
@@ -54,12 +54,10 @@ function apply(id) {
 
 // (0.8.9.6.2) A sheet over this Settings window: the file dialog, a confirmation (docs/THEMES-GUIDE.md "Community themes")
 function Sheet({ children }) {
-  const win = useAppWindow();
-  const g = wm.frame(wm.get(win.id) || {});
   return (
-    <Layer name="modal">
-      <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 640, height: g.h || 480 }}>{children}</View>
-    </Layer>
+    <WindowSheet>
+      <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>{children}</View>
+    </WindowSheet>
   );
 }
 

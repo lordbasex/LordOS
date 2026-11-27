@@ -91,11 +91,17 @@ import { Layer, Overlay, LAYERS } from '@lordos/sdk';
   Dock's, a right-click's: the themes' `Menu.jsx`), which holds it while it shows (`holdKeyboard()` in
   `@lordos/runtime`, in development): its keys, Escape included, are the menu's and never reach the app or a machine's
   guest behind it (`server/tests/vm_keys_scene.mjs`).
-- **A window's sheets (0.8.8.7).** A `<Layer name="modal">` rendered inside an app's window (Settings' file
-  dialogs and sheets) is drawn in a box of the layer's size registered as that window's (`wm.addSheet`,
-  `wm.sheetNodes`). Screenshots' window capture paints those boxes over the window (`media.screenshot`'s `also`,
-  `paint_capture_until`), so a window with a dialog open comes out with its dialog, and the other windows'
-  sheets and every other layer are still left out (#58).
+- **A window's sheets (0.8.9.6.2).** A dialog over one app window (Settings' file dialogs, a model's or a wallpaper's
+  details, its confirmations) is a `<WindowSheet>` (`sdk/layers.js`): drawn in the window's own overlay host (the node
+  `AppHost` puts over the window's content), so it moves, stacks and is captured with its window, and a window, the
+  launcher or a menu opened later is drawn above it. Never `<Layer name="modal">` for that: the modal layer is above
+  every window, and while it shows anything no Linux app gets the keys (above), so Settings → AI's model sheet stayed
+  over Thunderbird and the launcher (QA, BUG-D; `server/tests/window_sheet_scene.mjs` also checks that no app under
+  `apps/` uses it). `children` may be a function of the sheet's area `{ x: 0, y: 0, w, h }` (`useWindowSheetArea()`).
+- **A modal layer inside a window (0.8.8.7).** A `<Layer name="modal">` still rendered inside an app's window is drawn
+  in a box of the layer's size registered as that window's (`wm.addSheet`, `wm.sheetNodes`). Screenshots' window
+  capture paints those boxes over the window (`media.screenshot`'s `also`, `paint_capture_until`), so a window with
+  such a dialog open comes out with it, and the other windows' sheets and every other layer are still left out (#58).
 - **Don't** fight the order with large `zIndex` values: they only order siblings. A new kind of
   surface gets a row in the table above (and in `sdk/layers.js`) instead.
 

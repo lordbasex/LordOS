@@ -11,7 +11,7 @@ export { t, useLocale } from '../../sdk/i18n.js';
 export { Toggle, Button, ScrollView, Segmented, TextInput, Spinner, useAppWindow } from '../../sdk/components.jsx';
 export { GroupBox, ConfirmDialog, spacing, typeScale } from '../../sdk/controls.jsx';
 export { menuStep } from '../../sdk/focusmodel.js';
-export { Overlay, Layer } from '../../sdk/layers.js';
+export { Overlay, Layer, WindowSheet, useWindowSheetArea } from '../../sdk/layers.js';
 export { formatBytes } from '../../sdk/system.js';
 export * as fs from '../../sdk/fs.js';
 export { errorText } from '../../sdk/errors.js';

@@ -3,7 +3,7 @@
 import {
   View, Text, useTheme, useLocale, Button, Toggle, Segmented, TextInput,
   admin, fs, formatBytes, keyring, AutofillButton, spacing, typeScale, errorText, statusText,
-  ToolbarButton, MenuButton, openUrl, FilePicker, Layer, useAppWindow, wm, SignalGlyph, wifiBars,
+  ToolbarButton, MenuButton, openUrl, FilePicker, WindowSheet, SignalGlyph, wifiBars,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Stack, Section, SettingRow, ValueRow, FieldRow, Badge, Note, Message, Actions, StatusDot, tint } from './ui.jsx';
@@ -336,7 +336,6 @@ function VpnImport({ onDone, edit }) {
   const [name, setName] = useState(edit ? edit.name : '');
   const [form, setForm] = useState(edit ? formFromConfig(edit, FORM_DEFAULTS[edit.type]) : {});
   const [picking, setPicking] = useState(false);
-  const win = useAppWindow();
   const [msg, setMsg] = useState(null);
   const [enabling, setEnabling] = useState(null);
   const [, setTick] = useState(0);
@@ -483,14 +482,13 @@ function VpnImport({ onDone, edit }) {
       {cur && cur.insecure && <Note tone="warn">{tr('network.vpn.pptpWarning')}</Note>}
       <Message msg={msg} />
       {picking ? (() => {
-        // the system file dialog over this Settings window (like Sharing's key import)
-        const g = wm.frame(wm.get(win.id) || {});
+        // the system file dialog over this Settings window's content (like Sharing's key import)
         return (
-          <Layer name="modal">
-            <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 640, height: g.h || 480 }}>
+          <WindowSheet>
+            <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
               <FilePicker multiple title={tr('network.vpn.clientCertPick')} filter={/\.(pem|crt|cer|key|p12|pfx)$/i} onClose={() => setPicking(false)} onPick={pickedCertFiles} />
             </View>
-          </Layer>
+          </WindowSheet>
         );
       })() : null}
       <Actions>

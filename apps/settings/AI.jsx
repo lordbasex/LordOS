@@ -18,8 +18,8 @@
 // Image (Real-ESRGAN) are not inside LordOS yet: their cards show their facts and "coming soon". The pure parts are
 // sdk/aistore.js.
 import {
-  View, Text, Image, Button, Toggle, Segmented, Dropdown, TextInput, SearchField, Layer, FilePicker, ScrollView, Lumo, useTheme, useLocale,
-  tOptional, useSettings, useStore, useAppWindow, useKeyboard, direction, wm, media, admin, formatBytes, spacing, typeScale, settings,
+  View, Text, Image, Button, Toggle, Segmented, Dropdown, TextInput, SearchField, WindowSheet, useWindowSheetArea, FilePicker, ScrollView, Lumo, useTheme, useLocale,
+  tOptional, useSettings, useStore, useKeyboard, direction, media, admin, formatBytes, spacing, typeScale, settings,
   VOICE_DEFAULTS, speakAvailable, previewVoice, tryVoice, player as voicePlayer, VOICE_LANGS, voiceLabel, voicePackage, modelPackage, hasVoice,
   PREVIEWS_PACKAGE, scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName,
   takeName, errorText, fs, LLM_MODELS, packagesForModel, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, installLlm, setBrainBackend, setBrainThreads, Slider,
@@ -344,7 +344,6 @@ function Box({ title, children }) {
 function TryBox({ e, ctx }) {
   const t = useTheme();
   const { t: tr } = useLocale();
-  const win = useAppWindow();
   const [text, setText] = useState('');
   const [out, setOut] = useState('');
   const [busy, setBusy] = useState(false);
@@ -403,17 +402,16 @@ function TryBox({ e, ctx }) {
       catch (err) { setOut(errorText(err)); }
       setBusy(false);
     };
-    const g = picking ? wm.frame(wm.get(win.id) || {}) : null;
     return (
       <Box title={tr('settings.aiStore.try.title')}>
         <Actions start><Button small disabled={!ctx.tess.ready || busy} label={tr('settings.aiStore.try.ocr')} onClick={() => setPicking(true)} /></Actions>
         {outBox(busy ? tr('settings.aiStore.try.reading') : out, tr('settings.aiStore.try.ocrOut'))}
         {picking ? (
-          <Layer name="modal">
-            <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 640, height: g.h || 480 }}>
+          <WindowSheet>
+            <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
               <FilePicker computer title={tr('settings.aiStore.try.ocr')} filter={/\.(png|jpe?g|webp|bmp|tiff?)$/i} onClose={() => setPicking(false)} onPick={read} />
             </View>
-          </Layer>
+          </WindowSheet>
         ) : null}
       </Box>
     );
@@ -452,9 +450,10 @@ function readPictureText(path, langs) {
 function Sheet({ e, ctx, onClose }) {
   const t = useTheme();
   const { t: tr } = useLocale();
-  const win = useAppWindow();
   useKeyboard((ev) => { if (ev.key === 'Escape') onClose(); });
-  const g = wm.frame(wm.get(win.id) || {}) || {};
+  // a sheet of this Settings window, over its content only (QA 0.8.9.6.2: in the shell's modal layer it stayed drawn
+  // over Thunderbird and the launcher opened afterwards)
+  const g = useWindowSheetArea();
   const W = g.w || 720, H = g.h || 560;
   const wide = W >= 760;
   const sw = Math.min(820, W - 32);
@@ -505,8 +504,8 @@ function Sheet({ e, ctx, onClose }) {
     </Box>
   );
   return (
-    <Layer name="modal">
-      <View onClick={onClose} style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: W, height: H, alignItems: 'center', justifyContent: 'center',
+    <WindowSheet>
+      <View onClick={onClose} style={{ position: 'absolute', left: 0, top: 0, width: W, height: H, alignItems: 'center', justifyContent: 'center',
         backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View onClick={(ev) => ev?.stopPropagation?.()} style={{ width: sw, maxHeight: H - 32, borderRadius: 14, overflow: 'hidden',
           backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
@@ -531,7 +530,7 @@ function Sheet({ e, ctx, onClose }) {
           </ScrollView>
         </View>
       </View>
-    </Layer>
+    </WindowSheet>
   );
 }
 
@@ -1061,7 +1060,6 @@ const MIN_MS = 3000;
 function CloneSheet({ onClose }) {
   const th = useTheme();
   const { t: tr } = useLocale();
-  const win = useAppWindow();
   const [name, setName] = useState('');
   const [consent, setConsent] = useState(false);
   const [wav, setWav] = useState(null);           // the clip, a WAV in ~/.cache/lordos/voice
@@ -1093,10 +1091,9 @@ function CloneSheet({ onClose }) {
     try { addOwnVoice(n, wav); onClose(n); } catch (e) { setErr(e.message); }
   };
 
-  const g = wm.frame(wm.get(win.id) || {});
   return (
-    <Layer name="modal">
-      <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 720, height: g.h || 560, alignItems: 'center',
+    <WindowSheet>
+      <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center',
         justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }}>
         {picking ? (
           <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
@@ -1128,6 +1125,6 @@ function CloneSheet({ onClose }) {
           </View>
         )}
       </View>
-    </Layer>
+    </WindowSheet>
   );
 }
