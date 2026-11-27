@@ -2111,6 +2111,9 @@ static void paint_verify(Out *o, int index, Rect skip) {
 }
 
 /* Paints a display's pending damage into its frame at its scale. Returns the physical rect painted. */
+/* the GPU's frosted glass may be used (paint_out): GPU composition, LORD_GPU_FROST not 0, and no remote viewer or
+ * recording reading the canvas (they would get the picture unblurred under the frosted nodes); set in the main loop */
+static int frost_want;
 static Rect paint_out(Server *s, Out *o, int index, int feed) {
     Rect r = { 0, 0, 0, 0 };
     Box b = o->pend;
@@ -2164,6 +2167,9 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     double t0 = now_ms(), px = 0;
     view_of(o, index);
     paint_blur_cache_on = 1;                /* a display's scene: its blurred backdrops may be kept and reused */
+    /* frosted nodes over a GPU-drawn moving wallpaper: blurred by the GPU (paint.c frost_source), on a GPU display that is
+     * not turned and while nothing reads the canvas as the screen (frost_want, the main loop) */
+    paint_gpu_frost = frost_want && o->gpu >= 0 && gpu_active() && !(o->d.rot & 3);
     for (int k = 0; k < nparts; k++) {
         Box q = parts[k];
         Rect pr = whole ? (Rect){ 0, 0, o->scene.w, o->scene.h } : out_phys_rect(&o->v, q.x0, q.y0, q.x1, q.y1);
@@ -2188,6 +2194,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
         px += (double)(pr.x1 - pr.x0) * (pr.y1 - pr.y0);
     }
     paint_blur_cache_on = 0;
+    paint_gpu_frost = 0;
     canvas_set_clip(&o->scene, (Rect){ 0, 0, o->scene.w, o->scene.h });
     ui.damage = (Box){ 0, 0, 0, 0 };
     view_reset();
@@ -3840,6 +3847,13 @@ int main(int argc, char **argv) {
         js_sys_unseen = unseen;                     /* the desk widgets' data feeds rest too (lord.system.seen) */
         /* moving wallpapers (media/mambient.c): which views show, their pause and stop, the loop cache's next frame */
         media_ambient_tick(unseen);
+        {   /* the GPU's frosted glass on or off: everything painted again, the other way */
+            static int frost_env = -1, frost_last = -1;
+            if (frost_env < 0) { const char *e = getenv("LORD_GPU_FROST"); frost_env = !(e && !strcmp(e, "0")); }
+            int want = frost_env && gpu_active() && !mirror_watchers() && !media_needs_cpu();
+            if (want != frost_last) { if (frost_last >= 0) full_damage(&s); frost_last = want; }
+            frost_want = want;
+        }
         {
             double ad = media_ambient_due();
             if (ad >= 0 && (delay < 0 || ad < delay)) delay = ad;

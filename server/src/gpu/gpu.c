@@ -18,6 +18,7 @@
 #include "../outputs.h"
 #include "../media/nv12.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,6 +87,16 @@ int  gpu_scanout(const GpuDmabuf *d, void (*done)(void *), void *data) { (void)d
 int  gpu_scanout_tear(const GpuDmabuf *d, void (*done)(void *), void *data, int tear) { (void)d; (void)done; (void)data; (void)tear; return -1; }
 int  gpu_flip_torn(void) { return 0; }
 int  gpu_can_scanout(const GpuDmabuf *d, int w, int h) { (void)d; (void)w; (void)h; return 0; }
+int  gpu_draw_frosted(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh,
+                      float bx, float by, float bw, float bh, float rad, int blur, Rect clip) {
+    (void)t; (void)dx; (void)dy; (void)dw; (void)dh; (void)sx; (void)sy; (void)sw; (void)sh; (void)bx; (void)by; (void)bw; (void)bh;
+    (void)rad; (void)blur; (void)clip; return -1;
+}
+int  gpu_frost_image(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh,
+                     float bx, float by, float bw, float bh, float rad, int blur, uint32_t *px, int W, int H) {
+    (void)t; (void)dx; (void)dy; (void)dw; (void)dh; (void)sx; (void)sy; (void)sw; (void)sh; (void)bx; (void)by; (void)bw; (void)bh;
+    (void)rad; (void)blur; (void)px; (void)W; (void)H; return -1;
+}
 void gpu_read_next(uint32_t *px, int w, int h) { (void)px; (void)w; (void)h; }
 int  gpu_read_done(void) { return 0; }
 
@@ -1330,6 +1341,252 @@ void gpu_draw_uv(GpuTex *t, float dx, float dy, float dw, float dh, const float 
     glEnableVertexAttribArray(1);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glDisable(GL_SCISSOR_TEST);
+}
+
+/* ---- frosted glass over a GPU picture (gpu_draw_frosted) ----
+ * Three passes at 1/f of the size into two textures of this context (grown, never shrunk; a pass reads only the part it
+ * wrote, clamped there by hand since the texture may be larger), then the result into the box with a rounded mask. The
+ * blur is canvas_backdrop_blur's in shape: f = 4 from a radius of 12, 2 from 6; its three box passes of 2·(radius / 2f)
+ * + 1 are one Gaussian of the same variance here. */
+#define FROST_HEAD "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n"
+static const char *fs_frost_blur =
+    FROST_HEAD
+    "varying vec2 v_uv; uniform sampler2D u_tex; uniform vec2 u_dir; uniform vec2 u_lo; uniform vec2 u_hi;\n"
+    "uniform float u_sig; uniform float u_n;\n"
+    "void main() { vec4 acc = vec4(0.0); float ws = 0.0;\n"
+    "  for (int i = -24; i <= 24; i++) { float fi = float(i); if (abs(fi) > u_n) continue;\n"
+    "    float w = exp(-fi * fi / (2.0 * u_sig * u_sig));\n"
+    "    acc += texture2D(u_tex, clamp(v_uv + u_dir * fi, u_lo, u_hi)) * w; ws += w; }\n"
+    "  gl_FragColor = acc / ws; }\n";
+static const char *vs_frost =
+    "attribute vec2 a_pos; attribute vec2 a_uv; attribute vec2 a_px; varying vec2 v_uv;\n"
+    "#ifdef GL_FRAGMENT_PRECISION_HIGH\nvarying highp vec2 v_px;\n#else\nvarying vec2 v_px;\n#endif\n"
+    "void main() { v_uv = a_uv; v_px = a_px; gl_Position = vec4(a_pos, 0.0, 1.0); }\n";
+static const char *fs_frost_out =
+    FROST_HEAD
+    "varying vec2 v_uv; uniform sampler2D u_tex; uniform vec4 u_box; uniform float u_rad;\n"
+    "#ifdef GL_FRAGMENT_PRECISION_HIGH\nvarying highp vec2 v_px;\n#else\nvarying vec2 v_px;\n#endif\n"
+    "void main() { vec2 c = (u_box.xy + u_box.zw) * 0.5, hs = (u_box.zw - u_box.xy) * 0.5;\n"
+    "  vec2 q = abs(v_px - c) - (hs - u_rad);\n"
+    "  float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - u_rad;\n"
+    "  float a = clamp(0.5 - d, 0.0, 1.0);\n"
+    "  gl_FragColor = vec4(texture2D(u_tex, v_uv).rgb, 1.0) * a; }\n";
+
+static struct {
+    unsigned gen;
+    int tried;
+    GLuint blur, out, tex[2], fbo;
+    int tw, th;
+    GLint b_tex, b_dir, b_lo, b_hi, b_sig, b_n, o_tex, o_box, o_rad;
+} FR;
+
+static GLuint frost_prog(const char *vs, const char *fs, int px) {
+    GLuint v = compile(GL_VERTEX_SHADER, vs), f = compile(GL_FRAGMENT_SHADER, fs);
+    if (!v || !f) { if (v) glDeleteShader(v); if (f) glDeleteShader(f); return 0; }
+    GLuint p = glCreateProgram();
+    glAttachShader(p, v);
+    glAttachShader(p, f);
+    glBindAttribLocation(p, 0, "a_pos");
+    glBindAttribLocation(p, 1, "a_uv");
+    if (px) glBindAttribLocation(p, 2, "a_px");
+    glLinkProgram(p);
+    glDeleteShader(v);
+    glDeleteShader(f);
+    GLint ok = 0;
+    glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    if (!ok) { glDeleteProgram(p); return 0; }
+    return p;
+}
+
+static int frost_ready(void) {
+    if (FR.gen != G.gen) { memset(&FR, 0, sizeof FR); FR.gen = G.gen; }
+    if (FR.blur && FR.out) return 1;
+    if (FR.tried) return 0;
+    FR.tried = 1;
+    FR.blur = frost_prog(vs_src, fs_frost_blur, 0);
+    FR.out = frost_prog(vs_frost, fs_frost_out, 1);
+    if (!FR.blur || !FR.out) { fprintf(stderr, "gpu: the frosted glass programs failed: frosted surfaces blur on the CPU\n"); return 0; }
+    FR.b_tex = glGetUniformLocation(FR.blur, "u_tex"); FR.b_dir = glGetUniformLocation(FR.blur, "u_dir");
+    FR.b_lo = glGetUniformLocation(FR.blur, "u_lo"); FR.b_hi = glGetUniformLocation(FR.blur, "u_hi");
+    FR.b_sig = glGetUniformLocation(FR.blur, "u_sig"); FR.b_n = glGetUniformLocation(FR.blur, "u_n");
+    FR.o_tex = glGetUniformLocation(FR.out, "u_tex"); FR.o_box = glGetUniformLocation(FR.out, "u_box");
+    FR.o_rad = glGetUniformLocation(FR.out, "u_rad");
+    glGenFramebuffers(1, &FR.fbo);
+    glGenTextures(2, FR.tex);
+    return 1;
+}
+
+/* the two work textures at least w × h */
+static int frost_size(int w, int h) {
+    if (w <= FR.tw && h <= FR.th) return 0;
+    int tw = w > FR.tw ? w : FR.tw, th = h > FR.th ? h : FR.th;
+    for (int i = 0; i < 2; i++) {
+        glBindTexture(GL_TEXTURE_2D, FR.tex[i]);
+        tex_params(GL_TEXTURE_2D);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tw, th, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    }
+    FR.tw = tw;
+    FR.th = th;
+    return glGetError() == GL_NO_ERROR ? 0 : -1;
+}
+
+/* a quad over the whole viewport with these texture coordinates (left, bottom, right, top in NDC order) */
+static void frost_quad(float u0, float v0, float u1, float v1) {
+    const GLfloat v[] = { -1, -1, u0, v0,  1, -1, u1, v0,  -1, 1, u0, v1,  1, 1, u1, v1 };
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, v);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, v + 2);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
+/* Into the framebuffer target (W × H, its y = 0 at NDC +1, as an output is drawn); clip in its pixels. */
+static int frost_core(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh,
+                      float bx, float by, float bw, float bh, float rad, int blur, Rect clip, GLuint target, int W, int H) {
+    if (!G.on || !t || t->gen != G.gen || t->w <= 0 || t->h <= 0 || dw <= 0 || dh <= 0 || bw <= 0 || bh <= 0 || blur < 1) return -1;
+    if (!frost_ready()) return -1;
+    if (clip.x0 < 0) clip.x0 = 0;
+    if (clip.y0 < 0) clip.y0 = 0;
+    if (clip.x1 > W) clip.x1 = W;
+    if (clip.y1 > H) clip.y1 = H;
+    Rect bb = { (int)floorf(bx), (int)floorf(by), (int)ceilf(bx + bw), (int)ceilf(by + bh) };
+    clip = (Rect){ clip.x0 > bb.x0 ? clip.x0 : bb.x0, clip.y0 > bb.y0 ? clip.y0 : bb.y0, clip.x1 < bb.x1 ? clip.x1 : bb.x1, clip.y1 < bb.y1 ? clip.y1 : bb.y1 };
+    if (clip.x1 <= clip.x0 || clip.y1 <= clip.y0) return 0;
+    while (glGetError() != GL_NO_ERROR) {}
+    /* what the blur reads: the box and twice the radius around it, inside the picture */
+    int m = 2 * blur, f = blur >= 12 ? 4 : blur >= 6 ? 2 : 1;
+    float x0 = fmaxf(floorf(bx) - m, floorf(dx)), y0 = fmaxf(floorf(by) - m, floorf(dy));
+    float x1 = fminf(ceilf(bx + bw) + m, ceilf(dx + dw)), y1 = fminf(ceilf(by + bh) + m, ceilf(dy + dh));
+    if (x1 <= x0 || y1 <= y0) return -1;
+    int rw = (int)ceilf((x1 - x0) / f), rh = (int)ceilf((y1 - y0) / f);
+    if (rw < 1 || rh < 1 || rw > 4096 || rh > 4096 || frost_size(rw, rh)) return -1;
+    float tw = (float)FR.tw, th = (float)FR.th;
+    /* 1: the picture's part, at 1/f, into tex[0] (its row 0 the part's top) */
+    glBindFramebuffer(GL_FRAMEBUFFER, FR.fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FR.tex[0], 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { glBindFramebuffer(GL_FRAMEBUFFER, target); return -1; }
+    glViewport(0, 0, rw, rh);
+    glDisable(GL_BLEND);
+    glDisable(GL_SCISSOR_TEST);
+    int p = t->external ? 1 : 0;
+    glUseProgram(G.prog[p]);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(t->external ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D, t->id);
+    glUniform1i(G.u_tex[p], 0);
+    glUniform1f(G.u_op[p], 1.0f);
+    glUniform1f(G.u_opaque[p], 1.0f);
+    glUniform1f(G.u_swap[p], t->swap ? 1.0f : 0.0f);
+    float ex = x0 + (float)rw * f, ey = y0 + (float)rh * f;
+    float u0 = (sx + (x0 - dx) / dw * sw) / t->w, u1 = (sx + (ex - dx) / dw * sw) / t->w;
+    float v0 = (sy + (y0 - dy) / dh * sh) / t->h, v1 = (sy + (ey - dy) / dh * sh) / t->h;
+    frost_quad(u0, v0, u1, v1);
+    /* 2, 3: across into tex[1], then down into tex[0] */
+    int rs = blur / (2 * f) > 0 ? blur / (2 * f) : 1, win = 2 * rs + 1;
+    float sig = sqrtf(3.0f * (float)(win * win - 1) / 12.0f);
+    float n = ceilf(3 * sig);
+    if (n > 24) n = 24;
+    glUseProgram(FR.blur);
+    glUniform1i(FR.b_tex, 0);
+    glUniform2f(FR.b_lo, 0.5f / tw, 0.5f / th);
+    glUniform2f(FR.b_hi, (rw - 0.5f) / tw, (rh - 0.5f) / th);
+    glUniform1f(FR.b_sig, sig);
+    glUniform1f(FR.b_n, n);
+    for (int pass = 0; pass < 2; pass++) {
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FR.tex[pass ? 0 : 1], 0);
+        glBindTexture(GL_TEXTURE_2D, FR.tex[pass ? 1 : 0]);
+        glUniform2f(FR.b_dir, pass ? 0 : 1 / tw, pass ? 1 / th : 0);
+        frost_quad(0, 0, rw / tw, rh / th);
+    }
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+    /* 4: into the box, its rounded mask, over what is there */
+    glBindFramebuffer(GL_FRAMEBUFFER, target);
+    glViewport(0, 0, W, H);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(clip.x0, H - clip.y1, clip.x1 - clip.x0, clip.y1 - clip.y0);
+    glUseProgram(FR.out);
+    glBindTexture(GL_TEXTURE_2D, FR.tex[0]);
+    glUniform1i(FR.o_tex, 0);
+    glUniform4f(FR.o_box, bx, by, bx + bw, by + bh);
+    float r = fminf(fmaxf(rad, 0), fminf(bw, bh) * 0.5f);
+    glUniform1f(FR.o_rad, r);
+    float qx0 = (float)bb.x0, qy0 = (float)bb.y0, qx1 = (float)bb.x1, qy1 = (float)bb.y1;
+    float nx0 = qx0 / W * 2 - 1, nx1 = qx1 / W * 2 - 1, ny0 = 1 - qy0 / H * 2, ny1 = 1 - qy1 / H * 2;
+    float a0 = (qx0 - x0) / f / tw, a1 = (qx1 - x0) / f / tw, b0 = (qy0 - y0) / f / th, b1 = (qy1 - y0) / f / th;
+    const GLfloat v[] = { nx0, ny0, a0, b0, qx0, qy0,  nx1, ny0, a1, b0, qx1, qy0,
+                          nx0, ny1, a0, b1, qx0, qy1,  nx1, ny1, a1, b1, qx1, qy1 };
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 24, v);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 24, v + 2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 24, v + 4);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisableVertexAttribArray(2);
+    glDisable(GL_SCISSOR_TEST);
+    return glGetError() == GL_NO_ERROR ? 0 : -1;
+}
+
+int gpu_draw_frosted(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh,
+                     float bx, float by, float bw, float bh, float rad, int blur, Rect clip) {
+    if (!G.on || !G.cur) return -1;
+    return frost_core(t, dx, dy, dw, dh, sx, sy, sw, sh, bx, by, bw, bh, rad, blur, clip, 0, G.cur->W, G.cur->H);
+}
+
+int gpu_frost_image(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh,
+                    float bx, float by, float bw, float bh, float rad, int blur, uint32_t *px, int W, int H) {
+    if (!G.on || W <= 0 || H <= 0 || W > 8192 || H > 8192) return -1;
+    if (!px) {          /* timing only: into a W × H image kept between calls, never read back */
+        static GLuint ktex, kfbo;
+        static int kw, kh;
+        static unsigned kgen;
+        if (kgen != G.gen || kw != W || kh != H) {
+            if (kgen != G.gen) ktex = kfbo = 0;
+            if (!ktex) { glGenTextures(1, &ktex); glGenFramebuffers(1, &kfbo); }
+            glBindTexture(GL_TEXTURE_2D, ktex);
+            tex_params(GL_TEXTURE_2D);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, W, H, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+            glBindFramebuffer(GL_FRAMEBUFFER, kfbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ktex, 0);
+            kgen = G.gen; kw = W; kh = H;
+        }
+        int r = frost_core(t, dx, dy, dw, dh, sx, sy, sw, sh, bx, by, bw, bh, rad, blur, (Rect){ 0, 0, W, H }, kfbo, W, H);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        return r;
+    }
+    GLuint tex = 0, fbo = 0;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    tex_params(GL_TEXTURE_2D);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, W, H, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+    int r = -1;
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
+        glViewport(0, 0, W, H);
+        glDisable(GL_SCISSOR_TEST);
+        glClearColor(0, 0, 0, 0);
+        glClear(GL_COLOR_BUFFER_BIT);
+        r = frost_core(t, dx, dy, dw, dh, sx, sy, sw, sh, bx, by, bw, bh, rad, blur, (Rect){ 0, 0, W, H }, fbo, W, H);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        if (!r) {
+            glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, px);
+            r = glGetError() == GL_NO_ERROR ? 0 : -1;
+        }
+        /* glReadPixels' first row is NDC -1, the image's last: flipped, and RGBA bytes made ARGB words */
+        for (int y = 0; !r && y < H / 2; y++)
+            for (int x = 0; x < W; x++) { uint32_t a = px[(size_t)y * W + x]; px[(size_t)y * W + x] = px[(size_t)(H - 1 - y) * W + x]; px[(size_t)(H - 1 - y) * W + x] = a; }
+        for (size_t i = 0, n = (size_t)W * H; !r && i < n; i++) {
+            const uint8_t *b = (const uint8_t *)&px[i];
+            px[i] = (uint32_t)b[3] << 24 | (uint32_t)b[0] << 16 | (uint32_t)b[1] << 8 | b[2];
+        }
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteTextures(1, &tex);
+    return r;
 }
 
 static struct { uint32_t *px; int w, h, done; } rb;

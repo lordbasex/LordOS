@@ -353,6 +353,10 @@ typedef struct { Box b; float x, y, k, dx, dy; int index; } PaintViewBox;
 extern PaintViewBox paint_views[PAINT_VIEWS_MAX];
 extern int paint_nviews;
 extern int paint_blur_cache_on;
+/* main.c: 1 while a GPU display is painted that no remote viewer or recording reads: a frosted node over a GPU-drawn
+ * moving wallpaper is blurred by the GPU (paint.c frost_source); paint_frost_gpu counts those nodes painted so */
+extern int paint_gpu_frost;
+extern long paint_frost_gpu;
 extern void (*damage_hook)(Box b);      /* node.c damage_add: set by paint.c during its damage walk */
 void paint_blur_cache_reset(void);
 void  paint_layer_view(int index);  /* the display with most of the window being moved */

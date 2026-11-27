@@ -182,6 +182,20 @@ void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh,
  * pairs): a turned or flipped buffer (wl_surface.set_buffer_transform) drawn upright. */
 void gpu_draw_uv(GpuTex *t, float dx, float dy, float dw, float dh, const float uv[8], Rect clip, float opacity);
 
+/* Frosted glass over a GPU picture (docs/MOVING-WALLPAPERS.md, "The frosted surfaces over the video"): what of t lies under
+ * the box (bx, by, bw × bh, a rounded rectangle of radius rad; physical px of the output being drawn), blurred as
+ * canvas_backdrop_blur blurs a radius of blur px (at 1/2 or 1/4 of the size, three box passes as one Gaussian), drawn
+ * into the box inside clip, opaque. t is mapped as gpu_draw maps it (sx, sy, sw × sh of the texture onto dx, dy, dw ×
+ * dh). So a moving wallpaper under the Dock or a frosted window is blurred by the GPU with each frame, with no CPU work
+ * and no read back. 0 drawn, -1 not (no GPU, a stale texture, a GL error: the caller's CPU path then does it). */
+int  gpu_draw_frosted(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh,
+                      float bx, float by, float bw, float bh, float rad, int blur, Rect clip);
+/* Tests (build/motion-bench frost): the same into a W × H transparent image read back into px (premultiplied ARGB, rows
+ * top to bottom), the box and the mapping in that image's pixels; px NULL: drawn into a W × H image kept between calls and
+ * not read back (a benchmark's timing). 0 ok. */
+int  gpu_frost_image(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh,
+                     float bx, float by, float bw, float bh, float rad, int blur, uint32_t *px, int W, int H);
+
 /* The remote desktop's copy of the next composed frame (docs/REMOTE.md, "Video (WebRTC)"): the
  * next gpu_frame of a w×h display reads the whole frame back into px (0xAARRGGBB, rows top to
  * bottom) before showing it; gpu_read_done says whether it did. */

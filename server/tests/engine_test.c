@@ -73,6 +73,16 @@ void wl_paint_begin(void) { nwdraw = 0; }
 void wl_paint_save(void) { nwsaved = nwdraw; memcpy(wsaved, wdraw, sizeof *wdraw * (size_t)nwdraw); }
 void wl_paint_restore(void) { nwdraw = nwsaved; memcpy(wdraw, wsaved, sizeof *wdraw * (size_t)nwsaved); }
 void wl_paint_popups(Canvas *c) { (void)c; }
+/* the GPU's frosted glass (paint.c frost_source → wl.c wl_paint_frost): noted here, as wl.c notes it for layer 0 */
+static int frost_calls, frost_node, frost_src_seen;
+int wl_paint_frost(int src, int node, float x, float y, float w, float h, float rad, float blur) {
+    (void)x; (void)y; (void)w; (void)h; (void)rad; (void)blur;
+    if (!test_gpu) return 0;
+    frost_calls++;
+    frost_node = node;
+    frost_src_seen = src;
+    return 1;
+}
 void wl_tf_begin(int node, float sx, float sy, float tx, float ty, float op, int skip) { (void)node; (void)op; (void)skip; wtf.begins++; wtf.sx = sx; wtf.sy = sy; wtf.tx = tx; wtf.ty = ty; wtf_on = 1; }
 void wl_tf_end(void) { wtf.ends++; wtf_on = 0; }
 void wl_tf_nested(int d) { (void)d; }
@@ -4472,6 +4482,87 @@ static void test_blit_crop(void) {
 }
 
 #ifndef ENGINE_BEFORE
+/* (ws170 QA BUG-14) the GPU's frosted glass over a moving wallpaper (paint.c frost_source, docs/MOVING-WALLPAPERS.md):
+ * on the GPU path a frosted node whose only backdrop is the GPU-drawn picture is handed to the GPU (wl_paint_frost)
+ * and is no strip the CPU repaints with each frame (paint_blurs_over); one with something else under it (a desktop
+ * icon, another window's shadow, a rounded clip around it) stays the CPU's, and so does everything without the switch,
+ * on the CPU path and in a capture */
+static void test_gpu_frost(void) {
+    enum { W = 800, H = 600 };
+    ui_reset();
+    static uint8_t ring[4];
+    mv_src = (MediaSrc){ .used = 1, .id = MV_MEDIA_ID, .kind = SK_PLAYER, .sock = -1, .cur_slot = -1, .map = ring, .w = W, .h = H };
+    mv_src.view.bg = 0xff000000u;
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xff202020);
+    Node *wall = box_in(root, 0, 0, W, H, 0xff303030);              /* the still wallpaper under it */
+    Node *video = node_new(NODE_MEDIA);
+    node_append(wall, video);
+    ss(video, "position", "absolute");
+    sn(video, "left", 0); sn(video, "top", 0); sn(video, "width", W); sn(video, "height", H);
+    video->term = MV_MEDIA_ID;
+    Node *icon = box_in(root, 420, 120, 48, 48, 0xffe0a020);       /* a desktop icon */
+    Node *dock = box_in(root, 200, 520, 400, 64, 0x80ffffff);
+    sn(dock, "borderRadius", 16); sn(dock, "backdropBlur", 20);
+    Node *win = box_in(root, 400, 100, 300, 200, 0xc0202024);       /* over the icon */
+    sn(win, "borderRadius", 10); sn(win, "backdropBlur", 20);
+    Node *bar = box_in(root, 0, 0, W, 24, 0x99202020);
+    sn(bar, "backdropBlur", 20);
+    /* the GPU draws the picture this paint, all of it on the node's box */
+    mv_src.nv = 1; mv_src.gtex = (GpuTex *)ring; mv_src.gpu_drawn = 1;
+    mv_src.map_ok = 1; mv_src.map_w = W; mv_src.map_h = H; mv_src.map_fx = 0; mv_src.map_fy = 0; mv_src.map_kx = 1.0f / W; mv_src.map_ky = 1.0f / H;
+    int was_gpu = test_gpu;
+    test_gpu = 1;
+    paint_gpu_frost = 1;
+    frost_calls = 0;
+    render(root, W, H);
+    media_src_view_note(&mv_src, video->id, W, H);
+    Box b[8];
+    int n = paint_blurs_over(video, b, 8);
+    CHECK(frost_calls == 2, "the Dock and the menu bar go to the GPU, the window over the icon doesn't: %d", frost_calls);
+    CHECK(n == 1 && b[0].x0 >= 340 && b[0].x1 <= 760 && b[0].y0 >= 40 && b[0].y1 <= 360, "the CPU repaints only the window's strip with each frame: %d", n);
+    /* the icon moves away: the window's backdrop is the picture alone */
+    sn(icon, "left", 20);
+    frost_calls = 0;
+    render(root, W, H);
+    CHECK(frost_calls == 3 && paint_blurs_over(video, b, 8) == 0, "nothing left for the CPU: %d calls", frost_calls);
+    /* a shadow reaching under the menu bar keeps it on the CPU */
+    sn(win, "top", 40); sn(win, "shadowColor", 0x66000000); sn(win, "shadowBlur", 24); sn(win, "shadowOffsetY", 8);
+    frost_calls = 0;
+    render(root, W, H);
+    n = paint_blurs_over(video, b, 8);
+    CHECK(frost_calls == 2 && n == 1, "the shadow under the menu bar: the bar stays on the CPU (%d to the GPU, %d strips)", frost_calls, n);
+    /* without the switch, on the CPU path, in a capture: never */
+    paint_gpu_frost = 0;
+    frost_calls = 0;
+    render(root, W, H);
+    CHECK(frost_calls == 0 && paint_blurs_over(video, b, 8) == 3, "switched off: every frosted node is the CPU's (%d)", frost_calls);
+    paint_gpu_frost = 1;
+    test_gpu = 0;
+    frost_calls = 0;
+    render(root, W, H);
+    CHECK(frost_calls == 0, "the CPU path: %d", frost_calls);
+    test_gpu = 1;
+    paint_capture_mode = 1;
+    frost_calls = 0;
+    render(root, W, H);
+    paint_capture_mode = 0;
+    CHECK(frost_calls == 0, "a capture: %d", frost_calls);
+    /* the picture not drawn by the GPU (a frame it couldn't import): the CPU's */
+    mv_src.gpu_drawn = 0;
+    frost_calls = 0;
+    paint_damage(root);
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    CHECK(paint_blurs_over(video, b, 8) == 3, "no GPU picture: every strip the CPU's");
+    paint_gpu_frost = 0;
+    test_gpu = was_gpu;
+    memset(&mv_src, 0, sizeof mv_src);
+    ui_reset();
+}
+#endif
+
+#ifndef ENGINE_BEFORE
 /* (ws170 QA BUG-14) the frosted strips over a GPU-drawn moving wallpaper: a blurred node whose background is opaque is
  * not one (its blur never shows), and a new frame repaints them at most every media_blur_interval_ms(), the last frame
  * always reaching them once its time comes */
@@ -4536,10 +4627,13 @@ static void bench_motion(void) {
     ui_reset();
     Node *root = view(NULL);
     ui.root = root;
-    Node *video = view(root);
+    static uint8_t ring[4];
+    mv_src = (MediaSrc){ .used = 1, .id = MV_MEDIA_ID, .kind = SK_PLAYER, .sock = -1, .cur_slot = -1, .map = ring, .w = 3840, .h = 2160 };
+    Node *video = node_new(NODE_MEDIA);                 /* the moving wallpaper (engine-test's media_paint: an opaque frame) */
+    node_append(root, video);
     ss(video, "position", "absolute");
     sn(video, "left", 0); sn(video, "top", 0); sn(video, "width", 3840); sn(video, "height", 2160);
-    sn(video, "backgroundColor", 0xff204060);
+    video->term = MV_MEDIA_ID;
     const float frost = 30;
     Node *bar = view(root);
     ss(bar, "position", "absolute");
@@ -4556,7 +4650,7 @@ static void bench_motion(void) {
         sn(w, "backgroundColor", 0xd0202024); sn(w, "borderRadius", 12); sn(w, "backdropBlur", frost);
         sn(w, "shadowColor", 0x66000000); sn(w, "shadowBlur", 24); sn(w, "shadowOffsetY", 8);
         sn(w, "padding", 12); sn(w, "gap", 4); ss(w, "overflow", "hidden");
-        for (int r = 0; r < wins[k].rows; r++) text(w, "lordbasex@master-lordos:~$ pt standard caro_davy anna eve jane giovanni vera", 14);
+        for (int r = 0; r < (getenv("BENCH_NO_TEXT") ? 0 : wins[k].rows); r++) text(w, "lordbasex@master-lordos:~$ pt standard caro_davy anna eve jane giovanni vera", 14);
     }
     Node *widget = view(root);
     ss(widget, "position", "absolute");
@@ -4578,6 +4672,8 @@ static void bench_motion(void) {
     paint_root_clear(&c, root, 0);
     Box boxes[32];
     int nb = paint_blurs_over(video, boxes, 32);
+    /* BENCH_NO_BLUR: the same boxes repainted without their blur (what the content alone costs) */
+    if (getenv("BENCH_NO_BLUR")) for (Node *ch = root->first; ch; ch = ch->next) ch->s.backdrop_blur = 0;
     double area = 0;
     for (int i = 0; i < nb; i++) area += (double)(boxes[i].x1 - boxes[i].x0) * (boxes[i].y1 - boxes[i].y0);
     enum { N = 31 };
@@ -4601,6 +4697,37 @@ static void bench_motion(void) {
     printf("motion: %d frosted boxes over the video, %.1f Mpx; one refresh %.2f ms; main thread per display: "
            "%.0f %% at 30 frames/s (every frame), %.0f %% at %.1f refreshes/s (every %d ms)\n",
            nb, area / 1e6, ms, ms * 30 / 10, ms * after_hz / 10, after_hz, every);
+    /* the GPU path (paint.c frost_source): the picture drawn by the GPU, its frosted nodes handed to it; what the CPU still
+     * repaints with each frame is what paint_blurs_over leaves */
+    mv_src.nv = 1; mv_src.gtex = (GpuTex *)ring; mv_src.gpu_drawn = 1;
+    mv_src.map_ok = 1; mv_src.map_w = W; mv_src.map_h = H; mv_src.map_kx = 1.0f / W; mv_src.map_ky = 1.0f / H;
+    int was_gpu = test_gpu;
+    test_gpu = 1;
+    paint_gpu_frost = 1;
+    frost_calls = 0;
+    ui.damage = (Box){ 0, 0, (float)W, (float)H };
+    paint_root_clear(&c, root, 0);
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    int gpu_boxes = frost_calls, left = paint_blurs_over(video, boxes, 32);
+    double gms = 0;
+    for (int f = 0; f < N; f++) {
+        double a = now_ms();
+        for (int i = 0; i < left; i++) {
+            ui.damage = boxes[i];
+            canvas_set_clip(&c, (Rect){ (int)boxes[i].x0, (int)boxes[i].y0, (int)boxes[i].x1, (int)boxes[i].y1 });
+            paint_root_clear(&c, root, 0);
+        }
+        canvas_set_clip(&c, (Rect){ 0, 0, W, H });
+        v[f] = now_ms() - a;
+    }
+    gms = median(v, N);
+    printf("motion, GPU frosted glass: %d of the %d frosted boxes blurred by the GPU, %d left to the CPU; a video frame costs "
+           "the main thread %.2f ms (%.0f %% at 30 frames/s per display; the GPU's own work: build/motion-bench frost)\n",
+           gpu_boxes, nb, left, gms, gms * 30 / 10);
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    paint_gpu_frost = 0;
+    test_gpu = was_gpu;
+    memset(&mv_src, 0, sizeof mv_src);
     free(px);
 }
 #endif
@@ -4650,6 +4777,7 @@ int main(int argc, char **argv) {
     test_minimize_damage();
     test_hidden_blur_damage();
     test_motion_blur_refresh();
+    test_gpu_frost();
     test_gscissor_unit();
     test_gcontend();
     memset(&gc_all, 0, sizeof gc_all);

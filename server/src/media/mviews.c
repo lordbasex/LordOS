@@ -272,6 +272,25 @@ double media_src_blur_due(MediaSrc *s, double now) {
     return left < 1 ? 1 : left;
 }
 
+/* A moving wallpaper's view drawn by the GPU this paint (an NV12 source with its texture, gpu_drawn) whose picture covers
+ * the logical box x0…y1 on node, opaque and unrounded: its source id, else 0. ui/paint.c then lets the GPU blur it under
+ * a frosted node there (wl_paint_frost). */
+int media_frost_source(int node, float x0, float y0, float x1, float y1) {
+    for (int i = 0; i < MEDIA_MAX_SRC; i++) {
+        MediaSrc *s = media_src_at(i);
+        if (!s || s->kind != SK_PLAYER || !s->nv || !s->gtex || !s->gpu_drawn || !s->map_ok || s->map_w <= 0 || s->map_h <= 0) continue;
+        for (int v = 0; v < MEDIA_VIEW_NODES; v++) {
+            Node *n = plain_node(s, v);
+            if (!n || n->id != node || n->s.radius > 0 || n->crop) continue;
+            for (Node *p = n; p; p = p->parent) if (p->s.opacity < 0.999f || p->s.display_none) return 0;
+            float px0 = n->ax + s->map_fx * n->w, py0 = n->ay + s->map_fy * n->h;
+            float px1 = px0 + s->map_w * s->map_kx * n->w, py1 = py0 + s->map_h * s->map_ky * n->h;
+            return x0 >= px0 - 0.5f && y0 >= py0 - 0.5f && x1 <= px1 + 0.5f && y1 <= py1 + 0.5f ? s->id : 0;
+        }
+    }
+    return 0;
+}
+
 /* The frame of a video or of the camera covers its whole box (the bands are painted opaque): if everything
  * that changed is inside, what's beneath that node isn't visible. Any of the source's plain nodes: each one is a
  * whole copy of the picture (one per display, a moving wallpaper), and paint.c asks with one display's damage. */

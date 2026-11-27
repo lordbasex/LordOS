@@ -124,6 +124,9 @@ void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, f
  * window: box and picture in the canvas's physical px, the part of the picture (s*, picture px). 0: paint it by CPU */
 int  wl_paint_media(Canvas *c, int src, int node, float bx, float by, float bw, float bh, float px, float py, float pw, float ph,
                     float sx, float sy, float sw, float sh, float op);
+/* GPU path: a frosted node whose only backdrop is such a picture, blurred by the GPU over it (gpu_draw_frosted); logical
+ * box, radius and blur. 0: the caller blurs on the CPU */
+int  wl_paint_frost(int src, int node, float x, float y, float w, float h, float rad, float blur);
 void wl_paint_popups(Canvas *c);
 
 /* Presentation (main.c). */

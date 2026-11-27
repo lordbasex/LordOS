@@ -297,7 +297,9 @@ static int npopups;
 /* GPU path: what is drawn below (layer 0) and above (layer 1) the UI, in order */
 /* sx, sy: a transformed window's scale. media: a media node's GPU picture (wl_paint_media) instead of a surface: the
  * source's id, its size here (mw × mh, logical) and the part of its texture (msx, msy, msw × msh, picture pixels) */
-typedef struct { int sid; float x, y; Rect clip; float op; float sx, sy; int media; float mw, mh, msx, msy, msw, msh; } Draw;
+/* frost: a frosted node over that picture (wl_paint_frost): its box (fx, fy, fw × fh, logical), corner radius and blur */
+typedef struct { int sid; float x, y; Rect clip; float op; float sx, sy; int media; float mw, mh, msx, msy, msw, msh;
+                 int frost; float fx, fy, fw, fh, frad, fblur; } Draw;
 static Draw draws[2][128];
 static int ndraws[2];
 static int need_frame;              /* an app changed its content: must present */
@@ -4888,6 +4890,36 @@ int wl_paint_media(Canvas *c, int src, int node, float bx, float by, float bw, f
     return 1;
 }
 
+/* A frosted node (a backdrop blur) whose only backdrop is a GPU picture already noted for layer 0 on this display (ui/paint.c
+ * decides that): noted after it, so the GPU blurs that picture into the node's box with each frame (gpu_draw_frosted)
+ * and the CPU neither copies the picture's rows nor blurs them. Logical box, radius and blur. 0: not noted (no such
+ * picture here, inside a transform, the list full): the caller blurs on the CPU. */
+int wl_paint_frost(int src, int node, float x, float y, float w, float h, float rad, float blur) {
+    if (!gpu_active() || paint_capture_mode || tfv.on || src <= 0 || w <= 0 || h <= 0 || ndraws[0] >= 128) return 0;
+    const Draw *v = NULL;
+    for (int i = ndraws[0] - 1; i >= 0 && !v; i--)
+        if (draws[0][i].media == src && !draws[0][i].frost && draws[0][i].sx == 1 && draws[0][i].sy == 1) v = &draws[0][i];
+    if (!v || x < v->x - 0.5f || y < v->y - 0.5f || x + w > v->x + v->mw + 0.5f || y + h > v->y + v->mh + 0.5f) return 0;
+    Draw d = *v;
+    d.frost = 1;
+    d.fx = x; d.fy = y; d.fw = w; d.fh = h; d.frad = rad; d.fblur = blur;
+    Rect box = { (int)floorf(x), (int)floorf(y), (int)ceilf(x + w), (int)ceilf(y + h) };
+    d.clip = rect_and(rect_and(v->clip, node_clip(node)), box);
+    draws[0][ndraws[0]++] = d;
+    return 1;
+}
+
+static void draw_frost(const Draw *d) {
+    int flip = 0;
+    GpuTex *t = media_gpu_tex(d->media, &flip);
+    if (!t) return;
+    float sy = d->msy, sh = d->msh;
+    if (flip) { sy = d->msy + d->msh; sh = -d->msh; }
+    float k = paint_view.k;
+    gpu_draw_frosted(t, PVX(d->x), PVY(d->y), d->mw * k, d->mh * k, d->msx, sy, d->msw, sh,
+                     PVX(d->fx), PVY(d->fy), d->fw * k, d->fh * k, d->frad * k, (int)(d->fblur * k + 0.5f), phys_rect(d->clip));
+}
+
 int wl_gpu_layers_empty(void) { float x, y; return !ndraws[0] && !ndraws[1] && !fs_surf && !npopups && !dnd_icon_at(&x, &y); }
 
 void wl_gpu_draw_layer(int layer) {
@@ -4895,7 +4927,7 @@ void wl_gpu_draw_layer(int layer) {
     if (layer == 0) {
         for (int i = 0; i < ndraws[0]; i++) {
             Draw *d = &draws[0][i];
-            if (d->media) { draw_media(d); continue; }
+            if (d->media) { if (d->frost) draw_frost(d); else draw_media(d); continue; }
             Surf *s = find(d->sid);
             if (!s || !s->content) continue;
             if (d->sx == 1 && d->sy == 1) { draw_surface(s, d->x, d->y, (float)s->lw, (float)s->lh, d->clip, d->op * surf_alpha(s)); continue; }

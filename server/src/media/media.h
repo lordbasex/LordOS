@@ -65,6 +65,8 @@ unsigned media_cursor_serial(void);
 
 /* Opaque media node that contains the whole region (x0,y0)-(x1,y1), to paint only from it (paint.c). 0 if there is none. */
 int  media_cover_node(float x0, float y0, float x1, float y1);
+/* a moving wallpaper's GPU-drawn view on node whose picture covers that logical box: its source id (paint.c's GPU frost) */
+int  media_frost_source(int node, float x0, float y0, float x1, float y1);
 
 /* captures (main.c): after painting the scene and after assembling each frame. */
 void media_scene_painted(const Canvas *scene);

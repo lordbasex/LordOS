@@ -72,6 +72,7 @@ static int tf_self, tf_unit;    /* the transformed node being rasterized; the on
 int paint_tf_nocache;           /* tests: transformed subtrees rasterized again, the cache untouched */
 static int tf_nest;             /* > 0: painting into a transformed node's raster, not the canvas */
 static int blur_from_cache(Canvas *c, const Node *n);
+static int frost_source(const Node *n);
 static void blur_to_cache(Canvas *c, const Node *n, float x, float y, float w, float h, int radius);
 static void below_note_blur(float x, float y, float w, float h, int radius);
 static void below_note_affine(const float fwd[6], int sw, int sh);
@@ -205,8 +206,12 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
 
     if (own && s->backdrop_blur >= 1) {
         if (below_collect && !tf_nest) below_note_blur(x, y, w, h, (int)(s->backdrop_blur * k + 0.5f));
+        /* only a moving wallpaper drawn by the GPU below it: the GPU blurs it there with each frame (wl_paint_frost), the
+         * canvas keeps the transparent hole the picture left, and the node's own paint goes over it */
+        int src = corners_differ ? 0 : frost_source(n);
+        if (src && wl_paint_frost(src, n->id, n->ax, n->ay, n->w, n->h, s->radius, s->backdrop_blur)) paint_frost_gpu++;
         /* what is below unchanged since it was blurred: the blurred pixels kept ("Blurred backdrop cache") */
-        if (!blur_from_cache(c, n)) {
+        else if (!blur_from_cache(c, n)) {
             PROF(1, canvas_backdrop_blur(c, x, y, w, h, rad, (int)(s->backdrop_blur * k + 0.5f)));
             blur_to_cache(c, n, x, y, w, h, (int)(s->backdrop_blur * k + 0.5f));
         }
@@ -2216,6 +2221,62 @@ int paint_node_hidden(const Node *target) {
 /* The nodes with a backdrop blur painted over target (after it in paint order) that meet its box: each one's box and the
  * margin its blur reads (blur_near), cut to target's box, at most max. A moving wallpaper drawn by the GPU below the UI
  * keeps the CPU's pixels there, so the Dock and the menu bar still blur it (media/mview.c). Their count (≤ max). */
+/* ---- frosted glass on the GPU (docs/MOVING-WALLPAPERS.md, "The frosted surfaces over the video") ----
+ * A frosted node whose backdrop is nothing but a moving wallpaper the GPU draws below the UI (wl_paint_media) is blurred
+ * by the GPU from the picture's texture with each frame (wl_paint_frost, gpu_draw_frosted): a new frame then costs the
+ * CPU nothing there, no rows read back and no repaint (ws170 QA BUG-14). Decided in paint order: the picture's view
+ * must cover the node's box, and nothing painted after it and before the node may reach that box (another window, its
+ * shadow, a desktop icon, an ancestor's background, an app window): those are only in the CPU's canvas, so the CPU
+ * blurs then, as always. Never in a capture, a transform, a per-corner radius or an ancestor's rounded clip, and only
+ * while paint_gpu_frost is on (main.c: a GPU display, no remote viewer or recording reading the canvas). */
+int paint_gpu_frost;
+long paint_frost_gpu;
+/* does m paint anything of its own (not its children)? */
+static int paints_self(const Node *m) {
+    const Style *s = &m->s;
+    if (m->type != NODE_VIEW || (s->bg >> 24) || s->has_gradient || s->backdrop_blur >= 1) return 1;
+    if ((s->shadow_color >> 24) && (s->shadow_blur > 0 || s->shadow_x || s->shadow_y)) return 1;
+    if (s->ext && (s->ext->wavy >> 24)) return 1;
+    for (int e = 0; e < 4; e++) if (node_border(m, e) > 0) return 1;
+    return 0;
+}
+/* the box m paints in, with its shadow's reach */
+static Box paint_reach(const Node *m) {
+    float e = 1;
+    if ((m->s.shadow_color >> 24) && (m->s.shadow_blur > 0 || m->s.shadow_x || m->s.shadow_y))
+        e += m->s.shadow_blur * 2 + fmaxf(fabsf(m->s.shadow_x), fabsf(m->s.shadow_y));
+    return (Box){ m->ax - e, m->ay - e, m->ax + m->w + e, m->ay + m->h + e };
+}
+typedef struct { const Node *n; Box b; int src, bad, done, steps; } FrostWalk;
+static void frost_walk(Node *m, FrostWalk *w) {
+    if (w->done || m->type == NODE_RAW || m->s.display_none || m->s.opacity <= 0.004f) return;
+    if (++w->steps > 20000) { w->bad = 1; w->done = 1; return; }
+    if (m == w->n) { w->done = 1; return; }
+    int anc = 0;
+    for (const Node *p = w->n->parent; p && !anc; p = p->parent) anc = p == m;
+    if (m->own_tf) {                                    /* a turned or scaled node: its raster isn't this canvas */
+        if (anc || box_meets(paint_reach(m), w->b)) { w->bad = 1; w->done = 1; return; }
+        return;
+    }
+    if (anc && m->s.overflow_hidden && m->s.radius > 0) { w->bad = 1; w->done = 1; return; }    /* its rounded clip */
+    if (box_meets(paint_reach(m), w->b)) {
+        int src = m->type == NODE_MEDIA ? media_frost_source(m->id, w->b.x0, w->b.y0, w->b.x1, w->b.y1) : 0;
+        if (src) { w->src = src; w->bad = 0; return; }    /* the picture: what was painted before it is under it */
+        if (paints_self(m)) w->bad = 1;                    /* over the picture (or under it, until it comes) */
+    }
+    Node *kids[MAX_KIDS];
+    int nk = node_children_ordered(m, kids, MAX_KIDS);
+    for (int i = 0; i < nk && !w->done; i++) frost_walk(kids[i], w);
+}
+static int frost_source(const Node *n) {
+    if (!paint_gpu_frost || paint_capture_mode || tf_nest || !n || n->s.backdrop_blur < 1 || !gpu_active() || !ui.root) return 0;
+    if (!node_edges_plain(n) || n->own_tf) return 0;
+    FrostWalk w = { .n = n, .b = { n->ax, n->ay, n->ax + n->w, n->ay + n->h } };
+    if (w.b.x1 <= w.b.x0 || w.b.y1 <= w.b.y0) return 0;
+    frost_walk(ui.root, &w);
+    return w.done && !w.bad ? w.src : 0;
+}
+
 /* A blurred node whose own background is opaque (no gradient, no transparency in it or above it) covers its blur
  * entirely: what moves under it never shows, so a new video frame need not repaint it (ws170 QA BUG-14). */
 static int blur_covered(const Node *n) {
@@ -2226,7 +2287,7 @@ static int blur_covered(const Node *n) {
 static void blurs_after(Node *n, const Node *target, Box d, int *seen, Box *out, int max, int *k) {
     if (n->type == NODE_RAW || n->s.display_none || *k >= max) return;
     if (n == target) { *seen = 1; return; }
-    if (*seen && n->s.backdrop_blur >= 1 && n->s.opacity > 0.004f && !blur_covered(n)) {
+    if (*seen && n->s.backdrop_blur >= 1 && n->s.opacity > 0.004f && !blur_covered(n) && !frost_source(n)) {
         Box b = n->prev_box;
         if (b.x1 <= b.x0 || b.y1 <= b.y0) b = (Box){ n->ax, n->ay, n->ax + n->w, n->ay + n->h };
         if (b.x1 > b.x0 && b.y1 > b.y0 && box_meets(b, d)) {

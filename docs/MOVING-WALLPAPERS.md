@@ -52,22 +52,37 @@ the video: those rows alone are converted (or read back from the GPU) and those 
 Those strips were repainted with **every** frame: with a 4K wallpaper on three 4K displays, Settings, Files, Notes and
 the Terminal open and translucent widgets, lord-server averaged 145 % of a core (its main thread about 80 %: clearing,
 re-blurring and repainting every frosted window, the menu bar, the Dock and the widgets, and reading the video's rows
-back from the GPU for them, `gpu_tex_read_rows`). Since then:
+back from the GPU for them, `gpu_tex_read_rows`). Profiling one 4K display's strips showed where: of a 32 ms refresh,
+about 22 ms were the blur itself and 2 ms the text; caching the windows' content apart from their backdrop would have
+saved little. So the blur moved to the GPU:
 
-- **At most every 200 ms** (`MEDIA_BLUR_MS`, `media_src_blur_frame` in `mviews.c`; `LORD_MOTION_BLUR_MS`, 0 = every
-  frame as before): a new frame repaints the strips only when the last refresh is that old; otherwise it waits
-  (`blur_pending`), and the main loop's ambient tick refreshes it once its time comes (`media_src_blur_due`), so the
-  last frame shown is always blurred too. The video itself still plays at its own rate on the GPU; only its blurred
-  copy behind frosted glass steps at 5 refreshes a second, which a 30 px blur hides.
-- **A blurred node with an opaque background is not a strip** (`blur_covered` in `paint.c`): its blur never shows, so a
-  new frame doesn't repaint it.
+- **The GPU's frosted glass** (`gpu_draw_frosted` in `gpu/gpu.c`; `wl_paint_frost` in `wl/wl.c`; `frost_source` in
+  `ui/paint.c`). On a GPU display, a frosted node whose backdrop is nothing but the moving wallpaper the GPU draws below
+  the UI is not blurred by the CPU: the canvas keeps the transparent hole the picture left, the node's own background
+  and content are painted over it as always, and the node is noted in layer 0 right after the picture. With each
+  composed frame the GPU takes the picture's part under the box (and twice the radius around it) from its texture at
+  1/4 (or 1/2) of the size, blurs it across and down with one Gaussian of the variance of the CPU's three box passes,
+  and draws it into the box with a rounded mask; the UI texture goes over it. A new video frame then costs the CPU
+  nothing there: no strip is damaged (`paint_blurs_over` leaves these nodes out), no row is read back, nothing is
+  repainted or uploaded. The decision is made in paint order and is the same for the picture's strips and the node's
+  paint: the picture's view must cover the node's box, opaque and unrounded, and nothing painted after it and before
+  the node may reach the box (another window, its shadow, a desktop icon, an ancestor's background, an app window, a
+  transform, an ancestor's rounded clip); then the CPU blurs, as before. Never in a capture (screenshots, an agent's,
+  the protected-window fill), never while a remote viewer or a recording reads the canvas (`frost_want` in `main.c`:
+  turning it on or off repaints everything), never on a turned display; `LORD_GPU_FROST=0` turns it off.
+- **The CPU's strips that remain** (a frosted window over another one, a shadow under the menu bar) are repainted at
+  most every 200 ms (`MEDIA_BLUR_MS`, `media_src_blur_frame` in `mviews.c`; `LORD_MOTION_BLUR_MS`, 0 = every frame), the
+  last frame always reaching them through the ambient tick (`media_src_blur_due`).
+- **A blurred node with an opaque background is not a strip** (`blur_covered` in `paint.c`): its blur never shows.
 
-Measured with `build/engine-test bench-motion` (one 3840×2160 display at scale 1, the menu bar, the Dock, a widget and
-two frosted windows with text: 4.2 Mpx of strips; the video's read-back not counted): one refresh **31.7 ms**, so
-**95 % of a core per display at 30 frames/s** before and **16 % at 5 refreshes/s** after. What remains: each refresh
-still repaints a whole frosted window's content with its blur on the CPU (caching a node's content apart from its
-blurred backdrop, or blurring on the GPU, would remove that); and three displays' strips are refreshed in the same
-frame. The full desktop has not been measured again on the maintainer's three monitors yet.
+Measured: `build/engine-test bench-motion` (one 3840×2160 display at scale 1, the menu bar, the Dock, a widget and two
+frosted windows with text: 4.2 Mpx of strips; the read-back not counted) gives one CPU refresh of **31–32 ms, 92–97 %
+of a core per display at 30 frames/s** before; with the GPU's frosted glass all 5 boxes go to the GPU and a video frame
+costs the main thread **0 ms**. `build/motion-bench frost /dev/dri/renderD128` (the RX 580 of the development machine)
+checks the GPU's blur against `canvas_backdrop_blur` (mean difference 1.9–2.5 levels, largest 9, five boxes from 28 px
+bars to 900 × 600 windows) and times a 4K desktop's 5 boxes: **2.5 ms of GPU work a frame and 0.1 ms of CPU**. The
+full desktop has not been measured again on the maintainer's three monitors yet; the line to compare is `top` on
+lord-server with Settings, Files, Notes and the Terminal open.
 
 ## Each technique
 
@@ -217,8 +232,8 @@ Other runs, one view:
 
 "lord-server's frame work" is what the bench does per frame: in the BGRA rows a copy into each display's canvas and
 that canvas's upload, in the others one upload (NV12) or import (dmabuf) or nothing (cache), plus the shader pass. It
-leaves out what a real session adds on top: the blurred strips (repainted at most every 200 ms since the ws170 QA, per
-frame before; earlier still, with the
+leaves out what a real session adds on top: the blurred strips (since the ws170 QA blurred by the GPU where only the
+video is under them, and the CPU's at most every 200 ms; per frame before; earlier still, with the
 whole display's repaint around them) and composing the displays (GPU work, a few GL calls). So the session's 184 % is
 not this table's 19.6 %: most of it was repainting and uploading each whole display, which the GPU path no longer does.
 The full session with three monitors has **not** been measured yet: it needs the maintainer's desktop; the line to

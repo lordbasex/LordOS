@@ -3,6 +3,8 @@
  * surfaceless GPU context of a render node (gpu_init_offscreen): never a display, never the session's.
  *
  *   build/motion-bench check RENDER
+ *   build/motion-bench frost RENDER
+ *        the GPU's frosted glass (gpu_draw_frosted) against canvas_backdrop_blur, and its time for a 4K desktop's boxes
  *        the NV12 programs against the CPU's conversion (nv12.c), and a frame packed for the loop cache and drawn back
  *   build/motion-bench run RENDER FILE MODE VIEWS SECONDS [W H] [CAP]
  *        MODE: bgra    0.8.9.6's path: lord-media converts to BGRA; per view a copy into a display's canvas and its upload
@@ -272,12 +274,96 @@ static int run(const char *file, const char *mode, int views, double secs, int b
     return 0;
 }
 
+/* ---- frost: the GPU's frosted glass against the CPU's (gpu_draw_frosted, canvas_backdrop_blur) ----
+ * A 1920×1080 picture of soft colour bands and sharp squares; boxes like Flow's (the menu bar, the Dock, a window, a
+ * widget: radius 30, corners 0 to 20) blurred by the CPU over that picture and by the GPU from its texture. Inside each
+ * box (its rounded mask, the edge pixels left out) the mean difference must stay under 4 levels and no pixel may differ
+ * by more than 48 (the GPU's Gaussian is the three box passes' shape, not their arithmetic). Then the time of the GPU's
+ * work for a 4K desktop's boxes (glFinish included), what lord-server's main thread no longer does per video frame. */
+static int frost(void) {
+    enum { W = 1920, H = 1080 };
+    uint32_t *pic = malloc((size_t)W * H * 4), *cpu = malloc((size_t)W * H * 4), *gpu = malloc((size_t)W * H * 4);
+    if (!pic || !cpu || !gpu) return 1;
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++) {
+            int r = (x * 255) / W, g = (y * 255) / H, b = 128 + (int)(100 * sinf(x * 0.01f + y * 0.02f));
+            if (((x / 40) + (y / 40)) % 7 == 0) { r = 255 - r; g = 240; b = 20; }
+            pic[(size_t)y * W + x] = 0xff000000u | (uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b;
+        }
+    GpuTex *t = gpu_tex_pixels(NULL, pic, W, H, 1);
+    if (!t) { printf("frost: no texture\n"); return 1; }
+    static const struct { float x, y, w, h, r; int blur; } box[] = {
+        { 0, 0, 1920, 28, 0, 30 }, { 560, 980, 800, 84, 20, 30 }, { 200, 120, 900, 600, 12, 30 }, { 1500, 100, 360, 200, 18, 30 },
+        { 700, 300, 400, 300, 10, 8 },
+    };
+    int bad = 0;
+    for (size_t i = 0; i < sizeof box / sizeof box[0]; i++) {
+        memcpy(cpu, pic, (size_t)W * H * 4);
+        Canvas c;
+        canvas_init(&c, cpu, W, H, W);
+        canvas_backdrop_blur(&c, box[i].x, box[i].y, box[i].w, box[i].h, box[i].r, box[i].blur);
+        if (gpu_frost_image(t, 0, 0, W, H, 0, 0, W, H, box[i].x, box[i].y, box[i].w, box[i].h, box[i].r, box[i].blur, gpu, W, H)) {
+            printf("frost: the GPU could not draw box %zu\n", i);
+            bad++;
+            continue;
+        }
+        double sum = 0;
+        long n = 0;
+        int worst = 0;
+        float cx = box[i].x + box[i].w / 2, cy = box[i].y + box[i].h / 2, hw = box[i].w / 2, hh = box[i].h / 2, r = box[i].r;
+        for (int y = (int)box[i].y + 1; y < (int)(box[i].y + box[i].h) - 1; y++)
+            for (int x = (int)box[i].x + 1; x < (int)(box[i].x + box[i].w) - 1; x++) {
+                float qx = fabsf(x + 0.5f - cx) - (hw - r), qy = fabsf(y + 0.5f - cy) - (hh - r);
+                float d = sqrtf(fmaxf(qx, 0) * fmaxf(qx, 0) + fmaxf(qy, 0) * fmaxf(qy, 0)) + fminf(fmaxf(qx, qy), 0) - r;
+                if (d > -1.5f) continue;                /* the anti-aliased edge */
+                uint32_t a = cpu[(size_t)y * W + x], b = gpu[(size_t)y * W + x];
+                for (int k = 0; k < 24; k += 8) {
+                    int e = abs((int)((a >> k) & 255) - (int)((b >> k) & 255));
+                    sum += e;
+                    if (e > worst) worst = e;
+                }
+                n += 3;
+            }
+        double mean = n ? sum / n : 0;
+        int ok = n > 0 && mean < 4 && worst <= 48;
+        printf("frost: box %zu (%.0f×%.0f, radius %d, corners %.0f): mean difference %.2f, largest %d: %s\n", i, box[i].w, box[i].h,
+               box[i].blur, box[i].r, mean, worst, ok ? "ok" : "FAILED");
+        bad += !ok;
+    }
+    /* the time: a 4K desktop's boxes (as engine-test bench-motion's) drawn from a 3840×2160 picture, 60 times */
+    enum { BW = 3840, BH = 2160 };
+    uint32_t *big = calloc((size_t)BW * BH, 4), *img = malloc((size_t)BW * BH * 4);
+    GpuTex *bt = big ? gpu_tex_pixels(NULL, big, BW, BH, 1) : NULL;
+    if (bt && img) {
+        static const float k4[][5] = { { 0, 0, 3840, 28, 0 }, { 200, 120, 1600, 1000, 12 }, { 2000, 300, 1200, 800, 12 },
+                                       { 3300, 120, 360, 200, 18 }, { 1370, 2060, 1100, 84, 20 } };
+        gpu_frost_image(bt, 0, 0, BW, BH, 0, 0, BW, BH, 0, 0, 10, 10, 0, 30, img, BW, BH);     /* warm */
+        double t0 = now_ms(), c0 = self_cpu_ms();
+        enum { N = 60 };
+        for (int f = 0; f < N; f++)
+            for (int i = 0; i < 5; i++) gpu_frost_image(bt, 0, 0, BW, BH, 0, 0, BW, BH, k4[i][0], k4[i][1], k4[i][2], k4[i][3], k4[i][4], 30, NULL, BW, BH);
+        gpu_offscreen_finish();
+        double wall = (now_ms() - t0) / N, cpu_ms = (self_cpu_ms() - c0) / N;
+        printf("frost: a 4K desktop's 5 boxes on the GPU: %.2f ms a frame (GPU, glFinish), %.2f ms of this thread's CPU\n", wall, cpu_ms);
+    }
+    free(big);
+    free(img);
+    gpu_tex_free(bt);
+    gpu_tex_free(t);
+    free(pic);
+    free(cpu);
+    free(gpu);
+    printf("frost: %s\n", bad ? "FAILED" : "ok");
+    return bad ? 1 : 0;
+}
+
 int main(int argc, char **argv) {
-    if (argc < 3) { fprintf(stderr, "usage: motion-bench check RENDER | run RENDER FILE MODE VIEWS SECONDS [W H] [CAP]\n"); return 2; }
+    if (argc < 3) { fprintf(stderr, "usage: motion-bench check RENDER | frost RENDER | run RENDER FILE MODE VIEWS SECONDS [W H] [CAP]\n"); return 2; }
     int render = open(argv[2], O_RDWR | O_CLOEXEC);
     render_path = argv[2];
     if (render < 0 || gpu_init_offscreen(render)) { printf("skipped: needs a GPU render node with EGL (%s)\n", argv[2]); return 77; }
     if (!strcmp(argv[1], "check")) return check();
+    if (!strcmp(argv[1], "frost")) return frost();
     if (!strcmp(argv[1], "run") && argc >= 7)
         return run(argv[3], argv[4], atoi(argv[5]), atof(argv[6]), argc > 8 ? atoi(argv[7]) : 1920, argc > 8 ? atoi(argv[8]) : 1080,
                    argc > 9 ? atoi(argv[9]) : 0, render);
