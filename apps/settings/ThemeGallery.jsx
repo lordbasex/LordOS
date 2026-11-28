@@ -9,7 +9,7 @@
 // filters, order, arrow keys, the report's address) are sdk/themegallery.js.
 import {
   View, Text, useTheme, useLocale, themes, wm, spacing, typeScale, SearchField, Segmented, Button, DesktopStyleThumb,
-  direction, openUrl, lordosVersion, useKeyboard, FilePicker, WindowSheet, ConfirmDialog,
+  direction, openUrl, lordosVersion, useKeyboard, FilePicker, WindowSheet, ConfirmDialog, createStore, useStore,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { galleryEntry, filterGallery, filterCounts, gridStep, gridColumns, themeIssueUrl, GALLERY_FILTERS } from '../../sdk/themegallery.js';
@@ -39,8 +39,12 @@ function versionText() {
   try { const v = lordosVersion(); return `${v.version}${v.channel ? ` · ${v.channel}` : ''}`; } catch (e) { return ''; }
 }
 
-// The themes as gallery entries; read again on each render (cheap: a directory listing of a few themes).
+// The themes as gallery entries; read again on each render (cheap: a directory listing of a few themes). galleryRev:
+// bumped when something here changes a theme's record without changing this page's state (Try Again), so it renders
+// again (QA of 0.8.9.6.2: Try Again cleared the record but the card kept "Couldn't start" and a disabled Apply)
+const galleryRev = createStore(0);
 function useGallery() {
+  useStore(galleryRev);
   let version = '';
   try { version = lordosVersion().version; } catch (e) { version = ''; }
   return themes.list().map((th) => galleryEntry(th, { lordosVersion: version }));
@@ -127,7 +131,7 @@ function Failed({ e, current, small }) {
       </Text>
       <View style={{ flexDirection: 'row', gap: spacing.s }}>
         <Button small label={tr('settings.style.report')} onClick={report} />
-        {e.user && !small ? <Button small label={tr('settings.style.retry')} onClick={() => { themes.retry(e.id); setMsg(null); }} /> : null}
+        {e.user && !small ? <Button small label={tr('settings.style.retry')} onClick={() => { themes.retry(e.id); setMsg(null); galleryRev.set((n) => n + 1); }} /> : null}
       </View>
       {small ? null : <Note>{tr('settings.style.reportHint')}</Note>}
       {msg ? <Note tone="warn">{msg}</Note> : null}

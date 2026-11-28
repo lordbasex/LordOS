@@ -479,6 +479,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Settings → Appearance: Try Again on a theme that couldn't start takes effect at once** (seen on VM 127 while
+  checking BUG-H: Try Again cleared the theme's failure record, but the card kept "Couldn't start" and a disabled
+  Apply until the page was left and opened again). The gallery renders again after it (`galleryRev`).
 - **Notifications: a Linux or Flatpak app's buttons still work from the centre once its banner has gone** (BUG-J
   validation on VM 127 with ws173: GNOME Clocks from Flathub showed its timer and alarm notifications with its real
   icon, but the alarm's **Stop** in the notification centre did nothing). A banner whose time was up went with the
