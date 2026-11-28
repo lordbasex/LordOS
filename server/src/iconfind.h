@@ -32,7 +32,8 @@ int iconfind_app(const IconRoots *r, const char *name, char *out, size_t n);
 int iconfind_status(const IconRoots *r, const char *name, char *out, size_t n);
 
 /* Is the file (already through realpath) one lord-server may hand lord-media as an SVG icon? A .svg under the
- * system's or the user's icon folders, /usr/share, /usr/local/share or /opt (absolute Icon= paths). */
+ * system's or the user's icon folders, /usr/share, /usr/local/share or /opt (absolute Icon= paths), and a web app's
+ * icon folders (~/.cache/lordos/web/icons, ~/.config/lordos/web/icons). */
 int iconfind_svg_allowed(const char *real, const char *home);
 
 #endif

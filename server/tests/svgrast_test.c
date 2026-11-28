@@ -240,6 +240,44 @@ static void test_dirty_gradient(void) {
     CHECK(ok == 20, "a linear gradient drawn every time on reused memory (%d of 20)", ok);
 }
 
+/* the shape of WhatsApp's site icon (QA ws174: a web app's cached SVG): only a viewBox, a filter nanosvg ignores, a
+ * gradient fill by url(#id) in user space, arcs and an even-odd phone over the bubble. It must come back as a green
+ * picture, transparent in its corners. */
+static const char *whatsapp =
+    "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 175.216 175.552\">"
+    "<defs><linearGradient id=\"b\" x1=\"85.915\" x2=\"86.535\" y1=\"32.567\" y2=\"137.092\" gradientUnits=\"userSpaceOnUse\">"
+    "<stop offset=\"0\" stop-color=\"#57d163\"/><stop offset=\"1\" stop-color=\"#23b33a\"/></linearGradient>"
+    "<filter id=\"a\" width=\"1.115\" height=\"1.114\" x=\"-.057\" y=\"-.057\" color-interpolation-filters=\"sRGB\">"
+    "<feGaussianBlur stdDeviation=\"3.531\"/></filter></defs>"
+    "<path fill=\"#b3b3b3\" filter=\"url(#a)\" d=\"M54.532 138.45l2.235 1.324A74.6 74.6 0 1 0 31.1 113.6l1.4 2.2-6 21.9z\"/>"
+    "<path fill=\"#fff\" d=\"M12.966 161.238l10.439-38.114a73.42 73.42 0 1 1 29.4 28.6z\"/>"
+    "<path fill=\"url(#b)\" d=\"M23.5 150.5l7.6-27.7a63.5 63.5 0 1 1 22.1 21.3z\"/>"
+    "<path fill=\"#fff\" fill-rule=\"evenodd\" d=\"M68.772 55.603c-1.378-3.061-2.828-3.123-4.137-3.176l-3.524-.043"
+    "c-1.226 0-3.218.46-4.902 2.3s-6.435 6.287-6.435 15.332 6.588 17.785 7.506 19.013 12.718 20.381 31.405 27.75"
+    "c15.529 6.124 18.689 4.906 22.061 4.6s10.877-4.447 12.408-8.74 1.532-7.971 1.073-8.74-1.685-1.226-3.525-2.146"
+    "-10.877-5.367-12.562-5.981-2.91-.919-4.137.921-4.746 5.979-5.819 7.206-2.144 1.381-3.984.462-7.76-2.861-14.784-9.124"
+    "c-5.465-4.873-9.154-10.891-10.228-12.73s-.114-2.835.808-3.751c.825-.824 1.838-2.147 2.759-3.22s1.224-1.84 1.836-3.065"
+    ".307-2.301-.153-3.22-4.032-10.011-5.666-13.647z\"/></svg>";
+
+static void test_whatsapp(void) {
+    uint8_t *px = NULL;
+    int w = 0, h = 0;
+    double ms;
+    const char *e = raster(whatsapp, strlen(whatsapp), 64, -1, &px, &w, &h, &ms);
+    CHECK(!e && px, "whatsapp: %s", e ? e : "no pixels");
+    if (e || !px) return;
+    CHECK(w == 64 && h == 64, "whatsapp: %dx%d", w, h);
+    const uint8_t *corner = px;                                   /* top left: outside the bubble */
+    CHECK(corner[3] == 0, "whatsapp: the corner is painted (alpha %u)", corner[3]);
+    /* a point of the green bubble above and right of the phone, (135, 60) in the viewBox (premultiplied BGRA) */
+    const uint8_t *g = px + ((size_t)(60 * h / 175) * w + 135 * w / 175) * 4;
+    CHECK(g[3] > 200 && g[1] > g[2] + 40 && g[1] > g[0] + 40, "whatsapp: not green there (b %u g %u r %u a %u)", g[0], g[1], g[2], g[3]);
+    long painted = 0;
+    for (int i = 0; i < w * h; i++) painted += px[i * 4 + 3] > 0;
+    CHECK(painted > w * h / 2, "whatsapp: only %ld of %d pixels painted", painted, w * h);
+    free(px);
+}
+
 int main(void) {
     test_dirty_gradient();
     test_scan();
@@ -249,6 +287,7 @@ int main(void) {
     test_malformed();
     test_numbers();
     test_sizes();
+    test_whatsapp();
     if (fails) { printf("svgrast-test: %d failed\n", fails); return 1; }
     printf("svgrast-test: ok\n");
     return 0;

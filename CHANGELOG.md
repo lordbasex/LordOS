@@ -479,6 +479,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Web Apps: a site's SVG icon shows in the list** (QA on ws174: WhatsApp → Refresh icon kept
+  `~/.cache/lordos/web/icons/whatsapp.svg`, a valid picture, but its row stayed blank). lord-server hands lord-media
+  an SVG only from the folders `iconfind_svg_allowed` lists, and a web app's icon folders weren't among them, so the
+  picture was never asked for. `~/.cache/lordos/web/icons/` (the site's icon) and `~/.config/lordos/web/icons/` (the
+  registry's) are now; the file is still opened with `O_NOFOLLOW`, at most 1 MB, and drawn only by lord-media in its
+  sandbox (`server/src/iconfind.c`, `docs/MEDIA.md`). Tests: `build/iconfind-test` (the two folders, and paths beside
+  or out of them refused) and `build/svgrast-test` (a WhatsApp-shaped icon: viewBox only, a filter, a gradient by
+  `url(#id)`, arcs and an even-odd glyph, drawn green with clear corners).
 - **Ctrl+Alt+Shift+Backspace from Classic stays in Flow** (QA on ws174: Flow came up, then Classic again after about
   5 seconds). lord-server loads Flow without touching `settings.theme`, and Flow's `startShell` then asked for the theme
   still saved there. When lord-server says this desktop was loaded in place of the chosen one (`lord.themes.fellBack()`:

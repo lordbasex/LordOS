@@ -395,7 +395,7 @@ unmodified, approved on 2026-11-10); `lord-server` never parses an SVG.
   `src` is an `.svg` file, or `svg:<px>:<rrggbb|->:<absolute path>` (`sdk/iconsrc.js`: the size it's
   shown at times 2, 16–256 px, and for a symbolic icon the color), goes to `server/src/media/svgicon.c`.
 - **What lord-server does.** It checks the path after `realpath` (`iconfind_svg_allowed`: a `.svg`
-  under `/usr/share`, `/usr/local/share`, `/opt`, the Flatpak exports or the user's icon folders),
+  under `/usr/share`, `/usr/local/share`, `/opt`, the Flatpak exports, the user's icon folders or a web app's icon folders, `~/.cache/lordos/web/icons` and `~/.config/lordos/web/icons`),
   opens it with `O_NOFOLLOW`, checks it's a regular file of at most 1 MB and sends the fd in a
   `MW_SVG` job to the foreground worker (`v[1]` = side, `v[2]` = `0xRRGGBB` or -1). No path or
   parameter text goes to the helper. In app mode (`--app`) nothing is asked for.
