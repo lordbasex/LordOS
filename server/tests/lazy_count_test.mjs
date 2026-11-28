@@ -34,5 +34,15 @@ eq('invalidate reads again at once', [reads, c.peek()], [4, 1]);
 const e = lazyCount(() => { throw new Error('x'); }, { first: 0, now: () => t, later });
 e.get(); tick(0);
 eq('a read that throws counts as 0', e.peek(), 0);
+// a read that answers later (lord.pkg.upgradeCountAsync through sdk/fs.js workerReply)
+let settle = null, areads = 0;
+const a = lazyCount(() => { areads++; return new Promise((res, rej) => { settle = { res, rej }; }); }, { first: 0, ttl: 60000, now: () => t, later });
+a.get(); tick(0);
+eq('async: asked once, still the old value', [areads, a.get(), a.get(), timers.length], [1, 0, 0, 0]);
+settle.res(7); await null; await null;
+eq('async: the answer is the value', a.peek(), 7);
+tick(61000); a.get(); tick(0);
+settle.rej(new Error('busy')); await null; await null;
+eq('async: a failed read keeps the last value', [areads, a.peek()], [2, 7]);
 console.log(bad ? `lazy-count-test: ${bad}/${n} failed` : `lazy-count-test: ${n} ok`);
 process.exit(bad ? 1 : 0);

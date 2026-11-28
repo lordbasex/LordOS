@@ -275,6 +275,17 @@ was shared with builds). No native call over 50 ms in any of them; the only nati
 - Test: `tests/files_info_nofreeze.sh` (in `make test`, about 30 s) opens Get Info twice on a home folder of 100 000
   files and fails on a `call fs.du` stall line, a card that never shows the size, or an opening over 250 ms.
 
+## The Raspberry Pi's session start (0.8.9.6.2)
+
+The ws171 QA on a Raspberry Pi 5 (SD card) logged a 1095 ms first `__lordTick` of the shell. Slow native calls' stall
+lines now carry their JavaScript caller (the stall detector above), which named the work inside it:
+
+| What | Before | After | What it was |
+|---|---|---|---|
+| The shell's first `__lordTick` | 1095 | 92–100 (two boots) | `fs.recent` (1006 ms; now `recentCached` on the workers), then `pkg.upgrades` (655 ms) |
+| `pkg.available` while the theme loads (`sdk/updates.js`) | 640 | under 0.1 | it opened the index; now only its header is read |
+| The crown menu's update count (`storeUpdates`) | 648 once, on the main thread | the call only | `lord.pkg.upgradeCountAsync` on a worker, 15 s after the start, then at most once a minute (`sdk/lazycount.js`) |
+
 ## What remains
 
 - Opening the Store builds its first page (about 1000 nodes) in one run of about 200 ms.

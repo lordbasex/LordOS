@@ -504,7 +504,7 @@ The queries read the index with mmap and `/var/lib/dpkg/status`, and reload by t
 these change. `lang` (`'es'`, `'pt'` or omitted) picks the AppStream name and description.
 
 ```js
-lord.pkg.available()            // true if there is already an index
+lord.pkg.available()            // true if there is already an index (only its header is read until a query opens it)
 lord.pkg.lastUpdate()           // seconds since 1970 (0: never)
 lord.pkg.sources()              // [{ uri, suite, component, codename, label, date, validUntil, priority, packages }]
 lord.pkg.search(q, { limit = 50, apps = false, every = false, section, lang })   // [Summary], sorted by relevance
@@ -513,6 +513,8 @@ lord.pkg.info(name, { lang })   // Summary + { description, homepage, arch, sour
                                 //   origin, appDescription, versions: [{ version, suite, size }] } | null
 lord.pkg.installed({ lang })    // [Summary] of everything installed
 lord.pkg.upgrades()             // [{ name, from, to, summary, suite, size }]
+lord.pkg.upgradeCountAsync()    // (0.8.9.6.2) req: upgrades().length counted on an fsasync.c worker with its own index
+                                //   and dpkg status, answered as __lordFsReply(req, { count }) (sdk/appcontrol.js storeUpdates)
 lord.pkg.plan({ install: [], remove: [], recommends, allowRemove, cascade, upgrade, keepOrphans })
     // { ok, error, items: [{ action: 'install'|'upgrade'|'remove', name, version, oldVersion, size,
     //   requested, reason }], held: [], download, installedDelta }   (bytes)

@@ -593,6 +593,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   cable is pulled frames are dropped, as on a real unplugged switch, and the member sends again once the link is made,
   whichever member started first. Nothing else changes: the port has no backend and reaches nothing. Test:
   `vm-whonix-xml` checks that each member's link hub has the peerless port. Checked on VM 116: the Workstation alone for ten minutes (`ip neigh` INCOMPLETE), then its "Start Gateway" bar: 10.152.152.10 REACHABLE and Tor's check `IsTor: true`.
+- **The crown menu's update count is made on lord-server's workers** (`lord.pkg.upgradeCountAsync()`, answered through
+  `__lordFsReply` with `{ count }`). Deferring `lord.pkg.upgrades()` off the first render still held the Pi's main
+  thread 648 ms once, 15 s after the start; the worker opens its own copy of the package index and dpkg's status
+  (nothing of the interface's is shared), counts the installed packages with a newer candidate and closes them.
+  `storeUpdates()` uses it when present (`lazyCount` takes a Promise; a failed count keeps the last one) and falls back
+  to `upgrades()` elsewhere. On the Pi (ws173pi3, `docs/MAIN-THREAD.md`): first `__lordTick` 1095 → 100 ms, no
+  `pkg.*` stall left at the start, and the menu shows the count ("1 updates") once the worker answers. Tests:
+  `lazy-count-test` (async answers and failures).
 - **A slow native call's stall line now says who called it.** `lord-server: stall: N ms call <name>` past the stall
   limit (50 ms, `LORD_STALL_MS`) ends with the caller's JavaScript frames, as the `__lordTick` lines do (`js.c`
   `js_prof_wrap`, `JS_GetStackText`). The 0.8.9.6.2 QA's Pi start-up stalls named only `fs.recent`, `vm.list` and

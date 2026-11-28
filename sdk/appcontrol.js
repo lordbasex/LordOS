@@ -177,10 +177,18 @@ export function recentItems(n = 10) {
   return list.slice(0, n).map((f) => ({ label: f.name || fs.basename(f.path), onClick: () => openFileWithApps(f.path, f.name) }));
 }
 
-// The count is read off the shell's first render and then at most once a minute (lazycount.js): the menu bar builds the
-// crown menu on every render, and lord.pkg.upgrades() opens the package index and dpkg's status (655 ms of the first
-// __lordTick on the Raspberry Pi, QA 0.8.9.6.2). storeUpdatesCount is a store of it: what shows the number subscribes.
-const upgradesCount = lazyCount(() => (typeof lord !== 'undefined' && lord.pkg && typeof lord.pkg.upgrades === 'function' ? (lord.pkg.upgrades() || []).length : 0));
+// The count is read off the shell's first render and then at most once a minute (lazycount.js), on one of lord-server's
+// workers (lord.pkg.upgradeCountAsync): the menu bar builds the crown menu on every render, and lord.pkg.upgrades() on
+// the interface's thread opens the package index and dpkg's status (655 ms of the first __lordTick on the Raspberry Pi,
+// QA 0.8.9.6.2). storeUpdatesCount is a store of it: what shows the number subscribes.
+function readUpgradeCount() {
+  if (typeof lord === 'undefined' || !lord.pkg) return 0;
+  if (typeof lord.pkg.upgradeCountAsync === 'function') {
+    try { return fs.workerReply(lord.pkg.upgradeCountAsync()).then((r) => Number(r.count) || 0); } catch (e) { /* below */ }
+  }
+  return typeof lord.pkg.upgrades === 'function' ? (lord.pkg.upgrades() || []).length : 0;
+}
+const upgradesCount = lazyCount(readUpgradeCount);
 export const storeUpdatesCount = { get: () => upgradesCount.get(), subscribe: (fn) => upgradesCount.subscribe(fn) };
 export function storeUpdates() { return upgradesCount.get(); }
 export function storeUpdatesChanged() { upgradesCount.invalidate(); }

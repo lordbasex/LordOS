@@ -10,6 +10,8 @@
 #include "../pkg/match.h"
 #include "../pkg/resolve.h"
 #include "../pkg/status.h"
+#include "../fsasync.h"
+#include "js_err.h"
 
 #include <ctype.h>
 #include <fcntl.h>
@@ -304,6 +306,41 @@ static JSValue f_upgrades(JSContext *c, JSValueConst this_val, int argc, JSValue
         JS_SetPropertyUint32(c, arr, n++, o);
     }
     return arr;
+}
+
+/* upgradeCountAsync() -> req: how many installed packages have a newer candidate (upgrades().length), counted on an
+ * fsasync.c worker with its own index and dpkg status (nothing of this file's X/ST is touched there), answered as
+ * __lordFsReply(req, { count }). The crown menu's Store item and the Updates widget (sdk/appcontrol.js storeUpdates):
+ * upgrades() on this thread opened the index and dpkg's status and resolved every package, 650 ms on the Raspberry
+ * Pi (QA 0.8.9.6.2). arg: the native architecture, read here (pkg_native_arch caches it without a lock). */
+static char *upgrade_count_job(const char *arch) {
+    Idx x;
+    Status st;
+    memset(&st, 0, sizeof st);
+    long n = -1;
+    if (!idx_open(&x, PKG_DIR)) {
+        if (!status_load(&st, DPKG_STATUS, arch)) {
+            n = 0;
+            for (int i = 0; i < st.n; i++) {
+                const StPkg *p = &st.p[i];
+                long cand = pkg_candidate(&x, p->key, strlen(p->key), p);
+                if (cand >= 0 && ver_cmp(idx_s(&x, x.pkg[cand].version), p->version) > 0) n++;
+            }
+        }
+        status_free(&st);
+        idx_close(&x);
+    }
+    char *j = malloc(48);
+    if (j && n < 0) snprintf(j, 48, "{\"count\":0,\"error\":\"pkg.noIndex\"}");
+    else if (j) snprintf(j, 48, "{\"count\":%ld}", n);
+    return j;
+}
+static JSValue f_upgrade_count_async(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    char err[256] = "";
+    int req = fsasync_submit_fn(upgrade_count_job, pkg_native_arch(), err, sizeof err);
+    if (req < 0) return js_throw_line(c, err);
+    return JS_NewInt32(c, req);
 }
 
 static int names_of(JSContext *c, JSValueConst o, const char *k, char names[][129], int max) {
@@ -684,6 +721,7 @@ static const JSCFunctionListEntry pkg_funcs[] = {
     JS_CFUNC_DEF("info", 2, f_info),
     JS_CFUNC_DEF("installed", 1, f_installed),
     JS_CFUNC_DEF("upgrades", 0, f_upgrades),
+    JS_CFUNC_DEF("upgradeCountAsync", 0, f_upgrade_count_async),
     JS_CFUNC_DEF("plan", 1, f_plan),
     JS_CFUNC_DEF("orphans", 0, f_orphans),
     JS_CFUNC_DEF("apps", 1, f_apps),

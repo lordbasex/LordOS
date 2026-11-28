@@ -3,7 +3,7 @@
 // its next render; `subscribe` says when it changed.
 //
 //   lazyCount(read, { first, ttl, now, later })   → { get(), peek(), subscribe(fn), invalidate() }
-//     read    () => number (exceptions count as 0)
+//     read    () => number, or a Promise of one (an exception counts as 0; a rejection keeps the last value)
 //     first   ms before the first read (default 15 s: after the session's start, never inside it)
 //     ttl     ms a value stays fresh (default 60 s)
 //     now, later   Date.now and setTimeout (tests pass their own)
@@ -17,13 +17,19 @@ export function lazyCount(read, opts = {}) {
   const later = opts.later || ((fn, ms) => setTimeout(fn, ms));
   let value = 0, at = 0, pending = false, read0 = false;
   const subs = new Set();
-  const run = () => {
+  const apply = (v) => {
+    const n = Number(v) || 0;
     pending = false;
-    let n = 0;
-    try { n = Number(read()) || 0; } catch (e) { n = 0; }
     at = now();
     read0 = true;
     if (n !== value) { value = n; for (const fn of [...subs]) { try { fn(n); } catch (e) { /* a subscriber's own */ } } }
+  };
+  // read() may answer later (a Promise: a count made on one of lord-server's workers); one read at a time
+  const run = () => {
+    let r = 0;
+    try { r = read(); } catch (e) { r = 0; }
+    if (r && typeof r.then === 'function') r.then(apply, () => apply(value));   // a failed read keeps the last count
+    else apply(r);
   };
   const schedule = () => {
     if (pending || (read0 && now() - at < ttl)) return;
