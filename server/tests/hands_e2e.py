@@ -327,14 +327,23 @@ def capture_paths():
         time.sleep(1.5)
         t = a.text('read_window', window_id='monitor')
         # the first app row with a Rule switch, whatever it is on this computer (Machines on a PC with machines; another
-        # app or LordOS's own component elsewhere, as on a Raspberry Pi): a wide, row-high clickable under the tabs
+        # app or LordOS's own component elsewhere, as on a Raspberry Pi): a wide, row-high clickable under the tabs. An
+        # essential system service shows a dash instead of the switch and its "System" pill in the row's name: skipped
+        # (QA ws174: the first row was one, and the check looked for a switch that isn't there)
+        pills = set()
+        for lang in ('en', 'es', 'pt'):
+            try:
+                pills.add(json.load(open(os.path.join(ROOT, f'assets/locales/{lang}/monitor.json')))['net.system'])
+            except (OSError, KeyError, ValueError):
+                pass
         m = None
-        for mm in re.finditer(r'clickable "[^"]*" \[ref_\d+\] @(\d+),(\d+) (\d+)x(\d+)', t):
-            if int(mm.group(3)) >= 250 and 30 <= int(mm.group(4)) <= 60 and int(mm.group(2)) > 150:
+        for mm in re.finditer(r'clickable "([^"]*)" \[ref_\d+\] @(\d+),(\d+) (\d+)x(\d+)', t):
+            if int(mm.group(4)) >= 250 and 30 <= int(mm.group(5)) <= 60 and int(mm.group(3)) > 150 \
+                    and not any(re.search(rf'(^|\s){re.escape(p)}(\s|$)', mm.group(1)) for p in pills):
                 m = mm
                 break
-        check(m is not None, 'the Network tab\'s first row')
-        rx, ry, rw, rh = (int(v) for v in m.groups()) if m else (32, 230, 314, 40)
+        check(m is not None, 'the Network tab\'s first row with a switch')
+        rx, ry, rw, rh = (int(v) for v in m.groups()[1:]) if m else (32, 230, 314, 40)
         sx, sy = rx + rw - 21, ry + 20                       # its Rule switch (handsDeny)
         r = a.call('computer', action='screenshot', target='window:monitor')
         check(not r.get('isError'), 'a window holding handsDeny nodes is captured (no "The action failed.")')

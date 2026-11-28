@@ -445,6 +445,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `PAPER-VALIDATION.md` and the draft tested-graphics-cards page (`web/content/hardware/gpus.*.md`).
 
 ### Tests
+- **Test fixes from the ws174 runs.** `build/webalive-fake` is made `go-w` after it is linked: under a umask of 0002
+  it was group-writable and `web/webmgr.c` rightly refused it as lord-web, so the suite failed on such machines
+  (`server/mk/webapps.mk`). `tests/hands_e2e.py` picks the first Network row that has a rule switch, skipping an
+  essential system service (a dash and its "System" pill, in any of en, es, pt) instead of the first row. The test-only
+  compiler warnings are gone: a command buffer big enough for its three paths (`tests/pkgapp_test.c`), the Flatpak
+  indexes read on every architecture (`tests/apps_actions_test.c`, the checks stay x86-64 only), and a path buffer
+  sized from the folder's (`tests/vm_test.c`). The Machines bench expects the Light profile's memory for the computer
+  it runs on, as `apps/machines/model.js` `profileSize` gives it (half the RAM, at most 3072 MB, within Machines' own
+  limit), not a fixed 4096 MB (`tools/vm/e2e/machines/flows.py`).
 - **`hands-e2e` no longer assumes this computer's state** (ws171 on a Pi): case 5 takes the first app row of
   Monitor → Network, whatever it is (it looked for "Machines"), so the handsDeny blackout checks run everywhere; case 9
   says it skipped when no voice is installed instead of failing.

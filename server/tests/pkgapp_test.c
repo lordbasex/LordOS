@@ -46,7 +46,7 @@ static void entry(char *o, size_t n, const char *path, const void *d, size_t len
 
 /* A good package signed by seed. extra: one more listed path with this content (not created). */
 static void build(const uint8_t *seed, const char *keyhex) {
-    char d[512];
+    char d[1024];
     snprintf(d, sizeof d, "rm -rf %s && mkdir -p %s/bin && chmod -R go-w %s", app, app, app);
     if (system(d)) exit(2);
     put("manifest.json", manifest, strlen(manifest), 0644);
