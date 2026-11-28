@@ -92,13 +92,14 @@ export function notify({ app = '', title = '', body = '', actions = [], defaultA
   const n = { id, app, label: String(label), Icon: typeof icon === 'function' ? icon : null, title: String(title), body: String(body), actions: Array.isArray(actions) ? actions.slice(0, 3) : [],
     defaultAction: defaultAction && typeof defaultAction.run === 'function' ? defaultAction : null,
     sticky: !!sticky || ap.style === 'alert', time: Date.now(), onClose };
-  notifyHistory.set((l) => [{ id, app: n.app, label: n.label, title: n.title, body: n.body, time: n.time, actions: n.actions }, ...l].slice(0, HISTORY));
+  notifyHistory.set((l) => [{ id, app: n.app, label: n.label, Icon: n.Icon, title: n.title, body: n.body, time: n.time, actions: n.actions }, ...l].slice(0, HISTORY));
   // Do Not Disturb or "no banner": kept in the history only, without a sound
   if (dndActive() || ap.style === 'none') return id;
   notifications.set((l) => [n, ...l].slice(0, MAX_SHOWN));
   const tone = toneOf(ap.sound);
   if (withSound && tone) sound.play(tone);
-  if (!n.sticky) timers.set(id, setTimeout(() => dismissNotification(id), Math.max(1500, timeout)));
+  // its time is up: the banner goes, the notification stays in the centre with its buttons ('expired', not 'closed')
+  if (!n.sticky) timers.set(id, setTimeout(() => dismissNotification(id, 'expired'), Math.max(1500, timeout)));
   return id;
 }
 

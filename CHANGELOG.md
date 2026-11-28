@@ -479,6 +479,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Notifications: a Linux or Flatpak app's buttons still work from the centre once its banner has gone** (BUG-J
+  validation on VM 127 with ws173: GNOME Clocks from Flathub showed its timer and alarm notifications with its real
+  icon, but the alarm's **Stop** in the notification centre did nothing). A banner whose time was up went with the
+  reason "closed", so lord-server told the app it was dismissed and forgot the portal notification's buttons; it now
+  goes as "expired", which tells the app nothing (the notification is still in the centre). The history also keeps the
+  icon a notification came with, so the centre's group of an app the registry doesn't list (a Flatpak app's) shows it
+  (Flow and Classic). Test: `notify_expiry_scene.mjs`.
 - **Settings → Energy: whole hours read "1 h", not "1 h 0 min"** (seen on VM 127 while checking BUG-B: "Require
   password after the display turns off" offered "1 h 0 min"). A new `prefs.power.h` text, in every language, for a
   duration of whole hours (the sleep lists' 1, 2 and 3 h too).

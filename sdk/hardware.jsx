@@ -692,7 +692,9 @@ function linuxNotify(n) {
   const key = web ? web.key : n.flatpak ? `linux:${n.flatpak}` : `linux:${app?.desktopId || n.desktop || n.app || 'app'}`;
   const prev = fromLinux.get(n.id);
   if (prev) dismissNotification(prev, 'replaced');
-  const reason = { closed: 2, expired: 1, action: 2, replaced: 0, remote: 0 };
+  // a banner whose time is up isn't closed: the notification stays in the centre, and its buttons still reach the app
+  // (QA of 0.8.9.6.2: a Flatpak alarm's Stop in the centre did nothing once its banner had gone)
+  const reason = { closed: 2, expired: 0, action: 2, replaced: 0, remote: 0 };
   const hasDefault = (n.actions || []).some(([k]) => k === 'default');
   const id = notify({
     app: key, label: web ? web.label : fp ? fp.name : shortAppName(app) || n.app, icon: web ? web.icon : app?.Icon || null,

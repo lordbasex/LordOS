@@ -1029,6 +1029,8 @@ EOF
         run "battery-settings-scene (apps/settings/Battery.jsx)" node tests/textfield_menu_test.mjs battery_settings_scene.mjs
         # Sentinela (docs/SENTINELA.md): a rule's desktop notification with the closed actions, and its Settings page
         run "sentinela-notify-scene (sdk/sentinela.js)" node tests/textfield_menu_test.mjs sentinela_notify_scene.mjs
+        # (QA of 0.8.9.6.2) a banner whose time is up stays in the centre with its buttons and its icon
+        run "notify-expiry-scene (sdk/notify.js)" node tests/textfield_menu_test.mjs notify_expiry_scene.mjs
         run "sentinela-settings-scene (apps/settings/Sentinela.jsx)" node tests/textfield_menu_test.mjs sentinela_settings_scene.mjs
     else skip "store-trademark-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.9.5) the Store's long lists load their next page near the end of the scroll
