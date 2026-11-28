@@ -488,6 +488,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Monitor → Network: "Recently denied" lists what the Denied count counts** (QA on ws174: Denied 5 and 8, and below
+  it "Nothing denied in the last ten minutes"). lord-netperm's Denied counter counts every denied connection, incoming
+  ones and ports an app wasn't let open included, but the list kept only outgoing ones. It now shows every direction
+  (an incoming one by its local port, `← :5353`), the latest of each first, merged with how many
+  (`apps/monitor/deniedmodel.js`, `apps/monitor/Network.jsx`). Test: `tests/monitor_denied_test.mjs`.
 - **Waking from s2idle on virtio-gpu no longer hangs in the flip-stall recovery** (QA on ws174). After the watchdog
   drops a page flip that never completed (BUG-B), the next frame is a full modeset, and on virtio-gpu that
   `SETCRTC` blocked in the kernel with the whole desktop. That one modeset (only the one after a dropped flip; the
