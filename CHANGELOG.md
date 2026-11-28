@@ -479,6 +479,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Community themes: Lock Screen from a community theme no longer freezes the desktop** (QA on ws174). The theme's
+  `session.lock()` called LordOS's lock straight away, which re-renders the shell while the theme's own code was still
+  on the stack, so removing the theme's nodes was refused and the screen stopped answering. Locking now runs in a job
+  of its own, the way logging out already did (`sdk/themeapi.js`).
 - **Settings → Appearance: Try Again on a theme that couldn't start takes effect at once** (seen on VM 127 while
   checking BUG-H: Try Again cleared the theme's failure record, but the card kept "Couldn't start" and a disabled
   Apply until the page was left and opened again). The gallery renders again after it (`galleryRev`).
