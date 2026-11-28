@@ -51,19 +51,19 @@ The three run on the same display server, the same interface engine and the same
 
 [[shot:2]]
 
-## Luna (in development)
+## Luna (since 0.8.9.6.2)
 
-In development after 0.8.9.6.1 (the latest release is 0.8.9.6.1): a tribute to the desktops of 2001, with art drawn by us in that style. Glossy blue title bars with rounded tops, a green start button on a blue taskbar with quick launch and a button for every window, and Files as that era's explorer: big Back, Forward and Up buttons, an address bar with Go, and a task pane with "File and Folder Tasks", "Other Places" and "Details".
+Since 0.8.9.6.2: a tribute to the desktops of 2001, with art drawn by us in that style. Glossy blue title bars with rounded tops, a green start button on a blue taskbar with quick launch and a button for every window, and Files as that era's explorer: big Back, Forward and Up buttons, an address bar with Go, and a task pane with "File and Folder Tasks", "Other Places" and "Details".
 
 It is also the first desktop that brings a **style pack** and **app skins**: its own icons, white pointers, a few short sounds and its own font, and Files' toolbar, sidebar, items and status bar drawn its way. Files still does every action itself, with its usual checks. In **Settings → Appearance → From this style** you can turn each part off, for example to keep its frames and use LordOS's own icons.
 
 ## Celeste
 
-A frame around each display with a bar on its thick side and drawers that slide out of its edges: the dashboard, the launcher, the session menu and a sidebar with your notifications. It has five colour schemes and four surfaces, from clear to opaque. It shipped in 0.8.9.5 as a community theme; in development after 0.8.9.6.1 it is an official one. It is in Settings → Appearance, not in the first-start chooser.
+A frame around each display with a bar on its thick side and drawers that slide out of its edges: the dashboard, the launcher, the session menu and a sidebar with your notifications. It has five colour schemes and four surfaces, from clear to opaque. It shipped in 0.8.9.5 as a community theme; since 0.8.9.6.2 it is an official one. It is in Settings → Appearance, not in the first-start chooser.
 
-## Names of their own, and their own repository (in development)
+## Names of their own, and their own repository (since 0.8.9.6.2)
 
-In development after 0.8.9.6.1 (the latest release is 0.8.9.6.1), the desktops dropped "Lord" from their names: Lord Flow, Lord Classic, Lord Workspaces and Lord Celeste are now **Flow**, **Classic**, **Workspaces** and **Celeste**, in every language. Nothing changes for you: LordOS keeps your choice, because it was always stored by an id that didn't change. Each desktop now names its author in Settings → Appearance (ours: Federico Pereira, IPERFEX).
+Since 0.8.9.6.2, the desktops dropped "Lord" from their names: Lord Flow, Lord Classic, Lord Workspaces and Lord Celeste are now **Flow**, **Classic**, **Workspaces** and **Celeste**, in every language. Nothing changes for you: LordOS keeps your choice, because it was always stored by an id that didn't change. Each desktop now names its author in Settings → Appearance (ours: Federico Pereira, IPERFEX).
 
 The official desktops are now developed in their own repository, **LordOS-themes**, like the wallpapers: one folder per desktop with its source, screenshots, a README, its license and where it came from, and a catalog with the SHA-256 of every file. LordOS builds from a checked copy of one pinned version of it, so building LordOS still needs no network, and every file must match the catalog before it's copied in. To make your own, start with [lordos-theme-kit](https://github.com/lordbasex/lordos-theme-kit).
 

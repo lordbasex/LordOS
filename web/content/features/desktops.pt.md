@@ -51,19 +51,19 @@ Os três rodam sobre o mesmo servidor gráfico, o mesmo motor de interface e os 
 
 [[shot:2]]
 
-## Luna (em desenvolvimento)
+## Luna (desde a 0.8.9.6.2)
 
-Em desenvolvimento depois da 0.8.9.6.1 (a versão mais recente é a 0.8.9.6.1): uma homenagem aos desktops de 2001, com arte desenhada por nós nesse estilo. Barras de título azuis brilhantes com o topo arredondado, um botão iniciar verde numa barra de tarefas azul com inicialização rápida e um botão para cada janela, e o Arquivos como o explorador daquela época: botões grandes de Voltar, Avançar e Acima, uma barra de endereço com Ir, e um painel de tarefas com "Tarefas de arquivo e pasta", "Outros locais" e "Detalhes".
+Desde a 0.8.9.6.2: uma homenagem aos desktops de 2001, com arte desenhada por nós nesse estilo. Barras de título azuis brilhantes com o topo arredondado, um botão iniciar verde numa barra de tarefas azul com inicialização rápida e um botão para cada janela, e o Arquivos como o explorador daquela época: botões grandes de Voltar, Avançar e Acima, uma barra de endereço com Ir, e um painel de tarefas com "Tarefas de arquivo e pasta", "Outros locais" e "Detalhes".
 
 Também é o primeiro desktop que traz um **pacote de estilo** e **aparências de apps**: os próprios ícones, ponteiros brancos, alguns sons curtos e a própria fonte, e a barra de ferramentas, a barra lateral, os itens e a barra de status do Arquivos desenhados do seu jeito. O Arquivos continua fazendo cada ação ele mesmo, com as verificações de sempre. Em **Ajustes → Aparência → Deste estilo** você pode desligar cada parte, por exemplo para ficar com as molduras dele e usar os ícones do próprio LordOS.
 
 ## Celeste
 
-Uma moldura em volta de cada tela com uma barra no seu lado grosso e gavetas que saem das suas bordas: o painel, o lançador, o menu de sessão e uma barra lateral com as suas notificações. Tem cinco esquemas de cor e quatro superfícies, de transparente a opaca. Chegou na 0.8.9.5 como tema da comunidade; em desenvolvimento depois da 0.8.9.6.1 é um oficial. Está em Configurações → Aparência, não no seletor do primeiro início.
+Uma moldura em volta de cada tela com uma barra no seu lado grosso e gavetas que saem das suas bordas: o painel, o lançador, o menu de sessão e uma barra lateral com as suas notificações. Tem cinco esquemas de cor e quatro superfícies, de transparente a opaca. Chegou na 0.8.9.5 como tema da comunidade; desde a 0.8.9.6.2 é um oficial. Está em Configurações → Aparência, não no seletor do primeiro início.
 
-## Nomes próprios, e o seu próprio repositório (em desenvolvimento)
+## Nomes próprios, e o seu próprio repositório (desde a 0.8.9.6.2)
 
-Em desenvolvimento depois da 0.8.9.6.1 (a versão mais recente é a 0.8.9.6.1), os desktops tiraram "Lord" dos nomes: Lord Flow, Lord Classic, Lord Workspaces e Lord Celeste agora são **Flow**, **Classic**, **Workspaces** e **Celeste**, em todos os idiomas. Para você nada muda: o LordOS mantém a sua escolha, porque ela sempre foi guardada por um id que não mudou. Cada desktop agora nomeia o seu autor em Configurações → Aparência (os nossos: Federico Pereira, IPERFEX).
+Desde a 0.8.9.6.2, os desktops tiraram "Lord" dos nomes: Lord Flow, Lord Classic, Lord Workspaces e Lord Celeste agora são **Flow**, **Classic**, **Workspaces** e **Celeste**, em todos os idiomas. Para você nada muda: o LordOS mantém a sua escolha, porque ela sempre foi guardada por um id que não mudou. Cada desktop agora nomeia o seu autor em Configurações → Aparência (os nossos: Federico Pereira, IPERFEX).
 
 Os desktops oficiais agora são desenvolvidos no seu próprio repositório, o **LordOS-themes**, como os papéis de parede: uma pasta por desktop com o seu código, capturas, um README, a sua licença e a sua procedência, e um catálogo com o SHA-256 de cada arquivo. O LordOS é construído a partir de uma cópia verificada de uma versão fixada, então compilar o LordOS continua sem precisar de rede, e cada arquivo tem de conferir com o catálogo antes de ser copiado. Para fazer o seu, comece pelo [lordos-theme-kit](https://github.com/lordbasex/lordos-theme-kit).
 

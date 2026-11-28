@@ -33,10 +33,10 @@ int  webpage_title_badge(const char *title);
  * Chrome's full version is the one place for its version: the string's major, the Client Hints and
  * navigator.userAgentData (webua.h) all come from it, so they never disagree. It must be the current stable Chrome's
  * (an old version is a fingerprint of its own): RELEASING.md takes it from Chrome's stable channel each release. */
-#define WEBPAGE_CHROME_FULL   "158.0.8127.36"
+#define WEBPAGE_CHROME_FULL   "158.0.8127.88"
 #define WEBPAGE_CHROME_MAJOR  158
 #define WEBPAGE_EDGE_MAJOR    158
-#define WEBPAGE_FIREFOX_MAJOR 160
+#define WEBPAGE_FIREFOX_MAJOR 161
 int  webpage_user_agent(int kind, const char *machine, const char *version, char *out, size_t n);
 
 /* LordOS's sound for a page's notification ("notifySound" in the registry, webreg.h WEBREG_SOUND_*):

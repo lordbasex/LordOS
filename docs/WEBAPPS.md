@@ -463,7 +463,7 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     exactly what desktop Chrome on Linux sends, nothing added. Chrome's reduced user agent says `Linux x86_64` on
     every Linux, an ARM one too, so this string is the same on `aarch64`. Since the calls work (in development,
     "Calls" below) Chrome is also Chrome in the two other places sites look, from the same table
-    (`webua.h`, `webua.c`; Chrome's whole version `WEBPAGE_CHROME_FULL`, `158.0.8127.36`, next to the string's major in
+    (`webua.h`, `webua.c`; Chrome's whole version `WEBPAGE_CHROME_FULL`, `158.0.8127.88`, next to the string's major in
     `webpage.h`): the **User-Agent Client Hints** on the page's requests and **`navigator.userAgentData`**. Both are
     exactly what Chrome 158 on Linux sent and answered on 2026-11-25 (a throwaway profile against a local echo server):
     - every request to a secure origin (https, or http on localhost) carries `Sec-CH-UA: "Chromium";v="158",
@@ -474,8 +474,8 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
       origin only, `webcall_hints_site`, kept in the profile's `state.json`, `clientHints`, as Chrome keeps it; another
       site's, a sign-in's or a redirect's, is neither kept nor logged, so no trail of other sites is written), that
       site's own requests also carry the ones it named:
-      `Sec-CH-UA-Full-Version-List` (`"Chromium";v="158.0.8127.36", "Not.A/Brand";v="24.0.0.0", "Google
-      Chrome";v="158.0.8127.36"`), `-Full-Version`, `-Platform-Version` (`""`), `-Arch` (`"x86"`; `"arm"` on
+      `Sec-CH-UA-Full-Version-List` (`"Chromium";v="158.0.8127.88", "Not.A/Brand";v="24.0.0.0", "Google
+      Chrome";v="158.0.8127.88"`), `-Full-Version`, `-Platform-Version` (`""`), `-Arch` (`"x86"`; `"arm"` on
       `aarch64`), `-Bitness` (`"64"`), `-Model` (`""`), `-WoW64` (`?0`), `-Form-Factors` (`"Desktop"`). Another site's
       requests from that page carry only the first three (no Permissions-Policy delegation, a limit);
     - `navigator.userAgentData` in a secure context (brands, `mobile` false, `platform` "Linux", `getHighEntropyValues()`
@@ -494,7 +494,7 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   - `edge`, **Edge on Linux**: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)
     Chrome/158.0.0.0 Safari/537.36 Edg/158.0.0.0`, what desktop Edge on Linux sends, without LordOS's token. For the
     office, mail and team chat sites of Edge's own maker, which expect it.
-  - `firefox`, **Firefox on Linux**: `Mozilla/5.0 (X11; Linux <machine>; rv:160.0) Gecko/20100101 Firefox/160.0`.
+  - `firefox`, **Firefox on Linux**: `Mozilla/5.0 (X11; Linux <machine>; rv:161.0) Gecko/20100101 Firefox/161.0`.
     Firefox names its processor (`x86_64`, `aarch64`); a machine name that isn't `[A-Za-z0-9_]` becomes `x86_64`.
   - `lordos`, **LordOS (WebKit)**: the string every app had before, `Mozilla/5.0 (X11; Linux <machine>)
     AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15 LordOS/<version>`: Linux, WebKit's own

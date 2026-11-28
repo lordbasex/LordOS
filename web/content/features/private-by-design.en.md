@@ -102,9 +102,9 @@ A window can be marked protected. Passwords is. In LordOS screenshots, screen re
 
 [[shot:5]]
 
-## An AI agent on your desktop, with your permission (in development)
+## An AI agent on your desktop, with your permission (since 0.8.9.6.2)
 
-In development after 0.8.9.6.1 (the latest release is 0.8.9.6.1): **Hands** lets an AI agent such as Claude Code use the LordOS desktop the way Claude in Chrome uses a browser. It connects through `lordos-mcp` (`claude mcp add -s user lordos-mcp -- lordos-mcp`), which talks to `lord-server`'s `org.lordos.Hands1` on the session bus. Instead of guessing from pixels, the agent reads LordOS's own UI tree: each button, field, menu and row with its role, name, state and a stable `ref`. It can list windows, open apps and files, click, type, scroll, take screenshots, set a field's value, read an app's log and record a GIF. No tool runs code, and its clicks and keys go through `lord-server`'s own input path, never `/dev/uinput`.
+Since 0.8.9.6.2: **Hands** lets an AI agent such as Claude Code use the LordOS desktop the way Claude in Chrome uses a browser. It connects through `lordos-mcp` (`claude mcp add -s user lordos-mcp -- lordos-mcp`), which talks to `lord-server`'s `org.lordos.Hands1` on the session bus. Instead of guessing from pixels, the agent reads LordOS's own UI tree: each button, field, menu and row with its role, name, state and a stable `ref`. It can list windows, open apps and files, click, type, scroll, take screenshots, set a field's value, read an app's log and record a GIF. No tool runs code, and its clicks and keys go through `lord-server`'s own input path, never `/dev/uinput`.
 
 - **Off until you turn it on**, in Settings → AI → Hands, for this session only.
 - **Each program asks first.** A system prompt shows the name and program path it reports, marked as not verified, with This session or Deny. Only your real mouse and keyboard answer it.
@@ -136,4 +136,4 @@ It is checked by `build/hands-test` (91 checks), `hands_model_test.mjs` (49) and
 - [sdk/privacy.js](https://github.com/lordbasex/LordOS/blob/main/sdk/privacy.js) and [sdk/powerbox.jsx](https://github.com/lordbasex/LordOS/blob/main/sdk/powerbox.jsx): prompts and the file dialog
 - [server/tests/sandbox_test.c](https://github.com/lordbasex/LordOS/blob/main/server/tests/sandbox_test.c) and [tests/lpk-evil](https://github.com/lordbasex/LordOS/tree/main/tests/lpk-evil): the tests
 - [docs/PRIVACY.md](https://github.com/lordbasex/LordOS/blob/main/docs/PRIVACY.md)
-- [docs/HANDS.md](https://github.com/lordbasex/LordOS/blob/main/docs/HANDS.md): the Hands design (an AI agent on the desktop, in development)
+- [docs/HANDS.md](https://github.com/lordbasex/LordOS/blob/main/docs/HANDS.md): the Hands design (an AI agent on the desktop, since 0.8.9.6.2)

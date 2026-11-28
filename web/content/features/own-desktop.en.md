@@ -107,7 +107,7 @@ All in 0.8.7, except the two items marked 0.8.8.
 
 ## New in 0.8.9
 
-Published in 0.8.9 Beta on 18 November 2026; the latest release is 0.8.9.6 Beta (25 November 2026).
+Published in 0.8.9 Beta on 18 November 2026; the latest release is 0.8.9.6.2 Beta (28 November 2026).
 
 - **Choose your desktop.** The first time a new account signs in on an installed system, LordOS shows Flow, Classic and Workspaces side by side, in a random order and with none chosen for you, lets you try the one you pick live and shows where to change it later.
 - **Desk widgets in every theme.** "Add widget" in the wallpaper's menu: a clock (with a second hand if you like), weather for the city you choose from a list that never leaves the computer, a calendar, your devices' batteries, a sound wave that follows the music, a camera or TV channel, Claude Code's limits and more. They read their data only while you can see them.

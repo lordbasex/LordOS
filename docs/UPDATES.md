@@ -12,7 +12,7 @@ a server or VPS, and `apt` sees the same repository.
 | The signed repository | `https://lordos.org/apt`, suite `stable`, component `main`, amd64 and arm64 |
 | Its source on every system | `/etc/apt/sources.list.d/lordos.sources` (deb822, `Signed-By:`) |
 | Its key on every system | `/usr/share/keyrings/lordos-archive-keyring.gpg` (in the `lordos` package) |
-| Building, signing and uploading it | `tools/release/apt-repo.sh` (on the maintainer's Mac) |
+| Building, signing and uploading it | `tools/release/apt-repo.sh` (on the maintainer's LordOS machine) |
 | The Store's side | `apps/store/debian.js` (`Updates`), `sdk/updates.js`, `lord.pkg.releaseNotes` and `lord.pkg.rebootRequired` (`server/src/ui/js_pkg.c`) |
 | Version-to-version changes | `packaging/migrations/` (system, as root) and `MIGRATIONS` in `sdk/settings.js` (each user's settings) |
 | The tested-hardware snapshot (0.8.7) | the `lordos-hwdata` package (`tools/iso/mkdeb-hwdata.sh`), which `lordos` depends on; published with a release or alone between releases (below) |
@@ -43,7 +43,8 @@ https://lordos.org/apt-staging/        the same layout, for tests before anythin
   can go back. Versions follow dpkg's order, so a test build named `0.8.1~staging1` sorts after
   `0.8.0` and before `0.8.1` (checked by `build/pkg-test`).
 - **Built with Debian's tools.** `apt-ftparchive` writes `Packages` and `Release` (in a
-  `debian:trixie` container on the Mac, or natively on a Debian host); `gpg` signs on the Mac.
+  `debian:trixie` container on a machine without them, or natively on a Debian host such as the maintainer's LordOS
+  machine); `gpg` signs on that machine.
 - **Release notes.** `main/notes/ReleaseNotes` is a deb822 file covered by the signed `Release`:
   one stanza per lordos version with `Package`, `Version` and `Notes` (the version's section of
   [CHANGELOG.md](../CHANGELOG.md) as Markdown, through `tools/release/release-notes.sh` without its
@@ -86,7 +87,7 @@ APT needs OpenPGP, so the repository has its own key instead of reusing the raw 
 Neither private key is ever copied to a VM, a build machine, a server or the repository. Keep an
 offline copy of `~/.config/lordos-release/` (the whole folder) as well.
 
-**Before 2031-10-18**, extend the key's expiry on the Mac (`gpg --quick-set-expire <fingerprint> 5y`
+**Before 2031-10-18**, extend the key's expiry on the maintainer's LordOS machine (`gpg --quick-set-expire <fingerprint> 5y`
 with `GNUPGHOME=~/.config/lordos-release/apt-gnupg`), export it again into `packaging/keys/` and ship
 it in a release some months before the old date: a system that has not updated by then needs
 `install.sh` again. To replace the key, ship the new one in the keyring file next to the old one for
@@ -339,9 +340,9 @@ LordOS's build recipes in `apt/recipes/`. An app reaches a system in one of two 
 | Delivery | Apps | How |
 |---|---|---|
 | **direct** | Claude Code (`claude-code`), Claude Desktop (`claude-desktop`), Visual Studio Code (`code`), Cursor (`cursor`); commercial: Google Chrome (`google-chrome-stable`, amd64 and arm64), Microsoft Edge (`microsoft-edge-stable`, amd64), Spotify (`spotify-client`, amd64); third-party apps (0.8.8.4): VSCodium (`codium`, amd64 and arm64), Brave Browser (`brave-browser`, amd64 and arm64); remote access (0.8.8.6): Tailscale (`tailscale`, amd64 and arm64, suite `trixie`) | the vendor has a signed APT repository: the user's system adds it (a deb822 `.sources` with the key pinned in the catalog) and installs and updates from the vendor. Nothing is copied to lordos.org. |
-| **mirror** | `llama.cpp`, `whisper.cpp`, `codex-cli` (built by LordOS); `goose`, `opencode`, `artcraft-launcher` (the vendor's .deb) | no vendor repository: verified on the maintainer's Mac and published in `pool/catalog/` of lordos.org/apt, signed with the LordOS archive key with everything else. |
+| **mirror** | `llama.cpp`, `whisper.cpp`, `codex-cli` (built by LordOS); `goose`, `opencode`, `artcraft-launcher` (the vendor's .deb) | no vendor repository: verified on the maintainer's LordOS machine and published in `pool/catalog/` of lordos.org/apt, signed with the LordOS archive key with everything else. |
 
-The flow, on the maintainer's Mac only (like the rest of the repository):
+The flow, on the maintainer's LordOS machine only (like the rest of the repository):
 
 1. `apt/build.sh check` validates the catalog and, for every vendor repository, that its key file
    holds exactly the pinned fingerprint, that `InRelease` verifies with it (`gpgv`, `VALIDSIG` by that
@@ -564,7 +565,7 @@ for now.
 
 ## Tests (2026-10-18)
 
-- **Staging** (`https://lordos.org/apt-staging`, built and signed on the Mac with `apt-repo.sh`):
+- **Staging** (`https://lordos.org/apt-staging`, built and signed on the maintainer's LordOS machine with `apt-repo.sh`):
   lordos 0.8.0 (amd64, arm64, from the 0.8.0 release, checked against its signed `SHA256SUMS`) and
   test builds `0.8.1~staging*`.
 - **Signatures:** `InRelease` verifies with LordOS's own code (`build/pkg-test pgp

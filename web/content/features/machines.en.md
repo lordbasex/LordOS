@@ -97,7 +97,7 @@ The rest of the desktop got the same care: Settings, the Store, Files and Monito
 - **Capture mouse** for games and 3D programs; ❖Esc or Ctrl+Alt lets it go.
 - **A real graphics card for a machine**: a share of an Intel iGPU (Broadwell to Comet Lake) through GVT-g, with LordOS's own start-up driver for it, written from public sources.
 - **`machines` in the Terminal**: list, start, stop, snapshot, clone and change machines from a terminal. Since 0.8.9.6: run a program in a Linux machine, copy files in and out, read its logs, make a machine from a short file kept with a project, and a local MCP server for coding agents, only for a machine you allowed in its Configure.
-- **Close the window when the machine stops** (in development, Configure → Startup and shutdown, off by default): after a shutdown or Turn Off the machine's window closes; if the machine stops because of a problem, the window stays open with the error.
+- **Close the window when the machine stops** (since 0.8.9.6.2, Configure → Startup and shutdown, off by default): after a shutdown or Turn Off the machine's window closes; if the machine stops because of a problem, the window stays open with the error.
 
 ## New in 0.8.9.6
 

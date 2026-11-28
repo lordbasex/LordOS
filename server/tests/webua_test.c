@@ -86,7 +86,7 @@ static void test_headers(void) {
     }
     CHECK(webua_header(WEBUA_LOW_N, WEBUA_HINT_ALL, "x86_64", &name, v, sizeof v) == 1, "full version list");
     if (WEBPAGE_CHROME_MAJOR == 158)
-        CHECK(!strcmp(v, "\"Chromium\";v=\"158.0.8127.36\", \"Not.A/Brand\";v=\"24.0.0.0\", \"Google Chrome\";v=\"158.0.8127.36\""), "full list: %s", v);
+        CHECK(!strcmp(v, "\"Chromium\";v=\"158.0.8127.88\", \"Not.A/Brand\";v=\"24.0.0.0\", \"Google Chrome\";v=\"158.0.8127.88\""), "full list: %s", v);
     CHECK(webua_header(-1, 0, "x86_64", &name, v, sizeof v) == -1 && webua_header(99, 0, "x86_64", &name, v, sizeof v) == -1, "bad index");
     CHECK(webua_header(0, 0, "x86_64", &name, v, 8) == -1, "short buffer");
     CHECK(!strcmp(webua_arch("x86_64"), "x86") && !strcmp(webua_arch("aarch64"), "arm") && !strcmp(webua_arch("riscv64"), ""), "arch");
@@ -150,7 +150,7 @@ static void test_script(void) {
     CHECK(js && !strncmp(js, "F({", 3), "the script's call");
     if (js && WEBPAGE_CHROME_MAJOR == 158) {
         CHECK(strstr(js, "\"brands\":[{\"brand\":\"Chromium\",\"version\":\"158\"},{\"brand\":\"Not.A/Brand\",\"version\":\"24\"},{\"brand\":\"Google Chrome\",\"version\":\"158\"}]") != NULL, "brands: %s", js);
-        CHECK(strstr(js, "\"fullVersionList\":[{\"brand\":\"Chromium\",\"version\":\"158.0.8127.36\"},{\"brand\":\"Not.A/Brand\",\"version\":\"24.0.0.0\"}") != NULL, "full list");
+        CHECK(strstr(js, "\"fullVersionList\":[{\"brand\":\"Chromium\",\"version\":\"158.0.8127.88\"},{\"brand\":\"Not.A/Brand\",\"version\":\"24.0.0.0\"}") != NULL, "full list");
     }
     CHECK(js && strstr(js, "\"architecture\":\"x86\"") && strstr(js, "\"bitness\":\"64\"") && strstr(js, "\"platform\":\"Linux\"")
           && strstr(js, "\"vendor\":\"Google Inc.\"") && strstr(js, "\"uaFullVersion\":\"" WEBPAGE_CHROME_FULL "\""), "values");

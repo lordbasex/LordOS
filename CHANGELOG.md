@@ -10,6 +10,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.9.6.2-beta] - 2026-11-28
+
+An update of the package through the Store and `apt`, with no new images. **Hands**: an AI agent such as Claude Code
+can use the LordOS desktop through `lordos-mcp` (read windows, click and type through lord-server, with a banner and a
+Stop, and person-only places out of its reach). **Spell checking** in LordOS's own text fields (`lord-spell`, Hunspell in
+a sandbox) and **✨ Writing** on selected text with the local model; the Brain can use the graphics card and a chosen
+number of cores. **Community themes**: style packs and app skins, installing a desktop style from a file with its own
+security piece, `minLordOS` and translated texts; the official themes get names of their own. **Settings → Wallpaper**
+is a gallery with three new collections, and moving wallpapers cost a fraction of what they did. The **toolkit audit**
+(`lordos-testbench --toolkits`) checks GTK and Qt apps and reaches the hardware report; Qt and GTK 3 on Xwayland follow
+dark mode. Web apps get a Chrome-like right-click menu, spell checking and the groundwork for calls. Lumo is the 3D Lumo.
+Fixes include the interface language for Linux apps and a New Folder button in the file dialog (#262), Machines in
+French (#266), the keyboard light with the display off (#270), the installer on a GPT disk with several partitions
+(#280), lord-nvgpu with Debian's NVIDIA packages (#273), Brave and Vulkan apps closing at the open-file limit (#251),
+screenshots with several displays (#252) and stalls on a spinning disk (#250), plus the findings of a Claude Security
+scan of this version and of the QA runs on the maintainer's PC, VM 116, VM 127 and a Raspberry Pi 5. New: a horizontal
+scroll bar in Text Editor (#264), "Close the window when the machine stops" in Machines (#267), % and ± in Calculator
+(#271) and Files' "Properties" (#279).
+
 ### Security
 - **Hands: an AI agent's input no longer takes a screen capture or recording through Screenshots** (security scan of
   0.8.9.6.2, F1). An agent could press ❖⇧3 (or ❖⇧4, Print Screen, a toolbar button) and get a full, unredacted PNG
@@ -1700,6 +1719,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `make -C server test` and the WPE build's own test).
 
 ### Changed
+- **Web apps' Browser identity follows the current browsers** (docs/RELEASING.md step 1, 2026-11-28):
+  `WEBPAGE_CHROME_FULL` is `158.0.8127.88` (Chrome's stable update for Linux; the major stays 158, as does Edge's) and
+  `WEBPAGE_FIREFOX_MAJOR` 161, so the Firefox identity sends `Mozilla/5.0 (X11; Linux <machine>; rv:161.0)
+  Gecko/20100101 Firefox/161.0`. `build/webua-test` and docs/WEBAPPS.md ("Browser identity") quote the new numbers.
+- **Release signing runs on the maintainer's LordOS machine** (docs/RELEASING.md, docs/UPDATES.md,
+  docs/IMMUTABLE.md and the comments of `tools/release/`): the release key, the archive key and the scripts that use
+  them (`sign-code.sh`, `sign-hwsnapshot.sh`, `sign-release.sh`, `apt-repo.sh`, `publish-lists.sh`) are used there with
+  Debian's own tools; the docs no longer name another computer for it.
 - **Files: "Get Info" is now called "Properties"** (GitHub #279: people looked for "Properties" in the right-click
   menu and didn't recognise "Get Info"). The same entry, in the item's and the folder's context menus and the File
   menu, opens the same info panel (size, item count, location, dates, permissions, Open with) with the same shortcut,
@@ -15662,7 +15689,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6.1-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6.2-beta...HEAD
+[0.8.9.6.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6.1-beta...v0.8.9.6.2-beta
 [0.8.9.6.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6-beta...v0.8.9.6.1-beta
 [0.8.9.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.5-beta...v0.8.9.6-beta
 [0.8.9.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.4-beta...v0.8.9.5-beta

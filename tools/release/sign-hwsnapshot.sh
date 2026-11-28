@@ -8,7 +8,7 @@
 #
 #   tools/release/sign-hwsnapshot.sh [root] [private-key.pem]
 #
-# Run on the maintainer's machine only, next to tools/release/sign-code.sh and before the tree travels to the
+# Run on the maintainer's LordOS machine only, next to tools/release/sign-code.sh and before the tree travels to the
 # build VMs: the snapshot is the same for every architecture and ships in its own Architecture: all package,
 # lordos-hwdata (tools/iso/mkdeb-hwdata.sh), which lordos depends on; a newer one alone is published to the signed
 # APT repository between releases (docs/RELEASING.md, "A newer hardware snapshot between releases"). The private

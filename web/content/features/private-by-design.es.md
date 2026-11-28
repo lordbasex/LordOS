@@ -102,9 +102,9 @@ Una ventana se puede marcar como protegida. La de Contraseñas lo está. En las 
 
 [[shot:5]]
 
-## Un agente de IA en tu escritorio, con tu permiso (en desarrollo)
+## Un agente de IA en tu escritorio, con tu permiso (desde la 0.8.9.6.2)
 
-En desarrollo después de la 0.8.9.6.1 (la última versión publicada es la 0.8.9.6.1): **Manos** deja que un agente de IA como Claude Code use el escritorio de LordOS como Claude in Chrome usa un navegador. Se conecta con `lordos-mcp` (`claude mcp add -s user lordos-mcp -- lordos-mcp`), que habla con `org.lordos.Hands1` de `lord-server` en el bus de sesión. En vez de adivinar a partir de los píxeles, el agente lee el árbol de la interfaz del propio LordOS: cada botón, campo, menú y fila con su rol, su nombre, su estado y una `ref` estable. Puede listar las ventanas, abrir apps y archivos, hacer clic, escribir, desplazarse, sacar capturas, poner el valor de un campo, leer el registro de una app y grabar un GIF. Ninguna herramienta ejecuta código, y sus clics y teclas pasan por el propio camino de entrada de `lord-server`, nunca por `/dev/uinput`.
+Desde la 0.8.9.6.2: **Manos** deja que un agente de IA como Claude Code use el escritorio de LordOS como Claude in Chrome usa un navegador. Se conecta con `lordos-mcp` (`claude mcp add -s user lordos-mcp -- lordos-mcp`), que habla con `org.lordos.Hands1` de `lord-server` en el bus de sesión. En vez de adivinar a partir de los píxeles, el agente lee el árbol de la interfaz del propio LordOS: cada botón, campo, menú y fila con su rol, su nombre, su estado y una `ref` estable. Puede listar las ventanas, abrir apps y archivos, hacer clic, escribir, desplazarse, sacar capturas, poner el valor de un campo, leer el registro de una app y grabar un GIF. Ninguna herramienta ejecuta código, y sus clics y teclas pasan por el propio camino de entrada de `lord-server`, nunca por `/dev/uinput`.
 
 - **Apagado hasta que lo encendés**, en Ajustes → Inteligencia artificial → Manos, solo para esta sesión.
 - **Cada programa pregunta primero.** Un aviso del sistema muestra el nombre y la ruta del programa que informa, marcados como no verificados, con Esta sesión o Denegar. Solo tu mouse y tu teclado reales lo responden.
@@ -136,4 +136,4 @@ Lo verifican `build/hands-test` (91 verificaciones), `hands_model_test.mjs` (49)
 - [sdk/privacy.js](https://github.com/lordbasex/LordOS/blob/main/sdk/privacy.js) y [sdk/powerbox.jsx](https://github.com/lordbasex/LordOS/blob/main/sdk/powerbox.jsx): los avisos y el diálogo de archivos
 - [server/tests/sandbox_test.c](https://github.com/lordbasex/LordOS/blob/main/server/tests/sandbox_test.c) y [tests/lpk-evil](https://github.com/lordbasex/LordOS/tree/main/tests/lpk-evil): las pruebas
 - [docs/PRIVACY.md](https://github.com/lordbasex/LordOS/blob/main/docs/PRIVACY.md)
-- [docs/HANDS.md](https://github.com/lordbasex/LordOS/blob/main/docs/HANDS.md): el diseño de Manos (un agente de IA en el escritorio, en desarrollo)
+- [docs/HANDS.md](https://github.com/lordbasex/LordOS/blob/main/docs/HANDS.md): el diseño de Manos (un agente de IA en el escritorio, desde la 0.8.9.6.2)

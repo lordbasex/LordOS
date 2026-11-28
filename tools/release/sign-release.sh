@@ -6,7 +6,7 @@
 #   tools/release/sign-release.sh <release-dir> [private-key.pem]
 #
 # The private key never enters the repository or a build VM. Default location:
-# ~/.config/lordos-release/release-ed25519.key.pem (mode 0600) on the maintainer's machine.
+# ~/.config/lordos-release/release-ed25519.key.pem (mode 0600) on the maintainer's LordOS machine.
 set -eu
 dir=${1:?usage: sign-release.sh <release-dir> [private-key.pem]}
 key=${2:-$HOME/.config/lordos-release/release-ed25519.key.pem}

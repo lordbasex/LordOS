@@ -51,19 +51,19 @@ Los tres corren sobre el mismo servidor gráfico, el mismo motor de interfaz y l
 
 [[shot:2]]
 
-## Luna (en desarrollo)
+## Luna (desde la 0.8.9.6.2)
 
-En desarrollo después de la 0.8.9.6.1 (la última versión publicada es la 0.8.9.6.1): un homenaje a los escritorios de 2001, con arte dibujado por nosotros en ese estilo. Barras de título azules brillantes con la parte de arriba redondeada, un botón de inicio verde en una barra de tareas azul con inicio rápido y un botón por cada ventana, y Archivos como el explorador de esa época: botones grandes de Atrás, Adelante y Subir, una barra de dirección con Ir, y un panel de tareas con "Tareas de archivo y carpeta", "Otros sitios" y "Detalles".
+Desde la 0.8.9.6.2: un homenaje a los escritorios de 2001, con arte dibujado por nosotros en ese estilo. Barras de título azules brillantes con la parte de arriba redondeada, un botón de inicio verde en una barra de tareas azul con inicio rápido y un botón por cada ventana, y Archivos como el explorador de esa época: botones grandes de Atrás, Adelante y Subir, una barra de dirección con Ir, y un panel de tareas con "Tareas de archivo y carpeta", "Otros sitios" y "Detalles".
 
 También es el primer escritorio que trae un **paquete de estilo** y **apariencias de apps**: sus propios iconos, punteros blancos, unos sonidos cortos y su propio tipo de letra, y la barra de herramientas, la barra lateral, los elementos y la barra de estado de Archivos dibujados a su manera. Archivos sigue haciendo cada acción él mismo, con sus comprobaciones de siempre. En **Ajustes → Apariencia → De este estilo** podés apagar cada parte, por ejemplo para quedarte con sus marcos y usar los iconos propios de LordOS.
 
 ## Celeste
 
-Un marco alrededor de cada pantalla con una barra en su lado grueso y cajones que salen de sus bordes: el panel, el lanzador, el menú de sesión y una barra lateral con tus notificaciones. Tiene cinco esquemas de color y cuatro superficies, de transparente a opaca. Llegó en la 0.8.9.5 como tema de la comunidad; en desarrollo después de la 0.8.9.6.1 es uno oficial. Está en Ajustes → Apariencia, no en el selector del primer inicio.
+Un marco alrededor de cada pantalla con una barra en su lado grueso y cajones que salen de sus bordes: el panel, el lanzador, el menú de sesión y una barra lateral con tus notificaciones. Tiene cinco esquemas de color y cuatro superficies, de transparente a opaca. Llegó en la 0.8.9.5 como tema de la comunidad; desde la 0.8.9.6.2 es uno oficial. Está en Ajustes → Apariencia, no en el selector del primer inicio.
 
-## Nombres propios, y su propio repositorio (en desarrollo)
+## Nombres propios, y su propio repositorio (desde la 0.8.9.6.2)
 
-En desarrollo después de la 0.8.9.6.1 (la última versión es la 0.8.9.6.1), los escritorios sacaron "Lord" de sus nombres: Lord Flow, Lord Classic, Lord Workspaces y Lord Celeste ahora son **Flow**, **Classic**, **Workspaces** y **Celeste**, en todos los idiomas. Para vos no cambia nada: LordOS conserva tu elección, porque siempre se guardó con un id que no cambió. Cada escritorio ahora nombra a su autor en Ajustes → Apariencia (los nuestros: Federico Pereira, IPERFEX).
+Desde la 0.8.9.6.2, los escritorios sacaron "Lord" de sus nombres: Lord Flow, Lord Classic, Lord Workspaces y Lord Celeste ahora son **Flow**, **Classic**, **Workspaces** y **Celeste**, en todos los idiomas. Para vos no cambia nada: LordOS conserva tu elección, porque siempre se guardó con un id que no cambió. Cada escritorio ahora nombra a su autor en Ajustes → Apariencia (los nuestros: Federico Pereira, IPERFEX).
 
 Los escritorios oficiales ahora se desarrollan en su propio repositorio, **LordOS-themes**, como los fondos de pantalla: una carpeta por escritorio con su código, capturas, un README, su licencia y su procedencia, y un catálogo con el SHA-256 de cada archivo. LordOS se construye desde una copia verificada de una versión fijada, así que compilar LordOS sigue sin necesitar red, y cada archivo tiene que coincidir con el catálogo antes de copiarse. Para hacer el tuyo, empezá con [lordos-theme-kit](https://github.com/lordbasex/lordos-theme-kit).
 
