@@ -479,6 +479,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Changing Dark, the accent or the fonts no longer holds the desktop while the disk is busy** (QA on ws174:
+  `portal.set` took 120–480 ms under disk IO). The GSettings keyfile that GTK apps read
+  (`~/.config/glib-2.0/settings/keyfile`) was read, written and renamed on the interface's thread. It is now changed
+  on bgsave's worker with a new `bgsave_edit`: the worker reads the file's current text, applies LordOS's keys over
+  it (the apps' own keys stay) and writes it the way settings.json is written; an edit queued while an older one
+  waits replaces it, so a file never goes back to older values (`server/src/bgsave.c`, `server/src/ui/portal.c`).
+  Tests: `build/bgsave-test` (an edit returns while the disk is held, the newest one wins over the file's current
+  text, NULL leaves the file) and `build/portal-gs-test` (an app's key in the keyfile is kept).
 - **Web Apps: a site's SVG icon shows in the list** (QA on ws174: WhatsApp → Refresh icon kept
   `~/.cache/lordos/web/icons/whatsapp.svg`, a valid picture, but its row stayed blank). lord-server hands lord-media
   an SVG only from the folders `iconfind_svg_allowed` lists, and a web app's icon folders weren't among them, so the

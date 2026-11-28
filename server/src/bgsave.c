@@ -36,6 +36,7 @@ typedef struct {
     char *data;                 /* the queued text (NULL: nothing queued) */
     size_t len;
     unsigned flags;
+    bgsave_edit_fn edit;        /* data is an edit's input (bgsave_edit), not the file's text */
     int busy;                   /* the worker is writing this file now */
     int used;
 } Slot;
@@ -79,6 +80,34 @@ int bgsave_write_now(const char *dst, const char *tmp, const char *data, size_t 
     return 0;
 }
 
+#define EDIT_MAX (1 << 20)
+
+int bgsave_edit_now(const char *dst, const char *tmp, bgsave_edit_fn edit, const char *data, size_t len, unsigned flags) {
+    char *old = NULL;
+    size_t n = 0;
+    int fd = open(dst, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY);
+    struct stat st;
+    if (fd >= 0 && !fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_size < EDIT_MAX && (old = malloc((size_t)st.st_size + 1))) {
+        while (n < (size_t)st.st_size) {
+            ssize_t r = read(fd, old + n, (size_t)st.st_size - n);
+            if (r < 0 && errno == EINTR) continue;
+            if (r <= 0) break;
+            n += (size_t)r;
+        }
+        old[n] = 0;
+    }
+    if (fd >= 0) close(fd);
+    size_t outlen = 0;
+    char *text = edit(dst, old ? old : "", old ? n : 0, data, len, &outlen);
+    free(old);
+    if (!text) return 0;
+    int r = bgsave_write_now(dst, tmp, text, outlen, flags);
+    int e = errno;
+    free(text);
+    errno = e;
+    return r;
+}
+
 static void *worker(void *arg) {
     (void)arg;
     pthread_mutex_lock(&mu);
@@ -101,6 +130,7 @@ static void *worker(void *arg) {
         char *data = s->data;
         size_t len = s->len;
         unsigned flags = s->flags;
+        bgsave_edit_fn edit = s->edit;
         char dst[PATH_MAX], tmp[PATH_MAX];
         memcpy(dst, s->dst, sizeof dst);
         memcpy(tmp, s->tmp, sizeof tmp);
@@ -111,7 +141,7 @@ static void *worker(void *arg) {
         if (bgsave_test_hook) bgsave_test_hook(dst);
         bgsave_last_flags = flags;
 #endif
-        if (bgsave_write_now(dst, tmp, data, len, flags))
+        if (edit ? bgsave_edit_now(dst, tmp, edit, data, len, flags) : bgsave_write_now(dst, tmp, data, len, flags))
             fprintf(stderr, "lord-server: %s not saved: %s\n", dst, strerror(errno));
         free(data);
         pthread_mutex_lock(&mu);
@@ -145,10 +175,11 @@ static int start(void) {
     return 0;
 }
 
-int bgsave_put(const char *dst, const char *tmp, const char *data, size_t len, unsigned flags) {
+static int queue(const char *dst, const char *tmp, bgsave_edit_fn edit, const char *data, size_t len, unsigned flags) {
     if (strlen(dst) >= PATH_MAX || strlen(tmp) >= PATH_MAX) { errno = ENAMETOOLONG; return -1; }
+#define NOW() (edit ? bgsave_edit_now(dst, tmp, edit, data, len, flags) : bgsave_write_now(dst, tmp, data, len, flags))
     char *copy = malloc(len ? len : 1);
-    if (!copy) return bgsave_write_now(dst, tmp, data, len, flags);
+    if (!copy) return NOW();
     memcpy(copy, data, len);
     pthread_mutex_lock(&mu);
     Slot *s = NULL, *fresh = NULL;
@@ -165,17 +196,28 @@ int bgsave_put(const char *dst, const char *tmp, const char *data, size_t len, u
     if (!s) {                           /* no worker or no free slot: as before, on this thread */
         pthread_mutex_unlock(&mu);
         free(copy);
-        return bgsave_write_now(dst, tmp, data, len, flags);
+        return NOW();
     }
+#undef NOW
     unsigned keep = s->data ? s->flags & (BGS_FSYNC | BGS_SYNCDIR) : 0;    /* a durable save queued stays durable */
     free(s->data);                      /* an older text not written yet: only the newest matters */
     s->data = copy;
     s->len = len;
     s->flags = flags | keep;
+    s->edit = edit;
     snprintf(s->tmp, sizeof s->tmp, "%s", tmp);
     pthread_cond_signal(&work_cv);
     pthread_mutex_unlock(&mu);
     return 0;
+}
+
+int bgsave_put(const char *dst, const char *tmp, const char *data, size_t len, unsigned flags) {
+    return queue(dst, tmp, NULL, data, len, flags);
+}
+
+int bgsave_edit(const char *dst, const char *tmp, bgsave_edit_fn edit, const char *data, size_t len, unsigned flags) {
+    if (!edit) { errno = EINVAL; return -1; }
+    return queue(dst, tmp, edit, data, len, flags);
 }
 
 void bgsave_sync_now(const char *path) {
