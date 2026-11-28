@@ -1,7 +1,8 @@
 // A test fixture (installed --unchecked: the checks refuse it): every way it tries to restyle nodes that are not its
 // own, or to reach past its lord, must be refused. Each case aims at its own node id (101…), so lord-server's log
 // ("lord.setStyle refused (node N …)") shows each one was refused. Lines "CT …" go to the shell's log.
-import { startShell, View, configureWindows, ThemeProvider, settings, wm, useStore, createStore, Button, formatDate, refreshTrash } from '@lordos/sdk';
+import { startShell, View, configureWindows, ThemeProvider, settings, wm, useStore, createStore, Button, formatDate, refreshTrash,
+  TextInput, takeTextFocus, textFocusOwner, focusToken, restoreFocus } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, createContext, forwardRef } from 'react';
 
@@ -74,6 +75,18 @@ settings.subscribe(set.bind(null, 107, 'opacity', 0));
 setTimeout(() => settings.set({ mode: settings.get().mode === 'light' ? 'dark' : 'light' }), 30);
 setTimeout(() => out('timers ran'), 200);
 
+// F2 of the 0.8.9.6.2 scan: a field of LordOS's (its TextInput, autoFocus: as the keyring prompt's password field) has
+// the keys. The theme sees a stand-in, never LordOS's token, and can't take the keys or give them to a token of its own
+const myTok = {};
+setTimeout(() => {
+  const o = textFocusOwner();
+  out(`focus owner ${o === null ? 'none' : o === myTok ? 'mine' : Object.isFrozen(o) && !Object.keys(o).length ? 'stand-in' : 'REAL TOKEN'}`);
+  out(`focus take ${takeTextFocus(myTok, () => out('focus KEY STOLEN'))} ${takeTextFocus({}, () => out('focus KEY STOLEN'))}`);
+  restoreFocus(o);
+  restoreFocus(myTok);
+  out(`focus kept ${focusToken() === o ? 'by LordOS' : 'LOST'}`);
+}, 350);
+
 let ownNode = null;
 setTimeout(() => { try { set(ownNode.id, 'opacity', 0.9); out('own-node works'); } catch (e) { out('own-node refused'); } }, 300);
 
@@ -85,6 +98,7 @@ function App() {
     <ThemeProvider tokens={{}}>
       <View ref={set.bind(null, 109, 'opacity')} style={{ flex: 1, backgroundColor: '#203040' }}>
         <View ref={(h) => { if (h) ownNode = h; }} style={{ width: 40, height: 40, backgroundColor: '#ff8000' }} />
+        <TextInput value="" onChange={() => {}} autoFocus secure />
         <View>{forgedHost('child')}{forgedProvider}{forgedRaw}</View>
         <Button label={forgedHost('prop')} onClick={() => {}} />
         <Stores />

@@ -281,6 +281,7 @@ EOF
     if have node; then run "themec-test (tools/themec/themec.js: the community theme compiler and its checks)" node tests/themec_test.mjs; fi
     if have node; then run "power-model-test (sdk/powermodel.js: a countdown a community theme started never confirms)" node tests/power_model_test.mjs; fi
     if have node; then run "theme-keys-model-test (sdk/themekeysmodel.js: a theme never hears keys LordOS takes)" node tests/theme_keys_model_test.mjs; fi
+    if have node; then run "theme-focus-model-test (sdk/themefocusmodel.js: a theme's text focus is its own, never LordOS's)" node tests/theme_focus_model_test.mjs; fi
     if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
     if have node; then run "toolkit-pkgs-test (the toolkit audit's bindings and Qt theme in both images and the Recommends)" node tests/toolkit_pkgs_test.mjs; fi
     if have node; then run "iso-firmware-test (tools/iso/build.sh firmware list vs the Store map, #227)" node tests/iso_firmware_test.mjs; fi

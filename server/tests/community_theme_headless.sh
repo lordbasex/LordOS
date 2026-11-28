@@ -109,6 +109,10 @@ has "probe: LordOS's code read its getter, Proxy, iterator and toStringTag objec
 for n in 112 114; do has "probe: a bound native as an accessor (node $n) refused" "lord.setStyle refused (node $n is not"; done
 hasnt "probe: a forged app registry is never used" "forged app RENDERED"
 has "probe: a forged app doesn't open" "CT forged app opens false"
+has "probe: a LordOS field's focus is a stand-in to the theme, never its real token (scan F2)" "CT focus owner stand-in"
+has "probe: the theme can't take the keys from a LordOS field" "CT focus take false false"
+has "probe: restoreFocus can't move the keys off a LordOS field" "CT focus kept by LordOS"
+hasnt "probe: no key reached the theme" "CT focus KEY STOLEN"
 has "probe: wm has no setArgs, setProtected, setMenus, setPip, scriptMove or setCloseGuard" "CT wm.setArgs undefined wm.setProtected undefined wm.setMenus undefined wm.setPip undefined wm.scriptMove undefined wm.setCloseGuard undefined"
 
 session forger forger 40 --unchecked

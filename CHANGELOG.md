@@ -23,6 +23,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (both names refused, `media.saveImage`/`copyImage`/`crop` left alone) and the Screenshots scene of
   `tests/textfield_menu_test.mjs` (no `screenshot` or `screenRecord` call for an agent's ❖⇧3, ❖⇧4, window, record;
   the person's ❖⇧3 still captures both displays).
+- **Community themes: the text focus is the facade's own, never LordOS's** (security scan of 0.8.9.6.2, F2). A
+  theme's SDK had LordOS's `takeTextFocus`, `releaseTextFocus`, `restoreFocus`, `textFocusOwner` and `focusToken`,
+  so a theme could watch for the keyring prompt's password field (or any other shell field) and point every key at
+  its own handler. Those five are gone from the theme's allowlist and the facade gives a theme its own version
+  (`sdk/themefocusmodel.js`): its tokens are registered under tokens the facade makes, LordOS's real tokens never
+  reach it (while a LordOS field has the keys it sees one frozen stand-in that no call takes back), and it has the
+  keys only under the policy of its own key listeners (`themeFocusBlocked`, as `themeHearsKeys`): never while a LordOS
+  field has them, any keyboard layer is open (a system prompt, LordOS's search, a sheet), a dialog owns the keyboard
+  or a LordOS window has the focus (a Linux app's only while the theme holds the keyboard), checked when it takes
+  them and again at each key; and it is never sticky: a pointerdown on an app window takes the keys back. The
+  LordOS-themes `flow` and `classic` menus use the same names and keep working by mouse; their keyboard navigation now
+  works only while no LordOS window is focused. Tests: `tests/theme_focus_model_test.mjs` (40 checks: the stand-in,
+  refusals, each blocking condition, per-key checks, the drop) and the `probe` fixture of
+  `tests/community_theme_headless.sh` (a LordOS `TextInput` with the keys: the theme sees the stand-in, can't take or
+  restore the keys, and hears no key).
 
 ### Added
 - **Text Editor: a horizontal scroll bar for lines wider than the window** (GitHub #264, first part; soft word wrap

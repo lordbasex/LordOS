@@ -20,6 +20,8 @@ import { apps as hostApps } from '@lordos/apps';
 import { addListener as rtAddListener, keyboardLayer, setHostGuard, setRootErrorHandler, onCommit, THEME_OWNED } from '@lordos/runtime';
 import { LAYERS } from './layers.js';
 import { themeHearsKeys } from './themekeysmodel.js';
+import { createThemeFocus, themeFocusBlocked } from './themefocusmodel.js';
+import { dialogStack } from './dialogkeys.js';
 import { captureCornerAlways } from './capturestatus.jsx';
 
 const { createElement: h } = React;
@@ -412,6 +414,29 @@ function keysForTheme() {
   const w = id != null && SDK.wm.get ? SDK.wm.get(id) : null;
   return themeHearsKeys({ layerOpen: !!keyboardLayer(), textFocused: !!SDK.hasTextFocus?.(), focusedApp: id == null ? null : (w ? w.app : '?'), holds: themeHolds });
 }
+// The text focus a theme's menu takes (takeTextFocus, releaseTextFocus, textFocusOwner, focusToken, restoreFocus): the
+// facade's own (themefocusmodel.js; security scan 0.8.9.6.2, F2), never LordOS's helpers. Its tokens are the facade's,
+// LordOS's real tokens never reach the theme, and it has the keys only under the policy of its own key listeners
+// (keysForTheme, less the text focus it holds itself): no keyboard layer open, no dialog with the keyboard, no LordOS
+// window focused; checked when it takes them and again at each key. A pointerdown on an app window takes them back.
+function lordHoldsKeys() {
+  const id = SDK.wm.focused();
+  const w = id != null && SDK.wm.get ? SDK.wm.get(id) : null;
+  return themeFocusBlocked({ layerOpen: !!keyboardLayer(), dialogOwner: dialogStack.owner() !== null, focusedApp: id == null ? null : (w ? w.app : '?'), holds: themeHolds });
+}
+// the node is inside a window's frame (an app window, its title bar included)
+function onAppWindow(target) {
+  const frames = new Set();
+  for (const w of SDK.windows.get()) { const n = SDK.wm.frameNode ? SDK.wm.frameNode(w.id) : 0; if (n) frames.add(n); }
+  for (let p = target, d = 0; p && d < 4096; p = p.parent || null, d++) if (frames.has(p.id)) return true;
+  return false;
+}
+function themeFocus() {
+  const f = createThemeFocus({ take: SDK.takeTextFocus, release: SDK.releaseTextFocus, owner: SDK.textFocusOwner, restore: SDK.restoreFocus,
+    blocked: lordHoldsKeys, wrap: (fn) => (e) => { themeCallSafe(fn, eventToTheme(e)); } });
+  rtAddListener('pointerdown', (e) => { if (isInstance(e.target) && onAppWindow(e.target)) f.drop(); });
+  return f;
+}
 const POINTER_TYPES = new Set(['pointerdown', 'pointerup', 'pointermove']);
 function themeAddListener(type, fn) {
   if (typeof fn !== 'function') return () => {};
@@ -530,7 +555,7 @@ const FUNCTIONS = ['t', 'tOptional', 'appName', 'formatDate', 'formatTime', 'for
   'addMenuBarKeys', 'registerGestureActions', 'desktopSwipe', 'activeDesktop', 'desktopList', 'desktopName', 'switchDesktop',
   'openOverview', 'closeOverview', 'toggleOverview', 'toggleShowDesktop', 'snapZoneAt', 'startDeskWidgets', 'widgetPicker',
   'statusItems', 'useIndicators', 'useThumb', 'openCalendarApp', 'webHelpItems', 'menuAction', 'startView', 'guestAppsMode',
-  'takeTextFocus', 'releaseTextFocus', 'restoreFocus', 'textFocusOwner', 'focusToken', 'setBannerPlacement', 'useSystemInfo',
+  'setBannerPlacement', 'useSystemInfo',
   'useCpuUsage', 'memUsedKB', 'mediaFormatTime', 'lordosWallpapers', 'nightActive', 'dndActive', 'useThemeFont'];
 // read access to a system model, by the capability theme.json declares; undeclared, a neutral value
 const CAPABILITY = {
@@ -608,6 +633,12 @@ export function makeThemeSdk({ id, caps }) {
   };
   sdk.addListener = themeAddListener;
   sdk.holdKeyboard = themeHoldKeyboard;
+  const focus = themeFocus();
+  sdk.takeTextFocus = (tok, fn) => focus.take(tok, fn);
+  sdk.releaseTextFocus = (tok) => { focus.release(tok); };
+  sdk.textFocusOwner = () => focus.owner();
+  sdk.focusToken = () => focus.owner();
+  sdk.restoreFocus = (tok) => { focus.restore(tok); };
   sdk.useShortcuts = themeUseShortcuts;
   sdk.registerGestureActions = (a) => SDK.registerGestureActions(sanitizeIn(a) || {});
   // notifications: showing one is allowed; a notification centre reads the history as plain, read-only data (with the
