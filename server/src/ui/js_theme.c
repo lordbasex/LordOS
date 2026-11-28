@@ -295,7 +295,7 @@ static JSValue f_host_microtask(JSContext *c, JSValueConst t, int argc, JSValueC
     if (argc < 1 || !JS_IsFunction(c, argv[0])) return js_throw_code(c, "theme.notAllowed", "call", "hostMicrotask", NULL);
     if (S.realm && JS_IsFunctionOfRealm(c, argv[0], S.realm)) return js_throw_code(c, "theme.notAllowed", "call", "hostMicrotask", NULL);
     if (JS_EnqueueTrustedJob(c, job_call, 1, argv) < 0) return JS_EXCEPTION;
-    return JS_UNDEFINED;
+    return JS_TRUE;                 /* queued (runtime/index.js queues it itself otherwise) */
 }
 /* lord.themeOwn(id): this node is one of the theme's own (made by the facade's View, Text or Image) */
 static JSValue f_theme_own(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
