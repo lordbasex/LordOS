@@ -5,8 +5,8 @@
 #   python3 tests/hands_e2e.py
 #   1. the maintainer's example: open Notes, File → Import…, pick Documents/Shopping list.md, Choose: the note exists;
 #      and a recording exported as a GIF;
-#   2. a permission prompt (Screenshots asks for the screen): a click aimed at it and a key are refused, the screenshot
-#      shows it black;
+#   2. a permission prompt (Screenshots asks for the screen, the person's click on Capture: an agent's is refused, F1 of
+#      the 0.8.9.6.2 scan): a click aimed at it and a key are refused, the screenshot shows it black;
 #   3. the banner shows on the display while the agent is connected, and the person's click on its Stop (through the test
 #      hooks, as a real pointer) stops the agent: its next call is refused as stopped;
 #   4. a community theme's trust dialog (Settings → Appearance, an untrusted theme): Enter while it has the keyboard and a
@@ -224,7 +224,19 @@ def permission_prompt():
         t = a.text('find', window_id='desktop', query='Capture')
         r = ref(t, r'clickable "Capture"')
         check(r is not None, 'Screenshots\' Capture found')
+        # an agent's click never takes a capture (security scan 0.8.9.6.2, F1): no prompt, nothing captured
         a.text('computer', action='left_click', ref=r)
+        time.sleep(1.5)
+        w0, h0, rows0 = png_rgb(a.png())
+        mid0 = rows0[h0 // 4][(w0 // 2) * 3:(w0 // 2) * 3 + 3]
+        check(not (abs(mid0[0] - mid0[1]) < 8 and abs(mid0[1] - mid0[2]) < 8 and mid0[0] < 80),
+              f'the agent\'s click on Capture raises no prompt: its capture is refused ({tuple(mid0)})')
+        # the person's click (the test hooks, a real pointer) asks for the screen: the prompt the agent can't reach
+        m = re.search(r'clickable "Capture" \[ref_\d+\] @(\d+),(\d+) (\d+)x(\d+)', t)
+        if m:
+            cx, cy = int(m.group(1)) + int(m.group(3)) // 2, int(m.group(2)) + int(m.group(4)) // 2
+            for cmd in (f'ptr {cx} {cy}', 'btn 0 1', 'btn 0 0'):
+                a.hook(cmd)
         time.sleep(1.5)
         c = a.text('computer', action='left_click', coordinate=[640, 250])
         check('Refused (system-layer)' in c, 'a click aimed at the permission prompt is refused')

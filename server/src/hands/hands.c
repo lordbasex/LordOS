@@ -272,7 +272,8 @@ int hands_chords(const char *s, HandsChord *c, int max, int *n) {
 /* ---- the security-state natives an agent's input never sets off (js.c prof_call) ----
  * the vault's requests (vault.request: reveal, copy, edit…), the keyring, filling a password into a terminal, the
  * firewall's changes, permissions, administrator actions (admin.request), Sentinela's
- * blocklist, theme trust and removal, signing keys, screen-sharing answers, Hands' own switch, power; lord.clipboard.get
+ * blocklist, theme trust and removal, signing keys, screen-sharing answers, Hands' own switch, power, a screen capture or
+ * recording (Screenshots: unredacted, unlike Hands' own Screenshot); lord.clipboard.get
  * answers "" while the clipboard holds a secret. A name ending in "." covers its whole namespace.
  * lord.hands.cursor and lord.hands.motion are not on it: a shell that re-mounts while the agent owns the input (a theme
  * switch the agent clicked) registers its cursor again and re-sends the person's motion. The cursor's nodes are checked
@@ -285,6 +286,9 @@ int hands_native_guard(const char *name) {
         "fw.addRule", "fw.removeRule", "fw.updateRule", "sentinela.block", "sentinela.unblock",
         "themes.trust", "themes.remove", "sign.share", "sign.restore", "share.answer", "hands.serve", "hands.answer",
         "session.power",
+        /* (security scan 0.8.9.6.2, F1) a capture or a recording of the whole screen: Hands' own Screenshot is the agent's,
+         * with the system band, handsDeny nodes and what is outside its allowlist painted black */
+        "media.screenshot", "media.screenRecord",
     };
     if (!name) return HANDS_G_NONE;
     if (!strcmp(name, "clipboard.get")) return HANDS_G_CLIP;

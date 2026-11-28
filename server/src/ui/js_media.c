@@ -27,6 +27,7 @@
 #include "../sec/perms.h"
 #include "../sec/restrict.h"
 #include "../fw/rules.h"
+#include "../hands/hands.h"
 #include "ui.h"
 #include "js_err.h"
 
@@ -457,6 +458,15 @@ static JSValue f_transcode(JSContext *c, JSValueConst t, int argc, JSValueConst 
 
 /* ---- screenshots ---- */
 
+/* A capture taken while an AI agent owned the input (Hands; security scan 0.8.9.6.2, F1): lord.media.screenshot is
+ * refused to the agent's own runs (hands_native_guard), and a capture another run took meanwhile is marked and never
+ * leaves lord-server: no copy, no file, no text read from it. 1 (and the error thrown) for such a picture. */
+static int agent_capture(JSContext *c, const MediaSrc *s) {
+    if (!s || !s->agent_cap) return 0;
+    js_throw_code(c, "hands.refused", NULL);
+    return 1;
+}
+
 /* screenshot(app, { x, y, width, height, display, until, also }?) → id (with protected windows as the protected fill). until: the
  * node of a window's frame (wm.frameNode): what is above that window is left out (Screenshots' window capture).
  * also: with until, up to PAINT_ALSO_MAX node ids painted over the window (its sheets, wm.sheetNodes); others ignored. */
@@ -489,6 +499,7 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
                                        opt_int(c, o, "width", 0, 0, 65536), opt_int(c, o, "height", 0, 0, 65536),
                                        (uint32_t)opt_int(c, o, "display", 0, 0, 1 << 30), opt_int(c, o, "until", 0, 0, 1 << 30),
                                        also, nalso, &refused);
+        if (s && hands_agent_owns_input()) s->agent_cap = 1;    /* the agent's doing: kept inside (agent_capture) */
         /* a protected window asked for alone is refused as such (the app must not crop a capture of it instead) */
         ret = s ? JS_NewInt32(c, s->id) : js_throw_code(c, refused ? "media.protectedWindow" : "media.captureFailed", NULL);
     }
@@ -571,6 +582,7 @@ static JSValue f_ocr(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t;
     MediaSrc *s = argc >= 2 ? media_src_get(arg_id(c, argv[0])) : NULL;
     if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
+    if (agent_capture(c, s)) return JS_EXCEPTION;
     if (!s || !s->px || (s->kind != SK_CAPTURE && s->kind != SK_IMAGE) || s->w < 1 || s->h < 1) return JS_NULL;
     const char *langs = JS_ToCString(c, argv[1]);
     if (!langs) return JS_EXCEPTION;
@@ -649,6 +661,7 @@ static JSValue f_annotate(JSContext *c, JSValueConst t, int argc, JSValueConst *
         dst->h = base->h;
     }
     dst->opaque = base->opaque;          /* a picture opened with transparency keeps it */
+    if (base->agent_cap) dst->agent_cap = 1;   /* the markup of an agent's capture is one too */
     memcpy(dst->px, base->px, (size_t)base->w * base->h * 4);
     JSValue lenv = JS_GetPropertyStr(c, argv[1], "length");
     int32_t n = 0;
@@ -687,6 +700,7 @@ static JSValue f_save_image(JSContext *c, JSValueConst t, int argc, JSValueConst
     (void)t;
     MediaSrc *s = argc >= 2 ? media_src_get(arg_id(c, argv[0])) : NULL;
     if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
+    if (agent_capture(c, s)) return JS_EXCEPTION;
     const char *out = argc >= 2 ? arg_path(c, argv[1]) : NULL;
     if (!s || !s->px || !out) { if (out) JS_FreeCString(c, out); return js_throw_code(c, "media.invalidArguments", NULL); }
     char tmp[PATH_MAX + 64], dst[PATH_MAX], fmt[8], params[64];
@@ -708,6 +722,7 @@ static JSValue f_copy_image(JSContext *c, JSValueConst t, int argc, JSValueConst
     (void)t;
     MediaSrc *s = argc ? media_src_get(arg_id(c, argv[0])) : NULL;
     if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
+    if (agent_capture(c, s)) return JS_EXCEPTION;
     if (!s || !s->px) return js_throw_code(c, "media.invalidImage", NULL);
     const char *rt = getenv("XDG_RUNTIME_DIR");
     if (!rt) return js_throw_code(c, "media.noRuntimeDir", NULL);

@@ -171,11 +171,8 @@ const grab = (d) => allowed(() => media.screenshot(APP, d ? { display: d.id } : 
 const area = createStore(null);   // { shots: [{ handle, display }], mode, start, rect, hover, pointer }
 const isOverlay = (w) => w.app === APP && String(w.instance || w.id).includes('overlay');
 let overlaysUp = false;           // the selection's overlays were opened (and none closed yet)
-let agentTimer = 0;               // a selection an AI agent's input opened ends by itself (below)
 function endArea(keep) {
   overlaysUp = false;
-  clearTimeout(agentTimer);
-  agentTimer = 0;
   const a = area.get();
   if (!a) return;
   area.set(null);
@@ -188,12 +185,17 @@ function endArea(keep) {
 windows.subscribe(() => {
   if (overlaysUp && area.get() && windows.get().filter(isOverlay).length < (area.get().shots || []).length) endArea();
 });
-// Screenshots' selection is in the system band, which an AI agent never reaches (docs/HANDS.md): one its input opened
-// would cover the person's screens with no way out for it. It ends by itself after AGENT_SELECT_MS unless the person
-// takes it (their own pointer or key on it).
-const AGENT_SELECT_MS = 15000;
+// An AI agent's input (Hands, docs/HANDS.md) never takes a capture or starts a recording: ❖⇧3 / ❖⇧4 / Print Screen
+// injected as keys, or a click on the toolbar, would save the whole screen unredacted (handsDeny pages, apps outside
+// the agent's allowlist), which Hands' own Screenshot never shows it (security scan 0.8.9.6.2, F1). The agent has
+// Hands' Screenshot for that. Refused here, and again in lord-server (hands_native_guard: media.screenshot and
+// media.screenRecord; a capture taken while the agent owns the input is never copied, saved or read as text).
 const byAgent = () => typeof lord !== 'undefined' && typeof lord.hands?.injecting === 'function' && !!lord.hands.injecting();
-const personTook = () => { if (agentTimer && !byAgent()) { clearTimeout(agentTimer); agentTimer = 0; } };
+function agentRefused() {
+  if (!byAgent()) return false;
+  refused({ code: 'hands.refused' });
+  return true;
+}
 // A window alone (issue #70): the screen painted again up to that window and no further, so what covered it
 // (other windows, a menu, the Dock) is left out and the window is whole. Its sheets are painted over it (a dialog
 // its app opened in the modal layer, such as Settings → Wallpaper's file dialog, issue #58). null when lord-server
@@ -262,14 +264,14 @@ function copyColor(hex) {
 
 export const capture = {
   // ❖⇧3: a file per display, as other systems do
-  full: () => afterHide(() => withTimer(async () => {
+  full: () => !agentRefused() && afterHide(() => withTimer(async () => {
     let first = true;
     for (const d of displaysToCapture(lord.screen)) { const h = await grab(d); if (!h) return; await finish(h, { copy: first, display: d }); first = false; }
   })),
   // mode: 'area', 'window', 'color', 'text' or 'record' (the area to record: on the main display, which is what is
   // recorded). With Remember Last Selection the last area comes back with its handles, and Enter or the button takes
   // it; an area to record is always confirmed so.
-  area: (mode = 'area') => { const agent = byAgent(); return afterHide(() => (mode === 'record' ? (f) => f() : withTimer)(async () => {
+  area: (mode = 'area') => { if (agentRefused()) return undefined; return afterHide(() => (mode === 'record' ? (f) => f() : withTimer)(async () => {
     endArea();
     const shots = [];
     const main = (lord.screen.displays || []).length > 1 && !lord.screen.mirror ? lord.screen.displays.find((d) => d.main) || null : null;
@@ -290,12 +292,12 @@ export const capture = {
       wm.setFullscreen(id, true, { capture: true });
     });
     overlaysUp = shots.length > 0;
-    if (agent && overlaysUp) agentTimer = setTimeout(() => { agentTimer = 0; endArea(); }, AGENT_SELECT_MS);
   })); },
   // region: an area of the main display (logical pixels), or the whole screen
   async record(region = null) {
     const cur = recording.get();
     if (cur) { media.stop(cur.id); return; }
+    if (agentRefused()) return;
     afterHide(() => withTimer(async () => {
       const o = opts();
       const path = freeName(saveDir(o, true), tr('screenshots.recName', { date: stamp() }), 'mp4');
@@ -415,6 +417,7 @@ const ringOrMenu = () => barShown() && (!!bar.get().ring || bar.get().menu);
 // While a selection waits with its handles (Remember Last Selection, an area to record), Enter takes it
 const adjusting = () => !!area.get()?.adjust && !!area.get()?.rect;
 function confirmArea() {
+  if (agentRefused()) return;                   // the person's selection is theirs to take (Enter injected: refused)
   const a = area.get();
   if (a?.rect) areaDone(a.rect, displayAt((a.shots || []).map((sh) => sh.display).filter(Boolean), a.rect.x + a.rect.w / 2, a.rect.y + a.rect.h / 2));
 }
@@ -435,7 +438,7 @@ addShortcuts([
   { id: 'capture.bar.down', keys: ['ArrowDown'], when: ringOrMenu, run: () => barKey('ArrowDown'), listed: () => false },
   { id: 'capture.bar.up', keys: ['ArrowUp'], when: ringOrMenu, run: () => barKey('ArrowUp'), listed: () => false },
   { id: 'capture.cancel', keys: ['Escape'], when: selecting, run: () => endArea(), listed: () => false },
-  { id: 'capture.windowMode', keys: ['Space'], when: selecting, run: () => { personTook(); toggleWindowMode(); }, listed: () => false },
+  { id: 'capture.windowMode', keys: ['Space'], when: selecting, run: toggleWindowMode, listed: () => false },
   { id: 'capture.copyColor', keys: ['c', 'Shift+c'], when: selecting, run: copyUnderPointer, listed: () => false },
   { id: 'capture.textMode', keys: ['t', 'Shift+t'], when: selecting, run: () => area.set((x) => (x ? { ...x, mode: x.mode === 'text' ? 'area' : 'text', start: null, rect: null } : x)), listed: () => false },
 ]);
@@ -455,7 +458,6 @@ function Overlay({ index }) {
     const offMove = addListener('pointermove', (e) => {
       const cur = area.get();
       if (!cur) return;
-      personTook();
       const loupe = cur.mode !== 'window' ? loupeAt(cur, e.x, e.y) : null;
       // a handle or the inside of a selection that waits (adjust): it is resized or moved inside its display
       if (cur.grab) {
@@ -483,7 +485,6 @@ function Overlay({ index }) {
   }, [list, index]);
   if (!a || !shot) return null;
   const down = (e) => {
-    personTook();
     if (a.mode === 'color') { if (a.loupe) copyColor(a.loupe.color); endArea(); return; }
     const shown = (a.shots || []).map((sh) => sh.display).filter(Boolean);
     const what = a.adjust && a.rect ? hitHandle(a.rect, e.x, e.y) : null;

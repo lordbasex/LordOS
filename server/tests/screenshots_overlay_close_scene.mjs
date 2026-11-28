@@ -24,7 +24,8 @@ lord.perms = { get: () => 'allow', names: () => [] };
 lord.wayland = new Proxy({}, { get: () => () => undefined });
 lord.fs = new Proxy({ home: () => '/home/test', stat: () => { throw new Error('ENOENT'); } }, { get: (o, k) => (k in o ? o[k] : () => undefined) });
 let nextHandle = 100;
-lord.media = new Proxy({ screenshot: () => nextHandle++, info: () => ({ width: 1920, height: 1080 }) },
+let shots = 0, recordings = 0;
+lord.media = new Proxy({ screenshot: () => { shots++; return nextHandle++; }, screenRecord: () => { recordings++; return 900; }, info: () => ({ width: 1920, height: 1080 }) },
   { get: (o, k) => (k in o ? o[k] : () => undefined) });
 lord.screen.displays = [{ id: 1, x: 0, y: 0, w: 1920, h: 1080, main: true, scale: 100 }, { id: 2, x: 1920, y: 0, w: 1920, h: 1080, scale: 100 }];
 lord.screen.width = 3840; lord.screen.height = 1080; lord.screen.mirror = false;
@@ -65,4 +66,24 @@ await flush();
 check('one overlay closed: the others go too', overlays().length, 0);
 await type('ta');
 check('and the keys are the field\'s again', value, 'c t ca tota');
+
+// An AI agent's input never takes a capture (security scan 0.8.9.6.2, F1): ❖⇧3, ❖⇧4 and a recording injected as keys
+// or clicked on the toolbar are refused before lord.media.screenshot is called (lord-server refuses it again)
+const before = shots;
+lord.hands = { injecting: () => true };
+capture.full();
+capture.area('area');
+capture.area('window');
+capture.area('record');
+await capture.record();
+await sleep(400);
+await flush();
+check('an agent\'s capture: lord.media.screenshot never called', shots - before, 0);
+check('an agent\'s recording: lord.media.screenRecord never called', recordings, 0);
+check('an agent\'s ❖⇧4: no overlay', overlays().length, 0);
+lord.hands = { injecting: () => false };
+capture.full();
+await sleep(400);
+await flush();
+check('the person\'s ❖⇧3 still captures every display', shots - before, 2);
 process.exit(0);

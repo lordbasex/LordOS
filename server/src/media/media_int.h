@@ -150,6 +150,10 @@ typedef struct {
     /* its picture belongs to a protected window (shown in a NODE_MEDIA inside a protected node, or marked by its owner:
      * lord.vm.protect): never copied out of lord-server (media_src_exportable). Set once, never cleared. */
     int protect;
+    /* a screen capture taken while an AI agent owned the input (Hands, hands_agent_owns_input), or a picture made from
+     * one (crop, resize, turns, markup): never copied, saved or read as text (js_media.c agent_capture; security scan
+     * 0.8.9.6.2, F1). Set once, never cleared. */
+    int agent_cap;
 } MediaSrc;
 
 /* media.c */

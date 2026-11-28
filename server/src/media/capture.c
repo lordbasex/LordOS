@@ -261,6 +261,7 @@ MediaSrc *media_crop(MediaSrc *src, int x, int y, int w, int h) {
     s->w = w;
     s->h = h;
     s->opaque = src->opaque;           /* a picture with transparency keeps it */
+    s->agent_cap = src->agent_cap;     /* an agent's capture stays one */
     s->frame_seq = 1;
     return s;
 }
@@ -276,6 +277,7 @@ static MediaSrc *new_pixels(const MediaSrc *src, int w, int h) {
     s->w = w;
     s->h = h;
     s->opaque = src->opaque;
+    s->agent_cap = src->agent_cap;
     s->frame_seq = 1;
     return s;
 }

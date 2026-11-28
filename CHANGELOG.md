@@ -10,6 +10,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Security
+- **Hands: an AI agent's input no longer takes a screen capture or recording through Screenshots** (security scan of
+  0.8.9.6.2, F1). An agent could press ❖⇧3 (or ❖⇧4, Print Screen, a toolbar button) and get a full, unredacted PNG
+  of every display in `~/Pictures/Screenshots` and on the clipboard, including the handsDeny pages and the windows
+  outside its allowlist that Hands' own Screenshot paints black. Screenshots now refuses every capture, area
+  selection, recording and Enter on a waiting selection when the input is the agent's (`lord.hands.injecting()`),
+  with "Only you can do this" (`hands.refused`), and no longer needs the 15-second timeout for an agent's selection.
+  As a backstop, lord-server refuses `lord.media.screenshot` and `lord.media.screenRecord` to an agent's input
+  (`hands_native_guard`), and a capture another run takes while the agent owns the input is marked (`agent_cap`,
+  inherited by crops, resizes, turns and markup) and never copied, saved or read by OCR. Tests: `build/hands-test`
+  (both names refused, `media.saveImage`/`copyImage`/`crop` left alone) and the Screenshots scene of
+  `tests/textfield_menu_test.mjs` (no `screenshot` or `screenRecord` call for an agent's ❖⇧3, ❖⇧4, window, record;
+  the person's ❖⇧3 still captures both displays).
+
 ### Added
 - **Text Editor: a horizontal scroll bar for lines wider than the window** (GitHub #264, first part; soft word wrap
   is planned for 0.8.9.6.3). Along the bottom of the text column, it shows when the widest line doesn't fit; drag its
