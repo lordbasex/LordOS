@@ -4,10 +4,13 @@
 import { View, Text, useTheme, useStore, Button, TextInput, Segmented, Toggle, ScrollView, t, mailAccounts, mailStatus, mailConfig, autoconfig, OAUTH_PROVIDERS, DAV_PRESETS, davPreset } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 
-export function Sheet({ children, onClose, width = 460 }) {
+// handsDeny: every sheet of this file (adding an account, its servers and password, trusting a certificate, the
+// accounts panel) is the person's own, never an AI agent's (docs/HANDS.md; security scan 0.8.9.6.2, F3). Isolated,
+// Mail draws in its own process, so lord-server's broker refuses the save itself too (brokermail.c).
+export function Sheet({ children, onClose, width = 460, handsDeny = false }) {
   const th = useTheme();
   return (
-    <View onMouseDown={(e) => { e.stopPropagation?.(); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.32)', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+    <View handsDeny={handsDeny || undefined} onMouseDown={(e) => { e.stopPropagation?.(); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.32)', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
       <View onClick={(e) => e.stopPropagation?.()} style={{ width, maxWidth: '94%', maxHeight: '92%', padding: 18, gap: 10, borderRadius: 14, backgroundColor: th.windowBg,
         border: `1px solid ${th.separator}`, boxShadow: '0 20px 50px rgba(0,0,0,0.45)' }}>
         {children}
@@ -190,7 +193,7 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail', preset: preset0 = 
   const title = kind === 'dav' ? t('mail.setup.titleDav') : t('mail.setup.title');
   const failed = step === 'result' && !!created && (result === 'auth' || result === 'offline' || result === 'cert');
   return (
-    <Sheet>
+    <Sheet handsDeny>
       <Text style={{ fontSize: 17, fontWeight: 700, color: th.text }}>{title}</Text>
       {step === 'who' && (
         <View style={{ gap: 8 }}>
@@ -279,7 +282,7 @@ export function CertDialog({ cert, onClose }) {
     </View>
   );
   return (
-    <Sheet width={520}>
+    <Sheet width={520} handsDeny>
       <Text style={{ fontSize: 16, fontWeight: 700, color: '#ff453a' }}>{t('mail.cert.title')}</Text>
       <Text style={{ fontSize: 13, color: th.text }}>{t('mail.cert.body', { host: `${cert.host}:${cert.port}` })}</Text>
       <View style={{ padding: 10, borderRadius: 8, backgroundColor: th.control, gap: 3 }}>
@@ -311,7 +314,7 @@ export function PasswordPrompt({ acct, onClose }) {
   };
   if (notSaved) {
     return (
-      <Sheet>
+      <Sheet handsDeny>
         <Text style={{ fontSize: 16, fontWeight: 700, color: th.text }}>{t('mail.password.title')}</Text>
         <Text style={{ fontSize: 13, color: th.textDim }}>{keyringNote(notSaved)}</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
@@ -321,7 +324,7 @@ export function PasswordPrompt({ acct, onClose }) {
     );
   }
   return (
-    <Sheet>
+    <Sheet handsDeny>
       <Text style={{ fontSize: 16, fontWeight: 700, color: th.text }}>{t('mail.password.title')}</Text>
       <Text style={{ fontSize: 13, color: th.textDim }}>{t('mail.password.body', { user: a?.user || acct })}</Text>
       <TextInput value={pw} onChange={setPw} secure autoFocus onSubmit={go} onCancel={onClose} />
@@ -357,7 +360,7 @@ export function AccountsPanel({ onClose, onAdd, onPassword, initial = null, conf
   };
   if (confirm && a) {
     return (
-      <Sheet width={420}>
+      <Sheet width={420} handsDeny>
         <Text style={{ fontSize: 16, fontWeight: 700, color: th.text }}>{t('mail.accounts.removeTitle', { name: a.name || a.email || a.user })}</Text>
         <Text style={{ fontSize: 13, color: th.textDim }}>{t(a.kind === 'dav' ? 'mail.accounts.removeBodyDav' : 'mail.accounts.removeBody')}</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
@@ -368,7 +371,7 @@ export function AccountsPanel({ onClose, onAdd, onPassword, initial = null, conf
     );
   }
   return (
-    <Sheet width={620}>
+    <Sheet width={620} handsDeny>
       <Text style={{ fontSize: 17, fontWeight: 700, color: th.text }}>{t('mail.accounts.title')}</Text>
       <View style={{ flexDirection: 'row', gap: 12, height: 300 }}>
         <View style={{ width: 200, gap: 2, backgroundColor: th.sidebarBg, borderRadius: 8, padding: 6 }}>

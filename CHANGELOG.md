@@ -38,6 +38,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   refusals, each blocking condition, per-key checks, the drop) and the `probe` fixture of
   `tests/community_theme_headless.sh` (a LordOS `TextInput` with the keys: the theme sees the stand-in, can't take or
   restore the keys, and hears no key).
+- **Hands: an AI agent's input never trusts a mail certificate or changes a mail account** (security scan of
+  0.8.9.6.2, F3). Mail's certificate dialog was not handsDeny and Mail is not a person-only app, so an agent's click
+  on **Trust** (with someone in the middle presenting their own certificate) saved that fingerprint, and lord-maild
+  then sent the password and the mail through them. Now, while the agent owns the input, the broker refuses the
+  isolated Mail's `save` of the accounts file (`hands.refused`) unless it changes only display fields (name, full
+  name, signature, color, folded and collapsed folders, saving to Sent; the notify, mail-paused and dav-paused
+  switches): a trusted certificate, a server, the user, address or way in, an account added or removed, a trusted
+  sender or anything unparseable is refused (`brokermail_cfg_guarded`, fail closed). In the shell's own process
+  `lord.mail.saveConfig` is on `hands_native_guard`'s list. Every sheet of Mail's account setup (Add Account, the
+  certificate warning, the password prompt, the accounts panel) is `handsDeny` too. Tests: `build/brokermail-test`
+  (10 cases of what is guarded, an agent's Trust and Add Account refused with nothing saved, a signature change
+  saved, the person's own Trust saved) and `build/hands-test` (`mail.saveConfig` refused, `mail.config` and
+  `mail.request` left alone).
 
 ### Added
 - **Text Editor: a horizontal scroll bar for lines wider than the window** (GitHub #264, first part; soft word wrap

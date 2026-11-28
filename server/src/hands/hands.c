@@ -289,6 +289,9 @@ int hands_native_guard(const char *name) {
         /* (security scan 0.8.9.6.2, F1) a capture or a recording of the whole screen: Hands' own Screenshot is the agent's,
          * with the system band, handsDeny nodes and what is outside its allowlist painted black */
         "media.screenshot", "media.screenRecord",
+        /* (F3) Mail's accounts file in the shell's own process: trusted certificates, servers, accounts (the isolated
+         * Mail's "save" is refused in the broker, brokermail.c brokermail_cfg_guarded) */
+        "mail.saveConfig",
     };
     if (!name) return HANDS_G_NONE;
     if (!strcmp(name, "clipboard.get")) return HANDS_G_CLIP;

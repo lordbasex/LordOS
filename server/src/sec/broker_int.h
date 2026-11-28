@@ -31,6 +31,9 @@ int  brokerkr_pollfd(void);                                    /* lord-vault rep
 
 /* Is broker connection `conn` a system package? */
 int  brokersrv_conn_system(int conn);
+/* Hands: an AI agent's input owns the input now (hands_agent_owns_input; the request it set off is refused when it
+ * changes a security decision) */
+int  brokersrv_hands_owns(void);
 /* Event for the session's JS (privacy.js __lordBroker): kind, preformatted JSON (≤ 4 KiB). */
 void brokersrv_shell_event(const char *kind, const char *json);
 
@@ -38,6 +41,11 @@ void brokersrv_shell_event(const char *kind, const char *json);
 /* fds: received with the request; the handler closes or keeps every one of them. */
 void brokermail_handle(int conn, int fd, uint32_t reqid, const char *app, char *payload, uint32_t len, int *fds, int nfds);
 void brokermail_sys_open(int conn, int fd, uint32_t reqid, const char *app, char *payload, uint32_t len);
+/* Hands (security scan 0.8.9.6.2, F3): 1 when the accounts file `nw` changes what only the person decides against `old`
+ * (NULL or empty: none yet): an account added or removed, its servers, user, address, way in, trusted certificates or
+ * any other field than the display ones (name, fullName, signature, color, collapsed, folded, sentSaved), or a
+ * top-level key other than notify, mailPaused and davPaused (trustedSenders). Anything unparseable is 1. */
+int  brokermail_cfg_guarded(const char *old, size_t ol, const char *nw, size_t nl);
 void brokermail_conn_closed(int conn);
 void brokermail_tick(void);
 int  brokermail_pollfd(void);                                  /* lord-maild replies waiting, or -1 */

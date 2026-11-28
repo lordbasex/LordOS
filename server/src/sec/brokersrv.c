@@ -278,6 +278,7 @@ int brokersrv_add(int fd, const char *id, int pid) {
 void brokersrv_set_packaged(int fd) { for (int i = 0; i < MAX_APPS; i++) if (apps[i].used && apps[i].fd == fd) apps[i].packaged = 1; }
 void brokersrv_set_system(int fd) { for (int i = 0; i < MAX_APPS; i++) if (apps[i].used && apps[i].fd == fd) apps[i].sys = 1; }
 int brokersrv_conn_system(int conn) { return conn >= 0 && conn < MAX_APPS && apps[conn].used && apps[conn].sys; }
+int brokersrv_hands_owns(void) { return hands_agent_owns_input(); }
 void brokersrv_shell_event(const char *kind, const char *json) { queue_evt(kind, "%s", json); }
 
 /* The app is already running: ask its process for another window (Dock → «New window»). */

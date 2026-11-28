@@ -217,7 +217,7 @@ LordOS; take a screenshot of it. An isolated `.lpk` app runs in its own process:
   while a Hands client is active and the agent's input came after the person's last real click or key
   (`hands_agent_owns_input`; motion never counts, time never clears it), the vault and keyring, `term.fill` and saving a
   terminal secret, the firewall's changes, permissions, administrator actions, Sentinela's blocklist, theme trust and
-  removal, signing keys, screen-sharing answers, Hands' own switch, power and a screen capture or recording (`media.screenshot`, `media.screenRecord`: Screenshots' capture is unredacted; a capture taken while the agent owns the input is never copied, saved or read as text) refuse (`hands.refused`), so a surface
+  removal, signing keys, screen-sharing answers, Hands' own switch, power and a screen capture or recording (`media.screenshot`, `media.screenRecord`: Screenshots' capture is unredacted; a capture taken while the agent owns the input is never copied, saved or read as text), Mail's accounts file in the shell (`mail.saveConfig`; the isolated Mail's save is refused in the broker unless it changes only display fields: `brokermail_cfg_guarded`) refuse (`hands.refused`), so a surface
   missing its `handsDeny` can't reopen them. **By origin, not only by time** (0.8.9.6.2, BUG-10 of the QA: the shell's
   own refreshes were refused for minutes after each agent click, 237 times in one session): every JavaScript run has
   an origin (`hands.h` `HANDS_ORIGIN_*`, `js.c` `run_origin`). The agent's: its input being delivered, a shell call
