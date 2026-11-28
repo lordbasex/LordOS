@@ -479,6 +479,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Desktop: Monitor over many windows no longer stalls the GPU path** (QA on the maintainer's PC, ws174: three 4K
+  displays at 200 %, about 18 windows under Monitor; `compositor.log` showed `stall: 0.8–1.6 s paint display` every two
+  seconds and `lord-server` at 100 %, gone with Monitor closed). The opaque-cover skip (what an opaque node painted
+  over the whole damaged region hides is not painted) and the hidden-blur rule (a blurred window under an opaque one
+  doesn't grow the damage) ran only on the CPU path, so on the GPU path each of Monitor's live rectangles (about four
+  a second, 9 to 10 % of a display) painted every window under it again. Both now hold on the GPU path too: what the
+  cover leaves out is only walked to note its app windows and GPU pictures in the frame's list, in paint order
+  (`skip_note_walk`), and only when nothing before the cover is transformed (`cover_notable`); never in a capture or
+  with a dragged window (`server/src/ui/paint.c`). Monitor's own damage was checked headless (Monitor alone: ~4 frames
+  a second, 9 to 10 % of a 1920×1080 display in 6 to 8 rectangles, its live charts) and left as it is. Test:
+  `build/engine-test` `test_gpu_cover` (every frame equal to a full repaint, the same list of app windows, no covered
+  window painted; GPU path 6.2 → 0.55 ms a frame); `test_damage_fuzz`, `test_damage_pipeline` and the drag hashes
+  unchanged. Docs: `docs/MONITOR.md`, `docs/LAYERS.md`.
 - **Machines: the LordOS and Kali cards' "Install without questions" note, and the computer's name after changing
   cards** (QA on the maintainer's PC, ws174). The note showed the raw keys `machines.un.how.lordos` and
   `machines.un.how.kali`; it now says where the answers go (LordOS: the small `LORDOSAUTO` disk the installer reads,

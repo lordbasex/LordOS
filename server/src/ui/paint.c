@@ -65,6 +65,9 @@ enum { SKIP_PATH_MAX = 64 };
 static const Node *skip_path[SKIP_PATH_MAX];
 static int skip_depth, skip_path_ok;
 static int paint_cull;                  /* paint_node may skip clipped subtrees outside the clip (CPU path) */
+/* GPU path, the opaque cover (paint_root_body): the subtrees skip_until leaves out are not painted, but their app
+ * windows and GPU pictures are noted in the frame's list, in paint order, as painting them would (skip_note_walk) */
+static int skip_note;
 
 static int layer_paint(Canvas *c, Node *n, float opacity);
 static int tf_paint(Canvas *c, Node *n, float opacity);
@@ -114,6 +117,7 @@ static int skip_ancestor(const Node *n) {
 static int cap_last, cap_done;
 
 static void paint_node_body(Canvas *c, Node *n, float opacity);
+static void skip_note_walk(Canvas *c, Node *n, float opacity);
 static void paint_node(Canvas *c, Node *n, float opacity) {
     if (cap_done) return;
     paint_node_body(c, n, opacity);
@@ -191,7 +195,10 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
      * pixel over the same pixel (the copy of what is below already has it), one level darker than a
      * full repaint at the corners of rounded windows below the dragged one (step 9, approved
      * 2026-10-28: the only pixel change of the drag-frame work, towards what a full repaint gives). */
-    if (!own && !skip_ancestor(n)) return;
+    if (!own && !skip_ancestor(n)) {
+        if (skip_note) skip_note_walk(c, n, opacity);
+        return;
+    }
 
     if (own && (s->shadow_color >> 24) && (s->shadow_blur > 0 || s->shadow_x || s->shadow_y))
         PROF(0, canvas_shadow(c, x, y, w, h, rad, s->shadow_x * k, s->shadow_y * k, s->shadow_blur * k,
@@ -828,6 +835,26 @@ static void layer_register(Canvas *c, Node *n, float op) {
                          (n->w - pd[EDGE_L] - pd[EDGE_R] - bl - br) * k, (n->h - pd[EDGE_T] - pd[EDGE_B] - bt - bb) * k, op);
     }
     if (n->type != NODE_TEXT) for (Node *k = n->first; k; k = k->next) layer_register(c, k, op);
+}
+
+/* A subtree the opaque cover leaves out on the GPU path (skip_note): its app windows and GPU pictures noted as
+ * paint_node_body notes them (the same early returns, children in paint order), nothing painted. Their holes, opened
+ * inside the damage, are painted over by the cover. paint_root_body takes the cover only when nothing before it in
+ * paint order is transformed (cover_notable): tf_paint places those windows through wl_tf_begin. */
+static void skip_note_walk(Canvas *c, Node *n, float opacity) {
+    if (n->type == NODE_RAW || n->s.display_none) return;
+    float op = opacity * n->s.opacity;
+    if (op < 0.004f) return;
+    const float *pd = node_padding(n);
+    float bl = node_border(n, EDGE_L), bt = node_border(n, EDGE_T), br = node_border(n, EDGE_R), bb = node_border(n, EDGE_B);
+    float lix = n->ax + pd[EDGE_L] + bl, liy = n->ay + pd[EDGE_T] + bt;
+    float liw = n->w - pd[EDGE_L] - pd[EDGE_R] - bl - br, lih = n->h - pd[EDGE_T] - pd[EDGE_B] - bt - bb;
+    if (n->type == NODE_SURFACE) wl_paint(c, n->term, n->id, lix, liy, liw, lih, op);
+    if (n->type == NODE_MEDIA) media_paint_note(c, n->term, n->id, VX(lix), VY(liy), liw * paint_view.k, lih * paint_view.k, op);
+    if (n->type == NODE_TEXT) return;
+    Node *kids[MAX_KIDS];
+    int k = node_children_ordered(n, kids, MAX_KIDS);
+    for (int i = 0; i < k; i++) skip_note_walk(c, kids[i], op);
 }
 
 /* The layer's box: the window's and its subtree's (logical px) in *b, its pixels on the view's
@@ -1836,8 +1863,9 @@ static Box blur_near(const Node *n) {
  * (45 % of a 1280x800 screen per frame on VM 116, in one box even with several rectangles on,
  * instead of a few small rectangles; docs/MONITOR.md). Same test as cover_walk below (opaque
  * background, opacity 1 down the tree, no transform, away from rounded corners, clipped by its
- * ancestors), in paint order: only a cover met after the node counts. CPU path without a dragged
- * window only, as the opaque-cover skip (engine-test test_hidden_blur_damage). */
+ * ancestors), in paint order: only a cover met after the node counts. Without a dragged window only,
+ * as the opaque-cover skip; on the GPU path too since 0.8.9.6.2 (engine-test test_hidden_blur_damage,
+ * test_gpu_cover). */
 typedef struct { int target, seen, covered; Box d; } HideWalk;
 
 static void hide_walk(Node *n, Box clip, HideWalk *h) {
@@ -1863,7 +1891,7 @@ static void hide_walk(Node *n, Box clip, HideWalk *h) {
 }
 
 static int blur_hidden(Node *n) {
-    if (gpu_active() || layer.want || !ui.root || n->has_tf) return 0;
+    if (layer.want || !ui.root || n->has_tf) return 0;
     Box b = n->prev_box;
     if (b.x1 <= b.x0 || b.y1 <= b.y0) return 0;
     HideWalk h = { n->id, 0, 0, { floorf(b.x0), floorf(b.y0), ceilf(b.x1), ceilf(b.y1) } };
@@ -2317,6 +2345,19 @@ static int opaque_cover_node(Node *root) {
     return found == root->id ? 0 : found;
 }
 
+/* GPU path: whether every node met before the cover in paint order can be left to skip_note_walk: none of them
+ * transformed (1), or one is (0). *reached: the cover was met. */
+static int cover_notable(const Node *n, int cover, int *reached) {
+    if (n->id == cover) { *reached = 1; return 1; }
+    if (n->type == NODE_RAW || n->s.display_none) return 1;
+    if (n->own_tf) return 0;
+    if (n->type == NODE_TEXT) return 1;
+    Node *kids[MAX_KIDS];
+    int k = node_children_ordered((Node *)n, kids, MAX_KIDS);
+    for (int i = 0; i < k && !*reached; i++) if (!cover_notable(kids[i], cover, reached)) return 0;
+    return 1;
+}
+
 /* paint_below_verify: the canvas before a frame that switched to the copy (below_switch) */
 static uint32_t *below_snapshot(const Canvas *c) {
     uint32_t *p = malloc((size_t)c->w * c->h * 4);
@@ -2532,7 +2573,17 @@ static int paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb, GpuDr
     /* solo cambió un cuadro de video que tapa esa región: se pinta desde ese nodo (no en el camino
      * GPU, que arma acá la lista de ventanas de las apps) */
     skip_until = gpu_active() ? 0 : media_cover_node(ui.damage.x0, ui.damage.y0, ui.damage.x1, ui.damage.y1);
-    if (!skip_until && !gpu_active() && !layer.want) skip_until = opaque_cover_node(root);
+    /* the opaque cover: also on the GPU path (ws174, Monitor over 18 windows at 4K: each of its changes painted every
+     * window under it again), where what it leaves out is only noted (skip_note); not in a capture */
+    skip_note = 0;
+    if (!skip_until && !layer.want && (!gpu_active() || !paint_capture_mode)) {
+        skip_until = opaque_cover_node(root);
+        if (skip_until && gpu_active()) {
+            int reached = 0;
+            if (cover_notable(root, skip_until, &reached) && reached) skip_note = 1;
+            else skip_until = 0;
+        }
+    }
     skip_reached = 0;
     paint_cull = !gpu_active() && paint_multi_damage;
     /* una ventana que se mueve: lo de abajo se copia y se pinta desde ella (capa del arrastre) */
@@ -2573,6 +2624,7 @@ static int paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb, GpuDr
     if (pre && taken) free(pre);                /* W is the GPU's: the old way is compared there by LORD_GPU_VERIFY */
     else if (pre) below_verify(c, root, pre);
     skip_until = 0;
+    skip_note = 0;
     paint_cull = 0;
     tf_gc();
     wl_paint_popups(c);                     /* menús de las apps Wayland, encima de todo */

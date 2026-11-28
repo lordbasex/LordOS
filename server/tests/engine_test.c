@@ -34,8 +34,10 @@
  * logical px, as term_paint.c notes s->gx… for term_damage */
 static int term_cursor;
 static Box term_at;
+static int term_paints;                 /* test_gpu_cover: how many times a terminal was painted inside the clip */
 void term_paint(Canvas *c, int id, float x, float y, float w, float h, float op) {
     (void)id;
+    if (x < c->clip.x1 && y < c->clip.y1 && x + w > c->clip.x0 && y + h > c->clip.y0) term_paints++;
     const float k = paint_view.k;
     uint32_t a = (uint32_t)(op * 255 + 0.5f) << 24;
     canvas_rrect(c, x, y, w, h, 0, a | 0x101014);
@@ -4487,6 +4489,86 @@ static void test_blit_crop(void) {
  * and is no strip the CPU repaints with each frame (paint_blurs_over); one with something else under it (a desktop
  * icon, another window's shadow, a rounded clip around it) stays the CPU's, and so does everything without the switch,
  * on the CPU path and in a capture */
+/* Monitor over many windows on the GPU path (QA on the maintainer's PC, ws174: 3 displays at 4K, 200 %, about 18
+ * windows under Monitor; every ~2 s a 0.8-1.6 s stall painting a display, gone with Monitor closed). The opaque-cover
+ * skip (cover_walk) and the hidden-blur rule (blur_hidden) ran only on the CPU path, so on the GPU path every window
+ * under Monitor's changing chart was painted again inside each of its rectangles, and a translucent, blurred window
+ * under it grew the damage to its whole body. Now both hold on the GPU path too: the windows below the cover are only
+ * noted (their app windows stay in the frame's list, in paint order, for the GPU to draw), never painted. Every frame
+ * must equal a full repaint, the list of app windows must be the full repaint's, and no covered terminal is painted. */
+static void test_gpu_cover(void) {
+    enum { W = 1280, H = 800, NWIN = 18, ROWS = 40, BARS = 24 };
+    for (int gpu = 0; gpu < 2; gpu++)
+        for (int mode = 0; mode < 2; mode++) {
+            test_gpu = gpu;
+            paint_multi_damage = mode;
+            ui_reset();
+            Node *root = view(NULL);
+            ui.root = root;
+            sn(root, "backgroundColor", 0xff203040);
+            for (int i = 0; i < NWIN; i++) {
+                Node *w = i == NWIN - 2 ? box_in(root, 360, 260, 600, 400, 0xff1f1f23)
+                                        : box_in(root, (float)(20 + i * 30), (float)(20 + i * 16), 700, 480, 0xff1f1f23);
+                ss(w, "overflow", "hidden");
+                sn(w, "borderRadius", 12);
+                sn(w, "shadowColor", 0x80000000); sn(w, "shadowBlur", 30); sn(w, "shadowOffsetY", 10);
+                for (int r = 0; r < ROWS; r++) box_in(w, 10, (float)(30 + r * 11), 680, 9, r % 2 ? 0xff2c2c30 : 0xff34343a);
+                Node *t = node_new(NODE_TERM);
+                node_append(w, t);
+                ss(t, "position", "absolute");
+                sn(t, "left", 400); sn(t, "top", 100); sn(t, "width", 200); sn(t, "height", 120);
+                if (i % 6 == 2) {                               /* a Linux app's window */
+                    Node *surf = node_new(NODE_SURFACE);
+                    surf->term = 100 + i;
+                    node_append(w, surf);
+                    ss(surf, "position", "absolute");
+                    sn(surf, "left", 20); sn(surf, "top", 60); sn(surf, "width", 300); sn(surf, "height", 200);
+                }
+                if (i == NWIN - 2) {                            /* a translucent, blurred Terminal right under Monitor */
+                    Node *body = box_in(w, 0, 24, 600, 376, 0x50202020);
+                    sn(body, "backdropBlur", 14);
+                }
+            }
+            Node *mon = box_in(root, 300, 200, 760, 520, 0xff2a2a2c);   /* Monitor, opaque, on top */
+            ss(mon, "overflow", "hidden");
+            sn(mon, "borderRadius", 10);
+            Node *chart = box_in(mon, 40, 60, 680, 400, 0xff20304a);
+            ss(chart, "overflow", "hidden");
+            Node *bars[BARS];
+            for (int i = 0; i < BARS; i++) bars[i] = box_in(chart, (float)(i * 28), 200, 20, 200, 0xff30d158);
+            render(root, W, H);
+            int bad = 0, worst_all = 0, list_bad = 0, frames = 0;
+            long painted = 0;
+            double ms = 0;
+            for (int f = 0; f < 12; f++) {
+                for (int i = 0; i < BARS; i++) sn(bars[i], "top", (float)(40 + (rnd() % 300)));   /* every bar: the chart changes */
+                layout_root(root, W, H);
+                int n = 0;
+                float area = 0;
+                term_paints = 0;
+                double t0 = now_ms();
+                if (paint_partial(root, W, H, &n, &area) < 0) { bad++; continue; }
+                ms += now_ms() - t0;
+                painted += term_paints;
+                frames++;
+                WDraw got[WDRAW_MAX];
+                int ngot = nwdraw;
+                memcpy(got, wdraw, sizeof *wdraw * (size_t)nwdraw);
+                int where = 0, worst = full_differs(root, W, H, &where);
+                if (worst > worst_all) worst_all = worst;
+                if (gpu && (ngot != nwdraw || memcmp(got, wdraw, sizeof *wdraw * (size_t)ngot))) list_bad++;
+            }
+            CHECK(!bad, "gpu cover %d/%d: %d frames with bad rectangles", gpu, mode, bad);
+            CHECK(worst_all <= 1, "gpu cover %d/%d: a frame differs from a full repaint by %d", gpu, mode, worst_all);
+            CHECK(!list_bad, "gpu cover %d/%d: %d frames lost or reordered app windows", gpu, mode, list_bad);
+            CHECK(!painted, "gpu cover %d/%d: %ld covered terminals painted in %d frames", gpu, mode, painted, frames);
+            printf("monitor over %d windows (%s, %s): %.2f ms a frame, %ld covered terminals painted\n", NWIN, gpu ? "GPU path" : "CPU path",
+                   mode ? "several rectangles" : "one box", frames ? ms / frames : 0, painted);
+        }
+    test_gpu = 0;
+    paint_multi_damage = 0;
+}
+
 static void test_gpu_frost(void) {
     enum { W = 800, H = 600 };
     ui_reset();
@@ -4776,6 +4858,7 @@ int main(int argc, char **argv) {
     test_text_child_damage();
     test_minimize_damage();
     test_hidden_blur_damage();
+    test_gpu_cover();
     test_motion_blur_refresh();
     test_gpu_frost();
     test_gscissor_unit();
