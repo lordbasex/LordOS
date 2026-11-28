@@ -479,6 +479,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Quick Settings: Dark, Transparency and the accent colour set from a community theme show at once** (QA on ws174:
+  they showed only on the next render). A store tells each subscriber on its own now: one that throws (a native call
+  refused while the theme's code is on the stack) no longer keeps the rest from hearing the change, and the error is
+  logged once (`sdk/store.js`). `agentInput` (`sdk/adminsyncmodel.js`) counts a refused `lord.hands.injecting` as "not
+  injecting", and the terminal's Writing switch (`sdk/writing.jsx`) is skipped and told on the next change when
+  `lord.writing` is refused. The realm rules are unchanged. Test: `tests/store_subscribers_test.mjs`.
 - **Community themes: Lock Screen from a community theme no longer freezes the desktop** (QA on ws174). The theme's
   `session.lock()` called LordOS's lock straight away, which re-renders the shell while the theme's own code was still
   on the stack, so removing the theme's nodes was refused and the screen stopped answering. Locking now runs in a job

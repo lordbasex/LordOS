@@ -25,9 +25,12 @@ export function setWritingOn(on) { settings.set((s) => ({ ...s, writing: { ...(s
 // The `lumo` command (docs/AI.md "Writing from the terminal") follows the same switch and model: lord-server is told
 // them (lord.writing.serve) and picks the installed model itself when a command asks.
 function serveTerminal() {
-  const w = api();
-  if (!w || typeof w.serve !== 'function') return;
-  try { w.serve(writingOn(), (settings.get().sentinela || {}).model || null); } catch (e) { /* an older lord-server */ }
+  // an older lord-server, or refused (a community theme's code on the stack): skipped, told on the next change
+  try {
+    const w = api();
+    if (!w || typeof w.serve !== 'function') return;
+    w.serve(writingOn(), (settings.get().sentinela || {}).model || null);
+  } catch (e) { /* skipped */ }
 }
 serveTerminal();
 settings.subscribe(serveTerminal);
