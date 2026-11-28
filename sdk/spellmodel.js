@@ -44,11 +44,41 @@ const SKIP_CHUNK = /:\/\/|^www\.|@|^[~/]|[\\_{}<>=#$%^*|]|\.(com|org|net|io|dev|
 // Markdown link targets ("[📎 nota.txt](nota.txt)": the part in parentheses) and file names with an extension
 // ("nota.txt", "informe-final.pdf") are not words: each is blanked, code point for code point, so the positions of the
 // rest stay (MEJORA-2 of the ws170 QA: Notes underlined the "txt" of an attachment's link).
+// Bounded work (security scan 0.8.9.6.2, F5: FILE_NAME backtracked quadratically over a 100,000-letter line on every
+// render, on lord-server's one JS thread): only the first TEXT_MAX code points are checked, the text is cut at
+// whitespace first, a chunk longer than CHUNK_MAX holds no word worth checking (each is at most WORD_MAX bytes and a
+// longer run is a hash, a URL or base64) and is blanked, and the patterns run on one short chunk at a time, anchored
+// at its start (FILE_NAME tries only the chunk's own start, never every position).
+export const TEXT_MAX = 50000;
+export const CHUNK_MAX = 256;
 const LINK_TARGET = /\]\([^)\s]*\)/gu;
-const FILE_NAME = /[\p{L}\p{N}_-]+(?:\.[\p{L}\p{N}_-]+)*\.[a-z0-9]{1,5}(?![\p{L}\p{N}])/gu;
+const FILE_NAME = /^[\p{L}\p{N}_-]+(?:\.[\p{L}\p{N}_-]+)*\.[a-z0-9]{1,5}(?![\p{L}\p{N}])/u;
 const blank = (m) => ' '.repeat([...m].length);
+function chunkText(c) {
+  const n = [...c].length;
+  if (n > CHUNK_MAX) return ' '.repeat(n);
+  let s = c.replace(LINK_TARGET, (m) => `]${blank(m.slice(1))}`);
+  // file names: at the chunk's start or after a character that can't be in one ("(nota.txt", "«a.pdf»")
+  let out = '';
+  while (s) {
+    const m = FILE_NAME.exec(s);
+    if (m) { out += blank(m[0]); s = s.slice(m[0].length); continue; }
+    const ch = String.fromCodePoint(s.codePointAt(0));
+    out += ch;
+    s = s.slice(ch.length);
+    // skip the rest of a run of name characters: a file name never starts inside one
+    if (/[\p{L}\p{N}_-]/u.test(ch)) {
+      const run = /^[\p{L}\p{N}_-]*/u.exec(s)[0];
+      out += run;
+      s = s.slice(run.length);
+    }
+  }
+  return out;
+}
 export function spellText(text) {
-  return String(text).replace(LINK_TARGET, (m) => `]${blank(m.slice(1))}`).replace(FILE_NAME, blank);
+  const cps = [...String(text)];
+  const t = cps.length > TEXT_MAX ? cps.slice(0, TEXT_MAX).join('') : cps.join('');
+  return t.replace(/\S+/gu, chunkText);
 }
 
 export function spellWords(text, scripts = null) {

@@ -4,7 +4,7 @@
 // the languages and the packages Settings may install. node server/tests/spell_model_test.mjs
 import {
   spellWords, checkable, scriptOf, scriptOfTag, personalGood, badRanges, unknownWords, rangeAt, underlines, spellMenuItems, spellLanguages,
-  spellLocale, toUtf16, SPELL_PACKAGES, spellPackageOk, packageInstalled, toggleLang, WORD_MAX, BATCH,
+  spellLocale, toUtf16, SPELL_PACKAGES, spellPackageOk, packageInstalled, toggleLang, WORD_MAX, BATCH, spellText, TEXT_MAX,
 } from '../../sdk/spellmodel.js';
 
 let ok = 0, bad = 0;
@@ -71,6 +71,21 @@ eq('a suggestion replaces the word', got, 'world');
 eq('while suggestions come', spellMenuItems({ word: 'x', loading: true, tr, onReplace() {}, onAdd() {}, onIgnore() {} })[0], { label: 'spell.menu.looking', disabled: true });
 eq('no suggestions', spellMenuItems({ word: 'x', suggestions: [], tr, onReplace() {}, onAdd() {}, onIgnore() {} })[0], { label: 'spell.menu.none', disabled: true });
 eq('no word: no rows', spellMenuItems({ word: null, tr }), []);
+
+// ---- bounded work (security scan 0.8.9.6.2, F5): no quadratic backtracking, a cap on the text ----
+{
+  const time = (f) => { const t0 = Date.now(); const r = f(); return [r, Date.now() - t0]; };
+  const longLine = 'a'.repeat(100000);
+  const [w1, ms1] = time(() => spellWords(longLine));
+  eq('100,000 letters without a dot: no word, fast', [w1.length, ms1 < 1500], [0, true]);
+  const [w2, ms2] = time(() => spellWords(`${'ab-cd_ef'.repeat(20000)}`));
+  eq('a long run of name characters: fast', [w2.length, ms2 < 1500], [0, true]);
+  const [w3, ms3] = time(() => spellWords('palabra '.repeat(20000)));
+  eq('a long text of words: only the first TEXT_MAX code points', [w3.length, w3[w3.length - 1].end <= TEXT_MAX, ms3 < 3000], [Math.ceil(TEXT_MAX / 8), true, true]);
+  eq('a chunk longer than CHUNK_MAX holds no word', spellWords(`${'word,'.repeat(60)} hello`).map((x) => x.word), ['hello']);
+  eq('file names still blanked inside a chunk', spellWords('ver (informe-final.pdf) y nota.txt hoy').map((x) => x.word), ['ver', 'hoy']);
+  eq('spellText keeps the length of what it checks', spellText('a [📎 n.txt](n.txt) b').length, 'a [📎 n.txt](n.txt) b'.length);
+}
 
 // ---- languages and packages ----
 eq('defaults when nothing chosen', spellLanguages([], ['en_US', 'es_ES'], ['es_ES', 'en_US']), ['es_ES', 'en_US']);

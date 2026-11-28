@@ -103,13 +103,28 @@ function flush() {
 
 // The ranges to underline in a text ([[start, end]] in code points), asking lord-spell about the words not known yet
 // (after a pause in typing). caret: the field's caret while it has the keys (the word being typed isn't underlined).
+// Memoized (security scan 0.8.9.6.2, F5): a field draws again at each caret blink; the words of a text are found once
+// per text and languages, and the ranges once per text, caret and spellVersion (verdicts, languages, the person's words).
+const memo = { text: null, scripts: null, tokens: [], version: -1, caret: -2, personal: null, ranges: [] };
 export function spellRanges(text, caret = -1) {
   start();
   if (!spellOn() || !langs.length || !text) return [];
-  const tokens = spellWords(text, scripts);
+  if (memo.text !== text || memo.scripts !== scripts) {
+    memo.text = text;
+    memo.scripts = scripts;
+    memo.tokens = spellWords(text, scripts);
+    memo.version = -1;
+  }
+  const version = spellVersion.get();
+  if (memo.version === version && memo.caret === caret && memo.personal === personal) return memo.ranges;
+  const tokens = memo.tokens;
   const want = unknownWords(tokens, verdict, BATCH * 4);
   if (want.length) { for (const w of want) pending.add(w); schedule(); }
-  return badRanges(tokens, verdict, { personal: personalAll(), caret });
+  memo.version = version;
+  memo.caret = caret;
+  memo.personal = personal;
+  memo.ranges = badRanges(tokens, verdict, { personal: personalAll(), caret });
+  return memo.ranges;
 }
 
 // useSpellRanges(text, enabled, caret): the same for a component, drawn again when the verdicts come
