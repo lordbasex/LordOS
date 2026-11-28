@@ -55,3 +55,4 @@ build/webalive-test: $(WEBALIVE_TEST_SRC) $(WEBAPPS_HDR) | build/webalive-fake
 build/webalive-fake: tests/webalive_fake.c src/vault/dbus.c src/web/webreg.c src/web/weburl.c src/sec/json.c src/vault/dbus.h src/web/webreg.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -o $@ tests/webalive_fake.c src/vault/dbus.c src/web/webreg.c src/web/weburl.c src/sec/json.c
+	@chmod go-w $@                       # web/webmgr.c refuses a lord-web anyone else may write (umask 0002 makes it g+w)

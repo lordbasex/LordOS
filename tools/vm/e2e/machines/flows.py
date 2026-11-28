@@ -7,6 +7,17 @@ import json, os, platform, re, shutil, subprocess, time
 from mh import Session, Image, BUILD, IMAGES, skip, log, kvm_ok, have
 import images
 
+
+def light_memory_mb():
+    """The Light profile's memory on this computer, as apps/machines/model.js profileSize gives it: half the RAM, at
+    most 3072 MB, within what Machines lets a machine have (server/src/vm/machine.c vm_mem_max_mb: the RAM less 2 GB,
+    or 1 GB at 4 GB or less), in 256 MB steps, at least 256. Not a fixed 4096 (QA ws174: a host of another size)."""
+    ram = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") // (1024 * 1024)
+    floor = 1024 if ram <= 4096 else 2048
+    mem_max = (ram - floor if ram > floor else 0) or 2048
+    want = min(3072, ram // 2)
+    return max(256, (min(want, mem_max) // 256) * 256 or 256)
+
 # Create and Start copies the image into the machine's folder first: 120 s on an SSD, up to 480 s on a Raspberry Pi's SD
 # card (ws171, 54 of 54 passed there with 480). MH_CREATE_S overrides it; the default is longer on arm64.
 CREATE_S = int(os.environ.get("MH_CREATE_S") or (480 if platform.machine() in ("aarch64", "arm64") else 120))
@@ -171,7 +182,8 @@ def flow_assistant(s, r, c):
     c.update(dir=m["dir"], id=m["id"], created_s=round(time.time() - t0, 1))
     mj = json.load(open(os.path.join(m["dir"], "machine.json")))
     # an imported image of an unknown system starts with the guest agent off (Configure turns it on: flow_configure)
-    r.t("assistant: machine.json has the name, the Light profile's 2 vCPUs and 4 GB", mj.get("name") == NAME and mj.get("vcpus") == 2 and mj.get("memory_mb") == 4096, mj)
+    want_mb = light_memory_mb()
+    r.t(f"assistant: machine.json has the name, the Light profile's 2 vCPUs and {want_mb} MB", mj.get("name") == NAME and mj.get("vcpus") == 2 and mj.get("memory_mb") == want_mb, mj)
     vw = r.step("assistant: the machine's window opens", lambda: vm_window(s, NAME))
     allow_shortcuts(s, 8)
     ready = r.step("guest: Debian boots to MH-READY on its serial console", lambda: s.wait_serial(m["dir"], "MH-READY", 180))

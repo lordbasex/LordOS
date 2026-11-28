@@ -82,7 +82,7 @@ export async function scan() {
   library.set({ scanning: false });
   if (todo.length || Object.keys(cache).length !== Object.keys(next).length) {
     try { fs.mkdir('.cache/lordos'); } catch (e) { /* already there */ }
-    try { fs.write(CACHE, JSON.stringify(next)); } catch (e) { /* no disk */ }
+    try { await fs.writeAsync(CACHE, JSON.stringify(next)); } catch (e) { /* no disk */ }
   }
   running = false;
 }

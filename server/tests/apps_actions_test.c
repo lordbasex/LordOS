@@ -259,6 +259,8 @@ int main(void) {
             if (!strcmp(fl[i].id, "org.example.NoMime")) no = i;
             if (!strcmp(fl[i].id, "org.example.Opens")) yes = i;
         }
+        (void)no;                       /* read only on x86-64 below (the tree is an x86_64 deployment) */
+        (void)yes;
 #if defined(__x86_64__)
         CHECK("both Flatpak apps are listed", no >= 0 && yes >= 0);
         CHECK("their MIME types are read, a second export's added to its app", no >= 0 && yes >= 0 &&

@@ -23,6 +23,7 @@ import * as fs from './fs.js';
 export { translationKey, kernelText, curatedText } from './describemodel.js';
 
 const CACHE_DIR = '.cache/lordos/descriptions';
+let cacheDirMade = false;
 const d = createDescriber({
   native: (kind, arg, lang) => {
     try {
@@ -34,8 +35,9 @@ const d = createDescriber({
   webAppEntry,
   readCache: (lang) => fs.read(`${CACHE_DIR}/${lang}.json`),
   writeCache: (lang, text) => {
-    for (const dir of ['.cache', '.cache/lordos', CACHE_DIR]) { try { fs.mkdir(dir); } catch (e) { /* there */ } }
-    fs.write(`${CACHE_DIR}/${lang}.json`, text);
+    if (!cacheDirMade) { for (const dir of ['.cache', '.cache/lordos', CACHE_DIR]) { try { fs.mkdir(dir); } catch (e) { /* there */ } } cacheDirMade = true; }
+    // on a worker: the memory copy is the one read; a busy disk never holds the interface (QA ws174)
+    fs.writeAsync(`${CACHE_DIR}/${lang}.json`, text).catch(() => { /* kept in memory */ });
   },
 });
 export const { describeProgram, describeApp, saveLumoTranslation } = d;

@@ -27,6 +27,15 @@ void bgsave_flush(const char *dst);
 /* writes one file now, on this thread, the way the worker does: 0 or -1 (errno) */
 int  bgsave_write_now(const char *dst, const char *tmp, const char *data, size_t len, unsigned flags);
 
+/* A file lord-server changes in place rather than replaces (the portal's GSettings keyfile, shared with GTK apps): on
+ * the worker, edit gets the file's current text (at most 1 MB, no link followed; "" when there is none), and the data
+ * queued here, and returns the new text (malloc; NULL leaves the file as it is), written as bgsave_put writes. One
+ * slot per file as for bgsave_put: an edit queued while an older one waits replaces it, so data must describe the
+ * whole change, not a step of it. 0 queued (or, without a worker, done now); -1 not done (errno). */
+typedef char *(*bgsave_edit_fn)(const char *dst, const char *old, size_t oldlen, const char *data, size_t len, size_t *outlen);
+int  bgsave_edit(const char *dst, const char *tmp, bgsave_edit_fn edit, const char *data, size_t len, unsigned flags);
+int  bgsave_edit_now(const char *dst, const char *tmp, bgsave_edit_fn edit, const char *data, size_t len, unsigned flags);
+
 /* lord.fs.write's durability off the interface's thread (QA 0.8.9.6.2 on a Raspberry Pi: a 1.4 GB copy to the SD card
  * held its fsync 5 to 23 s): the file is written and renamed on the caller's thread as before, and queued here; the
  * worker opens it (no link followed) and syncs it and its folder after the queued saves. 0 queued (or already), 1 synced

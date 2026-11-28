@@ -46,6 +46,22 @@ static int writes(void) { bgsave_flush(NULL); return bgsave_writes; }
 
 static char D[256];
 
+/* bgsave_edit's edit: the old text, then the data */
+static char *append_edit(const char *dst, const char *old, size_t oldlen, const char *data, size_t len, size_t *outlen) {
+    (void)dst;
+    char *out = malloc(oldlen + len + 1);
+    if (!out) return NULL;
+    memcpy(out, old, oldlen);
+    memcpy(out + oldlen, data, len);
+    out[oldlen + len] = 0;
+    *outlen = oldlen + len;
+    return out;
+}
+static char *keep_edit(const char *dst, const char *old, size_t oldlen, const char *data, size_t len, size_t *outlen) {
+    (void)dst; (void)old; (void)oldlen; (void)data; (void)len; (void)outlen;
+    return NULL;
+}
+
 static char *slurp(const char *p) {
     FILE *f = fopen(p, "rb");
     if (!f) return NULL;
@@ -167,6 +183,32 @@ int main(void) {
     set_gate(1);
     bgsave_flush(NULL);
     for (int i = 0; i < BGS_SLOTS; i++) CHECK(same(many[i], "s"));
+
+    /* 7. an edit (the portal's GSettings keyfile, QA ws174): made on the worker from the file's current text; one
+     * queued while an older one is held replaces it; NULL leaves the file */
+    snprintf(dst, sizeof dst, "%s/slow-keyfile", D);
+    snprintf(tmp, sizeof tmp, "%s.tmp", dst);
+    CHECK(bgsave_put(dst, tmp, "a", 1, 0) == 0);
+    bgsave_flush(dst);
+    set_gate(0);
+    double e0 = now_ms();
+    CHECK(bgsave_edit(dst, tmp, append_edit, "b", 1, 0) == 0);
+    wait_held();
+    CHECK(bgsave_edit(dst, tmp, append_edit, "c", 1, 0) == 0);
+    CHECK(bgsave_edit(dst, tmp, append_edit, "d", 1, 0) == 0);
+    CHECK(now_ms() - e0 < 500);                       /* returned while the disk was held */
+    set_gate(1);
+    bgsave_flush(dst);
+    CHECK(same(dst, "abd"));                         /* b on "a", then only the newest of c and d, on "ab" */
+    CHECK(bgsave_edit(dst, tmp, keep_edit, "x", 1, 0) == 0);
+    bgsave_flush(dst);
+    CHECK(same(dst, "abd"));
+    CHECK(bgsave_edit(dst, tmp, NULL, "x", 1, 0) == -1);
+    snprintf(dst, sizeof dst, "%s/new-keyfile", D);
+    snprintf(tmp, sizeof tmp, "%s.tmp", dst);
+    CHECK(bgsave_edit(dst, tmp, append_edit, "n", 1, 0) == 0);
+    bgsave_flush(dst);
+    CHECK(same(dst, "n"));                           /* no file yet: the edit starts from "" */
 
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", D);

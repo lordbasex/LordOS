@@ -251,6 +251,8 @@ EOF
     # the firewall rule sheet's parser (sdk/fwrule.js) against the same cases as build/fwdest-test
     if have node; then run "remotecert-test (sdk/remotecert.js)" node tests/remotecert_test.mjs; fi
     if have node; then run "remotedesk-test (sdk/remotedeskmodel.js)" node tests/remotedesk_test.mjs; fi
+    if have node; then run "store-subscribers-test (sdk/store.js: one failing subscriber skips none)" node tests/store_subscribers_test.mjs; fi
+    if have node; then run "monitor-denied-test (Monitor → Network: Recently denied, every direction)" node tests/monitor_denied_test.mjs; fi
     if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
     if have node; then run "hands-model-test (sdk/handsmodel.js, Hands' reader)" node tests/hands_model_test.mjs; fi
     if have node; then run "hands-deny-test (sdk/handsdeny.js, the surfaces an agent never reaches)" node tests/hands_deny_test.mjs; fi

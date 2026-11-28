@@ -603,7 +603,10 @@ export function makeThemeSdk({ id, caps }) {
   // logging out: marked the theme's (its crash count stays, main.c), then done by LordOS's own code in a job of its own,
   // so saving the session before it goes isn't under the theme's policy
   const quitForTheme = () => SDK.session.quit();
-  sdk.session = Object.freeze({ lock: () => SDK.session.lock(), quit: () => { lord.themes.quitByTheme(); Promise.resolve().then(quitForTheme); }, canPower: () => SDK.session.canPower?.(),
+  // locking re-renders the shell (the lock screen replaces the desktop): done in a job of its own too, so the theme's
+  // nodes it removes aren't removed while the theme's own code is still on the stack (refused there, js_theme.c)
+  const lockForTheme = () => { SDK.session.lock(); };
+  sdk.session = Object.freeze({ lock: () => { Promise.resolve().then(lockForTheme); }, quit: () => { lord.themes.quitByTheme(); Promise.resolve().then(quitForTheme); }, canPower: () => SDK.session.canPower?.(),
     // a countdown the theme starts never confirms by itself: only the person's real click or key does (powermodel.js)
     restart: () => SDK.session.restart({ byTheme: true }), shutdown: () => SDK.session.shutdown({ byTheme: true }), managed: () => SDK.session.managed() });
   sdk.spotlight = Object.freeze({ toggle: (d) => SDK.spotlight.toggle(sanitizeIn(d)), open: (d) => SDK.spotlight.open?.(sanitizeIn(d)), close: () => SDK.spotlight.close?.() });

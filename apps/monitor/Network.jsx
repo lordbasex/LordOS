@@ -25,6 +25,7 @@ import { RuleSheet } from './RuleSheet.jsx';
 import { HistoryControls, HistoryChart, useHistory } from './History.jsx';
 import { REMOTE_KEY, RemoteDetail, ShareHolderLine, remoteGroup, useRemoteDesktop } from './RemoteDesktop.jsx';
 import { TokenSearch, ViewButton, useNetView, TreeChildren, Child } from './NetTree.jsx';
+import { recentDenials, deniedTarget } from './deniedmodel.js';
 
 const { COMPONENTS, isSystemId, filterFlows, groupFlows, sortTree, machinesLabel, componentOf, componentLabel, vmIdOf, forwardedRules, VM_PARENT } = netModel;
 
@@ -493,13 +494,7 @@ function Summary({ groups, conns, last, tr, fw, names, range, sysHist, launcher,
   for (const g of groups) for (const h of g.hosts.values()) hosts.push({ ...h, app: g });
   hosts.sort((a, b) => b.sent + b.recv - (a.sent + a.recv));
   if (hosts.some((h) => h.sent + h.recv)) hosts.splice(0, hosts.length, ...hosts.filter((h) => h.sent + h.recv));   // with traffic, only those that moved bytes
-  const denied = (fw?.events || []).filter((e) => e.v === 'deny' && e.dir === 'out' && (!e.at || Date.now() - e.at < 10 * 60 * 1000));
-  const byDst = new Map();                    // the latest of each (app, destination), with how many
-  for (const e of denied) {
-    const k = `${e.app}|${(e.hosts && e.hosts[0]) || e.addr}`;
-    byDst.set(k, { e, n: (byDst.get(k)?.n || 0) + 1 });
-  }
-  const deniedRecent = [...byDst.values()].slice(-4).reverse();
+  const { rows: deniedRecent } = recentDenials(fw?.events, Date.now());   // every direction, as the Denied count
   return (
     <>
       <Section id="traffic" title={tr('monitor.net.traffic')}>
@@ -551,10 +546,10 @@ function Summary({ groups, conns, last, tr, fw, names, range, sysHist, launcher,
         </Section>
       ) : null}
       <Section id="denied" title={tr('monitor.net.recentlyDenied')}>
-        {denied.length ? deniedRecent.map(({ e, n }, i) => (
+        {deniedRecent.length ? deniedRecent.map(({ e, n }, i) => (
           <View key={i} style={{ gap: 1 }}>
             <Text style={{ fontSize: 11, color: t.text, fontFamily: 'monospace', direction: 'ltr', textAlign: 'start', lineHeight: 1.3 }} numberOfLines={2}>
-              {`${(e.hosts && e.hosts[0]) || e.addr || '?'}${n > 1 ? ` ×${n}` : ''}`}</Text>
+              {`${deniedTarget(e)}${n > 1 ? ` ×${n}` : ''}`}</Text>
             <Text style={{ fontSize: 10, color: t.textDim, lineHeight: 1.3, textAlign: 'start' }} numberOfLines={2}>
               {`${labelOf(tr, groups.find((g) => g.key === e.app) || { key: e.app, name: e.app })} · ${tr(`monitor.net.by.${e.by === 'list' || e.by === 'restricted' || e.by === 'mode' ? e.by : 'rule'}`)}`}
             </Text>

@@ -96,7 +96,7 @@ export { archive } from './archive.js';
 export { print, queueName } from './print.js';
 export { emoji, Grid as EmojiGrid, ToneBar as EmojiToneBar } from './emoji.jsx';
 import { PrintDialog } from './printdialog.jsx';
-import { RestorePrompt, startSessionRestore, markThemeSwitch, unmarkThemeSwitch, logOut } from './sessionrestore.jsx';
+import { RestorePrompt, startSessionRestore, markThemeSwitch, unmarkThemeSwitch, logOut, themeFellBack } from './sessionrestore.jsx';
 import { ThemeSwitchOverlay, showThemeSwitch, hideThemeSwitch, notifyThemeNotApplied } from './themeswitch.jsx';
 import { askPower, canPower } from './power.jsx';
 export { PowerDialog, powerAsk, POWER_SECONDS } from './power.jsx';
@@ -387,15 +387,17 @@ export function startShell(element) {
   const wanted = settings.get().theme;
   const current = themes.current();
   if (wanted && current && wanted !== current) {
-    if (lord.themes.use(wanted)) return;
+    // lord-server loaded this theme in place of the one chosen (a community theme taken off by the watchdog, or
+    // Ctrl+Alt+Shift+Backspace, main.c community_back): this one is the choice now; asking for the other again would
+    // undo the rescue a moment later (QA ws174: back to Classic after 5 s)
+    const fellBack = themeFellBack();
+    if (!fellBack && lord.themes.use(wanted)) return;
     // the chosen theme didn't start (it threw, or was refused at login) and lord-server kept this one: the choice
     // goes back to the theme that runs, and the person is told why the style didn't change
     let entry = null;
     try { entry = themes.list().find((x) => x.id === wanted) || null; } catch (e) { entry = null; }
-    if (entry?.failed) {
-      settings.set({ theme: current });
-      notifyThemeNotApplied(entry);
-    }
+    if (fellBack || entry?.failed) settings.set({ theme: current });
+    if (entry?.failed) notifyThemeNotApplied(entry);
   }
   try { lord.input?.pointerAccent?.(null); } catch (e) { /* older server */ }   // LordOS's black arrow; a theme may tint it (setPointerAccent)
   startStylePack();                     // the theme's pointer colours, sounds and font, or LordOS's own (appskins.jsx)

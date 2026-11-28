@@ -540,6 +540,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `PAPER-VALIDATION.md` and the draft tested-graphics-cards page (`web/content/hardware/gpus.*.md`).
 
 ### Tests
+- **Test fixes from the ws174 runs.** `build/webalive-fake` is made `go-w` after it is linked: under a umask of 0002
+  it was group-writable and `web/webmgr.c` rightly refused it as lord-web, so the suite failed on such machines
+  (`server/mk/webapps.mk`). `tests/hands_e2e.py` picks the first Network row that has a rule switch, skipping an
+  essential system service (a dash and its "System" pill, in any of en, es, pt) instead of the first row. The test-only
+  compiler warnings are gone: a command buffer big enough for its three paths (`tests/pkgapp_test.c`), the Flatpak
+  indexes read on every architecture (`tests/apps_actions_test.c`, the checks stay x86-64 only), and a path buffer
+  sized from the folder's (`tests/vm_test.c`). The Machines bench expects the Light profile's memory for the computer
+  it runs on, as `apps/machines/model.js` `profileSize` gives it (half the RAM, at most 3072 MB, within Machines' own
+  limit), not a fixed 4096 MB (`tools/vm/e2e/machines/flows.py`).
 - **`hands-e2e` no longer assumes this computer's state** (ws171 on a Pi): case 5 takes the first app row of
   Monitor → Network, whatever it is (it looked for "Machines"), so the handsDeny blackout checks run everywhere; case 9
   says it skipped when no voice is installed instead of failing.
@@ -599,6 +608,63 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   language. Going back from Debian to LordOS left the computer's name at `debian-13`: the name made from the machine's
   name now follows it while it is still the one filled in by itself; a name the person typed stays
   (`hostnameNext` in `apps/machines/catalog.js`, `apps/machines/assistant.jsx`). Test: `tests/vm_catalog_test.mjs`.
+- **Monitor → Network: "Recently denied" lists what the Denied count counts** (QA on ws174: Denied 5 and 8, and below
+  it "Nothing denied in the last ten minutes"). lord-netperm's Denied counter counts every denied connection, incoming
+  ones and ports an app wasn't let open included, but the list kept only outgoing ones. It now shows every direction
+  (an incoming one by its local port, `← :5353`), the latest of each first, merged with how many
+  (`apps/monitor/deniedmodel.js`, `apps/monitor/Network.jsx`). Test: `tests/monitor_denied_test.mjs`.
+- **Waking from s2idle on virtio-gpu no longer hangs in the flip-stall recovery** (QA on ws174). After the watchdog
+  drops a page flip that never completed (BUG-B), the next frame is a full modeset, and on virtio-gpu that
+  `SETCRTC` blocked in the kernel with the whole desktop. That one modeset (only the one after a dropped flip; the
+  first one after the boot splash and Settings → Displays are unchanged) now runs on a thread of its own, and the
+  frame waits for it at most 250 ms. A real card's modeset answers well within that and goes on exactly as before.
+  Past it, the frame counts as a flip still pending: no watchdog drops it again, the cursor leaves that CRTC alone, the
+  loop looks for the answer every 50 ms and completes the frame when it comes; a failed modeset hands its buffer back
+  and the next frame tries again, on a thread again (`server/src/kms.c`, `kms_recover_poll`, `server/src/main.c`).
+  Checked in the test only; it still needs a suspend and wake on a real PC and on the VM. Test:
+  `build/kms-recover-test` (an answer at once, one held past the bound, a failure, the CPU path, and closing while it
+  runs).
+- **Raspberry Pi: background saves no longer hold the desktop during a copy to the SD card** (QA on ws174: the
+  interface stopped 2–8 s at a time in `lord.fs.write`'s `mkstemp`, and its rename was on the same thread). The
+  writer there was the end-to-end bench's channel (`tools/vm/e2e/driver.js`), which saved every command's answer with
+  the synchronous `lord.fs.write`; it now uses `fs.writeAsync` (fsasync's worker, in order per file). The shell's own
+  saves made in the background, whose memory copy is what's read, moved to `fs.writeAsync` too: Lumo's translated
+  descriptions (`sdk/describe.js`), Sentinela's alerts (`sdk/sentinela.js`), the search's recent use
+  (`sdk/spotlight.js`) and Music's library cache (`apps/player/library.js`), and their folders are made once a
+  session. None of them ran per frame; `lord.fs.write` stays for saves a person asks for and waits on.
+- **Changing Dark, the accent or the fonts no longer holds the desktop while the disk is busy** (QA on ws174:
+  `portal.set` took 120–480 ms under disk IO). The GSettings keyfile that GTK apps read
+  (`~/.config/glib-2.0/settings/keyfile`) was read, written and renamed on the interface's thread. It is now changed
+  on bgsave's worker with a new `bgsave_edit`: the worker reads the file's current text, applies LordOS's keys over
+  it (the apps' own keys stay) and writes it the way settings.json is written; an edit queued while an older one
+  waits replaces it, so a file never goes back to older values (`server/src/bgsave.c`, `server/src/ui/portal.c`).
+  Tests: `build/bgsave-test` (an edit returns while the disk is held, the newest one wins over the file's current
+  text, NULL leaves the file) and `build/portal-gs-test` (an app's key in the keyfile is kept).
+- **Web Apps: a site's SVG icon shows in the list** (QA on ws174: WhatsApp → Refresh icon kept
+  `~/.cache/lordos/web/icons/whatsapp.svg`, a valid picture, but its row stayed blank). lord-server hands lord-media
+  an SVG only from the folders `iconfind_svg_allowed` lists, and a web app's icon folders weren't among them, so the
+  picture was never asked for. `~/.cache/lordos/web/icons/` (the site's icon) and `~/.config/lordos/web/icons/` (the
+  registry's) are now; the file is still opened with `O_NOFOLLOW`, at most 1 MB, and drawn only by lord-media in its
+  sandbox (`server/src/iconfind.c`, `docs/MEDIA.md`). Tests: `build/iconfind-test` (the two folders, and paths beside
+  or out of them refused) and `build/svgrast-test` (a WhatsApp-shaped icon: viewBox only, a filter, a gradient by
+  `url(#id)`, arcs and an even-odd glyph, drawn green with clear corners).
+- **Ctrl+Alt+Shift+Backspace from Classic stays in Flow** (QA on ws174: Flow came up, then Classic again after about
+  5 seconds). lord-server loads Flow without touching `settings.theme`, and Flow's `startShell` then asked for the theme
+  still saved there. When lord-server says this desktop was loaded in place of the chosen one (`lord.themes.fellBack()`:
+  the rescue keys, or a community theme the watchdog took off), the running theme becomes the choice and the other one
+  isn't asked for again; a failed community theme is still explained in a notification. `fellBack()` answers only once,
+  so it is now read in one place for both `startShell` and session restore (`themeFellBack`, `sdk/sessionrestore.jsx`,
+  `sdk/index.js`).
+- **Quick Settings: Dark, Transparency and the accent colour set from a community theme show at once** (QA on ws174:
+  they showed only on the next render). A store tells each subscriber on its own now: one that throws (a native call
+  refused while the theme's code is on the stack) no longer keeps the rest from hearing the change, and the error is
+  logged once (`sdk/store.js`). `agentInput` (`sdk/adminsyncmodel.js`) counts a refused `lord.hands.injecting` as "not
+  injecting", and the terminal's Writing switch (`sdk/writing.jsx`) is skipped and told on the next change when
+  `lord.writing` is refused. The realm rules are unchanged. Test: `tests/store_subscribers_test.mjs`.
+- **Community themes: Lock Screen from a community theme no longer freezes the desktop** (QA on ws174). The theme's
+  `session.lock()` called LordOS's lock straight away, which re-renders the shell while the theme's own code was still
+  on the stack, so removing the theme's nodes was refused and the screen stopped answering. Locking now runs in a job
+  of its own, the way logging out already did (`sdk/themeapi.js`).
 - **Settings → Appearance: Try Again on a theme that couldn't start takes effect at once** (seen on VM 127 while
   checking BUG-H: Try Again cleared the theme's failure record, but the card kept "Couldn't start" and a disabled
   Apply until the page was left and opened again). The gallery renders again after it (`galleryRev`).

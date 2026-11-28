@@ -21,6 +21,7 @@
 #include "../hw/hw.h"
 #include "../hw/jbuf.h"
 #include "../fsops.h"
+#include "../bgsave.h"
 #include "../fplend.h"
 #include "../sec/appid.h"
 #include "../sec/pathcanon.h"
@@ -2515,53 +2516,74 @@ static void keyfile_set(char **buf, const char *group, const char *key, const ch
     *buf = out;
 }
 
+/* the edit, on bgsave's worker (portal_set runs on the interface's thread, and under disk IO the read, the write and
+ * the rename held it 120–480 ms, QA ws174): data is "group\tkey\tvalue\n" lines, applied over the file's text */
+static void keyfile_dirs(const char *dst) {
+    char dir[PATH_MAX];
+    snprintf(dir, sizeof dir, "%s", dst);
+    const char *home = getenv("HOME");
+    size_t hl = home ? strlen(home) : 0;
+    if (!hl || strncmp(dir, home, hl) || dir[hl] != '/') return;
+    for (char *p = dir + hl + 1; (p = strchr(p, '/')); p++) { *p = 0; mkdir(dir, 0700); *p = '/'; }
+}
+
+static char *keyfile_edit(const char *dst, const char *old, size_t oldlen, const char *data, size_t len, size_t *outlen) {
+    keyfile_dirs(dst);
+    char *buf = malloc(oldlen + 1), *in = malloc(len + 1);
+    if (!buf || !in) { free(buf); free(in); return NULL; }
+    memcpy(buf, old, oldlen);
+    buf[oldlen] = 0;
+    memcpy(in, data, len);
+    in[len] = 0;
+    for (char *line = in, *next; line && *line; line = next) {
+        next = strchr(line, '\n');
+        if (next) *next++ = 0;
+        char *key = strchr(line, '\t'), *val = key ? strchr(key + 1, '\t') : NULL;
+        if (!val) continue;
+        *key++ = 0;
+        *val++ = 0;
+        keyfile_set(&buf, line, key, val);
+    }
+    free(in);
+    *outlen = strlen(buf);
+    return buf;
+}
+
+static void kf_add(char *out, size_t n, const char *group, const char *key, const char *val) {
+    size_t l = strlen(out);
+    if (strpbrk(val, "\t\n") || l >= n) return;            /* the names are ours; a tab or a newline is never one */
+    snprintf(out + l, n - l, "%s\t%s\t%s\n", group, key, val);
+}
+
 static void keyfile_write(void) {
     const char *home = getenv("HOME");
     if (!home) return;
-    char dir[512], path[600], tmp[620];
-    snprintf(dir, sizeof dir, "%s/.config", home);
-    mkdir(dir, 0700);
-    snprintf(dir, sizeof dir, "%s/.config/glib-2.0", home);
-    mkdir(dir, 0700);
-    snprintf(dir, sizeof dir, "%s/.config/glib-2.0/settings", home);
-    mkdir(dir, 0700);
-    snprintf(path, sizeof path, "%s/keyfile", dir);
-    snprintf(tmp, sizeof tmp, "%s/.keyfile-lordos", dir);
-    char *buf = NULL;
-    FILE *f = fopen(path, "r");
-    if (f) {
-        fseek(f, 0, SEEK_END);
-        long n = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        if (n >= 0 && n < (1 << 20) && (buf = malloc((size_t)n + 1))) { buf[fread(buf, 1, (size_t)n, f)] = 0; }
-        fclose(f);
-    }
-    if (!buf && !(buf = calloc(1, 1))) return;
-    char v[96];
+    char path[600], tmp[620];
+    snprintf(path, sizeof path, "%s/.config/glib-2.0/settings/keyfile", home);
+    snprintf(tmp, sizeof tmp, "%s/.config/glib-2.0/settings/.keyfile-lordos", home);
+    static const char I[] = "org/gnome/desktop/interface";
+    char kf[2048] = "", v[96];
     snprintf(v, sizeof v, "'%s'", gtk_theme);
-    keyfile_set(&buf, "org/gnome/desktop/interface", "gtk-theme", v);
-    keyfile_set(&buf, "org/gnome/desktop/interface", "color-scheme", dark ? "'prefer-dark'" : "'default'");
+    kf_add(kf, sizeof kf, I, "gtk-theme", v);
+    kf_add(kf, sizeof kf, I, "color-scheme", dark ? "'prefer-dark'" : "'default'");
     snprintf(v, sizeof v, "'%s'", acc_name);
-    keyfile_set(&buf, "org/gnome/desktop/interface", "accent-color", v);
+    kf_add(kf, sizeof kf, I, "accent-color", v);
     snprintf(v, sizeof v, "'%s'", buttons);
-    keyfile_set(&buf, "org/gnome/desktop/wm/preferences", "button-layout", v);
+    kf_add(kf, sizeof kf, "org/gnome/desktop/wm/preferences", "button-layout", v);
     /* the text keys too: Debian's schema default, 'Adwaita Sans 11', isn't installed either */
     snprintf(v, sizeof v, "'%s'", font_ui);
-    keyfile_set(&buf, "org/gnome/desktop/interface", "font-name", v);
-    keyfile_set(&buf, "org/gnome/desktop/interface", "document-font-name", v);
+    kf_add(kf, sizeof kf, I, "font-name", v);
+    kf_add(kf, sizeof kf, I, "document-font-name", v);
     snprintf(v, sizeof v, "'%s'", font_mono);
-    keyfile_set(&buf, "org/gnome/desktop/interface", "monospace-font-name", v);
-    keyfile_set(&buf, "org/gnome/desktop/interface", "font-antialiasing", "'" FONT_AA "'");
-    keyfile_set(&buf, "org/gnome/desktop/interface", "font-hinting", "'" FONT_HINT "'");
-    keyfile_set(&buf, "org/gnome/desktop/interface", "font-rgba-order", "'" FONT_RGBA "'");
-    keyfile_set(&buf, "org/gnome/desktop/interface", "text-scaling-factor", "1.0");
-    keyfile_set(&buf, "org/gnome/desktop/interface", "icon-theme", "'" ICON_THEME "'");
-    f = fopen(tmp, "w");
-    if (!f) { free(buf); return; }
-    int ok = fputs(buf, f) >= 0;
-    ok = fclose(f) == 0 && ok;
-    if (ok) rename(tmp, path); else unlink(tmp);
-    free(buf);
+    kf_add(kf, sizeof kf, I, "monospace-font-name", v);
+    kf_add(kf, sizeof kf, I, "font-antialiasing", "'" FONT_AA "'");
+    kf_add(kf, sizeof kf, I, "font-hinting", "'" FONT_HINT "'");
+    kf_add(kf, sizeof kf, I, "font-rgba-order", "'" FONT_RGBA "'");
+    kf_add(kf, sizeof kf, I, "text-scaling-factor", "1.0");
+    kf_add(kf, sizeof kf, I, "icon-theme", "'" ICON_THEME "'");
+    /* every key each time: a newer edit queued over an older one replaces it whole (bgsave.h) */
+    if (bgsave_edit(path, tmp, keyfile_edit, kf, strlen(kf), 0))
+        fprintf(stderr, "lord-server: %s not saved: %s\n", path, strerror(errno));
 }
 
 static int theme_installed(const char *name) {

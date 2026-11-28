@@ -2,6 +2,7 @@
  * connection plays the app, stubs stand in for the shell (hw_emit, where the sheet would open) and the
  * compositor. Run by tests/run_suites.sh under dbus-run-session, with a temporary home folder. */
 #include "../src/ui/portal.h"
+#include "../src/bgsave.h"
 #include "../src/ui/gshort.h"
 #include "../src/ui/webask.h"
 #include "../src/ui/webalive.h"
@@ -340,10 +341,17 @@ int main(void) {
 
         /* and in the GSettings keyfile, for GTK 3 outside Flatpak */
         double rgb[3] = { 0.5, 0.2, 0.9 };
-        portal_set(1, rgb, "purple", "close,minimize,maximize:");
         char kf[600];
         snprintf(kf, sizeof kf, "%s/.config/glib-2.0/settings/keyfile", home);
-        FILE *f = fopen(kf, "r");
+        /* an app's own key, saved before: kept. The keyfile is written on bgsave's worker (QA ws174: 120–480 ms on
+         * the interface's thread under disk IO), so the test waits for it */
+        portal_set(0, rgb, "purple", "close,minimize,maximize:");
+        bgsave_flush(NULL);
+        FILE *f = fopen(kf, "a");
+        if (f) { fputs("[org/gnome/gedit/preferences/editor]\nwrap-mode='word'\n", f); fclose(f); }
+        portal_set(1, rgb, "purple", "close,minimize,maximize:");
+        bgsave_flush(NULL);
+        f = fopen(kf, "r");
         char text[4096] = "";
         if (f) { text[fread(text, 1, sizeof text - 1, f)] = 0; fclose(f); }
         char line[128];
@@ -355,6 +363,8 @@ int main(void) {
         CHECK(strstr(text, "\ntext-scaling-factor=1.0\n") && strstr(text, "\nicon-theme='Adwaita'\n"));
         const char *g1 = strstr(text, "[org/gnome/desktop/interface]");
         CHECK(g1 && !strstr(g1 + 1, "[org/gnome/desktop/interface]"));      /* one group, the keys added to it */
+        CHECK(strstr(text, "[org/gnome/gedit/preferences/editor]\nwrap-mode='word'\n") != NULL);
+        CHECK(strstr(text, "\ncolor-scheme='prefer-dark'\n") && strstr(text, "\naccent-color='purple'\n"));
     }
 
     char session[400], err[128];

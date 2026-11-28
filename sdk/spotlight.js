@@ -39,6 +39,7 @@ function searchBox() {
 
 const USE_FILE = '.local/share/lordos/spotlight.json';
 let usage = null;
+let useDirMade = false;
 function loadUsage() {
   if (usage) return usage;
   usage = {};
@@ -54,7 +55,8 @@ function noteUse(key) {
   u[key] = { n: (u[key]?.n || 0) + 1, at: Date.now() };
   const keys = Object.keys(u);
   if (keys.length > 300) for (const k of keys.sort((a, b) => u[a].at - u[b].at).slice(0, keys.length - 300)) delete u[k];
-  try { ensureDir('.local/share/lordos'); fs.write(USE_FILE, JSON.stringify(u)); } catch (e) { /* no disk: memory only */ }
+  // on a worker: the memory copy is the one read (loadUsage); a busy disk never holds the interface (QA ws174)
+  try { if (!useDirMade) { ensureDir('.local/share/lordos'); useDirMade = true; } fs.writeAsync(USE_FILE, JSON.stringify(u)).catch(() => { /* memory only */ }); } catch (e) { /* no disk: memory only */ }
 }
 function usageBoost(key) {
   const u = loadUsage()[key];

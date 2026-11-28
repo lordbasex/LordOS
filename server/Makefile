@@ -627,14 +627,14 @@ build/gshort-test: tests/gshort_test.c src/ui/gshort.c src/ui/gshort.h src/wl/ke
 # the ScreenCast restore token, the Screenshot portal and the FileChooser's lending to Flatpak apps over a private bus
 # (tests/run_suites.sh, needs dbus-run-session)
 test: build/portal-cast-test
-build/portal-cast-test: tests/portal_cast_test.c src/ui/portal.c src/ui/portal.h src/ui/webask.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/cast/castsm.h src/fplend.h
+build/portal-cast-test: tests/portal_cast_test.c src/ui/portal.c src/ui/portal.h src/ui/webask.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/cast/castsm.h src/fplend.h src/bgsave.c src/bgsave.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_cast_test.c src/ui/portal.c src/ui/gshort.c src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c -lpthread
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_cast_test.c src/ui/portal.c src/ui/gshort.c src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/bgsave.c -lpthread
 
 test: build/portal-gs-test
-build/portal-gs-test: tests/portal_gs_test.c src/ui/portal.c src/ui/portal.h src/ui/webask.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/cast/castsm.h
+build/portal-gs-test: tests/portal_gs_test.c src/ui/portal.c src/ui/portal.h src/ui/webask.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/cast/castsm.h src/bgsave.c src/bgsave.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_gs_test.c src/ui/portal.c src/ui/gshort.c src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c -lpthread
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_gs_test.c src/ui/portal.c src/ui/gshort.c src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/bgsave.c -lpthread
 test: build/wlregion-test
 build/wlregion-test: tests/wlregion_test.c src/wl/wlregion.h
 	@mkdir -p build
@@ -670,7 +670,7 @@ test: build/kms-recover-test
 build/kms-recover-test: tests/kms_recover_test.c src/kms.c src/kms.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
-	    -o $@ tests/kms_recover_test.c src/kms.c
+	    -DKMS_TEST -o $@ tests/kms_recover_test.c src/kms.c -lpthread
 	./$@ || { rm -f $@; exit 1; }
 # tests/wdog_test.c: the compositor's watchdog (src/wdog.c): stalls seen, priority dropped, endless JS stopped
 test: build/wdog-test

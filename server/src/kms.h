@@ -49,6 +49,10 @@ typedef struct {
      * Raspberry Pi (vc4) RGB is only shown linear: buffers with v3d's UIF tiling do not go
      * straight to the screen. scan_known = 0: the driver does not say (ADDFB2 is tried). */
     char driver[32];
+    /* the modeset after a dropped flip (kms_flip_abandon) runs on a thread of its own: recover_bg asks for it, recover
+     * is the one running (kms.c struct recover), recover_back the dumb buffer it shows (the CPU path) */
+    int recover_bg, recover_back;
+    void *recover, *recover_data;
     int crtc_index, scan_known, nscan;
     struct { uint32_t fourcc; uint64_t modifier; } scan[96];
 } Kms;
@@ -88,6 +92,19 @@ int  kms_flip_fb(Kms *k, uint32_t fb, void *data);
  * finds no flip pending and is ignored. Nothing when no flip is pending. */
 int  kms_flip_stuck(const Kms *k, uint64_t now_ns, uint64_t limit_ns);
 void kms_flip_abandon(Kms *k);
+
+/* That full modeset may block in the kernel too: virtio-gpu after an s2idle wake held SETCRTC with the whole desktop
+ * (QA ws174). So the one after kms_flip_abandon runs on a thread: the caller waits for it at most KMS_RECOVER_WAIT_MS
+ * (a real card's modeset answers well within it, and goes on as before). Past that, the frame counts as a flip pending
+ * that no watchdog drops again; kms_recover_poll, called every loop, completes it when the thread answers (on_flip,
+ * or the buffers swap) and, if the modeset failed, leaves the next frame to try once more, on a thread again. While it
+ * runs, nothing else goes to that CRTC (the cursor waits). kms_recover_busy: modesets still running. */
+#define KMS_RECOVER_WAIT_MS 250
+void kms_recover_poll(Kms *k);
+int  kms_recover_busy(void);
+#ifdef KMS_TEST
+extern int (*kms_test_setcrtc)(int fd, struct drm_mode_crtc *set);   /* tests: stands in for the ioctl */
+#endif
 
 /* Does the primary plane show this format with this modifier? 1 yes (or unknown), 0 no.
  * DRM_FORMAT_MOD_INVALID (implicit) counts as linear. */

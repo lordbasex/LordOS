@@ -21,4 +21,7 @@ export function syncDone(state, arg, ok, now) {
   return { applied: s.applied === arg ? '' : s.applied, failed: arg, failedAt: now };
 }
 // the input being handled is an AI agent's (lord.hands.injecting; false without Hands)
-export const agentInput = () => typeof lord !== 'undefined' && typeof lord.hands?.injecting === 'function' && !!lord.hands.injecting();
+// (refused, as while a community theme's code is on the stack, counts as not injecting)
+export const agentInput = () => {
+  try { return typeof lord !== 'undefined' && typeof lord.hands?.injecting === 'function' && !!lord.hands.injecting(); } catch (e) { return false; }
+};

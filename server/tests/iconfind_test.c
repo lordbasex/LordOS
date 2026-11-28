@@ -127,6 +127,11 @@ static void test_allowed(void) {
         { "/usr/lib/lordos/assets/machines/symbols/cpu-symbolic.svg", 1 },
         { "/usr/lib/lordos/bin/a.svg", 0 },
         { "/usr/lib/lordos/assets/../bin/a.svg", 0 },
+        { "/home/u/.cache/lordos/web/icons/whatsapp.svg", 1 },
+        { "/home/u/.config/lordos/web/icons/whatsapp.svg", 1 },
+        { "/home/u/.cache/lordos/web/whatsapp.svg", 0 },
+        { "/home/u/.cache/lordos/web/icons/../../../Documents/a.svg", 0 },
+        { "/home/u/.cache/lordos/web/icons/whatsapp.png", 0 },
     };
     for (size_t i = 0; i < sizeof cases / sizeof *cases; i++)
         if (iconfind_svg_allowed(cases[i].path, "/home/u") != cases[i].ok) { fails++; printf("FAIL allowed %s\n", cases[i].path); }

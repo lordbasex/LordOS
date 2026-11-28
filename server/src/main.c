@@ -3935,6 +3935,8 @@ int main(int argc, char **argv) {
         int wait = delay < 0 ? -1 : (int)ceil(delay);
         if ((wants && (!all_busy(&s) || ahead) && pace <= 0) || ui.quit_requested) wait = 0;
         if (ui.theme_request[0] && (wait < 0 || wait > 16)) wait = 16;     /* a theme switch waits for its overlay's frames */
+        /* a modeset after a dropped flip, still on its thread (kms.h): its answer is looked for every 50 ms */
+        for (int i = 0; i < OUT_MAX; i++) if (s.out[i].kms.recover && (wait < 0 || wait > 50)) wait = 50;
         if (timeout_ms > 0) {
             double left = start + timeout_ms - now_ms();
             if (left <= 0) break;
@@ -4064,6 +4066,7 @@ int main(int argc, char **argv) {
             int recovered = 0;
             for (int i = 0; i < OUT_MAX; i++) {
                 Kms *k = &s.out[i].kms;
+                if (k->recover) { kms_recover_poll(k); if (!k->recover) recovered = 1; }   /* its modeset answered */
                 if (!s.out[i].on || !k->flip_pending) { flip_told[i] = 0; continue; }
                 if (flip_told[i] != k->flip_submit_ns && kms_flip_stuck(k, loop_wake, 2000000000ull)) {
                     flip_told[i] = k->flip_submit_ns;
