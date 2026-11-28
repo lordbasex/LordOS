@@ -659,6 +659,7 @@ export default function Settings() {
   const homeSkin = useSkin('settings', 'home');
   const [atHomeState, setAtHome] = useState(() => !args?.section);
   const atHome = !!homeSkin && atHomeState;
+  const denied = settingsPageDenied(section);   // a person-only page: out of an AI agent's reach (sdk/handsdeny.js)
   const setSection = (s) => { lastSection = s; setSectionState(s); setAtHome(false); subPage.set(null); if (side.narrow) side.close(); };
   // the mouse's back and forward buttons (#234) walk sections and a section's sub-pages (subpage.js: Wallpaper's collections)
   const sub = useStore(subPage);
@@ -718,7 +719,9 @@ export default function Settings() {
     <View style={{ flex: 1, flexDirection: 'row' }}>
       {side.narrow ? null : <SkinRegion app="settings" region="sidebar" model={vm}>{sidebar}</SkinRegion>}
       {atHome ? <View style={{ flex: 1, minWidth: 0 }}><SkinRegion app="settings" region="home" model={vm} /></View> : (
-      <View style={{ flex: 1, minWidth: 0 }}>
+      // a person-only page (sdk/handsdeny.js): the whole content column is handsDeny, its header (Cloud's Add Account)
+      // included, and so are its sheets below (security scan 0.8.9.6.2, F4)
+      <View handsDeny={denied || undefined} style={{ flex: 1, minWidth: 0 }}>
         <View style={{ height: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: pad }}>
           <Hairline edge="bottom" />
           {side.narrow ? <SidebarToggle small shown={side.shown} onClick={side.toggle} /> : null}
@@ -729,7 +732,7 @@ export default function Settings() {
         <ScrollView resetKey={placeOf(section, sub)} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: pad, paddingTop: side.narrow ? spacing.l : spacing.xl, alignItems: 'center' }}>
             {/* Cloud's account page has two columns, Wallpaper and AI are galleries: they take a wider column on wide windows */}
-            <View handsDeny={settingsPageDenied(section)} style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : section === 'wallpaper' || section === 'ai' ? 1180 : 680 }}>
+            <View handsDeny={denied || undefined} style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : section === 'wallpaper' || section === 'ai' ? 1180 : 680 }}>
               <Body page={section === 'network' || section === 'cloud' || section === 'ai' ? args?.page : undefined}
                 alert={section === 'ai' ? args?.alert : undefined} />
             </View>
@@ -738,7 +741,7 @@ export default function Settings() {
       </View>)}
       {side.narrow && side.shown ? <SidebarOverlay width={220} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
       {/* Cloud's sheets: inside this window, over its content, never in the shell's modal layer (docs/CLOUD.md 18.2) */}
-      {section === 'cloud' ? <CloudSheets /> : null}
+      {section === 'cloud' ? <CloudSheets handsDeny={denied} /> : null}
     </View>
   );
 }

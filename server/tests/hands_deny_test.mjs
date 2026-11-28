@@ -23,7 +23,21 @@ yes('an ordinary page and app are not', !settingsPageDenied('appearance') && !ap
 const monitor = readFileSync(`${root}apps/monitor/index.jsx`, 'utf8');
 yes('the firewall views are Privacy sections', /registerPrivacySection\(\{ id: 'firewall'/.test(monitor) && /registerPrivacySection\(\{ id: 'fwrules'/.test(monitor));
 // the places that apply the lists use them, never a copy
-yes('Settings uses settingsPageDenied', /handsDeny=\{settingsPageDenied\(section\)\}/.test(settingsSrc) && !/PERSON_ONLY\s*=/.test(settingsSrc));
+yes('Settings uses settingsPageDenied', /const denied = settingsPageDenied\(section\)/.test(settingsSrc) && !/PERSON_ONLY\s*=/.test(settingsSrc));
+// (security scan 0.8.9.6.2, F4) the whole content column of a person-only page, its header included, and Cloud's sheets
+yes('a person-only page: the whole content column is handsDeny (header too)', /<View handsDeny=\{denied \|\| undefined\} style=\{\{ flex: 1, minWidth: 0 \}\}>\s*<View style=\{\{ height: 48/.test(settingsSrc));
+yes('Cloud\'s sheets are handsDeny with the page', /<CloudSheets handsDeny=\{denied\} \/>/.test(settingsSrc) &&
+  /<View handsDeny=\{handsDeny \|\| undefined\} style=\{\{ position: 'absolute'/.test(readFileSync(`${root}apps/settings/Cloud.jsx`, 'utf8')));
+{
+  const cloudSrc = readFileSync(`${root}apps/settings/Cloud.jsx`, 'utf8');
+  const fn = (name) => cloudSrc.slice(cloudSrc.indexOf(`function ${name}(`), cloudSrc.indexOf('\n}\n', cloudSrc.indexOf(`function ${name}(`)));
+  for (const name of ['RemoveSheet', 'EmptyTrashSheet']) {
+    yes(`Cloud's ${name} confirms in a destructive ConfirmDialog`, /<ConfirmDialog destructive/.test(fn(name)));
+    yes(`Cloud's ${name} has no plain red confirm`, !/backgroundColor: '#e5483f'/.test(fn(name)));
+  }
+}
+// (F3) Mail's account setup, certificate and password sheets
+yes('Mail\'s setup sheets are handsDeny', (readFileSync(`${root}apps/mail/Setup.jsx`, 'utf8').match(/<Sheet( width=\{\d+\})? handsDeny>/g) || []).length === 6);
 yes('every app window uses appDenied', /handsDeny=\{appDenied\(app\.id\)\}/.test(readFileSync(`${root}sdk/components.jsx`, 'utf8')));
 yes('every destructive confirmation is handsDeny', /handsDeny=\{handsDeny \?\? !!destructive\}/.test(readFileSync(`${root}sdk/controls.jsx`, 'utf8')));
 yes('the trust dialog is handsDeny', /ConfirmDialog cautious handsDeny/.test(readFileSync(`${root}apps/settings/ThemeGallery.jsx`, 'utf8')));

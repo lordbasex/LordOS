@@ -292,6 +292,12 @@ int hands_native_guard(const char *name) {
         /* (F3) Mail's accounts file in the shell's own process: trusted certificates, servers, accounts (the isolated
          * Mail's "save" is refused in the broker, brokermail.c brokermail_cfg_guarded) */
         "mail.saveConfig",
+        /* (F4) Settings → Cloud: adding an account (and answering its questions) or signing in (beginSignIn,
+         * openSignInPage: the browser's sign-in and the token it brings), removing one with its pending uploads, turning one
+         * on or off, emptying the provider's trash for good, a public link (it publishes files outside the machine), and
+         * deleting in a mount (cloud.delete unlinks on the server: not the Trash, nothing to put back) */
+        "cloud.add", "cloud.answer", "cloud.beginSignIn", "cloud.openSignInPage", "cloud.remove", "cloud.setEnabled",
+        "cloud.emptyTrash", "cloud.link", "cloud.delete",
     };
     if (!name) return HANDS_G_NONE;
     if (!strcmp(name, "clipboard.get")) return HANDS_G_CLIP;

@@ -690,12 +690,15 @@ static void native_guard(void) {
                               "fw.removeList", "perms.set", "admin.request", "sentinela.unblock", "themes.trust", "themes.remove",
                               "hands.serve", "hands.answer", "share.answer", "session.power",
                               "media.screenshot", "media.screenRecord",   /* F1 of the 0.8.9.6.2 scan: Screenshots' unredacted capture */
-                              "mail.saveConfig" };                         /* F3: Mail's trusted certificates and accounts */
+                              "mail.saveConfig",                           /* F3: Mail's trusted certificates and accounts */
+                              "cloud.add", "cloud.answer", "cloud.remove", "cloud.emptyTrash",     /* F4: Settings → Cloud */
+                              "cloud.beginSignIn", "cloud.openSignInPage", "cloud.setEnabled", "cloud.link", "cloud.delete" };
     for (size_t i = 0; i < sizeof refused / sizeof refused[0]; i++) CHECK(hands_native_guard(refused[i]) == HANDS_G_REFUSE, "lord.%s refused to an agent", refused[i]);
     CHECK(hands_native_guard("clipboard.get") == HANDS_G_CLIP, "lord.clipboard.get: empty while a secret");
     const char *free_[] = { "fs.list", "term.write", "fw.status", "fw.rules", "perms.get", "vaultx.y", "vault.poll", "vault.available", "admin.available", "hands.status", "themes.list", "term.fillx",
                             "media.saveImage", "media.copyImage", "media.crop", "media.screenshotx",
-                            "mail.config", "mail.request", "mail.saveConfigx" };
+                            "mail.config", "mail.request", "mail.saveConfigx", "cloud.status", "cloud.list", "cloud.links", "cloud.unlink",
+                            "cloud.cancelSignIn", "cloud.rename", "cloud.pause", "cloud.keep", "cloud.free", "cloud.setOptions" };
     for (size_t i = 0; i < sizeof free_ / sizeof free_[0]; i++) CHECK(hands_native_guard(free_[i]) == HANDS_G_NONE, "lord.%s left alone", free_[i]);
     /* a shell re-mounted by a theme switch the agent clicked registers its cursor again and re-sends the person's motion
      * (QA ws168: the violet cursor never came back): neither is on the closed list; the cursor's nodes are checked in

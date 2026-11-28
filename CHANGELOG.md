@@ -51,6 +51,31 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (10 cases of what is guarded, an agent's Trust and Add Account refused with nothing saved, a signature change
   saved, the person's own Trust saved) and `build/hands-test` (`mail.saveConfig` refused, `mail.config` and
   `mail.request` left alone).
+- **Hands: a person-only Settings page is out of an agent's reach as a whole, Cloud's sheets included** (security
+  scan of 0.8.9.6.2, F4). Only the page's body was `handsDeny`: Cloud's **Add Account** button in the header and every
+  Cloud sheet (Add Account, credentials, Remove Account, Empty Trash) were outside it, so an agent could add an account
+  of its choosing or press the red confirm of Empty Trash (the provider's trash, for good) or Remove Account (with its
+  pending uploads), which were plain views, not `ConfirmDialog`s. Now the whole content column of a person-only page
+  is `handsDeny`, header included, and Cloud's sheets are drawn in one `handsDeny` box; Remove Account and Empty Trash
+  confirm in destructive `ConfirmDialog`s (Enter is Cancel, an agent's click and key refused); and lord-server refuses
+  to an agent's input (`hands_native_guard`) every `lord.cloud` call that signs in, changes an account or its
+  credentials, publishes or destroys: `add` and `answer` (a new account and its questions), `beginSignIn` and
+  `openSignInPage` (the browser's sign-in and the token it brings), `remove`, `setEnabled`, `emptyTrash` (the
+  provider's trash, for good), `link` (a public link shares files outside the machine, so only the person makes one)
+  and `delete` (it unlinks in the mount, so the file goes on the server: not the Trash, nothing Files can put back,
+  unlike moving a file to the Trash). Unlinking a share, pausing, keeping, freeing space, renaming an account and the
+  bandwidth options stay open. Tests: `tests/hands_deny_test.mjs` (the column and the sheets, both confirms; Mail's
+  six setup sheets for F3) and `build/hands-test` (the nine names refused; `status`, `list`, `links`, `unlink`,
+  `cancelSignIn`, `rename`, `pause`, `keep`, `free` and `setOptions` left alone).
+- **Spelling: bounded work, so a long line can't freeze the desktop** (security scan of 0.8.9.6.2, F5). The file-name
+  pattern (`FILE_NAME`, `sdk/spellmodel.js`) backtracked quadratically over a long run of letters without a dot, over
+  the whole field's text, on every render (each caret blink) on lord-server's one JS thread: a mail with a
+  100,000-letter line, quoted in a reply, froze the session until the watchdog. Now only the first 50,000 code points
+  of a text are checked (`TEXT_MAX`), the text is cut at whitespace first, a chunk longer than 256 code points
+  (`CHUNK_MAX`: a hash, a URL, base64, never a word) is skipped, and the file-name pattern is anchored and tried only
+  where a name can start in one short chunk. `spellRanges` is memoized per text, languages, caret, verdicts and the
+  person's words, so a caret blink doesn't scan again. Test: `tests/spell_model_test.mjs` (100,000 letters, a long run
+  of name characters, a long text, a long chunk, file names still blanked, positions kept).
 
 ### Added
 - **Text Editor: a horizontal scroll bar for lines wider than the window** (GitHub #264, first part; soft word wrap

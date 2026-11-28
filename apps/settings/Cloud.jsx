@@ -7,6 +7,7 @@ import {
   View, Text, Button, Toggle, TextInput, SearchField, Segmented, ScrollView, useTheme, useLocale, useStore, useCloud, cloud, cloudModel, createStore,
   formatBytes, formatDate, formatTime, tOptional, spacing, typeScale, wm, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText,
   AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, hasTextFocus, cloudState, askKeyringUnlock, systemInfo, lordosVersion, AutofillButton, fs,
+  ConfirmDialog,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stack, Section, SettingRow, Note, Actions, PopUp, tint } from './ui.jsx';
@@ -1555,7 +1556,8 @@ function QuestionSheet({ sheet }) {
   );
 }
 
-// Empty Trash (17.2), for providers that have one: asked first; the answer comes later.
+// Empty Trash (17.2), for providers that have one: asked first in a destructive ConfirmDialog (handsDeny: the person's
+// own answer, never an AI agent's; security scan 0.8.9.6.2, F4); the answer comes later, in a sheet.
 function EmptyTrashSheet({ st, sheet }) {
   const t = useTheme();
   const { t: tr } = useLocale();
@@ -1568,20 +1570,21 @@ function EmptyTrashSheet({ st, sheet }) {
     setBusy(true);
     cloud.emptyTrash(a.id).then((r) => { setBusy(false); setMsg(r && r.error ? { ok: false, text: errorMessage(r, a) } : { ok: true, text: tr('cloud.trash.done', { provider: M.providerName(a, providerCache.get()) }) }); });
   };
+  if (!msg) {
+    return (
+      <ConfirmDialog destructive title={tr('cloud.trash.title', { name: a.name })} detail={tr('cloud.trash.detail', { provider: M.providerName(a, providerCache.get()) })}
+        okLabel={tr('cloud.trash.ok')} cancelLabel={tr('cloud.cancel')} onOk={busy ? () => {} : go} onCancel={close}>
+        {busy ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Spinner size={16} /><Dim t={t}>{tr('cloud.trash.running')}</Dim></View> : null}
+      </ConfirmDialog>
+    );
+  }
   return (
     <Sheet width={400} onClose={close} label={tr('cloud.trash.empty')}>
       <View style={{ padding: spacing.xl, gap: spacing.s }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.trash.title', { name: a.name })}</Text>
-        <Dim t={t} style={{ fontSize: typeScale.body }}>{tr('cloud.trash.detail', { provider: M.providerName(a, providerCache.get()) })}</Dim>
-        {busy ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Spinner size={16} /><Dim t={t}>{tr('cloud.trash.running')}</Dim></View> : null}
-        {msg ? <Text style={{ fontSize: typeScale.callout, color: msg.ok ? tint.ok : tint.error, textAlign: 'start' }}>{msg.text}</Text> : null}
+        <Text style={{ fontSize: typeScale.callout, color: msg.ok ? tint.ok : tint.error, textAlign: 'start' }}>{msg.text}</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
-          <Button label={tr(msg ? 'cloud.done' : 'cloud.cancel')} onClick={close} />
-          {msg ? null : (
-            <View onClick={busy ? undefined : go} style={{ height: 28, paddingHorizontal: 14, borderRadius: t.controlRadius, justifyContent: 'center', backgroundColor: '#e5483f', opacity: busy ? 0.5 : 1 }}>
-              <Text style={{ fontSize: typeScale.body, fontWeight: 500, color: '#fff' }}>{tr('cloud.trash.ok')}</Text>
-            </View>
-          )}
+          <Button label={tr('cloud.done')} onClick={close} />
         </View>
       </View>
     </Sheet>
@@ -1668,7 +1671,6 @@ function SignInCard({ st, info }) {
 // ---- Remove Account… ----
 
 function RemoveSheet({ st, sheet }) {
-  const t = useTheme();
   const { t: tr } = useLocale();
   const a = (st.accounts || []).find((x) => x.id === sheet.id);
   const [pending, setPending] = useState(null);
@@ -1681,20 +1683,13 @@ function RemoveSheet({ st, sheet }) {
     if (r && r.error) { setErr(errorText(r.error)); return; }
     setView({ page: null, sheet: null });
   };
+  // a destructive ConfirmDialog: handsDeny, the person's own answer (security scan 0.8.9.6.2, F4)
   return (
-    <Sheet width={380} onClose={close} label={tr('cloud.removeTitle', { name: a.name })}>
-      <View style={{ padding: spacing.xl, gap: spacing.s }}>
-        <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.removeTitle', { name: a.name })}</Text>
-        <Dim t={t} style={{ fontSize: typeScale.body }}>{pending ? tr('cloud.removePending', { count: Number(pending) || 1 }) : tr('cloud.removeHint')}</Dim>
-        {err ? <Text style={{ fontSize: typeScale.callout, color: tint.error, textAlign: 'start' }}>{err}</Text> : null}
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
-          <Button label={tr('cloud.cancel')} onClick={close} />
-          <View onClick={() => go(!!pending)} style={{ height: 28, paddingHorizontal: 14, borderRadius: t.controlRadius, justifyContent: 'center', backgroundColor: '#e5483f' }}>
-            <Text style={{ fontSize: typeScale.body, fontWeight: 500, color: '#fff' }}>{tr(pending ? 'cloud.removeAnyway' : 'cloud.removeOk')}</Text>
-          </View>
-        </View>
-      </View>
-    </Sheet>
+    <ConfirmDialog destructive title={tr('cloud.removeTitle', { name: a.name })}
+      detail={pending ? tr('cloud.removePending', { count: Number(pending) || 1 }) : tr('cloud.removeHint')}
+      okLabel={tr(pending ? 'cloud.removeAnyway' : 'cloud.removeOk')} cancelLabel={tr('cloud.cancel')} onOk={() => go(!!pending)} onCancel={close}>
+      {err ? <Text style={{ fontSize: typeScale.callout, color: tint.error, textAlign: 'start' }}>{err}</Text> : null}
+    </ConfirmDialog>
   );
 }
 
@@ -1730,7 +1725,9 @@ export function CloudSettings({ page }) {
 }
 
 // The Cloud pane's sheets, drawn by Settings at its window's root (index.jsx), over the window's content only.
-export function CloudSheets() {
+// handsDeny (Cloud is a person-only page, sdk/handsdeny.js): every sheet is in one box that an AI agent never reads,
+// clicks or types in (security scan 0.8.9.6.2, F4: the sheets were siblings of the denied page).
+export function CloudSheets({ handsDeny = false }) {
   const { t: tr } = useLocale();
   const st = useCloud();
   const v = useStore(cloudView);
@@ -1738,7 +1735,7 @@ export function CloudSheets() {
   if (!sh || !st) return null;
   const a = sh.id ? (st.accounts || []).find((x) => x.id === sh.id) : null;
   return (
-    <>
+    <View handsDeny={handsDeny || undefined} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }}>
       {sh.kind === 'add' ? <AddSheet st={st} /> : null}
       {sh.kind === 'cred' ? <CredSheet st={st} sheet={sh} /> : null}
       {sh.kind === 'remove' ? <RemoveSheet st={st} sheet={sh} /> : null}
@@ -1751,6 +1748,6 @@ export function CloudSheets() {
         <FilePicker mode="folder" start={a.mount} title={tr('cloud.addFolderTitle', { name: a.name })} onClose={() => setView({ sheet: null })}
           onPick={(p2) => { setView({ sheet: null }); const path = [].concat(p2)[0]; if (path && M.accountOf(path, [a])) cloud.keep([path]); }} />
       ) : null}
-    </>
+    </View>
   );
 }
