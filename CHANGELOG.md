@@ -76,6 +76,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   where a name can start in one short chunk. `spellRanges` is memoized per text, languages, caret, verdicts and the
   person's words, so a caret blink doesn't scan again. Test: `tests/spell_model_test.mjs` (100,000 letters, a long run
   of name characters, a long text, a long chunk, file names still blanked, positions kept).
+- **Web apps: a notification's tag no longer reaches the log as a hash** (security scan of 0.8.9.6.2, F6). The
+  `notify:` line of a web app's log carried 8 hex digits of FNV-1a seeded with a 64-bit salt and a splitmix finalizer:
+  every step invertible, so two or three notifications whose tags someone knew (chat ids, often phone numbers) let
+  them recover the state and test candidate numbers against the other lines of a shared log; and a failed
+  `getrandom` fell back to a time-and-pid salt. Now the line says only the tag's place in this run's order of first
+  appearance (`page tag 3`, `other` after 1,024, `none` without one: `webpage_tag_id`), computed from nothing of the
+  tag, and the salt and its fallback are gone. The "replaced" check compares an in-memory 64-bit key that is never
+  logged (`webpage_tag_key`). docs/WEBAPPS.md updated. Test: `build/webapp-test` (numbering, another run's other
+  order, a full table, the tag never in the line).
 
 ### Added
 - **Text Editor: a horizontal scroll bar for lines wider than the window** (GitHub #264, first part; soft word wrap

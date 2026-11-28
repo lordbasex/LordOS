@@ -55,14 +55,20 @@ int  webpage_sound_suppress(int mode, int learned, int silent, double last_audio
 int  webpage_sound_learns(int mode, double note_ms, double audio_ms);
 
 /* The log line (without "notify: " and the newline) for one notification the page posted, into out: its length, 0 when
- * it doesn't fit. "page tag <hash8|none> silent <yes|no|unknown> renotify <yes|no|unknown> shown|replaced". Never the
- * title, body, icon or an address: the tag (a messaging app's chat id, often a phone number) only as 8 hex digits of a
- * hash keyed with salt, a random number lord-web picks at start and never writes, so a line can be matched with the
- * next one of the same run but not turned back into the tag. silent and renotify: 1, 0, or -1 when WebKit doesn't say
- * (WPE 2.54's WebKitNotification tells neither). replaced: the notification took the place of one with the same tag. */
-size_t webpage_notify_line(const char *tag, unsigned long long salt, int silent, int renotify, int replaced, char *out, size_t n);
-/* the 8 hex digits above (tag non-empty) */
-void   webpage_tag_hash(const char *tag, unsigned long long salt, char out[9]);
+ * it doesn't fit. "page tag <N|other|none> silent <yes|no|unknown> renotify <yes|no|unknown> shown|replaced". Never the
+ * title, body, icon or an address, nor anything computed from the tag (a messaging app's chat id, often a phone
+ * number): only id, its place in this run's order of first appearance (webpage_tag_id: 1 for the first tag seen, 2 for
+ * the next…; 0 "other" once WEBPAGE_TAG_IDS were seen, -1 "none" without a tag), so lines of one run can be matched and
+ * nothing of the tag can be recovered from a log (security scan 0.8.9.6.2, F6: an invertible keyed hash was).
+ * silent and renotify: 1, 0, or -1 when WebKit doesn't say (WPE 2.54's WebKitNotification tells neither). replaced:
+ * the notification took the place of one with the same tag. */
+size_t webpage_notify_line(int id, int silent, int renotify, int replaced, char *out, size_t n);
+/* A tag's 64-bit FNV-1a, to tell two tags apart in memory only (never logged or written). */
+unsigned long long webpage_tag_key(const char *tag);
+/* This run's tags in the order they appeared: tag's place (1…WEBPAGE_TAG_IDS), 0 when the table is full, -1 for no tag. */
+#define WEBPAGE_TAG_IDS 1024
+typedef struct { unsigned long long key[WEBPAGE_TAG_IDS]; int n; } WebTagIds;
+int    webpage_tag_id(WebTagIds *t, const char *tag);
 
 /* The profile's state file (<profile>/state.json, lord-web's own: { "ownSound": true|false, "clientHints":
  * { "<origin>": ["sec-ch-ua-arch", ...] } }). clientHints: the high-entropy Client Hints each site asked for with

@@ -779,12 +779,13 @@ silently.
 line to the app's log (`/var/log/lordos/users/<user>/web/<app>-<profile>.log`), in the call log's budget of 60 lines a
 minute (`webcall_log_as`, shared with `webcall:`):
 
-    notify: page tag 3f9a0c17 silent unknown renotify unknown shown
+    notify: page tag 3 silent unknown renotify unknown shown
 
-Never the title, the body, the icon or an address. The tag (a messaging app's chat id, often a phone number) is only 8
-hex digits of a hash keyed with a random number lord-web picks at start and never writes: two lines of the same run can
-be matched, a line can't be turned back into the tag, and the next run gives other digits. `none` when there is no
-tag. `replaced` when it took the place of one with the same tag (lord-web's own replace, or WebKit withdrawing the old
+Never the title, the body, the icon or an address, nor anything computed from the tag (a messaging app's chat id,
+often a phone number): only its place in this run's order of first appearance (`1` for the first tag seen, `2` for
+the next, `other` after 1,024), so two lines of the same run can be matched and nothing of the tag can be recovered
+(until 0.8.9.6.2 it was 8 hex digits of a keyed hash, which a few known pairs could invert; security scan F6). `none`
+when there is no tag. `replaced` when it took the place of one with the same tag (lord-web's own replace, or WebKit withdrawing the old
 one less than a second before). `silent` and `renotify` are `unknown`: WPE 2.54's `WebKitNotification` tells neither.
 With it, "the sound played but no banner" can be told apart: no `notify:` line means the page never posted one.
 

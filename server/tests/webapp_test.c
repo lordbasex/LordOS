@@ -1386,24 +1386,29 @@ static void test_spellang(void) {
     CHECK(spellang_installed("/nonexistent-dir", NULL, 0) == 0, "no folder");
 }
 
-/* the notify: log line (webpage_notify_line): no text of the notification, the tag only as a keyed hash */
+/* the notify: log line (webpage_notify_line): no text of the notification, and nothing computed from the tag, only its
+ * place in this run's order (security scan 0.8.9.6.2, F6: a keyed hash could be inverted from a few known pairs) */
 static void test_notify_line(void) {
-    char out[128], a[9], b[9], c[9];
-    CHECK(webpage_notify_line("5491100000000@c.us", 42, -1, -1, 0, out, sizeof out) > 0, "line made");
-    CHECK(!strncmp(out, "page tag ", 9) && strlen(out) == strlen("page tag 00000000 silent unknown renotify unknown shown"), "shape: %s", out);
+    char out[128];
+    static WebTagIds ids;
+    memset(&ids, 0, sizeof ids);
+    int a = webpage_tag_id(&ids, "5491100000000@c.us"), b = webpage_tag_id(&ids, "5491100000001@c.us"), a2 = webpage_tag_id(&ids, "5491100000000@c.us");
+    CHECK(a == 1 && b == 2 && a2 == 1, "tags numbered in the order they came: %d %d %d", a, b, a2);
+    CHECK(webpage_notify_line(a, -1, -1, 0, out, sizeof out) > 0 && !strcmp(out, "page tag 1 silent unknown renotify unknown shown"), "line: %s", out);
     CHECK(!strstr(out, "549") && !strstr(out, "c.us"), "the tag itself never: %s", out);
-    for (const char *p = out + 9; p < out + 17; p++) CHECK((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f'), "8 hex digits: %s", out);
-    webpage_tag_hash("chat-1", 42, a);
-    webpage_tag_hash("chat-1", 42, b);
-    webpage_tag_hash("chat-1", 43, c);
-    CHECK(!strcmp(a, b), "the same tag and salt: the same hash");
-    CHECK(strcmp(a, c), "another salt (another run): another hash");
-    webpage_tag_hash("chat-2", 42, c);
-    CHECK(strcmp(a, c), "another tag: another hash");
-    CHECK(webpage_notify_line(NULL, 42, 1, 0, 1, out, sizeof out) && !strcmp(out, "page tag none silent yes renotify no replaced"), "no tag: %s", out);
-    CHECK(webpage_notify_line("", 42, 0, 1, 0, out, sizeof out) && !strcmp(out, "page tag none silent no renotify yes shown"), "empty tag: %s", out);
-    CHECK(!webpage_notify_line("t", 42, 0, 0, 0, out, 20) && !out[0], "too small: nothing");
-    CHECK(!webpage_notify_line("t", 42, 0, 0, 0, NULL, 0), "no buffer");
+    CHECK(webpage_notify_line(b, 0, 0, 1, out, sizeof out) && !strcmp(out, "page tag 2 silent no renotify no replaced"), "second tag: %s", out);
+    /* the same tags in another order give other numbers: the number says nothing about the tag */
+    static WebTagIds ids2;
+    memset(&ids2, 0, sizeof ids2);
+    CHECK(webpage_tag_id(&ids2, "5491100000001@c.us") == 1 && webpage_tag_id(&ids2, "5491100000000@c.us") == 2, "another run: another order");
+    CHECK(webpage_tag_id(&ids, "") == -1 && webpage_tag_id(&ids, NULL) == -1 && webpage_tag_id(NULL, "x") == -1, "no tag: -1");
+    for (int i = 0; ids.n < WEBPAGE_TAG_IDS; i++) { char t[32]; snprintf(t, sizeof t, "chat-%d", i); webpage_tag_id(&ids, t); }
+    CHECK(webpage_tag_id(&ids, "one more") == 0 && webpage_tag_id(&ids, "5491100000000@c.us") == 1, "a full table: other (0), known tags keep their number");
+    CHECK(webpage_notify_line(0, 1, 1, 0, out, sizeof out) && !strcmp(out, "page tag other silent yes renotify yes shown"), "full: %s", out);
+    CHECK(webpage_notify_line(-1, 1, 0, 1, out, sizeof out) && !strcmp(out, "page tag none silent yes renotify no replaced"), "no tag: %s", out);
+    CHECK(webpage_tag_key("chat-1") == webpage_tag_key("chat-1") && webpage_tag_key("chat-1") != webpage_tag_key("chat-2"), "the in-memory key tells tags apart");
+    CHECK(!webpage_notify_line(1, 0, 0, 0, out, 20) && !out[0], "too small: nothing");
+    CHECK(!webpage_notify_line(1, 0, 0, 0, NULL, 0), "no buffer");
 }
 
 /* ✨ AI on a page's selection (docs/AI.md "Writing"): what lord-web and lord-server let reach the shell */
