@@ -134,12 +134,10 @@ export function NotificationCenter({ t, at, onClose, isOnBar }) {
               <View style={{ paddingHorizontal: 12, paddingBottom: 12, gap: 12 }}>
                 {groups.map((g) => {
                   const app = g.key ? getApp(g.key) : null;
-                  // an app the registry doesn't list (a Flatpak app's notification): the icon its notification came with
-                  const GroupIcon = app?.Icon || g.items.find((n) => n.Icon)?.Icon || null;
                   return (
                     <View key={g.key || '-'} style={{ gap: 6 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 }}>
-                        {GroupIcon ? <GroupIcon size={16} /> : null}
+                        {app?.Icon ? <app.Icon size={16} /> : null}
                         <Text style={{ fontSize: 12, fontWeight: 600, color: t.textDim, textAlign: 'start' }}>{app ? appName(app) : g.items[0].label || ''}</Text>
                       </View>
                       {g.items.slice(0, 6).map((n) => <Item key={n.id} t={t} n={n} onRemove={() => remove(n.id)} />)}

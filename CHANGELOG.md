@@ -484,8 +484,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   icon, but the alarm's **Stop** in the notification centre did nothing). A banner whose time was up went with the
   reason "closed", so lord-server told the app it was dismissed and forgot the portal notification's buttons; it now
   goes as "expired", which tells the app nothing (the notification is still in the centre). The history also keeps the
-  icon a notification came with, so the centre's group of an app the registry doesn't list (a Flatpak app's) shows it
-  (Flow and Classic). Test: `notify_expiry_scene.mjs`.
+  icon a notification came with (`Icon`), for a centre to show for an app the registry doesn't list (a Flatpak app's
+  group in Flow's and Classic's centre has no icon yet: that change belongs in LordOS-themes, whose pinned snapshot
+  `themes-sync-test` checks). Test: `notify_expiry_scene.mjs`.
 - **Settings → Energy: whole hours read "1 h", not "1 h 0 min"** (seen on VM 127 while checking BUG-B: "Require
   password after the display turns off" offered "1 h 0 min"). A new `prefs.power.h` text, in every language, for a
   duration of whole hours (the sleep lists' 1, 2 and 3 h too).
