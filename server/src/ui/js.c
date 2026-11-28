@@ -43,6 +43,7 @@
 #include "js_broker.h"
 #include "js_wasm.h"
 #include "js_theme.h"
+#include "logclean.h"
 #include "js_err.h"
 #include "themestore.h"
 #include "../media/svgicon.h"
@@ -91,17 +92,33 @@ static double now_ms(void) {
 /* The last exception, kept short (its message and the first lines of its stack) for js_init_error() */
 static char last_error[1024];
 
+/* (security scan 0.8.9.6.2, F8) In a community session a theme's text reaches the log only cleaned and prefixed:
+ * its lord.log and console lines, and an exception's message and stack (whatever realm threw: a theme's Error can
+ * travel through LordOS's code), every line on its own with control characters neutralised (logclean.h), so no
+ * line it writes can pass for another subsystem's. With the theme's code on the stack or in its realm the prefix
+ * is "js: theme <id>: ". */
+static char community_id[32];
+static void log_prefix(JSContext *c, char *out, size_t n) {
+    if (jst_active() && community_id[0] && (c == jst_realm() || jst_on_stack(c))) snprintf(out, n, "js: theme %s: ", community_id);
+    else snprintf(out, n, "js: ");
+}
+
 static void dump_exception(JSContext *c) {
     JSValue e = JS_GetException(c);
     const char *msg = JS_ToCString(c, e);
-    fprintf(stderr, "js: %s\n", msg ? msg : "(exception)");
+    char pre[64];
+    log_prefix(c, pre, sizeof pre);
+    int clean = jst_active();
+    if (clean) logclean_print(stderr, pre, msg ? msg : "(exception)");
+    else fprintf(stderr, "js: %s\n", msg ? msg : "(exception)");
     snprintf(last_error, sizeof last_error, "%s", msg ? msg : "(exception)");
     if (msg) JS_FreeCString(c, msg);
     if (JS_IsObject(e)) {
         JSValue st = JS_GetPropertyStr(c, e, "stack");
         const char *s = JS_IsUndefined(st) ? NULL : JS_ToCString(c, st);
         if (s) {
-            fprintf(stderr, "%s\n", s);
+            if (clean) logclean_print(stderr, pre, s);
+            else fprintf(stderr, "%s\n", s);
             size_t used = strlen(last_error), lines = 0;
             for (const char *p = s; *p && lines < 6 && used + 2 < sizeof last_error; lines++) {
                 size_t l = strcspn(p, "\n");
@@ -720,7 +737,13 @@ static JSValue f_now(JSContext *c, JSValueConst this_val, int argc, JSValueConst
 static JSValue f_log(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     const char *s = JS_ToCString(c, argv[0]);
-    if (s) { fprintf(stderr, "js: %s\n", s); JS_FreeCString(c, s); }
+    if (!s) return JS_UNDEFINED;
+    if (jst_active()) {                  /* a community session: line by line, cleaned, the theme's prefixed (F8) */
+        char pre[64];
+        log_prefix(c, pre, sizeof pre);
+        logclean_print(stderr, pre, s);
+    } else fprintf(stderr, "js: %s\n", s);
+    JS_FreeCString(c, s);
     return JS_UNDEFINED;
 }
 
@@ -1059,6 +1082,7 @@ static int start_community(const Community *cm) {
     jst_set_realm(t);
     char name[64];
     snprintf(name, sizeof name, "<theme:%s>", cm->id);
+    snprintf(community_id, sizeof community_id, "%s", cm->id);
     JSValue v = JS_Eval(t, cm->code, cm->len, name, JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_STRICT);
     r = JS_IsException(v) ? -1 : 0;
     if (r) dump_exception(t);

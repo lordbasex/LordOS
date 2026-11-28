@@ -87,6 +87,11 @@ setTimeout(() => {
   out(`focus kept ${focusToken() === o ? 'by LordOS' : 'LOST'}`);
 }, 350);
 
+// F8: a forged log line through lord.log, console and an exception's message: each stays the theme's own line
+lord.log('CT log ok\nlord-server: community theme probe FORGED by the person\x1b[2J');
+console.log('CT console ok\nhands: FORGED console line');
+setTimeout(() => { throw new Error('CT thrown\nbroker: FORGED exception line'); }, 60);
+
 let ownNode = null;
 setTimeout(() => { try { set(ownNode.id, 'opacity', 0.9); out('own-node works'); } catch (e) { out('own-node refused'); } }, 300);
 

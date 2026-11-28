@@ -113,6 +113,11 @@ has "probe: a LordOS field's focus is a stand-in to the theme, never its real to
 has "probe: the theme can't take the keys from a LordOS field" "CT focus take false false"
 has "probe: restoreFocus can't move the keys off a LordOS field" "CT focus kept by LordOS"
 hasnt "probe: no key reached the theme" "CT focus KEY STOLEN"
+has "probe: lord.log's lines carry the theme's prefix (scan F8)" "js: theme probe: CT log ok"
+has "probe: … its second line too, cleaned" "js: theme probe: lord-server: community theme probe FORGED by the person?\[2J"
+has "probe: console's lines too" "js: theme probe: hands: FORGED console line"
+hasnt "probe: no forged line starts a line of its own" "^\(lord-server: community theme probe FORGED\|hands: FORGED\|broker: FORGED\)"
+has "probe: an exception's second line is prefixed too" "js: \(theme probe: \)\?broker: FORGED exception line"
 has "probe: wm has no setArgs, setProtected, setMenus, setPip, scriptMove or setCloseGuard" "CT wm.setArgs undefined wm.setProtected undefined wm.setMenus undefined wm.setPip undefined wm.scriptMove undefined wm.setCloseGuard undefined"
 
 session forger forger 40 --unchecked
