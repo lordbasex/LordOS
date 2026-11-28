@@ -881,6 +881,8 @@
   "un.how.preseed": "Odpowiedzi trafiają do własnych plików startowych instalatora, twoje hasło tylko jako skrót, i są usuwane po zainstalowaniu systemu.",
   "un.how.autoinstall": "Odpowiedzi trafiają na mały dysk odczytywany przez instalator, twoje hasło tylko jako skrót, a dysk jest usuwany po zainstalowaniu systemu.",
   "un.how.kickstart": "Odpowiedzi trafiają na mały dysk odczytywany przez instalator, twoje hasło tylko jako skrót, a dysk jest usuwany po zainstalowaniu systemu.",
+  "un.how.kali": "Odpowiedzi trafiają do własnych plików startowych instalatora, twoje hasło tylko jako skrót, i są usuwane po zainstalowaniu systemu.",
+  "un.how.lordos": "Odpowiedzi trafiają na mały dysk odczytywany przez instalator, twoje hasło tylko jako skrót, a dysk jest usuwany po zainstalowaniu systemu.",
   "un.image": "Instaluje z {file}, sprawdzonego również z podpisaną listą twórcy",
   "un.review": "Bez pytań: konto {user} na {host}",
   "un.reviewOff": "Odpowiadasz na pytania instalatora",

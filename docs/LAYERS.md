@@ -149,7 +149,8 @@ per frame with Monitor's moving dots over a hidden Terminal (MONITOR.md, "A blur
 behind Monitor"). The test is the opaque-cover skip's (opaque background, opacity 1 down the tree, no
 transform, away from rounded corners, clipped by its ancestors), in paint order; when the window on
 top moves, turns translucent or closes, the change reaches the blurred surface and the rule applies
-again (`test_hidden_blur_damage`).
+again (`test_hidden_blur_damage`). Since 0.8.9.6.2 the rule and the opaque-cover skip hold on the GPU path too: what
+the cover leaves out is only noted for the GPU's list of app windows (`test_gpu_cover`, MONITOR.md).
 
 | | |
 |---|---|

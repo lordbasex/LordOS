@@ -881,6 +881,8 @@
   "un.how.preseed": "A válaszok a telepítő saját indítófájljaiba kerülnek, a jelszava csak hash-ként, és a rendszer telepítése után törlődnek.",
   "un.how.autoinstall": "A válaszok egy kis lemezre kerülnek, amelyet a telepítő beolvas, a jelszava csak hash-ként, és a lemez a rendszer telepítése után eltávolításra kerül.",
   "un.how.kickstart": "A válaszok egy kis lemezre kerülnek, amelyet a telepítő beolvas, a jelszava csak hash-ként, és a lemez a rendszer telepítése után eltávolításra kerül.",
+  "un.how.kali": "A válaszok a telepítő saját indítófájljaiba kerülnek, a jelszava csak hash-ként, és a rendszer telepítése után törlődnek.",
+  "un.how.lordos": "A válaszok egy kis lemezre kerülnek, amelyet a telepítő beolvas, a jelszava csak hash-ként, és a lemez a rendszer telepítése után eltávolításra kerül.",
   "un.image": "Telepítés innen: {file}, a készítő aláírt listájával is ellenőrizve",
   "un.review": "Kérdések nélkül: {user} fiók a(z) {host} gépen",
   "un.reviewOff": "Ön válaszol a telepítő kérdéseire",

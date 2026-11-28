@@ -881,6 +881,8 @@
   "un.how.preseed": "Die Antworten kommen in die eigenen Startdateien des Installationsprogramms, dein Passwort nur als Hash, und sie werden entfernt, sobald das System installiert ist.",
   "un.how.autoinstall": "Die Antworten kommen auf einen kleinen Datenträger, den das Installationsprogramm liest, dein Passwort nur als Hash, und der Datenträger wird entfernt, sobald das System installiert ist.",
   "un.how.kickstart": "Die Antworten kommen auf einen kleinen Datenträger, den das Installationsprogramm liest, dein Passwort nur als Hash, und der Datenträger wird entfernt, sobald das System installiert ist.",
+  "un.how.kali": "Die Antworten kommen in die eigenen Startdateien des Installationsprogramms, dein Passwort nur als Hash, und sie werden entfernt, sobald das System installiert ist.",
+  "un.how.lordos": "Die Antworten kommen auf einen kleinen Datenträger, den das Installationsprogramm liest, dein Passwort nur als Hash, und der Datenträger wird entfernt, sobald das System installiert ist.",
   "un.image": "Installiert aus {file}, ebenfalls mit der signierten Liste seines Herstellers abgeglichen",
   "un.review": "Ohne Rückfragen: Konto {user} auf {host}",
   "un.reviewOff": "Du beantwortest die Fragen des Installationsprogramms",

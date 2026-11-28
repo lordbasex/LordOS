@@ -881,6 +881,8 @@
   "un.how.preseed": "Yanıtlar yükleyicinin kendi başlangıç dosyalarına girer, parolanız yalnızca karma olarak, ve sistem yüklendiğinde kaldırılır.",
   "un.how.autoinstall": "Yanıtlar yükleyicinin okuduğu küçük bir diske girer, parolanız yalnızca karma olarak, ve sistem yüklendiğinde disk kaldırılır.",
   "un.how.kickstart": "Yanıtlar yükleyicinin okuduğu küçük bir diske girer, parolanız yalnızca karma olarak, ve sistem yüklendiğinde disk kaldırılır.",
+  "un.how.kali": "Yanıtlar yükleyicinin kendi başlangıç dosyalarına girer, parolanız yalnızca karma olarak, ve sistem yüklendiğinde kaldırılır.",
+  "un.how.lordos": "Yanıtlar yükleyicinin okuduğu küçük bir diske girer, parolanız yalnızca karma olarak, ve sistem yüklendiğinde disk kaldırılır.",
   "un.image": "{file} üzerinden yükler; bu dosya da yapımcısının imzalı listesine göre denetlenir",
   "un.review": "Soru sormadan: {host} üzerinde {user} hesabı",
   "un.reviewOff": "Yükleyicinin sorularını siz yanıtlarsınız",

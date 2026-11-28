@@ -881,6 +881,8 @@
   "un.how.preseed": "Jawapan dimasukkan ke dalam fail permulaan pemasang sendiri, kata laluan anda hanya sebagai cincangan, dan ia dialih keluar setelah sistem dipasang.",
   "un.how.autoinstall": "Jawapan diletakkan pada cakera kecil yang dibaca oleh pemasang, kata laluan anda hanya sebagai cincangan, dan cakera itu dialih keluar setelah sistem dipasang.",
   "un.how.kickstart": "Jawapan diletakkan pada cakera kecil yang dibaca oleh pemasang, kata laluan anda hanya sebagai cincangan, dan cakera itu dialih keluar setelah sistem dipasang.",
+  "un.how.kali": "Jawapan dimasukkan ke dalam fail permulaan pemasang sendiri, kata laluan anda hanya sebagai cincangan, dan ia dialih keluar setelah sistem dipasang.",
+  "un.how.lordos": "Jawapan diletakkan pada cakera kecil yang dibaca oleh pemasang, kata laluan anda hanya sebagai cincangan, dan cakera itu dialih keluar setelah sistem dipasang.",
   "un.image": "Dipasang daripada {file}, turut disemak dengan senarai bertandatangan pembuatnya",
   "un.review": "Tanpa soalan: akaun {user} pada {host}",
   "un.reviewOff": "Anda menjawab soalan pemasang",

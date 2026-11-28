@@ -881,6 +881,8 @@
   "un.how.preseed": "Svaren läggs i installationsprogrammets egna startfiler, ditt lösenord bara som hash, och de tas bort när systemet har installerats.",
   "un.how.autoinstall": "Svaren läggs på en liten disk som installationsprogrammet läser, ditt lösenord bara som hash, och disken tas bort när systemet har installerats.",
   "un.how.kickstart": "Svaren läggs på en liten disk som installationsprogrammet läser, ditt lösenord bara som hash, och disken tas bort när systemet har installerats.",
+  "un.how.kali": "Svaren läggs i installationsprogrammets egna startfiler, ditt lösenord bara som hash, och de tas bort när systemet har installerats.",
+  "un.how.lordos": "Svaren läggs på en liten disk som installationsprogrammet läser, ditt lösenord bara som hash, och disken tas bort när systemet har installerats.",
   "un.image": "Installerar från {file}, även kontrollerad mot tillverkarens signerade lista",
   "un.review": "Utan frågor: kontot {user} på {host}",
   "un.reviewOff": "Du svarar på installationsprogrammets frågor",

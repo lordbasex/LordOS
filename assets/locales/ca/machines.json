@@ -881,6 +881,8 @@
   "un.how.preseed": "Les respostes van als fitxers d’inici del mateix instal·lador, la contrasenya només com a hash, i s’eliminen quan el sistema està instal·lat.",
   "un.how.autoinstall": "Les respostes van en un disc petit que llegeix l’instal·lador, la contrasenya només com a hash, i el disc s’elimina quan el sistema està instal·lat.",
   "un.how.kickstart": "Les respostes van en un disc petit que llegeix l’instal·lador, la contrasenya només com a hash, i el disc s’elimina quan el sistema està instal·lat.",
+  "un.how.kali": "Les respostes van als fitxers d’inici del mateix instal·lador, la contrasenya només com a hash, i s’eliminen quan el sistema està instal·lat.",
+  "un.how.lordos": "Les respostes van en un disc petit que llegeix l’instal·lador, la contrasenya només com a hash, i el disc s’elimina quan el sistema està instal·lat.",
   "un.image": "S’instal·la des de {file}, també comprovat amb la llista signada del seu fabricant",
   "un.review": "Sense preguntes: compte {user} a {host}",
   "un.reviewOff": "Respons tu les preguntes de l’instal·lador",

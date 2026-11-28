@@ -881,6 +881,8 @@
   "un.how.preseed": "Napupunta ang mga sagot sa sariling start file ng installer, ang password mo bilang hash lang, at inaalis ang mga ito kapag na-install na ang system.",
   "un.how.autoinstall": "Napupunta ang mga sagot sa isang maliit na disk na binabasa ng installer, ang password mo bilang hash lang, at inaalis ang disk kapag na-install na ang system.",
   "un.how.kickstart": "Napupunta ang mga sagot sa isang maliit na disk na binabasa ng installer, ang password mo bilang hash lang, at inaalis ang disk kapag na-install na ang system.",
+  "un.how.kali": "Napupunta ang mga sagot sa sariling start file ng installer, ang password mo bilang hash lang, at inaalis ang mga ito kapag na-install na ang system.",
+  "un.how.lordos": "Napupunta ang mga sagot sa isang maliit na disk na binabasa ng installer, ang password mo bilang hash lang, at inaalis ang disk kapag na-install na ang system.",
   "un.image": "Nag-i-install mula sa {file}, sinuri rin laban sa naka-sign na listahan ng gumawa nito",
   "un.review": "Walang tanong: account na {user} sa {host}",
   "un.reviewOff": "Ikaw ang sasagot sa mga tanong ng installer",

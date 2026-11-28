@@ -881,6 +881,8 @@
   "un.how.preseed": "Răspunsurile intră în fișierele de pornire proprii ale programului de instalare, parola dvs. doar ca hash, și sunt eliminate după instalarea sistemului.",
   "un.how.autoinstall": "Răspunsurile sunt puse pe un disc mic citit de programul de instalare, parola dvs. doar ca hash, iar discul este eliminat după instalarea sistemului.",
   "un.how.kickstart": "Răspunsurile sunt puse pe un disc mic citit de programul de instalare, parola dvs. doar ca hash, iar discul este eliminat după instalarea sistemului.",
+  "un.how.kali": "Răspunsurile intră în fișierele de pornire proprii ale programului de instalare, parola dvs. doar ca hash, și sunt eliminate după instalarea sistemului.",
+  "un.how.lordos": "Răspunsurile sunt puse pe un disc mic citit de programul de instalare, parola dvs. doar ca hash, iar discul este eliminat după instalarea sistemului.",
   "un.image": "Se instalează din {file}, verificat și cu lista semnată a producătorului",
   "un.review": "Fără întrebări: contul {user} pe {host}",
   "un.reviewOff": "Răspundeți dvs. la întrebările programului de instalare",

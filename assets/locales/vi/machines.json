@@ -881,6 +881,8 @@
   "un.how.preseed": "Các câu trả lời được đưa vào tệp khởi động riêng của trình cài đặt, mật khẩu của bạn chỉ dưới dạng mã băm, và chúng bị xóa khi hệ thống đã cài xong.",
   "un.how.autoinstall": "Các câu trả lời được đặt trên một đĩa nhỏ mà trình cài đặt đọc, mật khẩu của bạn chỉ dưới dạng mã băm, và đĩa bị gỡ khi hệ thống đã cài xong.",
   "un.how.kickstart": "Các câu trả lời được đặt trên một đĩa nhỏ mà trình cài đặt đọc, mật khẩu của bạn chỉ dưới dạng mã băm, và đĩa bị gỡ khi hệ thống đã cài xong.",
+  "un.how.kali": "Các câu trả lời được đưa vào tệp khởi động riêng của trình cài đặt, mật khẩu của bạn chỉ dưới dạng mã băm, và chúng bị xóa khi hệ thống đã cài xong.",
+  "un.how.lordos": "Các câu trả lời được đặt trên một đĩa nhỏ mà trình cài đặt đọc, mật khẩu của bạn chỉ dưới dạng mã băm, và đĩa bị gỡ khi hệ thống đã cài xong.",
   "un.image": "Cài từ {file}, cũng được đối chiếu với danh sách có chữ ký của nhà phát hành",
   "un.review": "Không cần hỏi: tài khoản {user} trên {host}",
   "un.reviewOff": "Bạn trả lời các câu hỏi của trình cài đặt",

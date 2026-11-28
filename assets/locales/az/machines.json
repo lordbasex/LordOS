@@ -881,6 +881,8 @@
   "un.how.preseed": "Cavablar quraşdırıcının öz başlanğıc fayllarına yazılır, parolunuz yalnız heş kimi, və sistem quraşdırılandan sonra silinir.",
   "un.how.autoinstall": "Cavablar quraşdırıcının oxuduğu kiçik diskə yazılır, parolunuz yalnız heş kimi, və sistem quraşdırılandan sonra disk silinir.",
   "un.how.kickstart": "Cavablar quraşdırıcının oxuduğu kiçik diskə yazılır, parolunuz yalnız heş kimi, və sistem quraşdırılandan sonra disk silinir.",
+  "un.how.kali": "Cavablar quraşdırıcının öz başlanğıc fayllarına yazılır, parolunuz yalnız heş kimi, və sistem quraşdırılandan sonra silinir.",
+  "un.how.lordos": "Cavablar quraşdırıcının oxuduğu kiçik diskə yazılır, parolunuz yalnız heş kimi, və sistem quraşdırılandan sonra disk silinir.",
   "un.image": "{file} faylından quraşdırır, o da istehsalçının imzalanmış siyahısı ilə yoxlanılır",
   "un.review": "Suallarsız: {host} üzərində {user} hesabı",
   "un.reviewOff": "Quraşdırıcının suallarına siz cavab verirsiniz",

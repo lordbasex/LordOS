@@ -881,6 +881,8 @@
   "un.how.preseed": "As respostas vão nos arquivos de início do próprio instalador, sua senha só como hash, e são apagadas quando o sistema estiver instalado.",
   "un.how.autoinstall": "As respostas vão num pequeno disco que o instalador lê, sua senha só como hash, e o disco é removido quando o sistema estiver instalado.",
   "un.how.kickstart": "As respostas vão num pequeno disco que o instalador lê, sua senha só como hash, e o disco é removido quando o sistema estiver instalado.",
+  "un.how.kali": "As respostas vão nos arquivos de início do próprio instalador, sua senha só como hash, e são apagadas quando o sistema estiver instalado.",
+  "un.how.lordos": "As respostas vão num pequeno disco que o instalador lê, sua senha só como hash, e o disco é removido quando o sistema estiver instalado.",
   "un.image": "Instala a partir de {file}, também verificada com a lista assinada de quem a faz",
   "un.review": "Sem perguntas: conta {user} em {host}",
   "un.reviewOff": "Você responde às perguntas do instalador",

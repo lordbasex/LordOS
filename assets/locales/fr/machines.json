@@ -881,6 +881,8 @@
   "un.how.preseed": "Les réponses vont dans les fichiers de démarrage de l’installateur, votre mot de passe seulement sous forme d’empreinte, et elles sont supprimées une fois le système installé.",
   "un.how.autoinstall": "Les réponses vont sur un petit disque que lit l’installateur, votre mot de passe seulement sous forme d’empreinte, et le disque est retiré une fois le système installé.",
   "un.how.kickstart": "Les réponses vont sur un petit disque que lit l’installateur, votre mot de passe seulement sous forme d’empreinte, et le disque est retiré une fois le système installé.",
+  "un.how.kali": "Les réponses vont dans les fichiers de démarrage de l’installateur, votre mot de passe seulement sous forme d’empreinte, et elles sont supprimées une fois le système installé.",
+  "un.how.lordos": "Les réponses vont sur un petit disque que lit l’installateur, votre mot de passe seulement sous forme d’empreinte, et le disque est retiré une fois le système installé.",
   "un.image": "S’installe depuis {file}, vérifiée aussi avec la liste signée de son éditeur",
   "un.review": "Sans questions : compte {user} sur {host}",
   "un.reviewOff": "Vous répondez aux questions de l’installateur",

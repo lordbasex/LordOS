@@ -881,6 +881,8 @@
   "un.how.preseed": "Vastaukset menevät asennusohjelman omiin käynnistystiedostoihin, salasanasi vain tiivisteenä, ja ne poistetaan, kun järjestelmä on asennettu.",
   "un.how.autoinstall": "Vastaukset menevät pienelle levylle, jonka asennusohjelma lukee, salasanasi vain tiivisteenä, ja levy poistetaan, kun järjestelmä on asennettu.",
   "un.how.kickstart": "Vastaukset menevät pienelle levylle, jonka asennusohjelma lukee, salasanasi vain tiivisteenä, ja levy poistetaan, kun järjestelmä on asennettu.",
+  "un.how.kali": "Vastaukset menevät asennusohjelman omiin käynnistystiedostoihin, salasanasi vain tiivisteenä, ja ne poistetaan, kun järjestelmä on asennettu.",
+  "un.how.lordos": "Vastaukset menevät pienelle levylle, jonka asennusohjelma lukee, salasanasi vain tiivisteenä, ja levy poistetaan, kun järjestelmä on asennettu.",
   "un.image": "Asentaa tiedostosta {file}, joka on myös tarkistettu tekijänsä allekirjoitetusta luettelosta",
   "un.review": "Ilman kysymyksiä: tili {user} koneessa {host}",
   "un.reviewOff": "Vastaat asennusohjelman kysymyksiin itse",

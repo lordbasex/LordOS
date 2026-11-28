@@ -881,6 +881,8 @@
   "un.how.preseed": "Las respuestas van dentro de los archivos de arranque del instalador, tu contraseña solo como hash, y se borran una vez instalado el sistema.",
   "un.how.autoinstall": "Las respuestas van en un disco chico que lee el instalador, tu contraseña solo como hash, y el disco se quita una vez instalado el sistema.",
   "un.how.kickstart": "Las respuestas van en un disco chico que lee el instalador, tu contraseña solo como hash, y el disco se quita una vez instalado el sistema.",
+  "un.how.kali": "Las respuestas van dentro de los archivos de arranque del instalador, tu contraseña solo como hash, y se borran una vez instalado el sistema.",
+  "un.how.lordos": "Las respuestas van en un disco chico que lee el instalador, tu contraseña solo como hash, y el disco se quita una vez instalado el sistema.",
   "un.image": "Se instala desde {file}, también comprobada con la lista firmada de quien la hace",
   "un.review": "Sin preguntas: cuenta {user} en {host}",
   "un.reviewOff": "Vos respondés las preguntas del instalador",
